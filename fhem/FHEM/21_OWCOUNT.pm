@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.21";
+my $owx_version="5.22";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -817,8 +817,10 @@ sub OWCOUNT_GetPage ($$$@) {
       if ($sync) {
         #TODO use OWX_ASYNC_Schedule instead
         my $task = PT_THREAD(\&OWXCOUNT_PT_GetPage);
-        while ($task->PT_SCHEDULE($hash,$page,$final)) { OWX_ASYNC_Poll($hash->{IODev}); };
-        $ret = $task->PT_RETVAL();
+        eval {
+          while ($task->PT_SCHEDULE($hash,$page,$final)) { OWX_ASYNC_Poll($hash->{IODev}); };
+        };
+        $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
       } else {
         eval {
           OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXCOUNT_PT_GetPage),$hash,$page,$final );
@@ -1123,8 +1125,10 @@ sub OWCOUNT_InitializeDevice($) {
   }elsif( $interface eq "OWX_ASYNC" ){
     #TODO use OWX_ASYNC_Schedule instead
     my $task = PT_THREAD(\&OWXCOUNT_PT_InitializeDevicePage);
-    while ($task->PT_SCHEDULE($hash,14,$newdata)) { OWX_ASYNC_Poll($hash->{IODev}); };
-    $ret = $task->PT_RETVAL();
+    eval {
+      while ($task->PT_SCHEDULE($hash,14,$newdata)) { OWX_ASYNC_Poll($hash->{IODev}); };
+    };
+    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret  = OWFSCOUNT_GetPage($hash,14,0);
@@ -1148,8 +1152,10 @@ sub OWCOUNT_InitializeDevice($) {
   }elsif( $interface eq "OWX_ASYNC" ){
     #TODO use OWX_ASYNC_Schedule instead
     my $task = PT_THREAD(\&OWXCOUNT_PT_InitializeDevicePage);
-    while ($task->PT_SCHEDULE($hash,0,$newdata)) { OWX_ASYNC_Poll($hash->{IODev}); };
-    $ret = $task->PT_RETVAL();
+    eval {
+      while ($task->PT_SCHEDULE($hash,0,$newdata)) { OWX_ASYNC_Poll($hash->{IODev}); };
+    };
+    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret  = OWFSCOUNT_GetPage($hash,0,0);

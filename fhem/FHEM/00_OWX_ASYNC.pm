@@ -128,7 +128,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.2;
+$owx_async_version=5.3;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -1133,11 +1133,16 @@ sub OWX_ASYNC_RunTasks($) {
     while ( ( $owx_dev, $queue ) = each %{$master->{tasks}} ) {
       if (@$queue) {
         my $task = $queue->[0];
-        unless ($task->PT_SCHEDULE(@{$task->{ExecuteArgs}})) {
+        my $ret;
+        eval {
+          $ret = $task->PT_SCHEDULE(@{$task->{ExecuteArgs}});
+        };
+        if (!$ret or $@) {
           shift @$queue;
           delete $master->{tasks}->{$owx_dev} unless @$queue;
-          if ($task->PT_RETVAL()) {
-            Log3 ($master->{NAME},2,"OWX_ASYNC: Error running task for $owx_dev: ".$task->PT_RETVAL());
+          my $msg = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+          if (defined $msg) {
+            Log3 ($master->{NAME},2,"OWX_ASYNC: Error running task for $owx_dev: $msg");
           }
         }
         OWX_ASYNC_Poll( $master );
