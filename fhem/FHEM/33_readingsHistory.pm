@@ -289,7 +289,7 @@ readingsHistory_2html($)
   for (my $i = 0; $i < $rows; $i++) {
     my $line = $hash->{fhem}{history}[$i];
     if( ref($line) eq 'ARRAY' ) {
-      $lines .= $line->[2] if( $line );
+      $lines .= $line->[3] if( $line );
     } else {
       $lines .= $line if( $line );
     }
