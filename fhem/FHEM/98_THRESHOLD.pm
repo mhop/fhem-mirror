@@ -54,8 +54,8 @@ THRESHOLD_Define($$$)
   my $target_sensor;
   my $target_reading;
   my $offset=0;
-  my $pn = $a[0]; 
-  
+  my $pn = $a[0];
+    
   if (@b > 6 || @a < 3 || @a > 6) {
     my $msg = "wrong syntax: define <name> THRESHOLD " .
                "<sensor>:<reading1>:<hysteresis>:<target_value>:<offset> AND|OR <sensor2>:<reading2>:<state> ".
@@ -243,7 +243,7 @@ THRESHOLD_Define($$$)
     {
       my $mode="external";
       readingsBulkUpdate   ($hash, "cmd", "wait for next cmd");
-      readingsBulkUpdate   ($hash, "mode", "external");
+      readingsBulkUpdate   ($hash, "mode",$mode);
     }
     readingsEndUpdate    ($hash, 1);
 #    my $msg = THRESHOLD_Check($hash);
@@ -293,6 +293,21 @@ THRESHOLD_Set($@)
     readingsEndUpdate    ($hash, 1);
     return THRESHOLD_Check($hash);
   } elsif ($arg eq "deactivated" ) {
+      if ($value ne "") {
+        if ($value eq "cmd1_gt" ) {
+            readingsBeginUpdate  ($hash);
+            THRESHOLD_setValue   ($hash,1);
+            THRESHOLD_set_state  ($hash);
+            readingsEndUpdate    ($hash, 1);
+        } elsif ($value eq "cmd2_lt" ) {
+            readingsBeginUpdate  ($hash);
+            THRESHOLD_setValue   ($hash,2);
+            THRESHOLD_set_state  ($hash);
+            readingsEndUpdate    ($hash, 1);
+          } else {
+            return "$pn: set deactivated: $value, unknown command";
+          }
+      }
       $ret=CommandAttr(undef, "$pn disable 1");   
   } elsif ($arg eq "active" ) {
       return "$pn: set active, set desired value first" if ($desired_value eq "");
@@ -844,8 +859,9 @@ THRESHOLD_setValue($$)
       Set the desired value. If no desired value is set, the module is not active.
       </li>
       <br>
-      <li> <code>set &lt;name&gt; deactivated &lt;value&gt;<br></code>
-      Module is disabled.
+      <li><code>set &lt;name&gt; deactivated &lt;command&gt;<br></code>
+      Module is disabled.<br>
+      &lt;command&gt; is optional. It can be "cmd1_gt" or "cmd2_lt" passed in order to achieve a defined state before disabling the module.
       </li>
       <br>
       <li> <code>set &lt;name&gt; active &lt;value&gt;<br></code>
@@ -1219,8 +1235,9 @@ THRESHOLD_setValue($$)
       Sollwert-Vorgabe durch einen Sensor wird hiermit übersteuert, solange bis "set external" gesetzt wird.
       </li>
       <br>
-      <li><code>set &lt;name&gt; deactivated &lt;value&gt;<br></code>
-      Modul wird deaktiviert.
+      <li><code>set &lt;name&gt; deactivated &lt;command&gt;<br></code>
+      Modul wird deaktiviert.<br>
+      &lt;command&gt; ist optional. Es kann "cmd1_gt" oder "cmd2_lt" übergeben werden, um vor dem Deaktivieren des Moduls einen definierten Zustand zu erreichen.
       </li>
       <br>
       <li><code>set &lt;name&gt; active<br></code>
