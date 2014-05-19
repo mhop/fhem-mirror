@@ -961,7 +961,7 @@ readingsGroup_Attr($$$)
       <br>
         <code>define heizung readingsGroup t1:temperature t2:temperature t3:temperature<br>
         attr heizung notime 1<br>
-        attr heizung mapping {'t1.temperature' => 'Vorlauf', 't2.temperature' => 'R&amp;uuml;cklauf', 't3.temperature' => 'Zirkulation'}</br>
+        attr heizung mapping {'t1.temperature' => 'Vorlauf', 't2.temperature' => 'R&amp;uuml;cklauf', 't3.temperature' => 'Zirkulation'}<br>
         attr heizung style style="font-size:20px"<br>
       <br>
         define systemStatus readingsGroup sysstat<br>
@@ -1048,8 +1048,8 @@ readingsGroup_Attr($$$)
         Specify an sprintf style format string used to display the reading values. If the format string is undef
         this reading will be skipped. Can be given as a string, a perl expression returning a hash or a perl
         expression returning a string, e.g.:<br>
-          <code>attr temperatures valueFormat %.1f &deg;C</code></br>
-          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code></br>
+          <code>attr temperatures valueFormat %.1f &deg;C</code><br>
+          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code><br>
           <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li>
       <li>nameIcon<br>
         Specify the icon to be used instead of the reading name. Can be a simple string or a perl expression enclosed
@@ -1058,8 +1058,8 @@ readingsGroup_Attr($$$)
       <li>valueIcon<br>
         Specify an icon to be used instead of the reading value. Can be a simple string or a perl expression enclosed
         in {} that returns a hash that maps reading value to the icon name. e.g.:<br>
-          <code>attr devices valueIcon $VALUE</code></br>
-          <code>attr devices valueIcon {state => '%VALUE'}</code></br>
+          <code>attr devices valueIcon $VALUE</code><br>
+          <code>attr devices valueIcon {state => '%VALUE'}</code><br>
           <code>attr devices valueIcon {state => '%devStateIcon'}</code>
           <code>attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }</code></li>
       <li>commands<br>

@@ -474,7 +474,7 @@ mailcheck_Read($)
   <a name="mailcheck_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>Subject</br>
+    <li>Subject<br>
       the subject of the last mail received</li>
   </ul><br>
 

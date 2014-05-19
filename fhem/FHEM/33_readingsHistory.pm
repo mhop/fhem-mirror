@@ -666,9 +666,9 @@ readingsHistory_Attr($$$)
     <b>Set</b>
     <ul>
       <li>add ...<br>
-        directly add text as new line to history.</br>
+        directly add text as new line to history.<br>
       <li>clear<br>
-        clear the history.</br>
+        clear the history.<br>
     </ul><br>
 
   <a name="readingsHistory_Get"></a>
@@ -707,8 +707,8 @@ readingsHistory_Attr($$$)
         Specify an sprintf style format string used to display the reading values. If the format string is undef
         this reading will be skipped. Can be given as a string, a perl expression returning a hash or a perl
         expression returning a string, e.g.:<br>
-          <code>attr history valueFormat %.1f &deg;C</code></br>
-          <code>attr history valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code></br>
+          <code>attr history valueFormat %.1f &deg;C</code><br>
+          <code>attr history valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code><br>
           <code>attr history valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li>
       <li>rows<br>
         Number of history rows to show.</li>
