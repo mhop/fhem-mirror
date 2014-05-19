@@ -572,6 +572,9 @@ FW_answerCall($)
     if($cmd =~ m/^define +([^ ]+) /) { # "redirect" after define to details
       $FW_detail = $1;
     }
+    elsif($cmd =~ m/^copy +([^ ]+) +([^ ]+)/) { # "redirect" after define to details
+      $FW_detail = $2;
+    }
   }
 
   # Redirect after a command, to clean the browser URL window
