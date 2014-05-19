@@ -80,6 +80,8 @@
 #
 # 2014-05-12 - added     sorted write & read for config data
 #
+# 2014-05-15 - fixed     handling of multiline defs
+#
 ##############################################################################
 #
 
@@ -908,21 +910,6 @@ sub _cfgDB_Move() {
 # will be removed 2014-06-15
 #
 #######################################
-
-# deprecated - replaced by cfgDB_FileRead()
-sub _cfgDB_Readfile($) {
-	my ($filename) = @_;
-	my @outfile = cfgDB_FileRead($filename);
-	return (int(@outfile)) ? join("\n",@outfile) : undef;
-}
-
-# deprecated - replaced by cfgDB_FileWrite()
-sub _cfgDB_Writefile($$) {
-	my ($filename,$content) = @_;
-	my @c = split(/\n/,$content);
-	cfgDB_FileWrite($filename,@c);
-	return;
-}
 
 # deprecated - replaced by cfgDB_FileUpdate()
 sub _cfgDB_Updatefile($) {
