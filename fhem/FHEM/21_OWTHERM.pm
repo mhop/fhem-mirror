@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.18";
+my $owx_version="5.19";
 
 my %gets = (
   "id"          => "",
@@ -465,8 +465,10 @@ sub OWTHERM_Get($@) {
   }elsif( $interface eq "OWX_ASYNC" ){
     #TODO use OWX_ASYNC_Schedule instead
     my $task = PT_THREAD(\&OWXTHERM_PT_GetValues);
-    while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
-    $ret = $task->PT_RETVAL();
+    eval {
+      while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+    };
+    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
@@ -633,8 +635,10 @@ sub OWTHERM_InitializeDevice($) {
   }elsif( $interface eq "OWX_ASYNC" ){
     #TODO use OWX_ASYNC_Schedule instead
     my $task = PT_THREAD(\&OWXTHERM_PT_SetValues);
-    while ($task->PT_SCHEDULE($hash,$args)) { OWX_ASYNC_Poll($hash->{IODev}); };
-    $ret = $task->PT_RETVAL();
+    eval {
+      while ($task->PT_SCHEDULE($hash,$args)) { OWX_ASYNC_Poll($hash->{IODev}); };
+    };
+    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_SetValues($hash,$args);

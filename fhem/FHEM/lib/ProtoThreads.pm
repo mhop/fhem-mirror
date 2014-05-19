@@ -1,4 +1,4 @@
-# Perl Protothreads
+# Perl Protothreads Version 1.01
 # 
 # a lightwight pseudo-threading framework for perl that is
 # heavily inspired by Adam Dunkels protothreads for the c-language
@@ -128,7 +128,7 @@ FILTER_ONLY
     ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_BEGIN");
     if ($success) {
       $thread = $arg;
-      $code=$before."{ my \$PT_YIELD_FLAG = 1; goto ".$thread."->{PT_THREAD_STATE} if ".$thread."->{PT_THREAD_STATE};".$after;
+      $code=$before."my \$PT_THREAD_STATE = eval { my \$PT_YIELD_FLAG = 1; goto ".$thread."->{PT_THREAD_STATE} if ".$thread."->{PT_THREAD_STATE};".$after;
       while (1) {
         ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_YIELD_UNTIL");
         if ($success) {
@@ -177,7 +177,7 @@ FILTER_ONLY
           next;
         }
         if ($code =~ /PT_END\s*;/s) {
-          $code = $`."} ".$thread."->{PT_THREAD_STATE} = 0; delete ".$thread."->{PT_THREAD_RETURN}; return PT_ENDED;".$';
+          $code = $`.$thread."->{PT_THREAD_STATE} = 0; delete ".$thread."->{PT_THREAD_RETURN}; return PT_ENDED; }; die \$\@ if \$\@; return \$PT_THREAD_STATE;".$';
         }
         last;
       }

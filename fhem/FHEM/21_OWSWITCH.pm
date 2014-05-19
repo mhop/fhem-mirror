@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.15";
+my $owx_version="5.16";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -508,8 +508,10 @@ sub OWSWITCH_Get($@) {
     }elsif( $interface eq "OWX_ASYNC") {
       #TODO use OWX_ASYNC_Schedule instead
       my $task = PT_THREAD(\&OWXSWITCH_PT_GetState);
-      while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
-      $ret = $task->PT_RETVAL();
+      eval {
+        while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
     #-- OWFS interface
     }elsif( $interface eq "OWFS" ){
       $ret = OWFSSWITCH_GetState($hash);
@@ -530,8 +532,10 @@ sub OWSWITCH_Get($@) {
     }elsif( $interface eq "OWX_ASYNC" ){
       #TODO use OWX_ASYNC_Schedule instead
       my $task = PT_THREAD(\&OWXSWITCH_PT_GetState);
-      while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
-      $ret = $task->PT_RETVAL();
+      eval {
+        while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSSWITCH_GetState($hash);
     }else{

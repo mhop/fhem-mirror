@@ -486,8 +486,10 @@ sub OWMULTI_Get($@) {
   }elsif( $interface eq "OWX_ASYNC"){
     #TODO use OWX_ASYNC_Schedule instead
     my $task = PT_THREAD(\&OWXMULTI_PT_GetValues);
-    while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
-    $ret = $task->PT_RETVAL();
+    eval {
+      while ($task->PT_SCHEDULE($hash)) { OWX_ASYNC_Poll($hash->{IODev}); };
+    };
+    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
   #-- OWFS interface not yet implemented
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);

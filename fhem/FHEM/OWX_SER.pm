@@ -58,7 +58,7 @@ sub new() {
 	$self->{LastFamilyDiscrepancy} = 0;
 	$self->{LastDeviceFlag} = 0;
 	#-- module version
-	$self->{version} = 4.0;
+	$self->{version} = 4.1;
 	$self->{alarmdevs} = [];
 	$self->{devs} = [];
 	$self->{pt_alarms} = PT_THREAD(\&pt_alarms);
@@ -128,7 +128,7 @@ sub pt_alarms () {
     PT_WAIT_UNTIL($self->response_ready());
     PT_EXIT unless $self->next_response("alarm");
   } while( $self->{LastDeviceFlag}==0 );
-  main::Log3($self->{name},1, " Alarms = ".join(' ',@{$self->{alarmdevs}}));
+  main::Log3($self->{name},5, " Alarms = ".join(' ',@{$self->{alarmdevs}}));
   PT_EXIT($self->{alarmdevs});
   PT_END;
 }
@@ -196,7 +196,7 @@ sub pt_execute($$$$$$$) {
     
     #-- for debugging
     if( $main::owx_async_debug > 1){
-      main::Log3($self->{name},3,"OWX_SER::Execute: Sending out ".unpack ("H*",$select));
+      main::Log3($self->{name},5,"OWX_SER::Execute: Sending out ".unpack ("H*",$select));
     }
     $self->block($select);
   }
@@ -208,7 +208,7 @@ sub pt_execute($$$$$$$) {
   my $res = $self->{string_in};
   #-- for debugging
   if( $main::owx_async_debug > 1){
-    main::Log3($self->{name},3,"OWX_SER::Execute: Receiving ".unpack ("H*",$res));
+    main::Log3($self->{name},5,"OWX_SER::Execute: Receiving ".unpack ("H*",$res));
   }
 
   PT_EXIT($res);
@@ -260,7 +260,7 @@ sub initialize($) {
   if(!defined($hwdevice)){
     die $msg." not defined: $!";
   } else {
-    main::Log3($hash->{NAME},1,$msg." defined");
+    main::Log3($hash->{NAME},2,$msg." defined");
   }
 
   $hwdevice->reset_error();
@@ -338,7 +338,7 @@ sub initialize($) {
       $k=ord(substr($res,$i,1))%16;
       $ress.=sprintf "0x%1x%1x ",$j,$k;
     }
-    main::Log3($hash->{NAME},1, $ress);
+    main::Log3($hash->{NAME},4, $ress);
     $ress = $ress0;
     #-- sleeping for some time
     select(undef,undef,undef,0.5);
@@ -353,7 +353,7 @@ sub initialize($) {
     }
   }
   $self->{interface} = $interface;
-  main::Log3($hash->{NAME},1, $ress);
+  main::Log3($hash->{NAME},3, $ress);
   if ($interface eq "DS2480") {
     return $ds2480;
   } elsif ($interface eq "DS9097") {

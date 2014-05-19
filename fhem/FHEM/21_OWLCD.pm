@@ -76,7 +76,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="3.36";
+my $owx_version="3.37";
 #-- controller may be HD44780 or KS0073 
 #   these values have to be changed for different display 
 #   geometries or memory maps
@@ -320,8 +320,10 @@ sub OWLCD_Get($@) {
   if($a[1] eq "gpio") {
     if ($hash->{ASYNC}) {
       my $task = PT_THREAD(\&OWXLCD_PT_Get);
-      while ($task->PT_SCHEDULE($hash,"gpio")) { OWX_ASYNC_Poll($hash->{IODev}); };
-      $ret = $task->PT_RETVAL();
+      eval {
+        while ($task->PT_SCHEDULE($hash,"gpio")) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
       return $ret if $ret;
       return "$name.gpio => ".main::ReadingsVal($hash->{NAME},"gpio","");
     } else {
@@ -334,8 +336,10 @@ sub OWLCD_Get($@) {
   if($a[1] eq "counter") {
     if ($hash->{ASYNC}) {
       my $task = PT_THREAD(\&OWXLCD_PT_Get);
-      while ($task->PT_SCHEDULE($hash,"counter")) { OWX_ASYNC_Poll($hash->{IODev}); };
-      $ret = $task->PT_RETVAL();
+      eval {
+        while ($task->PT_SCHEDULE($hash,"counter")) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
       return $ret if $ret;
       return "$name.counter => ".main::ReadingsVal($hash->{NAME},"counter","");
     } else {
@@ -348,8 +352,10 @@ sub OWLCD_Get($@) {
   if($a[1] eq "version") {
     if ($hash->{ASYNC}) {
       my $task = PT_THREAD(\&OWXLCD_PT_Get);
-      while ($task->PT_SCHEDULE($hash,"version")) { OWX_ASYNC_Poll($hash->{IODev}); };
-      $ret = $task->PT_RETVAL();
+      eval {
+        while ($task->PT_SCHEDULE($hash,"version")) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
       return $ret if $ret;
       return "$name.gpio => ".main::ReadingsVal($hash->{NAME},"version","");
     } else {
@@ -364,8 +370,10 @@ sub OWLCD_Get($@) {
     Log3 $name,1,"Calling GetMemory with page $page";
     if ($hash->{ASYNC}) {
       my $task = PT_THREAD(\&OWXLCD_PT_GetMemory);
-      while ($task->PT_SCHEDULE($hash,$page)) { OWX_ASYNC_Poll($hash->{IODev}); };
-      $ret = $task->PT_RETVAL();
+      eval {
+        while ($task->PT_SCHEDULE($hash,$page)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      };
+      $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
       return $ret if $ret;
       return "$name $reading $page => ".main::ReadingsVal($hash->{NAME},"memory$page","");
     } else {
