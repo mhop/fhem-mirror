@@ -969,6 +969,8 @@ FW_doDetail($)
   $attrList =~ s/room /room:$roomList /;
   $attrList =~ s/group /group:$groupList /;
   $attrList = FW_widgetOverride($d, $attrList);
+  $attrList =~ s/\\/\\\\/g;
+  $attrList =~ s/'/\\'/g;
   FW_makeSelect($d, "attr", $attrList,"attr");
 
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
