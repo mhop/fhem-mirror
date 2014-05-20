@@ -845,7 +845,7 @@ readingsGroup_Set($@)
 {
   my ($hash, $name, $cmd, $param, @a) = @_;
 
-  my $list = "refresh:noArgs";
+  my $list = "refresh:noArg";
 
   if( $cmd eq "refresh" ) {
     readingsGroup_updateDevices($hash);

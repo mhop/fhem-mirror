@@ -569,7 +569,7 @@ readingsHistory_Set($@)
 {
   my ($hash, $name, $cmd, $param, @a) = @_;
 
-  my $list = "clear:noArgs add";
+  my $list = "clear:noArg add";
 
   if( $cmd eq "clear" ) {
     $hash->{fhem}{history} = [];
@@ -609,7 +609,7 @@ readingsHistory_Get($@)
 {
   my ($hash, @a) = @_;
 
-  my $list = "history:noArgs html:noArgs";
+  my $list = "history:noArg html:noArg";
 
   my $name = $a[0];
   return "$name: get needs at least one parameter" if(@a < 2);
