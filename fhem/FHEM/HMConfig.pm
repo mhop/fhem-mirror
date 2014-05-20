@@ -654,7 +654,7 @@ my $K_actDetID = '000000'; # id of actionDetector
                                                                                                                                         "0.0K"=>7, "0.5K"=>8, "1.0K"=>9, "1.5K"=>10, "2.0K"=>11, "2.5K"=>12, "3.0K"=>13, "3.5K"=>14}},
   btnNoBckLight   =>{a=>  9.4,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"button response without backlight",lit=>{off=>0,on=>1}},
   showSetTemp     =>{a=>  9.5,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show set or actual temperature"   ,lit=>{actTemp=>0,setTemp=>1}},
-  showHumitidy    =>{a=>  9.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show temp only or also humidity"  ,lit=>{temp=>0,tempHum=>1}},
+  showHumidity    =>{a=>  9.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show temp only or also humidity"  ,lit=>{temp=>0,tempHum=>1}},
   sendWeatherData =>{a=>  9.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"send  weather data"               ,lit=>{off=>0,on=>1}},
 
   boostPos        =>{a=> 10.0,s=>0.5,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>'0.2'   ,u=>'%'   ,d=>1,t=>"valve boost position"},
@@ -1003,7 +1003,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
   "HM-CC-RT-DN06"     =>{ CtrlRc          =>1,TempRC          =>1},
   "HM-TC-IT-WM-W-EU02"=>{ dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1,tempOffset      =>1
                          ,hyst2point      =>1,heatCool        =>1,boostPeriod     =>1,winOpnBoost     =>1
-                         ,showWeekday     =>1,showInfo        =>1,showSetTemp     =>1,showHumitidy    =>1
+                         ,showWeekday     =>1,showInfo        =>1,showSetTemp     =>1,showHumidity    =>1
                          ,noMinMax4Manu   =>1,daylightSaveTime=>1,sendWeatherData =>1
                          ,modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1
                          },
@@ -1245,7 +1245,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
   none4Type  =>{ "test"=>"" },
 );
 %culHmModelGets = (
-  none4Mod   =>{ "none"=>"" },
+  "CCU-FHEM" =>{ "listDevice"=>"" },
 );
 
 ##############################---set---########################################
@@ -1735,7 +1735,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
       }
     }
   }
-  foreach my $type (keys %culHmRegType){ #update references to register
+  foreach my $type (keys %culHmRegType) { #update references to register
     foreach my $reg (keys %{$culHmRegType{$type}}){
       if ($culHmRegDefShLg{$reg}){
         delete $culHmRegType{$type}{$reg};
@@ -1744,7 +1744,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
       }
     }
   }
-  foreach my $type(keys %culHmRegModel){ #update references to register
+  foreach my $type (keys %culHmRegModel){ #update references to register
     foreach my $reg (keys %{$culHmRegModel{$type}}){
       if ($culHmRegDefShLg{$reg}){
         delete $culHmRegModel{$type}{$reg};
@@ -1753,7 +1753,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
       }
     }
   }
-  foreach my $type (keys %culHmRegChan){ #update references to register
+  foreach my $type (keys %culHmRegChan) { #update references to register
     foreach my $reg (keys %{$culHmRegChan{$type}}){
       if ($culHmRegDefShLg{$reg}){
         delete $culHmRegChan{$type}{$reg};

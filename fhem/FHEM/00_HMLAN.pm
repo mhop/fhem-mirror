@@ -556,7 +556,7 @@ sub HMLAN_Parse($$) {##########################################################
     my $HMcnd =$stat >>8; #high = HMLAN cond
     $stat &= 0xff;        # low byte related to message format
 
-    if ($HMcnd == 0x01){#HMLAN responded to AES request
+    if ($HMcnd == 0x01 && $mFld[3] ne "FF"){#HMLAN responded to AES request
       $CULinfo = "AESKey-".$mFld[3];
     }
 

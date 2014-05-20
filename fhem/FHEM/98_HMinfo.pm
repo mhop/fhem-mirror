@@ -461,6 +461,8 @@ sub HMinfo_paramCheck(@) { ####################################################
   my @noIoDev;
   my @noID;
   my @idMismatch;
+  my @ccuUndef;
+  my @perfIoUndef;
   my @aesInval;
   foreach my $eName (@entities){
     if ($defs{$eName}{helper}{role}{dev}){
@@ -468,9 +470,24 @@ sub HMinfo_paramCheck(@) { ####################################################
       my $pairId =  CUL_HM_Get($ehash,$eName,"param","R-pairCentral");
       my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
       my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
-      if    (!$IoDev)               { push @noIoDev,$eName;}
-      elsif ($pairId eq "undefined"){ push @noID,$eName;}
-      elsif ($pairId !~ m /$ioHmId/){ push @idMismatch,"$eName paired:$pairId IO attr: $ioHmId";}
+      my ($ioCCU,$prefIO) = split":",AttrVal($eName,"IOgrp","");
+      if ($ioCCU){
+        if(   !$defs{$ioCCU}
+           || AttrVal($ioCCU,"model","") ne "CCU-FHEM"
+           || !$defs{$ioCCU}{helper}{role}{dev}){
+          push @ccuUndef,"$eName ->$ioCCU";
+        }
+        else{
+          $ioHmId = $defs{$ioCCU}{DEF};
+          if ($prefIO && !$defs{$prefIO}){
+            push @perfIoUndef,"$eName ->$prefIO";
+          }            
+        }
+      }
+      if (!$IoDev)                  { push @noIoDev,$eName;}
+      if ($pairId eq "undefined")   { push @noID,$eName;}
+      elsif ($pairId !~ m /$ioHmId/
+             && $IoDev )            { push @idMismatch,"$eName paired:$pairId IO attr: $ioHmId";}
 
       elsif (AttrVal($eName,"aesCommReq",0) && $IoDev->{TYPE} ne "HMLAN")
                                     { push @aesInval,"$eName ";}
@@ -478,11 +495,12 @@ sub HMinfo_paramCheck(@) { ####################################################
   }
 
   my $ret = "";
-  $ret .="\n\n no IO device assigned"     ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
-  $ret .="\n\n PairedTo missing/unknown"  ."\n    ".(join "\n    ",sort @noID)       if (@noID);
-  $ret .="\n\n PairedTo mismatch to IODev"."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
-  $ret .="\n\n aesCommReq set, IO not compatibel"
-                                          ."\n    ".(join "\n    ",sort @aesInval)   if (@aesInval);
+  $ret .="\n\n no IO device assigned"             ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
+  $ret .="\n\n PairedTo missing/unknown"          ."\n    ".(join "\n    ",sort @noID)       if (@noID);
+  $ret .="\n\n PairedTo mismatch to IODev"        ."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
+  $ret .="\n\n aesCommReq set, IO not compatibel" ."\n    ".(join "\n    ",sort @aesInval)   if (@aesInval);
+  $ret .="\n\n IOgrp: CCU not found"              ."\n    ".(join "\n    ",sort @ccuUndef)   if (@ccuUndef);
+  $ret .="\n\n IOgrp: prefered IO undefined"      ."\n    ".(join "\n    ",sort @perfIoUndef)if (@perfIoUndef);
  return  $ret;
 }
 
@@ -688,14 +706,13 @@ sub HMinfo_getEntities(@) { ###################################################
     my $eHash = $modules{CUL_HM}{defptr}{$id};
     my $eName = $eHash->{NAME};
     my $isChn = (length($id) != 6 || CUL_HM_Get($eHash,$eName,"param","channel_01") eq "undefined")?1:0;
-    my $eMd   = CUL_HM_Get($eHash,$eName,"param","model");
     my $eIg   = CUL_HM_Get($eHash,$eName,"param","ignore");
     $eIg = "" if ($eIg eq "undefined");
     next if (!(($doDev && length($id) == 6) ||
                ($doChn && $isChn)));
     next if (!$doIgn && $eIg);
-    next if ( $noVrt && $eMd =~ m/^virtual/);
-    next if ( $noPhy && $eMd !~ m/^virtual/);
+    next if ( $noVrt && $eHash->{helper}{role}{vrt});
+    next if ( $noPhy && !$eHash->{helper}{role}{vrt});
     my $eSt = CUL_HM_Get($eHash,$eName,"param","subType");
 
     next if ( $noSen && $eSt =~ m/^(THSensor|remote|pushButton|threeStateSensor|sensor|motionDetector|swi)$/);
@@ -898,7 +915,7 @@ sub HMinfo_GetFn($@) {#########################################################
       my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl","tempList.cfg:$e"));
       push @tlr,$tr if($tr);
     }
-    $ret .= "\templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
+    $ret .= "\n\n templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
     my $repl;
