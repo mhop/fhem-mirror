@@ -82,9 +82,14 @@
 #
 # 2014-05-15 - fixed     handling of multiline defs
 #
+# 2014-05-20 - removed   no longer needed functions for file handling
+#              changed   use strict;
+#
 ##############################################################################
 #
 
+use strict;
+use warnings;
 use DBI;
 
 ##################################################
@@ -102,7 +107,7 @@ sub cfgDB_FileRead($);
 sub cfgDB_FileUpdate($);
 sub cfgDB_Fileversion($$);
 sub cfgDB_FileWrite($@);
-sub cfgDB_FW_fileList(@$);
+sub cfgDB_FW_fileList($$@);
 sub cfgDB_Read99();
 sub cfgDB_ReadAll($);
 sub cfgDB_SaveCfg();
@@ -153,7 +158,7 @@ my $cfgDB_dbuser	= $dbconfig{user};
 my $cfgDB_dbpass	= $dbconfig{password};
 my $cfgDB_dbtype;
 
-(%dbconfig, @config) = (undef,undef);
+#(%dbconfig, @config) = (undef,undef);
 
 if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype ="POSTGRESQL";
@@ -307,20 +312,20 @@ sub cfgDB_FileUpdate($) {
 # read and execute fhemconfig and fhemstate
 sub cfgDB_ReadAll($) {
 	my ($cl) = @_;
-	my $ret;
+	my ($ret, @dbconfig);
 	# add Config Rows to commandfile
-	my @dbconfig = _cfgDB_ReadCfg(@dbconfig);
+	@dbconfig = _cfgDB_ReadCfg(@dbconfig);
 	# add State Rows to commandfile
 	@dbconfig = _cfgDB_ReadState(@dbconfig);
 	# AnalyzeCommandChain for all entries
-	$ret .= _cfgDB_Execute($cl, @dbconfig);
+	$ret = _cfgDB_Execute($cl, @dbconfig);
 	return $ret if($ret);
 	return undef;
 }
 
 # save running configuration to version 0
 sub cfgDB_SaveCfg() {
-	my (%devByNr, @rowList);
+	my (%devByNr, @rowList, %comments, $t, $out);
 
 	map { $devByNr{$defs{$_}{NR}} = $_ } keys %defs;
 
@@ -447,7 +452,7 @@ sub cfgDB_svnId() {
 }
 
 # return filelist depending on directory and regexp
-sub cfgDB_FW_fileList(@$) {
+sub cfgDB_FW_fileList($$@) {
 	my ($dir,$re,@ret) = @_;
 	my @files = split(/\n/, _cfgDB_Filelist('notitle'));
 	foreach my $f (@files) {
@@ -620,8 +625,8 @@ sub _cfgDB_Info() {
 	push @r, " dbuser: $cfgDB_dbuser" if !$attr{configdb}{private};
 	push @r, " dbpass: $cfgDB_dbpass" if !$attr{configdb}{private};
 	push @r, " dbtype: $cfgDB_dbtype";
-	push @r, " Unknown dbmodel type in configuration file." if $dbtype eq 'unknown';
-	push @r, " Only Mysql, Postgresql, SQLite are fully supported." if $dbtype eq 'unknown';
+	push @r, " Unknown dbmodel type in configuration file." if $cfgDB_dbtype eq 'unknown';
+	push @r, " Only Mysql, Postgresql, SQLite are fully supported." if $cfgDB_dbtype eq 'unknown';
 	push @r, $l;
 
 	my $fhem_dbh = _cfgDB_Connect;
@@ -832,11 +837,11 @@ sub _cfgDB_binFileimport($$;$) {
 	my ($filename,$filesize,$doDelete) = @_;
 	$doDelete = (defined($doDelete)) ? 1 : 0;
 
-	open (in,"<$filename") || die $!;
+	open (inFile,"<$filename") || die $!;
 		my $blobContent;
-		binmode(in);
-		my $readBytes = read(in, $blobContent, $filesize);
-	close(in);
+		binmode(inFile);
+		my $readBytes = read(inFile, $blobContent, $filesize);
+	close(inFile);
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhembinfilesave values (?, ?)');
