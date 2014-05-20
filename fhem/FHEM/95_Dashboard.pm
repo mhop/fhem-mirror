@@ -4,7 +4,7 @@
 # 95_Dashboard.pm
 #
 ########################################################################################
-# Released : 20.12.2013 @svenson08
+# Released : 20.12.2013 Sascha Hermann
 # Version :
 # 1.00: Released to testers
 # 1.02: Don't show link on Groups with WebLinks. Hide GroupToogle Button (new Attribut dashboard_showtooglebuttons).
@@ -47,13 +47,14 @@
 # 2.10: Internal Changes. Lock/Unlock now only in Detail view. Attribut dashboard_lockstate are obsolet.
 # 2.11: Attribute dashboard_showhelper ist obolet. Erase tabs-at-the-top-buttonbar-hidden and tabs-on-the-bottom-buttonbar-hidden values 
 #       from Attribute dashboard_showtabs. Change Buttonbar Style. Clear CSS and Dashboard.js.
-# 2.12: Update Docu. CSS Class Changes.
+# 2.12: Update Docu. CSS Class Changes. Insert Configdialog for Tabs. Change handling of parameters in both directions.
+# 2.13: Changed View of readingsHistory. Fix Linebrake in unlock state. Bugfix Display Group with similar group names.
 #
 # Known Bugs/Todos:
-# BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden?
+# BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden? -> widgets aus js über XHR nachladen und dann anzeigen (jquery xml nachladen...)
 # BUG: Variabler abstand wird nicht gesichert
 # BUG: dashboard_webfrontendfilter doesn't Work Antwort #469
-# BUG: Überlappen Gruppen andere?
+# BUG: Überlappen Gruppen andere? ->Zindex oberer reihe > als darunter liegenden
 #
 # Log 1, "[DASHBOARD simple debug] '".$g."' ";
 ########################################################################################
@@ -84,24 +85,31 @@ package main;
 
 use strict;
 use warnings;
-
-use vars qw($FW_dir);       # base directory for web server
-use vars qw($FW_icondir);   # icon base directory
+use vars qw(%FW_icons); 	# List of icons
+use vars qw($FW_dir);       	# base directory for web server
+use vars qw($FW_icondir);   	# icon base directory
 use vars qw($FW_room);      # currently selected room
 use vars qw(%defs);		    # FHEM device/button definitions
-use vars qw($FW_wname);     # Web instance
+#use vars qw(%FW_groups);	# List of Groups
+use vars qw($FW_wname);   # Web instance
 use vars qw(%FW_hiddenroom);# hash of hidden rooms, used by weblink
-use vars qw(%FW_types);     # device types
-use vars qw($FW_ss);      # is smallscreen, needed by 97_GROUP/95_VIEW
+use vars qw(%FW_types);    # device types
+use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
-# --------------------------- Global Variable -----------------------------------------------
+#########################
+# Forward declaration
+sub Dashboard_GetGroupList();
+
+#########################
+# Global variables
 my %group;
+my $dashboard_groupListfhem;
 my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
 my $dashboardname = "Dashboard"; # Link Text
 my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
-my $dashboardversion = "2.12";
-# -------------------------------------------------------------------------------------------
+my $dashboardversion = "2.13";
+
 
 #############################################################################################
 sub Dashboard_Initialize ($) {
@@ -109,6 +117,7 @@ sub Dashboard_Initialize ($) {
 		
   $hash->{DefFn}       = "Dashboard_define";
   $hash->{SetFn}   	   = "Dashboard_Set";  
+  $hash->{GetFn}   = "Dashboard_Get";
   $hash->{UndefFn}     = "Dashboard_undef";
   $hash->{FW_detailFn} = "Dashboard_DetailFN";    
   $hash->{AttrFn}      = "Dashboard_attr";
@@ -182,12 +191,12 @@ sub Dashboard_DetailFN() {
   
 	my $ret = ""; 
 	$ret .= "<table class=\"block wide\" id=\"dashboardtoolbar\"  style=\"width:100%\">\n";
-	$ret .= "<tr><td><div>\n";   
-#	$ret .= "		<div> <a href=\"javascript:dashboard_setposition()\"><button id=\"dashboard_setpositionbutton\" type=\"button\" title=\"Set the Positions\" disabled>Set Positions</button></a>\n";
+	$ret .= "<tr><td>Helper:\n<div>\n";   
 	$ret .= "	   <a href=\"$FW_ME?room=$dashboardhiddenroom\"><button type=\"button\">Return to Dashboard</button></a>\n";
-#	$ret .= "	   <div id=\"resultText\" style=\"padding-top: 8px;\"></div>\n";
-	$ret .= "      </div>\n";
-	$ret .= "   </div></td></tr>\n"; 	
+	$ret .= "	   <a href=\"$FW_ME?cmd=shutdown restart\"><button type=\"button\">Restart FHEM</button></a>\n";
+	$ret .= "	   <a href=\"$FW_ME?cmd=save\"><button type=\"button\">Save config</button></a>\n";
+	$ret .= "  </div>\n";
+	$ret .= "</td></tr>\n"; 	
 	$ret .= "</table>\n";
 	return $ret;
 }
@@ -206,6 +215,66 @@ sub Dashboard_Set($@) {
 	}
 }
 
+sub Dashboard_Escape($) {
+  my $a = shift;
+  return "null" if(!defined($a));
+  my %esc = ("\n" => '\n', "\r" => '\r', "\t" => '\t', "\f" => '\f', "\b" => '\b', "\"" => '\"', "\\" => '\\\\', "\'" => '\\\'', );
+  $a =~ s/([\x22\x5c\n\r\t\f\b])/$esc{$1}/eg;
+  return $a;
+}
+
+sub Dashboard_Get($@) {
+  my ($hash, @a) = @_;
+  my $res = "";
+  
+  my $arg = (defined($a[1]) ? $a[1] : "");
+  if ($arg eq "config") {
+		my $name = $hash->{NAME};
+		my $attrdata  = $attr{$name};
+		if ($attrdata) {
+			my $x = keys $attrdata;
+			my $i = 0;		
+			my @splitattr;
+			$res  .= "{\n";
+			$res  .= "  \"CONFIG\": {\n";
+			$res  .= "    \"name\": \"$name\",\n";
+			$res  .= "    \"lockstate\": \"".ReadingsVal($name,"lockstate","unlock")."\",\n";			
+
+			my @iconFolders = split(":", AttrVal($FW_wname, "iconPath", "$FW_sp:default:fhemSVG:openautomation"));	
+			my $iconDirs = "";
+			foreach my $idir  (@iconFolders) {$iconDirs .= "$attr{global}{modpath}/www/images/".$idir.",";}
+			$res  .= "    \"icondirs\": \"$iconDirs\"";			
+			
+			$res .=  ($i != $x) ? ",\n" : "\n";
+			foreach my $attr (sort keys $attrdata) {
+				$i++;				
+				@splitattr = split("@", $attrdata->{$attr});
+				if (@splitattr == 2) {
+					$res .= "    \"".Dashboard_Escape($attr)."\": \"".$splitattr[0]."\",\n";
+					$res .= "    \"".Dashboard_Escape($attr)."color\": \"".$splitattr[1]."\"";
+				} else { $res .= "    \"".Dashboard_Escape($attr)."\": \"".$attrdata->{$attr}."\"";}
+				$res .=  ($i != $x) ? ",\n" : "\n";
+			}
+			$res .= "  }\n";
+			$res .= "}\n";			
+			return $res;
+		}		
+  } elsif ($arg eq "groupWidget") {
+#### Comming Soon ######
+# For dynamic load of GroupWidgets from JavaScript  
+		my $dbgroup = "";
+		#for (my $p=2;$p<@a;$p++){$dbgroup .= @a[$p]." ";} #For Groupnames with Space
+		for (my $p=2;$p<@a;$p++){$dbgroup .= $a[$p]." ";} #For Groupnames with Space
+ 
+		$dashboard_groupListfhem = Dashboard_GetGroupList;
+		%group = BuildGroupList($dashboard_groupListfhem);
+		$res .= BuildGroupWidgets(1,1,1212,trim($dbgroup),"t1c1,".trim($dbgroup).",true,0,0:"); 
+		return $res;		
+  } else {
+    return "Unknown argument $arg choose one of config:noArg groupWidget";
+  }
+}
+
 sub Dashboard_define ($$) {
  my ($hash, $def) = @_;
  my $now = time();
@@ -216,6 +285,8 @@ sub Dashboard_define ($$) {
  RemoveInternalTimer($hash);
  InternalTimer      ($now + 5, 'CreateDashboardEntry', $hash, 0);
  InternalTimer      ($now + 5, 'CheckDashboardAttributUssage', $hash, 0);
+ my $dashboard_groupListfhem = Dashboard_GetGroupList;
+
  return;
 }
 
@@ -295,15 +366,7 @@ sub Dashboard_SummaryFN($$$$)
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab4sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab5sorting", ""),
 							   AttrVal($defs{$d}{NAME}, "dashboard_tab6sorting", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab7sorting", ""));							   
- my @tabicons = (AttrVal($defs{$d}{NAME}, "dashboard_tab1icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab2icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab3icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab4icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab5icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab6icon", ""),
-							AttrVal($defs{$d}{NAME}, "dashboard_tab7icon", ""));
-							   
+							   AttrVal($defs{$d}{NAME}, "dashboard_tab7sorting", ""));							   				   
  #############################################################################################
   
  if ($disable == 1) { 
@@ -324,6 +387,7 @@ sub Dashboard_SummaryFN($$$$)
 		if (trim($FW_wname) eq trim($webfilter[$i]) ) { $filterhit = 1; }
 	} 
 	if ($filterhit == 0) {
+	# construction site
 	#  $ret .= "No Dashboard configured for ".$FW_wname."<br>";  
 	#  $ret .= "Set Attribute dashboard_webfrontendfilter, see <a href=\"/fhem?detail=$d\" title=\"".$name."\">Details</a>";
 	  return $ret; 
@@ -352,25 +416,33 @@ sub Dashboard_SummaryFN($$$$)
  #-------------------------------------------------------------------------------------------------
  
  if ($room ne "all") { 
+ 
+	################################ 
+	$dashboard_groupListfhem = Dashboard_GetGroupList;
+	################################
+ 
 	$ret .= "<div id=\"tabEdit\" class=\"dashboard-dialog-content dashboard-widget-content\" title=\"Dashboard-Tab\" style=\"display:none;\">\n";		
 	$ret .= "	<div id=\"dashboard-dialog-tabs\" class=\"dashboard dashboard_tabs\">\n";	
 	$ret .= "		<ul class=\"dashboard dashboard_tabnav\">\n";
-	$ret .= "			<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-1\">Tab-Page1</a></li>\n";
-	$ret .= "			<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-2\">Tab-Page1</a></li>\n";
-	$ret .= "			<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-3\">Tab-Page1</a></li>\n";
+	$ret .= "			<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-1\">Current Tab</a></li>\n";
+	$ret .= "			<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-2\">Common</a></li>\n";
 	$ret .= "		</ul>\n";	
 	$ret .= "		<div id=\"tabs-1\" class=\"dashboard_tabcontent\">\n";
 	$ret .= "			<table>\n";
 	$ret .= "				<tr colspan=\"2\"><td><div id=\"tabID\"></div></td></tr>\n";		
 	$ret .= "				<tr><td>Tabtitle:</td><td colspan=\"2\"><input id=\"tabTitle\" type=\"text\" size=\"25\"></td></tr>";
-	$ret .= "				<tr><td>Tabicon:</td><td><input id=\"tabIcon\" type=\"text\" size=\"10\"></td><td><input id=\"startTime\" type=\"text\" size=\"7\"></td></tr>";
-	$ret .= "				<tr><td>Groups:</td><td><input id=\"tabGroups\" type=\"text\" size=\"10\"></td><td><input id=\"endTime\" type=\"text\" size=\"7\"></td></tr>";
-	$ret .= "				<tr><td></td><td><input type=\"checkbox\" id=\"allday\" value=\"\"><label for=\"allday\">Allday Event</label></td></tr>";	
+	$ret .= "				<tr><td>Tabicon:</td><td><input id=\"tabIcon\" type=\"text\" size=\"10\"></td><td><input id=\"tabIconColor\" type=\"text\" size=\"7\"></td></tr>";
+	$ret .= "				<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\" onfocus=\"FW_multipleSelect(this)\" allvals=\"multiple,$dashboard_groupListfhem\" readonly=\"readonly\"></td></tr>";	
+	$ret .= "				<tr><td></td><td colspan=\"2\"><input type=\"checkbox\" id=\"tabActiveTab\" value=\"\"><label for=\"tabActiveTab\">This Tab is currently selected</label></td></tr>";	
 	$ret .= "			</table>\n";
-	$ret .= "		</div>\n";		
+	$ret .= "		</div>\n";	
+	$ret .= "		<div id=\"tabs-2\" class=\"dashboard_tabcontent\">\n";
+	$ret .= "Comming soon";
+	$ret .= "		</div>\n";	
 	$ret .= "	</div>\n";		
 	$ret .= "</div>\n";
 
+	$ret .= "<div id=\"dashboard_define\" style=\"display: none;\">$d</div>\n";
 	$ret .= "<table class=\"roomoverview dashboard\" id=\"dashboard\">\n";
 
 	$ret .= "<tr><td><div class=\"dashboardhidden\">\n"; 
@@ -380,25 +452,19 @@ sub Dashboard_SummaryFN($$$$)
 	 $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\">\n";  
 	 
 	 ########################### Dashboard Tab-Liste ##############################################
-	 my $tabicon = "";
-	 $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   
-		
-	 for (my $i=0;$i<$tabcount;$i++){ 
-		$tabicon = ""; 
-		if ($tabicons[$i] ne "") { $tabicon = FW_makeImage($tabicons[$i],$tabicons[$i],"dashboard dashboard_tabicon ui-tabs-icon")."&nbsp;"; }
-		$ret .= "    <li class=\"dashboard dashboard_tab dashboard_tab_".$showbuttonbar."\">".$tabicon."<a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>"; 
-	 } 
+	 $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   		
+	 for (my $i=0;$i<$tabcount;$i++){$ret .= "    <li class=\"dashboard dashboard_tab dashboard_tab_".$showbuttonbar."\"><a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>";}
 	 $ret .= "	</ul>\n"; 	 
-	 ##############################################################################################
+	 ########################################################################################
 	 
 	 for (my $t=0;$t<$tabcount;$t++){ 
 		my @tabgroup = split(",", $tabgroups[$t]); #Set temp. position for groups without an stored position
-		for (my $i=0;$i<@tabgroup;$i++){
+		for (my $i=0;$i<@tabgroup;$i++){	
 			my @stabgroup = split(":", trim($tabgroup[$i]));		
-			if (index($tabsortings[$t],trim($stabgroup[0])) < 0) { $tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:"; }
+			if (index($tabsortings[$t],','.trim($stabgroup[0]).',') < 0) {$tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:";}
 		}	
 			
-		%group = BuildGroupList($tabgroups[$t]);	 
+		%group = BuildGroupList($tabgroups[$t]);	
 		$ret .= "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings[$t]."\" class=\"dashboard dashboard_tabpanel\">\n";
 		$ret .= "   <ul class=\"dashboard_tabcontent\">\n";
 		$ret .= "	<table class=\"dashboard_tabcontent\">\n";	 
@@ -512,19 +578,28 @@ sub BuildGroupWidgets($$$$$) {
 sub BuildGroupList($) {
  my @dashboardgroups = split(",", $_[0]); #array for all groups to build an widget
  my %group = ();
- my $test;
  
  foreach my $d (sort keys %defs) {
     foreach my $grp (split(",", AttrVal($d, "group", ""))) {
 		$grp = trim($grp);
 		foreach my $g (@dashboardgroups){ 
 			my ($gtitle, $iconName) = split(":", trim($g));
-			$group{$grp}{$d} = 1 if($gtitle eq $grp); 
+			$group{$grp}{$d} = 1 if($gtitle eq $grp); 			
 		}
     }
- } 
+ }  
  return %group;
 }  
+
+sub Dashboard_GetGroupList() {
+  my %allGroups = ();
+  foreach my $d (keys %defs ) {
+    next if(IsIgnored($d));
+    foreach my $g (split(",", AttrVal($d, "group", ""))) { $allGroups{$g}{$d} = 1; }
+  }  
+  my $ret = join(",", sort map { $_ =~ s/ /#/g ;$_} keys %allGroups);
+  return $ret;
+}
 
 sub BuildGroup($)
 {
@@ -539,7 +614,6 @@ sub BuildGroup($)
 
 	next if ($g ne $currentgroup);
 	$ret .= "<table class=\"dashboard block wide\" id=\"TYPE_$currentgroup\">";
-	#foreach my $d (sort keys %{$group{$g}}) {
 	
 	 foreach my $d (sort { lc(AttrVal($a,"sortby",AttrVal($a,"alias",$a))) cmp lc(AttrVal($b,"sortby",AttrVal($b,"alias",$b))) } keys %{$group{$g}}) {	
 		$ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
@@ -550,22 +624,17 @@ sub BuildGroup($)
 
 		$icon = FW_makeImage($icon,$icon,"icon dashboard_groupicon") . "&nbsp;" if($icon);
 	
-		#if($FW_hiddenroom{detail}) { 
-		#	$ret .= "<td><div class=\"col1\">$icon$devName</div></td>"; 	
-		#} 
-		#else { 
-		if ($type ne "weblink" && $type ne "SVG" && $type ne "readingsGroup") { # Don't show Link by weblink, svg and readingsGroup
+		if ($type ne "weblink" && $type ne "SVG" && $type ne "readingsGroup" && $type ne "readingsHistory") { # Don't show Link by weblink, svg and readingsGroup
 			$ret .= FW_pH "detail=$d", "$icon$devName", 1, "col1", 1; 
 		}			
-		#}		
 		
 		$row++;		
 			
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 		
-	    ################   Edit Result for readingroup etc. #####################
+	    ##############   Customize Result for Special Types #####################
 		my @txtarray = split(">", $txt);				
-		if ($type eq "readingsGroup" && $txtarray[0]  eq "<table") {		
+		if (($type eq "readingsGroup" || $type eq "readingsHistory") && $txtarray[0]  eq "<table") {		
 		    my $storeinfo = 0;
 			my $txtreturn = "";
 			my $linkreturn = "";
