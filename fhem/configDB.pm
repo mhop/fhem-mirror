@@ -262,7 +262,7 @@ sub cfgDB_AttrRead($) {
 # generic file functions called from fhem.pl
 sub cfgDB_FileRead($) {
 	my ($filename) = @_;
-		my ($err, @ret, $counter);
+	my ($err, @ret, $counter);
 	my $fhem_dbh = _cfgDB_Connect;
 	my $sth = $fhem_dbh->prepare( "SELECT content FROM fhembinfilesave WHERE filename LIKE '$filename'" );
 	$sth->execute();
@@ -628,9 +628,13 @@ sub _cfgDB_Info() {
 	my ($sql, $sth, @line, $row);
 
 # read versions table statistics
+	my $maxVersions = $attr{configdb}{maxversions};
+	$maxVersions = ($maxVersions) ? $maxVersions : 0;
+	push @r, " max Versions: $maxVersions" if($maxVersions);
 	my $count;
 	$count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
-	push @r, " config: $count entries\n";
+	push @r, " config: $count entries";
+	push @r, "";
 
 # read versions creation time
 	$sql = "SELECT * FROM fhemconfig as c join fhemversions as v on v.versionuuid=c.versionuuid ".
@@ -659,9 +663,6 @@ sub _cfgDB_Info() {
 	}
 	push @r, $l;
 
-# count files stored in database
-#	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhemfilesave group by filename");
-#	$count = @$row;
 	$row = $fhem_dbh->selectall_arrayref("SELECT filename from fhembinfilesave group by filename");
 	$count = @$row;
 	$count = ($count)?$count:'No';
