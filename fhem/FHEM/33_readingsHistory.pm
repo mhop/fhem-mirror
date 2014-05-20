@@ -320,10 +320,16 @@ readingsHistory_detailFn()
 }
 
 sub
-readingsHistory_Notify($$$)
-{
-  my ($hash,$reading,$value) = @_;
+makeTimestamp($$) {
+  my ($t, $timestampFormat) = @_;
+
+  my @lt = localtime($t);
+
+  return strftime( $timestampFormat, @lt ) if( $timestampFormat );
+
+  return sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0] );
 }
+
 sub
 readingsHistory_Notify($$)
 {
@@ -440,13 +446,7 @@ readingsHistory_Notify($$)
           }
 
           my $t = time;
-          my @lt = localtime($t);
-          my $tm;
-          if( $timestampFormat ) {
-            $tm = strftime( $timestampFormat, @lt );
-          } else {
-            $tm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0] );
-          }
+          my $tm = makeTimestamp( $t, $timestampFormat );
 
           my $show_links = !AttrVal( $name, "nolinks", "0" );
           $show_links = 0 if($FW_hiddenroom{detail});
@@ -575,8 +575,7 @@ readingsHistory_Set($@)
     $hash->{fhem}{history} = [];
 
     my $t = time;
-    my @lt = localtime($t);
-    my $tm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0] );
+    my $tm = makeTimestamp( time, AttrVal( $name, "timestampFormat", undef) );
     my $msg = "$tm&nbsp;&nbsp;--clear--";
 
     my $entry = [$t,"", $cmd, $msg];
@@ -588,8 +587,7 @@ readingsHistory_Set($@)
     return undef;
   } elsif ( $cmd eq "add" ) {
     my $t = time;
-    my @lt = localtime($t);
-    my $tm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0] );
+    my $tm = makeTimestamp( time, AttrVal( $name, "timestampFormat", undef) );
     my $msg = "$tm&nbsp;&nbsp;$param ". join( " ", @a );
 
     my $entry = [$t,"", "$param ". join( " ", @a ),$msg];
