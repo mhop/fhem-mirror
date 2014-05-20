@@ -73,7 +73,7 @@
 #
 # 2014-04-27 - added     new functions for binfile handling
 #
-# 2014-05-11 - removed   binfileimport
+# 2014-05-11 - removed   command binfileimport
 #              changed   store all files as binary
 #              added     _cfgDB_Move to move all files from text 
 #                        to binary filesave on first load of configDB
@@ -83,7 +83,7 @@
 # 2014-05-15 - fixed     handling of multiline defs
 #
 # 2014-05-20 - removed   no longer needed functions for file handling
-#              changed   use strict;
+#              changed   code improvement; use strict; use warnings;
 #
 ##############################################################################
 #
@@ -134,11 +134,6 @@ sub _cfgDB_Rotate($);
 sub _cfgDB_Search($$;$);
 sub _cfgDB_Uuid();
 
-# deprecated!
-sub _cfgDB_Readfile($);
-sub _cfgDB_Updatefile($);
-sub _cfgDB_Writefile($$);
-
 ##################################################
 # Read configuration file for DB connection
 #
@@ -158,7 +153,8 @@ my $cfgDB_dbuser	= $dbconfig{user};
 my $cfgDB_dbpass	= $dbconfig{password};
 my $cfgDB_dbtype;
 
-#(%dbconfig, @config) = (undef,undef);
+%dbconfig = ();
+@config   = ();
 
 if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype ="POSTGRESQL";
@@ -613,9 +609,9 @@ sub _cfgDB_Migrate() {
 
 # show database statistics
 sub _cfgDB_Info() {
-	my ($l, @r, @row_ary, $f);
+	my ($l, @r, $f);
 	for my $i (1..65){ $l .= '-';}
-#	$l .= "\n";
+
 	push @r, $l;
 	push @r, " configDB Database Information";
 	push @r, $l;
