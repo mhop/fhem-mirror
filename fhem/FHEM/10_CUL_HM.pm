@@ -134,7 +134,7 @@ sub CUL_HM_Initialize($) {
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrFn}    = "CUL_HM_Attr";
   $hash->{AttrList}  = "do_not_notify:1,0 ignore:1,0 dummy:1,0 "
-                       ."IODev IOList "               #IOList is for CCU only
+                       ."IODev IOList IOgrp "               #IOList is for CCU only
                        ."showtime:1,0 "
                        ."serialNr firmware .stc .devInfo "
                        ."rawToReadable unit "#"KFM-Sensor" only
@@ -434,13 +434,14 @@ sub CUL_HM_Define($$) {##############################
     }
   }
   else{# define a device
-    $hash->{helper}{role}{dev}=1;
-    $hash->{helper}{role}{chn}=1;# take role of chn 01 until it is defined
-    $hash->{helper}{q}{qReqConf}=""; # queue autoConfig requests for this device
-    $hash->{helper}{q}{qReqStat}=""; # queue autoConfig requests for this device
+    $hash->{helper}{role}{dev}   = 1;
+    $hash->{helper}{role}{chn}   = 1;# take role of chn 01 until it is defined
+    $hash->{helper}{q}{qReqConf} = ""; # queue autoConfig requests 
+    $hash->{helper}{q}{qReqStat} = ""; # queue statusRequest for this device
+    $hash->{helper}{mRssi}{mNo}  = "";
     CUL_HM_prtInit ($hash);
     CUL_HM_hmInitMsg($hash);
-    AssignIoPort($hash) if (!$init_done && $HMid ne "000000");
+    CUL_HM_assignIO($hash)if (!$init_done && $HMid ne "000000");
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
 
@@ -1982,7 +1983,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independent
   my ($ioHash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
   my $shash = $modules{CUL_HM}{defptr}{$src};
-  my $dhash = $modules{CUL_HM}{defptr}{$dst};
+  my $dhash = $modules{CUL_HM}{defptr}{$dst} if (defined $modules{CUL_HM}{defptr}{$dst});
   return "" if(!$shash->{DEF});# this should be from ourself
   my $ret = "";
   my $pendType = $shash->{helper}{prt}{rspWait}{Pending}?
@@ -2020,9 +2021,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }  
   
   my $repeat;
-  if   ($mTp eq "02"){# Ack/Nack ###########################
-
-    #see if the channel is defined separate - otherwise go for chief
+  if   ($mTp eq "02"){# Ack/Nack/aesReq ####################
     my $subType = substr($p,0,2);
     my $reply;
     my $success;
@@ -2086,6 +2085,9 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
     elsif($subType eq "04"){ #ACK-AES, interim########
+      my (undef,$key,$aesKeyNbr) = unpack'A2A12A2',$p;
+      push @evtEt,[$shash,1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);# if   ($msgStat =~ m/AESKey/)
+      #push @evtEt,[$shash,1,"aesCommToDev:".substr($msgStat,7)];#elsif($msgStat =~ m/AESCom/){# AES communication to central
       #$success = ""; #result not final, another response should come
       $reply = "done";
     }
@@ -2118,6 +2120,14 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     $ret = $reply;
   }
+  elsif($mTp eq "03"){# AESack #############################
+    #Reply to AESreq - only visible with CUL or in monitoring mode
+    #not with HMLAN/USB
+    #my $aesKey = $p;
+    push @evtEt,[$shash,1,"aesReqTo:".$dhash->{NAME}] if (defined $dhash);
+    $ret = "done";    
+  }
+
   elsif($mTp eq "00"){######################################
     my $paired = 0; #internal flag
     CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
@@ -2142,8 +2152,10 @@ sub CUL_HM_parseCommon(@){#####################################################
         delete $shash->{READINGS}{"RegL_00:"};
         delete $shash->{READINGS}{".RegL_00:"};
 
-        AssignIoPort($shash,$ioHash->{NAME})
-                    if (!$modules{CUL_HM}{helper}{hmManualOper});
+        if (!$modules{CUL_HM}{helper}{hmManualOper}){
+          $attr{$shash->{NAME}}{IODev} = $ioHash;
+          CUL_HM_assignIO($shash) ;
+        }
 
         my ($idstr, $s) = ($ioId, 0xA);
         $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
@@ -2484,6 +2496,7 @@ sub CUL_HM_updtSDTeam(@){#in: TeamName, optional caller name and its new state
   return CUL_HM_UpdtReadSingle($defs{$name},"state",$dStat,1);
 }
 sub CUL_HM_pushEvnts(){########################################################
+  #write events to Readings and collect touched devices
   my @ent = ();
   @evtEt = sort {($a->[0] cmp $b->[0])|| ($a->[1] cmp $b->[1])} @evtEt;
   $evtDly = 0;# switch delay trigger off
@@ -2563,7 +2576,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     return $attr{$devName}{$p}           if ($attr{$devName}{$p});
     return "undefined";
   }
-  elsif($cmd =~ m /^(reg|regVal)$/) {  #####################################################
+  elsif($cmd =~ m /^(reg|regVal)$/) {  ########################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
     if ($regReq eq 'all'){
       my @regArr = CUL_HM_getRegN($st,$md,$chn);
@@ -2702,6 +2715,19 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     print aSave "\n======= finished ===\n";
     close(aSave);
   }
+  elsif($cmd eq "listDevice"){  ###############################################
+    
+    my @dl = grep !/^$/,
+             map{AttrVal($_,"IOgrp","") =~ m/^$name/ ? $_ : ""}
+             keys %defs;
+    my @rl;
+    foreach (@dl){
+      my(undef,$pref) = split":",$attr{$_}{IOgrp},2;
+      $pref =  "---" if (!$pref);
+      push @rl, "$defs{$_}{IODev}->{NAME} / $pref $_ ";
+    }
+    return "devices using $name\ncurrent IO / preferred\n  ".join "\n  ", sort @rl;
+  }
 
   Log3 $name,3,"CUL_HM get $name " . join(" ", @a[1..$#a]);
 
@@ -2798,8 +2824,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "$cmd requires parameter: $h";
   }
 
-  AssignIoPort($defs{$devName}) 
-        if (!$defs{$devName}{IODev}||!$defs{$devName}{IODev}{NAME});
+  CUL_HM_assignIO($defs{$devName}) ;
+
   my $id = CUL_HM_IoId($defs{$devName});
   return "no IO device identified" if(length($id) != 6 );
 
@@ -4646,14 +4672,13 @@ sub CUL_HM_SndCmd($$) {
   $hash = CUL_HM_getDeviceHash($hash);
   return if(   AttrVal($hash->{NAME},"ignore","")
             || AttrVal($hash->{NAME},"dummy",""));
+  CUL_HM_assignIO($hash) ;
   if(!defined $hash->{IODev} ||!defined $hash->{IODev}{NAME}){
-    AssignIoPort($hash);
-    if(!defined $hash->{IODev} ||!defined $hash->{IODev}{NAME}){
-      CUL_HM_eventP($hash,"IOerr");
-      CUL_HM_UpdtReadSingle($hash,"state","ERR_IOdev_undefined",1);
-      return;
-    }
-  };
+    CUL_HM_eventP($hash,"IOerr");
+    CUL_HM_UpdtReadSingle($hash,"state","ERR_IOdev_undefined",1);
+    return;
+  }
+  
   my $io = $hash->{IODev};
   my $ioName = $io->{NAME};
   
@@ -4865,12 +4890,18 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   my $mIn = shift;
   my $step = $modules{CUL_HM}{helper}{updateStep};
   my $name = $modules{CUL_HM}{helper}{updatingName};
+  my $dst  = $modules{CUL_HM}{helper}{updateDst};
+  my $id   = $modules{CUL_HM}{helper}{updateId};
+  my $mNo  = $modules{CUL_HM}{helper}{updateNbr};
   my $hash = $defs{$name};
-  my $dst = $modules{CUL_HM}{helper}{updateDst};
-  my $id = $modules{CUL_HM}{helper}{updateId};
-  my $mNo = $modules{CUL_HM}{helper}{updateNbr};
   my $mNoA = sprintf("%02X",$mNo);
-  return if ($mIn !~ m/$mNoA..02$dst${id}00/&&$mIn !~ m/0010${dst}00000000/);
+  
+  return if ($mIn !~ m/$mNoA..02$dst${id}00/ && $mIn !~ m/0010${dst}00000000/);
+  if ($mIn =~ m/$mNoA..02$dst${id}00/){
+    $modules{CUL_HM}{helper}{updateRetry} = 0;
+    $modules{CUL_HM}{helper}{updateNbrPassed} = $mNo;
+  }
+  
   if ($step == 0){#check bootloader entered - now change speed
     return if ($mIn =~ m/$mNoA..02$dst${id}00/);
     Log3 $name,2,"CUL_HM fwUpdate $name entered mode - switch speed";
@@ -4920,8 +4951,20 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
       $modules{CUL_HM}{helper}{updateStep}++;
       $modules{CUL_HM}{helper}{updateNbr} = $mNo;
       #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
-      InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:Block$step",0);
+      InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateBTo","fail:Block$step",0);
     }
+  }
+}
+sub CUL_HM_FWupdateBTo($){# FW update block timeout
+  my $in = shift;
+  $modules{CUL_HM}{helper}{updateRetry}++;
+  if ($modules{CUL_HM}{helper}{updateRetry} > 3){#retry exceeded
+    CUL_HM_FWupdateEnd($in);
+  }
+  else{# have a retry
+    $modules{CUL_HM}{helper}{updateStep}--;
+    $modules{CUL_HM}{helper}{updateNbr} = $modules{CUL_HM}{helper}{updateNbrPassed};
+    CUL_HM_FWupdateSteps("0010".$modules{CUL_HM}{helper}{updateDst}."00000000");
   }
 }
 sub CUL_HM_FWupdateEnd($){#end FW update
@@ -6182,34 +6225,20 @@ sub CUL_HM_storeRssi(@){
     $peerName = $h->{NAME};
   }
   
-  $defs{$name}{helper}{mRssi}{mNo} = "" if (!$defs{$name}{helper}{mRssi});
-  my ($mVal,$mPn,$hashMax) = ($val,substr($peerName,3),$defs{$name}{helper}{mRssi});
-  if ($hashMax->{mNo} ne $mNo){# new message
+  my ($mVal,$mPn) = ($val,substr($peerName,3));
+  if ($defs{$name}{helper}{mRssi}{mNo} ne $mNo){# new message
     delete $defs{$name}{helper}{mRssi};
     $defs{$name}{helper}{mRssi}{mNo} = $mNo;
-    $hashMax = $defs{$name}{helper}{mRssi};
-    $hashMax->{max} = $mPn;
-    $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
-    $hashMax->{io}{$mPn} = $mVal;
   }
-  else{
-    if ($mPn =~ m /^rpt_(.*)/){# map repeater to io device, use max rssi
-      $mPn = $1;
-      $mVal = $hashMax->{io}{$mPn} 
-            if(   $hashMax->{io}{$mPn} 
-               && $hashMax->{io}{$mPn} > $mVal
-               );
-    }
-    $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
-    $hashMax->{io}{$mPn} = $mVal;
-    my $max = -200;
-    foreach (keys %{$hashMax->{io}}){
-      if ($hashMax->{io}{$_}>$max){
-        $hashMax->{max} = $_;
-        $max = $hashMax->{io}{$_};
-      }
-    }
+
+  if ($mPn =~ m /^rpt_(.*)/){# map repeater to io device, use max rssi
+    $mPn = $1;
+    $mVal = $defs{$name}{helper}{mRssi}{io}{$mPn} 
+          if(   $defs{$name}{helper}{mRssi}{io}{$mPn} 
+             && $defs{$name}{helper}{mRssi}{io}{$mPn} > $mVal);
   }
+  $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
+  $defs{$name}{helper}{mRssi}{io}{$mPn} = $mVal;
   
   $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
   my $rssiP = $defs{$name}{helper}{rssi}{$peerName};
@@ -6308,6 +6337,51 @@ sub CUL_HM_UpdtCentralState($){
   $state = "IOs_ok" if (!$state);
   $defs{$name}{STATE} = $state;
 }
+sub CUL_HM_assignIO($){ #check and assign IO
+  # assign IO device
+  my $hash = shift;
+  if (   $hash->{helper}{prt}{sProc} == 1
+      && defined $hash->{IODev} ){#don't change while send in process
+    return; 
+  }
+  my $hn = $hash->{NAME};
+  my ($ioCCU,$prefIO) = split(":",AttrVal($hn,"IOgrp","_"),2);
+  $ioCCU = "" if (!defined $defs{$ioCCU} || AttrVal($ioCCU,"model","") ne "CCU-FHEM");
+  if ($ioCCU){
+    my $ccuIOs = AttrVal($ioCCU,"IOList","");
+    my @ios = sort {$hash->{helper}{mRssi}{io}{$b} <=> $hash->{helper}{mRssi}{io}{$a} } 
+           keys(%{$hash->{helper}{mRssi}{io}});
+    unshift @ios,$prefIO if ($prefIO);# set prefIO to first choice
+    foreach my $iom (grep !/^$/,@ios){
+      if ($ccuIOs =~ m /$iom/){     
+        if (  !$defs{$iom}
+            || $defs{$iom}{STATE} !~ m/^(opened|Initialized)$/               # we need to queue
+            ||(defined $defs{$iom}{XmitOpen} && $defs{$iom}{XmitOpen} == 0)){#overload, dont send
+          next;
+        }
+        Log 1,"General change $hn io to $iom" if($hash->{IODev} ne $defs{$iom});
+        if (   $hash->{IODev} 
+            && $hash->{IODev} ne $defs{$iom}
+            && $hash->{IODev}->{TYPE}
+            && $hash->{IODev}->{TYPE} eq "HMLAN"){#if recent io is HMLAN and we have to change remove the device from IO
+          my $id = CUL_HM_hash2Id($hash);
+          IOWrite($hash, "", "remove:$id");
+        }
+        $hash->{IODev} = $defs{$iom};
+        return;
+      }
+    }
+  }
+  # not assigned thru CCU - try normal
+  my $dIo = AttrVal($hn,"IODev","");
+  if ($dIo && $defs{$dIo} && $dIo ne $hash->{IODev}->{NAME}){
+    $hash->{IODev} = $defs{$dIo};
+  }
+  else{
+    AssignIoPort($hash);#let kernal decide
+  }
+}
+
 
 sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
   my ($name,$time) = @_;
@@ -6389,14 +6463,11 @@ sub CUL_HM_procQs($){#process non-wakeup queues
   foreach my $q ("qReqStat","qReqConf"){
     if   (@{$mq->{$q}}){
       my $devN = ${$mq->{$q}}[0];
+      CUL_HM_assignIO($defs{$devN}); 
+      next  if(!defined $defs{$devN}{IODev}{NAME});
       my $ioName = $defs{$devN}{IODev}{NAME};   
-      if(!defined $ioName){   
-        AssignIoPort($defs{$devN});
-        next  if(!defined $defs{$devN}{IODev}{NAME});
-        $ioName = $defs{$devN}{IODev}{NAME};
-      };
-      if (   (   $ioName
-              && ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|init)$/
+
+      if (   (   ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|init)$/
               && $q eq "qReqStat")
            ||(   CUL_HM_autoReadReady($ioName)
               && !$defs{$devN}{cmdStack}
@@ -7617,6 +7688,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          prior to rewrite data to an entity it is necessary to pair the device with FHEM.<br>
          restore will not delete any peered channels, it will just add peer channels.<br>
          </li>
+     <li><B>listDevice</B><br>
+         returns a list of Devices using the ccu service to assign an IO.<br>
+         </li>
      <br>
   </ul>
 
@@ -7632,7 +7706,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          if set HMLAN/USB is forced to request AES signature before sending ACK to the device.<br>
          This funktion strictly works with HMLAN/USB - it doesn't work for CUL type IOs.<br>
     </li>
-      <li><a name="#CUL_HMactCycle">actCycle</a>
+    <li><a name="#CUL_HMactCycle">actCycle</a>
          actCycle &lt;[hhh:mm]|off&gt;<br>
          Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maximum silent time for the device. 
          Upon no message received in this period an event will be raised "&lt;device&gt; is dead". 
@@ -7649,7 +7723,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          The overall function can be viewed checking out the "ActionDetector" entity. The status of all entities is present in the READING section.<br>
          Note: This function can be enabled for devices with non-cyclic messages as well. It is up to the user to enter a reasonable cycletime.
       </li>
-      <li><a name="#CUL_HMautoReadReg">autoReadReg</a><br>
+    <li><a name="#CUL_HMautoReadReg">autoReadReg</a><br>
         '0' autoReadReg will be ignored.<br>
         '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
         '2' like '1' plus execute after power_on.<br>
@@ -7692,6 +7766,19 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         extert takes benefit of the implementation.
         Nevertheless  - by definition - showInternalValues overrules expert.
         </li>
+    <li><a name="#CUL_HMIOgrp">IOgrp</a><br>
+        can be given to devices and shall point to a virtual CCU. As a consequence the
+        CCU will take care of the assignment to the best suitable IO. It is necessary that a
+        virtual CCU is defined and all relevant IO devices are assigned to it. Upon sending the CCU will
+        check which IO is operational and has the best RSSI performance for this device.<br>
+        Optional a prefered IO can be added. In case this IO is operational it willge selected regardless
+        of rssi values. <br>
+        Example:<br>
+        <ul><code>
+          attr myDevice1 IOgrp vccu<br>
+          attr myDevice2 IOgrp vccu:prefIO<br>
+        </code></ul>
+        </li>
     <li><a name="#CUL_HMlevelRange">levelRange</a><br>
         can be used with dimmer only. It defines the dimmable range to be used with this dimmer-channel. 
         It is meant to support e.g. LED light that starts at 10% and reaches maxbrightness at 40%.
@@ -7711,10 +7798,6 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           attr myChannel levelRange 0,40<br>
           attr myChannel levelRange 10,80<br>
         </code></ul>
-        </li>
-    <li><a name="#CUL_HMtempListTmpl">tempListTmpl</a><br>
-        Sets the default template for a heating controller.<br> 
-        Format is &lt;file&gt;:&lt;templatename&gt;. lt
         </li>
     <li><a name="#CUL_HMmodel">model</a>,
         <a name="subType">subType</a><br>
@@ -7746,6 +7829,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         can be given to devices, denied for channels. If switched '1' each RSSI entry will be
         written to a reading. User may use this to log and generate a graph of RSSI level.<br>
         Due to amount of readings and events it is NOT RECOMMENDED to switch it on by default.
+        </li>
+    <li><a name="#CUL_HMtempListTmpl">tempListTmpl</a><br>
+        Sets the default template for a heating controller.<br> 
+        Format is &lt;file&gt;:&lt;templatename&gt;. lt
         </li>
     <li><a name="unit">unit</a><br>
         set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
@@ -8813,6 +8900,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         vor dem zur&uuml;ckschreiben der Daten eines Eintrags muss das Ger&auml;t mit FHEM verbunden werden.<br>
         "restore" l&ouml;scht keine verkn&uuml;pften Kan&auml;le, es f&uuml;gt nur neue Peers hinzu.<br>
       </li>
+      <li><B>listDevice</B><br>
+         gibt eine Lister der Devices, welche den ccu service zum zuweisen der IOs zurück<br>
+         </li>
+
     </ul><br>
     <a name="CUL_HMattr"></a><b>Attribute</b>
     <ul>
@@ -8875,6 +8966,19 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         "expert" macht sich diese Implementierung zu Nutze.
         Gleichwohl setzt "showInternalValues" - bei Definition - 'expert' außer Kraft .
       </li>
+    <li><a name="#CUL_HMIOgrp">IOgrp</a><br>
+        kann an Devices vergeben werden udn zeigt auf eine virtuelle ccu. Danach wird die ccu
+        beim Senden das passende IO für das Device auswählen. Es ist notwendig, dass die virtuelle ccu
+        definiert und alle erlaubten IOs eingetragen sind. Beim Senden wird die ccu prüfen
+        welches IO operational ist und welches den besten rssi-faktor für das Device hat.<br>
+        Optional kann ein bevorzugtes IO definiert werden. In diesem Fall wird es, wenn operational,
+        genutzt - unabhängig von den rssi Werten.<br>
+        Beispiel:<br>
+        <ul><code>
+          attr myDevice1 IOgrp vccu<br>
+          attr myDevice2 IOgrp vccu:prefIO<br>
+        </code></ul>
+        </li>
     <li><a name="#CUL_HMlevelRange">levelRange</a><br>
         nur f&uuml;r Dimmer! Der Dimmbereich wird eingeschr&auml;nkt. 
         Es ist gedacht um z.B. LED Lichter unterst&uuml;tzen welche mit 10% beginnen und bei 40% bereits das Maximum haben.
