@@ -46,7 +46,7 @@ sub readingsHistory_Initialize($)
   $hash->{SetFn}    = "readingsHistory_Set";
   $hash->{GetFn}    = "readingsHistory_Get";
   $hash->{AttrFn}   = "readingsHistory_Attr";
-  $hash->{AttrList} = "disable:1,2,3 mapping style timestampFormat valueFormat noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1 rows";
+  $hash->{AttrList} = "disable:1,2,3 mapping style timestampFormat valueFormat noheading:1 nohtml:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1 rows";
 
   $hash->{FW_detailFn}  = "readingsHistory_detailFn";
   $hash->{FW_summaryFn}  = "readingsHistory_detailFn";
@@ -320,7 +320,7 @@ readingsHistory_detailFn()
 }
 
 sub
-makeTimestamp($$) {
+readingsHistory_makeTimestamp($$) {
   my ($t, $timestampFormat) = @_;
 
   my @lt = localtime($t);
@@ -411,6 +411,10 @@ readingsHistory_Notify($$)
         $value = $s;
       }
 
+      my $no_html = AttrVal( $name, "nohtml", "0" );
+      my $spacing = "&nbsp;&nbsp;";
+      $spacing = " " if $no_html;
+
       my $mapping = AttrVal( $name, "mapping", "");
       $mapping = eval $mapping if( $mapping =~ m/^{.*}$/ );
       #$mapping = undef if( ref($mapping) ne 'HASH' );
@@ -437,21 +441,23 @@ readingsHistory_Notify($$)
 
           next if( defined($regex) && $reading !~ m/^$regex$/);
 
+          my $msg = $s;
+
           my $value_format = readingsHistory_lookup2($value_format,$n,$reading,$value);
           next if( !defined($value_format) );
           if( $value_format =~ m/%/ ) {
-            $value_format = sprintf( $value_format, $value );
+            $msg = sprintf( $value_format, $value );
           } elsif( $value_format ) {
-            $value_format = $value_format;
+            $msg = $value_format;
           }
 
           my $t = time;
-          my $tm = makeTimestamp( $t, $timestampFormat );
+          my $tm = readingsHistory_makeTimestamp( $t, $timestampFormat );
 
           my $show_links = !AttrVal( $name, "nolinks", "0" );
           $show_links = 0 if($FW_hiddenroom{detail});
           $show_links = 0 if(!defined($FW_ME));
-          #$show_links = 0 if(!defined($FW_subdir));
+          $show_links = 0 if($no_html);
 
           my $a = AttrVal($n, "alias", $n);
           my $m = $a;
@@ -461,8 +467,11 @@ readingsHistory_Notify($$)
             $m = readingsHistory_lookup($mapping,$n,$a,$reading,$value,$room,$group,$m);
           }
 
-          my $msg = "$tm&nbsp;&nbsp;$m $value_format";
-          $msg = "$tm&nbsp;&nbsp;<a href=\"$FW_ME$FW_subdir?detail=$n\">$m</a> $value_format" if( $show_links );
+          if( $show_links ) {
+            $msg = "$tm$spacing<a href=\"$FW_ME$FW_subdir?detail=$n\">$m</a> $msg";
+          } else {
+            $msg = "$tm$spacing$m $msg";
+          }
 
           my $entry = [$t, $n, $s,$msg];
           #my $entry = [$t, $n, "$reading: $value", $msg];
@@ -569,14 +578,18 @@ readingsHistory_Set($@)
 {
   my ($hash, $name, $cmd, $param, @a) = @_;
 
-  my $list = "clear:noArg add";
+  my $list = "add clear:noArg";
+
+  my $no_html = AttrVal( $name, "nohtml", "0" );
+  my $spacing = "&nbsp;&nbsp;";
+  $spacing = " " if $no_html;
 
   if( $cmd eq "clear" ) {
     $hash->{fhem}{history} = [];
 
     my $t = time;
-    my $tm = makeTimestamp( time, AttrVal( $name, "timestampFormat", undef) );
-    my $msg = "$tm&nbsp;&nbsp;--clear--";
+    my $tm = readingsHistory_makeTimestamp( time, AttrVal( $name, "timestampFormat", undef) );
+    my $msg = "$tm$spacing--clear--";
 
     my $entry = [$t,"", $cmd, $msg];
 
@@ -587,8 +600,8 @@ readingsHistory_Set($@)
     return undef;
   } elsif ( $cmd eq "add" ) {
     my $t = time;
-    my $tm = makeTimestamp( time, AttrVal( $name, "timestampFormat", undef) );
-    my $msg = "$tm&nbsp;&nbsp;$param ". join( " ", @a );
+    my $tm = readingsHistory_makeTimestamp( time, AttrVal( $name, "timestampFormat", undef) );
+    my $msg = "$tm$spacing$param ". join( " ", @a );
 
     my $entry = [$t,"", "$param ". join( " ", @a ),$msg];
 
@@ -623,10 +636,12 @@ readingsHistory_Get($@)
     my $rows = AttrVal($name,"rows", 5 );
     $rows = 1 if( $rows < 1 );
 
+    my $timestampFormat = AttrVal( $name, "timestampFormat", undef);
     for (my $i = 0; $i < $rows; $i++) {
       my $line = $hash->{fhem}{history}[$i];
       if( ref($line) eq 'ARRAY' ) {
-        $ret .= "$line->[0]\t$line->[1]\t$line->[2]\t$line->[3]" if( $line );
+        my $tm = readingsHistory_makeTimestamp( $line->[0], $timestampFormat );
+        $ret .= "$tm\t$line->[1]\t$line->[2]\t$line->[3]" if( $line );
       } else {
         $ret .= $line if( $line );
       }
