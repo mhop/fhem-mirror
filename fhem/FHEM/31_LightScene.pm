@@ -67,10 +67,13 @@ sub LightScene_Define($$)
   }
   $hash->{CONTENT} = \%list;
 
-  my %scenes;
-  $hash->{SCENES} = \%scenes;
+  if( !defined($hash->{SCENES}) ) {
+    my %scenes;
+    $hash->{SCENES} = \%scenes;
 
-  LightScene_Load($hash);
+    LightScene_Load($hash);
+  }
+
   LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
 
   $hash->{STATE} = 'Initialized';
