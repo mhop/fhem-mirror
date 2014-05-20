@@ -1633,7 +1633,8 @@ FW_style($$)
     my $cfgDB = defined($a[3]) ? $a[3] : "";
     if ($cfgDB eq 'configDB') {
       my $filePath = FW_fileNameToPath($fileName);
-      $data = _cfgDB_Readfile($filePath);
+      my ($err,@content) = cfgDB_FileRead($filePath);
+      $data = join("\n",@content);
     } else {
       $fileName =~ s,.*/,,g;        # Little bit of security
       my $filePath = FW_fileNameToPath($fileName);
@@ -1686,7 +1687,8 @@ FW_style($$)
 
     } else { # save file to configDB
       $FW_data =~ s/\r//g if($^O !~ m/Win/);
-      _cfgDB_Writefile($filePath, $FW_data);
+      my @content = split(/\n/,$FW_data);
+      cfgDB_FileWrite($filePath,@content);
       my $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
       $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" :
                         "Saved the file $fileName to configDB");
