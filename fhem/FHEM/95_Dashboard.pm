@@ -232,7 +232,7 @@ sub Dashboard_Get($@) {
 		my $name = $hash->{NAME};
 		my $attrdata  = $attr{$name};
 		if ($attrdata) {
-			my $x = keys $attrdata;
+			my $x = keys %$attrdata;
 			my $i = 0;		
 			my @splitattr;
 			$res  .= "{\n";
@@ -246,7 +246,7 @@ sub Dashboard_Get($@) {
 			$res  .= "    \"icondirs\": \"$iconDirs\"";			
 			
 			$res .=  ($i != $x) ? ",\n" : "\n";
-			foreach my $attr (sort keys $attrdata) {
+			foreach my $attr (sort keys %$attrdata) {
 				$i++;				
 				@splitattr = split("@", $attrdata->{$attr});
 				if (@splitattr == 2) {
