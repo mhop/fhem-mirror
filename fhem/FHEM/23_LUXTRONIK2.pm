@@ -69,9 +69,9 @@ LUXTRONIK2_Initialize($)
                  "autoSynchClock:slider,10,5,300 ".
                  "boilerVolumn ".
                  "heatPumpElectricalPowerFactor ".
-                 "heatPumpElectricalPowerWatt:slider,1000,16000,100 ".
-                 "heatRodElectricalPowerWatt:slider,1000,16000,100 ".
-                 "compressor2ElectricalPowerWatt:slider,1000,16000,100 ".
+                 "heatPumpElectricalPowerWatt ".
+                 "heatRodElectricalPowerWatt ".
+                 "compressor2ElectricalPowerWatt ".
                  "doStatistics:0,1 ".
                  "ignoreFirmwareCheck:0,1 ".
                  "statusHTML ".
@@ -247,6 +247,9 @@ LUXTRONIK2_Set($$@)
    elsif($cmd eq 'activeTariff' && int(@_)==4 ) {
       $val = 0 if( $val < 1 || $val > 9 );
       readingsSingleUpdate($hash,"activeTariff",$val, 1);
+      $hash->{LOCAL} = 1;
+      LUXTRONIK2_GetUpdate($hash);
+      $hash->{LOCAL} = 0;
       return "$name: activeTariff set to $val.";
    }
 
@@ -292,11 +295,11 @@ LUXTRONIK2_Set($$@)
   my $list = "statusRequest:noArg"
           ." activeTariff:0,1,2,3,4,5,6,7,8,9"
           ." resetStatistics:all,statBoilerGradientCoolDownMin,statAmbientTemp...,statElectricity...,statHours...,statHeatQ..."
-          ." hotWaterTemperatureTarget:slider,30.0,0.5,65.0"
-          ." returnTemperatureSetBack:slider,-5,0.5,5"
+          ." hotWaterTemperatureTarget "
+          ." returnTemperatureSetBack "
           ." opModeHotWater:Auto,Party,Off"
           ." synchronizeClockHeatPump:noArg"
-          ." INTERVAL:slider,30,30,1800";
+          ." INTERVAL ";
           
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -778,16 +781,16 @@ LUXTRONIK2_UpdateDone($)
       if ($value ne "") {
          readingsBulkUpdate($hash,"statBoilerGradientCoolDown",$value); 
          Log3 $name,3,"$name: statBoilerGradientCoolDown set to $value";
+         my @new = split / /, $value;
          if ( exists( $hash->{READINGS}{statBoilerGradientCoolDownMin} ) ) {
-            my @new = split / /, $value;
             my @old = split / /, $hash->{READINGS}{statBoilerGradientCoolDownMin}{VAL};
             if ($new[5]>6 && $new[1]>$old[1] && $new[1] < 0) {
-               readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value); 
-               Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to $value";
+               readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value,1); 
+               Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to '$value'";
             }
-         } else {
-            readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value); 
-            Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to $value";
+         } elsif ($new[5]>6 && $new[1] < 0) {
+            readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value,1); 
+            Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to '$value'";
          }
       }
       
@@ -852,9 +855,9 @@ LUXTRONIK2_UpdateDone($)
            && $a[11] == 1
           && $averageAmbientTemperature >= $thresholdHeatingLimit) {
           if ($ambientTemperature>=10 ) {
-            $value = "Heizungsgrenze (Soll 1&#176;C)";
+            $value = "Heizungsgrenze (Soll 15 C)";
           } else {
-            $value = "Frostschutz (Soll 20&#176;C)";
+            $value = "Frostschutz (Soll 20 C)";
           }
      } else {
        $value = $heatingState{$a[46]};
@@ -862,9 +865,9 @@ LUXTRONIK2_UpdateDone($)
      # Consider heating reduction limit
       if ($a[46] == 0) {
         if ($thresholdTemperatureSetBack <= $ambientTemperature) { 
-          $value .= " ".LUXTRONIK2_CalcTemp($a[47])."°C"; 
+          $value .= " ".LUXTRONIK2_CalcTemp($a[47])." C"; #° &deg; &#176; &#x00B0; 
         } else {
-          $value = "Normal da < ".$thresholdTemperatureSetBack."°C"; 
+          $value = "Normal da < ".$thresholdTemperatureSetBack." C"; 
         }
       }
      }
@@ -950,14 +953,14 @@ LUXTRONIK2_UpdateDone($)
         $value .= "$opStateHeatPump1<br>\n";
         $value .= "$opStateHeatPump2<br>\n";
         $value .= "$opStateHeatPump3<br>\n";
-        $value .= "Brauchwasser: ".$hotWaterTemperature."&#176;C";
+        $value .= "Brauchwasser: ".$hotWaterTemperature."&deg;C";
         readingsBulkUpdate($hash,"floorplanHTML",$value);
      }
     # State update
       $value = "$opStateHeatPump1 $opStateHeatPump2 - $opStateHeatPump3";
       if ($thermalPower != 0) { 
-         $value .= " (".sprintf ("%.1f", $thermalPower)." kW";
-         if ($heatPumpPower>0) {$value .= ", COP: ".sprintf ("%.2f", $cop);}
+         $value .= sprintf (" (%.1f kW", $thermalPower);
+         if ($heatPumpPower>0) {$value .= sprintf (", COP: %.2f", $cop);}
          $value .= ")"; }
       readingsBulkUpdate($hash, "state", $value);
      
@@ -1235,22 +1238,20 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$$$)
       $save = 1;
       $last[0] = $currOpState;
       $value2 = ($currOpHours - $last[2])/60;
-      if ($value2 > 9.5) {
+      if ($value2 >= 6) {
          $value1 = $last[3] / $last[5];
-         $returnStr = "aT: " . sprintf "%.1f", $value1;
+         $returnStr = sprintf "aT: %.1f", $value1;
          $value1 = $last[4] / $last[5];
-         $returnStr .= " iT: " . sprintf "%.1f", $value1;
-         $returnStr .= " tT: " . sprintf "%.1f", $targetTemp;
+         $returnStr .= sprintf " iT: %.1f", $value1;
+         $returnStr .= " tT: " . $targetTemp;
          $value1 = $currHeatQuantity -  $last[1];
          $value3 = $value1 * 60 / $value2;
-         $returnStr .= " thP: " . sprintf "%.1f", $value3;
-         $returnStr .= " DQ: " . sprintf "%.1f", $value1;
-         $returnStr .= " t: " . sprintf "%.0f", $value2;
+         $returnStr .= sprintf " thP: %.1f DQ: %.1f t: %.0f", $value3, $value1, $value2;
          if ($last[7]>0) {
             $value1 = $value3 *1000 / $last[7] * $last[5];;
-            $returnStr .= " COP: " . sprintf "%.2f", $value1;
+            $returnStr .= sprintf " COP: %.2f", $value1;
          }
-         if ($last[6] > $targetTemp) { $returnStr .= " tTStart: " . sprintf "%.1f", $last[6]; }
+         if ($last[6] > $targetTemp) { $returnStr .= " tTStart: " . $last[6]; }
       }
    }
 
@@ -1339,21 +1340,16 @@ LUXTRONIK2_doStatisticBoilerHeatUp ($$$$$$)
         Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 3->1: Boiler heat-up measurement finished";
         $value1 =  ( int(10 * $maxTemp) - int(10 * $minTemp) ) / 10; # delta hot water temperature
         $value2 = ( $currOpHours - $lastOpHours ) / 60; # delta time (minutes)
-        $returnStr = "DT/min: ".sprintf("%.2f", $value1/$value2)." DT: ".sprintf("%.2f", $value1)." Dmin: ".sprintf("%.0f", $value2);
-
-        $value3 = $currHQ - $lastHQ; # delta heat quantity
-        # Delta Heat Quantity
-        $returnStr .= " DQ: ".sprintf("%.1f",$value3);
-        # Average thermal power
-        $returnStr .= " thP: ".sprintf("%.1f",$value3 * 60 / $value2);
-        
+        $value3 = $currHQ - $lastHQ; # delta heat quantity, average thermal power
+ 
+        $returnStr = sprintf "DT/min: %.2f DT: %.2f Dmin: %.0f DQ: %.1f thP: %.1f", $value1/$value2, $value1, $value2, $value3, $value3*60/$value2;
         
         #real (mixed) Temperature-Difference
         my $boilerVolumn = AttrVal($name, "boilerVolumn", 0);
         if ($boilerVolumn >0 ) {
            # (delta T) [K] = Wärmemenge [kWh] / #Volumen [l] * ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 40°C) * 0,992 [kg/l] (H2O Dichte bei 40°C) ) [K/(kWh*l)] )  
            $value2 = 868.4 * $value3 / $boilerVolumn ;  
-           $returnStr .= " realDT: ".sprintf("%.0f", $value2);
+           $returnStr .= sprintf " realDT: %.0f", $value2;
         }
         
         $step = 1; 
@@ -1416,9 +1412,9 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
             $value1 =  $currTemp - $maxTemp; # delta hot water temperature
             $value2 = ( $time - $startTime ) / 3600; # delta time (hours)
          }
-         $value3 = sprintf("%.2f", $value1 / $value2 );  # Temperature gradient over time rounded to 1/100th
-         $value2 = sprintf("%.2f", $value2 ); # rounded to 1/100th
-         $value1 = sprintf("%.1f", $value1 ); # rounded to 1/10th
+         $value3 = sprintf("%.2f", $value1 / $value2);  # Temperature gradient over time rounded to 1/100th
+         $value2 = sprintf("%.2f", $value2); # rounded to 1/100th
+         $value1 = sprintf("%.1f", $value1); # rounded to 1/10th
          $returnStr = "DT/h: $value3 DT: $value1 Dh: $value2";
          $step = 0;
       } 
@@ -1509,7 +1505,7 @@ LUXTRONIK2_doStatisticMinMaxSingle ($$$$)
       $a[1]++; # Count
       $a[3] += $value; # Sum
       if ($value < $b[1]) { $b[1]=$value; } # Min
-      if ($a[1]>0) {$b[3] = sprintf "%.1f" , $a[3] / $a[1];} # Avg
+      if ($a[1]>0) {$b[3] = sprintf "%.1f" , $a[3] / $a[1] ;} # Avg
       if ($value > $b[5]) { $b[5]=$value; } # Max
 
       # in case of period change, save "last" values and reset counters
@@ -1712,7 +1708,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
 
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
-<ul>
+<ul style="width:800px">
   Luxtronik 2.0 is a heating controller used in <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, Siemens Novelan (WPR NET) and Wolf Heiztechnik (BWL/BWS) heat pumps.
   <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
@@ -1830,7 +1826,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
 
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
-<ul>
+<ul style="width:800px">
   Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, 
   Siemens Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist.
   <br>
@@ -1944,7 +1940,8 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
       gesetzt ist, dann wird der Firmware-Test ignoriert und neue Firmware kann getestet werden.
       Dieses Attribut wird jedoch ignoriert, wenn die Steuerungs-Firmware bereits als nicht kompatibel berichtet wurde.
       </li><br>
-    <li><code>statusHTML</code><br>
+    <li><code>statusHTML</code>
+      <br>
       wenn gesetzt, dann wird ein HTML-formatierter Wert "floorplanHTML" erzeugt, 
       welcher vom Modul <a href="#FLOORPLAN">FLOORPLAN</a> genutzt werden kann.<br>
       Momentan wird nur gepr&uuml;ft, ob der Wert dieses Attributes ungleich NULL ist, 

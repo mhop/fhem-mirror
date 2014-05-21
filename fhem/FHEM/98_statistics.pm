@@ -874,7 +874,7 @@ statistics_FormatDuration($)
    <ul>
       <li><b>Minimal-, Mittel- und Maximalwerte:</b> brightness, current, humidity, temperature, voltage, wind, windSpeed</li>
       <li><b>Deltawerte:</b> count, energy, power, total, rain, rain_total</li>
-      <li><b>Dauer der Stati:</b> Window, state <i>(wenn kein anderer Gerätewert gültig)</i></li>
+      <li><b>Dauer der Stati:</b> Window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
   <br>&nbsp;
   <br>
@@ -929,12 +929,12 @@ statistics_FormatDuration($)
       <br>
       Start der Berechnung der periodischen Daten, standardm&auml;ssig 10 Sekunden vor der vollen Stunde,
       <br>
-      erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;ßert werden
+      erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden
       <br>
     </li><br>
     <li><code>singularReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;:Statistiktypen<i>(Min|Avg|Max|Delta)</i>:ZeitPeriode<i>(Hour|Day|Month|Year)</i></code>
       <br>
-      Regulärer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
+      Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
       <br>
       z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>

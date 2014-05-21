@@ -269,6 +269,9 @@ JSONMETER_Set($$@)
    elsif($cmd eq 'activeTariff' && int(@_)==4 ) {
       $val = 0 if( $val < 1 || $val > 9 );
       readingsSingleUpdate($hash,"activeTariff",$val, 1);
+       $hash->{LOCAL} = 1;
+       JSONMETER_GetUpdate($hash);
+       $hash->{LOCAL} = 0;
       return "$name: activeTariff set to $val.";
    }
    my $list = "statusRequest:noArg"
@@ -884,7 +887,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
-<ul>
+<ul style="width:800px">
   This module reads data from a measurement unit (so called smart meters for electricity, gas or heat)
   <br>
   that provides OBIS compliant data in JSON format on a webserver or on the FHEM file system.
@@ -1002,7 +1005,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
-<ul>
+<ul style="width:800px">
   Dieses Modul liest Daten von Messger&auml;ten (z.B. Stromz&auml;hler, Gasz&auml;hler oder W&auml;rmez&auml;hler, so genannte Smartmeter),
   <br>
   welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
