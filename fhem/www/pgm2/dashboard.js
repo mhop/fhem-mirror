@@ -1,7 +1,7 @@
 //########################################################################################
 // dashboard.js
 //########################################################################################
-// Released : 14.11.2013 @svenson08
+// Released : 14.11.2013 Sascha Hermann
 // Version : 
 // 1.01: Released to testers 
 // 1.02: Add DebugMsg. Fix independent Groupsize adjustment after set & siterefresh. Fix
@@ -241,7 +241,7 @@ function GetColWidth(ColCount, ColWidth){
  }
  if (ColWidthSum < 100) { aColWidth[ColWidthCount-1] = parseInt(aColWidth[ColWidthCount-1]) + (100 - ColWidthSum); } //fill up to 100% width  
 
- aColWidth[0] = parseInt(aColWidth[0])-(0.22 * ColCount);
+ aColWidth[0] = parseInt(aColWidth[0])-(0.3 * ColCount);
  return aColWidth;
 }
 
