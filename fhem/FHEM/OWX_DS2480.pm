@@ -98,9 +98,7 @@ sub query ($$$) {
   $hwdevice->baudrate($serial->{baud});
   $hwdevice->write_settings;
 
-  if( $main::owx_async_debug > 2){
-    main::Log3($serial->{name},3, "OWX_DS2480.query sending out: ".unpack ("H*",$cmd));
-  }
+  main::Log3($serial->{name},5, "OWX_DS2480.query sending out: ".unpack ("H*",$cmd));
   
   my $count_out = $hwdevice->write($cmd);
 
@@ -134,19 +132,26 @@ sub read() {
   $serial->{string_in} .= $string_part;                            
   $serial->{retcount} += $count_in;		
   $serial->{num_reads}++;
-  if( $main::owx_async_debug > 2){
-    main::Log3($serial->{name},3, "OWX_DS2480 read: Loop no. $serial->{num_reads}");
-  }
-  if( $main::owx_async_debug > 2){	
-    main::Log3($serial->{name},3, "OWX_DS2480 read: Receiving in loop no. $serial->{num_reads} ".unpack("H*",$string_part));
+  if( $main::owx_async_debug > 1){
+    if ($count_in>0) {
+      main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}, Receiving: ".unpack("H*",$string_part));
+    } else {
+      main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}");
+    }
   }
   return $count_in > 0 ? 1 : undef;
 }
 
 sub response_ready() {
   my ($serial) = @_;
-  return 1 if ($serial->{retcount} >= $serial->{retlen});
-  die "OWX_DS2480 read timeout, bytes read: $serial->{retcount}, expected: $serial->{retlen}" if (($serial->{num_reads} > 1) and (tv_interval($serial->{starttime}) > $serial->{timeout}));
+  if ($serial->{retcount} >= $serial->{retlen}) {
+    main::Log3($serial->{name},5, "OWX_DS2480 read: After loop no. $serial->{num_reads} received: ".unpack("H*",$serial->{string_in}));
+    return 1;
+  }
+  if (($serial->{num_reads} > 1) and (tv_interval($serial->{starttime}) > $serial->{timeout})) {
+    main::Log3($serial->{name},5, "OWX_DS2480 read: After loop no. $serial->{num_reads} received: ".unpack("H*",$serial->{string_in}). " -> TIMEOUT");
+    die "OWX_DS2480 read timeout, bytes read: $serial->{retcount}, expected: $serial->{retlen}" ;
+  }
   return 0;
 }
 
