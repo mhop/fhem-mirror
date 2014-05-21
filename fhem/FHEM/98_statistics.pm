@@ -38,7 +38,7 @@ use warnings;
 use Time::Local;
 
 sub statistics_PeriodChange($);
-sub statistics_DoStatisticsAll($);
+sub statistics_DoStatisticsAll($$);
 sub statistics_DoStatistics ($$$);
 sub statistics_doStatisticMinMax ($$$$$);
 sub statistics_doStatisticMinMaxSingle ($$$$$$$);
@@ -162,7 +162,7 @@ statistics_Set($$@)
       return $resultStr;
    
    } elsif ($cmd eq 'doStatistics') {
-      statistics_DoStatisticsAll($hash);
+      statistics_DoStatisticsAll($hash,0);
       return undef;
    }
   my $list = "resetStatistics:all" . statistics_getStoredDevices($hash);
@@ -185,7 +185,7 @@ statistics_Notify($$)
             delete($hash->{READINGS}{$r}); 
          }
      }
-     statistics_DoStatisticsAll $hash;
+     statistics_DoStatisticsAll $hash, 0;
      my %unknownDevices;
      foreach my $r (keys %{$hash->{READINGS}}) {
          if ($r =~ /^\.(.*):.*/) { $unknownDevices{$1}++; }
@@ -294,35 +294,23 @@ statistics_PeriodChange($)
    elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
    elsif ($dayNow != $dayLast) { $periodSwitch = 2; }
 
-   foreach my $r (keys %{$hash->{READINGS}}) 
-   {
-      if ($r =~ /^monitoredDevices.*/) {
-         if ($r !~/UnknownTypes|Unsupported/) {
-            Log3 $name,4,"$name: Starting period change statistics (Type: $periodSwitch) for all devices of reading '$r'";
-            my @devNameArray = split /,/, $hash->{READINGS}{$r}{VAL}; 
-            foreach my $devName (@devNameArray) {
-               Log3 $name,4,"$name: Doing period change statistics for device '$devName'";
-               statistics_DoStatistics $hash, $defs{$devName}, $periodSwitch;
-            }
-         }
-      }
-   }
+   statistics_DoStatisticsAll $hash, $periodSwitch;
 
    return undef;
 }
 
 ##########################
 sub
-statistics_DoStatisticsAll($)
+statistics_DoStatisticsAll($$)
 {
-   my ($hash) = @_;
+   my ($hash,$periodSwitch) = @_;
    my $name = $hash->{NAME};
    return "" if(!defined($hash->{DEV_REGEXP}));
    my $regexp = $hash->{DEV_REGEXP};
    foreach my $devName (sort keys %defs) {
-     if($devName =~ m/^($regexp)$/) {
-         Log3 $name,4,"$name: Doing statistics for device '$devName'";
-         statistics_DoStatistics($hash, $defs{$devName}, 0);
+     if ($devName ne $name && $devName =~ m/^($regexp)$/) {
+         Log3 $name,4,"$name: Doing statistics (type $periodSwitch) for device '$devName'";
+         statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
       }
    }
 }
@@ -783,7 +771,7 @@ statistics_FormatDuration($)
   my ($value) = @_;
   #Tage
   my $returnstr ="";
-  if ($value > 86400) { sprintf "%d\d ", int($value/86400); }
+  if ($value > 86400) { $returnstr = sprintf "%dd ", int($value/86400); }
   # Stunden
   $value %= 86400;
   $returnstr .= sprintf "%02d:", int($value/3600);
