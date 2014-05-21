@@ -7,7 +7,7 @@
 # Prof. Dr. Peter A. Henning
 # Norbert Truchsess
 #
-# $Id: OWX_SER.pm 2013-04 - ntruchsess $
+# $Id$
 #
 ########################################################################################
 #
