@@ -1130,7 +1130,8 @@ sub OWX_ASYNC_RunTasks($) {
   my ( $master ) = @_;
   my ( $owx_dev, $queue );
   if ($master->{STATE} eq "Active") {
-    while ( ( $owx_dev, $queue ) = each %{$master->{tasks}} ) {
+    foreach my $owx_dev (keys %{$master->{tasks}}) {
+      my $queue = $master->{tasks}->{$owx_dev};
       if (@$queue) {
         my $task = $queue->[0];
         my $ret;
