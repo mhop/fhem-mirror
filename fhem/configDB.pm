@@ -166,6 +166,8 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "unknown";
 }
 
+$attr{configdb}{nostate} = 1 if($ENV{'cfgDB_nostate'});
+
 ##################################################
 # Basic functions needed for DB configuration
 # directly called from fhem.pl
@@ -312,7 +314,7 @@ sub cfgDB_ReadAll($) {
 	# add Config Rows to commandfile
 	@dbconfig = _cfgDB_ReadCfg(@dbconfig);
 	# add State Rows to commandfile
-	@dbconfig = _cfgDB_ReadState(@dbconfig);
+	@dbconfig = _cfgDB_ReadState(@dbconfig) unless $attr{configdb}{nostate};
 	# AnalyzeCommandChain for all entries
 	$ret = _cfgDB_Execute($cl, @dbconfig);
 	return $ret if($ret);
