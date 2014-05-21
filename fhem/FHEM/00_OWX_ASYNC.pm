@@ -10,7 +10,7 @@
 # Norbert Truchsess
 # Prof. Dr. Peter A. Henning
 #
-# $Id: 00_OWX_ASYNC.pm 2013-04 - ntruchsess $
+# $Id$
 #
 ########################################################################################
 #
