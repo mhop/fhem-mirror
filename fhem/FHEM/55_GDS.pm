@@ -555,6 +555,7 @@ sub decodeCAPData($$){
 	$readings{a_valid}			= checkCAPValid($readings{a_expires});
 	$readings{a_onset_local}		= capTrans($readings{a_onset});
 	$readings{a_expires_local}	= capTrans($readings{a_expires});
+	$readings{a_sent_local}	= capTrans($readings{a_sent});
 
 # text informations
 	$readings{a_headline}		= $alertsXml->{info}[$info]{headline};
