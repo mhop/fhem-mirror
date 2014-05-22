@@ -725,7 +725,7 @@ sub _cfgDB_Recover($) {
 # delete old configurations
 sub _cfgDB_Reorg(;$$) {
 	my ($lastversion,$quiet) = @_;
-	$lastversion = ($lastversion > 0) ? $lastversion : 3;
+	$lastversion = (defined($lastversion)) ? $lastversion : 3;
 	Log3('configDB', 4, "DB Reorg started, keeping last $lastversion versions.");
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version > $lastversion)");
