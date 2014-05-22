@@ -1518,7 +1518,6 @@ CommandDefine($$)
   return "Invalid characters in name (not A-Za-z0-9.:_): $name"
                         if($name !~ m/^[a-z0-9.:_]*$/i);
 
-  %ntfyHash = ();
   my $m = $a[1];
   if(!$modules{$m}) {                           # Perhaps just wrong case?
     foreach my $i (keys %modules) {
@@ -1563,8 +1562,8 @@ CommandDefine($$)
       $hash{NTFY_ORDER} = ($modules{$m}{NotifyOrderPrefix} ?
                 $modules{$m}{NotifyOrderPrefix} : "50-") . $name;
     }
+    %ntfyHash = ();
     DoTrigger("global", "DEFINED $name", 1) if($init_done);
-
   }
   return $ret;
 }
