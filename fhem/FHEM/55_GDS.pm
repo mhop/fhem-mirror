@@ -627,7 +627,7 @@ sub capTrans($) {
 	my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime($t+$offset);
 	$mon  += 1;
 	$year += 1900;
-	$t = sprintf "%02s.%02s.%02s %02s:%02s:%02s\n", $mday, $mon, $year, $hour, $min, $sec;
+	$t = sprintf "%02s.%02s.%02s %02s:%02s:%02s", $mday, $mon, $year, $hour, $min, $sec;
 	return $t;
 }
 
