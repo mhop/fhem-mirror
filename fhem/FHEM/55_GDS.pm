@@ -150,7 +150,7 @@ sub GDS_Shutdown($) {
 sub GDS_Set($@) {
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
-	my $usage =	"Unknown argument, choose one of clear:noArg help:noArg rereadcfg:noArg update:noArg ".
+	my $usage =	"Unknown argument, choose one of clear:alerts,all help:noArg rereadcfg:noArg update:noArg ".
 				"conditions:".$sList." ";
 
 	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
@@ -165,8 +165,8 @@ sub GDS_Set($@) {
 	given($command) {
 		when("clear"){
 			CommandDeleteReading(undef, "$name a_.*");
-			CommandDeleteReading(undef, "$name c_.*");
-			CommandDeleteReading(undef, "$name g_.*");
+			CommandDeleteReading(undef, "$name c_.*") if(defined($parameter) && $parameter eq "all");
+			CommandDeleteReading(undef, "$name g_.*") if(defined($parameter) && $parameter eq "all");
 			}
 		when("help"){
 			$result = setHelp();
@@ -367,7 +367,7 @@ sub getHelp(){
 			"get <name> alerts <region>\n".
 			"get <name> conditions <stationName>\n".
 			"get <name> help\n".
-			"get <name> list stations|data\n".
+			"get <name> list capstations|stations|data\n".
 			"get <name> rereadcfg\n".
 			"get <name> warnings <region>\n";
 }
@@ -1204,9 +1204,12 @@ sub initDropdownLists($){
 	<ul>
 
 		<br/>
-		<code>set &lt;name&gt; clear </code>
+		<code>set &lt;name&gt; clear alerts|all</code>
 		<br/><br/>
-		<ul>Delete all a_*, c_* and g_* readings</ul>
+		<ul>
+			<li>alerts: Delete all a_* readings</li>
+			<li>all: Delete all a_*, c_* and g_* readings</li>
+		</ul>
 		<br/>
 
 		<code>set &lt;name&gt; conditions &lt;stationName&gt;</code>
@@ -1265,10 +1268,10 @@ sub initDropdownLists($){
 		<ul>Show a help text with available commands</ul>
 		<br/>
 
-		<code>get &lt;name&gt; list capstationlist|data|stations</code>
+		<code>get &lt;name&gt; list capstations|data|stations</code>
 		<br/><br/>
 		<ul>
-			<li><b>capstationlist:</b> Retrieve list showing all defined warning regions. You can find your WARNCELLID with this list.</li>
+			<li><b>capstations:</b> Retrieve list showing all defined warning regions. You can find your WARNCELLID with this list.</li>
 			<li><b>data:</b> List current conditions for all available stations in one single table</li>
 			<li><b>stations:</b> List all available stations that provide conditions data</li>
 		</ul>
