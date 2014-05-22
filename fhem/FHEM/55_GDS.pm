@@ -686,6 +686,7 @@ sub retrieveConditions($$@){
 	"RR1" => "r", "RR24" => "r", "SSS" => "r", "DD" => "r", "FF" => "r", "FX" => "r", "Wetter/Wolken" => "l", "B\xF6en" => "l");
 	
 	foreach $item (@a) {
+		Log3($hash, 4, "conditions item: $item");
 		$wx{$item} = &readItem($line, $pos{$item}, $alignment{$item}, $item);
 	}
 
