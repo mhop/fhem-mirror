@@ -271,7 +271,7 @@ sub UpdateSprinkleControlList($$) {
 
   foreach my $d (sort keys %defs) { 
     if($defs{$d}{TYPE} eq "SprinkleControl") {
-      push(@newlist, $d) unless(defined($hash) && ($d eq $hash->{NAME}) && ($cmd eq "del"))
+      push(@newlist, $d) unless(defined($hash) && ($d eq $hash->{NAME}) && ($cmd eq "del"));
     }
   }
   

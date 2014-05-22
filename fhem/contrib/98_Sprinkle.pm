@@ -285,10 +285,14 @@ sub Sprinkle_InternalTimerDoIt(@) {
     my ($rel, $hr, $min, $sec) = ($1, $2, $3, $4);
     my @lt = localtime(time);
     my $nt = time;
-    $nt -= ($lt[2]*3600+$lt[1]*60+$lt[0]) # Midnight for absolute time
-      if($rel ne "+");
-    $nt += ($hr*3600+$min*60+$sec); # Plus relative time
-    
+
+    if($rel ne "+") {
+      $nt -= (($lt[2]*3600)+($lt[1]*60)+$lt[0]); # Midnight for absolute time
+      $nt += 86400 if((($lt[2]*3600)+($lt[1]*60)+$lt[0]) >= (($hr*3600)+($min*60)+$sec)); # tomorrow is next time
+    }
+
+    $nt += (($hr*3600)+($min*60)+$sec); # Plus relative time
+
     @lt = localtime($nt);
     my $ntm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
     $hash->{NextTime} = $ntm;
@@ -394,7 +398,7 @@ sub Sprinkle_DoIt($$) {
       if($oldState ne "on" && (($SprinkleControl && SprinkleControl_AllocateNewThread($SprinkleControl, $me, $cmd)) || !$SprinkleControl)) {
         fhem "set $device $OnCmdAdd $OnCmd";
         $doit = 1;
-      }  elsif ($oldState ne $newState) {
+      }  elsif($oldState ne $newState) {
         $newState = "Wait";
         $doit = 2;
       }
@@ -408,7 +412,6 @@ sub Sprinkle_DoIt($$) {
   }
 
   readingsSingleUpdate($hash, "state", $newState, 1) if($doit >= 1);
-
   return $newState;
 }
 
