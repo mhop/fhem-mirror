@@ -1144,6 +1144,11 @@ sub initDropdownLists($){
 #
 #	2014-05-07	added readings a_onset_local & a_expires_local
 #
+#	2014-05-22	added reading a_sent_local
+#
+#	2014-05-23	added set <name> clear alerts|all
+#							fixed some typos in docu and help
+#
 ####################################################################################################
 #
 # Further informations
