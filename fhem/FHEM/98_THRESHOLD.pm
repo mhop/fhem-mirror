@@ -35,7 +35,7 @@ THRESHOLD_Initialize($)
   $hash->{SetFn}   = "THRESHOLD_Set";
   $hash->{AttrFn}   = "THRESHOLD_Attr";
   $hash->{NotifyFn} = "THRESHOLD_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 state_format state_cmd1_gt state_cmd2_lt target_func number_format";
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 state_format state_cmd1_gt state_cmd2_lt target_func number_format setOnDeactivated:cmd1_gt,cmd2_lt";
 }
 
 
@@ -269,6 +269,7 @@ THRESHOLD_Set($@)
   my $offset = $hash->{offset};
   my $mode;
   my $state_format = AttrVal($pn, "state_format", "_m _dv");
+  my $cmd = AttrVal($pn, "setOnDeactivated", "");
  
   if ($arg eq "desired" ) {
     return "$pn: set desired value:$value, desired value needs a numeric parameter" if(@a != 3 || $value !~ m/^[-\d\.]*$/);
@@ -293,21 +294,22 @@ THRESHOLD_Set($@)
     readingsEndUpdate    ($hash, 1);
     return THRESHOLD_Check($hash);
   } elsif ($arg eq "deactivated" ) {
-      if ($value ne "") {
-        if ($value eq "cmd1_gt" ) {
+      $cmd = $value if ($value ne "");
+      if ($cmd ne "") {
+        if ($cmd eq "cmd1_gt" ) {
             readingsBeginUpdate  ($hash);
             THRESHOLD_setValue   ($hash,1);
             THRESHOLD_set_state  ($hash);
             readingsEndUpdate    ($hash, 1);
-        } elsif ($value eq "cmd2_lt" ) {
+        } elsif ($cmd eq "cmd2_lt" ) {
             readingsBeginUpdate  ($hash);
             THRESHOLD_setValue   ($hash,2);
             THRESHOLD_set_state  ($hash);
             readingsEndUpdate    ($hash, 1);
           } else {
-            return "$pn: set deactivated: $value, unknown command";
+            return "$pn: set deactivated: $cmd, unknown command, use: cmd1_gt or cmd2_lt";
           }
-      }
+      } 
       $ret=CommandAttr(undef, "$pn disable 1");   
   } elsif ($arg eq "active" ) {
       return "$pn: set active, set desired value first" if ($desired_value eq "");
@@ -915,6 +917,8 @@ THRESHOLD_setValue($$)
     The sensor value is given as "_tv" in the expression.<br>
     Example:<br>
     <code>attr TH_heating target_func -0.578*_tv+33.56</code><br>
+    <li>setOnDeactivated</li>
+    Command to be executed before deactivating. Possible values: cmd1_gt, cmd2_lt<br>
   </ul>
   <br>
     
@@ -1288,7 +1292,9 @@ THRESHOLD_setValue($$)
     <li>target_func</li>
     Hier kann ein Perlausdruck angegeben werden, um aus dem Vorgabewert eines externen Sensors (target_value) einen Sollwert zu berechnen.<br>
     Der Sensorwert wird mit "_tv" im Ausdruck angegeben. Siehe dazu Beispiele oben zur Steuerung der Heizung nach einer Heizkennlinie.<br>
-  </ul>
+    <li>setOnDeactivated</li>
+    Kommando, welches vor dem Deaktivieren ausgeführt werden soll. Mögliche Angaben: cmd1_gt, cmd2_lt<br>
+    </ul>
   <br>
     
 =end html_DE
