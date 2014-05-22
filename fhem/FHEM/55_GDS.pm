@@ -444,7 +444,7 @@ sub getListCapStations($$){
 sub setHelp(){
 	return	"Use one of the following commands:\n".
 			sepLine(35)."\n".
-			"set <name> clear\n".
+			"set <name> clear alerts|all\n".
 			"set <name> conditions <stationName>\n".
 			"set <name> rereadcfg\n".
 			"set <name> update\n".
