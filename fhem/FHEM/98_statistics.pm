@@ -87,7 +87,10 @@ statistics_Initialize($)
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
   $hash->{AttrList} = "disable:0,1 "
                    ."dayChangeTime "
+                   ."deltaReadings "
+                   ."durationReadings "
                    ."excludedReadings "
+                   ."minAvgMaxReadings "
                    ."periodChangePreset "
                    ."singularReadings "
                    .$readingFnAttributes;
@@ -364,6 +367,37 @@ statistics_DoStatistics($$$)
       if ($$f[1] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $$f[2], $periodSwitch);}
       if ($$f[1] == 3) { statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch);}
    }
+    
+   my @specialReadings = split /|/, AttrVal($hashName, "deltaReadings", "");
+   foreach $readingName (@specialReadings) 
+   {
+      my $completeReadingName = $devName.":".$readingName;
+      next if ($completeReadingName =~ m/^($exclReadings)$/ );
+      next if not exists ($dev->{READINGS}{$readingName});
+      $statisticDone = 1;
+      statistics_doStatisticDelta ($hash, $dev, $readingName, 1, $periodSwitch);
+   }
+   
+   @specialReadings = split /|/, AttrVal($hashName, "durationReadings", "");
+   foreach $readingName (@specialReadings) 
+   {
+      my $completeReadingName = $devName.":".$readingName;
+      next if ($completeReadingName =~ m/^($exclReadings)$/ );
+      next if not exists ($dev->{READINGS}{$readingName});
+      $statisticDone = 1;
+      statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch);
+   }
+
+   @specialReadings = split /|/, AttrVal($hashName, "minAvgMaxReadings", "");
+   foreach $readingName (@specialReadings) 
+   {
+      my $completeReadingName = $devName.":".$readingName;
+      next if ($completeReadingName =~ m/^($exclReadings)$/ );
+      next if not exists ($dev->{READINGS}{$readingName});
+      $statisticDone = 1;
+      statistics_doStatisticMinMax ($hash, $dev, $readingName, 1, $periodSwitch);
+   }
+
    if ($statisticDone != 1) { 
       if (exists ($dev->{READINGS}{state})) { 
          statistics_doStatisticDuration $hash, $dev, "state", $periodSwitch;
@@ -546,15 +580,15 @@ statistics_doStatisticDelta ($$$$$)
       my $deltaValue = $value - $hidden[1];
       
     # Do statistic
-      $stat[1] = sprintf( "%.".$decPlaces."f", $stat[1] + $deltaValue);
-      $stat[3] = sprintf( "%.".$decPlaces."f", $stat[3] + $deltaValue);
-      $stat[5] = sprintf( "%.".$decPlaces."f", $stat[5] + $deltaValue);
-      $stat[7] = sprintf( "%.".$decPlaces."f", $stat[7] + $deltaValue);
+      $stat[1] += $deltaValue;
+      $stat[3] += $deltaValue;
+      $stat[5] += $deltaValue;
+      $stat[7] += $deltaValue;
 
     # Determine if "since" value has to be shown in current and last reading
     # If change of year, change yearly statistic
       if ($periodSwitch == 4) {
-         $last[7] = $stat[7];
+         $last[7] = sprintf "%.".$decPlaces."f", $stat[7];
          $stat[7] = 0;
          if ($showDate == 1) { $showDate = 0; } # Do not show the "since:" value for year changes anymore
          if ($showDate >= 2) { $showDate = 1; $last[9] = $stat[9]; } # Shows the "since:" value for the first year change
@@ -562,7 +596,7 @@ statistics_doStatisticDelta ($$$$$)
       }
     # If change of month, change monthly statistic 
       if ($periodSwitch >= 3){
-         $last[5] = $stat[5];
+         $last[5] = sprintf "%.".$decPlaces."f", $stat[5];
          $stat[5] = 0;
          if ($showDate == 3) { $showDate = 2; } # Do not show the "since:" value for month changes anymore
          if ($showDate >= 4) { $showDate = 3; $last[9] = $stat[9]; } # Shows the "since:" value for the first month change
@@ -575,7 +609,7 @@ statistics_doStatisticDelta ($$$$$)
          if ($showDate == 5) { $showDate = 4; } # Do not show the "since:" value for day changes anymore
          if ($showDate >= 6) { # Shows the "since:" value for the first day change
             $showDate = 5; 
-            $last[9] = $stat[9];
+            $last[9] = sprintf "%.".$decPlaces."f", $stat[9];
            # Next monthly and yearly values start at 00:00 and show only date (no time)
             $stat[5] = 0;
             $stat[7] = 0;
@@ -585,7 +619,7 @@ statistics_doStatisticDelta ($$$$$)
       }
     # If change of hour, change hourly statistic 
       if ($periodSwitch >= 1){
-         $last[1] = $stat[1];
+         $last[1] = sprintf "%.".$decPlaces."f", $stat[1];
          $stat[1] = 0;
          if ($showDate == 7) { $showDate = 6; } # Do not show the "since:" value for day changes anymore
          if ($showDate >= 8) { $showDate = 7; $last[9] = $stat[9]; } # Shows the "since:" value for the first hour change
@@ -594,7 +628,7 @@ statistics_doStatisticDelta ($$$$$)
    }
 
  # Store visible statistic readings (delta values)
-   $result = "Hour: $stat[1] Day: $stat[3] Month: $stat[5] Year: $stat[7]";
+   $result = sprintf "Hour: %.".$decPlaces."f Day: %.".$decPlaces."f Month: %.".$decPlaces."f Year: %.".$decPlaces."f", $stat[1], $stat[3], $stat[5], $stat[7];
    if ( $showDate >=2 ) { $result .= " (since: $stat[9] )"; }
    readingsBulkUpdate($dev,$statReadingName,$result, 1);
    Log3 $name,5,"$name: Set '$statReadingName'='$result'";
