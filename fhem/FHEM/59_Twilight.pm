@@ -361,8 +361,10 @@ sub Twilight_fireEvent($)
 
    my $nextEvent      = $hash->{TW}{$sx}{NEXTE};
    my $nextEventTime  = "undefined";
-      $nextEventTime  = strftime("%H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})) if ($hash->{TW}{$nextEvent}{TIME} ne "nan");
-   Log3 $hash, 4, "[".$hash->{NAME}."] " . sprintf  ("%-10s state=%-2s light=%-2s nextEvent=%-10s %-14s  deg=%+.1f°",$sx, $state, $light, $nextEvent, strftime("%d.%m.%Y  %H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})), $deg);
+   if ($hash->{TW}{$nextEvent}{TIME} ne "nan") {
+      $nextEventTime  = strftime("%H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME}));
+      Log3 $hash, 4, "[".$hash->{NAME}."] " . sprintf  ("%-10s state=%-2s light=%-2s nextEvent=%-10s %-14s  deg=%+.1f°",$sx, $state, $light, $nextEvent, strftime("%d.%m.%Y  %H:%M:%S",localtime($hash->{TW}{$nextEvent}{TIME})), $deg);
+   }
 
    my $eventTime  = $hash->{TW}{$sx}{TIME};
    my $now        = time();
