@@ -1,5 +1,5 @@
 ##############################################################################
-# $Id: 
+# $Id$
 ##############################################################################
 # Modul for I2C PWM Driver MCP23017
 #
@@ -341,11 +341,11 @@ sub I2C_MCP23017_Set($@) {
 	} else {
 	  my $list = "";
     foreach (0..7) {
-		  next unless ( ("A" . $_) ~~ @outports );		#Inputs Ã¼berspringen
+		  next unless ( ("A" . $_) ~~ @outports );		#Inputs überspringen
 			$list .= "PortA" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
     }
 		foreach (0..7) {
-		  next unless ( ("B" . $_) ~~ @outports );		#Inputs Ã¼berspringen
+		  next unless ( ("B" . $_) ~~ @outports );		#Inputs überspringen
 			$list .= "PortB" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
     }
     $msg = "Unknown argument $a[1], choose one of " . $list;
@@ -360,9 +360,9 @@ sub I2C_MCP23017_Set($@) {
 #			join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) )
 #			unless(exists($setsP{$val}));
 #		my $po = substr $cmd, 4, 1;		# A oder B
-#		my $regaddr = $po eq "A" ? $Registers{GPIOA} : $Registers{GPIOB};				#Adresse fÃ¼r GPIO Register
+#		my $regaddr = $po eq "A" ? $Registers{GPIOA} : $Registers{GPIOB};				#Adresse für GPIO Register
 #    substr($cmd,0,5,"");
-#	  return "$name error: Port$po$cmd is defined as input" unless ( ($po . $cmd) ~~ @outports );		#PrÃ¼fen ob entsprechender Port Input ist
+#	  return "$name error: Port$po$cmd is defined as input" unless ( ($po . $cmd) ~~ @outports );		#Prüfen ob entsprechender Port Input ist
 #
 #		my $sbyte = 0;
 #		foreach (reverse 0..7) {
@@ -379,11 +379,11 @@ sub I2C_MCP23017_Set($@) {
 #  } else {
 #	  my $list = "";
 #    foreach (0..7) {
-#		  next unless ( ("A" . $_) ~~ @outports );		#Inputs Ã¼berspringen
+#		  next unless ( ("A" . $_) ~~ @outports );		#Inputs überspringen
 #			$list .= "PortA" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
 #    }
 #		foreach (0..7) {
-#		  next unless ( ("B" . $_) ~~ @outports );		#Inputs Ã¼berspringen
+#		  next unless ( ("B" . $_) ~~ @outports );		#Inputs überspringen
 #			$list .= "PortB" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
 #    }
 #    return "Unknown argument $a[1], choose one of " . $list;
@@ -414,20 +414,20 @@ sub I2C_MCP23017_I2CRec($@) {																									#ueber CallFn vom physical
   my $name = $hash->{NAME};  
   my $phash = $hash->{IODev};
   my $pname = $phash->{NAME};
-  while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals fÃ¼r alle Keys in $clientmsg die mit dem physical Namen beginnen
+  while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals für alle Keys in $clientmsg die mit dem physical Namen beginnen
     $hash->{$k} = $v if $k =~ /^$pname/ ;
   } 
-	#hier noch Ã¼berprÃ¼fen, ob Register und Daten ok
+	#hier noch überprüfen, ob Register und Daten ok
   if ($clientmsg->{direction} && defined $clientmsg->{reg} && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok" ) {
 		if ($clientmsg->{direction} eq "i2cread" && $clientmsg->{received}) { # =~ m/^[a-f0-9]{2}$/i) {
-			#my @rec = @{$clientmsg->{received}};							#bei Ã¼bergabe im hash als array
-			my @rec = split(" ",$clientmsg->{received});			#bei Ã¼bergabe im als skalar
+			#my @rec = @{$clientmsg->{received}};							#bei übergabe im hash als array
+			my @rec = split(" ",$clientmsg->{received});			#bei übergabe im als skalar
 			Log3 $hash, 3, "$name: wrong amount of registers transmitted from $pname" unless (@rec == $clientmsg->{nbyte});
 			foreach (reverse 0..$#rec) {																							#reverse, damit Inputs (Register 0 und 1 als letztes geschrieben werden)
 				I2C_MCP23017_UpdReadings($hash, $_ + $clientmsg->{reg} , $rec[$_]);
 			}
 			readingsSingleUpdate($hash,"state", "Ok", 1);
-		} elsif ($clientmsg->{direction} eq "i2cwrite" && defined $clientmsg->{data}) { # =~ m/^[a-f0-9]{2}$/i) {#readings aktualisieren wenn Ãœbertragung ok
+		} elsif ($clientmsg->{direction} eq "i2cwrite" && defined $clientmsg->{data}) { # =~ m/^[a-f0-9]{2}$/i) {#readings aktualisieren wenn Übertragung ok
 			I2C_MCP23017_UpdReadings($hash, $clientmsg->{reg} , $clientmsg->{data}) if ( ($clientmsg->{reg} == $Registers{GPIOA}) || ($clientmsg->{reg} == $Registers{GPIOB}) );
 			readingsSingleUpdate($hash,"state", "Ok", 1);
 		
@@ -466,14 +466,14 @@ sub I2C_MCP23017_UpdReadings($$$) {																						#nach Rueckmeldung read
 	  foreach (0..7) {
 			  my $pval = 1 & ( $inh >> $_ );
 				readingsBulkUpdate($hash, 'PortA'.$_ , $rsetsP{$pval}) 
-		      if (ReadingsVal($name, 'PortA'.$_,"nix") ne $rsetsP{$pval});  #nur wenn Wert geÃ¤ndert
+		      if (ReadingsVal($name, 'PortA'.$_,"nix") ne $rsetsP{$pval});  #nur wenn Wert geändert
 		}
 	} elsif ($reg == $Registers{GPIOB}) {
 		my %rsetsP = reverse %setsP;
 	  foreach (0..7) {
 			  my $pval = 1 & ( $inh >> $_ );
 				readingsBulkUpdate($hash, 'PortB'.$_ , $rsetsP{$pval}) 
-		      if (ReadingsVal($name, 'PortB'.$_,"nix") ne $rsetsP{$pval});  #nur wenn Wert geÃ¤ndert
+		      if (ReadingsVal($name, 'PortB'.$_,"nix") ne $rsetsP{$pval});  #nur wenn Wert geändert
 		}
 	}
 	
@@ -660,7 +660,7 @@ sub I2C_MCP23017_UpdReadings($$$) {																						#nach Rueckmeldung read
 			Standard: -, g&uuml;ltige Werte: A0-A7, B0-B7<br><br>
 		</li>
 		<li>Interrupt<br>
-			Durch Komma getrennte Input Ports, die einen Interrupt auf IntA/B auslÃ¶sen.<br>
+			Durch Komma getrennte Input Ports, die einen Interrupt auf IntA/B auslösen.<br>
 			Standard: -, g&uuml;ltige Werte: A0-A7, B0-B7<br><br>
 		</li>
 		<li>invert_input<br>
