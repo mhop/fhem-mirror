@@ -39,12 +39,32 @@ sub Heating_Control_Initialize($)
   }
 
 # Consumer
+  $hash->{SetFn}   = "Heating_Control_Set";
   $hash->{DefFn}   = "Heating_Control_Define";
   $hash->{UndefFn} = "Heating_Control_Undef";
   $hash->{GetFn}   = "Heating_Control_Get";
+  $hash->{AttrFn}  = "Heating_Control_Attr";  
   $hash->{UpdFn}   = "Heating_Control_Update";
   $hash->{AttrList}= "disable:0,1 windowSensor ".
                         $readingFnAttributes;
+}
+################################################################################
+sub Heating_Control_Set($@) {
+  my ($hash, @a) = @_;
+  return "no set value specified" if(int(@a) < 2);
+  return "Unknown argument $a[1], choose one of enable/disable refresh" if($a[1] eq "?");
+  
+  my $name = shift @a;
+  my $v = join(" ", @a);
+
+  Log3 $hash, 3, "[$name] set $name $v";
+  
+  if      ($v eq "enable") {
+     fhem("attr $name disable 1"); 
+  } elsif ($v eq "disable") {
+     fhem("attr $name disable 1"); 
+  }
+  return undef;
 }
 ################################################################################
 sub Heating_Control_Get($@)
@@ -461,7 +481,7 @@ sub Heating_Control_Device_Schalten($$$$) {
   my $mod     = "[".$hash->{NAME} ."] ";                                        ###
 
   #modifier des Zieldevices auswaehlen
-  my $setModifier = isHeizung($hash);
+  my $setModifier = Heating_Control_isHeizung($hash);
 
   # Kommando aufbauen
   if (defined $hash->{helper}{CONDITION}) {
@@ -513,7 +533,17 @@ sub Heating_Control_Device_Schalten($$$$) {
   }
 }
 ########################################################################
-sub isHeizung($) {
+sub Heating_Control_Attr($$$) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  if( $attrName eq "disable" ) {
+     my $hash = $defs{$name};
+     readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
+  }
+  return undef;
+}
+########################################################################
+sub Heating_Control_isHeizung($) {
   my ($hash)  = @_;
 
   my %setmodifiers =
@@ -532,8 +562,8 @@ sub isHeizung($) {
                        "HM-CC-RT-DN"           => 1 } );
   my $dHash = $defs{$hash->{DEVICE}};                                           ###
   my $dType = $dHash->{TYPE};
-  Log3 $hash, 5, "dType------------>$dType";
   return ""   if (!defined($dType));
+  Log3 $hash, 5, "dType------------>$dType";
 
   my $setModifier = $setmodifiers{$dType};
      $setModifier = ""  if (!defined($setModifier));
@@ -654,6 +684,49 @@ sub SortNumber {
       by well-known Block with {}.<br>
       Note: if a command is defined only this command are executed. In case of executing
       a "set desired-temp" command, you must define it explicitly.<br>
+  <!-- -------------------------------------------------------------------------- -->
+  <!----------------------------------------------------------------------------- -->
+  <!-- -------------------------------------------------------------------------- -->
+      <li>in the command section you can access the event:
+      <ul>
+        <li>The variable $EVENT will contain the complete event, e.g.
+          <code>measured-temp: 21.7 (Celsius)</code></li>
+        <li>$EVTPART0,$EVTPART1,$EVTPART2,etc contain the space separated event
+          parts (e.g. <code>$EVTPART0="measured-temp:", $EVTPART1="21.7",
+          $EVTPART2="(Celsius)"</code>. This data is available as a local
+          variable in perl, as environment variable for shell scripts, and will
+          be textually replaced for FHEM commands.</li>
+        <li>$NAME contains the device to send the event, e.g.
+          <code>myFht</code></li>
+       </ul></li>
+
+      <li>Note: the following is deprecated and will be removed in a future
+        release. The described replacement is attempted if none of the above
+        variables ($NAME/$EVENT/etc) found in the command.
+      <ul>
+        <li>The character <code>%</code> will be replaced with the received
+        event, e.g. with <code>on</code> or <code>off</code> or
+        <code>measured-temp: 21.7 (Celsius)</code><br> It is advisable to put
+        the <code>%</code> into double quotes, else the shell may get a syntax
+        error.</li>
+
+        <li>The character <code>@</code> will be replaced with the device
+        name.</li>
+
+        <li>To use % or @ in the text itself, use the double mode (%% or
+        @@).</li>
+
+        <li>Instead of <code>%</code> and <code>@</code>, the parameters
+        <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code> (same
+        as <code>@</code>) and <code>%TYPE</code> (contains the device type,
+        e.g.  <code>FHT</code>) can be used. The space separated event "parts"
+        are available as %EVTPART0, %EVTPART1, etc.  A single <code>%</code>
+        looses its special meaning if any of these parameters appears in the
+        definition.</li>
+      </ul></li>
+  <!-- -------------------------------------------------------------------------- -->
+  <!----------------------------------------------------------------------------- -->
+  <!-- -------------------------------------------------------------------------- -->
       The following parameter are replaced:<br>
         <ol>
           <li>@ => the device to switch</li>
@@ -806,7 +879,22 @@ sub SortNumber {
   </ul>
 
   <a name="Heating_Controlset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b> 
+
+    <code><b><font size="+1">set &lt;name&gt; &lt;value&gt;</font></b></code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    <b>enable</b>                # enables  the Heating_Control
+    <b>disable</b>               # disables the Heating_Control
+    </pre>
+
+    <b><font size="+1">Examples</font></b>:
+    <ul>
+      <code>set hc disable</code><br>
+      <code>set hc enable</code><br>
+    </ul>
+  </ul>  
 
   <a name="Heating_Controlget"></a>
   <b>Get</b> <ul>N/A</ul><br>

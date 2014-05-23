@@ -25,8 +25,7 @@ package main;
 use strict;
 use warnings;
 use POSIX;
-
-##################################### 
+########################################################################
 sub WeekdayTimer_Initialize($)
 {
   my ($hash) = @_;
@@ -37,6 +36,8 @@ sub WeekdayTimer_Initialize($)
   }
 
 # Consumer
+  $hash->{SetFn}   = "WeekdayTimer_Set";
+  $hash->{AttrFn}  = "WeekdayTimer_Attr";  
   $hash->{DefFn}   = "WeekdayTimer_Define";
   $hash->{UndefFn} = "WeekdayTimer_Undef";
   $hash->{GetFn}   = "WeekdayTimer_Get";
@@ -44,12 +45,21 @@ sub WeekdayTimer_Initialize($)
   $hash->{AttrList}= "disable:0,1 ".
                         $readingFnAttributes;
 }
-
+################################################################################
+sub WeekdayTimer_Set($@) {
+  my ($hash, @a) = @_;
+  return "no set value specified" if(int(@a) < 2);
+  return "Unknown argument $a[1], choose one of enable/disable refresh" if($a[1] eq "?");
+  
+  Heating_Control_Set($@);
+  
+  return undef;
+}
+########################################################################
 sub WeekdayTimer_Get($@) {
    return Heating_Control_Get($@);
 }
-
-
+########################################################################
 sub WeekdayTimer_Define($$){
   my ($hash, $def) = @_;
 
@@ -57,22 +67,32 @@ sub WeekdayTimer_Define($$){
   $hash->{helper}{DESIRED_TEMP_READING} = "";
   return $ret;
 }
-
+########################################################################
 sub WeekdayTimer_Undef($$){
   my ($hash, $arg) = @_;
   return Heating_Control_Undef($hash, $arg);
 }
-
+########################################################################
 sub WeekdayTimer_UpdatePerlTime($) {
     my ($hash) = @_;
     Heating_Control_UpdatePerlTime($hash);
 }
-
+########################################################################
 sub WeekdayTimer_Update($){
 my ($hash) = @_;
   return Heating_Control_Update($hash);
 }
-#
+########################################################################
+sub WeekdayTimer_Attr($$$) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  if( $attrName eq "disable" ) {
+     my $hash = $defs{$name};
+     readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
+  }
+  return undef;
+}
+########################################################################
 sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
 
   foreach my $hc ( sort keys %{$modules{WeekdayTimer}{defptr}} ) {
@@ -169,7 +189,22 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
   </ul>
 
   <a name="WeekdayTimerset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b>
+
+    <code><b><font size="+1">set &lt;name&gt; &lt;value&gt;</font></b></code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    <b>disable</b>               # disables the Weekday_Timer
+    <b>enable</b>                # enables  the Weekday_Timer
+    </pre>
+
+    <b><font size="+1">Examples</font></b>:
+    <ul>
+      <code>set wd disable</code><br>
+      <code>set wd enable</code><br>
+    </ul>
+  </ul>  
 
   <a name="WeekdayTimerget"></a>
   <b>Get</b> <ul>N/A</ul><br>
