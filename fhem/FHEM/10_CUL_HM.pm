@@ -145,7 +145,7 @@ sub CUL_HM_Initialize($) {
                        ."burstAccess:0_off,1_auto "
                        ."param msgRepeat "
                        ."tempListTmpl "
-                       ."levelRange "
+                       ."levelRange levelMap "
                        ."aesCommReq:1,0 "      # IO will request AES if 
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        .$readingFnAttributes;
@@ -701,6 +701,23 @@ sub CUL_HM_Attr(@) {#################################
       return "min:$min mit be lower then max:$max" if ($min >= $max);
     }
   }
+  elsif($attrName eq "levelMap" ){
+    if ($cmd eq "set"){
+      return "use $attrName only for channels" if (!$hash->{helper}{role}{chn});
+      delete $hash->{helper}{lm};
+      foreach (split":",$attrVal){
+        my ($val,$vNm) = split"=",$_;
+        if ($val !~ m/^\d*$/){
+          delete $hash->{helper}{lm};
+          return "$val is not numeric";
+        }
+        $hash->{helper}{lm}{$val} = $vNm;
+      }
+    }
+    else{
+      delete $hash->{helper}{lm};
+    }
+  }
   
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
@@ -1225,7 +1242,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $err = hex(substr($p,6,2));
       if    ($lvlStr{md}{$md}){$lvl = $lvlStr{md}{$md}{$lvl}}
       elsif ($lvlStr{st}{$st}){$lvl = $lvlStr{st}{$st}{$lvl} }
-      else                    {$lvl = hex($lvl)/2}
+      else                    {$lvl = hex($lvl)}
 
       push @evtEt,[$shash,1,"level:$lvl"] if($md eq "HM-Sen-Wa-Od");
       push @evtEt,[$shash,1,"state:$lvl"];
@@ -1432,7 +1449,8 @@ sub CUL_HM_Parse($$) {#########################################################
       $physLvl = ReadingsVal($name,"phyLevel",$val)
             if(!defined $physLvl);             #not updated? use old or ignore
 
-      my $vs = ($val==100 ? "on":($pVal==0 ? "off":"$val")); # user string...
+      my $vs = ($shash->{helper}{lm} && $shash->{helper}{lm}{$val})?$shash->{helper}{lm}{$val}
+                     :($val==100 ? "on":($pVal==0 ? "off":"$val")); # user string...
       push @evtEt,[$shash,1,"level:$val"];
       push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
@@ -1790,7 +1808,8 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     if (defined($state)){# if state was detected post events
       my $txt;
-      if    ($lvlStr{md}{$md}){$txt = $lvlStr{md}{$md}{$state}}
+      if    ($shash->{helper}{lm} && $shash->{helper}{lm}{hex($state)}){$txt = $shash->{helper}{lm}{hex($state)}}
+      elsif ($lvlStr{md}{$md}){$txt = $lvlStr{md}{$md}{$state}}
       elsif ($lvlStr{st}{$st}){$txt = $lvlStr{st}{$st}{$state}}
       else                    {$txt = "unknown:$state"}
 
@@ -2360,14 +2379,15 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $chn = hex(substr($p,0,2));
     my $long = ($chn & 0x40)?"long":"short";
     $chn = $chn & 0x3f;
-    my $cName = CUL_HM_id2Hash($src.sprintf("%02X",$chn));
-    $cName = $cName->{NAME};
+    my $cHash = CUL_HM_id2Hash($src.sprintf("%02X",$chn));
+    my $cName = $cHash->{NAME};
     my $level = "-";
     if (length($p)>5){
       my $l = substr($p,4,2);
-      if    ($lvlStr{md}{$md} && $lvlStr{md}{$md}{$l}){$level = $lvlStr{md}{$md}{$l}}
-      elsif ($lvlStr{st}{$st} && $lvlStr{st}{$st}{$l}){$level = $lvlStr{st}{$st}{$l}}
-      else                                            {$level = hex($l)};
+      if    ($cHash->{helper}{lm} && $cHash->{helper}{lm}{hex($l)}){$level = $cHash->{helper}{lm}{hex($l)}}
+      elsif ($lvlStr{md}{$md}     && $lvlStr{md}{$md}{$l}    ){$level = $lvlStr{md}{$md}{$l}}
+      elsif ($lvlStr{st}{$st}     && $lvlStr{st}{$st}{$l}    ){$level = $lvlStr{st}{$st}{$l}}
+      else                                                    {$level = hex($l)};
     }
     elsif($mTp eq "40"){
       $level = $long;
@@ -3901,11 +3921,22 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     else{
       my @keys;
-      foreach my $tp (keys %lvlStr){
-        foreach my $mk (keys %{$lvlStr{$tp}}){
-          foreach (keys %{$lvlStr{$tp}{$mk}}){
-            $cndNo = hex($_) if ($cond eq $lvlStr{$tp}{$mk}{$_});
-            push @keys,$lvlStr{$tp}{$mk}{$_};
+      if ($chnHash->{helper}{lm}){
+        foreach (keys %{$chnHash->{helper}{lm}}){
+          if ($chnHash->{helper}{lm}{$_} eq $cond){
+            $cndNo = $_;
+            last;
+          }
+          push @keys,$chnHash->{helper}{lm};
+        }
+      }
+      else{
+        foreach my $tp (keys %lvlStr){
+          foreach my $mk (keys %{$lvlStr{$tp}}){
+            foreach (keys %{$lvlStr{$tp}{$mk}}){
+              $cndNo = hex($_) if ($cond eq $lvlStr{$tp}{$mk}{$_});
+              push @keys,$lvlStr{$tp}{$mk}{$_};
+            }
           }
         }
       }

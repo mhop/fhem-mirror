@@ -1760,6 +1760,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 <a name="HMinfo"></a>
 <h3>HMinfo</h3>
 <ul>
+
   HMinfo is a module to support getting an overview  of
   eQ-3 HomeMatic devices as defines in <a href="#CUL_HM">CUL_HM</a>. <br><br>
   <B>Status information and counter</B><br>
@@ -1825,7 +1826,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           list all HM models that are supported in FHEM
       </li>
       <li><a name="#HMinfoparam">param</a> <a href="#HMinfoFilter">[filter]</a> &lt;name&gt; &lt;name&gt;...<br>
-          returns a table parameter values (attribute, readings,...)
+          returns a table of parameter values (attribute, readings,...)
           for all entities as a table
       </li>
       <li><a name="#HMinforegister">register</a> <a href="#HMinfoFilter">[filter]</a><br>
@@ -1835,8 +1836,8 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           performs a consistency check on register readings for completeness
       </li>
       <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
-          performs a consistency check on peers. If a peer is set in one channel
-          this funktion will search wether the peer also exist on the opposit side.
+          performs a consistency check on peers. If a peer is set in a channel
+          it will check wether the peer also exist on the opposit side.
       </li>
       <li><a name="#HMinfopeerXref">peerXref</a> <a href="#HMinfoFilter">[filter]</a><br>
           provides a cross-reference on peerings, a kind of who-with-who summary over HM
@@ -1847,20 +1848,20 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           list defined templates. If no name is given all templates will be listed<br>
       </li>
-	  
+
       <li><a name="#HMinfomsgStat">msgStat</a> <a href="#HMinfoFilter">[filter]</a><br>
           statistic about message transferes over a week<br>
       </li>
       <li><a name="#HMinfoprotoEvents">protoEvents </a><a href="#HMinfoFilter">[filter]</a> <br>
           this is likely a very <B>important view</B> for message incidents.
-		  Information about pending commands and - much more relevant - about failed executions 
-		  is given in a table over all devices.<br>
-		  Consider to clear this statistic use <a name="#HMinfoclear">clear Protocol</a>.<br>
+          Information about pending commands and - much more relevant - about failed executions 
+          is given in a table over all devices.<br>
+          Consider to clear this statistic use <a name="#HMinfoclear">clear Protocol</a>.<br>
       </li>
       <li><a name="#HMinforssi">rssi </a><a href="#HMinfoFilter">[filter]</a><br>
           statistic over rssi data for HM entities.<br>
       </li>
-	  
+
       <li><a name="#HMinfotemplateChk">templateChk</a> <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
          verifies if the register-readings comply to the template <br>
          Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
@@ -1881,7 +1882,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
   </ul>
   <a name="HMinfoset"><b>Set</b></a>
   <ul>
-    even though the commands are more a get funktion they are implemented
+    Even though the commands are a get funktion they are implemented
     as set to allow simple web interface usage<br>
     <ul>
       <li><a name="#HMinfoupdate">update</a><br>
@@ -1924,6 +1925,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           purge will use the latest stored readings and remove older one. 
           See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
       </li>
+
       
          <br>
       <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter] [save|restore|verify] [&lt;file&gt;]</a><br>
@@ -1966,11 +1968,11 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          <br>
      </li>
       <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter] [templateName][verify|restore] [&lt;file&gt;]</a><br>
-	    program one or more thermostat lists. The list of thermostats is selected by filter.<br>
+            program one or more thermostat lists. The list of thermostats is selected by filter.<br>
         <ul>
-		<li><B>templateName</B> is the name of the template as being named in the file. The file format ist 
-		identical to <a ref="#HMinfotempList">tempList</a>. If the entity in the file matches templateName the subsequent
-		temp-settings from the file are bing programmed to all Thermostats that match the filter<br></li>
+          <li><B>templateName</B> is the name of the template as being named in the file. The file format ist 
+            identical to <a ref="#HMinfotempList">tempList</a>. If the entity in the file matches templateName the subsequent
+            temp-settings from the file are bing programmed to all Thermostats that match the filter<br></li>
         <li><B>file</B> name of the file to be used. Default: <B>tempList.cfg</B></li>
         </ul>
       </li>
@@ -2032,6 +2034,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           User must ensure to read configuration prior to execution.<br>
           templateSet may not setup a complete register block but only a part if it. This is up to template design.<br>
           <br>
+
         </ul>
       </li>
     </ul>
@@ -2123,6 +2126,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        set to 1 will prevent any automatic operation, update or default settings
        in CUL_HM.<br>
      </li>
+
    </ul>
    <br>
   <a name="HMinfovariables"><b>Variables</b></a>
@@ -2133,6 +2137,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
      <li><b>W_unConfRegs:</b> Warning:list of entities with unconfirmed register changes. Execute getConfig to clear this.</li>
      <li><b>I_rssiMinLevel:</b> Info:counts of rssi min readings per device, clustered in blocks</li>
      
+
      <li><b>ERR__protocol:</b> Error:count of non-recoverable protocol events per device.
          Those events are NACK, IOerr, ResendFail, CmdDel, CmdPend.<br>
          Counted are the number of device with those events, not the number of events!</li>
@@ -2149,6 +2154,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          W_sum_&lt;reading&gt;: count of readings as defined in attribut
          <a href="#HMinfosumStatus">sumStatus</a>. </li>
      Example:<br>
+
      <ul><code>
        ERR___rssiCrit LightKittchen,WindowDoor,Remote12<br>
        ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1<br>
@@ -2160,6 +2166,404 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        W_sum_overheat: off:7;<br>
        C_sumDefined: entities:23 device:11 channel:16 virtual:5;<br>
      </code></ul>
+   </ul>
+</ul>
+=end html
+
+
+=begin html_DE
+
+<a name="HMinfo"></a>
+<h3>HMinfo</h3>
+<ul>
+  <tr><td>
+  Das Modul HMinfo erm&ouml;glicht einen &Uuml;berblick &uuml;ber eQ-3 HomeMatic Ger&auml;te, die mittels <a href="#CUL_HM">CUL_HM</a> definiert sind.<br><br>
+  <B>Status Informationen und Z&auml;hler</B><br>
+  HMinfo gibt einen &Uuml;berlick &uuml;ber CUL_HM Installationen einschliesslich aktueller Zust&auml;nde.
+  Readings und Z&auml;hler werden aus Performance Gr&uuml;nden nicht automatisch aktualisiert. <br>
+  Mit dem Kommando <a href="#HMinfoupdate">update</a> k&ouml;nnen die Werte aktualisiert werden.
+  <ul><code><br>
+           set hm update<br>
+  </code></ul><br>
+  Die Webansicht von HMinfo stellt Details &uuml;ber CUL_HM Instanzen mit ungew&ouml;hnlichen Zust&auml;nden zur Verf&uuml;gung. Dazu geh&ouml;ren:
+  <ul>
+      <li>Action Detector Status</li>
+      <li>CUL_HM Ger&auml;te und Zust&auml;nde</li>
+      <li>Ereignisse im Zusammenhang mit Kommunikationsproblemen</li>
+      <li>Z&auml;hler f&uuml;r bestimmte Readings und Zust&auml;nde (z.B. battery) - <a href="#HMinfoattr">attribut controlled</a></li>
+      <li>Z&auml;hler f&uuml;r Readings, die auf Fehler hindeuten (z.B. overheat, motorError) - <a href="#HMinfoattr">attribut controlled</a></li>
+  </ul>
+  <br>
+
+  Weiterhin stehen HM Kommandos zur Verf&uuml;gung, z.B. f&uuml;r das Speichern aller gesammelten Registerwerte.<br><br>
+
+  Ein Kommando wird f&uuml;r alle HM Instanzen der kompletten Installation ausgef&uuml;hrt.
+  Die Ausf&uuml;hrung ist jedoch auf die dazugeh&ouml;rigen Instanzen beschr&auml;nkt.
+  So wird rssi nur auf Ger&auml;te angewendet, da Kan&auml;le RSSI Werte nicht unterst&uuml;tzen.<br><br>
+  <a name="HMinfoFilter"><b>Filter</b></a>
+  <ul> werden wie folgt angewendet:<br><br>
+        <code>set &lt;name&gt; &lt;cmd&gt; &lt;filter&gt; [&lt;param&gt;]</code><br>
+        wobei sich filter aus Typ und Name zusammensetzt<br>
+        [-dcasev] [-f &lt;filter&gt;]<br><br>
+        <b>Typ</b> <br>
+        <ul>
+            <li>d - device   :verwende Ger&auml;t</li>
+            <li>c - channels :verwende Kanal</li>
+            <li>v - virtual  :unterdr&uuml;cke virtuelle Instanz</li>
+            <li>p - physical :unterdr&uuml;cke physikalische Instanz</li>
+            <li>a - aktor    :unterdr&uuml;cke Aktor</li>
+            <li>s - sensor   :unterdr&uuml;cke Sensor</li>
+            <li>e - empty    :verwendet das Resultat auch wenn die Felder leer sind</li>
+        </ul>
+        und/oder <b>Name</b>:<br>
+        <ul>
+            <li>-f &lt;filter&gt;  :Regul&auml;rer Ausdruck (regexp), um die Instanznamen zu filtern</li>
+        </ul>
+        Beispiel:<br>
+        <ul><code>
+           set hm param -d -f dim state # Zeige den Parameter 'state' von allen Ger&auml;ten, die "dim" im Namen enthalten<br>
+           set hm param -c -f ^dimUG$ peerList # Zeige den Parameter 'peerList' f&uuml;r alle Kan&auml;le mit dem Namen "dimUG"<br>
+           set hm param -dcv expert # Ermittle das Attribut expert f&uuml;r alle Ger&auml;te, Kan&auml;le und virtuelle Instanzen<br>
+        </code></ul>
+  </ul>
+  <br>
+  <a name="HMinfodefine"><b>Define</b></a>
+  <ul>
+    <code>define &lt;name&gt; HMinfo</code><br>
+    Es muss nur eine Instanz ohne jegliche Parameter definiert werden.<br>
+  </ul>
+  <br>
+  <a name="HMinfoget"><b>Get</b></a>
+  <ul>
+      <li><a name="#HMinfomodels">models</a><br>
+          zeige alle HM Modelle an, die von FHEM unterst&uuml;tzt werden
+      </li>
+      <li><a name="#HMinfoparam">param</a> <a href="#HMinfoFilter">[filter]</a> &lt;name&gt; &lt;name&gt;...<br>
+          zeigt Parameterwerte (Attribute, Readings, ...) f&uuml;r alle Instanzen in Tabellenform an 
+      </li>
+      <li><a name="#HMinforegister">register</a> <a href="#HMinfoFilter">[filter]</a><br>
+          zeigt eine Tabelle mit Registern einer Instanz an
+      </li>
+      <li><a name="#HMinforegCheck">regCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
+          validiert Registerwerte
+      </li>
+      <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
+          validiert die Einstellungen der Paarungen (Peers). Hat ein Kanal einen Peer gesetzt, muss dieser auch auf
+          der Gegenseite gesetzt sein.
+      </li>
+      <li><a name="#HMinfopeerXref">peerXref</a> <a href="#HMinfoFilter">[filter]</a><br>
+          erzeugt eine komplette Querverweisliste aller Paarungen (Peerings)
+      </li>
+      <li><a name="#HMinfoconfigCheck">configCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
+          Plausibilit&auml;tstest aller HM Einstellungen inklusive regCheck und peerCheck
+      </li>
+      <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
+          zeigt eine Liste von Vorlagen. Ist kein Name angegeben, werden alle Vorlagen angezeigt<br>
+      </li>
+      <li><a name="#HMinfomsgStat">msgStat</a> <a href="#HMinfoFilter">[filter]</a><br>
+          zeigt eine Statistik aller Meldungen der letzen Woche<br>
+      </li>
+      <li><a name="#HMinfoprotoEvents">protoEvents</a> <a href="#HMinfoFilter">[filter]</a> <br>
+          vermutlich die <B>wichtigste Auflistung</B> f&uuml;r Meldungsprobleme.
+          Informationen &uuml;ber ausstehende Kommandos und fehlgeschlagene Sendevorg&auml;nge
+          f&uuml;r alle Ger&auml;te in Tabellenform.<br>
+          Mit <a name="#HMinfoclear">clear Protocol</a> kann die Statistik gel&ouml;scht werden.<br>
+      </li>
+      <li><a name="#HMinforssi">rssi </a><a href="#HMinfoFilter">[filter]</a><br>
+          Statistik &uuml;ber die RSSI Werte aller HM Instanzen.<br>
+      </li>
+
+      <li><a name="#HMinfotemplateChk">templateChk <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+         Verifiziert, ob die Registerwerte mit der Vorlage in Einklang stehen.<br>
+         Die Parameter sind identisch mit denjenigen f&uuml;r <a href="#HMinfotemplateSet">templateSet</a>.<br>
+         Wenn kein Peer ben&ouml;tigt wird, stattdessen none verwenden.
+         Beispiele f&uuml;r die &Uuml;berpr&uuml;fung von Einstellungen<br>
+        <ul><code>
+         set hm templateChk -f RolloNord BlStopUpLg none         1 2 # RolloNord, no peer, parameter 1 and 2 given<br>
+         set hm templateChk -f RolloNord BlStopUpLg peerName:long    # RolloNord peerName, long only<br>
+         set hm templateChk -f RolloNord BlStopUpLg peerName         # RolloNord peerName, long and short<br>
+         set hm templateChk -f RolloNord BlStopUpLg peerName:all     # RolloNord peerName, long and short<br>
+         set hm templateChk -f RolloNord BlStopUpLg all:long         # RolloNord any peer, long only<br>
+         set hm templateChk -f RolloNord BlStopUpLg all              # RolloNord any peer,long and short<br>
+         set hm templateChk -f Rollo.*   BlStopUpLg all              # each Rollo* any peer,long and short<br>
+         set hm templateChk BlStopUpLg                               # each entities<br>
+        </code></ul>
+      </li>
+  </ul>
+  <a name="HMinfoset"><b>Set</b></a>
+  <ul>
+  Obwohl die Kommandos Einstellungen abrufen (get function), werden sie mittels set ausgef&uuml;hrt, um die 
+  Benutzung mittels Web Interface zu erleichtern.<br>
+    <ul>
+      <li><a name="#HMinfoupdate">update</a><br>
+          Aktualisiert HM Status Z&auml;hler.
+      </li>
+      <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
+          Aktiviert das automatische Lesen der Konfiguration f&uuml;r ein CUL_HM Ger&auml;t, wenn das Attribut autoReadReg auf 1 oder h&ouml;her steht.
+      </li>
+      <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [Protocol|readings|msgStat|register|rssi]<br>
+          F&uuml;hrt ein set clear ... f&uuml;r alle HM Instanzen aus<br>
+          <ul>
+          <li>Protocol bezieht sich auf set clear msgEvents</li>
+          <li>readings bezieht sich auf set clear readings</li>
+          <li>rssi l&ouml;scht alle rssi Z&auml;hler</li>
+          <li>msgStat l&ouml;scht die HM Meldungsstatistik</li>
+          <li>register l&ouml;scht alle Eintr&auml;ge in den Readings</li>
+          </ul>
+      </li>
+      <li><a name="#HMinfosaveConfig">saveConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          Sichert alle HM Registerwerte und Peers. Siehe <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.<br>
+          <a ref="#HMinfopurgeConfig">purgeConfig</a> wird automatisch ausgef&uuml;hrt, wenn die Datenmenge 1 MByte &uuml;bersteigt.<br>
+      </li>
+      <li><a name="#HMinfoarchConfig">archConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          F&uuml;hrt <a href="#HMinfosaveConfig">saveConfig</a> f&uuml;r alle Instanzen aus, sobald sich deren Konfiguration &auml;ndert.
+          Es schont gegen&uuml;ber saveConfig die Resourcen, da es nur vollst&auml;ndige Konfigurationen sichert.<br>
+          Die Option -a erzwingt das sofortige Archivieren f&uuml;r alle Ger&auml;te, die eine vollst&auml;ndige Konfiguration aufweisen.<br>
+      </li>
+      <li><a name="#HMinfoloadConfig">loadConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          L&auml;dt Register und Peers aus einer zuvor mit <a href="#HMinfosaveConfig">saveConfig</a> gesicherten Datei.<br>
+          Es sollte mit Vorsicht verwendet werden, da es Daten zu FHEM hinzuf&uuml;gt, die nicht verifiziert sind.
+          Readings werden nicht ersetzt, nur fehlende Readings werden hinzugef&uuml;gt. Der Befehl ist dazu geignet, um Readings
+          zu erstellen, die schwer zu erhalten sind. Readings von Ger&auml;ten, die nicht dauerhaft empfangen sondern nur auf Tastendruck
+          aufwachen (z.B. T&uuml;rsensoren), k&ouml;nnen nicht ohne Weiteres gelesen werden.<br>
+          Daher liegt es in der Verantwortung des Benutzers g&uuml;ltige Werte zu verwenden. Es sollte autoReadReg f&uuml;r Ger&auml;te verwendet werden,
+          die einfach ausgelesen werden k&ouml;nnen.<br>
+          Der Befehl aktualisiert lediglich FHEM Readings und Attribute. Die Programmierung des Ger&auml;tes wird <B>nicht</B> ver&auml;ndert.
+      </li>
+      <li><a name="#HMinfopurgeConfig">purgeConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          Bereinigt die gespeicherte Konfigurationsdatei. Durch die kumulative Speicherung der Registerwerte bleiben die
+          zuletzt gespeicherten Werte erhalten und alle &auml;lteren werden gel&ouml;scht.
+          Siehe <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
+      </li>
+      <br>
+      
+      <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter]</a>[save|restore|verify] [&lt;file&gt;]</a><br>
+          Diese Funktion erm&ouml;glicht die Verarbeitung von tempor&auml;ren Temperaturlisten f&uuml;r Thermostate.
+          Die Listen k&ouml;nnen in Dateien abgelegt, mit den aktuellen Werten verglichen und an das Ger&auml;t gesendet werden.<br>
+          <li><B>save</B> speichert die aktuellen tempList Werte des Systems in eine Datei. <br>
+              Zu beachten ist, dass die aktuell in FHEM vorhandenen Werte benutzt werden. Der Benutzer muss selbst sicher stellen,
+              dass diese mit den Werten im Ger&auml;t &uuml;berein stimmen.<br>
+              Der Befehl arbeitet nicht kummulativ. Alle evtl. vorher in der Datei vorhandenen Werte werden &uuml;berschrieben.</li>
+          <li><B>restore</B> in der Datei gespeicherte Termperaturliste wird direkt an das Ger&auml;t gesendet.</li>
+          <li><B>verify</B> vergleicht die Temperaturliste in der Datei mit den aktuellen Werten in FHEM. Der Benutzer muss 
+              selbst sicher stellen, dass diese mit den Werten im Ger&auml;t &uuml;berein stimmen.</li>
+          <br>
+          <li><B>filename</B> Name der Datei. Vorgabe ist <B>tempList.cfg</B></li>
+          Beispiel f&uuml;r einen Dateiinhalt:<br>
+          <ul><code>
+               entities:HK1_Climate,HK2_Clima<br>
+               tempListFri>07:00 14.0 13:00 16.0 16:00 18.0 21:00 19.0 24:00 14.0<br>
+               tempListMon>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0<br>
+               tempListSat>08:00 14.0 15:00 18.0 21:30 19.0 24:00 14.0<br>
+               tempListSun>08:00 14.0 15:00 18.0 21:30 19.0 24:00 14.0<br>
+               tempListThu>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0<br>
+               tempListTue>07:00 14.0 13:00 16.0 16:00 18.0 21:00 19.0 24:00 15.0<br>
+               tempListWed>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0<br>
+               entities:hk3_Climate<br>
+               tempListFri>06:00 17.0 12:00 21.0 23:00 20.0 24:00 19.5<br>
+               tempListMon>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListSat>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListSun>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListThu>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListTue>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+               tempListWed>06:00 17.0 12:00 21.0 23:00 20.0 24:00 17.0<br>
+         </code></ul>
+         Datei Schl&uuml;sselw&ouml;rter<br>
+         <li><B>entities</B> mittels Komma getrennte Liste der Instanzen f&uuml;r die die nachfolgende Liste bestimmt ist.
+         Es muss die tats&auml;chlich f&uuml;r die Temperaturliste zust&auml;ndige Instanz angegeben werden. Bei RTs ist das der Kanal 04,
+         bei TCs der Kanal 02.</li>
+         <li><B>tempList...</B> Zeiten und Temperaturen sind genau wie im Befehl "set tempList" anzugeben</li>
+         <br>
+     </li>
+     <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName][verify|restore] [&lt;file&gt;]</a><br>
+         programmiert eine oder mehrere Thermostatlisten (Vorlagen). Die Liste der Thermostate wird mittels Filter selektiert.<br>
+        <ul>
+         <li><B>templateName</B> ist der Name wie in der Datei angegeben. Das Dateiformat ist identisch mit
+                dem Format von <a ref="#HMinfotempList">tempList</a>. Wenn die in der Datei angegebene Instanz mit templateName
+                &uuml;bereinstimmt, werden die Termperatureinstellungen aus der Datei an diejenigen Thermostate gesendet, die mittels
+                filter ausgew&auml;hlt sind.<br></li>
+        <li><B>file</B> Name der Datei. Vorgabe: <B>tempList.cfg</B></li>
+        </ul>
+      </li>
+         <br>
+      <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
+          erm&ouml;glicht das Kopieren von Registern, Einstellungen und Verhalten zwischen gleichen Kan&auml;len, bei einem Peer auch
+          zwischen unterschiedlichen Kan&auml;len. Das Kopieren kann daher sowohl von Ger&auml;t zu Ger&auml;t, als auch innerhalb eines
+          Ger&auml;tes stattfinden.<br>
+         <b>src:peer</b> ist die Quell-Instanz. Der Peer muss angegeben werden, wenn dessen Verhalten kopiert werden soll.<br>
+         <b>dst:peer</b> ist die Ziel-Instanz.<br>
+         Beispiel:<br>
+         <ul><code>
+          set hm cpRegs blindR blindL  # kopiert alle Register (list 1) des Kanals von blindR nach blindL einschliesslich z.B. der
+          Rolladen Fahrzeiten. Register, die den Peer betreffen (list 3/4), werden nicht kopiert.<br>
+          set hm cpRegs blindR:Btn1 blindL:Btn2  # kopiert das Verhalten der Beziehung Btn1/blindR nach Btn2/blindL<br>
+          set hm cpRegs blindR:Btn1 blindR:Btn2  # kopiert das Verhalten der Beziehung Btn1/blindR nach Btn2/blindR, hier
+          innerhalb des Aktors<br>
+         </code></ul>
+         <br>
+         Einschr&auml;nkungen:<br>
+         <ul>
+         cpRegs <u>ver&auml;ndert keine Peerings</u> oder liest direkt aus den Ger&auml;ten. Die Readings m&uuml;ssen daher aktuell sein.<br>
+         cpRegs kann nur auf <u>identische Ger&auml;temodelle</u> angewendet werden<br>
+         cpRegs erwartet <u>aktuelle Readings</u>. Dies muss der Benutzer sicher stellen.<br>
+         </ul>
+      </li>
+      <li><a name="#HMinfotemplateDef">templateDef &lt;name&gt; &lt;param&gt; &lt;desc&gt; &lt;reg1:val1&gt; [&lt;reg2:val2&gt;] ...</a><br>
+          definiert eine Vorlage.<br>
+          <b>param</b> definiert die Namen der Parameters, die erforderlich sind, um die Vorlage auszuf&uuml;hren.
+                       Diese sind abh&auml;ngig von der Vorlage und k&ouml;nnen onTime oder brightnesslevel sein.
+                       Bei einer Liste mehrerer Parameter m&uuml;ssen diese mittels Kommata separiert werden.<br>
+                       param1:param2:param3<br>
+                       Der Parameter del f&uuml;hrt zur L&ouml;schung der Vorlage.<br>
+          <b>desc</b> eine Beschreibung f&uuml;r die Vorlage<br>
+          <b>reg:val</b> der Name des Registers und der dazugeh&ouml;rige Zielwert.<br>
+          Wenn das Register zwischen long und short unterscheidet, muss das f&uuml;hrende sh oder lg weggelassen werden.<br>
+          Parameter m&uuml;ssen mit p angegeben werden, p0 f&uuml;r den ersten, p1 f&uuml;r den zweiten usw.
+        <br>
+        Beispiel<br>
+        <ul><code>
+         set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
+        </code></ul>
+      </li>
+      <li><a name="#HMinfotemplateSet">templateSet &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+          setzt mehrere Register entsprechend der angegebenen Vorlage. Die Parameter m&uuml;ssen entsprechend der Vorlage angegeben werden.<br>
+          templateSet akkumuliert alle &Auml;nderungen und schreibt das Ergebnis gesammelt.<br>
+         <b>entity:</b> ist die Quell-Instanz. Der Peer muss angegeben werden, wenn dessen Verhalten kopiert werden soll.<br>
+         <b>template:</b> eine der vorhandenen Vorlagen<br>
+         <b>peer:</b> [long|short]:falls erforderlich muss der Peer angegeben werden. Wird kein Peer ben&ouml;tigt, '0' verwenden.
+                  Bei einem Peer muss f&uuml;r den Tastendruck long oder short angegeben werden.<br>
+         <b>param:</b> Nummer und Bedeutung des Parameters h&auml;ngt von der Vorlage ab.<br>
+         Ein Beispiel k&ouml;nnte sein (theoretisch, ohne die Vorlage anzugeben)<br>
+        <ul><code>
+         set hm templateSet Licht1 staircase FB1:short 20  <br>
+         set hm templateSet Licht1 staircase FB1:long 100  <br>
+        </code></ul>
+        Einschr&auml;nkungen:<br>
+        <ul>
+         Der Benutzer muss aktuelle Register/Konfigurationen sicher stellen.<br>
+         templateSet konfiguriert ggf. nur einzelne Register und keinen vollst&auml;ndigen Satz. Dies h&auml;ngt vom Design der Vorlage ab.<br>
+         <br>
+        </ul>
+      </li>
+    </ul>
+  </ul>
+  <br>
+
+
+  <a name="HMinfoattr"><b>Attribute</b></a>
+   <ul>
+    <li><a name="#HMinfosumStatus">sumStatus</a><br>
+        erzeugt eine Liste von Warnungen. Die zu untersuchenden Readings werden mittels Komma separiert angegeben.
+        Die Readings werden, so vorhanden, von allen Instanzen ausgewertet, gez&auml;hlt und getrennt nach Readings mit
+        gleichem Inhalt ausgegeben.<br>
+        Beispiel:<br>
+        <ul><code>
+           attr hm sumStatus battery,sabotageError<br>
+        </code></ul>
+        k&ouml;nnte nachfolgende Ausgaben erzeugen<br>
+        W_sum_batterie ok:5 low:3<br>
+        W_sum_sabotageError on:1<br>
+        <br>
+        Anmerkung: Z&auml;hler mit Werten von '0' werden nicht angezeigt. HMinfo findet alle vorhanden Werte selbstst&auml;ndig.<br>
+        Das Setzen des Attributes erm&ouml;glicht einen schnellen &Uuml;berblick &uuml;ber systemkritische Werte.<br>
+    </li>
+    <li><a name="#HMinfosumERROR">sumERROR</a>
+        &Auml;hnlich sumStatus, jedoch mit dem Fokus auf signifikante Fehler.
+        Hier k&ouml;nnen Reading <b>Werte</b> angegeben werden, die dazu f&uuml;hren, dass diese <b>nicht angezeigt</b> werden.
+        Damit kann beispielsweise verhindert werden, dass der zu erwartende Normalwert oder ein anderer nicht
+        kritischer Wert angezeigt wird.<br>
+        Beispiel:<br>
+        <ul><code>
+           attr hm sumERROR battery:ok,sabotageError:off,overheat:off,Activity:alive:unknown<br>
+        </code></ul>
+        erzeugt folgende Ausgabe:<br>
+        <ul><code>
+        ERR_batterie low:3<br>
+        ERR_sabotageError on:1<br>
+        ERR_overheat on:3<br>
+        ERR_Activity dead:5<br>
+        </code></ul>
+    </li>
+    <li><a name="#HMinfoautoUpdate">autoUpdate</a>
+        f&uuml;hrt den Befehl periodisch aus.<br>
+        Beispiel:<br>
+        <ul><code>
+           attr hm autoUpdate 00:10<br>
+        </code></ul>
+        f&uuml;hrt den Befehl alle 10 Minuten aus<br>
+    </li>
+    <li><a name="#HMinfoautoArchive">autoArchive</a>
+        Sobald neue Daten verf&uuml;gbar sind, wird das configFile aktualisiert.
+        F&uuml;r die Aktualisierung ist <a ref="#HMinfoautoUpdate">autoUpdate</a> zwingend erforderlich.<br>
+        siehe auch <a ref="#HMinfoarchConfig">archConfig</a>
+        <br>
+    </li>
+    <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
+        definiert die Zeit in Sekunden bis zum n&auml;chsten autoRead durch CUL_HM. Trotz dieses Zeitwertes stellt
+        FHEM sicher, dass zu einem Zeitpunkt immer nur ein Ger&auml;t gelesen wird, auch wenn der Minimalwert von 1
+        Sekunde eingestellt ist. Mit dem Timer kann der Zeitabstand
+        ausgeweitet werden - bis zu 300 Sekunden zwischen zwei Ausf&uuml;hrungen.<br>
+        Das Herabsetzen erh&ouml;ht die Funkbelastung, Heraufsetzen erh&ouml;ht die Wartzezeit.<br>
+    </li>
+    <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
+        maximale Zeit in Sekunden f&uuml;r die CUL_HM Meldungen puffert, wenn das Ger&auml;t nicht sendebereit ist.
+        Ist das Ger&auml;t nicht wieder rechtzeitig sendebereit, werden die gepufferten Meldungen verworfen und
+        IOErr ausgel&ouml;st.<br>
+        Hinweis: Durch die Pufferung kann es vorkommen, dass Aktivit&auml;t lange nach dem Absetzen des Befehls stattfindet.<br>
+        Standard ist 60 Sekunden, maximaler Wert ist 3600 Sekunden.<br>
+    </li>
+    <li><a name="#HMinfoconfigDir">configDir</a>
+        Verzeichnis f&uuml;r das Speichern und Lesen der Konfigurationsdateien, sofern in einem Befehl nur ein Dateiname ohne
+        Pfad angegen wurde.<br>
+        Verwendung beispielsweise bei <a ref="#HMinfotempList">tempList</a> oder <a ref="#HMinfosaveConfig">saveConfig</a><br>
+    </li>
+    <li><a name="#HMinfoconfigFilename">configFilename</a>
+        Standard Dateiname zur Verwendung von 
+        <a ref="#HMinfosaveConfig">saveConfig</a>, 
+        <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
+        <a ref="#HMinfoloadConfig">loadConfig</a><br>
+    </li>
+    <li><a name="#HMinfohmManualOper">hmManualOper</a>
+        auf 1 gesetzt, verhindert dieses Attribut jede automatische Aktion oder Aktualisierung seitens CUL_HM.<br>
+    </li>
+
+   </ul>
+   <br>
+  <a name="HMinfovariables"><b>Variablen</b></a>
+   <ul>
+    <li><b>I_autoReadPend:</b> Info: Liste der Instanzen, f&uuml;r die das Lesen von Konfiguration und Status ansteht,
+                                     &uuml;blicherweise ausgel&ouml;st durch autoReadReg.</li>
+    <li><b>ERR___rssiCrit:</b> Fehler: Liste der Ger&auml;te mit kritischem RSSI Wert </li>
+    <li><b>W_unConfRegs:</b> Warnung: Liste von Instanzen mit unbest&auml;tigten &Auml;nderungen von Registern.
+                                      Die Ausf&uuml;hrung von getConfig ist f&uuml;r diese Instanzen erforderlich.</li>
+    <li><b>I_rssiMinLevel:</b> Info: Anzahl der niedrigen RSSI Werte je Ger&auml;t, in Bl&ouml;cken angeordnet.</li>
+
+    <li><b>ERR__protocol:</b> Fehler: Anzahl nicht behebbarer Protokollfehler je Ger&auml;t.
+        Protokollfehler sind NACK, IOerr, ResendFail, CmdDel, CmdPend.<br>
+        Gez&auml;hlt wird die Anzahl der Ger&auml;te mit Fehlern, nicht die Anzahl der Fehler!</li>
+    <li><b>ERR__protoNames:</b> Fehler: Liste der Namen der Ger&auml;te mit nicht behebbaren Protokollfehlern</li>
+    <li><b>I_HM_IOdevices:</b> Info: Liste der IO Ger&auml;te, die von CUL_HM Instanzen verwendet werden</li>
+    <li><b>I_actTotal:</b> Info: Status des Actiondetectors, Z&auml;hler f&uuml;r Ger&auml;te mit bestimmten Status</li>
+    <li><b>ERRactNames:</b> Fehler: Namen von Ger&auml;ten, die der Actiondetector als ausgefallen meldet</li>
+    <li><b>C_sumDefined:</b> Count: In CUL_HM definierte Instanzen. Instanzen k&ouml;nnen als Ger&auml;t UND
+                                    als Kanal gez&auml;hlt werden, falls die Funktion des Kanals durch das Ger&auml;t
+                                    selbst abgedeckt ist. &Auml;hnlich virtual</li>
+    <li><b>ERR_&lt;reading&gt;:</b> Fehler: Anzahl mittels Attribut <a href="#HMinfosumERROR">sumERROR</a>
+                                           definierter Readings, die nicht den Normalwert beinhalten. </li>
+    <li><b>ERR_names:</b> Fehler: Namen von Instanzen, die in einem ERR_&lt;reading&gt; enthalten sind.</li>
+    <li><b>W_sum_&lt;reading&gt;</b> Warnung: Anzahl der mit Attribut <a href="#HMinfosumStatus">sumStatus</a> definierten Readings.</li>
+    Beispiele:<br>
+    <ul><code>
+      ERR___rssiCrit LightKittchen,WindowDoor,Remote12<br>
+      ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1<br>
+      ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5<br>
+      ERR_battery: low:2;<br>
+      ERR_names: remote1,buttonClara,<br>
+      I_rssiMinLevel 99&gt;:3 80&lt;:0 60&lt;:7 59&lt;:4<br>
+      W_sum_battery: ok:5;low:2;<br>
+      W_sum_overheat: off:7;<br>
+      C_sumDefined: entities:23 device:11 channel:16 virtual:5;<br>
+    </code></ul>
    </ul>
 </ul>
 =end html
