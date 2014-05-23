@@ -361,14 +361,14 @@ statistics_DoStatistics($$$)
       $readingName = $$f[0];
       my $completeReadingName = $devName.":".$readingName;
       next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
+-      next if not exists ($dev->{READINGS}{$readingName});
       $statisticDone = 1;
       if ($$f[1] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch);}
       if ($$f[1] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $$f[2], $periodSwitch);}
       if ($$f[1] == 3) { statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch);}
    }
     
-   my @specialReadings = split /|/, AttrVal($hashName, "deltaReadings", "");
+   my @specialReadings = split /,/, AttrVal($hashName, "deltaReadings", "");
    foreach $readingName (@specialReadings) 
    {
       my $completeReadingName = $devName.":".$readingName;
@@ -378,7 +378,7 @@ statistics_DoStatistics($$$)
       statistics_doStatisticDelta ($hash, $dev, $readingName, 1, $periodSwitch);
    }
    
-   @specialReadings = split /|/, AttrVal($hashName, "durationReadings", "");
+   @specialReadings = split /,/, AttrVal($hashName, "durationReadings", "");
    foreach $readingName (@specialReadings) 
    {
       my $completeReadingName = $devName.":".$readingName;
@@ -388,7 +388,7 @@ statistics_DoStatistics($$$)
       statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch);
    }
 
-   @specialReadings = split /|/, AttrVal($hashName, "minAvgMaxReadings", "");
+   @specialReadings = split /,/, AttrVal($hashName, "minAvgMaxReadings", "");
    foreach $readingName (@specialReadings) 
    {
       my $completeReadingName = $devName.":".$readingName;
@@ -890,7 +890,7 @@ statistics_FormatDuration($)
 <a name="statistics"></a>
 <h3>statistics</h3>
 <ul style="width:800px">
-  Dieses Modul wertet von den angegebenen Ger&auml;ten bestimmte Werte statistisch aus und f&uuml;gt sie den jeweiligen Ger&auml;ten als neue Werte hinzu.
+  Dieses Modul wertet von den angegebenen Ger&auml;ten (als regulärer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
   <br>
   Derzeit werden Statistiken f&uuml;r folgende Ger&auml;tewerte berechnet:
    <ul>
@@ -907,15 +907,14 @@ statistics_FormatDuration($)
     <br>
     Beispiel: <code>define Statistik statistics Sensor_.*|Wettersensor</code>
     <br>&nbsp;
+    <li><code>&lt;Ger&auml;teNameRegExp&gt;</code>
+      <br>
+      Regul&auml;rer Ausdruck f&uuml;r den Ger&auml;tenamen. !!! Nicht die Ger&auml;tewerte !!!
+    </li><br>
     <li><code>[Prefix]</code>
       <br>
       Optional. Der Prefix wird vor den Namen der statistischen Ger&auml;tewerte gesetzt. Standardm&auml;ssig <i>stat</i>
     </li><br>
-    <li><code>&lt;Ger&auml;teNameRegExp&gt;</code>
-      <br>
-      Regularer Ausdruck f&uuml;r den Ger&auml;tenamen. !!! Nicht die Ger&auml;tewerte !!!
-      <br>
-    </li>
   </ul>
   
   <br>
@@ -946,6 +945,18 @@ statistics_FormatDuration($)
       regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
       z.B. "FritzDect:current|Sensor_.*:humidity"
       <br>
+    </li><br>
+    <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
+      <br>
+      Durch Kommas getrennte Liste von Ger&auml;tewerten 
+    </li><br>
+    <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
+      <br>
+      Durch Kommas getrennte Liste von Ger&auml;tewerten 
+    </li><br>
+    <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
+      <br>
+      Durch Kommas getrennte Liste von Ger&auml;tewerten 
     </li><br>
     <li><code>periodChangePreset &lt;Sekunden&gt;</code>
       <br>
