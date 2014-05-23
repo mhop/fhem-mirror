@@ -284,7 +284,7 @@ sub cfgDB_FileRead($) {
 }
 sub cfgDB_FileWrite($@) {
 	my ($filename,@content) = @_;
-	chomp(@content) if($filename =~ m/.gplot$/);
+#	chomp(@content) if($filename =~ m/.gplot$/);
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhembinfilesave values (?, ?)');
