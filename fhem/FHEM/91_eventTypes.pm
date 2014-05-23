@@ -34,24 +34,22 @@ eventTypes_Define($$)
   my $cnt = 0;
   my @t = localtime;
   my $f = ResolveDateWildcards($a[2], @t);
-  my $fh = new IO::File "$f";
 
-  if($fh) {
-    while(my $l = <$fh>) {
-      chomp($l);
-      next if($l =~ m/ CULHM (SND|RCV) /);
-      next if($l =~ m/ UNKNOWNCODE /);
-      next if($l =~ m/^\d+ global /);
-      my @a = split(" ", $l, 3);
-      if(@a != 3) {
-        Log3 undef, 2, "eventTypes: $f: bogus line $l";
-        next;
-      }
-      $modules{eventTypes}{ldata}{$a[1]}{$a[2]} = $a[0];
-      $cnt++;
+  my ($err, @content) = FileRead($f);
+  foreach my $l (@content) {
+    chomp($l);
+    next if($l =~ m/ CULHM (SND|RCV) /);
+    next if($l =~ m/ UNKNOWNCODE /);
+    next if($l =~ m/^\d+ global /);
+    my @a = split(" ", $l, 3);
+    if(@a != 3) {
+      Log3 undef, 2, "eventTypes: $f: bogus line $l";
+      next;
     }
-    close($fh);
+    $modules{eventTypes}{ldata}{$a[1]}{$a[2]} = $a[0];
+    $cnt++;
   }
+
   Log3 undef, 2, "eventTypes: loaded $cnt events from $f";
 
   $hash->{STATE} = "active";
@@ -111,17 +109,15 @@ eventTypes_Shutdown($$)
 {
   my ($hash, $name) = @_;
 
+  my @content;
   my $fName = $hash->{DEF};
-  my $fh = new IO::File ">$fName";
-  return "Can't open $fName: $!" if(!defined($fh));
   my $ldata = $modules{eventTypes}{ldata};
-
   foreach my $t (sort keys %{$ldata}) {
     foreach my $e (sort keys %{$ldata->{$t}}) {
-      print $fh "$ldata->{$t}{$e} $t $e\n";
+      push @content, "$ldata->{$t}{$e} $t $e\n";
     }
   }
-  close($fh);
+  FileWrite($fName, @content);
   return undef;
 }
 
