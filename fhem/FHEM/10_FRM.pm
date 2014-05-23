@@ -6,6 +6,7 @@ package main;
 use vars qw{%attr %defs}; 
 use strict;
 use warnings;
+use GPUtils qw(:all);
 
 #add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
 BEGIN {
@@ -774,7 +775,7 @@ FRM_OWX_Init($$)
 			$firmata->onewire_config($pin,1);
 		}
 	};
-	return FRM_Catch($@) if ($@);
+	return GP_Catch($@) if ($@);
 	$hash->{STATE}="Initialized";
 	InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
 	return undef;
@@ -857,40 +858,48 @@ sub FRM_OWX_Verify {
 sub FRM_OWX_Alarms {
 	my ($hash) = @_;
 
-	#-- get the interface
-	my $frm = $hash->{IODev};
-	return 0 unless defined $frm;
-	my $firmata = $frm->{FirmataDevice};
-	my $pin     = $hash->{PIN};
-	return 0 unless ( defined $firmata and defined $pin );
-	$hash->{ALARMDEVS} = undef;			
-	$firmata->onewire_search_alarms($hash->{PIN});
-	my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
-	for (my $i=0;$i<$times;$i++) {
-		if (FRM_poll($hash->{IODev})) {
-			if (defined $hash->{ALARMDEVS}) {
-				return 1;
+	my $ret = eval {
+		my $firmata = FRM_Client_FirmataDevice($hash);
+		my $pin     = $hash->{PIN};
+		return 0 unless ( defined $firmata and defined $pin );
+		$hash->{ALARMDEVS} = undef;			
+		$firmata->onewire_search_alarms($hash->{PIN});
+		my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
+		for (my $i=0;$i<$times;$i++) {
+			if (FRM_poll($hash->{IODev})) {
+				if (defined $hash->{ALARMDEVS}) {
+					return 1;
+				}
+			} else {
+				select (undef,undef,undef,0.05);
 			}
-		} else {
-			select (undef,undef,undef,0.05);
 		}
+		$hash->{ALARMDEVS} = [];
+		return 1;
+	};
+	if ($@) {
+		Log3 $hash->{NAME},4,"FRM_OWX_Alarms: ".GP_Catch($@);
+		return 0;
 	}
-	$hash->{ALARMDEVS} = [];
-	return 1;
+	return $ret;
 }
 
 sub FRM_OWX_Reset {
 	my ($hash) = @_;
-	#-- get the interface
-	my $frm = $hash->{IODev};
-	return undef unless defined $frm;
-	my $firmata = $frm->{FirmataDevice};
-	my $pin     = $hash->{PIN};
-	return undef unless ( defined $firmata and defined $pin );
-
-	$firmata->onewire_reset($pin);
+	my $ret = eval {
+		my $firmata = FRM_Client_FirmataDevice($hash);
+		my $pin     = $hash->{PIN};
+		return undef unless ( defined $firmata and defined $pin );
 	
-	return 1;
+		$firmata->onewire_reset($pin);
+		
+		return 1;
+	};
+	if ($@) {
+		Log3 $hash->{NAME},4,"FRM_OWX_Alarms: ".GP_Catch($@);
+		return 0;
+	}
+	return $ret;
 }
 
 sub FRM_OWX_Complex ($$$$) {
@@ -898,62 +907,66 @@ sub FRM_OWX_Complex ($$$$) {
 
 	my $res = "";
 
-	#-- get the interface
-	my $frm = $hash->{IODev};
-	return 0 unless defined $frm;
-	my $firmata = $frm->{FirmataDevice};
-	my $pin     = $hash->{PIN};
-	return 0 unless ( defined $firmata and defined $pin );
-
-	my $ow_command = {};
-
-	#-- has match ROM part
-	if ($owx_dev) {
-		$ow_command->{"select"} = FRM_OWX_device_to_firmata($owx_dev);
-
-		#-- padding first 9 bytes into result string, since we have this
-		#   in the serial interfaces as well
-		$res .= "000000000";
-	}
-
-	#-- has data part
-	if ($data) {
-		my @data = unpack "C*", $data;
-		$ow_command->{"write"} = \@data;
-		$res.=$data;
-	}
-
-	#-- has receive part
-	if ( $numread > 0 ) {
-		$ow_command->{"read"} = $numread;
-		#Firmata sends 0-address on read after skip
-		$owx_dev = '00.000000000000.00' unless defined $owx_dev;
-		my $id = $hash->{FRM_OWX_CORRELATIONID};
-		$ow_command->{"id"} = $hash->{FRM_OWX_CORRELATIONID};
-		$hash->{FRM_OWX_REQUESTS}->{$id} = {
-			command => $ow_command,
-			device => $owx_dev
-		};
-		delete $hash->{FRM_OWX_REPLIES}->{$owx_dev};		
-		$hash->{FRM_OWX_CORRELATIONID} = ($id + 1) & 0xFFFF;
-	}
-
-	$firmata->onewire_command_series( $pin, $ow_command );
+	my $ret = eval {
+		my $firmata = FRM_Client_FirmataDevice($hash);
+		my $pin     = $hash->{PIN};
+		return 0 unless ( defined $firmata and defined $pin );
 	
-	if ($numread) {
-		my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
-		for (my $i=0;$i<$times;$i++) {
-			if (FRM_poll($hash->{IODev})) {
-				if (defined $hash->{FRM_OWX_REPLIES}->{$owx_dev}) {
-					$res .= $hash->{FRM_OWX_REPLIES}->{$owx_dev};
-					return $res;
+		my $ow_command = {};
+	
+		#-- has match ROM part
+		if ($owx_dev) {
+			$ow_command->{"select"} = FRM_OWX_device_to_firmata($owx_dev);
+	
+			#-- padding first 9 bytes into result string, since we have this
+			#   in the serial interfaces as well
+			$res .= "000000000";
+		}
+	
+		#-- has data part
+		if ($data) {
+			my @data = unpack "C*", $data;
+			$ow_command->{"write"} = \@data;
+			$res.=$data;
+		}
+	
+		#-- has receive part
+		if ( $numread > 0 ) {
+			$ow_command->{"read"} = $numread;
+			#Firmata sends 0-address on read after skip
+			$owx_dev = '00.000000000000.00' unless defined $owx_dev;
+			my $id = $hash->{FRM_OWX_CORRELATIONID};
+			$ow_command->{"id"} = $hash->{FRM_OWX_CORRELATIONID};
+			$hash->{FRM_OWX_REQUESTS}->{$id} = {
+				command => $ow_command,
+				device => $owx_dev
+			};
+			delete $hash->{FRM_OWX_REPLIES}->{$owx_dev};		
+			$hash->{FRM_OWX_CORRELATIONID} = ($id + 1) & 0xFFFF;
+		}
+	
+		$firmata->onewire_command_series( $pin, $ow_command );
+		
+		if ($numread) {
+			my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
+			for (my $i=0;$i<$times;$i++) {
+				if (FRM_poll($hash->{IODev})) {
+					if (defined $hash->{FRM_OWX_REPLIES}->{$owx_dev}) {
+						$res .= $hash->{FRM_OWX_REPLIES}->{$owx_dev};
+						return $res;
+					}
+				} else {
+					select (undef,undef,undef,0.05);
 				}
-			} else {
-				select (undef,undef,undef,0.05);
 			}
 		}
+		return $res;
+	};
+	if ($@) {
+		Log3 $hash->{NAME},4,"FRM_OWX_Alarms: ".GP_Catch($@);
+		return 0;
 	}
-	return $res;
+	return $ret;
 }
 
 ########################################################################################
@@ -971,27 +984,31 @@ sub FRM_OWX_Discover ($) {
 
 	my ($hash) = @_;
 
-	#-- get the interface
-	my $frm = $hash->{IODev};
-	return 0 unless defined $frm;
-	my $firmata = $frm->{FirmataDevice};
-	my $pin     = $hash->{PIN};
-	return 0 unless ( defined $firmata and defined $pin );
-	my $old_devices = $hash->{DEVS};
-	$hash->{DEVS} = undef;			
-	$firmata->onewire_search($hash->{PIN});
-	my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
-	for (my $i=0;$i<$times;$i++) {
-		if (FRM_poll($hash->{IODev})) {
-			if (defined $hash->{DEVS}) {
-				return 1;
+	my $ret = eval {
+		my $firmata = FRM_Client_FirmataDevice($hash);
+		my $pin     = $hash->{PIN};
+		return 0 unless ( defined $firmata and defined $pin );
+		my $old_devices = $hash->{DEVS};
+		$hash->{DEVS} = undef;			
+		$firmata->onewire_search($hash->{PIN});
+		my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
+		for (my $i=0;$i<$times;$i++) {
+			if (FRM_poll($hash->{IODev})) {
+				if (defined $hash->{DEVS}) {
+					return 1;
+				}
+			} else {
+				select (undef,undef,undef,0.05);
 			}
-		} else {
-			select (undef,undef,undef,0.05);
 		}
+		$hash->{DEVS} = $old_devices;
+		return 1;
+	};
+	if ($@) {
+		Log3 $hash->{NAME},4,"FRM_OWX_Alarms: ".GP_Catch($@);
+		return 0;
 	}
-	$hash->{DEVS} = $old_devices;
-	return 1;
+	return $ret;
 }
 
 1;
