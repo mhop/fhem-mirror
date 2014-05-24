@@ -250,7 +250,8 @@ statistics_PeriodChange($)
    my $name = $hash->{NAME};
    my $dummy;
    my $val;
-   my $periodChangePreset = AttrVal($name, "periodChangePreset", 10);
+   my $periodChangePreset = AttrVal($name, "periodChangePreset", 5);
+   my $isDayChange = ( ReadingsVal($name, "nextPeriodChangeCalc", "") =~ /Day Change/ );
 
   # Determine the next day change time
    my @th=localtime();
@@ -258,7 +259,7 @@ statistics_PeriodChange($)
    my $dayChangeTime = timelocal(0,0,0,$th[3],$th[4],$th[5]+1900);
    if (AttrVal($name, "dayChangeTime", "00:00") =~ /(\d+):(\d+)/ && $1<24 && $1 >=0 && $2<60 && $2>=0) {
       $dayChangeDelay = $1 * 3600 + $2 * 60;
-      $dayChangeTime += $dayChangeDelay;
+      $dayChangeTime += $dayChangeDelay - $periodChangePreset;
    }
 
    RemoveInternalTimer($hash);
@@ -266,7 +267,7 @@ statistics_PeriodChange($)
    my $periodEndTime = 3600 * ( int((gettimeofday()+1800)/3600) + 1 ) - $periodChangePreset ;
  # Run procedure also for given dayChangeTime  
    $val = "";
-   if ( gettimeofday() < $dayChangeTime && $dayChangeTime < $periodEndTime) {
+   if ( $dayChangeDelay>0 && gettimeofday()<$dayChangeTime && $dayChangeTime<=$periodEndTime ) {
       $periodEndTime = $dayChangeTime;
       $val = " (Day Change)";
    } 
@@ -280,22 +281,33 @@ statistics_PeriodChange($)
  # Determine if time period switched (day, month, year)
  # Get deltaValue and Tariff of previous call
  
-   my $periodSwitch = 1;
+   my $periodSwitch = 0;
    my $yearLast;
    my $monthLast;
    my $dayLast;
-   my $minuteNow;
+   my $hourLast;
    my $hourNow;
    my $dayNow;
    my $monthNow;
    my $yearNow;
 
-   ($dummy, $dummy, $dummy, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - 1800);
-   ($dummy, $minuteNow, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + 1800);
-
-   if ($yearNow != $yearLast) { $periodSwitch = 4; }
-   elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
-   elsif ($dayNow != $dayLast) { $periodSwitch = 2; }
+   if ($dayChangeDelay>0) {
+      if ($isDayChange) {
+         ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - $dayChangeDelay);
+         ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + $periodEndTime);
+         if ($yearNow != $yearLast) { $periodSwitch = -4; }
+         elsif ($monthNow != $monthLast) { $periodSwitch = -3; }
+         elsif ($dayNow != $dayLast) { $periodSwitch = -2; }
+         if ($dayChangeDelay % 3600 == 0) { $periodSwitch = abs($periodSwitch); }
+      }
+   } else {
+      ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - 1800);
+      ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + 1800);
+      if ($yearNow != $yearLast) { $periodSwitch = 4; }
+      elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
+      elsif ($dayNow != $dayLast) { $periodSwitch = 2; }
+      elsif ($hourNow != $hourLast) { $periodSwitch = 1; }
+   }
 
    statistics_DoStatisticsAll $hash, $periodSwitch;
 
@@ -587,7 +599,7 @@ statistics_doStatisticDelta ($$$$$)
 
     # Determine if "since" value has to be shown in current and last reading
     # If change of year, change yearly statistic
-      if ($periodSwitch == 4) {
+      if ($periodSwitch == 4 || $periodSwitch == -4) {
          $last[7] = sprintf "%.".$decPlaces."f", $stat[7];
          $stat[7] = 0;
          if ($showDate == 1) { $showDate = 0; } # Do not show the "since:" value for year changes anymore
@@ -595,7 +607,7 @@ statistics_doStatisticDelta ($$$$$)
          Log3 $name,4,"$name: Shifting current year in last value of '$statReadingName'.";
       }
     # If change of month, change monthly statistic 
-      if ($periodSwitch >= 3){
+      if ($periodSwitch >= 3 || $periodSwitch <= -3){
          $last[5] = sprintf "%.".$decPlaces."f", $stat[5];
          $stat[5] = 0;
          if ($showDate == 3) { $showDate = 2; } # Do not show the "since:" value for month changes anymore
@@ -603,7 +615,7 @@ statistics_doStatisticDelta ($$$$$)
          Log3 $name,4,"$name: Shifting current month in last value of '$statReadingName'.";
       }
     # If change of day, change daily statistic
-      if ($periodSwitch >= 2){
+      if ($periodSwitch >= 2 || $periodSwitch <= -2){
          $last[3] = $stat[3];
          $stat[3] = 0;
          if ($showDate == 5) { $showDate = 4; } # Do not show the "since:" value for day changes anymore
@@ -827,12 +839,13 @@ statistics_FormatDuration($)
 <ul style="width:800px">
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
   <br>
-   Until now statistics for the following areadings are built:
+   Until now statistics for the following readings are automatically built:
    <ul>
       <li><b>Minimal, average  and maximal values:</b> brightness, current, humidity, temperature, voltage, wind, windSpeed</li>
       <li><b>Delta values:</b> count, energy, power, total, rain, rain_total</li>
       <li><b>Duration of states:</b> Window, state <i>(if no other reading is valid)</i></li>
-   </ul>
+   </ul> 
+   Further readings can be added via the correspondent <a url="#statisticsattr">attribut</a>.
   <br>&nbsp;
   <br>
   
@@ -867,15 +880,32 @@ statistics_FormatDuration($)
   <a name="statisticsattr"></a>
    <b>Attributes</b>
    <ul>
+    <li><code>dayChangeTime &lt;Zeit&gt;</code>
+      <br>
+      Time of day change. Default is 00:00. For weather data the day change is e.g. 06:50. 
+      <br>
+    </li><br>
+    <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
+      <br>
+      Comma separated list of reading names for which a delta statistic shall be calculated. 
+    </li><br>
+    <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
+      <br>
+      Comma separated list of reading names for which a duration statistic shall be calculated. 
+    </li><br>
     <li><code>excludedReadings <code>&lt;DeviceRegExp:ReadingNameRegExp&gt;</code></code>
       <br>
       Regular expression of the readings that shall be excluded from the statistics.<br>
       The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. "FritzDect:current|Sensor_.*:humidity"
       <br>
     </li><br>
+    <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
+      <br>
+      Comma separated list of reading names for which a min/average/max statistic shall be   calculated. 
+    </li><br>
     <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes<i>(Min|Avg|Max|Delta)</i>:period<i>(Hour|Day|Month|Year)</i></code>
       <br>
-      Regulare expression of statistic values, which shall not be shown in summary but also in singular readings
+      Regulare expression of statistic values, which shall not be shown in summary but also in singular readings. Eases the creation of plots.
       <br>
       z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
@@ -892,12 +922,13 @@ statistics_FormatDuration($)
 <ul style="width:800px">
   Dieses Modul wertet von den angegebenen Ger&auml;ten (als regulärer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
   <br>
-  Derzeit werden Statistiken f&uuml;r folgende Ger&auml;tewerte berechnet:
+  Derzeit werden Statistiken f&uuml;r folgende Ger&auml;tewerte vom Modul automatisch berechnet:
    <ul>
       <li><b>Minimal-, Mittel- und Maximalwerte:</b> brightness, current, humidity, temperature, voltage, wind, windSpeed</li>
       <li><b>Deltawerte:</b> count, energy, power, total, rain, rain_total</li>
       <li><b>Dauer der Stati:</b> Window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
+  Weitere Ger&auml;tewerte k&ouml;nnen &uuml;ber die entsprechenden <a url="#statisticsattr">Attribute</a> hinzugef&uuml;gt werden
   <br>&nbsp;
   <br>
   
@@ -937,13 +968,7 @@ statistics_FormatDuration($)
    <ul>
     <li><code>dayChangeTime &lt;Zeit&gt;</code>
       <br>
-      <b>noch nicht implementiert</b>
-      <br>
-    </li><br>
-    <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
-      <br>
-      regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
-      z.B. "FritzDect:current|Sensor_.*:humidity"
+      Uhrzeit des Tageswechsels. Standardm&auml;ssig 00:00. Bei Wetterdaten erfolgt der Tageswechsel z.B. 6:50. 
       <br>
     </li><br>
     <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
@@ -954,6 +979,12 @@ statistics_FormatDuration($)
       <br>
       Durch Kommas getrennte Liste von Ger&auml;tewerten 
     </li><br>
+    <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
+      <br>
+      regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
+      z.B. "FritzDect:current|Sensor_.*:humidity"
+      <br>
+    </li><br>
     <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
       Durch Kommas getrennte Liste von Ger&auml;tewerten 
@@ -962,12 +993,13 @@ statistics_FormatDuration($)
       <br>
       Start der Berechnung der periodischen Daten, standardm&auml;ssig 10 Sekunden vor der vollen Stunde,
       <br>
-      erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden
+      Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden
       <br>
     </li><br>
     <li><code>singularReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;:Statistiktypen<i>(Min|Avg|Max|Delta)</i>:ZeitPeriode<i>(Hour|Day|Month|Year)</i></code>
       <br>
       Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
+      Erleichtert die Erzeugung von Plots. 
       <br>
       z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
