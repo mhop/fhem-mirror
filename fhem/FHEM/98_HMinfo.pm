@@ -705,7 +705,8 @@ sub HMinfo_getEntities(@) { ###################################################
     next if ($id eq "000000");
     my $eHash = $modules{CUL_HM}{defptr}{$id};
     my $eName = $eHash->{NAME};
-    my $isChn = (length($id) != 6 || CUL_HM_Get($eHash,$eName,"param","channel_01") eq "undefined")?1:0;
+    next if ( !$eName || $eName !~ m/$re/);
+    my $isChn = $eHash->{helper}{chn}?1:0;
     my $eIg   = CUL_HM_Get($eHash,$eName,"param","ignore");
     $eIg = "" if ($eIg eq "undefined");
     next if (!(($doDev && length($id) == 6) ||
@@ -717,7 +718,6 @@ sub HMinfo_getEntities(@) { ###################################################
 
     next if ( $noSen && $eSt =~ m/^(THSensor|remote|pushButton|threeStateSensor|sensor|motionDetector|swi)$/);
     next if ( $noAct && $eSt =~ m/^(switch|blindActuator|dimmer|thermostat|smokeDetector|KFM100|outputUnit)$/);
-    next if ( $eName !~ m/$re/);
     push @names,$eName;
   }
   return sort(@names);

@@ -2544,7 +2544,7 @@ sub CUL_HM_pushEvnts(){########################################################
 sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
   return "no value specified" if(@a < 2);
-
+  return "" if(!$hash->{NAME});
   my $name = $hash->{NAME};
   my $devName = InternalVal($name,"device",$name);
   my $st = AttrVal($devName, "subType", "");
@@ -4866,6 +4866,7 @@ sub CUL_HM_respPendTout($) {
     elsif ($pHash->{rspWait}{reSent} > AttrVal($name,"msgRepeat",3)#too many
            ||(!($rxt & 0x9B))){#config cannot retry
       my $pendCmd = "MISSING ACK";
+
       if ($pHash->{rspWait}{Pending}){
         $pendCmd = "RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending};
         CUL_HM_complConfig($name);
@@ -4903,6 +4904,17 @@ sub CUL_HM_respPendTout($) {
       }
       else{# normal device resend
         if ($rxt & 0x02){# type = burst - need to set burst-Bit for retry
+          if ($pHash->{mmcA}){#fillback multi-message command
+            unshift @{$hash->{cmdStack}},$_ foreach (reverse@{$pHash->{mmcA}});
+            delete $pHash->{mmcA};
+            delete $pHash->{mmcS};
+            
+            my $cmd = shift @{$hash->{cmdStack}};
+            $cmd = sprintf("As%02X01%s", length($cmd)/2, substr($cmd,2));
+            $pHash->{rspWait}{cmd} = $cmd;
+            CUL_HM_responseSetup($hash,$cmd);
+          }
+
           my ($pre,$tp,$tail) = unpack 'A6A2A*',$pHash->{rspWait}{cmd};
           $pHash->{rspWait}{cmd} = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
         }
@@ -6255,7 +6267,11 @@ sub CUL_HM_storeRssi(@){
   return if (!$val);
   if (AttrVal($peerName,"subType","") eq "virtual"){
     my $h = InternalVal($name,"IODev","");#CUL_HM_name2IoName($peerName);
+    return if (!$h);
     $peerName = $h->{NAME};
+  }
+  else{
+    return if (length($peerName)<3);
   }
   
   my ($mVal,$mPn) = ($val,substr($peerName,3));
