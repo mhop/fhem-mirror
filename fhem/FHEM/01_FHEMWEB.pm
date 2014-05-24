@@ -1638,11 +1638,12 @@ FW_style($$)
     } else {
       $fileName =~ s,.*/,,g;        # Little bit of security
       my $filePath = FW_fileNameToPath($fileName);
-      if(!open(FH, $filePath)) {
-        FW_pO "<div id=\"content\">$filePath: $!</div>";
+      my($err, @data) = FileRead($filePath);
+      if($err) {
+        FW_pO "<div id=\"content\">$err</div>";
         return;
       }
-      $data = join("", <FH>);
+      $data = join("\n", @data);
       close(FH);
     }
 
@@ -1671,14 +1672,13 @@ FW_style($$)
     my $filePath = FW_fileNameToPath($fileName);
 
     if($cfgDB ne 'configDB') { # save file to filesystem
-      if(!open(FH, ">$filePath")) {
+
+      $FW_data =~ s/\r//g;
+      my $err = FileWrite($filePath, split("\n", $FW_data));
+      if($err) {
         FW_pO "<div id=\"content\">$filePath: $!</div>";
         return;
       }
-      $FW_data =~ s/\r//g if($^O !~ m/Win/);
-      binmode (FH);
-      print FH $FW_data;
-      close(FH);
       my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
       $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
       $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fileName");

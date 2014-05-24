@@ -443,22 +443,22 @@ SVG_WriteGplot($)
   return if(!$fName);
 
   my @rows;
-  push @rows, "# Created by FHEM/98_SVG.pm, ".TimeNow()."\n";
-  push @rows, "set terminal png transparent size <SIZE> crop\n";
-  push @rows, "set output '<OUT>.png'\n";
-  push @rows, "set xdata time\n";
-  push @rows, "set timefmt \"%Y-%m-%d_%H:%M:%S\"\n";
-  push @rows, "set xlabel \" \"\n";
-  push @rows, "set title '$FW_webArgs{title}'\n";
-  push @rows, "set ytics ".$FW_webArgs{ytics}."\n";
-  push @rows, "set y2tics ".$FW_webArgs{y2tics}."\n";
+  push @rows, "# Created by FHEM/98_SVG.pm, ".TimeNow();
+  push @rows, "set terminal png transparent size <SIZE> crop";
+  push @rows, "set output '<OUT>.png'";
+  push @rows, "set xdata time";
+  push @rows, "set timefmt \"%Y-%m-%d_%H:%M:%S\"";
+  push @rows, "set xlabel \" \"";
+  push @rows, "set title '$FW_webArgs{title}'";
+  push @rows, "set ytics ".$FW_webArgs{ytics}."";
+  push @rows, "set y2tics ".$FW_webArgs{y2tics}."";
   push @rows, "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
-                      ($FW_webArgs{gridy2} ? " y2tics":"")."\n";
-  push @rows, "set ylabel \"$FW_webArgs{ylabel}\"\n";
-  push @rows, "set y2label \"$FW_webArgs{y2label}\"\n";
-  push @rows, "set yrange $FW_webArgs{yrange}\n" if($FW_webArgs{yrange});
-  push @rows, "set y2range $FW_webArgs{y2range}\n" if($FW_webArgs{y2range});
-  push @rows, "\n";
+                      ($FW_webArgs{gridy2} ? " y2tics":"")."";
+  push @rows, "set ylabel \"$FW_webArgs{ylabel}\"";
+  push @rows, "set y2label \"$FW_webArgs{y2label}\"";
+  push @rows, "set yrange $FW_webArgs{yrange}" if($FW_webArgs{yrange});
+  push @rows, "set y2range $FW_webArgs{y2range}" if($FW_webArgs{y2range});
+  push @rows, "";
 
   my $ld = $FW_webArgs{logdevicetype};
   my @plot;
@@ -471,7 +471,7 @@ SVG_WriteGplot($)
             join(":", map { $v[$_] =~ s/:/\\x3a/g if($_<$#v); $v[$_] } 0..$#v) :
             $v[0];
 
-    push @rows, "#$ld $r\n";
+    push @rows, "#$ld $r";
     push @plot, "\"<IN>\" using 1:2 axes ".
                 ($FW_webArgs{"axes_$i"} eq "right" ? "x1y2" : "x1y1").
                 ($FW_webArgs{"title_$i"} eq "notitle" ? " notitle" :
@@ -480,9 +480,15 @@ SVG_WriteGplot($)
                 " lw "    .$FW_webArgs{"width_$i"} .
                 " with "  .$FW_webArgs{"type_$i"};
   }
-  push @rows, "\n";
-  push @rows, "plot ".join(",\\\n     ", @plot)."\n";
-
+  push @rows, "";
+  for(my $i=0; $i < @plot; $i++) {
+    my $r = $plot[$i];
+    $r = "plot $r" if($i == 0);
+    $r = "     $r" if($i > 0);
+    $r = "$r,\\" if($i+1 < @plot);
+    push @rows, $r;
+  }
+  
   my $err = FileWrite($fName, @rows);
   FW_pO "SVG_WriteGplot: $err" if($err);
 
@@ -509,7 +515,6 @@ SVG_readgplotfile($$)
 
   foreach my $l (@svgplotfile) {
     $l = "$l\n" unless $l =~ m/\n$/;
-    $l =~ s/\r//g;
     my $plotfn = undef;
     if($l =~ m/^#$ldType (.*)$/) {
       $plotfn = $1;

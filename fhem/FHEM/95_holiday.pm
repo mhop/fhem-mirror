@@ -69,7 +69,6 @@ holiday_refresh($$)
   foreach my $l (@holidayfile) {
     next if($l =~ m/^\s*#/);
     next if($l =~ m/^\s*$/);
-    chomp($l);
     my $found;
 
     if($l =~ m/^1/) {               # Exact date: 1 MM-DD Holiday
