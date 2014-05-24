@@ -6404,8 +6404,8 @@ sub CUL_HM_assignIO($){ #check and assign IO
     foreach my $iom (grep !/^$/,@ios){
       if ($ccuIOs =~ m /$iom/){     
         if (  !$defs{$iom}
-            ||(   $defs{$iom}{STATE} ne "Initialized"   # we need to queue
-               && InternalVal($iom,"XmitOpen",0) == 0)){#overload, dont send
+            || $defs{$iom}{STATE} eq "disconnected" # CUL? 
+            || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB?
           next;
         }
         if (   $hash->{IODev} 
