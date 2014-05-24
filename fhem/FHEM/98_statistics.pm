@@ -291,15 +291,13 @@ statistics_PeriodChange($)
    my $monthNow;
    my $yearNow;
 
-   if ($dayChangeDelay>0) {
-      if ($isDayChange) {
+   if ($dayChangeDelay>0 && $isDayChange) {
          ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - $dayChangeDelay);
          ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + $periodEndTime);
          if ($yearNow != $yearLast) { $periodSwitch = -4; }
          elsif ($monthNow != $monthLast) { $periodSwitch = -3; }
          elsif ($dayNow != $dayLast) { $periodSwitch = -2; }
          if ($dayChangeDelay % 3600 == 0) { $periodSwitch = abs($periodSwitch); }
-      }
    } else {
       ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - 1800);
       ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + 1800);
