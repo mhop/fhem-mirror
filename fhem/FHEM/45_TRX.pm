@@ -235,49 +235,48 @@ TRX_DoInit($)
   # Get Status
   $init = pack('H*', "0D00000102000000000000000000");
   DevIo_SimpleWrite($hash, $init, 0);
-  $buf = DevIo_TimeoutRead($hash, 0.1);
+  $buf = unpack('H*',DevIo_TimeoutRead($hash, 0.1));
 
   if (! $buf) {
     	Log3 $name, 1, "TRX: Initialization Error: No character read";
 	return "TRX: Initialization Error $name: no char read";
-  } elsif ($buf !~ m/\x0d\x01\x00.........../) {
-	my $hexline = unpack('H*', $buf);
-    	Log3 $name, 1, "TRX: Initialization Error hexline='$hexline'";
-	return "TRX: Initialization Error %name expected char=0x2c, but char=$char received.";
+  } elsif ($buf !~ m/0d0100....................../) {
+    	Log3 $name, 1, "TRX: Initialization Error hexline='$buf', expected 0d0100......................";
+	return "TRX: Initialization Error %name expected 0D0100, but char=$char received.";
   } else {
     	Log3 $name,1, "TRX: Init OK";
   	$hash->{STATE} = "Initialized";
 	# Analyse result and display it:
-	if ($buf =~ m/\x0d\x01\x00(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)/) {
+	if ($buf =~ m/0d0100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/) {
 		my $status = "";
 
 		my $seqnbr = $1;
 		my $cmnd = $2;
-		my $msg1 = ord($3);
-		my $msg2 = ord($4);
-		my $msg3 = ord($5);
-		my $msg4 = ord($6);
-		my $msg5 = ord($7);
+		my $msg1 = $3;
+		my $msg2 = ord(pack('H*', $4));
+		my $msg3 = ord(pack('H*', $5));
+		my $msg4 = ord(pack('H*', $6));
+		my $msg5 = ord(pack('H*', $7));
   		my $freq = { 
-			0x50 => '310MHz',
-			0x51 => '315MHz',
-			0x52 => '433.92MHz receiver only',
-			0x53 => '433.92MHz transceiver',
-			0x55 => '868.00MHz',
-			0x56 => '868.00MHz FSK',
-			0x57 => '868.30MHz',
-			0x58 => '868.30MHz FSK',
-			0x59 => '868.35MHz',
-			0x5A => '868.35MHz FSK',
-			0x5B => '868.95MHz'
+			'50' => '310MHz',
+			'51' => '315MHz',
+			'52' => '433.92MHz receiver only',
+			'53' => '433.92MHz transceiver',
+			'55' => '868.00MHz',
+			'56' => '868.00MHz FSK',
+			'57' => '868.30MHz',
+			'58' => '868.30MHz FSK',
+			'59' => '868.35MHz',
+			'5a' => '868.35MHz FSK',
+			'5b' => '868.95MHz'
                  }->{$msg1} || 'unknown Mhz';
 		$status .= $freq;
 		$status .= ", " . sprintf "firmware=%d",$msg2;
 		$status .= ", protocols enabled: ";
 		$status .= "undecoded " if ($msg3 & 0x80); 
-		$status .= "RFU6 " if ($msg3 & 0x40); 
-		$status .= "RFU5 " if ($msg3 & 0x20); 
-		$status .= "RFU4 " if ($msg3 & 0x10); 
+		$status .= "RFU " if ($msg3 & 0x40); 
+		$status .= "ByronSX " if ($msg3 & 0x20); 
+		$status .= "RSL " if ($msg3 & 0x10); 
 		$status .= "Lighting4 " if ($msg3 & 0x08); 
 		$status .= "FineOffset/Viking " if ($msg3 & 0x04); 
 		$status .= "Rubicson " if ($msg3 & 0x02); 
