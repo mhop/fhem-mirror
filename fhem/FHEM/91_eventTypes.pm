@@ -37,7 +37,6 @@ eventTypes_Define($$)
 
   my ($err, @content) = FileRead($f);
   foreach my $l (@content) {
-    chomp($l);
     next if($l =~ m/ CULHM (SND|RCV) /);
     next if($l =~ m/ UNKNOWNCODE /);
     next if($l =~ m/^\d+ global /);
@@ -114,7 +113,7 @@ eventTypes_Shutdown($$)
   my $ldata = $modules{eventTypes}{ldata};
   foreach my $t (sort keys %{$ldata}) {
     foreach my $e (sort keys %{$ldata->{$t}}) {
-      push @content, "$ldata->{$t}{$e} $t $e\n";
+      push @content, "$ldata->{$t}{$e} $t $e";
     }
   }
   FileWrite($fName, @content);

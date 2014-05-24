@@ -3799,6 +3799,7 @@ FileRead($)
     if(open(FH, $fname)) {
       @ret = <FH>;
       close(FH);
+      chomp(@ret);
     } else {
       $err = "Can't open $fname: $!";
     }
@@ -3818,8 +3819,9 @@ FileWrite($@)
 
   } else {
     if(open(FH, ">$fname")) {
+      binmode (FH);
       foreach my $l (@rows) {
-        print FH $l;
+        print FH $l,"\n";
       }
       close(FH);
       return undef;
