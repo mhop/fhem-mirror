@@ -750,13 +750,15 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
 
   my $oldChn = $hash->{helper}{io}{newChn};
   my @p = unpack 'A8A2A*',$oldChn;
-  if($hash->{helper}{q}{qReqConf}  ||
-     $hash->{helper}{q}{qReqStat}  ||
-     $hash->{helper}{prt}{sProc}){
+  #if($hash->{helper}{q}{qReqConf}  ||
+  #   $hash->{helper}{q}{qReqStat}  ||
+  #   $hash->{helper}{prt}{sProc}){
+  if($hash->{helper}{prt}{sProc}){
     $p[1] |= 2;
   }
   else{
-    $p[1] &= 0xFD;
+    $p[1] &= 0xFD;# remove this Bit if no more data to send
+                  # otherwise could cause continous send (e.g. from SC
   }
   $hash->{helper}{io}{newChn} = sprintf("%s%02X%s",@p);
   if (($hash->{helper}{io}{newChn} ne $oldChn)
@@ -6386,11 +6388,10 @@ sub CUL_HM_assignIO($){ #check and assign IO
     foreach my $iom (grep !/^$/,@ios){
       if ($ccuIOs =~ m /$iom/){     
         if (  !$defs{$iom}
-            || $defs{$iom}{STATE} !~ m/^(opened|Initialized)$/               # we need to queue
-            ||(defined $defs{$iom}{XmitOpen} && $defs{$iom}{XmitOpen} == 0)){#overload, dont send
+            ||(   $defs{$iom}{STATE} ne "Initialized"   # we need to queue
+               && InternalVal($iom,"XmitOpen",0) == 0)){#overload, dont send
           next;
         }
-        Log 1,"General change $hn io to $iom" if($hash->{IODev} ne $defs{$iom});
         if (   $hash->{IODev} 
             && $hash->{IODev} ne $defs{$iom}
             && $hash->{IODev}->{TYPE}
