@@ -6274,20 +6274,22 @@ sub CUL_HM_storeRssi(@){
     return if (length($peerName)<3);
   }
   
-  my ($mVal,$mPn) = ($val,substr($peerName,3));
-  if ($defs{$name}{helper}{mRssi}{mNo} ne $mNo){# new message
-    delete $defs{$name}{helper}{mRssi};
-    $defs{$name}{helper}{mRssi}{mNo} = $mNo;
+  if ($peerName =~ m/^at_/){
+    if ($defs{$name}{helper}{mRssi}{mNo} ne $mNo){# new message
+      delete $defs{$name}{helper}{mRssi};
+      $defs{$name}{helper}{mRssi}{mNo} = $mNo;
+    }
+    
+    my ($mVal,$mPn) = ($val,substr($peerName,3));
+    if ($mPn =~ m /^rpt_(.*)/){# map repeater to io device, use max rssi
+      $mPn = $1;
+      $mVal = $defs{$name}{helper}{mRssi}{io}{$mPn} 
+            if(   $defs{$name}{helper}{mRssi}{io}{$mPn} 
+               && $defs{$name}{helper}{mRssi}{io}{$mPn} > $mVal);
+    }
+    $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
+    $defs{$name}{helper}{mRssi}{io}{$mPn} = $mVal;
   }
-
-  if ($mPn =~ m /^rpt_(.*)/){# map repeater to io device, use max rssi
-    $mPn = $1;
-    $mVal = $defs{$name}{helper}{mRssi}{io}{$mPn} 
-          if(   $defs{$name}{helper}{mRssi}{io}{$mPn} 
-             && $defs{$name}{helper}{mRssi}{io}{$mPn} > $mVal);
-  }
-  $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
-  $defs{$name}{helper}{mRssi}{io}{$mPn} = $mVal;
   
   $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
   my $rssiP = $defs{$name}{helper}{rssi}{$peerName};
@@ -6393,31 +6395,29 @@ sub CUL_HM_assignIO($){ #check and assign IO
       && defined $hash->{IODev} ){#don't change while send in process
     return; 
   }
-  my $hn = $hash->{NAME};
+  my $hn = $hash->{NAME};     
   my ($ioCCU,$prefIO) = split(":",AttrVal($hn,"IOgrp","_"),2);
-  $ioCCU = "" if (!defined $defs{$ioCCU} || AttrVal($ioCCU,"model","") ne "CCU-FHEM");
-  if ($ioCCU){
+  if (defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"){
     my $ccuIOs = AttrVal($ioCCU,"IOList","");
-    my @ios = sort {$hash->{helper}{mRssi}{io}{$b} <=> $hash->{helper}{mRssi}{io}{$a} } 
-           keys(%{$hash->{helper}{mRssi}{io}});
+    my @ios = sort {$hash->{helper}{mRssi}{io}{$b} <=> 
+                    $hash->{helper}{mRssi}{io}{$a} } 
+          split(",",$ccuIOs);
     unshift @ios,$prefIO if ($prefIO);# set prefIO to first choice
     foreach my $iom (grep !/^$/,@ios){
-      if ($ccuIOs =~ m /$iom/){     
-        if (  !$defs{$iom}
-            || $defs{$iom}{STATE} eq "disconnected" # CUL? 
-            || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB?
-          next;
-        }
-        if (   $hash->{IODev} 
-            && $hash->{IODev} ne $defs{$iom}
-            && $hash->{IODev}->{TYPE}
-            && $hash->{IODev}->{TYPE} eq "HMLAN"){#if recent io is HMLAN and we have to change remove the device from IO
-          my $id = CUL_HM_hash2Id($hash);
-          IOWrite($hash, "", "remove:$id");
-        }
-        $hash->{IODev} = $defs{$iom};
-        return;
+      if (  !$defs{$iom}
+          || $defs{$iom}{STATE} eq "disconnected" 
+          || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB?
+        next;
       }
+      if (   $hash->{IODev} 
+          && $hash->{IODev} ne $defs{$iom}
+          && $hash->{IODev}->{TYPE}
+          && $hash->{IODev}->{TYPE} eq "HMLAN"){#if recent io is HMLAN and we have to change remove the device from IO
+        my $id = CUL_HM_hash2Id($hash);
+        IOWrite($hash, "", "remove:$id");
+      }
+      $hash->{IODev} = $defs{$iom};
+      return;
     }
   }
   # not assigned thru CCU - try normal
