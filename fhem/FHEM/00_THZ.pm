@@ -1283,13 +1283,13 @@ my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
 
 
 ############willi data
-$insideTemp=24.6;
-$roomSetTemp = 21;
-$p13GradientHC1 = 0.26;
-$heatSetTemp = 21.3;
-$p15RoomInfluenceHC1 = 50;
-$outside_tempFiltered = 13.1;
-$p14LowEndHC1 =1.5;
+#$insideTemp=24.6;
+#$roomSetTemp = 21;
+#$p13GradientHC1 = 0.26;
+#$heatSetTemp = 21.3;
+#$p15RoomInfluenceHC1 = 50;
+#$outside_tempFiltered = 13.1;
+#$p14LowEndHC1 =1.5;
 
 
 
