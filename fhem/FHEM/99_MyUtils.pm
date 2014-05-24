@@ -144,10 +144,10 @@ sub RollTest() {
 }
 
 sub RollAll($$) {
-   #Log 1, "################";
+#   Log 1, "################";
    my ($cmd, $delay) = @_;
-   #Log 1, "c:$cmd d:$delay";
-   #&RollGroup(\@rollAlle, $cmd, $delay);
+#   Log 1, "c:$cmd d:$delay";
+#   &RollGroup(\@rollAlle, $cmd, $delay);
    if($cmd eq "closes") {
      &RollGroup(\@rollRunter, $cmd,$delay);
    }
@@ -160,7 +160,8 @@ sub RollAll($$) {
 sub RollWeck($) {
    my ($delay) = @_;
    &RollGroup(\@rollWeck, "up 5", $delay);
-   myfhem("set wach 1");
+   myfhem("define weckwachat at +03:00:00 set wach 1");
+#   myfhem("set wach 1");
 }
 
 sub Dbg($) {
@@ -173,7 +174,6 @@ sub RollCheck() {
     my $temp=20;
     my $wett;
     my $twil;
-    my $fen;
     my $r;
     my $sr;
     my $i=0;
@@ -181,6 +181,7 @@ sub RollCheck() {
 
     for $r ( @rolls ) {
 
+	my $fen="Closed";
 	my $tempH=0;
 	my $sonne=0;
 	my $tag=0;
@@ -198,17 +199,19 @@ sub RollCheck() {
 	    $tempH=1;
 	}
 	
-        $wett=ReadingsVal("wetter", "code", 99);
-        $sr=Value("sonnenrichtung");
-	if($wett==30 || $wett==32 || $wett==34 || $wett==36) { # sonnig, heiter, heiss
-	    if (index($sr, $r->{dir}) != -1) {
-		$sonne=1;
-	    }
+        $twil=Value("twil");
+	if($twil>=3 && $twil<10) { # civil
+	    $tag=1;
 	}
 
-        $twil=Value("twil");
-	if($twil>=3 && $twil<10) {
-	    $tag=1;
+        $wett=ReadingsVal("wetter", "code", 99);
+        $sr=Value("sonnenrichtung");
+        if($twil>=5 && $twil<8) { # indoor
+	    if($wett==30 || $wett==32 || $wett==34 || $wett==36) { # sonnig, heiter, heiss
+		if (index($sr, $r->{dir}) != -1) {
+		    $sonne=1;
+		}
+	    }
 	}
 
         if($r->{win} ne "") {
@@ -225,11 +228,11 @@ sub RollCheck() {
             }
 	}
 
-#       Dbg("  tempH:$tempH so:$sonne tag:$tag skipR:$skipRunter");
+        Dbg("RollCheck:$r->{roll}-tempH:$tempH temp:$temp so:$sonne wett:$wett sr:$sr twil:$twil tag:$tag fen:$fen skipR:$skipRunter skipH:$skipHoch");
 
 	if( $tag and $sonne and $tempH) {
             if($r->{state}!=STATE_SCHLITZ) {
-                if(!$skipRunter) { 
+                if(!$skipHoch && !$skipRunter) { 
 		    myfhem("define r".$i." at +".$t." set ".$r->{roll}." closes");
 		    myfhem("define ru".$i." at +".$t2." set ".$r->{roll}." up 7");
 		    Dbg("RollChg: $r->{roll} - runter schlitz\n");
@@ -243,8 +246,8 @@ sub RollCheck() {
                 if(!$skipHoch) { 
 		    myfhem("define r".$i." at +".$t." set ".$r->{roll}." opens");
 		    Dbg("RollChg: $r->{roll} - hoch\n");
+		    $r->{state}=STATE_HOCH;
 		}
-                $r->{state}=STATE_HOCH;
 	    }
 	}
 
