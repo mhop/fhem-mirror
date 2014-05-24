@@ -683,8 +683,9 @@ sub retrieveConditions($$@){
 	}
 	close WXDATA;
 
-	%alignment = ("Station" => "l", "H\xF6he" => "r", "Luftd." => "r", "TT" => "r", "Tmin" => "r", "Tmax" => "r",
-	"RR1" => "r", "RR24" => "r", "SSS" => "r", "DD" => "r", "FF" => "r", "FX" => "r", "Wetter/Wolken" => "l", "B\xF6en" => "l");
+	%alignment = ("Station" => "l", "H\xF6he" => "r", "Luftd." => "r", "TT" => "r", "Tn12" => "r", "Tx12" => "r", 
+	"Tmin" => "r", "Tmax" => "r", "Tg24" => "r", "Tn24" => "r", "Tm24" => "r", "Tx24" => "r", "SSS24" => "r", "SGLB24" => "r", 
+	"RR1" => "r", "RR12" => "r", "RR24" => "r", "SSS" => "r", "DD" => "r", "FF" => "r", "FX" => "r", "Wetter/Wolken" => "l", "B\xF6en" => "l");
 	
 	foreach $item (@a) {
 		Log3($hash, 4, "conditions item: $item");
@@ -696,24 +697,33 @@ sub retrieveConditions($$@){
 
 	if(length($wx{"Station"})){
 		$cread{$prefix."_stationName"}	= $wx{"Station"};
-		$cread{$prefix."_altitude"}		= $wx{"H\xF6he"};
+		$cread{$prefix."_altitude"}			= $wx{"H\xF6he"};
 		$cread{$prefix."_pressure-nn"}	= $wx{"Luftd."};
 		$cread{$prefix."_temperature"}	= $wx{"TT"};
-		$cread{$prefix."_tempMin"}		= $wx{"Tmin"};
-		$cread{$prefix."_tempMax"}		= $wx{"Tmax"};
-		$cread{$prefix."_rain1h"}		= $wx{"RR1"};
-		$cread{$prefix."_rain24h"}		= $wx{"RR24"};
-		$cread{$prefix."_snow"}			= $wx{"SSS"};
-		$cread{$prefix."_windDir"}		= $wx{"DD"};
-		$cread{$prefix."_windSpeed"}	= $wx{"FF"};
-		$cread{$prefix."_windPeak"}		= $wx{"FX"};
-		$cread{$prefix."_weather"}		= $wx{"Wetter\/Wolken"};
-		$cread{$prefix."_windGust"}		= $wx{"B\xF6en"};
+		$cread{$prefix."_tMinAir12"}		= $wx{"Tn12"};
+		$cread{$prefix."_tMaxAir12"}		= $wx{"Tx12"};
+		$cread{$prefix."_tMinGrnd24"}		= $wx{"Tg24"};
+		$cread{$prefix."_tMinAir24"}		= $wx{"Tn24"};
+		$cread{$prefix."_tAvgAir24"}		= $wx{"Tm24"};
+		$cread{$prefix."_tMaxAir24"}		= $wx{"Tx24"};
+		$cread{$prefix."_tempMin"}			= $wx{"Tmin"};
+		$cread{$prefix."_tempMax"}			= $wx{"Tmax"};
+		$cread{$prefix."_rain1h"}				= $wx{"RR1"};
+		$cread{$prefix."_rain12h"}			= $wx{"RR12"};
+		$cread{$prefix."_rain24h"}			= $wx{"RR24"};
+		$cread{$prefix."_snow"}					= $wx{"SSS"};
+		$cread{$prefix."_sunshine"}			= $wx{"SSS24"};
+		$cread{$prefix."_solar"}				= $wx{"SGLB24"};
+		$cread{$prefix."_windDir"}			= $wx{"DD"};
+		$cread{$prefix."_windSpeed"}		= $wx{"FF"};
+		$cread{$prefix."_windPeak"}			= $wx{"FX"};
+		$cread{$prefix."_weather"}			= $wx{"Wetter\/Wolken"};
+		$cread{$prefix."_windGust"}			= $wx{"B\xF6en"};
 	} else {
 		$cread{$prefix."_stationName"}	= "unknown: $myStation";
 	}
 
-	CommandDeleteReading(undef, "$name $prefix"."_.*");
+#	CommandDeleteReading(undef, "$name $prefix"."_.*");
 	readingsBeginUpdate($hash);
 	while(($k, $v) = each %cread) { 
 	readingsBulkUpdate($hash, $k, latin1ToUtf8($v)) if(defined($v)); }
@@ -1162,11 +1172,20 @@ sub initDropdownLists($){
 # Höhe  : m über NN
 # Luftd.: reduzierter Luftdruck auf Meereshöhe in hPa
 # TT    : Lufttemperatur in Grad Celsius
+# Tn12  : Minimum der Lufttemperatur, 18 UTC Vortag bis 06 UTC heute, Grad Celsius
+# Tx12  : Maximum der Lufttemperatur, 18 UTC Vortag bis 06 UTC heute, Grad Celsius
+# Tg24  : Temperaturminimum 5cm ¸ber Erdboden, 22.05.2014 00 UTC bis 24 UTC, Grad Celsius
+# Tn24  : Minimum der Lufttemperatur, 22.05.2014 00 UTC bis 24 UTC, Grad Celsius
+# Tm24  : Mittel der Lufttemperatur, 22.05.2014 00 UTC bis 24 UTC, Grad Celsius
+# Tx24  : Maximum der Lufttemperatur, 22.05.2014 00 UTC bis 24 UTC, Grad Celsius
 # Tmin  : Minimum der Lufttemperatur, 06 UTC Vortag bis 06 UTC heute, Grad Celsius
 # Tmax  : Maximum der Lufttemperatur, 06 UTC Vortag bis 06 UTC heute, Grad Celsius
 # RR1   : Niederschlagsmenge, einstündig, mm = l/qm
+# RR12  : Niederschlagsmenge, 12st¸ndig, 18 UTC Vortag bis 06 UTC heute, mm = l/qm
 # RR24  : Niederschlagsmenge, 24stündig, 06 UTC Vortag bis 06 UTC heute, mm = l/qm
 # SSS   : Gesamtschneehöhe in cm
+# SSS24 : Sonnenscheindauer 22.05.2014 in Stunden
+# SGLB24: Tagessumme Globalstrahlung am 22.05.2014 in J/qcm 
 # DD    : Windrichtung 
 # FF    : Windgeschwindigkeit letztes 10-Minutenmittel in km/h
 # FX    : höchste Windspitze im Bezugszeitraum in km/h
