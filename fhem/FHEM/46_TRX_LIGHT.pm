@@ -440,7 +440,7 @@ TRX_LIGHT_Set($@)
 		return "error set name=$name  deviceid=$deviceid";
   	}
   	$hex_prefix = sprintf "0716";
-  	$hex_command = sprintf "%02x%02x%s%02xx00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
+  	$hex_command = sprintf "%02x%02x00%s%02xx00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
   	Log3 $name, 5, "TRX_LIGHT_Set() chime name=$name device_type=$device_type, deviceid=$deviceid command=$command";
   	Log3 $name, 5, "TRX_LIGHT_Set() chime hexline=$hex_prefix$hex_command";
  } elsif ($protocol_type == 0x17) {
@@ -655,6 +655,9 @@ sub TRX_LIGHT_parse_X10 ($$)
   } elsif ($type == 0x15) {
   	$device = sprintf '%02x%02x%c%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
   	$data = $bytes->[7];
+  } elsif ($type == 0x16) { #Chime
+  	$device = sprintf '%02x', $bytes->[4];
+  	$data = $bytes->[5];
   } elsif ($type == 0x17) { # Fan
   	$device = sprintf '%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5];
   	$data = $bytes->[6];
@@ -932,7 +935,7 @@ TRX_LIGHT_Parse($$)
 
   #Log3 $iohash, 5, "TRX_LIGHT: num_bytes=$num_bytes hex=$hexline type=$type";
   my $res = "";
-  if ($type == 0x10 || $type == 0x11 || $type == 0x12 || $type == 0x14) {
+  if ($type == 0x10 || $type == 0x11 || $type == 0x12 || $type == 0x14 || $type == 0x15 || $type == 0x16 || $type == 0x17 || $type == 0x18 || $type == 0x19) {
 	Log3 $iohash, 5, "TRX_LIGHT_Parse() X10 num_bytes=$num_bytes hex=$hexline";
         $res = TRX_LIGHT_parse_X10($iohash, \@rfxcom_data_array);
   	Log3 $iohash, 1, "TRX_LIGHT_Parse() unsupported hex=$hexline" if ($res eq "");
