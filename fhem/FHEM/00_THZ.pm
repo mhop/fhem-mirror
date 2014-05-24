@@ -1209,7 +1209,7 @@ my $ret =  <<'END';
 <?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="163" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 <style type="text/css"><![CDATA[
 text       { font-family:Times; font-size:12px; }
-text.title { font-size:14px; }
+text.title { font-size:14	px; }
 text.copy  { text-decoration:underline; stroke:none; fill:blue;    }
 text.paste { text-decoration:underline; stroke:none; fill:blue;    }
 polyline { stroke:black; fill:none; }
