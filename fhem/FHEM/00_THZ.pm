@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 05/2014
-# v. 0.099
+# v. 0.100
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -105,7 +105,11 @@ my %sets = (
     "p42Fanstage3AirflowOutlet"		=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300" },	#abluft extrated
     "p49SummerModeTemp"			=> {cmd2=>"0A0116", argMin =>  "11", argMax =>  "24" },		#threshold for summer mode !! 
     "p50SummerModeHysteresis"		=> {cmd2=>"0A05A2", argMin =>  "0.5", argMax =>  "5" },		#Hysteresis for summer mode !! 
-    "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin =>  "-10", argMax =>  "20" },		
+    "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin =>  "-10", argMax =>  "20" },
+    "p54MinPumpCycles"			=> {cmd2=>"0A05B8", argMin =>  "1", argMax =>  "24"  },
+    "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", argMax => "200"  },
+    "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "0", argMax =>  "25"  },
+    "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "0", argMax =>  "25"  },
     "pHolidayBeginDay"			=> {cmd2=>"0A011B", argMin =>  "1", argMax =>  "31"  }, 
     "pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>  "1", argMax =>  "12"  },
     "pHolidayBeginYear"			=> {cmd2=>"0A011D", argMin =>  "12", argMax => "20"  },
@@ -522,7 +526,7 @@ sub THZ_Set($@){
   elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg1) *256 + time2quaters($arg)} # PartyBeginTime-endtime, in the register is represented endtime begintime
   #partytime (0A05D1) non funziona; 
   elsif  ((substr($cmdHex2,0,6) eq "0A05D3") or (substr($cmdHex2,0,6) eq "0A05D4")) 	{$arg= time2quaters($arg)} # holidayBeginTime-endtime
-  elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057") or (substr($cmdHex2,0,6) eq "0A0588") or (substr($cmdHex2,0,6) eq "0A05A0") or (substr($cmdHex2,0,6) eq "0B059D"))	{ } 				# fann speed and boostetimeout: do not multiply
+  elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057") or (substr($cmdHex2,0,6) eq "0A0588") or (substr($cmdHex2,0,6) eq "0A05A0") or (substr($cmdHex2,0,6) eq "0B059D")      or (substr($cmdHex2,0,6) eq "0A05B7") or (substr($cmdHex2,0,6) eq "0A05B8")   )	{ } 				# fann speed and boostetimeout: do not multiply
   elsif  (substr($cmdHex2,2,4) eq "010E") 					{$arg=$arg*100} 		#gradientHC1 &HC2
   else 			             						{$arg=$arg*10} 
   THZ_Write($hash,  "02"); 			# STX start of text
@@ -862,7 +866,7 @@ sub THZ_Parse($) {
       elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 		{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
       elsif (substr($message,4,4) eq "05D1") 				 		{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
       elsif ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   	{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
-      elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575") or (substr($message,4,4) eq "03AE") or (substr($message,4,4) eq "03AF") or (substr($message,4,4) eq "03B0") or (substr($message,4,4) eq "03B1") or (substr($message,4,3) eq "091") or (substr($message,4,3) eq "092") or (substr($message,4,3) eq "093"))	{$message = hex(substr($message, 8,4))}
+      elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575") or (substr($message,4,4) eq "03AE") or (substr($message,4,4) eq "03AF") or (substr($message,4,4) eq "03B0") or (substr($message,4,4) eq "03B1") or (substr($message,4,3) eq "091") or (substr($message,4,3) eq "092") or (substr($message,4,3) eq "093") or (substr($message,4,4) eq "05B7") or (substr($message,4,4) eq "05B8"))	{$message = hex(substr($message, 8,4))}
       elsif ((substr($message,4,4) eq "0588") or (substr($message,4,4) eq "05A0")  or (substr($message,4,4) eq "0571") or (substr($message,4,4) eq "0572") or (substr($message,4,4) eq "0573") or (substr($message,4,4) eq "0574")) {$message = hex(substr($message, 8,4)) ." min" }
       elsif (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4)) ." m3/h" }
       elsif (substr($message,4,4) eq "05A2")						{$message = hex(substr($message, 8,4))/10 ." K" }
@@ -1205,7 +1209,7 @@ my $ret =  <<'END';
 <?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="163" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 <style type="text/css"><![CDATA[
 text       { font-family:Times; font-size:12px; }
-text.title { font-size:16px; }
+text.title { font-size:14px; }
 text.copy  { text-decoration:underline; stroke:none; fill:blue;    }
 text.paste { text-decoration:underline; stroke:none; fill:blue;    }
 polyline { stroke:black; fill:none; }
@@ -1278,6 +1282,20 @@ my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
 my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
 
 
+############willi data
+$insideTemp=24.6;
+$roomSetTemp = 21;
+$p13GradientHC1 = 0.26;
+$heatSetTemp = 21.3;
+$p15RoomInfluenceHC1 = 50;
+$outside_tempFiltered = 13.1;
+$p14LowEndHC1 =1.5;
+
+
+
+
+
+
 #labels ######################
 $ret .= '<text line_id="line_1" x="70" y="105.2" class="l1"> --- heat curve</text>' ;
 $ret .= '<text  line_id="line_0" x="70" y="121.2"  class="l0"> --- working point: outside_tempFiltered=';
@@ -1290,7 +1308,7 @@ $ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . 
 
 #equation####################
 $insideTemp=$roomSetTemp if ($insideTemp eq "n.a."); 
-my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + $p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp); 
+my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
 my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
 my $c= -1 * $p13GradientHC1 /75;
 my $Simul_heatSetTemp; 
