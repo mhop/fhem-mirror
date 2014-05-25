@@ -750,9 +750,6 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
 
   my $oldChn = $hash->{helper}{io}{newChn};
   my @p = unpack 'A8A2A*',$oldChn;
-  #if($hash->{helper}{q}{qReqConf}  ||
-  #   $hash->{helper}{q}{qReqStat}  ||
-  #   $hash->{helper}{prt}{sProc}){
   if($hash->{helper}{prt}{sProc}){
     $p[1] |= 2;
   }
@@ -5121,8 +5118,7 @@ sub CUL_HM_protState($$){
   Log3 $name,5,"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
   CUL_HM_hmInitMsgUpdt($hash) if (  $hash->{helper}{prt}{sProc} != $sProcIn
-                                  &&$hash->{helper}{prt}{sProc} == 0
-                                  ||$hash->{helper}{prt}{sProc} == 2);
+                                  && $hash->{helper}{prt}{sProc} < 2);
 }
 
 ###################-----------helper and shortcuts--------#####################
@@ -6499,7 +6495,6 @@ sub CUL_HM_qEntity($$){  # add to queue
   my $wT = (@{$modules{CUL_HM}{helper}{qReqStat}})?
                               "1":
                               $modules{CUL_HM}{hmAutoReadScan};
-  CUL_HM_hmInitMsgUpdt($defs{$devN});
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
 }

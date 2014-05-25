@@ -837,12 +837,12 @@ sub HMinfo_GetFn($@) {#########################################################
     $ret .= "\n";
     $ret .= "\n    requests pending";
     $ret .= "\n    ----------------";
-    $ret .= "\n    autoReadReg          :".join(", ",@{$modules{CUL_HM}{helper}{qReqConf}});
-    $ret .= "\n        recent           :".($modules{CUL_HM}{helper}{autoRdActive}?$modules{CUL_HM}{helper}{autoRdActive}:"none");
-    $ret .= "\n    status request       :".join(", ",@{$modules{CUL_HM}{helper}{qReqStat}}) ;
-    $ret .= "\n    autoReadReg wakeup   :".join(", ",@{$modules{CUL_HM}{helper}{qReqConfWu}});
-    $ret .= "\n    status request wakeup:".join(", ",@{$modules{CUL_HM}{helper}{qReqStatWu}});
-    $ret .= "\n    autoReadTest         :".join(", ",@{$modules{CUL_HM}{helper}{confCheckArr}});
+    $ret .= "\n    autoReadReg          : ".join(" ",@{$modules{CUL_HM}{helper}{qReqConf}});
+    $ret .= "\n        recent           : ".($modules{CUL_HM}{helper}{autoRdActive}?$modules{CUL_HM}{helper}{autoRdActive}:"none");
+    $ret .= "\n    status request       : ".join(" ",@{$modules{CUL_HM}{helper}{qReqStat}}) ;
+    $ret .= "\n    autoReadReg wakeup   : ".join(" ",@{$modules{CUL_HM}{helper}{qReqConfWu}});
+    $ret .= "\n    status request wakeup: ".join(" ",@{$modules{CUL_HM}{helper}{qReqStatWu}});
+    $ret .= "\n    autoReadTest         : ".join(" ",@{$modules{CUL_HM}{helper}{confCheckArr}});
     $ret .= "\n";
     @IOlist = HMinfo_noDup(@IOlist);
     foreach(@IOlist){
