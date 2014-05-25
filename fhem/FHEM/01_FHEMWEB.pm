@@ -772,31 +772,19 @@ FW_digestCgi($)
 sub
 FW_updateHashes()
 {
-  #################
-  # Make a room  hash
-  %FW_rooms = ();
+  %FW_rooms = ();  # Make a room  hash
+  %FW_groups = (); # Make a group  hash
+  %FW_types = ();  # Needed for type sorting
+
   foreach my $d (keys %defs ) {
     next if(IsIgnored($d));
+
     foreach my $r (split(",", AttrVal($d, "room", "Unsorted"))) {
       $FW_rooms{$r}{$d} = 1;
     }
-  }
-
-  #################
-  # Make a group  hash
-  %FW_groups = ();
-  foreach my $d (keys %defs ) {
-    next if(IsIgnored($d));
     foreach my $r (split(",", AttrVal($d, "group", ""))) {
       $FW_groups{$r}{$d} = 1;
     }
-  }  
-  
-  ###############
-  # Needed for type sorting
-  %FW_types = ();
-  foreach my $d (sort keys %defs ) {
-    next if(IsIgnored($d));
     my $t = AttrVal($d, "subType", $defs{$d}{TYPE});
     $t = AttrVal($d, "model", $t) if($t && $t eq "unknown"); # RKO: ???
     $FW_types{$d} = $t;
@@ -1096,13 +1084,21 @@ FW_roomOverview($)
   }
   $FW_room = "" if(!$FW_room);
 
-  my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
-  @sortBy = sort keys %FW_rooms if( scalar @sortBy == 0 );
+  my @rlist;
+  if(AttrVal($FW_wname, "sortRooms", "")) { # Slow!
+    my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
+    @rlist = sort { FW_roomIdx(@sortBy,$a) cmp
+                    FW_roomIdx(@sortBy,$b) } keys %FW_rooms;
+
+  } else {
+    @rlist = sort keys %FW_rooms;
+
+  }
+
 
   ##########################
   # Rooms and other links
-  foreach my $r ( sort { FW_roomIdx(@sortBy,$a) cmp
-                         FW_roomIdx(@sortBy,$b) } keys %FW_rooms ) {
+  foreach my $r (@rlist) {
     next if($r eq "hidden" || $FW_hiddenroom{$r});
     $FW_room = $r if(!$FW_room && $FW_ss);
     $r =~ s/</&lt;/g;
