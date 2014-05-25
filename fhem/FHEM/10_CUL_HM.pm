@@ -6790,7 +6790,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       }
       $dlf{$prg}{$dayTxt} = 1;
       my $day = $dl{$dayTxt};
-      $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
+      $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/_[0-6]_/);
       if (AttrVal($name,"model","") =~ m/HM-TC-IT-WM-W/){
         $tln =~ s/^R_/R_P1_/ if ($tln !~ m/^R_P/);# add P1 as default
       }
