@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  YAMAHA_BD: make YAMAHA_BD more performant by using non-blocking
+             HTTP request (from HttpUtils.pm)
+  - added:   YAMAHA_BD: new set command trickPlay and more remoteControl
+             commands. new reading trickPlay
   - added:   new module 98_statistics.pm: hourly, daily, monthly, yearly
              statistics for min/avg/max/delta/duration of selected readings
   - added:   new module 52_I2C_MCP23017.pm (klausw)
