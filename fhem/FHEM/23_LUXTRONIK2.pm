@@ -45,7 +45,7 @@ sub LUXTRONIK2_doStatisticMinMax ($$$);
 sub LUXTRONIK2_doStatisticMinMaxSingle ($$$$);
 sub LUXTRONIK2_storeReadings ($$$$$$);
 sub LUXTRONIK2_doStatisticDelta ($$$$$) ;
-sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$);
+sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 
 # Modul Version for remote debugging
   my $modulVersion = "2014-05-10";
@@ -1239,11 +1239,7 @@ LUXTRONIK2_doStatisticThermalPower ($$$$$$$$$)
       $last[0] = $currOpState;
       $value2 = ($currOpHours - $last[2])/60;
       if ($value2 >= 6) {
-         $value1 = $last[3] / $last[5];
-         $returnStr = sprintf "aT: %.1f", $value1;
-         $value1 = $last[4] / $last[5];
-         $returnStr .= sprintf " iT: %.1f", $value1;
-         $returnStr .= " tT: " . $targetTemp;
+         $returnStr = sprintf "aT: %.1f iT: %.1f tT: %.1f", $last[3]/$last[5], $last[4]/$last[5], $targetTemp;
          $value1 = $currHeatQuantity -  $last[1];
          $value3 = $value1 * 60 / $value2;
          $returnStr .= sprintf " thP: %.1f DQ: %.1f t: %.0f", $value3, $value1, $value2;
@@ -1412,10 +1408,7 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
             $value1 =  $currTemp - $maxTemp; # delta hot water temperature
             $value2 = ( $time - $startTime ) / 3600; # delta time (hours)
          }
-         $value3 = sprintf("%.2f", $value1 / $value2);  # Temperature gradient over time rounded to 1/100th
-         $value2 = sprintf("%.2f", $value2); # rounded to 1/100th
-         $value1 = sprintf("%.1f", $value1); # rounded to 1/10th
-         $returnStr = "DT/h: $value3 DT: $value1 Dh: $value2";
+         $returnStr = sprintf "DT/h: %.2f DT: %.1f Dh: %.2f", $value1/$value2, $value1, $value2;
          $step = 0;
       } 
    }   
@@ -1595,7 +1588,7 @@ LUXTRONIK2_doStatisticDelta ($$$$$)
    }
 
    # LUXTRONIK2_doStatisticDeltaSingle; $hash, $readingName, $deltaValue, $periodSwitch, $showDate, $firstCall
-   LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingName, $deltaValue, $factor, $periodSwitch, $showDate);
+   LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingName, $deltaValue, $factor, $periodSwitch, $showDate, 0);
 
    my $activeTariff = ReadingsVal($name,"activeTariff",0);
 
@@ -1605,13 +1598,13 @@ LUXTRONIK2_doStatisticDelta ($$$$$)
       if ($activeTariff > 0) {
          foreach (1,2,3,4,5,6,7,8,9) {
             if ( $previousTariff == $_ ) {
-               LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower."Tariff".$_, $deltaValue * $electricalPower, $factor, $periodSwitch, $showDate);
+               LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower."Tariff".$_, $deltaValue * $electricalPower, $factor, $periodSwitch, $showDate, 1);
             } elsif ($activeTariff == $_ || ($periodSwitch > 0 && exists($hash->{READINGS}{$readingNamePower . "Tariff".$_}))) {
-               LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower."Tariff".$_, 0, $factor, $periodSwitch, $showDate);
+               LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower."Tariff".$_, 0, $factor, $periodSwitch, $showDate, 1);
             }
          }
       } else {
-         LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower, $deltaValue * $electricalPower, $factor, $periodSwitch, $showDate);
+         LUXTRONIK2_doStatisticDeltaSingle ($hash, $readingNamePower, $deltaValue * $electricalPower, $factor, $periodSwitch, $showDate, 1);
       }
    }
  # Hidden storage of current values for next call(before values)
@@ -1622,11 +1615,11 @@ LUXTRONIK2_doStatisticDelta ($$$$$)
 }
 
 sub ######################################## 
-LUXTRONIK2_doStatisticDeltaSingle ($$$$$$) 
+LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$) 
 {
-   my ($hash, $readingName, $deltaValue, $factor, $periodSwitch, $showDate) = @_;
+   my ($hash, $readingName, $deltaValue, $factor, $periodSwitch, $showDate, $specMonth) = @_;
    my $dummy;
-   my $result; 
+   my $result;   
 
  # get existing statistic reading
    my @curr;
@@ -1655,14 +1648,16 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
 
  # If change of year, change yearly statistic
    if ($periodSwitch == 3){
-      $last[5] = sprintf("%.0f",$curr[5] / $factor);
+      if ($specMonth) { $last[5] = sprintf("%.3f",$curr[5] / $factor/ 1000); }
+      else {$last[5] = sprintf("%.0f",$curr[5] / $factor);}
       $curr[5] = 0;
       if ($showDate == 1) { $last[7] = $curr[7]; }
    }
 
  # If change of month, change monthly statistic 
    if ($periodSwitch >= 2){
-      $last[3] = sprintf("%.0f",$curr[3] / $factor);
+      if ($specMonth) { $last[3] = sprintf("%.3f",$curr[3] / $factor/ 1000); }
+      else {$last[3] = sprintf("%.0f",$curr[3] / $factor);}
       $curr[3] = 0;
       if ($showDate == 3) { $last[7] = $curr[7];}
    }
@@ -1686,9 +1681,8 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$)
    readingsBulkUpdate($hash,".".$readingName,$result);
    
  # Store visible statistic readings (delta values)
-   $result = "Day: ".sprintf("%.1f",$curr[1]/$factor);
-   $result .= " Month: ".sprintf("%.0f",$curr[3]/$factor);
-   $result .= " Year: ".sprintf("%.0f",$curr[5]/$factor);
+   if ($specMonth) { $result = sprintf "Day: %.1f Month: %.3f Year: %.3f", $curr[1]/$factor, $curr[3]/$factor/1000, $curr[5]/$factor/1000; }
+   else { $result = sprintf "Day: %.1f Month: %.0f Year: %.0f", $curr[1]/$factor, $curr[3]/$factor, $curr[5]/$factor; }
    if ( $showDate >=2 ) { $result .= " (since: $curr[7] )"; }
    readingsBulkUpdate($hash,$readingName,$result);
    
