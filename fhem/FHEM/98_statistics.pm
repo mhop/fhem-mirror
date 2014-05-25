@@ -843,7 +843,7 @@ statistics_FormatDuration($)
       <li><b>Delta values:</b> count, energy, power, total, rain, rain_total</li>
       <li><b>Duration of states:</b> Window, state <i>(if no other reading is valid)</i></li>
    </ul> 
-   Further readings can be added via the correspondent <a url="#statisticsattr">attribut</a>.
+   Further readings can be added via the correspondent <a href="#statisticsattr">attribut</a>.
   <br>&nbsp;
   <br>
   
@@ -901,6 +901,13 @@ statistics_FormatDuration($)
       <br>
       Comma separated list of reading names for which a min/average/max statistic shall be   calculated. 
     </li><br>
+    <li><code>periodChangePreset &lt;Sekunden&gt;</code>
+      <br>
+      Start of the calculation of periodical data, default is 5 Sekunden before each full hour,
+      <br>
+      Allows the correct timely assignment within plots, can be adapted to the cpu load.
+      <br>
+    </li><br>
     <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes<i>(Min|Avg|Max|Delta)</i>:period<i>(Hour|Day|Month|Year)</i></code>
       <br>
       Regulare expression of statistic values, which shall not be shown in summary but also in singular readings. Eases the creation of plots.
@@ -918,7 +925,7 @@ statistics_FormatDuration($)
 <a name="statistics"></a>
 <h3>statistics</h3>
 <ul style="width:800px">
-  Dieses Modul wertet von den angegebenen Ger&auml;ten (als regulärer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
+  Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
   <br>
   Derzeit werden Statistiken f&uuml;r folgende Ger&auml;tewerte vom Modul automatisch berechnet:
    <ul>
@@ -926,7 +933,7 @@ statistics_FormatDuration($)
       <li><b>Deltawerte:</b> count, energy, power, total, rain, rain_total</li>
       <li><b>Dauer der Stati:</b> Window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
-  Weitere Ger&auml;tewerte k&ouml;nnen &uuml;ber die entsprechenden <a url="#statisticsattr">Attribute</a> hinzugef&uuml;gt werden
+  Weitere Ger&auml;tewerte k&ouml;nnen &uuml;ber die entsprechenden <a href="#statisticsattr">Attribute</a> hinzugef&uuml;gt werden
   <br>&nbsp;
   <br>
   
@@ -989,7 +996,7 @@ statistics_FormatDuration($)
     </li><br>
     <li><code>periodChangePreset &lt;Sekunden&gt;</code>
       <br>
-      Start der Berechnung der periodischen Daten, standardm&auml;ssig 10 Sekunden vor der vollen Stunde,
+      Start der Berechnung der periodischen Daten, standardm&auml;ssig 5 Sekunden vor der vollen Stunde,
       <br>
       Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden
       <br>
