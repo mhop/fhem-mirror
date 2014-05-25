@@ -5393,7 +5393,7 @@ sub CUL_HM_id2Name($) { #in: name or HMid out: name
     return $devId;                           #not defined, return ID only
   }
 }
-sub CUL_HM_id2Hash($) {#in: id, out:hash
+sub CUL_HM_id2Hash($) { #in: id, out:hash
   my ($id) = @_;
   return $modules{CUL_HM}{defptr}{$id} if ($modules{CUL_HM}{defptr}{$id});
   $id = substr($id,0,6);
@@ -6316,32 +6316,32 @@ sub CUL_HM_storeRssi(@){
 sub CUL_HM_UpdtCentral($){
   my $name = shift;
   my $id = CUL_HM_name2Id($name);
-  my @myIos;
-  delete $defs{$_}{owner_CCU} 
+  delete $defs{$_}{owner_CCU} # remove assignments in IO dev to this CCU
         foreach (grep !/^$/,
                  map{InternalVal($_,"owner_CCU","") eq $name ? $_ : ""}
                  keys %defs);
 
+  my @myIos;# get all IOs uing 'my' ID
   foreach (CUL_HM_noDup(grep !/^$/,map{AttrVal($_,"IODev","")}keys %defs)){
     push @myIos,$_ if (CUL_HM_h2IoId($defs{$_}) eq $defs{$name}{DEF});
   }
   foreach my $ioN(split",",AttrVal($name,"IOList","")){
-    if ($defs{$ioN}){
-      if ( $defs{$ioN}{TYPE} eq "HMLAN"){;
-      }
-      elsif($defs{$ioN}{TYPE} eq "CUL"){
-        my $x = CommandAttr(undef, "$ioN rfmode HomeMatic") 
-              if (AttrVal($ioN,"rfmode","") ne "HomeMatic");
-      }
-      else {
-        next;
-      }
-      CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}")
-              if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF});
-      $defs{$ioN}{owner_CCU} = $name;
+    next if (!$defs{$ioN});
+    if ( $defs{$ioN}{TYPE} eq "HMLAN"){;
     }
+    elsif($defs{$ioN}{TYPE} eq "CUL"){
+      CommandAttr(undef, "$ioN rfmode HomeMatic") 
+            if (AttrVal($ioN,"rfmode","") ne "HomeMatic");
+    }
+    else {
+      next;
+    }
+    CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}")
+            if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF});
+    $defs{$ioN}{owner_CCU} = $name;
   }
   $defs{$name}{assignedIOs} = join(",",@myIos);
+  # --- search for peers to CCU and  potentially device this channel
   foreach my $ccuBId (CUL_HM_noDup(grep /$id/ ,map{split ",",AttrVal($_,"peerIDs","")}keys %defs)){
     my $btnS = substr($ccuBId,6,2);
     my $btn = hex($btnS) + 0;
@@ -6796,7 +6796,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       $dlf{$prg}{$dayTxt} = 1;
       my $day = $dl{$dayTxt};
       $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
-
+      if (AttrVal($name,"model","") =~ m/HM-TC-IT-WM-W/){
+        $tln =~ s/^R_/R_P1_/ if ($tln !~ m/^R_P/);# add P1 as default
+      }
+      else{
+        $tln =~ s/^R_P1_/R_/ if ($tln =~ m/^R_P/);# remove P1 default
+      }
       $val =~ tr/ +/ /;
       $val =~ s/^ //;
       $val =~ s/ $//;

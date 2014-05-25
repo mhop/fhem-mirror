@@ -961,7 +961,7 @@ sub HMLAN_condUpdate($$) {#####################################################
   elsif ($HMcnd == 255) {#reset counter after init
     $hashQ->{answerPend} = 0;
     @{$hashQ->{apIDs}} = ();       #clear Q-status
-    $hash->{XmitOpen} = 1;         #allow transmit
+    $hash->{XmitOpen} = 0;         #deny transmit
   }
   else{
     $hash->{XmitOpen} = 1

@@ -706,11 +706,10 @@ sub HMinfo_getEntities(@) { ###################################################
     my $eHash = $modules{CUL_HM}{defptr}{$id};
     my $eName = $eHash->{NAME};
     next if ( !$eName || $eName !~ m/$re/);
-    my $isChn = $eHash->{helper}{chn}?1:0;
     my $eIg   = CUL_HM_Get($eHash,$eName,"param","ignore");
     $eIg = "" if ($eIg eq "undefined");
-    next if (!(($doDev && length($id) == 6) ||
-               ($doChn && $isChn)));
+    next if (!(($doDev && $eHash->{helper}{role}{dev}) ||
+               ($doChn && $eHash->{helper}{role}{chn})));
     next if (!$doIgn && $eIg);
     next if ( $noVrt && $eHash->{helper}{role}{vrt});
     next if ( $noPhy && !$eHash->{helper}{role}{vrt});
