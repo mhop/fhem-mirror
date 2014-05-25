@@ -31,7 +31,7 @@ package main;
 
 use strict;
 use warnings;
-use Time::HiRes qw(gettimeofday sleep);
+use Time::HiRes qw(gettimeofday);
 use HttpUtils;
  
 sub YAMAHA_BD_Get($@);
@@ -40,9 +40,6 @@ sub YAMAHA_BD_GetStatus($;$);
 sub YAMAHA_BD_Attr(@);
 sub YAMAHA_BD_ResetTimer($;$);
 sub YAMAHA_BD_Undefine($$);
-
-
-
 
 ###################################
 sub
@@ -55,8 +52,7 @@ YAMAHA_BD_Initialize($)
   $hash->{DefFn}     = "YAMAHA_BD_Define";
   $hash->{AttrFn}    = "YAMAHA_BD_Attr";
   $hash->{UndefFn}   = "YAMAHA_BD_Undefine";
-
-  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 model ".
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model ".
                       $readingFnAttributes;
 }
 
@@ -67,120 +63,33 @@ YAMAHA_BD_GetStatus($;$)
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $power;
+    my $return;
     
     $local = 0 unless(defined($local));
 
     return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{ON_INTERVAL}) or !defined($hash->{helper}{OFF_INTERVAL}));
 
-    my $device = $hash->{helper}{ADDRESS};
-
     # get the model informations if no informations are available
-    if(defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
+    if((not defined($hash->{MODEL})) or (not defined($hash->{FIRMWARE})))
     {
 		YAMAHA_BD_getModel($hash);
     }
 
     Log3 $name, 4, "YAMAHA_BD: Requesting system status";
-    my $return = YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Service_Info>GetParam</Service_Info></System></YAMAHA_AV>");
-    
-    
-    
-    
-  
-    if(not defined($return) or $return eq "")
-    {
-		readingsSingleUpdate($hash, "state", "absent", 1);
-		YAMAHA_BD_ResetTimer($hash) unless($local == 1);
-		return;
-    }
-  
-    readingsBeginUpdate($hash);
-    if($return =~ /<Error_Info>(.+?)<\/Error_Info>/)
-    {
-        readingsBulkUpdate($hash, "error", lc($1));
-    
-    }
-  
+    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Service_Info>GetParam</Service_Info></System></YAMAHA_AV>", "statusRequest","systemStatus");
+
     Log3 $name, 4, "YAMAHA_BD: Requesting power state";
-    $return = YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Power_Control><Power>GetParam</Power></Power_Control></Main_Zone></YAMAHA_AV>");
-    
-    if($return =~ /<Power>(.+?)<\/Power>/)
-    {
-       $power = $1;
-       
-		if($power eq "Standby" or $power eq "Network Standby")
-		{	
-			$power = "off";
-		}
-       readingsBulkUpdate($hash, "power", lc($power));
-       readingsBulkUpdate($hash, "state", lc($power));
-    }
-    
+    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Power_Control><Power>GetParam</Power></Power_Control></Main_Zone></YAMAHA_AV>", "statusRequest","powerStatus");
     
 	Log3 $name, 4, "YAMAHA_BD: Requesting playing info";
-    $return = YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Play_Info>GetParam</Play_Info></Main_Zone></YAMAHA_AV>");
+    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Play_Info>GetParam</Play_Info></Main_Zone></YAMAHA_AV>", "statusRequest","playInfo");
     
-	if(defined($return))
-	{
-		if($return =~ /<Status>(.+?)<\/Status>/)
-		{
-			readingsBulkUpdate($hash, "playStatus", lc($1));
-        }
-        
-        if($return =~ /<Chapter>(.+?)<\/Chapter>/)
-		{
-			readingsBulkUpdate($hash, "currentChapter", lc($1));
-        }
-        
-        if($return =~ /<File_Name>(.+?)<\/File_Name>/)
-		{
-			readingsBulkUpdate($hash, "currentMedia", $1);
-        }
-        
-        if($return =~ /<Disc_Type>(.+?)<\/Disc_Type>/)
-		{
-			readingsBulkUpdate($hash, "discType", $1);
-        }
-        
-        if($return =~ /<Input_Info><Status>(.+?)<\/Status><\/Input_Info/)
-        {
-    		readingsBulkUpdate($hash, "input", $1);	
-        }
-        elsif($return =~ /<Input_Info>(.+?)<\/Input_Info/)
-        {
-    		readingsBulkUpdate($hash, "input", $1);
-        }
-        
-        if($return =~ /<Tray>(.+?)<\/Tray>/)
-        {
-			readingsBulkUpdate($hash, "trayStatus", lc($1));
-        }
-        
-        if($return =~ /<Current_PlayTime>(.+?)<\/Current_PlayTime>/)
-        {
-            readingsBulkUpdate($hash, "playTimeCurrent", YAMAHA_BD_formatTimestamp($1));
-        }    
-         
-        if($return =~ /<Total_Time>(.+?)<\/Total_Time>/)
-        {
-            readingsBulkUpdate($hash, "playTimeTotal", YAMAHA_BD_formatTimestamp($1));
-        }
-	    
-    }
-    else
-    {
-    
-        Log3 $name, 3, "YAMAHA_BD: Received no response for playing info request";
-    }
-    
-    
-    readingsEndUpdate($hash, 1);
-    
+	Log3 $name, 4, "YAMAHA_BD: Requesting trickPlay info";
+    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Play_Control>GetParam</Play_Control></Main_Zone></YAMAHA_AV>", "statusRequest","trickPlayInfo");
+
+    # Reset timer if this is not a local run
     YAMAHA_BD_ResetTimer($hash) unless($local == 1);
-    
-    Log3 $name, 4, "YAMAHA_BD $name: ".$hash->{STATE};
-    
-    return $hash->{STATE};
+
 }
 
 ###################################
@@ -232,248 +141,288 @@ YAMAHA_BD_Set($@)
     my $result = "";
     
     return "No Argument given" if(!defined($a[1]));  
-    
-    # get the model informations if no informations are available
-    if(defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
-    {
-		YAMAHA_BD_getModel($hash);
-    }
-    
+   
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg statusRequest:noArg tray:open,close remoteControl:up,down,left,right,return,enter,OSDonScreen,OSDstatus,topMenu,popupMenu,red,green,blue,yellow,0,1,2,3,4,5,6,7,8,9,setup,home,clear fast:forward,reverse slow:forward,reverse skip:forward,reverse play:noArg pause:noArg stop:noArg";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg statusRequest:noArg tray:open,close remoteControl:up,down,left,right,return,enter,OSDonScreen,OSDstatus,topMenu,popupMenu,red,green,blue,yellow,0,1,2,3,4,5,6,7,8,9,setup,home,clear,program,search,repeat,repeat-AB,subtitle,angle,audio,pictureInPicture,secondVideo,secondAudio fast:forward,reverse slow:forward,reverse skip:forward,reverse play:noArg pause:noArg stop:noArg trickPlay:normal,repeatChapter,repeatTitle,repeatFolder,repeat-AB,randomChapter,randomTitle,randomAll,shuffleChapter,shuffleTitle,shuffleAll,setApoint";
 
-    # Depending on the status response, use the short or long Volume command
-
-		if($what eq "on")
-		{
-		
-			$result = YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>On</Power></Power_Control></Main_Zone></YAMAHA_AV>");
-
-			if(defined($result) and $result =~ /RC="0"/ and $result =~ /<Power><\/Power>/)	
-			{
-				# As the player startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
-				readingsBeginUpdate($hash);
-				readingsBulkUpdate($hash, "power", "on");
-				readingsBulkUpdate($hash, "state","on");
-				readingsEndUpdate($hash, 1);
-				return undef;
-			}
-			else
-			{
-				return "Could not set power to on";
-			}
-		
-		}
-		elsif($what eq "off")
-		{
-			$result = YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>Network Standby</Power></Power_Control></Main_Zone></YAMAHA_AV>");
-			
-			if(not defined($result) or not $result =~ /RC="0"/)
-			{
-				# if the returncode isn't 0, than the command was not successful
-				return "Could not set power to off";
-			}
-			
-	    }
-	    elsif($what eq "remoteControl")
-	    {
-			if($a[2] eq "up")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Up</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "down")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Down</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "left")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Left</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "right")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Right</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "enter")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Enter</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "return")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Return</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "OSDonScreen")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><OSD>OnScreen</OSD></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "OSDstatus")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><OSD>Status</OSD></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "topMenu")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Menu>TOP MENU</Menu></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "popupMenu")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Menu>POPUP MENU</Menu></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "red")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Color>RED</Color></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "green")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Color>GREEN</Color></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "blue")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Color>BLUE</Color></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "yellow")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Color>YELLOW</Color></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "0")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>0</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "1")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>1</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "2")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>2</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "3")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>3</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "4")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>4</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "5")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>5</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "6")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>6</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "7")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>7</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "8")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>8</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "9")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>9</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "setup")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>SETUP</Function></Remote_Control></Main_Zone></YAMAHA_AV>");
-			} 
-            elsif($a[2] eq "home")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>HOME</Function></Remote_Control></Main_Zone></YAMAHA_AV>");
-			} 
-            elsif($a[2] eq "clear")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>CLEAR</Function></Remote_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "subtitle")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>SUBTITLE</Stream></Play_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "angle")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>ANGLE</Stream></Play_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "pictureInPicture")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>PinP</Stream></Play_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "secondVideo")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>2nd Video</Stream></Play_Control></Main_Zone></YAMAHA_AV>");
-			}
-            elsif($a[2] eq "secondAudio")
-			{
-			    YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>2nd Audio</Stream></Play_Control></Main_Zone></YAMAHA_AV>");
-			}
-			else
-			{
-			    return $usage;
-			}
-	    }
-        elsif($what eq "tray")
-		{
-			if($a[2] eq "open")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Tray_Control><Tray>Open</Tray></Tray_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "close")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Tray_Control><Tray>Close</Tray></Tray_Control></Main_Zone></YAMAHA_AV>");
-			}	
-		}
-        elsif($what eq "skip")
-		{
-			if($a[2] eq "forward")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Skip>Fwd</Skip></Play_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "reverse")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Skip>Rev</Skip></Play_Control></Main_Zone></YAMAHA_AV>");
-			}	
-		}
-        elsif($what eq "fast")
-		{
-			if($a[2] eq "forward")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Fast>Fwd</Fast></Play_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "reverse")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Fast>Rev</Fast></Play_Control></Main_Zone></YAMAHA_AV>");
-			}	
-		}
-        elsif($what eq "slow")
-		{
-			if($a[2] eq "forward")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Slow>Fwd</Slow></Play_Control></Main_Zone></YAMAHA_AV>");
-			}
-			elsif($a[2] eq "reverse")
-			{
-			    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Slow>Rev</Slow></Play_Control></Main_Zone></YAMAHA_AV>");
-			}	
-		}
-        elsif($what eq "play")
-		{
-                YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Play>Play</Play></Play_Control></Main_Zone></YAMAHA_AV>");
-		}
-        elsif($what eq "pause")
-		{
-                YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Play>Pause</Play></Play_Control></Main_Zone></YAMAHA_AV>");
-		}
-        elsif($what eq "stop")
-		{
-                YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Play>Stop</Play></Play_Control></Main_Zone></YAMAHA_AV>");
-		}
-		elsif($what eq "statusRequest")
-		{
-			# Will be executed anyway on the end of the function			
-		}
-	    else
-	    {
-			return $usage;
-	    }
+    if($what eq "on")
+    {		
+         YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>On</Power></Power_Control></Main_Zone></YAMAHA_AV>","on",undef);
+    }
+    elsif($what eq "off")
+    {
+        YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>Network Standby</Power></Power_Control></Main_Zone></YAMAHA_AV>","off",undef);
+    }
+    elsif($what eq "remoteControl")
+    {
+        if($a[2] eq "up")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Up</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","up");
+        }
+        elsif($a[2] eq "down")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Down</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","down");
+        }
+        elsif($a[2] eq "left")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Left</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","left");
+        }
+        elsif($a[2] eq "right")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Right</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","right");
+        }
+        elsif($a[2] eq "enter")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Enter</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","enter");
+        }
+        elsif($a[2] eq "return")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Cursor>Return</Cursor></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","return");
+        }
+        elsif($a[2] eq "OSDonScreen")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><OSD>OnScreen</OSD></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","OSDonScreen");
+        }
+        elsif($a[2] eq "OSDstatus")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><OSD>Status</OSD></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","OSDstatus");
+        }
+        elsif($a[2] eq "topMenu")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Menu>TOP MENU</Menu></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","topMenu");
+        }
+        elsif($a[2] eq "popupMenu")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Menu>POPUP MENU</Menu></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","popupMenu");
+        }
+        elsif($a[2] eq "red")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Color>RED</Color></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","red");
+        }
+        elsif($a[2] eq "green")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Color>GREEN</Color></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","green");
+        }
+        elsif($a[2] eq "blue")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Color>BLUE</Color></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","blue");
+        }
+        elsif($a[2] eq "yellow")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Color>YELLOW</Color></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","yellow");
+        }
+        elsif($a[2] eq "0")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>0</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","0");
+        }
+        elsif($a[2] eq "1")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>1</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","1");
+        }
+        elsif($a[2] eq "2")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>2</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","2");
+        }
+        elsif($a[2] eq "3")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>3</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","3");
+        }
+        elsif($a[2] eq "4")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>4</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","4");
+        }
+        elsif($a[2] eq "5")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>5</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","5");
+        }
+        elsif($a[2] eq "6")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>6</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","6");
+        }
+        elsif($a[2] eq "7")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>7</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","7");
+        }
+        elsif($a[2] eq "8")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>8</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","8");
+        }
+        elsif($a[2] eq "9")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Numeric>9</Numeric></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","9");
+        }
+        elsif($a[2] eq "setup")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>SETUP</Function></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","setup");
+        } 
+        elsif($a[2] eq "home")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>HOME</Function></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","home");
+        } 
+        elsif($a[2] eq "clear")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>CLEAR</Function></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","clear");
+        }
+        elsif($a[2] eq "program")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><Function>PROGRAM</Function></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","program");
+        }
+        elsif($a[2] eq "search")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7C9E</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","search");
+        }
+        elsif($a[2] eq "repeat")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7CA3</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","repeat");
+        }
+        elsif($a[2] eq "repeat-AB")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7CA4</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","repeat-AB");
+        }
+        elsif($a[2] eq "subtitle")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>SUBTITLE</Stream></Play_Control></Main_Zone></YAMAHA_AV>","remoteControl","subtitle");
+        }
+        elsif($a[2] eq "angle")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>ANGLE</Stream></Play_Control></Main_Zone></YAMAHA_AV>","remoteControl","angle");
+        }
+        elsif($a[2] eq "audio")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>AUDIO</Stream></Play_Control></Main_Zone></YAMAHA_AV>","remoteControl","audio");
+        }
+        elsif($a[2] eq "pictureInPicture")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>PinP</Stream></Play_Control></Main_Zone></YAMAHA_AV>","remoteControl","pictureInPicture");
+        }
+        elsif($a[2] eq "secondVideo")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>2nd Video</Stream></Play_Control></Main_Zone></YAMAHA_AV>","remoteControl","secondVideo");
+        }
+        elsif($a[2] eq "secondAudio")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>2nd Audio</Stream></Play_Control></Main_Zone></YAMAHA_AV>","remoteControl","secondAudio");
+        }
+        else
+        {
+            return $usage;
+        }
+    }
+    elsif($what eq "trickPlay")
+    {
+        if($a[2] eq "normal")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Normal</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","normal");
+        }
+        elsif($a[2] eq "repeatChapter")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Repeat Chapter/Track/File</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","repeatChapter");
+        }
+        elsif($a[2] eq "repeatTitle")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Repeat Title</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","repeatTitle");
+        }
+        elsif($a[2] eq "repeatFolder")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Repeat Folder</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","repeatFolder");
+        }
+        elsif($a[2] eq "randomChapter")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Random Chapter/Track/File</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","randomChapter");
+        }
+        elsif($a[2] eq "randomTitle")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Random title</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","randomTitle");
+        }
+        elsif($a[2] eq "randomAll")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Random All</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","randomAll");
+        }
+        elsif($a[2] eq "shuffleChapter")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Shuffle Chapter/Track/File</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","shuffleChapter");
+        }
+        elsif($a[2] eq "shuffleTitle")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Shuffle title</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","shuffleTitle");
+        }
+        elsif($a[2] eq "shuffleAll")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>Shuffle All</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","shuffleAll");
+        }
+        elsif($a[2] eq "setApoint")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>SetA point</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","setApoint");
+        }
+        elsif($a[2] eq "repeat-AB")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Trick_Play>A-B Repeat</Trick_Play></Play_Control></Main_Zone></YAMAHA_AV>","trickPlay","ABrepeat");
+        }
+        else
+        {
+            return $usage;
+        }
+    }
+    elsif($what eq "tray")
+    {
+        if($a[2] eq "open")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Tray_Control><Tray>Open</Tray></Tray_Control></Main_Zone></YAMAHA_AV>","tray","open");
+        }
+        elsif($a[2] eq "close")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Tray_Control><Tray>Close</Tray></Tray_Control></Main_Zone></YAMAHA_AV>","tray","close");
+        }	
+    }
+    elsif($what eq "skip")
+    {
+        if($a[2] eq "forward")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Skip>Fwd</Skip></Play_Control></Main_Zone></YAMAHA_AV>","skip","forward");
+        }
+        elsif($a[2] eq "reverse")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Skip>Rev</Skip></Play_Control></Main_Zone></YAMAHA_AV>","skip","reverse");
+        }	
+    }
+    elsif($what eq "fast")
+    {
+        if($a[2] eq "forward")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Fast>Fwd</Fast></Play_Control></Main_Zone></YAMAHA_AV>","fast","forward");
+        }
+        elsif($a[2] eq "reverse")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Fast>Rev</Fast></Play_Control></Main_Zone></YAMAHA_AV>","fast","reverse");
+        }	
+    }
+    elsif($what eq "slow")
+    {
+        if($a[2] eq "forward")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Slow>Fwd</Slow></Play_Control></Main_Zone></YAMAHA_AV>","slow","forward");
+        }
+        elsif($a[2] eq "reverse")
+        {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Slow>Rev</Slow></Play_Control></Main_Zone></YAMAHA_AV>","slow","reverse");
+        }	
+    }
+    elsif($what eq "play")
+    {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Play>Play</Play></Play_Control></Main_Zone></YAMAHA_AV>","play", undef);
+    }
+    elsif($what eq "pause")
+    {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Play>Pause</Play></Play_Control></Main_Zone></YAMAHA_AV>","pause", undef);
+    }
+    elsif($what eq "stop")
+    {
+            YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Play>Stop</Play></Play_Control></Main_Zone></YAMAHA_AV>", "play",undef);
+    }
+    elsif($what ne "statusRequest")
+    {
+        return $usage;
+    }
 	
     
     # Call the GetStatus() Function to retrieve the new values after setting something (with local flag, so the internal timer is not getting interupted)
@@ -523,11 +472,6 @@ YAMAHA_BD_Define($$)
 		$hash->{helper}{ON_INTERVAL}=$hash->{helper}{OFF_INTERVAL};
     } 
 
-    unless(exists($hash->{helper}{AVAILABLE}) and ($hash->{helper}{AVAILABLE} == 0))
-    {
-    	$hash->{helper}{AVAILABLE} = 1;
-    	readingsSingleUpdate($hash, "presence", "present", 1);
-    }
 
     # start the status update timer
     $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
@@ -589,42 +533,223 @@ YAMAHA_BD_Undefine($$)
 
 #############################
 sub
-YAMAHA_BD_SendCommand($$;$)
+YAMAHA_BD_SendCommand($$$$)
 {
-    my ($hash, $command, $loglevel) = @_;
+    my ($hash, $data,$cmd,$arg) = @_;
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     my $response;
      
-    Log3 $name, 5, "YAMAHA_BD: execute on $name: $command";
+    Log3 $name, 4, "YAMAHA_BD ($name): execute \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
     
     # In case any URL changes must be made, this part is separated in this function".
     
-    $response = GetFileFromURL("http://".$address.":50100/YamahaRemoteControl/ctrl", AttrVal($name, "request-timeout", 4) , "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command, 1, ($hash->{helper}{AVAILABLE} ? undef : 5));
+
+    HttpUtils_NonblockingGet({
+                                url        => "http://".$address.":50100/YamahaRemoteControl/ctrl",
+                                timeout    => AttrVal($name, "request-timeout", 4),
+                                noshutdown => 1,
+                                data       => "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data,
+                                loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
+                                hash       => $hash,
+                                cmd        => $cmd,
+                                arg        => $arg,
+                                callback   => \&YAMAHA_BD_ParseResponse
+                            }
+    );
     
-    Log3 $name, 5, "YAMAHA_BD: got response for $name: $response" if(defined($response));
+}
+
+sub
+YAMAHA_BD_ParseResponse($$$)
+{
+
+    my ( $param, $err, $data ) = @_;    
     
-    unless(defined($response))
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+    
+    my $cmd = $param->{cmd};
+    my $arg = $param->{arg};
+    
+    
+    if($err)
     {
-	
-		if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
+        Log3 $name, 4, "YAMAHA_BD ($name): error while executing \"$cmd".(defined($arg) ? " ".$arg : "")."\": $err";
+        
+        if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
 		{
-			Log3 $name, 3, "YAMAHA_BD: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
+			Log3 $name, 3, "YAMAHA_BD: could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress: $err";
 			readingsSingleUpdate($hash, "presence", "absent", 1);
+            readingsSingleUpdate($hash, "state", "absent", 1);
 		}
+    
     }
-    else
+    elsif($data)
     {
-		if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 0)
+    
+        Log3 $name, 5, "YAMAHA_BD ($name): got HTTP response for \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
+    
+   
+		if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} == 0)
 		{
 			Log3 $name, 3, "YAMAHA_BD: device $name reappeared";
 			readingsSingleUpdate($hash, "presence", "present", 1);            
 		}
+        
+        readingsBeginUpdate($hash);
+        
+         if(not $data =~ /RC="0"/)
+		{
+			# if the returncode isn't 0, than the command was not successful
+			Log3 $name, 3, "YAMAHA_BD ($name) - Could not execute \"$cmd".(defined($arg) ? " ".$arg : "")."\"";
+		}
+        
+        if($cmd eq "statusRequest" and $arg eq "systemStatus")
+        {
+            if($data =~ /<Error_Info>(.+?)<\/Error_Info>/)
+            {
+                readingsBulkUpdate($hash, "error", lc($1));
+    
+            }
+        }
+        elsif($cmd eq "statusRequest" and $arg eq "systemConfig")
+        {
+                if($data =~ /<Model_Name>(.+?)<\/Model_Name>.*<Version>(.+?)<\/Version>/)
+                {
+                    $hash->{MODEL} = $1;
+                    $hash->{FIRMWARE} = $2;
+                    
+                    $hash->{MODEL} =~ s/\s*YAMAHA\s*//g;
+    
+                    $attr{$name}{"model"} = $hash->{MODEL};
+                }
+                
+        }   
+        elsif($cmd eq "statusRequest" and $arg eq "powerStatus")
+        {
+            if($data =~ /<Power>(.+?)<\/Power>/)
+            {   
+                my $power = $1;
+           
+                if($power eq "Standby" or $power eq "Network Standby")
+                {	
+                    $power = "off";
+                }
+               readingsBulkUpdate($hash, "power", lc($power));
+               readingsBulkUpdate($hash, "state", lc($power));
+            }
+        
+        }
+        elsif($cmd eq "on")
+        {
+            if($data =~ /RC="0"/ and $data =~ /<Power><\/Power>/)	
+			{
+				# As the player startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
+				
+				readingsBulkUpdate($hash, "power", "on");
+				readingsBulkUpdate($hash, "state","on");
+				
+				
+			}
+			else
+			{
+				Log3 $name, 3, "YAMAHA_BD ($name) - Could not set power to on";
+			}
+        }
+        elsif($cmd eq "off")
+        {
+        
+            if(not $data =~ /RC="0"/)
+			{
+				# if the returncode isn't 0, than the command was not successful
+				Log3 $name, 3, "YAMAHA_BD ($name) - Could not set power to off";
+			}
+
+            
+        }
+        elsif($cmd eq "remoteControl")
+        {
+        
+           
+
+            
+        }
+        elsif($cmd eq "statusRequest" and $arg eq "trickPlayInfo")
+        {
+            if($data =~ /<Trick_Play>(.+?)<\/Trick_Play>/)
+            {
+    			readingsBulkUpdate($hash, "trickPlay", $1);	
+            }
+        
+        }
+        elsif($cmd eq "statusRequest" and $arg eq "inputInfo")
+        {
+        
+            
+            
+        }
+        elsif($cmd eq "statusRequest" and $arg eq "playInfo")
+        {
+        
+      
+            if($data =~ /<Status>(.+?)<\/Status>/)
+            {
+                readingsBulkUpdate($hash, "playStatus", lc($1));
+            }
+            
+            if($data =~ /<Chapter>(.+?)<\/Chapter>/)
+            {
+                readingsBulkUpdate($hash, "currentChapter", lc($1));
+            }
+            
+            if($data =~ /<File_Name>(.+?)<\/File_Name>/)
+            {
+                readingsBulkUpdate($hash, "currentMedia", $1);
+            }
+            
+            if($data =~ /<Disc_Type>(.+?)<\/Disc_Type>/)
+            {
+                readingsBulkUpdate($hash, "discType", $1);
+            }
+            
+            if($data =~ /<Input_Info><Status>(.+?)<\/Status><\/Input_Info/)
+            {
+                readingsBulkUpdate($hash, "input", $1);	
+            }
+            elsif($data =~ /<Input_Info>(.+?)<\/Input_Info/)
+            {
+                readingsBulkUpdate($hash, "input", $1);
+            }
+            
+            if($data =~ /<Tray>(.+?)<\/Tray>/)
+            {
+                readingsBulkUpdate($hash, "trayStatus", lc($1));
+            }
+            
+            if($data =~ /<Current_PlayTime>(.+?)<\/Current_PlayTime>/)
+            {
+                readingsBulkUpdate($hash, "playTimeCurrent", YAMAHA_BD_formatTimestamp($1));
+            }    
+             
+            if($data =~ /<Total_Time>(.+?)<\/Total_Time>/)
+            {
+                readingsBulkUpdate($hash, "playTimeTotal", YAMAHA_BD_formatTimestamp($1));
+            }
+            
+        
+        
+        }
+        
+        
+        readingsEndUpdate($hash, 1);
+   
+   
+        YAMAHA_BD_GetStatus($hash, 1) if($cmd ne "statusRequest");
+    
     }
     
-    $hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
-    
-    return $response;
+    $hash->{helper}{AVAILABLE} = ($err ? 0 : 1);
 
 }
 
@@ -668,25 +793,9 @@ sub YAMAHA_BD_getModel($)
     my $response;
     my $desc_url;
     
-    $response = YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>");
-    
-    Log3 $name, 3, "YAMAHA_BD: could not get system configuration from device $name. Please turn on the device or check for correct hostaddress!" if (not defined($response) and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
-    
-    if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>(.+?)<\/Version>/)
-    {
-        $hash->{MODEL} = $1;
-        $hash->{SYSTEM_ID} = $2;
-        $hash->{FIRMWARE} = $3;
-    }
-    else
-    {
-		return undef;
-    }
+   YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig");
     
     
-    $hash->{MODEL} =~ s/\s*YAMAHA\s*//g;
-    
-	$attr{$name}{"model"} = $hash->{MODEL};
 	
    
 }
@@ -774,6 +883,7 @@ sub YAMAHA_BD_formatTimestamp($)
 <li><b>skip</b> forward,reverse &nbsp;&nbsp;-&nbsp;&nbsp; skip the current track or chapter</li>
 <li><b>fast</b> forward,reverse &nbsp;&nbsp;-&nbsp;&nbsp; fast forward or reverse playback</li>
 <li><b>slow</b> forward,reverse &nbsp;&nbsp;-&nbsp;&nbsp; slow forward or reverse playback</li>
+<li><b>trickPlay</b> normal,repeatChapter,repeatTitle,... &nbsp;&nbsp;-&nbsp;&nbsp; controls the Trick-Play features</li>
 
 
 </ul>
@@ -819,7 +929,20 @@ sub YAMAHA_BD_formatTimestamp($)
     remoteControl yellow<br>
     remoteControl blue<br>
     </code></ul><br><br>
-
+    
+    <u>Play Control Buttons:</u><br><br>
+    <ul><code>
+    remoteControl program<br>
+    remoteControl search<br>
+    remoteControl repeat<br>
+    remoteControl repeat-AB<br>
+    remoteControl subtitle<br>
+    remoteControl audio<br>
+    remoteControl angle<br>
+    remoteControl pictureInPicture<br>
+    remoteControl secondAudio<br>
+    remoteControl secondVideo<br>
+    </code></ul><br><br>
     The button names are the same as on your remote control.<br><br>
   
   </ul>
@@ -854,6 +977,7 @@ sub YAMAHA_BD_formatTimestamp($)
   <li><b>power</b> - Reports the power status of the player or zone (can be "on" or "off")</li>
   <li><b>presence</b> - Reports the presence status of the player or zone (can be "absent" or "present"). In case of an absent device, it cannot be controlled via FHEM anymore.</li>
   <li><b>trayStatus</b> - The disc tray status (can be "open" or "close")</li>
+  <li><b>trickPlay</b> - The current trickPlay mode</li>
   <li><b>state</b> - Reports the current power state and an absence of the device (can be "on", "off" or "absent")</li>
   <br><br><u>Input dependent Readings/Events:</u><br>
   <li><b>currentChapter</b> - Number of the current DVD/BD Chapter (only at DVD/BD's)</li>
@@ -865,7 +989,7 @@ sub YAMAHA_BD_formatTimestamp($)
 <br>
   <b>Implementator's note</b><br>
   <ul>
-  <li>Some older models (e.g. BD-S671) cannot be controlled over networked by delivery. A <u><b>firmware update is neccessary</b></u> to control theese models via FHEM</li> 
+  <li>Some older models (e.g. BD-S671) cannot be controlled over networked by delivery. A <u><b>firmware update is neccessary</b></u> to control these models via FHEM. In general it is always recommended to use the latest firmware.</li> 
    <li>The module is only usable if you activate "Network Control" on your player. Otherwise it is not possible to communicate with the player.</li>
   </ul>
   <br>
@@ -934,7 +1058,7 @@ sub YAMAHA_BD_formatTimestamp($)
 <li><b>skip</b> forward,reverse &nbsp;&nbsp;-&nbsp;&nbsp; &uuml;berspringt das aktuelle Kapitel oder den aktuellen Titel</li>
 <li><b>fast</b> forward,reverse &nbsp;&nbsp;-&nbsp;&nbsp; schneller Vor- oder R&uuml;cklauf</li>
 <li><b>slow</b> forward,reverse &nbsp;&nbsp;-&nbsp;&nbsp; langsamer Vor- oder R&uuml;cklauf</li>
-
+<li><b>trickPlay</b> normal,repeatChapter,repeatTitle,... &nbsp;&nbsp;-&nbsp;&nbsp; aktiviert Trick-Play Funktionen (Wiederholung, Zufallswiedergabe, ...)</li>
 
 </ul>
 <br><br>
@@ -980,6 +1104,21 @@ sub YAMAHA_BD_formatTimestamp($)
     remoteControl yellow<br>
     remoteControl blue<br>
     </code></ul><br><br>
+  
+    <u>Wiedergabetasten:</u><br><br>
+    <ul><code>
+    remoteControl program<br>
+    remoteControl search<br>
+    remoteControl repeat<br>
+    remoteControl repeat-AB<br>
+    remoteControl subtitle<br>
+    remoteControl audio<br>
+    remoteControl angle<br>
+    remoteControl pictureInPicture<br>
+    remoteControl secondAudio<br>
+    remoteControl secondVideo<br>
+    </code></ul><br><br>
+    
     Die Befehlsnamen entsprechen den Tasten auf der Fernbedienung.<br><br>
   </ul>
 
@@ -1014,6 +1153,7 @@ sub YAMAHA_BD_formatTimestamp($)
   <li><b>power</b> - Der aktuelle Betriebsstatus ("on" => an, "off" => aus)</li>
   <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" => empfangsbereit, "absent" => nicht empfangsbereit, z.B. Stromausfall)</li>
   <li><b>trayStatus</b> - Der Status der Schublade("open" => ge&ouml;ffnet, "close" => geschlossen)</li>
+  <li><b>trickPlay</b> - Der aktuell aktive Trick-Play Modus</li>
   <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
   <br><br><u>Quellenabh&auml;ngige Readings/Events:</u><br>
   <li><b>currentChapter</b> - Das aktuelle Kapitel eines DVD- oder Blu-Ray-Films</li>
