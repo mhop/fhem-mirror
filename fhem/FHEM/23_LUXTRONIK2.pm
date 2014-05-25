@@ -1742,9 +1742,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       <li><code>hotWaterTemperatureTarget &lt;temperature&gt;</code><br>
          Target temperature of domestic hot water boiler in &deg;C
          </li><br>
-     <li><code>resetStatistics &lt;all|statBoilerGradientCoolDownMin|statAmbientTemp...|statElectricity...|statHours...|statHeatQ...&gt;</code>
+     <li><code>resetStatistics &lt;statReadings&gt;</code>
          <br>
-         Deletes the selected statistic values.
+         Deletes the selected statistic values <i>all, statBoilerGradientCoolDownMin, statAmbientTemp..., statElectricity..., statHours..., statHeatQ...</i>
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
          <br>
@@ -1861,9 +1861,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          <br>
          Soll-Temperatur des Hei&szlig;wasserboilers in &deg;C
          </li><br>
-     <li><code>resetStatistics &lt;all|statBoilerGradientCoolDownMin|statAmbientTemp...|statElectricity...|statHours...|statHeatQ...&gt;</code>
+     <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>
-         L&ouml;scht die ausgew&auml;hlten statisischen Werte.
+         L&ouml;scht die ausgew&auml;hlten statisischen Werte: <i>all, statBoilerGradientCoolDownMin, statAmbientTemp..., statElectricity..., statHours..., statHeatQ...</i>
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
          <br>
