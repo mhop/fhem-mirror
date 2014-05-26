@@ -379,7 +379,7 @@ statistics_DoStatistics($$$)
       $readingName = $$f[0];
       my $completeReadingName = $devName.":".$readingName;
       next if ($completeReadingName =~ m/^($exclReadings)$/ );
--      next if not exists ($dev->{READINGS}{$readingName});
+      next if not exists ($dev->{READINGS}{$readingName});
       $statisticDone = 1;
       if ($$f[1] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch);}
       if ($$f[1] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $$f[2], $periodSwitch);}
