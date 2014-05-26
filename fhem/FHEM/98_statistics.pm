@@ -662,11 +662,15 @@ statistics_doStatisticDelta ($$$$$)
  # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
    if ($singularReadings ne "") {
-      # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Hour",$stat[1],$last[1],$periodSwitch >= 1);
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Day",$stat[3],$last[3],$periodSwitch >= 2);
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Month",$stat[5],$last[5],$periodSwitch >= 3);
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$stat[7],$last[7],$periodSwitch >= 4);
+      # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$value,$lastValue,$saveLast
+      $value = sprintf  "%.".$decPlaces."f", $stat[1];
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Hour",$value,$last[1],$periodSwitch >= 1);
+      $value = sprintf  "%.".$decPlaces."f", $stat[3];
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Day",$value,$last[3],$periodSwitch >= 2);
+      $value = sprintf  "%.".$decPlaces."f", $stat[5];
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Month",$value,$last[5],$periodSwitch >= 3);
+      $value = sprintf  "%.".$decPlaces."f", $stat[7];
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$value,$last[7],$periodSwitch >= 4);
    }
    
   # Store hidden reading
@@ -782,7 +786,7 @@ statistics_storeSingularReadings ($$$$$$$$$$)
 {
    my ($hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast) = @_;
    return if $singularReadings eq "";
-
+   
    if ($statType eq "Delta") { $statReadingName .= $period;}
    else { $statReadingName .= $statType;}
    my $devName=$dev->{NAME};
