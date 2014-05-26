@@ -787,14 +787,11 @@ statistics_storeSingularReadings ($$$$$$$$$$)
    else { $statReadingName .= $statType;}
    my $devName=$dev->{NAME};
    if ("$devName:$readingName:$statType:$period" =~ /^($singularReadings)$/) {
+      readingsBulkUpdate($dev, $statReadingName, $statValue, 1);
+      Log3 $hashName, 5, "Set ".$statReadingName." = $statValue";
       if ($saveLast) {
-         readingsBulkUpdate($dev, $statReadingName."Last", $statValue, 1);
-         Log3 $hashName, 5, "Set ".$statReadingName."Last = $statValue";
-         readingsBulkUpdate($dev, $statReadingName, $value, 1);
+         readingsBulkUpdate($dev, $statReadingName."Last", $value, 1);
          Log3 $hashName, 5, "Set ".$statReadingName."Last = $value";
-      } else {
-         readingsBulkUpdate($dev, $statReadingName, $statValue, 1);
-         Log3 $hashName, 5, "Set ".$statReadingName." = $statValue";
       } 
    }
 }
