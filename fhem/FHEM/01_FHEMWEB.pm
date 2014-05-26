@@ -1087,8 +1087,9 @@ FW_roomOverview($)
   my @rlist;
   if(AttrVal($FW_wname, "sortRooms", "")) { # Slow!
     my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
-    @rlist = sort { FW_roomIdx(@sortBy,$a) cmp
-                    FW_roomIdx(@sortBy,$b) } keys %FW_rooms;
+    my %sHash;                                                       
+    map { $sHash{$_} = FW_roomIdx(@sortBy,$_) } keys %FW_rooms;
+    @rlist = sort { $sHash{$a} cmp $sHash{$b} } keys %FW_rooms;
 
   } else {
     @rlist = sort keys %FW_rooms;
