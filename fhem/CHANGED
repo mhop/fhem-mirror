@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  55_GDS.pm: use Blocking.pm for retrieval of large files
   - change:  YAMAHA_BD: make YAMAHA_BD more performant by using non-blocking
              HTTP request (from HttpUtils.pm)
   - added:   YAMAHA_BD: new set command trickPlay and more remoteControl
