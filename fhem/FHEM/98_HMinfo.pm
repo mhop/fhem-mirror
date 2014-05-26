@@ -539,102 +539,10 @@ sub HMinfo_tempList(@) { ######################################################
     $ret = "incomplete data for ".join("\n     ",@incmpl) if (scalar@incmpl);
   }
   elsif ($action eq "verify"){
-    open(aSave, "$fName") || return("Can't open $fName: $!");
-    my @el = ();
-    my @elAll = ();
-    my @entryFail = ();
-    my @entryNF = ();
-    while(<aSave>){
-      chomp;
-      next if($_ =~ m/#/);
-      if($_ =~ m/^entities:/){
-        my $line = $_;
-        $line =~s/.*://;
-        @el = ();
-        foreach (split(",",$line)){
-          if ($defs{$_}){
-            push @el,$_ if ($defs{$_} && $_ =~ m/$filter/);
-          }
-          else{
-            push @entryNF,$_;
-          }
-        }
-        push @elAll,@el;
-      }
-      elsif(@el && $_ =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
-        my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
-        $tln =~ s/ //g;
-        $val =~ s/ //g;
-        $tln = "R_".$tln if($tln !~ m/^R_/);
-        my $day = $dl{$1} if ($tln =~ m/tempList(...)/);
-        $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
-        foreach my $eN(@el){
-          my $valR = ReadingsVal($eN,$tln,"");
-          $valR =~ s/ //g;
-          push (@entryFail,$eN." :".$tln) if ($valR ne  $val);
-        }
-      }
-    }
-    $ret .= "\nentries tested:\n     "   .join("\n     ",@elAll)     if (scalar@elAll);
-    $ret .= "\nfailed verify:\n     "    .join("\n     ",@entryFail) if (scalar@entryFail);
-    $ret .= "\nentries not found:\n     ".join("\n     ",@entryNF)   if (scalar@entryNF);
+    $ret = HMinfo_tempListTmpl($filter,"",$action,$fName);
   }
   elsif ($action eq "restore"){
-    open(aSave, "$fName") || return("Can't open $fName: $!");
-    my @el = ();
-    my @elAll = ();
-    my @entryFail = ();
-    my @entryNF = ();
-    my @exec = ();
-    while(<aSave>){
-      chomp;
-      my $line = $_;
-      next if($line =~ m/#/);
-      if($line =~ m/^entities:/){
-        $line =~s/.*://;
-        @el = ();
-        foreach (split(",",$line)){
-          if ($defs{$_}){
-            push @el,$_ if ($_ =~ m/$filter/);
-          }
-          else{
-            push @entryNF,$_;
-          }
-        }
-        push @elAll,@el;
-      }
-      elsif(@el && $_ =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
-        my ($tln,$val) = ($1,$2)if($_ =~ m/(.*)>(.*)/);
-        $tln =~ s/ //g;
-        $tln = "R_".$tln if($tln !~ m/^R_/);
-        my $day = $dl{$1} if ($tln =~ m/tempList(...)/);
-        $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/[0-6]_/);
-        $val =~ tr/ +/ /;
-        $val =~ s/^ //;
-        $val =~ s/ $//;
-        foreach my $eN(@el){
-          if ($tln =~ m/(P.)_._tempList/){
-            $val = lc($1)." ".$val;
-          }
-          $tln =~ s/R_(P._)?._//;
-          my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
-          if ($x ne "1"){
-            my $list =$line;
-            $list =~ s/\>.*//;
-            push @entryFail,$eN." :".$list." respose:$x";
-          }
-          push @exec,"$eN $tln exec $val" if (!(grep /$eN/,@exec));
-        }
-      }
-    }
-    close(aSave);
-    foreach (@exec){
-      my @param = split(" ",$_);
-      CUL_HM_Set($defs{$param[0]},@param);
-    }
-
-    $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
-    $ret = "Entries not found:\n     ".join("\n     ",@entryNF)   if (scalar@entryNF);
+    $ret = HMinfo_tempListTmpl($filter,"",$action,$fName);
   }
   else{
     $ret = "$action unknown option - please use save, verify or restore";
@@ -667,7 +575,6 @@ sub HMinfo_tempListTmpl(@) { ##################################################
                      : AttrVal($name,"tempListTmpl","tempList.cfg:$name");
 
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
-
     push @rs,  ($r ? "fail  : $tmplDev for $name: $r"
                    : "passed: $tmplDev for $name")
                ."\n";
@@ -1883,7 +1790,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
   <ul>
     Even though the commands are a get funktion they are implemented
     as set to allow simple web interface usage<br>
-    <ul>
       <li><a name="#HMinfoupdate">update</a><br>
           updates HM status counter.
       </li>
@@ -1931,6 +1837,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           this function supports handling of tempList for thermstates.
           It allows templists to be saved in a separate file, verify settings against the file
           and write the templist of the file to the devices. <br>
+          <ul>
           <li><B>save</B> saves tempList readings of the system to the file. <br>
               Note that templist as available in FHEM is put to the file. It is up to the user to make
               sure the data is actual<br>
@@ -1964,6 +1871,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          <li><B>entities</B> comma separated list of entities which refers to the temp lists following.
            The actual entity holding the templist must be given - which is channel 04 for RTs or channel 02 for TCs</li>
          <li><B>tempList...</B> time and temp couples as used in the set tempList commands</li>
+         </ul>
          <br>
      </li>
       <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter] [templateName][verify|restore] [&lt;file&gt;]</a><br>
@@ -2036,13 +1944,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 
         </ul>
       </li>
-    </ul>
 
   </ul>
   <br>
 
-  <a name="HMinfoget"></a><b>Get</b>
-  <ul> N/A </ul>
   <br><br>
   <a name="HMinfoattr"><b>Attributes</b></a>
    <ul>
