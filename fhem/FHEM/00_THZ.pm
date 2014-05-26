@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 05/2014
-# v. 0.100
+# v. 0.101
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -37,8 +37,8 @@ sub THZ_Read($);
 sub THZ_ReadAnswer($);
 sub THZ_Ready($);
 sub THZ_Write($$);
-sub THZ_Parse($);
-sub THZ_Parse1($);
+sub THZ_Parse($$);
+#sub THZ_Parse1($);
 sub THZ_checksum($);
 sub THZ_replacebytes($$$);
 sub THZ_decode($);
@@ -52,6 +52,9 @@ sub THZ_GetRefresh($);
 sub THZ_Refresh_all_gets($);
 sub THZ_Get_Comunication($$);
 sub THZ_PrintcurveSVG;
+
+#new by Jakob
+sub mysubstr($$$$);
 
 
 
@@ -283,6 +286,9 @@ my %OpMode = ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setb
 my %Rev_OpMode = reverse %OpMode;
 my %OpModeHC = ("1" =>"normal", "2" => "setback", "3" =>"standby", "4" =>"restart", "5" =>"restart");
 my %SomWinMode = ( "01" =>"winter", "02" => "summer");
+my $firstLoadAll = 0;
+my $noanswerreceived = 0;
+my $internalHash;
 ########################################################################################
 #
 # THZ_Initialize($)
@@ -529,35 +535,22 @@ sub THZ_Set($@){
   elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057") or (substr($cmdHex2,0,6) eq "0A0588") or (substr($cmdHex2,0,6) eq "0A05A0") or (substr($cmdHex2,0,6) eq "0B059D")      or (substr($cmdHex2,0,6) eq "0A05B7") or (substr($cmdHex2,0,6) eq "0A05B8")   )	{ } 				# fann speed and boostetimeout: do not multiply
   elsif  (substr($cmdHex2,2,4) eq "010E") 					{$arg=$arg*100} 		#gradientHC1 &HC2
   else 			             						{$arg=$arg*10} 
-  THZ_Write($hash,  "02"); 			# STX start of text
-  ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
-  my $msgtmp= $msg . " sent" . $arg ."---";
-  if ($msg eq "10") {
-    $cmdHex2=THZ_encodecommand(($cmdHex2 . substr((sprintf("%04X", $arg)), -4)),"set");  #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
-    THZ_Write($hash,  $cmdHex2); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
-    select(undef, undef, undef, 0.2); #maybe important for older firmware 
-    ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer     is "10",		DLE data link escape 
-     }
-   $msgtmp=  $msgtmp  ."\n" ."set--" . $cmdHex2  ."\n" . $msg; 
-   if ($msg eq "10") {
-      ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer  is "02"  -- STX start of text
-     THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer      
-     ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
-      THZ_Write($hash,  "10");
-     }
-   elsif ($msg eq "1002") {
-     THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer      
-     ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
-      THZ_Write($hash,  "10");
-     }
-   $msgtmp= $msgtmp ."\n" . $msg; 
-   if (defined($err))  {return ($cmdHex2 . "-". $msg ."--" . $err);}
-   else {
-	sleep 1;
-	$msg=THZ_Get($hash, $name, $cmd);
-	$msgtmp= $msgtmp ."\n" . $msg;
-	return ($msg);
-	} 
+  
+  Log3 $hash->{NAME}, 5, "THZ_Set: Check if port is open. State = '($hash->{STATE})'";
+  #if (($hash->{STATE} eq "DISCONNECTED")) 
+  #{
+  #	DevIo_OpenDev($hash, 0, "");
+  #}
+  $cmdHex2=THZ_encodecommand(($cmdHex2 . substr((sprintf("%04X", $arg)), -4)),"set");  #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
+  ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
+  if (defined($err))  {
+    return ($cmdHex2 . "-". $msg ."--" . $err);}
+  else {
+    select(undef,undef,undef,0.2);
+    $msg=THZ_Get($hash, $name, $cmd);
+    return ($msg);
+  }
+  
 }
 
 
@@ -579,43 +572,49 @@ sub THZ_Get($@){
 
   return "\"get $name\" needs one parameter" if(@a != 2);
   my $cmd = $a[1];
-  my ($err, $msg) =("", " ");
+   my ($err, $msg2) =("", " ");
 
-   if ($cmd eq "debug_read_raw_register_slow") {
+  if ($cmd eq "debug_read_raw_register_slow") {
     THZ_debugread($hash);
     return ("all raw registers read and saved");
     } 
-  
   
   my $cmdhash = $gets{$cmd};
   return "Unknown argument $cmd, choose one of " .
         join(" ", sort keys %gets) if(!defined($cmdhash));
 
+  Log3 $hash->{NAME}, 5, "THZ_Get: Try to get '$cmd'";
   my $cmdHex2 = $cmdhash->{cmd2};
   if(defined($cmdHex2) ) {
-      ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
-      if (defined($err))  {return ($msg ."\n msg2 " . $err);}
-      $msg = THZ_Parse($msg);
+      $cmdHex2=THZ_encodecommand($cmdHex2,"get");
+      ($err, $msg2) = THZ_Get_Comunication($hash,  $cmdHex2);
+      if (defined($err))     {
+             Log3 $hash->{NAME}, 5, "THZ_Get: Error msg2: '$err'";
+             return ($msg2 ."\n msg2 " . $err);
+      }
+      $msg2 = THZ_Parse($hash,$msg2);
   }
   
   my $cmdHex3 = $cmdhash->{cmd3};
   if(defined($cmdHex3)) {
-     select(undef, undef, undef, 0.1);
       my $msg3= " ";
+      $cmdHex3=THZ_encodecommand($cmdHex3,"get");
       ($err, $msg3) = THZ_Get_Comunication($hash,  $cmdHex3);
-      if (defined($err))  {return ($msg3 ."\n msg3 " . $err);}
-      $msg = THZ_Parse($msg3) * 1000 + $msg  ;
+       if (defined($err))     {
+             Log3 $hash->{NAME}, 5, "THZ_Get: Error msg3: '$err'";
+             return ($msg3 ."\n msg3 " . $err);
+      }
+      $msg2 = THZ_Parse($hash,$msg3) * 1000 + $msg2  ;
   }	            		
    
   my $unit = $cmdhash->{unit};
   if(defined($cmdHex3)) {
-    $msg = $msg . " " . $unit;
+    $msg2 = $msg2 . " " . $unit;
   }  
     
   my $activatetrigger =1;
-  readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
-  return ($msg);
-	       
+  readingsSingleUpdate($hash, $cmd, $msg2, $activatetrigger);
+  return ($msg2);	       
 }
 
 
@@ -630,22 +629,31 @@ sub THZ_Get($@){
 sub THZ_Get_Comunication($$) {
 my ($hash, $cmdHex) = @_;
 my ($err, $msg) =("", " ");
-	            		
+
+
+ Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
+ 	            		
   THZ_Write($hash,  "02"); 			# STX start of text
   ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
   
    if ($msg eq "10")  {
-    $cmdHex=THZ_encodecommand($cmdHex,"get");
+    #$cmdHex=THZ_encodecommand($cmdHex,"get");
       THZ_Write($hash,  $cmdHex); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
-     select(undef, undef, undef, 0.1); 		# delay added for Tom!!!!!!
+     select(undef, undef, undef, 0.2); 		# delay added for Tom!!!!!!
      ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer2     is "1002",		DLE data link escape -- STX start of text
     }
     
-   if($msg eq "1002") {
-     THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer      
-     ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
-     THZ_Write($hash,  "10");
-     }
+  if ($msg eq "10") {
+    ($err, $msg) = THZ_ReadAnswer($hash);
+  }        
+
+  if($msg eq "1002" || $msg eq "02") {
+   THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer      
+   ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
+   THZ_Write($hash,  "10");
+   }
+   
+   
    if (!(defined($err)))  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
    return($err, $msg) ;
 }
@@ -824,31 +832,57 @@ sub THZ_encodecommand($$) {
 #
 ########################################################################################
 
+
 sub THZ_decode($) {
   my ($message_orig) = @_;
   #  raw data received from device have to be de-escaped before header evaluation and data use:
   # - each sequece 2B 18 must be replaced with single byte 2B
   # - each sequece 10 10 must be replaced with single byte 10
-    my $find = "1010";
-    my $replace = "10";
-    $message_orig=THZ_replacebytes($message_orig, $find, $replace);
-    $find = "2B18";
-    $replace = "2B";
-    $message_orig=THZ_replacebytes($message_orig, $find, $replace);
+  my $find = "1010";
+  my $replace = "10";
+  $message_orig=THZ_replacebytes($message_orig, $find, $replace);
+  $find = "2B18";
+  $replace = "2B";
+  $message_orig=THZ_replacebytes($message_orig, $find, $replace);
+  
+  #Check if answer is NAK
+  if (length($message_orig) == 2 && $message_orig eq "15") {
+    return("NAK received from device",$message_orig);
+  }
+  
   #check header and if ok 0100, check checksum and return the decoded msg
-  if ("0100" eq substr($message_orig,0,4)) {
+  my $header = substr($message_orig,0,4);
+  if ($header eq  "0100")
+  {
     if (THZ_checksum($message_orig) eq substr($message_orig,4,2)) {
-        $message_orig =~ /0100(.*)1003/; 
-        my $message = $1;
-        return (undef, $message)
+      $message_orig =~ /0100(.*)1003/; 
+      my $message = $1;
+      return (undef, $message);
     }
-    else {return (THZ_checksum($message_orig) . "crc_error", $message_orig)}; }
-
-  if ("0103" eq substr($message_orig,0,4)) { return (" command not known", $message_orig)}; 
-
-  if ("0102" eq substr($message_orig,0,4)) {  return (" CRC error in request", $message_orig)}
-  else {return (" new error code " , $message_orig);}; 
+    else {return (THZ_checksum($message_orig) . "crc_error in answer", $message_orig)};
+  }
+  if ($header eq "0103")
+  {
+    return ("command not known", $message_orig);
+  }
+  if ($header eq "0102")
+  {
+    return ("CRC error in request", $message_orig);
+  }
+  if ($header eq "0104")
+  {
+    return ("UNKNOWN REQUEST", $message_orig);
+  }
+   if ($header eq "0180")
+  {
+    return (undef, $message_orig);
+  }
+  
+  return ("new unknown answer " , $message_orig);
 }
+
+
+
 
 ########################################################################################
 #
@@ -856,8 +890,11 @@ sub THZ_decode($) {
 #
 ########################################################################################
 	
-sub THZ_Parse($) {
-  my ($message) = @_;
+sub THZ_Parse($$) {
+  my ($hash,$message) = @_;
+  Log3 $hash->{NAME}, 5, "Parse message: $message";	  
+  my $length = length($message);
+  Log3 $hash->{NAME}, 4, "Message length: $length";
   given (substr($message,2,2)) {
   when ("0A")    {
        if (substr($message,4,4) eq "0116")						{$message = hex2int(substr($message, 8,4))/10 ." °C" }
@@ -990,6 +1027,9 @@ sub THZ_Parse($) {
               	  "Date: " 		. (hex(substr($message,12,2))+2000)  .	"/"		. hex(substr($message,14,2)) . "/"		. hex(substr($message,16,2));
   }
   when ("FB")    {                     #allFB
+#          1         2         3         5         6         7         8         9
+#012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
+#0DFBFDA8005D014E010602CF01CCFDA8FDA80007014C200813021C021C0258001A001E0013006100000000
     $message =    "outsideTemp: " 				. hex2int(substr($message, 8,4))/10 . " " .
         	  "flowTemp: "					. hex2int(substr($message,12,4))/10 . " " .  #Vorlauf Temperatur
         	  "returnTemp: "				. hex2int(substr($message,16,4))/10 . " " .  #Rücklauf Temperatur
@@ -1024,11 +1064,11 @@ sub THZ_Parse($) {
         	  "mainVentilatorSpeed: "			. hex(substr($message,70,4))/1   	. " " .  # m3/h
                   "outside_tempFiltered: "			. hex2int(substr($message,74,4))/10     . " " .
                   "relHumidity: "				. hex2int(substr($message,78,4))/10	. " " .
-		  "dewPoint: "					. hex2int(substr($message,86,4))/1	. " " .
-		  "P_Nd: "					. hex2int(substr($message,86,4))/100	. " " .	#bar
-		  "P_Hd: "					. hex2int(substr($message,90,4))/100	. " " .  #bar
-		  "actualPower_Qc: "				. hex2int(substr($message,94,8))/1      . " " .	#kw
-		  "actualPower_Pel: "				. hex2int(substr($message,102,4))/1     . " " .	#kw
+		  "dewPoint: "					. hex2int(mysubstr($hash,$message,86,4))/1	. " " .
+		  "P_Nd: "					. hex2int(mysubstr($hash,$message,86,4))/100	. " " .	#bar
+		  "P_Hd: "					. hex2int(mysubstr($hash,$message,90,4))/100	. " " .  #bar
+		  "actualPower_Qc: "				. hex2int(mysubstr($hash,$message,94,8))/1      . " " .	#kw
+		  "actualPower_Pel: "				. hex2int(mysubstr($hash,$message,102,4))/1     . " " .	#kw
 		  "collectorTemp: " 				. hex2int(substr($message, 4,4))/10  . " " .	#kw
 		  "insideTemp: " 				. hex2int(substr($message, 32,4))/10 ;	#Innentemperatur 
   }
@@ -1061,6 +1101,63 @@ sub THZ_Parse($) {
   }
   return (undef, $message);
 }
+
+
+
+
+
+
+
+
+
+#######################################
+#mysubstr($$$)
+#Same function as subst. But checks if offset + lenght is 
+#available in the string. If not, returns zeros.
+#######################################
+sub mysubstr($$$$)
+{
+  my ($hash,$message,$start, $length) = @_; 
+  my $ReturnValue = "";                
+  if (length($message) < ($start + $length))
+  {
+    Log3 $hash->{NAME},5, "mysubstr: offset($start) + length($length) is greater then message : '$message'";
+    my $msg;
+    for(my $i = 0;$i < $length;$i++)
+    {
+            $msg += "0";
+    }
+    $ReturnValue = uc(unpack('H*',pack('H*', $msg)));
+    Log3 $hash->{NAME},5,"mysubstr: retval instead '$ReturnValue'";
+    return $ReturnValue;
+  }
+  return substr($message,$start,$length);	
+}
+
+local $SIG{__WARN__} = sub
+{
+  my $message = shift;
+  
+  if (!defined($internalHash)) {
+    Log 3, "EXCEPTION in THZ: '$message'";
+  }
+  else
+  {
+    Log3 $internalHash->{NAME},3, "EXCEPTION in THZ: '$message'";
+  }  
+};
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #######################################
@@ -1185,7 +1282,7 @@ sub THZ_Undef($$) {
        $defs{$d}{IODev} == $hash)
       {
         my $lev = ($reread_active ? 4 : 2);
-        Log GetLogLevel($name,$lev), "deleting port for $d";
+        Log3 $hash->{NAME}, $lev, "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -1272,11 +1369,11 @@ polyline { stroke:black; fill:none; }
 </g>
 END
 
-my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",0))[81];
+my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",14))[81];
 $insideTemp="n.a." if ($insideTemp eq "-60"); #in case internal room sensor not connected
-my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[21];
-my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0);
-my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[11];
+my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",16))[21];
+my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
+my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",17))[11];
 my $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
 my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
 my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
