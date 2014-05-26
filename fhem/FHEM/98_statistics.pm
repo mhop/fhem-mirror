@@ -662,15 +662,15 @@ statistics_doStatisticDelta ($$$$$)
  # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
    if ($singularReadings ne "") {
-      # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$value,$lastValue,$saveLast
-      $value = sprintf  "%.".$decPlaces."f", $stat[1];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Hour",$value,$last[1],$periodSwitch >= 1);
-      $value = sprintf  "%.".$decPlaces."f", $stat[3];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Day",$value,$last[3],$periodSwitch >= 2);
-      $value = sprintf  "%.".$decPlaces."f", $stat[5];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Month",$value,$last[5],$periodSwitch >= 3);
-      $value = sprintf  "%.".$decPlaces."f", $stat[7];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$value,$last[7],$periodSwitch >= 4);
+      # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
+      my $statValue = sprintf  "%.".$decPlaces."f", $stat[1];
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Hour",$statValue,$last[1],$periodSwitch >= 1);
+      $statValue = sprintf  "%.".$decPlaces."f", $stat[3];
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Day",$statValue,$last[3],$periodSwitch >= 2);
+      $statValue = sprintf  "%.".$decPlaces."f", $stat[5];
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Month",$statValue,$last[5],$periodSwitch >= 3);
+      $statValue = sprintf  "%.".$decPlaces."f", $stat[7];
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$statValue,$last[7],$periodSwitch >= 4);
    }
    
   # Store hidden reading
