@@ -6317,13 +6317,15 @@ sub CUL_HM_UpdtCentral($){
                  map{InternalVal($_,"owner_CCU","") eq $name ? $_ : ""}
                  keys %defs);
 
-  my @myIos;# get all IOs uing 'my' ID
+  my @myIos;# get all IOs using 'my' ID
   foreach (CUL_HM_noDup(grep !/^$/,map{AttrVal($_,"IODev","")}keys %defs)){
-    push @myIos,$_ if (CUL_HM_h2IoId($defs{$_}) eq $defs{$name}{DEF});
+    push @myIos,$_ if (CUL_HM_h2IoId($defs{$_}) eq $id);
   }
+  $defs{$name}{assignedIOs} = join(",",@myIos);
+  
   foreach my $ioN(split",",AttrVal($name,"IOList","")){
     next if (!$defs{$ioN});
-    if ( $defs{$ioN}{TYPE} eq "HMLAN"){;
+    if (  $defs{$ioN}{TYPE} eq "HMLAN"){;
     }
     elsif($defs{$ioN}{TYPE} eq "CUL"){
       CommandAttr(undef, "$ioN rfmode HomeMatic") 
@@ -6332,11 +6334,11 @@ sub CUL_HM_UpdtCentral($){
     else {
       next;
     }
-    CommandAttr(undef, "$ioN hmId $defs{$name}{DEF}")
-            if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF});
+    CommandAttr(undef, "$ioN hmId $id")
+            if (AttrVal($ioN,"hmId","") ne $id);
     $defs{$ioN}{owner_CCU} = $name;
   }
-  $defs{$name}{assignedIOs} = join(",",@myIos);
+
   # --- search for peers to CCU and  potentially device this channel
   foreach my $ccuBId (CUL_HM_noDup(grep /$id/ ,map{split ",",AttrVal($_,"peerIDs","")}keys %defs)){
     my $btnS = substr($ccuBId,6,2);
@@ -6369,12 +6371,12 @@ sub CUL_HM_UpdtCentralState($){
   }
   foreach my $ioN (@IOl){
     my $cnd = ReadingsVal($ioN,"cond","");
-    if ($cnd){
-      $state .= "$ioN:".($cnd !~ m/(init|ok)/?$cnd:"ok").",";
+    if ($cnd){ # covering all HMLAN/USB
+      $state .= "$ioN:$cnd,";
     }
-    else{
+    else{ # handling CUL
       my $st = InternalVal($ioN,"STATE","unknown");
-      $state .= "$ioN:".($st !~ m/([iI]nit|ok)/?$st:"ok").",";
+      $state .= "$ioN:".($st ne "Initialized"?$st:"ok").",";
     }
     if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){
       Log 1,"CUL_HM correct hmId for assigned IO $ioN";
