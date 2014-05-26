@@ -1241,7 +1241,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $err = hex(substr($p,6,2));
       if    ($lvlStr{md}{$md}){$lvl = $lvlStr{md}{$md}{$lvl}}
       elsif ($lvlStr{st}{$st}){$lvl = $lvlStr{st}{$st}{$lvl} }
-      else                    {$lvl = hex($lvl)}
+      else                    {$lvl = hex($lvl)/2}
 
       push @evtEt,[$shash,1,"level:$lvl"] if($md eq "HM-Sen-Wa-Od");
       push @evtEt,[$shash,1,"state:$lvl"];
