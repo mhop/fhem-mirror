@@ -627,7 +627,7 @@ statistics_doStatisticDelta ($$$$$)
          if ($showDate == 5) { $showDate = 4; } # Do not show the "since:" value for day changes anymore
          if ($showDate >= 6) { # Shows the "since:" value for the first day change
             $showDate = 5; 
-            $last[9] = sprintf "%.".$decPlaces."f", $stat[9];
+            $last[9] = $stat[9];
            # Next monthly and yearly values start at 00:00 and show only date (no time)
             $stat[5] = 0;
             $stat[7] = 0;
