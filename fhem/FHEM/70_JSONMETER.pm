@@ -1049,7 +1049,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
   <ul>
        <li><code>activeTariff &lt; 0 - 9 &gt;</code>
          <br>
-         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) für verschiedene Tarife (Doppelstromz&auml;hler), wenn der Stromz&auml;hler dies selbst nicht unterscheiden kann (z.B. LS110) oder wenn gepr&uuml;ft werden soll, ob ein zeitabh&auml;ngiger Tarif preiswerter w&auml;re.<br>
+         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) f&uuml;r verschiedene Tarife (Doppelstromz&auml;hler), wenn der Stromz&auml;hler dies selbst nicht unterscheiden kann (z.B. LS110) oder wenn gepr&uuml;ft werden soll, ob ein zeitabh&auml;ngiger Tarif preiswerter w&auml;re.<br>
          Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
          0 = tariflos 
       </li><br>
@@ -1059,7 +1059,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
       </li><br>
       <li><code>resetStatistics &lt;all|statElectricityConsumed...|statElectricityConsumedTariff...|statElectricityPower...&gt;</code>
          <br>
-         Löscht die ausgewählten statisischen Werte.
+         L&ouml;scht die ausgew&auml;hlten statisischen Werte.
          </li><br>
       <li><code>restartJsonAnalysis</code>
         <br>
