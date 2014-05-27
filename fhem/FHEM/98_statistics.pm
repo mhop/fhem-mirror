@@ -63,9 +63,9 @@ sub statistics_FormatDuration($);
    ,["energy_current", 1, 1] 
    ,["energy_total", 2, 3] 
    ,["humidity", 1, 0]
-   ,["lightsensor", 3, 1] 
-   ,["lock", 3, 1] 
-   ,["motion", 3, 1] 
+   ,["lightsensor", 3] 
+   ,["lock", 3] 
+   ,["motion", 3] 
    ,["power", 1, 1] 
    ,["rain", 2, 1] 
    ,["rain_rate", 1, 1] 
@@ -76,8 +76,8 @@ sub statistics_FormatDuration($);
    ,["wind", 1, 0] 
    ,["wind_speed", 1, 1] 
    ,["windSpeed", 1, 0] 
-   ,["Window", 3, 1] 
-   ,["window", 3, 1] 
+   ,["Window", 3] 
+   ,["window", 3] 
   );
 ##############################################################
 
@@ -645,6 +645,11 @@ statistics_doStatisticDelta ($$$$$)
       }
    }
 
+  # Store hidden reading
+   $result = "LastValue: $value ShowDate: $showDate ";  
+   readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
+   Log3 $name,5,"$name: Set '$hiddenReadingName'='$result'";
+
  # Store visible statistic readings (delta values)
    $result = sprintf "Hour: %.".$decPlaces."f Day: %.".$decPlaces."f Month: %.".$decPlaces."f Year: %.".$decPlaces."f", $stat[1], $stat[3], $stat[5], $stat[7];
    if ( $showDate >=2 ) { $result .= " (since: $stat[9] )"; }
@@ -673,11 +678,6 @@ statistics_doStatisticDelta ($$$$$)
       statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$statValue,$last[7],$periodSwitch >= 4);
    }
    
-  # Store hidden reading
-   $result = "LastValue: $value ShowDate: $showDate ";  
-   readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
-   Log3 $name,5,"$name: Set '$hiddenReadingName'='$result'";
-
    return ;
 }
 
