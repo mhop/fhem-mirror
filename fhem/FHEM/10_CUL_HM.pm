@@ -133,26 +133,27 @@ sub CUL_HM_Initialize($) {
   $hash->{GetFn}     = "CUL_HM_Get";
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrFn}    = "CUL_HM_Attr";
-  $hash->{AttrList}  = "do_not_notify:1,0 ignore:1,0 dummy:1,0 "
-                       ."IODev IOList IOgrp "               #IOList is for CCU only
-                       ."showtime:1,0 "
+  $hash->{Attr}{dev} =  "ignore:1,0 dummy:1,0 "  # -- device only attributes
+                       ."IODev IOList IOgrp "               
                        ."serialNr firmware .stc .devInfo "
-                       ."rawToReadable unit "#"KFM-Sensor" only
-                       ."peerIDs repPeers "
                        ."actCycle actStatus "
                        ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
-                       ."expert:0_off,1_on,2_full "
                        ."burstAccess:0_off,1_auto "
-                       ."param msgRepeat "
-                       ."tempListTmpl "
-                       ."levelRange levelMap "
+                       ."msgRepeat "
                        ."aesCommReq:1,0 "      # IO will request AES if 
-                       ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
+                       ."rssiLog:1,0 ";        # enable writing RSSI to Readings (device only)
+  $hash->{Attr}{chn} =  "repPeers "            # -- channel only attributes
+                       ."peerIDs "
+                       ."tempListTmpl "
+                       ."levelRange levelMap ";
+  $hash->{AttrList}  =  "do_not_notify:1,0 showtime:1,0 "
+                       ."rawToReadable unit "#"KFM-Sensor" only
+                       ."expert:0_off,1_on,2_full "
+                       ."param "
+                       .$hash->{Attr}{dev}
+                       .$hash->{Attr}{chn}
                        .$readingFnAttributes;
-  #autoReadReg:
-  #        ,6_allForce
-  #        ,4_backUpdt
-
+                       
   my @modellist;
   foreach my $model (keys %{$culHmModel}){
     push @modellist,$culHmModel->{$model}{name};
@@ -186,12 +187,6 @@ sub CUL_HM_Initialize($) {
   $hash->{hmAutoReadScan} = 4; # delay autoConf readings
   $hash->{helper}{hmManualOper} = 0;# default automode
   
-  my @dcpl = # deviceChannelParamList list of device params valid for channels
-          ("ignore","dummy",
-           "actCycle","actStatus",
-           "expert","burstAccess","msgRepeat","autoReadReg",
-           ".stc",".devInfo","firmware","serialNr","model","subType");
-  $hash->{helper}{dcpl} = \@dcpl;
 }
 
 sub CUL_HM_updateConfig($){
@@ -394,6 +389,21 @@ sub CUL_HM_updateConfig($){
           CUL_HM_qAutoRead($name,1);
           last;
         }
+      }
+    }
+    #remove invalid attributes
+    if (!$hash->{helper}{role}{dev}){
+      my @l = split(" ",$modules{CUL_HM}{Attr}{dev});
+      map {$_ =~ s/\:.*//} @l; 
+      foreach (@l){
+        delete $attr{$name}{$_} if (defined $attr{$name}{$_});
+      }
+    }
+    if (!$hash->{helper}{role}{chn}){
+      my @l = split(" ",$modules{CUL_HM}{Attr}{chn});
+      map {$_ =~ s/\:.*//} @l; 
+      foreach (@l){
+        delete $attr{$name}{$_} if (defined $attr{$name}{$_});
       }
     }
     CUL_HM_complConfig($name);
@@ -2591,7 +2601,6 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     return $hash->{$p}                   if ($hash->{$p});
     return $hash->{helper}{$p}           if ($hash->{helper}{$p} && ref($hash->{helper}{$p}) ne "HASH");
     
-    return "undefined"                   if (!grep /^$p$/,@{$modules{CUL_HM}{helper}{dcpl}});
     return $attr{$devName}{$p}           if ($attr{$devName}{$p});
     return "undefined";
   }
@@ -6396,12 +6405,12 @@ sub CUL_HM_assignIO($){ #check and assign IO
   my $hn = $hash->{NAME};     
   my ($ioCCU,$prefIO) = split(":",AttrVal($hn,"IOgrp","_"),2);
   if (defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"){
-    my $ccuIOs = AttrVal($ioCCU,"IOList","");
     my @ios = sort {$hash->{helper}{mRssi}{io}{$b} <=> 
                     $hash->{helper}{mRssi}{io}{$a} } 
-          split(",",$ccuIOs);
+              grep {defined $hash->{helper}{mRssi}{io}{$_}} 
+              split(",", AttrVal($ioCCU,"IOList",""));
     unshift @ios,$prefIO if ($prefIO);# set prefIO to first choice
-    foreach my $iom (grep !/^$/,@ios){
+    foreach my $iom (@ios){
       if (  !$defs{$iom}
           || $defs{$iom}{STATE} eq "disconnected" 
           || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB?
@@ -6410,7 +6419,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
       if (   $hash->{IODev} 
           && $hash->{IODev} ne $defs{$iom}
           && $hash->{IODev}->{TYPE}
-          && $hash->{IODev}->{TYPE} eq "HMLAN"){#if recent io is HMLAN and we have to change remove the device from IO
+          && $hash->{IODev}->{TYPE} eq "HMLAN"){#if recent io is HMLAN and we have to remove the device from IO
         my $id = CUL_HM_hash2Id($hash);
         IOWrite($hash, "", "remove:$id");
       }
