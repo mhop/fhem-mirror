@@ -205,6 +205,7 @@ FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             http://forum.fhem.de Frontends
 FHEM/98_Text2Speech.pm       tobiasfaust          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_apptime.pm           martinp876           http://forum.fhem.de Sonstiges
+FHEM/98_ComfoAir.pm          StefanStrobel        http://forum.fhem.de Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_GEOFANCY.pm          loredo               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de HomeMatic
