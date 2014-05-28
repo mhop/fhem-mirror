@@ -314,6 +314,11 @@ readingsGroup_2html($)
 
   my $separator = AttrVal( $d, "separator", ":" );
   my $style = AttrVal( $d, "style", "" );
+  if( $style =~ m/^{.*}$/ ) {
+    my $s = eval $style;
+    $style = $s if( $s );
+  }
+
   my $name_style = AttrVal( $d, "nameStyle", "" );
   my $value_style = AttrVal( $d, "valueStyle", "" );
   my $timestamp_style = AttrVal( $d, "timestampStyle", "" );
@@ -1077,8 +1082,8 @@ readingsGroup_Attr($$$)
     </li>
     </ul><br>
 
-      The nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style
-      string to use. The perl code can use $DEVICE,$READING and $VALUE, e.g.:<br>
+      The style, nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style
+      string to use. For nameStyle and valueStyle The perl code can use $DEVICE,$READING and $VALUE, e.g.:<br>
     <ul>
           <code>attr batteries valueStyle {($VALUE ne "ok")?'style="color:red"':'style="color:green"'}</code><br>
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
