@@ -333,30 +333,30 @@ YAMAHA_AVR_Set($@)
 
                     if($diff > 0)
                     {
-                        Log3 $name, 4, "YAMAHA_AVR: use smooth volume change (with $steps steps of +$diff volume change to reach $target_volume)";
+                        Log3 $name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of +$diff volume change to reach $target_volume)";
                     }
                     else
                     {
-                        Log3 $name, 4, "YAMAHA_AVR: use smooth volume change (with $steps steps of $diff volume change to reach $target_volume)";
+                        Log3 $name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of $diff volume change to reach $target_volume)";
                     }
             
                     # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
                     if(defined($hash->{READINGS}{volumeStraight}{VAL}) and $diff != 0)
                     {        
-                        Log3 $name, 4, "YAMAHA_AVR: set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
+                        Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
                         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff)."|$diff|$target_volume" );
                     }
                     else
                     {
                         # Set the desired volume
-                        Log3 $name, 4, "YAMAHA_AVR: set volume to ".$target_volume." dB";
+                        Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB";
                         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", "$target_volume|0|$target_volume");
                     }
                 }
                 else
                 {
                     # Set the desired volume
-                    Log3 $name, 4, "YAMAHA_AVR: set volume to ".$target_volume." dB";
+                    Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB";
                     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", "$target_volume|0|$target_volume");
                 }
             }
@@ -643,7 +643,7 @@ YAMAHA_AVR_Define($$)
 		}
 		else
 		{
-		    Log3 $name, 2, "YAMAHA_AVR: selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device ".$hash->{NAME}.". Using Main Zone instead";
+		    Log3 $name, 2, "YAMAHA_AVR ($name) - selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device ".$hash->{NAME}.". Using Main Zone instead";
 		    $hash->{ACTIVE_ZONE} = "mainzone";
 		    YAMAHA_AVR_getInputs($hash);
 		}
