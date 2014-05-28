@@ -438,7 +438,7 @@ readingsGroup_2html($)
         } else {
           my $cmd = lookup2($commands,$name,$d,$txt);
 
-          if( $cmd =~ m/^(\w*):(\S*)?$/ ) {
+          if( $cmd =~ m/^([\w-]*):(\S*)?$/ ) {
             my $set = $1;
             my $values = $2;
 
@@ -561,7 +561,7 @@ readingsGroup_2html($)
         if( !$devStateIcon ) {
           $cmd = lookup2($commands,$name,$n,$v) if( !$devStateIcon );
 
-          if( $cmd =~ m/^(\w*):(\S*)?$/ ) {
+          if( $cmd =~ m/^([\w-]*):(\S*)?$/ ) {
             my $set = $1;
             my $values = $2;
 
