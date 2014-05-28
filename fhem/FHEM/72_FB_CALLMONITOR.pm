@@ -755,7 +755,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   Just dial the shortcode for activating on one of your phones, after 3 seconds just hang up. The feature is now activated.
   <br>
   After activating the CallMonitor-Support in your FritzBox, this module is able to 
-  generate an event for each call.
+  generate an event for each external call. Internal calls were not be detected by the Callmonitor.
   <br><br>
   This module work with any FritzBox Fon model.
   <br><br>
@@ -859,7 +859,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   Einfach die entsprechende Kurzwahl auf irgend einem Telefon eingeben, welches an die Fritz!Box angeschlossen ist. 
   Nach ca. 3 Sekunden kann man einfach wieder auflegen. Nun ist der CallMonitor aktiviert.
   <br>
-  Sobald der CallMonitor auf der Fritz!Box aktiviert wurde erzeugt das Modul entsprechende Events (s.u.)
+  Sobald der CallMonitor auf der Fritz!Box aktiviert wurde erzeugt das Modul entsprechende Events (s.u.) f&uuml;r alle externen Anrufe. Interne Anrufe werden nicht durch den Callmonitor erfasst.
   <br><br>
   Dieses Modul funktioniert mit allen Fritz!Box Modellen, welche Telefonie unterst&uuml;tzen (Namenszusatz: Fon).
   <br><br>
