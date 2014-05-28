@@ -131,6 +131,8 @@ readingsGroup_updateDevices($)
 
   if( AttrVal( $hash->{NAME}, "sortDevices", 0 ) == 1 ) {
     @devices = sort { my $aa = @{$a}[0]; my $bb =  @{$b}[0];
+                      $aa = "#" if( $aa =~ m/^</ );
+                      $bb = "#" if( $bb =~ m/^</ );
                       lc(AttrVal($aa,"sortby",AttrVal($aa,"alias",$aa))) cmp
                       lc(AttrVal($bb,"sortby",AttrVal($bb,"alias",$bb))) } @devices;
   }
