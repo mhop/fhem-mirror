@@ -211,6 +211,7 @@ use vars qw(%oldvalue);         # Old values, see commandref.html
 use vars qw(%readyfnlist);      # devices which want a "readyfn"
 use vars qw(%selectlist);       # devices which want a "select"
 use vars qw(%value);            # Current values, see commandref.html
+use vars qw($lastDefChange);    # number of last def/attr change
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
@@ -231,6 +232,7 @@ my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 
 $init_done = 0;
+$lastDefChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
 
@@ -481,6 +483,8 @@ $attr{global}{motd} = "$sc_text\n\n"
         if(!$attr{global}{motd} || $attr{global}{motd} =~ m/^$sc_text/);
 
 $init_done = 1;
+$lastDefChange = 1;
+
 foreach my $d (keys %defs) {
   if($defs{$d}{IODevMissing}) {
     Log 3, "No I/O device found for $defs{$d}{NAME}";
@@ -1565,6 +1569,7 @@ CommandDefine($$)
     %ntfyHash = ();
     DoTrigger("global", "DEFINED $name", 1) if($init_done);
   }
+  $lastDefChange++ if(!$hash{TEMPORARY});
   return $ret;
 }
 
@@ -1589,6 +1594,7 @@ CommandModify($$)
         "$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]" : ""));
   $hash->{DEF} = $hash->{OLDDEF} if($ret);
   delete($hash->{OLDDEF});
+  $lastDefChange++ if(!$hash->{TEMPORARY});
   return $ret;
 }
 
@@ -1651,7 +1657,7 @@ CommandDelete($$)
   my ($cl, $def) = @_;
   return "Usage: delete <name>$namedef\n" if(!$def);
 
-  my @rets;
+  my (@rets, $isReal);
   foreach my $sdev (devspec2array($def)) {
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
@@ -1668,6 +1674,8 @@ CommandDelete($$)
       push @rets, $ret;
       next;
     }
+
+    $isReal = 1 if(!$defs{$sdev}{TEMPORARY});
 
     # Delete releated hashes
     foreach my $p (keys %selectlist) {
@@ -1686,6 +1694,7 @@ CommandDelete($$)
     DoTrigger("global", "DELETED $sdev", 1) if(!$temporary);
 
   }
+  $lastDefChange++ if($isReal);
   return join("\n", @rets);
 }
 
@@ -1698,7 +1707,7 @@ CommandDeleteAttr($$)
   my @a = split(" ", $def, 2);
   return "Usage: deleteattr <name> [<attrname>]\n$namedef" if(@a < 1);
 
-  my @rets;
+  my (@rets, $isReal);
   foreach my $sdev (devspec2array($a[0])) {
 
     if(!defined($defs{$sdev})) {
@@ -1718,6 +1727,8 @@ CommandDeleteAttr($$)
       next;
     }
 
+    $isReal = 1 if(!$defs{$sdev}{TEMPORARY});
+
     if(@a == 1) {
       delete($attr{$sdev});
     } else {
@@ -1726,6 +1737,7 @@ CommandDeleteAttr($$)
 
   }
 
+  $lastDefChange++ if($isReal);
   return join("\n", @rets);
 }
 
@@ -2025,6 +2037,7 @@ CommandRename($$)
   CallFn($new, "RenameFn", $new,$old);# ignore replies
 
   DoTrigger("global", "RENAMED $old $new", 1);
+  $lastDefChange++ if(!$defs{$new}{TEMPORARY});
   return undef;
 }
 
@@ -2158,8 +2171,7 @@ sub
 CommandAttr($$)
 {
   my ($cl, $param) = @_;
-  my $ret = undef;
-  my @a;
+  my ($ret, $isReal, @a);
 
   @a = split(" ", $param, 3) if($param);
 
@@ -2234,6 +2246,8 @@ CommandAttr($$)
       next;
     }
 
+    $isReal = 1 if(!$defs{$sdev}{TEMPORARY});
+
     $a[0] = $sdev;
     $ret = CallFn($sdev, "AttrFn", "set", @a);
     if($ret) {
@@ -2258,6 +2272,8 @@ CommandAttr($$)
     }
 
   }
+
+  $lastDefChange++ if($isReal);
   Log 3, join(" ", @rets) if(!$cl && @rets);
   return join("\n", @rets);
 }
