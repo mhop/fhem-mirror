@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.3
+# Version: 1.2.4
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -276,7 +276,7 @@ sub PHTV_Set($@) {
         && ref( $hash->{helper}{device}{channelPreset} ) eq "HASH" )
     {
         my $i     = 1;
-        my $count = scalar( keys $hash->{helper}{device}{channelPreset} );
+        my $count = scalar( keys %{ $hash->{helper}{device}{channelPreset} } );
         $count = 80 if ( $count > 80 );
         while ( $i <= $count ) {
             $channels .=
@@ -2054,9 +2054,9 @@ sub PHTV_ReceiveCommand($$$) {
         elsif ( $service eq "ambilight/cached" ) {
             if ( ref($return) eq "HASH" ) {
                 my $hexsum = "";
-                foreach my $layer ( keys $return ) {
-                    foreach my $side ( keys $return->{$layer} ) {
-                        foreach my $led ( keys $return->{$layer}{$side} ) {
+                foreach my $layer ( keys %{$return} ) {
+                    foreach my $side ( keys %{ $return->{$layer} } ) {
+                        foreach my $led ( keys %{ $return->{$layer}{$side} } ) {
                             my $hex = "";
                             my $l   = $layer;
                             my $s   = $side;
