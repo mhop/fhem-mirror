@@ -17,6 +17,7 @@ sub JeeLink_Ready($);
 sub JeeLink_Write($$);
 
 sub JeeLink_SimpleWrite(@);
+sub JeeLink_ResetDevice($);
 
 my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:ETH200comfort:CUL_IR:HX2272:FS20:AliRF";
 
@@ -167,7 +168,7 @@ JeeLink_Set($@)
   my $arg = join(" ", @a);
 
 
-  my $list = "beep raw led:on,off led-on-for-timer LaCrossePairForSec setReceiverMode:LaCrosse,HX2272,FS20";
+  my $list = "beep raw led:on,off led-on-for-timer reset LaCrossePairForSec setReceiverMode:LaCrosse,HX2272,FS20";
   return $list if( $cmd eq '?' || $cmd eq '');
 
 
@@ -249,6 +250,9 @@ JeeLink_Set($@)
         $modules{JeeLink}{ldata}{$name} = $to;
     Log3 $name, 4, "Follow: +$to setstate $name off";
     CommandDefine(undef, $name."_timer at +$to {fhem(\"set $name led" ." off\")}");
+
+  } elsif ($cmd =~ m/reset/i) {
+    return JeeLink_ResetDevice($hash);
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
@@ -594,7 +598,16 @@ JeeLink_Parse($$$$)
         return;
 
   } elsif( $dmsg =~ m/drecvintr exit/ ) {
-        JeeLink_SimpleWrite($hash, "ec",1);
+        # command "ec" will not work with the EC3000, use reset instead
+        Log3 $hash, 0, "$name: drecvintr detected"; 
+        JeeLink_ResetDevice($hash);
+
+        #JeeLink_SimpleWrite($hash, "ec",1);
+  } elsif( $dmsg =~ m/RFM12 hang/ ) {
+        # EC3000 seems not to recover from an RFM12 hang, so do a reset
+        Log3 $hash, 0, "$name: RFM12 hang detected"; 
+        JeeLink_ResetDevice($hash);
+
     return;
   }
 
@@ -718,6 +731,17 @@ JeeLink_SimpleWrite(@)
   # Some linux installations are broken with 0.001, T01 returns no answer
   select(undef, undef, undef, 0.01);
 }
+sub
+JeeLink_ResetDevice($)
+{
+  my ($hash) = @_;
+
+  DevIo_CloseDev($hash);
+  my $ret = DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
+
+  return $ret;
+}
+
 
 sub
 JeeLink_Attr(@)
@@ -843,7 +867,9 @@ sub JeeLink_getIndexOfArray($@) {
   <ul>
     <li>raw &lt;datar&gt;<br>
         send &lt;data&gt; as a raw message to the JeeLink to be transmitted over the RF link.
-        </li><br>
+        </li>
+    <li>reset<br>
+        force a device reset closing and reopening the device.</li>
     <li>LaCrossePairForSec &lt;sec&gt; [ignore_battery]<br>
        enable autocreate of new LaCrosse sensors for &lt;sec&gt; seconds. if ignore_battery is not given only sensors
        sending the 'new battery' flag will be created.
