@@ -755,7 +755,7 @@ YAMAHA_AVR_ParseResponse ($$$)
     my $cmd = $param->{cmd};
     my $arg = $param->{arg};
     
-    $hash->{helper}{AVAILABLE} = ($err eq "" ? 1 : 0);
+   
     
     if($err ne "")
     {
@@ -766,7 +766,9 @@ YAMAHA_AVR_ParseResponse ($$$)
 			Log3 $name, 3, "YAMAHA_AVR ($name) - could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
 			readingsSingleUpdate($hash, "presence", "absent", 1);
             readingsSingleUpdate($hash, "state", "absent", 1);
-		}          
+		}  
+
+        $hash->{helper}{AVAILABLE} = 0;
     }
     elsif($data ne "")
     {
@@ -777,6 +779,8 @@ YAMAHA_AVR_ParseResponse ($$$)
 			Log3 $name, 3, "YAMAHA_AVR ($name) - device $name reappeared";
 			readingsSingleUpdate($hash, "presence", "present", 1);            
 		}
+        
+        $hash->{helper}{AVAILABLE} = 1;
         
         if(not $data =~ /RC="0"/)
 		{
