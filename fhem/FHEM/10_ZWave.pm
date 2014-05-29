@@ -206,7 +206,14 @@ my %zwave_class = (
     parse => { "078612(..)(..)(..)(..)(..)" =>
     'sprintf("version:Lib %d Prot %d.%d App %d.%d",'.
         'hex($1),hex($2),hex($3),hex($4),hex($5))', } },
-  INDICATOR                => { id => '87', },
+  INDICATOR                => { id => '87',
+    set   => { indicatorOff    => "0100",
+               indicatorOn     => "01FF",
+               indicatorDim    => "01%02x", },
+    get   => { indicatorStatus => "02",     }, 
+    parse => { "038703(..)"    => '($1 eq "00" ? "indState:off" : 
+                               ($1 eq "ff" ? "indState:on" : 
+                                             "indState:dim ".hex($1)))',}, },
   PROPRIETARY              => { id => '88', },
   LANGUAGE                 => { id => '89', },
   TIME                     => { id => '8a', },
@@ -238,7 +245,8 @@ my %zwave_class = (
   NON_INTEROPERABLE        => { id => 'f0', },
   );
 my %zwave_cmdArgs = (
-  dim => "slider,0,1,99",
+  dim          => "slider,0,1,99",
+  indicatorDim => "slider,0,1,99",
   );
 
 
@@ -850,6 +858,15 @@ s2Hex($)
     Reset the configuration parameter for the cfgAddress parameter to its
     default value.  See the device documentation to determine this value.</li>
 
+  <br><br><b>Class INDICATOR</b>
+  <li>indicatorOn<br>
+    switch the indicator on</li>
+  <li>indicatorOff<br>
+    switch the indicator off</li>
+  <li>indicatorDim value<br>
+    takes values from 1 to 99.
+    If the indicator does not support dimming. It is interpreted as on.</li>
+
   <br><br><b>Class PROTECTION</b>
   <li>protectionOff<br>
     device is unprotected</li>
@@ -939,6 +956,11 @@ s2Hex($)
     </li>
   <li>hrvStatusSupported<br>
     report the supported status fields as a bitfield.
+    </li>
+
+  <br><br><b>Class INDICATOR</b>
+  <li>indicatorStatus<br>
+    return the indicator status of the node, as indState:on, indState:off or indState:dim value.
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
@@ -1064,6 +1086,9 @@ s2Hex($)
   <li>indoorHumidity: %s %</li>
   <li>remainingFilterLife: %s %</li>
   <li>supportedStatus: <list of supported stati></li>
+
+  <br><br><b>Class INDICATOR</b>
+  <li>indState:[on|off|dim value]</li>
 
   <br><br><b>Class METER</b>
   <li>energy:val [kWh|kVAh|pulseCount]</li>
