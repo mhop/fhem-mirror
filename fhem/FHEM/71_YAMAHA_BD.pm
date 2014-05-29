@@ -573,7 +573,7 @@ YAMAHA_BD_ParseResponse($$$)
     my $arg = $param->{arg};
     
     
-    if($err)
+    if($err ne "")
     {
         Log3 $name, 4, "YAMAHA_BD ($name) - error while executing \"$cmd".(defined($arg) ? " ".$arg : "")."\": $err";
         
@@ -585,7 +585,7 @@ YAMAHA_BD_ParseResponse($$$)
 		}
     
     }
-    elsif($data)
+    elsif($data ne "")
     {
     
         Log3 $name, 5, "YAMAHA_BD ($name) - got HTTP response for \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
