@@ -82,6 +82,8 @@ $FW_formmethod = "post";
 my $FW_zlib_checked;
 my $FW_use_zlib = 1;
 my $FW_activateInform = 0;
+my $FW_lastWebName = "";  # Name of last FHEMWEB instance, for caching
+my $FW_lastHashUpdate = 0;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -93,6 +95,7 @@ my %FW_icons;      # List of icons
 my @FW_iconDirs;   # Directory search order for icons
 my $FW_RETTYPE;    # image/png or the like
 my %FW_rooms;      # hash of all rooms
+my @FW_roomsArr;   # ordered list of rooms
 my %FW_groups;     # hash of all groups
 my %FW_types;      # device types, for sorting
 my %FW_hiddengroup;# hash of hidden groups
@@ -590,7 +593,11 @@ FW_answerCall($)
     return -1;
   }
 
-  FW_updateHashes();
+  if($FW_lastWebName ne $FW_wname || $FW_lastHashUpdate != $lastDefChange) {
+    FW_updateHashes();
+    $FW_lastWebName = $FW_wname;
+    $FW_lastHashUpdate = $lastDefChange;
+  }
 
   my $t = AttrVal("global", "title", "Home, Sweet Home");
 
@@ -791,6 +798,17 @@ FW_updateHashes()
   }
 
   $FW_room = AttrVal($FW_detail, "room", "Unsorted") if($FW_detail);
+
+  if(AttrVal($FW_wname, "sortRooms", "")) { # Slow!
+    my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
+    my %sHash;                                                       
+    map { $sHash{$_} = FW_roomIdx(\@sortBy,$_) } keys %FW_rooms;
+    @FW_roomsArr = sort { $sHash{$a} cmp $sHash{$b} } keys %FW_rooms;
+
+  } else {
+    @FW_roomsArr = sort keys %FW_rooms;
+
+  }
 }
 
 ##############################
@@ -1009,7 +1027,7 @@ FW_makeTableFromArray($$@) {
 }
 
 sub
-FW_roomIdx(\@$)
+FW_roomIdx($$)
 {
   my ($arr,$v) = @_; 
   my ($index) = grep { $v =~ /^$arr->[$_]$/ } 0..$#$arr;
@@ -1084,22 +1102,10 @@ FW_roomOverview($)
   }
   $FW_room = "" if(!$FW_room);
 
-  my @rlist;
-  if(AttrVal($FW_wname, "sortRooms", "")) { # Slow!
-    my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
-    my %sHash;                                                       
-    map { $sHash{$_} = FW_roomIdx(@sortBy,$_) } keys %FW_rooms;
-    @rlist = sort { $sHash{$a} cmp $sHash{$b} } keys %FW_rooms;
-
-  } else {
-    @rlist = sort keys %FW_rooms;
-
-  }
-
 
   ##########################
   # Rooms and other links
-  foreach my $r (@rlist) {
+  foreach my $r (@FW_roomsArr) {
     next if($r eq "hidden" || $FW_hiddenroom{$r});
     $FW_room = $r if(!$FW_room && $FW_ss);
     $r =~ s/</&lt;/g;
