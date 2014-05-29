@@ -7,7 +7,7 @@ attr global room System
 attr global sendStatistics never
 attr global statefile ./demolog/fhem.save
 attr global updateInBackground 1
-attr global userattr Light Light_map devStateIcon devStateStyle icon lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 sortby structexclude webCmd
+attr global userattr Light Light_map devStateIcon devStateStyle icon lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 sortby structexclude webCmd widgetOverride
 attr global verbose 3
 
 define telnetPort telnet 7072 global
@@ -165,11 +165,9 @@ attr lcCinema webCmd scene
 
 define anyViews Dashboard
 attr anyViews dashboard_colcount 2
-attr anyViews dashboard_lockstate lock
 attr anyViews dashboard_row top-center
 attr anyViews dashboard_rowcentercolwidth 400
 attr anyViews dashboard_rowtopheight 205
-attr anyViews dashboard_showhelper 1
 attr anyViews dashboard_tab1groups Home State,Light,AV,Single Lights
 attr anyViews dashboard_tab1name Dashboard Demo
 attr anyViews dashboard_tab1sorting t0c100,Light,true,518,129:t0c100,Home State,true,496,204:t0c0,Single Lights,true,522,209:t0c0,AV,true,221,170:
