@@ -672,9 +672,29 @@ YAMAHA_BD_ParseResponse($$$)
                 readingsBulkUpdate($hash, "playStatus", lc($1));
             }
             
-            if($data =~ /<Chapter>(.+?)<\/Chapter>/)
+            if($data =~ /<Contents>.*?<Chapter>(.+?)<\/Chapter>.*?<\/Contents>/)
             {
-                readingsBulkUpdate($hash, "currentChapter", lc($1));
+                readingsBulkUpdate($hash, "currentChapter", $1);
+            }
+            
+            if($data =~ /<Contents>.*?<Track>(.+?)<\/Track>.*?<\/Contents>/)
+            {
+                readingsBulkUpdate($hash, "currentTrack", $1);
+            }
+            
+            if($data =~ /<Contents>.*?<Title>(.+?)<\/Title>.*?<\/Contents>/)
+            {
+                readingsBulkUpdate($hash, "currentTitle", $1);
+            }
+            
+            if($data =~ /<Disc_Info>.*?<Track_Num>(.+?)<\/Track_Num>.*?<\/Disc_Info>/)
+            {
+                readingsBulkUpdate($hash, "totalTracks", $1);
+            }
+            
+            if($data =~ /<Contents>.*?<Type>(.+?)<\/Type>.*?<\/Contents>/)
+            {
+                readingsBulkUpdate($hash, "contentType", lc($1));
             }
             
             if($data =~ /<File_Name>(.+?)<\/File_Name>/)
@@ -923,6 +943,7 @@ sub YAMAHA_BD_formatTimestamp($)
   <ul>
   <li><b>input</b> - The current playback source (can be "DISC", "USB" or "Network")</li>
   <li><b>discType</b> - The current type of disc, which is inserted (e.g. "No Disc", "CD", "DVD", "BD",...)</li>
+  <li><b>contentType</b> - The current type of content, which is played (e.g. "audio", "video", "photo" or "no contents")</li>
   <li><b>error</b> - indicates an hardware error of the player (can be "none", "fan error" or "usb overcurrent")</li>
   <li><b>power</b> - Reports the power status of the player or zone (can be "on" or "off")</li>
   <li><b>presence</b> - Reports the presence status of the player or zone (can be "absent" or "present"). In case of an absent device, it cannot be controlled via FHEM anymore.</li>
@@ -932,9 +953,12 @@ sub YAMAHA_BD_formatTimestamp($)
   <br><br><u>Input dependent Readings/Events:</u><br>
   <li><b>currentChapter</b> - Number of the current DVD/BD Chapter (only at DVD/BD's)</li>
   <li><b>currentMedia</b> - Name of the current file (only at USB)</li>
+  <li><b>currentTrack</b> - Number of the current CD-Audio title (only at CD-Audio)</li>
+  <li><b>currentTitle</b> - Number of the current title (only at DVD/BD's)</li>
   <li><b>playTimeCurrent</b> - current timecode of played media</li>
   <li><b>playTimeTotal</b> - the total time of the current movie (only at DVD/BD's)</li>
   <li><b>playStatus</b> - indicates if the player plays media or not (can be "play", "pause", "stop", "fast fwd", "fast rev", "slow fwd", "slow rev")</li>
+  <li><b>totalTracks</b> - The number of total tracks on inserted CD-Audio</li>
   </ul>
 <br>
   <b>Implementator's note</b><br>
@@ -1099,6 +1123,7 @@ sub YAMAHA_BD_formatTimestamp($)
   <ul>
   <li><b>input</b> - Die aktuelle Wiedergabequelle ("DISC", "USB" oder "Network")</li>
   <li><b>discType</b> - Die Art der eingelegten Disc (z.B "No Disc" => keine Disc eingelegt, "CD", "DVD", "BD",...)</li>
+  <li><b>contentType</b> - Die Art des Inhaltes, der gerade abgespielt wird ("audio", "video", "photo" oder "no contents")</li>
   <li><b>error</b> - zeigt an, ob ein interner Fehler im Player vorliegt ("none" => kein Fehler, "fan error" => L&uuml;fterdefekt, "usb overcurrent" => USB Spannungsschutz)</li>
   <li><b>power</b> - Der aktuelle Betriebsstatus ("on" => an, "off" => aus)</li>
   <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" => empfangsbereit, "absent" => nicht empfangsbereit, z.B. Stromausfall)</li>
@@ -1107,10 +1132,13 @@ sub YAMAHA_BD_formatTimestamp($)
   <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
   <br><br><u>Quellenabh&auml;ngige Readings/Events:</u><br>
   <li><b>currentChapter</b> - Das aktuelle Kapitel eines DVD- oder Blu-Ray-Films</li>
+  <li><b>currentTitle</b> - Die Titel-Nummer des aktuellen DVD- oder Blu-Ray-Films</li>
+  <li><b>currentTrack</b> - Die aktuelle Track-Nummer der wiedergebenden Audio-CD</li>
   <li><b>currentMedia</b> -  Der Name der aktuell wiedergebenden Datei (Nur bei der Wiedergabe &uuml;ber USB)</li>
   <li><b>playTimeCurrent</b> - Der aktuelle Timecode an dem sich die Wiedergabe momentan befindet.</li>
   <li><b>playTimeTotal</b> - Die komplette Spieldauer des aktuellen Films (Nur bei der Wiedergabe von DVD/BD's)</li>
   <li><b>playStatus</b> - Wiedergabestatus des aktuellen Mediums</li>
+  <li><b>totalTracks</b> - Gesamtanzahl aller Titel einer Audio-CD</li>
   </ul>
 <br>
   <b>Hinweise des Autors</b>
