@@ -656,8 +656,7 @@ IsIgnored($)
 {
   my $devname = shift;
   if($devname &&
-     defined($attr{$devname}) &&
-     defined($attr{$devname}{ignore})) {
+     defined($attr{$devname}) && $attr{$devname}{ignore}) {
     Log 4, "Ignoring $devname";
     return 1;
   }
