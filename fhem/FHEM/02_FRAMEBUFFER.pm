@@ -126,6 +126,11 @@ sub FRAMEBUFFER_updateDisplay($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $fbv = '/usr/local/bin/fbvs';
+  my $fd = $hash->{fd};
+  
+  if (defined $fd) {
+	close $fd;
+  }
   
   if (-x $fbv) {
 	if (defined $hash->{debugFile}) {
@@ -138,10 +143,12 @@ sub FRAMEBUFFER_updateDisplay($) {
 	}  
 
 	if (FRAMEBUFFER_readLayout($hash)) {
-		open(FBV, "|".$fbv . ' -d '. $hash->{fhem}{fb_device});
-		binmode FBV;
-		print FBV FRAMEBUFFER_returnPNG($name);
-		close FBV;
+		open($fd, "|".$fbv . ' -d '. $hash->{fhem}{fb_device});
+		binmode $fd;
+		print $fd FRAMEBUFFER_returnPNG($name);
+		# don't close the file immediately, as this will wait
+		# for the fbv process to terminate which may take some time
+		#close FBV;
 	}
   } else {
 	Log3 $name, 1, "$fbv doesn't exist or isn't executable, please install it";
