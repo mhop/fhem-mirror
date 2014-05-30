@@ -2,7 +2,8 @@
 # 00_THZ
 # $Id$
 # by immi 05/2014
-# v. 0.101
+# v. 0.103
+my $thzversion = "0.103";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -289,6 +290,7 @@ my %SomWinMode = ( "01" =>"winter", "02" => "summer");
 my $firstLoadAll = 0;
 my $noanswerreceived = 0;
 my $internalHash;
+
 ########################################################################################
 #
 # THZ_Initialize($)
@@ -350,7 +352,7 @@ sub THZ_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $a[0];
-
+  $hash->{VERSION} = $thzversion;
   return "wrong syntax. Correct is: define <name> THZ ".
   				"{devicename[\@baudrate]|ip:port}"
   				 if(@a != 3);
@@ -546,7 +548,6 @@ sub THZ_Set($@){
   if (defined($err))  {
     return ($cmdHex2 . "-". $msg ."--" . $err);}
   else {
-    select(undef,undef,undef,0.2);
     $msg=THZ_Get($hash, $name, $cmd);
     return ($msg);
   }
@@ -630,16 +631,15 @@ sub THZ_Get_Comunication($$) {
 my ($hash, $cmdHex) = @_;
 my ($err, $msg) =("", " ");
 
-
  Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
- 	            		
+ if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
+ 
   THZ_Write($hash,  "02"); 			# STX start of text
   ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
   
    if ($msg eq "10")  {
-    #$cmdHex=THZ_encodecommand($cmdHex,"get");
+
       THZ_Write($hash,  $cmdHex); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
-     select(undef, undef, undef, 0.2); 		# delay added for Tom!!!!!!
      ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer2     is "1002",		DLE data link escape -- STX start of text
     }
     
@@ -648,11 +648,11 @@ my ($err, $msg) =("", " ");
   }        
 
   if($msg eq "1002" || $msg eq "02") {
-   THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer      
+   THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer
+   select(undef,undef,undef,0.001);	#needed to fix hystory parameter
    ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
-   THZ_Write($hash,  "10");
+   THZ_Write($hash,  "10");  
    }
-   
    
    if (!(defined($err)))  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
    return($err, $msg) ;
@@ -668,18 +668,19 @@ my ($err, $msg) =("", " ");
 # Parameter hash and command to be sent to the interface
 #
 ########################################################################################
-sub THZ_ReadAnswer($) {
-  my ($hash) = @_;
-#--next line added in order to slow-down 100ms
-  select(undef, undef, undef, 0.1);
-#--
-  my $buf = DevIo_SimpleRead($hash);
-  return ("InterfaceNotRespondig", "") if(!defined($buf));
-
-  my $name = $hash->{NAME};
-  
-  my $data =  uc(unpack('H*', $buf));
-  return (undef, $data);
+sub THZ_ReadAnswer($) 
+{
+	my ($hash) = @_;
+	Log3 $hash->{NAME}, 5, "$hash->{NAME} start Funktion THZ_ReadAnswer";
+        my $buf = DevIo_SimpleReadWithTimeout($hash, 1);
+	if(!defined($buf)) {
+	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe timeout to slow?";
+	  return ("InterfaceNotRespondig", "");
+	}
+	my $name = $hash->{NAME};
+	my $data =  uc(unpack('H*', $buf));
+	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
+	return (undef, $data);
 }
 
  
@@ -1108,8 +1109,6 @@ sub THZ_Parse($$) {
 
 
 
-
-
 #######################################
 #mysubstr($$$)
 #Same function as subst. But checks if offset + lenght is 
@@ -1371,7 +1370,8 @@ END
 
 my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",14))[81];
 $insideTemp="n.a." if ($insideTemp eq "-60"); #in case internal room sensor not connected
-my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",16))[21];
+my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[21];
+$roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
 my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
 my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",17))[11];
 my $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
