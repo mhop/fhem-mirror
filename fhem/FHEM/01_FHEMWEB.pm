@@ -1108,11 +1108,12 @@ FW_roomOverview($)
   foreach my $r (@FW_roomsArr) {
     next if($r eq "hidden" || $FW_hiddenroom{$r});
     $FW_room = $r if(!$FW_room && $FW_ss);
-    $r =~ s/</&lt;/g;
-    $r =~ s/>/&lt;/g;
-    push @list1, $r;
-    $r =~ s/ /%20/g;
-    push @list2, "$FW_ME?room=$r";
+    my $lr = $r;
+    $lr =~ s/</&lt;/g;
+    $lr =~ s/>/&lt;/g;
+    push @list1, $lr;
+    $lr =~ s/ /%20/g;
+    push @list2, "$FW_ME?room=$lr";
   }
   my @list = (
      "Everything",    "$FW_ME?room=all",
