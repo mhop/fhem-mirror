@@ -73,6 +73,7 @@ my %zwave_class = (
     get   => { smStatus    => "04" },
     parse => { "..3105(..)(..)(.*)" => 'ZWave_ParseMultilevel($1,$2,$3)'},},
   METER                    => { id => '32',
+    get   => { meter       => "01", },
     parse => { "..3202(.*)"=> 'ZWave_ParseMeter($1)' }, },
   ZIP_ADV_SERVER           => { id => '33', },
   ZIP_ADV_CLIENT           => { id => '34', },
@@ -961,6 +962,11 @@ s2Hex($)
   <br><br><b>Class INDICATOR</b>
   <li>indicatorStatus<br>
     return the indicator status of the node, as indState:on, indState:off or indState:dim value.
+    </li>
+
+  <br><br><b>Class METER</b>
+  <li>meter<br>
+    request the meter report.
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
