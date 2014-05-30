@@ -51,7 +51,18 @@ my %zwave_class = (
     parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" : 
                                ($1 eq "ff" ? "state:on" : 
                                              "state:dim ".hex($1)))',}, },
-  SWITCH_ALL               => { id => '27', },
+  SWITCH_ALL               => { id => '27',
+    set   => { swaIncludeNone  => "0100",
+               swaIncludeOff   => "0101",
+               swaIncludeOn    => "0102",
+               swaIncludeOnOff => "01ff",
+               swaOn           => "04",
+               swaOff          => "05", },
+    get   => { swaInclude      => "02", },
+    parse => { "03270300"      => "swa:none",
+               "03270301"      => "swa:off",
+               "03270302"      => "swa:on",
+               "032703ff"      => "swa:on off", }, },
   SWITCH_TOGGLE_BINARY     => { id => '28', },
   SWITCH_TOGGLE_MULTILEVEL => { id => '29', },
   CHIMNEY_FAN              => { id => '2a', },
@@ -876,6 +887,22 @@ s2Hex($)
   <li>protectionSeq<br>
     device can be operated, if a certain sequence is keyed.</li>
 
+  <br><br><b>Class SWITCH_ALL</b>
+  <li>swaIncludeNone<br>
+    the device does not react to swaOn and swaOff commands</li>
+  <li>swaIncludeOff<br>
+    the device reacts to the swaOff command
+    but does not react to the swaOn command</li>
+  <li>swaIncludeOn<br>
+    the device reacts to the swaOn command
+    but does not react to the swaOff command</li>
+  <li>swaIncludeOnOff<br>
+    the device reacts to the swaOn and swaOff commands</li>
+  <li>swaOn<br>
+    sends the all on command to the device</li>
+  <li>swaOff<br>
+    sends the all off command to the device.</li>
+
   <br><br><b>Class SWITCH_BINARY</b>
   <li>on<br>
     switch the device on</li>
@@ -1001,6 +1028,11 @@ s2Hex($)
   <br><br><b>Class SENSOR_MULTILEVEL</b>
   <li>smStatus<br>
     request data from the node (temperature/humidity/etc)
+    </li>
+
+  <br><br><b>Class SWITCH_ALL</b>
+  <li>swaInclude<br>
+    return the switch-all mode of the node.
     </li>
 
   <br><br><b>Class SWITCH_BINARY</b>
@@ -1141,6 +1173,9 @@ s2Hex($)
   <li>tankCapacity $val [l|cbm|usgal]</li>
   <li>distance $val [m|cm|feet]</li>
   <li>anglePosition $val [%|relN|relS]</li>
+
+  <br><br><b>Class SWITCH_ALL</b>
+  <li>swa:[none|on|off|on off]</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>state:on</li>
