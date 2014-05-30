@@ -742,38 +742,44 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   #bit-usage is widely unknown. 
   my ($hash)=@_;
   my $rxt = CUL_HM_getRxType($hash);
-  my @p;
-  if (!($rxt & ~0x04)){@p = ("00","01","FE1F");}#config only
-  elsif($rxt & 0x10)  {@p = ("00","01","1E");  }#lazyConfig
-  else                {@p = ("00","01","00");  }
-#  else                {@p = ("00","01","1E");  }
-  if (AttrVal($hash->{NAME},"aesCommReq",0)){
-    $p[0] = sprintf("%02X",($p[0] + 1));
-    $p[2] = ($p[2]eq "")?"1E":$p[2];
-  }
   my $id = CUL_HM_hash2Id($hash);
-  $hash->{helper}{io}{newChn} = "+$id,".join(",",@p);
+  my @p;
+  if (!($rxt & ~0x04)){@p = ("$id","00","01","FE1F");}#config only
+  elsif($rxt & 0x10)  {@p = ("$id","00","01","1E");  }#lazyConfig
+  else                {@p = ("$id","00","01","00");  }
+# else                {@p = ("$id","00","01","1E");  }
+  if (AttrVal($hash->{NAME},"aesCommReq",0)){
+    $p[1] = sprintf("%02X",(hex($p[1]) + 1));
+    $p[3] = ($p[3]eq "")?"1E":$p[3];
+  }
+  $hash->{helper}{io}{newChn} = "";
+  $hash->{helper}{io}{rxt} = ($rxt & 0x08)?2:0;
+  $hash->{helper}{io}{p} = \@p;
   CUL_HM_hmInitMsgUpdt($hash);
 }
 sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
   my ($hash)=@_;
 
   my $oldChn = $hash->{helper}{io}{newChn};
-  my @p = unpack 'A8A2A*',$oldChn;
+  my @p = @{$hash->{helper}{io}{p}};
+  # General todo
+  #  $p[1] |= 2; need to be set if data is pending for a wakeup device. 
+  # it will force HMLAN to send A112 (have data). HMLAN will return 
+  # status "81" ACK if the device answers the A112 - FHEM should start sending Data by then
+  # 
   if($hash->{helper}{prt}{sProc}){
-    $p[1] |= 2;
+    $p[1] = sprintf("%02X",hex($p[1]) | $hash->{helper}{io}{rxt});
   }
-  else{
-    $p[1] &= 0xFD;# remove this Bit if no more data to send
-                  # otherwise could cause continous send (e.g. from SC
-  }
-  $hash->{helper}{io}{newChn} = sprintf("%s%02X%s",@p);
-  if (($hash->{helper}{io}{newChn} ne $oldChn)
-      &&$hash->{IODev}
-      &&$hash->{IODev}->{TYPE}
-      &&($hash->{IODev}->{TYPE} eq "HMLAN")){
-    my $id = CUL_HM_hash2Id($hash);
-    IOWrite($hash, "", "init:$id");
+#  else{
+#    $p[1] = sprintf("%02X",hex($p[1]) & 0xFD);# remove this Bit if no more data to send
+#                                              # otherwise could cause continous send (e.g. from SC)
+#  }
+  $hash->{helper}{io}{newChn} = '+'.join(",",@p);
+  if ((  $hash->{helper}{io}{newChn} ne $oldChn)
+      && $hash->{IODev}
+      && $hash->{IODev}->{TYPE}
+      && $hash->{IODev}->{TYPE} eq "HMLAN"){
+    IOWrite($hash, "", "init:$p[0]");
   }
 }
 
@@ -6624,7 +6630,7 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   $default = 0 if (!defined $default);
   if($defs{$name}){
-    my $val = ($attr{$name}{$attrName})
+    my $val = (defined $attr{$name}{$attrName})
                  ?$attr{$name}{$attrName}
                  :"";
     no warnings 'numeric';
@@ -6762,8 +6768,13 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   my @el = split",",$name;
   my ($fName,$tmpl) = split":",$template;
   if (!$tmpl){
-    $tmpl = $fName;
-    $fName = "tempList.cfg";
+    if(defined $tmpl){
+      $tmpl = $name;
+    }
+    else{#only template was given
+      $tmpl = $fName;
+      $fName = "tempList.cfg";
+    }
   }
   return "file: $fName for $name does not exist"  if (!(-e $fName));
   open(aSave, "$fName") || return("Can't open $fName: $!");

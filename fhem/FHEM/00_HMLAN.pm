@@ -540,7 +540,7 @@ sub HMLAN_Parse($$) {##########################################################
     #    00 30= should: AES response failed
     #    00 4x= AES response accepted
     #    00 50= ??(seen with 'R')
-    #    00 8x= first AES-response for this device?
+    #    00 8x= response to a message send autonomous by HMLAN (e.g. A112 -> wakeup)
     #    01 xx= ?? 0100 AES response send (gen autoMsgSent)
     #    02 xx= prestate to 04xx. Message is still sent. This is a warning
     #    04 xx= nothing sent anymore. Any restart unsuccessful except power
@@ -552,9 +552,7 @@ sub HMLAN_Parse($$) {##########################################################
     #     2 Warning-HighLoad
     #     4 Overload condition - no send anymore
     #
-    my $stat = hex($mFld[1]);
-    my $HMcnd =$stat >>8; #high = HMLAN cond
-    $stat &= 0xff;        # low byte related to message format
+    my ($HMcnd,$stat) = map{hex($_)} unpack('A2A2',($mFld[1]));
 
     if ($HMcnd == 0x01 && $mFld[3] ne "FF"){#HMLAN responded to AES request
       $CULinfo = "AESKey-".$mFld[3];
