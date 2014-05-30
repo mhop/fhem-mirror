@@ -505,7 +505,7 @@ sub HMinfo_paramCheck(@) { ####################################################
 }
 
 sub HMinfo_tempList(@) { ######################################################
-  my ($filter,$action,$fName)=@_;
+  my ($hiN,$filter,$action,$fName)=@_;
   $filter = "." if (!$filter);
   $action = "" if (!$action);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
@@ -539,10 +539,10 @@ sub HMinfo_tempList(@) { ######################################################
     $ret = "incomplete data for ".join("\n     ",@incmpl) if (scalar@incmpl);
   }
   elsif ($action eq "verify"){
-    $ret = HMinfo_tempListTmpl($filter,"",$action,$fName);
+    $ret = HMinfo_tempListTmpl($hiN,$filter,"",$action,$fName);
   }
   elsif ($action eq "restore"){
-    $ret = HMinfo_tempListTmpl($filter,"",$action,$fName);
+    $ret = HMinfo_tempListTmpl($hiN,$filter,"",$action,$fName);
   }
   else{
     $ret = "$action unknown option - please use save, verify or restore";
@@ -550,7 +550,7 @@ sub HMinfo_tempList(@) { ######################################################
   return $ret;
 }
 sub HMinfo_tempListTmpl(@) { ##################################################
-  my ($filter,$tmpl,$action,$fName)=@_;
+  my ($hiN,$filter,$tmpl,$action,$fName)=@_;
   $filter = "." if (!$filter);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret = "";
@@ -572,8 +572,8 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   foreach my $name (@el){
     my $tmplDev;
     $tmplDev = $tmpl ? $tmpl
-                     : AttrVal($name,"tempListTmpl","tempList.cfg:$name");
-
+                     : AttrVal($name,"tempListTmpl",
+                       AttrVal($hiN,"configDir",".")."/tempList.cfg:$name");
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
     push @rs,  ($r ? "fail  : $tmplDev for $name: $r"
                    : "passed: $tmplDev for $name")
@@ -1116,16 +1116,16 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "tempList")   {##handle thermostat templist from file ---------
     my $fn = $a[1]?$a[1]:"tempList.cfg";
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
-    $ret = HMinfo_tempList($filter,$a[0],$fn);
+    $ret = HMinfo_tempList($name,$filter,$a[0],$fn);
   }
   elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file --------
-    if ($a[0] =~ m/(verify|restore)/){#allow default template - i.e. not specified
+    if ($a[0] && $a[0] =~ m/(verify|restore)/){#allow default template - i.e. not specified
       unshift @a,"";
     }
     my $fn = $a[2]?$a[2]:"";
     my $ac = $a[1]?$a[1]:"verify";
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn && $fn !~ m/\//);
-    $ret = HMinfo_tempListTmpl($filter,$a[0],$ac,$fn);
+    $ret = HMinfo_tempListTmpl($name,$filter,$a[0],$ac,$fn);
   }
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
