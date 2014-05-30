@@ -115,7 +115,6 @@ YAMAHA_AVR_Get($@)
     
     if(exists($hash->{READINGS}{$what}))
     {
-        YAMAHA_AVR_GetStatus($hash, 1);
 
         if(defined($hash->{READINGS}{$what}))
         {
@@ -572,8 +571,8 @@ YAMAHA_AVR_Set($@)
         return $usage;
     }
     
-    # Call the GetStatus() Function to retrieve the new values after setting something (with local flag, so the internal timer is not getting interupted)
-    YAMAHA_AVR_GetStatus($hash, 1);
+    # Call the GetStatus() Function by resetting the timer to one second to retrieve the new values after setting something.
+    YAMAHA_AVR_ResetTimer($hash, 1);
     
     return undef;  
 }
@@ -1061,15 +1060,31 @@ YAMAHA_AVR_ParseResponse ($$$)
         }
         elsif($cmd eq "on")
         {
-            if($data =~ /RC="0"/ and $data =~ /<Power><\/Power>/)	
-			{
+            if($data =~ /RC="0"/ and $data =~ /<Power><\/Power>/)
+            {
 				# As the receiver startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
 				readingsBulkUpdate($hash, "power", "on");
 				readingsBulkUpdate($hash, "state","on");
-			}
-			else
-			{
-				Log3 $name, 3, "YAMAHA_AVR ($name) - Could not set power to off";
+                
+                readingsEndUpdate($hash, 1);
+                
+                YAMAHA_AVR_ResetTimer($hash, 5);
+                
+                return;
+            }
+        }
+        elsif($cmd eq "off")
+        {
+            if($data =~ /RC="0"/ and $data =~ /<Power><\/Power>/)
+            {
+				readingsBulkUpdate($hash, "power", "off");
+				readingsBulkUpdate($hash, "state","off");
+                
+                readingsEndUpdate($hash, 1);
+                
+                YAMAHA_AVR_ResetTimer($hash, 3);
+                
+                return;
 			}
         }
         elsif($cmd eq "volume")
@@ -1109,7 +1124,7 @@ YAMAHA_AVR_ParseResponse ($$$)
         
         readingsEndUpdate($hash, 1);
          
-        YAMAHA_AVR_GetStatus($hash, 1) if($cmd ne "statusRequest");
+        YAMAHA_AVR_ResetTimer($hash, 1) if($cmd ne "statusRequest");
     }
 }
 
