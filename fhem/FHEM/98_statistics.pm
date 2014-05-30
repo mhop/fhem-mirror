@@ -417,7 +417,7 @@ statistics_DoStatistics($$$)
    }
 
    if ($statisticDone != 1) { 
-      if (exists ($dev->{READINGS}{state})) { 
+      if ( exists ($dev->{READINGS}{state}) && $dev->{READINGS}{state}{VAL} ne "defined" ) { 
          statistics_doStatisticDuration $hash, $dev, "state", $periodSwitch;
          $statisticDone = 1;
       }
@@ -862,15 +862,14 @@ statistics_FormatDuration($)
     <br>
     Beispiel: <code>define Statistik statistics Sensor_.*|Wettersensor</code>
     <br>&nbsp;
+    <li><code>&lt;DeviceNameRegExp&gt;</code>
+      <br>
+      Regular expression of device names. <b>!!! Not the device readings !!!</b>
+    </li><br>
     <li><code>[Prefix]</code>
       <br>
       Optional. Prefix set is place before statistical data. Default is <i>stat</i>
     </li><br>
-    <li><code>&lt;DeviceNameRegExp&gt;</code>
-      <br>
-      Regular expression of device names. !!! Not the device readings !!!
-      <br>
-    </li>
   </ul>
   
   <br>
@@ -950,11 +949,11 @@ statistics_FormatDuration($)
   <ul>
     <code>define &lt;Name&gt; statistics &lt;Ger&auml;teNameRegExp&gt; [Prefix]</code>
     <br>
-    Beispiel: <code>define Statistik statistics Sensor_.*|Wettersensor</code>
+    Beispiel: <code>define Statistik statistics Wettersensor|Badsensor</code>
     <br>&nbsp;
     <li><code>&lt;Ger&auml;teNameRegExp&gt;</code>
       <br>
-      Regul&auml;rer Ausdruck f&uuml;r den Ger&auml;tenamen. !!! Nicht die Ger&auml;tewerte !!!
+      Regul&auml;rer Ausdruck f&uuml;r den Ger&auml;tenamen. <b>!!! Nicht die Ger&auml;tewerte !!!</b>
     </li><br>
     <li><code>[Prefix]</code>
       <br>
