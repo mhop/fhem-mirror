@@ -2,8 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 05/2014
-# v. 0.103
-my $thzversion = "0.103";
+my $thzversion = "0.104";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -649,7 +648,7 @@ my ($err, $msg) =("", " ");
 
   if($msg eq "1002" || $msg eq "02") {
    THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer
-   select(undef,undef,undef,0.001);	#needed to fix hystory parameter
+   select(undef,undef,undef,0.01);	#needed to fix hystory parameter
    ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
    THZ_Write($hash,  "10");  
    }
@@ -672,7 +671,10 @@ sub THZ_ReadAnswer($)
 {
 	my ($hash) = @_;
 	Log3 $hash->{NAME}, 5, "$hash->{NAME} start Funktion THZ_ReadAnswer";
+	select(undef,undef,undef,0.001);
         my $buf = DevIo_SimpleReadWithTimeout($hash, 1);
+	#$buf1 = DevIo_SimpleReadWithTimeout($hash, 0.001);
+	#$buf = ($buf . $buf1) if(defined($buf1));
 	if(!defined($buf)) {
 	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe timeout to slow?";
 	  return ("InterfaceNotRespondig", "");
