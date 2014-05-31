@@ -330,7 +330,11 @@ sub fromVEvent {
   $self->{uid}= $vevent->value("UID");
   $self->{uid}=~ s/\W//g; # remove all non-alphanumeric characters, this makes life easier for perl specials
   $self->{start}= tm($vevent->value("DTSTART"));
-  $self->{end}= tm($vevent->value("DTEND"));
+  if(defined($vevent->value("DTEND"))) {
+    $self->{end}= tm($vevent->value("DTEND"));
+  } elsif(defined($vevent->value("DURATION"))) {
+    $self->{end}= $self->{start} + d($vevent->value("DURATION"));
+  }
   $self->{lastModified}= tm($vevent->value("LAST-MODIFIED"));
   $self->{summary}= $vevent->value("SUMMARY");
   $self->{location}= $vevent->value("LOCATION");
