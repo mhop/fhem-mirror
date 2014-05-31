@@ -848,9 +848,9 @@ statistics_FormatDuration($)
   <br>
    Until now statistics for the following readings are automatically built:
    <ul>
-      <li><b>Minimal, average  and maximal values:</b> brightness, current, humidity, temperature, voltage, wind, windSpeed</li>
-      <li><b>Delta values:</b> count, energy, power, total, rain, rain_total</li>
-      <li><b>Duration of states:</b> Window, state <i>(if no other reading is valid)</i></li>
+      <li><b>Minimal, average  and maximal values:</b> brightness, current, energy_current, humidity, temperature, voltage, wind, wind_speed, windSpeed</li>
+      <li><b>Delta values:</b> count, energy, energy_total, power, total, rain, rain_rate, rain_total</li>
+      <li><b>Duration of states:</b> lightsensor, lock, motion, Window, window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
    </ul> 
    Further readings can be added via the correspondent <a href="#statisticsattr">attribut</a>.
   <br>&nbsp;
@@ -937,9 +937,9 @@ statistics_FormatDuration($)
   <br>
   Derzeit werden Statistiken f&uuml;r folgende Ger&auml;tewerte vom Modul automatisch berechnet:
    <ul>
-      <li><b>Minimal-, Mittel- und Maximalwerte:</b> brightness, current, humidity, temperature, voltage, wind, windSpeed</li>
-      <li><b>Deltawerte:</b> count, energy, power, total, rain, rain_total</li>
-      <li><b>Dauer der Stati:</b> Window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
+      <li><b>Minimal-, Mittel- und Maximalwerte:</b> brightness, current, energy_current, humidity, temperature, voltage, wind, wind_speed, windSpeed</li>
+      <li><b>Deltawerte:</b> count, energy, energy_total, power, total, rain, rain_rate, rain_total</li>
+      <li><b>Dauer der Stati:</b> lightsensor, lock, motion, Window, window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
   Weitere Ger&auml;tewerte k&ouml;nnen &uuml;ber die entsprechenden <a href="#statisticsattr">Attribute</a> hinzugef&uuml;gt werden
   <br>&nbsp;
