@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  honor DURATION in 57_Calendar.pm
   - bugfix:  YAMAHA_AVR: don't let FHEM hang anymore, when the receiver
              is not reachable
   - change:  55_GDS.pm: use Blocking.pm for retrieval of large files
