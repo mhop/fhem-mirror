@@ -128,9 +128,7 @@ statistics_Define($$)
 
   RemoveInternalTimer($hash);
   
- # Run period change procedure next full hour (15 seconds before).
-  my $periodEndTime = 3600 * ( int(gettimeofday()/3600) + 1 ) - 15 ;
-  InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 0);
+  InternalTimer( gettimeofday() + 11, "statistics_PeriodChange", $hash, 0);
 
   return undef;
 }
@@ -196,7 +194,6 @@ statistics_Notify($$)
             delete($hash->{READINGS}{$r}); 
          }
      }
-     statistics_DoStatisticsAll $hash, 0;
      my %unknownDevices;
      foreach my $r (keys %{$hash->{READINGS}}) {
          if ($r =~ /^\.(.*):.*/) { $unknownDevices{$1}++; }
@@ -210,7 +207,7 @@ statistics_Notify($$)
      }
      if ($val ne "") {
        Log3 $name,4,"$name: Initialization - Found hidden readings for device(s) '$val'.";
-       readingsSingleUpdate($hash,"monitoredDevicesUnknownType",$val,1);
+       readingsSingleUpdate($hash,"monitoredDevicesUnknown",$val,1);
      }
      return;
    }
@@ -272,7 +269,7 @@ statistics_PeriodChange($)
 
    RemoveInternalTimer($hash);
  # Run period change procedure each full hour ("periodChangePreset" second before).
-   my $periodEndTime = 3600 * ( int((gettimeofday()+1800)/3600) + 1 ) - $periodChangePreset ;
+   my $periodEndTime = 3600 * ( int((gettimeofday()+$periodChangePreset)/3600) + 1 ) - $periodChangePreset ;
  # Run procedure also for given dayChangeTime  
    $val = "";
    if ( $dayChangeDelay>0 && gettimeofday()<$dayChangeTime && $dayChangeTime<=$periodEndTime ) {
@@ -282,12 +279,11 @@ statistics_PeriodChange($)
    $val = strftime ("%Y-%m-%d %H:%M:%S", localtime($periodEndTime)) . $val;
    InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 1);
    readingsSingleUpdate($hash, "nextPeriodChangeCalc", $val, 0);
-   Log3 $name,4,"$name: Next period change will be calculated at ".strftime ("%H:%M:%S", localtime($periodEndTime));
+   Log3 $name,4,"$name: Next period change will be calculated at $val";
 
    return if( AttrVal($name, "disable", 0 ) == 1 );
    
  # Determine if time period switched (day, month, year)
- # Get deltaValue and Tariff of previous call
  
    my $periodSwitch = 0;
    my $yearLast;
@@ -299,20 +295,23 @@ statistics_PeriodChange($)
    my $monthNow;
    my $yearNow;
 
-   if ($dayChangeDelay>0 && $isDayChange) {
-         ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - $dayChangeDelay);
-         ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + $periodEndTime);
-         if ($yearNow != $yearLast) { $periodSwitch = -4; }
-         elsif ($monthNow != $monthLast) { $periodSwitch = -3; }
-         elsif ($dayNow != $dayLast) { $periodSwitch = -2; }
-         if ($dayChangeDelay % 3600 == 0) { $periodSwitch = abs($periodSwitch); }
+   if ($isDayChange) {
+      Log3 $name,4,"$name: Calculating day change";
+      ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - $dayChangeDelay + $periodChangePreset - 59);
+      ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + $periodChangePreset);
+      if ($yearNow != $yearLast) { $periodSwitch = -4; }
+      elsif ($monthNow != $monthLast) { $periodSwitch = -3; }
+      elsif ($dayNow != $dayLast) { $periodSwitch = -2; }
+      if ($dayChangeDelay % 3600 == 0) { $periodSwitch = abs($periodSwitch); }
    } else {
-      ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - 1800);
-      ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + 1800);
-      if ($yearNow != $yearLast) { $periodSwitch = 4; }
-      elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
-      elsif ($dayNow != $dayLast) { $periodSwitch = 2; }
-      elsif ($hourNow != $hourLast) { $periodSwitch = 1; }
+      ($dummy, $dummy, $hourLast, $dummy, $dummy, $dummy) = localtime (gettimeofday());
+      ($dummy, $dummy, $hourNow, $dummy, $dummy, $dummy) = localtime (gettimeofday() + $periodChangePreset);
+      if ($hourNow != $hourLast) { 
+         $periodSwitch = 1; 
+         Log3 $name,4,"$name: Calculating hour change";
+      } else {
+         Log3 $name,4,"$name: Calculating statistics at startup";
+      }
    }
 
    statistics_DoStatisticsAll $hash, $periodSwitch;
@@ -622,7 +621,7 @@ statistics_doStatisticDelta ($$$$$)
       }
     # If change of day, change daily statistic
       if ($periodSwitch >= 2 || $periodSwitch <= -2){
-         $last[3] = $stat[3];
+         $last[3] = sprintf "%.".$decPlaces."f", $stat[3];
          $stat[3] = 0;
          if ($showDate == 5) { $showDate = 4; } # Do not show the "since:" value for day changes anymore
          if ($showDate >= 6) { # Shows the "since:" value for the first day change
@@ -671,11 +670,11 @@ statistics_doStatisticDelta ($$$$$)
       my $statValue = sprintf  "%.".$decPlaces."f", $stat[1];
       statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Hour",$statValue,$last[1],$periodSwitch >= 1);
       $statValue = sprintf  "%.".$decPlaces."f", $stat[3];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Day",$statValue,$last[3],$periodSwitch >= 2);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Day",$statValue,$last[3],$periodSwitch >= 2 || $periodSwitch <= -2);
       $statValue = sprintf  "%.".$decPlaces."f", $stat[5];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Month",$statValue,$last[5],$periodSwitch >= 3);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Month",$statValue,$last[5],$periodSwitch >= 3 || $periodSwitch <= -3);
       $statValue = sprintf  "%.".$decPlaces."f", $stat[7];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$statValue,$last[7],$periodSwitch >= 4);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$statValue,$last[7],$periodSwitch == 4 || $periodSwitch == -4);
    }
    
    return ;
@@ -695,9 +694,9 @@ statistics_doStatisticDuration ($$$$)
 
    Log3 $name, 4, "Calculating duration statistics for '".$dev->{NAME}.":$readingName = $state'";
   # Daily Statistic
-   statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Day", $state, ($periodSwitch >= 2);
+   statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Day", $state, ($periodSwitch >= 2 || $periodSwitch <= -2);
   # Monthly Statistic 
-   statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Month", $state, ($periodSwitch >= 3);
+   statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Month", $state, ($periodSwitch >= 3 || $periodSwitch <= -3);
 
    return ;
 
@@ -939,7 +938,7 @@ statistics_FormatDuration($)
    <ul>
       <li><b>Minimal-, Mittel- und Maximalwerte:</b> brightness, current, energy_current, humidity, temperature, voltage, wind, wind_speed, windSpeed</li>
       <li><b>Deltawerte:</b> count, energy, energy_total, power, total, rain, rain_rate, rain_total</li>
-      <li><b>Dauer der Stati:</b> lightsensor, lock, motion, Window, window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
+      <li><b>Dauer der Status:</b> lightsensor, lock, motion, Window, window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
   Weitere Ger&auml;tewerte k&ouml;nnen &uuml;ber die entsprechenden <a href="#statisticsattr">Attribute</a> hinzugef&uuml;gt werden
   <br>&nbsp;
@@ -1009,12 +1008,15 @@ statistics_FormatDuration($)
       Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden
       <br>
     </li><br>
-    <li><code>singularReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;:Statistiktypen<i>(Min|Avg|Max|Delta)</i>:ZeitPeriode<i>(Hour|Day|Month|Year)</i></code>
-      <br>
+    <li><code>singularReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;:Statistiktypen:ZeitPeriode</code>
+      <ul>
+         <li>Statistiktypen: Min|Avg|Max|Delta</li>
+         <li>ZeitPeriode: Hour|Day|Month|Year</li>
+      </ul>
       Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
       Erleichtert die Erzeugung von Plots. 
       <br>
-      z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
+      z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|FritzDect:power:Delta:Day</code>
       <br>
     </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a>

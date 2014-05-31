@@ -1823,7 +1823,6 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 <ul style="width:800px">
   Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, 
   Siemens Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist.
-  <br>
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
   <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.69, V1.70.</i>
@@ -1847,6 +1846,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <b>Set</b><br>
   <ul>
      Durch einen Firmware-Test wird vor jeder Set-Operation sichergestellt, dass W&auml;rmepumpen mit ungetester Firmware nicht unabsichtlich besch&auml;digt werden.
+     <br>&nbsp;
        <li><code>activeTariff &lt; 0 - 9 &gt;</code>
          <br>
          Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) f&uuml;r verschiedene Tarife (Doppelstromz&auml;hler)<br>
@@ -1922,7 +1922,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       und Absch&auml;tzung des elektrischen Verbrauches
       </li><br>
     <li><code>heatPumpElectricalPowerFactor</code><br>
-         &Auml;nderung der elektrischen Leistungsaufnahme per 1 K Vorlauftemperaturdifferenz zu 35 &deg;C (z.B. 2% pro 1 K = 0,02)<br>
+         &Auml;nderung der elektrischen Leistungsaufnahme per 1 K Vorlauftemperaturdifferenz zu 35 &deg;C
+         <br>
+         (z.B. 2% pro 1 K = 0,02)
          </li><br>
     <li><code>heatHeatRodElectricalPowerWatt</code><br>
       Betriebsleistung der Heizst&auml;be zur Absch&auml;tzung des elektrischen Verbrauches
