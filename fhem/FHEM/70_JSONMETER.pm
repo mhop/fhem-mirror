@@ -941,9 +941,9 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
          <br>
          Polling interval in seconds
        </li><br>
-     <li><code>resetStatistics &lt;all|statElectricityConsumed...|statElectricityConsumedTariff...|statElectricityPower...&gt;</code>
+     <li><code>resetStatistics &lt;statReadings&gt;</code>
          <br>
-         Deletes the selected statistic values.
+         Deletes the selected statistic values: <i>all, statElectricityConsumed..., statElectricityConsumedTariff..., statElectricityPower...</i>
          </li><br>
      <li><code>restartJsonAnalysis</code><br>
          Restarts the analysis of the json file for known readings (compliant to the OBIS standard).
@@ -1007,7 +1007,6 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 <h3>JSONMETER</h3>
 <ul style="width:800px">
   Dieses Modul liest Daten von Messger&auml;ten (z.B. Stromz&auml;hler, Gasz&auml;hler oder W&auml;rmez&auml;hler, so genannte Smartmeter),
-  <br>
   welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
   <br>
   &nbsp;
@@ -1049,22 +1048,21 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
   <ul>
        <li><code>activeTariff &lt; 0 - 9 &gt;</code>
          <br>
-         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) f&uuml;r verschiedene Tarife (Doppelstromz&auml;hler), wenn der Stromz&auml;hler dies selbst nicht unterscheiden kann (z.B. LS110) oder wenn gepr&uuml;ft werden soll, ob ein zeitabh&auml;ngiger Tarif preiswerter w&auml;re.<br>
-         Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
+         Erlaubt die gezielte, separate Erfassung der statistischen Verbrauchswerte (doStatistics = 1) f&uuml;r verschiedene Tarife (Doppelstromz&auml;hler), wenn der Stromz&auml;hler dies selbst nicht unterscheiden kann (z.B. LS110) oder wenn gepr&uuml;ft werden soll, ob ein zeitabh&auml;ngiger Tarif preiswerter w&auml;re. Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
          0 = tariflos 
       </li><br>
      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
          Abfrageinterval in Sekunden
       </li><br>
-      <li><code>resetStatistics &lt;all|statElectricityConsumed...|statElectricityConsumedTariff...|statElectricityPower...&gt;</code>
+      <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>
-         L&ouml;scht die ausgew&auml;hlten statisischen Werte.
+         L&ouml;scht die ausgew&auml;hlten statisischen Werte: <i>all, statElectricityConsumed..., statElectricityConsumedTariff..., statElectricityPower...</i>
+ 
          </li><br>
       <li><code>restartJsonAnalysis</code>
         <br>
         Neustart der Analyse der json-Datei zum Auffinden bekannter Ger&auml;tewerte (kompatibel zum OBIS Standard).
-        <br>
         Diese Analysie wird normaler Weise nur einmalig durchgef&uuml;hrt, nachdem Ger&auml;tewerte gefunden wurden.
         </li><br>
      <li><code>statusRequest</code>
@@ -1098,7 +1096,6 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
       <li><code>doStatistics &lt; 0 | 1 &gt;</code>
          <br>
          Bildet t&auml;gliche, monatliche und j&auml;hrliche Statistiken bestimmter Ger&auml;tewerte (Mittel/Min/Max oder kumulierte Werte).
-         <br>
          F&uuml;r grafische Auswertungen k&ouml;nnen die Werte der Form 'stat<i>ReadingName</i><b>Last</b>' genutzt werden.
          </li><br>
       <li><code>pathString &lt;Zeichenkette&gt;</code>
