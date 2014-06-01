@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  moved 98_openweathermap.pm to contrib
+             moved 55_BBB_BMP180.pm to contrib
   - change:  honor DURATION in 57_Calendar.pm
   - bugfix:  YAMAHA_AVR: don't let FHEM hang anymore, when the receiver
              is not reachable
