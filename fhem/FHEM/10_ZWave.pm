@@ -179,7 +179,11 @@ my %zwave_class = (
   ALARM                    => { id => '71', 
     get   => { alarm       => "04%02x", },
     parse => { "..7105(..)(..)" => '"alarm_type_$1:level $2"',}, },
-  MANUFACTURER_SPECIFIC    => { id => '72', },
+  MANUFACTURER_SPECIFIC    => { id => '72',
+    get   => { manufacturer         => "04", },
+    parse => { "087205(....)(....)(....)" => '"mfs:0x".$1.'.
+                                             '" 0x".$2.'.
+                                             '" 0x".$3', }, },
   POWERLEVEL               => { id => '73', },
   PROTECTION               => { id => '75',
     set   => { protectionOff => "0100",
@@ -991,6 +995,13 @@ s2Hex($)
     return the indicator status of the node, as indState:on, indState:off or indState:dim value.
     </li>
 
+  <br><br><b>Class MANUFACTURER_SPECIFIC</b>
+  <li><br>
+    return the manufacturer specific id (16bit),
+    the product type (16bit)
+    and the product specific id (16bit).
+    </li>
+
   <br><br><b>Class METER</b>
   <li>meter<br>
     request the meter report.
@@ -1127,6 +1138,9 @@ s2Hex($)
 
   <br><br><b>Class INDICATOR</b>
   <li>indState:[on|off|dim value]</li>
+
+  <br><br><b>Class MANUFACTURER_SPECIFIC</b>
+  <li>mfs:hexValue hexValue hexValue</li>
 
   <br><br><b>Class METER</b>
   <li>energy:val [kWh|kVAh|pulseCount]</li>
