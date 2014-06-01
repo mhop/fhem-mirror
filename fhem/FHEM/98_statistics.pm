@@ -689,7 +689,6 @@ statistics_doStatisticSpecialPeriod ($$$$$)
 {
    my ($hash, $dev, $readingName, $decPlaces, $value) = @_;
    my $name = $hash->{NAME};
-   my $result;
    
    my $specialPeriod = AttrVal($name, "specialDeltaPeriodHours", 0);
    
@@ -697,7 +696,9 @@ statistics_doStatisticSpecialPeriod ($$$$$)
 
    my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . "SpecialPeriod";
    my $hiddenReadingName = ".".$dev->{NAME} . ":" . $readingName . "SpecialPeriod";
-   my @hidden = split / /, ($value . " " . $hash->{READINGS}{$hiddenReadingName}{VAL}); # Internal values
+   my $result = $value;
+   if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) { $result .= " " . $hash->{READINGS}{$hiddenReadingName}{VAL}; }
+   my @hidden = split / /, $result; # Internal values
    if ( exists($hidden[$specialPeriod]) ) { delete $hidden[$specialPeriod]; }
    
    foreach my $val (@hidden) { $result += $val; }
