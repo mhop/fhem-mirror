@@ -228,7 +228,6 @@ FHEM/98_copy.pm              justme1968           http://forum.fhem.de Sonstiges
 FHEM/98_dewpoint.pm          wherzig              http://forum.fhem.de Automatisierung
 FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
-FHEM/98_geodata.pm           betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_notice.pm            mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_pilight.pm           andreas-fey          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_rain.pm              baumrasen            http://forum.fhem.de Sonstiges
@@ -257,6 +256,7 @@ contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
 contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
 contrib/55_BBB_BMP180.pm     betateilchen         http://forum.fhem.de Einplatinencomputer
 contrib/71_LISTENLIVE.pm     betateilchen         http://forum.fhem.de Multimedia
+contrib/98_geodata.pm        betateilchen         http://forum.fhem.de Sonstiges
 contrib/98_openweathermap.pm betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 contrib/98_PID.pm            betateilchen         http://forum.fhem.de Automatisierung
                                                 

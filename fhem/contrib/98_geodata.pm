@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 98_geodata.pm 5089 2014-03-01 21:06:35Z betateilchen $
 
 package main;
 
