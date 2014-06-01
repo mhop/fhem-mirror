@@ -1450,7 +1450,7 @@ LUXTRONIK2_doStatisticMinMax ($$$)
       $yearLast += 1900;
       $monthLast ++;
    }
-   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
+   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime ( gettimeofday() + $hash->{INTERVAL});
    $yearNow += 1900;
    $monthNow ++;
 
@@ -1568,7 +1568,7 @@ LUXTRONIK2_doStatisticDelta ($$$$$)
       $previousTariff = 0; 
       $showDate = 6;
    }
-   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
+   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + $hash->{INTERVAL});
    if ($yearNow != $yearLast) { $periodSwitch = 3; }
    elsif ($monthNow != $monthLast) { $periodSwitch = 2; }
    elsif ($dayNow != $dayLast) { $periodSwitch = 1; }
