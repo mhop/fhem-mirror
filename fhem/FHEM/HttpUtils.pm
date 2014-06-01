@@ -188,7 +188,7 @@ HttpUtils_Connect2($)
   my $method = $hash->{method};
   $method = ($data ? "POST" : "GET") if( !$method );
 
-  my $hdr = "$method $hash->{path} HTTP/1.0\r\n";
+  my $hdr = "$method $hash->{path} HTTP/1.1\r\n";
   $hdr .= "Host: $hash->{host}\r\n";
   $hdr .= "Authorization: Basic $hash->{auth}\r\n" if(defined($hash->{auth}));
   $hdr .= $hash->{header}."\r\n" if(defined($hash->{header}));
@@ -266,7 +266,7 @@ HttpUtils_ParseAnswer($$)
     return ("$hash->{displayurl}: empty answer received", "");
   }
   Log3 undef,$hash->{loglevel}, "$hash->{displayurl}: HTTP response code $code";
-
+  $hash->{code} = $code;
   if($code==301 || $code==302 || $code==303) { # redirect
     if(++$hash->{redirects} > 5) {
       return ("$hash->{displayurl}: Too many redirects", "");
