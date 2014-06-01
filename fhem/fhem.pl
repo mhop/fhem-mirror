@@ -3804,19 +3804,27 @@ configDBUsed()
 sub
 FileRead($)
 {
-  my ($fname) = @_;
-  my ($err, @ret);
+  my ($param) = @_;
+  my ($err, @ret, $fileName, $forceType);
 
-  if(configDBUsed()) {
-    ($err, @ret) = cfgDB_FileRead($fname);
+  if(ref($param) eq "HASH") {
+    $fileName = $param->{FileName};
+    $forceType = $param->{ForceType};
+  } else {
+    $fileName = $param;
+  }
+  $forceType = "" if(!defined($forceType));
+
+  if(configDBUsed() && $forceType ne "file") {
+    ($err, @ret) = cfgDB_FileRead($fileName);
 
   } else {
-    if(open(FH, $fname)) {
+    if(open(FH, $fileName)) {
       @ret = <FH>;
       close(FH);
       chomp(@ret);
     } else {
-      $err = "Can't open $fname: $!";
+      $err = "Can't open $fileName: $!";
     }
   }
 
@@ -3826,14 +3834,22 @@ FileRead($)
 sub
 FileWrite($@)
 {
-  my ($fname, @rows) = @_;
-  my ($err, @ret);
+  my ($param, @rows) = @_;
+  my ($err, @ret, $fileName, $forceType);
 
-  if(configDBUsed()) {
-    return cfgDB_FileWrite($fname, @rows);
+  if(ref($param) eq "HASH") {
+    $fileName = $param->{FileName};
+    $forceType = $param->{ForceType};
+  } else {
+    $fileName = $param;
+  }
+  $forceType = "" if(!defined($forceType));
+
+  if(configDBUsed() && $forceType ne "file") {
+    return cfgDB_FileWrite($fileName, @rows);
 
   } else {
-    if(open(FH, ">$fname")) {
+    if(open(FH, ">$fileName")) {
       binmode (FH);
       foreach my $l (@rows) {
         print FH $l,"\n";
@@ -3842,7 +3858,7 @@ FileWrite($@)
       return undef;
 
     } else {
-      return "Can't open $fname: $!";
+      return "Can't open $fileName: $!";
 
     }
   }
