@@ -101,6 +101,7 @@ statistics_Initialize($)
                    ."minAvgMaxReadings "
                    ."periodChangePreset "
                    ."singularReadings "
+                   ."specialDeltaPeriodHours "
                    .$readingFnAttributes;
 }
 
@@ -242,8 +243,6 @@ statistics_Notify($$)
       Log3 $name,5,"$name: Notification of '".$dev->{NAME}."' received but for my own readings only.";
    }
    
-   WriteStatefile();
-   
    return;
 }
 
@@ -333,6 +332,8 @@ statistics_DoStatisticsAll($$)
          statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
       }
    }
+   
+   if ($periodSwitch != 0 ) { WriteStatefile(); }
 }
 
 
@@ -381,8 +382,8 @@ statistics_DoStatistics($$$)
       next if not exists ($dev->{READINGS}{$readingName});
       $statisticDone = 1;
       if ($$f[1] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch);}
-      if ($$f[1] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $$f[2], $periodSwitch);}
-      if ($$f[1] == 3) { statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch);}
+      if ($$f[1] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $$f[2], $periodSwitch );}
+      if ($$f[1] == 3) { statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch ); }
    }
     
    my @specialReadings = split /,/, AttrVal($hashName, "deltaReadings", "");
@@ -677,7 +678,35 @@ statistics_doStatisticDelta ($$$$$)
       statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$statValue,$last[7],$periodSwitch == 4 || $periodSwitch == -4);
    }
    
+   if ($periodSwitch>=1) { statistics_doStatisticSpecialPeriod ( $hash, $dev, $readingName, $decPlaces, $stat[1] ); }
+
    return ;
+}
+
+# Calculates deltas for period of several hours
+sub ######################################## 
+statistics_doStatisticSpecialPeriod ($$$$$) 
+{
+   my ($hash, $dev, $readingName, $decPlaces, $value) = @_;
+   my $name = $hash->{NAME};
+   my $result;
+   
+   my $specialPeriod = AttrVal($name, "specialDeltaPeriodHours", 0);
+   
+   return if $specialPeriod ==0;
+
+   my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . "SpecialPeriod";
+   my $hiddenReadingName = ".".$dev->{NAME} . ":" . $readingName . "SpecialPeriod";
+   my @hidden = split / /, ($value . " " . $hash->{READINGS}{$hiddenReadingName}{VAL}); # Internal values
+   if ( exists($hidden[$specialPeriod]) ) { delete $hidden[$specialPeriod]; }
+   
+   foreach my $val (@hidden) { $result += $val; }
+   $result = sprintf "%.".$decPlaces."f", $result;
+   if ($#hidden != $specialPeriod) { $result .= " (".($#hidden+1)."_hours)"; }
+   readingsBulkUpdate($dev, $statReadingName, $result, 1);
+   $result = join( " ", @hidden );
+   readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
+
 }
 
 # Calculates single Duration Values and informs about end of day and month
@@ -723,7 +752,7 @@ statistics_doStatisticDurationSingle ($$$$$$)
   # Show since-Value
       $hidden{"showDate:"} = 1;
       $saveLast = 0;
-      # $stat[7] = strftime ("%Y-%m-%d_%H:%M:%S",localtime()  );
+      $hidden{"(since:"} = strftime ("%Y-%m-%d_%H:%M:%S)",localtime()  );
    } else {
   # Do calculations if hidden reading exists
       %hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
@@ -739,26 +768,26 @@ statistics_doStatisticDurationSingle ($$$$$$)
   # Prepare new current reading, delete hidden reading if it is used again
    $result = "";
    while (my ($key, $duration) = each(%hidden)){
-      if ($key !~ /lastState:|lastTime:|showDate:/) {
+      if ($key !~ /lastState:|lastTime:|showDate:|since:/) {
          if ($result ne "") {$result .= " ";}
          $result .= "$key ".statistics_FormatDuration($duration); 
          if ($saveLast) { delete $hidden{$key}; }
       }
    }
    if ($result eq "") {$result = "$state: 0";} 
-   # if ($hidden[9] == 1) { $result .= " (since: $stat[7] )"; }
+   if ($hidden{"showDate:"} == 1) { $result .= " (since: ".$hidden{"(since:"}; }
 
   # Store current reading as last reading, Reset current reading
     if ($saveLast) { 
       readingsBulkUpdate($dev, $statReadingName . "Last", $result, 1); 
-      Log3 $name, 5, "Set '".$statReadingName . "Last'='$result'";
+      Log3 $name, 5, "Set '".$statReadingName . "Last = $result'";
       $result = "$state: 00:00:00";
       $hidden{"showDate:"} = 0;
    }
 
   # Store current reading
    readingsBulkUpdate($dev, $statReadingName, $result, 0);
-   Log3 $name, 5, "Set '$statReadingName'='$result'";
+   Log3 $name, 5, "Set '$statReadingName = $result'";
  
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
@@ -922,7 +951,11 @@ statistics_FormatDuration($)
       z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
     </li><br>
-   </ul>
+   <li><code>specialDeltaPeriodHours &lt;Hours&gt;</code>
+      <br>
+      Adds for readings of delta statistics a singular reading for the given period of hours (e.g. for the rain of the last 72 hours)
+   </li><br>
+  </ul>
 </ul>
 
 =end html
@@ -994,7 +1027,7 @@ statistics_FormatDuration($)
     <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
       <br>
       regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
-      z.B. "FritzDect:current|Sensor_.*:humidity"
+      z.B. "<code>FritzDect:current|Sensor_.*:humidity</code>"
       <br>
     </li><br>
     <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
@@ -1008,16 +1041,19 @@ statistics_FormatDuration($)
       Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden
       <br>
     </li><br>
-    <li><code>singularReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;:Statistiktypen:ZeitPeriode</code>
+    <li><code>singularReadings &lt;Ger&auml;teNameRegExp:Ger&auml;teWertRegExp:StatistikTypen:ZeitPeriode&gt;</code>
       <ul>
-         <li>Statistiktypen: Min|Avg|Max|Delta</li>
+         <li>StatistikTypen: Min|Avg|Max|Delta|Duration</li>
          <li>ZeitPeriode: Hour|Day|Month|Year</li>
       </ul>
       Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
       Erleichtert die Erzeugung von Plots. 
       <br>
       z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|FritzDect:power:Delta:Day</code>
+    </li><br>
+    <li><code>specialDeltaPeriodHours &lt;Stunden&gt;</code>
       <br>
+      F&uuml;gt den Delta-Statistiken einen singul&auml;ren Ger&auml;tewert f&uuml;r die angegebenen Stunden hinzu (z.b. f&uuml;r den Regen in den letzten 72 Stunden)
     </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a>
     </li><br>
