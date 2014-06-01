@@ -1642,7 +1642,7 @@ FW_style($$)
     } else {
       $fileName =~ s,.*/,,g;        # Little bit of security
       my $filePath = FW_fileNameToPath($fileName);
-      my($err, @data) = FileRead($filePath);
+      my($err, @data) = FileRead({FileName=>$filePath, ForceType=>"file"} );
       if($err) {
         FW_pO "<div id=\"content\">$err</div>";
         return;
@@ -1678,7 +1678,7 @@ FW_style($$)
     if($cfgDB ne 'configDB') { # save file to filesystem
 
       $FW_data =~ s/\r//g;
-      my $err = FileWrite($filePath, split("\n", $FW_data));
+      my $err = FileWrite({FileName=>$filePath, ForceType=>"file"}, split("\n", $FW_data));
       if($err) {
         FW_pO "<div id=\"content\">$filePath: $!</div>";
         return;
