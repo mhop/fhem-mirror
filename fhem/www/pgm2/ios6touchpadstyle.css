@@ -255,7 +255,8 @@ padding: 5px;
 #menu    {
 position: absolute;
 top:44px;
-overflow: auto;
+overflow: scroll;
+-webkit-overflow-scrolling: touch;
 float: left;
 width: 200px;
 
@@ -270,8 +271,8 @@ padding:0px;
 #content, #right {
 background-color:#e0e3e8;
 background:#e0e3e8;
-
-overflow:auto;
+overflow: scroll;
+-webkit-overflow-scrolling: touch;
 border-left: 1px solid #000000;
 float: right;
 
