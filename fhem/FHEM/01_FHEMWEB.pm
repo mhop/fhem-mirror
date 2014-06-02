@@ -1635,21 +1635,15 @@ FW_style($$)
     my $fileName = $a[2]; 
     my $data = "";
     my $cfgDB = defined($a[3]) ? $a[3] : "";
-    if ($cfgDB eq 'configDB') {
-      my $filePath = FW_fileNameToPath($fileName);
-      my ($err,@content) = cfgDB_FileRead($filePath);
-      $data = join("\n",@content);
-    } else {
-      $fileName =~ s,.*/,,g;        # Little bit of security
-      my $filePath = FW_fileNameToPath($fileName);
-      my($err, @data) = FileRead({FileName=>$filePath, ForceType=>"file"} );
-      if($err) {
-        FW_pO "<div id=\"content\">$err</div>";
-        return;
-      }
-      $data = join("\n", @data);
-      close(FH);
+    my $forceType = ($cfgDB eq 'configDB') ? $cfgDB : "file";
+    $fileName =~ s,.*/,,g;        # Little bit of security
+    my $filePath = FW_fileNameToPath($fileName);
+    my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$forceType} );
+    if($err) {
+      FW_pO "<div id=\"content\">$err</div>";
+      return;
     }
+    $data = join("\n", @content);
 
     $data =~ s/&/&amp;/g;
 
@@ -1670,35 +1664,23 @@ FW_style($$)
   } elsif($a[1] eq "save") {
     my $fileName = $a[2];
     my $cfgDB = defined($a[3]) ? $a[3] : "";
+    my $forceType = ($cfgDB eq 'configDB') ? $cfgDB : "file";
     $fileName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
     $fileName =~ s,.*/,,g;        # Little bit of security
     my $filePath = FW_fileNameToPath($fileName);
 
-    if($cfgDB ne 'configDB') { # save file to filesystem
-
-      $FW_data =~ s/\r//g;
-      my $err = FileWrite({FileName=>$filePath, ForceType=>"file"}, split("\n", $FW_data));
-      if($err) {
-        FW_pO "<div id=\"content\">$filePath: $!</div>";
-        return;
-      }
-      my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
-      $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
-      $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fileName");
-      FW_style("style list", $ret);
-      $ret = "";
-
-    } else { # save file to configDB
-      $FW_data =~ s/\r//g if($^O !~ m/Win/);
-      my @content = split(/\n/,$FW_data);
-      cfgDB_FileWrite($filePath,@content);
-      my $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
-      $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" :
-                        "Saved the file $fileName to configDB");
-      FW_style("style list", $ret);
-      $ret = "";
+    $FW_data =~ s/\r//g;
+    my $err = FileWrite({FileName=>$filePath, ForceType=>$forceType}, split("\n", $FW_data));
+    if($err) {
+      FW_pO "<div id=\"content\">$filePath: $!</div>";
+      return;
     }
+    my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
+    $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
+    $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fileName to $forceType");
+    FW_style("style list", $ret);
+    $ret = "";
 
   } elsif($a[1] eq "iconFor") {
     FW_iconTable("iconFor", "icon", "style setIF $a[2] %s", undef);
