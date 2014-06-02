@@ -481,6 +481,7 @@ sub cfgDB_Read99() {
 # return SVN Id from file stored in database
 sub cfgDB_Fileversion($$) {
   my ($file,$ret) = @_;
+  $ret = "No Id found for $file";
   my ($err,@in) = cfgDB_FileRead($file);
   foreach(@in){ $ret = $_ if($_ =~ m/# \$Id:/); }
   return $ret;
