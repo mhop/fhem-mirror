@@ -2858,10 +2858,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "$cmd requires parameter: $h";
   }
 
-  CUL_HM_assignIO($defs{$devName}) ;
-
   my $id = CUL_HM_IoId($defs{$devName});
-  return "no IO device identified" if(length($id) != 6 );
+  if(length($id) != 6 ){# have to try to find an O
+    CUL_HM_assignIO($defs{$devName});
+    $id = CUL_HM_IoId($defs{$devName});
+    return "no IO device identified" if(length($id) != 6 );
+  }
+  
 
   #convert 'old' commands to current methodes like regSet and regBulk...
   # Unify the interface
@@ -6408,8 +6411,8 @@ sub CUL_HM_assignIO($){ #check and assign IO
       && defined $hash->{IODev} ){#don't change while send in process
     return; 
   }
-  my $hn = $hash->{NAME};     
-  my ($ioCCU,$prefIO) = split(":",AttrVal($hn,"IOgrp","_"),2);
+    
+  my ($ioCCU,$prefIO) = split(":",AttrVal($hash->{NAME},"IOgrp","_"),2);
   if (defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"){
     my @ios = sort {$hash->{helper}{mRssi}{io}{$b} <=> 
                     $hash->{helper}{mRssi}{io}{$a} } 
@@ -6426,17 +6429,18 @@ sub CUL_HM_assignIO($){ #check and assign IO
           && $hash->{IODev} ne $defs{$iom}
           && $hash->{IODev}->{TYPE}
           && $hash->{IODev}->{TYPE} eq "HMLAN"){#if recent io is HMLAN and we have to remove the device from IO
-        my $id = CUL_HM_hash2Id($hash);
-        IOWrite($hash, "", "remove:$id");
+        IOWrite($hash, "", "remove:".CUL_HM_hash2Id($hash));
       }
       $hash->{IODev} = $defs{$iom};
       return;
     }
   }
   # not assigned thru CCU - try normal
-  my $dIo = AttrVal($hn,"IODev","");
-  if ($dIo && $defs{$dIo} && $dIo ne $hash->{IODev}->{NAME}){
-    $hash->{IODev} = $defs{$dIo};
+  my $dIo = AttrVal($hash->{NAME},"IODev","");
+  if ($defs{$dIo}){
+    if($dIo ne $hash->{IODev}->{NAME}){
+      $hash->{IODev} = $defs{$dIo};
+    }
   }
   else{
     AssignIoPort($hash);#let kernal decide
