@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 05/2014
-my $thzversion = "0.104";
+my $thzversion = "0.105";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -52,6 +52,7 @@ sub THZ_GetRefresh($);
 sub THZ_Refresh_all_gets($);
 sub THZ_Get_Comunication($$);
 sub THZ_PrintcurveSVG;
+sub THZ_RemoveInternalTimer($);
 
 #new by Jakob
 sub mysubstr($$$$);
@@ -85,9 +86,10 @@ my %sets = (
     "p16GradientHC2"			=> {cmd2=>"0C010E", argMin => "0",  argMax =>  "5"  }, # /100
     "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin => "0",  argMax => "20"  },
     "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin => "0",  argMax => "100"  },   
-    "p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "48"  },
-    "p05DHWsetNight"			=> {cmd2=>"0A05BF", argMin => "13", argMax => "48"  },
-    "p06DHWsetStandby"			=> {cmd2=>"0A0581", argMin => "13", argMax => "48"  },
+    "p04DHWsetDay"			=> {cmd2=>"0A0013", argMin => "13", argMax => "49"  },
+    "p05DHWsetNight"			=> {cmd2=>"0A05BF", argMin => "13", argMax => "49"  },
+    "p83DHWsetSolarTemp"		=> {cmd2=>"0A05BE", argMin => "13", argMax => "75"  },
+    "p06DHWsetStandby"			=> {cmd2=>"0A0581", argMin => "13", argMax => "49"  },
     "p11DHWsetManual"			=> {cmd2=>"0A0580", argMin => "13", argMax => "54"  },
     "p07FanStageDay"			=> {cmd2=>"0A056C", argMin =>  "0", argMax =>  "3"  },
     "p08FanStageNight"			=> {cmd2=>"0A056D", argMin =>  "0", argMax =>  "3"  },
@@ -313,7 +315,7 @@ sub THZ_Initialize($)
   $hash->{UndefFn} = "THZ_Undef";
   $hash->{GetFn}   = "THZ_Get";
   $hash->{SetFn}   = "THZ_Set";
-#  $hash->{AttrFn}  = "THZ_Attr"; 
+  $hash->{AttrFn}  = "THZ_Attr"; 
   $hash->{AttrList}= "IODev do_not_notify:1,0  ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 "
 		    ."interval_sGlobal:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_sSol:0,60,120,180,300,600,3600,7200,43200,86400 "
@@ -379,13 +381,13 @@ sub THZ_Define($$)
 ########################################################################################
 sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
-  RemoveInternalTimer($hash);
+  THZ_RemoveInternalTimer("THZ_GetRefresh");
   my $timedelay= 5; 						#strart after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
-    my %par = ( command => $cmdhash, hash => $hash );
+    my %par = (  hash => $hash, command => $cmdhash );
     RemoveInternalTimer(\%par);
-    InternalTimer(gettimeofday() + ($timedelay++) , "THZ_GetRefresh", \%par, 0);		#increment 1.3s $timedelay++
-    $timedelay += 0.3;
+    InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6s $timedelay++
+    $timedelay += 0.6;
   }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
 }
 
@@ -469,7 +471,7 @@ sub THZ_Ready($)
 {
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
-  { RemoveInternalTimer($hash);
+  { THZ_RemoveInternalTimer("THZ_GetRefresh");
   select(undef, undef, undef, 0.1); #equivalent to sleep 100ms
   return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
   }	
@@ -648,7 +650,7 @@ my ($err, $msg) =("", " ");
 
   if($msg eq "1002" || $msg eq "02") {
    THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer
-   select(undef,undef,undef,0.01);	#needed to fix hystory parameter
+   #select(undef,undef,undef,0.010);
    ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
    THZ_Write($hash,  "10");  
    }
@@ -671,16 +673,49 @@ sub THZ_ReadAnswer($)
 {
 	my ($hash) = @_;
 	Log3 $hash->{NAME}, 5, "$hash->{NAME} start Funktion THZ_ReadAnswer";
-	select(undef,undef,undef,0.001);
-        my $buf = DevIo_SimpleReadWithTimeout($hash, 1);
-	#$buf1 = DevIo_SimpleReadWithTimeout($hash, 0.001);
-	#$buf = ($buf . $buf1) if(defined($buf1));
+        my $buf = DevIo_SimpleReadWithTimeout($hash, 0.8);
 	if(!defined($buf)) {
-	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe timeout to slow?";
+	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
 	  return ("InterfaceNotRespondig", "");
 	}
 	my $name = $hash->{NAME};
 	my $data =  uc(unpack('H*', $buf));
+	
+	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, second read makes sure all the buffer is read.
+	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.005);
+	  Log3($hash->{NAME}, 5, "doubble read activated $data");
+	  if(defined($buf1))
+	  {
+	  $buf = ($buf . $buf1) ;
+	  $data =  uc(unpack('H*', $buf));
+	   Log3($hash->{NAME}, 5, "doubble read result with buf1  $data");
+	  }
+	}
+	
+	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, third read makes sure all the buffer is read.
+	{ my $buf2 = DevIo_SimpleReadWithTimeout($hash, 0.005);
+	  Log3($hash->{NAME}, 5, "triple read activated $data");
+	  if(defined($buf2))
+	  {
+	  $buf = ($buf . $buf2) ;
+	  $data =  uc(unpack('H*', $buf));
+	   Log3($hash->{NAME}, 5, "triple read result with buf2  $data");
+	  }
+	}
+	
+	
+	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, fourth read makes sure all the buffer is read.
+	{ my $buf3 = DevIo_SimpleReadWithTimeout($hash, 0.005);
+	  Log3($hash->{NAME}, 5, "quadruple read activated $data");
+	  if(defined($buf3))
+	  {
+	  $buf = ($buf . $buf3) ;
+	  $data =  uc(unpack('H*', $buf));
+	   Log3($hash->{NAME}, 5, "quadruple read result with buf3  $data");
+	  }
+	}
+	
+	
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
 }
@@ -1259,10 +1294,11 @@ sub THZ_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
   if( $attrName =~ /^interval_/ ) {
-  DevIo_CloseDev($hash);
-  RemoveInternalTimer($hash);
+  #DevIo_CloseDev($hash);
+  THZ_RemoveInternalTimer("THZ_GetRefresh");
   #sleep 1;
-  DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets");
+  #DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets");
+  THZ_Refresh_all_gets($hash);
   }
   return undef;
 }
@@ -1276,7 +1312,7 @@ sub THZ_Attr(@) {
 sub THZ_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
-  RemoveInternalTimer($hash);
+  THZ_RemoveInternalTimer("THZ_GetRefresh");
   foreach my $d (sort keys %defs) {
     if(defined($defs{$d}) &&
        defined($defs{$d}{IODev}) &&
@@ -1290,6 +1326,26 @@ sub THZ_Undef($$) {
   DevIo_CloseDev($hash); 
   return undef;
 }
+
+
+##########################################
+# THZ_RemoveInternalTimer($) 
+# modified takes as an argument the function to be called, not the argument
+########################################################################################
+sub THZ_RemoveInternalTimer($)
+{
+  my ($callingfun) = @_;
+  foreach my $a (keys %intAt) {
+    delete($intAt{$a}) if($intAt{$a}{FN} eq $callingfun);
+  }
+}
+
+
+
+
+
+
+
 
 
 
