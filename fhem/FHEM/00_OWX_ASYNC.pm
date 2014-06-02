@@ -858,8 +858,8 @@ sub OWX_ASYNC_PT_Kick($) {
 
   GP_ForallClients($hash,sub { 
     my ($client) = @_;
-    Log3 $client->{NAME},5,"OWX_ASYNC_PT_Kick: doing tempConv for $client->{TYPE}, tempConv: ".main::AttrVal($client->{NAME},"tempConv","-");
     if ($client->{TYPE} eq "OWTHERM" and AttrVal($client->{NAME},"tempConv","") eq "onkick" ) {
+      Log3 $client->{NAME},5,"OWX_ASYNC_PT_Kick: doing tempConv for $client->{NAME}";
       OWX_ASYNC_Schedule($client, PT_THREAD(\&OWXTHERM_PT_GetValues), $client );
     }
   },undef);
