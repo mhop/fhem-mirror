@@ -27,7 +27,7 @@
 #dashboard input, #dashboard select {
 	margin:0px;
 }
-#dashboard tr {
+#dashboard  tr {
 	height:40px
 }
 #dashboard .dashboard_columncenter {height: inherit;}		
@@ -94,22 +94,23 @@ padding:10px 0px 0px 3px;
 }
 #dashboard .ui-tabs .ui-tabs-panel {display: block;border-width: 0;background: none;box-shadow: 0 0 0 0;border-radius: 0; padding: 0;}
 #dashboard .ui-tabs .ui-tabs-nav {margin: 0;padding: 0.2em 0.2em 0.4em;}
-#dashboard .ui-tabs .ui-tabs-nav li {list-style: none;float: left;position: relative;top: 0;margin: 1px .2em 0 0;padding: 0;}
-#dashboard .ui-tabs .ui-tabs-nav li a {float: none;padding:0;}
+#dashboard .ui-tabs .ui-tabs-nav li {
+list-style: none;float: left;position: relative;top: 0;margin: 1px .2em 0 0;padding: 2px;
+text-align:center; width:75px;}
+#dashboard .ui-tabs .ui-tabs-nav li a {padding:0;}
 #dashboard .ui-tabs .ui-tabs-nav .ui-tabs-anchor {
-	float: left;
 		font-weight:bold;
-color:#4c566c;
-font-size:16px;
-text-shadow: 0px 1px #FFFFFF;
-padding:0px 3px 0px 0px; 
+color:#000000;
+font-size:10px;
+text-shadow: 0px 1px #ffffff;
+word-wrap:break-word;
 	}
 #dashboard .ui-tabs-icon {
 fill:#FFFFFF;
 padding:7.5px;
 width:27px;
 height:27px;
-
+margin: auto;
 box-shadow: inset 0px 1px 1px rgba(255, 255, 255, 0.7);
 
 background: -moz-linear-gradient(top, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.2) 100%); /* FF3.6+ */
@@ -124,13 +125,37 @@ background-size: 42px 18px;
 background-repeat:no-repeat;
 border-radius:7.5px;
 border: 1px solid #666666;
-background-color:#4b6dab;
+display:block;
 }
+#ui-id-1 .ui-tabs-icon {
+background-color:#4C3BA5;
+}
+#ui-id-2 .ui-tabs-icon {
+background-color:#4C80AF;
+}
+#ui-id-3 .ui-tabs-icon {
+background-color:#4DAAAF;
+}
+#ui-id-4 .ui-tabs-icon {
+background-color:#53C237;
+}
+#ui-id-5 .ui-tabs-icon {
+background-color:#EFCD5F;
+}
+#ui-id-6 .ui-tabs-icon {
+background-color:#E5883B;
+}
+#ui-id-7 .ui-tabs-icon {
+background-color:#DA3C33;
+}
+
 #dashboard .ui-widget-header .ui-state-active .ui-tabs-icon {
-border-color:#333333;
-background-color:#111111;
+background-color:#777777;
 }
-#dashboard .dashboard_tabnav_hidden{background-color: #333333;}
+#dashboard .ui-widget-header .ui-state-hover .ui-tabs-icon { 
+background-color:#777777;
+}
+#dashboard .dashboard_tabnav_hidden{}
 #dashboard .ui-widget-header .ui-state-default {
 
 	}
