@@ -101,6 +101,7 @@ statistics_Initialize($)
                    ."minAvgMaxReadings "
                    ."periodChangePreset "
                    ."specialDeltaPeriodHours "
+                   ."singularReadings "
                    .$readingFnAttributes;
 }
 
