@@ -190,6 +190,7 @@ HttpUtils_Connect2($)
 
   my $hdr = "$method $hash->{path} HTTP/1.1\r\n";
   $hdr .= "Host: $hash->{host}\r\n";
+  $hdr .= "Connection: Close\r\n";
   $hdr .= "Authorization: Basic $hash->{auth}\r\n" if(defined($hash->{auth}));
   $hdr .= $hash->{header}."\r\n" if(defined($hash->{header}));
   if(defined($data)) {
