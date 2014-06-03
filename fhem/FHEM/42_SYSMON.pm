@@ -1589,6 +1589,7 @@ sub SYSMON_acquireInfo_intern($$;$)
 	if(!defined($art)) { $art= 0; }
 
   $ret = $str;
+  no warnings;
   if($art == 1) {
     if($str+0 == 1) {
 	   $ret="on";
@@ -1600,6 +1601,7 @@ sub SYSMON_acquireInfo_intern($$;$)
 	    }
     }
   }
+  use warnings;
 	return $ret;
 }
 
@@ -1673,12 +1675,12 @@ sub SYSMON_ShowValuesFmt ($$;@)
     
     my $hash = $main::defs{$name};
     
-    if(!defined($cur_readings_map)) {
-	    SYSMON_updateCurrentReadingsMap($hash);
-    }
+    #if(!defined($cur_readings_map)) {
+	  #  SYSMON_updateCurrentReadingsMap($hash);
+    #}
   
     SYSMON_updateCurrentReadingsMap($hash);
-#Log 3, "SYSMON $>name, @data<";
+  #Log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
   if(scalar(@data)<=0) {
 	  # Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
