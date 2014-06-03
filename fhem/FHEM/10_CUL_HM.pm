@@ -6857,8 +6857,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     foreach my $p (keys %dlf){
       my @unprg = grep !/^$/,map {$dlf{$p}{$_}?"":$_} keys %{$dlf{$p}};
       my $cnt = scalar @unprg;
-      if ($cnt > 0 && $cnt < 7) {$ret .= "\n incomplete template for prog $p days:".join(",",@unprg);}
-      elsif ($cnt == 7) {$ret .= "\n unprogrammed prog $p ";}
+      if ($cnt > 0 && $cnt < 7) {$ret .= "\n $name: incomplete template for prog $p days:".join(",",@unprg);}
+      elsif ($cnt == 7) {$ret .= "\n $name: unprogrammed prog $p ";}
     }
   }
   foreach (@exec){

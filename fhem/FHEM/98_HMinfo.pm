@@ -818,7 +818,7 @@ sub HMinfo_GetFn($@) {#########################################################
               devspec2array("model=HM.*-TC.*:FILTER=chanNo=02:FILTER=tempListTmpl=.*"));
     my @tlr;
     foreach my $e (@td){
-      my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl","tempList.cfg:$e"));
+      my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl",AttrVal($hash->{NAME},"configDir",".")."/tempList.cfg:$e"));
       push @tlr,$tr if($tr);
     }
     $ret .= "\n\n templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
