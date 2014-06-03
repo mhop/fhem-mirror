@@ -868,6 +868,7 @@ sub CUL_HM_Parse($$) {#########################################################
   #  return "" if($src eq $id);# mirrored messages - covered by !$shash
   if(!$shash){    # Unknown source
     CUL_HM_pushEvnts();
+    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
     return (CUL_HM_pushEvnts(),@entities);
   }
   $respRemoved = 0;  #set to 'no response in this message' at start
@@ -877,6 +878,7 @@ sub CUL_HM_Parse($$) {#########################################################
   $ioId = $id if(!$ioId);
   if (CUL_HM_getAttrInt($name,"ignore")){
     CUL_HM_pushEvnts();
+    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
     return (CUL_HM_pushEvnts(),$name,@entities);
   }
   if ($msgStat){
@@ -887,6 +889,7 @@ sub CUL_HM_Parse($$) {#########################################################
     elsif($msgStat =~ m/AESCom/){# AES communication to central
       push @evtEt,[$shash,1,"aesCommToDev:".substr($msgStat,7)];
       CUL_HM_pushEvnts();
+      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
       return (CUL_HM_pushEvnts(),$name);
     }
   }
@@ -922,6 +925,7 @@ sub CUL_HM_Parse($$) {#########################################################
       Log3 $name,4,"CUL_HM $name dupe: dont process";
     }
     CUL_HM_pushEvnts();
+    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
     return (CUL_HM_pushEvnts(),$name,@entities); #return something to please dispatcher
   }
   $shash->{lastMsg} = $msgX;
@@ -2010,7 +2014,7 @@ sub CUL_HM_Parse($$) {#########################################################
   push @entities,CUL_HM_pushEvnts();
 
   @entities = CUL_HM_noDup(@entities,$shash->{NAME});
-  $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/$devH->{NAME}/,@entities);
+  $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
   return @entities;
 }
 
@@ -2590,7 +2594,6 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     
     foreach(@arr){
       my ($cmd,$val) = split(":",$_,2);
-      Log 1,"General $_ : $cmd,$val";
       if (!$val               ||
           $val !~ m/^\[.*\]$/ ||
           $val =~ m/\[.*\[/   ||
