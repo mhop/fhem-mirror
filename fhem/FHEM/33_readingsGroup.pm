@@ -40,7 +40,7 @@ sub readingsGroup_Initialize($)
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1";
+  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 nonames:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -169,9 +169,9 @@ sub readingsGroup_Undefine($$)
 }
 
 sub
-lookup($$$$$$$$)
+lookup($$$$$$$$$)
 {
-  my($mapping,$name,$alias,$reading,$value,$room,$group,$default) = @_;
+  my($mapping,$name,$alias,$reading,$value,$room,$group,$row,$default) = @_;
 
   if( $mapping ) {
     if( ref($mapping) eq 'HASH' ) {
@@ -197,6 +197,7 @@ lookup($$$$$$$$)
     $default =~ s/\%VALUE/$value/g;
     $default =~ s/\%ROOM/$room/g;
     $default =~ s/\%GROUP/$group/g;
+    $default =~ s/\%ROW/$row/g;
 
     $default =~ s/\$ALIAS/$alias/g;
     $default =~ s/\$DEVICE/$name/g;
@@ -204,6 +205,7 @@ lookup($$$$$$$$)
     $default =~ s/\$VALUE/$value/g;
     $default =~ s/\$ROOM/$room/g;
     $default =~ s/\$GROUP/$group/g;
+    $default =~ s/\$ROW/$row/g;
   }
 
   return $default;
@@ -291,6 +293,7 @@ readingsGroup_2html($)
   my $show_heading = !AttrVal( $d, "noheading", "0" );
   my $show_links = !AttrVal( $d, "nolinks", "0" );
   $show_links = 0 if($FW_hiddenroom{detail});
+  my $show_names = !AttrVal($d, "nonames", "0" );
 
   my $disable = AttrVal($d,"disable", 0);
   if( AttrVal($d,"disable", 0) > 2 ) {
@@ -360,6 +363,7 @@ readingsGroup_2html($)
   $ret .= "<tr><td><div class=\"devType\">$txt</a></div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table $style class=\"block wide\">";
   $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
+
   foreach my $device (@{$devices}) {
     my $item = 0;
     my $h = $defs{$device->[0]};
@@ -429,11 +433,12 @@ readingsGroup_2html($)
             my $a = AttrVal($name, "alias", $name);
             my $m = "$a$separator";
             $m = $a if( $multi != 1 );
+            $m = "" if( !$show_names );
             my $room = AttrVal($name, "room", "");
             my $group = AttrVal($name, "group", "");
-            my $txt = lookup($mapping,$name,$a,"","",$room,$group,$m);
+            my $txt = lookup($mapping,$name,$a,"","",$room,$group,$row,$m);
 
-            $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>";
+            $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $show_names );
           }
         } else {
           my $cmd = lookup2($commands,$name,$d,$txt);
@@ -467,7 +472,7 @@ readingsGroup_2html($)
               my $a = AttrVal($name, "alias", $name);
               my $room = AttrVal($name, "room", "");
               my $group = AttrVal($name, "group", "");
-              my $mapped = lookup($mapping,$name,$a,$set,"",$room,$group,undef);
+              my $mapped = lookup($mapping,$name,$a,$set,"",$room,$group,$row,undef);
               if( defined($mapped) ) {
                 $txt =~ s/$set&nbsp;/$mapped&nbsp;/;
               }
@@ -533,10 +538,10 @@ readingsGroup_2html($)
         $m = $a if( $multi != 1 );
         my $room = AttrVal($name, "room", "");
         my $group = AttrVal($name, "group", "");
-        my $txt = lookup($mapping,$name,$a,($multi!=1?"":$n),$v,$room,$group,$m);
+        my $txt = lookup($mapping,$name,$a,($multi!=1?"":$n),$v,$room,$group,$row,$m);
 
         if( $nameIcon ) {
-          if( my $icon = lookup($nameIcon,$name,$a,$n,$v,$room,$group,"") ) {
+          if( my $icon = lookup($nameIcon,$name,$a,$n,$v,$room,$group,$row,"") ) {
             $txt = FW_makeImage( $icon, $txt, "icon" );
           }
         }
@@ -544,7 +549,7 @@ readingsGroup_2html($)
         my $cmd;
         my $devStateIcon;
         if( $valueIcon ) {
-          if( my $icon = lookup($valueIcon,$name,$a,$n,$v,$room,$group,"") ) {
+          if( my $icon = lookup($valueIcon,$name,$a,$n,$v,$room,$group,$row,"") ) {
             if( $icon =~ m/^[\%\$]devStateIcon$/ ) {
               my %extPage = ();
               my ($allSets, $cmdlist, $txt) = FW_devState($name, $room, \%extPage);
@@ -586,7 +591,8 @@ readingsGroup_2html($)
 
            if( $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
               $v = $1;
-              my $mapped = lookup($mapping,$name,$a,$set,"",$room,$group,undef);
+
+              my $mapped = lookup($mapping,$name,$a,$set,"",$room,$group,$row,undef);
               if( defined($mapped) ) {
                 $v =~ s/$set&nbsp;/$mapped&nbsp;/;
               }
@@ -607,7 +613,7 @@ readingsGroup_2html($)
         $txt = "<a href=\"$FW_ME$FW_subdir?detail=$name\">$txt</a>" if( $show_links );
         $v = "<div $value_style>$v</div>" if( $value_style && !$devStateIcon );
 
-        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $first || $multi == 1 );
+        $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $show_names && ($first || $multi == 1) );
         $ret .= "<td informId=\"$d-$name.$n\">$devStateIcon</td>" if( $devStateIcon );
         $ret .= "<td $value_columns><div informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
@@ -807,7 +813,7 @@ readingsGroup_Notify($$)
             my $a = AttrVal($n, "alias", $n);
             my $room = AttrVal($n, "room", "");
             my $group = AttrVal($n, "group", "");
-            if( my $icon = lookup($valueIcon,$n,$a,$reading,$value,$room,$group,"") ) {
+            if( my $icon = lookup($valueIcon,$n,$a,$reading,$value,$room,$group,1,"") ) {
               if( $icon eq "%devStateIcon" ) {
                 my %extPage = ();
                 my ($allSets, $cmdlist, $txt) = FW_devState($n, $room, \%extPage);
@@ -1026,12 +1032,14 @@ readingsGroup_Attr($$$)
         Disables the html links from the heading and the reading names.</li>
       <li>nostate<br>
         If set to 1 the state reading is excluded.</li>
+      <li>nonames<br>
+        If set to 1 the reading name / row title is not displayed.</li>
       <li>notime<br>
         If set to 1 the reading timestamp is not displayed.</li>
       <li>mapping<br>
         Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names
         to the displayed name.  The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
-        %DEVICE, %ALIAS, %ROOM, %GROUP and %READING are replaced by the device name, device alias, room attribute,
+        %DEVICE, %ALIAS, %ROOM, %GROUP, %ROW and %READING are replaced by the device name, device alias, room attribute,
         group attribute and reading name respectively. You can also prefix these keywords with $ instead of %. Examples:<br>
           <code>attr temperatures mapping $DEVICE-$READING</code><br>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
