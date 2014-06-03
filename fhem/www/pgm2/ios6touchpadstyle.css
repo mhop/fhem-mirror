@@ -31,7 +31,16 @@ height: calc(100vh - 44px);
 #hdr input {
 width: 80%;
 }
-
+.SVGplot{
+	text-align:center;
+}
+.SVGplot embed {
+    -o-transition:scale(-o-calc(100vw - 260px),100px);    
+    -ms-transition:scale(c-ms-alc(100vw - 260px),100px);
+    -moz-transition:scale(-moz-calc(100vw - 260px),100px);
+    -webkit-transition:scale(-webkit-calc(100vw - 260px),100px);
+    transition:scale(calc(100vw - 260px),100px);
+}
 /*iPad Skalierung*/
 /* iPads (landscape) ----------- */
 @media only screen
@@ -408,7 +417,6 @@ height: 44px;
 }
 table.room a, table.block a {
 vertical-align: middle;
-text-shadow: 0px 1px #FFFFFF; 
 }
 table.room a {
 padding-left: 5px;
@@ -580,10 +588,6 @@ background-image: -moz-linear-gradient(bottom, #666666 0%, #CBCBCB 100%);
 background-image: -webkit-linear-gradient(top, #666666 0%, #CBCBCB 100%);
 background-image: -ms-linear-gradient(bottom, #666666 0%, #CBCBCB 100%);
 background-image: linear-gradient(to bottom, #666666 0%, #CBCBCB 100%);
-}
-
-.SVGplot {
-	text-align:center;
 }
 
 .sysmon table {
