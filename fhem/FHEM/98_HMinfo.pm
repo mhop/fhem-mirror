@@ -1298,7 +1298,9 @@ sub HMinfo_loadConfig($@) {####################################################
       $param =~ s/\.RegL/RegL/;
       $param =~ s/RegL/\.RegL/ if ($exp != 2);
       my ($reg,$data) = split(" ",$param,2);
-      my $rl = join",",CUL_HM_reglUsed($eN);
+      my @rla = CUL_HM_reglUsed($eN);
+      next if (!$rla[0]);
+      my $rl = join",",@rla;
       my $r2 = $reg;
       $r2 =~ s/^\.//;
 
@@ -1318,6 +1320,7 @@ sub HMinfo_loadConfig($@) {####################################################
       $defs{$eN}{READINGS}{$reg}{VAL} = $changes{$eN}{$reg};
       $defs{$eN}{READINGS}{$reg}{TIME} = "from archive";
       my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..):(.*)/);
+      next if (!$list);
       my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));
       CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
       push @el,"$eN reg list:$reg";    
