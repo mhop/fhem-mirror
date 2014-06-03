@@ -603,6 +603,8 @@ statistics_doStatisticDelta ($$$$$)
       $stat[5] += $deltaValue;
       $stat[7] += $deltaValue;
 
+   if ($periodSwitch>=1) { statistics_doStatisticSpecialPeriod ( $hash, $dev, $readingName, $decPlaces, $stat[1] ); }
+
     # Determine if "since" value has to be shown in current and last reading
     # If change of year, change yearly statistic
       if ($periodSwitch == 4 || $periodSwitch == -4) {
@@ -677,8 +679,6 @@ statistics_doStatisticDelta ($$$$$)
       $statValue = sprintf  "%.".$decPlaces."f", $stat[7];
       statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$statValue,$last[7],$periodSwitch == 4 || $periodSwitch == -4);
    }
-   
-   if ($periodSwitch>=1) { statistics_doStatisticSpecialPeriod ( $hash, $dev, $readingName, $decPlaces, $stat[1] ); }
 
    return ;
 }
@@ -696,17 +696,25 @@ statistics_doStatisticSpecialPeriod ($$$$$)
 
    my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . "SpecialPeriod";
    my $hiddenReadingName = ".".$dev->{NAME} . ":" . $readingName . "SpecialPeriod";
+   
    my $result = $value;
+   Log3 $name,4,"$name: Add $value to $hiddenReadingName";
    if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) { $result .= " " . $hash->{READINGS}{$hiddenReadingName}{VAL}; }
    my @hidden = split / /, $result; # Internal values
-   if ( exists($hidden[$specialPeriod]) ) { delete $hidden[$specialPeriod]; }
+   if ( exists($hidden[$specialPeriod]) ) { 
+      Log3 $name,4,"$name: Remove last value ".$hidden[$specialPeriod]." from '$hiddenReadingName'";
+      delete $hidden[$specialPeriod]; 
+   }
+   
    $result = 0;
    foreach my $val (@hidden) { $result += $val; }
    $result = sprintf "%.".$decPlaces."f", $result;
    if ($#hidden != $specialPeriod) { $result .= " (".($#hidden+1).".hours)"; }
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
+   
    $result = join( " ", @hidden );
    readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
+   Log3 $name,4,"$name: Set '$hiddenReadingName = $result'";
 
 }
 
