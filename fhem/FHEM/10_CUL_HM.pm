@@ -211,6 +211,7 @@ sub CUL_HM_updateConfig($){
       $attr{$name}{"event-on-change-reading"} = 
                 AttrVal($name, "event-on-change-reading", ".*")
                 if(!$nAttr);
+      $attr{$name}{model} = "ActionDetector";
       delete $hash->{helper}{role};
       $hash->{helper}{role}{vrt} = 1;
       next;
@@ -2581,11 +2582,36 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   @h = split(" ", $h) if($h);
 
   if(!defined($h)) {
-    my @arr;
-    push @arr, keys %{$culHmGlobalGets}         if(!$roleV);
-    push @arr, keys %{$culHmVrtGets}            if($roleV);
-    push @arr, keys %{$culHmSubTypeGets->{$st}} if($culHmSubTypeGets->{$st});
-    push @arr, keys %{$culHmModelGets->{$md}}   if($culHmModelGets->{$md});
+    my @arr = ();
+    if(!$roleV)                 {foreach(keys %{$culHmGlobalGets}        ){push @arr,"$_:".$culHmGlobalGets->{$_}          }};
+    if($roleV)                  {foreach(keys %{$culHmVrtGets}           ){push @arr,"$_:".$culHmVrtGets->{$_}             }};
+    if($culHmSubTypeGets->{$st}){foreach(keys %{$culHmSubTypeGets->{$st}}){push @arr,"$_:".${$culHmSubTypeGets->{$st}}{$_} }};
+    if($culHmModelGets->{$md})  {foreach(keys %{$culHmModelGets->{$md}}  ){push @arr,"$_:".${$culHmModelGets->{$md}}{$_}   }};
+    
+    foreach(@arr){
+      my ($cmd,$val) = split(":",$_,2);
+      Log 1,"General $_ : $cmd,$val";
+      if (!$val               ||
+          $val !~ m/^\[.*\]$/ ||
+          $val =~ m/\[.*\[/   ||
+          $val =~ m/(\<|\>)]/
+          ){
+        $_ = $cmd;
+      }
+      else{
+        $val =~ s/(\[|\])//g;
+        my @vArr = split('\|',$val);
+        foreach (@vArr){
+          if ($_ =~ m/(.*)\.\.(.*)/ ){
+            my @list = map { ($_.".0", $_+0.5) } (($1+0)..($2+0));
+            pop @list;
+            $_ = join(",",@list);
+          }
+        }
+        $_ = "$cmd:".join(",",@vArr);
+      }
+    }
+
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr);
 
     return $usg;
@@ -2750,17 +2776,34 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     close(aSave);
   }
   elsif($cmd eq "listDevice"){  ###############################################
-    
-    my @dl = grep !/^$/,
-             map{AttrVal($_,"IOgrp","") =~ m/^$name/ ? $_ : ""}
-             keys %defs;
-    my @rl;
-    foreach (@dl){
-      my(undef,$pref) = split":",$attr{$_}{IOgrp},2;
-      $pref =  "---" if (!$pref);
-      push @rl, "$defs{$_}{IODev}->{NAME} / $pref $_ ";
+    if      ($md eq "CCU-FHEM"){
+      my @dl = grep !/^$/,
+               map{AttrVal($_,"IOgrp","") =~ m/^$name/ ? $_ : ""}
+               keys %defs;
+      my @rl;
+      foreach (@dl){
+        my(undef,$pref) = split":",$attr{$_}{IOgrp},2;
+        $pref =  "---" if (!$pref);
+        push @rl, "$defs{$_}{IODev}->{NAME} / $pref $_ ";
+      }
+      return "devices using $name\ncurrent IO / preferred\n  ".join "\n  ", sort @rl;
+    } 
+    elsif ($md eq "ActionDetector"){
+      my $re = $a[2]?$a[2]:"all";
+      if($re && $re =~ m/^(all|alive|unknown|dead|notAlive)$/){
+        my @fnd = map {$_.":".$defs{$name}{READINGS}{$_}{VAL}}
+                  grep /^status_/,
+                  keys %{$defs{ActionDetector}{READINGS}};
+        if    ($re eq "notAlive"){ @fnd = grep !/:alive$/,@fnd; }
+        elsif ($re eq "all")     {;        }
+        else                     { @fnd = grep /:$a[2]$/,@fnd;}
+        $_ =~ s/status_(.*):.*/$1/ foreach(@fnd);
+        push @fnd,"empty" if (!scalar(@fnd));
+        return  join",",@fnd;
+      } else{
+        return "please enter parameter [alive|unknown|dead|notAlive]";
+      }
     }
-    return "devices using $name\ncurrent IO / preferred\n  ".join "\n  ", sort @rl;
   }
 
   Log3 $name,3,"CUL_HM get $name " . join(" ", @a[1..$#a]);
@@ -7763,7 +7806,15 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          restore will not delete any peered channels, it will just add peer channels.<br>
          </li>
      <li><B>listDevice</B><br>
-         returns a list of Devices using the ccu service to assign an IO.<br>
+         <li>when used with ccu it returns a list of Devices using the ccu service to assign an IO.<br>
+             </li>
+         <li>when used with ActionDetector user will get a comma separated list of entities being assigned to the action detector<br>
+             get ActionDetector listDevice          # returns all assigned entities<br>
+             get ActionDetector listDevice notActive# returns entities which habe not status alive<br>
+             get ActionDetector listDevice alive    # returns entities with status alive<br>
+             get ActionDetector listDevice unknown  # returns entities with status unknown<br>
+             get ActionDetector listDevice dead     # returns entities with status dead<br>
+             </li>
          </li>
      <br>
   </ul>
@@ -8975,7 +9026,15 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         "restore" l&ouml;scht keine verkn&uuml;pften Kan&auml;le, es f&uuml;gt nur neue Peers hinzu.<br>
       </li>
       <li><B>listDevice</B><br>
-         gibt eine Lister der Devices, welche den ccu service zum zuweisen der IOs zurück<br>
+         <li>bei einer CCU gibt es eine Liste der Devices, welche den ccu service zum zuweisen der IOs zurück<br>
+           </li>
+         <li>beim ActionDetector wird eine Komma geteilte Liste der Entities zurückgegeben<br>
+             get ActionDetector listDevice          # returns alle assigned entities<br>
+             get ActionDetector listDevice notActive# returns entities ohne status alive<br>
+             get ActionDetector listDevice alive    # returns entities mit status alive<br>
+             get ActionDetector listDevice unknown  # returns entities mit status unknown<br>
+             get ActionDetector listDevice dead     # returns entities mit status dead<br>
+             </li>
          </li>
 
     </ul><br>
