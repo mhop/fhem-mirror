@@ -24,9 +24,13 @@ set y2range [0:30700]
 set ylabel "Nutzung %"
 set y2label "Nutzung MB"
 
-#FileLog 0:fs_usb1|~\s/media/usb1\x3a:0:$fld[4]+$fld[5]
-#FileLog 0:fs_usb1|~\s/media/usb1\x3a:0:$fld[7]+$fld[8]
-#FileLog 0:fs_usb1|~\s/media/usb1\x3a:0:$fld[9]+$fld[10]
+#FileLog 5:fs_usb1\x3a:0:
+#FileLog 8:fs_usb1\x3a:0:
+#FileLog 10:fs_usb1\x3a:0:
+
+#----FileLog 0:fs_usb1|~\s/media/usb1\x3a:0:$fld[4]+$fld[5]
+#----FileLog 0:fs_usb1|~\s/media/usb1\x3a:0:$fld[7]+$fld[8]
+#----FileLog 0:fs_usb1|~\s/media/usb1\x3a:0:$fld[9]+$fld[10]
 #nur ~# FileLog 6:~\s/media/usb1\x3a:0:
 #nur ~# FileLog 9:~\s/media/usb1\x3a:0:
 #nur ~# FileLog 11:~\s/media/usb1\x3a:0:
