@@ -100,7 +100,6 @@ statistics_Initialize($)
                    ."excludedReadings "
                    ."minAvgMaxReadings "
                    ."periodChangePreset "
-                   ."singularReadings "
                    ."specialDeltaPeriodHours "
                    .$readingFnAttributes;
 }
@@ -700,10 +699,10 @@ statistics_doStatisticSpecialPeriod ($$$$$)
    if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) { $result .= " " . $hash->{READINGS}{$hiddenReadingName}{VAL}; }
    my @hidden = split / /, $result; # Internal values
    if ( exists($hidden[$specialPeriod]) ) { delete $hidden[$specialPeriod]; }
-   
+   $result = 0;
    foreach my $val (@hidden) { $result += $val; }
    $result = sprintf "%.".$decPlaces."f", $result;
-   if ($#hidden != $specialPeriod) { $result .= " (".($#hidden+1)."_hours)"; }
+   if ($#hidden != $specialPeriod) { $result .= " (".($#hidden+1).".hours)"; }
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
    $result = join( " ", @hidden );
    readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
