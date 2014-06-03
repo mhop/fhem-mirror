@@ -1246,6 +1246,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 );
 %culHmModelGets = (
   "CCU-FHEM" =>{ "listDevice"=>"" },
+  "ActionDetector" =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive]" },
 );
 
 ##############################---set---########################################
