@@ -625,7 +625,7 @@ JeeLink_Parse($$$$)
         $hash->{MatchList} = \%matchListPCA301;
         JeeLink_SimpleWrite($hash, "1a" ); # led on
         JeeLink_SimpleWrite($hash, "1q" ); # quiet mode
-        JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
+        #JeeLink_SimpleWrite($hash, "0x" ); # hex mode off
         JeeLink_SimpleWrite($hash, "0a" ); # led off
         JeeLink_SimpleWrite($hash, "l" );  # list known devices
 
