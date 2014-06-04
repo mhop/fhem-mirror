@@ -365,6 +365,26 @@ sub message_prepare {
   return $packet;
 }
 
+=head2 packet_sysex
+
+create a binary packet containing a sysex-message
+
+=cut
+
+sub packet_sysex {
+
+  my ( $self, @sysex_data ) = @_;
+
+  my $protocol_version  = $self->{protocol_version};
+  my $protocol_commands = $COMMANDS->{$protocol_version};
+  
+  my $bytes = @sysex_data + 2;
+  my $packet = pack "C" x $bytes, $protocol_commands->{START_SYSEX},
+    @sysex_data,
+    $protocol_commands->{END_SYSEX};
+  return $packet;
+}
+
 =head2 packet_sysex_command
 
 create a binary packet containing a sysex-command

@@ -570,6 +570,12 @@ sub sampling_interval {
   return $self->{io}->data_write($sampling_interval_packet);
 }
 
+sub sysex_send {
+  my ( $self, @sysex_data ) = @_;
+  my $sysex_packet = $self->{protocol}->packet_sysex(@sysex_data);
+  return $self->{io}->data_write($sysex_packet);
+}
+
 sub i2c_write {
   my ($self,$address,@data) = @_;
   return $self->{io}->data_write($self->{protocol}->packet_i2c_request($address,0x0,@data));
