@@ -51,8 +51,9 @@ sub Heating_Control_Initialize($)
 ################################################################################
 sub Heating_Control_Set($@) {
   my ($hash, @a) = @_;
+  
   return "no set value specified" if(int(@a) < 2);
-  return "Unknown argument $a[1], choose one of enable/disable refresh" if($a[1] eq "?");
+  return "Unknown argument $a[1], choose one of enable disable " if($a[1] eq "?");
   
   my $name = shift @a;
   my $v = join(" ", @a);
@@ -60,7 +61,7 @@ sub Heating_Control_Set($@) {
   Log3 $hash, 3, "[$name] set $name $v";
   
   if      ($v eq "enable") {
-     fhem("attr $name disable 1"); 
+     fhem("attr $name disable 0"); 
   } elsif ($v eq "disable") {
      fhem("attr $name disable 1"); 
   }
