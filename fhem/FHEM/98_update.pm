@@ -28,10 +28,10 @@ use warnings;
 use HttpUtils;
 use File::Copy qw(cp mv);
 use Blocking;
-use FhemUtils::release;                                               
+
+my %UPDATE;
 
 sub CommandUpdate($$);
-sub update_CheckFhemRelease($$$);
 sub update_CheckNotice($$$);
 sub update_CheckUpdates($$$$$);
 sub update_CleanUpLocalFiles($$$);
@@ -48,9 +48,10 @@ sub update_WriteLocalControlFile($$$$$);
 sub
 update_Initialize($$)
 {
-  foreach my $pack (split(" ",uc($UPDATE{packages}))) {
-    $UPDATE{$pack}{control} = "controls_".lc($pack).".txt";
-  }
+  $UPDATE{server}         = "http://fhem.de";
+  $UPDATE{path}           = "fhemupdate4";
+  $UPDATE{packages}       = "FHEM";
+  $UPDATE{FHEM}{control} = "controls_fhem.txt";
 
   my %hash = (
     Fn  => "CommandUpdate",
@@ -76,7 +77,7 @@ CommandUpdate($$)
   my @args = split(/ +/,$param);
 
   # set default trunk
-  my $BRANCH = (!defined($attr{global}{updatebranch}) ? $DISTRIB_BRANCH : uc($attr{global}{updatebranch}));
+  my $BRANCH = (!defined($attr{global}{updatebranch}) ? "DEVELOPMENT" : uc($attr{global}{updatebranch}));
   if ($BRANCH ne "STABLE" && $BRANCH ne "DEVELOPMENT") {
     $ret = "global attribute 'updatebranch': unknown keyword: '$BRANCH'. Keyword should be 'STABLE' or 'DEVELOPMENT'";
     Log 1, "update $ret";
@@ -376,9 +377,6 @@ update_DoUpdate(@)
   my $ret = "";
 
   if ($BRANCH ne "THIRDPARTY") {
-    # Get fhem.pl version
-    my $checkFhemRelease = update_CheckFhemRelease($force,$srcdir,$BRANCH);
-    return $checkFhemRelease if ($checkFhemRelease);
     # set packages
     @packages = split(" ",uc($UPDATE{packages}));
   } else {
@@ -933,58 +931,6 @@ update_ListChanges($$$)
     }
   }
 
-  return $ret;
-}
-
-########################################
-sub
-update_CheckFhemRelease($$$)
-{
-  my ($force,$srcdir,$BRANCH) = @_;
-  my $server = $UPDATE{server};
-  my $versRemote;
-  my $ret = undef;
-  
-  # get fhem to check version
-  Log 3, "update get $server/$srcdir/FHEM/FhemUtils/release.pm";
-  my $uRelease = GetFileFromURL("$server/$srcdir/FHEM/FhemUtils/release.pm");
-  Log 5, "update get $server/$srcdir/FHEM/FhemUtils/release.pm";
-  return "Can't get release.pm from $server" if (!$uRelease);
-
-  my ($NEW_DISTRIB_ID,$NEW_DISTRIB_RELEASE,$NEW_DISTRIB_BRANCH,$NEW_DISTRIB_DESCRIPTION) = "";
-  foreach my $l (split("[\r\n]", $uRelease)) {
-    chomp($l);
-    Log 5, "update release.pm: $l";
-    if ($l =~ m/^\$DISTRIB_ID="(.*)"/) {
-      $NEW_DISTRIB_ID = $1;
-    }
-    if ($l =~ m/^\$DISTRIB_RELEASE="(\d+.\d+)"/) {
-      $NEW_DISTRIB_RELEASE = $1;
-    }
-    if ($l =~ m/^\$DISTRIB_BRANCH="(.*)"/) {
-      $NEW_DISTRIB_BRANCH = $1;
-    }
-  }
-
-  if (!$NEW_DISTRIB_ID || !$NEW_DISTRIB_RELEASE || !$NEW_DISTRIB_BRANCH) {
-    Log 1, "update The operation was canceled, while checking the remote Release.";
-    return "Can't read remote Release Informations. Update canceled now."
-  }
-  $NEW_DISTRIB_DESCRIPTION="$NEW_DISTRIB_ID $NEW_DISTRIB_RELEASE ($NEW_DISTRIB_BRANCH)";
-
-  if (!$force &&
-     ($NEW_DISTRIB_RELEASE lt $DISTRIB_RELEASE ||
-     ($NEW_DISTRIB_RELEASE == $DISTRIB_RELEASE &&
-     ($DISTRIB_BRANCH eq "DEVELOPMENT" && $NEW_DISTRIB_BRANCH ne "DEVELOPMENT")))) {
-    $ret  = "The installed version $DISTRIB_DESCRIPTION is newer than the remote\n";
-    $ret .= "version $NEW_DISTRIB_DESCRIPTION.\n";
-    $ret .= "A downgrade is not recommended! Your default updatebranch is '$BRANCH'.\n";
-    $ret .= "You can force the downgrade with the argument 'force' (e.g. 'update force')\n";
-    $ret .= "at your own risk. In case of problems within the downgrade process, there is\n";
-    $ret .= "no support from the developers!";
-    Log 1, "update Downgrade is not allowed!";
-  }
-  Log 1, "update check Releases => local: $DISTRIB_DESCRIPTION remote: $NEW_DISTRIB_DESCRIPTION";
   return $ret;
 }
 
