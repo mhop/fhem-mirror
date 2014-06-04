@@ -29,7 +29,7 @@ FHEM2FHEM_Initialize($)
 # Normal devices
   $hash->{DefFn}   = "FHEM2FHEM_Define";
   $hash->{UndefFn} = "FHEM2FHEM_Undef";
-  $hash->{AttrList}= "dummy:1,0";
+  $hash->{AttrList}= "dummy:1,0 disable:0,1 disabledForIntervals";
 }
 
 #####################################
@@ -126,8 +126,10 @@ FHEM2FHEM_Read($)
 
   if(!defined($buf) || length($buf) == 0) {
     FHEM2FHEM_Disconnected($hash);
-    return "";
+    return;
   }
+
+  return if(IsDisabled($name));
 
   my $data = $hash->{PARTIAL};
   Log3 $hash, 5, "FHEM2FHEM/RAW: $data/$buf";
@@ -376,6 +378,8 @@ FHEM2FHEM_SimpleRead($)
   <b>Attributes</b>
   <ul>
     <li><a href="#dummy">dummy</a></li>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
   </ul>
 
 </ul>
@@ -464,9 +468,11 @@ FHEM2FHEM_SimpleRead($)
    <b>Get</b> <ul>N/A</ul><br>
 
    <a name="FHEM2FHEMattr"></a>
-   <b>Attributes</b>
+   <b>Attribute</b>
    <ul>
      <li><a href="#dummy">dummy</a></li>
+      <li><a href="#disable">disable</a></li>
+      <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
    </ul>
 
 </ul>
