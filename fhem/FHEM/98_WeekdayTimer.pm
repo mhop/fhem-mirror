@@ -48,12 +48,21 @@ sub WeekdayTimer_Initialize($)
 ################################################################################
 sub WeekdayTimer_Set($@) {
   my ($hash, @a) = @_;
+ 
   return "no set value specified" if(int(@a) < 2);
-  return "Unknown argument $a[1], choose one of enable/disable refresh" if($a[1] eq "?");
+  return "Unknown argument $a[1], choose one of enable disable " if($a[1] eq "?");
   
-  Heating_Control_Set($@);
+  my $name = shift @a;
+  my $v = join(" ", @a);
+
+  Log3 $hash, 3, "[$name] set $name $v";
   
-  return undef;
+  if      ($v eq "enable") {
+     fhem("attr $name disable 0"); 
+  } elsif ($v eq "disable") {
+     fhem("attr $name disable 1"); 
+  }
+  return undef;  
 }
 ########################################################################
 sub WeekdayTimer_Get($@) {
