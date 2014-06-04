@@ -868,7 +868,7 @@ sub CUL_HM_Parse($$) {#########################################################
   #  return "" if($src eq $id);# mirrored messages - covered by !$shash
   if(!$shash){    # Unknown source
     CUL_HM_pushEvnts();
-    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
+    $defs{$_}{".noDispatchVars"} = 1 foreach (@entities);
     return (CUL_HM_pushEvnts(),@entities);
   }
   $respRemoved = 0;  #set to 'no response in this message' at start
