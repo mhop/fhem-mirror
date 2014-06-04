@@ -662,6 +662,8 @@ FW_answerCall($)
     $cmd = "style eventMonitor";
   }
 
+  FW_roomOverview($cmd);
+
   if($FW_cmdret) {
     $FW_detail = "";
     $FW_room = "";
@@ -669,7 +671,7 @@ FW_answerCall($)
     if( $FW_cmdret !~ m/<html>.*<\/html>/ ) {
       $FW_cmdret = FW_htmlEscape($FW_cmdret);
 
-      my @lines = split( /\n/, $FW_cmdret );
+      my @lines = split( /\n/, $FW_cmdret ); # Adding links
       $FW_cmdret = "";
       foreach my $line (@lines) {
         $FW_cmdret .= "\n" if( $FW_cmdret );
@@ -693,7 +695,6 @@ FW_answerCall($)
 
   }
 
-  FW_roomOverview($cmd);
   if($FW_contentFunc) {
     no strict "refs";
     my $ret = &{$FW_contentFunc}($arg);
