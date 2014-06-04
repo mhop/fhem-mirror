@@ -74,7 +74,7 @@ sub Twilight_Initialize($)
   $hash->{DefFn}   = "Twilight_Define";
   $hash->{UndefFn} = "Twilight_Undef";
   $hash->{GetFn}   = "Twilight_Get";
-  $hash->{AttrList}= $readingFnAttributes;
+  $hash->{AttrList}= "$readingFnAttributes " ."useExtWeather";
 }
 #
 #
@@ -540,12 +540,29 @@ sub Twilight_sunpos($)
   my $twilight = int(($dElevation+12.0)/18.0 * 1000)/10;
      $twilight = 100 if ($twilight>100);
      $twilight = 0   if ($twilight<  0);
+	 
+  my $twilight_weather	 ;
 
-  my $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
-     $twilight_weather = 100 if ($twilight_weather>100);
-     $twilight_weather = 0   if ($twilight_weather<  0);
+  if( (my $ExtWeather = AttrVal($hashName, "useExtWeather", "")) eq "") {
+     $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
+	    Log3 $hash, 5, "[$hash->{NAME}] " . "Original weather readings";
+  } else {
+	   my($extDev,$extReading) = split(":",$ExtWeather);
+	   my $extWeatherHorizont = ReadingsVal($extDev,$extReading,-1); 
+	   if ($extWeatherHorizont >= 0){
+		     $extWeatherHorizont = 100 if ($extWeatherHorizont > 100);
+		     Log3 $hash, 5, "[$hash->{NAME}] " . "New weather readings from: ".$extDev.":".$extReading.":".$extWeatherHorizont;	
+		     $twilight_weather = $twilight - int(0.007 * ($extWeatherHorizont ** 2)); ## SCM: 100% clouds => 30% light (rough estimation)
+	   } else {
+		     $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
+		     Log3 $hash, 3, "[$hash->{NAME}] " . "Error with external readings from: ".$extDev.":".$extReading." , taking original weather readings";	 
+	   }
+  } 
+  
+  $twilight_weather = 100 if ($twilight_weather>100);
+  $twilight_weather = 0   if ($twilight_weather<  0);
 
-  # set readings
+  #  set readings
   $dAzimuth   = int(100*$dAzimuth  )/100;
   $dElevation = int(100*$dElevation)/100;
 
@@ -729,6 +746,10 @@ sub twilight($$$$) {
   <b>Attributes</b>
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+	<li><b>useExtWeather &lt;device&gt;:&lt;reading&gt;</b></li>
+	use data from other devices to calculate <b>twilight_weather</b>.<br/>
+	The reading used shoud be in the range of 0 to 100 like the reading <b>c_clouds</b>	in an <b><a href="#openweathermap">openweathermap</a></b> device, where 0 is clear sky and 100 are overcast clouds.<br/>
+	With the use of this attribute weather effects like heavy rain or thunderstorms are neglegted for the calculation of the <b>twilight_weather</b> reading.<br/>
   </ul>
   <br>
 
@@ -856,6 +877,10 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
   <b>Attributes</b>
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+	<li><b>useExtWeather &lt;device&gt;:&lt;reading&gt;</b></li>
+	Nutzt Daten von einem anderen Device um <b>twilight_weather</b> zu berechnen.<br/>
+	Das Reading sollte sich im Intervall zwischen 0 und 100 bewegen, z.B. das Reading <b>c_clouds</b> in einem<b><a href="#openweathermap">openweathermap</a></b> device, bei dem 0 heiteren und 100 bedeckten Himmel bedeuten.
+	Wird diese Attribut genutzt , werden Wettereffekte wie Starkregen oder Gewitter fuer die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen.   
   </ul>
   <br>
 

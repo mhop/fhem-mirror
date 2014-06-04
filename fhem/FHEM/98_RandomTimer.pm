@@ -138,7 +138,7 @@ sub RandomTimer_SetTimer($)
   myInternalTimer      ("Exec",     $setExecTime, "RandomTimer_Exec", $hash, 0);
 
   if ($hash->{REP} gt "") {
-     my $setTimerTime = max($now+$secToMidnight, $hash->{stopTime}) + 60;
+     my $setTimerTime = max($now+$secToMidnight, $hash->{stopTime}) + $hash->{TIMETOSWITCH}+15;
      myRemoveInternalTimer("SetTimer", $hash);
      myInternalTimer      ("SetTimer", $setTimerTime, "RandomTimer_SetTimer", $hash, 0);
   }
