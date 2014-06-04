@@ -25,9 +25,9 @@ package main;
 use strict;
 use warnings;
 use Config;
-use FhemUtils::release;                                               
 
 sub CommandFheminfo($$);
+my %UPDATE;
 
 ########################################
 sub
@@ -37,6 +37,11 @@ fheminfo_Initialize($$)
     Fn  => "CommandFheminfo",
     Hlp => "[send],show or send Fhem statistics",
   );
+  $UPDATE{server}         = "http://fhem.de";
+  $UPDATE{path}           = "fhemupdate4";
+  $UPDATE{packages}       = "FHEM";
+  $UPDATE{FHEM}{control} = "controls_fhem.txt";
+
   $cmds{fheminfo} = \%hash;
 }
 
@@ -68,10 +73,10 @@ CommandFheminfo($$)
   return "Unknown argument $args[0], usage: fheminfo [send]"
     if(@args && lc($args[0]) ne "send");
   return "Argument 'send' is not useful, if global attribute 'sendStatistics' is set to 'never'."
-    if(@args && lc($args[0]) eq "send" && lc(AttrVal("global","sendStatistics",undef)) eq "never");
+    if(@args && lc($args[0]) eq "send" && lc(AttrVal("global","sendStatistics","")) eq "never");
 
-  my $branch   = $DISTRIB_BRANCH;
-  my $release  = $DISTRIB_RELEASE;
+  my $branch   = "DEVELOPMENT";
+  my $release  = "5.5";
   my $os       = $^O;
   my $arch     = $Config{"archname"};
   my $perl     = $^V;
@@ -130,15 +135,11 @@ CommandFheminfo($$)
   my $fail;
   my $control_ref = {};
 
-  foreach my $pack (split(" ",uc($UPDATE{packages}))) {
-    $UPDATE{$pack}{control} = "controls_".lc($pack).".txt";
-  }
-
   my $pack = "FHEM";
 
   if(!-e "$moddir/$UPDATE{$pack}{control}") {
     my $server = $UPDATE{server};
-    my $BRANCH = ($DISTRIB_BRANCH eq "DEVELOPMENT") ? "SVN" : "STABLE";
+    my $BRANCH = "SVN";
     my $srcdir = $UPDATE{path}."/".lc($BRANCH);
     Log 5, "fheminfo get $server/$srcdir/$UPDATE{$pack}{control}";
     my $controlFile = GetFileFromURL("$server/$srcdir/$UPDATE{$pack}{control}");

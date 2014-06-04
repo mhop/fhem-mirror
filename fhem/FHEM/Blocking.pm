@@ -125,6 +125,7 @@ BlockingInformParent($;$$)
   } else {
     $param = "";
   }
+  $param =~ s/;/;;/g;
 
   syswrite($telnetClient, "{$informFn($param)}\n");
 
