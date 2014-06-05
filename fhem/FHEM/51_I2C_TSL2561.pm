@@ -937,10 +937,10 @@ sub I2C_TSL2561_CalculateLux($) {
     With this module you can read values from the digital luminosity sensor TSL2561
     via the i2c bus on Raspberry Pi.<br><br>
     
-    Before you can use the Modul on the Raspberry Pi you must load the I2C kernel
+    Before you can use the module on the Raspberry Pi you must load the I2C kernel
     modules.<br>
     Add these two lines to your <b>/etc/modules</b> file to load the kernel modules
-    automaticly during booting your Raspberry Pi.<br>
+    automatically when booting your Raspberry Pi.<br>
     <code><pre>
      i2c-bcm2708 
      i2c-dev
@@ -953,15 +953,6 @@ sub I2C_TSL2561_CalculateLux($) {
     <code>wget http://raspberry.znix.com/hipifiles/hipi-install<br>
     perl hipi-install</code><br><br>
     
-    If you want to use the sensor on the second I2C bus at the P5 connector
-    (only available at the version 2 of the Raspberry Pi) you must add the bold
-    line of this code in your FHEM start script:
-    <code><pre>
-    case "$1" in
-    'start')
-        <b>sudo hipi-i2c e 0 1</b>
-        ...
-    </pre></code>
   <p>
   
   <b>Define</b>
