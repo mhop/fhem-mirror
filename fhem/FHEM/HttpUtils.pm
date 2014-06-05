@@ -188,9 +188,10 @@ HttpUtils_Connect2($)
   my $method = $hash->{method};
   $method = ($data ? "POST" : "GET") if( !$method );
 
-  my $hdr = "$method $hash->{path} HTTP/1.1\r\n";
+  my $httpVersion = $hash->{httpversion} ? $hash->{httpversion} : "1.0";
+  my $hdr = "$method $hash->{path} HTTP/$httpVersion\r\n";
   $hdr .= "Host: $hash->{host}\r\n";
-  $hdr .= "Connection: Close\r\n";
+  $hdr .= "Connection: Close\r\n" if($httpVersion ne "1.0");
   $hdr .= "Authorization: Basic $hash->{auth}\r\n" if(defined($hash->{auth}));
   $hdr .= $hash->{header}."\r\n" if(defined($hash->{header}));
   if(defined($data)) {
@@ -305,7 +306,7 @@ HttpUtils_ParseAnswer($$)
 #    url, callback
 #  optional(default):
 #    hideurl(0),timeout(4),data(""),loglevel(4),header(""),
-#    noshutdown(1),shutdown(0),
+#    noshutdown(1),shutdown(0),httpversion("1.0")
 #    method($data ? "POST" : "GET")
 # Example:
 #   HttpUtils_NonblockingGet({
