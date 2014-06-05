@@ -959,7 +959,7 @@ statistics_FormatDuration($)
       <br>
       Regulare expression of statistic values, which shall not be shown in summary but also in singular readings. Eases the creation of plots.
       <br>
-      z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
+      z.B. <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
     </li><br>
    <li><code>specialDeltaPeriodHours &lt;Hours&gt;</code>
@@ -1060,7 +1060,7 @@ statistics_FormatDuration($)
       Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
       Erleichtert die Erzeugung von Plots. 
       <br>
-      z.B. <code>Wettersensor:rain:Delta:(Hour|Day))|FritzDect:power:Delta:Day</code>
+      z.B. <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
     </li><br>
     <li><code>specialDeltaPeriodHours &lt;Stunden&gt;</code>
       <br>
