@@ -180,11 +180,11 @@ YAMAHA_AVR_Set($@)
 
     if($what eq "on")
     {		
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what,undef, 1);
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what,undef);
     }
     elsif($what eq "off")
     {
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef, 1);
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef);
     }
     elsif($what eq "input")
     {
@@ -572,7 +572,7 @@ YAMAHA_AVR_Set($@)
     }
     
     # Call the GetStatus() Function by resetting the timer to one second to retrieve the new values after setting something.
-    YAMAHA_AVR_ResetTimer($hash, 1);
+    YAMAHA_AVR_ResetTimer($hash, 0);
     
     return undef;  
 }
@@ -722,12 +722,16 @@ YAMAHA_AVR_SendCommand($@)
     my ($hash, $data,$cmd,$arg,$blocking) = @_;
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
-    
-    $blocking = 0 unless(defined($blocking));
-    
+
+    if(not defined($blocking) and $cmd ne "statusRequest" and $hash->{helper}{AVAILABLE} == 1)
+    {
+        $blocking = 1;
+    }
+    else
+    {
+        $blocking = 0;
+    }
      
-   
-    
     # In case any URL changes must be made, this part is separated in this function".
     
     if($blocking == 1)
@@ -747,7 +751,6 @@ YAMAHA_AVR_SendCommand($@)
                                 
         my ($err, $data) = HttpUtils_BlockingGet($param);
         return YAMAHA_AVR_ParseResponse($param, $err, $data);
-        
     
     }
     else
@@ -781,8 +784,6 @@ YAMAHA_AVR_ParseResponse ($$$)
     my $name = $hash->{NAME};
     my $cmd = $param->{cmd};
     my $arg = $param->{arg};
-    
-   
     
     if($err ne "")
     {
@@ -1123,9 +1124,14 @@ YAMAHA_AVR_ParseResponse ($$$)
             my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
             
             my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
+
+            readingsBulkUpdate($hash, "volumeStraight", $current_volume);
+            readingsBulkUpdate($hash, "volume", YAMAHA_AVR_volume_abs2rel($current_volume));
             
             if(not $current_volume == $target_volume)
             {
+                readingsEndUpdate($hash, 1);  
+     
                 if($diff == 0)
                 {
                             Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB (target is $target_volume dB)";
@@ -1201,8 +1207,8 @@ sub YAMAHA_AVR_getModel($)
 {
     my ($hash) = @_;
    
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>", "statusRequest","unitDescription", 1);
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig", 1);
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>", "statusRequest","unitDescription");
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig");
 }	
 	
 #############################
@@ -1304,10 +1310,10 @@ sub YAMAHA_AVR_getInputs($)
     return undef if (not defined($zone) or $zone eq "");
     
     # query all inputs
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>", "statusRequest","getInputs", 1);
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>", "statusRequest","getInputs");
 
     # query all available scenes
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes", 1);
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes");
 }
 
 #############################
