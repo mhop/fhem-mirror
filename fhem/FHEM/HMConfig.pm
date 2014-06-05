@@ -1246,7 +1246,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 );
 %culHmModelGets = (
   "CCU-FHEM" =>{ "listDevice"=>"" },
-  "ActionDetector" =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive]" },
+  "ActionDetector" =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive] ..." },
 );
 
 ##############################---set---########################################
@@ -1472,7 +1472,10 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
 
-  "CCU-FHEM00"        =>{ update  =>""},
+  "CCU-FHEM00"        =>{ update       =>"",
+                          hmPairForSec =>"<sec>",
+                          hmPairSerial =>"<serial>",
+  },
 );
 # clones- - - - - - - - - - - - - - - - -
 #$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
