@@ -180,11 +180,11 @@ YAMAHA_AVR_Set($@)
 
     if($what eq "on")
     {		
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what,undef);
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what,undef, 1);
     }
     elsif($what eq "off")
     {
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef);
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef, 1);
     }
     elsif($what eq "input")
     {
@@ -719,26 +719,54 @@ YAMAHA_AVR_Undefine($$)
 sub
 YAMAHA_AVR_SendCommand($@)
 {
-    my ($hash, $data,$cmd,$arg) = @_;
+    my ($hash, $data,$cmd,$arg,$blocking) = @_;
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
+    
+    $blocking = 0 unless(defined($blocking));
+    
      
-    Log3 $name, 5, "YAMAHA_AVR ($name) - execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\" on $name: $data";
+   
     
     # In case any URL changes must be made, this part is separated in this function".
     
-     HttpUtils_NonblockingGet({
-                                url        => "http://".$address."/YamahaRemoteControl/ctrl",
-                                timeout    => AttrVal($name, "request-timeout", 4),
-                                noshutdown => 1,
-                                data       => "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data,
-                                loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
-                                hash       => $hash,
-                                cmd        => $cmd,
-                                arg        => $arg,
-                                callback   => \&YAMAHA_AVR_ParseResponse
-                            }
-    ); 
+    if($blocking == 1)
+    {
+    
+        Log3 $name, 5, "YAMAHA_AVR ($name) - execute blocking \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\" on $name: $data";
+        my $param = {
+                                    url        => "http://".$address."/YamahaRemoteControl/ctrl",
+                                    timeout    => AttrVal($name, "request-timeout", 4),
+                                    noshutdown => 1,
+                                    data       => "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data,
+                                    loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
+                                    hash       => $hash,
+                                    cmd        => $cmd,
+                                    arg        => $arg
+                                };
+                                
+        my ($err, $data) = HttpUtils_BlockingGet($param);
+        return YAMAHA_AVR_ParseResponse($param, $err, $data);
+        
+    
+    }
+    else
+    {
+         Log3 $name, 5, "YAMAHA_AVR ($name) - execute nonblocking \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\" on $name: $data";
+           
+         HttpUtils_NonblockingGet({
+                                    url        => "http://".$address."/YamahaRemoteControl/ctrl",
+                                    timeout    => AttrVal($name, "request-timeout", 4),
+                                    noshutdown => 1,
+                                    data       => "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data,
+                                    loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
+                                    hash       => $hash,
+                                    cmd        => $cmd,
+                                    arg        => $arg,
+                                    callback   => \&YAMAHA_AVR_ParseResponse
+                                }
+        ); 
+    }
 }
 
 #############################
@@ -1173,8 +1201,8 @@ sub YAMAHA_AVR_getModel($)
 {
     my ($hash) = @_;
    
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>", "statusRequest","unitDescription");
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig");
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>", "statusRequest","unitDescription", 1);
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig", 1);
 }	
 	
 #############################
@@ -1276,10 +1304,10 @@ sub YAMAHA_AVR_getInputs($)
     return undef if (not defined($zone) or $zone eq "");
     
     # query all inputs
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>", "statusRequest","getInputs");
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>", "statusRequest","getInputs", 1);
 
     # query all available scenes
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes");
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes", 1);
 }
 
 #############################
