@@ -140,26 +140,8 @@ border-radius:7.5px;
 border: 1px solid #666666;
 display:block;
 }
-#ui-id-1 .ui-tabs-icon {
-background-color:#4C3BA5;
-}
-#ui-id-2 .ui-tabs-icon {
-background-color:#4C80AF;
-}
-#ui-id-3 .ui-tabs-icon {
-background-color:#4DAAAF;
-}
-#ui-id-4 .ui-tabs-icon {
-background-color:#53C237;
-}
-#ui-id-5 .ui-tabs-icon {
-background-color:#EFCD5F;
-}
-#ui-id-6 .ui-tabs-icon {
-background-color:#E5883B;
-}
-#ui-id-7 .ui-tabs-icon {
-background-color:#DA3C33;
+#ui-id-1 .ui-tabs-icon, #ui-id-2 .ui-tabs-icon, #ui-id-3 .ui-tabs-icon, #ui-id-4 .ui-tabs-icon, #ui-id-5 .ui-tabs-icon, #ui-id-6 .ui-tabs-icon, #ui-id-7 .ui-tabs-icon {
+background-color:#4b6dab;
 }
 
 #dashboard .ui-widget-header .ui-state-active .ui-tabs-icon {
