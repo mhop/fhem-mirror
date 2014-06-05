@@ -16,6 +16,10 @@
 	color:#000000 !important;
 text-shadow: 0px 1px #FFFFFF !important;
 }
+.ui-widget-content {
+	background:none !important;
+	color:inherit !important;
+}
 .ui-dialog table {
 	border-spacing:5px!important;
 	margin:0px!important;
