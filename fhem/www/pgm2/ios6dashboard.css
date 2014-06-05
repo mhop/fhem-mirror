@@ -172,6 +172,10 @@ overflow: visible !important;
 position: absolute;top: 0;left: 0;padding: .2em !important;outline: 0;border: 1px solid #FFFFFF;z-index: 100;
 display: inline-block !important;
 }
+#dashboard-dialog input[type="text"] {
+min-width:80px !important;
+width:70% !important;
+}
 #dashboard-dialog .ui-dialog-content {padding: 0;}
 #dashboard-dialog .ui-widget-header {
 padding: 5px;}	
@@ -211,8 +215,19 @@ padding: 5px;
 
 /* Colorpicker 
 ------------------------------------------------------------------------*/
-.evo-pop {-index: 10000; width: 204px;padding: 3px 3px 0;border: 1px solid;}
-.evo-pop-ie {z-index: 10000;width: 212px;padding: 3px;}
+.evo-pop {-index: 10000;
+ width: 225px;
+ padding: 3px 3px 0;
+ background-color:#fefefe;
+ border: 1px #999999 solid;
+ }
+.evo-pop-ie {z-index: 10000;
+width: 225px;
+padding: 3px;
+background-color:#fefefe;
+border: 1px #999999 solid;
+ 
+}
 .evo-palette td {font-size: 1px;border: solid 1px #c0c0c0;padding: 7px;cursor: pointer;}
 .evo-palette tr.top td {border-bottom: 0;}
 .evo-palette tr.in td {border-top: 0;border-bottom: 0;}
