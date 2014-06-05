@@ -67,6 +67,7 @@ sub statistics_FormatDuration($);
    ,["lock", 3] 
    ,["motion", 3] 
    ,["power", 1, 1] 
+   ,["pressure", 1, 1] 
    ,["rain", 2, 1] 
    ,["rain_rate", 1, 1] 
    ,["rain_total", 2, 1] 
@@ -263,6 +264,7 @@ statistics_PeriodChange($)
    my $dayChangeTime = timelocal(0,0,0,$th[3],$th[4],$th[5]+1900);
    if (AttrVal($name, "dayChangeTime", "00:00") =~ /(\d+):(\d+)/ && $1<24 && $1 >=0 && $2<60 && $2>=0) {
       $dayChangeDelay = $1 * 3600 + $2 * 60;
+      if ($dayChangeDelay == 0) { $dayChangeDelay = 24*3600; }
       $dayChangeTime += $dayChangeDelay - $periodChangePreset;
    }
 
@@ -271,7 +273,7 @@ statistics_PeriodChange($)
    my $periodEndTime = 3600 * ( int((gettimeofday()+$periodChangePreset)/3600) + 1 ) - $periodChangePreset ;
  # Run procedure also for given dayChangeTime  
    $val = "";
-   if ( $dayChangeDelay>0 && gettimeofday()<$dayChangeTime && $dayChangeTime<=$periodEndTime ) {
+   if ( gettimeofday()<$dayChangeTime && $dayChangeTime<=$periodEndTime ) {
       $periodEndTime = $dayChangeTime;
       $val = " (Day Change)";
    } 
@@ -709,7 +711,7 @@ statistics_doStatisticSpecialPeriod ($$$$$)
    $result = 0;
    foreach my $val (@hidden) { $result += $val; }
    $result = sprintf "%.".$decPlaces."f", $result;
-   if ($#hidden != $specialPeriod) { $result .= " (".($#hidden+1).".hours)"; }
+   if ($#hidden + 1 != $specialPeriod) { $result .= " (".($#hidden+1).".hours)"; }
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
    
    $result = join( " ", @hidden );
@@ -885,7 +887,7 @@ statistics_FormatDuration($)
   <br>
    Until now statistics for the following readings are automatically built:
    <ul>
-      <li><b>Minimal, average  and maximal values:</b> brightness, current, energy_current, humidity, temperature, voltage, wind, wind_speed, windSpeed</li>
+      <li><b>Minimal, average  and maximal values:</b> brightness, current, energy_current, humidity, pressure, temperature, voltage, wind, wind_speed, windSpeed</li>
       <li><b>Delta values:</b> count, energy, energy_total, power, total, rain, rain_rate, rain_total</li>
       <li><b>Duration of states:</b> lightsensor, lock, motion, Window, window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
    </ul> 
@@ -907,7 +909,7 @@ statistics_FormatDuration($)
       <br>
       Optional. Prefix set is place before statistical data. Default is <i>stat</i>
     </li><br>
-  </ul>
+  </ul>-
   
   <br>
   <b>Set</b>
@@ -944,7 +946,7 @@ statistics_FormatDuration($)
     </li><br>
     <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Comma separated list of reading names for which a min/average/max statistic shall be   calculated. 
+      Comma separated list of reading names for which a min/average/max statistic shall be calculated. 
     </li><br>
     <li><code>periodChangePreset &lt;Sekunden&gt;</code>
       <br>
@@ -978,7 +980,7 @@ statistics_FormatDuration($)
   <br>
   Derzeit werden Statistiken f&uuml;r folgende Ger&auml;tewerte vom Modul automatisch berechnet:
    <ul>
-      <li><b>Minimal-, Mittel- und Maximalwerte:</b> brightness, current, energy_current, humidity, temperature, voltage, wind, wind_speed, windSpeed</li>
+      <li><b>Minimal-, Mittel- und Maximalwerte:</b> brightness, current, energy_current, humidity, pressure, temperature, voltage, wind, wind_speed, windSpeed</li>
       <li><b>Deltawerte:</b> count, energy, energy_total, power, total, rain, rain_rate, rain_total</li>
       <li><b>Dauer der Status:</b> lightsensor, lock, motion, Window, window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
