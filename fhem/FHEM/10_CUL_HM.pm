@@ -6423,7 +6423,9 @@ sub CUL_HM_storeRssi(@){
 }
 sub CUL_HM_UpdtCentral($){
   my $name = shift;
+  return if(!$init_done);
   my $id = CUL_HM_name2Id($name);
+  
   delete $defs{$_}{owner_CCU} # remove assignments in IO dev to this CCU
         foreach (grep !/^$/,
                  map{InternalVal($_,"owner_CCU","") eq $name ? $_ : ""}
@@ -6453,6 +6455,7 @@ sub CUL_HM_UpdtCentral($){
 
   # --- search for peers to CCU and  potentially device this channel
   foreach my $ccuBId (CUL_HM_noDup(grep /$id/ ,map{split ",",AttrVal($_,"peerIDs","")}keys %defs)){
+    next if (length($ccuBId) !=8);
     my $btnS = substr($ccuBId,6,2);
     my $btn = hex($btnS) + 0;
     next if (!$btn);

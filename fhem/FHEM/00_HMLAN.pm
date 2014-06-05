@@ -149,7 +149,9 @@ sub HMLAN_RemoveHMPair($) {####################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
+  RemoveInternalTimer("hmPairForSec:$name");
   delete($hash->{hmPair});
+  delete($hash->{hmPairSerial});
 }
 sub HMLAN_Notify(@) {##########################################################
   my ($hash,$dev) = @_;
@@ -217,8 +219,8 @@ sub HMLAN_Attr(@) {############################################################
   }
   elsif($aName eq "hmId"){
     if ($cmd eq "set"){
-      my $owner = InternalVal($name,"owner_CCU",undef);
-      return "device owned by $owner" if ($owner);
+      my $owner_ccu = InternalVal($name,"owner_CCU",undef);
+      return "device owned by $owner_ccu" if ($owner_ccu);
       return "wrong syntax: hmId must be 6-digit-hex-code (3 byte)"
         if ($aVal !~ m/^[A-F0-9]{6}$/i);
     }
@@ -334,19 +336,23 @@ sub HMLAN_Set($@) {############################################################
   if($type eq "hmPairForSec") { ####################################
     return "Usage: set $name hmPairForSec <seconds_active>"
         if(!$arg || $arg !~ m/^\d+$/);
+    HMLAN_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
-    InternalTimer(gettimeofday()+$arg, "HMLAN_RemoveHMPair", "hmPairForSec:".$name, 1);
+    InternalTimer(gettimeofday()+$arg, "HMLAN_RemoveHMPair", "hmPairForSec:$name", 1);
   }
   elsif($type eq "hmPairSerial") { ################################
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
         if(!$arg || $arg !~ m/^.{10}$/);
 
-    my $id = AttrVal($hash->{NAME}, "hmId", "123456");
+    my $id = InternalVal($hash->{NAME}, "owner", "123456");
     $hash->{HM_CMDNR} = $hash->{HM_CMDNR} ? ($hash->{HM_CMDNR}+1)%256 : 1;
 
     HMLAN_Write($hash, undef, sprintf("As15%02X8401%s000000010A%s",
                     $hash->{HM_CMDNR}, $id, unpack('H*', $arg)));
+    HMLAN_RemoveHMPair("hmPairForSec:$name");
+    $hash->{hmPair} = 1;
     $hash->{hmPairSerial} = $arg;
+    InternalTimer(gettimeofday()+20, "HMLAN_RemoveHMPair", "hmPairForSec:".$name, 1);
   }
   return ("",1);# no not generate trigger outof command
 }
