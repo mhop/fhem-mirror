@@ -882,13 +882,29 @@ sub CUL_HM_Parse($$) {#########################################################
     $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
     return (CUL_HM_pushEvnts(),$name,@entities);
   }
+
   if ($msgStat){
     if   ($msgStat =~ m/AESKey/){
       push @evtEt,[$shash,1,"aesKeyNbr:".substr($msgStat,7)];
       $msgStat = ""; # already processed
     }
     elsif($msgStat =~ m/AESCom/){# AES communication to central
-      push @evtEt,[$shash,1,"aesCommToDev:".substr($msgStat,7)];
+      my $aesStat = substr($msgStat,7);
+      push @evtEt,[$shash,1,"aesCommToDev:".$aesStat];
+      ### General may need substential rework
+      # activate AES only for dedicated channels?
+      if($mTp =~ m /^4[01]/){ #someone is triggered##########
+        my $chn = hex($mI[0])& 0x3f;
+        my $cName = CUL_HM_id2Name($src.sprintf("%02X",$chn));
+         
+        my @peers = grep !/00000000/,split(",",AttrVal($cName,"peerIDs",""));
+        foreach my $peer (grep /$dst/,@peers){
+          my $pName = CUL_HM_id2Name($peer);
+          $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
+          next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
+          push @evtEt,[$defs{$pName},1,"trig_aes1_$cName:$aesStat:$mNo"];
+        }
+      }
       CUL_HM_pushEvnts();
       $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
       return (CUL_HM_pushEvnts(),$name);
@@ -2433,6 +2449,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
       push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
       push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
+      
       CUL_HM_stateUpdatDly($pName,10);
     }
     return "";
@@ -6423,8 +6440,8 @@ sub CUL_HM_storeRssi(@){
 }
 sub CUL_HM_UpdtCentral($){
   my $name = shift;
-  return if(!$init_done);
   my $id = CUL_HM_name2Id($name);
+  return if(!$init_done || length($id) != 6);
   
   delete $defs{$_}{owner_CCU} # remove assignments in IO dev to this CCU
         foreach (grep !/^$/,
