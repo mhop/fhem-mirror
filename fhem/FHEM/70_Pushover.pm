@@ -54,7 +54,7 @@ sub Pushover_Initialize($$)
   my ($hash) = @_;
   $hash->{DefFn}    = "Pushover_Define";
   $hash->{SetFn}    = "Pushover_Set";
-  $hash->{AttrList} = "timestamp:0,1 title sound device priority:0,1,-1";
+  $hash->{AttrList} = "disable:0,1 timestamp:0,1 title sound device priority:0,1,-1";
   #a priority value of 2 is not predifined as for this also a value for retry and expire must be set
   #which will most likely not be used with default values.
 }
@@ -97,6 +97,11 @@ sub Pushover_Set($@)
   if (!defined($sets{$cmd}))
   {
     return "Unknown argument " . $cmd . ", choose one of " . join(" ", sort keys %sets);
+  }
+
+  if (AttrVal($name, "disable", 0 ) == 1)
+  {
+    return "Device is disabled";
   }
 
   if ($cmd eq 'msg')
