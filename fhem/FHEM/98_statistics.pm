@@ -632,10 +632,13 @@ statistics_doStatisticDelta ($$$$$)
          if ($showDate >= 6) { # Shows the "since:" value for the first day change
             $showDate = 5; 
             $last[9] = $stat[9];
-           # Next monthly and yearly values start at 00:00 and show only date (no time)
-            $stat[5] = 0;
-            $stat[7] = 0;
-            $stat[9] = strftime "%Y-%m-%d", localtime(); # start
+           # Next monthly and yearly values start normaly at 00:00 and show only date (no time)
+            if (AttrVal($name, "dayChangeTime", "00:00") =~ /00:00|0:00/) {
+               my $periodChangePreset = AttrVal($name, "periodChangePreset", 5);
+               $stat[5] = 0;
+               $stat[7] = 0;
+               $stat[9] = strftime "%Y-%m-%d", localtime(gettimeofday()+$periodChangePreset); # start
+            }
          } 
          Log3 $name,4,"$name: Shifting current day in last value of '$statReadingName'.";
       }
