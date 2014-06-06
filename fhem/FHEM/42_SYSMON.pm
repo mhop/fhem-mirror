@@ -66,6 +66,7 @@ use constant {
   FB_N_TIME_CTRL      => "night_time_ctrl",
   FB_NUM_NEW_MESSAGES => "num_new_messages",
   FB_FW_VERSION       => "fw_version_info",
+  FB_DECT_TEMP        => "dect_temp",
 };
 
 use constant FS_PREFIX => "~ ";
@@ -359,6 +360,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	  $rMap->{+FB_N_TIME_CTRL}      = "night time control";
 	  $rMap->{+FB_NUM_NEW_MESSAGES} = "new messages";
 	  $rMap->{+FB_FW_VERSION}       = "firmware info";
+	  $rMap->{+FB_DECT_TEMP}        = "DECT temperatur";
   }
   
 	# User defined
@@ -727,6 +729,7 @@ SYSMON_obtainParameters($$)
       	$map = SYSMON_getFBInetConnectionState($hash, $map);
       	$map = SYSMON_getFBNightTimeControl($hash, $map);
       	$map = SYSMON_getFBNumNewMessages($hash, $map);
+      	$map = SYSMON_getFBDECTTemp($hash, $map);
       }
     }
   }
@@ -1567,6 +1570,19 @@ sub SYSMON_getFBNumNewMessages($$)
 	my ($hash, $map) = @_;
 	
 	$map->{+FB_NUM_NEW_MESSAGES}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r tam status/NumNewMessages");
+	
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# Liefert DECT-Temperatur einer FritzBox.
+# Parameter: HASH; MAP
+#------------------------------------------------------------------------------
+sub SYSMON_getFBDECTTemp($$)
+{
+	my ($hash, $map) = @_;
+	
+	$map->{+FB_DECT_TEMP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dect status/Temperature");
 	
 	return $map;
 }
