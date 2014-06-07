@@ -67,7 +67,9 @@ notify_Exec($$)
     $s = "" if(!defined($s));
     my $found = ($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/);
     if(!$found && AttrVal($n, "eventMap", undef)) {
-      (undef, $s) = ReplaceEventMap($n, [$n,$s], 0);
+      my @res = ReplaceEventMap($n, [$n,$s], 0);
+      shift @res;
+      $s = join(" ", @res);
       $found = ("$n:$s" =~ m/^$re$/);
     }
     if($found) {
