@@ -1043,7 +1043,7 @@ sub JeeLink_getIndexOfArray($@) {
 
     <li>MatchList<br>
       can be set to a perl expression that returns a hash that is used as the MatchList<br>
-      <code>attr myJeeling MatchList {'5:AliRF' => '^\\S+\\s+5 '}</code></li>
+      <code>attr myJeeLink MatchList {'5:AliRF' => '^\\S+\\s+5 '}</code></li>
 
     <li>initCommands<br>
       Space separated list of commands to send for device initialization.<br>
