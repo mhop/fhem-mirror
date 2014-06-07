@@ -845,16 +845,19 @@ JeeLink_Attr(@)
     $hash->{Clients} = $aVal;
     $hash->{Clients} = $clientsJeeLink if( !$hash->{Clients}) ;
   } elsif( $aName eq "MatchList" ) {
-    my $match_list = eval $aVal;
-    if( $@ ) {
-      Log3 $name, 2, $name .": $aVal: ". $@;
+    my $match_list;
+    if( $cmd eq "set" ) {
+      $match_list = eval $aVal;
+      if( $@ ) {
+        Log3 $name, 2, $name .": $aVal: ". $@;
+      }
     }
 
     if( ref($match_list) eq 'HASH' ) {
       $hash->{MatchList} = $match_list;
     } else {
-      $hash->{MatchList} = \%matchListPCA301 if( !$hash->{MatchList} );
-      Log3 $name, 2, $name .": $aVal: not a HASH";
+      $hash->{MatchList} = \%matchListPCA301;
+      Log3 $name, 2, $name .": $aVal: not a HASH" if( $aVal );
     }
   } elsif($aName =~ m/^tune/i) { #tune attribute freq / rx:bWidth / rx:rAmpl / rx:sens / tx:deviation / tx:power
   # Frequenze: Fc =860+ F x0.0050MHz
