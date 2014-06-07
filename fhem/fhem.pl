@@ -3547,21 +3547,40 @@ readingsBulkUpdate($$$@)
   if($changed && defined($readings)) {
   
     # these flags determine if any of the "event-on" attributes are set
-    my $attreocr   = $hash->{".attreocr"};
-    my $attreour   = $hash->{".attreour"};
+    my $attreocr = $hash->{".attreocr"};
+    my $attreour = $hash->{".attreour"};
 
-    # these flags determine whether the reading is listed in any of
-    # the attributes
-    my $eocr= $attreocr && grep($reading =~ m/^$_$/, @{$attreocr});
-    my $eour= $attreour && grep($reading =~ m/^$_$/, @{$attreour});
+    # determine whether the reading is listed in any of the attributes
+    my $eocr = $attreocr && (my @eocrv=grep { my $l = $_;
+                                            $l =~ s/:.*//;
+                                            ($reading=~ m/^$l$/) ? $_ : undef} @{$attreocr});
+    my $eour = $attreour && grep($reading =~ m/^$_$/, @{$attreour});
+
+    # check if threshold is given
+    my $threshold_reachded = 1;
+    if( $eocr
+        && $eocrv[0] =~ m/.*:(.*)/ ) {
+
+      my $last_value = $hash->{".attreocr-threshold$reading"};
+      if( !defined($last_value) ) {
+        $hash->{".attreocr-threshold$reading"} = $value;
+      } elsif( abs($value-$last_value) < $1 ) {
+        $threshold_reachded = 0;
+      } else {
+        $hash->{".attreocr-threshold$reading"} = $value;
+      }
+      #Log 1, "EOCR:$eocr value: $value last:$last_value  threshold: $1 reached: $threshold_reachded";
+    }
+
     # determine if an event should be created:
     # always create event if no attribute is set
     # or if the reading is listed in event-on-update-reading
     # or if the reading is listed in event-on-change-reading...
-    # ...and its value has changed.
+    # ...and its value has changed...
+    # ...and the change greater then the threshold
     $changed= !($attreocr || $attreour)
               || $eour  
-              || ($eocr && ($value ne $readings->{VAL}));
+              || ($eocr && ($value ne $readings->{VAL}) && $threshold_reachded);
     #Log 1, "EOCR:$eocr EOUR:$eour CHANGED:$changed";
 
     my @v = grep { my $l = $_;

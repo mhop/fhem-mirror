@@ -435,7 +435,9 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     Wenn nicht gesetzt, erzeugt jede Ver&auml;nderung eines "readings" ein
     Ereignis, welches z.B. von <a href="#notify">notify</a> oder<a
     href="FileLog"> FileLog</a> ber&uuml;cksichtigt wird. Wenn gesetzt erzeugen
-    nur Aktualisierungen der eingetragenen "readings" ein Ereignis.
+    nur Aktualisierungen der eingetragenen "readings" ein Ereignis. Wenn hinter dem
+    Namen eines "readings" ein optionaler Schwellwert &uuml;ber [:threshold] angegeben ist
+    wird das event nur getriggert wenn die &Auml;nderungen >= threshold ist.
     </li>
 
     <a name="event-on-change-reading"></a>

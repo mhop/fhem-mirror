@@ -426,7 +426,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     The attribute takes a comma-separated list of readings. You may use regular
     expressions in that list. If set, only changes of the listed readings
     create events. In other words, if a reading listed here is updated with the
-    new value identical to the old value, no event is created.
+    new value identical to the old value, no event is created. If an optional [:threshold]
+    is given after a reading name events are only generated if the change is >= threshold.
     </li>
     The precedence of event-on-update-reading and event-on-change-reading is as
     follows:
