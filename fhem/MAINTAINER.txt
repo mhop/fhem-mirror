@@ -264,6 +264,7 @@ www/codemirror/*             betateilchen         http://forum.fhem.de Frontends
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends
 www/images/*                 ulimaass             http://forum.fhem.de Frontends
 www/pgm2/dashboard/*         svenson08            http://forum.fhem.de Frontends
+www/pgm2/fhemweb_readingsHistory.js  justme1968   http://forum.fhem.de Frontends
 www/pgm2/*                   rudolfkoenig         http://forum.fhem.de Frontends
 www/jscolor/*                justme1968           http://forum.fhem.de Frontends
 www/frontend/*               johannnes            http://forum.fhem.de Frontends
