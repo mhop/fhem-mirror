@@ -451,7 +451,6 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{q}{qReqStat} = ""; # queue statusRequest for this device
     $hash->{helper}{mRssi}{mNo}  = "";
     CUL_HM_prtInit ($hash);
-    CUL_HM_hmInitMsg($hash);
     CUL_HM_assignIO($hash)if (!$init_done && $HMid ne "000000");
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
@@ -649,7 +648,7 @@ sub CUL_HM_Attr(@) {#################################
       CUL_HM_UpdtCentral($name);
     }
     else{
-      CUL_HM_hmInitMsg($hash);
+      CUL_HM_hmInitMsg($hash) if ($init_done);
     }
     $attr{$name}{$attrName} = $attrVal if ($cmd eq "set");
   }
@@ -657,9 +656,10 @@ sub CUL_HM_Attr(@) {#################################
     $updtReq = 1;
   }
   elsif($attrName eq "aesCommReq" ){
-    return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
     if ($cmd eq "set"){
-      return "$attrName support 0 or 1 only" if ($attrVal !~ m/[01]/);
+      return "use $attrName only for device"        if (!$hash->{helper}{role}{dev});
+      return "$attrName support 0 or 1 only"        if ($attrVal !~ m/[01]/);
+      return "$attrName invalid for virtal devices" if ($hash->{role}{vrt});
       $attr{$name}{$attrName} = $attrVal;
     }
     else{
@@ -745,10 +745,11 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   my $rxt = CUL_HM_getRxType($hash);
   my $id = CUL_HM_hash2Id($hash);
   my @p;
-  if (!($rxt & ~0x04)){@p = ("$id","00","01","FE1F");}#config only
-  elsif($rxt & 0x10)  {@p = ("$id","00","01","1E");  }#lazyConfig
-  else                {@p = ("$id","00","01","00");  }
-# else                {@p = ("$id","00","01","1E");  }
+  if ($hash->{helper}{role}{vrt}){;}                     #virtual channels should not be assigned
+  elsif(!($rxt & ~0x04)) {@p = ("$id","00","01","FE1F");}#config only
+  elsif($rxt & 0x10)     {@p = ("$id","00","01","1E");  }#lazyConfig
+  else                   {@p = ("$id","00","01","00");  }
+# else                   {@p = ("$id","00","01","1E");  }
   if (AttrVal($hash->{NAME},"aesCommReq",0)){
     $p[1] = sprintf("%02X",(hex($p[1]) + 1));
     $p[3] = ($p[3]eq "")?"1E":$p[3];
@@ -760,7 +761,7 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
 }
 sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
   my ($hash)=@_;
-
+  return if ($hash->{helper}{role}{vrt});
   my $oldChn = $hash->{helper}{io}{newChn};
   my @p = @{$hash->{helper}{io}{p}};
   # General todo
@@ -6033,7 +6034,16 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   { #update readings in device - oldfashioned style, copy from Readings
     my @histVals;
     foreach my $var ("displayMode","displayTemp","controlMode","decalcDay","displayTempUnit","day-temp","night-temp","party-temp"){
-      push @histVals,$var.":".ReadingsVal($name,"R-".$var,"???");
+      my $varV = ReadingsVal($name,"R-".$var,"???");
+      
+      foreach my $e( grep {${$_}[2] =~ m/$var/}# see if change is pending
+                     grep {$hash eq ${$_}[0]}
+                     grep {scalar(@{$_} == 3)}
+                     @evtEt){
+        $varV = ${$e}[2];
+        $varV =~ s/^R-$var:// ;
+      }
+      push @histVals,"$var:$varV";
     }
     CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($hash),1,@histVals) if (@histVals);
   }
