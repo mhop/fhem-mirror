@@ -292,7 +292,8 @@ sub GDS_Attr(@){
 			break;
 			}
 		when("gdsSetCond"){
-			fhem("define gdsDummy at +00:00:30 set $name conditions $attrValue");
+			CommandDefine(undef, "gdsDummy at +00:00:30 set $name conditions $attrValue");
+			$attr{gdsDummy}{room} = 'hidden';
 			break;
 			}
 		default {$attr{$name}{$attrName} = $attrValue;}
@@ -591,7 +592,7 @@ sub decodeCAPData($$){
 	while(($k, $v) = each %readings){
 		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)) if(defined($v)); }
 	readingsEndUpdate($hash, 1);
-
+	eval {readingsSingleUpdate($hash, 'a_eventCode_AREA_COLOR_hex', _rgbd2h(ReadingsVal($name, 'a_eventCode_AREA_COLOR', '')),0);};
 	return;
 }
 
@@ -1072,6 +1073,13 @@ sub sepLine($) {
 	return $output;
 }
 
+sub _rgbd2h($) {
+	my ($input) = @_;
+	my @a = split(" ", $input);
+	my $output = sprintf( "%x%x%x", $a[0],$a[1],$a[2]);
+	return $output;
+}
+
 sub createIndexFile($){
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
@@ -1507,7 +1515,7 @@ sub initDropdownLists($){
 	<ul>
 		<li><b>_&lt;readingName&gt;</b> - debug informations</li>
 		<li><b>a_&lt;readingName&gt;</b> - weather data from CAP alert messages. Readings will NOT be updated automatically</li>
-		<li><b>c_&lt;readingName&gt;</b> - weather data from SET weather conditions. Readings will be updated every 60 minutes</li>
+		<li><b>c_&lt;readingName&gt;</b> - weather data from SET weather conditions. Readings will be updated every 20 minutes</li>
 		<li><b>g_&lt;readingName&gt;</b> - weather data from GET weather conditions. Readings will NOT be updated automatically</li>
 	</ul>
 	<br/><br/>
