@@ -7,6 +7,9 @@ FW_colorpickerUpdateLine(d)
   el = document.getElementById(name);
 
   if(el) {
+    if( d[1].length > 6 ) {
+      d[1] = d[1].slice(0,6);
+    }
     el.color.fromString(d[1]);
   }
 }
