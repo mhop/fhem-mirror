@@ -1242,6 +1242,7 @@ FW_showRoom()
         next;
       }
     }
+    next if(!$FW_types{$dev});   # FHEMWEB connection, missed due to caching
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       next if($FW_hiddengroup{$grp}); 
       $group{$grp}{$dev} = 1;
