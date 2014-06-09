@@ -114,6 +114,7 @@ FHEM/36_EC3000.pm            justme1968           http://forum.fhem.de Sonstige 
 FHEM/36_JeeLink.pm           justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/36_PCA301.pm            justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/36_LaCrosse.pm          justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/36_EMT7110.pm           HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/38_CO20.pm              justme1968           http://forum.fhem.de Sonstiges
 FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
 FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
