@@ -265,6 +265,7 @@ sub cfgDB_AttrRead($) {
 # generic file functions called from fhem.pl
 sub cfgDB_FileRead($) {
 	my ($filename) = @_;
+	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
 	my $fhem_dbh = _cfgDB_Connect;
 	my $sth = $fhem_dbh->prepare( "SELECT content FROM fhembinfilesave WHERE filename LIKE '$filename'" );
@@ -284,7 +285,7 @@ sub cfgDB_FileRead($) {
 }
 sub cfgDB_FileWrite($@) {
 	my ($filename,@content) = @_;
-#	chomp(@content) if($filename =~ m/.gplot$/);
+	Log3(undef, 4, "configDB writing file: $filename");
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhembinfilesave values (?, ?)');
