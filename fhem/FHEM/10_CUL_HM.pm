@@ -868,9 +868,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
   #  return "" if($src eq $id);# mirrored messages - covered by !$shash
   if(!$shash){    # Unknown source
-#    CUL_HM_pushEvnts();
-#    $defs{$_}{".noDispatchVars"} = 1 foreach (@entities);
-#    return (CUL_HM_pushEvnts(),@entities);
+    return "" if ($msg =~ m/998112......000001/);# HMLAN internal message, consum 
     return;
   }
   $respRemoved = 0;  #set to 'no response in this message' at start
@@ -903,7 +901,7 @@ sub CUL_HM_Parse($$) {#########################################################
           my $pName = CUL_HM_id2Name($peer);
           $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
           next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
-          push @evtEt,[$defs{$pName},1,"trig_aes1_$cName:$aesStat:$mNo"];
+          push @evtEt,[$defs{$pName},1,"trig_aes_$cName:$aesStat:$mNo"];
         }
       }
       CUL_HM_pushEvnts();
@@ -2833,7 +2831,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
         else                     { @fnd = grep /:$a[2]$/,@fnd;}
         $_ =~ s/status_(.*):.*/$1/ foreach(@fnd);
         push @fnd,"empty" if (!scalar(@fnd));
-        return  join",",@fnd;
+        return  join",",sort(@fnd);
       } else{
         return "please enter parameter [alive|unknown|dead|notAlive]";
       }
@@ -4321,32 +4319,16 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
       }
       elsif(  ($vc ne "init" && $hashVd->{msgRed} <= $hashVd->{miss})
             || $hash->{helper}{virtTC} ne "00") {
-         $hashVd->{msgSent} = 1;
-#        CUL_HM_SndCmd($defs{$hashVd->{nDev}},sprintf("%02X%s%s%s"
-#                                             ,$msgCnt
-#                                             ,"A112221133150B94"
-#                                             ,""
-#                                             ,""));
-#        if ($defs{$hashVd->{nDev}}->{cmdStack}){
-#          my $mcA = sprintf("%02X",$msgCnt);
-#          CUL_HM_PushCmdStack($defs{$hashVd->{nDev}},sprintf("%02X%s%s%s"
-#                                               ,$msgCnt
-#                                               ,$hashVd->{cmd}
-#                                               ,$hash->{helper}{virtTC}
-#                                               ,$hashVd->{val}));
-#
-#          CUL_HM_SndCmd($defs{$hashVd->{nDev}}, $mcA.'A1121743BF150B94');
-#          CUL_HM_ProcessCmdStack($defs{$hashVd->{nDev}});
-#        }
-#        else{
-          CUL_HM_SndCmd($defs{$hashVd->{nDev}},sprintf("%02X%s%s%s"
+        $hashVd->{msgSent} = 1;
+        CUL_HM_SndCmd($defs{$hashVd->{nDev}},sprintf("%02X%s%s%s"
                                              ,$msgCnt
                                              ,$hashVd->{cmd}
                                              ,$hash->{helper}{virtTC}
                                              ,$hashVd->{val}));
-#        }
       }
       InternalTimer($tn+10,"CUL_HM_valvePosTmr","valveTmr:$vId",0);
+      $hashVd->{virtTC} = $hash->{helper}{virtTC};#save for repeat
+      $hash->{helper}{virtTC} = "00";
     }
     elsif ($hashVd->{typ} == 2){#send to broadcast
       CUL_HM_PushCmdStack($hash,sprintf("%02X%s%s"
@@ -4362,7 +4344,6 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
     CUL_HM_UpdtReadSingle($hash,"state","stopped",1);
     return;# terminate processing
   }
-  $hash->{helper}{virtTC} = "00";
   CUL_HM_ProcessCmdStack($hash);
 }
 sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup 
@@ -4391,6 +4372,7 @@ sub CUL_HM_valvePosTmr(@) {#calc next vd wakeup
     $hashVd->{ackT} = $ackTime;
   }
   else {
+    $hash->{helper}{virtTC} = $hashVd->{virtTC} if($hash->{helper}{virtTC} eq "00" && $hashVd->{virtTC});
     $hashVd->{miss}++;
   }
   CUL_HM_UpdtReadSingle($hash,"valveCtrl",$vcn,1) if($vc ne $vcn);
