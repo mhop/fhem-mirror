@@ -238,7 +238,7 @@ EMT7110_Attr(@)
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; EMT7110 &lt;addr&gt;</code> <br>
-    addr is a 1 digit hex number to identify the EMT7110 device.<br>
+    addr is a 4 digit hex number to identify the EMT7110 device.<br>
   </ul>
   <br>
 
@@ -262,7 +262,7 @@ EMT7110_Attr(@)
   <ul>
     <li>accumulatedPowerMeasured<br>
       The accumulated power sent by the EMT7110. The EMT7110 accumulates the power even if it was removed and reconnected to the power outlet.
-      The only was to reset it is to remove and reinsert the batteries in the EMT7110.       
+      The only way to reset it is to remove and reinsert the batteries in the EMT7110.       
     </li><br>
     
     <li>accumulatedPower<br>
