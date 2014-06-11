@@ -1,10 +1,21 @@
 ##############################################
 # $Id$
 
+# EnOcean Security in Perl, teach-in, VAES, MAC and message handling
+# Copyright: Jan Schneider (timberwolf at tec-observer dot de)
+# License: GPL (v2) see http://www.gnu.org/licenses/gpl-2.0.html
+
 package main;
 
 use strict;
 use warnings;
+my $cryptFunc;
+eval "use Crypt::Rijndael";
+if ($@) {
+  $cryptFunc = 0;  
+} else {
+  $cryptFunc = 1;
+}
 use SetExtensions;
 
 sub EnOcean_Define($$);
@@ -12,7 +23,7 @@ sub EnOcean_Initialize($);
 sub EnOcean_Parse($$);
 sub EnOcean_Get($@);
 sub EnOcean_Set($@);
-sub EnOcean_hvac_01Cmd($$$);
+sub EnOcean_hvac_01Cmd($$);
 sub EnOcean_CheckSenderID($$$);
 sub EnOcean_SndRadio($$$$$$$);
 sub EnOcean_ReadingScaled($$$$);
@@ -25,6 +36,10 @@ my %EnO_rorgname = ("F6" => "switch",  # RPS, org 05
                     "D1" => "MSC",     # MSC
                     "D2" => "VLD",     # VLD
                     "D4" => "UTE",     # UTE
+                    "30" => "SEC",     # secure telegram
+                    "31" => "ENC",     # secure telegram with encapsulation
+                    "32" => "SECD",    # decrypted secure telegram
+                    "35" => "STE",     # secure Teach-In
                    );
 my @EnO_ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
 my %EnO_ptm200btn;
@@ -92,7 +107,8 @@ my %EnO_manuf = (
   "030" => "NEC AccessTechnica Ltd",
   "031" => "ITEC Corporation",  
   "032" => "Simix Co Ltd",  
-  "034" => "Eurotronic Technology GmbH",  
+  "033" => "Permundo GmbH",  
+  "034" => "Eurotronic Technology GmbH",
   "035" => "Art Japan Co Ltd",  
   "036" => "Tiansu Automation Control System Co Ltd",  
   "038" => "Gruppo Giordano Idea Spa",  
@@ -222,6 +238,11 @@ my %EnO_subType = (
   "D2.01.0A" => "actuator.01",
   "D2.01.10" => "actuator.01",
   "D2.01.11" => "actuator.01",
+  "D2.03.00" => "switch.00",
+  "D2.03.10" => "windowHandle.10",  
+  "D2.10.00" => "roomCtrlPanel.00",  
+  "D2.10.01" => "roomCtrlPanel.00",  
+  "D2.10.02" => "roomCtrlPanel.00",  
   "D5.00.01" => "contact",
   "F6.02.01" => "switch",
   "F6.02.02" => "switch",
@@ -269,22 +290,25 @@ EnOcean_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 " .
                        "actualTemp angleMax:slider,-180,20,180 angleMin:slider,-180,20,180 " .
-                       "angleTime:0,1,2,3,4,5,6 comMode:biDir,uniDir " .
+                       "angleTime:0,1,2,3,4,5,6 comMode:biDir,uniDir dataEnc " .
                        "defaultChannel:" . join(",", @EnO_defaultChannel) . " " .
                        "destinationID " .
                        "devChannel devUpdate:off,auto,demand,polling,interrupt dimValueOn " .
                        "disable:0,1 disabledForIntervals " .
                        "gwCmd:" . join(",", sort @EnO_gwCmd) . " humidityRefDev " .
+                       "key macAlgo " .
                        "manufID:" . join(",", sort keys %EnO_manuf) . " " . 
                        "model:" . join(",", @EnO_models) . " " .
                        "pollInterval rampTime repeatingAllowed:yes,no " .
+                       "rlc rlcAlgo rlcTX " .
                        "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin " .
                        "securityLevel:unencrypted sensorMode:switch,pushbutton " .
                        "shutTime shutTimeCloses subDef " .
                        "subDef0 subDefI " .
                        "subType:" . join(",", sort grep { !$subTypeList{$_}++ } values %EnO_subType) . " " .
+                       "subTypeReading:" . join(",", sort grep { !$subTypeSetList{$_}++ } values %EnO_subType) . " " .
                        "subTypeSet:" . join(",", sort grep { !$subTypeSetList{$_}++ } values %EnO_subType) . " " .
-                       "switchMode:switch,pushbutton " .
+                       "summerMode:off,on switchMode:switch,pushbutton " .
                        "switchType:direction,universal,central temperatureRefDev " .
                        $readingFnAttributes;
 
@@ -292,6 +316,11 @@ EnOcean_Initialize($)
     $EnO_ptm200btn{$EnO_ptm200btn[$i]} = "$i:30";
   }
   $EnO_ptm200btn{released} = "0:20";
+  if ($cryptFunc == 1){
+    Log3 undef, 2, "EnOcean Cryptographic functions available.";  
+  } else {
+    Log3 undef, 2, "EnOcean Cryptographic functions are not available.";  
+  }  
   return undef;
 }
 
@@ -358,7 +387,7 @@ EnOcean_Get ($@)
       shift(@a);
       my $cmdID;
       my $channel = shift(@a);
-      $channel = AttrVal($name, "defaultChannel", undef) if (!defined $channel);
+      $channel = AttrVal($name, "defaultChannel", AttrVal($name, "devChannel", undef)) if (!defined $channel);
       if (!defined $channel || $channel eq "all") {
         $channel = 30;     
       } elsif ($channel eq "input") {
@@ -371,13 +400,13 @@ EnOcean_Get ($@)
       
       if ($cmd eq "state") {
         $cmdID = 3;      
-        Log3 $name, 3, "EnOcean $name get $cmdID $channel.";  
+        Log3 $name, 3, "EnOcean get $name $cmd $channel";  
         $data = sprintf "%02X%02X", $cmdID, $channel;
         
       } elsif ($cmd eq "measurement") {
         $cmdID = 6;
         my $query = shift(@a);
-        Log3 $name, 3, "EnOcean $name get $cmdID $channel $query.";  
+        Log3 $name, 3, "EnOcean get $name $cmd $channel $query";  
         if ($query eq "energy") {
           $query = 0;
         } elsif ($query eq "power") {
@@ -387,10 +416,30 @@ EnOcean_Get ($@)
         }
         $data = sprintf "%02X%02X", $cmdID, $query << 5 | $channel;
         
+      } elsif ($cmd eq "special" && $manufID eq "033") {
+        $rorg = "D1";
+        my $query = shift(@a);
+        Log3 $name, 3, "EnOcean get $name $cmd $channel $query";  
+        if ($query eq "health") {
+          $query = 7;
+        } elsif ($query eq "load") {
+          $query = 8;
+        } elsif ($query eq "voltage") {
+          $query = 9;
+        } elsif ($query eq "serialNumber") {
+          $query = 0x81;
+        } else {
+          return "$cmd <channel> <query> wrong, choose health|load|voltage|serialNumber.";
+        }
+        $data = sprintf "0331%02X", $query;
+      
       } else {
-        return "Unknown argument $cmd, choose one of state measurement";
+        if ($manufID eq "033") {
+          return "Unknown argument $cmd, choose one of state measurement special";
+        } else {
+          return "Unknown argument $cmd, choose one of state measurement";        
+        }
       }
-      Log3 $name, 2, "EnOcean get $name $cmd";
     
     } else {
       # subtype does not support get commands
@@ -398,8 +447,8 @@ EnOcean_Get ($@)
     
     }
     EnOcean_SndRadio(undef, $hash, $rorg, $data, $subDef, $status, $destinationID);
-    # next commands will be sent with a delay
-    select(undef, undef, undef, 0.2);
+    # next commands will be sent with a delay, previously 0.2 sec
+    ###select(undef, undef, undef, 0.1);
   }
 }  
 
@@ -750,7 +799,7 @@ EnOcean_Set($@)
         "desired-temp" => "\\d+(\\.\\d)?",
         "actuator"     => "\\d+",
         "unattended"   => "",
-        "initialize"   => "",
+        #"initialize"   => "",
         "runInit"      => "",
         "liftSet"      => "",
         "valveOpen"    => "",
@@ -764,17 +813,19 @@ EnOcean_Set($@)
 
       $updateState = 2;
       $hash->{CMD} = $cmd;
-      $hash->{READINGS}{CMD}{TIME} = $tn;
-      $hash->{READINGS}{CMD}{VAL} = $cmd;
+      #$hash->{READINGS}{CMD}{TIME} = $tn;
+      #$hash->{READINGS}{CMD}{VAL} = $cmd;
+      readingsSingleUpdate($hash, "CMD", $cmd, 1);
 
       my $arg = "true";
       if ($re) {
         $arg = $a[1];
         shift(@a);
       }
-
-      $hash->{READINGS}{$cmd}{TIME} = $tn;
-      $hash->{READINGS}{$cmd}{VAL} = $arg;
+  
+      #$hash->{READINGS}{$cmd}{TIME} = $tn;
+      #$hash->{READINGS}{$cmd}{VAL} = $arg;
+      readingsSingleUpdate($hash, $cmd, $arg, 1);
 
     } elsif ($st eq "gateway") {
       # Gateway (EEP A5-38-08)
@@ -1525,7 +1576,7 @@ EnOcean_Set($@)
           }
         }
         $channel = shift(@a);
-        $channel = AttrVal($name, "defaultChannel", undef) if (!defined $channel);
+        $channel = AttrVal($name, "defaultChannel", AttrVal($name, "devChannel", undef)) if (!defined $channel);
         if (!defined $channel || $channel eq "all") {
           CommandDeleteReading(undef, "$name channel.*");          
           CommandDeleteReading(undef, "$name dim.*");          
@@ -1838,7 +1889,13 @@ EnOcean_Set($@)
         }        
         my $measurementCmd = shift(@a);
         my $measurementCmdVal = shift(@a);
-        if ($measurementCmd eq "mode") {
+        if (!defined $measurementCmdVal) {
+          return "Usage: $cmd $measurementCmd <value> needed.";
+        }
+        if (!defined $measurementCmd) {
+          return "Usage: $cmd <measurementCmd> wrong, choose mode|report|" .
+                 "reset|delta|unit|responseTimeMax|responseTimeMin.";
+        } elsif ($measurementCmd eq "mode") {
           if ($measurementCmdVal eq "energy") {
             $measurementMode = "energy";        
             $measurementModeCmd = 0;        
@@ -2100,14 +2157,14 @@ EnOcean_Set($@)
         $data = "00";
         $rorg = "F6";
         $status = "20";
-        # next commands will be sent with a delay
-        select(undef, undef, undef, 0.2);
+        # next commands will be sent with a delay, previously 0.2 sec
+        ###select(undef, undef, undef, 0.1);
 	Log3 $name, 2, "EnOcean set $name released";
         EnOcean_SndRadio(undef, $hash, $rorg, $data, $subDef, $status, $destinationID);
       }
     }
-    # next commands will be sent with a delay
-    select(undef, undef, undef, 0.2);
+    # next commands will be sent with a delay, previously 0.2 sec
+    ###select(undef, undef, undef, 0.1);
   }
 
   # set reading state if acknowledge is not expected
@@ -2123,6 +2180,7 @@ sub
 EnOcean_Parse($$)
 {
   my ($iohash, $msg) = @_;
+  my $err;
   my (undef, $packetType, $rorg, $data, $id, $status, $odata) = split(":", $msg);
   $odata =~ m/^(..)(........)(..)(..)$/;
   my ($subTelNum, $destinationID, $RSSI, $securityLevel) = (hex($1), $2, hex($3), hex($4));  
@@ -2162,6 +2220,20 @@ EnOcean_Parse($$)
   my $name = $hash->{NAME};
   my $teach = $defs{$name}{IODev}{Teach};
   my $teachOut;
+  
+  if ($rorg eq "30" || $rorg eq "31") {
+    Log3 $name, 5, "EnOcean $name secure data RORG: $rorg DATA: $data ID: $id STATUS: $status";    
+    ($err, $rorg, $data) = EnOcean_sec_convertToNonsecure($hash, $rorg, $data);   
+    if (defined $err) {
+      Log3 $name, 2, "EnOcean $name security ERROR: $err"; 
+      return "";
+    }
+    if ($rorg eq "32") {
+    # reconstruct RORG
+    $rorg = "D2";
+    Log3 $name, 5, "EnOcean $name decrypted data RORG: 32 >> $rorg DATA: $data ID: $id STATUS: $status";    
+    }
+  }
 
   # extract data bytes $db[x] ... $db[0]
   my @db;
@@ -2174,7 +2246,9 @@ EnOcean_Parse($$)
   my $model = AttrVal($name, "model", "");
   my $manufID = uc(AttrVal($name, "manufID", ""));
   my $st = AttrVal($name, "subType", "");
-  Log3 $name, 5, "EnOcean $name PacketType:$packetType RORG:$rorg DATA:$data ID:$id STATUS:$status";
+  my $subtypeReading = AttrVal($name, "subTypeReading", undef);
+
+  Log3 $name, 5, "EnOcean $name received PacketType: $packetType RORG: $rorg DATA: $data ID: $id STATUS: $status";
 
   if ($rorg eq "F6") {
     # RPS Telegram (PTM200)
@@ -2341,18 +2415,21 @@ EnOcean_Parse($$)
 
         if ($st eq "hvac.01" || $st eq "MD15") {
           if ($teach) {
-            # bidirectional Teach-In for EEP A5-20-01 (MD15)
+            # bidirectional Teach-In for EEP A5-20-01
             $attr{$name}{comMode} = "biDir";          
             $attr{$name}{destinationID} = "unicast";
             # SenderID = ChipID
-            $attr{$name}{subDef} = "00000000";
+            #$attr{$name}{subDef} = "00000000";
+            my $subDef = "00000000";
+            $subDef = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, $subDef);
+            $attr{$name}{subDef} = $subDef;
             # next commands will be sent with a delay, max 10 s
-            select(undef, undef, undef, 0.1);
+            ###select(undef, undef, undef, 0.1);
             # teach-in response
-            EnOcean_SndRadio(undef, $hash, $rorg, "800FFFF0", "00000000", "00", $hash->{DEF});
-            #EnOcean_SndRadio(undef, $hash, $rorg, "800800F0", "00000000", "00", $hash->{DEF});
-            select(undef, undef, undef, 0.5);
-            EnOcean_hvac_01Cmd($hash, $name, 128); # 128 == 20 degree C
+            EnOcean_SndRadio(undef, $hash, $rorg, "800FFFF0", $subDef, "00", $hash->{DEF});
+            # next commands will be sent with a delay, previously 0.5 sec
+            ###select(undef, undef, undef, 0.1);
+            EnOcean_hvac_01Cmd($hash, 128); # 128 == 20 degree C
           } else {
             Log3 $name, 1, "EnOcean Unknown device $name and subType $st, set transceiver in teach mode.";
             return "";
@@ -2407,7 +2484,7 @@ EnOcean_Parse($$)
       push @event, "3:actuatorStatus:".(($db[2] & 0x01) ? "obstructed" : "ok");
       push @event, "3:measured-temp:". sprintf "%0.1f", ($db[1]*40/255);
       push @event, "3:selfCtl:"      . (($db[0] & 0x04) ? "on" : "off");
-      EnOcean_hvac_01Cmd($hash, $name, $db[1]);
+      EnOcean_hvac_01Cmd($hash, $db[1]);
 
     } elsif ($st eq "PM101") {
       # Light and Presence Sensor [Omnio Ratio eagle-PM101]
@@ -2514,7 +2591,7 @@ EnOcean_Parse($$)
         $airQuality = "low";
       }
       push @event, "3:airQuality:$airQuality";
-      push @event, "3:state:CO2 $co2 AQ: $airQuality T: $temp H: $humi";
+      push @event, "3:state:CO2: $co2 AQ: $airQuality T: $temp H: $humi";
 
     } elsif ($st eq "radonSensor.01") {
       # Gas Sensor, Radon Sensor (EEP A5-09-06)
@@ -3286,7 +3363,7 @@ EnOcean_Parse($$)
       push @event, "3:powerSwitch:" . ($db[0] & 1 ? "on" : "off");
       push @event, "3:state:" . ($db[0] & 1 ? "on" : "off");
 
-    } elsif ($st =~ m/^autoMeterReading/) {
+    } elsif ($st =~ m/^autoMeterReading/ || $st eq "actuator.01" && $manufID eq "033") {
       # Automated meter reading (AMR) (EEP A5-12-00 ... A5-12-03)
       # $db[3] (MSB) + $db[2] + $db[1] (LSB) is the Meter reading
       # $db[0]_bit_7 ... $db[0]_bit_4 is the Measurement channel
@@ -3295,16 +3372,16 @@ EnOcean_Parse($$)
       # 2 = x/100, 3 = x/1000
       my $dataType = ($db[0] & 4) >> 2;
       my $divisor = $db[0] & 3;
+      my $meterReading;
       if ($divisor == 3) {
-        $divisor = 1000;
+        $meterReading = sprintf "%.3f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 1000;
       } elsif ($divisor == 2) {
-        $divisor = 100;
+        $meterReading = sprintf "%.2f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 100;
       } elsif ($divisor == 1) {
-        $divisor = 10;
+        $meterReading = sprintf "%.1f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 10;
       } else {
-        $divisor = 1;
+        $meterReading = $db[3] << 16 | $db[2] << 8 | $db[1];
       }
-      my $meterReading = sprintf "%0.1f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / $divisor;
       my $channel = $db[0] >> 4;
 
       if ($st eq "autoMeterReading.00") {
@@ -3318,7 +3395,7 @@ EnOcean_Parse($$)
           # cumulative counter
           push @event, "3:counter$channel:$meterReading";
         }
-      } elsif ($st eq "autoMeterReading.01") {
+      } elsif ($st eq "autoMeterReading.01" || $st eq "actuator.01" && $manufID eq "033") {
         # Automated meter reading (AMR), Electricity (EEP A5-12-01)
         # [Eltako FSS12, FWZ12, DSZ14DRS, DSZ14WDRS, DWZ61]
         # $db[0]_bit_7 ... $db[0]_bit_4 is the Tariff info
@@ -3341,13 +3418,15 @@ EnOcean_Parse($$)
         } elsif ($dataType == 1) {
           # momentary power
           push @event, "3:power:$meterReading";
-          push @event, "3:state:$meterReading";
+          if (!($st eq "actuator.01" && $manufID eq "033")) {
+	    push @event, "3:state:$meterReading";
+          }
         } else {
           # power consumption
           push @event, "3:energy$channel:$meterReading";
           push @event, "3:currentTariff:$channel";
         }
-      } elsif ($st eq "autoMeterReading.02" | $st eq "autoMeterReading.03") {
+      } elsif ($st eq "autoMeterReading.02" || $st eq "autoMeterReading.03") {
         # Automated meter reading (AMR), Gas, Water (EEP A5-12-02, A5-12-03)
         if ($dataType == 1) {
           # current value
@@ -3663,8 +3742,43 @@ EnOcean_Parse($$)
 
   } elsif ($rorg eq "D1") {
     # MSC telegram
-    if ($st eq "test") {
-    
+    if ($st eq "actuator.01" && $manufID eq "033") {
+      if (substr($data, 3, 1) == 4) {
+        my $getParam = ReadingsVal($name, "getParam", 0);
+        if ($getParam == 7) {
+          push @event, "3:loadClassification:no";
+          push @event, "3:loadLink:" . (($db[1] & 16) ? "connected":"disconnected");
+          push @event, "3:loadOperation:3-wire";
+          push @event, "3:loadState:" . (($db[1] & 64) ? "on":"off");
+          CommandDeleteReading(undef, "$name getParam");        
+        } elsif ($getParam == 8) {
+          if ($db[0] & 4) {
+            push @event, "3:devTempState:warning";
+          } elsif ($db[0] & 2) {
+            push @event, "3:devTempState:max";
+          } else {
+            push @event, "3:devTempState:ok";
+          }
+          push @event, "3:mainsPower:" . (($db[1] & 8) ? "failure":"ok");
+          if ($db[1] == 0xFF) {
+          push @event, "3:devTemp:invalid";
+          } else {
+          push @event, "3:devTemp:" . $db[1];
+          }
+          CommandDeleteReading(undef, "$name getParam");        
+        } elsif ($getParam == 9) {
+          push @event, "3:voltage:" . sprintf("%.2f", (hex(substr($data, 4, 4)) * 0.01));        
+          CommandDeleteReading(undef, "$name getParam");        
+        } elsif ($getParam == 0x81) {
+          $hash->{READINGS}{serialNumber}{VAL} = substr($data, 4, 4);
+          $hash->{READINGS}{getParam}{VAL} = 0x82;          
+          EnOcean_SndRadio(undef, $hash, "D1", "033182", AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});        
+        } elsif ($getParam == 0x82) {
+          push @event, "3:serialNumber:" . $hash->{READINGS}{serialNumber}{VAL} . substr($data, 4, 4);        
+          CommandDeleteReading(undef, "$name getParam");        
+        }
+      }
+      #push @event, "3:MSCData:$data";    
     } elsif ($st eq "raw") {
       # raw
       push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
@@ -3682,6 +3796,8 @@ EnOcean_Parse($$)
   } elsif ($rorg eq "D2") {
     # VLD telegram
     if ($st eq "test") {
+      ### Test
+      push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
     
     } elsif ($st eq "actuator.01") {
       # Electronic switches and dimmers with Energy Measurement and Local Control
@@ -3728,8 +3844,9 @@ EnOcean_Parse($$)
           push @event, "3:channel" . $channel . ":on";
           push @event, "3:state:on";
         }
-        if ($channel ne "input" && $channel == 0) {
+        if ($channel ne "Input") {
           push @event, "3:dim:" . $dimValue;
+          push @event, "3:dim" . $channel . ":" . $dimValue;
         } else {
           push @event, "3:dim" . $channel . ":" . $dimValue;
         }
@@ -3738,9 +3855,10 @@ EnOcean_Parse($$)
         # actuator measurement response
         my $unit = $db[4] >> 5;
         if ($unit == 1) {
-          $unit = "Wh";
+          #$unit = "Wh";
+          $unit = "KWh";
           push @event, "3:energyUnit" . $channel . ":" . $unit;
-          push @event, "3:energy" . $channel . ":" . hex substr($data, 4, 8);
+          push @event, "3:energy" . $channel . ":" . sprintf("%.3f", (hex substr($data, 4, 8)) / 1000);
         } elsif ($unit == 2) {
           $unit = "KWh";
           push @event, "3:energyUnit" . $channel . ":" . $unit;
@@ -3761,9 +3879,227 @@ EnOcean_Parse($$)
       
       } else {
         # unknown response
+       }
+      
+    } elsif ($st eq "switch.00" || $st eq "windowHandle.10") {
+      if ($db[0] == 1) {
+        push @event, "3:state:open_from_tilted";      
+      } elsif ($db[0] == 2) {
+        push @event, "3:state:closed";      
+      } elsif ($db[0] == 3) {
+        push @event, "3:state:open";      
+      } elsif ($db[0] == 4) {
+        push @event, "3:state:tilted";      
+      } elsif ($db[0] == 5) {
+        push @event, "3:state:AI B0";      
+        push @event, "3:channelA:AI";      
+        push @event, "3:channelB:B0";      
+        push @event, "3:energyBow:pressed";      
+      } elsif ($db[0] == 6) {
+        push @event, "3:state:?";      
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 7) {
+        push @event, "3:state:A0 B0";      
+        push @event, "3:channelA:A0";      
+        push @event, "3:channelB:B0";      
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 8) {
+        if (AttrVal($name, "sensorMode", "switch") eq "pushbutton") {
+          push @event, "3:state:pressed";      
+        }
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 9) {
+        push @event, "3:state:AI BI";      
+        push @event, "3:channelA:AI";      
+        push @event, "3:channelB:BI";      
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 10) {
+        push @event, "3:state:A0 BI";      
+        push @event, "3:channelA:A0";      
+        push @event, "3:channelB:BI";      
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 11) {
+        push @event, "3:state:BI";      
+        push @event, "3:channelB:BI";      
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 12) {
+        push @event, "3:state:B0";      
+        push @event, "3:channelB:B0";      
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 13) {
+        push @event, "3:state:AI";      
+        push @event, "3:channelA:AI";      
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 14) {
+        push @event, "3:state:A0";      
+        push @event, "3:channelA:A0";      
+        push @event, "3:energyBow:pressed";
+      } elsif ($db[0] == 15) {
+        if (AttrVal($name, "sensorMode", "switch") eq "pushbutton") {
+          push @event, "3:state:released";      
+        }
+        push @event, "3:energyBow:released";
+      }
+      
+    } elsif ($st eq "roomCtrlPanel.00") {
+      ### Test
+      #push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
+      # message identifier
+      my $mid = hex(substr($data, 0, 2)) >> 5;
+      # message continuation flag
+      my $mcf = hex(substr($data, 0, 2)) & 3;     
+      if ($mcf == 0) {
+        # message complete
+        push @event, "3:message:complete";
+        
+      } elsif ($mcf == 1) {
+        # message incomplete
+        push @event, "3:message:incomplete";
+        
+      } elsif ($mcf == 2) {
+        # automatic message control
+        push @event, "3:message:autoCtrl";
+        
+      } elsif ($mcf == 3) {
+        # reserved
+        
+      }
+      if ($mid == 0) {
+        # general message
+        push @event, "3:general:$data";
+        
+      } elsif ($mid == 1) {
+        # data message
+        my $temperature = "-";
+        $temperature = sprintf "%.1f", $db[0] / 255 * 40 if ($db[2] & 1);
+        push @event, "3:temperature:$temperature";        
+        my $setpointTemp = "-";
+        $setpointTemp = sprintf "%.1f", $db[1] / 255 * 40 if ($db[2] & 2);
+        push @event, "3:setpointTemp:$setpointTemp";        
+        my $roomCtrlMode = ($db[2] & 12) >> 2;
+        if ($roomCtrlMode == 3) {
+          $roomCtrlMode = "buildingProtection";
+        } elsif ($roomCtrlMode == 2) {
+           $roomCtrlMode = "preComfort";
+        } elsif ($roomCtrlMode == 1) {
+           $roomCtrlMode = "economy";
+        } else{
+           $roomCtrlMode = "comfort";       
+        }
+        push @event, "3:roomCtrlMode:$roomCtrlMode";        
+        my $heating = ($db[2] & 48) >> 4;
+        if ($heating == 3) {
+          $heating = "auto";
+        } elsif ($heating == 2) {
+           $heating = "off";
+        } elsif ($heating == 1) {
+           $heating = "on";
+        } else{
+           $heating = "-";       
+        }
+        push @event, "3:heating:$heating";        
+        my $cooling = ($db[2] & 192) >> 6;
+        if ($cooling == 3) {
+          $cooling = "auto";
+        } elsif ($cooling == 2) {
+           $cooling = "off";
+        } elsif ($cooling == 1) {
+           $cooling = "on";
+        } else{
+           $cooling = "-";       
+        }
+        push @event, "3:cooling:$cooling";        
+        my $occupancy = $db[3] & 3;
+        if ($occupancy == 3) {
+          $occupancy = "reserved";
+        } elsif ($occupancy == 2) {
+           $occupancy = "absent";
+        } elsif ($occupancy == 1) {
+           $occupancy = "present";
+        } else{
+           $occupancy = "-";       
+        }
+        push @event, "3:occupancy:$occupancy";        
+        my $motion = ($db[3] & 12) >> 2;
+        if ($motion == 3) {
+          $motion = "reserved";
+        } elsif ($motion == 2) {
+           $motion = "on";
+        } elsif ($motion == 1) {
+           $motion = "off";
+        } else{
+           $motion = "-";       
+        }
+        push @event, "3:motion:$motion";       
+        push @event, "3:solarPowered:" . ($db[3] & 16 ? "no" : "yes");        
+        my $battery = ($db[3] & 96) >> 5;
+        if ($battery == 3) {
+          $battery = "empty";
+        } elsif ($battery == 2) {
+           $battery = "low";
+        } elsif ($battery == 1) {
+           $battery = "ok";
+        } else{
+           $battery = "-";       
+        }
+        push @event, "3:battery:$battery";        
+        my $window = $db[4] & 3;
+        if ($window == 3) {
+          $window = "reserved";
+        } elsif ($window == 2) {
+           $window = "open";
+        } elsif ($window == 1) {
+           $window = "closed";
+        } else{
+           $window = "-";       
+        }
+        push @event, "3:window:$window";        
+        push @event, "3:moldWarning:" . ($db[4] & 4 ? "on" : "off");       
+        push @event, "3:customWarning1:" . ($db[4] & 8 ? "on" : "off");        
+        push @event, "3:customWarning2:" . ($db[4] & 16 ? "on" : "off");        
+        my $fanSpeed = "-";
+        $fanSpeed = sprintf "%d", $db[5] & 127 if ($db[4] & 128);
+        push @event, "3:fan:$fanSpeed";
+        my $humi = "-";
+        $humi = sprintf "%d", $db[6] / 2.55 if ($db[5] & 128);
+        push @event, "3:humidity:$humi";        
+        push @event, "3:state:T: $temperature H: $humi F: $fanSpeed SPT: $setpointTemp O: $occupancy M: $motion";
+        #request configuration massage
+        EnOcean_SndRadio(undef, $hash, "D2", "0211", AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
+        Log3 $name, 2, "EnOcean $name request send";        
+      
+      } elsif ($mid == 2) {
+        # configuration message
+        push @event, "3:config:$data";
+        EnOcean_SndRadio(undef, $hash, "D2", "0000", AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
+        Log3 $name, 2, "EnOcean $name acknowledge send";
+      
+      } elsif ($mid == 3) {
+        # room control setup
+        my $setpointComfort = "-";
+        $setpointComfort = sprintf "%.1f", $db[1] / 255 * 40 if ($db[0] & 1);
+        push @event, "3:setpointComfort:$setpointComfort";        
+        my $setpointEconomy = "-";
+        $setpointEconomy = sprintf "%.1f", $db[2] / 255 * 40 if ($db[0] & 2);
+        push @event, "3:setpointEconomy:$setpointEconomy";        
+        my $setpointPreComfort = "-";
+        $setpointPreComfort = sprintf "%.1f", $db[3] / 255 * 40 if ($db[0] & 4);
+        push @event, "3:setpointPreComfort:$setpointPreComfort";        
+        my $setpointBuildingProtection = "-";
+        $setpointBuildingProtection = sprintf "%.1f", $db[3] / 255 * 40 if ($db[0] & 8);
+        push @event, "3:setpointBuildingProtection:$setpointBuildingProtection";        
+        #push @event, "3:ctrlSetup:$data";
+        EnOcean_SndRadio(undef, $hash, "D2", "0000", AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
+        Log3 $name, 2, "EnOcean $name acknowledge send";
+      
+      } elsif ($mid == 4) {
+        # time program setup
+        push @event, "3:timeSetup:$data";
+        EnOcean_SndRadio(undef, $hash, "D2", "0000", AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
+        Log3 $name, 2, "EnOcean $name acknowledge send";
       
       }
-    
+     
     } elsif ($st eq "raw") {
       # raw
       push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";    
@@ -3776,7 +4112,7 @@ EnOcean_Parse($$)
       push @event, "3:state:$data";
     }
   } elsif ($rorg eq "D4" && $teach) {
-    # UTE - Universal Uni- and Bidirectional Teach-In / Teach Out
+    # UTE - Universal Uni- and Bidirectional Teach-In / Teach-Out
     # 
     if (($db[6] & 1) == 0) {
       # Teach-In Query telegram received
@@ -3801,7 +4137,7 @@ EnOcean_Parse($$)
           push @event, "3:teach-in:EEP $rorg-$func-$type Manufacturer: $mid";
           if (!($db[6] & 0x40)) {
             # EEP Teach-In-Response expected
-            # send EEP Teach-In-Response message
+            # send EEP Teach-In Response message
             $data = (sprintf "%02X", $db[6] & 0x80 | 0x11) . substr($data, 2, 12);
             my $subDef = "00000000";
             if ($comMode eq "biDir") {
@@ -3810,9 +4146,9 @@ EnOcean_Parse($$)
             } 
             $attr{$name}{subDef} = $subDef;
             # command will be sent with a delay
-            select(undef, undef, undef, 0.1);
+            ###select(undef, undef, undef, 0.1);
             EnOcean_SndRadio(undef, $hash, "D4", $data, $subDef, "00", $id);
-            Log3 $name, 2, "EnOcean $name UTE teach-in-response send to $id";
+            Log3 $name, 2, "EnOcean $name UTE teach-in response send to $id";
           }
           Log3 $name, 2, "EnOcean $name UTE teach-in EEP $rorg-$func-$type Manufacturer: $mid";
           # store attr subType, manufID ...
@@ -3828,7 +4164,7 @@ EnOcean_Parse($$)
           # send EEP Teach-In Response message
           $data = (sprintf "%02X", $db[6] & 0x80 | 0x31) . substr($data, 2, 12);
           # command will be sent with a delay
-          select(undef, undef, undef, 0.1);
+          ###select(undef, undef, undef, 0.1);
           EnOcean_SndRadio(undef, $hash, "D4", $data, $defs{$name}{IODev}{BaseID}, "00", $id);        
           Log3 $name, 2, "EnOcean $name EEP $rorg-$func-$type not supported";
           # store attr subType, manufID ...
@@ -3840,7 +4176,7 @@ EnOcean_Parse($$)
         $teachOut =1;
         $data = (sprintf "%02X", $db[6] & 0x80 | 0x21) . substr($data, 2, 12);
         # command will be sent with a delay
-        select(undef, undef, undef, 0.1);
+        ###select(undef, undef, undef, 0.1);
         EnOcean_SndRadio(undef, $hash, "D4", $data, AttrVal($name, "subDef", $defs{$name}{IODev}{BaseID}), "00", $id);
         Log3 $name, 2, "EnOcean $name delete request executed";        
       } elsif ($teachInReq == 2) {
@@ -3849,8 +4185,19 @@ EnOcean_Parse($$)
     } else {
       # Teach-In Respose telegram received
       # no action
-      Log3 $name, 2, "EnOcean $name $data UTE Teach-In Respose telegram received";
+      Log3 $name, 2, "EnOcean $name UTE teach-in respose telegram $data received";
     }  
+  } elsif ($rorg eq "35" && $teach) {
+     Log3 $name, 2, "EnOcean $name sec_parseTeachIn Input RORG: $rorg DATA: $data";
+     # Secure Teach-In
+    ($err, $msg) = EnOcean_sec_parseTeachIn($hash, $data);
+    if (defined $err) {
+      Log3 $name, 2, "EnOcean $name secure teach-in ERROR: $err"; 
+      return "";
+    }
+    Log3 $name, 2, "EnOcean $name secure teach-in $msg";    
+    CommandSave(undef, undef);
+    return "";  
   }
 
   readingsBeginUpdate($hash);
@@ -3893,6 +4240,14 @@ sub EnOcean_Attr(@) {
       CommandDeleteAttr(undef, "$name devUpdate");
     }
 
+  } elsif ($attrName eq "summerMode") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^(off|on)$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name devUpdate");
+    }
+
   }
   return undef;
 }
@@ -3908,12 +4263,14 @@ sub EnOcean_Notify(@) {
 
 # Message from Fhem to the actuator (EEP A5-20-01)
 sub
-EnOcean_hvac_01Cmd($$$)
+EnOcean_hvac_01Cmd($$)
 {
-  my ($hash, $name, $db_1) = @_;
+  my ($hash, $db_1) = @_;
+  my $name = $hash->{NAME}; 
   my $cmd = ReadingsVal($name, "CMD", undef);
+  my $subDef = AttrVal($name, "subDef", "00000000");
   if($cmd) {
-    my $msg; # Unattended
+    my $msg;
     my $arg1 = ReadingsVal($name, $cmd, 0); # Command-Argument
     # primarily temperature from the reference device, secondly the attribute actualTemp
     # and thirdly from the MD15 measured temperature device is read
@@ -3923,14 +4280,16 @@ EnOcean_hvac_01Cmd($$$)
     $actualTemp = 20 if ($actualTemp !~ m/^[+-]?\d+(\.\d+)?$/);
     $actualTemp = 0 if ($actualTemp < 0);
     $actualTemp = 40 if ($actualTemp > 40);
-    readingsSingleUpdate($hash, "temperature", (sprintf "%0.1f", $actualTemp), 1);
-    
+    my $summerMode = AttrVal($name, "summerMode", "off");
+    readingsSingleUpdate($hash, "temperature", (sprintf "%0.1f", $actualTemp), 1);    
     if($cmd eq "actuator") {
-      $msg = sprintf "%02X000008", $arg1;
+      #$msg = sprintf "%02X000008", $arg1;
+      $msg = sprintf "%02X00%02X08", $arg1, ($summerMode eq "on" ? 8 : 0);      
     } elsif($cmd eq "desired-temp") {
-      $msg = sprintf "%02X%02X0408", $arg1 * 255 / 40, (40 - $actualTemp) * 255 / 40;
-    } elsif($cmd eq "initialize") {
-      $msg = "00006408";
+      #$msg = sprintf "%02X%02X0408", $arg1 * 255 / 40, (40 - $actualTemp) * 255 / 40;
+      $msg = sprintf "%02X%02X%02X08", $arg1 * 255 / 40, (40 - $actualTemp) * 255 / 40, ($summerMode eq "on" ? 12 : 4);      
+    #} elsif($cmd eq "initialize") {
+    #  $msg = "00006408";
     # Maintenance commands
     } elsif($cmd eq "runInit") {
       $msg = "00008108";
@@ -3942,12 +4301,13 @@ EnOcean_hvac_01Cmd($$$)
       $msg = "00001108";
     }
     if($msg) {
-      select(undef, undef, undef, 0.2);
-      EnOcean_SndRadio(undef, $hash, "A5", $msg, "00000000", "00", $hash->{DEF});
-      if($cmd eq "initialize") {
-        delete($defs{$name}{READINGS}{CMD});
-        delete($defs{$name}{READINGS}{$cmd});
-      }
+      # next commands will be sent with a delay, previously 0.2 sec
+      ###select(undef, undef, undef, 0.1);
+      EnOcean_SndRadio(undef, $hash, "A5", $msg, $subDef, "00", $hash->{DEF});
+      #if($cmd eq "initialize") {
+      #  delete($defs{$name}{READINGS}{CMD});
+      #  delete($defs{$name}{READINGS}{$cmd});
+      #}
     }
   }
 }
@@ -4044,7 +4404,12 @@ EnOcean_CheckSenderID($$$)
       push @{$count{$element} > 1 ? \@intersection : \@difference }, $element;
     }
     @difference = sort @difference;
-    $senderID = $difference[0];    
+    if (defined $difference[0]) {
+      $senderID = $difference[0];
+    } else {
+      $senderID = "0" x 8;
+      Log3 $IODev, 2, "EnOcean $IODev no free senderIDs available";      
+    }
   
   } else {
   
@@ -4071,9 +4436,9 @@ EnOcean_SndRadio($$$$$$$)
   }
   # Data Length:4 Optional Length:2 Packet Type = 01 (radio)
   my $header = sprintf "%04X%02X01", (length($data)/2 + 6), $odataLength;
+  Log3 $hash->{NAME}, 4, "EnOcean $hash->{NAME} sent PacketType: 1 RORG: $rorg DATA: $data ID: $senderID STATUS: $status ODATA: $odata";
   $data = $rorg . $data . $senderID . $status . $odata;
   IOWrite($hash, $header, $data);
-  Log3 $hash->{NAME}, 4, "EnOcean IOWrite $hash->{NAME} Header: $header Data: $data";
 }
 
 # Scale Readings
@@ -4105,6 +4470,516 @@ EnOcean_TimerSet($)
 {
   my ($par)=@_;
   EnOcean_Set($par->{hash}, @{$par->{timerCmd}});
+}
+
+# Parse Secure Teach-In Telegrams
+sub EnOcean_sec_parseTeachIn($$) {
+	my ($hash, $telegram) = @_;
+	my $name = $hash->{NAME};
+    
+	my $rlc;	# Rolling code
+	my $key1;	# First part of private key
+	my $key2;	# Second part of private key
+
+	# Extract byte fields from telegram
+	# TEACH_IN_INFO, SLF, RLC/KEY/variable
+	$telegram =~ /^(..)(..)(.*)/;	# TODO Parse error handling?
+	my $teach_bin = unpack('B8',pack('H2', $1));	# Parse as ASCII HEX, unpack to bitstring
+	my $slf_bin = unpack('B8',pack('H2', $2));	# Parse as ASCII HEX, unpack to bitstring
+	my $crypt = $3;
+    
+	# Extract bit fields from teach-in info field
+	# IDX, CNT, PSK, TYPE, INFO
+	$teach_bin =~ /(..)(..)(.)(.)(..)/;	# TODO Parse error handling?
+	my $idx = unpack('C',pack('B8', '000000'.$1));	# Padd to byte, parse as unsigned char
+	my $cnt = unpack('C',pack('B8', '000000'.$2));  # Padd to byte, parse as unsigned char
+	my $psk = $3;
+	my $type = $4;
+	my $info = unpack('C',pack('B8', '000000'.$5)); # Padd to byte, parse as unsigned char
+    
+	# Extract bit fields from SLF field
+	# RLC_ALGO, RLC_TX, MAC_ALGO, DATA_ENC
+	$slf_bin =~ /(..)(.)(..)(...)/;	# TODO Parse error handling?
+	my $rlc_algo = unpack('C',pack('B8', '000000'.$1));	# Padd to byte, parse as unsigned char
+	my $rlc_tx = $2;
+	my $mac_algo = unpack('C',pack('B8', '000000'.$3));	# Padd to byte, parse as unsigned char
+	my $data_enc = unpack('C',pack('B8', '00000'.$4));	# Padd to byte, parse as unsigned char
+    
+	#print "IDX: $idx, CNT: $cnt, PSK: $psk, TYPE: $type, INFO: $info\n";
+	
+	# The teach-in information is split in two telegrams due to the ERP1 limitations on telegram length
+	# So we should get a telegram with index 0 and count 2 with the first half of the infos needed
+	if ($idx == 0 && $cnt == 2) {
+		# First part of the teach in message
+		#print "First part of 2 part teach in message received\n";
+		#print "RLC_ALGO: $rlc_algo, RLC_TX: $rlc_tx, MAC_ALGO: $mac_algo, DATA_ENC: $data_enc\n";
+		#print "RLC and KEY are ". ($psk == 1 ? "" : "not") . " encrypted\n";
+		#print "Application is ". ($type == 1 ? "a PTM" : "non-specfic") . "\n";
+        
+		# Decode teach in type
+		if ($type == 0) {
+                       if ($info == 0) {
+                         $attr{$name}{comMode} = "uniDir";
+                       } else {
+                         $attr{$name}{comMode} = "biDir";
+                       }
+		} else {
+                       if ($info == 0) {
+                         $attr{$name}{subType} = $EnO_subType{"D2.03.00"};
+                         $attr{$name}{manufID} = "7FF";
+                         readingsSingleUpdate($hash, "teach-in", "EEP D2-03-00 Manufacturer: " . $EnO_manuf{"7FF"}, 1);
+                         Log3 $name, 2, "EnOcean $name teach-in EEP D2-03-00 Rocker A Manufacturer: " . $EnO_manuf{"7FF"};                         
+                       } else {
+                         $attr{$name}{subType} = $EnO_subType{"D2.03.00"};
+                         $attr{$name}{manufID} = "7FF";
+                         readingsSingleUpdate($hash, "teach-in", "EEP D2-03-00 Manufacturer: " . $EnO_manuf{"7FF"}, 1);
+                         Log3 $name, 2, "EnOcean $name teach-in EEP D2-03-00 Rocker B Manufacturer: " . $EnO_manuf{"7FF"};                         
+                       }
+		}
+		
+        
+		# Decode RLC algorithm and extract RLC and private key (only first part most likely)
+		if ($rlc_algo == 0) {
+			# No RLC used in telegram or internally in memory, use case untested
+			return ("Secure modes without RLC not tested or supported", undef);
+		} elsif ($rlc_algo == 1) {
+			# "RLC= 2-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+            
+			# Extract RLC and KEY fields from data trailing SLF field
+			# RLC, KEY, ID, STATUS
+			$crypt =~ /^(....)(.*)$/;
+			$rlc = $1;
+			$key1 = $2;
+            
+			#print "RLC: $rlc\n";
+			#print "Part 1 of KEY: $key1\n";
+			
+			# Store in device hash
+			$attr{$name}{rlcAlgo} = '2,++';
+                        readingsSingleUpdate($hash, ".rlc", $rlc, 0);
+			# storing backup copy
+			$attr{$name}{rlc} = $rlc;
+			$attr{$name}{key} = $key1;
+            
+		} elsif ($rlc_algo == 2) {
+			# RLC= 3-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+
+			# Extract RLC and KEY fields from data trailing SLF field
+			# RLC, KEY, ID, STATUS
+			$crypt =~ /^(......)(.*)$/;
+			$rlc = $1;
+			$key1 = $2;
+            
+			#print "RLC: $rlc\n";
+			#print "Part 1 of KEY: $key1\n";
+
+			# Store in device hash            
+			$attr{$name}{rlcAlgo} = '3,++';
+                        readingsSingleUpdate($hash, ".rlc", $rlc, 0);
+			# storing backup copy
+			$attr{$name}{rlc} = $rlc;
+			$attr{$name}{key} = $key1;
+		} else {
+			# Undefined RLC algorithm
+			return ("Undefined RLC algorithm $rlc_algo", undef);
+		}
+        
+		# RLC Transmission
+		if ($rlc_tx == 0 ) {
+			# Secure operation mode telegrams do not contain RLC, we store and track it ourself
+			$attr{$name}{rlcTX} = 'false';
+		} else {
+			# Secure operation mode messages contain RLC, CAUTION untested
+			$attr{$name}{rlcTX} = 'true';
+		}
+        
+		# Decode MAC Algorithm
+		if ($mac_algo == 0) {
+			# No MAC included in the secure telegram
+			# Doesn't make sense for RLC senders like the PTM215, as we can't verify the RLC then...
+			#$attr{$name}{macAlgo} = 'none';
+			return ("Secure mode without MAC algorithm unsupported", undef);
+		} elsif ($mac_algo == 1) {
+			# CMAC is a 3-byte-long code
+			$attr{$name}{macAlgo} = '3';
+		} elsif ($mac_algo == 2) {
+			# MAC is a 4-byte-long code
+			$attr{$name}{macAlgo} = '4';
+		} else {
+			# Undefined MAC algorith;
+			# Nothing we can do either...
+			#$attr{$name}{macAlgo} = 'undefined';
+			return ("Undefined MAC algorithm $mac_algo", undef);
+		}
+        
+		# Decode data encryption algorithm
+		if ($data_enc == 0) {
+			# Data not encrypted? Right now we will handle this like an error, concrete use case untested
+			return ("Secure mode message without data encryption unsupported", undef);
+		} elsif ($data_enc == 1) {
+			# Unspecified
+			return ("Undefined data encryption algorithm $data_enc", undef);
+		} elsif ($data_enc == 2) {
+			# Unspecified
+			return ("Undefined data encryption algorithm $data_enc", undef);
+		} elsif ($data_enc == 3) {
+			# Data will be encrypted/decrypted XORing with a string obtained from a AES128 encryption
+			$attr{$name}{dataEnc} = 'VAES';
+		} elsif ($data_enc == 4) {
+			# Data will be encrypted/decrypted using the AES128 algorithm in CBC mode
+			# Might be used in the future right now untested
+			#$attr{$name}{dataEnc} = 'AES-CBC';
+			return ("Secure mode message with AES-CBC data encryption unsupported", undef);
+		} else {
+			# Something went horribly wrong
+			return ("Could not parse data encryption information, $data_enc", undef);
+		}
+        
+		# Ok we got a lots of infos and the first part of the private key
+		return (undef, "part1: $name");
+	} elsif ($idx == 1 && $cnt == 0) {
+		# Second part of the teach-in telegrams
+		
+		# Extract byte fields from telegram
+		# Don't care about info fields, KEY, ID, don't care about status
+		$telegram =~ /^..(.*)$/;	# TODO Parse error handling?
+		$key2 = $1;
+        
+		# We already should have gathered the infos from the first teach-in telegram
+		if (!defined($attr{$name}{key})) {
+			# We have missed the first telegram
+			return ("Missing first teach-in telegram", undef);
+		}
+        
+		# Append second part of private key to first part of private key
+		$attr{$name}{key} .= $key2;
+		# We're done
+		return (undef, "part2: $name");
+	} 
+	# Sequence error?
+	return ("Teach-in sequence problem IDC: $idx CNT: $cnt", undef);
+}
+
+# Do VAES decyrption
+# All parameters need to be passed as byte strings
+#
+# Parameter 1: Current rolling code, 16 bytes
+# Parameter 2: Private key, 16bytes
+# Paremeter 3: Encrypted data, 16bytes
+#
+# Returns: Decrypted data, 16 bytes
+#
+# Decryption of more than 16bytes of data is currently unsupported 
+#
+sub EnOcean_sec_decodeVAES($$$) {
+	my $rlc = $_[0];
+	my $private_key = $_[1];
+	my $data_enc = $_[2];
+	# Public key according to EnOcean Security specification
+	my $public_key = pack('H32', '3410de8f1aba3eff9f5a117172eacabd');
+
+        # Input for VAES
+        my $aes_in = $public_key ^ $rlc;
+
+	#print "--\n";
+        #print "Public Key  ".unpack('H32', $public_key)."\n";
+        #print "RLC         ".unpack('H32', $rlc)."\n";
+        #print "AES input   ".unpack('H32', $aes_in)."\n";
+	#print "--\n";
+        #print "Private Key ".unpack('H32', $private_key)."\n";
+
+        my $cipher = Crypt::Rijndael->new( $private_key );
+        my $aes_out = $cipher->encrypt($aes_in);
+
+        #print "AES output  ".unpack('H32', $aes_out)."\n";
+        #print "Data_enc:   ".unpack('H32', $data_enc)."\n";
+
+        my $data_dec = $data_enc ^ $aes_out;
+
+        #print "Data_dec:   ".unpack('H32', $data_dec)."\n";
+	return $data_dec;
+}
+
+# Returns current RLC in hex format and increments the stored RLC
+# Checks the boundaries of the RLC for roll-over
+# 
+# Parameter 1: Sender ID in hexadecimal format for lookup in receivers hash
+#
+# Affects: receivers hash
+#
+# Returns: RLC in hexadecimal format
+#
+sub EnOcean_sec_getRLC($) {
+	my $hash = $_[0];
+        my $name = $hash->{NAME};
+
+	# Fetch newest RLC from receiver hash
+	my $old_rlc = ReadingsVal($name, ".rlc", $attr{$name}{rlc});
+	if (hex($old_rlc) < hex($attr{$name}{rlc})) {
+	  $old_rlc = $attr{$name}{rlc};
+	}
+
+	#print "RLC old: $old_rlc\n";
+	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC old: $old_rlc";
+
+	# Advance RLC by one
+	my $new_rlc = hex($old_rlc) + 1;
+
+	# Boundary check
+	if ($attr{$name}{rlcAlgo} eq '2,++') {
+		if ($new_rlc > 65535) {
+			#print "RLC rollover\n";
+			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
+			$new_rlc = 0;
+		        $attr{$name}{rlc} = "0";
+                        CommandSave(undef, undef);			
+		}
+		readingsSingleUpdate($hash, ".rlc", uc(unpack('H4',pack('n', $new_rlc))), 0);
+		$attr{$name}{rlc} = uc(unpack('H4',pack('n', $new_rlc)));
+	} elsif ($attr{$name}{rlcAlgo} eq '3,++') {
+		if ($new_rlc > 16777215) {
+			#print "RLC rollover\n";
+			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
+			$new_rlc = 0;
+		        $attr{$name}{rlc} = "0";
+                        CommandSave(undef, undef);			
+		}
+                readingsSingleUpdate($hash, ".rlc", uc(unpack('H6',pack('N', $new_rlc))), 0);
+		$attr{$name}{rlc} = uc(unpack('H6',pack('N', $new_rlc)));
+	}
+	
+	#print "RLC new: ".$attr{$name}{rlc}."\n";
+	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC new: ".$attr{$name}{rlc};
+	return $old_rlc;
+}
+
+# Generate MAC of data
+# 
+# Parameter 1: private key as byte string, 16bytes
+# Parameter 2: data fro which mac should be calculated in hexadecimal format, len variable
+# Parameter 3: length of MAC to be generated in bytes
+#
+# Returns: MAC in hexadecimal format
+#
+# This function currently supports data with lentgh of less then 16bytes, 
+# MAC for longer data is untested but specified
+#
+sub EnOcean_sec_generateMAC($$$) {
+	my $private_key = $_[0];
+	my $data = $_[1];
+	my $cmac_len = $_[2];
+
+	#print "Calculating MAC for data $data\n";
+        Log3 undef, 5, "EnOcean_sec_generateMAC Calculating MAC for data $data";                         
+	Log3 undef, 5, "EnOcean_sec_generateMAC private key ".unpack('H32', $private_key);
+	
+	# Pack data to 16byte byte string, padd with 10..0 binary
+	my $data_expanded = pack('H32', $data.'80');
+
+	#print "Exp. data  ".unpack('H32', $data_expanded)."\n";
+	
+	# Constants according to specification
+	my $const_zero = pack('H32','00');
+	my $const_rb = pack('H32', '00000000000000000000000000000087');
+	
+	# Encrypt zero data with private key to get L
+	my $cipher = Crypt::Rijndael->new($private_key);
+        my $l = $cipher->encrypt($const_zero);
+	#print "L          ".unpack('H32', $l)."\n";
+	#print "L          ".unpack('B128', $l)."\n";
+	
+	# Expand L to 128bit string
+	my $l_bit = unpack('B128', $l);
+	
+	# K1 and K2 stored as 128bit string
+	my $k1_bit;
+	my $k2_bit;
+	
+	# K1 and K2 as binary 
+	my $k1;
+	my $k2;
+	
+	# Store L << 1 in K1
+	$l_bit =~ /^.(.{127})/;
+	$k1_bit = $1.'0';
+	$k1 = pack('B128', $k1_bit);
+
+	# If MSB of L == 1, K1 = K1 XOR const_Rb
+	if($l_bit =~ m/^1/) {
+		#print "MSB of L is set\n";
+		$k1 = $k1 ^ $const_rb;
+		$k1_bit = unpack('B128', $k1);
+	} else {
+		#print "MSB of L is unset\n";
+	}
+
+	# Store K1 << 1 in K2
+	$k1_bit =~ /^.(.{127})/;
+	$k2_bit = $1.'0';
+	$k2 = pack('B128', $k2_bit);
+
+	# If MSB of K1 == 1, K2 = K2 XOR const_Rb
+	if($k1_bit =~ m/^1/) {
+		#print "MSB of K1 is set\n";
+		$k2 = $k2 ^ $const_rb;
+	} else {
+		#print "MSB of K1 is unset\n";
+	}
+	
+	# XOR data with K2
+	$data_expanded ^= $k2;
+
+	# Encrypt data
+	my $cmac = $cipher->encrypt($data_expanded);
+
+	#print "CMAC ".unpack('H32', $cmac)."\n";
+        Log3 undef, 5, "EnOcean_sec_generateMAC CMAC ".unpack('H32', $cmac);                         
+	
+	# Extract specified len of MAC
+	my $cmac_pattern = '^(.{'.($cmac_len * 2).'})';
+	unpack('H32', $cmac) =~ /$cmac_pattern/;
+	Log3 undef, 5, "EnOcean_sec_generateMAC cutted CMAC ".unpack('H32', $1);
+	
+	# Return MAC in hexadecimal format
+	return uc($1);
+}
+
+# Verify (MAC) and decode/decrypt secure mode message
+#
+# Parameter 1: content of radio telegram in hexadecimal format
+# 
+# Returns: "ERROR-" + error description, "OK-" + EEP F6-02-01 telegram in hexadecimal format
+#
+# Right now we only decode PTM215 telegrams which are transmitted as RORG 30 and without
+# encapsulation. Encapsulation of other telegrams is possible and specified but untested due to the
+# lack of hardware suporting this. 
+#
+sub EnOcean_sec_convertToNonsecure($$$) {
+	my ($hash, $rorg, $crypt_data) = @_;
+        my $name = $hash->{NAME};
+        if ($cryptFunc == 0) {
+	  return ("Cryptographic functions are not available", undef, undef);        
+        }
+        my $private_key;
+        
+	# Prefix of pattern to extract the different cryptographic infos
+	my $crypt_pattern = "^(.*)";;
+	
+	# Flags and infos for fields to expect
+	my $expect_rlc = 0;
+	my $expect_mac = 0;
+	my $mac_len;
+	my $expect_enc = 0;
+
+    # Check if the RORG is supported
+    if ($rorg ne '30') {
+        return ("RORG $rorg unsupported", undef, undef);
+    }
+    
+	# Check if we got any data for this sender ID
+	if (!defined($attr{$name})) {
+		# Sender unknown
+		return ("Sender unknown/not teached in", undef, undef);
+	}
+	$attr{$name}{rlcAlgo} = '2,++';
+	# Check if RLC is transmitted and when, which length to expect
+	if($attr{$name}{rlcTX} eq 'true') {
+		# Message should contain RLC
+		if ($attr{$name}{rlcAlgo} eq '2,++') {
+			$crypt_pattern .= "(....)";
+			$expect_rlc = 1;
+		} elsif ($attr{$name}{rlcAlgo} eq '3,++') {
+			$crypt_pattern .= "(......)";
+			$expect_rlc = 1; 
+		} else {
+			# RLC_TX but no info on RLC length
+			return ("RLC_TX and RLC_ALGO inconsistent", undef, undef);
+		}
+	}
+
+	# Check what length of MAC to expect
+	if($attr{$name}{macAlgo} eq '3') {
+		$crypt_pattern .= "(......)";
+		$mac_len = 3;
+		$expect_mac = 1;
+	} elsif ($attr{$name}{macAlgo} eq '4') {
+		$crypt_pattern .= "(........)";
+		$mac_len = 4;
+		$expect_mac = 1;
+	} else {
+		# According to the specification it's possible to transmit no MAC, bt we don't implement this for now
+		return ("Secure mode messages without MAC unsupported", undef, undef);
+	}
+	
+	# Suffix for crypt pattern
+	$crypt_pattern .= '$';
+
+	#print "Crypt_pattern: $crypt_pattern\n";
+	
+	# Extract byte fields from message payload
+	$crypt_data =~ /$crypt_pattern/;
+	my $data_enc = $1;
+	my $rlc;
+	my $mac;
+	if ($expect_rlc == 1 && $expect_mac == 1) {
+		$rlc = $2;
+		$mac = $3;
+	} elsif ($expect_rlc == 0 && $expect_mac == 1) {
+		$mac = $2;
+	}
+	
+	#print "DATA: $data_enc\n";
+        Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure DATA: $data_enc";                         
+	#if ($expect_rlc == 1) { print "RLC: $rlc\n";};
+	if ($expect_rlc == 1) { Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RLC: $rlc";};
+	#print "MAC: $mac\n";
+        Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure MAC: $mac";                         
+
+	# TODO RLC could be transmitted with data, could not test this
+	#if(!defined($rlc)) {
+	#	print "No RLC in message, using stored value\n";
+	#	$rlc = getRLC($id);
+	#}
+	
+	# Maximum RLC search window is 128
+	foreach my $rlc_window (0..128) {
+		#print "Trying RLC offset $rlc_window\n";		
+
+		# Fetch stored RLC		
+		$rlc = EnOcean_sec_getRLC($hash);
+
+		# Fetch private Key for VAES
+		
+		if ($attr{$name}{key} =~ /[\dA-F]{32}/) {
+		  $private_key = pack('H32',$attr{$name}{key});
+		} else {
+	          return ("private key wrong, please teach-in the device new", undef, undef);
+		}
+
+		# Generate and check MAC over RORG+DATA+RLC fields
+		if($mac eq EnOcean_sec_generateMAC($private_key, $rorg.$data_enc.$rlc, $mac_len)) {
+			#print "RLC verfified\n";
+			
+			# Expand RLC to 16byte
+			my $rlc_expanded = pack('H32',$rlc);
+
+			# Expand data to 16byte
+			my $data_expanded = pack('H32',$data_enc);
+		
+			# Decode data using VAES
+			my $data_dec = EnOcean_sec_decodeVAES($rlc_expanded, $private_key, $data_expanded);
+		
+			# Extract one nibble of data
+			my $data_end = unpack('H32', $data_dec);
+			$data_end =~ /^.(.)/;
+		
+			#print "MSG: $1\n";
+### Bitte Ausgabeformat checken, Soll: 00 ... FF			
+			return (undef, '32', "0" . uc($1));
+		}
+	}
+	# Couldn't verify or decrypt message in RLC window
+	return ("Can't verify or decrypt telegram", undef, undef);
 }
 
 # Undef
@@ -4169,6 +5044,31 @@ EnOcean_Undef($$)
   Use the TCM <code>attr &lt;name&gt; <a href="#blockSenderID">blockSenderID</a> own</code>
   to block receiving telegrams with a TCM SenderIDs.
   <br><br>
+  <b>EnOcean Security features</b><br><br>
+  <ul>
+    The receiving of encrypted messages is supported. This module currently allows the secure operating mode of PTM 215
+    based switches. To use this, you first have to start the teach
+    in mode via<br><br>
+    <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br><br>
+    and then doing the following on the PTM 215 module:<br>
+    <li>Remove the switch cover of the module</li>
+    <li>Press both buttons of one rocker side (A0&A1 or B0&B1)</li>
+    <li>While keeping the buttons pressed actuate the energy bow twice.</li><br>
+    This generates two teach-in telegrams which create a Fhem device with the subType "switch.00" and synchronize the Fhem with
+    the PTM 215. Both the Fhem and the PTM 215 now maintain a counter which is used to generate a rolling code encryption scheme.
+    Also during teach-in, a private key is transmitted to the Fhem. The counter value is allowed to desynchronize for a maximum of
+    128 counts, to allow compensating for missed telegrams, if this value is crossed you need to teach-in the PTM 215 again. Also
+    if your Fhem installation gets erased including the state information, you need to teach in the PTM 215 modules again (which
+    you would need to do anyway).<br>
+    As for the security of this solution, if someone manages to capture the teach-in telegrams, he can extract the private keay of
+    the PTM 215 module, so the added security isn't perfect but relies on the fact, that noone listens to you setting up your
+    installation.
+    <br><br>
+    The cryptographic functions need the additional Perl module Crypt/Rijndael. The module must be installed manually.
+    With the help of CPAN at the operating system level, for example,<br><br>
+    <code>/usr/bin/perl -MCPAN -e 'install Crypt::Rijndael'</code>
+  <br><br>
+  </ul>
 
   <a name="EnOceandefine"></a>
   <b>Define</b>
@@ -4727,15 +5627,19 @@ EnOcean_Undef($$)
   <b>Get</b>
   <ul>
     <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-11)<br>
-        [Telefunken Funktionsstecker, PEHA Easyclick]<br>
+        [Telefunken Funktionsstecker, PEHA Easyclick, Permundo SmartPlug PSC234]<br>
     <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
        <li>state [&lt;channel&gt;]<br>
-         </li>
+       </li>
        <li>measurement &lt;channel&gt; energy|power<br>
-         </li>
+       </li>
+       <li>special &lt;channel&gt; health|load|voltage|serialNumber<br>
+       additional Permondo SmartPlug PSC234 commands
+       </li>
+
     </ul><br>
        The default channel can be specified with the attr <a href="#EnOcean_defaultChannel">defaultChannel</a>.<br>     
        The attr subType must be actuator.01. This is done if the device was
@@ -4897,13 +5801,17 @@ EnOcean_Undef($$)
       Type of device (EEP Profile) used for sending commands. Set the Attribute manually.
       The profile has to fit their basic profile. More information can be found in the basic profiles.
     </li>
+    <li><a name="EnOcean_summerMode">summerMode</a> off|on,
+      [summerMode] = off is default.<br>
+      Put Battery Powered Actuator (hvac.01) in summer operation to reduce energy consumption.
+    </li>
     <li><a name="switchMode">switchMode</a> switch|pushbutton,
-      [SwitchMode] = switch is default.<br>
+      [switchMode] = switch is default.<br>
       The set command "released" immediately after &lt;value&gt; is sent if the
       attribute is set to "pushbutton".
     </li>
     <li><a name="switchType">switchType</a> direction|universal|central,
-      [SwitchType] = direction is default.<br>
+      [switchType] = direction is default.<br>
       EnOcean Devices support different types of sensors, e. g. direction
       switch, universal switch or pushbutton, central on/off.<br>
       For Eltako devices these are the sensor types "Richtungstaster",
@@ -4985,6 +5893,25 @@ EnOcean_Undef($$)
      </li>
      <br><br>
 
+     <li>Pushbutton Switch (EEP D2-03-00)<br>
+         [EnOcean PTM 215 Modul]<br>
+     <ul>
+         <li>A0</li>
+         <li>AI</li>
+         <li>B0</li>
+         <li>BI</li>
+         <li>&lt;BtnX BtnY&gt; First and second action where BtnX and BtnY is
+             one of the above, e.g. A0 BI</li>
+         <li>pressed</li>
+         <li>released</li>
+         <li>energyBow: pressed|released</li>         
+         <li>state: &lt;BtnX&gt;|&lt;BtnY&gt;|released|pressed</li>
+     </ul><br>
+        The attr subType must be switch.00. This is done if the device was
+        created by autocreate. Set attr sensorMode to pushbutton manually if needed.
+     </li>
+     <br><br>
+
      <li>Smoke Detector (EEP F6-02-01 ... F6-02-02)<br>
          [Eltako FRW]<br>
      <ul>
@@ -5025,7 +5952,7 @@ EnOcean_Undef($$)
      </li>
      <br><br>
 
-     <li>Window Handle (EEP F6-10-00)<br>
+     <li>Window Handle (EEP F6-10-00, D2-03-10)<br>
          [HOPPE SecuSignal, Eltako FHF, Eltako FTKE]<br>
      <ul>
          <li>closed</li>
@@ -5034,7 +5961,7 @@ EnOcean_Undef($$)
          <li>open_from_tilted</li>
          <li>state: closed|open|tilted|open_from_tilted</li>
      </ul><br>
-        The device windowHandle should be created by autocreate.
+        The device windowHandle or windowHandle.10 should be created by autocreate.
      </li>
      <br><br>
 
@@ -5795,24 +6722,30 @@ EnOcean_Undef($$)
         The values of the reading position and anglePos are updated automatically,
         if the command position is sent or the reading state was changed
         manually to open or closed.<br>
-        Set attr subType to manufProfile, attr manufID to 00D and attr model to
+        Set attr subType file, attr manufID to 00D and attr model to
         FSB14|FSB61|FSB70 manually.
      </li>
      <br><br>
 
      <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-11)<br>
-         [Telefunken Funktionsstecker, PEHA Easyclick]<br>
+         [Telefunken Funktionsstecker, PEHA Easyclick, Permondo SmartPlug PSC234]<br>
      <ul>
         <li>on</li>
         <li>off</li>
         <li>channel&lt;0...29|All|Input&gt;: on|off</li>
         <li>dayNight: day|night</li>        
         <li>defaultState: on|off|last</li>        
+        <li>devTemp: t/&#176C|invalid</li>
+        <li>devTempState: ok|max|warning</li>
         <li>dim&lt;0...29|Input&gt;: dim/% (Sensor Range: dim = 0 % ... 100 %)</li>
         <li>energy&lt;channel&gt;: 1/[Ws|Wh|KWh]</li>
         <li>energyUnit&lt;channel&gt;: Ws|Wh|KWh</li>
         <li>error&lt;channel&gt;: ok|warning|failure</li>
+        <li>loadClassification: no</li>        
         <li>localControl&lt;channel&gt;: enabled|disabled</li>
+        <li>loadLink: connected|disconnected</li>
+        <li>loadOperation: 3-wire</li>
+        <li>loadState: on|off</li>
         <li>measurementMode: energy|power</li>        
         <li>measurementReport: auto|query</li>        
         <li>measurementReset: not_active|trigger</li>        
@@ -5828,6 +6761,7 @@ EnOcean_Undef($$)
         <li>rampTime&lt;1...3l&gt;: 1/s</li>
         <li>responseTimeMax: 1/s</li>
         <li>responseTimeMin: 1/s</li>
+        <li>serialNumber: [00000000 ... FFFFFFFF]</li>
         <li>teachInDev: enabled|disabled</li>        
 
         <li>state: on|off</li>
@@ -5880,3 +6814,4 @@ EnOcean_Undef($$)
 
 =end html
 =cut
+           
