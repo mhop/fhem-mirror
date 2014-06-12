@@ -154,6 +154,8 @@ speedtest_SpeedtestDone($)
 
   Log3 $hash, 5, "speedtest_SpeedtestDone: $string";
 
+  return if( $a[1] eq "Invalid server ID" );
+
   readingsBeginUpdate($hash);
 
   readingsBulkUpdate($hash,"ping",$a[1]);
