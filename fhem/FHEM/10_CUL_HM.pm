@@ -584,7 +584,7 @@ sub CUL_HM_Attr(@) {#################################
         else {return "param $_ unknown, use offAtPon or onAtRain";}
       }
     }
-    elsif ($md =~ m/^virtual_/){
+    elsif ($hash->{helper}{role}{vrt}){
       if ($cmd eq "set"){
         if ($attrVal eq "noOnOff"){# no action
         }
@@ -596,6 +596,9 @@ sub CUL_HM_Attr(@) {#################################
         else{
           return "attribut param $attrVal not valid for $name";
         }
+      }
+      else{
+        delete $hash->{helper}{vd}{msgRed};
       }
     }
 #    elsif ($st eq "blindActuator"){
@@ -872,7 +875,6 @@ sub CUL_HM_Parse($$) {#########################################################
     return;
   }
   $respRemoved = 0;  #set to 'no response in this message' at start
-
   my $name = $shash->{NAME};
   my $ioId = CUL_HM_h2IoId($devH->{IODev});
   $ioId = $id if(!$ioId);
@@ -922,8 +924,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
   # +++++ check for duplicate or repeat ++++
   my $msgX = "No:$mNo - t:$mTp s:$src d:$dst ".($p?$p:"");
-  if($mTp ne "00" && 
-     $devH->{lastMsg} && $devH->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
+  if($devH->{lastMsg} && $devH->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
            
     if(   $devH->{helper}{rpt}                           #was responded
        && $devH->{helper}{rpt}{IO}  eq $ioName           #from same IO
@@ -951,6 +952,7 @@ sub CUL_HM_Parse($$) {#########################################################
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
+
   my $parse = CUL_HM_parseCommon($iohash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md);
   push @evtEt,[$shash,1,"powerOn:-"] if($parse eq "powerOn");
   push @evtEt,[$shash,1,""]          if($parse eq "parsed"); # msg is parsed but may
@@ -2077,25 +2079,25 @@ sub CUL_HM_parseCommon(@){#####################################################
       $shash->{helper}{prt}{sleeping} = 1;
     }
   }  
-  
+
   my $repeat;
   if   ($mTp eq "02"){# Ack/Nack/aesReq ####################
     my $subType = substr($p,0,2);
     my $reply;
     my $success;
 
-    if ($shash->{helper}{prt}{rspWait}{wakeup}){
+    if ($shash->{helper}{prt}{rspWait}{brstWu}){
       if ($shash->{helper}{prt}{rspWait}{mNo} eq $mNo &&
           $subType eq "00"){
-        if ($shash->{helper}{prt}{awake} && $shash->{helper}{prt}{awake}==4){#re-wakeup
-          delete $shash->{helper}{prt}{rspWait};#clear wakeup values
+        if ($shash->{helper}{prt}{awake} && $shash->{helper}{prt}{awake}==4){#re-burstWakeup
+          delete $shash->{helper}{prt}{rspWait};#clear burst-wakeup values
           $shash->{helper}{prt}{rspWait}{$_} = $shash->{helper}{prt}{rspWaitSec}{$_}
                   foreach (keys%{$shash->{helper}{prt}{rspWaitSec}});   #back to original message
           delete $shash->{helper}{prt}{rspWaitSec};
           IOWrite($shash, "", $shash->{helper}{prt}{rspWait}{cmd});     # and send
           CUL_HM_statCnt($shash->{IODev}{NAME},"s");
           #General set timer
-          return "done"
+          return "done";
         }
         $shash->{protCondBurst} = "on" if (   $shash->{protCondBurst}
                                            && $shash->{protCondBurst} !~ m/forced/);
@@ -2125,7 +2127,6 @@ sub CUL_HM_parseCommon(@){#####################################################
                        ,$mNo)
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       $reply = "ACKStatus";
-      
       my $chnHash = CUL_HM_id2Hash($src.substr($p,2,2));
       push @evtEt,[$chnHash,0,"recentStateType:ack"];
      
@@ -3089,7 +3090,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "burstXmit") { ################################################
     $state = "";
-    $hash->{helper}{prt}{wakeup}=1;# start wakeup
+    $hash->{helper}{prt}{brstWu}=1;# start burst wakeup
     CUL_HM_SndCmd($hash,"++B112$id$dst");
   }
 
@@ -4187,7 +4188,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           CUL_HM_ProcessCmdStack($devHash);
         }
         elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
-          $hash->{helper}{prt}{wakeup}=1;# start auto-wakeup
+          $hash->{helper}{prt}{brstWu}=1;# start auto-burstWakeup
           CUL_HM_SndCmd($devHash,"++B112$id$dst");
         }
       }
@@ -4271,7 +4272,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_ProcessCmdStack($devHash);
     }
     elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
-      $hash->{helper}{prt}{wakeup}=1;# start auto-wakeup
+      $hash->{helper}{prt}{brstWu}=1;# start auto-burstWakeup
       CUL_HM_SndCmd($devHash,"++B112$id$dst");
     }
   }
@@ -4503,7 +4504,7 @@ sub CUL_HM_RemoveHMPair($) {####################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   RemoveInternalTimer("hmPairForSec:$name");
-  return if ($name || !defined $defs{$name});
+  return if (!$name || !defined $defs{$name});
   delete($defs{$name}{hmPair});
   delete($defs{$name}{hmPairSerial});
 }
@@ -4606,7 +4607,6 @@ sub CUL_HM_PushCmdStack($$) {
 sub CUL_HM_ProcessCmdStack($) {
   my ($chnhash) = @_;
   my $hash = CUL_HM_getDeviceHash($chnhash);
-
   if (!$hash->{helper}{prt}{rspWait}{cmd}){
     if($hash->{cmdStack} && @{$hash->{cmdStack}}){
       CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
@@ -4719,7 +4719,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
     }
     elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
       # response setup - do not repeat, set counter to 250
-      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss","wakeup:=1");
+      CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss","brstWu:=1");
     }
     elsif($mTp !~ m /C./){
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss");
@@ -4951,11 +4951,11 @@ sub CUL_HM_respPendTout($) {
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
     return if(!$pHash->{rspWait}{reSent});      # Double timer?
     my $rxt = CUL_HM_getRxType($hash);
-    if ($pHash->{rspWait}{wakeup}){#wakeup try failed (conditionalBurst)
+    if ($pHash->{rspWait}{brstWu}){#burst-wakeup try failed (conditionalBurst)
       CUL_HM_respPendRm($hash);# don't count problems, was just a try
       $hash->{protCondBurst} = "off" if (!$hash->{protCondBurst}||
                                           $hash->{protCondBurst} !~ m/forced/);;
-      $pHash->{wakeup} = 0;# finished
+      $pHash->{brstWu} = 0;# finished
       $pHash->{awake} = 0;# set to asleep
       CUL_HM_protState($hash,"CMDs_pending");
       # commandstack will be executed when device wakes up itself
