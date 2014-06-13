@@ -109,7 +109,7 @@ sub apptime_getTiming($$$@) {
     $h->{max}=$ts1;
     $h->{mAr}=join ("; ",@arg);
   }
-        ;
+
   $h->{tot}+=$ts1;
   return @ret;
 }
@@ -124,6 +124,8 @@ sub apptime_CommandDispTiming($$@) {
   return "$sFld undefined field, use one of ".join(",",keys %fld) 
         if(!defined $fld{$sFld});
   my @bmArr;
+  my @a = map{"$defs{$_}:$_"} keys (%defs); # prepare mapping hash 2 name
+  $_ =~ s/[HASH\(\)]//g foreach(@a);
   foreach my $d (sort keys %defs) {
     next if(!$defs{$d}{helper}||!$defs{$d}{helper}{bm});
     if ($sFld eq "clear"){
@@ -137,13 +139,20 @@ sub apptime_CommandDispTiming($$@) {
       ($n,$t) = split(";",$f,2) if ($d eq "global");
       $t = "" if (!defined $t);
       my $h = $defs{$d}{helper}{bm}{$f};
+          
+      my $arg = $h->{mAr};
+      foreach (@a){
+        my ($h,$n) = split(":",$_);
+        $arg =~ s/$h/$n/g; 
+      }
+
       push @bmArr,[($n,$t
                    ,$h->{max}
                    ,$h->{cnt}
                    ,$h->{tot}
                    ,$h->{tot} /$h->{cnt}
                    ,$h->{dmx}
-                   ,$h->{mAr}
+                   ,$arg
                   )];
     }
   }
