@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - ad-hoc:  (betateilchen)
+             reverted 10_CUL_HM.pm to previous version 6096
+             due to nonworking version 6098 and no reaction from developer
+             for three days. See forum topic 24475
   - feature: 36_EMT7110: added this new module
   - feature: 36_JeeLink: added initCommands attribute and flash command (by HCS)
   - feature: SYSMON: DECT Temperatur
