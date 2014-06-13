@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.19";
+my $owx_version="5.20";
 
 my %gets = (
   "id"          => "",
@@ -1107,18 +1107,10 @@ sub OWXTHERM_PT_GetValues($@) {
     unless (OWX_ASYNC_Execute($master,$thread,1,$owx_dev,"\x44",0)) {
       PT_EXIT("$owx_dev not accessible for convert");
     }
-    my ($seconds,$micros) = gettimeofday;
+    my $now = gettimeofday();
     my $delay = $convtimes{AttrVal($name,"resolution",12)};
-    my $len = length ($delay); #delay is millis, tv_address works with [sec,micros]
-    if ($len>3) {
-      $seconds += substr($delay,0,$len-3);
-      $micros += (substr ($delay,-3)*1000);
-    } else {
-      $micros += ($delay*1000);
-    }
-    $thread->{execute_delayed} = [$seconds,$micros];
-    PT_WAIT_UNTIL(defined $thread->{ExecuteResponse});
-    PT_YIELD_UNTIL(tv_interval($thread->{execute_delayed})>=0);
+    $thread->{ExecuteTime} = $now + $delay*0.001;
+    PT_YIELD_UNTIL(defined $thread->{ExecuteResponse} and (gettimeofday() >= $thread->{ExecuteTime}));
   }
   #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE

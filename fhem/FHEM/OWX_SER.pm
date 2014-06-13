@@ -101,9 +101,9 @@ sub Define ($$) {
   if ( $dev !~ m/\@\d*/ ){
     $hash->{DeviceName} = $dev."\@9600";
   }
-  $dev = split('@',$dev);
+  my ($device,$baudrate) = split('@',$dev);
   #-- let fhem.pl MAIN call OWX_Ready when setup is done.
-  $main::readyfnlist{"$hash->{NAME}.$dev"} = $hash;
+  $main::readyfnlist{"$hash->{NAME}.$device"} = $hash;
     
   return undef;
 }

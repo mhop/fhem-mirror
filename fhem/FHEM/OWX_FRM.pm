@@ -59,7 +59,6 @@ sub Define($$) {
   $self->{id}  = 0;
   $self->{name} = $hash->{NAME};
   $self->{hash} = $hash;
-  $self->{delayed} = {};
   return undef;
 }
 
@@ -107,7 +106,7 @@ COMMAND_HANDLER: {
       my $id = $data->{id};
       my $request = ( defined $id ) ? $self->{requests}->{$id} : undef;
       unless ( defined $request ) {
-        return unless ( defined $data->{device} );
+        last unless ( defined $data->{device} );
         my $owx_device = FRM_OWX_firmata_to_device( $data->{device} );
         my %requests   = %{ $self->{requests} };
         foreach my $key ( keys %requests ) {
@@ -118,7 +117,7 @@ COMMAND_HANDLER: {
           };
         };
       };
-      return unless ( defined $request );
+      last unless ( defined $request );
       my $owx_data   = pack "C*", @{ $data->{data} };
       my $owx_device = $request->{device};
       my $context    = $request->{context};
@@ -143,6 +142,7 @@ COMMAND_HANDLER: {
       last;
     };
   };
+  main::OWX_ASYNC_RunTasks($self->{hash});
 };
 
 ########### functions implementing interface to OWX ##########
@@ -203,35 +203,8 @@ sub alarms($) {
   return $success;
 };
 
-sub execute($$$$$$$) {
-  my ( $self, $hash, $context, $reset, $owx_dev, $data, $numread, $delay ) = @_;
-
-  my $delayed = $self->{delayed};
-  my $queue = $delayed->{$owx_dev} if defined $owx_dev;
-
-  if ( $queue and @{$queue->{items}} ) {
-    if ( $context or $reset or $data or $numread or $delay ) {
-      push @{$queue->{items}}, {
-        context => $context,
-        'reset' => $reset,
-        device  => $owx_dev,
-        data    => $data,
-        numread => $numread,
-        delay   => $delay
-        };
-    };
-    if (!( defined $queue->{'until'} ) or ( tv_interval( $queue->{'until'} ) >= 0 ) ) {
-      my $item = shift @{$queue->{items}};
-      $context = $item->{context};
-      $reset   = $item->{'reset'};
-      $data    = $item->{data};
-      $numread = $item->{numread};
-      $delay   = $item->{delay};
-    } else {
-      return 1;
-    }
-  }
-  return 1 unless ( $context or $reset or $data or $numread or $delay );
+sub execute($$$$$$) {
+  my ( $self, $hash, $context, $reset, $owx_dev, $data, $numread ) = @_;
 
   my $success = undef;
 
@@ -266,32 +239,9 @@ sub execute($$$$$$$) {
     #$self->exit($hash);
   };
 
-  if ($delay and $success) {
-    unless ($queue) {
-      $queue = { items => [] } ;
-      $delayed->{$owx_dev} = $queue;
-    }
-    my ( $seconds, $micros ) = gettimeofday;
-    my $len = length($delay);    #delay is millis, tv_address works with [sec,micros]
-    if ( $len > 3 ) {
-      $seconds += substr( $delay, 0, $len - 3 );
-      $micros += ( substr( $delay, $len - 3 ) * 1000 );
-    } else {
-      $micros += ( $delay * 1000 );
-    }
-    $queue->{'until'} = [ $seconds, $micros ];
-    main::InternalTimer( "$seconds.$micros", "OWX_ASYNC_Poll", $hash, 0 );
-  } else {
-    if ($queue) {
-      if (@{$queue->{items}}) {
-        delete( $queue->{'until'} );
-      } else {
-        delete $delayed->{$owx_dev};
-      }
-    }
-  }
   unless ($numread) {
     main::OWX_ASYNC_AfterExecute( $hash, $context, $success, $reset, $owx_dev, $data, $numread, "" );
+    main::InternalTimer(gettimeofday(), "OWX_ASYNC_RunTasks", $hash,0);
   }
   return $success;
 };
@@ -305,10 +255,6 @@ sub poll($) {
   my ( $self, $hash ) = @_;
   if ( my $frm = $hash->{IODev} ) {
     main::FRM_poll($frm);
-    foreach my $address ( keys %{$self->{delayed}} ) {
-      $self->execute( $hash, undef, undef, $address, undef, undef, undef );
-      main::FRM_poll($frm);
-    }
   }
 };
 
