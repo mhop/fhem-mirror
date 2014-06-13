@@ -872,6 +872,11 @@ sub CUL_HM_Parse($$) {#########################################################
   #  return "" if($src eq $id);# mirrored messages - covered by !$shash
   if(!$shash){    # Unknown source
     return "" if ($msg =~ m/998112......000001/);# HMLAN internal message, consum 
+    my $ccu =InternalVal($ioName,"owner_CCU","");
+    if ($defs{$ccu}){#
+      push @evtEt,[$defs{$ccu},0,"unknown_$src:received"];# do not trigger
+      return CUL_HM_pushEvnts();
+    }
     return;
   }
   $respRemoved = 0;  #set to 'no response in this message' at start
