@@ -585,6 +585,7 @@ LightScene_Set($@)
     @devices = @{$hash->{devices}};
   }
 
+  my $first = 1;
   foreach my $d (@devices) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
@@ -608,7 +609,8 @@ LightScene_Set($@)
       $ret .= $d .": ". $state ."\n" if( defined($FW_webArgs{room}) && $FW_webArgs{room} eq "all" ); #only if telnet
 
     } elsif ( $cmd eq "scene" ) {
-      readingsSingleUpdate($hash, "state", $scene, 1 ) if( !$hash->{followDevices} );
+      readingsSingleUpdate($hash, "state", $scene, 1 ) if( $first && !$hash->{followDevices} );
+
       next if( !defined($hash->{SCENES}{$scene}{$d}));
 
       my $state = $hash->{SCENES}{$scene}{$d};
@@ -629,6 +631,8 @@ LightScene_Set($@)
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
     }
+
+    $first = 0;
   }
 
   delete($hash->{INSET});
