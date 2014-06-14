@@ -764,7 +764,8 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
 }
 sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
   my ($hash)=@_;
-  return if ($hash->{helper}{role}{vrt});
+  return if (  $hash->{helper}{role}{vrt}
+             ||!defined $hash->{helper}{io}{p});
   my $oldChn = $hash->{helper}{io}{newChn};
   my @p = @{$hash->{helper}{io}{p}};
   # General todo
