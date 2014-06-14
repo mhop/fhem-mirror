@@ -575,3 +575,7 @@
     into readingsname, value and unit
   - added new module contrib/97_SprinkleControl.pm
   - added new module contrib/98_Sprinkle.pm
+  
+- Thu Jun 12 2014 (rr2000)
+  - added new module 37_SHC.pm
+  - added new module 37_SHCdev.pm to support smarthomatic devices
