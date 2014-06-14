@@ -783,8 +783,7 @@ readingsGroup_Notify($$)
                 ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
               }
 
-              DoTrigger( "$name", "$n.i$item.item: $txt" );
-              #CommandTrigger( "", "$name $n.i$item.item: $txt" );
+              DoTrigger( $name, "$n.i$item.item: $txt" );
             }
 
             next;
@@ -828,8 +827,7 @@ readingsGroup_Notify($$)
             if( $devStateIcon ) {
               (undef,$devStateIcon) = readingsGroup_makeLink(undef,$devStateIcon,$cmd);
 
-              DoTrigger( "$name", "$n.$reading: $devStateIcon" );
-              #CommandTrigger( "", "$name $n.$reading: $devStateIcon" );
+              DoTrigger( $name, "$n.$reading: $devStateIcon" );
               next;
             }
           }
@@ -843,8 +841,7 @@ readingsGroup_Notify($$)
 
           $value = "<div $value_style>$value</div>" if( $value_style );
 
-          DoTrigger( "$name", "$n.$reading: $value" );
-          #CommandTrigger( "", "$name $n.$reading: $value" );
+          DoTrigger( $name, "$n.$reading: $value" );
         }
       }
     }
@@ -899,7 +896,6 @@ readingsGroup_Attr($$$)
 
     if( $cmd eq "set" ) {
       $hash->{alwaysTrigger} = $attrVal;
-      delete( $hash->{helper}->{myDisplay} ) if( $hash->{alwaysTrigger} );
     } else {
       delete $hash->{alwaysTrigger};
     }
