@@ -30,6 +30,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw($FW_ss); 
+use Blocking;
 
 #
 # uses the Yahoo! Weather API: http://developer.yahoo.com/weather/
@@ -207,160 +208,202 @@ sub Weather_UpdateReading($$$$) {
   return 1;
 }
 
-
 ################################### 
-sub Weather_RetrieveData($)
+sub Weather_RetrieveData($$)
 {
-  my ($hash)= @_;
-  
+  my ($name, $blocking) = @_;
+  my $hash = $defs{$name};
+ 
   my $location= $hash->{LOCATION}; # WOEID [WHERE-ON-EARTH-ID], go to http://weather.yahoo.com to find out
   my $units= $hash->{UNITS}; 
-
-  my $fc = undef;
-  my $xml = GetFileFromURL("http://weather.yahooapis.com/forecastrss?w=" . $location . "&u=" . $units, 3, undef, 1);
-  return 0 if( ! defined $xml || $xml eq "");
-
-  my $lang= $hash->{LANG};
-  my @YahooCodes_i18n;
-  my %wdays_txt_i18n;
-  my @directions_txt_i18n;
-  my %pressure_trend_txt_i18n;
-
-  if($lang eq "de") {
-    @YahooCodes_i18n= @YahooCodes_de;
-    %wdays_txt_i18n= %wdays_txt_de;
-    @directions_txt_i18n= @directions_txt_de;
-    %pressure_trend_txt_i18n= %pressure_trend_txt_de;
-  } elsif($lang eq "nl") {
-    @YahooCodes_i18n= @YahooCodes_nl;
-    %wdays_txt_i18n= %wdays_txt_nl;
-    @directions_txt_i18n= @directions_txt_nl;
-    %pressure_trend_txt_i18n= %pressure_trend_txt_nl;
-  } else {
-    @YahooCodes_i18n= @YahooCodes_en;
-    %wdays_txt_i18n= %wdays_txt_en;
-    @directions_txt_i18n= @directions_txt_en;
-    %pressure_trend_txt_i18n= %pressure_trend_txt_en;
-  }
-
-
-  foreach my $l (split("<",$xml)) {
-          #Debug "DEBUG WEATHER: line=\"$l\"";
-          next if($l eq "");                   # skip empty lines
-          $l =~ s/(\/|\?)?>$//;                # strip off /> and >
-          my ($tag,$value)= split(" ", $l, 2); # split tag data=..... at the first blank
-          next if(!defined($tag) || ($tag !~ /^yweather:/));
-          $fc= 0 if($tag eq "yweather:condition");
-          $fc++ if($tag eq "yweather:forecast");
-          my $prefix= $fc ? "fc" . $fc ."_" : "";
+  my $url = "http://weather.yahooapis.com/forecastrss?w=" . $location . "&u=" . $units;
   
-          ### location
-          if ($tag eq "yweather:location" ) {
-            $value =~/city="(.*?)" .*country="(.*?)".*/;
-            my $loc = "";
-            $loc = $1 if (defined($1)); 
-            $loc .= ", $2" if (defined($2)); 
-            readingsBulkUpdate($hash, "city", $loc);
-          }
-        
-          ### current condition and forecast
-          if (($tag eq "yweather:condition" ) || ($tag eq "yweather:forecast" )) {
-             my $code = (($value =~/code="([0-9]*?)".*/) ? $1 : undef);
-             if(defined($code)) {
-               readingsBulkUpdate($hash, $prefix . "code", $code);
-               my $text = $YahooCodes_i18n[$code];
-               if ($text) { readingsBulkUpdate($hash, $prefix . "condition", $text); }
-               #### add icon logic here - generate from code
-               $text = $iconlist[$code];
-               readingsBulkUpdate($hash, $prefix . "icon", $text) if ($text);
-             }  
-          }
-
-          ### current condition 
-          if ($tag eq "yweather:condition" ) {
-             my $temp = (($value =~/temp="(-?[0-9.]*?)".*/) ? $1 : undef);
-             if(defined($temp)) {
-                readingsBulkUpdate($hash, "temperature", $temp);
-                readingsBulkUpdate($hash, "temp_c", $temp); # compatibility
-                $temp = int(( $temp * 9  / 5 ) + 32.5);  # Celsius to Fahrenheit
-                readingsBulkUpdate($hash, "temp_f", $temp); # compatibility
-             }  
-
-             my $datum = (($value =~/date=".*? ([0-9].*)".*/) ? $1 : undef);  
-             readingsBulkUpdate($hash, "current_date_time", $datum) if (defined($1));
-
-             my $day = (($value =~/date="(.*?), .*/) ? $1 : undef);  
-             if(defined($day)) {
-                readingsBulkUpdate($hash, "day_of_week", $wdays_txt_i18n{$day});
-             }          
-          }
-
-          ### forecast 
-          if ($tag eq "yweather:forecast" ) {
-             my $low_c = (($value =~/low="(-?[0-9.]*?)".*/) ? $1 : undef);
-             if(defined($low_c)) { readingsBulkUpdate($hash, $prefix . "low_c", $low_c); }
-             my $high_c = (($value =~/high="(-?[0-9.]*?)".*/) ? $1 : undef);
-             if(defined($high_c)) { readingsBulkUpdate($hash, $prefix . "high_c", $high_c); }
-             my $day1 = (($value =~/day="(.*?)" .*/) ? $1 : undef); # forecast
-             if(defined($day1)) {
-                readingsBulkUpdate($hash, $prefix . "day_of_week", $wdays_txt_i18n{$day1});
-             }   
-          }
-
-          ### humidiy / Pressure
-          if ($tag eq "yweather:atmosphere" ) {
-            $value =~/humidity="([0-9.]*?)" .*visibility="([0-9.]*?|\s*?)" .*pressure="([0-9.]*?)"  .*rising="([0-9.]*?)" .*/;
-
-            if ($1) { readingsBulkUpdate($hash, "humidity", $1); }
-            my $vis = (($2 eq "") ? " " : int($2+0.5));   # clear visibility field
-            readingsBulkUpdate($hash, "visibility", $vis);
-            if ($3) { readingsBulkUpdate($hash, "pressure", int($3+0.5)); }
-            if ($4) {
-              readingsBulkUpdate($hash, "pressure_trend", $4);
-              readingsBulkUpdate($hash, "pressure_trend_txt", $pressure_trend_txt_i18n{$4});
-              readingsBulkUpdate($hash, "pressure_trend_sym", $pressure_trend_sym{$4});
-            }
-          }
-
-          ### wind
-          if ($tag eq "yweather:wind" ) {
-            $value =~/chill="(-?[0-9.]*?)" .*direction="([0-9.]*?)" .*speed="([0-9.]*?)" .*/;
-            readingsBulkUpdate($hash, "wind_chill", $1) if (defined($1));
-            readingsBulkUpdate($hash, "wind_direction", $2) if (defined($2));
-            my $windspeed= defined($3) ? int($3+0.5) : "";
-            readingsBulkUpdate($hash, "wind_speed", $windspeed);
-            readingsBulkUpdate($hash, "wind", $windspeed); # duplicate for compatibility
-            if (defined($2) & defined($3)) {
-              my $wdir = degrees_to_direction($2,@directions_txt_i18n);
-              readingsBulkUpdate($hash, "wind_condition", "Wind: $wdir $windspeed km/h"); # compatibility
-            }
-          }   
+  if ($blocking) {
+  	my $response = GetFileFromURL($url, 5, undef, 0);
+    
+    my %param = (hash => $hash, doTrigger => 0);
+    Weather_RetrieveDataFinished(\%param, undef, $response);
   }
-}  #end sub
+  else {
+    HttpUtils_NonblockingGet(
+      {
+          url        => $url,
+          timeout    => 5,
+          noshutdown => 0,
+          hash       => $hash,
+          doTrigger  => 1,
+          callback   => \&Weather_RetrieveDataFinished,
+      }
+    );
+  }
+}
 
+sub Weather_RetrieveDataFinished($$$)
+{
+  my ( $param, $err, $xml ) = @_;
+  my $hash = $param->{hash};
+  my $doTrigger = $param->{doTrigger};
+  my $name = $hash->{NAME};
 
+  my $urlResult;
+  if (defined($xml) && $xml ne "") {
+    my $fc = undef;
+    my $lang= $hash->{LANG};
+    my @YahooCodes_i18n;
+    my %wdays_txt_i18n;
+    my @directions_txt_i18n;
+    my %pressure_trend_txt_i18n;
+
+    if($lang eq "de") {
+      @YahooCodes_i18n= @YahooCodes_de;
+      %wdays_txt_i18n= %wdays_txt_de;
+      @directions_txt_i18n= @directions_txt_de;
+      %pressure_trend_txt_i18n= %pressure_trend_txt_de;
+    } elsif($lang eq "nl") {
+      @YahooCodes_i18n= @YahooCodes_nl;
+      %wdays_txt_i18n= %wdays_txt_nl;
+      @directions_txt_i18n= @directions_txt_nl;
+      %pressure_trend_txt_i18n= %pressure_trend_txt_nl;
+    } else {
+      @YahooCodes_i18n= @YahooCodes_en;
+      %wdays_txt_i18n= %wdays_txt_en;
+      @directions_txt_i18n= @directions_txt_en;
+      %pressure_trend_txt_i18n= %pressure_trend_txt_en;
+    }
+
+    foreach my $l (split("<",$xml)) {
+      #Debug "DEBUG WEATHER: line=\"$l\"";
+      next if($l eq "");                   # skip empty lines
+      $l =~ s/(\/|\?)?>$//;                # strip off /> and >
+      my ($tag,$value)= split(" ", $l, 2); # split tag data=..... at the first blank
+      next if(!defined($tag) || ($tag !~ /^yweather:/));
+      $fc= 0 if($tag eq "yweather:condition");
+      $fc++ if($tag eq "yweather:forecast");
+      my $prefix= $fc ? "fc" . $fc ."_" : "";
+
+      ### location
+      if ($tag eq "yweather:location" ) {
+        $value =~/city="(.*?)" .*country="(.*?)".*/;
+        my $loc = "";
+        $loc = $1 if (defined($1)); 
+        $loc .= ", $2" if (defined($2)); 
+        $urlResult->{"readings"}->{"city"} = $loc;
+      }
+    
+      ### current condition and forecast
+      if (($tag eq "yweather:condition" ) || ($tag eq "yweather:forecast" )) {
+         my $code = (($value =~/code="([0-9]*?)".*/) ? $1 : undef);
+         if(defined($code)) {
+           $urlResult->{"readings"}->{$prefix . "code"} = $code;
+           my $text = $YahooCodes_i18n[$code];
+           if ($text) { 
+            $urlResult->{"readings"}->{$prefix . "condition"} = $text;
+           }
+           #### add icon logic here - generate from code
+           $text = $iconlist[$code];
+           $urlResult->{"readings"}->{$prefix . "icon"} = $text if ($text);
+         }  
+      }
+
+      ### current condition 
+      if ($tag eq "yweather:condition" ) {
+         my $temp = (($value =~/temp="(-?[0-9.]*?)".*/) ? $1 : undef);
+         if(defined($temp)) {
+            $urlResult->{"readings"}->{"temperature"} = $temp;
+            $urlResult->{"readings"}->{"temp_c"} = $temp;
+            $temp = int(( $temp * 9  / 5 ) + 32.5);  # Celsius to Fahrenheit
+            $urlResult->{"readings"}->{"temp_f"} = $temp;
+         }
+
+         my $datum = (($value =~/date=".*? ([0-9].*)".*/) ? $1 : undef);  
+         $urlResult->{"readings"}->{"current_date_time"} = $datum if (defined($1));
+
+         my $day = (($value =~/date="(.*?), .*/) ? $1 : undef);  
+         if(defined($day)) {
+            $urlResult->{"readings"}->{"day_of_week"} = $wdays_txt_i18n{$day};
+         }          
+      }
+
+      ### forecast 
+      if ($tag eq "yweather:forecast" ) {
+         my $low_c = (($value =~/low="(-?[0-9.]*?)".*/) ? $1 : undef);
+         if(defined($low_c)) { $urlResult->{"readings"}->{$prefix . "low_c"} = $low_c; }
+         my $high_c = (($value =~/high="(-?[0-9.]*?)".*/) ? $1 : undef);
+         if(defined($low_c)) { $urlResult->{"readings"}->{$prefix . "high_c"} = $high_c; }
+         my $day1 = (($value =~/day="(.*?)" .*/) ? $1 : undef); # forecast
+         if(defined($day1)) {
+            $urlResult->{"readings"}->{$prefix . "day_of_week"} = $wdays_txt_i18n{$day1};
+         }   
+      }
+
+      ### humidiy / Pressure
+      if ($tag eq "yweather:atmosphere" ) {
+        $value =~/humidity="([0-9.]*?)" .*visibility="([0-9.]*?|\s*?)" .*pressure="([0-9.]*?)"  .*rising="([0-9.]*?)" .*/;
+
+        if ($1) { $urlResult->{"readings"}->{"humidity"} = $1; }
+        my $vis = (($2 eq "") ? " " : int($2+0.5));   # clear visibility field
+        $urlResult->{"readings"}->{"visibility"} = $vis;
+        if ($3) { $urlResult->{"readings"}->{"pressure"} = int($3+0.5); }
+        if ($4) {
+          $urlResult->{"readings"}->{"pressure_trend"} = $4;
+          $urlResult->{"readings"}->{"pressure_trend_txt"} = $pressure_trend_txt_i18n{$4};
+          $urlResult->{"readings"}->{"pressure_trend_sym"} = $pressure_trend_sym{$4};
+        }
+      }
+
+      ### wind
+      if ($tag eq "yweather:wind" ) {
+        $value =~/chill="(-?[0-9.]*?)" .*direction="([0-9.]*?)" .*speed="([0-9.]*?)" .*/;
+        $urlResult->{"readings"}->{"wind_chill"} = $1 if (defined($1));
+        $urlResult->{"readings"}->{"wind_direction"} = $2 if defined($2);
+        my $windspeed= defined($3) ? int($3+0.5) : "";
+        $urlResult->{"readings"}->{"wind_speed"} = $windspeed;
+        $urlResult->{"readings"}->{"wind"} = $windspeed;# duplicate for compatibility
+        if (defined($2) & defined($3)) {
+          my $wdir = degrees_to_direction($2,@directions_txt_i18n);
+          $urlResult->{"readings"}->{"wind_condition"} = "Wind: $wdir $windspeed km/h"; # compatibility
+        }
+      }   
+    }
+  }
+
+  if (exists($urlResult->{readings})) {
+      readingsBeginUpdate($hash);
+      while ( (my $key, my $value) = each %{$urlResult->{readings}} )
+      {
+        readingsBulkUpdate($hash, $key, $value);
+      }
+      
+      my $temperature= $hash->{READINGS}{temperature}{VAL};
+      my $humidity= $hash->{READINGS}{humidity}{VAL};
+      my $wind= $hash->{READINGS}{wind}{VAL};
+      my $val= "T: $temperature  H: $humidity  W: $wind";
+      Log3 $hash, 4, "Weather ". $hash->{NAME} . ": $val";
+      readingsBulkUpdate($hash, "state", $val);
+      readingsEndUpdate($hash, $doTrigger ? 1 : 0);
+  }
+}
 
 ###################################
-sub Weather_GetUpdate($)
+sub Weather_GetUpdateLocal($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
-  if(!$hash->{LOCAL}) {
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Weather_GetUpdate", $hash, 1);
-  }
+  Weather_RetrieveData($name, 1);
 
-  readingsBeginUpdate($hash);
+  return 1;
+}
 
-  Weather_RetrieveData($hash);
+sub Weather_GetUpdateTimer($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+ 
+  Weather_RetrieveData($name, 0);
+  
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Weather_GetUpdateTimer", $hash, 1);
 
-  my $temperature= $hash->{READINGS}{temperature}{VAL};
-  my $humidity= $hash->{READINGS}{humidity}{VAL};
-  my $wind= $hash->{READINGS}{wind}{VAL};
-  my $val= "T: $temperature  H: $humidity  W: $wind";
-  Log3 $hash, 4, "Weather ". $hash->{NAME} . ": $val";
-  readingsBulkUpdate($hash, "state", $val);
-  readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); # DoTrigger, because sub is called by a timer instead of dispatch
-      
   return 1;
 }
 
@@ -374,9 +417,7 @@ sub Weather_Get($@) {
 
   return "argument is missing" if(int(@a) != 2);
 
-  $hash->{LOCAL} = 1;
-  Weather_GetUpdate($hash);
-  delete $hash->{LOCAL};
+  Weather_GetUpdateLocal($hash);
 
   my $reading= $a[1];
   my $value;
@@ -400,7 +441,7 @@ sub Weather_Set($@) {
   # usage check
   if((@a == 2) && ($a[1] eq "update")) {
     RemoveInternalTimer($hash);
-    Weather_GetUpdate($hash);
+    Weather_GetUpdateTimer($hash);
     return undef;
   } else {
     return "Unknown argument $cmd, choose one of update";
@@ -438,11 +479,9 @@ sub Weather_Define($$) {
   $hash->{READINGS}{current_date_time}{TIME}= TimeNow();
   $hash->{READINGS}{current_date_time}{VAL}= "none";
 
-  $hash->{LOCAL} = 1;
-  Weather_GetUpdate($hash);
-  delete $hash->{LOCAL};
+  Weather_GetUpdateLocal($hash);
 
-  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Weather_GetUpdate", $hash, 0);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Weather_GetUpdateTimer", $hash, 0);
 
   return undef;
 }
