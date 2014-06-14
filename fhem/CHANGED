@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: LightScene: added followDevices attribute
   - feature: non-blocking retrieval of data in 57_Weather.pm (Boris & herrmannj)
   - feature: new modules 37_SHC.pm and 37_SHCdev.pm added (rr2000)
   - ad-hoc:  (betateilchen)

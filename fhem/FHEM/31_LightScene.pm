@@ -29,7 +29,7 @@ sub LightScene_Initialize($)
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
   $hash->{AttrFn}   = "LightScene_Attr";
-  $hash->{AttrList} = "switchingOrder";
+  $hash->{AttrList} = "followDevices:1 switchingOrder";
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
   $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
@@ -190,10 +190,8 @@ LightScene_detailFn()
 
   my $hash = $defs{$d};
 
-  if( AttrVal($FW_wname, "longpoll", 1) ) {
-    Log3 $hash->{NAME}, 5, "opened: $FW_cname";
-    $hash->{helper}->{myDisplay}->{$FW_cname} = 1;
-  }
+  $hash->{mayBeVisible} = 1;
+
   my $html = LightScene_2html($d); #mod
   $html .= LightScene_editTable($hash); #mod
   return $html;
@@ -205,12 +203,6 @@ LightScene_Notify($$)
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
-
-  if( !defined($hash->{helper}{myDisplay})
-      || !%{$hash->{helper}{myDisplay}} ) {
-    Log3 $name, 5, "$name: not on any display, ignoring notify";
-    return if($dev->{NAME} ne "global");
-  }
 
   if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
@@ -257,36 +249,18 @@ LightScene_Notify($$)
 
       next if (!$hash->{CONTENT}->{$dev->{NAME}});
 
-      if( !defined($hash->{helper}{myDisplay})
-          || !%{$hash->{helper}{myDisplay}} ) {
-        Log3 $name, 4, "$name: not on any display, ignoring notify";
-        return undef;
+      if( !defined($hash->{mayBeVisible}) ) {
+        Log3 $name, 5, "$name: not on any display, ignoring notify";
+        return undef if( !$hash->{followDevices} );
       } else {
-        my $do_update = 0;
-        foreach my $display ( keys %{$hash->{helper}{myDisplay}} ) {
-          if( defined($defs{$display}) ) {
-            my $filter = $defs{$display}->{inform};
-            $filter = $filter->{filter} if( ref($filter) eq 'HASH' );
-            return undef if( !defined($filter) );
-            if($filter eq "$name") {
-              $do_update = 1;
-            } else {
-              Log3 $name, 4, "$name: $display is not my room, ignoring notify";
-              delete( $hash->{helper}{myDisplay}{$display} );
-            }
-          } else {
-            Log3 $name, 4, "$name: $display is closed, ignoring notify";
-            delete( $hash->{helper}{myDisplay}{$display} );
-          }
-        }
-        if( !$do_update ) {
-          Log3 $name, 4, "$name: not on any display, ignoring notify";
-          return undef;
+        if( defined($FW_visibleDeviceHash{$name}) ) {
         } else {
-          Log3 $name, 5, "$name: do update";
+          Log3 $name, 5, "$name: no longer visible, ignoring notify";
+          delete( $hash->{mayBeVisible} );
+          return undef if( !$hash->{followDevices} );
         }
       }
-
+      return undef if ( !$hash->{mayBeVisible} && !$hash->{followDevices} );
 
       my @parts = split(/: /,$s);
       my $reading = shift @parts;
@@ -301,8 +275,42 @@ LightScene_Notify($$)
       my %extPage = ();
       (undef, undef, $value) = FW_devState($dev->{NAME}, $room, \%extPage);
 
-      DoTrigger( "$name", "$dev->{NAME}.$reading: $value" );
-      #CommandTrigger( "", "$name $dev->{NAME}.$reading: $value" );
+      DoTrigger( $name, "$dev->{NAME}.$reading: $value" ) if( $hash->{mayBeVisible} );
+
+      if( $hash->{followDevices} ) {
+        my %s = ();
+
+        foreach my $d (@{$hash->{devices}}) {
+          next if(!$defs{$d});
+
+          my($state,undef,undef) = LightScene_SaveDevice($hash,$d);
+          $s{$d} = $state;
+        }
+
+        my $matched = 0;
+        foreach my $scene (sort keys %{ $hash->{SCENES} }) {
+          $matched = 1;
+          foreach my $d (sort keys %{ $hash->{SCENES}{$scene} }) {
+            next if( !defined($hash->{SCENES}{$scene}{$d}));
+
+            my $state = $hash->{SCENES}{$scene}{$d};
+            $state = $state->{state} if( ref($state) eq 'HASH' );
+
+            if( ref($state) eq 'ARRAY' ) {
+              $matched = 0;
+            } elsif( $state ne $s{$d} ) {
+              $matched = 0;
+            }
+
+            last if( !$matched );
+          }
+
+          readingsSingleUpdate($hash, "state", $scene, 1 ) if( $matched );
+          last if( $matched );
+        }
+        DoTrigger( $name, "nomatch" ) if( !$matched );
+
+      }
     }
   }
 
@@ -600,7 +608,7 @@ LightScene_Set($@)
       $ret .= $d .": ". $state ."\n" if( defined($FW_webArgs{room}) && $FW_webArgs{room} eq "all" ); #only if telnet
 
     } elsif ( $cmd eq "scene" ) {
-      $hash->{STATE} = $scene;
+      readingsSingleUpdate($hash, "state", $scene, 1 ) if( !$hash->{followDevices} );
       next if( !defined($hash->{SCENES}{$scene}{$d}));
 
       my $state = $hash->{SCENES}{$scene}{$d};
@@ -748,7 +756,16 @@ LightScene_Attr($@)
 {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
-  if( $attrName eq "switchingOrder" ) {
+  if( $attrName eq "followDevices" ) {
+    my $hash = $defs{$name};
+    $attrVal = 1 if($attrVal);
+
+    if( $cmd eq "set" ) {
+      $hash->{followDevices} = $attrVal;
+    } else {
+      delete $hash->{followDevices};
+    }
+  } elsif( $attrName eq "switchingOrder" ) {
     my $hash = $defs{$name};
 
     if( $cmd eq "set" ) {
@@ -920,6 +937,9 @@ LightScene_editTable($) {
         the device settings have precedence over the scene setting.<br>
         1 -> for each device do nothing if current device state is the same as the saved state
         0 -> always set the state even if the current state is the same as the saved state. this is the default</li>
+      <li>followDevices<br>
+        1 -> the LightScene tries to follow the switching state of the devices and set its state to the name of the
+             scene that matches. if no match is found state will be unchanged.</li>
       <li>switchingOrder<br>
         space separated list of &lt;scene&gt;:&lt;deviceList&gt; items that will give a per scene order
         in which the devices should be switched.<br>
