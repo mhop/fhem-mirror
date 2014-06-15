@@ -82,6 +82,7 @@ BlockingCall($$@)
 
   foreach my $d (sort keys %defs) {   # Close all kind of FD
     my $h = $defs{$d};
+    $h->{DBH}->{InactiveDestroy} = 1 if($h->{TYPE} eq 'DbLog');
     TcpServer_Close($h) if($h->{SERVERSOCKET});
     if($h->{DeviceName}) {
       require "$attr{global}{modpath}/FHEM/DevIo.pm";
