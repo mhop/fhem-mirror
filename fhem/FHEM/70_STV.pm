@@ -96,10 +96,12 @@ sub STV_Ready($)
     elsif(!$hash->{CHILDPID}) {
       return if($hash->{CHILDPID} = fork);
       my $ppid = getppid();
-  
-      ### Copied from Blocking.pm
+
+	  ### Copied from Blocking.pm
       foreach my $d (sort keys %defs) {   # Close all kind of FD
         my $h = $defs{$d};
+        #the following line was added by vbs to not close parent's DbLog DB handle
+        $h->{DBH}->{InactiveDestroy} = 1 if ($h->{TYPE} eq 'DbLog');
         TcpServer_Close($h) if($h->{SERVERSOCKET});
         if($h->{DeviceName}) {
           require "$attr{global}{modpath}/FHEM/DevIo.pm";
@@ -561,7 +563,7 @@ sub STV_Set($@)
        return $hash->{".validcommands"};
   }
   if ($hash->{".validcommands"} =~ /$cmd/) {
-    if ((AttrVal($name, "setWhenOffline", undef) eq "ignore") and ($hash->{STATE} ne "opened")) {
+    if ((AttrVal($name, "setWhenOffline", "execute") eq "ignore") and ($hash->{STATE} ne "opened")) {
       Log3 $name, 3, "[STV] Device seems offline. Set command ignored: $cmd";
       return;
     }
