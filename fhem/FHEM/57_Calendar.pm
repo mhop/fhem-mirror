@@ -292,8 +292,14 @@ sub d {
   } elsif($dw =~ m/(\d+)W$/) {
     $t+= 604800*$1; # weeks
   }
-  if($dt =~ m/^(\d+)H(\d+)M(\d+)S$/) {
-    $t+= $1*3600+$2*60+$3;
+  if($dt =~ m/(\d+)H/) {
+    $t+= $1*3600;
+  }
+  if($dt =~ m/(\d+)M/) {
+    $t+= $1*60;
+  }
+  if($dt =~ m/(\d+)S/) {
+    $t+= $1;
   }
   $t*= $sign;
   #main::Debug "sign: $sign  dw: $dw  dt: $dt   t= $t";
@@ -335,7 +341,14 @@ sub fromVEvent {
   } elsif(defined($vevent->value("DURATION"))) {
     $self->{end}= $self->{start} + d($vevent->value("DURATION"));
   }
-  $self->{lastModified}= tm($vevent->value("LAST-MODIFIED"));
+  # we take the creation time if the last modification time is unavailable
+  if(defined($vevent->value("LAST-MODIFIED"))) {
+    $self->{lastModified}= tm($vevent->value("LAST-MODIFIED"));
+    #main::Debug "LAST-MOD: $self->{lastModified} ";
+  } else {
+    $self->{lastModified}= tm($vevent->value("DTSTAMP"));
+    #main::Debug "DTSTAMP: $self->{lastModified} ";
+  }  
   $self->{summary}= $vevent->value("SUMMARY");
   $self->{location}= $vevent->value("LOCATION");
 
