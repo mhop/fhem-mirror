@@ -29,7 +29,7 @@ sub LightScene_Initialize($)
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
   $hash->{AttrFn}   = "LightScene_Attr";
-  $hash->{AttrList} = "followDevices:1 switchingOrder";
+  $hash->{AttrList} = "followDevices:1 switchingOrder ". $readingFnAttributes;
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
   $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
@@ -955,6 +955,7 @@ LightScene_editTable($) {
         <code>define media LightScene TV,DVD,Amplifier,masterPower<br>
               attr media switchingOrder .*On:masterPower,.* allOff:!.*,masterPower</code>
         </li>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     </ul><br>
 </ul>
 
