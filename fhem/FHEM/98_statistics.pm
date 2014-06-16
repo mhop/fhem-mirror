@@ -594,10 +594,10 @@ statistics_doStatisticTendency ($$$$)
       Log3 $name,4,"$name: Remove last value ".$hidden[7]." from '$hiddenReadingName'";
       delete $hidden[7]; 
    }
-   if ( exists($hidden[1]) ) {$stat[1] = sprintf "%.".$decPlaces."f", $value-$hidden[1];}
-   if ( exists($hidden[2]) ) {$stat[3] = sprintf "%.".$decPlaces."f", $value-$hidden[2];}
-   if ( exists($hidden[3]) ) {$stat[5] = sprintf "%.".$decPlaces."f", $value-$hidden[3];}
-   if ( exists($hidden[6]) ) {$stat[7] = sprintf "%.".$decPlaces."f", $value-$hidden[6];}
+   if ( exists($hidden[1]) ) {$stat[1] = sprintf "%+.".$decPlaces."f", $value-$hidden[1];}
+   if ( exists($hidden[2]) ) {$stat[3] = sprintf "%+.".$decPlaces."f", $value-$hidden[2];}
+   if ( exists($hidden[3]) ) {$stat[5] = sprintf "%+.".$decPlaces."f", $value-$hidden[3];}
+   if ( exists($hidden[6]) ) {$stat[7] = sprintf "%+.".$decPlaces."f", $value-$hidden[6];}
 
    $result = "1h: " . $stat[1] ." 2h: ". $stat[3] ." 3h: ". $stat[5] ." 6h: ". $stat[7];
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
