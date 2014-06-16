@@ -10,7 +10,6 @@
 # READ COMMANDREF DOCUMENTATION FOR CORRECT USE!
 #
 # Copyright: betateilchen ®
-# e-mail: fhem.development@betateilchen.de
 #
 # This file is part of fhem.
 #
