@@ -464,7 +464,7 @@ sub cfgDB_FW_fileList($$@) {
 
 # read filelist containing 99_ files in database
 sub cfgDB_Read99() {
-  my $ret;
+  my $ret = "";
   my $fhem_dbh = _cfgDB_Connect;
   my $sth = $fhem_dbh->prepare( "SELECT filename FROM fhembinfilesave WHERE filename like '%/99_%.pm' group by filename" );
   $sth->execute();
