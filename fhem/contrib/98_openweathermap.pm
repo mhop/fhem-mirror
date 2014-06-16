@@ -14,7 +14,6 @@
 #
 #	All tasks can be accessed single or in any desired combination.
 #	Copyright: betateilchen ®
-#	e-mail   : fhem.development@betateilchen.de
 #
 #	This file is part of fhem.
 #

@@ -6,7 +6,6 @@
 #	An FHEM Perl module to retrieve data from "Deutscher Wetterdienst"
 #
 #	Copyright: betateilchen ®
-#	e-mail: fhem.development@betateilchen.de
 #
 #	This file is part of fhem.
 #
