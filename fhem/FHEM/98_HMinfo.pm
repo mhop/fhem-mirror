@@ -1679,8 +1679,8 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
   <ul><code><br>
            set hm update<br>
   </code></ul><br>
-  Webview of HMinfo will provide details, basically counter about how
-  many CUL_HM entities experience exceptional conditions. Areas provided are
+  Webview of HMinfo providee details, basically counter about how
+  many CUL_HM entities experience exceptional conditions. It contains
   <ul>
       <li>Action Detector status</li>
       <li>CUL_HM related IO devices and condition</li>
@@ -1693,9 +1693,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
   It also allows some HM wide commands such
   as store all collected register settings.<br><br>
 
-  Commands will be executed on all HM entities of the installation.
+  Commands are executed on all HM entities.
   If applicable and evident execution is restricted to related entities.
-  In fact, rssi is executed on devices only because channels do not support rssi values.<br><br>
+  e.g. rssi is executed on devices only since channels do not support rssi values.<br><br>
   <a name="HMinfoFilter"><b>Filter</b></a>
   <ul>  can be applied as following:<br><br>
         <code>set &lt;name&gt; &lt;cmd&gt; &lt;filter&gt; [&lt;param&gt;]</code><br>
@@ -1762,9 +1762,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           statistic about message transferes over a week<br>
       </li>
       <li><a name="#HMinfoprotoEvents">protoEvents </a><a href="#HMinfoFilter">[filter]</a> <br>
-          this is likely a very <B>important view</B> for message incidents.
-          Information about pending commands and - much more relevant - about failed executions 
-          is given in a table over all devices.<br>
+          <B>important view</B> about pending commands and failed executions for all devices in a single table.<br>
           Consider to clear this statistic use <a name="#HMinfoclear">clear Protocol</a>.<br>
       </li>
       <li><a name="#HMinforssi">rssi </a><a href="#HMinfoFilter">[filter]</a><br>

@@ -107,7 +107,7 @@ sub apptime_getTiming($$$@) {
   $ts1 = int((gettimeofday()-$ts1)*1000);
   if ($ts1 && $h->{max}<$ts1){
     $h->{max}=$ts1;
-    $h->{mAr}=join ("; ",@arg);
+    $h->{mAr}= \@arg;
   }
 
   $h->{tot}+=$ts1;
@@ -139,11 +139,15 @@ sub apptime_CommandDispTiming($$@) {
       ($n,$t) = split(";",$f,2) if ($d eq "global");
       $t = "" if (!defined $t);
       my $h = $defs{$d}{helper}{bm}{$f};
-          
-      my $arg = $h->{mAr};
-      foreach (@a){
-        my ($h,$n) = split(":",$_);
-        $arg =~ s/$h/$n/g; 
+
+      my $arg = "";
+      if ($h->{mAr}){
+        foreach my $i (0..scalar(@{$h->{mAr}})){ 
+          if(ref(${$h->{mAr}}[$i]) eq 'HASH' and exists(${$h->{mAr}}[$i]->{NAME})){
+            ${$h->{mAr}}[$i] = "HASH(".${$h->{mAr}}[$i]->{NAME}.")";
+          }
+        }
+        $arg = join ("; ",@{$h->{mAr}});
       }
 
       push @bmArr,[($n,$t
