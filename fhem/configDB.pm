@@ -209,7 +209,13 @@ sub cfgDB_Init() {
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemstate(stateString TEXT)");
 
 #	create TABLE fhembinfilesave if nonexistent
-	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content BLOB)");
+	if($cfgDB_dbtype eq "MYSQL") {
+		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content MEDIUMBLOB)");
+#		my $spaltentyp = $fhem_dbh->do("SHOW FIELDS FROM fhembinfilesave LIKE 'content'");
+#		Log3(undef,1,$spaltentyp);
+	} else {
+		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content BLOB)");
+	}
 
 	$fhem_dbh->commit();
 
