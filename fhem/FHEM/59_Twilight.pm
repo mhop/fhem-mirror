@@ -146,11 +146,12 @@ sub Twilight_Define($$)
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
   $hash->{WEATHER}        = $weather;
-  $hash->{SUNPOS_OFFSET}  = 1;
+  $hash->{SUNPOS_OFFSET}  = 5*60;
  
-  Twilight_sunposTimerSet($hash);
-  myRemoveInternalTimer("Midnight", $hash);
-  myInternalTimer      ("Midnight", time()+1, "Twilight_Midnight", $hash, 0);
+  my $mHash = { HASH=>$hash };
+  Twilight_sunpos($mHash);  
+  Twilight_Midnight($mHash);
+  
   return undef;
 }
 ################################################################################
@@ -231,7 +232,7 @@ sub Twilight_TwilightTimes($$)
     ($hash->{TW}{$sr}{TIME}, $hash->{TW}{$ss}{TIME})=
        Twilight_calc($latitude, $longitude, $deg, $declination, $timezone, $midseconds, $timediff);
 
-    Log3 $hash, 3, "$hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(nan)"      if ($hash->{TW}{$sr}{TIME} eq "nan");
+    Log3 $hash, 4, "hint: $hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(nan)"      if ($hash->{TW}{$sr}{TIME} eq "nan");
     $hash->{TW}{$sr}{TIME} += 0.01*$idx                                                if ($hash->{TW}{$sr}{TIME} ne "nan");
     $hash->{TW}{$ss}{TIME} -= 0.01*$idx                                                if ($hash->{TW}{$ss}{TIME} ne "nan");
 
@@ -343,7 +344,6 @@ sub Twilight_sunposTimerSet($) {
   myRemoveInternalTimer       ("sunpos", $hash);
   myInternalTimer             ("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
 
-  $hash->{SUNPOS_OFFSET} = 5*60;
 }
 ################################################################################
 sub Twilight_fireEvent($)
