@@ -579,3 +579,6 @@
 - Thu Jun 12 2014 (rr2000)
   - added new module 37_SHC.pm
   - added new module 37_SHCdev.pm to support smarthomatic devices
+
+- Wed Jun 18 2014 (heikoranft)
+  - added new module 89_HEATRONIC.pm 
