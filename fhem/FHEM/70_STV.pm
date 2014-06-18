@@ -156,7 +156,8 @@ sub STV_Define($$)
 
   $hash->{Host} = $args[2];
   if (defined $args[3]) { 
-    $hash->{Port} = $args[3]
+    $hash->{Port} = $args[3];
+    $hash->{".validcommands"} = "mute volume call sms date";
   } else {
     $hash->{Port} = 52235;
     $hash->{".validcommands"} = "mute volume call sms date";
