@@ -192,6 +192,7 @@ FHEM/88_Itach_Relay.pm       sachag               http://forum.fhem.de Automatis
 FHEM/88_Itach_IRDevice       ulimaass             http://forum.fhem.de Sonstige Systeme
 FHEM/88_VantagePro2.pm       sachag               http://forum.fhem.de Sonstiges
 FHEM/88_WEBCOUNT.pm          sachag               http://forum.fhem.de Sonstiges
+FHEM/89_HEATRONIC.pm         heikoranft           http://forum.fhem.de Sonstige Systeme
 FHEM/90_at.pm                rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/91_eventTypes.pm        rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/91_notify.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
