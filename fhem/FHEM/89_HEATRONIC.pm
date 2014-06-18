@@ -511,6 +511,8 @@ HEATRONIC_DecodeMsg_HC($$$)
 
   my $type;
   my $prefix = "hc1_";
+  my $hc_Tdesired;
+  my $hc_Tmeasured;
   
   if (defined(HEATRONIC_CRCtest($hash,$string, $length)))
   {
@@ -528,8 +530,8 @@ HEATRONIC_DecodeMsg_HC($$$)
 	
     if ($length != 9)
     {
-      my $hc_Tdesired   = hex(substr($string,8*2,4))/10;
-      my $hc_Tmeasured  = hex(substr($string,10*2,4))/10;
+      $hc_Tdesired   = hex(substr($string,8*2,4))/10;
+      $hc_Tmeasured  = hex(substr($string,10*2,4))/10;
     }
     my $hc_mode       = hex(substr($string,6*2,2));
 	
