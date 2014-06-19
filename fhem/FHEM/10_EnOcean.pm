@@ -24,6 +24,7 @@ sub EnOcean_Parse($$);
 sub EnOcean_Get($@);
 sub EnOcean_Set($@);
 sub EnOcean_hvac_01Cmd($$);
+sub EnOcean_roomCtrlPanel_00Cmd($$$$$$$);
 sub EnOcean_CheckSenderID($$$);
 sub EnOcean_SndRadio($$$$$$$);
 sub EnOcean_ReadingScaled($$$$);
@@ -432,7 +433,8 @@ EnOcean_Get ($@)
           return "$cmd <channel> <query> wrong, choose health|load|voltage|serialNumber.";
         }
         $data = sprintf "0331%02X", $query;
-      
+        readingsSingleUpdate($hash, "getParam", $query, 0);
+        
       } else {
         if ($manufID eq "033") {
           return "Unknown argument $cmd, choose one of state measurement special";
@@ -3745,13 +3747,13 @@ EnOcean_Parse($$)
     if ($st eq "actuator.01" && $manufID eq "033") {
       if (substr($data, 3, 1) == 4) {
         my $getParam = ReadingsVal($name, "getParam", 0);
-        if ($getParam == 7) {
+        if ($getParam == 8) {
           push @event, "3:loadClassification:no";
           push @event, "3:loadLink:" . (($db[1] & 16) ? "connected":"disconnected");
           push @event, "3:loadOperation:3-wire";
           push @event, "3:loadState:" . (($db[1] & 64) ? "on":"off");
           CommandDeleteReading(undef, "$name getParam");        
-        } elsif ($getParam == 8) {
+        } elsif ($getParam == 7) {
           if ($db[0] & 4) {
             push @event, "3:devTempState:warning";
           } elsif ($db[0] & 2) {
@@ -3778,7 +3780,7 @@ EnOcean_Parse($$)
           CommandDeleteReading(undef, "$name getParam");        
         }
       }
-      #push @event, "3:MSCData:$data";    
+ 
     } elsif ($st eq "raw") {
       # raw
       push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
@@ -3947,7 +3949,7 @@ EnOcean_Parse($$)
       # message identifier
       my $mid = hex(substr($data, 0, 2)) >> 5;
       # message continuation flag
-      my $mcf = hex(substr($data, 0, 2)) & 3;     
+      my $mcf = hex(substr($data, 0, 2)) & 3;
       if ($mcf == 0) {
         # message complete
         push @event, "3:message:complete";
@@ -3966,7 +3968,11 @@ EnOcean_Parse($$)
       }
       if ($mid == 0) {
         # general message
+        my $irc = ($db[0] & 56) >> 3;
+        my $fbc = ($db[0] & 6) >> 1;
+        my $gmt = $db[0] & 1;
         push @event, "3:general:$data";
+        EnOcean_roomCtrlPanel_00Cmd(undef, $hash, $mid, $mcf, $irc, $fbc, $gmt);
         
       } elsif ($mid == 1) {
         # data message
@@ -4261,7 +4267,7 @@ sub EnOcean_Notify(@) {
   return undef;
 }
 
-# Message from Fhem to the actuator (EEP A5-20-01)
+# sent message to the actuator (EEP A5-20-01)
 sub
 EnOcean_hvac_01Cmd($$)
 {
@@ -4312,6 +4318,17 @@ EnOcean_hvac_01Cmd($$)
   }
 }
 
+sub
+EnOcean_roomCtrlPanel_00Cmd($$$$$$$)
+{
+  my ($crtl, $hash, $mid, $mcf, $irc, $fbc, $gmt) = @_;
+  my $name = $hash->{NAME};
+  my ($err, $response);
+  
+  
+  return ($err, $response);
+}
+
 # Check SenderIDs
 sub
 EnOcean_CheckSenderID($$$)
@@ -4359,7 +4376,7 @@ EnOcean_CheckSenderID($$$)
       push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI});
       push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0});
     }
-    $senderID = join(",", sort grep(!$listID{$_}++, @listID));    
+    $senderID = join(" ", sort grep(!$listID{$_}++, @listID));    
     
   } elsif ($ctrl eq "getFreeID") {
     # find and sort free SenderIDs
@@ -4370,9 +4387,9 @@ EnOcean_CheckSenderID($$$)
     foreach my $dev (keys %defs) {
       next if ($defs{$dev}{TYPE} ne "EnOcean");
       push(@listID, grep(hex($_) >= $IDCntr1 && hex($_) <= $IDCntr2, $defs{$dev}{DEF}));
-      push(@listID, $attr{$dev}{subDef}) if ($attr{$dev}{subDef});
-      push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI});
-      push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0});
+      push(@listID, $attr{$dev}{subDef}) if ($attr{$dev}{subDef} && $attr{$dev}{subDef} ne "00000000");
+      push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI} && $attr{$dev}{subDefI} ne "00000000");
+      push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0} && $attr{$dev}{subDef0} ne "00000000");
     }
     @listID = sort grep(!$listID{$_}++, @listID);
     foreach $element (@listID, @freeID) {
@@ -4381,7 +4398,7 @@ EnOcean_CheckSenderID($$$)
     foreach $element (keys %count) {
       push @{$count{$element} > 1 ? \@intersection : \@difference }, $element;
     }
-    $senderID = ":" . join(",", sort @difference);
+    $senderID = ":" . join(" ", sort @difference);
     
   } elsif ($ctrl eq "getNextID") {
     # get next free SenderID
@@ -4392,9 +4409,9 @@ EnOcean_CheckSenderID($$$)
     foreach my $dev (keys %defs) {
       next if ($defs{$dev}{TYPE} ne "EnOcean");
       push(@listID, grep(hex($_) >= $IDCntr1 && hex($_) <= $IDCntr2, $defs{$dev}{DEF}));
-      push(@listID, $attr{$dev}{subDef}) if ($attr{$dev}{subDef});
-      push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI});
-      push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0});
+      push(@listID, $attr{$dev}{subDef}) if ($attr{$dev}{subDef} && $attr{$dev}{subDef} ne "00000000");
+      push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI} && $attr{$dev}{subDefI} ne "00000000");
+      push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0} && $attr{$dev}{subDef0} ne "00000000");
     }
     @listID = sort grep(!$listID{$_}++, @listID);
     foreach $element (@listID, @freeID) {
@@ -4974,7 +4991,6 @@ sub EnOcean_sec_convertToNonsecure($$$) {
 			$data_end =~ /^.(.)/;
 		
 			#print "MSG: $1\n";
-### Bitte Ausgabeformat checken, Soll: 00 ... FF			
 			return (undef, '32', "0" . uc($1));
 		}
 	}
