@@ -6446,8 +6446,13 @@ sub CUL_HM_UpdtCentral($){
                  map{InternalVal($_,"owner_CCU","") eq $name ? $_ : ""}
                  keys %defs);
 
+  my @l = grep !/^$/,
+          map{AttrVal($_,"IODev","")} 
+          map{CUL_HM_id2Name($_)}
+          grep /^.{6}$/,
+          keys %{$modules{CUL_HM}{defptr}};
   my @myIos;# get all IOs using 'my' ID
-  foreach (CUL_HM_noDup(grep !/^$/,map{AttrVal($_,"IODev","")}keys %defs)){
+  foreach (CUL_HM_noDup(@l))  {
     push @myIos,$_ if (CUL_HM_h2IoId($defs{$_}) eq $id);
   }
   $defs{$name}{assignedIOs} = join(",",@myIos);
@@ -6477,7 +6482,7 @@ sub CUL_HM_UpdtCentral($){
     CommandDefine(undef,$name."_Btn$btn CUL_HM $ccuBId")
         if (!$modules{CUL_HM}{defptr}{$ccuBId});
     foreach my $pn (grep !/^$/,map{$_ if (AttrVal($_,"peerIDs","") =~ m/$id$btnS/)}keys %defs){
-      CUL_HM_ID2PeerList ($name."_Btn$btn",CUL_HM_name2Id($pn),1);
+      CUL_HM_ID2PeerList ($name."_Btn$btn",CUL_HM_name2Id($pn),1); 
     }
   }
   my $io = AttrVal($name,"IODev","empty");
