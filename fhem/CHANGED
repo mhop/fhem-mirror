@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FLOORPLAN has new style 7 to display commands only.
   - added:   89_HEATRONIC.pm (heikoranft)
   - bugfix:  duration parsing of calendar events in 57_Calendar.pm fixed
   - feature: LightScene: added followDevices attribute
