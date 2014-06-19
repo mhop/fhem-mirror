@@ -4,7 +4,7 @@
 # Feedback: http://groups.google.com/group/fhem-users
 # Define Custom Floorplans
 # Released : 26.02.2012
-# Version  : 2.0
+# Version  : 2.1
 # Revisions:
 # 0001: Released to testers
 # 0002: use local FP_select and FP_submit after clash with FHEMWEB update
@@ -44,12 +44,13 @@
 # 0033: Updated loglevel -> verbose, added fp_roomIcons (Feb 2, 2014)
 # 0034: iOS fullscreen app - navigating to other floorplan doesn't open safari anymore (Feb 15, 2014)
 # 0035: added allowedCommands-Attribute based on FHEMWEB (Feb 20, 2014)
+# 0036: added style "commands only", changed html-method "get" to "$FW_formmethod" (June 19, 2014)
 #
 ################################################################
 #
 #  Copyright notice
 #
-#  (c) 2012-2013 Copyright: Ulrich Maass
+#  (c) 2012-2014 Copyright: Ulrich Maass
 #
 #  This file is part of fhem.
 # 
@@ -142,7 +143,7 @@ my $FW_plotmode="";              # like in FHEMWEB: SVG
 my $FW_plotsize;				 # like in FHEMWEB: like in fhemweb dependent on regular/smallscreen/touchpad
 my %FW_zoom;                     # copied from FHEMWEB - using local version to avoid global variable
 my @FW_zoom;                     # copied from FHEMWEB - using local version to avoid global variable
-my @styles = ("0 (Icon only)","1 (Name+Icon)","2 (Name+Icon+Commands)","3 (Device-Reading)","4 (S300TH-specific)","5 (Icon+Commands)","6 (Reading+Timestamp)");
+my @styles = ("0 (Icon only)","1 (Name+Icon)","2 (Name+Icon+Commands)","3 (Device-Reading)","4 (S300TH-specific)","5 (Icon+Commands)","6 (Reading+Timestamp)","7 (Commands only)");
 
 
 #-------------------------------------------------------------------------------
@@ -227,6 +228,12 @@ FP_CGI(){
     $params[1] = $params[2];
   }
   my @htmlpart = split("\\?", $params[1]) if ($params[1]);                         # split URL by ?   ->   htmlpart[0] = FP_name, htmlpart[1] = commandstring
+  if (!$htmlpart[1] && $htmlpart[0] !~ "\\?") {                                    # in case of 'post' URL does not contain ?
+     $htmlpart[0] =~ /([a-z0-9.:_]+)&(.*)/i;
+	 $htmlpart[1] = $2 if ($2);
+	 $htmlpart[1] =~ s/\\+/&/g if ($htmlpart[1]);
+	 $htmlpart[0] = $1 if ($1);
+  }
   $FP_name = $htmlpart[0] if (!$FP_name);
   ### set global parameters, check floorplan-name  
   if ($FP_name) {																   # floorplan-name is part of URL
@@ -258,6 +265,7 @@ FP_CGI(){
     $FW_subdir = "/floorplan/$FP_name";
     $FP_arrange = AttrVal($FP_name, "fp_arrange", 0);
   }
+  
   ## process cgi
   my $commands = FP_digestCgi($htmlpart[1]) if $htmlpart[1];                       # analyze URL-commands
   my $FP_ret = AnalyzeCommand(undef, $commands,
@@ -310,8 +318,9 @@ FP_digestCgi($) {
   $FP_fwdetail = undef;
   $arg =~ s,^[?/],,;
   foreach my $pv (split("&", $arg)) {                                   #per each URL-section devided by &
+    next if($pv eq ""); # happens when post forgot to set FW_ME
     $pv =~ s/\+/ /g;
-    $pv =~ s/%(..)/chr(hex($1))/ge;
+	$pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
     my ($p,$v) = split("=",$pv, 2);                                     #$p = parameter, $v = value
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");                 # Multiline: escape the NL for fhem
     $FP_webArgs{$p} = $v;
@@ -408,7 +417,7 @@ FP_showStart() {
   FW_pO "<div id=\"logo\"></div>";
   FP_menu();
   FW_pO "<div class=\"screen\" id=\"hdr\">";
-  FW_pO "<form method=\"get\" action=\"" . $FW_ME . "\">";
+  FW_pO "<form method=\"$FW_formmethod\" action=\"" . $FW_ME . "\">";
   FW_pO "<table WIDTH=\"100%\"><tr>";
   FW_pO "<td><input type=\"text\" name=\"cmd\" size=\"30\"/></td>";   						  #input-field
   FW_pO "</tr></table>";
@@ -474,7 +483,7 @@ FP_show(){
 		$style = 0 if (!$style);
         # start device-specific table
 		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px;\" id=\"div-$d\">";
-		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name/$d\" autocomplete=\"off\">";
+		FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name/$d\" autocomplete=\"off\">";
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"table-$d\" align=\"center\">";         # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
 		$txt = ReadingsVal($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
@@ -482,7 +491,7 @@ FP_show(){
 		
     ########################
     # Device-name per device
-		if ($style gt 0 && $style ne 5) {
+		if ($style gt 0 && $style ne 5 && $style ne 7) {
 			FW_pO "   <tr class=\"devicename fp_$FP_name\" id=\"$d-devicename\">";             # For css: class=devicename, id=<devicename>-devicename
 			my $devName = "";
 			if ($style == 3 || $style == 6) {
@@ -501,10 +510,11 @@ FP_show(){
     ########################
     # Device-state per device
 #	    FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                               # For css: class=devicestate, id=devicename
+       if ($style != 7) {
 	    if ($style == 3 || $style == 6) {
 	      FW_pO "<tr class=\"devicereading fp_$FP_name\" id=\"$d"."-$text\">";                  # For css: class=devicereading, id=<devicename>-<reading>
-	    } else {  
-	      FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                             # For css: class=devicestate, id=<devicename>
+	    } else { 
+          FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                           # For css: class=devicestate, id=<devicename>
 	    }
         $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;                                     # format FHT-temperature
 	    ### use device-specific icons according to userattr fp_image or fp_<floorplan>.image
@@ -530,7 +540,7 @@ FP_show(){
 	      FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";                                   # state
 		}
 	    FW_pO "</td></tr>";
-	
+	   }
 	    if ($style == 6) {                                                                      # add ReadingsTimeStamp for style 6
 		  $txt="";
     	  FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d-devicetimestamp\">";         # For css: class=devicetimestamp, id=<devicename>-devicetimestamp
@@ -542,7 +552,7 @@ FP_show(){
 
     ########################
     # Commands per device		  
-        if($cmdlist && ( $style == 2 || $style == 5) ) {
+        if($cmdlist && ( $style == 2 || $style == 5 || $style == 7) ) {
           my @cList = split(":", $cmdlist);
           my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
           my $firstIdx = 0;
@@ -623,7 +633,7 @@ FP_menu() {
 	FW_pH "$FW_ME", "fhem", 1;
 	FW_pO "</tr>";
 	foreach my $f (sort keys %defs) {
-		next if ($defs{$f}{TYPE} ne "FLOORPLAN");
+		next if (!$defs{$f}{TYPE} || $defs{$f}{TYPE} ne "FLOORPLAN");
     	FW_pO "<tr>";
         my $icoName = "ico$f";
         map { my ($n,$v) = split(":",$_); $icoName=$v if($f =~ m/$n/); }
@@ -649,8 +659,9 @@ FP_menuArrange() {
 	my @nfpl;                                                               # devices not assigned to floorplan
 	foreach my $d (sort keys %defs) {                                       # loop all devices
 		my $type = $defs{$d}{TYPE};
+		$type = '?' if (!$type);
 		# exclude these types from list of available devices
-		next if($type =~ m/^(WEB|CUL$|FHEM.*|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify|autocreate)/ );
+		next if ($type =~ m/^(WEB|CUL$|FHEM.*|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify|autocreate)/ );
 		my $disp = $d;
 		$disp .= ' (' . AttrVal($d,"room","Unsorted").") $type";
 		my $alias = AttrVal($d, "alias", undef);
@@ -671,7 +682,7 @@ FP_menuArrange() {
 
 	# add device to floorplan
 	if (!defined($FP_arrange_selected)) {
-		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form1
+		FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name\">"; #form1
 		FW_pO "<div class=\"menu-add\" id=\"fpmenu\">\n" .                                       
 		($FP_fwdetail?FP_input("detl.$FP_fwdetail", $FP_fwdetail, "hidden") . "\n" :"") .
 		FW_select("","add.dev", \@nfpl, "", "menu-add") .
@@ -683,7 +694,7 @@ FP_menuArrange() {
 	if (!defined($FP_arrange_selected)) {
 		my $dv = $FP_arrange_default;
 		$dv =  $desc{$dv} if ($dv);
-		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form2
+		FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name\">"; #form2
 		FW_pO "<div class=\"menu-select\" id=\"fpmenu\">\n" .                                       
 		($FP_fwdetail?FP_input("detl.$FP_fwdetail", $FP_fwdetail, "hidden") . "\n" :"") .
 		FW_select("","arr.dev", \@fpl, $dv, "menu-select") .
@@ -710,7 +721,7 @@ FP_menuArrange() {
       }
 	### build the form
 		my $disp =  $FP_arrange eq "detail" ? $desc{$d} : $d;
-		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form3
+		FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name\">"; #form3
 		my ($top, $left, $style, $text, $text2) = split(",", $attrd);
 		$text .= ','.$text2 if ($text2);														# re-append Description after reading-ID for style3
 		$style = $styles[$style];
@@ -921,6 +932,7 @@ FP_pOfill($@) {
 			<li>4  S300TH-specific, displays temperature above humidity</li>
 			<li>5  icon/state and commands</li>
 			<li>6  device-reading, reading-timestamp and optional description</li>
+            <li>7  commands only</li>
 		</ul>
 	  </li>
       <li>description will be displayed instead of the original devicename</li>
@@ -1089,6 +1101,7 @@ FP_pOfill($@) {
 			<li>4  S300TH-spezifisch, zeigt Temperatur und Luftfeuchtigkeit an</li>
 			<li>5  icon/Status und Kommandos (ohne Gerätename)</li>
 			<li>6  Geräte-reading, Zeitstempel und optionale Beschreibung</li>
+            <li>7  nur Kommandos</li>
 		</ul>
 	  </li>
       <li>Eine ggf. angegebene Bschreibung wird anstelle des original-Gerätenamens angezeigt.</li>
