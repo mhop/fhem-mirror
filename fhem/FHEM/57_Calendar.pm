@@ -31,7 +31,18 @@ use HttpUtils;
 
 package main;
 
-
+#
+# Note:
+#
+# There might be issues when turning to daylight saving time and back that
+# need further investigation. For reference please see
+# http://forum.fhem.de/index.php?topic=18707.new#new
+# http://forum.fhem.de/index.php?topic=15827.new;topicseen#new
+#
+# Potential future extensions: add support for EXDATE
+# http://forum.fhem.de/index.php?topic=24485.new#new
+#
+#
 #####################################
 #
 # ICal
