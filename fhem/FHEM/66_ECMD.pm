@@ -1,12 +1,34 @@
-#
-#
-# 66_ECMD.pm
-# written by Dr. Boris Neubert 2011-01-15
-# e-mail: omega at online dot de
-#
-##############################################
 # $Id$
+
+##############################################################################
+#
+#     66_ECMD.pm
+#     Copyright by Dr. Boris Neubert
+#     e-mail: omega at online dot de
+#
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
 package main;
+
+#
+# Potential future extensions: add support for PARTIALly received datagrams
+# http://forum.fhem.de/index.php/topic,24280.msg174330.html#msg174330
+
 
 use strict;
 use warnings;
@@ -207,6 +229,7 @@ ECMD_Get($@)
         #my $nonl= AttrVal($name, "nonl", 0);
         my $ecmd= join " ", @args;
         #ecmd .= "\n" unless($nonl);
+        $ecmd= AnalyzePerlCommand(undef, $ecmd);
         $answer= ECMD_SimpleExpect($hash, $ecmd, ".*");
   }  else {
         return "get $cmd: unknown command ";
@@ -590,7 +613,14 @@ ECMD_Write($$$)
     <code>get &lt;name&gt; raw &lt;command&gt;</code>
     <br><br>
     Sends the command <code>&lt;command&gt;</code> to the physical ECMD device
-    <code>&lt;name&gt;</code> and reads the response.
+    <code>&lt;name&gt;</code> and reads the response. In the likely case that 
+    the command needs to be terminated by a newline character, you have to
+    resort to a <a href="#perl">&lt;perl special&gt;</a>.
+    <br><br>
+    Example: 
+    <ul>
+      <code>get AVRNETIO raw { "ip\n" }</code><br>
+    </ul>
   </ul>
   <br><br>
 
