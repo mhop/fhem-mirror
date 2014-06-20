@@ -581,4 +581,8 @@
   - added new module 37_SHCdev.pm to support smarthomatic devices
 
 - Wed Jun 18 2014 (heikoranft)
-  - added new module 89_HEATRONIC.pm 
+  - added new module 89_HEATRONIC.pm
+
+- Fri Jun 20 2014 (hofrichter)
+  - added new module 70_PIONEERAVR.pm to support Pioneer AV receivers
+  - added new module 71_PIONEERAVRZONE.pm to support zones of PIONEER AV receivers 

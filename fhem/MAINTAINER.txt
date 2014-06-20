@@ -161,6 +161,7 @@ FHEM/70_Jabber.pm            BioS                 http://forum.fhem.de Unterstue
 FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges
 FHEM/70_PHTV.pm              loredo               http://forum.fhem.de Multimedia
 FHEM/70_ONKYO_AVR.pm         loredo               http://forum.fhem.de Multimedia
+FHEM/70_PIONEERAVR.pm        hofrichter           http://forum.fhem.de Multimedia
 FHEM/70_SCIVT.pm             rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/70_SISPM.pm             real-wusel           http://forum.fhem.de Sonstiges
 FHEM/70_SML.pm               bentele              http://forum.fhem.de Sonstiges
