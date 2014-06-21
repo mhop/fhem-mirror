@@ -218,10 +218,12 @@ my %zwave_class = (
     get   => { association => "02%02x",      },
     parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"',}, },
   VERSION                  => { id => '86',
-    get   => { version     => "11",       },
+    get   => { version      => "11",
+               versionClass => "13%02x", },
     parse => { "078612(..)(..)(..)(..)(..)" =>
     'sprintf("version:Lib %d Prot %d.%d App %d.%d",'.
-        'hex($1),hex($2),hex($3),hex($4),hex($5))', } },
+        'hex($1),hex($2),hex($3),hex($4),hex($5))', 
+               "048614(..)(..)"             => '"versionClass_$1:$2"', }, },
   INDICATOR                => { id => '87',
     set   => { indicatorOff    => "0100",
                indicatorOn     => "01FF",
@@ -1076,6 +1078,9 @@ s2Hex($)
     return the version information of this node in the form:<br>
     Lib A Prot x.y App a.b
     </li>
+  <li>versionClass classId<br>
+     return the supported command version for the requested class
+  </li>
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval<br>
@@ -1214,6 +1219,7 @@ s2Hex($)
 
   <br><br><b>Class VERSION</b>
   <li>version:Lib A Prot x.y App a.b</li>
+  <li>versionClass_$classId:$version</li>
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeup:notification</li>
