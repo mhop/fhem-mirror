@@ -88,6 +88,8 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x1905 => [ "MEDIA_MOUNT", "light"], # Media Mount
 	0x1906 => [ "DC106", "light"], # DC/RMF/Yooda
 	0x1907 => [ "FOREST", "light"], # Forest
+	0x1A00 => [ "RFY", "light"], # RTS RFY
+	0x1A01 => [ "RFY_ext", "light"], # RTS RFY ext
 );
 
 my %light_device_commands = (	# HEXSTRING => commands
@@ -137,6 +139,8 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1905 => [ "down", "up", "stop"], # Media Mount
 	0x1906 => [ "open", "close", "stop", "confirm"], # DC/RMF/Yooda
 	0x1907 => [ "open", "close", "stop", "confirm_pair"], # Forest
+        0x1A00 => [ "stop", "up", "", "down", "", "", "", "program"], # RTS RFY
+        0x1A01 => [ "stop", "up", "", "down", "", "", "", "program"], # RTS RFY ext
 );
 
 my %light_device_c2b;        # DEVICE_TYPE->hash (reverse of light_device_codes)
@@ -150,7 +154,7 @@ TRX_LIGHT_Initialize($)
     $light_device_c2b{$light_device_codes{$k}->[0]} = $k;
   }
 
-  $hash->{Match}     = "^..(10|11|12|13|14|15|16|17|18|19).*";
+  $hash->{Match}     = "^..(10|11|12|13|14|15|16|17|18|19|1A).*";
   $hash->{SetFn}     = "TRX_LIGHT_Set";
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
@@ -483,6 +487,24 @@ TRX_LIGHT_Set($@)
   	$hex_command = sprintf "%02x%02x%s%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
   	Log3 $name, 5, "TRX_LIGHT_Set() Blinds1 name=$name device_type=$device_type, deviceid=$deviceid command=$command";
   	Log3 $name, 5, "TRX_LIGHT_Set() Blinds1 hexline=$hex_prefix$hex_command";
+ } elsif ($protocol_type == 0x1A) {
+	my $unitid;
+	my $unitcode;
+  	if (uc($deviceid) =~ /^([0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F])(0[0-9A-F])$/ ) {
+		$unitid = $1;
+		$unitcode = $2;
+		if (($device_type_num == 0x1A00) && !($unitcode =~ /^0[0-4]$/)) {
+		   Log3 $name, 1, "TRX_LIGHT_Set() RFY wrong unitcode: name=$name device_type=$device_type, unitid=$unitid unitcode=$unitcode";
+		   return "error set name=$name  deviceid=$deviceid";
+		}
+	} else {
+		Log3 $name, 1, "TRX_LIGHT_Set() RFY wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+                return "error set name=$name  deviceid=$deviceid";
+        }
+  	$hex_prefix = sprintf "0C1A";
+  	$hex_command = sprintf "%02x%02x%s%s%02x0000000000", $device_type_num & 0xff, $seqnr, $unitid, $unitcode, $cmnd; 
+  	Log3 $name, 5, "TRX_LIGHT_Set() RFY name=$name device_type=$device_type, unitid=$unitid unitcode=$unitcode command=$command";
+  	Log3 $name, 5, "TRX_LIGHT_Set() RFY hexline=$hex_prefix$hex_command";
   } else {
 	return "No set implemented for $device_type . Unknown protocol type";	
   }
@@ -528,7 +550,7 @@ TRX_LIGHT_Define($$)
   $devicelog = $a[4] if (int(@a) > 4);
   $commandcodes = $a[5] if ($type eq "PT2262" && int(@a) > 5);
 
-  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "TRC02" && $type ne "PT2262" && $type ne "ENER010" && $type ne "ENER5" && $type ne "COCO_GDR2" && $type ne "MDREMOTE" && $type ne "RSL2" && $type ne "LIVOLO" && $type ne "BLYSS" && $type ne "BYRONSX" && $type ne "SIEMENS_SF01" && $type ne "HARRISON" && $type ne "ROLLER_TROL" && $type ne "HASTA_OLD" && $type ne "AOK_RF01" && $type ne "AOK_AC114" && $type ne "RAEX_YR1326" && $type ne "MEDIA_MOUNT" && $type ne "DC106" && $type ne "FOREST") {
+  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "TRC02" && $type ne "PT2262" && $type ne "ENER010" && $type ne "ENER5" && $type ne "COCO_GDR2" && $type ne "MDREMOTE" && $type ne "RSL2" && $type ne "LIVOLO" && $type ne "BLYSS" && $type ne "BYRONSX" && $type ne "SIEMENS_SF01" && $type ne "HARRISON" && $type ne "ROLLER_TROL" && $type ne "HASTA_OLD" && $type ne "AOK_RF01" && $type ne "AOK_AC114" && $type ne "RAEX_YR1326" && $type ne "MEDIA_MOUNT" && $type ne "DC106" && $type ne "FOREST" && $type ne "RFY" && $type ne "RFY_ext") {
   	Log3 $name, 1,"TRX_LIGHT_Define() wrong type: $type";
   	return "TRX_LIGHT: wrong type: $type";
   }
@@ -656,14 +678,17 @@ sub TRX_LIGHT_parse_X10 ($$)
   	$device = sprintf '%02x%02x%c%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
   	$data = $bytes->[7];
   } elsif ($type == 0x16) { #Chime
-  	$device = sprintf '%02x', $bytes->[4];
-  	$data = $bytes->[5];
+	$device = sprintf '%02x', $bytes->[4];
+	$data = $bytes->[5];
   } elsif ($type == 0x17) { # Fan
   	$device = sprintf '%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5];
   	$data = $bytes->[6];
   } elsif ($type == 0x19) { # Blinds1
   	$device = sprintf '%02x%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
   	$data = $bytes->[7];
+  } elsif ($type == 0x1A) { # RFY
+	$device = printf '%02x%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
+        $data = $bytes->[7];
   } else {
 	$error = sprintf "TRX_LIGHT: wrong type=%02x", $type;
 	Log3 $hash, 1, "TRX_LIGHT_parse_X10() ".$error;
@@ -1012,6 +1037,8 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	  <li> <code>MEDIA_MOUNT</code> (Media Mount blind devices. deviceid: 00000100-FFFFFF0F. Commands [ "down", "up", "stop" ].)</li>
 	  <li> <code>DC106</code> (DC/RMF/Yooda blind devices. deviceid: 00000100-FFFFFFF0. Commands [ "open", "close", "stop", "confirm" ].)</li>
 	  <li> <code>FOREST</code> (Forest blind devices. deviceid: 00000100-FFFFFFF0. Commands [ "open", "close", "stop", "confirm_pair" ].)</li>
+	  <li> <code>RFY</code> (Somfy RTS devices. deviceid: 000001-0FFFFF, unicode: 01-04 (00 = allunits). Commands [ "up", "down", "stop", "program" ].)</li>
+	  <li> <code>RFY_ext</code> (Somfy RTS devices. deviceid: 000001-0FFFFF, unicode: 00-0F. Commands [ "up", "down", "stop", "program" ].)</li>
         </ul>
     </ul>
     <br>
@@ -1025,6 +1052,9 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     For LIGHTWAVERF, EMW100, BBSB, MDREMOTE, RSL2, LIVOLO and TRC02 it is a 8 Character-Hex-String for the deviceid, consisting of <br>
 	- unid-id: 8-Char-Hex: 000001 to FFFFFF<br>
 	- unit-code: 2-Char-Hex: 01 to 10  <br>
+    For RFY and RFY-ext it is a 8 Character-Hex-String for the deviceid, consisting of <br>
+	- unid-id: 8-Char-Hex: 000001 to FFFFFF<br>
+	- unit-code: 2-Char-Hex: 01 to 04 for RFY (00 for all units) and 00 to 0F for RFY_ext  <br>
     </ul>
     <br>
     <code>&lt;devicelog&gt;</code>
