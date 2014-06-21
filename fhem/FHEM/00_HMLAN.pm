@@ -747,9 +747,11 @@ sub HMLAN_SimpleWrite(@) {#####################################################
       my $chn = substr($msg,52,2);
       if (!$hDst->{chn} || $hDst->{chn} ne $chn){
         my $updt = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn};
-        Log3 $hash,  HMLAN_getVerbLvl($hash,$src,$dst,"5")
+        if ($updt){
+          Log3 $hash,  HMLAN_getVerbLvl($hash,$src,$dst,"5")
                   , 'HMLAN_Send:  '.$name.' S:'.$updt;
-        syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
+          syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
+        }
       }
       $hDst->{chn} = $chn;
     }

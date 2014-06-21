@@ -1143,12 +1143,12 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($md =~ m/HM-CC-RT-DN/) { ##############################################
     my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
     if   ($mTp eq "10" && $p =~ m/^0A(....)(..)(..)(..)/) {#info-level
-      my ($chn,$setTemp,$actTemp,$err,$bat,$vp,$ctrlMode) =
-          ("04",hex($1),hex($1),hex($2),hex($2),hex($3), hex($4));
+      my ($chn,$setTemp,$err,$vp,$ctrlMode) =
+          ("04",hex($1),hex($2),hex($3), hex($4));
+      my $actTemp =(($setTemp        ) & 0x3ff)/10;
       $setTemp    =(($setTemp    >>10) & 0x3f )/2;
-      $actTemp    =(($actTemp        ) & 0x3ff)/10;
+      my $bat     =(($err            ) & 0x1f)/10+1.5;
       $err        = ($err        >> 5) & 0x7  ;
-      $bat        =(($bat            ) & 0x1f)/10+1.5;
       $vp         = ($vp             ) & 0x7f ;
       my $uk0     = ($ctrlMode       ) & 0x3f ;#unknown
       $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
