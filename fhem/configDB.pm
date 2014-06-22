@@ -652,6 +652,7 @@ sub _cfgDB_Info() {
 	$sth = $fhem_dbh->prepare( $sql );
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
+		$line[3] = "" unless defined $line[3];
 		$row	 = " Ver $line[6] saved: $line[1] $line[2] $line[3] def: ".
 				$fhem_dbh->selectrow_array("SELECT COUNT(*) from fhemconfig where COMMAND = 'define' and VERSIONUUID = '$line[5]'");
 		$row	.= " attr: ".
