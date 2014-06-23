@@ -32,7 +32,8 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       10 => { name => "Systolic Blood Pressure (mmHg)", reading => "systolicBloodPressure", },
                       11 => { name => "Heart Pulse (bpm)", reading => "heartPulse", },
                       12 => { name => "Temperature (&deg;C)", reading => "temperature", },
-                      35 => { name => "CO2 (ppm)", reading => "co2", }, );
+                      35 => { name => "CO2 (ppm)", reading => "co2", },
+                      54 => { name => "SPo2 (%)", reading => "spo2", }, );
 
 sub
 withings_Initialize($)
