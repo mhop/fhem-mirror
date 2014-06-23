@@ -2225,7 +2225,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $shash->{READINGS}{".RegL_00:"};
         
           if (!$modules{CUL_HM}{helper}{hmManualOper}){
-            $attr{$shash->{NAME}}{IODev} = $ioHash;
+            $attr{$shash->{NAME}}{IODev} = $ioN;
             $attr{$shash->{NAME}}{IOgrp} = "$ioOwn:$ioHash->{NAME}" if($ioOwn);
             CUL_HM_assignIO($shash) ;
           }
