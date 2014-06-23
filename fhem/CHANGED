@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  70_PIONEERAVR.pm and PIONEERAVRZONE.pm: added "use SetExtensions", commandref updates
+			 fixed RC_layout
   - feature: new modules 70_PIONEERAVR.pm and PIONEERAVRZONE.pm
   - feature: FLOORPLAN has new style 7 to display commands only.
   - added:   89_HEATRONIC.pm (heikoranft)
