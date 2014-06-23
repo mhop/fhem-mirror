@@ -61,7 +61,7 @@ TCM_Initialize($)
   $hash->{NotifyFn} = "TCM_Notify";
   $hash->{AttrFn}   = "TCM_Attr";
   $hash->{AttrList} = "do_not_notify:1,0 dummy:1,0 blockSenderID:own,no learningMode:always,demand,nearfield " .
-                      "sendInterval:0,25,40,50,100,150,200,250";
+                      "comType:TCM,RS485 sendInterval:0,25,40,50,100,150,200,250";
 }
 
 # Define
@@ -560,7 +560,7 @@ TCM_Get($@)
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
-
+  return if (AttrVal($name, "comType", "TCM") eq "RS485" || $hash->{DeviceName} eq "none");
   return "\"get $name\" needs one parameter" if(@a != 2);
   my $cmd = $a[1];
   my ($err, $msg);
@@ -574,6 +574,7 @@ TCM_Get($@)
     $rawcmd .= "000000000000000000";
     TCM_Write($hash, "", $rawcmd);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
+
     $msg = TCM_Parse120($hash, $msg, 1) if(!$err);
   } else {
     # TCM 310
@@ -584,6 +585,7 @@ TCM_Get($@)
     my $cmdHex = $cmdhash->{cmd};
     TCM_Write($hash, sprintf("%04X0005", length($cmdHex)/2), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
+
     $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
   }
   if($err) {
@@ -633,12 +635,11 @@ TCM_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
-
+  return if (AttrVal($name, "comType", "TCM") eq "RS485" || $hash->{DeviceName} eq "none");
   return "\"set $name\" needs at least one parameter" if(@a < 2);
   my $cmd = $a[1];
   my $arg = $a[2];
   my ($err, $msg);
-
   my $chash = ($hash->{MODEL} eq "ESP2" ? \%sets120 : \%sets310);
   my $cmdhash = $chash->{$cmd};
   return "Unknown argument $cmd, choose one of ".join(" ",sort keys %{$chash})
@@ -793,6 +794,14 @@ TCM_Attr(@) {
       CommandDeleteAttr(undef, "$name $attrName");
     }
     
+  } elsif ($attrName eq "comType") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^(TCM|RS485)$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
   } elsif ($attrName eq "learningMode") {
     if (!defined $attrVal){
     
@@ -818,17 +827,29 @@ sub TCM_Notify(@) {
   my $name = $hash->{NAME};
   if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
     my $attrVal;
+    my $comType = AttrVal($name, "comType", "TCM");
     my $setCmdVal = "";
     my @setCmd = ("set", "reset", $setCmdVal);
     # read and discard receive buffer, modem reset
     if ($hash->{MODEL} eq "ESP2") {
+      if ($comType eq "TCM") {
+        TCM_ReadAnswer($hash, "set reset");
+        TCM_Set($hash, @setCmd);
+      }
     } else {
       TCM_ReadAnswer($hash, "set reset");
       TCM_Set($hash, @setCmd);
       #usleep(200);
     }
     # default attributes
-    my %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 0});
+    my %setAttrInit;
+    if ($comType eq "RS485" || $hash->{DeviceName} eq "none") {
+      %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 0},
+                      "learningMode" => {ESP2 => "always", ESP3 => "always"}      
+                     );
+    }else {
+      %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 0});
+    }
     foreach(keys %setAttrInit) {
       $attrVal = AttrVal($name, $_, undef);
       if(!defined $attrVal && defined $setAttrInit{$_}{$hash->{MODEL}}) {
@@ -837,42 +858,46 @@ sub TCM_Notify(@) {
       }
     }
     # default transceiver parameter
-    my %setCmdRestore = ("mode"     => "00",
-                         "maturity" => "01",
-                         "repeater" => "RepEnable: 00 RepLevel: 00"
-                        );
-    foreach(keys %setCmdRestore) {
-      $setCmdVal = ReadingsVal($name, $_, undef);
-      if (defined $setCmdVal) {
-        if ($_ eq "repeater") {
-          $setCmdVal = substr($setCmdVal, 11, 2) . substr($setCmdVal, 24, 2);
-          $setCmdVal = "0000" if ($setCmdVal eq "0001");
-        }
-        @setCmd = ("set", $_, $setCmdVal);
-        TCM_Set($hash, @setCmd);
-        Log3 $name, 2, "TCM $name $_ $setCmdVal restored";
-      } else {
-        if ($hash->{MODEL} eq "ESP2") {
-        
-        } else {
+    if ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
+      my %setCmdRestore = ("mode"     => "00",
+                           "maturity" => "01",
+                           "repeater" => "RepEnable: 00 RepLevel: 00"
+                          );
+      foreach(keys %setCmdRestore) {
+        $setCmdVal = ReadingsVal($name, $_, undef);
+        if (defined $setCmdVal) {
           if ($_ eq "repeater") {
-            $setCmdVal = substr($setCmdRestore{$_}, 11, 2) . substr($setCmdRestore{$_}, 24, 2);
-          } else {
-            $setCmdVal = $setCmdRestore{$_};
+            $setCmdVal = substr($setCmdVal, 11, 2) . substr($setCmdVal, 24, 2);
+            $setCmdVal = "0000" if ($setCmdVal eq "0001");
           }
           @setCmd = ("set", $_, $setCmdVal);
-          my $msg = TCM_Set($hash, @setCmd);
-          Log3 $name, 2, "TCM $name $_ $setCmdVal initialized" if ($msg eq "");
+          TCM_Set($hash, @setCmd);
+          Log3 $name, 2, "TCM $name $_ $setCmdVal restored";
+        } else {
+          if ($hash->{MODEL} eq "ESP2") {
+        
+          } else {
+            if ($_ eq "repeater") {
+              $setCmdVal = substr($setCmdRestore{$_}, 11, 2) . substr($setCmdRestore{$_}, 24, 2);
+            } else {
+              $setCmdVal = $setCmdRestore{$_};
+            }
+            @setCmd = ("set", $_, $setCmdVal);
+            my $msg = TCM_Set($hash, @setCmd);
+            Log3 $name, 2, "TCM $name $_ $setCmdVal initialized" if ($msg eq "");
+          }
         }
       }
     }
-    my @getBaseID = ("get", "baseID");
-    if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/ ) {
-      $hash->{BaseID} = sprintf "%08X", hex $&;
-      $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
-    } else {
-      $hash->{BaseID} = "00000000";
-      $hash->{LastID} = "00000000";
+    if ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
+      my @getBaseID = ("get", "baseID");
+      if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/ ) {
+        $hash->{BaseID} = sprintf "%08X", hex $&;
+        $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
+      } else {
+        $hash->{BaseID} = "00000000";
+        $hash->{LastID} = "00000000";
+      }
     }
     CommandSave(undef, undef);
     readingsSingleUpdate($hash, "state", "initialized", 1);
@@ -930,7 +955,7 @@ TCM_Undef($$)
   of commands depends on the hardware and the firmware version. A firmware update
   is usually not provided.
   <br><br>
-  The TCM module enables also a read-only wired connection to Eltako actuators over the
+  The TCM module enables also a wired connection to Eltako actuators over the
   Eltako RS485 bus in the switchboard or distribution box via Eltako FGW14 RS232-RS485
   gateway modules. These actuators are linked to an associated wireless antenna module
   (FAM14) on the bus. The FAM14 device frequently polls the actuator status of all
@@ -940,9 +965,9 @@ TCM_Undef($$)
   downtime. As all actuators are polled approx. every 1-2 seconds, it should be avoided to
   use event-on-update-reading. Use instead either event-on-change-reading or
   event-min-interval.
-  The Eltako bus uses the EnOcean Serial Protocol version 2 (ESP2) protocol, which is
-  the same serial protocol used by TCM 120 modules. For this reason, a FGW14 can be
-  configured as a TCM 120.<br><br>
+  The Eltako bus uses the EnOcean Serial Protocol version 2 (ESP2). For this reason,
+  a FGW14 can be configured as a ESP2. The attribute <a href="#TCM_comType">comType</a>
+  must be set to RS485.<br><br>
   
   <a name="TCMdefine"></a>
   <b>Define</b>
@@ -1067,6 +1092,10 @@ TCM_Undef($$)
       Block receiving telegrams with a TCM SenderID sent by repeaters.      
       </li>
     <li><a href="#attrdummy">dummy</a></li>
+    <li><a name="TCM_comType">comType</a> &lt;TCM|RS485&gt;,
+      comType = TCM is default.<br>
+      Type of communication device
+    </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a name="TCM_learningMode">learningMode</a> &lt;always|demand|nearfield&gt;,
       [learningMode] = demand is default.<br>
@@ -1075,8 +1104,9 @@ TCM_Undef($$)
       [learningMode] = demand: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode, see also <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br>
       [learningMode] = nearfield: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode and the signal strength RSSI >= -60 dBm.<be>
     </li>
-    <li><a name="TCM_sendInterval">sendInterval</a> &lt;0 ... 250&gt;,
-      sendInterval = 100 ms is default.<br>
+    <li><a name="TCM_sendInterval">sendInterval</a> &lt;0 ... 250&gt;<br>
+      ESP2: sendInterval = 100 ms is default.<br>
+      ESP3: sendInterval = 0 ms is default.<br>
       Smallest interval between two sending telegrams
     </li>
     <li><a href="#verbose">verbose</a></li>
