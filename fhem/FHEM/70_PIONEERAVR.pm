@@ -46,6 +46,10 @@
 # supress the "on" command if networkStandby = "off"
 # 
 # changelog
+# 23.6.2014: added "use SetExtensions qw/ :all /;"
+#			 added set extension to documentation
+# 21.6.2014:version
+#			fixed RC_layout
 # 10.6.2014:version 0007
 #			unified logging texts
 #			added "verbose 5" log messages for all reads (messages coming from the PioneerAVR)
@@ -77,6 +81,7 @@ if( $^O =~ /Win/ ) {
 } else {
   require Device::SerialPort;
 }
+use SetExtensions qw/ :all /;
 #########################
 # Forward declaration
 sub PIONEERAVR_Set($@);
@@ -114,7 +119,7 @@ sub
 PIONEERAVR_Initialize($) {
 	my ($hash) = @_;
 
-#	require "$attr{global}{modpath}/FHEM/DevIo.pm";
+	require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 	# Provider
 	$hash->{ReadFn}  = "PIONEERAVR_Read";
@@ -141,7 +146,7 @@ PIONEERAVR_Initialize($) {
 #Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Geräte ausgeführt wird 
 # und das Modul bereits geladen und mit der Initialize-Funktion initialisiert ist. Sie ist typischerweise dazu da,
 # die übergebenen Parameter zu prüfen und an geeigneter Stelle zu speichern sowie 
-# einen Kommunikationsweg zum Pioneer Receiver zu öffnen (z.B. TCP-Verbindung, RS232-Schnittstelle)
+# einen Kommunikationsweg zum Pioneer AV Receiver zu öffnen (TCP-Verbindung bzw. RS232-Schnittstelle)
 #Als Übergabeparameter bekommt die Define-Funktion den Hash der Geräteinstanz sowie den Rest der Parameter, die im Befehl angegeben wurden. 
 #
 # Damit die übergebenen Werte auch anderen Funktionen zur Verfügung stehen und an die jeweilige Geräteinstanz gebunden sind, 
@@ -735,7 +740,8 @@ sub
 PIONEERAVR_Ready($)
 {
   my ($hash) = @_;
-
+  my $name = $hash->{NAME};
+  Log3 $name, 5, "PIONEERAVR $name: PIONEER_Ready() called";
   return DevIo_OpenDev($hash, 1, "PIONEERAVR_DoInit")
                 if($hash->{STATE} eq "disconnected");
 
@@ -754,7 +760,7 @@ PIONEERAVR_DoInit($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
-  my $msg = undef;
+  Log3 $name, 5, "PIONEERAVR $name: PIONEER_DoInit() called";
 
   PIONEERAVR_Clear($hash);
  
@@ -768,6 +774,8 @@ sub
 PIONEERAVR_Clear($)
 {
   my $hash = shift;
+  my $name = $hash->{NAME};
+  Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Clear() called";
 
   # Clear the pipe
   DevIo_TimeoutRead($hash, 0.1);
@@ -1439,7 +1447,7 @@ RC_layout_PioneerAVR() {
   $row[0]="toggle:POWEROFF";
   $row[1]="volumeUp:UP,mute toggle:MUTE,inputUp:CHUP";
   $row[2]=":VOL,:blank,:PROG";
-  $row[3]="channelDown:DOWN,:blank,channelDown:CHDOWN";
+  $row[3]="volumeDown:DOWN,:blank,inputDown:CHDOWN";
   $row[4]="attr rc_iconpath icons/remotecontrol";
   $row[5]="attr rc_iconprefix black_btn_";
 
@@ -1527,6 +1535,7 @@ RC_layout_PioneerAVR() {
 	<li>stop<br>stops playback for the same inputs as play</li>
 	<li>repeat<br>repeat for the following inputs: AdapterPort, Ipod, Favorites, InternetRadio, MediaServer</li>
 	<li>shuffle<br>random play for the same inputs as repeat</li>
+	<li><a href="#setExtensions">set extensions</a> are supported (except <blink>)</li>
     <br><br>
     Example:
     <ul>
@@ -1646,6 +1655,7 @@ RC_layout_PioneerAVR() {
 	<li>stop<br>Stoppt die Wiedergabe für die gleichen Eingangsquellen wie "play"</li>
 	<li>repeat<br>Wiederholung für folgende Eingangsquellen: AdapterPort, Ipod, Favorites, InternetRadio, MediaServer</li>
 	<li>shuffle<br>Zufällige Wiedergabe für die gleichen Eingangsquellen wie "repeat"</li>
+	<li><a href="#setExtensions">set extensions</a> (ausser <blink>) werden unterstützt</li>
    <br><br>
     Beispiel:
     <ul>

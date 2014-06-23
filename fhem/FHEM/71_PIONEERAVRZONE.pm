@@ -26,6 +26,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use SetExtensions qw/ :all /;
 
 sub PIONEERAVRZONE_Get($@);
 sub PIONEERAVRZONE_Set($@);
@@ -293,6 +294,7 @@ PIONEERAVRZONE_Parse($$)
 				# ZVXX
 				# XX 00 ... 81 -> -81dB ... 0dB
 				if ( $msg =~ m/^ZV(\d\d)$/ ) {
+					Log3 $name, 5, "PIONEERAVRZONE $name: ". dq($msg) ." interpreted as: Zone2 - New volume = " . $1 . " (raw volume data).";
 					readingsBulkUpdate($hash, "volumeStraight", $1 - 81 );				
 					readingsBulkUpdate($hash, "volume", sprintf "%d", $1/0.8 );
 					push @matches, $d;
@@ -302,21 +304,28 @@ PIONEERAVRZONE_Parse($$)
 				} elsif ( $msg =~ m/^Z2MUT(\d)$/) {
 					if ($1) {
 						readingsBulkUpdate($hash, "mute", "off" );
+						Log3 $name, 5, "PIONEERAVRZONE $name: ". dq($msg) ." interpreted as: Zone2 - Mute off.";
 					} 
 					else {
 						readingsBulkUpdate($hash, "mute", "on" );
+						Log3 $name, 5, "PIONEERAVRZONE $name: ". dq($msg) ." interpreted as: Zone2 - Mute on.";
 					}
 					push @matches, $d;
 				# Input zone2
 				# Z2FXX
 				# XX -> input number 00 ... 49
 				} elsif ($msg =~ m/^Z2F(\d\d)$/ ) {
-					if ( defined ( $IOhash->{helper}{INPUTNAMES}->{$1}{aliasName}) ) {
-						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$1}{aliasName} );
-					} elsif ( defined ( $IOhash->{helper}{INPUTNAMES}->{$1}{name}) ) {
-						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$1}{name} );
+					my $inputNr = $1;
+					Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone2 - Input is set to inputNr: $inputNr ";
+					if ( defined ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName}) ) {
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - Input aliasName for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
+						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} );
+					} elsif ( defined ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name}) ) {
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - Input Name for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{name};
+						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name} );
 					} else {
 						readingsBulkUpdate($hash, "input", $msg );
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - InputName: can't find Name for input $inputNr";
 					}
 					push @matches, $d;
 				# Power zone2
@@ -326,9 +335,11 @@ PIONEERAVRZONE_Parse($$)
 					if ($1 == "0") {
 						readingsBulkUpdate($hash, "power", "on" );
 						$state = "on";
-					} elsif ($1 == "1") {
+						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone2 - Power: on";	
+						} elsif ($1 == "1") {
 						readingsBulkUpdate($hash, "power", "off" );
 						$state = "off";
+						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone2 - Power: off";
 					}
 					# Set reading for state
 					#
@@ -345,6 +356,7 @@ PIONEERAVRZONE_Parse($$)
 				# YVXX
 				# XX 00 ... 81 -> -81dB ... 0dB
 				if ( $msg =~ m/^YV(\d\d)$/ ) {
+					Log3 $name, 5, "PIONEERAVRZONE $name: ". dq($msg) ." interpreted as: Zone3 - New volume = " . $1 . " (raw volume data).";
 					readingsBulkUpdate($hash, "volumeStraight", $1 - 81 );				
 					readingsBulkUpdate($hash, "volume", sprintf "%d", $1/0.8 );
 					push @matches, $d;
@@ -354,20 +366,27 @@ PIONEERAVRZONE_Parse($$)
 				} elsif ( $msg =~ m/^Z3MUT(\d)$/) {
 					if ($1) {
 						readingsBulkUpdate($hash, "mute", "off" );
+						Log3 $name, 5, "PIONEERAVRZONE $name: ". dq($msg) ." interpreted as: Zone3 - Mute off.";
 					} 
 					else {
 						readingsBulkUpdate($hash, "mute", "on" );
+						Log3 $name, 5, "PIONEERAVRZONE $name: ". dq($msg) ." interpreted as: Zone3 - Mute on.";
 					}
 					push @matches, $d;
 				# Input zone3
 				# Z3FXX
 				# XX -> input number 00 ... 49
 				} elsif ($msg =~ m/^Z3F(\d\d)$/ ) {
-					if ( defined ( $IOhash->{helper}{INPUTNAMES}->{$1}{aliasName}) ) {
-						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$1}{aliasName} );
-					} elsif ( defined ( $IOhash->{helper}{INPUTNAMES}->{$1}{name}) ) {
-						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$1}{name} );
+					my $inputNr = $1;
+					Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone3 - Input is set to inputNr: $inputNr ";
+					if ( defined ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName}) ) {
+						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} );
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone3 - Input aliasName for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
+					} elsif ( defined ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name}) ) {
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone3 - Input Name for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{name};
+						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name} );
 					} else {
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone3 - InputName: can't find Name for input $inputNr";
 						readingsBulkUpdate($hash, "input", $msg );
 					}
 					push @matches, $d;
@@ -376,9 +395,11 @@ PIONEERAVRZONE_Parse($$)
 				# X = 0: Power on; X = 1: Power off
 				} elsif ( $msg =~ m/^BPR(0|1)$/  ) {
 					if ($1 == "0") {
+						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone3 - Power: on";	
 						readingsBulkUpdate($hash, "power", "on" );
 						$state = "on";
 					} elsif ($1 == "1") {
+						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone3 - Power: off";	
 						readingsBulkUpdate($hash, "power", "off" );
 						$state = "off";
 					}
@@ -397,11 +418,16 @@ PIONEERAVRZONE_Parse($$)
 				# ZEAXX
 				# XX -> input number 00 ... 49
 				if ($msg =~ m/^ZEA(\d\d)$/ ) {
+					my $inputNr = $1;
+					Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: hdZone - Input is set to inputNr: $inputNr ";
 					if ( defined ( $IOhash->{helper}{INPUTNAMES}->{$1}{aliasName}) ) {
+						Log3 $hash,5,"PIONEERAVRZONE $name: hdZone - Input aliasName for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
 						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$1}{aliasName} );
 					} elsif ( defined ( $IOhash->{helper}{INPUTNAMES}->{$1}{name}) ) {
+						Log3 $hash,5,"PIONEERAVRZONE $name: hdZone - Input Name for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{name};
 						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$1}{name} );
 					} else {
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone3 - InputName: can't find Name for input $inputNr";
 						readingsBulkUpdate($hash, "input", $msg );
 					}
 					push @matches, $d;
@@ -410,9 +436,11 @@ PIONEERAVRZONE_Parse($$)
 				# X = 0: Power on; X = 1: Power off
 				} elsif ( $msg =~ m/^ZEP(0|1)$/ ) {
 					if ($1 == "0") {
+						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: hdZone - Power: on";	
 						readingsBulkUpdate($hash, "power", "on" );
 						$state = "on";
 					} elsif ($1 == "1") {
+						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: hdZone - Power: off";	
 						readingsBulkUpdate($hash, "power", "off" );
 						$state = "off";
 					}
@@ -549,7 +577,7 @@ PIONEERAVRZONE_Define($$)
 	inputs is read in during Fhem start and with <code>get <name> statusRequest</code></li>
 	<li>inputUp<br>change zone input to next input</li>
 	<li>inputDown<br>change zone input to previous input</li>
-	
+	<li><a href="#setExtensions">set extensions</a> are supported (except <blink>)</li>
    <br><br>
     Example:
     <ul>
@@ -624,6 +652,8 @@ PIONEERAVRZONE_Define($$)
 	Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen</li>
 	<li>inputUp<br>nächste Eingangsquelle für die Zone auswählen</li>
 	<li>inputDown<br>vorherige Eingangsquelle für die Zone auswählen</li>
+	<li><a href="#setExtensions">set extensions</a> (ausser <blink>) werden unterstützt</li>
+
 	
    <br><br>
     Beispiel:
