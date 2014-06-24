@@ -20,7 +20,6 @@
 #
 ##############################################################################
 
-
 package main;
 
 use strict;
@@ -47,7 +46,7 @@ PIONEERAVRZONE_Initialize($)
   $hash->{ParseFn}   = "PIONEERAVRZONE_Parse";
 
   $hash->{AttrFn}    = "PIONEERAVRZONE_Attr";
-  $hash->{AttrList}  = "IODev zone ".
+  $hash->{AttrList}  = "IODev ".
                         $readingFnAttributes;
 }
 
@@ -271,7 +270,7 @@ return undef;
 sub
 PIONEERAVRZONE_Parse($$)
 {
-  # we are called from dispatch() from the physical device
+  # we are called from dispatch() from the PIONEERAVR device
   # we never come here if $msg does not match $hash->{MATCH} in the first place
   # NOTE: we will update all matching readings for all (logical) devices, not just the first!
   
@@ -481,9 +480,9 @@ PIONEERAVRZONE_Define($$)
 	my ($hash, $def) = @_;
 	my @a = split("[ \t]+", $def);
 
-	return "Usage: define <name> PIONEERAVRZONE [<zone> [...]]"    if(int(@a) < 2);
+	return "Usage: define <name> PIONEERAVRZONE <zone>  ... wrong paramter count: ".int(@a)    if(int(@a) != 3);
 	my $name= $a[0];
-	
+
 	AssignIoPort($hash);
 	
     my $IOhash= $hash->{IODev};
@@ -493,18 +492,20 @@ PIONEERAVRZONE_Define($$)
             return $err;
     }
            
-	#2. Parameter (Zone)
+	#Parameter (Zone)
 	my $zone="";
-	if(defined($a[2])) {
-		if ($a[2] =~ m/[zone\d]|[hdZone]/) {
-			$zone= $a[2];
-		}
+	if ($a[2] =~ m/^(zone\d|hdZone)$/) {
+		$zone= $a[2];
 	} else {
-		my $err= "PIONEERAVRZONE define $name error: unknown Zone '$zone' -> must be one of [zone2|zone3hdZone] (I/O device is " 
-				  . $IOhash->{NAME} . ").";
+		my $err= "PIONEERAVRZONE define $name error: unknown Zone ".dq($a[2])." -> must be one of [zone2|zone3|hdZone] (I/O device is " 
+			. $IOhash->{NAME} . "). Usage: define <name> PIONEERAVRZONE <zone>";
 		Log3 $hash, 1, $err;
 		return $err;
 	}
+
+	# for autocreate: we store here a pointer of defined devices
+	# so we can check if the device exists
+	$modules{PIONEERAVRZONE}{defptr}{$zone} = $hash;	
 	
     if(!defined($IOhash->{helper}{SETS}{$zone})) {
             my $err= "PIONEERAVRZONE define $name error: unknown Zone $zone (I/O device is " 
@@ -525,7 +526,15 @@ PIONEERAVRZONE_Define($$)
     }
 	
 	return undef;
-
+}
+#####################################
+#Function to show special chars (e.g. \n\r) in logs
+sub
+dq($) 
+{
+	my ($s)= @_;
+	$s= "<nothing>" unless(defined($s));
+	return "\"" . escapeLogLine($s) . "\"";
 }
 
 1;
@@ -543,11 +552,12 @@ PIONEERAVRZONE_Define($$)
     <code>define &lt;name&gt; PIONEERAVRZONE &lt;zone&gt; </code>
     <br><br>
 
-    Defines a Zone (zone2, zone3 or hdZone) of a PioneerAVR device.<p>
+    Defines a Zone (zone2, zone3 or hdZone) of a PioneerAVR device.<br>
+	Note: devices to control zone2, zone3 and/or HD-zone are autocreated on reception of the first message for those zones.<br><br>
     
-    Normally, the logical PIONEERAVRZONE is attached to the latest previously defined physical PIONEERAVR device
-    for I/O. Use the <code>IODev</code> attribute of the logical PIONEERAVRZONE to attach to any
-    physical PioneerAVR device, e.g. <code>attr myPioneerAvrZone2 IODev myPioneerAvr</code>.
+    Normally, the PIONEERAVRZONE device is attached to the latest previously defined PIONEERAVR device
+    for I/O. Use the <code>IODev</code> attribute of the PIONEERAVRZONE device to attach to any
+    PIONEERAVR device, e.g. <code>attr myPioneerAvrZone2 IODev myPioneerAvr</code>.
     <br><br>
 
     Examples:
