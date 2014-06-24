@@ -5,7 +5,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
-use Device::SMBus;
+#use Device::SMBus;
 
 #my $clientsI2C = ":I2C_PC.*:I2C_SHT21:I2C_MCP23017:I2C_BMP180:";
 
@@ -20,16 +20,23 @@ I2C_TSL2561
 );
 
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
-
+my $I2C_SLAVE = 0x0703;									#Variable for IOCTL (set I2C slave address)
 
 #my %matchListI2C = (			#kann noch weg?
 #    "1:I2C_PCF8574"=> ".*",
 #    "2:FHT"       => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
 #);
+my $libcheck_SMBus = 1;
+my $check_ioctl_ph = 1;
 
 sub RPII2C_Initialize($) {
   my ($hash) = @_;
   
+  eval "use Device::SMBus;";
+  $libcheck_SMBus = 0 if($@);
+  eval {require "sys/ioctl.ph"};
+  $check_ioctl_ph = 0 if($@);
+	
 # Provider
 	$hash->{Clients} = join (':',@clients);
   #$hash->{WriteFn}  = "RPII2C_Write";    #wird vom client per IOWrite($@) aufgerufen
@@ -40,39 +47,46 @@ sub RPII2C_Initialize($) {
   $hash->{UndefFn} = "RPII2C_Undef";
   $hash->{GetFn}   = "RPII2C_Get";
   $hash->{SetFn}   = "RPII2C_Set";
-  #$hash->{AttrFn}  = "RPII2C_Attr";
+  $hash->{AttrFn}  = "RPII2C_Attr";
 	$hash->{NotifyFn} = "RPII2C_Notify";
   $hash->{AttrList}= "do_not_notify:1,0 ignore:1,0 showtime:1,0 " .
                      "$readingFnAttributes";
+	$hash->{AttrList} .= " useHWLib:IOCTL,SMBus " if( $libcheck_SMBus && $check_ioctl_ph);
+	$hash->{AttrList} .= " swap_i2c0:off,on";
 }
 #####################################
 sub RPII2C_Define($$) {							#
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-
   unless(@a == 3) {
     my $msg = "wrong syntax: define <name> RPII2C <0|1>";
     Log3 undef, 2, $msg;
     return $msg;
   }
-  if(-e $gpioprg) {							#I2C Devices fuer FHEM User lesbar machen
-    if(-x $gpioprg) {
-      if(-u $gpioprg) {
-        my $exp = $gpioprg.' load i2c';
-        $exp = `$exp`;
-      } else {
-        Log3 $hash, 1, "file $gpioprg is not setuid"; 
-      }
-    } else {
-       Log3 $hash, 1, "file $gpioprg is not executable"; 
-    }
-  } else {
-    Log3 $hash, 1, "file $gpioprg doesnt exist"; 
-  }    #system "/usr/local/bin/gpio load i2c";
-  
-  my $name = $a[0];
+	
+	$hash->{SMBus_exists}    = $libcheck_SMBus if($libcheck_SMBus);
+	$hash->{ioctl_ph_exists} = $check_ioctl_ph if($check_ioctl_ph);
+
+	my $name = $a[0];
   my $dev = $a[2];
 	
+	if ($check_ioctl_ph) {
+		$hash->{hwfn} = \&RPII2C_HWACCESS_ioctl;
+	} elsif ($libcheck_SMBus) {
+		$hash->{hwfn} = \&RPII2C_HWACCESS;
+	} else {
+		return $name . ": Error! no library for Hardware access installed";
+	}
+	my $device = "/dev/i2c-".$dev;
+	unless ( RPII2C_CHECK_GPIO_DEVICE($dev) ) {
+		Log3 $hash, 1, "file $device not accessible try to use gpio utility to fix it";
+		if ( defined(my $ret = RPII2C_CHECK_GPIO_UTIL($gpioprg)) ) {
+			Log3 $hash, 1, $ret if $ret;
+		} else {													#I2C Devices mit gpio utility fuer FHEM User lesbar machen
+			my $exp = $gpioprg.' load i2c';
+			$exp = `$exp`;
+		}
+  }
 	$hash->{NOTIFYDEV} = "global";
 	
   #$hash->{Clients} = $clientsI2C;
@@ -83,10 +97,8 @@ sub RPII2C_Define($$) {							#
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  
-  return $name . ': Error! I2C device not found: /dev/i2c-'.$dev . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev' unless -e "/dev/i2c-".$dev;
-	return $name . ': Error! I2C device not readable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user' unless -r "/dev/i2c-".$dev;
-	return $name . ': Error! I2C device not writable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user' unless -w "/dev/i2c-".$dev;
+	my $check = RPII2C_CHECK_GPIO_DEVICE($dev);
+  return $name . $check if $check;
 	
 	$hash->{DeviceName} = "/dev/i2c-".$dev;
 	$hash->{STATE} = "initialized";
@@ -145,6 +157,18 @@ sub RPII2C_Undef($$) {			 		   	#
   return undef;
 }
 #####################################
+sub RPII2C_Attr(@){
+	my (undef, $name, $attr, $val) = @_;
+	my $hash = $defs{$name};
+	if ($attr && $attr eq 'useHWLib') {
+		$hash->{hwfn} = \&RPII2C_HWACCESS_ioctl if $val eq "IOCTL";
+		$hash->{hwfn} = \&RPII2C_HWACCESS if $val eq "SMBus";
+	} elsif ($attr && $attr eq 'swap_i2c0' && defined($val)) {
+		RPII2C_SWAPI2C0($hash,$val);
+	}
+	return undef;
+}
+#####################################
 sub RPII2C_Set($@) {								#writeBlock noch nicht fertig
   my ($hash, @a) = @_;
   my $name = shift @a;
@@ -188,7 +212,7 @@ sub RPII2C_Set($@) {								#writeBlock noch nicht fertig
 	$i2chash->{reg}   = $reg if defined($reg);																			#startadresse zum lesen
 	$i2chash->{nbyte} = $nbyte if defined($nbyte);
 	$i2chash->{data} = $data if defined($data);
-	RPII2C_HWACCESS($hash, $i2chash);
+	&{$hash->{hwfn}}($hash, $i2chash);
 	undef $i2chash;																																	#Hash loeschen
 	return undef;
 }
@@ -210,7 +234,8 @@ sub RPII2C_Get($@) {								#
 		$i2chash->{reg}   = hex($a[3]) if defined($a[3]);																			#startadresse zum lesen
 		$i2chash->{nbyte} = $a[4] if defined($a[4]);
 		#Log3 $hash, 1, "Reg: ". $i2chash->{reg};
-	  my $status = RPII2C_HWACCESS($hash, $i2chash);
+	  #my $status = RPII2C_HWACCESS_ioctl($hash, $i2chash);
+		my $status  = &{$hash->{hwfn}}($hash, $i2chash);
 		#my $received = join(" ", @{$i2chash->{received}});															#als Array
 		my $received = $i2chash->{received};																						#als Scalar
 		undef $i2chash;																																	#Hash loeschen
@@ -227,7 +252,8 @@ sub RPII2C_Write($$) { 							#wird vom Client aufgerufen
 	Log3 $hash, 5, $ankommen;
 	
 	if ( $clientmsg->{direction} && $clientmsg->{i2caddress} ) {
-		$clientmsg->{$name . "_" . "SENDSTAT"} = RPII2C_HWACCESS($hash, $clientmsg);
+		$clientmsg->{$name . "_" . "SENDSTAT"} = &{$hash->{hwfn}}($hash, $clientmsg);
+    #$clientmsg->{$name . "_" . "SENDSTAT"} = RPII2C_HWACCESS($hash, $clientmsg);
 	}
 	
 	foreach my $d ( sort keys %main::defs ) {				#zur Botschaft passenden Clienten ermitteln geht auf Client: I2CRecFn
@@ -245,6 +271,76 @@ sub RPII2C_Write($$) { 							#wird vom Client aufgerufen
   return undef;
 }
 #####################################
+#FRM_forall_clients($$$)
+#{
+#  my ($hash,$fn,$args) = @_;
+#  foreach my $d ( sort keys %main::defs ) {
+#    if ( defined( $main::defs{$d} )
+#      && defined( $main::defs{$d}{IODev} )
+#      && $main::defs{$d}{IODev} == $hash ) {
+#       &$fn($main::defs{$d},$args);					#funktion mit Varianblennamen von $fn ausführen
+#    }
+#  }
+#  return undef;
+#}
+#####################################
+
+sub RPII2C_CHECK_GPIO_DEVICE {	
+	my ($dev) = @_;
+    my $ret = undef;
+    #unless (defined($hash->{gpio_util_exists})) {
+	if(-e $dev) {
+		if(-r $dev) {
+			unless(-w $dev) {
+				$ret =  ': Error! I2C device not writable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user'; 
+			}
+		} else {
+			$ret =    ': Error! I2C device not readable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user'; 
+		}
+	} else {
+		$ret =      ': Error! I2C device not found: /dev/i2c-'   .$dev . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev'; 
+	}
+	return $ret;
+}
+
+sub RPII2C_CHECK_GPIO_UTIL {
+	my ($gpioprg) = @_;
+    my $ret = undef;
+    #unless (defined($hash->{gpio_util_exists})) {
+	if(-e $gpioprg) {
+		if(-x $gpioprg) {
+			unless(-u $gpioprg) {
+				$ret =  "file $gpioprg is not setuid"; 
+			}
+		} else {
+			$ret =  "file $gpioprg is not executable"; 
+		}
+	} else {
+		$ret = "file $gpioprg doesnt exist"; 
+	}
+	return $ret;
+}
+
+sub RPII2C_SWAPI2C0 {
+	my ($hash,$set) = @_;
+		unless (defined(my $ret = RPII2C_CHECK_GPIO_UTIL($gpioprg))) {
+			if (defined($set) && $set eq "on") {
+				system "$gpioprg -g mode 0 in";
+				system "$gpioprg -g mode 1 in";
+				system "$gpioprg -g mode 28 ALT0";
+				system "$gpioprg -g mode 29 ALT0";
+			} else {
+				system "$gpioprg -g mode 28 in";
+				system "$gpioprg -g mode 29 in";
+				system "$gpioprg -g mode 0 ALT0";
+				system "$gpioprg -g mode 1 ALT0";
+			}
+		} else {
+			Log3 $hash, 1, $ret if $ret;
+		}
+	return
+}
+
 sub RPII2C_HWACCESS($$) {
     my ($hash, $clientmsg) = @_;
 		my $status = "error";
@@ -262,15 +358,15 @@ sub RPII2C_HWACCESS($$) {
 			Log3 $hash, 5, "$hash->{NAME}: Block schreiben Register: " . sprintf("0x%.2X", $clientmsg->{reg}) . " Inhalt: " . $wr . " N: ". int(@data) ." Returnvar.: $inh";
 			$status = "Ok" if $inh == 0;
 #kommt wieder weg#################
-		} elsif (defined($clientmsg->{nbyte}) && defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {	#Registerbereich (mehrfach) beschreiben
-		  my @data = split(" ", $clientmsg->{data});
-			foreach (0..$#data) {
-				my $i =	$_ -( int($_ / $clientmsg->{nbyte}) * $clientmsg->{nbyte} );
-				$inh = $dev->writeByteData( ($clientmsg->{reg} + $i ) ,$data[$_]);
-				Log3 $hash, 5, "$hash->{NAME} NReg schreiben; Reg: " . ($clientmsg->{reg} + $i) . " Inh: " . $data[$_] . " Returnvar.: $inh";
-				last if $inh != 0;
-				$status = "Ok" if $inh == 0;
-			}
+#		} elsif (defined($clientmsg->{nbyte}) && defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {	#Registerbereich (mehrfach) beschreiben
+#		  my @data = split(" ", $clientmsg->{data});
+#			foreach (0..$#data) {
+#				my $i =	$_ -( int($_ / $clientmsg->{nbyte}) * $clientmsg->{nbyte} );
+#				$inh = $dev->writeByteData( ($clientmsg->{reg} + $i ) ,$data[$_]);
+#				Log3 $hash, 5, "$hash->{NAME} NReg schreiben; Reg: " . ($clientmsg->{reg} + $i) . " Inh: " . $data[$_] . " Returnvar.: $inh";
+#				last if $inh != 0;
+#				$status = "Ok" if $inh == 0;
+#			}
 #hier Mehrfachbeschreibung eines Registers noch entfernen und dafuer Bereich mit Registeroperationen beschreiben
 		} elsif (defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {	#Register beschreiben
 		  my @data = split(" ", $clientmsg->{data});
@@ -302,7 +398,7 @@ sub RPII2C_HWACCESS($$) {
 			}
 			#@{$clientmsg->{received}} = split(" ", $rmsg) if($rmsg);										#Daten als Array uebertragen
 			$clientmsg->{received} = $rmsg if($rmsg);																	#Daten als Scalar uebertragen
-		} elsif ($clientmsg->{direction} eq "i2cread") {																																#Byte lesen
+		} elsif ($clientmsg->{direction} eq "i2cread") {																								#Byte lesen																															#Byte lesen
 			my $nbyte = defined($clientmsg->{nbyte}) ? $clientmsg->{nbyte} : 1;
 			my $rmsg = "";
 			for (my $n = 0; $n < $nbyte; $n++) {
@@ -319,9 +415,85 @@ sub RPII2C_HWACCESS($$) {
 		$hash->{STATE} = $status;
 		$hash->{ERRORCNT} = defined($hash->{ERRORCNT}) ? $hash->{ERRORCNT} += 1 : 1 if $status ne "Ok";
 		$clientmsg->{$hash->{NAME} . "_" . "RAWMSG"} = $inh;
-		
 	return $status;
 }
+#####################
+
+sub RPII2C_HWACCESS_ioctl($$) {
+	my ($hash, $clientmsg) = @_;
+	my $status = "error";
+	Log3 $hash, 5, "$hash->{NAME}: HWaccess I2CAddr: " . sprintf("0x%.2X", $clientmsg->{i2caddress});
+	my ($fh, $msg) = undef;
+	
+	my $ankommen = "$hash->{NAME}: vom client empfangen";
+  	foreach my $av (keys %{$clientmsg}) { $ankommen .= "|" . $av . ": " . $clientmsg->{$av}; }
+	Log3 $hash, 5, $ankommen;
+	
+	my $i2caddr = hex(sprintf "%x", $clientmsg->{i2caddress});
+	if ( sysopen(my $fh, $hash->{DeviceName}, O_RDWR) != 1) {																						#Datei oeffnen
+		Log3 $hash, 1, "$hash->{NAME}: HWaccess sysopen failure: $!"
+	} elsif( not defined( ioctl($fh,$I2C_SLAVE,$i2caddr) ) ) {																						#I2C Adresse per ioctl setzen
+		Log3 $hash, 1, "$hash->{NAME}: HWaccess (0x".unpack( "H2",pack "C", $clientmsg->{i2caddress}).") ioctl failure: $!"
+	} elsif (defined($clientmsg->{nbyte}) && defined($clientmsg->{reg}) && defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cblockwrite") {	#Registerblock beschreiben
+		my $data = chr($clientmsg->{reg});
+		foreach (split(" ", $clientmsg->{data})) {
+			$data .= chr($_);
+		}
+		my $retval = syswrite($fh, $data, length($data));
+		unless (defined($retval) && $retval == length($data)) {
+			Log3 $hash, 1, "$hash->{NAME}: HWaccess blockweise nach 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})." schreiben, Reg: 0x". unpack( "H2",pack "C", $clientmsg->{reg}) . " Inh: $clientmsg->{data}, laenge: ".length($data)."| -> syswrite failure: $!";
+		} else {
+			$status = "Ok";
+			Log3 $hash, 5, "$hash->{NAME}: HWaccess block schreiben, Reg: 0x". unpack( "H2",pack "C", $clientmsg->{reg}) . " Inh(dec):|$clientmsg->{data}|, laenge: |".length($data)."|";
+		}
+		#(my $datah = $data) =~ s/(.|\n)/sprintf("%.2X ",ord($1))/eg;
+   	#Log3 $hash, 1, "$hash->{NAME}: HWaccess block schreiben data:|$clientmsg->{data}|, laenge: |".length($data)."|";
+		#$status = "Ok" if $resulw == length($data);
+
+	} elsif (defined($clientmsg->{data}) && $clientmsg->{direction} eq "i2cwrite") {																#byteweise beschreiben
+    	my $reg = undef;
+		$reg = $clientmsg->{reg} if (defined($clientmsg->{reg}));
+		$status = "Ok";
+		foreach (split(" ", $clientmsg->{data})) {
+			my $data = (defined($reg) ? chr($reg++) : "") . chr($_);
+			my $retval = syswrite($fh, $data, length($data));
+			unless (defined($retval) && $retval == length($data)) {
+				Log3 $hash, 1, "$hash->{NAME}: HWaccess byteweise nach 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})." schreiben, ". (defined($reg) ?  "Reg: 0x". unpack( "H2",pack "C", ($reg - 1)) . " " : "")."Inh: 0x" .  unpack( "H2",pack "C", $_) .", laenge: ".length($data)."| -> syswrite failure: $!";
+				$status = "error";
+				last;
+			}
+			Log3 $hash, 5,   "$hash->{NAME}: HWaccess byteweise schreiben, ". (defined($reg) ?  "Reg: 0x". unpack( "H2",pack "C", ($reg - 1)) . " " : "")."Inh: 0x" .  unpack( "H2",pack "C", $_) .", laenge: ".length($data);
+		}
+	} elsif ($clientmsg->{direction} eq "i2cread") {																								#vom I2C lesen
+		my $nbyte = defined($clientmsg->{nbyte}) ? $clientmsg->{nbyte} : 1;
+		my $rmsg = "";
+		foreach (my $n = 0; $n < $nbyte; $n++) {
+			if ( defined($clientmsg->{reg}) ) {
+				Log3 $hash, 5, "$hash->{NAME}: HWaccess byteweise lesen setze Registerpointer auf " . ($clientmsg->{reg} + $n);
+				my $retval = syswrite($fh, chr($clientmsg->{reg} + $n), 1);
+				unless (defined($retval) && $retval == 1) {
+					Log3 $hash, 1, "$hash->{NAME}: HWaccess byteweise von 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})." lesen,". (defined($clientmsg->{reg}) ? " Reg: 0x". unpack( "H2",pack "C", ($clientmsg->{reg} + $n)) : "") . " -> syswrite failure: $!" if $!;
+					last;
+				}
+			}
+			my $buf = undef;
+			my $retval = sysread($fh, $buf, 1);
+			unless (defined($retval) && $retval == 1) {
+				Log3 $hash, 1, "$hash->{NAME}: HWaccess byteweise von 0x".unpack( "H2",pack "C", $clientmsg->{i2caddress})." lesen,". (defined($clientmsg->{reg}) ? " Reg: 0x". unpack( "H2",pack "C", ($clientmsg->{reg} + $n)) : "") . " -> sysread failure: $!" if $!;
+				last;
+			}
+			$rmsg .= ord($buf);
+			$rmsg .= " " if $n <= $nbyte;
+			$status = "Ok" if ($n + 1) == $nbyte;
+		}
+		$clientmsg->{received} = $rmsg if($rmsg);																									#Daten als Scalar uebertragen
+	}
+	$hash->{STATE} = $status;
+	$hash->{ERRORCNT} = defined($hash->{ERRORCNT}) ? $hash->{ERRORCNT} += 1 : 1 if $status ne "Ok";
+	#$clientmsg->{$hash->{NAME} . "_" . "RAWMSG"} = $inh;
+	return $status;
+}
+
 
 =pod
 =begin html
@@ -336,10 +508,23 @@ sub RPII2C_HWACCESS($$) {
 		<b>preliminary:</b><br>
 		<ul>
 			<li>
-				This module uses gpio utility from <a href="http://wiringpi.com/download-and-install/">WiringPi</a> library change access rights of I2C-Interface<br>
-				WiringPi installation is described here: <a href="#RPI_GPIO">RPI_GPIO</a><br>
-				Alternatively for other systems (BeagleBone, etc.) you can manually change access rights for <code>/dev/i2c-x</code>. You will need write-/read access for user that runs FHEM. This can be doen e.g. in etc/init.d/fhem<br>
-
+				Access rights for /dev/i2c-* devices
+				<ul>
+				<li>
+                	Add following lines into <code>/etc/init.d/fhem</code> before <code>perl fhem.pl</code> line in start or into <code>/etc/rc.local</code>:<br>
+					<code>
+						sudo chown fhem /dev/i2c-*<br>
+						sudo chgrp dialout /dev/i2c-*<br>
+						sudo chmod +t /dev/i2c-*<br>
+						sudo chmod 660 /dev/i2c-*<br>
+					</code>
+				</li>
+                <li>
+                	Alternatively for Raspberry Pi you can install the gpio utility from <a href="http://wiringpi.com/download-and-install/">WiringPi</a> library change access rights of I2C-Interface<br>
+					WiringPi installation is described here: <a href="#RPI_GPIO">RPI_GPIO.</a><br>
+					gpio utility will be automaticly used, if installed.<br>
+                </li>
+				</ul>
 			</li>
 			<li>
 				installation of i2c dependencies:<br>
@@ -356,7 +541,8 @@ sub RPII2C_HWACCESS($$) {
 				</code>
 			</li>
 			<li>
-				To access the I2C-Bus the Device::SMBus module is necessary:<br>
+				Optional, access via IOCTL will be used if Device::SMBus is not present.<br>
+				To access the I2C-Bus via the Device::SMBus module, following steps are necessary:<br>
 				<code>sudo apt-get install libmoose-perl<br>
 				sudo cpan Device::SMBus</code><br>
 			</li>
@@ -376,16 +562,12 @@ sub RPII2C_HWACCESS($$) {
 			<code>set &lt;name&gt; writeByte    &lt;I2C Address&gt; &lt;value&gt;</code><br><br>
 		</li>
 		<li>
-			Write one byte (or more bytes sequentially) to the specified register of an I2C device:<br>
+			Write n-bytes to an register range (as an series of single register write operations), beginning at the specified register:<br>
 			<code>set &lt;name&gt; writeByteReg &lt;I2C Address&gt; &lt;Register Address&gt;  &lt;value&gt;</code><br><br>
 		</li>
 		<li>
-			Write n-bytes to an register range, beginning at the specified register:<br>	
+			Write n-bytes to an register range (as an block write operation), beginning at the specified register:<br>	
 			<code>set &lt;name&gt; writeBlock   &lt;I2C Address&gt; &lt;Register Address&gt; &lt;value&gt;</code><br><br>
-		</li>
-		<li>
-			Same as writeBlock but writes register range sequentially. The numbers of byte to write must be a multipe of the number of register.
-			<code>set &lt;name&gt; writeNBlock  &lt;I2C Address&gt; &lt;Register Address&gt; &lt;number of registers&gt; &lt;value&gt;</code><br><br>
 		</li><br>
 		Examples:
 		<ul>
@@ -421,6 +603,16 @@ sub RPII2C_HWACCESS($$) {
 	<a name="RPII2CAttr"></a>
 	<b>Attributes</b>
 	<ul>
+		<li>swap_i2c0<br>
+			Swap Raspberry Pi's I2C-0 from J5 to P5 rev. B<br>
+			This attribute is for Raspberry Pi only and needs gpio utility from <a href="http://wiringpi.com/download-and-install/">WiringPi</a> library.<br>
+			Default: none, valid values: on, off<br><br>
+		</li>
+		<li>useHWLib<br>
+		Change hardware access method.<br>
+		Attribute exists only if both access methods are usable<br>
+		Default: IOCTL, valid values: IOCTL, SMBus<br><br>
+		</li>
 		<li><a href="#ignore">ignore</a></li>
 		<li><a href="#do_not_notify">do_not_notify</a></li>
 		<li><a href="#showtime">showtime</a></li>
@@ -442,9 +634,22 @@ sub RPII2C_HWACCESS($$) {
 		<b>Vorbereitung:</b><br>
 		<ul>
 			<li>
-				Dieses Modul nutzt das gpio Utility der <a href="http://wiringpi.com/download-and-install/">WiringPi</a> Bibliothek um FHEM Schreibrechte auf die I2C Schnittstelle zu geben.<br>
-				WiringPi Installation ist hier beschrieben: <a href="#RPI_GPIO">RPI_GPIO</a><br>
-				F&uuml;r andere Systeme (BeagleBone, etc.) oder auch f&uuml;r das Raspberry kann auf WiringPi verzichtet werden. In diesem Fall m&uuml;ssen die Dateien <code>/dev/i2c-x</code> Schreib-/Leserechte, f&uuml;r den User unter dem FHEM l&auml;uft, gesetzt bekommen. (z.B. in der etc/init.d/fhem)<br>
+				<ul>
+				<li>
+                	Folgende Zeilen m&uuml;ssen der Datei <code>/etc/init.d/fhem</code> vor <code>perl fhem.pl</code> in start hinzu, oder in die Datei <code>/etc/rc.local</code> eingef&uuml;gt werden:<br>
+					<code>
+						sudo chown fhem /dev/i2c-*<br>
+						sudo chgrp dialout /dev/i2c-*<br>
+						sudo chmod +t /dev/i2c-*<br>
+						sudo chmod 660 /dev/i2c-*<br>
+					</code>
+				</li>
+                <li>
+                	Für das Raspberry Pi kann alternativ das gpio Utility der <a href="http://wiringpi.com/download-and-install/">WiringPi</a> Bibliothek benutzt werden um FHEM Schreibrechte auf die I2C Schnittstelle zu bekommen.<br>
+					WiringPi Installation ist hier beschrieben: <a href="#RPI_GPIO">RPI_GPIO</a><br>
+					Das gpio Utility wird, wenn vorhanden, automatisch verwendet<br>
+                </li>
+				</ul>
 			</li>
 			<li>
 				Installation der I2C Abh&auml;ngigkeiten:<br>
@@ -461,7 +666,8 @@ sub RPII2C_HWACCESS($$) {
 				</code>
 			</li>
 			<li>
-				Desweiteren ist das Perl Modul Device::SMBus f&uuml;r den Zugrff auf den I2C Bus notwendig:<br>
+				Optional, Hardwarezugriff via IOCTL wird standardm&auml;&szlig;ig genutzt, wenn Device::SMBus nicht installiert ist<br>
+				Soll der Hardwarezugriff &uuml;ber das Perl Modul Device::SMBus erfolgen sind diese Schritte notwendig:<br>
 				<code>sudo apt-get install libmoose-perl<br>
 				sudo cpan Device::SMBus</code><br>
 			</li>
@@ -481,16 +687,12 @@ sub RPII2C_HWACCESS($$) {
 			<code>set &lt;name&gt; writeByte    &lt;I2C Address&gt; &lt;value&gt;</code><br><br>
 		</li>
 		<li>
-			Schreibe ein Byte (oder auch mehrere nacheinander) direkt auf ein Register des adressierten I2C device:<br>
+			Schreibe n-bytes auf einen Registerbereich (als Folge von Einzelbefehlen), beginnend mit dem angegebenen Register:<br>
 			<code>set &lt;name&gt; writeByteReg &lt;I2C Address&gt; &lt;Register Address&gt;  &lt;value&gt;</code><br><br>
 		</li>
 		<li>
-			Schreibe n-bytes auf einen Registerbereich, beginnend mit dem angegebenen Register:<br>	
+			Schreibe n-bytes auf einen Registerbereich (als Blockoperation), beginnend mit dem angegebenen Register:<br>	
 			<code>set &lt;name&gt; writeBlock   &lt;I2C Address&gt; &lt;Register Address&gt; &lt;value&gt;</code><br><br>
-		</li>
-		<li>
-			Identisch zu writeBlock nur kann der Registerbereich sequentiell beschrieben werden. Die Anzahl der Byte muss ein vielfaches der &lt;number of registers&gt; sein.
-			<code>set &lt;name&gt; writeNBlock  &lt;I2C Address&gt; &lt;Register Address&gt; &lt;number of registers&gt; &lt;value&gt;</code><br><br>
 		</li><br>
 		Beispiele:
 		<ul>
@@ -525,6 +727,16 @@ sub RPII2C_HWACCESS($$) {
 	<a name="RPII2CAttr"></a>
 	<b>Attribute</b>
 	<ul>
+		<li>swap_i2c0<br>
+			Umschalten von I2C-0 des Raspberry Pi Rev. B von J5 auf P5<br>
+			Dieses Attribut ist nur f&uuml;r das Raspberry Pi vorgesehen und ben&ouml;tigt das gpio utility wie unter dem Punkt Vorbereitung beschrieben.<br>
+			Standard: keiner, g&uuml;ltige Werte: on, off<br><br>
+		</li>
+		<li>useHWLib<br>
+			&Auml;ndern der Methode des Hardwarezugriffs.<br>
+			Dieses Attribut existiert nur, wenn beide Zugriffsmethoden verf&uuml;gbar sind<br>
+			Standard: IOCTL, g&uuml;ltige Werte: IOCTL, SMBus<br><br>
+		</li>
 		<li><a href="#ignore">ignore</a></li>
 		<li><a href="#do_not_notify">do_not_notify</a></li>
 		<li><a href="#showtime">showtime</a></li>
