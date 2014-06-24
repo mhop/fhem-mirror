@@ -95,8 +95,8 @@ sub Sprinkle_Define($$)
   return "Given device not exists: $device" if(!$defs{$device});
   return "Given Sensordevice not exists: $sensor" if(defined($sensor) && !$defs{$sensor});
 
-  return "The specified reading of device not exists: $deviceport" if (defined($deviceport) && !defined(ReadingsVal($device, $deviceport, undef)));
-  return "The specified reading of sensor not exists: $sensorport" if (defined($sensorport) && !defined(ReadingsVal($sensor, $sensorport, undef)));
+  #return "The specified reading of device not exists: $deviceport" if (defined($deviceport) && !defined(ReadingsVal($device, $deviceport, undef)));
+  #return "The specified reading of sensor not exists: $sensorport" if (defined($sensorport) && !defined(ReadingsVal($sensor, $sensorport, undef)));
   
   return "Wrong timespec, use \"[+]<hour>:<minute>:<second>\"" if(defined($timespec) && $timespec !~ m/^([\+]?)([\d]{2}):([\d]{2}):([\d]{2})$/); 
 
@@ -139,10 +139,12 @@ sub Sprinkle_Define($$)
 #####################################
 sub Sprinkle_Undefine($$)
 {
- my ($hash, $arg) = @_;
+  my ($hash, $arg) = @_;
+  my $me = $hash->{NAME};
 
- RemoveInternalTimer($hash);
- return undef;
+  Log3 $hash, 4, "$me: Lösche alle internen Timer";
+  RemoveInternalTimer($hash);
+  return undef;
 }
 
 ###################################
@@ -200,7 +202,7 @@ sub Sprinkle_Set($@)
   #if($cmd ne "tts") {
   #  return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 0);
   #}
-  
+  Log3 $hash, 4, "$me: Lösche alle internen Timer";
   RemoveInternalTimer($hash);
 
   if($cmd eq "Disable" && !IsDisabled($me)) {
@@ -232,6 +234,7 @@ sub Sprinkle_Set($@)
     }
   }
 
+  Log3 $hash, 4, "$me: Rufe Funktion DoIt mit Command: $cmd auf";
   Sprinkle_DoIt($hash, $cmd);
   
   return undef;
@@ -246,9 +249,14 @@ sub Sprinkle_Notify($$) {
   my ($hash, $dev) = @_;
   my $me = $hash->{NAME};
   my $devname = $dev->{NAME};
+
+  Log3 $hash, 4, "$me: NotifyFn: Statusänderung des überwachten Aktors '$devname' von '".OldValue($devname)."' nach '".Value($devname)."' festgestellt";
+  
   return undef if(IsDisabled($me));
   return undef if($hash->{Device} ne $dev->{NAME}); 
+  return undef if(OldValue($devname) eq Value($devname));
 
+  Log3 $hash, 4, "$me: NotifyFn: überwachter Aktor $devname, Statuswechsel von '".OldValue($devname)."' nach '".Value($devname)."'";
   my $SprinkleControl = AttrVal($me, "SprinkleControl", undef);
   
   my $newState;
@@ -256,8 +264,10 @@ sub Sprinkle_Notify($$) {
   $newState = "Aus" if(lc(ReadingsVal($devname, "state", "")) =~ m/(aus|off)/);
 
   if($newState eq "An") {
+    Log3 $hash, 4, "$me: NotifyFn: Allokiere einen neuen Thread im SprinkleControl: $SprinkleControl" if($SprinkleControl);
     SprinkleControl_AllocateNewThread($SprinkleControl, $me, "An") if($SprinkleControl);
   } elsif($newState eq "Aus") {
+    Log3 $hash, 4, "$me: NotifyFn: Gebe einen Thread frei im SprinkleControl: $SprinkleControl" if($SprinkleControl);
     SprinkleControl_DeallocateThread($SprinkleControl, $me) if($SprinkleControl);
   }
 
@@ -265,15 +275,19 @@ sub Sprinkle_Notify($$) {
     $newState = "Auto(An)" if ($newState eq "An");
     $newState = "Auto" if ($newState eq "Aus");
   }
-
+  Log3 $hash, 4, "$me: NotifyFn: Setze neuen Status auf: $newState"  if($newState);
   readingsSingleUpdate($hash, "state", $newState, 1) if($newState);
 
   return undef;
 }
 
 ################################################
+# Setzt den Internen Timer und startet die 
+# Hauptprozedur. 
 #
-#
+# param1: $hash
+# param2: DoIt = 1 -> Starte InternalTimer und DoIt
+#         DoIt = 2 -> Starte nur InternalTimer
 ###############################################
 sub Sprinkle_InternalTimerDoIt(@) {
   my ($hash, $DoIt) = @_;
@@ -294,16 +308,19 @@ sub Sprinkle_InternalTimerDoIt(@) {
     $nt += (($hr*3600)+($min*60)+$sec); # Plus relative time
 
     @lt = localtime($nt);
-    my $ntm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
-    $hash->{NextTime} = $ntm;
+    my $ntm = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $lt[3], ($lt[4]+1), ($lt[5]+1900), $lt[2], $lt[1], $lt[0]);
+    $hash->{TriggerTime_FMT} = $ntm;
     $hash->{TriggerTime} = $nt;
 
     my $DefaultCmd = AttrVal($me, "Sprinkle_DefaultCmd", "Auto");
+    
+    Log3 $hash, 4, "$me: InternalTimerDoIt: Lösche alle internen Timer";
     RemoveInternalTimer($hash);
     Sprinkle_DoIt($hash, $DefaultCmd) if($DoIt == 1);
-    InternalTimer($nt, "Sprinkle_InternalTimerDoIt", $hash, 0);  
+    Log3 $hash, 4, "$me: InternalTimerDoIt: Setze InternalTimer auf: $ntm";  
+    InternalTimer($nt, "Sprinkle_InternalTimerDoIt", $hash, 0);
   } else {
-    delete $hash->{NextTime};
+    delete $hash->{TriggerTime_FMT};
     delete $hash->{TriggerTime};
   }
 
@@ -319,9 +336,10 @@ sub Sprinkle_InternalTimerDoIt(@) {
 sub Sprinkle_DoIt($$) {
   my ($hash, $cmd) = @_;
   my $me = $hash->{NAME};
+  Log3 $hash, 4, "$me: DoIt: Mache etwas, Command: $cmd";
   return undef if(IsDisabled($me));
   return undef if((lc(ReadingsVal($me, "state", undef)) =~ m/an/) &&
-                  (lc($cmd) !~ m/aus/)) ; # Aufruf durch InternalTimer und manuell wurde bereits angeschaltet
+                  (lc($cmd) !~ m/aus/)) ; # Aufruf durch InternalTimer und manuell wurde bereits angeschaltet oder Wartestellung
 
   my $SensorTreshold = AttrVal($me, "Sprinkle_SensorThreshold", undef);
   my $OnTimeSec = AttrVal($me, "Sprinkle_OnTimeSec", undef);
@@ -340,6 +358,7 @@ sub Sprinkle_DoIt($$) {
   } else {
     $oldState = lc(ReadingsVal($device, "state", undef));
   }
+  Log3 $hash, 4, "$me: DoIt: ermittelter Status des Aktors: $oldState";
   return "actual state of given device not accessable, please check definition of $me" if(!$oldState);
 
   # Status des Sensors abfragen  
@@ -353,7 +372,9 @@ sub Sprinkle_DoIt($$) {
     #Bodenfeuchte ist kein Messwert sondern nur ein on/off Reading
     $sensorvalue = 0 if(lc($sensorvalue) =~ m/^(on)/);
     $sensorvalue = 999 if(lc($sensorvalue) =~ m/^(off)/);
-  }  
+  }
+  Log3 $hash, 4, "$me: DoIt: ermittelter Wert des Sensors: $sensorvalue";
+  
 
   return "AutoMode not accessable. Please check your Sprinkle attributes and value of Sensor" 
     if(lc($cmd) eq "auto" && (!defined($OnTimeSec) || $OnTimeSec <= 0 || !defined($sensorvalue) || !defined($SensorTreshold)));
@@ -378,9 +399,11 @@ sub Sprinkle_DoIt($$) {
   if(lc($cmd) eq "an") {
     $newState = $cmd;
     if($oldState ne $newState && (($SprinkleControl && SprinkleControl_AllocateNewThread($SprinkleControl, $me, $cmd)) || !$SprinkleControl)) {
+      Log3 $hash, 4, "$me: DoIt: Schalte Aktor $device auf $OnCmd";
       fhem "set $device $OnCmdAdd $OnCmd";
       $doit = 1;
     }  elsif($oldState ne $newState) {
+      Log3 $hash, 4, "$me: Setze Status auf: wait";
       $newState = "Wait";
       $doit = 2;
     }
@@ -388,23 +411,29 @@ sub Sprinkle_DoIt($$) {
   } elsif(lc($cmd) eq "aus") {
     $newState = $cmd;
     if($oldState ne $newState && (($SprinkleControl && SprinkleControl_DeallocateThread($SprinkleControl, $me)) || !$SprinkleControl)) {
+      Log3 $hash, 4, "$me: DoIt: Schalte Aktor $device aus";
       fhem "set $device off";
       $doit = 1;
     }
   
   } elsif(lc($cmd) eq "auto") {
     if($SensorTreshold >= $sensorvalue) {
+      Log3 $hash, 4, "$me: DoIt: Im Automodus wurde Schwellwert unterschritten erkannt. Soll: $SensorTreshold , Ist: $sensorvalue";
       $newState = "Auto(An)";
       if($oldState ne "on" && (($SprinkleControl && SprinkleControl_AllocateNewThread($SprinkleControl, $me, $cmd)) || !$SprinkleControl)) {
+        Log3 $hash, 4, "$me: DoIt: Schalte im AutoModus Device $device auf $OnCmd";
         fhem "set $device $OnCmdAdd $OnCmd";
         $doit = 1;
       }  elsif($oldState ne $newState) {
+        Log3 $hash, 4, "$me: DoIt: Setze im Automodus auf: wait";
         $newState = "Wait";
         $doit = 2;
       }
     } else {
+      Log3 $hash, 4, "$me: DoIt: Im Automodus wurde Schwellwert noch nicht erreicht. Soll: $SensorTreshold , Ist: $sensorvalue";
       $newState = "Auto";
       if($oldState ne "off" && (($SprinkleControl && SprinkleControl_DeallocateThread($SprinkleControl, $me)) || !$SprinkleControl)) {
+        Log3 $hash, 4, "$me: DoIt: Schalte im Automodus Device $device aus";
         fhem "set $device off";
         $doit = 1;
       }
@@ -412,6 +441,7 @@ sub Sprinkle_DoIt($$) {
   }
 
   readingsSingleUpdate($hash, "state", $newState, 1) if($doit >= 1);
+  Log3 $hash, 4, "$me: DoIt: Setze neuen Status auf: $newState"   if($doit >= 1);
   return $newState;
 }
 

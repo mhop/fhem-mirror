@@ -176,6 +176,8 @@ sub SprinkleControl_AllocateNewThread($@) {
   my ($me, $dev, $cmd, $prio) = @_;
   my $hash = $defs{$me};
 
+  Log3 $hash, 4, "$me: Anforderung Thread allokieren durch '$dev' mit comand '$cmd'";
+
   return 1 if(IsDisabled($me));
 
   my $threads = ReadingsVal($me, "CountThreads",0);
@@ -186,14 +188,19 @@ sub SprinkleControl_AllocateNewThread($@) {
   $present = 1 if(defined($hash->{helper}{Queue}{$dev}));
   
   if($present == 0) {
-    # noch nciht in der queue vorhanden
+    # noch nicht in der queue vorhanden
+    Log3 $hash, 4, "$me: Füge Device '$dev' der Queue hinzu";
     $hash->{helper}{Queue}{$dev}{priority}  = $prio;
     $hash->{helper}{Queue}{$dev}{command}   = $cmd;
-  } 
+  } else {
+    Log3 $hash, 4, "$me: Device '$dev' bereits in der Queue vorhanden";
+  }
 
   if($present == 0 || ($present == 1 && $hash->{helper}{Queue}{$dev}{active} == 0)) {
     # schon in der Queue vorhanden aber in Wartestellung
+    Log3 $hash, 4, "$me: Device '$dev' aktuell in der Queue vorhanden oder in Wartestellung, prüfe auf freien Thread";
     if($threads < $max) {
+      Log3 $hash, 4, "$me: freier Thread vorhanden, gebe Thread frei für Device '$dev' und markiere als 'active'";
       $threads += 1;
       $hash->{helper}{Queue}{$dev}{active} = 1;
       readingsBeginUpdate($hash);
@@ -205,11 +212,13 @@ sub SprinkleControl_AllocateNewThread($@) {
     
     } else {
       # abgelehnt da MAX erreicht, in queue gelegt
+      Log3 $hash, 4, "$me: kein freier Thread vorhanden, MAXTHREADS wurde erreicht, markiere Device '$dev' in der Queue als 'inactive'";
       $hash->{helper}{Queue}{$dev}{active} = 0;
       return undef ; 
     }
   } else {
     # Device ist bereits in der Queue vorhanden
+    Log3 $hash, 4, "$me: Device '$dev' bereits in der Queue vorhanden, mache nichts";
     return undef; 
   }
 
@@ -225,10 +234,13 @@ sub SprinkleControl_DeallocateThread($@) {
   my ($me, $dev) = @_;
   my $hash = $defs{$me};
 
+  Log3 $hash, 4, "$me: Anforderung Thread löschen durch '$dev'";
+
   my $threads = ReadingsVal($me, "CountThreads",0);
   my $max     = $hash->{MaxParallel};
 
   if(defined($hash->{helper}{Queue}{$dev})) {
+    Log3 $hash, 4, "$me: Device '$dev' in der Queue erkannt und gelöscht. Thread freigegeben";
     $threads -= 1;
     $threads = 0 if($threads<0);
     delete $hash->{helper}{Queue}{$dev};
@@ -242,12 +254,11 @@ sub SprinkleControl_DeallocateThread($@) {
   # den nächsten wartenden Thread aus der Queue starten
   #my %queue = %{$hash->{helper}{Queue}};
   my @queue = sort keys %{$hash->{helper}{Queue}};
-#Log3 $hash, 3, "Queue: \n".Dumper(@queue);
   for(my $i=0; $i < @queue; $i++) {
     my $d = $queue[$i]; 
-#Log3 $hash,3, "Device: $d";    
+    Log3 $hash, 4, "$me: wartendes Device in der Queue erkannt: '$d'";  
     if($hash->{helper}{Queue}{$d}{active} == 0) {
-#Log3 $hash, 3, "DoIt: $d -> ".$hash->{helper}{Queue}{$d}{command};      
+      Log3 $hash, 4, "$me: Starte wartendes Device, rufe DoIt für Device '$d' mit Command '".$hash->{helper}{Queue}{$d}{command}."'' auf";
       Sprinkle_DoIt($defs{$d}, $hash->{helper}{Queue}{$d}{command});
       last;
     }
