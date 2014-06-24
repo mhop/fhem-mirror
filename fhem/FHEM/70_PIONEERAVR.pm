@@ -23,14 +23,14 @@
 #
 # This module handles the communication with a Pioneer AVR and controls the main zone. 
 
-# this is the physical module - it opens the device (via rs232 or TCP), and its ReadFn is called after the global select reports, 
-#   that data is available.
+# this is the module for the communication interface and to control the main zone - 
+#   it opens the device (via rs232 or TCP), and its ReadFn is called after the global select reports, that data is available.
 # - on Windows select does not work for devices not connected via TCP, here is a ReadyFn function necessary, which polls the device 10 times 
 #    a second, and returns true if data is available.
 # - ReadFn makes sure, that a message is complete and correct, and calls the global Dispatch() with one message
-# - Dispatch() searches for a matching logical module (by checking $hash->{Clients} or $hash->{MatchList} in the physical module, and 
-# $hash->{Match} in all matching logical modules), and calls the ParseFn of the logical module 
-# (we use this mechanism to pass informations to the PIONEERAVR_ZONE device(s) ) 
+# - Dispatch() searches for a matching logical module (by checking $hash->{Clients} or $hash->{MatchList} in this device, and 
+# $hash->{Match} in all matching zone devices), and calls the ParseFn of the zone devices 
+# (This mechanism is used to pass information to the PIONEERAVRZONE device(s) ) 
 #
 # See also:
 #  Elite & Pioneer FY14AVR IP & RS-232 7-31-13.xlsx
@@ -50,38 +50,19 @@
 #			 added set extension to documentation
 # 21.6.2014:version
 #			fixed RC_layout
-# 10.6.2014:version 0007
-#			unified logging texts
-#			added "verbose 5" log messages for all reads (messages coming from the PioneerAVR)
-#			added "verbose 5" log messages for all set (commands sent to the PioneerAVR)
-#			added "verbose 5" log messages for all get (commands sent to the PioneerAVR)
-#			fixed set <name> listeningMode <mode>
-#			fixed get <name> raw <PIONEER_RAW_COMMAND> - this sends <PIONEER_RAW_COMMAND> to the PioneerAVR (e.g. to power off the Pioneer AVR: get mypioneerAvr raw PF )
-#				get <name> raw (without further arguments) sends only a new line command -> this should wakeup the connection if the PioneerAVR is in standby
-#			removed unneeded functions, RESTART OF FHEM NEEDED (reload PIONEERAVR is not enough)
-#			updated set <name> on -- to be even more Pioneer documentation conform (sending now additionally \n\r immediately before PO\n\r)
-# 9.6.2014: all commands end now with "\r\n"
-#			The command for PowerOn (PO) is now send twice 
-#			"blink" (part of setextensions) does not make much sense for a Pioneer AVR - set <name> blink returns this information ;-)  
-#			Added support for module 95_remotecontrol
-#			New functions: sub RC_layout_PioneerAVR(); sub PIONEERAVR_RCmakenotify($$);
-#			Updated PIONEERAVR_Initialize for remotecontrol
-#			added reading "networkStandby" [on|off] -> "on" indicates that the Pioneer AVR can be turned on from standby
-#			added reading "tunerFrequency"
-#		version 0008
-#			fixed get <name> tunerFrequency
 
 package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 use Time::HiRes qw(gettimeofday);
 if( $^O =~ /Win/ ) {
   require Win32::SerialPort;
 } else {
   require Device::SerialPort;
 }
-use SetExtensions qw/ :all /;
+
 #########################
 # Forward declaration
 sub PIONEERAVR_Set($@);
@@ -182,138 +163,41 @@ PIONEERAVR_Define($$) {
         $attr{$name}{webCmd} = 'volume:mute:input';
     }
     unless ( exists( $attr{$name}{devStateIcon} ) ) {
-        $attr{$name}{devStateIcon} =
-          'on:rc_GREEN:off off:rc_STOP:on absent:rc_RED';
+        $attr{$name}{devStateIcon} = 'on:rc_GREEN:off off:rc_STOP:on absent:rc_RED';
     }
     $hash->{helper}{receiver} = undef;
 
-    unless ( exists( $hash->{helper}{AVAILABLE} )
-        and ( $hash->{helper}{AVAILABLE} == 0 ))
+    unless ( exists( $hash->{helper}{AVAILABLE} ) and ( $hash->{helper}{AVAILABLE} == 0 ))
     {
         $hash->{helper}{AVAILABLE} = 1;
         readingsSingleUpdate( $hash, "presence", "present", 1 );
     }
   
 	$hash->{helper}{INPUTNAMES} = {
-		"00" => {
-			"name" => "phono",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"01" => {
-			"name" => "cd",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"02" => {
-			"name" => "tuner",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"03" => {
-			"name" => "cdrTape",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"04" => {
-			"name" => "dvd",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"05" => {
-			"name" => "tvSat",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"06" => {
-			"name" => "CblSat",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"10" => {
-			"name" => "video1",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"12" => {
-			"name" => "multiChIn",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"14" => {
-			"name" => "video2",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"15" => {
-			"name" => "dvrBdr",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"17" => {
-			"name" => "iPodUsb",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"18" => {
-			"name" => "xmRadio",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"19" => {
-			"name" => "hdmi1",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"20" => {
-			"name" => "hdmi2",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"21" => {
-			"name" => "hdmi3",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"22" => {
-			"name" => "hdmi4",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"23" => {
-			"name" => "hdmi5",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"25" => {
-			"name" => "bd",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"26" => {
-			"name" => "homeMediaGallery",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"27" => {
-			"name" => "sirius",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"31" => {
-			"name" => "hdmiCyclic",
-			"aliasName" => "",
-			"enabled" => "1"
-		},
-		"33" => {
-			"name" => "adapterPort",
-			"aliasName" => "",
-			"enabled" => "1"
-		}			
+		"00" => {"name" => "phono",				"aliasName" => "",	"enabled" => "1"},
+		"01" => {"name" => "cd",				"aliasName" => "",	"enabled" => "1"},
+		"02" => {"name" => "tuner",				"aliasName" => "",	"enabled" => "1"},
+		"03" => {"name" => "cdrTape",			"aliasName" => "",	"enabled" => "1"},
+		"04" => {"name" => "dvd",				"aliasName" => "",	"enabled" => "1"},
+		"05" => {"name" => "tvSat",				"aliasName" => "",	"enabled" => "1"},
+		"06" => {"name" => "CblSat",			"aliasName" => "",	"enabled" => "1"},
+		"10" => {"name" => "video1",			"aliasName" => "",	"enabled" => "1"},
+		"12" => {"name" => "multiChIn",			"aliasName" => "",	"enabled" => "1"},
+		"14" => {"name" => "video2",			"aliasName" => "",	"enabled" => "1"},
+		"15" => {"name" => "dvrBdr",			"aliasName" => "",	"enabled" => "1"},
+		"17" => {"name" => "iPodUsb",			"aliasName" => "",	"enabled" => "1"},
+		"18" => {"name" => "xmRadio",			"aliasName" => "",	"enabled" => "1"},
+		"19" => {"name" => "hdmi1",				"aliasName" => "",	"enabled" => "1"},
+		"20" => {"name" => "hdmi2",				"aliasName" => "",	"enabled" => "1"},
+		"21" => {"name" => "hdmi3",				"aliasName" => "",	"enabled" => "1"},
+		"22" => {"name" => "hdmi4",				"aliasName" => "",	"enabled" => "1"},
+		"23" => {"name" => "hdmi5",				"aliasName" => "",	"enabled" => "1"},
+		"25" => {"name" => "bd",				"aliasName" => "",	"enabled" => "1"},
+		"26" => {"name" => "homeMediaGallery",	"aliasName" => "",	"enabled" => "1"},
+		"27" => {"name" => "sirius",			"aliasName" => "",	"enabled" => "1"},
+		"31" => {"name" => "hdmiCyclic",		"aliasName" => "",	"enabled" => "1"},
+		"33" => {"name" => "adapterPort",		"aliasName" => "",	"enabled" => "1"}			
 	};
-
-	PIONEERAVR_askForInputNames($hash,5);
-
 	# ----------------Human Readable command mapping table-----------------------
 	$hash->{helper}{SETS} = {
 		'main' => {
@@ -696,6 +580,8 @@ PIONEERAVR_Define($$) {
 		"0f01"=>"MULTI CH IN"
 	};
 	#### statusRequest
+	#### Update Input alias names, available Inputs
+	PIONEERAVR_askForInputNames($hash,5);
 	#### we execute all 'get <name> XXX'   
 	foreach my $zone ( keys %{$hash->{helper}{GETS}} ) {
 		foreach my $key ( keys %{$hash->{helper}{GETS}{$zone}} ) {
@@ -730,7 +616,6 @@ PIONEERAVR_Undef($$)
 		delete $defs{$d}{IODev};
 	  }
 	}
-
 	DevIo_CloseDev($hash);
 	return undef;
 }
@@ -793,7 +678,7 @@ dq($)
 	return "\"" . escapeLogLine($s) . "\"";
 }
 
-#PIONEER_Log() is used to show the data sent end received from/to the PioneerAVR if attr logTraffic is set
+#PIONEERAVR_Log() is used to show the data sent end received from/to the PioneerAVR if attr logTraffic is set
 sub
 PIONEERAVR_Log($$$)
 {
@@ -1145,6 +1030,7 @@ sub PIONEERAVR_Read($)
 	my $name = $hash->{NAME};
 	my $state='';
 	my $buf = '';
+	my $msgForZone = "";
 	#include previous partial message
 	if(defined($hash->{PARTIAL}) && $hash->{PARTIAL}) {
 		$buf = $hash->{PARTIAL} . DevIo_SimpleRead($hash);
@@ -1394,30 +1280,55 @@ sub PIONEERAVR_Read($)
 				readingsBulkUpdate($hash, "networkStandby", "off" );
 				Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: networkStandby is off";	
 			}
-		# dispatch "zone" - commands to other zones
-		# Volume, mute, power
-		} elsif ($line =~ m/^[Y|Z]V(\d\d)$|^Z[2|3]MUT(\d)$|^Z[2|3]F(\d\d)$|^[A|B]PR(0|1)$|^ZEA(\d\d)$|^ZEP(0|1)$/) { 
-			Dispatch($hash, $line, undef);  # dispatch result to PIONEERAVRZONEs
-			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: not for the Main zone -> dispatch to PIONEERAVRZONEs";	
+		# commands for other zones (Volume, mute, power)
+		#} elsif ($line =~ m/^[Y|Z]V(\d\d)$|^Z[2|3]MUT(\d)$|^Z[2|3]F(\d\d)$|^[A|B]PR(0|1)$|^ZEA(\d\d)$|^ZEP(0|1)$/) {
+		# Zone 2 command
+
+		} elsif ($line =~ m/^ZV(\d\d)$|^Z2MUT(\d)$|^Z2F(\d\d)$|^APR(0|1)$/) {
+			$msgForZone="zone2";
+			Log3 $hash, 5, "PIONEERAVR $name: received $line - message for zone2!";
+		# Zone 3 command
+		} elsif ($line =~ m/^YV(\d\d)$|^Z3MUT(\d)$|^Z3F(\d\d)$|^BPR(0|1)$/) {
+			$msgForZone="zone3";
+			Log3 $hash, 5, "PIONEERAVR $name: received $line - message for zone3!";
+		# hdZone command
+		} elsif ($line =~ m/^ZEA(\d\d)$|^ZEP(0|1)$/) {
+			$msgForZone="hdZone";
+			Log3 $hash, 5, "PIONEERAVR $name: received $line - message for hdZone!";
 		} else {
 			Log3 $hash, 5, "PIONEERAVR $name: received $line - don't know what this means - help me!";
 		}
+		
+		# if PIONEERAVRZONE device exists for that zone, dispatch the command
+		# otherwise try to autocreate the device
+		unless($msgForZone eq "") {
+			my $hashZone = $modules{PIONEERAVRZONE}{defptr}{$msgForZone};
+			Log3 $hash, 5, "PIONEERAVR $name: received message for Zone: ".$msgForZone;
+			if(!$hashZone) {
+				my $ret = "UNDEFINED PIONEERAVRZONE_$msgForZone PIONEERAVRZONE $msgForZone";
+				Log3 $name, 3, "PIONEERAVR $ret, please define it";
+				DoTrigger("global", $ret);
+				return "";
+			}
+			# dispatch "zone" - commands to other zones
+			Dispatch($hash, $line, undef);  # dispatch result to PIONEERAVRZONEs
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: not for the Main zone -> dispatch to PIONEERAVRZONEs";	
+
+		}
+		
 	}
 	readingsEndUpdate($hash, 1);
 	$hash->{PARTIAL} = $buf;
 }
 
-
 #########################################################
-
 sub PIONEERAVR_askForInputNames($$) {
 	my ($hash, $loglevel) = @_;
 	my $name = $hash->{NAME};
 	my $comstr = '';
 	
 	# we ask for the inputs 1 to 49 if an input name exists (command: ?RGB00 ... ?RGB49)
-	# we ask for the inputs 1 to 49 if the input is disabled (command: ?SSC0003 ... ?SSC4903)
-	#
+	# 	and if the input is disabled (command: ?SSC0003 ... ?SSC4903)
 	for ( my $i=0; $i<50; $i++ ) {
 		select(undef, undef, undef, 0.1);
 		$comstr = sprintf '?RGB%02d', $i;
@@ -1455,7 +1366,6 @@ RC_layout_PioneerAVR() {
   return @row;
 }
 #####################################
-
 
 1;
 
@@ -1497,8 +1407,9 @@ RC_layout_PioneerAVR() {
     <code>define &lt;name&gt; PIONEERAVR serial &lt;SerialDevice&gt;[&lt;@BaudRate&gt;]</code>
     <br><br>
 
-    Defines a physical PIONEERAVR device. The keywords <code>telnet</code> or
-    <code>serial</code> are fixed. Default port on Pioneer AV receivers is 23 (according to the above mentioned Pioneer documetation)<br><br>
+    Defines a Pioneer AV receiver device (communication interface and main zone control). The keywords <code>telnet</code> or
+    <code>serial</code> are fixed. Default port on Pioneer AV receivers is 23 (according to the above mentioned Pioneer documetation)<br>
+	Note: devices to control zone2, zone3 and/or HD-zone are autocreated on reception of the first message for those zones.<br><br>
 
     Examples:
     <ul>
@@ -1516,7 +1427,7 @@ RC_layout_PioneerAVR() {
     <br><br>
     where &lt;what&gt; is one of
 	<li>reopen <br>Tries to reopen the data connection</li>
-	<li>statusRequest<br>gets some information from the physical Pioneer AVR and updates the readings accordingly</li>
+	<li>statusRequest<br>gets some information from the Pioneer AV receiver and updates the readings accordingly</li>
 	<li>off <br>turn power off</li>
 	<li>on <br>turn power on</li>
 	<li>toggle <br>toggles power</li>
@@ -1554,12 +1465,12 @@ RC_layout_PioneerAVR() {
   <ul>
     <code>get &lt;name&gt; raw &lt;command&gt;</code>
     <br><br>
-    Sends the command <code>&lt;command&gt;</code> to the physical Pioneer AVR device
+    Sends the command <code>&lt;command&gt;</code> to the Pioneer AV receiver
     <code>&lt;name&gt;</code>.
-	<li><br>loadInputNames<br>reads the names of the inputs from the physical Pioneer AVR
+	<li><br>loadInputNames<br>reads the names of the inputs from the Pioneer AV receiver
 	and checks if those inputs are enabled</li>
 	<li>display<br>updates the reading 'display' and 'displayPrevious' with what is shown
-	on the display of the physical Pioneer AVR</li>
+	on the display of the Pioneer AV receiver</li>
   </ul>
   <br><br>
 
@@ -1616,9 +1527,11 @@ RC_layout_PioneerAVR() {
     <code>define &lt;name&gt; PIONEERAVR serial &lt;SerialDevice&gt;[&lt;@BaudRate&gt;]</code>
     <br><br>
 
-    Definiert ein physisches PIONEERAVR device. Die Schlüsselwörter <code>telnet</code> bzw.
+    Definiert ein Fhem device für einen Pioneer AV Receiver (Kommunikationsschnittstelle und Steuerung der Main - Zone). Die Schlüsselwörter <code>telnet</code> bzw.
     <code>serial</code> sind fix. Der Standard Port für die Ethernet Verbindung bei Pioneer AV Receiver ist 23 
-	(laut der oben angeführten Pioneer Dokumetation)<br><br>
+	(laut der oben angeführten Pioneer Dokumetation)<br>
+	Note: Devices zur Steuerung der Zone2, Zone3 und/oder HD-Zone werden per autocreate beim Eintreffen der ersten Nachricht für eine der Zonen erzeugt.
+	<br><br>
 
     Beispiele:
     <ul>
@@ -1636,19 +1549,19 @@ RC_layout_PioneerAVR() {
     <br><br>
     "was" ist eines von
 	<li>reopen <br>Versucht die Datenverbindung wieder herzustellen</li>
-	<li>statusRequest<br>Fragt Information vom physischen Pioneer AV Receiver und aktualisiert die readings entsprechend</li>
-	<li>off <br>Ausschalten</li>
-	<li>on <br>Einschalten</li>
-	<li>toggle <br>Ein/Ausschalten</li>
+	<li>statusRequest<br>Fragt Information vom Pioneer AV Receiver und aktualisiert die readings entsprechend</li>
+	<li>off <br>Ausschalten der Main Zone</li>
+	<li>on <br>Einschalten der Main Zone</li>
+	<li>toggle <br>Ein/Ausschalten der Main Zone</li>
 	<li>volume <0 ... 100><br>Lautstärke der Main-Zone in % der Maximallautstärke</li>
-	<li>volumeUp<br>Lautstärke um 0.5dB erhöhen</li>
-	<li>volumeDown<br>Lautstärke um 0.5dB verringern</li>
-	<li>volumeStraight<-80.5 ... 12><br>Einstellen der Lautstärke mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
-	<li>mute <on|off|toggle></li>
+	<li>volumeUp<br>Lautstärke der Main Zone um 0.5dB erhöhen</li>
+	<li>volumeDown<br>Lautstärke der Main Zone um 0.5dB verringern</li>
+	<li>volumeStraight<-80.5 ... 12><br>Einstellen der Lautstärke der Main Zone mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
+	<li>mute <on|off|toggle> der Main Zone</li>
 	<li>input <nicht am Pioneer AV Receiver deaktivierte Eingangsquelle><br> Die Liste der verfügbaren (also der nicht deaktivierten)
 	Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen</li>
-	<li>inputUp<br>nächste Eingangsquelle auswählen</li>
-	<li>inputDown<br>vorherige Eingangsquelle auswählen</li>
+	<li>inputUp<br>nächste Eingangsquelle der Main Zone auswählen</li>
+	<li>inputDown<br>vorherige Eingangsquelle der Main Zone auswählen</li>
 	<li>listeningMode</li>
 	<li>play <br>Startet die Wiedergabe für folgende Eingangsquellen: AdapterPort, Ipod, Favorites, InternetRadio, MediaServer, Mhl</li>
 	<li>pause<br>Unterbricht die Wiedergabe für die gleichen Eingangsquellen wie "play"</li>
