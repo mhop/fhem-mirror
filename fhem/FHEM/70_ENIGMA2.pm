@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.3.2
+# Version: 1.3.4
 #
 # Major Version History:
 # - 1.3.0 - 2013-12-21
@@ -78,7 +78,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout "
+"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -522,6 +522,8 @@ sub ENIGMA2_Set($@) {
             }
             elsif ( $request ne "" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand( $a[2] );
+                $cmd .= "&rcu=" . $attr{$name}{remotecontrol}
+                  if defined( $attr{$name}{remotecontrol} );
             }
             else {
                 my $commandKeys = "";
@@ -871,14 +873,12 @@ sub ENIGMA2_SendCommand($$;$$) {
         $timeout = $attr{$name}{timeout};
     }
     else {
-        $timeout = 6;
+        $timeout = 3;
     }
 
     # send request via HTTP-GET method
     if ( $http_method eq "GET" || $http_method eq "" || $cmd eq "" ) {
         Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
-
-        #        $response = GetFileFromURL( $URL, $timeout, undef, 0, 5 );
 
         HttpUtils_NonblockingGet(
             {
@@ -903,8 +903,6 @@ sub ENIGMA2_SendCommand($$;$$) {
           . $URL
           . " (POST DATA: "
           . urlDecode($cmd) . ")";
-
-        #        $response = GetFileFromURL( $URL, $timeout, $cmd, 0, 5 );
 
         HttpUtils_NonblockingGet(
             {
@@ -940,7 +938,9 @@ sub ENIGMA2_ReceiveCommand($$$) {
     my $service = $param->{service};
     my $cmd     = $param->{cmd};
     my $state =
-      ( $hash->{READINGS}{state}{VAL} ) ? $hash->{READINGS}{state}{VAL} : "";
+      ( $hash->{READINGS}{state}{VAL} )
+      ? $hash->{READINGS}{state}{VAL}
+      : "";
     my $type = ( $param->{type} ) ? $param->{type} : "";
     my $return;
 
@@ -1710,8 +1710,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                                     $t[1], $t[0] );
                             }
                             else {
-                                $timestring =
-                                  substr(
+                                $timestring = substr(
                                     FmtDateTime( $eventNow->{$e2reading} ),
                                     11 );
                             }
@@ -1747,8 +1746,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                                     $t[1], $t[0] );
                             }
                             else {
-                                $timestring =
-                                  substr(
+                                $timestring = substr(
                                     FmtDateTime( $eventNext->{$e2reading} ),
                                     11 );
                             }
@@ -2392,7 +2390,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
         'MACRO'          => 112,
         'MUTE'           => 113,
         'VOLUMEDOWN'     => 114,
+        'VOLDOWN'        => 114,
         'VOLUMEUP'       => 115,
+        'VOLUP'          => 115,
         'POWER'          => 116,
         'KPEQUAL'        => 117,
         'KPPLUSMINUS'    => 118,
@@ -2556,7 +2556,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
         'YELLOW'         => 400,
         'BLUE'           => 401,
         'CHANNELUP'      => 402,
+        'CHANUP'         => 402,
         'CHANNELDOWN'    => 403,
+        'CHANDOWN'       => 403,
         'FIRST'          => 404,
         'LAST'           => 405,
         'AB'             => 406,
@@ -2670,13 +2672,16 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
             <b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; controls volume mute
           </li>
           <li>
-            <b>play</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; starts/resumes playback
+            <b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp; starts/resumes playback
           </li>
           <li>
-            <b>pause</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; pauses current playback or enables timeshift
+            <b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp; pauses current playback or enables timeshift
           </li>
           <li>
-            <b>stop</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; stops current playback
+            <b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp; stops current playback
+          </li>
+          <li>
+            <b>record</b> &nbsp;&nbsp;-&nbsp;&nbsp; starts recording of current channel
           </li>
           <li>
             <b>input</b> tv,radio &nbsp;&nbsp;-&nbsp;&nbsp; switches between tv and radio mode
@@ -2755,6 +2760,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           </li>
           <li>
             <b>https</b> - Access box via secure HTTP (true/false)
+          </li>
+          <li>
+            <b>remotecontrol</b> - Explicitly set specific remote control unit format. This will only be considered for set-command <strong>remoteControl</strong> as of now.
           </li>
           <li>
             <b>timeout</b> - Set different polling timeout in seconds (default=6)
