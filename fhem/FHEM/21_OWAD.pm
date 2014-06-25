@@ -310,7 +310,7 @@ sub OWAD_Attr(@) {
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
         }
         last;
       };
@@ -751,7 +751,7 @@ sub OWAD_GetValues($) {
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
    
   #-- Get readings, alarms and stati according to interface type
   if( $interface eq "OWX" ){
@@ -935,7 +935,7 @@ sub OWAD_Set($@) {
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
     return undef;
   }
   
