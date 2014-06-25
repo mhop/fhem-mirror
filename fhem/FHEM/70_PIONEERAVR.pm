@@ -19,9 +19,8 @@
 #     along with Fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-# by hofrichter
 #
-# This module handles the communication with a Pioneer AVR and controls the main zone. 
+# This module handles the communication with a Pioneer AV receiver and controls the main zone. 
 
 # this is the module for the communication interface and to control the main zone - 
 #   it opens the device (via rs232 or TCP), and its ReadFn is called after the global select reports, that data is available.
@@ -57,6 +56,7 @@ use strict;
 use warnings;
 use SetExtensions;
 use Time::HiRes qw(gettimeofday);
+use DevIo;
 if( $^O =~ /Win/ ) {
   require Win32::SerialPort;
 } else {
@@ -210,6 +210,10 @@ PIONEERAVR_Define($$) {
 			'muteOn'			 => 'MO',
 			'muteOff'			 => 'MF',
 			'muteToggle'		 => 'MZ',
+			'bassUp'			 => 'BI',
+			'bassDown'			 => 'BD',
+			'trebleUp'			 => 'TI',
+			'trebleDown'		 => 'TD',
 			'input'			     => 'FN',
 			'inputUp'			 => 'FU',
 			'inputDown'			 => 'FD',
@@ -269,37 +273,42 @@ PIONEERAVR_Define($$) {
 	# ----------------Human Readable command mapping table-----------------------
 	$hash->{helper}{GETS}  = {
 		'main' => {
-			'power'                => '?P',
-			'volume'               => '?V',
-			'mute'                 => '?M',
-			'input'                => '?F',
+			'bass'            	   => '?BA',
+			'channel'              => '?PR',
 			'display'              => '?FL',
+			'input'                => '?F',
 			'listeningMode'        => '?S',
 			'listeningModePlaying' => '?L',
+			'model'                => '?RGD',
+			'mute'                 => '?M',
+			'networkStandby'	   => '?STJ',
+			'power'                => '?P',
+			'softwareVersion'      => '?SSI',
 			'speakers'             => '?SPK',
 			'speakerSystem'        => '?SSF',
-			'channel'              => '?PR',
+			'tone'			       => '?TO',
 			'tunerFrequency'       => '?FR',
 			'tunerChannelNames'    => '?TQ',
-			'model'                => '?RGD',
-			'networkStandby'	   => '?STJ',
-			'softwareVersion'      => '?SSI'
+			'treble'               => '?TR',		
+			'volume'               => '?V'
 		},
 		'zone2' => {
-			'power'              => '?AP',
-			'volume'             => '?ZV',
+			'bass'            	 => '?ZGB',
+			'input'              => '?ZS',
 			'mute'               => '?Z2M',
-			'input'              => '?ZS'
+			'power'              => '?AP',
+			'treble'             => '?ZGC',		
+			'volume'             => '?ZV'
 		},
 		'zone3' => {
-			'power'              => '?BP',
-			'volume'             => '?YV',
+			'input'              => '?ZT',
 			'mute'               => '?Z3M',
-			'input'              => '?ZT'
+			'power'              => '?BP',
+			'volume'             => '?YV'
 		},
 		'hdZone' => {
-			'power'              => '?ZEP',
-			'input'              => '?ZEA'
+			'input'              => '?ZEA',
+			'power'              => '?ZEP'
 		}
 	};
 	# ----------------Human Readable command mapping table-----------------------
@@ -737,9 +746,10 @@ PIONEERAVR_Set($@)
 	. " channel:1,2,3,4,5,6,7,8,9"
 	. " listeningMode:"
 	. join(',', sort values (%{$hash->{helper}{LISTENINGMODES}}))
-	. " volumeUp:noArg volumeDown:noArg mute:on,off,toggle statusRequest:noArg volume:slider,0,1,100"
+	. " volumeUp:noArg volumeDown:noArg mute:on,off,toggle tone:on,bypass bass:slider,-6,1,6"
+	. " treble:slider,-6,1,6 statusRequest:noArg volume:slider,0,1,100"
 	. " volumeStraight:slider,-80,1,12"
-	. " speakers:off,A,B,A+B";
+	. " speakers:off,A,B,A+B tunerPresetName";
 	
 	my $currentInput= ReadingsVal($name,"input","");
 	
@@ -758,7 +768,7 @@ PIONEERAVR_Set($@)
 	# set <name> blink is part of the setextensions
 	# but blink does not make sense for an PioneerAVR so we disable it here
 	} elsif ( $cmd eq "blink" ) {
-		return "blink does not make too much sense with an PIONEER AVR isn't it?";
+		return "blink does not make too much sense with an PIONEER AV receiver isn't it?";
 	}
 	return "No Argument given" if ( !defined( $a[1] ) );
 
@@ -771,7 +781,7 @@ PIONEERAVR_Set($@)
 		### Power on
 		### Command: PO
 		### according to "Elite & Pioneer FY14AVR IP & RS-232 7-31-13.xlsx" (notice) we need to send <cr> and 
-		### wait 100ms before the first command is accepted by the Pioneer AVR
+		### wait 100ms before the first command is accepted by the Pioneer AV receiver
 		} elsif ( $cmd  eq "on" ) {
 			Log3 $name, 5, "PIONEERAVR $name: Set $cmd -> 2x newline + 2x PO with 100ms break in between";
 			my $setCmd= "";
@@ -804,7 +814,7 @@ PIONEERAVR_Set($@)
 		#### play, pause, stop, random, repeat
 		#### Only available if the input is one of:
 		####    ipod, internetRadio, mediaServer, favorites, adapterPort, mhl
-		#### we need to send different Pioneer Avr commands
+		#### we need to send different commands to the Pioneer AV receiver
 		####    depending on that input
 		} elsif ($cmd  ~~ @setsPlayer) {
 			Log3 $name, 5, "PIONEERAVR $name: set $cmd for inputNr: $inputNr (player command)";
@@ -843,7 +853,8 @@ PIONEERAVR_Set($@)
 		#### commands with argument(s)
 	} elsif(@a > 2) {
 		my $arg = $a[2];
-		####Input (all available Inputs of the Pioneer Avr -> see 'get $name loadInputNames')
+		my $arg2 = $a[3];
+		####Input (all available Inputs of the Pioneer AV receiver -> see 'get $name loadInputNames')
 		#### according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV 
 		#### first try the aliasName (only if this fails try the default input name)
 		if ( $cmd eq "input" ) {
@@ -884,6 +895,33 @@ PIONEERAVR_Set($@)
 			Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
 			my $zahl = sprintf "%d", $arg * 1.85;
 			PIONEERAVR_Write($hash, sprintf "%03dVL", $zahl);
+			return undef;
+		####tone (on|bypass)
+		} elsif ( $cmd eq "tone" ) {
+			if ($arg eq "on") {
+				PIONEERAVR_Write($hash, "1TO");
+#				readingsSingleUpdate($hash, "tone", "on", 1 );
+			}
+			elsif ($arg eq "bypass") {
+				PIONEERAVR_Write($hash, "0TO");
+#				readingsSingleUpdate($hash, "tone", "bypass", 1 );
+			} else {
+				my $err= "PIONEERAVR $name: Error: unknown set ... tone argument: $arg !";
+				Log3 $name, 5, $err;
+				return $err;
+			}
+			return undef;
+		####bass (-6 - 6) in dB
+		} elsif ( $cmd eq "bass" ) {
+			Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+			my $zahl = sprintf "%d", ($arg * (-1)) + 6;
+			PIONEERAVR_Write($hash, sprintf "%02dBA", $zahl);
+			return undef;
+		####treble (-6 - 6) in dB
+		} elsif ( $cmd eq "treble" ) {
+			Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
+			my $zahl = sprintf "%d", ($arg * (-1)) + 6;
+			PIONEERAVR_Write($hash, sprintf "%02dTR", $zahl);
 			return undef;
 		####Mute (on|off|toggle)
 		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV 
@@ -1064,6 +1102,30 @@ sub PIONEERAVR_Read($)
 			readingsBulkUpdate($hash, "volumeStraight", $volume/2 - 80 );				
 			readingsBulkUpdate($hash, "volume", sprintf "%d", $volume/1.85 );
 			Log3 $name, 5, "PIONEERAVR $name: ". dq($line) ." interpreted as: Main Zone - New volume = ".$volume . " (raw volume data).";
+
+		# Main zone tone (0 = bypass, 1 = on)
+		} elsif ( $line =~ m/^TO([0|1])$/) {
+			if ($1 == "1") {
+				readingsBulkUpdate($hash, "tone", "on" );
+				Log3 $name, 5, "PIONEERAVR $name: ".dq($line) ." interpreted as: Main Zone - tone on ";
+			} 
+			else {
+				readingsBulkUpdate($hash, "tone", "bypass" );
+				Log3 $name, 5, "PIONEERAVR $name: ".dq($line) ." interpreted as: Main Zone - tone bypass ";
+			}
+		# Main zone bass (-6 to +6 dB)
+		# works only if tone=on
+		} elsif ( $line =~ m/^BA(\d\d)$/) {
+			readingsBulkUpdate($hash, "bass", ($1 *(-1)) + 6 );				
+			Log3 $name, 5, "PIONEERAVR $name: ". dq($line) ." interpreted as: Main Zone - New bass = ".$1 . " (raw bass data).";
+
+		# Main zone treble (-6 to +6 dB)
+		# works only if tone=on
+		} elsif ( $line =~ m/^TR(\d\d)$/) {
+			readingsBulkUpdate($hash, "treble", ($1 *(-1)) + 6 );				
+			Log3 $name, 5, "PIONEERAVR $name: ". dq($line) ." interpreted as: Main Zone - New treble = ".$1 . " (raw treble data).";
+
+
 		# Main zone Mute				
 		} elsif ( substr($line,0,3) eq "MUT" ) {
 			my $mute = substr($line,3,1);
@@ -1269,8 +1331,8 @@ sub PIONEERAVR_Read($)
 		} elsif ( $line =~ m/^B00$/ ) {
 			Log3 $hash, 5,"PIONEERAVR $name: Error nr $line received (BUSY	Now AV Receiver is Busy. Please wait few seconds.)";
 		# network standby
-		# STJ1 -> on  -> Pioneer AVR can be switched on from standby
-		# STJ0 -> off -> Pioneer AVR cannot be switched on from standby
+		# STJ1 -> on  -> Pioneer AV receiver can be switched on from standby
+		# STJ0 -> off -> Pioneer AV receiver cannot be switched on from standby
 		} elsif ( $line =~ m/^STJ([0|1])/) {
 			if ($1 == "1") {
 				readingsBulkUpdate($hash, "networkStandby", "on" );
@@ -1350,7 +1412,7 @@ sub PIONEERAVR_RCmakenotify($$) {
 }
 
 #####################################
-# Default-remote control layout for Pioneer AVR
+# Default-remote control layout for PIONEERAVR
 sub 
 RC_layout_PioneerAVR() {
   my $ret;
@@ -1386,7 +1448,7 @@ RC_layout_PioneerAVR() {
   </ul>
   <br><br>
   This module is based on the <a href="http://www.pioneerelectronics.com/StaticFiles/PUSA/Files/Home%20Custom%20Install/Elite%20&%20Pioneer%20FY14AVR%20IP%20&%20RS-232%207-31-13.zip">Pioneer documentation</a> 
-  and tested with a Pioneer AVR VSX-923 from <a href="http://www.pioneer.de">Pioneer</a>.
+  and tested with a Pioneer AV receiver VSX-923 from <a href="http://www.pioneer.de">Pioneer</a>.
   <br><br>
   Note: this module requires the Device::SerialPort or Win32::SerialPort module
   if the module is connected via serial Port or USB.
@@ -1436,6 +1498,9 @@ RC_layout_PioneerAVR() {
 	<li>volumeDown<br>decreases the main volume by 0.5dB</li>
 	<li>volumeStraight<-80.5 ... 12><br>same values for volume as shown on the display of the Pioneer AV rreceiver</li>
 	<li>mute <on|off|toggle></li>
+	<li>tone <on|bypass></li>
+	<li>bass <-6 ... 6><br>tone control of bass from -6dB to + 6dB (works only if tone is on)</li>
+	<li>treble <-6 ... 6><br>tone control of treble from -6dB to + 6dB (works only if tone is on)</li>
 	<li>input <not on the Pioneer hardware deactivated input><br>the list of possible (i.e. not deactivated)
 	inputs is read in during Fhem start and with <code>get <name> statusRequest</code></li>
 	<li>inputUp<br>change input to next input</li>
@@ -1503,7 +1568,7 @@ RC_layout_PioneerAVR() {
   </ul>
   <br><br>
   Dieses Modul basiert auf der <a href="http://www.pioneerelectronics.com/StaticFiles/PUSA/Files/Home%20Custom%20Install/Elite%20&%20Pioneer%20FY14AVR%20IP%20&%20RS-232%207-31-13.zip">Pioneer documentation</a> 
-  und ist mit einem Pioneer AVR VSX-923 von <a href="http://www.pioneer.de">Pioneer</a> getestet.
+  und ist mit einem Pioneer AV Receiver VSX-923 von <a href="http://www.pioneer.de">Pioneer</a> getestet.
   <br><br>
   Achtung: Dieses Modul benötigt die Perl-Module Device::SerialPort oder Win32::SerialPort
   wenn die Datenverbindung via USB bzw. rs232 Port erfolgt.
@@ -1558,6 +1623,9 @@ RC_layout_PioneerAVR() {
 	<li>volumeDown<br>Lautstärke der Main Zone um 0.5dB verringern</li>
 	<li>volumeStraight<-80.5 ... 12><br>Einstellen der Lautstärke der Main Zone mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
 	<li>mute <on|off|toggle> der Main Zone</li>
+	<li>tone <on|bypass></li>
+	<li>bass <-6 ... 6><br>Bass von -6dB bis + 6dB (funktioniert nur wenn tone = on)</li>
+	<li>treble <-6 ... 6><br>Höhen (treble) von -6dB bis + 6dB (funktioniert nur wenn tone = on)</li>
 	<li>input <nicht am Pioneer AV Receiver deaktivierte Eingangsquelle><br> Die Liste der verfügbaren (also der nicht deaktivierten)
 	Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen</li>
 	<li>inputUp<br>nächste Eingangsquelle der Main Zone auswählen</li>
