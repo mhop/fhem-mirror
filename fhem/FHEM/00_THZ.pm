@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 06/2014
-my $thzversion = "0.106";
+my $thzversion = "0.107";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -37,7 +37,6 @@ sub THZ_Read($);
 sub THZ_ReadAnswer($);
 sub THZ_Ready($);
 sub THZ_Write($$);
-sub THZ_Parse($$);
 sub THZ_Parse1($$);
 sub THZ_checksum($);
 sub THZ_replacebytes($$$);
@@ -54,8 +53,7 @@ sub THZ_Get_Comunication($$);
 sub THZ_PrintcurveSVG;
 sub THZ_RemoveInternalTimer($);
 
-#new by Jakob
-sub mysubstr($$$$);
+
 
 
 
@@ -114,8 +112,8 @@ my %sets = (
     "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin =>  "-10", argMax =>  "20",	type =>"5temp",  unit =>" °C"},
     "p54MinPumpCycles"			=> {cmd2=>"0A05B8", argMin =>  "1", 	argMax =>  "24",	type =>"1clean",  unit =>""},
     "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", 	argMax => "200",	type =>"1clean",  unit =>""},
-    "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "0", 	argMax =>  "25",	type =>"5temp",  unit =>" °C"},
-    "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "0", 	argMax =>  "25",	type =>"5temp",  unit =>" °C"},
+    "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "1", 	argMax =>  "20",	type =>"5temp",  unit =>" °C"},
+    "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "1", 	argMax =>  "25",	type =>"5temp",  unit =>" °C"},
     "pHolidayBeginDay"			=> {cmd2=>"0A011B", argMin =>  "1", 	argMax =>  "31", 	type =>"0clean",  unit =>""},
     "pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>  "1", 	argMax =>  "12",	type =>"0clean",  unit =>""},
     "pHolidayBeginYear"			=> {cmd2=>"0A011D", argMin =>  "12", 	argMax =>  "20",	type =>"0clean",  unit =>""},
@@ -875,7 +873,6 @@ sub THZ_encodecommand($$) {
 #
 ########################################################################################
 
-
 sub THZ_decode($) {
   my ($message_orig) = @_;
   #  raw data received from device have to be de-escaped before header evaluation and data use:
@@ -925,254 +922,10 @@ sub THZ_decode($) {
 }
 
 
-
-
-########################################################################################
+###############################
+#added by jakob do not know if needed
 #
-# THZ_Parse -0A01
-#
-########################################################################################
-	
-sub THZ_Parse($$) {
-  my ($hash,$message) = @_;
-  Log3 $hash->{NAME}, 5, "Parse message: $message";	  
-  my $length = length($message);
-  Log3 $hash->{NAME}, 4, "Message length: $length";
-  
-  
-  given (substr($message,2,2)) {
-  when ("0A")    {
-       if (substr($message,4,4) eq "0116")						{$message = hex2int(substr($message, 8,4))/10  } #done
-      elsif (substr($message,4,4) eq "0112") 						{$message = $OpMode{hex(substr($message, 8,2))} } #done
-      elsif ((substr($message,4,3) eq "011")	or (substr($message,4,3) eq "012")) 	{$message = hex(substr($message, 8,2))} #done #holiday						      # the answer look like  0A0120-3A0A01200E00  for year 14
-      elsif ((substr($message,4,2) eq "1D") or (substr($message,4,2) eq "17")) 		{$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))} #done  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30  
-      elsif (substr($message,4,4) eq "05D1") 				 		{$message = quaters2time(substr($message, 10,2)) ."--". quaters2time(substr($message, 8,2))}  #like above but before stop then start !!!!
-      elsif ((substr($message,4,4) eq "05D3") or (substr($message,4,4) eq "05D4"))   	{$message = quaters2time(substr($message, 10,2)) }  #value 1Ch 28dec is 7 
-      elsif ((substr($message,4,3) eq "056")  or (substr($message,4,4) eq "0570")  or (substr($message,4,4) eq "0575") or (substr($message,4,4) eq "03AE") or (substr($message,4,4) eq "03AF") or (substr($message,4,4) eq "03B0") or (substr($message,4,4) eq "03B1") or (substr($message,4,3) eq "091") or (substr($message,4,3) eq "092") or (substr($message,4,3) eq "093") or (substr($message,4,4) eq "05B7") or (substr($message,4,4) eq "05B8"))	{$message = hex(substr($message, 8,4))}
-      elsif ( (substr($message,4,4) eq "0162") or (substr($message,4,4) eq "0588") or (substr($message,4,4) eq "05A0")  or (substr($message,4,4) eq "0571") or (substr($message,4,4) eq "0572") or (substr($message,4,4) eq "0573") or (substr($message,4,4) eq "0574")) {$message = hex(substr($message, 8,4))  } #done
-      elsif (substr($message,4,3) eq "057")						{$message = hex(substr($message, 8,4))  }  #done
-      elsif (substr($message,4,4) eq "05A2")						{$message = hex(substr($message, 8,4))/10  } #done
-      else 										{$message = hex2int(substr($message, 8,4))/10 } #done
-  }  
-  when ("0B")    {							   #set parameter HC1
-      if (substr($message,4,2) eq "14")  {$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-      elsif (substr($message,4,4) eq "059E")						{$message = hex(substr($message, 8,4))/10   } #done
-      elsif (substr($message,4,4) eq "059D")						{$message = hex(substr($message, 8,4))  } #done
-      elsif (substr($message,4,4) eq "010E")						{$message = hex(substr($message, 8,4))/100} #done
-      elsif (substr($message,4,4) eq "010F")						{$message = hex(substr($message, 8,2)) } #done
-      else 				 {$message = hex2int(substr($message, 8,4))/10 } #done
-  }
-  when ("0C")    {							   #set parameter HC2
-      if (substr($message,4,2) eq "15")  {$message = quaters2time(substr($message, 8,2)) ."--". quaters2time(substr($message, 10,2))}  #value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-      elsif (substr($message,4,4) eq "059E")						{$message = hex(substr($message, 8,4))/10  } #done
-      elsif (substr($message,4,4) eq "010E")						{$message = hex(substr($message, 8,4))/100} #done
-      elsif (substr($message,4,4) eq "010F")						{$message = hex(substr($message, 8,2)) } #done
-      else 				 {$message = hex2int(substr($message, 8,4))/10  } #done
-  }
-  
-    when ("16")    {                     #all16 Solar
-    $message =
-		"collector_temp: " 		. hex2int(substr($message, 4,4))/10 . " " .
-        	"dhw_temp: " 			. hex2int(substr($message, 8,4))/10 . " " .
-        	"flow_temp: "			. hex2int(substr($message,12,4))/10 . " " .
-        	"ed_sol_pump_temp: "		. hex2int(substr($message,16,4))/10 . " " .
-        	"x20: "	 	 		. hex2int(substr($message,20,4))    . " " .
-        	"x24: "				. hex2int(substr($message,24,4))    . " " . 
-		"x28: "				. hex2int(substr($message,28,4))    . " " . 
-        	"x32: "				. hex2int(substr($message,32,2)) ;
-  }
-  
-  
-    when ("F3")    {                     #allF3 DHW
-    $message =
-		"dhw_temp: " 			. hex2int(substr($message, 4,4))/10 . " " .
-        	"outside_temp: " 		. hex2int(substr($message, 8,4))/10 . " " .
-        	"dhw_set_temp: "		. hex2int(substr($message,12,4))/10 . " " .
-        	"comp_block_time: "		. hex2int(substr($message,16,4))    . " " .
-        	"x20: " 			. hex2int(substr($message,20,4))    . " " .
-        	"heat_block_time: "		. hex2int(substr($message,24,4))    . " " . 
-		"x28: "				. hex2int(substr($message,28,4))    . " " . 
-        	"x32: "				. hex2int(substr($message,32,4))    . " " .
-        	"x36: "				. hex2int(substr($message,36,4));
-  }
-  
-  when ("E8")    {                     #sAllE8
-    $message =  $message . " " .
-		"x04: " 			. hex2int(substr($message, 4,4)) . " " .
-        	"x08: " 			. hex2int(substr($message, 8,4)) . " " .
-        	"x12: "				. hex2int(substr($message,12,4)) . " " .
-        	"x16: "				. hex2int(substr($message,16,4)) . " " .
-        	"x20: " 			. hex2int(substr($message,20,4)) . " " .
-        	"x24: "				. hex2int(substr($message,24,4)) . " " . 
-		"x28: "				. hex2int(substr($message,28,4)) . " " . 
-	      	"x32: "				. hex2int(substr($message,32,4)) . " " .
-        	"x36: "			        . hex2int(substr($message,36,4)) . " " .
-		"x40: "				. hex2int(substr($message,40,4)) . " " .
-		"x44: "				. hex2int(substr($message,44,4)) . " " .
-		"x48: "				. hex2int(substr($message,48,4)) . " " .
-        	"x52: "				. hex2int(substr($message,52,4)) . " " .
-        	"x52: "				. hex2int(substr($message,56,4)) . " " .
- 	     	"x60d: " 			. hex2int(substr($message,60,4)) . " " .
- 	    	"x64: "				. hex2int(substr($message,64,4)) . " " .
-		"x68: "				. hex2int(substr($message,68,4)) . " " .
-         	"x72: "				. hex2int(substr($message,72,4)) ;
-  }  
-  
-  
-  when ("F4")    {                     #allF4 HC1
-    $message =
-		"outsideTemp: " 		. hex2int(substr($message, 4,4))/10 . " " .
-        	"x08: " 			. hex2int(substr($message, 8,4))/10 . " " .
-        	"returnTemp: "			. hex2int(substr($message,12,4))/10 . " " .
-        	"integralHeat: "		. hex2int(substr($message,16,4))    . " " .
-        	"flowTemp: " 			. hex2int(substr($message,20,4))/10 . " " .
-        	"heatSetTemp: "			. hex2int(substr($message,24,4))/10 . " " . #soll HC1
-		"heatTemp: "			. hex2int(substr($message,28,4))/10 . " " . #ist
-#	      	"x32: "				. hex2int(substr($message,32,4))/10 . " " .
-        	"seasonMode: "		        . $SomWinMode{(substr($message,38,2))}  . " " .
-#		"x40: "				. hex2int(substr($message,40,4))/10 . " " .
-		"integralSwitch: "		. hex2int(substr($message,44,4))    . " " .
-		"opMode: "			. $OpModeHC{hex(substr($message,48,2))}  . " " .
-#       	"x52: "				. hex2int(substr($message,52,4)) . " " .
-        	"roomSetTemp: "			. hex2int(substr($message,56,4))/10 ;
-# 	     	"x60: " 			. hex2int(substr($message,60,4)) . " " .
-# 	    	"x64: "				. hex2int(substr($message,64,4)) . " " .
-#		"x68: "				. hex2int(substr($message,68,4)) . " " .
-#       	"x72: "				. hex2int(substr($message,72,4)) . " " .
-# 	     	"x76: "				. hex2int(substr($message,76,4)) . " " .
-# 	    	"x80: "				. hex2int(substr($message,80,2))
-  }
-  when ("F5")    {                     #allF5  HC2
-    $message =
-		"outsideTemp: " 		. hex2int(substr($message, 4,4))/10 . " " .
-        	"returnTemp: " 		. hex2int(substr($message, 8,4))/10 . " " .
-        	"vorlaufTemp: "			. hex2int(substr($message,12,4))/10 . " " .
-        	"heatSetTemp: "		. hex2int(substr($message,16,4))/10 . " " .
-        	"heatTemp: " 			. hex2int(substr($message,20,4))/10 . " " .
-        	"stellgroesse: "		. hex2int(substr($message,24,4))/10 . " " . 
-	        "seasonMode: "		        . $SomWinMode{(substr($message,30,2))}  . " " .
-#	     	"x32: "				. hex2int(substr($message,32,4)) . " " .
-	    	"opMode: "			. $OpModeHC{hex(substr($message,36,2))} ;
-# 	  	"x40: "				. hex2int(substr($message,40,4)) . " " .
-#		"x44: "				. hex2int(substr($message,44,4)) . " " .
-#		"x48: " 			. hex2int(substr($message,48,4));
-  }
-
-  
-  when ("FD")    {                     #firmware_ver
-    $message = "version: " . hex(substr($message,4,4))/100 ;
-  }
-  when ("FC")    {                     #timedate 00 - 0F 1E 08 - 0D 03 0B
-    my %weekday = ( "0" =>"Monday", "1" => "Tuesday", "2" =>"Wednesday", "3" => "Thursday", "4" => "Friday", "5" =>"Saturday", "6" => "Sunday" );
-    $message = 	  "Weekday: "		. $weekday{hex(substr($message, 4,2))}    . " " .
-            	  "Hour: " 		. hex(substr($message, 6,2)) . " Min: " . hex(substr($message, 8,2)) . " Sec: " . hex(substr($message,10,2)) . " " .
-              	  "Date: " 		. (hex(substr($message,12,2))+2000)  .	"/"		. hex(substr($message,14,2)) . "/"		. hex(substr($message,16,2));
-  }
-  when ("FB")    {                     #allFB
-#          1         2         3         5         6         7         8         9
-#012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
-#0DFBFDA8005D014E010602CF01CCFDA8FDA80007014C200813021C021C0258001A001E0013006100000000
-    $message =    "outsideTemp: " 				. hex2int(substr($message, 8,4))/10 . " " .
-        	  "flowTemp: "					. hex2int(substr($message,12,4))/10 . " " .  #Vorlauf Temperatur
-        	  "returnTemp: "				. hex2int(substr($message,16,4))/10 . " " .  #Rücklauf Temperatur
-        	  "hotGasTemp: " 				. hex2int(substr($message,20,4))/10 . " " .  #Heißgas Temperatur		
-        	  "dhwTemp: "					. hex2int(substr($message,24,4))/10 . " " .  #Speicher Temperatur current cilinder water temperature
-        	  "flowTempHC2: "				. hex2int(substr($message,28,4))/10 . " " .  #Vorlauf TemperaturHK2
-		  "evaporatorTemp: "				. hex2int(substr($message,36,4))/10 . " " .  #Speicher Temperatur    
-        	  "condenserTemp: "				. hex2int(substr($message,40,4))/10 . " " .  
-        	  "mixerOpen: "					. ((hex(substr($message,45,1)) &  0b0001) / 0b0001) . " " .	#status bit
-		  "mixerClosed: "				. ((hex(substr($message,45,1)) &  0b0010) / 0b0010) . " " .	#status bit
-		  "heatPipeValve: "				. ((hex(substr($message,45,1)) &  0b0100) / 0b0100) . " " .	#status bit
-		  "diverterValve: "				. ((hex(substr($message,45,1)) &  0b1000) / 0b1000) . " " .	#status bit
-		  "dhwPump: "					. ((hex(substr($message,44,1)) &  0b0001) / 0b0001) . " " .	#status bit
-		  "heatingCircuitPump: "			. ((hex(substr($message,44,1)) &  0b0010) / 0b0010) . " " .	#status bit
-		  "solarPump: "					. ((hex(substr($message,44,1)) &  0b1000) / 0b1000) . " " .	#status bit
-		  "compressor: "				. ((hex(substr($message,47,1)) &  0b1000) / 0b1000) . " " .	#status bit
-		  "boosterStage3: "				. ((hex(substr($message,46,1)) &  0b0001) / 0b0001) . " " .	#status bit
-		  "boosterStage2: "				. ((hex(substr($message,46,1)) &  0b0010) / 0b0010) . " " .	#status bit
-		  "boosterStage1: "				. ((hex(substr($message,46,1)) &  0b0100) / 0b0100). " " .	#status bit
-		  "highPressureSensor: "			. (1-((hex(substr($message,49,1)) &  0b0001) / 0b0001)) . " " .	#status bit  #P1 	inverterd?
-		  "lowPressureSensor: "				. (1-((hex(substr($message,49,1)) &  0b0010) / 0b0010)) . " " .	#status bit  #P3  inverterd?
-		  "evaporatorIceMonitor: "			. ((hex(substr($message,49,1)) &  0b0100) / 0b0100). " " .	#status bit  #N3
-		  "signalAnode: "				. ((hex(substr($message,49,1)) &  0b1000) / 0b1000). " " .	#status bit  #S1
-		  "rvuRelease: "				. ((hex(substr($message,48,1)) &  0b0001) / 0b0001). " " . 	#status bit 
-		  "ovenFireplace: "				. ((hex(substr($message,48,1)) &  0b0010) / 0b0010). " " .  	#status bit
-		  "STB: "					. ((hex(substr($message,48,1)) &  0b0100) / 0b0100). " " .	#status bit  	
-		  "outputVentilatorPower: "			. hex(substr($message,50,4))/10  	. " " .
-        	  "inputVentilatorPower: " 			. hex(substr($message,54,4))/10  	. " " .
-        	  "mainVentilatorPower: "			. hex(substr($message,58,4))/10  	. " " .
-        	  "outputVentilatorSpeed: "			. hex(substr($message,62,4))/1   	. " " .  # m3/h
-        	  "inputVentilatorSpeed: " 			. hex(substr($message,66,4))/1   	. " " .  # m3/h
-        	  "mainVentilatorSpeed: "			. hex(substr($message,70,4))/1   	. " " .  # m3/h
-                  "outside_tempFiltered: "			. hex2int(substr($message,74,4))/10     . " " .
-                  "relHumidity: "				. hex2int(substr($message,78,4))/10	. " " .
-		  "dewPoint: "					. hex2int(mysubstr($hash,$message,82,4))/10	. " " .
-		  "P_Nd: "					. hex2int(mysubstr($hash,$message,86,4))/100	. " " .	#bar
-		  "P_Hd: "					. hex2int(mysubstr($hash,$message,90,4))/100	. " " .  #bar
-		  "actualPower_Qc: "				. hex2int(mysubstr($hash,$message,94,8))/1      . " " .	#kw
-		  "actualPower_Pel: "				. hex2int(mysubstr($hash,$message,102,8))/1     . " " .	#kw
-		  "collectorTemp: " 				. hex2int(substr($message, 4,4))/10  . " " .	#kw
-		  "insideTemp: " 				. hex2int(substr($message, 32,4))/10 ;	#Innentemperatur 
-  }
-  when ("09")    {                     #operating history
-    $message =    "compressorHeating: "	. hex(substr($message, 4,4))    . " " .
-                  "compressorCooling: "	. hex(substr($message, 8,4))    . " " .
-                  "compressorDHW: "		. hex(substr($message, 12,4))    . " " .
-                  "boosterDHW: "		. hex(substr($message, 16,4))    . " " .
-                  "boosterHeating: "		. hex(substr($message, 20,4))   ;			
-  }
-  when ("D1")    {                     #last10errors tested only for 1 error   { THZ_Parse("6BD1010115008D07EB030000000000000000000")  }
-    $message =    "number_of_faults: "		. hex(substr($message, 4,2))    . " " .
-                  #empty
-		  "fault0CODE: "		. hex(substr($message, 8,2))    . " " .
-                  "fault0TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 14,2) . substr($message, 12,2))/100)))   . " " .
-                  "fault0DATE: "		. (hex(substr($message, 18,2) . substr($message, 16,2))/100) . " " .
-		  
-		  "fault1CODE: "		. hex(substr($message, 20,2))    . " " .
-                  "fault1TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 26,2) . substr($message, 24,2))/100)))   . " " .
-                  "fault1DATE: "		. (hex(substr($message, 30,2) . substr($message, 28,2))/100) . " " .
-		 
-		  "fault2CODE: "		. hex(substr($message, 32,2))    . " " .
-                  "fault2TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 38,2) . substr($message, 36,2))/100)))   . " " .
-                  "fault2DATE: "		. (hex(substr($message, 42,2) . substr($message, 40,2))/100) . " " .
-		
-		  "fault3CODE: "		. hex(substr($message, 44,2))    . " " .
-                  "fault3TIME: "		. sprintf(join(':', split("\\.", hex(substr($message, 50,2) . substr($message, 48,2))/100)))   . " " .
-                  "fault3DATE: "		. (hex(substr($message, 54,2) . substr($message, 52,2))/100)  ;			
-  }    
-  }
-  return (undef, $message);
-}
-
-
-
-
-
-
-
-#######################################
-#mysubstr($$$)
-#Same function as subst. But checks if offset + lenght is 
-#available in the string. If not, returns zeros.
-#######################################
-sub mysubstr($$$$)
-{
-  my ($hash,$message,$start, $length) = @_; 
-  my $ReturnValue = "";                
-  if (length($message) < ($start + $length))
-  {
-    Log3 $hash->{NAME},5, "mysubstr: offset($start) + length($length) is greater then message : '$message'";
-    my $msg;
-    for(my $i = 0;$i < $length;$i++)
-    {
-            $msg += "0";
-    }
-    $ReturnValue = uc(unpack('H*',pack('H*', $msg)));
-    Log3 $hash->{NAME},5,"mysubstr: retval instead '$ReturnValue'";
-    return $ReturnValue;
-  }
-  return substr($message,$start,$length);	
-}
+###############################
 
 local $SIG{__WARN__} = sub
 {
@@ -1353,16 +1106,16 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
- my @numbers=('0B0005','0A03AF', '0A03B0', '0A03B1'); 
+ #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',); 
   #my @numbers = (1..255);
   #my @numbers = (1..65535);
-  #my @numbers = (1..2979);
+  my @numbers = (1..3179);
   my $indice= "FF";
   unlink("data.txt"); #delete  debuglog
   foreach $indice(@numbers) {	
     #my $cmd = sprintf("%02X", $indice);
-   # my $cmd = "0A" . sprintf("%04X",  $indice);
-    my $cmd = $indice;
+    my $cmd = "0A" . sprintf("%04X",  $indice);
+   # my $cmd = $indice;
     my $cmdHex2 = THZ_encodecommand($cmd,"get");
     #($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
     #STX start of text
@@ -1374,7 +1127,7 @@ sub THZ_debugread($){
     ($err, $msg) = THZ_ReadAnswer($hash);
     # ack datatranfer and read from the heatpump        
     THZ_Write($hash,  "10");
-    select(undef, undef, undef, 0.1);
+    select(undef, undef, undef, 0.05);
     ($err, $msg) = THZ_ReadAnswer($hash);
     THZ_Write($hash,  "10");
     
