@@ -286,7 +286,7 @@ sub OWTHERM_Attr(@) {
 
         if ($init_done) {
           RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
         }
         last;
       };

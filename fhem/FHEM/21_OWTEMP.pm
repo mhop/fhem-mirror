@@ -274,7 +274,7 @@ OWTEMP_GetUpdate($$)
     } else {
       $hash->{INTERVAL} = $hash->{INTV_ALARM};
     }
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 0);
   } else {
     return $value;
   }

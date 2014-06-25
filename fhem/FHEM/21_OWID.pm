@@ -240,7 +240,7 @@ sub OWID_Attr(@) {
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
         }
         last;
       };
@@ -339,7 +339,7 @@ sub OWID_GetValues($) {
   
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
   
   #-- hash of the busmaster
   my $master       = $hash->{IODev};
@@ -408,7 +408,7 @@ sub OWID_Set($@) {
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
     return undef;
   }
 }
