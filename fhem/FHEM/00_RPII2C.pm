@@ -78,7 +78,7 @@ sub RPII2C_Define($$) {							#
 		return $name . ": Error! no library for Hardware access installed";
 	}
 	my $device = "/dev/i2c-".$dev;
-	unless ( RPII2C_CHECK_GPIO_DEVICE($dev) ) {
+	if ( RPII2C_CHECK_GPIO_DEVICE($device) ) {
 		Log3 $hash, 1, "file $device not accessible try to use gpio utility to fix it";
 		if ( defined(my $ret = RPII2C_CHECK_GPIO_UTIL($gpioprg)) ) {
 			Log3 $hash, 1, $ret if $ret;
@@ -97,10 +97,10 @@ sub RPII2C_Define($$) {							#
     $attr{$name}{dummy} = 1;
     return undef;
   }
-	my $check = RPII2C_CHECK_GPIO_DEVICE($dev);
+	my $check = RPII2C_CHECK_GPIO_DEVICE($device);
   return $name . $check if $check;
 	
-	$hash->{DeviceName} = "/dev/i2c-".$dev;
+	$hash->{DeviceName} = $device;
 	$hash->{STATE} = "initialized";
   return undef;
 }
@@ -278,7 +278,7 @@ sub RPII2C_Write($$) { 							#wird vom Client aufgerufen
 #    if ( defined( $main::defs{$d} )
 #      && defined( $main::defs{$d}{IODev} )
 #      && $main::defs{$d}{IODev} == $hash ) {
-#       &$fn($main::defs{$d},$args);					#funktion mit Varianblennamen von $fn ausführen
+#       &$fn($main::defs{$d},$args);					#funktion mit Varianblennamen von $fn ausfuehren
 #    }
 #  }
 #  return undef;
@@ -292,13 +292,13 @@ sub RPII2C_CHECK_GPIO_DEVICE {
 	if(-e $dev) {
 		if(-r $dev) {
 			unless(-w $dev) {
-				$ret =  ': Error! I2C device not writable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user'; 
+				$ret =  ': Error! I2C device not writable: '.$dev . '. Please install wiringpi or change access rights for fhem user'; 
 			}
 		} else {
-			$ret =    ': Error! I2C device not readable: /dev/i2c-'.$dev . '. Please install wiringpi or change access rights for fhem user'; 
+			$ret =    ': Error! I2C device not readable: '.$dev . '. Please install wiringpi or change access rights for fhem user'; 
 		}
 	} else {
-		$ret =      ': Error! I2C device not found: /dev/i2c-'   .$dev . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev'; 
+		$ret =      ': Error! I2C device not found: '   .$dev . '. Please check kernelmodules must loaded: i2c_bcm2708, i2c_dev'; 
 	}
 	return $ret;
 }
@@ -645,7 +645,7 @@ sub RPII2C_HWACCESS_ioctl($$) {
 					</code>
 				</li>
                 <li>
-                	Für das Raspberry Pi kann alternativ das gpio Utility der <a href="http://wiringpi.com/download-and-install/">WiringPi</a> Bibliothek benutzt werden um FHEM Schreibrechte auf die I2C Schnittstelle zu bekommen.<br>
+                	F&uumlr das Raspberry Pi kann alternativ das gpio Utility der <a href="http://wiringpi.com/download-and-install/">WiringPi</a> Bibliothek benutzt werden um FHEM Schreibrechte auf die I2C Schnittstelle zu bekommen.<br>
 					WiringPi Installation ist hier beschrieben: <a href="#RPI_GPIO">RPI_GPIO</a><br>
 					Das gpio Utility wird, wenn vorhanden, automatisch verwendet<br>
                 </li>
