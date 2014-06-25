@@ -140,6 +140,7 @@ sub CUL_HM_Initialize($) {
                        ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
                        ."burstAccess:0_off,1_auto "
                        ."msgRepeat "
+                       ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."aesCommReq:1,0 "      # IO will request AES if 
                        ."rssiLog:1,0 ";        # enable writing RSSI to Readings (device only)
   $hash->{Attr}{chn} =  "repPeers "            # -- channel only attributes
@@ -874,6 +875,7 @@ sub CUL_HM_Parse($$) {#########################################################
   if(!$shash){    # Unknown source
     return "" if ($msg =~ m/998112......000001/);# HMLAN internal message, consum 
     my $ccu =InternalVal($ioName,"owner_CCU","");
+    CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
     if ($defs{$ccu}){#
       push @evtEt,[$defs{$ccu},0,"unknown_$src:received"];# do not trigger
       return CUL_HM_pushEvnts();
@@ -1590,7 +1592,7 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       my $trigType;
-      if($chn & 0x40){
+      if($chn & 0x40){# long press
         if(!$shash->{BNO} || $shash->{BNO} ne $bno){#bno = event counter
           $shash->{BNO}=$bno;
           $shash->{BNOCNT}=0; # message counter reest
@@ -1600,7 +1602,7 @@ sub CUL_HM_Parse($$) {#########################################################
                   " ".$shash->{BNOCNT}."-".$mFlg.$mTp."-";
         $trigType = "Long";
       }
-      else{
+      else{# short press
         $state .= ($st eq "swi")?"toggle":"Short";#swi only support toggle
         $trigType = "Short";
       }
@@ -4167,7 +4169,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
         if ($st eq "virtual"){
-          my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b[$i]));
+          my $btnName = $pSt eq "smokeDetector" ? $name :CUL_HM_id2Name($dst.sprintf("%02X",$b[$i]));
           next if (!defined $attr{$btnName});
           CUL_HM_ID2PeerList ($btnName,$peerDst.$pCh[$i],$set); #upd. peerlist
         }
@@ -5556,7 +5558,8 @@ sub CUL_HM_DumpProtocol($$@) {
   my ($prefix, $iohash, $len,$cnt,$msgFlags,$mTp,$src,$dst,$p) = @_;
   my $iname = $iohash->{NAME};
   no warnings;# conv 2 number would cause a warning - which is ok
-  my $hmProtocolEvents = int(AttrVal($iname, "hmProtocolEvents", 0));
+  my $hmProtocolEvents = int (AttrVal(CUL_HM_id2Name($src), "hmProtocolEvents",
+                              AttrVal(InternalVal($iname,"owner_CCU",$iname), "hmProtocolEvents", 0)));
   use warnings;
   return if(!$hmProtocolEvents);
 
@@ -5594,7 +5597,7 @@ sub CUL_HM_DumpProtocol($$@) {
   $src=CUL_HM_id2Name($src);
   $dst=CUL_HM_id2Name($dst);
   my $msg ="$prefix L:$len N:$cnt F:$msgFlags CMD:$mTp SRC:$src DST:$dst $p$txt ($msgFlLong)";
-  Log3 $iname,4,$msg;
+  Log3 $iname,1,$msg;
   DoTrigger($iname, $msg) if($hmProtocolEvents > 2);
 }
 
@@ -8062,12 +8065,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   <ul>
   <li><B>general</B><br>
       recentStateType:[ack|info] # cannot be used ti trigger notifies<br>
+      <ul>
       <li>ack indicates that some statusinfo is derived from an acknowledge</li>  
       <li>info indicates an autonomous message from the device</li>  
       <li><a name="CUL_HMsabotageAttackId"><b>sabotageAttackId</b></a><br>
         Alarming configuration access to the device from a unknown source<br></li>
       <li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
         Alarming configuration access to the device that was not issued by our system<br></li>
+     </ul>
      </li>  
   <li><B>HM-CC-TC,ROTO_ZEL-STG-RM-FWT</B><br>
       T: $t H: $h<br>
@@ -8216,11 +8221,11 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       battery [low|ok]<br>
       trigger [Long|Short]_$no trigger event from channel<br>
   </li>
-  <li><B>swi</B><br>
-      Btn$x toggle<br>
-      Btn$x toggle (to $dest)<br>
-      battery: [low|ok]<br>
-  </li>
+     <li><B>swi</B><br>
+        Btn$x toggle<br>
+        Btn$x toggle (to $dest)<br>
+        battery: [low|ok]<br>
+     </li>
   <li><B>switch/dimmer/blindActuator</B><br>
       $val<br>
       powerOn [on|off|$val]<br>
