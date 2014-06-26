@@ -15,33 +15,36 @@ Device::Firmata - Perl interface to Firmata for the arduino platform.
 
 =head1 VERSION
 
-Version 0.56
+Version 0.59
 
 =cut
 
-our $VERSION = '0.56';
+our $VERSION = '0.59';
 our $DEBUG = 0;
 
 
 =head1 SYNOPSIS
 
-use strict;
-use warnings;
-use Device::Firmata::Constants qw/ :all /;
-use Device::Firmata;
-$|++;
-use Time::HiRes 'sleep';
+    use strict;
+    use warnings;
 
-my $led_pin = 13;
+    use Device::Firmata::Constants qw/ :all /;
+    use Device::Firmata;
 
-my $device = Device::Firmata->open('/dev/ttyUSB0') or die "Could not connect to Firmata Server";
-$device->pin_mode($led_pin=>PIN_OUTPUT);
-my $iteration = 0;
-while (1) {
-    my $strobe_state = $iteration++%2;
-    $device->digital_write($led_pin=>$strobe_state);
-    sleep 0.5;
-}
+    use Time::HiRes 'sleep';
+
+    $|++;
+
+    my $led_pin = 13;
+
+    my $device = Device::Firmata->open('/dev/ttyUSB0') or die "Could not connect to Firmata Server";
+    $device->pin_mode($led_pin=>PIN_OUTPUT);
+    my $iteration = 0;
+    while (1) {
+        my $strobe_state = $iteration++%2;
+        $device->digital_write($led_pin=>$strobe_state);
+        sleep 0.5;
+    }
 
 =head1 SUBROUTINES/METHODS
 
