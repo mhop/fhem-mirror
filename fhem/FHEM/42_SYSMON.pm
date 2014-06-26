@@ -111,7 +111,7 @@ SYSMON_Define($$)
 
   $hash->{STATE} = "Initialized";
 
-  $hash->{DEF_TIME} = time() unless defined($hash->{DEF_TIME});
+  #$hash->{DEF_TIME} = time() unless defined($hash->{DEF_TIME});
 
   SYSMON_updateCurrentReadingsMap($hash);
 
@@ -861,8 +861,10 @@ SYSMON_getFHEMUptime($$)
 {
 	my ($hash, $map) = @_;
 
-	if(defined ($hash->{DEF_TIME})) {
-	  my $fhemuptime = time()-$hash->{DEF_TIME};
+	#if(defined ($hash->{DEF_TIME})) {
+	if(defined($fhem_started)) {
+	  #my $fhemuptime = time()-$hash->{DEF_TIME};
+	  my $fhemuptime = time()-$fhem_started;
 	  $map->{+FHEMUPTIME} = sprintf("%d",$fhemuptime);
 	  $map->{+FHEMUPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($fhemuptime));
   }
