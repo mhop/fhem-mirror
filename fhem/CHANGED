@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  70_PIONEERAVR.pm: player commands are now available for more inputs
+			 "play" was not in the drop down list of available set commands
+			 check every 120s if the data connection to the Pioneer AV receiver is still up
+			 check if we get a reply from the Pioneer AV receiver not later than 3s after a command was sent
+			 fix for alias names of inputs 
+			 70_PIONEERAVRZONE.pm: bugfix in logging
   - change:  00_RPII2C.pm: hardware access changed to ioctl and syswrite/read 
              SMBus module not needed anymore but still usable, see attribute useHWLib
              possibility to swap I2C-0 to P5 for Rev. B raspberries via attribute swap_i2c0 (not tested yet)
