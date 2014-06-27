@@ -317,10 +317,10 @@ PIONEERAVRZONE_Parse($$)
 					my $inputNr = $1;
 					Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone2 - Input is set to inputNr: $inputNr ";
 					if ( defined ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName}) ) {
-						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - Input aliasName for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - Input aliasName for input $inputNr is " . $IOhash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
 						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} );
 					} elsif ( defined ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name}) ) {
-						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - Input Name for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{name};
+						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - Input Name for input $inputNr is " . $IOhash->{helper}{INPUTNAMES}{$inputNr}{name};
 						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name} );
 					} else {
 						readingsBulkUpdate($hash, "input", $msg );
@@ -420,10 +420,10 @@ PIONEERAVRZONE_Parse($$)
 					my $inputNr = $1;
 					Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: hdZone - Input is set to inputNr: $inputNr ";
 					if ( defined ( $IOhash->{helper}{INPUTNAMES}->{$1}{aliasName}) ) {
-						Log3 $hash,5,"PIONEERAVRZONE $name: hdZone - Input aliasName for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
+						Log3 $hash,5,"PIONEERAVRZONE $name: hdZone - Input aliasName for input $inputNr is " . $IOhash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
 						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$1}{aliasName} );
 					} elsif ( defined ( $IOhash->{helper}{INPUTNAMES}->{$1}{name}) ) {
-						Log3 $hash,5,"PIONEERAVRZONE $name: hdZone - Input Name for input $inputNr is " . $hash->{helper}{INPUTNAMES}{$inputNr}{name};
+						Log3 $hash,5,"PIONEERAVRZONE $name: hdZone - Input Name for input $inputNr is " . $IOhash->{helper}{INPUTNAMES}{$inputNr}{name};
 						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$1}{name} );
 					} else {
 						Log3 $hash,5,"PIONEERAVRZONE $name: Zone3 - InputName: can't find Name for input $inputNr";
@@ -529,13 +529,13 @@ PIONEERAVRZONE_Define($$)
 }
 #####################################
 #Function to show special chars (e.g. \n\r) in logs
-sub
-dq($) 
-{
-	my ($s)= @_;
-	$s= "<nothing>" unless(defined($s));
-	return "\"" . escapeLogLine($s) . "\"";
-}
+#sub
+#dq($) 
+#{
+#	my ($s)= @_;
+#	$s= "<nothing>" unless(defined($s));
+#	return "\"" . escapeLogLine($s) . "\"";
+#}
 
 1;
 
