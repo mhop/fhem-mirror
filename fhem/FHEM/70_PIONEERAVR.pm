@@ -181,9 +181,10 @@ PIONEERAVR_Define($$) {
 	"03" => {"name" => "cdrTape",			"aliasName" => "",	"enabled" => "1"},
 	"04" => {"name" => "dvd",				"aliasName" => "",	"enabled" => "1"},
 	"05" => {"name" => "tvSat",				"aliasName" => "",	"enabled" => "1"},
-	"06" => {"name" => "CblSat",			"aliasName" => "",	"enabled" => "1"},
+	"06" => {"name" => "cblSat",			"aliasName" => "",	"enabled" => "1"},
 	"10" => {"name" => "video1",			"aliasName" => "",	"enabled" => "1"},
 	"12" => {"name" => "multiChIn",			"aliasName" => "",	"enabled" => "1"},
+	"13" => {"name" => "usbDac",			"aliasName" => "",	"enabled" => "1"},
 	"14" => {"name" => "video2",			"aliasName" => "",	"enabled" => "1"},
 	"15" => {"name" => "dvrBdr",			"aliasName" => "",	"enabled" => "1"},
 	"17" => {"name" => "iPodUsb",			"aliasName" => "",	"enabled" => "1"},
@@ -193,12 +194,21 @@ PIONEERAVR_Define($$) {
 	"21" => {"name" => "hdmi3",				"aliasName" => "",	"enabled" => "1"},
 	"22" => {"name" => "hdmi4",				"aliasName" => "",	"enabled" => "1"},
 	"23" => {"name" => "hdmi5",				"aliasName" => "",	"enabled" => "1"},
+	"24" => {"name" => "hdmi6",				"aliasName" => "",	"enabled" => "1"},
 	"25" => {"name" => "bd",				"aliasName" => "",	"enabled" => "1"},
 	"26" => {"name" => "homeMediaGallery",	"aliasName" => "",	"enabled" => "1"},
 	"27" => {"name" => "sirius",			"aliasName" => "",	"enabled" => "1"},
 	"31" => {"name" => "hdmiCyclic",		"aliasName" => "",	"enabled" => "1"},
-	"33" => {"name" => "adapterPort",		"aliasName" => "",	"enabled" => "1"}			
-  };
+	"33" => {"name" => "adapterPort",		"aliasName" => "",	"enabled" => "1"},			
+	"34" => {"name" => "hdmi7",				"aliasName" => "",	"enabled" => "1"},
+	"35" => {"name" => "hdmi8",				"aliasName" => "",	"enabled" => "1"},
+	"38" => {"name" => "internetRadio",		"aliasName" => "",	"enabled" => "1"},			
+	"41" => {"name" => "pandora",			"aliasName" => "",	"enabled" => "1"},			
+	"44" => {"name" => "mediaServer",		"aliasName" => "",	"enabled" => "1"},			
+	"45" => {"name" => "favorites",			"aliasName" => "",	"enabled" => "1"},			
+	"48" => {"name" => "mhl",				"aliasName" => "",	"enabled" => "1"},			
+	"53" => {"name" => "spotify",			"aliasName" => "",	"enabled" => "1"}
+	};
   # ----------------Human Readable command mapping table-----------------------
   $hash->{helper}{SETS} = {
 	'main' => {
@@ -684,7 +694,7 @@ PIONEERAVR_Set($@)
   my $arg = ($a[2] ? $a[2] : "");
   my @args= @a; shift @args; shift @args;
   my @setsPlayer= ("play","pause","stop","repeat","shuffle"); # available commands for certain inputs (@playerInputNr)
-  my @playerInputNr= ("13","17","18","26","27","33","38","41","44","45","48"); 		# Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl
+  my @playerInputNr= ("13","17","18","26","27","33","38","41","44","45","48","53"); 		# Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
   my @setsTuner = ("channelUp","channelDown","channelStraight","channel"); # available commands for input tuner 
   my @setsWithoutArg= ("off","toggle","volumeUp","volumeDown","muteOn","muteOff","muteToggle","inputUp","inputDown"); # set commands without arguments
   my $playerCmd= "";
@@ -787,8 +797,8 @@ PIONEERAVR_Set($@)
 			$playerCmd= $cmd."Ipod";
 		} elsif ($inputNr eq "33") {
 			$playerCmd= $cmd."AdapterPort";
-		#### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites
-		} elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45")) {
+		#### homeMediaGallery, sirius, internetRadio, pandora, mediaServer, favorites, spotify
+		} elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45") || ($inputNr eq "53")) {
 			$playerCmd= $cmd."Network";
 		#### 'random' and 'repeat' are not available on input mhl
 		} elsif (($inputNr eq "48") && (( $cmd eq "play") || ( $cmd eq "pause") ||( $cmd eq "stop"))) {
@@ -824,6 +834,7 @@ PIONEERAVR_Set($@)
 		Log3 $name, 5, "PIONEERAVR $name: sending raw command ".dq($allArgs);
 		PIONEERAVR_Write($hash, $allArgs);
 		return undef;
+		
 	####Input (all available Inputs of the Pioneer AV receiver -> see 'get $name loadInputNames')
 	#### according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV 
 	#### first try the aliasName (only if this fails try the default input name)
@@ -1454,9 +1465,9 @@ sub PIONEERAVR_askForInputNames($$) {
 	my $name = $hash->{NAME};
 	my $comstr = '';
 	
-	# we ask for the inputs 1 to 49 if an input name exists (command: ?RGB00 ... ?RGB49)
-	# 	and if the input is disabled (command: ?SSC0003 ... ?SSC4903)
-	for ( my $i=0; $i<50; $i++ ) {
+	# we ask for the inputs 1 to 59 if an input name exists (command: ?RGB00 ... ?RGB59)
+	# 	and if the input is disabled (command: ?SSC0003 ... ?SSC5903)
+	for ( my $i=0; $i<60; $i++ ) {
 		select(undef, undef, undef, 0.1);
 		$comstr = sprintf '?RGB%02d', $i;
 		PIONEERAVR_Write($hash,$comstr);
