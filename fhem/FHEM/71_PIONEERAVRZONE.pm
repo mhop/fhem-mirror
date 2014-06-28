@@ -120,7 +120,7 @@ PIONEERAVRZONE_Set($@)
 	
 	my @setsWithoutArg= ("off","toggle","volumeUp","volumeDown","muteOn","muteOff","muteToggle","inputUp","inputDown");
     
-	Log3 $name, 5, "PIONEERAVRZONE $name: called function PIONEERAVR_Set()";
+	Log3 $name, 5, "PIONEERAVRZONE $name: called function PIONEERAVR_Set($cmd)";
 
 	return "No Argument given" if ( !defined( $cmd ) );
 
@@ -206,12 +206,28 @@ PIONEERAVRZONE_Set($@)
 		####Input (all available Inputs of the Pioneer Avr -> see 'get $name loadInputNames')
 		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV 
 		if ( $cmd eq "input" ) {
+
+			Log3 $name, 5, "PIONEERAVRZONE $name: set $cmd ".dq($arg);
 			foreach my $key ( keys %{$IOhash->{helper}{INPUTNAMES}} ) {
-				if ( $IOhash->{helper}{INPUTNAMES}->{$key}{name} eq $arg ) {
-					IOWrite($hash, sprintf "%02dFN", $key);
-					readingsSingleUpdate($hash, "input", $arg, 1 );
+				if ( $IOhash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
+					if ( $zone eq "zone2" ) {
+						IOWrite($hash, sprintf "%02dZS", $key);
+					} elsif ($zone eq "zone3") {
+						IOWrite($hash, sprintf "%02dZT", $key);
+					} elsif ($zone eq "hdZone") {
+						IOWrite($hash, sprintf "%02dZEA", $key);
+					}
+				} elsif ( $IOhash->{helper}{INPUTNAMES}->{$key}{name} eq $arg ) {
+					if ( $zone eq "zone2" ) {
+						IOWrite($hash, sprintf "%02dZS", $key);
+					} elsif ($zone eq "zone3") {
+						IOWrite($hash, sprintf "%02dZT", $key);
+					} elsif ($zone eq "hdZone") {
+						IOWrite($hash, sprintf "%02dZEA", $key);
+					}
 				}
 			}
+
 			return undef;
 		#####VolumeStraight (-80.5 - 12) in dB
 		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV 
@@ -316,10 +332,11 @@ PIONEERAVRZONE_Parse($$)
 				} elsif ($msg =~ m/^Z2F(\d\d)$/ ) {
 					my $inputNr = $1;
 					Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone2 - Input is set to inputNr: $inputNr ";
-					if ( defined ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName}) ) {
+
+					if ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} ne "") {
 						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - Input aliasName for input $inputNr is " . $IOhash->{helper}{INPUTNAMES}{$inputNr}{aliasName};
 						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$inputNr}{aliasName} );
-					} elsif ( defined ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name}) ) {
+					} elsif ( $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name} ne "" ) {
 						Log3 $hash,5,"PIONEERAVRZONE $name: Zone2 - Input Name for input $inputNr is " . $IOhash->{helper}{INPUTNAMES}{$inputNr}{name};
 						readingsBulkUpdate($hash, "input", $IOhash->{helper}{INPUTNAMES}->{$inputNr}{name} );
 					} else {
