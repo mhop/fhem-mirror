@@ -1143,7 +1143,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   elsif($md =~ m/HM-CC-RT-DN/) { ##############################################
-    my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
+    my %ctlTbl=( 0=>"auto", 1=>"manual", 2=>"party",3=>"boost");
     if   ($mTp eq "10" && $p =~ m/^0A(....)(..)(..)(..)/) {#info-level
       my ($chn,$setTemp,$err,$vp,$ctrlMode) =
           ("04",hex($1),hex($2),hex($3), hex($4));
@@ -1169,7 +1169,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"measured-temp:$actTemp" ];
       push @evtEt,[$shash,1,"desired-temp:$setTemp"  ];
       push @evtEt,[$shash,1,"ValvePosition:$vp"    ];
-      push @evtEt,[$shash,1,"mode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
       #push @evtEt,[$shash,1,"unknown0:$uk0"];
       #push @evtEt,[$shash,1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
       push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp valve: $vp"];
@@ -1189,12 +1189,12 @@ sub CUL_HM_Parse($$) {#########################################################
       my $setTemp = sprintf("%.1f",int(hex($1)/4)/2);
       my $ctrlMode = hex($1)&0x3;
       push @evtEt,[$shash,1,"desired-temp:$setTemp"];
-      push @evtEt,[$shash,1,"mode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
 
       my $tHash = $modules{CUL_HM}{defptr}{$dst."04"};
       if ($tHash){
         push @evtEt,[$tHash,1,"desired-temp:$setTemp"];
-        push @evtEt,[$tHash,1,"mode:$ctlTbl{$ctrlMode}"];
+        push @evtEt,[$tHash,1,"controlMode:$ctlTbl{$ctrlMode}"];
       }
     }
     elsif($mTp eq "3F" && $ioId eq $dst) { # Timestamp request
@@ -1204,7 +1204,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   elsif($md eq "HM-TC-IT-WM-W-EU") { ##########################################
-    my %ctlTbl=( 0=>"auto", 1=>"manu", 2=>"party",3=>"boost");
+    my %ctlTbl=( 0=>"auto", 1=>"manual", 2=>"party",3=>"boost");
     if( ( $mTp eq "10" && $mI[0] eq '0B')  #info-level
       ||( $mTp eq "02" && $mI[0] eq '01')) {#ack-status
       my @d = map{hex($_)} unpack 'A2A4(A2)*',$p;
@@ -1233,7 +1233,7 @@ sub CUL_HM_Parse($$) {#########################################################
                  ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
 
       push @evtEt,[$shash,1,"desired-temp:$setTemp"];
-      push @evtEt,[$shash,1,"mode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
       push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp"];
       push @evtEt,[$dHash,1,"battery:".($lbat?"low":"ok")];
       push @evtEt,[$dHash,1,"batteryLevel:$bat"];
@@ -3605,14 +3605,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $mode = lc $mode;
     return "invalid $mode:select of mode [auto|boost|day|night] or"
           ." controlManu,controlParty"
-                if ($mode !~ m/^(auto|manu|party|boost|day|night)$/);
+                if ($mode !~ m/^(auto|manual|party|boost|day|night)$/);
     my ($temp,$party);
     if ($mode =~ m/^(auto|boost|day|night)$/){
       return "no additional params for $mode" if ($a[3]);
     }
-    if($mode eq "manu"){
-      my $t = $a[2] ne "manu"?$a[2]:ReadingsVal($name,"desired-temp",18);
-      return "temperatur for manu  4.5 to 30.5 C"
+    if($mode eq "manual"){
+      my $t = $a[2] ne "manual"?$a[2]:ReadingsVal($name,"desired-temp",18);
+      return "temperatur for manual  4.5 to 30.5 C"
                 if ($t < 4.5 || $t > 30.5);
       $temp = $t*2;
     }
@@ -3645,7 +3645,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $party = sprintf("%02X%02X%02X%02X%02X%02X%02X",
                         $sh,$sd,$sy,$eh,$ed,$ey,($sm*16+$em));
     }
-    my %mCmd = (auto=>0,manu=>1,party=>2,boost=>3,day=>4,night=>5);
+    my %mCmd = (auto=>0,manual=>1,party=>2,boost=>3,day=>4,night=>5);
     CUL_HM_UpdtReadSingle($hash,"mode","set_".$mode,1);
     my $msg = '8'.($mCmd{$mode}).$chn;
     $msg .= sprintf("%02X",$temp) if ($temp);
@@ -8088,7 +8088,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       displayMode temp-[hum|only]<br>
       displayTemp [setpoint|actual]<br>
       displayTempUnit [fahrenheit|celsius]<br>
-      controlMode [manual|auto|central|party]<br>
+      controlMode [auto|manual|central|party]<br>
       tempValveMode [Auto|Closed|Open|unknown]<br>
       param-change  offset=$o1, value=$v1<br>
       ValveErrorPosition_for_$dname  $vep %<br>
@@ -8107,7 +8107,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       measured-temp $actTemp<br>
       desired-temp $setTemp<br>
       ValvePosition $vp %<br>
-      mode  [auto|manu|party|boost]<br>
+      mode  [auto|manual|party|boost]<br>
       battery [low|ok]<br>
       batteryLevel $bat V<br>
       measured-temp $actTemp<br>
@@ -9311,7 +9311,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         displayMode temp-[hum|only]<br>
         displayTemp [setpoint|actual]<br>
         displayTempUnit [fahrenheit|celsius]<br>
-        controlMode [manual|auto|central|party]<br>
+        controlMode [auto|manual|central|party]<br>
         tempValveMode [Auto|Closed|Open|unknown]<br>
         param-change offset=$o1, value=$v1<br>
         ValveErrorPosition_for_$dname $vep %<br>
@@ -9330,7 +9330,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         measured-temp $actTemp<br>
         desired-temp $setTemp<br>
         ValvePosition $vp %<br>
-        mode [auto|manu|party|boost]<br>
+        mode [auto|manual|party|boost]<br>
         battery [low|ok]<br>
         batteryLevel $bat V<br>
         measured-temp $actTemp<br>
