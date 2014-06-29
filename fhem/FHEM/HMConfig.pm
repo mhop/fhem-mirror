@@ -1433,7 +1433,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
   "HM-CC-RT-DN00"     =>{ sysTime        =>""
                          ,fwUpdate       =>"<filename> <bootTime> ..."
                         },
-  "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manu|boost|day|night]"
+  "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manual|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
                          ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
                          ,tempListSat    =>"[prep|exec] HH:MM temp ..."
@@ -1447,7 +1447,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,"desired-temp" =>"[on|off|5.0..30.0]"
                          ,sysTime        =>""
                         },
-  "HM-TC-IT-WM-W-EU02"=>{ controlMode    =>"[auto|manu|boost|day|night]"
+  "HM-TC-IT-WM-W-EU02"=>{ controlMode    =>"[auto|manual|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
                          ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
                          ,tempListSat    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
