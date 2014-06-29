@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License along
 # with smarthomatic. If not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-# $Id: 37_SHCdev.pm xxxx 2014-xx-xx xx:xx:xx rr2000 $
+# $Id$
 
 package main;
 

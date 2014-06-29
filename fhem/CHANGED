@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  37_SHC.pm: Move xml file under subdir lib, otherwise it won't be
+             deployed during update
   - bugfix:  70_PIONEERAVR.pm: player commands are now available for more inputs
 			 "play" was not in the drop down list of available set commands
 			 check every 120s if the data connection to the Pioneer AV receiver is still up

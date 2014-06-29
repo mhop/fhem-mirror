@@ -46,7 +46,7 @@
 # 3.) Get send string: $str = $parser->getSendString($receiverID);
 # 4.) Send string to base station (over UART).
 ##########################################################################
-# $Id: 37_SHC_Dev.pm xxxx 2014-xx-xx xx:xx:xx rr2000 $
+# $Id$
 
 package SHC_parser;
 
@@ -97,7 +97,7 @@ sub new
 sub init_datafield_positions()
 {
   my $x = XML::LibXML->new() or die "new on XML::LibXML failed";
-  my $d = $x->parse_file("FHEM/SHC_packet_layout.xml") or die "parsing XML file failed";
+  my $d = $x->parse_file("FHEM/lib/SHC_packet_layout.xml") or die "parsing XML file failed";
 
   for my $element ($d->findnodes("/Packet/Header/EnumValue[ID='MessageType']/Element")) {
     my $value = ($element->findnodes("Value"))[0]->textContent;
