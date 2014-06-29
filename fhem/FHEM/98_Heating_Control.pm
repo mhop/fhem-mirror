@@ -652,7 +652,7 @@ sub SortNumber {
 
     The new temperature is sent to the &lt;device&gt; automatically with <br><br>
 
-    <code>set &lt;device&gt; (desired-temp|desiredTemerature) &lt;temp&gt;</code><br><br>
+    <code>set &lt;device&gt; (desired-temp|desiredTemperature) &lt;temp&gt;</code><br><br>
 
     Because of the fhem-type of structures, a structures of heating sinks is sent "desired-temp":
     Use an explicit command if you have structures of MAX heating thermostats.<br>
@@ -802,7 +802,7 @@ sub SortNumber {
     Es k&oumlnnen f&uumlr jeden Tag unterschiedliche Schaltzeiten angegeben werden.<br>
     Ist das &lt;device&gt; ein Heizk&oumlrperthermostat (zb. FHT8b, MAX) so wird bei FHT8b/MAX die
     zu setzende Temperatur im &lt;profile&gt; automatisch mittels <br><br>
-    <code>set &lt;device&gt; (desired-temp|desiredTemerature) &lt;temp&gt;</code> <br><br> gesendet.
+    <code>set &lt;device&gt; (desired-temp|desiredTemperature) &lt;temp&gt;</code> <br><br> gesendet.
     Struktuen von Heizk&oumlrperthermostaten bekommen aufgrund des fhem-Typs auch desired-temp gesendet:
     Nutze bitte explizite Kommandos wenn Strukturen von MAX Heizthermostaten gesteuert werden sollen.<br><br>
     Ist eine &lt;condition&gt; angegeben und ist zum Schaltpunkt der Ausdruck unwahr,
