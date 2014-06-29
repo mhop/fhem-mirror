@@ -599,6 +599,8 @@ PIONEERAVR_Define($$) {
 	"0e01"=>"HDMI THROUGH",
 	"0f01"=>"MULTI CH IN"
   };
+  ### initialize timer
+  $hash->{helper}{nextConnectionCheck} = gettimeofday()+120;
   #### statusRequest
   #### Update Input alias names, available Inputs
   PIONEERAVR_askForInputNames($hash,5);
@@ -1216,13 +1218,13 @@ sub PIONEERAVR_Read($)
 			# readingsBulkUpdate( $hash, "state", $state );
 		if ($hash->{STATE} ne $state) {
 			Log3 $hash,5,"PIONEERAVR $name: Update STATE from " . $hash->{STATE} . " to $state";	
-			my $connState = ReadingsVal($name,"connectionState","");
-			if ($hash->{STATE} ne "on" && $hash->{STATE} ne "off" && $hash->{STATE} ne $connState) {
-				Log3 $hash,5,"PIONEERAVR $name: Update connectionState from $connState to " . $hash->{STATE};	
-				readingsBulkUpdate($hash, "connectionState", $hash->{STATE});
-			}
-			readingsBulkUpdate($hash, "state", $state );
-			#$hash->{STATE} = $state;
+			#my $connState = ReadingsVal($name,"connectionState","");
+			#if ($hash->{STATE} ne "on" && $hash->{STATE} ne "off" && $hash->{STATE} ne $connState) {
+				#Log3 $hash,5,"PIONEERAVR $name: Update connectionState from $connState to " . $hash->{STATE};	
+				#readingsBulkUpdate($hash, "connectionState", $hash->{STATE});
+			#}
+			#readingsBulkUpdate($hash, "state", $state );
+			$hash->{STATE} = $state;
 		}
 	# Display updates
 	} elsif ( substr($line,0,2) eq "FL" ) {
@@ -1383,6 +1385,7 @@ sub PIONEERAVR_Reopen($) {
   my $ret = DevIo_OpenDev($hash, 1, undef);
   if ($hash->{STATE} eq "opened") {
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen() -> now opened";
+	readingsSingleUpdate($hash , "connectionState" , "opened" , 1 );
 	PIONEERAVR_statusUpdate($hash);
   }
   return $ret;
@@ -1430,17 +1433,24 @@ sub PIONEERAVR_checkConnection ($) {
 	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- change state temporary to: ".$hash->{STATE};
   }
   my $connState = DevIo_Expect($hash,"\r\n",2);
-  Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after DevIo_Expect(): ".$hash->{STATE};
+  Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after DevIo_Expect(): ".$hash->{STATE}." state: $state ConnState: ".dq($connState);
+  if ( !defined($connState)) {
+	# not connected!
+	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- reopen()";
+	PIONEERAVR_Reopen($hash);
+  }
   #restore state $hash->{STATE}
-  if (($hash->{STATE} eq "opened" || $hash->{STATE} eq "CONNECTED") && ($state eq "on" || $state eq "off")){
-	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash , "connectionState" , $hash->{STATE} , 1 );
-	readingsBulkUpdate($hash, "state", $state );
-	readingsEndUpdate($hash, 1);
-	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state restored to: ".$hash->{STATE};
+  Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after PIONEERAVR_Reopen(): ".$hash->{STATE}." state: $state ConnState: ".dq($connState);
+  if (($hash->{STATE} eq "opened" || $hash->{STATE} eq "connected" ) && ($state eq "on" || $state eq "off")){
+	#readingsSingleUpdate($hash, "state", $state,1 );
+	$hash->{STATE} = $state;
+	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: $state restored to: ".$hash->{STATE};
   } elsif ($hash->{STATE} eq "disconnected") {
- 	Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: ".$hash->{STATE};
-	readingsSingleUpdate($hash, "connectionState",$hash->{STATE} , 1 );
+ 	Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state (discon): ".$hash->{STATE};
+	readingsBeginUpdate($hash);
+	readingsBulkUpdate($hash, "connectionState","disconnected",1 );
+	#readingsBulkUpdate($hash, "state", $hash->{STATE},1 );
+	readingsEndUpdate($hash, 1);
   }
   #RemoveInternalTimer($hash);
   $hash->{helper}{nextConnectionCheck}  = gettimeofday()+120; 
