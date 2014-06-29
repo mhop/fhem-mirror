@@ -228,7 +228,7 @@ FP_CGI(){
     $params[1] = $params[2];
   }
   my @htmlpart = split("\\?", $params[1]) if ($params[1]);                         # split URL by ?   ->   htmlpart[0] = FP_name, htmlpart[1] = commandstring
-  if (!$htmlpart[1] && $htmlpart[0] !~ "\\?") {                                    # in case of 'post' URL does not contain ?
+  if (!$htmlpart[1] && $htmlpart[0] && $htmlpart[0] !~ "\\?") {                    # in case of 'post' URL does not contain ?
      $htmlpart[0] =~ /([a-z0-9.:_]+)&(.*)/i;
 	 $htmlpart[1] = $2 if ($2);
 	 $htmlpart[1] =~ s/\\+/&/g if ($htmlpart[1]);
