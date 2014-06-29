@@ -297,7 +297,7 @@ readingsGroup_2html($)
 
   my $disable = AttrVal($d,"disable", 0);
   if( AttrVal($d,"disable", 0) > 2 ) {
-    return undef;
+    return "";
   } elsif( AttrVal($d,"disable", 0) > 1 ) {
     my $ret;
     $ret .= "<table>";
