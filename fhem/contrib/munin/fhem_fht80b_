@@ -1,6 +1,9 @@
 #!/bin/bash
 # -*- bash -*-
 # vim: ft=bash
+#
+# $Id$
+#
 
 : << =cut
 
