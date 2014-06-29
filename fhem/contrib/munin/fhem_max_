@@ -9,8 +9,7 @@
 
 =head1 NAME
 
-fhem_hms100_ - plugin to graph temperature and humidity by ELV HMS100TF devices
- (other devices may also work (untested))
+fhem_max_ - plugin to graph temperature and desiredTemperature from ELV/EQ3 MAX devices
 
 =head1 APPLICABLE SYSTEMS
 
@@ -22,12 +21,12 @@ cp /usr/share/fhem/contrib/getstate/99_getstate.pm /usr/share/fhem/FHEM/
 
 You can test if your devices are able to be queried by submitting this line to FHEM (via telnet or web):
   getstate <device>
-  i.e: getstate au_tf_sensor
-  output should be something like this: humidity:62 temperature:19
+  i.e: getstate wz_thermostat1
+  output should be something like this: [...] desiredTemperature:15.0 temperature:21.4 [...]
 
 =head1 CONFIGURATION
 
-fhem_hms100_ has to be linked to the device name, ie. fhem_hms100_wz_aussen
+fhem_max_ has to be linked to the device name, ie. fhem_max_wz_thermostat1
 
 The following environment variables are available
 
@@ -36,7 +35,7 @@ The following environment variables are available
 
 This is a typical configuration:
 
- [fht_hms100_*]
+ [fht_max_*]
    env.host fritz.box
    env.port 7072
 
@@ -55,7 +54,7 @@ None known.
 
 =head1 AUTHOR
 
-2012 Oliver Voelker <code@magenbrot.net>
+2014 Oliver Voelker <code@magenbrot.net>
 
 =head1 LICENSE
 
@@ -75,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 =cut
 
 NC=`which nc 2>/dev/null`
-DEVICE=`echo $0 | sed -e 's/.*fhem_hms100_\(.*\)/\1/'`
+DEVICE=`echo $0 | sed -e 's/.*fhem_max_\(.*\)/\1/'`
 
 HOST="localhost"
 PORT="7072"
@@ -96,14 +95,14 @@ if [ "$1" = "config" ]; then
   echo "graph_category fhem"
   echo "temp.label temperature"
   echo "temp.colour 00FF00"
-  echo "hum.label humidity"
-  echo "hum.colour 0000FF"
+  echo "dtemp.label desiredTemperature"
+  echo "dtemp.colour 0000FF"
   exit 0
 fi
 
 fhem=`echo -e "getstate ${DEVICE}\nquit" | ${NC} $HOST $PORT`
 temp=`echo $fhem | awk '{split($0,a,"temperature:"); split(a[2],b," "); print b[1]}'`
-hum=`echo $fhem | awk '{split($0,a,"humidity:"); split(a[2],b," "); print b[1]}'`
+dtemp=`echo $fhem | awk '{split($0,a,"desiredTemperature:"); split(a[2],b," "); print b[1]}'`
 
 echo temp.value $temp
-echo hum.value $hum
+echo dtemp.value $dtemp
