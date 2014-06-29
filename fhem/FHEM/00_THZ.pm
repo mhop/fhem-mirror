@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 06/2014
-my $thzversion = "0.107";
+my $thzversion = "0.108";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -52,6 +52,7 @@ sub THZ_Refresh_all_gets($);
 sub THZ_Get_Comunication($$);
 sub THZ_PrintcurveSVG;
 sub THZ_RemoveInternalTimer($);
+sub THZ_Set($@);
 
 
 
@@ -122,130 +123,128 @@ my %sets = (
     "pHolidayEndMonth"			=> {cmd2=>"0A011F", argMin =>  "1", 	argMax =>  "12",	type =>"0clean",  unit =>""},
     "pHolidayEndYear"			=> {cmd2=>"0A0120", argMin =>  "12", 	argMax =>  "20",	type =>"0clean",  unit =>""},
     "pHolidayEndTime"			=> {cmd2=>"0A05D4", argMin =>  "00:00", argMax =>  "23:59", 	type =>"9holy",  unit =>""}, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
-    "party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-    "programHC1_Mo_0"			=> {cmd2=>"0B1410", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-    "programHC1_Mo_1"			=> {cmd2=>"0B1411", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Mo_2"			=> {cmd2=>"0B1412", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Tu_0"			=> {cmd2=>"0B1420", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Tu_1"			=> {cmd2=>"0B1421", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Tu_2"			=> {cmd2=>"0B1422", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_We_0"			=> {cmd2=>"0B1430", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_We_1"			=> {cmd2=>"0B1431", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_We_2"			=> {cmd2=>"0B1432", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Th_0"			=> {cmd2=>"0B1440", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Th_1"			=> {cmd2=>"0B1441", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Th_2"			=> {cmd2=>"0B1442", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Fr_0"			=> {cmd2=>"0B1450", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Fr_1"			=> {cmd2=>"0B1451", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Fr_2"			=> {cmd2=>"0B1452", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Sa_0"			=> {cmd2=>"0B1460", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Sa_1"			=> {cmd2=>"0B1461", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Sa_2"			=> {cmd2=>"0B1462", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_So_0"			=> {cmd2=>"0B1470", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_So_1"			=> {cmd2=>"0B1471", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_So_2"			=> {cmd2=>"0B1472", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Mo-Fr_0"		=> {cmd2=>"0B1480", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Mo-Fr_1"		=> {cmd2=>"0B1481", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Mo-Fr_3"		=> {cmd2=>"0B1482", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Sa-So_0"		=> {cmd2=>"0B1490", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Sa-So_1"		=> {cmd2=>"0B1491", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Sa-So_3"		=> {cmd2=>"0B1492", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Mo-So_0"		=> {cmd2=>"0B14A0", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Mo-So_1"		=> {cmd2=>"0B14A1", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC1_Mo-So_3"		=> {cmd2=>"0B14A2", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Mo_0"			=> {cmd2=>"0C1510", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
-    "programHC2_Mo_1"			=> {cmd2=>"0C1511", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Mo_2"			=> {cmd2=>"0C1512", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Tu_0"			=> {cmd2=>"0C1520", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Tu_1"			=> {cmd2=>"0C1521", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Tu_2"			=> {cmd2=>"0C1522", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_We_0"			=> {cmd2=>"0C1530", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_We_1"			=> {cmd2=>"0C1531", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_We_2"			=> {cmd2=>"0C1532", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Th_0"			=> {cmd2=>"0C1540", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Th_1"			=> {cmd2=>"0C1541", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Th_2"			=> {cmd2=>"0C1542", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Fr_0"			=> {cmd2=>"0C1550", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Fr_1"			=> {cmd2=>"0C1551", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Fr_2"			=> {cmd2=>"0C1552", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Sa_0"			=> {cmd2=>"0C1560", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Sa_1"			=> {cmd2=>"0C1561", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Sa_2"			=> {cmd2=>"0C1562", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_So_0"			=> {cmd2=>"0C1570", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_So_1"			=> {cmd2=>"0C1571", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_So_2"			=> {cmd2=>"0C1572", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Mo-Fr_0"		=> {cmd2=>"0C1580", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Mo-Fr_1"		=> {cmd2=>"0C1581", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Mo-Fr_3"		=> {cmd2=>"0C1582", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Sa-So_0"		=> {cmd2=>"0C1590", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Sa-So_1"		=> {cmd2=>"0C1591", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Sa-So_3"		=> {cmd2=>"0C1592", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Mo-So_0"		=> {cmd2=>"0C15A0", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Mo-So_1"		=> {cmd2=>"0C15A1", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programHC2_Mo-So_3"		=> {cmd2=>"0C15A2", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo_0"			=> {cmd2=>"0A1710", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo_1"			=> {cmd2=>"0A1711", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo_2"			=> {cmd2=>"0A1712", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Tu_0"			=> {cmd2=>"0A1720", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Tu_1"			=> {cmd2=>"0A1721", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Tu_2"			=> {cmd2=>"0A1722", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_We_0"			=> {cmd2=>"0A1730", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_We_1"			=> {cmd2=>"0A1731", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_We_2"			=> {cmd2=>"0A1732", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Th_0"			=> {cmd2=>"0A1740", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Th_1"			=> {cmd2=>"0A1741", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Th_2"			=> {cmd2=>"0A1742", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Fr_0"			=> {cmd2=>"0A1750", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Fr_1"			=> {cmd2=>"0A1751", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Fr_2"			=> {cmd2=>"0A1752", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Sa_0"			=> {cmd2=>"0A1760", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Sa_1"			=> {cmd2=>"0A1761", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Sa_2"			=> {cmd2=>"0A1762", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_So_0"			=> {cmd2=>"0A1770", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_So_1"			=> {cmd2=>"0A1771", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_So_2"			=> {cmd2=>"0A1772", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo-Fr_0"		=> {cmd2=>"0A1780", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo-Fr_1"		=> {cmd2=>"0A1781", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo-Fr_2"		=> {cmd2=>"0A1782", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Sa-So_0"		=> {cmd2=>"0A1790", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Sa-So_1"		=> {cmd2=>"0A1791", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Sa-So_2"		=> {cmd2=>"0A1792", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo-So_0"		=> {cmd2=>"0A17A0", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo-So_1"		=> {cmd2=>"0A17A1", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programDHW_Mo-So_2"		=> {cmd2=>"0A17A2", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo_0"			=> {cmd2=>"0A1D10", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo_1"			=> {cmd2=>"0A1D11", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo_2"			=> {cmd2=>"0A1D12", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Tu_0"			=> {cmd2=>"0A1D20", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Tu_1"			=> {cmd2=>"0A1D21", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Tu_2"			=> {cmd2=>"0A1D22", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_We_0"			=> {cmd2=>"0A1D30", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_We_1"			=> {cmd2=>"0A1D31", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_We_2"			=> {cmd2=>"0A1D32", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Th_0"			=> {cmd2=>"0A1D40", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Th_1"			=> {cmd2=>"0A1D41", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Th_2"			=> {cmd2=>"0A1D42", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Fr_0"			=> {cmd2=>"0A1D50", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Fr_1"			=> {cmd2=>"0A1D51", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Fr_2"			=> {cmd2=>"0A1D52", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Sa_0"			=> {cmd2=>"0A1D60", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Sa_1"			=> {cmd2=>"0A1D61", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Sa_2"			=> {cmd2=>"0A1D62", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_So_0"			=> {cmd2=>"0A1D70", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_So_1"			=> {cmd2=>"0A1D71", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_So_2"			=> {cmd2=>"0A1D72", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo-Fr_0"		=> {cmd2=>"0A1D80", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo-Fr_1"		=> {cmd2=>"0A1D81", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo-Fr_2"		=> {cmd2=>"0A1D82", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Sa-So_0"		=> {cmd2=>"0A1D90", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Sa-So_1"		=> {cmd2=>"0A1D91", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Sa-So_2"		=> {cmd2=>"0A1D92", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo-So_0"		=> {cmd2=>"0A1DA0", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo-So_1"		=> {cmd2=>"0A1DA1", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""},
-    "programFan_Mo-So_2"		=> {cmd2=>"0A1DA2", argMin =>  "00:00", argMax =>  "23:59", type =>"7prog",  unit =>""}
+   # "party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
+    "programHC1_Mo_0"			=> {cmd2=>"0B1410", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
+    "programHC1_Mo_1"			=> {cmd2=>"0B1411", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Mo_2"			=> {cmd2=>"0B1412", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Tu_0"			=> {cmd2=>"0B1420", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Tu_1"			=> {cmd2=>"0B1421", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Tu_2"			=> {cmd2=>"0B1422", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_We_0"			=> {cmd2=>"0B1430", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_We_1"			=> {cmd2=>"0B1431", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_We_2"			=> {cmd2=>"0B1432", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Th_0"			=> {cmd2=>"0B1440", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Th_1"			=> {cmd2=>"0B1441", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Th_2"			=> {cmd2=>"0B1442", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Fr_0"			=> {cmd2=>"0B1450", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Fr_1"			=> {cmd2=>"0B1451", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Fr_2"			=> {cmd2=>"0B1452", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Sa_0"			=> {cmd2=>"0B1460", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Sa_1"			=> {cmd2=>"0B1461", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Sa_2"			=> {cmd2=>"0B1462", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_So_0"			=> {cmd2=>"0B1470", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_So_1"			=> {cmd2=>"0B1471", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_So_2"			=> {cmd2=>"0B1472", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Mo-Fr_0"		=> {cmd2=>"0B1480", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Mo-Fr_1"		=> {cmd2=>"0B1481", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Mo-Fr_2"		=> {cmd2=>"0B1482", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Sa-So_0"		=> {cmd2=>"0B1490", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Sa-So_1"		=> {cmd2=>"0B1491", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Sa-So_2"		=> {cmd2=>"0B1492", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Mo-So_0"		=> {cmd2=>"0B14A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Mo-So_1"		=> {cmd2=>"0B14A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC1_Mo-So_2"		=> {cmd2=>"0B14A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Mo_0"			=> {cmd2=>"0C1510", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
+    "programHC2_Mo_1"			=> {cmd2=>"0C1511", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Mo_2"			=> {cmd2=>"0C1512", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Tu_0"			=> {cmd2=>"0C1520", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Tu_1"			=> {cmd2=>"0C1521", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Tu_2"			=> {cmd2=>"0C1522", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_We_0"			=> {cmd2=>"0C1530", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_We_1"			=> {cmd2=>"0C1531", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_We_2"			=> {cmd2=>"0C1532", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Th_0"			=> {cmd2=>"0C1540", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Th_1"			=> {cmd2=>"0C1541", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Th_2"			=> {cmd2=>"0C1542", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Fr_0"			=> {cmd2=>"0C1550", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Fr_1"			=> {cmd2=>"0C1551", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Fr_2"			=> {cmd2=>"0C1552", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Sa_0"			=> {cmd2=>"0C1560", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Sa_1"			=> {cmd2=>"0C1561", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Sa_2"			=> {cmd2=>"0C1562", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_So_0"			=> {cmd2=>"0C1570", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_So_1"			=> {cmd2=>"0C1571", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_So_2"			=> {cmd2=>"0C1572", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Mo-Fr_0"		=> {cmd2=>"0C1580", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Mo-Fr_1"		=> {cmd2=>"0C1581", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Mo-Fr_2"		=> {cmd2=>"0C1582", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Sa-So_0"		=> {cmd2=>"0C1590", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Sa-So_1"		=> {cmd2=>"0C1591", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Sa-So_2"		=> {cmd2=>"0C1592", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Mo-So_0"		=> {cmd2=>"0C15A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Mo-So_1"		=> {cmd2=>"0C15A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programHC2_Mo-So_2"		=> {cmd2=>"0C15A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo_0"			=> {cmd2=>"0A1710", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo_1"			=> {cmd2=>"0A1711", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo_2"			=> {cmd2=>"0A1712", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Tu_0"			=> {cmd2=>"0A1720", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Tu_1"			=> {cmd2=>"0A1721", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Tu_2"			=> {cmd2=>"0A1722", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_We_0"			=> {cmd2=>"0A1730", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_We_1"			=> {cmd2=>"0A1731", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_We_2"			=> {cmd2=>"0A1732", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Th_0"			=> {cmd2=>"0A1740", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Th_1"			=> {cmd2=>"0A1741", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Th_2"			=> {cmd2=>"0A1742", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Fr_0"			=> {cmd2=>"0A1750", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Fr_1"			=> {cmd2=>"0A1751", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Fr_2"			=> {cmd2=>"0A1752", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Sa_0"			=> {cmd2=>"0A1760", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Sa_1"			=> {cmd2=>"0A1761", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Sa_2"			=> {cmd2=>"0A1762", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_So_0"			=> {cmd2=>"0A1770", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_So_1"			=> {cmd2=>"0A1771", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_So_2"			=> {cmd2=>"0A1772", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo-Fr_0"		=> {cmd2=>"0A1780", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo-Fr_1"		=> {cmd2=>"0A1781", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo-Fr_2"		=> {cmd2=>"0A1782", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Sa-So_0"		=> {cmd2=>"0A1790", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Sa-So_1"		=> {cmd2=>"0A1791", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Sa-So_2"		=> {cmd2=>"0A1792", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo-So_0"		=> {cmd2=>"0A17A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo-So_1"		=> {cmd2=>"0A17A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programDHW_Mo-So_2"		=> {cmd2=>"0A17A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo_0"			=> {cmd2=>"0A1D10", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo_1"			=> {cmd2=>"0A1D11", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo_2"			=> {cmd2=>"0A1D12", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Tu_0"			=> {cmd2=>"0A1D20", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Tu_1"			=> {cmd2=>"0A1D21", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Tu_2"			=> {cmd2=>"0A1D22", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_We_0"			=> {cmd2=>"0A1D30", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_We_1"			=> {cmd2=>"0A1D31", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_We_2"			=> {cmd2=>"0A1D32", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Th_0"			=> {cmd2=>"0A1D40", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Th_1"			=> {cmd2=>"0A1D41", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Th_2"			=> {cmd2=>"0A1D42", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Fr_0"			=> {cmd2=>"0A1D50", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Fr_1"			=> {cmd2=>"0A1D51", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Fr_2"			=> {cmd2=>"0A1D52", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Sa_0"			=> {cmd2=>"0A1D60", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Sa_1"			=> {cmd2=>"0A1D61", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Sa_2"			=> {cmd2=>"0A1D62", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_So_0"			=> {cmd2=>"0A1D70", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_So_1"			=> {cmd2=>"0A1D71", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_So_2"			=> {cmd2=>"0A1D72", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo-Fr_0"		=> {cmd2=>"0A1D80", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo-Fr_1"		=> {cmd2=>"0A1D81", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo-Fr_2"		=> {cmd2=>"0A1D82", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Sa-So_0"		=> {cmd2=>"0A1D90", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Sa-So_1"		=> {cmd2=>"0A1D91", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Sa-So_2"		=> {cmd2=>"0A1D92", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo-So_0"		=> {cmd2=>"0A1DA0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo-So_1"		=> {cmd2=>"0A1DA1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+    "programFan_Mo-So_2"		=> {cmd2=>"0A1DA2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""}
   );
-
-
 
 
 ########################################################################################
@@ -279,7 +278,7 @@ my %getsonly = (
 	"sElectrHCDay" 			=> {cmd2=>"0A091E", cmd3=>"0A091F",	type =>"1clean", unit =>" Wh"},
 	"sElectrHCTotal"		=> {cmd2=>"0A0920", cmd3=>"0A0921",	type =>"1clean", unit =>" kWh"},
 	#"sAllE8"			=> {cmd2=>"E8"},
-	#"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
+	"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
 my %gets=(%getsonly, %sets);
@@ -500,8 +499,6 @@ sub THZ_Set($@){
   my ($hash, @a) = @_;
   my $dev = $hash->{DeviceName};
   my $name = $hash->{NAME};
-  my $ll5 = GetLogLevel($name,5);
-  my $ll2 = GetLogLevel($name,2);
 
   return "\"set $name\" needs at least two parameters: <device-parameter> and <value-to-be-modified>" if(@a < 2);
   my $cmd = $a[1];
@@ -514,43 +511,64 @@ sub THZ_Set($@){
   my $cmdHex2 = $cmdhash->{cmd2};
   my $argMax = $cmdhash->{argMax};
   my $argMin = $cmdhash->{argMin};
-  if  ((substr($cmdHex2,0,6) eq "0A05D1") or (substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) {
-    ($arg, $arg1)=split('--', $arg);
-      if (($arg ne "n.a.") and ($arg1 ne "n.a.")) {
-        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg1 gt $argMax) or ($arg1 lt $argMin));
-        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg gt $argMax) or ($arg lt $argMin));
-        }
+  # check the parameter range
+  given ($cmdhash->{type}) {
+    when (["7prog", "8party"]) {          
+      ($arg, $arg1)=split('--', $arg);
+      return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg1 gt $argMax) or ($arg1 lt $argMin) or ($arg gt $argMax) or ($arg lt $argMin)) ) ;
     }
-  elsif (substr($cmdHex2,0,6) eq "0A0112") {
-    $arg1=$arg;
-    $arg=$Rev_OpMode{$arg};
-    return "Unknown argument $arg1: $cmd supports  " . join(" ", sort values %OpMode) if(!defined($arg));
+    when ("2opmode") {
+     $arg1=$arg;
+     $arg=$Rev_OpMode{$arg};
+     return "Unknown argument $arg1: $cmd supports  " . join(" ", sort values %OpMode) 	if(!defined($arg));
     }
-  else {
-    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
+    default {
+     return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
     }
-    
-  if 	((substr($cmdHex2,0,6) eq "0A0116") or (substr($cmdHex2,0,6) eq "0A05A2") or (substr($cmdHex2,0,6) eq "0A01AC"))	 {$arg=$arg*10} #summermode
-  elsif  ((substr($cmdHex2,2,2) eq "1D") or (substr($cmdHex2,2,2)  eq "17") or (substr($cmdHex2,2,2) eq "15") or (substr($cmdHex2,2,2)  eq "14")) 	{$arg= time2quaters($arg) *256   + time2quaters($arg1)} # BeginTime-endtime, in the register is represented  begintime endtime
-  elsif  (substr($cmdHex2,0,6) eq "0A05D1") 		  			{$arg= time2quaters($arg1) *256 + time2quaters($arg)} # PartyBeginTime-endtime, in the register is represented endtime begintime
-  #partytime (0A05D1) non funziona; 
-  elsif  ((substr($cmdHex2,0,6) eq "0A05D3") or (substr($cmdHex2,0,6) eq "0A05D4")) 	{$arg= time2quaters($arg)} # holidayBeginTime-endtime
-  elsif  ((substr($cmdHex2,0,5) eq "0A056") or (substr($cmdHex2,0,5) eq "0A057") or (substr($cmdHex2,0,6) eq "0A0588") or (substr($cmdHex2,0,6) eq "0A05A0") or (substr($cmdHex2,0,6) eq "0B059D")      or (substr($cmdHex2,0,6) eq "0A05B7") or (substr($cmdHex2,0,6) eq "0A05B8")  or (substr($cmdHex2,0,6) eq "0A0162")   )	{ } 				# fann speed and boostetimeout: do not multiply
-   elsif ((substr($cmdHex2,0,4) eq "0A01") or (substr($cmdHex2,2,4) eq "010F") )			 {$arg=$arg*256}		        	# shift 2 times -- the answer look like  0A0120-3A0A01200E00  for year 14
-  elsif  (substr($cmdHex2,2,4) eq "010E") 					{$arg=$arg*100} 		#gradientHC1 &HC2
-  else 			             						{$arg=$arg*10} 
+  }  
+ 
   
-  Log3 $hash->{NAME}, 5, "THZ_Set: '$cmd $arg' ... Check if port is open. State = '($hash->{STATE})'";
+  given ($cmdhash->{type}) {
+   when ("9holy") 		{$arg= time2quaters($arg)}
+   when ("8party") 		{$arg= time2quaters($arg1) *256  + time2quaters($arg)}     #non funziona
+   when ("7prog")		{$arg= time2quaters($arg)  *256  + time2quaters($arg1)}
+   when ("6gradient")		{$arg=$arg*100} 
+   when ("5temp")		{$arg=$arg*10}   
+   when (["2opmode", "0clean"]) {$arg=$arg*256}  #doubble shift ;;; conversion done above for opmode
+   when ("1clean") 		{ }
+   default 			{ } 
+  }  
 
+  Log3 $hash->{NAME}, 5, "THZ_Set: '$cmd $arg' ... Check if port is open. State = '($hash->{STATE})'";
   $cmdHex2=THZ_encodecommand(($cmdHex2 . substr((sprintf("%04X", $arg)), -4)),"set");  #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
   ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
-  if (defined($err))  {
-    return ($cmdHex2 . "-". $msg ."--" . $err);}
+  #$err=undef;
+  if (defined($err))  { return ($cmdHex2 . "-". $msg ."--" . $err);}
   else {
-    $msg=THZ_Get($hash, $name, $cmd);
-    return ($msg);
+	$msg=THZ_Get($hash, $name, $cmd);
+	#take care of program of the week
+	given ($a[1]) {
+	 when (/Mo-So/)  	{
+	    $a[1] =~ s/Mo-So/Mo-Fr/;	$msg.= "\n" . THZ_Set($hash, @a);
+	    select(undef, undef, undef, 0.2);
+	    $a[1] =~ s/Mo-Fr/Sa-So/;	$msg.="\n" . THZ_Set($hash, @a);
+	  }
+	 when (/Mo-Fr/)  	{
+	    $a[1] =~ s/_Mo-Fr_/_Mo_/;	$msg.="\n" . THZ_Set($hash, @a);
+	    $a[1] =~ s/_Mo_/_Tu_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+	    $a[1] =~ s/_Tu_/_We_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+	    $a[1] =~ s/_We_/_Th_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+	    $a[1] =~ s/_Th_/_Fr_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
+	  }
+	 when (/Sa-So/)  	{
+	    $a[1] =~ s/_Sa-So_/_Sa_/; 	$msg.="\n" . THZ_Set($hash, @a);
+	    $a[1] =~ s/_Sa_/_So_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
+	  }
+	  default 	{}
+	} 
+	#split _ mo-fr when [3] undefined do nothing, when mo-fr  chiama gli altri
+        return ($msg);
   }
-  
 }
 
 
@@ -949,6 +967,7 @@ local $SIG{__WARN__} = sub
 
 sub THZ_Parse1($$) {
 my %parsinghash = (
+  #msgtype => parsingrule  
   "09his"  => [["compressorHeating: ",	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
 	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
 	      [" boosterHeating: ",	20, 4, "hex", 1]
@@ -1147,7 +1166,7 @@ sub THZ_debugread($){
 		  print MYFILE ($cmd . "-" . $msg . "\n");
 		  close (MYFILE); 
     }    
-    select(undef, undef, undef, 0.05); #equivalent to sleep 200ms
+    select(undef, undef, undef, 0.05); #equivalent to sleep 50ms
   }
 }
 
