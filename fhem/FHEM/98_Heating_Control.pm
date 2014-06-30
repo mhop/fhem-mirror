@@ -45,7 +45,7 @@ sub Heating_Control_Initialize($)
   $hash->{GetFn}   = "Heating_Control_Get";
   $hash->{AttrFn}  = "Heating_Control_Attr";  
   $hash->{UpdFn}   = "Heating_Control_Update";
-  $hash->{AttrList}= "disable:0,1 windowSensor ".
+  $hash->{AttrList}= "disable:0,1 delayedExecutionCond windowSensor ".
                         $readingFnAttributes;
 }
 ################################################################################
@@ -340,11 +340,6 @@ sub Heating_Control_Update($) {
   my $name   = $hash->{NAME};
   my $now    = time() + 5;       # garantiert > als die eingestellte Schlatzeit
 
-  # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
-  if (Heating_Control_FensterOffen($hash)) {
-     return;
-  }
-
   # Schaltparameter ermitteln
   my ($nowSwitch,$nextSwitch,$newParam,$nextParam)
      = Heating_Control_akt_next_param($now, $hash);
@@ -354,6 +349,11 @@ sub Heating_Control_Update($) {
   $hash->{PERLTIMEUPDATEMODE} = 0;
 
   Log3 $hash, 4, $mod .strftime('Next switch %d.%m.%Y %H:%M:%S',localtime($nextSwitch));
+
+  # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
+  if (Heating_Control_FensterOffen($hash, $nowSwitch, $newParam)) {
+     return;
+  }
 
   # Timer und Readings setzen.
   myRemoveInternalTimer("Update", $hash);
@@ -373,41 +373,78 @@ sub Heating_Control_Update($) {
   return 1;
 }
 ########################################################################
-sub Heating_Control_FensterOffen ($) {
-  my ($hash) = @_;
-  my $mod = "[".$hash->{NAME} ."]";                                             ###
+sub Heating_Control_FensterOffen ($$$) {
+  my ($hash, $tim, $event) = @_;
+  my $mod = "[".$hash->{NAME} ."]";
+  
+  my $verzoegerteAusfuehrungCond = AttrVal($hash->{NAME}, "delayedExecutionCond", "0");
 
-  my %contacts =  ( "CUL_FHTTK" => { "READING" => "Window", "STATUS" => "(Open)"                       },
-                    "CUL_HM"    => { "READING" => "state",  "STATUS" => "(open|tilted)",  "model" => 1 },
-                    "MAX"       => { "READING" => "state",  "STATUS" => "(open)"                       });
+  my %specials= (
+         "%HEATING_CONTROL"  => $hash->{NAME},
+         "%WEEKDAYTIMER"     => $hash->{NAME},
+         "%TIME"             => $tim,
+         "%NAME"             => $hash->{DEVICE},
+         "%EVENT"            => $event
+  );
+  $verzoegerteAusfuehrungCond = EvalSpecials($verzoegerteAusfuehrungCond, %specials);
+  my $verzoegerteAusfuehrung = eval($verzoegerteAusfuehrungCond);
+  
+  if ($verzoegerteAusfuehrung) {
+     if (!defined($hash->{VERZOEGRUNG})) {
+        Log3 $hash, 3, "$mod switch of $hash->{DEVICE} delayed - $verzoegerteAusfuehrungCond is TRUE";
+     }
+     myRemoveInternalTimer("Update", $hash);
+     myInternalTimer      ("Update", time()+60, "$hash->{TYPE}_Update", $hash, 0);
+     $hash->{VERZOEGRUNG} = 1;
+     return 1
+  }
+  
+  my %contacts =  ( "CUL_FHTTK"       => { "READING" => "Window",          "STATUS" => "(Open)",        "MODEL" => "r" },
+                    "CUL_HM"          => { "READING" => "state",           "STATUS" => "(open|tilted)", "MODEL" => "r" },
+                    "MAX"             => { "READING" => "state",           "STATUS" => "(open)",        "MODEL" => "r" },
+                    "WeekdayTimer"    => { "READING" => "delayedExecution","STATUS" => "^1\$",          "MODEL" => "a" },
+                    "Heating_Control" => { "READING" => "delayedExecution","STATUS" => "^1\$",          "MODEL" => "a" }
+                  );
 
-  my $fensterKontakte = AttrVal($hash->{NAME}, "windowSensor", "");
-  Log3 $hash, 5, "$mod list of windowsenors found: '$fensterKontakte'";
+  my $fensterKontakte = AttrVal($hash->{NAME}, "windowSensor",     "")." ".$hash->{NAME};
+  $fensterKontakte =~ s/^\s+//;
+	 $fensterKontakte =~ s/\s+$//;
+  
+  Log3 $hash, 5, "$mod list of senors found: '$fensterKontakte'";
   if ($fensterKontakte ne "" ) {
-     my @kontakte = split(/ /, $fensterKontakte);
+     my @kontakte = split("[ \t]+", $fensterKontakte);
      foreach my $fk (@kontakte) {
         if(!$defs{$fk}) {
-           Log3 $hash, 3, "$mod Window sensor <$fk> not found - check name.";
+           Log3 $hash, 3, "$mod sensor <$fk> not found - check name.";
         } else {
            my $fk_hash = $defs{$fk};
            my $fk_typ  = $fk_hash->{TYPE};
            if (!defined($contacts{$fk_typ})) {
               Log3 $hash, 3, "$mod TYPE '$fk_typ' of $fk not yet supported, $fk ignored - inform maintainer";
            } else {
+           
               my $reading      = $contacts{$fk_typ}{READING};
               my $statusReg    = $contacts{$fk_typ}{STATUS};
-              my $windowStatus = ReadingsVal($fk,$reading,"nF");
+              my $model        = $contacts{$fk_typ}{MODEL};
+              
+              my $windowStatus;
+              if ($model eq "r")  {   ### Reading, sonst Attribut
+                 $windowStatus = ReadingsVal($fk,$reading,"nF");
+              }else{
+                 $windowStatus = AttrVal    ($fk,$reading,"nF");              
+              }
+              
               if ($windowStatus eq "nF") {
-                 Log3 $hash, 3, "$mod READING '$reading' of $fk not found, $fk ignored - inform maintainer";
+                 Log3 $hash, 3, "$mod Reading/Attribute '$reading' of $fk not found, $fk ignored - inform maintainer" if ($model eq "r");
               } else {
-                 Log3 $hash, 5, "$mod windowsensor '$fk' Reading '$reading' is '$windowStatus'";
+                 Log3 $hash, 5, "$mod sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'";
 
                  if ($windowStatus =~  m/^$statusReg$/g) {
                     if (!defined($hash->{VERZOEGRUNG})) {
-                       Log3 $hash, 3, "$mod switch of $hash->{DEVICE} delayed - windowsensor '$fk' Reading '$reading' is '$windowStatus'";
+                       Log3 $hash, 3, "$mod switch of $hash->{DEVICE} delayed - sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'";
                     }
-					myRemoveInternalTimer("Update", $hash);
-					myInternalTimer      ("Update", time()+60, "$hash->{TYPE}_Update", $hash, 0);
+					               myRemoveInternalTimer("Update", $hash);
+					               myInternalTimer      ("Update", time()+60, "$hash->{TYPE}_Update", $hash, 0);
                     $hash->{VERZOEGRUNG} = 1;
                     return 1
                  }
@@ -512,7 +549,7 @@ sub Heating_Control_Device_Schalten($$$$) {
 
   if (defined $hash->{helper}{COMMAND} || ($nowSwitch gt "" && $aktParam ne $newParam )) {
      if (!$setModifier && $secondsSinceSwitch < -60) {
-        Log3 $hash, 5, $mod."no switch in the yesterdays because of the devices type($hash->{DEVICE}is not a heating).";
+        Log3 $hash, 5, $mod."no switch in the yesterdays because of the devices type($hash->{DEVICE} is not a heating).";
      } else {
         if ($command && !$disabled) {
           $newParam =~ s/:/ /g;
@@ -564,14 +601,12 @@ sub Heating_Control_isHeizung($) {
   my $dHash = $defs{$hash->{DEVICE}};                                           ###
   my $dType = $dHash->{TYPE};
   return ""   if (!defined($dType));
-  Log3 $hash, 5, "dType------------>$dType";
 
   my $setModifier = $setmodifiers{$dType};
      $setModifier = ""  if (!defined($setModifier));
   if (ref($setModifier)) {
 
       my $subTypeReading = $setmodifiers{$dType}{subTypeReading};
-      Log3 $hash, 5, "subTypeReading------------>$subTypeReading";
       
       my $model;
       if ($subTypeReading eq "type" ) {
@@ -777,6 +812,29 @@ sub SortNumber {
   <a name="Heating_ControlLogattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>delayedExecutionCond <br> 
+    defines a delay Function. When returning true, the switching of the device is delayed until the function retruns a false value. The behavior is just like a windowsensor. 
+   
+    <br><br>
+    <b>Example:</b>
+    <pre>
+    attr hc delayedExecutionCond isDelayed("%HEATING_CONTROL","%WEEKDAYTIMER","%TIME","%NAME","%EVENT")  
+    </pre>
+    the parameters %HEATING_CONTROL(timer name) %TIME %NAME(device name) %EVENT are replaced at runtime by the correct value.
+
+    <br><br>
+    <b>Example of a function:</b>    
+    <pre>
+    sub isDelayed($$$$$) {
+       my($hc, $wdt, $tim, $nam, $event ) = @_;
+       
+       my $theSunIsStillshining = ...
+    
+       return ($tim eq "16:30" && $theSunIsStillshining) ;    
+    }
+    </pre>        
+    </li>
+    
     <li><a href="#disable">disable</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
@@ -903,13 +961,35 @@ sub SortNumber {
   <a name="Heating_ControlLogattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>delayedExecutionCond <br>
+    definiert eine Veroegerungsfunktion. Wenn die Funktion wahr liefert, wird die Schaltung des Geraets solage verzoegert, bis die Funktion wieder falsch liefert. Das Verhalten entspricht einem Fensterkontakt. 
+    
+    <br><br>
+    <b>Beispiel:</b>    
+    <pre>
+    attr wd delayedExecutionCond isDelayed("%HEATING_CONTROL","%WEEKDAYTIMER","%TIME","%NAME","%EVENT")  
+    </pre>
+    Die Parameter %HEATING_CONTROL(timer Name) %TIME %NAME(device Name) %EVENT werden zur Laufzeit durch die echten Werte ersetzt.
+    
+    <br><br>
+    <b>Beispielfunktion:</b>    
+    <pre>
+    sub isDelayed($$$$$) {
+       my($hc, $wdt, $tim, $nam, $event ) = @_;
+       
+       my $theSunIsStillshining = ...
+    
+       return ($tim eq "16:30" && $theSunIsStillshining) ;    
+    }
+    </pre>        
+    </li>
+    
     <li><a href="#disable">disable</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#stateFormat">stateFormat</a></li>
     <li>windowSensor<br>Definiert eine Liste mit Fensterkontakten. Wenn das Reading window state eines Fensterkontakts <b>open</b> ist, wird der aktuelle Schaltvorgang verz&oumlgert.</li>
   </ul><br>
-</ul>
 
 =end html_DE
 =cut
