@@ -34,6 +34,7 @@ use Time::Local 'timelocal_nocheck';
 
 sub RandomTimer_stopTimeReached($);
 sub schaltZeitenErmitteln ($$);
+sub RandomTimer_setState($);
 
 sub RandomTimer_Initialize($)
 {
@@ -126,13 +127,14 @@ sub RandomTimer_SetTimer($)
   $hash->{active} = 0;
 
   schaltZeitenErmitteln($hash, $now);
+  RandomTimer_setState($hash);
   
   Log3 $hash, 4, "[".$hash->{NAME}."]" . " timings for RandomTimer on $hash->{DEVICE}: "
    . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
    . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
   
   my $secToMidnight = 24*3600 -(3600*$hour + 60*$min + $sec);
-
+  
   my $setExecTime = max($now, $hash->{startTime});
   myRemoveInternalTimer("Exec",     $hash);
   myInternalTimer      ("Exec",     $setExecTime, "RandomTimer_Exec", $hash, 0);
@@ -146,26 +148,27 @@ sub RandomTimer_SetTimer($)
 ########################################################################
 sub RandomTimer_Exec($) {
    my ($myHash) = @_;
-   #my $hash     = $myHash->{HASH};
+   
    my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
    return if (!defined($hash));
   
    # Wenn aktiv aber disabled, dann timer abschalten, Meldung ausgeben.
-   my $active   = RandomTimer_isAktiv($hash);
-   my $disabled = RandomTimer_isDisabled($hash);
+   my $active          = RandomTimer_isAktiv($hash);
+   my $disabled        = RandomTimer_isDisabled($hash);
    my $stopTimeReached = RandomTimer_stopTimeReached($hash);
 
+   $hash->{active} = 0;    
+   
    if ($active) {
       # wenn temporär ausgeschaltet
       if ($disabled) {
         Log3 $hash, 3, "[".$hash->{NAME}. "] RandomTimer for $hash->{DEVICE} going down";
         RandomTimer_down($hash);
-        $hash->{active} = 0;
-		      $hash->{STATE}  = "disabled";
+        RandomTimer_setState($hash);
         return;
       }
-  	   # Wenn aktiv und Abschaltzeit erreicht, dann Gerät ausschalten, Meldung ausgeben und Timer schließen
-     	if ($stopTimeReached) {
+      # Wenn aktiv und Abschaltzeit erreicht, dann Gerät ausschalten, Meldung ausgeben und Timer schließen
+      if ($stopTimeReached) {
          Log3 $hash, 3, "[".$hash->{NAME}."] RandomTimer for $hash->{DEVICE} going down";
          RandomTimer_device_off($hash);
          RandomTimer_down($hash);
@@ -174,16 +177,18 @@ sub RandomTimer_Exec($) {
             Log 3, "[".$hash->{NAME}. "]" ."runonceMode";
             fhem ("delete $hash->{NAME}") ;
          }
+         RandomTimer_setState($hash);
          return;
       }
    } else { # !active
       if ($disabled) {
          Log3 $hash, 4, "[".$hash->{NAME}. "] RandomTimer on $hash->{DEVICE} timer disabled - no start";
-		       $hash->{STATE}  = "disabled";
+         RandomTimer_setState($hash);
          return;
       }
       if ($stopTimeReached) {
          Log3 $hash, 3, "[".$hash->{NAME}."] defintion after stopTime";
+         RandomTimer_setState($hash);
          return;
       }
       Log3 $hash, 3, "[".$hash->{NAME}."]"." starting RandomTimer on $hash->{DEVICE}: "
@@ -192,6 +197,7 @@ sub RandomTimer_Exec($) {
    }
 
    $hash->{active} = 1;
+   RandomTimer_setState($hash);
 
    RandomTimer_device_toggle($hash);
 
@@ -216,7 +222,6 @@ sub RandomTimer_down($) {
    my ($hash) = @_;
 
    $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
-   $hash->{STATE}   = "down";
    fhem ("set $hash->{DEVICE} $hash->{COMMAND}");
 }
 ########################################################################
@@ -224,17 +229,27 @@ sub RandomTimer_device_off($) {
    my ($hash) = @_;
 
    $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
-   $hash->{STATE}   = "off";
+}
+########################################################################
+sub RandomTimer_setState($) {
+  my ($hash) = @_;
+     
+  if (RandomTimer_isDisabled($hash)) {
+     $hash->{STATE}  = "disabled";
+  } else {
+     $hash->{STATE}  = $hash->{active} ? "on" : "off";
+  }
+  
 }
 ########################################################################
 sub RandomTimer_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
-  if( $attrName eq "disable" || $attrName eq "disableCmd" ) {
+  if( $attrName eq "disable" || $attrName eq "disableCond" ) {
   
      my $hash = $defs{$name};
      myRemoveInternalTimer("SetTimer", $hash);
-     myInternalTimer      ("SetTimer", time()+1, "RandomTimer_SetTimer", $hash, 0);	 
+     myInternalTimer      ("SetTimer", time()+1, "RandomTimer_SetTimer", $hash, 0);  
   }
   return undef;
 }
@@ -256,8 +271,6 @@ sub schaltZeitenErmitteln ($$) {
 
   startZeitErmitteln($hash, $now);
   stopZeitErmitteln ($hash, $now);
-
-  $hash->{STATE}  = strftime("%H:%M:%S",localtime($hash->{startTime}));
 
 }
 ########################################################################
@@ -380,7 +393,6 @@ sub RandomTimer_device_toggle ($)
        my $ret  = AnalyzeCommandChain(undef, $command);
        Log3 ($hash, 3, $ret)                  if($ret);
     }
-    $hash->{STATE} = $hash->{COMMAND};
 }
 ########################################################################
 sub get_switchmode ($) {
@@ -554,7 +566,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         attr   ZufallsTimerZ         switchmode  400/400
         </pre>
     </li>
-	
+ 
    </ul>
 =end html
 =cut
