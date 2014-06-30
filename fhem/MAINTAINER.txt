@@ -45,6 +45,7 @@ FHEM/10_FBDECT.pm            rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/10_FRM.pm               ntruchsess           http://forum.fhem.de Sonstiges
 FHEM/10_FS20.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/10_IT.pm                justme1968           http://forum.fhem.de InterTechno
+FHEM/10_SOMFY.pm             thdankert            http://forum.fhem.de Sonstiges
 FHEM/10_Itach_IR             ulimaass             http://forum.fhem.de Sonstige Systeme
 FHEM/10_MAX.pm               mgehre               http://forum.fhem.de MAX
 FHEM/10_OWServer.pm          borisneubert/mfr69bs http://forum.fhem.de 1Wire

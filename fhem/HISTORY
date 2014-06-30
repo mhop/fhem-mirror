@@ -586,3 +586,6 @@
 - Fri Jun 20 2014 (hofrichter)
   - added new module 70_PIONEERAVR.pm to support Pioneer AV receivers
   - added new module 71_PIONEERAVRZONE.pm to support zones of PIONEER AV receivers 
+
+- Mon Jun 30 2014 (thomyd)
+  - added new module 10_SOMFY.pm to support Somfy RTS blinds
