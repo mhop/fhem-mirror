@@ -42,7 +42,7 @@ sub WeekdayTimer_Initialize($)
   $hash->{UndefFn} = "WeekdayTimer_Undef";
   $hash->{GetFn}   = "WeekdayTimer_Get";
   $hash->{UpdFn}   = "WeekdayTimer_Update";
-  $hash->{AttrList}= "disable:0,1 ".
+  $hash->{AttrList}= "disable:0,1 delayedExecutionCond ".
                         $readingFnAttributes;
 }
 ################################################################################
@@ -221,13 +221,35 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
   <a name="WeekdayTimerLogattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>delayedExecutionCond <br> 
+    defines a delay Function. When returning true, the switching of the device is delayed until the function retruns a false value. The behavior is just like a windowsensor in Heating_Control.
+    
+    <br><br>
+    <b>Example:</b>    
+    <pre>
+    attr wd delayedExecutionCond isDelayed("%HEATING_CONTROL","%WEEKDAYTIMER","%TIME","%NAME","%EVENT")  
+    </pre>
+    the parameter %WEEKDAYTIMER(timer name) %TIME %NAME(device name) %EVENT are replaced at runtime by the correct value.
+    
+    <br><br>
+    <b>Example of a function:</b>    
+    <pre>
+    sub isDelayed($$$$$) {
+       my($hc, $wdt, $tim, $nam, $event ) = @_;
+       
+       my $theSunIsStillshining = ...
+    
+       return ($tim eq "16:30" && $theSunIsStillshining) ;    
+    }
+    </pre>    
+    </li>
+    
     <li><a href="#disable">disable</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#stateFormat">stateFormat</a></li>
   </ul><br>
-</ul>
 
 
 =end html
