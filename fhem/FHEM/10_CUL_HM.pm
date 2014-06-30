@@ -585,7 +585,7 @@ sub CUL_HM_Attr(@) {#################################
         else {return "param $_ unknown, use offAtPon or onAtRain";}
       }
     }
-    elsif ($hash->{helper}{role}{vrt}){
+    elsif ($st eq "virtual"){
       if ($cmd eq "set"){
         if ($attrVal eq "noOnOff"){# no action
         }
@@ -7603,7 +7603,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       set control mode to party and device ending time. Add the time it ends
       and the <b>number of days</b> it shall last. If it shall end next day '1'
       must be entered<br></li>
-      <li><B>systime</B><br>
+      <li><B>sysTime</B><br>
           set time in climate channel to system time</li>
     </ul><br>
     </li>
@@ -7620,7 +7620,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           set control mode to party, define temp and timeframe.<br>
           example:<br>
           <code>set controlParty 15 03.8.13 20:30 5.8.13 11:30</code></li>
-      <li><B>systime</B><br>
+      <li><B>sysTime</B><br>
           set time in climate channel to system time</li>
       <li><B>desired-temp &lt;temp&gt;</B><br>
           Set different temperatures. &lt;temp&gt; must be between 6 and 30
@@ -8815,7 +8815,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               setzt die Steuerung f&uuml;r die angegebene Zeit in den Partymodus. Dazu ist die Endzeit sowie <b>Anzahl an Tagen</b>
               die er dauern soll anzugeben. Falls er am n&auml;chsten Tag enden soll ist '1'
               anzugeben<br></li>
-            <li><B>systime</B><br>
+            <li><B>sysTime</B><br>
               setzt Zeit des Klimakanals auf die Systemzeit</li>
           </ul><br>
         </li>
@@ -8827,7 +8827,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               setzt die Steuerung in den Partymodus, definiert Temperatur und Zeitrahmen.<br>
               Beispiel:<br>
               <code>set controlParty 15 03.8.13 20:30 5.8.13 11:30</code></li>
-            <li><B>systime</B><br>
+            <li><B>sysTime</B><br>
               setzt Zeit des Klimakanals auf die Systemzeit</li>
             <li><B>desired-temp &lt;temp&gt;</B><br>
               Setzt verschiedene Temperaturen. &lt;temp&gt; muss zwischen 6°C und 30°C liegen, die Aufl&ouml;sung betr&auml;gt 0.5°C.</li>
