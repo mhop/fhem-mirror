@@ -421,6 +421,18 @@ statistics_DoStatistics($$$)
       statistics_doStatisticMinMax ($hash, $dev, $readingName, 1, $periodSwitch);
    }
 
+   if ($periodSwitch>=1) {
+      @specialReadings = split /,/, AttrVal($hashName, "tendencyReadings", "");
+      foreach $readingName (@specialReadings) 
+      {
+         my $completeReadingName = $devName.":".$readingName;
+         next if ($completeReadingName =~ m/^($exclReadings)$/ );
+         next if not exists ($dev->{READINGS}{$readingName});
+         $statisticDone = 1;
+         statistics_doStatisticTendency ($hash, $dev, $readingName, 1);
+      }
+   }
+   
    if ($statisticDone != 1) { 
       if ( exists ($dev->{READINGS}{state}) && $dev->{READINGS}{state}{VAL} ne "defined" ) { 
          statistics_doStatisticDuration $hash, $dev, "state", $periodSwitch;
@@ -589,7 +601,7 @@ statistics_doStatisticTendency ($$$$)
    my $result = $value;
    Log3 $name,4,"$name: Add $value to $hiddenReadingName";
    if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) { $result .= " " . $hash->{READINGS}{$hiddenReadingName}{VAL}; }
-   my @hidden = split / /, $result; # Internal values
+   @hidden = split / /, $result; # Internal values
    if ( exists($hidden[7]) ) { 
       Log3 $name,4,"$name: Remove last value ".$hidden[7]." from '$hiddenReadingName'";
       delete $hidden[7]; 
@@ -601,6 +613,16 @@ statistics_doStatisticTendency ($$$$)
 
    $result = "1h: " . $stat[1] ." 2h: ". $stat[3] ." 3h: ". $stat[5] ." 6h: ". $stat[7];
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
+
+  # Store single readings
+   my $singularReadings = AttrVal($name, "singularReadings", "");
+   if ($singularReadings ne "") {
+      # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","1h",$stat[1],0,0);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","2h",$stat[1],0,0);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","3h",$stat[1],0,0);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","6h",$stat[1],0,0);
+   }
 
    $result = join( " ", @hidden );
    readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
@@ -884,7 +906,7 @@ statistics_storeSingularReadings ($$$$$$$$$$)
    my ($hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast) = @_;
    return if $singularReadings eq "";
    
-   if ($statType eq "Delta") { $statReadingName .= $period;}
+   if ($statType =~ /Delta|Tendency/) { $statReadingName .= $period;}
    else { $statReadingName .= $statType;}
    my $devName=$dev->{NAME};
    if ("$devName:$readingName:$statType:$period" =~ /^($singularReadings)$/) {
@@ -1022,7 +1044,11 @@ statistics_FormatDuration($)
       Allows the correct timely assignment within plots, can be adapted to the cpu load.
       <br>
     </li><br>
-    <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes<i>(Min|Avg|Max|Delta)</i>:period<i>(Hour|Day|Month|Year)</i></code>
+    <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes:period</i></code>
+      <ul>
+         <li>statTypes: Min|Avg|Max|Delta|Duration|Tendency</li>
+         <li>period: Hour|Day|Month|Year|1h|2h|3h|6h</li>
+      </ul>
       <br>
       Regulare expression of statistic values, which shall not be shown in summary but also in singular readings. Eases the creation of plots.
       <br>
@@ -1033,6 +1059,10 @@ statistics_FormatDuration($)
       <br>
       Adds for readings of delta statistics a singular reading for the given period of hours (e.g. for the rain of the last 72 hours)
    </li><br>
+    <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
+      <br>
+      Comma separated list of reading names for which a min/average/max statistic shall be calculated. 
+    </li><br>
   </ul>
 </ul>
 
@@ -1126,8 +1156,8 @@ statistics_FormatDuration($)
     </li><br>
     <li><code>singularReadings &lt;Ger&auml;teNameRegExp:Ger&auml;teWertRegExp:StatistikTypen:ZeitPeriode&gt;</code>
       <ul>
-         <li>StatistikTypen: Min|Avg|Max|Delta|Duration</li>
-         <li>ZeitPeriode: Hour|Day|Month|Year</li>
+         <li>StatistikTypen: Min|Avg|Max|Delta|Duration|Tendency</li>
+         <li>ZeitPeriode: Hour|Day|Month|Year|1h|2h|3h|6h</li>
       </ul>
       Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
       Erleichtert die Erzeugung von Plots. 
@@ -1137,6 +1167,10 @@ statistics_FormatDuration($)
     <li><code>specialDeltaPeriodHours &lt;Stunden&gt;</code>
       <br>
       F&uuml;gt den Delta-Statistiken einen singul&auml;ren Ger&auml;tewert f&uuml;r die angegebenen Stunden hinzu (z.b. f&uuml;r den Regen in den letzten 72 Stunden)
+    </li><br>
+    <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
+      <br>
+      Durch Kommas getrennte Liste von Ger&auml;tewerten 
     </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a>
     </li><br>
