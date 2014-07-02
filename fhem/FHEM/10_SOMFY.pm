@@ -188,6 +188,8 @@ sub SOMFY_Do_For_Timer($@)
 	  # schedule the stop command for later
 	  InternalTimer(gettimeofday()+$param,"SOMFY_Extension_Fn","SOMFY $name $cmd",0);
 	}
+
+	return
 }
 
 ###################################
