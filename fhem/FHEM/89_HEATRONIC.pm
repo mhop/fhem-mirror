@@ -36,7 +36,7 @@
 #               interval_dhw_Tcylinder, minDiff_ch_Tflow_measured
 #   2014-06-29  logging messages 9000ff00
 #   2014-07-03  found the reason for some weird controller data: the short message
-#               with 9 Bytes accidentally has the correct CRC with length of 11 Bytes
+#               with 9 Bytes accidentally has the correct CRC with length of 17 Bytes
 #               -> fixed problem
 
 
@@ -587,7 +587,7 @@ HEATRONIC_DecodeMsg_HC($$$)
     elsif($type == 112) { $prefix = "hc2_"; }
     elsif($type == 114) { $prefix = "hc3_"; }
     elsif($type == 116) { $prefix = "hc4_"; }
-    else { return undef; }
+    elsif($type == 211) { return 1; }
 	
     if ($length != 9)
     {
