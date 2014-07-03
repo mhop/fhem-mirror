@@ -341,8 +341,12 @@ sub Heating_Control_Update($) {
   my $now    = time() + 5;       # garantiert > als die eingestellte Schlatzeit
 
   # Schaltparameter ermitteln
-  my ($nowSwitch,$nextSwitch,$newParam,$nextParam)
-     = Heating_Control_akt_next_param($now, $hash);
+  my ($nowSwitch,$nextSwitch,$newParam,$nextParam) = Heating_Control_akt_next_param($now, $hash);
+
+ # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
+  if (Heating_Control_FensterOffen($hash, $nowSwitch, $newParam)) {
+     return;
+  }
 
   # ggf. Device schalten
   Heating_Control_Device_Schalten($hash, $now, $nowSwitch, $newParam);
@@ -350,10 +354,6 @@ sub Heating_Control_Update($) {
 
   Log3 $hash, 4, $mod .strftime('Next switch %d.%m.%Y %H:%M:%S',localtime($nextSwitch));
 
-  # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
-  if (Heating_Control_FensterOffen($hash, $nowSwitch, $newParam)) {
-     return;
-  }
 
   # Timer und Readings setzen.
   myRemoveInternalTimer("Update", $hash);
