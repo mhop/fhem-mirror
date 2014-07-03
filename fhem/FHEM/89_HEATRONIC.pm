@@ -31,6 +31,13 @@
 #   2014-06-15  error in handling controller data
 #   2014-06-17  telegram length from 2014-06-13 determined: 9 Bytes, switching
 #               heating mode (comfort, eco, frost) at specified time
+#   2014-06-22  new: sub HEATRONIC_TimeDiff, interval_ch_time, 
+#               interval_ch_Tflow_measured, interval_dhw_Tmeasured,
+#               interval_dhw_Tcylinder, minDiff_ch_Tflow_measured
+#   2014-06-29  logging messages 9000ff00
+#   2014-07-03  found the reason for some weird controller data: the short message
+#               with 9 Bytes accidentally has the correct CRC with length of 11 Bytes
+#               -> fixed problem
 
 
 
@@ -60,6 +67,7 @@ use IO::File;
 sub HEATRONIC_Initialize($);
 sub HEATRONIC_Define($$);
 sub HEATRONIC_Undef($$);
+#sub HEATRONIC_Attr(@);
 sub HEATRONIC_Read($);
 sub HEATRONIC_DecodeMsg_CH1($$$);
 sub HEATRONIC_DecodeMsg_CH2($$$);
@@ -70,6 +78,7 @@ sub HEATRONIC_DecodeMsg_DT($$$);
 sub HEATRONIC_DecodeMsg_SOL($$$);
 sub HEATRONIC_CRCtest($$$);
 sub HEATRONIC_CRCget($);
+sub HEATRONIC_timeDiff($);
 
 my @crc_table = qw( 0x00 0x02 0x04 0x06 0x08 0x0a 0x0c 0x0e 0x10 0x12 0x14 0x16 0x18 0x1a 0x1c 0x1e 
                     0x20 0x22 0x24 0x26 0x28 0x2a 0x2c 0x2e 0x30 0x32 0x34 0x36 0x38 0x3a 0x3c 0x3e
@@ -91,7 +100,7 @@ my @crc_table = qw( 0x00 0x02 0x04 0x06 0x08 0x0a 0x0c 0x0e 0x10 0x12 0x14 0x16 
 my $buffer = "";
 my $fh;
 #my $debug;
-#my $interval;
+my $interval_ch_time;
 
 
 
@@ -104,12 +113,24 @@ HEATRONIC_Initialize($)
 
   $hash->{DefFn}   = "HEATRONIC_Define";
   $hash->{UndefFn} = "HEATRONIC_Undef";
+#  $hash->{AttrFn}  = "HEATRONIC_Attr";
   $hash->{ReadFn}  = "HEATRONIC_Read";
   $hash->{AttrList} =
-	  "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 " . $readingFnAttributes;
+	  "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 " 
+      ."log88001800:0,1 "
+      ."log88003400:0,1 "
+      ."log9000FF00:0,1 "
+	  ."interval_ch_time:0,60,300,600,900,1800,3600,7200,43200,86400 "
+	  ."interval_ch_Tflow_measured:0,15,30,60,300,600,900,1800,3600,7200,43200,86400 "
+      ."interval_dhw_Tmeasured:0,15,30,60,300,600,900,1800,3600,7200,43200,86400 "
+      ."interval_dhw_Tcylinder:0,15,30,60,300,600,900,1800,3600,7200,43200,86400 "
+      ."minDiff_ch_Tflow_measured:0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0 "
+      ."binary_operation:OR,AND "
+	  . $readingFnAttributes;
 }
 
-
+# if fmt =~"m/_betriebsart$/"
+# 
 
 sub
 HEATRONIC_Define($$)
@@ -157,7 +178,14 @@ HEATRONIC_DoInit($)
   return undef;
 }
 
-
+#sub
+#HEATRONIC_Attr(@)
+#{
+#  my ($cmd, $name, $attrName, $attrVal) = @_;
+  
+#  my $hash = $defs{$name};
+#  my $ret;
+#}
 
 sub
 HEATRONIC_Read($)
@@ -171,7 +199,7 @@ HEATRONIC_Read($)
   my $position = 0;
 
 #  $debug = AttrVal($name, "debug", 0);
-#  $interval = AttrVal($name, "interval", 0);
+#  $interval_ch_time = AttrVal($name, "interval_ch_time", undef);
 
 
 
@@ -353,6 +381,8 @@ HEATRONIC_Read($)
 	
     if (length(substr($buffer,$position)) >= $length*2)
     {
+      my $logging = AttrVal($name, "log9000FF00", 0);
+      
       $value = HEATRONIC_DecodeMsg_HC($hash,substr($buffer,$position,$length*2),$length);
       if (!defined($value))
       {
@@ -368,6 +398,14 @@ HEATRONIC_Read($)
           $length = 9;
           $value = HEATRONIC_DecodeMsg_HC($hash,substr($buffer,$position,$length*2),$length);
         }
+      }
+      
+      if ($logging == 1)
+      {
+        my $fh_logging = IO::File->new("/opt/fhem/log/j9000FF00.log",">>");
+        $fh_logging->print(strftime("%Y-%m-%d %H:%M:%S",localtime()) . ": " . substr($buffer,$position,$length*2) . "\n");
+        $fh_logging->flush();
+        undef $fh_logging;
       }
       
       if (defined($value))
@@ -444,11 +482,33 @@ HEATRONIC_DecodeMsg_CH1($$$)
     my $ch_burner_fan       = (hex(substr($string,11*2,2)) & 0x01) ? 1 : 0;
     my $ch_mode             = (hex(substr($string,9*2,2)) & 0x03);
 	
+    my $ch_Tflow_measuredTS     = ReadingsTimestamp( $name, "ch_Tflow_measured", undef );
+    my $interval_ch_Tflow_measured = AttrVal($name, "interval_ch_Tflow_measured", -1);
+
+    my $minDiff_ch_Tflow_measured = AttrVal($name, "minDiff_ch_Tflow_measured", 0);
+    my $ch_Tflow_measuredOldVal = ReadingsVal( $name, "ch_Tflow_measured",0);
+
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "ch_Tflow_desired", $ch_Tflow_desired); 
-    readingsBulkUpdate($hash, "ch_Tflow_measured", sprintf("%.1f",$ch_Tflow_measured)); 
-    readingsBulkUpdate($hash, "ch_Treturn", ($ch_Treturn*10 == 0x8000) ? sprintf("%.1f",$ch_Treturn) : "n/a");
-    readingsBulkUpdate($hash, "ch_Tmixer", sprintf("%.1f", $ch_Tmixer));
+
+    if (!defined($ch_Tflow_measuredTS))
+    {
+      $interval_ch_Tflow_measured = -1;
+    }
+
+    if ($interval_ch_Tflow_measured != 0 )
+    {
+      if (($interval_ch_Tflow_measured > 0) && (HEATRONIC_timeDiff($ch_Tflow_measuredTS) >= $interval_ch_Tflow_measured) || $interval_ch_Tflow_measured == -1)
+      {
+        if (abs($ch_Tflow_measuredOldVal-$ch_Tflow_measured) >= $minDiff_ch_Tflow_measured)
+        {
+          readingsBulkUpdate($hash, "ch_Tflow_measured", sprintf("%.1f",$ch_Tflow_measured)); 
+        }
+      }
+    }
+
+    readingsBulkUpdate($hash, "ch_Treturn", ($ch_Treturn*10 == 0x8000) ? "0.0" : sprintf("%.1f",$ch_Treturn));
+    readingsBulkUpdate($hash, "ch_Tmixer", ($ch_Tmixer*10 == 0x8000) ? "0.0" : sprintf("%.1f", $ch_Tmixer));
     readingsBulkUpdate($hash, "ch_mode", $ch_mode);
     readingsBulkUpdate($hash, "ch_burner_fan", $ch_burner_fan);
     readingsBulkUpdate($hash, "ch_burner_operation", $ch_burner_operation);
@@ -527,6 +587,7 @@ HEATRONIC_DecodeMsg_HC($$$)
     elsif($type == 112) { $prefix = "hc2_"; }
     elsif($type == 114) { $prefix = "hc3_"; }
     elsif($type == 116) { $prefix = "hc4_"; }
+    else { return undef; }
 	
     if ($length != 9)
     {
@@ -567,11 +628,49 @@ HEATRONIC_DecodeMsg_DHW($$$)
     my $dhw_Tcylinder = hex(substr($string,7*2,4))/10;
     my $ch_runtime_dhw = hex(substr($string,14*2,6));
     my $ch_starts_dhw = hex(substr($string,17*2,6));
+    my $dhw_charge_once = (hex(substr($string,9*2,2)) & 0x02) ? 1 : 0;
+    my $dhw_thermal_desinfection = (hex(substr($string,9*2,2)) & 0x04) ? 1 : 0;
+    my $dhw_generating = (hex(substr($string,9*2,2)) & 0x08) ? 1 : 0;
+    my $dhw_boost_charge = (hex(substr($string,9*2,2)) & 0x10) ? 1 : 0;
+    my $dhw_Tok = (hex(substr($string,9*2,2)) & 0x20) ? 1 : 0;
+
+   
+    my $dhw_TmeasuredTS     = ReadingsTimestamp( $name, "dhw_Tmeasured", undef );
+    my $interval_dhw_Tmeasured = AttrVal($name, "interval_dhw_Tmeasured", -1);
+
+    my $dhw_TcylinderTS     = ReadingsTimestamp( $name, "dhw_Tcylinder", undef );
+    my $interval_dhw_Tcylinder = AttrVal($name, "interval_dhw_Tcylinder",   -1);
+
 	
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "dhw_Tdesired", $dhw_Tdesired);
-    readingsBulkUpdate($hash, "dhw_Tmeasured", sprintf("%.1f",$dhw_Tmeasured));
-    readingsBulkUpdate($hash, "dhw_Tcylinder", sprintf("%.1f",$dhw_Tcylinder));
+
+    if (!defined($dhw_TmeasuredTS))
+    {
+      $interval_dhw_Tmeasured = -1;
+    }
+
+    if ($interval_dhw_Tmeasured != 0)
+    {
+      if (($interval_dhw_Tmeasured > 0) && (HEATRONIC_timeDiff($dhw_TmeasuredTS) >= $interval_dhw_Tmeasured) || $interval_dhw_Tmeasured == -1)
+      {
+        readingsBulkUpdate($hash, "dhw_Tmeasured", sprintf("%.1f",$dhw_Tmeasured));
+      }
+    }
+    
+    if (!defined($dhw_Tcylinder))
+    {
+      $interval_dhw_Tcylinder = -1;
+    }
+
+    if ($interval_dhw_Tcylinder != 0)
+    {
+      if (($interval_dhw_Tcylinder > 0) && (HEATRONIC_timeDiff($dhw_TcylinderTS) >= $interval_dhw_Tcylinder) || $interval_dhw_Tcylinder == -1)
+      {
+        readingsBulkUpdate($hash, "dhw_Tcylinder", sprintf("%.1f",$dhw_Tcylinder));
+      }
+    }
+    
     readingsBulkUpdate($hash, "ch_runtime_dhw", $ch_runtime_dhw);
     readingsBulkUpdate($hash, "ch_starts_dhw", $ch_starts_dhw);
     readingsEndUpdate($hash,1);
@@ -599,6 +698,9 @@ HEATRONIC_DecodeMsg_DT($$$)
 {
   my ($hash,$string,$length) = @_;
   my $name = $hash->{NAME};
+
+  my $ch_timeTS = ReadingsTimestamp( $name, "ch_time", undef );
+  my $interval_ch_time = AttrVal($name, "interval_ch_time", -1);
   
   if (defined(HEATRONIC_CRCtest($hash,$string,$length)))
   {
@@ -610,10 +712,22 @@ HEATRONIC_DecodeMsg_DT($$$)
     my $sec   = hex(substr($string,9*2,2));
     my $dow   = hex(substr($string,10*2,2));
 #    my $dst     = (hex(substr($string,11*2,2)) & 0x01) ? "dst" : "";
+
+    if (!defined($ch_timeTS))
+    {
+      $interval_ch_time = -1;
+    }
 	
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "ch_time", sprintf("%4d-%02d-%02d %02d:%02d:%02d", $year, $month, $day, $hours, $min, $sec ));
-    readingsEndUpdate($hash,1);
+    if ($interval_ch_time != 0)
+    {
+      if (($interval_ch_time > 0) && (HEATRONIC_timeDiff($ch_timeTS) < $interval_ch_time))
+      {
+        return 1;
+      }
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "ch_time", sprintf("%4d-%02d-%02d %02d:%02d:%02d", $year, $month, $day, $hours, $min, $sec ));
+      readingsEndUpdate($hash,1);
+    }
 
     return 1;
   }
@@ -733,6 +847,16 @@ HEATRONIC_CRCget($)
   return "(".sprintf("%02x",$crc) . "/" . substr($string,$length*2-4,2) .")";
 }
 
+sub
+HEATRONIC_timeDiff($) {
+  my ($strTS)=@_;
+  
+  my $serTS = (defined($strTS) && $strTS ne "") ? time_str2num($strTS) : gettimeofday();
+  my $timeDiff = gettimeofday()- $serTS;
+  $timeDiff=0 if ( $timeDiff<0);
+  return $timeDiff;
+}
+
 1;
 
 =pod
@@ -755,6 +879,16 @@ HEATRONIC_CRCget($)
 	   <code> define Boiler HEATRONIC /dev/ttyUSB0@9600</code>
 	 </ul><br/>
 	 
+     <a name="HEATRONIC_attributes"><b>Attributes:</b></a>
+     <ul>
+        <li><B>interval_ch_time, interval_ch_Tflow_measured, interval_dhw_Tmeasured, interval_dhw_Tcylinder</B><br/>
+          interval (in seconds) to update the corresponding values
+        </li><br/>
+        <li><B>minDiff_ch_Tflow_measured</B><br/>
+          minimal difference (in degrees, e.g. 0.2) to update the corresponding values
+        </li><br/>
+     </ul>
+   
 	 <a name="HEATRONIC_readings"><b>Readings:</b></a>
 	 <ul>
 	     <li><B>ch_Tflow_desired</B><br/>
@@ -876,6 +1010,16 @@ HEATRONIC_CRCget($)
 	 <ul>
 	   <code> define Heizung HEATRONIC /dev/ttyUSB0@9600</code>
 	 </ul><br/>
+
+     <a name="HEATRONIC_attributes"><b>Attributes:</b></a>
+     <ul>
+        <li><B>interval_ch_time, interval_ch_Tflow_measured, interval_dhw_Tmeasured, interval_dhw_Tcylinder</B><br/>
+          Intervall (in Sekunden) zum Update der entsprechenden Werte
+        </li><br/>
+        <li><B>minDiff_ch_Tflow_measured</B><br/>
+          Minimaldifferenz (in Grad, z.B. 0.2) zum Update der entsprechenden Werte
+        </li><br/>
+     </ul>
 	 
 	 <a name="HEATRONIC_readings"><b>Readings:</b></a>
 	 <ul>
