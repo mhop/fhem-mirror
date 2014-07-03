@@ -138,9 +138,9 @@ STACKABLE_CC_Undef($$)
     <ul><code>
       define SCC0 CUL /dev/ttyAMA0@38400<br>
       attr SCC0 rfmode SlowRF<br>
-      define SCC1 STACKABLE_CC CUL<br>
+      define SCC1 STACKABLE_CC SCC0<br>
       attr SCC1 rfmode HomeMatic<br>
-      define SCC2 STACKABLE_CC CUL<br>
+      define SCC2 STACKABLE_CC SCC1<br>
       attr SCC2 rfmode Max<br>
     </code></ul>
     <b>Important:</b>
@@ -195,9 +195,9 @@ STACKABLE_CC_Undef($$)
     <ul><code>
       define SCC0 CUL /dev/ttyAMA0@38400<br>
       attr SCC0 rfmode SlowRF<br>
-      define SCC1 STACKABLE_CC CUL<br>
+      define SCC1 STACKABLE_CC SCC0<br>
       attr SCC1 rfmode HomeMatic<br>
-      define SCC2 STACKABLE_CC CUL<br>
+      define SCC2 STACKABLE_CC SCC1<br>
       attr SCC2 rfmode Max<br>
     </code></ul>
     <b>Wichtig:</b>
