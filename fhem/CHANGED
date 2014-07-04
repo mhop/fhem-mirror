@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  do no parse empty lines in 57_Calendar.pm
   - bugfix:  10_SOMFY.pm: save enc-key and rolling-code as reading instead of attribute
                          to prevent loss of control after FHEM restart.
   - feature: new module 10_SOMFY.pm to support Somfy RTS blinds
