@@ -118,7 +118,7 @@ PIONEERAVR_Initialize($) {
 	$hash->{GetFn}   = "PIONEERAVR_Get";
 	$hash->{SetFn}   = "PIONEERAVR_Set";
 	$hash->{AttrFn}  = "PIONEERAVR_Attr";
-	$hash->{AttrList}= "logTraffic:0,1,2,3,4,5 ".
+	$hash->{AttrList}= "logTraffic:0,1,2,3,4,5 checkConnection:enable,disable ".
 						$readingFnAttributes;
 	
 	# remotecontrol
@@ -1339,11 +1339,14 @@ sub PIONEERAVR_Read($)
   # We delete the current "inactivity timer" and set a new timer 
   #   to check if connection to the Pioneer AV receiver is still working in 120s
 
-  my $in120s = gettimeofday()+120;
-  $hash->{helper}{nextConnectionCheck} = $in120s;
-  RemoveInternalTimer($hash);
-  InternalTimer($in120s, "PIONEERAVR_checkConnection", $hash, 0);
-  Log3 $hash,5,"PIONEERAVR $name: Connection is up --- Check again in 120s --> Internal timer (120s) set";	
+  if (AttrVal($name, "checkConnection", "enable") eq "enable" ) {
+	  my $in120s = gettimeofday()+120;
+	  $hash->{helper}{nextConnectionCheck} = $in120s;
+	  RemoveInternalTimer($hash);
+	  InternalTimer($in120s, "PIONEERAVR_checkConnection", $hash, 0);
+	  Log3 $hash,5,"PIONEERAVR $name: Connection is up --- Check again in 120s --> Internal timer (120s) set";	
+  }
+
   readingsEndUpdate($hash, 1);
   $hash->{PARTIAL} = $buf;
 }
@@ -1385,7 +1388,7 @@ sub PIONEERAVR_Reopen($) {
   my $ret = DevIo_OpenDev($hash, 1, undef);
   if ($hash->{STATE} eq "opened") {
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen() -> now opened";
-	readingsSingleUpdate($hash , "connectionState" , "opened" , 1 );
+	#readingsSingleUpdate($hash , "connectionState" , "opened" , 1 );
 	PIONEERAVR_statusUpdate($hash);
   }
   return $ret;
@@ -1395,15 +1398,19 @@ sub PIONEERAVR_Reopen($) {
 # connection check 3s after writing
 sub PIONEERAVR_Write($$) {
   my ($hash, $msg) = @_;
+  my $name= $hash->{NAME};
   $msg= $msg."\r\n";
   my $logMsg = "SimpleWrite " . dq($msg);
   PIONEERAVR_Log($hash, undef, $logMsg);
   DevIo_SimpleWrite($hash, $msg, 0);
-  my $now3 = gettimeofday()+3;
-  if ($hash->{helper}{nextConnectionCheck} > $now3) { 
-	$hash->{helper}{nextConnectionCheck} = $now3;
-	RemoveInternalTimer($hash);
-	InternalTimer($now3, "PIONEERAVR_checkConnection", $hash, 0);
+
+  if (AttrVal($name, "checkConnection", "enable") eq "enable" ) {
+	my $now3 = gettimeofday()+3;
+	if ($hash->{helper}{nextConnectionCheck} > $now3) { 
+		$hash->{helper}{nextConnectionCheck} = $now3;
+		RemoveInternalTimer($hash);
+		InternalTimer($now3, "PIONEERAVR_checkConnection", $hash, 0);
+	}
   }
 }
 
@@ -1438,23 +1445,17 @@ sub PIONEERAVR_checkConnection ($) {
 	# not connected!
 	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- reopen()";
 	PIONEERAVR_Reopen($hash);
-  }
-  #restore state $hash->{STATE}
-  Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after PIONEERAVR_Reopen(): ".$hash->{STATE}." state: $state ConnState: ".dq($connState);
-  if (($hash->{STATE} eq "opened" || $hash->{STATE} eq "connected" ) && ($state eq "on" || $state eq "off")){
-	#readingsSingleUpdate($hash, "state", $state,1 );
+    Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after PIONEERAVR_Reopen(): ".$hash->{STATE}." state: $state ConnState: ".dq($connState);
+  } else {
+    # we got a reply -> connection is good -> restore state
+	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: ".$hash->{STATE}." restored to: $state";
 	$hash->{STATE} = $state;
-	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: $state restored to: ".$hash->{STATE};
-  } elsif ($hash->{STATE} eq "disconnected") {
- 	Log3 $name, 3, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state (discon): ".$hash->{STATE};
-	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "connectionState","disconnected",1 );
-	#readingsBulkUpdate($hash, "state", $hash->{STATE},1 );
-	readingsEndUpdate($hash, 1);
+  } 
+  if (AttrVal($name, "checkConnection", "enable") eq "enable" ) {
+	$hash->{helper}{nextConnectionCheck}  = gettimeofday()+120; 
+	InternalTimer($hash->{helper}{nextConnectionCheck}, "PIONEERAVR_checkConnection", $hash, 0);
+	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection(): set internaltimer(120s)";
   }
-  #RemoveInternalTimer($hash);
-  $hash->{helper}{nextConnectionCheck}  = gettimeofday()+120; 
-  InternalTimer($hash->{helper}{nextConnectionCheck}, "PIONEERAVR_checkConnection", $hash, 0);
 }
 #########################################################
 sub PIONEERAVR_statusUpdate($) {
@@ -1644,6 +1645,7 @@ RC_layout_PioneerAVR() {
   <b>Attributes</b>
   <br><br>
   <ul>
+    <li>checkConnection &lt;enable|disable>&gt;<br>Enables/disbales the check if the data connection to the Pioneer AV reciver is open.(Default: enable)</li>
     <li>logTraffic &lt;loglevel&gt;<br>Enables logging of sent and received datagrams with the given loglevel. 
 	Control characters in the logged datagrams are escaped, i.e. a double backslash is shown for a single backslash,
 	\n is shown for a line feed character, etc.</li>
@@ -1784,6 +1786,8 @@ RC_layout_PioneerAVR() {
   <b>Attribute</b>
   <br><br>
   <ul>
+    <li>checkConnection &lt;enable|disable>&gt;<br>Ein-/Ausscahlten der regelmäßigen Überprüfung, ob die Datenverbindung
+	zum Pioneer AV Receiver funktionert. Ist das Attribut nicht gesetzt, oder "enable" so wird regelmäßig die Verbindung überprüft.</li>
     <li>logTraffic &lt;loglevel&gt;<br>Ermöglicht das loggen der Datenommunikation vom/zum Pioneer AV Receiver. 
 	Steuerzeichen werden angezeigtz.B. ein doppelter Ruckwärts-Schrägstrich wird als einfacher Rückwärts-Schrägstrich angezeigt,
 	\n wird für das Steuerzeichen "line feed" angezeigt, etc.</li>
