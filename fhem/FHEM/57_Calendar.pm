@@ -108,6 +108,7 @@ sub parseSub {
     $line =~ s/[\x0D]//; # chomp will not remove the CR
     #main::Debug "$ln: $line";
     $ln++;
+    next if($line eq ""); # remove empty line
     last if($line =~ m/^END:.*$/);
     if($line =~ m/^BEGIN:(.*)$/) {
       my $entry= ICal::Entry->new($1);
