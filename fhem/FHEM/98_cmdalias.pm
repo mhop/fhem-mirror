@@ -25,7 +25,7 @@ cmdalias_Define($$$)
 {
   my ($hash, $def) = @_;
 
-  if($def !~ m/^([^ ]*) cmdalias ([^ ]*)(.*) AS (.*)$/) {
+  if($def !~ m/^([^ ]*) cmdalias ([^ ]*)(.*) AS (.*)$/s) {
     my $msg =
       "wrong syntax: define <name> cmdalias <cmd> [parameter] AS command...";
     return $msg;
@@ -33,7 +33,8 @@ cmdalias_Define($$$)
   my ($name, $alias, $param, $newcmd) = ($1, $2, $3, $4);
   $param =~ s/^ *//;
   # Checking for misleading regexps
-  eval { "Hallo" =~ m/^$param$/ };
+  return "Bad regexp: starting with *" if($param =~ m/^\*/);
+  eval { qr/^$param$/ };
   return "$name: Bad regexp in $param: $@" if($@);
   $hash->{ALIAS} = lc($alias);
   $hash->{PARAM} = $param;
