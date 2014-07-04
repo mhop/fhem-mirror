@@ -452,6 +452,8 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{q}{qReqStat} = ""; # queue statusRequest for this device
     $hash->{helper}{mRssi}{mNo}  = "";
     CUL_HM_prtInit ($hash);
+    $hash->{helper}{io}{vccu} = "";
+    $hash->{helper}{io}{prefIO} = "";
     CUL_HM_assignIO($hash)if (!$init_done && $HMid ne "000000");
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
@@ -688,11 +690,22 @@ sub CUL_HM_Attr(@) {#################################
     }
   }
   elsif($attrName eq "IOList"){
-    if ($cmd eq "set"){
-      return "use $attrName only for ccu device" 
+    return "use $attrName only for ccu device" 
             if (!$hash->{helper}{role}{dev}
                 || AttrVal($name,"model","CCU-FHEM") !~ "CCU-FHEM");
-      CUL_HM_UpdtCentral($name);
+    delete $attr{$name}{$attrName};
+    CUL_HM_UpdtCentral($name);
+  }
+  elsif($attrName eq "IOgrp" ){
+    if ($cmd eq "set"){
+      return "use $attrName only for devices" if (!$hash->{helper}{role}{dev});
+      my ($ioCCU,$prefIO) = split(":",$attrVal,2);
+      $hash->{helper}{io}{vccu}   = $ioCCU;
+      $hash->{helper}{io}{prefIO} = $prefIO;
+    }
+    else{
+      $hash->{helper}{io}{vccu} = "";
+      $hash->{helper}{io}{prefIO} = "";
     }
   }
   elsif($attrName eq "autoReadReg"){
@@ -2458,7 +2471,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
       push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
       
-      CUL_HM_stateUpdatDly($pName,10);
+      CUL_HM_stateUpdatDly($pName,10) if($mTp eq "40");
     }
     return "";
   }
@@ -6497,6 +6510,9 @@ sub CUL_HM_UpdtCentral($){
       }
     }
   }
+  my @ioList = split(",",AttrVal($name,"IOList",""));
+  $defs{$name}{helper}{io}{ioList} = \@ioList;
+  
   CUL_HM_UpdtCentralState($name);
 }
 sub CUL_HM_UpdtCentralState($){
@@ -6532,9 +6548,9 @@ sub CUL_HM_assignIO($){ #check and assign IO
     return; 
   }
     
-  my ($ioCCU,$prefIO) = split(":",AttrVal($hash->{NAME},"IOgrp","_"),2);
+  my ($ioCCU,$prefIO) = ($hash->{helper}{io}{vccu},$hash->{helper}{io}{prefIO});
   if (defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"){
-    my @ioccu =split(",", AttrVal($ioCCU,"IOList",""));
+    my @ioccu = @{$defs{$ioCCU}{helper}{io}{ioList}};
     my @ios = ((sort {$hash->{helper}{mRssi}{io}{$b} <=> 
                     $hash->{helper}{mRssi}{io}{$a} } 
                     grep {defined $hash->{helper}{mRssi}{io}{$_}} @ioccu)
