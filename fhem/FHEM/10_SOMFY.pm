@@ -44,7 +44,7 @@ sub SOMFY_Initialize($) {
 	#                         YsKKC0RRRRAAAAAA
 	#  $hash->{Match}     = "^YsA..0..........\$";
 	$hash->{SetFn}   = "SOMFY_Set";
-	$hash->{StateFn} = "SOMFY_SetState";
+	#$hash->{StateFn} = "SOMFY_SetState";
 	$hash->{DefFn}   = "SOMFY_Define";
 	$hash->{UndefFn} = "SOMFY_Undef";
 
@@ -81,8 +81,13 @@ sub SOMFY_Define($$) {
 		return "Define $a[0]: wrong address format: specify a 6 digit hex value "
 	}
 
+	# group devices by their address
+	my $name  = $a[0];
 	my $address = $a[2];
+
 	$hash->{ADDRESS} = uc($address);
+
+	my $tn = TimeNow();
 
 	# check optional arguments for device definition
 	if ( int(@a) > 3 ) {
@@ -93,8 +98,12 @@ sub SOMFY_Define($$) {
 			  . "specify a 2 digits hex value (first nibble = A) "
 		}
 
-		# store it as attribute, so it is saved in the statefile
-		$attr{ $a[0] }{"enc-key"} = lc( $a[3] );
+		# store it as reading, so it is saved in the statefile
+		# only store it, if the reading does not exist yet
+		my $old_enc_key = uc(ReadingsVal($name, "enc_key", "invalid"));
+		if($old_enc_key eq "invalid") {
+			setReadingsVal($hash, "enc_key", uc($a[3]), $tn);
+		}
 
 		if ( int(@a) == 5 ) {
 			# check rolling code (4 hex digits)
@@ -103,21 +112,16 @@ sub SOMFY_Define($$) {
 			 	 . "specify a 4 digits hex value "
 			}
 
-			# store it
-			$attr{ $a[0] }{"rolling-code"} = lc( $a[4] );
+			# store it, if old reading does not exist yet
+			my $old_rolling_code = uc(ReadingsVal($name, "rolling_code", "invalid"));
+			if($old_rolling_code eq "invalid") {
+				setReadingsVal($hash, "rolling_code", uc($a[4]), $tn);
+			}
 		}
 	}
-	else {
-		# no values for encryption and rolling code provided, use initial defaults
-		$attr{ $a[0] }{"enc-key"}      = "A0";
-		$attr{ $a[0] }{"rolling-code"} = "0000";
-	}
 
-	# group devices by their address
 	my $code  = uc($address);
 	my $ncode = 1;
-	my $name  = $a[0];
-
 	$hash->{CODE}{ $ncode++ } = $code;
 	$modules{SOMFY}{defptr}{$code}{$name} = $hash;
 
@@ -139,21 +143,6 @@ sub SOMFY_Undef($$) {
 			}
 		}
 	}
-	return undef;
-}
-
-#####################################
-sub SOMFY_SetState($$$$) {
-	my ( $hash, $tim, $vt, $val ) = @_;
-
-	if ( $val =~ m/^(.*) \d+$/ ) {
-		$val = $1;
-	}
-
-	if ( !defined( $somfy_c2b{$val} ) ) {
-		return "Undefined value $val";
-	}
-
 	return undef;
 }
 
@@ -251,14 +240,28 @@ sub SOMFY_Set($@) {
 
 	my $value = $name ." ". join(" ", @args);
 
+	# convert old attribute values to READINGs
+	my $timestamp = TimeNow();
+	if(defined($attr{$name}{"enc-key"} && defined($attr{$name}{"rolling-code"}))) {
+		setReadingsVal($hash, "enc_key", $attr{$name}{"enc-key"}, $timestamp);
+		setReadingsVal($hash, "rolling_code", $attr{$name}{"rolling-code"}, $timestamp);
+
+		# delete old attribute
+		delete($attr{$name}{"enc-key"});
+		delete($attr{$name}{"rolling-code"});
+	}
+
 	# message looks like this
 	# Ys_key_ctrl_cks_rollcode_a0_a1_a2
 	# Ys ad 20 0ae3 a2 98 42
 
+	my $enckey = uc(ReadingsVal($name, "enc_key", "A0"));
+	my $rollingcode = uc(ReadingsVal($name, "rolling_code", "0000"));
+
 	$message = "Ys"
-	  . uc( $attr{ $name }{"enc-key"} )
+	  . $enckey
 	  . $command
-	  . uc( $attr{ $name }{"rolling-code"} )
+	  . $rollingcode
 	  . uc( $hash->{ADDRESS} );
 
 	## Log that we are going to switch Somfy
@@ -268,7 +271,6 @@ sub SOMFY_Set($@) {
 	## Send Message to IODev and wait for correct answer
 	my $msg = CallFn( $io->{NAME}, "GetFn", $io, ( " ", "raw", $message ) );
 
-	my $enckey = uc($attr{$name}{"enc-key"});
 	if ( $msg =~ m/raw => Ys$enckey.*/ ) {
 		Log 4, "Answer from $io->{NAME}: $msg";
 	}
@@ -277,13 +279,15 @@ sub SOMFY_Set($@) {
 	}
 
 	# increment encryption key and rolling code
-	my $enc_key_increment      = hex( $attr{ $name }{"enc-key"} );
-	my $rolling_code_increment = hex( $attr{ $name }{"rolling-code"} );
+	my $enc_key_increment      = hex( $enckey );
+	my $rolling_code_increment = hex( $rollingcode );
 
-	$attr{ $name }{"enc-key"} =
-	  sprintf( "%02X", ( ++$enc_key_increment & hex("0xAF") ) );
-	$attr{ $name }{"rolling-code"} =
-	  sprintf( "%04X", ( ++$rolling_code_increment ) );
+	my $new_enc_key = sprintf( "%02X", ( ++$enc_key_increment & hex("0xAF") ) );
+	my $new_rolling_code = sprintf( "%04X", ( ++$rolling_code_increment ) );
+
+	# update the readings, but do not generate an event
+	setReadingsVal($hash, "enc_key", $new_enc_key, $timestamp);
+	setReadingsVal($hash, "rolling_code", $new_rolling_code, $timestamp);
 
 	## Do we need to change symbol length back?
 	if (   defined( $attr{ $name } )
@@ -318,7 +322,7 @@ sub SOMFY_Set($@) {
 	}
 
 	##########################
-	# Look for all devices with the same address, and set state, timestamp
+	# Look for all devices with the same address, and set state, enc-key, rolling-code and timestamp
 	my $code = "$hash->{ADDRESS}";
 	my $tn   = TimeNow();
 	foreach my $n ( keys %{ $modules{SOMFY}{defptr}{$code} } ) {
@@ -328,6 +332,10 @@ sub SOMFY_Set($@) {
 		$lh->{STATE}                 = $value;
 		$lh->{READINGS}{state}{TIME} = $tn;
 		$lh->{READINGS}{state}{VAL}  = $value;
+		$lh->{READINGS}{enc_key}{TIME} 		= $tn;
+		$lh->{READINGS}{enc_key}{VAL}       = $new_enc_key;
+		$lh->{READINGS}{rolling_code}{TIME} = $tn;
+		$lh->{READINGS}{rolling_code}{VAL}  = $new_rolling_code;
 	}
 	return $ret;
 }
