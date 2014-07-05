@@ -25,7 +25,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.0
+# Version: 1.1.1
 #
 # Major Version History:
 # - 1.1.0 - 2014-02-06
@@ -60,6 +60,7 @@ sub GEOFANCY_addExtension($$$) {
     $data{FWEXT}{$url}{LINK}       = $link;
 }
 
+#########################
 sub GEOFANCY_removeExtension($) {
     my ($link) = @_;
 
@@ -171,18 +172,18 @@ sub GEOFANCY_CGI() {
     my ($request) = @_;
 
     my $hash;
-    my $name;
-    my $link;
-    my $URI;
-    my $device;
-    my $id;
-    my $lat;
-    my $long;
-    my $entry;
-    my $msg;
-    my $date;
-    my $time;
-    my $locName;
+    my $name    = "";
+    my $link    = "";
+    my $URI     = "";
+    my $device  = "";
+    my $id      = "";
+    my $lat     = "";
+    my $long    = "";
+    my $entry   = "";
+    my $msg     = "";
+    my $date    = "";
+    my $time    = "";
+    my $locName = "";
 
     # data received
     if ( $request =~ m,^(/[^/]+?)(?:\&|\?)(.*)?$, ) {
