@@ -1308,14 +1308,14 @@ sub GUEST_StartInternalTimers($$) {
       </div><br>
       <br>
       <div style="margin-left: 2em">
-        <u>Mögliche Stati und ihre Bedeutung</u><br>
+        <u>Mögliche Status und ihre Bedeutung</u><br>
         <br>
         <div style="margin-left: 2em">
-          Dieses Modul unterscheidet 6 verschiedene Stati:<br>
+          Dieses Modul unterscheidet 6 verschiedene Status:<br>
           <br>
           <ul>
             <li>
-              <b>home</b> - Mitbrwohner ist zuhause und wach
+              <b>home</b> - Mitbrwohner ist zu Hause und wach
             </li>
             <li>
               <b>gotosleep</b> - Mitbewohner ist auf dem Weg ins Bett
@@ -1327,7 +1327,7 @@ sub GUEST_StartInternalTimers($$) {
               <b>awoken</b> - Mitbewohner ist gerade aufgewacht
             </li>
             <li>
-              <b>absent</b> - Mitbewohner ist momentan nicht zuhause, wird aber bald zurück sein
+              <b>absent</b> - Mitbewohner ist momentan nicht zu Hause, wird aber bald zurück sein
             </li>
             <li>
               <b>none</b> - Gast Device ist deaktiviert
@@ -1381,7 +1381,7 @@ sub GUEST_StartInternalTimers($$) {
           Immer wenn eine Lokation mit dem Namen 'underway' gesetzt wird, wird auch der Status auf 'absent' gesetzt, sofern die Anwesenheit bis dahin noch auf 'present' stand. Sofern das Attribut rg_locationUnderway gesetzt wurde, so lösen alle dort angegebenen Lokationen einen Statuswechsel nach 'underway' aus. Diese Lokationen werden auch nicht in das Reading 'lastLocation' übertragen.<br>
           <br>
           Immer wenn eine Lokation mit dem Namen 'wayhome' gesetzt wird, wird das Reading 'wayhome' auf '1' gesetzt, sofern die Anwesenheit zu diesem Zeitpunkt 'absent' ist. Sofern das Attribut rg_locationWayhome gesetzt wurde, so führt das VERLASSEN einer dort aufgeführten Lokation ebenfalls dazu, dass das Reading 'wayhome' auf '1' gesetzt wird. Es gibt also 2 Möglichkeiten den Nach-Hause-Weg-Indikator zu beeinflussen (implizit und explizit).<br>
-          Die Ankunft zuhause setzt den Wert von 'wayhome' zurück auf '0'.<br>
+          Die Ankunft zu Hause setzt den Wert von 'wayhome' zurück auf '0'.<br>
           <br>
           Wenn Sie auch das <a href="#GEOFANCY">GEOFANCY</a> Modul verwenden, können Sie das Reading 'location' ganz einfach über GEOFANCY Ereignisse aktualisieren lassen. Definieren Sie dazu einen NOTIFY-Trigger wie diesen:<br>
           <br>
@@ -1398,7 +1398,7 @@ sub GUEST_StartInternalTimers($$) {
             <b>rg_autoGoneAfter</b> - Anzahl der Stunden, nach denen sich der Status automatisch auf 'gone' ändert, wenn der aktuelle Status 'absent' ist; Standard ist 36 Stunden
           </li>
           <li>
-            <b>rg_locationHome</b> - hiermit übereinstimmende Lokationen werden als zuhause gewertet; der erste Eintrag wird für das Zusammenspiel bei Statusänderungen benutzt; mehrere Einträge durch Leerzeichen trennen; Standard ist 'home'
+            <b>rg_locationHome</b> - hiermit übereinstimmende Lokationen werden als zu Hause gewertet; der erste Eintrag wird für das Zusammenspiel bei Statusänderungen benutzt; mehrere Einträge durch Leerzeichen trennen; Standard ist 'home'
           </li>
           <li>
             <b>rg_locationUnderway</b> - hiermit übereinstimmende Lokationen werden als unterwegs gewertet; der erste Eintrag wird für das Zusammenspiel bei Statusänderungen benutzt; mehrere Einträge durch Leerzeichen trennen; Standard ist 'underway'
@@ -1410,7 +1410,7 @@ sub GUEST_StartInternalTimers($$) {
             <b>rg_locations</b> - Liste der in FHEMWEB anzuzeigenden Lokationsauswahlliste in FHEMWEB; mehrere Einträge nur durch Komma trennen und KEINE Leerzeichen verwenden
           </li>
           <li>
-            <b>rg_moodDefault</b> - die Stimmung, die nach Ankunft zuhause oder nach dem Statuswechsel von 'awoken' auf 'home' gesetzt werden soll
+            <b>rg_moodDefault</b> - die Stimmung, die nach Ankunft zu Hause oder nach dem Statuswechsel von 'awoken' auf 'home' gesetzt werden soll
           </li>
           <li>
             <b>rg_moodSleepy</b> - die Stimmung, die nach Statuswechsel zu 'gotosleep' oder 'awoken' gesetzt werden soll
@@ -1425,10 +1425,10 @@ sub GUEST_StartInternalTimers($$) {
             <b>rg_realname</b> - wo immer GUEST den richtigen Namen verwenden möchte nutzt es den Wert des Attributs alias oder group; Standard ist group
           </li>
           <li>
-            <b>rg_showAllStates</b> - die Stati 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess über das devStateIcon Attribut zu ermöglichen; Standard ist 0
+            <b>rg_showAllStates</b> - die Status 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess über das devStateIcon Attribut zu ermöglichen; Standard ist 0
           </li>
           <li>
-            <b>rg_states</b> - Liste aller in FHEMWEB angezeigter Stati; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterstützte Stati führen zu Fehlern
+            <b>rg_states</b> - Liste aller in FHEMWEB angezeigter Status; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterstützte Status führen zu Fehlern
           </li>
         </ul>
       </div><br>
@@ -1498,7 +1498,7 @@ sub GUEST_StartInternalTimers($$) {
             <b>location</b> - der aktuelle Aufenthaltsort
           </li>
           <li>
-            <b>presence</b> - gibt den Zuhause Status in Abhängigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
+            <b>presence</b> - gibt den zu Hause Status in Abhängigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
           </li>
           <li>
             <b>mood</b> - die aktuelle Stimmung
