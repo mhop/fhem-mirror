@@ -7,7 +7,6 @@
 	connected to the Raspberry Pi.
 
 	contributed by Dirk Hoffmann 2013
-	$Id$
 
 =head1 DESCRIPTION
 	51_I2C_BMP180.pm reads the air pressure of the digital pressure sensor BMP180
