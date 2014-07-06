@@ -17,15 +17,16 @@ sub I2C_PCF8574_Initialize($) {
 
   #$hash->{Match}     = ".*";
   $hash->{DefFn}     = 	"I2C_PCF8574_Define";
-	$hash->{InitFn}  	 = 'I2C_PCF8574_Init';
+	$hash->{InitFn}  	 =  'I2C_PCF8574_Init';
   $hash->{AttrFn}    = 	"I2C_PCF8574_Attr";
   $hash->{SetFn}     = 	"I2C_PCF8574_Set";
+	$hash->{StateFn}   =  "I2C_PCF8574_State";
   $hash->{GetFn}     = 	"I2C_PCF8574_Get";
   $hash->{UndefFn}   = 	"I2C_PCF8574_Undef";
   $hash->{ParseFn}   = 	"I2C_PCF8574_Parse";
   $hash->{I2CRecFn}  = 	"I2C_PCF8574_I2CRec";
   $hash->{AttrList}  = 	"IODev do_not_notify:1,0 ignore:1,0 showtime:1,0 ".
-												"poll_interval InputPorts ".
+												"poll_interval InputPorts OnStartup ".
 												"$readingFnAttributes";
 }
 ###################################
@@ -54,6 +55,16 @@ sub I2C_PCF8574_Set($@) {					#
 				$sbyte += $setsP{$val} << (1 * $_);
 			} else {									#alle anderen Portwerte werden den Readings entnommen
 				$sbyte += $setsP{ReadingsVal($name,'Port'.$_,"off")} << (1 * $_);		#->sonst aus dem Reading holen
+			}
+		}
+		$sendpackage{data} = $sbyte;
+	} elsif ( $cmd && $cmd eq "setfromreading" ) {
+		my $sbyte = 0;
+		foreach (0..7) {
+			if ($_ ~~ @inports) {						#Port der als Input konfiguriert ist wird auf 1 gesetzt
+				$sbyte += 1 << (1 * $_);
+			} else {												#alle anderen Portwerte werden den Readings entnommen
+				$sbyte += $setsP{ReadingsVal($name,'Port'.$_,"off")} << (1 * $_);	
 			}
 		}
 		$sendpackage{data} = $sbyte;
@@ -103,9 +114,16 @@ sub I2C_PCF8574_Get($@) {
 }
 ###################################
 sub I2C_PCF8574_Attr(@) {					#
- my (undef, $name, $attr, $val) = @_;
+ my ($command, $name, $attr, $val) = @_;
  my $hash = $defs{$name};
  my $msg = '';
+  if ($command && $command eq "set" && $attr && $attr eq "IODev") {
+		if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $val)) {
+			main::AssignIoPort($hash,$val);
+			my @def = split (' ',$hash->{DEF});
+			I2C_PCF8574_Init($hash,\@def) if (defined ($hash->{IODev}));
+		}
+	}
   if ($attr eq 'poll_interval') {
     if ( defined($val) ) {
       if ( looks_like_number($val) && $val > 0) {
@@ -122,6 +140,14 @@ sub I2C_PCF8574_Attr(@) {					#
 			my @inp = split(" ", $val);
 			foreach (@inp) {
 				$msg = "wrong value: $_ for \"set $name $attr\" use space separated numbers 0-7" unless ($_ >= 0 && $_ < 8);
+			}
+		}
+	} elsif ($attr && $attr eq "OnStartup") {
+		if (defined $val) {
+			foreach (split (/,/,$val)) {
+				my @pair = split (/=/,$_);
+				$msg = "wrong value: $_ for \"attr $hash->{NAME} $attr\" use comma separated <port>=on|off|last where <port> = 0 - 7" 
+				unless ( scalar(@pair) == 2 && ($pair[0] =~ m/^[0-7]$/i && ( $pair[1] eq "last" || exists($setsP{$pair[1]}) ) ) );		
 			}
 		}
 	}
@@ -163,6 +189,8 @@ sub I2C_PCF8574_Init($$) {				#
 
   AssignIoPort($hash);
 	$hash->{STATE} = 'Initialized';
+	I2C_PCF8574_Set($hash, $name, "setfromreading");
+	
 	return;
 }
 ###################################
@@ -173,6 +201,32 @@ sub I2C_PCF8574_Catch($) {
     return $1;
   }
   return undef;
+}
+###################################
+sub I2C_PCF8574_State($$$$) {			#reload readings at FHEM start
+	my ($hash, $tim, $sname, $sval) = @_;
+	Log3 $hash, 4, "$hash->{NAME}: $sname kann auf $sval wiederhergestellt werden $tim";
+	if ($sname =~ m/^Port[0-7]$/i) {
+		my $po = $sname; #noch ändern 
+		$po =~ tr/[a-zA-Z]//d;			#Nummer aus String extrahieren
+		
+		my @inports = sort(split(/ /,AttrVal($hash->{NAME}, "InputPorts", "")));
+		unless ( $po ~~ @inports) {
+			my %onstart = split /[,=]/, AttrVal($hash->{NAME}, "OnStartup", "");
+			if ( exists($onstart{$po}) && exists($setsP{$onstart{$po}})) {
+				Log3 $hash, 5, "$hash->{NAME}: $sname soll auf $onstart{$po} gesetzt werden";
+				readingsSingleUpdate($hash,$sname, $onstart{$po}, 1);
+			} else {
+				Log3 $hash, 5, "$hash->{NAME}: $sname soll auf Altzustand: $sval gesetzt werden";
+				$hash->{READINGS}{$sname}{VAL} = $sval;
+				$hash->{READINGS}{$sname}{TIME} = $tim;
+			}
+			
+		} else {
+			Log3 $hash, 5, "$hash->{NAME}: $sname ist Eingang";
+		}
+	} 
+	return undef;
 }
 ###################################
 sub I2C_PCF8574_Undef($$) {				#
@@ -341,6 +395,11 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 			Ports in this list can't be written<br>
 			Default: no, valid values: 0 1 2 .. 7<br><br>
 		</li>
+		<li>OnStartup<br>
+			Comma separated list of output ports and their desired state after start<br>
+			Without this atribut all output ports will set to last state<br>
+			Default: -, valid values: <port>=on|off|last where <port> = 0 - 7<br><br>
+		</li>
 		<li><a href="#IODev">IODev</a></li>
 		<li><a href="#ignore">ignore</a></li>
 		<li><a href="#do_not_notify">do_not_notify</a></li>
@@ -411,6 +470,11 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 			Durch Leerzeichen getrennte Portnummern die als Inputs genutzt werden.<br>
 			Ports in dieser Liste k&ouml;nnen nicht geschrieben werden.<br>
 			Standard: no, g&uuml;ltige Werte: 0 1 2 .. 7<br><br>
+		</li>
+		<li>OnStartup<br>
+			Durch Komma getrennte Output Ports und ihr gew&uuml;nschter Status nach dem Start.<br>
+			Ohne dieses Attribut werden alle Ausg&auml;nge nach dem Start auf den letzten Status gesetzt.<br>
+			Standard: -, g&uuml;ltige Werte: <port>=on|off|last wobei <port> = 0 - 7<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
 		<li><a href="#ignore">ignore</a></li>
