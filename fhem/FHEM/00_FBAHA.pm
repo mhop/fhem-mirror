@@ -57,6 +57,7 @@ FBAHA_Define($$)
   DevIo_CloseDev($hash);
   $hash->{DeviceName} = $dev;
 
+  return undef if($dev eq "none"); # DEBUGGING
   my $ret = DevIo_OpenDev($hash, 0, "FBAHA_DoInit");
   return $ret;
 }
@@ -173,7 +174,6 @@ FBAHA_configInd($$)
 {
   my ($data, $onlyId) = @_;
 
-
   my @answer;
   while(length($data) >= 288) {
     my $id  = hex(substr($data,  0, 4)); 
@@ -202,7 +202,7 @@ FBAHA_configInd($$)
       push @answer, "  MANUF:$mnf";
       push @answer, "  UniqueID:$idf";
       push @answer, "  Firmware:$frm";
-      push @answer, substr($data, 288, $dlen);
+      push @answer, substr($data, 288+$dlen);
       return @answer;
     }
     $data = substr($data, 288+$dlen); # rest

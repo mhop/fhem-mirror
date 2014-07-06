@@ -132,20 +132,20 @@ FHEM2FHEM_Read($)
   return if(IsDisabled($name));
 
   my $data = $hash->{PARTIAL};
-  Log3 $hash, 5, "FHEM2FHEM/RAW: $data/$buf";
+  #Log3 $hash, 5, "FHEM2FHEM/RAW: $data/$buf";
   $data .= $buf;
 
   while($data =~ m/\n/) {
     my $rmsg;
     ($rmsg,$data) = split("\n", $data, 2);
     $rmsg =~ s/\r//;
-    Log3 $name, 4, "$name: $rmsg";
 
     if($hash->{informType} eq "LOG") {
       my ($type, $name, $msg) = split(" ", $rmsg, 3);
       next if(!defined($msg)); # Bogus data
       my $re = $hash->{regexp};
       next if($re && !($name =~ m/^$re$/ || "$name:$msg" =~ m/^$re$/));
+      Log3 $name, 4, "$name: $rmsg";
 
       if(!$defs{$name}) {
         #LoadModule($type); Why do we need this line?
@@ -166,6 +166,7 @@ FHEM2FHEM_Read($)
       my ($type, $rname, $msg) = split(" ", $rmsg, 3);
       my $rdev = $hash->{rawDevice};
       next if($rname ne $rdev);
+      Log3 $name, 4, "$name: $rmsg";
       Dispatch($defs{$rdev}, $msg, undef);
 
     }
