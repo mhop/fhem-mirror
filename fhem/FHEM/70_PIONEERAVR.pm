@@ -39,19 +39,9 @@
 # match for devices/Dispatch() ???
 # random/repeat attributes
 # remote control layout (dynamic depending on available/current input?)
-# option for not permanent data connection
 # handle special chars in display
 # suppress the "on" command if networkStandby = "off"
 # 
-# changelog
-# 26.6.2014: player commands are now available for more inputs
-#			 "play" was not in the drop down list of available set commands
-#			 check every 120s if the data connection to the Pioneer AV receiver is still up
-#			 check if we get a reply from the Pioneer AV receiver not later than 3s after a command was sent
-#			 new command set raw <PioneerCommand>
-#			 removed get raw <PioneerCommand>
-# 23.6.2014: added "use SetExtensions qw/ :all /;"
-#			 added set extension to documentation
 
 package main;
 
@@ -772,8 +762,11 @@ PIONEERAVR_Set($@)
 		PIONEERAVR_Write($hash, $setCmd);	
 		select(undef, undef, undef, 0.2);
 		PIONEERAVR_Write($hash, $setCmd);	
-		return undef;			
-		
+		if (ReadingsVal($name,"networkStandby","") eq "off") {
+			return "NetworkStandby for the Pioneer AV receiver is off. If Fhem should be able to turn the AV Receiver on from standby enable networkStandby on the Pioneer AV Receiver!";
+		} else {
+			return undef;			
+		}
 	#### simple set commands without attributes
 	#### we just "translate" the human readable command to the PioneerAvr command
 	#### lookup in $hash->{helper}{SETS} if the command exists and what to write to PioneerAvr 
@@ -1014,7 +1007,9 @@ PIONEERAVR_Get($@)
 
 #####################################
 # called from the global loop, when the select for hash->{FD} reports data
-# PIONEERAVR_Read() makes sure, that a message is complete and correct, and calls the global Dispatch() with one message
+# PIONEERAVR_Read() makes sure, that a message is complete and correct, 
+# and calls the global Dispatch() with one message if this message is not for the main zone 
+# as the main zone is handled here
 sub PIONEERAVR_Read($) 
 {
   my ($hash) = @_;
@@ -1028,7 +1023,7 @@ sub PIONEERAVR_Read($)
   }	else {
 	$buf = DevIo_SimpleRead($hash);
   }
-  return if($buf eq '');
+  return if(!defined($buf));
   my $logMsg = "Spontaneously received " . dq($buf);
   PIONEERAVR_Log($hash, undef, $logMsg);
 
@@ -1212,19 +1207,11 @@ sub PIONEERAVR_Read($)
 		}
 		# Set STATE
 		# devIO.pm sets hash->STATE accordingly to the connection state (opened, CONNECTED, DISCONNECTED)
-		# we want that hash->STATE represents the state of the device (initialized, off, on)
-		# so we copy the "devIO-state" to the reading "connectionState"
-		# if ( !defined( $hash->{READINGS}{state}{VAL} ) || $hash->{READINGS}{state}{VAL} ne $state )	{
-			# readingsBulkUpdate( $hash, "state", $state );
+		# we want that hash->STATE represents the state of the device (DISCONNECTED, off, on)
 		if ($hash->{STATE} ne $state) {
 			Log3 $hash,5,"PIONEERAVR $name: Update STATE from " . $hash->{STATE} . " to $state";	
-			#my $connState = ReadingsVal($name,"connectionState","");
-			#if ($hash->{STATE} ne "on" && $hash->{STATE} ne "off" && $hash->{STATE} ne $connState) {
-				#Log3 $hash,5,"PIONEERAVR $name: Update connectionState from $connState to " . $hash->{STATE};	
-				#readingsBulkUpdate($hash, "connectionState", $hash->{STATE});
-			#}
-			#readingsBulkUpdate($hash, "state", $state );
-			$hash->{STATE} = $state;
+			readingsBulkUpdate($hash, "state", $state );
+#			$hash->{STATE} = $state;
 		}
 	# Display updates
 	} elsif ( substr($line,0,2) eq "FL" ) {
@@ -1345,6 +1332,8 @@ sub PIONEERAVR_Read($)
 	  RemoveInternalTimer($hash);
 	  InternalTimer($in120s, "PIONEERAVR_checkConnection", $hash, 0);
 	  Log3 $hash,5,"PIONEERAVR $name: Connection is up --- Check again in 120s --> Internal timer (120s) set";	
+  } else {
+	  Log3 $hash,5,"PIONEERAVR $name: Connection is up --- checkConnection is disabled";	 
   }
 
   readingsEndUpdate($hash, 1);
@@ -1388,7 +1377,6 @@ sub PIONEERAVR_Reopen($) {
   my $ret = DevIo_OpenDev($hash, 1, undef);
   if ($hash->{STATE} eq "opened") {
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen() -> now opened";
-	#readingsSingleUpdate($hash , "connectionState" , "opened" , 1 );
 	PIONEERAVR_statusUpdate($hash);
   }
   return $ret;
@@ -1418,7 +1406,7 @@ sub PIONEERAVR_Write($$) {
 # PIONEERAVR_checkConnection is called if PIONEERAVR received no data for 120s
 #   we send a "new line" and expect (if the connection is up) to receive "R"
 #   we use DevIo_Expect() for this
-#   DevIO_Expect() sends a command and waits up to 2s for a reply
+#   DevIO_Expect() sends a command (just a "new line") and waits up to 2s for a reply
 #   if there is a reply DevIO_Expect() returns the reply
 #   if there is no reply 
 #   - DevIO_Expect() tries to close and reopen the connection
@@ -1430,7 +1418,7 @@ sub PIONEERAVR_Write($$) {
 sub PIONEERAVR_checkConnection ($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $state = $hash->{STATE};
+  my $state = $hash->{STATE}; #backup current state
 
   Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: ".$hash->{STATE};
   # we use DevIo_Expect() to check if the connection to the Pioneer AV receiver still works
@@ -1440,21 +1428,23 @@ sub PIONEERAVR_checkConnection ($) {
 	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- change state temporary to: ".$hash->{STATE};
   }
   my $connState = DevIo_Expect($hash,"\r\n",2);
-  Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after DevIo_Expect(): ".$hash->{STATE}." state: $state ConnState: ".dq($connState);
+  Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after DevIo_Expect(): ".$hash->{STATE}.", previous state: ".$state.", reply from DevIo_Expect: ".dq($connState);
   if ( !defined($connState)) {
 	# not connected!
-	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- reopen()";
+	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- no reply after DevIo_Expect()-> reopen()";
 	PIONEERAVR_Reopen($hash);
-    Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after PIONEERAVR_Reopen(): ".$hash->{STATE}." state: $state ConnState: ".dq($connState);
+    Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state after PIONEERAVR_Reopen(): ".$hash->{STATE}.", previous state: ".$state;
   } else {
     # we got a reply -> connection is good -> restore state
-	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: ".$hash->{STATE}." restored to: $state";
+	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: ".$hash->{STATE}." restored to: ".$state;
 	$hash->{STATE} = $state;
   } 
   if (AttrVal($name, "checkConnection", "enable") eq "enable" ) {
 	$hash->{helper}{nextConnectionCheck}  = gettimeofday()+120; 
 	InternalTimer($hash->{helper}{nextConnectionCheck}, "PIONEERAVR_checkConnection", $hash, 0);
 	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection(): set internaltimer(120s)";
+  } else {
+	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection(): disabled";
   }
 }
 #########################################################
@@ -1645,7 +1635,7 @@ RC_layout_PioneerAVR() {
   <b>Attributes</b>
   <br><br>
   <ul>
-    <li>checkConnection &lt;enable|disable>&gt;<br>Enables/disbales the check if the data connection to the Pioneer AV reciver is open.(Default: enable)</li>
+    <li>checkConnection &lt;enable|disable&gt;<br>Enables/disbales the check if the data connection to the Pioneer AV reciver is open.(Default: enable)</li>
     <li>logTraffic &lt;loglevel&gt;<br>Enables logging of sent and received datagrams with the given loglevel. 
 	Control characters in the logged datagrams are escaped, i.e. a double backslash is shown for a single backslash,
 	\n is shown for a line feed character, etc.</li>
@@ -1786,8 +1776,9 @@ RC_layout_PioneerAVR() {
   <b>Attribute</b>
   <br><br>
   <ul>
-    <li>checkConnection &lt;enable|disable>&gt;<br>Ein-/Ausscahlten der regelmäßigen Überprüfung, ob die Datenverbindung
-	zum Pioneer AV Receiver funktionert. Ist das Attribut nicht gesetzt, oder "enable" so wird regelmäßig die Verbindung überprüft.</li>
+    <li>checkConnection &lt;enable|disable&gt;<br>Ein-/Ausschalten der regelmäßigen Überprüfung, ob die Datenverbindung
+	zum Pioneer AV Receiver funktionert. Ist das Attribut nicht gesetzt, oder "enable" so wird regelmäßig die Verbindung überprüft.
+	mit "disable" lässt sich die regelmäßige Überprüfung abschalten.</li>
     <li>logTraffic &lt;loglevel&gt;<br>Ermöglicht das loggen der Datenommunikation vom/zum Pioneer AV Receiver. 
 	Steuerzeichen werden angezeigtz.B. ein doppelter Ruckwärts-Schrägstrich wird als einfacher Rückwärts-Schrägstrich angezeigt,
 	\n wird für das Steuerzeichen "line feed" angezeigt, etc.</li>
