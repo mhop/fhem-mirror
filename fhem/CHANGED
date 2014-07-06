@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 52_I2C_PCF8574.pm: added attribute OnStartup
+             52_I2C_PCA9532.pm: added attribute OnStartup,
+                      added attribute OutputPorts as substitute for InputPorts
+             51_RPI_GPIO.pm: changed access to gpio via userspace by default (for BBB and Cubie),
+                      access via gpio utility as fallback
   - feature: PIONEERAVR: new attribute: checkConnection
   - change:  do no parse empty lines in 57_Calendar.pm
   - bugfix:  10_SOMFY.pm: save enc-key and rolling-code as reading instead of attribute
