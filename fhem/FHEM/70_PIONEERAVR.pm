@@ -1218,7 +1218,7 @@ sub PIONEERAVR_Read($)
 		my $display = pack("H*",substr($line,4,28));
 		readingsBulkUpdate($hash, "displayPrevious", ReadingsVal($name,"display","") );
 		readingsBulkUpdate($hash, "display", $display );
-		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Display update";	
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Display update to: $display";	
 
 	# Tuner channel names
 	} elsif ( $line =~ m/^TQ(\w\d)\"(.{8})\"$/ ) {
