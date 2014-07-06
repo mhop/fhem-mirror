@@ -1492,7 +1492,10 @@ sub CUL_HM_Parse($$) {#########################################################
           }
           else{                                #invalid PhysLevel
             $rSUpdt = 1;
-            CUL_HM_stateUpdatDly($name,5);     # update to get level
+            # CUL_HM_stateUpdatDly($name,5);     # update to get level
+            # we have to relay on device. Ack may come from a conditional event (BM)
+            # if condition is not met device will not send status. 
+            # We need to avoid regular requests
           }
         }
       }
@@ -2471,7 +2474,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
       push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
       
-      CUL_HM_stateUpdatDly($pName,10) if($mTp eq "40");
+      CUL_HM_stateUpdatDly($pName,10) if ($mTp eq "40");#conditional request may not deliver state-req
     }
     return "";
   }
