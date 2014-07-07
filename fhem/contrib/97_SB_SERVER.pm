@@ -453,39 +453,40 @@ sub SB_SERVER_Set( $@ ) {
 	    if( $hash->{RCCNAME} ne "none" ) {
 		fhem( "set $hash->{RCCNAME} on" );
 	    }
-
-	} elsif( $cmd eq "renew" ) {
-	    Log3( $hash, 5, "SB_SERVER_Set: renew" );
-	    DevIo_SimpleWrite( $hash, "listen 1\n", 0 );
-
-	} elsif( $cmd eq "abort" ) {
-	    DevIo_SimpleWrite( $hash, "listen 0\n", 0 );
-
-	} elsif( $cmd eq "statusRequest" ) {
-	    Log3( $hash, 5, "SB_SERVER_Set: statusRequest" );
-	    DevIo_SimpleWrite( $hash, "serverstatus 0 200\n", 0 );
-	    DevIo_SimpleWrite( $hash, "favorites items 0 " . 
-			       AttrVal( $name, "maxfavorites", 100 ) . "\n", 
-			       0 );
-	    DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
-
-	} elsif( $cmd eq "cliraw" ) {
-	    # write raw messages to the CLI interface per player
-	    my $v = join( " ", @a );
-	    $v .= "\n";	
-	    Log3( $hash, 5, "SB_SERVER_Set: cliraw: $v " ); 
-	    IOWrite( $hash, $v );
-
-	} elsif( $cmd eq "rescan" ) {
-	    IOWrite( $hash, $cmd . " " . $a[ 0 ] . "\n" );
-
-	} else {
-	    ;
 	}
 
-	return( undef );
+    } elsif( $cmd eq "renew" ) {
+	Log3( $hash, 5, "SB_SERVER_Set: renew" );
+	DevIo_SimpleWrite( $hash, "listen 1\n", 0 );
+	
+    } elsif( $cmd eq "abort" ) {
+	DevIo_SimpleWrite( $hash, "listen 0\n", 0 );
+	
+    } elsif( $cmd eq "statusRequest" ) {
+	Log3( $hash, 5, "SB_SERVER_Set: statusRequest" );
+	DevIo_SimpleWrite( $hash, "serverstatus 0 200\n", 0 );
+	DevIo_SimpleWrite( $hash, "favorites items 0 " . 
+			   AttrVal( $name, "maxfavorites", 100 ) . "\n", 
+			   0 );
+	DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
+	
+    } elsif( $cmd eq "cliraw" ) {
+	# write raw messages to the CLI interface per player
+	my $v = join( " ", @a );
+	$v .= "\n";	
+	Log3( $hash, 5, "SB_SERVER_Set: cliraw: $v " ); 
+	    IOWrite( $hash, $v );
+	
+    } elsif( $cmd eq "rescan" ) {
+	IOWrite( $hash, $cmd . " " . $a[ 0 ] . "\n" );
+	
+    } else {
+	;
     }
+    
+    return( undef );
 }
+
 
 # ----------------------------------------------------------------------------
 # Read
