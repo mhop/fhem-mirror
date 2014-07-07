@@ -1113,11 +1113,15 @@ sub SB_PLAYER_Set( $@ ) {
 	
     } elsif( $cmd eq "playlists" ) {
 	if( @arg == 1 ) {
-	    if( defined( $SB_PLAYER_Playlists{$name}{$arg[0]}{NAME} ) ) {
-		IOWrite( $hash, "$hash->{PLAYERMAC} playlists play " . 
-			 "$SB_PLAYER_Playlists{$name}{$arg[0]}{NAME}\n" );
+	    my $msg;
+	    if( defined( $SB_PLAYER_Playlists{$name}{$arg[0]}{ID} ) ) {
+		$msg = "$hash->{PLAYERMAC} playlistcontrol cmd:load " . 
+		    "playlist_id:$SB_PLAYER_Playlists{$name}{$arg[0]}{ID}";
+		Log3( $hash, 5, "SB_PLAYER_Set($name): playlists command = " . 
+		      $msg . " ........  with $arg[0]" );
+		IOWrite( $hash, $msg . "\n" );
 	    } else {
-		my $msg = "SB_PLAYER_Set: no name for playlist defined.";
+		$msg = "SB_PLAYER_Set: no name for playlist defined.";
 		Log3( $hash, 3, $msg );
 		return( $msg );
 	    }
@@ -1351,6 +1355,8 @@ sub SB_PLAYER_RecBroadcast( $$@ ) {
 
     } elsif( $cmd eq "PLAYLISTS" ) {
 	if( $args[ 0 ] eq "ADD" ) {
+	    Log3( $hash, 5, "SB_PLAYER_RecbroadCast($name): PLAYLISTS ADD " . 
+	      "name:$args[1] id:$args[2] uid:$args[3]" );
 	    $SB_PLAYER_Playlists{$name}{$args[3]}{ID} = $args[ 2 ];
 	    $SB_PLAYER_Playlists{$name}{$args[3]}{NAME} = $args[ 1 ];
 	    if( $hash->{SERVERPLAYLISTS} eq "" ) {
