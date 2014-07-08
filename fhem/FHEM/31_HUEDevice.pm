@@ -670,7 +670,7 @@ HUEDevice_Parse($$)
   Log3 $name, 4, "parse status message for $name";
 
   if( $hash->{helper}->{group} ) {
-    $hash->{lighes} = join( ",", @{$result->{lights}} );
+    $hash->{lights} = join( ",", @{$result->{lights}} );
 
     foreach my $id ( @{$result->{lights}} ) {
       my $code = $hash->{IODev}->{NAME} ."-". $id;
