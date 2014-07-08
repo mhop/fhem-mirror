@@ -54,7 +54,9 @@ readingsGroup_updateDevices($)
   my ($hash) = @_;
 
   my %list;
+  my %list2;
   my @devices;
+  my @devices2;
 
   my @params = split(" ", $hash->{DEF});
   while (@params) {
@@ -129,6 +131,54 @@ readingsGroup_updateDevices($)
     }
   }
 
+  foreach my $device (@devices) {
+    my $regex = $device->[1];
+    my @list = (undef);
+    @list = split(",",$regex) if( $regex );
+    my $first = 1;
+    my $multi = @list;
+    for( my $i = 0; $i <= $#list; ++$i ) {
+      my $regex = $list[$i];
+      while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && defined($list[++$i]) ) {
+        $regex .= ",". $list[$i];
+      }
+
+      next if( !$regex );
+
+      if( $regex =~ m/^<.*>$/ ) {
+        # handle <{...}@reading>@device
+      } elsif( $regex =~ m/(.*)@(.*)/ ) {
+        $regex = $1;
+
+        next if( $regex && $regex =~ m/^\+(.*)/ );
+        next if( $regex && $regex =~ m/^\?(.*)/ );
+
+        my $name = $2;
+        if( $name =~ m/^{(.*)}$/ ) {
+          my $DEVICE = $device->[0];
+          $name = eval $name;
+        }
+
+        next if( !$name );
+        next if( !defined($defs{$name}) );
+
+        $list2{$name} = 1;
+
+        @devices2 = @devices if( !@devices2 );
+
+        my $found = 0;
+        foreach my $device (@devices2) {
+
+          $found = 1 if( $device->[0] eq $name && $device->[1] eq $regex );
+          last if $found;
+        }
+        next if $found;
+
+        push @devices2, [$name,$regex];
+      }
+    }
+  }
+
   if( AttrVal( $hash->{NAME}, "sortDevices", 0 ) == 1 ) {
     @devices = sort { my $aa = @{$a}[0]; my $bb =  @{$b}[0];
                       $aa = "#" if( $aa =~ m/^</ );
@@ -139,6 +189,9 @@ readingsGroup_updateDevices($)
 
   $hash->{CONTENT} = \%list;
   $hash->{DEVICES} = \@devices;
+  $hash->{CONTENT2} = \%list2;
+  delete $hash->{DEVICES2};
+  $hash->{DEVICES2} = \@devices2 if( @devices2 );
 
   $hash->{fhem}->{last_update} = gettimeofday();
 }
@@ -374,6 +427,7 @@ readingsGroup_2html($)
     }
     next if( !$h );
     my $name = $h->{NAME};
+    my $name2 = $h->{NAME};
 
     my @list = (undef);
     @list = split(",",$regex) if( $regex );
@@ -430,13 +484,13 @@ readingsGroup_2html($)
           $row++;
 
           if( $h != $hash ) {
-            my $a = AttrVal($name, "alias", $name);
-            my $m = "$a$separator";
+            my $a = AttrVal($name2, "alias", $name2);
+            my $m = "$a";
             $m = $a if( $multi != 1 );
             $m = "" if( !$show_names );
-            my $room = AttrVal($name, "room", "");
-            my $group = AttrVal($name, "group", "");
-            my $txt = lookup($mapping,$name,$a,"","",$room,$group,$row,$m);
+            my $room = AttrVal($name2, "room", "");
+            my $group = AttrVal($name2, "group", "");
+            my $txt = lookup($mapping,$name2,$a,"","",$room,$group,$row,$m);
 
             $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $show_names );
           }
@@ -487,13 +541,28 @@ readingsGroup_2html($)
         $ret .= "<td><div $name_style $inform_id>$txt</div></td>";
         $first = 0;
         next;
-      } elsif( $regex && $regex =~ m/^\+(.*)/ ) {
-        $regex = $1;
-      } elsif( $regex && $regex =~ m/^\?(.*)/ ) {
-        $regex = $1;
-        $h = $attr{$name};
       } else {
-        $h = $h->{READINGS};
+        if( $regex =~ m/(.*)@(.*)/ ) {
+          $regex = $1;
+          $name = $2;
+          if( $name =~ m/^{(.*)}$/ ) {
+            my $DEVICE = $device->[0];
+            $name = eval $name;
+          }
+          next if( !$name );
+
+          $h = $defs{$name};
+
+          next if( !$h );
+        }
+        if( $regex && $regex =~ m/^\+(.*)/ ) {
+          $regex = $1;
+        } elsif( $regex && $regex =~ m/^\?(.*)/ ) {
+          $regex = $1;
+          $h = $attr{$name};
+        } else {
+          $h = $h->{READINGS};
+        }
       }
 
       foreach my $n (sort keys %{$h}) {
@@ -533,12 +602,12 @@ readingsGroup_2html($)
 
         my $value_columns = lookup2($value_columns,$name,$n,$v);
 
-        my $a = AttrVal($name, "alias", $name);
+        my $a = AttrVal($name2, "alias", $name2);
         my $m = "$a$separator$n";
         $m = $a if( $multi != 1 );
-        my $room = AttrVal($name, "room", "");
-        my $group = AttrVal($name, "group", "");
-        my $txt = lookup($mapping,$name,$a,($multi!=1?"":$n),$v,$room,$group,$row,$m);
+        my $room = AttrVal($name2, "room", "");
+        my $group = AttrVal($name2, "group", "");
+        my $txt = lookup($mapping,$name2,$a,($multi!=1?"":$n),$v,$room,$group,$row,$m);
 
         if( $nameIcon ) {
           if( my $icon = lookup($nameIcon,$name,$a,$n,$v,$room,$group,$row,"") ) {
@@ -662,6 +731,7 @@ readingsGroup_Notify($$)
   #return if($dev->{NAME} eq $name);
 
   my $devices = $hash->{DEVICES};
+  $devices = $hash->{DEVICES2} if( $hash->{DEVICES2} );
 
   my $max = int(@{$dev->{CHANGED}});
   for (my $i = 0; $i < $max; $i++) {
@@ -690,7 +760,7 @@ readingsGroup_Notify($$)
     } else {
       next if(AttrVal($name,"disable", undef));
 
-      next if (!$hash->{CONTENT}->{$dev->{NAME}});
+      next if (!$hash->{CONTENT}->{$dev->{NAME}} && !$hash->{CONTENT2}->{$dev->{NAME}});
 
       if( $hash->{alwaysTrigger} ) {
       } elsif( !defined($hash->{mayBeVisible}) ) {
@@ -754,6 +824,7 @@ readingsGroup_Notify($$)
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
           next if( $regex && $regex =~ m/^\+/ );
           next if( $regex && $regex =~ m/^\?/ );
+
           if( $regex && $regex =~ m/^<(.*)>$/ ) {
             my $txt = $1;
             my $readings;
@@ -833,7 +904,7 @@ readingsGroup_Notify($$)
           }
 
           $cmd = lookup2($commands,$n,$reading,$value);
-          if( $cmd && $cmd =~ m/^([\w-]*):(\S*)?$/ ) {
+          if( $cmd && $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
             next;
           }
 
@@ -946,6 +1017,8 @@ readingsGroup_Attr($$$)
       <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
       <li>If regex starts with a '+' it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a '?' it will be matched against the attributes of the device instead of the readings.</li>
+      <li>regex can be of the form &lt;regex&gt;@device to use readings from a different device.</li>
+      <li>regex can be of the form &lt;regex&gt;@{perl} to use readings from a different device.</li>
       <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[@readings]&gt; where STRING or the string returned by perl is
           inserted as a reading or:
           <ul><li>the item will be skipped if STRING is undef</li>
