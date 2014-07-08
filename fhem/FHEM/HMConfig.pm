@@ -301,7 +301,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   ActionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
   OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode",lit=>{absolut=>0,minimal=>1}},
   OnTimeMode      =>{a=> 10.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode" ,lit=>{absolut=>0,minimal=>1}},
-  MaxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>''         ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
+  MaxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.5    ,c=>''         ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction. 25.5 = unUsed"},
   DriveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
 #dimmer mainly
   OnDly           =>{a=>  6.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"on delay"},
@@ -896,6 +896,7 @@ $culHmRegModel{"KS550TECH"}           = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"KS550LC"}             = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"KS888"}               = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"HM-SEC-SC-2"}         = $culHmRegModel{"HM-SEC-SC"};
+$culHmRegModel{"HM-SEC-WDS-2"}        = $culHmRegModel{"HM-SEC-WDS"};
 
 $culHmRegModel{"HM-LC-Dim1L-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1L-Pl"};#rf_d
 $culHmRegModel{"HM-LC-DIM1L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
@@ -938,7 +939,6 @@ $culHmRegModel{"HM-RC-Key4-2"}        = $culHmRegModel{"HM-RC-4-2"};
 $culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"} = $culHmRegModel{"HM-CC-TC"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
-
 
 %culHmRegChan = (# if channelspecific then enter them here
   "HM-CC-TC02"        =>{ displayMode     =>1,displayTemp     =>1,displayTempUnit =>1

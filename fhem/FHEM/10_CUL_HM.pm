@@ -806,6 +806,7 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
 # translate level to readable
     my %lvlStr = ( md  =>{ "HM-SEC-WDS"      =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
+                          ,"HM-SEC-WDS-2"    =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
                           ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
                           ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
                          }
