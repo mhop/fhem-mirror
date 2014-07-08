@@ -6052,8 +6052,12 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
         $varV =~ s/^R-$var:// ;
       }
       push @histVals,"$var:$varV";
+      Log 1,"General update $name:$var:$varV ";
     }
-    CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($hash),1,@histVals) if (@histVals);
+    if (@histVals){
+      CUL_HM_UpdtReadBulk($hash,1,@histVals) ;
+      CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($hash),1,@histVals);
+    }
   }
   return $setting;
 }
