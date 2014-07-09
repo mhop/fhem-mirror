@@ -31,11 +31,6 @@
 #  CLIPORT          the port for the CLI interface of the server
 #
 # ############################################################################
-#
-#  $Id$
-#
-# ############################################################################
-
 
 package main;
 use strict;
@@ -469,6 +464,7 @@ sub SB_SERVER_Set( $@ ) {
 	
     } elsif( $cmd eq "statusRequest" ) {
 	Log3( $hash, 5, "SB_SERVER_Set: statusRequest" );
+	DevIo_SimpleWrite( $hash, "version ?\n", 0 );
 	DevIo_SimpleWrite( $hash, "serverstatus 0 200\n", 0 );
 	DevIo_SimpleWrite( $hash, "favorites items 0 " . 
 			   AttrVal( $name, "maxfavorites", 100 ) . "\n", 
@@ -634,6 +630,9 @@ sub SB_SERVER_DoInit( $ ) {
 
 	    # and signal to our clients
 	    SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
+	    SB_SERVER_Broadcast( $hash, "SERVER", 
+				 "IP " . $hash->{IP} . 
+				 ":9000" );
 	}
 	return( "" );
     }
@@ -648,6 +647,10 @@ sub SB_SERVER_DoInit( $ ) {
     DevIo_SimpleWrite( $hash, "favorites items 0 " . 
 		       AttrVal( $name, "maxfavorites", 100 ) . "\n", 0 );
     DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
+
+    SB_SERVER_Broadcast( $hash, "SERVER", 
+			 "IP " . $hash->{IP} . 
+			 ":9000" );
 
     # start the alive checking mechanism
     $hash->{ALIVECHECK} = "?";
@@ -720,6 +723,9 @@ sub SB_SERVER_ParseCmds( $$ ) {
 	    readingsSingleUpdate( $hash, "power", "on", 1 );
 	    # signal our players
 	    SB_SERVER_Broadcast( $hash, "SERVER", "ON" );
+	    SB_SERVER_Broadcast( $hash, "SERVER", 
+				 "IP " . $hash->{IP} . 
+				 ":9000" );
 	}
 
     } elsif( $cmd eq "pref" ) {
