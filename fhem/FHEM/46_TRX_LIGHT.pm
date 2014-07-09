@@ -766,7 +766,7 @@ sub TRX_LIGHT_parse_X10 ($$)
 
   readingsBeginUpdate($def);
 
-  if ($type == 0x10 || $type == 0x11 || $type == 0x14) {
+  if ($type == 0x10 || $type == 0x11 || $type == 0x14 || $type == 0x16) {
 	# try to use it for all types:
 	$current = $command;
 	if ($type == 0x11 && $command eq "level") {
@@ -888,7 +888,7 @@ sub TRX_LIGHT_parse_PT2262 ($$)
   my $name = $def->{NAME};
   return "" if(IsIgnored($name));
 
-  Log3 $name, 1, "TRX_LIGHT_parse_PT2262() $name devn=$device_name command=$command, cmd=$hexdata";
+  Log3 $name, 5, "TRX_LIGHT_parse_PT2262() $name devn=$device_name command=$command, cmd=$hexdata";
 
   my $n = 0;
   my $val = "";
