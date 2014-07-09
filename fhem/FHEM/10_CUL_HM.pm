@@ -2467,15 +2467,22 @@ sub CUL_HM_parseCommon(@){#####################################################
       $level = $long;
     }
 
-    my @peers = grep !/00000000/,split(",",AttrVal($cName,"peerIDs",""));
-    foreach my $peer (grep /$dst/,@peers){
-      my $pName = CUL_HM_id2Name($peer);
-      $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
-      next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
-      push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
-      push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
-      
-      CUL_HM_stateUpdatDly($pName,10) if ($mTp eq "40");#conditional request may not deliver state-req
+    my $peerIDs = AttrVal($cName,"peerIDs","");
+    if ($peerIDs =~ m/$dst/){# dst is available in the ID list
+      my @peers = grep !/00000000/,split(",",$peerIDs);
+      foreach my $peer (grep /^$dst/,@peers){
+        my $pName = CUL_HM_id2Name($peer);
+        $pName = CUL_HM_id2Name($dst) if (!$defs{$pName}); #$dst - device-id of $peer
+        next if (!$defs{$pName});
+        push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
+        push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
+        
+        CUL_HM_stateUpdatDly($pName,10) if ($mTp eq "40");#conditional request may not deliver state-req
+      }
+    }
+    else{# remote triggers a device that is not listed
+      my $pName = CUL_HM_id2Name($dst);
+      push @evtEt,[$cHash,1,"trigDst_$pName:noConfig"];
     }
     return "";
   }
@@ -3616,7 +3623,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
     my $mode = $a[2];
     if ($cmd ne "controlMode"){
-      $mode = substr($a[1],7);
+      $mode = substr($cmd,7);
+      $mode =~ s/^Manu$/manual/;
       $a[2] = ($a[2] eq "off")?4.5:($a[2] eq "on"?30.5:$a[2]);
     }
     $mode = lc $mode;
