@@ -252,8 +252,11 @@ sub SB_PLAYER_Define( $$ ) {
     }
 
     # height and width of the cover art for the URL
-    if( !defined( $attr{$name}{coverartsize} ) ) {
-	$attr{$name}{coverartsize} = 50;
+    if( !defined( $attr{$name}{coverartwidth} ) ) {
+	$attr{$name}{coverartwidth} = 50;
+    }
+    if( !defined( $attr{$name}{coverartheight} ) ) {
+	$attr{$name}{coverartheight} = 50;
     }
 
     # Preset our readings if undefined
