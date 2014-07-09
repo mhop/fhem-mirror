@@ -149,7 +149,7 @@ TCM_Write($$$)
   Log3 $name, 5, "TCM $name sending $bstring";
   DevIo_SimpleWrite($hash, $bstring, 1);
   # next commands will be sent with a delay
-  usleep(int(AttrVal($name, "sendInterval", 100)));
+  usleep(int(AttrVal($name, "sendInterval", 100)) * 1000);
 }
 
 # ESP2 CRC
@@ -1093,7 +1093,7 @@ TCM_Undef($$)
       </li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a name="TCM_comType">comType</a> &lt;TCM|RS485&gt;,
-      comType = TCM is default.<br>
+      [comType] = TCM is default.<br>
       Type of communication device
     </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -1105,8 +1105,8 @@ TCM_Undef($$)
       [learningMode] = nearfield: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode and the signal strength RSSI >= -60 dBm.<be>
     </li>
     <li><a name="TCM_sendInterval">sendInterval</a> &lt;0 ... 250&gt;<br>
-      ESP2: sendInterval = 100 ms is default.<br>
-      ESP3: sendInterval = 0 ms is default.<br>
+      ESP2: [sendInterval] = 100 ms is default.<br>
+      ESP3: [sendInterval] = 0 ms is default.<br>
       Smallest interval between two sending telegrams
     </li>
     <li><a href="#verbose">verbose</a></li>
