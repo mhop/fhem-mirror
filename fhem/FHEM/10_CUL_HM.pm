@@ -381,7 +381,7 @@ sub CUL_HM_updateConfig($){
 
     CUL_HM_qStateUpdatIfEnab($name);
     next if (0 == (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
-    if(!CUL_HM_peersValid($name)){
+    if(CUL_HM_peerUsed($name) == 2){
       CUL_HM_qAutoRead($name,1);
     }
     else{
@@ -3322,7 +3322,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "level") { ####################################################
     #level        =>"<level> <relockDly> <speed>..."
     my (undef,undef,$lvl,$rLocDly,$speed) = @a;
-    return "please enter level 0 to 100" if (!defined($lvl)    || $lvl>100);
+    return "" if($lvl !~ m/^\d+\.?\d+$/)
+
+    return "please enter level 0 to 100" if (!defined($lvl)    || $lvl !~ m/^\d+\.?\d+$/ || $lvl>100);
     return "reloclDelay range 0..65535 or ignore"
                                          if (defined($rLocDly) &&
                                              ($rLocDly > 65535 ||
@@ -6804,12 +6806,14 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
 
 sub CUL_HM_peerUsed($) {# are peers expected?
+  # return 0: no peers expected 
+  #        1: peers expected, list valid 
+  #        2: peers expected, list invalid 
+  #        3: peers possible (virtuall actor)
   my $name = shift;
   my $hash = $defs{$name};
   return 0 if (!$hash->{helper}{role}{chn});#device has no channels
-  my $devId = substr($hash->{DEF},0,6);
-  my $peerIDs = AttrVal($name,"peerIDs",undef);
-  return 0 if (AttrVal(CUL_HM_id2Name($devId),"subType","") eq "virtual");
+  return 3 if ($hash->{helper}{role}{vrt});
 
   my $mId = CUL_HM_getMId($hash);
   my $cNo = hex(substr($hash->{DEF}."01",6,2))."p"; #default to channel 01
@@ -6818,17 +6822,10 @@ sub CUL_HM_peerUsed($) {# are peers expected?
     my ($l,$c) = split":",$ls;
     if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
         ||($c && $c =~ m/$cNo/       )){
+      return (AttrVal($name,"peerIDs","") =~ m/00000000/?1:2);
       return 1;
     }
   }
-}
-sub CUL_HM_peersValid($) {# is list valid?
-  my $name = shift;
-  if (CUL_HM_peerUsed($name)
-      && AttrVal($name,"peerIDs","") !~ m/00000000/){
-    return 0;
-  }
-  return 1;
 }
 sub CUL_HM_reglUsed($) {# provide data for HMinfo
   my $name = shift;
@@ -6886,7 +6883,7 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
   my $name = shift;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   return if ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x07) < 5);
-  if (CUL_HM_peerUsed($name) && !CUL_HM_peersValid($name) ){
+  if (CUL_HM_peerUsed($name) == 2){
     CUL_HM_qAutoRead($name,0);
     CUL_HM_complConfigTest($name);
     delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
