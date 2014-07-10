@@ -3071,52 +3071,62 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "clear") { ####################################################
-    my (undef,undef,$sect) = @a;
-    if   ($sect eq "readings"){
-      my @cH = ($hash);
-      push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
-      delete $_->{READINGS} foreach (@cH);
-      delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
-      CUL_HM_complConfig($_->{NAME}) foreach (@cH);
+    my (undef,undef,$sectIn) = @a;
+    my @sectL;
+    if ($sectIn eq "all") {
+      @sectL = ("rssi","msgEvents","readings");#readings is last - it schedules a reread possible
     }
-    elsif($sect eq "register"){
-      my @cH = ($hash);
-      push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
-
-      foreach my $h(@cH){
-        delete $h->{READINGS}{$_}
-             foreach (grep /^(\.?)(R-|RegL)/,keys %{$h->{READINGS}});
-        delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
-        CUL_HM_complConfig($h->{NAME});
-      }
-    }
-    elsif($sect eq "msgEvents"){
-      CUL_HM_respPendRm($hash);
-
-      $hash->{helper}{prt}{bErr}=0;
-      delete $hash->{cmdStack};
-      delete $hash->{helper}{prt}{rspWait};
-      delete $hash->{helper}{prt}{rspWaitSec};
-      delete $hash->{helper}{prt}{mmcA};
-      delete $hash->{helper}{prt}{mmcS};
-      delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
-
-      if ($hash->{IODev}{NAME} &&
-          $modules{CUL_HM}{$hash->{IODev}{NAME}} &&
-          $modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}){
-        @{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}} =
-              grep !/$name/,@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}};
-      }
-      CUL_HM_unQEntity($name,"qReqConf");
-      CUL_HM_unQEntity($name,"qReqStat");
-      CUL_HM_protState($hash,"Info_Cleared");
-    }
-    elsif($sect eq "rssi"){
-      delete $defs{$name}{helper}{rssi};
-      delete ($hash->{$_}) foreach (grep(/^rssi/,keys %{$hash}))
+    elsif($sectIn =~ m/(rssi|msgEvents|readings|register)/){
+      @sectL = ($sectIn);
     }
     else{
       return "unknown section. User readings, msgEvents or rssi";
+    }
+    foreach my $sect (@sectL){
+      if   ($sect eq "readings"){
+        my @cH = ($hash);
+        push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
+        delete $_->{READINGS} foreach (@cH);
+        delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
+        CUL_HM_complConfig($_->{NAME}) foreach (@cH);
+        CUL_HM_qStateUpdatIfEnab($_->{NAME}) foreach (@cH);
+      }
+      elsif($sect eq "register"){
+        my @cH = ($hash);
+        push @cH,$defs{$hash->{$_}} foreach(grep /^channel/,keys %{$hash});
+      
+        foreach my $h(@cH){
+          delete $h->{READINGS}{$_}
+               foreach (grep /^(\.?)(R-|RegL)/,keys %{$h->{READINGS}});
+          delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
+          CUL_HM_complConfig($h->{NAME});
+        }
+      }
+      elsif($sect eq "msgEvents"){
+        CUL_HM_respPendRm($hash);
+      
+        $hash->{helper}{prt}{bErr}=0;
+        delete $hash->{cmdStack};
+        delete $hash->{helper}{prt}{rspWait};
+        delete $hash->{helper}{prt}{rspWaitSec};
+        delete $hash->{helper}{prt}{mmcA};
+        delete $hash->{helper}{prt}{mmcS};
+        delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
+      
+        if ($hash->{IODev}{NAME} &&
+            $modules{CUL_HM}{$hash->{IODev}{NAME}} &&
+            $modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}){
+          @{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}} =
+                grep !/$name/,@{$modules{CUL_HM}{$hash->{IODev}{NAME}}{pendDev}};
+        }
+        CUL_HM_unQEntity($name,"qReqConf");
+        CUL_HM_unQEntity($name,"qReqStat");
+        CUL_HM_protState($hash,"Info_Cleared");
+      }
+      elsif($sect eq "rssi"){
+        delete $defs{$name}{helper}{rssi};
+        delete ($hash->{$_}) foreach (grep(/^rssi/,keys %{$hash}))
+      }
     }
     $state = "";
   }
@@ -7151,13 +7161,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
 
      Universal commands (available to most hm devices):
      <ul>
-     <li><B>clear &lt;[readings|register|msgEvents]&gt;</B><a name="CUL_HMclear"></a><br>
+     <li><B>clear &lt;[readings|register|msgEvents|all]&gt;</B><a name="CUL_HMclear"></a><br>
          A set of variables can be removed.<br>
          <ul>
          readings: all readings will be deleted. Any new reading will be added usual. May be used to eliminate old data<br>
          register: all captured register-readings in FHEM will be removed. This has NO impact to the values in the device.<br>
          msgEvents:  all message event counter will be removed. Also commandstack will be cleared. <br>
          rssi:  collected rssi values will be cleared. <br>
+         all:  all of the above. <br>
          </ul>
      </li>
      <li><B>getConfig</B><a name="CUL_HMgetConfig"></a><br>
@@ -8434,13 +8445,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       
       Allgemeine Befehle (verf&uuml;gbar f&uuml;r die meisten HM-Ger&auml;te):
       <ul>
-        <li><B>clear &lt;[readings|register|msgEvents]&gt;</B><a name="CUL_HMclear"></a><br>
+        <li><B>clear &lt;[readings|register|msgEvents|all]&gt;</B><a name="CUL_HMclear"></a><br>
             Eine Reihe von Variablen kann entfernt werden.<br>
           <ul>
             readings: Alle Messwerte werden gel&ouml;scht, neue Werte werden normal hinzugef&uuml;gt. Kann benutzt werden um alte Daten zu entfernen<br>
             register: Alle in FHEM aufgezeichneten Registerwerte werden entfernt. Dies hat KEINEN Einfluss auf Werte im Ger&auml;t.<br>
             msgEvents: Alle Anchrichtenz&auml;hler werden gel&ouml;scht. Ebenso wird der Befehlsspeicher zur&uuml;ckgesetzt. <br>
-            rssi: gesammelte RSSI-Werte werden gel&ouml;scht. <br>
+            rssi: gesammelte RSSI-Werte werden gel&ouml;scht.<br>
+            all: alles oben genannte.<br>
           </ul>
         </li>
         <li><B>getConfig</B><a name="CUL_HMgetConfig"></a><br>
