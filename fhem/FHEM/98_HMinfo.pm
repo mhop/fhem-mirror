@@ -1015,12 +1015,13 @@ sub HMinfo_GetFn($@) {#########################################################
            ."\n          range: min to max value"
            ."\n          count: number of events in calculation"
            ."\n  ---clear status---"
-           ."\n set clear [<typeFilter>] [Protocol|readings|msgStat|register|rssi]"
+           ."\n set clear [<typeFilter>] [Protocol|readings|msgStat|register|rssi|all]"
            ."\n          Protocol     # delete all protocol-events"
            ."\n          readings     # delete all readings"
            ."\n          register     # delete all register-readings"
            ."\n          rssi         # delete all rssi data"
            ."\n          msgStat      # delete message statistics"
+           ."\n          all          # delete all of the above"
            ."\n ---help---"
            ."\n get help                            #"
            ."\n ***footnote***"
@@ -1086,7 +1087,7 @@ sub HMinfo_SetFn($@) {#########################################################
   $cmd = "?" if(!$cmd);# by default print options
   if   ($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
     my ($type) = @a;
-    if ($type eq "msgStat"){
+    if ($type eq "msgStat" || $type eq "all" ){
       foreach (keys %{$modules{CUL_HM}{stat}{r}}){
         next if ($_ ne "dummy");
         delete $modules{CUL_HM}{stat}{$_};
@@ -1095,9 +1096,9 @@ sub HMinfo_SetFn($@) {#########################################################
       }
       return;
     }
-    else{
-      return "unknown parameter - use Protocol, readings, msgStat, register or rssi"
-            if ($type !~ m/^(Protocol|readings|register|rssi)$/);
+    if ($type ne "msgStat"){
+      return "unknown parameter - use Protocol, readings, msgStat, register, rssi or all"
+            if ($type !~ m/^(Protocol|readings|register|rssi|all)$/);
       $opt .= "d" if ($type !~ m/(readings|register)/);# readings apply to all, others device only
       my @entities;
       $type = "msgEvents" if ($type eq "Protocol");# translate parameter

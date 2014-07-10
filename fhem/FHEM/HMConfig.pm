@@ -1255,7 +1255,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
   getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
   getConfig     => "",
   regSet        => "[prep|exec] <regName> <value> ... [<peerChannel>]",
-  clear         => "[readings|register|rssi|msgEvents]",
+  clear         => "[readings|register|rssi|msgEvents|all]",
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
   raw           => "data ...",
