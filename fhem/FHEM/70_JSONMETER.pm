@@ -660,7 +660,7 @@ JSONMETER_doStatisticMinMax ($$$)
       $yearLast += 1900;
       $monthLast ++;
    }
-   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime ( gettimeofday() + $hash->{INTERVAL});
+   ($dummy, $dummy, $dummy, $dayNow, $monthNow, $yearNow) = localtime;
    $yearNow += 1900;
    $monthNow ++;
 
@@ -756,7 +756,7 @@ JSONMETER_doStatisticDelta ($$$$$)
       $previousTariff = 0; 
       $showDate = 8;
    }
-   ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime ( gettimeofday() + $hash->{INTERVAL});
+   ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime;
 
    if ($yearNow != $yearLast) { $periodSwitch = 4; }
    elsif ($monthNow != $monthLast) { $periodSwitch = 3; }
