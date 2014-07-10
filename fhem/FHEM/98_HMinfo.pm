@@ -373,7 +373,8 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsNoPeer;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
-    next if (!CUL_HM_peerUsed($eName));
+    my $peersUsed = CUL_HM_peerUsed($eName);
+    next if ($peersUsed == 0);
 
     my $id = $defs{$eName}{DEF};
     my $devId = substr($id,0,6);
@@ -382,9 +383,9 @@ sub HMinfo_peerCheck(@) { #####################################################
     my $peerIDs = AttrVal($eName,"peerIDs",undef);
     
     if (!$peerIDs){                # no peers - is this correct?
-      push @peerIDsEmpty,"empty: ".$eName;
+      push @peerIDsEmpty,"empty: ".$eName if ($peersUsed != 3);
     }
-    elsif($peerIDs !~ m/00000000/){#peerList incomplete
+    elsif($peersUsed == 2){#peerList incomplete
       push @peerIDsFail,"incomplete: ".$eName.":".$peerIDs;
     }
     else{# work on a valid list:
@@ -425,7 +426,7 @@ sub HMinfo_burstCheck(@) { ####################################################
   my @peerIDsCond;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn}         #entity has no channels
-          || !CUL_HM_peerUsed($eName)                  #entity not peered
+          || CUL_HM_peerUsed($eName) != 1              #entity not peered or list incomplete
           || CUL_HM_Get($defs{$eName},$eName,"regList")#option not supported
              !~ m/peerNeedsBurst/);
 
@@ -467,7 +468,7 @@ sub HMinfo_paramCheck(@) { ####################################################
   foreach my $eName (@entities){
     if ($defs{$eName}{helper}{role}{dev}){
       my $ehash = $defs{$eName};
-      my $pairId =  CUL_HM_Get($ehash,$eName,"param","R-pairCentral");
+      my $pairId =  ReadingsVal($eName,"R-pairCentral","undefined");
       my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
       my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
       my ($ioCCU,$prefIO) = split":",AttrVal($eName,"IOgrp","");
@@ -485,12 +486,14 @@ sub HMinfo_paramCheck(@) { ####################################################
         }
       }
       if (!$IoDev)                  { push @noIoDev,$eName;}
-      if ($pairId eq "undefined")   { push @noID,$eName;}
-      elsif ($pairId !~ m /$ioHmId/
-             && $IoDev )            { push @idMismatch,"$eName paired:$pairId IO attr: $ioHmId";}
-
       elsif (AttrVal($eName,"aesCommReq",0) && $IoDev->{TYPE} ne "HMLAN")
                                     { push @aesInval,"$eName ";}
+                                    
+      if (!$defs{$eName}{helper}{role}{vrt}){
+        if ($pairId eq "undefined") { push @noID,$eName;}
+        elsif ($pairId !~ m /$ioHmId/
+             && $IoDev )            { push @idMismatch,"$eName paired:$pairId IO attr: $ioHmId";}
+      }
     }
   }
 
@@ -804,11 +807,11 @@ sub HMinfo_GetFn($@) {#########################################################
     $ret = $cmd." done:" .HMinfo_regCheck(@entities);
   }
   elsif($cmd eq "peerCheck")  {##check peers-----------------------------------
-    my @entities = HMinfo_getEntities($opt."v",$filter);
+    my @entities = HMinfo_getEntities($opt,$filter);
     $ret = $cmd." done:" .HMinfo_peerCheck(@entities);
   }
   elsif($cmd eq "configCheck"){##check peers and register----------------------
-    my @entities = HMinfo_getEntities($opt."v",$filter);
+    my @entities = HMinfo_getEntities($opt,$filter);
     $ret = $cmd." done:" .HMinfo_regCheck(@entities)
                          .HMinfo_peerCheck(@entities)
                          .HMinfo_burstCheck(@entities)
@@ -836,8 +839,13 @@ sub HMinfo_GetFn($@) {#########################################################
   elsif($cmd eq "peerXref")   {##print cross-references------------------------
     my @peerPairs;
     my @peerFhem;
+    my @peerUndef;
     my @fheml = ();
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
+      # search for irregular trigger
+      my @failTrig = map {"$dName: $_"} grep /^trigDst_/,keys %{$defs{$dName}{READINGS}};
+      push @peerUndef,@failTrig if (@failTrig);
+      #--- check regular references
       my $peerIDs = AttrVal($dName,"peerIDs",undef);
       next if(!$peerIDs);
       my $dId = unpack 'A6',CUL_HM_name2Id($dName);
@@ -860,6 +868,10 @@ sub HMinfo_GetFn($@) {#########################################################
     push @peerFhem,map {"$_ => $fChn{$_}"} keys %fChn;
     $ret = $cmd." done:" ."\n x-ref list"."\n    ".(join "\n    ",sort @peerPairs)
                                          ."\n    ".(join "\n    ",sort @peerFhem)
+                         ;
+    $ret .=               "\n warning: sensor triggers but no config found"
+                                         ."\n    ".(join "\n    ",sort @peerUndef)
+            if(@peerUndef)
                          ;
   }
   elsif($cmd eq "templateList"){##template: list templates --------------------
@@ -1415,7 +1427,7 @@ sub HMinfo_archConfigExec($)  {################################################
   my @archs;
   @eN = ();
   foreach(HMinfo_noDup(@names)){
-    if (CUL_HM_peersValid($_) !=1 ||HMinfo_regCheck($_)){
+    if (CUL_HM_peerUsed($_) !=1 ||HMinfo_regCheck($_)){
       push @eN,$_;
     }
     else{
