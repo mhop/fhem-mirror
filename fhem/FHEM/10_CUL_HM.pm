@@ -2641,7 +2641,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
 
   my $h = undef;
   $h = $culHmGlobalGets->{$cmd}       if(!$roleV);
-  $h = $culHmVrtGets->{$cmd}          if($roleV);
+  $h = $culHmVrtGets->{$cmd}          if(!defined($h) && $roleV);
   $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
   $h = $culHmModelGets->{$md}{$cmd}   if(!defined($h) && $culHmModelGets->{$md});
   my @h;
@@ -2777,15 +2777,18 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "cmdList") {  #################################################
     my   @arr;
-    push @arr,"$_ $culHmGlobalGets->{$_}"       foreach (keys %{$culHmGlobalGets});
+
+    if(!$roleV) {push @arr,"$_ $culHmGlobalGets->{$_}" foreach (keys %{$culHmGlobalGets})};
+    if($roleV)  {push @arr,"$_ $culHmVrtGets->{$_}"     foreach (keys %{$culHmVrtGets})};
+
     push @arr,"$_ $culHmSubTypeGets->{$st}{$_}" foreach (keys %{$culHmSubTypeGets->{$st}});
     push @arr,"$_ $culHmModelGets->{$md}{$_}"   foreach (keys %{$culHmModelGets->{$md}});
     my   @arr1;
-    if( $st ne "virtual")                    {foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_ ".$culHmGlobalSets->{$_}            }};
+    if( !$roleV)                             {foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_ ".$culHmGlobalSets->{$_}            }};
     if(($st eq "virtual"||!$st)    && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_ ".$culHmGlobalSetsVrtDev->{$_}      }};
-    if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_ ".$culHmGlobalSetsDevice->{$_}      }};
-    if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_ ".${$culHmSubTypeDevSets->{$st}}{$_}}};
-    if( $st ne "virtual"           && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_ ".$culHmGlobalSetsChn->{$_}         }};
+    if( !$roleV                    && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_ ".$culHmGlobalSetsDevice->{$_}      }};
+    if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_ ".${$culHmSubTypeDevSets->{$st}}{$_}}};
+    if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_ ".$culHmGlobalSetsChn->{$_}         }};
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_ ".${$culHmSubTypeSets->{$st}}{$_}   }};
     if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_ ".${$culHmModelSets->{$md}}{$_}     }};
     if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_ ".${$culHmChanSets->{$md."00"}}{$_} }};
@@ -3322,7 +3325,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "level") { ####################################################
     #level        =>"<level> <relockDly> <speed>..."
     my (undef,undef,$lvl,$rLocDly,$speed) = @a;
-    return "" if($lvl !~ m/^\d+\.?\d+$/)
 
     return "please enter level 0 to 100" if (!defined($lvl)    || $lvl !~ m/^\d+\.?\d+$/ || $lvl>100);
     return "reloclDelay range 0..65535 or ignore"
@@ -8093,14 +8095,16 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   <ul>
   <li><B>general</B><br>
       recentStateType:[ack|info] # cannot be used ti trigger notifies<br>
-      <ul>
-      <li>ack indicates that some statusinfo is derived from an acknowledge</li>  
-      <li>info indicates an autonomous message from the device</li>  
-      <li><a name="CUL_HMsabotageAttackId"><b>sabotageAttackId</b></a><br>
-        Alarming configuration access to the device from a unknown source<br></li>
-      <li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
-        Alarming configuration access to the device that was not issued by our system<br></li>
-     </ul>
+        <ul>
+          <li>ack indicates that some statusinfo is derived from an acknowledge</li>  
+          <li>info indicates an autonomous message from the device</li>  
+          <li><a name="CUL_HMsabotageAttackId"><b>sabotageAttackId</b></a><br>
+            Alarming configuration access to the device from a unknown source<br></li>
+          <li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
+            Alarming configuration access to the device that was not issued by our system<br></li>
+          <li><a name="CUL_HMtrigDst"><b>trigDst_&lt;name&gt;: noConfig</b></a><br>
+            A sensor triggered a Device which is not present in its peerList. Obviously the peerList is not up to date<br></li>
+       </ul>
      </li>  
   <li><B>HM-CC-TC,ROTO_ZEL-STG-RM-FWT</B><br>
       T: $t H: $h<br>
@@ -9318,12 +9322,16 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     <ul>
       <li><B>Allgemein</B><br>
         recentStateType:[ack|info] # kann nicht verwendet werden um Nachrichten zu triggern<br>
-        <li>ack zeigt an das eine Statusinformation aus einer Best&auml;tigung abgeleitet wurde</li>
-        <li>info zeigt eine automatische Nachricht eines Ger&auml;ts an</li>
-        <li><a name="CUL_HMsabotageAttackId"><b>sabotageAttackId</b></a><br>
-          Alarmiert bei Konfiguration des Ger&auml;ts durch unbekannte Quelle<br></li>
-        <li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
-          Alarmiert bei Konfiguration des Ger&auml;ts welche nicht durch das System ausgel&ouml;st wurde<br></li>
+        <ul>
+          <li>ack zeigt an das eine Statusinformation aus einer Best&auml;tigung abgeleitet wurde</li>
+          <li>info zeigt eine automatische Nachricht eines Ger&auml;ts an</li>
+          <li><a name="CUL_HMsabotageAttackId"><b>sabotageAttackId</b></a><br>
+            Alarmiert bei Konfiguration des Ger&auml;ts durch unbekannte Quelle<br></li>
+          <li><a name="CUL_HMsabotageAttack"><b>sabotageAttack</b></a><br>
+            Alarmiert bei Konfiguration des Ger&auml;ts welche nicht durch das System ausgel&ouml;st wurde<br></li>
+          <li><a name="CUL_HMtrigDst"><b>trigDst_&lt;name&gt;: noConfig</b></a><br>
+           Ein Sensor triggert ein Device welches nicht in seiner Peerliste steht. Die Peerliste ist nicht akuell<br></li>
+        </ul>
       </li>
       <li><B>HM-CC-TC,ROTO_ZEL-STG-RM-FWT</B><br>
         T: $t H: $h<br>

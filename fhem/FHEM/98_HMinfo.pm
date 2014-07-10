@@ -371,17 +371,18 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsEmpty;
   my @peerIDnotDef;
   my @peerIDsNoPeer;
+  my @peerIDsUknTrig;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
     my $peersUsed = CUL_HM_peerUsed($eName);
     next if ($peersUsed == 0);
-
-    my $id = $defs{$eName}{DEF};
-    my $devId = substr($id,0,6);
-    my $st = AttrVal(CUL_HM_id2Name($devId),"subType","");# from Master
-    my $md = AttrVal(CUL_HM_id2Name($devId),"model","");
+        
     my $peerIDs = AttrVal($eName,"peerIDs",undef);
-    
+    my @failTrig = map {CUL_HM_name2Id(substr($_,8))} grep /^trigDst_/,keys %{$defs{$eName}{READINGS}};
+    foreach (HMinfo_noDup(@failTrig)){
+      push @peerIDsUknTrig,"undefinedTrigger: ".$eName.":".$_ if($_ && $peerIDs !~ m/$_/);
+    }
+
     if (!$peerIDs){                # no peers - is this correct?
       push @peerIDsEmpty,"empty: ".$eName if ($peersUsed != 3);
     }
@@ -389,6 +390,10 @@ sub HMinfo_peerCheck(@) { #####################################################
       push @peerIDsFail,"incomplete: ".$eName.":".$peerIDs;
     }
     else{# work on a valid list:
+      my $id = $defs{$eName}{DEF};
+      my $devId = substr($id,0,6);
+      my $st = AttrVal(CUL_HM_id2Name($devId),"subType","");# from Master
+      my $md = AttrVal(CUL_HM_id2Name($devId),"model","");
       next if ($st eq "repeater");
       foreach my $pId (split",",$peerIDs){
         next if ($pId eq "00000000" ||$pId =~m /$devId/);
@@ -413,10 +418,12 @@ sub HMinfo_peerCheck(@) { #####################################################
     }
   }
   my $ret = "";
-  $ret .="\n\n peer list not read"  ."\n    ".(join "\n    ",sort @peerIDsEmpty) if(@peerIDsEmpty);
-  $ret .="\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)  if(@peerIDsFail);
-  $ret .="\n\n peer not defined"    ."\n    ".(join "\n    ",sort @peerIDnotDef) if(@peerIDnotDef);
-  $ret .="\n\n peer not verified"   ."\n    ".(join "\n    ",sort @peerIDsNoPeer)if(@peerIDsNoPeer);
+  $ret .="\n\n peer list not read"  ."\n    ".(join "\n    ",sort @peerIDsEmpty)  if(@peerIDsEmpty);
+  $ret .="\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)   if(@peerIDsFail);
+  $ret .="\n\n peer not defined"    ."\n    ".(join "\n    ",sort @peerIDnotDef)  if(@peerIDnotDef);
+  $ret .="\n\n peer not verified"   ."\n    ".(join "\n    ",sort @peerIDsNoPeer) if(@peerIDsNoPeer);
+  $ret .="\n\n peer unknown trigger"."\n    ".(join "\n    ",sort @peerIDsUknTrig)if(@peerIDsUknTrig);
+  
   return  $ret;
 }
 sub HMinfo_burstCheck(@) { ####################################################
