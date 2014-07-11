@@ -2072,8 +2072,8 @@ sub CUL_HM_parseCommon(@){#####################################################
   my $dhash = $modules{CUL_HM}{defptr}{$dst} if (defined $modules{CUL_HM}{defptr}{$dst});
   return "" if(!$shash->{DEF});# this should be from ourself
   my $ret = "";
-  my $pendType = $shash->{helper}{prt}{rspWait}{Pending}?
-                           $shash->{helper}{prt}{rspWait}{Pending}:"";
+  my $rspWait = $shash->{helper}{prt}{rspWait};
+  my $pendType = $rspWait->{Pending} ? $rspWait->{Pending} : "";
   #------------ parse message flag for start processing command Stack
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202
@@ -2282,8 +2282,10 @@ sub CUL_HM_parseCommon(@){#####################################################
       $ret = "done";
     }
     elsif($subType eq "01"){ #storePeerList=================================
-      my $msgValid = 0;
-      if ($pendType eq "PeerList"){
+      my $mNoInt = hex($mNo); 
+      if ($pendType eq "PeerList"  && 
+          ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
+
         my $chn = $shash->{helper}{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn};
         $chnhash = $shash if (!$chnhash);
@@ -2328,14 +2330,18 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
     elsif($subType eq "02" ||$subType eq "03"){ #ParamResp==================
-      if ($pendType eq "RegisterRead"){
+      my $mNoInt = hex($mNo); 
+      if ( $pendType eq "RegisterRead" && 
+          ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
         $repeat = 1;#prevent stop for messagenumber match
-        my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
+        $rspWait->{mNo} = $mNoInt;  # next message will be numbered same or one plus.       
+        
+        my $chnSrc = $src.$rspWait->{forChn};
         my $chnHash = $modules{CUL_HM}{defptr}{$chnSrc};
         $chnHash = $shash if (!$chnHash);
         my $chnName = $chnHash->{NAME};
         my ($format,$data) = ($1,$2) if ($p =~ m/^(..)(.*)/);
-        my $list = $shash->{helper}{prt}{rspWait}{forList};
+        my $list = $rspWait->{forList};
         $list = "00" if (!$list); #use the default
         if ($format eq "02"){ # list 2: format aa:dd aa:dd ...
           $data =~ s/(..)(..)/ $1:$2/g;
@@ -2357,14 +2363,14 @@ sub CUL_HM_parseCommon(@){#####################################################
           }
         }
         my $lastAddr = hex($1) if ($data =~ m/.*(..):..$/);
-        my $peer = $shash->{helper}{prt}{rspWait}{forPeer};
+        my $peer = $rspWait->{forPeer};
         my $regLNp = "RegL_$list:$peer";# pure, no expert
         my $regLN = ((CUL_HM_getAttrInt($chnName,"expert") == 2)?"":".").$regLNp;
         if (   defined $lastAddr 
-            && (    $lastAddr > $shash->{helper}{prt}{rspWait}{nAddr}
+            && (    $lastAddr > $rspWait->{nAddr}
                  || $lastAddr == 0)){
           CUL_HM_UpdtReadSingle($chnHash,$regLN,ReadingsVal($chnName,$regLN,"")." $data",0);
-          $shash->{helper}{prt}{rspWait}{nAddr} = $lastAddr;
+          $rspWait->{nAddr} = $lastAddr;
         }
 
         if ($data =~ m/00:00$/){ # this was the last message in the block
@@ -2492,8 +2498,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 #   CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IoId($shash).$src);
 #   CUL_HM_ProcessCmdStack($shash);
   }
-  if ($shash->{helper}{prt}{rspWait}{mNo}             &&
-      $shash->{helper}{prt}{rspWait}{mNo} eq $mNo     &&
+  if ($rspWait->{mNo}             &&
+      $rspWait->{mNo} eq $mNo     &&
       !$repeat){
     #response we waited for - stop Waiting
     CUL_HM_respPendRm($shash);
@@ -6586,7 +6592,8 @@ sub CUL_HM_assignIO($){ #check and assign IO
   }
     
   my ($ioCCU,$prefIO) = ($hash->{helper}{io}{vccu},$hash->{helper}{io}{prefIO});
-  if (defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"){
+  if (   defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"
+      && @{$defs{$ioCCU}{helper}{io}{ioList}}){
     my @ioccu = @{$defs{$ioCCU}{helper}{io}{ioList}};
     my @ios = ((sort {$hash->{helper}{mRssi}{io}{$b} <=> 
                     $hash->{helper}{mRssi}{io}{$a} } 
