@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: readingsGroup: added valueColumn attribute
   - feature: readingsGroup: added ...,<reading>@<device>,... argument format
   - feature: 52_I2C_PCF8574.pm: added attribute OnStartup
              52_I2C_PCA9532.pm: added attribute OnStartup,
