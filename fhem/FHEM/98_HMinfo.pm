@@ -1094,14 +1094,14 @@ sub HMinfo_SetFn($@) {#########################################################
         delete $modules{CUL_HM}{stat}{r}{$_};
         delete $modules{CUL_HM}{stat}{s}{$_};
       }
-      return;
     }
     if ($type ne "msgStat"){
       return "unknown parameter - use Protocol, readings, msgStat, register, rssi or all"
             if ($type !~ m/^(Protocol|readings|register|rssi|all)$/);
-      $opt .= "d" if ($type !~ m/(readings|register)/);# readings apply to all, others device only
+      $opt .= "d" if ($type =~ m/(Protocol|rssi)/);# readings apply to all, others device only
       my @entities;
       $type = "msgEvents" if ($type eq "Protocol");# translate parameter
+      Log 1,"General filter:$opt,$filter";
       foreach my $dName (HMinfo_getEntities($opt,$filter)){
         push @entities,$dName;
         CUL_HM_Set($defs{$dName},$dName,"clear",$type);
