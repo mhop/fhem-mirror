@@ -128,6 +128,7 @@ JSONMETER_Initialize($)
   $hash->{AttrFn}   = "JSONMETER_Attr";
   $hash->{AttrList} = "disable:0,1 "
                 ."doStatistics:0,1 "
+                ."timeOut "
                 ."pathString "
                 ."port "
                 ."alwaysAnalyse:0,1 "
@@ -291,16 +292,25 @@ JSONMETER_Get($@)
   my $result;
   my $message;
   
-   if ($cmd eq "jsonFile") {
+  if ($cmd eq "jsonFile") {
+      my $time = gettimeofday();
       $result = JSONMETER_GetJsonFile $name;
       my @a = split /\|/, $result;
       if ($a[1]==0) { 
-         return $a[2]; 
+         $message = $a[2]; 
       } else {
-         return decode_base64($a[2]);
+         $message = decode_base64($a[2]);
       }
+      $time = gettimeofday() - $time;
+      if ($time > AttrVal($name, "timeOut", 10)) { 
+         $message =  sprintf( "Runtime: %.2f s (!!! Increase attribute 'timeOut' !!!)\n_________________\n\n", $time) . $message;
+      } else {
+         $message =  sprintf( "Runtime: %.2f s\n_________________\n\n", $time) . $message;
+      }
+      return $message;
       
   } elsif ($cmd eq "jsonAnalysis") {
+      my $time = gettimeofday();
       $hash->{fhem}{jsonInterpreter} = "";
       $result = JSONMETER_GetJsonFile $name;
       my @a = split /\|/, $result;
@@ -308,7 +318,9 @@ JSONMETER_Get($@)
       
       $result = JSONMETER_ParseJsonFile $result;
       # my @a = split /\|/, $result;
-      $message = decode_base64($result); #$a[2]);
+      $time = gettimeofday() - $time;
+      $message = sprintf( "Runtime: %.2f s\n_________________\n\n", $time);
+      $message .= decode_base64($result); #$a[2]);
       return $message;
   }
   
@@ -341,8 +353,9 @@ JSONMETER_GetUpdate($)
       return "$name|0|Error reading device: Please define the attribute 'pathString'.";
    }
    
+   my $timeOut = AttrVal($name, "timeOut", 10);
    $hash->{helper}{RUNNING_PID} = BlockingCall("JSONMETER_GetJsonFile", $name, 
-                                          "JSONMETER_ParseJsonFile", 10,
+                                          "JSONMETER_ParseJsonFile", $timeOut,
                                           "JSONMETER_UpdateAborted", $hash) 
                                 unless(exists($hash->{helper}{RUNNING_PID}));
 }
@@ -364,8 +377,7 @@ JSONMETER_GetJsonFile ($)
     if (($type eq "url" || $type eq "file") && ! defined($attr{$name}{"pathString"}))
          {return "$name|0|Error: deviceType is '$type' - Please define the attribute 'pathString' first.";}
 
-    my $pathString = "";
-    $pathString = $attr{$name}{"pathString"} if defined($attr{$name}{"pathString"});
+    my $pathString = AttrVal($name, "pathString", "");
    
     my $port = 80;
     $port = $hash->{PORT} if defined $hash->{PORT};
@@ -995,6 +1007,12 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
       <br>
       Specifies the IP port for the deviceType 'url' (default is 80)
       </li><br>
+   <li><code>timeOut &lt;seconds&gt;</code>
+      <br>
+      Specifies the timeout for the reading of the raw data. (default is 10)
+      <br>
+      The run time of the reading process can be measured via "get <device> jsonFile".
+      </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
@@ -1110,7 +1128,13 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
       </li><br>
       <li><code>port &lt;Nummer&gt;</code>
       <br>
-      Beim Ger&auml;tetyp 'url' kann hier der URL-Port festgelegt werden (standardm&auml;ssig 80)
+      Beim Ger&auml;tetyp 'url' kann hier der URL-Port festgelegt werden. (standardm&auml;ssig 80)
+      </li><br>
+      <li><code>timeOut &lt;Sekunden&gt;</code>
+         <br>
+         Gibt an, nach wieviel Sekunden das Einlesen der Rohdaten abgebrochen werden soll. (standardm&auml;ssig 10)
+         <br>
+         Die Laufzeit des Einlesevorganges wird bei "get <device> jsonFile" angezeigt.
       </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
