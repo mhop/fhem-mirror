@@ -63,6 +63,8 @@
 #
 #	2014-03-22	added:	added set command 'clear'
 #
+#	2014-07-11	modi:	readingsFnAttr removed
+#
 
 package main;
 
@@ -100,10 +102,8 @@ sub openweathermap_Initialize($) {
 							"owoSrc00 owoSrc01 owoSrc02 owoSrc03 owoSrc04 ".
 							"owoSrc05 owoSrc06 owoSrc07 owoSrc08 owoSrc09 ".
 							"owoSrc10 owoSrc11 owoSrc12 owoSrc13 owoSrc14 ".
-							"owoSrc15 owoSrc16 owoSrc17 owoSrc18 owoSrc19 ".
-							$readingFnAttributes;
+							"owoSrc15 owoSrc16 owoSrc17 owoSrc18 owoSrc19 ";
 }
-
 
 sub OWO_Shutdown($) {
 	my ($hash) = @_;
