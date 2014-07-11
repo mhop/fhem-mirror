@@ -901,7 +901,11 @@ sub TCM_Notify(@) {
         }
       }
     }
-    if ($comType ne "RS485" && $hash->{DeviceName} ne "none" && !defined(AttrVal($name, "baseID", undef))) {
+    my $baseID = AttrVal($name, "baseID", undef);
+    if (defined($baseID)) {
+      $hash->{BaseID} = $baseID;
+      $hash->{LastID} = sprintf "%08X", (hex $baseID) + 127;    
+    } elsif ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
       my @getBaseID = ("get", "baseID");
       if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/ ) {
         $hash->{BaseID} = sprintf "%08X", hex $&;
