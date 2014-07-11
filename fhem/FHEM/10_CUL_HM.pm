@@ -693,7 +693,8 @@ sub CUL_HM_Attr(@) {#################################
     return "use $attrName only for ccu device" 
             if (!$hash->{helper}{role}{dev}
                 || AttrVal($name,"model","CCU-FHEM") !~ "CCU-FHEM");
-    delete $attr{$name}{$attrName};
+    if($cmd eq "set"){$attr{$name}{$attrName} = $attrVal;}
+    else             {delete $attr{$name}{$attrName};}
     CUL_HM_UpdtCentral($name);
   }
   elsif($attrName eq "IOgrp" ){
