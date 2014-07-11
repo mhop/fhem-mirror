@@ -40,7 +40,7 @@ sub readingsGroup_Initialize($)
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 nonames:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1";
+  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumn valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 nonames:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -385,11 +385,18 @@ readingsGroup_2html($)
     $value_format = $vf if( $vf );
   }
 
+  my $value_column = AttrVal( $d, "valueColumn", "" );
+  if( $value_column =~ m/^{.*}$/ ) {
+    my $vc = eval $value_column;
+    $value_column = $vc if( $vc );
+  }
+
   my $value_columns = AttrVal( $d, "valueColumns", "" );
   if( $value_columns =~ m/^{.*}$/ ) {
     my $vc = eval $value_columns;
     $value_columns = $vc if( $vc );
   }
+
 
   my $mapping = AttrVal( $d, "mapping", "");
   $mapping = eval $mapping if( $mapping =~ m/^{.*}$/ );
@@ -433,6 +440,7 @@ readingsGroup_2html($)
     @list = split(",",$regex) if( $regex );
     my $first = 1;
     my $multi = @list;
+    my $column = 1;
     #foreach my $regex (@list) {
     for( my $i = 0; $i <= $#list; ++$i ) {
       my $regex = $list[$i];
@@ -600,6 +608,7 @@ readingsGroup_2html($)
           $v = $value_format;
         }
 
+        my $value_column = lookup2($value_column,$name,$n,undef);
         my $value_columns = lookup2($value_columns,$name,$n,$v);
 
         my $a = AttrVal($name2, "alias", $name2);
@@ -683,11 +692,20 @@ readingsGroup_2html($)
         $v = "<div $value_style>$v</div>" if( $value_style && !$devStateIcon );
 
         $ret .= "<td><div $name_style class=\"dname\">$txt</div></td>" if( $show_names && ($first || $multi == 1) );
+
+        if( $value_column && $multi ) {
+          while ($column < $value_column ) {
+            $ret .= "<td></td>";
+            ++$column;
+          }
+        }
+
         $ret .= "<td informId=\"$d-$name.$n\">$devStateIcon</td>" if( $devStateIcon );
         $ret .= "<td $value_columns><div informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
 
         $first = 0;
+        ++$column;
       }
     }
   }
@@ -1125,6 +1143,9 @@ readingsGroup_Attr($$$)
       <li>valueStyle<br>
         Specify an HTML style for the reading values, e.g.:<br>
           <code>attr temperatures valueStyle style="text-align:right"</code></li>
+      <li>valueColumn<br>
+        Specify the minimum column in which a reading should appear. <br>
+          <code>attr temperatures valueColumn { temperature => 2 }</code></li>
       <li>valueColumns<br>
         Specify an HTML colspan for the reading values, e.g.:<br>
           <code>attr wzReceiverRG valueColumns { eventdescription => 'colspan="4"' }</code></li>
