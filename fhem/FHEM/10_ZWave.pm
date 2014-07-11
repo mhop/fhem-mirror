@@ -535,6 +535,7 @@ ZWave_ParseMultilevel($$$)
   my $pr = (hex($fl)>>5)&0x07; # precision
   my $sc = (hex($fl)>>3)&0x03; # scale
   my $bc = (hex($fl)>>0)&0x07; # bytecount
+  $arg = substr($arg, 0, 2*$bc);
   my $msb = (hex($arg)>>8*$bc-1); # most significant bit  ( 0 = pos, 1 = neg )
   my $val = $msb ? -( 2 ** (8 * $bc) - hex($arg) ) : hex($arg); # 2's complement   
   my $ml = $ml_tbl{$type};
