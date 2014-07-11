@@ -6015,7 +6015,26 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
   my $reg5 = ReadingsVal($name,$regPre."RegL_05:" ,"");
   my $reg6 = ReadingsVal($name,$regPre."RegL_06:" ,"");
-
+  { #update readings in device - oldfashioned style, copy from Readings
+    my @histVals;
+    foreach my $var ("displayMode","displayTemp","controlMode","decalcDay","displayTempUnit","day-temp","night-temp","party-temp"){
+      my $varV = ReadingsVal($name,"R-".$var,"???");
+      
+      foreach my $e( grep {${$_}[2] =~ m/$var/}# see if change is pending
+                     grep {$hash eq ${$_}[0]}
+                     grep {scalar(@{$_} == 3)}
+                     @evtEt){
+        $varV = ${$e}[2];
+        $varV =~ s/^R-$var:// ;
+      }
+      push @histVals,"$var:$varV";
+    }
+    if (@histVals){
+      CUL_HM_UpdtReadBulk($hash,1,@histVals) ;
+      CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($hash),1,@histVals);
+    }
+  }
+  
   if (ReadingsVal($name,"R-controlMode","") =~ m/^party/){
     if (   $reg6                # ugly handling to add vanishing party register
         && $reg6 !~ m/ 61:/
@@ -6036,51 +6055,39 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my @Tregs = split(",",$tempRegs);
   my @time  = @Tregs[grep !($_ % 2), 0..$#Tregs]; # even-index =time
   my @temp  = @Tregs[grep $_ % 2, 0..$#Tregs];    # odd-index  =data
-  return "reglist incomplete\n" if (scalar( @time )<168);
-  delete $hash->{READINGS}{$_} 
-          foreach (grep !/_/,grep /tempList/,keys %{$hash->{READINGS}});
 
-  foreach  (@time){$_=hex($_)*10};
-  foreach  (@temp){$_=hex($_)/2};
-  my $setting;
   my @changedRead;
-  push (@changedRead,"R_tempList_State:".
-                (($hash->{helper}{shadowReg}{"RegL_05:"} ||
-                  $hash->{helper}{shadowReg}{"RegL_06:"} )?"set":"verified"));
-  for (my $day = 0;$day<7;$day++){
-    my $tSpan  = 0;
-    my $dayRead = "";
-    for (my $entry = 0;$entry<24;$entry++){
-      my $reg = $day *24 + $entry;
-      last if ($tSpan > 1430);
-      $tSpan = $time[$reg];
-      my $entry = sprintf("%02d:%02d %3.01f",($tSpan/60),($tSpan%60),$temp[$reg]);
-        $setting .= "Temp set: ${day}_".$days[$day]." ".$entry." C\n";
-        $dayRead .= " ".$entry;
-      $tSpan = $time[$reg];
+  my $setting;
+  if (scalar( @time )<168){
+    push (@changedRead,"R_tempList_State:incomplete");
+    $setting = "reglist incomplete\n" ;
+  }
+  else{
+    delete $hash->{READINGS}{$_} 
+            foreach (grep !/_/,grep /tempList/,keys %{$hash->{READINGS}});
+    
+    foreach  (@time){$_=hex($_)*10};
+    foreach  (@temp){$_=hex($_)/2};
+    push (@changedRead,"R_tempList_State:".
+                  (($hash->{helper}{shadowReg}{"RegL_05:"} ||
+                    $hash->{helper}{shadowReg}{"RegL_06:"} )?"set":"verified"));
+    for (my $day = 0; $day < 7; $day++){
+      my $tSpan  = 0;
+      my $dayRead = "";
+      for (my $entry = 0;$entry<24;$entry++){
+        my $reg = $day *24 + $entry;
+        last if ($tSpan > 1430);
+        $tSpan = $time[$reg];
+        my $entry = sprintf("%02d:%02d %3.01f",($tSpan/60),($tSpan%60),$temp[$reg]);
+          $setting .= "Temp set: ${day}_".$days[$day]." ".$entry." C\n";
+          $dayRead .= " ".$entry;
+        $tSpan = $time[$reg];
+      }
+      push (@changedRead,"R_${day}_tempList$days[$day]:$dayRead");
     }
-    push (@changedRead,"R_${day}_tempList$days[$day]:$dayRead");
   }
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
-  { #update readings in device - oldfashioned style, copy from Readings
-    my @histVals;
-    foreach my $var ("displayMode","displayTemp","controlMode","decalcDay","displayTempUnit","day-temp","night-temp","party-temp"){
-      my $varV = ReadingsVal($name,"R-".$var,"???");
-      
-      foreach my $e( grep {${$_}[2] =~ m/$var/}# see if change is pending
-                     grep {$hash eq ${$_}[0]}
-                     grep {scalar(@{$_} == 3)}
-                     @evtEt){
-        $varV = ${$e}[2];
-        $varV =~ s/^R-$var:// ;
-      }
-      push @histVals,"$var:$varV";
-    }
-    if (@histVals){
-      CUL_HM_UpdtReadBulk($hash,1,@histVals) ;
-      CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($hash),1,@histVals);
-    }
-  }
+
   return $setting;
 }
 sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
