@@ -60,8 +60,9 @@ TCM_Initialize($)
   $hash->{SetFn}    = "TCM_Set";
   $hash->{NotifyFn} = "TCM_Notify";
   $hash->{AttrFn}   = "TCM_Attr";
-  $hash->{AttrList} = "do_not_notify:1,0 dummy:1,0 blockSenderID:own,no learningMode:always,demand,nearfield " .
-                      "comType:TCM,RS485 sendInterval:0,25,40,50,100,150,200,250";
+  $hash->{AttrList} = "baseID blockSenderID:own,no comType:TCM,RS485 do_not_notify:1,0 " .
+                      "dummy:1,0 learningMode:always,demand,nearfield " .
+                      "sendInterval:0,25,40,50,100,150,200,250";
 }
 
 # Define
@@ -794,6 +795,17 @@ TCM_Attr(@) {
       CommandDeleteAttr(undef, "$name $attrName");
     }
     
+  } elsif ($attrName eq "baseID") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^[Ff]{2}[\dA-Fa-f]{6}$/) {        
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    } else {
+      $hash->{BaseID} = $attrVal;
+      $hash->{LastID} = sprintf "%08X", (hex $attrVal) + 127;      
+    }
+
   } elsif ($attrName eq "comType") {
     if (!defined $attrVal){
     
@@ -889,7 +901,7 @@ sub TCM_Notify(@) {
         }
       }
     }
-    if ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
+    if ($comType ne "RS485" && $hash->{DeviceName} ne "none" && !defined(AttrVal($name, "baseID", undef))) {
       my @getBaseID = ("get", "baseID");
       if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/ ) {
         $hash->{BaseID} = sprintf "%08X", hex $&;
@@ -1092,6 +1104,10 @@ TCM_Undef($$)
       Block receiving telegrams with a TCM SenderID sent by repeaters.      
       </li>
     <li><a href="#attrdummy">dummy</a></li>
+    <li><a name="TCM_baseID">baseID</a> &lt;FF800000 ... FFFFFF80&gt;,
+      [baseID] = <none> is default.<br>
+      Set Transceiver baseID and override automatic allocation. Use this attribute only if the IODev does not allow automatic allocation.
+    </li>
     <li><a name="TCM_comType">comType</a> &lt;TCM|RS485&gt;,
       [comType] = TCM is default.<br>
       Type of communication device
