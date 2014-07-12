@@ -51,7 +51,7 @@ PRESENCE_Initialize($)
     $hash->{DefFn}   = "PRESENCE_Define";
     $hash->{UndefFn} = "PRESENCE_Undef";
     $hash->{AttrFn}  = "PRESENCE_Attr";
-    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 ".$readingFnAttributes;
+    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 powerOnFn ".$readingFnAttributes;
 
 }
 
@@ -238,7 +238,6 @@ sub
 PRESENCE_Undef($$)
 {
     my ($hash, $arg) = @_;
-    my $name = $hash->{NAME};
 
     RemoveInternalTimer($hash);
 
@@ -255,16 +254,20 @@ sub
 PRESENCE_Set($@)
 {
     my ($hash, @a) = @_;
-
+    my $name = $hash->{NAME};
+    
     return "No Argument given" if(!defined($a[1]));
 
     my $usage = "Unknown argument ".$a[1].", choose one of statusRequest";
 
+    my $powerOnFn = AttrVal($name, "powerOnFn", undef);
+    $usage .= " powerOn" if(defined($powerOnFn));
+    
     if($a[1] eq "statusRequest")
     {
         if($hash->{MODE} ne "lan-bluetooth")
         {
-            Log3  $hash->{NAME}, 5, "PRESENCE (".$hash->{NAME}.") - starting local scan";
+            Log3 $name, 5, "PRESENCE ($name) - starting local scan";
             PRESENCE_StartLocalScan($hash, 1);
             return undef;
         }
@@ -276,9 +279,35 @@ PRESENCE_Set($@)
             }
             else
             {
-                return "PRESENCE Definition \"".$hash->{NAME}."\" is not connected to ".$hash->{DeviceName}; 
+                return "PRESENCE Definition \"$name\" is not connected to ".$hash->{DeviceName}; 
             }
         } 
+    }
+    elsif(defined($powerOnFn) && $a[1] eq "powerOn") 
+    {
+        my %specials= (
+        "%NAME" => $name,
+        "%ADDRESS" => $hash->{ADDRESS},
+        "%ARGUMENT" => $a[2]
+        );
+        
+        $powerOnFn= EvalSpecials($powerOnFn, %specials);
+        
+        Log3 $name, 5, "PRESENCE ($name) - executing powerOnFn: $powerOnFn";
+        eval $powerOnFn;
+
+        if($@)
+        {
+            Log3 $name, 3, "PRESENCE ($name) - executed powerOnFn failed: ".$@;
+            readingsSingleUpdate($hash, "powerOnFn", "failed",1);
+            return "executed powerOnFn failed: ".$@;
+        }
+        else
+        {
+            readingsSingleUpdate($hash, "powerOnFn", "executed",1);
+        }
+
+        return undef;
     }
     else
     {
@@ -360,6 +389,18 @@ PRESENCE_Attr(@)
             PRESENCE_StartLocalScan($hash);
         }
     }
+    elsif($a[0] eq "set" and $a[2] eq "powerOnFn")
+    {
+        my $powerOnFn = $a[3];
+        
+        $powerOnFn =~ s/^\s+//;
+        $powerOnFn =~ s/\s+$//;
+        
+        if($powerOnFn eq "")
+        {
+            return "powerOnFn contains no value";
+        }
+    }
 
     return undef;
 }
@@ -372,7 +413,7 @@ sub
 PRESENCE_Read($)
 {
     my ($hash) = @_;
-
+    my $name = $hash->{NAME};
     my $buf = DevIo_SimpleRead($hash);
     return "" if(!defined($buf));
 
@@ -398,7 +439,6 @@ PRESENCE_Read($)
         {
             readingsBulkUpdate($hash, "device_name", $1);
         }
-
     }
     elsif($buf eq "command accepted")
     {
@@ -410,19 +450,19 @@ PRESENCE_Read($)
     }
     elsif($buf =~ /socket_closed;(.+?)$/)
     {
-        Log3 $hash->{NAME}, 3, "PRESENCE: collectord lost connection to room $1 for device ".$hash->{NAME};
+        Log3 $hash->{NAME}, 3, "PRESENCE ($name) - collectord lost connection to room $1 for device ".$hash->{NAME};
     }
     elsif($buf =~ /socket_reconnected;(.+?)$/)
     {
-        Log3 $hash->{NAME}, 3, "PRESENCE: collectord reconnected to room $1 for device ".$hash->{NAME};
+        Log3 $hash->{NAME}, 3, "PRESENCE ($name) - collectord reconnected to room $1 for device ".$hash->{NAME};
     }
     elsif($buf =~ /error;(.+?)$/)
     {
-        Log3 $hash->{NAME}, 3, "PRESENCE: room $1 cannot execute hcitool to check device ".$hash->{NAME};
+        Log3 $hash->{NAME}, 3, "PRESENCE ($name) - room $1 cannot execute hcitool to check device ".$hash->{NAME};
     }
     elsif($buf =~ /error$/)
     {
-        Log3 $hash->{NAME}, 3, "PRESENCE: presenced cannot execute hcitool to check device ".$hash->{NAME};
+        Log3 $hash->{NAME}, 3, "PRESENCE ($name) - presenced cannot execute hcitool to check device ".$hash->{NAME};
     }
 
     readingsEndUpdate($hash, 1);
@@ -1093,6 +1133,7 @@ Options:
   <b>Set</b>
   <ul>
   <li><b>statusRequest</b> - Schedules an immediatly check.</li>
+  <li><b>powerOn</b> - Executes the given power on function set as attribute to power on the device (only when attribute "powerOnFn" is set)</li>
   </ul>
   <br>
 
@@ -1123,8 +1164,18 @@ Options:
     <br><br>
     Possible values: 0 => Use default recognition, 1 => Use repeater-supported recognition<br>
     Default Value is 0 (Use default recognition)
-
     <br><br>
+    <li><a>powerOnFn</a></li><br>
+    Define a Perl statement, which powers on the device.<br><br>
+    
+    When executing the powerOnFn (set command: powerOn) following placeholders will be replaced by there corresponding values:<br><br>
+    <ul>
+    <li><code>%NAME</code> - name of the PRESENCE definition</li>
+    <li><code>%ADDRESS</code> - the address of the PRESENCE definition as given in the define statement</li>
+    <li><code>%ARGUMENT</code> - the argument given to the powerOn set command</li>
+    </ul>
+    <br>
+    Example: <code>powerOn("%ADDRESS", "username", "password")</code>
     </ul>
   <br>
  
@@ -1134,6 +1185,7 @@ Options:
     <u>General Events:</u><br><br>
     <ul>
     <li><b>state</b>: $state (absent|present|disabled) - The state of the device or "disabled" when the disable attribute is enabled</li>
+    <li><b>powerOnFn</b>: (executed|failed) - powerOn was executed or has failed</li>
     </ul><br><br>
     <u>Bluetooth specific events:</u><br><br>
     <ul>
@@ -1320,6 +1372,7 @@ Options:
   <ul>
   
   <li><b>statusRequest</b> - Startet einen sofortigen Check.</li> 
+  <li><b>powerOn</b> - Startet die powerOn-Funktion welche durch den Parameter powerOnFn angegeben ist (Nur wenn das Attribut "powerOnFn" definiert ist)</li>
   </ul>
   <br>
 
@@ -1354,6 +1407,17 @@ Options:
     Standardwert ist 0 (Standarderkennung verwenden)
 
     <br><br>
+    <li><a>powerOnFn</a></li><br>
+    Eine Perlfunktion oder -ausdruck, welche das Ger&auml;t einschaltet.<br><br>
+    
+    Wenn die powerOn-Funktion ausgef&uuml;hrt wird (set-Befehl: powerOn) werden folgende Platzhalter durch ihre entsprechenden Werte ersetzt:<br><br>
+    <ul>
+    <li><code>%NAME</code> - Name der PRESENCE-Definition</li>
+    <li><code>%ADDRESS</code> - Die überwachte Addresse der PRESENCE Definition, wie sie im define-Befehl angegeben wurde.</li>
+    <li><code>%ARGUMENT</code> - Das Argument, was dem Set-Befehl "powerOn" &uuml;bergeben wurde.</li>
+    </ul>
+    <br>
+    Beispiel: <code>powerOn("%ADDRESS", "username", "passwort")</code>
     </ul>
   <br>
  
@@ -1363,6 +1427,7 @@ Options:
     <u>Generelle Events:</u><br><br>
     <ul>
     <li><b>state</b>: $state (absent|present|disabled) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das disable-Attribut aktiviert ist</li>
+    <li><b>powerOnFn</b>: (executed|failed) - power on was executed or has failed</li>
     </ul><br><br>
     <u>Bluetooth-spezifische Events:</u><br><br>
     <ul>
