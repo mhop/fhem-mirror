@@ -639,6 +639,7 @@ netatmo_parsePublic($$)
     $hash->{status} = $json->{error}{message} if( $json->{error} );
     if( $hash->{status} eq "ok" ) {
       if( $hash->{Lat} ) {
+        my $ii = 0;
         readingsBeginUpdate($hash);
         my $found = 0;
         my $devices = $json->{body};
@@ -655,12 +656,11 @@ netatmo_parsePublic($$)
                     my $type = $device->{measures}->{$module}->{type}[$i];
 
                     $hash->{".updateTimestamp"} = FmtDateTime($timestamp);
-                    $hash->{CHANGETIME}[$i++] = FmtDateTime($timestamp);
+                    $hash->{CHANGETIME}[$ii++] = FmtDateTime($timestamp);
                     readingsBulkUpdate( $hash, $type, $value, 1 );
 
                     ++$i;
                   }
-                  last;
                 }
               }
               
