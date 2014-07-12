@@ -57,6 +57,26 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"D$device"} = $hash;
 
+  } elsif( ($a[2] eq "PUBLIC" && @a > 5 ) ) {
+    $subtype = "DEVICE";
+
+    my $device = $a[@a-3];
+    my $lat = $a[@a-2];
+    my $lon = $a[@a-1];
+    my $rad = 0.02;
+
+    $hash->{Device} = $device;
+    $hash->{Lat} = $lat;
+    $hash->{Lon} = $lon;
+    $hash->{Rad} = $rad;
+
+    $hash->{INTERVAL} = 60*15;
+
+    my $d = $modules{$hash->{TYPE}}{defptr}{"D$device"};
+    return "device $device already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
+
+    $modules{$hash->{TYPE}}{defptr}{"D$device"} = $hash;
+
   } elsif( ($a[2] eq "MODULE" && @a == 5 ) ) {
     $subtype = "MODULE";
 
@@ -90,6 +110,7 @@ netatmo_Define($$)
   } else {
     return "Usage: define <name> netatmo device\
        define <name> netatmo userid publickey\
+       define <name> netatmo PUBLIC device latitude longitude [radius]\
        define <name> netatmo [ACCOUNT] username password"  if(@a < 3 || @a > 5);
   }
 
@@ -296,6 +317,59 @@ netatmo_getDevices($;$)
   }
 }
 sub
+netatmo_getPublicDevices($$;$$$$)
+{
+  my ($hash,$blocking,$lon_ne,$lat_ne,$lon_sw,$lat_sw) = @_;
+  my $name = $hash->{NAME};
+
+  my $iohash = $hash->{IODev};
+  $iohash = $hash if( !defined($iohash) );
+
+  if( !defined($lat_ne) ) {
+    my $s = $lon_ne;
+    $s = 0.025 if ( !defined($s) );
+    my $lat = AttrVal("global","latitude", 50.112);
+    my $lon = AttrVal("global","longitude", 8.686);
+
+    $lon_ne = $lon + $s;
+    $lat_ne = $lat + $s;
+    $lon_sw = $lon - $s;
+    $lat_sw = $lat - $s;
+  } elsif( !defined($lat_sw) ) {
+    my $lat = $lat_ne;
+    my $lon = $lon_ne;
+    my $s = $lon_sw;
+    $s = 0.025 if ( !defined($s) );
+
+    $lon_ne = $lon + $s;
+    $lat_ne = $lat + $s;
+    $lon_sw = $lon - $s;
+    $lat_sw = $lat - $s;
+  }
+  Log3 $name, 4, "$name getpublicdata: $lon_ne, $lon_sw, $lat_ne, $lat_sw";
+
+  netatmo_refreshToken($iohash);
+
+  if( $blocking ) {
+    my($err,$data) = HttpUtils_BlockingGet({
+      url => 'http://api.netatmo.net/api/getpublicdata',
+      noshutdown => 1,
+      data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw },
+    });
+
+      return netatmo_dispatch( {hash=>$hash,type=>'publicdata'},$err,$data );
+  } else {
+    HttpUtils_NonblockingGet({
+      url => 'http://api.netatmo.net/api/getpublicdata',
+      noshutdown => 1,
+      data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw },
+      hash => $hash,
+      type => 'publicdata',
+      callback => \&netatmo_dispatch,
+    });
+  }
+}
+sub
 netatmo_getDeviceDetail($$)
 {
   my ($hash,$id) = @_;
@@ -320,6 +394,7 @@ netatmo_requestDeviceReadings($@)
 
   my $iohash = $hash->{IODev};
   my $type = $hash->{dataTypes};
+  $type = "Temperature,Co2,Humidity,Noise,Pressure" if( !$type );
 
   netatmo_refreshToken( $iohash );
 
@@ -390,6 +465,8 @@ netatmo_dispatch($$$)
       netatmo_parseDeviceList($hash,$json);
     } elsif( $param->{type} eq 'getmeasure' ) {
       netatmo_parseReadings($hash,$json);
+    } elsif( $param->{type} eq 'publicdata' ) {
+      return netatmo_parsePublic($hash,$json);
     }
   }
 }
@@ -552,22 +629,80 @@ netatmo_parseReadings($$)
 }
 
 sub
+netatmo_parsePublic($$)
+{
+  my($hash, $json) = @_;
+  my $name = $hash->{NAME};
+
+  if( $json ) {
+    $hash->{status} = $json->{status};
+    $hash->{status} = $json->{error}{message} if( $json->{error} );
+    if( $hash->{status} eq "ok" ) {
+      if( $hash->{Lat} ) {
+        readingsBeginUpdate($hash);
+        my $found = 0;
+        my $devices = $json->{body};
+        if( ref($devices) eq "ARRAY" ) {
+          foreach my $device (@{$devices}) {
+            if( $device->{_id} eq $hash->{Device} ) {
+              next if( ref($device->{measures}) ne "HASH" );
+              foreach my $module ( keys %{$device->{measures}}) {
+                next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
+                foreach my $timestamp ( keys %{$device->{measures}->{$module}->{res}} ) {
+                  next if( !$hash->{LAST_POLL} || $hash->{LAST_POLL} > $timestamp  );
+                  my $i = 0;
+                  foreach my $value ( @{$device->{measures}->{$module}->{res}->{$timestamp}} ) {
+                    my $type = $device->{measures}->{$module}->{type}[$i];
+
+                    $hash->{".updateTimestamp"} = FmtDateTime($timestamp);
+                    $hash->{CHANGETIME}[$i++] = FmtDateTime($timestamp);
+                    readingsBulkUpdate( $hash, $type, $value, 1 );
+
+                    ++$i;
+                  }
+                  last;
+                }
+              }
+              
+              $found = 1;
+              last;
+            }
+          }
+        }
+        ($hash->{LAST_POLL}) = gettimeofday();
+        delete $hash->{CHANGETIME};
+
+        if( !$found ) {
+          $hash->{STATE} = "Error: device not found";
+        }
+        readingsEndUpdate($hash,1);
+      } else {
+        return $json->{body};
+      }
+    } else {
+      return $hash->{status};
+    }
+  }
+}
+
+sub
 netatmo_pollDevice($)
 {
   my ($hash) = @_;
 
-  my $json;
   if( $hash->{Module} ) {
-    $json = netatmo_requestDeviceReadings( $hash, $hash->{Device}, $hash->{Module} );
+    netatmo_requestDeviceReadings( $hash, $hash->{Device}, $hash->{Module} );
+  } elsif( defined($hash->{Lat}) ) {
+    netatmo_getPublicDevices($hash, 0, $hash->{Lat}, $hash->{Lon}, $hash->{Rad} );
   } else {
-    $json = netatmo_requestDeviceReadings( $hash, $hash->{Device} );
+    netatmo_requestDeviceReadings( $hash, $hash->{Device} );
   }
 }
 
 sub
 netatmo_Get($$@)
 {
-  my ($hash, $name, $cmd) = @_;
+  my ($hash, $name, $cmd, @args) = @_;
 
   my $list;
   if( $hash->{SUBTYPE} eq "DEVICE"
@@ -584,7 +719,7 @@ netatmo_Get($$@)
       return undef;
     }
   } elsif( $hash->{SUBTYPE} eq "ACCOUNT" ) {
-    $list = "devices:noArg";
+    $list = "devices:noArg public";
 
     if( $cmd eq "devices" ) {
       my $devices = netatmo_getDevices($hash,1);
@@ -594,6 +729,48 @@ netatmo_Get($$@)
       }
 
       $ret = "id\t\t\tname\t\thw\tfw\n" . $ret if( $ret );
+      $ret = "no devices found" if( !$ret );
+      return $ret;
+    } elsif( $cmd eq "public" ) {
+      my $devices = netatmo_getPublicDevices($hash, 1, $args[0], $args[1], $args[2], $args[3] );
+      my $ret;
+
+      if( ref($devices) eq "ARRAY" ) {
+        foreach my $device (@{$devices}) {
+           $ret .= sprintf( "%s\t%.8f\t%.8f\t%i", $device->{_id},
+                                                  $device->{place}->{location}->[0], $device->{place}->{location}->[1],
+                                                  $device->{place}->{altitude} );
+          next if( ref($device->{measures}) ne "HASH" );
+          foreach my $module ( keys %{$device->{measures}}) {
+            next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
+            foreach my $timestamp ( keys %{$device->{measures}->{$module}->{res}} ) {
+              my $i = 0;
+              $ret .= "\t";
+              foreach my $value ( @{$device->{measures}->{$module}->{res}->{$timestamp}} ) {
+                my $type = $device->{measures}->{$module}->{type}[$i];
+
+                if( $type eq "temperature" ) {
+                  $ret .= sprintf( "\t%.1f \xc2\xb0C", $value );
+                } elsif( $type eq "humidity" ) {
+                  $ret .= sprintf( "\t%i %%", $value );
+                } elsif( $type eq "pressure" ) {
+                  $ret .= sprintf( "\t%i hPa", $value );
+                } elsif( $type eq "rain" ) {
+                  $ret .= sprintf( "\t%i mm", $value );
+                }
+
+              ++$i;
+              }
+              last;
+            }
+          }
+           $ret .= "\n";
+         }
+      } else {
+        $ret = $devices if( !ref($devices) );
+      }
+      
+      $ret = "id\t\t\tlongitude\tlatitude\taltitude\n" . $ret if( $ret );
       $ret = "no devices found" if( !$ret );
       return $ret;
     }
@@ -655,6 +832,7 @@ netatmo_Attr($$$)
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; netatmo &lt;device&gt;</code><br>
+    <code>define &lt;name&gt; netatmo PUBLIC &lt;device&gt; &lt;latitude&gt; &lt;longitude&gt; [&lt;radius&gt;]</code><br>
     <code>define &lt;name&gt; netatmo [ACCOUNT] &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt;</code><br>
     <br>
 
@@ -683,6 +861,11 @@ netatmo_Attr($$$)
   <ul>
     <li>update<br>
       trigger an update</li>
+    <li>public<br>
+      no arguments -> get all public stations in a radius of 0.025&deg; around global fhem longitude/latitude<br>
+      &lt;rad&gt; -> get all public stations in a radius of &lt;rad&gt;&deg; around global fhem longitude/latitude<br>
+      &lt;lon&gt; &lt;lat&gt; [&lt;rad&gt;] -> get all public stations in a radius of 0.025&deg; or &lt;rad&gt;&deg; around &lt;lon&gt;/&lt;lat&gt;<br>
+      &lt;lon_ne&gt; &lt;lat_ne&gt; &lt;lon_sw&gt; &lt;lat_sw&gt; -> get all public stations in the area of &lt;lon_ne&gt; &lt;lat_ne&gt; &lt;lon_sw&gt; &lt;lat_sw&gt;<br></li>
   </ul><br>
 
   <a name="netatmo_Attr"></a>
