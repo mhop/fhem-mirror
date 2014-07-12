@@ -1408,12 +1408,12 @@ Options:
 
     <br><br>
     <li><a>powerOnFn</a></li><br>
-    Eine Perlfunktion oder -ausdruck, welche das Ger&auml;t einschaltet.<br><br>
+    Eine Perlfunktion oder -ausdruck, welcher das Ger&auml;t einschaltet.<br><br>
     
     Wenn die powerOn-Funktion ausgef&uuml;hrt wird (set-Befehl: powerOn) werden folgende Platzhalter durch ihre entsprechenden Werte ersetzt:<br><br>
     <ul>
     <li><code>%NAME</code> - Name der PRESENCE-Definition</li>
-    <li><code>%ADDRESS</code> - Die überwachte Addresse der PRESENCE Definition, wie sie im define-Befehl angegeben wurde.</li>
+    <li><code>%ADDRESS</code> - Die &uuml;berwachte Addresse der PRESENCE Definition, wie sie im define-Befehl angegeben wurde.</li>
     <li><code>%ARGUMENT</code> - Das Argument, was dem Set-Befehl "powerOn" &uuml;bergeben wurde.</li>
     </ul>
     <br>
@@ -1427,7 +1427,7 @@ Options:
     <u>Generelle Events:</u><br><br>
     <ul>
     <li><b>state</b>: $state (absent|present|disabled) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das disable-Attribut aktiviert ist</li>
-    <li><b>powerOnFn</b>: (executed|failed) - power on was executed or has failed</li>
+    <li><b>powerOnFn</b>: (executed|failed) - Ausf&uuml;hrung des powerOn-Befehls war erfolgreich.</li>
     </ul><br><br>
     <u>Bluetooth-spezifische Events:</u><br><br>
     <ul>
