@@ -105,13 +105,24 @@ FW_doUpdate()
       FW_widgets[w].updateDevs(devs);
     }
   }
+
+  // reset the connection to avoid memory problems
+  if(FW_pollConn.responseText.length > 300*1024)
+    FW_longpoll();
 }
 
 function
 FW_longpoll()
 {
+  log("Connecting...");
   FW_curLine = 0;
+  if(FW_pollConn) {
+    FW_leaving = 1;
+    FW_pollConn.abort();
+  }
+
   FW_pollConn = new XMLHttpRequest();
+  FW_leaving = 0;
 
   var filter = document.body.getAttribute("longpollfilter");
   if(filter == null)
@@ -325,8 +336,10 @@ loadScript(sname, callback)
       }
     }
   } else {
-    if(isiOS)
+    if(isiOS) {
+      FW_leaving = 1;
       FW_pollConn.abort();
+    }
     script.onload = function(){
       if(callback)
         callback();
