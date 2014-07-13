@@ -80,6 +80,8 @@ TcpServer_Accept($$)
     }
   }
 
+  $clientinfo[0]->blocking(0);  # Forum #24799
+
   if($hash->{SSL}) {
     # Certs directory must be in the modpath, i.e. at the same level as the
     # FHEM directory
