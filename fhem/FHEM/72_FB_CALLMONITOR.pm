@@ -233,64 +233,75 @@ FB_CALLMONITOR_Read($)
   
     $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
    
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "event", lc($array[1]));
-    readingsBulkUpdate($hash, "external_number", (defined($external_number) ? $external_number : "unknown")) if($array[1] eq "RING" or $array[1] eq "CALL");
-    readingsBulkUpdate($hash, "external_name",(defined($reverse_search) ? $reverse_search : "unknown")) if($array[1] eq "RING" or $array[1] eq "CALL");
-    readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING" or $array[1] eq "CALL");
-    readingsBulkUpdate($hash, "external_connection", $array[5]) if($array[1] eq "RING");
-    readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
-    readingsBulkUpdate($hash, "internal_connection", $connection_type{$array[3]}) if($array[1] eq "CALL" or $array[1] eq "CONNECT" and defined($connection_type{$array[3]}));
-    readingsBulkUpdate($hash, "call_duration", $array[3]) if($array[1] eq "DISCONNECT");
    
+    if($array[1] eq "CALL" or $array[1] eq "RING")
+    {
+        if(AttrVal($name, "unique-call-ids", "0") eq "1")
+        {
+            $hash->{helper}{TEMP}{$array[2]}{call_id}= Digest::MD5::md5_hex($data);
+        }
+        else
+        {
+            $hash->{helper}{TEMP}{$array[2]}{call_id} = $array[2];
+        }
+    }
 
+    if($array[1] eq "CALL")
+    {
+        delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
+
+        $hash->{helper}{TEMP}{$array[2]}{external_number} = (defined($external_number) ? $external_number : "unknown");
+        $hash->{helper}{TEMP}{$array[2]}{external_name} = (defined($reverse_search) ? $reverse_search : "unknown");
+        $hash->{helper}{TEMP}{$array[2]}{internal_number} = $array[4];
+        $hash->{helper}{TEMP}{$array[2]}{external_connection} = $array[6];
+        $hash->{helper}{TEMP}{$array[2]}{internal_connection} =  $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
+        $hash->{helper}{TEMP}{$array[2]}{direction} = "outgoing";
+    }
+   
     if($array[1] eq "RING")
     {
-        $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} = $array[1];
-        my $no = "unknown";
-        if(defined($external_number))
-        {
-    	    $no = $external_number;
-            if(defined($reverse_search))
-            {
-                $no .= " (".$reverse_search.")";
-            }
-        }
-
-        $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{NUMBER} = $no;
-        $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{LINE} = $array[4];
+        delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
         
+        $hash->{helper}{TEMP}{$array[2]}{external_number} = (defined($external_number) ? $external_number : "unknown");
+        $hash->{helper}{TEMP}{$array[2]}{external_name} = (defined($reverse_search) ? $reverse_search : "unknown");
+        $hash->{helper}{TEMP}{$array[2]}{internal_number} = $array[4];
+        $hash->{helper}{TEMP}{$array[2]}{external_connection} = $array[5];
+        $hash->{helper}{TEMP}{$array[2]}{direction} = "incoming";
     }
-    elsif ($array[1] eq "DISCONNECT")
+   
+    if($array[1] eq "CONNECT" and not exists($hash->{helper}{TEMP}{$array[2]}{internal_connection}))
     {
-        if (($array[3] eq "0") and (exists($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) and $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} eq "RING")) 
+        $hash->{helper}{TEMP}{$array[2]}{internal_connection} =  $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
+    }    
+    
+    if($array[1] eq "DISCONNECT")
+    {
+        $hash->{helper}{TEMP}{$array[2]}{call_duration} = $array[3];
+    
+        if($hash->{helper}{TEMP}{$array[2]}{direction} eq "incoming" and $array[3] eq "0")
         {
-            readingsBulkUpdate($hash, "missed_call", $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{NUMBER});
-            readingsBulkUpdate($hash, "missed_call_line", $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{LINE})
+            $hash->{helper}{TEMP}{$array[2]}{missed_call} = $hash->{helper}{TEMP}{$array[2]}{external_number}.($hash->{helper}{TEMP}{$array[2]}{external_name} ne "unknown" ? " (".$hash->{helper}{TEMP}{$array[2]}{external_name}.")" : "");
+            $hash->{helper}{TEMP}{$array[2]}{missed_call_line} = $hash->{helper}{TEMP}{$array[2]}{internal_number};
         }
-        delete($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) if(exists($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}));
-    }
-
-
-    if(AttrVal($name, "unique-call-ids", "0") eq "1")
+    }    
+    
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "event", lc($array[1]));
+    
+    foreach my $key (keys $hash->{helper}{TEMP}{$array[2]})
     {
-        if($array[1] eq "RING" or $array[1] eq "CALL")
-        {
-    	    $hash->{helper}{CALLID}{$array[2]} = Digest::MD5::md5_hex($data);
-        }
-        readingsBulkUpdate($hash, "call_id", $hash->{helper}{CALLID}{$array[2]});
-	
-        if($array[1] eq "DISCONNECT")
-        {
-            delete($hash->{helper}{CALLID}{$array[2]});
-    	}
-    }
-    else
-    {
-        readingsBulkUpdate($hash, "call_id", $array[2]);
+        readingsBulkUpdate($hash, $key, $hash->{helper}{TEMP}{$array[2]}{$key});
     }
     
+    
+    if($array[1] eq "DISCONNECT")
+    {
+        delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
+    }
+
     readingsEndUpdate($hash, 1);
+    
+
   
 }
 
@@ -827,6 +838,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <b>Generated Events:</b><br><br>
   <ul>
   <li><b>event</b> (call|ring|connect|disconnect) - which event in detail was triggerd</li>
+  <li><b>direction</b> (incoming|outgoing) - the call direction in general (incoming or outgoing call)</li>
   <li><b>external_number</b> - The participants number which is calling (event: ring) or beeing called (event: call)</li>
   <li><b>external_name</b> - The result of the reverse lookup of the external_number via internet. Is only available if reverse-search is activated. Special values are "unknown" (no search results found) and "timeout" (got timeout while search request). In case of an timeout and activated caching, the number will be searched again next time a call occurs with the same number</li>
   <li><b>internal_number</b> - The internal number (fixed line, VoIP number, ...) on which the participant is calling (event: ring) or is used for calling (event: call)</li>
@@ -937,6 +949,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <b>Generierte Events:</b><br><br>
   <ul>
   <li><b>event</b> (call|ring|connect|disconnect) - Welches Event wurde genau ausgel&ouml;st.</li>
+  <li><b>direction</b> (incoming|outgoing) - Die Anruf-Richtung ("incoming" =&gt; eingehender Anruf, "outgoing" =&gt; ausgehender Anruf)</li>
   <li><b>external_number</b> - Die Rufnummer des Gegen&uuml;bers, welcher anruft (event: ring) oder angerufen wird (event: call)</li>
   <li><b>external_name</b> - Das Ergebniss der R&uuml;ckw&auml;rtssuche (sofern aktiviert). Im Fehlerfall kann diese Reading auch den Inhalt "unknown" (keinen Eintrag gefunden) und "timeout" (Zeit&uuml;berschreitung bei der Abfrage) enthalten. Im Falle einer Zeit&uuml;berschreitung und aktiviertem Caching, wird die Rufnummer beim n&auml;chsten Mal erneut gesucht.</li>
   <li><b>internal_number</b> - Die interne Rufnummer (Festnetz, VoIP-Nummer, ...) auf welcher man angerufen wird (event: ring) oder die man gerade nutzt um jemanden anzurufen (event: call)</li>
