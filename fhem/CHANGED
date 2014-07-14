@@ -2,8 +2,8 @@
 # Do not insert empty lines here, update check depends on it.
   - feature: mailcheck: allow user and pssword as perl expression
   - feature: netatmo: support for public stations
-  - feature: PRESENCE: new set command "powerOn" to execute a Perl function
-             which power on the checked device (given via attribute)
+  - feature: PRESENCE: new set command "power" to execute a FHEM command
+             which can power on or off the checked device (given via attribute)
   - feature: readingsGroup: added valueColumn attribute
   - feature: readingsGroup: added ...,<reading>@<device>,... argument format
   - feature: 52_I2C_PCF8574.pm: added attribute OnStartup

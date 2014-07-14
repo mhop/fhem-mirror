@@ -51,7 +51,7 @@ PRESENCE_Initialize($)
     $hash->{DefFn}   = "PRESENCE_Define";
     $hash->{UndefFn} = "PRESENCE_Undef";
     $hash->{AttrFn}  = "PRESENCE_Attr";
-    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 powerOnFn ".$readingFnAttributes;
+    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 powerCmd ".$readingFnAttributes;
 
 }
 
@@ -260,8 +260,8 @@ PRESENCE_Set($@)
 
     my $usage = "Unknown argument ".$a[1].", choose one of statusRequest";
 
-    my $powerOnFn = AttrVal($name, "powerOnFn", undef);
-    $usage .= " powerOn" if(defined($powerOnFn));
+    my $powerCmd = AttrVal($name, "powerCmd", undef);
+    $usage .= " power" if(defined($powerCmd));
     
     if($a[1] eq "statusRequest")
     {
@@ -283,7 +283,7 @@ PRESENCE_Set($@)
             }
         } 
     }
-    elsif(defined($powerOnFn) && $a[1] eq "powerOn") 
+    elsif(defined($powerCmd) && $a[1] eq "power") 
     {
         my %specials= (
         "%NAME" => $name,
@@ -291,20 +291,20 @@ PRESENCE_Set($@)
         "%ARGUMENT" => $a[2]
         );
         
-        $powerOnFn= EvalSpecials($powerOnFn, %specials);
+        $powerCmd= EvalSpecials($powerCmd, %specials);
         
-        Log3 $name, 5, "PRESENCE ($name) - executing powerOnFn: $powerOnFn";
-        eval $powerOnFn;
+        Log3 $name, 5, "PRESENCE ($name) - executing powerCmd: $powerCmd";
+        my $return = AnalyzeCommandChain(undef, $powerCmd);
 
-        if($@)
+        if($return)
         {
-            Log3 $name, 3, "PRESENCE ($name) - executed powerOnFn failed: ".$@;
-            readingsSingleUpdate($hash, "powerOnFn", "failed",1);
-            return "executed powerOnFn failed: ".$@;
+            Log3 $name, 3, "PRESENCE ($name) - executed powerCmd failed: ".$return;
+            readingsSingleUpdate($hash, "powerCmd", "failed",1);
+            return "executed powerCmd failed: ".$return;
         }
         else
         {
-            readingsSingleUpdate($hash, "powerOnFn", "executed",1);
+            readingsSingleUpdate($hash, "powerCmd", "executed",1);
         }
 
         return undef;
@@ -1133,7 +1133,7 @@ Options:
   <b>Set</b>
   <ul>
   <li><b>statusRequest</b> - Schedules an immediatly check.</li>
-  <li><b>powerOn</b> - Executes the given power on function set as attribute to power on the device (only when attribute "powerOnFn" is set)</li>
+  <li><b>power</b> - Executes the given power command which is set as attribute to power (on or off) the device (only when attribute "powerCmd" is set)</li>
   </ul>
   <br>
 
@@ -1165,18 +1165,24 @@ Options:
     Possible values: 0 => Use default recognition, 1 => Use repeater-supported recognition<br>
     Default Value is 0 (Use default recognition)
     <br><br>
-    <li><a>powerOnFn</a></li><br>
-    Define a Perl statement, which powers on the device.<br><br>
+    <li><a>powerCmd</a></li><br>
+    Define a FHEM command, which powers on or off the device.<br><br>
     
-    When executing the powerOnFn (set command: powerOn) following placeholders will be replaced by there corresponding values:<br><br>
+    When executing the powerCmd (set command: power) following placeholders will be replaced by there corresponding values:<br><br>
     <ul>
     <li><code>%NAME</code> - name of the PRESENCE definition</li>
     <li><code>%ADDRESS</code> - the address of the PRESENCE definition as given in the define statement</li>
-    <li><code>%ARGUMENT</code> - the argument given to the powerOn set command</li>
+    <li><code>%ARGUMENT</code> - the argument given to the power set command (e.g. "on" or "off)</li>
     </ul>
     <br>
-    Example: <code>powerOn("%ADDRESS", "username", "password")</code>
+    Example FHEM commands:<br><br>
+    <ul>
+        <li><code>set PowerSwitch_1 on</code></li>
+        <li><code>set PowerSwitch_1 %ARGUMENT</code></li>
+        <li><code>"/opt/power_on.sh %ADDRESS"</code></li>
+        <li><code>{powerOn("%ADDRESS", "username", "password")}</code></li>
     </ul>
+  </ul>
   <br>
  
   <a name="PRESENCEevents"></a>
@@ -1185,7 +1191,7 @@ Options:
     <u>General Events:</u><br><br>
     <ul>
     <li><b>state</b>: $state (absent|present|disabled) - The state of the device or "disabled" when the disable attribute is enabled</li>
-    <li><b>powerOnFn</b>: (executed|failed) - powerOn was executed or has failed</li>
+    <li><b>powerCmd</b>: (executed|failed) - power command was executed or has failed</li>
     </ul><br><br>
     <u>Bluetooth specific events:</u><br><br>
     <ul>
@@ -1372,7 +1378,7 @@ Options:
   <ul>
   
   <li><b>statusRequest</b> - Startet einen sofortigen Check.</li> 
-  <li><b>powerOn</b> - Startet die powerOn-Funktion welche durch den Parameter powerOnFn angegeben ist (Nur wenn das Attribut "powerOnFn" definiert ist)</li>
+  <li><b>power</b> - Startet den powerCmd-Befehl welche durch den Parameter powerCmd angegeben ist (Nur wenn das Attribut "powerCmd" definiert ist)</li>
   </ul>
   <br>
 
@@ -1407,17 +1413,23 @@ Options:
     Standardwert ist 0 (Standarderkennung verwenden)
 
     <br><br>
-    <li><a>powerOnFn</a></li><br>
-    Eine Perlfunktion oder -ausdruck, welcher das Ger&auml;t einschaltet.<br><br>
+    <li><a>powerCmd</a></li><br>
+    Ein FHEM-Befehl, welcher das Ger&auml;t schalten kann.<br><br>
     
-    Wenn die powerOn-Funktion ausgef&uuml;hrt wird (set-Befehl: powerOn) werden folgende Platzhalter durch ihre entsprechenden Werte ersetzt:<br><br>
+    Wenn der power-Befehl ausgef&uuml;hrt wird (set-Befehl: power) werden folgende Platzhalter durch ihre entsprechenden Werte ersetzt:<br><br>
     <ul>
     <li><code>%NAME</code> - Name der PRESENCE-Definition</li>
     <li><code>%ADDRESS</code> - Die &uuml;berwachte Addresse der PRESENCE Definition, wie sie im define-Befehl angegeben wurde.</li>
-    <li><code>%ARGUMENT</code> - Das Argument, was dem Set-Befehl "powerOn" &uuml;bergeben wurde.</li>
+    <li><code>%ARGUMENT</code> - Das Argument, was dem Set-Befehl "power" &uuml;bergeben wurde. (z.B. "on" oder "off")</li>
     </ul>
     <br>
-    Beispiel: <code>powerOn("%ADDRESS", "username", "passwort")</code>
+    Beispielhafte FHEM-Befehle:<br><br>
+    <ul>
+        <li><code>set PowerSwitch_1 on</code></li>
+        <li><code>set PowerSwitch_1 %ARGUMENT</code></li>
+        <li><code>"/opt/power_on.sh %ADDRESS"</code></li>
+        <li><code>{powerOn("%ADDRESS", "username", "password")}</code></li>
+    </ul>
     </ul>
   <br>
  
@@ -1427,7 +1439,7 @@ Options:
     <u>Generelle Events:</u><br><br>
     <ul>
     <li><b>state</b>: $state (absent|present|disabled) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das disable-Attribut aktiviert ist</li>
-    <li><b>powerOnFn</b>: (executed|failed) - Ausf&uuml;hrung des powerOn-Befehls war erfolgreich.</li>
+    <li><b>powerCmd</b>: (executed|failed) - Ausf&uuml;hrung des power-Befehls war erfolgreich.</li>
     </ul><br><br>
     <u>Bluetooth-spezifische Events:</u><br><br>
     <ul>
