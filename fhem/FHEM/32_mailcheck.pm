@@ -66,13 +66,35 @@ mailcheck_Define($$)
   my $password = $a[4];
   my $folder = $a[5];
 
+  if( $user =~ m/^{.*}$/ ) {
+    my $NAME = $name;
+    my $HOST = $host;
+    my $u = eval $user;
+    if( $@ ) {
+      Log3 $name, 2, $name .": ". $user .": ". $@;
+    }
+    $user = $u if( $u );
+  }
+
+  if( $password =~ m/^{.*}$/ ) {
+    my $NAME = $name;
+    my $HOST = $host;
+    my $USER = $user;
+    my $p = eval $password;
+    if( $@ ) {
+      Log3 $name, 2, $name .": ". $password .": ". $@;
+    }
+    $password = $p if( $p );
+  }
+Log 3, $password;
+
   $hash->{tag} = undef;
 
   $hash->{NAME} = $name;
 
   $hash->{Host} = $host;
-  $hash->{User} = $user;
-  $hash->{helper}{PASS} = $password;
+  $hash->{helper}{user} = $user;
+  $hash->{helper}{password} = $password;
 
   $hash->{Folder} = "INBOX";
   $hash->{Folder} = $folder if( $folder );
@@ -133,8 +155,8 @@ mailcheck_Connect($)
     my $client = Mail::IMAPClient->new(
        Socket   => $socket,
        KeepAlive => 'true',
-       User     => $hash->{User},
-       Password => $hash->{helper}{PASS},
+       User     => $hash->{helper}{user},
+       Password => $hash->{helper}{password},
      );
 
     $client->Debug(AttrVal($name, "debug", 0)) if( $client );
@@ -462,12 +484,15 @@ mailcheck_Read($)
   <ul>
     <code>define &lt;name&gt; mailcheck &lt;host&gt; &lt;user&gt; &lt;password&gt; [&lt;folder&gt;]</code><br>
     <br>
+    &lt;user&gt; and <li>&lt;password&gt; can be of the form {perl-code}. no spaces are allowed. for both evals $NAME and $HOST is set to the name and host of the mailcheck device and $USER is set to the user in the password eval.
+    <br>
 
     Defines a mailcheck device.<br><br>
 
     Examples:
     <ul>
-      <code>define mailcheck mailcheck imap.mail.me.com x.y@me.com</code><br>
+      <code>define mailcheck mailcheck imap.mail.me.com x.y@me.com myPassword</code><br>
+      <code>define mailcheck mailcheck imap.mail.me.com {"x.y@me.com"} {myPasswordOfAccount($USER)}</code><br>
     </ul>
   </ul><br>
 
