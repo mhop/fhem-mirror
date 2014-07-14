@@ -40,7 +40,7 @@ sub readingsGroup_Initialize($)
   #$hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 nameIcon valueIcon mapping separator style nameStyle valueColumn valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 nonames:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1";
+  $hash->{AttrList} = "disable:1,2,3 cacheHtml:1 nameIcon valueIcon mapping separator style nameStyle valueColumn valueColumns valueStyle valueFormat commands timestampStyle noheading:1 nolinks:1 nonames:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -194,6 +194,7 @@ readingsGroup_updateDevices($)
   $hash->{DEVICES2} = \@devices2 if( @devices2 );
 
   $hash->{fhem}->{last_update} = gettimeofday();
+  $hash->{fhem}->{lastDefChange} = $lastDefChange;
 }
 
 sub readingsGroup_Define($$)
@@ -334,8 +335,13 @@ readingsGroup_2html($)
 
   return undef if( !$hash );
 
+  #if( $hash->{fhem}->{cached} && $hash->{fhem}->{lastDefChange} && $hash->{fhem}->{lastDefChange} != $lastDefChange ) {
+  #  return $hash->{fhem}->{cached};
+  #}
+
   if( $hash->{DEF} =~ m/=/ ) {
     if( !$hash->{fhem}->{last_update}
+        || $hash->{fhem}->{lastDefChange} != $lastDefChange
         || gettimeofday() - $hash->{fhem}->{last_update} > 600 ) {
       readingsGroup_updateDevices($hash);
     }
@@ -714,6 +720,8 @@ readingsGroup_2html($)
   $ret .= "</table></td></tr>";
   $ret .= "</table>";
 
+  #$hash->{fhem}->{cached} = $ret;
+
   return $ret;
 }
 sub
@@ -762,7 +770,7 @@ readingsGroup_Notify($$)
 
         $hash->{DEF} =~ s/(\s*)$old((:\S+)?\s*)/$1$new$2/g;
       }
-      readingsGroup_updateDevices($hash);
+      #readingsGroup_updateDevices($hash);
     } elsif( $dev->{NAME} eq "global" && $s =~ m/^DELETED ([^ ]*)$/) {
       my ($name) = ($1);
 
@@ -772,9 +780,9 @@ readingsGroup_Notify($$)
         $hash->{DEF} =~ s/^ //;
         $hash->{DEF} =~ s/ $//;
       }
-      readingsGroup_updateDevices($hash);
+      #readingsGroup_updateDevices($hash);
     } elsif( $dev->{NAME} eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
-      readingsGroup_updateDevices($hash);
+      #readingsGroup_updateDevices($hash);
     } else {
       next if(AttrVal($name,"disable", undef));
 
