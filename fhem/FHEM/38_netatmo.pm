@@ -60,10 +60,13 @@ netatmo_Define($$)
   } elsif( ($a[2] eq "PUBLIC" && @a > 5 ) ) {
     $subtype = "DEVICE";
 
-    my $device = $a[@a-3];
-    my $lat = $a[@a-2];
-    my $lon = $a[@a-1];
-    my $rad = 0.02;
+    my $device = $a[3];
+    my $lon = $a[4];
+    my $lat = $a[5];
+    my $rad = $a[6];
+    $rad = 0.02 if( !$rad );
+
+    delete( $hash->{LAST_POLL} );
 
     $hash->{Device} = $device;
     $hash->{Lat} = $lat;
@@ -645,28 +648,28 @@ netatmo_parsePublic($$)
         my $devices = $json->{body};
         if( ref($devices) eq "ARRAY" ) {
           foreach my $device (@{$devices}) {
-            if( $device->{_id} eq $hash->{Device} ) {
-              next if( ref($device->{measures}) ne "HASH" );
-              foreach my $module ( keys %{$device->{measures}}) {
-                next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
-                foreach my $timestamp ( keys %{$device->{measures}->{$module}->{res}} ) {
-                  next if( !$hash->{LAST_POLL} || $hash->{LAST_POLL} > $timestamp  );
-                  my $i = 0;
-                  foreach my $value ( @{$device->{measures}->{$module}->{res}->{$timestamp}} ) {
-                    my $type = $device->{measures}->{$module}->{type}[$i];
+            next if( $device->{_id} ne $hash->{Device} );
+            next if( ref($device->{measures}) ne "HASH" );
+            Log3 $name, 4, "$name found:  $device->{_id}: $device->{place}->{location}->[0] $device->{place}->{location}->[1]";
+            foreach my $module ( keys %{$device->{measures}}) {
+              next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
+              foreach my $timestamp ( keys %{$device->{measures}->{$module}->{res}} ) {
+                next if( $hash->{LAST_POLL} || $hash->{LAST_POLL} > $timestamp  );
+                my $i = 0;
+                foreach my $value ( @{$device->{measures}->{$module}->{res}->{$timestamp}} ) {
+                  my $type = $device->{measures}->{$module}->{type}[$i];
 
-                    $hash->{".updateTimestamp"} = FmtDateTime($timestamp);
-                    $hash->{CHANGETIME}[$ii++] = FmtDateTime($timestamp);
-                    readingsBulkUpdate( $hash, $type, $value, 1 );
+                  $hash->{".updateTimestamp"} = FmtDateTime($timestamp);
+                  $hash->{CHANGETIME}[$ii++] = FmtDateTime($timestamp);
+                  readingsBulkUpdate( $hash, $type, $value, 1 );
 
-                    ++$i;
-                  }
+                  ++$i;
                 }
               }
-              
-              $found = 1;
-              last;
             }
+
+            $found = 1;
+            last;
           }
         }
         ($hash->{LAST_POLL}) = gettimeofday();
@@ -693,7 +696,7 @@ netatmo_pollDevice($)
   if( $hash->{Module} ) {
     netatmo_requestDeviceReadings( $hash, $hash->{Device}, $hash->{Module} );
   } elsif( defined($hash->{Lat}) ) {
-    netatmo_getPublicDevices($hash, 0, $hash->{Lat}, $hash->{Lon}, $hash->{Rad} );
+    netatmo_getPublicDevices($hash, 0, $hash->{Lon}, $hash->{Lat}, $hash->{Rad} );
   } else {
     netatmo_requestDeviceReadings( $hash, $hash->{Device} );
   }
@@ -769,7 +772,7 @@ netatmo_Get($$@)
       } else {
         $ret = $devices if( !ref($devices) );
       }
-      
+
       $ret = "id\t\t\tlongitude\tlatitude\taltitude\n" . $ret if( $ret );
       $ret = "no devices found" if( !$ret );
       return $ret;
