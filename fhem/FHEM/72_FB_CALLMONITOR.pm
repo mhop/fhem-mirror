@@ -288,7 +288,7 @@ FB_CALLMONITOR_Read($)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "event", lc($array[1]));
     
-    foreach my $key (keys $hash->{helper}{TEMP}{$array[2]})
+    foreach my $key (keys %{$hash->{helper}{TEMP}{$array[2]}})
     {
         readingsBulkUpdate($hash, $key, $hash->{helper}{TEMP}{$array[2]}{$key});
     }
