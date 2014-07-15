@@ -1,4 +1,4 @@
-# Perl Protothreads Version 1.01
+# Perl Protothreads Version 1.04
 # 
 # a lightwight pseudo-threading framework for perl that is
 # heavily inspired by Adam Dunkels protothreads for the c-language
@@ -58,16 +58,19 @@
 package ProtoThreads;
 
 use constant {
-  PT_WAITING => 0,
-  PT_EXITED => 1,
-  PT_ENDED => 2,
-  PT_YIELDED => 3,
+  PT_INITIAL   => 0,
+  PT_WAITING   => 1,
+  PT_YIELDED   => 2,
+  PT_EXITED    => 3,
+  PT_ENDED     => 4,
+  PT_ERROR     => 5,
+  PT_CANCELED  => 6,
 };
 
 my $DEBUG=0;
 
 use Exporter 'import';
-@EXPORT = qw(PT_THREAD PT_WAITING PT_EXITED PT_ENDED PT_YIELDED PT_INIT PT_SCHEDULE);
+@EXPORT = qw(PT_THREAD PT_INITIAL PT_WAITING PT_YIELDED PT_EXITED PT_ENDED PT_ERROR PT_CANCELED PT_INIT PT_SCHEDULE);
 @EXPORT_OK = qw();
 
 use Text::Balanced qw (
@@ -77,14 +80,17 @@ use Text::Balanced qw (
 sub PT_THREAD($) {
   my $method = shift;
   return bless({
-    PT_THREAD_STATE => 0,
-    PT_THREAD_METHOD => $method 
+    PT_THREAD_STATE => PT_INITIAL,
+    PT_THREAD_POSITION => 0,
+    PT_THREAD_METHOD => $method
   }, "ProtoThreads");
 }
 
 sub PT_INIT($) {
   my $self = shift;
-  $self->{PT_THREAD_STATE} = 0;
+  $self->{PT_THREAD_POSITION} = 0;
+  $self->{PT_THREAD_STATE} = PT_INITIAL;
+  delete $self->{PT_THREAD_ERROR};
 }
 
 sub PT_SCHEDULE(@) {
@@ -93,9 +99,26 @@ sub PT_SCHEDULE(@) {
   return ($state == PT_WAITING or $state == PT_YIELDED);
 }
 
+sub PT_CANCEL($) {
+  my ($self,$cause) = @_;
+  $self->{PT_THREAD_POSITION} = 0;
+  $self->{PT_THREAD_ERROR} = $cause;
+  $self->{PT_THREAD_STATE} = PT_CANCELED;
+}
+
 sub PT_RETVAL() {
   my $self = shift;
   return $self->{PT_THREAD_RETURN};
+}
+
+sub PT_STATE() {
+  my $self = shift;
+  return $self->{PT_THREAD_STATE};
+}
+
+sub PT_CAUSE() {
+  my $self = shift;
+  return $self->{PT_THREAD_ERROR};
 }
 
 sub PT_NEXTCOMMAND($$) {
@@ -121,65 +144,67 @@ FILTER_ONLY
    
   my $code = $_;
   my $counter = 1;
-  my ($success,$before,$arg,$after);
+  my ($success,$before,$arg,$after,$beforeblock);
   
   while(1) {
-    my $thread = " - no PT_BEGIN before use of thread - ";
-    ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_BEGIN");
+    ($success,$beforeblock,$arg,$after) = PT_NEXTCOMMAND($code,"PT_BEGIN");
     if ($success) {
-      $thread = $arg;
-      $code=$before."my \$PT_THREAD_STATE = eval { my \$PT_YIELD_FLAG = 1; goto ".$thread."->{PT_THREAD_STATE} if ".$thread."->{PT_THREAD_STATE};".$after;
-      while (1) {
-        ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_YIELD_UNTIL");
-        if ($success) {
-          $code=$before."\$PT_YIELD_FLAG = 0; ".$thread."->{PT_THREAD_STATE} = 'PT_LABEL_$counter'; PT_LABEL_$counter: return PT_YIELDED unless (\$PT_YIELD_FLAG and ($arg));".$after;
-          $counter++;
-          next;
+      if ($after =~ /PT_END\s*;/s) {
+        my $thread = $arg;
+        my $block = $thread."->{PT_THREAD_STATE} = eval { my \$PT_YIELD_FLAG = 1; goto ".$thread."->{PT_THREAD_POSITION} if ".$thread."->{PT_THREAD_POSITION};".$`.$thread."->{PT_THREAD_POSITION} = 0; delete ".$thread."->{PT_THREAD_RETURN}; return PT_ENDED; }; if (\$\@) {".$thread."->{PT_THREAD_STATE} = PT_ERROR; ".$thread."->{PT_THREAD_ERROR} = \$\@; }; return ".$thread."->{PT_THREAD_STATE};";
+        my $afterblock = $';
+        while (1) {
+          ($success,$before,$arg,$after) = PT_NEXTCOMMAND($block,"PT_YIELD_UNTIL");
+          if ($success) {
+            $block=$before."\$PT_YIELD_FLAG = 0; ".$thread."->{PT_THREAD_POSITION} = 'PT_LABEL_$counter'; PT_LABEL_$counter: return PT_YIELDED unless (\$PT_YIELD_FLAG and ($arg));".$after;
+            $counter++;
+            next;
+          }
+          if ($block =~ /PT_YIELD\s*;/s) {
+            $block = $`."\$PT_YIELD_FLAG = 0; ".$thread."->{PT_THREAD_POSITION} = 'PT_LABEL_$counter'; PT_LABEL_$counter: return PT_YIELDED unless \$PT_YIELD_FLAG;".$';
+            $counter++;
+            next;
+          }
+          ($success,$before,$arg,$after) = PT_NEXTCOMMAND($block,"PT_WAIT_UNTIL");
+          if ($success) {
+            $block=$before.$thread."->{PT_THREAD_POSITION} = 'PT_LABEL_$counter'; PT_LABEL_$counter: return PT_WAITING unless ($arg);".$after;
+            $counter++;
+            next;
+          }
+          ($success,$before,$arg,$after) = PT_NEXTCOMMAND($block,"PT_WAIT_WHILE");
+          if ($success) {
+            $block=$before.$thread."->{PT_THREAD_POSITION} = 'PT_LABEL_$counter'; PT_LABEL_$counter: return PT_WAITING if ($arg);".$after;
+            $counter++;
+            next;
+          }
+          ($success,$before,$arg,$after) = PT_NEXTCOMMAND($block,"PT_WAIT_THREAD");
+          if ($success) {
+            $block=$before."PT_WAIT_WHILE(PT_SCHEDULE(".$arg."));".$after;
+            next;
+          }
+          ($success,$before,$arg,$after) = PT_NEXTCOMMAND($block,"PT_SPAWN");
+          if ($success) {
+            $block=$before.$arg."->{PT_THREAD_POSITION} = 0; PT_WAIT_THREAD($arg);".$after;
+            next;
+          }
+          ($success,$before,$arg,$after) = PT_NEXTCOMMAND($block,"PT_EXIT");
+          if ($success) {
+            $block=$before.$thread."->{PT_THREAD_POSITION} = 0; ".$thread."->{PT_THREAD_RETURN} = $arg; return PT_EXITED;".$after;
+            next;
+          }
+          if ($block =~ /PT_EXIT(\s*;|\s+)/s) {
+            $block = $`.$thread."->{PT_THREAD_POSITION} = 0; delete ".$thread."->{PT_THREAD_RETURN}; return PT_EXITED".$1.$';
+            next;
+          }
+          if ($block =~ /PT_RESTART(\s*;|\s)/s) {
+            $block = $`.$thread."->{PT_THREAD_POSITION} = 0; return PT_WAITING;".$1.$';
+            next;
+          }
+          last;
         }
-        if ($code =~ /PT_YIELD\s*;/s) {
-          $code = $`."\$PT_YIELD_FLAG = 0; ".$thread."->{PT_THREAD_STATE} = 'PT_LABEL_$counter'; PT_LABEL_$counter: return PT_YIELDED unless \$PT_YIELD_FLAG;".$';
-          $counter++;
-          next;
-        }
-        ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_WAIT_UNTIL");
-        if ($success) {
-          $code=$before.$thread."->{PT_THREAD_STATE} = 'PT_LABEL_$counter'; PT_LABEL_$counter: return PT_WAITING unless ($arg);".$after;
-          $counter++;
-          next;
-        }
-        ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_WAIT_WHILE");
-        if ($success) {
-          $code=$before.$thread."->{PT_THREAD_STATE} = 'PT_LABEL_$counter'; PT_LABEL_$counter: return PT_WAITING if ($arg);".$after;
-          $counter++;
-          next;
-        }
-        ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_WAIT_THREAD");
-        if ($success) {
-          $code=$before."PT_WAIT_WHILE(PT_SCHEDULE(".$arg."));".$after;
-          next;
-        }
-        ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_SPAWN");
-        if ($success) {
-          $code=$before.$arg."->{PT_THREAD_STATE} = 0; PT_WAIT_THREAD($arg);".$after;
-          next;
-        }
-        ($success,$before,$arg,$after) = PT_NEXTCOMMAND($code,"PT_EXIT");
-        if ($success) {
-          $code=$before.$thread."->{PT_THREAD_STATE} = 0; ".$thread."->{PT_THREAD_RETURN} = $arg; return PT_EXITED;".$after;
-          next;
-        }
-        if ($code =~ /PT_EXIT(\s*;|\s+)/s) {
-          $code = $`.$thread."->{PT_THREAD_STATE} = 0; delete ".$thread."->{PT_THREAD_RETURN}; return PT_EXITED".$1.$';
-          next;
-        }
-        if ($code =~ /PT_RESTART(\s*;|\s)/s) {
-          $code = $`.$thread."->{PT_THREAD_STATE} = 0; return PT_WAITING;".$1.$';
-          next;
-        }
-        if ($code =~ /PT_END\s*;/s) {
-          $code = $`.$thread."->{PT_THREAD_STATE} = 0; delete ".$thread."->{PT_THREAD_RETURN}; return PT_ENDED; }; die \$\@ if \$\@; return \$PT_THREAD_STATE;".$';
-        }
-        last;
+        $code = $beforeblock.$block.$afterblock;
+      } else {
+        die "PT_END expected"
       }
       next;
     }
