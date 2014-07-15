@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.22";
+my $owx_version="5.23";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -151,6 +151,8 @@ sub OWCOUNT_Initialize ($) {
   $hash->{UndefFn} = "OWCOUNT_Undef";
   $hash->{GetFn}   = "OWCOUNT_Get";
   $hash->{SetFn}   = "OWCOUNT_Set";
+  $hash->{NotifyFn}= "OWCOUNT_Notify";
+  $hash->{InitFn}  = "OWCOUNT_Init";
   $hash->{AttrFn}  = "OWCOUNT_Attr";
   #-- see header for attributes
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423,DS2423enew,DS2423eold LogM LogY ".
@@ -264,9 +266,29 @@ sub OWCOUNT_Define ($$) {
   readingsSingleUpdate($hash,"state","defined",1);
   Log3 $name, 3, "OWCOUNT: Device $name defined."; 
   
-  #-- Start timer for updates
-  InternalTimer(time()+10, "OWCOUNT_GetValues", $hash, 0);
+  $hash->{NOTIFYDEV} = "global";
+  
+  if ($init_done) {
+    OWCOUNT_Init($hash);
+  }
+  return undef; 
+}
 
+sub OWCOUNT_Notify ($$) {
+  my ($hash,$dev) = @_;
+  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
+    OWCOUNT_Init($hash);
+  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
+  }
+}
+
+sub OWCOUNT_Init ($) {
+  my ($hash)=@_;
+  #-- Start timer for updates
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+10, "OWCOUNT_GetValues", $hash, 0);
+  #--
+  readingsSingleUpdate($hash,"state","Initialized",1);
   return undef; 
 }
 
@@ -303,6 +325,9 @@ sub OWCOUNT_Attr(@) {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
           $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
+          if ($init_done) {
+            OWCOUNT_Init($hash);
+          }
         }
         last;
       };
@@ -626,7 +651,15 @@ sub OWCOUNT_Get($@) {
     my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      $value = OWX_ASYNC_Verify($master,$hash->{ROM_ID});
+      my ($task,$task_state);
+      eval {
+        $task = OWX_ASYNC_PT_Verify($hash);
+        OWX_ASYNC_Schedule($hash,$task);
+        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+      };
+      return GP_Catch($@) if $@;
+      return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
+      return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
     }
@@ -800,6 +833,7 @@ sub OWCOUNT_GetPage ($$$@) {
   my ($hash, $page,$final,$sync) = @_;
   
   #-- get memory page/counter according to interface type
+  my $master= $hash->{IODev};
   my $interface= $hash->{IODev}->{TYPE};
   my $name    = $hash->{NAME};
   my $ret; 
@@ -815,15 +849,16 @@ sub OWCOUNT_GetPage ($$$@) {
       $ret = OWXCOUNT_GetPage($hash,$page,$final);
     }elsif( $interface eq "OWX_ASYNC" ){      
       if ($sync) {
-        #TODO use OWX_ASYNC_Schedule instead
-        my $task = PT_THREAD(\&OWXCOUNT_PT_GetPage);
+        my ($task,$task_state);
         eval {
-          while ($task->PT_SCHEDULE($hash,$page,$final)) { OWX_ASYNC_Poll($hash->{IODev}); };
+          $task = OWXCOUNT_PT_GetPage($hash,$page,$final);
+          OWX_ASYNC_Schedule($hash,$task);
+          $task_state = OWX_ASYNC_RunToCompletion($master,$task);
         };
-        $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+        $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
       } else {
         eval {
-          OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXCOUNT_PT_GetPage),$hash,$page,$final );
+          OWX_ASYNC_Schedule( $hash, OWXCOUNT_PT_GetPage($hash,$page,$final) );
         };
         $ret = GP_Catch($@) if $@;
       }
@@ -1097,6 +1132,7 @@ sub OWCOUNT_InitializeDevice($) {
   
   my $name     = $hash->{NAME};
   #-- get memory page/counter according to interface type
+  my $master= $hash->{IODev};
   my $interface= $hash->{IODev}->{TYPE};
   
   my $olddata  = "";
@@ -1123,12 +1159,13 @@ sub OWCOUNT_InitializeDevice($) {
     $ret  = OWXCOUNT_GetPage($hash,14,0);
     $ret  = OWXCOUNT_SetPage($hash,14,$olddata); 
   }elsif( $interface eq "OWX_ASYNC" ){
-    #TODO use OWX_ASYNC_Schedule instead
-    my $task = PT_THREAD(\&OWXCOUNT_PT_InitializeDevicePage);
+    my ($task,$task_state);
     eval {
-      while ($task->PT_SCHEDULE($hash,14,$newdata)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $task = OWXCOUNT_PT_InitializeDevicePage($hash,14,$newdata);
+      OWX_ASYNC_Schedule($hash,$task);
+      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
     };
-    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret  = OWFSCOUNT_GetPage($hash,14,0);
@@ -1150,12 +1187,13 @@ sub OWCOUNT_InitializeDevice($) {
     $ret  = OWXCOUNT_GetPage($hash,0,0);
     $ret  = OWXCOUNT_SetPage($hash,0,$olddata); 
   }elsif( $interface eq "OWX_ASYNC" ){
-    #TODO use OWX_ASYNC_Schedule instead
-    my $task = PT_THREAD(\&OWXCOUNT_PT_InitializeDevicePage);
+    my ($task,$task_state);
     eval {
-      while ($task->PT_SCHEDULE($hash,0,$newdata)) { OWX_ASYNC_Poll($hash->{IODev}); };
+      $task = OWXCOUNT_PT_InitializeDevicePage($hash,0,$newdata);
+      OWX_ASYNC_Schedule($hash,$task);
+      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
     };
-    $ret = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
+    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret  = OWFSCOUNT_GetPage($hash,0,0);
@@ -1372,7 +1410,7 @@ sub OWCOUNT_SetPage ($$$) {
       $ret = OWXCOUNT_SetPage($hash,$page,$data);
     }elsif( $interface eq "OWX_ASYNC" ){
       eval {
-        OWX_ASYNC_Schedule( $hash, PT_THREAD(\&OWXCOUNT_PT_SetPage),$hash,$page,$data );
+        OWX_ASYNC_Schedule( $hash, OWXCOUNT_PT_SetPage($hash,$page,$data) );
       };
       $ret = GP_Catch($@) if $@;
     #-- OWFS interface
@@ -1578,12 +1616,12 @@ sub OWFSCOUNT_SetPage($$$) {
 #
 ########################################################################################
 
-sub OWXCOUNT_BinValues($$$$$$$$) {
-  my ($hash, $context, $success, $reset, $owx_dev, $select, $numread, $res) = @_;
+sub OWXCOUNT_BinValues($$$$$) {
+  my ($hash, $context, $owx_dev, $select, $res) = @_;
   
   #-- unused are success, reset, data
   
-  return undef unless ($success and defined $context and $context =~ /^(get|set)page\.([\d]+)(\.final|)$/);
+  return undef unless (defined $context and $context =~ /^(get|set)page\.([\d]+)(\.final|)$/);
   
   my $cmd = $1;
   my $page = $2;
@@ -1711,7 +1749,7 @@ sub OWXCOUNT_GetPage($$$) {
     if( $res eq 0 );
   return "$owx_dev has returned invalid data"
     if( length($res)!=54);
-  return OWXCOUNT_BinValues($hash,$context,1,1,$owx_dev,$select,42,substr($res,12));
+  return OWXCOUNT_BinValues($hash,$context,$owx_dev,$select,substr($res,12));
 }
 
 ########################################################################################
@@ -1822,54 +1860,50 @@ sub OWXCOUNT_SetPage($$$) {
 ########################################################################################
 
 sub OWXCOUNT_PT_GetPage($$$) {
-  my ($thread,$hash,$page,$final) = @_;
-  
-  my ($select, $res, $response);
-  
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  PT_BEGIN($thread);
-  
-  #-- reset presence
-  $hash->{PRESENT}  = 0;
 
-  #=============== wrong value requested ===============================
-  if( ($page<0) || ($page>15) ){
-    PT_EXIT("wrong memory page requested");
-  } 
-  #=============== get memory + counter ===============================
-  #-- issue the match ROM command \x55 and the read memory + counter command
-  #   \xA5 TA1 TA2 reading 40 data bytes and 2 CRC bytes
-  my $ta2 = ($page*32) >> 8;
-  my $ta1 = ($page*32) & 255;
-  $select=sprintf("\xA5%c%c",$ta1,$ta2);   
-  
-  #-- reading 9 + 3 + 40 data bytes (32 byte memory, 4 byte counter + 4 byte zeroes) and 2 CRC bytes = 54 bytes
-  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 42 )) {
-    PT_EXIT("device $owx_dev not accessible for reading page $page");
-  }
-  PT_WAIT_UNTIL($thread->{ExecuteResponse});
-  $response = $thread->{ExecuteResponse};
+  my ($hash,$page,$final) = @_;
 
-  #-- reset the bus (needed to stop receiving data ?)
-  OWX_ASYNC_Execute( $master, $thread, 1, undef, undef, undef );
+  return PT_THREAD(sub {
+    my ($thread) = @_;
 
-  unless ($response->{success}) {
-    PT_EXIT("device $owx_dev error reading page $page");
-  }
-  $res = $response->{readdata};
-  
-  #TODO validate whether testing '0' is appropriate with async interface
-  if( $res eq 0 ) {
-    PT_EXIT("device $owx_dev error reading page $page");
-  }
-  $res = OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),1,1,$owx_dev,$response->{writedata},$response->{numread},$res);
-  if ($res) {
-    PT_EXIT($res);
-  }
-  PT_END;
+    #-- ID of the device, hash of the busmaster
+    my $owx_dev = $hash->{ROM_ID};
+    my $master  = $hash->{IODev};
+
+    PT_BEGIN($thread);
+
+    #=============== wrong value requested ===============================
+    if( ($page<0) || ($page>15) ){
+      die("wrong memory page requested");
+    } 
+    #=============== get memory + counter ===============================
+    #-- issue the match ROM command \x55 and the read memory + counter command
+    #   \xA5 TA1 TA2 reading 40 data bytes and 2 CRC bytes
+    my $ta2 = ($page*32) >> 8;
+    my $ta1 = ($page*32) & 255;
+    $thread->{'select'}=sprintf("\xA5%c%c",$ta1,$ta2);
+    
+    #-- reading 9 + 3 + 40 data bytes (32 byte memory, 4 byte counter + 4 byte zeroes) and 2 CRC bytes = 54 bytes
+
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 42 );
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $thread->{response} = $thread->{pt_execute}->PT_RETVAL();
+
+    #-- reset the bus (needed to stop receiving data ?)
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,undef,undef,undef);
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    if (my $ret = OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),$owx_dev,$thread->{'select'},$thread->{response})) {
+      die $ret;
+    }
+    PT_END;
+  });
 }
 
 ########################################################################################
@@ -1883,144 +1917,119 @@ sub OWXCOUNT_PT_GetPage($$$) {
 
 sub OWXCOUNT_PT_SetPage($$$) {
 
-  my ($thread,$hash,$page,$data) = @_;
+  my ($hash,$page,$data) = @_;
   
-  my ($select, $res, $response);
-  
-  #-- ID of the device, hash of the busmaster
-  my $owx_dev = $hash->{ROM_ID};
-  my $master  = $hash->{IODev};
-  
-  PT_BEGIN($thread);
-  #=============== wrong page requested ===============================
-  if( ($page<0) || ($page>15) ){
-    PT_EXIT("wrong memory page write attempt");
-  } 
-  #=============== midnight value =====================================
-  if( ($page==14) || ($page==15) ){
-    OWCOUNT_ParseMidnight($hash,$data,$page);
-  }
-  #=============== set memory =========================================
-  #-- issue the match ROM command \x55 and the write scratchpad command
-  #   \x0F TA1 TA2 followed by the data
-  my $ta2 = ($page*32) >> 8;
-  my $ta1 = ($page*32) & 255;
-  #Log 1, "OWXCOUNT: setting page Nr. $ta2 $ta1 $data";
-  $select=sprintf("\x0F%c%c",$ta1,$ta2).$data;
-  
-  #-- first command, next 2 are address, then data
-  #$res2 = "OWCOUNT SET PAGE 1 device $owx_dev ";
-  #for($i=0;$i<10;$i++){  
-  #  $j=int(ord(substr($select,$i,1))/16);
-  #  $k=ord(substr($select,$i,1))%16;
-  #	$res2.=sprintf "0x%1x%1x ",$j,$k;
-  #}
-  #main::Log(1, $res2);
+  return PT_THREAD(sub {
+    my ($thread) = @_;
 
-  #"setpage.1"
-  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 0)) {
-    PT_EXIT("device $owx_dev not accessible in writing scratchpad");
-  }
-  PT_WAIT_UNTIL($thread->{ExecuteResponse});
-  unless ($thread->{ExecuteResponse}->{success}) {
-    PT_EXIT("device $owx_dev error writing scratchpad");
-  }
+    my ($res, $response);
 
-  #-- issue the match ROM command \x55 and the read scratchpad command
-  #   \xAA, receiving 2 address bytes, 1 status byte and scratchpad content
-  $select = "\xAA";
-  #-- reading 9 + 3 + up to 32 bytes
-  # TODO: sometimes much less than 28
-  #"setpage.2"
-  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 28)) {
-    PT_EXIT("device $owx_dev not accessible in writing scratchpad");
-  }
-  PT_WAIT_UNTIL($thread->{ExecuteResponse});
-  $response = $thread->{ExecuteResponse};
-  unless ($response->{success}) {
-    PT_EXIT("device $owx_dev error writing scratchpad");
-  }
-  $res = $response->{readdata};
-  if( length($res) < 13 ){
-    PT_EXIT("device $owx_dev not accessible in reading scratchpad"); 
-  } 
-    
-  #-- first 1 command, next 2 are address, then data
-  #$res3 = substr($res,9,10);
-  #$res2 = "OWCOUNT SET PAGE 2 device $owx_dev ";
-  #for($i=0;$i<10;$i++){  
-  #  $j=int(ord(substr($res3,$i,1))/16);
-  #  $k=ord(substr($res3,$i,1))%16;
-  #  $res2.=sprintf "0x%1x%1x ",$j,$k;
-  #}
-  #main::Log(1, $res2);
-  #-- issue the match ROM command \x55 and the copy scratchpad command
-  #   \x5A followed by 3 byte authentication code obtained in previous read
-  $select="\x5A".substr($res,0,3);
-  #-- first command, next 2 are address, then data
-  #$res2 = "OWCOUNT SET PAGE 3 device $owx_dev ";
-  #for($i=0;$i<10;$i++){  
-  #  $j=int(ord(substr($select,$i,1))/16);
-  #  $k=ord(substr($select,$i,1))%16;
-  #  $res2.=sprintf "0x%1x%1x ",$j,$k;
-  #}
-  #main::Log(1, $res2);
+    #-- ID of the device, hash of the busmaster
+    my $owx_dev = $hash->{ROM_ID};
+    my $master  = $hash->{IODev};
 
-  #"setpage.3"
-  unless (OWX_ASYNC_Execute( $master, $thread, 1, $owx_dev, $select, 6)) {
-    PT_EXIT("device $owx_dev not accessible for copying scratchpad");
-  }
-  PT_WAIT_UNTIL($thread->{ExecuteResponse});
-  $response = $thread->{ExecuteResponse};
-  unless ($response->{success}) {
-    PT_EXIT("device $owx_dev error copying scratchpad");
-  }
-  $res = $response->{readdata};
-  #TODO validate whether testing '0' is appropriate with async interface
-  #-- process results
-  if( $res eq 0 ){
-    PT_EXIT("device $owx_dev error copying scratchpad"); 
-  } 
-  PT_END;
+    PT_BEGIN($thread);
+    #=============== wrong page requested ===============================
+    if( ($page<0) || ($page>15) ){
+      PT_EXIT("wrong memory page write attempt");
+    } 
+    #=============== midnight value =====================================
+    if( ($page==14) || ($page==15) ){
+      OWCOUNT_ParseMidnight($hash,$data,$page);
+    }
+    #=============== set memory =========================================
+    #-- issue the match ROM command \x55 and the write scratchpad command
+    #   \x0F TA1 TA2 followed by the data
+    my $ta2 = ($page*32) >> 8;
+    my $ta1 = ($page*32) & 255;
+    #Log 1, "OWXCOUNT: setting page Nr. $ta2 $ta1 $data";
+    $thread->{'select'}=sprintf("\x0F%c%c",$ta1,$ta2).$data;
+
+    #"setpage.1"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 0 );
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+
+    #-- issue the match ROM command \x55 and the read scratchpad command
+    #   \xAA, receiving 2 address bytes, 1 status byte and scratchpad content
+    $thread->{'select'} = "\xAA";
+    #-- reading 9 + 3 + up to 32 bytes
+    # TODO: sometimes much less than 28
+    #"setpage.2"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 28 );
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $res = $thread->{pt_execute}->PT_RETVAL();
+    if( length($res) < 13 ){
+      PT_EXIT("device $owx_dev not accessible in reading scratchpad"); 
+    } 
+
+    #-- issue the match ROM command \x55 and the copy scratchpad command
+    #   \x5A followed by 3 byte authentication code obtained in previous read
+    $thread->{'select'}="\x5A".substr($res,0,3);
+    #-- first command, next 2 are address, then data
+
+    #"setpage.3"
+    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 6 );
+    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    PT_WAIT_THREAD($thread->{pt_execute});
+    delete $thread->{TimeoutTime};
+    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
+    $res = $thread->{pt_execute}->PT_RETVAL();
+    #TODO validate whether testing '0' is appropriate with async interface
+    #-- process results
+    if( $res eq 0 ){
+      PT_EXIT("device $owx_dev error copying scratchpad"); 
+    } 
+    PT_END;
+  });
 }
 
 sub OWXCOUNT_PT_InitializeDevicePage($$$) {
-  my ($thread,$hash,$page,$newdata) = @_;
+  my ($hash,$page,$newdata) = @_;
 
-  my $ret;
-  
-  PT_BEGIN($thread);
+  return PT_THREAD(sub {
+    my ($thread) = @_;
 
-  $thread->{task} = PT_THREAD(\&OWXCOUNT_PT_GetPage);
-  PT_WAIT_THREAD($thread->{task},$hash,$page,0);
-  $ret = $thread->{task}->PT_RETVAL();
-  if ($ret) {
-    PT_EXIT($ret);
-  }
+    my $ret;
 
-  $thread->{olddata} = $hash->{owg_str}->[14];
+    PT_BEGIN($thread);
 
-  $thread->{task} = PT_THREAD(\&OWXCOUNT_PT_SetPage);
-  PT_WAIT_THREAD($thread->{task},$hash,$page,$newdata);
-  $ret = $thread->{task}->PT_RETVAL();
-  if ($ret) {
-    PT_EXIT($ret);
-  }
+    $thread->{task} = OWXCOUNT_PT_GetPage($hash,$page,0);
+    PT_WAIT_THREAD($thread->{task});
+    $ret = $thread->{task}->PT_RETVAL();
+    if ($ret) {
+      PT_EXIT($ret);
+    }
 
-  $thread->{task} = PT_THREAD(\&OWXCOUNT_PT_GetPage);
-  PT_WAIT_THREAD($thread->{task},$hash,$page,0);
-  $ret = $thread->{task}->PT_RETVAL();
-  if ($ret) {
-    PT_EXIT($ret);
-  }
-  
-  $thread->{task} = PT_THREAD(\&OWXCOUNT_PT_SetPage);
-  PT_WAIT_THREAD($thread->{task},$hash,$page,$thread->{olddata});
-  $ret = $thread->{task}->PT_RETVAL();
-  if ($ret) {
-    PT_EXIT($ret);
-  }
-  PT_END;
+    $thread->{olddata} = $hash->{owg_str}->[14];
+
+    $thread->{task} = OWXCOUNT_PT_SetPage($hash,$page,$newdata);
+    PT_WAIT_THREAD($thread->{task});
+    $ret = $thread->{task}->PT_RETVAL();
+    if ($ret) {
+      PT_EXIT($ret);
+    }
+
+    $thread->{task} = OWXCOUNT_PT_GetPage($hash,$page,0);
+    PT_WAIT_THREAD($thread->{task});
+    $ret = $thread->{task}->PT_RETVAL();
+    if ($ret) {
+      PT_EXIT($ret);
+    }
+
+    $thread->{task} = OWXCOUNT_PT_SetPage($hash,$page,$thread->{olddata});
+    PT_WAIT_THREAD($thread->{task});
+    $ret = $thread->{task}->PT_RETVAL();
+    if ($ret) {
+      PT_EXIT($ret);
+    }
+    PT_END;
+  });
 }
 
 1;

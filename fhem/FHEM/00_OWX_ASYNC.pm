@@ -128,7 +128,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.4;
+$owx_async_version=5.5;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -251,7 +251,7 @@ sub OWX_ASYNC_Attr(@) {
   return $ret;
 }
 
-sub OWX_ASYNC_Notify {
+sub OWX_ASYNC_Notify ($$) {
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
@@ -276,12 +276,14 @@ sub OWX_ASYNC_Ready ($) {
 
 sub OWX_ASYNC_Read ($) {
   my $hash = shift;
+  Log3 ($hash->{NAME},5,"OWX_ASYNC_Read") if ($owx_async_debug > 2);
   OWX_ASYNC_Poll($hash);
   OWX_ASYNC_RunTasks($hash);
 };
 
 sub OWX_ASYNC_Poll ($) {
 	my $hash = shift;
+	Log3 ($hash->{NAME},5,"OWX_ASYNC_Poll") if ($owx_async_debug > 2);
 	if (defined $hash->{ASYNC}) {
 		$hash->{ASYNC}->poll($hash);
 	};
@@ -326,56 +328,35 @@ sub OWX_ASYNC_Disconnected($) {
 #TODO fix OWX_ASYNC_Alarms return value on failure
 ########################################################################################
 
-sub OWX_ASYNC_Alarms ($) {
-	my ($hash) = @_;
+sub OWX_ASYNC_PT_Alarms ($) {
+  my ($hash) = @_;
+  
+  #-- get the interface
+  my $async = $hash->{ASYNC};
 
-	#-- get the interface
-	my $name          = $hash->{NAME};
-	my $async           = $hash->{ASYNC};
-	my $res;
-
-	if (defined $async) {
-		delete $hash->{ALARMDEVS};
-		return $async->alarms($hash);
-	} else {
-		#-- interface error
-		my $owx_interface = $hash->{INTERFACE};
-		if( !(defined($owx_interface))){
-			return undef;
-		} else {
-			return "OWX: Alarms called with unknown interface $owx_interface on bus $name";
-		}
-	}
-};
-
-#######################################################################################
-#
-# OWX_ASYNC_AwaitAlarmsResponse - Wait for the result of a call to OWX_ASYNC_Alarms 
-#
-# Parameter hash = hash of bus master
-#
-# Return: Reference to Array of alarmed 1-Wire-addresses found on 1-Wire bus.
-#         undef if timeout occours
-#
-########################################################################################
-
-sub OWX_ASYNC_AwaitAlarmsResponse($) {
-	my ($hash) = @_;
-
-	#-- get the interface
-	my $async           = $hash->{ASYNC};
-	if (defined $async) {
-		my $times = AttrVal($hash->{NAME},"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
-		for (my $i=0;$i<$times;$i++) {
-			if(! defined $hash->{ALARMDEVS} ) {
-				select (undef,undef,undef,0.05);
-				$async->poll($hash);
-			} else {
-				return $hash->{ALARMDEVS};
-			};
-		};
-	};
-	return undef;
+  #-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
+  if (defined $async) {
+    return PT_THREAD(sub {
+      my ($thread) = @_;
+      PT_BEGIN($thread);
+      $thread->{pt_alarms} = $async->get_pt_alarms();
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_alarms});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_alarms}->PT_CAUSE() if ($thread->{pt_alarms}->PT_STATE() == PT_ERROR);
+      if (defined (my $alarmed_devs = $thread->{pt_alarms}->PT_RETVAL())) {
+        OWX_ASYNC_AfterAlarms($hash,$alarmed_devs);
+      };
+      PT_END;
+    });
+  } else {
+    my $owx_interface = $hash->{INTERFACE};
+    if( !defined($owx_interface) ) {
+      die "OWX: Alarms called with undefined interface on bus $hash->{NAME}";
+    } else {
+      die "OWX: Alarms called with unknown interface $owx_interface on bus $hash->{NAME}";
+    } 
+  }
 }
 
 ########################################################################################
@@ -384,10 +365,10 @@ sub OWX_ASYNC_AwaitAlarmsResponse($) {
 #
 # stores device-addresses found in $hash->{ALARMDEVS}
 #
-# Attention: this function is not intendet to be called directly! 
+# Attention: this function is not intendet to be called directly!
 #
 # Parameter hash = hash of bus master
-#       alarmed_devs = Reference to Array of device-address-strings
+# alarmed_devs = Reference to Array of device-address-strings
 #
 # Returns: nothing
 #
@@ -395,63 +376,22 @@ sub OWX_ASYNC_AwaitAlarmsResponse($) {
 
 sub OWX_ASYNC_AfterAlarms($$) {
   my ($hash,$alarmed_devs) = @_;
-  $hash->{ALARMDEVS} = $alarmed_devs;
+  my @alarmed_devnames = ();
   GP_ForallClients($hash,sub {
-  	my ($hash,$devs) = @_;
-  	my $romid = $hash->{ROM_ID};
-  	if (grep {/$romid/} @$devs) {
-  		readingsSingleUpdate($hash,"alarm",1,!$hash->{ALARM});
-  		$hash->{ALARM}=1;
-  	} else {
-  		readingsSingleUpdate($hash,"alarm",0, $hash->{ALARM});
-  		$hash->{ALARM}=0;
-  	}
-  },$alarmed_devs);
-};
-
-########################################################################################
-#
-# OWX_ASYNC_DiscoverAlarms - Search for devices on the 1-Wire bus which have the alarm flag set
-#
-# Parameter hash = hash of bus master
-#
-# Return: Message or list of alarmed devices
-#
-########################################################################################
-
-sub OWX_ASYNC_DiscoverAlarms($) {
-  my ($hash) = @_;
-  if (OWX_ASYNC_Alarms($hash)) {
-  	if (my $alarmed_devs = OWX_ASYNC_AwaitAlarmsResponse($hash)) {
-      my @owx_alarm_names=();
-      my $name = $hash->{NAME};
-  	
-  if( $alarmed_devs == 0){
-    return "OWX: No alarmed 1-Wire devices found on bus $name";
-  }
-  #-- walk through all the devices to get their proper fhem names
-  foreach my $fhem_dev (sort keys %main::defs) {
-    #-- skip if busmaster
-    next if( $name eq $main::defs{$fhem_dev}{NAME} );
-    #-- all OW types start with OW
-    next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
-    foreach my $owx_dev  (@{$alarmed_devs}) {
-      #-- two pieces of the ROM ID found on the bus
-      my $owx_rnf = substr($owx_dev,3,12);
-      my $owx_f   = substr($owx_dev,0,2);
-      my $id_owx  = $owx_f.".".$owx_rnf;
-        
-      #-- skip if not in alarm list
-      if( $owx_dev eq $main::defs{$fhem_dev}{ROM_ID} ){
-        $main::defs{$fhem_dev}{STATE} = "Alarmed";
-        push(@owx_alarm_names,$main::defs{$fhem_dev}{NAME});
-      }
+    my ($client) = @_;
+    my $romid = $client->{ROM_ID};
+    Log3 ($client->{IODev}->{NAME},5,"OWX_ASYNC_AfterAlarms client NAME: $client->{NAME}, ROM_ID: $romid, ALARM: $client->{ALARM}, alarmed_devs: [".join(",",@$alarmed_devs)."]") if ($owx_async_debug>2);
+    if (grep {$romid eq $_} @$alarmed_devs) {
+      readingsSingleUpdate($client,"alarm",1,!$client->{ALARM});
+      $client->{ALARM}=1;
+      push (@alarmed_devnames,$client->{NAME});
+    } else {
+      readingsSingleUpdate($client,"alarm",0, $client->{ALARM});
+      $client->{ALARM}=0;
     }
-  }
-  #-- so far, so good - what do we want to do with this ?
-  return "OWX: ".scalar(@owx_alarm_names)." alarmed 1-Wire devices found on bus $name (".join(",",@owx_alarm_names).")";
-  	}
-  }
+  });
+  $hash->{ALARMDEVS} = \@alarmed_devnames;
+  Log3 ($hash->{NAME},5,"OWX_ASYNC_AfterAlarms: ALARMDEVS = [".join(",",@alarmed_devnames)."]") if ($owx_async_debug>2);
 };
 
 ########################################################################################
@@ -465,15 +405,35 @@ sub OWX_ASYNC_DiscoverAlarms($) {
 #
 ########################################################################################
 
-sub OWX_ASYNC_Discover ($) {
+sub OWX_ASYNC_PT_Discover ($) {
 	my ($hash) = @_;
-	if (OWX_ASYNC_Search($hash)) {
-		if (my $owx_devices = OWX_ASYNC_AwaitSearchResponse($hash)) {
-			return OWX_ASYNC_AutoCreate($hash,$owx_devices);			
-		};
-	} else {
-		return undef;
-	}
+	
+  #-- get the interface
+  my $async = $hash->{ASYNC};
+
+  #-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
+  if (defined $async) {
+    return PT_THREAD(sub {
+      my ($thread) = @_;
+      PT_BEGIN($thread);
+      $thread->{pt_discover} = $async->get_pt_discover();
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_discover});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_discover}->PT_CAUSE() if ($thread->{pt_discover}->PT_STATE() == PT_ERROR);
+      if (my $owx_devices = $thread->{pt_discover}->PT_RETVAL()) {
+        PT_EXIT(OWX_ASYNC_AutoCreate($hash,$owx_devices));
+      };
+      PT_END;
+    });
+  } else {
+    my $owx_interface = $hash->{INTERFACE};
+    if( !defined($owx_interface) ) {
+      die "OWX: Discover called with undefined interface on bus $hash->{NAME}";
+    } else {
+      die "OWX: Discover called with unknown interface $owx_interface on bus $hash->{NAME}";
+    } 
+  }
 }
 
 #######################################################################################
@@ -486,60 +446,36 @@ sub OWX_ASYNC_Discover ($) {
 #
 ########################################################################################
 
-sub OWX_ASYNC_Search($) {
-	my ($hash) = @_;
+sub OWX_ASYNC_PT_Search($) {
+  my ($hash) = @_;
   
-	my $res;
-	my $ow_dev;
-  
-	#-- get the interface
-	my $async = $hash->{ASYNC};
+  #-- get the interface
+  my $async = $hash->{ASYNC};
 
-	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
-	if (defined $async) {
-		delete $hash->{DEVS};
-		return $async->discover($hash);
-	} else {
-		my $owx_interface = $hash->{INTERFACE};
-		if( !defined($owx_interface) ) {
-			return undef;
-		} else {
-			Log3 ($hash->{NAME},3,"OWX: Search called with unknown interface $owx_interface");
-			return undef;
-		} 
-	}
+  #-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
+  if (defined $async) {
+    return PT_THREAD(sub {
+      my ($thread) = @_;
+      PT_BEGIN($thread);
+      $thread->{pt_discover} = $async->get_pt_discover();
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_discover});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_discover}->PT_CAUSE() if ($thread->{pt_discover}->PT_STATE() == PT_ERROR);
+      if (defined (my $owx_devs = $thread->{pt_discover}->PT_RETVAL())) {
+        OWX_ASYNC_AfterSearch($hash,$owx_devs);
+      }
+      PT_END;
+    });
+  } else {
+    my $owx_interface = $hash->{INTERFACE};
+    if( !defined($owx_interface) ) {
+      die "OWX: Search called with undefined interface on bus $hash->{NAME}";
+    } else {
+      die "OWX: Search called with unknown interface $owx_interface on bus $hash->{NAME}";
+    } 
+  }
 }
-
-#######################################################################################
-#
-# OWX_ASYNC_AwaitSearchResponse - Wait for the result of a call to OWX_ASYNC_Search 
-#
-# Parameter hash = hash of bus master
-#
-# Return: Reference to Array of 1-Wire-addresses found on 1-Wire bus.
-#         undef if timeout occours
-#
-########################################################################################
-
-sub OWX_ASYNC_AwaitSearchResponse($) {
-	my ($hash) = @_;
-	#-- get the interface
-	my $async = $hash->{ASYNC};
-
-	#-- Discover all devices on the 1-Wire bus, they will be found in $hash->{DEVS}
-	if (defined $async) {
-		my $times = AttrVal($hash->{NAME},"timeout",5000) / 50; #timeout in ms, defaults to 1 sec #TODO add attribute timeout?
-		for (my $i=0;$i<$times;$i++) {
-			if(! defined $hash->{DEVS} ) {
-				select (undef,undef,undef,0.05);
-				$async->poll($hash);
-			} else {
-				return $hash->{DEVS};
-			};
-		};
-	};
-	return undef;
-};
 
 ########################################################################################
 #
@@ -547,10 +483,10 @@ sub OWX_ASYNC_AwaitSearchResponse($) {
 #
 # stores device-addresses found in $hash->{DEVS}
 #
-# Attention: this function is not intendet to be called directly! 
+# Attention: this function is not intendet to be called directly!
 #
 # Parameter hash = hash of bus master
-#       owx_devs = Reference to Array of device-address-strings
+# owx_devs = Reference to Array of device-address-strings
 #
 # Returns: nothing
 #
@@ -558,20 +494,24 @@ sub OWX_ASYNC_AwaitSearchResponse($) {
 
 sub OWX_ASYNC_AfterSearch($$) {
   my ($hash,$owx_devs) = @_;
-  if (defined $owx_devs and (ref($owx_devs) eq "ARRAY")) {
-  	$hash->{DEVS} = $owx_devs;
-  	GP_ForallClients($hash,sub {
-  		my ($hash,$devs) = @_;
-  		my $romid = $hash->{ROM_ID};
-  		if (grep {/$romid/} @$devs) {
-  			readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT});
-  			$hash->{PRESENT} = 1;
-  		} else {
-  			readingsSingleUpdate($hash,"present",0,$hash->{PRESENT});
-  			$hash->{PRESENT} = 0;
-  		}
-  	},$owx_devs);
-  }
+#  if (defined $owx_devs and (ref($owx_devs) eq "ARRAY")) {
+  my @devnames = ();
+  GP_ForallClients($hash,sub {
+    my ($client) = @_;
+    my $romid = $client->{ROM_ID};
+    Log3 ($client->{IODev}->{NAME},5,"OWX_ASYNC_AfterSearch client NAME: $client->{NAME}, ROM_ID: $romid, PRESENT: $client->{PRESENT}, devs: [".join(",",@$owx_devs)."]") if ($owx_async_debug>2);
+    if (grep {$romid eq $_} @$owx_devs) {
+      readingsSingleUpdate($client,"present",1,!$client->{PRESENT});
+      $client->{PRESENT} = 1;
+      push (@devnames,$client->{NAME});
+    } else {
+      readingsSingleUpdate($client,"present",0,$client->{PRESENT});
+      $client->{PRESENT} = 0;
+    }
+  });
+  $hash->{DEVS} = \@devnames;
+  Log3 ($hash->{NAME},5,"OWX_ASYNC_AfterSearch: DEVS = [".join(",",@devnames)."]") if ($owx_async_debug>2);
+#  }
 }
 
 ########################################################################################
@@ -585,7 +525,7 @@ sub OWX_ASYNC_AfterSearch($$) {
 #
 ########################################################################################
 
-sub OWX_ASYNC_AutoCreate($$) { 
+sub OWX_ASYNC_AutoCreate($$) {
   my ($hash,$owx_devs) = @_;
   my $name = $hash->{NAME};
   my ($chip,$acstring,$acname,$exname);
@@ -633,7 +573,8 @@ sub OWX_ASYNC_AutoCreate($$) {
           push(@owx_names,$exname);
           #-- replace the ROM ID by the proper value including CRC
           $main::defs{$fhem_dev}{ROM_ID}=$owx_dev;
-          $main::defs{$fhem_dev}{PRESENT}=1;    
+          readingsSingleUpdate($main::defs{$fhem_dev},"present",1,!$main::defs{$fhem_dev}->{PRESENT});
+          $main::defs{$fhem_dev}{PRESENT}=1;
           $match = 1;
           last;
         }
@@ -668,6 +609,7 @@ sub OWX_ASYNC_AutoCreate($$) {
         } else{
           select(undef,undef,undef,0.1);
           push(@owx_names,$acname);
+          readingsSingleUpdate($main::defs{$acname},"present",1,!$main::defs{$acname}->{PRESENT});
           $main::defs{$acname}{PRESENT}=1;
           #-- THIS IODev, default room (model is set in the device module)
           CommandAttr (undef,"$acname IODev $hash->{NAME}"); 
@@ -710,7 +652,7 @@ sub OWX_ASYNC_AutoCreate($$) {
   Log3 ($hash->{NAME},2, "OWX: 1-Wire devices found on bus $name (".join(",",@owx_names).")");
   #-- tabular view as return value
   return "OWX: 1-Wire devices found on bus $name \n".$ret;
-}   
+}
 
 ########################################################################################
 #
@@ -727,16 +669,28 @@ sub OWX_ASYNC_Get($@) {
   my $name     = $hash->{NAME};
   my $owx_dev  = $hash->{ROM_ID};
 
+  my ($task,$task_state);
+
   if( $a[1] eq "alarms") {
-    my $res = OWX_ASYNC_DiscoverAlarms($hash);
-    #-- process result
-    return $res
-    
+    eval {
+      $task = OWX_ASYNC_PT_Alarms($hash);
+      OWX_ASYNC_ScheduleMaster($hash,$task);
+      $task_state = OWX_ASYNC_RunToCompletion($hash,$task);
+    };
+    return $@ if $@;
+    return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
+    unless ( defined $hash->{ALARMDEVS} and @{$hash->{ALARMDEVS}}) {
+      return "OWX: No alarmed 1-Wire devices found on bus $name";
+    }
+    return "OWX: ".scalar(@{$hash->{ALARMDEVS}})." alarmed 1-Wire devices found on bus $name (".join(",",@{$hash->{ALARMDEVS}}).")";
   } elsif( $a[1] eq "devices") {
-    my $res = OWX_ASYNC_Discover($hash);
-    #-- process result
-    return $res
-        
+    eval {
+      $task = OWX_ASYNC_PT_Discover($hash);
+      OWX_ASYNC_ScheduleMaster($hash,$task);
+      $task_state = OWX_ASYNC_RunToCompletion($hash,$task);
+    };
+    return $@ if $@;
+    return ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
   } elsif( $a[1] eq "version") {
     return $owx_async_version;
     
@@ -781,15 +735,23 @@ sub OWX_ASYNC_Init ($) {
       return "OWX_ASYNC_Init failed: $err";
     };
     $hash->{ASYNC} = $ret;
+    $hash->{ASYNC}->{debug} = $owx_async_debug;
    	$hash->{INTERFACE} = $owx->{interface};
   } else {
     return "OWX: Init called with undefined interface";
   }
-  
+
+  $hash->{STATE} = "Active";
+
   #-- Fourth step: discovering devices on the bus
   #   in 10 seconds discover all devices on the 1-Wire bus
-  InternalTimer(gettimeofday()+10, "OWX_ASYNC_Discover", $hash,0);
-  
+  my $pt_discover = OWX_ASYNC_PT_Discover($hash);
+  $pt_discover->{ExecuteTime} = gettimeofday()+10;
+  eval {
+    OWX_ASYNC_ScheduleMaster($hash,$pt_discover);
+  };
+  return GP_Catch($@) if $@;
+
   #-- Default settings
   $hash->{interval}     = AttrVal($hash->{NAME},"interval",300);          # kick every 5 minutes
   $hash->{followAlarms} = "off";
@@ -800,7 +762,6 @@ sub OWX_ASYNC_Init ($) {
   #readingsSingleUpdate($hash,"state","defined",1);
   #-- Intiate first alarm detection and eventually conversion in a minute or so
   InternalTimer(gettimeofday() + $hash->{interval}, "OWX_ASYNC_Kick", $hash,0);
-  $hash->{STATE} = "Active";
   GP_ForallClients($hash,\&OWX_ASYNC_InitClient,undef);
   return undef;
 }
@@ -833,43 +794,58 @@ sub OWX_ASYNC_Kick($) {
   #-- Call us in n seconds again.
   InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_ASYNC_Kick", $hash,0);
 
-  eval {
-    OWX_ASYNC_ScheduleMaster( $hash, PT_THREAD(\&OWX_ASYNC_PT_Kick), $hash );
-  };
-  Log3 $hash->{NAME},3,"OWX_ASYNC_Kick: ".GP_Catch($@) if $@;
+  unless ($hash->{".kickrunning"}) {
+    $hash->{".kickrunning"} = 1;
+    eval {
+      OWX_ASYNC_ScheduleMaster( $hash, PT_THREAD(sub {
+        my ($thread) = @_;
+        PT_BEGIN($thread);
+        #-- Only if we have the dokick attribute set to 1
+        if (main::AttrVal($hash->{NAME},"dokick",0)) {
+          Log3 $hash->{NAME},5,"OWX_ASYNC_PT_Kick: kicking DS14B20 temperature conversion";
+          #-- issue the skip ROM command \xCC followed by start conversion command \x44 
+          $thread->{pt_execute} = OWX_ASYNC_PT_Execute($hash,1,undef,"\x44",0);
+          $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+          PT_WAIT_THREAD($thread->{pt_execute});
+          delete $thread->{TimeoutTime};
+          if ($thread->{pt_execute}->PT_STATE() == PT_ERROR) {
+            Log3 ($hash->{NAME},4,"OWX_ASYNC_PT_Kick: Failure in temperature conversion: ".$thread->{pt_execute}->PT_CAUSE());
+          } else {
+            $thread->{ExecuteTime} = gettimeofday()+1;
+            PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
+            delete $thread->{ExecuteTime};
+            GP_ForallClients($hash,sub { 
+              my ($client) = @_;
+              if ($client->{TYPE} eq "OWTHERM" and AttrVal($client->{NAME},"tempConv","") eq "onkick" ) {
+                Log3 $client->{NAME},5,"OWX_ASYNC_PT_Kick: doing tempConv for $client->{NAME}";
+                OWX_ASYNC_Schedule($client, PT_THREAD(\&OWXTHERM_PT_GetValues), $client );
+              }
+            },undef);
+          }
+        }
   
-  return 1;
-}
-
-sub OWX_ASYNC_PT_Kick($) {
-  my ($thread,$hash) = @_;
-
-  PT_BEGIN($thread);
-  #-- Only if we have the dokick attribute set to 1
-  if (main::AttrVal($hash->{NAME},"dokick",0)) {
-    Log3 $hash->{NAME},5,"OWX_ASYNC_PT_Kick: kicking DS14B20 temperature conversion";
-    #-- issue the skip ROM command \xCC followed by start conversion command \x44 
-    unless (OWX_ASYNC_Execute($hash,$thread,1,undef,"\x44",0)) {
-      PT_EXIT("OWX_ASYNC: Failure in temperature conversion");
-    }
-    $thread->{ExecuteTime} = gettimeofday()+1;
-    PT_YIELD_UNTIL(defined $thread->{ExecuteResponse} and (gettimeofday() >= $thread->{ExecuteTime}));
-
-    GP_ForallClients($hash,sub { 
-      my ($client) = @_;
-      if ($client->{TYPE} eq "OWTHERM" and AttrVal($client->{NAME},"tempConv","") eq "onkick" ) {
-        Log3 $client->{NAME},5,"OWX_ASYNC_PT_Kick: doing tempConv for $client->{NAME}";
-        OWX_ASYNC_Schedule($client, PT_THREAD(\&OWXTHERM_PT_GetValues), $client );
-      }
-    },undef);
+        $thread->{pt_search} = OWX_ASYNC_PT_Search($hash);
+        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+        PT_WAIT_THREAD($thread->{pt_search});
+        delete $thread->{Timeouttime};
+        if ($thread->{pt_search}->PT_STATE() == PT_ERROR) {
+          Log3 ($hash->{NAME},4,"OWX_ASYNC_PT_Kick: Failure in search: ".$thread->{pt_search}->PT_CAUSE());
+        } else {
+          $thread->{pt_alarms} = OWX_ASYNC_PT_Alarms($hash);
+          $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+          PT_WAIT_THREAD($thread->{pt_alarms});
+          delete $thread->{TimeoutTime};
+          if ($thread->{pt_alarms}->PT_STATE() == PT_ERROR) {
+            Log3 ($hash->{NAME},4,"OWX_ASYNC_PT_Kick: Failure in alarm-search: ".$thread->{pt_alarms}->PT_CAUSE());
+          };
+        }
+        delete $hash->{".kickrunning"};
+        PT_END;
+      }));
+    };
+    Log3 ($hash->{NAME},4,"OWX_ASYNC_PT_Kick".GP_Catch($@)) if ($@);
   }
-
-  #TODO OWX_ASYNC_Search allways returns 1 when busmaster is active
-  if (OWX_ASYNC_Search($hash)) {
-    OWX_ASYNC_Alarms($hash);
-  };
-  
-  PT_END;
+  return 1;
 }
 
 ########################################################################################
@@ -950,17 +926,42 @@ sub OWX_ASYNC_Undef ($$) {
 #
 ########################################################################################
 
-sub OWX_ASYNC_Verify ($$) {
-	my ($hash,$dev) = @_;
-	my $address = substr($dev,0,15);
-	if (OWX_ASYNC_Search($hash)) {
-		if (my $owx_devices = OWX_ASYNC_AwaitSearchResponse($hash)) {
-		  if (grep {/$address/} @{$owx_devices}) {
-		    return 1;
-			};
-		};
-	}
-	return 0;
+sub OWX_ASYNC_PT_Verify($) {
+  my ($hash) = @_;
+
+  #-- get the interface
+  my $async = $hash->{IODev}->{ASYNC};
+  my $romid = $hash->{ROM_ID};
+
+  #-- Verify a devices is present on the 1-Wire bus
+  if (defined $async) {
+    return PT_THREAD(sub {
+      my ($thread) = @_;
+      PT_BEGIN($thread);
+      $thread->{pt_verify} = $async->get_pt_verify($romid);
+      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+      PT_WAIT_THREAD($thread->{pt_verify});
+      delete $thread->{TimeoutTime};
+      die $thread->{pt_verify}->PT_CAUSE() if ($thread->{pt_verify}->PT_STATE() == PT_ERROR);
+      
+      my $value = $thread->{pt_verify}->PT_RETVAL();
+
+      if( $value == 0 ){
+        readingsSingleUpdate($hash,"present",0,$hash->{PRESENT}); 
+      } else {
+        readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
+      }
+      $hash->{PRESENT} = $value;
+      PT_END;
+    });
+  } else {
+    my $owx_interface = $hash->{IODev}->{INTERFACE};
+    if( !defined($owx_interface) ) {
+      die "OWX: Verify called with undefined interface on bus $hash->{IODev}->{NAME}";
+    } else {
+      die "OWX: Verify called with unknown interface $owx_interface on bus $hash->{IODev}->{NAME}";
+    } 
+  }
 }
 
 ########################################################################################
@@ -983,209 +984,171 @@ sub OWX_ASYNC_Verify ($$) {
 #
 ########################################################################################
 
-sub OWX_ASYNC_Execute($$$$$$) {
-	my ( $hash, $context, $reset, $owx_dev, $data, $numread ) = @_;
-	if (my $executor = $hash->{ASYNC}) {
-		delete $context->{ExecuteResponse};
-		my $now = gettimeofday();
-		#TODO implement propper timeout based on timeout-attribute
-		#my $timeoutms = AttrVal($hash->{NAME},"timeout",1000);
-		$context->{TimeoutTime} = $now+2;
-    Log3 ($hash->{NAME},5,sprintf("OWX_ASYNC_Execute: set TimeoutTime: %.6f, now: %.6f",$context->{TimeoutTime},$now)) if ($owx_async_debug);
-		return $executor->execute( $hash, $context, $reset, $owx_dev, $data, $numread );
-	} else {
-		return 0;
-	}
-};
-
-########################################################################################
-#
-# OWX_ASYNC_AfterExecute - is called when a query initiated by OWX_Execute successfully returns
-#
-# calls 'AfterExecuteFn' on the devices module (if such is defined)
-# stores data read in $hash->{replies}{$owx_dev}{$context} after calling 'AfterExecuteFn'
-#
-# Attention: this function is not intendet to be called directly! 
-#
-# Parameter hash = hash of bus master
-#        context = context parameter of call to OWX_Execute. Allows to correlate request and response
-#        success = indicates whether an error did occur
-#          reset = indicates whether a reset was carried out
-#        owx_dev = 1-wire device-address
-#           data = data written to the 1-wire device before read was executed
-#        numread = number of bytes requested from 1-wire device
-#       readdata = bytes read from 1-wire device
-#
-# Returns: nothing
-#
-########################################################################################
-
-sub OWX_ASYNC_AfterExecute($$$$$$$$) {
-	my ( $master, $context, $success, $reset, $owx_dev, $writedata, $numread, $readdata ) = @_;
-
-	Log3 ($master->{NAME},5,"AfterExecute:".
-	" context: ".(defined $context ? $context : "undef").
-	", success: ".(defined $success ? $success : "undef").
-	", reset: ".(defined $reset ? $reset : "undef").
-	", owx_dev: ".(defined $owx_dev ? $owx_dev : "undef").
-	", writedata: ".(defined $writedata ? unpack ("H*",$writedata) : "undef").
-	", numread: ".(defined $numread ? $numread : "undef").
-	", readdata: ".(defined $readdata ? unpack ("H*",$readdata) : "undef"));
-
-  if ( defined $context and ref $context eq "ProtoThreads" ) {
-    $context->{ExecuteResponse} = {
-      success   => $success,
-      'reset'   => $reset,
-      writedata => $writedata,
-      readdata  => $readdata,
-      numread   => $numread,
-    };
-    delete $context->{TimeoutTime};
+sub OWX_ASYNC_PT_Execute($$$$$) {
+  my ( $hash, $reset, $owx_dev, $data, $numread ) = @_;
+  if (my $executor = $hash->{ASYNC}) {
+    return $executor->get_pt_execute($reset,$owx_dev,$data,$numread);
   } else {
-    die "OWX_ASYNC_AfterExecute: $context is not a ProtoThread";
+    die "OWX_ASYNC_PT_Execute: no async device assigned";
   }
-};
+}
 
 sub OWX_ASYNC_Schedule($$@) {
   my ( $hash, $task, @args ) = @_;
   my $master = $hash->{IODev};
   die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
-  my $owx_dev = $hash->{ROM_ID};
+  my $name = $hash->{NAME};
   $task->{ExecuteArgs} = \@args;
-  my $now = gettimeofday();
-  $task->{ExecuteTime} = $now;
-  if (defined $master->{tasks}->{$owx_dev}) {
-    push @{$master->{tasks}->{$owx_dev}}, $task;
+  $task->{ExecuteTime} = gettimeofday() unless (defined $task->{ExecuteTime});
+  if (defined $master->{tasks}->{$name}) {
+    push @{$master->{tasks}->{$name}}, $task;
+    $hash->{NUMTASKS} = @{$master->{tasks}->{$name}};
   } else {
-    $master->{tasks}->{$owx_dev} = [$task];
+    $master->{tasks}->{$name} = [$task];
+    $hash->{NUMTASKS} = 1;
   }
-  main::InternalTimer($now, "OWX_ASYNC_RunTasks", $master,0);
+  #TODO make use of $master->{".nexttasktime"}
+  InternalTimer($task->{ExecuteTime}, "OWX_ASYNC_RunTasks", $master,0);
 };
 
 sub OWX_ASYNC_ScheduleMaster($$@) {
   my ( $master, $task, @args ) = @_;
   die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
+  my $name = $master->{NAME};
   $task->{ExecuteArgs} = \@args;
-  my $now = gettimeofday();
-  $task->{ExecuteTime} = $now;
-  if (defined $master->{tasks}->{master}) {
-    push @{$master->{tasks}->{master}}, $task;
+  $task->{ExecuteTime} = gettimeofday() unless (defined $task->{ExecuteTime});
+  if (defined $master->{tasks}->{$name}) {
+    push @{$master->{tasks}->{$name}}, $task;
+    $master->{NUMTASKS} = @{$master->{tasks}->{$name}};
   } else {
-    $master->{tasks}->{master} = [$task];
+    $master->{tasks}->{$name} = [$task];
+    $master->{NUMTASKS} = 1;
   }
-  main::InternalTimer($now, "OWX_ASYNC_RunTasks", $master,0);
+  #TODO make use of $master->{".nexttasktime"}
+  InternalTimer($task->{ExecuteTime}, "OWX_ASYNC_RunTasks", $master,0);
 };
+
+sub OWX_ASYNC_RunToCompletion($$) {
+  my ($master,$task) = @_;
+  my $task_state;
+  do {
+    OWX_ASYNC_Poll($master);
+    OWX_ASYNC_RunTasks($master);
+    $task_state = $task->PT_STATE();
+  } while ($task_state == PT_INITIAL or $task_state == PT_WAITING or $task_state == PT_YIELDED);
+  return $task_state;
+}
 
 sub OWX_ASYNC_RunTasks($) {
   my ( $master ) = @_;
   if ($master->{STATE} eq "Active") {
-    Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: ".((defined $master->{".currenttaskdevice"}) ? $master->{".currenttaskdevice"} : "-undefined-")." called") if ($owx_async_debug);
+    Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: called") if ($owx_async_debug>2);
     my $now = gettimeofday();
-    my $currentqueue;
-    my $currentdevice = $master->{".currenttaskdevice"};
-    $currentqueue = $master->{tasks}->{$currentdevice} if (defined $currentdevice);
-    do {
-      unless (defined $currentqueue and @$currentqueue) {
-        foreach my $owx_dev (keys %{$master->{tasks}}) {
-          my $queue = $master->{tasks}->{$owx_dev};
-          if (@$queue) {
-            # if task is eligible to run now:
-            if (defined ($queue->[0]->{ExecuteTime}) and ($now >= $queue->[0]->{ExecuteTime})) {
-              $currentqueue = $queue;
-              $currentdevice = $owx_dev;
-              Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: $owx_dev identified") if ($owx_async_debug);
+    while(1) {
+      my @queue_waiting  = ();
+      my @queue_ready    = ();
+      my @queue_sleeping = ();
+      my @queue_initial  = ();
+      foreach my $name (keys %{$master->{tasks}}) {
+        my $queue = $master->{tasks}->{$name};
+        while (@$queue) {
+          my $state = $queue->[0]->PT_STATE();
+          if ($state == PT_WAITING) {
+            push @queue_waiting,{ device => $name, queue => $queue};
+            last;
+          } elsif ($state == PT_YIELDED) {
+            if ($now >= $queue->[0]->{ExecuteTime}) {
+              push @queue_ready, { device => $name, queue => $queue};
+            } else {
+              push @queue_sleeping, { device => $name, queue => $queue};
+            }
+            last;
+          } elsif ($state == PT_INITIAL) {
+            push @queue_initial, { device => $name, queue => $queue};
+            last;
+          } else {
+            shift @$queue;
+            $main::defs{$name}->{NUMTASKS} = @$queue;
+          }
+        };
+        delete $master->{tasks}->{$name} unless (@$queue);
+      }
+      if (defined (my $current = @queue_waiting ? shift @queue_waiting : @queue_ready ? shift @queue_ready : @queue_initial ? shift @queue_initial : undef)) {
+        my $task = $current->{queue}->[0];
+        my $timeout = $task->{TimeoutTime};
+        if ($task->PT_SCHEDULE(@{$task->{ExecuteArgs}})) {
+          my $state = $task->PT_STATE();
+          # waiting for ExecuteResponse:
+          if ($state == PT_WAITING) {
+            die "$current->{device} unexpected thread state PT_WAITING without TimeoutTime" unless (defined $task->{TimeoutTime});
+            #task timed out:
+            if ($now >= $task->{TimeoutTime}) {
+              Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} task timed out");
+              Log3 ($master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} TimeoutTime: %.6f, now: %.6f",$task->{TimeoutTime},$now)) if ($owx_async_debug>1);
+              $task->PT_CANCEL("Timeout");
+              shift @{$current->{queue}};
+              $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
+              next;
+            } else {
+              Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} waiting for data or timeout" if ($owx_async_debug>2);
+              #new timeout or timeout did change:
+              if (!defined $timeout or $timeout != $task->{TimeoutTime}) {
+                Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} schedule for timeout at %.6f",$task->{TimeoutTime});
+                InternalTimer($task->{TimeoutTime}, "OWX_ASYNC_RunTasks", $master,0);
+              }
               last;
             }
+          # sleeping:
+          } elsif ($state == PT_YIELDED) {
+            next;
           } else {
-            delete $master->{tasks}->{$owx_dev};
+            die "$current->{device} unexpected thread state while running: $state";
           }
-        }
-      }
-      if (defined $currentqueue and @$currentqueue) {
-        my $task = $currentqueue->[0];
-        my $timeout = $task->{TimeoutTime};
-        my $ret;
-        eval {
-          $ret = $task->PT_SCHEDULE(@{$task->{ExecuteArgs}});
-        };
-        # finished running or error:
-        if (!$ret or $@) {
-          shift @$currentqueue;
-          undef $currentqueue;
-          my $msg = ($@) ? GP_Catch($@) : $task->PT_RETVAL();
-          if (defined $msg) {
-            Log3 ($master->{NAME},3,"OWX_ASYNC_RunTasks: $currentdevice Error running task: $msg");
+        } else {
+          my $state = $task->PT_STATE();
+          if ($state == PT_ENDED) {
+            Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} finished task");
+          } elsif ($state == PT_EXITED) {
+            Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} exited task: ".(defined $task->PT_RETVAL() ? $task->PT_RETVAL : "- no retval -"));
+          } elsif ($state == PT_ERROR) {
+            Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} Error task: ".$task->PT_CAUSE());
+            $main::defs{$current->{device}}->{PRESENT} = 0;
           } else {
-            Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: $currentdevice finished task");
+            die "$current->{device} unexpected thread state after termination: $state";
           }
-        # waiting for ExecuteResponse:
-        } elsif (defined $task->{TimeoutTime}) {
-          #task timed out:
-          if ($now >= $task->{TimeoutTime}) {
-            shift @$currentqueue;
-            undef $currentqueue;
-            Log3 ($master->{NAME},3,"OWX_ASYNC_RunTasks: $currentdevice task timed out");
-            Log3 ($master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $currentdevice TimeoutTime: %.6f, now: %.6f",$task->{TimeoutTime},$now));
-          } else {
-            Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $currentdevice waiting for data or timeout" if ($owx_async_debug);
-            #new timeout or timeout did change:
-            if (!defined $timeout or $timeout != $task->{TimeoutTime}) {
-              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $currentdevice schedule for timeout at %.6f",$task->{TimeoutTime});
-              main::InternalTimer($task->{TimeoutTime}, "OWX_ASYNC_RunTasks", $master,0);
-            }
-          }
-        # or not finished running, no error but scheduled for future:
-        } elsif (defined $task->{ExecuteTime} and $now < $task->{ExecuteTime}) {
-          undef $currentqueue;
-          Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: $currentdevice task not finished, next executetime: $task->{ExecuteTime}");
-        } elsif ($owx_async_debug) {
-          Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $currentdevice no action";
-        }
-        if (defined $currentqueue and @$currentqueue) {
-          Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $currentdevice exit loop" if ($owx_async_debug);
-          $master->{".currenttaskdevice"} = $currentdevice;
-          OWX_ASYNC_Poll($master);
-          return;
-        } elsif ($owx_async_debug) {
-          Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- continue loop");
+          shift @{$current->{queue}};
+          $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
+          next;
         }
       } else {
         my $nexttime;
-        foreach my $owx_dev (keys %{$master->{tasks}}) {
-          my $queue = $master->{tasks}->{$owx_dev};
-          if (@$queue) {
-            my $nexttask = $queue->[0];
-            # if task is scheduled for future:
-            if (defined $nexttask->{ExecuteTime}) {
-              $nexttime = $nexttask->{ExecuteTime} if (!defined $nexttime or ($nexttime > $nexttask->{ExecuteTime}));
-              $currentdevice = $owx_dev;
-            }
-          } else {
-            delete $master->{tasks}->{$owx_dev};
+        my $nextdevice;
+        foreach my $current (@queue_sleeping) {
+          # if task is scheduled for future:
+          if (!defined $nexttime or ($nexttime > $current->{queue}->[0]->{ExecuteTime})) {
+            $nexttime = $current->{queue}->[0]->{ExecuteTime};
+            $nextdevice = $current->{device};
           }
         }
         if (defined $nexttime) {
           if ($nexttime > $now) {
             if (!defined $master->{".nexttasktime"} or $nexttime < $master->{".nexttasktime"} or $now >= $master->{".nexttasktime"}) {
-              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $currentdevice schedule next at %.6f",$nexttime);
+              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice schedule next at %.6f",$nexttime) if ($owx_async_debug);
               main::InternalTimer($nexttime, "OWX_ASYNC_RunTasks", $master,0);
               $master->{".nexttasktime"} = $nexttime;
             } else {
-              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $currentdevice skip %.6f, allready scheduled at %.6f",$nexttime,$master->{".nexttasktime"}) if ($owx_async_debug);
+              Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice skip %.6f, allready scheduled at %.6f",$nexttime,$master->{".nexttasktime"}) if ($owx_async_debug>2);
             }
           } else {
-            delete $master->{".nexttasktime"};
-            Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $currentdevice nexttime at %.6f allready passed",$nexttime) if ($owx_async_debug);
+            Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $nextdevice nexttime at %.6f allready passed",$nexttime) if ($owx_async_debug>2);
           }
         } else {
-          Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- no nexttime") if ($owx_async_debug);
+          Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- no nexttime") if ($owx_async_debug>2);
         }
-        delete $master->{".currenttaskdevice"};
-        Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- exit loop") if ($owx_async_debug);
-        OWX_ASYNC_Poll($master);
-        return;
+        Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: -undefined- exit loop") if ($owx_async_debug>2);
+        last;
       }
-    } while (1);
+    };
   }
 };
 

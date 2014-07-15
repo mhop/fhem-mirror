@@ -32,14 +32,14 @@ sub GP_Catch($) {
   return undef;
 }
 
-sub GP_ForallClients($$$)
+sub GP_ForallClients($$@)
 {
-  my ($hash,$fn,$args) = @_;
+  my ($hash,$fn,@args) = @_;
   foreach my $d ( sort keys %main::defs ) {
     if (   defined( $main::defs{$d} )
       && defined( $main::defs{$d}{IODev} )
       && $main::defs{$d}{IODev} == $hash ) {
-      	&$fn($main::defs{$d},$args);
+      	&$fn($main::defs{$d},@args);
     }
   }
   return undef;
