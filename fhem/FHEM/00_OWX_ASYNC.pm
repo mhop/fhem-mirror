@@ -934,16 +934,18 @@ sub OWX_ASYNC_PT_Verify($) {
   my $romid = $hash->{ROM_ID};
 
   #-- Verify a devices is present on the 1-Wire bus
-  if (defined $async) {
-    return PT_THREAD(sub {
-      my ($thread) = @_;
-      PT_BEGIN($thread);
+  return PT_THREAD(sub {
+    my ($thread) = @_;
+    PT_BEGIN($thread);
+
+    if (defined $async) {
+
       $thread->{pt_verify} = $async->get_pt_verify($romid);
       $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_verify});
       delete $thread->{TimeoutTime};
       die $thread->{pt_verify}->PT_CAUSE() if ($thread->{pt_verify}->PT_STATE() == PT_ERROR);
-      
+
       my $value = $thread->{pt_verify}->PT_RETVAL();
 
       if( $value == 0 ){
@@ -952,16 +954,16 @@ sub OWX_ASYNC_PT_Verify($) {
         readingsSingleUpdate($hash,"present",1,!$hash->{PRESENT}); 
       }
       $hash->{PRESENT} = $value;
-      PT_END;
-    });
-  } else {
-    my $owx_interface = $hash->{IODev}->{INTERFACE};
-    if( !defined($owx_interface) ) {
-      die "OWX: Verify called with undefined interface on bus $hash->{IODev}->{NAME}";
     } else {
-      die "OWX: Verify called with unknown interface $owx_interface on bus $hash->{IODev}->{NAME}";
-    } 
-  }
+      my $owx_interface = $hash->{IODev}->{INTERFACE};
+      if( !defined($owx_interface) ) {
+        die "OWX: Verify called with undefined interface on bus $hash->{IODev}->{NAME}";
+      } else {
+        die "OWX: Verify called with unknown interface $owx_interface on bus $hash->{IODev}->{NAME}";
+      } 
+    }
+    PT_END;
+  });
 }
 
 ########################################################################################
