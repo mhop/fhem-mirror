@@ -556,7 +556,7 @@ readingsGroup_2html($)
         $first = 0;
         next;
       } else {
-        if( $regex =~ m/(.*)@(.*)/ ) {
+        if( $regex && $regex =~ m/(.*)@(.*)/ ) {
           $regex = $1;
           $name = $2;
           if( $name =~ m/^{(.*)}$/ ) {
