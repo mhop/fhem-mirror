@@ -169,11 +169,11 @@ netatmo_getToken($)
 {
   my ($hash) = @_;
 
-  my $https = "https";
-  $https = "http" if( AttrVal($hash->{NAME}, "nossl", 0) );
+  $hash->{https} = "https";
+  $hash->{https} = "http" if( AttrVal($hash->{NAME}, "nossl", 0) );
 
   my($err,$data) = HttpUtils_BlockingGet({
-    url => "$https://api.netatmo.net/oauth2/token",
+    url => "$hash->{https}://api.netatmo.net/oauth2/token",
     timeout => 10,
     noshutdown => 1,
     data => {grant_type => 'password', client_id => $hash->{client_id},  client_secret=> $hash->{client_secret}, username => $hash->{username}, password => $hash->{password}},
@@ -195,12 +195,9 @@ netatmo_refreshToken($;$)
     return undef if( $seconds < $hash->{expires_at} - 300 );
   }
 
-  my $https = "https";
-  $https = "http" if( AttrVal($hash->{NAME}, "nossl", 0) );
-
   if( $nonblocking ) {
     HttpUtils_NonblockingGet({
-      url => "$https://api.netatmo.net/oauth2/token",
+      url => "$hash->{https}://api.netatmo.net/oauth2/token",
       timeout => 10,
       noshutdown => 1,
       data => {grant_type => 'refresh_token', client_id => $hash->{client_id},  client_secret=> $hash->{client_secret}, refresh_token => $hash->{refresh_token}},
@@ -210,7 +207,7 @@ netatmo_refreshToken($;$)
     });
   } else {
     my($err,$data) = HttpUtils_BlockingGet({
-      url => "$https://api.netatmo.net/oauth2/token",
+      url => "$hash->{https}://api.netatmo.net/oauth2/token",
       timeout => 10,
       noshutdown => 1,
       data => {grant_type => 'refresh_token', client_id => $hash->{client_id},  client_secret=> $hash->{client_secret}, refresh_token => $hash->{refresh_token}},
@@ -265,6 +262,7 @@ netatmo_initDevice($)
     $hash->{country} = $device->{place}{country};
     $hash->{bssid} = $device->{place}{bssid};
     $hash->{altitude} = $device->{place}{altitude};
+    $hash->{city} = $device->{place}{geoip_city};
     $hash->{location} = $device->{place}{location}[0] .",". $device->{place}{location}[1];
   }
 
@@ -292,7 +290,7 @@ netatmo_initDevice($)
 
     $hash->{helper}{readingNames} = \@reading_names;
   }
-  $attr{$name}{stateFormat} = $state_format if( !defined( $attr{$name}{stateFormat} ) );
+  $attr{$name}{stateFormat} = $state_format if( !defined($attr{$name}{stateFormat}) && defined($state_format) );
 
   netatmo_poll($hash);
 }
@@ -306,7 +304,7 @@ netatmo_getDevices($;$)
 
   if( $blocking ) {
     my($err,$data) = HttpUtils_BlockingGet({
-      url => 'http://api.netatmo.net/api/devicelist',
+      url => "$hash->{https}://api.netatmo.net/api/devicelist",
       noshutdown => 1,
       data => { access_token => $hash->{access_token}, scope => 'read_station' },
     });
@@ -316,7 +314,7 @@ netatmo_getDevices($;$)
     return $hash->{helper}{devices};
   } else {
     HttpUtils_NonblockingGet({
-      url => 'http://api.netatmo.net/api/devicelist',
+      url => "$hash->{https}://api.netatmo.net/api/devicelist",
       noshutdown => 1,
       data => { access_token => $hash->{access_token}, scope => 'read_station', },
       hash => $hash,
@@ -361,7 +359,7 @@ netatmo_getPublicDevices($$;$$$$)
 
   if( $blocking ) {
     my($err,$data) = HttpUtils_BlockingGet({
-      url => 'http://api.netatmo.net/api/getpublicdata',
+      url => "$iohash->{https}://api.netatmo.net/api/getpublicdata",
       noshutdown => 1,
       data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw },
     });
@@ -369,7 +367,7 @@ netatmo_getPublicDevices($$;$$$$)
       return netatmo_dispatch( {hash=>$hash,type=>'publicdata'},$err,$data );
   } else {
     HttpUtils_NonblockingGet({
-      url => 'http://api.netatmo.net/api/getpublicdata',
+      url => "$iohash->{https}://api.netatmo.net/api/getpublicdata",
       noshutdown => 1,
       data => { access_token => $iohash->{access_token}, lat_ne => $lat_ne, lon_ne => $lon_ne, lat_sw => $lat_sw, lon_sw => $lon_sw },
       hash => $hash,
@@ -407,14 +405,14 @@ netatmo_requestDeviceReadings($@)
 
   netatmo_refreshToken( $iohash );
 
-  my %data = (access_token => $iohash->{access_token}, scope => 'read_station', device_id => $id, scale => "max", type => $type);
+  my %data = (access_token => $iohash->{access_token}, device_id => $id, scale => "max", type => $type);
   $data{"module_id"} = $module if( $module );
 
   my $lastupdate = ReadingsVal( $name, ".lastupdate", undef );
   $data{"date_begin"} = $lastupdate if( defined($lastupdate) );
 
   HttpUtils_NonblockingGet({
-    url => 'http://api.netatmo.net/api/getmeasure',
+    url => "$iohash->{https}://api.netatmo.net/api/getmeasure",
     timeout => 10,
     noshutdown => 1,
     data => \%data,
@@ -660,7 +658,7 @@ netatmo_parsePublic($$)
             foreach my $module ( keys %{$device->{measures}}) {
               next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
               foreach my $timestamp ( keys %{$device->{measures}->{$module}->{res}} ) {
-                next if( $hash->{LAST_POLL} || $hash->{LAST_POLL} > $timestamp  );
+                next if( $hash->{LAST_POLL} && $hash->{LAST_POLL} > $timestamp  );
                 my $i = 0;
                 foreach my $value ( @{$device->{measures}->{$module}->{res}->{$timestamp}} ) {
                   my $type = $device->{measures}->{$module}->{type}[$i];
@@ -809,6 +807,17 @@ netatmo_Attr($$$)
       $attr{$name}{$attrName} = 0;
       netatmo_poll($hash);
     }
+  } elsif( $attrName eq "nossl" ) {
+    my $hash = $defs{$name};
+    if( $hash->{SUBTYPE} eq "ACCOUNT" ) {
+      if( $cmd eq "set" && $attrVal ne "0" ) {
+        $hash->{https} = "http";
+      } else {
+        $hash->{https} = "https";
+      }
+    } else {
+      return $attrName ." not allowed for netatmo $hash->{SUBTYPE}";
+    }
   }
 
   if( $cmd eq "set" ) {
@@ -860,9 +869,6 @@ netatmo_Attr($$$)
   <a name="netatmo_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>co2</li>
-    <li>battery</li>
-    <li>batteryLevel</li>
   </ul><br>
 
   <a name="netatmo_Get"></a>
