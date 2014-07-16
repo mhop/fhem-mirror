@@ -204,12 +204,12 @@ sub reset_response() {
   my $name = $serial->{name};
   
   if( !($res & 192) ) {
-    main::Log3($name,3, "OWX_DS2480 reset failure on bus $name");
+    main::Log3($name,4, "OWX_DS2480 reset failure on bus $name");
     return 0;
   }
   
   if( ($res & 3) == 2 ) {
-    main::Log3($name,1, "OWX_DS2480 reset Alarm presence detected on bus $name");
+    main::Log3($name,4, "OWX_DS2480 reset Alarm presence detected on bus $name");
     $serial->{ALARMED} = "yes";
   } else {
     $serial->{ALARMED} = "no";
@@ -289,7 +289,7 @@ sub search_response($) {
   my $response = substr($serial->{string_in},1);
   #-- interpret the return data
   if( length($response)!=16 ) {
-    main::Log3($serial->{name},3, "OWX_DS2480: Search 2nd return has wrong parameter with length = ".(length($response).""));
+    main::Log3($serial->{name},4, "OWX_DS2480: Search 2nd return has wrong parameter with length = ".(length($response).""));
     return 0;
   }
   #-- Response search data parsing (Fig. 11 of Maxim AN192)
@@ -362,7 +362,7 @@ sub Level_2480 ($) {
       main::Log3($self->{name},5, "OWX_SER: Level change to normal OK");
       return 1;
     } else {
-      main::Log3($self->{name},3, "OWX_SER: Failed to change to normal level");
+      main::Log3($self->{name},4, "OWX_SER: Failed to change to normal level");
       return 0;
     }
   #-- start pulse  
@@ -377,7 +377,7 @@ sub Level_2480 ($) {
       main::Log3($self->{name},5, "OWX_SER: Level change OK");
       return 1;
     } else {
-      main::Log3($self->{name},3, "OWX_SER: Failed to change level");
+      main::Log3($self->{name},4, "OWX_SER: Failed to change level");
       return 0;
     }
   }
@@ -422,7 +422,7 @@ sub WriteBytePower_2480 ($) {
     main::Log3($self->{name},5, "OWX_SER::WriteBytePower OK");
     return 1;
   } else {
-    main::Log3($self->{name},3, "OWX_SER::WriteBytePower failure");
+    main::Log3($self->{name},4, "OWX_SER::WriteBytePower failure");
     return 0;
   }
 }
