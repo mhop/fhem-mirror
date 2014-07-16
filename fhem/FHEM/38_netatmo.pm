@@ -169,8 +169,11 @@ netatmo_getToken($)
 {
   my ($hash) = @_;
 
+  my $https = "https";
+  $https = "http" if( AttrVal($hash->{NAME}, "nossl", 0) );
+
   my($err,$data) = HttpUtils_BlockingGet({
-    url => 'https://api.netatmo.net/oauth2/token',
+    url => "$https://api.netatmo.net/oauth2/token",
     timeout => 10,
     noshutdown => 1,
     data => {grant_type => 'password', client_id => $hash->{client_id},  client_secret=> $hash->{client_secret}, username => $hash->{username}, password => $hash->{password}},
@@ -192,9 +195,12 @@ netatmo_refreshToken($;$)
     return undef if( $seconds < $hash->{expires_at} - 300 );
   }
 
+  my $https = "https";
+  $https = "http" if( AttrVal($hash->{NAME}, "nossl", 0) );
+
   if( $nonblocking ) {
     HttpUtils_NonblockingGet({
-      url => 'https://api.netatmo.net/oauth2/token',
+      url => "$https://api.netatmo.net/oauth2/token",
       timeout => 10,
       noshutdown => 1,
       data => {grant_type => 'refresh_token', client_id => $hash->{client_id},  client_secret=> $hash->{client_secret}, refresh_token => $hash->{refresh_token}},
@@ -204,7 +210,7 @@ netatmo_refreshToken($;$)
     });
   } else {
     my($err,$data) = HttpUtils_BlockingGet({
-      url => 'https://api.netatmo.net/oauth2/token',
+      url => "$https://api.netatmo.net/oauth2/token",
       timeout => 10,
       noshutdown => 1,
       data => {grant_type => 'refresh_token', client_id => $hash->{client_id},  client_secret=> $hash->{client_secret}, refresh_token => $hash->{refresh_token}},
@@ -878,6 +884,8 @@ netatmo_Attr($$$)
       the interval in seconds used to check for new values.</li>
     <li>disable<br>
       1 -> stop polling</li>
+    <li>nossl<br>
+      1 -> don't use ssl.</li><br>
   </ul>
 </ul>
 
