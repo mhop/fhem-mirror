@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.23";
+my $owx_version="5.24";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -651,14 +651,10 @@ sub OWCOUNT_Get($@) {
     my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      my ($task,$task_state);
       eval {
-        $task = OWX_ASYNC_PT_Verify($hash);
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
       };
       return GP_Catch($@) if $@;
-      return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
       return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -848,20 +844,14 @@ sub OWCOUNT_GetPage ($$$@) {
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_GetPage($hash,$page,$final);
     }elsif( $interface eq "OWX_ASYNC" ){      
-      if ($sync) {
-        my ($task,$task_state);
-        eval {
-          $task = OWXCOUNT_PT_GetPage($hash,$page,$final);
-          OWX_ASYNC_Schedule($hash,$task);
-          $task_state = OWX_ASYNC_RunToCompletion($master,$task);
-        };
-        $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
-      } else {
-        eval {
+      eval {
+        if ($sync) {
+          $ret = OWX_ASYNC_RunToCompletion($hash,OWXCOUNT_PT_GetPage($hash,$page,$final));
+        } else {
           OWX_ASYNC_Schedule( $hash, OWXCOUNT_PT_GetPage($hash,$page,$final) );
-        };
-        $ret = GP_Catch($@) if $@;
-      }
+        }
+      };
+      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSCOUNT_GetPage($hash,$page,$final);
@@ -1159,13 +1149,10 @@ sub OWCOUNT_InitializeDevice($) {
     $ret  = OWXCOUNT_GetPage($hash,14,0);
     $ret  = OWXCOUNT_SetPage($hash,14,$olddata); 
   }elsif( $interface eq "OWX_ASYNC" ){
-    my ($task,$task_state);
     eval {
-      $task = OWXCOUNT_PT_InitializeDevicePage($hash,14,$newdata);
-      OWX_ASYNC_Schedule($hash,$task);
-      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+      $ret = OWX_ASYNC_RunToCompletion($hash,OWXCOUNT_PT_InitializeDevicePage($hash,14,$newdata));
     };
-    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+    $ret = GP_Catch($@) if $@;
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret  = OWFSCOUNT_GetPage($hash,14,0);
@@ -1187,13 +1174,10 @@ sub OWCOUNT_InitializeDevice($) {
     $ret  = OWXCOUNT_GetPage($hash,0,0);
     $ret  = OWXCOUNT_SetPage($hash,0,$olddata); 
   }elsif( $interface eq "OWX_ASYNC" ){
-    my ($task,$task_state);
     eval {
-      $task = OWXCOUNT_PT_InitializeDevicePage($hash,0,$newdata);
-      OWX_ASYNC_Schedule($hash,$task);
-      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+      $ret = OWX_ASYNC_RunToCompletion($hash,OWXCOUNT_PT_InitializeDevicePage($hash,0,$newdata));
     };
-    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+    $ret = GP_Catch($@) if $@;
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret  = OWFSCOUNT_GetPage($hash,0,0);
