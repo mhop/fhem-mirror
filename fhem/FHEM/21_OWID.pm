@@ -68,7 +68,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log($$);
 
-my $owx_version="5.13";
+my $owx_version="5.14";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -334,14 +334,10 @@ sub OWID_Get($@) {
     my $master       = $hash->{IODev};
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      my ($task,$task_state);
       eval {
-        $task = OWX_ASYNC_PT_Verify($hash);
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
       };
       return GP_Catch($@) if $@;
-      return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
       return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -386,10 +382,8 @@ sub OWID_GetValues($) {
   my $master       = $hash->{IODev};
   
   if( $hash->{ASYNC} ){
-    #TODO use OWX_ASYNC_Schedule instead
-    my $task = OWX_ASYNC_PT_Verify($hash);
     eval {
-      OWX_ASYNC_Schedule($hash,$task);
+      OWX_ASYNC_Schedule($hash,OWX_ASYNC_PT_Verify($hash));
     };
     return GP_Catch($@) if $@;
     return undef;

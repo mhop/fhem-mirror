@@ -77,7 +77,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="3.38";
+my $owx_version="5.1";
 #-- controller may be HD44780 or KS0073 
 #   these values have to be changed for different display 
 #   geometries or memory maps
@@ -324,14 +324,10 @@ sub OWLCD_Get($@) {
   if($a[1] eq "present") {
     #-- asynchronous mode
     if( $hash->{ASYNC} ){
-      my ($task,$task_state);
       eval {
-        $task = OWX_ASYNC_PT_Verify($hash);
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
       };
       return GP_Catch($@) if $@;
-      return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
       return "$name.present => ".ReadingsVal($name,"present","unknown");
     } else {
       $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -343,13 +339,10 @@ sub OWLCD_Get($@) {
   #-- get gpio states
   if($a[1] eq "gpio") {
     if ($hash->{ASYNC}) {
-      my ($task,$task_state);
       eval {
-        $task = OWXLCD_PT_Get($hash,"gpio");
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        $ret = OWX_ASYNC_RunToCompletion($hash,OWXLCD_PT_Get($hash,"gpio"));
       };
-      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+      $ret = GP_Catch($@) if $@;
       return $ret if $ret;
       return "$name.gpio => ".main::ReadingsVal($hash->{NAME},"gpio","");
     } else {
@@ -361,13 +354,10 @@ sub OWLCD_Get($@) {
   #-- get gpio counters
   if($a[1] eq "counter") {
     if ($hash->{ASYNC}) {
-      my ($task,$task_state);
       eval {
-        $task = OWXLCD_PT_Get($hash,"counter");
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        $ret = OWX_ASYNC_RunToCompletion($hash,OWXLCD_PT_Get($hash,"counter"));
       };
-      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+      $ret = GP_Catch($@) if $@;
       return $ret if $ret;
       return "$name.counter => ".main::ReadingsVal($hash->{NAME},"counter","");
     } else {
@@ -379,13 +369,10 @@ sub OWLCD_Get($@) {
   #-- get version
   if($a[1] eq "version") {
     if ($hash->{ASYNC}) {
-      my ($task,$task_state);
       eval {
-        $task = OWXLCD_PT_Get($hash,"version");
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        $ret = OWX_ASYNC_RunToCompletion($hash,OWXLCD_PT_Get($hash,"version"));
       };
-      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+      $ret = GP_Catch($@) if $@;
       return $ret if $ret;
       return "$name.gpio => ".main::ReadingsVal($hash->{NAME},"version","");
     } else {
@@ -399,13 +386,10 @@ sub OWLCD_Get($@) {
     my $page  = (defined $a[2] and $a[2] =~ m/\d/) ? int($a[2]) : 0;
     Log3 $name,1,"Calling GetMemory with page $page";
     if ($hash->{ASYNC}) {
-      my ($task,$task_state);
       eval {
-        $task = OWXLCD_PT_GetMemory($hash,$page);
-        OWX_ASYNC_Schedule($hash,$task);
-        $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+        $ret = OWX_ASYNC_RunToCompletion($hash,OWXLCD_PT_GetMemory($hash,$page));
       };
-      $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+      $ret = GP_Catch($@) if $@;
       return $ret if $ret;
       return "$name $reading $page => ".main::ReadingsVal($hash->{NAME},"memory$page","");
     } else {

@@ -82,7 +82,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.16";
+my $owx_version="5.17";
 #-- flexible channel name
 my $owg_channel;
 
@@ -481,14 +481,10 @@ sub OWMULTI_Get($@) {
     if( $interface =~ /^OWX/ ){
       #-- asynchronous mode
       if( $hash->{ASYNC} ){
-        my ($task,$task_state);
         eval {
-          $task = OWX_ASYNC_PT_Verify($hash);
-          OWX_ASYNC_Schedule($hash,$task);
-          $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+          OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
         };
         return GP_Catch($@) if $@;
-        return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
         return "$name.present => ".ReadingsVal($name,"present","unknown");
       } else {
         $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -517,13 +513,10 @@ sub OWMULTI_Get($@) {
     #-- not different from getting all values ..
     $ret = OWXMULTI_GetValues($hash);
   }elsif( $interface eq "OWX_ASYNC"){
-    my ($task,$task_state);
     eval {
-      $task = OWXMULTI_PT_GetValues($hash);
-      OWX_ASYNC_Schedule($hash,$task);
-      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+      $ret = OWX_ASYNC_RunToCompletion($hash,OWXMULTI_PT_GetValues($hash));
     };
-    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+    $ret = GP_Catch($@) if $@;
   #-- OWFS interface not yet implemented
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);

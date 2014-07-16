@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.21";
+my $owx_version="5.22";
 
 my %gets = (
   "id"          => "",
@@ -461,14 +461,10 @@ sub OWTHERM_Get($@) {
     if( $interface =~ /^OWX/ ){
       #-- asynchronous mode
       if( $hash->{ASYNC} ){
-        my ($task,$task_state);
         eval {
-          $task = OWX_ASYNC_PT_Verify($hash);
-          OWX_ASYNC_Schedule($hash,$task);
-          $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+          OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
         };
         return GP_Catch($@) if $@;
-        return $task->PT_CAUSE() if ($task_state == PT_ERROR or $task_state == PT_CANCELED);
         return "$name.present => ".ReadingsVal($name,"present","unknown");
       } else {
         $value = OWX_Verify($master,$hash->{ROM_ID});
@@ -496,13 +492,10 @@ sub OWTHERM_Get($@) {
     #-- not different from getting all values ..
     $ret = OWXTHERM_GetValues($hash);
   }elsif( $interface eq "OWX_ASYNC" ){
-    my ($task,$task_state);
     eval {
-      $task = OWXTHERM_PT_GetValues($hash);
-      OWX_ASYNC_Schedule($hash,$task);
-      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+      $ret = OWX_ASYNC_RunToCompletion($hash,OWXTHERM_PT_GetValues($hash));
     };
-    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+    $ret = GP_Catch($@) if $@;
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
@@ -668,13 +661,10 @@ sub OWTHERM_InitializeDevice($) {
   if( $interface eq "OWX" ){
     $ret = OWXTHERM_SetValues($hash,$args);
   }elsif( $interface eq "OWX_ASYNC" ){
-    my ($task,$task_state);
     eval {
-      $task = OWXTHERM_PT_SetValues($hash,$args);
-      OWX_ASYNC_Schedule($hash,$task);
-      $task_state = OWX_ASYNC_RunToCompletion($master,$task);
+      $ret = OWX_ASYNC_RunToCompletion($hash,OWXTHERM_PT_SetValues($hash,$args));
     };
-    $ret = ($@) ? GP_Catch($@) : ($task_state == PT_ERROR or $task_state == PT_CANCELED) ? $task->PT_CAUSE() : $task->PT_RETVAL();
+    $ret = GP_Catch($@) if $@;
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_SetValues($hash,$args);
@@ -1108,7 +1098,7 @@ sub OWXTHERM_SetValues($$) {
 #
 ########################################################################################
 
-sub OWXTHERM_PT_GetValues($@) {
+sub OWXTHERM_PT_GetValues($) {
 
   my ($hash) = @_;
   
