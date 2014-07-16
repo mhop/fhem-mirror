@@ -579,6 +579,35 @@ netatmo_parseDeviceList($$)
 }
 
 sub
+netatmo_updateReadings($$)
+{
+  my($hash, $readings) = @_;
+
+  my ($seconds) = gettimeofday();
+
+  my $latest = 0;
+  if( @{$readings} ) {
+    readingsBeginUpdate($hash);
+    my $i = 0;
+    foreach my $reading (sort { $a->[0] <=> $b->[0] } @{$readings}) {
+      $hash->{".updateTimestamp"} = FmtDateTime($reading->[0]);
+      $hash->{CHANGETIME}[$i++] = FmtDateTime($reading->[0]);
+      readingsBulkUpdate( $hash, $reading->[1], $reading->[2] );
+      $latest = $reading->[0] if( $reading->[0] > $latest );
+    }
+    #$hash->{helper}{update_count} = int(@{$readings});
+
+    #$seconds = $latest + 1 if( $latest );
+    readingsBulkUpdate( $hash, ".lastupdate", $seconds, 0 );
+
+    readingsEndUpdate($hash,1);
+
+    delete $hash->{CHANGETIME};
+  }
+
+  return ($seconds,$latest);
+}
+sub
 netatmo_parseReadings($$)
 {
   my($hash, $json) = @_;
@@ -609,28 +638,8 @@ netatmo_parseReadings($$)
         }
       }
 
-      my $latest = 0;
-      if( @readings ) {
-        readingsBeginUpdate($hash);
-        my $i = 0;
-        foreach my $reading (sort { $a->[0] <=> $b->[0] } @readings) {
-          $hash->{".updateTimestamp"} = FmtDateTime($reading->[0]);
-          $hash->{CHANGETIME}[$i++] = FmtDateTime($reading->[0]);
-          readingsBulkUpdate( $hash, $reading->[1], $reading->[2], 1 );
-          $latest = $reading->[0] if( $reading->[0] > $latest );
-        }
-        #$hash->{helper}{update_count} = int(@readings);
-
-        my ($seconds) = gettimeofday();
-        $hash->{LAST_POLL} = FmtDateTime( $seconds );
-
-        #$seconds = $latest + 1 if( $latest );
-        readingsBulkUpdate( $hash, ".lastupdate", $seconds, 0 );
-
-        readingsEndUpdate($hash,1);
-
-        delete $hash->{CHANGETIME};
-      }
+      my ($seconds,undef) = netatmo_updateReadings( $hash, \@readings );
+      $hash->{LAST_POLL} = FmtDateTime( $seconds );
     }
   }
 }
@@ -646,9 +655,8 @@ netatmo_parsePublic($$)
     $hash->{status} = $json->{error}{message} if( $json->{error} );
     if( $hash->{status} eq "ok" ) {
       if( $hash->{Lat} ) {
-        my $ii = 0;
-        readingsBeginUpdate($hash);
         my $found = 0;
+        my @readings = ();
         my $devices = $json->{body};
         if( ref($devices) eq "ARRAY" ) {
           foreach my $device (@{$devices}) {
@@ -658,14 +666,12 @@ netatmo_parsePublic($$)
             foreach my $module ( keys %{$device->{measures}}) {
               next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
               foreach my $timestamp ( keys %{$device->{measures}->{$module}->{res}} ) {
-                next if( $hash->{LAST_POLL} && $hash->{LAST_POLL} > $timestamp  );
+                next if( $hash->{LAST_POLL} && $timestamp <= $hash->{LAST_POLL} );
                 my $i = 0;
                 foreach my $value ( @{$device->{measures}->{$module}->{res}->{$timestamp}} ) {
                   my $type = $device->{measures}->{$module}->{type}[$i];
 
-                  $hash->{".updateTimestamp"} = FmtDateTime($timestamp);
-                  $hash->{CHANGETIME}[$ii++] = FmtDateTime($timestamp);
-                  readingsBulkUpdate( $hash, $type, $value, 1 );
+                  push(@readings, [$timestamp, lc($type), $value]);
 
                   ++$i;
                 }
@@ -676,13 +682,11 @@ netatmo_parsePublic($$)
             last;
           }
         }
-        ($hash->{LAST_POLL}) = gettimeofday();
-        delete $hash->{CHANGETIME};
 
-        if( !$found ) {
-          $hash->{STATE} = "Error: device not found";
-        }
-        readingsEndUpdate($hash,1);
+        my (undef,$latest) = netatmo_updateReadings( $hash, \@readings );
+        $hash->{LAST_POLL} = $latest if( @readings );
+
+        $hash->{STATE} = "Error: device not found" if( !$found );
       } else {
         return $json->{body};
       }
