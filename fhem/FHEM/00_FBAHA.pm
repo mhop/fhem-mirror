@@ -119,7 +119,8 @@ FBAHA_Set($@)
       return $msg;
 
     }
-    FBAHA_Write($hash, "03", "0000028200000000");  # LISTEN
+    FBAHA_Write($hash, "03", "0000038200000000");  # LISTEN
+
   }
 
   if($type eq "reopen") {
