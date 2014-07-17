@@ -1032,7 +1032,7 @@ sub OWXTHERM_GetValues($) {
   eval {
     OWXTHERM_BinValues($hash,undef,$owx_dev,undef,undef,substr($res,10,9));
   };
-  return $@;
+  return $@ ? $@ : undef;
 }
 
 #######################################################################################
