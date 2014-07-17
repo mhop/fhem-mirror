@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.22";
+my $owx_version="5.23";
 
 my %gets = (
   "id"          => "",
