@@ -993,8 +993,9 @@ sub OWX_ASYNC_PT_Execute($$$$$) {
 sub OWX_ASYNC_Schedule($$) {
   my ( $hash, $task ) = @_;
   my $master = $hash->{TYPE} eq "OWX_ASYNC" ? $hash : $hash->{IODev};
-  die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
   my $name = $hash->{NAME};
+  Log3 ($master->{NAME},5,"OWX_ASYNC_Schedule master: ".$master->{NAME}.", task: ".$name);
+  die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
   $task->{ExecuteTime} = gettimeofday() unless (defined $task->{ExecuteTime});
   if (defined $master->{tasks}->{$name}) {
     push @{$master->{tasks}->{$name}}, $task;
