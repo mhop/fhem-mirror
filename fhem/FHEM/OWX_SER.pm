@@ -30,6 +30,8 @@ use warnings;
 
 use vars qw/@ISA/;
 
+require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
+
 use Time::HiRes qw( gettimeofday );
 use ProtoThreads;
 no warnings 'deprecated';
@@ -44,8 +46,6 @@ sub new() {
   my $class = shift;
   my $self = {
     interface => "serial",
-    #-- baud rate serial interface
-    baud => 9600,
     #-- 16 byte search string
     search => [0,0,0,0 ,0,0,0,0, 0,0,0,0, 0,0,0,0],
     ROM_ID => [0,0,0,0 ,0,0,0,0],
@@ -64,7 +64,15 @@ sub new() {
 
 sub poll($) {
   my ( $self ) = @_;
-  $self->read();
+  my $hash = $self->{hash};
+  if(defined($hash->{FD})) {
+    my ($rin,$win);
+    vec($rin, $hash->{FD}, 1) = 1;
+    vec($win, $hash->{FD}, 1) = 1;
+    if (select($rin, $win, $rin | $win, 2)) { #TODO: implement attribute based timeout
+      main::OWX_ASYNC_Disconnect($hash) unless $self->read();
+    }
+  }
 }
 
 ########################################################################################
@@ -82,17 +90,17 @@ sub poll($) {
 ########################################################################################
 
 sub Define ($$) {
-	my ($self,$hash,$def) = @_;
-	my @a = split("[ \t][ \t]*", $def);
+  my ($self,$hash,$def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
 
-	$self->{name} = $hash->{NAME};
+  $self->{name} = $hash->{NAME};
 
-	#-- check syntax
-	if(int(@a) < 3){
-		return "OWX_SER: Syntax error - must be define <name> OWX <serial-device>"
-	}
-	my $dev = $a[2];
-    
+  #-- check syntax
+  if(int(@a) < 3){
+    return "OWX_SER: Syntax error - must be define <name> OWX <serial-device>"
+  }
+  my $dev = $a[2];
+
   #-- when the specified device name contains @<digits> already, use it as supplied
   if ( $dev !~ m/\@\d*/ ){
     $hash->{DeviceName} = $dev."\@9600";
@@ -100,7 +108,10 @@ sub Define ($$) {
   my ($device,$baudrate) = split('@',$dev);
   #-- let fhem.pl MAIN call OWX_Ready when setup is done.
   $main::readyfnlist{"$hash->{NAME}.$device"} = $hash;
-    
+
+  $self->{baud} = $baudrate ? $baudrate : 9600;
+  $self->{hash} = $hash;
+
   return undef;
 }
 
@@ -153,13 +164,6 @@ sub get_pt_execute($$$$) {
     PT_BEGIN($thread);
     $thread->{writedata} = $writedata;
     
-    #-- get the interface
-    my $interface = $self->{interface};
-    my $hwdevice  = $self->{hwdevice};
-    unless (defined $hwdevice) {
-      PT_EXIT;
-    }
-  
     $self->reset() if ($reset);
   
     if (defined $writedata or $numread) {
@@ -263,30 +267,18 @@ sub get_pt_discover() {
 #
 ########################################################################################
 
-sub initialize($) {
-  my ($self,$hash) = @_;
+sub initialize() {
+  my ($self) = @_;
   my ($i,$j,$k,$l,$res,$ret,$ress);
   #-- Second step in case of serial device: open the serial device to test it
+  my $hash = $self->{hash};
   my $msg = "OWX_SER: Serial device $hash->{DeviceName}";
-  main::DevIo_OpenDev($hash,0,undef);
+  main::DevIo_OpenDev($hash,$self->{reopen},undef);
+  return undef unless $hash->{STATE} eq "opened";
+
   my $hwdevice = $hash->{USBDev};
-  if(!defined($hwdevice)){
-    die $msg." not defined: $!";
-  } else {
-    main::Log3($hash->{NAME},2,$msg." defined");
-  }
-
-  $hwdevice->reset_error();
-  $hwdevice->baudrate(9600);
-  $hwdevice->databits(8);
-  $hwdevice->parity('none');
-  $hwdevice->stopbits(1);
-  $hwdevice->handshake('none');
-  $hwdevice->write_settings;
-  #-- store with OWX device
-  $self->{hwdevice}   = $hwdevice;
-
   #force master reset in DS2480
+  $hwdevice->reset_error();
   $hwdevice->purge_all;
   $hwdevice->baudrate(4800);
   $hwdevice->write_settings;
@@ -294,7 +286,7 @@ sub initialize($) {
   select(undef,undef,undef,0.5);
 
   #-- Third step detect busmaster on serial interface
-  
+
   my $name = $self->{name};
   my $ress0 = "OWX_SER::Detect 1-Wire bus $name: interface ";
   $ress     = $ress0;
@@ -303,16 +295,15 @@ sub initialize($) {
   
   require "$main::attr{global}{modpath}/FHEM/OWX_DS2480.pm";
   my $ds2480 = OWX_DS2480->new($self);
-  
+
   #-- timing byte for DS2480
   $ds2480->start_query();
+  $hwdevice->baudrate(9600);
+  $hwdevice->write_settings;
   $ds2480->query("\xC1",1);
-  eval {   #ignore timeout
-    do {
-      $ds2480->read();
-    } while (!$ds2480->response_ready());
-  };
-    
+  $hwdevice->baudrate($self->{baud});
+  $hwdevice->write_settings;
+
   #-- Max 4 tries to detect an interface
   for($l=0;$l<100;$l++) {
     #-- write 1-Wire bus (Fig. 2 of Maxim AN192)
@@ -377,11 +368,11 @@ sub initialize($) {
   }
 }
 
-sub Disconnect($) {
-	my ($self,$hash) = @_;
-	main::DevIo_Disconnected($hash);
-	delete $self->{hwdevice};
-	$self->{interface} = "serial";
+sub exit($) {
+  my ($self) = @_;
+  main::DevIo_Disconnected($self->{hash});
+  $self->{interface} = "serial";
+  $self->{reopen} = 1;
 }
 
 ########################################################################################

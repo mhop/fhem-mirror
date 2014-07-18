@@ -86,24 +86,8 @@ sub block ($) {
 ########################################################################################
 
 sub query ($$$) {
-	
   my ($serial,$cmd,$retlen) = @_;
-  my ($i,$j,$k,$l,$m,$n);
-  
-  #-- get hardware device
-  my $hwdevice = $serial->{hwdevice};
-  
-  die "OWX_DS2480: query with no hwdevice" unless (defined $hwdevice);
-  
-  $hwdevice->baudrate($serial->{baud});
-  $hwdevice->write_settings;
-
-  main::Log3($serial->{name},5, "OWX_DS2480.query sending out: ".unpack ("H*",$cmd));
-  
-  my $count_out = $hwdevice->write($cmd);
-
-  die "OWX_DS2480: Write incomplete ".(defined $count_out ? $count_out : "undefined")." not equal ".(length($cmd))."" if (!(defined $count_out) or ($count_out ne length($cmd)));
-
+  main::DevIo_SimpleWrite($serial->{hash},$cmd,0);
   $serial->{retlen} += $retlen;
 }
 
@@ -119,16 +103,12 @@ sub query ($$$) {
 ########################################################################################
 
 sub read() {
-  my $serial = shift;
-  my ($i,$j,$k);
-
-  #-- get hardware device
-  my $hwdevice = $serial->{hwdevice};
-  return undef unless (defined $hwdevice);
+  my ($serial) = @_;
 
   #-- read the data
-  my ($count_in, $string_part) = $hwdevice->read(255);  
-  return undef if (not defined $count_in or not defined $string_part);
+  my $string_part = main::DevIo_DoSimpleRead($serial->{hash});
+  return undef unless defined $string_part;
+  my $count_in = length ($string_part);
   $serial->{string_in} .= $string_part;                            
   $serial->{retcount} += $count_in;		
   $serial->{num_reads}++;
