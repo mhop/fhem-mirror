@@ -93,10 +93,10 @@ sub initialize($)
   return $self;
 }
 
-sub Disconnect($)
+sub exit()
 {
-  my ($hash) = @_;
-  $hash->{STATE} = "disconnected";
+  my ($self) = @_;
+  #TODO implement deconfigure onewire in firmata.
 };
 
 sub FRM_OWX_observer
@@ -264,11 +264,6 @@ sub get_pt_execute($$$$) {
     };
     PT_END;
   });
-};
-
-sub exit($) {
-  my ( $self, $hash ) = @_;
-  main::OWX_ASYNC_Disconnected($hash);
 };
 
 sub poll($) {
