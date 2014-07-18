@@ -127,7 +127,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.6;
+$owx_async_version=5.7;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -291,6 +291,7 @@ sub OWX_ASYNC_Disconnect($) {
     delete $hash->{ASYNC};
   };
   $hash->{STATE} = "disconnected" if $hash->{STATE} eq "Active";
+  GP_ForallClients($hash,\&RemoveInternalTimer,undef);
 };
 
 ########################################################################################
