@@ -84,7 +84,6 @@ if( $^O =~ /Win/ ) {
 
 use Time::HiRes qw( gettimeofday tv_interval );
 
-require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 sub Log3($$$);
 
 use vars qw{%owg_family %gets %sets $owx_async_version $owx_async_debug};
@@ -275,47 +274,24 @@ sub OWX_ASYNC_Ready ($) {
 };
 
 sub OWX_ASYNC_Read ($) {
-  my $hash = shift;
+  my ($hash) = @_;
   Log3 ($hash->{NAME},5,"OWX_ASYNC_Read") if ($owx_async_debug > 2);
-  OWX_ASYNC_Poll($hash);
+  if (defined $hash->{ASYNC}) {
+    $hash->{ASYNC}->poll($hash);
+  };
   OWX_ASYNC_RunTasks($hash);
 };
 
-sub OWX_ASYNC_Poll ($) {
-	my $hash = shift;
-	Log3 ($hash->{NAME},5,"OWX_ASYNC_Poll") if ($owx_async_debug > 2);
-	if (defined $hash->{ASYNC}) {
-		$hash->{ASYNC}->poll($hash);
-	};
-};
-
 sub OWX_ASYNC_Disconnect($) {
-	my ($hash) = @_;
-	my $async = $hash->{ASYNC};
-	Log3 ($hash->{NAME},3, "OWX_ASYNC_Disconnect");
-	if (defined $async) {
-		$async->exit($hash);
-	};
-	my $times = AttrVal($hash->{NAME},"timeout",5000) / 50; #timeout in ms, defaults to 1 sec?
-	for (my $i=0;$i<$times;$i++) {
-		OWX_ASYNC_Poll($hash);
-		if ($hash->{STATE} ne "Active") {
-			last;
-		}
-	};
+  my ($hash) = @_;
+  my $async = $hash->{ASYNC};
+  Log3 ($hash->{NAME},3, "OWX_ASYNC_Disconnect");
+  if (defined $async) {
+    $async->exit($hash);
+    delete $hash->{ASYNC};
+  };
+  $hash->{STATE} = "disconnected" if $hash->{STATE} eq "Active";
 };
-
-sub OWX_ASYNC_Disconnected($) {
-	my ($hash) = @_;
-	Log3 ($hash->{NAME},4, "OWX_ASYNC_Disconnected");
-	if ($hash->{ASYNC} and $hash->{ASYNC} != $hash->{OWX}) {
-		delete $hash->{ASYNC};
-	};
-	if (my $owx = $hash->{OWX}) {
-		$owx->Disconnect($hash);
-	};
-	$hash->{STATE} = "disconnected" if $hash->{STATE} eq "Active";
-};	
 
 ########################################################################################
 #
@@ -711,12 +687,12 @@ sub OWX_ASYNC_Init ($) {
   
   RemoveInternalTimer($hash);
   if (defined ($hash->{ASNYC})) {
-  	$hash->{ASYNC}->exit($hash);
-  	$hash->{ASYNC} = undef; #TODO should we call delete on $hash->{ASYNC}?
+    $hash->{ASYNC}->exit($hash);
+    delete $hash->{ASYNC}; #TODO should we call delete on $hash->{ASYNC}?
   } 
   #-- get the interface
   my $owx = $hash->{OWX};
-  
+
   if (defined $owx) {
     $hash->{INTERFACE} = $owx->{interface};
     my $ret;
@@ -729,9 +705,10 @@ sub OWX_ASYNC_Init ($) {
       $hash->{STATE} = "Init Failed: $err";
       return "OWX_ASYNC_Init failed: $err";
     };
-    $hash->{ASYNC} = $ret;
+    return undef unless $ret;
+    $hash->{ASYNC} = $ret ;
     $hash->{ASYNC}->{debug} = $owx_async_debug;
-   	$hash->{INTERFACE} = $owx->{interface};
+    $hash->{INTERFACE} = $owx->{interface};
   } else {
     return "OWX: Init called with undefined interface";
   }
@@ -1016,7 +993,8 @@ sub OWX_ASYNC_RunToCompletion($$) {
     OWX_ASYNC_Schedule($hash,$task);
     my $master = $hash->{TYPE} eq "OWX_ASYNC" ? $hash : $hash->{IODev};
     do {
-      OWX_ASYNC_Poll($master);
+      die "interface $master->{INTERFACE} not active" unless defined $hash->{ASYNC};
+      $hash->{ASYNC}->poll($hash);
       OWX_ASYNC_RunTasks($master);
       $task_state = $task->PT_STATE();
     } while ($task_state == PT_INITIAL or $task_state == PT_WAITING or $task_state == PT_YIELDED);
