@@ -90,7 +90,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log($$);
 
-my $owx_version="5.17";
+my $owx_version="5.18";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -1571,7 +1571,7 @@ sub OWXAD_PT_GetPage($$$) {
       #-- issue the match ROM command \x55 and the start conversion command
 
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 );
-      $thread->{ExecuteTime} = gettimeofday() + 0.05; # was 0.02
+      $thread->{ExecuteTime} = gettimeofday() + 0.07; # was 0.02
       $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
       delete $thread->{TimeoutTime};

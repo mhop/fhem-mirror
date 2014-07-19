@@ -82,7 +82,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.17";
+my $owx_version="5.18";
 #-- flexible channel name
 my $owg_channel;
 
@@ -1079,11 +1079,10 @@ sub OWXMULTI_PT_GetValues($) {
     #"ds2438.temperaturconversionvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x44",0);
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    $thread->{ExecuteTime} = gettimeofday() + 0.012;
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
   
@@ -1093,11 +1092,10 @@ sub OWXMULTI_PT_GetValues($) {
     #"ds2438.voltageconversionvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB4",0);
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    $thread->{ExecuteTime} = gettimeofday() + 0.02; # was 0.006
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    $thread->{ExecuteTime} = gettimeofday() + 0.006;
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
   
@@ -1107,11 +1105,10 @@ sub OWXMULTI_PT_GetValues($) {
     #"ds2438.recallmemoryvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB8\x00",0);
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    $thread->{ExecuteTime} = gettimeofday() + 0.012;
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
 
@@ -1157,11 +1154,10 @@ sub OWXMULTI_PT_GetValues($) {
     #"ds2438.voltageconversionvad"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB4",0);
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    $thread->{ExecuteTime} = gettimeofday() + 0.02; # was 0.006
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    $thread->{ExecuteTime} = gettimeofday() + 0.006;
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
  
@@ -1171,11 +1167,10 @@ sub OWXMULTI_PT_GetValues($) {
     #"ds2438.recallmemoryvad"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB8\x00",0);
     $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
+    $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
     PT_WAIT_THREAD($thread->{pt_execute});
     delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    $thread->{ExecuteTime} = gettimeofday() + 0.012;
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
 
