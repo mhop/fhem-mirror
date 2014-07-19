@@ -66,7 +66,8 @@ sub poll($) {
   my ( $self ) = @_;
   my $hash = $self->{hash};
   if(defined($hash->{FD})) {
-    my ($rin,$win);
+    my $rin = '';
+    my $win = '';
     vec($rin, $hash->{FD}, 1) = 1;
     vec($win, $hash->{FD}, 1) = 1;
     if (select($rin, $win, $rin | $win, 2)) { #TODO: implement attribute based timeout
