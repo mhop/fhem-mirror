@@ -3343,7 +3343,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     #level        =>"<level> <relockDly> <speed>..."
     my (undef,undef,$lvl,$rLocDly,$speed) = @a;
 
-    return "please enter level 0 to 100" if (!defined($lvl)    || $lvl !~ m/^\d+\.?\d+$/ || $lvl>100);
+    return "please enter level 0 to 100" if (!defined($lvl)    || $lvl !~ m/^\d*\.?\d?$/ || $lvl>100);
     return "reloclDelay range 0..65535 or ignore"
                                          if (defined($rLocDly) &&
                                              ($rLocDly > 65535 ||
