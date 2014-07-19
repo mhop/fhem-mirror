@@ -430,7 +430,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
      undef($result);
      return $invert_match;
    }
-   elsif(not $result =~ /Leider wurde zu Deiner Suche kein Eintrag gefunden/)
+   elsif(not $result =~ /Leider wurde zu dieser Suche kein Eintrag gefunden/)
    {
 		Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from klicktel.de. Please contact the FHEM community.";
    }
