@@ -3731,7 +3731,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                         $sh,$sd,$sy,$eh,$ed,$ey,($sm*16+$em));
     }
     my %mCmd = (auto=>0,manual=>1,party=>2,boost=>3,day=>4,night=>5);
-    CUL_HM_UpdtReadSingle($hash,"mode","set_".$mode,1);
+    CUL_HM_UpdtReadSingle($hash,"controlMode","set_".$mode,1);
     my $msg = '8'.($mCmd{$mode}).$chn;
     $msg .= sprintf("%02X",$temp) if ($temp);
     $msg .= $party if ($party);
