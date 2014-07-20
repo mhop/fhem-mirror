@@ -209,6 +209,7 @@ FB_CALLMONITOR_Read($)
     my $area_code = AttrVal($name, "local-area-code", "");
     my $external_number = undef;
   
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - received data: $data"; 
     @array = split(";", $data);
   
     $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING" and $array[3] ne "");
@@ -224,7 +225,7 @@ FB_CALLMONITOR_Read($)
         }
         else
         {
-            Log3 $name, 2, "$name: given local area code '$area_code' is not an area code. therefore will be ignored";
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - given local area code '$area_code' is not an area code. therefore will be ignored";
         }
     }
 
@@ -233,9 +234,10 @@ FB_CALLMONITOR_Read($)
   
     $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
    
-   
     if($array[1] eq "CALL" or $array[1] eq "RING")
     {
+        delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
+     
         if(AttrVal($name, "unique-call-ids", "0") eq "1")
         {
             $hash->{helper}{TEMP}{$array[2]}{call_id}= Digest::MD5::md5_hex($data);
@@ -248,8 +250,6 @@ FB_CALLMONITOR_Read($)
 
     if($array[1] eq "CALL")
     {
-        delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
-
         $hash->{helper}{TEMP}{$array[2]}{external_number} = (defined($external_number) ? $external_number : "unknown");
         $hash->{helper}{TEMP}{$array[2]}{external_name} = (defined($reverse_search) ? $reverse_search : "unknown");
         $hash->{helper}{TEMP}{$array[2]}{internal_number} = $array[4];
@@ -260,8 +260,6 @@ FB_CALLMONITOR_Read($)
    
     if($array[1] eq "RING")
     {
-        delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
-        
         $hash->{helper}{TEMP}{$array[2]}{external_number} = (defined($external_number) ? $external_number : "unknown");
         $hash->{helper}{TEMP}{$array[2]}{external_name} = (defined($reverse_search) ? $reverse_search : "unknown");
         $hash->{helper}{TEMP}{$array[2]}{internal_number} = $array[4];
@@ -291,8 +289,7 @@ FB_CALLMONITOR_Read($)
     foreach my $key (keys %{$hash->{helper}{TEMP}{$array[2]}})
     {
         readingsBulkUpdate($hash, $key, $hash->{helper}{TEMP}{$array[2]}{$key});
-    }
-    
+    }   
     
     if($array[1] eq "DISCONNECT")
     {
@@ -300,9 +297,6 @@ FB_CALLMONITOR_Read($)
     }
 
     readingsEndUpdate($hash, 1);
-    
-
-  
 }
 
 
@@ -312,7 +306,6 @@ FB_CALLMONITOR_Ready($)
    my ($hash) = @_;
    
    return DevIo_OpenDev($hash, 1, undef);
-
 }
 
 sub
