@@ -1381,10 +1381,12 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($st eq "THSensor") { ##################################################
     if    ($mTp eq "70"){
       my $chn;
-      if    ($md =~  m/^(WS550|WS888|HM-WDC7000)/){$chn = "10"}
-      elsif ($md eq "HM-WDS30-OT2-SM")            {$chn = "05"}
-      else                                        {$chn = "01"}
       my ($d1,$h,$ap) = map{hex($_)} unpack 'A4A2A4',$p;
+      if    ($md =~  m/^(WS550|WS888|HM-WDC7000)/){$chn = "10"}
+      elsif ($md eq "HM-WDS30-OT2-SM")            {$chn = "05";$h=""}
+      elsif ($md =~  m/^(S550IA|HM-WDS30-T-O)/)   {$chn = "01";$h=""}
+      else                                        {$chn = "01"}
+
       my $t =  $d1 & 0x7fff;
       $t -= 0x8000 if($t &0x4000);
       $t = sprintf("%0.1f", $t/10);
