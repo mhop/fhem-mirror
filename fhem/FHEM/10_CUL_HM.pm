@@ -4835,7 +4835,7 @@ sub CUL_HM_sndIfOpen($) {
   RemoveInternalTimer("sndIfOpen:$io");# should not be necessary, but
   my $ioHash = $defs{$io};
   if (   $ioHash->{STATE} !~ m/^(opened|Initialized)$/
-      ||(defined $ioHash->{XmitOpen} && $ioHash->{XmitOpen} == 0)
+      ||(defined $ioHash->{XmitOpen} && $ioHash->{XmitOpen} != 1)
 #     ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
        ){#still no send allowed
     if ($modules{CUL_HM}{$io}{tmrStart} < gettimeofday() - $modules{CUL_HM}{hmIoMaxDly}){
@@ -4881,7 +4881,7 @@ sub CUL_HM_SndCmd($$) {
   if (  $io->{STATE} !~ m/^(opened|Initialized)$/          # we need to queue
       ||(hex substr($cmd,2,2) & 0x20) && (                 # check for commands with resp-req
            $modules{CUL_HM}{$ioName}{tmr}                  # queue already running
-         ||(defined $io->{XmitOpen} && $io->{XmitOpen} == 0)#overload, dont send
+         ||(defined $io->{XmitOpen} && $io->{XmitOpen} != 1)#overload, dont send
         )
       ){
 
