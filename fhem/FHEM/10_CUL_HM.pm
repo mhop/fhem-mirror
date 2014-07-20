@@ -6632,7 +6632,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
     
   my ($ioCCU,$prefIO) = ($hash->{helper}{io}{vccu},$hash->{helper}{io}{prefIO});
   if (   defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"
-      && @{$defs{$ioCCU}{helper}{io}{ioList}}){
+      && ref($defs{$ioCCU}{helper}{io}{ioList}) eq 'ARRAY'){
     my @ioccu = @{$defs{$ioCCU}{helper}{io}{ioList}};
     my @ios = ((sort {$hash->{helper}{mRssi}{io}{$b} <=> 
                     $hash->{helper}{mRssi}{io}{$a} } 
