@@ -3010,12 +3010,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       return "to many parameter. Try set $a[0] text $a[2] $a[3]" if($a[4]);
     }
-
     my $s = 54;
+    $l1 =~ s/\\_/ /g;
     $l1 = substr($l1."\x00", 0, 13);
     $l1 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
 
     $s = 70;
+    $l2 =~ s/\\_/ /g;
     $l2 = substr($l2."\x00", 0, 13);
     $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
 
@@ -7595,7 +7596,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           Set the text on the display of the device. To this purpose issue
           this set command first (or a number of them), and then choose from
           the teach-in menu of the 4Dis the "Central" to transmit the data.<br>
-          If used on a channel btn_no and on|off must not be given but only pure text.
+          If used on a channel btn_no and on|off must not be given but only pure text.<br>
+          \_ will be replaced by blank character.<br>
           Example:
           <ul>
           <code>
@@ -8835,7 +8837,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               (oder eine Anzahl davon) abgegeben werden, dann k&ouml;nnen im "teach-in" Men&uuml; des 4Dis mit
               "Central" Daten &uuml;bertragen werden.<br>
               Falls auf einen Kanal angewendet d&uuml;rfen btn_no und on|off nicht verwendet werden, nur
-              reiner Text.
+              reiner Text.<br>
+              \_ wird durch ein Leerzeichen ersetzt.<br>
               Beispiel:
               <ul>
                 <code>
