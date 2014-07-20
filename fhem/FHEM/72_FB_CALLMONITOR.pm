@@ -237,15 +237,7 @@ FB_CALLMONITOR_Read($)
     if($array[1] eq "CALL" or $array[1] eq "RING")
     {
         delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
-     
-        if(AttrVal($name, "unique-call-ids", "0") eq "1")
-        {
-            $hash->{helper}{TEMP}{$array[2]}{call_id}= Digest::MD5::md5_hex($data);
-        }
-        else
-        {
-            $hash->{helper}{TEMP}{$array[2]}{call_id} = $array[2];
-        }
+
     }
 
     if($array[1] eq "CALL")
@@ -296,6 +288,15 @@ FB_CALLMONITOR_Read($)
         delete($hash->{helper}{TEMP}{$array[2]}) if(exists($hash->{helper}{TEMP}{$array[2]}));
     }
 
+    if(AttrVal($name, "unique-call-ids", "0") eq "1")
+    {
+        readingsBulkUpdate($hash, "call_id" ,Digest::MD5::md5_hex($data));
+    }
+    else
+    {
+       readingsBulkUpdate($hash, "call_id", $array[2]);
+    }
+    
     readingsEndUpdate($hash, 1);
 }
 
