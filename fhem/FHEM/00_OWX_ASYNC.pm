@@ -127,7 +127,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.7;
+$owx_async_version=5.8;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -277,7 +277,7 @@ sub OWX_ASYNC_Read ($) {
   my ($hash) = @_;
   Log3 ($hash->{NAME},5,"OWX_ASYNC_Read") if ($owx_async_debug > 2);
   if (defined $hash->{ASYNC}) {
-    $hash->{ASYNC}->poll($hash);
+    $hash->{ASYNC}->poll();
   };
   OWX_ASYNC_RunTasks($hash);
 };
@@ -291,7 +291,13 @@ sub OWX_ASYNC_Disconnect($) {
     delete $hash->{ASYNC};
   };
   $hash->{STATE} = "disconnected" if $hash->{STATE} eq "Active";
-  GP_ForallClients($hash,\&RemoveInternalTimer,undef);
+  $hash->{PRESENT} = 0;
+  GP_ForallClients($hash,sub {
+    my ($client) = @_;
+    RemoveInternalTimer($client);
+    readingsSingleUpdate($client,"present",0,$client->{PRESENT});
+    $client->{PRESENT} = 0;
+  },undef);
 };
 
 ########################################################################################
@@ -994,8 +1000,8 @@ sub OWX_ASYNC_RunToCompletion($$) {
     OWX_ASYNC_Schedule($hash,$task);
     my $master = $hash->{TYPE} eq "OWX_ASYNC" ? $hash : $hash->{IODev};
     do {
-      die "interface $master->{INTERFACE} not active" unless defined $hash->{ASYNC};
-      $hash->{ASYNC}->poll($hash);
+      die "interface $master->{INTERFACE} not active" unless defined $master->{ASYNC};
+      $master->{ASYNC}->poll();
       OWX_ASYNC_RunTasks($master);
       $task_state = $task->PT_STATE();
     } while ($task_state == PT_INITIAL or $task_state == PT_WAITING or $task_state == PT_YIELDED);
