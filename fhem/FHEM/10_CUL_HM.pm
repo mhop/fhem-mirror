@@ -1223,35 +1223,71 @@ sub CUL_HM_Parse($$) {#########################################################
     if( ( $mTp eq "10" && $mI[0] eq '0B')  #info-level
       ||( $mTp eq "02" && $mI[0] eq '01')) {#ack-status
       my @d = map{hex($_)} unpack 'A2A4(A2)*',$p;
-      my ($chn,$setTemp,$actTemp, $cRep,$bat,$lbat,$wRep, $ctrlMode) =
-          ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],$d[3]);
-      $bat        =(($bat            ) & 0x1f)/10+1.5;
+      my ($chn,$setTemp,$actTemp, $cRep,$wRep,$bat ,$lbat,$wRep,$ctrlMode,$bState,$pTemp,$pStart,$pEnd) =
+          ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],$d[2],""       ,"off"  ,"-"   ,"-","-");
+      
       $lbat       = ($lbat           ) & 0x80;
-      $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
-
+      if (defined $d[5]){# message with party mode
+        $pTemp =(($d[11]     )& 0x3f) if (defined $d[11]) ;
+        my @p;
+        if ($mTp eq "10") {@p = @d[3..9]}
+        else              {@p = @d[4..10]}
+        my $st = (($p[0]      )& 0x3f)/2;
+        $pStart =     (($p[2]      )& 0x7f)    # year
+                 ."-".(($p[6]  >> 4)& 0x0f)    # month
+                 ."-".(($p[1]      )& 0x1f)    # day
+                 ." ".int($st)                 # Time h
+                 .":".(int($st)!=$st?"30":"00")# Time min
+                 ;
+        my $et = (($p[3]      )& 0x3f)/2;
+        $pEnd   =     (($p[5]      )& 0x7f)    # year
+                 ."-".(($p[6]      )& 0x0f)    # month
+                 ."-".(($p[4]      )& 0x1f)    # day
+                 ." ".int($et)                 # Time h
+                 .":".(int($et)!=$et?"30":"00")# Time min
+                 ;
+        push @evtEt,[$shash,1,"partyStart:$pStart"];
+        push @evtEt,[$shash,1,"partyEnd:$pEnd"];
+      }
+      elsif(defined $d[4]){#message with boost
+        $bState     = ($d[4]       ) & 0x3f;
+      }
+      
       my $dHash = $shash;
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       if ($mTp eq "10"){
+        $ctrlMode   = $d[3];
+        $bat        =(($bat            ) & 0x1f)/10+1.5;
         $setTemp    =(($setTemp    >>10) & 0x3f )/2;
         $actTemp    =(($actTemp        ) & 0x3ff)/10;
         $actTemp    = -1 * $actTemp if ($d[1] & 0x200 );# obey signed
         $actTemp = sprintf("%2.1f",$actTemp);
         push @evtEt,[$shash,1,"measured-temp:$actTemp"];
         push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
+        push @evtEt,[$dHash,1,"batteryLevel:$bat"];
+        $cRep = (($cRep    >>6) & 0x01 )?"on":"off";
+        $wRep = (($wRep    >>5) & 0x01 )?"on":"off";        
       }
       else{#actTemp is not provided in ack message - use old value
+        $ctrlMode   = $d[4];
         $actTemp = ReadingsVal($name,"measured-temp",0);
         $setTemp  =(hex($mI[2]) & 0x3f )/2;
+        $cRep = (($cRep    >>2) & 0x01 )?"on":"off";
+        $wRep = (($wRep    >>1) & 0x01 )?"on":"off";        
       }
+      $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
       $setTemp = ($setTemp < 5 )?'off':
                  ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
 
       push @evtEt,[$shash,1,"desired-temp:$setTemp"];
       push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
       push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp"];
-      push @evtEt,[$dHash,1,"battery:".($lbat?"low":"ok")];
-      push @evtEt,[$dHash,1,"batteryLevel:$bat"];
+      push @evtEt,[$shash,1,"battery:".($lbat?"low":"ok")];
+      push @evtEt,[$shash,1,"commReporting:$cRep"];
+      push @evtEt,[$shash,1,"winOpenReporting:$wRep"];
+      push @evtEt,[$shash,1,"boostState:$bState"];
+      push @evtEt,[$shash,1,"partyTemp:$pTemp"];
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
     }
     elsif($mTp eq "70"){
