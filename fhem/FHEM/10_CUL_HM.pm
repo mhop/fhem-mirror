@@ -1223,8 +1223,8 @@ sub CUL_HM_Parse($$) {#########################################################
     if( ( $mTp eq "10" && $mI[0] eq '0B')  #info-level
       ||( $mTp eq "02" && $mI[0] eq '01')) {#ack-status
       my @d = map{hex($_)} unpack 'A2A4(A2)*',$p;
-      my ($chn,$setTemp,$actTemp, $cRep,$wRep,$bat ,$lbat,$wRep,$ctrlMode,$bState,$pTemp,$pStart,$pEnd) =
-          ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],$d[2],""       ,"off"  ,"-"   ,"-","-");
+      my ($chn,$setTemp,$actTemp, $cRep,$wRep,$bat ,$lbat,$ctrlMode,$bState,$pTemp,$pStart,$pEnd) =
+          ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],""       ,"off"  ,"-"   ,"-","-");
       
       $lbat       = ($lbat           ) & 0x80;
       if (defined $d[5]){# message with party mode
@@ -3381,15 +3381,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "level") { ####################################################
     #level        =>"<level> <relockDly> <speed>..."
     my (undef,undef,$lvl,$rLocDly,$speed) = @a;
+    $rLocDly = 111600 if (!defined($rLocDly)||$rLocDly eq "ignore");# defaults
+    $speed   = 30     if (!defined($speed));
 
     return "please enter level 0 to 100" if (!defined($lvl)    || $lvl !~ m/^\d*\.?\d?$/ || $lvl>100);
     return "reloclDelay range 0..65535 or ignore"
-                                         if (defined($rLocDly) &&
-                                             ($rLocDly > 65535 ||
-                                              ($rLocDly < 0.1 && $rLocDly ne 'ignore' && $rLocDly ne '0' )));
-    return "select speed range 0 to 100" if (defined($speed)   && $speed>100);
-    $rLocDly = 111600 if (!defined($rLocDly)||$rLocDly eq "ignore");# defaults
-    $speed = 30 if (!defined($rLocDly));
+                                         if ( $rLocDly > 111600 ||
+                                             ($rLocDly < 0.1 &&  $rLocDly ne '0' ));
+    return "select speed range 0 to 100" if ( $speed > 100);
+    
     $rLocDly = CUL_HM_encodeTime8($rLocDly);# calculate hex value
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
                         sprintf("%02X%02s%02X",$lvl*2,$rLocDly,$speed*2));
