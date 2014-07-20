@@ -66,11 +66,11 @@ sub poll($) {
   my ( $self ) = @_;
   my $hash = $self->{hash};
   if(defined($hash->{FD})) {
-    my $rin = '';
-    my $win = '';
+    my ($rout, $rin) = ('', '');
     vec($rin, $hash->{FD}, 1) = 1;
-    vec($win, $hash->{FD}, 1) = 1;
-    if (select($rin, $win, $rin | $win, 2)) { #TODO: implement attribute based timeout
+    select($rout=$rin, undef, undef, 0.1);
+    my $mfound = vec($rout, $hash->{FD}, 1);
+    if ($mfound) {
       main::OWX_ASYNC_Disconnect($hash) unless $self->read();
     }
   }
