@@ -900,19 +900,19 @@ sub HMLAN_qResp($$$) {#response-waiting queue##################################
     $hashQ->{answerPend} ++;
     push @{$hashQ->{apIDs}},$id;
     if ($hashQ->{answerPend} >= $hashQ->{hmLanQlen}){
-      $hash->{XmitOpen} = 0;
+      $hash->{XmitOpen} = 2;#delay further sending
       InternalTimer(gettimeofday()+10, "HMLAN_clearQ", "hmClearQ:$hash->{NAME}", 0);
     }
   }
   else{
     $hashQ->{answerPend}-- if ($hashQ->{answerPend}>0);
     @{$hashQ->{apIDs}}=grep !/$id/,@{$hashQ->{apIDs}};
-    RemoveInternalTimer("hmClearQ:$hash->{NAME}")if ($hash->{XmitOpen} ==0);
-    $hash->{XmitOpen} = 1
-            if (($hashQ->{answerPend} < $hashQ->{hmLanQlen}) &&
-                !($hashQ->{HMcndN} == 4 ||
-                  $hashQ->{HMcndN} == 253)
-               );
+    RemoveInternalTimer("hmClearQ:$hash->{NAME}")if ($hash->{XmitOpen} == 0);
+
+    if ($hashQ->{HMcndN} == 4 ||
+        $hashQ->{HMcndN} == 253){                      $hash->{XmitOpen} = 0;}
+    elsif($hashQ->{answerPend} >= $hashQ->{hmLanQlen}){$hash->{XmitOpen} = 2;}
+    else{                                              $hash->{XmitOpen} = 1;}
   }
 }
 sub HMLAN_clearQ($) {#clear pending acks due to timeout########################
@@ -932,8 +932,9 @@ sub HMLAN_condUpdate($$) {#####################################################
   my $name = $hash->{NAME};
   my $hashCnd = $hash->{helper}{cnd};#short to helper
   my $hashQ   = $hash->{helper}{q};#short to helper
-  $hashCnd->{$HMcnd} = 0 if (!$hashCnd->{$HMcnd});
-  $hashCnd->{$HMcnd}++;
+  $hash->{helper}{cnd}{$HMcnd} = 0 if (!$hash->{helper}{cnd} || 
+                                       !$hash->{helper}{cnd}{$HMcnd});
+  $hash->{helper}{cnd}{$HMcnd}++;
   if ($HMcnd == 4){#HMLAN needs a rest. Supress all sends exept keep alive
     $hash->{STATE} = "overload";
   }
@@ -945,8 +946,8 @@ sub HMLAN_condUpdate($$) {#####################################################
   my $HMcndTxt = $HMcond{$HMcnd}?$HMcond{$HMcnd}:"Unknown:$HMcnd";
   Log3 $hash, 1, "HMLAN_Parse: $name new condition $HMcndTxt";
   my $txt;
-  $txt .= $HMcond{$_}.":".$hashCnd->{$_}." "
-                            foreach (keys%{$hashCnd});
+  $txt .= $HMcond{$_}.":".$hash->{helper}{cnd}{$_}." "
+                            foreach (keys%{$hash->{helper}{cnd}});
 
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"cond",$HMcndTxt);
@@ -970,8 +971,7 @@ sub HMLAN_condUpdate($$) {#####################################################
     $hash->{XmitOpen} = 0;         #deny transmit
   }
   else{
-    $hash->{XmitOpen} = 1
-        if($hashQ->{answerPend} < $hashQ->{hmLanQlen});#allow transmit
+    $hash->{XmitOpen} = ($hashQ->{answerPend} < $hashQ->{hmLanQlen})?"1":"2";#allow transmit
   }
   readingsEndUpdate($hash,1);
   my $ccu = InternalVal($name,"owner_CCU","");
