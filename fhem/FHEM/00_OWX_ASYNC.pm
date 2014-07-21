@@ -127,9 +127,9 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.8;
+$owx_async_version=5.9;
 #-- Debugging 0,1,2,3
-$owx_async_debug=3;
+$owx_async_debug=0;
 
 ########################################################################################
 #
