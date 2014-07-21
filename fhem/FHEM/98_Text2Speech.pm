@@ -64,7 +64,7 @@ sub Text2Speech_Initialize($)
                        " TTS_SentenceAppendix".
                        " TTS_FileMapping".
                        " TTS_FileTemplateDir".
-		       " TTS_VolumeAdjust".
+		                   " TTS_VolumeAdjust".
                        " ".$readingFnAttributes;
 }
 
@@ -183,6 +183,7 @@ sub Text2Speech_Attr(@) {
     }
   
   } elsif ($a[2] eq "TTS_FileMapping") {
+    #Bsp: silence:silence.mp3 pling:mypling,mp3
     #ueberpruefen, ob mp3 Template existiert
     my @FileTpl = split(" ", $TTS_FileMapping);
     for(my $j=0; $j<(@FileTpl); $j++) {
@@ -338,6 +339,7 @@ sub Text2Speech_Set($@)
 #####################################
 sub Text2Speech_PrepareSpeech($$) {
   my ($hash, $t) = @_;
+  my $me = $hash->{NAME};
 
   my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
   my $TTS_Delemiter = AttrVal($hash->{NAME}, "TTS_Delemiter", undef); 
@@ -364,6 +366,7 @@ sub Text2Speech_PrepareSpeech($$) {
   if($TTS_Ressource eq "Google") {
     my @text; 
 
+    # ersetze Sonderzeichen die Google nicht auflösen kann
     $t =~ s/ä/ae/g;
     $t =~ s/ö/oe/g;
     $t =~ s/ü/ue/g;
@@ -372,15 +375,32 @@ sub Text2Speech_PrepareSpeech($$) {
     $t =~ s/Ü/Ue/g;
     $t =~ s/ß/ss/g;
 
-    @text = $hash->{helper}{Text2Speech} if($hash->{helper}{Text2Speech}[0]);
+    @text = $hash->{helper}{Text2Speech} if($hash->{helper}{Text2Speech}[0]); #vorhandene Queue, neuen Sprachbaustein hinten anfuegen
     push(@text, $t);
 
+    # hole alle Filetemplates
     my @FileTpl = split(" ", $TTS_FileTpl);
     my @FileTplPc;
-    for(my $i=0; $i<(@FileTpl); $i++) {
-      #splitte bei jedem Template auf
-      @FileTplPc = split(/:/, $FileTpl[$i]);
-      @text = Text2Speech_SplitString(\@text, 100, ":".$FileTplPc[0].":", 1, "as"); # splitte bei bspw: :ring:
+
+    # bei Angabe direkter MP3-Files wird hier ein temporäres Template vergeben
+    for(my $i=0; $i<(@text); $i++) {
+      @FileTplPc = ($text[$i] =~ /:([^:]+):/g);
+      for(my $j=0; $j<(@FileTplPc); $j++) {
+        my $tpl = "FileTpl_".time()."_#".$i; #eindeutige Templatedefinition schaffen
+        Log3 $hash, 4, "$me: Angabe einer direkten MP3-Datei gefunden:  $FileTplPc[$i] => $tpl";
+        push(@FileTpl, $tpl.":".$FileTplPc[$j]); #zb: FileTpl_123645875_#0:/ring.mp3
+        $text[$i] =~ s/$FileTplPc[$j]/$tpl/g; # Ersetze die DateiDefinition gegen ein Template
+      }
+    }
+
+    #iteriere durch die Sprachbausteine und splitte den Text bei den Filetemplates auf
+    for(my $i=0; $i<(@text); $i++) {
+      my $cutter = '#!#'; #eindeutigen Cutter als Delemiter bei den Filetemplates vergeben
+      @FileTplPc = ($text[$i] =~ /:([^:]+):/g);
+      for(my $j=0; $j<(@FileTplPc); $j++) {
+        $text[$i] =~ s/:$FileTplPc[$j]:/$cutter$FileTplPc[$j]$cutter/g;
+      }
+      @text = Text2Speech_SplitString(\@text, 0, $cutter, 1, ""); 
     }
 
     @text = Text2Speech_SplitString(\@text, 100, $TTS_Delemiter, $TTS_ForceSplit, $TTS_AddDelemiter);
@@ -389,14 +409,16 @@ sub Text2Speech_PrepareSpeech($$) {
     @text = Text2Speech_SplitString(\@text, 100, ";", 0, "al");
     @text = Text2Speech_SplitString(\@text, 100, "und", 0, "af");
 
+    Log3 $hash, 4, "$me: Auflistung der Textbausteine nach Aufbereitung:"; 
     for(my $i=0; $i<(@text); $i++) {
+      # entferne führende und abschließende Leerzeichen aus jedem Textbaustein
+      $text[$i] =~ s/^\s+|\s+$//g; 
       for(my $j=0; $j<(@FileTpl); $j++) {
-        # entferne führende und abschließende Leerzeichen aus jedem Textbaustein
-        $text[$i] =~ s/^\s+|\s+$//g; 
-        # ersetze die FileTemplates
+        # ersetze die FileTemplates mit den echten MP3-Files
         @FileTplPc = split(/:/, $FileTpl[$j]);
-        $text[$i] = $TTS_FileTemplateDir ."/". $FileTplPc[1] if($text[$i] eq ":".$FileTplPc[0].":")
+        $text[$i] = $TTS_FileTemplateDir ."/". $FileTplPc[1] if($text[$i] eq $FileTplPc[0]);
       }
+      Log3 $hash, 4, "$me: $i => ".$text[$i]; 
     }
 
     @{$hash->{helper}{Text2Speech}} = @text;
@@ -412,7 +434,7 @@ sub Text2Speech_PrepareSpeech($$) {
 # param3: string: Delemiter
 # param4: int   : 1 -> es wird am Delemiter gesplittet
 #                 0 -> es wird nur gesplittet, wenn Stringlänge länger als MaxChar
-# param5: string: Add Delemiter to String? [al|af|as|<empty>] (AddLast/AddFirst/AddSingle)
+# param5: string: Add Delemiter to String? [al|af|<empty>] (AddLast/AddFirst)
 #
 # Splittet die Texte aus $hash->{helper}->{Text2Speech} anhand des
 # Delemiters, wenn die Stringlänge MaxChars übersteigt.
@@ -437,7 +459,6 @@ sub Text2Speech_SplitString(@$$$$){
     for(my $j=0; $j<(@b); $j++) {
       $b[$j] = $b[$j] . $Delemiter if($AddDelemiter eq "al"); # Am Satzende wieder hinzufügen.
       $b[$j+1] = $Delemiter . $b[$j+1] if(($AddDelemiter eq "af") && ($b[$j+1])); # Am Satzanfang des nächsten Satzes wieder hinzufügen.
-      push(@newText, $Delemiter) if($AddDelemiter eq "as" && $j>0); # AddSingle: füge Delemiter als EinzelSatz hinzu. Zb. bei FileTemplates
       push(@newText, $b[$j]);
     }
   }
@@ -751,7 +772,9 @@ sub Text2Speech_WriteStats($$$$){
 <b>Set</b> 
 <ul>
   <li><b>tts</b>:<br>
-    Giving a text to translate into audio.
+    Giving a text to translate into audio. You play set mp3-files directly. In this case you have to enclosure them with a single colon before and after the declaration.
+    The files must save under the directory of given <i>TTS_FileTemplateDir</i>.
+    Please note: The text doesn´t have any colons itself.
   </li>
   <li><b>volume</b>:<br>
     Setting up the volume audio response.<br>
@@ -842,6 +865,15 @@ sub Text2Speech_WriteStats($$$$){
     <b>5:</b> Additionally the individual debug informations from mplayer and mp3wrap will be logged
   </li>
 
+</ul><br>
+
+<a name="Text2SpeechExamples"></a>
+<b>Beispiele</b> 
+<ul>
+  <code>define MyTTS Text2Speech hw=0.0</code><br>
+  <code>set MyTTS tts Die Alarmanlage ist bereit.</code><br>
+  <code>set MyTTS tts :beep.mp3:</code><br>
+  <code>set MyTTS tts :mytemplates/alarm.mp3:Die Alarmanlage ist bereit.:ring.mp3:</code><br>
 </ul>
 
 =end html
@@ -909,7 +941,9 @@ sub Text2Speech_WriteStats($$$$){
 <b>Set</b> 
 <ul>
   <li><b>tts</b>:<br>
-    Setzen eines Textes zur Sprachausgabe.
+    Setzen eines Textes zur Sprachausgabe. Um mp3-Dateien direkt auszugeben, müssen diese mit f&uuml;hrenden 
+    und schließenden Doppelpunkten angegebenen sein. Die MP3-Dateien müssen unterhalb des Verzeichnisses <i>TTS_FileTemplateDir</i> gespeichert sein.<br>
+    Der Text selbst darf deshalb selbst keine Doppelpunte beinhalten. Siehe Beispiele.
   </li>
   <li><b>volume</b>:<br>
     Setzen der Ausgabe Lautst&auml;rke.<br>
@@ -980,7 +1014,7 @@ sub Text2Speech_WriteStats($$$$){
     Angabe von m&ouml;glichen MP3-Dateien mit deren Templatedefinition. Getrennt duch Leerzeichen.
     Die Templatedefinitionen können in den per <i>tts</i> &uuml;bergebenen Sprachbausteinen verwendet werden
     und m&uuml;ssen mit einem beginnenden und endenden Doppelpunkt angegeben werden.
-    Die Dateien müssen im Verzeichnis <i>TTS_FIleTemplateDir</i> gespeichert sein.<br>
+    Die Dateien müssen im Verzeichnis <i>TTS_FileTemplateDir</i> gespeichert sein.<br>
     <code>attr myTTS TTS_FileMapping ring:ringtone.mp3 beep:MyBeep.mp3</code><br>
     <code>set MyTTS tts Achtung: hier kommt mein Klingelton :ring: War der laut?</code>
   </li>
@@ -989,6 +1023,12 @@ sub Text2Speech_WriteStats($$$$){
     Verzeichnis, in dem die per <i>TTS_FileMapping</i> und <i>TTS_SentenceAppendix</i> definierten
     MP3-Dateien gespeichert sind.<br>
     Optional, Default: <code>cache/templates</code>
+  </li>
+
+  <li>TTS_VolumeAdjust<br>
+    Anhebung der Grundlautstärke zur Anpassung an die angeschlossenen Lautsprecher. <br>
+    Default: 110<br>
+    <code>attr myTTS TTS_VolumeAdjust 400</code><br>
   </li>
 
   <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
@@ -1004,7 +1044,17 @@ sub Text2Speech_WriteStats($$$$){
     <b>5:</b> Zus&auml;tzlich werden auch die Meldungen von Mplayer und Mp3Wrap ausgegeben
   </li>
 
+</ul><br> 
+
+<a name="Text2SpeechExamples"></a>
+<b>Beispiele</b> 
+<ul>
+  <code>define MyTTS Text2Speech hw=0.0</code><br>
+  <code>set MyTTS tts Die Alarmanlage ist bereit.</code><br>
+  <code>set MyTTS tts :beep.mp3:</code><br>
+  <code>set MyTTS tts :mytemplates/alarm.mp3:Die Alarmanlage ist bereit.:ring.mp3:</code><br>
 </ul>
+
 
 =end html_DE
 =cut 

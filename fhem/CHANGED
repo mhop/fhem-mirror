@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_Text2Speech: - playing mp3files directly, eg: :ring.mp3:
+                             - playing any mp3file only text
   - feature: FB_CALLMONITOR: new reading "direction" to differentiate
              between incoming and outgoing call.
   - feature: FB_CALLMONITOR: all informational readings about a call will be
