@@ -71,9 +71,14 @@ sub poll($) {
     select($rout=$rin, undef, undef, 0.1);
     my $mfound = vec($rout, $hash->{FD}, 1);
     if ($mfound) {
-      main::OWX_ASYNC_Disconnect($hash) unless $self->read();
+      if ($self->read()) {
+        return 1;
+      } else {
+        main::OWX_ASYNC_Disconnect($hash);
+      }
     }
   }
+  return undef;
 }
 
 ########################################################################################
@@ -102,17 +107,23 @@ sub Define ($$) {
   }
   my $dev = $a[2];
 
-  #-- when the specified device name contains @<digits> already, use it as supplied
-  if ( $dev !~ m/\@\d*/ ){
-    $hash->{DeviceName} = $dev."\@9600";
+  my $device;
+  #-- network attached serial:
+  if ( $dev =~ m/^(.+):([0-9]+)$/ ) {
+    $hash->{DeviceName} = $dev;
+    $device = $dev;
+  } else {
+    #-- when the specified device name contains @<digits> already, use it as supplied
+    if ( $dev !~ m/\@\d*/ ){
+      $hash->{DeviceName} = $dev."\@9600";
+    }
+    my $baudrate;
+    ($device,$baudrate) = split('@',$dev);
+    $self->{baud} = $baudrate ? $baudrate : 9600;
   }
-  my ($device,$baudrate) = split('@',$dev);
   #-- let fhem.pl MAIN call OWX_Ready when setup is done.
   $main::readyfnlist{"$hash->{NAME}.$device"} = $hash;
-
-  $self->{baud} = $baudrate ? $baudrate : 9600;
   $self->{hash} = $hash;
-
   return undef;
 }
 
@@ -277,15 +288,6 @@ sub initialize() {
   main::DevIo_OpenDev($hash,$self->{reopen},undef);
   return undef unless $hash->{STATE} eq "opened";
 
-  my $hwdevice = $hash->{USBDev};
-  #force master reset in DS2480
-  $hwdevice->reset_error();
-  $hwdevice->purge_all;
-  $hwdevice->baudrate(4800);
-  $hwdevice->write_settings;
-  $hwdevice->write(sprintf("\x00"));
-  select(undef,undef,undef,0.5);
-
   #-- Third step detect busmaster on serial interface
 
   my $name = $self->{name};
@@ -297,13 +299,26 @@ sub initialize() {
   require "$main::attr{global}{modpath}/FHEM/OWX_DS2480.pm";
   my $ds2480 = OWX_DS2480->new($self);
 
-  #-- timing byte for DS2480
-  $ds2480->start_query();
-  $hwdevice->baudrate(9600);
-  $hwdevice->write_settings;
-  $ds2480->query("\xC1",1);
-  $hwdevice->baudrate($self->{baud});
-  $hwdevice->write_settings;
+  if (defined (my $hwdevice = $hash->{USBDev})) {
+    #force master reset in DS2480
+    $hwdevice->reset_error();
+    $hwdevice->purge_all;
+    $hwdevice->baudrate(4800);
+    $hwdevice->write_settings;
+    $hwdevice->write(sprintf("\x00"));
+    select(undef,undef,undef,0.5);
+    #-- timing byte for DS2480
+    $ds2480->start_query();
+    $hwdevice->baudrate(9600);
+    $hwdevice->write_settings;
+    $ds2480->query("\xC1",0);
+    $hwdevice->baudrate($self->{baud});
+    $hwdevice->write_settings;
+  } else {
+    #-- for serial over network we cannot reset but just send the timing byte
+    $ds2480->start_query();
+    $ds2480->query("\xC1",0);
+  }
 
   #-- Max 4 tries to detect an interface
   for($l=0;$l<100;$l++) {

@@ -104,26 +104,24 @@ sub query ($$$) {
 
 sub read() {
   my ($serial) = @_;
-
   #-- read the data
   my $string_part = main::DevIo_DoSimpleRead($serial->{hash});
-  return undef unless defined $string_part;
-  my $count_in = length ($string_part);
-  $serial->{string_in} .= $string_part;                            
-  $serial->{retcount} += $count_in;		
   $serial->{num_reads}++;
-  if( $main::owx_async_debug > 1 ) {
-    if ($count_in>0) {
-      main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}, Receiving: ".unpack("H*",$string_part));
-    } elsif ($main::owx_async_debug > 2) {
-      main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}, no data read:");
-      foreach my $i (0..6) {
-        my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller($i);
-        main::Log3($serial->{name},5, "$subroutine $filename $line");
-      }
+  #return undef unless defined $string_part;
+  if (defined $string_part) {
+    my $count_in = length ($string_part);
+    $serial->{string_in} .= $string_part;
+    $serial->{retcount} += $count_in;
+    main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}, Receiving: ".unpack("H*",$string_part)) if( $main::owx_async_debug > 1 );
+    return $count_in > 0 ? 1 : undef;
+  } elsif ($main::owx_async_debug > 2) {
+    main::Log3($serial->{name},5, "OWX_DS2480 read: Loop no. $serial->{num_reads}, no data read:");
+    foreach my $i (0..6) {
+      my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller($i);
+      main::Log3($serial->{name},5, "$subroutine $filename $line");
     }
   }
-  return $count_in > 0 ? 1 : undef;
+  return undef;
 }
 
 sub response_ready() {
@@ -142,7 +140,7 @@ sub response_ready() {
 sub start_query() {
   my ($serial) = @_;
   #read and discard any outstanding data from previous commands:
-  while($serial->read()) {};
+  while($serial->poll()) {};
 
   $serial->{string_in} = "";
   $serial->{num_reads} = 0;
