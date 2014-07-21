@@ -127,7 +127,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.9;
+$owx_async_version=5.10;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -158,7 +158,7 @@ sub OWX_ASYNC_Initialize ($) {
   $hash->{ReadFn}   = "OWX_ASYNC_Read";
   $hash->{ReadyFn}  = "OWX_ASYNC_Ready";
   $hash->{InitFn}   = "OWX_ASYNC_Init";
-  $hash->{AttrList} = "dokick:0,1 interval IODev timeout";
+  $hash->{AttrList} = "dokick:0,1 interval IODev timeout maxtimeouts";
   main::LoadModule("OWX");
 }
 
@@ -1060,6 +1060,11 @@ sub OWX_ASYNC_RunTasks($) {
                 $task->PT_CANCEL("Timeout");
                 shift @{$current->{queue}};
                 $main::defs{$current->{device}}->{NUMTASKS} = @{$current->{queue}};
+                $master->{TIMEOUTS}++;
+                if ($master->{TIMEOUTS} > AttrVal($master->{NAME},"maxtimeouts",5)) {
+                  Log3 ($master->{NAME},3,"OWX_ASYNC_RunTasks: $master->{NAME} maximum number of timeouts exceedet ($master->{TIMEOUTS}), trying to reconnect");
+                  OWX_ASYNC_Disconnect($master);
+                }
                 next;
               } else {
                 Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} task waiting for data or timeout" if ($owx_async_debug>2);
@@ -1084,6 +1089,7 @@ sub OWX_ASYNC_RunTasks($) {
           my $state = $task->PT_STATE();
           if ($state == PT_ENDED) {
             Log3 ($master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} task finished");
+            $master->{TIMEOUTS} = 0;
           } elsif ($state == PT_EXITED) {
             Log3 ($master->{NAME},4,"OWX_ASYNC_RunTasks: $current->{device} task exited: ".(defined $task->PT_RETVAL() ? $task->PT_RETVAL : "- no retval -"));
           } elsif ($state == PT_ERROR) {
@@ -1214,9 +1220,12 @@ sub OWX_ASYNC_RunTasks($) {
             <li><a name="OWX_ASYNCdokick"><code>attr &lt;name&gt; dokick 0|1</code></a>
                 <br />1 if the interface regularly kicks thermometers on the bus to do a temperature conversion, 
                and to perform an alarm check, 0 if not</li>
-            <li><a name="OWX_ASYNCIODev"><code>attr &lt;name&gt; IODev <FRM-device></code></a>
+            <li><a name="OWX_ASYNCIODev"><code>attr &lt;name&gt; IODev &lt;FRM-device&gt;</code></a>
                 <br />assignes a specific FRM-device to OWX_ASYNC when working through an Arduino. 
                 Required only if there is more than one FRM defined.</li>
+            <li><a name="OWX_ASYNCmaxtimeouts"><code>attr &lt;name&gt; maxtimeouts &lt;number&gt;</code></a>
+                <br />maximum number of timeouts (in a row) before OWX_ASYNC disconnects itself from the
+                busmaster and tries to establish a new connection</li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
