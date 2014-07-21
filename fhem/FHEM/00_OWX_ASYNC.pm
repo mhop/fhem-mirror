@@ -129,7 +129,7 @@ my %attrs = (
 #-- some globals needed for the 1-Wire module
 $owx_async_version=5.8;
 #-- Debugging 0,1,2,3
-$owx_async_debug=0;
+$owx_async_debug=3;
 
 ########################################################################################
 #
@@ -191,10 +191,10 @@ sub OWX_ASYNC_Define ($$) {
   my $owx;
   #-- First step - different methods
   #-- check if we have a serial device attached
-  if ( $dev =~ m|$SER_regexp|i){  
+  if ( $dev =~ m|$SER_regexp|i or $dev =~ m/^(.+):([0-9]+)$/ ){
     require "$main::attr{global}{modpath}/FHEM/OWX_SER.pm";
     $owx = OWX_SER->new();
-  #-- check if we have a COC/CUNO interface attached  
+  #-- check if we have a COC/CUNO interface attached
   }elsif( (defined $main::defs{$dev} && (defined( $main::defs{$dev}->{VERSION} ) ? $main::defs{$dev}->{VERSION} : "") =~ m/CSM|CUNO/ )){
     require "$main::attr{global}{modpath}/FHEM/OWX_CCC.pm";
     $owx = OWX_CCC->new();
@@ -207,7 +207,7 @@ sub OWX_ASYNC_Define ($$) {
   };
   
   my $ret = $owx->Define($hash,$def);
-  #-- cancel definition of OWX if interface define fails 
+  #-- cancel definition of OWX if interface define fails
   return $ret if $ret;  
   	
   $hash->{OWX} = $owx;
