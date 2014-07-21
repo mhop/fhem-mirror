@@ -1159,46 +1159,89 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($md =~ m/HM-CC-RT-DN/) { ##############################################
     my %ctlTbl=( 0=>"auto", 1=>"manual", 2=>"party",3=>"boost");
-    if   ($mTp eq "10" && $p =~ m/^0A(....)(..)(..)(..)/) {#info-level
-      my ($chn,$setTemp,$err,$vp,$ctrlMode) =
-          ("04",hex($1),hex($2),hex($3), hex($4));
-      my $actTemp =(($setTemp        ) & 0x3ff)/10;
-      $setTemp    =(($setTemp    >>10) & 0x3f )/2;
-      my $bat     =(($err            ) & 0x1f)/10+1.5;
-      $err        = ($err        >> 5) & 0x7  ;
-      $vp         = ($vp             ) & 0x7f ;
-      my $uk0     = ($ctrlMode       ) & 0x3f ;#unknown
+
+    if   (  ($mTp eq "10" && $mI[0] eq "0A") #info-level/
+          ||($mTp eq "02" && $mI[0] eq "01")){#ackInfo
+
+      my ($dHash,$err       ,$ctrlMode  ,$setTemp          ,$bTime,$pTemp,$pStart,$pEnd,$chn,$uk0,$lBat,$actTemp,$vp) = 
+         ($shash,hex($mI[3]),hex($mI[5]),hex($mI[1].$mI[2]),"-"    ,"-"   ,"-"    ,"-"                             );
+      
+      $lBat = $err&0x80?"low":"ok"; # valid for Info-Level message?
+      
+      if($mTp eq "10"){
+        $chn = "04";#fixed
+        my $bat  =(($err            ) & 0x1f)/10+1.5;
+        $actTemp =sprintf("%2.1f",((($setTemp        ) & 0x3ff)/10));
+        $vp      = (hex($mI[4])     ) & 0x7f ;
+        $setTemp = ($setTemp    >>10);
+        $err     = ($err        >> 5);
+        $shash = $modules{CUL_HM}{defptr}{"$src$chn"} if($modules{CUL_HM}{defptr}{"$src$chn"});
+        push @evtEt,[$shash,1,"measured-temp:$actTemp" ];
+        push @evtEt,[$shash,1,"ValvePosition:$vp"    ];
+        #device---
+        push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
+        push @evtEt,[$dHash,1,"batteryLevel:$bat"];
+        push @evtEt,[$dHash,1,"actuator:$vp"];
+        #weather Chan
+        my $wHash = $modules{CUL_HM}{defptr}{$src."01"}; 
+        if ($wHash){
+          push @evtEt,[$wHash,1,"measured-temp:$actTemp"];
+          push @evtEt,[$wHash,1,"state:$actTemp"];
+        }
+      }
+      else{
+        $chn        =  $mI[1];
+        $setTemp    = ($setTemp    >> 8);
+        $err        = ($err        >> 1);
+        $shash = $modules{CUL_HM}{defptr}{"$src$chn"} if($modules{CUL_HM}{defptr}{"$src$chn"});
+        $actTemp = ReadingsVal($name,"measured-temp","");
+        $vp      = ReadingsVal($name,"actuator","");
+      }
+      $setTemp    =(($setTemp        ) & 0x3f )/2;
+      $err        = ($err            ) & 0x7  ;
+      $uk0        = ($ctrlMode       ) & 0x3f ;#unknown
       $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
-      $actTemp = sprintf("%2.1f",$actTemp);
+      
       $setTemp = ($setTemp < 5 )?'off':
                  ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
+      if (defined $mI[6]){# message with party mode
+        my @pt =  map{hex($_)} @mI[5..$#mI];
+        $pTemp =(($pt[7]     )& 0x3f)/2 if (defined $pt[7]) ;
+        my $st  = (    ($pt[0]      )& 0x3f)/2;
+        $pStart =     (($pt[2]      )& 0x7f)   # year
+                 ."-".(($pt[6]  >> 4)& 0x0f)   # month
+                 ."-".(($pt[1]      )& 0x1f)   # day
+                 ." ".int($st)                 # Time h
+                 .":".(int($st)!=$st?"30":"00")# Time min
+                 ;
+        my $et  = (    ($pt[3]      )& 0x3f)/2;
+        $pEnd   =     (($pt[5]      )& 0x7f)   # year
+                 ."-".(($pt[6]      )& 0x0f)   # month
+                 ."-".(($pt[4]      )& 0x1f)   # day
+                 ." ".int($et)                 # Time h
+                 .":".(int($et)!=$et?"30":"00")# Time min
+                 ;
+      }
+      elsif(defined $mI[5] && $ctrlMode == 3 ){#message with boost
+        $bTime     = ((hex($mI[5])  ) & 0x3f)." min";
+      }
 
-      my $dHash = $shash;
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
       my %errTbl=( 0=>"ok", 1=>"ValveTight", 2=>"adjustRangeTooLarge"
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
                   ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
 
       push @evtEt,[$shash,1,"motorErr:$errTbl{$err}" ];
-      push @evtEt,[$shash,1,"measured-temp:$actTemp" ];
       push @evtEt,[$shash,1,"desired-temp:$setTemp"  ];
-      push @evtEt,[$shash,1,"ValvePosition:$vp"    ];
       push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$shash,1,"boostTime:$bTime"];
+      push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp valve: $vp"];
+      push @evtEt,[$shash,1,"partyStart:$pStart"];
+      push @evtEt,[$shash,1,"partyEnd:$pEnd"];
+      push @evtEt,[$shash,1,"partyTemp:$pTemp"];
       #push @evtEt,[$shash,1,"unknown0:$uk0"];
       #push @evtEt,[$shash,1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
-      push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp valve: $vp"];
-      push @evtEt,[$dHash,1,"battery:".($err&0x80?"low":"ok")];
-      push @evtEt,[$dHash,1,"batteryLevel:$bat"];
-      push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
+      push @evtEt,[$dHash,1,"battery:$lBat"];
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
-      push @evtEt,[$dHash,1,"actuator:$vp"];
-      
-      my $wHash = $modules{CUL_HM}{defptr}{$src."01"}; 
-      if ($wHash){
-        push @evtEt,[$wHash,1,"measured-temp:$actTemp"];
-        push @evtEt,[$wHash,1,"state:$actTemp"];
-      }
     }
     elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
       my $setTemp = sprintf("%.1f",int(hex($1)/4)/2);
@@ -1223,36 +1266,10 @@ sub CUL_HM_Parse($$) {#########################################################
     if( ( $mTp eq "10" && $mI[0] eq '0B')  #info-level
       ||( $mTp eq "02" && $mI[0] eq '01')) {#ack-status
       my @d = map{hex($_)} unpack 'A2A4(A2)*',$p;
-      my ($chn,$setTemp,$actTemp, $cRep,$wRep,$bat ,$lbat,$ctrlMode,$bState,$pTemp,$pStart,$pEnd) =
-          ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],""       ,"off"  ,"-"   ,"-","-");
+      my ($chn,$setTemp,$actTemp, $cRep,$wRep,$bat ,$lbat,$ctrlMode,$bTime,$pTemp,$pStart,$pEnd) =
+          ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],""       ,"-"   ,"-"   ,"-"    ,"-");
       
       $lbat       = ($lbat           ) & 0x80;
-      if (defined $d[5]){# message with party mode
-        $pTemp =(($d[11]     )& 0x3f) if (defined $d[11]) ;
-        my @p;
-        if ($mTp eq "10") {@p = @d[3..9]}
-        else              {@p = @d[4..10]}
-        my $st = (($p[0]      )& 0x3f)/2;
-        $pStart =     (($p[2]      )& 0x7f)    # year
-                 ."-".(($p[6]  >> 4)& 0x0f)    # month
-                 ."-".(($p[1]      )& 0x1f)    # day
-                 ." ".int($st)                 # Time h
-                 .":".(int($st)!=$st?"30":"00")# Time min
-                 ;
-        my $et = (($p[3]      )& 0x3f)/2;
-        $pEnd   =     (($p[5]      )& 0x7f)    # year
-                 ."-".(($p[6]      )& 0x0f)    # month
-                 ."-".(($p[4]      )& 0x1f)    # day
-                 ." ".int($et)                 # Time h
-                 .":".(int($et)!=$et?"30":"00")# Time min
-                 ;
-        push @evtEt,[$shash,1,"partyStart:$pStart"];
-        push @evtEt,[$shash,1,"partyEnd:$pEnd"];
-      }
-      elsif(defined $d[4]){#message with boost
-        $bState     = ($d[4]       ) & 0x3f;
-      }
-      
       my $dHash = $shash;
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
@@ -1276,9 +1293,36 @@ sub CUL_HM_Parse($$) {#########################################################
         $cRep = (($cRep    >>2) & 0x01 )?"on":"off";
         $wRep = (($wRep    >>1) & 0x01 )?"on":"off";        
       }
-      $ctrlMode   = ($ctrlMode   >> 6) & 0x3  ;
-      $setTemp = ($setTemp < 5 )?'off':
-                 ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
+      $ctrlMode = ($ctrlMode   >> 6) & 0x3  ;
+      $setTemp  = ($setTemp < 5 )?'off':
+                  ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
+      
+      if (defined $d[4]){# message with party mode
+        $pTemp =(($d[11]     )& 0x3f)/2 if (defined $d[11]) ;
+        my @p;
+        if ($mTp eq "10") {@p = @d[3..9]}
+        else              {@p = @d[4..10]}
+        my $st = (($p[0]      )& 0x3f)/2;
+        $pStart =     (($p[2]      )& 0x7f)    # year
+                 ."-".(($p[6]  >> 4)& 0x0f)    # month
+                 ."-".(($p[1]      )& 0x1f)    # day
+                 ." ".int($st)                 # Time h
+                 .":".(int($st)!=$st?"30":"00")# Time min
+                 ;
+        my $et = (($p[3]      )& 0x3f)/2;
+        $pEnd   =     (($p[5]      )& 0x7f)    # year
+                 ."-".(($p[6]      )& 0x0f)    # month
+                 ."-".(($p[4]      )& 0x1f)    # day
+                 ." ".int($et)                 # Time h
+                 .":".(int($et)!=$et?"30":"00")# Time min
+                 ;
+        push @evtEt,[$shash,1,"partyStart:$pStart"];
+        push @evtEt,[$shash,1,"partyEnd:$pEnd"];
+        push @evtEt,[$shash,1,"partyTemp:$pTemp"];
+      }
+      elsif(defined $d[3] && $ctrlMode == 3 ){#message with boost
+        $bTime     = (($d[3]       ) & 0x3f)." min";
+      }
 
       push @evtEt,[$shash,1,"desired-temp:$setTemp"];
       push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
@@ -1286,8 +1330,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"battery:".($lbat?"low":"ok")];
       push @evtEt,[$shash,1,"commReporting:$cRep"];
       push @evtEt,[$shash,1,"winOpenReporting:$wRep"];
-      push @evtEt,[$shash,1,"boostState:$bState"];
-      push @evtEt,[$shash,1,"partyTemp:$pTemp"];
+      push @evtEt,[$shash,1,"boostTime:$bTime"];
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
     }
     elsif($mTp eq "70"){
@@ -3697,6 +3740,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     if($mode eq "manual"){
       my $t = $a[2] ne "manual"?$a[2]:ReadingsVal($name,"desired-temp",18);
+      if ($md =~ m/CC-TC/){$t = ($t eq "off")?4.5:(($t eq "on" )?30.5:$t);}
+      else                {$t = ($t eq "off")?5  :(($t eq "on" )?30  :$t);}
       return "temperatur for manual  4.5 to 30.5 C"
                 if ($t < 4.5 || $t > 30.5);
       $temp = $t*2;
@@ -5143,7 +5188,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   my $hash = $defs{$name};
   my $mNoA = sprintf("%02X",$mNo);
   
-  return if ($mIn !~ m/$mNoA..02$dst${id}00/ && $mIn !~ m/0010${dst}00000000/);
+  return if ($mIn !~ m/$mNoA..02$dst${id}00/ && $mIn !~ m/..10${dst}00000000/);
   if ($mIn =~ m/$mNoA..02$dst${id}00/){
     $modules{CUL_HM}{helper}{updateRetry} = 0;
     $modules{CUL_HM}{helper}{updateNbrPassed} = $mNo;
@@ -5159,13 +5204,13 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
     CUL_HM_FWupdateSpeed($name,100);
     select(undef, undef, undef, (0.04));
     $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
-    $modules{CUL_HM}{helper}{updateStep}++;
+    $modules{CUL_HM}{helper}{updateStep} = $step = 1;
     $modules{CUL_HM}{helper}{updateNbr} = $mNo;
     RemoveInternalTimer("fail:notInBootLoader");
     #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
-    InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:SpeedChangeFailed",0);
+#    InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:SpeedChangeFailed",0);
   }
-  else{# check response - start programming
+#  else{# check response - start programming
   ##16.130  CUL_Parse:  A 0A 30 0002 235EDB 255E91 00
   ##16.338  CUL_Parse:  A 0A 39 0002 235EDB 255E91 00
   ##16.716  CUL_Parse:  A 0A 42 0002 235EDB 255E91 00
@@ -5180,7 +5225,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   ## one block = 10 messages in 200-1000ms
     my $blocks = scalar(@{$modules{CUL_HM}{helper}{updateData}});
     RemoveInternalTimer("respPend:$hash->{DEF}");
-    RemoveInternalTimer("fail:SpeedChangeFailed");
+#    RemoveInternalTimer("fail:SpeedChangeFailed");
     RemoveInternalTimer("fail:Block".($step-1));
     if ($blocks < $step){#last block
       CUL_HM_FWupdateEnd("done");
@@ -5200,7 +5245,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
       #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
       InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateBTo","fail:Block$step",0);
     }
-  }
+#  }
 }
 sub CUL_HM_FWupdateBTo($){# FW update block timeout
   my $in = shift;
