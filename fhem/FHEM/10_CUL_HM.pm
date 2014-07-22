@@ -1871,7 +1871,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     elsif($mTp eq "41") {#01 is channel
       my($cnt,$bright) = (hex($mI[1]),hex($mI[2]));
-      my $nextTr = (@mI >2)? (int((1<<((hex($mI[3])>>4)-1))/1.1)."s")
+      my $nextTr = (@mI >3)? (int((1<<((hex($mI[3])>>4)-1))/1.1)."s")
                            : "-";
       push @evtEt,[$shash,1,"state:motion"];
       push @evtEt,[$shash,1,"motion:on$target"];
@@ -3165,7 +3165,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($sectIn eq "all") {
       @sectL = ("rssi","msgEvents","readings");#readings is last - it schedules a reread possible
     }
-    elsif($sectIn =~ m/(rssi|msgEvents|readings|register)/){
+    elsif($sectIn =~ m/(rssi|msgEvents|readings|register|unknownDev)/){
       @sectL = ($sectIn);
     }
     else{
@@ -3179,6 +3179,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
         CUL_HM_complConfig($_->{NAME}) foreach (@cH);
         CUL_HM_qStateUpdatIfEnab($_->{NAME}) foreach (@cH);
+      }
+      elsif($sect eq "unknownDev"){
+        delete $hash->{READINGS}{$_} 
+             foreach (grep /^unknown_/,keys %{$hash->{READINGS}});
       }
       elsif($sect eq "register"){
         my @cH = ($hash);
@@ -5208,9 +5212,8 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
     $modules{CUL_HM}{helper}{updateNbr} = $mNo;
     RemoveInternalTimer("fail:notInBootLoader");
     #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
-#    InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateEnd","fail:SpeedChangeFailed",0);
   }
-#  else{# check response - start programming
+
   ##16.130  CUL_Parse:  A 0A 30 0002 235EDB 255E91 00
   ##16.338  CUL_Parse:  A 0A 39 0002 235EDB 255E91 00
   ##16.716  CUL_Parse:  A 0A 42 0002 235EDB 255E91 00
@@ -5223,29 +5226,27 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   ##44.161 4: CUL_Parse: iocu1 A 1D 6A 20CA 255E91 235EDB 00121642446D1C3F45F240ED84DC5E7C1AB7554D
   ##44.180 4: CUL_Parse: iocu1 A 0A 6A 0002 235EDB 255E91 00
   ## one block = 10 messages in 200-1000ms
-    my $blocks = scalar(@{$modules{CUL_HM}{helper}{updateData}});
-    RemoveInternalTimer("respPend:$hash->{DEF}");
-#    RemoveInternalTimer("fail:SpeedChangeFailed");
-    RemoveInternalTimer("fail:Block".($step-1));
-    if ($blocks < $step){#last block
-      CUL_HM_FWupdateEnd("done");
-      Log3 $name,2,"CUL_HM fwUpdate completed";
+  my $blocks = scalar(@{$modules{CUL_HM}{helper}{updateData}});
+  RemoveInternalTimer("respPend:$hash->{DEF}");
+  RemoveInternalTimer("fail:Block".($step-1));
+  if ($blocks < $step){#last block
+    CUL_HM_FWupdateEnd("done");
+    Log3 $name,2,"CUL_HM fwUpdate completed";
+  }
+  else{# programming continue
+    my $bl = ${$modules{CUL_HM}{helper}{updateData}}[$step-1];
+    my $no = scalar(@{$bl});
+    Log3 $name,5,"CUL_HM fwUpdate write block $step of $blocks: $no messages";
+    foreach my $msgP (@{$bl}){
+      $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
+      CUL_HM_SndCmd($hash, $mNoA.((--$no)?"00":"20")."CA$id$dst".$msgP);
+      # select(undef, undef, undef, (0.01));# no wait necessary - FHEM is slow anyway
     }
-    else{# programming continue
-      my $bl = ${$modules{CUL_HM}{helper}{updateData}}[$step-1];
-      my $no = scalar(@{$bl});
-      Log3 $name,5,"CUL_HM fwUpdate write block $step of $blocks: $no messages";
-      foreach my $msgP (@{$bl}){
-        $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
-        CUL_HM_SndCmd($hash, $mNoA.((--$no)?"00":"20")."CA$id$dst".$msgP);
-        select(undef, undef, undef, (0.1));
-      }
-      $modules{CUL_HM}{helper}{updateStep}++;
-      $modules{CUL_HM}{helper}{updateNbr} = $mNo;
-      #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
-      InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateBTo","fail:Block$step",0);
-    }
-#  }
+    $modules{CUL_HM}{helper}{updateStep}++;
+    $modules{CUL_HM}{helper}{updateNbr} = $mNo;
+    #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
+    InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateBTo","fail:Block$step",0);
+  }
 }
 sub CUL_HM_FWupdateBTo($){# FW update block timeout
   my $in = shift;
