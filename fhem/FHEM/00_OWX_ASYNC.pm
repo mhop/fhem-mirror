@@ -127,7 +127,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.10;
+$owx_async_version=5.11;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -1064,6 +1064,7 @@ sub OWX_ASYNC_RunTasks($) {
                 if ($master->{TIMEOUTS} > AttrVal($master->{NAME},"maxtimeouts",5)) {
                   Log3 ($master->{NAME},3,"OWX_ASYNC_RunTasks: $master->{NAME} maximum number of timeouts exceedet ($master->{TIMEOUTS}), trying to reconnect");
                   OWX_ASYNC_Disconnect($master);
+                  $master->{TIMEOUTS} = 0;
                 }
                 next;
               } else {
