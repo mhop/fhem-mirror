@@ -1475,6 +1475,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
   "CCU-FHEM00"        =>{ update       =>"",
                           hmPairForSec =>"<sec>",
                           hmPairSerial =>"<serial>",
+                          defIgnUnknown=>"",
   },
 );
 # clones- - - - - - - - - - - - - - - - -

@@ -3231,6 +3231,18 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $hash->{helper}{prt}{brstWu}=1;# start burst wakeup
     CUL_HM_SndCmd($hash,"++B112$id$dst");
   }
+  elsif($cmd eq "defIgnUnknown") { ############################################
+    $state = "";
+    foreach (map {substr($_,8)} 
+             grep /^unknown_......$/,
+             keys %{$hash->{READINGS}}){
+      if (!$modules{CUL_HM}{defptr}{$_}){
+        CommandDefine(undef,"unknown_$_ CUL_HM $_") ;
+        $attr{"unknown_$_"}{ignore} = 1;
+      }
+      delete $hash->{READINGS}{"unknown_$_"};
+    }
+  }
 
   elsif($cmd eq "statusRequest") { ############################################
     my @chnIdList = CUL_HM_getAssChnIds($name);
@@ -7908,6 +7920,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          </li>
       </ul>
     </li>
+    <li>CCU_FHEM<br>
+    <ul>
+      <li>defIgnUnknown<br>
+          define unknown devices which are present in the readings. 
+          set attr ignore and remove the readingfrom the list. <br>
+      </li>
+    </ul>
+    </li>
     <li>HM-Sys-sRP-Pl<br><br>
     setup the repeater's entries. Up to 36entries can be applied.
     <ul>
@@ -9138,6 +9158,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>stop</B><br>
               stopt die Bewegung<br>
             </li>
+          </ul>
+        </li>
+        <li>CCU_FHEM<br>
+          <ul>
+          <li>defIgnUnknown<br>
+            Definieren die unbekannten Devices und setze das Attribut ignore. 
+            Ddann loesche die Readings. <br>
+          </li>
           </ul>
         </li>
         <li>HM-Sys-sRP-Pl<br><br>
