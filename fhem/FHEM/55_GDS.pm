@@ -1085,10 +1085,10 @@ sub createIndexFile($){
 
 	if($name){
 		my $text =	"<html><head></head><body>".
-					"<a href=\"/fhem/".$name."/".$name."_conditionsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>".
-					"<a href=\"/fhem/".$name."/".$name."_forecastsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>".
-					"<a href=\"/fhem/".$name."/".$name."_warningsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Warnungen</a><br/>".
-					"<a href=\"/fhem/".$name."/".$name."_radarmap.jpg\" target=\"blank\">Aktuelle Radarkarte</a><br/>".
+					"<a href=\"./".$name."/".$name."_conditionsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>".
+					"<a href=\"./".$name."/".$name."_forecastsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>".
+					"<a href=\"./".$name."/".$name."_warningsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Warnungen</a><br/>".
+					"<a href=\"./".$name."/".$name."_radarmap.jpg\" target=\"blank\">Aktuelle Radarkarte</a><br/>".
 					"</body></html>";
 		open	(DATEI, ">".$tempDir.$name.".html") or die $!;
 		print	 DATEI $text;
