@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.3.4
+# Version: 1.3.5
 #
 # Major Version History:
 # - 1.3.0 - 2013-12-21
@@ -1098,6 +1098,9 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     || ( $return->{e2instandby} eq "true" && $type ne "on" ) )
                 {
                     $state = "off";
+
+                    # Keep updating timer information during standby
+                    ENIGMA2_SendCommand( $hash, "timerlist" );
                 }
                 else {
                     $state = "on";
