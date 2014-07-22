@@ -1140,7 +1140,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"motor:stop"   ] if(($err&0x30) == 0x00);
 
       #VD hang detection
-      my $des = ReadingsVal($name, "ValveDesired", "");
+      my $des = ReadingsVal($name, "ValveDesired", $vp);
       $des =~ s/ .*//; # remove unit     
       if (($des < $vp-1 || $des > $vp+1) && ($err&0x30) == 0x00){ 
         if ($shash->{helper}{oldDes} eq $des){#desired valve position stable
@@ -3204,6 +3204,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         delete $hash->{helper}{prt}{rspWaitSec};
         delete $hash->{helper}{prt}{mmcA};
         delete $hash->{helper}{prt}{mmcS};
+        delete $hash->{lastMsg};
         delete ($hash->{$_}) foreach (grep(/^prot/,keys %{$hash}));
       
         if ($hash->{IODev}{NAME} &&
