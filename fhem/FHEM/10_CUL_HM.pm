@@ -977,8 +977,8 @@ sub CUL_HM_Parse($$) {#########################################################
   #----------start valid messages parsing ---------
 
   my $parse = CUL_HM_parseCommon($iohash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md);
-  push @evtEt,[$shash,1,"powerOn:-"] if($parse eq "powerOn");
-  push @evtEt,[$shash,1,""]          if($parse eq "parsed"); # msg is parsed but may
+  push @evtEt,[$shash,1,"powerOn:$tn"] if($parse eq "powerOn");
+  push @evtEt,[$shash,1,""]            if($parse eq "parsed"); # msg is parsed but may
                                                              # be processed further
   if   ($parse eq "ACK" ||
         $parse eq "done"   ){# remember - ACKinfo will be passed on
@@ -1191,7 +1191,7 @@ sub CUL_HM_Parse($$) {#########################################################
       }
       else{
         $chn        =  $mI[1];
-        $setTemp    = ($setTemp    >> 8);
+        $setTemp    = ($setTemp        );
         $err        = ($err        >> 1);
         $shash = $modules{CUL_HM}{defptr}{"$src$chn"} if($modules{CUL_HM}{defptr}{"$src$chn"});
         $actTemp = ReadingsVal($name,"measured-temp","");
@@ -2140,7 +2140,6 @@ sub CUL_HM_Parse($$) {#########################################################
         if(!@entities && !@evtEt);
 
   push @entities,CUL_HM_pushEvnts();
-
   @entities = CUL_HM_noDup(@entities,$shash->{NAME});
   $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
   return @entities;
