@@ -1524,8 +1524,6 @@ sub SB_SERVER_Notify( $$ ) {
       "Own:" . $name . " Device:" . $devName );
   
   if( $devName eq $hash->{RCCNAME} ) {
-      Log3( $hash, 1, "SB_SERVER_Notify($name): from $hash->{RCCNAME} " . 
-	  "with " . ReadingsVal( $hash->{RCCNAME}, "state", "off" ) );
       if( ReadingsVal( $hash->{RCCNAME}, "state", "off" ) eq "off" ) {
 	  RemoveInternalTimer( $hash );
 	  InternalTimer( gettimeofday() + 10, 
