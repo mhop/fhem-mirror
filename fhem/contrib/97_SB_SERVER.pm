@@ -80,6 +80,7 @@ sub SB_SERVER_Initialize( $ ) {
     $hash->{GetFn}   = "SB_SERVER_Get";
     $hash->{SetFn}   = "SB_SERVER_Set";
     $hash->{AttrFn}  = "SB_SERVER_Attr";
+    $hash->{NotifyFn}  = "SB_SERVER_Notify";
 
     $hash->{AttrList} = "alivetimer maxfavorites ";
     $hash->{AttrList} .= "doalivecheck:true,false ";
@@ -406,19 +407,13 @@ sub SB_SERVER_Attr( @ ) {
     my $name = shift( @_ );
     my @args = @_;
 
-    Log( 4, "SB_SERVER_Attr: called with @args" );
+    Log( 4, "SB_SERVER_Attr($name): called with @args" );
 
     if( $cmd eq "set" ) {
 	if( $args[ 0 ] eq "alivetimer" ) {
 
 	}
     }
-    
-    # do an update of the status
-#    InternalTimer( gettimeofday() + AttrVal( $name, "alivetimer", 120 ),
-#		   "SB_SERVER_Alive", 
-#		   $hash, 
-#		   0 );
 }
 
 
@@ -428,6 +423,8 @@ sub SB_SERVER_Attr( @ ) {
 sub SB_SERVER_Set( $@ ) {
     my ($hash, @a) = @_;
     my $name = $hash->{NAME};
+
+    Log( 4, "SB_SERVER_Set($name): called" );
 
     if( @a < 2 ) {
 	return( "at least one parameter is needed" ) ;
@@ -495,19 +492,18 @@ sub SB_SERVER_Set( $@ ) {
 # ----------------------------------------------------------------------------
 sub SB_SERVER_Read( $ ) {
     my ($hash) = @_;
+    my $name = $hash->{NAME};
 
+    Log3( $hash, 4, "SB_SERVER_Read($name): called" );
     Log3( $hash, 5, "+++++++++++++++++++++++++++++++++++++++++++++++++++++" );
     Log3( $hash, 5, "New Squeezebox Server Read cycle starts here" );
     Log3( $hash, 5, "+++++++++++++++++++++++++++++++++++++++++++++++++++++" );
-    Log3( $hash, 5, "SB_SERVER_Read: called" );
 
     my $buf = DevIo_SimpleRead( $hash );
 
     if( !defined( $buf ) ) {
 	return( "" );
     }
-
-    my $name = $hash->{NAME};
 
     # if we have data, the server is on again
     if( ReadingsVal( $name, "power", "off" ) ne "on" ) {
@@ -573,11 +569,11 @@ sub SB_SERVER_Write( $$$ ) {
     my ( $hash, $fn, $msg ) = @_;
     my $name = $hash->{NAME};
 
+    Log3( $hash, 4, "SB_SERVER_Write($name): called with FN:$fn" );
+
     if( !defined( $fn ) ) {
 	return( undef );
     }
-
-    Log3( $hash, 4, "SB_SERVER_Write($name): called with FN:$fn" );
 
     if( defined( $msg ) ) {
 	Log3( $hash, 4, "SB_SERVER_Write: MSG:$msg" );
@@ -614,7 +610,7 @@ sub SB_SERVER_DoInit( $ ) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    Log3( $hash, 4, "SB_SERVER_DoInit: called" );
+    Log3( $hash, 4, "SB_SERVER_DoInit($name): called" );
 
     if( !$hash->{TCPDev} ) {
 	Log3( $hash, 5, "SB_SERVER_DoInit: no TCPDev available?" );
@@ -706,8 +702,9 @@ sub SB_SERVER_DispatchCommandLine( $$ ) {
 # ----------------------------------------------------------------------------
 sub SB_SERVER_ParseCmds( $$ ) {
     my ( $hash, $instr ) = @_;
-
     my $name = $hash->{NAME};
+
+    Log3( $hash, 4, "SB_SERVER_ParseCmds($name): called" );
 
     my @args = split( " ", $instr );
 
@@ -799,6 +796,8 @@ sub SB_SERVER_Alive( $ ) {
     # close our ping mechanism again
     $p->close( );
 
+    Log3( $hash, 5, "SB_SERVER_Alive($name): " . 
+	  "RCC:" . $rccstatus . " Ping:" . $pingstatus );
 
     # set the status of the server accordingly
     if( ( $rccstatus eq "on" ) || ( $pingstatus eq "on" ) ) {
@@ -892,7 +891,7 @@ sub SB_SERVER_Broadcast( $$@ ) {
     my $name = $hash->{NAME};
     my $iodevhash;
 
-    Log3( $hash, 4, "SB_SERVER_Broadcast: called" );
+    Log3( $hash, 4, "SB_SERVER_Broadcast($name): called" );
 
     if( !defined( $bin ) ) {
 	$bin = 0;
@@ -931,8 +930,10 @@ sub SB_SERVER_Broadcast( $$@ ) {
 # ----------------------------------------------------------------------------
 sub SB_SERVER_ParseServerStatus( $$ ) {
     my( $hash, $dataptr ) = @_;
-    
+   
     my $name = $hash->{NAME};
+
+    Log3( $hash, 4, "SB_SERVER_ParseServerStatus($name): called " );
     
     # typically the start index being a number
     if( $dataptr->[ 0 ] =~ /^([0-9])*/ ) {
@@ -1176,6 +1177,8 @@ sub SB_SERVER_FavoritesParse( $$ ) {
     my ( $hash, $str ) = @_;
     
     my $name = $hash->{NAME};
+
+    Log3( $hash, 5, "SB_SERVER_FavoritesParse($name): called" );
 
     # flush the existing list
     foreach my $titi ( keys %{$favorites{$name}} ) {
@@ -1438,6 +1441,8 @@ sub SB_SERVER_ParseServerPlaylists( $$ ) {
     
     my $name = $hash->{NAME};
 
+    Log3( $hash, 4, "SB_SERVER_ParseServerPlaylists($name): called" );
+
     my $namebuf = "";
     my $uniquename = "";
     my $idbuf = -1;
@@ -1504,6 +1509,21 @@ sub SB_SERVER_ParseServerPlaylists( $$ ) {
     }
 
     return;
+}
+
+
+# ----------------------------------------------------------------------------
+#  the Notify function
+# ----------------------------------------------------------------------------
+sub SB_SERVER_Notify( $$ ) {
+  my ( $hash, $dev_hash ) = @_;
+  my $name = $hash->{NAME}; # own name / hash
+  my $devName = $dev_hash->{NAME}; # Device that created the events
+
+  Log3( $hash, 4, "SB_SERVER_Notify($name): called" . 
+      "Own:" . $name . " Device:" . $devName );
+  return( "" );
+
 }
 
 
