@@ -56,6 +56,8 @@ use Encode qw(decode encode);
 # include this for the self-calling timer we use later on
 use Time::HiRes qw(gettimeofday);
 
+use constant { true => 1, false => 0 };
+
 # the list of favorites
 my %SB_PLAYER_Favs;
 
@@ -87,14 +89,15 @@ sub SB_PLAYER_Initialize( $ ) {
     
     # the attributes we have. Space separated list of attribute values in 
     # the form name:default1,default2
-    $hash->{AttrList}  = "volumeStep ttslanguage:de,en,fr ";
-    $hash->{AttrList}  .= "ttslink ";
+    $hash->{AttrList}  = "volumeStep volumeLimit "; 
+    $hash->{AttrList}  .= "ttslanguage:de,en,fr ttslink ";
     $hash->{AttrList}  .= "donotnotify:true,false ";
     $hash->{AttrList}  .= "idismac:true,false ";
     $hash->{AttrList}  .= "serverautoon:true,false ";
     $hash->{AttrList}  .= "fadeinsecs ";
     $hash->{AttrList}  .= "amplifier:on,play ";
-    $hash->{AttrList}  .= "coverartsize:50,100,200 ";
+    $hash->{AttrList}  .= "coverartheight:50,100,200 ";
+    $hash->{AttrList}  .= "coverartwidth:50,100,200 ";
     $hash->{AttrList}  .= $readingFnAttributes;
 }
 
@@ -114,12 +117,13 @@ sub SB_PLAYER_Define( $$ ) {
     if( ( @a < 3 ) || ( @a > 5 ) ) {
 	Log3( $hash, 1, "SB_PLAYER_Define: falsche Anzahl an Argumenten" );
 	return( "wrong syntax: define <name> SB_PLAYER <playerid> " .
-	    "<ampl:FHEM_NAME> <coverart:FHEMNAME>" );
+		"<ampl:FHEM_NAME> <coverart:FHEMNAME>" );
     }
     
     # remove the name and our type
-    my $name = shift( @a );
-    shift( @a );
+    # my $name = shift( @a );
+    shift( @a ); # name
+    shift( @a ); # type
 
     # needed for manual creation of the Player; autocreate checks in ParseFn
     if( SB_PLAYER_IsValidMAC( $a[ 0] ) == 1 ) {
@@ -213,6 +217,11 @@ sub SB_PLAYER_Define( $$ ) {
     # volume delta settings
     if( !defined( $attr{$name}{volumeStep} ) ) {
 	$attr{$name}{volumeStep} = 10;
+    }
+
+    # Upper limit for volume setting
+    if( !defined( $attr{$name}{volumeLimit} ) ) {
+	$attr{$name}{volumeLimit} = 100;
     }
 
     # how many secs for fade in when going from stop to play
@@ -464,53 +473,47 @@ sub SB_PLAYER_Parse( $$ ) {
     if( $cmd eq "mixer" ) {
 	if( $args[ 0 ] eq "volume" ) {
 	    # update the volume 
-            if ($args[ 1 ] eq "?") {
+	    if ($args[ 1 ] eq "?") {
 		# it is a request
-            } elsif( scalar( $args[ 1 ] ) > 0 ) {
-		readingsSingleUpdate( $hash, "volume", 
-				      scalar( $args[ 1 ] ), 0 );
 	    } else {
-		readingsSingleUpdate( $hash, "volume", 
-				      "muted", 0 );
+		SB_SERVER_UpdateVolumeReadings( $hash, $args[ 1 ], true );
 	    }
-	    readingsSingleUpdate( $hash, "volumeStraight", 
-				  scalar( $args[ 1 ] ), 0 );
 	}
 
     } elsif( $cmd eq "remote" ) {
 	$hash->{ISREMOTESTREAM} = "$args[ 0 ]";
 
     } elsif( $cmd eq "play" ) {
-	readingsSingleUpdate( $hash, "playStatus", "playing", 1 );
+	readingsBulkUpdate( $hash, "playStatus", "playing" );
 	SB_PLAYER_Amplifier( $hash );
 
     } elsif( $cmd eq "stop" ) {
-	readingsSingleUpdate( $hash, "playStatus", "stopped", 1 );
+	readingsBulkUpdate( $hash, "playStatus", "stopped" );
 	SB_PLAYER_Amplifier( $hash );
 
     } elsif( $cmd eq "pause" ) {
-        if( $args[ 0 ] eq "0" ) {
-            readingsSingleUpdate( $hash, "playStatus", "playing", 1 );
+	if( $args[ 0 ] eq "0" ) {
+	    readingsBulkUpdate( $hash, "playStatus", "playing" );
 	    SB_PLAYER_Amplifier( $hash );
-        } else {
-            readingsSingleUpdate( $hash, "playStatus", "paused", 1 );
+	} else {
+	    readingsBulkUpdate( $hash, "playStatus", "paused" );
 	    SB_PLAYER_Amplifier( $hash );
-        } 
+	} 
 
     } elsif( $cmd eq "mode" ) {
 	#Log3( $hash, 1, "Playmode: $args[ 0 ]" );
 	# alittle more complex to fulfill FHEM Development guidelines
 	if( $args[ 0 ] eq "play" ) {
-	    readingsSingleUpdate( $hash, "playStatus", "playing", 1 );
+	    readingsBulkUpdate( $hash, "playStatus", "playing" );
 	    SB_PLAYER_Amplifier( $hash );
 	} elsif( $args[ 0 ] eq "stop" ) {
-	    readingsSingleUpdate( $hash, "playStatus", "stopped", 1 );
+	    readingsBulkUpdate( $hash, "playStatus", "stopped" );
 	    SB_PLAYER_Amplifier( $hash );
 	} elsif( $args[ 0 ] eq "pause" ) {
-	    readingsSingleUpdate( $hash, "playStatus", "paused", 1 );
+	    readingsBulkUpdate( $hash, "playStatus", "paused" );
 	    SB_PLAYER_Amplifier( $hash );
 	} else {
-	    readingsSingleUpdate( $hash, "playStatus", $args[ 0 ], 1 );
+	    readingsBulkUpdate( $hash, "playStatus", $args[ 0 ] );
 	}
 
     } elsif( $cmd eq "newmetadata" ) {
@@ -546,15 +549,15 @@ sub SB_PLAYER_Parse( $$ ) {
 #	    }
 	    if ($hash->{READINGS}{talkStatus}{VAL} eq "requested") {
 		# should be my talk
-        	Log3( $hash, 1, "SB_PLAYER: talkstatus = " . 
+		Log3( $hash, 5, "SB_PLAYER: talkstatus = " . 
 		      $hash->{READINGS}{talkStatus}{VAL} );
-            	readingsSingleUpdate( $hash, "talkStatus", "playing", 1 );
+		readingsBulkUpdate( $hash, "talkStatus", "playing" );
 		SB_PLAYER_Amplifier( $hash );
 	    } elsif ($hash->{READINGS}{talkStatus}{VAL} eq "requested " . 
 		     "recall pending" ) {
-		Log3( $hash, 1, "SB_PLAYER: talkstatus = " . 
+		Log3( $hash, 5, "SB_PLAYER: talkstatus = " . 
 		      $hash->{READINGS}{talkStatus}{VAL} );
-		readingsSingleUpdate( $hash, "talkStatus", "playing " . 
+		readingsBulkUpdate( $hash, "talkStatus", "playing " . 
 				      "recall pending", 1 );
 	    }
 	} elsif( $args[ 0 ] eq "repeat" ) {
@@ -590,46 +593,46 @@ sub SB_PLAYER_Parse( $$ ) {
 	    if( $hash->{READINGS}{talkStatus}{VAL} eq "playing recall pending" ) {
 		# I was waiting for the end of the talk and a playlist stopped
 		# need to recall saved playlist and saved status
-        	Log3( $hash, 1, "SB_PLAYER: stop talking - talkStatus was " . 
+		Log3( $hash, 5, "SB_PLAYER: stop talking - talkStatus was " . 
 		      "$hash->{READINGS}{talkStatus}{VAL}" );
-   	        readingsSingleUpdate( $hash, "talkStatus", "stopped", 1 );
+		readingsBulkUpdate( $hash, "talkStatus", "stopped" );
 		# recall
 		if( $hash->{READINGS}{savedState}{VAL} eq "off" ) {
 		    # I need to call the playlist and shut off the SB
 		    IOWrite( $hash, "$hash->{PLAYERMAC} playlist resume " . 
 			     "fhem_$hash->{NAME} noplay:1\n" ); 
 		    IOWrite( $hash, "$hash->{PLAYERMAC} power 0\n" );
-		    readingsSingleUpdate( $hash, "power", "off", 1 );
+		    readingsBulkUpdate( $hash, "power", "off" );
 		    SB_PLAYER_Amplifier( $hash );
-		    Log3( $hash, 1, "SB_PLAYER: recall : off" );
+		    Log3( $hash, 5, "SB_PLAYER: recall : off" );
 		} elsif( $hash->{READINGS}{savedPlayStatus}{VAL} eq "stopped" ) {
 		    # Need to recall playlist + stop
 		    IOWrite( $hash, "$hash->{PLAYERMAC} playlist resume " . 
 			     "fhem_$hash->{NAME} noplay:1\n" );
 		    IOWrite( $hash, "$hash->{PLAYERMAC} stop\n" );
-		    Log3( $hash, 1, "SB_PLAYER: recall : stop" );
+		    Log3( $hash, 5, "SB_PLAYER: recall : stop" );
 		} elsif( $hash->{READINGS}{savedPlayStatus}{VAL} eq "paused" ) {
 		    # Need to recall playlist + pause
 		    IOWrite( $hash, "$hash->{PLAYERMAC} playlist resume " . 
 			     "fhem_$hash->{NAME} noplay:1\n" );
 		    IOWrite( $hash, "$hash->{PLAYERMAC} pause 1\n" );
-		    Log3( $hash, 1, "SB_PLAYER: recall : pause 1" );
+		    Log3( $hash, 5, "SB_PLAYER: recall : pause 1" );
 		} else {
 		    # Need to recall and play playlist
 		    IOWrite( $hash, "$hash->{PLAYERMAC} playlist resume " . 
 			     "fhem_$hash->{NAME}\n" );
-		    Log3( $hash, 1, "SB_PLAYER: recall now - talkStatus=" . 
+		    Log3( $hash, 5, "SB_PLAYER: recall now - talkStatus=" . 
 			  "$hash->{READINGS}{talkStatus}{VAL}" );
 		}
 	    } elsif( $hash->{READINGS}{talkStatus}{VAL} eq "playing" ) {
 		# I was waiting for the end of the talk and a playlist stopped 
 		# keep all like this
-        	Log3( $hash, 1, "SB_PLAYER: stop talking - talkStatus was " . 
+		Log3( $hash, 5, "SB_PLAYER: stop talking - talkStatus was " . 
 		      "$hash->{READINGS}{talkStatus}{VAL}" );
-   	        readingsSingleUpdate( $hash, "talkStatus", "stopped", 1 );
+		readingsBulkUpdate( $hash, "talkStatus", "stopped" );
 	    } else {
 		# Should be an ordinary playlist stop
-        	Log3( $hash, 1, "SB_PLAYER: no recall pending - talkstatus " .
+		Log3( $hash, 5, "SB_PLAYER: no recall pending - talkstatus " .
 		      "= $hash->{READINGS}{talkStatus}{VAL}" );
 	    }  
 	    
@@ -674,24 +677,24 @@ sub SB_PLAYER_Parse( $$ ) {
     } elsif( $cmd eq "power" ) {
 	if (!(@args)) {
 	    # power toggle : should only happen when called with SB CLI
-            if (ReadingsVal($hash->{NAME}, "state", "off") eq "on") {
-                readingsSingleUpdate( $hash, "presence", "absent", 0 );
-                readingsSingleUpdate( $hash, "state", "off", 1 );
-                readingsSingleUpdate( $hash, "power", "off", 1 );
+	    if (ReadingsVal($hash->{NAME}, "state", "off") eq "on") {
+		readingsBulkUpdate( $hash, "presence", "absent" );
+		readingsBulkUpdate( $hash, "state", "off" );
+		readingsBulkUpdate( $hash, "power", "off" );
 		SB_PLAYER_Amplifier( $hash );
-            } else {
-                readingsSingleUpdate( $hash, "state", "on", 1 );
-                readingsSingleUpdate( $hash, "power", "on", 1 );
+	    } else {
+		readingsBulkUpdate( $hash, "state", "on" );
+		readingsBulkUpdate( $hash, "power", "on" );
 		SB_PLAYER_Amplifier( $hash );
-            }
+	    }
 	} elsif( $args[ 0 ] eq "1" ) {
-	    readingsSingleUpdate( $hash, "state", "on", 1 );
-	    readingsSingleUpdate( $hash, "power", "on", 1 );
+	    readingsBulkUpdate( $hash, "state", "on" );
+	    readingsBulkUpdate( $hash, "power", "on" );
 	    SB_PLAYER_Amplifier( $hash );
 	} elsif( $args[ 0 ] eq "0" ) {
-	    readingsSingleUpdate( $hash, "presence", "absent", 0 );
-	    readingsSingleUpdate( $hash, "state", "off", 1 );
-	    readingsSingleUpdate( $hash, "power", "off", 1 );
+	    readingsBulkUpdate( $hash, "presence", "absent" );
+	    readingsBulkUpdate( $hash, "state", "off" );
+	    readingsBulkUpdate( $hash, "power", "off" );
 	    SB_PLAYER_Amplifier( $hash );
 	} else {
 	    # should be "?" normally
@@ -736,7 +739,7 @@ sub SB_PLAYER_Parse( $$ ) {
 	# to be ignored, we get two hashes
 
     } elsif( ($cmd eq "unknownir" ) || ($cmd eq "ir" ) ) {
-	readingsSingleUpdate( $hash, "lastir", $args[ 0 ], 1 );
+	readingsBulkUpdate( $hash, "lastir", $args[ 0 ] );
 
     } elsif( $cmd eq "status" ) {
 	SB_SERVER_ParsePlayerStatus( $hash, \@args );
@@ -750,10 +753,12 @@ sub SB_PLAYER_Parse( $$ ) {
 	if( $args[ 0 ] eq "server" ) {
 	    if( $args[ 1 ] eq "currentSong" ) {
 		readingsBulkUpdate( $hash, "currentMedia", $args[ 2 ] );
+	    } elsif( $args[ 1 ] eq "volume" ) {
+		SB_SERVER_UpdateVolumeReadings( $hash, $args[ 2 ], true );
 	    }
 	} else {
-	    readingsSingleUpdate( $hash, "lastunkowncmd", 
-				  $cmd . " " . join( " ", @args ), 1 );
+	    readingsBulkUpdate( $hash, "lastunkowncmd", 
+				  $cmd . " " . join( " ", @args ) );
 	}
 
 
@@ -763,8 +768,8 @@ sub SB_PLAYER_Parse( $$ ) {
 
     } else {
 	# unkown command, we push it to the last command thingy
-	readingsSingleUpdate( $hash, "lastunkowncmd", 
-			      $cmd . " " . join( " ", @args ), 1 );
+	readingsBulkUpdate( $hash, "lastunkowncmd", 
+			      $cmd . " " . join( " ", @args ) );
     }
     
     # and signal the end of the readings update
@@ -820,20 +825,26 @@ sub SB_PLAYER_Shutdown( $$ ) {
 sub SB_PLAYER_Get( $@ ) {
     my ($hash, @a) = @_;
     
-    #my $name = $hash->{NAME};
+    my $name = $hash->{NAME};
 
     Log3( $hash, 1, "SB_PLAYER_Get: called with @a" );
 
-    my $name = shift( @a );
+    if( @a < 2 ) {
+	my $msg = "SB_PLAYER_Get: $name: wrong number of arguments";
+	Log3( $hash, 5, $msg );
+	return( $msg );
+    }
+
+    #my $name = shift( @a );
+    shift( @a ); # name
     my $cmd  = shift( @a ); 
 
-    # if( int( @a ) != 2 ) {
-    # 	my $msg = "SB_PLAYER_Get: $name: wrong number of arguments";
-    # 	Log3( $hash, 5, $msg );
-    # 	return( $msg );
-    # }
-
-    if( $cmd eq "volume" ) {
+    if( $cmd eq "?" ) {
+	my $res = "Unknown argument ?, choose one of " . 
+	    "volume " . $hash->{FAVSET} . " ";
+	return( $res );
+	
+    } elsif( $cmd eq "volume" ) {
 	return( scalar( ReadingsVal( "$name", "volumeStraight", 25 ) ) );
 
     } elsif( $cmd eq $hash->{FAVSET} ) {
@@ -930,7 +941,12 @@ sub SB_PLAYER_Set( $@ ) {
 	}
 	# set the volume to the desired level. Needs to be 0..100
 	# no error checking here, as the server does this
-	IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume $arg[ 0 ]\n" );
+	if( $arg[ 0 ] <= AttrVal( $name, "volumeLimit", 100 ) ) {
+	    IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume $arg[ 0 ]\n" );
+	} else {
+	    IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume " . 
+		     AttrVal( $name, "volumeLimit", 50 ) . "\n" );
+	}
 
     } elsif( $cmd eq $hash->{FAVSET} ) {
 	if( defined( $SB_PLAYER_Favs{$name}{$arg[0]}{ID} ) ) {
@@ -944,16 +960,20 @@ sub SB_PLAYER_Set( $@ ) {
 
     } elsif( ( $cmd eq "volumeUp" ) || ( $cmd eq "VOLUMEUP" ) || 
 	     ( $cmd eq "VolumeUp" ) ) {
-	#SB_PLAYER_HTTPWrite( $hash, "mixer", "volume", 
-	#"%2B$attr{$name}{volumeStep} " );
-	my $volstr = sprintf( "+%02d", $attr{$name}{volumeStep} );
-	IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume $volstr\n" );
+	# increase volume
+	if( ( ReadingsVal( $name, "volumeStraight", 50 ) + 
+	      AttrVal( $name, "volumeStep", 10 ) ) <= 
+	    AttrVal( $name, "volumeLimit", 100 ) ) {
+	    my $volstr = sprintf( "+%02d", AttrVal( $name, "volumeStep", 10 ) );
+	    IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume $volstr\n" );
+	} else {
+	    IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume " . 
+		     AttrVal( $name, "volumeLimit", 50 ) . "\n" );
+	}
 
     } elsif( ( $cmd eq "volumeDown" ) || ( $cmd eq "VOLUMEDOWN" ) || 
 	     ( $cmd eq "VolumeDown" ) ) {
-	#SB_PLAYER_HTTPWrite( $hash, "mixer", "volume", 
-	#		   "%2D$attr{$name}{volumeStep}" );
-	my $volstr = sprintf( "-%02d", $attr{$name}{volumeStep} );
+	my $volstr = sprintf( "-%02d", AttrVal( $name, "volumeStep", 10 ) );
 	IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume $volstr\n" );
 
     } elsif( ( $cmd eq "mute" ) || ( $cmd eq "MUTE" ) || ( $cmd eq "Mute" ) ) {
@@ -1034,7 +1054,7 @@ sub SB_PLAYER_Set( $@ ) {
 	    . "&q=". $outstr; 
 
 	Log3( $hash, 1, "SB_PLAYER_Set: talk: $name: $outstr" );
-   	#readingsSingleUpdate( $hash, "talkStatus", "requested", 1 );
+	#readingsSingleUpdate( $hash, "talkStatus", "requested", 1 );
 
 	# example for making it speak some google text-to-speech
 	#IOWrite( $hash, "$hash->{PLAYERMAC} playlist play " . $outstr . "\n" );
@@ -1051,7 +1071,7 @@ sub SB_PLAYER_Set( $@ ) {
 	    Log3( $hash, 1, "SB_PLAYER: talkStatus = $hash->{READINGS}{talkStatus}{VAL}" );
 	    Log3( $hash, 1, "SB_PLAYER: talk: add $outstr" );
 	}
-   	readingsSingleUpdate( $hash, "talkStatus", "requested", 1 );
+	readingsSingleUpdate( $hash, "talkStatus", "requested", 1 );
 
     } elsif( ( $cmd eq "playlist" ) || 
 	     ( $cmd eq "PLAYLIST" ) || 
@@ -1126,8 +1146,14 @@ sub SB_PLAYER_Set( $@ ) {
 	# saves player's context
 
 	Log3( $hash, 5, "SB_PLAYER_Set: save " ); 
-        readingsSingleUpdate( $hash, "savedState", $hash->{READINGS}{state}{VAL}, 1 );
-        readingsSingleUpdate( $hash, "savedPlayStatus", $hash->{READINGS}{playStatus}{VAL}, 1 );
+	readingsSingleUpdate( $hash, 
+			      "savedState", 
+			      $hash->{READINGS}{state}{VAL}, 
+			      1 );
+	readingsSingleUpdate( $hash, 
+			      "savedPlayStatus", 
+			      $hash->{READINGS}{playStatus}{VAL}, 
+			      1 );
 	IOWrite( $hash, "$hash->{PLAYERMAC} playlist save fhem_$hash->{NAME}\n" );
 #	if( $hash->{READINGS}{savedState}{VAL} eq "pause" ) {
 #	    #  last commands changed the status to stopped ???
@@ -1198,7 +1224,7 @@ sub SB_PLAYER_Set( $@ ) {
     } elsif( $cmd eq "unsync" ) {
 	IOWrite( $hash, "$hash->{PLAYERMAC} sync -\n" );
 	SB_PLAYER_GetStatus( $hash );
-		
+	
     } elsif( $cmd eq "playlists" ) {
 	if( @arg == 1 ) {
 	    my $msg;
@@ -1449,7 +1475,7 @@ sub SB_PLAYER_RecBroadcast( $$@ ) {
     } elsif( $cmd eq "PLAYLISTS" ) {
 	if( $args[ 0 ] eq "ADD" ) {
 	    Log3( $hash, 5, "SB_PLAYER_RecbroadCast($name): PLAYLISTS ADD " . 
-	      "name:$args[1] id:$args[2] uid:$args[3]" );
+		  "name:$args[1] id:$args[2] uid:$args[3]" );
 	    $SB_PLAYER_Playlists{$name}{$args[3]}{ID} = $args[ 2 ];
 	    $SB_PLAYER_Playlists{$name}{$args[3]}{NAME} = $args[ 1 ];
 	    if( $hash->{SERVERPLAYLISTS} eq "" ) {
@@ -1571,7 +1597,7 @@ sub SB_PLAYER_Amplifier( $ ) {
 	}
     } else {
 	Log3( $hash, 4, "SB_PLAYER_Amplifier($name): ATTR amplifier " . 
-	    "set to wrong value [on|play]" );
+	      "set to wrong value [on|play]" );
     }
 
     fhem( "set $hash->{AMPLIFIER} $setvalue" );
@@ -1616,7 +1642,7 @@ sub SB_PLAYER_CoverArt( $ ) {
 	      $hash->{COVERARTURL} );
     }
 }
-    
+
 # ----------------------------------------------------------------------------
 #  Handle the return for a playerstatus query
 # ----------------------------------------------------------------------------
@@ -1746,15 +1772,12 @@ sub SB_SERVER_ParsePlayerStatus( $$ ) {
 	    next;
 
 	} elsif( $_ =~ /^(mixervolume:)(.*)/ ) {
-	    if( scalar( $2 ) > 0 ) {
-		readingsBulkUpdate( $hash, "volume", 
-				      scalar( $2 ) );
+	    if( ( index( $2, "+" ) != -1 ) || ( index( $2, "-" ) != -1 ) ) {
+		# that was a relative value. We do nothing and fire an update
+		IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume ?\n" );
 	    } else {
-		readingsBulkUpdate( $hash, "volume", 
-				      "muted" );
+		SB_SERVER_UpdateVolumeReadings( $hash, $2, true );
 	    }
-	    readingsBulkUpdate( $hash, "volumeStraight", 
-				  scalar( $2 ) );
 	    next;
 
 	} elsif( $_ =~ /^(playlistshuffle:)(.*)/ ) {
@@ -1808,6 +1831,34 @@ sub SB_SERVER_ParsePlayerStatus( $$ ) {
     # update the cover art
     SB_PLAYER_CoverArt( $hash );
 
+}
+
+
+# ----------------------------------------------------------------------------
+#  update the volume readings
+# ----------------------------------------------------------------------------
+sub SB_SERVER_UpdateVolumeReadings( $$$ ) {
+    my( $hash, $vol, $bulk ) = @_;
+    
+    my $name = $hash->{NAME};
+
+    if( $bulk == true ) {    
+	readingsBulkUpdate( $hash, "volumeStraight", $vol );
+	if( $vol > 0 ) {
+	    readingsBulkUpdate( $hash, "volume", $vol );
+	} else {
+	    readingsBulkUpdate( $hash, "volume", "muted" );
+	}
+    } else {
+	readingsSingleUpdate( $hash, "volumeStraight", $vol, 0 );
+	if( $vol > 0 ) {
+	    readingsSingleUpdate( $hash, "volume", $vol, 0 );
+	} else {
+	    readingsSingleUpdate( $hash, "volume", "muted", 0 );
+	}
+    }
+
+    return;
 }
 
 
