@@ -1427,6 +1427,8 @@ sub SB_PLAYER_RecBroadcast( $$@ ) {
 	    SB_PLAYER_Amplifier( $hash );
 	} elsif( $args[ 0 ] eq "ON" ) {
 	    # the server is back
+	    readingsSingleUpdate( $hash, "state", "on", 1 );
+	    readingsSingleUpdate( $hash, "power", "on", 1 );
 	    # do and update of the status
 	    InternalTimer( gettimeofday() + 10, 
 			   "SB_PLAYER_GetStatus", 
