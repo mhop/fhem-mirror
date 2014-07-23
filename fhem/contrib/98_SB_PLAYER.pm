@@ -327,6 +327,11 @@ sub SB_PLAYER_Define( $$ ) {
 	$hash->{READINGS}{currentTitle}{TIME} = $tn; 
     }
 
+    if( !defined( $hash->{READINGS}{favorites}{VAL} ) ) {
+	$hash->{READINGS}{favorites}{VAL} = "not";
+	$hash->{READINGS}{favorites}{TIME} = $tn; 
+    }
+
     # for the FHEM AV Development Guidelinses
     # we use this to store the currently playing ID to later on return to
     if( !defined( $hash->{READINGS}{currentMedia}{VAL} ) ) {
@@ -954,6 +959,7 @@ sub SB_PLAYER_Set( $@ ) {
 	    IOWrite( $hash, "$hash->{PLAYERMAC} favorites playlist " . 
 		     "play item_id:$fid\n" );
 	    $hash->{FAVSELECT} = $arg[ 0 ];
+	    readingsSingleUpdate( $hash, "$hash->{FAVSET}", "$arg[ 0 ]", 1 );
 	    SB_PLAYER_GetStatus( $hash );
 	}
 
