@@ -1522,7 +1522,30 @@ sub SB_SERVER_Notify( $$ ) {
 
   Log3( $hash, 4, "SB_SERVER_Notify($name): called" . 
       "Own:" . $name . " Device:" . $devName );
-  return( "" );
+  
+  if( $devName eq $hash->{RCCNAME} ) {
+      Log3( $hash, 1, "SB_SERVER_Notify($name): from $hash->{RCCNAME} " . 
+	  "with " . ReadingsVal( $hash->{RCCNAME}, "state", "off" ) );
+      if( ReadingsVal( $hash->{RCCNAME}, "state", "off" ) eq "off" ) {
+	  RemoveInternalTimer( $hash );
+	  InternalTimer( gettimeofday() + 10, 
+			 "SB_SERVER_Alive", 
+			 $hash, 
+			 0 );
+      } elsif( ReadingsVal( $hash->{RCCNAME}, "state", "off" ) eq "on" ) {
+	  RemoveInternalTimer( $hash );
+	  # do an update of the status, but SB CLI must come up
+	  InternalTimer( gettimeofday() + 20, 
+			 "SB_SERVER_Alive", 
+			 $hash, 
+			 0 );
+      } else {
+	  return( undef );
+      }
+      return( "" );
+  } else {
+      return( undef );
+  }
 
 }
 
