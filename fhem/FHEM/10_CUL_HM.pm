@@ -3442,8 +3442,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my (undef,undef,$lvl,$rLocDly,$speed) = @a;
     $rLocDly = 111600 if (!defined($rLocDly)||$rLocDly eq "ignore");# defaults
     $speed   = 30     if (!defined($speed));
-
-    return "please enter level 0 to 100" if (!defined($lvl)    || $lvl !~ m/^\d*\.?\d?$/ || $lvl>100);
+    $lvl = 127.5 if ($lvl eq "lock");
+    return "please enter level 0 to 100 or lock" 
+                                         if (  !defined($lvl)           
+                                             || $lvl !~ m/^\d*\.?\d?$/  
+                                             || ($lvl > 100 && $lvl != 127.5));
     return "reloclDelay range 0..65535 or ignore"
                                          if ( $rLocDly > 111600 ||
                                              ($rLocDly < 0.1 &&  $rLocDly ne '0' ));
