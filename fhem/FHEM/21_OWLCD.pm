@@ -77,7 +77,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.1";
+my $owx_version="5.2";
 #-- controller may be HD44780 or KS0073 
 #   these values have to be changed for different display 
 #   geometries or memory maps
@@ -526,7 +526,7 @@ sub OWLCD_Set($@) {
     if( uc($value) eq "ON"){
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "blkon", 0) );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "bklon", 0) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -535,7 +535,7 @@ sub OWLCD_Set($@) {
     }elsif( uc($value) eq "OFF" ){
       if ($hash->{ASYNC}) {
         eval {
-          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "blkoff", 0) );
+          OWX_ASYNC_Schedule( $hash, OWXLCD_PT_SetFunction($hash, "bkloff", 0) );
         };
         return GP_Catch($@) if $@;
       } else {
@@ -1274,7 +1274,7 @@ sub OWXLCD_PT_SetFunction($$$) {
       $select = "\x49";
     #=============== wrong write attempt ===============================
     } else {
-      return "OWXLCD: Wrong function selected";
+      die "OWXLCD: Wrong function selected '$cmd'";
     } 
     #"set.function"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
