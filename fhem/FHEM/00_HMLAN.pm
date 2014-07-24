@@ -401,7 +401,11 @@ sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
 
 sub HMLAN_Write($$$) {#########################################################
   my ($hash,$fn,$msg) = @_;
-  if (length($msg)>22){
+  if ($fn eq "cmd"){
+    HMLAN_SimpleWrite($hash,$msg);
+    return;
+  }
+  elsif (length($msg)>22){
     my ($mtype,$src,$dst) = (substr($msg, 8, 2),
                              substr($msg, 10, 6),
                              substr($msg, 16, 6));
@@ -661,9 +665,7 @@ sub HMLAN_Parse($$) {##########################################################
     Dispatch($hash, $dmsg, \%addvals);
   }
   elsif($mFld[0] eq 'HHM-LAN-IF'){#HMLAN version info
-    $hash->{serialNr} = $mFld[2];
-    $hash->{firmware} = sprintf("%d.%d", (hex($mFld[1])>>12)&0xf, hex($mFld[1]) & 0xffff);
-    $hash->{owner} = $mFld[4];
+
     $hash->{uptime} = HMLAN_uptime($mFld[5],$hash);
     $hash->{assignedIDsReport}=hex($mFld[6]);
     $hash->{helper}{q}{keepAliveRec} = 1;
@@ -674,6 +676,20 @@ sub HMLAN_Parse($$) {##########################################################
                                    .' O:'  .$mFld[4].' t:'.$mFld[5].' IDcnt:'.$mFld[6];
     my $myId = AttrVal($name, "hmId", "");
     $myId = $attr{$name}{hmId} = $mFld[4] if (!$myId);
+    
+    my (undef,$info) = unpack('A11A29',$rmsg);
+    if (!$hash->{helper}{info} || $hash->{helper}{info} ne $info){
+      my $fwVer = hex($mFld[1]);
+      $fwVer = sprintf("%d.%d", ($fwVer >> 12) & 0xf, $fwVer & 0xffff);
+      $hash->{owner} = $mFld[4];
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash,"D-firmware"    ,$fwVer);
+      readingsBulkUpdate($hash,"D-serialNr"    ,$mFld[2]);
+      readingsBulkUpdate($hash,"D-HMIdOriginal",$mFld[3]);
+      readingsBulkUpdate($hash,"D-HMIdAssigned",$mFld[4]);
+      readingsEndUpdate($hash,1);
+      $hash->{helper}{info} = $info;
+    }
 
     if($mFld[4] ne $myId && !AttrVal($name, "dummy", 0)) {
       Log3 $hash, 1, 'HMLAN setting owner to '.$myId.' from '.$mFld[4];

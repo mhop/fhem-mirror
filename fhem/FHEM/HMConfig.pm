@@ -1630,6 +1630,10 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
                      VALVE   => "6,2",
                      MODE    => "6,2" } },
 
+  "11;p01=00"   => { txt => "INHIBIT0ff"  , params => {
+                     CHANNEL  => "02,2" } },
+  "11;p01=01"   => { txt => "INHIBIT0n"   , params => {
+                     CHANNEL  => "02,2" } },
   "11;p01=02"   => { txt => "SET"         , params => {
                      CHANNEL  => "02,2",
                      VALUE    => "04,2",
