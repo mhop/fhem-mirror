@@ -759,6 +759,8 @@ sub CUL_HM_prtInit($){ #setup protocol variables after define
 sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   #message to be send to HMLAN/USB to define device communication defails
   #bit-usage is widely unknown. 
+  #p[1]: 00000001 = request AES
+  #p[1]: 00000010 = data pending - autosend wakeup if device send data
   my ($hash)=@_;
   my $rxt = CUL_HM_getRxType($hash);
   my $id = CUL_HM_hash2Id($hash);
@@ -2226,16 +2228,15 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     elsif($subType eq "01"){ #ACKinfo#################
       $success = "yes";
-      my $rssi = substr($p,8,2);# --calculate RSSI
+      my (undef,$chn,undef,undef,$rssi) = unpack '(A2)*',$p;
+      my $chnHash = CUL_HM_id2Hash($src.$chn);
+      push @evtEt,[$chnHash,0,"recentStateType:ack"];
       CUL_HM_storeRssi( $shash->{NAME}
                        ,($dhash?$dhash->{NAME}:$shash->{IODev}{NAME})
                        ,(-1)*(hex($rssi))
                        ,$mNo)
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       $reply = "ACKStatus";
-      my $chnHash = CUL_HM_id2Hash($src.substr($p,2,2));
-      push @evtEt,[$chnHash,0,"recentStateType:ack"];
-     
       if ($shash->{helper}{tmdOn}){
         if ((not hex(substr($p,6,2))&0x40) && # not timedOn, we have to repeat
             $shash->{helper}{tmdOn} eq substr($p,2,2) ){# virtual channels for dimmer may be incorrect
@@ -2504,7 +2505,9 @@ sub CUL_HM_parseCommon(@){#####################################################
       $ret= "parsed";
     }
     elsif($subType eq "06"){ #reply to status request=======================
-      my $rssi = substr($p,8,2);# --calculate RSSI
+      my (undef,$chn,undef,undef,$rssi) = unpack '(A2)*',$p;
+      my $chnHash = CUL_HM_id2Hash($src.$chn);
+      push @evtEt,[$chnHash,0,"recentStateType:info"];
       CUL_HM_storeRssi( $shash->{NAME}
                        ,($dhash?$dhash->{NAME}:$shash->{IODev}{NAME})
                        ,(-1)*(hex($rssi))
@@ -2512,8 +2515,6 @@ sub CUL_HM_parseCommon(@){#####################################################
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       @{$modules{CUL_HM}{helper}{qReqStat}} = grep { $_ ne $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{qReqStat}};
-      my $chnHash = CUL_HM_id2Hash($src.substr($p,2,2));
-      push @evtEt,[$chnHash,0,"recentStateType:info"];
 
       if ($pendType eq "StatusReq"){#it is the answer to our request
         my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
@@ -3508,8 +3509,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'8001C8'.$delay);# OPEN
   }
   elsif($cmd eq "inhibit") { ##################################################
-      return "$a[2] is not on or off" if($a[2] !~ m/^(on|off)$/);
-     my $val = ($a[2] eq "on") ? "01" : "00";
+    return "$a[2] is not on or off" if($a[2] !~ m/^(on|off)$/);
+    my $val = ($a[2] eq "on") ? "01" : "00";
+    CUL_HM_UpdtReadSingle($hash,"inhibit","set_$a[2]",1);
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.$chn);  # SET_LOCK
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
