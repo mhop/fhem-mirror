@@ -1076,7 +1076,7 @@ netatmo_Attr($$$)
   <ul>
     <li>update<br>
       trigger an update</li>
-    <li>public [&lt;station&gt;] [&lt;address&gt;] <args><br>
+    <li>public [&lt;station&gt;] [&lt;address&gt;] &lt;args&gt;<br>
       no arguments -> get all public stations in a radius of 0.025&deg; around global fhem longitude/latitude<br>
       &lt;rad&gt; -> get all public stations in a radius of &lt;rad&gt;&deg; around global fhem longitude/latitude<br>
       &lt;lon&gt; &lt;lat&gt; [&lt;rad&gt;] -> get all public stations in a radius of 0.025&deg; or &lt;rad&gt;&deg; around &lt;lon&gt;/&lt;lat&gt;<br>
