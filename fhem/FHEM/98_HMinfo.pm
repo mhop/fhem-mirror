@@ -371,16 +371,23 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsEmpty;
   my @peerIDnotDef;
   my @peerIDsNoPeer;
-  my @peerIDsUknTrig;
+  my @peerIDsTrigUnp;
+  my @peerIDsTrigUnd;
+  my @peerIDsAES;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
     my $peersUsed = CUL_HM_peerUsed($eName);
     next if ($peersUsed == 0);
         
     my $peerIDs = AttrVal($eName,"peerIDs",undef);
-    my @failTrig = map {CUL_HM_name2Id(substr($_,8))} grep /^trigDst_/,keys %{$defs{$eName}{READINGS}};
+    my @failTrig = map {CUL_HM_name2Id(substr($_,8))} 
+                   grep /^trigDst_/,
+                   keys %{$defs{$eName}{READINGS}};
     foreach (HMinfo_noDup(@failTrig)){
-      push @peerIDsUknTrig,"undefinedTrigger: ".$eName.":".$_ if($_ && $peerIDs !~ m/$_/);
+      push @peerIDsTrigUnp,"triggerUnpeered: ".$eName.":".$_ 
+            if($_ && $peerIDs !~ m/$_/);
+      push @peerIDsTrigUnd,"triggerUndefined: ".$eName.":".$_ 
+            if($_ && !$modules{CUL_HM}{defptr}{$_});
     }
 
     if (!$peerIDs){                # no peers - is this correct?
@@ -392,8 +399,9 @@ sub HMinfo_peerCheck(@) { #####################################################
     else{# work on a valid list:
       my $id = $defs{$eName}{DEF};
       my $devId = substr($id,0,6);
-      my $st = AttrVal(CUL_HM_id2Name($devId),"subType","");# from Master
-      my $md = AttrVal(CUL_HM_id2Name($devId),"model","");
+      my $devN = CUL_HM_id2Name($devId);
+      my $st = AttrVal($devN,"subType","");# from Device
+      my $md = AttrVal($devN,"model","");
       next if ($st eq "repeater");
       foreach my $pId (split",",$peerIDs){
         next if ($pId eq "00000000" ||$pId =~m /$devId/);
@@ -413,16 +421,25 @@ sub HMinfo_peerCheck(@) { #####################################################
           my $pPlist = AttrVal($pName,"peerIDs","");
           push @peerIDsNoPeer,$eName." p:".$pName 
                 if (!$pPlist || $pPlist !~ m/$id/);
+          my $pDName = CUL_HM_id2Name($pDid);
+          if (AttrVal($pDName,"subType","") eq "virtual"){
+            if (AttrVal($devN,"aesCommReq",0) != 0){
+              push @peerIDsAES,$eName." p:".$pName     
+                    if (AttrVal($pDName,"model","") ne "CCU-FHEM");
+            }
+          }
         }
       }
     }
   }
   my $ret = "";
-  $ret .="\n\n peer list not read"  ."\n    ".(join "\n    ",sort @peerIDsEmpty)  if(@peerIDsEmpty);
-  $ret .="\n\n peer list incomplete"."\n    ".(join "\n    ",sort @peerIDsFail)   if(@peerIDsFail);
-  $ret .="\n\n peer not defined"    ."\n    ".(join "\n    ",sort @peerIDnotDef)  if(@peerIDnotDef);
-  $ret .="\n\n peer not verified"   ."\n    ".(join "\n    ",sort @peerIDsNoPeer) if(@peerIDsNoPeer);
-  $ret .="\n\n peer unknown trigger"."\n    ".(join "\n    ",sort @peerIDsUknTrig)if(@peerIDsUknTrig);
+  $ret .="\n\n peer list not read. Use getConfig to read it."          ."\n    ".(join "\n    ",sort @peerIDsEmpty  )if(@peerIDsEmpty);
+  $ret .="\n\n peer list incomplete. Use getConfig to read it."        ."\n    ".(join "\n    ",sort @peerIDsFail   )if(@peerIDsFail);
+  $ret .="\n\n peer not defined"                                       ."\n    ".(join "\n    ",sort @peerIDnotDef  )if(@peerIDnotDef);
+  $ret .="\n\n peer not verified. Check that peer is set on both sides"."\n    ".(join "\n    ",sort @peerIDsNoPeer )if(@peerIDsNoPeer);
+  $ret .="\n\n trigger sent to unpeered device"                        ."\n    ".(join "\n    ",sort @peerIDsTrigUnp)if(@peerIDsTrigUnp);
+  $ret .="\n\n trigger sent to undefined device"                       ."\n    ".(join "\n    ",sort @peerIDsTrigUnd)if(@peerIDsTrigUnd);
+  $ret .="\n\n aesComReq set but virtual peer is not vccu - won't work"."\n    ".(join "\n    ",sort @peerIDsAES    )if(@peerIDsAES);
   
   return  $ret;
 }
@@ -625,9 +642,9 @@ sub HMinfo_getEntities(@) { ###################################################
     next if ( !$eName || $eName !~ m/$re/);
     my $eIg   = CUL_HM_Get($eHash,$eName,"param","ignore");
     $eIg = "" if ($eIg eq "undefined");
+    next if (!$doIgn && $eIg);
     next if (!(($doDev && $eHash->{helper}{role}{dev}) ||
                ($doChn && $eHash->{helper}{role}{chn})));
-    next if (!$doIgn && $eIg);
     next if ( $noVrt && $eHash->{helper}{role}{vrt});
     next if ( $noPhy && !$eHash->{helper}{role}{vrt});
     my $eSt = CUL_HM_Get($eHash,$eName,"param","subType");
@@ -1152,6 +1169,11 @@ sub HMinfo_SetFn($@) {#########################################################
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
     $ret = HMinfo_loadConfig($filter,$fn); 
   }
+  elsif($cmd eq "verifyConfig"){##action: verifyConfig-------------------------
+    my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
+    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $ret = HMinfo_verifyConfig($filter,$fn); 
+  }
   elsif($cmd eq "purgeConfig"){##action: purgeConfig---------------------------
     my $id = ++$hash->{nb}{cnt};
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
@@ -1180,7 +1202,7 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "?")          {##action: get commandlist-----------------------
     my @cmdLst =     
            ( "autoReadReg","clear"  
-            ,"archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
+            ,"archConfig:-0,-a","saveConfig","verifyConfig","loadConfig","purgeConfig","update"
             ,"cpRegs"
             ,"tempList tempListTmpl"
             ,"templateDef","templateSet");
@@ -1217,6 +1239,7 @@ sub HMInfo_help(){ ############################################################
            ."\n set archConfig [-a] [<file>]                       # as saveConfig but only if data of entity is complete"
            ."\n set purgeConfig [<file>]                           # purge content of saved configfile "
            ."\n set loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
+           ."\n set verifyConfig [<typeFilter>] <file>             # compare curent date with configfile,report differences"
            ."\n set autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
            ."\n set tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
            ."\n set tempListTmpl[<typeFilter>][templateName][<filename>]# program a templist from a template in the file to one or multiple devices"
@@ -1273,6 +1296,71 @@ sub HMInfo_help(){ ############################################################
            ;
 }
 
+sub HMinfo_verifyConfig($@) {##################################################
+  my ($filter,$fName)=@_;
+  $filter = "." if (!$filter);
+  my $ret;
+
+  open(aSave, "$fName") || return("Can't open $fName: $!");
+  my @elPeer = ();
+  my @elReg = ();
+  my @entryNF = ();
+  my @elOk = ();
+  while(<aSave>){
+    chomp;
+    my $line = $_;
+    next if (   $line !~ m/set .* (peerBulk|regBulk) .*/);
+    my ($cmd1,$eN,$cmd,$param) = split(" ",$line,4);
+    next if ($eN !~ m/$filter/);
+    if (!$eN || !$defs{$eN}){
+      push @entryNF,"$eN deleted";
+      next;
+    }
+    
+    if($cmd eq "peerBulk"){
+      my $ePeer = AttrVal($eN,"peerIDs","");
+      if ($param ne $ePeer){
+        my @fPeers = grep !/00000000/,split(",",$param);#filepeers
+        my @ePeers = grep !/00000000/,split(",",$ePeer);#entitypeers
+        my %fp = map {$_=>1} @ePeers;
+        my @onlyFile = grep { !$fp{$_} } @fPeers; 
+        my %ep = map {$_=>1} @fPeers;
+        my @onlyEnt  = grep { !$ep{$_} } @ePeers; 
+        push @elPeer,"$eN peer deleted: $_" foreach(@onlyFile);
+        push @elPeer,"$eN peer added  : $_" foreach(@onlyEnt);
+      }
+    }
+    elsif($cmd eq "regBulk"){
+      next if($param !~ m/RegL_0[0-9]:/);
+      $param =~ s/\.RegL/RegL/;
+      my ($reg,$data) = split(" ",$param,2);
+      my $exp = CUL_HM_getAttrInt($eN,"expert");
+      my $eReg = ReadingsVal($eN,(($exp != 2)?".":"").$reg,"");
+      if ($eReg ne $data){
+#        my @fRegs = split(" ",$data);#fileRegs
+#        my @eRegs = split(" ",$eReg);#entityRegs
+#        my %fr = map {$_=>1} @eRegs;
+#        my @onlyFile = grep { !$fr{$_} } @fRegs; 
+#        my %er = map {$_=>1} @fRegs;
+#        my @onlyEnt  = grep { !$er{$_} } @eRegs; 
+#        
+#        push @elReg,"$eN Reg deleted: $_" foreach(@onlyFile);
+#        push @elReg,"$eN Reg added  : $_" foreach(@onlyEnt);
+        push @elReg,"$eN Reg $reg changed";
+      }
+      push @elOk,"   $eN" if (  !scalar @elPeer 
+                              &&!scalar @elReg);
+    }
+  }
+  close(aSave);
+  @elOk = HMinfo_noDup(@elOk);
+  $ret .= "\nverified:\n   "        .join("\n   ",sort(@elOk))    if (scalar @elOk);
+  $ret .= "\npeer mismatch:\n   "   .join("\n   ",sort(@elPeer))  if (scalar @elPeer);
+  $ret .= "\nreg mismatch:\n   "    .join("\n   ",sort(@elReg ))  if (scalar @elReg);
+  $ret .= "\nmissing devices:\n   " .join("\n   ",sort(@entryNF)) if (scalar @entryNF);
+
+  return $ret;
+}
 sub HMinfo_loadConfig($@) {####################################################
   my ($filter,$fName)=@_;
   $filter = "." if (!$filter);
@@ -1366,6 +1454,7 @@ sub HMinfo_purgeConfig($) {####################################################
              && $line !~ m/setreading .*/);
     my ($cmd,$eN,$typ,$p1,$p2) = split(" ",$line,5);
     if ($cmd eq "set" && $typ eq "regBulk"){
+      $p1 =~ s/\.RegL_/RegL_/;
       $typ .= " $p1";
       $p1 = $p2;
     }
@@ -1378,10 +1467,29 @@ sub HMinfo_purgeConfig($) {####################################################
   open(aSave, ">$fName") || return("Can't open $fName: $!");
   print aSave "\n\n#============data purged: ".TimeNow();
   foreach my $eN(sort keys %purgeH){
-    next if (!defined $defs{$eN});
+    next if (!defined $defs{$eN}); # remove deleted devices
     print aSave "\n\n#-------------- entity:".$eN." ------------";
     foreach my $cmd (sort keys %{$purgeH{$eN}}){
+      my @peers = ();
       foreach my $typ (sort keys %{$purgeH{$eN}{$cmd}}){
+
+        if ($typ eq "peerBulk"){# need peers to identify valid register
+          @peers =  map {CUL_HM_id2Name($_)}
+                    grep !/(00000000|peerBulk)/,
+                    split",",$purgeH{$eN}{$cmd}{$typ};
+        }
+        elsif($typ =~ m/^regBulk/){#
+          if ($typ !~ m/regBulk RegL_..:(self..)?$/){# only if peer is mentioned
+            my $found = 0;
+            foreach my $p (@peers){
+              if ($typ =~ m/regBulk RegL_..:$p/){
+                $found = 1;
+                last;
+              }
+            }
+            next if (!$found);
+          }
+        }
         print aSave "\n$cmd $eN $typ ".$purgeH{$eN}{$cmd}{$typ};
       }
     }
@@ -1851,6 +1959,12 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           purge will use the latest stored readings and remove older one. 
           See <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
       </li>
+      <li><a name="#HMinfoverifyConfig">verifyConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          Compare date in config file to the currentactive data and report differences. 
+          Possibly usable with a known-good configuration that was saved before. 
+          It may make sense to purge the config file before.
+          See <a href="#CUL_HMpurgeConfig">CUL_HM purgeConfig</a>.
+      </li>
 
       
          <br>
@@ -2046,6 +2160,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        <a ref="#HMinfosaveConfig">saveConfig</a>, 
        <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
        <a ref="#HMinfoloadConfig">loadConfig</a><br>
+       <a ref="#HMinfoverifyConfig">verifyConfig</a><br>
      </li>
      <li><a name="#HMinfohmManualOper">hmManualOper</a>
        set to 1 will prevent any automatic operation, update or default settings
@@ -2259,6 +2374,12 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           Bereinigt die gespeicherte Konfigurationsdatei. Durch die kumulative Speicherung der Registerwerte bleiben die
           zuletzt gespeicherten Werte erhalten und alle &auml;lteren werden gel&ouml;scht.
           Siehe <a href="#CUL_HMsaveConfig">CUL_HM saveConfig</a>.
+      </li>
+      <li><a name="#HMinfoverifyConfig">verifyConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
+          vergleicht die aktuellen Daten mit dem configFile und zeigt unterschiede auf. 
+          Es ist hilfreich wenn man eine bekannt gute Konfiguration gespeichert hat und gegen diese vergleiche will.
+          Ein purge vorher macht sinn. 
+          Siehe <a href="#CUL_HMpurgeConfig">CUL_HM purgeConfig</a>.
       </li>
       <br>
       
