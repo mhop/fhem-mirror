@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: added 36_Level.pm
   - feature: netatmo: added plz support for public stations
   - change:  70_ENIGMA2: keep reading for recordings up-to-date during standby
   - bugfix:  98_Text2Speech: - playing mp3files directly, eg: :ring.mp3:
