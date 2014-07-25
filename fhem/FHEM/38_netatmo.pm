@@ -1081,8 +1081,8 @@ netatmo_Attr($$$)
       &lt;rad&gt; -> get all public stations in a radius of &lt;rad&gt;&deg; around global fhem longitude/latitude<br>
       &lt;lon&gt; &lt;lat&gt; [&lt;rad&gt;] -> get all public stations in a radius of 0.025&deg; or &lt;rad&gt;&deg; around &lt;lon&gt;/&lt;lat&gt;<br>
       &lt;lon_ne&gt; &lt;lat_ne&gt; &lt;lon_sw&gt; &lt;lat_sw&gt; -> get all public stations in the area of &lt;lon_ne&gt; &lt;lat_ne&gt; &lt;lon_sw&gt; &lt;lat_sw&gt;<br>
+      if &lt;address&gt; is given then list stations in the area of this address. can be given as 5 digit german postal code or a: followed by a textual address. all spaces have to be replaced by a +.<br></li>
       if &lt;station&gt; is given then print fhem define for this station<br></li>
-      if &lt;address&gt; is given then list stations in the area of this address. can be given as 5 digit postal code a: followed by a textual address. all spaces have to be replaced by a +.<br></li>
   </ul><br>
 
   <a name="netatmo_Attr"></a>
