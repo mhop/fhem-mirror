@@ -831,10 +831,19 @@ sub CUL_HM_Parse($$) {#########################################################
              ref($iohash) ne 'HASH'  ||
              $t ne 'A'  || 
              length($msg)<20);
+
   if ($modules{CUL_HM}{helper}{updating}){
-    CUL_HM_FWupdateSteps($msg);
-    return "";
+    if ("done" eq CUL_HM_FWupdateSteps($msg)){
+      my $shash = CUL_HM_id2Hash($src);
+      my @e = CUL_HM_pushEvnts();
+      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$shash->{NAME}$/,@e);
+      return (@e,$shash->{NAME}); #return something to please dispatcher
+    }
+    else{
+      return "";
+    }
   }
+  
   $p = "" if(!defined($p));
   my @mI = unpack '(A2)*',$p; # split message info to bytes
   return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
@@ -4144,6 +4153,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     close(aUpdtF);
     # --- we are prepared start update---
+    CUL_HM_protState($hash,"CMDs_FWupdate");
     $modules{CUL_HM}{helper}{updating} = 1;
     $modules{CUL_HM}{helper}{updatingName} = $name;
     $modules{CUL_HM}{helper}{updateData} = \@imA;
@@ -4409,7 +4419,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $hash->{hmPairSerial} = $arg;
     InternalTimer(gettimeofday()+30, "CUL_HM_RemoveHMPair", "hmPairForSec:$name", 1);
   }
-
 
   else{
     return "$cmd not implemented - contact sysop";
@@ -4766,6 +4775,7 @@ sub CUL_HM_PushCmdStack($$) {
 sub CUL_HM_ProcessCmdStack($) {
   my ($chnhash) = @_;
   my $hash = CUL_HM_getDeviceHash($chnhash);
+
   if (!$hash->{helper}{prt}{rspWait}{cmd}){
     if($hash->{cmdStack} && @{$hash->{cmdStack}}){
       CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
@@ -4806,6 +4816,7 @@ sub CUL_HM_respWaitSu($@){ #setup response for multi-message response
 sub CUL_HM_responseSetup($$) {#store all we need to handle the response
  #setup repeatTimer and cmdStackControll
   my ($hash,$cmd) =  @_;
+  return if($hash->{helper}{prt}{sProc} == 3);#not relevant while FW update
   my (undef,$mNo,$mFlg,$mTp,$src,$dst,$chn,$sTp,$dat) = 
         unpack 'A4A2A2A2A6A6A2A2A*',$cmd;
   $mFlg = hex($mFlg);
@@ -5209,14 +5220,14 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   my $hash = $defs{$name};
   my $mNoA = sprintf("%02X",$mNo);
   
-  return if ($mIn !~ m/$mNoA..02$dst${id}00/ && $mIn !~ m/..10${dst}00000000/);
+  return "" if ($mIn !~ m/$mNoA..02$dst${id}00/ && $mIn !~ m/..10${dst}00000000/);
   if ($mIn =~ m/$mNoA..02$dst${id}00/){
     $modules{CUL_HM}{helper}{updateRetry} = 0;
     $modules{CUL_HM}{helper}{updateNbrPassed} = $mNo;
   }
   
   if ($step == 0){#check bootloader entered - now change speed
-    return if ($mIn =~ m/$mNoA..02$dst${id}00/);
+    return "" if ($mIn =~ m/$mNoA..02$dst${id}00/);
     Log3 $name,2,"CUL_HM fwUpdate $name entered mode - switch speed";
     $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
     CUL_HM_SndCmd($hash,"${mNoA}00CB$id${dst}105B11F81547");
@@ -5249,6 +5260,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   if ($blocks < $step){#last block
     CUL_HM_FWupdateEnd("done");
     Log3 $name,2,"CUL_HM fwUpdate completed";
+    return "done";
   }
   else{# programming continue
     my $bl = ${$modules{CUL_HM}{helper}{updateData}}[$step-1];
@@ -5263,6 +5275,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
     $modules{CUL_HM}{helper}{updateNbr} = $mNo;
     #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim","${dst}${id}00",0);
     InternalTimer(gettimeofday()+5,"CUL_HM_FWupdateBTo","fail:Block$step",0);
+    return "";
   }
 }
 sub CUL_HM_FWupdateBTo($){# FW update block timeout
@@ -5279,8 +5292,8 @@ sub CUL_HM_FWupdateBTo($){# FW update block timeout
 }
 sub CUL_HM_FWupdateEnd($){#end FW update
   my $in = shift;
-  CUL_HM_UpdtReadSingle($defs{$modules{CUL_HM}{helper}{updatingName}},
-                        "fwUpdate",$in,1);
+  my $hash = $defs{$modules{CUL_HM}{helper}{updatingName}};
+  CUL_HM_UpdtReadSingle($hash,"fwUpdate",$in,1);
   CUL_HM_FWupdateSpeed($modules{CUL_HM}{helper}{updatingName},10);
   delete $defs{$modules{CUL_HM}{helper}{updatingName}}->{cmdStack};
   delete $modules{CUL_HM}{helper}{updating};
@@ -5290,7 +5303,9 @@ sub CUL_HM_FWupdateEnd($){#end FW update
   delete $modules{CUL_HM}{helper}{updateDst};
   delete $modules{CUL_HM}{helper}{updateId};
   delete $modules{CUL_HM}{helper}{updateNbr};
-  
+  CUL_HM_respPendRm($hash);
+
+  CUL_HM_protState($hash,"CMDs_done_FWupdate");
 }
 sub CUL_HM_FWupdateSpeed($$){#set IO speed
   my ($name,$speed) = @_;
@@ -5358,6 +5373,10 @@ sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
   my $name = $hash->{NAME};
   my $sProcIn = $hash->{helper}{prt}{sProc};
+  if ($sProcIn == 3){#FW update processing
+    # do not change state - commandstack is bypassed
+    return if ( $state !~ m/(Info_Cleared|_FWupdate)/);
+  }
   if   ($state =~ m/processing/) {
     $hash->{helper}{prt}{sProc} = 1;
   }
@@ -5377,6 +5396,9 @@ sub CUL_HM_protState($$){
   }
   elsif($state eq "CMDs_pending"){
     $hash->{helper}{prt}{sProc} = 2;
+  }
+  elsif($state eq "CMDs_FWupdate"){
+    $hash->{helper}{prt}{sProc} = 3;
   }
   $hash->{protState} = $state;
   if (!$hash->{helper}{role}{chn}){
