@@ -36,7 +36,6 @@ sub WOL_Initialize($) {
 ################################################################################
 sub WOL_Set($@) {
   my ($hash, @a) = @_;
-  
   return "no set value specified" if(int(@a) < 2);
   return "Unknown argument $a[1], choose one of on off refresh" if($a[1] eq "?");
   
@@ -69,7 +68,7 @@ sub WOL_Set($@) {
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_UpdateReadings", $hash, 0);
 
-  if (AttrVal($name, "state", "") eq "on") {
+  if ($hash->{STATE} eq "on") {
       WOL_GetUpdate($hash);
   }
   return undef;
@@ -133,8 +132,7 @@ sub WOL_UpdateReadings($) {
   $hash->{INTERVAL} = AttrVal($hash->{NAME}, "interval", 900);
 
   my $ip = $hash->{IP};
-  my $name  = $hash->{NAME};
-  
+
   readingsBeginUpdate ($hash);
 
   if (`ping -c 1 -w 2 $ip` =~ m/100%/) {
@@ -150,12 +148,11 @@ sub WOL_UpdateReadings($) {
 sub WOL_GetUpdate($) {
   my ($hash) = @_;
 
-  my $name  = $hash->{NAME};
-  if (AttrVal($name, "state", "") eq "on") {
+  if ($hash->{STATE} eq "on") {
      wake($hash);
   }
 
-  if ($hash->{REPEAT} > 0 && AttrVal($name, "state", "") eq "on" ) {
+  if ($hash->{REPEAT} > 0 && $hash->{STATE} eq "on" ) {
      InternalTimer(gettimeofday()+$hash->{REPEAT}, "WOL_GetUpdate", $hash, 0);
   }
 }
