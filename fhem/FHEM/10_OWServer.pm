@@ -381,9 +381,11 @@ OWServer_Autocreate($)
 
   my %defined = ();
   foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "OWDevice");
+    next if($defs{$d}{TYPE} !~ /^OW(Device|AD|ID|MULTI|COUNT|LCD|SWITCH|THERM)$/);
     if(defined($defs{$d}{fhem}) && defined($defs{$d}{fhem}{address})) {
-      $defined{$defs{$d}{fhem}{address}} = $d;
+      $defined{$defs{$d}{fhem}{address}} = $d; 
+    } elsif(defined($defs{$d}{OW_ID}) and defined($defs{$d}{OW_FAMILY})) {
+      $defined{"$defs{$d}{OW_FAMILY}.$defs{$d}{OW_ID}"} = $d;
     }
   }
 

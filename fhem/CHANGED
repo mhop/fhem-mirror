@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 10_OWServer autocreate coexists with OWXXX modules (Boris & ntruchsess)
   - feature: added 36_Level.pm
   - feature: netatmo: added plz support for public stations
   - change:  70_ENIGMA2: keep reading for recordings up-to-date during standby
