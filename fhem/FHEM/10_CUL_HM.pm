@@ -931,7 +931,7 @@ sub CUL_HM_Parse($$) {#########################################################
       if($mTp =~ m /^4[01]/){ #someone is triggered##########
         my $chn = hex($mI[0])& 0x3f;
         my $cName = CUL_HM_id2Name($src.sprintf("%02X",$chn));
-         
+ 
         my @peers = grep !/00000000/,split(",",AttrVal($cName,"peerIDs",""));
         foreach my $peer (grep /$dst/,@peers){
           my $pName = CUL_HM_id2Name($peer);
@@ -2375,6 +2375,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       my $mNoInt = hex($mNo); 
       if ($pendType eq "PeerList"  && 
           ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
+        $rspWait->{mNo} = $mNoInt;
 
         my $chn = $shash->{helper}{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn};
@@ -2566,8 +2567,8 @@ sub CUL_HM_parseCommon(@){#####################################################
 
     my $peerIDs = AttrVal($cName,"peerIDs","");
     if ($peerIDs =~ m/$dst/){# dst is available in the ID list
-      my @peers = grep !/00000000/,split(",",$peerIDs);
-      foreach my $peer (grep /^$dst/,@peers){
+      my @peers = grep /^$dst/,split(",",$peerIDs);
+      foreach my $peer (@peers){
         my $pName = CUL_HM_id2Name($peer);
         $pName = CUL_HM_id2Name($dst) if (!$defs{$pName}); #$dst - device-id of $peer
         next if (!$defs{$pName});
@@ -2577,7 +2578,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         CUL_HM_stateUpdatDly($pName,10) if ($mTp eq "40");#conditional request may not deliver state-req
       }
     }
-    else{# remote triggers a device that is not listed
+    elsif($mFlgH & 2){# dst can be garbage - but not if answer request
       my $pName = CUL_HM_id2Name($dst);
       push @evtEt,[$cHash,1,"trigDst_$pName:noConfig"];
     }
@@ -6316,8 +6317,7 @@ sub CUL_HM_repReadings($) {   # parse repeater
     push @pB,$b;
   }
   my @readList;
-  push @readList,"repPeer_$_:undefined" for(0..35);#set default empty
-
+  push @readList,"repPeer_".sprintf("%02d",$_+1).":undefined" for(0..35);#set default empty
   my @retL;
   foreach my$pId(sort keys %pCnt){
     my ($pdID,$bdcst,$no) = unpack('A6A2A2',$pId);
@@ -6532,7 +6532,7 @@ sub CUL_HM_UpdtReadBulk(@) { #update a bunch of readings and trigger the events
     readingsBeginUpdate($hash);
     foreach my $rd (@readings){
       next if (!$rd);
-      my ($rdName, $rdVal) = split(":",$rd, 2);
+      my ($rdName, $rdVal) = split(":",$rd, 2); 
       readingsBulkUpdate($hash,$rdName,
                                ((defined($rdVal) && $rdVal ne "")?$rdVal:"-"));
     }
@@ -9195,7 +9195,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           </li>
           </ul>
         </li>
-        <li>HM-Sys-sRP-Pl<br><br>
+        <br>
+        <li>HM-Sys-sRP-Pl<br>
           legt Eintr&auml;ge f&uuml;r den Repeater an. Bis zu 36 Eintr&auml;ge k&ouml;nnen angelegt werden.
           <ul>
             <li><B>setRepeat &lt;entry&gt; &lt;sender&gt; &lt;receiver&gt; &lt;broadcast&gt;</B><br>
@@ -9214,7 +9215,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               Number src dst broadcast verify<br>
               number: Nummer des Eintrags in der Liste<br>
               src: Ursprungsger&auml;t der Nachricht - aus Repeater ausgelesen<br>
-              dst: Zielger&auml;t der Nachricht - asu den Attributen abgeleitet<br>
+              dst: Zielger&auml;t der Nachricht - aus den Attributen abgeleitet<br>
               broadcast: sollen Broadcasts weitergeleitet werden - aus Repeater ausgelesen<br>
               verify: stimmen Attribute und ausgelesen Werte &uuml;berein?<br>
             </li>
