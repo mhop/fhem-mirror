@@ -22,9 +22,10 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Version: 1.0 - 2014-04-10
+# Version: 1.1 - 2014-07-28
 #
 # Changelog:
+# v1.1 2014-07-28 Added UTF8 encoding / decoding to Messages
 # v1.0 2014-04-10 Stable Release - Housekeeping & Add to SVN
 # v0.3 2014-03-19 Fixed SetPresence() & Added extensive debugging capabilities by setting $debug to 1
 # v0.2 2014-01-28 Added SSL option in addition to TLS 
@@ -104,6 +105,7 @@ sub Jabber_Set_Message($@)
 {
   my ($hash,$dst,@tmpMsg) = @_;
   my $message = join(" ", @tmpMsg);
+  utf8::decode($message);
   if (Jabber_CheckConnection($hash)) {
     $hash->{JabberDevice}->MessageSend(to=>$dst,
                       subject=>"",
@@ -414,6 +416,7 @@ sub Jabber_INC_Message {
   
   my $sender = $xmpp_message->GetFrom();
   my $message = $xmpp_message->GetBody();
+  utf8::encode($message);
   Log 0, "$hash->{NAME} INC_Message: $sender: $message\n" if $debug;
   my $JID = new Net::Jabber::JID($sender);
   my $senderShort = $JID->GetJID("base");
