@@ -451,7 +451,6 @@ my $K_actDetID = '000000'; # id of actionDetector
 # Blind          9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
-# TC-IT 16:00
 #Keymatic 3.3 unknown, seen 1 here
 
 #--- list 1, Channel level------------------
@@ -766,6 +765,7 @@ my $K_actDetID = '000000'; # id of actionDetector
                         },
   threeStateSensor    =>{ cyclicInfoMsg   =>1,                    transmDevTryMax =>1
                          ,                                        transmitTryMax  =>1
+                         ,sign            =>1
                          ,peerNeedsBurst  =>1,expectAES       =>1
                     },
   sensRain            =>{ transmDevTryMax =>1,localResDis     =>1},
@@ -1000,7 +1000,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
                          ,winOpnTemp      =>1,winOpnPeriod    =>1,winOpnBoost     =>1,winOpnMode      =>1
                          ,winOpnDetFall   =>1
                          },
-  "HM-CC-RT-DN06"     =>{ CtrlRc          =>1,TempRC          =>1},
+  "HM-CC-RT-DN06"     =>{ sign            =>1,CtrlRc          =>1,TempRC          =>1},
   "HM-TC-IT-WM-W-EU02"=>{ dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1,tempOffset      =>1
                          ,hyst2point      =>1,heatCool        =>1,boostPeriod     =>1,winOpnBoost     =>1
                          ,showWeekday     =>1,showInfo        =>1,showSetTemp     =>1,showHumidity    =>1

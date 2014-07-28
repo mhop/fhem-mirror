@@ -1336,23 +1336,52 @@ sub HMinfo_verifyConfig($@) {##################################################
       my ($reg,$data) = split(" ",$param,2);
       my $exp = CUL_HM_getAttrInt($eN,"expert");
       my $eReg = ReadingsVal($eN,(($exp != 2)?".":"").$reg,"");
-      if ($eReg ne $data){
-#        my @fRegs = split(" ",$data);#fileRegs
-#        my @eRegs = split(" ",$eReg);#entityRegs
-#        my %fr = map {$_=>1} @eRegs;
-#        my @onlyFile = grep { !$fr{$_} } @fRegs; 
-#        my %er = map {$_=>1} @fRegs;
-#        my @onlyEnt  = grep { !$er{$_} } @eRegs; 
-#        
-#        push @elReg,"$eN Reg deleted: $_" foreach(@onlyFile);
-#        push @elReg,"$eN Reg added  : $_" foreach(@onlyEnt);
-        push @elReg,"$eN Reg $reg changed";
+      my ($ensp,$dnsp) = ($eReg,$data);
+      $ensp =~ s/ //g;
+      $dnsp =~ s/ //g;
+      if ($ensp ne $dnsp){
+
+        my %r; # generate struct with changes addresses
+        foreach my $reg(grep /..:../, split(" ",$eReg)){
+          my ($a,$d) = split(":",$reg);
+          $r{$a}{c} = $d;
+        }
+        foreach my $reg(grep !/00:00/,grep /..:../, split(" ",$data)){
+          my ($a,$d) = split(":",$reg);
+          next if (!$a || $a eq "00");
+          if   (!defined $r{$a}){$r{$a}{f} = $d;$r{$a}{c} = "";}
+          elsif($r{$a}{c} ne $d){$r{$a}{f} = $d;}
+          else                  {delete $r{$a};}
+        }
+        $r{$_}{f} = "" foreach (grep {!defined $r{$_}{f}} grep !/00/,keys %r);
+        my @aCh = map {hex($_)} keys %r;#list of changed addresses
+        
+        # search register valid for thie entity
+        my $dN = CUL_HM_getDeviceName($eN);
+        my $chn = CUL_HM_name2Id($eN);
+        my $listNo = substr($reg,6,1);
+        $chn = (length($chn) == 8)?substr($chn,6,2):"";
+        my $culHmRegDefine        =\%HMConfig::culHmRegDefine;
+        my @regArr = grep{$culHmRegDefine->{$_}->{l} eq $listNo} 
+                     CUL_HM_getRegN(AttrVal($dN,"subType","")
+                                   ,AttrVal($dN,"model","")
+                                   ,$chn);
+        # now identify which register belongs to suspect address. 
+        foreach my $rgN (@regArr){
+          next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
+          my $a = $culHmRegDefine->{$rgN}->{a};
+          next if (!grep /$a/,@aCh);
+          $a = sprintf("%02X",$a);
+          push @elReg,"$eN addr:$a changed from $r{$a}{f} to $r{$a}{c} - effected RegName:$rgN";
+        }
+        
       }
       push @elOk,"   $eN" if (  !scalar @elPeer 
                               &&!scalar @elReg);
     }
   }
   close(aSave);
+  @elReg = HMinfo_noDup(@elReg);
   @elOk = HMinfo_noDup(@elOk);
   $ret .= "\nverified:\n   "        .join("\n   ",sort(@elOk))    if (scalar @elOk);
   $ret .= "\npeer mismatch:\n   "   .join("\n   ",sort(@elPeer))  if (scalar @elPeer);
