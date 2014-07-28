@@ -1427,7 +1427,7 @@ sub initDropdownLists($){
 		<br/>
 		<code>get &lt;name&gt; alerts &lt;region&gt;</code>
 		<br/><br/>
-		<ul>Retrieve alert message for selected region from DWD server</ul>
+		<ul>Retrieve alert message for selected region from previously read alert file (see rereadcfg)</ul>
 		<br/>
 
 		<code>get &lt;name&gt; conditions &lt;stationName&gt;</code>
