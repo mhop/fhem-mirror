@@ -1927,7 +1927,7 @@ sub OWX_Search_9097 ($$) {
      
     if( ($id_bit == 1) && ($cmp_id_bit == 1) ){
       #print "no devices present at id_bit_number=$id_bit_number \n";
-      next;
+      last;
     }
     if ( $id_bit != $cmp_id_bit ){
       $search_direction = $id_bit;
