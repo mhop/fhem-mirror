@@ -1047,7 +1047,7 @@ sub HMinfo_GetFn($@) {#########################################################
            ."\n"
            ."\n set cpRegs <src:peer> <dst:peer>"
            ."\n            copy register for a channel or behavior of channel/peer"
-           ."\n set templateDef <entity> <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... "
+           ."\n set templateDef <templateName> <param1[:<param2>...]> <description> <reg1>:<val1> [<reg2>:<val2>] ... "
            ."\n                 define a template"
            ."\n set templateSet <entity> <templateName> <peer:[long|short]> [<param1> ...] "
            ."\n                 write register according to a given template"
@@ -1926,7 +1926,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           statistic over rssi data for HM entities.<br>
       </li>
 
-      <li><a name="#HMinfotemplateChk">templateChk</a> <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+      <li><a name="#HMinfotemplateChk">templateChk</a> <a href="#HMinfoFilter">[filter]</a> &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]<br>
          verifies if the register-readings comply to the template <br>
          Parameter are identical to <a href="#HMinfotemplateSet">templateSet</a><br>
          The procedure will check if the register values match the ones provided by the template<br>
@@ -2086,7 +2086,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
         </code></ul>
       </li>
-      <li><a name="#HMinfotemplateSet">templateSet &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+      <li><a name="#HMinfotemplateSet">templateSet</a> &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]<br>
          sets a bunch of register accroding to a given template. Parameter may be added depending on
          the template setup. <br>
          templateSet will collect and accumulate all changes. Finally the results are written streamlined.<br>
@@ -2342,9 +2342,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           Statistik &uuml;ber die RSSI Werte aller HM Instanzen.<br>
       </li>
 
-      <li><a name="#HMinfotemplateChk">templateChk <a href="#HMinfoFilter">[filter] &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+      <li><a name="#HMinfotemplateChk">templateChk</a> <a href="#HMinfoFilter">[filter]</a> &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]<br>
          Verifiziert, ob die Registerwerte mit der Vorlage in Einklang stehen.<br>
-         Die Parameter sind identisch mit denjenigen f&uuml;r <a href="#HMinfotemplateSet">templateSet</a>.<br>
+         Die Parameter sind identisch mit denen aus <a href="#HMinfotemplateSet">templateSet</a>.<br>
          Wenn kein Peer ben&ouml;tigt wird, stattdessen none verwenden.
          Beispiele f&uuml;r die &Uuml;berpr&uuml;fung von Einstellungen<br>
         <ul><code>
@@ -2500,7 +2500,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
         </code></ul>
       </li>
-      <li><a name="#HMinfotemplateSet">templateSet &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]</a><br>
+      <li><a name="#HMinfotemplateSet">templateSet</a> &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]<br>
           setzt mehrere Register entsprechend der angegebenen Vorlage. Die Parameter m&uuml;ssen entsprechend der Vorlage angegeben werden.<br>
           templateSet akkumuliert alle &Auml;nderungen und schreibt das Ergebnis gesammelt.<br>
          <b>entity:</b> ist die Quell-Instanz. Der Peer muss angegeben werden, wenn dessen Verhalten kopiert werden soll.<br>

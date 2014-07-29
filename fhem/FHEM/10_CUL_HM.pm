@@ -848,15 +848,15 @@ sub CUL_HM_Parse($$) {#########################################################
   my @mI = unpack '(A2)*',$p; # split message info to bytes
   return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
   # $shash will be replaced for multichannel commands
-  my $shash = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
-  my $devH = $shash;                # source device hash
-  my $dhash = CUL_HM_id2Hash($dst); # destination device hash
-  my $id = CUL_HM_h2IoId($iohash);
+  my $shash  = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
+  my $devH   = $shash;                # source device hash
+  my $dstH   = CUL_HM_id2Hash($dst); # destination device hash
+  my $id     = CUL_HM_h2IoId($iohash);
   my $ioName = $iohash->{NAME};
-  $evtDly = 1;# switch delay trigger on
+  $evtDly    = 1;# switch delay trigger on
   CUL_HM_statCnt($ioName,"r");
   my $dname = ($dst eq "000000") ? "broadcast" :
-                         ($dhash ? $dhash->{NAME} :
+                         ($dstH ? $dstH->{NAME} :
                     ($dst eq $id ? $ioName :
                                    $dst));
   if(!$shash && $mTp eq "00") { # generate device
@@ -877,22 +877,22 @@ sub CUL_HM_Parse($$) {#########################################################
 
   my @entities = ("global"); #additional entities with events to be notifies
   ####################  attack alarm detection#####################
-  if (   $dhash 
+  if (   $dstH 
       && !CUL_HM_getAttrInt($dname,"ignore")
       && ($mTp eq '01' || $mTp eq '11')){
-    my $ioId = AttrVal($dhash->{IODev}{NAME},"hmId","-");
+    my $ioId = AttrVal($dstH->{IODev}{NAME},"hmId","-");
     if($ioId ne $src){
-      CUL_HM_eventP($dhash,"ErrIoId_$src");
-      my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoId_$src"},2);
-      push @evtEt,[$dhash,1,"sabotageAttackId:ErrIoId_$src cnt:$evntCnt"];
+      CUL_HM_eventP($dstH,"ErrIoId_$src");
+      my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoId_$src"},2);
+      push @evtEt,[$dstH,1,"sabotageAttackId:ErrIoId_$src cnt:$evntCnt"];
     }
 
-    if( defined $dhash->{helper}{cSnd} && 
-          $dhash->{helper}{cSnd} ne substr($msg,7)){
-      Log3 $dname,2,"CUL_HM $dname attack:$dhash->{helper}{cSnd}:".substr($msg,7).".";
-      CUL_HM_eventP($dhash,"ErrIoAttack");
-      my ($evntCnt,undef) = split(' last_at:',$dhash->{"prot"."ErrIoAttack"},2);
-      push @evtEt,[$dhash,1,"sabotageAttack:ErrIoAttack cnt:$evntCnt"];
+    if( defined $dstH->{helper}{cSnd} && 
+          $dstH->{helper}{cSnd} ne substr($msg,7)){
+      Log3 $dname,2,"CUL_HM $dname attack:$dstH->{helper}{cSnd}:".substr($msg,7).".";
+      CUL_HM_eventP($dstH,"ErrIoAttack");
+      my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoAttack"},2);
+      push @evtEt,[$dstH,1,"sabotageAttack:ErrIoAttack cnt:$evntCnt"];
     }
   }
   ###########
@@ -1065,9 +1065,9 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"actuator:$vp"];
 
       # Set the valve state too, without an extra trigger
-      if($dhash){
-        push @evtEt,[$dhash,1,"state:set_$vp"   ];
-        push @evtEt,[$dhash,1,"ValveDesired:$vp"];
+      if($dstH){
+        push @evtEt,[$dstH,1,"state:set_$vp"   ];
+        push @evtEt,[$dstH,1,"ValveDesired:$vp"];
       }
     }
     elsif(($mTp eq '02' &&$sType eq '01')||    # ackStatus
@@ -1112,8 +1112,8 @@ sub CUL_HM_Parse($$) {#########################################################
         my (   $of,     $vep) = (hex($1), hex($2));
         push @evtEt,[$shash,1,"ValveErrorPosition_for_$dname: $vep"];
         push @evtEt,[$shash,1,"ValveOffset_for_$dname: $of"];
-        push @evtEt,[$dhash,1,"ValveErrorPosition:set_$vep"];
-        push @evtEt,[$dhash,1,"ValveOffset:set_$of"];
+        push @evtEt,[$dstH,1,"ValveErrorPosition:set_$vep"];
+        push @evtEt,[$dstH,1,"ValveOffset:set_$of"];
       }
       elsif($p =~ m/^010[56]/){ # 'prepare to set' or 'end set'
         push @evtEt,[$shash,1,""]; #
@@ -1480,7 +1480,6 @@ sub CUL_HM_Parse($$) {#########################################################
     my $hHash = CUL_HM_id2Hash($src."02");# hash for heating
     my $pon = 0;# power on if mNo == 0 and heating status plus second msg
                 # status or trigger from rain channel
-    my $devHash = $shash;
     if (($mTp eq "02" && $p =~ m/^01/) || #Ack_Status
         ($mTp eq "10" && $p =~ m/^06/)) { #Info_Status
 
@@ -1540,7 +1539,7 @@ sub CUL_HM_Parse($$) {#########################################################
       delete $shash->{helper}{pOn};
     }
     if ($pon){# we have power ON, perform action
-      push @evtEt,[$devHash,1,'powerOn:-',];
+      push @evtEt,[$devH,1,"powerOn:$tn",];
       CUL_HM_Set($hHash,$hHash->{NAME},"off")
                  if ($hHash && $hHash->{helper}{param}{offAtPon});
     }
@@ -1665,7 +1664,7 @@ sub CUL_HM_Parse($$) {#########################################################
          #        a status info for chan 0 at power on
          #        chn3 (virtual chan) and not used up to now
          #        info from it is likely a power on!
-        push @evtEt,[$shash,1,"powerOn"]   if($chn eq "03");
+        push @evtEt,[$shash,1,"powerOn:$tn"]   if($chn eq "03");
       }
       elsif ($md eq "HM-SEC-SFA-SM"){ # && $chn eq "00")
         my $h = CUL_HM_getDeviceHash($shash);
@@ -1742,7 +1741,6 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"timedOn:".(($err&0x40)?"running":"off")];
     }
     elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
-      my $devHash = $shash;
       $shash = $modules{CUL_HM}{defptr}{$src."02"}
                              if($modules{CUL_HM}{defptr}{$src."02"});
       my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$p;
@@ -1761,18 +1759,18 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"eState:E: $eCnt P: $P I: $I U: $U f: $F"];    
       push @evtEt,[$shash,1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
       
-      push @evtEt,[$defs{$devHash->{channel_02}},1,"state:$eCnt"] if ($devHash->{channel_02});
-      push @evtEt,[$defs{$devHash->{channel_03}},1,"state:$P"   ] if ($devHash->{channel_03});
-      push @evtEt,[$defs{$devHash->{channel_04}},1,"state:$I"   ] if ($devHash->{channel_04});
-      push @evtEt,[$defs{$devHash->{channel_05}},1,"state:$U"   ] if ($devHash->{channel_05});
-      push @evtEt,[$defs{$devHash->{channel_06}},1,"state:$F"   ] if ($devHash->{channel_06});
+      push @evtEt,[$defs{$devH->{channel_02}},1,"state:$eCnt"] if ($devH->{channel_02});
+      push @evtEt,[$defs{$devH->{channel_03}},1,"state:$P"   ] if ($devH->{channel_03});
+      push @evtEt,[$defs{$devH->{channel_04}},1,"state:$I"   ] if ($devH->{channel_04});
+      push @evtEt,[$defs{$devH->{channel_05}},1,"state:$U"   ] if ($devH->{channel_05});
+      push @evtEt,[$defs{$devH->{channel_06}},1,"state:$F"   ] if ($devH->{channel_06});
       
       if($eCnt == 0 && $mTp eq "5E" && hex($mNo) < 3 ){
-        push @evtEt,[$devHash,1,"powerOn:-"];
+        push @evtEt,[$devH,1,"powerOn:$tn"];
         my $eo = ReadingsVal($shash->{NAME},"energy",0)+
                  ReadingsVal($shash->{NAME},"energyOffset",0);
         push @evtEt,[$shash,1,"energyOffset:".$eo];
-        push @evtEt,[$defs{$devHash->{channel_02}},1,"energyOffset:$eo"] if ($devHash->{channel_02});
+        push @evtEt,[$defs{$devH->{channel_02}},1,"energyOffset:$eo"] if ($devH->{channel_02});
       }
     }
   }
@@ -1905,10 +1903,11 @@ sub CUL_HM_Parse($$) {#########################################################
 
     if ($mTp eq "10" && $p =~ m/^06..(..)(..)/) {
       my ($state,$err) = (hex($1),hex($2));
-      push @evtEt,[$shash,1,"battery:".(($err&0x80)?"low"  :"ok"  )];
+      push @evtEt,[$devH ,1,"battery:".(($err&0x80)?"low"  :"ok"  )];
       push @evtEt,[$shash,1,"level:"  .hex($state)];
       $state = (($state < 2)?"off":"smoke-Alarm");
       push @evtEt,[$shash,1,"state:$state"];
+      push @evtEt,[$devH ,1,"powerOn:$tn"] if(length($p) == 8 && $mNo eq "00");
       my $tName = ReadingsVal($name,"peerList","");#inform team
       $tName =~ s/,.*//;
       CUL_HM_updtSDTeam($tName,$name,$state);
@@ -2078,7 +2077,7 @@ sub CUL_HM_Parse($$) {#########################################################
           if ($mFlgH & 0x20){
             $longPress .= "_Release";
             $dChHash->{helper}{trgLgRpt}=0;
-            push @ack,$dhash,$mNo."8002".$dst.$src.$stAck;
+            push @ack,$dstH,$mNo."8002".$dst.$src.$stAck;
           }
           push @evtEt,[$dChHash,1,"state:$stT"];
           push @evtEt,[$dChHash,1,"virtActState:$stT"];
@@ -2093,23 +2092,23 @@ sub CUL_HM_Parse($$) {#########################################################
       my ($d1,$vp) =($1,hex($2)); # adjust_command[0..4] adj_data[0..250]
       $vp = int($vp/2.56+0.5);    # valve position in %
       my $chnHash = $modules{CUL_HM}{defptr}{$dst."01"};
-      $chnHash = $dhash if (!$chnHash);
+      $chnHash = $dstH if (!$chnHash);
       push @evtEt,[$chnHash,1,"ValvePosition:$vp %"];
       push @evtEt,[$chnHash,1,"ValveAdjCmd:".$d1];
       push @ack,$chnHash,$mNo."8002".$dst.$src.'0101'.
                          sprintf("%02X",$vp*2)."0000";
     }
     elsif($mTp eq "02"){
-      if ($dhash->{helper}{prt}{rspWait}{mNo}             &&
-          $dhash->{helper}{prt}{rspWait}{mNo} eq $mNo ){
+      if ($dstH->{helper}{prt}{rspWait}{mNo}             &&
+          $dstH->{helper}{prt}{rspWait}{mNo} eq $mNo ){
         #ack we waited for - stop Waiting
-        CUL_HM_respPendRm($dhash);
+        CUL_HM_respPendRm($dstH);
       }
     }
     else{
       $sendAck = 1;
     }
-    push @ack,$dhash,$mNo."8002".$dst.$src."00" if ($mFlgH & 0x20 && (!@ack) && $sendAck);
+    push @ack,$dstH,$mNo."8002".$dst.$src."00" if ($mFlgH & 0x20 && (!@ack) && $sendAck);
   }
   elsif($ioId eq $dst){# if fhem is destination check if we need to react
     if($mTp =~ m/^4./ &&  #Push Button event
@@ -2160,7 +2159,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independent
   my ($ioHash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
   my $shash = $modules{CUL_HM}{defptr}{$src};
-  my $dhash = $modules{CUL_HM}{defptr}{$dst} if (defined $modules{CUL_HM}{defptr}{$dst});
+  my $dstH = $modules{CUL_HM}{defptr}{$dst} if (defined $modules{CUL_HM}{defptr}{$dst});
   return "" if(!$shash->{DEF});# this should be from ourself
   my $ret = "";
   my $rspWait = $shash->{helper}{prt}{rspWait};
@@ -2241,7 +2240,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       my $chnHash = CUL_HM_id2Hash($src.$chn);
       push @evtEt,[$chnHash,0,"recentStateType:ack"];
       CUL_HM_storeRssi( $shash->{NAME}
-                       ,($dhash?$dhash->{NAME}:$shash->{IODev}{NAME})
+                       ,($dstH?$dstH->{NAME}:$shash->{IODev}{NAME})
                        ,(-1)*(hex($rssi))
                        ,$mNo)
             if ($rssi && $rssi ne '00' && $rssi ne'80');
@@ -2299,7 +2298,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     #Reply to AESreq - only visible with CUL or in monitoring mode
     #not with HMLAN/USB
     #my $aesKey = $p;
-    push @evtEt,[$shash,1,"aesReqTo:".$dhash->{NAME}] if (defined $dhash);
+    push @evtEt,[$shash,1,"aesReqTo:".$dstH->{NAME}] if (defined $dstH);
     $ret = "done";    
   }
 
@@ -2391,7 +2390,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           my $reqPeer = $chnhash->{helper}{getCfgList};
           if ($reqPeer){
             my $flag = CUL_HM_getFlag($shash);
-            my $id = CUL_HM_IoId($shash);
+            my $ioId = CUL_HM_IoId($shash);
             my @peerID = split(",",($attr{$chnName}{peerIDs}?
                                     $attr{$chnName}{peerIDs}:""));
             foreach my $l (split ",",$chnhash->{helper}{getCfgListNo}){
@@ -2401,7 +2400,7 @@ sub CUL_HM_parseCommon(@){#####################################################
                 $peer .="01" if (length($peer) == 6); # add the default
                 if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
                   CUL_HM_PushCmdStack($shash,sprintf("++%s01%s%s%s04%s%s",
-                          $flag,$id,$src,$chn,$peer,$listNo));# List3 or 4
+                          $flag,$ioId,$src,$chn,$peer,$listNo));# List3 or 4
                 }
               }
             }
@@ -2519,7 +2518,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       my $chnHash = CUL_HM_id2Hash($src.$chn);
       push @evtEt,[$chnHash,0,"recentStateType:info"];
       CUL_HM_storeRssi( $shash->{NAME}
-                       ,($dhash?$dhash->{NAME}:$shash->{IODev}{NAME})
+                       ,($dstH?$dstH->{NAME}:$shash->{IODev}{NAME})
                        ,(-1)*(hex($rssi))
                        ,$mNo)
             if ($rssi && $rssi ne '00' && $rssi ne'80');
@@ -4063,12 +4062,30 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
 
   elsif($cmd eq "press") { ####################################################
+    # [long|short] [<peer>] [<repCount(long only)>] [<repDelay>] [<forceTiming[0|1]>] ...
     my $mode = 0;
+    my ($repCnt,$repDly,$forceTiming) = (0,0,0);
     if ($a[2]){
-      if ($a[2] =~ m/^(long|short)$/){
-        $mode = $a[2] eq "long"?64:0; #value for longPress
+      ##############################
+      if ($a[2] eq "long"){
+        $mode = 64;
+        splice @a,2,1;
+        (undef,undef,undef,$repCnt,$repDly,$forceTiming) = @a;
+        $repCnt      = 1    if (!defined $repCnt     );
+        $repDly      = 0.25 if (!defined $repDly     );
+        $forceTiming = 1    if (!defined $forceTiming);
+        return "repeatCount $repCnt invalid. use value 1 - 255"     if ($repCnt < 1    || $repCnt>255 );
+        return "repDelay $repDly invalid. use value 0.25 - 1.00"    if ($repDly < 0.25 || $repDly>1 );
+        return "forceTiming $forceTiming invalid. use value 0 or 1" if ($forceTiming ne "0" && $forceTiming ne "1" );
+      }
+      elsif($a[2] eq "short"){
         splice @a,2,1;
       }
+      ##############################
+      #if ($a[2] =~ m/^(long|short)$/){
+      #  $mode = $a[2] eq "long"?64:0; #value for longPress
+      #  splice @a,2,1;
+      #}
     }
     my $vChn = $a[2]?$a[2]:"";
     
@@ -4122,10 +4139,23 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my ($pDev,$pCh) = unpack 'A6A2',$pId;
       return "button cannot be identified" if (!$pCh);
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
-      CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%02X%02X",$flag,
+      ######################
+      #CUL_HM_PushCmdStack($hash, 
+      my $msg = sprintf("3E%s%s%s40%02X%02X",
                                      $id,$dst,$pDev,
                                      hex($pCh)+$mode,
-                                     $pressCnt));
+                                     $pressCnt);
+      for (my $cnt = 0;$cnt < $repCnt; $cnt++ ){
+        CUL_HM_SndCmd($hash, "++80$msg");
+        select(undef, undef, undef, $repDly);
+      }
+      CUL_HM_SndCmd($hash, "++${flag}$msg");
+      ######################
+      
+      #CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%02X%02X",$flag,
+      #                               $id,$dst,$pDev,
+      #                               hex($pCh)+$mode,
+      #                               $pressCnt));
     }
   }
   elsif($cmd eq "fwUpdate") { #################################################
@@ -7679,10 +7709,17 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     <li>virtual<a name="CUL_HMvirtual"></a><br>
        <ul>
        <li><B><a href="#CUL_HMpeerChan">peerChan</a></B> see remote</li>
-       <li><B>press [long|short]<a name="CUL_HMpress"></a></B>
-         simulates a button press short (default) or long. Note that the current
-         implementation will not specify the duration for long. Only one trigger
+       <li><B><a name="CUL_HMpress"></a>press [long|short] [&lt;peer&gt;] [&lt;repCount&gt;] [&lt;repDelay&gt;] </B>
+         simulates button press for an actor from a peered sensor.
          will be sent of type "long".
+         <li>[long|short] defines whether long or short press shall be simulated. Defaults to short
+           </li>
+         <li>[&lt;peer&gt;] define which peer's trigger shall be simulated.Defaults to self(channelNo).
+           </li>
+         <li>[&lt;repCount&gt;] Valid for long press only. How long shall the button be pressed? Number of repetition of the messages is defined. Defaults to 1
+           </li>
+         <li>[&lt;repDelay&gt;] Valid for long press only. defines wait time between the single messages. 
+           </li>
        </li>
        <li><B>virtTemp &lt;[off -10..50]&gt;<a name="CUL_HMvirtTemp"></a></B>
          simulates a thermostat. If peered to a device it periodically sends the
@@ -8930,9 +8967,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         <li>virtual<a name="CUL_HMvirtual"></a><br>
           <ul>
             <li><B><a href="#CUL_HMpeerChan">peerChan</a></B> siehe remote</li>
-            <li><B>press [long|short]<a name="CUL_HMpress"></a></B>
-              Simuliert einen kurzen (Standard) oder langen Tastendruck. Zu beachten ist dass die momentane
-              Implementierung f&uuml;r "long" keine Dauer angibt . Es wird nur ein Trigger vom Typ "long" gesendet.
+            <li><B><a name="CUL_HMpress"></a>press [long|short] [&lt;peer&gt;] [&lt;repCount&gt;] [&lt;repDelay&gt;] </B>
+              Simuliert den Tastendruck am Aktor eines gepeerted Sensors
+             <li>[long|short] soll ein langer oder kurzer Taastendrucl simuliert werden? Default ist kurz. </li>
+             <li>[&lt;peer&gt;] legt fest, wessen peer's trigger simuliert werden soll.Default ist self(channelNo).</li>
+             <li>[&lt;repCount&gt;] nur gueltig fuer long. wie viele messages sollen gesendet werden? (Laenge des Button press). Default ist 1.</li>
+             <li>[&lt;repDelay&gt;] nur gueltig fuer long. definiert die Zeit zwischen den einzelnen Messages. </li>
             </li>
             <li><B>virtTemp &lt;[off -10..50]&gt;<a name="CUL_HMvirtTemp"></a></B>
               Simuliert ein Thermostat. Wenn mit einem Ger&auml;t gepeert wird periodisch eine Temperatur gesendet,

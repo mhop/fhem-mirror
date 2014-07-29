@@ -781,8 +781,6 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
   "HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1},
   "HM-RC-4-2"         =>{ localResDis     =>1},
 
-  "HM-LC-Bl1PBU-FM"   =>{ transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1},
-
   "HM-LC-Dim1L-Pl"    =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1},
   "HM-LC-Dim1L-CV-2"  =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1
                          ,logicCombination=>1
@@ -1298,7 +1296,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,on             =>""
                       ,off            =>""
                       ,toggle         =>""
-                      ,press          =>"[long|short] [<peer>] ..."
+                      ,press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."
                       ,inhibit        =>"[on|off]"
                       ,statusRequest  =>""
                       ,peerIODev      =>"[IO] <btn> [set|unset]..."
@@ -1310,7 +1308,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,toggle         =>""
                       ,pct            =>"<value> ... [<ontime>] [<ramptime>]"
                       ,stop           =>""
-                      ,press          =>"[long|short] [on|off|<peer>] ..."
+                      ,press          =>"[long|short] [on|off|<peer>] [<repCount(long only)>] [<repDelay>] ..."
                       ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
@@ -1322,7 +1320,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,toggle         =>""
                       ,pct            =>"[<value>] ... [<ontime>]"
                       ,stop           =>""
-                      ,press          =>"[long|short] [on|off|<peer>] ..."
+                      ,press          =>"[long|short] [on|off|<peer>] [<repCount(long only)>] [<repDelay>] ..."
                       ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
@@ -1335,7 +1333,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       },
   THSensor         =>{ peerChan       =>"0 <actChn> ... single [set|unset] [actor|remote|both]"},
   virtual          =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual|reverse] [set|unset] [actor|remote|both]"
-                      ,press          =>"[long|short] [noBurst] ..."
+                      ,press          =>"[long|short] [noBurst] [<repCount(long only)>] [<repDelay>] ..."
                       ,postEvent      =>"<condition>"},
   smokeDetector    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] actor"},
   winMatic         =>{ statusRequest  =>""},
@@ -1422,7 +1420,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,level          =>"<level> <relockDly> <speed>..."
                          ,keydef         =>"<btn> <txt1> <txt2>"
                          ,inhibit        =>"[on|off]"
-                         ,press          =>"[long|short] [<peer>] ..."
+                         ,press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>]..."
                          ,peerIODev      =>"[IO] <btn> [set|unset]..."
                         },
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
@@ -1468,7 +1466,7 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,on             =>""
                          ,off            =>""
                          ,toggle         =>""
-                         ,press          =>"[long|short] [<peer>] ..."
+                         ,press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
 
