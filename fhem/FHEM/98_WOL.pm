@@ -68,7 +68,8 @@ sub WOL_Set($@) {
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_UpdateReadings", $hash, 0);
 
-  if ($hash->{STATE} eq "on") {
+  my $state = ReadingsVal($hash->{NAME}, "state", "nF"); 
+  if ($state eq "on") {
       WOL_GetUpdate($hash);
   }
   return undef;
@@ -148,13 +149,14 @@ sub WOL_UpdateReadings($) {
 sub WOL_GetUpdate($) {
   my ($hash) = @_;
 
-  if ($hash->{STATE} eq "on") {
+  my $state = ReadingsVal($hash->{NAME}, "state", "nF"); 
+  if ($state eq "on") {
      wake($hash);
+     if ($hash->{REPEAT} > 0) {
+        InternalTimer(gettimeofday()+$hash->{REPEAT}, "WOL_GetUpdate", $hash, 0);
+     }
   }
 
-  if ($hash->{REPEAT} > 0 && $hash->{STATE} eq "on" ) {
-     InternalTimer(gettimeofday()+$hash->{REPEAT}, "WOL_GetUpdate", $hash, 0);
-  }
 }
 ################################################################################
 sub wake($){
