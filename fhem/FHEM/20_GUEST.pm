@@ -28,7 +28,7 @@
 # Major Version History:
 # - 1.1.0 - 2014-04-07
 # -- new readings in computer readable format (*_cr)
-# -- format of readings durTimer readings changes from minutes to HH:MM:ss
+# -- format of readings durTimer readings changed from minutes to HH:MM:ss
 #
 # - 1.0.0 - 2014-02-08
 # -- First release
@@ -1268,7 +1268,7 @@ sub GUEST_StartInternalTimers($$) {
         <code>define &lt;rg_FirstName&gt; GUEST [&lt;Device Name der Bewohnergruppe&gt;]</code><br>
         <br>
         Stellt ein spezielles Dummy Device bereit, welches einen Gast repräsentiert.<br>
-        Basierend auf dem aktuelle Status und anderen Readings können andere Aktionen innerhalb von FHEM angestoßen werden.<br>
+        Basierend auf dem aktuellen Status und anderen Readings können andere Aktionen innerhalb von FHEM angestoßen werden.<br>
         <br>
         Wird vom übergeordneten Modul <a href="#RESIDENTS">RESIDENTS</a> verwendet, kann aber auch einzeln benutzt werden.<br>
         <br>
@@ -1395,7 +1395,7 @@ sub GUEST_StartInternalTimers($$) {
       <div style="margin-left: 2em">
         <ul>
           <li>
-            <b>rg_autoGoneAfter</b> - Anzahl der Stunden, nach denen sich der Status automatisch auf 'gone' ändert, wenn der aktuelle Status 'absent' ist; Standard ist 36 Stunden
+            <b>rg_autoGoneAfter</b> - Anzahl der Stunden, nach denen sich der Status automatisch auf 'gone' ändert, wenn der aktuellen Status 'absent' ist; Standard ist 36 Stunden
           </li>
           <li>
             <b>rg_locationHome</b> - hiermit übereinstimmende Lokationen werden als zu Hause gewertet; der erste Eintrag wird für das Zusammenspiel bei Statusänderungen benutzt; mehrere Einträge durch Leerzeichen trennen; Standard ist 'home'
