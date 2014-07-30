@@ -4081,11 +4081,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       elsif($a[2] eq "short"){
         splice @a,2,1;
       }
-      ##############################
-      #if ($a[2] =~ m/^(long|short)$/){
-      #  $mode = $a[2] eq "long"?64:0; #value for longPress
-      #  splice @a,2,1;
-      #}
     }
     my $vChn = $a[2]?$a[2]:"";
     
@@ -5694,7 +5689,8 @@ sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
 sub CUL_HM_id2Name($) { #in: name or HMid out: name
   my ($p) = @_;
   $p = "" if (!defined $p);
-  return $p                               if($defs{$p}||$p =~ m/_chn:/);
+  return $p                               if($defs{$p}||$p =~ m/_chn:/
+                                             || $p !~ m/^[A-F0-9]{6,8}$/i);
   my $devId= substr($p, 0, 6);
   return "broadcast"                      if($devId eq "000000");
 
