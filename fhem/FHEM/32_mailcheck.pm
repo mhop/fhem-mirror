@@ -86,7 +86,6 @@ mailcheck_Define($$)
     }
     $password = $p if( $p );
   }
-Log 3, $password;
 
   $hash->{tag} = undef;
 
