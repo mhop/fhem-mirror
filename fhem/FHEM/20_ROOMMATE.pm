@@ -1290,7 +1290,7 @@ sub ROOMMATE_StartInternalTimers($$) {
           <br />
           <ul>
             <li>
-              <b>home</b> - Mitbrwohner ist zu Hause und wach
+              <b>home</b> - Mitbewohner ist zu Hause und wach
             </li>
             <li>
               <b>gotosleep</b> - Mitbewohner ist auf dem Weg ins Bett
