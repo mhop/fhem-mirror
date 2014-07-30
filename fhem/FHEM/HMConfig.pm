@@ -252,7 +252,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
   "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.4p.5p.6p,3:3p.6p,1,7:3p.4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,Clima:4:4,ClimaTeam:5:5,remote:6:6"}, #
-  "00BE" => {name=>"HM-MOD-RC-8"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"Sw:1:8",},
+  "00BE" => {name=>"HM-MOD-Re-8"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"Sw:1:8",},
   "00BF" => {name=>"HM-PB-2-FM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",},
   "004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "00C0" => {name=>"HM-SEC-MDIR-2"           ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
@@ -451,6 +451,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # Blind          9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
+# HM-MOD-RC-8 30:49
 #Keymatic 3.3 unknown, seen 1 here
 
 #--- list 1, Channel level------------------
@@ -810,7 +811,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                         },
 
   "HM-CC-VD"          =>{ valveOffset     =>1,valveErrorPos   =>1},
-  "HM-MOD-RC-8"       =>{ localResDis     =>1,lowBatLimitBA2  =>1,backlOnMode2    =>1},
+  "HM-MOD-RC-8"       =>{                     lowBatLimitBA2  =>1,backlOnMode2    =>1},
   "HM-CC-TC"          =>{ burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-RT-DN"       =>{ btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1
                          ,cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1
