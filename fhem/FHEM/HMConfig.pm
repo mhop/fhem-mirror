@@ -451,7 +451,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # Blind          9:00 10:00 20:00
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
-# HM-MOD-RC-8 30:49
+# HM-MOD-Re-8 30:49
 #Keymatic 3.3 unknown, seen 1 here
 
 #--- list 1, Channel level------------------
@@ -811,7 +811,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                         },
 
   "HM-CC-VD"          =>{ valveOffset     =>1,valveErrorPos   =>1},
-  "HM-MOD-RC-8"       =>{                     lowBatLimitBA2  =>1,backlOnMode2    =>1},
+  "HM-MOD-Re-8"       =>{                     lowBatLimitBA2  =>1,backlOnMode2    =>1},
   "HM-CC-TC"          =>{ burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-RT-DN"       =>{ btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1
                          ,cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1

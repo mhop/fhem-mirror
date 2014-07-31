@@ -5900,6 +5900,11 @@ sub CUL_HM_updtRegDisp($$$) {
   my $regLN = (($expL == 2)?"":".")
               .sprintf("RegL_%02X:",$listNo)
               .($peerId?CUL_HM_peerChName($peerId,$devId):"");
+              
+  if (($md eq "HM-MOD-Re-8") && $listNo == 0){#handle Fw bug 
+    CUL_HM_ModRe8($hash,$regLN);
+  }
+
   foreach my $rgN (@regArr){
     next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);
@@ -6322,7 +6327,6 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
   return $setting;
 }
-
 sub CUL_HM_repReadings($) {   # parse repeater
   my ($hash)=@_;
   my %pCnt;
@@ -6367,6 +6371,22 @@ sub CUL_HM_repReadings($) {   # parse repeater
   }
   CUL_HM_UpdtReadBulk($hash,0,@readList);
   return "No Source          Dest            Bcast\n". join"\n", sort @retL;
+}
+sub CUL_HM_ModRe8($$)     {   # repair FW bug
+  #Register 18 may come with a wrong address - we will corrent that
+  my ($hash,$regN)=@_;
+  my $rl0 = ReadingsVal($hash->{NAME},$regN,undef);
+  return if(  $rl0 !~ m/00:00/ # not if List is incomplete
+            ||$rl0 =~ m/12:/ ); # reg 18 present, dont touch
+  foreach my $ad (split(" ",$rl0)){
+    my ($a,$d) = split(":",$ad);
+    my $ah = hex($a);
+    if ($ah & 0xe0 && (($ah & 0x1F) == 0x12)){
+      Log3 $hash,3,"CUL_HM replace address $a to 0x12";
+      $hash->{READINGS}{$regN}{VAL} =~ s/ $a:/ 12:/;
+      last;
+    }
+  }
 }
 sub CUL_HM_dimLog($) {# dimmer readings - support virtual chan - unused so far
   my ($hash)=@_;
