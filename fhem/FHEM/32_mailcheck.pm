@@ -166,7 +166,7 @@ mailcheck_Connect($)
       $hash->{LAST_LOGIN} = FmtDateTime( gettimeofday() );
 
       $hash->{CLIENT} = $client;
-      Log3 $name, 3, "$name: logged in to $hash->{User}";
+      Log3 $name, 3, "$name: logged in to $hash->{user}";
 
       $hash->{HAS_IDLE} = $client->has_capability("IDLE");
 
