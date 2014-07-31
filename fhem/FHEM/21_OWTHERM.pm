@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.23";
+my $owx_version="5.24";
 
 my %gets = (
   "id"          => "",
@@ -627,8 +627,8 @@ sub OWTHERM_InitializeDevice($) {
   #-- Check if temperature conversion is consistent
   if( $interface =~ /^OWX/ ){
     if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
-      if( !(defined($attr{$hash->{IODev}->{NAME}}{dokick})) || 
-           ( defined($attr{$hash->{IODev}->{NAME}}{dokick}) && ($attr{$hash->{IODev}->{NAME}}{dokick} eq "0") )){
+      if( !(defined($hash->{IODev}->{dokick})) ||
+           ( defined($hash->{IODev}->{dokick}) && ($hash->{IODev}->{dokick} ne "1") )){
         Log3 $name, 1,"OWTHERM: Attribute tempConv=onkick changed to onread for $name because interface is not kicking";
         $attr{$name}{tempConv}="onread";
       }

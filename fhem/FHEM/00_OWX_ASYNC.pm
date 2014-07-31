@@ -232,17 +232,55 @@ sub OWX_ASYNC_Define ($$) {
 
 sub OWX_ASYNC_Attr(@) {
   my ($do,$name,$key,$value) = @_;
-  
+
   my $hash = $main::defs{$name};
   my $ret;
-  
+
   if ( $do eq "set") {
-  	ARGUMENT_HANDLER: {
+    SET_HANDLER: {
       $key eq "interval" and do {
         $hash->{interval} = $value;
         if ($main::init_done) {
           OWX_ASYNC_Kick($hash);
         }
+        last;
+      };
+      $key eq "buspower" and do {
+        if ($value eq "parasitic" and (defined $hash->{dokick}) and $hash->{dokick} ne "ignored") {
+          $hash->{dokick} = "ignored";
+          Log3($name,3,"OWX_ASYNC: ignoring attribute dokick because buspower is parasitic");
+        } elsif ($value eq "real" and (defined $hash->{dokick}) and $hash->{dokick} eq "ignored") {
+          $hash->{dokick} = $main::attr{$name}{dokick};
+        }
+        last;
+      };
+      $key eq "dokick" and do {
+        if ($main::attr{$name}{"buspower"} and $main::attr{$name}{"buspower"} eq "parasitic" and ((!defined $hash->{dokick}) or $hash->{dokick} ne "ignored")) {
+          $hash->{dokick} = "ignored";
+          Log3($name,3,"OWX_ASYNC: ignoring attribute dokick because buspower is parasitic");
+        } else {
+          $hash->{dokick} = $value;
+        }
+        last;
+      };
+    }
+  } elsif ( $do eq "del" ) {
+    DEL_HANDLER: {
+      $key eq "interval" and do {
+        $hash->{interval} = 300;
+        if ($main::init_done) {
+          OWX_ASYNC_Kick($hash);
+        }
+        last;
+      };
+      $key eq "buspower" and do {
+        if ((defined $hash->{dokick}) and $hash->{dokick} eq "ignored") {
+          $hash->{dokick} = $main::attr{$name}{dokick};
+        }
+        last;
+      };
+      $key eq "dokick" and do {
+        delete $hash->{dokick};
         last;
       };
     }
@@ -780,7 +818,7 @@ sub OWX_ASYNC_Kick($) {
         my ($thread) = @_;
         PT_BEGIN($thread);
         #-- Only if we have the dokick attribute set to 1
-        if (main::AttrVal($hash->{NAME},"dokick",0)) {
+        if ((defined $hash->{dokick}) and $hash->{dokick} eq "1") {
           Log3 $hash->{NAME},5,"OWX_ASYNC_PT_Kick: kicking DS14B20 temperature conversion";
           #-- issue the skip ROM command \xCC followed by start conversion command \x44 
           $thread->{pt_execute} = OWX_ASYNC_PT_Execute($hash,1,undef,"\x44",0);
@@ -1224,10 +1262,14 @@ sub OWX_ASYNC_RunTasks($) {
         <ul>
             <li><a name="OWX_ASYNCdokick"><code>attr &lt;name&gt; dokick 0|1</code></a>
                 <br />1 if the interface regularly kicks thermometers on the bus to do a temperature conversion, 
-               and to perform an alarm check, 0 if not</li>
+                and to perform an alarm check, 0 if not</li>
+            <li><a name="OWX_ASYNCbuspower"><code>attr &lt;name&gt; buspower real|parasitic</code></a>
+                <br />parasitic if there are any devices on the bus that steal power from the data line.
+                <br />Ensures that never more than a single device on the bus is talked to (throughput is throttled noticable!)
+                <br />Automatically disables attribute 'dokick'.</li>
             <li><a name="OWX_ASYNCIODev"><code>attr &lt;name&gt; IODev &lt;FRM-device&gt;</code></a>
                 <br />assignes a specific FRM-device to OWX_ASYNC when working through an Arduino. 
-                Required only if there is more than one FRM defined.</li>
+                <br />Required only if there is more than one FRM defined.</li>
             <li><a name="OWX_ASYNCmaxtimeouts"><code>attr &lt;name&gt; maxtimeouts &lt;number&gt;</code></a>
                 <br />maximum number of timeouts (in a row) before OWX_ASYNC disconnects itself from the
                 busmaster and tries to establish a new connection</li>
