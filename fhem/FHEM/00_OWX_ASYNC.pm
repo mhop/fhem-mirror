@@ -127,7 +127,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.11;
+$owx_async_version=5.12;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -158,7 +158,7 @@ sub OWX_ASYNC_Initialize ($) {
   $hash->{ReadFn}   = "OWX_ASYNC_Read";
   $hash->{ReadyFn}  = "OWX_ASYNC_Ready";
   $hash->{InitFn}   = "OWX_ASYNC_Init";
-  $hash->{AttrList} = "dokick:0,1 interval IODev timeout maxtimeouts";
+  $hash->{AttrList} = "dokick:0,1 interval buspower:real,parasitic IODev timeout maxtimeouts";
   main::LoadModule("OWX");
 }
 
@@ -981,6 +981,10 @@ sub OWX_ASYNC_Schedule($$) {
   Log3 ($master->{NAME},5,"OWX_ASYNC_Schedule master: ".$master->{NAME}.", task: ".$name);
   die "OWX_ASYNC_Schedule: Master not Active" unless $master->{STATE} eq "Active";
   $task->{ExecuteTime} = gettimeofday() unless (defined $task->{ExecuteTime});
+
+  #if buspower is parasitic serialize all tasks by scheduling everything to master queue.
+  $name = $master->{NAME} if (AttrVal($master->{NAME},"buspower","real") eq "parasitic");
+
   if (defined $master->{tasks}->{$name}) {
     push @{$master->{tasks}->{$name}}, $task;
     $hash->{NUMTASKS} = @{$master->{tasks}->{$name}};
