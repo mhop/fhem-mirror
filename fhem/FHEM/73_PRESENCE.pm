@@ -521,35 +521,35 @@ sub PRESENCE_StartLocalScan($;$)
 
     $hash->{STATE} = "active" if($hash->{STATE} eq "???");
 
-    if(not $local)
+    if($local == 0)
     {
-        Log3 $name, 5, "PRESENCE ($name) - resetting Timer";
+        Log3 $name, 5, "PRESENCE ($name) - stopping timer";
         RemoveInternalTimer($hash);
     }
 
     if($mode eq "local-bluetooth")
     {
-        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode local-bluetooth";
+        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode local-bluetooth";
         $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($mode eq "lan-ping")
     {
-        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode lan-ping";
+        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode lan-ping";
         $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($mode eq "fritzbox")
     {
-        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode fritzbox";
+        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode fritzbox";
         $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($mode eq "shellscript")
     {
-        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode shellscript";
+        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode shellscript";
         $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($mode eq "function")
     {
-        Log3 $name, 5, "PRESENCE ($name) - starting Blocking call for mode function";
+        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode function";
         $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
 }
@@ -561,7 +561,7 @@ PRESENCE_DoLocalPingScan($)
     my ($string) = @_;
     my ($name, $device, $local, $count) = split("\\|", $string);
 
-    Log3 $name, 5, "PRESENCE_DoLocalPingScan: $string";
+    Log3 $name, 5, "PRESENCE ($name) - starting ping scan: $string";
 
     my $retcode;
     my $return;
@@ -922,6 +922,7 @@ PRESENCE_ProcessLocalScan($)
         $a[3] =~ s/<<line-break>>/\n/g;
 
         Log3 $hash->{NAME}, 2, "PRESENCE ($name) - error while processing check: ".$a[3];
+        readingsBulkUpdate($hash, "state", "error");
     }
 
     readingsEndUpdate($hash, 1);
@@ -929,10 +930,14 @@ PRESENCE_ProcessLocalScan($)
     delete($hash->{helper}{RUNNING_PID});
 
     #Schedule the next check withing $timeout if it is a regular run
-    unless($local)
+    if($local eq "0")
     {
+        my $seconds = ($a[2] eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL});
+        
+        Log3 $hash->{NAME}, 4, "PRESENCE ($name) - rescheduling next check in $seconds seconds";
+        
         RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday()+($a[2] eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL}), "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+        InternalTimer(gettimeofday()+$seconds, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
     }
 }
 
@@ -967,6 +972,8 @@ PRESENCE_ProcessAbortedScan($)
         InternalTimer(gettimeofday()+10, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
         Log 2, "PRESENCE ($name) - device could not be checked (retrying in 10 seconds)"
     }
+    
+    readingsSingleUpdate($hash, "state", "timeout",1);
 }
 
 1;
@@ -1197,7 +1204,7 @@ Options:
   <ul>
     <u>General Events:</u><br><br>
     <ul>
-    <li><b>state</b>: $state (absent|present|disabled) - The state of the device or "disabled" when the disable attribute is enabled</li>
+    <li><b>state</b>: $state (absent|present|disabled|error|timeout) - The state of the device or "disabled" when the disable attribute is enabled</li>
     <li><b>powerCmd</b>: (executed|failed) - power command was executed or has failed</li>
     </ul><br><br>
     <u>Bluetooth specific events:</u><br><br>
@@ -1445,7 +1452,7 @@ Options:
   <ul>
     <u>Generelle Events:</u><br><br>
     <ul>
-    <li><b>state</b>: $state (absent|present|disabled) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das disable-Attribut aktiviert ist</li>
+    <li><b>state</b>: $state (absent|present|disabled|error|timeout) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das disable-Attribut aktiviert ist</li>
     <li><b>powerCmd</b>: (executed|failed) - Ausf&uuml;hrung des power-Befehls war erfolgreich.</li>
     </ul><br><br>
     <u>Bluetooth-spezifische Events:</u><br><br>
