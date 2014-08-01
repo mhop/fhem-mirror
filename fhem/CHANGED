@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: PRESENCE: new event "error" and "timeout" for state reading to indicate 
+             a non successful check 
   - bugfix:  70_Jabber: fixed UTF8 encoding/decoding of messages
   - feature: 10_OWServer autocreate coexists with OWXXX modules (Boris & ntruchsess)
   - feature: added 36_Level.pm
