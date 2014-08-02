@@ -2832,7 +2832,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       if    ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
       elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7)}
       elsif ($md =~ m/HM-TC-IT/    && $chn eq "02"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7,8,9)}
-      elsif ($md =~ m/^HM-PB-4DIS-WM/              {$addInfo = CUL_HM_4DisText($hash)}
+      elsif ($md =~ m/^HM-PB-4DIS-WM/)             {$addInfo = CUL_HM_4DisText($hash)}
       elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
 
       return $name." type:".$st." - \n".
