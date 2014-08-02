@@ -29,6 +29,9 @@ sub HMLAN_condUpdate($$);
 
 my %sets = ( "hmPairForSec" => "HomeMatic"
             ,"hmPairSerial" => "HomeMatic"
+            ,"reassignIDs"  => ""
+);
+my %gets = ( "assignIDs"    => ""
 );
 my %HMcond = ( 0  =>'ok'
               ,2  =>'Warning-HighLoad'
@@ -56,6 +59,7 @@ sub HMLAN_Initialize($) {
   $hash->{WriteFn} = "HMLAN_Write";
   $hash->{ReadyFn} = "HMLAN_Ready";
   $hash->{SetFn}   = "HMLAN_Set";
+  $hash->{GetFn}   = "HMLAN_Get";
   $hash->{NotifyFn}= "HMLAN_Notify";
   $hash->{AttrFn}  = "HMLAN_Attr";
   $hash->{Clients} = ":CUL_HM:";
@@ -122,7 +126,8 @@ sub HMLAN_Define($$) {#########################################################
   @{$hash->{helper}{log}{ids}} = \@al;
 
   $hash->{assignedIDsCnt} = 0;#define hash
-  $hash->{assignedIDs} = "";
+  $hash->{helper}{assIdRep} = 0;
+  $hash->{helper}{assIdCnt} = 0;
   HMLAN_condUpdate($hash,253);#set disconnected
   $hash->{STATE} = "disconnected";
   $hash->{owner} = "";
@@ -307,7 +312,7 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
       $hash->{helper}{recoverTest} = 1;
       HMLAN_Write($hash,"","As09998112"
                          .AttrVal($name,"hmId","999999")
-                         ."000001");
+                         ."000000");
     }
   }
   $hCap->{$hCap->{last}}+=$incr  if ($incr);
@@ -323,24 +328,42 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
   return;
 }
 
+sub HMLAN_Get($@) {############################################################
+  my ($hash, @a) = @_;
+  my $ret = "";
+  return "\"get $hash->{NAME}\" no command given" if(@a < 2);
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
+      if(!defined($gets{$a[1]}));
+
+  my $name = shift @a;
+  my $cmd = shift @a;
+  my $arg = join("", @a);
+  if($cmd eq "assignIDs") { #--------------------------------------
+    return "set $name $cmd doesn't support parameter" if(scalar(@a));
+    my @aIds = map{CUL_HM_id2Name($_)}  keys %{$hash->{helper}{ids}};
+    @aIds = map{CUL_HM_name2Id($_)." : $_"} sort @aIds;
+   $ret = "assignedIDs: ".scalar(@aIds)."\n".join("\n", @aIds);
+  }
+  return ($ret);# no not generate trigger outof command
+}
 sub HMLAN_Set($@) {############################################################
   my ($hash, @a) = @_;
 
-  return "\"set HMLAN\" needs at least one parameter" if(@a < 2);
+  return "\"set $hash->{NAME}\" no command given" if(@a < 2);
   return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
       if(!defined($sets{$a[1]}));
 
   my $name = shift @a;
-  my $type = shift @a;
+  my $cmd = shift @a;
   my $arg = join("", @a);
-  if($type eq "hmPairForSec") { ####################################
+  if($cmd eq "hmPairForSec") { ####################################
     return "Usage: set $name hmPairForSec <seconds_active>"
         if(!$arg || $arg !~ m/^\d+$/);
     HMLAN_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
     InternalTimer(gettimeofday()+$arg, "HMLAN_RemoveHMPair", "hmPairForSec:$name", 1);
   }
-  elsif($type eq "hmPairSerial") { ################################
+  elsif($cmd eq "hmPairSerial") { #################################
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
         if(!$arg || $arg !~ m/^.{10}$/);
 
@@ -354,8 +377,13 @@ sub HMLAN_Set($@) {############################################################
     $hash->{hmPairSerial} = $arg;
     InternalTimer(gettimeofday()+20, "HMLAN_RemoveHMPair", "hmPairForSec:".$name, 1);
   }
+  elsif($cmd eq "reassignIDs") { ##################################
+    return "set $name $cmd doesn't support parameter" if(scalar(@a));
+    HMLAN_assignIDs($hash);
+  }
   return ("",1);# no not generate trigger outof command
 }
+
 sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
   my ($hash, $arg, $regexp) = @_;
   my $type = $hash->{TYPE};
@@ -411,7 +439,7 @@ sub HMLAN_Write($$$) {#########################################################
                              substr($msg, 16, 6));
 
     if (   $mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24
-        && defined $hash->{assIDs}{$dst}){
+        && defined $hash->{helper}{ids}{$dst}){
       # Acks are generally send by HMLAN autonomously
       # Special
       Log3 $hash, 5, "HMLAN: Skip ACK";
@@ -425,13 +453,15 @@ sub HMLAN_Write($$$) {#########################################################
 #   my $IDnew = '+'.$dst.',00,01,';     # newChannel- trailing 01 to be sent if talk to neu channel
     my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?
 
-    if (!$hash->{assIDs}{$dst} && $dst ne "000000"){
+    if (!$hash->{helper}{ids}{$dst} && $dst ne "000000"){
       HMLAN_SimpleWrite($hash, $IDadd);
-      $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
-      $hash->{assIDs}{$dst} = 1;
-      my @asId = HMLAN_noDup(keys %{$hash->{assIDs}});
-      $hash->{assignedIDs}=join(',',@asId);
-      $hash->{assignedIDsCnt}=scalar(@asId);
+      $hash->{helper}{ids}{$dst}{name} = CUL_HM_id2Name($dst);
+      $hash->{helper}{assIdCnt} = scalar(keys %{$hash->{helper}{ids}});
+      $hash->{assignedIDsCnt} = $hash->{helper}{assIdCnt}
+              .(($hash->{helper}{assIdCnt} eq $hash->{helper}{assIdRep})
+                  ?""
+                  :" report:$hash->{helper}{assIdRep}")
+              ;
     }
   }
   elsif($msg =~ m /init:(......)/){
@@ -439,11 +469,13 @@ sub HMLAN_Write($$$) {#########################################################
     if ($modules{CUL_HM}{defptr}{$dst} &&
         $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn} ){
       HMLAN_SimpleWrite($hash,$modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn});
-      $hash->{helper}{$dst}{name} = CUL_HM_id2Name($dst);
-      $hash->{assIDs}{$dst} = 1;
-      my @asId = HMLAN_noDup(keys %{$hash->{assIDs}});
-      $hash->{assignedIDs}=join(',',@asId);
-      $hash->{assignedIDsCnt}=scalar(@asId);
+      $hash->{helper}{ids}{$dst}{name} = CUL_HM_id2Name($dst);
+      $hash->{helper}{assIdCnt} = scalar(keys %{$hash->{helper}{ids}});
+      $hash->{assignedIDsCnt} = $hash->{helper}{assIdCnt}
+              .(($hash->{helper}{assIdCnt} eq $hash->{helper}{assIdRep})
+                  ?""
+                  :" report:$hash->{helper}{assIdRep}")
+              ;
     }
     return;
   }
@@ -452,11 +484,13 @@ sub HMLAN_Write($$$) {#########################################################
     if ($modules{CUL_HM}{defptr}{$dst} &&
         $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn} ){
       HMLAN_SimpleWrite($hash,"-$dst");
-      delete $hash->{helper}{$dst};
-      delete $hash->{assIDs}{$dst};
-      my @asId = HMLAN_noDup(keys %{$hash->{assIDs}});
-      $hash->{assignedIDs}=join(',',@asId);
-      $hash->{assignedIDsCnt}=scalar(@asId);
+      delete $hash->{helper}{ids}{$dst};
+      $hash->{helper}{assIdCnt} = scalar(keys %{$hash->{helper}{ids}});
+      $hash->{assignedIDsCnt} = $hash->{helper}{assIdCnt}
+              .(($hash->{helper}{assIdCnt} eq $hash->{helper}{assIdRep})
+                  ?""
+                  :" report:$hash->{helper}{assIdRep}")
+              ;
     }
     return;
   }
@@ -570,15 +604,16 @@ sub HMLAN_Parse($$) {##########################################################
 
     if ($stat){# message with status information
       HMLAN_condUpdate($hash,$HMcnd)if ($hash->{helper}{q}{HMcndN} != $HMcnd);
-
-      if    ($stat & 0x03 && $dst eq $attr{$name}{hmId}){HMLAN_qResp($hash,$src,0);}
-      elsif ($stat & 0x08 && $src eq $attr{$name}{hmId}){HMLAN_qResp($hash,$dst,0);}
+      my $myId = $attr{$name}{hmId};
+      if    ($stat & 0x03 && $dst eq $myId){HMLAN_qResp($hash,$src,0);}
+      elsif ($stat & 0x08 && $src eq $myId){HMLAN_qResp($hash,$dst,0);}
 
       HMLAN_UpdtMsgLoad($name,((hex($flg)&0x10)?($mLen*2+880)  #burst=17units *2
                                                :($mLen*2+22))) #ACK=1 unit *2
           if (($stat & 0x48) == 8);# reject - but not from repeater
 
-      $hash->{helper}{$dst}{flg} = 0;#got response => unblock sending
+      $hash->{helper}{ids}{$dst}{flg} = 0 if(defined $hash->{helper}{ids}{$dst});
+                                           #got response => unblock sending
       if     ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
         Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
                   , "HMLAN_Parse: $name no ACK from $dst"   if($stat & 0x08);
@@ -599,7 +634,7 @@ sub HMLAN_Parse($$) {##########################################################
             if (   $letter eq "E"
                 && (hex($flg)&0x60) == 0x20 # ack but not from repeater
                 && $dst eq $attr{$name}{hmId}
-                && $hash->{assignedIDs} =~ m/$src/);
+                && $hash->{helper}{ids}{$src});
     }
 
     my $rssi = hex($mFld[4])-65536;
@@ -648,14 +683,15 @@ sub HMLAN_Parse($$) {##########################################################
       HMLAN_Write($hash,undef, "As15".$mNo."8002".$dst.$src."00");
     }
 
-    if ($letter eq 'R' && $hash->{helper}{$src}{flg}){
-      $hash->{helper}{$src}{flg} = 0;                 #release send-holdoff
-      if ($hash->{helper}{$src}{msg}){                #send delayed msg if any
+    if ($letter eq 'R' && $hash->{helper}{ids}{$src}{flg}){
+      $hash->{helper}{ids}{$src}{flg} = 0 if($dst ne "000000"); #release send-holdoff
+
+      if ($hash->{helper}{ids}{$src}{msg}){                #send delayed msg if any
         Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
                   ,"HMLAN_SdDly: $name $src";
-        HMLAN_SimpleWrite($hash, $hash->{helper}{$src}{msg});
+        HMLAN_SimpleWrite($hash, $hash->{helper}{ids}{$src}{msg});
       }
-      $hash->{helper}{$src}{msg} = "";                #clear message
+      $hash->{helper}{ids}{$src}{msg} = "";                #clear message
     }
     # prepare dispatch-----------
     # HM format A<len><msg>:<info>:<RSSI>:<IOname>  Info is not used anymore
@@ -667,7 +703,14 @@ sub HMLAN_Parse($$) {##########################################################
   elsif($mFld[0] eq 'HHM-LAN-IF'){#HMLAN version info
 
     $hash->{uptime} = HMLAN_uptime($mFld[5],$hash);
-    $hash->{assignedIDsReport}=hex($mFld[6]);
+    
+    $hash->{helper}{assIdRep} = hex($mFld[6]);
+    $hash->{assignedIDsCnt} = $hash->{helper}{assIdCnt}
+              .(($hash->{helper}{assIdCnt} eq $hash->{helper}{assIdRep})
+                  ?""
+                  :" report:$hash->{helper}{assIdRep}")
+              ;
+
     $hash->{helper}{q}{keepAliveRec} = 1;
     $hash->{helper}{q}{keepAliveRpt} = 0;
     Log3 $hash, ($hash->{helper}{log}{sys}?0:5)
@@ -727,7 +770,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
        unpack('A9A1A2A1A8A1A2A1A8A1A2A2A2A6A6A*',$msg);
 
     my $hmId = AttrVal($name,"hmId","");
-    my $hDst = $hash->{helper}{$dst};# shortcut
+    my $hDst = $hash->{helper}{ids}{$dst};# shortcut
     my $tn = gettimeofday();
     
     if($modules{CUL_HM}{defptr}{$dst} && 
@@ -823,7 +866,7 @@ sub HMLAN_DoInit($) {##########################################################
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
   InternalTimer($tn+$wdTimer, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
   # send first message to retrieve HMLAN condition
-  HMLAN_Write($hash,"","As09998112".$id."000001");
+  HMLAN_Write($hash,"","As09998112".$id."000000");
 
   return undef;
 }
@@ -832,8 +875,7 @@ sub HMLAN_assignIDs($){
   my ($hash) = @_;
   HMLAN_SimpleWrite($hash, "C"); #clear all assigned IDs
 
-  my @ids = split",",InternalVal($hash->{NAME},"assignedIDs","");
-  HMLAN_Write($hash,"","init:$_") foreach(@ids);
+  HMLAN_Write($hash,"","init:$_") foreach(keys %{$hash->{helper}{ids}});
 }
 
 sub HMLAN_writeAesKey($) {#####################################################
@@ -1045,12 +1087,17 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     <ul>
         <li><a href="#hmPairForSec">hmPairForSec</a></li>
         <li><a href="#hmPairSerial">hmPairSerial</a></li>
-    </ul>
+        <li><a href="#HMLANset_reassignIDs">reassignIDs</a>
+          Syncs the IDs between HMLAN and teh FHEM list. 
+          Usually this is done automatically and only is recomended if there is a difference in counts.
+          </li>
     <br><br>
-
+    </ul>
     <a name="HMLANget"><b>Get</b></a>
     <ul>
-        N/A
+        <li><a href="#HMLANgetassignIDs">assignIDs</a>
+          Gibt eine Liste aller diesem IO zugewiesenen IOs aus.
+          </li>
     </ul>
     <br><br>
 
@@ -1106,13 +1153,11 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     </ul><br>
     <a name="HMLANparameter"><b>parameter</b></a>
     <ul>
-      <li><B>assignedIDs</B><br>
-          HMIds that are assigned to HMLAN and will be handled. e.g. ACK will be generated internally</li>
       <li><B>assignedIDsCnt</B><br>
-          number of IDs that are assigned to HMLAN by FHEM</li>
-      <li><B>assignedIDsReport</B><br>
-          number of HMIds that HMLAN reports are assigned. This should be identical
-          to assignedIDsCnt</li>
+          number of IDs that are assigned to HMLAN by FHEM.
+          If the number reported by HMLAN differ it will be reported as 'reported'.<br>
+          It is recommended to resync HMLAN using the command 'assignIDs'.
+          </li>
       <li><B>msgKeepAlive</B><br>
           performance of keep-alive messages. <br>
           <B>dlyMax</B>: maximum delay of sheduled message-time to actual message send.<br>
@@ -1181,12 +1226,17 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     <ul>
         <li><a href="#hmPairForSec">hmPairForSec</a></li>
         <li><a href="#hmPairSerial">hmPairSerial</a></li>
+        <li><a href="#HMLANset_reassignIDs">reassignIDs</a>
+          Synchronisiert die im HMLAN eingetragenen IDs mit der von FHEM verwalteten Liste. 
+          I.a. findet dies automatisch statt, koennte aber in reset Fällen abweichen.
+          </li>
     </ul>
     <br><br>
-
     <a name="HMLANget"><b>Get</b></a>
     <ul>
-        N/A
+        <li><a href="#HMLANgetassignIDs">assignIDs</a>
+          Gibt eine Liste aller diesem IO zugewiesenen IOs aus.
+          </li>
     </ul>
     <br><br>
 
@@ -1250,13 +1300,11 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     </ul>
     <a name="HMLANparameter"><b>parameter</b></a>
     <ul>
-      <li><B>assignedIDs</B><br>
-          HMIds, die einem HMLAM zugeordnet sind und verarbeitet werden. Z.B. ACK werden intern generiert.</li>
       <li><B>assignedIDsCnt</B><br>
-          Anzahl der IDs, die von FHEM einem HMLAN zugeordnet sind</li>
-      <li><B>assignedIDsReport</B><br>
-          Anzahl der HMIDs, die vom HMLAN als zugeordnet gemeldet werden. 
-          Diese Anzahl sollte mit assignedIDsCnt identisch sein.</li>
+          Anzahl der IDs, die von FHEM einem HMLAN zugeordnet sind. 
+          Sollte die Anzahl von der im HMLAN abweichen wird dies als 'reported' gemeldet.<br>
+          Wird eine Abweichung festgestellt kann man mit dem Kommando assignIDs das HMLAN synchronisieren.
+          </li>
       <li><B>msgKeepAlive</B><br>
           G&uuml;te der keep-alive Meldungen. <br>
           <B>dlyMax</B>: maximale Verz&ouml;gerungsdauer zwischen dem geplanten Meldungszeitpunkt 
