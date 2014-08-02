@@ -232,7 +232,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00A6" => {name=>"HM-RC-Key4-2"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"unlock:1:1,lock:2:2,light:3:3,open:4:4",},
   "00A7" => {name=>"HM-Sen-RD-O"             ,st=>'sensRain'          ,cyc=>''      ,rxt=>''       ,lst=>'1:1,4:1p'     ,chn=>"Rain:1:1,Heating:2:2",},#stc:70 THSensor
   "00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'12:00' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",},
-  "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:6",},
+  "00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:6",},
   "00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"},
@@ -270,6 +270,9 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00D0" => {name=>"HM-LC-Sw4-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "00D1" => {name=>"HM-LC-Bl1-SM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "00D2" => {name=>"HM-LC-Bl1-FM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
+  "00D3" => {name=>"HM-Dis-WM55"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1'            ,chn=>"Dis:1:2",},
+  "00DA" => {name=>"HM-RC-8"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:8",},
+  "00DD" => {name=>"HM-PB-4DIS-WM-2"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:20",},
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
   "8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",},
   "FFF0" => {name=>"CCU-FHEM"                ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",},
@@ -943,6 +946,8 @@ $culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"} = $culHmRegModel{"HM-CC-TC"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
 
+$culHmRegModel{"HM-PB-4DIS-WM"}       = $culHmRegModel{"HM-PB-4DIS-WM-2"};
+
 %culHmRegChan = (# if channelspecific then enter them here
   "HM-CC-TC02"        =>{ displayMode     =>1,displayTemp     =>1,displayTempUnit =>1
                          ,controlMode     =>1,decalcDay       =>1
@@ -1395,6 +1400,7 @@ $culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
 $culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
 $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
+$culHmModelSets{"HM-PB-4DIS-WM"}       = $culHmModelSets{"HM-PB-4DIS-WM-2"};
 
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
