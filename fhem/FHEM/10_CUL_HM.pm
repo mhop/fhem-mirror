@@ -5907,7 +5907,6 @@ sub CUL_HM_updtRegDisp($$$) {
   if (($md eq "HM-MOD-Re-8") && $listNo == 0){#handle Fw bug 
     CUL_HM_ModRe8($hash,$regLN);
   }
-
   foreach my $rgN (@regArr){
     next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);
