@@ -258,6 +258,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00C0" => {name=>"HM-SEC-MDIR-2"           ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "00C1" => {name=>"HM-Sen-MDIR-O-2"         ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",},
+  "00C7" => {name=>"HM-SEC-SCo"              ,st=>'threeStateSensor'  ,cyc=>'00:50' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",},
   "00C8" => {name=>"HM-LC-Sw1-Pl-3"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "00C9" => {name=>"HM-LC-Sw1-SM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
   "00CA" => {name=>"HM-LC-Sw1-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",},
@@ -848,6 +849,9 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
   "HM-SEC-SC"         =>{                     sabotageMsg     =>1
                          ,msgScPosA       =>1,msgScPosB       =>1
                          ,                    ledOnTime       =>1,eventDlyTime    =>1},
+  "HM-SEC-SCo"        =>{                     sabotageMsg     =>1,localResDis     =>1,
+                         ,msgScPosA       =>1,msgScPosB       =>1
+                         ,                    ledOnTime       =>1,eventDlyTime    =>1},
   "HM-SCI-3-FM"       =>{ msgScPosA       =>1,msgScPosB       =>1
                          ,                                        eventDlyTime    =>1},
   "HM-SEC-TIS"        =>{                     sabotageMsg     =>1
@@ -1431,6 +1435,8 @@ $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
                          ,toggle         =>""},
   "HM-CC-RT-DN00"     =>{ sysTime        =>""
                          ,fwUpdate       =>"<filename> <bootTime> ..."
+                        },
+  "HM-LC-Bl1PBU-FM"   =>{ fwUpdate       =>"<filename> <bootTime> ..."
                         },
   "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manual|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"
