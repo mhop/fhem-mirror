@@ -8,9 +8,13 @@
 # written 2013 by Tobias Vaupel <fhem at 622 mbit dot de>
 #
 #
-# Version = 1.22
+# Version = 1.23
 #
 # Version  History:
+# - 1.23 - 2014-08-01
+# -- Add parameter "HDMI1" - "HDMI4" for command remoteControl to select HDMI input directly
+# -- Add command "input" to select a HDMI port, TV or SD-Card as source
+#
 # - 1.22 - 2013-12-28
 # -- fixed set command remoteControl
 #
@@ -103,6 +107,10 @@ my %VIERA_remoteControl_args = (
   "NRC_D0-ONOFF"        => "Digit 0",
   "NRC_P_NR-ONOFF"      => "P-NR (Noise reduction)",
   "NRC_R_TUNE-ONOFF"    => "Seems to do the same as INFO",
+  "NRC_HDMI1"           => "Switch to HDMI input 1",
+  "NRC_HDMI2"           => "Switch to HDMI input 2",
+  "NRC_HDMI3"           => "Switch to HDMI input 3",
+  "NRC_HDMI4"           => "Switch to HDMI input 4",
 );
 
 
@@ -155,7 +163,7 @@ sub VIERA_Set($@){
   my $usage = "choose one of off:noArg mute:on,off " .
               "remoteControl:" . join(",", sort keys %VIERA_remoteControl_args) . " " .
               "volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg ".
-              "channel channelUp:noArg channelDown:noArg";
+              "channel channelUp:noArg channelDown:noArg input:hdmi1,hdmi2,hdmi3,hdmi4,sdCard,tv";
   $usage =~ s/(NRC_|-ONOFF)//g;
   
   my $what = lc($a[1]);
@@ -246,6 +254,15 @@ sub VIERA_Set($@){
     when("statusrequest"){
       Log3 $name, 3, "VIERA: Set statusRequest";
       VIERA_GetStatus($hash, 1);
+      break;
+    }
+    
+    when("input"){
+      $state = uc($state);
+      return "VIERA: Input $state isn't available." if($state ne "HDMI1" && $state ne "HDMI2" && $state ne "HDMI3" && $state ne "HDMI4" && $state ne "SDCARD" && $state ne "TV");
+      $state = "SD_CARD" if ($state eq "SDCARD");
+      Log3 $name, 3, "VIERA: Set input $state";
+      VIERA_connection(VIERA_BuildXML_NetCtrl($hash,$state), $host);
       break;
     }
     
