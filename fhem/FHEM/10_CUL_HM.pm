@@ -1308,7 +1308,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $setTemp  = ($setTemp < 5 )?'off':
                   ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
       
-      if (defined $d[4]){# message with party mode
+      if (defined $d[11]){# message with party mode
         $pTemp =(($d[11]     )& 0x3f)/2 if (defined $d[11]) ;
         my @p;
         if ($mTp eq "10") {@p = @d[3..9]}
@@ -1949,7 +1949,7 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       push @evtEt,[$shash,1,"alive:yes"];
       push @evtEt,[$shash,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
-      if (  $md eq "HM-SEC-SC" ||
+      if (  $md =~ m/^HM-SEC-SC/ ||
             $md eq "HM-Sec-RHS"){push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
       elsif($md ne "HM-SEC-WDS"){push @evtEt,[$shash,1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
     }
@@ -3164,9 +3164,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   if   ($cmd eq "raw") {  #####################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
     $state = "";
-    foreach (@a[2..$#a]) {
-      CUL_HM_PushCmdStack($hash, $_);
+    my $msg = $a[2];
+    foreach my $sub (@a[3..$#a]) {
+      last if ($sub !~ m/^[A-F0-9]*$/);
+      $msg .= $sub;      
     }
+    CUL_HM_PushCmdStack($hash, $msg);
   }
   elsif($cmd eq "clear") { ####################################################
     my (undef,undef,$sectIn) = @a;
