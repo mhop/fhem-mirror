@@ -127,7 +127,7 @@ sub structure_Notify($$)
       $s = "" if(!defined($s));
       if($s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
         my ($old, $new) = ($1, $2);
-        if( defined($hash->{CONTENT}{$old}) ) {
+        if( exists($hash->{CONTENT}{$old}) ) {
 
           $hash->{DEF} =~ s/(\s+)$old(\s*)/$1$new$2/;
 
@@ -137,7 +137,7 @@ sub structure_Notify($$)
       } elsif($s =~ m/^DELETED ([^ ]*)$/) {
         my ($name) = ($1);
 
-        if( defined($hash->{CONTENT}{$name}) ) {
+        if( exists($hash->{CONTENT}{$name}) ) {
 
           $hash->{DEF} =~ s/(\s+)$name(\s*)/ /;
           $hash->{DEF} =~ s/^ //;
@@ -153,7 +153,7 @@ sub structure_Notify($$)
 
   #pruefen ob Devices welches das notify ausgeloest hat Mitglied dieser
   # Struktur ist
-  return "" if (!$hash->{CONTENT}->{$dev->{NAME}});
+  return "" if (! exists $hash->{CONTENT}->{$dev->{NAME}});
 
   # lade das Verhalten, Standard ist absolute 
   my $behavior = AttrVal($me, "clientstate_behavior", "absolute");
@@ -236,6 +236,7 @@ sub structure_Notify($$)
       }
     }
 
+    $hash->{CONTENT}{$d} = $devstate;
   }
 
   my $newState = "undefined";
