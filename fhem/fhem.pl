@@ -427,8 +427,11 @@ if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
 
 # FritzBox special: Wait until the time is set via NTP,
 # but not more than 2 hours
-while(time() < 2*3600) {
-  sleep(5);
+if(time() < 2*3600) {
+  Log 1, "date/time not set, waiting up to 2 hours to be set.";
+  while(time() < 2*3600) {
+    sleep(5);
+  }
 }
 
 ###################################################
