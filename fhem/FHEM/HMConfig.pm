@@ -946,7 +946,7 @@ $culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"} = $culHmRegModel{"HM-CC-TC"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
 
-$culHmRegModel{"HM-PB-4DIS-WM"}       = $culHmRegModel{"HM-PB-4DIS-WM-2"};
+$culHmRegModel{"HM-PB-4DIS-WM-2"}     = $culHmRegModel{"HM-PB-4DIS-WM"};
 
 %culHmRegChan = (# if channelspecific then enter them here
   "HM-CC-TC02"        =>{ displayMode     =>1,displayTemp     =>1,displayTempUnit =>1
@@ -1401,7 +1401,7 @@ $culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
 $culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
 $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
-$culHmModelSets{"HM-PB-4DIS-WM"}       = $culHmModelSets{"HM-PB-4DIS-WM-2"};
+$culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
 
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
