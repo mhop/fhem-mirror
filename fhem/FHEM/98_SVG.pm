@@ -1210,7 +1210,8 @@ SVG_render($$$$$$$$$)
   $initoffset = $step;
 
   if(AttrVal($FW_wname, "endPlotNow", undef) && $ddur>1.1 && $ddur<7.1) {
-    $initoffset -= (86400-time()%86400); # Forum #25768
+    my $now = time();
+    $initoffset -= ($now+fhemTzOffset($now))%86400; # Forum #25768
   }
 
   $initoffset = int(($step/2)/86400)*86400 if($aligntext);
