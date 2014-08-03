@@ -877,9 +877,10 @@ sub CUL_HM_Parse($$) {#########################################################
 
   my @entities = ("global"); #additional entities with events to be notifies
   ####################  attack alarm detection#####################
-  if (   $dstH 
+  if (   $dstH && $dst ne "000000"
       && !CUL_HM_getAttrInt($dname,"ignore")
-      && ($mTp eq '01' || $mTp eq '11')){
+      && ($mTp eq '01' || $mTp eq '11'
+      )){
     my $ioId = AttrVal($dstH->{IODev}{NAME},"hmId","-");
     if($ioId ne $src){
       CUL_HM_eventP($dstH,"ErrIoId_$src");
