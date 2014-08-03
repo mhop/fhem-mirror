@@ -978,7 +978,9 @@ SVG_render($$$$$$$$$)
   return $SVG_RET if(!defined($dp));
 
   my $nr_axis = AttrVal($parent_name,"nrAxis","1,1");
-  my ($nr_left_axis,$nr_right_axis,$use_left_axis,$use_right_axis) = split(",", AttrVal($name,"nrAxis",$nr_axis));
+  my ($nr_left_axis,$nr_right_axis,$use_left_axis,$use_right_axis) =
+                                split(",", AttrVal($name,"nrAxis",$nr_axis));
+
   $use_left_axis = $nr_left_axis if( !defined($use_left_axis) );
   $use_right_axis = $nr_right_axis if( !defined($use_right_axis) );
 
@@ -993,7 +995,8 @@ SVG_render($$$$$$$$$)
   my $ps = "800,400";
   $ps = $1 if($conf{terminal} =~ m/.*size[ ]*([^ ]*)/);
   my ($ow,$oh) = split(",", $ps);       # Original width
-  my ($w, $h) = ($ow-$nr_left_axis*$axis_width-$nr_right_axis*$axis_width, $oh-2*$y);   # Rect size
+  my $w = $ow-$nr_left_axis*$axis_width-$nr_right_axis*$axis_width;
+  my $h = $oh-2*$y;   # Rect size
 
   # Keep only the Filter part of the #FileLog
   $flog = join(" ", map { my @a=split(":",$_);
@@ -1040,10 +1043,12 @@ SVG_render($$$$$$$$$)
 
   ######################
   # Copy and Paste labels, hidden by default
-  SVG_pO "<text id=\"svg_paste\" x=\"" . ($ow-$axis_width-$nr_right_axis*$axis_width) . "\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_paste\" x=\"" .
+        ($ow-$axis_width-$nr_right_axis*$axis_width) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_paste(evt)\" " .
         "class=\"paste\" text-anchor=\"end\"> </text>";
-  SVG_pO "<text id=\"svg_copy\" x=\"" . ($ow-$nr_right_axis*$axis_width) . "\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_copy\" x=\"" .
+        ($ow-$nr_right_axis*$axis_width) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_copy(evt)\" " .
         "class=\"copy\" text-anchor=\"end\"> </text>";
 
@@ -1165,7 +1170,7 @@ SVG_render($$$$$$$$$)
   my $ddur = ($tosec-$fromsec)/86400;
   my ($first_tag, $tag, $step, $tstep, $aligntext,  $aligntics);
   
-  if ($ddur <= 0.1) {
+  if($ddur <= 0.1) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 300; $tstep = 60;
   } elsif($ddur <= 0.5) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 3600; $tstep = 900;
@@ -1203,6 +1208,11 @@ SVG_render($$$$$$$$$)
   my $t = SVG_fmtTime($first_tag, $fromsec);
   SVG_pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>";
   $initoffset = $step;
+
+  if(AttrVal($FW_wname, "endPlotNow", undef) && $ddur>1.1 && $ddur<7.1) {
+    $initoffset -= (86400-time()%86400); # Forum #25768
+  }
+
   $initoffset = int(($step/2)/86400)*86400 if($aligntext);
   for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $step) {
     $i = SVG_time_align($i,$aligntext);
