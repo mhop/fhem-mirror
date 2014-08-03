@@ -1278,12 +1278,10 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 );
 
 %culHmSubTypeDevSets = (# device of this subtype
-  switch           =>{ statusRequest => "",
-                       getSerial     => ""},
-  dimmer           =>{ statusRequest => "",
-                       getSerial     => ""},
-  blindActuator    =>{ statusRequest => "",
-                       getSerial     => ""},
+  switch           =>{ statusRequest => ""
+                      ,getSerial     => ""
+                      ,getVersion    => ""
+                       },
 #  remote           =>{ },
 #  threeStateSensor =>{ statusRequest =>""},
 #  THSensor         =>{ statusRequest =>""}, at least OT/OT2 do not support this
@@ -1293,8 +1291,11 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
   keyMatic         =>{ statusRequest => ""},
   repeater         =>{ statusRequest => "",
                        getSerial     => ""},
-  outputUnit       =>{ statusRequest => ""},# also LED16? proof
+  outputUnit       =>{ statusRequest => ""},
 );
+$culHmSubTypeDevSets{dimmer}         = $culHmSubTypeDevSets{switch};
+$culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
+
 
 %culHmGlobalSetsChn = (# all channels but virtuals
   sign          => "[on|off]",
@@ -1442,7 +1443,7 @@ $culHmModelSets{"HM-PB-4DIS-WM"}       = $culHmModelSets{"HM-PB-4DIS-WM-2"};
   "HM-CC-RT-DN00"     =>{ sysTime        =>""
                          ,fwUpdate       =>"<filename> <bootTime> ..."
                         },
-  "HM-LC-Bl1PBU-FM"   =>{ fwUpdate       =>"<filename> <bootTime> ..."
+  "HM-LC-Bl1PBU-FM00" =>{ fwUpdate       =>"<filename> <bootTime> ..."
                         },
   "HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manual|boost|day|night]"
                          ,controlManu    =>"[on|off|5.0..30.0]"

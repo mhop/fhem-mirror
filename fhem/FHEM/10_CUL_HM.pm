@@ -4419,12 +4419,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return ("",1) if ($target && $target eq "remote");#Nothing for actor
   }
 
-  elsif($cmd eq "pair") { #####################################################
+  elsif($cmd  =~ m/^(pair|getVersion)$/) { ####################################
     $state = "";
-    my $serialNr = ReadingsVal($name, "D-serialNr", undef);
-    return "serialNr is not set" if(!$serialNr);
-    CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".uc( unpack("H*",$serialNr)));
-    $hash->{hmPairSerial} = $serialNr;
+    my $serial = ReadingsVal($name, "D-serialNr", undef);
+    return "serial $serial - wrong length or Reading D-serialNr not present"
+          if(length($serial) != 10);
+    CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".uc( unpack("H*",$serial)));
+    $hash->{hmPairSerial} = $serial if ($cmd eq "pair");
   }
   elsif($cmd eq "hmPairForSec") { #############################################
     $state = "";
@@ -4437,15 +4438,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "hmPairSerial") { #############################################
     $state = "";
-    my $arg = $a[2]?$a[2]:"";
+    my $serial = $a[2]?$a[2]:"";
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
-        if($arg !~ m/^.{10}$/);
+        if(length($serial) != 10);
 
-    $hash->{HM_CMDNR} = $hash->{HM_CMDNR} ? ($hash->{HM_CMDNR}+1)%256 : 1;
-    CUL_HM_PushCmdStack($hash, "++8401${dst}000000010A".unpack('H*', $arg));
+    CUL_HM_PushCmdStack($hash, "++8401${dst}000000010A".uc( unpack('H*', $serial)));
     CUL_HM_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
-    $hash->{hmPairSerial} = $arg;
+    $hash->{hmPairSerial} = $serial;
     InternalTimer(gettimeofday()+30, "CUL_HM_RemoveHMPair", "hmPairForSec:$name", 1);
   }
 
