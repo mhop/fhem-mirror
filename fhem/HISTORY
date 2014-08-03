@@ -589,3 +589,6 @@
 
 - Mon Jun 30 2014 (thomyd)
   - added new module 10_SOMFY.pm to support Somfy RTS blinds
+
+- Sun Aug 03 2014 (xusader)
+  - added new module 70_PushNotifier.pm to support Push Messages with PushNotifier
