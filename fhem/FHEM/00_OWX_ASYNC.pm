@@ -3,38 +3,44 @@
 # OWX_ASYNC.pm
 #
 # FHEM module to commmunicate with 1-Wire bus devices
-# * via an active DS2480 bus master interface attached to an USB port
+# * via an active DS2480 bus master interface attached to a serial port, USB or Ethernet<->Serial interface
+# * via a passive DS9097 bus master interface attached to a serial port
 # * via an Arduino running ConfigurableFirmata attached to USB
 # * via an Arduino running ConfigurableFirmata connecting to FHEM via Ethernet
 #
 # Norbert Truchsess
-# Prof. Dr. Peter A. Henning
+# based on 00_OWX.pm written by Prof. Dr. Peter A. Henning
 #
 # $Id$
 #
 ########################################################################################
 #
-# define <name> OWX_ASYNC <serial-device> for USB interfaces or
+# define <name> OWX_ASYNC <serial-device> for serial or USB interfaces (both DS2480 and DS9097)
+# define <name> OWX_ASYNC <ip:port> for DS2480 over Ethernet
 # define <name> OWX_ASYNC <arduino-pin> for a Arduino/Firmata (10_FRM.pm) interface
 #    
 # where <name> may be replaced by any name string 
 #       <serial-device> is a serial (USB) device
 #       <arduino-pin> is an Arduino pin 
 #
-# get <name> alarms                 => find alarmed 1-Wire devices (not with CUNO)
-# get <name> devices                => find all 1-Wire devices 
-# get <name> version                => OWX_ASYNC version number
+# get <name> alarms                   => find alarmed 1-Wire devices (not with CUNO)
+# get <name> devices                  => find all 1-Wire devices
+# get <name> version                  => OWX_ASYNC version number
 #
-# set <name> interval <seconds>     => set period for temperature conversion and alarm testing
-# set <name> followAlarms on/off    => determine whether an alarm is followed by a search for
-#                                      alarmed devices
+# set <name> interval <seconds>       => set period for temperature conversion and alarm testing
+# set <name> followAlarms on/off      => determine whether an alarm is followed by a search for
+#                                        alarmed devices
 #
-# attr <name> dokick 0/1            => 1 if the interface regularly kicks thermometers on the
-#                                      bus to do a temperature conversion, 
-#                                      and to make an alarm check
-#                                      0 if not
+# attr <name> buspower real/parasitic => for devices that steal power from data-line
 #
-# attr <name> interval <seconds>    => set period for temperature conversion and alarm testing
+# attr <name> dokick 0/1              => 1 if the interface regularly kicks thermometers on the
+#                                        bus to do a temperature conversion,
+#                                        and to make an alarm check
+#                                        0 if not
+#
+# attr <name> interval <seconds>      => set period for temperature conversion and alarm testing
+#
+# attr <name> IODev <frm-device>      => required when there's more than a single frm-device defined.
 #
 ########################################################################################
 #
@@ -127,7 +133,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.12;
+$owx_async_version=5.13;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -1054,6 +1060,12 @@ sub OWX_ASYNC_RunToCompletion($$) {
   return $task->PT_RETVAL();  
 }
 
+sub OWX_ASYNC_TaskTimeout($$) {
+  my ( $master, $timeout ) = @_;
+  die "OWX_ASYNC_TaskTimeout: no task running" unless defined $master->{".runningtask"};
+  $master->{".runningtask"}->{TimeoutTime} = $timeout;
+}
+
 sub OWX_ASYNC_RunTasks($) {
   my ( $master ) = @_;
   if ($master->{STATE} eq "Active") {
@@ -1090,6 +1102,7 @@ sub OWX_ASYNC_RunTasks($) {
       }
       if (defined (my $current = @queue_waiting ? shift @queue_waiting : @queue_ready ? shift @queue_ready : @queue_initial ? shift @queue_initial : undef)) {
         my $task = $current->{queue}->[0];
+        $master->{".runningtask"} = $task;
         my $timeout = $task->{TimeoutTime};
         if ($task->PT_SCHEDULE()) {
           my $state = $task->PT_STATE();
@@ -1114,7 +1127,7 @@ sub OWX_ASYNC_RunTasks($) {
                 Log3 $master->{NAME},5,"OWX_ASYNC_RunTasks: $current->{device} task waiting for data or timeout" if ($owx_async_debug>2);
                 #new timeout or timeout did change:
                 if (!defined $timeout or $timeout != $task->{TimeoutTime}) {
-                  Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} task schedule for timeout at %.6f",$task->{TimeoutTime});
+                  Log3 $master->{NAME},5,sprintf("OWX_ASYNC_RunTasks: $current->{device} task schedule for timeout at %.6f",$task->{TimeoutTime}) if ($owx_async_debug>1);
                   InternalTimer($task->{TimeoutTime}, "OWX_ASYNC_RunTasks", $master,0);
                 }
                 last;

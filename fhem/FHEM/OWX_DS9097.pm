@@ -125,13 +125,9 @@ sub reset() {
 
 sub block($) {
   my ( $serial, $block ) = @_;
-  if (defined (my $hwdevice = $serial->{hash}->{USBDev})) {
-    main::Log3($serial->{name},5, "OWX_DS9097 block: ".unpack "H*",$block) if ( $main::owx_async_debug > 1 );
-    foreach my $bit (split //,unpack "b*",$block) {
-      $serial->bit($bit);
-    }
-  } else {
-    die "no USBDev";
+  main::Log3($serial->{name},5, "OWX_DS9097 block: ".unpack "H*",$block) if ( $main::owx_async_debug > 1 );
+  foreach my $bit (split //,unpack "b*",$block) {
+    $serial->bit($bit);
   }
 }
 
@@ -149,20 +145,22 @@ sub bit($) {
 sub pt_query($) {
   my ( $serial, $query ) = @_;
   my @bitsout = split //,$query;
+  my $numbits = @bitsout;
   my $bitsin = "";
   my $bit;
   return PT_THREAD(sub {
     my ( $thread ) = @_;
     PT_BEGIN($thread);
-    main::Log3($serial->{name},5, "OWX_DS9097 pt_query out: ".$query) if( $main::owx_async_debug > 1 );
+    main::Log3($serial->{name},5, "OWX_DS9097 pt_query out: ".$query) if( $main::owx_async_debug );
+    while ($serial->poll()) {};
+    $serial->{string_raw} = "";
     while (defined ($bit = shift @bitsout)) {
-      while ($serial->poll()) {};
-      $serial->{string_raw} = "";
       $serial->bit($bit);
-      PT_WAIT_UNTIL(length($serial->{string_raw}) > 0);
-      $bitsin .= substr($serial->{string_raw},0,1) eq ($bit == 1 ? "\xFF" : "\x00") ? "1" : "0";
     };
-    main::Log3($serial->{name},5,"OWX_DS9097 pt_query in: ".$bitsin) if ( $main::owx_async_debug > 1 );
+    main::OWX_ASYNC_TaskTimeout($serial->{hash},gettimeofday+1);
+    PT_WAIT_UNTIL(length($serial->{string_raw}) >= $numbits);
+    $bitsin = join "", map { ($_ == 0xFF) ? "1" : "0" } unpack "C*",$serial->{string_raw};
+    main::Log3($serial->{name},5,"OWX_DS9097 pt_query in: ".$bitsin) if ( $main::owx_async_debug );
     PT_EXIT($bitsin);
     PT_END;
   });
@@ -207,8 +205,6 @@ sub pt_next ($$) {
     } else {
       $serial->block("\xEC");
     }
-    #-- clear 8 byte of device id for current search
-    $context->{ROM_ID} = [0,0,0,0 ,0,0,0,0]; 
 
     #-- Response search data parsing operates bitwise
 
@@ -262,6 +258,7 @@ sub pt_next ($$) {
       }
       # serial number search direction write bit
       $serial->bit($search_direction);
+      main::Log3 ($serial->{name},5,"id_bit_number: $id_bit_number, search_direction: $search_direction, LastDiscrepancy: $last_zero ROM_ID: ".sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$context->{ROM_ID}})) if ($main::owx_async_debug);
       # increment the byte counter id_bit_number
       # and shift the mask rom_byte_mask
       $id_bit_number++;
@@ -271,9 +268,8 @@ sub pt_next ($$) {
         $rom_byte_number++;
         $rom_byte_mask = 1;
       } 
-      $context->{LastDiscrepancy} = $last_zero;
-      main::Log3 ($serial->{name},5,"id_bit_number: $id_bit_number, search_direction: $search_direction, LastDiscrepancy: $context->{LastDiscrepancy} ROM_ID: ".sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$context->{ROM_ID}})) if ($main::owx_async_debug > 2);
     }
+    $context->{LastDiscrepancy} = $last_zero;
     PT_END;
   });
 }
