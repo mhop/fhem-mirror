@@ -96,7 +96,7 @@ sub get_pt_execute($$$$) {
       $pt_query = $self->pt_query($select);
       PT_WAIT_THREAD($pt_query);
       die $pt_query->PT_CAUSE() if ($pt_query->PT_STATE() == PT_ERROR || $pt_query->PT_STATE() == PT_CANCELED);
-      my $res = pack "B*",$pt_query->PT_RETVAL();
+      my $res = pack "b*",$pt_query->PT_RETVAL();
       main::Log3($self->{name},5,"OWX_DS9097::pt_execute: Receiving ".unpack ("H*",$res)) if( $main::owx_async_debug > 1);
       PT_EXIT($res);
     } else {
@@ -113,13 +113,13 @@ sub reset() {
 
     $hwdevice->baudrate(9600);
     $hwdevice->write_settings;
-    $hwdevice->write("0xF0");
-
+    main::Log3($serial->{name},5, "OWX_DS9097 9600 baud") if ( $main::owx_async_debug > 2 );
+    $hwdevice->write("\xF0");
+    main::Log3($serial->{name},5, "OWX_DS9097 reset") if ( $main::owx_async_debug > 1 );
     while ($serial->poll()) {};
-
     $hwdevice->baudrate(115200);
     $hwdevice->write_settings;
-
+    main::Log3($serial->{name},5, "OWX_DS9097 115200 baud") if ( $main::owx_async_debug > 2 );
   }
 }
 
@@ -127,7 +127,7 @@ sub block($) {
   my ( $serial, $block ) = @_;
   if (defined (my $hwdevice = $serial->{hash}->{USBDev})) {
     main::Log3($serial->{name},5, "OWX_DS9097 block: ".unpack "H*",$block) if ( $main::owx_async_debug > 1 );
-    foreach my $bit (split //,unpack "B*",$block) {
+    foreach my $bit (split //,unpack "b*",$block) {
       $serial->bit($bit);
     }
   } else {
@@ -139,7 +139,7 @@ sub bit($) {
   my ( $serial, $bit ) = @_;
   if (defined (my $hwdevice = $serial->{hash}->{USBDev})) {
     my $sp1 = $bit == 1 ? "\xFF" : "\x00";
-    main::Log3($serial->{name},5, sprintf("OWX_DS9097 bit: %02X",ord($sp1))) if ( $main::owx_async_debug > 2 );
+    main::Log3($serial->{name},5, sprintf("OWX_DS9097 bit: %02x",ord($sp1))) if ( $main::owx_async_debug > 2 );
     $hwdevice->write($sp1);
   } else {
     die "no USBDev";
@@ -154,7 +154,7 @@ sub pt_query($) {
   return PT_THREAD(sub {
     my ( $thread ) = @_;
     PT_BEGIN($thread);
-    main::Log3($serial->{name},5, "OWX_DS9097 pt_query: ".$query) if( $main::owx_async_debug > 1 );
+    main::Log3($serial->{name},5, "OWX_DS9097 pt_query out: ".$query) if( $main::owx_async_debug > 1 );
     while (defined ($bit = shift @bitsout)) {
       while ($serial->poll()) {};
       $serial->{string_raw} = "";
@@ -162,6 +162,7 @@ sub pt_query($) {
       PT_WAIT_UNTIL(length($serial->{string_raw}) > 0);
       $bitsin .= substr($serial->{string_raw},0,1) eq ($bit == 1 ? "\xFF" : "\x00") ? "1" : "0";
     };
+    main::Log3($serial->{name},5,"OWX_DS9097 pt_query in: ".$bitsin) if ( $main::owx_async_debug > 1 );
     PT_EXIT($bitsin);
     PT_END;
   });
@@ -174,6 +175,7 @@ sub read() {
     if (defined $string_part and length($string_part) > 0) {
       $serial->{string_raw} .= $string_part;
       main::Log3($serial->{name},5, "OWX_DS9097 read: Loop no. $serial->{num_reads}, Receiving: ".unpack("H*",$string_part)) if( $main::owx_async_debug > 1 );
+      return 1;
     } elsif ($main::owx_async_debug > 2) {
       main::Log3($serial->{name},5, "OWX_DS9097 read: Loop no. $serial->{num_reads}, no data read:");
       foreach my $i (0..6) {
@@ -183,14 +185,6 @@ sub read() {
     }
   }
   return undef;
-}
-
-sub response_ready() {
-  my ( $serial ) = @_;
-  $serial->{string_in} = pack "B*",$serial->{string_raw};
-  main::Log3($serial->{name},5, "OWX_DS9097 response_ready: Received raw: ".$serial->{string_raw}) if( $main::owx_async_debug > 2 );
-  main::Log3($serial->{name},5, "OWX_DS9097 response_ready: Received: ".unpack("H*",$serial->{string_in})) if( $main::owx_async_debug > 1 );
-  return 1;
 }
 
 sub pt_next ($$) {
@@ -278,7 +272,7 @@ sub pt_next ($$) {
         $rom_byte_mask = 1;
       } 
       $context->{LastDiscrepancy} = $last_zero;
-      main::Log3 ($serial->{name},5,"id_bit_number: $id_bit_number, search_direction: $search_direction, LastDiscrepancy: $serial->{LastDiscrepancy} ROM_ID: ".sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$context->{ROM_ID}}));
+      main::Log3 ($serial->{name},5,"id_bit_number: $id_bit_number, search_direction: $search_direction, LastDiscrepancy: $context->{LastDiscrepancy} ROM_ID: ".sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$context->{ROM_ID}})) if ($main::owx_async_debug > 2);
     }
     PT_END;
   });

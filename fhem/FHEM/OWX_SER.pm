@@ -135,7 +135,7 @@ sub get_pt_alarms() {
   return PT_THREAD(sub {
     my ($thread) = @_;
     PT_BEGIN($thread);
-    $self->{alarmdevs} = [];
+    $thread->{alarmdevs} = [];
     #-- Discover all alarmed devices on the 1-Wire bus
     $self->first($thread);
     do {
@@ -173,7 +173,7 @@ sub get_pt_discover() {
       PT_WAIT_THREAD($pt_next);
       die $pt_next->PT_CAUSE() if ($pt_next->PT_STATE() == PT_ERROR || $pt_next->PT_STATE() == PT_CANCELED);
       $self->next_response($thread,"discover");
-    } while( $self->{LastDeviceFlag}==0 );
+    } while( $thread->{LastDeviceFlag}==0 );
     PT_EXIT($thread->{devs});
     PT_END;
   });
@@ -216,7 +216,7 @@ sub initialize() {
     $hwdevice->purge_all;
     $hwdevice->baudrate(4800);
     $hwdevice->write_settings;
-    $hwdevice->write(sprintf("\x00"));
+    $hwdevice->write("\x00");
     select(undef,undef,undef,0.5);
     #-- timing byte for DS2480
     $ds2480->start_query();
@@ -329,6 +329,7 @@ sub get_pt_verify($) {
     #-- reset the search state
     $thread->{LastDiscrepancy} = 64;
     $thread->{LastDeviceFlag} = 0;
+    $thread->{LastFamilyDiscrepancy} = 0;
     
     #-- now do the search
     $pt_next = $self->pt_next($thread,"verify");
@@ -339,6 +340,7 @@ sub get_pt_verify($) {
     #-- reset the search state
     $thread->{LastDiscrepancy} = 0;
     $thread->{LastDeviceFlag} = 0;
+    $thread->{LastFamilyDiscrepancy} = 0;
     #-- check result
     if ($dev eq $dev2){
       PT_EXIT(1);

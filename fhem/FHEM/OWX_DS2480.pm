@@ -354,11 +354,11 @@ sub pt_next ($$) {
     my $response = substr($serial->{string_in},1);
     #-- interpret the return data
     if( length($response)!=16 ) {
-      die "OWX_DS2480: Search 2nd return has wrong parameter with length = ".(length($response).""));
+      die "OWX_DS2480: Search 2nd return has wrong parameter with length = ".(length($response)."");
     }
     #-- Response search data parsing (Fig. 11 of Maxim AN192)
     #   operates on a 16 byte search response = 64 pairs of two bits
-    my $id_bit_number = 1;
+    $id_bit_number = 1;
     #-- clear 8 byte of device id for current search
     $context->{ROM_ID} = [0,0,0,0 ,0,0,0,0]; 
 
@@ -386,7 +386,9 @@ sub pt_next ($$) {
 
       #-- increment number
       $id_bit_number++;
+      main::Log3 ($serial->{name},5,"id_bit_number: $id_bit_number, LastDiscrepancy: $context->{LastDiscrepancy} ROM_ID: ".sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$context->{ROM_ID}})) if ($main::owx_async_debug > 2);
     }
+    PT_END;
   });
 }
 

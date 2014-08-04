@@ -745,6 +745,7 @@ sub OWX_ASYNC_Init ($) {
     eval {
       $ret = $owx->initialize($hash);
     };
+    Log3 ($hash->{NAME},4,"OWX_ASYNC_Init failed: $@") if $@;
     if (my $err = GP_Catch($@)) {
       $hash->{PRESENT} = 0;
       $hash->{STATE} = "Init Failed: $err";
