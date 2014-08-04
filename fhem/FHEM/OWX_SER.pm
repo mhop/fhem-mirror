@@ -368,6 +368,7 @@ sub first($) {
   $thread->{LastDiscrepancy} = 0;
   $thread->{LastDeviceFlag} = 0;
   $thread->{LastFamilyDiscrepancy} = 0;
+  $thread->{ROM_ID} = [0,0,0,0,0,0,0,0];
 }
 
 sub next_response($) {

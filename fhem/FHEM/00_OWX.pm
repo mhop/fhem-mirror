@@ -1198,9 +1198,12 @@ sub OWX_Complex_SER ($$$$) {
 
 sub OWX_First_SER ($$) {
   my ($hash,$mode) = @_;
-  
+
   #-- clear 16 byte of search data
   @owx_search=(0,0,0,0 ,0,0,0,0, 0,0,0,0, 0,0,0,0);
+  #-- clear 8 bytes of romid:
+  @owx_ROM_ID = (0,0,0,0,0,0,0,0);
+
   #-- reset the search state
   $owx_LastDiscrepancy = 0;
   $owx_LastDeviceFlag = 0;
@@ -1915,9 +1918,6 @@ sub OWX_Search_9097 ($$) {
       
   #$response = OWX_TouchByte($hash,$sp1); 
 
-  #-- clear 8 byte of device id for current search
-  @owx_ROM_ID =(0,0,0,0 ,0,0,0,0); 
-
   while ( $id_bit_number <= 64) {
     #loop until through all ROM bytes 0-7  
     my $id_bit     = OWX_TouchBit_9097($hash,1);
@@ -1977,8 +1977,8 @@ sub OWX_Search_9097 ($$) {
       $rom_byte_number++;
       $rom_byte_mask = 1;
     } 
-    $owx_LastDiscrepancy = $last_zero;
   }
+  $owx_LastDiscrepancy = $last_zero;
   return 1; 
 }
 
