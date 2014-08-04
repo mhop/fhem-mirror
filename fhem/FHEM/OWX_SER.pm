@@ -46,17 +46,11 @@ sub new() {
   my $class = shift;
   my $self = {
     interface => "serial",
-    #-- 16 byte search string
-    search => [0,0,0,0 ,0,0,0,0, 0,0,0,0, 0,0,0,0],
-    ROM_ID => [0,0,0,0 ,0,0,0,0],
-    #-- search state for 1-Wire bus search
-    LastDiscrepancy => 0,
-    LastFamilyDiscrepancy => 0,
-    LastDeviceFlag => 0,
     #-- module version
-    version => 4.1,
+    version => 5.0,
     alarmdevs => [],
     devs => [],
+    fams => [],
     timeout => 1.0, #default timeout 1 sec.
   };
   return bless $self,$class;
@@ -137,106 +131,21 @@ sub Define ($$) {
 
 sub get_pt_alarms() {
   my ($self) = @_;
+  my $pt_next;
   return PT_THREAD(sub {
     my ($thread) = @_;
     PT_BEGIN($thread);
     $self->{alarmdevs} = [];
     #-- Discover all alarmed devices on the 1-Wire bus
-    $self->first("alarm");
+    $self->first($thread);
     do {
-      $self->next("alarm");
-      PT_WAIT_UNTIL($self->response_ready());
-      PT_EXIT unless $self->next_response("alarm");
-    } while( $self->{LastDeviceFlag}==0 );
-    main::Log3($self->{name},5, " Alarms = ".join(' ',@{$self->{alarmdevs}}));
-    PT_EXIT($self->{alarmdevs});
-    PT_END;
-  });
-}
-
-########################################################################################
-# 
-# Complex - Send match ROM, data block and receive bytes as response
-#
-# Parameter hash    = hash of bus master, 
-#           owx_dev = ROM ID of device
-#           data    = string to send
-#           numread = number of bytes to receive
-#
-# Return response, if OK
-#        0 if not OK
-#
-########################################################################################
-
-sub get_pt_execute($$$$) {
-  my ($self, $reset, $dev, $writedata, $numread) = @_;
-  return PT_THREAD(sub {
-    my ($thread) = @_;
-    
-    PT_BEGIN($thread);
-    $thread->{writedata} = $writedata;
-    
-    $self->reset() if ($reset);
-  
-    if (defined $writedata or $numread) {
-  
-      my $select;
-    
-      #-- has match ROM part
-      if( $dev ) {
-            
-        #-- ID of the device
-        my $owx_rnf = substr($dev,3,12);
-        my $owx_f   = substr($dev,0,2);
-    
-        #-- 8 byte 1-Wire device address
-        my @rom_id  =(0,0,0,0 ,0,0,0,0); 
-        #-- from search string to byte id
-        $dev=~s/\.//g;
-        for(my $i=0;$i<8;$i++){
-           $rom_id[$i]=hex(substr($dev,2*$i,2));
-        }
-        $select=sprintf("\x55%c%c%c%c%c%c%c%c",@rom_id); 
-      #-- has no match ROM part, issue skip ROM command (0xCC:)
-      } else {
-        $select="\xCC";
-      }
-      if (defined $writedata) {
-        $select.=$writedata;
-      }
-      #-- has receive data part
-      if( $numread ) {
-        #$numread += length($data);
-        for( my $i=0;$i<$numread;$i++){
-          $select .= "\xFF";
-        };
-      }
-      
-      #-- for debugging
-      if( $main::owx_async_debug > 1){
-        main::Log3($self->{name},5,"OWX_SER::Execute: Sending out ".unpack ("H*",$select));
-      }
-      $self->block($select);
-    }
-    
-    PT_WAIT_UNTIL($self->response_ready());
-    
-    if ($reset and !$self->reset_response()) {
-      PT_EXIT
-    }
-  
-    my $res = $self->{string_in};
-    #-- for debugging
-    if( $main::owx_async_debug > 1){
-      main::Log3($self->{name},5,"OWX_SER::Execute: Receiving ".unpack ("H*",$res));
-    }
-  
-    if (defined $res) {
-      my $writelen = defined $thread->{writedata} ? split (//,$thread->{writedata}) : 0;
-      my @result = split (//, $res);
-      my $readdata = 9+$writelen < @result ? substr($res,9+$writelen) : "";
-      PT_EXIT($readdata);
-    }
+      $pt_next = $self->pt_next($thread,"alarms");
+      PT_WAIT_THREAD($pt_next);
+      die $pt_next->PT_CAUSE() if ($pt_next->PT_STATE() == PT_ERROR || $pt_next->PT_STATE() == PT_CANCELED);
+      $self->next_response($thread,"alarms");
+    } while( $thread->{LastDeviceFlag}==0 );
+    main::Log3($self->{name},5, " Alarms = ".join(' ',@{$thread->{alarmdevs}}));
+    PT_EXIT($thread->{alarmdevs});
     PT_END;
   });
 }
@@ -253,17 +162,19 @@ sub get_pt_execute($$$$) {
 
 sub get_pt_discover() {
   my ($self) = @_;
+  my $pt_next;
   return PT_THREAD(sub {
     my ($thread) = @_;
     PT_BEGIN($thread);
     #-- Discover all alarmed devices on the 1-Wire bus
-    $self->first("discover");
+    $self->first($thread);
     do {
-      $self->next("discover");
-      PT_WAIT_UNTIL($self->response_ready());
-      PT_EXIT unless $self->next_response("discover");
+      $pt_next = $self->pt_next($thread,"discover");
+      PT_WAIT_THREAD($pt_next);
+      die $pt_next->PT_CAUSE() if ($pt_next->PT_STATE() == PT_ERROR || $pt_next->PT_STATE() == PT_CANCELED);
+      $self->next_response($thread,"discover");
     } while( $self->{LastDeviceFlag}==0 );
-    PT_EXIT($self->{devs});
+    PT_EXIT($thread->{devs});
     PT_END;
   });
 }
@@ -404,6 +315,7 @@ sub exit($) {
 
 sub get_pt_verify($) {
   my ($self,$dev) = @_;
+  my $pt_next;
   return PT_THREAD(sub {
     my ($thread) = @_;
     my $i;
@@ -412,22 +324,21 @@ sub get_pt_verify($) {
     my $devs=$dev;
     $devs=~s/\.//g;
     for($i=0;$i<8;$i++){
-      @{$self->{ROM_ID}}[$i]=hex(substr($devs,2*$i,2));
+      $thread->{ROM_ID}->[$i]=hex(substr($devs,2*$i,2));
     }
     #-- reset the search state
-    $self->{LastDiscrepancy} = 64;
-    $self->{LastDeviceFlag} = 0;
+    $thread->{LastDiscrepancy} = 64;
+    $thread->{LastDeviceFlag} = 0;
     
-    $self->reset();
     #-- now do the search
-    $self->next("verify");
-    PT_WAIT_UNTIL($self->response_ready());
-    PT_EXIT unless $self->next_response("verify");
-    
-    my $dev2=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$self->{ROM_ID}});
+    $pt_next = $self->pt_next($thread,"verify");
+    PT_WAIT_THREAD($pt_next);
+    die $pt_next->PT_CAUSE() if ($pt_next->PT_STATE() == PT_ERROR || $pt_next->PT_STATE() == PT_CANCELED);
+    $self->next_response($thread,"verify");
+    my $dev2=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$thread->{ROM_ID}});
     #-- reset the search state
-    $self->{LastDiscrepancy} = 0;
-    $self->{LastDeviceFlag} = 0;
+    $thread->{LastDiscrepancy} = 0;
+    $thread->{LastDeviceFlag} = 0;
     #-- check result
     if ($dev eq $dev2){
       PT_EXIT(1);
@@ -440,10 +351,6 @@ sub get_pt_verify($) {
 
 #######################################################################################
 #
-# Private methods 
-#
-#######################################################################################
-#
 # First - Find the 'first' devices on the 1-Wire bus
 #
 # Parameter hash = hash of bus master, mode
@@ -454,57 +361,26 @@ sub get_pt_verify($) {
 ########################################################################################
 
 sub first($) {
-  my ($self) = @_;
-  
-  #-- clear 16 byte of search data
-  @{$self->{search}} = (0,0,0,0 ,0,0,0,0, 0,0,0,0, 0,0,0,0);
+  my ($self,$thread) = @_;
   #-- reset the search state
-  $self->{LastDiscrepancy} = 0;
-  $self->{LastDeviceFlag} = 0;
-  $self->{LastFamilyDiscrepancy} = 0;
-}
-
-#######################################################################################
-#
-# Search - Perform the 1-Wire Search Algorithm on the 1-Wire bus using the existing
-#              search state.
-#
-# Parameter hash = hash of bus master, mode=alarm,discover or verify
-#
-# Return 1 : device found, ROM number in owx_ROM_ID and pushed to list (LastDeviceFlag=0) 
-#                                     or only in owx_ROM_ID (LastDeviceFlag=1)
-#        0 : device not found, or ot searched at all
-#
-########################################################################################
-
-sub next($) {
-  my ($self,$mode)=@_;
-  
-  #-- if the last call was the last one, no search 
-  return undef if ( $self->{LastDeviceFlag} == 1 );
-    
-  #-- now do the search
-  $self->search($mode);
+  $thread->{LastDiscrepancy} = 0;
+  $thread->{LastDeviceFlag} = 0;
+  $thread->{LastFamilyDiscrepancy} = 0;
 }
 
 sub next_response($) {
-  my ($self,$mode) = @_;
-  
-  #TODO find out where contents of @owx_fams come from:
-  my @owx_fams=();
-
-  return undef unless $self->search_response();
+  my ($self,$thread,$mode) = @_;
 
   #-- character version of device ROM_ID, first byte = family 
-  my $dev=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$self->{ROM_ID}});
+  my $dev=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$thread->{ROM_ID}});
 
   #--check if we really found a device
-  if( main::OWX_CRC($self->{ROM_ID})!= 0){
+  if( main::OWX_CRC($thread->{ROM_ID})!= 0){
     #-- reset the search
     main::Log3($self->{name},1, "OWX_SER::Search CRC failed : $dev");
-    $self->{LastDiscrepancy} = 0;
-    $self->{LastDeviceFlag} = 0;
-    $self->{LastFamilyDiscrepancy} = 0;
+    $thread->{LastDiscrepancy} = 0;
+    $thread->{LastDeviceFlag} = 0;
+    $thread->{LastFamilyDiscrepancy} = 0;
     die "OWX_SER::Search CRC failed : $dev";
   }
   
@@ -513,8 +389,8 @@ sub next_response($) {
   #    $self->{LastDeviceFlag}=1;
   #}
   #--
-  if( $self->{LastDiscrepancy}==$self->{LastFamilyDiscrepancy} ){
-      $self->{LastFamilyDiscrepancy}=0;    
+  if( $thread->{LastDiscrepancy}==$thread->{LastFamilyDiscrepancy} ){
+      $thread->{LastFamilyDiscrepancy}=0;    
   }
     
   #-- mode was to verify presence of a device
@@ -524,38 +400,38 @@ sub next_response($) {
   } elsif( $mode eq "discover" ) {
     #-- check families
     my $famfnd=0;
-    foreach (@owx_fams){
-      if( substr($dev,0,2) eq $_ ){        
+    foreach (@{$self->{fams}}){
+      if( substr($dev,0,2) eq $_ ){
         #-- if present, set the fam found flag
         $famfnd=1;
         last;
       }
     }
-    push(@owx_fams,substr($dev,0,2)) if( !$famfnd );
-    foreach (@{$self->{devs}}){
+    push(@{$self->{fams}},substr($dev,0,2)) if( !$famfnd );
+    foreach (@{$thread->{devs}}){
       if( $dev eq $_ ){        
         #-- if present, set the last device found flag
-        $self->{LastDeviceFlag}=1;
+        $thread->{LastDeviceFlag}=1;
         last;
       }
     }
-    if( $self->{LastDeviceFlag}!=1 ){
+    if( $thread->{LastDeviceFlag}!=1 ){
       #-- push to list
-      push(@{$self->{devs}},$dev);
+      push(@{$thread->{devs}},$dev);
       main::Log3($self->{name},5, "OWX_SER::Search: new device found $dev");
     }
   #-- mode was to discover alarm devices 
   } else {
-    for(my $i=0;$i<@{$self->{alarmdevs}};$i++){
-      if( $dev eq ${$self->{alarmdevs}}[$i] ){        
+    for(my $i=0;$i<@{$thread->{alarmdevs}};$i++){
+      if( $dev eq ${$thread->{alarmdevs}}[$i] ){        
         #-- if present, set the last device found flag
-        $self->{LastDeviceFlag}=1;
+        $thread->{LastDeviceFlag}=1;
         last;
       }
     }
-    if( $self->{LastDeviceFlag}!=1 ){
+    if( $thread->{LastDeviceFlag}!=1 ){
     #--push to list
-      push(@{$self->{alarmdevs}},$dev);
+      push(@{$thread->{alarmdevs}},$dev);
       main::Log3($self->{name},5, "OWX_SER::Search: new alarm device found $dev");
     }
   }
