@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 06/2014
-my $thzversion = "0.108";
+# by immi 08/2014
+my $thzversion = "0.109";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -715,26 +715,50 @@ sub THZ_ReadAnswer($)
 	
 	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, third read makes sure all the buffer is read.
 	{ my $buf2 = DevIo_SimpleReadWithTimeout($hash, 0.005);
-	  Log3($hash->{NAME}, 5, "triple read activated $data");
+	  Log3($hash->{NAME}, 5, "3rd read activated $data");
 	  if(defined($buf2))
 	  {
 	  $buf = ($buf . $buf2) ;
 	  $data =  uc(unpack('H*', $buf));
-	   Log3($hash->{NAME}, 5, "triple read result with buf2  $data");
+	   Log3($hash->{NAME}, 5, "3rd read result with buf2  $data");
 	  }
 	}
 	
 	
 	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, fourth read makes sure all the buffer is read.
 	{ my $buf3 = DevIo_SimpleReadWithTimeout($hash, 0.005);
-	  Log3($hash->{NAME}, 5, "quadruple read activated $data");
+	  Log3($hash->{NAME}, 5, "4th read activated $data");
 	  if(defined($buf3))
 	  {
 	  $buf = ($buf . $buf3) ;
 	  $data =  uc(unpack('H*', $buf));
-	   Log3($hash->{NAME}, 5, "quadruple read result with buf3  $data");
+	   Log3($hash->{NAME}, 5, "4th read result with buf3  $data");
 	  }
 	}
+	
+	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, fourth read makes sure all the buffer is read.
+	{ my $buf4 = DevIo_SimpleReadWithTimeout($hash, 0.005);
+	  Log3($hash->{NAME}, 5, "5th read activated $data");
+	  if(defined($buf4))
+	  {
+	  $buf = ($buf . $buf4) ;
+	  $data =  uc(unpack('H*', $buf));
+	   Log3($hash->{NAME}, 5, "5th read result with buf4  $data");
+	  }
+	}
+	
+	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, fourth read makes sure all the buffer is read.
+	{ my $buf5 = DevIo_SimpleReadWithTimeout($hash, 0.005);
+	  Log3($hash->{NAME}, 5, "6th read activated $data");
+	  if(defined($buf5))
+	  {
+	  $buf = ($buf . $buf5) ;
+	  $data =  uc(unpack('H*', $buf));
+	   Log3($hash->{NAME}, 5, "6th read result with buf5  $data");
+	  }
+	}
+	
+	
 	
 	
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
