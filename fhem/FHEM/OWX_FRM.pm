@@ -47,7 +47,7 @@ sub new() {
     interface => "firmata",
 
     #-- module version
-    version => 4.0
+    version => 4.1
   }, $class;
 }
 
@@ -75,12 +75,13 @@ sub Define($$) {
 #
 ########################################################################################
 
-sub initialize($)
+sub initialize()
 {
-  my ( $self, $hash ) = @_;
+  my ( $self ) = @_;
 
   main::LoadModule("FRM");
   my $pin = $self->{pin};
+  my $hash = $self->{hash};
   my $ret = main::FRM_Init_Pin_Client( $hash, [$pin], PIN_ONEWIRE );
   die $ret if ( defined $ret );
   my $firmata = main::FRM_Client_FirmataDevice($hash);
@@ -266,9 +267,9 @@ sub get_pt_execute($$$$) {
   });
 };
 
-sub poll($) {
-  my ( $self, $hash ) = @_;
-  if ( my $frm = $hash->{IODev} ) {
+sub poll() {
+  my ( $self ) = @_;
+  if ( my $frm = $self->{hash}->{IODev} ) {
     main::FRM_poll($frm);
   }
 };
