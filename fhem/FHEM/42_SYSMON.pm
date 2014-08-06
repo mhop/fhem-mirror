@@ -2003,14 +2003,13 @@ sub SYSMON_PowerBatInfo($$)
     my $d_capacity = trim(SYSMON_execute($hash, $base."capacity"));
     my $d_status = trim(SYSMON_execute($hash, $base."status"));
     my $d_health = trim(SYSMON_execute($hash, $base."health"));
-    my $d_temp = trim(SYSMON_execute($hash, $base."temp"));
-    if(defined $d_temp) {$d_temp/=10;}
+    my $d_energy_full_design = trim(SYSMON_execute($hash, $base."energy_full_design"));
     
-    $map->{"power_".$type."_info"}=$type." info: ".$d_technology." , capacity: ".$d_capacity." %, status: ".$d_status." , health: ".$d_health." , temperatur: ".$d_temp." C";
+    $map->{"power_".$type."_info"}=$type." info: ".$d_technology." , capacity: ".$d_capacity." %, status: ".$d_status." , health: ".$d_health." , total capacity: ".$d_energy_full_design." mAh";
     
     # ggf. noch irgendwann: model_name, voltage_max_design, voltage_min_design
   } else {
-  	$map->{"power_".$type."_info"}=$type." info: n/a , capacity: n/a %, status: n/a , health: n/a , temperatur: n/a C";
+  	$map->{"power_".$type."_info"}=$type." info: n/a , capacity: n/a %, status: n/a , health: n/a , total capacity: n/a mAh";
   }
   
   return $map;
@@ -2245,9 +2244,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>power_battery_info<br>
-        human readable additional information to the battery (if installed): technology, capacity, status, health, temperatur<br>
+        human readable additional information to the battery (if installed): technology, capacity, status, health, total capacity<br>
         Example:<br>
-    		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , temperatur: 30 C</code><br>
+    		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
     </li>
     <br>    
   <br>
@@ -2752,9 +2751,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>power_battery_info<br>
-        Menschenlesbare Zusatzinformationen  f&uuml;r die Batterie (wenn vorhanden): Technologie, Kapazit&auml;t, Status, Zustand, Temperatur<br>
+        Menschenlesbare Zusatzinformationen  f&uuml;r die Batterie (wenn vorhanden): Technologie, Kapazit&auml;t, Status, Zustand, Gesamtkapazit&auml;t<br>
         Beispiel:<br>
-    		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , temperatur: 30 C</code><br>
+    		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
     </li>
     <br>    
   <br>
