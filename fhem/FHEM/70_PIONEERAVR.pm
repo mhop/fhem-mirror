@@ -220,6 +220,27 @@ PIONEERAVR_Define($$) {
 		'inputDown'			 => 'FD',
 		'channelUp'			 => 'TPI',
 		'channelDown'		 => 'TPD',
+		'0Network'			 => '00NW',
+		'1Network'			 => '01NW',
+		'2Network'			 => '02NW',
+		'3Network'			 => '03NW',
+		'4Network'			 => '04NW',
+		'5Network'			 => '05NW',
+		'6Network'			 => '06NW',
+		'7Network'			 => '07NW',
+		'8Network'			 => '08NW',
+		'9Network'			 => '09NW',
+		'prevNetwork'		 => '12NW',
+		'nextNetwork'		 => '13NW',
+		'revNetwork'		 => '14NW',
+		'fwdNetwork'		 => '15NW',
+		'upNetwork'		     => '26NW',
+		'downNetwork'		 => '27NW',
+		'rightNetwork'		 => '28NW',
+		'leftNetwork'		 => '29NW',
+		'enterNetwork'		 => '30NW',
+		'returnNetwork'		 => '31NW',
+		'menuNetwork'		 => '36NW',
 		'playNetwork'		 => '10NW',
 		'pauseNetwork'		 => '11NW',
 		'stopNetwork'		 => '20NW',
@@ -230,14 +251,57 @@ PIONEERAVR_Define($$) {
 		'stopIpod'	    	 => '02IP',
 		'repeatIpod'	     => '07IP',
 		'shuffleIpod'	     => '08IP',
+		'prevIpod'	    	 => '03IP',
+		'nextIpod'	    	 => '04IP',
+		'revIpod'	    	 => '05IP',
+		'fwdIpod'	         => '06IP',
+		'upIpod'	         => '13IP',
+		'downIpod'	    	 => '14IP',
+		'rightIpod'	    	 => '15IP',
+		'leftIpod'	    	 => '16IP',
+		'enterIpod'  	     => '17IP',
+		'returnIpod'	     => '18IP',
+		'menuIpod'  	     => '19IP',
 		'playAdapterPort'	 => '10BT',
 		'pauseAdapterPort'	 => '11BT',
 		'stopAdapterPort'	 => '12BT',
 		'repeatAdapterPort'	 => '17BT',
 		'shuffleAdapterPort' => '18BT',
+		'prevAdapterPort'	 => '13BT',
+		'nextAdapterPort'	 => '14BT',
+		'revAdapterPort'	 => '15BT',
+		'fwdAdapterPort'	 => '16BT',
+		'upAdapterPort'	     => '21BT',
+		'downAdapterPort'	 => '22BT',
+		'rightAdapterPort'	 => '23BT',
+		'leftAdapterPort'	 => '24BT',
+		'enterAdapterPort'   => '25BT',
+		'returnAdapterPort'	 => '26BT',
+		'menuAdapterPort'  	 => '27BT',
 		'playMhl'       	 => '23MHL',
 		'pauseMhl'       	 => '25MHL',
-		'stopMhl'       	 => '24MHL'
+		'stopMhl'       	 => '24MHL',
+		'0Mhl'		    	 => '07MHL',
+		'1Mhl'				 => '08MHL',
+		'2Mhl'				 => '09MHL',
+		'3Mhl'				 => '10MHL',
+		'4Mhl'				 => '11MHL',
+		'5Mhl'				 => '12MHL',
+		'6Mhl'			 	 => '13MHL',
+		'7Mhl'			 	 => '14MHL',
+		'8Mhl'			 	 => '15MHL',
+		'9Mhl'			 	 => '16MHL',
+		'prevMhl'		 	 => '31MHL',
+		'nextMhl'		 	 => '30MHL',
+		'revMhl'		 	 => '27MHL',
+		'fwdMhl'		 	 => '28MHL',
+		'upMhl'		     	 => '01MHL',
+		'downMhl'		 	 => '02MHL',
+		'rightMhl'		  	 => '04MHL',
+		'leftMhl'		 	 => '03MHL',
+		'enterMhl'		 	 => '17MHL',
+		'returnMhl'		 	 => '06MHL',
+		'menuMhl'		 	 => '05MHL'
 	},
 	'zone2' => {
 		'on'                 => 'APO',
@@ -313,6 +377,20 @@ PIONEERAVR_Define($$) {
 	}
   };
   # ----------------Human Readable command mapping table-----------------------
+    $hash->{helper}{REMOTECONTROL} = {
+		"cursorUp"       	  => "CUP",
+		"cursorDown"       	  => "CDN",
+		"cursorRight"		  => "CRI",
+		"cursorLeft"       	  => "CLE",
+		"cursorEnter"      	  => "CEN",
+		"cursorReturn"     	  => "CRT",
+		"statusDisplay"		  => "STS",
+		"audioParameter"	  => "APA",
+		"hdmiOutputParameter" => "HPA",
+		"videoParameter"	  => "VPA",
+		"homeMenu"			  => "HM"
+  };
+  
   $hash->{helper}{SPEAKERSYSTEMS} = {
 	"10"=>"9.1ch FH/FW",
 	"00"=>"Normal(SB/FH)",
@@ -685,9 +763,9 @@ PIONEERAVR_Set($@)
   my $cmd = $a[1];
   my $arg = ($a[2] ? $a[2] : "");
   my @args= @a; shift @args; shift @args;
-  my @setsPlayer= ("play","pause","stop","repeat","shuffle"); # available commands for certain inputs (@playerInputNr)
+  my @setsPlayer= ("play","pause","stop","repeat","shuffle","prev","next","rev","fwd","up","down","right","left","enter","return","menu"); # available commands for certain inputs (@playerInputNr)
   my @playerInputNr= ("13","17","18","26","27","33","38","41","44","45","48","53"); 		# Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
-  my @setsTuner = ("channelUp","channelDown","channelStraight","channel"); # available commands for input tuner 
+  my @setsTuner = ("channelUp","channelDown","channelStraight","channel"); 					# available commands for input tuner 
   my @setsWithoutArg= ("off","toggle","volumeUp","volumeDown","muteOn","muteOff","muteToggle","inputUp","inputDown"); # set commands without arguments
   my $playerCmd= "";
   my $inputNr= "";
@@ -718,7 +796,9 @@ PIONEERAVR_Set($@)
 	. " volumeUp:noArg volumeDown:noArg mute:on,off,toggle tone:on,bypass bass:slider,-6,1,6"
 	. " treble:slider,-6,1,6 statusRequest:noArg volume:slider,0,1,100"
 	. " volumeStraight:slider,-80,1,12"
-	. " speakers:off,A,B,A+B raw";
+	. " speakers:off,A,B,A+B raw"
+	. " remoteControl:"
+	. join(',', sort keys (%{$hash->{helper}{REMOTECONTROL}}));
 
   my $currentInput= ReadingsVal($name,"input","");
 	
@@ -729,7 +809,8 @@ PIONEERAVR_Set($@)
 
   # some input have more set commands ...
   if ( $inputNr ~~ @playerInputNr ) {
-	$list .= " play:noArg stop:noArg pause:noArg repeat:noArg shuffle:noArg";
+	$list .= " play:noArg stop:noArg pause:noArg repeat:noArg shuffle:noArg prev:noArg next:noArg rev:noArg fwd:noArg up:noArg down:noArg";
+	$list .= " right:noArg left:noArg enter:noArg return:noArg menu:noArg";
   }  
   if ( $cmd eq "?" ) {
 	return SetExtensions($hash, $list, $name, $cmd, @a);
@@ -781,7 +862,7 @@ PIONEERAVR_Set($@)
 		Log3 $name, 5, "PIONEERAVR $name: Set $cmd ";
 		PIONEERAVR_statusUpdate($hash);
 		return undef;
-	#### play, pause, stop, random, repeat
+	#### play, pause, stop, random, repeat,prev,next,rev,fwd,up,down,right,left,enter,return,menu
 	#### Only available if the input is one of:
 	####    ipod, internetRadio, mediaServer, favorites, adapterPort, mhl
 	#### we need to send different commands to the Pioneer AV receiver
@@ -796,7 +877,7 @@ PIONEERAVR_Set($@)
 		} elsif (($inputNr eq "26") ||($inputNr eq "27") || ($inputNr eq "38") || ($inputNr eq "41") || ($inputNr eq "44") || ($inputNr eq "45") || ($inputNr eq "53")) {
 			$playerCmd= $cmd."Network";
 		#### 'random' and 'repeat' are not available on input mhl
-		} elsif (($inputNr eq "48") && (( $cmd eq "play") || ( $cmd eq "pause") ||( $cmd eq "stop"))) {
+		} elsif (($inputNr eq "48") && ( $cmd ne "repeat") && ( $cmd ne "random")) {
 			$playerCmd= $cmd."Mhl";
 		} else {
 			my $err= "PIONEERAVR $name: The command $cmd for input nr. $inputNr is not possible!";
@@ -950,21 +1031,33 @@ PIONEERAVR_Set($@)
 	return undef;
 	####Speakers (off|A|B|A+B)
 	} elsif ( $cmd eq "speakers" ) {
-	Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
-	if ($arg eq "off") {
-		PIONEERAVR_Write($hash, "0SPK");
-	} elsif ($arg eq "A") {
-		PIONEERAVR_Write($hash, "1SPK");
-	} elsif ($arg eq "B") {
-		PIONEERAVR_Write($hash, "2SPK");
-	} elsif ($arg eq "A+B") {
-		PIONEERAVR_Write($hash, "3SPK");
-	} else {
-		my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... speakers. Must be one of off, A, B, A+B  !";
-		Log3 $name, 5, $err;
-		return $err;			
-	}
-	return undef;
+		Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
+		if ($arg eq "off") {
+			PIONEERAVR_Write($hash, "0SPK");
+		} elsif ($arg eq "A") {
+			PIONEERAVR_Write($hash, "1SPK");
+		} elsif ($arg eq "B") {
+			PIONEERAVR_Write($hash, "2SPK");
+		} elsif ($arg eq "A+B") {
+			PIONEERAVR_Write($hash, "3SPK");
+		} else {
+			my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... speakers. Must be one of off, A, B, A+B  !";
+			Log3 $name, 5, $err;
+			return $err;			
+		}
+		return undef;
+	####remoteControl
+	} elsif ( $cmd eq "remoteControl" ) {
+		Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
+		if (exists $hash->{helper}{REMOTECONTROL}{$arg}) {
+			my $setCmd= $hash->{helper}{REMOTECONTROL}{$arg};
+			my $v= PIONEERAVR_Write($hash, $setCmd);
+		} else {
+			my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... remoteControl!";
+			Log3 $name, 5, $err;
+			return $err;			
+		}
+		return undef;
 	} else {
 		return SetExtensions($hash, $list, $name, $cmd, @a);
 	}
@@ -1498,8 +1591,11 @@ RC_layout_PioneerAVR() {
   $row[1]="volumeUp:UP,mute toggle:MUTE,inputUp:CHUP";
   $row[2]=":VOL,:blank,:PROG";
   $row[3]="volumeDown:DOWN,:blank,inputDown:CHDOWN";
-  $row[4]="attr rc_iconpath icons/remotecontrol";
-  $row[5]="attr rc_iconprefix black_btn_";
+  $row[4]="remoteControl audioParameter:AUDIO,remoteControl cursorUp:UP,remoteControl videoParameter:VIDEO";
+  $row[5]="remoteControl cursorLeft:LEFT,remoteControl cursorEnter:ENTER,remoteControl cursorRight:RIGHT";
+  $row[6]="remoteControl homeMenu:HOMEsym,remoteControl cursorDown:DOWN,remoteControl cursorReturn:RETURN";
+  $row[7]="attr rc_iconpath icons/remotecontrol";
+  $row[8]="attr rc_iconprefix black_btn_";
 
   # unused available commands
   return @row;
@@ -1548,13 +1644,13 @@ RC_layout_PioneerAVR() {
 
     Defines a Pioneer AV receiver device (communication interface and main zone control). The keywords <code>telnet</code> or
     <code>serial</code> are fixed. Default port on Pioneer AV receivers is 23 (according to the above mentioned Pioneer documetation)<br>
-	Note: devices to control zone2, zone3 and/or HD-zone are autocreated on reception of the first message for those zones.<br><br>
+	Note: PIONEERAVRZONE devices to control zone2, zone3 and/or HD-zone are autocreated on reception of the first message for those zones.<br><br>
 
     Examples:
     <ul>
       <code>define VSX923 PIONEERAVR telnet 192.168.0.91:23</code><br>
       <code>define VSX923 PIONEERAVR serial /dev/ttyS0</code><br>
-      <code>define VSX923 PIONEERAVR serial /sev/ttyUSB0@9600</code><br>
+      <code>define VSX923 PIONEERAVR serial /dev/ttyUSB0@9600</code><br>
     </ul>
     <br>
   </ul>
@@ -1568,17 +1664,18 @@ RC_layout_PioneerAVR() {
     <li>raw <PioneerCommand> <br>Sends the command <code>&lt;PioneerCommand&gt;</code> unchanged to the Pioneer AV receiver.</li>
 	<li>reopen <br>Tries to reopen the data connection</li>
 	<li>statusRequest<br>gets some information from the Pioneer AV receiver and updates the readings accordingly</li>
-	<li>off <br>turn power off</li>
-	<li>on <br>turn power on</li>
-	<li>toggle <br>toggles power</li>
-	<li>volume <0 ... 100><br>main volume in % of the maximum volume</li>
-	<li>volumeUp<br>increases the main volume by 0.5dB</li>
-	<li>volumeDown<br>decreases the main volume by 0.5dB</li>
-	<li>volumeStraight<-80.5 ... 12><br>same values for volume as shown on the display of the Pioneer AV rreceiver</li>
+	<li>off <br>put the main zone in standby</li>
+	<li>on <br>turn main zone power on from standby. This only works if "Network standby" on the Pioneer AV Receiver is set to "on"</li>
+	<li>toggle <br>toggles power of the main zone from/to standby</li>
+	<li>volume <0 ... 100><br>volume of the main zone in % of the maximum volume</li>
+	<li>volumeUp<br>increases the volume of the main zone by 0.5dB</li>
+	<li>volumeDown<br>decreases the volume of the main zone by 0.5dB</li>
+	<li>volumeStraight<-80.5 ... 12><br>Sets the volume of the main zone to the <value> directly. 
+	Use the same values as shown on the display of the Pioneer AV rreceiver</li>
 	<li>mute <on|off|toggle></li>
 	<li>tone <on|bypass></li>
-	<li>bass <-6 ... 6><br>tone control of bass from -6dB to + 6dB (works only if tone is on)</li>
-	<li>treble <-6 ... 6><br>tone control of treble from -6dB to + 6dB (works only if tone is on)</li>
+	<li>bass <-6 ... 6><br>tone control of bass from -6dB to + 6dB (works only if tone is on (not standby) and the ListeningMode supports it)</li>
+	<li>treble <-6 ... 6><br>tone control of treble from -6dB to + 6dB (works only if tone is on (not standby) and the ListeningMode supports it)</li>
 	<li>input <not on the Pioneer hardware deactivated input><br>the list of possible (i.e. not deactivated)
 	inputs is read in during Fhem start and with <code>get <name> statusRequest</code></li>
 	<li>inputUp<br>change input to next input</li>
@@ -1603,6 +1700,33 @@ RC_layout_PioneerAVR() {
 	<li>stop<br>stops playback for the same inputs as play</li>
 	<li>repeat<br>repeat for the following inputs: AdapterPort, Ipod, Favorites, InternetRadio, MediaServer</li>
 	<li>shuffle<br>random play for the same inputs as repeat</li>
+	<li>prev<br>for the same inputs as play</li>
+	<li>next<br>for the same inputs as play</li>
+	<li>rev<br>for the same inputs as play</li>
+	<li>fwd<br>for the same inputs as play</li>
+	<li>up<br>for the same inputs as play</li>
+	<li>down<br>for the same inputs as play</li>
+	<li>right<br>for the same inputs as play</li>
+	<li>left<br>for the same inputs as play</li>
+	<li>enter<br>for the same inputs as play</li>
+	<li>return<br>for the same inputs as play</li>
+	<li>menu<br>for the same inputs as play</li>
+	<li>remoteControl <attr> where <attr> is one of:
+	<ul>
+		<li>cursorDown</li>
+		<li>cursorRight</li>
+		<li>cursorLeft</li>
+		<li>cursorEnter</li>
+		<li>cursorReturn</li>
+		<li>homeMenu</li>
+		<li>statusDisplay</li>
+		<li>audioParameter</li>
+		<li>hdmiOutputParameter</li>
+		<li>videoParameter</li>
+		<li>homeMenu</li>
+	</ul>
+	simulates the keys on the remote control. cursorXX does not work to control inputs -> use set <name> up ... instead
+	</li>
 	<li><a href="#setExtensions">set extensions</a> are supported (except <blink>)</li>
     <br><br>
     Example:
@@ -1620,10 +1744,6 @@ RC_layout_PioneerAVR() {
   <a name="PIONEERAVRget"></a>
   <b>Get</b>
   <ul>
-    <code>get &lt;name&gt; raw &lt;command&gt;</code>
-    <br><br>
-    Sends the command <code>&lt;command&gt;</code> to the Pioneer AV receiver
-    <code>&lt;name&gt;</code>.
 	<li><br>loadInputNames<br>reads the names of the inputs from the Pioneer AV receiver
 	and checks if those inputs are enabled</li>
 	<li>display<br>updates the reading 'display' and 'displayPrevious' with what is shown
@@ -1688,14 +1808,14 @@ RC_layout_PioneerAVR() {
     Definiert ein Fhem device für einen Pioneer AV Receiver (Kommunikationsschnittstelle und Steuerung der Main - Zone). Die Schlüsselwörter <code>telnet</code> bzw.
     <code>serial</code> sind fix. Der Standard Port für die Ethernet Verbindung bei Pioneer AV Receiver ist 23 
 	(laut der oben angeführten Pioneer Dokumetation)<br>
-	Note: Devices zur Steuerung der Zone2, Zone3 und/oder HD-Zone werden per autocreate beim Eintreffen der ersten Nachricht für eine der Zonen erzeugt.
+	Note: PIONEERAVRZONE-Devices zur Steuerung der Zone2, Zone3 und/oder HD-Zone werden per autocreate beim Eintreffen der ersten Nachricht für eine der Zonen erzeugt.
 	<br><br>
 
     Beispiele:
     <ul>
       <code>define VSX923 PIONEERAVR telnet 192.168.0.91:23</code><br>
       <code>define VSX923 PIONEERAVR serial /dev/ttyS0</code><br>
-      <code>define VSX923 PIONEERAVR serial /sev/ttyUSB0@9600</code><br>
+      <code>define VSX923 PIONEERAVR serial /dev/ttyUSB0@9600</code><br>
     </ul>
     <br>
   </ul>
@@ -1709,17 +1829,17 @@ RC_layout_PioneerAVR() {
     <li>raw <PioneerKommando> <br>Sendet den Befehl <code>&lt;PioneerKommando&gt;</code> unverändert an den Pioneer AV receiver.</li>
 	<li>reopen <br>Versucht die Datenverbindung wieder herzustellen</li>
 	<li>statusRequest<br>Fragt Information vom Pioneer AV Receiver und aktualisiert die readings entsprechend</li>
-	<li>off <br>Ausschalten der Main Zone</li>
-	<li>on <br>Einschalten der Main Zone</li>
-	<li>toggle <br>Ein/Ausschalten der Main Zone</li>
-	<li>volume <0 ... 100><br>Lautstärke der Main-Zone in % der Maximallautstärke</li>
+	<li>off <br>Ausschalten der Main Zone in den Standby Modus</li>
+	<li>on <br>Einschalten der Main Zone aus dem Standby Modus. Das funktioniert nur, wenn am Pioneer AV Receiver "Network Standby" "on" eingestellt ist.</li>
+	<li>toggle <br>Ein/Ausschalten der Main Zone in/von Standby</li>
+	<li>volume <0 ... 100><br>Lautstärke der Main Zone in % der Maximallautstärke</li>
 	<li>volumeUp<br>Lautstärke der Main Zone um 0.5dB erhöhen</li>
 	<li>volumeDown<br>Lautstärke der Main Zone um 0.5dB verringern</li>
-	<li>volumeStraight<-80.5 ... 12><br>Einstellen der Lautstärke der Main Zone mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
+	<li>volumeStraight<-80.5 ... 12><br>Direktes Einstellen der Lautstärke der Main Zone mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
 	<li>mute <on|off|toggle> der Main Zone</li>
 	<li>tone <on|bypass></li>
-	<li>bass <-6 ... 6><br>Bass von -6dB bis + 6dB (funktioniert nur wenn tone = on)</li>
-	<li>treble <-6 ... 6><br>Höhen (treble) von -6dB bis + 6dB (funktioniert nur wenn tone = on)</li>
+	<li>bass <-6 ... 6><br>Bass von -6dB bis + 6dB (funktioniert nur wenn tone = on und der ListeningMode es erlaubt)</li>
+	<li>treble <-6 ... 6><br>Höhen (treble) von -6dB bis + 6dB (funktioniert nur wenn tone = on und der ListeningMode es erlaubt)</li>
 	<li>input <nicht am Pioneer AV Receiver deaktivierte Eingangsquelle><br> Die Liste der verfügbaren (also der nicht deaktivierten)
 	Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen</li>
 	<li>inputUp<br>nächste Eingangsquelle der Main Zone auswählen</li>
@@ -1744,6 +1864,33 @@ RC_layout_PioneerAVR() {
 	<li>stop<br>Stoppt die Wiedergabe für die gleichen Eingangsquellen wie "play"</li>
 	<li>repeat<br>Wiederholung für folgende Eingangsquellen: AdapterPort, Ipod, Favorites, InternetRadio, MediaServer</li>
 	<li>shuffle<br>Zufällige Wiedergabe für die gleichen Eingangsquellen wie "repeat"</li>
+		<li>prev<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>next<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>rev<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>fwd<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>up<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>down<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>right<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>left<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>enter<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>return<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>menu<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>remoteControl <attr> wobei <attr> eines von folgenden sein kann:
+	<ul>
+		<li>cursorDown</li>
+		<li>cursorRight</li>
+		<li>cursorLeft</li>
+		<li>cursorEnter</li>
+		<li>cursorReturn</li>
+		<li>homeMenu</li>
+		<li>statusDisplay</li>
+		<li>audioParameter</li>
+		<li>hdmiOutputParameter</li>
+		<li>videoParameter</li>
+		<li>homeMenu</li>
+		Simuliert die Tasten der Fernbedienung. Achtung: mit cursorXX können die Eingänge nicht beeinflusst werden -> set <name> up ... kann zur Steuerung der Inputs verwendet werden.
+	</ul>
+	</li>
 	<li><a href="#setExtensions">set extensions</a> (ausser <blink>) werden unterstützt</li>
    <br><br>
     Beispiel:
@@ -1764,8 +1911,6 @@ RC_layout_PioneerAVR() {
   <ul>
     <code>get &lt;name&gt; raw &lt;Befehl&gt;</code>
     <br><br>
-    Sendet <code>&lt;Befehl&gt;</code> an den Pioneer AV Receiver
-    <code>&lt;name&gt;</code>.
 	<li><br>loadInputNames<br> liest die Namen der Eingangsquellen vom Pioneer AV Receiver
 	und überprüft, ob sie aktiviert sind</li>
 	<li>display<br>Aktualisiert das reading 'display' und 'displayPrevious' mit der aktuellen Anzeige des Displays Pioneer AV Receiver</li>
