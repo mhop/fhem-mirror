@@ -47,7 +47,7 @@ sub new() {
   my $self = {
     interface => "serial",
     #-- module version
-    version => 5.0,
+    version => 5.1,
     alarmdevs => [],
     devs => [],
     fams => [],
@@ -56,7 +56,7 @@ sub new() {
   return bless $self,$class;
 }
 
-sub poll($) {
+sub poll() {
   my ( $self ) = @_;
   my $hash = $self->{hash};
   if(defined($hash->{FD})) {
