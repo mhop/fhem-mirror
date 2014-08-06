@@ -44,6 +44,7 @@ use constant {
 
 use constant {
   CPU_FREQ     => "cpu_freq",
+  CPU1_FREQ     => "cpu1_freq",
   CPU_BOGOMIPS => "cpu_bogomips",
   CPU_TEMP     => "cpu_temp",
   CPU_TEMP_AVG => "cpu_temp_avg",
@@ -162,6 +163,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	if(SYSMON_isCPUFreqRPiBBB($hash)) {
 	  #$rMap->{"cpu_freq"}       = "CPU Frequenz";
 	  $rMap->{"cpu_freq"}        = "CPU frequency";
+	  $rMap->{"cpu1_freq"}        = "CPU frequency (second core)";
 	}
 	if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash)) {
     #$rMap->{+CPU_TEMP}       = "CPU Temperatur";
@@ -705,6 +707,9 @@ SYSMON_obtainParameters($$)
       if(SYSMON_isCPUFreqRPiBBB($hash)) {
         $map = SYSMON_getCPUFreq($hash, $map);
       }
+      if(SYSMON_isCPU1Freq($hash)) {
+        $map = SYSMON_getCPU1Freq($hash, $map);
+      }
       $map = SYSMON_getLoadAvg($hash, $map);
       $map = SYSMON_getCPUProcStat($hash, $map);
       #$map = SYSMON_getDiskStat($hash, $map);
@@ -969,7 +974,7 @@ SYSMON_getCPUTemp_BBB($$)
 }
 
 #------------------------------------------------------------------------------
-# leifert CPU Frequenz (Raspberry Pi, BeagleBone Black)
+# leifert CPU Frequenz (Raspberry Pi, BeagleBone Black, Cubietruck, etc.)
 #------------------------------------------------------------------------------
 sub
 SYSMON_getCPUFreq($$)
@@ -979,6 +984,20 @@ SYSMON_getCPUFreq($$)
 	$val = int($val);
 	my $val_txt = sprintf("%d", $val/1000);
   $map->{+CPU_FREQ}="$val_txt";
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert CPU Frequenz für 2te CPU (Cubietruck, etc.)
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPU1Freq($$)
+{
+	my ($hash, $map) = @_;
+	my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq 2>&1");
+	$val = int($val);
+	my $val_txt = sprintf("%d", $val/1000);
+  $map->{+CPU1_FREQ}="$val_txt";
 	return $map;
 }
 
@@ -1881,6 +1900,17 @@ SYSMON_isCPUFreqRPiBBB($) {
   }
 
 	return $sys_cpu_freq_rpi_bbb;
+}
+
+my $sys_cpu1_freq = undef;
+sub
+SYSMON_isCPU1Freq($) {
+	my ($hash) = @_;
+	if(!defined $sys_cpu1_freq) {
+	  $sys_cpu1_freq = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+  }
+
+	return $sys_cpu1_freq;
 }
 
 my $sys_fb = undef;
