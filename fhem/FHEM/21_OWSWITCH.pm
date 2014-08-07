@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.18";
+my $owx_version="5.19";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -1297,9 +1297,7 @@ sub OWXSWITCH_PT_GetState($) {
       #-- reading 9 + 3 + 2 data bytes + 2 CRC bytes = 16 bytes
       $thread->{'select'}=sprintf("\xF5\xDD\xFF");
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},4);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       $response = $thread->{pt_execute}->PT_RETVAL();
       unless (length($response) == 4) { 
@@ -1317,9 +1315,7 @@ sub OWXSWITCH_PT_GetState($) {
       #-- reading 9 + 3 + 8 data bytes + 2 CRC bytes = 22 bytes
       $thread->{'select'}=sprintf("\xF0\x88\x00");
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},10);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       $response = $thread->{pt_execute}->PT_RETVAL();
       unless (length($response) == 10) {
@@ -1337,9 +1333,7 @@ sub OWXSWITCH_PT_GetState($) {
       #-- reading 9 + 1 + 2 data bytes = 12 bytes
       $thread->{'select'}="\xF5";
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},2);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       $response = $thread->{pt_execute}->PT_RETVAL();
       unless (length($response) == 2) {
@@ -1392,9 +1386,7 @@ sub OWXSWITCH_PT_SetState($$) {
       #-- reading 9 + 3 + 1 data bytes + 2 CRC bytes = 15 bytes
 
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xAA\x07\x00", 3);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       $res = $thread->{pt_execute}->PT_RETVAL();
 
@@ -1408,9 +1400,7 @@ sub OWXSWITCH_PT_SetState($$) {
       $thread->{'select'}=sprintf("\x55\x07\x00%c",$statneu);
 
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'}, 2);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       $res = $thread->{pt_execute}->PT_RETVAL();
 
@@ -1439,9 +1429,7 @@ sub OWXSWITCH_PT_SetState($$) {
       $select=sprintf("\x5A%c%c",$value,255-$value);  
 
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select, 1);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       $res = $thread->{pt_execute}->PT_RETVAL();
 
@@ -1460,9 +1448,7 @@ sub OWXSWITCH_PT_SetState($$) {
       #   \x5A plus the value byte and its complement
       $select=sprintf("\x5A%c%c",252+$value,3-$value);   
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select, 1);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       $res = $thread->{pt_execute}->PT_RETVAL();
 
@@ -1492,9 +1478,7 @@ sub OWXSWITCH_PT_SetOutput($$$) {
     PT_BEGIN($thread);
 
     $thread->{task} = OWXSWITCH_PT_GetState($hash);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{task});
-    delete $thread->{TimeoutTime};
     die $thread->{task}->PT_CAUSE() if ($thread->{task}->PT_STATE() == PT_ERROR);
     $ret = $thread->{task}->PT_RETVAL();
     die $ret if $ret;
@@ -1508,9 +1492,7 @@ sub OWXSWITCH_PT_SetOutput($$$) {
     }
     $thread->{value} = $value;
     $thread->{task} = OWXSWITCH_PT_SetState($hash,$thread->{value});
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{task});
-    delete $thread->{TimeoutTime};
     die $thread->{task}->PT_CAUSE() if ($thread->{task}->PT_STATE() == PT_ERROR);
     $ret = $thread->{task}->PT_RETVAL();
     die $ret if $ret;

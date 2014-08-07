@@ -47,7 +47,7 @@ sub new() {
     interface => "firmata",
 
     #-- module version
-    version => 4.1
+    version => 4.2
   }, $class;
 }
 
@@ -178,6 +178,7 @@ sub get_pt_discover() {
     PT_BEGIN($thread);
     delete $self->{devs};
     main::FRM_Client_FirmataDevice($self->{hash})->onewire_search($self->{pin});
+    main::OWX_ASYNC_TaskTimeout($self->{hash},gettimeofday+main::AttrVal($self->{name},"timeout",2));
     PT_WAIT_UNTIL(defined $self->{devs});
     PT_EXIT($self->{devs});
     PT_END;
@@ -199,6 +200,7 @@ sub get_pt_alarms() {
     PT_BEGIN($thread);
     delete $self->{alarmdevs};
     main::FRM_Client_FirmataDevice($self->{hash})->onewire_search_alarms($self->{pin});
+    main::OWX_ASYNC_TaskTimeout($self->{hash},gettimeofday+main::AttrVal($self->{name},"timeout",2));
     PT_WAIT_UNTIL(defined $self->{alarmdevs});
     PT_EXIT($self->{alarmdevs});
     PT_END;
@@ -212,6 +214,7 @@ sub get_pt_verify($) {
     PT_BEGIN($thread);
     delete $self->{devs};
     main::FRM_Client_FirmataDevice($self->{hash})->onewire_search($self->{pin});
+    main::OWX_ASYNC_TaskTimeout($self->{hash},gettimeofday+main::AttrVal($self->{name},"timeout",2));
     PT_WAIT_UNTIL(defined $self->{devs});
     PT_EXIT(scalar(grep {$dev eq $_} @{$self->{devs}}));
     PT_END;
@@ -257,6 +260,7 @@ sub get_pt_execute($$$$) {
         $thread->{id} = $id;
         $self->{id} = ( $id + 1 ) & 0xFFFF;
         delete $self->{responses}->{$id};
+        main::OWX_ASYNC_TaskTimeout($self->{hash},gettimeofday+main::AttrVal($self->{name},"timeout",2));
         PT_WAIT_UNTIL(defined $self->{responses}->{$thread->{id}});
         my $ret = pack "C*", @{$self->{responses}->{$thread->{id}}};
         delete $self->{responses}->{$thread->{id}};

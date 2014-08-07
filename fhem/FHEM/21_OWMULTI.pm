@@ -82,7 +82,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.18";
+my $owx_version="5.19";
 #-- flexible channel name
 my $owg_channel;
 
@@ -1059,18 +1059,14 @@ sub OWXMULTI_PT_GetValues($) {
     #-- issue the match ROM command \x55 and the write scratchpad command
     #"ds2438.writestatusvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x4E\x00\x08",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- copy scratchpad to register
     #-- issue the match ROM command \x55 and the copy scratchpad command
     #"ds2438.copyscratchpadvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x48\x00",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- initiate temperature conversion
@@ -1078,10 +1074,8 @@ sub OWXMULTI_PT_GetValues($) {
     #-- issue the match ROM command \x55 and the start conversion command
     #"ds2438.temperaturconversionvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x44",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
@@ -1091,10 +1085,8 @@ sub OWXMULTI_PT_GetValues($) {
     #-- issue the match ROM command \x55 and the start conversion command
     #"ds2438.voltageconversionvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB4",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     $thread->{ExecuteTime} = gettimeofday() + 0.02; # was 0.006
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
@@ -1104,10 +1096,8 @@ sub OWXMULTI_PT_GetValues($) {
     #-- issue the match ROM command \x55 and the recall memory command
     #"ds2438.recallmemoryvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB8\x00",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
@@ -1117,9 +1107,7 @@ sub OWXMULTI_PT_GetValues($) {
     #-- reading 9 + 2 + 9 data bytes = 20 bytes
     #"ds2438.getvdd"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE\x00",9);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     $res = $thread->{pt_execute}->PT_RETVAL();
     unless (defined $res and length($res)==9) {
@@ -1134,18 +1122,14 @@ sub OWXMULTI_PT_GetValues($) {
     #-- issue the match ROM command \x55 and the write scratchpad command
     #"ds2438.writestatusvad"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x4E\x00\x00",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- copy scratchpad to register
     #-- issue the match ROM command \x55 and the copy scratchpad command
     #"ds2438.copyscratchpadvad"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x48\x00",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- initiate voltage conversion
@@ -1153,10 +1137,8 @@ sub OWXMULTI_PT_GetValues($) {
     #-- issue the match ROM command \x55 and the start conversion command
     #"ds2438.voltageconversionvad"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB4",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     $thread->{ExecuteTime} = gettimeofday() + 0.02; # was 0.006
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
@@ -1166,10 +1148,8 @@ sub OWXMULTI_PT_GetValues($) {
     #-- issue the match ROM command \x55 and the recall memory command
     #"ds2438.recallmemoryvad"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB8\x00",0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
     delete $thread->{ExecuteTime};
@@ -1179,9 +1159,7 @@ sub OWXMULTI_PT_GetValues($) {
     #-- reading 9 + 2 + 9 data bytes = 20 bytes
     #"ds2438.getvad"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE\x00", 9);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- process results
@@ -1237,9 +1215,7 @@ sub OWXMULTI_PT_SetValues($@) {
     my $select=sprintf("\x4E%c%c\x48",0,0);
     #"setvalues"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select, 0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     PT_END;

@@ -157,7 +157,7 @@ sub pt_query($) {
     while (defined ($bit = shift @bitsout)) {
       $serial->bit($bit);
     };
-    main::OWX_ASYNC_TaskTimeout($serial->{hash},gettimeofday+1);
+    main::OWX_ASYNC_TaskTimeout($serial->{hash},gettimeofday+main::AttrVal($serial->{name},"timeout",1));
     PT_WAIT_UNTIL(length($serial->{string_raw}) >= $numbits);
     $bitsin = join "", map { ($_ == 0xFF) ? "1" : "0" } unpack "C*",$serial->{string_raw};
     main::Log3($serial->{name},5,"OWX_DS9097 pt_query in: ".$bitsin) if ( $main::owx_async_debug );

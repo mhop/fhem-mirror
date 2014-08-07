@@ -133,7 +133,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_async_version=5.13;
+$owx_async_version=5.14;
 #-- Debugging 0,1,2,3
 $owx_async_debug=0;
 
@@ -367,9 +367,7 @@ sub OWX_ASYNC_PT_Alarms ($) {
       my ($thread) = @_;
       PT_BEGIN($thread);
       $thread->{pt_alarms} = $async->get_pt_alarms();
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_alarms});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_alarms}->PT_CAUSE() if ($thread->{pt_alarms}->PT_STATE() == PT_ERROR);
       if (defined (my $alarmed_devs = $thread->{pt_alarms}->PT_RETVAL())) {
         OWX_ASYNC_AfterAlarms($hash,$alarmed_devs);
@@ -444,9 +442,7 @@ sub OWX_ASYNC_PT_Discover ($) {
       my ($thread) = @_;
       PT_BEGIN($thread);
       $thread->{pt_discover} = $async->get_pt_discover();
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_discover});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_discover}->PT_CAUSE() if ($thread->{pt_discover}->PT_STATE() == PT_ERROR);
       if (my $owx_devices = $thread->{pt_discover}->PT_RETVAL()) {
         PT_EXIT(OWX_ASYNC_AutoCreate($hash,$owx_devices));
@@ -485,9 +481,7 @@ sub OWX_ASYNC_PT_Search($) {
       my ($thread) = @_;
       PT_BEGIN($thread);
       $thread->{pt_discover} = $async->get_pt_discover();
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_discover});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_discover}->PT_CAUSE() if ($thread->{pt_discover}->PT_STATE() == PT_ERROR);
       if (defined (my $owx_devs = $thread->{pt_discover}->PT_RETVAL())) {
         OWX_ASYNC_AfterSearch($hash,$owx_devs);
@@ -829,9 +823,7 @@ sub OWX_ASYNC_Kick($) {
           Log3 $hash->{NAME},5,"OWX_ASYNC_PT_Kick: kicking DS14B20 temperature conversion";
           #-- issue the skip ROM command \xCC followed by start conversion command \x44 
           $thread->{pt_execute} = OWX_ASYNC_PT_Execute($hash,1,undef,"\x44",0);
-          $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
           PT_WAIT_THREAD($thread->{pt_execute});
-          delete $thread->{TimeoutTime};
           if ($thread->{pt_execute}->PT_STATE() == PT_ERROR) {
             Log3 ($hash->{NAME},4,"OWX_ASYNC_PT_Kick: Failure in temperature conversion: ".$thread->{pt_execute}->PT_CAUSE());
           } else {
@@ -849,16 +841,12 @@ sub OWX_ASYNC_Kick($) {
         }
   
         $thread->{pt_search} = OWX_ASYNC_PT_Search($hash);
-        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
         PT_WAIT_THREAD($thread->{pt_search});
-        delete $thread->{Timeouttime};
         if ($thread->{pt_search}->PT_STATE() == PT_ERROR) {
           Log3 ($hash->{NAME},4,"OWX_ASYNC_PT_Kick: Failure in search: ".$thread->{pt_search}->PT_CAUSE());
         } else {
           $thread->{pt_alarms} = OWX_ASYNC_PT_Alarms($hash);
-          $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
           PT_WAIT_THREAD($thread->{pt_alarms});
-          delete $thread->{TimeoutTime};
           if ($thread->{pt_alarms}->PT_STATE() == PT_ERROR) {
             Log3 ($hash->{NAME},4,"OWX_ASYNC_PT_Kick: Failure in alarm-search: ".$thread->{pt_alarms}->PT_CAUSE());
           };
@@ -965,9 +953,7 @@ sub OWX_ASYNC_PT_Verify($) {
     if (defined $async) {
 
       $thread->{pt_verify} = $async->get_pt_verify($romid);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_verify});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_verify}->PT_CAUSE() if ($thread->{pt_verify}->PT_STATE() == PT_ERROR);
 
       my $value = $thread->{pt_verify}->PT_RETVAL();
