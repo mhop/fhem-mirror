@@ -1769,7 +1769,8 @@ sub SYSMON_ShowValuesFmt ($$;@)
 	                      CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.": ".$deg."C", 
 	                      CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.": "."MHz", 
 	                      CPU_BOGOMIPS,
-	                      UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP);
+	                      UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP, 
+	                      "power_ac_text", "power_usb_text", "power_battery_text");
 
 	  # network-interfaces
   	my $networks = AttrVal($name, "network-interfaces", undef);
@@ -1789,8 +1790,8 @@ sub SYSMON_ShowValuesFmt ($$;@)
         my($fName, $fDef, $fComment) = split(/:/, $_);
   	    push(@dataDescription, $fName);
   	  }
-  	}
-  	
+  	} 	
+
   	# User defined
 	  my $userdefined = AttrVal($name, "user-defined", undef);
     if(defined $userdefined) {
