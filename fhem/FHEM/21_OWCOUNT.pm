@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.24";
+my $owx_version="5.25";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -1870,17 +1870,13 @@ sub OWXCOUNT_PT_GetPage($$$) {
     #-- reading 9 + 3 + 40 data bytes (32 byte memory, 4 byte counter + 4 byte zeroes) and 2 CRC bytes = 54 bytes
 
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 42 );
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     $thread->{response} = $thread->{pt_execute}->PT_RETVAL();
 
     #-- reset the bus (needed to stop receiving data ?)
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,undef,undef,undef);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     if (my $ret = OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),$owx_dev,$thread->{'select'},$thread->{response})) {
@@ -1931,9 +1927,7 @@ sub OWXCOUNT_PT_SetPage($$$) {
 
     #"setpage.1"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 0 );
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- issue the match ROM command \x55 and the read scratchpad command
@@ -1943,9 +1937,7 @@ sub OWXCOUNT_PT_SetPage($$$) {
     # TODO: sometimes much less than 28
     #"setpage.2"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 28 );
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     $res = $thread->{pt_execute}->PT_RETVAL();
     if( length($res) < 13 ){
@@ -1959,9 +1951,7 @@ sub OWXCOUNT_PT_SetPage($$$) {
 
     #"setpage.3"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 6 );
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     $res = $thread->{pt_execute}->PT_RETVAL();
     #TODO validate whether testing '0' is appropriate with async interface

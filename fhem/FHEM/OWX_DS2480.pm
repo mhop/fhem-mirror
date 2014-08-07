@@ -104,6 +104,7 @@ sub get_pt_execute($$$$) {
       $self->block($select);
     }
     
+    main::OWX_ASYNC_TaskTimeout($self->{hash},gettimeofday+main::AttrVal($self->{name},"timeout",2));
     PT_WAIT_UNTIL($self->response_ready());
     
     if ($reset and !$self->reset_response()) {
@@ -348,6 +349,7 @@ sub pt_next ($$) {
     $serial->reset();
     $serial->query($sp1,1);
     $serial->query($sp2,16);
+    main::OWX_ASYNC_TaskTimeout($serial->{hash},gettimeofday+main::AttrVal($serial->{name},"timeout",2));
     PT_WAIT_UNTIL($serial->response_ready());
     die "reset failed" unless $serial->reset_response();
 

@@ -90,7 +90,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log($$);
 
-my $owx_version="5.18";
+my $owx_version="5.19";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -1572,9 +1572,7 @@ sub OWXAD_PT_GetPage($$$) {
 
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 );
       $thread->{ExecuteTime} = gettimeofday() + 0.07; # was 0.02
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
       PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
@@ -1600,9 +1598,7 @@ sub OWXAD_PT_GetPage($$$) {
     #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
 
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 10 );
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     my $response = $thread->{pt_execute}->PT_RETVAL();
     my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},10,$response);
@@ -1685,9 +1681,7 @@ sub OWXAD_PT_SetPage($$) {
     }
     #"setpage"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $select, 0 );
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     PT_END;
   });

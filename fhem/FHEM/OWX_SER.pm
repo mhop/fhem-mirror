@@ -47,7 +47,7 @@ sub new() {
   my $self = {
     interface => "serial",
     #-- module version
-    version => 5.1,
+    version => 5.2,
     alarmdevs => [],
     devs => [],
     fams => [],

@@ -77,7 +77,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.2";
+my $owx_version="5.3";
 #-- controller may be HD44780 or KS0073 
 #   these values have to be changed for different display 
 #   geometries or memory maps
@@ -845,9 +845,7 @@ sub OWXLCD_PT_Byte($$$) {
 
     #"byte"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     PT_END;
   });
@@ -963,16 +961,12 @@ sub OWXLCD_PT_Get($$) {
     }
     #"get.prepare"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- issue the read scratchpad command \xBE
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE", $thread->{len});
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     OWXLCD_BinValues($hash, "get.".$cmd, 1, 1, $owx_dev, "\xBE", $thread->{len}, $thread->{pt_execute}->PT_RETVAL());
@@ -1066,9 +1060,7 @@ sub OWXLCD_PT_GetMemory($$) {
     $select = sprintf("\4E%c\x10\x37",$page);
     #"prepare"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- sleeping for some time
@@ -1080,9 +1072,7 @@ sub OWXLCD_PT_GetMemory($$) {
     $thread->{'select'} = "\xBE";
     #"get.memory.$page"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$thread->{'select'},16);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     OWXLCD_BinValues($hash, "get.memory.$page", 1, 1, $owx_dev, $thread->{'select'}, 16, $thread->{pt_execute}->PT_RETVAL());
@@ -1278,9 +1268,7 @@ sub OWXLCD_PT_SetFunction($$$) {
     } 
     #"set.function"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     
     PT_END;
@@ -1419,9 +1407,7 @@ sub OWXLCD_PT_SetIcon($$$) {
         $select = "\x10\x26";
         #"set.icon.1"
         $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
         PT_WAIT_THREAD($thread->{pt_execute});
-        delete $thread->{TimeoutTime};
         die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
         #-- SEGRAM addres to 0 = \x40,
@@ -1430,18 +1416,14 @@ sub OWXLCD_PT_SetIcon($$$) {
         $select .= "\x4E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
         #"set.icon.2"
         $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
         PT_WAIT_THREAD($thread->{pt_execute});
-        delete $thread->{TimeoutTime};
         die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
         #-- issue the copy scratchpad to LCD command \x48
         $select="\x48";  
         #"set.icon.3"
         $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
         PT_WAIT_THREAD($thread->{pt_execute});
-        delete $thread->{TimeoutTime};
         die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       } else {
         #-- determine data value
@@ -1478,27 +1460,21 @@ sub OWXLCD_PT_SetIcon($$$) {
         $select = "\x10\x26";
         #"set.icon.4"
         $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
         PT_WAIT_THREAD($thread->{pt_execute});
-        delete $thread->{TimeoutTime};
         die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
         #-- SEGRAM addres to 0 = \x40 + icon address
         $select = sprintf("\x10%c",63+$icon);
         #"set.icon.5"
         $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
         PT_WAIT_THREAD($thread->{pt_execute});
-        delete $thread->{TimeoutTime};
         die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
         #-- data
         $select = sprintf("\x12%c",$data);
         #"set.icon.6"
         $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-        $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
         PT_WAIT_THREAD($thread->{pt_execute});
-        delete $thread->{TimeoutTime};
         die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       }  
 
@@ -1506,9 +1482,7 @@ sub OWXLCD_PT_SetIcon($$$) {
       $select = "\x10\x20";
       #"set.icon.7"
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     #-- or else
     } else {
@@ -1666,18 +1640,14 @@ sub OWXLCD_PT_SetLine($$$) {
     $select=sprintf("\x4E%c",$lcdpage[$line]).$msgA;
     #"set.line.1"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- issue the copy scratchpad to LCD command \x48
     $select="\x48";  
     #"set.line.2"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- if second string available:
@@ -1688,18 +1658,14 @@ sub OWXLCD_PT_SetLine($$$) {
       $select=sprintf("\x4E%c",$lcdpage[$line]+16).$thread->{msgB};
       #"set.line.3"
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
       #-- issue the copy scratchpad to LCD command \x48
       $select="\x48";  
       #"set.line.4"
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     }
     PT_END;
@@ -1825,18 +1791,14 @@ sub OWXLCD_PT_SetMemory($$$) {
     $select=sprintf("\x4E\%c",$page).$msgA;
     #"set.memory.page"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
 
     #-- issue the copy scratchpad to EEPROM command \x39
     $select = "\x39"; 
     #"set.memory.copy"
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,0);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     PT_END;
   });

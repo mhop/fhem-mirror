@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.24";
+my $owx_version="5.25";
 
 my %gets = (
   "id"          => "",
@@ -1128,9 +1128,7 @@ sub OWXTHERM_PT_GetValues($) {
       my $delay = $convtimes{AttrVal($name,"resolution",12)};
       $thread->{ExecuteTime} = $now + $delay*0.001;
       $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x44",0);
-      $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
       PT_WAIT_THREAD($thread->{pt_execute});
-      delete $thread->{TimeoutTime};
       die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
       PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
       delete $thread->{ExecuteTime};
@@ -1139,9 +1137,7 @@ sub OWXTHERM_PT_GetValues($) {
     #-- issue the match ROM command \x55 and the read scratchpad command \xBE
     #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE",9);
-    $thread->{TimeoutTime} = gettimeofday()+2; #TODO: implement attribute-based timeout
     PT_WAIT_THREAD($thread->{pt_execute});
-    delete $thread->{TimeoutTime};
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     OWXTHERM_BinValues($hash,1,$owx_dev,undef,9,$thread->{pt_execute}->PT_RETVAL());
     PT_END;
