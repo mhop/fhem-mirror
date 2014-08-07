@@ -151,9 +151,12 @@ notify_Attr(@)
          device, or <code>devicename:event</code>.</li>
 
       <li><code>&lt;pattern&gt;</code> must completely (!)
-        match either the device name, or the compound of the device name and the
-        event.  To identify the events use "inform" command in telnet or "Event
-        Monitor" in FHEMWEB.</li>
+        match either the device name, or the compound of the device name and
+        the event.  To identify the events use the inform command from the
+        telnet prompt or the "Event Monitor" link in the browser
+        (FHEMWEB), and wait for the event to be printed. See also the
+        eventTypes device.</li>
+
       <li>in the command section you can access the event:
       <ul>
         <li>The variable $EVENT will contain the complete event, e.g.

@@ -49,6 +49,7 @@ my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
                        ":STACKABLE_CC:CUL_RFR:";
 my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:STACKABLE_CC:"; 
 my $clientsMAX       = ":CUL_MAX:HMS:CUL_IR:STACKABLE_CC:";
+my $clientsWMBus     = ":WMBUS:HMS:CUL_IR:STACKABLE_CC:";
 
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
@@ -83,6 +84,12 @@ my %matchListMAX = (
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
 );
+my %matchListWMBus = (
+    "J:WMBUS"     => "^b.*",
+    "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
+    "D:CUL_IR"    => "^I............",
+    "H:STACKABLE_CC"=>"^\\*",
+);
 
 sub
 CUL_Initialize($)
@@ -104,8 +111,8 @@ CUL_Initialize($)
   $hash->{SetFn}   = "CUL_Set";
   $hash->{AttrFn}  = "CUL_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 model:CUL,CUN " . 
-                     "sendpool addvaltrigger rfmode:SlowRF,HomeMatic,MAX ".
+                     "showtime:1,0 model:CUL,CUN sendpool addvaltrigger ".
+                     "rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S ".
                      "hmId ".
                      "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ";
 
@@ -793,6 +800,11 @@ CUL_Parse($$$$@)
   #Translate Message from CUL to FHZ
   next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
 
+  if ($dmsg eq 'SMODE' || $dmsg eq 'TMODE') {      # brs/brt returns SMODE/TMODE
+    Log3 $name, 5, "CUL_Parse: switched to $dmsg";
+    return;
+  }
+	
   if($dmsg =~ m/^[0-9A-F]{4}U./) {                 # RF_ROUTER
     Dispatch($hash, $dmsg, undef);
     return;
@@ -864,6 +876,8 @@ CUL_Parse($$$$@)
     $dmsg .= "::$rssi:$name" if(defined($rssi));
 
   } elsif($fn eq "Z" && $len >= 21) {              # Moritz/Max
+    ;
+  } elsif($fn eq "b" && $len >= 24) {              # Wireless M-Bus
     ;
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
     $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
@@ -948,7 +962,11 @@ CUL_Attr(@)
 
     my $hash = $defs{$name};
 
-    $aVal = "SlowRF" if(!$aVal || ($aVal ne "HomeMatic" && $aVal ne "MAX"));
+    $aVal = "SlowRF" if(!$aVal ||
+                         ($aVal ne "HomeMatic" &&
+                          $aVal ne "MAX" &&
+                          $aVal ne "WMBus_T" &&
+                          $aVal ne "WMBus_S"));
     my $msg = $hash->{NAME} . ": Mode $aVal not supported";
 
     if($aVal eq "HomeMatic") {
@@ -979,6 +997,32 @@ CUL_Attr(@)
         return $msg;
       }
 
+   } elsif($aVal eq "WMBus_S") {
+      return if($hash->{initString} =~ m/brs/);
+      if($hash->{CMDS} =~ m/b/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
+        $hash->{Clients} = $clientsWMBus;
+        $hash->{MatchList} = \%matchListWMBus;
+        $hash->{initString} = "brs"; # Use S-Mode
+        CUL_WriteInit($hash);
+
+      } else {
+        Log3 $name, 2, $msg;
+        return $msg;
+      }
+   } elsif($aVal eq "WMBus_T") {
+      return if($hash->{initString} =~ m/brt/);
+      if($hash->{CMDS} =~ m/b/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
+        $hash->{Clients} = $clientsWMBus;
+        $hash->{MatchList} = \%matchListWMBus;
+        $hash->{initString} = "brt"; # Use T-Mode
+        CUL_WriteInit($hash);
+
+      } else {
+        Log3 $name, 2, $msg;
+        return $msg;
+      }
+      
+      
     } else {
       return if($hash->{initString} eq "X21");
       $hash->{Clients} = $clientsSlowRF;
@@ -1229,8 +1273,17 @@ CUL_prefix($$$)
         <li>MAX<br>
             To communicate with MAX! type of devices @10 kHz datarate.</li>
 
+        <li>WMBus_S</li>
+        <li>WMBus_T<br>
+            To communicate with Wireless M-Bus devices like water, gas or
+            electrical meters.  Wireless M-Bus uses two different communication
+            modes, S-Mode and T-Mode. While in this mode, no reception of other
+            protocols like SlowRF or HomeMatic is possible. See also the WMBUS
+            FHEM Module.
+            </li>
         </ul>
         </li><br>
+
     <li><a name="hmId">hmId</a><br>
         Set the HomeMatic ID of this device. If this attribute is absent, the
         ID will be F1&lt;FHTID&gt;. Note 1: After setting or changing this
@@ -1497,7 +1550,13 @@ CUL_prefix($$$)
         <li>MAX<br>
             F&uuml;r die Kommunikation mit MAX! Ger&auml;ten @10 kHz
             Datenrate.</li>
-
+        <li>WMBus_S</li>
+        <li>WMBus_T<br>
+            F&uuml;r die Kommunikation mit Wireless M-Bus Ger&auml;ten wie
+            Wasser-, Gas- oder Elektroz&auml;hlern.  Wireless M-Bus verwendet
+            zwei unterschiedliche Kommunikationsarten, S-Mode und T-Mode.  In
+            diesem Modus ist der Empfang von anderen Protokollen wie SlowRF
+            oder HomeMatic nicht m&ouml;glich.</li>
         </ul>
         </li><br>
 
