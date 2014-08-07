@@ -347,25 +347,32 @@ sub CUL_HM_updateConfig($){
         elsif($md =~ m/^virtual_/)                                         {$webCmd="virtual";}
         elsif($md eq "CCU-FHEM")                                           {$webCmd="virtual:update";}
 
-      }elsif((!$hash->{helper}{role}{chn} &&
+      }
+      elsif((!$hash->{helper}{role}{chn} &&
                $md !~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/)
             ||$st eq "repeater"
             ||$md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/ ){$webCmd="getConfig:clear msgEvents";
         if ($md =~ m/HM-CC-RT-DN/)                      {$webCmd.=":burstXmit";}
-      }elsif($st eq "blindActuator"){
+      }
+      elsif($st eq "blindActuator"){
         if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggle:on:off:up:down:stop";}
         else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
-      }elsif($st eq "dimmer"       ){
+      }
+      elsif($st eq "dimmer"       ){
         if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggle:on:off:up:down";}
         else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
-      }elsif($st eq "switch"       ){
+      }
+      elsif($st eq "switch"       ){
         if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggle:on:off";}
         else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
-      }elsif($st eq "smokeDetector"){   $webCmd="statusRequest";
+      }
+      elsif($st eq "smokeDetector"){   $webCmd="statusRequest";
           if ($hash->{helper}{fkt} eq "sdLead"){
                                         $webCmd.="teamCall:alarmOn:alarmOff";}
-      }elsif($st eq "keyMatic"     ){   $webCmd="lock:inhibit on:inhibit off";
-      }elsif($md eq "HM-OU-CFM-PL" ){   $webCmd="press short:press long"
+      }
+      elsif($st eq "keyMatic"     ){   $webCmd="lock:inhibit on:inhibit off";
+      }
+      elsif($md eq "HM-OU-CFM-PL" ){   $webCmd="press short:press long"
                                           .($chn eq "02"?":playTone replay":"");
       }
 
@@ -1791,7 +1798,7 @@ sub CUL_HM_Parse($$) {#########################################################
     if($mTp eq "02") {# this must be a reflection from what we sent, ignore
       push @evtEt,[$shash,1,""];
     }
-    elsif ($mTp eq "40" || $mTp eq "41"){# if channel is SD team we have to act
+    elsif ($mTp =~ m /^4[01]/){# if channel is SD team we have to act
       CUL_HM_parseSDteam($mTp,$src,$dst,$p);
     }
   }
@@ -1950,8 +1957,8 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
       push @evtEt,[$shash,1,"alive:yes"];
       push @evtEt,[$shash,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
-      if (  $md =~ m/^HM-SEC-SC/ ||
-            $md eq "HM-Sec-RHS"){push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
+      if (  $md =~ m/^(HM-SEC-SC.*|HM-Sec-RHS|Roto_ZEL-STG-RM-F.K)$/){
+                                 push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
       elsif($md ne "HM-SEC-WDS"){push @evtEt,[$shash,1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
     }
     elsif($mTp eq "41"){
@@ -2115,7 +2122,7 @@ sub CUL_HM_Parse($$) {#########################################################
     if($mTp =~ m/^4./ &&  #Push Button event
        ($mFlgH & 0x20)){  #response required Flag
                 # fhem CUL shall ack a button press
-      if ($md =~ m/HM-SEC-SC/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
+      if ($md =~ m/^(HM-SEC-SC.*|Roto_ZEL-STG-RM-FFK)$/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
         push @ack,$shash,$mNo."8002".$dst.$src."0101".((hex($mI[0])&1)?"C8":"00")."00";
       }
       else{
@@ -2155,7 +2162,6 @@ sub CUL_HM_Parse($$) {#########################################################
   $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
   return @entities;
 }
-
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independent
   my ($ioHash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
@@ -2567,8 +2573,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 
     my $peerIDs = AttrVal($cName,"peerIDs","");
     if ($peerIDs =~ m/$dst/){# dst is available in the ID list
-      my @peers = grep /^$dst/,split(",",$peerIDs);
-      foreach my $peer (@peers){
+      foreach my $peer (grep /^$dst/,split(",",$peerIDs)){
         my $pName = CUL_HM_id2Name($peer);
         $pName = CUL_HM_id2Name($dst) if (!$defs{$pName}); #$dst - device-id of $peer
         next if (!$defs{$pName});
@@ -2598,6 +2603,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 
   return $ret;
 }
+
 sub CUL_HM_queueUpdtCfg($){
   my $name = shift;
   if ($modules{CUL_HM}{helper}{hmManualOper}){ # no update when manual operation
@@ -2855,10 +2861,13 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       my $reg  = $culHmRegDefine->{$regName};
       my $help = $reg->{t};
       my ($min,$max) = ($reg->{min},"to ".$reg->{max});
-      if (defined($reg->{lit})){
+      if ($reg->{c} eq "lit"){
         $help .= " options:".join(",",keys%{$reg->{lit}});
         $min = "";
         $max = "literal";
+      }
+      elsif (defined($reg->{lit})){
+        $help .= " spacial:".join(",",keys%{$reg->{lit}});
       }
       push @rI,sprintf("%4d: %-16s | %3s %-14s | %8s | %s\n",
               $reg->{l},$regName,$min,$max.$reg->{u},
@@ -3303,7 +3312,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $list = $a[2];
       $list =~ s/[\.]?RegL_//;
       ($list,$peerID) = split(":",$list);
-      return "unknown list Number:".$list if(hex($list)>6);
+#      return "unknown list Number:".$list if(hex($list)>6);
     }
     elsif ($cmd eq "getRegRaw"){
       ($list,$peerID) = ($a[2],$a[3]);
@@ -3368,8 +3377,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     my $reg  = $culHmRegDefine->{$regName};
     return $st." - ".$regName            # give some help
-           .($reg->{lit}? " literal:".join(",",keys%{$reg->{lit}})." "
-                        : " range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
+           .($reg->{c} eq "lit"? " literal:".join(",",keys%{$reg->{lit}})." "
+                               : " range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
+                                 .($reg->{lit}?" special:".join(",",keys%{$reg->{lit}})." "
+                                              :""
+                                              )
             )
            .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
                   if ($data eq "?");
@@ -3380,16 +3392,19 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return"invalid value. use:". join(",",sort keys%{$reg->{lit}})
             if ($reg->{c} eq 'lit' && !defined($reg->{lit}{$data}));
 
+    my $conv = $reg->{c};
+    if (!$conv && $reg->{lit} && $reg->{lit}{$data}){
+      $data = $reg->{lit}{$data}; #conv special value prior to calculation
+    }
     $data *= $reg->{f} if($reg->{f});# obey factor befor possible conversion
-    my $conversion = $reg->{c};
-    if (!$conversion){;# do nothing
-    }elsif($conversion eq "fltCvT"  ){$data = CUL_HM_fltCvT($data);
-    }elsif($conversion eq "fltCvT60"){$data = CUL_HM_fltCvT60($data);
-    }elsif($conversion eq "min2time"){$data = CUL_HM_time2min($data);
-    }elsif($conversion eq "m10s3")   {$data = $data*10-3;
-    }elsif($conversion eq "hex")     {$data = hex($data);
-    }elsif($conversion eq "lit")     {$data = $reg->{lit}{$data};
-    }else{return " conversion undefined - please contact admin";
+    if (!$conv){;# do nothing
+    }elsif($conv eq "fltCvT"  ){$data = CUL_HM_fltCvT($data);
+    }elsif($conv eq "fltCvT60"){$data = CUL_HM_fltCvT60($data);
+    }elsif($conv eq "min2time"){$data = CUL_HM_time2min($data);
+    }elsif($conv eq "m10s3")   {$data = $data*10-3;
+    }elsif($conv eq "hex")     {$data = hex($data);
+    }elsif($conv eq "lit")     {$data = $reg->{lit}{$data};
+    }else{return " conv undefined - please contact admin";
     }
 
     my $addr = int($reg->{a});        # bit location later
@@ -5806,7 +5821,7 @@ sub CUL_HM_DumpProtocol($$@) {
 sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   my($name,$regName,$list,$peerId,$regLN)=@_;
   my $hash = $defs{$name};
-  my ($size,$pos,$conversion,$factor,$unit) = (8,0,"",1,""); # default
+  my ($size,$pos,$conv,$factor,$unit) = (8,0,"",1,""); # default
   my $addr = $regName;
   my $reg = $culHmRegDefine->{$regName};
   if ($reg) { # get the register's information
@@ -5816,7 +5831,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     $list = $reg->{l};
     $size = $reg->{s};
     $size = int($size)*8 + ($size*10)%10;
-    $conversion = $reg->{c}; #unconvert formula
+    $conv = $reg->{c}; #unconvert formula
     $factor = $reg->{f};
     $unit = " ".$reg->{u};
   }
@@ -5869,16 +5884,19 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   }
 
   $data = ($data>>$pos) & (0xffffffff>>(32-$size));
-  if (!$conversion){                ;# do nothing
-  } elsif($conversion eq "lit"     ){$data = defined $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit:$data";
-  } elsif($conversion eq "fltCvT"  ){$data = CUL_HM_CvTflt($data);
-  } elsif($conversion eq "fltCvT60"){$data = CUL_HM_CvTflt60($data);
-  } elsif($conversion eq "min2time"){$data = CUL_HM_min2time($data);
-  } elsif($conversion eq "m10s3"   ){$data = ($data+3)/10;
-  } elsif($conversion eq "hex"     ){$data = sprintf("0x%X",$data);
-  } else { return " conversion undefined - please contact admin";
+  if (!$conv){                ;# do nothing
+  } elsif($conv eq "lit"     ){$data = defined $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit:$data";
+  } elsif($conv eq "fltCvT"  ){$data = CUL_HM_CvTflt($data);
+  } elsif($conv eq "fltCvT60"){$data = CUL_HM_CvTflt60($data);
+  } elsif($conv eq "min2time"){$data = CUL_HM_min2time($data);
+  } elsif($conv eq "m10s3"   ){$data = ($data+3)/10;
+  } elsif($conv eq "hex"     ){$data = sprintf("0x%X",$data);
+  } else { return " conv undefined - please contact admin";
   }
   $data /= $factor if ($factor);# obey factor after possible conversion
+  if (!$conv && $reg->{litInv} && $reg->{litInv}{$data} ){
+    $data = $reg->{litInv}{$data};#conv special value past to calculation
+  }
   return $convFlg.$data.$unit;
 }
 sub CUL_HM_updtRegDisp($$$) {
@@ -6047,46 +6065,6 @@ sub CUL_HM_initRegHash() { #duplicate short and long press register
     Log3 undef, 1, "Error loading file: $file:\n $@" if(!$ret) ;
   }
   closedir(DH);
-
-# foreach my $reg (keys %{$culHmRegDefShLg}){ #update register list
-#   %{$culHmRegDefine->{"sh".$reg}} = %{$culHmRegDefShLg->{$reg}};
-#   %{$culHmRegDefine->{"lg".$reg}} = %{$culHmRegDefShLg->{$reg}};
-#     $culHmRegDefine->{"lg".$reg}{a} +=0x80;
-# }
-# foreach my $rN  (keys %{$culHmRegDefine}){#create literal inverse for fast search
-#   if ($culHmRegDefine->{$rN}{lit}){# literal assigned => create inverse
-#     foreach my $lit (keys %{$culHmRegDefine->{$rN}{lit}}){
-#       $culHmRegDefine->{$rN}{litInv}{$culHmRegDefine->{$rN}{lit}{$lit}}=$lit;
-#     }
-#   }
-# }
-#  foreach my $type(sort(keys %{$culHmRegType})){ #update references to register
-#    foreach my $reg (sort(keys %{$culHmRegType->{$type}})){
-#      if ($culHmRegDefShLg->{$reg}){
-#        delete $culHmRegType->{$type}{$reg};
-#        $culHmRegType->{$type}{"sh".$reg} = 1;
-#        $culHmRegType->{$type}{"lg".$reg} = 1;
-#      }
-#    }
-#  }
-#  foreach my $type(sort(keys %{$culHmRegModel})){ #update references to register
-#    foreach my $reg (sort(keys %{$culHmRegModel->{$type}})){
-#      if ($culHmRegDefShLg->{$reg}){
-#        delete $culHmRegModel->{$type}{$reg};
-#        $culHmRegModel->{$type}{"sh".$reg} = 1;
-#        $culHmRegModel->{$type}{"lg".$reg} = 1;
-#      }
-#    }
-#  }
-#  foreach my $type(sort(keys %{$culHmRegChan})){ #update references to register
-#    foreach my $reg (sort(keys %{$culHmRegChan->{$type}})){
-#      if ($culHmRegDefShLg->{$reg}){
-#        delete $culHmRegChan->{$type}{$reg};
-#        $culHmRegChan->{$type}{"sh".$reg} = 1;
-#        $culHmRegChan->{$type}{"lg".$reg} = 1;
-#      }
-#    }
-#  }
 }
 
 my %fltCvT60 = (1=>127,60=>7620);
