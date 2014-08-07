@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: SYSMON: aded power supply informations to the text output method
   - feature: SYSMON: power supply informations (ac, usb, battery)
   - feature: added 70_PushNotifier.pm
   - feature: 70_VIERA: Add parameter "HDMI1" - "HDMI4" for command remoteControl
