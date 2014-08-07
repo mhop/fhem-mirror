@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.25";
+my $owx_version="5.26";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -287,8 +287,6 @@ sub OWCOUNT_Init ($) {
   #-- Start timer for updates
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+10, "OWCOUNT_GetValues", $hash, 0);
-  #--
-  readingsSingleUpdate($hash,"state","Initialized",1);
   return undef; 
 }
 

@@ -82,7 +82,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.19";
+my $owx_version="5.20";
 #-- flexible channel name
 my $owg_channel;
 
@@ -303,8 +303,6 @@ sub OWMULTI_Init ($) {
   #-- Start timer for updates
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+10, "OWMULTI_GetValues", $hash, 0);
-  #--
-  readingsSingleUpdate($hash,"state","Initialized",1);
   return undef; 
 }
   

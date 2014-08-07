@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.19";
+my $owx_version="5.20";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -289,8 +289,6 @@ sub OWSWITCH_Init ($) {
   #-- Start timer for updates
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+10, "OWSWITCH_GetValues", $hash, 0);
-  #--
-  readingsSingleUpdate($hash,"state","Initialized",1);
   return undef; 
 }
 
