@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.5.0";
+my $VERSION = "1.6.0";
 
 use constant {
   DATE            => "date",
@@ -60,6 +60,8 @@ use constant {
   ETH0        => "eth0",
   WLAN0       => "wlan0",
   DIFF_SUFFIX => "_diff",
+  IP_SUFFIX   => "_ip",
+  IP6_SUFFIX  => "_ip6",
   FB_WLAN_STATE       => "wlan_state",
   FB_WLAN_GUEST_STATE => "wlan_guest_state",
   FB_INET_IP          => "internet_ip",
@@ -307,6 +309,8 @@ SYSMON_updateCurrentReadingsMap($) {
       $rMap->{$nName."_diff"}   =  $nPt." (diff)";
 	    $rMap->{$nName."_rx"}     =  $nPt." (RX)";
 	    $rMap->{$nName."_tx"}     =  $nPt." (TX)";
+	    $rMap->{$nName."_ip"}     =  $nPt." (IP)";
+	    $rMap->{$nName."_ip6"}    =  $nPt." (IP6)";
 	    
     }
   } else {
@@ -318,54 +322,72 @@ SYSMON_updateCurrentReadingsMap($) {
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	    $nName = "ath1";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	    $nName = "cpmac0";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	    $nName = "dsl";
       $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	    $nName = ETH0;
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	    $nName = "guest";
 	  	$rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	    $nName = "hotspot";
     	$rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	    $nName = "lan";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	    $nName = "vdsl";
 		  $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
 	  } else {
 	  	my $nName = ETH0;
@@ -373,12 +395,16 @@ SYSMON_updateCurrentReadingsMap($) {
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
 	    
       $nName = WLAN0;
       $rMap->{$nName}         = "Network adapter ".$nName;
 	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
 	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
 	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
     }
   }
   
@@ -1475,11 +1501,26 @@ sub SYSMON_getNetworkInfo ($$$)
     #           Kollisionen:0 Sendewarteschlangenlaenge:1000
     #           RX bytes:25517384 (24.3 MiB)  TX bytes:683970999 (652.2 MiB)
 
+    my $ip = undef; my $ip6 = undef;
     foreach (@dataThroughput) {
+    	if($_=~ m/inet\s+(addr:)*(\S*)/) {
+    	  $ip=$2;
+    	}
+    	if($_=~ m/inet6\s+(addr:)*\s*(\S*)/) {
+    		$ip6=$2;
+    	}
       if(index($_, 'RX bytes') >= 0) {
         $dataThroughput = $_;
         last;
       }
+    }
+    
+    if(defined $ip) {
+    	$map->{$nName.IP_SUFFIX} = $ip;
+    }
+    
+    if(defined $ip6) {
+    	$map->{$nName.IP6_SUFFIX} = $ip6;
     }
 
     my $rxRaw = -1;
@@ -2139,7 +2180,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>cpu_bogomips<br>
         CPU Speed: BogoMIPS
     </li>
-    <li>cpu_freq<br>
+    <li>cpu_freq (and cpu1_freq for dual core systems)<br>
         CPU frequency
     </li>
     <br>
@@ -2195,6 +2236,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
     Change of the amount of the transferred data in relation to the previous call (for eth0).<br>
     <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
+    IP and IP v6 adresses
+    <code>eth0_ip 192.168.0.15</code><br>
+    <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
     </li>
     <br>
     <li>File system information<br>
@@ -2640,7 +2684,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>cpu_bogomips<br>
         CPU Speed: BogoMIPS
     </li>
-    <li>cpu_freq<br>
+    <li>cpu_freq (auf den DualCore-Systemen wie Cubietruck auch cpu1_freq)<br>
         CPU-Frequenz
     </li>
     <br>
@@ -2698,6 +2742,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
     &Auml;nderung der &uuml;bertragenen Datenmenge in Bezug auf den vorherigen Aufruf (f&uuml;r eth0).<br>
     <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
+    IP and IP v6 Adressen
+    <code>eth0_ip 192.168.0.15</code><br>
+    <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
     </li>
     <br>
     <li>Dateisysteminformationen<br>
