@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.6.0";
+my $VERSION = "1.6.1";
 
 use constant {
   DATE            => "date",
@@ -2018,7 +2018,7 @@ sub SYSMON_PowerAcInfo($$)
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
   $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", Voltage: ".$d_voltage." V, Current: ".$d_current." mA";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA";
   
   return $map;
 }
@@ -2042,7 +2042,7 @@ sub SYSMON_PowerUsbInfo($$)
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
   $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", Voltage: ".$d_voltage." V, Current: ".$d_current." mA";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA";
   
   return $map;
 }
@@ -2061,18 +2061,20 @@ sub SYSMON_PowerBatInfo($$)
   my $d_voltage = SYSMON_execute($hash, $base."voltage_now");
   if(defined $d_voltage) {$d_voltage/=1000000;}
   
+  my $d_capacity = trim(SYSMON_execute($hash, $base."capacity"));
+  if($d_present ne "1") {
+  	$d_capacity = "0";
+  }
   #$map->{"power_".$type."_online"}=$d_online;
   #$map->{"power_".$type."_present"}=$d_present;
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
-  $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", Voltage: ".$d_voltage." V, Current: ".$d_current." mA";
+  $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current $d_capacity";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, capacity: ".$d_capacity." %";
   
-  # TODO
   if($d_present eq "1") {
     # Zusaetzlich: technology, capacity, status, health, temp (/10 => °C)
     my $d_technology = trim(SYSMON_execute($hash, $base."technology"));
-    my $d_capacity = trim(SYSMON_execute($hash, $base."capacity"));
     my $d_status = trim(SYSMON_execute($hash, $base."status"));
     my $d_health = trim(SYSMON_execute($hash, $base."health"));
     my $d_energy_full_design = trim(SYSMON_execute($hash, $base."energy_full_design"));
@@ -2291,7 +2293,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <b>Power Supply Readings</b>
     <li>power_ac_stat<br>
-        status information to the AC socket: present (0|1), online (0|1), voltage, current
+        status information to the AC socket: present (0|1), online (0|1), voltage, current<br>
         Example:<br>
     		<code>power_ac_stat: 1 1 4.807 264</code><br>
     </li>
@@ -2299,7 +2301,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>power_ac_text<br>
         human readable status information to the AC socket<br>
         Example:<br>
-    		<code>power_ac_text ac: present / online, Voltage: 4.807 V, Current: 264 mA</code><br>
+    		<code>power_ac_text ac: present / online, voltage: 4.807 V, current: 264 mA</code><br>
     </li>
     <br>
     <li>power_usb_stat<br>
@@ -2311,7 +2313,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>power_battery_stat<br>
-        status information to the battery (if installed)
+        status information to the battery (if installed): present (0|1), online (0|1), voltage, current, actual capacity<br>
+        Example:<br>
+    		<code>power_battery_stat: 1 1 4.807 264 100</code><br>
     </li>
     <br>
     <li>power_battery_text<br>
@@ -2514,6 +2518,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
        SM_CPUStat.gplot<br>
        SM_CPUStatSum.gplot<br>
        SM_CPUStatTotal.gplot<br>
+       SM_power_ac.gplot<br>
+       SM_power_usb.gplot<br>
+       SM_power_battery.gplot<br>
       </code>
       DbLog versions:<br>
       <code>
@@ -2630,6 +2637,17 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_cpustatT group RPi<br>
       attr wl_sysmon_cpustatT plotsize 840,420<br>
       attr wl_sysmon_cpustatT room 9.99_Test<br>
+      <br>
+      # Anzeige Stromversorgung AC
+      define wl_sysmon_power_ac SVG FileLog_sysmon:SM_power_ac:CURRENT
+      attr wl_sysmon_power_ac label "Stromversorgung (ac) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"
+      attr wl_sysmon_power_ac room Technik
+      attr wl_sysmon_power_ac group system
+      # Anzeige Stromversorgung Battery
+      define wl_sysmon_power_bat SVG FileLog_sysmon:SM_power_battery:CURRENT
+      attr wl_sysmon_power_bat label "Stromversorgung (bat) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"
+      attr wl_sysmon_power_bat room Technik
+      attr wl_sysmon_power_bat group system
     </code>
     </ul>
 
@@ -2801,7 +2819,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <b>Readings zur Stromversorgung</b>
     <li>power_ac_stat<br>
-        Statusinformation f&uuml;r die AC-Buchse: present (0|1), online (0|1), voltage, current
+        Statusinformation f&uuml;r die AC-Buchse: present (0|1), online (0|1), voltage, current<br>
         Beispiel:<br>
     		<code>power_ac_stat: 1 1 4.807 264</code><br>
     </li>
@@ -2821,7 +2839,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>power_battery_stat<br>
-        Statusinformation f&uuml;r die Batterie (wenn vorhanden)
+        Statusinformation f&uuml;r die Batterie (wenn vorhanden): present (0|1), online (0|1), voltage, current, actual capacity<br>
+        Beispiel:<br>
+    		<code>power_battery_stat: 1 1 4.807 264 100</code><br>
     </li>
     <br>
     <li>power_battery_text<br>
@@ -3033,6 +3053,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
        SM_CPUStat.gplot<br>
        SM_CPUStatSum.gplot<br>
        SM_CPUStatTotal.gplot<br>
+       SM_power_ac.gplot<br>
+       SM_power_usb.gplot<br>
+       SM_power_battery.gplot<br>
       </code>
       DbLog-Versionen:<br>
       <code>
@@ -3152,6 +3175,17 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_cpustatT group RPi<br>
       attr wl_sysmon_cpustatT plotsize 840,420<br>
       attr wl_sysmon_cpustatT room 9.99_Test<br>
+      <br>
+      # Anzeige Stromversorgung AC
+      define wl_sysmon_power_ac SVG FileLog_sysmon:SM_power_ac:CURRENT
+      attr wl_sysmon_power_ac label "Stromversorgung (ac) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"
+      attr wl_sysmon_power_ac room Technik
+      attr wl_sysmon_power_ac group system
+      # Anzeige Stromversorgung Battery
+      define wl_sysmon_power_bat SVG FileLog_sysmon:SM_power_battery:CURRENT
+      attr wl_sysmon_power_bat label "Stromversorgung (bat) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"
+      attr wl_sysmon_power_bat room Technik
+      attr wl_sysmon_power_bat group system
     </code>
     </ul>
 
