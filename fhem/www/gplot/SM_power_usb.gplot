@@ -1,0 +1,23 @@
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics 
+set y2tics 
+set grid y2tics
+set ylabel "Spannung (V)"
+set y2label "Strom (mA)"
+set yrange [4.4:5.2]
+#set y2range [0:1000]
+set y3range [0:2]
+
+#FileLog 6:power_usb_stat\x3a:0:
+# --- FileLog 7:power_usb_stat\x3a:0:$fld[6]/1000
+#FileLog 7:power_usb_stat\x3a:0:
+#FileLog 4:power_usb_stat\x3a:0:
+
+plot "<IN>" using 1:2 axes x1y1 title 'Spannung' ls l0 lw 1.2 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Strom' ls l2 lw 1.2 with lines,\
+     "<IN>" using 1:2 axes x1y3 title 'Online' ls l1fill lw 0 with steps
