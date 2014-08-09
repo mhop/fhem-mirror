@@ -131,6 +131,7 @@ FBDECT_Get($@)
     my $state = "inactive" if($answ[0] =~ m/ inactive,/);
     while($d) {
       my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
+      Log3 $hash, 4, "Payload: $d -> $ptyp: $pyld";
       last if($ptyp eq "");
       if($ptyp eq "state" && 
          ReadingsVal($hash->{NAME}, $ptyp, "") ne $pyld) {
@@ -172,6 +173,7 @@ FBDECT_Parse($$@)
     my $d = substr($msg, 32);
     while($d) {
       my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
+      Log3 $hash, 4, "Payload: $d -> $ptyp: $pyld";
       last if($ptyp eq "");
       readingsBulkUpdate($hash, $ptyp, $pyld);
       $d = substr($d, 16+$plen*2);
