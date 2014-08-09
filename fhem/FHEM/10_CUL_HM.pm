@@ -3373,27 +3373,27 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $state = "";
     my @regArr = CUL_HM_getRegN($st,$md,$chn);
     return "$regName failed: supported register are ".join(" ",sort @regArr)
-          if (!grep /^$regName$/,@regArr );
+            if (!grep /^$regName$/,@regArr );
 
     my $reg  = $culHmRegDefine->{$regName};
+    my $conv = $reg->{c};
     return $st." - ".$regName            # give some help
-           .($reg->{c} eq "lit"? " literal:".join(",",keys%{$reg->{lit}})." "
+           .($conv eq "lit"? " literal:".join(",",keys%{$reg->{lit}})." "
                                : " range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
                                  .($reg->{lit}?" special:".join(",",keys%{$reg->{lit}})." "
                                               :""
                                               )
             )
            .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
-                  if ($data eq "?");
+            if ($data eq "?");
     return "value:$data out of range $reg->{min} to $reg->{max} for Reg \""
            .$regName."\""
-            if (!($reg->{c} =~ m/^(lit|hex|min2time)$/)&&
+            if (!($conv =~ m/^(lit|hex|min2time)$/)&&
                 ($data < $reg->{min} ||$data > $reg->{max})); # none number
     return"invalid value. use:". join(",",sort keys%{$reg->{lit}})
-            if ($reg->{c} eq 'lit' && !defined($reg->{lit}{$data}));
+            if ($conv eq 'lit' && !defined($reg->{lit}{$data}));
 
-    my $conv = $reg->{c};
-    if (!$conv && $reg->{lit} && $reg->{lit}{$data}){
+    if ($conv ne 'lit' && $reg->{lit} && $reg->{lit}{$data}){
       $data = $reg->{lit}{$data}; #conv special value prior to calculation
     }
     $data *= $reg->{f} if($reg->{f});# obey factor befor possible conversion
@@ -4153,8 +4153,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my ($pDev,$pCh) = unpack 'A6A2',$pId;
       return "button cannot be identified" if (!$pCh);
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
-      ######################
-      #CUL_HM_PushCmdStack($hash, 
+
       my $msg = sprintf("3E%s%s%s40%02X%02X",
                                      $id,$dst,$pDev,
                                      hex($pCh)+$mode,
@@ -4164,12 +4163,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         select(undef, undef, undef, $repDly);
       }
       CUL_HM_SndCmd($hash, "++${flag}$msg");
-      ######################
-      
-      #CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%02X%02X",$flag,
-      #                               $id,$dst,$pDev,
-      #                               hex($pCh)+$mode,
-      #                               $pressCnt));
     }
   }
   elsif($cmd eq "fwUpdate") { #################################################
@@ -4365,7 +4358,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
 
     # First the remote (one loop for on, one for off)
-    if (!$target || $target =~ m/^(remote|both)$/){
+    if ($target =~ m/^(remote|both)$/){
       my $burst;
       if ($culHmRegModel->{$md}{peerNeedsBurst}|| #peerNeedsBurst supported
           $culHmRegType->{$st}{peerNeedsBurst}){
@@ -4407,7 +4400,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         }
       }
     }
-    if (!$target || $target =~ m/^(actor|both)$/ ){
+    if ($target =~ m/^(actor|both)$/ ){
       if ($modules{CUL_HM}{defptr}{$peerDst}){# is defined or ID only?
         if ($pSt eq "virtual"){
           CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b[2]),$set);
@@ -5477,6 +5470,7 @@ sub CUL_HM_ID2PeerList ($$$) {
     $peerNames .= CUL_HM_peerChName($pId,$dId).",";
   }
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
+
   my $dHash = CUL_HM_getDeviceHash($hash);
   my $st = AttrVal($dHash->{NAME},"subType","");
   my $md = AttrVal($dHash->{NAME},"model","");
@@ -5894,8 +5888,9 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   } else { return " conv undefined - please contact admin";
   }
   $data /= $factor if ($factor);# obey factor after possible conversion
-  if (!$conv && $reg->{litInv} && $reg->{litInv}{$data} ){
+  if ($conv ne "lit" && $reg->{litInv} && $reg->{litInv}{$data} ){
     $data = $reg->{litInv}{$data};#conv special value past to calculation
+    $unit = "";
   }
   return $convFlg.$data.$unit;
 }
@@ -7707,16 +7702,18 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
        <ul>
        <li><B><a href="#CUL_HMpeerChan">peerChan</a></B> see remote</li>
        <li><B><a name="CUL_HMpress"></a>press [long|short] [&lt;peer&gt;] [&lt;repCount&gt;] [&lt;repDelay&gt;] </B>
-         simulates button press for an actor from a peered sensor.
-         will be sent of type "long".
-         <li>[long|short] defines whether long or short press shall be simulated. Defaults to short
-           </li>
-         <li>[&lt;peer&gt;] define which peer's trigger shall be simulated.Defaults to self(channelNo).
-           </li>
-         <li>[&lt;repCount&gt;] Valid for long press only. How long shall the button be pressed? Number of repetition of the messages is defined. Defaults to 1
-           </li>
-         <li>[&lt;repDelay&gt;] Valid for long press only. defines wait time between the single messages. 
-           </li>
+         <ul>
+           simulates button press for an actor from a peered sensor.
+           will be sent of type "long".
+           <li>[long|short] defines whether long or short press shall be simulated. Defaults to short
+             </li>
+           <li>[&lt;peer&gt;] define which peer's trigger shall be simulated.Defaults to self(channelNo).
+             </li>
+           <li>[&lt;repCount&gt;] Valid for long press only. How long shall the button be pressed? Number of repetition of the messages is defined. Defaults to 1
+             </li>
+           <li>[&lt;repDelay&gt;] Valid for long press only. defines wait time between the single messages. 
+             </li>
+         </ul>
        </li>
        <li><B>virtTemp &lt;[off -10..50]&gt;<a name="CUL_HMvirtTemp"></a></B>
          simulates a thermostat. If peered to a device it periodically sends the
@@ -8965,12 +8962,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           <ul>
             <li><B><a href="#CUL_HMpeerChan">peerChan</a></B> siehe remote</li>
             <li><B><a name="CUL_HMpress"></a>press [long|short] [&lt;peer&gt;] [&lt;repCount&gt;] [&lt;repDelay&gt;] </B>
-              Simuliert den Tastendruck am Aktor eines gepeerted Sensors
-             <li>[long|short] soll ein langer oder kurzer Taastendrucl simuliert werden? Default ist kurz. </li>
-             <li>[&lt;peer&gt;] legt fest, wessen peer's trigger simuliert werden soll.Default ist self(channelNo).</li>
-             <li>[&lt;repCount&gt;] nur gueltig fuer long. wie viele messages sollen gesendet werden? (Laenge des Button press). Default ist 1.</li>
-             <li>[&lt;repDelay&gt;] nur gueltig fuer long. definiert die Zeit zwischen den einzelnen Messages. </li>
-            </li>
+              <ul>
+                  Simuliert den Tastendruck am Aktor eines gepeerted Sensors
+                 <li>[long|short] soll ein langer oder kurzer Taastendrucl simuliert werden? Default ist kurz. </li>
+                 <li>[&lt;peer&gt;] legt fest, wessen peer's trigger simuliert werden soll.Default ist self(channelNo).</li>
+                 <li>[&lt;repCount&gt;] nur gueltig fuer long. wie viele messages sollen gesendet werden? (Laenge des Button press). Default ist 1.</li>
+                 <li>[&lt;repDelay&gt;] nur gueltig fuer long. definiert die Zeit zwischen den einzelnen Messages. </li>
+              </ul>  
+              </li>
             <li><B>virtTemp &lt;[off -10..50]&gt;<a name="CUL_HMvirtTemp"></a></B>
               Simuliert ein Thermostat. Wenn mit einem Ger&auml;t gepeert wird periodisch eine Temperatur gesendet,
               solange bis "off" gew&auml;hlt wird. Siehe auch <a href="#CUL_HMvirtHum">virtHum</a><br>

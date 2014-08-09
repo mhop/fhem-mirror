@@ -939,6 +939,8 @@ sub HMinfo_GetFn($@) {#########################################################
       }
       $RegReply .= $peerLine."\n".$ptLine."\n";
       foreach my $rN (sort keys %{$hash->{helper}{r}}){
+        $hash->{helper}{r}{$rN} =~ s/(     o..)/$1                /g
+              if($rN =~ m/^MultiExec /); #shift thhis reading since it does not appear for short
         $RegReply .= $rN.$hash->{helper}{r}{$rN}."\n";
       }
       delete $hash->{helper}{r};
@@ -1584,11 +1586,15 @@ sub HMinfo_archConfigExec($)  {################################################
                               ,"c"
                               ,"\^(".join("|",@archs).")\$")
                               ,"strict"));
-  return (@eN ? join(",",@eN) : "");
+  return "$id,".(@eN ? join(",",@eN) : "");
 }
 sub HMinfo_archConfigPost($)  {################################################
-  my $post = shift;
-  push @{$modules{CUL_HM}{helper}{confUpdt}},split(",",$post) if ($post);
+  my @arr = split(",",shift);
+  my ($name,$id) = split(":",$arr[0]);
+  shift @arr;
+  push @{$modules{CUL_HM}{helper}{confUpdt}},@arr;
+  delete $defs{$name}{nb}{$id};
+
   return ;
 }
 
