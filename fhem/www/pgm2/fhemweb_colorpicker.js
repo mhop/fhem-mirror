@@ -36,7 +36,8 @@ colorpicker_setColor(el,mode,cmd)
   }
 
   var req = new XMLHttpRequest();
-  req.open("GET", cmd.replace('%',v), true);
+  var qcmd = addcsrf(cmd.replace('%',v));
+  req.open("GET", qcmd, true);
   req.send(null);
 
   if( 0 )

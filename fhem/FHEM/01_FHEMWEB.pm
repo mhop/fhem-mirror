@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use TcpServerUtils;
 use HttpUtils;
+use Time::HiRes qw(gettimeofday);
 
 #########################
 # Forward declaration
@@ -54,6 +55,7 @@ use vars qw($MW_dir);     # moddir (./FHEM), needed by edit Files in new
                           # structure
 
 use vars qw($FW_ME);      # webname (default is fhem), used by 97_GROUP/weblink
+use vars qw($FW_CSRF);    # CSRF Token or empty
 use vars qw($FW_ss);      # is smallscreen, needed by 97_GROUP/95_VIEW
 use vars qw($FW_tp);      # is touchpad (iPad / etc)
 use vars qw($FW_sp);      # stylesheetPrefix
@@ -128,6 +130,7 @@ FHEMWEB_Initialize($)
     JavaScripts
     SVGcache:1,0
     addStateEvent
+    csrfToken
     alarmTimeout
     allowedCommands
     allowfrom
@@ -434,6 +437,8 @@ FW_answerCall($)
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
+  $FW_CSRF = ($defs{$FW_wname}{CSRFTOKEN} ?
+                "&fwcsrf=".$defs{$FW_wname}{CSRFTOKEN} : "");
 
   $MW_dir = "$attr{global}{modpath}/FHEM";
   $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "");
@@ -499,7 +504,14 @@ FW_answerCall($)
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
                                                 $FW_tp ? "640,160" : "800,160");
   my ($cmd, $cmddev) = FW_digestCgi($arg);
-
+  if($cmd && $FW_CSRF) {
+    my $supplied = $FW_webArgs{fwcsrf} ? $FW_webArgs{fwcsrf} : "";
+    my $want = $defs{$FW_wname}{CSRFTOKEN};
+    if($supplied ne $want) {
+      Log3 $FW_wname, 3, "FHEMWEB $FW_wname CSRF error: $supplied ne $want";
+      return 0;
+    }
+  }
 
   if($FW_inform) {      # Longpoll header
     if($FW_inform =~ /type=/) {
@@ -658,7 +670,8 @@ FW_answerCall($)
 
   my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
-  FW_pO "</head>\n<body name=\"$t\" $onload>";
+  my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
+  FW_pO "</head>\n<body name=\"$t\" $csrf $onload>";
 
   if($FW_activateInform) {
     $FW_cmdret = $FW_activateInform = "";
@@ -679,7 +692,7 @@ FW_answerCall($)
       foreach my $line (@lines) {
         $FW_cmdret .= "\n" if( $FW_cmdret );
         foreach my $word ( split( / /, $line ) ) {
-          $word = "<a href=\"$FW_ME$FW_subdir?detail=$word\">$word</a>"
+          $word = "<a href=\"$FW_ME$FW_subdir?detail=$word$FW_CSRF\">$word</a>"
                 if( $defs{$word} );
           $FW_cmdret .= "$word ";
         }
@@ -921,6 +934,7 @@ FW_makeSelect($$$$)
   FW_pO "<form method=\"$FW_formmethod\" ".
                 "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
   FW_pO FW_hidden("detail", $d);
+  FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
   FW_pO FW_hidden("dev.$cmd$d", $d);
   FW_pO FW_submit("cmd.$cmd$d", $cmd, $class);
   FW_pO "<div class=\"$class downText\">&nbsp;$d&nbsp;</div>";
@@ -967,6 +981,7 @@ FW_doDetail($)
 
   FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
   FW_pO FW_hidden("detail", $d);
+  FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
 
   FW_makeSelect($d, "set", FW_widgetOverride($d, getAllSets($d)), "set");
   FW_makeSelect($d, "get", FW_widgetOverride($d, getAllGets($d)), "get");
@@ -1156,7 +1171,7 @@ FW_roomOverview($)
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       next if(!$list1[$idx]);
       my $sel = ($list1[$idx] eq $FW_room ? " selected=\"selected\""  : "");
-      FW_pO "<option value='$list2[$idx]'$sel>$list1[$idx]</option>";
+      FW_pO "<option value='$list2[$idx]$FW_CSRF'$sel>$list1[$idx]</option>";
     }
     FW_pO "</select></td>";
     FW_pO "</tr>";
@@ -1204,6 +1219,7 @@ FW_roomOverview($)
   FW_pO '<table border="0" class="header"><tr><td style="padding:0">';
   FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
   FW_pO FW_hidden("room", "$FW_room") if($FW_room);
+  FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
   FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
   FW_pO "</form>";
   FW_pO "</td></tr></table>";
@@ -1661,6 +1677,7 @@ FW_style($$)
     FW_pO     FW_textfieldv("saveName", 30, "saveName", $fileName);
     FW_pO     "<br><br>";
     FW_pO     FW_hidden("cmd", "style save $fileName $cfgDB");
+    FW_pO     FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
     FW_pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
                 "$data</textarea>";
     FW_pO "</form>";
@@ -1766,7 +1783,7 @@ FW_pH(@)
   my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
   my $ret;
 
-  $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
+  $link = ($link =~ m,^/,) ? "$link$FW_CSRF" : "$FW_ME$FW_subdir?$link$FW_CSRF";
   
   # Using onclick, as href starts safari in a webapp.
   # Known issue: the pointer won't change
@@ -1796,6 +1813,7 @@ FW_pHPlain(@)
   $link = "?$link" if($link !~ m+^/+);
   my $ret = "";
   $ret .= "<td>" if($td);
+  $link .= $FW_CSRF;
   if($FW_ss || $FW_tp) {
     $ret .= "<a onClick=\"location.href='$FW_ME$FW_subdir$link'\">$txt</a>";
   } else {
@@ -1929,6 +1947,20 @@ FW_Attr(@)
     } split(" ", $a[3]);
     $modules{FHEMWEB}{AttrList} .= " ".join(" ",@add) if(@add);
   }
+
+  if($a[2] eq "csrfToken" && $a[0] eq "set") {
+    my $csrf = $a[3];
+    if($csrf eq "random") {
+      my ($x,$y) = gettimeofday();
+      $csrf = rand($y)*rand($x);
+    }
+    $hash->{CSRFTOKEN} = $csrf;
+  }
+
+  if($a[2] eq "csrfToken" && $a[0] eq "del") {
+    delete($hash->{CSRFTOKEN});
+  }
+
 
   return $retMsg;
 }
@@ -2096,6 +2128,7 @@ FW_makeEdit($$$)
   FW_pO   "<div id=\"edit\" style=\"display:none\">";
   FW_pO   "<form method=\"$FW_formmethod\">";
   FW_pO       FW_hidden("detail", $name);
+  FW_pO       FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
   my $cmd = "modify";
   my $ncols = $FW_ss ? 30 : 60;
   FW_pO      "<textarea name=\"val.${cmd}$name\" ".
@@ -2265,10 +2298,10 @@ FW_devState($$@)
       $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
 
     } elsif($FW_ss || $FW_tp) {
-      $txt ="<a onClick=\"location.href='$FW_ME$FW_subdir?$link$rf'\">$txt</a>";
+      $txt ="<a onClick=\"location.href='$FW_ME$FW_subdir?$link$rf$FW_CSRF'\">$txt</a>";
 
     } else {
-      $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf\">$txt</a>";
+      $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>";
 
     }
   }
@@ -2454,6 +2487,7 @@ FW_dropdownFn()
     $fwsel = ($cmd eq "state" ? "" : "$cmd&nbsp;") .
              FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown","submit()").
              FW_hidden("cmd.$d", "set");
+    $fwsel .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
 
     return "<td colspan='2'><form method=\"$FW_formmethod\">".
       FW_hidden("arg.$d", $cmd) .
@@ -3055,6 +3089,15 @@ FW_widgetOverride($$)
         </code></ul>
         </li><br>
 
+     <a name="csrfToken"></a>
+     <li>csrfToken<br>
+        If set, FHEMWEB requires the value of this attribute as fwcsrf
+        Parameter for each command. If the value is random, then a random
+        number will be generated on each FHEMWEB start. It is used as
+        countermeasure for Cross Site Resource Forgery attacks.
+        Default is not active.
+        </li><br>
+
 
     </ul>
   </ul>
@@ -3589,6 +3632,16 @@ FW_widgetOverride($$)
           attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
           attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
         </code></ul>
+        </li><br>
+
+     <a name="csrfToken"></a>
+     <li>csrfToken<br>
+        Falls gesetzt, wird der Wert des Attributes als fwcsrf Parameter bei
+        jedem ueber FHEMWEB abgesetzten Kommando verlangt. Falls der Wert
+        random ist, dann wird ein Zufallswert beim jeden FHEMWEB Start neu
+        generiert.
+        Es dient zum Schutz von Cross Site Resource Forgery Angriffen.
+        Default ist leer, also nicht aktiv.
         </li><br>
 
     </ul>
