@@ -35,7 +35,8 @@ textField_setText(el,cmd)
 {
   var v = el.value;
   var req = new XMLHttpRequest();
-  req.open("GET", cmd.replace('%',v), true);
+  var qcmd = addcsrf(cmd.replace('%',v));
+  req.open("GET", qcmd, true);
   req.send(null);
 }
 

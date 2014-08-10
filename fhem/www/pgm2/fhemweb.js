@@ -15,8 +15,20 @@ log(txt)
 }
 
 function
+addcsrf(arg)
+{
+var oarg=arg;
+  var csrf = document.body.getAttribute('fwcsrf');
+  if(csrf && arg.indexOf('fwcsrf') < 0)
+    arg += '&fwcsrf='+csrf;
+log(oarg+" -> "+arg);
+  return arg;
+}
+
+function
 FW_cmd(arg)     /* see also FW_devState */
 {
+  arg = addcsrf(arg);
   var req = new XMLHttpRequest();
   req.open("GET", arg, true);
   req.send(null);
@@ -168,6 +180,7 @@ FW_longpoll()
   var query = document.location.pathname+"?XHR=1"+
                 "&inform=type=status;filter="+filter+
                 "&timestamp="+new Date().getTime();
+  query = addcsrf(query);
   FW_pollConn.open("GET", query, true);
   FW_pollConn.onreadystatechange = FW_doUpdate;
   FW_pollConn.send(null);
@@ -284,7 +297,9 @@ FW_queryValue(cmd, qFn, qArg)
     eval(qFn.replace("%", qResp));
     delete qConn;
   }
-  qConn.open("GET", document.location.pathname+"?cmd="+cmd+"&XHR=1", true);
+  var query = document.location.pathname+"?cmd="+cmd+"&XHR=1"
+  query = addcsrf(query);
+  qConn.open("GET", query, true);
   qConn.send(null);
 }
 

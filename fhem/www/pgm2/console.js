@@ -2,6 +2,8 @@ var consConn;
 
 var isFF = (navigator.userAgent.toLowerCase().indexOf('firefox') > -1);
 
+log("Console is opening");
+
 function
 consUpdate()
 {
@@ -29,6 +31,7 @@ consFill()
   var query = document.location.pathname+"?XHR=1"+
        "&inform=type=raw;filter=.*"+
        "&timestamp="+new Date().getTime();
+  query = addcsrf(query);
   consConn.open("GET", query, true);
   consConn.onreadystatechange = consUpdate;
   consConn.send(null);
