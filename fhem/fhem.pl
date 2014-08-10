@@ -602,7 +602,9 @@ while (1) {
 
       } else {
         my $wb = $hash->{$wbName};
+        alarm($hash->{ALARMTIMEOUT}) if($hash->{ALARMTIMEOUT});
         my $ret = syswrite($hash->{CD}, $wb);
+        alarm(0) if($hash->{ALARMTIMEOUT});
         if(!$ret || $ret < 0) {
           Log 4, "Write error to $p, deleting $hash->{NAME}";
           TcpServer_Close($hash);
@@ -2557,7 +2559,7 @@ SignalHandling()
     $SIG{'PIPE'} = 'IGNORE';
     $SIG{'CHLD'} = 'IGNORE';
     $SIG{'HUP'}  = sub { CommandRereadCfg(undef, "") };
-
+    $SIG{'ALRM'} = sub { Log 1, "ALARM signal, blocking write?" };
   }
 }
 

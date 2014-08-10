@@ -128,6 +128,7 @@ FHEMWEB_Initialize($)
     JavaScripts
     SVGcache:1,0
     addStateEvent
+    alarmTimeout
     allowedCommands
     allowfrom
     basicAuth
@@ -246,7 +247,9 @@ FW_Read($)
   my $name = $hash->{NAME};
 
   if($hash->{SERVERSOCKET}) {   # Accept and create a child
-    TcpServer_Accept($hash, "FHEMWEB");
+    my $nhash = TcpServer_Accept($hash, "FHEMWEB");
+    my $wt = AttrVal($name, "alarmTimeout", undef);
+    $nhash->{ALARMTIMEOUT} = $wt if($wt);
     return;
   }
 
