@@ -2159,7 +2159,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     The parameters are responsible for updating the readings according to the following scheme:
     <ul>
      <li>M1: (Default: 1)<br>
-     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text<br><br>
+     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text, power readings<br><br>
      </li>
      <li>M2: (Default: M1)<br>
      ram, swap<br>
@@ -2638,16 +2638,16 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_cpustatT plotsize 840,420<br>
       attr wl_sysmon_cpustatT room 9.99_Test<br>
       <br>
-      # Anzeige Stromversorgung AC
-      define wl_sysmon_power_ac SVG FileLog_sysmon:SM_power_ac:CURRENT
-      attr wl_sysmon_power_ac label "Stromversorgung (ac) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"
-      attr wl_sysmon_power_ac room Technik
-      attr wl_sysmon_power_ac group system
-      # Anzeige Stromversorgung Battery
-      define wl_sysmon_power_bat SVG FileLog_sysmon:SM_power_battery:CURRENT
-      attr wl_sysmon_power_bat label "Stromversorgung (bat) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"
-      attr wl_sysmon_power_bat room Technik
-      attr wl_sysmon_power_bat group system
+      # Anzeige Stromversorgung AC<br>
+      define wl_sysmon_power_ac SVG FileLog_sysmon:SM_power_ac:CURRENT<br>
+      attr wl_sysmon_power_ac label "Stromversorgung (ac) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"<br>
+      attr wl_sysmon_power_ac room Technik<br>
+      attr wl_sysmon_power_ac group system<br>
+      # Anzeige Stromversorgung Battery<br>
+      define wl_sysmon_power_bat SVG FileLog_sysmon:SM_power_battery:CURRENT<br>
+      attr wl_sysmon_power_bat label "Stromversorgung (bat) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"<br>
+      attr wl_sysmon_power_bat room Technik<br>
+      attr wl_sysmon_power_bat group system<br>
     </code>
     </ul>
 
@@ -2679,7 +2679,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
     <ul>
      <li>M1: (Default-Wert: 1)<br>
-     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text<br><br>
+     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text, power readings<br><br>
      </li>
      <li>M2: (Default-Wert: M1)<br>
      ram, swap<br>
@@ -3176,16 +3176,16 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_cpustatT plotsize 840,420<br>
       attr wl_sysmon_cpustatT room 9.99_Test<br>
       <br>
-      # Anzeige Stromversorgung AC
-      define wl_sysmon_power_ac SVG FileLog_sysmon:SM_power_ac:CURRENT
-      attr wl_sysmon_power_ac label "Stromversorgung (ac) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"
-      attr wl_sysmon_power_ac room Technik
-      attr wl_sysmon_power_ac group system
-      # Anzeige Stromversorgung Battery
-      define wl_sysmon_power_bat SVG FileLog_sysmon:SM_power_battery:CURRENT
-      attr wl_sysmon_power_bat label "Stromversorgung (bat) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"
-      attr wl_sysmon_power_bat room Technik
-      attr wl_sysmon_power_bat group system
+      # Anzeige Stromversorgung AC<br>
+      define wl_sysmon_power_ac SVG FileLog_sysmon:SM_power_ac:CURRENT<br>
+      attr wl_sysmon_power_ac label "Stromversorgung (ac) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"<br>
+      attr wl_sysmon_power_ac room Technik<br>
+      attr wl_sysmon_power_ac group system<br>
+      # Anzeige Stromversorgung Battery<br>
+      define wl_sysmon_power_bat SVG FileLog_sysmon:SM_power_battery:CURRENT<br>
+      attr wl_sysmon_power_bat label "Stromversorgung (bat) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"<br>
+      attr wl_sysmon_power_bat room Technik<br>
+      attr wl_sysmon_power_bat group system<br>
     </code>
     </ul>
 
