@@ -327,7 +327,7 @@ sub get_pt_verify($) {
       $thread->{ROM_ID}->[$i]=hex(substr($devs,2*$i,2));
     }
     #-- reset the search state
-    $thread->{LastDiscrepancy} = 64;
+    $thread->{LastDiscrepancy} = 65;
     $thread->{LastDeviceFlag} = 0;
     $thread->{LastFamilyDiscrepancy} = 0;
     
@@ -377,8 +377,11 @@ sub next_response($) {
   #-- character version of device ROM_ID, first byte = family 
   my $dev=sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$thread->{ROM_ID}});
 
+  #-- mode was to verify presence of a device
+  if ($mode eq "verify") {
+    main::Log3($self->{name},5, "OWX_SER::Search: device verified $dev");
   #--check if we really found a device
-  if( main::OWX_CRC($thread->{ROM_ID})!= 0){
+  } elsif( main::OWX_CRC($thread->{ROM_ID})!= 0) {
     #-- reset the search
     main::Log3($self->{name},1, "OWX_SER::Search CRC failed : $dev");
     $thread->{LastDiscrepancy} = 0;
@@ -386,21 +389,14 @@ sub next_response($) {
     $thread->{LastFamilyDiscrepancy} = 0;
     die "OWX_SER::Search CRC failed : $dev";
   }
-  
-  #-- for some reason this does not work - replaced by another test, see below
-  #if( $self->{LastDiscrepancy}==0 ){
-  #    $self->{LastDeviceFlag}=1;
-  #}
+
   #--
   if( $thread->{LastDiscrepancy}==$thread->{LastFamilyDiscrepancy} ){
-      $thread->{LastFamilyDiscrepancy}=0;    
+      $thread->{LastFamilyDiscrepancy}=0;
   }
-    
-  #-- mode was to verify presence of a device
-  if ($mode eq "verify") {
-    main::Log3($self->{name},5, "OWX_SER::Search: device verified $dev");
+
   #-- mode was to discover devices
-  } elsif( $mode eq "discover" ) {
+  if( $mode eq "discover" ) {
     #-- check families
     my $famfnd=0;
     foreach (@{$self->{fams}}){
@@ -424,7 +420,7 @@ sub next_response($) {
       main::Log3($self->{name},5, "OWX_SER::Search: new device found $dev");
     }
   #-- mode was to discover alarm devices 
-  } else {
+  } elsif ( $mode eq "alarms" ) {
     for(my $i=0;$i<@{$thread->{alarmdevs}};$i++){
       if( $dev eq ${$thread->{alarmdevs}}[$i] ){        
         #-- if present, set the last device found flag

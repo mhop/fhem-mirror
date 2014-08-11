@@ -190,10 +190,7 @@ sub pt_next ($$) {
   my ($serial,$context,$mode)=@_;
 
   my $id_bit_number = 1;
-  my $rom_byte_number = 0;
-  my $rom_byte_mask = 1;
-  my $last_zero = 0;
-  my ($pt_query,$search_direction);
+  my ($pt_query,$search_direction,@search,$query,$result);
 
   return PT_THREAD(sub {
     my ( $thread ) = @_;
@@ -208,68 +205,116 @@ sub pt_next ($$) {
 
     #-- Response search data parsing operates bitwise
 
-    while ( $id_bit_number <= 64) {
-      #loop until through all ROM bytes 0-7
-      $pt_query = $serial->pt_query("11");
+    @search = split //, unpack "b64", pack "C8",@{$context->{ROM_ID}};
+
+    #-- bits < LastDiscrepancy are allready known:
+    $query = "";
+    $result = "";
+
+    if ($context->{LastDiscrepancy} > 0) {
+      while ( $id_bit_number < $context->{LastDiscrepancy} ) {
+        $query.= "11".$search[$id_bit_number-1];
+        $id_bit_number++;
+      }
+      # $id_bit_number now is equal LastDiscrepancy
+      if ($id_bit_number < 65) {
+        $query.="111";
+        $search[$id_bit_number-1] = 1;
+        $id_bit_number++;
+      }
+    }
+
+    $query.="11" if ($id_bit_number != 57 and $id_bit_number < 65);
+    $pt_query = $serial->pt_query($query);
+
+    while (1) {
+
       PT_WAIT_THREAD($pt_query);
       die $pt_query->PT_CAUSE() if ($pt_query->PT_STATE() == PT_ERROR || $pt_query->PT_STATE() == PT_CANCELED);
       my $ret = $pt_query->PT_RETVAL();
 
-      my ($id_bit,$cmp_id_bit) = split //,$ret;
-       
-      if( ($id_bit == 1) && ($cmp_id_bit == 1) ){
-        main::Log3 ($serial->{name},5, "no devices present at id_bit_number=$id_bit_number");
-        last;
-      }
-      if ( $id_bit != $cmp_id_bit ){
-        $search_direction = $id_bit;
-      } else {
-        # hä ? if this discrepancy if before the Last Discrepancy
-        # on a previous next then pick the same as last time
-        if ( $id_bit_number < $context->{LastDiscrepancy} ){
-          if (($context->{ROM_ID}->[$rom_byte_number] & $rom_byte_mask) > 0){
-            $search_direction = 1;
-          } else {
-            $search_direction = 0;
-          }
+      die "unparsable return of query '$ret'" unless ($ret =~ /(1|0)(1|0)$/);
+      $result.=$ret;
+
+      last if ( $id_bit_number > 64 );
+
+      if ( $id_bit_number < 65 ) {
+
+        my $id_bit = $1;
+        my $cmp_id_bit = $2;
+
+        if( ($id_bit == 1) && ($cmp_id_bit == 1) ){
+          main::Log3 ($serial->{name},5, "no devices present at id_bit_number=$id_bit_number");
+          last;
+        }
+        if ( $id_bit != $cmp_id_bit ){
+          $search_direction = $id_bit;
         } else {
-          # if equal to last pick 1, if not then pick 0
-          if ($id_bit_number == $context->{LastDiscrepancy}){
-            $search_direction = 1;
-          } else {
-            $search_direction = 0;
-          }   
+          $search_direction = 0;
         }
-        # if 0 was picked then record its position in LastZero
-        if ($search_direction == 0){
-          $last_zero = $id_bit_number;
-          # check for Last discrepancy in family
-          if ($last_zero < 9) {
-            $context->{LastFamilyDiscrepancy} = $last_zero;
-          }
+        # set or clear the bit in the ROM byte rom_byte_number
+        # with mask rom_byte_mask
+        $search[$id_bit_number-1] = $search_direction;
+        # serial number search direction write bit
+        $serial->bit($search_direction);
+        $result.="$search_direction";
+
+        main::Log3 ($serial->{name},5,"id_bit_number: $id_bit_number, search_direction: $search_direction, ROM_ID: ".sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",unpack "C8",pack "b64", join "",@search)) if ($main::owx_async_debug);
+
+        $id_bit_number++;
+        last if ($id_bit_number > 64);
+        $pt_query = $serial->pt_query("11") unless ( $id_bit_number == 57 );
+      }
+      #bits 57-64 are CRC and can be calculated from bits 1-56
+      if ( $id_bit_number == 57 ) {
+        my @crc = (0,unpack("C7", pack ("b64", join ("",@search[0..55]))));
+        @search[56..63] = split //,unpack "b8",pack "C1",(main::OWX_CRC(\@crc));
+        $query = "";
+        while ($id_bit_number < 65) {
+          $query.= "11".$search[$id_bit_number-1];
+          $id_bit_number++;
         }
+        $pt_query = $serial->pt_query($query);
       }
-      # set or clear the bit in the ROM byte rom_byte_number
-      # with mask rom_byte_mask
-      if ( $search_direction == 1){
-        $context->{ROM_ID}->[$rom_byte_number] |= $rom_byte_mask;
-      } else {
-        $context->{ROM_ID}->[$rom_byte_number] &= ~$rom_byte_mask;
-      }
-      # serial number search direction write bit
-      $serial->bit($search_direction);
-      main::Log3 ($serial->{name},5,"id_bit_number: $id_bit_number, search_direction: $search_direction, LastDiscrepancy: $last_zero ROM_ID: ".sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$context->{ROM_ID}})) if ($main::owx_async_debug);
-      # increment the byte counter id_bit_number
-      # and shift the mask rom_byte_mask
-      $id_bit_number++;
-      $rom_byte_mask <<= 1;
-      #-- if the mask is 0 then go to new rom_byte_number and
-      if ($rom_byte_mask == 256){
-        $rom_byte_number++;
-        $rom_byte_mask = 1;
-      } 
     }
+
+    die "unexpected length of result: ".length($result).", expected: 192" if (length($result)!=192);
+
+    my $bit_number = 0;
+    my @bits = split //,$result;
+    my $last_zero = 0;
+    my @found = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+
+    if ($main::owx_async_debug>2) {
+      my @results;
+      for (my $i=0;$i<64;$i++) {
+        push @results,substr($result,$i*3,3);
+      }
+      main::Log3 ($serial->{name},5,"result: ".join(":",@results));
+      main::Log3 ($serial->{name},5,"bits:   ".join(",",@bits));
+      main::Log3 ($serial->{name},5,"search: ".join(",",@search));
+    }
+
+    while(@bits) {
+      my $id_bit = shift @bits;
+      my $cmp_id_bit = shift @bits;
+      shift @bits;
+      if ($id_bit == 1 and $cmp_id_bit == 1) {
+        last;
+      } elsif ($id_bit == 0 and $cmp_id_bit == 0) {
+        if ($search[$bit_number] == 0) {
+          $last_zero = $bit_number+1;
+        }
+        $found[$bit_number] = $search[$bit_number];
+      } else {
+        $found[$bit_number] = $id_bit;
+      }
+      $bit_number++;
+    }
+    @{$context->{ROM_ID}} = unpack "C8", pack "b64", join "",@found;
     $context->{LastDiscrepancy} = $last_zero;
+
+    main::Log3 ($serial->{name},5,"bit_number: $bit_number, LastDiscrepancy: $last_zero, ROM_ID: ".sprintf("%02X.%02X%02X%02X%02X%02X%02X.%02X",@{$context->{ROM_ID}})) if ($main::owx_async_debug);
     PT_END;
   });
 }
