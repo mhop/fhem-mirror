@@ -373,6 +373,7 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsNoPeer;
   my @peerIDsTrigUnp;
   my @peerIDsTrigUnd;
+  my @peeringStrange; # devices likely should not be peered 
   my @peerIDsAES;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
@@ -398,35 +399,51 @@ sub HMinfo_peerCheck(@) { #####################################################
     }
     else{# work on a valid list:
       my $id = $defs{$eName}{DEF};
-      my $devId = substr($id,0,6);
+      my ($devId,$chn) = unpack 'A6A2',$id;
       my $devN = CUL_HM_id2Name($devId);
       my $st = AttrVal($devN,"subType","");# from Device
       my $md = AttrVal($devN,"model","");
       next if ($st eq "repeater");
       foreach my $pId (split",",$peerIDs){
         next if ($pId eq "00000000" ||$pId =~m /$devId/);
-        if ($md eq "HM-CC-RT-DN" && $id =~ m/(0[45])$/){ # special RT climate
-          my $c = $1 eq "04"?"05":"04";
-          push @peerIDsNoPeer,$eName." pID:".$pId if ($pId !~ m/$c$/);
-        }
-        my $pDid = substr($pId,0,6);
+
+        my ($pDid,$pChn) = unpack'A6A2',$pId;
         if (!$modules{CUL_HM}{defptr}{$pId} && 
             (!$pDid || !$modules{CUL_HM}{defptr}{$pDid})){
           next if($pDid && CUL_HM_id2IoId($id) eq $pDid);
           push @peerIDnotDef,$eName." id:".$pId;
+          next;
         }
-        else{
-          my $pName = CUL_HM_id2Name($pId);
-          $pName =~s/_chn:01//;           #chan 01 could be covered by device
-          my $pPlist = AttrVal($pName,"peerIDs","");
-          push @peerIDsNoPeer,$eName." p:".$pName 
-                if (!$pPlist || $pPlist !~ m/$id/);
-          my $pDName = CUL_HM_id2Name($pDid);
-          if (AttrVal($pDName,"subType","") eq "virtual"){
-            if (AttrVal($devN,"aesCommReq",0) != 0){
-              push @peerIDsAES,$eName." p:".$pName     
-                    if (AttrVal($pDName,"model","") ne "CCU-FHEM");
+        my $pName = CUL_HM_id2Name($pId);
+        $pName =~s/_chn:01//;           #chan 01 could be covered by device
+        my $pPlist = AttrVal($pName,"peerIDs","");
+        push @peerIDsNoPeer,$eName." p:".$pName 
+              if (!$pPlist || $pPlist !~ m/$id/);
+        my $pDName = CUL_HM_id2Name($pDid);
+        my $pMd = AttrVal($pDName,"model","");
+        if (AttrVal($pDName,"subType","") eq "virtual"){
+          if (AttrVal($devN,"aesCommReq",0) != 0){
+            push @peerIDsAES,$eName." p:".$pName     
+                  if ($pMd ne "CCU-FHEM");
+          }
+        }
+        if ($md eq "HM-CC-RT-DN"){
+          if ($chn =~ m/(0[45])$/){ # special RT climate
+            my $c = $1 eq "04"?"05":"04";
+            push @peerIDsNoPeer,$eName." pID:".$pId if ($pId !~ m/$c$/);
+            if ($pMd !~ m/HM-CC-RT-DN/ ||$pChn !~ m/(0[45])$/ ){
+              push @peeringStrange,$eName." pID: Model $pMd should be HM-CC-RT-DN ClimatTeam Channel";
             }
+          }
+          elsif($chn eq "02" && 
+                ($pChn ne "02" ||$pMd ne "HM-TC-IT-WM-W-EU" )){
+            push @peeringStrange,$eName." pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
+          }
+        }
+        elsif ($md eq "HM-TC-IT-WM-W-EU"){
+          if($chn eq "02" && 
+                ($pChn ne "02" ||$pMd ne "HM-CC-RT-DN" )){
+            push @peeringStrange,$eName." pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
           }
         }
       }
@@ -437,6 +454,7 @@ sub HMinfo_peerCheck(@) { #####################################################
   $ret .="\n\n peer list incomplete. Use getConfig to read it."        ."\n    ".(join "\n    ",sort @peerIDsFail   )if(@peerIDsFail);
   $ret .="\n\n peer not defined"                                       ."\n    ".(join "\n    ",sort @peerIDnotDef  )if(@peerIDnotDef);
   $ret .="\n\n peer not verified. Check that peer is set on both sides"."\n    ".(join "\n    ",sort @peerIDsNoPeer )if(@peerIDsNoPeer);
+  $ret .="\n\n peering strange - likely not suitable"                  ."\n    ".(join "\n    ",sort @peeringStrange)if(@peeringStrange);
   $ret .="\n\n trigger sent to unpeered device"                        ."\n    ".(join "\n    ",sort @peerIDsTrigUnp)if(@peerIDsTrigUnp);
   $ret .="\n\n trigger sent to undefined device"                       ."\n    ".(join "\n    ",sort @peerIDsTrigUnd)if(@peerIDsTrigUnd);
   $ret .="\n\n aesComReq set but virtual peer is not vccu - won't work"."\n    ".(join "\n    ",sort @peerIDsAES    )if(@peerIDsAES);

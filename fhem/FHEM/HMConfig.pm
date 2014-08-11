@@ -431,6 +431,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>''         ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
   lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitBA2  =>{a=> 18.0,s=>1.0,l=>0,min=>0  ,max=>15      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
+  lowBatLimitBA3  =>{a=> 18.0,s=>1.0,l=>0,min=>0  ,max=>12      ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitFS   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>3       ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   lowBatLimitRT   =>{a=> 18.0,s=>1.0,l=>0,min=>2  ,max=>2.5     ,c=>''         ,f=>10      ,u=>'V'   ,d=>0,t=>"low batterie limit, step .1V"},
   batDefectLimit  =>{a=> 19.0,s=>1.0,l=>0,min=>0.1,max=>2       ,c=>''         ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
@@ -745,8 +746,6 @@ my $K_actDetID = '000000'; # id of actionDetector
                          ,lgMultiExec     =>1
                         },
   switch              =>{ intKeyVisib     =>1,sign            =>1
-                         ,confBtnTime     =>1,localResDis     =>1
-                         ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                          ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
@@ -815,7 +814,6 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                         },
 
   "HM-CC-VD"          =>{ valveOffset     =>1,valveErrorPos   =>1},
-  "HM-MOD-Re-8"       =>{                     lowBatLimitBA2  =>1,backlOnMode2    =>1},
   "HM-CC-TC"          =>{ burstRx         =>1,backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-RT-DN"       =>{ btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1
                          ,cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1
@@ -866,8 +864,17 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,lowBatLimit     =>1,batDefectLimit  =>1
                          ,                                        transmitTryMax  =>1},
   "HM-Dis-TD-T"       =>{ lowBatLimitFS   =>1,ledMode         =>1},
+
+  "HM-LC-Sw1-Pl"      =>{ confBtnTime     =>1,localResDis     =>1
+                         ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
+                        },
+  "HM-LC-Sw1PBU-FM"   =>{                     localResDis     =>1
+                         ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
+                        },
   "HM-LC-SW1-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1},
   "HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1,localResDis     =>1},
+  "HM-MOD-Re-8"       =>{                     lowBatLimitBA3  =>1,ledMode         =>1},
+
   "HM-Sys-sRP-Pl"     =>{ compMode        =>1},
   "KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
@@ -892,6 +899,34 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
   );
 
 #clones - - - - - - - - - - - - - - -
+$culHmRegModel{"HM-LC-SW1-PL2"}       = $culHmRegModel{"HM-LC-Sw1-Pl"};#rf_s , rf_s_644
+$culHmRegModel{"HM-LC-SW1-SM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW2-SM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW4-SM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW4-PCB"}       = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW4-WM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW1-FM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"Schueco_263-130"}     = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW2-FM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW1-PB-FM"}     = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW2-PB-FM"}     = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW4-DR"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW2-DR"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"ROTO_ZEL-STG-RM-FZS"} = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"ROTO_ZEL-STG-RM-FZS-2"} = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw1-Pl-3"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw1-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw4-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw4-PCB-2"}     = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw4-WM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw1-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw2-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw4-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-Sw2-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+
+$culHmRegModel{"Schueco_263-131"}     = $culHmRegModel{"HM-LC-Sw1PBU-FM"};#rf_s_1conf_644
+
+
 $culHmRegModel{"HM-RC-12-B"}          = $culHmRegModel{"HM-RC-12"};
 $culHmRegModel{"HM-RC-12-SW"}         = $culHmRegModel{"HM-RC-12"};
 $culHmRegModel{"HM-RC-19-B"}          = $culHmRegModel{"HM-RC-19"};
@@ -1262,27 +1297,28 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 
 ##############################---set---########################################
 %culHmGlobalSets = (# all but virtuals
-  regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
-  getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]",
-  getConfig     => "",
-  regSet        => "[prep|exec] <regName> <value> ... [<peerChannel>]",
-  clear         => "[readings|register|rssi|msgEvents|all]",
+                       regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ..."
+                      ,getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]"
+                      ,getConfig     => ""
+                      ,regSet        => "[prep|exec] <regName> <value> ... [<peerChannel>]"
+                      ,clear         => "[readings|register|rssi|msgEvents|all]"
+                      ,getVersion    => ""
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
-  raw           => "data ...",
-  virtual       => "<noButtons>",
-  clear         => "[readings|rssi|msgEvents|unknownDev]",
+                       raw           => "data ..."
+                      ,virtual       => "<noButtons>"
+                      ,clear         => "[readings|rssi|msgEvents|unknownDev]"
 );
 %culHmGlobalSetsDevice = (# all devices but virtuals
-  raw           => "data ...",
-  reset         => "",
-  pair          => "",
-  unpair        => "",
+                       raw           => "data ..."
+                      ,reset         => ""
+                      ,unpair        => ""
 );
 
 %culHmSubTypeDevSets = (# device of this subtype
   switch           =>{ statusRequest => ""
                       ,getSerial     => ""
+                      ,pair          => ""
                       ,getVersion    => ""
                        },
 #  remote           =>{ },
