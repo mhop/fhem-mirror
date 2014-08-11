@@ -782,10 +782,6 @@ sub HMLAN_SimpleWrite(@) {#####################################################
         select(undef, undef, undef, (($dDly > 0.1)?0.1:$dDly))
               if ($dDly > 0.01);
       }
-      if ($modules{CUL_HM}{defptr}{$dst}{helper}{io}{newCh}){# force chan msg
-        delete $hDst->{chn};
-        delete $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newCh};
-      }
     }
     if ($dst ne $hmId){  #delay send if answer is pending
       if ( $hDst->{flg} &&                #HMLAN's ack pending

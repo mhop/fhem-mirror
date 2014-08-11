@@ -4202,6 +4202,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     Log3 $name,2,"CUL_HM fwUpdate started for $name";
     CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
                         ."3011$id${dst}CA");
+                        
+    $hash->{helper}{io}{newChnFwUpdate} = $hash->{helper}{io}{newChn};#temporary hide init message
+    $hash->{helper}{io}{newChn} = "";
+
     InternalTimer(gettimeofday()+$enterBL,"CUL_HM_FWupdateEnd","fail:notInBootLoader",0);
     #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst."00000000",0);
   }
@@ -5333,6 +5337,10 @@ sub CUL_HM_FWupdateEnd($){#end FW update
   my $hash = $defs{$modules{CUL_HM}{helper}{updatingName}};
   CUL_HM_UpdtReadSingle($hash,"fwUpdate",$in,1);
   CUL_HM_FWupdateSpeed($modules{CUL_HM}{helper}{updatingName},10);
+  $hash->{helper}{io}{newChn} = $hash->{helper}{io}{newChnFwUpdate}
+      if(defined $hash->{helper}{io}{newChnFwUpdate});#restore initMsg
+  delete $hash->{helper}{io}{newChnFwUpdate};
+  
   delete $defs{$modules{CUL_HM}{helper}{updatingName}}->{cmdStack};
   delete $modules{CUL_HM}{helper}{updating};
   delete $modules{CUL_HM}{helper}{updatingName};
