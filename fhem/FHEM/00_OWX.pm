@@ -438,7 +438,6 @@ sub OWX_CRC ($) {
     for(my $i=0; $i<8; $i++){
       $crc8 = $crc8_table[ $crc8 ^ $owx_ROM_ID[$i] ];
     }  
-    return $crc8;
   } elsif (ref($romid) eq "ARRAY") {
     for(my $i=0; $i<8; $i++){
       $crc8 = $crc8_table[ $crc8 ^ $romid->[$i] ];
@@ -452,9 +451,9 @@ sub OWX_CRC ($) {
     for(my $i=0; $i<7; $i++){
       $crc8 = $crc8_table[ $crc8 ^ $owx_ROM_ID[$i] ];
     }  
-    return $crc8;
   }
-}  
+  return $crc8;
+}
 
 ########################################################################################
 #
