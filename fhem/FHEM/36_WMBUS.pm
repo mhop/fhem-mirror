@@ -305,7 +305,7 @@ WMBUS_Attr(@)
 <h3>WMBUS - Wireless M-Bus</h3>
 <ul>
   This module supports Wireless M-Bus meters for e.g. water, heat, gas or electricity.
-  Wireless M-Bus is a standard protocol supported by various manufaturers.
+  Wireless M-Bus is a standard protocol supported by various manufacturers.
   
   It uses the 868 MHz band for radio transmissions.
   Therefore you need a device which can receive Wireless M-Bus messages, e.g. a <a href="#CUL">CUL</a> with culfw >= 1.59.
@@ -319,6 +319,14 @@ WMBUS_Attr(@)
   WMBus messages can be optionally encrypted. In that case the matching AESkey must be specified with attr AESkey. Otherwise the decryption
   will fail and no relevant data will be available.
   <br><br>
+  <b>Prerequisites</b><br>
+  This module requires the perl module Crypt::CBC, Digest::CRC and Crypt::OpenSSL::AES (AES only if encrypted messages should be processed).<br>
+  On a debian based system these can be installed with<br>
+  <code>
+  sudo apt-get install libcrypt-cbc-perl libdigest-crc-perl libssl-dev<br>
+  sudo cpan -i Crypt::OpenSSL::AES
+  </code>
+  <br><br>
   <a name="WMBUSdefine"></a>
   <b>Define</b>
   <ul>
@@ -326,14 +334,14 @@ WMBUS_Attr(@)
     <br>
     Normally a WMBus device isn't defined manually but automatically through the autocreate mechanism upon the first reception of a message.
     <br>
-    For manual definition there are two ways.
+    For a manual definition there are two ways.
     <ul>
 			<li>
-			Specifying a raw WMBus message as received by a CUL. Such a message starts with a lower case 'b' and contains at least 24 hexadecimal digits.
+			By specifying a raw WMBus message as received by a CUL. Such a message starts with a lower case 'b' and contains at least 24 hexadecimal digits.
 			The WMBUS module extracts all relevant information from such a message.
 			</li>
 			<li>
-      Explictly specifify the information that uniquely identifies a WMBus device. <br>
+      Explictly specify the information that uniquely identifies a WMBus device. <br>
       The manufacturer code, which is is a three letter shortcut of the manufacturer name. See 
       <a href="http://dlms.com/organization/flagmanufacturesids/index.html">dlms.com</a> for a list of registered ids.<br>
       The identification number is the serial no of the meter.<br>
@@ -358,7 +366,7 @@ WMBUS_Attr(@)
         for this "logical" device. An example for the physical device is a CUL.
 	 </li><br>
 	 <li>AESKey<br>
-			A 16 byte AES-Key in hexadecimal digits. Used to decrypt message from meters which have encryption enabled.
+			A 16 byte AES-Key in hexadecimal digits. Used to decrypt messages from meters which have encryption enabled.
 	</li>
   </ul>
 	<br>
@@ -366,7 +374,7 @@ WMBUS_Attr(@)
   <b>Readings</b><br>
   <ul>
   Meters can send a lot of different information depending on their type. An electricity meter will send other data than a water meter.
-  The information also depends on the manufacturer of the meter. See the WMBus specification on <a href="www.oms-group.org">oms-group.org</a> for details.
+  The information also depends on the manufacturer of the meter. See the WMBus specification on <a href="http://www.oms-group.org">oms-group.org</a> for details.
   <br><br>
   The readings are generated in blocks starting with block 1. A meter can send several data blocks.
   Each block has at least a type, a value and a unit, e.g. for an electricity meter it might look like<br>
@@ -379,7 +387,7 @@ WMBUS_Attr(@)
   There is also a fixed set of readings.
   <ul>
   <li><code>is_encrypted</code> is 1 if the received message is encrypted.</li>
-  <li><code>decryption_ok</code> is 1 of a message has either been successfully decrypted or if it is unencrypted.</li>
+  <li><code>decryption_ok</code> is 1 if a message has either been successfully decrypted or if it is unencrypted.</li>
   <li><code>state</code> contains the state of the meter and may contain error message like battery low. Normally it contains 'no error'.</li>
   </ul>
   </ul>
@@ -388,4 +396,106 @@ WMBUS_Attr(@)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="WMBUS"></a>
+<h3>WMBUS - Wireless M-Bus</h3>
+<ul>
+  Dieses Modul unterstützt Zähler mit Wireless M-Bus, z. B. für Wasser, Gas oder Elektrizität.
+  Wireless M-Bus ist ein standardisiertes Protokoll das von unterschiedlichen Herstellern unterstützt wird.
+
+	Es verwendet das 868 MHz Band für Radioübertragungen.
+	Daher wird ein Gerät benötigt das die Wireless M-Bus Nachrichten empfangen kann, z. B. ein <a href="#CUL">CUL</a> mit culfw >= 1.59.
+  <br>
+  WMBus verwendet zwei unterschiedliche Radioprotokolle, T-Mode und S-Mode. Der Empfänger muss daher so konfiguriert werden, dass er das selbe Protokoll
+  verwendet wie der Sender. Im Falle eines CUL kann das erreicht werden, in dem das Attribut <a href="#rfmode">rfmode</a> auf WMBus_T bzw. WMBus_S gesetzt wird.
+  <br>
+  WMBus Geräte senden Daten periodisch abhängig von ihrer Konfiguration. Es können u. U. Tage zwischen einzelnen Nachrichten vergehen oder sie können im 
+  Minutentakt gesendet werden.
+  <br>
+  WMBus Nachrichten können optional verschlüsselt werden. Bei verschlüsselten Nachrichten muss der passende Schlüssel mit dem Attribut AESkey angegeben werden. 
+  Andernfalls wird die Entschlüsselung fehlschlagen und es können keine relevanten Daten ausgelesen werden.
+  <br><br>
+  <b>Voraussetzungen</b><br>
+  Dieses Modul benötigt die perl Module Crypt::CBC, Digest::CRC and Crypt::OpenSSL::AES (AES wird nur benötigt wenn verschlüsselte Nachrichten verarbeitet werden sollen).<br>
+  Bei einem Debian basierten System können diese so installiert werden<br>
+  <code>
+  sudo apt-get install libcrypt-cbc-perl libdigest-crc-perl libssl-dev<br>
+  sudo cpan -i Crypt::OpenSSL::AES
+  </code>
+  <br><br>
+  <a name="WMBUSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt;]|&lt;bHexCode&gt;</code> <br>
+    <br>
+    Normalerweise wird ein WMBus Device nicht manuell angelegt. Dies geschieht automatisch bem Empfang der ersten Nachrichten eines Gerätes über den 
+    fhem autocreate Mechanismus.
+    <br>
+    Für eine manuelle Definition gibt es zwei Wege.
+    <ul>
+			<li>
+			Durch Verwendung einer WMBus Rohnachricht wie sie vom CUL empfangen wurde. So eine Nachricht beginnt mit einem kleinen 'b' und enthält mindestens
+			24 hexadezimale Zeichen.
+			Das WMBUS Modul extrahiert daraus alle benötigten Informationen.
+			</li>
+			<li>
+			Durch explizite Angabe der Informationen die ein WMBus Gerät eindeutig identfizieren.<br>
+			Der Hersteller Code, besteht aus drei Buchstaben als Abkürzung des Herstellernamens. Eine Liste der Abkürzungen findet sich unter
+      <a href="http://dlms.com/organization/flagmanufacturesids/index.html">dlms.com</a><br>
+      Die Idenitfikationsnummer ist die Seriennummer des Zählers.<br>
+      Version ist ein Versionscode des Zählers.<br>
+      Typ ist die Art des Zählers, z. B. Wasser oder Elektrizität, kodiert als Zahl.
+      </li>
+      <br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="WMBUSset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+  <a name="WMBUSget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+  
+  <a name="WMBUSattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#IODev">IODev</a><br>
+				Setzt den IO oder physisches Gerät welches für den Empfang der Signale für dieses 'logische' Gerät verwendet werden soll.
+				Ein Beispiel für ein solches Gerät ist ein CUL.
+	 </li><br>
+	 <li>AESKey<br>
+			Ein 16 Bytes langer AES-Schlüssel in hexadezimaler Schreibweise. Wird verwendet um Nachrichten von Zählern zu entschlüsseln bei denen
+			die Verschlüsselung aktiviert ist.
+	</li>
+  </ul>
+	<br>
+  <a name="WMBUSreadings"></a>
+  <b>Readings</b><br>
+  <ul>
+  Zähler können sehr viele unterschiedliche Informationen senden, abhängig von ihrem Typ. Ein Elektrizitätszähler wird andere Daten senden als ein
+  Wasserzähler. Die Information hängt auch vom Hersteller des Zählers ab. Für weitere Informationen siehe die WMBus Spezifikation unter
+  <a href="http://www.oms-group.org">oms-group.org</a>.
+  <br><br>
+  Die Readings werden als Blöck dargestellt, beginnend mit Block 1. Ein Zähler kann mehrere Blöcke senden.
+  Jeder Block enthält zumindest einen Typ, einen Wert und eine Einheit. Für einen Elektrizitätszähler könnte das z. B. so aussehen<br>
+  <ul>
+  <code>1:type VIF_ELECTRIC_ENERGY</code><br>
+  <code>1:unit Wh</code><br>
+  <code>1:value 2948787</code><br>
+	</ul>
+	<br>
+	Es gibt auch eine Anzahl von festen Readings.
+  <ul>
+  <li><code>is_encrypted</code> ist 1 wenn die empfangene Nachricht verschlüsselt ist.</li>
+  <li><code>decryption_ok</code> ist 1 wenn die Nachricht entweder erfolgreich entschlüsselt wurde oder gar nicht verschlüsselt war.</li>
+  <li><code>state</code> enthält den Status des Zählers und kann Fehlermeldungen wie 'battery low' enthalten. Normalerweise ist der Wert 'no error'.</li>
+  </ul>
+  </ul>
+  
+  
+</ul>
+=end html_DE
+
 =cut
