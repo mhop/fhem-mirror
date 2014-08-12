@@ -1,10 +1,16 @@
+# $Id: $
+
 package WMBus;
 
 use strict;
 use warnings;
 use feature qw(say);
-use Crypt::CBC;
-use Digest::CRC;
+use Crypt::CBC;  # libcrypt-cbc-perl
+use Digest::CRC; # libdigest-crc-perl
+
+# there seems to be no debian package for Crypt::OpenSSL::AES, so use
+# sudo apt-get install libssl-dev
+# sudo cpan -i Crypt::OpenSSL::AES
 
 require Exporter;
 my @ISA = qw(Exporter);
