@@ -51,7 +51,6 @@ sub new() {
     alarmdevs => [],
     devs => [],
     fams => [],
-    timeout => 1.0, #default timeout 1 sec.
   };
   return bless $self,$class;
 }
@@ -236,10 +235,11 @@ sub initialize() {
     #-- write 1-Wire bus (Fig. 2 of Maxim AN192)
     $ds2480->start_query();
     $ds2480->query("\x17\x45\x5B\x0F\x91",5);
-    eval {   #ignore timeout
+    my $until = gettimeofday + main::AttrVal($hash->{NAME},"timeout",1);
+    eval {
       do {
-        $ds2480->read();
-      } while (!$ds2480->response_ready());
+        $ds2480->poll();
+      } until ($ds2480->response_ready() or gettimeofday >= $until);
     };
     $res = $ds2480->{string_in};
     #-- process 4/5-byte string for detection

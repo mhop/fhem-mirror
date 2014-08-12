@@ -219,10 +219,6 @@ sub response_ready() {
     main::Log3($serial->{name},5, "OWX_DS2480 read: After loop no. $serial->{num_reads} received: ".unpack("H*",$serial->{string_in}));
     return 1;
   }
-  if (($serial->{num_reads} > 1) and (tv_interval($serial->{starttime}) > $serial->{timeout})) {
-    main::Log3($serial->{name},5, "OWX_DS2480 read: After loop no. $serial->{num_reads} received: ".unpack("H*",$serial->{string_in}). " -> TIMEOUT");
-    die "OWX_DS2480 read timeout, bytes read: $serial->{retcount}, expected: $serial->{retlen}" ;
-  }
   return 0;
 }
 
@@ -235,7 +231,6 @@ sub start_query() {
   $serial->{num_reads} = 0;
   $serial->{retlen} = 0;
   $serial->{retcount} = 0;
-  $serial->{starttime} = [gettimeofday];
 }
 
 ########################################################################################
