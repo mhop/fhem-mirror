@@ -1198,7 +1198,6 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
-    Log 1,"General loadConfig: $fn";
     $ret = HMinfo_loadConfig($filter,$fn); 
   }
   elsif($cmd eq "verifyConfig"){##action: verifyConfig-------------------------
