@@ -381,14 +381,17 @@ sub HMinfo_peerCheck(@) { #####################################################
     next if ($peersUsed == 0);
         
     my $peerIDs = AttrVal($eName,"peerIDs",undef);
+    $peerIDs =~ s/00000000,//;
     my @failTrig = map {CUL_HM_name2Id(substr($_,8))} 
                    grep /^trigDst_/,
                    keys %{$defs{$eName}{READINGS}};
     foreach (HMinfo_noDup(@failTrig)){
+      next if (!$_);
       push @peerIDsTrigUnp,"triggerUnpeered: ".$eName.":".$_ 
-            if($_ && $peerIDs !~ m/$_/);
+            if( ($peerIDs &&  $peerIDs !~ m/$_/)
+               ||("CCU-FHEM" ne AttrVal(CUL_HM_id2Name(substr($_,0,6)),"model","")));
       push @peerIDsTrigUnd,"triggerUndefined: ".$eName.":".$_ 
-            if($_ && !$modules{CUL_HM}{defptr}{$_});
+            if(!$modules{CUL_HM}{defptr}{$_});
     }
 
     if (!$peerIDs){                # no peers - is this correct?
@@ -863,7 +866,8 @@ sub HMinfo_GetFn($@) {#########################################################
               devspec2array("model=HM.*-TC.*:FILTER=chanNo=02:FILTER=tempListTmpl=.*"));
     my @tlr;
     foreach my $e (@td){
-      my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl",AttrVal($hash->{NAME},"configDir",".")."/tempList.cfg:$e"));
+      my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl"
+                                                         ,AttrVal($hash->{NAME},"configDir",".")."/tempList.cfg:$e"));
       push @tlr,$tr if($tr);
     }
     $ret .= "\n\n templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
@@ -885,7 +889,9 @@ sub HMinfo_GetFn($@) {#########################################################
     my @fheml = ();
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
       # search for irregular trigger
-      my @failTrig = map {"$dName: $_"} grep /^trigDst_/,keys %{$defs{$dName}{READINGS}};
+      my @failTrig = map {"$dName: $_"} 
+                     grep /^trigDst_/,
+                     keys %{$defs{$dName}{READINGS}};
       push @peerUndef,@failTrig if (@failTrig);
       #--- check regular references
       my $peerIDs = AttrVal($dName,"peerIDs",undef);
@@ -895,10 +901,11 @@ sub HMinfo_GetFn($@) {#########################################################
       foreach (split",",$peerIDs){
         next if ($_ eq "00000000");
         my $pn = CUL_HM_peerChName($_,$dId);
+        $pn =~ s/_chn:01//;
         push @pl,$pn;
         push @fheml,"$_$dName" if ($pn =~ m/^fhem..$/);
       }
-      push @peerPairs,$dName." => ".join(", ",(sort @pl)) if (@pl);
+      push @peerPairs,$dName." => ".join(" ",(sort @pl)) if (@pl);
     }
     #--- calculate peerings to Central ---
     my %fChn;
@@ -929,7 +936,7 @@ sub HMinfo_GetFn($@) {#########################################################
           push @noReg,$dName;
           next;
       }
-      my ($peerOld,$ptOld,$ptLine,$peerLine) = ("","","                  ","                  ");
+      my ($peerOld,$ptOld,$ptLine,$peerLine) = ("","",pack('A23',""),pack('A23',""));
       foreach my $reg (split("\n",$regs)){
         my ($peer,$h1) = split ("\t",$reg);
         $peer =~s/ //g;
@@ -937,29 +944,34 @@ sub HMinfo_GetFn($@) {#########################################################
           $RegReply .= $reg."\n";
           next;
         }
-        $peer =~s/3://;
         next if (!$h1);
+        $peer =~s/3://;
         my ($regN,$h2) = split (":",$h1);
+        my ($pt,$rN) = unpack 'A2A*',$regN;
+        if (!defined($hash->{helper}{r}{$rN})){
+          $hash->{helper}{r}{$rN}{v} = "";
+          $hash->{helper}{r}{$rN}{u} = pack('A5',"");
+        }
         my ($val,$unit) = split (" ",$h2);
-        $unit = $unit?("[".$unit."]"):"   ";
-        my ($pt,$rN) = ($1,$2) if ($regN =~m/(..)(.*)/);
-        $rN .= $unit;
-        $hash->{helper}{r}{$rN} = "" if (!defined($hash->{helper}{r}{$rN}));
-        $hash->{helper}{r}{$rN} .= sprintf("%16s",$val);
+        $hash->{helper}{r}{$rN}{v} .= pack('A16',$val);
+        $hash->{helper}{r}{$rN}{u} =  pack('A5',"[".$unit."]") if ($unit);
         if ($pt ne $ptOld){
-          $ptLine .= sprintf("%16s",$pt);
-            $ptOld = $pt;
+          $ptLine .= pack('A16',$pt);
+          $ptOld = $pt;
         }
         if ($peer ne $peerOld){
-          $peerLine .= sprintf("%32s",$peer);
-            $peerOld = $peer;
+          $peerLine .= pack('A32',$peer);
+          $peerOld = $peer;
         }
       }
       $RegReply .= $peerLine."\n".$ptLine."\n";
       foreach my $rN (sort keys %{$hash->{helper}{r}}){
         $hash->{helper}{r}{$rN} =~ s/(     o..)/$1                /g
               if($rN =~ m/^MultiExec /); #shift thhis reading since it does not appear for short
-        $RegReply .= $rN.$hash->{helper}{r}{$rN}."\n";
+        $RegReply .=  pack ('A18',$rN)
+                     .$hash->{helper}{r}{$rN}{u}
+                     .$hash->{helper}{r}{$rN}{v}
+                     ."\n";
       }
       delete $hash->{helper}{r};
     }
@@ -1138,7 +1150,6 @@ sub HMinfo_SetFn($@) {#########################################################
       $opt .= "d" if ($type =~ m/(Protocol|rssi)/);# readings apply to all, others device only
       my @entities;
       $type = "msgEvents" if ($type eq "Protocol");# translate parameter
-      Log 1,"General filter:$opt,$filter";
       foreach my $dName (HMinfo_getEntities($opt,$filter)){
         push @entities,$dName;
         CUL_HM_Set($defs{$dName},$dName,"clear",$type);
@@ -1187,6 +1198,7 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
     $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    Log 1,"General loadConfig: $fn";
     $ret = HMinfo_loadConfig($filter,$fn); 
   }
   elsif($cmd eq "verifyConfig"){##action: verifyConfig-------------------------
@@ -1362,12 +1374,12 @@ sub HMinfo_verifyConfig($@) {##################################################
       if ($ensp ne $dnsp){
 
         my %r; # generate struct with changes addresses
-        foreach my $reg(grep /..:../, split(" ",$eReg)){
-          my ($a,$d) = split(":",$reg);
+        foreach my $rg(grep /..:../, split(" ",$eReg)){
+          my ($a,$d) = split(":",$rg);
           $r{$a}{c} = $d;
         }
-        foreach my $reg(grep !/00:00/,grep /..:../, split(" ",$data)){
-          my ($a,$d) = split(":",$reg);
+        foreach my $rg(grep !/00:00/,grep /..:../, split(" ",$data)){
+          my ($a,$d) = split(":",$rg);
           next if (!$a || $a eq "00");
           if   (!defined $r{$a}){$r{$a}{f} = $d;$r{$a}{c} = "";}
           elsif($r{$a}{c} ne $d){$r{$a}{f} = $d;}
@@ -1379,7 +1391,7 @@ sub HMinfo_verifyConfig($@) {##################################################
         # search register valid for thie entity
         my $dN = CUL_HM_getDeviceName($eN);
         my $chn = CUL_HM_name2Id($eN);
-        my $listNo = substr($reg,6,1);
+        my (undef,$listNo,undef,$peer) = unpack('A6A1A1A*',$reg);
         $chn = (length($chn) == 8)?substr($chn,6,2):"";
         my $culHmRegDefine        =\%HMConfig::culHmRegDefine;
         my @regArr = grep{$culHmRegDefine->{$_}->{l} eq $listNo} 
@@ -1388,11 +1400,13 @@ sub HMinfo_verifyConfig($@) {##################################################
                                    ,$chn);
         # now identify which register belongs to suspect address. 
         foreach my $rgN (@regArr){
-          next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
-          my $a = $culHmRegDefine->{$rgN}->{a};
-          next if (!grep /$a/,@aCh);
+          next if ($culHmRegDefine->{$rgN}{l} ne $listNo);
+          my $a = $culHmRegDefine->{$rgN}{a};
+          next if (!grep {$a == int($_)} @aCh);
           $a = sprintf("%02X",$a);
-          push @elReg,"$eN addr:$a changed from $r{$a}{f} to $r{$a}{c} - effected RegName:$rgN";
+          push @elReg,"$eN "
+                      .($peer?": peer:$peer ":"")
+                      ."addr:$a changed from $r{$a}{f} to $r{$a}{c} - effected RegName:$rgN";
         }
         
       }
