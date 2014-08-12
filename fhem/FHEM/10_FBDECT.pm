@@ -26,7 +26,9 @@ my %fbdect_payload = (
   20 => { n=>"power",       fmt=>'sprintf("%0.2f W", hex($pyld)/100)' },
   21 => { n=>"energy",      fmt=>'sprintf("%0.0f Wh",hex($pyld))' },
   22 => { n=>"powerFactor", fmt=>'sprintf("%0.3f", hex($pyld))' },
-  23 => { n=>"temperature", fmt=>'sprintf("%0.1f C", hex($pyld)/10)' },
+  23 => { n=>"temperature", fmt=>'sprintf("%0.1f C (%s)",'.
+        'hex(substr($pyld,0,8))/10,'.
+        '(hex(substr($pyld,8,8))+0)?"corrected":"measured")' },
   35 => { n=>"options",     fmt=>'FBDECT_decodeOptions($pyld)' },
   37 => { n=>"control",     fmt=>'FBDECT_decodeControl($pyld)' },
 );
@@ -393,7 +395,7 @@ FBDECT_Undef($$)
     <li>power: $v W</li>
     <li>energy: $v Wh</li>
     <li>powerFactor: $v"</li>
-    <li>temperature: $v C</li>
+    <li>temperature: $v C ([measured|corrected])</li>
     <li>options: uninitialized</li>
     <li>options: powerOnState:[on|off|last],lock:[none,webUi,remoteFb,button]</li>
     <li>control: disabled</li>
@@ -479,7 +481,7 @@ FBDECT_Undef($$)
     <li>power: $v W</li>
     <li>energy: $v Wh</li>
     <li>powerFactor: $v"</li>
-    <li>temperature: $v C</li>
+    <li>temperature: $v C ([measured|corrected])</li>
     <li>options: uninitialized</li>
     <li>options: powerOnState:[on|off|last],lock:[none,webUi,remoteFb,button]</li>
     <li>control: disabled</li>
