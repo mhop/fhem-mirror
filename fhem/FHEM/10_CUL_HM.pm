@@ -3187,7 +3187,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($sectIn eq "all") {
       @sectL = ("rssi","msgEvents","readings");#readings is last - it schedules a reread possible
     }
-    elsif($sectIn =~ m/(rssi|msgEvents|readings|register|unknownDev)/){
+    elsif($sectIn =~ m/(rssi|trigger|msgEvents|readings|register|unknownDev)/){
       @sectL = ($sectIn);
     }
     else{
@@ -3205,6 +3205,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       elsif($sect eq "unknownDev"){
         delete $hash->{READINGS}{$_} 
              foreach (grep /^unknown_/,keys %{$hash->{READINGS}});
+      }
+      elsif($sect eq "trigger"){
+        delete $hash->{READINGS}{$_} 
+             foreach (grep /^trig/,keys %{$hash->{READINGS}});
       }
       elsif($sect eq "register"){
         my @cH = ($hash);
@@ -6694,8 +6698,11 @@ sub CUL_HM_UpdtCentral($){
     next if (!$btn);
     CommandDefine(undef,$name."_Btn$btn CUL_HM $ccuBId")
         if (!$modules{CUL_HM}{defptr}{$ccuBId});
-    foreach my $pn (grep !/^$/,map{$_ if (AttrVal($_,"peerIDs","") =~ m/$id$btnS/)}keys %defs){
-      CUL_HM_ID2PeerList ($name."_Btn$btn",CUL_HM_name2Id($pn),1); 
+    foreach my $pn (grep !/^$/,
+                    map{$_ if (AttrVal($_,"peerIDs","") =~ m/$id$btnS/)}
+                    keys %defs){
+
+      CUL_HM_ID2PeerList ($name."_Btn$btn",unpack('A8',CUL_HM_name2Id($pn)."01"),1); 
     }
   }
   my $io = AttrVal($name,"IODev","empty");
@@ -7098,6 +7105,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   my %dlf = (1=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0},
              2=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0},
              3=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0});
+  return "" if ($template =~ m/(none|0)/);
   my $ret = "";
   my @el = split",",$name;
   my ($fName,$tmpl) = split":",$template;
@@ -8262,7 +8270,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         Due to amount of readings and events it is NOT RECOMMENDED to switch it on by default.
         </li>
     <li><a name="#CUL_HMtempListTmpl">tempListTmpl</a><br>
-        Sets the default template for a heating controller.<br> 
+        Sets the default template for a heating controller. If not given the detault template is taken from 
+        file tempList.cfg using the enitity name as template name (e.g. ./tempLict.cfg:RT1_Clima <br> 
+        To avoid template usage set this attribut to  '0'.<br> 
         Format is &lt;file&gt;:&lt;templatename&gt;. lt
         </li>
     <li><a name="unit">unit</a><br>
@@ -9457,7 +9467,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         </code></ul>
         </li>
     <li><a name="#CUL_HMtempListTmpl">tempListTmpl</a><br>
-        Setzt das Default f&uuml;r Heizungskontroller.<br> 
+        Setzt das Default f&uuml;r Heizungskontroller. Ist es nicht gesetzt wird der default filename genutzt und der name
+        der entity als templatename. Z.B. ./tempList.cfg:RT_Clima<br> 
+        Um das template nicht zu nutzen kann man es auf '0'setzen.<br>
         Format ist &lt;file&gt;:&lt;templatename&gt;. 
         </li>
       <li><a name="CUL_HMmodel">model</a>,
