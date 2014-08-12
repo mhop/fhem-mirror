@@ -92,7 +92,7 @@ FBAHA_Set($@)
   if($type eq "reregister") {
     # Release seems to be deadly on the 546e
     FBAHA_Write($hash, "02", "") if($hash->{HANDLE});  # RELEASE
-    FBAHA_Write($hash, "00", "00010001");              # REGISTER
+    FBAHA_Write($hash, "00", "00022005");              # REGISTER
     my ($err, $data) = FBAHA_ReadAnswer($hash, "REGISTER", "^01");
     if($err) {
       Log3 $name, 1, $err;
