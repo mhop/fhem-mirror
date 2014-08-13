@@ -904,8 +904,9 @@ sub decodeLinkLayer($$)
 	$self->{datablocks}++ if $self->{datalen} % 18 != 0;
 
 	
-	($self->{lfield}, $self->{cfield}, $self->{mfield}, $self->{afield_id}, $self->{afield_ver}, $self->{afield_type}, 
-		$self->{crc0}) = unpack('CCvLCCn', $linklayer);
+	($self->{lfield}, $self->{cfield}, $self->{mfield}) = unpack('CCv', $linklayer);
+	$self->{afield_id} = $self->decodeBCD(8,substr($linklayer,4,4));
+	($self->{afield_ver}, $self->{afield_type}, $self->{crc0}) = unpack('CCn', substr($linklayer,8,4));
 
 	#printf("lfield %d\n", $self->{lfield});
 	#printf("crc0 %x calc %x\n", $self->{crc0}, $self->checkCRC(substr($linklayer,0,10)));
