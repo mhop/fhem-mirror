@@ -4824,7 +4824,7 @@ sub CUL_HM_ProcessCmdStack($) {
 
   if (!$hash->{helper}{prt}{rspWait}{cmd}){
     if($hash->{cmdStack} && @{$hash->{cmdStack}}){
-      CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
+     CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
     }
     elsif($hash->{helper}{prt}{sProc} != 0){
       CUL_HM_protState($hash,"CMDs_done");                                    
@@ -5028,8 +5028,11 @@ sub CUL_HM_sndIfOpen($) {
 sub CUL_HM_SndCmd($$) {
   my ($hash, $cmd) = @_;
   $hash = CUL_HM_getDeviceHash($hash);
-  return if(   AttrVal($hash->{NAME},"ignore","")
-            || AttrVal($hash->{NAME},"dummy",""));
+  if(   AttrVal($hash->{NAME},"ignore",0) != 0
+     || AttrVal($hash->{NAME},"dummy" ,0) != 0){
+    CUL_HM_eventP($hash,"dummy");
+    return;
+  }
   CUL_HM_assignIO($hash) ;
   if(!defined $hash->{IODev} ||!defined $hash->{IODev}{NAME}){
     CUL_HM_eventP($hash,"IOerr");
@@ -5397,7 +5400,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
   my ($evntCnt,undef) = split(' last_at:',$evnt);
   $nAttr->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
 
-  if ($evntType =~ m/(Nack|ResndFail|IOerr)/){# unrecoverable Error
+  if ($evntType =~ m/(Nack|ResndFail|IOerr|dummy)/){# unrecoverable Error
     CUL_HM_UpdtReadSingle($hash,"state",$evntType,1);
     $hash->{helper}{prt}{bErr}++;
     $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
@@ -5423,6 +5426,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
 sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
   my $name = $hash->{NAME};
+
   my $sProcIn = $hash->{helper}{prt}{sProc};
   if ($sProcIn == 3){#FW update processing
     # do not change state - commandstack is bypassed
