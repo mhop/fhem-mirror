@@ -223,6 +223,24 @@ RSS_returnRSS($) {
 
 ##################
 sub
+RSS_getScript() {
+
+  my $scripts= "";
+  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
+  if(defined($data{FWEXT})) {
+    foreach my $k (sort keys %{$data{FWEXT}}) {
+      my $h = $data{FWEXT}{$k};
+      next if($h !~ m/HASH/ || !$h->{SCRIPT});
+      my $script = $h->{SCRIPT};
+      $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
+      $scripts .= sprintf($jsTemplate, $script) . "\n";
+    }
+  }
+  return $scripts; 
+}
+
+
+sub
 RSS_returnHTML($) {
   my ($name) = @_;
 
@@ -232,7 +250,10 @@ RSS_returnHTML($) {
   my $refresh= AttrVal($name, 'refresh', 60);
   my $areas= AttrVal($name, 'areas', "");
   my $mime = ($type eq 'png')? 'image/png' : 'image/jpeg';
-  my $code= "<html>\n <head>\n  <title>$name</title>\n  <meta http-equiv=\"refresh\" content=\"$refresh\"/>\n </head>\n <body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n  <img src=\"$img\" usemap=\"#map\"/>\n  <map name=\"map\" id=\"map\">\n   $areas\n  </map>\n </body>\n</html>";
+  my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
+  my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
+  my $scripts= RSS_getScript();
+  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$name</title>\n<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n$scripts</head>\n<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n<img src=\"$img\" usemap=\"#map\"/>\n<map name=\"map\" id=\"map\">\n$areas\n</map>\n</body>\n</html>";
   return ("text/html; charset=utf-8", $code);
 }
 
@@ -617,6 +638,7 @@ RSS_returnIMG($$) {
     # set the background
     #
     # check if background directory is set
+    my $reason= "?"; # remember reason for undefined image
     my $bgdir= AttrVal($name,"bg","undef");
 	if(defined($bgdir)){
 		my $bgnr; # item number
@@ -639,6 +661,10 @@ RSS_returnIMG($$) {
 		# detect pictures
 		if(opendir(BGDIR, $bgdir)){
 			my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
+			
+			#foreach my $f (@bgfiles) {
+			#  Debug sprintf("File \"%s\"\n", $f);
+			#}
 			closedir(BGDIR);
 			# get item number
 			if($#bgfiles>=0) {
@@ -672,6 +698,7 @@ RSS_returnIMG($$) {
 				  }
 				} else {
 				  $S= undef;
+				  $reason= "Something was wrong with background image \"$bgfile\".";
 				}
 			}
 		}
@@ -679,7 +706,12 @@ RSS_returnIMG($$) {
     #
     # evaluate layout
     #
-    RSS_evalLayout($S, $name, $defs{$name}{fhem}{layout});
+    if(defined($S)) {
+      RSS_evalLayout($S, $name, $defs{$name}{fhem}{layout});
+    } else {
+      Log3 undef, 2, "$name: Could not create image. $reason";
+      $S= GD::Image->newTrueColor($width,$height); # return empty image
+    }
     $defs{$name}{STATE} = localtime();
   }; warn $@ if $@;
     
