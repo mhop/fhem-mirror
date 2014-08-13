@@ -883,6 +883,7 @@ SVG_showLog($)
       ($cfg, $plot) = SVG_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
       my $ret = SVG_render($wl, $f, $t, $cfg,
                         $internal_data, $plot, $FW_wname, $FW_cssdir, $flog);
+      $internal_data = "";
       FW_pO $ret;
       if($SVGcache) {
         mkdir($cDir) if(! -d $cDir);
