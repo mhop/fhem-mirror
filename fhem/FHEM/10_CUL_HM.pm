@@ -1920,7 +1920,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $tName =~ s/,.*//;
       CUL_HM_updtSDTeam($tName,$name,$state);
     }
-    elsif ($mTp eq "40" || $mTp eq "41"){ #autonomous event
+    elsif ($mTp =~ m /^4[01]/){ #autonomous event
       CUL_HM_parseSDteam($mTp,$src,$dst,$p);
     }
     elsif ($mTp eq "01"){ #Configs
@@ -5274,7 +5274,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
   
   if ($step == 0){#check bootloader entered - now change speed
     return "" if ($mIn =~ m/$mNoA..02$dst${id}00/);
-    Log3 $name,2,"CUL_HM fwUpdate $name entered mode - switch speed";
+    Log3 $name,2,"CUL_HM fwUpdate $name entered mode. IO-speed: fast";
     $mNo = (++$mNo)%256; $mNoA = sprintf("%02X",$mNo);
     CUL_HM_SndCmd($hash,"${mNoA}00CB$id${dst}105B11F81547");
 #    CUL_HM_SndCmd($hash,"${mNoA}20CB$id${dst}105B11F815470B081A1C191D1BC71C001DB221B623EA");
@@ -5356,6 +5356,7 @@ sub CUL_HM_FWupdateEnd($){#end FW update
   CUL_HM_respPendRm($hash);
 
   CUL_HM_protState($hash,"CMDs_done_FWupdate");
+  Log3 $hash->{NAME},2,"CUL_HM fwUpdate $hash->{NAME} end. IO-speed: normal";
 }
 sub CUL_HM_FWupdateSpeed($$){#set IO speed
   my ($name,$speed) = @_;
@@ -7011,7 +7012,6 @@ sub CUL_HM_peerUsed($) {# are peers expected?
     if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
         ||($c && $c =~ m/$cNo/       )){
       return (AttrVal($name,"peerIDs","") =~ m/00000000/?1:2);
-      return 1;
     }
   }
 }

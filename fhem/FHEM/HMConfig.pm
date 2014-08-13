@@ -874,6 +874,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
   "HM-LC-SW1-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1},
   "HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1,localResDis     =>1},
   "HM-MOD-Re-8"       =>{                     lowBatLimitBA3  =>1,ledMode         =>1},
+  "HM-ES-PMSw1-Pl"    =>{sign            =>1},
 
   "HM-Sys-sRP-Pl"     =>{ compMode        =>1},
   "KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
