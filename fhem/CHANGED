@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: enabled JavaScript in 02_RSS to support WebViewControl
   - added:   new module 36_WMBUS.pm (kaihs) Wireless M-Bus
   - feature: SYSMON: aded new plots (power infos for cubietruck)
   - feature: SYSMON: aded new readings for each network interface: ip and ip6
