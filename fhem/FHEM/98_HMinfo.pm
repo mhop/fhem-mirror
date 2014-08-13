@@ -368,7 +368,6 @@ sub HMinfo_regCheck(@) { ######################################################
 sub HMinfo_peerCheck(@) { #####################################################
   my @entities = @_;
   my @peerIDsFail;
-  my @peerIDsEmpty;
   my @peerIDnotDef;
   my @peerIDsNoPeer;
   my @peerIDsTrigUnp;
@@ -377,39 +376,41 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsAES;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
-    my $peersUsed = CUL_HM_peerUsed($eName);
-    next if ($peersUsed == 0);
+    my $peersUsed = CUL_HM_peerUsed($eName);#
+    next if ($peersUsed == 0);# no peers expected
         
-    my $peerIDs = AttrVal($eName,"peerIDs",undef);
+    my $peerIDs = AttrVal($eName,"peerIDs","");
     $peerIDs =~ s/00000000,//;
-    my @failTrig = map {CUL_HM_name2Id(substr($_,8))} 
-                   grep /^trigDst_/,
-                   keys %{$defs{$eName}{READINGS}};
-    foreach (HMinfo_noDup(@failTrig)){
-      next if (!$_);
+    foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
+                                           grep /^trigDst_/,
+                                           keys %{$defs{$eName}{READINGS}})){
       push @peerIDsTrigUnp,"triggerUnpeered: ".$eName.":".$_ 
             if( ($peerIDs &&  $peerIDs !~ m/$_/)
                ||("CCU-FHEM" ne AttrVal(CUL_HM_id2Name(substr($_,0,6)),"model","")));
       push @peerIDsTrigUnd,"triggerUndefined: ".$eName.":".$_ 
             if(!$modules{CUL_HM}{defptr}{$_});
     }
-
-    if (!$peerIDs){                # no peers - is this correct?
-      push @peerIDsEmpty,"empty: ".$eName if ($peersUsed != 3);
-    }
-    elsif($peersUsed == 2){#peerList incomplete
+    
+    if($peersUsed == 2){#peerList incomplete
       push @peerIDsFail,"incomplete: ".$eName.":".$peerIDs;
     }
-    else{# work on a valid list:
+    else{# work on a valid list
       my $id = $defs{$eName}{DEF};
       my ($devId,$chn) = unpack 'A6A2',$id;
       my $devN = CUL_HM_id2Name($devId);
       my $st = AttrVal($devN,"subType","");# from Device
       my $md = AttrVal($devN,"model","");
       next if ($st eq "repeater");
+      if ($st eq 'smokeDetector'){
+        push @peeringStrange,$eName." not peered!! add SD to any team !!"
+              if(!$peerIDs);
+      }
       foreach my $pId (split",",$peerIDs){
-        next if ($pId eq "00000000" ||$pId =~m /$devId/);
-
+        next if ($pId =~m /$devId/);
+        if (length($pId) != 8){
+          push @peerIDnotDef,$eName." id:$pId  invalid format";
+          next;
+        }
         my ($pDid,$pChn) = unpack'A6A2',$pId;
         if (!$modules{CUL_HM}{defptr}{$pId} && 
             (!$pDid || !$modules{CUL_HM}{defptr}{$pDid})){
@@ -453,7 +454,6 @@ sub HMinfo_peerCheck(@) { #####################################################
     }
   }
   my $ret = "";
-  $ret .="\n\n peer list not read. Use getConfig to read it."          ."\n    ".(join "\n    ",sort @peerIDsEmpty  )if(@peerIDsEmpty);
   $ret .="\n\n peer list incomplete. Use getConfig to read it."        ."\n    ".(join "\n    ",sort @peerIDsFail   )if(@peerIDsFail);
   $ret .="\n\n peer not defined"                                       ."\n    ".(join "\n    ",sort @peerIDnotDef  )if(@peerIDnotDef);
   $ret .="\n\n peer not verified. Check that peer is set on both sides"."\n    ".(join "\n    ",sort @peerIDsNoPeer )if(@peerIDsNoPeer);
