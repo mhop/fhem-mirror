@@ -356,8 +356,12 @@ structure_Set($@)
     $list[0] = $d;
     my $sret;
     if($filter) {
-      my $ret = AnalyzeCommand(undef,
-        "set $list[0]:$filter ". join(" ", @list[1..@list-1]) );
+      my $ret;
+      if(defined($defs{$list[0]}) && $defs{$list[0]}{TYPE} eq "structure") {
+        AnalyzeCommand(undef, "set $list[0] [$filter] ". join(" ", @list[1..@list-1]) );
+      } else {
+        AnalyzeCommand(undef, "set $list[0]:$filter ". join(" ", @list[1..@list-1]) );
+      }
       $sret .= $ret if( $ret );
     } else {
       $sret .= CommandSet(undef, join(" ", @list));
