@@ -275,9 +275,15 @@ sub HMLAN_Attr(@) {############################################################
       RemoveInternalTimer( "keepAliveCk:".$name);
       RemoveInternalTimer( "keepAlive:".$name);
       DevIo_CloseDev($defs{$name});
-      HMLAN_condUpdate($defs{$name},251);#set dummy
+      HMLAN_condUpdate($defs{$name},251);#state: dummy
     }
     else{
+      if ($cmd eq "set"){
+        $attr{$name}{$aName} = $aVal;
+      }
+      else{
+        delete $attr{$name}{$aName};
+      }
       DevIo_OpenDev($defs{$name}, 1, "HMLAN_DoInit");
     }
   }
@@ -433,7 +439,7 @@ sub HMLAN_Write($$$) {#########################################################
     HMLAN_SimpleWrite($hash,$msg);
     return;
   }
-  elsif (length($msg)>22){
+  elsif (length($msg)>21){
     my ($mtype,$src,$dst) = (substr($msg, 8, 2),
                              substr($msg, 10, 6),
                              substr($msg, 16, 6));
@@ -752,8 +758,7 @@ sub HMLAN_Ready($) {###########################################################
 }
 sub HMLAN_SimpleWrite(@) {#####################################################
   my ($hash, $msg, $nonl) = @_;
-
-  return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
+  return if(!$hash || AttrVal($hash->{NAME}, "dummy", 0) != 0);
 
   my $name = $hash->{NAME};
   my $len = length($msg);
