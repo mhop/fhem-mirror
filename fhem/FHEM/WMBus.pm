@@ -401,7 +401,8 @@ my %validDeviceTypes = (
  0x19 => 'A/D Converter',
  0x1a => 'Smokedetector',
  0x1b => 'Room sensor (e.g. temperature or humidity)',
- 0x1c => 'Gasdetector'
+ 0x1c => 'Gasdetector',
+ 0x28 => 'Waste water',
  
 );
 
@@ -838,7 +839,7 @@ sub decodeApplicationLayer($) {
 		#print "Long header\n";
 		($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw}) 
 			= unpack('VvCCCCn', substr($applicationlayer,$offset)); 
-	  $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}}; 
+	  $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
   	$self->{meter_manufacturer} = $self->manId2ascii($self->{meter_man});
 		$offset += 12;
   } else {
@@ -919,7 +920,7 @@ sub decodeLinkLayer($$)
 	}
 
 	$self->{manufacturer} = $self->manId2ascii($self->{mfield});
-	$self->{typestring} =  $validDeviceTypes{$self->{afield_type}};
+	$self->{typestring} =  $validDeviceTypes{$self->{afield_type}} || 'unknown';
 	return 1;
 }
 
