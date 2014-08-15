@@ -386,7 +386,7 @@ sub HMinfo_peerCheck(@) { #####################################################
                                            keys %{$defs{$eName}{READINGS}})){
       push @peerIDsTrigUnp,"triggerUnpeered: ".$eName.":".$_ 
             if( ($peerIDs &&  $peerIDs !~ m/$_/)
-               ||("CCU-FHEM" ne AttrVal(CUL_HM_id2Name(substr($_,0,6)),"model","")));
+               ||("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
       push @peerIDsTrigUnd,"triggerUndefined: ".$eName.":".$_ 
             if(!$modules{CUL_HM}{defptr}{$_});
     }
@@ -889,12 +889,17 @@ sub HMinfo_GetFn($@) {#########################################################
     my @fheml = ();
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
       # search for irregular trigger
-      my @failTrig = map {"$dName: $_"} 
-                     grep /^trigDst_/,
-                     keys %{$defs{$dName}{READINGS}};
-      push @peerUndef,@failTrig if (@failTrig);
-      #--- check regular references
       my $peerIDs = AttrVal($dName,"peerIDs",undef);
+
+      foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
+                                              grep /^trigDst_/,
+                                              keys %{$defs{$dName}{READINGS}})){
+        push @peerUndef,"$dName triggers $_"
+            if( ($peerIDs &&  $peerIDs !~ m/$_/)
+               ||("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
+      }
+
+      #--- check regular references
       next if(!$peerIDs);
       my $dId = unpack 'A6',CUL_HM_name2Id($dName);
       my @pl = ();
