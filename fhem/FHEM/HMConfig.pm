@@ -1303,7 +1303,6 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] <regName> <value> ... [<peerChannel>]"
                       ,clear         => "[readings|trigger|register|rssi|msgEvents|all]"
-                      ,getVersion    => ""
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
                        raw           => "data ..."
@@ -1317,8 +1316,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 );
 
 %culHmSubTypeDevSets = (# device of this subtype
-  switch           =>{ statusRequest => ""
-                      ,getSerial     => ""
+  switch           =>{ getSerial     => ""
                       ,pair          => ""
                       ,getVersion    => ""
                        },

@@ -1645,7 +1645,7 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       if ($st ne "switch"){
-        my $dir = $err&0x30;
+        my $dir = $err & 0x30;
         if   ($dir == 0x10){push @evtEt,[$shash,1,"$eventName:up:$vs"  ];}
         elsif($dir == 0x20){push @evtEt,[$shash,1,"$eventName:down:$vs"];}
         elsif($dir == 0x00){push @evtEt,[$shash,1,"$eventName:stop:$vs"];}
@@ -2085,7 +2085,7 @@ sub CUL_HM_Parse($$) {#########################################################
           if ($mFlgH & 0x20){
             $longPress .= "_Release";
             $dChHash->{helper}{trgLgRpt}=0;
-            push @ack,$dstH,$mNo."8002".$dst.$src.$stAck;
+            push @ack,$shash,$mNo."8002".$dst.$src.$stAck;
           }
           push @evtEt,[$dChHash,1,"state:$stT"];
           push @evtEt,[$dChHash,1,"virtActState:$stT"];
