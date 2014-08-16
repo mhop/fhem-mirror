@@ -29,6 +29,7 @@ my %hueModels = (
   LST001 => {name => 'LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
   LWB001 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWB003 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWB004 => {name => 'Hue Lux'              ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'  ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 );
 
