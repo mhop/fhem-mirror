@@ -1553,6 +1553,8 @@ $culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT00"} = $culHmChanSets{"HM-CC-TC00"};
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
 
+$culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
+
 %culHmFunctSets = (# command depending on function
   sdLead              =>{ alarmOn       =>""
                          ,alarmOff      =>""
@@ -1565,14 +1567,14 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
 
 
 # RC send BCAST to specific address. Is the meaning understood?
-@culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
-                     "BURST", "BIDI", "RPTED", "RPTEN");
+@culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "BCAST", "Bit3",
+                   "BURST", "BIDI"    , "RPTED", "RPTEN");
                      #RPTEN    0x80: set in every message. Meaning?
                      #RPTED    0x40: repeated (repeater operation)
                      #BIDI     0x20: response is expected
                      #Burst    0x10: set if burst is required by device
                      #Bit3     0x08:
-                     #CFG      0x04: Device in Config mode
+                     #BCAST    0x04: Broadcast - to all my peers parallel
                      #WAKEMEUP 0x02: awake - hurry up to send messages
                      #WAKEUP   0x01: send initially to keep the device awake
 
