@@ -559,7 +559,29 @@ sub HMinfo_tempList(@) { ######################################################
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret;;
   if    ($action eq "save"){
-    open(aSave, ">$fName") || return("Can't open $fName: $!");
+#    foreach my $eN(HMinfo_getEntities("d")){#search and select channel
+#      my $md = AttrVal($eN,"model","");
+#      my $chN; #tempList channel name
+#      if ($md =~ m/(HM-CC-RT-DN-BoM|HM-CC-RT-DN)/){
+#        $chN = $defs{$eN}{channel_04};
+#      }
+#      elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC|HM-TC-IT-WM-W-EU)/){
+#        $chN = $defs{$eN}{channel_02};
+#      }
+#      next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
+#      print aSave "\nentities:$chN";
+#      my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
+#      if (scalar @tl != 7 && scalar @tl != 21){
+#        print aSave "\nincomplete:$chN only data for ".join(",",@tl);
+#        push @incmpl,$chN;
+#        next;
+#      }
+#      foreach my $rd (@tl){
+#        print aSave "\n$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
+#      }
+#    }
+    my @chList;
+    my @storeList;
     my @incmpl;
     foreach my $eN(HMinfo_getEntities("d")){#search and select channel
       my $md = AttrVal($eN,"model","");
@@ -570,20 +592,58 @@ sub HMinfo_tempList(@) { ######################################################
       elsif ($md =~ m/(ROTO_ZEL-STG-RM-FWT|HM-CC-TC|HM-TC-IT-WM-W-EU)/){
         $chN = $defs{$eN}{channel_02};
       }
-      next if (!$chN || !$defs{$chN} || $chN !~ m/$filter/);
-      print aSave "\nentities:$chN";
-      my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
-      if (scalar@tl != 7 && scalar@tl != 21){
-        print aSave "\nincomplete:$chN only data for ".join(",",@tl);
-        push @incmpl,$chN;
-        next;
-      }
-      foreach my $rd (@tl){
-        print aSave "\n$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
+      if ($chN && $defs{$chN} && $chN =~ m/$filter/){
+        my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
+        if (scalar @tl != 7 && scalar @tl != 21){
+          push @incmpl,$chN;
+          next;
+        }
+        else{
+          push @chList,$chN;
+          push @storeList,"entities:$chN";
+          foreach my $rd (@tl){
+            #print aSave "\n$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
+            push @storeList,"$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
+          }
+        }
       }
     }
-    print aSave "\n======= finished ===\n";
-    close(aSave);
+    my  @oldList;
+    if (-f $fName ){
+      open(aRead, "$fName") || return("Can't open $fName: $!");
+      my $skip = 0;
+      while(<aRead>){
+        chomp;
+        my $line = $_;
+        if ($line =~ m/entities:(.*)/){
+          my $eFound = $1;
+          if (grep /\b$eFound\b/,@chList){
+            # renew this entry
+            $skip = 1;
+          }
+          else{
+            $skip = 0;
+          }
+          Log 1,"General entity $eFound :$skip";
+        }
+        push @oldList,$line if (!$skip);
+      }
+      close(aRead);
+    }
+   open(aSave, ">$fName") || return("Can't open $fName: $!");
+   foreach my $line (@oldList,@storeList){
+     print aSave "\n$line";
+#     my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
+#     if (scalar @tl != 7 && scalar @tl != 21){
+#       print aSave "\nincomplete:$chN only data for ".join(",",@tl);
+#       push @incmpl,$chN;
+#       next;
+#     }
+#     foreach my $rd (@tl){
+#       print aSave "\n$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
+#     }
+   }
+   close(aSave);
     $ret = "incomplete data for ".join("\n     ",@incmpl) if (scalar@incmpl);
   }
   elsif ($action eq "verify"){
@@ -868,7 +928,8 @@ sub HMinfo_GetFn($@) {#########################################################
     foreach my $e (@td){
       my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl"
                                                          ,AttrVal($hash->{NAME},"configDir",".")."/tempList.cfg:$e"));
-      push @tlr,$tr if($tr);
+      next if ($tr eq "unused");
+      push @tlr,"$e: $tr" if($tr);
     }
     $ret .= "\n\n templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
   }
@@ -1115,7 +1176,6 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"configCheck","param","peerCheck","peerXref"
             ,"protoEvents","msgStat","rssi"
             ,"models"
-            ,"clear"
             ,"regCheck","register"
             ,"templateList","templateChk"
             );
@@ -1151,7 +1211,7 @@ sub HMinfo_SetFn($@) {#########################################################
     }
     if ($type ne "msgStat"){
       return "unknown parameter - use Protocol, readings, msgStat, register, rssi or all"
-            if ($type !~ m/^(Protocol|readings|register|rssi|all)$/);
+            if ($type !~ m/^(Protocol|readings|register|rssi|all|trigger)$/);
       $opt .= "d" if ($type =~ m/(Protocol|rssi)/);# readings apply to all, others device only
       my @entities;
       $type = "msgEvents" if ($type eq "Protocol");# translate parameter
@@ -1235,18 +1295,8 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = HMinfo_archConfig($hash,$name,$opt,($a[0]?$a[0]:""));
   }
 
-  elsif($cmd eq "?")          {##action: get commandlist-----------------------
-    my @cmdLst =     
-           ( "autoReadReg","clear"  
-            ,"archConfig:-0,-a","saveConfig","verifyConfig","loadConfig","purgeConfig","update"
-            ,"cpRegs"
-            ,"tempList tempListTmpl"
-            ,"templateDef","templateSet");
-    $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
-  }
-
   ### redirect set commands to get - thus the command also work in webCmd
-  elsif(HMinfo_GetFn($hash,$name,"?") =~ m/\b$cmd\b/){##----------------
+  elsif($cmd ne '?' && HMinfo_GetFn($hash,$name,"?") =~ m/\b$cmd\b/){##----------------
     unshift @a,"-f",$filter if ($filter);
     unshift @a,"-".$opt if ($opt);
     $ret = HMinfo_GetFn($hash,$name,$cmd,@a);
@@ -1254,8 +1304,10 @@ sub HMinfo_SetFn($@) {#########################################################
 
   else{
     my @cmdLst =     
-           ( "autoReadReg","clear"  
-            ,"archConfig:-0,-a","saveConfig","loadConfig","purgeConfig","update"
+           ( "autoReadReg"
+            ,"clear"    #:msgStat,Protocol,all,rssi,register,trigger,readings"  
+            ,"archConfig:-0,-a","saveConfig","verifyConfig","loadConfig","purgeConfig"
+            ,"update"
             ,"cpRegs"
             ,"tempList tempListTmpl"
             ,"templateDef","templateSet");
@@ -2014,7 +2066,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfoarchConfig">archConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
           performs <a href="#HMinfosaveConfig">saveConfig</a> for entities that appeare to have achanged configuration.
           It is more conservative that saveConfig since incomplete sets are not stored.<br>
-          option -a force an archieve for all devices that have a complete set of data<br>
+          Option -a force an archieve for all devices that have a complete set of data<br>
       </li>
       <li><a name="#HMinfoloadConfig">loadConfig</a> <a href="#HMinfoFilter">[filter] [&lt;file&gt;]</a><br>
           loads register and peers from a file saved by <a href="#HMinfosaveConfig">saveConfig</a>.<br>
