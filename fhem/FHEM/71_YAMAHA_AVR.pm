@@ -83,7 +83,7 @@ YAMAHA_AVR_GetStatus($;$)
     }
 
     # get all available inputs and scenes if nothing is available
-    if((not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0) or (not defined($hash->{helper}{SCENES}) or length($hash->{helper}{SCENES}) == 0))
+    if((not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0))
     {
 		YAMAHA_AVR_getInputs($hash);
     }
@@ -154,7 +154,7 @@ YAMAHA_AVR_Set($@)
     }
 
     # get all available inputs if nothing is available
-    if((not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0) or (not defined($hash->{helper}{SCENES}) or length($hash->{helper}{SCENES}) == 0))
+    if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
     {
 		YAMAHA_AVR_getInputs($hash);
     }
@@ -174,9 +174,10 @@ YAMAHA_AVR_Set($@)
     return "No Argument given" if(!defined($a[1]));     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown ".(defined($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"")."mute:on,off,toggle remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".(defined($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"").($hash->{helper}{SELECTED_ZONE} eq "mainzone" ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".(exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").(exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")." enhancer:on,off " : "")."sleep:off,30min,60min,90min,120min,last statusRequest:noArg";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown ".(exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"")."mute:on,off,toggle remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".(exists($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"").($hash->{ACTIVE_ZONE} eq "mainzone" ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".(exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").(exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")." enhancer:on,off " : "")."sleep:off,30min,60min,90min,120min,last statusRequest:noArg";
 
     Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a);
+    
     if($what eq "on")
     {		
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what,undef);
@@ -784,6 +785,11 @@ YAMAHA_AVR_ParseResponse ($$$)
     my $cmd = $param->{cmd};
     my $arg = $param->{arg};
     
+    if(exists($param->{code}))
+    {
+        Log3 $name, 5, "YAMAHA_AVR ($name) - received HTTP code ".$param->{code}." for command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
+    }
+    
     if($err ne "")
     {
         Log3 $name, 5, "YAMAHA_AVR ($name) - could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $err";
@@ -964,6 +970,10 @@ YAMAHA_AVR_ParseResponse ($$$)
                 
                 # input name as it is displayed on the receivers front display
                 if($data =~ /<Input>.*?<Title>\s*(.+?)\s*<\/Title>.*<\/Input>/)
+                {
+                    readingsBulkUpdate($hash, "inputName", $1);
+                }
+                elsif($data =~ /<Input>.*?<Input_Sel_Title>\s*(.+?)\s*<\/Input_Sel_Title>.*<\/Input>/)
                 {
                     readingsBulkUpdate($hash, "inputName", $1);
                 }
