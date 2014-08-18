@@ -28,6 +28,7 @@ sub WMBUS_Initialize($) {
   $hash->{AttrFn}    = "WMBUS_Attr";
   $hash->{AttrList}  = "IODev".
                        " AESkey".
+                       " ignore:0,1".
                        " $readingFnAttributes";
 }
 
@@ -324,7 +325,7 @@ WMBUS_Attr(@)
   will fail and no relevant data will be available.
   <br><br>
   <b>Prerequisites</b><br>
-  This module requires the perl module Crypt::CBC, Digest::CRC and Crypt::OpenSSL::AES (AES only if encrypted messages should be processed).<br>
+  This module requires the perl modules Crypt::CBC, Digest::CRC and Crypt::OpenSSL::AES (AES only if encrypted messages should be processed).<br>
   On a debian based system these can be installed with<br>
   <code>
   sudo apt-get install libcrypt-cbc-perl libdigest-crc-perl libssl-dev<br>
@@ -336,7 +337,7 @@ WMBUS_Attr(@)
   <ul>
     <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt;]|&lt;bHexCode&gt;</code> <br>
     <br>
-    Normally a WMBus device isn't defined manually but automatically through the autocreate mechanism upon the first reception of a message.
+    Normally a WMBus device isn't defined manually but automatically through the <a href="#autocreate">autocreate</a> mechanism upon the first reception of a message.
     <br>
     For a manual definition there are two ways.
     <ul>
@@ -372,6 +373,9 @@ WMBUS_Attr(@)
 	 <li>AESKey<br>
 			A 16 byte AES-Key in hexadecimal digits. Used to decrypt messages from meters which have encryption enabled.
 	</li>
+  <li>
+    <a href="#ignore">ignore</a>
+  </li>
   </ul>
 	<br>
   <a name="WMBUSreadings"></a>
@@ -435,7 +439,7 @@ WMBUS_Attr(@)
     <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt;]|&lt;bHexCode&gt;</code> <br>
     <br>
     Normalerweise wird ein WMBus Device nicht manuell angelegt. Dies geschieht automatisch bem Empfang der ersten Nachrichten eines Ger&auml;tes &uuml;ber den 
-    fhem autocreate Mechanismus.
+    fhem <a href="#autocreate">autocreate</a> Mechanismus.
     <br>
     F&uuml;r eine manuelle Definition gibt es zwei Wege.
     <ul>
@@ -473,7 +477,10 @@ WMBUS_Attr(@)
 			Ein 16 Bytes langer AES-Schl&uuml;ssel in hexadezimaler Schreibweise. Wird verwendet um Nachrichten von Z&auml;hlern zu entschl&uuml;sseln bei denen
 			die Verschl&uuml;sselung aktiviert ist.
 	</li>
-  </ul>
+  <li>
+    <a href="#ignore">ignore</a>
+  </li>
+	</ul>
 	<br>
   <a name="WMBUSreadings"></a>
   <b>Readings</b><br>
