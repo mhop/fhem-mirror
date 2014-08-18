@@ -2398,7 +2398,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           if ($reqPeer){
             my $flag = CUL_HM_getFlag($shash);
             my $ioId = CUL_HM_IoId($shash);
-            my @peerID = split(",",(AttrVal($chnName,"peerIDs","");
+            my @peerID = split(",",(AttrVal($chnName,"peerIDs","")));
             foreach my $l (split ",",$chnhash->{helper}{getCfgListNo}){
               next if (!$l);
               my $listNo = "0".$l;
