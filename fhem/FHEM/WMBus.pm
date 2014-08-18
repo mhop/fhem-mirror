@@ -16,6 +16,8 @@ require Exporter;
 my @ISA = qw(Exporter);
 my @EXPORT = qw(new parse parseLinkLayer parseApplicationLayer manId2ascii type2string);
 
+sub manId2ascii($$);
+
 
 use constant {
 	# sent by meter
@@ -128,10 +130,17 @@ sub valueCalcDateTime($$) {
 	
 	
 	my $datePart = $value >> 16;
-	my $min = ($value & 0b111111);
-	my $hour = ($value & 0b11111) >> 6;
+	my $timeInvalid = $value & 0b10000000;
 	
-	return valueCalcDate($datePart, $dataBlock) . sprintf(' %02d:%02d', $hour, $min);
+	my $dateTime = valueCalcDate($datePart, $dataBlock);
+	if ($timeInvalid == 0) {
+		my $min = ($value & 0b111111);
+		my $hour = ($value >> 6) & 0b11111;
+		my $su = ($value & 0b10000000000000000);
+	  $dateTime .= sprintf(' %02d:%02d %s', $hour, $min, $su ? 'DST' : '');
+	}
+	
+	return $dateTime;  
 }
 
 sub valueCalcHex($$) {
@@ -331,12 +340,36 @@ my %VIFInfo = (
 	},
 );	
 
-# Codes used with extension indicator $FD
-my %VIFInfo_FD = (                              
+# Codes used with extension indicator $FD, see 8.4.4 on page 80
+my %VIFInfo_FD = (  
+	VIF_CREDIT  => {                        #  Credit of 10nn-3 of the nominal local legal currency units
+	  typeMask     => 0b01111100,
+	  expMask      => 0b00000011,
+	  type         => 0b00000000,
+		bias         => -3,
+		unit         => '€',
+		calcFunc     => \&valueCalcNumeric,
+	},
+	VIF_DEBIT  => {                         #  Debit of 10nn-3 of the nominal local legal currency units
+	  typeMask     => 0b01111100,
+	  expMask      => 0b00000011,
+	  type         => 0b00000100,
+		bias         => -3,
+		unit         => '€',
+		calcFunc     => \&valueCalcNumeric,
+	},
 	VIF_ACCESS_NO  => {                     #  Access number (transmission count)
 	  typeMask     => 0b01111111,
 	  expMask      => 0b00000000,
 	  type         => 0b00001000,
+		bias         => 0,
+		unit         => '',
+		calcFunc     => \&valueCalcNumeric,
+	},
+	VIF_MEDIUM  => {                        #  Medium (as in fixed header)
+	  typeMask     => 0b01111111,
+	  expMask      => 0b00000000,
+	  type         => 0b00001001,
 		bias         => 0,
 		unit         => '',
 		calcFunc     => \&valueCalcNumeric,
@@ -349,13 +382,37 @@ my %VIFInfo_FD = (
 		unit         => '',
 		calcFunc     => \&valueCalcNumeric,
 	},
-	VIF_ERROR_FLAGS => {                  #  Error flags (binary)
+	VIF_ERROR_FLAGS => {                    #  Error flags (binary)
 	  typeMask     => 0b01111111,
 	  expMask      => 0b00000000,
 	  type         => 0b00010111,
 		bias         => 0,
 		unit         => '',
 		calcFunc     => \&valueCalcHex,
+	},
+	VIF_VOLTAGE => {                        #  10nnnn-9 Volts
+	  typeMask     => 0b01110000,
+	  expMask      => 0b00001111,
+	  type         => 0b01000000,
+		bias         => -9,
+		unit         => 'V',
+		calcFunc     => \&valueCalcNumeric,
+	},	
+	VIF_ELECTRICAL_CURRENT => {             #  10nnnn-12 Ampere
+	  typeMask     => 0b01110000,
+	  expMask      => 0b00001111,
+	  type         => 0b01010000,
+		bias         => -12,
+		unit         => 'A',
+		calcFunc     => \&valueCalcNumeric,
+	},	
+	VIF_RECEPTION_LEVEL => {                  #   reception level of a received radio device.
+	  typeMask     => 0b01111111,
+	  expMask      => 0b00000000,
+	  type         => 0b01110001,
+		bias         => 0,
+		unit         => 'dBm',
+		calcFunc     => \&valueCalcNumeric,
 	},
 );
 
@@ -506,7 +563,7 @@ sub removeCRC($$)
 
 sub manId2hex($$)
 {
-	my $self = shift;
+	my $class = shift;
 	my $idascii = shift;
 	
 	return (ord(substr($idascii,1,1))-64) << 10 | (ord(substr($idascii,2,1))-64) << 5 | (ord(substr($idascii,3,1))-64);
@@ -514,7 +571,7 @@ sub manId2hex($$)
 
 sub manId2ascii($$)
 {
-	my $self = shift;
+	my $class = shift;
 	my $idhex = shift;
 		
 	return chr(($idhex >> 10) + 64) . chr((($idhex >> 5) & 0b00011111) + 64) . chr(($idhex & 0b00011111) + 64);
@@ -576,6 +633,7 @@ sub decodeValueInformationBlock($$$) {
 	my $bias;
 	my $exponent;
 	my $vifInfoRef = \%VIFInfo;
+	my $vifExtension = 0;
 	
 	$vif = unpack('C', $vib);
 	$offset = 1;
@@ -584,18 +642,20 @@ sub decodeValueInformationBlock($$$) {
 
 	if ($isExtension) {
 		# switch to extension codes
-		if ($vif == 0xFD) {
+		$vifExtension = $vif;
+		if ($vifExtension == 0xFD) {
 			$vifInfoRef = \%VIFInfo_FD;
-		} elsif ($vif == 0xFB) {
+		} elsif ($vifExtension == 0xFB) {
 			$vifInfoRef = \%VIFInfo_FB;
-		} elsif ($vif == 0xFF) {
+		} elsif ($vifExtension == 0xFF) {
 			# manufacturer specific data, can't be interpreted
 			$dataBlockRef->{type} = "MANUFACTURER SPECIFIC";
 			$dataBlockRef->{unit} = "";
+			$dataBlockRef->{value} = "";
 			return $offset;
 	  } else {
-			$self->{errormsg} = "unknown VIFE " . sprintf("%x", $vif) . " at offset $offset-1";
-			$self->{errorcode} = ERR_UNKNOWN_VIFE;		
+			$dataBlockRef->{errormsg} = "unknown VIFE " . sprintf("%x", $vifExtension) . " at offset $offset-1";
+			$dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;		
 		}
 		$vif = unpack('C', substr($vib,$offset++,1));
 	}
@@ -626,8 +686,8 @@ sub decodeValueInformationBlock($$$) {
 	}
 	
 	if ($dataBlockRef->{type} eq '') {
-		$self->{errormsg} = "unknown VIF " . sprintf("%x",$vif);
-		$self->{errorcode} = ERR_UNKNOWN_VIF;
+		$dataBlockRef->{errormsg} = sprintf("in VIFExtension %x unknown VIF %x",$vifExtension, $vif);
+		$dataBlockRef->{errorcode} = ERR_UNKNOWN_VIF;
 	}
 	
 	return $offset;
@@ -663,8 +723,8 @@ sub decodeDataInformationBlock($$$) {
 		$isExtension = $dif & DIF_EXTENSION_BIT;
 		$difExtNo++;
 		if ($difExtNo > 10) {
-			$self->{errormsg} = 'too many DIFE';
-			$self->{errorcode} = ERR_TOO_MANY_DIFE;
+			$dataBlockRef->{errormsg} = 'too many DIFE';
+			$dataBlockRef->{errorcode} = ERR_TOO_MANY_DIFE;
 			last EXTENSION;
 		}
 		
@@ -720,6 +780,7 @@ sub decodePayload($$) {
 		# create a new anonymous hash reference
 		$dataBlock = {};
 		$dataBlock->{number} = $dataBlockNo;
+		$dataBlock->{unit} = '';
 		
 		while (unpack('C',substr($payload,$offset,1)) == 0x2f) {
 			# skip filler bytes
@@ -731,7 +792,6 @@ sub decodePayload($$) {
 		}
 		
 		$offset += $self->decodeDataRecordHeader(substr($payload,$offset), $dataBlock);
-
 		#printf("No. %d, type %x at offset %d\n", $dataBlockNo, $dataBlock->{dataField}, $offset-1);
 		
 		if ($dataBlock->{dataField} == DIF_NONE || $dataBlock->{dataField} == DIF_READOUT) {
@@ -787,6 +847,8 @@ sub decodePayload($$) {
 		if (defined $dataBlock->{calcFunc}) {
 			$dataBlock->{value} = $dataBlock->{calcFunc}->($value, $dataBlock); 
 			#print "Value raw " . $value . " value calc " . $dataBlock->{value} ."\n";
+		} else {
+			$dataBlock->{value} = "";
 		}
 		
 		push @dataBlocks, $dataBlock;
@@ -840,7 +902,7 @@ sub decodeApplicationLayer($) {
 		($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw}) 
 			= unpack('VvCCCCn', substr($applicationlayer,$offset)); 
 	  $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
-  	$self->{meter_manufacturer} = $self->manId2ascii($self->{meter_man});
+#   	$self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
 		$offset += 12;
   } else {
 		# unsupported
@@ -919,7 +981,10 @@ sub decodeLinkLayer($$)
 		return 0;
 	}
 
-	$self->{manufacturer} = $self->manId2ascii($self->{mfield});
+	# according to the MBus spec only upper case letters are allowed.
+	# some devices send lower case letters none the less
+	# convert to upper case to make them spec conformant
+	$self->{manufacturer} = uc($self->manId2ascii($self->{mfield}));
 	$self->{typestring} =  $validDeviceTypes{$self->{afield_type}} || 'unknown';
 	return 1;
 }
