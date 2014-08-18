@@ -114,7 +114,7 @@ WMBUS_Define($$)
 		if ($mb->parseApplicationLayer()) {
 			if ($mb->{cifield} == WMBus::CI_RESP_12) { 
 				$hash->{Meter_Id} = $mb->{meter_id};
-				$hash->{Meter_Manufacturer} = $mb->manId2ascii($mb->{meter_man});
+				$hash->{Meter_Manufacturer} = $mb->{meter_manufacturer};
 				$hash->{Meter_Version} = $mb->{meter_vers};
 				$hash->{Meter_Dev} = $mb->{meter_devtypestring};
 				$hash->{Access_No} = $mb->{access_no};
@@ -241,6 +241,9 @@ sub WMBUS_SetReadings($$$)
 				readingsBulkUpdate($hash, "$dataBlock->{number}:type", $dataBlock->{type}); 
 				readingsBulkUpdate($hash, "$dataBlock->{number}:value", $dataBlock->{value}); 
 				readingsBulkUpdate($hash, "$dataBlock->{number}:unit", $dataBlock->{unit});
+				if ($dataBlock->{errormsg}) {
+					readingsBulkUpdate($hash, "$dataBlock->{number}:errormsg", $dataBlock->{errormsg});
+				}
 			}
 		}
 	}
