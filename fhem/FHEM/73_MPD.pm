@@ -21,6 +21,8 @@
 #  GNU General Public License for more details.
 ################################################################
 
+# Version 1.01   - 18.08.14
+# add set toggle command
 # Version 1.0   - 21.02.14
 # add german doc , readings & state times only on change, devStateIcon
 # Version 0.95  - 17.02.14
@@ -73,7 +75,8 @@ my %sets = (
    "interval"              => "",
    "mpdCMD"                => "",
    "reset:noArg"           => "",
-   "IdleNow:noArg"         => ""
+   "IdleNow:noArg"         => "",
+   "toggle:noArg"          => ""
    
   );
 
@@ -304,6 +307,13 @@ sub MPD_Set($@)
  if ($cmd eq "pause")   { $ret = mpd_cmd($hash, "pause");   }
  if ($cmd eq "stop")    { $ret = mpd_cmd($hash, "stop");  }
  if ($cmd eq "update")  { $ret = mpd_cmd($hash, "update");  }
+ 
+ if ($cmd eq "toggle")  
+  { 
+    $ret = mpd_cmd($hash, "play") if (($hash->{STATE} eq "stop") || ($hash->{STATE} eq "pause"));  
+    $ret = mpd_cmd($hash, "stop") if ($hash->{STATE} eq "play");
+  }
+
  if ($cmd eq "previous")
  { 
     if (defined($hash->{READINGS}{"song"}{VAL}) > 0)
@@ -936,6 +946,7 @@ FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f
     next     => like MPC next, play next song in playlist<br>
     random   => like MPC random, toggel on/off<br>
     repaet   => like MPC repeat, toggel on/off<br>
+    toggle   => toggles from play to stop or from stop/pause to play<br>
     updateDb => like MPC update<br>
     volume (%) => like MPC volume %, 0 - 100<br>
     volumeUp => inc volume ( + attr volumeStep size )<br>
@@ -1026,6 +1037,7 @@ FHEM Forum : <a href='http://forum.fhem.de/index.php/topic,18517.0.html'>Modul f
     next => spielt den n&aumlchsten Titel in der Playliste<br>
     random => zuf&auml;llige Wiedergabe an/aus<br>
     repaet => Wiederholung an/aus<br>
+    toggle => wechselt von play nach stop bzw. stop/pause nach play<br>
     volume (%) => &auml;ndert die Lautst&auml;rke von 0 - 100%<br>
     volumeUp => Lautst&auml;rke schrittweise erh&ouml;hen , Schrittweite = ( attr volumeStep size )<br>
     volumeDown => Lautst&auml;rke schrittweise erniedrigen , Schrittweite = ( attr volumeStep size )<br>
