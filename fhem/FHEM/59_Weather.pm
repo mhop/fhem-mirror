@@ -219,8 +219,14 @@ sub Weather_RetrieveData($$)
   my $url = "http://weather.yahooapis.com/forecastrss?w=" . $location . "&u=" . $units;
   
   if ($blocking) {
-  	my $response = GetFileFromURL($url, 5, undef, 0);
-    
+  	#my $response = GetFileFromURL($url, 5, undef, 0);
+  	my $response = HttpUtils_BlockingGet(
+			{
+			  url        => $url,
+			  timeout    => 5,
+			  #noshutdown => 0,
+			}
+			);
     my %param = (hash => $hash, doTrigger => 0);
     Weather_RetrieveDataFinished(\%param, undef, $response);
   }
@@ -229,7 +235,7 @@ sub Weather_RetrieveData($$)
       {
           url        => $url,
           timeout    => 5,
-          noshutdown => 0,
+          #noshutdown => 0,
           hash       => $hash,
           doTrigger  => 1,
           callback   => \&Weather_RetrieveDataFinished,
