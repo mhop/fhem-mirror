@@ -244,7 +244,7 @@ $modules{Global}{AttrList} =
   "mseclog:1,0 version nofork:1,0 logdir holiday2we " .
   "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
-  "exclude_from_update motd updatebranch uniqueID ".
+  "exclude_from_update motd restoreDirs uniqueID ".
   "sendStatistics:onUpdate,manually,never updateInBackground:1,0 ".
   "showInternalValues:1,0 ";
 $modules{Global}{AttrFn} = "GlobalAttr";

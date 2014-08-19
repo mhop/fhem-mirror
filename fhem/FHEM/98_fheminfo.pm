@@ -217,7 +217,7 @@ CommandFheminfo($$)
   $ret = $str;
 
   if(@args != 0 && $args[0] eq "send") {
-    my $uri = "http://fhem.de/stats/statistics.cgi";
+    my $uri = "http://fhem.de/stats/statistics.html";
     my $req = HTTP::Request->new("POST",$uri);
     $req->content_type("application/x-www-form-urlencoded");
     my $contInfo;
@@ -410,7 +410,7 @@ sub _myDiv($$) {
     The optional parameter <code>send</code> transmitts the collected data
     to a central server in order to support the development of FHEM. The
     transmitted data is processed graphically. The results can be viewed
-    on <a href="http://fhem.de/stats/statistics.cgi">http://fhem.de/stats/statistics.cgi</a>.
+    on <a href="http://fhem.de/stats/statistics.html">http://fhem.de/stats/statistics.html</a>.
     Based on the IP address, the approximate location is determined with
     an accuracy of about 40-80 km. The IP address is not saved.
   <br>
@@ -530,7 +530,7 @@ sub _myDiv($$) {
     Der optionale Parameter <code>send</code> &uuml;bertr&auml;gt die Informationen
     an einen zentralen Server um die Entwicklung von FHEM zu unterst&uuml;tzen.
     Die &uuml;bermittelten Daten werden grafisch aufbereitet und k&ouml;nnen auf
-    <a href="http://fhem.de/stats/statistics.cgi">http://fhem.de/stats/statistics.cgi</a>
+    <a href="http://fhem.de/stats/statistics.html">http://fhem.de/stats/statistics.html</a>
     abgerufen werden. Anhand der IP-Adresse wird der ungef&auml;hre Standort mit
     einer Genauigkeit von ca. 40-80 km ermittelt. Die IP-Adresse wird nicht gespeichert.
   <br>
