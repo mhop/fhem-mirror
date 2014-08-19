@@ -60,6 +60,7 @@
       <a href="#reload">reload</a> &nbsp;
       <a href="#rename">rename</a> &nbsp;
       <a href="#rereadcfg">rereadcfg</a> &nbsp;
+      <a href="#restore">restore</a> &nbsp;
       <a href="#save">save</a> &nbsp;
       <a href="#set">set</a> &nbsp;
       <a href="#setdefaultattr">setdefaultattr</a> &nbsp;
@@ -1159,28 +1160,6 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
         Nachricht zu erstellen.
     </li><br>
 
-    <a name="updateInBackground"></a>
-    <li>updateInBackground<br>
-        wenn dieses Attribut gesetzt ist, wird das update Befehl in einem
-        separaten Prozess ausgef&uuml;hrt, und alle Meldungen werden per Event
-        &uuml;bermittelt. In der telnet Sitzung wird inform, in FHEMWEB wird
-        das Event Monitor aktiviert.
-        </li><br>
-
-    <a name="backup_before_update"></a>
-    <li>backup_before_update<br>
-        Wenn dieses Attribut auf &quot;0&quot; gesetzt wurde, erstellt FHEM keine 
-    Sicherheitskopie Ihrer Installation bei Verwendung des Befehls <a href="#backup">backup</a>. 
-    Die Standardeinstellung ist die Erstellung einer Sicherheitskopie vor einem 
-    Update.<br>
-        Hinweis: Setzen Sie dieses Attribut nur wenn Sie sich sicher sind!<br>
-        Das Attribut wird vom <a href="#update">update</a> Befehl benutzt.<br>
-        Beispiel:<br>
-        <ul>
-          attr global backup_before_update 0
-        </ul>
-    </li><br>
-
     <a name="backupcmd"></a>
     <li>backupcmd<br>
         Sie k&ouml;nnen das Update durch Ihre eigenen Befehle/Skripts durchf&uuml;hren 
@@ -1232,17 +1211,6 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
         Enth&auml;lt den Namen der FHEM Konfigurationsdatei. Wenn <a href="#save">save</a> 
     ohne Argumente aufgerufen wird dann wird die Ausgabedatei unter diesem 
     Dateinamen gespeichert.
-    </li><br>
-
-    <a name="exclude_from_update"></a>
-    <li>exclude_from_update<br>
-        Enth&auml;lt eine Liste durch Leerzeichen getrennter Dateien welche nicht im 
-    Update ber&uuml;cksichtigt werden. Dieses Attribut wird vom <a href="#update">update</a> 
-    Befehl benutzt.<br>
-        Beispiel:<br>
-        <ul>
-          attr global exclude_from_update 21_OWTEMP.pm temp4hum4.gplot FS20.on.png FS20.off.png
-        </ul>
     </li><br>
 
     <a name="holiday2we"></a>

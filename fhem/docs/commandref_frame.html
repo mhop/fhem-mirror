@@ -61,6 +61,7 @@
       <a href="#quit">quit</a> &nbsp;
       <a href="#reload">reload</a> &nbsp;
       <a href="#rename">rename</a> &nbsp;
+      <a href="#restore">restore</a> &nbsp;
       <a href="#rereadcfg">rereadcfg</a> &nbsp;
       <a href="#save">save</a> &nbsp;
       <a href="#set">set</a> &nbsp;
@@ -1103,27 +1104,6 @@ A line ending with \ will be concatenated with the next one, so long lines
         receiving a corresponding message.
     </li><br>
 
-    <a name="updateInBackground"></a>
-    <li>updateInBackground<br>
-        If this attribute is set to 1, the update will be executed in the
-        backgrund process. The return message is communicated via events, and
-        in telnet the inform command is activated, in FHEMWEB the Event
-        Monitor.
-        </li><br>
-
-    <a name="backup_before_update"></a>
-    <li>backup_before_update<br>
-        If this attribute is set to 0, an update skip always backing up your
-        installation via the <a href="#backup">backup</a> command. The default
-        is to backup always before updates.<br>
-        Note: Set this attribute only if you know what you do!<br>
-        This Attribute is used by the <a href="#update">update</a> command.<br>
-        Example:<br>
-        <ul>
-          attr global backup_before_update 0
-        </ul>
-    </li><br>
-
     <a name="backupcmd"></a>
     <li>backupcmd<br>
         You could pass the backup to your own command / script by using this attribute.
@@ -1172,16 +1152,6 @@ A line ending with \ will be concatenated with the next one, so long lines
         Contains the name of the fhem configuration file. If <a
         href="#save">save</a> is called without argument, then the output will
         be written to this file.
-    </li><br>
-
-    <a name="exclude_from_update"></a>
-    <li>exclude_from_update<br>
-        Contains a space separated list of file which will be excluded by an update.
-        This Attribute is used by the <a href="#update">update</a> command.<br>
-        Example:<br>
-        <ul>
-          attr global exclude_from_update 21_OWTEMP.pm temp4hum4.gplot FS20.on.png FS20.off.png
-        </ul>
     </li><br>
 
     <a name="holiday2we"></a>
@@ -1274,25 +1244,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     </li><br>
 
     <li><a href="#fheminfo">uniqueID</a>
-
-    <a name="updatebranch"></a>
-    <li>updatebranch<br>
-        The update branch will be set by the file FhemUtils/release.pm contained
-        in the modpath. For example, if a stable version (version 5.3 upwards) of
-        fhem is installed via a direct download connection of the archieve on the
-        fhem-website, then the branch of the update is automatically on "stable".
-        In this branch, only updates fixing confirmed errors, relevant security
-        fixes or new stable versions are provided.<br>
-        By using the command "update development &lt;filename&gt;", particular files
-        or packages can always be installed directly from the development branch
-        (e.g. "update development &lt;package&gt;").<br>
-        If you want to update from the development branch in stable verion in
-        general, you can force this behaviour by using the attribute "updatebranch DEVELOPMENT".
-        In case the installation of fhem should generally using the development
-        branch, this attribute would not have to be set. Instead, use "update development force"
-        to update all files including release.pm (containing the release-information)
-        to the newest version.
-    </li><br>
 
     <a name="userattr"></a>
     <li>userattr<br>
