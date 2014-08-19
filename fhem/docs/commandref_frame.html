@@ -485,6 +485,11 @@ A line ending with \ will be concatenated with the next one, so long lines
             seconds between the current and the previous evaluation. Granularity
             of time is one second. No value is calculated if the time past is
             below one second.  Useful to calculate rates.</li>
+        <li>integral: reverse function of differential. The result is incremented 
+            by the product of the time difference between the last two readings 
+            and the avarage of the last two readings. <br>
+            result += (time - timeold) * (oldval + value) / 2
+            </li>
         <li>offset: if the current evaluated value is smaler than the previously
             evaluated value the reading is incremented by the previous value.
             the reading can then be used as an offset correct for a counter that

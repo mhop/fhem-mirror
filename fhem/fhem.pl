@@ -3483,6 +3483,15 @@ readingsEndUpdate($$)
         if(defined($deltav) && defined($deltat) && ($deltat>= 1.0)) {
           $result= $deltav/$deltat;
         }
+      } elsif($modifier eq "integral") {
+        if(defined($oldt) && defined($oldvalue)) {
+          my $deltat= $hash->{".updateTime"} - $oldt if(defined($oldt));
+          my $avgval= ($value + $oldvalue) / 2;
+          $result = ReadingsVal($name,$userReading,$value);
+          if(defined($deltat) && $deltat>= 1.0) {
+            $result+= $avgval*$deltat;
+          }
+        }
       } elsif($modifier eq "offset") {
         $oldvalue = $value if( !defined($oldvalue) );
         $result = ReadingsVal($name,$userReading,0);
