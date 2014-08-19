@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  avoid updating weather information on get (59_Weather.pm)
   - change:  removed noshutdown=0 for HTTP connections made in 57_Calendar.pm
 	     and 59_Weather.pm to address issues when FHEM is behind 
 	     a web proxy

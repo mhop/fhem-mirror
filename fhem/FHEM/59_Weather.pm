@@ -423,15 +423,14 @@ sub Weather_Get($@) {
 
   return "argument is missing" if(int(@a) != 2);
 
-  Weather_GetUpdateLocal($hash);
-
   my $reading= $a[1];
   my $value;
 
   if(defined($hash->{READINGS}{$reading})) {
         $value= $hash->{READINGS}{$reading}{VAL};
   } else {
-        return "no such reading: $reading";
+        return "Unknown reading $reading, choose one of " .
+	  join(" ", sort keys($hash->{READINGS}));
   }
 
   return "$a[0] $reading => $value";
