@@ -196,13 +196,12 @@ doUpdate($$)
     return if(!$remFile); # Error already reported
 
     if(length($remFile) ne $r[2]) {
-      uLog 1, "$remFile is ".length($remFile)." bytes, not $r[2] as expected";
+      uLog 1, "$fName is ".length($remFile)." bytes, not $r[2] as expected";
       uLog 1, "aborting.";
       return;
     }
 
     return if(!upd_writeFile($root, $restoreDir, $fName, $remFile));
-
   }
 
   if($nChanged == 0) {
