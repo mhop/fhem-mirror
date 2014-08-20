@@ -196,10 +196,11 @@ doUpdate($$)
     return if(!$remFile); # Error already reported
 
     if(length($remFile) ne $r[2]) {
-      uLog 1, "$fName is ".length($remFile)." bytes, not $r[2] as expected";
+      uLog 1,
+          "Got ".length($remFile)." bytes for $fName, not $r[2] as expected,";
       if($attr{global}{verbose} == 5) {
         upd_writeFile($root, $restoreDir, "$fName.corrupt", $remFile);
-        uLog 1, "saving it to $fName.corrupt";
+        uLog 1, "saving it to $fName.corrupt .";
         next;
       } else {
         uLog 1, "aborting.";
