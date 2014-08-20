@@ -431,7 +431,7 @@ sub Weather_Get($@) {
   } else {
         my $rt= ""; 
         if(defined($hash->{READINGS})) {
-                $rt= join(" ", sort keys($hash->{READINGS}));
+                $rt= join(" ", sort keys %{$hash->{READINGS}});
         }   
         return "Unknown reading $reading, choose one of " . $rt;
   }
