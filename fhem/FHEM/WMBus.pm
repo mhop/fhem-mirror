@@ -103,7 +103,7 @@ sub valueCalcDate($$) {
 	if ($day > 31 || $month > 12 || $year > 2099) {
 		return "invalid";
 	} else {
-		return $year . "-" . $month . "-" . $day; 
+		return sprintf("%04d-%02d-%02d", $year, $month, $day); 
 	}
 }
 
@@ -135,9 +135,13 @@ sub valueCalcDateTime($$) {
 	my $dateTime = valueCalcDate($datePart, $dataBlock);
 	if ($timeInvalid == 0) {
 		my $min = ($value & 0b111111);
-		my $hour = ($value >> 6) & 0b11111;
-		my $su = ($value & 0b10000000000000000);
-	  $dateTime .= sprintf(' %02d:%02d %s', $hour, $min, $su ? 'DST' : '');
+		my $hour = ($value >> 8) & 0b11111;
+		my $su = ($value & 0b1000000000000000);
+		if ($min > 59 || $hour > 23) {
+			$dateTime = 'invalid';
+	  } else {
+			$dateTime .= sprintf(' %02d:%02d %s', $hour, $min, $su ? 'DST' : '');
+		}
 	}
 	
 	return $dateTime;  
@@ -848,7 +852,7 @@ sub decodePayload($$) {
 			$dataBlock->{value} = $dataBlock->{calcFunc}->($value, $dataBlock); 
 			#print "Value raw " . $value . " value calc " . $dataBlock->{value} ."\n";
 		} else {
-			$dataBlock->{value} = "";
+			$dataBlock->{value} = $value;
 		}
 		
 		push @dataBlocks, $dataBlock;
