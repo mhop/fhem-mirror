@@ -429,8 +429,11 @@ sub Weather_Get($@) {
   if(defined($hash->{READINGS}{$reading})) {
         $value= $hash->{READINGS}{$reading}{VAL};
   } else {
-        return "Unknown reading $reading, choose one of " .
-	  join(" ", sort keys($hash->{READINGS}));
+        my $rt= ""; 
+        if(defined($hash->{READINGS})) {
+                $rt= join(" ", sort keys($hash->{READINGS}));
+        }   
+        return "Unknown reading $reading, choose one of " . $rt;
   }
 
   return "$a[0] $reading => $value";
