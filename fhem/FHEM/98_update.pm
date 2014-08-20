@@ -235,11 +235,13 @@ doUpdate($$)
 
   uLog(1, "");
   uLog 1,
-      'update finished, "shutdown restart" is needed to activate the changes';
+      'update finished, "shutdown restart" is needed to activate the changes.';
   my $ss = AttrVal("global","sendStatistics",undef);
   if(!defined($ss)) {
+    uLog(1, "");
     uLog(1, "Please consider using the global attribute sendStatistics");
   } elsif(defined($ss) && lc($ss) eq "onupdate") {
+    uLog(1, "");
     uLog(1, AnalyzeCommandChain(undef, "fheminfo send"));
   }
 }
