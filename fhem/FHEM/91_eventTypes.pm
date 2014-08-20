@@ -37,6 +37,7 @@ eventTypes_Define($$)
 
   my ($err, @content) = FileRead($f);
   foreach my $l (@content) {
+    next if(!defined($l));
     next if($l =~ m/ CULHM (SND|RCV) /);
     next if($l =~ m/ UNKNOWNCODE /);
     next if($l =~ m/^\d+ global /);
