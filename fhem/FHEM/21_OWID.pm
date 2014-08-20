@@ -54,7 +54,7 @@ use Time::HiRes qw(gettimeofday);
 use strict;
 use warnings;
 
-#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+#add FHEM/lib to @INC if it is not already included. Should rather be in fhem.pl than here though...
 BEGIN {
   if (!grep(/FHEM\/lib$/,@INC)) {
     foreach my $inc (grep(/FHEM$/,@INC)) {
@@ -68,7 +68,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log($$);
 
-my $owx_version="5.14";
+my $owx_version="5.15";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -222,6 +222,14 @@ sub OWID_Define ($$) {
   return undef;
 }
 
+#########################################################################################
+#
+# OWID_Notify - Implements NotifyFn function
+# 
+# Parameter hash = hash of device addressed, dev = device name
+#
+#########################################################################################
+
 sub OWID_Notify ($$) {
   my ($hash,$dev) = @_;
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
@@ -229,6 +237,14 @@ sub OWID_Notify ($$) {
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
 }
+
+#########################################################################################
+#
+# OWID_Define - Implements InitFn function
+# 
+# Parameter hash = hash of device addressed
+#
+#########################################################################################
 
 sub OWID_Init ($) {
   my ($hash)=@_;
@@ -283,7 +299,7 @@ sub OWID_Attr(@) {
           }
         }
         last;
-      };
+      }
     }
   }
   return $ret;
