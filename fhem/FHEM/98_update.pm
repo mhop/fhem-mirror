@@ -18,6 +18,7 @@ sub upd_writeFile($$$$);
 my $updateInBackground;
 my $updRet;
 my %updDirs;
+my $updArg;
 
 
 ########################################
@@ -47,6 +48,7 @@ CommandUpdate($$)
 
   $updateInBackground = AttrVal("global","updateInBackground",undef);
   $updateInBackground = 0 if($arg ne "all");                                   
+  $updArg = $arg;
   if($updateInBackground) {
     CallFn($cl->{NAME}, "ActivateInformFn", $cl);
     BlockingCall("doUpdateInBackground", {src=>$src,arg=>$arg});
@@ -69,7 +71,7 @@ uLog($$)
   if($updateInBackground) {
     Log 1, $arg;
   } else {
-    Log $loglevel, $arg;
+    Log $loglevel, $arg if($updArg ne "check");
     $updRet .= "$arg\n";
   }
 }
