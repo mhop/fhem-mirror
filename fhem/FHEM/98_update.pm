@@ -112,7 +112,7 @@ doUpdate($$)
   $basePath = $1;
   $ctrlFileName = $2;
 
-  if(AttrVal("global", "backup_before_update", 0)) {
+  if(AttrVal("global", "backup_before_update", 0) && $arg ne "check") {
     my $cmdret = AnalyzeCommand(undef, "backup");
     if ($cmdret !~ m/backup done.*/) {
       uLog 1, "Something went wrong during backup: $cmdret";
