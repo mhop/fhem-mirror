@@ -292,20 +292,20 @@ my @usbtable = (
       response  => "^V .* CSM.*",
       define    => "CUL_PARAM CUL DEVICE\@38400 1PARAM34", },
 
-    { NAME      => "TCM310",
+    { NAME      => "TCM_ESP3",
       matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
                     "ttyUSB(.*)", "ttyACM(.*)", "ttyAMA(.*)"],
       DeviceName=> "DEVICE\@57600",
       request   => pack("H*", "5500010005700838"),   # get idbase
       response  => "^\x55\x00\x05\x01",
-      define    => "TCM310_PARAM TCM 310 DEVICE\@57600", },
+      define    => "TCM310_PARAM TCM ESP3 DEVICE\@57600", },
 
-    { NAME      => "TCM120",
+    { NAME      => "TCM_ESP2",
       matchList => ["ttyUSB(.*)"],
       DeviceName=> "DEVICE\@9600",
       request   => pack("H*", "A55AAB5800000000000000000003"),   # get idbase
       response  => "^\xA5\x5A............",
-      define    => "TCM120_PARAM TCM 120 DEVICE\@9600", },
+      define    => "TCM120_PARAM TCM ESP2 DEVICE\@9600", },
 
     { NAME      => "FHZ",
       matchList => ["cu.usbserial(.*)", "ttyUSB(.*)"],
