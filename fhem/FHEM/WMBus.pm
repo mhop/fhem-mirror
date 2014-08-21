@@ -103,7 +103,7 @@ sub valueCalcDate($$) {
 	if ($day > 31 || $month > 12 || $year > 2099) {
 		return "invalid";
 	} else {
-		return sprintf("%04d-%02d-%02d", $year, $month, $day); 
+		return sprintf("%04d-%02d-%02d", $year, $month, $day);
 	}
 }
 
@@ -139,7 +139,7 @@ sub valueCalcDateTime($$) {
 		my $su = ($value & 0b1000000000000000);
 		if ($min > 59 || $hour > 23) {
 			$dateTime = 'invalid';
-	  } else {
+		} else {
 			$dateTime .= sprintf(' %02d:%02d %s', $hour, $min, $su ? 'DST' : '');
 		}
 	}
@@ -655,9 +655,9 @@ sub decodeValueInformationBlock($$$) {
 			# manufacturer specific data, can't be interpreted
 			$dataBlockRef->{type} = "MANUFACTURER SPECIFIC";
 			$dataBlockRef->{unit} = "";
-			$dataBlockRef->{value} = "";
 			return $offset;
 	  } else {
+			$dataBlockRef->{type} = 'unknown';
 			$dataBlockRef->{errormsg} = "unknown VIFE " . sprintf("%x", $vifExtension) . " at offset $offset-1";
 			$dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;		
 		}
@@ -690,6 +690,7 @@ sub decodeValueInformationBlock($$$) {
 	}
 	
 	if ($dataBlockRef->{type} eq '') {
+		$dataBlockRef->{type} = 'unknown';
 		$dataBlockRef->{errormsg} = sprintf("in VIFExtension %x unknown VIF %x",$vifExtension, $vif);
 		$dataBlockRef->{errorcode} = ERR_UNKNOWN_VIF;
 	}
@@ -822,9 +823,15 @@ sub decodePayload($$) {
 			$offset += 4;
 		} elsif ($dataBlock->{dataField} == DIF_VARLEN) {
 			my $lvar = unpack('C',substr($payload, $offset++, 1));
+			#print "in datablock $dataBlockNo: LVAR field " . sprintf("%x", $lvar) . "\n";
 			if ($lvar <= 0xbf) {
-				#  ASCII string with LVAR characters
-        $value = unpack('a*',substr($payload, $offset, $lvar));
+				if ($dataBlock->{type} eq "MANUFACTURER SPECIFIC") {
+					# special handling, LSE seems to lie about this
+					$value = unpack('H*',substr($payload, $offset, $lvar));
+				} else {
+					#  ASCII string with LVAR characters
+					$value = unpack('a*',substr($payload, $offset, $lvar));
+				}
         $offset += $lvar;
       } elsif ($lvar >= 0xc0 && $lvar <= 0xcf) {
 				#  positive BCD number with (LVAR - C0h) • 2 digits
@@ -841,6 +848,8 @@ sub decodePayload($$) {
       }
     } elsif ($dataBlock->{dataField} == DIF_SPECIAL) {
 			# special functions
+			#print "DIF_SPECIAL at $offset\n";
+			$value = unpack("H*", substr($payload,$offset));
 			last PAYLOAD;
 		}	else {
 			$self->{errormsg} = "in datablock $dataBlockNo: unhandled datafield " . sprintf("%x",$dataBlock->{dataField});
@@ -851,9 +860,12 @@ sub decodePayload($$) {
 		if (defined $dataBlock->{calcFunc}) {
 			$dataBlock->{value} = $dataBlock->{calcFunc}->($value, $dataBlock); 
 			#print "Value raw " . $value . " value calc " . $dataBlock->{value} ."\n";
-		} else {
+		} elsif (defined $value) {
 			$dataBlock->{value} = $value;
+		} else {
+			$dataBlock->{value} = "";
 		}
+		undef $value;
 		
 		push @dataBlocks, $dataBlock;
 	}
@@ -951,7 +963,7 @@ sub decodeApplicationLayer($) {
 
 	} else {
 		# error, encryption mode not implemented
-		$self->{errormsg} = 'Encryption mode not implemented';
+		$self->{errormsg} = sprintf('Encryption %x mode not implemented', $self->{cw_parts}{mode});
   	$self->{errorcode} = ERR_UNKNOWN_ENCRYPTION;
 		$self->{decrypted} = 0;
 		return 0;

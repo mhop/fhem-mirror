@@ -12,6 +12,31 @@ use warnings;
 use SetExtensions;
 use WMBus;
 
+
+#my %defaultAttrs = (
+#	# manufacturer
+#	FFD => { # FastForward AG, EnergyCam
+#		# type
+#		  2 => [ # electricity
+#		  # fhem commands to execute
+#			'attr %D% userreading energy:1:value { ReadingsVal("%D%","1:value",0)/1000 . " kWh";; }',
+#			'attr %D% stateformat {ReadingsVal("%D%","energy","") . " " . ReadingsTimestamp("%D%","energy","");;}',
+#			],
+#			3 => [ # gas
+#		  # fhem commands to execute
+#			'attr %D% userreading volume:1:value { ReadingsVal("%D%","1:value",0) . " " . ReadingsVal("%D%","1:unit","");; }',
+#			'attr %D% stateformat {ReadingsVal("%D%","volume","") . " " . ReadingsTimestamp("%D%","volume","");;}',
+#			],
+#			7 => [ # water
+#		  # fhem commands to execute
+#			'attr %D% userreading volume:1:value { ReadingsVal("%D%","1:value",0) . " " . ReadingsVal("%D%","1:unit","");; }',
+#			'attr %D% stateformat {ReadingsVal("%D%","volume","") . " " . ReadingsTimestamp("%D%","volume","");;}',
+#			],
+#		
+#		}
+#);
+			
+
 sub WMBUS_Parse($$);
 sub WMBUS_SetReadings($$$);
 
@@ -234,16 +259,12 @@ sub WMBUS_SetReadings($$$)
 		my $dataBlock;
 		
 		for $dataBlock ( @$dataBlocks ) {
-			if ( $dataBlock->{type} eq "MANUFACTURER SPECIFIC") {
-				readingsBulkUpdate($hash, "$dataBlock->{number}:type", $dataBlock->{type});
-			} else {
-				readingsBulkUpdate($hash, "$dataBlock->{number}:storage_no", $dataBlock->{storageNo});
-				readingsBulkUpdate($hash, "$dataBlock->{number}:type", $dataBlock->{type}); 
-				readingsBulkUpdate($hash, "$dataBlock->{number}:value", $dataBlock->{value}); 
-				readingsBulkUpdate($hash, "$dataBlock->{number}:unit", $dataBlock->{unit});
-				if ($dataBlock->{errormsg}) {
-					readingsBulkUpdate($hash, "$dataBlock->{number}:errormsg", $dataBlock->{errormsg});
-				}
+			readingsBulkUpdate($hash, "$dataBlock->{number}:storage_no", $dataBlock->{storageNo});
+			readingsBulkUpdate($hash, "$dataBlock->{number}:type", $dataBlock->{type}); 
+			readingsBulkUpdate($hash, "$dataBlock->{number}:value", $dataBlock->{value}); 
+			readingsBulkUpdate($hash, "$dataBlock->{number}:unit", $dataBlock->{unit});
+			if ($dataBlock->{errormsg}) {
+				readingsBulkUpdate($hash, "$dataBlock->{number}:errormsg", $dataBlock->{errormsg});
 			}
 		}
 	}
