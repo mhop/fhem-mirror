@@ -38,6 +38,7 @@ use constant {
 	DIF_NONE => 0x00,
 	DIF_INT8 => 0x01,
 	DIF_INT16 => 0x02,
+	DIF_INT24 => 0x03,
 	DIF_INT32 => 0x04,
 	DIF_FLOAT32 => 0x05,
 	DIF_INT48 => 0x06,
@@ -642,6 +643,7 @@ sub decodeValueInformationBlock($$$) {
 	$vif = unpack('C', $vib);
 	$offset = 1;
 	
+	#printf("vif: %x\n", $vif);
 	my $isExtension = $vif & VIF_EXTENSION_BIT;
 
 	if ($isExtension) {
@@ -662,12 +664,13 @@ sub decodeValueInformationBlock($$$) {
 			$dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;		
 		}
 		$vif = unpack('C', substr($vib,$offset++,1));
+		#printf("vife: %x\n", $vif);
 	}
 
 	
 	$vif &= ~VIF_EXTENSION_BIT;
 	
-	#printf("vif: %x\n", $vif);
+	#printf("vif w/o ext: %x\n", $vif);
 	$dataBlockRef->{type} = '';
 	VIFID: foreach my $vifType ( keys $vifInfoRef ) { 
 	
@@ -736,6 +739,7 @@ sub decodeDataInformationBlock($$$) {
 		$storageNo |= ($dif & 0b00001111) << ($difExtNo*4)+1;
 		$tariff    |= (($dif & 0b00110000 >> 4)) << (($difExtNo-1)*2);
 		$devUnit   |= (($dif & 0b01000000 >> 6)) << ($difExtNo-1);
+		#printf("dife %x storage %d\n", $dif, $storageNo);
 	}
 	
 	$dataBlockRef->{functionField} = $functionField;
@@ -745,6 +749,7 @@ sub decodeDataInformationBlock($$$) {
 	$dataBlockRef->{devUnit} = $devUnit;
 	
 	#printf("in DIF: datafield %x\n", $dataBlockRef->{dataField});
+	#print "offset in dif $offset\n";
 	return $offset;
 }
 
@@ -812,15 +817,30 @@ sub decodePayload($$) {
 		} elsif ($dataBlock->{dataField} == DIF_BCD8) {
 			$value = $self->decodeBCD(8, substr($payload,$offset,4));
 			$offset += 4;
+		} elsif ($dataBlock->{dataField} == DIF_BCD12) {
+			$value = $self->decodeBCD(12, substr($payload,$offset,6));
+			$offset += 6;
 		} elsif ($dataBlock->{dataField} == DIF_INT8) {
 			$value = unpack('C', substr($payload, $offset, 1));
 			$offset += 1;
 		} elsif ($dataBlock->{dataField} == DIF_INT16) {
 			$value = unpack('v', substr($payload, $offset, 2));
 			$offset += 2;
+		} elsif ($dataBlock->{dataField} == DIF_INT24) {
+			my @bytes = unpack('CCC', substr($payload, $offset, 3));
+			$offset += 3;
+			$value = $bytes[0] + $bytes[1] << 8 + $bytes[2] << 16;
 		} elsif ($dataBlock->{dataField} == DIF_INT32) {
 			$value = unpack('V', substr($payload, $offset, 4));
 			$offset += 4;
+		} elsif ($dataBlock->{dataField} == DIF_INT48) {
+			my @words = unpack('vvv', substr($payload, $offset, 6));
+			$value = $words[0] + $words[1] << 16 + $words[2] << 32;
+			$offset += 6;
+		} elsif ($dataBlock->{dataField} == DIF_INT64) {
+			my @lwords = unpack('VV', substr($payload, $offset, 8));
+			$value = $lwords[0] + $lwords[1] << 32; 
+			$offset += 8;
 		} elsif ($dataBlock->{dataField} == DIF_VARLEN) {
 			my $lvar = unpack('C',substr($payload, $offset++, 1));
 			#print "in datablock $dataBlockNo: LVAR field " . sprintf("%x", $lvar) . "\n";
