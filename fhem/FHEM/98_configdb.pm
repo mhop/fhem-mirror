@@ -223,12 +223,14 @@ sub CommandConfigdb($$) {
 			Currently the fhem modules<br/>
 			<br/>
 			<li>02_RSS.pm</li>
+			<li>91_eventTypes</li>
 			<li>93_DbLog.pm</li>
 			<li>95_holiday.pm</li>
 			<li>98_SVG.pm</li>
 			<br/>
 			will use configDB to read their configuration data from database<br/> 
 			instead of formerly used configuration files inside the filesystem.<br/>
+			<br/>
 			This requires you to import your configuration files from filesystem into database.<br/>
 			<br/>
 			Example:<br/>
@@ -237,7 +239,9 @@ sub CommandConfigdb($$) {
 			<code>configdb fileimport www/gplot/xyz.gplot</code><br/>
 			<br/>
 			<b>This does not affect the definitons of your holiday or RSS entities.</b><br/>
-			The given filenames in the definitions will be translated automatically to find the correct entries inside the database.<br/>
+			<br/>
+			<b>During migration all external configfiles used in current configuration<br/>
+			will be imported aufmatically.</b><br>
 			<br/>
 			Each fileimport into database will overwrite the file if it already exists in database.<br/>
 			<br/>
@@ -537,6 +541,7 @@ attr Melder_FAr peerIDs 00000000,2286BC03,
 			Momentan verwenden die Module<br/>
 			<br/>
 			<li>02_RSS.pm</li>
+			<li>91_eventTypes</li>
 			<li>93_DbLog.pm</li>
 			<li>95_holiday.pm</li>
 			<li>98_SVG.pm</li>
@@ -551,7 +556,9 @@ attr Melder_FAr peerIDs 00000000,2286BC03,
 			<code>configdb fileimport www/gplot/xyz.gplot</code><br/>
 			<br/>
 			<b>Dies hat keinerlei Auswirkungen auf die Definition der holiday oder RSS Instanzen.</b><br/>
-			Die dort verwendeten Dateinamen werden automtisch umgesetzt, um die zugeh&ouml;rigen Daten in der Datenbank zu finden.<br/>
+			<br>
+			<b>Während einer Migration werden alle in der aktuell bestehenden Konfiguration verwendeten externen<br/>
+			Konfigurationsdateien automatisch in die Datenbank importiert.</b></br>
 			<br/>
 			Jeder Neuimport einer bereits in der Datenbank gespeicherten Datei &uuml;berschreibt die vorherige Datei in der Datenbank.<br/>
 			<br/>
