@@ -272,6 +272,7 @@ sub
 upd_getUrl($)
 {
   my ($url) = @_;
+  $url =~ s/%/%25/g;
   my ($err, $data) = HttpUtils_BlockingGet({ url=>$url });
   if($err) {
     uLog 1, $err;
