@@ -624,7 +624,6 @@ sub HMinfo_tempList(@) { ######################################################
           else{
             $skip = 0;
           }
-          Log 1,"General entity $eFound :$skip";
         }
         push @oldList,$line if (!$skip);
       }
@@ -951,12 +950,12 @@ sub HMinfo_GetFn($@) {#########################################################
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
       # search for irregular trigger
       my $peerIDs = AttrVal($dName,"peerIDs",undef);
-
+      $peerIDs =~ s/00000000,//;
       foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
                                               grep /^trigDst_/,
                                               keys %{$defs{$dName}{READINGS}})){
         push @peerUndef,"$dName triggers $_"
-            if( ($peerIDs &&  $peerIDs !~ m/$_/)
+            if( ($peerIDs && $peerIDs !~ m/$_/)
                ||("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
       }
 
@@ -965,7 +964,6 @@ sub HMinfo_GetFn($@) {#########################################################
       my $dId = unpack 'A6',CUL_HM_name2Id($dName);
       my @pl = ();
       foreach (split",",$peerIDs){
-        next if ($_ eq "00000000");
         my $pn = CUL_HM_peerChName($_,$dId);
         $pn =~ s/_chn:01//;
         push @pl,$pn;

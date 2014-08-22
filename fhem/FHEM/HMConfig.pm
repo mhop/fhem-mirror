@@ -73,6 +73,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # c: receive on config
 # w: receive in wakeup
 # b: receive on burst
+# f: receive on burst if enabled
 #register list definition - identifies valid register lists
 # 1,3,5:3p.4.5 => list 1 valid for all channel
 #              => list 3 for all channel
