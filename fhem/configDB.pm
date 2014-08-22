@@ -84,6 +84,8 @@
 # 2014-05-20 - removed   no longer needed functions for file handling
 #              changed   code improvement; use strict; use warnings;
 #
+# 2014-08-22 - added     automatic fileimport during migration
+#
 ##############################################################################
 #
 
@@ -450,6 +452,74 @@ sub cfgDB_SaveState() {
 	return;
 }
 
+# import existing files during migration 
+sub cfgDB_MigrationImport() {
+
+	my ($ret, $filename, @files, @def);
+
+# find eventTypes file
+	$filename = '';
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=eventTypes');
+	foreach $filename (@def) {
+		next unless $filename;
+		push @files, $filename;
+	}
+
+# import templateDB.gplot
+	$filename  = $attr{global}{modpath};
+	$filename .= "/www/gplot/templateDB.gplot";
+	push @files, $filename;
+
+# find used gplot files
+	$filename ='';
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=SVG','GPLOTFILE');
+	foreach $filename (@def) {
+		next unless $filename;
+		push @files, "./www/gplot/".$filename.".gplot";
+	}
+
+# find DbLog configs
+	$filename ='';
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=DbLog','CONFIGURATION');
+	foreach $filename (@def) {
+		next unless $filename;
+		push @files, $filename;
+	}
+
+# find RSS layouts
+	$filename ='';
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=RSS','LAYOUTFILE');
+	foreach $filename (@def) {
+		next unless $filename;
+		push @files, $filename;
+	}
+
+# find holiday files
+	$filename ='';
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=holiday','NAME');
+	foreach $filename (@def) {
+		next unless $filename;
+		push @files, "./FHEM/".$filename.".holiday";
+	}
+
+# do the import
+	$filename = '';
+	foreach $filename (@files) {
+		if ( -r $filename ) {
+			my $filesize = -s $filename;
+			_cfgDB_binFileimport($filename,$filesize);
+			$ret .= "importing: $filename\n";
+		}
+	}
+
+	return $ret;
+}
+
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId() { 
 	return "# ".'$Id$' 
@@ -599,21 +669,23 @@ sub _cfgDB_Uuid() {
 sub _cfgDB_Migrate() {
 	my $ret;
 	$ret = "Starting migration...\n";
-	Log3('configDB',4,'Starting migration.');
-	$ret .= "Processing: database initialization.\n";
-	Log3('configDB',4,'Processing: cfgDB_Init.');
+	Log3('configDB',4,'Starting migration');
+	$ret .= "Processing: database initialization\n";
+	Log3('configDB',4,'Processing: cfgDB_Init');
 	cfgDB_Init;
-	$ret .= "Processing: save config.\n";
-	Log3('configDB',4,'Processing: cfgDB_SaveCfg.');
+	$ret .= "Processing: save config\n";
+	Log3('configDB',4,'Processing: cfgDB_SaveCfg');
 	cfgDB_SaveCfg;
-	$ret .= "Processing: save state.\n";
-	Log3('configDB',4,'Processing: cfgDB_SaveState.');
+	$ret .= "Processing: save state\n";
+	Log3('configDB',4,'Processing: cfgDB_SaveState');
 	cfgDB_SaveState;
-	$ret .= "Migration completed.\n\n";
-	Log3('configDB',4,'Migration finished.');
+	$ret .= "Processing: fileimport\n";
+	Log3('configDB',4,'Processing: cfgDB_MigrationImport');
+	$ret .= cfgDB_MigrationImport;
+	$ret .= "Migration completed\n\n";
+	Log3('configDB',4,'Migration completed.');
 	$ret .= _cfgDB_Info;
 	return $ret;
-
 }
 
 # show database statistics
@@ -796,6 +868,21 @@ sub _cfgDB_Diff($$) {
 	$ret = "\nNo differences found!" if !$ret;
 	$ret = "compare device: $search in current version 0 (left) to version: $searchversion (right)\n$ret\n";
 	return $ret;
+}
+
+# find DEF, input supports devspec definitions
+sub _cfgDB_findDef($;$) {
+	my ($search,$internal) = @_;
+	$internal = 'DEF' unless defined($internal);
+
+	my @ret;
+	my @etDev = devspec2array($search);
+	foreach my $d (@etDev) {
+		next unless $d;
+		push @ret, $defs{$d}{$internal};
+	}
+
+	return @ret;
 }
 
 ##################################################
