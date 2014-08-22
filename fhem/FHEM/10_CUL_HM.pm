@@ -767,14 +767,16 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   #message to be send to HMLAN/USB to define device communication defails
   #bit-usage is widely unknown. 
   #p[1]: 00000001 = request AES
-  #p[1]: 00000010 = data pending - autosend wakeup if device send data
+  #p[1]: 00000010 = data pending - autosend wakeup and lazyConfig
+  #                   if device send data
+  #p[2]: is this the number of the AES key to be used? 
   my ($hash)=@_;
   my $rxt = CUL_HM_getRxType($hash);
   my $id = CUL_HM_hash2Id($hash);
   my @p;
   if ($hash->{helper}{role}{vrt}){;}                     #virtual channels should not be assigned
   elsif(!($rxt & ~0x04)) {@p = ("$id","00","01","FE1F");}#config only
-  elsif($rxt & 0x10)     {@p = ("$id","00","01","1E");  }#lazyConfig
+  elsif(  $rxt &  0x10)  {@p = ("$id","00","01","1E");  }#lazyConfig (01,00,1E also possible?)
   else                   {@p = ("$id","00","01","00");  }
 # else                   {@p = ("$id","00","01","1E");  }
   if (AttrVal($hash->{NAME},"aesCommReq",0)){
@@ -782,7 +784,7 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
     $p[3] = ($p[3]eq "")?"1E":$p[3];
   }
   $hash->{helper}{io}{newChn} = "";
-  $hash->{helper}{io}{rxt} = ($rxt & 0x08)?2:0;
+  $hash->{helper}{io}{rxt} = ($rxt & 0x18)?2:0;#wakeup || #lazyConfig
   $hash->{helper}{io}{p} = \@p;
   CUL_HM_hmInitMsgUpdt($hash);
 }
@@ -910,6 +912,7 @@ sub CUL_HM_Parse($$) {#########################################################
     return "" if ($msg =~ m/998112......000001/);# HMLAN internal message, consum 
     my $ccu =InternalVal($ioName,"owner_CCU","");
     CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
+
     if ($defs{$ccu}){#
       push @evtEt,[$defs{$ccu},0,"unknown_$src:received"];# do not trigger
       return CUL_HM_pushEvnts();
@@ -2313,7 +2316,6 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $paired = 0; #internal flag
     CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
                   if (!$modules{CUL_HM}{helper}{hmManualOper});
-    
     my $ioN = $ioHash->{NAME};
     # hmPair set in IOdev or  eventually in ccu!
     my $ioOwn = InternalVal($ioN,"owner_CCU","");
@@ -2321,7 +2323,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $hmPser = InternalVal($ioN,"hmPairSerial",InternalVal($ioOwn,"hmPairSerial",""));
     if ( $hmPair ){# pairing is active
       if (!$hmPser || $hmPser eq ReadingsVal($shash->{NAME},"D-serialNr","")){
-      
+
         # pairing requested - shall we?      
         my $ioId = CUL_HM_h2IoId($ioHash);
         if( $mFlg.$mTp ne "0400") {
@@ -3610,7 +3612,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my @rPeer;
     @rPeer = split ",",$repPeers;
     if ($eNo eq "setAll"){
-      return " too many entries in repPeer" if (int(@rPeer) > 36);
+      return " too many entries in repPeers" if (int(@rPeer) > 36);
       return "setAll: attr repPeers undefined" if (!defined $repPeers);
       my $entry = 0;
       foreach my $repData (@rPeer){
@@ -5273,7 +5275,7 @@ sub CUL_HM_FWupdateSteps($){#steps for FW update
     $modules{CUL_HM}{helper}{updateRetry} = 0;
     $modules{CUL_HM}{helper}{updateNbrPassed} = $mNo;
   }
-  
+
   if ($step == 0){#check bootloader entered - now change speed
     return "" if ($mIn =~ m/$mNoA..02$dst${id}00/);
     Log3 $name,2,"CUL_HM fwUpdate $name entered mode. IO-speed: fast";
@@ -5462,7 +5464,8 @@ sub CUL_HM_protState($$){
   Log3 $name,5,"CUL_HM $name protEvent:$state".
             ($hash->{cmdStack}?" pending:".scalar @{$hash->{cmdStack}}:"");
   CUL_HM_hmInitMsgUpdt($hash) if (  $hash->{helper}{prt}{sProc} != $sProcIn
-                                  && $hash->{helper}{prt}{sProc} < 2);
+                                  && (   $hash->{helper}{prt}{sProc} < 2
+                                      ||($hash->{helper}{prt}{sProc} == 2 && $sProcIn == 0 )));
 }
 
 ###################-----------helper and shortcuts--------#####################
@@ -8016,17 +8019,19 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <br>
       short application: <br>
       <code>setRepeat setAll 0 0 0<br></code>
-      will rewrite the complete list to the deivce. Data will be taken from attribut repPeer. <br>
-      attribut repPeer is formated:<br>
+      will rewrite the complete list to the deivce. Data will be taken from attribut repPeers. <br>
+      attribut repPeers is formated:<br>
       src1:dst1:[y/n],src2:dst2:[y/n],src2:dst2:[y/n],...<br>
       <br>
       Reading repPeer is formated:<br>
-      Number src dst broadcast verify<br>
-      number: entry sequence number<br>
-      src: message source device - read from repeater<br>
-      dst: message destination device - assembled from attributes<br>
-      broadcast: shall broadcast be repeated for this source - read from repeater<br>
-      verify: do attributes and readings match?<br>
+      <ul>
+        Number src dst broadcast verify<br>
+        number: entry sequence number<br>
+        src: message source device - read from repeater<br>
+        dst: message destination device - assembled from attributes<br>
+        broadcast: shall broadcast be repeated for this source - read from repeater<br>
+        verify: do attributes and readings match?<br>
+      </ul>
     </li>
     </ul>
     </li>
@@ -9264,17 +9269,19 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               <br>
               Kurzanwendung: <br>
               <code>setRepeat setAll 0 0 0<br></code>
-              schreibt die gesamte Liste der Ger&auml;te neu. Daten kommen vom Attribut repPeer. <br>
-              Das Attribut repPeer hat folgendes Format:<br>
+              schreibt die gesamte Liste der Ger&auml;te neu. Daten kommen vom Attribut repPeers. <br>
+              Das Attribut repPeers hat folgendes Format:<br>
               src1:dst1:[y/n],src2:dst2:[y/n],src2:dst2:[y/n],...<br>
               <br>
-              Foramtierte Werte von repPeer:<br>
-              Number src dst broadcast verify<br>
-              number: Nummer des Eintrags in der Liste<br>
-              src: Ursprungsger&auml;t der Nachricht - aus Repeater ausgelesen<br>
-              dst: Zielger&auml;t der Nachricht - aus den Attributen abgeleitet<br>
-              broadcast: sollen Broadcasts weitergeleitet werden - aus Repeater ausgelesen<br>
-              verify: stimmen Attribute und ausgelesen Werte &uuml;berein?<br>
+              Formatierte Werte von repPeer:<br>
+              <ul>
+                Number src dst broadcast verify<br>
+                number: Nummer des Eintrags in der Liste<br>
+                src: Ursprungsger&auml;t der Nachricht - aus Repeater ausgelesen<br>
+                dst: Zielger&auml;t der Nachricht - aus den Attributen abgeleitet<br>
+                broadcast: sollen Broadcasts weitergeleitet werden - aus Repeater ausgelesen<br>
+                verify: stimmen Attribute und ausgelesen Werte &uuml;berein?<br>
+              </ul>
             </li>
           </ul>
         </li>
