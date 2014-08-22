@@ -161,7 +161,7 @@ WMBUS_Undef($$)
   my $name = $hash->{NAME};
   my $addr = $hash->{addr};
 
-  #delete( $modules{WMBUS}{defptr}{$addr} );
+  delete( $modules{WMBUS}{defptr}{$addr} );
 
   return undef;
 }
