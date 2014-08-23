@@ -39,7 +39,6 @@ sub SVG_time_align($$);
 sub SVG_time_to_sec($);
 sub SVG_openFile($$$);
 
-my ($SVG_lt, $SVG_ltstr);
 my %SVG_devs;       # hash of from/to entries per device
 
 #####################################
@@ -1506,27 +1505,6 @@ SVG_render($$$$$$$$$)
   }
   SVG_pO "</svg>";
   return $SVG_RET;
-}
-
-sub
-SVG_time_to_sec($)
-{
-  my ($str) = @_;
-  if(!$str) {
-    return 0;
-  }
-  my ($y,$m,$d,$h,$mi,$s) = split("[-_:]", $str);
-  $s = 0 if(!$s);
-  $mi= 0 if(!$mi);
-  $h = 0 if(!$h);
-  $d = 1 if(!$d);
-  $m = 1 if(!$m);
-
-  if(!$SVG_ltstr || $SVG_ltstr ne "$y-$m-$d-$h") { # 2.5x faster
-    $SVG_lt = mktime(0,0,$h,$d,$m-1,$y-1900,0,0,-1);
-    $SVG_ltstr = "$y-$m-$d-$h";
-  }
-  return $s+$mi*60+$SVG_lt;
 }
 
 sub
