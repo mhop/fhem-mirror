@@ -83,6 +83,42 @@ abstime2rel($)
   return sprintf("%02d:%02d:%02d", $diff/3600, ($diff/60)%60, $diff%60);
 }
 
+sub
+defInfo($;$)
+{
+  my ($search,$internal) = @_;
+  $internal = 'DEF' unless defined($internal);
+  my @ret;
+  my @etDev = devspec2array($search);
+  foreach my $d (@etDev) {
+    next unless $d;
+    push @ret, $defs{$d}{$internal};
+  }
+  return @ret;
+}
+
+my ($SVG_lt, $SVG_ltstr);
+sub
+SVG_time_to_sec($)
+{
+  my ($str) = @_;
+  if(!$str) {
+    return 0;
+  }
+  my ($y,$m,$d,$h,$mi,$s) = split("[-_:]", $str);
+  $s = 0 if(!$s);
+  $mi= 0 if(!$mi);
+  $h = 0 if(!$h);
+  $d = 1 if(!$d);
+  $m = 1 if(!$m);
+
+  if(!$SVG_ltstr || $SVG_ltstr ne "$y-$m-$d-$h") { # 2.5x faster
+    $SVG_lt = mktime(0,0,$h,$d,$m-1,$y-1900,0,0,-1);
+    $SVG_ltstr = "$y-$m-$d-$h";
+  }
+  return $s+$mi*60+$SVG_lt;
+}
+
 
 ######## trim #####################################################
 # What  : cuts blankspaces from the beginning and end of a string
@@ -203,7 +239,9 @@ IsInt($)
 #
 # To avoid this, we recommend following procedure:
 #
-# 1. Create your own file 99_myUtils.pm from the template below
+# 1. Create your own file 99_myUtils.pm from the template below, 
+#    e.g. with FHEMWEB, Edit files, Editing 99_Utils.pm, and saving it as 
+#    99_myUtils.pm
 # 2. Put this file inside the ./FHEM directory
 # 3. Put your own functions into this new file
 #
@@ -219,33 +257,60 @@ use POSIX;
 sub
 myUtils_Initialize($$)
 {
-	my ($hash) = @_;
+  my ($hash) = @_;
 }
 
-# start with your own functions below this line
-
-
-# behind your last function, we need the following
 1;
-# end-of-template
+
 </code>
 </pre>
+
 </br>
-	<b>Defined functions</b><br/><br/>
-	<ul>
-		<li><b>abstime2rel()</b><br>???</li><br/>
-		<li><b>ltrim()</b><br>returns string without leading spaces</li><br/>
-		<li><b>max()</b><br>returns the highest value from a given list (sorted alphanumeric)</li><br/>
-		<li><b>maxNum()</b><br>returns the highest value from a given list (sorted numeric)</li><br/>
-		<li><b>min()</b><br>returns the lowest value from a given list (sorted alphanumeric)</li><br/>
-		<li><b>minNum()</b><br>returns the lowest value from a given list (sorted numeric)</li><br/>
-		<li><b>rtrim()</b><br>returns string without trailing spaces</li><br/>
-		<li><b>time_str2num()</b><br>???</li><br/>
-		<li><b>trim()</b><br>returns string without leading and without trailing spaces</li><br/>
-		<li><b>UntoggleDirect()</b><br>For devices paired directly, converts state 'toggle' into 'on' or 'off'</li><br/>
-		<li><b>UntoggleIndirect()</b><br>For devices paired indirectly, switches the target device 'on' or 'off' <br/>
-		also when a 'toggle' was sent from the source device</li><br/>
-	</ul>
+  <b>Defined functions</b><br/><br/>
+  <ul>
+    <li><b>abstime2rel("HH:MM:SS")</b><br>tells you the difference as HH:MM:SS
+      between now and the argument</li><br/>
+
+    <li><b>ltrim("string")</b><br>returns string without leading
+      spaces</li><br/>
+
+    <li><b>max(str1, str2, ...)</b><br>returns the highest value from a given
+      list (sorted alphanumeric)</li><br/>
+
+    <li><b>maxNum(num1, num2, ...)</b><br>returns the highest value from a
+      given list (sorted numeric)</li><br/>
+
+    <li><b>min(str1, str2, ...)</b><br>returns the lowest value from a given
+      list (sorted alphanumeric)</li><br/>
+
+    <li><b>minNum(num1, num2, ...)</b><br>returns the lowest value from a given
+      list (sorted numeric)</li><br/>
+
+    <li><b>rtrim("string")</b><br>returns string without trailing
+      spaces</li><br/>
+
+    <li><b>time_str2num("YYYY-MM-DD HH:MM:SS")</b><br>convert a time string to
+      number of seconds since 1970</li><br/>
+
+    <li><b>trim("string")</b><br>returns string without leading and without
+      trailing spaces</li><br/>
+
+    <li><b>UntoggleDirect("deviceName")</b><br>For devices paired directly,
+       converts state 'toggle' into 'on' or 'off'</li><br/>
+
+    <li><b>UntoggleIndirect()</b><br>For devices paired indirectly, switches
+      the target device 'on' or 'off', also when a 'toggle' was sent from the
+      source device</li><br/>
+
+    <li><b>defInfo("devspec", "internal")</b><br>return an array with the
+      internal values of all devices found with devspec, e.g.
+      defInfo("TYPE=SVG", "GPLOTFILE").</li><br/>
+
+    <li><b>SVG_time_to_sec("YYYY-MM-DD_HH:MM:SS")</b><br>converts the argument
+      to the number of seconds since 1970. Optimized for repeated use of similar
+      timestamps.</li></br>
+
+  </ul>
 </ul>
 =end html
 =cut
