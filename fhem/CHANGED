@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: state definition and split attribute added to 66_ECMD, 
+             67_ECMDDevice
   - FHEMWEB: JavaScripts and CssFiles attributes added
   - change:  avoid updating weather information on get (59_Weather.pm)
   - change:  removed noshutdown=0 for HTTP connections made in 57_Calendar.pm
