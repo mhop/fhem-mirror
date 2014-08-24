@@ -93,10 +93,9 @@ FW_sliderCreate(slider, curr)
       document.onmousemove = oldFn1; document.onmouseup  = oldFn2;
       document.ontouchmove = oldFn3; document.ontouchend = oldFn4;
       if(cmd) {
-        if(cmd.substring(0,3) != "js:") {
+        if(cmd.substring(0,3) != "js:")
           if(typeof val != "undefined")
-            document.location = cmd.replace('%',val);
-        }
+            FW_cmd(cmd.replace('%',val)+"&XHR=1");
       } else {
         if(typeof val != "undefined")
           slider.nextSibling.setAttribute('value', val);
