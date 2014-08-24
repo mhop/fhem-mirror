@@ -1776,7 +1776,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$defs{$devH->{channel_05}},1,"state:$U"   ] if ($devH->{channel_05});
       push @evtEt,[$defs{$devH->{channel_06}},1,"state:$F"   ] if ($devH->{channel_06});
       
-      if($eCnt == 0 && $mTp eq "5E" && hex($mNo) < 3 ){
+      if($eCnt == 0 && hex($mNo) < 3 ){
         push @evtEt,[$devH,1,"powerOn:$tn"];
         my $eo = ReadingsVal($shash->{NAME},"energy",0)+
                  ReadingsVal($shash->{NAME},"energyOffset",0);
