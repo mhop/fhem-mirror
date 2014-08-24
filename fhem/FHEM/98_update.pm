@@ -263,7 +263,7 @@ upd_mkDir($$$)
     my $path = "$root/".join("/", @p[0..$i]);
     if(!-d $path) {
       mkdir $path;
-      uLog 1, "MKDIR $root/".join("/", @p[0..$i]);
+      uLog 4, "MKDIR $root/".join("/", @p[0..$i]);
     }
   }
 }
