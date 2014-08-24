@@ -1188,8 +1188,6 @@ sub CUL_HM_Parse($$) {#########################################################
       my ($dHash,$err       ,$ctrlMode  ,$setTemp          ,$bTime,$pTemp,$pStart,$pEnd,$chn,$uk0,$lBat,$actTemp,$vp) = 
          ($shash,hex($mI[3]),hex($mI[5]),hex($mI[1].$mI[2]),"-"    ,"-"   ,"-"    ,"-"                             );
       
-      $lBat = $err&0x80?"low":"ok"; # valid for Info-Level message?
-      
       if($mTp eq "10"){
         $chn = "04";#fixed
         my $bat  =(($err            ) & 0x1f)/10+1.5;
@@ -1218,6 +1216,7 @@ sub CUL_HM_Parse($$) {#########################################################
         $shash = $modules{CUL_HM}{defptr}{"$src$chn"} if($modules{CUL_HM}{defptr}{"$src$chn"});
         $actTemp = ReadingsVal($name,"measured-temp","");
         $vp      = ReadingsVal($name,"actuator","");
+        $lBat = $err&0x80?"low":"ok";
       }
       $setTemp    =(($setTemp        ) & 0x3f )/2;
       $err        = ($err            ) & 0x7  ;
@@ -1262,7 +1261,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"partyTemp:$pTemp"];
       #push @evtEt,[$shash,1,"unknown0:$uk0"];
       #push @evtEt,[$shash,1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
-      push @evtEt,[$dHash,1,"battery:$lBat"];
+      push @evtEt,[$dHash,1,"battery:$lBat"] if ($lBat);
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
     }
     elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
