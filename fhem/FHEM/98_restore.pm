@@ -58,7 +58,8 @@ CommandRestore($$)
   $src = "$src/$filename";
   $dest = "$dest/$2" if($2);
 
-  return (-f $src ? restoreFile($src, $dest) : restoreDir($src, $dest));
+  return (-f $src ? restoreFile($src, $dest) : restoreDir($src, $dest)).
+        "\n\nrestore finished";
 }
 
 sub
