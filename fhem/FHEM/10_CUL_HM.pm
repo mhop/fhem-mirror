@@ -1718,7 +1718,7 @@ sub CUL_HM_Parse($$) {#########################################################
           $shash->{BNOCNT}=0; # message counter reest
         }
         $shash->{BNOCNT}+=1;
-        $state .= "Long" .($mFlg eq "A0" ? "Release" : "").
+        $state .= "Long" .($mFlgH & 0x20 ? "Release" : "").
                   " ".$shash->{BNOCNT}."-".$mFlg.$mTp."-";
         $trigType = "Long";
       }
@@ -2675,8 +2675,8 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
     push @evtEt,[$sHash,1,"smoke_detect:".$smokeSrc];
     foreach (split ",",$attr{$sName}{peerIDs}){
       my $tHash = CUL_HM_id2Hash($_);
-        push @evtEt,[$tHash,1,"state:$sProsa"];
-        push @evtEt,[$tHash,1,"smoke_detect:$smokeSrc"];
+      push @evtEt,[$tHash,1,"state:$sProsa"];
+      push @evtEt,[$tHash,1,"smoke_detect:$smokeSrc"];
     }
   }
   return @entities;
