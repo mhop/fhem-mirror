@@ -127,6 +127,7 @@ FHEMWEB_Initialize($)
   my @attrList = qw(
     CORS:0,1
     HTTPS:1,0
+    CssFiles
     JavaScripts
     SVGcache:1,0
     addStateEvent
@@ -642,7 +643,10 @@ FW_answerCall($)
     FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   }
 
-  FW_pO "<link href=\"$FW_ME/pgm2/style.css\" rel=\"stylesheet\"/>";
+  my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>";
+  FW_pO sprintf($cssTemplate, "pgm2/style.css");
+  my @cssFiles = split(" ", AttrVal($FW_wname, "CssFiles", ""));
+  map { FW_pO sprintf($cssTemplate, $_); } @cssFiles;
 
   ########################
   # FW Extensions
@@ -3076,6 +3080,15 @@ FW_widgetOverride($$)
         FHEM-Server, and iPad/iPhone as Web-client.
         </li><br>
 
+     <a name="CssFiles"></a>
+     <li>CssFiles<br>
+        Space separated list of .css files to be included. The filenames
+        are relative to the www directory. Example:
+        <ul><code>
+          attr WEB CssFiles pgm2/mystyle.css
+        </code></ul>
+        </li><br>
+
      <a name="JavaScripts"></a>
      <li>JavaScripts<br>
         Space separated list of JavaScript files to be included. The filenames
@@ -3617,6 +3630,15 @@ FW_widgetOverride($$)
         durchgefuehrt. Fuer bestimmte Hardware-Kombinationen (langsamer FHEM
         Server, iPad/iPhone als Client) scheint dieses Attribu Ladeprobleme zu
         beheben.
+        </li><br>
+
+     <a name="CssFiles"></a>
+     <li>CssFiles<br>
+        Leerzeichen getrennte Liste von .css Dateien, die geladen werden.
+        Die Dateinamen sind relativ zum www Verzeichnis anzugeben. Beispiel:
+        <ul><code>
+          attr WEB CssFiles pgm2/mystyle.css
+        </code></ul>
         </li><br>
 
      <a name="JavaScripts"></a>
