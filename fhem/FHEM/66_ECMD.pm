@@ -64,7 +64,7 @@ ECMD_Initialize($)
   $hash->{GetFn}   = "ECMD_Get";
   $hash->{SetFn}   = "ECMD_Set";
   $hash->{AttrFn}  = "ECMD_Attr";
-  $hash->{AttrList}= "classdefs logTraffic:0,1,2,3,4,5 timeout";
+  $hash->{AttrList}= "classdefs split logTraffic:0,1,2,3,4,5 timeout";
 }
 
 #####################################
@@ -316,6 +316,12 @@ ECMD_EvalClassDef($$$)
                         Log3 $hash, 5, "$name: parameters are $def";
                         $hash->{fhem}{classDefs}{$classname}{params}= $def;
                 #
+                # state
+                #
+                } elsif($cmd eq "state") {
+                        Log3 $hash, 5, "$name: state is determined as $def";
+                        $hash->{fhem}{classDefs}{$classname}{state}= $def;
+                #
                 # reading
                 #
                 } elsif($cmd eq "reading") {
@@ -487,6 +493,7 @@ sub ECMD_Read($)
 {
   my ($hash) = @_;
   my $buf = ECMD_SimpleRead($hash);
+  return unless(defined($buf));
   return if($buf eq "");
   
   ECMD_Log $hash, 5,  "Spontaneously received " . dq($buf);
@@ -631,6 +638,13 @@ ECMD_Write($$$)
     <li>classdefs<br>A colon-separated list of &lt;classname&gt;=&lt;filename&gt;.
     The list is automatically updated if a class definition is added. You can
     directly set the attribute.</li>
+    <li>split<br>
+    Some devices send several readings in one transmission. The split attribute defines the
+    separator to split such transmissions into separate messages. The regular expression for
+    matching a reading is then applied to each message in turn. After splitting, the separator 
+    is <b>not</b> part of the single messages.
+    Example: <code>attr myECMD \n</code> splits <code>foo 12\nbar off</code> into 
+    <code>foo 12</code> and <code>bar off</code>.</li>
     <li>logTraffic &lt;loglevel&gt;<br>Enables logging of sent and received datagrams with the given loglevel. Control characters in the logged datagrams are escaped, i.e. a double backslash is shown for a single backslash, \n is shown for a line feed character, etc.</li>
     <li>timeout &lt;seconds&gt;<br>Time in seconds to wait for a reply from the physical ECMD device before FHEM assumes that something has gone wrong. The default is 3 seconds if this attribute is not set.</li> 
     <!--
@@ -681,6 +695,12 @@ ECMD_Write($$$)
             <br><br>
             </li>
 
+            <li><code>state &lt;reading&gt;</code><br><br>
+            Normally, the state reading is set to the latest command or reading name followed
+            by the value, if any. This command sets the state reading to the value of the
+            named reading if and only if the reading is updated.<br><br>
+            </li>
+           
             <li><code>set &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code><br>
             <code>get &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
             <br><br>
