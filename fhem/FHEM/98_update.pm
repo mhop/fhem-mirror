@@ -307,6 +307,7 @@ upd_writeFile($$$$)
     mv "$root/$restoreDir/$fName", "$root/$fName" if($restoreDir);
     return 0;
   }
+  binmode(FD);
   print FD $content;
   close(FD);
 
