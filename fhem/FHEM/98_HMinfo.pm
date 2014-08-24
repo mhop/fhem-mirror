@@ -949,7 +949,7 @@ sub HMinfo_GetFn($@) {#########################################################
     my @fheml = ();
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
       # search for irregular trigger
-      my $peerIDs = AttrVal($dName,"peerIDs",undef);
+      my $peerIDs = AttrVal($dName,"peerIDs","");
       $peerIDs =~ s/00000000,//;
       foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
                                               grep /^trigDst_/,

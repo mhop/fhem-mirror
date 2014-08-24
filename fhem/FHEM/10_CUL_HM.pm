@@ -367,8 +367,8 @@ sub CUL_HM_updateConfig($){
         else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
       }
       elsif($st eq "smokeDetector"){   $webCmd="statusRequest";
-          if ($hash->{helper}{fkt} eq "sdLead"){
-                                        $webCmd.="teamCall:alarmOn:alarmOff";}
+        if ($hash->{helper}{fkt} eq "sdLead"){
+                                        $webCmd.=":teamCall:alarmOn:alarmOff";}
       }
       elsif($st eq "keyMatic"     ){   $webCmd="lock:inhibit on:inhibit off";
       }
@@ -1780,7 +1780,6 @@ sub CUL_HM_Parse($$) {#########################################################
         my $eo = ReadingsVal($shash->{NAME},"energy",0)+
                  ReadingsVal($shash->{NAME},"energyOffset",0);
         push @evtEt,[$shash,1,"energyOffset:".$eo];
-        push @evtEt,[$defs{$devH->{channel_02}},1,"energyOffset:$eo"] if ($devH->{channel_02});
       }
     }
   }
