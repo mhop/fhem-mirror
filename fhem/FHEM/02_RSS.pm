@@ -94,6 +94,7 @@ RSS_Define($$) {
   $hash->{fhem}{style}= $style;
   $hash->{fhem}{hostname}= $hostname;
   $hash->{fhem}{filename}= $filename;
+  $hash->{LAYOUTFILE} = $filename;
 
   eval "use GD::Text::Align";
   $hash->{fhem}{useTextAlign} = ($@ ? 0 : 1 );
