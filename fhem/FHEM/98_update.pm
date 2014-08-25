@@ -318,6 +318,8 @@ upd_writeFile($$$$)
     return;
   }
 
+  cfgDB_FileUpdate("$root/$fName") if(configDBUsed());
+
   return 1;
 }
 
