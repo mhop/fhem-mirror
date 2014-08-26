@@ -1246,7 +1246,8 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "tempList")   {##handle thermostat templist from file ---------
     my $fn = $a[1]?$a[1]:"tempList.cfg";
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
+          if ($fn !~ m/\//);
     $ret = HMinfo_tempList($name,$filter,$a[0],$fn);
   }
   elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file --------
@@ -1260,18 +1261,20 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
     $ret = HMinfo_loadConfig($filter,$fn); 
   }
   elsif($cmd eq "verifyConfig"){##action: verifyConfig-------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
+          if ($fn !~ m/\//);
     $ret = HMinfo_verifyConfig($filter,$fn); 
   }
   elsif($cmd eq "purgeConfig"){##action: purgeConfig---------------------------
     my $id = ++$hash->{nb}{cnt};
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
+          if ($fn !~ m/\//);
     my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name:$id",$fn)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
@@ -1281,7 +1284,8 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "saveConfig") {##action: saveConfig----------------------------
     my $id = ++$hash->{nb}{cnt};
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn !~ m/\//);
+    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
+          if ($fn !~ m/\//);
     my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id",$fn,$opt,$filter)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
@@ -1637,7 +1641,8 @@ sub HMinfo_archConfig($$$$) {##################################################
   # save config only if register are complete
   my ($hash,$name,$opt,$fN) = @_;
   $fN = $fN?$fN:AttrVal($name,"configFilename","regSave.cfg");
-  $fN = AttrVal($name,"configDir",".")."\/".$fN if ($fN !~ m/\//);
+  $fN = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fN 
+        if ($fN !~ m/\//);
   my $id = ++$hash->{nb}{cnt};
   my $bl = BlockingCall("HMinfo_archConfigExec", join(",",("$name:$id"
                                                        ,$fN
