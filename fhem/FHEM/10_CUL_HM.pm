@@ -134,26 +134,36 @@ sub CUL_HM_Initialize($) {
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrFn}    = "CUL_HM_Attr";
   $hash->{Attr}{dev} =  "ignore:1,0 dummy:1,0 "  # -- device only attributes
-                       ."IODev IOList IOgrp "               
-                       ."serialNr firmware .stc .devInfo "
-                       ."actCycle actStatus "
+                       ."IODev IOList IOgrp "        
+                       ."actCycle "            # also for action detector                       
+                       ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
+                       ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
+                       ;
+  $hash->{Attr}{devPhy} =    # -- physical device only attributes
+                        "serialNr firmware .stc .devInfo "
+                       ."actStatus "
                        ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
                        ."burstAccess:0_off,1_auto "
                        ."msgRepeat "
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."aesCommReq:1,0 "      # IO will request AES if 
-                       ."rssiLog:1,0 ";        # enable writing RSSI to Readings (device only)
+                       ;
   $hash->{Attr}{chn} =  "repPeers "            # -- channel only attributes
                        ."peerIDs "
                        ."tempListTmpl "
                        ."levelRange levelMap ";
-  $hash->{AttrList}  =  "do_not_notify:1,0 showtime:1,0 "
+  $hash->{Attr}{glb} =  "do_not_notify:1,0 showtime:1,0 "
                        ."rawToReadable unit "#"KFM-Sensor" only
                        ."expert:0_off,1_on,2_full "
                        ."param "
+                       ;
+  $hash->{AttrList}  =  
+                        $hash->{Attr}{glb}
                        .$hash->{Attr}{dev}
+                       .$hash->{Attr}{devPhy}
                        .$hash->{Attr}{chn}
-                       .$readingFnAttributes;
+                       .$readingFnAttributes
+                       ;
                        
   my @modellist;
   foreach my $model (keys %{$culHmModel}){
@@ -214,6 +224,8 @@ sub CUL_HM_updateConfig($){
                 if(!$nAttr);
       $attr{$name}{model} = "ActionDetector";
       delete $hash->{helper}{role};
+      delete $attr{$name}{$_}
+            foreach ("autoReadReg","actCycle","actStatus","burstAccess","serialNr"); 
       $hash->{helper}{role}{vrt} = 1;
       next;
     }
@@ -308,6 +320,9 @@ sub CUL_HM_updateConfig($){
         RemoveInternalTimer("valveTmr:$vId");
         InternalTimer($hash->{helper}{vd}{next}
                      ,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+        # delete - virtuals dont have regs 
+        delete $attr{$name}{$_}
+            foreach ("autoReadReg","actCycle","actStatus","burstAccess","serialNr"); 
       }
     }
     elsif ($st eq "sensRain") {
@@ -335,6 +350,10 @@ sub CUL_HM_updateConfig($){
         $md =~ /(-TC|ROTO_ZEL-STG-RM-FWT|HM-CC-RT-DN)/){
       $attr{$name}{stateFormat} = "last:trigLast";
     }
+    foreach(keys %{$attr{$name}}){
+      delete $attr{$name}{$_} if(CUL_HM_AttrCheck($name,$_));
+    }
+
     # -+-+-+-+-+ add default web-commands
     my $webCmd;
     $webCmd  = AttrVal($name,"webCmd",undef);
@@ -528,6 +547,8 @@ sub CUL_HM_Rename($$$) {#############################
 }
 sub CUL_HM_Attr(@) {#################################
   my ($cmd,$name, $attrName,$attrVal) = @_;
+  my $chk = CUL_HM_AttrCheck($name, $attrName);
+  return $chk if ($chk);
   my @hashL;
   my $updtReq = 0;
   my $hash = CUL_HM_name2Hash($name);
@@ -718,6 +739,10 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "autoReadReg"){
     if ($cmd eq "set"){
+      if($init_done){
+        return "$attrName only for physical devices"
+              if(CUL_HM_getAttr($name,"subType","virtual"));
+      }
       CUL_HM_complConfigTest($name)
         if (!CUL_HM_getAttrInt($name,"ignore"));;
     }
@@ -757,6 +782,24 @@ sub CUL_HM_Attr(@) {#################################
   
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
+}
+sub CUL_HM_AttrCheck(@) {############################
+  #verify if attr is applicable
+  my ($name, $attrName) = @_;
+  return undef if (!$init_done); # we cannot determine if attributes are missing
+  if ($defs{$name}{helper}{role}{vrt}){
+    return " $attrName illegal for virtual devices"
+      if ($modules{CUL_HM}{Attr}{devPhy} =~ m /\b$attrName\b/);
+  }
+  if (!$defs{$name}{helper}{role}{chn}){
+    return " $attrName only valid for channels"
+      if ($modules{CUL_HM}{Attr}{chn} =~ m /\b$attrName\b/);
+  }
+  if (!$defs{$name}{helper}{role}{dev}){
+    return " $attrName only valid for devices"
+      if (($modules{CUL_HM}{Attr}{dev}.$modules{CUL_HM}{Attr}{devPhy}) =~ m /\b$attrName\b/);
+  }
+  return undef;
 }
 sub CUL_HM_prtInit($){ #setup protocol variables after define
   my ($hash)=@_;
@@ -2938,9 +2981,9 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       my $timestamps = "\n#     timestamp of the readings for reference";
       if ($pIds){
         print aSave "\n# Peer Names:"
-                    .($defs{$name}{peerList}?$defs{$name}{peerList}:"");
+                    .InternalVal($eName,"peerList","");
         $timestamps .= "\n#        "
-                      .($defs{$eName}{peerList}?$defs{$eName}{peerList}:"")
+                      .InternalVal($eName,"peerList","")
                       ." :peerList";
         print aSave "\nset ".$eName." peerBulk ".$pIds;
       }
@@ -6080,7 +6123,8 @@ sub CUL_HM_initRegHash() { #duplicate short and long press register
     no strict "refs";
       my $ret = do $file;
     use strict "refs";
-    Log3 undef, 1, "Error loading file: $file:\n $@" if(!$ret) ;
+    if(!$ret){ Log3 undef, 1, "Error loading file: $file:\n $@";}
+    else     { Log3 undef, 3, "additional HM config file loaded: $file";}
   }
   closedir(DH);
 }
@@ -6983,6 +7027,22 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
   return 1;
 }
 
+sub CUL_HM_getAttr($$$){#return attrValue - consider device if empty
+  my ($name,$attrName,$default) = @_;
+  my $val;
+  if($defs{$name}){
+    $val = (defined $attr{$name}{$attrName})
+                 ? $attr{$name}{$attrName}
+                 : undef;
+    if (!defined $val){
+      my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
+      $val = (defined $attr{$devN}{$attrName})
+                 ? $attr{$devN}{$attrName}
+                 : $default;
+    }
+  }
+  return $val;
+}
 sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   $default = 0 if (!defined $default);
@@ -7085,7 +7145,7 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
     CUL_HM_qAutoRead($name,0);
     CUL_HM_complConfigTest($name);
     delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
-    Log3 $name,5,"CUL_HM $name queue configRead";
+    Log3 $name,5,"CUL_HM $name queue configRead, peers incomplete";
     return;
   }
   my @regList = CUL_HM_reglUsed($name);
@@ -7094,7 +7154,7 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
       CUL_HM_qAutoRead($name,0);
       CUL_HM_complConfigTest($name);
       delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
-      Log3 $name,5,"CUL_HM $name queue configRead";
+      Log3 $name,5,"CUL_HM $name queue configRead, register incomplete";
       last;
     }
   }

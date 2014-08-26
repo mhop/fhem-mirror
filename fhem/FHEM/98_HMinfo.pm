@@ -1655,12 +1655,12 @@ sub HMinfo_archConfigExec($)  {################################################
   if ($opt eq "-a"){@eN = HMinfo_getEntities("d","");}
   else             {@eN = @{$modules{CUL_HM}{helper}{confUpdt}}}
   my @names;
-  push @names,CUL_HM_getAssChnNames($_) foreach(@eN);
+  push @names,(CUL_HM_getAssChnNames($_),$_) foreach(@eN);
   @{$modules{CUL_HM}{helper}{confUpdt}} = ();
   my @archs;
   @eN = ();
   foreach(HMinfo_noDup(@names)){
-    if (CUL_HM_peerUsed($_) !=1 ||HMinfo_regCheck($_)){
+    if (CUL_HM_peerUsed($_) ==2 ||HMinfo_regCheck($_)){
       push @eN,$_;
     }
     else{
