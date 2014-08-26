@@ -6745,19 +6745,19 @@ sub CUL_HM_UpdtCentral($){
     $defs{$ioN}{owner_CCU} = $name;
   }
 
-  # --- search for peers to CCU and  potentially device this channel
+  # --- search for peers to CCU and potentially device this channel
   foreach my $ccuBId (CUL_HM_noDup(grep /$id/ ,map{split ",",AttrVal($_,"peerIDs","")}keys %defs)){
     next if (length($ccuBId) !=8);
-    my $btnS = substr($ccuBId,6,2);
-    my $btn = hex($btnS) + 0;
+    # now for each ccu Channel, that ist peered with someone. 
+    my $btn = hex(substr($ccuBId,6,2)) + 0;
     next if (!$btn);
     CommandDefine(undef,$name."_Btn$btn CUL_HM $ccuBId")
         if (!$modules{CUL_HM}{defptr}{$ccuBId});
+    my $ccuChnName = $modules{CUL_HM}{defptr}{$ccuBId}{NAME};
     foreach my $pn (grep !/^$/,
-                    map{$_ if (AttrVal($_,"peerIDs","") =~ m/$id$btnS/)}
+                    map{$_ if (AttrVal($_,"peerIDs","") =~ m/$ccuBId/)}
                     keys %defs){
-
-      CUL_HM_ID2PeerList ($name."_Btn$btn",unpack('A8',CUL_HM_name2Id($pn)."01"),1); 
+      CUL_HM_ID2PeerList ($ccuChnName,unpack('A8',CUL_HM_name2Id($pn)."01"),1); 
     }
   }
   my $io = AttrVal($name,"IODev","empty");
