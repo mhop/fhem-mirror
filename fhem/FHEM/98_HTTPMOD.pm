@@ -128,7 +128,6 @@ sub HTTPMOD_Define($$)
 sub HTTPMOD_Undef($$)
 {                     
     my ( $hash, $arg ) = @_;       
-    DevIo_CloseDev($hash);         
     RemoveInternalTimer($hash);    
     return undef;                  
 }    
@@ -424,7 +423,8 @@ sub HTTPMOD_Read($$$)
             pass the noshutdown flag to HTTPUtils for webservers that need it (some embedded webservers only deliver empty pages otherwise)
         <li><b>disable</b></li>
             stop doing HTTP requests while this attribute is set to 1
-            
+        <li><b>timeout</b></li>
+            time in seconds to wait for an answer. Default value is 2
     </ul>
     <br>
     <b>Author's notes</b><br><br>
