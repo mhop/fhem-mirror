@@ -32,7 +32,10 @@
 #
 #   2014-04-18  initial version
 #   2014-05-17  added more protocol commands, changed logging settings
-#	2014-05-25	added hide- attributes
+#   2014-05-25  added hide- attributes
+#   2014-07-07  corrected handling of 0xD2 Message (protocol is different than documented)
+#   2014-07-24  added max queue length checking and attribute
+#
 
 package main;
 
@@ -158,9 +161,10 @@ my %parseInfo = (
                                 { name => "Proz_Abluft_hoch"},
                                 { name => "Proz_Zuluft_hoch"}]},
 
-    "00d2"  =>  { unpack   => "CCCCCxC",
+    "00d2"  =>  { unpack   => "CCCCCCC",
                   name     => "Temperaturen",
                   request  => "00d1", defaultpoll => 1,
+                  check    => '($fields[5] & 15) == 15',
                   readings => [ { name => "Temp_Komfort",  expr => '$val / 2 - 20',
                                   set  => "00D3:%02x", setexpr => '($val + 20) *2',
                                   setmin => 12, setmax => 28, hint => "slider,12,1,28"},
@@ -169,6 +173,7 @@ my %parseInfo = (
                                 { name => "Temp_Zuluft" ,  expr => '$val / 2 - 20'},
                                 { name => "Temp_Abluft" ,  expr => '$val / 2 - 20'},
                                 { name => "Temp_Fortluft", expr => '$val / 2 - 20'},
+                                { name => "Temp_Flag"},
                                 { name => "Temp_EWT",      expr => '$val / 2 - 20'}]},
                                 
     "00de"  =>  { unpack   => "H6H6H6S>S>S>S>H6",
@@ -245,13 +250,13 @@ ComfoAir_Initialize($)
         if (defined ($msgHashRef->{request})) {                     # Nachricht kann abgefragt werden
             my $requestName = "request-" . $msgName;                # für eine Set-Option
             my $attrName    = "poll-"    . $msgName;                # für das Attribut zur Steuerung welche Blöcke abgefragt werden
-			my $attr2Name   = "hide-"    . $msgName;                # für das Attribut zum Verstecken von Blöcken
+            my $attr2Name   = "hide-"    . $msgName;                # für das Attribut zum Verstecken von Blöcken
             $requestHash{$requestName} = $msgHashRef;               # erzeuge requestHash für Verweis von requestName auf msgHash
             $requestHash{$requestName}->{replyCode} = $replyCode;   # ergänze Replycode im msgHash
             $cmdHash{$msgHashRef->{request}} = $msgHashRef;         # erzeuge %cmdHash für Verweis von RequestCode auf msgHash (für Debug Log)
             push @setList, $requestName;
             push @pollList, "$attrName:0,1";
-			push @pollList, "$attr2Name:0,1";
+            push @pollList, "$attr2Name:0,1";
         }
         # gehe durch alle Readings im Nachrichtentyp und erzeuge getHash, setHash und setList, rmap, setopt
         foreach my $readingHashRef (@{$msgHashRef->{readings}}) {
@@ -292,6 +297,7 @@ ComfoAir_Initialize($)
     $hash->{AttrList}= "do_not_notify:1,0 " . 
         "queueDelay " .
         "timeout " .
+        "queueMax " . 
         #"minSendDelay " .
         join (" ", @pollList) . " " .                               # Def der zyklisch abzufragenden Nachrichten
         $readingFnAttributes;
@@ -556,33 +562,44 @@ ComfoAir_InterpretFrame($$)
     
     # Parse Data
     if ($parseInfo{$hexcmd}) {
-		if (!AttrVal($name, "hide-$parseInfo{$hexcmd}{name}", 0)) {
-			# Definition für diesen Nachrichten-Typ gefunden
-			my %p = %{$parseInfo{$hexcmd}};
-			Log3 $name, 4, "$name: read got " . $p{"name"} . " (reply code $hexcmd) with data $hexdata";
-			readingsBeginUpdate($hash);
-			# Definition der einzelnen Felder abarbeiten
-			my @fields = unpack($p{"unpack"}, $data);
-			for (my $i = 0; $i < scalar(@fields); $i++) {
-				# einzelne Felder verarbeiten
-				my $reading = $p{"readings"}[$i]{"name"};
-				my $val     = $fields[$i];
-				# Exp zur Nachbearbeitung der Werte?
-				if ($p{"readings"}[$i]{"expr"}) {
-					Log3 $name, 5, "$name: read evaluate $val with expr " . $p{"readings"}[$i]{"expr"};
-					$val = eval($p{"readings"}[$i]{"expr"});
-				}
-				# Map zur Nachbereitung der Werte?
-				if ($p{"readings"}[$i]{"map"}) {
-					my %map = split (/[,: ]+/, $p{"readings"}[$i]{"map"});
-					Log3 $name, 5, "$name: read maps value $val with " . $p{"readings"}[$i]{"map"};
-					$val = $map{$val} if ($map{$val});
-				}
-				Log3 $name, 5, "$name: read assign $reading with $val";
-				readingsBulkUpdate($hash, $reading, $val);
-			}
-			readingsEndUpdate($hash, 1);
-		}
+        if (!AttrVal($name, "hide-$parseInfo{$hexcmd}{name}", 0)) {
+            # Definition für diesen Nachrichten-Typ gefunden
+            my %p = %{$parseInfo{$hexcmd}};
+            Log3 $name, 4, "$name: read got " . $p{"name"} . " (reply code $hexcmd) with data $hexdata";
+            # Definition der einzelnen Felder abarbeiten
+            my @fields = unpack($p{"unpack"}, $data);
+            my $filter = 0;
+            if ($p{check}) {
+                Log3 $name, 5, "$name: cmd $hexcmd check is " . eval($p{check}) . 
+                     ', $fields[5] = ' . $fields[5] if ($fields[5] > 15);
+                if (!eval($p{check})) {
+                    Log3 $name, 5, "$name: filter data for failed check: @fields";
+                    $filter = 1;
+                }
+            }
+            if (!$filter) {
+                readingsBeginUpdate($hash);
+                for (my $i = 0; $i < scalar(@fields); $i++) {
+                    # einzelne Felder verarbeiten
+                    my $reading = $p{"readings"}[$i]{"name"};
+                    my $val     = $fields[$i];
+                    # Exp zur Nachbearbeitung der Werte?
+                    if ($p{"readings"}[$i]{"expr"}) {
+                        Log3 $name, 5, "$name: read evaluate $val with expr " . $p{"readings"}[$i]{"expr"};
+                        $val = eval($p{"readings"}[$i]{"expr"});
+                    }
+                    # Map zur Nachbereitung der Werte?
+                    if ($p{"readings"}[$i]{"map"}) {
+                        my %map = split (/[,: ]+/, $p{"readings"}[$i]{"map"});
+                        Log3 $name, 5, "$name: read maps value $val with " . $p{"readings"}[$i]{"map"};
+                        $val = $map{$val} if ($map{$val});
+                    }
+                    Log3 $name, 5, "$name: read assign $reading with $val";
+                    readingsBulkUpdate($hash, $reading, $val);
+                }
+                readingsEndUpdate($hash, 1);
+            }
+        }
     } else {
         my $level = ($hash->{INTERVAL} ? 4 : 5);
         Log3 $name, $level, "$name: read: unknown cmd $hexcmd, len " . unpack ('C', $len) . 
@@ -651,10 +668,10 @@ ComfoAir_ReadAnswer($$$)
         if($^O =~ m/Win/ && $hash->{USBDev}) {
             $hash->{USBDev}->read_const_time($to*1000);   # set timeout (ms)
             $buf = $hash->{USBDev}->read(999);
-			if(length($buf) == 0) {
-				Log3 $name, 3, "$name: Timeout in ReadAnswer for get $arg";
-				return ("Timeout reading answer for $arg", undef);
-			}
+            if(length($buf) == 0) {
+                Log3 $name, 3, "$name: Timeout in ReadAnswer for get $arg";
+                return ("Timeout reading answer for $arg", undef);
+            }
         } else {
             if(!$hash->{FD}) {
                 Log3 $name, 3, "$name: Device lost in ReadAnswer for get $arg";
@@ -723,7 +740,7 @@ sub
 ComfoAir_GetUpdate($$) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "ComfoAir_GetUpdate", $hash, 1)
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "ComfoAir_GetUpdate", $hash, 0)
         if ($hash->{INTERVAL});
     
     foreach my $msgHashRef (values %parseInfo) {
@@ -763,13 +780,19 @@ ComfoAir_Send($$$;$$){
     $entry{DATA}   = $frame;
     $entry{EXPECT} = $expectReply;
   
-    if(!$hash->{QUEUE} || 0 == scalar(@{$hash->{QUEUE}})) {
+    my $qlen = ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0);
+    Log3 $name, 5, "$name: send queue length : $qlen";
+    if(!$qlen) {
         $hash->{QUEUE} = [ \%entry ];
     } else {
-        if ($first) {
-            unshift (@{$hash->{QUEUE}}, \%entry);
+        if ($qlen > AttrVal($name, "queueMax", 20)) {
+            Log3 $name, 3, "$name: send queue too long, dropping request";
         } else {
-            push(@{$hash->{QUEUE}}, \%entry);
+            if ($first) {
+                unshift (@{$hash->{QUEUE}}, \%entry);
+            } else {
+                push(@{$hash->{QUEUE}}, \%entry);
+            }
         }
     }
     ComfoAir_HandleSendQueue("direct:".$name);
@@ -930,7 +953,7 @@ ComfoAir_SendAck($)
         Bootloader-Version
         Firmware-Version
         RS232-Modus
-		Sensordaten
+        Sensordaten
         KonPlatine-Version
         Verzoegerungen
         Ventilation-Levels
@@ -946,7 +969,7 @@ ComfoAir_SendAck($)
         poll-Bootloader-Version
         poll-Firmware-Version
         poll-RS232-Modus
-		poll-Sensordaten
+        poll-Sensordaten
         poll-KonPlatine-Version
         poll-Verzoegerungen
         poll-Ventilation-Levels
@@ -974,7 +997,7 @@ ComfoAir_SendAck($)
         <pre>
         request-Status-Bypass 
         request-Bootloader-Version 
-		request-Sensordaten
+        request-Sensordaten
         request-Temperaturen 
         request-Firmware-Version 
         request-KonPlatine-Version 
@@ -1006,7 +1029,7 @@ ComfoAir_SendAck($)
         <li><b>poll-Bootloader-Version</b></li> 
         <li><b>poll-Firmware-Version</b></li> 
         <li><b>poll-RS232-Modus</b></li> 
-		<li><b>poll-Sensordaten</b></li> 
+        <li><b>poll-Sensordaten</b></li> 
         <li><b>poll-KonPlatine-Version</b></li> 
         <li><b>poll-Verzoegerungen</b></li> 
         <li><b>poll-Ventilation-Levels</b></li> 
@@ -1018,7 +1041,7 @@ ComfoAir_SendAck($)
         <li><b>hide-Bootloader-Version</b></li> 
         <li><b>hide-Firmware-Version</b></li> 
         <li><b>hide-RS232-Modus</b></li> 
-		<li><b>hide-Sensordaten</b></li> 
+        <li><b>hide-Sensordaten</b></li> 
         <li><b>hide-KonPlatine-Version</b></li> 
         <li><b>hide-Verzoegerungen</b></li> 
         <li><b>hide-Ventilation-Levels</b></li> 
@@ -1026,10 +1049,12 @@ ComfoAir_SendAck($)
         <li><b>hide-Betriebsstunden</b></li> 
         <li><b>hide-Status-Bypass</b></li> 
         <li><b>hide-Status-Vorheizung</b></li> 
-			prevent readings of the named group from being created even if used passively without polling and an external remote control requests this data.
-			please note that this attribute doesn't delete already existing readings.<br>
+            prevent readings of the named group from being created even if used passively without polling and an external remote control requests this data.
+            please note that this attribute doesn't delete already existing readings.<br>
         <li><b>queueDelay</b></li> 
             modify the delay used when sending requests to the device from the internal queue, defaults to 1 second <br>
+        <li><b>queueMax</b></li>
+            max length of the send queue, defaults to 50<br>
         <li><b>timeout</b></li> 
             set the timeout for reads, defaults to 2 seconds <br>
     </ul>
