@@ -6116,7 +6116,7 @@ sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
 
 #--------------- Conversion routines for register settings---------------------
 sub CUL_HM_initRegHash() { #duplicate short and long press register
-  my $mp = "./FHEM";
+  my $mp = "./$attr{global}{modpath}/FHEM";
   opendir(DH, $mp) || return;
   foreach my $m (grep /^HMConfig_(.*)\.pm$/,readdir(DH)) {
     my $file = "${mp}/$m";
