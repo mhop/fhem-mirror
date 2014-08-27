@@ -225,7 +225,8 @@ sub CUL_HM_updateConfig($){
       $attr{$name}{model} = "ActionDetector";
       delete $hash->{helper}{role};
       delete $attr{$name}{$_}
-            foreach ("autoReadReg","actCycle","actStatus","burstAccess","serialNr"); 
+            foreach ( "autoReadReg","actCycle","actStatus","burstAccess","serialNr"
+                     ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
       $hash->{helper}{role}{vrt} = 1;
       next;
     }
@@ -3014,7 +3015,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       foreach (@dl){
         my(undef,$pref) = split":",$attr{$_}{IOgrp},2;
         $pref =  "---" if (!$pref);
-        push @rl, "$defs{$_}{IODev}->{NAME} / $pref $_ ";
+        my $IODev = $defs{$_}{IODev}->{NAME}?$defs{$_}{IODev}->{NAME}:"---";
+        push @rl, "$IODev / $pref $_ ";
       }
       return "devices using $name\ncurrent IO / preferred\n  ".join "\n  ", sort @rl;
     } 
