@@ -778,6 +778,7 @@ sub HMinfo_GetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
+  
   if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
     $opt = $a[0];
     $optEmpty = ($opt =~ m/e/)?1:0;
@@ -792,7 +793,7 @@ sub HMinfo_GetFn($@) {#########################################################
   #------------ statistics ---------------
   if   ($cmd eq "protoEvents"){##print protocol-events-------------------------
     my ($type) = @a;
-    $type = "long" if(!$type);
+    $type = "short" if(!$type);
     my @paramList;
     my @IOlist;
     my @plSum; push @plSum,0 for (0..9);#prefill
@@ -1088,6 +1089,7 @@ sub HMinfo_GetFn($@) {#########################################################
                           ,$chan
                           );
     }
+    @model = grep /$filter/,sort @model if($filter);
     $ret = $cmd.($filter?" filtered":"").":$filter\n  "
            .sprintf("%-16s %-24s %4s %-24s %-5s %-5s %s\n  "
                           ,"subType"
@@ -1098,7 +1100,7 @@ sub HMinfo_GetFn($@) {#########################################################
                           ,"List"
                           ,"channels"
                           )
-            .join"\n  ",grep(/$filter/,sort @model);
+            .join"\n  ", @model;
   }
   elsif($cmd eq "help")       {
     $ret = " Unknown argument $cmd, choose one of "
@@ -1302,7 +1304,7 @@ sub HMinfo_SetFn($@) {#########################################################
     unshift @a,"-f",$filter if ($filter);
     unshift @a,"-".$opt if ($opt);
     $ret = HMinfo_GetFn($hash,$name,$cmd,@a);
-  }
+ }
 
   else{
     my @cmdLst =     
