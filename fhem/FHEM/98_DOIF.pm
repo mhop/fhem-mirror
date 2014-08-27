@@ -1,5 +1,5 @@
 ##############################################
-#     98_DOIF
+#     $Id$
 #
 #     This file is part of fhem.
 #
@@ -16,8 +16,7 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#     $Id$
-##############################################################################
+###############################################
 
 
 package main;
@@ -737,7 +736,7 @@ CmdDoIf($$)
   }
   #$hash->{STATE} = 'initialized';
   $hash->{helper}{last_timer}=0;
-
+  $hash->{helper}{sleeptimer}=-1;
   while ($tail ne "") {
     return($tail, "no left bracket of condition") if ($tail !~ /^ *\(/);
     #condition
@@ -788,7 +787,6 @@ CmdDoIf($$)
     }
     $hash->{do}{$last_do+1}=$else_cmd_ori;
   }
-  $hash->{helper}{sleeptimer}=-1;
   return("","")
 }
 
@@ -909,7 +907,7 @@ The commands are always processed from left to right. There is only one command 
 + The execution part can be left out in each case. So that the module can be used for pure status display.<br>
 + Definition of the status display with use of any readings or statuses<br>
 </ol><br>
-In the condition, but also in the execution part states, Readings or Internals are given in square brackets. The syntax is:<br>
+In the condition, but also in the execution part states, readings or internals are given in square brackets. The syntax is:<br>
 <br>
 [&lt;device&gt;:&lt;reading&gt;:&lt;format&gt;|[&lt;regular expression&gt;]] or [&lt;device&gt;:&&lt;internal&gt;:&lt;format&gt;|[&lt;regular expression;]]<br>
 <br>
@@ -1048,7 +1046,7 @@ Zeitintervalle über mehrere Tage müssen als Zeitpunkte angegeben werden (einsc
 <br>
 Schalten bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
-<code>define DI_light ([{sunset(0,"17:00","21:00")}-{sunset_abs()}]) (set outdoorlight off) DOELSEIF (set outdoorlight on)</code><br>
+<code>define DI_light DOIF ([{sunset(0,"17:00","21:00")}-{sunset_abs()}]) (set outdoorlight off) DOELSE (set outdoorlight on)</code><br>
 <br>
 Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen:<br>
 <br>
@@ -1089,7 +1087,7 @@ Filtern nach Zahlen<br>
 <br>
 Es soll aus einem Reading, der z. B. ein Prozentzeichen beinhaltet, nur der Zahlenanteil für den Vergleich genutzt werden.<br>
 <br>
-<code>define DI_heating ([adjusting:actuator:d] &lt; 10) (set heating off) DOELSE (set heating on)</code><br>
+<code>define DI_heating DOIF ([adjusting:actuator:d] &lt; 10) (set heating off) DOELSE (set heating on)</code><br>
 <br>
 Verzögerungen für die Ausführung von Kommandos werden pro Kommando über das Attribut "wait" definiert. Syntax:<br>
 <br>
