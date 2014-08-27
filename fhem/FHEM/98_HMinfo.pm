@@ -794,11 +794,14 @@ sub HMinfo_GetFn($@) {#########################################################
   if   ($cmd eq "protoEvents"){##print protocol-events-------------------------
     my ($type) = @a;
     $type = "short" if(!$type);
-    my @paramList;
+    my @paramList2;
     my @IOlist;
     my @plSum; push @plSum,0 for (0..9);#prefill
+    my $maxNlen = 3;
     foreach my $dName (HMinfo_getEntities($opt."d",$filter)){
       my $id = $defs{$dName}{DEF};
+      my $nl = length($dName); 
+      $maxNlen = $nl if($nl > $maxNlen);
       my ($found,$para) = HMinfo_getParam($id,
                              ,"protState","protCmdPend"
                              ,"protSnd","protLastRcv","protResnd"
@@ -816,49 +819,51 @@ sub HMinfo_GetFn($@) {#########################################################
         my ($x) =  $pl[$_] =~ /(\d+)/;
         $plSum[$_] += $x if ($x);
       }
-      if ($type eq "short"){
-        push @paramList, sprintf("%-20s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
-                      @pl[0..3],@pl[5..9]);
-      }
-      else{
-        push @paramList, sprintf("%-20s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
-                      @pl[0..9]);
-      }
+      push @paramList2,[@pl];
       push @IOlist,$defs{$pl[0]}{IODev}->{NAME};
     }
-
-    my $hdr = sprintf("%-20s:%-16s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
-                             ,"name"
-                             ,"State","CmdPend"
-                             ,"Snd","LastRcv","Resnd"
-                             ,"CmdDel","ResndFail","Nack","IOerr");
-    $hdr = sprintf("%-20s:%-16s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
-                             ,"name"
-                             ,"State","CmdPend"
-                             ,"Snd","Resnd"
-                             ,"CmdDel","ResndFail","Nack","IOerr") if ($type eq "short");
-    $ret = $cmd." done:" ."\n    ".$hdr  ."\n    ".(join "\n    ",sort @paramList);
-    $ret .= "\n======================================================="
-           ."=========================================================";
+    $maxNlen ++;
+    my ($hdr,$ftr);
+    my @paramList;
     if ($type eq "short"){
-      $ret .= "\n    ".sprintf("%-20s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[5..9]);
+      push @paramList, sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
+                    @{$_}[0..3],@{$_}[5..9]) foreach(@paramList2);
+      $hdr = sprintf("%-${maxNlen}s:%-16s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s",
+                               ,"name"
+                               ,"State","CmdPend"
+                               ,"Snd","Resnd"
+                               ,"CmdDel","ResndFail","Nack","IOerr");
+      $ftr = sprintf("%-${maxNlen}s%-17s|%-10s|%-10s|%-10s#%-10s|%-10s|%-10s|%-10s","sum",@plSum[1..3],@plSum[5..9]);
     }
     else{
-      $ret .= "\n    ".sprintf("%-20s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s","sum",@plSum[1..9]);
-    }
-
-    $ret .= "\n\n    CUL_HM queue length:$modules{CUL_HM}{prot}{rspPend}";
+      push @paramList, sprintf("%-${maxNlen}s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
+                    @{$_}[0..9]) foreach(@paramList2);
+      $hdr = sprintf("%-${maxNlen}s:%-16s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s",
+                               ,"name"
+                               ,"State","CmdPend"
+                               ,"Snd","LastRcv","Resnd"
+                               ,"CmdDel","ResndFail","Nack","IOerr");
+      $ftr = sprintf("%-${maxNlen}20s%-17s|%-18s|%-18s|%-14s|%-18s#%-18s|%-18s|%-18s|%-18s","sum",@plSum[1..9]);
+   }
     
-    $ret .= "\n";
-    $ret .= "\n    requests pending";
-    $ret .= "\n    ----------------";
-    $ret .= "\n    autoReadReg          : ".join(" ",@{$modules{CUL_HM}{helper}{qReqConf}});
-    $ret .= "\n        recent           : ".($modules{CUL_HM}{helper}{autoRdActive}?$modules{CUL_HM}{helper}{autoRdActive}:"none");
-    $ret .= "\n    status request       : ".join(" ",@{$modules{CUL_HM}{helper}{qReqStat}}) ;
-    $ret .= "\n    autoReadReg wakeup   : ".join(" ",@{$modules{CUL_HM}{helper}{qReqConfWu}});
-    $ret .= "\n    status request wakeup: ".join(" ",@{$modules{CUL_HM}{helper}{qReqStatWu}});
-    $ret .= "\n    autoReadTest         : ".join(" ",@{$modules{CUL_HM}{helper}{confCheckArr}});
-    $ret .= "\n";
+    $ret = $cmd." done:" 
+           ."\n    ".$hdr  
+           ."\n    ".(join "\n    ",sort @paramList)
+           ."\n================================================================================================================"
+           ."\n    ".$ftr 
+           ."\n"
+           ."\n    CUL_HM queue length:$modules{CUL_HM}{prot}{rspPend}"
+           ."\n"
+           ."\n    requests pending"
+           ."\n    ----------------"
+           ."\n    autoReadReg          : ".join(" ",@{$modules{CUL_HM}{helper}{qReqConf}})
+           ."\n        recent           : ".($modules{CUL_HM}{helper}{autoRdActive}?$modules{CUL_HM}{helper}{autoRdActive}:"none")
+           ."\n    status request       : ".join(" ",@{$modules{CUL_HM}{helper}{qReqStat}}) 
+           ."\n    autoReadReg wakeup   : ".join(" ",@{$modules{CUL_HM}{helper}{qReqConfWu}})
+           ."\n    status request wakeup: ".join(" ",@{$modules{CUL_HM}{helper}{qReqStatWu}})
+           ."\n    autoReadTest         : ".join(" ",@{$modules{CUL_HM}{helper}{confCheckArr}})
+           ."\n"
+           ;
     @IOlist = HMinfo_noDup(@IOlist);
     foreach(@IOlist){
       $_ .= ":".$defs{$_}{STATE}
