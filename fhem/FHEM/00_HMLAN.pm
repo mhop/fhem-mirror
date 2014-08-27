@@ -561,7 +561,7 @@ sub HMLAN_Parse($$) {##########################################################
 
   if ($letter =~ m/^[ER]/){#@mFld=($src, $status, $msec, $d2, $rssi, $msg)
     # max speed for devices is 100ms after receive - example:TC
-
+    return if($mFld[5] =~ m/99.112999999000000/);#ignore overload test
     my ($mNo,$flg,$type,$src,$dst,$p) = unpack('A2A2A2A6A6A*',$mFld[5]);
     my $mLen = length($mFld[5])/2;
     my $CULinfo = "";
