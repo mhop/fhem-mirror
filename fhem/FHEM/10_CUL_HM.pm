@@ -597,9 +597,16 @@ sub CUL_HM_Attr(@) {#################################
     }
   }
   elsif($attrName eq "actCycle"){#"000:00" or 'off'
-    return if (CUL_HM_name2Id($name) eq $K_actDetID);
-    return "attribut not allowed for channels"
-                    if (!$hash->{helper}{role}{dev});
+    if ($cmd eq "set"){
+      if (CUL_HM_name2Id($name) eq $K_actDetID){
+        return "$attrName must be higher then 30, $attrVal not allowed"
+              if ($attrVal < 30);
+      }
+      else{
+        return "attribut not allowed for channels"
+                      if (!$hash->{helper}{role}{dev});
+      }
+    }
     $updtReq = 1;
   }
   elsif($attrName eq "param"){
@@ -6472,16 +6479,13 @@ sub CUL_HM_ActGetCreateHash() {# get ActionDetector - create if necessary
   }
   my $actHash = $modules{CUL_HM}{defptr}{"000000"};
   my $actName = $actHash->{NAME} if($actHash);
-
+  my $ac = AttrVal($actName,"actCycle",600);
   if (!$actHash->{helper}{actCycle} ||
-      $actHash->{helper}{actCycle} != $attr{$actName}{actCycle}){
-    $attr{$actName}{actCycle} = 30 if(!$attr{$actName}{actCycle} ||
-                                       $attr{$actName}{actCycle}<30);
-    $actHash->{helper}{actCycle} = $attr{$actName}{actCycle};
+      $actHash->{helper}{actCycle} != $ac){
+    $actHash->{helper}{actCycle} = $ac;
     RemoveInternalTimer("ActionDetector");
     $actHash->{STATE} = "active";
-    InternalTimer(gettimeofday()+$attr{$actName}{actCycle},
-                                       "CUL_HM_ActCheck", "ActionDetector", 0);
+    InternalTimer(gettimeofday()+$ac,"CUL_HM_ActCheck", "ActionDetector", 0);
   }
   return $actHash;
 }
@@ -6604,10 +6608,9 @@ sub CUL_HM_ActCheck($) {# perform supervision
 
   CUL_HM_UpdtReadBulk($actHash,1,@event);
 
-  $attr{$actName}{actCycle} = 600 if($attr{$actName}{actCycle}<30);
-  $actHash->{helper}{actCycle} = $attr{$actName}{actCycle};
-  InternalTimer(gettimeofday()+$attr{$actName}{actCycle},
-                                     "CUL_HM_ActCheck", "ActionDetector", 0);
+  $actHash->{helper}{actCycle} = AttrVal($actName,"actCycle",600);
+  InternalTimer(gettimeofday()+$actHash->{helper}{actCycle}
+                                      ,"CUL_HM_ActCheck", "ActionDetector", 0);
 }
 
 #+++++++++++++++++ helper +++++++++++++++++++++++++++++++++++++++++++++++++++++
