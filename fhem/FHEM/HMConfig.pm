@@ -341,7 +341,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
 #output Unit
   ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be played"},
-  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"                            ,lit=>{no=>0x00,red_short=>0x11,red_long=>0x12,green_short=>0x21,green_long=>0x22,orange_short=>0x31,orange_long=>0x32}},
+  ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED color"                            ,lit=>{no=>0x00,redS=>0x11,redL=>0x12,greenS=>0x21,greenL=>0x22,orangeS=>0x31,orangeL=>0x32}},
   ActTypeOuCf     =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"type sound or LED"                    ,lit=>{no=>0,short=>1,long=>2}},
   ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Number of repetitions"},
   Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume"                               ,lit=>{vol_100=>255,vol_90=>250,vol_80=>246,vol_70=>240,vol_60=>234,vol_50=>227,vol_40=>218,vol_30=>207,vol_20=>190,vol_10=>162,vol_00=>10}},
@@ -1465,7 +1465,7 @@ $culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
                          ,controlMode    =>"[auto|manual|central|party]"
                          ,statusRequest  =>""
                          ,sysTime        =>""},
-  "HM-OU-CFM-PL01"    =>{ led            =>"<color>[,<color>...] [<repeat>]"},
+  "HM-OU-CFM-PL01"    =>{ led            =>"[redL|greenL|orangeL|redS|greenS|orangeS|pause][,<color2>...] [<repeat>]"},
   "HM-OU-CFM-PL02"    =>{ playTone       =>"[replay|<MP3No>[,<MP3No>...]] [<repeat>]"},
   "HM-SEC-WIN01"      =>{ stop           =>"",
                          ,level          =>"<level> <relockDly> <speed>..."
