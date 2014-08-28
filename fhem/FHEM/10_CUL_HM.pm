@@ -747,10 +747,6 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "autoReadReg"){
     if ($cmd eq "set"){
-      if($init_done){
-        return "$attrName only for physical devices"
-              if(CUL_HM_getAttr($name,"subType","virtual"));
-      }
       CUL_HM_complConfigTest($name)
         if (!CUL_HM_getAttrInt($name,"ignore"));;
     }
@@ -806,6 +802,10 @@ sub CUL_HM_AttrCheck(@) {############################
   if (!$defs{$name}{helper}{role}{dev}){
     return " $attrName only valid for devices"
       if (($modules{CUL_HM}{Attr}{dev}.$modules{CUL_HM}{Attr}{devPhy}) =~ m /\b$attrName\b/);
+  }
+  if ($defs{$name}{helper}{role}{vrt}){
+    return " $attrName only valid for physical devices"
+      if ($modules{CUL_HM}{Attr}{devPhy} =~ m /\b$attrName\b/);
   }
   return undef;
 }
