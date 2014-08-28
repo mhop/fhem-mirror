@@ -1889,7 +1889,7 @@ sub CUL_HM_Parse($$) {#########################################################
           if (@mI > 8){#status for all channel included
             # open to decode byte $mI[4] - related to backlight? seen 20 and 21
             my $lStat = join("",@mI[5..8]); # all LED status in one long
-             my %colTbl=("00"=>"off","01"=>"red","10"=>"green","11"=>"orange");
+            my %colTbl=("00"=>"off","01"=>"red","10"=>"green","11"=>"orange");
             my @leds = reverse(unpack('(A2)*',sprintf("%032b",hex($lStat))));
             $_ = $colTbl{$_} foreach (@leds);
             for(my $cCnt = 0;$cCnt<16;$cCnt++){# go for all channels
@@ -2248,7 +2248,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       $shash->{helper}{prt}{sleeping} = 1 if($mFlgH & 0x20) ;
     }
   }
-  elsif($rxt & 0x10){ # lazy config
+  if($rxt & 0x10 && $shash->{helper}{prt}{sleeping}){ # lazy config
     if($mFlgH & 0x02                  #wakeup device
        && $defs{$shash->{IODev}{NAME}}{TYPE} eq "HMLAN"){
       $shash->{helper}{io}{newCh} = 1 if ($shash->{helper}{prt}{sProc} == 2);
