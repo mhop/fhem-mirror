@@ -44,7 +44,8 @@ CommandUpdate($$)
 
   my $ret = eval { "Hello" =~ m/$arg/ };
   return "first argument must be a valid regexp, all, force or check"
-        if($arg =~ m/^\?/ || $arg =~ m/^\*/ || $ret);
+        if($arg =~ m/^[-\?\*]/ || $ret);
+  $arg = lc($arg) if($arg =~ m/^(check|all|force)$/i);
 
   $updateInBackground = AttrVal("global","updateInBackground",undef);
   $updateInBackground = 0 if($arg ne "all");                                   
@@ -178,7 +179,10 @@ doUpdate($$)
     foreach my $ex (@excl) {
       $isExcl = 1 if($fName =~ m/$ex/);
     }
-    next if($isExcl);
+    if($isExcl) {
+      uLog 4, "update: skipping $fName, matches exclude_from_update";
+      next;
+    }
 
     if($isSingle) {
       next if($fName !~ m/$arg/);
@@ -364,6 +368,7 @@ upd_initRestoreDirs($)
   my @t = localtime;
   my $restoreDir = sprintf("$rdName/%04d-%02d-%02d",
                         $t[5]+1900, $t[4]+1, $t[3]);
+  Log 1, "MKDIR $restoreDir" if(!  -d "$root/restoreDir");
   upd_mkDir($root, $restoreDir, 0);
 
   if(!opendir(DH, "$root/$rdName")) {
@@ -375,7 +380,7 @@ upd_initRestoreDirs($)
   while(int(@oldDirs) > $nDirs) {
     my $dir = "$root/$rdName/". shift(@oldDirs);
     next if($dir =~ m/$restoreDir/);    # Just in case
-    uLog 1, "deleting: $dir";
+    uLog 1, "RMDIR: $dir";
     upd_rmTree($dir);
   }
     
