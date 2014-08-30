@@ -20,7 +20,7 @@ FW_timeCreate(el,cmd)
   if(brOff > 0) {
     par.innerHTML = par.innerHTML.substring(0, brOff).replace('"-"','"+"');
     if(cmd)
-      document.location = cmd.replace('%',v);
+      FW_cmd(cmd.replace('%',v)+"&XHR=1");
     return;
   }
 
