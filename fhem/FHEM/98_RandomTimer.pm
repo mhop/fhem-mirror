@@ -170,7 +170,7 @@ sub RandomTimer_Exec($) {
       # Wenn aktiv und Abschaltzeit erreicht, dann Gerät ausschalten, Meldung ausgeben und Timer schließen
       if ($stopTimeReached) {
          Log3 $hash, 3, "[".$hash->{NAME}."] RandomTimer for $hash->{DEVICE} going down";
-         RandomTimer_device_off($hash);
+         #RandomTimer_device_off($hash);
          RandomTimer_down($hash);
          $hash->{active} = 0;
          if ( AttrVal($hash->{NAME}, "runonce", -1) eq 1 ) {
@@ -222,14 +222,14 @@ sub RandomTimer_down($) {
    my ($hash) = @_;
 
    $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
-   fhem ("set $hash->{DEVICE} $hash->{COMMAND}");
+   RandomTimer_device_switch($hash);
 }
 ########################################################################
-sub RandomTimer_device_off($) {
-   my ($hash) = @_;
-
-   $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
-}
+#sub RandomTimer_device_off($) {
+#  my ($hash) = @_;
+#
+#   $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
+#}
 ########################################################################
 sub RandomTimer_setState($) {
   my ($hash) = @_;
@@ -342,30 +342,30 @@ sub stopZeitErmitteln  ($$) {
 
 }
 ########################################################################
-sub schaltzeitenErmitteln ($)
-{
-   my ($hash) = @_;
-   my($sec,$min,$hour)=localtime(time);
-
-   my $timespec_stop  = $hash->{TIMESPEC_STOP};
-
-  Log3 ($hash, 3, "Wrong timespec_stop <$timespec_stop>, use \"[+][*]<time or func>\"" )
-     if($timespec_stop !~ m/^(\+)?(\*)?(.*)$/i);
-  my ($srel, $srep, $stspec) = ($1, $2, $3);
-  my ($err, $h, $m, $s, $fn) = GetTimeSpec($stspec);
-  Log3 ($hash, 3, $err) if($err);
-  $h -=24  if ($h >= 24);
-
-  if ($hash->{S_REL}) {
-     my ($thour, $tmin, $tsec) = split(/:/, $hash->{STARTTIME});
-     my $timeToStart = time() + 3600*($thour-$hour) + 60*($tmin-$min) + ($tsec-$sec);
-     my $timeToStop = $timeToStart + 3600*$h + 60*$m + $s;
-     ($s,$m,$h)=localtime($timeToStop);
-  }
-
-  my $timeToStop_st =  sprintf ("%02d:%02d:%2d", $h,$m,$s );
-  return ($timeToStop_st);
-}
+#sub schaltzeitenErmitteln ($)
+#{
+#   my ($hash) = @_;
+#   my($sec,$min,$hour)=localtime(time);
+#
+#   my $timespec_stop  = $hash->{TIMESPEC_STOP};
+#
+#  Log3 ($hash, 3, "Wrong timespec_stop <$timespec_stop>, use \"[+][*]<time or func>\"" )
+#     if($timespec_stop !~ m/^(\+)?(\*)?(.*)$/i);
+#  my ($srel, $srep, $stspec) = ($1, $2, $3);
+#  my ($err, $h, $m, $s, $fn) = GetTimeSpec($stspec);
+#  Log3 ($hash, 3, $err) if($err);
+#  $h -=24  if ($h >= 24);
+#
+#  if ($hash->{S_REL}) {
+#     my ($thour, $tmin, $tsec) = split(/:/, $hash->{STARTTIME});
+#     my $timeToStart = time() + 3600*($thour-$hour) + 60*($tmin-$min) + ($tsec-$sec);
+#     my $timeToStop = $timeToStart + 3600*$h + 60*$m + $s;
+#     ($s,$m,$h)=localtime($timeToStop);
+#  }
+#
+#  my $timeToStop_st =  sprintf ("%02d:%02d:%2d", $h,$m,$s );
+#  return ($timeToStop_st);
+#}
 ########################################################################
 sub RandomTimer_device_toggle ($)
 {
@@ -379,20 +379,25 @@ sub RandomTimer_device_toggle ($)
 
     if ($zufall < $sigma ) {
        $hash->{COMMAND}  = ($hash->{COMMAND} eq "on") ? "off" : "on";
-
-       my $command = "set @ $hash->{COMMAND}";
-       if ($hash->{COMMAND} eq "on") {
-          $command = AttrVal($hash->{NAME}, "onCmd", $command);
-       } else {
-          $command = AttrVal($hash->{NAME}, "offCmd", $command);
-       }
-       $command =~ s/@/$hash->{DEVICE}/g;
-       $command = SemicolonEscape($command);
-       Log3 $hash, 4, "[".$hash->{NAME}. "]"." command: $command";
-
-       my $ret  = AnalyzeCommandChain(undef, $command);
-       Log3 ($hash, 3, $ret)                  if($ret);
+       RandomTimer_device_switch($hash); 
     }
+}
+########################################################################
+sub RandomTimer_device_switch ($)
+{
+   my ($hash) = @_;
+   my $command = "set @ $hash->{COMMAND}";
+   if ($hash->{COMMAND} eq "on") {
+      $command = AttrVal($hash->{NAME}, "onCmd", $command);
+   } else {
+      $command = AttrVal($hash->{NAME}, "offCmd", $command);
+   }
+   $command =~ s/@/$hash->{DEVICE}/g;
+   $command = SemicolonEscape($command);
+   Log3 $hash, 4, "[".$hash->{NAME}. "]"." command: $command";
+
+   my $ret  = AnalyzeCommandChain(undef, $command);
+   Log3 ($hash, 3, $ret)                  if($ret)
 }
 ########################################################################
 sub get_switchmode ($) {
