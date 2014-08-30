@@ -157,7 +157,10 @@ my %zwave_class = (
   THERMOSTAT_SETBACK       => { id => '47', },
   DOOR_LOCK_LOGGING        => { id => '4c', },
   SCHEDULE_ENTRY_LOCK      => { id => '4e', },
-  BASIC_WINDOW_COVERING    => { id => '50', },
+  BASIC_WINDOW_COVERING    => { id => '50',
+    set   => { coveringClose  => "0140",
+               coveringOpen   => "0100",
+               coveringStop   => "02" , },  },
   MTP_WINDOW_COVERING      => { id => '51', },
   CRC_16_ENCAP             => { id => '56', },
   MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
@@ -1088,6 +1091,21 @@ s2Hex($)
     return the wakeup interval in seconds, in the form<br>
     wakeupReport:interval seconds target id
     </li>
+
+
+   <br><br><b>Class BASIC_WINDOW_COVERING</b>
+  <li>coveringClose<br>
+    Starts closing the window cover. Moving stops if blinds are fully colsed or
+    a coveringStop command was issued. 
+    </li>
+  <li>coveringOpen<br>
+    Starts opening the window cover.  Moving stops if blinds are fully open or
+    a coveringStop command was issued. 
+    </li>
+  <li>coveringStop<br>
+    Stop moving the window cover. Blinds are partially open (closed).
+  </li>
+
 
   </ul>
   <br>
