@@ -67,7 +67,16 @@ sub addproperty {
   my ($self,$line)= @_;
   # TRIGGER;VALUE=DATE-TIME:20120531T150000Z
   #main::Debug "line= $line";
-  my ($property,$parameter)= split(":", $line,2); # TRIGGER;VALUE=DATE-TIME    20120531T150000Z
+  my ($property,$property1,$parameter);
+  ####### takes care of TZID, which has ":" in the property DTEND;TZID="(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna":20140904T180000
+  if ($line =~ m/TZID=/){
+    ($property,$property1,$parameter)= split(":", $line,3); 
+    $property .=$property1;
+  }  
+  else {
+    ($property,$parameter)= split(":", $line,2); 
+  }
+  ######
   #main::Debug "property= $property parameter= $parameter";
   my ($key,$parts)= split(";", $property,2);
   #main::Debug "key= $key parts= $parts";
@@ -109,6 +118,15 @@ sub parseSub {
     #main::Debug "$ln: $line";
     $ln++;
     next if($line eq ""); # remove empty line
+    #### corrects line-wraps: if next line is starting with at least 2 spaces, join them
+        if ($ln<$#ical){
+          my $line1= $ical[$ln];
+          if ($line1 =~ s/^\s\s*//) {
+            $line.=$line1;
+            $ln++;
+          };
+        };
+    ####    
     last if($line =~ m/^END:.*$/);
     if($line =~ m/^BEGIN:(.*)$/) {
       my $entry= ICal::Entry->new($1);
