@@ -310,18 +310,44 @@ DOIF_CheckTimers($$$$)
 {
   my $i=0;
   my @nrs;
+  my @times;
   my $nr;
   my $days="";
   my $err;
-  my ($hash,$block,$condition,$timerarray)=@_;
-  #if ($block =~ /^(([0-2][0-9](:[0-5][0-9]){1,2})|(\{.*\}))(-([0-2][0-9](:[0-5][0-9]){1,2})|-({.*})|$)/) {
-  if ($block =~ /^((\{.*\})|([0-2][0-9](:[0-5][0-9]){1,2}))(\|[0-8]+$|-([0-2][0-9](:[0-5][0-9]){1,2})|-({.*})|$)(\|[0-8]+$|$)/) {
-    my ($timer,$days)=split(/\|/,$block);
-    foreach my $time (split(/-/,$timer)) {
+  my $beginning;
+  my $pos;
+  my $time;
+  my $block;
+  my ($hash,$timer,$condition,$timerarray)=@_;
+  if ($timer =~ /^((\{.*\})|([0-2][0-9](:[0-5][0-9]){1,2}))(\|[0-8]+$|-([0-2][0-9](:[0-5][0-9]){1,2})|-({.*})|$)(\|[0-8]+$|$)/) {
+    while ($timer ne "") {
+      if ($timer=~ /^\s*\{/) { 
+        ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\{\}]'); 
+        return ($time,$err) if ($err);
+        $time="{".$time."}";
+        if ($timer =~ /^\s*\|/g) {
+          $pos=pos($timer);
+          $days=substr($timer,$pos);
+          $timer="";
+        }
+      } elsif ($timer =~ /-/g) {
+        $pos=pos($timer)-1;
+        $time=substr($timer,0,$pos);
+        $timer=substr($timer,$pos+1);
+      } else { 
+        ($time,$days)=split(/\|/,$timer);
+        $timer="";
+      }
+      $nr=$hash->{helper}{last_timer}++;
+      $times[$i]=$time;
+      $nrs[$i++]=$nr;
+      $timer=substr($timer,pos($timer)) if ($timer =~ /^\s*\-/g);
+    }
+    $days = "" if (!$days);
+    for (my $j=0; $j<$i;$j++) {
+      $nr=$nrs[$j];
+      $time=$times[$j];
       $time .=":00" if ($time =~ m/^[0-2][0-9]:[0-5][0-9]$/);
-      $nr=$hash->{helper}{last_timer};
-      $nrs[$i]=$nr;
-      $i++;
       $hash->{timer}{$nr}=0;
       $hash->{time}{$nr}=$time;
       $hash->{timeCond}{$nr}=$condition;
@@ -331,15 +357,11 @@ DOIF_CheckTimers($$$$)
       return($hash->{time}{$nr},$err) if ($err);
       $hash->{timers}{$condition}.=" $nr ";
       $hash->{timerfunc}{$nr}=\${$timerarray}[$nr];
-      $nr++;
-      $hash->{helper}{last_timer}=$nr;
     }
-    $days = "" if (!$days);
     if ($i == 2) {
       $block='DOIF_time($hash->{realtime}{'.$nrs[0].'},$hash->{realtime}{'.$nrs[1].'},$wday,$hms,"'.$days.'")';
     } else {
       $block='DOIF_time_once($hash->{timer}{'.$nrs[0].'},$wday,"'.$days.'")';
-      #$block=' $hash->{timer}{'.$nrs[0].'} ';
     }
     return ($block,"");
   }
