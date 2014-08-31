@@ -884,22 +884,22 @@ The state administration is an important distinguishing feature of DOIF to notif
 <br>
 Syntax:<br>
 <br>
-define &lt;name&gt; DOIF (condition) (commands) DOELSEIF (condition) (commands) DOELSEIF ... DOELSE (commands)<br>
+<code>define &lt;name&gt; DOIF (&lt;condition&gt;) (&lt;commands&gt;) DOELSEIF (&lt;condition&gt;) (&lt;commands&gt;) DOELSEIF ... DOELSE (&lt;commands&gt;)</code><br>
 <br>
 The commands are always processed from left to right. There is only one command executed, namely the first, for which the corresponding condition in the processed sequence is true. In addition, only the conditions are checked, which include a matching device of the trigger (in square brackets).<br>
 <br>
 <b>Features</b><br>
 <ol><br>
-+ Intuitive syntax, as used in branches (if-then-elseif-else) in higher-level languages​​<br>
++ Intuitive syntax, as used in branches (if-then-elseif-else) in higher-level languages<br>
 + In the condition of any logical queries can be made as well as perl functions are used (full perl support)<br>
 + It can be any FHEM commands and perl commands are executed<br>
 + You can specify any number of Devices and times in the condition<br>
 + Syntax checking at the time of definition are identified missing brackets<br>
 + no filtering of events, like notify about regular expressions, required<br>
-+ Status is specified with [&lt;Devicename&gt;], Readings with [&lt;Devicename&gt;:&lt;Readingname&gt;]<br>
-+ Time information on the condition: [HH:MM:SS] or [HH:MM] or [{perl-fuction}]<br>
-+ Time intervals: [begin-end] for the beginning and end, the above time format can be selected.<br>
-+ Weekday control: [Time|012345678] or [begin-end|012345678] (0-6 corresponds to Sunday through Saturday) such as 7 for $we and 8 for !$we<br>
++ Status is specified with <code>[&lt;devicename&gt;]</code>, readings with <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code><br>
++ Time information on the condition: <code>[HH:MM:SS]</code> or <code>[HH:MM]</code> or <code>[{&lt;perl-function&gt;}]</code><br>
++ Time intervals: <code>[&lt;begin&gt;-&lt;end&gt;]</code> for <code>&lt;begin&gt;</code> and <code>&lt;end&gt;</code>, the above time format can be selected.<br>
++ Weekday control: <code>[&lt;time&gt;|012345678]</code> or <code>[&lt;begin&gt;-&lt;end&gt;|012345678]</code> (0-6 corresponds to Sunday through Saturday) such as 7 for $we and 8 for !$we<br>
 + Any number DOELSEIF-cases<br>
 + DOELSE at the end is optional<br>
 + Execution only once after state change (the default) or always possible.<br>
@@ -909,19 +909,19 @@ The commands are always processed from left to right. There is only one command 
 </ol><br>
 In the condition, but also in the execution part states, readings or internals are given in square brackets. The syntax is:<br>
 <br>
-[&lt;device&gt;:&lt;reading&gt;:&lt;format&gt;|[&lt;regular expression&gt;]] or [&lt;device&gt;:&&lt;internal&gt;:&lt;format&gt;|[&lt;regular expression;]]<br>
+<code>[&lt;device&gt;:&lt;reading&gt;:&lt;format&gt;|[&lt;regular expression&gt;]]</code> or <code>[&lt;device&gt;:&&lt;internal&gt;:&lt;format&gt;|[&lt;regular expression&gt;]]</code><br>
 <br>
-&lt;format&gt; and [&lt;regular expression&gt;] are filter options und are optional.<br>
+<code>&lt;format&gt;</code> and <code>[&lt;regular expression&gt;]</code> are filter options und are optional.<br>
 <br>
-possible &lt;format&gt;:<br>
+possible <code>&lt;format&gt;</code>:<br>
 <br>
-'d'  for decimal number.<br>
+<code>'d'</code>  for decimal number.<br>
 <br>
-[&lt;device&gt;:&lt;reading&gt;:d] corresponsed to [&lt;device&gt;:&lt;reading&gt;:[(-?\d+(\.\d+)?)]]<br>
+<code>[&lt;device&gt;:&lt;reading&gt;:d]</code> corresponsed to <code>[&lt;device&gt;:&lt;reading&gt;:[(-?\d+(\.\d+)?)]]</code><br>
 <br>
 If only the state of a device is to be used, then only the device can be specified:<br>
 <br>
-[&lt;device&gt;] corresponsed to [&lt;device&gt;:&STATE]<br>
+<code>[&lt;device&gt;]</code> corresponsed to <code>[&lt;device&gt;:&STATE]</code><br>
 <br>
 Many examples - see german section. 
 <br>
@@ -944,7 +944,7 @@ Ein wichtiges Unterscheidungsmerkmal von DOIF zu notify oder at ist die Zustands
 <br>
 Syntax:<br>
 <br>
-define &lt;name&gt; DOIF (Bedingung) (Befehle) DOELSEIF (Bedingung) (Befehle) DOELSEIF ... DOELSE (Befehle)<br>
+<code>define &lt;name&gt; DOIF (&lt;Bedingung&gt;) (&lt;Befehle&gt;) DOELSEIF (&lt;Bedingung&gt;) (&lt;Befehle&gt;) DOELSEIF ... DOELSE (&lt;Befehle&gt;)</code><br>
 <br>
 Die Angaben werden immer von links nach rechts abgearbeitet. Es wird immer nur ein Kommando ausgeführt, und zwar das erste, für das die dazugehörige Bedingung in der abgearbeiteten Reihenfolge wahr ist. Hinzu kommt, dass nur die Bedingungen überprüft werden, die zum ausgelösten Event auch ein Device beinhalten (Angaben in eckigen Klammern).<br>
 <br>
@@ -956,10 +956,10 @@ Die Angaben werden immer von links nach rechts abgearbeitet. Es wird immer nur e
 + Es können beliebig viele Devices und Zeiten in der Bedingung angegeben werden<br>
 + Syntaxüberprüfung zum Zeitpunkt der Definition: Es werden fehlende Klammern erkannt<br>
 + keine Filterung von Ereignissen, wie bei notify über reguläre Ausdrücke, erforderlich<br>
-+ Status wird mit [&lt;Devicename&gt;], Readings mit [&lt;Devicename&gt;:&lt;Readingname&gt;] in der Bedingung sowie bei FHEM-Befehlen angegeben<br>
-+ Zeitangaben in der Bedingung: [HH:MM:SS] oder [HH:MM] oder [{Perl-Funktion}]<br>
-+ Zeitintervalle: [Beginn-Ende] für Beginn bzw. Ende kann das obige Zeitformat gewählt werden<br>
-+ Wochentagsteuerung: [Time|012345678] oder [Beginn-Ende|012345678] (0-6 entspricht Sonntag bis Samstag) sowie 7 für $we und 8 für !$we<br>
++ Status wird mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code> in der Bedingung sowie bei FHEM-Befehlen angegeben<br>
++ Zeitangaben in der Bedingung: <code>[HH:MM:SS]</code> oder <code>[HH:MM]</code> oder <code>[{&lt;perl-function&gt;}]</code><br>
++ Zeitintervalle: <code>[&lt;begin&gt;-&lt;end&gt;]</code> für <code>&lt;begin&gt;</code> bzw. <code>&lt;end&gt;</code> kann das obige Zeitformat gewählt werden<br>
++ Wochentagsteuerung: <code>[&lt;time&gt;|012345678]</code> oder <code>[&lt;begin&gt;-&lt;end&gt;|012345678]</code> (0-6 entspricht Sonntag bis Samstag) sowie 7 für $we und 8 für !$we<br>
 + Es können beliebig viele DOELSEIF-Angaben gemacht werden<br>
 + DOELSE am Ende der Kette ist optional<br>
 + Ausführung nur einmal nach Zustandswechsel (Standardeinstellung) oder immer wieder ist möglich<br>
@@ -969,156 +969,149 @@ Die Angaben werden immer von links nach rechts abgearbeitet. Es wird immer nur e
 </ol><br>
 In der Bedingung, aber auch im Ausführungsteil werden Stati, Readings oder Internals in eckigen Klammern angegeben. Die Syntax lautet:<br>
 <br>
-[&lt;device&gt;:&lt;reading&gt;:&lt;format&gt;|[&lt;regulärer Ausdruck&gt;]] bzw. [&lt;device&gt;:&&lt;internal&gt;:&lt;format&gt;|[&lt;regulärer Ausdruck&gt;]]<br>
+<code>[&lt;device&gt;:&lt;reading&gt;:&lt;format&gt;|[&lt;regulärer Ausdruck&gt;]]</code> bzw. <code>[&lt;device&gt;:&&lt;internal&gt;:&lt;format&gt;|[&lt;regulärer Ausdruck&gt;]]</code><br>
 <br>
-&lt;format&gt; und [&lt;regulärer Ausdruck&gt;] sind Filteroptionen, sie können optional genutzt werden.<br>
+<code>&lt;format&gt;</code> und <code>[&lt;regulärer Ausdruck&gt;]</code> sind Filteroptionen, sie können optional genutzt werden.<br>
 <br>
-Mögliche Formatangaben für &lt;format&gt; sind:<br>
+Mögliche Formatangaben für <code>&lt;format&gt;</code> sind:<br>
 <br>
-'d' zum Filtern von positiven und negativen Dezimalzahlen.<br>
+<code>'d'</code> zum Filtern von positiven und negativen Dezimalzahlen.<br>
 <br>
-[&lt;device&gt;:&lt;reading&gt;:d] entspricht [&lt;device&gt;:&lt;reading&gt;:[(-?\d+(\.\d+)?)]]<br>
+<code>[&lt;device&gt;:&lt;reading&gt;:d]</code> entspricht <code>[&lt;device&gt;:&lt;reading&gt;:[(-?\d+(\.\d+)?)]]</code><br>
 <br>
 Wenn nur der Status eines Devices genutzt werden soll, dann kann auch nur das Device angeben werden:<br>
 <br>
-[&lt;device&gt;] entspricht [&lt;device&gt;:&STATE]<br>
+<code>[&lt;device&gt;]</code> entspricht <code>[&lt;device&gt;:&STATE]</code><br>
 <br>
 <br>
-<b>Beispiele</b><br>
+<b>Ereignissteuerung</b><br>
 <br>
 Einfache Ereignissteuerung wie beim notify mit einmaliger Ausführung beim Zustandswechsel, "remotecontrol" ist hier ein Device, es wird in eckigen Klammern angegeben. Ausgewertet wird der Status des Devices - nicht das Event.<br>
 <br>
-<code>define DI_garage DOIF ([remotecontrol] eq "on") (set garage on) DOELSEIF ([remotecontrol] eq "off")  (set garage off)</code><br>
+<code>define di_garage DOIF ([remotecontrol] eq "on") (set garage on) DOELSEIF ([remotecontrol] eq "off")  (set garage off)</code><br>
 <br>
 Die Ausführung erfolgt standardmäßig nur nach Zustandswechsel des Moduls (nicht des Aktors). Das bedeutet, dass ein mehrmaliges Drücken der Fernbedienung auf "on" nur einmal "set garage on" ausführt. Wünscht man eine Ausführung bei jedem Trigger, weil z. B. Garage nicht nur über die Fernbedienung geschaltet wird, dann muss man das per "do always"-Attribut angeben:<br>
 <br>
-<code>attr DI_garage do always</code><br>
+<code>attr di_garage do always</code><br>
 <br>
-Einfache Zeitsteuerung. Mehrere FHEM-Befehle werden mit Komma, statt mit Semikolon voneinander getrennt:<br>
+<b>Zeitsteuerung</b><br>
 <br>
-<code>define DI_light DOIF ([08:00]) (set switch on,set lamp on) DOELSEIF ([10:00]) (set switch off,set lamp off)</code><br>
+Einschalten um 8:00 Uhr, ausschalten um 10:00 Uhr. Mehrere FHEM-Befehle werden mit Komma, statt mit Semikolon voneinander getrennt:<br>
+<br>
+<code>define di_light DOIF ([08:00]) (set switch on,set lamp on) DOELSEIF ([10:00]) (set switch off,set lamp off)</code><br>
 <br>
 Falls ein Komma nicht als Trennzeichen zwischen FHEM-Befehlen gelten soll, so muss der FHEM-Ausdruck zusätzlich in runde Klammern gesetzt werden:<br>
 <br>
-<code>define DI_light DOIF ([08:00]) ((set lamp1,lamp2 on),set switch on)</code><br>
+<code>define di_light DOIF ([08:00]) ((set lamp1,lamp2 on),set switch on)</code><br>
 <br>
 Zeitsteuerung mit mehreren Zeitschaltpunkten:<br>
 <br>
-<code>define DI_light DOIF ([08:00] or [10:00] or [20:00]) (set switch on) DOELSEIF ([09:00] or [11:00] or [00:00]) (set switch off)</code><br>
+<code>define di_light DOIF ([08:00] or [10:00] or [20:00]) (set switch on) DOELSEIF ([09:00] or [11:00] or [00:00]) (set switch off)</code><br>
 <br>
 Zeitsteuerung mit Zeitintervallen:<br>
 <br>
 Radio soll zwischen 8:00 und 10:00 Uhr an sein:<br>
 <br>
-<code>define DI_radio DOIF ([08:00-10:00]) (set radio on) DOELSE (set radio off) </code><br>
+<code>define di_radio DOIF ([08:00-10:00]) (set radio on) DOELSE (set radio off) </code><br>
 <br>
 mit mehreren Zeitintervallen:<br>
 <br>
-<code>define DI_radio DOIF ([08:00-10:00] or [20:00-22:00]) (set radio on) DOELSE (set radio off) </code><br>
+<code>define di_radio DOIF ([08:00-10:00] or [20:00-22:00]) (set radio on) DOELSE (set radio off) </code><br>
 <br>
 nur sonntags (0) und samstags (6)<br>
 <br>
-<code>define DI_radio DOIF ([08:00-10:00|06]) (set radio on) DOELSE (set radio off) </code><br>
+<code>define di_radio DOIF ([08:00-10:00|06]) (set radio on) DOELSE (set radio off) </code><br>
 <br>
 Nur montags, mittwochs und freitags:<br>
 <br>
-<code>define DI_radio DOIF ([08:00-10:00|135]) (set radio on) DOELSE (set radio off) </code><br>
+<code>define di_radio DOIF ([08:00-10:00|135]) (set radio on) DOELSE (set radio off) </code><br>
 <br>
 Nur am Wochenende bzw. an Feiertagen lt. holiday-Datei (7 entspricht $we):<br>
 <br>
-<code>define DI_radio DOIF ([08:00-10:00|7]) (set radio on) DOELSE (set radio off) </code><br>
+<code>define di_radio DOIF ([08:00-10:00|7]) (set radio on) DOELSE (set radio off) </code><br>
 <br>
 Nur an Arbeitstagen (8 ist das Gegenteil von 7, entspricht !$we):<br>
 <br>
-<code>define DI_radio DOIF ([08:00-10:00|8]) (set radio on) DOELSE (set radio off) </code><br>
+<code>define di_radio DOIF ([08:00-10:00|8]) (set radio on) DOELSE (set radio off) </code><br>
 <br>
 Zeitintervalle über Mitternacht:<br>
 <br>
-<code>define DI_light DOIF ([22:00-07:00]) (set light on) DOELSE (set light off) </code><br>
+<code>define di_light DOIF ([22:00-07:00]) (set light on) DOELSE (set light off) </code><br>
 <br>
 in Verbindung mit Wochentagen (einschalten am Freitag ausschalten am Folgetag):<br>
 <br>
-<code>define DI_light DOIF ([22:00-07:00|5]) (set light on) DOELSE (set light off) </code><br>
+<code>define di_light DOIF ([22:00-07:00|5]) (set light on) DOELSE (set light off) </code><br>
 <br>
-Zeitintervalle über mehrere Tage müssen als Zeitpunkte angegeben werden (einschalten am Freitag ausschalten am Montag):<br>
+Zeitintervalle über mehrere Tage müssen als Zeitpunkte angegeben werden, z. B. einschalten am Freitag ausschalten am Montag:<br>
 <br>
-<code>define DI_light DOIF ([22:00|5]) (set light on) DOELSEIF ([10:00|1]) (set light off) </code><br>
+<code>define di_light DOIF ([22:00|5]) (set light on) DOELSEIF ([10:00|1]) (set light off) </code><br>
 <br>
 Schalten bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
-<code>define DI_light DOIF ([{sunset(0,"17:00","21:00")}-{sunset_abs()}]) (set outdoorlight off) DOELSE (set outdoorlight on)</code><br>
+<code>define di_light DOIF ([{sunset(0,"17:00","21:00")}-{sunset_abs()}]) (set outdoorlight off) DOELSE (set outdoorlight on)</code><br>
 <br>
-Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen:<br>
-<br>
-Rollläden sollen an Arbeitstagen nach 6:25 Uhr hochfahren, wenn es hell wird, am Wochenende erst um 9:00 Uhr:<br>
-<br>
-<code>define DI_shutters DOIF ([sensor:brightness]&gt;100 and [06:25-09:00|8] or [09:00|7]) (set shutters on)</code><br>
+<b>Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</b><br>
 <br>
 Lampe soll ab 6:00 Uhr angehen, wenn es dunkel ist und wieder ausgehen, wenn es hell wird, spätestens aber um 9:00 Uhr:<br>
 <br>
-<code>define DI_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
+<code>define di_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
 <br>
-Rollläden sollen an Arbeitstagen nach 6:25 Uhr hochfahren, wenn es hell wird, am Wochenende erst um 9:00 Uhr:<br>
+Rollläden sollen an Arbeitstagen nach 6:25 Uhr hochfahren, wenn es hell wird, am Wochenende erst um 9:00 Uhr, herunter sollen sie wieder, wenn es dunkel wird:<br>
 <br>
-<code>define DI_Rolladen DOIF ([sensor:brightness]&gt;100 and [06:25-09:00|8] or [09:00|7])) (set shutters on)</code><br>
+<code>define di_shutters DOIF ([sensor:brightness]&gt;100 and [06:25-09:00|8] or [09:00|7]) (set shutters up) DOELSEIF ([sensor:brightness]&lt;50) (set shutters down)</code><br>
 <br>
-Zweipunktregler a la THRESHOLD:<br>
+<b>Nutzung von Readings, Stati oder Internals im FHEM-Ausführungsteil</b><br>
 <br>
-<code>setreading sensor default 20<br>
-setreading sensor hysteresis 1<br>
+Wenn ein Taster betätigt wird, soll Lampe1 mit dem aktuellen Zustand der Lampe2 geschaltet werden:<br>
 <br>
-define DI_threshold DOIF ([sensor:temperature]&lt;([sensor:default]-[sensor:hysteresis])) (set heating on) DOELSEIF ([sensor:temperature]&gt;[sensor:default]) (set heating off)</code><br>
-<br>
-Nutzung von Readings, Stati oder Internals im FHEM-Ausführungsteil:<br>
-<br>
-Wenn ein Taster betätigt wird, soll Lampe1 mit dem aktuellen Zustand der Lampe2 geschaltet werden.<br>
-<br>
-<code>define DI_button DOIF ([button]) (set lamp1 [lamp2])<br>
+<code>define di_button DOIF ([button]) (set lamp1 [lamp2])<br>
 attr di_button do always</code><br>
+<br>
+Benachrichtung beim Auslösen eines Alarms durch Öffnen eines Fensters:<br>
+<br>
+<code>define di_pushmsg DOIF ([window] eq "open" and [alarm] eq "armed") (set Pushover msg 'alarm' 'open windows [window:LastDevice]' '' 2 'persistent' 30 3600)</code><br>
 <br>
 Berechnungen im FHEM-Ausführungsteil können mit geschweiften Klammern erfolgen. Aus Kompatibilitätsgründen zu bestehenden FHEM-Befehlen (insb. at) muss der Perlausdruck hinter der geschweiften Klammer auf mit einer runden Klammer beginnen. Innerhalb der Perlberechnung können Readings, Stati oder Internals wie gewohnt in eckigen Klammern angegeben werden.<br>
 <br>
 Es soll ein Vorgabewert aus zwei verschiedenen Readings ermittelt werden und an das set Kommando übergeben werden:<br>
 <br>
-<code>define DI_average DOIF ([08:00]) (set TH_Modul desired {([default:temperature]+[outdoor:temperature])/2})<br>
-attr DI_average do always</code><br>
+<code>define di_average DOIF ([08:00]) (set TH_Modul desired {([default:temperature]+[outdoor:temperature])/2})<br>
+attr di_average do always</code><br>
 <br>
-Filtern nach Zahlen<br>
+<b>Filtern nach Zahlen</b><br>
 <br>
-Es soll aus einem Reading, der z. B. ein Prozentzeichen beinhaltet, nur der Zahlenanteil für den Vergleich genutzt werden.<br>
+Es soll aus einem Reading, der z. B. ein Prozentzeichen beinhaltet, nur der Zahlenanteil für den Vergleich genutzt werden:<br>
 <br>
-<code>define DI_heating DOIF ([adjusting:actuator:d] &lt; 10) (set heating off) DOELSE (set heating on)</code><br>
+<code>define di_heating DOIF ([adjusting:actuator:d] &lt; 10) (set heating off) DOELSE (set heating on)</code><br>
+<br>
+<b>Verzögerungen</b><br>
 <br>
 Verzögerungen für die Ausführung von Kommandos werden pro Kommando über das Attribut "wait" definiert. Syntax:<br>
 <br>
-attr &lt;Modulname&gt; wait &lt;Sekunden für das erste Kommando&gt;:&lt;Sekunden für das zweite Kommando&gt;:...<br>
+<code>attr &lt;Modulname&gt; wait &lt;Sekunden für das erste Kommando&gt;:&lt;Sekunden für das zweite Kommando&gt;:...<br></code>
 <br>
-Die Sekundenangaben können von hinten weggelassen werden. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein anders Kommando, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
-<br>
-Beispiele mit Verzögerung:<br>
+Die Sekundenangaben können von hinten ausgelassen werden. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein anders Kommando, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
 <br>
 Benachrichtung: "Waschmaschine fertig", wenn Verbrauch mindestens 5 Minuten unter 2 Watt (Perl-Code wird in geschweifte Klammern gesetzt):<br>
 <br>
-<code>define DI_washer DOIF ([power:watt]&lt;2) ({system("wmail washer finished")})<br>
-attr DI_washer wait 300</code><br>
+<code>define di_washer DOIF ([power:watt]&lt;2) ({system("wmail washer finished")})<br>
+attr di_washer wait 300</code><br>
 <br>
 Eine erneute Benachrichtigung wird erst wieder ausgelöst, wenn zwischendurch der Verbrauch über 2 Watt angestiegen war.<br>
 <br>
 Rolladen um 20 Minuten zeitverzögert bei Sonne runter- bzw. hochfahren (wenn der Zustand der Sonne wechselt, wird die Verzögerungszeit zurückgesetzt):<br>
 <br>
-<code>define DI_shutters DOIF ([Sun] eq "on") (set shutters down) DOELSE (set shutters up) <br>
-attr DI_shutters wait 1200:1200</code><br>
+<code>define di_shutters DOIF ([Sun] eq "on") (set shutters down) DOELSE (set shutters up) <br>
+attr di_shutters wait 1200:1200</code><br>
 <br>
-Beschattungssteuerung abhängig von der Temperatur: Der Rollladen soll runter von 11:00 Uhr bis Sonnenuntergang, wenn die Temperatur über 26 Grad ist. Temperaturschwankungen um 26 Grad werden mit Hilfe des wait-Attributes durch eine 15 minutige Verzögerung ausgeglichen. <br>
+Beschattungssteuerung abhängig von der Temperatur. Der Rollladen soll runter von 11:00 Uhr bis Sonnenuntergang, wenn die Temperatur über 26 Grad ist. Temperaturschwankungen um 26 Grad werden mit Hilfe des wait-Attributes durch eine 15 minutige Verzögerung ausgeglichen. <br>
 <br>
-<code>define DI_shutters DOIF ([sensor:temperature] &gt; 26 and [11:00-{sunset_abs()}] (set shutters down) DOELSE (set shutters up)<br>
-attr DI_shutters wait 900:900 </code><br>
+<code>define di_shutters DOIF ([sensor:temperature] &gt; 26 and [11:00-{sunset_abs()}] (set shutters down) DOELSE (set shutters up)<br>
+attr di_shutters wait 900:900 </code><br>
 <br>
-Belüftung in Kombination mit einem Lichtschalter mit Nachlaufsteuerung:<br>
+Belüftung in Kombination mit einem Lichtschalter mit Nachlaufsteuerung. Der Lüfter soll angehen, wenn das Licht mindestens 2 Minuten lang brennt oder die Luftfeuchtigkeit 65 % überschreitet, der Lüfter soll ausgehen, drei Minuten nachdem die Luftfeuchtigkeit unter 60 % fällt und das Licht aus ist bzw. das Licht ausgeht und die Luftfeuchtigkeit unter 60% ist. Definitionen lassen sich über die Weboberfläche (DEF-Eingabebereich) übersichtlich gestalten:<br>
 <br>
-Der Lüfter soll angehen, wenn das Licht mindestens 2 Minuten lang brennt oder die Luftfeuchtigkeit 65 % überschreitet, der Lüfter soll ausgehen, drei Minuten nachdem die Luftfeuchtigkeit unter 60 % fällt und das Licht aus ist bzw. das Licht ausgeht und die Luftfeuchtigkeit unter 60% ist. Definitionen lassen sich über die Weboberfläche (DEF-Eingabebereich) übersichtlich gestalten:<br>
-<br>
-<code>define DI_fan DOIF ([light] eq "on")<br>
+<code>define di_fan DOIF ([light] eq "on")<br>
    <ol>
   (set fan on)<br>
   </ol>
@@ -1130,10 +1123,11 @@ DOELSEIF ([light] eq "off" and [sensor:humidity]&lt;60)<br>  <ol>
   (set fan off)<br>
   </ol>
 <br>
-attr DI_fan wait 120:0:180</code><br>
+attr di_fan wait 120:0:180</code><br>
 <br>
+<b>Status des Moduls</b><br>
 <br>
-Der Status des Moduls wird standardmäßig mit cmd_1, cmd_2, usw. belegt. Dieser lässt sich über das Attribut "cmdState" mit | getrennt festlegen:<br>
+Der Status des Moduls wird standardmäßig mit cmd_1, cmd_2, usw. belegt. Dieser lässt sich über das Attribut "cmdState" mit | getrennt umdefinieren:<br>
 <br>
 attr &lt;Modulname&gt; cmdState  &lt;Status für das erste Kommando&gt;|&lt;Status für das zweite Kommando&gt;|...<br>
 <br>
@@ -1143,12 +1137,12 @@ z. B.<br>
 <br>
 Wenn nur der DOIF-Fall angegeben wird, so wird, wenn Bedingung nicht erfüllt ist, ein cmd_2-Status gesetzt. Damit wird ein Zustandswechsel des Moduls erreicht, was zur Folge hat, dass beim nächsten Wechsel von false auf true das DOIF-Kommando erneut ausgeführt wird.<br>
 <br>
-Reine Statusanzeige ohne Ausführung von Befehlen. Der Ausführungsteil kann jeweils ausgelassen werden.<br>
+Reine Statusanzeige ohne Ausführung von Befehlen. Der Ausführungsteil kann jeweils ausgelassen werden:<br>
 <br>
-<code>define DI_humiditystate DOIF ([outdoor:humidity]&gt;70) DOELSEIF ([outdoor:humidity]&gt;50) DOELSE<br>
+<code>define di_humiditystate DOIF ([outdoor:humidity]&gt;70) DOELSEIF ([outdoor:humidity]&gt;50) DOELSE<br>
 attr di_hum cmdState wet|normal|dry</code><br>
 <br>
-Anpassung des Status mit Hilfe des Attributes "state". Es können beliebige Reading und Stati oder Internals angegeben werden.<br>
+Anpassung des Status mit Hilfe des Attributes "state". Es können beliebige Reading und Stati oder Internals angegeben werden:<br>
 <br>
 <code>attr di_hum state The current humidity is [outdoor:humidity], it is [di_hum]</code><br>
 <br>
@@ -1156,30 +1150,54 @@ Es können beim Attribut state ebenfalls, wie bei FHEM-Befehlen im Ausführungst
 <br>
 Berechnung des Mittelwertes zweier Readings:<br>
 <br>
-<code>define DI_average DOIF <br>
-attr DI_average state Average of the two rooms is {([room1:temperature]+[room2:temperature])/2}</code><br>
+<code>define di_average DOIF <br>
+attr di_average state Average of the two rooms is {([room1:temperature]+[room2:temperature])/2}</code><br>
 <br>
 Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwert auf eine Stelle mit der Perlfunktion sprintf formatieren:<br>
 <br>
-<code>attr DI_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
+<code>attr di_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
 <br>
+<b>Weitere Anwendungsbeispiele</b><br>
+<br>
+Zweipunktregler a la THRESHOLD<br>
+<br>
+<code>setreading sensor default 20<br>
+setreading sensor hysteresis 1<br>
+<br>
+define di_threshold DOIF ([sensor:temperature]&lt;([sensor:default]-[sensor:hysteresis])) (set heating on) DOELSEIF ([sensor:temperature]&gt;[sensor:default]) (set heating off)</code><br>
+<br>
+Eleganter lässt sich ein Zweipunktregler (Thermostat) mit Hilfe des, für solche Zwecke, spezialisierten THRESHOLD-Moduls realisieren, siehe: <a href="http://fhem.de/commandref_DE.html#THRESHOLD">THRESHOLD</a><br>
+<br>
+on-for-timer<br>
+<br>
+Die Nachbildung eines on-for-timers lässt sich mit zwei DOIF´s und einem Dummy realisieren:<br>
+<br>
+<code>define switch_d dummy<br>
+<br>
+define di_switch DOIF ([detector] eq "motion") (set switch_d on, set switch_d off)<br>
+attr di_switch do always<br>
+<br>
+define di_light DOIF ([switch_d] eq "on") (set light on) DOELSE (set light off)<br>
+attr di_light wait 0:300</code><br>
+<br>
+Hiermit wird das Licht bei Bewegung eingeschaltet. Dabei wird, solange es brennt, bei jeder Bewegung die Ausschaltzeit auf 5 Minuten neugesetzt, "set light on" wird dabei nicht unnötig wiederholt.<br>
 <br>
 Die Beispiele stellen nur eine kleine Auswahl von möglichen Problemlösungen dar. Da sowohl in der Bedingung (hier ist die komplette Perl-Syntax möglich), als auch im Ausführungsteil, keine Einschränkungen gegeben sind, sind die Möglichkeiten zur Lösung eigener Probleme mit Hilfe des Moduls sehr vielfältig.<br>
 <br>
-<b>Zu beachten ist:</b><br>
+<b>Zu beachten</b><br>
 <br>
 In jeder Bedingung muss mindestens ein Reading oder ein Status (Internal) oder eine Zeitangabe gemacht werden (Angaben in eckigen Klammern). Die entsprechenden DO-Fälle werden nur dann ausgewertet, wenn auch das entsprechende Event oder Zeit-Trigger ausgelöst wird.<br>
 <br>
 Zeitangaben der Art: <br>
 <br>
-<code>define DI_light DOIF ([08:00] and [10:00]) (set switch on)</code><br>
+<code>define di_light DOIF ([08:00] and [10:00]) (set switch on)</code><br>
 <br>
 sind nicht sinnvoll, da diese Bedingung nie wahr sein wird.<br>
 <br>
 Angaben, bei denen aufgrund der Definition kein Zustandswechsel erfolgen kann z. B.:<br>
 <br>
-<code>define DI_light DOIF ([08:00]) (set switch on)<br>
-attr DI_light do always</code><br>
+<code>define di_light DOIF ([08:00]) (set switch on)<br>
+attr di_light do always</code><br>
 <br>
 müssen mit Attribut "do always" definiert werden, damit sie nicht nur einmal, sondern jedes mal (hier jeden Tag) ausgeführt werden. <br>
 <br>
@@ -1187,25 +1205,29 @@ Bei Devices, die mit Zwischenzuständen arbeiten, insbesondere HM-Komponenten (Z
 <br>
 statt:<br>
 <br>
-<code>define DI_lamp DOIF ([HM_switch] eq "on") (set lamp on) DOELSE (set lamp off)</code><br>
+<code>define di_lamp DOIF ([HM_switch] eq "on") (set lamp on) DOELSE (set lamp off)</code><br>
 <br>
 konkreter spezifizieren:<br>
 <br>
-<code>define DI_lamp DOIF ([HM_switch] eq "on") (set lamp on) DOELSEIF ([HM_switch] eq "off") (set lamp off)</code><br>
+<code>define di_lamp DOIF ([HM_switch] eq "on") (set lamp on) DOELSEIF ([HM_switch] eq "off") (set lamp off)</code><br>
 <br>
 Namenskonvention: Da der Doppelpunkt bei Readingangaben als Trennzeichen gilt, darf er nicht im Namen des Devices vorkommen. In solchen Fällen bitte das Device umbenennen.<br>
+<br>
+Da innerhalb eines DOIF-Moduls festgehalten wird, welches Kommando zuletzt ausgeführt wurde (Zustandsverwaltung), so wird das Wiederholen desselben Kommmandos vom Modul unterbunden. 
+Daher sollte nach Möglichkeit eine Problemlösung mit Hilfe eines und nicht mehrerer DOIF-Module realisiert werden, getreu dem Motto "wer die Lampe einschaltet, soll sie auch wieder ausschalten".
+Dadurch wird erreicht, dass unnötiges (wiederholendes) Schalten vom Modul unterbunden werden kann, ohne dass sich der Anwender selbst darum kümmern muss.<br>
 <br>
 Mehrere Bedingungen, die zur Ausführung gleicher Kommandos führen, sollten zusammengefasst werden. Dadurch wird ein unnötiges Schalten aufgrund verschiedener Zustände verhindert.<br>
 <br>
 Beispiel:<br>
 <br>
-<code>define DI_lamp DOIF ([brightness] eq "off") (set lamp on) DOELSEIF ([19:00]) (set lamp on) DOELSE (set lamp off)</code><br>
+<code>define di_lamp DOIF ([brightness] eq "off") (set lamp on) DOELSEIF ([19:00]) (set lamp on) DOELSE (set lamp off)</code><br>
 <br>
-Hier wird um 19:00 Uhr Lampe eingeschaltet, obwohl sie evtl. vorher schon durch das Ereignis Helligkeit off eingeschaltet wurde.<br>
+Hier wird um 19:00 Uhr Lampe eingeschaltet, obwohl sie evtl. vorher schon durch das Ereignis brightness "off" eingeschaltet wurde.<br>
 <br>
-<code>define DI_lamp DOIF ([brightness] eq "off" or [19:00]) (set lamp on) DOELSE (set lamp off)</code><br>
+<code>define di_lamp DOIF ([brightness] eq "off" or [19:00]) (set lamp on) DOELSE (set lamp off)</code><br>
 <br>
-Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd1 und cmd2 jetzt nur noch einen Zustand cmd1 darstellen und dieser wird nicht wiederholt.<br>
+Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 jetzt nur noch einen Zustand cmd_1 darstellen und dieser wird nicht wiederholt.<br>
 <br>
 </ul>
 =end html_DE
