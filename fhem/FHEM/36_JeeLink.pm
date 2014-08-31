@@ -19,7 +19,7 @@ sub JeeLink_Write($$);
 sub JeeLink_SimpleWrite(@);
 sub JeeLink_ResetDevice($);
 
-my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:ETH200comfort:CUL_IR:HX2272:FS20:AliRF";
+my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:ETH200comfort:CUL_IR:HX2272:FS20:AliRF:Level:EMT7110";
 
 my %matchListPCA301 = (
     "1:PCA301"          => "^\\S+\\s+24",
@@ -27,6 +27,7 @@ my %matchListPCA301 = (
     "3:RoomNode"        => "^\\S+\\s+11",
     "4:LaCrosse"        => "^\\S+\\s+9 ",
     "5:AliRF"           => "^\\S+\\s+5 ",
+    "6:EMT7110"         => "^OK\\sEMT7110\\s,",
 );
 
 my %matchListJeeLink433 = (
