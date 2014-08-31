@@ -154,11 +154,12 @@ EMT7110_Parse($$)
     
     my $costs = $accumulatedPower * AttrVal( $rname, "pricePerKWH", 0);
     
-     if( !$modules{EMT7110}{defptr}{$raddr} ) {
-       Log3 $name, 3, "EMT7110 Unknown device $rname, please define it";
+    if( !$modules{EMT7110}{defptr}{$raddr} ) {
+      Log3 $name, 3, "EMT7110 Unknown device $rname, please define it";
     
-       return "UNDEFINED EMT7110_$rname EMT7110 $raddr";
-     }
+      return "" if( !$hash->{LaCrossePair} );
+      return "UNDEFINED EMT7110_$rname EMT7110 $raddr";
+    }
     
     my @list;
     push(@list, $rname);
@@ -230,16 +231,23 @@ EMT7110_Attr(@)
 <ul>
 
   <tr><td>
-  The EMT7110 is a plug with integrated power meter functionality.<br><br>
-
+  The EMT7110 is a plug with integrated power meter functionality.<br>
   It can be integrated into FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>
-
-  <a name="EMT7110_Define"></a>
+  The EMT7110 sends with 9.579 kbit/s. Therefore it is necessary to set the JeeLink to a mode where it recieves this data rate.<br>
+  This can be done using the initCommands attribute of the JeeLink.<br><br>
+  If you have only 9.579 kbit/s sensors use this setting:<br>
+  <code>attr myJeeLink initCommands 1r v</code><br><br>
+  If you have also 17.241 kbit/s sensors (like TX29...) use this setting:<br>
+  <code>attr myJeeLink initCommands 30t v</code><br>
+  30t means that the JeeLink toggles the data rate every 30 Seconds.<br>
+  
+   
+  <br><a name="EMT7110_Define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; EMT7110 &lt;addr&gt;</code> <br>
     addr is a 4 digit hex number to identify the EMT7110 device.<br>
-  </ul>
+    To enable autocreate for a certain time you must set LaCrossePairForSec in the <a href="#JeeLink">JeeLink</a> IODevice device.<br>
   <br>
 
   <a name="EMT7110_Set"></a>
