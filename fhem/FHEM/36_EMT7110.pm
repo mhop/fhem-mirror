@@ -244,7 +244,6 @@ EMT7110_Attr(@)
    
   <br><a name="EMT7110_Define"></a>
   <b>Define</b>
-  <ul>
     <code>define &lt;name&gt; EMT7110 &lt;addr&gt;</code> <br>
     addr is a 4 digit hex number to identify the EMT7110 device.<br>
     To enable autocreate for a certain time you must set LaCrossePairForSec in the <a href="#JeeLink">JeeLink</a> IODevice device.<br>
