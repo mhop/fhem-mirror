@@ -70,6 +70,7 @@ BlockingCall($$@)
   }
 
   if($pid) {
+    Log 4, "BlockingCall created child ($pid), uses $tName to connect back";
     my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn, 
               abortFn=>$abortFn, abortArg=>$abortArg );
     if($timeout) {
