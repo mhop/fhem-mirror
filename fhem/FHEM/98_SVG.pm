@@ -136,7 +136,6 @@ SVG_FwFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
-  my $ld = $defs{$hash->{LOGDEVICE}};
   my $ret = "";
 
   if(AttrVal($FW_wname, "plotmode", "SVG") eq "jsSVG") {
@@ -771,8 +770,8 @@ SVG_showLog($)
   my $gplot_pgm = "$FW_gplotdir/$type.gplot";
 
   my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplot_pgm);
-  if($err) {
-    my $msg = "Cannot read $gplot_pgm";
+  if($err || !$defs{$d}) {
+    my $msg = ($defs{$d} ? "Cannot read $gplot_pgm" : "No Logdevice $d");
     Log3 $FW_wname, 1, $msg;
 
     if($pm =~ m/SVG/) { # FW_fatal for SVG:
@@ -975,7 +974,7 @@ SVG_render($$$$$$$$$)
 
   $SVG_RET="";
   my $SVG_ss = AttrVal($parent_name, "smallscreen", 0);
-  return $SVG_RET if(!defined($dp));
+  return $SVG_RET if(!defined($dp) || $dp eq "");
 
   my $nr_axis = AttrVal($parent_name,"nrAxis","1,1");
   my ($nr_left_axis,$nr_right_axis,$use_left_axis,$use_right_axis) =
