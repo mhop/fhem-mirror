@@ -1009,6 +1009,10 @@ devspec2array($)
         }
 
         my $hash = $defs{$d};
+        if(!$hash->{TYPE}) {
+          Log 1, "Error: $d has no TYPE";
+          next;
+        }
         my $val = $hash->{$n};
         if(!defined($val)) {
           my $r = $hash->{READINGS};
