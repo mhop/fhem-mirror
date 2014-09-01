@@ -386,7 +386,9 @@ sub Text2Speech_PrepareSpeech($$) {
     for(my $i=0; $i<(@text); $i++) {
       @FileTplPc = ($text[$i] =~ /:([^:]+):/g);
       for(my $j=0; $j<(@FileTplPc); $j++) {
-        my $tpl = "FileTpl_".time()."_#".$i; #eindeutige Templatedefinition schaffen
+        my $time = time();
+        $time =~ s/\.//g;
+        my $tpl = "FileTpl_".$time."_#".$i; #eindeutige Templatedefinition schaffen
         Log3 $hash, 4, "$me: Angabe einer direkten MP3-Datei gefunden:  $FileTplPc[$i] => $tpl";
         push(@FileTpl, $tpl.":".$FileTplPc[$j]); #zb: FileTpl_123645875_#0:/ring.mp3
         $text[$i] =~ s/$FileTplPc[$j]/$tpl/g; # Ersetze die DateiDefinition gegen ein Template
@@ -598,18 +600,23 @@ sub Text2Speech_DoIt($) {
       }
     }
 
+    Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite jetzt den Text: ". $hash->{helper}{Text2Speech}[0];
+
     if(-e $TTS_CacheFileDir."/".$hash->{helper}{Text2Speech}[0]) { 
       # falls eine bestimmte mp3-Datei gespielt werden soll
       $filename = $hash->{helper}{Text2Speech}[0];
+      Log3 $hash->{NAME}, 4, "Text2Speech: $filename als direkte MP3 Datei erkannt!";
     } else {
       $filename = md5_hex($hash->{helper}{Text2Speech}[0]) . ".mp3";
+      Log3 $hash->{NAME}, 4, "Text2Speech: Textbaustein ist keine direkte MP3 Datei, ermittle MD5 CacheNamen: $filename";
     } 
     $file = $TTS_CacheFileDir."/".$filename;
 
-    Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite jetzt den Text: ". $hash->{helper}{Text2Speech}[0];
-
+    
     if(! -e $file) { # Datei existiert noch nicht im Cache
       Text2Speech_Download($hash, $file, $hash->{helper}{Text2Speech}[0]);
+    } else {
+      Log3 $hash->{NAME}, 4, "Text2Speech: '$file' gefunden, kein Download";
     }
 
     if(-e $file) { # Datei existiert jetzt
