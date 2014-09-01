@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  98_Text2Speech.pm: fix a problem with microseconds in time()
+             by using mp3-templates or playing mp3 directly
   - feature: state definition and split attribute added to 66_ECMD, 
              67_ECMDDevice
   - FHEMWEB: JavaScripts and CssFiles attributes added
