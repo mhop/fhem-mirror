@@ -278,6 +278,7 @@ ECMDDevice_Parse($$)
       my $hash= $defs{$d};
       if($hash->{TYPE} eq "ECMDDevice" && $hash->{IODev} eq $IOhash) {
 	my $classname= $hash->{fhem}{classname};
+	next unless($classname);
 	my $classDef= $IOhash->{fhem}{classDefs}{$classname};
 	#Debug "  Checking device $d with class $classname...";
 	next unless(defined($classDef->{readings}));
