@@ -67,16 +67,12 @@ sub addproperty {
   my ($self,$line)= @_;
   # TRIGGER;VALUE=DATE-TIME:20120531T150000Z
   #main::Debug "line= $line";
-  my ($property,$property1,$parameter);
-  ####### takes care of TZID, which has ":" in the property DTEND;TZID="(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna":20140904T180000
-  if ($line =~ m/TZID=/){
-    ($property,$property1,$parameter)= split(":", $line,3); 
-    $property .=$property1;
-  }  
-  else {
-    ($property,$parameter)= split(":", $line,2); 
-  }
-  ######
+  # for DTSTART, DTEND there are several variants:
+  #    DTSTART;TZID=Europe/Berlin:20140205T183600
+  #  * DTSTART;TZID="(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna":20140904T180000
+  #    DTSTART:20140211T212000Z
+  #    DTSTART;VALUE=DATE:20130619
+  my ($property,$parameter)= split(":", $line,2); # TRIGGER;VALUE=DATE-TIME    20120531T150000Z
   #main::Debug "property= $property parameter= $parameter";
   my ($key,$parts)= split(";", $property,2);
   #main::Debug "key= $key parts= $parts";
