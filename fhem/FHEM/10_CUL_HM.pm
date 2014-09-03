@@ -228,6 +228,7 @@ sub CUL_HM_updateConfig($){
             foreach ( "autoReadReg","actCycle","actStatus","burstAccess","serialNr"
                      ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
       $hash->{helper}{role}{vrt} = 1;
+      $hash->{helper}{role}{dev} = 1;
       next;
     }
     CUL_HM_ID2PeerList($name,"",1); # update peerList out of peerIDs
@@ -7517,8 +7518,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          <a href="#CUL_HMpeerChan">peerChan</a>.<br>
      </li>
      <li><B>peerBulk</B> &lt;peerch1,peerch2,...&gt; [set|unset]<a name="CUL_HMpeerBulk"></a><br>
-         peerBulk will add peer channels to the channel. All peers in the
-         list will be added. <br>
+         peerBulk will add peer channels to the channel. All peers in the list will be added. <br>
+         with unset option the peers in the list will be subtracted from the device's peerList.<br>
          peering sets the configuration of this link to its defaults. As peers are not
          added in pairs default will be as defined for 'single' by HM for this device. <br>
          More suffisticated funktionality is provided by

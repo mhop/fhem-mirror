@@ -537,7 +537,7 @@ sub HMinfo_paramCheck(@) { ####################################################
       if (!$defs{$eName}{helper}{role}{vrt}){
         if ($pairId eq "undefined") { push @noID,$eName;}
         elsif ($pairId !~ m /$ioHmId/
-             && $IoDev )            { push @idMismatch,"$eName paired:$pairId IO attr: $ioHmId";}
+             && $IoDev )            { push @idMismatch,"$eName paired:$pairId IO attr: ${ioHmId}.";}
       }
     }
   }

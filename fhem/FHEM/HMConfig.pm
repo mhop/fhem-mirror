@@ -1338,7 +1338,7 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
 
 %culHmGlobalSetsChn = (# all channels but virtuals
   sign          => "[on|off]",
-  peerBulk      => "<peer1,peer2,...>",
+  peerBulk      => "<peer1,peer2,...> [set|unset]",
 );
 %culHmSubTypeSets = (# channels of this subtype
   switch           =>{ "on-for-timer" =>"<ontime>"
