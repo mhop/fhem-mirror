@@ -327,8 +327,9 @@ sub GDS_Attr(@){
 			break;
 			}
 		when("gdsSetCond"){
-			CommandDefine(undef, "gdsDummy_$name at +00:00:30 set $name conditions $attrValue");
-			$attr{gdsDummy}{room} = 'hidden';
+			my $dummy = "gdsDummy_$name";
+			CommandDefine(undef, "$dummy at +00:00:30 set $name conditions $attrValue");
+			$attr{$dummy}{room} = 'hidden';
 			break;
 			}
 		default {$attr{$name}{$attrName} = $attrValue;}
