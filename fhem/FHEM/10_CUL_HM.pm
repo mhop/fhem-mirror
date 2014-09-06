@@ -1470,8 +1470,10 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($md eq "KFM-Sensor") { ################################################
     if ($mTp eq "53"){
-      if($p =~ m/.14(.)0200(..)(..)(..)/) {
-        my ($seq, $k_v1, $k_v2, $k_v3) = (hex($1),$2,hex($3),hex($4));
+      if($p =~ m/(..)4(.)0200(..)(..)(..)/) {
+        my ($chn,$seq, $k_v1, $k_v2, $k_v3) = (hex($1),hex($2),$3,hex($4),hex($5));
+        push @evtEt,[$shash,1,"battery:".($chn & 0x80?"low":"ok")];
+        
         my $v = 128-$k_v2;                  # FIXME: calibrate
         $v += 256 if(!($k_v3 & 1));
         push @evtEt,[$shash,1,"rawValue:$v"];
