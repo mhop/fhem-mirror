@@ -1,4 +1,4 @@
-# $Id: $
+# $Id$
 
 package WMBus;
 
@@ -20,7 +20,12 @@ sub manId2ascii($$);
 
 
 use constant {
-	# sent by meter
+	# Link Layer block size
+	LL_BLOCK_SIZE => 16,
+	# size of CRC in bytes
+	CRC_SIZE => 2,
+
+  # sent by meter
 	SND_NR => 0x44, # Send, no reply
 	SND_IR => 0x46, # Send installation request, must reply with CNF_IR
 	ACC_NR => 0x47,
@@ -532,36 +537,38 @@ sub removeCRC($$)
 	my $i;
 	my $res;
 	my $crc;
+	my $blocksize = LL_BLOCK_SIZE;
+	my $blocksize_with_crc = LL_BLOCK_SIZE + CRC_SIZE;
+	my $crcoffset;
 	
-	my $msgLen = length($msg);
-	my $noOfBlocks = int($msgLen / 18);
-	my $rest = $msgLen % 18;
+	my $msgLen = $self->{datalen}; # size without CRCs
+	my $noOfBlocks = $self->{datablocks}; # total number of data blocks, each with a CRC appended
+	my $rest = $msgLen % LL_BLOCK_SIZE; # size of the last data block, can be smaller than 16 bytes
+
+  # each block is 16 bytes + 2 bytes CRC
 	
-	
-	#print "Länge "  . $msgLen . "\n";
+	#print "Länge $msgLen Anz. Blöcke $noOfBlocks rest $rest\n";
 	
 	for ($i=0; $i < $noOfBlocks; $i++) {
-
-		$crc = unpack('n',substr($msg, 18*$i+16, 2));
-		#printf("%d: CRC %x, calc %x\n", $i, $crc, $self->checkCRC(substr($msg, 18*$i, 16))); 
-		if ($crc != $self->checkCRC(substr($msg, 18*$i, 16))) {
+		$crcoffset = $blocksize_with_crc * $i + LL_BLOCK_SIZE;
+		#print "crc offset $crcoffset\n";
+		if ($rest > 0 && $crcoffset + CRC_SIZE > ($noOfBlocks - 1) * $blocksize_with_crc + $rest) {
+			# last block is smaller
+			$crcoffset = ($noOfBlocks - 1) * $blocksize_with_crc + $rest;
+  		#print "last crc offset $crcoffset\n";
+			$blocksize = $msgLen - ($i * $blocksize); 
+		}
+		
+		$crc = unpack('n',substr($msg, $crcoffset, CRC_SIZE));
+		#printf("%d: CRC %x, calc %x blocksize $blocksize\n", $i, $crc, $self->checkCRC(substr($msg, $blocksize_with_crc*$i, $blocksize))); 
+		if ($crc != $self->checkCRC(substr($msg, $blocksize_with_crc*$i, $blocksize))) {
 			$self->{errormsg} = "crc check failed for block $i";
 			$self->{errorcode} = ERR_CRC_FAILED;
 			return 0;
 		}
-		$res .= substr($msg, 18*$i, 16);
+		$res .= substr($msg, $blocksize_with_crc*$i, $blocksize);
 	}
 
-	if ($rest != 0) {
-		$res .= substr($msg, $noOfBlocks*18, $rest - 2);
-		$crc = unpack('n',substr($msg, $msgLen-2, 2));
-		if ($crc != $self->checkCRC(substr($msg, $noOfBlocks*18, $rest - 2))) {
-			$self->{errormsg} = "crc check failed for block $i";
-			$self->{errorcode} = ERR_CRC_FAILED;
-		  #printf("rest %d: CRC %x, calc %x\n", $rest, $crc, $self->checkCRC(substr($msg, $noOfBlocks*18, $rest - 2))); 
-			return 0;
-		}
-	}
 	return $res;
 }
 
@@ -937,8 +944,9 @@ sub decodeApplicationLayer($) {
 		#print "Long header\n";
 		($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw}) 
 			= unpack('VvCCCCn', substr($applicationlayer,$offset)); 
+		$self->{meter_id} = sprintf("%08d", $self->{meter_id});	
 	  $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
-#   	$self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
+   	$self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
 		$offset += 12;
   } else {
 		# unsupported
@@ -970,13 +978,13 @@ sub decodeApplicationLayer($) {
 				$self->{decrypted} = 1;
 			} else {
 				# Decryption verification failed
-				$self->{errormsg} = 'Decryption failed';
+				$self->{errormsg} = 'Decryption failed, wrong key?';
 				$self->{errorcode} = ERR_DECRYPTION_FAILED;
 				#printf("%x\n", unpack('n', $payload));
 				return 0;
 			}
 		} else {
-			$self->{errormsg} = 'encrypted message and no aeskey given';
+			$self->{errormsg} = 'encrypted message and no aeskey provided';
 	  	$self->{errorcode} = ERR_NO_AESKEY;
 			return 0;
 		}
@@ -998,15 +1006,14 @@ sub decodeLinkLayer($$)
 	my $self = shift;
 	my $linklayer = shift;
 
-	$self->{datalen} = length($self->{msg}) - 12;
-	$self->{datablocks} = $self->{datalen} / 18; # header block is 12 bytes, each following block is 16 bytes + 2 bytes CRC
-	$self->{datablocks}++ if $self->{datalen} % 18 != 0;
 
 	
 	($self->{lfield}, $self->{cfield}, $self->{mfield}) = unpack('CCv', $linklayer);
-	$self->{afield_id} = $self->decodeBCD(8,substr($linklayer,4,4));
+	$self->{afield_id} = sprintf("%08d", $self->decodeBCD(8,substr($linklayer,4,4)));
 	($self->{afield_ver}, $self->{afield_type}, $self->{crc0}) = unpack('CCn', substr($linklayer,8,4));
 
+	
+	
 	#printf("lfield %d\n", $self->{lfield});
 	#printf("crc0 %x calc %x\n", $self->{crc0}, $self->checkCRC(substr($linklayer,0,10)));
 	
@@ -1017,6 +1024,17 @@ sub decodeLinkLayer($$)
 		return 0;
 	}
 
+	# header block is 12 bytes, each following block is 16 bytes + 2 bytes CRC, the last block may be smaller
+	$self->{datalen} = $self->{lfield} - 9; # this is without CRCs and the lfield itself
+	$self->{datablocks} = int($self->{datalen} / LL_BLOCK_SIZE);
+	$self->{datablocks}++ if $self->{datalen} % LL_BLOCK_SIZE != 0;
+	$self->{msglen} = 12 + $self->{datalen} + $self->{datablocks} * CRC_SIZE;
+	
+	#printf("calc len %d, actual %d\n", $self->{msglen}, length($self->{msg}));
+	if (length($self->{msg}) > $self->{msglen}) {
+		$self->{remainingData} = substr($self->{msg},$self->{msglen});
+	}
+	
 	# according to the MBus spec only upper case letters are allowed.
 	# some devices send lower case letters none the less
 	# convert to upper case to make them spec conformant

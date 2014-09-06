@@ -1,7 +1,7 @@
 #
 #	kaihs@FHEM_Forum (forum.fhem.de)
 #
-# $Id: $
+# $Id$
 #
 # 
 
@@ -39,6 +39,7 @@ use WMBus;
 
 sub WMBUS_Parse($$);
 sub WMBUS_SetReadings($$$);
+sub WMBUS_SetRSSI($$$);
 
 sub WMBUS_Initialize($) {
   my ($hash) = @_;
@@ -63,6 +64,7 @@ WMBUS_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 	my $mb;
+	my $rssi;
 
   if(@a != 6 && @a != 3) {
     my $msg = "wrong syntax: define <name> WMBUS [<ManufacturerID> <SerialNo> <Version> <Type>]|b<HexMessage>";
@@ -75,6 +77,8 @@ WMBUS_Define($$)
   if (@a == 3) {
 		# unparsed message
 		my $msg = $a[2];
+		
+		($msg, $rssi) = split(/::/,$msg);
 		
 		return "a WMBus message must be a least 12 bytes long" if $msg !~ m/b[a-zA-Z0-9]{24,}/;
 		
@@ -89,6 +93,7 @@ WMBUS_Define($$)
 			} else {
 				delete $hash->{Error};
 			}
+			WMBUS_SetRSSI($hash, $mb, $rssi);
 		} else {
 			return "failed to parse msg: $mb->{errormsg}";
 		}
@@ -112,7 +117,7 @@ WMBUS_Define($$)
 		}
 
 		$hash->{Manufacturer} = $a[2];
-		$hash->{IdentNumber} = int($a[3]);
+		$hash->{IdentNumber} = sprintf("%08d",$a[3]);
 		$hash->{Version} = $a[4];
 		$hash->{DeviceType} = $a[5];
 		
@@ -121,7 +126,7 @@ WMBUS_Define($$)
   
   return "WMBUS device $addr already used for $modules{WMBUS}{defptr}{$addr}->{NAME}." if( $modules{WMBUS}{defptr}{$addr}
                                                                                              && $modules{WMBUS}{defptr}{$addr}->{NAME} ne $name );
-
+  $hash->{addr} = $addr;
   $modules{WMBUS}{defptr}{$addr} = $hash;
 
   AssignIoPort($hash);
@@ -195,6 +200,7 @@ WMBUS_Parse($$)
   my $name = $hash->{NAME};
   my $addr;
   my $rhash;
+  my $rssi;
   
   # $hash is the hash of the IODev!
  
@@ -204,6 +210,8 @@ WMBUS_Parse($$)
 		Log3 $name, 5, "WMBUS raw msg " . $msg;
 		
 		my $mb = new WMBus;
+		
+		($msg, $rssi) = split(/::/,$msg);
 		
 		if ($mb->parseLinkLayer(pack('H*',substr($msg,1)))) {
 			$addr = join("_", $mb->{manufacturer}, $mb->{afield_id}, $mb->{afield_ver}, $mb->{afield_type});  
@@ -215,10 +223,11 @@ WMBUS_Parse($$)
 			
 					return "UNDEFINED WMBUS_$addr WMBUS $msg";
 			}
-      my $rname = $rhash->{NAME};
+			WMBUS_SetRSSI($rhash, $mb, $rssi);
+
+			my $rname = $rhash->{NAME};
 			my $aeskey;
-			
-			
+
 			if ($aeskey = AttrVal($rname, 'AESkey', undef)) {
 				$mb->{aeskey} = pack("H*",$aeskey);
 			} else {
@@ -243,11 +252,22 @@ WMBUS_Parse($$)
   }
 }
 
-sub WMBUS_SetReadings($$$)
+sub WMBUS_SetRSSI($$$) {
+	my ($hash, $mb, $rssi) = @_;
+	
+	readingsBeginUpdate($hash);
+	# RSSI is decoded by 00_CUL.pm from the last byte of the message
+	readingsBulkUpdate($hash, "RSSI", $rssi ? $rssi : 'unknown');
+	if (defined $mb->{remainingData} && length($mb->{remainingData}) >= 1) {
+		# if there is a trailing byte after the WMBUS message it is the LQI
+		readingsBulkUpdate($hash, "LQI", unpack("C", $mb->{remainingData}));
+	}	
+	readingsEndUpdate($hash,1);
+}
+
+sub WMBUS_SetReadings($$$$)
 {
-	my $hash = shift;
-	my $name = shift;
-	my $mb = shift;
+	my ($hash, $name, $mb) = @_;
 	
 	my @list;
 	push(@list, $name);
@@ -270,6 +290,7 @@ sub WMBUS_SetReadings($$$)
 	}
 	readingsBulkUpdate($hash, "is_encrypted", $mb->{isEncrypted});
 	readingsBulkUpdate($hash, "decryption_ok", $mb->{decrypted});
+	
 	if ($mb->{decrypted}) {
 		readingsBulkUpdate($hash, "state", $mb->{statusstring});
 	} else {
