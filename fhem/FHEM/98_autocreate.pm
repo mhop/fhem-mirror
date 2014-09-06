@@ -298,14 +298,14 @@ my @usbtable = (
       DeviceName=> "DEVICE\@57600",
       request   => pack("H*", "5500010005700838"),   # get idbase
       response  => "^\x55\x00\x05\x01",
-      define    => "TCM310_PARAM TCM ESP3 DEVICE\@57600", },
+      define    => "TCM_ESP3_PARAM TCM ESP3 DEVICE\@57600", },
 
     { NAME      => "TCM_ESP2",
       matchList => ["ttyUSB(.*)"],
       DeviceName=> "DEVICE\@9600",
       request   => pack("H*", "A55AAB5800000000000000000003"),   # get idbase
       response  => "^\xA5\x5A............",
-      define    => "TCM120_PARAM TCM ESP2 DEVICE\@9600", },
+      define    => "TCM_ESP2_PARAM TCM ESP2 DEVICE\@9600", },
 
     { NAME      => "FHZ",
       matchList => ["cu.usbserial(.*)", "ttyUSB(.*)"],
