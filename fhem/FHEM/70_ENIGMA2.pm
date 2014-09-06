@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.3.5
+# Version: 1.3.6
 #
 # Major Version History:
 # - 1.3.0 - 2013-12-21
@@ -78,7 +78,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard "
+"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -1100,7 +1100,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     $state = "off";
 
                     # Keep updating timer information during standby
-                    ENIGMA2_SendCommand( $hash, "timerlist" );
+                    ENIGMA2_SendCommand( $hash, "timerlist" )
+                      if ( !AttrVal( $name, "lightMode", 0 ) );
                 }
                 else {
                     $state = "on";
@@ -1120,9 +1121,12 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                     # get current states
                     ENIGMA2_SendCommand( $hash, "getcurrent" );
-                    ENIGMA2_SendCommand( $hash, "timerlist" );
-                    ENIGMA2_SendCommand( $hash, "vol" );
-                    ENIGMA2_SendCommand( $hash, "signal" );
+                    ENIGMA2_SendCommand( $hash, "timerlist" )
+                      if ( !AttrVal( $name, "lightMode", 0 ) );
+                    ENIGMA2_SendCommand( $hash, "vol" )
+                      if ( !AttrVal( $name, "lightMode", 0 ) );
+                    ENIGMA2_SendCommand( $hash, "signal" )
+                      if ( !AttrVal( $name, "lightMode", 0 ) );
                 }
             }
             elsif ( defined( $hash->{helper}{AVAILABLE} )
@@ -2763,6 +2767,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           </li>
           <li>
             <b>https</b> - Access box via secure HTTP (true/false)
+          </li>
+          <li>
+            <b>lightMode</b> - reduces regular queries (resulting in less functionality), e.g. for low performance devices. (true/false)
           </li>
           <li>
             <b>remotecontrol</b> - Explicitly set specific remote control unit format. This will only be considered for set-command <strong>remoteControl</strong> as of now.
