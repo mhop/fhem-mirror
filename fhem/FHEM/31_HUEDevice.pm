@@ -88,7 +88,7 @@ HUEDevice_devStateIcon($)
 
   my $name = $hash->{NAME};
 
-  return ".*:light_question" if( $hash->{helper}{reachable} ne 'true' && AttrVal($name, "color-icons", 0) != 0 );
+  return ".*:light_question" if( !$hash->{helper}{reachable} && AttrVal($name, "color-icons", 0) != 0 );
 
   return ".*:off:toggle"
          if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
@@ -179,7 +179,7 @@ sub HUEDevice_Define($$)
     $hash->{INTERVAL} = $interval;
 
     $hash->{helper}{on} = -1;
-    $hash->{helper}{reachable} = '';
+    $hash->{helper}{reachable} = undef;
     $hash->{helper}{colormode} = '';
     $hash->{helper}{bri} = -1;
     $hash->{helper}{ct} = -1;
@@ -650,11 +650,11 @@ HUEDevice_GetUpdate($)
 
   my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
   if( !defined($result) ) {
-    $hash->{helper}{reachable} = 'false';
+    $hash->{helper}{reachable} = 0;
     $hash->{STATE} = "unknown";
     return;
   } elsif( $result->{'error'} ) {
-    $hash->{helper}{reachable} = 'false';
+    $hash->{helper}{reachable} = 0;
     $hash->{STATE} = $result->{'error'}->{'description'};
     return;
   }
@@ -707,7 +707,7 @@ HUEDevice_Parse($$)
   my $state = $result->{'state'};
 
   my $on        = $state->{on};
-  my $reachable = $state->{reachable};
+  my $reachable = $state->{reachable}?1:0;
   my $colormode = $state->{'colormode'};
   my $bri       = $state->{'bri'};
   my $ct        = $state->{'ct'};
@@ -731,7 +731,7 @@ HUEDevice_Parse($$)
   if( defined($hue) && $hue != $hash->{helper}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
   if( defined($sat) && $sat != $hash->{helper}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
   if( defined($xy) && $xy ne $hash->{helper}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
-  if( defined($reachable) && $reachable ne $hash->{helper}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable);}
+  if( !defined($hash->{helper}{reachable}) || $reachable != $hash->{helper}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable);}
   if( defined($alert) && $alert ne $hash->{helper}{alert} ) {readingsBulkUpdate($hash,"alert",$alert);}
   if( defined($effect) && $effect ne $hash->{helper}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
 
