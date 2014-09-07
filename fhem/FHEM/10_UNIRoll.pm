@@ -129,7 +129,7 @@ UNIRoll_Set($@)
 
 # CUL-Kommandos ermitteln und Sendestrings anpassen
   my $culcmds = $hash->{IODev}->{CMDS}; # BCFiAZEGMKURTVWXefmltux
-  if($culcmds && $culcmds !~ m/U/) {
+  if(!defined($culcmds) || $culcmds !~ m/U/) {
     $rawpre = $rawpre_old;
     $rawpost = $rawpost_old;
   }
