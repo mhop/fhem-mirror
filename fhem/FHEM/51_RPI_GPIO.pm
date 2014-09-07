@@ -488,8 +488,8 @@ sub RPI_GPIO_fileaccess($$;$) {						#Fileaccess for GPIO base directory
 		my $dir = AttrVal($hash->{NAME},"direction","input");
 		$dir = $dir eq "input" ? "in" : "out";
 		if ($dir eq "out" && $fname eq "value" && defined($args[1])) {
-			my $al = AttrVal($hash->{NAME},"active_low","off");
-			my $lev = $al eq "on" ? 0 : 1;
+			my $al = AttrVal($hash->{NAME},"active_low","no");
+			my $lev = $al eq "yes" ? 0 : 1;
 			$dir = ($args[1] == $lev ? "high" : "low")
 		} 
 		#$dir = ($args[1] == 1 ? "high" : "low") if ($dir eq "out" && $fname eq "value" && defined($args[1]));
