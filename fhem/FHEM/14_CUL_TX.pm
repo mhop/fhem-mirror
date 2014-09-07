@@ -62,13 +62,43 @@ CUL_TX_Parse($$)
 {
   my ($hash, $msg) = @_;
   $msg = substr($msg, 1);
-  # Msg format: TXTHHXYZXY, see http://www.f6fbb.org/domo/sensors/tx3_th.php
+  # Msg format: TXTHHXYZXYC, see http://www.f6fbb.org/domo/sensors/tx3_th.php
   my @a = split("", $msg);
-  my $id2 = hex($a[4]) & 1; #meaning unknown
   my $id3 = (hex($a[3])<<3) + (hex($a[4])>>1);
 
+  if(scalar(@a) < 11) {
+    Log3 $hash, 4, "CUL_TX $id3 ($msg) not enough data";
+    return "";
+  }
+
   if($a[5] ne $a[8] || $a[6] ne $a[9]) {
-    Log3 $hash, 4, "CUL_TX $id3 ($msg) data error";
+    Log3 $hash, 4, "CUL_TX $id3 ($msg) data error 1";
+    return "";
+  }
+
+  # checksum calculation
+  # calculate sum of all nibbles
+  my $sum = 0;
+  for( my $i=0; $i <= scalar(@a)-2; $i++) {
+    $sum += hex($a[$i]);
+  }
+  # discard everything but last nibble of sum
+  $sum &= 0xF;
+  if($sum != hex($a[10])) {
+    Log3 $hash, 4, "CUL_TX $id3 ($msg) data error 2";
+    return "";
+  }
+
+  # parity bit calculation
+  my $hexstring = "0x".join("", @a[3..9]);
+  my @bits = split("", sprintf("%b", hex($hexstring)));
+  $sum = 0;
+  foreach my $bit (@bits) {
+    $sum += int($bit);
+  }
+  # parity bit ($a[4] & 1) is set so that parity is even
+  if($sum % 2 != 0) {
+    Log3 $hash, 4, "CUL_TX $id3 ($msg) data error 3";
     return "";
   }
 
@@ -93,7 +123,7 @@ CUL_TX_Parse($$)
     $def->{lastT} = $now;
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
-    Log3 $name, 4, "CUL_TX $msgtype $name $id3 T: $val F: $id2";
+    Log3 $name, 4, "CUL_TX $msgtype $name $id3 T: $val";
 
   } elsif ($type eq "E") {
     if($now - $def->{lastH} < $def->{minsecs} ) {
@@ -102,7 +132,7 @@ CUL_TX_Parse($$)
     $def->{lastH} = $now;
     $msgtype = "humidity";
     $val = $valraw;
-    Log3 $name, 4, "CUL_TX $msgtype $name $id3 H: $val F: $id2";
+    Log3 $name, 4, "CUL_TX $msgtype $name $id3 H: $val";
 
   } else {
     Log3 $name, 2, "CUL_TX $type $name $id3 ($msg) unknown type";
