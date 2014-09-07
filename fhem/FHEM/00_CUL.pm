@@ -786,7 +786,7 @@ CUL_Parse($$$$@)
   my $dmsgLog = (AttrVal($name,"rfmode","") eq "HomeMatic")
                    ? join(" ",(unpack'A1A2A2A4A6A6A*',$rmsg))
                    :$dmsg;
-  if($dmsg =~ m/^[AFTKEHRStZri]([A-F0-9][A-F0-9])+$/) { # RSSI
+  if($dmsg =~ m/^[AFTKEHRStZrib]([A-F0-9][A-F0-9])+$/) { # RSSI
     my $l = length($dmsg);
     $rssi = hex(substr($dmsg, $l-2, 2));
     $dmsg = substr($dmsg, 0, $l-2);
@@ -878,7 +878,7 @@ CUL_Parse($$$$@)
   } elsif($fn eq "Z" && $len >= 21) {              # Moritz/Max
     ;
   } elsif($fn eq "b" && $len >= 24) {              # Wireless M-Bus
-    ;
+    $dmsg .= "::$rssi" if (defined($rssi));
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
     $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
   } else {
@@ -1002,7 +1002,7 @@ CUL_Attr(@)
       if($hash->{CMDS} =~ m/b/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
         $hash->{Clients} = $clientsWMBus;
         $hash->{MatchList} = \%matchListWMBus;
-        $hash->{initString} = "brs"; # Use S-Mode
+        $hash->{initString} = "X21\nbrs"; # Use S-Mode, X21 is needed for RSSI reporting
         CUL_WriteInit($hash);
 
       } else {
@@ -1014,7 +1014,7 @@ CUL_Attr(@)
       if($hash->{CMDS} =~ m/b/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
         $hash->{Clients} = $clientsWMBus;
         $hash->{MatchList} = \%matchListWMBus;
-        $hash->{initString} = "brt"; # Use T-Mode
+        $hash->{initString} = "X21\nbrt"; # Use T-Mode, X21 is needed for RSSI reporting
         CUL_WriteInit($hash);
 
       } else {
