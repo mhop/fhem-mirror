@@ -78,6 +78,7 @@ TCM_Define($$)
                         "{devicename[\@baudrate]|ip:port|none}"
     if(@a != 4 || $model !~ m/^(ESP2|ESP3|120|310)$/);
 
+  $hash->{NOTIFYDEV} = "global";
   DevIo_CloseDev($hash);
   my $dev  = $a[3];
   $hash->{DeviceName} = $dev;
@@ -387,7 +388,31 @@ TCM_Read($)
 
       } elsif($packetType == 7) {
         # packet type REMOTE_MAN_COMMAND
-        Log3 $name, 1, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
+        #Log3 $name, 1, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
+        $mdata =~ m/^(....)(....)(.*)$/;
+        my ($function, $manufID, $messageData) = ($1,$2,$3);
+        $odata =~ m/^(........)(........)(..)(..)$/;
+        my ($RSSI, $receivingQuality) = ($3, "excellent");
+        if (hex($RSSI) > 87) {
+          $receivingQuality = "bad";
+        } elsif (hex($RSSI) > 75) {
+          $receivingQuality = "good";
+        }
+        my %addvals = (
+          PacketType       => $packetType,
+          DestinationID    => $1,
+          RSSI             => -hex($RSSI),
+          ReceivingQuality => $receivingQuality,
+        );
+        $hash->{RSSI} = -hex($RSSI);
+        $packetType = sprintf "%01X", $packetType;
+        
+        if ($blockSenderID eq "own" && (hex $2) >= $baseID && (hex $2) <= $lastID) {
+          Log3 $name, 4, "TCM $name Telegram from $2 blocked.";
+        } else {
+          #EnOcean:PacketType:RORG:MessageData:SourceID:DestinationID:FunctionNumber:ManufacturerID:RSSI:Delay
+          Dispatch($hash, "EnOcean:$packetType:C5:$messageData:$2:$1:$function:$manufID:$RSSI:$4", \%addvals);
+        }
 
       } elsif($packetType == 9) {
         # packet type RADIO_MESSAGE
@@ -518,10 +543,12 @@ TCM_Ready($)
   my ($hash) = @_;
 
   return DevIo_OpenDev($hash, 1, undef)
-                if($hash->{STATE} eq "disconnected");
+#    if($hash->{STATE} ne "opened");
+    if($hash->{STATE} eq "disconnected");
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
+  return undef if(!$po);
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   return ($InBytes>0);
 }
@@ -590,7 +617,7 @@ TCM_Get($@)
     $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
   }
   if($err) {
-    Log3 undef, 1, TCM $name $err;
+    Log3 undef, 1, "TCM $name $err";
     return $err;
   }
   readingsSingleUpdate($hash, $cmd, $msg, 1);
@@ -837,7 +864,11 @@ TCM_Attr(@) {
 sub TCM_Notify(@) {
   my ($hash, $dev) = @_;
   my $name = $hash->{NAME};
-  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
+  if ($dev->{NAME} eq "global" && grep (m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}})){
+    if ($hash->{STATE} eq "disconnected") {
+      Log3 $name, 2, "TCM $name not initialized";
+      return undef;
+    }
     my $attrVal;
     my $comType = AttrVal($name, "comType", "TCM");
     my $setCmdVal = "";
@@ -851,7 +882,6 @@ sub TCM_Notify(@) {
     } else {
       TCM_ReadAnswer($hash, "set reset");
       TCM_Set($hash, @setCmd);
-      #usleep(200);
     }
     # default attributes
     my %setAttrInit;
