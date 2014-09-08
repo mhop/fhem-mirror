@@ -2642,7 +2642,10 @@ sub CUL_HM_parseCommon(@){#####################################################
         CUL_HM_stateUpdatDly($pName,10) if ($mTp eq "40");#conditional request may not deliver state-req
       }
     }
-    elsif($mFlgH & 2){# dst can be garbage - but not if answer request
+    elsif($mFlgH & 2 # dst can be garbage - but not if answer request
+          && (   !$dstH 
+              || $dstH->{NAME} ne InternalVal($shash->{NAME},"IODev",""))
+          ){
       my $pName = CUL_HM_id2Name($dst);
       push @evtEt,[$cHash,1,"trigDst_$pName:noConfig"];
     }
