@@ -1473,9 +1473,7 @@ sub CUL_HM_Parse($$) {#########################################################
       if($p =~ m/(..)4(.)0200(..)(..)(..)/) {
         my ($chn,$seq, $k_v1, $k_v2, $k_v3) = (hex($1),hex($2),$3,hex($4),hex($5));
         push @evtEt,[$shash,1,"battery:".($chn & 0x80?"low":"ok")];
-        
-        my $v = 128-$k_v2;                  # FIXME: calibrate
-        $v += 256 if(!($k_v3 & 1));
+        my $v = 1408 - ((($k_v3 & 0x07)<<8) + $k_v2);
         push @evtEt,[$shash,1,"rawValue:$v"];
         my $nextSeq = ReadingsVal($name,"Sequence","");
         $nextSeq =~ s/_.*//;
