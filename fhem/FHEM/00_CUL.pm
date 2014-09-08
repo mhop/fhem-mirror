@@ -674,7 +674,6 @@ CUL_SendFromQueue($$)
   my ($hash, $bstring) = @_;
   my $name = $hash->{NAME};
   my $hm = ($bstring =~ m/^A/);
-  my $mz = ($bstring =~ m/^Z/);
   my $to = ($hm ? 0.15 : 0.3);
   my $now = gettimeofday();
   if($bstring ne "") {

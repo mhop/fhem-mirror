@@ -2489,15 +2489,12 @@ FW_dropdownFn()
     $fpname =~ s/.*floorplan\/(\w+)$/$1/;  #allow usage of attr fp_setbutton
     my $fwsel;
     $fwsel = ($cmd eq "state" ? "" : "$cmd&nbsp;") .
-             FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown","submit()").
-             FW_hidden("cmd.$d", "set");
-    $fwsel .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
+              FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown",
+                "FW_cmd('$FW_ME?XHR=1&cmd.$d=set $d  '+ ".
+                "this.options[this.selectedIndex].value+ ' &room=$FW_room')");
+     return "<td colspan='2'>".
+      "$fwsel</td>";
 
-    return "<td colspan='2'><form method=\"$FW_formmethod\">".
-      FW_hidden("arg.$d", $cmd) .
-      FW_hidden("dev.$d", $d) .
-      ($FW_room ? FW_hidden("room", $FW_room) : "") .
-      "$fwsel</form></td>";
   }
   return undef;
 }
