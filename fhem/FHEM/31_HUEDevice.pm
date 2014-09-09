@@ -236,6 +236,7 @@ HUEDevice_SetParam($$@)
     if( $value > 100 ) { $value = 100; }
     $cmd = 'pct';
   } elsif( !defined($value) && $cmd =~ m/^(\d+)/) {
+    $value2 = $value;
     $value = $1;
     $value = 254 if( $value > 254 );
     $cmd = 'bri';
