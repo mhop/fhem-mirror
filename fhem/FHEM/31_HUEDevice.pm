@@ -231,7 +231,10 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq "toggle" ) {
     $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
   } elsif( $cmd =~ m/^dim(\d+)/ ) {
-    $value = $1 unless defined($value);
+    if( defined($1) ) {
+      $value2 = $value;
+      $value = $1;
+    }
     if( $value <   0 ) { $value =   0; }
     if( $value > 100 ) { $value = 100; }
     $cmd = 'pct';
