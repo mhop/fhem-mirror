@@ -265,7 +265,7 @@ sub WMBUS_SetRSSI($$$) {
 	readingsEndUpdate($hash,1);
 }
 
-sub WMBUS_SetReadings($$$$)
+sub WMBUS_SetReadings($$$)
 {
 	my ($hash, $name, $mb) = @_;
 	
