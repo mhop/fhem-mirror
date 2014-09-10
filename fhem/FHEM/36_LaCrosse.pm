@@ -187,6 +187,8 @@ LaCrosse_Parse($$)
   my $rhash = $modules{LaCrosse}{defptr}{$raddr};
   my $rname = $rhash?$rhash->{NAME}:$raddr;
 
+  return "" if( IsIgnored($rname) );
+
   if( !$modules{LaCrosse}{defptr}{$raddr} ) {
     foreach my $d (sort keys %defs) {
       next if( !defined($defs{$d}) );
