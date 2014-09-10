@@ -1555,7 +1555,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT00"} = $culHmChanSets{"HM-CC-TC00"};
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
 
 $culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
-$culHmChanSets{"HM-OU-CFM-PL01"}        = $culHmChanSets{"HM-OU-CF-PL01"};
+$culHmChanSets{"HM-OU-CF-PL01"}         = $culHmChanSets{"HM-OU-CFM-PL01"};
 
 %culHmFunctSets = (# command depending on function
   sdLead              =>{ alarmOn       =>""
