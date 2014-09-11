@@ -64,7 +64,7 @@ ECMD_Initialize($)
   $hash->{GetFn}   = "ECMD_Get";
   $hash->{SetFn}   = "ECMD_Set";
   $hash->{AttrFn}  = "ECMD_Attr";
-  $hash->{AttrList}= "classdefs split logTraffic:0,1,2,3,4,5 timeout";
+  $hash->{AttrList}= "classdefs split logTraffic:0,1,2,3,4,5 timeout partial";
 }
 
 #####################################
@@ -172,9 +172,30 @@ sub
 ECMD_SimpleExpect($$$)
 {
   my ($hash, $msg, $expect) = @_;
+  
+  my $name= $hash->{NAME};
+  my $timeout= AttrVal($name, "timeout", 3.0);
+  my $partialTimeout= AttrVal($name, "partial", 0.0);
  
   ECMD_Log $hash, undef, "write " . dq($msg) . ", expect $expect";
-  my $answer= DevIo_Expect($hash, $msg, AttrVal($hash->{NAME}, "timeout", 3.0));
+  my $answer= DevIo_Expect($hash, $msg, $timeout );
+  
+  #Debug "$name: Expect got \"" . escapeLogLine($answer) . "\".";  
+  
+  # complete partial answers
+  if($partialTimeout> 0) {
+    my $t0= gettimeofday();
+    while(!defined($answer) || ($answer !~ /^$expect$/)) {
+      #Debug "$name: waiting for a match...";
+      my $a= DevIo_SimpleReadWithTimeout($hash, $partialTimeout); # we deliberately use partialTimeout here!
+      #Debug "$name: SimpleReadWithTimeout got \"" . escapeLogLine($a) . "\".";  
+      if(defined($a)) {
+	$answer= ( defined($answer) ? $answer . $a : $a );
+      }
+      #Debug "$name: SimpleExpect has now answer \"" . escapeLogLine($answer) . "\".";  
+      last if(gettimeofday()-$t0> $partialTimeout);
+    }
+  }
   
   if(defined($answer)) {
     ECMD_Log $hash, undef, "read " . dq($answer);
@@ -226,9 +247,7 @@ ECMD_Get($@)
 
   if($cmd eq "raw") {
         return "get raw needs an argument" if(@a< 3);
-        #my $nonl= AttrVal($name, "nonl", 0);
         my $ecmd= join " ", @args;
-        #ecmd .= "\n" unless($nonl);
         $ecmd= AnalyzePerlCommand(undef, $ecmd);
         $answer= ECMD_SimpleExpect($hash, $ecmd, ".*");
   }  else {
@@ -511,8 +530,6 @@ ECMD_Write($$$)
   my $requestSeparator= "\000"; # AttrVal($hash, "requestSeparator", "\000");
   my $responseSeparator= ""; # AttrVal($hash, "responseSeparator", "");
   my @ecmds= split $requestSeparator, $msg;
-  #my @ecmds= split "\n", $msg;
-  #my $nonl= AttrVal($name, "nonl", 0);
   ECMD_Log $hash, 5, "command split into " . ($#ecmds+1) . " parts." if($#ecmds>0);
   foreach my $ecmd (@ecmds) {
         ECMD_Log $hash, 5, "sending command " . dq($ecmd);
@@ -647,11 +664,7 @@ ECMD_Write($$$)
     <code>foo 12</code> and <code>bar off</code>.</li>
     <li>logTraffic &lt;loglevel&gt;<br>Enables logging of sent and received datagrams with the given loglevel. Control characters in the logged datagrams are escaped, i.e. a double backslash is shown for a single backslash, \n is shown for a line feed character, etc.</li>
     <li>timeout &lt;seconds&gt;<br>Time in seconds to wait for a reply from the physical ECMD device before FHEM assumes that something has gone wrong. The default is 3 seconds if this attribute is not set.</li> 
-    <!--
-    <li>nonl<br>A newline (\n) is automatically appended to every command string sent to the device
-    unless this attribute is set. Please note that newlines (\n) in a command string are interpreted
-    as separators to split the command string into several commands and are never literally sent.</li>
-    -->
+    <li>partial &lt;seconds&gt;<br>Some physical ECMD devices split readings and replies into several transmissions. If the partial attribute is set, this behavior is accounted for as follows: (a) If a reply is expected for a get or set command, FHEM collects transmissions from the physical ECMD device until either the reply matches the expected reply or the time in seconds given with the partial attribute has expired. (b) If a spontaneous transmission does not match the regular expression for any reading, the transmission is recorded and prepended to the next transmission. If the line is quiet for longer than the time in seconds given with the partial attribute, the recorded transmission is discarded. Use regular expressions that produce exact matches.</li> 
     <li><a href="#verbose">verbose</a></li>
   </ul>
   <br><br>
@@ -660,11 +673,11 @@ ECMD_Write($$$)
   <b>Datagram monitoring and matching</b>
   <br><br>
   
-  Data to and from the physical device is processed as is. In particular, if you need to send a line feed you have to include send a \n control character. On the other hand, control characters like line feeds are not stripped from the data received. This needs to be considered when defining a <a href="#ECMDClassdef">class definition</a>.<p>
+  Data to and from the physical device is processed as is. In particular, if you need to send a line feed you have to explicitely send a \n control character. On the other hand, control characters like line feeds are not stripped from the data received. This needs to be considered when defining a <a href="#ECMDClassdef">class definition</a>.<p>
   
   For debugging purposes, especially when designing a <a href="#ECMDClassdef">class definition</a>, it is advisable to turn traffic logging on. Use <code>attr myECMD logTraffic 3</code> to log all data to and from the physical device at level 3. A typical response might look like <code>21.2\n</code>, i.e. a floating point number followed by a newline.<p>
   
-  Data received from the physical device is processed as it comes in chunks. If for some reason a datagram from the device is split in transit, pattern matching and processing will most likely fail.
+  Data received from the physical device is processed as it comes in chunks. If for some reason a datagram from the device is split in transit, pattern matching and processing will most likely fail. You can use the <code>partial</code> attribute to make FHEM collect and recombine the chunks.
   <br><br>
   
   <a name="ECMDConnection"></a>
@@ -714,7 +727,9 @@ ECMD_Write($$$)
             <code>set &lt;commandname&gt; expect "&lt;regex&gt;"</code><br>
             <code>get &lt;commandname&gt; expect "&lt;regex&gt;"</code>
             <br><br>
-            Declares what FHEM expects to receive after the execution of the get or set command <code>&lt;commandname&gt;</code>. <code>&lt;regex&gt;</code> is a Perl regular expression. The double quotes around the regular expression are mandatory and they are not part of the regular expression itself. Particularly, broken connections can only be detected if something is expected (see <a href="#ECMDConnection">Connection error handling</a>).
+            Declares what FHEM expects to receive after the execution of the get or set command <code>&lt;commandname&gt;</code>. <code>&lt;regex&gt;</code> is a Perl regular expression. The double quotes around the regular expression are mandatory and they are not part of the regular expression itself.
+            <code>&lt;regex&gt;</code> must match the entire reply, as in <code>m/^&lt;regex&gt;$/</code>.
+            Particularly, broken connections can only be detected if something is expected (see <a href="#ECMDConnection">Connection error handling</a>).
             <br><br>
             </li>
 
@@ -740,6 +755,7 @@ ECMD_Write($$$)
             <code>reading &lt;reading&gt; match "&lt;regex&gt;"</code>
             <br><br>
             Declares a new reading named <code>&lt;reading&gt;</code>. A spontaneous data transmission from the physical device that matches the Perl regular expression <code>&lt;regex&gt;</code> is evaluated to become the value of the named reading. All ECMDDevice devices belonging to the ECMD device with readings with matching regular expressions will receive an update of the said readings.
+            <code>&lt;regex&gt;</code> must match the entire reply, as in <code>m/^&lt;regex&gt;$/</code>.
             <br><br>
             </li>
             
