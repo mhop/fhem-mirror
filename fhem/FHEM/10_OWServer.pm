@@ -369,11 +369,14 @@ OWServer_Autocreate($)
   my ($hash)= @_;
   my $name = $hash->{NAME};
 
+  my $acdname= "";
   foreach my $d (keys %defs) {
     next if($defs{$d}{TYPE} ne "autocreate");
-    return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+    $acdname= $defs{$d}{NAME};
+    return undef if(AttrVal($acdname,"disable",undef));
   }
-
+  return undef unless($acdname ne "");
+  
   my $owserver= $hash->{fhem}{owserver};
 
   my @dir= split(",", $owserver->dir("/"));
@@ -423,7 +426,7 @@ OWServer_Autocreate($)
     }
   }
 
-  CommandSave(undef,undef) if( $created && AttrVal( "autocreate", "autosave", 1 ) );
+  CommandSave(undef,undef) if( $created && AttrVal($acdname, "autosave", 1 ) );
 
   return undef;
 }
