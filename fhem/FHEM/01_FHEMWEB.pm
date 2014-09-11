@@ -1521,7 +1521,7 @@ FW_select($$$$$@)
   $id = ($id ? "id=\"$id\" informId=\"$id\"" : "");
   my $s = "<select $jSelFn $id name=\"$n\" class=\"$class\">";
   foreach my $v (@{$va}) {
-    if($def && $v eq $def) {
+    if(defined($def) && $v eq $def) {
       $s .= "<option selected=\"selected\" value='$v'>$v</option>\n";
     } else {
       $s .= "<option value='$v'>$v</option>\n";
