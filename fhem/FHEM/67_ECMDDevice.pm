@@ -264,6 +264,41 @@ ECMDDevice_Parse($$)
   my @matches;
   my $name= $IOhash->{NAME};
   
+  my $ts= gettimeofday();
+  
+  if(defined(AttrVal($name, "partial", undef))) {
+  
+	if(!defined($IOhash->{fhem}{partial})) {
+	  $IOhash->{fhem}{partial}{ts}= $ts;
+	  $IOhash->{fhem}{partial}{msg}= "";
+	}
+
+	#Debug "$name: partial message \"" . escapeLogLine($IOhash->{fhem}{partial}{msg}) . "\" recorded at $ts";
+	if($IOhash->{fhem}{partial}{msg} ne "") {	
+	  # clear partial message if expired
+	  my $timeout= AttrVal($name, "partial", 1);
+	  my $t0= $IOhash->{fhem}{partial}{ts};
+	  if($ts-$t0> $timeout) {
+	    $IOhash->{fhem}{partial}{msg}= "";
+	    #Debug "$name: partial message expired.";
+	  }
+	}
+
+	# prepend to recently received message
+	$IOhash->{fhem}{partial}{ts}= $ts;
+	$message= $IOhash->{fhem}{partial}{msg} . $message;
+	$IOhash->{fhem}{partial}{msg}= "";
+	
+  } else {
+  
+	# clean the partial stuff for clarity
+	if(defined($IOhash->{fhem}{partial})) {
+	  delete($IOhash->{fhem}{partial})
+	}
+  }
+  
+  #Debug "$name: analyzing \"" . escapeLogLine($message) . "\".";
+  
   my @msgs;
   if(defined(AttrVal($name, "split", undef))) {
     @msgs= split(AttrVal($name, "split", undef), $message);
@@ -271,8 +306,13 @@ ECMDDevice_Parse($$)
     push @msgs, $message;
   }
   
+  #my @unmatchedMsgs; # future use
+  my $lastMsg= "";
+  my $msgMatched;
+  
   foreach my $msg (@msgs) {
-    #Debug "Trying to find a match for \"" . escapeLogLine($msg) ."\"";
+    #Debug "$name: trying to find a match for \"" . escapeLogLine($msg) ."\"";
+    $msgMatched= 0; 
     # walk over all clients
     foreach my $d (keys %defs) {
       my $hash= $defs{$d};
@@ -288,9 +328,10 @@ ECMDDevice_Parse($$)
 	foreach my $r (keys %{$classDef->{readings}}) {
 	  my $regex= ECMDDevice_ReplaceSpecials($classDef->{readings}{$r}{match}, %specials);
 	  #Debug "      Trying to match reading $r with regular expressing \"$regex\".";
-	  if($msg =~ m/$regex/) {
+	  if($msg =~ m/^$regex$/) {
 	    # we found a match
 	    Log3 $IOhash, 5, "$name: match regex $regex for reading $r of device $d with class $classname";
+	    $msgMatched++;
 	    push @matches, $d;
 	    my $postproc= $classDef->{readings}{$r}{postproc};
 	    my $value= ECMDDevice_PostProc($hash, $postproc, $msg);
@@ -300,12 +341,28 @@ ECMDDevice_Parse($$)
 	}
       }  
     }
-  
+    #push @unmatchedMsgs, $msg unless($msgMatched); # future use
   }
   
+  $lastMsg= $msgs[$#msgs] unless($msgMatched); # contains the last message if the last message is unmatched
+  if(defined(AttrVal($name, "partial", undef)) && $lastMsg ne "") {
+    # we come here if the last message was unmatched and we want partial messages
+    if($#msgs>= 0) { 
+      # we had more messages; therefore the partial message belonged to the first message and needs
+      # to be cleared
+      $IOhash->{fhem}{partial}{msg}= "";  
+    }
+    $IOhash->{fhem}{partial}{msg}.= $lastMsg;  # append unmatched message
+    #Debug "$name: partial message \"" . escapeLogLine($IOhash->{fhem}{partial}{msg}) . "\" kept.";
+  }  
+  
   return @matches if(@matches);
+  
+  # we come here if no match is found
+  
   # NOTE: In a split message, undefined messages are not reported if there was at least one match.
-  return "UNDEFINED ECMDDevice message $message";  
+  # return "UNDEFINED ECMDDevice message $message";  
+  return "";
   
 }
 
