@@ -3786,7 +3786,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'0'.$color{$a[2]});
       }
     }
-    elsif($md eq "HM-OU-CFM-PL"){
+    elsif($md =~ m/HM-OU-CFM?-PL/){
       my %color = (redL =>18,greenL =>34,orangeL =>50,
                    redS =>17,greenS =>33,orangeS =>49,
                    pause=>01);
