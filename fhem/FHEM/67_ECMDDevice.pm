@@ -92,6 +92,19 @@ ECMDDevice_DeviceParams2Specials($)
 }
 
 sub
+ECMDDevice_GetCachedSpecials($) 
+{
+	my($hash)= @_;
+	
+	if(!defined($hash->{fhem}{cache}{specials})) {
+	    my %specials= ECMDDevice_DeviceParams2Specials($hash);
+	    $hash->{fhem}{cache}{specials}= \%specials;
+	} 
+	
+	return %{$hash->{fhem}{cache}{specials}}
+}
+
+sub
 ECMDDevice_ReplaceSpecials($%)
 {
         my ($s, %specials)= @_;
@@ -142,7 +155,7 @@ ECMDDevice_PostProc($$$)
   my ($hash, $postproc, $value)= @_;
 
   if($postproc) {
-        my %specials= ECMDDevice_DeviceParams2Specials($hash);
+        my %specials= ECMDDevice_GetCachedSpecials($hash);
         my $command= ECMDDevice_ReplaceSpecials($postproc, %specials);
 	$_= $value;
 	Log3 $hash, 5, "Postprocessing \"" . escapeLogLine($value) . "\" with perl command $command.";
@@ -152,6 +165,37 @@ ECMDDevice_PostProc($$$)
   return $value;
 }
 
+sub
+ECMDDevice_EvalCommand($$$)
+{
+  my ($hash, $command, $value)= @_;
+
+  if($command) {
+	$_= $value;
+	Log3 $hash, 5, "Postprocessing \"" . escapeLogLine($value) . "\" with perl command $command.";
+	$value= AnalyzePerlCommand(undef, $command);
+	Log3 $hash, 5, "Postprocessed value is \"" . escapeLogLine($value) . "\".";
+  }
+  return $value;
+}
+
+sub
+ECMDDevice_GetCachedReadingsCommand($$$)
+{
+  my ($hash, $classDef, $reading)= @_;
+  my $command= $hash->{fhem}{cache}{readings}{command}{$reading};
+  if(!defined($command)) {
+        my %specials= ECMDDevice_GetCachedSpecials($hash);
+	my $postproc= $classDef->{readings}{$reading}{postproc};
+	if($postproc) {
+	  $command= ECMDDevice_ReplaceSpecials($postproc, %specials);
+	} else {
+	  $command= undef;
+	}
+	$hash->{fhem}{cache}{readings}{command}{$reading}= $command;
+  }
+  return $command;
+}
 
 ###################################
 
@@ -178,7 +222,7 @@ ECMDDevice_Get($@)
         my $params= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{params};
         my $postproc= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{postproc};
 
-        my %specials= ECMDDevice_DeviceParams2Specials($hash);
+        my %specials= ECMDDevice_GetCachedSpecials($hash);
         # add specials for command
         if($params) {
                 shift @a; shift @a;
@@ -226,7 +270,7 @@ ECMDDevice_Set($@)
         my $params= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{params};
         my $postproc= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{postproc};
 
-        my %specials= ECMDDevice_DeviceParams2Specials($hash);
+        my %specials= ECMDDevice_GetCachedSpecials($hash);
         # add specials for command
         if($params) {
                 shift @a; shift @a;
@@ -249,6 +293,22 @@ ECMDDevice_Set($@)
         ECMDDevice_Changed($hash, $cmdname, $v); # was: return ECMDDevice_Changed($hash, $cmdname, $v);
         return undef;
 
+}
+
+
+#############################
+sub 
+ECMDDevice_GetCachedReadingsMatch($$$) 
+{
+  my ($hash, $classDef, $r)= @_;
+  
+  my $regex= $hash->{fhem}{cache}{readings}{match}{$r};
+  if(!defined($regex)) {
+    my %specials= ECMDDevice_GetCachedSpecials($hash);
+    $regex= ECMDDevice_ReplaceSpecials($classDef->{readings}{$r}{match}, %specials);
+    $hash->{fhem}{cache}{readings}{match}{$r}= $regex;
+  }
+  return $regex;
 }
 
 #############################
@@ -323,18 +383,17 @@ ECMDDevice_Parse($$)
 	#Debug "  Checking device $d with class $classname...";
 	next unless(defined($classDef->{readings}));
 	#Debug "   Trying to find a match in class $classname...";
-	my %specials= ECMDDevice_DeviceParams2Specials($hash);
 	# we run over all readings in that classdef
 	foreach my $r (keys %{$classDef->{readings}}) {
-	  my $regex= ECMDDevice_ReplaceSpecials($classDef->{readings}{$r}{match}, %specials);
+	  my $regex= ECMDDevice_GetCachedReadingsMatch($hash, $classDef, $r);
 	  #Debug "      Trying to match reading $r with regular expressing \"$regex\".";
 	  if($msg =~ m/^$regex$/) {
 	    # we found a match
 	    Log3 $IOhash, 5, "$name: match regex $regex for reading $r of device $d with class $classname";
 	    $msgMatched++;
 	    push @matches, $d;
-	    my $postproc= $classDef->{readings}{$r}{postproc};
-	    my $value= ECMDDevice_PostProc($hash, $postproc, $msg);
+	    my $command= ECMDDevice_GetCachedReadingsCommand($hash, $classDef, $r);
+	    my $value= ECMDDevice_EvalCommand($hash, $command, $msg);
 	    Log3 $hash, 5, "postprocessed value is $value";
 	    ECMDDevice_Changed($hash, $r, $value);
 	  }
@@ -446,9 +505,16 @@ ECMDDevice_Define($$)
         } else {
           return undef;
         }
+        
+        # create cache stubs
+        $hash->{fhem}{cache}{specials}= ();
+        $hash->{fhem}{cache}{readings}{match}= ();
+        $hash->{fhem}{cache}{readings}{command}= ();
 }
 
+#############################
 1;
+#############################
 
 =pod
 =begin html
