@@ -55,6 +55,7 @@ SVG_Initialize($)
   $hash->{FW_atPageEnd} = 1;
   $data{FWEXT}{"/SVG_WriteGplot"}{CONTENTFUNC} = "SVG_WriteGplot";
   $data{FWEXT}{"/SVG_showLog"}{FUNC} = "SVG_showLog";
+  $data{FWEXT}{"/SVG_showLog"}{FORKABLE} = 1;
 }
 
 #####################################

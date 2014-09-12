@@ -2344,8 +2344,8 @@ CommandSetstate($$)
 
     } else {
 
-      # The timestamp is not the correct one, but we do not store a timestamp for
-      # this reading.
+      # The timestamp is not the correct one, but we do not store a timestamp
+      # for this reading.
       my $tn = TimeNow();
       $oldvalue{$sdev}{TIME} = $tn;
       $oldvalue{$sdev}{VAL} = ($init_done ? $d->{STATE} : $a[1]);
