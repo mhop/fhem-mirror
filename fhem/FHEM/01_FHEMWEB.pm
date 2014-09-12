@@ -372,10 +372,14 @@ FW_Read($)
 
   $arg = "" if(!defined($arg));
   Log3 $FW_wname, 4, "HTTP $name GET $arg";
+  $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   my $pid;
   if(AttrVal($FW_wname, "plotfork", undef)) {
     # Process SVG rendering as a parallel process
-    return if(($arg =~ m+/SVG_showLog+) && ($pid = fork));
+    my $p = $data{FWEXT};
+    if(grep { $p->{$_}{FORKABLE} && $arg =~ m+^$FW_ME$_+ } keys %{$p}) {
+      return if($pid = fork);
+    }
   }
 
   my $cacheable = FW_answerCall($arg);
@@ -437,7 +441,6 @@ FW_answerCall($)
 
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
-  $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   $FW_CSRF = ($defs{$FW_wname}{CSRFTOKEN} ?
                 "&fwcsrf=".$defs{$FW_wname}{CSRFTOKEN} : "");
 
