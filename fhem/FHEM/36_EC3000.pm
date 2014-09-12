@@ -63,7 +63,7 @@ EC3000_Define($$)
     Log3 $name, 1, "$name: no I/O device";
   }
 
-  #$attr{$name}{devStateIcon} = 'on:on:toggle off:off:toggle *.:light_question:off' if( !defined( $attr{$name}{devStateIcon} ) );
+  #$attr{$name}{devStateIcon} = 'on:on:toggle off:off:toggle *.:light_exclamation:off' if( !defined( $attr{$name}{devStateIcon} ) );
   #$attr{$name}{webCmd} = 'on:off:toggle:statusRequest' if( !defined( $attr{$name}{webCmd} ) );
   #CommandAttr( undef, "$name userReadings consumptionTotal:consumption monotonic {ReadingsVal(\$name,'consumption',0)}" ) if( !defined( $attr{$name}{userReadings} ) );
 
