@@ -95,7 +95,7 @@ SWAP_0000002200000003_devStateIcon($@)
   return undef if( !defined($attr{$name}{ProductCode}) );
   return undef if( $attr{$name}{ProductCode} ne '0000002200000003' );
 
-  return ".*:light_question" if( $state eq "unknown" || $state =~m/^set/ );
+  return ".*:light_exclamation" if( $state eq "unknown" || $state =~m/^set/ );
 
   return ".*:off:toggle" if( $state eq "off" );
 
