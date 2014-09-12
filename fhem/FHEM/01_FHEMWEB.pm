@@ -374,11 +374,17 @@ FW_Read($)
   Log3 $FW_wname, 4, "HTTP $name GET $arg";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   my $pid;
-  if(AttrVal($FW_wname, "plotfork", undef)) {
+  if(defined(AttrVal($FW_wname, "plotfork", undef))) {
     # Process SVG rendering as a parallel process
     my $p = $data{FWEXT};
     if(grep { $p->{$_}{FORKABLE} && $arg =~ m+^$FW_ME$_+ } keys %{$p}) {
-      return if($pid = fork);
+      if($pid = fork) {
+	  use constant PRIO_PROCESS => 0;
+	  setpriority(PRIO_PROCESS, $pid, 
+		getpriority(PRIO_PROCESS, $pid) + AttrVal($FW_wname, "plotfork", 0)
+	  );
+	  return;
+      }
     }
   }
 
@@ -2716,9 +2722,16 @@ FW_widgetOverride($$)
         </li><br>
 
     <a name="plotfork"></a>
-    <li>plotfork<br>
-        If set, generate the logs in a parallel process. Note: do not use it
-        on Windows and on systems with small memory foorprint.
+    <li>plotfork [&lt;&Delta;p&gt;]<br>
+        If set, run part of the processing (e.g. <a href="#SVG">SVG</a> plot 
+        generation or <a href="#RSS">RSS</a> feeds) in parallel processes. 
+        Actually, child processes are forked whose
+        priorities are the FHEM process' priority plus &Delta;p. 
+        Higher values mean lower priority. e.g. use &Delta;p= 10 to renice the
+        child processes and provide more CPU power to the main FHEM process.
+        &Delta;p is optional and defaults to 0.<br>
+        Note: do not use it
+        on Windows and on systems with small memory footprint.
     </li><br>
 
     <a name="basicAuth"></a>
