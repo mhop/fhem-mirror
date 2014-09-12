@@ -42,6 +42,7 @@ RSS_addExtension($$$) {
     $data{FWEXT}{$url}{FUNC} = $func;
     $data{FWEXT}{$url}{LINK} = $link;
     $data{FWEXT}{$url}{NAME} = $friendlyname;
+    $data{FWEXT}{$url}{FORKABLE} = 1;
 }
 
 ##################
