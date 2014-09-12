@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "1.0";
+my $alarmversion    = "1.1";
 
 #########################################################################################
 #
@@ -55,7 +55,7 @@ sub Alarm_Initialize ($) {
 		
   $hash->{DefFn}       = "Alarm_Define";
   $hash->{SetFn}   	   = "Alarm_Set";  
-  #$hash->{GetFn}       = "Alarm_Get";
+  $hash->{GetFn}       = "Alarm_Get";
   $hash->{UndefFn}     = "Alarm_Undef";   
   #$hash->{AttrFn}      = "Alarm_Attr";
   my $attst            = "lockstate:lock,unlock";
@@ -199,7 +199,14 @@ sub Alarm_Set($@) {
 
 sub Alarm_Get($@) {
   my ($hash, @a) = @_;
-  return
+  my $res = "";
+  
+  my $arg = (defined($a[1]) ? $a[1] : "");
+  if ($arg eq "version") {
+    return "Alarm.version => $alarmversion";
+  } else {
+    return "Unknown argument $arg choose one of version";
+  }
 }
 
 #########################################################################################
@@ -287,6 +294,8 @@ sub Alarm_Exec($$$$$){
       readingsSingleUpdate( $hash, "state", "Canceled", 0 );
       readingsSingleUpdate( $hash, "level", "none", 0 );
       Log3 $hash,3,$msg;
+   }else{
+     Log3 $hash,3,"[Alarm $level] Exec called with act=$act";
    }
    #return $msg;
 }
