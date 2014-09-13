@@ -1065,7 +1065,7 @@ MAX_Parse($$)
       kompensiert werden. Die ausgelese Temperatur ist gleich der gemessenen
       Temperatur + <code>measurementOffset</code>. Normalerweise ist die intern gemessene Temperatur h&ouml;her
       als die Raumtemperatur, da der Sensor n&auml;her am Heizk&ouml;rper ist und man verwendet einen
-      kleinen negativen Offset, der zwischen -3,5 und 3,5 Kelvin sein mu&szlig;.
+      kleinen negativen Offset, der zwischen -3,5 und 3,5 Kelvin sein mu&szlig;.</li>
     <li>minimumTemperature &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegemene <code>minimum</code> Temperatur in der Speicher
       des Ger&auml;tes. Diese begrenzt die Temperatur, die am Ger&auml;t manuell eingestellt werden kann.</li>
