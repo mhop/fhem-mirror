@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "1.1";
+my $alarmversion    = "1.2";
 
 #########################################################################################
 #
@@ -404,7 +404,7 @@ sub Alarm_CreateNotifiers($){
            }
            if( (index($aval[0],"alarm".$level) != -1) && ($aval[3] eq "off") ){
               $cmd .= '('.$aval[1].')|';
-              # Log3 $hash,1,"[Alarm $level] Adding sensor $d to cancel notifier";
+              #Log3 $hash,1,"[Alarm $level] Adding sensor $d to cancel notifier";
            }
         }   
      }
@@ -478,7 +478,12 @@ sub Alarm_CreateNotifiers($){
                        $nonum++;
                        my @tarr = split(':',$aval[3]);
                        if( int(@tarr) == 1){   
-                          $cmd  .= sprintf('define alarm%1ddly%1d at +00:00:%02d %s;',$level,$nonum,$aval[3],$aval[1]);       
+                          if( $aval[3] > 59 ){
+                             Log3 $hash,3,"[Alarm $level] Invalid delay specification for actor $d: $aval[3] > 59";
+                             $cmd = '';
+                          } else {
+                             $cmd  .= sprintf('define alarm%1ddly%1d at +00:00:%02d %s;',$level,$nonum,$aval[3],$aval[1]);       
+                          }
                        }elsif( int(@tarr) == 2){
                           $cmd  .= sprintf('define alarm%1ddly%1d at +00:%02d:%02d %s;',$level,$nonum,$tarr[0],$tarr[1],$aval[1]);
                        }      
@@ -594,8 +599,8 @@ sub Alarm_Html($)
     $row=1;
     $ret .= "<tr><td><div class=\"devType\">Sensors</div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\" id=\"TYPE_Alarm\">\n"; 
-    $ret .= "<tr class=\"odd\"><td/><td class=\"col2\">Notify to Alarm Level</td><td class=\"col3\">".
-            "Notify on RegExp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Message Part I</td><td class=\"col4\">Action</td></tr>\n";
+    $ret .= "<tr class=\"odd\"><td/><td class=\"col2\">Notify to Alarm Level<br/>".join("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",(0..($alarmno-1)))."</td><td class=\"col3\">".
+            "Notify on RegExp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Message Part I</td><td class=\"col4\">Action</td></tr>\n";
     foreach my $d (sort keys %defs ) {
        next if(IsIgnored($d));
        if( AttrVal($d, "alarmDevice","") eq "Sensor" ) {
@@ -624,7 +629,9 @@ sub Alarm_Html($)
     $row=1;
     $ret .= "<tr><td><div class=\"devType\">Actors</div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\" id=\"TYPE_Alarm\">\n"; 
-    $ret .= "<tr class=\"odd\"><td/><td class=\"col2\">Set in Alarm Level</td><td class=\"col3\">Set Action&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Unset Action</td><td class=\"col4\">Delay</td></tr>\n";
+    $ret .= "<tr class=\"odd\"><td/><td class=\"col2\">Set by Alarm Level<br/>".join("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",(0..($alarmno-1))).
+            "</td><td class=\"col3\">Set Action".
+            "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Unset Action</td><td class=\"col4\">Delay</td></tr>\n";
     foreach my $d (sort keys %defs ) {
        next if(IsIgnored($d));
        if( AttrVal($d, "alarmDevice","") eq "Actor" ) {
@@ -637,7 +644,7 @@ sub Alarm_Html($)
            $ret .= "<td width=\"100\" class=\"col1\"><a href=\"$FW_ME?detail=$d\">$d</a></td>\n";
            $ret .= "<td id=\"$d\" class=\"col2\">\n";
            for( my $k=0;$k<$alarmno;$k++ ){
-              $ret .= sprintf("<input type=\"checkbox\" name=\"alarm$k\"%s>$k</input>&nbsp;",(index($aval[0],"alarm".$k) != -1)?"checked=\"checked\"":""); 
+              $ret .= sprintf("<input type=\"checkbox\" name=\"alarm$k\"%s/>&nbsp;",(index($aval[0],"alarm".$k) != -1)?"checked=\"checked\"":""); 
            }
            $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmon\" size=\"13\" maxlength=\"256\" value=\"$aval[1]\"/>"; 
            $ret .= "<input type=\"text\" name=\"alarmaoff\" size=\"13\" maxlength=\"256\" value=\"$aval[2]\"/></td>"; 
