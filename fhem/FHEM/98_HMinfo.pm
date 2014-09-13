@@ -387,8 +387,8 @@ sub HMinfo_peerCheck(@) { #####################################################
                                            grep /^trigDst_/,
                                            keys %{$defs{$eName}{READINGS}})){
       push @peerIDsTrigUnp,"triggerUnpeered: ".$eName.":".$_ 
-            if( ($peerIDs &&  $peerIDs !~ m/$_/)
-               ||("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
+            if(  ($peerIDs &&  $peerIDs !~ m/$_/)
+               &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
       push @peerIDsTrigUnd,"triggerUndefined: ".$eName.":".$_ 
             if(!$modules{CUL_HM}{defptr}{$_});
     }
