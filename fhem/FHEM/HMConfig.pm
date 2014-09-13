@@ -1349,7 +1349,7 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
                       ,press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."
                       ,inhibit        =>"[on|off]"
                       ,statusRequest  =>""
-                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                      ,peerIODev      =>"[IO] <btn> [set|unset]... not for future use"
                      },
   dimmer           =>{ "on-for-timer" =>"<ontime> [<ramptime>]..."
                       ,"on-till"      =>"<time> [<ramptime>]..."
@@ -1363,7 +1363,7 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
                       ,statusRequest  =>""
-                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                      ,peerIODev      =>"[IO] <btn> [set|unset]... not for future use"
                      },
   blindActuator    =>{ on             =>""
                       ,off            =>""
@@ -1375,7 +1375,7 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
                       ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
                       ,inhibit        =>"[on|off]"
                       ,statusRequest  =>""
-                      ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                      ,peerIODev      =>"[IO] <btn> [set|unset]... not for future use"
                       },
   remote           =>{ peerChan       =>"<btnNumber> <actChn> ... [single|dual|reverse] [set|unset] [actor|remote|both]"},
   threeStateSensor =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
@@ -1438,6 +1438,7 @@ $culHmModelSets{"HM-RC-19-B"}          = $culHmModelSets{"HM-RC-19"};
 $culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
 
 $culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
+$culHmModelSets{"HM-OU-CF-PL"}         = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
 $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
@@ -1472,7 +1473,7 @@ $culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
                          ,keydef         =>"<btn> <txt1> <txt2>"
                          ,inhibit        =>"[on|off]"
                          ,press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>]..."
-                         ,peerIODev      =>"[IO] <btn> [set|unset]..."
+                         ,peerIODev      =>"[IO] <btn> [set|unset]... not for future use"
                         },
   "HM-Sen-RD-O02"     =>{ "on-for-timer" =>"<sec>"
                          ,"on-till"      =>"<time>"
@@ -1530,7 +1531,6 @@ $culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
   },
 );
 # clones- - - - - - - - - - - - - - - - -
-#$culHmChanSets{"HM-OU-CF-PL02"}  = $culHmChanSets{"HM-OU-CF-PL01"};
 $culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{"THSensor"};
@@ -1555,7 +1555,6 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT00"} = $culHmChanSets{"HM-CC-TC00"};
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
 
 $culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
-$culHmChanSets{"HM-OU-CF-PL01"}         = $culHmChanSets{"HM-OU-CFM-PL01"};
 
 %culHmFunctSets = (# command depending on function
   sdLead              =>{ alarmOn       =>""
