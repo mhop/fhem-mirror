@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "1.2";
+my $alarmversion    = "1.3";
 
 #########################################################################################
 #
@@ -58,7 +58,7 @@ sub Alarm_Initialize ($) {
   $hash->{GetFn}       = "Alarm_Get";
   $hash->{UndefFn}     = "Alarm_Undef";   
   #$hash->{AttrFn}      = "Alarm_Attr";
-  my $attst            = "lockstate:lock,unlock";
+  my $attst            = "lockstate:lock,unlock statedisplay:simple,color,table,graphics,none";
   for( my $level=0;$level<$alarmno;$level++ ){
      $attst .=" level".$level."start level".$level."end level".$level."msg level".$level."xec:0,1 level".$level."onact level".$level."offact";
   }
@@ -151,6 +151,8 @@ sub Alarm_CreateEntry($) {
 	     }	
       }
    }
+   my $mga = Alarm_getstate($hash)." Keine Störung";
+   readingsSingleUpdate( $hash, "state", $mga, 0 );
 }
 
 #########################################################################################
@@ -211,6 +213,54 @@ sub Alarm_Get($@) {
 
 #########################################################################################
 #
+# Alarm_getstate - Helper function to assemble a state display
+# 
+# Parameter hash = hash of device addressed
+#
+#########################################################################################
+
+sub Alarm_getstate($) {
+  my ($hash) = @_;
+  my $res = '';
+  my $type = AttrVal($hash->{NAME},"statedisplay",0);
+  #--------------------------
+  if( $type eq "simple" ){
+     for( my $level=0;$level<$alarmno;$level++ ){
+        if( $hash->{READINGS}{"level".$level}{VAL} eq "off" ){
+           $res.='O';
+        }else{
+           $res.='X';
+        }
+     }
+  #--------------------------
+  }elsif( $type eq "color" ){
+     $res = '<span style="color:green">';
+     for( my $level=0;$level<$alarmno;$level++ ){
+        if( $hash->{READINGS}{"level".$level}{VAL} eq "off" ){
+           $res.=' '.$level;
+        }else{
+           $res.=' <span style="width:1ex;color:red">'.$level.'</span>';
+        }
+     }
+     $res.='</span>';
+  #--------------------------
+  }elsif( $type eq "table" ){
+     $res = '<table><tr style="height:1ex">';
+     for( my $level=0;$level<$alarmno;$level++ ){
+        if( $hash->{READINGS}{"level".$level}{VAL} eq "off" ){
+           $res.='<td style="width:1ex;background-color:green"/>';
+        }else{
+           $res.='<td style="width:1ex;background-color:red"/>';
+        }
+     }
+     $res.='</tr></table>';
+  #--------------------------
+  }
+  return $res;
+}
+
+#########################################################################################
+#
 # Alarm_Exec - Execute the Alarm
 # 
 # Parameter name  = name of the Alarm definition
@@ -228,6 +278,8 @@ sub Alarm_Exec($$$$$){
    my $msg   = '';
    my $cmd;
    my $mga;
+   my $dly;
+   my @sta;
 
    #-- raising the alarm
    if( $act eq "on" ){
@@ -243,11 +295,13 @@ sub Alarm_Exec($$$$$){
          my ($sec, $min, $hour, $day, $month, $year, $wday, $yday, $isdst) = localtime(time);
          my $ntp = $hour*60+$min;
      
-         if( ($ntp <= $etp) && ($ntp >= $stp) ){
-            my $str1 = "$day.$month $hour:$min";
+         if( ($ntp <= $etp) && ($ntp >= $stp) ){  
+            #-- calling actors 
+            $cmd = AttrVal($name, "level".$level."onact", 0);
+            fhem($cmd);
             #-- raised by sensor (attribute values have been controlled in CreateNotifiers)
-            my @sta = split('\|',  AttrVal($dev, "alarmSettings", 0));
-            my $mga = $sta[2]." ".AttrVal($name, "level".$level."msg", 0);
+            @sta = split('\|',  AttrVal($dev, "alarmSettings", 0));
+            $mga = $sta[2]." ".AttrVal($name, "level".$level."msg", 0);
             #-- replace some parts
             my @evtpart = split(" ",$evt);
             $mga =~ s/\$NAME/$dev/g;
@@ -255,19 +309,13 @@ sub Alarm_Exec($$$$$){
             for( my $i=1;$i<= int(@evtpart);$i++){
                $mga =~ s/\$EVTPART$i/$evtpart[$i-1]/g;
             }
-            #-- only if level is higher than before
-            if( ($aclvl eq "none") || ($level >= $aclvl) ){
-               $msg = "[Alarm $level] raised from device $dev with event $evt"; 
-               readingsSingleUpdate( $hash, "state", $mga, 0 );
-               readingsSingleUpdate( $hash, "level", $level, 0 );
-               #-- calling actors 
-               $cmd = AttrVal($name, "level".$level."onact", 0);
-               fhem($cmd);
-               Log3 $hash,3,$msg;
-            }else{
-               $msg = "[Alarm $level] not raised from device $dev, already higher level $aclvl running";
-               Log3 $hash,3,$msg;
-            } 
+            #-- readings
+            readingsSingleUpdate( $hash, "level".$level,$dev,0 );
+            readingsSingleUpdate( $hash, "short", $mga, 0);
+            $mga = Alarm_getstate($hash)." ".$mga;
+            readingsSingleUpdate( $hash, "state", $mga, 0 );
+            $msg = "[Alarm $level] raised from device $dev with event $evt"; 
+            Log3 $hash,3,$msg;
          }else{
             $msg = "[Alarm $level] not raised, not in time slot";
             Log3 $hash,5,$msg;
@@ -277,23 +325,29 @@ sub Alarm_Exec($$$$$){
          Log3 $hash,5,$msg;
       } 
    }elsif( $act eq "off" ){
-      #-- deleting all running ats
-      my $dly = sprintf("alarm%1ddly",$level);
-      foreach my $d (sort keys %intAt ) {
-         next if( $intAt{$d}{FN} ne "at_Exec" );
-         $mga = $intAt{$d}{ARG}{NAME};
-         next if( $mga !~ /$dly\d/);
-         #Log3 $hash,1,"[Alarm] Killing delayed action $name";
-         CommandDelete(undef,"$mga");
-      }
-      #-- calling actors 
-      $cmd = AttrVal($name, "level".$level."offact", 0);
-      $msg = "[Alarm $level] canceled from device $dev";
-      fhem($cmd);
-      #-- todo: several levels may be active at one - unclear so far.
-      readingsSingleUpdate( $hash, "state", "Canceled", 0 );
-      readingsSingleUpdate( $hash, "level", "none", 0 );
-      Log3 $hash,3,$msg;
+      #-- only if this level is active
+      if( $hash->{READINGS}{"level".$level}{VAL} ne "off"){
+        #-- deleting all running ats
+        $dly = sprintf("alarm%1ddly",$level);
+        foreach my $d (sort keys %intAt ) {
+           next if( $intAt{$d}{FN} ne "at_Exec" );
+           $mga = $intAt{$d}{ARG}{NAME};
+           next if( $mga !~ /$dly\d/);
+           #Log3 $hash,1,"[Alarm] Killing delayed action $name";
+           CommandDelete(undef,"$mga");
+        }
+        #-- calling actors 
+        $cmd = AttrVal($name, "level".$level."offact", 0);
+        fhem($cmd);
+        #-- readings
+        readingsSingleUpdate( $hash, "level".$level,"off",0 );
+        $mga = " Level $level canceled";
+        readingsSingleUpdate( $hash, "short", $mga, 0);
+        $mga = Alarm_getstate($hash)." ".$mga;
+        readingsSingleUpdate( $hash, "state", $mga, 0 );
+        $msg = "[Alarm $level] canceled from device $dev";
+        Log3 $hash,3,$msg;
+     }
    }else{
      Log3 $hash,3,"[Alarm $level] Exec called with act=$act";
    }
@@ -317,6 +371,8 @@ sub Alarm_Sharp($$$$$){
    my $hash  = $defs{$name};
    my $aclvl = $hash->{READINGS}{"level"}{VAL};
    my $msg   = '';
+   my $mga;
+   my $cmd;
          
    #-- sharpening the alarm
    if( $act eq "sharp" ){
@@ -331,18 +387,22 @@ sub Alarm_Sharp($$$$$){
       #   $msg =~ s/\$EVTPART$i/$evtpart[$i-1]/g;
       #}
       $msg = "[Alarm $level] sharpened from device $dev with event $evt"; 
-      CommandAttr (undef,$name.' level'.$level.'xec sharp'); 
+      CommandAttr(undef,$name.' level'.$level.'xec sharp'); 
       Log3 $hash,3,$msg; 
+   #-- unsharpening implies canceling as well
    }elsif( $act eq "unsharp"){
       $msg = "[Alarm $level] unsharpened from device $dev with event $evt";
       CommandAttr (undef,$name.' level'.$level.'xec unsharp'); 
-      #-- unsharpening implies canceling as well
-      readingsSingleUpdate( $hash, "state", "Canceled", 0 );
-      readingsSingleUpdate( $hash, "level", "none", 0 );
       #-- calling actors 
-      my $cmd = AttrVal($name, "level".$level."offact", 0);
+      $cmd = AttrVal($name, "level".$level."offact", 0);
       fhem($cmd);
-      Log3 $hash,3,$msg;   
+      readingsSingleUpdate( $hash, "level".$level,"off",0 );
+      $mga = " Level $level canceled";
+      readingsSingleUpdate( $hash, "short", $mga, 0);
+      $mga = Alarm_getstate($hash)." ".$mga;
+      readingsSingleUpdate( $hash, "state", $mga, 0 );
+      $msg = "[Alarm $level] canceled from device $dev";
+      Log3 $hash,3,$msg;
    }
    return $msg;
 }
@@ -543,6 +603,9 @@ sub Alarm_Html($)
  
     my $hash = $defs{$name};
     my $id = $defs{$name}{NR};
+    
+    #-- 
+    readingsSingleUpdate( $hash, "state", Alarm_getstate($hash)." ".$hash->{READINGS}{"short"}{VAL}, 0 );
  
     #--
     my $lockstate = ($hash->{READINGS}{lockstate}{VAL}) ? $hash->{READINGS}{lockstate}{VAL} : "unlock";
@@ -666,8 +729,72 @@ sub Alarm_Html($)
 =begin html
 
 <a name="Alarm"></a>
-<h3>Alarm</h3>
-
+        <h3>Alarm</h3>
+        <p> FHEM module to set up a House Alarm System with 8 different alarm levels</p>
+        <br />
+        <br />
+        <a name="Alarmdefine"></a>
+        <h4>Define</h4>
+        <p>
+            <code>define &lt;name&gt; Alarm</code> 
+            <br />Defines the Alarm system.
+        </p>
+        <br />
+        <a name="Alarmset"></a>
+        <h4>Set</h4>
+        <ul>
+            <li><a name="alarm_cancel">
+                    <code>set &lt;name&gt; cancel &lt;level&gt;</code>
+                </a>
+                <br/>cancels an alarm of level &lt;level&gt;, where &lt;level&gt; = 1..7
+            </li>
+            <li><a name="alarm_sharp">
+                    <code>set &lt;name&gt; sharp &lt;level&gt;</code><br/>
+                    <code>set &lt;name&gt; unsharp &lt;level&gt;</code>
+                </a>
+                <br/>sets the alarm of level &lt;level&gt; to sharp (i.e., active) or unsharp (i.e., inactive), where &lt;level&gt; = 1..7
+            </li>
+            <li><a name="alarm_lock">
+                    <code>set &lt;name&gt; lock</code><br/>
+                    <code>set &lt;name&gt; unlock</code>
+                </a>
+                <br/>sets the lockstate of the alarm module to <i>locked</i> (i.e., alarm setups may not be changed)
+                resp. <i>unlocked</i> (i.e., alarm setups may be changed>)</li>
+        </ul>
+        <br />
+        <a name="Alarmget"></a>
+        <h4>Get</h4>
+        <ul>
+            <li><a name="alarm_version"></a>
+                <code>get &lt;name&gt; version</code>
+                <br />Display the version of the module</li>
+        </ul>
+        <br />
+        <a name="Alarmattr"></a>
+        <h4>Attributes</h4>
+        <ul>
+            <li><a name="alarm_lockstate"><code>attr &lt;name&gt; lockstate locked|unlocked</code></a>
+                <br /><i>locked</i> means that alarm setups may not be changed, 
+                <i>unlocked</i> means that alarm setups may be changed></li>
+            <li><a name="alarm_statedisplay"><code>attr &lt;name&gt; statedisplay simple,color,table,none</code></a>
+                <br />defines how the state of all eight alarm levels is shown. Example for the case when only alarm no. 2 is raised:
+                <ul>
+                    <li> simple=OOXOOOOO</li>
+                    <li> color=<span style="color:green"> 0 1 <span style="width:1ex;color:red">2</span> 3 4 5 6 7</span></li>
+                    <li> table=<table><tr style="height:1ex"><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:red"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/></tr></table> </li>
+                    <li> none=no state display</li>
+                </ul>
+                </li>
+            <li><a name="alarm_internals"/>For each of the 8 alarm levels, several attributes hold the alarm setup. 
+                They should not be changed by hand, but through the web interface to avoid confusion: 
+                <code>level&lt;level&gt;start, level&lt;level&gt;end, level&lt;level&gt;msg, level&lt;level&gt;xec, 
+                level&lt;level&gt;onact, level&lt;level&gt;offact</code></li>
+            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
+                    href="#event-on-update-reading">event-on-update-reading</a>, <a
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
+                    <a href="#webCmd">webCmd</a></li>
+        </ul>
 =end html
 =begin html_DE
 
