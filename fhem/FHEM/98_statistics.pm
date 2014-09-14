@@ -519,6 +519,7 @@ statistics_doStatisticMinMaxSingle ($$$$$$$)
    $statReadingName .= ucfirst($readingName).$period;
    my @hidden;
    my @stat;
+   my $lastValue;
    my $firstRun = not exists($hash->{READINGS}{$hiddenReadingName});
  
    if ( $firstRun ) { 
@@ -557,13 +558,16 @@ statistics_doStatisticMinMaxSingle ($$$$$$$)
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
    if ($singularReadings ne "") {
-      # statistics_storeSingularReadings $hashName,$singleReading,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$value,$saveLast
+      # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
       my $statValue = sprintf  "%.".$decPlaces."f", $stat[1];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Min",$period,$statValue,$value,$saveLast);
+      if ($saveLast) { $lastValue = $statValue; $statValue = $value; }
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Min",$period,$statValue,$lastValue,$saveLast);
       $statValue = sprintf  "%.".$decPlaces."f", $stat[3];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Avg",$period,$statValue,$value,$saveLast);
+      if ($saveLast) { $lastValue = $statValue; $statValue = $value; }
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Avg",$period,$statValue,$lastValue,$saveLast);
       $statValue = sprintf  "%.".$decPlaces."f", $stat[5];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Max",$period,$statValue,$value,$saveLast);
+      if ($saveLast) { $lastValue = $statValue; $statValue = $value; }
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Max",$period,$statValue,$lastValue,$saveLast);
    }
 
   # Store hidden reading
@@ -1096,12 +1100,20 @@ statistics_UpdateDevReading($$$$)
 <ul style="width:800px">
   Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
   <br>
-  Derzeit werden Statistiken f&uuml;r folgende Ger&auml;tewerte vom Modul automatisch berechnet:
+  Derzeit werden die folgenden Statistik-Typen f&uuml;r bestimmte Ger&auml;tewerte vom Modul automatisch berechnet:
    <ul>
-      <li><b>Minimum, Durchschnitt und Maximum von Momentanwerten:</b> brightness, current, energy_current, humidity, temperature, voltage, wind, wind_speed, windSpeed</li>
-      <li><b>Tendenz &uuml;ber 1h, 2h, 3h und 6h:</b> pressure</li>
-      <li><b>Deltawerte von kumulierten Ger&auml;tewerten:</b> count, energy, energy_total, power, total, rain, rain_rate, rain_total</li>
-      <li><b>Dauer der Status:</b> lightsensor, lock, motion, Window, window, state <i>(wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
+      <li><b>Min|Avg|Max</b> Minimum, Durchschnitt und Maximum von Momentanwerten:
+         <br>
+         Zeitraum Tag, Monat, Jahr: <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         <br>
+         Zeitraum Stunde, Tag, Monat, Jahr: <i>wind, wind_speed, windSpeed</i></li>
+      <li><b>Tendency</b> Tendenz &uuml;ber 1h, 2h, 3h und 6h: <i>pressure</i></li>
+      <li><b>Delta</b> Differenz zwischen Anfangs- und Endwerte innerhalb eines Zeitraums (Stunde, Tag, Monat, Jahr):
+         <br>
+         <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i></li>
+      <li><b>Duration</b>Dauer der Status innerhalb eines Zeitraums (Tag, Monat, Jahr):
+         <br>
+         <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
   Weitere Ger&auml;tewerte k&ouml;nnen &uuml;ber die entsprechenden <a href="#statisticsattr">Attribute</a> hinzugef&uuml;gt werden
   <br>&nbsp;
@@ -1152,11 +1164,11 @@ statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Durch Kommas getrennte Liste von Ger&auml;tewerten 
+      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, für welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
     </li><br>
     <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Durch Kommas getrennte Liste von Ger&auml;tewerten 
+      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, für welche die Dauer einzelner Gerätewerte innerhalb bestimmte Zeiträume (Stunde/Tag/Monat/Jahr) erfasst wird.
     </li><br>
     <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
       <br>
@@ -1164,9 +1176,13 @@ statistics_UpdateDevReading($$$$)
       z.B. "<code>FritzDect:current|Sensor_.*:humidity</code>"
       <br>
     </li><br>
+    <li><code>hideAllSummaryReadings &lt;0 | 1&gt;</code>
+      <br>
+      noch nicht implementiert - Es werden keine gesammelten Statistiken angezeigt, sondern nur die unter "singularReadings" definierten Einzelwerte 
+    </li><br>
     <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Durch Kommas getrennte Liste von Ger&auml;tewerten 
+      Durch Kommas getrennte Liste von Ger&auml;tewerten, für die in bestimmten Zeiträumen (Tag, Monat, Jahr) Minimum, Mittelwert und Maximum erfasst werden. 
     </li><br>
     <li><code>periodChangePreset &lt;Sekunden&gt;</code>
       <br>
@@ -1175,13 +1191,13 @@ statistics_UpdateDevReading($$$$)
       Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden
       <br>
     </li><br>
-    <li><code>singularReadings &lt;Ger&auml;teNameRegExp:Ger&auml;teWertRegExp:StatistikTypen:ZeitPeriode&gt;</code>
+    <li><code>singularReadings &lt;Ger&auml;teNameRegExp:Ger&auml;teWertRegExp:StatistikTypen:ZeitRaum&gt;</code>
       <ul>
          <li>StatistikTypen: Min|Avg|Max|Delta|Duration|Tendency</li>
-         <li>ZeitPeriode: Hour|Day|Month|Year|1h|2h|3h|6h</li>
+         <li>ZeitRaum: Hour|Day|Month|Year|1h|2h|3h|6h</li>
       </ul>
       Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
-      Erleichtert die Erzeugung von Plots. 
+      Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify). 
       <br>
       z.B. <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
     </li><br>
@@ -1191,7 +1207,7 @@ statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Durch Kommas getrennte Liste von Ger&auml;tewerten 
+      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, für die innerhalb bestimmter Zeiträume (1h, 2h, 3h, 6h) die Differenz zwischen Anfangs- und Endwert ermittelt wird. 
     </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a>
     </li><br>
