@@ -455,9 +455,9 @@ CommandIF($$)
   Beim IF-Befehl handelt es sich um einen FHEM-Befehl. Der Befehl kann überall dort genutzt werden, wo FHEM-Befehle vorkommen dürfen.
   Im Gegensatz zu Perl-if bleibt man auf der FHEM-Ebene und muss nicht auf die Perl-Ebene, um FHEM-Befehle mit Hilfe der fhem-Funktion auszuführen.<br>
   <br>
-  IF ist kein eigenständig arbeitendes Modul, sondern ein FHEM-Befehl, der in Kombination mit anderen Modulen, wie z. B. notify oder at, sinnvoll eingesetzt werden kann.<br>
+  IF ist kein eigenständig arbeitendes Modul, sondern ein FHEM-Befehl, der nur in Kombination mit anderen Modulen, wie z. B. notify oder at, sinnvoll eingesetzt werden kann.<br>
   Es gibt inzwischen ein neueres <a href="http://fhem.de/commandref_DE.html#DOIF">DOIF</a>-Modul, welches auf der Syntax vom IF-Befehl aufbaut.
-  Es arbeitet im Gegensatz zu IF als Modul selbstständig ohne notify bzw. at. Damit lassen sich viele Probleme eleganter jeweils mit einem einzigen Modul realisieren.<br>
+  Es arbeitet im Gegensatz zu IF als Modul selbstständig ereignis- und zeitgesteuert ohne notify bzw. at. Damit lassen sich viele Problemlösungen eleganter, jeweils mit einem einzigen Modul, realisieren.<br>
   <br>
   In der Bedingung des IF-Befehls wird die vollständige Syntax des Perl-if unterstützt. Mögliche Operatoren sind u. a.:<br>
   <br>
