@@ -14,7 +14,7 @@ gcmsend_Initialize($)
  $hash->{DefFn}    = "gcmsend_Define";
  $hash->{NotifyFn} = "gcmsend_notify";
  $hash->{SetFn} = "gcmsend_set";
- $hash->{AttrList} = "loglevel:0,1,2,3,4,5 regIds apiKey stateFilter vibrate deviceFilter";
+ $hash->{AttrList} = "loglevel:0,1,2,3,4,5 regIds apiKey stateFilter vibrate deviceFilter playSound";
 }
 
 sub 
@@ -344,6 +344,8 @@ sub gcmsend_notify($$)
                 <br />Make the receiving device vibrate upon receiving the message. Must be true or false.</li>
     <li><a name="gcmsend_deviceFilter"><code>attr &lt;name&gt; deviceFilter &lt;regexp&gt;</a>
                 <br />Send a GCM notify only is the device name matches the given filter regexp.</li>
+    <li><a name="gcmsend_playSound"><code attr &lt;name&gt; playSound &lt;true|false&gt;</a>
+                <br />Specifies that the implementation of GCM should play a sound when an event is received. Note that andFHEM does not implement this attribute yet.</li>
   </ul>
 </ul>
 
