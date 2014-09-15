@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLMONITOR: reverse-search attribute is now providing all 
+             possible values, which are selectable (via fhemweb_multiple.js).
+             see commandref for all possible values
   - feature: speed up through caching of postproc and regex in ECMDDevice
   - bugfix: fixed handling of autocreation for 10_OWServer.pm
   - feature: option to cope with partial messages in ECMD/ECMDDevice
