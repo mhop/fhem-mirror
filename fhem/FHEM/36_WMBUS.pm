@@ -40,6 +40,7 @@ use WMBus;
 sub WMBUS_Parse($$);
 sub WMBUS_SetReadings($$$);
 sub WMBUS_SetRSSI($$$);
+sub WMBUS_RSSIAsRaw($);
 
 sub WMBUS_Initialize($) {
   my ($hash) = @_;
@@ -79,6 +80,8 @@ WMBUS_Define($$)
 		my $msg = $a[2];
 		
 		($msg, $rssi) = split(/::/,$msg);
+		
+		$msg .= WMBUS_RSSIAsRaw($rssi);
 		
 		return "a WMBus message must be a least 12 bytes long" if $msg !~ m/b[a-zA-Z0-9]{24,}/;
 		
@@ -212,6 +215,7 @@ WMBUS_Parse($$)
 		my $mb = new WMBus;
 		
 		($msg, $rssi) = split(/::/,$msg);
+		$msg .= WMBUS_RSSIAsRaw($rssi);
 		
 		if ($mb->parseLinkLayer(pack('H*',substr($msg,1)))) {
 			$addr = join("_", $mb->{manufacturer}, $mb->{afield_id}, $mb->{afield_ver}, $mb->{afield_type});  
@@ -252,17 +256,40 @@ WMBUS_Parse($$)
   }
 }
 
+
+# if the culfw doesn't send the RSSI value (because it an old version that doesn't implement this) but 00_CUL.pm already expects it
+# one byte is missing from the data which leads to CRC errors
+# To avoid this calculate the raw data byte from the RSSI and append it to the data.
+# If it is a valid RSSI it will be ignored by the WMBus parser (the data contains the length of the data itself
+# and only that much is parsed).
+sub WMBUS_RSSIAsRaw($) {
+	my $rssi = shift;
+	
+	if (defined $rssi) {
+		if ($rssi < -74) {
+			$b = ($rssi+74)*2+256;
+		} else {
+			$b = ($rssi+74)*2;
+		}
+		return sprintf("%02X", $b);
+	} else {
+		return "";
+	}
+}
+
 sub WMBUS_SetRSSI($$$) {
 	my ($hash, $mb, $rssi) = @_;
 	
-	readingsBeginUpdate($hash);
-	# RSSI is decoded by 00_CUL.pm from the last byte of the message
-	readingsBulkUpdate($hash, "RSSI", $rssi ? $rssi : 'unknown');
-	if (defined $mb->{remainingData} && length($mb->{remainingData}) >= 1) {
-		# if there is a trailing byte after the WMBUS message it is the LQI
+	if (defined $mb->{remainingData} && length($mb->{remainingData}) >= 2) {
+		# if there are trailing bytes after the WMBUS message it is the LQI and the RSSI
+		readingsBeginUpdate($hash);
+		my ($lqi, $rssi) = unpack("CC", $mb->{remainingData});
+    $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
+
+		readingsBulkUpdate($hash, "RSSI", $rssi);
 		readingsBulkUpdate($hash, "LQI", unpack("C", $mb->{remainingData}));
+		readingsEndUpdate($hash,1);
 	}	
-	readingsEndUpdate($hash,1);
 }
 
 sub WMBUS_SetReadings($$$)
