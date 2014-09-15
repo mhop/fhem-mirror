@@ -160,6 +160,21 @@ sub valueCalcHex($$) {
 	return sprintf("%x", $value);
 }
 
+my %TimeSpec = (
+	0b00 => 's', # seconds
+	0b01 => 'm', # minutes
+	0b10 => 'h', # hours
+	0b11 => 'd', # days
+);
+
+sub valueCalcTimeperiod($$) {
+	my $value = shift;
+	my $dataBlock = shift;
+	
+	$dataBlock->{unit} = $TimeSpec{$dataBlock->{exponent}};
+	return $value;
+}
+
 # VIF types (Value Information Field), see page 32
 my %VIFInfo = (
 	VIF_ELECTRIC_ENERGY  => {                     #  10(nnn-3) Wh  0.001Wh to 10000Wh
@@ -399,6 +414,14 @@ my %VIFInfo_FD = (
 		bias         => 0,
 		unit         => '',
 		calcFunc     => \&valueCalcHex,
+	},
+	VIF_DURATION_SINCE_LAST_READOUT => {    #   Duration since last readout [sec(s)..day(s)]
+	  typeMask     => 0b01111100,
+	  expMask      => 0b00000011,
+	  type         => 0b00101100,
+		bias         => 0,
+		unit         => 's',
+		calcFunc     => \&valueCalcTimeperiod,
 	},
 	VIF_VOLTAGE => {                        #  10nnnn-9 Volts
 	  typeMask     => 0b01110000,
@@ -687,14 +710,14 @@ sub decodeValueInformationBlock($$$) {
 			#printf "vifType $vifType matches\n"; 
 			
 			$bias = $vifInfoRef->{$vifType}{bias};
-			$exponent = $vif & $vifInfoRef->{$vifType}{expMask};
+			$dataBlockRef->{exponent} = $vif & $vifInfoRef->{$vifType}{expMask};
 			
 			$dataBlockRef->{type} = $vifType;
 			$dataBlockRef->{unit} = $vifInfoRef->{$vifType}{unit};
-			$dataBlockRef->{valueFactor} = 10 ** ($exponent + $bias);
+			$dataBlockRef->{valueFactor} = 10 ** ($dataBlockRef->{exponent} + $bias);
 			$dataBlockRef->{calcFunc} = $vifInfoRef->{$vifType}{calcFunc};
 			
-			#printf("type %s bias %d exp %d valueFactor %d unit %s\n", $dataBlockRef->{type}, $bias, $exponent, $dataBlockRef->{valueFactor},$dataBlockRef->{unit});
+			#printf("type %s bias %d exp %d valueFactor %d unit %s\n", $dataBlockRef->{type}, $bias, $dataBlockRef->{exponent}, $dataBlockRef->{valueFactor},$dataBlockRef->{unit});
 			last VIFID;
 		}
 	}
@@ -848,6 +871,10 @@ sub decodePayload($$) {
 			my @lwords = unpack('VV', substr($payload, $offset, 8));
 			$value = $lwords[0] + $lwords[1] << 32; 
 			$offset += 8;
+		} elsif ($dataBlock->{dataField} == DIF_FLOAT32) {
+			#not allowed according to wmbus standard, Qundis seems to use it nevertheless
+			$value = unpack('f', substr($payload, $offset, 4));
+			$offset += 4;
 		} elsif ($dataBlock->{dataField} == DIF_VARLEN) {
 			my $lvar = unpack('C',substr($payload, $offset++, 1));
 			#print "in datablock $dataBlockNo: LVAR field " . sprintf("%x", $lvar) . "\n";
