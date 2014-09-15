@@ -1082,8 +1082,8 @@ TCM_Undef($$)
     <li>teach &lt;t/s&gt;<br>
       Set Fhem in learning mode, see <a href="#TCM_learningMode">learningMode</a>.<br>
       The command is always required for UTE and to teach-in bidirectional actuators
-      e. g. EEP 4BS (RORG A5-20-XX),
-      <li>reset<br>
+      e. g. EEP 4BS (RORG A5-20-XX)</li>
+    <li>reset<br>
       Reset the device</li>
     <li>repeater [0000|0101|0102]<br>
       Set Repeater Level: off = 0000, 1 = 0101, 2 = 0102.</li>
