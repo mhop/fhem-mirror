@@ -1736,7 +1736,7 @@ sub HMinfo_templateDef(@){#####################################################
   $HMConfig::culHmTpl{$name}{p} = "";
   $HMConfig::culHmTpl{$name}{p} = join(" ",split(":",$param)) if($param ne "0");
   $HMConfig::culHmTpl{$name}{t} = $desc;
-  my $paramNo = split(":",$param);
+  my $paramNo = scalar (split(":",$param));
   foreach (@regs){
     my ($r,$v)=split":",$_;
     if (!defined $v){
