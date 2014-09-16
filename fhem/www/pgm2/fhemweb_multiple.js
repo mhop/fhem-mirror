@@ -1,7 +1,7 @@
 function
 FW_multipleSelChange(name, devName, vArr)
 {
-  if(vArr.length < 2 || vArr[0] != "multiple")
+  if(vArr.length < 2 || (vArr[0] != "multiple" && vArr[0] != "multiple-strict"))
     return undefined;
   
   var o = new Object();
@@ -10,14 +10,17 @@ FW_multipleSelChange(name, devName, vArr)
   o.newEl.size=30;
   o.qFn = 'FW_multipleSetSelected(qArg, "%")';
   o.qArg = o.newEl;
-  o.newEl.setAttribute('onFocus', 'FW_multipleSelect(this)');
+  
+  o.newEl.setAttribute('onFocus', vArr[0] == "multiple-strict" ?
+      'FW_multipleSelect(this, true)' : 'FW_multipleSelect(this, false)');
+
   o.newEl.setAttribute('allVals', vArr);
   o.newEl.setAttribute('readonly', 'readonly');
   return o;
 }
 
 function
-FW_multipleSelect(el)
+FW_multipleSelect(el, strict)
 {
   loadLink("pgm2/jquery-ui.min.css");
   loadScript("pgm2/jquery.min.js", function(){
@@ -42,10 +45,11 @@ FW_multipleSelect(el)
       var selArr=[];
       for(var i1 in selObj)
         selArr.push(i1);
+      
       $('body').append(
         '<div id="multidlg" style="display:none">'+
-          '<table>'+table+'</table><input id="md_freeText" '+
-                'value="'+selArr.join(',')+'"/>'+
+          '<table>'+table+'</table>'+(!strict ? '<input id="md_freeText" '+
+                'value="'+selArr.join(',')+'"/>' : '')+
         '</div>');
 
       $('#multidlg').dialog(
@@ -78,5 +82,9 @@ FW_multipleSetSelected(el, val)
 
 
 FW_widgets['multiple'] = {
+  selChange:FW_multipleSelChange
+};
+
+FW_widgets['multiple-strict'] = {
   selChange:FW_multipleSelChange
 };

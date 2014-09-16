@@ -3064,7 +3064,12 @@ FW_widgetOverride($$)
             ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", then a javascript
             driven slider is displayed</li>
           <li>if the modifier is of the form ":multiple,val1,val2,...", then
-            multiple values can be selected, the result is comma separated.</li>
+            multiple values can be selected and own values can be written, the
+            result is comma separated.</li>
+          <li>if the modifier is of the form ":multiple-strict,val1,val2,...", then
+            multiple values can be selected and no new values can be added, the
+            result is comma separated.</li>
+
           <li>else a dropdown with all the modifier values is displayed</li>
         </ul>
         If this attribute is specified for a FHEMWEB instance, then it is
@@ -3607,9 +3612,13 @@ FW_widgetOverride($$)
             ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", so wird ein in
             JavaScript programmierter Slider angezeigt</li>
 
-          <li>Ist der Modifier ":multiple,val1,val2,...", dann ein
-            Mehrfachauswahl ist m&ouml;glich, das Ergebnis ist
-            Komma-separiert.</li>
+          <li>Ist der Modifier ":multiple,val1,val2,...", dann ist eine
+            Mehrfachauswahl m&ouml;glich und es k&ouml;nnen neue Werte gesetzt
+            werden. Das Ergebnis ist Komma-separiert.</li>
+
+          <li>Ist der Modifier ":multiple-strict,val1,val2,...", dann ist eine
+            Mehrfachauswahl m&ouml;glich, es k&ouml;nnen jedoch keine neuen
+            Werte definiert werden. Das Ergebnis ist Komma-separiert.</li>
 
           <li>In allen anderen F&auml;llen erscheint ein Dropdown mit allen
             Modifier Werten.</li>
