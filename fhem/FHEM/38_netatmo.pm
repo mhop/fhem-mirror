@@ -942,7 +942,19 @@ netatmo_Get($$@)
           next if( ref($device->{measures}) ne "HASH" );
           my $ext;
           foreach my $module ( keys %{$device->{measures}}) {
-            next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
+            #next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
+            if( ref($device->{measures}->{$module}->{res}) ne "HASH" ) {
+              my $value = $device->{measures}->{$module}->{rain_60min};
+              if( defined($value) ) {
+                $ext .= "$module ";
+                $ext .= join(',', "rain");
+                $ext .= " ";
+                $ret .= sprintf( "\t%i mm", $value ) if( defined($value) );
+              }
+
+              next;
+            }
+
             $ext .= "$module ";
             $ext .= join(',', @{$device->{measures}->{$module}->{type}});
             $ext .= " ";
