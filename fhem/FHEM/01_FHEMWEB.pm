@@ -374,16 +374,15 @@ FW_Read($)
   Log3 $FW_wname, 4, "HTTP $name GET $arg";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   my $pid;
-  if(defined(AttrVal($FW_wname, "plotfork", undef))) {
+  my $pf = AttrVal($FW_wname, "plotfork", undef);
+  if($pf) {   # 0 disables
     # Process SVG rendering as a parallel process
     my $p = $data{FWEXT};
     if(grep { $p->{$_}{FORKABLE} && $arg =~ m+^$FW_ME$_+ } keys %{$p}) {
       if($pid = fork) {
-	  use constant PRIO_PROCESS => 0;
-	  setpriority(PRIO_PROCESS, $pid, 
-		getpriority(PRIO_PROCESS, $pid) + AttrVal($FW_wname, "plotfork", 0)
-	  );
-	  return;
+	use constant PRIO_PROCESS => 0;
+	setpriority(PRIO_PROCESS, $pid, getpriority(PRIO_PROCESS,$pid) + $pf);
+	return;
       }
     }
   }
@@ -2723,9 +2722,9 @@ FW_widgetOverride($$)
 
     <a name="plotfork"></a>
     <li>plotfork [&lt;&Delta;p&gt;]<br>
-        If set, run part of the processing (e.g. <a href="#SVG">SVG</a> plot 
-        generation or <a href="#RSS">RSS</a> feeds) in parallel processes. 
-        Actually, child processes are forked whose
+        If set to a nonzero value, run part of the processing (e.g. <a
+        href="#SVG">SVG</a> plot generation or <a href="#RSS">RSS</a> feeds) in
+        parallel processes.  Actually, child processes are forked whose
         priorities are the FHEM process' priority plus &Delta;p. 
         Higher values mean lower priority. e.g. use &Delta;p= 10 to renice the
         child processes and provide more CPU power to the main FHEM process.
@@ -3281,9 +3280,12 @@ FW_widgetOverride($$)
     <li>plotfork<br>
         Normalerweise wird die Ploterstellung im Hauptprozess ausgef&uuml;hrt,
         FHEM wird w&auml;rend dieser Zeit nicht auf andere Ereignisse
-        reagieren. Auf Rechnern mit sehr wenig Speicher (z.Bsp. FRITZ!Box 7170)
-        kann das zum automatischen Abschuss des FHEM Prozesses durch das OS
-        f&uuml;hren.
+        reagieren.
+        Falls dieses Attribut auf einen nicht 0 Wert gesetzt ist, dann wird die
+        Berechnung in weitere Prozesse ausgelagert. Das kann die Berechnung auf
+        Rechnern mit mehreren Prozessoren beschleunigen, allerdings kann es auf
+        Rechnern mit wenig Speicher (z.Bsp. FRITZ!Box 7390) zum automatischen
+        Abschuss des FHEM Prozesses durch das OS f&uuml;hren.
         </li><br>
 
     <a name="basicAuth"></a>
