@@ -938,29 +938,21 @@ netatmo_Get($$@)
           $ret .= sprintf( "%s\t%.8f\t%.8f\t%i", $device->{_id},
                                                  $device->{place}->{location}->[0], $device->{place}->{location}->[1],
                                                  $device->{place}->{altitude} );
+          $ret .= "\t";
+
           my $addr .= netatmo_getAddress( $hash, 1, $device->{place}->{location}->[0], $device->{place}->{location}->[1] );
           next if( ref($device->{measures}) ne "HASH" );
-          my $ext;
-          foreach my $module ( keys %{$device->{measures}}) {
-            #next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
-            if( ref($device->{measures}->{$module}->{res}) ne "HASH" ) {
-              my $value = $device->{measures}->{$module}->{rain_60min};
-              if( defined($value) ) {
-                $ext .= "$module ";
-                $ext .= join(',', "rain");
-                $ext .= " ";
-                $ret .= sprintf( "\t%i mm", $value ) if( defined($value) );
-              }
 
-              next;
-            }
+          my $ext;
+          foreach my $module ( sort keys %{$device->{measures}}) {
+            next if( ref($device->{measures}->{$module}->{res}) ne "HASH" );
 
             $ext .= "$module ";
             $ext .= join(',', @{$device->{measures}->{$module}->{type}});
             $ext .= " ";
+
             foreach my $timestamp ( keys %{$device->{measures}->{$module}->{res}} ) {
               my $i = 0;
-              $ret .= "\t";
               foreach my $value ( @{$device->{measures}->{$module}->{res}->{$timestamp}} ) {
                 my $type = $device->{measures}->{$module}->{type}[$i];
 
@@ -979,8 +971,21 @@ netatmo_Get($$@)
               last;
             }
           }
+          my $got_rain = 0;
+          foreach my $module ( keys %{$device->{measures}}) {
+            my $value = $device->{measures}->{$module}->{rain_60min};
+            if( defined($value) ) {
+              $got_rain = 1;
 
-          #$ret .= "\n\t\t";
+              $ext .= "$module ";
+              $ext .= join(',', "rain");
+              $ext .= " ";
+
+              $ret .= sprintf( "\t%i mm", $value ) if( defined($value) );
+            }
+          }
+          $ret .= "\t" if( !$got_rain );
+
           $ret .= "\t$addr";
 
           $ret .= "\n\tdefine netatmo_P$device->{_id} netatmo PUBLIC $device->{_id} $ext" if( $station );
