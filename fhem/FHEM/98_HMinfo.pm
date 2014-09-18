@@ -1208,6 +1208,7 @@ sub HMinfo_SetFn($@) {#########################################################
   $cmd = "?" if(!$cmd);# by default print options
   if   ($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
     my ($type) = @a;
+    return "please enter what to clear" if (! $type);
     if ($type eq "msgStat" || $type eq "all" ){
       foreach (keys %{$modules{CUL_HM}{stat}{r}}){
         next if ($_ ne "dummy");
