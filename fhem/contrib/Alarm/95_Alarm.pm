@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "1.3";
+my $alarmversion    = "1.4";
 
 #########################################################################################
 #
@@ -274,12 +274,14 @@ sub Alarm_Exec($$$$$){
 
    my ($name,$level,$dev,$evt,$act) = @_;
    my $hash  = $defs{$name};
-   my $aclvl = $hash->{READINGS}{"level"}{VAL};
+   my $aclvl = $hash->{READINGS}{'level'.$level}{VAL};
    my $msg   = '';
    my $cmd;
    my $mga;
    my $dly;
    my @sta;
+   
+   #Log3 $hash,1,"[Alarm $level] Exec called with dev $dev evt $evt act $act]";
 
    #-- raising the alarm
    if( $act eq "on" ){
@@ -327,26 +329,26 @@ sub Alarm_Exec($$$$$){
    }elsif( $act eq "off" ){
       #-- only if this level is active
       if( $hash->{READINGS}{"level".$level}{VAL} ne "off"){
-        #-- deleting all running ats
-        $dly = sprintf("alarm%1ddly",$level);
-        foreach my $d (sort keys %intAt ) {
-           next if( $intAt{$d}{FN} ne "at_Exec" );
-           $mga = $intAt{$d}{ARG}{NAME};
-           next if( $mga !~ /$dly\d/);
-           #Log3 $hash,1,"[Alarm] Killing delayed action $name";
-           CommandDelete(undef,"$mga");
-        }
-        #-- calling actors 
-        $cmd = AttrVal($name, "level".$level."offact", 0);
-        fhem($cmd);
-        #-- readings
-        readingsSingleUpdate( $hash, "level".$level,"off",0 );
-        $mga = " Level $level canceled";
-        readingsSingleUpdate( $hash, "short", $mga, 0);
-        $mga = Alarm_getstate($hash)." ".$mga;
-        readingsSingleUpdate( $hash, "state", $mga, 0 );
-        $msg = "[Alarm $level] canceled from device $dev";
-        Log3 $hash,3,$msg;
+         #-- deleting all running ats
+         $dly = sprintf("alarm%1ddly",$level);
+         foreach my $d (sort keys %intAt ) {
+            next if( $intAt{$d}{FN} ne "at_Exec" );
+            $mga = $intAt{$d}{ARG}{NAME};
+            next if( $mga !~ /$dly\d/);
+            #Log3 $hash,1,"[Alarm] Killing delayed action $name";
+            CommandDelete(undef,"$mga");
+         }
+         #-- calling actors 
+         $cmd = AttrVal($name, "level".$level."offact", 0);
+         fhem($cmd);
+         #-- readings
+         readingsSingleUpdate( $hash, "level".$level,"off",0 );
+         $mga = " Level $level canceled";
+         readingsSingleUpdate( $hash, "short", "", 0);
+         $mga = Alarm_getstate($hash)." ".$mga;
+         readingsSingleUpdate( $hash, "state", $mga, 0 );
+         $msg = "[Alarm $level] canceled from device $dev";
+         Log3 $hash,3,$msg;
      }
    }else{
      Log3 $hash,3,"[Alarm $level] Exec called with act=$act";
@@ -440,8 +442,9 @@ sub Alarm_CreateNotifiers($){
      fhem('delete alarm'.$level.'.unsh.N' )
         if( defined $defs{'alarm'.$level.'.unsh.N'});
   
-     my @st = split(':',AttrVal($name, "level".$level."start", 0));
-     my @et = split(':',AttrVal($name, "level".$level."end", 0));
+     
+     my @st = split(':',(AttrVal($name, "level".$level."start", 0) ne '')?AttrVal($name, "level".$level."start", 0):'0:00');
+     my @et = split(':',(AttrVal($name, "level".$level."end", 0) ne '')?AttrVal($name, "level".$level."end", 0):'23:59');
   
      if( (int(@st)!=2) || ($st[0] > 23) || ($st[0] < 0) || ($st[1] > 59) || ($st[1] < 0) ){
       Log3 $hash,1,"[Alarm $level] Cannot be executed due to wrong time spec ".AttrVal($name, "level".$level."start", 0)." for level".$level."start";
@@ -469,7 +472,7 @@ sub Alarm_CreateNotifiers($){
         }   
      }
      if( $cmd eq '' ){
-        Log3 $hash,1,"[Alarm $level] Creation of cancel notifier not possible";
+        Log3 $hash,1,"[Alarm $level] No \"Cancel\" device defined, level will be ignored";
      } else {
         $cmd  =  substr($cmd,0,length($cmd)-1);
         $cmd  = 'alarm'.$level.'.off.N notify '.$cmd;
@@ -507,7 +510,7 @@ sub Alarm_CreateNotifiers($){
         }
         #-- raise notifier
         if( $cmd eq '' ){
-           Log3 $hash,1,"[Alarm $level] Creation of raise notifier not possible";
+           Log3 $hash,1,"[Alarm $level] No \"Raise\" device defined";
         } else {   
            $cmd  = substr($cmd,0,length($cmd)-1);
            $cmd  = 'alarm'.$level.'.on.N notify '.$cmd;
