@@ -1734,10 +1734,20 @@ sub HMinfo_templateDef(@){#####################################################
 
   return "$name already defined, delete it first" if($HMConfig::culHmTpl{$name});
   return "insufficient parameter" if(@regs < 1);
-  $HMConfig::culHmTpl{$name}{p} = "";
-  $HMConfig::culHmTpl{$name}{p} = join(" ",split(":",$param)) if($param ne "0");
+ 
+  my $paramNo;
+  if($param ne "0"){
+    my @p = split(":",$param);
+    $HMConfig::culHmTpl{$name}{p} = join(" ",@p) ;
+    $paramNo = scalar (@p);
+  }
+  else{ 
+    $HMConfig::culHmTpl{$name}{p} = "";
+    $paramNo = 0;
+  }
+  
   $HMConfig::culHmTpl{$name}{t} = $desc;
-  my $paramNo = scalar (split(":",$param));
+  
   foreach (@regs){
     my ($r,$v)=split":",$_;
     if (!defined $v){
