@@ -217,6 +217,26 @@ IsInt($)
   defined $_[0] && $_[0] =~ /^[+-]?\d+$/;
 }
 
+# Small NC replacement: fhemNc("ip:port", "text", waitForReturn);
+sub
+fhemNc($$$)
+{
+  my ($addr, $txt, $waitForReturn) = @_;
+  my $client = IO::Socket::INET->new(PeerAddr => $addr);
+  return "Can't connect to $addr\n" if(!$client);
+  syswrite($client, $txt);
+  return "" if(!$waitForReturn);
+  my ($ret, $buf) = ("", "");
+  shutdown($client, 1);
+  alarm(5);
+  while(sysread($client, $buf, 256) > 0) {
+    $ret .= $buf;
+  }
+  alarm(0);
+  close($client);
+  return $ret;
+}
+
 1;
 
 =pod
@@ -309,6 +329,12 @@ myUtils_Initialize($$)
     <li><b>SVG_time_to_sec("YYYY-MM-DD_HH:MM:SS")</b><br>converts the argument
       to the number of seconds since 1970. Optimized for repeated use of similar
       timestamps.</li></br>
+
+    <li><b>fhemNc("host:port", "textToSend", waitForReturn)</b><br>
+      sends textToSend to host:port, and if waitForReturn is set, then read
+      the answer (wait up to 5 seconds) and return it. Intended as small
+      nc replacement.
+      </li></br>
 
   </ul>
 </ul>
