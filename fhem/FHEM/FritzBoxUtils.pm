@@ -99,18 +99,18 @@ sub
 FB_WLANswitch($) {
  my $cmd = shift;
  my $ret = ""; 
- if ($cmd =~ m"on"i) {            # on or ON
-  $ret .= "ATD: " . `echo "ATD#96*1*" | nc 127.0.0.1 1011` ;
+ if ($cmd =~ m/on/i) {            # on or ON
+  $ret .= "ATD:".fhemNc("127.0.0.1:1011", "ATD#96*1*\n", 1);
   sleep 1 ;
-  $ret .= " ATH: " . `echo "ATH" | nc 127.0.0.1 1011` ;
+  $ret .= " ATH:".fhemNc("127.0.0.1:1011", "ATH\n", 1);
  }
- if ($cmd =~ m"off"i) {           # off or OFF
-  $ret .= "ATD: " . `echo "ATD#96*0*" | nc 127.0.0.1 1011` ;
+ if ($cmd =~ m/off/i) {           # off or OFF
+  $ret .= "ATD:".fhemNc("127.0.0.1:1011", "ATD#96*0*\n", 1);
   sleep 1 ;
-  $ret .= " ATH: " . `echo "ATH" | nc 127.0.0.1 1011` ;
+  $ret .= " ATH:".fhemNc("127.0.0.1:1011", "ATH\n", 1);
  }
  $ret =~ s,[\r\n]*,,g;        # remove CR from return-string
- Log 4, "FB_WLANswitch($cmd) returned: $ret";
+ Log 3, "FB_WLANswitch($cmd) returned: $ret";
 }
 
 1;
