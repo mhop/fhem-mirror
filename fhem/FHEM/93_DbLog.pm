@@ -796,7 +796,7 @@ DbLog_Get($@)
   my ($retval,$sql_timestamp, $sql_device, $sql_reading, $sql_value, $type, $event, $unit) = "";
   my @ReturnArray;
   my $writeout = 0;
-  my (@min, @max, @sum, @cnt, @lastv, @lastd);
+  my (@min, @max, @sum, @cnt, @lastv, @lastd, @mind, @maxd);
   my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval); #fuer delta-h/d Berechnung
 
   #extract the Device:Reading arguments into @readings array
@@ -858,6 +858,8 @@ DbLog_Get($@)
     $cnt[$i]   = 0;
     $lastv[$i] = 0;
     $lastd[$i] = "undef";
+    $mind[$i]  = "undef";
+    $maxd[$i]  = "undef";
     $minval    =  999999;
     $maxval    = -999999;
 
@@ -1005,8 +1007,14 @@ DbLog_Get($@)
 
       if(Scalar::Util::looks_like_number($sql_value)){
         #nur setzen wenn nummerisch
-        $min[$i] = $sql_value if($sql_value < $min[$i]);
-        $max[$i] = $sql_value if($sql_value > $max[$i]);;
+        if($sql_value < $min[$i]) {
+          $min[$i] = $sql_value;
+          $mind[$i] = $sql_timestamp;
+        }
+        if($sql_value > $max[$i]) {
+          $max[$i] = $sql_value;
+          $maxd[$i] = $sql_timestamp;
+        }
         $sum[$i] += $sql_value;
         $minval = $sql_value if($sql_value < $minval);
         $maxval = $sql_value if($sql_value > $maxval);
@@ -1063,6 +1071,8 @@ DbLog_Get($@)
     $data{"cnt$k"} = $cnt[$j] ? $cnt[$j] : "undef";
     $data{"currval$k"} = $lastv[$j];
     $data{"currdate$k"} = $lastd[$j];
+    $data{"mindate$k"} = $mind[$j];
+    $data{"maxdate$k"} = $maxd[$j];
   }
 
   #cleanup plotfork connection
