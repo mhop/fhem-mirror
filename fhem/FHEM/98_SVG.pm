@@ -1717,9 +1717,9 @@ plotAsPng(@)
       expression, so you have access e.g. to the Value functions.<br><br>
 
       If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
-      avg, cnt, sum, currval (last value) and currdate (last date) values of
-      the individual curves, by accessing the corresponding values from the
-      data hash, see the example below:<br>
+      mindate, maxdate, avg, cnt, sum, currval (last value) and currdate (last
+      date) values of the individual curves, by accessing the corresponding
+      values from the data hash, see the example below:<br>
 
       <ul>
         <li>Fixed text for the right and left axis:<br>
@@ -1904,9 +1904,9 @@ plotAsPng(@)
 
       Egal, ob es sich bei der Plotart um gnuplot-scroll oder SVG handelt, es
       k&ouml;nnen ebenfalls die Werte der individuellen Kurve f&uuml;r min,
-      max, avg, cnt, sum, currval (letzter Wert) und currdate (letztes Datum)
-      durch Zugriff der entsprechenden Werte &uuml;ber das DataHash verwendet
-      werden. Siehe untenstehendes Beispiel:<br>
+      max, mindate, maxdate, avg, cnt, sum, currval (letzter Wert) und currdate
+      (letztes Datum) durch Zugriff der entsprechenden Werte &uuml;ber das
+      DataHash verwendet werden. Siehe untenstehendes Beispiel:<br>
       <ul>
         <li>Beschriftunng der rechten und linken y-Achse:<br>
           <ul>

@@ -499,7 +499,8 @@ FileLog_logWrapper($)
 # - delta-h / delta-d to get rain/h and rain/d values from continuous data.
 #
 # It will set the %data values
-#  min<x>, max<x>, avg<x>, cnt<x>, currdate<x>, currval<x>, sum<x>
+#  mindate<x>, min<x>, maxdate<x>, max<x>, avg<x>, cnt<x>, currdate<x>,
+#  currval<x>, sum<x>
 # for each requested column, beginning with <x> = 1
 
 sub
@@ -585,7 +586,7 @@ FileLog_Get($@)
   # last2: last delta value recorded (for the very last entry)
   # last3: last delta timestamp (d or h)
   my (@d, @fname);
-  my (@min, @max, @sum, @cnt, @lastv, @lastd);
+  my (@min, @max, @sum, @cnt, @lastv, @lastd, @mind, @maxd);
 
   for(my $i = 0; $i < int(@a); $i++) {
     my @fld = split(":", $a[$i], 4);
@@ -621,6 +622,8 @@ FileLog_Get($@)
     $cnt[$i] = 0;
     $lastv[$i] = 0;
     $lastd[$i] = "undef";
+    $mind[$i] = "undef";
+    $maxd[$i] = "undef";
   }
 
   my %lastdate;
@@ -698,8 +701,14 @@ RESCAN:
       }
 
       next if(!defined($val) || $val !~ m/^[-\.\d]+$/o);
-      $min[$i] = $val if($val < $min[$i]);
-      $max[$i] = $val if($val > $max[$i]);
+      if($val < $min[$i]) {
+        $min[$i] = $val;
+        $mind[$i] = $dte;
+      }
+      if($val > $max[$i]) {
+        $max[$i] = $val;
+        $maxd[$i] = $dte;
+      }
       $sum[$i] += $val;
       $cnt[$i]++;
       $lastv[$i] = $val;
@@ -791,6 +800,8 @@ RESCAN:
     $data{"cnt$j"} = $cnt[$i] ? $cnt[$i] : "undef";
     $data{"currval$j"} = $lastv[$i];
     $data{"currdate$j"} = $lastd[$i];
+    $data{"mindate$j"} = $mind[$i];
+    $data{"maxdate$j"} = $maxd[$i];
 
     Log3 $name, 4,
         "$name get: line $j, regexp:".$d[$i]->{re}.", col:".$d[$i]->{col}.
