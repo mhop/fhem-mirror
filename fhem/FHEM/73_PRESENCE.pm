@@ -1,4 +1,4 @@
-# $Id$
+﻿# $Id$
 ##############################################################################
 #
 #     73_PRESENCE.pm
@@ -51,7 +51,7 @@ PRESENCE_Initialize($)
     $hash->{DefFn}   = "PRESENCE_Define";
     $hash->{UndefFn} = "PRESENCE_Undef";
     $hash->{AttrFn}  = "PRESENCE_Attr";
-    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 powerCmd ".$readingFnAttributes;
+    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_speed:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 powerCmd ".$readingFnAttributes;
 
 }
 
@@ -519,7 +519,7 @@ sub PRESENCE_StartLocalScan($;$)
          return;
     }
 
-    $hash->{STATE} = "active" if($hash->{STATE} eq "???");
+    $hash->{STATE} = "active" if($hash->{STATE} eq "???" or "defined");
 
     if($local == 0)
     {
@@ -540,7 +540,7 @@ sub PRESENCE_StartLocalScan($;$)
     elsif($mode eq "fritzbox")
     {
         Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode fritzbox";
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzbox_speed", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     }
     elsif($mode eq "shellscript")
     {
@@ -635,33 +635,44 @@ sub
 PRESENCE_DoLocalFritzBoxScan($)
 {
     my ($string) = @_;
-    my ($name, $device, $local, $repeater) = split("\\|", $string);
+    my ($name, $device, $local, $speedcheck) = split("\\|", $string);
 
     Log3 $name, 5, "PRESENCE_DoLocalFritzBoxScan: $string";
-    my $number=0;
+    
+    my $number = 0;
+    my $status = 0;
+    my $speed;
 
-    my $check_command = ($repeater ? "active" : "speed");
-
-
-    my $status=0;
-
-    if (defined($defs{$name}{helper}{cachednr})) 
+    my $check_command = ($device =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/ ? "mac" : "name");
+    
+    $device = uc $device if($device =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/);
+    
+    if(defined($defs{$name}{helper}{cachednr})) 
     {
         $number = $defs{$name}{helper}{cachednr};
    
         Log3 $name, 5, "PRESENCE ($name) - try checking $name as device $device with cached number $number";
-   
-        my $cached_name = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name");    
+        my $cached_name = "";
+        
+        $cached_name = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");    
+
         chomp $cached_name;
    
         # only use the cached $number if it has still the correct device name
         if($cached_name eq $device)
         {
-            Log3 $name, 5, "PRESENCE ($name) - checking with cached number the $check_command state ($number)";
-            $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");
-     
+            Log3 $name, 5, "PRESENCE ($name) - checking state with cached number ($number)";
+            $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/active");
             chomp $status;
-     
+            
+            if($status ne "0" and $speedcheck eq "1")
+            {
+    	        $speed = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed");
+                chomp $speed;
+                Log3 $name, 5, "PRESENCE ($name) - speed check returned: $speed";
+                $speed = undef if($speed eq "0");
+    	    }
+            
             Log3 $name, 5, "PRESENCE ($name) - ctlmgr_ctl (cached: $number) returned: $status";
      
             if(not $status =~ /^\s*\d+\s*$/)
@@ -669,11 +680,11 @@ PRESENCE_DoLocalFritzBoxScan($)
                 return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
             }
 
-            return ($status == 0)? "$name|$local|absent|$number" : "$name|$local|present|$number"; ###MH
+            return ($status == 0 ? "$name|$local|absent|$number" : "$name|$local|present|$number").($speedcheck == 1 and defined($speed) ? "|$speed" :"");
         }
         else
         {
-            Log3 $name, 5, "PRESENCE ($name) - cached device name ($cached_name) does not match expected name ($device). perform a full scan";
+            Log3 $name, 5, "PRESENCE ($name) - cached device ($cached_name) does not match expected device ($device). perform a full scan";
         }
     }
 
@@ -694,27 +705,34 @@ PRESENCE_DoLocalFritzBoxScan($)
 
     while($number <= $max)
     {
-        $net_device = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name");
-    
+        $net_device = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command");
+
         chomp $net_device;
     
-        Log3 $name, 5, "PRESENCE ($name) - checking with device number $number the $check_command state ($net_device)";
+        Log3 $name, 5, "PRESENCE ($name) - checking device number $number ($net_device)";
 
         if($net_device eq $device)
         {
-            $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command"); 
+            $status = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/active");
+     	    chomp $status;
+            
+            if($status ne "0" and $speedcheck eq "1")
+            {
+                $speed = PRESENCE_ExecuteFritzBoxCMD($name, "/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed");
+                chomp $speed;
+                Log3 $name, 5, "PRESENCE ($name) - speed check returned: $speed";
+                $speed = undef if($speed eq "0");
+            }
    
-            chomp $status;
-   
-            Log3 $name, 5, "PRESENCE ($name) - $check_command for device number $net_device is $status";
+            Log3 $name, 5, "PRESENCE ($name) - state for device number $net_device is $status";
+            
             last;
         }
 
         $number++;
-       
     }
 
-    return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "");
+    return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "|").($speedcheck == 1 and defined($speed) ? "|$speed" : "");
 }
 
 
@@ -728,7 +746,6 @@ PRESENCE_DoLocalBluetoothScan($)
     my $return;
     my $wait = 1;
     my $ps;
-
     my $psargs = "ax";
 
     if(qx(ps --help 2>&1) =~ /BusyBox/g)
@@ -744,7 +761,6 @@ PRESENCE_DoLocalBluetoothScan($)
 
     Log3 $name, 4, "PRESENCE ($name): 'which hcitool' returns: $hcitool";
     chomp $hcitool;
-
 
     if(-x $hcitool)
     {
@@ -822,10 +838,7 @@ PRESENCE_DoLocalShellScriptScan($)
         $return = "$name|$local|error|unexpected script output (expected 0 or 1): $ret"; 
     }
 
-
-
     return $return;
-
 }
 
 
@@ -882,22 +895,27 @@ PRESENCE_ProcessLocalScan($)
 
     my @a = split("\\|",$string);
     my $hash = $defs{$a[0]}; 
-
-    return if($hash->{helper}{DISABLED});
-
+  
     my $local = $a[1];
     my $name = $hash->{NAME};
     
     Log3 $hash->{NAME}, 5, "PRESENCE ($name) - blocking scan result: $string";
 
+    delete($hash->{helper}{RUNNING_PID});
+    
+    if($hash->{helper}{DISABLED})
+    {
+        Log3 $hash->{NAME}, 5, "PRESENCE ($name) - don't process the scan result, as $name is disabled";
+        return;
+    }
+    
     if(defined($hash->{helper}{RETRY_COUNT}))
     {
         Log3 $hash->{NAME}, 2, "PRESENCE ($name) - check returned a valid result after ".$hash->{helper}{RETRY_COUNT}." unsuccesful ".($hash->{helper}{RETRY_COUNT} > 1 ? "retries" : "retry");
         delete($hash->{helper}{RETRY_COUNT});
     }
 
-
-    if($hash->{MODE} eq "fritzbox" and defined($a[3]))
+    if($hash->{MODE} eq "fritzbox" and defined($a[3]) and $a[3] ne "")
     {
         $hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent")); 
     }
@@ -912,10 +930,20 @@ PRESENCE_ProcessLocalScan($)
     {
         readingsBulkUpdate($hash, "state", "present");
         readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]) and $hash->{MODE} =~ /^(lan-bluetooth|local-bluetooth)$/ );
+        
+        if($hash->{MODE} eq "fritzbox" and defined($a[4]))
+        {
+            readingsBulkUpdate($hash, "speed", $a[4]);
+        }
     }
     elsif($a[2] eq "absent")
     {
         readingsBulkUpdate($hash, "state", "absent");
+        
+        if($hash->{MODE} eq "fritzbox" and defined($a[4]))
+        {
+            readingsBulkUpdate($hash, "speed", $a[4]);
+        }
     }
     elsif($a[2] eq "error")
     {
@@ -927,7 +955,7 @@ PRESENCE_ProcessLocalScan($)
 
     readingsEndUpdate($hash, 1);
 
-    delete($hash->{helper}{RUNNING_PID});
+  
 
     #Schedule the next check withing $timeout if it is a regular run
     if($local eq "0")
@@ -1013,12 +1041,13 @@ PRESENCE_ProcessAbortedScan($)
     <code>define iPhone PRESENCE lan-ping 192.168.179.21</code><br>
     <br>
     <b>Mode: fritzbox</b><br><br>
-    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
+    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name/mac-address&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
-    Checks for a network device by requesting the internal state on a FritzBox via ctlmgr_ctl. The device-name must be the same as shown in the network overview of the FritzBox<br><br>
-    <i>This check is only applicaple when FHEM is running on a FritzBox!</i><br><br>
+    Checks for a network device by requesting the internal state on a FritzBox via ctlmgr_ctl. The device-name must be the same as shown in the network overview of the FritzBox or can be substituted by the MAC address with the format XX:XX:XX:XX:XX:XX<br><br>
+    <i>This check is only applicable when FHEM is running on a FritzBox! The detection of absence can take about 10-15 minutes!</i><br><br>
     <u>Example</u><br><br>
-    <code>define iPhone PRESENCE fritzbox iPhone-4S</code><br><br>
+    <code>define iPhone PRESENCE fritzbox iPhone-6</code><br>
+    <code>define iPhone PRESENCE fritzbox 00:06:08:05:0D:00</code><br><br>
     <b>Mode: local-bluetooth</b><br><br>
     <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;bluetooth-address&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
@@ -1170,14 +1199,12 @@ Options:
     <li><a>ping_count</a></li> (Only in Mode "ping" on non-Windows machines applicable)<br>
     Changes the count of the used ping packets to recognize a present state. Depending on your network performance sometimes a packet can be lost or blocked.<br><br>
     Default Value is 4 (packets)<br><br>
-    <li><a>fritzbox_repeater</a></li> (Only in Mode "fritzbox" applicable)<br>
-    If your FritzBox is part of a network using repeaters, than this attribute needs to be enabled to ensure a correct recognition for devices, which are connected via repeater.
+    <li><a>fritzbox_speed</a></li> (only for mode "fritzbox")<br>
+    When this attribute is enabled, the network speed is checked in addition to the device state.<br>
+    This only makes sense for wireless devices connected directly to the FritzBox.
     <br><br>
-    This attribute is also needed, if your network device has no speed information on the FritzBox website (Home Network).<br><br>
-    <b>BE AWARE: The recognition of device going absent in a repeated network can take about 15 - 20 minutes!!</b>
-    <br><br>
-    Possible values: 0 => Use default recognition, 1 => Use repeater-supported recognition<br>
-    Default Value is 0 (Use default recognition)
+    Possible values: 0 => do not check speed, 1 => check speed when device is active<br>
+    Default value is 0 (no speed check)
     <br><br>
     <li><a>powerCmd</a></li><br>
     Define a FHEM command, which powers on or off the device.<br><br>
@@ -1255,13 +1282,14 @@ Options:
     <u>Beispiel</u><br><br>
     <code>define iPhone PRESENCE lan-ping 192.168.179.21</code><br><br>
     <b>Modus: fritzbox</b><br><br>
-    <code>define &lt;name&gt; PRESENCE fritzbox &lt;Ger&auml;tename&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
+    <code>define &lt;name&gt; PRESENCE fritzbox &lt;Ger&auml;tename/MAC-Adresse&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft ob ein Ger&auml;t welches per WLAN mit der FritzBox verbunden ist, erreichbar durch Abfrage des Status mit dem Befehl ctlmgr_ctl. 
-    Der Ger&auml;tename (Parameter: &lt;Ger&auml;tename&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird.<br><br>
-    <i>Dieser Modus ist nur verwendbar, wenn FHEM auf einer FritzBox läuft!</i><br><br>
+    Der Ger&auml;tename (Parameter: &lt;Ger&auml;tename&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird oder kann durch die MAC-Adresse im Format XX:XX:XX:XX:XX:XX ersetzt werden.<br><br>
+    <i>Dieser Modus ist nur verwendbar, wenn FHEM auf einer FritzBox l&auml;uft! Die Erkennung einer Abwesenheit kann ca. 10-15 Minuten dauern!</i><br><br>
     <u>Beispiel</u><br><br>
-    <code>define iPhone PRESENCE fritzbox iPhone-4S</code><br><br>
+    <code>define iPhone PRESENCE fritzbox iPhone-6</code><br>
+    <code>define iPhone PRESENCE fritzbox 00:06:08:05:0D:00</code><br><br>
     <b>Modus: local-bluetooth</b><br><br>
     <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
@@ -1416,16 +1444,12 @@ Options:
     Verändert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
     Je nach Netzwerkstabilität können erste Pakete verloren gehen oder blockiert werden.<br><br>
     Standartwert ist 4 (Versuche)<br><br>
-    <li><a>fritzbox_repeater</a></li> (Nur im Modus "fritzbox" anwendbar)<br>
-    Wenn die FritzBox Teil eines Netzwerkes ist, welches mit Repeatern arbeitet, dann muss dieses Attribut gesetzt sein um die Erkennung von Ger&auml;ten zu gew&auml;hrleisten,
-    welche &uuml;ber einen Repeater erreichbar sind.
+    <li><a>fritzbox_speed</a></li> (Nur im Modus "fritzbox")<br>
+    Zus&auml;tzlich zum Status des Ger&auml;ts wird die aktuelle Verbindungsgeschwindigkeit ausgegeben<br>
+    Das macht nur bei WLAN Geräten Sinn, die direkt mit der FritzBox verbunden sind. Bei abwesenden Ger&auml;ten wird als Geschwindigkeit 0 ausgegeben.
     <br><br>
-    Dies gilt ebenso f&uuml;r Devices, welche keine Geschwindigkeitsangaben auf der FritzBox Seite (Heimnetz) anzeigen k&ouml;nnen.<br><br>
-    <b>ACHTUNG: Die Erkennung der Abwesenheit eines Ger&auml;tes in einem Repeater-Netzwerk kann ca. 15 - 20 Minuten dauern!!</b>
-    <br><br>
-    M&ouml;gliche Werte: 0 => Standarderkennung verwenden, 1 => Erkennung f&uuml;r Repeaterger&auml;te verwenden<br>
-    Standardwert ist 0 (Standarderkennung verwenden)
-
+    M&ouml;gliche Werte: 0 => Geschwindigkeit nicht pr&uuml;fen, 1 => Geschwindigkeit pr&uuml;fen<br>
+    Standardwert ist 0 (Keine Geschwindigkeitspr&uuml;fung)
     <br><br>
     <li><a>powerCmd</a></li><br>
     Ein FHEM-Befehl, welcher das Ger&auml;t schalten kann.<br><br>
