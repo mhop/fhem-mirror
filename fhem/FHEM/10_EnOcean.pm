@@ -170,6 +170,7 @@ my %EnO_subType = (
   "A5.09.05" => "vocSensor.01",
   "A5.09.06" => "radonSensor.01",
   "A5.09.07" => "particlesSensor.01",
+  "A5.09.08" => "CO2Sensor.01",
   "A5.10.01" => "roomSensorControl.05",
   "A5.10.02" => "roomSensorControl.05",
   "A5.10.03" => "roomSensorControl.05",
@@ -207,6 +208,8 @@ my %EnO_subType = (
   "A5.12.01" => "autoMeterReading.01",
   "A5.12.02" => "autoMeterReading.02",
   "A5.12.03" => "autoMeterReading.03",
+  "A5.12.04" => "autoMeterReading.04",
+  "A5.12.05" => "autoMeterReading.05",
   "A5.13.01" => "environmentApp",
   "A5.13.02" => "environmentApp",
   "A5.13.03" => "environmentApp",
@@ -257,6 +260,7 @@ my %EnO_subType = (
   "F6.03.02" => "switch",
   "F6.04.01" => "keycard",
  #"F6.04.02" => "keycard.02",
+  "F6.05.01" => "liquidLeakage",
   "F6.10.00" => "windowHandle",
  #"F6.10.01" => "windowHandle.01",
   "F6.3F.7F" => "switch.7F",
@@ -946,8 +950,6 @@ EnOcean_Set($@)
 
       $updateState = 2;
       $hash->{CMD} = $cmd;
-      #$hash->{READINGS}{CMD}{TIME} = $tn;
-      #$hash->{READINGS}{CMD}{VAL} = $cmd;
       readingsSingleUpdate($hash, "CMD", $cmd, 1);
 
       my $arg = "true";
@@ -955,9 +957,6 @@ EnOcean_Set($@)
         $arg = $a[1];
         shift(@a);
       }
-  
-      #$hash->{READINGS}{$cmd}{TIME} = $tn;
-      #$hash->{READINGS}{$cmd}{VAL} = $arg;
       readingsSingleUpdate($hash, $cmd, $arg, 1);
 
     } elsif ($st eq "gateway") {
@@ -2337,7 +2336,7 @@ EnOcean_Set($@)
         }
 
       } else {
-        return "Unknown argument $cmd, choose one of 1BS 4BS MSC RPS UTE VLD test";
+        return "Unknown argument $cmd, choose one of 1BS 4BS MSC RPS UTE VLD";
       }
       if ($a[2]) {
         if ($a[2] !~ m/^[\dA-Fa-f]{2}$/) {
@@ -2574,9 +2573,9 @@ EnOcean_Parse($$)
   # extract data bytes $db[x] ... $db[0]
   my @db;
   my $dbCntr = 0;
-  for (my $strCntr = length($data) / 2 - 1; $strCntr >= 0; $strCntr--) {
+  for (my $strCntr = length($data) / 2 - 1; $strCntr >= 0; $strCntr --) {
     $db[$dbCntr] = hex substr($data, $strCntr * 2, 2);
-    $dbCntr++;
+    $dbCntr ++;
   }  
 
   my @event;
@@ -2683,25 +2682,30 @@ EnOcean_Parse($$)
 
     } else {
       if ($nu) {
-        # Theoretically there can be a released event with some of the A0, BI
-        # pins set, but with the plastic cover on this wont happen.
-        $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
-        $msg .= " " . $EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
-        $msg .= " released" if (!($db[0] & 0x10));
-        push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
-        if ($msg =~ m/A0/) {push @event, "3:channelA:A0";}
-        if ($msg =~ m/AI/) {push @event, "3:channelA:AI";}
-        if ($msg =~ m/B0/) {push @event, "3:channelB:B0";}
-        if ($msg =~ m/BI/) {push @event, "3:channelB:BI";}
-        if ($msg =~ m/C0/) {push @event, "3:channelC:C0";}
-        if ($msg =~ m/CI/) {push @event, "3:channelC:CI";}
-        if ($msg =~ m/D0/) {push @event, "3:channelD:D0";}
-        if ($msg =~ m/DI/) {push @event, "3:channelD:DI";}
-      } else {
-        if ($db[0] == 112) {
+        if ($st eq "keycard") {
           # Key Card, not tested
-          $msg = "keycard_inserted";  
-        } elsif ($db[0] & 0xC0) {
+          $msg = "keycard_inserted" if ($db[0] == 112);
+        } elsif ($st eq "liquidLeakage") {
+          # liquid leakage sensor, not tested
+          $msg = "wet" if ($db[0] == 0x11);          
+        } else {
+          # Theoretically there can be a released event with some of the A0, BI
+          # pins set, but with the plastic cover on this wont happen.
+          $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
+          $msg .= " " . $EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
+          $msg .= " released" if (!($db[0] & 0x10));
+          push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
+          if ($msg =~ m/A0/) {push @event, "3:channelA:A0";}
+          if ($msg =~ m/AI/) {push @event, "3:channelA:AI";}
+          if ($msg =~ m/B0/) {push @event, "3:channelB:B0";}
+          if ($msg =~ m/BI/) {push @event, "3:channelB:BI";}
+          if ($msg =~ m/C0/) {push @event, "3:channelC:C0";}
+          if ($msg =~ m/CI/) {push @event, "3:channelC:CI";}
+          if ($msg =~ m/D0/) {push @event, "3:channelD:D0";}
+          if ($msg =~ m/DI/) {push @event, "3:channelD:DI";}
+        }
+      } else {
+        if ($db[0] & 0xC0) {
           # Only a Mechanical Handle is setting these bits when NU = 0
           $msg = "closed"           if ($db[0] == 0xF0);
           $msg = "open"             if ($db[0] == 0xE0);
@@ -2709,6 +2713,8 @@ EnOcean_Parse($$)
           $msg = "open_from_tilted" if ($db[0] == 0xC0);
         } elsif ($st eq "keycard") {
           $msg = "keycard_removed";          
+        } elsif ($st eq "liquidLeakage") {
+          $msg = "dry";          
         } else {
           $msg = (($db[0] & 0x10) ? "pressed" : "released");
           push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");          
@@ -2770,8 +2776,6 @@ EnOcean_Parse($$)
             # bidirectional Teach-In for EEP A5-20-01
             $attr{$name}{comMode} = "biDir";          
             $attr{$name}{destinationID} = "unicast";
-            # SenderID = ChipID
-            #$attr{$name}{subDef} = "00000000";
             my $subDef = "00000000";
             $subDef = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, $subDef);
             $attr{$name}{subDef} = $subDef;
@@ -3002,6 +3006,14 @@ EnOcean_Parse($$)
       }
       push @event, "3:concentration:$vocConc";
       push @event, "3:state:$vocConc";
+
+    } elsif ($st eq "CO2Sensor.01") {
+      # CO2 Sensor (EEP A5-09-08)
+      # [untested]
+      # $db[1] is the CO2 concentration where 0x00 = 0 ppm ... 0xFF = 2000 ppm
+      my $co2 = $db[1] / 255 * 2000;
+      push @event, "3:CO2:$co2";
+      push @event, "3:state:$co2";
 
     } elsif ($st eq "particlesSensor.01") {
       # Gas Sensor, Particles Sensor (EEP A5-09-07)
@@ -3733,7 +3745,7 @@ EnOcean_Parse($$)
       push @event, "3:powerSwitch:" . ($db[0] & 1 ? "on" : "off");
       push @event, "3:state:" . ($db[0] & 1 ? "on" : "off");
 
-    } elsif ($st =~ m/^autoMeterReading/ || $st eq "actuator.01" && $manufID eq "033") {
+    } elsif ($st =~ m/^autoMeterReading\.0[0-3]$/ || $st eq "actuator.01" && $manufID eq "033") {
       # Automated meter reading (AMR) (EEP A5-12-00 ... A5-12-03)
       # $db[3] (MSB) + $db[2] + $db[1] (LSB) is the Meter reading
       # $db[0]_bit_7 ... $db[0]_bit_4 is the Measurement channel
@@ -3807,6 +3819,55 @@ EnOcean_Parse($$)
           push @event, "3:consumption$channel:$meterReading";
           push @event, "3:currentTariff:$channel";
         }
+      }
+      
+    } elsif ($st =~ m/^autoMeterReading\.0[45]$/) {
+      # $db[1] is the temperature 0 .. 0xFF >> -40 ... 40
+      # $db[0]_bit_1 ... $db[0]_bit_0 is the battery level
+      my $temperature = sprintf "%0.1f", ($db[1] / 255 * 80) - 40;
+      my $battery = $db[0] & 3;
+      if ($battery == 3) {
+        $battery = "empty";
+      } elsif ($battery == 2) {
+        $battery = "low";
+      } elsif ($battery == 1) {
+        $battery = "ok";
+      } else {
+        $battery = "full";
+      }
+      push @event, "3:battery:$battery";
+      push @event, "3:temperature:$temperature";
+      
+      if ($st eq "autoMeterReading.04") {
+        # Automated meter reading (AMR), Temperature, Load (EEP A5-12-04)
+        # $db[3] ... $db[2]_bit_2 is the Current Value in gram
+        my $weight = $db[3] << 6 | $db[2];
+        push @event, "3:weight:$weight";
+        push @event, "3:state:T: $temperature W: $weight B: $battery";
+        
+        
+      } elsif ($st eq "autoMeterReading.05") {
+        # Automated meter reading (AMR), Temperature, Container (EEP A5-12-05)
+        # $db[3] ... $db[2]_bit_6 is position sensor
+        my @sp;
+        $sp[0] = ($db[3] & 128) >> 7;
+        $sp[1] = ($db[3] & 64) >> 6;
+        $sp[2] = ($db[3] & 32) >> 5;
+        $sp[3] = ($db[3] & 16) >> 4;
+        $sp[4] = ($db[3] & 8) >> 3;
+        $sp[5] = ($db[3] & 4) >> 2;
+        $sp[6] = ($db[3] & 2) >> 1;
+        $sp[7] = $db[3] & 1;
+        $sp[8] = ($db[2] & 128) >> 7;
+        $sp[9] = ($db[2] & 64) >> 6;
+        my $amount = 0;
+        for (my $spCntr = 0; $spCntr <= 9; $spCntr ++) {
+          push @event, "3:location" . $spCntr . ":" . ($sp[$spCntr] ? "possessed" : "not_possessed");
+          $amount += $sp[$spCntr];
+        }
+        push @event, "3:amount:$amount";        
+        push @event, "3:state:T: $temperature L: " . $sp[0] . $sp[1] . " " . $sp[2] . $sp[3] .
+                        " " . $sp[4] . $sp[5] . " " . $sp[6] . $sp[7] . " " . $sp[8] . $sp[9] . " B: $battery";
       }
 
     } elsif ($st eq "environmentApp") {
@@ -7451,6 +7512,17 @@ EnOcean_Undef($$)
      </li>
      <br><br>
 
+     <li>Liquid Leakage Sensor (EEP F6-05-01)<br>
+         [untested]<br>
+     <ul>
+         <li>dry</li>
+         <li>wet</li>
+         <li>state: dry|wet</li>
+     </ul><br>
+         Set attr subType to liquidLeakage manually.
+     </li>
+     <br><br>
+
      <li>Window Handle (EEP F6-10-00, D2-03-10)<br>
          [HOPPE SecuSignal, Eltako FHF, Eltako FTKE]<br>
      <ul>
@@ -7695,6 +7767,17 @@ EnOcean_Undef($$)
        <li>state: PM10: p m3/&mu;g PM2_5: p m3/&mu;g PM1: p m3/&mu;g</li>
      </ul><br>
         The attr subType must be particlesSensor.01. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
+     <li>CO2 Sensor (EEP A5-09-08)<br>
+         [untested]<br>
+     <ul>
+       <li>CO2: c/ppm (Sensor Range: c = 0 ppm ... 2000 ppm)</li>
+       <li>state: c/ppm</li>
+     </ul><br>
+        The attr subType must be CO2Sensor.01. This is done if the device was
         created by autocreate.
      </li>
      <br><br>
@@ -8039,7 +8122,37 @@ EnOcean_Undef($$)
        <li>currentTariff: 0 ... 15</li>
       <li>state: Vs/l</li>
      </ul><br>
-        The attr subType must be autoMeterReading.02|autoMeterReading.02.
+        The attr subType must be autoMeterReading.02|autoMeterReading.03.
+        This is done if the device was created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Automated meter reading (AMR), Temperatur, Load (EEP A5-12-04)<br>
+         [untested]<br>
+     <ul>
+       <li>T: t/&#176C W: m/g B: full|ok|low|empty</li>
+       <li>battery: full|ok|low|empty</li>
+       <li>temperature: t/&#176C (Sensor Range: t = -40 &#176C ... 40 &#176C)</li>
+       <li>weight: m/g</li>
+       <li>state: T: t/&#176C W: m/g B: full|ok|low|empty</li>
+     </ul><br>
+        The attr subType must be autoMeterReading.04.
+        This is done if the device was created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Automated meter reading (AMR), Temperatur, Container Sensor (EEP A5-12-05)<br>
+         [untested]<br>
+     <ul>
+       <li>T: t/&#176C L: <location0 ... location9> B: full|ok|low|empty</li>
+       <li>amount: 0 ... 10</li>
+       <li>battery: full|ok|low|empty</li>
+       <li>location<0 ... 9>: possessed|not_possessed</li>       
+       <li>temperature: t/&#176C (Sensor Range: t = -40 &#176C ... 40 &#176C)</li>
+       <li>weight: m/g</li>
+       <li>state: T: t/&#176C L: <location0 ... location9> B: full|ok|low|empty</li>
+     </ul><br>
+        The attr subType must be autoMeterReading.05.
         This is done if the device was created by autocreate.
      </li>
      <br><br>
