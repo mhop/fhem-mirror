@@ -260,6 +260,35 @@
 				</BoolValue>
 			</Array>
 		</Message>
+		<Message>
+			<Name>AnalogPin</Name>
+			<Description>This is the voltage of up to 8 ADC channels. The ATMega328 in the PDIP package has only 6 ADCs and one ADC may be blocked by the battery voltage measurement, so there may be less than 8 ADC values reported depending on the device and configuration.</Description>
+			<MessageID>2</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<Array>
+				<Length>8</Length>
+				<BoolValue>
+					<ID>On</ID>
+					<Description>Tells if the pin is on (voltage over trigger threshold) or not.</Description>
+				</BoolValue>
+			</Array>
+			<Array>
+				<Length>8</Length>
+				<UIntValue>
+					<ID>Voltage</ID>
+					<Description>This is the voltage level in mV.</Description>
+					<Bits>11</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>1100</MaxVal>
+				</UIntValue>
+			</Array>
+		</Message>
 	</MessageGroup>
 	<MessageGroup>
 		<Name>Weather</Name>
@@ -490,6 +519,65 @@
 				<MinVal>0</MinVal>
 				<MaxVal>100</MaxVal>
 			</UIntValue>
+		</Message>
+		<Message>
+			<Name>Color</Name>
+			<Description>This is to set a fixed color.</Description>
+			<MessageID>10</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>Color</ID>
+				<Description>The color is according to the 6 bit color palette used in SHC.</Description>
+				<Bits>6</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>63</MaxVal>
+			</UIntValue>
+		</Message>
+		<Message>
+			<Name>ColorAnimation</Name>
+			<Description>This is to set a color animation.</Description>
+			<MessageID>11</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>Repeat</ID>
+				<Description>The number of times the animation will be repeated. 0 means infinitely.</Description>
+				<Bits>4</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>15</MaxVal>
+			</UIntValue>
+			<BoolValue>
+				<ID>AutoReverse</ID>
+				<Description>If true, the animation will be played back in the normal direction and then in reverse order.</Description>
+			</BoolValue>
+			<Array>
+				<Length>10</Length>
+				<UIntValue>
+					<ID>Time</ID>
+					<Description>The time for the animation between the current color and the next one. The number of seconds used is 0.05 * 1.3 ^ Time and covers the range from 0.03s to 170s. Use 0 to mark the end of the animation. Further values will be ignored.</Description>
+					<Bits>5</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>31</MaxVal>
+				</UIntValue>
+				<UIntValue>
+					<ID>Color</ID>
+					<Description>The color is according to the 6 bit color palette used in SHC. The last color (or the first when AutoReverse is true) of the animation will remain visible after the animation is completed.</Description>
+					<Bits>6</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>63</MaxVal>
+				</UIntValue>
+			</Array>
 		</Message>
 	</MessageGroup>
 </Packet>

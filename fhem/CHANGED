@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: SHC: support for analog inputs (EnvSensor) and new device
+                  RGB_Dimmer added (rr2000)
   - feature: PRESENCE: MAC address support for mode fritzbox (by Markus M.)
   - bugfix:  PRESENCE: fixing presence detection in mode fritzbox with new 
              Fritz!OS 6.20 (by Markus M.)
