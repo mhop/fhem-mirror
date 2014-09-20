@@ -200,6 +200,8 @@ my %EnO_subType = (
   "A5.10.1D" => "roomSensorControl.1D",
   "A5.10.1E" => "roomSensorControl.1B",
   "A5.10.1F" => "roomSensorControl.1F",
+  "A5.10.20" => "roomSensorControl.20",
+  "A5.10.21" => "roomSensorControl.20",  
   "A5.11.01" => "lightCtrlState.01",
   "A5.11.02" => "tempCtrlState.01",
   "A5.11.03" => "shutterCtrlState.01",
@@ -3301,7 +3303,7 @@ EnOcean_Parse($$)
       # $db[0]_bit_6 ... $db[0]_bit_4 is the fan speed
       # $db[0]_bit_1 is Occupany enable where 0 = enabled, 1 = disabled
       # $db[0]_bit_0 is Occupany Button where 0 = pressed, 1 = released
-      my $humi = $db[3] / 2.5;
+      my $humi = sprintf "%d", $db[3] / 2.5;
       my $setpoint = $db[2] / 2.5;
       my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
       my $fanSpeed;
@@ -3356,6 +3358,41 @@ EnOcean_Parse($$)
       push @event, "3:temperature:$temp";
       push @event, "3:state:T: $temp F: $fanSpeed SP: $setpoint P: $presence";
       my $setpointScaled = EnOcean_ReadingScaled($hash, $db[2], 0, 255);
+      if (defined $setpointScaled) {
+        push @event, "3:setpointScaled:" . $setpointScaled;
+      }
+
+    } elsif ($st eq "roomSensorControl.20") {
+      # Room Operation Panel (A5-10-20, A5-10-21)
+      # [untested]
+      # $db[3] is the setpoint where 0 = 0 ... 255 = 255
+      # $db[2] is the humidity setpoint where min 0x00 = 0 %rH, max 0xFA = 10 %rH
+      # $db[1] is the temperature where 250 = 0 °C ... 0 = 40 °C
+      # $db[0]_bit_6 ... $db[0]_bit_5 is setpoint mode
+      # $db[0]_bit_4 is battery state 0 = ok, 1 = low
+      # $db[0]_bit_0 is user activity where 0 = no, 1 = yes
+      my $humi = sprintf "%d", $db[2] / 2.5;
+      my $setpoint = $db[3];
+      my $temp = sprintf "%0.1f", 40 - $db[1] * 40 / 250;
+      my $setpointMode;
+      if ((($db[0] & 0x60) >> 5) == 3) {
+        $setpointMode = "reserved";
+      } elsif ((($db[0] & 0x60) >> 5) == 2) {
+        $setpointMode = "auto";
+      } elsif ((($db[0] & 0x60) >> 1) == 1){
+        $setpointMode = "frostProtection";
+      } else {
+        $setpointMode = "setpoint";
+      }
+      my $battery = ($db[0] & 0x10) ? "low" : "ok";
+      push @event, "3:activity:" . (($db[0] & 1) ? "yes" : "no");
+      push @event, "3:battery:$battery";    
+      push @event, "3:humidity:$humi";
+      push @event, "3:setpoint:$setpoint";
+      push @event, "3:setpointMode:$setpointMode";
+      push @event, "3:temperature:$temp";
+      push @event, "3:state:T: $temp H: $humi SP: $setpoint B: $battery";
+      my $setpointScaled = EnOcean_ReadingScaled($hash, $db[3], 0, 255);
       if (defined $setpointScaled) {
         push @event, "3:setpointScaled:" . $setpointScaled;
       }
@@ -7967,6 +8004,29 @@ EnOcean_Undef($$)
        adjust the scaling alternatively.<br>
        The attr subType must be roomSensorControl.1F. This is done if the device was
        created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Room Operation Panel (EEP A5-10-20, A5-10-21)<br>
+         [untested]<br>
+     <ul>
+       <li>T: t/&#176C H: rH/% SP: 0 ... 255 B: ok|low</li>
+       <li>activity: yes|no</li>
+       <li>battery: ok|low</li>
+       <li>humidity: rH/% (Sensor Range: rH = 0 % ... 100 %)</li>
+       <li>setpoint: 0 ... 255</li>
+       <li>setpointMode: auto|frostProtect|setpoint</li>
+       <li>setpointScaled: &lt;floating-point number&gt;</li>
+       <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
+       <li>state: t/&#176C H: rH/% SP: 0 ... 255 B: ok|low</li>
+     </ul><br>
+       The scaling of the setpoint adjustment is device- and vendor-specific. Set the
+       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
+       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
+       setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
+       adjust the scaling alternatively.<br>
+       The attr subType must be roomSensorControl.20 or roomSensorControl.21.
+       This is done if the device was created by autocreate.
      </li>
      <br><br>
 
