@@ -32,7 +32,7 @@ sub SVG_doround($$$);
 sub SVG_fmtTime($$);
 sub SVG_pO($);
 sub SVG_readgplotfile($$);
-sub SVG_render($$$$$$$$$);
+sub SVG_render($$$$$$$$$;$$);
 sub SVG_showLog($);
 sub SVG_substcfg($$$$$$);
 sub SVG_time_align($$);
@@ -182,8 +182,19 @@ SVG_FwFn($$$$)
   if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
     my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
     $ret .= "<div class=\"SVGplot\">";
-    $ret .= "<embed src=\"$arg\" type=\"image/svg+xml\" " .
-          "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+
+    if(AttrVal($FW_wname, "plotEmbed", 1)) {
+      $ret .= "<embed src=\"$arg\" type=\"image/svg+xml\" " .
+            "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+
+    } else {
+      my $oret=$FW_RET; $FW_RET="";
+      my ($type, $data) = SVG_doShowLog($d, $hash->{LOGDEVICE},
+                $hash->{GPLOTFILE}, $hash->{LOGFILE}, $w, $h);
+      $FW_RET=$oret;
+      $ret .= $data;
+
+    }
     $ret .= "</div>";
 
   } else {
@@ -761,11 +772,16 @@ SVG_calcOffsets($$)
 sub
 SVG_showLog($)
 {
-  my ($cmd) = @_;
-  my $wl   = $FW_webArgs{dev};
-  my $d    = $FW_webArgs{logdev};
-  my $type = $FW_webArgs{gplotfile};
-  my $file = $FW_webArgs{logfile};
+  return SVG_doShowLog($FW_webArgs{dev},
+                       $FW_webArgs{logdev},
+                       $FW_webArgs{gplotfile},
+                       $FW_webArgs{logfile});
+}
+
+sub
+SVG_doShowLog($$$$$$)
+{
+  my ($wl, $d, $type, $file, $styleW, $styleH) = @_;
   my $pm = AttrVal($wl,"plotmode",$FW_plotmode);
 
   my $gplot_pgm = "$FW_gplotdir/$type.gplot";
@@ -881,7 +897,8 @@ SVG_showLog($)
       FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}), 1);
       ($cfg, $plot) = SVG_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
       my $ret = SVG_render($wl, $f, $t, $cfg,
-                        $internal_data, $plot, $FW_wname, $FW_cssdir, $flog);
+                        $internal_data, $plot, $FW_wname, $FW_cssdir, $flog,
+                        $styleW, $styleH);
       $internal_data = "";
       FW_pO $ret;
       if($SVGcache) {
@@ -961,7 +978,7 @@ SVG_openFile($$$)
 
 #####################################
 sub
-SVG_render($$$$$$$$$)
+SVG_render($$$$$$$$$;$$)
 {
   my $name = shift;  # e.g. wl_8
   my $from = shift;  # e.g. 2008-01-01
@@ -972,6 +989,8 @@ SVG_render($$$$$$$$$)
   my $parent_name = shift;  # e.g. FHEMWEB instance name
   my $parent_dir  = shift;  # FW_dir
   my $flog        = shift;  # #FileLog lines, as array pointer
+  my $styleW      = shift;
+  my $styleH      = shift;
 
   $SVG_RET="";
   my $SVG_ss = AttrVal($parent_name, "smallscreen", 0);
@@ -1005,10 +1024,17 @@ SVG_render($$$$$$$$$)
 
   ######################
   # Html Header
-  SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
-  SVG_pO '<!DOCTYPE svg>';
-  SVG_pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
+  if(!$styleW) {
+    SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
+    SVG_pO '<!DOCTYPE svg>';
+    SVG_pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
          'xmlns:xlink="http://www.w3.org/1999/xlink" '.$flog.'>';
+  } else {
+    SVG_pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
+             'xmlns:xlink="http://www.w3.org/1999/xlink" '.
+             "style='width:${styleW}px; height:${styleH}px;' ".
+             '>';
+  }
 
   my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
   SVG_pO "<style type=\"text/css\"><![CDATA[";

@@ -78,6 +78,7 @@ use vars qw($FW_cmdret);  # Returned data by the fhem call
 use vars qw($FW_room);    # currently selected room
 use vars qw($FW_formmethod);
 use vars qw(%FW_visibleDeviceHash);
+use vars qw(@FW_httpheader); # HTTP header, line by line
 
 $FW_formmethod = "post";
 
@@ -90,7 +91,6 @@ my $FW_lastHashUpdate = 0;
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
 # Note: for delivering SVG plots we fork
-my @FW_httpheader; # HTTP header, line by line
 my @FW_enc;        # Accepted encodings (browser header)
 my $FW_data;       # Filecontent from browser when editing a file
 my %FW_icons;      # List of icons
@@ -152,6 +152,7 @@ FHEMWEB_Initialize($)
     ploteditor:always,onClick,never
     plotfork:1,0
     plotmode:gnuplot,gnuplot-scroll,SVG
+    plotEmbed:0,1
     plotsize
     nrAxis
     redirectCmds:0,1
