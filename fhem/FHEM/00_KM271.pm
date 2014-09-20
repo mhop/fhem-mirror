@@ -194,7 +194,7 @@ my @km271_bitarrays = (
   # 1 - HK_Betriebswerte2
   [ "-", "Sommer", "Tag", "Keine Kommunikation mit FB", "FB fehlerhaft",
           "Fehler Vorlauffuehler", "Maximaler Vorlauf",
-          "Externer Stoehreingang", "Frei" ],
+          "Externer Stoereingang", "Frei" ],
   # 2 - WW_Betriebswerte1
   [ "-", "Automatik", "Desinfektion", "Nachladung", "Ferien",
          "Fehler Desinfektion", "Fehler Fuehler", "Fehler WW bleibt kalt",
