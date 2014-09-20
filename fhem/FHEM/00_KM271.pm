@@ -950,18 +950,17 @@ KM271_SetReading($$$$)
     <a name="all_km271_events"></a>
     <li>all_km271_events<br>
         If this attribute is set to 1, do not ignore following events:<br>
-        HK1_Vorlaufisttemperatur, HK2_Vorlaufisttemperatur, Kessel_Vorlaufisttemperatur,
-        Kessel_Integral, Kessel_Integral1<br>
+        HK1_Vorlaufisttemperatur, HK1_Mischerstellung, HK2_Vorlaufisttemperatur, HK2_Mischerstellung,
+		Kessel_Vorlaufisttemperatur, Kessel_Integral, Kessel_Integral1<br>
         These events account for ca. 92% of all events.<br>
         All UNKNOWN events are ignored too, most of them were only seen
         directly after setting the device into logmode.
         </li>
     <a name="ww_timermode"></a>
     <li>ww_timermode [automatik|tag]<br>
-        Defines the working mode for the ww_on-for-timer command (default is tag).<br>
-        ww_on-for-timer will set the ww_betriebsart of the heater according to this attribute.
+        Defines the working mode for the ww_on-till command (default is tag).<br>
+        ww_on-till will set the ww_betriebsart of the heater according to this attribute.
         </li>
-
   </ul>
   <br>
 
