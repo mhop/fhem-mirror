@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  plotEmbed FHEMWEB attribute (fix for an iOS8 bug)
   - feature: SHC: support for analog inputs (EnvSensor) and new device
                   RGB_Dimmer added (rr2000)
   - feature: PRESENCE: MAC address support for mode fritzbox (by Markus M.)
@@ -9,9 +10,9 @@
              possible values, which are selectable (via fhemweb_multiple.js).
              see commandref for all possible values
   - feature: speed up through caching of postproc and regex in ECMDDevice
-  - bugfix: fixed handling of autocreation for 10_OWServer.pm
+  - bugfix:  fixed handling of autocreation for 10_OWServer.pm
   - feature: option to cope with partial messages in ECMD/ECMDDevice
-  - bugfix: SOMFY: add module to CUL client list, to set IODev automatically
+  - bugfix:  SOMFY: add module to CUL client list, to set IODev automatically
   - feature: sequence: triggerPartial Attribute added
   - feature: 36_JeeLink: changed flash command to use fhem firmware
                          directory (by HCS)
@@ -39,11 +40,13 @@
                       to select HDMI input directly.
                       Add command "input" to select a HDMI port, TV or SD-Card
                       as source
-  - bugfix:  LevelSender: Version 1.0.5: Could not get compiled by the Arduino IDE
-  - feature: PRESENCE: new event "error" and "timeout" for state reading to indicate 
-             a non successful check 
+  - bugfix:  LevelSender: Version 1.0.5: Could not get compiled by the Arduino
+             IDE
+  - feature: PRESENCE: new event "error" and "timeout" for state reading to
+             indicate a non successful check 
   - bugfix:  70_Jabber: fixed UTF8 encoding/decoding of messages
-  - feature: 10_OWServer autocreate coexists with OWXXX modules (Boris & ntruchsess)
+  - feature: 10_OWServer autocreate coexists with OWXXX modules (Boris &
+             ntruchsess)
   - feature: added 36_Level.pm
   - feature: netatmo: added plz support for public stations
   - change:  70_ENIGMA2: keep reading for recordings up-to-date during standby
@@ -62,30 +65,35 @@
   - feature: readingsGroup: added ...,<reading>@<device>,... argument format
   - feature: 52_I2C_PCF8574.pm: added attribute OnStartup
              52_I2C_PCA9532.pm: added attribute OnStartup,
-                      added attribute OutputPorts as substitute for InputPorts
-             51_RPI_GPIO.pm: changed access to gpio via userspace by default (for BBB and Cubie),
-                      access via gpio utility as fallback
+                added attribute OutputPorts as substitute for InputPorts
+             51_RPI_GPIO.pm: changed access to gpio via userspace by default
+                (for BBB and Cubie), access via gpio utility as fallback
   - feature: PIONEERAVR: new attribute: checkConnection
   - change:  do no parse empty lines in 57_Calendar.pm
-  - bugfix:  10_SOMFY.pm: save enc-key and rolling-code as reading instead of attribute
-                         to prevent loss of control after FHEM restart.
+  - bugfix:  10_SOMFY.pm: save enc-key and rolling-code as reading instead of
+             attribute to prevent loss of control after FHEM restart.
   - feature: new module 10_SOMFY.pm to support Somfy RTS blinds
   - bugfix:  70_PIONEERAVR.pm: fix for STATE if connection is lost
   - bugfix:  37_SHC.pm: Move xml file under subdir lib, otherwise it won't be
              deployed during update
   - bugfix:  70_PIONEERAVR.pm: player commands are now available for more inputs
-			 "play" was not in the drop down list of available set commands
-			 check every 120s if the data connection to the Pioneer AV receiver is still up
-			 check if we get a reply from the Pioneer AV receiver not later than 3s after a command was sent
-			 fix for alias names of inputs 
-			 more input presets (spotify, mhl, hdmi7, hdmi8), inputs are now queried from 1 - 59
-			 71_PIONEERAVRZONE.pm: bugfix:logging, set input
+	     "play" was not in the drop down list of available set commands
+             check every 120s if the data connection to the Pioneer AV
+             receiver is still up
+             check if we get a reply from the Pioneer AV receiver not later
+             than 3s after a command was sent
+	     fix for alias names of inputs 
+             more input presets (spotify, mhl, hdmi7, hdmi8), inputs are now
+             queried from 1 - 59
+             71_PIONEERAVRZONE.pm: bugfix:logging, set input
   - change:  00_RPII2C.pm: hardware access changed to ioctl and syswrite/read 
-             SMBus module not needed anymore but still usable, see attribute useHWLib
-             possibility to swap I2C-0 to P5 for Rev. B raspberries via attribute swap_i2c0 (not tested yet)
-  - feature: 70_ENIGMA2: add attribute remotecontrol=[standard,advanced,keyboard]
-  - bugfix:  70_PIONEERAVR.pm and PIONEERAVRZONE.pm: added "use SetExtensions", commandref updates
-			 fixed RC_layout
+             SMBus module not needed anymore but still usable, see attribute
+             useHWLib possibility to swap I2C-0 to P5 for Rev. B raspberries
+             via attribute swap_i2c0 (not tested yet)
+  - feature: 70_ENIGMA2: add attribute
+             remotecontrol=[standard,advanced,keyboard]
+  - bugfix:  70_PIONEERAVR.pm and PIONEERAVRZONE.pm: added "use SetExtensions",
+             commandref updates fixed RC_layout
   - feature: new modules 70_PIONEERAVR.pm and PIONEERAVRZONE.pm
   - feature: FLOORPLAN has new style 7 to display commands only.
   - added:   89_HEATRONIC.pm (heikoranft)
@@ -268,8 +276,8 @@
   - feature: DASHBOARD: Tabs can show an icon.
   - bugfix:  DASHBOARD: dashboard_showfullsize only in DashboardRoom.
              Fix showhelper Bug on lock/unlock. The error that after a trigger 
-			 action the curren tab is changed to the "old" activetab tab has 
-			 been fixed.
+                         action the curren tab is changed to the "old"
+                         activetab tab has been fixed.
   - bugfix:  SYSMON: Filesystems (absent medium)
   - feature: FLOORPLAN-menu-items can get icons attached by new 
              attribute fp_roomIcons
@@ -279,7 +287,8 @@
   - bugfix:  SYSMON: another format for ifconfig output
   - feature: DASHBOARD: Use longpoll to update content.
 			 rowcentercolwidth can now be defined per column.
-			 Dashboard can hide FHEMWEB Roomliste and Header => Fullsizemode.
+                         Dashboard can hide FHEMWEB Roomliste and Header =>
+                         Fullsizemode.
   - bugfix:  SYSMON: null reading for absent mount points
   - feature: DbLog: jokers "%" in device/reading definition are now possible
   - feature: SYSMON: new CPU Statistics and Plots

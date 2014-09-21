@@ -79,6 +79,7 @@ use vars qw($FW_room);    # currently selected room
 use vars qw($FW_formmethod);
 use vars qw(%FW_visibleDeviceHash);
 use vars qw(@FW_httpheader); # HTTP header, line by line
+use vars qw($FW_userAgent); # user agent string
 
 $FW_formmethod = "post";
 
@@ -310,6 +311,7 @@ FW_Read($)
             length($hash->{BUF})<$hash->{CONTENT_LENGTH});
 
   @FW_httpheader = split("[\r\n]", $hash->{HDR});
+  $FW_userAgent = join("", grep /^User-Agent:/, @FW_httpheader);
   delete($hash->{HDR});
 
   my @origin = grep /Origin/, @FW_httpheader;
@@ -418,8 +420,8 @@ sub
 FW_closeConn($)
 {
   my ($hash) = @_;
-  # Needed for slow server+iPad/iPhone. Forum #20294
-  if(AttrVal($hash->{SNAME}, "closeConn", undef)) {
+  if(AttrVal($hash->{SNAME}, "closeConn",               # Forum #20294
+                              $FW_userAgent =~ m/(iPhone|iPad|iPod)/)) {
     TcpServer_Close($hash);
     delete($defs{$hash->{NAME}});
   }
@@ -2734,6 +2736,18 @@ FW_widgetOverride($$)
         on Windows and on systems with small memory footprint.
     </li><br>
 
+    <a name="plotEmbed"></a>
+    <li>plotEmbed 0<br>
+        SVG plots are rendered as part of &lt;embed&gt; tags, as in the past
+        this was the only way to display SVG, and it allows to render them in
+        parallel, see plotfork. As of iOS 8, if FHEMWEB is called from the Home
+        Screen, the SVG is fetched but not displayed, which is IMHO a bug.
+        Setting plotEmbed to 0 will render SVG in-place, but as a side-effect
+        makes the plotfork attribute meaningless.<br>
+        This attribute defaults to 0 on iOS8 devices, and 1 elsewhere.
+    </li><br>
+
+
     <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>
         request a username/password authentication for access. You have to set
@@ -3288,6 +3302,21 @@ FW_widgetOverride($$)
         Rechnern mit wenig Speicher (z.Bsp. FRITZ!Box 7390) zum automatischen
         Abschuss des FHEM Prozesses durch das OS f&uuml;hren.
         </li><br>
+
+    <a name="plotEmbed"></a>
+    <li>plotEmbed 0<br>
+        SVG Grafiken werden als Teil der &lt;embed&gt; Tags dargestellt, da
+        fr&uuml;her das der einzige Weg war SVG darzustellen, weiterhin
+        erlaubt es das parallele Berechnen via plotfork (s.o.)
+        Ab iOS 8 werden SVG Grafiken in einem embed Tag nicht dargestellt,
+        falls FHEMWEB vom HomeScreen gestartet wurde (mAn ist das ein Bug in
+        iOS8).
+        Falls plotEmbed auf 0 gesetzt wird, dann werden die SVG Grafiken als
+        Teil der HTML-Seite generiert, was leider das plotfork Attribut
+        wirkungslos macht. Die Voreinstellung ist 0 auf iOS 8 Ger&auml;ten, und
+        1 sonst.
+    </li><br>
+
 
     <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>
