@@ -33,6 +33,7 @@ use warnings;
 my $VERSION = "1.7.1";
 
 use constant {
+	PERL_VERSION    => "perl_version",
   DATE            => "date",
   UPTIME          => "uptime",
   UPTIME_TEXT     => "uptime_text",
@@ -160,6 +161,7 @@ SYSMON_updateCurrentReadingsMap($) {
   # Map aktueller Namen erstellen
 	
 	# Feste Werte
+	$rMap->{+PERL_VERSION}       = "Perl Version";
 	$rMap->{+DATE}               = "Date";
 	$rMap->{+CPU_BOGOMIPS}       = "BogoMIPS";
 	if(SYSMON_isCPUFreqRPiBBB($hash)) {
@@ -709,6 +711,9 @@ SYSMON_obtainParameters($$)
 	 
 	# Einmaliges
 	if(!$u_first_mark) {
+	  # Perl version
+	  $map->{+PERL_VERSION} = "$]";
+	  
 		if(SYSMON_isProcFS($hash)) {
   	  $map = SYSMON_getCPUBogoMIPS($hash, $map);
 	  }
