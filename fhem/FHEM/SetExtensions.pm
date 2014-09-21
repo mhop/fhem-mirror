@@ -20,17 +20,20 @@ SetExtensions($$@)
     "off-till"      => 1,
     "blink"         => 2,
     "intervals"     => 0,
+    "toggle"        => 0
   );
 
   my $hasOn  = ($list =~ m/\bon\b/);
   my $hasOff = ($list =~ m/\boff\b/);
-  if(!$hasOn || !$hasOff) {
-    my $em = AttrVal($name, "eventMap", undef);
-    if($em) {
+  my $value = Value($name);
+  my $em = AttrVal($name, "eventMap", undef);
+  if($em) {
+    if(!$hasOn || !$hasOff) {
       $hasOn  = ($em =~ m/:on\b/)  if(!$hasOn);
       $hasOff = ($em =~ m/:off\b/) if(!$hasOff);
     }
     $cmd = ReplaceEventMap($name, $cmd, 1) if($cmd ne "?"); # Fix B0-for-timer
+    (undef, $value) = ReplaceEventMap($name, [$name, $value], 0);
   }
   if(!$hasOn || !$hasOff) { # No extension
     return "Unknown argument $cmd, choose one of $list";
@@ -125,6 +128,9 @@ SetExtensions($$@)
       }
     }
     
+  } elsif($cmd eq "toggle") {
+    DoSet($name, $value =~ m/^on/ ? "off" : "on");
+
   }
 
   return undef;

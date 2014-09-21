@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: add toggle to SetExtensions (introduced for ZWave)
   - bugfix:  plotEmbed FHEMWEB attribute (fix for an iOS8 bug)
   - feature: SHC: support for analog inputs (EnvSensor) and new device
                   RGB_Dimmer added (rr2000)
