@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.20";
+my $owx_version="5.21";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -276,6 +276,16 @@ sub OWSWITCH_Define ($$) {
   return undef;
 }
 
+########################################################################################
+#
+# OWSWITCH_Notify - Implements Notify function
+#
+# CalledBy:  FHEM
+# Calling:   -- 
+# Parameter: hash = hash of device addressed, def = definition string
+#
+#########################################################################################
+
 sub OWSWITCH_Notify ($$) {
   my ($hash,$dev) = @_;
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
@@ -283,6 +293,16 @@ sub OWSWITCH_Notify ($$) {
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
 }
+
+########################################################################################
+#
+# OWSWITCH_Init - Implements Init function
+#
+# CalledBy:  FHEM
+# Calling:   -- 
+# Parameter: hash = hash of device addressed, def = definition string
+#
+#########################################################################################
 
 sub OWSWITCH_Init ($) {
   my ($hash)=@_;
@@ -1014,7 +1034,7 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
   #-- Outer if - check get or set
   if ( $context =~ /.*getstate.*/ ){
     #-- family = 12 => DS2406 -------------------------------------------------------
-    if( ($context eq "getstate.ds2406") or ($context eq "ds2406.getstate") ) {
+    if( ($context eq "getstate.ds2406") or ($context eq "ds2406.getstate") )  {
       @data=split(//,$res);
       return "invalid data length, ".int(@data)." instead of 4 bytes"
         if (@data != 4); 
@@ -1060,16 +1080,16 @@ sub OWXSWITCH_BinValues($$$$$$$$) {
     if( ($context =~ /setstate\.ds2406\..*/) or ($context =~ /ds2406\.setstate\..*/) ) {
       $value = substr($context,-1);
       @data=split(//,$res);
-      if( int(@data) != 2){
-        return "state could not be set for device $owx_dev";
-      }
+      return "state could not be set for device $owx_dev"
+        if( int(@data) != 2);
       return "invalid CRC"
         if (OWX_CRC16($command,$data[0],$data[1]) == 0);
-      #-- put into local buffer
+      #-- put into local buffer]";
       $hash->{owg_val}->[0] = $value % 2;
       $hash->{owg_vax}->[0] = $value % 2;
       $hash->{owg_val}->[1] = int($value / 2);
       $hash->{owg_vax}->[1] = int($value / 2);
+
     #-- family = 29 => DS2408 -------------------------------------------------------
     }elsif( ($context eq "setstate.ds2408") or ($context eq "ds2408.setstate") ) {
       @data=split(//,$res);
@@ -1228,7 +1248,7 @@ sub OWXSWITCH_SetState($$) {
       return "device $owx_dev not accessible in writing"; 
     }
     OWX_Reset($master);
-    return OWXSWITCH_BinValues($hash,"ds2406.setstate.$value",1,undef,$owx_dev,undef,undef,substr($res,13));
+    return OWXSWITCH_BinValues($hash,"ds2406.setstate.$value",1,undef,$owx_dev,substr($res,9,4),undef,substr($res,13));
   #--  family = 29 => DS2408
   } elsif( $hash->{OW_FAMILY} eq "29" ) {
     #=============== set gpio values ===============================
@@ -1591,6 +1611,8 @@ sub OWXSWITCH_PT_SetOutput($$$) {
         <a name="OWSWITCHattr"></a>
         <h4>Attributes</h4> For each of the following attributes, the channel identification A,B,...
         may be used. <ul>
+            <li><a name="owswitch_states"><code>&lt;name&gt; stateS &lt;string&gt;</code></a>
+                <br/> character string denoting external shortening condition, default is "red angled arrow downwward"</li>
             <li><a name="owswitch_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
                         &lt;string&gt;|&lt;string&gt;</code></a>
                 <br />name for the channel | a type description for the measured value. </li>
