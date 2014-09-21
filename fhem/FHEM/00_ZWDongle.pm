@@ -25,23 +25,27 @@ sub ZWave_HandleSendStack($);
 # http://buzzdavidson.com/?p=68
 # https://bitbucket.org/bradsjm/aeonzstickdriver
 my %sets = (
-  "addNode"   => { cmd   => "4a%02x@",     # ZW_ADD_NODE_TO_NETWORK',
+  "addNode"   => { cmd   => "4a%02x@",       # ZW_ADD_NODE_TO_NETWORK',
                    param => {on=>0x81, off=>0x05 } },
-  "removeNode"=> { cmd   => "4b%02x@",     # ZW_REMOVE_NODE_FROM_NETWORK',
+  "removeNode"=> { cmd   => "4b%02x@",       # ZW_REMOVE_NODE_FROM_NETWORK',
                    param => {on=>0x81, off=>0x05 } },
-  "createNode"=> { cmd   => "60%02x"  },  # ZW_REQUEST_NODE_INFO',
-  "neighborUpdate"=> { cmd   => "48" },    # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
+  "createNode"=> { cmd   => "60%02x"  },     # ZW_REQUEST_NODE_INFO',
+  "neighborUpdate" => { cmd => "48",
+                   param => {noArg => ""} }, # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
+  "sendNIF"   => { cmd   => "12%02x05@" },   # ZW_SEND_NODE_INFORMATION
 );
 
 my %gets = (
-  "caps"      => "07",     # SERIAL_API_GET_CAPABILITIES
-  "ctrlCaps"  => "05",     # ZW_GET_CONTROLLER_CAPS
-  "nodeInfo"  => "41%02x", # ZW_GET_NODE_PROTOCOL_INFO
-  "nodeList"  => "02",     # SERIAL_API_GET_INIT_DATA
-  "homeId"    => "20",     # MEMORY_GET_ID
-  "version"   => "15",     # ZW_GET_VERSION
-  "raw"       => "%s",
-  "neighborList" => "80%02x0101", # GET_ROUTING_TABLE_LINE  include dead links, include non-routing neigbors
+  "caps"      => "07",            # SERIAL_API_GET_CAPABILITIES
+  "ctrlCaps"  => "05",            # ZW_GET_CONTROLLER_CAPS
+  "nodeInfo"  => "41%02x",        # ZW_GET_NODE_PROTOCOL_INFO
+  "nodeList"  => "02",            # SERIAL_API_GET_INIT_DATA
+  "homeId"    => "20",            # MEMORY_GET_ID
+  "version"   => "15",            # ZW_GET_VERSION
+  "getVirtualNodes" => "a5",      # ZW_GET_VIRTUAL_NODES
+  "neighborList" => "80%02x0101", # GET_ROUTING_TABLE_LINE include dead links,
+                                  #              include non-routing neigbors
+  "raw"       => "%s",            # hex
 );
 
 # Known controller function. 
@@ -141,7 +145,6 @@ use vars qw(%zw_type6);
 );
 
 
-
 sub
 ZWDongle_Initialize($)
 {
@@ -226,7 +229,7 @@ ZWDongle_Set($@)
   }
   my $cmd = $sets{$type}{cmd};
   my $par = $sets{$type}{param};
-  if($par) {
+  if($par && !$par->{noArg}) {
     return "Unknown argument for $type, choose one of ".join(" ",keys %{$par})
       if(!defined($par->{$a[0]}));
     $a[0] = $par->{$a[0]};
@@ -259,7 +262,8 @@ ZWDongle_Get($@)
   return "\"get $name\" needs at least one parameter" if(@a < 1);
   my $type = shift @a;
 
-  return "Unknown argument $type, choose one of " . join(" ", sort keys %gets)
+  return "Unknown argument $type, choose one of " .
+        join(" ", map { $gets{$_} =~ m/%/ ? $_ : "$_:noArg" } sort keys %gets)
         if(!defined($gets{$type}));
 
   my @ga = split("%", $gets{$type}, -1);
@@ -297,11 +301,12 @@ ZWDongle_Get($@)
     for my $byte (0..31) {
       my $bits = $r[10+$byte];
       for my $bit (0..7) {
-        my $fn = $zw_func_id{sprintf("%02x", $byte*8+$bit)};
-        push @list, $fn if(($bits & (1<<$bit)) && $fn);
+        my $id = sprintf("%02x", $byte*8+$bit);
+        push @list, ($zw_func_id{$id} ? $zw_func_id{$id} : "UNKNOWN_$id")
+                if($bits & (1<<$bit));
       }
     }
-    $msg .= " ".join(",",@list);
+    $msg .= " ".join(" ",@list);
 
   } elsif($type eq "homeId") {                  ############################
     $msg = sprintf("HomeId:%s CtrlNodeId:%s", 
@@ -322,6 +327,9 @@ ZWDongle_Get($@)
       push @list, $type[$bit] if(($r[2] & (1<<$bit)) && $bit < @type);
     }
     $msg = join(" ", @list);
+
+  } elsif($type eq "getVirtualNodes") {         ############################
+    $msg = join(" ", @r);
 
   } elsif($type eq "nodeInfo") {                 ############################
     my $id = sprintf("%02x", $r[6]);

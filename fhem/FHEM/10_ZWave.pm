@@ -264,11 +264,12 @@ my %zwave_class = (
   SENSOR_CONFIGURATION     => { id => '9e', },
   MARK                     => { id => 'ef', },
   NON_INTEROPERABLE        => { id => 'f0', },
-  );
+);
+
 my %zwave_cmdArgs = (
   dim          => "slider,0,1,99",
   indicatorDim => "slider,0,1,99",
-  );
+);
 
 
 sub
@@ -362,10 +363,17 @@ ZWave_Cmd($$@)
   }
 
   if(!$cmdList{$cmd}) {
-    my $list = join(" ",sort keys %cmdList);
-    foreach my $cmd (keys %zwave_cmdArgs) {      # add slider & co
-      $list =~ s/\b$cmd\b/$cmd:$zwave_cmdArgs{$cmd}/;
+    my @list;
+    foreach my $cmd (sort keys %cmdList) {
+      if($zwave_cmdArgs{$cmd}) {
+        push @list, "$cmd:$zwave_cmdArgs{$cmd}";
+      } elsif($cmdList{$cmd}{fmt} !~ m/%/) {
+        push @list, "$cmd:noArg";
+      } else {
+        push @list, $cmd;
+      }
     }
+    my $list = join(" ",@list);
 
     if($type eq "set") {
       unshift @a, $name, $cmd;
