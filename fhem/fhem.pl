@@ -3204,8 +3204,8 @@ ReplaceEventMap($$$)
     my ($re, $val, $modifier) = split(":", $rv, 3);
     next if(!defined($val));
     if($dir) {  # event -> GivenName
-      if($str =~ m/$re/) {
-        $str =~ s/$re/$val/;
+      if($str =~ m/\b$re\b/) {
+        $str =~ s/\b$re\b/$val/;
         $changed = 1;
         last;
       }
