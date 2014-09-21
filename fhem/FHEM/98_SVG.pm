@@ -183,7 +183,8 @@ SVG_FwFn($$$$)
     my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
     $ret .= "<div class=\"SVGplot\">";
 
-    if(AttrVal($FW_wname, "plotEmbed", 1)) {
+    if(AttrVal($FW_wname, "plotEmbed",
+                        $FW_userAgent =~ m/(iPhone|iPad|iPod).*OS (8|9)/)) {
       $ret .= "<embed src=\"$arg\" type=\"image/svg+xml\" " .
             "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
