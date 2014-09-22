@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   34_NUT.pm (maintainer: creideiki)
   - feature: SYSMON: added new reading: perl_version
   - feature: add toggle to SetExtensions (introduced for ZWave)
   - bugfix:  plotEmbed FHEMWEB attribute (fix for an iOS8 bug)

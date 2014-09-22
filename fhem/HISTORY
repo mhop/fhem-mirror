@@ -592,3 +592,6 @@
 
 - Sun Aug 03 2014 (xusader)
   - added new module 70_PushNotifier.pm to support Push Messages with PushNotifier
+
+- Mon Sep 22 2014 (creideiki)
+  - added new module 34_NUT to support the Network UPS Tools
