@@ -1,3 +1,4 @@
+
 #!/bin/sh
 
 set -e
@@ -8,17 +9,11 @@ fi
 
 chown -R fhem /opt/fhem
 
-#set up of autostart
-if test -x /sbin/initctl; then
-    # upstart
-    mkdir -p /etc/init
-    cp /opt/fhem/contrib/init-scripts/fhem.upstart /etc/init/fhem.conf
-    initctl start fhem
-else
-    # Sysvinit
-    mkdir -p /etc/init.d
-    cp /opt/fhem/contrib/init-scripts/fhem.3 /etc/init.d/fhem
-    chmod ugo+x /etc/init.d/fhem
-    update-rc.d fhem defaults
-    invoke-rc.d fhem start
-fi
+# set up of autostart
+# Sysvinit; upstart no longer supported
+
+mkdir -p /etc/init.d
+cp /opt/fhem/contrib/init-scripts/fhem.3 /etc/init.d/fhem
+chmod ugo+x /etc/init.d/fhem
+update-rc.d fhem defaults
+invoke-rc.d fhem start
