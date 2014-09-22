@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.7.1";
+my $VERSION = "1.8.0";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -1822,50 +1822,80 @@ sub SYSMON_FBVersionInfo($$)
 
 #------------------------------------------------------------------------------
 # Systemparameter als HTML-Tabelle ausgeben
-# Parameter: Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
+# Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
 # (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
 # Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesHTML ($;@)
 {
 	my ($name, @data) = @_;
-	return SYSMON_ShowValuesFmt($name, 1, @data);
+	return SYSMON_ShowValuesFmt($name, undef, 1, @data);
+}
+
+#------------------------------------------------------------------------------
+# Systemparameter als HTML-Tabelle ausgeben. Zusätzlich wird eine Ueberschrift ausgegeben.
+# Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
+# Title: Ueberschrift (Text)
+# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+# Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
+#------------------------------------------------------------------------------
+sub SYSMON_ShowValuesHTMLTitled ($$;@)
+{
+	my ($name, $title, @data) = @_;
+	return SYSMON_ShowValuesFmt($name, $title, 1, @data);
 }
 
 #------------------------------------------------------------------------------
 # Systemparameter im Textformat ausgeben
-# Parameter: Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
+# Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
 # (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
 # Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesText('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesText ($;@)
 {
 	my ($name, @data) = @_;
-	return SYSMON_ShowValuesFmt($name, 0, @data);
+	return SYSMON_ShowValuesFmt($name, undef, 0, @data);
+}
+
+#------------------------------------------------------------------------------
+# Systemparameter im Textformat ausgeben
+# Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
+# Title: Ueberschrift (Text)
+# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+# Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesText('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
+#------------------------------------------------------------------------------
+sub SYSMON_ShowValuesTextTitled ($$;@)
+{
+	my ($name, $title, @data) = @_;
+	return SYSMON_ShowValuesFmt($name, $title, 0, @data);
 }
 
 #------------------------------------------------------------------------------
 # Systemparameter formatiert ausgeben
 # Parameter: 
-#   Format: 0 = Text, 1 = HTML
 #   Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
+#   Title: Ueberschrift
+#   Format: 0 = Text, 1 = HTML
 #   (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
 #------------------------------------------------------------------------------
-sub SYSMON_ShowValuesFmt ($$;@)
+sub SYSMON_ShowValuesFmt ($$$;@)
 {
-    my ($name, $format, @data) = @_;
+  my ($name, $title, $format, @data) = @_;
     
-    if($format != 0 && $format != 1) {
-    	return "unknown output format\r\n";
-    }
+  if($format != 0 && $format != 1) {
+  	return "unknown output format\r\n";
+  }
     
-    my $hash = $main::defs{$name};
+  my $hash = $main::defs{$name};
     
-    #if(!defined($cur_readings_map)) {
-	  #  SYSMON_updateCurrentReadingsMap($hash);
-    #}
+  #if(!defined($cur_readings_map)) {
+	#  SYSMON_updateCurrentReadingsMap($hash);
+  #}
   
+  # nur, wenn es sich um eine SYSMON Instanz handelt
+  if($hash->{TYPE} eq 'SYSMON') {  
     SYSMON_updateCurrentReadingsMap($hash);
+  }
   #Log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
   if(scalar(@data)<=0) {
@@ -1913,7 +1943,17 @@ sub SYSMON_ShowValuesFmt ($$;@)
     }
   }
   
-  my $map = SYSMON_obtainParameters($hash, 1);
+  my $map;
+  if($hash->{TYPE} eq 'SYSMON') {  
+    $map = SYSMON_obtainParameters($hash, 1);
+  } else {
+  	# Wenn nicht SYSMON, dann versuchen, die Daten aus den Readings auszulesen
+  	#$map = SYSMON_obtainReadings($hash);
+  	foreach my $rname (keys ($hash->{READINGS})) {
+  	  my $rval=$hash->{READINGS}->{$rname}->{VAL};
+  	  $map->{$rname}=$rval;
+  	}
+  }
 
   my $div_class="sysmon";
 
@@ -1924,6 +1964,16 @@ sub SYSMON_ShowValuesFmt ($$;@)
   	if($format == 0) {
   	  $htmlcode = "";
   	}
+  }
+  
+  if(defined $title) {
+    if($format == 1) {
+  	  $htmlcode .= "<tr><td valign='top' colspan='2'>".$title."</td></tr>";
+    } else {
+      if($format == 0) {
+        $htmlcode .= sprintf("%s\r\n", $title);
+      }
+    }
   }
   
   # oben definierte Werte anzeigen
@@ -2617,6 +2667,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <ul>
     The module provides a function that returns selected Readings as HTML.<br>
     As a parameter the name of the defined SYSMON device is expected.<br>
+    It can also Reading Group, Clone dummy or other modules be used. Their readings are simple used for display. <br>
     The second parameter is optional and specifies a list of readings to be displayed in the format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;]]</code>.<br>
     <code>ReadingName</code> is the Name of desired Reading, <code>Comment</code> is used as the display name and postfix is displayed after eihentlichen value (such as units or as MHz can be displayed).<br>
     If no <code>Comment</code> is specified, an internally predefined description is used.<br>
@@ -2624,10 +2675,18 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
     </ul><br>
+  <b>Text output method (see Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;,&lt;Title&gt;[,&lt;Liste&gt;])</b><br><br>
+    <ul>
+    According to SYSMON_ShowValuesHTML, but with a Title text above.<br>
+    </ul><br>
     
   <b>Text output method (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
     <ul>
     According to SYSMON_ShowValuesHTML, but formatted as plain text.<br>
+    </ul><br>
+  <b>Text output method (see Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;,&lt;Title&gt;[,&lt;Liste&gt;])</b><br><br>
+    <ul>
+    According to SYSMON_ShowValuesHTMLTitled, but formatted as plain text.<br>
     </ul><br>
     
   <b>Reading values with perl: SYSMON_getValues([&lt;array of desired keys&gt;])</b><br><br>
@@ -3152,6 +3211,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <ul>
     Das Modul definiert eine Funktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
     Als Parameter wird der Name des definierten SYSMON-Ger&auml;ts erwartet.<br>
+    Es kann auch ReadingsGroup, CloneDummy oder andere Module genutzt werden, dann werden einfach deren Readings verwendet.<br>
     Der zweite Parameter ist optional und gibt eine Liste der anzuzeigende Readings 
     im Format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;]]</code> an.<br>
     Dabei gibt <code>ReadingName</code> den anzuzeigenden Reading an, der Wert aus <code>Comment</code> wird als der Anzeigename verwendet
@@ -3163,9 +3223,20 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
     </ul><br>
     
+    <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;,&lt;Title&gt;[,&lt;Liste&gt;])</b><br><br>
+    <ul>
+    Wie SYSMON_ShowValuesHTML, aber mit einer &Uuml;berschrift dar&uuml;ber.<br>
+    </ul><br>
+    
+    
     <b>Text-Ausgabe-Methode (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
     <ul>
     Analog SYSMON_ShowValuesHTML, jedoch formatiert als reines Text.<br>
+    </ul><br>
+    
+    <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;,&lt;Title&gt;[,&lt;Liste&gt;])</b><br><br>
+    <ul>
+    Wie SYSMON_ShowValuesText, aber mit einer &Uuml;berschrift dar&uuml;ber.<br>
     </ul><br>
     
     <b>Readings-Werte mit Perl lesen: SYSMON_getValues([&lt;Liste der gew&uuml;nschten Schl&uuml;ssel&gt;])</b><br><br>
