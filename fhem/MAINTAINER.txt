@@ -127,6 +127,7 @@ FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
 FHEM/42_RFXMETER.pm          wherzig              http://forum.fhem.de RFXTRX
 FHEM/42_SYSMON.pm            hexenmeister         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/43_RFXX10REC.pm         wherzig              http://forum.fhem.de RFXTRX
+FHEM/44_TEK603.pm            eisler               http://forum.fhem.de Sonstige Systeme
 FHEM/45_TRX.pm               wherzig              http://forum.fhem.de RFXTRX
 FHEM/46_TRX_ELSE.pm          wherzig              http://forum.fhem.de RFXTRX
 FHEM/46_TRX_LIGHT.pm         wherzig              http://forum.fhem.de RFXTRX
