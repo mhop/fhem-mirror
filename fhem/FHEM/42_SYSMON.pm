@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.8.1";
+my $VERSION = "1.8.2";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -1842,7 +1842,8 @@ sub SYSMON_ShowValuesHTML ($;@)
 sub SYSMON_ShowValuesHTMLTitled ($;$@)
 {
 	my ($name, $title, @data) = @_;
-	$title = $attr{$name}{'alias'} unless $title; 
+	$title = $attr{$name}{'alias'} unless $title;
+	$title = $name unless $title;
 	return SYSMON_ShowValuesFmt($name, $title, 1, @data);
 }
 
@@ -1868,7 +1869,8 @@ sub SYSMON_ShowValuesText ($;@)
 sub SYSMON_ShowValuesTextTitled ($;$@)
 {
 	my ($name, $title, @data) = @_;
-	$title = $attr{$name}{'alias'} unless $title; 
+	$title = $attr{$name}{'alias'} unless $title;
+	$title = $name unless $title;
 	return SYSMON_ShowValuesFmt($name, $title, 0, @data);
 }
 
