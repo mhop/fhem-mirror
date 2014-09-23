@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  SYSMON: idletime on multicore, warnings
   - change:  09_CUL_FHTTK.pm: modified set option for sync, open and closed
   - feature: SYSMON: HTML/Text output for SYSMON-CloneDummies
   - feature: SYSMON: Method for titled HTML/Text output 
