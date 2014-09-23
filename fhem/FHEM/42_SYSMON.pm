@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.8.0";
+my $VERSION = "1.8.1";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -1839,9 +1839,10 @@ sub SYSMON_ShowValuesHTML ($;@)
 # (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
 # Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
 #------------------------------------------------------------------------------
-sub SYSMON_ShowValuesHTMLTitled ($$;@)
+sub SYSMON_ShowValuesHTMLTitled ($;$@)
 {
 	my ($name, $title, @data) = @_;
+	$title = $attr{$name}{'alias'} unless $title; 
 	return SYSMON_ShowValuesFmt($name, $title, 1, @data);
 }
 
@@ -1864,9 +1865,10 @@ sub SYSMON_ShowValuesText ($;@)
 # (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
 # Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesText('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
 #------------------------------------------------------------------------------
-sub SYSMON_ShowValuesTextTitled ($$;@)
+sub SYSMON_ShowValuesTextTitled ($;$@)
 {
 	my ($name, $title, @data) = @_;
+	$title = $attr{$name}{'alias'} unless $title; 
 	return SYSMON_ShowValuesFmt($name, $title, 0, @data);
 }
 
@@ -2675,16 +2677,16 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
     </ul><br>
-  <b>Text output method (see Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;,&lt;Title&gt;[,&lt;Liste&gt;])</b><br><br>
+  <b>Text output method (see Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
     <ul>
-    According to SYSMON_ShowValuesHTML, but with a Title text above.<br>
+    According to SYSMON_ShowValuesHTML, but with a Title text above. If no title provided, device alias will be used (if any)<br>
     </ul><br>
     
   <b>Text output method (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
     <ul>
     According to SYSMON_ShowValuesHTML, but formatted as plain text.<br>
     </ul><br>
-  <b>Text output method (see Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;,&lt;Title&gt;[,&lt;Liste&gt;])</b><br><br>
+  <b>Text output method (see Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
     <ul>
     According to SYSMON_ShowValuesHTMLTitled, but formatted as plain text.<br>
     </ul><br>
@@ -3223,9 +3225,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
     </ul><br>
     
-    <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;,&lt;Title&gt;[,&lt;Liste&gt;])</b><br><br>
+    <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
     <ul>
-    Wie SYSMON_ShowValuesHTML, aber mit einer &Uuml;berschrift dar&uuml;ber.<br>
+    Wie SYSMON_ShowValuesHTML, aber mit einer &Uuml;berschrift dar&uuml;ber. Wird keine &Uuml;berschrift angegeben, wird alias des Moduls genutzt (falls definiert).<br>
     </ul><br>
     
     
@@ -3234,7 +3236,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Analog SYSMON_ShowValuesHTML, jedoch formatiert als reines Text.<br>
     </ul><br>
     
-    <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;,&lt;Title&gt;[,&lt;Liste&gt;])</b><br><br>
+    <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
     <ul>
     Wie SYSMON_ShowValuesText, aber mit einer &Uuml;berschrift dar&uuml;ber.<br>
     </ul><br>
