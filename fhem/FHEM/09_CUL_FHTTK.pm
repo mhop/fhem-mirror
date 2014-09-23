@@ -168,16 +168,24 @@ CUL_FHTTK_Set($@)
 		return "Unknown argument $opt ($value), choose one of " . join(" ", @cList);
 	}
   
-  # add T as prefix, because of protocol like TCCCCCXX
-  my $arg = "T" . $hash->{CODE};
+  if($opt eq "Syncing" ) {
+    Log3 $name, 3, "CUL_FHTTK ($name) syncing with FHT80b.";
+	    
+    IOWrite($hash, "", sprintf("T%s0c", $hash->{CODE})); # 0x0c - sync
+	# window state switch to closed
+	
+  } elsif ($opt eq "Open" ) {
+    Log3 $name, 3, "CUL_FHTTK ($name) send open window state. ($opt)";
+    IOWrite($hash, "", sprintf("T%s01", $hash->{CODE})); # 0x01 - open or 0x81
+
+  } elsif ($opt eq "Closed" ) {
+    Log3 $name, 3, "CUL_FHTTK ($name) send closed window state. ($opt)";
     
-  # fhttfk_c2b
-  $arg .= $fhttfk_c2b{$opt};
-  Log3 $name, 5, "$name $opt message with option code: $arg";
-  
-  # write msg to CUL/CUNO
-  CUL_SimpleWrite($hash, $arg);
-  Log3 $name, 2, "CUL_FHTTK set $name $opt";
+    IOWrite($hash, "", sprintf("T%s02", $hash->{CODE})); # 0x02 - closed or 0x82
+
+  } else {
+    return "Unknown argument $a[1], choose one of Syncing Open Closed"
+  }
   
   # update new state 
   readingsSingleUpdate($hash, "state", $opt, 1);
