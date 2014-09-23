@@ -17,12 +17,34 @@ port=7072
 
 case "$1" in
 'start')
+
         echo "Starting fhem..."
+
+# if you need to start hmland for use with
+# Homematic, please start the hmland daemon
+# like this (please use correct path and port, 
+# depending on your installation!)
+#
+#       /opt/hmcfgusb/hmland -d -p 1234 -r 0
+#
+
         perl fhem.pl fhem.cfg
+
+# if you want to use configDB for configuration,
+# use this command to start fhem:
+#
+#       perl fhem.pl configDB
+#
+# and remove/comment the above line including fhem.cfg
+
         RETVAL=$?
         ;;
 'stop')
         echo "Stopping fhem..."
+
+# if you want to stop hmland during fhem stop:
+#       pkill hmland
+
         perl fhem.pl $port "shutdown"
         RETVAL=$?
         ;;
