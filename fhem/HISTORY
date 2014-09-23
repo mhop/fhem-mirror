@@ -595,3 +595,7 @@
 
 - Mon Sep 22 2014 (creideiki)
   - added new module 34_NUT to support the Network UPS Tools
+
+- Tue Sep 23 2014 (eisler)
+  - added new module 44_TEK603 to support the TEK603 Eco Monitor
+ 
