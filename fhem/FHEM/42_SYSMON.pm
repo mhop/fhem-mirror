@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.8.2";
+my $VERSION = "1.8.5";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -915,6 +915,23 @@ SYSMON_getUserDefined($$$$)
 	return $map;
 }
 
+my $sys_cpu_core_num = undef;
+sub
+SYSMON_getCPUCoreNum($)
+{
+	my ($hash) = @_;
+	
+	return $sys_cpu_core_num if $sys_cpu_core_num;
+	
+	my $str = SYSMON_execute($hash, "cat /sys/devices/system/cpu/kernel_max");
+  if(int($str)!=0) {
+  	$sys_cpu_core_num = int($str)+1;
+	 	return $sys_cpu_core_num;
+	}
+
+	return 1; # Default / unbekannt
+}
+
 #------------------------------------------------------------------------------
 # leifert Zeit seit dem Systemstart
 #------------------------------------------------------------------------------
@@ -927,7 +944,9 @@ SYSMON_getUptime($$)
 	my $uptime_str = SYSMON_execute($hash, "cat /proc/uptime");
   my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
   if(int($uptime)!=0) {
-    my $idle_percent = $idle/$uptime*100;
+  	# Anzahl Cores beruecksichtigen
+  	my $core_num = SYSMON_getCPUCoreNum($hash);
+    my $idle_percent = $idle/($uptime*$core_num)*100;
 
 	  $map->{+UPTIME}=sprintf("%d",$uptime);
 	  #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
@@ -1100,8 +1119,10 @@ SYSMON_getCPUBogoMIPS($$)
     my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep -m 1 'BogoMIPS'");
     #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
     my ($dummy, $val_txt) = split(/:\s+/, $val);
-    $val_txt = trim($val_txt);
-    $map->{+CPU_BOGOMIPS}="$val_txt";
+    if($val_txt) {
+      $val_txt = trim($val_txt);
+      $map->{+CPU_BOGOMIPS}="$val_txt";
+    }
   } else {
   	$map->{+CPU_BOGOMIPS}=$old_val;
   }
@@ -1482,20 +1503,24 @@ sub SYSMON_getFileSystemInfo ($$$)
     $map->{+FS_PREFIX.$fs} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs." (not available)";
   }
   
-  if(!defined $filesystems[0]) { return $map; } # Ausgabe leer
+  #return $map unless defined(@filesystems);
+  return $map unless int(@filesystems)>0;
+  #if(!defined $filesystems[0]) { return $map; } # Ausgabe leer
   
   logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0] for $fs");
   
   #if (!($filesystems[0]=~ /$fs\s*$/)){ shift @filesystems; }
   if (!($filesystems[0]=~ /$fs$/)){ 
     shift @filesystems; 
-    logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0] for $fs");
+    if(int(@filesystems)>0) {
+      logF($hash, "SYSMON_getFileSystemInfo", "analyse line $filesystems[0] for $fs");
+    }
   } else {
   	logF($hash, "SYSMON_getFileSystemInfo", "pattern ($fs) found");
   }
   #if (index($filesystems[0], $fs) < 0) { shift @filesystems; } # Wenn die Bezeichnung so lang ist, dass die Zeile umgebrochen wird...
   #if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
-  if ($filesystems[0]=~ /$fs$/)
+  if (int(@filesystems)>0 && $filesystems[0]=~ /$fs$/)
   {
   	logF($hash, "SYSMON_getFileSystemInfo", "use line $filesystems[0]");
   	
@@ -1509,6 +1534,7 @@ sub SYSMON_getFileSystemInfo ($$$)
       $map->{+FS_PREFIX.$mnt_point} = $out_txt;
     }
   }
+
   # else {
   #	if(defined $fDef) {
   #		$map->{$fName} = "not available";
