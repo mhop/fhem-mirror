@@ -132,3 +132,12 @@ fb7390:
 
 fb7270:
 	cd contrib/FB7270 && ./makeimage $(DESTDIR)
+
+synology:
+	rm -f contrib/Synology/package.tgz
+	rm -f $(DESTDIR).spk
+	sed -ie 's/\.\/log/\/var\/log/g' fhem.cfg
+	sed -ie 's/modpath \./modpath \/var\/packages\/FHEM\/target/g' fhem.cfg
+	sed -ie 's/version=".*"/version="$(DESTDIR)"/g' contrib/Synology/INFO
+	tar -vpczf contrib/Synology/package.tgz * --exclude "contrib/Synology"
+	cd contrib/Synology && tar -vcf ../../$(DESTDIR).spk *
