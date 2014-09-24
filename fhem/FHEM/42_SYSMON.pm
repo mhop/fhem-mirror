@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.8.5";
+my $VERSION = "1.8.6";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -1979,7 +1979,7 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   } else {
   	# Wenn nicht SYSMON, dann versuchen, die Daten aus den Readings auszulesen
   	#$map = SYSMON_obtainReadings($hash);
-  	foreach my $rname (keys ($hash->{READINGS})) {
+  	foreach my $rname (keys %{$hash->{READINGS}}) {
   	  my $rval=$hash->{READINGS}->{$rname}->{VAL};
   	  $map->{$rname}=$rval;
   	}
