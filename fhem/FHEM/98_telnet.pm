@@ -324,11 +324,12 @@ telnet_Undef($$)
 }
 
 sub
-telnet_ActivateInform($)
+telnet_ActivateInform($;$)
 {
-  my ($cl) = @_;
+  my ($cl, $arg) = @_;
   my $name = $cl->{NAME};
-  CommandInform($cl, "timer") if(!$inform{$name});
+  $arg = "" if(!defined($arg));
+  CommandInform($cl, "timer $arg") if(!$inform{$name});
 }
 
 
