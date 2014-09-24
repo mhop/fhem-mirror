@@ -27,15 +27,15 @@
 #     Aliase nehmen (z.B. voltage) bzw. modifizierte Bezeichnungen (z.B. inputVoltage)?
 # B - attr pollInterval: Wertebereich prüfen (min. 5, max. ?)
 # B - readingFnAttributes implementieren
+# C - Zusätzliche berechnete Werte - vielleicht auch per attr?
 # C - per GET könnte man alle Werte der USV verfügbar machen
 # D - SET implementieren, um diverse Dinge mit der USV anstellen zu können (Test, Ausschalten, ...)
+# D - Für die Web-Oberfläche wäre es vermutlich schick, wenn man die veränderbaren Variablen auch verändern könnte,
+#     inklusive den ENUMs und RANGEs, die NUT für die Werte anbietet
 #
 #
 # FIXME
-# - DevIo_Expect funktioniert nicht, da ich den Status auf OL setze. Da die Daten sowieso nicht schnell genug da sind
-#   und ich NUT_Read brauche, wäre es wohl besser, die Anfrage einfach zu schreiben.
-#   Wie kriege ich raus, ob die Verbindung noch steht?
-# - Fehlermeldung in fhem.log: "Notify Loop for ..." Wieso?
+# - Fehlermeldung in fhem.log: "Notify Loop for..." Wieso?
 #
 
 
@@ -54,6 +54,9 @@ sub NUT_Read($);
 sub NUT_ListVar($);
 sub NUT_Auswertung($);
 sub NUT_DbLog_split($);
+sub NUT_createVariables($);
+sub NUT_makeReadings($);
+sub NUT_addUnit($$);
 
 
 # Definitionen für die Berechnung der Einheit aus dem Namen
@@ -129,7 +132,7 @@ sub NUT_Define($$) {
 
   # Defaults setzen
 
-  $attr{$name}{pollState} = 5;
+  $attr{$name}{pollState} = 10;
   $attr{$name}{pollVal} = 60;
   $attr{$name}{disable} = 0;
   $attr{$name}{asReadings} = 'battery.charge battery.runtime input.voltage ups.load ups.power ups.realpower';
@@ -185,6 +188,8 @@ sub NUT_ListVar($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  $hash->{pollValState} += $attr{$name}{pollState};
+
   if ($attr{$name}{disable} == 0) {
     # TODO
     # - Mechanismus, der verhindert, dass lauter Befehle abgesendet werden, während er noch auf Antworten wartet
@@ -197,15 +202,22 @@ sub NUT_ListVar($) {
     }
 
     my $ups = $hash->{UpsName};
-    Log3 $name, 5, "Sending 'LIST VAR $ups'...";
-    DevIo_SimpleWrite($hash, "LIST VAR $ups\n", 0);
+    if ($hash->{pollValState} > $attr{$name}{pollVal}) {
+      $hash->{pollValState} = 0;
+      # Kompletten Datensatz anfordern
+      Log3 $name, 5, "Sending 'LIST VAR $ups'...";
+      DevIo_SimpleWrite($hash, "LIST VAR $ups\n", 0);
+    } else {
+      # Nur Status anfordern
+      Log3 $name, 5, "Sending 'GET VAR $ups ups.status'...";
+      DevIo_SimpleWrite($hash, "GET VAR $ups ups.status\n", 0);
+    }
     $hash->{WaitForAnswer} = 1;
 
   } else {
     Log3 $name, 5, "NUT polling disabled.";
   }
 
-  $hash->{pollValState} += $attr{$name}{pollState};
   RemoveInternalTimer("pollTimer:".$name);
   InternalTimer(gettimeofday() + $attr{$name}{pollState}, "NUT_PollTimer", "pollTimer:".$name, 0);
 }
@@ -220,96 +232,159 @@ sub NUT_PollTimer($) {
 }
 
 
+
 sub NUT_Auswertung($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $buf = $hash->{buffer};
 
+  my @lines = split /\n/, $buf;
 
-  # Fehlermeldungen auswerten
-  while ($buf =~ m/(.*)^ERR (.+?)$(.*)/m) {
-    Log3 $name, 2, "NUT Error: $2";
-    readingsSingleUpdate($hash, 'lastError', $2, 1);
-    # Fehlermeldung rauswerfen
-    $buf = $1 . "\n" . $3;
-    delete $hash->{WaitForAnswer};
-  }
-  $hash->{buffer} = $buf;
-
-  # Auswerten
-  if ($buf =~ m'(.*?)\s*^BEGIN LIST VAR (.+?)$(.*)^END LIST VAR \g2$\s*(.*)'ms) {
-    Log3 $name, 4, "Daten vor LIST VAR:\n'$1'" unless $1 eq "";
-    Log3 $name, 4, "Daten nach LIST VAR:\n'$4'" unless $4 eq "";
-    my $ups = $hash->{UpsName};
-    Log3 $name, 3, "Falsche USV: $2 statt $ups" unless $2 eq $ups;
-
-    # Relevante Daten in den Readings speichern
-    my @readings = split('\n', $3);
-    Log3 $name, 5, "Anzahl Readings von $name: $#readings";
-
-    delete $hash->{helper};
-    foreach (@readings) {
-#      Log3 $name, 5, "Test $_...";
-      if (m/VAR \w+ ([\w\.]+) "(.*)"/) {
-        $hash->{helper}{$1} = $2;
-#        Log3 $name, 5, "... found $1 -> $2";
-      }
+  if (substr($buf, -1) ne "\n") {
+    # Letzte Zeile ist noch unvollständig
+    $hash->{buffer} = $lines[$#lines];
+    $lines[$#lines] = '';
+    if (length($hash->{buffer}) > 1024) {
+       # Notbremse, wenn eine Zeile zu lange wird
+       Log3 $name, 1, "NUT: Zeile > 1024 Zeichen!";
+       $hash->{buffer} = '';
     }
-
-    # set Arrtibutes
-    $attr{$name}{model} = $hash->{helper}{'ups.model'} unless defined $attr{$name}{model};
-    $attr{$name}{serNo} = $hash->{helper}{'ups.serial'} unless defined $attr{$name}{serNo};
-
-    # Create derived readings
-    unless (defined $hash->{helper}{'ups.power'}) {
-      if (defined $hash->{helper}{'ups.load'} and defined $hash->{helper}{'ups.power.nominal'}) {
-         $hash->{helper}{'ups.power'} = $hash->{helper}{'ups.power.nominal'} * $hash->{helper}{'ups.load'} / 100;
-      }
-    }
-    unless (defined $hash->{helper}{'ups.realpower'}) {
-      if (defined $hash->{helper}{'ups.load'} and defined $hash->{helper}{'ups.realpower.nominal'}) {
-         $hash->{helper}{'ups.realpower'} = $hash->{helper}{'ups.realpower.nominal'} * $hash->{helper}{'ups.load'} / 100;
-      }
-    }
-
-    # Einheiten an die Werte anfügen
-    # Das soll ja eigentlich nicht passieren, aber da die interfaces nur sehr unvollständig passen, geht das nicht anders.
-    # Geht das effizienter?
-    my $excl = join('|', @nutunitsexclude);
-    foreach (keys %{$hash->{helper}}) {
-      unless (m/($excl)/) {
-        foreach my $unit (@nutunits) {
-          if (m/$unit->[0]/) {
-            $hash->{helper}{$_} .= ' ' . $unit->[1];
-            last;
-          }
-        }
-      }
-    }
-
-#    Log3 $name, 5, "Set Readings";
-
-    # Der Status wird ja oft abgefragt, um nichts zu verpassen. Damit das nicht jedes Mal
-    # Notifies gibt, wird dieser nur getriggert, wenn sich am Status etwas ändert.
-    # FIXME und was ist mit event-on-*-reading?
-    readingsSingleUpdate($hash, 'state', $hash->{helper}{'ups.status'}, $hash->{helper}{'ups.status'} ne $hash->{lastStatus});
-    $hash->{lastStatus} = $hash->{helper}{'ups.status'};
-
-    if ($hash->{pollValState} > $attr{$name}{pollVal}) {
-      $hash->{pollValState} = 0;
-      readingsBeginUpdate($hash);
-      foreach (split (' ', $attr{$name}{asReadings})) {
-        readingsBulkUpdate($hash, $_, $hash->{helper}{$_}) if defined $hash->{helper}{$_};
-      }
-      readingsEndUpdate($hash, 1);
-    }
-
-    # FIXME Mehrere Readings im Buffer werden hier ignoriert
+  } else {
     $hash->{buffer} = '';
-    delete $hash->{WaitForAnswer};
+  }
+
+  my %var = ();
+
+  foreach my $line (@lines) {
+    if (length($line) > 0) {
+      Log3 $name, 5, "NUT RX: $line";
+      my $arg = '';
+      if ($line =~ m/(.*) "(.*)"/) {
+        # Argument in "
+        $line = $1;
+        $arg = $2;
+      }
+
+      my @words = split / /, $line;
+
+      if ($words[0] eq 'VAR') {
+        # Variable erkannt
+        if ($words[1] eq $hash->{UpsName}) {
+          my $var = $words[2];
+          $hash->{helper}{$var} = NUT_addUnit($var, $arg);
+          # Sonderfälle
+          if ($var eq 'ups.status') {
+            # Status wird sofort übernommen
+            # Der Status wird ja oft abgefragt, um nichts zu verpassen. Damit das nicht jedes Mal
+            # Notifies gibt, wird dieser nur getriggert, wenn sich am Status etwas ändert.
+            # FIXME und was ist mit event-on-*-reading?
+            readingsSingleUpdate($hash, 'state', $hash->{helper}{'ups.status'}, $hash->{helper}{'ups.status'} ne $hash->{lastStatus});
+            $hash->{lastStatus} = $hash->{helper}{'ups.status'};
+          } elsif ($var eq 'ups.model' and not defined $attr{$name}{model}) {
+            $attr{$name}{model} = $hash->{helper}{$var};
+          } elsif ($var eq 'ups.serial' and not defined $attr{$name}{serNo}) {
+            $attr{$name}{serNo} = $hash->{helper}{$var};
+          }
+        } else {
+          Log3 $name, 1, "NUT $hash->{UpsName}: VAR from wrong UPS $words[1]";
+        }
+
+      } elsif ($words[0] eq 'BEGIN') {
+        # Anfang einer Liste - n/u
+
+      } elsif ($words[0] eq 'END') {
+        # Ende einer Liste
+        if ($words[2] eq 'VAR') {
+          # Ende einer Variablen-Liste
+          # Erzeugen von berechneten Variablen
+          NUT_createVariables($hash);
+          # Umwidmen der Variablen in Readings
+          NUT_makeReadings($hash);
+        }
+
+      } elsif ($words[0] eq 'ERR') {
+        # Fehlermeldungen
+        my $err = $words[1];
+        Log3 $name, 2, "NUT Error: $err";
+        readingsSingleUpdate($hash, 'lastError', $err, 1);
+        readingsSingleUpdate($hash, 'state', $err, 1);
+        if ($err=~ m/(ACCESS-DENIED|UNKNOWN-UPS)/) {
+           # Das sind Fehlermeldungen, die keine Hoffnung machen, dass es noch funktionieren könnte
+           $attr{$name}{disable} = 1;
+        }
+
+      } else {
+        # TODO Es gibt noch viele Antworten, die interessant sein könnten...
+        # http://www.networkupstools.org/docs/developer-guide.chunked/ar01s09.html
+        Log3 $name, 5, "NUT: not implemented: $line";
+      }
+
+      delete $hash->{WaitForAnswer};
+
+    } # if len > 0
+  } # foreach
+
+}
+
+
+
+sub NUT_addUnit($$) {
+  my ($var, $arg) = @_;
+
+  # Einheiten an die Werte anfügen
+  # Das soll ja eigentlich nicht passieren, aber da die interfaces nur sehr unvollständig passen, geht das nicht anders.
+  # Geht das effizienter?
+  my $excl = join('|', @nutunitsexclude);
+  unless ($var =~ m/($excl)/) {
+    foreach my $unit (@nutunits) {
+      if ($var =~ m/$unit->[0]/) {
+        $arg .= ' ' . $unit->[1];
+        last;
+      }
+    }
+  }
+
+  return $arg;
+}
+
+
+sub NUT_createVariables($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  # Zusätzliche Werte berechnen, die die USV nicht zur Verfügung stellt
+
+  unless (defined $hash->{helper}{'ups.power'}) {
+    if (defined $hash->{helper}{'ups.load'} and defined $hash->{helper}{'ups.power.nominal'}) {
+       $hash->{helper}{'ups.power'} = $hash->{helper}{'ups.power.nominal'} * $hash->{helper}{'ups.load'} / 100;
+    }
+  }
+  unless (defined $hash->{helper}{'ups.realpower'}) {
+    if (defined $hash->{helper}{'ups.load'} and defined $hash->{helper}{'ups.realpower.nominal'}) {
+       $hash->{helper}{'ups.realpower'} = $hash->{helper}{'ups.realpower.nominal'} * $hash->{helper}{'ups.load'} / 100;
+    }
   }
 
 }
+
+
+
+sub NUT_makeReadings($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  # Die USV-Variablen en bloc in Readings überführen
+  # FIXME und was ist mit event-on-*-reading?
+  # FIXME Woher kommt die Fehlermeldung 'Notify loop for...' im Log?
+
+  readingsBeginUpdate($hash);
+  foreach (split (' ', $attr{$name}{asReadings})) {
+    readingsBulkUpdate($hash, $_, $hash->{helper}{$_}) if defined $hash->{helper}{$_};
+  }
+  readingsEndUpdate($hash, 1);
+
+}
+
 
 
 sub NUT_DbLog_split($) {
@@ -373,7 +448,7 @@ sub NUT_DbLog_split($) {
   <ul>
     <li><a href="#disable">disable</a></li><br>
     <li><a name="">pollState</a><br>
-        Polling interval in seconds for the state of the ups. Default: 5</li><br>
+        Polling interval in seconds for the state of the ups. Default: 10</li><br>
     <li><a name="">pollVal</a><br>
         Polling interval in seconds of the other Readings. This should be a multiple of pollState. Default: 60</li><br>
     <li><a name="">asReadings</a><br>
@@ -433,7 +508,7 @@ sub NUT_DbLog_split($) {
   <ul>
     <li><a href="#disable">disable</a></li><br>
     <li><a name="">pollState</a><br>
-        Polling-Intervall in Sekunden für den Status der USV. Default: 5</li><br>
+        Polling-Intervall in Sekunden für den Status der USV. Default: 10</li><br>
     <li><a name="">pollVal</a><br>
         Polling-Intervall für die anderen Werte. Dieser Wert wird auf ein Vielfaches von pollState gerundet. Default: 60</li><br>
     <li><a name="NUT_asReadings">asReadings</a><br>
