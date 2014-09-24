@@ -689,8 +689,8 @@ FW_answerCall($)
   FW_pO "</head>\n<body name=\"$t\" $csrf $onload>";
 
   if($FW_activateInform) {
+    $cmd = "style eventMonitor $FW_activateInform";
     $FW_cmdret = $FW_activateInform = "";
-    $cmd = "style eventMonitor";
   }
 
   FW_roomOverview($cmd);
@@ -1740,8 +1740,13 @@ FW_style($$)
     FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\">".
           "</script>";
     FW_pO "<div id=\"content\">";
-    FW_pO "<div id=\"console\">";
-    FW_pO "Events:<br>\n";
+    if($a[2] && $a[2] ne "1") {
+      FW_pO "<div id=\"console\" filter=\"$a[2]\">";
+      FW_pO "Events ($a[2] only):<br>\n";
+    } else {
+      FW_pO "<div id=\"console\">";
+      FW_pO "Events:<br>\n";
+    }
     FW_pO "</div>";
     FW_pO "</div>";
 
@@ -2184,7 +2189,11 @@ FW_Notify($$)
   return undef if(!$h);
 
   my $dn = $dev->{NAME};
-  return undef if(!$h->{devices}{$dn} && $h->{type} !~ m/raw/);
+  if($h->{type} eq "raw") {
+    return undef if($dn !~ m/$h->{filter}/);
+  } else { # Status
+    return undef if(!$h->{devices}{$dn});
+  }
 
   my @data;
   my %extPage;
@@ -2558,9 +2567,10 @@ FW_visibleDevices(;$)
 }
 
 sub 
-FW_ActivateInform()
+FW_ActivateInform($;$)
 {
-  $FW_activateInform = 1;
+  my ($cl, $arg) = @_;
+  $FW_activateInform = ($arg ? $arg : 1);
 }
 
 sub

@@ -51,7 +51,7 @@ CommandUpdate($$)
   $updateInBackground = 0 if($arg ne "all");                                   
   $updArg = $arg;
   if($updateInBackground) {
-    CallFn($cl->{NAME}, "ActivateInformFn", $cl);
+    CallFn($cl->{NAME}, "ActivateInformFn", $cl, "global");
     BlockingCall("doUpdateInBackground", {src=>$src,arg=>$arg});
     return "Executing the update the background.";
 
@@ -150,8 +150,7 @@ doUpdate($$)
 
   my @excl = split(" ", AttrVal("global", "exclude_from_update", ""));
 
-  uLog 1, "List of new / modified files since last update:"
-    if($arg eq "check");
+  my @rl = upd_getChanges($root, $basePath);
   ###########################
   # process the remote controlfile
   my $nChanged = 0;
@@ -194,6 +193,8 @@ doUpdate($$)
 
     }
 
+    uLog 1, "List of new / modified files since last update:"
+      if($arg eq "check" && $nChanged == 0);
     uLog 1, "$r[0] $fName";
     $nChanged++;
     next if($arg eq "check");
@@ -222,17 +223,12 @@ doUpdate($$)
     return;
   }
 
-  if($arg eq "check") {
-    my @lines = split(/[\r\n]/,upd_getUrl("$basePath/CHANGED"));
-    my $ret = "";
-    foreach my $line (@lines) {
-      next if($line =~ m/^#/);
-      last if($line eq "");
-      $ret .= $line."\n";
-    }
-    uLog 1, "\nList of last changes:\n".$ret;
-    return;
+  if(@rl) {
+    uLog(1, "");
+    uLog 1, "New entries in the CHANGED file:";
+    map { uLog 1, $_ } @rl;
   }
+  return if($arg eq "check");
 
   if($arg eq "all" || $arg eq "force") { # store the controlfile
     return if(!upd_writeFile($root, $restoreDir,
@@ -270,6 +266,35 @@ upd_mkDir($$$)
       uLog 4, "MKDIR $root/".join("/", @p[0..$i]);
     }
   }
+}
+
+sub
+upd_getChanges($$)
+{
+  my ($root, $basePath) = @_;
+  my $lFile = "";
+  if(open(FH, "$root/CHANGED")) {
+    foreach my $l (<FH>) { # first non-comment line
+      next if($l =~ m/^#/);
+      chomp $l;
+      $lFile = $l;
+      last;
+    }
+    close(FH);
+  }
+  my @lines = split(/[\r\n]/,upd_getUrl("$basePath/CHANGED"));
+  my $maxLines = 25;
+  my @ret;
+  foreach my $line (@lines) {
+    next if($line =~ m/^#/);
+    last if($line eq "" || $line eq $lFile);
+    push @ret, $line;
+    if($maxLines-- < 1) {
+      push @ret, "... rest of lines skipped.";
+      last;
+    }
+  }
+  return @ret;
 }
 
 sub
