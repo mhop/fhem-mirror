@@ -27,6 +27,7 @@ all:
 	@echo "    install       - to install fhem"
 	@echo "    dist          - to create a .tar.gz file"
 	@echo "    deb           - to create a .deb file"
+	@echo "    synology      - to create an spk file"
 	@echo "    fb7390        - to create an AVM Fritz!Box 7390 imagefile"
 	@echo "    fb7270        - to create a zip file for the AVM Fritz!Box 7270"
 	@echo "    backup        - to backup current installation of fhem"
