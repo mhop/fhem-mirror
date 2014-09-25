@@ -1,0 +1,7 @@
+#!/bin/sh
+eval $(env | grep "^SYNOPKG_PKGDEST=")
+eval $(env | grep "^SYNOPKG_PKGNAME=")
+ret=`rm -f ${SYNOPKG_PKGDEST}`
+ret=`rm -f /var/log/fhem*.log`
+ret=`rm -f /var/log/fhem*.save`
+exit 0

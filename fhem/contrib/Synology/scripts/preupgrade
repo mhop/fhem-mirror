@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# while upgrading backup fhem.cfg
+CONF=/var/packages/FHEM/target/fhem.cfg
+if [ -e ${CONF} ]; then
+	/bin/cp -f ${CONF} /tmp/${PPID}_fhem.cfg
+fi
+
+exit 0

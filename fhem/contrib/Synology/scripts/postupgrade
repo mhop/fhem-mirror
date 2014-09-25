@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# after upgrading restore fhem.cfg
+CONF=/var/packages/FHEM/target/fhem.cfg
+SEARCH=".*attr global verbose.*"
+ADDLINE="\ndefine telnetPort telnet 7072 global   # our TCP/IP\n"
+if [ -e /tmp/${PPID}_fhem.cfg ]; then
+	/bin/cp -f /tmp/${PPID}_fhem.cfg ${CONF}
+	/bin/rm -f /tmp/*_fhem.cfg
+
+	grep -q "telnet" ${CONF} || (
+				perl -pi -e "s,^attr global port 7072.*$,," ${CONF};
+				perl -pi -e "if(/^${SEARCH}$/) { print \"${ADDLINE}\"; }" ${CONF};)
+		
+fi
+
+exit 0
