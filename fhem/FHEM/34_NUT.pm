@@ -3,6 +3,8 @@
 #
 # Abfrage einer UPS über die Network UPS Tools (www.networkupstools.org)
 #
+# V 0.3.0 [25.09.2014]
+#
 
 # DEFINE bla NUT <upsname> [<host>[:<port>]]
 # Readings:
@@ -16,7 +18,7 @@
 #  disable:0,1	Polling abklemmen
 #  pollState	Häufigkeit, mit der der Status der USV abgefragt wird (Default 5 sec)
 #  pollVal	Häufigkeit, mit der die anderen Readings abgefragt werden (Default 60 sec, Vielfaches von pollState)
-#  asReadings	Werte des USV, die als Readings zur Verfügung stehen sollen
+#  asReadings	Mit Kommata getrennte Liste der Werte der USV, die als Readings zur Verfügung stehen sollen
 #
 #
 
@@ -26,7 +28,6 @@
 # A - Sollte man als Reading einfach die Bezeichnung der USV nehmen (also z.B. input.voltage) oder 
 #     Aliase nehmen (z.B. voltage) bzw. modifizierte Bezeichnungen (z.B. inputVoltage)?
 # B - attr pollInterval: Wertebereich prüfen (min. 5, max. ?)
-# B - readingFnAttributes implementieren
 # C - Zusätzliche berechnete Werte - vielleicht auch per attr?
 # C - per GET könnte man alle Werte der USV verfügbar machen
 # D - SET implementieren, um diverse Dinge mit der USV anstellen zu können (Test, Ausschalten, ...)
@@ -53,34 +54,9 @@ sub NUT_DevInit($);
 sub NUT_Read($);
 sub NUT_ListVar($);
 sub NUT_Auswertung($);
-sub NUT_DbLog_split($);
 sub NUT_createVariables($);
 sub NUT_makeReadings($);
-sub NUT_addUnit($$);
 
-
-# Definitionen für die Berechnung der Einheit aus dem Namen
-my @nutunits = ( 
-	['percent' => '%'],
-	['temperature' => '°C'],
-	['humidity' => '%'],
-	['voltage' => 'V'],
-	['transfer' => 'V'],
-	['realpower' => 'W'],
-	['power' => 'VA'],
-	['current' => 'A'],
-	['frequency' => 'Hz'],
-	['load' => '%'],
-	['charge' => '%'],
-	['capacity' => '%'],
-	['delay' => 'sec'],
-	['timer' => 'sec'],
-	['interval' => 'sec'],
-	['runtime' => 'sec']
-);
-
-# Stichwörter, die zeigen, dass _keine_ Einheit vorhanden ist
-my @nutunitsexclude = ('alarm', 'extended', 'transfer.reason', 'factor');
 
 
 
@@ -93,11 +69,9 @@ sub NUT_Initialize($) {
   $hash->{UndefFn} = "NUT_Undef";
   $hash->{ReadyFn} = "NUT_Ready";
   $hash->{ReadFn}  = "NUT_Read";
-  $hash->{DbLog_splitFn} = "NUT_DbLog_split";
 
-  $hash->{AttrList} = "disable:0,1 pollState pollVal asReadings model serNo";
-#                      $readingFnAttributes;
-
+  $hash->{AttrList} = "disable:0,1 pollState pollVal asReadings model serNo ".
+                      $readingFnAttributes;
 }
 
 
@@ -135,7 +109,7 @@ sub NUT_Define($$) {
   $attr{$name}{pollState} = 10;
   $attr{$name}{pollVal} = 60;
   $attr{$name}{disable} = 0;
-  $attr{$name}{asReadings} = 'battery.charge battery.runtime input.voltage ups.load ups.power ups.realpower';
+  $attr{$name}{asReadings} = 'battery.charge,battery.runtime,input.voltage,ups.load,ups.power,ups.realpower';
 
   $hash->{pollValState} = 0;
   $hash->{lastStatus} = "";
@@ -253,8 +227,6 @@ sub NUT_Auswertung($) {
     $hash->{buffer} = '';
   }
 
-  my %var = ();
-
   foreach my $line (@lines) {
     if (length($line) > 0) {
       Log3 $name, 5, "NUT RX: $line";
@@ -271,14 +243,11 @@ sub NUT_Auswertung($) {
         # Variable erkannt
         if ($words[1] eq $hash->{UpsName}) {
           my $var = $words[2];
-          $hash->{helper}{$var} = NUT_addUnit($var, $arg);
+          $hash->{helper}{$var} = $arg;
           # Sonderfälle
           if ($var eq 'ups.status') {
             # Status wird sofort übernommen
-            # Der Status wird ja oft abgefragt, um nichts zu verpassen. Damit das nicht jedes Mal
-            # Notifies gibt, wird dieser nur getriggert, wenn sich am Status etwas ändert.
-            # FIXME und was ist mit event-on-*-reading?
-            readingsSingleUpdate($hash, 'state', $hash->{helper}{'ups.status'}, $hash->{helper}{'ups.status'} ne $hash->{lastStatus});
+            readingsSingleUpdate($hash, 'state', $hash->{helper}{'ups.status'}, 1);
             $hash->{lastStatus} = $hash->{helper}{'ups.status'};
           } elsif ($var eq 'ups.model' and not defined $attr{$name}{model}) {
             $attr{$name}{model} = $hash->{helper}{$var};
@@ -290,7 +259,16 @@ sub NUT_Auswertung($) {
         }
 
       } elsif ($words[0] eq 'BEGIN') {
-        # Anfang einer Liste - n/u
+        # Anfang einer Liste
+        if ($words[2] eq 'VAR') {
+          # Hier werden die alten Daten gelöscht.
+          # Das ist notwendig, da sonst nicht entschieden werden kann, welche Daten die USV liefert
+          # und welche berechnet werden müssen.
+          # FIXME Problem: Wenn in der Zeit, bis END LIST VAR durch ist, per GET Werte abgefragt werden sollen,
+          #       dann fehlen die möglicherweise. GET ist aber noch nicht implementiert.
+          #       Mögliche Lösung: Neue Werte in z.B. {helper}{NEW} einlesen und bei END LIST VAR umschieben.
+          delete $hash->{helper};
+        }
 
       } elsif ($words[0] eq 'END') {
         # Ende einer Liste
@@ -328,26 +306,6 @@ sub NUT_Auswertung($) {
 
 
 
-sub NUT_addUnit($$) {
-  my ($var, $arg) = @_;
-
-  # Einheiten an die Werte anfügen
-  # Das soll ja eigentlich nicht passieren, aber da die interfaces nur sehr unvollständig passen, geht das nicht anders.
-  # Geht das effizienter?
-  my $excl = join('|', @nutunitsexclude);
-  unless ($var =~ m/($excl)/) {
-    foreach my $unit (@nutunits) {
-      if ($var =~ m/$unit->[0]/) {
-        $arg .= ' ' . $unit->[1];
-        last;
-      }
-    }
-  }
-
-  return $arg;
-}
-
-
 sub NUT_createVariables($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -374,30 +332,14 @@ sub NUT_makeReadings($) {
   my $name = $hash->{NAME};
 
   # Die USV-Variablen en bloc in Readings überführen
-  # FIXME und was ist mit event-on-*-reading?
   # FIXME Woher kommt die Fehlermeldung 'Notify loop for...' im Log?
 
   readingsBeginUpdate($hash);
-  foreach (split (' ', $attr{$name}{asReadings})) {
+  foreach (split (',', $attr{$name}{asReadings})) {
     readingsBulkUpdate($hash, $_, $hash->{helper}{$_}) if defined $hash->{helper}{$_};
   }
   readingsEndUpdate($hash, 1);
 
-}
-
-
-
-sub NUT_DbLog_split($) {
-  my ($event) = @_;
-  my ($reading, $value) = split(": ", $event);
-  my $unit = "";
-
-  if ($value =~ m/([\d\.]+) (.*)/) {
-    $value = $1;
-    $unit = $2;
-  }
-
-  return ($reading, $value, $unit);
 }
 
 
@@ -447,14 +389,17 @@ sub NUT_DbLog_split($) {
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="">pollState</a><br>
         Polling interval in seconds for the state of the ups. Default: 10</li><br>
     <li><a name="">pollVal</a><br>
         Polling interval in seconds of the other Readings. This should be a multiple of pollState. Default: 60</li><br>
-    <li><a name="">asReadings</a><br>
-        Values of the UPS which are used as Readings<br>
+    <li><a name="#NUT_asReadings">asReadings</a><br>
+        Values of the UPS which are used as Readings (ups.status is read anyway)<br>
         Example:<br>
-        <code>attr theUPS asReadings battery.charge battery.runtime input.voltage ups.load ups.power ups.realpower</code> </li><br>
+        <code>attr theUPS asReadings battery.charge,battery.runtime,input.voltage,ups.load,ups.power,ups.realpower</code> </li><br>
+    <li><a name="">withUnits</a><br>
+        When set to 1, unit are attached to the readings.</li><br>
     <li><a name="">model</a><br>
         This is automatically filled with the model name of the UPS.</li><br>
     <li><a name="">serNo</a><br>
@@ -507,14 +452,17 @@ sub NUT_DbLog_split($) {
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="">pollState</a><br>
         Polling-Intervall in Sekunden für den Status der USV. Default: 10</li><br>
     <li><a name="">pollVal</a><br>
         Polling-Intervall für die anderen Werte. Dieser Wert wird auf ein Vielfaches von pollState gerundet. Default: 60</li><br>
     <li><a name="NUT_asReadings">asReadings</a><br>
-        Mit Leerzeichen getrennte Liste der USV-Werte, die als Readings verwendet werden sollen.<br>
+        Mit Kommata getrennte Liste der USV-Werte, die als Readings verwendet werden sollen (ups.status wird auf jeden Fall gelesen).<br>
         Beispiel:<br>
-        <code>attr dieUSV asReadings battery.charge battery.runtime input.voltage ups.load ups.power ups.realpower</code> </li><br>
+        <code>attr dieUSV asReadings battery.charge,battery.runtime,input.voltage,ups.load,ups.power,ups.realpower</code> </li><br>
+    <li><a name="">withUnits</a><br>
+        Mit dem Setzen auf 1 werden die passenden Einheiten an die Readings angefügt.</li><br>
     <li><a name="">model</a><br>
         Wird automatisch mit der Modellbezeichnung der USV gefüllt.</li><br>
     <li><a name="">serNo</a><br>

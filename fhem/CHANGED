@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  34_NUT: readingFnAttributes added; creation of units deleted;
+                changed attr asReadings to use comma instead of space
   - bugfix:  SYSMON: crash on FritzBox
   - bugfix:  34_NUT: fixed possible buffer overflow, rewrote reception of data
   - bugfix:  SYSMON: idletime on multicore, warnings
