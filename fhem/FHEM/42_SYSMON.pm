@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.8.6";
+my $VERSION = "1.8.7";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -1568,7 +1568,7 @@ sub SYSMON_getNetworkInfo ($$$)
   #Log 3, "SYSMON>>>>>>>>>>>>>>>>> ".$dataThroughput[0];
   
   #--- DEBUG ---
-  if($device eq "_test_") {
+  if($device eq "_test1") {
   	@dataThroughput = (
   	"enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1492",
   	"        inet 192.168.2.7  netmask 255.255.255.0  broadcast 192.168.2.255",
@@ -1577,6 +1577,19 @@ sub SYSMON_getNetworkInfo ($$$)
   	"        RX errors 0  dropped 0  overruns 0  frame 0",
   	"        TX packets 1915387  bytes 587386206 (560.1 MiB)",
   	"        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0");
+  }
+  
+  if($device eq "_test2") {
+  	@dataThroughput = (
+    "eth0      Link encap:Ethernet  Hardware Adresse b8:27:eb:47:a9:8d",
+    "          inet Adresse:192.168.2.118  Bcast:192.168.2.255  Maske:255.255.255.0",
+    "          inet6-Adresse: 2003:46:b6b:3100:ba27:ebff:fe47:a98d/64 Gültigkeitsbereich:Global",
+    "          inet6-Adresse: fe80::ba27:ebff:fe47:a98d/64 Gültigkeitsbereich:Verbindung",
+    "          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metrik:1",
+    "          RX packets:1224709 errors:0 dropped:0 overruns:0 frame:0",
+    "          TX packets:1156620 errors:0 dropped:0 overruns:0 carrier:0",
+    "          Kollisionen:0 Sendewarteschlangenlänge:1000",
+    "          RX bytes:180806073 (172.4 MiB)  TX bytes:108919337 (103.8 MiB)");
   }
   #--- DEBUG ---
 
@@ -1594,15 +1607,27 @@ sub SYSMON_getNetworkInfo ($$$)
     #           TX packets:533293 errors:0 dropped:0 overruns:0 carrier:0
     #           Kollisionen:0 Sendewarteschlangenlaenge:1000
     #           RX bytes:25517384 (24.3 MiB)  TX bytes:683970999 (652.2 MiB)
+    
 
     my $ip = undef; my $ip6 = undef;
     foreach (@dataThroughput) {
-    	if($_=~ m/inet\s+(addr:)*(\S*)/) {
+    	if($_=~ m/inet\s+(Adresse:)*(\S*)/) {
     	  $ip=$2;
     	}
-    	if($_=~ m/inet6\s+(addr:)*\s*(\S*)/) {
+    	if(!$ip && $_=~ m/inet\s+(addr:)*(\S*)/) {
+    	  $ip=$2;
+    	}
+    	
+    	if($_=~ m/inet6-(Adresse:)*\s*(\S*)\s+G.ltigkeitsbereich:Verbindung/) {
+    	  $ip6=$2;
+    	}
+    	if(!$ip && $_=~ m/inet6\s+(addr:)*\s*(\S*)\s+Scope:Link/) {
+    	  $ip6=$2;
+    	}
+    	if(!$ip && $_=~ m/inet6\s+(addr:)*\s*(\S*)/) {
     		$ip6=$2;
     	}
+
       if(index($_, 'RX bytes') >= 0) {
         $dataThroughput = $_;
         last;
