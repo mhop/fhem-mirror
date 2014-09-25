@@ -1,0 +1,32 @@
+#!/bin/sh
+DIR='/var/packages/FHEM/scripts'
+
+case $1 in
+	start)
+		${DIR}/fhem.sh start
+		exit 0
+		;;
+	stop)
+		${DIR}/fhem.sh stop
+		exit 0
+		;;
+	restart)
+		${DIR}/fhem.sh stop
+		${DIR}/fhem.sh start
+		exit 0
+		;;
+	status)
+		${DIR}/fhem.sh status
+		if [ "$?" = "0" ]; then
+			exit 0
+		else
+			exit 1
+		fi
+		;;
+	log)
+		${DIR}/fhem.sh log
+		exit 0
+		;;
+esac
+
+exit 0

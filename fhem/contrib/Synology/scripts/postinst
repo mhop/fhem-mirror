@@ -1,0 +1,14 @@
+#!/bin/sh
+eval $(env | grep "^SYNOPKG_PKGDEST=")
+eval $(env | grep "^SYNOPKG_PKGNAME=")
+eval $(env | grep "^SYNOPKG_PKGPORT=")
+eval $(env | grep "^SYNOPKG_PKGINST_TEMP_DIR=")
+eval $(env | grep "^FHEM_DS_IP=")
+#ret=`ln -s /var/packages/${SYNOPKG_PKGNAME}/target/app /usr/syno/synoman/webman/3rdparty/${SYNOPKG_PKGNAME}`
+#ret=`ln -s /var/packages/${SYNOPKG_PKGNAME}/target /usr/local/${SYNOPKG_PKGNAME}`
+#
+#ret=`perl -pi -e "s,##ip##,${FHEM_DS_IP}," /var/packages/${SYNOPKG_PKGNAME}/target/app/config`
+#ret=`perl -pi -e "s,##adminport##,${SYNOPKG_PKGPORT}," /var/packages/${SYNOPKG_PKGNAME}/target/app/config`
+#
+ret=`rmdir ${SYNOPKG_PKGINST_TEMP_DIR}`
+exit 0
