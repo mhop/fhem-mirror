@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  34_NUT: removed calculation of values. Use userReadings instead.
+                     removed autogeneration of attr model and serNo.
   - feature: SYSMON: improvement: support network information (IP, IPv6) on german linux
   - feature: Synology DiskStation NAS basic spk file creation
   - change:  34_NUT: readingFnAttributes added; creation of units deleted;

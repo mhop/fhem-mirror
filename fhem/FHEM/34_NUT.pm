@@ -3,8 +3,6 @@
 #
 # Abfrage einer UPS über die Network UPS Tools (www.networkupstools.org)
 #
-# V 0.3.0 [25.09.2014]
-#
 
 # DEFINE bla NUT <upsname> [<host>[:<port>]]
 # Readings:
@@ -19,6 +17,7 @@
 #  pollState	Häufigkeit, mit der der Status der USV abgefragt wird (Default 5 sec)
 #  pollVal	Häufigkeit, mit der die anderen Readings abgefragt werden (Default 60 sec, Vielfaches von pollState)
 #  asReadings	Mit Kommata getrennte Liste der Werte der USV, die als Readings zur Verfügung stehen sollen
+#  $readingFnAttributes
 #
 #
 
@@ -28,7 +27,7 @@
 # A - Sollte man als Reading einfach die Bezeichnung der USV nehmen (also z.B. input.voltage) oder 
 #     Aliase nehmen (z.B. voltage) bzw. modifizierte Bezeichnungen (z.B. inputVoltage)?
 # B - attr pollInterval: Wertebereich prüfen (min. 5, max. ?)
-# C - Zusätzliche berechnete Werte - vielleicht auch per attr?
+# B - Zugriff auf Attribute per AttrVal
 # C - per GET könnte man alle Werte der USV verfügbar machen
 # D - SET implementieren, um diverse Dinge mit der USV anstellen zu können (Test, Ausschalten, ...)
 # D - Für die Web-Oberfläche wäre es vermutlich schick, wenn man die veränderbaren Variablen auch verändern könnte,
@@ -54,7 +53,6 @@ sub NUT_DevInit($);
 sub NUT_Read($);
 sub NUT_ListVar($);
 sub NUT_Auswertung($);
-sub NUT_createVariables($);
 sub NUT_makeReadings($);
 
 
@@ -70,7 +68,7 @@ sub NUT_Initialize($) {
   $hash->{ReadyFn} = "NUT_Ready";
   $hash->{ReadFn}  = "NUT_Read";
 
-  $hash->{AttrList} = "disable:0,1 pollState pollVal asReadings model serNo ".
+  $hash->{AttrList} = "disable:0,1 pollState pollVal asReadings ".
                       $readingFnAttributes;
 }
 
@@ -162,8 +160,6 @@ sub NUT_ListVar($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  $hash->{pollValState} += $attr{$name}{pollState};
-
   if ($attr{$name}{disable} == 0) {
     # TODO
     # - Mechanismus, der verhindert, dass lauter Befehle abgesendet werden, während er noch auf Antworten wartet
@@ -176,8 +172,7 @@ sub NUT_ListVar($) {
     }
 
     my $ups = $hash->{UpsName};
-    if ($hash->{pollValState} > $attr{$name}{pollVal}) {
-      $hash->{pollValState} = 0;
+    if ($hash->{pollValState} == 0) {
       # Kompletten Datensatz anfordern
       Log3 $name, 5, "Sending 'LIST VAR $ups'...";
       DevIo_SimpleWrite($hash, "LIST VAR $ups\n", 0);
@@ -194,6 +189,9 @@ sub NUT_ListVar($) {
 
   RemoveInternalTimer("pollTimer:".$name);
   InternalTimer(gettimeofday() + $attr{$name}{pollState}, "NUT_PollTimer", "pollTimer:".$name, 0);
+
+  $hash->{pollValState} += $attr{$name}{pollState};
+  $hash->{pollValState} = 0 if $hash->{pollValState} >= $attr{$name}{pollVal};
 }
 
 
@@ -249,10 +247,6 @@ sub NUT_Auswertung($) {
             # Status wird sofort übernommen
             readingsSingleUpdate($hash, 'state', $hash->{helper}{'ups.status'}, 1);
             $hash->{lastStatus} = $hash->{helper}{'ups.status'};
-          } elsif ($var eq 'ups.model' and not defined $attr{$name}{model}) {
-            $attr{$name}{model} = $hash->{helper}{$var};
-          } elsif ($var eq 'ups.serial' and not defined $attr{$name}{serNo}) {
-            $attr{$name}{serNo} = $hash->{helper}{$var};
           }
         } else {
           Log3 $name, 1, "NUT $hash->{UpsName}: VAR from wrong UPS $words[1]";
@@ -274,8 +268,6 @@ sub NUT_Auswertung($) {
         # Ende einer Liste
         if ($words[2] eq 'VAR') {
           # Ende einer Variablen-Liste
-          # Erzeugen von berechneten Variablen
-          NUT_createVariables($hash);
           # Umwidmen der Variablen in Readings
           NUT_makeReadings($hash);
         }
@@ -306,27 +298,6 @@ sub NUT_Auswertung($) {
 
 
 
-sub NUT_createVariables($) {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  # Zusätzliche Werte berechnen, die die USV nicht zur Verfügung stellt
-
-  unless (defined $hash->{helper}{'ups.power'}) {
-    if (defined $hash->{helper}{'ups.load'} and defined $hash->{helper}{'ups.power.nominal'}) {
-       $hash->{helper}{'ups.power'} = $hash->{helper}{'ups.power.nominal'} * $hash->{helper}{'ups.load'} / 100;
-    }
-  }
-  unless (defined $hash->{helper}{'ups.realpower'}) {
-    if (defined $hash->{helper}{'ups.load'} and defined $hash->{helper}{'ups.realpower.nominal'}) {
-       $hash->{helper}{'ups.realpower'} = $hash->{helper}{'ups.realpower.nominal'} * $hash->{helper}{'ups.load'} / 100;
-    }
-  }
-
-}
-
-
-
 sub NUT_makeReadings($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -336,6 +307,8 @@ sub NUT_makeReadings($) {
 
   readingsBeginUpdate($hash);
   foreach (split (',', $attr{$name}{asReadings})) {
+    s/^\s+//;
+    s/\s+$//;
     readingsBulkUpdate($hash, $_, $hash->{helper}{$_}) if defined $hash->{helper}{$_};
   }
   readingsEndUpdate($hash, 1);
@@ -356,11 +329,6 @@ sub NUT_makeReadings($) {
   also be possible to control the UPS (start test, switch off).<br>
   Which values you can use as readings is set with <a href="#NUT_asReadings">asReadings</a>. Which values are available with this UPS, you can check with 
   <code>list theUPS</code>. Only ups.status is always read and used as the status of the device.<br>
-  In addition to the values which are provided by the UPS there are some values calculated by the module, if they are not provided by the UPS. At the moment these are
-  <ul>
-    <li>ups.power = ups.power.nominal * ups.load / 100</li>
-    <li>ups.realpower = ups.realpower.nominal * ups.load / 100</li>
-  </ul>
 
   <br><br>
 
@@ -400,10 +368,6 @@ sub NUT_makeReadings($) {
         <code>attr theUPS asReadings battery.charge,battery.runtime,input.voltage,ups.load,ups.power,ups.realpower</code> </li><br>
     <li><a name="">withUnits</a><br>
         When set to 1, unit are attached to the readings.</li><br>
-    <li><a name="">model</a><br>
-        This is automatically filled with the model name of the UPS.</li><br>
-    <li><a name="">serNo</a><br>
-        This is automatically filled with the serial number of the UPS.</li><br>
   </ul>
 </ul>
 
@@ -419,11 +383,6 @@ sub NUT_makeReadings($) {
   auch Temperatur u.ä.) und zukünftig die USV auch steuern kann (Test aktivieren, USV herunterfahren u.ä.).<br>
   Welche Readings zur Verfügung stehen, bestimmt das Attribut <a href="#NUT_asReadings">asReadings</a>. Welche Werte eine USV zur Verfügung stellt, kann man mit
   <code>list dieUSV</code> unter <i>Helper:</i> ablesen. Nur ups.status wird immer ausgelesen und ergibt den Status des Geräts.<br>
-  Zusätzlich zu den Werten, die die USV zur Verfügung stellt, werden ggf. noch weitere Werte berechnet, falls sie nicht durch die USV geliefert werden. Zur Zeit sind dies
-  <ul>
-    <li>ups.power = ups.power.nominal * ups.load / 100</li>
-    <li>ups.realpower = ups.realpower.nominal * ups.load / 100</li>
-  </ul>
 
   <br><br>
 
@@ -463,10 +422,6 @@ sub NUT_makeReadings($) {
         <code>attr dieUSV asReadings battery.charge,battery.runtime,input.voltage,ups.load,ups.power,ups.realpower</code> </li><br>
     <li><a name="">withUnits</a><br>
         Mit dem Setzen auf 1 werden die passenden Einheiten an die Readings angefügt.</li><br>
-    <li><a name="">model</a><br>
-        Wird automatisch mit der Modellbezeichnung der USV gefüllt.</li><br>
-    <li><a name="">serNo</a><br>
-        Wird automatisch mit der Seriennummer der USV gefüllt.</li><br>
   </ul>
 </ul>
 
