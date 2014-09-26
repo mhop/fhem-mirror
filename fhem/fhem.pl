@@ -1373,8 +1373,9 @@ CommandSave($$)
   print SFH "include $attr{global}{lastinclude}\n"
         if($attr{global}{lastinclude});
 
-  foreach my $fh (values %fh) {
-    close($fh) if($fh ne "1");
+  foreach my $key (keys %fh) {
+    next if($fh{$key} eq "1"); ## R/O include files
+    $ret .= "$key: $!" if(!close($fh{$key}));
   }
   return ($ret ? $ret : "Wrote configuration to $param");
 }
@@ -2564,6 +2565,7 @@ SignalHandling()
     $SIG{'CHLD'} = 'IGNORE';
     $SIG{'HUP'}  = sub { CommandRereadCfg(undef, "") };
     $SIG{'ALRM'} = sub { Log 1, "ALARM signal, blocking write?" };
+    #$SIG{'XFSZ'} = sub { Log 1, "XFSZ signal" }; to test with limit filesize 
   }
 }
 
