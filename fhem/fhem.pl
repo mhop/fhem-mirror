@@ -1232,8 +1232,7 @@ sub
 WriteStatefile()
 {
   if(configDBUsed()) {
-    cfgDB_SaveState();
-    return "";
+    return cfgDB_SaveState();
   }
 
   return "No statefile specified" if(!$attr{global}{statefile});
@@ -1288,7 +1287,7 @@ WriteStatefile()
     }
   }
 
-  close(SFH);
+  return "$attr{global}{statefile}: $!" if(!close(SFH));
   return "";
 }
 
@@ -1297,11 +1296,12 @@ sub
 CommandSave($$)
 {
   my ($cl, $param) = @_;
-  my $ret = "";
 
   DoTrigger("global", "SAVE", 1);
 
-  WriteStatefile();
+  my $ret =  WriteStatefile();
+  return $ret if($ret);
+  $ret = "";    # cfgDB_SaveState may return undef
 
   if(configDBUsed()) {
     $ret = cfgDB_SaveCfg();
@@ -2565,7 +2565,7 @@ SignalHandling()
     $SIG{'CHLD'} = 'IGNORE';
     $SIG{'HUP'}  = sub { CommandRereadCfg(undef, "") };
     $SIG{'ALRM'} = sub { Log 1, "ALARM signal, blocking write?" };
-    #$SIG{'XFSZ'} = sub { Log 1, "XFSZ signal" }; to test with limit filesize 
+    #$SIG{'XFSZ'} = sub { Log 1, "XFSZ signal" }; # to test with limit filesize 
   }
 }
 
