@@ -219,8 +219,9 @@ PRESENCE_Define($$)
 
     if($hash->{MODE} =~ /(lan-ping|local-bluetooth|fritzbox|shellscript|function)/)
     {
+        delete $hash->{helper}{RUNNING_PID} if(defined($hash->{helper}{RUNNING_PID}));
         RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+        InternalTimer(gettimeofday(), "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
      
         return;
     }
@@ -519,7 +520,7 @@ sub PRESENCE_StartLocalScan($;$)
          return;
     }
 
-    $hash->{STATE} = "active" if($hash->{STATE} eq "???" or "defined");
+    $hash->{STATE} = "active" if($hash->{STATE} eq "???" or $hash->{STATE} eq "defined");
 
     if($local == 0)
     {
