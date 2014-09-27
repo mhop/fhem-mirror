@@ -31,69 +31,65 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
-use DevIo;
 use Digest::MD5;
 use HttpUtils;
 use DevIo;
 
 my %connection_type = (
-0 => "0",
-1 => "FON1",
-2 => "FON2",
-3 => "FON3",
-4 => "ISDN",
-5 => "FAX",
-6 => "not_defined",
-7 => "not_defined",
-8 => "not_defined",
-9 => "not_defined",
-10 => "DECT_1",
-11 => "DECT_2",
-12 => "DECT_3",
-13 => "DECT_4",
-14 => "DECT_5",
-15 => "DECT_6",
-16 => "FRITZMini_1",
-17 => "FRITZMini_2",
-18 => "FRITZMini_3",
-19 => "FRITZMini_4",
-20 => "VoIP_1",
-21 => "VoIP_2",
-22 => "VoIP_3",
-23 => "VoIP_4",
-24 => "VoIP_5",
-25 => "VoIP_6",
-26 => "VoIP_7",
-27 => "VoIP_8",
-28 => "VoIP_9",
-29 => "VoIP_10",
-40 => "Answering_Machine_1",
-41 => "Answering_Machine_2",
-42 => "Answering_Machine_3",
-43 => "Answering_Machine_4",
-44 => "Answering_Machine_5"
+    0 => "0",
+    1 => "FON1",
+    2 => "FON2",
+    3 => "FON3",
+    4 => "ISDN",
+    5 => "FAX",
+    6 => "not_defined",
+    7 => "not_defined",
+    8 => "not_defined",
+    9 => "not_defined",
+    10 => "DECT_1",
+    11 => "DECT_2",
+    12 => "DECT_3",
+    13 => "DECT_4",
+    14 => "DECT_5",
+    15 => "DECT_6",
+    16 => "FRITZMini_1",
+    17 => "FRITZMini_2",
+    18 => "FRITZMini_3",
+    19 => "FRITZMini_4",
+    20 => "VoIP_1",
+    21 => "VoIP_2",
+    22 => "VoIP_3",
+    23 => "VoIP_4",
+    24 => "VoIP_5",
+    25 => "VoIP_6",
+    26 => "VoIP_7",
+    27 => "VoIP_8",
+    28 => "VoIP_9",
+    29 => "VoIP_10",
+    40 => "Answering_Machine_1",
+    41 => "Answering_Machine_2",
+    42 => "Answering_Machine_3",
+    43 => "Answering_Machine_4",
+    44 => "Answering_Machine_5"
 );
 
 
-
-
+#####################################
 sub
 FB_CALLMONITOR_Initialize($)
 {
-  my ($hash) = @_;
+    my ($hash) = @_;
 
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
+    # Provider
+    $hash->{ReadFn}  = "FB_CALLMONITOR_Read";  
+    $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
+    $hash->{GetFn}   = "FB_CALLMONITOR_Get";
+    $hash->{SetFn}   = "FB_CALLMONITOR_Set";
+    $hash->{DefFn}   = "FB_CALLMONITOR_Define";
+    $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
+    $hash->{AttrFn}  = "FB_CALLMONITOR_Attr";
 
-# Provider
-  $hash->{ReadFn}  = "FB_CALLMONITOR_Read";  
-  $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
-  $hash->{GetFn}   = "FB_CALLMONITOR_Get";
-  $hash->{SetFn}   = "FB_CALLMONITOR_Set";
-  $hash->{DefFn}   = "FB_CALLMONITOR_Define";
-  $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrFn}  = "FB_CALLMONITOR_Attr";
-  
-  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:multiple,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at reverse-search-cache:0,1 reverse-search-phonebook-file ".
+    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:multiple-strict,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at reverse-search-cache:0,1 reverse-search-phonebook-file ".
                         $readingFnAttributes;
 }
 
@@ -101,48 +97,44 @@ FB_CALLMONITOR_Initialize($)
 sub
 FB_CALLMONITOR_Define($$)
 {
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
-  
-  if(@a != 3) {
-    my $msg = "wrong syntax: define <name> FB_CALLMONITOR ip[:port]";
-    Log 2, $msg;
-    return $msg;
-  }
-  DevIo_CloseDev($hash);
+    my ($hash, $def) = @_;
+    my @a = split("[ \t][ \t]*", $def);
 
-  my $name = $a[0];
-  my $dev = $a[2];
-  $dev .= ":1012" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
+    if(@a != 3) 
+    {
+        my $msg = "wrong syntax: define <name> FB_CALLMONITOR ip[:port]";
+        Log 2, $msg;
+        return $msg;
+    }
+    
+    DevIo_CloseDev($hash);
 
-  
+    my $dev = $a[2];
 
-  $hash->{DeviceName} = $dev;
-  my $ret = DevIo_OpenDev($hash, 0, undef);
+    $dev .= ":1012" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
-  
+    $hash->{DeviceName} = $dev;
 
-  return $ret;
+    return DevIo_OpenDev($hash, 0, undef);
 }
 
 
 #####################################
+# closing the connection on undefinition (shutdown/delete)
 sub
 FB_CALLMONITOR_Undef($$)
 {
-  my ($hash, $arg) = @_;
-  my $name = $hash->{NAME};
+    my ($hash, $arg) = @_;
 
-
-
-  DevIo_CloseDev($hash); 
-  return undef;
+    DevIo_CloseDev($hash); 
+    
+    return undef;
 }
 
 
 
 #####################################
-# No get commands possible, as we just receive the events from the FritzBox.
+# Get function for returning a reverse search name
 sub
 FB_CALLMONITOR_Get($@)
 {
@@ -168,6 +160,8 @@ FB_CALLMONITOR_Get($@)
 
 }
 
+#####################################
+# Set function for executing a reread of the internal phonebook
 sub
 FB_CALLMONITOR_Set($@)
 {
