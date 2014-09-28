@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.8.7";
+my $VERSION = "1.9.1";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -771,7 +771,11 @@ SYSMON_obtainParameters($$)
   if($m2 gt 0) { # Nur wenn > 0
     # M2: ram, swap
     if($refresh_all || ($ref % $m2) eq 0) {
-      $map = SYSMON_getRamAndSwap($hash, $map);
+    	if(SYSMON_isOSX()){
+    	  $map = SYSMON_getRamAndSwapOSX($hash, $map);
+    	} else {
+        $map = SYSMON_getRamAndSwap($hash, $map);
+      }
     }
   }
 
@@ -1389,7 +1393,9 @@ sub SYSMON_getRamAndSwap($$)
   #my @speicher = qx(free -m);
   my @speicher = SYSMON_execute($hash, "free");
 
-  if(!@speicher) {return $map;}
+  if(!@speicher) {
+  	return $map;
+  }
     
   shift @speicher;
   my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
@@ -1421,10 +1427,10 @@ sub SYSMON_getRamAndSwap($$)
     }
 
     $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, ($used - $buffers - $cached), (($used - $buffers - $cached) / $total * 100), ($free + $buffers + $cached));
-  } 
+  }
   else
   {
-    $ram = "n/a"
+    $ram = "n/a";
   }
   $map->{+RAM} = $ram;
   
@@ -1443,9 +1449,230 @@ sub SYSMON_getRamAndSwap($$)
   }
 
   $map->{+SWAP} = $swap;
-
+  
   return $map;
 }
+
+#------------------------------------------------------------------------------
+# Prüft, ob das Host-System OSX ist (darvin).
+#------------------------------------------------------------------------------
+sub SYSMON_isOSX()
+{
+	return $^O eq 'darwin';
+}
+
+#------------------------------------------------------------------------------
+# Prüft, ob das Host-System Linux ist (linux).
+#------------------------------------------------------------------------------
+sub SYSMON_isLinux()
+{
+	return $^O eq 'linux';
+}
+
+#------------------------------------------------------------------------------
+# Liefert Werte fuer RAM und SWAP (Gesamt, Verwendet, Frei).
+#------------------------------------------------------------------------------
+sub SYSMON_getRamAndSwapOSX($$)
+{
+  my ($hash, $map) = @_;
+  
+  my $debug = 0; # Nur zum Testen!
+
+  #my @speicher = qx(free -m);
+  my @amemsize = SYSMON_execute($hash, "sysctl hw.memsize");
+  
+  if($debug) {
+  	@amemsize = ("hw.memsize: 8589934592");
+  }
+  
+  if($amemsize[0]=~m/hw.memsize:\s+(.+)/) {
+    my $total = $1;
+    
+    my @avmstat = SYSMON_execute($hash, "vm_stat");
+    if($debug) {
+  	  @avmstat = ('Mach Virtual Memory Statistics: (page size of 4096 bytes)',
+                  'Pages free:                                5268.',
+                  'Pages active:                            440314.',
+                  'Pages inactive:                          430905.',
+                  'Pages speculative:                          878.',
+                  'Pages throttled:                              0.',
+                  'Pages wired down:                        398445.',
+                  'Pages purgeable:                             69.',
+                  '"Translation faults":                 508984629.',
+                  'Pages copy-on-write:                    5668036.',
+                  'Pages zero filled:                    347281743.',
+                  'Pages reactivated:                    114745855.',
+                  'Pages purged:                          13495647.',
+                  'File-backed pages:                        88747.',
+                  'Anonymous pages:                         783350.',
+                  'Pages stored in compressor:             1760568.',
+                  'Pages occupied by compressor:            820444.',
+                  'Decompressions:                        48558417.',
+                  'Compressions:                          63022425.',
+                  'Pageins:                                3754238.',
+                  'Pageouts:                                589840.',
+                  'Swapins:                                 714378.',
+                  'Swapouts:                               1017813.');
+    }
+    
+    #wired down, active, inactive
+    my $wired_down=0;
+    my $active=0;
+    my $inactive=0;
+    my $blockSize = 4096;
+    foreach my $k (@avmstat) {
+    	if($k=~m/page\s+size\s+of\s+(\d+)\s+bytes/) {
+        $blockSize = $1;
+      }
+    	if($k=~m/Pages\s+wired\s+down:\s+(.+)\./) {
+        $wired_down = $1;
+      }
+      if($k=~m/Pages\s+active:\s+(.+)\./) {
+        $active = $1;
+      }
+      if($k=~m/Pages\s+inactive:\s+(.+)\./) {
+        $inactive = $1;
+      }
+    }
+    
+    $wired_down = $wired_down * $blockSize / 1048576; # In Megabyte umrechnen
+    $active = $active * $blockSize / 1048576;
+    $inactive = $inactive * $blockSize / 1048576;
+    
+    my $used = $wired_down+$active+$inactive;
+    
+    $total = $total/1048576;
+    my $free = $total-$used;
+    my $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used , ($used / $total * 100), $free);
+    #Log 3, "SYSMON >>>>>>>>>>>>>>>>>>>>>>>>> OSX: RAM:  ".$ram;
+    $map->{+RAM} = $ram;
+  
+    my @avm = SYSMON_execute($hash, "sysctl vm.swapusage");
+    if($debug) {
+    	@avm=(
+    	#'vm.loadavg: { 2.45 2.19 3.34 }',
+      'vm.swapusage: total = 1024.00M  used = 529.25M  free = 494.75M  (encrypted)',
+      #'vm.cs_force_kill: 0',
+      #'vm.cs_force_hard: 0',
+      #'vm.cs_debug: 0',
+      #'vm.cs_all_vnodes: 0',
+      #'vm.cs_enforcement: 0',
+      #'vm.cs_enforcement_panic: 0',
+      #'vm.sigpup_disable: 0',
+      #'vm.global_no_user_wire_amount: 67108864',
+      #'vm.global_user_wire_limit: 8522825728',
+      #'vm.user_wire_limit: 8522825728',
+      #'vm.vm_copy_src_not_internal: 129',
+      #'vm.vm_copy_src_not_symmetric: 14994',
+      #'vm.vm_copy_src_large: 0',
+      #'vm.vm_page_external_count: 355255',
+      #'vm.vm_page_filecache_min: 104857',
+      #'vm.compressor_mode: 4',
+      #'vm.compressor_bytes_used: 2984467096',
+      #'vm.compressor_swapout_target_age: 0',
+      #'vm.compressor_eval_period_in_msecs: 250',
+      #'vm.compressor_sample_min_in_msecs: 500',
+      #'vm.compressor_sample_max_in_msecs: 10000',
+      #'vm.compressor_thrashing_threshold_per_10msecs: 50',
+      #'vm.compressor_thrashing_min_per_10msecs: 20',
+      #'vm.compressor_minorcompact_threshold_divisor: 20',
+      #'vm.compressor_majorcompact_threshold_divisor: 25',
+      #'vm.compressor_unthrottle_threshold_divisor: 35',
+      #'vm.compressor_catchup_threshold_divisor: 50',
+      #'vm.cs_validation: 1',
+      #'vm.cs_blob_count: 616',
+      #'vm.cs_blob_size: 8053170',
+      #'vm.cs_blob_count_peak: 693',
+      #'vm.cs_blob_size_peak: 8389641',
+      #'vm.cs_blob_size_max: 1675264',
+      #'vm.vm_debug_events: 0',
+      #'vm.allow_stack_exec: 0',
+      #'vm.allow_data_exec: 1',
+      #'vm.shared_region_unnest_logging: 1',
+      #'vm.shared_region_trace_level: 1',
+      #'vm.shared_region_version: 3',
+      #'vm.shared_region_persistence: 0',
+      #'vm.vm_page_free_target: 2000',
+      #'vm.memory_pressure: 0',
+      #'vm.page_free_wanted: 86',
+      #'vm.page_purgeable_count: 1055',
+      #'vm.page_purgeable_wired_count: 0',
+      #'vm.madvise_free_debug: 0',
+      #'vm.page_reusable_count: 39048',
+      #'vm.reusable_success: 11350536',
+      #'vm.reusable_failure: 1060241',
+      #'vm.reusable_shared: 248771',
+      #'vm.all_reusable_calls: 290574',
+      #'vm.partial_reusable_calls: 11142306',
+      #'vm.reuse_success: 9593371',
+      #'vm.reuse_failure: 5124',
+      #'vm.all_reuse_calls: 257820',
+      #'vm.partial_reuse_calls: 9684238',
+      #'vm.can_reuse_success: 6171792',
+      #'vm.can_reuse_failure: 79183',
+      #'vm.reusable_reclaimed: 0',
+      #'vm.page_free_count: 1914',
+      #'vm.page_speculative_count: 810',
+      #'vm.page_cleaned_count: 0',
+      #'vm.pageout_inactive_dirty_internal: 63170734',
+      #'vm.pageout_inactive_dirty_external: 465495',
+      #'vm.pageout_inactive_clean: 18967682',
+      #'vm.pageout_speculative_clean: 32929182',
+      #'vm.pageout_inactive_used: 115155398',
+      #'vm.pageout_freed_from_inactive_clean: 18423099',
+      #'vm.pageout_freed_from_speculative: 32929182',
+      #'vm.pageout_freed_from_cleaned: 568334',
+      #'vm.pageout_enqueued_cleaned: 1010912',
+      #'vm.pageout_enqueued_cleaned_from_inactive_clean: 0',
+      #'vm.pageout_enqueued_cleaned_from_inactive_dirty: 1011010',
+      #'vm.pageout_cleaned: 568334',
+      #'vm.pageout_cleaned_reactivated: 407922',
+      #'vm.pageout_cleaned_reference_reactivated: 4',
+      #'vm.pageout_cleaned_volatile_reactivated: 0',
+      #'vm.pageout_cleaned_fault_reactivated: 557',
+      #'vm.pageout_cleaned_commit_reactivated: 407361',
+      #'vm.pageout_cleaned_busy: 33',
+      #'vm.pageout_cleaned_nolock: 12931'
+      );
+    }
+    
+    #vm.swapusage: total = 1024.00M  used = 529.25M  free = 494.75M  (encrypted)
+    if($avm[0]=~m/vm.swapusage:\s+total\s+=\s+(\S*)\s+used\s+=\s+(\S*)\s+free\s+=\s+(\S*)\s+(.*)/) {
+      my $total2 = SYSMON_fmtStorageAmount_($1);
+      my $used2  = SYSMON_fmtStorageAmount_($2);
+      my $free2  = SYSMON_fmtStorageAmount_($3);
+      my $swap = sprintf("Total: %.2f MB, Used: %.2f MB,  %.2f %%, Free: %.2f MB", $total2, $used2, ($used2 / $total2 * 100), $free2);
+      $map->{+SWAP} = $swap; 
+      #Log 3, "SYSMON >>>>>>>>>>>>>>>>>>>>>>>>> OSX: SWAP: ".$swap;
+    }
+  }
+  
+  return $map;
+}
+
+sub SYSMON_fmtStorageAmount_($) {
+	my ($t) = @_;
+	if($t=~m/([\d|\.]+)(.*)/) {
+		my $r=$1;
+		my $m=$2;
+		if($m) {
+			# Modifier testen
+			if($m eq 'M') {
+				# Megabyte ist OK,so lassen
+				return $r;
+			}
+			if($m eq 'G') {
+				# Gigabyte: in MB umwandeln
+				$r=$r*1024;
+			}
+			# K, oder P nehmen ich nicht mehr bzw. noch nicht an ;)
+			return $r;
+		}
+	}
+	return $t;
+}
+
+
 
 #------------------------------------------------------------------------------
 # Liefert Fuellstand fuer das angegebene Dateisystem (z.B. '/dev/root', '/dev/sda1' (USB stick)).
