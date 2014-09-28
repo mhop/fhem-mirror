@@ -1523,6 +1523,8 @@ $culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
                          ,press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
+  "HM-CC-RT-DN06"     =>{ press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."
+                         },
 
   "CCU-FHEM00"        =>{ update       =>"",
                           hmPairForSec =>"<sec>",

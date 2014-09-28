@@ -1332,12 +1332,14 @@ sub CUL_HM_Parse($$) {#########################################################
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
       push @ack,$shash,"${mNo}803F$ioId${src}0204$s2000";
       push @evtEt,[$shash,1,"time-request"];
+      
       # reset desired-temp just to get an AckInfo for battery state
-      CUL_HM_Set(CUL_HM_name2Hash($devH->{channel_04}),
-                 $devH->{channel_04},
-                 "desired-temp",ReadingsVal($devH->{channel_04}
-                                             ,"desired-temp"
-                                             ,""));
+      my $mode = ReadingsVal($devH->{channel_04},"controlMode",undef);
+      if ($mode){
+        my %mCmd = (auto=>0,manual=>1,party=>2,boost=>3,day=>4,night=>5);
+        my $msg = '8'.($mCmd{$mode})."04";
+        CUL_HM_PushCmdStack($shash,'++A011'.$ioId.$src.$msg);
+      }
     }
   }
   elsif($md eq "HM-TC-IT-WM-W-EU") { ##########################################
