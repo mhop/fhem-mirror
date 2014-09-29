@@ -18,7 +18,9 @@ use vars qw(%zw_func_id);
 use vars qw(%zw_type6);
 
 my @zwave_models = qw(
-  Everspring_AN1582 Everspring_AN1583
+  Everspring_AN1582
+  Everspring_AN1583
+  Fibaro_FGRM222
 );
 
 my %zwave_id2class;
@@ -244,7 +246,7 @@ my %zwave_class = (
   MULTI_CHANNEL_ASSOCIATION=> { id => '8e', }, # aka MULTI_INSTANCE_ASSOCIATION
   MULTI_CMD                => { id => '8f', }, # Handled in Parse
   ENERGY_PRODUCTION        => { id => '90', },
-  MANUFACTURER_PROPRIETARY => { id => '91', },
+  MANUFACTURER_PROPRIETARY => { id => '91', }, # see manuf_proprietary below
   SCREEN_MD                => { id => '92', },
   SCREEN_ATTRIBUTES        => { id => '93', },
   SIMPLE_AV_CONTROL        => { id => '94', },
@@ -271,6 +273,14 @@ my %zwave_cmdArgs = (
   indicatorDim => "slider,0,1,99",
 );
 
+my %manuf_proprietary = ( # MANUFACTURER_PROPRIETARY ist model dependent
+   Fibaro_FGRM222 => {
+    set   => { positionSlat=>"010f26010100%02x", 
+               positionBlinds=>"010f260102%02x00",},
+    get   => { position=>"010f2602020000", },
+    parse => { "010f260303(..)(..)" => 'sprintf("position:Blinds %d Slat %d",'.
+                                          'hex($1),hex($2))',  }, },
+);
 
 sub
 ZWave_Initialize($)
@@ -352,8 +362,14 @@ ZWave_Cmd($$@)
   my %cmdList;
   my $classes = AttrVal($name, "classes", "");
   foreach my $cl (split(" ", $classes)) {
-    my $ptr = $zwave_class{$cl}{$type} if($zwave_class{$cl}{$type});
+    my $ptr = $zwave_class{$cl}{$type}
+        if($zwave_class{$cl} && $zwave_class{$cl}{$type});
+    if($cl eq "MANUFACTURER_PROPRIETARY") {
+      my $p = $manuf_proprietary{AttrVal($name, "model", "")};
+      $ptr = $p->{$type} if($p && $p->{$type});
+    }
     next if(!$ptr);
+
     foreach my $k (keys %{$ptr}) {
       if(!$cmdList{$k}) {
         $cmdList{$k}{fmt} = $ptr->{$k};
@@ -730,6 +746,7 @@ ZWave_Parse($$@)
   }
 
 
+  my $name = $hash->{NAME};
   my @event;
   my @args = ($arg); # MULTI_CMD handling
 
@@ -753,8 +770,13 @@ ZWave_Parse($$@)
 
     my $ptr = $zwave_class{$className}{parse}
                         if($zwave_class{$className}{parse});
+    if($className eq "MANUFACTURER_PROPRIETARY") {
+      my $p = $manuf_proprietary{AttrVal($name, "model", "")};
+      $ptr = $p->{parse} if($p && $p->{parse})
+    }
+
     if(!$ptr) {
-      Log3 $hash, 4, "$hash->{NAME}: Unknown message ($className $arg)";
+      Log3 $hash, 4, "$name: Unknown message ($className $arg)";
       next;
     }
 
@@ -765,7 +787,7 @@ ZWave_Parse($$@)
         push @event, $val;
       }
     }
-    Log3 $hash, 4, "$hash->{NAME}: $className $arg generated no event"
+    Log3 $hash, 4, "$name: $className $arg generated no event"
         if(!@event);
   }
 
@@ -788,7 +810,7 @@ ZWave_Parse($$@)
         if($vn eq "state");     # different from set
   }
   readingsEndUpdate($hash, 1);
-  return $hash->{NAME};
+  return $name;
 }
 
 #####################################
@@ -896,6 +918,12 @@ s2Hex($)
   <li>indicatorDim value<br>
     takes values from 1 to 99.
     If the indicator does not support dimming. It is interpreted as on.</li>
+
+  <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
+  <li>positionBlinds<br>
+    drive blinds to position %</li>
+  <li>positionSlat<br>
+    drive slat to position %</li>
 
   <br><br><b>Class PROTECTION</b>
   <li>protectionOff<br>
@@ -1006,7 +1034,13 @@ s2Hex($)
 
   <br><br><b>Class INDICATOR</b>
   <li>indicatorStatus<br>
-    return the indicator status of the node, as indState:on, indState:off or indState:dim value.
+    return the indicator status of the node, as indState:on, indState:off or
+    indState:dim value.
+    </li>
+  
+  <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
+  <li>position<br>
+    Fibaro FGRM-222: return the blinds position and slat angle.
     </li>
 
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
@@ -1171,6 +1205,9 @@ s2Hex($)
   <br><br><b>Class INDICATOR</b>
   <li>indState:[on|off|dim value]</li>
 
+  <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
+  <li>position:Blinds [%] Slat [%]</li>
+  
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
   <li>mfs:hexValue hexValue hexValue</li>
 
