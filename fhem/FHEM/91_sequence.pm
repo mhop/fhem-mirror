@@ -15,7 +15,7 @@ sequence_Initialize($)
   $hash->{DefFn} = "sequence_Define";
   $hash->{UndefFn} = "sequence_Undef";
   $hash->{NotifyFn} = "sequence_Notify";
-  $hash->{AttrList} = "disable:0,1 triggerPartial:0,1";
+  $hash->{AttrList} = "disable:0,1 triggerPartial:1,0 reportEvents:1,0";
 }
 
 
@@ -73,12 +73,17 @@ sequence_Notify($$)
     my $idx = $hash->{IDX} + 2;
     Log3 $ln, 5, "sequence $ln matched $idx";
     my @d = split("[ \t]+", $hash->{DEF});
-
+    $hash->{EVENTS} = "" if(!$hash->{EVENTS});
+    $hash->{EVENTS} .= " $n:$s";
 
     if($idx > $hash->{MAX}) {   # Last element reached
 
-      Log3 $ln, 5, "sequence $ln triggered";
-      DoTrigger($ln, "trigger");
+      my $tt = "trigger";
+      $tt .= $hash->{EVENTS} if(AttrVal($ln, "reportEvents", undef));
+      delete($hash->{EVENTS});
+
+      Log3 $ln, 5, "sequence $ln $tt";
+      DoTrigger($ln, $tt);
       $idx  = 0;
 
     } else {
@@ -105,8 +110,12 @@ sequence_Trigger($)
   $hash->{RE} = $d[0];
   my $idx = $hash->{IDX}/2;
   $hash->{IDX} = 0;
-  Log3 $ln, 5, "sequence $ln timeout on $idx";
-  DoTrigger($ln, "partial_$idx") if(AttrVal($ln, "triggerPartial", undef));
+  my $tt = "partial_$idx";
+  Log3 $ln, 5, "sequence $ln timeout on $idx ($tt)";
+  $tt .= $hash->{EVENTS} if(AttrVal($ln, "reportEvents", undef));
+  delete($hash->{EVENTS});
+
+  DoTrigger($ln, $tt) if(AttrVal($ln, "triggerPartial", undef));
 }
 
 sub
@@ -168,6 +177,17 @@ sequence_Undef($$)
       generates the event seq partial_2. This can be used to assign different
       tasks for a single button, depending on the number of times it is
       pressed.
+      </li><br>
+    <li><a href="#reportEvents">reportEvents</a><br>
+      if set (to 1), report the events (space separated) after the
+      "trigger" or "partial_X" keyword. This way one can create more general
+      sequences, and create different notifies to react:<br>
+      <ul><code>
+        define seq sequence remote:btn.* remote:btn.*<br>
+        attr seq reportEvents<br>
+        define n_b1b2 notify seq:trigger.remote:btn1.remote:btn2 set lamp1 on<br>
+        define n_b2b1 notify seq:trigger.remote:btn2.remote:btn1 set lamp1 off<br>
+      </code></ul>
       </li>
   </ul>
   <br>
@@ -225,6 +245,38 @@ sequence_Undef($$)
       erzeugt das Event "seq partial_2". Dies kann verwendet werden, um z.Bsp.
       einer Taste unterschiedliche Aufgaben zuzuweisen, jenachdem wie oft sie
       gedr&uuml;ckt wurde.
+      </li>
+  </ul>
+  <br>
+
+  <a name="sequenceattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#triggerPartial">triggerPartial</a><br>
+      Falls gesetzt (auf 1), und nicht alle erwarteten Events eingetroffen
+      sind, dann wird ein partial_X Event generiert, wobei X durch Anzahl der
+      eingetroffenen Events ersetzt wird. Beispiel:<br><code><ul>
+      fhem> define seq sequence d1:on 1 d1:on 1 d1:on<br>
+      fhem> attr seq triggerPartial<br>
+      fhem> set d1 on;; sleep 0.5;; set d1 on<br>
+      </ul></code>
+      erzeugt das Event "seq partial_2". Dies kann verwendet werden, um z.Bsp.
+      einer Taste unterschiedliche Aufgaben zuzuweisen, jenachdem wie oft sie
+      gedr&uuml;ckt wurde.
+      </li><br>
+
+    <li><a href="#reportEvents">reportEvents</a><br>
+      Falls gesetzt (auf 1), meldet trigger die empfangenen Events (Leerzeichen
+      getrennt) nach dem "trigger" oder "partial_X" Schl&uuml;sselwort.
+      Das kann verwendet werden, um generische sequence Instanzen zu definieren:
+      <br>
+      <ul><code>
+        define seq sequence remote:btn.* remote:btn.*<br>
+        attr seq reportEvents<br>
+        define n_b1b2 notify seq:trigger.remote:btn1.remote:btn2 set lamp1 on<br>
+        define n_b2b1 notify seq:trigger.remote:btn2.remote:btn1 set lamp1 off<br>
+      </code></ul>
       </li>
   </ul>
   <br>
