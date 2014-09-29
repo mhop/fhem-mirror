@@ -240,7 +240,7 @@ $modules{Global}{ORDER} = -1;
 $modules{Global}{LOADED} = 1;
 $modules{Global}{AttrList} =
   "archivecmd apiversion archivedir configfile lastinclude logfile " .
-  "modpath nrarchive pidfilename port statefile title userattr " .
+  "modpath nrarchive pidfilename port statefile title " .
   "mseclog:1,0 version nofork:1,0 logdir holiday2we " .
   "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
@@ -1361,7 +1361,12 @@ CommandSave($$)
         print $fh "define $d $defs{$d}{TYPE}\n";
       }
     }
-    foreach my $a (sort keys %{$attr{$d}}) {
+
+    foreach my $a (sort {
+                     return -1 if($a eq "userattr"); # userattr must be first
+                     return  1 if($b eq "userattr");
+                     return $a cmp $b;
+                   } keys %{$attr{$d}}) {
       next if($d eq "global" &&
               ($a eq "configfile" || $a eq "version"));
       my $val = $attr{$d}{$a};
@@ -2062,6 +2067,9 @@ getAllAttr($)
         if($modules{$defs{$d}{TYPE}}{AttrList});
   $list .= " " . $attr{global}{userattr}
         if($attr{global}{userattr});
+  $list .= " " . $attr{$d}{userattr}
+        if($attr{$d} && $attr{$d}{userattr});
+  $list .= " userattr";
   return $list;
 }
 
