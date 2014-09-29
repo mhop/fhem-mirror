@@ -112,6 +112,7 @@ speedtest_GetUpdate($)
       }
   }
 
+  readingsSingleUpdate($hash,"state", "running", 1);
   $hash->{helper}{RUNNING_PID} = BlockingCall("speedtest_DoSpeedtest", $name."|".$server, "speedtest_SpeedtestDone", 300, "speedtest_SpeedtestAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
 
@@ -154,13 +155,17 @@ speedtest_SpeedtestDone($)
 
   Log3 $hash, 5, "speedtest_SpeedtestDone: $string";
 
-  return if( $a[1] eq "Invalid server ID" );
+  if( $a[1] eq "Invalid server ID" ) {
+    readingsSingleUpdate($hash,"state", "failed", 1);
+    return;
+  }
 
   readingsBeginUpdate($hash);
 
   readingsBulkUpdate($hash,"ping",$a[1]);
   readingsBulkUpdate($hash,"download",$a[2]);
   readingsBulkUpdate($hash,"upload",$a[3]);
+  readingsBulkUpdate($hash,"state",defined($a[3])?"ok":"failed");
 
   readingsEndUpdate($hash,1);
 }
