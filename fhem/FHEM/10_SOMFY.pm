@@ -8,6 +8,23 @@
 # the newest culfw (support for "Y" command).
 #
 # Published under GNU GPL License, v2
+#
+# History:
+#	1.0		thomyd			initial implementation
+#
+#	1.1		Elektrolurch	state changed to open,close,pos <x>
+# 							for using "set device pos <value> the attributes
+#							drive-down-time-to-100, drive-down-time-to-close,
+#							drive-up-time-to-100 and drive-up-time-to-open must be set
+# 							Hardware section seperated to SOMFY_SetCommand
+#
+#	1.2		Elektrolurch	state is now set after reaching the position of the blind
+#							preparation for receiving signals of Somfy remotes signals,
+#							associated with the blind
+#
+#	1.3		thomyd			Basic implementation of "parse" function, requires updated CULFW
+#							Removed open/close as the same functionality can be achieved with an eventMap.
+
 ######################################################
 
 package main;
@@ -20,9 +37,21 @@ my %codes = (
 	"11" => "stop", 	# stop the current movement
 	"20" => "off",      # go "up"
 	"40" => "on",       # go "down"
-	"80" => "prog",     # enter programming mode
+	"80" => "prog",     # finish pairing
 	"100" => "on-for-timer",
 	"101" => "off-for-timer",
+	"XX" => "z_custom",	# custom control code
+);
+
+my %sets = (
+	"off" => "",
+	"on" => "",
+	"stop" => "",
+	"go-my" => "",
+	"on-for-timer" => "textField",
+	"off-for-timer" => "textField",
+	"z_custom" => "textField",
+	"pos" => "0,10,20,30,40,50,60,70,80,90,100"
 );
 
 my %somfy_c2b;
@@ -33,6 +62,14 @@ my $somfy_defrepetition = 6;	# Default Somfy frame repeat counter
 my %models = ( somfyblinds => 'blinds', ); # supported models (blinds only, as of now)
 
 #############################
+sub myUtilsSOMFY_Initialize($) {
+	$modules{SOMFY}{LOADED} = 1;
+	my $hash = $modules{SOMFY};
+
+	SOMFY_Initialize($hash);
+} # end sub myUtilsSomfy_initialize
+
+#############################
 sub SOMFY_Initialize($) {
 	my ($hash) = @_;
 
@@ -41,15 +78,20 @@ sub SOMFY_Initialize($) {
 		$somfy_c2b{ $codes{$k} } = $k;
 	}
 
-	#                         YsKKC0RRRRAAAAAA
-	#  $hash->{Match}     = "^YsA..0..........\$";
-	$hash->{SetFn}   = "SOMFY_Set";
-	#$hash->{StateFn} = "SOMFY_SetState";
-	$hash->{DefFn}   = "SOMFY_Define";
-	$hash->{UndefFn} = "SOMFY_Undef";
+	#                       YsKKC0RRRRAAAAAA
+	#  $hash->{Match}	= "^YsA..0..........\$";
+	$hash->{SetFn}		= "SOMFY_Set";
+	#$hash->{StateFn} 	= "SOMFY_SetState";
+	$hash->{DefFn}   	= "SOMFY_Define";
+	$hash->{UndefFn}	= "SOMFY_Undef";
+	$hash->{ParseFn}  	= "SOMFY_Parse";
+	$hash->{AttrFn}  	= "SOMFY_Attr";
 
-	#  $hash->{ParseFn}   = "SOMFY_Parse";
-	$hash->{AttrList} = "IODev"
+	$hash->{AttrList} = " drive-down-time-to-100"
+	  . " drive-down-time-to-close"
+	  . " drive-up-time-to-100"
+	  . " drive-up-time-to-open "
+	  . " IODev"
 	  . " symbol-length"
 	  . " enc-key"
 	  . " rolling-code"
@@ -62,6 +104,21 @@ sub SOMFY_Initialize($) {
 	  . " loglevel:0,1,2,3,4,5,6";
 
 }
+
+#############################
+sub SOMFY_StartTime($) {
+	my ($d) = @_;
+
+	my ($s, $ms) = gettimeofday();
+
+	my $t = $s + ($ms / 1000000); # 10 msec
+	my $t1 = 0;
+	$t1 = $d->{'starttime'} if(exists($d->{'starttime'} ));
+	$d->{'starttime'}  = $t;
+	my $dt = sprintf("%.2f", $t - $t1);
+
+	return $dt;
+} # end sub SOMFY_StartTime
 
 #############################
 sub SOMFY_Define($$) {
@@ -124,7 +181,7 @@ sub SOMFY_Define($$) {
 	my $ncode = 1;
 	$hash->{CODE}{ $ncode++ } = $code;
 	$modules{SOMFY}{defptr}{$code}{$name} = $hash;
-
+	$hash->{move} = 'stop';
 	AssignIoPort($hash);
 }
 
@@ -147,59 +204,26 @@ sub SOMFY_Undef($$) {
 }
 
 #####################################
-sub SOMFY_Extension_Fn($)
+sub SOMFY_SendCommand($@)
 {
-  my (undef, $name, $cmd) = split(" ", shift, 3);
-  return if(!defined($defs{$name}));
-
-  if($cmd eq "on-for-timer") {
-    DoSet($name, "stop"); # send the stop-command
-
-  } elsif($cmd eq "off-for-timer") {
-    DoSet($name, "stop");
-
-  }
-}
-
-#############################
-sub SOMFY_Do_For_Timer($@)
-{
-  	my ($hash, $name, $cmd, $param) = @_;
-
-  	my $cmd1 = ($cmd =~ m/on.*/ ? "on" : "off");
-
-	RemoveInternalTimer("SOMFY $name $cmd");
-	return "$cmd requires a number as argument" if($param !~ m/^\d*\.?\d*$/);
-
-	if($param) {
-	  # send the on/off command first
-	  DoSet($name, $cmd1);
-	  # schedule the stop command for later
-	  InternalTimer(gettimeofday()+$param,"SOMFY_Extension_Fn","SOMFY $name $cmd",0);
-	}
-
-	return
-}
-
-###################################
-sub SOMFY_Set($@) {
-	my ( $hash, $name, @args ) = @_;
-
+	my ($hash, @args) = @_;
 	my $ret = undef;
-	my $numberOfArgs  = int(@args);
+	my $cmd = $args[0];
 	my $message;
+	my $name = $hash->{NAME};
+	my $numberOfArgs  = int(@args);
 
-	if ( $numberOfArgs < 1 ) {
-		return "no set value specified" ;
-	}
 
-  return SOMFY_Do_For_Timer($hash, $name, @args) if($args[0] =~ m/[on|off]-for-timer$/);
-  return "Bad time spec" if($numberOfArgs == 2 && $args[1] !~ m/^\d*\.?\d+$/);
+  # custom control needs 2 digit hex code
+  return "Bad custom control code, use 2 digit hex codes only" if($args[0] eq "z_custom"
+  	&& ($numberOfArgs == 1
+  		|| ($numberOfArgs == 2 && $args[1] !~ m/^[a-fA-F0-9]{2}$/)));
 
-    my $command = $somfy_c2b{ $args[0] };
+    my $command = $somfy_c2b{ $cmd };
+	# eigentlich überflüssig, da oben schon auf Existenz geprüft wird -> %sets
 	if ( !defined($command) ) {
 
-		return "Unknown argument $args[0], choose one of "
+		return "Unknown argument $cmd, choose one of "
 		  . join( " ", sort keys %somfy_c2b );
 	}
 
@@ -221,8 +245,8 @@ sub SOMFY_Set($@) {
 	if (   defined( $attr{ $name } )
 		&& defined( $attr{ $name }{"symbol-length"} ) )
 	{
-		$message = "Yt" . $attr{ $name }{"symbol-length"};
-		CUL_SimpleWrite( $io, $message );
+		$message = "t" . $attr{ $name }{"symbol-length"};
+		IOWrite( $hash, "Y", $message );
 		Log GetLogLevel( $name, 4 ),
 		  "SOMFY set symbol-length: $message for $io->{NAME}";
 	}
@@ -232,8 +256,8 @@ sub SOMFY_Set($@) {
 	if (   defined( $attr{ $name } )
 		&& defined( $attr{ $name }{"repetition"} ) )
 	{
-		$message = "Yr" . $attr{ $name }{"repetition"};
-		CUL_SimpleWrite( $io, $message );
+		$message = "r" . $attr{ $name }{"repetition"};
+		IOWrite( $hash, "Y", $message );
 		Log GetLogLevel( $name, 4 ),
 		  "SOMFY set repetition: $message for $io->{NAME}";
 	}
@@ -258,7 +282,12 @@ sub SOMFY_Set($@) {
 	my $enckey = uc(ReadingsVal($name, "enc_key", "A0"));
 	my $rollingcode = uc(ReadingsVal($name, "rolling_code", "0000"));
 
-	$message = "Ys"
+	if($command eq "XX") {
+		# use user-supplied custom command
+		$command = $args[1];
+	}
+
+	$message = "s"
 	  . $enckey
 	  . $command
 	  . $rollingcode
@@ -268,15 +297,8 @@ sub SOMFY_Set($@) {
 	Log GetLogLevel( $name, 2 ), "SOMFY set $value: $message";
 	( undef, $value ) = split( " ", $value, 2 );    # Not interested in the name...
 
-	## Send Message to IODev and wait for correct answer
-	my $msg = CallFn( $io->{NAME}, "GetFn", $io, ( " ", "raw", $message ) );
-
-	if ( $msg =~ m/raw => Ys$enckey.*/ ) {
-		Log 4, "Answer from $io->{NAME}: $msg";
-	}
-	else {
-		Log 2, "SOMFY IODev device didn't answer Ys command correctly: $msg";
-	}
+	## Send Message to IODev using IOWrite
+	IOWrite( $hash, "Y", $message );
 
 	# increment encryption key and rolling code
 	my $enc_key_increment      = hex( $enckey );
@@ -293,8 +315,8 @@ sub SOMFY_Set($@) {
 	if (   defined( $attr{ $name } )
 		&& defined( $attr{ $name }{"symbol-length"} ) )
 	{
-		$message = "Yt" . $somfy_defsymbolwidth;
-		CUL_SimpleWrite( $io, $message );
+		$message = "t" . $somfy_defsymbolwidth;
+		IOWrite( $hash, "Y", $message );
 		Log GetLogLevel( $name, 4 ),
 		  "SOMFY set symbol-length back: $message for $io->{NAME}";
 	}
@@ -303,8 +325,8 @@ sub SOMFY_Set($@) {
 	if (   defined( $attr{ $name } )
 		&& defined( $attr{ $name }{"repetition"} ) )
 	{
-		$message = "Yr" . $somfy_defrepetition;
-		CUL_SimpleWrite( $io, $message );
+		$message = "r" . $somfy_defrepetition;
+		IOWrite( $hash, "Y", $message );
 		Log GetLogLevel( $name, 4 ),
 		  "SOMFY set repetition back: $message for $io->{NAME}";
 	}
@@ -328,25 +350,307 @@ sub SOMFY_Set($@) {
 	foreach my $n ( keys %{ $modules{SOMFY}{defptr}{$code} } ) {
 
 		my $lh = $modules{SOMFY}{defptr}{$code}{$n};
-		$lh->{CHANGED}[0]            = $value;
-		$lh->{STATE}                 = $value;
-		$lh->{READINGS}{state}{TIME} = $tn;
-		$lh->{READINGS}{state}{VAL}  = $value;
 		$lh->{READINGS}{enc_key}{TIME} 		= $tn;
 		$lh->{READINGS}{enc_key}{VAL}       = $new_enc_key;
 		$lh->{READINGS}{rolling_code}{TIME} = $tn;
 		$lh->{READINGS}{rolling_code}{VAL}  = $new_rolling_code;
 	}
 	return $ret;
-}
+} # end sub SOMFY_SendCommand
+
+###################################
+sub SOMFY_CalcNewPos($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	my $dt = SOMFY_StartTime($hash);
+	my $move = $hash->{move};
+	my $oldpos = $hash->{oldpos};
+	my $newpos = ($move eq 'up')?0:100; # it works anyway
+	my $timestamp = TimeNow();
+
+
+	# Attributes for calulation
+	my $t1down100 = AttrVal($name,'drive-down-time-to-100',undef);
+	my $t1downclose = AttrVal($name,'drive-down-time-to-close',undef);
+	my $t1upopen = AttrVal($name,'drive-up-time-to-open',undef);
+	my $t1up100 =  AttrVal($name,'drive-up-time-to-100',undef);
+
+	if(defined($t1down100) && defined($t1downclose) && defined($t1up100) && defined($t1upopen)) {
+		# attributes are set
+		if($move eq 'down') {
+			$newpos = $oldpos + (100 * $dt / $t1down100);
+
+		} elsif($move eq 'up') {
+			if($oldpos > 100) {
+				$dt = $dt - $t1up100;
+				$newpos = $oldpos - (100 * $dt / ($t1upopen - $t1up100));
+				$newpos = 100 if($newpos > 100), # driven only short between close and pos 100!
+
+			} else {
+				$newpos = $oldpos - (100 * $dt / ($t1upopen - $t1up100));
+
+			}
+			$newpos = 0 if($newpos < 0);
+
+		} else {
+			Log3($name,1,"SOMFY_CalcNewPos: $name move wrong $move");
+		} # error
+	} else {
+		# no attributes set
+		Log3($name,1,"SOMFY_CalcNewPos $name drive-down-time... attributes not set");
+	}
+
+	# update state
+	my $value;
+	if($newpos == 0) {
+		$value = 'off';
+
+	} elsif($newpos > 100) {
+		$value = 'on';
+
+	} else {
+		$value = 'pos '.SOMFY_Runden($newpos); # for using icons in state
+	}
+
+	$hash->{CHANGED}[0]            = $value;
+	$hash->{STATE}                 = $value;
+	$hash->{READINGS}{state}{TIME} = $timestamp;
+	$hash->{READINGS}{state}{VAL}  = $value;
+	setReadingsVal($hash,'position',$newpos,$timestamp);
+
+	# finish move
+	$hash->{move} = 'stop';
+	return undef;
+} # end sub SOMFY_CalcNewPos
+
+###################################
+sub SOMFY_SendStop($) {
+	my ($hash) = @_;
+	SOMFY_SendCommand($hash,'stop');
+	SOMFY_CalcNewPos($hash);
+} # end sub SOMFY_SendStop
+
+###################################
+sub SOMFY_Runden($) {
+	my ($v) = @_;
+	return sprintf("%d", ($v + 5) /10) * 10;
+} # end sub SOMFY_Runden
+
+###################################
+sub SOMFY_Set($@) {
+	my ( $hash, $name, @args ) = @_;
+	my $numberOfArgs  = int(@args);
+
+	if ( $numberOfArgs < 1 ) {
+		return "no set value specified" ;
+	}
+
+	my $cmd = lc($args[0]);
+	my $drivetime = 0; # on/off-for-timer and pos <value> -> move by time
+	my $updatetime = 0; # move to endpos or go-my / stop -> assume stop = pos 100
+
+	my $oldpos = ReadingsVal($name,'position',0);
+	$hash->{oldpos} = $oldpos; # store it for later recalculation
+	my $newpos = $args[1];
+
+	return "Bad time spec" if($cmd =~m/(on|off)-for-timer/ && $numberOfArgs == 2 && $args[1] !~ m/^\d*\.?\d+$/);
+
+	if(($cmd =~m/off/) || ($cmd eq 'pos' &&  $args[1] == 0)) {
+		$cmd = 'off';
+		$hash->{move} = 'up';
+		$newpos = 0;
+		$updatetime = (AttrVal($name,'drive-up-time-open',25) - AttrVal($name,'drive-up-time-100',0)) * $oldpos / 100;
+
+	} elsif ($cmd =~m/on/) {
+		$cmd = 'on';
+		$hash->{move} = 'down';
+
+		my $t1 = AttrVal($name,'drive-down-time-to-100',100);
+		my $t2 = AttrVal($name,'drive-down-time-to-close',100);
+		$newpos = sprintf("%d",100 * $t2/$t1);
+		$updatetime = $t1* (1 - ($oldpos / 100)) + ($t2 - $t1);
+
+	} elsif($cmd eq 'pos') {
+		return "bad pos specification"  if(!defined($newpos));
+		return "SOMFY_set: oldpos eq newpos ($newpos" if($newpos == $oldpos);
+		return  "SOMFY_set: $newpos must be > 0 and < 100" if($newpos < 0 || $newpos > 100);
+
+		my $t1down = AttrVal($name,'drive-down-time-to-100',undef);
+		my $t1upopen = AttrVal($name,'drive-up-time-to-open',undef);
+		my $t1up100 =  AttrVal($name,'drive-up-time-to-100',undef);
+		return "Please set attr drive-down-time-to-100, drive-down-time-to-close, "
+		. "drive-up-time-to-100 and drive-up-time-to-open before using the pos <value> extension" if(!defined($t1down) || !defined($t1upopen) || !defined($t1up100));
+
+		if($newpos > $oldpos) { # down
+			$cmd = 'on';
+			$hash->{move} = 'down';
+			$drivetime = ($t1down * ($newpos -  $oldpos) / 100);
+
+		} else { # up
+			$cmd = 'off';
+			$hash->{move} = 'up';
+			my $t1 = $t1upopen - $t1up100;
+			$drivetime = ($t1 * ($oldpos -  $newpos) / 100);
+		}
+		Log3($name,3,"somfy_set: cmd $cmd newpos $newpos drivetime $drivetime");
+
+	} elsif($cmd =~m/stop|go_my/) { # assuming stop = pos 100
+		$newpos = 100;
+		$hash->{move} = 'stop';
+		$hash->{READINGS}{position}{VAL} = 100;
+		Log3($name,1,"SOMFY_set: Warning: go-my/stop will mess up correct positioning! Please use pos <value> instead.");
+
+	} elsif($cmd eq 'on-for-timer') {
+		$cmd = 'on';
+		$hash->{move} = 'down';
+		$drivetime = $args[1];
+		my $tclose = AttrVal($name,'drive-down-time-to-close',25);
+		my $tmax = ($oldpos / 100) * $tclose;
+
+		if(($tmax + $drivetime) > $tclose) { # limit ?
+			$drivetime = 0;
+			$updatetime = $tmax;
+		}
+	} elsif($cmd eq 'off-for-timer') {
+		$cmd = 'off';
+		$hash->{move} = 'up';
+		$drivetime = $args[1];
+		my $topen = AttrVal($name,'drive-up-time-to-open',25);
+		my $t100 = AttrVal($name,'drive-up-time-to-100',0);
+		my $tpos =  $topen * ($topen / ($topen - $t100)) - ($oldpos / 100);
+
+		if(($tpos + $drivetime) > $topen) { # limit ?
+			$drivetime  = 0;
+			$updatetime = $tpos;
+		}
+	} elsif(!exists($sets{$cmd})) {
+		my @cList;
+		foreach my $k (sort keys %sets) {
+			my $opts = undef;
+			$opts = $sets{$k};
+
+			if (defined($opts)) {
+				push(@cList,$k . ':' . $opts);
+			} else {
+				push (@cList,$k);
+			}
+		} # end foreach
+
+		return "Unknown argument $cmd, choose one of " . join(" ", @cList);
+	} # error and ? handling
+
+	$args[0] = $cmd;
+
+	if($drivetime > 0) {
+		# timer fuer stop starten
+		RemoveInternalTimer($hash);
+		Log3($name,3,"SOMFY_set: $name -> stopping in $drivetime sec");
+		InternalTimer(gettimeofday()+$drivetime,"SOMFY_SendStop",$hash,0);
+
+	} elsif($updatetime > 0) {
+		# timer fuer Update state starten
+		RemoveInternalTimer($hash);
+		Log3($name,3,"SOMFY_set: $name -> state update in $updatetime sec");
+		InternalTimer(gettimeofday()+$updatetime,"SOMFY_CalcNewPos",$hash,0);
+
+	} else {
+		Log3($name,1,"SOMFY_set: Error - drivetime and updatetime = 0");
+	}
+
+	SOMFY_SendCommand($hash,@args);
+	SOMFY_StartTime($hash);
+
+	return undef;
+} # end sub SOMFY_setFN
+###############################
+
 
 #############################
 sub SOMFY_Parse($$) {
+	my ($hash, $msg) = @_;
 
-	# not implemented yet, since we only support SENDING of somfy commands
+	# Msg format:
+	# Ys AB 2C 004B 010010
+	# address needs bytes 1 and 3 swapped
+
+	if (substr($msg, 0, 2) eq "Yr" || substr($msg, 0, 2) eq "Yt") {
+		# changed time or repetition, just return the name
+		return $hash->{NAME};
+	}
+
+    # get address
+    my $address = uc(substr($msg, 14, 2).substr($msg, 12, 2).substr($msg, 10, 2));
+
+    # get command and set new state
+	my $cmd = sprintf("%X", hex(substr($msg, 4, 2)) & 0xF0);
+	if ($cmd eq "10") {
+	 $cmd = "11"; # use "stop" instead of "go-my"
+    }
+
+	my $newstate = $codes{ $cmd };
+
+	my $def = $modules{SOMFY}{defptr}{$address};
+
+	if($def) {
+		my @list;
+		foreach my $name (keys %{ $def }) {
+      		my $lh = $def->{$name};
+     	 	$name = $lh->{NAME};        # It may be renamed
+
+      		return "" if(IsIgnored($name));   # Little strange.
+
+      		# update the state and log it
+     		readingsSingleUpdate($lh, "state", $newstate, 1);
+
+			Log3 $name, 4, "SOMFY $name $newstate";
+
+			push(@list, $name);
+		}
+		# return list of affected devices
+		return @list;
+
+	} else {
+		Log3 $hash, 3, "SOMFY Unknown device $address, please define it";
+		return "UNDEFINED SOMFY_$address SOMFY $address";
+	}
 }
+##############################
+sub SOMFY_Attr(@) {
+	my ($cmd,$name,$aName,$aVal) = @_;
+	my $hash = $defs{$name};
 
+	return "\"SOMFY Attr: \" $name does not exist" if (!defined($hash));
+
+	# $cmd can be "del" or "set"
+	# $name is device name
+	# aName and aVal are Attribute name and value
+	if ($cmd eq "set") {
+		if ($aName =~/drive-(down|up)-time-to.*/) {
+			# check name and value
+			return "SOMFY_attr: value must be >0 and <= 100" if($aVal <= 0 || $aVal > 100);
+		}
+
+		if ($aName eq 'drive-down-time-to-100') {
+			$attr{$name}{'drive-down-time-to-100'} = $aVal;
+			$attr{$name}{'drive-down-time-to-close'} = $aVal if(!defined($attr{$name}{'drive-down-time-to-close'}) || ($attr{$name}{'drive-down-time-to-close'} < $aVal));
+
+		} elsif($aName eq 'drive-down-time-to-close') {
+			$attr{$name}{'drive-down-time-to-close'} = $aVal;
+			$attr{$name}{'drive-down-time-to-100'} = $aVal if(!defined($attr{$name}{'drive-down-time-to-100'}) || ($attr{$name}{'drive-down-time-to-100'} > $aVal));
+
+		} elsif($aName eq 'drive-up-time-to-100') {
+			$attr{$name}{'drive-up-time-to-100'} = $aVal;
+
+		} elsif($aName eq 'drive-up-time-to-open') {
+			$attr{$name}{'drive-up-time-to-open'} = $aVal;
+			$attr{$name}{'drive-up-time-to-100'} = 0 if(!defined($attr{$name}{'drive-up-time-to-100'}) || ($attr{$name}{'drive-up-time-to-100'} > $aVal));
+		}
+	}
+
+	return undef;
+}
 #############################
+
 1;
 
 
@@ -358,8 +662,8 @@ sub SOMFY_Parse($$) {
 <ul>
   The Somfy RTS (identical to Simu Hz) protocol is used by a wide range of devices,
   which are either senders or receivers/actuators.
-  As we right now are only able to SEND Somfy commands, but CAN'T receive them, this module currently only
-  supports devices like blinds, dimmers, etc. through a <a href="#CUL">CUL</a> device, so this must be defined first.
+  Right now only SENDING of Somfy commands is implemented in the CULFW, so this module currently only
+  supports devices like blinds, dimmers, etc. through a <a href="#CUL">CUL</a> device (which must be defined first).
 
   <br><br>
 
@@ -416,16 +720,18 @@ sub SOMFY_Parse($$) {
     off
     go-my
     stop
+    pos value (0..100) # see note
     prog  # Special, see note
     on-for-timer
     off-for-timer
-</pre>
+	</pre>
     Examples:
     <ul>
       <code>set rollo_1 on</code><br>
       <code>set rollo_1,rollo_2,rollo_3 on</code><br>
       <code>set rollo_1-rollo_3 on</code><br>
       <code>set rollo_1 off</code><br>
+      <code>set rollo_1 pos 50</code><br>
     </ul>
     <br>
     Notes:
@@ -439,6 +745,12 @@ sub SOMFY_Parse($$) {
       instead of reversing the blind.<br>
       This can be used to go to a specific position by measuring the time it takes to close the blind completely.
       </li>
+      <li>pos value<br>
+	  The position must be between 0 and 100 and the appropriate
+	  attributes drive-down-time-to-100, drive-down-time-to-close,
+	  drive-up-time-to-100 and drive-up-time-to-open must be set.<br>
+	  pos 100 means the blind covers the window (but is not completely shut), 0 means it is completely open.
+	  </li>
     </ul>
   </ul>
   <br>
@@ -510,6 +822,31 @@ sub SOMFY_Parse($$) {
         appear in commands which use some wildcard/attribute as name specifiers
         (see <a href="#devspec">devspec</a>). You still get them with the
         "ignored=1" special devspec.
+        </li><br>
+
+    <a name="drive-down-time-to-100"></a>
+    <li>drive-down-time-to-100<br>
+        The time the blind needs to drive down from "open" (pos 0) to pos 100.<br>
+		In this position, the lower edge touches the window frame, but it is not completely shut.<br>
+		For a mid-size window this time is about 12 to 15 seconds.
+        </li><br>
+
+    <a name="drive-down-time-to-close"></a>
+    <li>drive-down-time-to-close<br>
+        The time the blind needs to drive down from "open" (pos 0) to "close", the end position of the blind.<br>
+		This is about 3 to 5 seonds more than the "drive-down-time-to-100" value.
+        </li><br>
+
+    <a name="drive-up-time-to-100"></a>
+    <li>drive-up-time-to-100<br>
+        The time the blind needs to drive up from "close" (endposition) to "pos 100".<br>
+		This usually takes about 3 to 5 seconds.
+        </li><br>
+
+    <a name="drive-up-time-to-open"></a>
+    <li>drive-up-time-to-open<br>
+        The time the blind needs drive up from "close" (endposition) to "open" (upper endposition).<br>
+		This value is usually a bit higher than "drive-down-time-to-close", due to the blind's weight.
         </li><br>
 
   </ul>
