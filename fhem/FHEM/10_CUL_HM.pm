@@ -1338,7 +1338,7 @@ sub CUL_HM_Parse($$) {#########################################################
       if ($mode){
         my %mCmd = (auto=>0,manual=>1,party=>2,boost=>3,day=>4,night=>5);
         my $msg = '8'.($mCmd{$mode})."04";
-        CUL_HM_PushCmdStack($shash,'++A011'.$ioId.$src.$msg);
+#General remove setting of mode till solution is found        CUL_HM_PushCmdStack($shash,'++A011'.$ioId.$src.$msg);
       }
     }
   }
