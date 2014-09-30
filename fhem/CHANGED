@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: SOMFY: support for exact positioning (one-time setup of run times required)
+                    support for parse()-function, requires newest CULFW.
   - feature: userattr is now also device attribute
   - feature: ZWave: Fibaro_FGRM222 MANUFACTURER_PROPRIETARY class
   - feature: sequence: reportEvents attribtue added
