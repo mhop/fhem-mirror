@@ -85,6 +85,8 @@
 #
 # 2014-08-22 - added     automatic fileimport during migration
 #
+# 2014-09-30 - added     support for device based userattr
+#
 ##############################################################################
 #
 
@@ -363,13 +365,26 @@ sub cfgDB_SaveCfg() {
 			push @rowList, "define $d $defs{$d}{TYPE} $def";
 		}
 
-		foreach my $a (sort keys %{$attr{$d}}) {
+		foreach my $a (sort {
+										return -1 if($a eq "userattr"); # userattr must be first
+										return  1 if($b eq "userattr");
+										return $a cmp $b;
+										} keys %{$attr{$d}}) {
 			next if($d eq "global" &&
 				($a eq "configfile" || $a eq "version"));
 			my $val = $attr{$d}{$a};
 			$val =~ s/;/;;/g;
 			push @rowList, "attr $d $a $val";
 		}
+
+#		foreach my $a (sort keys %{$attr{$d}}) {
+#			next if($d eq "global" &&
+#				($a eq "configfile" || $a eq "version"));
+#			my $val = $attr{$d}{$a};
+#			$val =~ s/;/;;/g;
+#			push @rowList, "attr $d $a $val";
+#		}
+
 	}
 
 		foreach my $a (sort keys %{$attr{configdb}}) {
