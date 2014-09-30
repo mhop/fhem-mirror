@@ -536,7 +536,7 @@ sub cfgDB_MigrationImport() {
 
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId() { 
-	return "# ".'$Revision: 6636 $' 
+	return "# ".'$Id$' 
 }
 
 # return filelist depending on directory and regexp
