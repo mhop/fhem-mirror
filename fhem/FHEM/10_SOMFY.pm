@@ -48,6 +48,7 @@ my %sets = (
 	"on" => "",
 	"stop" => "",
 	"go-my" => "",
+	"prog" => "",
 	"on-for-timer" => "textField",
 	"off-for-timer" => "textField",
 	"z_custom" => "textField",
