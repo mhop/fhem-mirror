@@ -400,7 +400,7 @@ statistics_DoStatistics($$$)
       next if ($completeReadingName =~ m/^($exclReadings)$/ );
       next if not exists ($dev->{READINGS}{$readingName});
       $statisticDone = 1;
-      statistics_doStatisticDelta ($hash, $dev, $readingName, 1, $periodSwitch);
+      statistics_doStatisticDelta ($hash, $dev, $readingName, 3, $periodSwitch);
    }
    
    @specialReadings = split /,/, AttrVal($hashName, "durationReadings", "");
@@ -1039,16 +1039,16 @@ statistics_UpdateDevReading($$$$)
   <a name="statisticsattr"></a>
    <b>Attributes</b>
    <ul>
-    <li><code>dayChangeTime &lt;Zeit&gt;</code>
+    <li><code>dayChangeTime &lt;time&gt;</code>
       <br>
       Time of day change. Default is 00:00. For weather data the day change is e.g. 06:50. 
       <br>
     </li><br>
-    <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
+    <li><code>deltaReadings &lt;readings&gt;</code>
       <br>
       Comma separated list of reading names for which a delta statistic shall be calculated. 
     </li><br>
-    <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
+    <li><code>durationReadings &lt;readings&gt;</code>
       <br>
       Comma separated list of reading names for which a duration statistic shall be calculated. 
     </li><br>
@@ -1058,11 +1058,11 @@ statistics_UpdateDevReading($$$$)
       The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. "FritzDect:current|Sensor_.*:humidity"
       <br>
     </li><br>
-    <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
+    <li><code>minAvgMaxReadings &lt;readings&gt;</code>
       <br>
       Comma separated list of reading names for which a min/average/max statistic shall be calculated. 
     </li><br>
-    <li><code>periodChangePreset &lt;Sekunden&gt;</code>
+    <li><code>periodChangePreset &lt;seconds&gt;</code>
       <br>
       Start of the calculation of periodical data, default is 5 Sekunden before each full hour,
       <br>
@@ -1080,11 +1080,11 @@ statistics_UpdateDevReading($$$$)
       z.B. <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
     </li><br>
-   <li><code>specialDeltaPeriodHours &lt;Hours&gt;</code>
+   <li><code>specialDeltaPeriodHours &lt;hours&gt;</code>
       <br>
       Adds for readings of delta statistics a singular reading for the given period of hours (e.g. for the rain of the last 72 hours)
    </li><br>
-    <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
+    <li><code>tendencyReadings &lt;readings&gt;</code>
       <br>
       Comma separated list of reading names for which a min/average/max statistic shall be calculated. 
     </li><br>
@@ -1164,11 +1164,11 @@ statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, für welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
+      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
     </li><br>
     <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, für welche die Dauer einzelner Gerätewerte innerhalb bestimmte Zeiträume (Stunde/Tag/Monat/Jahr) erfasst wird.
+      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Dauer einzelner Gerätewerte innerhalb bestimmte Zeitr&auml;ume (Stunde/Tag/Monat/Jahr) erfasst wird.
     </li><br>
     <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
       <br>
@@ -1182,7 +1182,7 @@ statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Durch Kommas getrennte Liste von Ger&auml;tewerten, für die in bestimmten Zeiträumen (Tag, Monat, Jahr) Minimum, Mittelwert und Maximum erfasst werden. 
+      Durch Kommas getrennte Liste von Ger&auml;tewerten, f&uuml;r die in bestimmten Zeitr&auml;umen (Tag, Monat, Jahr) Minimum, Mittelwert und Maximum erfasst werden. 
     </li><br>
     <li><code>periodChangePreset &lt;Sekunden&gt;</code>
       <br>
@@ -1207,7 +1207,7 @@ statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
       <br>
-      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, für die innerhalb bestimmter Zeiträume (1h, 2h, 3h, 6h) die Differenz zwischen Anfangs- und Endwert ermittelt wird. 
+      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r die innerhalb bestimmter Zeitr&auml;ume (1h, 2h, 3h, 6h) die Differenz zwischen Anfangs- und Endwert ermittelt wird. 
     </li><br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a>
     </li><br>
