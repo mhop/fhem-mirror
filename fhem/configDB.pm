@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 6636 $
 ##############################################################################
 #
 # configDB.pm
@@ -536,7 +536,7 @@ sub cfgDB_MigrationImport() {
 
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId() { 
-	return "# ".'$Id$' 
+	return "# ".'$Revision: 6636 $' 
 }
 
 # return filelist depending on directory and regexp
