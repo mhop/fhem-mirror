@@ -51,8 +51,8 @@ sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
   my $modulVersion = "2014-05-10";
 
 #List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.69#V1.70#";
-  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.69#V1.70#";
+  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#";
+  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#";
  
 sub ########################################
 LUXTRONIK2_Initialize($)
