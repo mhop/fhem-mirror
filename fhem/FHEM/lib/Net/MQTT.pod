@@ -1,0 +1,59 @@
+use strict;
+use warnings;
+package Net::MQTT;
+$Net::MQTT::VERSION = '1.142010';
+# ABSTRACT: Perl modules for MQTT Protocol (http://mqtt.org/)
+
+
+1;
+
+__END__
+
+=pod
+
+=encoding UTF-8
+
+=head1 NAME
+
+Net::MQTT - Perl modules for MQTT Protocol (http://mqtt.org/)
+
+=head1 VERSION
+
+version 1.142010
+
+=head1 SYNOPSIS
+
+  # net-mqtt-sub /topic
+
+  # net-mqtt-pub /topic message
+
+  # net-mqtt-trace mqtt.tcp
+
+=head1 DESCRIPTION
+
+Low level API for the MQTT protocol described at L<http://mqtt.org>.
+
+B<IMPORTANT:> This is an early release and the API is still subject to
+change.
+
+=head1 DISCLAIMER
+
+This is B<not> official IBM code.  I work for IBM but I'm writing this
+in my spare time (with permission) for fun.
+
+=head1 SEE ALSO
+
+net-mqtt-sub(1), net-mqtt-pub(1),  net-mqtt-trace(1), Net::MQTT::Message(3)
+
+=head1 AUTHOR
+
+Mark Hindess <soft-cpan@temporalanomaly.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2014 by Mark Hindess.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
