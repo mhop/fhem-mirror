@@ -300,7 +300,7 @@ sub MQTT_send_message($$$@) {
   my $msgid = $hash->{msgid}++;
   my $msg = Net::MQTT::Message->new(message_id => $msgid,@_);
   main::Log3($name,5,"MQTT $name message sent: ".$msg->string());
-  DevIo_SimpleWrite($hash,$msg->bytes);
+  DevIo_SimpleWrite($hash,$msg->bytes,undef);
   return $msgid;
 };
 
