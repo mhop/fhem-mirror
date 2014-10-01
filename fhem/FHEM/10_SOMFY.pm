@@ -24,6 +24,9 @@
 #
 #	1.3		thomyd			Basic implementation of "parse" function, requires updated CULFW
 #							Removed open/close as the same functionality can be achieved with an eventMap.
+#
+#	1.4 	thomyd			Implemented fallback on/off-for-timer methods and only show warning about stop/go-my
+#							if the positioning attributes are set.
 
 ######################################################
 
@@ -427,8 +430,14 @@ sub SOMFY_CalcNewPos($) {
 ###################################
 sub SOMFY_SendStop($) {
 	my ($hash) = @_;
+
 	SOMFY_SendCommand($hash,'stop');
-	SOMFY_CalcNewPos($hash);
+
+	# only calculate new position if the attributes are set
+	my $positioningAttributes = AttrVal($hash->{NAME},'drive-down-time-to-100',undef);
+	if (defined($positioningAttributes)) {
+		SOMFY_CalcNewPos($hash)
+	}
 } # end sub SOMFY_SendStop
 
 ###################################
@@ -456,14 +465,13 @@ sub SOMFY_Set($@) {
 
 	return "Bad time spec" if($cmd =~m/(on|off)-for-timer/ && $numberOfArgs == 2 && $args[1] !~ m/^\d*\.?\d+$/);
 
-	if(($cmd =~m/off/) || ($cmd eq 'pos' &&  $args[1] == 0)) {
+	if(($cmd eq 'off') || ($cmd eq 'pos' &&  $args[1] == 0)) {
 		$cmd = 'off';
 		$hash->{move} = 'up';
 		$newpos = 0;
 		$updatetime = (AttrVal($name,'drive-up-time-open',25) - AttrVal($name,'drive-up-time-100',0)) * $oldpos / 100;
 
-	} elsif ($cmd =~m/on/) {
-		$cmd = 'on';
+	} elsif ($cmd eq 'on') {
 		$hash->{move} = 'down';
 
 		my $t1 = AttrVal($name,'drive-down-time-to-100',100);
@@ -493,36 +501,53 @@ sub SOMFY_Set($@) {
 			my $t1 = $t1upopen - $t1up100;
 			$drivetime = ($t1 * ($oldpos -  $newpos) / 100);
 		}
-		Log3($name,3,"somfy_set: cmd $cmd newpos $newpos drivetime $drivetime");
+		Log3($name,3,"SOMFY_set: cmd $cmd newpos $newpos drivetime $drivetime");
 
 	} elsif($cmd =~m/stop|go_my/) { # assuming stop = pos 100
-		$newpos = 100;
+
 		$hash->{move} = 'stop';
-		$hash->{READINGS}{position}{VAL} = 100;
-		Log3($name,1,"SOMFY_set: Warning: go-my/stop will mess up correct positioning! Please use pos <value> instead.");
+
+		# only warn about stop/go-my if the attributes are set
+		my $positioningAttributes = AttrVal($name,'drive-down-time-to-100',undef);
+
+		if (defined($positioningAttributes)) {
+			$newpos = 100;
+			$hash->{READINGS}{position}{VAL} = 100;
+
+			Log3($name,3,"SOMFY_set: Warning: go-my/stop will mess up correct positioning! Please use pos <value> instead.");
+		}
 
 	} elsif($cmd eq 'on-for-timer') {
 		$cmd = 'on';
 		$hash->{move} = 'down';
 		$drivetime = $args[1];
-		my $tclose = AttrVal($name,'drive-down-time-to-close',25);
-		my $tmax = ($oldpos / 100) * $tclose;
+		my $tclose = AttrVal($name,'drive-down-time-to-close',undef);
 
-		if(($tmax + $drivetime) > $tclose) { # limit ?
-			$drivetime = 0;
-			$updatetime = $tmax;
+		# only calculate if positioning attributes are set
+		if (defined($tclose)) {
+			my $tmax = ($oldpos / 100) * $tclose;
+
+			if(($tmax + $drivetime) > $tclose) { # limit ?
+				$drivetime = 0;
+				$updatetime = $tmax;
+			}
 		}
 	} elsif($cmd eq 'off-for-timer') {
 		$cmd = 'off';
 		$hash->{move} = 'up';
 		$drivetime = $args[1];
-		my $topen = AttrVal($name,'drive-up-time-to-open',25);
-		my $t100 = AttrVal($name,'drive-up-time-to-100',0);
-		my $tpos =  $topen * ($topen / ($topen - $t100)) - ($oldpos / 100);
+		my $topen = AttrVal($name,'drive-up-time-to-open',undef);
 
-		if(($tpos + $drivetime) > $topen) { # limit ?
-			$drivetime  = 0;
-			$updatetime = $tpos;
+		# only calculate if positioning attributes are set
+		if (defined($topen)) {
+
+			my $t100 = AttrVal($name,'drive-up-time-to-100',0);
+			my $tpos =  $topen * ($topen / ($topen - $t100)) - ($oldpos / 100);
+
+			if(($tpos + $drivetime) > $topen) { # limit ?
+				$drivetime  = 0;
+				$updatetime = $tpos;
+			}
 		}
 	} elsif(!exists($sets{$cmd})) {
 		my @cList;
@@ -542,6 +567,8 @@ sub SOMFY_Set($@) {
 
 	$args[0] = $cmd;
 
+	my $positioningAttributes = AttrVal($name,'drive-down-time-to-100',undef);
+
 	if($drivetime > 0) {
 		# timer fuer stop starten
 		RemoveInternalTimer($hash);
@@ -549,11 +576,12 @@ sub SOMFY_Set($@) {
 		InternalTimer(gettimeofday()+$drivetime,"SOMFY_SendStop",$hash,0);
 
 	} elsif($updatetime > 0) {
-		# timer fuer Update state starten
-		RemoveInternalTimer($hash);
-		Log3($name,3,"SOMFY_set: $name -> state update in $updatetime sec");
-		InternalTimer(gettimeofday()+$updatetime,"SOMFY_CalcNewPos",$hash,0);
-
+		if(defined($positioningAttributes)) {
+			# timer fuer Update state starten
+			RemoveInternalTimer($hash);
+			Log3($name,3,"SOMFY_set: $name -> state update in $updatetime sec");
+			InternalTimer(gettimeofday()+$updatetime,"SOMFY_CalcNewPos",$hash,0);
+		}
 	} else {
 		Log3($name,1,"SOMFY_set: Error - drivetime and updatetime = 0");
 	}
