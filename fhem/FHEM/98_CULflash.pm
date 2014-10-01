@@ -7,7 +7,7 @@ use HttpUtils;
 
 sub CommandCULflash($$);
 
-my $urlbase = "http://fhem.de/fhemupdate4/svn/";
+my $urlbase = "http://fhem.de/fhemupdate/";
 
 #####################################
 sub
