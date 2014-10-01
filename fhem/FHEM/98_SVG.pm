@@ -25,6 +25,7 @@ use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
 use vars qw(%FW_pos);     # scroll position
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw($FW_formmethod);
+use vars qw($FW_userAgent);
 
 my $SVG_RET;        # Returned data (SVG)
 sub SVG_calcOffsets($$);
