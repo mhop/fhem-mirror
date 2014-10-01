@@ -163,7 +163,7 @@ sub MQTT_Read {
     MESSAGE_TYPE: {
       $message_type == MQTT_CONNACK and do {
         readingsSingleUpdate($hash,"connection","connected",1);
-        GP_ForallClients($hash,\&MQTT_DEVICE_Start);
+        GP_ForallClients($hash,\&MQTT_client_start);
         last;
       };
   
@@ -174,7 +174,11 @@ sub MQTT_Read {
           main::Log3($client->{NAME},5,"publish received for $topic, ".$mqtt->message());
           if (grep { $_ eq $topic } @{$client->{subscribe}}) {
             readingsSingleUpdate($client,"transmission-state","publish received",1);
-            MQTT_DEVICE_onmessage($client,$topic,$mqtt->message());
+            if ($client->{TYPE} eq "MQTT_DEVICE") {
+              MQTT_DEVICE_onmessage($client,$topic,$mqtt->message());
+            } else {
+              MQTT_BRIDGE_onmessage($client,$topic,$mqtt->message());
+            }
           };
         },undef);
         last;
@@ -299,6 +303,50 @@ sub MQTT_send_message($$$@) {
   DevIo_SimpleWrite($hash,$msg->bytes);
   return $msgid;
 };
+
+sub MQTT_client_define($$) {
+  my ( $client, $def ) = @_;
+
+  $client->{NOTIFYDEV} = $client->{DEF} if $client->{DEF};
+  $client->{qos} = MQTT_QOS_AT_MOST_ONCE;
+  $client->{subscribe} = [];
+  if ($main::init_done) {
+    return MQTT_client_start($client);
+  } else {
+    return undef;
+  }
+}
+
+sub MQTT_client_undefine($) {
+  MQTT_client_stop(shift);
+}
+
+
+sub MQTT_client_start($) {
+  my $client = shift;
+  my $name = $client->{NAME};
+  if (! (defined AttrVal($name,"stateFormat",undef))) {
+    $main::attr{$name}{stateFormat} = "transmission-state";
+  }
+  if (@{$client->{subscribe}}) {
+    my $msgid = MQTT_send_subscribe($client->{IODev},
+      topics => [map { [$_ => $client->{qos} || MQTT_QOS_AT_MOST_ONCE] } @{$client->{subscribe}}],
+    );
+    $client->{message_ids}->{$msgid}++;
+    readingsSingleUpdate($client,"transmission-state","subscribe sent",1)
+  }
+}
+
+sub MQTT_client_stop($) {
+  my $client = shift;
+  if (@{$client->{subscribe}}) {
+    my $msgid = MQTT_send_unsubscribe($client->{IODev},
+      topics => [@{$client->{subscribe}}],
+    );
+    $client->{message_ids}->{$msgid}++;
+    readingsSingleUpdate($client,"transmission-state","unsubscribe sent",1)
+  }
+}
 
 1;
 
