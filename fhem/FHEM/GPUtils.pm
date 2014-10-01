@@ -10,6 +10,15 @@ use warnings;
 our %EXPORT_TAGS = (all => [qw(GP_Define GP_Catch GP_ForallClients)]);
 Exporter::export_ok_tags('all');
 
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+  if (!grep(/FHEM\/lib$/,@INC)) {
+    foreach my $inc (grep(/FHEM$/,@INC)) {
+      push @INC,$inc."/lib";
+    };
+  };
+};
+
 sub GP_Define($$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t]+", $def);
