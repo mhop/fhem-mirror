@@ -48,7 +48,8 @@ my @YahooCodes_en = (
        'mostly cloudy', # day
        'partly cloudy', # night
        'partly cloudy', # day
-       'clear', #night
+       # see http://forum.fhem.de/index.php?action=post;topic=21375.30
+       'sunny', #clear (night) according to Yahoo API docs, but actually used day and night.
        'sunny',
        'fair', #night
        'fair', #day
