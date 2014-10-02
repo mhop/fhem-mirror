@@ -622,12 +622,18 @@ sub isAlarmed {
 sub isStarted {
   my ($self,$t) = @_;
   return 0 if($self->isDeleted());
-  return $self->{start}<= $t && $t< $self->{end} ? 1 : 0;
+  return 0 unless(defined($self->{start}));
+  return 0 if($t < $self->{start});
+  if(defined($self->{end})) {
+    return 0 if($t>= $self->{end});
+  }
+  return 1;
 }
 
 sub isEnded {
   my ($self,$t) = @_;
   return 0 if($self->isDeleted());
+  return 0 unless(defined($self->{end}));
   return $self->{end}<= $t ? 1 : 0;
 }
 
