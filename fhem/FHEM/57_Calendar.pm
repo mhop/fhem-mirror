@@ -615,7 +615,7 @@ sub isAlarmed {
   my ($self,$t) = @_;
   return 0 if($self->isDeleted());
   return $self->{alarm} ?
-    (($self->{alarm}<= $t && $t<= $self->{start}) ? 1 : 0) : 0;
+    (($self->{alarm}<= $t && $t< $self->{start}) ? 1 : 0) : 0;
 }
 
 # return 1 if time is between start time and end time, else 0
