@@ -147,11 +147,11 @@ FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Unterstue
 FHEM/55_PIFACE.pm            klaus.schauer        http://forum.fhem.de Einplatinencomputer
 FHEM/55_weco.pm              betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
-FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Sonstiges
+FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Unterstützende Dienste
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/59_WWO.pm               baumrasen            http://forum.fhem.de Sonstiges
-FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Sonstiges
+FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Unterstützende Dienste
 FHEM/60_EM.pm                rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/61_EMWZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/62_EMEM.pm              rudolfkoenig         http://forum.fhem.de SlowRF
