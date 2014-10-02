@@ -25,10 +25,6 @@
 
 use strict;
 use warnings;
-use GPUtils qw(:all);
-
-use Net::MQTT::Constants;
-use Net::MQTT::Message;
 
 my %sets = (
 );
@@ -37,28 +33,45 @@ my %gets = (
   "version"   => "",
 );
 
-my %qos = map {qos_string($_) => $_} (MQTT_QOS_AT_MOST_ONCE,MQTT_QOS_AT_LEAST_ONCE,MQTT_QOS_EXACTLY_ONCE);
-
 sub MQTT_DEVICE_Initialize($) {
 
   my $hash = shift @_;
 
   # Consumer
-  $hash->{DefFn}    = "MQTT_client_define";
-  $hash->{UndefFn}  = "MQTT_client_undefine";
-  $hash->{SetFn}    = "MQTT_DEVICE_Set";
-  $hash->{AttrFn}   = "MQTT_DEVICE_Attr";
+  $hash->{DefFn}    = "MQTT::Client_Define";
+  $hash->{UndefFn}  = "MQTT::Client_Undefine";
+  $hash->{SetFn}    = "MQTT::DEVICE::Set";
+  $hash->{AttrFn}   = "MQTT::DEVICE::Attr";
   
   $hash->{AttrList} =
     "IODev ".
-    "qos:".join(",",keys %qos)." ".
+    "qos:".join(",",keys %MQTT::qos)." ".
     "publishSet ".
     "publishSet_.* ".
     "subscribeReading_.* ".
     $main::readingFnAttributes;
+    
+    main::LoadModule("MQTT");
 }
 
-sub MQTT_DEVICE_Set($@) {
+package MQTT::DEVICE;
+
+use strict;
+use warnings;
+use GPUtils qw(:all);
+
+use Net::MQTT::Constants;
+
+BEGIN {
+  MQTT->import(qw(:all));
+
+  GP_Import(qw(
+    readingsSingleUpdate
+    Log3
+  ))
+};
+
+sub Set($@) {
   my ($hash, @a) = @_;
   return "Need at least one parameters" if(@a < 2);
   return "Unknown argument $a[1], choose one of " . join(" ", map {$sets{$_} eq "" ? $_ : "$_:$sets{$_}"} sort keys %sets)
@@ -66,16 +79,16 @@ sub MQTT_DEVICE_Set($@) {
   my $command = $a[1];
   my $value = $a[2];
   if (defined $value) {
-    MQTT_send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos});
+    send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos});
     readingsSingleUpdate($hash,$command,$value,1);
   } else {
-    MQTT_send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $hash->{qos});
+    send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $hash->{qos});
     readingsSingleUpdate($hash,"state",$command,1);
   }
   return undef;
 }
 
-sub MQTT_DEVICE_Attr($$$$) {
+sub Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
 
   my $hash = $main::defs{$name};
@@ -86,7 +99,7 @@ sub MQTT_DEVICE_Attr($$$$) {
         push @{$hash->{subscribe}},$value unless grep {$_ eq $value} @{$hash->{subscribe}};
         if ($main::init_done) {
           if (my $mqtt = $hash->{IODev}) {;
-            my $msgid = MQTT_send_subscribe($mqtt,
+            my $msgid = send_subscribe($mqtt,
               topics => [[$value => $hash->{qos} || MQTT_QOS_AT_MOST_ONCE]],
             );
             $hash->{message_ids}->{$msgid}++;
@@ -100,7 +113,7 @@ sub MQTT_DEVICE_Attr($$$$) {
             delete $hash->{subscribeReadings}->{$topic};
             if ($main::init_done) {
               if (my $mqtt = $hash->{IODev}) {;
-                my $msgid = MQTT_send_unsubscribe($mqtt,
+                my $msgid = send_unsubscribe($mqtt,
                   topics => [$topic],
                 );
                 $hash->{message_ids}->{$msgid}++;
@@ -139,28 +152,15 @@ sub MQTT_DEVICE_Attr($$$$) {
       }
       last;
     };
-    $attribute eq "qos" and do {
-      if ($command eq "set") {
-        $hash->{qos} = $qos{$value};
-      } else {
-        $hash->{qos} = MQTT_QOS_AT_MOST_ONCE;
-      }
-      last;
-    };
-    $attribute eq "IODev" and do {
-      if ($command eq "set") {
-      } else {
-      }
-      last;
-    };
+    client_attr($hash,$command,$name,$attribute,$value);
   }
 }
 
-sub MQTT_DEVICE_onmessage($$$) {
+sub onmessage($$$) {
   my ($hash,$topic,$message) = @_;
   if (defined (my $reading = $hash->{subscribeReadings}->{$topic})) {
-    main::Log3($hash->{NAME},5,"calling readingsSingleUpdate($hash->{NAME},$reading,$message,1");
-    main::readingsSingleUpdate($hash,$reading,$message,1);
+    Log3($hash->{NAME},5,"calling readingsSingleUpdate($hash->{NAME},$reading,$message,1");
+    readingsSingleUpdate($hash,$reading,$message,1);
   }
 }
 

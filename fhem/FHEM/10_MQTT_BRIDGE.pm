@@ -25,10 +25,6 @@
 
 use strict;
 use warnings;
-use GPUtils qw(:all);
-
-use Net::MQTT::Constants;
-use Net::MQTT::Message;
 
 my %sets = (
 );
@@ -38,31 +34,51 @@ my %gets = (
   "readings"  => ""
 );
 
-my %qos = map {qos_string($_) => $_} (MQTT_QOS_AT_MOST_ONCE,MQTT_QOS_AT_LEAST_ONCE,MQTT_QOS_EXACTLY_ONCE);
-
 sub MQTT_BRIDGE_Initialize($) {
 
   my $hash = shift @_;
 
   # Consumer
-  $hash->{DefFn}    = "MQTT_client_define";
-  $hash->{UndefFn}  = "MQTT_client_undefine";
-  $hash->{GetFn}    = "MQTT_BRIDGE_Get";
-  $hash->{NotifyFn} = "MQTT_BRIDGE_Notify";
-  $hash->{AttrFn}   = "MQTT_BRIDGE_Attr";
+  $hash->{DefFn}    = "MQTT::Client_Define";
+  $hash->{UndefFn}  = "MQTT::Client_Undefine";
+  $hash->{GetFn}    = "MQTT::BRIDGE::Get";
+  $hash->{NotifyFn} = "MQTT::BRIDGE::Notify";
+  $hash->{AttrFn}   = "MQTT::BRIDGE::Attr";
   
   $hash->{AttrList} =
     "IODev ".
-    "qos:".join(",",keys %qos)." ".
+    "qos:".join(",",keys %MQTT::qos)." ".
     "publish-topic-base ".
     "publishState ".
     "publishReading_.* ".
     "subscribeSet ".
     "subscribeSet_.* ".
     $main::readingFnAttributes;
+
+    main::LoadModule("MQTT");
 }
 
-sub MQTT_BRIDGE_Get($$@) {
+package MQTT::BRIDGE;
+
+use strict;
+use warnings;
+use GPUtils qw(:all);
+
+use Net::MQTT::Constants;
+
+BEGIN {
+  MQTT->import(qw(:all));
+
+  GP_Import(qw(
+    AttrVal
+    CommandAttr
+    readingsSingleUpdate
+    Log3
+    DoSet
+  ))
+};
+
+sub Get($$@) {
   my ($hash, $name, $command) = @_;
   return "Need at least one parameters" unless (defined $command);
   return "Unknown argument $command, choose one of " . join(" ", sort keys %gets)
@@ -73,8 +89,8 @@ sub MQTT_BRIDGE_Get($$@) {
     $command eq "readings" and do {
       my $base = AttrVal($name,"publish-topic-base","/$hash->{DEF}/");
       foreach my $reading (keys %{$main::defs{$hash->{DEF}}{READINGS}}) {
-        unless (defined main::AttrVal($name,"publishReading_$reading",undef)) {
-          main::CommandAttr($hash,"$name publishReading_$reading $base$reading");
+        unless (defined AttrVal($name,"publishReading_$reading",undef)) {
+          CommandAttr($hash,"$name publishReading_$reading $base$reading");
         }
       };
       last;
@@ -82,28 +98,28 @@ sub MQTT_BRIDGE_Get($$@) {
   };
 }
 
-sub MQTT_BRIDGE_Notify() {
+sub Notify() {
   my ($hash,$dev) = @_;
 
-  main::Log3($hash->{NAME},5,"Notify for $dev->{NAME}");
+  Log3($hash->{NAME},5,"Notify for $dev->{NAME}");
   foreach my $event (@{$dev->{CHANGED}}) {
     $event =~ /^([^:]+)(: )?(.*)$/;
-    main::Log3($hash->{NAME},5,"$event, '".((defined $1) ? $1 : "-undef-")."', '".((defined $3) ? $3 : "-undef-")."'");
+    Log3($hash->{NAME},5,"$event, '".((defined $1) ? $1 : "-undef-")."', '".((defined $3) ? $3 : "-undef-")."'");
     if (defined $3 and $3 ne "") {
       if (defined $hash->{publishReadings}->{$1}) {
-        MQTT_send_publish($hash->{IODev}, topic => $hash->{publishReadings}->{$1}, message => $3, qos => $hash->{qos});
+        send_publish($hash->{IODev}, topic => $hash->{publishReadings}->{$1}, message => $3, qos => $hash->{qos});
         readingsSingleUpdate($hash,"transmission-state","publish sent",1);
       }
     } else {
       if (defined $hash->{publishState}) {
-        MQTT_send_publish($hash->{IODev}, topic => $hash->{publishState}, message => $1, qos => $hash->{qos});
+        send_publish($hash->{IODev}, topic => $hash->{publishState}, message => $1, qos => $hash->{qos});
         readingsSingleUpdate($hash,"transmission-state","publish sent",1);
       }
     }
   }
 }
 
-sub MQTT_BRIDGE_Attr($$$$) {
+sub Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
 
   my $hash = $main::defs{$name};
@@ -114,7 +130,7 @@ sub MQTT_BRIDGE_Attr($$$$) {
         push @{$hash->{subscribe}},$value unless grep {$_ eq $value} @{$hash->{subscribe}};
         if ($main::init_done) {
           if (my $mqtt = $hash->{IODev}) {;
-            my $msgid = MQTT_send_subscribe($mqtt,
+            my $msgid = send_subscribe($mqtt,
               topics => [[$value => $hash->{qos} || MQTT_QOS_AT_MOST_ONCE]],
             );
             $hash->{message_ids}->{$msgid}++;
@@ -128,7 +144,7 @@ sub MQTT_BRIDGE_Attr($$$$) {
             $hash->{subscribe} = [grep { $_ != $topic } @{$hash->{subscribe}}];
             if ($main::init_done) {
               if (my $mqtt = $hash->{IODev}) {;
-                my $msgid = MQTT_send_unsubscribe($mqtt,
+                my $msgid = send_unsubscribe($mqtt,
                   topics => [$topic],
                 );
                 $hash->{message_ids}->{$msgid}++;
@@ -156,33 +172,20 @@ sub MQTT_BRIDGE_Attr($$$$) {
       }
       last;
     };
-    $attribute eq "qos" and do {
-      if ($command eq "set") {
-        $hash->{qos} = $qos{$value};
-      } else {
-        $hash->{qos} = MQTT_QOS_AT_MOST_ONCE;
-      }
-      last;
-    };
-    $attribute eq "IODev" and do {
-      if ($command eq "set") {
-      } else {
-      }
-      last;
-    };
+    client_attr($hash,$command,$name,$attribute,$value);
   }
 }
 
-sub MQTT_BRIDGE_onmessage($$$) {
+sub onmessage($$$) {
   my ($hash,$topic,$message) = @_;
   if (defined (my $command = $hash->{subscribeSets}->{$topic})) {
     my @args = split ("[ \t]+",$message);
     if ($command eq "") {
-      main::Log3($hash->{NAME},5,"calling DoSet($hash->{DEF}".(@args ? ",".join(",",@args) : ""));
-      main::DoSet($hash->{DEF},@args);
+      Log3($hash->{NAME},5,"calling DoSet($hash->{DEF}".(@args ? ",".join(",",@args) : ""));
+      DoSet($hash->{DEF},@args);
     } else {
-      main::Log3($hash->{NAME},5,"calling DoSet($hash->{DEF},$command".(@args ? ",".join(",",@args) : ""));
-      main::DoSet($hash->{DEF},$command,@args);
+      Log3($hash->{NAME},5,"calling DoSet($hash->{DEF},$command".(@args ? ",".join(",",@args) : ""));
+      DoSet($hash->{DEF},$command,@args);
     }
   }
 }
