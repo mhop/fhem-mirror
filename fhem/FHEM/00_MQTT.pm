@@ -23,15 +23,6 @@
 #
 ##############################################
 
-use strict;
-use warnings;
-use GPUtils qw(:all);
-
-use Net::MQTT::Constants;
-use Net::MQTT::Message;
-
-require "10_MQTT_DEVICE.pm";
-
 my %sets = (
   "connect" => "",
   "disconnect" => "",
@@ -53,36 +44,67 @@ sub MQTT_Initialize($) {
 
   # Provider
   $hash->{Clients} = join (':',@clients);
-  $hash->{ReadyFn} = "MQTT_Ready";
-  $hash->{ReadFn}  = "MQTT_Read";
+  $hash->{ReadyFn} = "MQTT::Ready";
+  $hash->{ReadFn}  = "MQTT::Read";
 
   # Consumer
-  $hash->{DefFn}    = "MQTT_Define";
-  $hash->{UndefFn}  = "MQTT_Undef";
-  $hash->{SetFn}    = "MQTT_Set";
-  $hash->{NotifyFn} = "MQTT_Notify";
+  $hash->{DefFn}    = "MQTT::Define";
+  $hash->{UndefFn}  = "MQTT::Undef";
+  $hash->{SetFn}    = "MQTT::Set";
+  $hash->{NotifyFn} = "MQTT::Notify";
 
   $hash->{AttrList} = "keep-alive";
 }
 
-sub MQTT_Define($$) {
+package MQTT;
+
+use Exporter ('import');
+@EXPORT = ();
+@EXPORT_OK = qw(send_publish send_subscribe send_unsubscribe client_attr);
+%EXPORT_TAGS = (all => [@EXPORT_OK]);
+
+use strict;
+use warnings;
+
+use GPUtils qw(:all);
+
+use Net::MQTT::Constants;
+use Net::MQTT::Message;
+
+our %qos = map {qos_string($_) => $_} (MQTT_QOS_AT_MOST_ONCE,MQTT_QOS_AT_LEAST_ONCE,MQTT_QOS_EXACTLY_ONCE);
+
+BEGIN {GP_Import(qw(
+  gettimeofday
+  readingsSingleUpdate
+  DevIo_OpenDev
+  DevIo_SimpleWrite
+  DevIo_SimpleRead
+  DevIo_CloseDev
+  RemoveInternalTimer
+  InternalTimer
+  AttrVal
+  Log3
+  AssignIoPort
+  ))};
+
+sub Define($$) {
   my ( $hash, $def ) = @_;
 
   $hash->{NOTIFYDEV} = "global";
   $hash->{msgid} = 1;
 
   if ($main::init_done) {
-    return MQTT_Start($hash);
+    return Start($hash);
   } else {
     return undef;
   }
 }
 
-sub MQTT_Undef($) {
-  MQTT_Stop(shift);
+sub Undef($) {
+  Stop(shift);
 }
 
-sub MQTT_Set($@) {
+sub Set($@) {
   my ($hash, @a) = @_;
   return "Need at least one parameters" if(@a < 2);
   return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
@@ -92,64 +114,64 @@ sub MQTT_Set($@) {
 
   COMMAND_HANDLER: {
     $command eq "connect" and do {
-      MQTT_Start($hash);
+      Start($hash);
       last;
     };
     $command eq "disconnect" and do {
-      MQTT_Stop($hash);
+      Stop($hash);
       last;
     };
   };
 }
 
-sub MQTT_Notify($$) {
+sub Notify($$) {
   my ($hash,$dev) = @_;
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
-    MQTT_Start($hash);
+    Start($hash);
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
 }
 
-sub MQTT_Start($) {
+sub Start($) {
   my $hash = shift;
   my ($dev) = split("[ \t]+", $hash->{DEF});
   $hash->{DeviceName} = $dev;
   DevIo_CloseDev($hash);
-  return DevIo_OpenDev($hash, 0, "MQTT_Init");
+  return DevIo_OpenDev($hash, 0, "MQTT::Init");
 }
 
-sub MQTT_Stop($) {
+sub Stop($) {
   my $hash = shift;
-  MQTT_send_disconnect($hash);
+  send_disconnect($hash);
   DevIo_CloseDev($hash);
-  main::RemoveInternalTimer($hash);
-  main::readingsSingleUpdate($hash,"connection","disconnected",1);
+  RemoveInternalTimer($hash);
+  readingsSingleUpdate($hash,"connection","disconnected",1);
 }
 
-sub MQTT_Ready($) {
+sub Ready($) {
   my $hash = shift;
-  return DevIo_OpenDev($hash, 1, "MQTT_Init") if($hash->{STATE} eq "disconnected");
+  return DevIo_OpenDev($hash, 1, "MQTT::Init") if($hash->{STATE} eq "disconnected");
 }
 
-sub MQTT_Init($) {
+sub Init($) {
   my $hash = shift;
-  MQTT_send_connect($hash);
-  main::readingsSingleUpdate($hash,"connection","connecting",1);
+  send_connect($hash);
+  readingsSingleUpdate($hash,"connection","connecting",1);
   $hash->{ping_received}=1;
-  MQTT_Timer($hash);
+  Timer($hash);
   return undef;
 }
 
-sub MQTT_Timer($) {
+sub Timer($) {
   my $hash = shift;
-  main::RemoveInternalTimer($hash);
-  main::readingsSingleUpdate($hash,"connection","timed-out",1) unless $hash->{ping_received};
+  RemoveInternalTimer($hash);
+  readingsSingleUpdate($hash,"connection","timed-out",1) unless $hash->{ping_received};
   $hash->{ping_received} = 0;
-  main::InternalTimer(gettimeofday()+main::AttrVal($hash-> {NAME},"keep-alive",60), "MQTT_Timer", $hash, 0);
-  MQTT_send_ping($hash);
+  InternalTimer(gettimeofday()+AttrVal($hash-> {NAME},"keep-alive",60), "MQTT::Timer", $hash, 0);
+  send_ping($hash);
 }
 
-sub MQTT_Read {
+sub Read {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $buf = DevIo_SimpleRead($hash);
@@ -158,12 +180,12 @@ sub MQTT_Read {
   while (my $mqtt = Net::MQTT::Message->new_from_bytes($hash->{buf},1)) {
     my $message_type = $mqtt->message_type();
   
-    main::Log3($name,5,"MQTT $name message received: ".$mqtt->string());
+    Log3($name,5,"MQTT $name message received: ".$mqtt->string());
   
     MESSAGE_TYPE: {
       $message_type == MQTT_CONNACK and do {
         readingsSingleUpdate($hash,"connection","connected",1);
-        GP_ForallClients($hash,\&MQTT_client_start);
+        GP_ForallClients($hash,\&client_start);
         last;
       };
   
@@ -171,13 +193,13 @@ sub MQTT_Read {
         my $topic = $mqtt->topic();
         GP_ForallClients($hash,sub {
           my $client = shift;
-          main::Log3($client->{NAME},5,"publish received for $topic, ".$mqtt->message());
+          Log3($client->{NAME},5,"publish received for $topic, ".$mqtt->message());
           if (grep { $_ eq $topic } @{$client->{subscribe}}) {
             readingsSingleUpdate($client,"transmission-state","publish received",1);
             if ($client->{TYPE} eq "MQTT_DEVICE") {
-              MQTT_DEVICE_onmessage($client,$topic,$mqtt->message());
+              MQTT::DEVICE::onmessage($client,$topic,$mqtt->message());
             } else {
-              MQTT_BRIDGE_onmessage($client,$topic,$mqtt->message());
+              MQTT::BRIDGE::onmessage($client,$topic,$mqtt->message());
             }
           };
         },undef);
@@ -258,95 +280,123 @@ sub MQTT_Read {
   
       $message_type == MQTT_PINGRESP and do {
         $hash->{ping_received} = 1;
-        main::readingsSingleUpdate($hash,"connection","active",1);
+        readingsSingleUpdate($hash,"connection","active",1);
         last;
       };
   
-      main::Log3($hash->{NAME},4,"MQTT_Read '$hash->{NAME}' unexpected message type '".message_type_string($message_type)."'");
+      Log3($hash->{NAME},4,"MQTT::Read '$hash->{NAME}' unexpected message type '".message_type_string($message_type)."'");
     }
   }
   return undef;
 };
 
-sub MQTT_send_connect($) {
+sub send_connect($) {
   my $hash = shift;
-  return MQTT_send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => main::AttrVal($hash->{NAME},"keep-alive",60));
+  return send_message($hash, message_type => MQTT_CONNECT, keep_alive_timer => AttrVal($hash->{NAME},"keep-alive",60));
 };
 
-sub MQTT_send_publish($@) {
-  return MQTT_send_message(shift, message_type => MQTT_PUBLISH, @_);
+sub send_publish($@) {
+  return send_message(shift, message_type => MQTT_PUBLISH, @_);
 };
 
-sub MQTT_send_subscribe($@) {
+sub send_subscribe($@) {
   my $hash = shift;
-  return MQTT_send_message($hash, message_type => MQTT_SUBSCRIBE, @_);
+  return send_message($hash, message_type => MQTT_SUBSCRIBE, @_);
 };
 
-sub MQTT_send_unsubscribe($@) {
-  return MQTT_send_message(shift, message_type => MQTT_UNSUBSCRIBE, @_);
+sub send_unsubscribe($@) {
+  return send_message(shift, message_type => MQTT_UNSUBSCRIBE, @_);
 };
 
-sub MQTT_send_ping($) {
-  return MQTT_send_message(shift, message_type => MQTT_PINGREQ);
+sub send_ping($) {
+  return send_message(shift, message_type => MQTT_PINGREQ);
 };
 
-sub MQTT_send_disconnect($) {
-  return MQTT_send_message(shift, message_type => MQTT_DISCONNECT);
+sub send_disconnect($) {
+  return send_message(shift, message_type => MQTT_DISCONNECT);
 };
 
-sub MQTT_send_message($$$@) {
+sub send_message($$$@) {
   my $hash = shift;
   my $name = $hash->{NAME};
   my $msgid = $hash->{msgid}++;
   my $msg = Net::MQTT::Message->new(message_id => $msgid,@_);
-  main::Log3($name,5,"MQTT $name message sent: ".$msg->string());
+  Log3($name,5,"MQTT $name message sent: ".$msg->string());
   DevIo_SimpleWrite($hash,$msg->bytes,undef);
   return $msgid;
 };
 
-sub MQTT_client_define($$) {
+sub Client_Define($$) {
   my ( $client, $def ) = @_;
 
   $client->{NOTIFYDEV} = $client->{DEF} if $client->{DEF};
   $client->{qos} = MQTT_QOS_AT_MOST_ONCE;
   $client->{subscribe} = [];
+  
   if ($main::init_done) {
-    return MQTT_client_start($client);
+    return client_start($client);
   } else {
     return undef;
   }
-}
+};
 
-sub MQTT_client_undefine($) {
-  MQTT_client_stop(shift);
-}
+sub Client_Undefine($) {
+  client_stop(shift);
+};
 
+sub client_attr($$$$$) {
+  my ($client,$command,$name,$attribute,$value) = @_;
 
-sub MQTT_client_start($) {
+  ATTRIBUTE_HANDLER: {
+    $attribute eq "qos" and do {
+      if ($command eq "set") {
+        $client->{qos} = $MQTT::qos{$value};
+      } else {
+        $client->{qos} = MQTT_QOS_AT_MOST_ONCE;
+      }
+      last;
+    };
+    $attribute eq "IODev" and do {
+      if ($main::init_done) {
+        if ($command eq "set") {
+          client_stop($client);
+          $main::attr{$name}{IODev} = $value;
+          client_start($client);
+        } else {
+          client_stop($client);
+        }
+      }
+      last;
+    };
+  }
+};
+
+sub client_start($) {
   my $client = shift;
+  AssignIoPort($client);
   my $name = $client->{NAME};
   if (! (defined AttrVal($name,"stateFormat",undef))) {
     $main::attr{$name}{stateFormat} = "transmission-state";
   }
   if (@{$client->{subscribe}}) {
-    my $msgid = MQTT_send_subscribe($client->{IODev},
+    my $msgid = send_subscribe($client->{IODev},
       topics => [map { [$_ => $client->{qos} || MQTT_QOS_AT_MOST_ONCE] } @{$client->{subscribe}}],
     );
     $client->{message_ids}->{$msgid}++;
-    readingsSingleUpdate($client,"transmission-state","subscribe sent",1)
+    readingsSingleUpdate($client,"transmission-state","subscribe sent",1);
   }
-}
+};
 
-sub MQTT_client_stop($) {
+sub client_stop($) {
   my $client = shift;
   if (@{$client->{subscribe}}) {
-    my $msgid = MQTT_send_unsubscribe($client->{IODev},
+    my $msgid = send_unsubscribe($client->{IODev},
       topics => [@{$client->{subscribe}}],
     );
     $client->{message_ids}->{$msgid}++;
-    readingsSingleUpdate($client,"transmission-state","unsubscribe sent",1)
+    readingsSingleUpdate($client,"transmission-state","unsubscribe sent",1);
   }
-}
+};
 
 1;
 
