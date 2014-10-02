@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 59_Weather: change icon for condition clear to sunny.png
   - bugfix: 57_Calendar: calendar event anymore in modeAlarmed if started
   - feature: 57_Calendar: deal with non-existent end times
   - bugfix: SOMFY: fix non-working on/off-for-timer methods
