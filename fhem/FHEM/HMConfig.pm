@@ -272,6 +272,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00D1" => {name=>"HM-LC-Bl1-SM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "00D2" => {name=>"HM-LC-Bl1-FM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
   "00D3" => {name=>"HM-Dis-WM55"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1'            ,chn=>"Dis:1:2",},
+  "00D9" => {name=>"HM-MOD-Em-8"             ,st=>'remote'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,4'          ,chn=>"Btn:1:8",},
   "00DA" => {name=>"HM-RC-8"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:8",},
   "00DD" => {name=>"HM-PB-4DIS-WM-2"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:20",},
   "8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",},
