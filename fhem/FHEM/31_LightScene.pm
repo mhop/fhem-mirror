@@ -34,9 +34,6 @@ sub LightScene_Initialize($)
   $hash->{FW_detailFn}  = "LightScene_detailFn";
   $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
 
-  addToAttrList("lightSceneParamsToSave");
-  addToAttrList("lightSceneRestoreOnlyIfChanged:1,0");
-
   eval "use JSON";
   $LightScene_hasJSON = 0 if($@);
 
@@ -64,6 +61,9 @@ sub LightScene_Define($$)
   foreach my $a (@args) {
     foreach my $d (devspec2array($a)) {
       $list{$d} = 1;
+
+      addToDevAttrList( $d, "lightSceneParamsToSave" );
+      addToDevAttrList( $d, "lightSceneRestoreOnlyIfChanged:1,0" );
     }
   }
   $hash->{CONTENT} = \%list;
