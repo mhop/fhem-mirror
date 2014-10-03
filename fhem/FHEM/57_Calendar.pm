@@ -639,7 +639,9 @@ sub isEnded {
 
 sub nextTime {
   my ($self,$t) = @_;
-  my @times= ( $self->{start}, $self->{end} );
+  my @times= ( );
+  push @times, $self->{start} if(defined($self->{start}));
+  push @times, $self->{end} if(defined($self->{end}));
   unshift @times, $self->{alarm} if($self->{alarm});
   @times= sort grep { $_ > $t } @times;
 
@@ -880,11 +882,12 @@ sub Calendar_GetUpdate($$) {
   my $type = $hash->{fhem}{type};
   my $url= $hash->{fhem}{url};
   
+  my $errmsg= "";
   my $ics;
   
   if($type eq "url"){ 
     #$ics= GetFileFromURLQuiet($url,10,undef,0,5) if($type eq "url");
-    $ics= HttpUtils_BlockingGet( { url => $url, hideurl => 1, timeout => 10, } );
+    ($errmsg, $ics)= HttpUtils_BlockingGet( { url => $url, hideurl => 1, timeout => 10, } );
   } elsif($type eq "file") {
     if(open(ICSFILE, $url)) {
       while(<ICSFILE>) { 
@@ -901,8 +904,8 @@ sub Calendar_GetUpdate($$) {
   }
     
   
-  if(!defined($ics) or ("$ics" eq "")) {
-    Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL";
+  if(!defined($ics) or ("$ics" eq "") or ($errmsg ne "")) {
+    Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL. $errmsg";
     return 0;
   }
   
