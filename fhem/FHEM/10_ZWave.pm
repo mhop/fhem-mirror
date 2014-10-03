@@ -13,15 +13,10 @@ sub ZWave_Get($@);
 sub ZWave_Cmd($$@);
 sub ZWave_ParseMeter($);
 sub ZWave_SetClasses($$$$);
+sub ZWave_getParse($$$);
 
 use vars qw(%zw_func_id);
 use vars qw(%zw_type6);
-
-my @zwave_models = qw(
-  Everspring_AN1582
-  Everspring_AN1583
-  Fibaro_FGRM222
-);
 
 my %zwave_id2class;
 my %zwave_class = (
@@ -193,7 +188,8 @@ my %zwave_class = (
     parse => { "..7105(..)(..)" => '"alarm_type_$1:level $2"',}, },
   MANUFACTURER_SPECIFIC    => { id => '72',
     get   => { model       => "04", },
-    parse => { "087205(....)(....)(....)" => 'ZWave_mfsParse($1,$2,$3)'}},
+    parse => { "087205(....)(....)(....)" => 'ZWave_mfsParse($1,$2,$3)',
+               "087205(....)(....)(.{4})" => '"modelId:$1-$2-$3"', }},
   POWERLEVEL               => { id => '73', },
   PROTECTION               => { id => '75',
     set   => { protectionOff => "0100",
@@ -278,6 +274,7 @@ my %zwave_cmdArgs = (
   indicatorDim => "slider,0,1,99",
 );
 
+my %modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222" );
 my %manuf_proprietary = ( # MANUFACTURER_PROPRIETARY ist model dependent
    Fibaro_FGRM222 => {
     set   => { positionSlat=>"010f26010100%02x", 
@@ -298,9 +295,7 @@ ZWave_Initialize($)
   $hash->{UndefFn}   = "ZWave_Undef";
   $hash->{ParseFn}   = "ZWave_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ".
-    "ignore:1,0 dummy:1,0 showtime:1,0 classes ".
-    "$readingFnAttributes " .
-    "model:".join(",", sort @zwave_models);
+    "ignore:1,0 dummy:1,0 showtime:1,0 classes $readingFnAttributes";
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 }
 
@@ -367,12 +362,7 @@ ZWave_Cmd($$@)
   my %cmdList;
   my $classes = AttrVal($name, "classes", "");
   foreach my $cl (split(" ", $classes)) {
-    my $ptr = $zwave_class{$cl}{$type}
-        if($zwave_class{$cl} && $zwave_class{$cl}{$type});
-    if($cl eq "MANUFACTURER_PROPRIETARY") {
-      my $p = $manuf_proprietary{AttrVal($name, "model", "")};
-      $ptr = $p->{$type} if($p && $p->{$type});
-    }
+    my $ptr = ZWave_getHash($hash, $cl, $type);
     next if(!$ptr);
 
     foreach my $k (keys %{$ptr}) {
@@ -468,29 +458,18 @@ ZWave_Cmd($$@)
     no strict "refs";
     my $iohash = $hash->{IODev};
     my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
-    my ($err, $data) = &{$fn}($iohash, $cmd, "^000400$id");
+    my ($err, $data) = &{$fn}($iohash, $cmd, "^000400$id") if($fn);
     use strict "refs";
 
     return $err if($err);
-    $val =  ZWave_Parse($iohash, $data, 1);
+    $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
 
   } else {
     $cmd .= " ".join(" ", @a) if(@a);
 
   }
 
-  my $tn = TimeNow();
-  if($type eq "set") {
-    readingsSingleUpdate($hash, "state", $cmd, 1);
-
-  } else {
-    my $mval = $val;
-    ($cmd, $mval) = split(":", $val) if($val);
-    if($cmd && $mval) {
-      readingsSingleUpdate($hash, $cmd, $mval, 1);
-    }
-
-  }
+  readingsSingleUpdate($hash, "state", $cmd, 1) if($type eq "set");
   return $val;
 }
 
@@ -664,13 +643,31 @@ ZWave_mfsParse($$$)
   return sprintf("model:0x%s 0x%s 0x%s", $mf, $prod, $id);
 }
 
+sub
+ZWave_getHash($$$)
+{
+  my ($hash, $cl, $type) = @_;
+
+  my $ptr = $zwave_class{$cl}{$type}
+      if($zwave_class{$cl} && $zwave_class{$cl}{$type});
+
+  if($cl eq "MANUFACTURER_PROPRIETARY") {
+    my $modelId = ReadingsVal($hash, "modelId", "");
+    $modelId = $modelIdAlias{$modelId} if($modelIdAlias{$modelId});
+    my $p = $manuf_proprietary{$modelId};
+    $ptr = $p->{$type} if($p && $p->{$type});
+  }
+
+  return $ptr;
+}
+
 ###################################
 # 0004000a03250300 (sensor binary off for id 11)
-# { ZWave_Parse($defs{zd}, "0004000c028407", 0) }
+# { ZWave_Parse($defs{zd}, "0004000c028407", "") }
 sub
 ZWave_Parse($$@)
 {
-  my ($iodev, $msg, $local) = @_;
+  my ($iodev, $msg, $srcCmd) = @_;
   my $homeId = $iodev->{homeId};
   my $ioName = $iodev->{NAME};
   if(!$homeId) {
@@ -751,7 +748,7 @@ ZWave_Parse($$@)
   }
 
   if($evt) {
-    return "$cmd $evt" if($local);
+    return "$cmd $evt" if($srcCmd);
     DoTrigger($ioName, "$cmd $evt");
     Log3 $ioName, 4, "$ioName $cmd $evt";
     return "";
@@ -805,13 +802,7 @@ ZWave_Parse($$@)
        next;
     }
 
-    my $ptr = $zwave_class{$className}{parse}
-                        if($zwave_class{$className}{parse});
-    if($className eq "MANUFACTURER_PROPRIETARY") {
-      my $p = $manuf_proprietary{AttrVal($name, "model", "")};
-      $ptr = $p->{parse} if($p && $p->{parse})
-    }
-
+    my $ptr = ZWave_getHash($hash, $className, "parse");
     if(!$ptr) {
       Log3 $hash, 4, "$name: Unknown message ($className $arg)";
       next;
@@ -836,7 +827,6 @@ ZWave_Parse($$@)
   $baseHash->{lastMsgTimestamp} = time();
 
   return "" if(!@event);
-  return join(" ", @event) if($local);
 
   readingsBeginUpdate($hash);
   for(my $i = 0; $i < int(@event); $i++) {
@@ -847,6 +837,8 @@ ZWave_Parse($$@)
         if($vn eq "state");     # different from set
   }
   readingsEndUpdate($hash, 1);
+
+  return join("\n", @event) if($srcCmd);
   return $name;
 }
 
@@ -1220,7 +1212,6 @@ s2Hex($)
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#model">model</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a href="#classes">classes</a>
       This attribute is needed by the ZWave module, as the list of the possible
