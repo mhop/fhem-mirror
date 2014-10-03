@@ -68,9 +68,16 @@ my %zwave_class = (
   SWITCH_TOGGLE_BINARY     => { id => '28', },
   SWITCH_TOGGLE_MULTILEVEL => { id => '29', },
   CHIMNEY_FAN              => { id => '2a', },
-  SCENE_ACTIVATION         => { id => '2b', },
-  SCENE_ACTUATOR_CONF      => { id => '2c', },
-  SCENE_CONTROLLER_CONF    => { id => '2d', },
+  SCENE_ACTIVATION         => { id => '2b',
+    set   => { sceneActivate => "01%02x%02x",}, },
+  SCENE_ACTUATOR_CONF      => { id => '2c',
+    set   => { sceneConfig => "01%02x%02x80%02x",},
+    get   => { sceneConfig => "02%02x",          },
+    parse => { "052c03(..)(..)(..)"   => '"scene_$1:level $2 duration $3"',}, },
+  SCENE_CONTROLLER_CONF    => { id => '2d',   
+    set   => { sceneConfig => "01%02x%02x%02x",},
+    get   => { sceneConfig => "02%02x",          },
+    parse => { "052d03(..)(..)(..)"   => '"group_$1:scene $2 duration $3"',}, },
   ZIP_CLIENT               => { id => '2e', },
   ZIP_ADV_SERVICES         => { id => '2f', },
   SENSOR_BINARY            => { id => '30', 
@@ -185,10 +192,8 @@ my %zwave_class = (
     get   => { alarm       => "04%02x", },
     parse => { "..7105(..)(..)" => '"alarm_type_$1:level $2"',}, },
   MANUFACTURER_SPECIFIC    => { id => '72',
-    get   => { manufacturer         => "04", },
-    parse => { "087205(....)(....)(....)" => '"mfs:0x".$1.'.
-                                             '" 0x".$2.'.
-                                             '" 0x".$3', }, },
+    get   => { model       => "04", },
+    parse => { "087205(....)(....)(....)" => 'ZWave_mfsParse($1,$2,$3)'}},
   POWERLEVEL               => { id => '73', },
   PROTECTION               => { id => '75',
     set   => { protectionOff => "0100",
@@ -627,6 +632,38 @@ ZWave_mcCapability($$)
   return "mcCapability_$chid:".join(" ", @classes);
 }
 
+sub
+ZWave_mfsParse($$$)
+{
+  my ($mf, $prod, $id) = @_;
+  my $xml = $attr{global}{modpath}.
+            "/FHEM/lib/openzwave_manufacturer_specific.xml";
+  if(open(FH, $xml)) {
+    my ($lastMf, $mName, $ret) = ("","");
+    while(my $l = <FH>) {
+      if($l =~ m/<Manufacturer.*id="([^"]*)".*name="([^"]*)"/) {
+        $lastMf = uc($1);
+        $mName = $2;
+        next;
+      }
+
+      if($l =~ m/<Product type="([^"]*)".*id="([^"]*)".*name="([^"]*)"/) {
+        if($mf eq $lastMf && $prod eq uc($1) && $id eq uc($2)) {
+          $ret = "model:$mName $3";
+          last;
+        }
+      }
+    }
+    close(FH);
+    return $ret if($ret);
+
+  } else {
+    Log 1, "can't open $xml: $!";
+
+  }
+  return sprintf("model:0x%s 0x%s 0x%s", $mf, $prod, $id);
+}
+
 ###################################
 # 0004000a03250300 (sensor binary off for id 11)
 # { ZWave_Parse($defs{zd}, "0004000c028407", 0) }
@@ -964,6 +1001,18 @@ s2Hex($)
   <li>dim value<br>
     dim to the requested value (0..100)</li>
 
+  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
+  <li>sceneConfig<br>
+    set configuration for a specific scene.
+	Parameters are: sceneId, dimmingDuration, finalValue (0x0..0xff)
+    </li>
+	
+  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
+  <li>groupConfig<br>
+    set configuration for a specific scene.
+	Parameters are: groupId, sceneId, dimmingDuration.
+    </li>	
+	
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>tmOff</li>
   <li>tmCooling</li>
@@ -1103,6 +1152,17 @@ s2Hex($)
   <li>swmStatus<br>
     return the status of the node, as state:on, state:off or state:dim value.
     </li>
+	
+  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
+  <li>sceneConfig<br>
+    returns the settings for a given scene. Parameter is sceneId
+    </li>
+
+  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
+  <li>groupConfig<br>
+    returns the settings for a given group. Parameter is groupId
+    </li>
+	
 
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>thermostatMode<br>
@@ -1268,7 +1328,14 @@ s2Hex($)
   <li>state:on</li>
   <li>state:off</li>
   <li>state:dim value</li>
-
+    
+  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
+  <li>scene_Id:level dimmingDuration finalValue</li>
+  
+  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
+  <li>group_Id:scene dimmingDuration</li>
+ 
+ 
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>off</li>
   <li>cooling</li>
