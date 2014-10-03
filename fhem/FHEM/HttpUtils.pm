@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use IO::Socket::INET;
 use MIME::Base64;
+use vars qw($SSL_ERR);
 
 my %ext2MIMEType= qw{
   css   text/css
@@ -167,9 +168,12 @@ HttpUtils_Connect2($)
         || undef $hash->{conn};
     }
   }
+
   if(!$hash->{conn}) {
     undef $hash->{conn};
-    return "$hash->{displayurl}: Can't connect to $hash->{addr}: $@"; 
+    my $err = $@;
+    $err = "$SSL_ERR" if(!$err && $hash->{protocol} eq "https");
+    return "$hash->{displayurl}: Can't connect to $hash->{addr}: $err"; 
   }
 
   my $data;
@@ -356,6 +360,7 @@ sub
 CustomGetFileFromURL($$@)
 {
   my ($hideurl, $url, $timeout, $data, $noshutdown, $loglevel) = @_;
+  $loglevel = 4 if(!defined($loglevel));
   my $hash = { hideurl   => $hideurl,
                url       => $url,
                timeout   => $timeout,
