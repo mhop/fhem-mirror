@@ -17,7 +17,7 @@ time_str2num($)
 {
   my ($str) = @_;
   my @a;
-  if($str ne "") {
+  if($str) {
     @a = split("[- :]", $str);
     return mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
   } else {
