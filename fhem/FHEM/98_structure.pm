@@ -45,8 +45,6 @@ structure_Initialize($)
                        "clientstate_behavior:relative,relativeKnown,absolute,last ".
                        $readingFnAttributes;
 
-  addToAttrList("structexclude");
-
   my %ahash = ( Fn=>"CommandAddStruct",
                 Hlp=>"<structure> <devspec>,add <devspec> to <structure>" );
   $cmds{addstruct} = \%ahash;
@@ -71,14 +69,15 @@ structure_Define($$)
   my $modname = shift(@a);
   my $stype   = shift(@a);
 
-  addToAttrList($stype);
-  addToAttrList($stype . "_map");
   $hash->{ATTR} = $stype;
 
   my %list;
   foreach my $a (@a) {
     foreach my $d (devspec2array($a)) {
       $list{$d} = 1;
+      addToDevAttrList($d, $stype);
+      addToDevAttrList($d, $stype . "_map");
+      addToDevAttrList($d, "structexclude");
     }
   }
   $hash->{CONTENT} = \%list;

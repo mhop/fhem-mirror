@@ -91,6 +91,7 @@ sub WakeUpFn($);
 sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$);
+sub addToDevAttrList($$);
 sub addToAttrList($);
 sub addToWritebuffer($$@);
 sub attrSplit($);
@@ -3167,19 +3168,25 @@ AddDuplicate($$)
 
 # Add an attribute to the userattr list, if not yet present
 sub
-addToAttrList($)
+addToDevAttrList($$)
 {
-  my $arg = shift;
+  my ($dev,$arg) = @_;
 
   my $ua = "";
-  $ua = $attr{global}{userattr} if($attr{global}{userattr});
+  $ua = $attr{$dev}{userattr} if($attr{$dev}{userattr});
   my @al = split(" ", $ua);
   my %hash;
   foreach my $a (@al) {
     $hash{$a} = 1 if(" $AttrList " !~ m/ $a /); # Cleanse old ones
   }
   $hash{$arg} = 1 if(" $AttrList " !~ m/ $arg /);
-  $attr{global}{userattr} = join(" ", sort keys %hash);
+  $attr{$dev}{userattr} = join(" ", sort keys %hash);
+}
+
+sub
+addToAttrList($)
+{
+  addToDevAttrList("global", @_);
 }
 
 sub
