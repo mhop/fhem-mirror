@@ -1,3 +1,4 @@
+attr global userattr devStateIcon devStateStyle icon lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 sortby structexclude webCmd widgetOverride
 attr global autoload_undefined_devices 1
 attr global backup_before_update 0
 attr global logfile -
@@ -7,7 +8,6 @@ attr global room System
 attr global sendStatistics never
 attr global statefile ./demolog/fhem.save
 attr global updateInBackground 1
-attr global userattr Light Light_map devStateIcon devStateStyle icon lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0 sortby structexclude webCmd widgetOverride
 attr global verbose 3
 
 define telnetPort telnet 7072 global
@@ -15,6 +15,7 @@ attr telnetPort room System
 
 define WEB FHEMWEB 8083 global
 attr WEB JavaScripts codemirror/fhem_codemirror.js
+attr WEB defaultRoom Light
 attr WEB hiddenroom DashboardRoom
 attr WEB iconPath openautomation:fhemSVG
 attr WEB room System
@@ -46,12 +47,14 @@ define CUL_0 CUL none 0000
 attr CUL_0 dummy 1
 attr CUL_0 room System
 define Outdoor FS20 1234 11
+attr Outdoor userattr Light Light_map structexclude
 attr Outdoor IODev CUL_0
 attr Outdoor Light AllLights
 attr Outdoor group Single Lights
 attr Outdoor icon light_outdoor
 attr Outdoor room Light
 define Office FS20 1234 12
+attr Office userattr Light Light_map structexclude
 attr Office IODev CUL_0
 attr Office Light AllLights
 attr Office group Single Lights
@@ -59,6 +62,7 @@ attr Office icon light_office
 attr Office model fs20st
 attr Office room Light
 define Livingroom FS20 1234 13
+attr Livingroom userattr Light Light_map structexclude
 attr Livingroom IODev CUL_0
 attr Livingroom Light AllLights
 attr Livingroom eventMap off:dim0% on:dim100%
@@ -73,6 +77,7 @@ attr AllLights group Structure
 attr AllLights icon light_light
 attr AllLights room Light
 define Alarm FS20 1234 14
+attr Alarm userattr Light Light_map structexclude
 attr Alarm IODev CUL_0
 attr Alarm Light AllLights
 attr Alarm follow-on-for-timer 1
@@ -121,24 +126,28 @@ attr outdoorNotifier icon light_ceiling_light
 attr outdoorNotifier room Light
 
 define Projector dummy
+attr Projector userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr Projector devStateIcon on:control_on_off:off off:control_home:on
 attr Projector group AV
 attr Projector room Cinema
 attr Projector setList on:noArg off:noArg
 attr Projector webCmd on:off
 define TV dummy
+attr TV userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr TV devStateIcon on:control_on_off:off off:control_home:on
 attr TV group AV
 attr TV room Cinema
 attr TV setList on:noArg off:noArg
 attr TV webCmd on:off
 define Screen dummy
+attr Screen userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr Screen devStateIcon down:fts_garage_door_100:up up:fts_garage_door_10:down
 attr Screen group AV
 attr Screen room Cinema
 attr Screen setList up:noArg down:noArg
 attr Screen webCmd down:up
 define CeilingLight FS20 0001 01
+attr CeilingLight userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr CeilingLight IODev CUL_0
 attr CeilingLight eventMap off:dim0% on:dim100%
 attr CeilingLight group Light
@@ -147,6 +156,7 @@ attr CeilingLight model dummyDimmer
 attr CeilingLight room Cinema
 attr CeilingLight webCmd on:off:dim
 define ReadingLight FS20 0001 02
+attr ReadingLight userattr lightSceneParamsToSave lightSceneRestoreOnlyIfChanged:1,0
 attr ReadingLight IODev CUL_0
 attr ReadingLight eventMap off:dim0% on:dim100%
 attr ReadingLight group Light
