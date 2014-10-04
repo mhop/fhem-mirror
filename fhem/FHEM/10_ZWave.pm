@@ -665,7 +665,7 @@ ZWave_getHash($$$)
       if($zwave_class{$cl} && $zwave_class{$cl}{$type});
 
   if($cl eq "MANUFACTURER_PROPRIETARY") {
-    my $modelId = ReadingsVal($hash, "modelId", "");
+    my $modelId = ReadingsVal($hash->{NAME}, "modelId", "");
     $modelId = $modelIdAlias{$modelId} if($modelIdAlias{$modelId});
     my $p = $manuf_proprietary{$modelId};
     $ptr = $p->{$type} if($p && $p->{$type});
