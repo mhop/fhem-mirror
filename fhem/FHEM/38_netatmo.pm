@@ -93,6 +93,18 @@ netatmo_Define($$)
       return "module $module already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
 
       $modules{$hash->{TYPE}}{defptr}{"M$module"} = $hash;
+
+      my $state_format;
+      if( $readings =~ m/temperature/ ) {
+        $state_format .= " " if( $state_format );
+        $state_format .= "T: temperature";
+      }
+      if( $readings =~ m/humidity/ ) {
+        $state_format .= " " if( $state_format );
+        $state_format .= "H: humidity";
+      }
+      $attr{$name}{stateFormat} = $state_format if( !defined($attr{$name}{stateFormat}) && defined($state_format) );
+
     } else {
       my $lon = $a[4];
       my $lat = $a[5];
