@@ -12,6 +12,7 @@ sub ZWave_Set($@);
 sub ZWave_Get($@);
 sub ZWave_Cmd($$@);
 sub ZWave_ParseMeter($);
+sub ZWave_ParseScene($);
 sub ZWave_SetClasses($$$$);
 sub ZWave_getParse($$$);
 
@@ -64,7 +65,9 @@ my %zwave_class = (
   SWITCH_TOGGLE_MULTILEVEL => { id => '29', },
   CHIMNEY_FAN              => { id => '2a', },
   SCENE_ACTIVATION         => { id => '2b',
-    set   => { sceneActivate => "01%02x%02x",}, },
+    set   => { sceneActivate => "01%02x%02x",}, 
+    parse => { "042b01(..)(..)"  => '"scene_$1:$2"',
+               "042b01(..)ff" => 'ZWave_ParseScene($1)',}, },
   SCENE_ACTUATOR_CONF      => { id => '2c',
     set   => { sceneConfig => "01%02x%02x80%02x",},
     get   => { sceneConfig => "02%02x",          },
@@ -579,6 +582,16 @@ ZWave_SetClasses($$$$)
 }
 
 sub
+ZWave_ParseScene($)
+{
+  my ($p)=@_;
+  my @arg = ("unknown", "on", "off", 
+             "dim up start", "dim down start", "dim up end", "dim down end");
+  return sprintf("sceneEvent%s:%s", int(hex($p)/10), $arg[hex($p)%10]);
+} 
+
+
+sub
 ZWave_mcCapability($$)
 {
   my ($hash, $caps) = @_;
@@ -993,10 +1006,18 @@ s2Hex($)
   <li>dim value<br>
     dim to the requested value (0..100)</li>
 
+	
+  <br><br><b>Class SCENE_ACTIVATION</b>
+  <li>sceneConfig<br>
+    activate settings for a specific scene.
+	Parameters are: sceneId, dimmingDuration (00..ff)
+    </li>
+	
+	
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
   <li>sceneConfig<br>
     set configuration for a specific scene.
-	Parameters are: sceneId, dimmingDuration, finalValue (0x0..0xff)
+	Parameters are: sceneId, dimmingDuration, finalValue (00..ff)
     </li>
 	
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
@@ -1319,6 +1340,9 @@ s2Hex($)
   <li>state:on</li>
   <li>state:off</li>
   <li>state:dim value</li>
+    
+  <br><br><b>Class SCENE_ACTIVATION</b>
+  <li>scene_Id:level finalValue</li>
     
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
   <li>scene_Id:level dimmingDuration finalValue</li>
