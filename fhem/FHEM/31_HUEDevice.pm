@@ -88,20 +88,21 @@ HUEDevice_devStateIcon($)
 
   my $name = $hash->{NAME};
 
-  return ".*:light_question" if( !$hash->{helper}{reachable} && AttrVal($name, "color-icons", 0) != 0 );
+  return ".*:light_question" if( !$hash->{helper}{reachable} );
 
-  return ".*:off:toggle"
-         if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
+  return ".*:off:toggle" if( ReadingsVal($name,"state","off") eq "off" );
 
   my $percent = ReadingsVal($name,"pct","100");
   my $s = $dim_values{int($percent/7)};
   $s="on" if( $percent eq "100" );
 
-  return ".*:$s:toggle"
-         if( AttrVal($name, "model", "") eq "LWB001" );
+  return ".*:$s:toggle" if( $attr{$name}{subType} eq "dimmer" );
+  return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWL001" );
 
-  return ".*:$s:toggle"
-         if( AttrVal($name, "model", "") eq "LWL001" );
+  #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB001" );
+  #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB003" );
+  #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB004" );
+
 
   return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
   return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
@@ -231,37 +232,51 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq "toggle" ) {
     $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
   } elsif( $cmd =~ m/^dim(\d+)/ ) {
-    if( defined($1) ) {
-      $value2 = $value;
-      $value = $1;
-    }
-    if( $value <   0 ) { $value =   0; }
-    if( $value > 100 ) { $value = 100; }
+    $value2 = $value;
+    $value = $1;
+    $value =   0 if( $value <   0 );
+    $value = 100 if( $value > 100 );
     $cmd = 'pct';
   } elsif( !defined($value) && $cmd =~ m/^(\d+)/) {
     $value2 = $value;
     $value = $1;
+    $value =   0 if( $value < 0 );
     $value = 254 if( $value > 254 );
     $cmd = 'bri';
   }
+
+  $cmd = "off" if($cmd eq "pct" && $value == 0 );
 
   if($cmd eq 'on') {
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'} = 254 if( ReadingsVal($name,"bri","0") eq 0 );
     $obj->{'transitiontime'} = $value * 10 if( defined($value) );
+
   } elsif($cmd eq 'off') {
     $obj->{'on'}  = JSON::false;
     $obj->{'transitiontime'} = $value * 10 if( defined($value) );
+
   } elsif($cmd eq "pct") {
-    $value = 3.5 if( $value < 3.5 && AttrVal($name, "model", "") eq "LWL001" );
+    my $bri;
+    if( $value > 50 ) {
+      $bri = 2.57 * ($value-50) + 128;
+    } else {
+      $bri = 2.59 * ($value-50) + 128;
+    }
+    $bri = 0 if( $bri < 0 );
+    $bri = 254 if( $bri > 254 );
+    #$value = 3.5 if( $value < 3.5 && AttrVal($name, "model", "") eq "LWL001" );
     $obj->{'on'}  = JSON::true;
-    $obj->{'bri'}  = int(2.54 * $value);
+    #$obj->{'bri'}  = int(2.55 * $value);
+    $obj->{'bri'}  = int($bri);
     $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
+
   } elsif($cmd eq "bri") {
-    $value = 8 if( $value < 8 && AttrVal($name, "model", "") eq "LWL001" );
+    #$value = 8 if( $value < 8 && AttrVal($name, "model", "") eq "LWL001" );
     $obj->{'on'}  = JSON::true;
     $obj->{'bri'}  = 0+$value;
     $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
+
   } elsif($cmd eq "dimUp") {
     my $bri = ReadingsVal($name,"bri","0");
     $bri += 25;
@@ -271,6 +286,7 @@ HUEDevice_SetParam($$@)
     $obj->{'transitiontime'} = 1;
     #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
     $defs{$name}->{helper}->{update_timeout} = 0;
+
   } elsif($cmd eq "dimDown") {
     my $bri = ReadingsVal($name,"bri","0");
     $bri -= 25;
@@ -280,6 +296,7 @@ HUEDevice_SetParam($$@)
     $obj->{'transitiontime'} = 1;
     #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
     $defs{$name}->{helper}->{update_timeout} = 0;
+
   } elsif($cmd eq "ct") {
     $obj->{'on'}  = JSON::true;
     $obj->{'ct'}  = 0+$value;
@@ -400,6 +417,7 @@ HUEDevice_Set($@)
 #
 #    return undef if( $diff < 100 );
 #  }
+Log 3, Dumper %obj;
 
   if( scalar keys %obj ) {
     my $result;
@@ -746,7 +764,7 @@ HUEDevice_Parse($$)
       $s = 'on';
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
 
-      $percent = int( $bri * 100 / 254 );
+      $percent = int($bri * 99 / 254 + 1);
       if( $percent > 0
           && $percent < 100  ) {
         $s = $dim_values{int($percent/7)};
@@ -761,10 +779,10 @@ HUEDevice_Parse($$)
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
-  if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
   if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
+  #if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
 
-  $s = 'off' if( !$reachable );
+  $s = 'unreachable' if( !$reachable );
 
   $hash->{helper}{on} = $on;
   $hash->{helper}{reachable} = $reachable;
@@ -861,7 +879,7 @@ HUEDevice_Parse($$)
       <li>color &lt;value&gt;<br>
         set colortemperature to &lt;value&gt; kelvin.</li>
       <li>bri &lt;value&gt; [&lt;ramp-time&gt;]<br>
-        set brighness to &lt;value&gt;; range is 1-254.</li>
+        set brighness to &lt;value&gt;; range is 0-254.</li>
       <li>dimUp</li>
       <li>dimDown</li>
       <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
