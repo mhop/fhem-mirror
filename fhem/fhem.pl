@@ -2063,7 +2063,7 @@ getAllAttr($)
   my $d = shift;
   return "" if(!$defs{$d});
 
-  my $list = $AttrList;
+  my $list = $AttrList; # Global values
   $list .= " " . $modules{$defs{$d}{TYPE}}{AttrList}
         if($modules{$defs{$d}{TYPE}}{AttrList});
   $list .= " " . $attr{global}{userattr}
@@ -3172,21 +3172,18 @@ addToDevAttrList($$)
 {
   my ($dev,$arg) = @_;
 
-  my $ua = "";
-  $ua = $attr{$dev}{userattr} if($attr{$dev}{userattr});
-  my @al = split(" ", $ua);
-  my %hash;
-  foreach my $a (@al) {
-    $hash{$a} = 1 if(" $AttrList " !~ m/ $a /); # Cleanse old ones
-  }
-  $hash{$arg} = 1 if(" $AttrList " !~ m/ $arg /);
+  my $ua = $attr{$dev}{userattr};
+  $ua = "" if(!$ua);
+  my %hash = map { ($_ => 1) }
+             grep { " $AttrList " !~ m/ $_ / }
+             split(" ", "$ua $arg");
   $attr{$dev}{userattr} = join(" ", sort keys %hash);
 }
 
 sub
 addToAttrList($)
 {
-  addToDevAttrList("global", @_);
+  addToDevAttrList("global", shift);
 }
 
 sub
