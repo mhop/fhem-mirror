@@ -29,6 +29,7 @@
   <a href="#intro">Introduction</a><br>
   <a href="#command">Fhem command types</a><br>
   <a href="#devspec">Device specification</a><br>
+  <a href="#attributes">Attributes</a><br>
 
   <br>
   <b>Fhem commands</b>
@@ -314,7 +315,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <li>the spec may not contain space characters.</n>
   <li>if there is a device which exactly corresponds to the spec, then
       no special processing is done.</li>
-  <li>first the spec is separated by komma, then the regular expression and
+  <li>first the spec is separated by comma, then the regular expression and
       filter operations are executed.</li>
   <li>the returned list can contain the same device more than once, so
       "set lamp3,lamp3 on" switches lamp3 twice.</li>
@@ -323,30 +324,44 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
 </ul>
 
-<a name="help"></a>
-<h3>?, help</h3>
+
+<a name="attributes"></a>
+<h3>Attributes</h3>
+
+All devices have attributes. These can be set by means of the <a
+href="#attr">attr</a> command, displayed with the <a
+href="#displayattr">displayattr</a> command, and deleted by the <a
+href="#deleteattr">deleteattr</a> command.<p>
+
+There are global attributes that are used by all devices and local attributes
+that apply to individual device classes only.<p>
+
+Some devices (like <a href="#FHEMWEB">FHEMWEB</a>) automatically define new
+global attributes on the first definition of a device of such type.<p>
+
+You can use the command <p><code>attr global userattr
+&lt;attributelist&gt;</code><p> for the <a href="#global">global</a> device to
+declare new global attributes and <p><code>attr &lt;devicespec&gt; userattr
+&lt;attributelist&gt;</code><p> for individual devices according to <a
+href="#devspec">devspec</a> to declare new local attributes. 
+
+<code>&lt;attributelist&gt;</code> is a space-separated list which contains the
+names of the additional attributes. See the documentation of the <a
+href="#attr">attr</a> command for examples.<p>
+
+Be careful not to overwrite additional global attributes previously defined by
+yourself or a device. Use the <code>attr global userattr
+&lt;attributelist&gt;</code> as early in your configuration as possible.
+
+<h4>Device specific attributes</h4>
+
+Device specific attributes are documented in the corresponding device section.
+
+
+<h4>Global attributes used by all devices</h4>
+ 
 <ul>
-  <code>?</code><br>
-  <code>help</code><br>
-  <br>
-  Get a list of all commands and short description for each one
-</ul>
 
-<a name="attr"></a>
-<h3>attr</h3>
-<ul>
-  <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
-
-  <br>Set an attribute for a device defined by <a href="#define">define</a>.
-  You can define your own attributes too to use them in other applications.
-
-  Use "attr &lt;name&gt; ?" to get a list of possible attributes.
-  See the <a href="#devspec">Device specification</a> section for details on
-  &lt;devspec&gt;.
-  <br><br>
-
-  Attributes used by all devices:
-  <ul>
     <a name="verbose"></a>
     <li>verbose<br>
         Set the verbosity level. Possible values:
@@ -365,10 +380,12 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="comment"></a>
     <li>comment<br>
         Add an arbitrary comment.
+        
     <a name="alias"></a>
     <li>alias<br>
         Used by FHEMWEB to display a device with another name e.g. when using
         special characters/spaces not accepted by device definition.
+        
     <a name="room"></a>
     <li>room<br>
         Filter/group devices. Recognized by web-pgm2 and web-pgm3.  A device
@@ -396,15 +413,33 @@ A line ending with \ will be concatenated with the next one, so long lines
         instead of the state in the summary view. Useful e.g. for FS20 PIRI
         devices.
     </li>
+    
+    <a name="eventMap"></a>
+    <li>eventMap<br>
+        Replace event names and set arguments. The value of this attribute
+        consists of a list of space separated values, each value is a colon
+        separated pair. The first part specifies the "old" value, the second
+        the new/desired value. If the first character is slash(/) or comma(,)
+        then split not by space but by this character, enabling to embed spaces.
+        Examples:<ul><code>
+        attr store eventMap on:open off:closed<br>
+        attr store eventMap /on-for-timer 10:open/off:closed/<br>
+        set store open
+        </code></ul>
+        </li><br>
+    
 
-    <a name="readingFnAttributes"></a>
-    <h4>readingFnAttributes</h4>
-    The following attributes are honored by the modules that make use
-    of the standardized readings updating mechanism in fhem.pl. Check the
-    modules attribute list if you want to know if it is supporting it.
-    <br>
-    <br>
+</ul>
 
+<a name="readingFnAttributes"></a>
+<h4>readingFnAttributes</h4><p>
+
+The following global attributes are honored by the modules that make use of the
+standardized readings updating mechanism in fhem.pl. Check the module's
+attribute list if you want to know if a device supports these attributes.  <br>
+
+<ul>
+    
     <a name="stateFormat"></a>
     <li>stateFormat<br>
     Modifies the STATE of the device, shown by the list command or in the room
@@ -514,11 +549,50 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>the name of the defined Readings consists of alphanumeric characters
         with underscore (_) and the minus (-) sign.</li>
       </ul>
-    </li><br>
-    </ul>
-  <br>
+    </li>
+ </ul>
 
-  Device specific attributes are documented in the corresponding device section.
+<h4>Common attributes</h4>
+
+The following local attributes are used by a wider range of devices:
+
+<ul>
+   <a name="IODev"></a>
+    <li>IODev<br>
+        Set the IO or physical device which should be used for sending signals
+        for this "logical" device. An example for the physical device is an FHZ
+        or a CUL. Note: Upon startup FHEM assigns each logical device
+        (FS20/HMS/KS300/etc) the last physical device which can receive data
+        for this type of device. The attribute IODev needs to be used only if
+        you attached more than one physical device capable of receiving signals
+        for this logical device.</li><br>
+
+</ul>
+
+
+<br><br>
+
+<a name="help"></a>
+<h3>?, help</h3>
+<ul>
+  <code>?</code><br>
+  <code>help</code><br>
+  <br>
+  Get a list of all commands and short description for each one
+</ul>
+
+<a name="attr"></a>
+<h3>attr</h3>
+<ul>
+  <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
+
+  <br>Set an attribute for a device defined by <a href="#define">define</a>.
+  You can define your own <a href="#attributes">attributes</a> too to use them
+  in other applications.
+
+  Use "attr &lt;name&gt; ?" to get a list of possible attributes.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
   <br><br>
 
   Examples:
