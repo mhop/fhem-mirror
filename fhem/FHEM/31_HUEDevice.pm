@@ -417,7 +417,6 @@ HUEDevice_Set($@)
 #
 #    return undef if( $diff < 100 );
 #  }
-Log 3, Dumper %obj;
 
   if( scalar keys %obj ) {
     my $result;
