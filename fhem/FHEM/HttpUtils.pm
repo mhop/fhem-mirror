@@ -149,6 +149,8 @@ HttpUtils_Connect($)
   } else {
     $hash->{conn} = IO::Socket::INET->new(
                 PeerAddr=>"$host:$port", Timeout=>$hash->{timeout});
+    return "$hash->{displayurl}: Can't connect(1) to $hash->{addr}: $@"
+      if(!$hash->{conn});
   }
   return HttpUtils_Connect2($hash);
 }
@@ -172,8 +174,8 @@ HttpUtils_Connect2($)
   if(!$hash->{conn}) {
     undef $hash->{conn};
     my $err = $@;
-    $err = "$SSL_ERR" if(!$err && $hash->{protocol} eq "https");
-    return "$hash->{displayurl}: Can't connect to $hash->{addr}: $err"; 
+    $err = $SSL_ERR if(!$err && $hash->{protocol} eq "https");
+    return "$hash->{displayurl}: Can't connect(2) to $hash->{addr}: $err"; 
   }
 
   my $data;
