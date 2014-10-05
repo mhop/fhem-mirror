@@ -822,7 +822,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,burstRx         =>1,lowBatLimitRT   =>1,backOnTime      =>1
                          ,sign            =>1
                         },
-  "HM-MOD-Em-8"       =>{ lowBatLimit     =>1,transmDevTryMax =>1,localResDis     =>1  
+  "HM-MOD-Em-8"       =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
+                         ,ledMode         =>1
                          ,transmitTryMax  =>1,eventFilterTime =>1
                          ,msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1                         
                          },
