@@ -77,6 +77,7 @@ use constant {
 	ERR_DECRYPTION_FAILED => 8,
 	ERR_NO_AESKEY => 9,
 	ERR_UNKNOWN_ENCRYPTION => 10,
+	ERR_TOO_MANY_VIFE => 11,
 	
 	
 	
@@ -461,6 +462,7 @@ my %VIFInfo_FB = (
 	},
 );
 
+
 # see 4.2.3, page 24
 my %validDeviceTypes = (
  0x00 => 'Other',
@@ -518,6 +520,14 @@ my %encryptionModes = (
 	0x02 => 'static telegram',
 	0x03 => 'reserved',
 );
+
+my %functionFieldTypes = (
+	0b00 => 'Instantaneous value',
+	0b01 => 'Maximum value',
+	0b10 => 'Minimum value',
+	0b11 => 'Value during error state',
+);
+
 
 sub type2string($$) {
 	my $class = shift;
@@ -648,6 +658,8 @@ sub decodeBCD($$$) {
 	my $val=0;
 	my $mult=1;
 	
+	#print "bcd:" . unpack("H*", $bcd) . "\n";
+	
 	for (my $i = 0; $i < $digits/2; $i++) {
 		$byte = unpack('C',substr($bcd, $i, 1));
 		$val += ($byte & 0x0f) * $mult;
@@ -667,61 +679,84 @@ sub decodeValueInformationBlock($$$) {
 	my $vif;
 	my $bias;
 	my $exponent;
-	my $vifInfoRef = \%VIFInfo;
+	my $vifInfoRef;
 	my $vifExtension = 0;
+	my $vifExtNo = 0;
+	my $isExtension;
 	
-	$vif = unpack('C', $vib);
-	$offset = 1;
-	
-	#printf("vif: %x\n", $vif);
-	my $isExtension = $vif & VIF_EXTENSION_BIT;
 
-	if ($isExtension) {
-		# switch to extension codes
+  $dataBlockRef->{type}	= '';
+
+	EXTENSION: while (1) {
+		$vif = unpack('C', substr($vib,$offset++,1));
+		$isExtension = $vif & VIF_EXTENSION_BIT;
+  	#printf("vif: %x\n", $vif);
+  	
+  	last EXTENSION if (defined $vifInfoRef);
+  	last EXTENSION if (!$isExtension && $dataBlockRef->{type} eq "MANUFACTURER SPECIFIC");
+  	
+
+		$vifExtNo++;
+		if ($vifExtNo > 10) {
+			$dataBlockRef->{errormsg} = 'too many VIFE';
+			$dataBlockRef->{errorcode} = ERR_TOO_MANY_VIFE;
+			last EXTENSION;
+		}
+		
+	  # switch to extension codes
 		$vifExtension = $vif;
-		if ($vifExtension == 0xFD) {
+  	$vif &= ~VIF_EXTENSION_BIT;
+  	#printf("vif ohne extension: %x\n", $vif);
+  	if ($vif <= 0b01111011) {
+			# The unit and multiplier is taken from the table for primary VIF
+			$vifInfoRef = \%VIFInfo;
+		} elsif ($vif == 0x7D) {
 			$vifInfoRef = \%VIFInfo_FD;
-		} elsif ($vifExtension == 0xFB) {
+		} elsif ($vif == 0x7B) {
 			$vifInfoRef = \%VIFInfo_FB;
-		} elsif ($vifExtension == 0xFF) {
+		} elsif ($vif == 0x7C) {
+			# Plaintext VIF
+			my $vifLength = unpack('C', substr($vib,$offset++,1));
+			$dataBlockRef->{type} = "see unit";
+			$dataBlockRef->{unit} = unpack(sprintf("C%d",$vifLength), substr($vib, $offset, $vifLength));
+			$offset += $vifLength;
+		} elsif ($vif == 0x7F) {
 			# manufacturer specific data, can't be interpreted
 			$dataBlockRef->{type} = "MANUFACTURER SPECIFIC";
 			$dataBlockRef->{unit} = "";
-			return $offset;
 	  } else {
 			$dataBlockRef->{type} = 'unknown';
-			$dataBlockRef->{errormsg} = "unknown VIFE " . sprintf("%x", $vifExtension) . " at offset $offset-1";
+			$dataBlockRef->{errormsg} = "unknown VIFE " . sprintf("%x", $vifExtension) . " at offset " . $offset-1;
 			$dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;		
 		}
-		$vif = unpack('C', substr($vib,$offset++,1));
-		#printf("vife: %x\n", $vif);
+		last EXTENSION if (!$isExtension);
+
 	}
 
 	
-	$vif &= ~VIF_EXTENSION_BIT;
 	
 	#printf("vif w/o ext: %x\n", $vif);
-	$dataBlockRef->{type} = '';
-	VIFID: foreach my $vifType ( keys $vifInfoRef ) { 
-	
-		#printf "vifType $vifType\n"; 
-	
-		if (($vif & $vifInfoRef->{$vifType}{typeMask}) == $vifInfoRef->{$vifType}{type}) {
-			#printf "vifType $vifType matches\n"; 
-			
-			$bias = $vifInfoRef->{$vifType}{bias};
-			$dataBlockRef->{exponent} = $vif & $vifInfoRef->{$vifType}{expMask};
-			
-			$dataBlockRef->{type} = $vifType;
-			$dataBlockRef->{unit} = $vifInfoRef->{$vifType}{unit};
-			$dataBlockRef->{valueFactor} = 10 ** ($dataBlockRef->{exponent} + $bias);
-			$dataBlockRef->{calcFunc} = $vifInfoRef->{$vifType}{calcFunc};
-			
-			#printf("type %s bias %d exp %d valueFactor %d unit %s\n", $dataBlockRef->{type}, $bias, $dataBlockRef->{exponent}, $dataBlockRef->{valueFactor},$dataBlockRef->{unit});
-			last VIFID;
+	if (defined $vifInfoRef) {
+		VIFID: foreach my $vifType ( keys $vifInfoRef ) { 
+		
+			#printf "vifType $vifType\n"; 
+		
+			if (($vif & $vifInfoRef->{$vifType}{typeMask}) == $vifInfoRef->{$vifType}{type}) {
+				#printf "vifType $vifType matches\n"; 
+				
+				$bias = $vifInfoRef->{$vifType}{bias};
+				$dataBlockRef->{exponent} = $vif & $vifInfoRef->{$vifType}{expMask};
+				
+				$dataBlockRef->{type} = $vifType;
+				$dataBlockRef->{unit} = $vifInfoRef->{$vifType}{unit};
+				$dataBlockRef->{valueFactor} = 10 ** ($dataBlockRef->{exponent} + $bias);
+				$dataBlockRef->{calcFunc} = $vifInfoRef->{$vifType}{calcFunc};
+				
+				#printf("type %s bias %d exp %d valueFactor %d unit %s\n", $dataBlockRef->{type}, $bias, $dataBlockRef->{exponent}, $dataBlockRef->{valueFactor},$dataBlockRef->{unit});
+				last VIFID;
+			}
 		}
 	}
-	
 	if ($dataBlockRef->{type} eq '') {
 		$dataBlockRef->{type} = 'unknown';
 		$dataBlockRef->{errormsg} = sprintf("in VIFExtension %x unknown VIF %x",$vifExtension, $vif);
@@ -773,6 +808,7 @@ sub decodeDataInformationBlock($$$) {
 	}
 	
 	$dataBlockRef->{functionField} = $functionField;
+	$dataBlockRef->{functionFieldText} = $functionFieldTypes{$functionField};
 	$dataBlockRef->{dataField} = $df;
 	$dataBlockRef->{storageNo} = $storageNo;
 	$dataBlockRef->{tariff} = $tariff;
@@ -834,7 +870,11 @@ sub decodePayload($$) {
 		$offset += $self->decodeDataRecordHeader(substr($payload,$offset), $dataBlock);
 		#printf("No. %d, type %x at offset %d\n", $dataBlockNo, $dataBlock->{dataField}, $offset-1);
 		
-		if ($dataBlock->{dataField} == DIF_NONE || $dataBlock->{dataField} == DIF_READOUT) {
+		if ($dataBlock->{dataField} == DIF_NONE) {
+		} elsif ($dataBlock->{dataField} == DIF_READOUT) {
+			$self->{errormsg} = "in datablock $dataBlockNo: unexpected DIF_READOUT";
+			$self->{errorcode} = ERR_UNKNOWN_DATAFIELD;
+			return 0;
 		} elsif ($dataBlock->{dataField} == DIF_BCD2) {
 			$value = $self->decodeBCD(2, substr($payload,$offset,1));
 			$offset += 1;
@@ -952,6 +992,8 @@ sub decrypt($) {
 sub decodeApplicationLayer($) {
 	my $self = shift;
 	my $applicationlayer = $self->removeCRC(substr($self->{msg},12));
+	
+	#print unpack("H*", $applicationlayer) . "\n";
 	
 	if ($self->{errorcode} != ERR_NO_ERROR) {
 		# CRC check failed
