@@ -48,12 +48,13 @@ sub
 sr($$$$$$)
 {
   my ($rise, $seconds, $isrel, $daycheck, $min, $max) = @_;
-  sr_alt($rise, $isrel, $daycheck, $defaultaltit, $seconds, $min, $max);
+  sr_alt(time(), $rise, $isrel, $daycheck, $defaultaltit, $seconds, $min, $max);
 }
 
 sub
-sr_alt($$$$$$$)
+sr_alt($$$$$$$$)
 {
+  my $nt=shift;
   my $rise=shift;
   my $isrel=shift;
   my $daycheck=shift;
@@ -81,7 +82,7 @@ sr_alt($$$$$$$)
    Log3 undef, 5, "Compute sunrise/sunset for latitude $lat , longitude $long";
  
 
-  my $nt = time;
+  #my $nt = time;
   my @lt = localtime($nt);
   my $gmtoff = _calctz($nt,@lt); # in hour
 
@@ -358,15 +359,18 @@ h2hms_fmt($)
   return sprintf("%02d:%02d:%02d", $h, $m, $s);
 }
 
-
-sub sunrise_rel(@) { return sr_alt(1, 1, 0, shift, shift, shift, shift) }
-sub sunset_rel(@)  { return sr_alt(0, 1, 0, shift, shift, shift, shift) }
-sub sunrise_abs(@) { return sr_alt(1, 0, 0, shift, shift, shift, shift) }
-sub sunset_abs(@)  { return sr_alt(0, 0, 0, shift, shift, shift, shift) }
-sub sunrise(@)     { return sr_alt(1, 2, 0, shift, shift, shift, shift) }
-sub sunset(@)      { return sr_alt(0, 2, 0, shift, shift, shift, shift) }
-sub isday(@)       { return sr_alt(1, 0, 1, shift,     0, undef, undef) }
 sub sunrise_coord($$$) { ($long, $lat, $tz) = @_; return undef; }
+
+sub sunrise_rel (@)    { return sr_alt(time(), 1, 1, 0, shift, shift, shift, shift) }
+sub sunset_rel  (@)    { return sr_alt(time(), 0, 1, 0, shift, shift, shift, shift) }
+sub sunrise_abs (@)    { return sr_alt(time(), 1, 0, 0, shift, shift, shift, shift) }
+sub sunset_abs  (@)    { return sr_alt(time(), 0, 0, 0, shift, shift, shift, shift) }
+sub sunrise     (@)    { return sr_alt(time(), 1, 2, 0, shift, shift, shift, shift) }
+sub sunset      (@)    { return sr_alt(time(), 0, 2, 0, shift, shift, shift, shift) }
+sub isday       (@)    { return sr_alt(time(), 1, 0, 1, shift,     0, undef, undef) }
+
+sub sunrise_abs_dat(@) { return sr_alt(shift,  1, 0, 0, shift, shift, shift, shift) }
+sub sunset_abs_dat (@) { return sr_alt(shift,  0, 0, 0, shift, shift, shift, shift) }
 
 1;
 
@@ -401,6 +405,9 @@ isday</pre>
   sunrise/sunset. <br>
   sunrise_abs()/sunset_abs() return the absolute time of the corresponding
   event today (no 24 hours added).<br>
+  sunrise_abs_dat()/sunset_abs_dat() return the absolute time of the corresponding
+  event to a given date(no 24 hours added).<br>
+  
   All functions take up to three arguments:<br>
   <ul>
     <li>The first specifies an offset (in seconds), which will be added to the
@@ -416,7 +423,7 @@ isday</pre>
   Possible values are: "REAL", "CIVIL", "NAUTIC", "ASTRONOMIC" or a 
   positive or negative number preceded by "HORIZON="<br>
   REAL is 0, CIVIL is -6, NATUIC is -12, ASTRONOMIC is -18 degrees above horizon.<br><br>
-  Example:<br>
+  Examples:<br>
   <ul>
   <PRE>
     # When sun is 6 degrees below horizon - same as sunrise();
@@ -432,6 +439,22 @@ isday</pre>
     define a15 at *{sunset("REAL",0,"18:00","21:00")} set lamp1 on
   </PRE>
   </ul>
+  
+  The functions sunrise_abs_dat()/sunset_abs_dat() need as a very first parameter the date(format epoch: time()) for which the events should be calculated.
+  <br><br>
+  Examples:
+  <br>
+  <ul>
+  <PRE>
+    # to calculate the sunrise of today + 7 days
+    my $date = time() + 7*86400;
+    sunrise_abs_dat($date);
+    
+    # to calculate the sunrise of today + 7 days 6 degrees below horizon 
+    my $date = time() + 7*86400;
+    sunrise_abs_dat($date, "CIVIL");    
+  </ul>
+  </PRE>  
   
   <b>Define</b> <ul>N/A</ul><br>
 
