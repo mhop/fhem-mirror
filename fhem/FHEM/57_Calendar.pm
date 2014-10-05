@@ -36,8 +36,10 @@ package main;
 #
 # There might be issues when turning to daylight saving time and back that
 # need further investigation. For reference please see
-# http://forum.fhem.de/index.php?topic=18707.new#new
-# http://forum.fhem.de/index.php?topic=15827.new;topicseen#new
+# http://forum.fhem.de/index.php?topic=18707.new
+# http://forum.fhem.de/index.php?topic=15827.new
+#
+# Continuation lines are only partially honored, e.g. not for descriptions
 #
 # Potential future extensions: add support for EXDATE
 # http://forum.fhem.de/index.php?topic=24485.new#new
@@ -65,19 +67,22 @@ sub new {
 
 sub addproperty {
   my ($self,$line)= @_;
+  # contentline        = name *(";" param ) ":" value CRLF [Page 13]
+  # example:
   # TRIGGER;VALUE=DATE-TIME:20120531T150000Z
-  #main::Debug "line= $line";
+  #main::Debug "line=\'$line\'";
   # for DTSTART, DTEND there are several variants:
   #    DTSTART;TZID=Europe/Berlin:20140205T183600
   #  * DTSTART;TZID="(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna":20140904T180000
   #    DTSTART:20140211T212000Z
   #    DTSTART;VALUE=DATE:20130619
-  my ($property,$parameter)= split(":", $line,2); # TRIGGER;VALUE=DATE-TIME    20120531T150000Z
-  #main::Debug "property= $property parameter= $parameter";
-  my ($key,$parts)= split(";", $property,2);
-  #main::Debug "key= $key parts= $parts";
-  $parts= "" unless(defined($parts));
-  $parameter= "" unless(defined($parameter));
+  my ($key,$parts,$parameter);
+  if($line =~ /^([\w\d\-]+)(;(.*))?:(.*)$/) {
+    $key= $1;
+    $parts= defined($3) ? $3 : "";
+    $parameter= defined($4) ? $4 : "";
+  }
+  #main::Debug "-> key=\'$key\' parts=\'$parts\' parameter=\'$parameter\'";
   if($key eq "EXDATE") {
     push @{$self->{properties}{exdates}}, $parameter;
   }
@@ -738,7 +743,11 @@ sub updateFromCalendar {
       $event->setMode($self->event($uid)->mode()); # copy the mode from the existing event
       #main::Debug "Our lastModified: " . ts($self->event($uid)->lastModified());
       #main::Debug "New lastModified: " . ts($event->lastModified());
-      if($self->event($uid)->lastModified() != $event->lastModified()) {
+      if(
+	defined($self->event($uid)->lastModified()) &&
+	defined($event->lastModified()) &&
+        ($self->event($uid)->lastModified() != $event->lastModified())
+        ) {
          $event->setState("updated");
          #main::Debug "We set it to updated.";
       } else {

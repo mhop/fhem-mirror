@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 57_Calendar: line parsing rewritten, care for missing 
+                         modification timestamps
   - change: SYSMON: support userReadings in SYSMON_ShowValues
   - change: 59_Weather: change icon for condition clear to sunny.png
   - bugfix: 57_Calendar: calendar event anymore in modeAlarmed if started
