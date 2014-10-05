@@ -186,7 +186,8 @@ my %zwave_class = (
                configWord  => "04%02x02%04x",
                configLong  => "04%02x04%08x", },
     get   => { config      => "05%02x", },
-    parse => { "..7006(..)..(.*)" => '"config_$1:".hex($2)',}, },
+    parse => { "^..70..(..)..(.*)" => 'ZWave_configParse($hash,$1,$2)'} },
+
   ALARM                    => { id => '71', 
     get   => { alarm       => "04%02x", },
     parse => { "..7105(..)(..)" => '"alarm_type_$1:level $2"',}, },
@@ -285,8 +286,7 @@ my %zwave_cmdArgs = (
   }
 );
 
-use vars qw(%zwave_modelConfig);
-#my %zwave_modelConfig;
+my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222" );
 my %zwave_manuf_proprietary = ( # MANUFACTURER_PROPRIETARY ist model dependent
    Fibaro_FGRM222 => {
@@ -435,7 +435,7 @@ ZWave_Cmd($$@)
   }
 
   if($cmd =~ m/^config/) {
-    my ($err, $cmd) = ZWave_checkConfigParam($hash, $type, $cmd, $cmdFmt, @a);
+    my ($err, $cmd) = ZWave_configCheckParam($hash, $type, $cmd, $cmdFmt, @a);
     return $err if($err);
     $cmdFmt = $cmd;
   } else {
@@ -693,11 +693,13 @@ ZWave_cleanString($)
   return $c;
 }
 
+###################################
 # Poor mans XML-Parser
 sub
-ZWave_parseConfig($)
+ZWave_configParseModel($)
 {
   my ($cfg) = @_;
+  Log 3, "ZWave reading config for $cfg";
   my $fn = $attr{global}{modpath}."/FHEM/lib/openzwave_deviceconfig.xml.gz";
   my $gz = gzopen($fn, "rb");
   if(!$gz) {
@@ -738,7 +740,7 @@ ZWave_parseConfig($)
   }
   $gz->gzclose();
 
-  my %mc;
+  my %mc = (set=>{}, get=>{}, config=>{});
   foreach my $cmd (keys %hash) {
     my $h = $hash{$cmd};
     my $arg = ($h->{type} eq "button" ? "a" : "a%b");
@@ -753,14 +755,24 @@ ZWave_parseConfig($)
   $zwave_modelConfig{$cfg} = \%mc;
 }
 
+###################################
 sub
-ZWave_checkConfigParam($$$$@)
+ZWave_configGetHash($)
+{
+  my ($hash) = @_;
+  return undef if(!$hash);
+  my $mc = ReadingsVal($hash->{NAME}, "modelConfig", "");
+  ZWave_configParseModel($mc) if($mc && !$zwave_modelConfig{$mc});
+  return $zwave_modelConfig{$mc};
+}
+
+sub
+ZWave_configCheckParam($$$$@)
 {
   my ($hash, $type, $cmd, $fmt, @arg) = @_;
-  my $mc = ReadingsVal($hash->{NAME}, "modelConfig", "");
-  return ("", sprintf($fmt, @arg)) if(!$mc || !$zwave_modelConfig{$mc});
-  my $h = $zwave_modelConfig{$mc}{config};
-  $h = $h->{$cmd};
+  my $mc = ZWave_configGetHash($hash);
+  return ("", sprintf($fmt, @arg)) if(!$mc);
+  my $h = $mc->{config}{$cmd};
   return ("", sprintf($fmt, @arg)) if(!$h);
 
   return ("", sprintf("05%02x", $h->{index})) if($type eq "get");
@@ -787,6 +799,30 @@ ZWave_checkConfigParam($$$$@)
 }
 
 sub
+ZWave_configParse($$$)
+{
+  my ($hash, $cmdId, $val) = @_;
+  $val = hex($val);
+  $cmdId = hex($cmdId);
+
+  my $mc = ZWave_configGetHash($hash);
+  return "config_$cmdId:$val" if(!$mc);
+  my $h = $mc->{config};
+  foreach my $cmd (keys %{$h}) {
+    if($h->{$cmd}{index} == $cmdId) {
+      my $hi = $h->{$cmd}{Item};
+      if($hi) {
+        foreach my $item (keys %{$hi}) {
+          return "$cmd:$item" if($hi->{$item} == $val);
+        }
+      }
+      return "$cmd:$val";
+    }
+  }
+  return "config_$cmdId:$val";
+}
+
+sub
 ZWave_getHash($$$)
 {
   my ($hash, $cl, $type) = @_;
@@ -795,17 +831,13 @@ ZWave_getHash($$$)
       if($zwave_class{$cl} && $zwave_class{$cl}{$type});
 
   if($cl eq "CONFIGURATION" && $type ne "parse") {
-    my $mc = ReadingsVal($hash->{NAME}, "modelConfig", "");
-    ZWave_parseConfig($mc) if($mc && !$zwave_modelConfig{$mc});
-    my $mch = $zwave_modelConfig{$mc};
-    if($mch) {
-      my $mcp = $mch->{$type};
-      if($mcp) {
-        my %nptr = ();
-        map({$nptr{$_} = $ptr->{$_}} keys %{$ptr});
-        map({$nptr{$_} = $mcp->{$_}} keys %{$mcp});
-        $ptr = \%nptr;
-      }
+    my $mc = ZWave_configGetHash($hash);
+    if($mc) {
+      my $mcp = $mc->{$type};
+      my %nptr = ();
+      map({$nptr{$_} = $ptr->{$_}} keys %{$ptr});
+      map({$nptr{$_} = $mcp->{$_}} keys %{$mcp});
+      $ptr = \%nptr;
     }
   }
 
@@ -1011,16 +1043,17 @@ ZWave_Undef($$)
   return undef;
 }
 
+#####################################
+# Show the help from the device.xml, if the correct entry is selected
 sub
 ZWave_helpFn($$)
 {
   my ($d,$cmd) = @_;
-  my $mc = ReadingsVal($d, "modelConfig", "");
-  return "" if(!$mc || !$zwave_modelConfig{$mc});
-  my $h = $zwave_modelConfig{$mc}{config};
-  $h = $h->{$cmd};
+  my $mc = ZWave_configGetHash($defs{$d});
+  return "" if(!$mc);
+  my $h = $mc->{config}{$cmd};
   return "" if(!$h || !$h->{Help});
-  return "Help for $cmd:<br>".$h->{Help};
+  return "Help for $cmd:<br>".$h->{Help}."<br><br>";
 }
 
 sub
@@ -1030,8 +1063,15 @@ ZWave_fhemwebFn($$$$)
 
   return "<div id=\"Help_$d\" class=\"help\"></div>".<<JSEND
   <script type="text/javascript">
-    var oldHelp={}
-    function helpSet(val) { document.querySelector("#Help_$d").innerHTML=val; }
+    var oldHelp={};
+    var helpDiv=document.querySelector("#Help_$d");
+
+    setTimeout(function() { // Wait for it to appear, thn move it
+      var w=document.querySelector("div.makeTable.wide");
+      w.insertBefore(helpDiv,w.firstChild);
+    }, 200);
+
+    function helpSet(val) { helpDiv.innerHTML=val; }
     function
     helpCheck(name)
     {
@@ -1092,7 +1132,8 @@ s2Hex($)
   Example:
   <ul>
     <code>define lamp ZWave 00ce2074 9</code><br>
-    <code>attr lamp classes SWITCH_BINARY BASIC MANUFACTURER_SPECIFIC VERSION SWITCH_ALL ASSOCIATION METER CONFIGURATION ALARM</code><br>
+    <code>attr lamp classes SWITCH_BINARY BASIC MANUFACTURER_SPECIFIC VERSION
+      SWITCH_ALL ASSOCIATION METER CONFIGURATION ALARM</code><br>
   </ul>
   </ul>
   <br>
@@ -1133,7 +1174,9 @@ s2Hex($)
       configWord cfgAddress 16bitValue<br>
       configLong cfgAddress 32bitValue<br>
     Send a configuration value for the parameter cfgAddress. cfgAddress and
-    value is node specific.</li>
+    value is node specific.<br>
+    Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
+    specific config commands are available.</li>
   <li>configDefault cfgAddress<br>
     Reset the configuration parameter for the cfgAddress parameter to its
     default value.  See the device documentation to determine this value.</li>
@@ -1269,7 +1312,9 @@ s2Hex($)
   <br><br><b>Class CONFIGURATION</b>
   <li>config cfgAddress<br>
     return the value of the configuration parameter cfgAddress. The value is
-    device specific.
+    device specific.<br>
+    Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
+    specific config commands are available.
     </li>
 
   <br><br><b>HRV_STATUS</b>
@@ -1292,10 +1337,13 @@ s2Hex($)
     </li>
 
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
-  <li><br>
+  <li>model<br>
     return the manufacturer specific id (16bit),
     the product type (16bit)
-    and the product specific id (16bit).
+    and the product specific id (16bit).<br>
+    Note: if the openzwave xml files are installed, then return the name of the
+    manufacturer and of the product. This call is also necessary to decode more
+    model specific configuration commands and parameters.
     </li>
 
   <br><br><b>Class METER</b>
@@ -1448,7 +1496,9 @@ s2Hex($)
   <li>clock:get</li>
 
   <br><br><b>Class CONFIGURATION</b>
-  <li>config_X:Y</li>
+  <li>config_X:Y<br>
+    Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
+    specific config messages are available.</li>
 
   <br><br><b>Class HRV_STATUS</b>
   <li>outdoorTemperature: %0.1f C</li>
@@ -1467,7 +1517,9 @@ s2Hex($)
   <li>position:Blinds [%] Slat [%]</li>
   
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
-  <li>mfs:hexValue hexValue hexValue</li>
+  <li>modelId:hexValue hexValue hexValue</li>
+  <li>model:manufacturerName productName</li>
+  <li>modelConfig:configLocation</li>
 
   <br><br><b>Class METER</b>
   <li>energy:val [kWh|kVAh|pulseCount]</li>
