@@ -1032,6 +1032,7 @@ CUL_Attr(@)
       $hash->{initString} = "X21";
       CUL_SimpleWrite($hash, "Ax") if ($hash->{CMDS} =~ m/A/); # reset AskSin
       CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
+      CUL_SimpleWrite($hash, "brx") if ($hash->{CMDS} =~ m/b/); # reset WMBus
       CUL_WriteInit($hash);
 
     }
