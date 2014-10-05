@@ -170,7 +170,7 @@ sub onmessage($$$) {
 =begin html
 
 <a name="MQTT_DEVICE"></a>
-<h3>MQTT</h3>
+<h3>MQTT_DEVICE</h3>
 <ul>
   acts as a fhem-device that is mapped to <a href="http://mqtt.org">mqtt</a>-topics.
   <br><br>
@@ -189,11 +189,11 @@ sub onmessage($$$) {
     <b>Set</b>
     <ul>
       <li>
-        <code>set &lt;name&gt; &lt;command&gt;/code><br>
+        <code>set &lt;name&gt; &lt;command&gt;</code><br>
         sets reading 'state' and publishes the command to topic configured via attr publishSet
       </li><br>
       <li>
-        <code>set &lt;name&gt; &lth;reading&gt; &lt;value&gt;/code><br>
+        <code>set &lt;name&gt; &lth;reading&gt; &lt;value&gt;</code><br>
         sets reading &lth;reading&gt; and publishes the command to topic configured via attr publishSet_&lth;reading&gt;
       </li><br>
     </ul>
@@ -203,11 +203,11 @@ sub onmessage($$$) {
     <b>Attributes</b><br>
     <ul>
       <li>
-        <code>attr &lt;name&gt; publishSet [&lt;commands&gt] &lt;topic&gt;/code><br>
+        <code>attr &lt;name&gt; publishSet [&lt;commands&gt] &lt;topic&gt;</code><br>
         configures set commands that may be used to both set reading 'state' and publish to configured topic<br>
       </li>
       <li>
-        <code>attr &lt;name&gt; publishSet_&lt;reading&gt; [&lt;values&gt] &lt;topic&gt;/code><br>
+        <code>attr &lt;name&gt; publishSet_&lt;reading&gt; [&lt;values&gt] &lt;topic&gt;</code><br>
         configures reading that may be used to both set 'reading' (to optionally configured values) and publish to configured topic<br>
       </li>
     </ul>
