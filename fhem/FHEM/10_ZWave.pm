@@ -6,6 +6,7 @@ package main;
 use strict;
 use warnings;
 use SetExtensions;
+use Compress::Zlib;
 
 sub ZWave_Parse($$@);
 sub ZWave_Set($@);
@@ -191,8 +192,9 @@ my %zwave_class = (
     parse => { "..7105(..)(..)" => '"alarm_type_$1:level $2"',}, },
   MANUFACTURER_SPECIFIC    => { id => '72',
     get   => { model       => "04", },
-    parse => { "087205(....)(....)(....)" => 'ZWave_mfsParse($1,$2,$3)',
-               "087205(....)(....)(.{4})" => '"modelId:$1-$2-$3"', }},
+    parse => { "087205(....)(....)(....)" => 'ZWave_mfsParse($1,$2,$3,0)',
+               "087205(....)(....)(.{4})" => 'ZWave_mfsParse($1,$2,$3,1)',
+               "087205(....)(.{4})(.{4})" => '"modelId:$1-$2-$3"', }},
   POWERLEVEL               => { id => '73', },
   PROTECTION               => { id => '75',
     set   => { protectionOff => "0100",
@@ -250,7 +252,7 @@ my %zwave_class = (
   MULTI_CHANNEL_ASSOCIATION=> { id => '8e', }, # aka MULTI_INSTANCE_ASSOCIATION
   MULTI_CMD                => { id => '8f', }, # Handled in Parse
   ENERGY_PRODUCTION        => { id => '90', },
-  MANUFACTURER_PROPRIETARY => { id => '91', }, # see manuf_proprietary below
+  MANUFACTURER_PROPRIETARY => { id => '91', }, # see zwave_manuf_proprietary
   SCREEN_MD                => { id => '92', },
   SCREEN_ATTRIBUTES        => { id => '93', },
   SIMPLE_AV_CONTROL        => { id => '94', },
@@ -273,12 +275,20 @@ my %zwave_class = (
 );
 
 my %zwave_cmdArgs = (
-  dim          => "slider,0,1,99",
-  indicatorDim => "slider,0,1,99",
+  set => {
+    dim          => "slider,0,1,99",
+    indicatorDim => "slider,0,1,99",
+  },
+  get => {
+  },
+  parse => {
+  }
 );
 
-my %modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222" );
-my %manuf_proprietary = ( # MANUFACTURER_PROPRIETARY ist model dependent
+use vars qw(%zwave_modelConfig);
+#my %zwave_modelConfig;
+my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222" );
+my %zwave_manuf_proprietary = ( # MANUFACTURER_PROPRIETARY ist model dependent
    Fibaro_FGRM222 => {
     set   => { positionSlat=>"010f26010100%02x", 
                positionBlinds=>"010f260102%02x00",},
@@ -300,6 +310,8 @@ ZWave_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ".
     "ignore:1,0 dummy:1,0 showtime:1,0 classes $readingFnAttributes";
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
+
+  $hash->{FW_detailFn} = "ZWave_fhemwebFn";
 }
 
 
@@ -355,7 +367,6 @@ sub
 ZWave_Cmd($$@)
 {
   my ($type, $hash, @a) = @_;
-  my $ret = undef;
   return "no $type argument specified" if(int(@a) < 2);
   my $name = shift(@a);
   my $cmd  = shift(@a);
@@ -379,8 +390,8 @@ ZWave_Cmd($$@)
   if(!$cmdList{$cmd}) {
     my @list;
     foreach my $cmd (sort keys %cmdList) {
-      if($zwave_cmdArgs{$cmd}) {
-        push @list, "$cmd:$zwave_cmdArgs{$cmd}";
+      if($zwave_cmdArgs{$type}{$cmd}) {
+        push @list, "$cmd:$zwave_cmdArgs{$type}{$cmd}";
       } elsif($cmdList{$cmd}{fmt} !~ m/%/) {
         push @list, "$cmd:noArg";
       } else {
@@ -422,7 +433,14 @@ ZWave_Cmd($$@)
   } else {
     return "$type $cmd needs $parTxt" if($nArg != int(@a));
   }
-  $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
+
+  if($cmd =~ m/^config/) {
+    my ($err, $cmd) = ZWave_checkConfigParam($hash, $type, $cmd, $cmdFmt, @a);
+    return $err if($err);
+    $cmdFmt = $cmd;
+  } else {
+    $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
+  }
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
   if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
@@ -625,9 +643,9 @@ ZWave_mcCapability($$)
 }
 
 sub
-ZWave_mfsParse($$$)
+ZWave_mfsParse($$$$)
 {
-  my ($mf, $prod, $id) = @_;
+  my ($mf, $prod, $id, $config) = @_;
   my $xml = $attr{global}{modpath}.
             "/FHEM/lib/openzwave_manufacturer_specific.xml";
   ($mf, $prod, $id) = (lc($mf), lc($prod), lc($id)); # Just to make it sure
@@ -642,7 +660,12 @@ ZWave_mfsParse($$$)
 
       if($l =~ m/<Product type="([^"]*)".*id="([^"]*)".*name="([^"]*)"/) {
         if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
-          $ret = "model:$mName $3";
+          if($config) {
+            $ret = "modelConfig:$1" if($l =~ m/config="([^"]*)"/);
+            return $ret;
+          } else {
+            $ret = "model:$mName $3";
+          }
           last;
         }
       }
@@ -658,6 +681,112 @@ ZWave_mfsParse($$$)
 }
 
 sub
+ZWave_cleanString($)
+{
+  my ($c) = @_;
+  $c =~ s/[.,].*$//g;
+  $c =~ s/[^A-Z]+(.)/uc($1)/gei;
+  $c =~ s/[^A-Z]//i;
+  while(length($c) > 32) {     # might be endless loop
+    $c =~ s/[A-Z][^A-Z]*$//;
+  }
+  return $c;
+}
+
+# Poor mans XML-Parser
+sub
+ZWave_parseConfig($)
+{
+  my ($cfg) = @_;
+  my $fn = $attr{global}{modpath}."/FHEM/lib/openzwave_deviceconfig.xml.gz";
+  my $gz = gzopen($fn, "rb");
+  if(!$gz) {
+    Log 3, "Can't open $fn: $!";
+    return;
+  }
+
+  my ($line, $class, %hash, $cmdName);
+  while($gz->gzreadline($line)) {       # Search the "file" entry
+    last if($line =~ m/^<Product sourceFile="$cfg">$/);
+  }
+
+  while($gz->gzreadline($line)) {
+    last if($line =~ m+^</Product>+);
+    $class = $1 if($line =~ m/^<CommandClass.*id="([^"]*)"/);
+    next if(!$class || $class ne "112");
+    if($line =~ m/^<Value /) {
+      my %h;
+      $h{type}  = $1 if($line =~ m/type="([^"]*)"/i);
+      $h{genre} = $1 if($line =~ m/genre="([^"]*)"/i); # config, user
+      $h{label} = $1 if($line =~ m/label="([^"]*)"/i);
+      $h{min}   = $1 if($line =~ m/min="([^"]*)"/i);
+      $h{max}   = $1 if($line =~ m/max="([^"]*)"/i);
+      $h{value} = $1 if($line =~ m/value="([^"]*)"/i);
+      $h{index} = $1 if($line =~ m/index="([^"]*)"/i); # 1, 2, etc
+      $h{read_only}  = $1 if($line =~ m/read_only="([^"]*)"/i); # true,false
+      $h{write_only} = $1 if($line =~ m/write_only="([^"]*)"/i); # true,false
+      $cmdName = "config".ZWave_cleanString($h{label});
+      $hash{$cmdName} = \%h;
+    }
+    $hash{$cmdName}{Help} = $1 if($line =~ m+^<Help>(.*)</Help>$+);
+    if($line =~ m/^<Item/) {
+      my $label = $1 if($line =~ m/label="([^"]*)"/i);
+      my $value = $1 if($line =~ m/value="([^"]*)"/i);
+      $label = ZWave_cleanString($label);
+      $hash{$cmdName}{Item}{$label} = $value;
+    }
+  }
+  $gz->gzclose();
+
+  my %mc;
+  foreach my $cmd (keys %hash) {
+    my $h = $hash{$cmd};
+    my $arg = ($h->{type} eq "button" ? "a" : "a%b");
+    $mc{set}{$cmd} = $arg if(!$h->{read_only} || $h->{read_only} ne "true");
+    $mc{get}{$cmd} ="noArg" if(!$h->{write_only} || $h->{write_only} ne "true");
+    $mc{config}{$cmd} = $h;
+    $zwave_cmdArgs{set}{$cmd} = join(",", keys %{$h->{Item}}) if($h->{Item});
+    $zwave_cmdArgs{set}{$cmd} = "noArg" if($h->{type} eq "button");
+    $zwave_cmdArgs{get}{$cmd} = "noArg";
+  }
+
+  $zwave_modelConfig{$cfg} = \%mc;
+}
+
+sub
+ZWave_checkConfigParam($$$$@)
+{
+  my ($hash, $type, $cmd, $fmt, @arg) = @_;
+  my $mc = ReadingsVal($hash->{NAME}, "modelConfig", "");
+  return ("", sprintf($fmt, @arg)) if(!$mc || !$zwave_modelConfig{$mc});
+  my $h = $zwave_modelConfig{$mc}{config};
+  $h = $h->{$cmd};
+  return ("", sprintf($fmt, @arg)) if(!$h);
+
+  return ("", sprintf("05%02x", $h->{index})) if($type eq "get");
+
+  my $t = $h->{type};
+  if($t eq "list") {
+    my $v = $h->{Item}{$arg[0]};
+    return ("Unknown parameter $arg[0] for $cmd, use one of ".
+                join(",", keys %{$h->{Item}}), "") if(!$v);
+    return ("", sprintf("04%02x01%02x", $h->{index}, $v));
+  }
+  if($t eq "button") {
+    return ("", sprintf("04%02x01%02x", $h->{index}, $h->{value}));
+  }
+
+  return ("Parameter is not decimal", "") if($arg[0] !~ m/^[0-9]+$/);
+  if($t eq "short") {
+    return ("", sprintf("04%02x02%04x", $h->{index}, $arg[0]));
+  }
+  if($t eq "byte") {
+    return ("", sprintf("04%02x01%02x", $h->{index}, $arg[0]));
+  }
+  return ("", sprintf("04%02x01%02x", $h->{index}, $arg[0]));
+}
+
+sub
 ZWave_getHash($$$)
 {
   my ($hash, $cl, $type) = @_;
@@ -665,10 +794,25 @@ ZWave_getHash($$$)
   my $ptr = $zwave_class{$cl}{$type}
       if($zwave_class{$cl} && $zwave_class{$cl}{$type});
 
+  if($cl eq "CONFIGURATION" && $type ne "parse") {
+    my $mc = ReadingsVal($hash->{NAME}, "modelConfig", "");
+    ZWave_parseConfig($mc) if($mc && !$zwave_modelConfig{$mc});
+    my $mch = $zwave_modelConfig{$mc};
+    if($mch) {
+      my $mcp = $mch->{$type};
+      if($mcp) {
+        my %nptr = ();
+        map({$nptr{$_} = $ptr->{$_}} keys %{$ptr});
+        map({$nptr{$_} = $mcp->{$_}} keys %{$mcp});
+        $ptr = \%nptr;
+      }
+    }
+  }
+
   if($cl eq "MANUFACTURER_PROPRIETARY") {
     my $modelId = ReadingsVal($hash->{NAME}, "modelId", "");
-    $modelId = $modelIdAlias{$modelId} if($modelIdAlias{$modelId});
-    my $p = $manuf_proprietary{$modelId};
+    $modelId = $zwave_modelIdAlias{$modelId} if($zwave_modelIdAlias{$modelId});
+    my $p = $zwave_manuf_proprietary{$modelId};
     $ptr = $p->{$type} if($p && $p->{$type});
   }
 
@@ -867,6 +1011,47 @@ ZWave_Undef($$)
   return undef;
 }
 
+sub
+ZWave_helpFn($$)
+{
+  my ($d,$cmd) = @_;
+  my $mc = ReadingsVal($d, "modelConfig", "");
+  return "" if(!$mc || !$zwave_modelConfig{$mc});
+  my $h = $zwave_modelConfig{$mc}{config};
+  $h = $h->{$cmd};
+  return "" if(!$h || !$h->{Help});
+  return "Help for $cmd:<br>".$h->{Help};
+}
+
+sub
+ZWave_fhemwebFn($$$$)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  return "<div id=\"Help_$d\" class=\"help\"></div>".<<JSEND
+  <script type="text/javascript">
+    var oldHelp={}
+    function helpSet(val) { document.querySelector("#Help_$d").innerHTML=val; }
+    function
+    helpCheck(name)
+    {
+      var sel = document.querySelector("select."+name);
+      if(!sel)
+        return;
+      var newVal = sel.options[sel.selectedIndex].value;
+      if(oldHelp[name] && oldHelp[name] != newVal) {
+        FW_queryValue('{ZWave_helpFn("$d","'+newVal+'")}', 'helpSet("%")', '');
+      }
+      oldHelp[name] = newVal;
+    }
+
+    setInterval(function() {
+      helpCheck("set");
+      helpCheck("get");
+    }, 300);
+  </script>
+JSEND
+}
 
 #####################################
 # 2-byte signed hex
