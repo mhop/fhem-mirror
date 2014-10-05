@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.21";
+my $owx_version="5.22";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -1248,7 +1248,8 @@ sub OWXSWITCH_SetState($$) {
       return "device $owx_dev not accessible in writing"; 
     }
     OWX_Reset($master);
-    return OWXSWITCH_BinValues($hash,"ds2406.setstate.$value",1,undef,$owx_dev,substr($res,9,4),undef,substr($res,13));
+    #return OWXSWITCH_BinValues($hash,"ds2406.setstate.$value",1,undef,$owx_dev,substr($res,9,4),undef,substr($res,13));
+    return;
   #--  family = 29 => DS2408
   } elsif( $hash->{OW_FAMILY} eq "29" ) {
     #=============== set gpio values ===============================
@@ -1261,7 +1262,8 @@ sub OWXSWITCH_SetState($$) {
       return "device $owx_dev not accessible in writing"; 
     }
     OWX_Reset($master);
-    return OWXSWITCH_BinValues($hash,"ds2408.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+    #return OWXSWITCH_BinValues($hash,"ds2408.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+    return;
   #-- family = 3A => DS2413      
   } elsif( $hash->{OW_FAMILY} eq "3A" ) {
     #=============== set gpio values ===============================
@@ -1274,7 +1276,8 @@ sub OWXSWITCH_SetState($$) {
       return "device $owx_dev not accessible in writing"; 
     }
     OWX_Reset($master);
-    return OWXSWITCH_BinValues($hash,"ds2413.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+    #return OWXSWITCH_BinValues($hash,"ds2413.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+    return;
   }else {
     return "unknown device family $hash->{OW_FAMILY}\n";
   }
