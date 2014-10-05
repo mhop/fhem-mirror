@@ -2553,7 +2553,6 @@ InternalTimer($$$$)
   $nextat = $tim if(!$nextat || $nextat > $tim);
 }
 
-#####################################
 sub
 RemoveInternalTimer($)
 {
@@ -2565,18 +2564,44 @@ RemoveInternalTimer($)
 
 #####################################
 sub
+stacktrace() {
+  
+  my $i = 1;
+  my $max_depth = 50;
+  
+  Log 3, "stacktrace:";
+  while( (my @call_details = (caller($i++))) && ($i<$max_depth) ) {
+    Log 3, sprintf ("    %-35s called by %s (%s)",
+               $call_details[3], $call_details[1], $call_details[2]);
+  }
+}
+
+my $inWarnSub;
+
+sub
 SignalHandling()
 {
   if($^O ne "MSWin32") {
-    $SIG{'INT'}  = sub { $sig_term = 1; };
-    $SIG{'TERM'} = sub { $sig_term = 1; };
-    $SIG{'PIPE'} = 'IGNORE';
-    $SIG{'CHLD'} = 'IGNORE';
-    $SIG{'HUP'}  = sub { CommandRereadCfg(undef, "") };
-    $SIG{'ALRM'} = sub { Log 1, "ALARM signal, blocking write?" };
+    $SIG{INT}  = sub { $sig_term = 1; };
+    $SIG{TERM} = sub { $sig_term = 1; };
+    $SIG{PIPE} = 'IGNORE';
+    $SIG{CHLD} = 'IGNORE';
+    $SIG{HUP}  = sub { CommandRereadCfg(undef, "") };
+    $SIG{ALRM} = sub { Log 1, "ALARM signal, blocking write?" };
     #$SIG{'XFSZ'} = sub { Log 1, "XFSZ signal" }; # to test with limit filesize 
   }
+  $SIG{__WARN__} = sub {
+    my ($msg) = @_;
+
+    return if($inWarnSub);
+    $inWarnSub = 1;
+    chomp($msg);
+    Log 1, "PERL WARNING: $msg"; 
+    stacktrace() if($attr{global}{verbose} >= 3 && $msg !~ m/ redefined at /);
+    $inWarnSub = 0;
+  };  
 }
+
 
 #####################################
 sub
