@@ -195,7 +195,7 @@ sub onmessage($$$) {
 =begin html
 
 <a name="MQTT_BRIDGE"></a>
-<h3>MQTT</h3>
+<h3>MQTT_BRIDGE</h3>
 <ul>
   acts as a bridge in between an fhem-device and <a href="http://mqtt.org">mqtt</a>-topics.
   <br><br>
@@ -226,23 +226,23 @@ sub onmessage($$$) {
     <b>Attributes</b><br>
     <ul>
       <li>
-        <code>attr &lt;name&gt; subscribeSet &lt;topic&gt;/code><br>
+        <code>attr &lt;name&gt; subscribeSet &lt;topic&gt;</code><br>
         configures a topic that will issue a 'set &lt;message&gt; whenever a message is received<br>
       </li>
       <li>
-        <code>attr &lt;name&gt; subscribeSet_&lt;reading&gt; &lt;topic&gt;/code><br>
+        <code>attr &lt;name&gt; subscribeSet_&lt;reading&gt; &lt;topic&gt;</code><br>
         configures a topic that will issue a 'set &lt;reading&gt; &lt;message&gt; whenever a message is received<br>
       </li>
       <li>
-        <code>attr &lt;name&gt; publishState &lt;topic&gt;/code><br>
+        <code>attr &lt;name&gt; publishState &lt;topic&gt;</code><br>
         configures a topic such that a message is sent to topic whenever the device state changes.<br>
       </li>
       <li>
-        <code>attr &lt;name&gt; publishReading_&lt;reading&gt; &lt;topic&gt;/code><br>
+        <code>attr &lt;name&gt; publishReading_&lt;reading&gt; &lt;topic&gt;</code><br>
         configures a topic such that a message is sent to topic whenever the device readings value changes.<br>
       </li>
       <li>
-        <code>attr &lt;name&gt; publish-topic-base &lt;topic&gt;/code><br>
+        <code>attr &lt;name&gt; publish-topic-base &lt;topic&gt;</code><br>
         this is used as base path when issueing 'get &lt;device&gt; readings' to construct topics to publish to based on the devices existing readings<br>
       </li>
     </ul>
