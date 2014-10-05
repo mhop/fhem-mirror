@@ -630,17 +630,18 @@ ZWave_mfsParse($$$)
   my ($mf, $prod, $id) = @_;
   my $xml = $attr{global}{modpath}.
             "/FHEM/lib/openzwave_manufacturer_specific.xml";
+  ($mf, $prod, $id) = (lc($mf), lc($prod), lc($id)); # Just to make it sure
   if(open(FH, $xml)) {
     my ($lastMf, $mName, $ret) = ("","");
     while(my $l = <FH>) {
       if($l =~ m/<Manufacturer.*id="([^"]*)".*name="([^"]*)"/) {
-        $lastMf = uc($1);
+        $lastMf = lc($1);
         $mName = $2;
         next;
       }
 
       if($l =~ m/<Product type="([^"]*)".*id="([^"]*)".*name="([^"]*)"/) {
-        if($mf eq $lastMf && $prod eq uc($1) && $id eq uc($2)) {
+        if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
           $ret = "model:$mName $3";
           last;
         }
