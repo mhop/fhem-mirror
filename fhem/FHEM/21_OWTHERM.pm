@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.26";
+my $owx_version="5.27";
 
 my %gets = (
   "id"          => "",
@@ -362,12 +362,12 @@ sub OWTHERM_FormatValues($) {
   $factor  = 1.0;
   
   if( $unit eq "Celsius" ){
-    $abbr   = "&deg;C";
+    $abbr   = "°C";
   } elsif ($unit eq "Kelvin" ){
     $abbr   = "K";
     $offset += "273.16"
   } elsif ($unit eq "Fahrenheit" ){
-    $abbr   = "&deg;F";
+    $abbr   = "°F";
     $offset = ($offset+32)/1.8;
     $factor = 1.8;
   } else {
@@ -602,12 +602,12 @@ sub OWTHERM_InitializeDevice($) {
   $factor  = 1.0;
   
   if( $unit eq "Celsius" ){
-    $abbr   = "&deg;C";
+    $abbr   = "°C";
   } elsif ($unit eq "Kelvin" ){
     $abbr   = "K";
     $offset += "273.16"
   } elsif ($unit eq "Fahrenheit" ){
-    $abbr   = "&deg;F";
+    $abbr   = "°F";
     $offset = ($offset+32)/1.8;
     $factor = 1.8;
   } else {
@@ -1313,11 +1313,11 @@ sub OWXTHERM_PT_SetValues($$) {
                 reading the sensor (1 second waiting time, default). </li>
             <li><a name="owtherm_tempOffset"><code>attr &lt;name&gt; tempOffset &lt;float&gt;</code>
                 </a>
-                <br />temperature offset in &deg;C added to the raw temperature reading. </li>
+                <br />temperature offset in °C added to the raw temperature reading. </li>
             <li><a name="owtherm_tempUnit"><code>attr &lt;name&gt; tempUnit
                         Celsius|Kelvin|Fahrenheit</code>
                 </a>
-                <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
+                <br />unit of measurement (temperature scale), default is Celsius = °C </li>
             <li><a name="owtherm_resolution">
                     <code>attr &lt;name&gt; resolution 9|10|11|12</code></a><br /> Temperature
                 resolution in bit, only relevant for DS18B20 </li>
