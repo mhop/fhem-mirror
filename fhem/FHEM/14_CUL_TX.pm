@@ -93,7 +93,7 @@ CUL_TX_Parse($$)
     $def->{lastT} = $now;
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
-    Log3 $name, 4, "CUL_TX $msgtype $name $id3 T: $val F: $id2";
+    Log3 $name, 4, "CUL_TX $msgtype $name $id3 T: $val UnknownFlag: $id2";
 
   } elsif ($type eq "E") {
     if($now - $def->{lastH} < $def->{minsecs} ) {
@@ -102,7 +102,7 @@ CUL_TX_Parse($$)
     $def->{lastH} = $now;
     $msgtype = "humidity";
     $val = $valraw;
-    Log3 $name, 4, "CUL_TX $msgtype $name $id3 H: $val F: $id2";
+    Log3 $name, 4, "CUL_TX $msgtype $name $id3 H: $val UnknownFlag: $id2";
 
   } else {
     Log3 $name, 2, "CUL_TX $type $name $id3 ($msg) unknown type";
@@ -110,6 +110,11 @@ CUL_TX_Parse($$)
 
   }
 
+  # I suspect that humidity 0F.F is battery warning. Can someone verify?
+  if($val !~ m/^[0-9.-]*$/) {
+    Log3 $name, 5, "CUL_TX $type $name bogus value $val ($msg)";
+    return "";
+  }
 
   my $state="";
   my $t = ReadingsVal($name, "temperature", undef);
