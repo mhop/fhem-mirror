@@ -1,5 +1,21 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added: MQTT: connect fhem with mqtt
+  - added: MQTT_BRIDGE: bidirectional mapping of existing fhem-device to mqtt-topic
+  - added: MQTT_DEVICE: fhem-device that can be controlled by and publishes to mqtt
+  - added: I2C_LCD: module to drive PCF8574T based LCD connected via I2C
+  - added: I2C_DS1307: module to read time and date from DS1307 connected by i2c
+  - added: OWX_ASYNC: asynchronous, non-blocking version of OWX for DS2480, DS9097 and FRM
+  - feature FRM: work as physical IODev for I2C_XXX modules
+    added: FRM_ROTENC: read rotary-encoders with FRM
+    added: FRM_RGB: control rgb-leds with FRM
+    added: FRM_STEPPER: control stepper-motors with FRM
+    added: FRM_AD: analog input for FRM
+    added: FRM_PWM: analog (pwm) output for FRM
+    added: FRM_SERVO: control servo-motors with FRM
+  - added: FRM_IN: digital input for FRM
+  - added: FRM_OUT: digital output for FRM
+  - added: FRM: connect Arduino with firmata to fhem
   - change: 57_Calendar: line parsing rewritten, care for missing 
                          modification timestamps
   - change: SYSMON: support userReadings in SYSMON_ShowValues
