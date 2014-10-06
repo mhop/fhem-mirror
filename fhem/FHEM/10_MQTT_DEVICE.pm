@@ -176,7 +176,7 @@ sub onmessage($$$) {
   <br><br>
   requires a <a href="#MQTT">MQTT</a>-device as IODev<br><br>
   
-  Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod>Net::MQTT</a>.
+  Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.
   <br><br>
   
   <a name="MQTT_DEVICEdefine"></a>
