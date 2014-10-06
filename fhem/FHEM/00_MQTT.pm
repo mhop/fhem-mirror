@@ -412,7 +412,7 @@ sub client_stop($) {
    
   Each <a href="#MQTT_DEVICE">MQTT_DEVICE</a> acts as a bridge in between an fhem-device and mqtt.
   
-  Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod>Net::MQTT</a>.
+  Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.
   <br><br>
   
   <a name="MQTTdefine"></a>
