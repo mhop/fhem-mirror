@@ -141,7 +141,7 @@ sub Attr($$$$) {
         foreach my $topic (keys %{$hash->{subscribeSets}}) {
           if ($hash->{subscribeSets}->{topic} eq $2) {
             delete $hash->{subscribeSets}->{$topic};
-            $hash->{subscribe} = [grep { $_ != $topic } @{$hash->{subscribe}}];
+            $hash->{subscribe} = [grep { $_ ne $topic } @{$hash->{subscribe}}];
             if ($main::init_done) {
               if (my $mqtt = $hash->{IODev}) {;
                 my $msgid = send_unsubscribe($mqtt,

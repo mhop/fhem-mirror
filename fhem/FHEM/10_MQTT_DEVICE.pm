@@ -109,7 +109,7 @@ sub Attr($$$$) {
       } else {
         foreach my $topic (keys %{$hash->{subscribeReadings}}) {
           if ($hash->{subscribeReadings}->{$topic} eq $1) {
-            $hash->{subscribe} = [grep { $_ != $topic } @{$hash->{subscribe}}];
+            $hash->{subscribe} = [grep { $_ ne $topic } @{$hash->{subscribe}}];
             delete $hash->{subscribeReadings}->{$topic};
             if ($main::init_done) {
               if (my $mqtt = $hash->{IODev}) {;
