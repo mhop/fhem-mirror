@@ -23,8 +23,10 @@ FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/00_KM271.pm             physikus             http://forum.fhem.de Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/00_MAXLAN.pm            mgehre               http://forum.fhem.de MAX
+FHEM/00_MQTT.pm              ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/00_NetzerI2C.pm         klausw               http://forum.fhem.de Sonstige Systeme
-FHEM/00_OWX.pm               pahenning            http://forum.fhem.de 1Wire
+FHEM/00_OWX.pm               pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/00_OWX_ASYNC            ntruchsess           http://forum.fhem.de 1Wire
 FHEM/00_RPII2C               klausw               http://forum.fhem.de Einplatinencomputer
 FHEM/00_TCM.pm               klaus-schauer        http://forum.fhem.de EnOcean
 FHEM/00_THZ.pm               immiimmi             http://forum.fhem.de Sonstiges
@@ -42,11 +44,13 @@ FHEM/10_CUL_IR.pm            odroegehorn          http://forum.fhem.de SlowRF
 FHEM/10_EIB.pm               hotmaz               http://forum.fhem.de KNX/EIB
 FHEM/10_EnOcean.pm           klaus-schauer        http://forum.fhem.de EnOcean
 FHEM/10_FBDECT.pm            rudolfkoenig         http://forum.fhem.de FRITZ!Box
-FHEM/10_FRM.pm               ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/10_FRM.pm               ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/10_FS20.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/10_IT.pm                justme1968           http://forum.fhem.de InterTechno
 FHEM/10_Itach_IR             ulimaass             http://forum.fhem.de Sonstige Systeme
 FHEM/10_MAX.pm               mgehre               http://forum.fhem.de MAX
+FHEM/10_MQTT_BRIDGE          ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/10_MQTT_DEVICE          ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/10_OWServer.pm          borisneubert/mfr69bs http://forum.fhem.de 1Wire
 FHEM/10_SOMFY.pm             thdankert            http://forum.fhem.de Sonstiges
 FHEM/10_UNIRoll.pm           c-herrmann           http://forum.fhem.de SlowRF
@@ -67,28 +71,28 @@ FHEM/17_EGPM2LAN.pm          alexus               http://forum.fhem.de Sonstiges
 FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/19_Revolt.pm            martinppp/mehf       http://forum.fhem.de SlowRF
-FHEM/20_FRM_AD.pm            ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_ROTENC.pm        ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_I2C.pm           ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_IN.pm            ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_LCD.pm           ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_OUT.pm           ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_PWM.pm           ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_RBG.pm           ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_SERVO.pm         ntruchsess           http://forum.fhem.de Sonstiges
-FHEM/20_FRM_STEPPER.pm       ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/20_FRM_AD.pm            ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/20_FRM_ROTENC.pm        ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/20_FRM_I2C.pm           ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/20_FRM_IN.pm            ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/20_FRM_LCD.pm           ntruchsess           http://forum.fhem.de Sonstige Systeme (deprecated)
+FHEM/20_FRM_OUT.pm           ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/20_FRM_PWM.pm           ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/20_FRM_RBG.pm           ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/20_FRM_SERVO.pm         ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/20_FRM_STEPPER.pm       ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/20_OWFS.pm              mfr69bs              http://forum.fhem.de 1Wire (deprecated)
 FHEM/20_X10.pm               borisneubert         http://forum.fhem.de SlowRF
 FHEM/20_ROOMMATE.pm          loredo               http://forum.fhem.de Automatisierung
 FHEM/20_GUEST.pm             loredo               http://forum.fhem.de Automatisierung
-FHEM/21_OWAD.pm              pahenning            http://forum.fhem.de 1Wire
-FHEM/21_OWCOUNT.pm           pahenning            http://forum.fhem.de 1Wire
-FHEM/21_OWID.pm              pahenning            http://forum.fhem.de 1Wire
-FHEM/21_OWLCD.pm             pahenning            http://forum.fhem.de 1Wire
-FHEM/21_OWMULTI.pm           pahenning            http://forum.fhem.de 1Wire
-FHEM/21_OWSWITCH.pm          pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWAD.pm              pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/21_OWCOUNT.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/21_OWID.pm              pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/21_OWLCD.pm             pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/21_OWMULTI.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/21_OWSWITCH.pm          pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_OWTEMP.pm            mfr69bs              http://forum.fhem.de 1Wire (deprecated)
-FHEM/21_OWTHERM.pm           pahenning            http://forum.fhem.de 1Wire
+FHEM/21_OWTHERM.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Snstiges
 FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
 FHEM/23_LUXTRONIK2.pm        tupol                http://forum.fhem.de Sonstiges (PM: http://forum.fhem.de/index.php?action=pm;sa=send;u=5432)
@@ -138,6 +142,8 @@ FHEM/50_WS300.pm             Dirk                 http://forum.fhem.de SlowRF
 FHEM/51_I2C_BMP180.pm        Dirk                 http://forum.fhem.de Einplatinencomputer
 FHEM/51_Netzer.pm            klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/51_RPI_GPIO.pm          klausw               http://forum.fhem.de Einplatinencomputer
+FHEM/52_I2C_DS1307           ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/52_I2C_LCD              ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_MCP23017         klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_PCA9532          klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_PCF8574          klausw               http://forum.fhem.de Sonstige Systeme
@@ -261,14 +267,20 @@ FHEM/HMConfig.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/HttpUtils.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/MaxCommon.pm            mgehre               http://forum.fhem.de MAX
 FHEM/ONKYOdb.pm              loredo               http://forum.fhem.de Multimedia
+FHEM/OWX_DS2480.pm           ntruchsess           http://forum.fhem.de 1Wire
+FHEM/OWX_DS9097.pm           ntruchsess           http://forum.fhem.de 1Wire
+FHEM/OWX_FRM.pm              ntruchsess           http://forum.fhem.de 1Wire
+FHEM/OWX_SER.pm              ntruchsess           http://forum.fhem.de 1Wire
 FHEM/SetExtensions.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/SHC_datafields.pm       rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/SHC_parser.pm           rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/TcpServerUtils.pm       rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstiges
+FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/lib/ProtoThreads.pm     ntruchsess           http://forum.fhem.de FHEM Development
 FHEM/lib/SHC_packet_layout.xml  rr2000            http://forum.fhem.de Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/FhemUtils/*             mfr69bs              http://forum.fhem.de Sonstiges
+FHEM/GPUtils.pm              ntruchsess           http://forum.fhem.de FHEM Development
 
 contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
 contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
