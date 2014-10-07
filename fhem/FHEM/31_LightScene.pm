@@ -292,6 +292,7 @@ LightScene_Notify($$)
           $matched = 1;
           foreach my $d (sort keys %{ $hash->{SCENES}{$scene} }) {
             next if( !defined($hash->{SCENES}{$scene}{$d}));
+            next if(!$defs{$d});
 
             my $state = $hash->{SCENES}{$scene}{$d};
             $state = $state->{state} if( ref($state) eq 'HASH' );
@@ -338,7 +339,8 @@ LightScene_Save()
 
   my $hash;
   for my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "LightScene");
+    next if( !$defs{$d}{TYPE} );
+    next if( $defs{$d}{TYPE} ne "LightScene" );
     next if( !defined($defs{$d}{SCENES}) );
 
     $hash->{$d} = $defs{$d}{SCENES} if( keys(%{$defs{$d}{SCENES}}) );
