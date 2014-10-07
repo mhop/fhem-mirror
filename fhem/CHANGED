@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 59_Weather: change icons for conditions 31, 34, 36
   - added: MQTT: connect fhem with mqtt
   - added: MQTT_BRIDGE: bidirectional mapping of existing fhem-device to mqtt-topic
   - added: MQTT_DEVICE: fhem-device that can be controlled by and publishes to mqtt
