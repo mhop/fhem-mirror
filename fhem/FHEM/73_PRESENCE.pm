@@ -582,17 +582,16 @@ PRESENCE_DoLocalPingScan($)
         { 
             $return = "$name|$local|error|Could not execute ping command: \"ping -n $count -4 $device\"";
         }
-
     }
     else
     {
-        $temp = qx(ping -c $count $device);
+        $temp = qx(ping -c $count $device 2>&1);
 
         chomp $temp;
         if($temp ne "")
         {
             Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
-            $return = "$name|$local|".(($temp =~ /\d+ [Bb]ytes (from|von)/ and not $temp =~ /unreachable/i) ? "present" : "absent");
+            $return = "$name|$local|".(($temp =~ /\d+ [Bb]ytes (from|von)/ and not $temp =~ /[Uu]nreachable/) ? "present" : "absent");
         }
         else
         { 
@@ -601,7 +600,6 @@ PRESENCE_DoLocalPingScan($)
     }
 
     return $return;
-
 }
 
 sub 
