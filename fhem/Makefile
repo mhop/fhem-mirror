@@ -1,6 +1,10 @@
 VERS=5.5
 DATE=2013-09-29
 
+# used for nightly build
+DATEN=$(shell date +"%Y-%m-%d")
+VERSN=$(VERS).$(shell svn info | grep 'Revision' | awk '{ print $$2; }')
+
 RELATIVE_PATH=YES
 BINDIR=/opt/fhem
 MODDIR=$(BINDIR)
@@ -27,6 +31,7 @@ all:
 	@echo "    install       - to install fhem"
 	@echo "    dist          - to create a .tar.gz file"
 	@echo "    deb           - to create a .deb file"
+	@echo "    deb-nightly   - to create a nightly .deb file from current svn"
 	@echo "    synology      - to create an spk file"
 	@echo "    fb7390        - to create an AVM Fritz!Box 7390 imagefile"
 	@echo "    fb7270        - to create a zip file for the AVM Fritz!Box 7270"
@@ -128,7 +133,7 @@ deb:
 	dpkg-deb --build $(DESTDIR)
 	rm -rf $(DESTDIR)
 
-nightly_deb:
+deb-nightly:
 	@echo $(PWD)
 	rm -rf .f
 	rm -rf $(DESTDIR)
@@ -149,8 +154,6 @@ nightly_deb:
 	mv .f $(DESTDIR)
 	dpkg-deb --build $(DESTDIR)
 	rm -rf $(DESTDIR)
-
-
 
 fb7390:
 	cd contrib/FB7390 && sh ./makeimage $(DESTDIR)
