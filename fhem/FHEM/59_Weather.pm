@@ -48,8 +48,7 @@ my @YahooCodes_en = (
        'mostly cloudy', # day
        'partly cloudy', # night
        'partly cloudy', # day
-       # see http://forum.fhem.de/index.php?action=post;topic=21375.30
-       'sunny', #clear (night) according to Yahoo API docs, but actually used day and night.
+       'clear', 
        'sunny',
        'fair', #night
        'fair', #day
@@ -118,8 +117,8 @@ my @iconlist = (
        'chance_of_rain', 'snowflurries', 'chance_of_snow', 'heavysnow', 'snow', 'sleet',
        'sleet', 'dust', 'fog', 'haze', 'smoke', 'flurries',
        'windy', 'icy', 'cloudy', 'mostlycloudy_night', 'mostlycloudy', 'partly_cloudy_night',
-       'partly_cloudy', 'clear', 'sunny', 'mostly_clear_night', 'clear', 'heavyrain',
-       'clear', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredshowers', 'heavysnow',
+       'partly_cloudy', 'sunny', 'sunny', 'mostly_clear_night', 'mostly_sunny', 'heavyrain',
+       'sunny', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredshowers', 'heavysnow',
        'chance_of_snow', 'heavysnow', 'partly_cloudy', 'heavyrain', 'chance_of_snow', 'scatteredshowers');
 
 ###################################
