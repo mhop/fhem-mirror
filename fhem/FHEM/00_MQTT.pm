@@ -34,6 +34,7 @@ my %gets = (
 
 my @clients = qw(
   MQTT_DEVICE
+  MQTT_BRIDGE
 );
 
 sub MQTT_Initialize($) {
