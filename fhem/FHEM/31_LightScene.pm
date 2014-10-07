@@ -299,7 +299,7 @@ LightScene_Notify($$)
 
             if( ref($state) eq 'ARRAY' ) {
               $matched = 0;
-            } elsif( $state ne $s{$d} ) {
+            } elsif( !defined($s{$d}) || $state ne $s{$d} ) {
               $matched = 0;
             }
 
