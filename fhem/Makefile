@@ -128,6 +128,30 @@ deb:
 	dpkg-deb --build $(DESTDIR)
 	rm -rf $(DESTDIR)
 
+nightly_deb:
+	@echo $(PWD)
+	rm -rf .f
+	rm -rf $(DESTDIR)
+	make ROOT=`pwd`/.f install
+	cp -r contrib/DEBIAN .f
+	rm -rf .f/$(MODDIR)/contrib/FB7*/var
+	rm -rf .f/$(MODDIR)/contrib/FB7*/*.image
+	rm -rf .f/$(MODDIR)/contrib/FB7*/*.zip
+	find .f -name .svn -print | xargs rm -rf
+	find .f -name \*.orig -print | xargs rm -f
+	find .f -name .#\* -print | xargs rm -f
+	find .f -type f -print | grep -v Makefile |\
+		xargs perl -pi -e 's/=VERS=/$(VERSN)/g;s/=DATE=/$(DATEN)/g'
+	find .f -type f | xargs chmod 644
+	find .f -type d | xargs chmod 755
+	chmod 755 `cat contrib/executables`
+	chown -R root:root .f
+	mv .f $(DESTDIR)
+	dpkg-deb --build $(DESTDIR)
+	rm -rf $(DESTDIR)
+
+
+
 fb7390:
 	cd contrib/FB7390 && sh ./makeimage $(DESTDIR)
 
