@@ -147,6 +147,7 @@ deb-nightly:
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print | grep -v Makefile |\
 		xargs perl -pi -e 's/=VERS=/$(VERSN)/g;s/=DATE=/$(DATEN)/g'
+	wget -qO .f/$(MODDIR)/FHEM/controls_fhem.txt http://fhem.de/fhemupdate/controls_fhem.txt
 	find .f -type f | xargs chmod 644
 	find .f -type d | xargs chmod 755
 	chmod 755 `cat contrib/executables`
