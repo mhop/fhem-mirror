@@ -61,7 +61,7 @@ package MQTT;
 
 use Exporter ('import');
 @EXPORT = ();
-@EXPORT_OK = qw(send_publish send_subscribe send_unsubscribe client_attr);
+@EXPORT_OK = qw(send_publish send_subscribe send_unsubscribe client_attr client_subscribe_topic client_unsubscribe_topic topic_to_regexp);
 %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 use strict;
@@ -195,7 +195,7 @@ sub Read {
         GP_ForallClients($hash,sub {
           my $client = shift;
           Log3($client->{NAME},5,"publish received for $topic, ".$mqtt->message());
-          if (grep { $_ eq $topic } @{$client->{subscribe}}) {
+          if (grep { $topic =~ $_ } @{$client->{subscribeExpr}}) {
             readingsSingleUpdate($client,"transmission-state","publish received",1);
             if ($client->{TYPE} eq "MQTT_DEVICE") {
               MQTT::DEVICE::onmessage($client,$topic,$mqtt->message());
@@ -327,12 +327,55 @@ sub send_message($$$@) {
   return $msgid;
 };
 
+sub topic_to_regexp($) {
+  my $t = shift;
+  $t =~ s|#$|.\*|;
+  $t =~ s|\/\.\*$|.\*|;
+  $t =~ s|\/|\\\/|g;
+  $t =~ s|(\+)([^+]*$)|(+)$2|;
+  $t =~ s|\+|[^\/]+|g;
+  return "^$t\$";
+}
+
+sub client_subscribe_topic($$) {
+  my ($client,$topic) = @_;
+  push @{$client->{subscribe}},$topic unless grep {$_ eq $topic} @{$client->{subscribe}};
+  my $expr = topic_to_regexp($topic);
+  push @{$client->{subscribeExpr}},$expr unless grep {$_ eq $expr} @{$client->{subscribeExpr}};
+  if ($main::init_done) {
+    if (my $mqtt = $client->{IODev}) {;
+      my $msgid = send_subscribe($mqtt,
+        topics => [[$topic => $client->{qos} || MQTT_QOS_AT_MOST_ONCE]],
+      );
+      $client->{message_ids}->{$msgid}++;
+      readingsSingleUpdate($client,"transmission-state","subscribe sent",1)
+    }
+  }
+};
+
+sub client_unsubscribe_topic($$) {
+  my ($client,$topic) = @_;
+  $client->{subscribe} = [grep { $_ ne $topic } @{$client->{subscribe}}];
+  my $expr = topic_to_regexp($topic);
+  $client->{subscribeExpr} = [grep { $_ ne $expr} @{$client->{subscribeExpr}}];
+  if ($main::init_done) {
+    if (my $mqtt = $client->{IODev}) {;
+      my $msgid = send_unsubscribe($mqtt,
+        topics => [$topic],
+      );
+      $client->{message_ids}->{$msgid}++;
+      readingsSingleUpdate($client,"transmission-state","unsubscribe sent",1)
+    }
+  }
+};
+
 sub Client_Define($$) {
   my ( $client, $def ) = @_;
 
   $client->{NOTIFYDEV} = $client->{DEF} if $client->{DEF};
   $client->{qos} = MQTT_QOS_AT_MOST_ONCE;
   $client->{subscribe} = [];
+  $client->{subscribeExpr} = [];
   
   if ($main::init_done) {
     return client_start($client);

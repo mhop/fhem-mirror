@@ -126,30 +126,17 @@ sub Attr($$$$) {
   ATTRIBUTE_HANDLER: {
     $attribute =~ /^subscribeSet(_?)(.*)/ and do {
       if ($command eq "set") {
-        $hash->{subscribeSets}->{$value} = $2;
-        push @{$hash->{subscribe}},$value unless grep {$_ eq $value} @{$hash->{subscribe}};
-        if ($main::init_done) {
-          if (my $mqtt = $hash->{IODev}) {;
-            my $msgid = send_subscribe($mqtt,
-              topics => [[$value => $hash->{qos} || MQTT_QOS_AT_MOST_ONCE]],
-            );
-            $hash->{message_ids}->{$msgid}++;
-            readingsSingleUpdate($hash,"transmission-state","subscribe sent",1)
+        unless (defined $hash->{subscribeSets}->{$value} and $hash->{subscribeSets}->{$value} eq $2) {
+          unless (defined $hash->{subscribeSets}->{$value}) {
+            client_subscribe_topic($hash,$value);
           }
+          $hash->{subscribeSets}->{$value} = $2;
         }
       } else {
         foreach my $topic (keys %{$hash->{subscribeSets}}) {
-          if ($hash->{subscribeSets}->{topic} eq $2) {
+          if ($hash->{subscribeSets}->{$topic} eq $2) {
+            client_unsubscribe_topic($hash,$topic);
             delete $hash->{subscribeSets}->{$topic};
-            $hash->{subscribe} = [grep { $_ ne $topic } @{$hash->{subscribe}}];
-            if ($main::init_done) {
-              if (my $mqtt = $hash->{IODev}) {;
-                my $msgid = send_unsubscribe($mqtt,
-                  topics => [$topic],
-                );
-                $hash->{message_ids}->{$msgid}++;
-              }
-            }
             last;
           }
         }

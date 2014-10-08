@@ -49,6 +49,7 @@ sub MQTT_DEVICE_Initialize($) {
     "publishSet ".
     "publishSet_.* ".
     "subscribeReading_.* ".
+    "autoSubscribeReadings ".
     $main::readingFnAttributes;
     
     main::LoadModule("MQTT");
@@ -66,6 +67,8 @@ BEGIN {
   MQTT->import(qw(:all));
 
   GP_Import(qw(
+    CommandDeleteReading
+    CommandAttr
     readingsSingleUpdate
     Log3
   ))
@@ -95,32 +98,39 @@ sub Attr($$$$) {
   ATTRIBUTE_HANDLER: {
     $attribute =~ /^subscribeReading_(.+)/ and do {
       if ($command eq "set") {
-        $hash->{subscribeReadings}->{$value} = $1;
-        push @{$hash->{subscribe}},$value unless grep {$_ eq $value} @{$hash->{subscribe}};
-        if ($main::init_done) {
-          if (my $mqtt = $hash->{IODev}) {;
-            my $msgid = send_subscribe($mqtt,
-              topics => [[$value => $hash->{qos} || MQTT_QOS_AT_MOST_ONCE]],
-            );
-            $hash->{message_ids}->{$msgid}++;
-            readingsSingleUpdate($hash,"transmission-state","subscribe sent",1)
+        unless (defined $hash->{subscribeReadings}->{$value} and $hash->{subscribeReadings}->{$value} eq $1) {
+          unless (defined $hash->{subscribeReadings}->{$value}) {
+            client_subscribe_topic($hash,$value);
           }
+          $hash->{subscribeReadings}->{$value} = $1;
         }
       } else {
         foreach my $topic (keys %{$hash->{subscribeReadings}}) {
           if ($hash->{subscribeReadings}->{$topic} eq $1) {
-            $hash->{subscribe} = [grep { $_ ne $topic } @{$hash->{subscribe}}];
+            client_unsubscribe_topic($hash,$topic);
             delete $hash->{subscribeReadings}->{$topic};
-            if ($main::init_done) {
-              if (my $mqtt = $hash->{IODev}) {;
-                my $msgid = send_unsubscribe($mqtt,
-                  topics => [$topic],
-                );
-                $hash->{message_ids}->{$msgid}++;
-              }
-            }
+            CommandDeleteReading(undef,"$hash->{NAME} $1");
             last;
           }
+        }
+      }
+      last;
+    };
+    $attribute eq "autoSubscribeReadings" and do {
+      if ($command eq "set") {
+        unless (defined $hash->{'.autoSubscribeTopic'} and $hash->{'.autoSubscribeTopic'} eq $value) {
+          if (defined $hash->{'.autoSubscribeTopic'}) {
+            client_unsubscribe_topic($hash,$hash->{'.autoSubscribeTopic'});
+          }
+          $hash->{'.autoSubscribeTopic'} = $value;
+          $hash->{'.autoSubscribeExpr'} = topic_to_regexp($value);
+          client_subscribe_topic($hash,$value);
+        }
+      } else {
+        if (defined $hash->{'.autoSubscribeTopic'}) {
+          client_unsubscribe_topic($hash,$hash->{'.autoSubscribeTopic'});
+          delete $hash->{'.autoSubscribeTopic'};
+          delete $hash->{'.autoSubscribeExpr'};
         }
       }
       last;
@@ -146,6 +156,7 @@ sub Attr($$$$) {
             delete $sets{$set};
           }
         } else {
+          CommandDeleteReading(undef,"$hash->{NAME} $2");
           delete $sets{$2};
         }
         delete $hash->{publishSets}->{$2};
@@ -161,6 +172,10 @@ sub onmessage($$$) {
   if (defined (my $reading = $hash->{subscribeReadings}->{$topic})) {
     Log3($hash->{NAME},5,"calling readingsSingleUpdate($hash->{NAME},$reading,$message,1");
     readingsSingleUpdate($hash,$reading,$message,1);
+  } elsif ($topic =~ $hash->{'.autoSubscribeExpr'}) {
+    Log3($hash->{NAME},5,"calling readingsSingleUpdate($hash->{NAME},$1,$message,1");
+    CommandAttr(undef,"$hash->{NAME} subscribeReading_$1 $topic");
+    readingsSingleUpdate($hash,$1,$message,1);
   }
 }
 
@@ -209,6 +224,15 @@ sub onmessage($$$) {
       <li>
         <code>attr &lt;name&gt; publishSet_&lt;reading&gt; [&lt;values&gt] &lt;topic&gt;</code><br>
         configures reading that may be used to both set 'reading' (to optionally configured values) and publish to configured topic<br>
+      </li>
+      <li>
+        <code>attr &lt;name&gt; autoSubscribeReadings &lt;topic&gt;</code><br>
+        specify a mqtt-topic pattern with wildcard (e.c. 'myhouse/kitchen/+') and MQTT_DEVICE automagically creates readings based on the wildcard-match<br>
+        e.g a message received with topic 'myhouse/kitchen/temperature' would create and update a reading 'temperature'
+      </li>
+      <li>
+        <code>attr &lt;name&gt; subscribeReading_&lt;reading&gt; &lt;topic&gt;</code><br>
+        mapps a reading to a specific topic. The reading is updated whenever a message to the configured topic arrives<br>
       </li>
     </ul>
   </ul>
