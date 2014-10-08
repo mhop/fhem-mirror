@@ -46,6 +46,7 @@ sub MQTT_DEVICE_Initialize($) {
   $hash->{AttrList} =
     "IODev ".
     "qos:".join(",",keys %MQTT::qos)." ".
+    "retain:0,1 ".
     "publishSet ".
     "publishSet_.* ".
     "subscribeReading_.* ".
@@ -83,10 +84,10 @@ sub Set($@) {
   my $value = $a[2];
   my $msgid;
   if (defined $value) {
-    $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos});
+    $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos}, retain => $hash->{retain});
     readingsSingleUpdate($hash,$command,$value,1);
   } else {
-    $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $hash->{qos});
+    $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $hash->{qos}, retain => $hash->{retain});
     readingsSingleUpdate($hash,"state",$command,1);
   }
   $hash->{message_ids}->{$msgid}++ if defined $msgid;

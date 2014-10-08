@@ -48,6 +48,7 @@ sub MQTT_BRIDGE_Initialize($) {
   $hash->{AttrList} =
     "IODev ".
     "qos:".join(",",keys %MQTT::qos)." ".
+    "retain:0,1 ".
     "publish-topic-base ".
     "publishState ".
     "publishReading_.* ".
@@ -108,12 +109,12 @@ sub Notify() {
     my $msgid;
     if (defined $3 and $3 ne "") {
       if (defined $hash->{publishReadings}->{$1}) {
-        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishReadings}->{$1}, message => $3, qos => $hash->{qos});
+        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishReadings}->{$1}, message => $3, qos => $hash->{qos}, retain => $hash->{retain});
         readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
       }
     } else {
       if (defined $hash->{publishState}) {
-        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishState}, message => $1, qos => $hash->{qos});
+        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishState}, message => $1, qos => $hash->{qos}, retain => $hash->{retain});
         readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
       }
     }
