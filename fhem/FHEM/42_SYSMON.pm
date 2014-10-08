@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.2";
+my $VERSION = "1.9.3";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -928,11 +928,15 @@ SYSMON_getCPUCoreNum($)
 	return $sys_cpu_core_num if $sys_cpu_core_num;
 	
 	my $str = SYSMON_execute($hash, "cat /sys/devices/system/cpu/kernel_max");
-  if(int($str)!=0) {
-  	$sys_cpu_core_num = int($str)+1;
-	 	return $sys_cpu_core_num;
-	}
-
+	if(defined($str)) {
+		if($str ne "") {
+      if(int($str)!=0) {
+      	$sys_cpu_core_num = int($str)+1;
+	 	    return $sys_cpu_core_num;
+  	  }
+    }
+  }
+  
 	return 1; # Default / unbekannt
 }
 
