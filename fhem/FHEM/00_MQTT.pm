@@ -433,6 +433,7 @@ sub Client_Define($$) {
 
   $client->{NOTIFYDEV} = $client->{DEF} if $client->{DEF};
   $client->{qos} = MQTT_QOS_AT_MOST_ONCE;
+  $client->{retain} = 0;
   $client->{subscribe} = [];
   $client->{subscribeExpr} = [];
   
@@ -456,6 +457,14 @@ sub client_attr($$$$$) {
         $client->{qos} = $MQTT::qos{$value};
       } else {
         $client->{qos} = MQTT_QOS_AT_MOST_ONCE;
+      }
+      last;
+    };
+    $attribute eq "retain" and do {
+      if ($command eq "set") {
+        $client->{retain} = $value; 
+      } else {
+        $client->{retain} = 0;
       }
       last;
     };
