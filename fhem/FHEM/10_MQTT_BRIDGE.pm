@@ -105,17 +105,19 @@ sub Notify() {
   foreach my $event (@{$dev->{CHANGED}}) {
     $event =~ /^([^:]+)(: )?(.*)$/;
     Log3($hash->{NAME},5,"$event, '".((defined $1) ? $1 : "-undef-")."', '".((defined $3) ? $3 : "-undef-")."'");
+    my $msgid;
     if (defined $3 and $3 ne "") {
       if (defined $hash->{publishReadings}->{$1}) {
-        send_publish($hash->{IODev}, topic => $hash->{publishReadings}->{$1}, message => $3, qos => $hash->{qos});
-        readingsSingleUpdate($hash,"transmission-state","publish sent",1);
+        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishReadings}->{$1}, message => $3, qos => $hash->{qos});
+        readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
       }
     } else {
       if (defined $hash->{publishState}) {
-        send_publish($hash->{IODev}, topic => $hash->{publishState}, message => $1, qos => $hash->{qos});
-        readingsSingleUpdate($hash,"transmission-state","publish sent",1);
+        $msgid = send_publish($hash->{IODev}, topic => $hash->{publishState}, message => $1, qos => $hash->{qos});
+        readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
       }
     }
+    $hash->{message_ids}->{$msgid}++ if defined $msgid;
   }
 }
 
