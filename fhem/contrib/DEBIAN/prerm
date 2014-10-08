@@ -2,10 +2,8 @@
 
 set -e
 
-if pgrep fhem.pl >/dev/null; then
-  if test -x /sbin/initctl; then
-    initctl stop fhem
-  else
-    invoke-rc.d fhem stop
-  fi
-fi
+# stop fhem if running
+invoke-rc.d fhem stop
+
+# remove fhem autostart
+update-rc.d fhem remove

@@ -9,6 +9,13 @@ fi
 
 chown -R fhem:root /opt/fhem
 
+# prevent package fhem from being
+# upgraded by apt-get upgrade
+
+apt-mark hold fhem
+echo "fhem hold" | dpkg --set-selections
+
+
 # set up of autostart
 # Sysvinit; upstart no longer supported
 
