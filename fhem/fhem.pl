@@ -213,6 +213,7 @@ use vars qw(%readyfnlist);      # devices which want a "readyfn"
 use vars qw(%selectlist);       # devices which want a "select"
 use vars qw(%value);            # Current values, see commandref.html
 use vars qw($lastDefChange);    # number of last def/attr change
+use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
@@ -891,8 +892,10 @@ AnalyzePerlCommand($$)
     $evalSpecials = undef;
   }
 
+  $cmdFromAnalyze = $cmd;
   my $ret = eval $cmd;
   $ret = $@ if($@);
+  $cmdFromAnalyze = undef;
   return $ret;
 }
 
@@ -2597,6 +2600,7 @@ SignalHandling()
     $inWarnSub = 1;
     chomp($msg);
     Log 1, "PERL WARNING: $msg"; 
+    Log 3, "eval: $cmdFromAnalyze" if($cmdFromAnalyze && $msg =~ m/\(eval /);
     stacktrace() if($attr{global}{verbose} >= 3 && $msg !~ m/ redefined at /);
     $inWarnSub = 0;
   };  
