@@ -81,13 +81,16 @@ sub Set($@) {
     if(!defined($sets{$a[1]}));
   my $command = $a[1];
   my $value = $a[2];
+  my $msgid;
   if (defined $value) {
-    send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos});
+    $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos});
     readingsSingleUpdate($hash,$command,$value,1);
   } else {
-    send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $hash->{qos});
+    $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{""}->{topic}, message => $command, qos => $hash->{qos});
     readingsSingleUpdate($hash,"state",$command,1);
   }
+  $hash->{message_ids}->{$msgid}++ if defined $msgid;
+  readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
   return undef;
 }
 
