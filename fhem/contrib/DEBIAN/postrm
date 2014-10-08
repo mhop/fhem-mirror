@@ -10,11 +10,7 @@ fi
 if test -f /etc/init/fhem.conf; then
     rm /etc/init/fhem.conf
 fi
-if test -f /etc/init.d/fhem; then
-    update-rc.d fhem remove
-    rm /etc/init.d/fhem
-fi
 
-if test ! -x /sbin/initctl; then
-  update-rc.d -f fhem remove
+if test -f /etc/init.d/fhem; then
+    rm /etc/init.d/fhem
 fi
