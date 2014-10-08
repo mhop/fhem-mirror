@@ -937,7 +937,9 @@ SYSMON_getCPUCoreNum($)
     }
   }
   
-	return 1; # Default / unbekannt
+  # Default / unbekannt
+  $sys_cpu_core_num = 1;
+  return $sys_cpu_core_num;
 }
 
 #------------------------------------------------------------------------------
@@ -2173,11 +2175,7 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   }
     
   my $hash = $main::defs{$name};
-    
-  #if(!defined($cur_readings_map)) {
-	#  SYSMON_updateCurrentReadingsMap($hash);
-  #}
-  
+      
   # nur, wenn es sich um eine SYSMON Instanz handelt
   if($hash->{TYPE} eq 'SYSMON') {  
     SYSMON_updateCurrentReadingsMap($hash);
@@ -2190,9 +2188,12 @@ sub SYSMON_ShowValuesFmt ($$$;@)
 	  if($format == 1) {
 	  	$deg = "&deg;";
 	  }
+	  # bei der Benutzung mit CloneDummies ist $cur_readings_map nicht unbedingt definiert
 	  @dataDescription = (DATE,
-	                      CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.": ".$deg."C", 
-	                      CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.": "."MHz", 
+	                      #CPU_TEMP.":".$cur_readings_map->{+CPU_TEMP}.": ".$deg."C", 
+	                      CPU_TEMP.":"."CPU temperature".": ".$deg."C", 
+	                      #CPU_FREQ.":".$cur_readings_map->{+CPU_FREQ}.": "."MHz", 
+	                      CPU_FREQ.":"."CPU frequency".": "."MHz", 
 	                      CPU_BOGOMIPS,
 	                      UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP, 
 	                      "power_ac_text", "power_usb_text", "power_battery_text");
