@@ -45,7 +45,7 @@ case "$1" in
 # if you want to stop hmland during fhem stop:
 #       pkill hmland
 
-        perl fhem.pl $port "shutdown"
+        pkill -U fhem perl
         RETVAL=$?
         ;;
 'status')
