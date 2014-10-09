@@ -57,7 +57,8 @@ I2C_LCD_Initialize($)
   $hash->{StateFn}   = "I2C_LCD_State";
   
   $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev model pinMapping"
-  ." backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off $main::readingFnAttributes";
+  ." customChar0 customChar1 customChar2 customChar3 customChar4 customChar5 customChar6 customChar7" 
+  ." backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off replaceRegex $main::readingFnAttributes";
   #  autoScroll:on,off direction:leftToRight,rightToLeft do not work reliably
 }
 
@@ -114,6 +115,9 @@ I2C_LCD_Init($$)
 #      I2C_LCD_Apply_Attribute($name,"autoscroll");
 #      I2C_LCD_Apply_Attribute($name,"direction");
       I2C_LCD_Apply_Attribute($name,"blink");
+      foreach (0..7) {
+        I2C_LCD_Apply_Attribute($name,"customChar".$_);
+      }
     };
     return I2C_LCD_Catch($@) if $@;
   }
@@ -158,6 +162,13 @@ I2C_LCD_Attr($$$$) {
           my @def = split (' ',$hash->{DEF});
           I2C_LCD_Init($hash,\@def) if ($main::init_done);
           last;
+        };
+        $attribute =~ /customChar[0-7]/ and do {
+          my @vals = split(/, */, $value);
+          die "wrong number of elements (must be 8) in '$value'" if ( @vals != 8 );
+          foreach (@vals) {
+              die "$_ is out of range 0-31" if ($_ < 0 || $_ > 31 );
+          }
         };
         $main::attr{$name}{$attribute}=$value;
         I2C_LCD_Apply_Attribute($name,$attribute);
@@ -208,6 +219,12 @@ sub I2C_LCD_Apply_Attribute {
         }
         last;
       };
+      $attribute =~ /customChar([0-7])/ and do {
+        my $nr = $1;
+        my $p = AttrVal($name,$attribute,"0,0,0,0,0,0,0,0");
+        my @vals = split(/, */, $p);
+        $lcd->createChar($nr,\@vals);
+      }
     }
   }
 }
@@ -235,6 +252,9 @@ sub I2C_LCD_Set(@) {
         if (AttrVal($hash->{NAME},"autoClear","on") eq "on") {
           $lcd->clear();
         }
+        # set reading prior to regexp, could contain unprintable chars!
+        main::readingsSingleUpdate($hash,"text",$value,1);
+        $value = _i2c_lcd_replace($hash,$value);
         if (AttrVal($hash->{NAME},"autoBreak","on") eq "on") {
           my $sizex = $hash->{sizex};
           my $sizey = $hash->{sizey};
@@ -252,7 +272,6 @@ sub I2C_LCD_Set(@) {
         } else {
           $lcd->print($value);
         }
-        main::readingsSingleUpdate($hash,"text",$value,1);
         last;
       };
       $command eq "home" and do {
@@ -306,9 +325,10 @@ sub I2C_LCD_Set(@) {
         $lcd->setCursor($x,$y);
         shift @a; shift @a; shift @a;
         my $t = join(" ", @a);
-        my %umlaute = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" ," - " => " " ,"©"=>"@");
-        my $umlautkeys = join ("|", keys(%umlaute));
-        $t =~ s/($umlautkeys)/$umlaute{$1}/g;
+        # set reading prior to regexp, could contain unprintable chars!
+        main::readingsSingleUpdate($hash,"writeXY",$value." ".$t,1);
+        readingsSingleUpdate($hash,"state",$t,1);
+        $t = _i2c_lcd_replace($hash,$t);
         my $sl = length $t;
         if ($sl > $l) {
           $t = substr($t,0,$l);
@@ -321,8 +341,6 @@ sub I2C_LCD_Set(@) {
           $t = ($al eq "l") ? $t.$dif : $dif.$t;
         }
         $lcd->print($t);
-        main::readingsSingleUpdate($hash,"writeXY",$value." ".$t,1);
-        readingsSingleUpdate($hash,"state",$t,1);
         last; #"X=$x|Y=$y|L=$l|Text=$t";
       };
     }
@@ -352,6 +370,23 @@ STATEHANDLER: {
 			last;
 		}
 	}
+}
+
+sub _i2c_lcd_replace($$){
+    my ($hash, $txt) = @_;
+    my($lcdReplaceRegex)=AttrVal($hash->{NAME},"replaceRegex","none");
+    if($lcdReplaceRegex ne "none"){
+        my(@rex)=split(/,/,$lcdReplaceRegex);
+        foreach(@rex){
+            my($search,$replace)=split(/=/,$_);
+            $txt=~s/$search/$replace/g;
+        }
+    }
+    $txt =~ s/\\(
+    (?:x\{[0-9a-fA-F]+\}) |         # more than 2 digit hex
+    (?:N\{U\+[0-9a-fA-F]{2,4}\})    # unicode by hex
+    )/"qq|\\$1|"/geex;  
+    return $txt;
 }
 
 package I2C_LCD_IO;
@@ -433,6 +468,11 @@ sub write {
       <li>autoBreak &lt;on|off&gt;</li>
       <li>restoreOnStartup &lt;on|off&gt;</li>
       <li>restoreOnReconnect &lt;on|off&gt;</li>
+      <li>replaceRegex ä=ae,cd+=ef,g=\x{DF}<br/>
+      specify find=replace regex pattern eg for non-printable characters. \x{DF} will become char 223, which is ° on my lcd.
+      </li>
+      <li>customChar&lt;0-7&gt;<br/>
+      up to 8 5x8px custom chars, see http://www.quinapalus.com/hd44780udg.html for a generator, use \x{00} to \x{07} to display</li>
       <li><a href="#IODev">IODev</a><br>
       Specify which <a href="#I2C">I2C</a> to use. (Optional, only required if there is more
       than one I2C-device defined.)
