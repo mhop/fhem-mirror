@@ -518,45 +518,37 @@ sub client_stop($) {
 <a name="MQTT"></a>
 <h3>MQTT</h3>
 <ul>
-  connects fhem to <a href="http://mqtt.org">mqtt</a>
-  <br><br>
-  A single MQTT device can serve multiple <a href="#MQTT_DEVICE">MQTT_DEVICE</a> clients.<br><br>
-   
-  Each <a href="#MQTT_DEVICE">MQTT_DEVICE</a> acts as a bridge in between an fhem-device and mqtt.
-  
-  Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.
-  <br><br>
-  
+  <p>connects fhem to <a href="http://mqtt.org">mqtt</a>.</p>
+  <p>A single MQTT device can serve multiple <a href="#MQTT_DEVICE">MQTT_DEVICE</a> and <a href="#MQTT_BRIDGE">MQTT_BRIDGE</a> clients.<br/>
+     Each <a href="#MQTT_DEVICE">MQTT_DEVICE</a> acts as a bridge in between an fhem-device and mqtt.<br/>
+     Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.</p>
   <a name="MQTTdefine"></a>
-  <b>Define</b><br>
-  <ul><br>
-    <code>define &lt;name&gt; MQTT &lt;ip:port&gt;</code> <br>
-    Specifies the MQTT device.<br>
-    <br>
-    <br>
-    <a name="MQTTset"></a>
-    <b>Set</b>
-    <ul>
-      <li>
-        <code>set &lt;name&gt; connect</code><br>
-        (re-)connects the MQTT-device to the mqtt-broker
-      </li><br>
-      <li>
-        <code>set &lt;name&gt; disconnect</code><br>
-        disconnects the MQTT-device from the mqtt-broker
-      </li>
-    </ul>
-    <br><br>
-    <a name="MQTTattr"></a>
-    <b>Attributes</b><br>
-    <ul>
-      <li>keep-alive<br>
-      sets the keep-alive time (in seconds).
-      </li>
-    </ul>
+  <p><b>Define</b></p>
+  <ul>
+    <p><code>define &lt;name&gt; MQTT &lt;ip:port&gt;</code></p>
+    <p>Specifies the MQTT device.</p>
+  </ul>
+  <a name="MQTTset"></a>
+  <p><b>Set</b></p>
+  <ul>
+    <li>
+      <p><code>set &lt;name&gt; connect</code><br/>
+         (re-)connects the MQTT-device to the mqtt-broker</p>
+    </li>
+    <li>
+      <p><code>set &lt;name&gt; disconnect</code><br/>
+         disconnects the MQTT-device from the mqtt-broker</p>
+    </li>
+  </ul>
+  <a name="MQTTattr"></a>
+  <p><b>Attributes</b></p>
+  <ul>
+    <li>
+      <p>keep-alive<br/>
+         sets the keep-alive time (in seconds).</p>
+    </li>
   </ul>
 </ul>
-<br>
 
 =end html
 =cut
