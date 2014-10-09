@@ -166,18 +166,20 @@ sub cfgDB_svnId;
 # global, to be able to access them from modules
 
 #Special values in %modules (used if set):
+# AttrFn   - called for attribute changes
 # DefFn    - define a "device" of this type
-# UndefFn  - clean up (delete timer, close fd), called by delete and rereadcfg
 # DeleteFn - clean up (delete logfile), called by delete after UndefFn
-# ParseFn  - Interpret a raw message
-# ListFn   - details for this "device"
-# SetFn    - set/activate this device
+# ExceptFn - called if the global select reports an except field
 # GetFn    - get some data from this device
-# StateFn  - set local info for this device, do not activate anything
 # NotifyFn - call this if some device changed its properties
-# RenameFn - inform the device about its renameing
-# ReadyFn  - check for available data, if no FD
+# ParseFn  - Interpret a raw message
 # ReadFn   - Reading from a Device (see FHZ/WS300)
+# ReadyFn  - check for available data, if no FD
+# RenameFn - inform the device about its renameing
+# SetFn    - set/activate this device
+# ShutdownFn-called before shutdown
+# StateFn  - set local info for this device, do not activate anything
+# UndefFn  - clean up (delete timer, close fd), called by delete and rereadcfg
 
 #Special values in %defs:
 # TYPE    - The name of the module it belongs to
