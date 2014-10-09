@@ -730,7 +730,7 @@ ZWave_configParseModel($)
       $h{index} = $1 if($line =~ m/index="([^"]*)"/i); # 1, 2, etc
       $h{read_only}  = $1 if($line =~ m/read_only="([^"]*)"/i); # true,false
       $h{write_only} = $1 if($line =~ m/write_only="([^"]*)"/i); # true,false
-      my ($cmd,$shortened) = ZWave_cleanString($h{label}, "");
+      my ($cmd,$shortened) = ZWave_cleanString($h{label}, $h{index});
       $cmdName = "config$cmd";
       $h{Help} = "";
       $h{Help} .= "Full text for $cmdName is $h{label}<br>" if($shortened);
