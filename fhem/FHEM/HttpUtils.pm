@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use IO::Socket::INET;
 use MIME::Base64;
-use vars qw($SSL_ERR);
+use vars qw($SSL_ERROR);
 
 my %ext2MIMEType= qw{
   css   text/css
@@ -174,7 +174,10 @@ HttpUtils_Connect2($)
   if(!$hash->{conn}) {
     undef $hash->{conn};
     my $err = $@;
-    $err = $SSL_ERR if(!$err && $hash->{protocol} eq "https");
+    if($hash->{protocol} eq "https") {
+      $err = "" if(!$err);
+      $err .= " ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr());
+    }
     return "$hash->{displayurl}: Can't connect(2) to $hash->{addr}: $err"; 
   }
 
