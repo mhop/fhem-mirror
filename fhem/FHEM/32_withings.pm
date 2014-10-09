@@ -338,9 +338,9 @@ withings_initUser($)
   my $user = withings_getUserDetail( $hash, $hash->{User} );
 
   $hash->{shortName} = $user->{shortname};
-  $hash->{gender} = ($user->{gender}==0)?"male":"female";
-  $hash->{userName} = $user->{firstname} ." ". $user->{lastname};
-  $hash->{birthdate} = strftime("%Y-%m-%d", localtime($user->{birthdate}));
+  $hash->{gender} = ($user->{gender}==0)?"male":"female" if( defined($hash->{gender}) );
+  $hash->{userName} = ($user->{firstname}?$user->{firstname}:"") ." ". ($user->{lastname}?$user->{lastname}:"");
+  $hash->{birthdate} = strftime("%Y-%m-%d", localtime($user->{birthdate})) if( defined($user->{birthdate}) );
 
   $attr{$name}{stateFormat} = "weight kg" if( !defined( $attr{$name}{stateFormat} ) );
 
