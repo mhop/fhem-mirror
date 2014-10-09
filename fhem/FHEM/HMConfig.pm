@@ -251,6 +251,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   "00B9" => {name=>"HM-LC-Dim1T-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
+  "00BC" => {name=>"HM-WDS40-TH-I-2"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
   "00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.4p.5p.6p,3:3p.6p,1,7:3p.4'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,Clima:4:4,ClimaTeam:5:5,remote:6:6"}, #
   "00BE" => {name=>"HM-MOD-Re-8"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'3'            ,chn=>"Sw:1:8",},
@@ -825,7 +826,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
   "HM-MOD-Em-8"       =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
                          ,ledMode         =>1
                          ,transmitTryMax  =>1,eventFilterTime =>1
-                         ,msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1                         
+                         ,msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1      #General remove me                   
                          },
 
   "HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
