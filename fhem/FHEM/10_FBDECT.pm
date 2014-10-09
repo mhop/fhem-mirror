@@ -27,7 +27,7 @@ my %fbdect_payload = (
   21 => { n=>"energy",      fmt=>'sprintf("%0.0f Wh",hex($pyld))' },
   22 => { n=>"powerFactor", fmt=>'sprintf("%0.3f", hex($pyld))' },
   23 => { n=>"temperature", fmt=>'sprintf("%0.1f C (%s)",'.
-        'hex(substr($pyld,0,8))/10,'.
+        'hex(substr($pyld,6,2))/10,'.
         '(hex(substr($pyld,8,8))+0)?"corrected":"measured")' },
   35 => { n=>"options",     fmt=>'FBDECT_decodeOptions($pyld)' },
   37 => { n=>"control",     fmt=>'FBDECT_decodeControl($pyld)' },
