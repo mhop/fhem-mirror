@@ -248,7 +248,7 @@ $modules{Global}{AttrList} =
   "backupcmd backupdir backupsymlink backup_before_update " .
   "exclude_from_update motd restoreDirs uniqueID ".
   "sendStatistics:onUpdate,manually,never updateInBackground:1,0 ".
-  "showInternalValues:1,0 ";
+  "showInternalValues:1,0 stacktrace:1,0 ";
 $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
@@ -2601,7 +2601,9 @@ SignalHandling()
     chomp($msg);
     Log 1, "PERL WARNING: $msg"; 
     Log 3, "eval: $cmdFromAnalyze" if($cmdFromAnalyze && $msg =~ m/\(eval /);
-    stacktrace() if($attr{global}{verbose} >= 3 && $msg !~ m/ redefined at /);
+    stacktrace() if($attr{global}{stacktrace} &&
+                    $attr{global}{verbose} >= 3 &&
+                    $msg !~ m/ redefined at /);
     $inWarnSub = 0;
   };  
 }
