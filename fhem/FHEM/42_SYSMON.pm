@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.3";
+my $VERSION = "1.9.3.1";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -927,13 +927,16 @@ SYSMON_getCPUCoreNum($)
 	
 	return $sys_cpu_core_num if $sys_cpu_core_num;
 	
-	my $str = SYSMON_execute($hash, "cat /sys/devices/system/cpu/kernel_max");
-	if(defined($str)) {
-		if($str ne "") {
-      if(int($str)!=0) {
-      	$sys_cpu_core_num = int($str)+1;
-	 	    return $sys_cpu_core_num;
-  	  }
+	# nur wenn verfuegbar
+	if(SYSMON_isSysCpuNum($hash)) {
+	  my $str = SYSMON_execute($hash, "cat /sys/devices/system/cpu/kernel_max");
+	  if(defined($str)) {
+		  if($str ne "") {
+        if(int($str)!=0) {
+        	$sys_cpu_core_num = int($str)+1;
+	 	      return $sys_cpu_core_num;
+  	    }
+      }
     }
   }
   
@@ -2417,6 +2420,17 @@ SYSMON_isSysPowerBat($) {
   }
 
 	return $sys_power_bat;
+}
+
+my $sys_cpu_num = undef;
+sub
+SYSMON_isSysCpuNum($) {
+	my ($hash) = @_;
+	if(!defined $sys_cpu_num) {
+	  $sys_cpu_num = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/kernel_max ] && echo 1 || echo 0"));
+  }
+
+	return $sys_cpu_num;
 }
 
 sub SYSMON_PowerAcInfo($$)
