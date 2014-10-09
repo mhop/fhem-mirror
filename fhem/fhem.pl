@@ -3095,7 +3095,7 @@ Dispatch($$$)
     }
   }
 
-  return undef if($found[0] eq "");	# Special return: Do not notify
+  return undef if(!int(@found) || $found[0] eq "");	# Special return: Do not notify
 
   foreach my $found (@found) {
 
