@@ -681,16 +681,19 @@ ZWave_mfsParse($$$$)
 }
 
 sub
-ZWave_cleanString($)
+ZWave_cleanString($$)
 {
-  my ($c) = @_;
+  my ($c, $postfix) = @_;
   $c =~ s/[.,].*$//g;
   $c =~ s/[^A-Z]+(.)/uc($1)/gei;
   $c =~ s/[^A-Z]//i;
+  my $shortened=0;
   while(length($c) > 32) {     # might be endless loop
     $c =~ s/[A-Z][^A-Z]*$//;
+    $shortened++;
   }
-  return $c;
+  $c .= $postfix if($shortened);
+  return ($c, $shortened);;
 }
 
 ###################################
@@ -727,15 +730,20 @@ ZWave_configParseModel($)
       $h{index} = $1 if($line =~ m/index="([^"]*)"/i); # 1, 2, etc
       $h{read_only}  = $1 if($line =~ m/read_only="([^"]*)"/i); # true,false
       $h{write_only} = $1 if($line =~ m/write_only="([^"]*)"/i); # true,false
-      $cmdName = "config".ZWave_cleanString($h{label});
+      my ($cmd,$shortened) = ZWave_cleanString($h{label}, "");
+      $cmdName = "config$cmd";
+      $h{Help} = "";
+      $h{Help} .= "Full text for $cmdName is $h{label}<br>" if($shortened);
       $hash{$cmdName} = \%h;
     }
-    $hash{$cmdName}{Help} = $1 if($line =~ m+^<Help>(.*)</Help>$+);
+    $hash{$cmdName}{Help} .= "$1<br>" if($line =~ m+^<Help>(.*)</Help>$+);
     if($line =~ m/^<Item/) {
       my $label = $1 if($line =~ m/label="([^"]*)"/i);
       my $value = $1 if($line =~ m/value="([^"]*)"/i);
-      $label = ZWave_cleanString($label);
-      $hash{$cmdName}{Item}{$label} = $value;
+      my ($item, $shortened) = ZWave_cleanString($label, $value);
+      $hash{$cmdName}{Item}{$item} = $value;
+      $hash{$cmdName}{Help} .= "Full text for $item is $label<br>"
+        if($shortened);
     }
   }
   $gz->gzclose();
