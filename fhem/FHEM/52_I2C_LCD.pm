@@ -327,7 +327,6 @@ sub I2C_LCD_Set(@) {
         my $t = join(" ", @a);
         # set reading prior to regexp, could contain unprintable chars!
         main::readingsSingleUpdate($hash,"writeXY",$value." ".$t,1);
-        readingsSingleUpdate($hash,"state",$t,1);
         $t = _i2c_lcd_replace($hash,$t);
         my $sl = length $t;
         if ($sl > $l) {
@@ -468,8 +467,8 @@ sub write {
       <li>autoBreak &lt;on|off&gt;</li>
       <li>restoreOnStartup &lt;on|off&gt;</li>
       <li>restoreOnReconnect &lt;on|off&gt;</li>
-      <li>replaceRegex ä=ae,cd+=ef,g=\x{DF}<br/>
-      specify find=replace regex pattern eg for non-printable characters. \x{DF} will become char 223, which is ° on my lcd.
+      <li>replaceRegex &auml;=ae,cd+=ef,g=\x{DF}<br/>
+      specify find=replace regex pattern eg for non-printable characters. \x{DF} will become char 223, which is &ordm; on my lcd.
       </li>
       <li>customChar&lt;0-7&gt;<br/>
       up to 8 5x8px custom chars, see http://www.quinapalus.com/hd44780udg.html for a generator, use \x{00} to \x{07} to display</li>
