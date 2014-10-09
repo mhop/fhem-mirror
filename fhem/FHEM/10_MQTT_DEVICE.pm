@@ -191,57 +191,49 @@ sub onmessage($$$) {
 <a name="MQTT_DEVICE"></a>
 <h3>MQTT_DEVICE</h3>
 <ul>
-  acts as a fhem-device that is mapped to <a href="http://mqtt.org">mqtt</a>-topics.
-  <br><br>
-  requires a <a href="#MQTT">MQTT</a>-device as IODev<br><br>
-  
-  Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.
-  <br><br>
-  
+  <p>acts as a fhem-device that is mapped to <a href="http://mqtt.org/">mqtt</a>-topics.</p>
+  <p>requires a <a href="#MQTT">MQTT</a>-device as IODev<br/>
+     Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.</p>
   <a name="MQTT_DEVICEdefine"></a>
-  <b>Define</b><br>
-  <ul><br>
-    <code>define &lt;name&gt; MQTT_DEVICE</code> <br>
-    Specifies the MQTT device.<br>
-    <br>
-    <a name="MQTT_DEVICEset"></a>
-    <b>Set</b>
-    <ul>
-      <li>
-        <code>set &lt;name&gt; &lt;command&gt;</code><br>
-        sets reading 'state' and publishes the command to topic configured via attr publishSet
-      </li><br>
-      <li>
-        <code>set &lt;name&gt; &lth;reading&gt; &lt;value&gt;</code><br>
-        sets reading &lth;reading&gt; and publishes the command to topic configured via attr publishSet_&lth;reading&gt;
-      </li><br>
-    </ul>
-    <br><br>
-
-    <a name="MQTT_DEVICEattr"></a>
-    <b>Attributes</b><br>
-    <ul>
-      <li>
-        <code>attr &lt;name&gt; publishSet [&lt;commands&gt] &lt;topic&gt;</code><br>
-        configures set commands that may be used to both set reading 'state' and publish to configured topic<br>
-      </li>
-      <li>
-        <code>attr &lt;name&gt; publishSet_&lt;reading&gt; [&lt;values&gt] &lt;topic&gt;</code><br>
-        configures reading that may be used to both set 'reading' (to optionally configured values) and publish to configured topic<br>
-      </li>
-      <li>
-        <code>attr &lt;name&gt; autoSubscribeReadings &lt;topic&gt;</code><br>
-        specify a mqtt-topic pattern with wildcard (e.c. 'myhouse/kitchen/+') and MQTT_DEVICE automagically creates readings based on the wildcard-match<br>
-        e.g a message received with topic 'myhouse/kitchen/temperature' would create and update a reading 'temperature'
-      </li>
-      <li>
-        <code>attr &lt;name&gt; subscribeReading_&lt;reading&gt; &lt;topic&gt;</code><br>
-        mapps a reading to a specific topic. The reading is updated whenever a message to the configured topic arrives<br>
-      </li>
-    </ul>
+  <p><b>Define</b></p>
+  <ul>
+    <p><code>define &lt;name&gt; MQTT_DEVICE</code><br/>
+       Specifies the MQTT device.</p>
+  </ul>
+  <a name="MQTT_DEVICEset"></a>
+  <p><b>Set</b></p>
+  <ul>
+    <li>
+      <p><code>set &lt;name&gt; &lt;command&gt;</code><br/>
+         sets reading 'state' and publishes the command to topic configured via attr publishSet</p>
+    </li>
+    <li>
+      <p><code>set &lt;name&gt; &lt;h;reading&gt; &lt;value&gt;</code><br/>
+         sets reading &lt;h;reading&gt; and publishes the command to topic configured via attr publishSet_&lt;h;reading&gt;</p>
+    </li>
+  </ul>
+  <a name="MQTT_DEVICEattr"></a>
+  <p><b>Attributes</b></p>
+  <ul>
+    <li>
+      <p><code>attr &lt;name&gt; publishSet [&lt;commands&gt;] &lt;topic&gt;</code><br/>
+         configures set commands that may be used to both set reading 'state' and publish to configured topic</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; publishSet_&lt;reading&gt; [&lt;values&gt;] &lt;topic&gt;</code><br/>
+         configures reading that may be used to both set 'reading' (to optionally configured values) and publish to configured topic</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; autoSubscribeReadings &lt;topic&gt;</code><br/>
+         specify a mqtt-topic pattern with wildcard (e.c. 'myhouse/kitchen/+') and MQTT_DEVICE automagically creates readings based on the wildcard-match<br/>
+         e.g a message received with topic 'myhouse/kitchen/temperature' would create and update a reading 'temperature'</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; subscribeReading_&lt;reading&gt; &lt;topic&gt;</code><br/>
+         mapps a reading to a specific topic. The reading is updated whenever a message to the configured topic arrives</p>
+    </li>
   </ul>
 </ul>
-<br>
 
 =end html
 =cut

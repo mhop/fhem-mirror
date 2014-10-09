@@ -187,58 +187,50 @@ sub onmessage($$$) {
 <a name="MQTT_BRIDGE"></a>
 <h3>MQTT_BRIDGE</h3>
 <ul>
-  acts as a bridge in between an fhem-device and <a href="http://mqtt.org">mqtt</a>-topics.
-  <br><br>
-  requires a <a href="#MQTT">MQTT</a>-device as IODev<br><br>
-  
-  Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.
-  <br><br>
-  
+  <p>acts as a bridge in between an fhem-device and <a href="http://mqtt.org/">mqtt</a>-topics.</p>
+  <p>requires a <a href="#MQTT">MQTT</a>-device as IODev<br/>
+     Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.</p>
   <a name="MQTT_BRIDGEdefine"></a>
-  <b>Define</b><br>
-  <ul><br>
-    <code>define &lt;name&gt; MQTT_BRIDGE &lt;fhem-device-name&gt;</code> <br>
-    Specifies the MQTT device.<br>
-    &lt;fhem-device-name&gt; is the fhem-device this MQTT_BRIDGE is linked to.<br>
-    <br>
-    <a name="MQTT_BRIDGEget"></a>
-    <b>Get</b>
-    <ul>
-      <li>
-        <code>get &lt;name&gt; readings</code><br>
-        retrieves all existing readings from fhem-device and configures (default-)topics for them.<br>
-        attribute 'publish-topic-base' is prepended if set.
-      </li><br>
-    </ul>
-    <br><br>
-
-    <a name="MQTT_BRIDGEattr"></a>
-    <b>Attributes</b><br>
-    <ul>
-      <li>
-        <code>attr &lt;name&gt; subscribeSet &lt;topic&gt;</code><br>
-        configures a topic that will issue a 'set &lt;message&gt; whenever a message is received<br>
-      </li>
-      <li>
-        <code>attr &lt;name&gt; subscribeSet_&lt;reading&gt; &lt;topic&gt;</code><br>
-        configures a topic that will issue a 'set &lt;reading&gt; &lt;message&gt; whenever a message is received<br>
-      </li>
-      <li>
-        <code>attr &lt;name&gt; publishState &lt;topic&gt;</code><br>
-        configures a topic such that a message is sent to topic whenever the device state changes.<br>
-      </li>
-      <li>
-        <code>attr &lt;name&gt; publishReading_&lt;reading&gt; &lt;topic&gt;</code><br>
-        configures a topic such that a message is sent to topic whenever the device readings value changes.<br>
-      </li>
-      <li>
-        <code>attr &lt;name&gt; publish-topic-base &lt;topic&gt;</code><br>
-        this is used as base path when issueing 'get &lt;device&gt; readings' to construct topics to publish to based on the devices existing readings<br>
-      </li>
-    </ul>
+  <p><b>Define</b></p>
+  <ul>
+    <p><code>define &lt;name&gt; MQTT_BRIDGE &lt;fhem-device-name&gt;</code></p>
+    <p>Specifies the MQTT device.<br/>
+       &lt;fhem-device-name&gt; is the fhem-device this MQTT_BRIDGE is linked to.</p>
+  </ul>
+  <a name="MQTT_BRIDGEget"></a>
+  <p><b>Get</b></p>
+  <ul>
+    <li>
+      <p><code>get &lt;name&gt; readings</code><br/>
+         retrieves all existing readings from fhem-device and configures (default-)topics for them.<br/>
+         attribute 'publish-topic-base' is prepended if set.</p>
+    </li>
+  </ul>
+  <a name="MQTT_BRIDGEattr"></a>
+  <p><b>Attributes</b></p>
+  <ul>
+    <li>
+      <p><code>attr &lt;name&gt; subscribeSet &lt;topic&gt;</code><br/>
+         configures a topic that will issue a 'set &lt;message&gt; whenever a message is received</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; subscribeSet_&lt;reading&gt; &lt;topic&gt;</code><br/>
+         configures a topic that will issue a 'set &lt;reading&gt; &lt;message&gt; whenever a message is received</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; publishState &lt;topic&gt;</code><br/>
+         configures a topic such that a message is sent to topic whenever the device state changes.</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; publishReading_&lt;reading&gt; &lt;topic&gt;</code><br/>
+         configures a topic such that a message is sent to topic whenever the device readings value changes.</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; publish-topic-base &lt;topic&gt;</code><br/>
+         this is used as base path when issueing 'get &lt;device&gt; readings' to construct topics to publish to based on the devices existing readings</p>
+    </li>
   </ul>
 </ul>
-<br>
 
 =end html
 =cut
