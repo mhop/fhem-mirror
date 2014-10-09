@@ -170,6 +170,7 @@ sub cfgDB_svnId;
 # DefFn    - define a "device" of this type
 # DeleteFn - clean up (delete logfile), called by delete after UndefFn
 # ExceptFn - called if the global select reports an except field
+# FingerprintFn - convert messages for duplicate detection
 # GetFn    - get some data from this device
 # NotifyFn - call this if some device changed its properties
 # ParseFn  - Interpret a raw message
@@ -3031,7 +3032,6 @@ Dispatch($$$)
   return rejectDuplicate($name,$idx,$addvals) if($isdup);
 
   my @found;
-
   my $clientArray = $hash->{".clientArray"};
   $clientArray = computeClientArray($hash, $module) if(!$clientArray);
 
@@ -3050,7 +3050,7 @@ Dispatch($$$)
     last if(int(@found));
   }
 
-  if(!int(@found)) {
+  if(!int(@found) || !defined($found[0])) {
     my $h = $hash->{MatchList}; $h = $module->{MatchList} if(!$h);
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
@@ -3077,7 +3077,7 @@ Dispatch($$$)
         }
       }
     }
-    if(!int(@found)) {
+    if(!int(@found) || !defined($found[0])) {
       DoTrigger($name, "UNKNOWNCODE $dmsg");
       Log3 $name, 3, "$name: Unknown code $dmsg, help me!";
       return undef;
@@ -3097,7 +3097,7 @@ Dispatch($$$)
     }
   }
 
-  return undef if(!int(@found) || $found[0] eq "");	# Special return: Do not notify
+  return undef if(!defined($found[0]) || $found[0] eq "");	# Special return: Do not notify
 
   foreach my $found (@found) {
 
