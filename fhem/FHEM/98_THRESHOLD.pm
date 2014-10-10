@@ -272,6 +272,7 @@ THRESHOLD_Set($@)
  
   if ($arg eq "desired" ) {
     return "$pn: set desired value:$value, desired value needs a numeric parameter" if(@a != 3 || $value !~ m/^[-\d\.]*$/);
+    
     if ($desired_value ne "") {
       return $ret if ($desired_value == $value);
     }
@@ -291,6 +292,7 @@ THRESHOLD_Set($@)
     readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
     readingsBulkUpdate   ($hash, "desired_value", $value);
     readingsEndUpdate    ($hash, 1);
+    $ret=CommandDeleteAttr(undef, "$pn disable");
     return THRESHOLD_Check($hash);
   } elsif ($arg eq "deactivated" ) {
       $cmd = $value if ($value ne "");
@@ -954,7 +956,7 @@ THRESHOLD_setValue($$)
   Die Vorgabe der Solltemperatur kann auch von beliebigen Wandthermostaten (z. B. HM, MAX, FHT) genutzt werden.<br>
   <br>
   Das Schaltverhalten des THRESHOLD-Moduls kann zusätzlich durch einen weiteren Sensor oder eine Sensorgruppe,
-  definiert über structure (z. B. Fensterkontakte), über eine AND- bzw. OR-Verknüpfung beeinflusst werden.<br>
+  definiert über structure (z. B. Fensterkontakte), über eine AND- bzw. OR-Verknüpfung beeinflusst werden.
   Bei komplexeren Bedingungen mit mehreren and- bzw. or-Verknüpfung sollte man das neuere <a href="http://fhem.de/commandref_DE.html#DOIF">DOIF</a>-Modul verwenden.<br>
   <br>
   Es ist ebenfalls die Kombination mehrerer THRESHOLD-Module miteinander möglich.<br>
