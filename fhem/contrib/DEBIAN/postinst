@@ -1,5 +1,4 @@
-
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
@@ -9,18 +8,15 @@ fi
 
 chown -R fhem:root /opt/fhem
 
-# prevent package fhem from being
-# upgraded by apt-get upgrade
-
-apt-mark hold fhem
-echo "fhem hold" | dpkg --set-selections
-
-
 # set up of autostart
 # Sysvinit; upstart no longer supported
 
-mkdir -p /etc/init.d
+#mkdir -p /etc/init.d
 cp /opt/fhem/contrib/init-scripts/fhem.3 /etc/init.d/fhem
 chmod ugo+x /etc/init.d/fhem
 update-rc.d fhem defaults
-invoke-rc.d fhem start
+
+if test -f /etc/init.d/fhem; then
+    invoke-rc.d fhem start
+fi
+

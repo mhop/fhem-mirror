@@ -2,8 +2,12 @@
 
 set -e
 
+apt-mark unhold fhem
+
 # stop fhem if running
-invoke-rc.d fhem stop
+if test -f /etc/init.d/fhem; then
+    invoke-rc.d fhem stop
+fi
 
 # remove fhem autostart
 update-rc.d fhem remove
