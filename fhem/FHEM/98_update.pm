@@ -19,6 +19,7 @@ my $updateInBackground;
 my $updRet;
 my %updDirs;
 my $updArg;
+my $mainPgm = "/fhem.pl\$";
 
 
 ########################################
@@ -331,8 +332,10 @@ upd_writeFile($$$$)
 
   my $rest = ($restoreDir ? "trying to restore the previous version and ":"").
                 "aborting the update";
-  if(!open(FD, ">$root/$fName")) {
-    uLog 1, "open $root/$fName failed: $!, $rest";
+  my $fPath = "$root/$fName";
+  $fPath = $0 if($fPath =~ m/$mainPgm/);
+  if(!open(FD, ">$fPath")) {
+    uLog 1, "open $fPath failed: $!, $rest";
     mv "$root/$restoreDir/$fName", "$root/$fName" if($restoreDir);
     return 0;
   }
@@ -340,14 +343,14 @@ upd_writeFile($$$$)
   print FD $content;
   close(FD);
 
-  my $written = -s "$root/$fName";
+  my $written = -s "$fPath";
   if($written != length($content)) {
-    uLog 1, "writing $root/$fName failed: $!, $rest";
-    mv "$root/$restoreDir/$fName", "$root/$fName" if($restoreDir);
+    uLog 1, "writing $fPath failed: $!, $rest";
+    mv "$root/$restoreDir/$fName", "$fPath" if($restoreDir);
     return;
   }
 
-  cfgDB_FileUpdate("$root/$fName") if(configDBUsed());
+  cfgDB_FileUpdate("$fPath") if(configDBUsed());
 
   return 1;
 }
