@@ -632,6 +632,18 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|".$countVisibAttr;
   # 54 - returnTemperatureSetBack
   $return_str .= "|".$heatpump_parameters[1];
+  # 55 - mixer1FlowTemperature
+  $return_str .= "|". ($heatpump_visibility[31]==1 ? $heatpump_values[21] : "no");
+  # 56 - mixer1TargetTemperature
+  $return_str .= "|". ($heatpump_visibility[32]==1 ? $heatpump_values[22] : "no");
+  # 57 - mixer2FlowTemperature
+  $return_str .= "|". ($heatpump_visibility[34]==1 ? $heatpump_values[24] : "no");
+  # 58 - mixer2TargetTemperature
+  $return_str .= "|". ($heatpump_visibility[35]==1 ? $heatpump_values[25] : "no");
+  # 59 - mixer3FlowTemperature
+  $return_str .= "|". ($heatpump_visibility[210]==1 ? $heatpump_values[137] : "no");
+  # 60 - mixer3TargetTemperature
+  $return_str .= "|". ($heatpump_visibility[211]==1 ? $heatpump_values[136] : "no");
   return $return_str;
 }
 
@@ -905,6 +917,12 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate( $hash, "heatSourceIN",$heatSourceIN);
      readingsBulkUpdate( $hash, "heatSourceOUT",LUXTRONIK2_CalcTemp($a[24]));
      readingsBulkUpdate( $hash, "hotGasTemperature",LUXTRONIK2_CalcTemp($a[26]));
+     if ($a[55] !~ /no/) {readingsBulkUpdate( $hash, "mixer1FlowTemperature",LUXTRONIK2_CalcTemp($a[55]));}
+     if ($a[56] !~ /no/) {readingsBulkUpdate( $hash, "mixer1TargetTemperature",LUXTRONIK2_CalcTemp($a[56]));}
+     if ($a[57] !~ /no/) {readingsBulkUpdate( $hash, "mixer2FlowTemperature",LUXTRONIK2_CalcTemp($a[57]));}
+     if ($a[58] !~ /no/) {readingsBulkUpdate( $hash, "mixer2TargetTemperature",LUXTRONIK2_CalcTemp($a[58]));}
+     if ($a[59] !~ /no/) {readingsBulkUpdate( $hash, "mixer3FlowTemperature",LUXTRONIK2_CalcTemp($a[59]));}
+     if ($a[60] !~ /no/) {readingsBulkUpdate( $hash, "mixer3TargetTemperature",LUXTRONIK2_CalcTemp($a[60]));}
 
     # Operating hours (seconds->hours) and heat quantities   
      # LUXTRONIK2_storeReadings: $hash, $readingName, $value, $factor, $doStatistic, $electricalPower
