@@ -112,6 +112,7 @@ sub CUL_HM_storeRssi(@);
 sub CUL_HM_qStateUpdatIfEnab($@);
 sub CUL_HM_getAttrInt($@);
 sub CUL_HM_appFromQ($$);
+sub CUL_HM_autoReadReady($);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
@@ -1237,8 +1238,8 @@ sub CUL_HM_Parse($$) {#########################################################
     if   (  ($mTp eq "10" && $mI[0] eq "0A") #info-level/
           ||($mTp eq "02" && $mI[0] eq "01")){#ackInfo
 
-      my ($dHash,$err       ,$ctrlMode  ,$setTemp          ,$bTime,$pTemp,$pStart,$pEnd,$chn,$uk0,$lBat,$actTemp,$vp) = 
-         ($shash,hex($mI[3]),hex($mI[5]),hex($mI[1].$mI[2]),"-"    ,"-"   ,"-"    ,"-"                             );
+      my ($err       ,$ctrlMode  ,$setTemp          ,$bTime,$pTemp,$pStart,$pEnd,$chn,$uk0,$lBat,$actTemp,$vp) = 
+         (hex($mI[3]),hex($mI[5]),hex($mI[1].$mI[2]),"-"    ,"-"   ,"-"    ,"-"                             );
       
       if($mTp eq "10"){
         $chn = "04";#fixed
@@ -1251,15 +1252,22 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$shash,1,"measured-temp:$actTemp" ];
         push @evtEt,[$shash,1,"ValvePosition:$vp"    ];
         #device---
-        push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
-        push @evtEt,[$dHash,1,"batteryLevel:$bat"];
-        push @evtEt,[$dHash,1,"actuator:$vp"];
+        push @evtEt,[$devH,1,"measured-temp:$actTemp"];
+        push @evtEt,[$devH,1,"batteryLevel:$bat"];
+        push @evtEt,[$devH,1,"actuator:$vp"];
         #weather Chan
         my $wHash = $modules{CUL_HM}{defptr}{$src."01"}; 
         if ($wHash){
           push @evtEt,[$wHash,1,"measured-temp:$actTemp"];
           push @evtEt,[$wHash,1,"state:$actTemp"];
         }
+#        if($devH->{helper}{getBatState}){
+#          CUL_HM_Set(CUL_HM_name2Hash($devH->{channel_04}),
+#                      $devH->{channel_04},
+#                      "desired-temp",ReadingsVal($devH->{channel_04}
+#                      ,"desired-temp"
+#                      ,""));
+#        }
       }
       else{
         $chn        =  $mI[1];
@@ -1270,6 +1278,7 @@ sub CUL_HM_Parse($$) {#########################################################
         $vp      = ReadingsVal($name,"actuator","");
         $lBat = $err&0x80?"low":"ok";
       }
+      delete $devH->{helper}{getBatState};
       $setTemp    =(($setTemp        ) & 0x3f )/2;
       $err        = ($err            ) & 0x7  ;
       $uk0        = ($ctrlMode       ) & 0x3f ;#unknown
@@ -1313,8 +1322,8 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"partyTemp:$pTemp"];
       #push @evtEt,[$shash,1,"unknown0:$uk0"];
       #push @evtEt,[$shash,1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
-      push @evtEt,[$dHash,1,"battery:$lBat"] if ($lBat);
-      push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
+      push @evtEt,[$devH,1,"battery:$lBat"] if ($lBat);
+      push @evtEt,[$devH,1,"desired-temp:$setTemp"];
     }
     elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
       my $setTemp = sprintf("%.1f",int(hex($1)/4)/2);
@@ -1332,14 +1341,8 @@ sub CUL_HM_Parse($$) {#########################################################
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
       push @ack,$shash,"${mNo}803F$ioId${src}0204$s2000";
       push @evtEt,[$shash,1,"time-request"];
-      
-      # reset desired-temp just to get an AckInfo for battery state
-      my $mode = ReadingsVal($devH->{channel_04},"controlMode",undef);
-      if ($mode){
-        my %mCmd = (auto=>0,manual=>1,party=>2,boost=>3,day=>4,night=>5);
-        my $msg = '8'.($mCmd{$mode})."04";
-#General remove setting of mode till solution is found        CUL_HM_PushCmdStack($shash,'++A011'.$ioId.$src.$msg);
-      }
+      # schedule desired-temp just to get an AckInfo for battery state
+      $shash->{helper}{getBatState} = 1;
     }
   }
   elsif($md eq "HM-TC-IT-WM-W-EU") { ##########################################
@@ -6220,6 +6223,7 @@ sub CUL_HM_4DisText($) {      # convert text for 4dis
     $sStr = sprintf("%02X:",$sAddr+11);
     $txtHex =~ s/$sStr(..).*/,$1/; #remove reg after string
     $txtHex =~ s/ ..:/,/g;         #remove addr
+    $txtHex =~ s/ //g;             #remove space
     $txtHex =~ s/,00.*//;          #remove trailing string
     my @ch = split(",",$txtHex,12);
     foreach (@ch){$txt{$sAddr}.=chr(hex($_)) if (length($_)==2)};
