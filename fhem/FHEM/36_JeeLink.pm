@@ -27,7 +27,7 @@ my %matchListPCA301 = (
     "3:RoomNode"        => "^\\S+\\s+11",
     "4:LaCrosse"        => "^\\S+\\s+9 ",
     "5:AliRF"           => "^\\S+\\s+5 ",
-    "6:EMT7110"         => "^OK\\sEMT7110\\s,",
+    "6:EMT7110"         => "^OK\\sEMT7110\\s",
 );
 
 my %matchListJeeLink433 = (
