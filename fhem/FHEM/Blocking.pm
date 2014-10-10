@@ -113,7 +113,7 @@ BlockingInformParent($;$$)
   if(!$telnetClient) {
     my $addr = "localhost:$defs{$telnetDevice}{PORT}";
     $telnetClient = IO::Socket::INET->new(PeerAddr => $addr);
-    Log 1, "CallBlockingFn: Can't connect to $addr\n" if(!$telnetClient);
+    Log 1, "CallBlockingFn: Can't connect to $addr: $@" if(!$telnetClient);
   }
 
   if(defined($param)) {
