@@ -30,8 +30,7 @@ my %sets = (
   "removeNode"=> { cmd   => "4b%02x@",       # ZW_REMOVE_NODE_FROM_NETWORK',
                    param => {on=>0x81, off=>0x05 } },
   "createNode"=> { cmd   => "60%02x"  },     # ZW_REQUEST_NODE_INFO',
-  "neighborUpdate" => { cmd => "48",
-                   param => {noArg => ""} }, # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
+  "neighborUpdate" => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
   "sendNIF"   => { cmd   => "12%02x05@" },   # ZW_SEND_NODE_INFORMATION
 );
 
