@@ -39,8 +39,6 @@ package main;
 # http://forum.fhem.de/index.php?topic=18707.new
 # http://forum.fhem.de/index.php?topic=15827.new
 #
-# Continuation lines are only partially honored, e.g. not for descriptions
-#
 # Potential future extensions: add support for EXDATE
 # http://forum.fhem.de/index.php?topic=24485.new#new
 #
@@ -81,7 +79,10 @@ sub addproperty {
     $key= $1;
     $parts= defined($3) ? $3 : "";
     $parameter= defined($4) ? $4 : "";
+  } else {
+    return;
   }
+  return unless($key);
   #main::Debug "-> key=\'$key\' parts=\'$parts\' parameter=\'$parameter\'";
   if($key eq "EXDATE") {
     push @{$self->{properties}{exdates}}, $parameter;
@@ -115,19 +116,19 @@ sub parseSub {
   while($ln<$#ical) {
     my $line= $ical[$ln];
     chomp $line;
-    $line =~ s/[\x0D]//; # chomp will not remove the CR
-    #main::Debug "$ln: $line";
+    $line =~ s/[\x0D]$//; # chomp will not remove the CR
     $ln++;
-    next if($line eq ""); # remove empty line
-    #### corrects line-wraps: if next line is starting with at least 2 spaces, join them
-        if ($ln<$#ical){
-          my $line1= $ical[$ln];
-          if ($line1 =~ s/^\s\s*//) {
-            $line.=$line1;
-            $ln++;
-          };
-        };
-    ####    
+    # check for and handle continuation lines (4.1 on page 12)
+    while($ln<$#ical) {
+      my $line1= $ical[$ln];
+      last unless($line1 =~ /^\s(.*)/);
+      $line.= $1;
+      chomp $line;
+      $line =~ s/[\x0D]$//; # chomp will not remove the CR
+      $ln++;
+    };
+    #main::Debug "$ln: $line";
+    next if($line eq ""); # ignore empty line
     last if($line =~ m/^END:.*$/);
     if($line =~ m/^BEGIN:(.*)$/) {
       my $entry= ICal::Entry->new($1);
@@ -978,6 +979,7 @@ sub Calendar_Set($@) {
   my ($hash, @a) = @_;
 
   my $cmd= $a[1];
+  $cmd= "?" unless($cmd);
 
   # usage check
   if((@a == 2) && ($a[1] eq "update")) {
@@ -998,12 +1000,14 @@ sub Calendar_Get($@) {
 
   my ($hash, @a) = @_;
 
-
   my $eventsObj= $hash->{fhem}{events};
   my @events;
 
   my $cmd= $a[1];
-  if(grep(/^$cmd$/, ("text","full","summary","location","alarm","start","end"))) {
+  $cmd= "?" unless($cmd);
+  
+  my @cmds2= qw/text full summary location alarm start end/;
+  if($cmd ~~ @cmds2) {
 
     return "argument is missing" if($#a < 2);
     my $reading= $a[2];
@@ -1049,7 +1053,7 @@ sub Calendar_Get($@) {
     return join(";", @uids);
   
   } else {
-    return "Unknown argument $cmd, choose one of text summary full find";
+    return "Unknown argument $cmd, choose one of find text full summary location alarm start end";
   }
 
 }

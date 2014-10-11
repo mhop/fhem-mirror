@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 57_Calendar: process continuation lines, get/set syntax checks
   - bugfix: SYSMON: fix availability of cpu/kernel_max
   - bugfix: SYSMON: numeric check
   - change: 59_Weather: change icons for conditions 31, 34, 36
