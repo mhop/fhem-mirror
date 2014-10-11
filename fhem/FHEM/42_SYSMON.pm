@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.3.1";
+my $VERSION = "1.9.4.0";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -71,6 +71,11 @@ use constant {
   FB_NUM_NEW_MESSAGES => "num_new_messages",
   FB_FW_VERSION       => "fw_version_info",
   FB_DECT_TEMP        => "dect_temp",
+    
+	FB_DSL_RATE         => "dsl_rate",
+	FB_DSL_SYNCTIME     => "dsl_synctime",
+	FB_DSL_FEC_15       => "dsl_fec_15",
+	FB_DSL_CRC_15       => "dsl_crc_15",
 };
 
 use constant FS_PREFIX => "~ ";
@@ -420,6 +425,12 @@ SYSMON_updateCurrentReadingsMap($) {
 	  $rMap->{+FB_NUM_NEW_MESSAGES} = "new messages";
 	  $rMap->{+FB_FW_VERSION}       = "firmware info";
 	  $rMap->{+FB_DECT_TEMP}        = "DECT temperatur";
+	  
+	  $rMap->{+FB_DSL_RATE}       = "DSL rate",
+	  $rMap->{+FB_DSL_SYNCTIME}   = "DSL synctime";
+	  $rMap->{+FB_DSL_FEC_15}     = "DSL recoverable errors per 15 minutes"; # forward error correction
+	  $rMap->{+FB_DSL_CRC_15}     = "DSL unrecoverable errors per 15 minutes"; # cyclic redundancy check
+	  
   }
   
 	# User defined
@@ -820,6 +831,13 @@ SYSMON_obtainParameters($$)
       	$map = SYSMON_getFBNightTimeControl($hash, $map);
       	$map = SYSMON_getFBNumNewMessages($hash, $map);
       	$map = SYSMON_getFBDECTTemp($hash, $map);
+      	
+      	#DSL-Downstream und DSL-Upstream abfragen
+	      $map = SYSMON_getFBStreemRate($hash, $map);
+	      #Sync-Zeit mit Vermittlungsstelle abfragen
+	      $map = SYSMON_getFBSyncTime($hash, $map);
+	      #Uebertragungsfehler abfragen (nicht behebbar und behebbar)
+	      $map = SYSMON_getFBCRCFEC($hash, $map);
       }
     }
   }
@@ -1106,7 +1124,7 @@ SYSMON_getCPUFreq($$)
 }
 
 #------------------------------------------------------------------------------
-# leifert CPU Frequenz für 2te CPU (Cubietruck, etc.)
+# leifert CPU Frequenz fuer 2te CPU (Cubietruck, etc.)
 #------------------------------------------------------------------------------
 sub
 SYSMON_getCPU1Freq($$)
@@ -1463,7 +1481,7 @@ sub SYSMON_getRamAndSwap($$)
 }
 
 #------------------------------------------------------------------------------
-# Prüft, ob das Host-System OSX ist (darvin).
+# Prueft, ob das Host-System OSX ist (darvin).
 #------------------------------------------------------------------------------
 sub SYSMON_isOSX()
 {
@@ -1471,7 +1489,7 @@ sub SYSMON_isOSX()
 }
 
 #------------------------------------------------------------------------------
-# Prüft, ob das Host-System Linux ist (linux).
+# Prueft, ob das Host-System Linux ist (linux).
 #------------------------------------------------------------------------------
 sub SYSMON_isLinux()
 {
@@ -2107,6 +2125,69 @@ sub SYSMON_FBVersionInfo($$)
   return $map;
 }
 
+
+#DSL-Downstream und DSL-Upstream abfragen
+sub SYSMON_getFBStreemRate($$) {
+	my ($hash, $map) = @_;
+	
+	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_ds_rate");
+	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_us_rate");
+	
+	if($ds_rate ne "" && $us_rate ne "") {
+    $map->{+FB_DSL_RATE}="down: ".$ds_rate." KBit/s, up: ".$us_rate." KBit/s";
+  }
+  
+  return $map;
+}
+
+# Ausrechnet aus der Zahl der Sekunden Anzeige in Tagen:Stunden:Minuten:Sekunden.
+sub SYSMON_sec2Dauer($){
+  my ($t) = @_;
+  my $d = int($t/86400);
+  my $r = $t-($d*86400);
+  my $h = int($r/3600);
+     $r = $r - ($h*3600);
+  my $m = int($r/60);
+  my $s = $r - $m*60;
+  return sprintf("%02d Tage %02d Std. %02d Min. %02d Sec.",$d,$h,$m,$s);
+}
+
+#Sync-Zeit mit Vermittlungsstelle abfragen
+sub SYSMON_getFBSyncTime($$) {
+	my ($hash, $map) = @_;
+	
+	my $data = SYSMON_execute($hash, "ctlmgr_ctl r sar status/modem_ShowtimeSecs");
+	
+	if($data ne "") {
+		my $idata = int($data);
+    $map->{+FB_DSL_SYNCTIME}=SYSMON_sec2Dauer($idata);
+  }
+  
+  return $map;
+}
+
+#Uebertragungsfehler abfragen (nicht behebbar und behebbar)
+sub SYSMON_getFBCRCFEC($$) {
+	my ($hash, $map) = @_;
+	
+	my $ds_crc = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_crc_per15min");
+	my $us_crc = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_crc_per15min");
+	
+	my $ds_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_fec_per15min");
+	my $us_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_fec_per15min");	
+	
+	if($ds_crc ne "") {
+	  # FB_DSL_CRC_15
+    $map->{+FB_DSL_CRC_15}="down: ".$ds_crc." up: ".$us_crc;
+  }
+  if($ds_fec ne "") {
+	  # FB_DSL_FEC_15
+    $map->{+FB_DSL_FEC_15}="down: ".$ds_fec." up: ".$us_fec;
+  }
+  
+  return $map;
+}
+
 #------------------------------------------------------------------------------
 # Systemparameter als HTML-Tabelle ausgeben
 # Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
@@ -2120,7 +2201,7 @@ sub SYSMON_ShowValuesHTML ($;@)
 }
 
 #------------------------------------------------------------------------------
-# Systemparameter als HTML-Tabelle ausgeben. Zusätzlich wird eine Ueberschrift ausgegeben.
+# Systemparameter als HTML-Tabelle ausgeben. Zusaetzlich wird eine Ueberschrift ausgegeben.
 # Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
 # Title: Ueberschrift (Text)
 # (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
@@ -2725,6 +2806,23 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Information on the installed firmware version: <VersionNum> <creation date> <time>
     </li>
     <br>
+    <b>DSL Informations (FritzBox)</b>
+    <li>dsl_rate<br>
+        Information about the down und up stream rate
+    </li>
+    <br>
+	  <li>dsl_synctime<br>
+        sync time with DSLAM
+    </li>
+    <br>
+    <li>dsl_crc_15<br>
+        number of uncorrectable errors (CRC) for the last 15 minutes
+    </li>
+    <br>
+		<li>dsl_fec_15<br>
+        number of correctable errors (FEC) for the last 15 minutes
+    </li>
+    <br>
     <b>Power Supply Readings</b>
     <li>power_ac_stat<br>
         status information to the AC socket: present (0|1), online (0|1), voltage, current<br>
@@ -3258,6 +3356,23 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>fw_version_info<br>
         Angaben zu der installierten Firmware-Version: <VersionNr> <Erstelldatum> <Zeit>
+    </li>
+    <br>
+    <b>DSL Informationen (FritzBox)</b>
+    <li>dsl_rate<br>
+        Down/Up Verbindungsgeschwindigkeit
+    </li>
+    <br>
+	  <li>dsl_synctime<br>
+        Sync-Zeit mit Vermittlungsstelle
+    </li>
+    <br>
+    <li>dsl_crc_15<br>
+        Nicht behebbare &Uuml;bertragungsfehler in den letzten 15 Minuten
+    </li>
+    <br>
+		<li>dsl_fec_15<br>
+        Behebbare &Uuml;bertragungsfehler in den letzten 15 Minuten
     </li>
     <br>
     <b>Readings zur Stromversorgung</b>
