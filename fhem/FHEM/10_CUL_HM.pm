@@ -3834,6 +3834,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       #<entries><multiply><MP3><MP3>
       my $msgBytes = sprintf("%02X%02X",$itemCnt,$repeat);
       foreach my $mp3 (@itemList){
+        return "input: $mp3 is not an integer below 255" 
+           if (!defined $mp3 || $mp3 !~ /^[+-]?\d+$/ || $mp3 > 255);
         $msgBytes .= sprintf("%02X",$mp3);
       }
       $msg = '++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes;
@@ -6437,7 +6439,7 @@ sub CUL_HM_repReadings($) {   # parse repeater
 sub CUL_HM_ModRe8($$)     {   # repair FW bug
   #Register 18 may come with a wrong address - we will corrent that
   my ($hash,$regN)=@_;
-  my $rl0 = ReadingsVal($hash->{NAME},$regN,undef);
+  my $rl0 = ReadingsVal($hash->{NAME},$regN,"empty");
   return if(  $rl0 !~ m/00:00/ # not if List is incomplete
             ||$rl0 =~ m/12:/ ); # reg 18 present, dont touch
   foreach my $ad (split(" ",$rl0)){
