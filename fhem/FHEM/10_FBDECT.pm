@@ -13,6 +13,8 @@ sub FBDECT_Set($@);
 sub FBDECT_Get($@);
 sub FBDECT_Cmd($$@);
 
+sub FBDECT_decodePayload($$$);
+
 my @fbdect_models = qw(Powerline546E Dect200);
 
 my %fbdect_payload = (
@@ -26,9 +28,7 @@ my %fbdect_payload = (
   20 => { n=>"power",       fmt=>'sprintf("%0.2f W", hex($pyld)/100)' },
   21 => { n=>"energy",      fmt=>'sprintf("%0.0f Wh",hex($pyld))' },
   22 => { n=>"powerFactor", fmt=>'sprintf("%0.3f", hex($pyld))' },
-  23 => { n=>"temperature", fmt=>'sprintf("%0.1f C (%s)",'.
-        'hex(substr($pyld,6,2))/10,'.
-        '(hex(substr($pyld,8,8))+0)?"corrected":"measured")' },
+  23 => { n=>"temperature", fmt=>'FBDECT_decodeTemp($pyld, $hash, $addReading)' },
   35 => { n=>"options",     fmt=>'FBDECT_decodeOptions($pyld)' },
   37 => { n=>"control",     fmt=>'FBDECT_decodeControl($pyld)' },
 );
@@ -132,7 +132,7 @@ FBDECT_Get($@)
     my $d = pop @answ;
     my $state = "inactive" if($answ[0] =~ m/ inactive,/);
     while($d) {
-      my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
+      my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d, $hash, 0);
       Log3 $hash, 4, "Payload: $d -> $ptyp: $pyld";
       last if($ptyp eq "");
       if($ptyp eq "state" && 
@@ -174,7 +174,7 @@ FBDECT_Parse($$@)
   if($mt eq "07") {
     my $d = substr($msg, 32);
     while($d) {
-      my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
+      my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d, $hash, 1);
       Log3 $hash, 4, "Payload: $d -> $ptyp: $pyld";
       last if($ptyp eq "");
       readingsBulkUpdate($hash, $ptyp, $pyld);
@@ -194,12 +194,12 @@ FBDECT_Parse($$@)
           push @answ, "FBDECT_DECODE_ERROR:short payload $d";
           last;
         }
-        my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
+        my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d, $hash, 1);
         last if($ptyp eq "");
         push @answ, "  $ptyp: $pyld";
         $d = substr($d, 16+$plen*2);
       }
-      Log 4, "FBDECT PARSED: ".join(" / ", @answ);
+      Log3 $iodev, 4, "FBDECT PARSED: ".join(" / ", @answ);
       # Ignore the rest, is too confusing.
       @answ = grep /state:/, @answ;
       (undef, $state) = split(": ", $answ[0], 2) if(@answ > 0);
@@ -208,7 +208,7 @@ FBDECT_Parse($$@)
   }
 
   readingsEndUpdate($hash, 1);
-  Log 5, "FBDECT_Parse for device $hash->{NAME} done";
+  Log3 $iodev, 5, "FBDECT_Parse for device $hash->{NAME} done";
   return $hash->{NAME};
 }
 
@@ -219,6 +219,22 @@ FBDECT_decodeRelayTimes($)
   return "unknown"  if(length($p) < 16);
   return "disabled" if(substr($p, 12, 4) eq "0000");
   return $p;
+}
+
+sub
+FBDECT_decodeTemp($$$)
+{
+  my ($p, $hash, $addReading) = @_;
+
+  my $v = hex(substr($p,0,8));
+  $v = -(4294967296-$v) if($v > 2147483648);
+  $v /= 10;
+  if(hex(substr($p,8,8))+0) {
+    readingsBulkUpdate($hash, "tempadjust", sprintf("%0.1f C", $v))
+        if($addReading);
+    return "";
+  }
+  return sprintf("%0.1f C (measured)", $v);
 }
 
 sub
@@ -286,25 +302,28 @@ FBDECT_decodeControl($)
 }
 
 sub
-FBDECT_decodePayload($)
+FBDECT_decodePayload($$$)
 {
-  my ($d) = @_;
+  my ($d, $hash, $addReading) = @_;
   if(length($d) < 12) {
-    Log 4, "FBDECT ignoring payload: data too short";
+    Log3 $hash, 4, "FBDECT ignoring payload: data too short";
     return ("", "", "");
   }
 
   my $ptyp = hex(substr($d, 0, 8));
   my $plen = hex(substr($d, 8, 4));
   if(length($d) < 16+$plen*2) {
-    Log 4, "FBDECT ignoring payload: data shorter than given length($plen)";
+    Log3 $hash, 4, "FBDECT ignoring payload: data shorter than given length($plen)";
     return ("", "", "");
   }
   my $pyld = substr($d, 16, $plen*2);
 
   if($fbdect_payload{$ptyp}) {
-    $pyld = eval $fbdect_payload{$ptyp}{fmt} if($fbdect_payload{$ptyp}{fmt});
-    $ptyp = $fbdect_payload{$ptyp}{n};
+    $cmdFromAnalyze = $fbdect_payload{$ptyp}{fmt};
+    $pyld = eval $cmdFromAnalyze if($cmdFromAnalyze);
+    $cmdFromAnalyze = undef;
+
+    $ptyp = ($pyld ? $fbdect_payload{$ptyp}{n} : "");
   }
   return ($ptyp, $plen, $pyld);
 }
@@ -395,7 +414,8 @@ FBDECT_Undef($$)
     <li>power: $v W</li>
     <li>energy: $v Wh</li>
     <li>powerFactor: $v"</li>
-    <li>temperature: $v C ([measured|corrected])</li>
+    <li>temperature: $v C (measured)</li>
+    <li>tempadjust: $v C</li>
     <li>options: uninitialized</li>
     <li>options: powerOnState:[on|off|last],lock:[none,webUi,remoteFb,button]</li>
     <li>control: disabled</li>
