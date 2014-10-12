@@ -116,7 +116,7 @@ SVG_FwDetail($@)
 
   my $ret = ($nobr ? "" : "<br>");
   $ret .= "$text " if($text);
-  $ret .= FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
+  $ret .= FW_pH("detail=$d", $alias,0, "SVGlabel SVG_$d", 1,0) if(!$FW_subdir);
   $ret .= "<br>";
   return $ret;
 }
@@ -182,7 +182,7 @@ SVG_FwFn($$$$)
 
   if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
     my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
-    $ret .= "<div class=\"SVGplot\">";
+    $ret .= "<div class=\"SVGplot SVG_$d\">";
 
     if(AttrVal($FW_wname, "plotEmbed",
                         $FW_userAgent !~ m/(iPhone|iPad|iPod).*OS (8|9)/)) {
