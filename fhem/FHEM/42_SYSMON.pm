@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.4.0";
+my $VERSION = "1.9.4.1";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -2134,7 +2134,7 @@ sub SYSMON_getFBStreemRate($$) {
 	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_us_rate");
 	
 	if($ds_rate ne "" && $us_rate ne "") {
-    $map->{+FB_DSL_RATE}="down: ".$ds_rate." KBit/s, up: ".$us_rate." KBit/s";
+    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
   }
   
   return $map;
@@ -2178,11 +2178,11 @@ sub SYSMON_getFBCRCFEC($$) {
 	
 	if($ds_crc ne "") {
 	  # FB_DSL_CRC_15
-    $map->{+FB_DSL_CRC_15}="down: ".$ds_crc." up: ".$us_crc;
+    $map->{+FB_DSL_CRC_15}="down: ".int($ds_crc)." up: ".int($us_crc);
   }
   if($ds_fec ne "") {
 	  # FB_DSL_FEC_15
-    $map->{+FB_DSL_FEC_15}="down: ".$ds_fec." up: ".$us_fec;
+    $map->{+FB_DSL_FEC_15}="down: ".int($ds_fec)." up: ".int($us_fec);
   }
   
   return $map;
