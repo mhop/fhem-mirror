@@ -233,6 +233,8 @@ my %EnO_subType = (
  #"A5.20.12" => "hvac.12",
   "A5.30.01" => "digitalInput.01",
   "A5.30.02" => "digitalInput.02",
+  "A5.30.03" => "digitalInput.03",
+  "A5.30.04" => "digitalInput.04",
   "A5.38.08" => "gateway",
   "A5.3F.7F" => "manufProfile",
   "D2.01.00" => "actuator.01",
@@ -336,7 +338,7 @@ EnOcean_Initialize($)
                        "pollInterval rampTime repeatingAllowed:yes,no " .
                        "remoteManagement:off,on rlc rlcAlgo rlcTX " .
                        "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin " .
-                       "securityLevel:unencrypted sensorMode:switch,pushbutton " .
+                       "securityCode securityLevel:unencrypted sensorMode:switch,pushbutton " .
                        "shutTime shutTimeCloses subDef " .
                        "subDef0 subDefI " .
                        "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
@@ -381,8 +383,7 @@ EnOcean_Define($$)
 }
 
 # Get
-sub
-EnOcean_Get ($@)
+sub EnOcean_Get ($@)
 {
   my ($hash, @a) = @_;
   return "no get value specified" if (@a < 2);
@@ -426,6 +427,7 @@ EnOcean_Get ($@)
   #                 1: execute set commands and and update reading state
   #                 2: execute set commands delayed
   my $updateState = 1;
+  Log3 $name, 5, "EnOcean $name EnOcean_Get command: " . join(" ", @a);
   shift @a;
 
   for (my $i = 0; $i < @a; $i++) {
@@ -438,49 +440,53 @@ EnOcean_Get ($@)
       $rorg = "C5";
       my $seq = int(rand(2) + 1) << 6;
       shift(@a);
-      Log3 $name, 3, "EnOcean get $name $cmd";
       my $cntr = (((3 << 11) | $manufID) << 12) | $cmdID;
       $data = sprintf "%02X%08X%06X00", $seq, $cntr, ($eep << 3) | 1;
-      #$data = sprintf "0004%04X", $manufID;
+      #$data = sprintf "0004%04X%06X", $manufID, ($eep << 3) | 1;
       $destinationID = "FFFFFFFF";
+      Log3 $name, 3, "EnOcean get $name $cmd $data";
   
     } elsif ($cmd eq "remotePing") {
       $cmdID = 6;
       $manufID = 0x7FF;
       $packetType = 7;
       $rorg = "C5";
-      my $seq = int(rand(2) + 1) << 6;
+      #my $seq = int(rand(2) + 1) << 6;
       shift(@a);
-      Log3 $name, 3, "EnOcean get $name $cmd";  
-      my $cntr = ($manufID << 12) | $cmdID;
+      #my $cntr = ($manufID << 12) | $cmdID;
       #$data = sprintf "%02X%08X00000000", $seq, $cntr;
       $data = sprintf "0006%04X", $manufID;
       $destinationID = $hash->{DEF};
-      #($rorg, $data) = EnOcean_encapsulation($packetType, $rorg, $data, $destinationID);
+      Log3 $name, 3, "EnOcean get $name $cmd $data";  
+      #($rorg, $data) = EnOcean_Encapsulation($packetType, $rorg, $data, $destinationID);
 
     } elsif ($cmd eq "remoteCommands") {
       $cmdID = 7;
       $manufID = 0x7FF;
+      $packetType = 7;
       $rorg = "C5";
-      my $seq = int(rand(2) + 1) << 6;
+      #my $seq = int(rand(2) + 1) << 6;
       shift(@a);
-      Log3 $name, 3, "EnOcean get $name $cmd";  
-      my $cntr = ($manufID << 12) | $cmdID;
-      $data = sprintf "%02X%08X00000000", $seq, $cntr;
+      #my $cntr = ($manufID << 12) | $cmdID;
+      #$data = sprintf "%02X%08X00000000", $seq, $cntr;
+      $data = sprintf "0007%04X", $manufID;
       $destinationID = $hash->{DEF};
-      ($rorg, $data) = EnOcean_encapsulation($packetType, $rorg, $data, $destinationID);
+      Log3 $name, 3, "EnOcean get $name $cmd $data";  
+      #($rorg, $data) = EnOcean_Encapsulation($packetType, $rorg, $data, $destinationID);
 
     } elsif ($cmd eq "remoteStatus") {
       $cmdID = 8;
       $manufID = 0x7FF;
+      $packetType = 7;
       $rorg = "C5";
-      my $seq = int(rand(2) + 1) << 6;
+      #my $seq = int(rand(2) + 1) << 6;
       shift(@a);
-      Log3 $name, 3, "EnOcean get $name $cmd";  
-      my $cntr = ($manufID << 12) | $cmdID;
-      $data = sprintf "%02X%08X00000000", $seq, $cntr;
+      #my $cntr = ($manufID << 12) | $cmdID;
+      #$data = sprintf "%02X%08X00000000", $seq, $cntr;
+      $data = "000807FF";
       $destinationID = $hash->{DEF};
-      ($rorg, $data) = EnOcean_encapsulation($packetType, $rorg, $data, $destinationID);
+      Log3 $name, 3, "EnOcean get $name $cmd $data";  
+      #($rorg, $data) = EnOcean_Encapsulation($packetType, $rorg, $data, $destinationID);
  
     } elsif ($st eq "actuator.01") {
       # Electronic switches and dimmers with Energy Measurement and Local Control
@@ -489,7 +495,7 @@ EnOcean_Get ($@)
       shift(@a);
       my $channel = shift(@a);
       $channel = AttrVal($name, "defaultChannel", AttrVal($name, "devChannel", undef)) if (!defined $channel);
-      if (!defined $channel || $channel eq "all") {
+      if (!defined $channel || $channel eq "all" || $channel eq "FF") {
         $channel = 30;     
       } elsif ($channel eq "input") {
         $channel = 31;
@@ -547,6 +553,7 @@ EnOcean_Get ($@)
       # Room Control Panel
       # (D2-10-00 - D2-10-02)
       $rorg = "D2";
+      shift(@a);
       $updateState = 2;
       if ($cmd eq "data") {
         # data request
@@ -599,6 +606,8 @@ EnOcean_Set($@)
     Log3 $name, 4, "EnOcean $name set commands disabled.";  
     return;
   }
+  my $cmdID;
+  my $cmdList = "";
   my $data;
   my $destinationID = AttrVal($name, "destinationID", undef);
   if (AttrVal($name, "comMode", "uniDir") eq "biDir") {
@@ -625,19 +634,117 @@ EnOcean_Set($@)
   if ($subDef !~ m/^[\dA-F]{8}$/) {return "SenderID $subDef wrong, choose <8-digit-hex-code>.";}
   my $switchMode = AttrVal($name, "switchMode", "switch");
   my $tn = TimeNow();
+  if (AttrVal($name, "remoteManagement", "off") eq "on") {
+    # Remote Management
+    $cmdList = "action:noArg lock:noArg remote_teach-in:noArg remote_teach-out:noArg setCode:noArg unlock:noArg ";
+  }
   # control set actions
   # $updateState = -1: no set commands available e. g. sensors
   #                 0: execute set commands
   #                 1: execute set commands and and update reading state
   #                 2: execute set commands delayed
   my $updateState = 1;
+  Log3 $name, 5, "EnOcean $name EnOcean_Set command: " . join(" ", @a);
   shift @a;
 
   for (my $i = 0; $i < @a; $i++) {
     my $cmd = $a[$i];
     my ($cmd1, $cmd2);
 
-    if ($st eq "roomSensorControl.05") {
+    if ($cmd eq "unlock") {
+      $cmdID = 1;
+      my $secCode = AttrVal($name, "securityCode", undef);
+      return "Security Code not defined, set attr $name securityCode <00000001 ... FFFFFFFE>!" if (!defined($secCode)); 
+      $manufID = 0x7FF;
+      $rorg = "C5";
+      my $seq = int(rand(2) + 1) << 6;
+      shift(@a);
+      my $cntr = (((4 << 11) | $manufID) << 12) | $cmdID;
+      $data = sprintf "%02X%08X%s", $seq, $cntr, uc($secCode);
+      ####
+      $destinationID = $hash->{DEF};
+      Log3 $name, 3, "EnOcean get $name $cmd $data";
+      $updateState = 0;
+
+    } elsif ($cmd eq "lock") {
+      $cmdID = 2;
+      my $secCode = AttrVal($name, "securityCode", undef);
+      return "Security Code not defined, set attr $name securityCode <00000001 ... FFFFFFFE>!" if (!defined($secCode)); 
+      $manufID = 0x7FF;
+      $rorg = "C5";
+      my $seq = int(rand(2) + 1) << 6;
+      shift(@a);
+      my $cntr = (((4 << 11) | $manufID) << 12) | $cmdID;
+      $data = sprintf "%02X%08X%s", $seq, $cntr, uc($secCode);
+      ####
+      $destinationID = $hash->{DEF};
+      Log3 $name, 3, "EnOcean get $name $cmd $data";
+      $updateState = 0;
+
+    } elsif ($cmd eq "setCode") {
+      $cmdID = 3;
+      my $secCode = AttrVal($name, "securityCode", undef);
+      return "Security Code not defined, set attr $name securityCode <00000001 ... FFFFFFFE>!" if (!defined($secCode)); 
+      $manufID = 0x7FF;
+      $rorg = "C5";
+      my $seq = int(rand(2) + 1) << 6;
+      shift(@a);
+      my $cntr = (((4 << 11) | $manufID) << 12) | $cmdID;
+      $data = sprintf "%02X%08X%s", $seq, $cntr, uc($secCode);
+      ####
+      $destinationID = $hash->{DEF};
+      Log3 $name, 3, "EnOcean get $name $cmd $data";
+      $updateState = 0;
+
+    } elsif ($cmd eq "action") {
+      $cmdID = 5;
+      $manufID = 0x7FF;
+      $rorg = "C5";
+      my $seq = int(rand(2) + 1) << 6;
+      shift(@a);
+      my $cntr = ($manufID << 12) | $cmdID;
+      ####
+      $data = sprintf "%02X%08X00000000", $seq, $cntr;
+      $destinationID = $hash->{DEF};
+      Log3 $name, 3, "EnOcean get $name $cmd $data";
+      $updateState = 0;
+
+    } elsif ($cmd eq "remote_teach-in") {
+      $cmdID = 0x201;
+      $manufID = 0x7FF;
+      $rorg = "C5";
+      my $seq = int(rand(2) + 1) << 6;
+      shift(@a);
+      my $cntr = (((4 << 11) | $manufID) << 12) | $cmdID;
+      ####
+      my $eep = AttrVal($name, "eep", undef);
+      return "EEP not defined, set attr $name eep <rorg>-<function>-<type>" if (!defined($eep));
+      $eep =~ m/^(..)(.)(..)(.)(..)$/;
+      $data = sprintf "%02X%08X%s%s%s01", $seq, $cntr, $1, $3, $5;
+      $destinationID = "FFFFFFFF";
+      $destinationID = $hash->{DEF};
+      Log3 $name, 3, "EnOcean get $name $cmd $data";
+      $updateState = 0;
+
+    } elsif ($cmd eq "remote_teach-out") {
+      $cmdID = 0x201;
+      $manufID = 0x7FF;
+      $rorg = "C5";
+      my $seq = int(rand(2) + 1) << 6;
+      shift(@a);
+      my $cntr = (((4 << 11) | $manufID) << 12) | $cmdID;
+      ####
+      my $eep = AttrVal($name, "eep", undef);
+      return "EEP not defined, set attr $name eep <rorg>-<function>-<type>" if (!defined($eep));
+      $eep =~ m/^(..)(.)(..)(.)(..)$/;
+      $data = sprintf "%02X%08X%s%s%s03", $seq, $cntr, $1, $3, $5;
+      #$destinationID = "FFFFFFFF";
+      $destinationID = $hash->{DEF};
+      ($rorg, $data) = EnOcean_Encapsulation($packetType, $rorg, $data, $destinationID);
+      Log3 $name, 3, "EnOcean get $name $cmd $data";
+      $updateState = 0;
+
+    } elsif ($st eq "roomSensorControl.05") {
       # Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)
       # [Eltako FTR55D, FTR55H, Thermokon SR04 *, Thanos SR *, untested]
       # $db[3] is the fan speed or night reduction for Eltako
@@ -654,6 +761,7 @@ EnOcean_Set($@)
       $actualTemp = 20 if ($actualTemp !~ m/^[+-]?\d+(\.\d+)?$/);
       $actualTemp = 0 if ($actualTemp < 0);
       $actualTemp = 40 if ($actualTemp > 40);
+      $actualTemp = sprintf "%0.1f", $actualTemp;
       my $setCmd = 8;
       if ($manufID eq "00D") {
         # EEP A5-10-06 plus DB3 [Eltako FVS]
@@ -668,7 +776,7 @@ EnOcean_Set($@)
           #
           if (defined $a[1]) {
             if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= 0) && ($a[1] <= 40)) {
-              $setpointTemp = $a[1];
+              $setpointTemp = sprintf "%0.1f", $a[1];
               shift(@a);
             } else {
               return "Usage: $a[1] is not numeric or out of range";
@@ -922,7 +1030,7 @@ EnOcean_Set($@)
           $data = sprintf "%02X%02X%02X%02X", $fanStage, $setpoint, $actualTemp, $setCmd;
           
         } else {
-          return "Unknown argument " . $cmd . ", choose one of fanStage:auto,0,1,2,3 setpoint setpointScaled switch:on,off teach"
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "fanStage:auto,0,1,2,3 setpoint setpointScaled switch:on,off teach"
         }
         
       }
@@ -945,7 +1053,7 @@ EnOcean_Set($@)
         "valveClosed"  => "",
       );
       my $re = $sets{$a[0]};
-      return "Unknown argument $cmd, choose one of ".join(" ", sort keys %sets)
+      return "Unknown argument $cmd, choose one of " . $cmdList . join(" ", sort keys %sets)
         if (!defined($re));
       return "Need a parameter" if ($re && @a < 2);
       return "Argument $a[1] is incorrect (expect $re)" if ($re && $a[1] !~ m/^$re$/);
@@ -978,7 +1086,7 @@ EnOcean_Set($@)
         $cmd = $a[1];
         shift(@a);
       } else {
-        return "Unknown Gateway command " . $cmd . ", choose one of " . join(" ", sort keys %EnO_gwCmd);
+        return "Unknown Gateway command " . $cmd . ", choose one of " . $cmdList . join(" ", sort keys %EnO_gwCmd);
       }
       my $gwCmdID;
       $rorg = "A5";
@@ -1418,7 +1526,7 @@ EnOcean_Set($@)
         $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $blindParam1, $blindParam2, $setCmd;
 
       } else {
-        return "Unknown Gateway command " . $cmd . ", choose one of ". join(" ", sort keys %EnO_gwCmd);
+        return "Unknown Gateway command " . $cmd . ", choose one of ". $cmdList . join(" ", sort keys %EnO_gwCmd);
       }
       Log3 $name, 2, "EnOcean set $name $cmd";
 
@@ -1668,7 +1776,7 @@ EnOcean_Set($@)
             }
           }
         } else {
-          return "Unknown argument " . $cmd . ", choose one of closes:noArg down opens:noArg position:slider,0,5,100 stop:noArg teach:noArg up"
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "closes:noArg down opens:noArg position:slider,0,5,100 stop:noArg teach:noArg up"
         }
         if ($shutCmd || $cmd eq "stop") {
           $updateState = 0;
@@ -1713,7 +1821,7 @@ EnOcean_Set($@)
         }
         $channel = shift(@a);
         $channel = AttrVal($name, "defaultChannel", AttrVal($name, "devChannel", undef)) if (!defined $channel);
-        if (!defined $channel || $channel eq "all") {
+        if (!defined $channel || $channel eq "all" || $channel eq "FF") {
           CommandDeleteReading(undef, "$name channel.*");          
           CommandDeleteReading(undef, "$name dim.*");          
           readingsSingleUpdate($hash, "channelAll", "on", 1);
@@ -2115,7 +2223,7 @@ EnOcean_Set($@)
                   ($measurementDelta | 0x0F) << 4 | $unitCmd, ($measurementDelta | 0xFF00) >> 8,
                   $responseTimeMax, $responseTimeMin;
       } else {
-        my $cmdList = "dim:slider,0,1,100 on off local measurement";
+        $cmdList .= "dim:slider,0,1,100 on off local measurement";
         return SetExtensions ($hash, $cmdList, $name, @a);
       }
       Log3 $name, 3, "EnOcean set $name $cmd $data";
@@ -2128,6 +2236,7 @@ EnOcean_Set($@)
       if ($cmd eq "desired-temp"|| $cmd eq "setpointTemp") {
         if (defined $a[1]) {
           if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= 0) && ($a[1] <= 40)) {
+            $a[1] = sprintf "%0.1f", $a[1];
             readingsSingleUpdate($hash, "setpointTemp", $a[1], 1);
             readingsSingleUpdate($hash, "setpointTempSet", $a[1], 0);
             Log3 $name, 3, "EnOcean set $name setpointTemp $a[1]";
@@ -2143,6 +2252,7 @@ EnOcean_Set($@)
           if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= 0) && ($a[1] <= 40)) {
             Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
             $cmd =~ s/(\b)([a-z])/$1\u$2/g;
+            $a[1] = sprintf "%0.1f", $a[1];
             readingsSingleUpdate($hash, "setpoint" . $cmd, $a[1], 1);
             readingsSingleUpdate($hash, "setpoint" . $cmd . "Set", $a[1], 0);
             shift(@a);
@@ -2259,7 +2369,7 @@ EnOcean_Set($@)
         Log3 $name, 3, "EnOcean set $name $cmd";
 
       } else {
-        my $cmdList = "cooling:auto,off,on,no_change desired-temp setpointTemp:slider,0,1,40 " . 
+        $cmdList .= "cooling:auto,off,on,no_change desired-temp setpointTemp:slider,0,1,40 " . 
                       "comfortTemp deleteTimeProgram:noArg " .
                       "economyTemp preComfortTemp buildingProtectionTemp config:noArg " .
                       "clearCmds:noArg fanSpeed:slider,0,1,100 heating:auto,off,on,no_change " .
@@ -2280,7 +2390,7 @@ EnOcean_Set($@)
       } elsif ($cmd eq "open") {
         $setCmd = 8;
       } else {
-        return "Unknown argument $cmd, choose one of open:noArg closed:noArg teach:noArg";
+        return "Unknown argument $cmd, choose one of " . $cmdList . "open:noArg closed:noArg teach:noArg";
       }
       $data = sprintf "%02X", $setCmd;
       Log3 $name, 2, "EnOcean set $name $cmd";
@@ -2360,8 +2470,8 @@ EnOcean_Set($@)
       ($cmd1, $cmd2) = split(",", $cmd, 2);
       # check values
       if (!defined($EnO_ptm200btn{$cmd1}) || ($cmd2 && !defined($EnO_ptm200btn{$cmd2}))) {
-        my $list = join(" ", sort keys %EnO_ptm200btn);
-        return SetExtensions($hash, $list, $name, @a);
+        $cmdList .= join(" ", sort keys %EnO_ptm200btn);
+        return SetExtensions($hash, $cmdList, $name, @a);
       }
       my $channelA = ReadingsVal($name, "channelA", undef);
       my $channelB = ReadingsVal($name, "channelB", undef);
@@ -2428,12 +2538,14 @@ EnOcean_Set($@)
         Log3 $name, 2, "EnOcean set $name $cmd";
       }
     
-    } elsif (AttrVal($name, "remoteManagement", "off") eq "on") {
-
     } else {
       # subtype does not support set commands
       $updateState = -1;
-      return;          
+      if (AttrVal($name, "remoteManagement", "off") eq "on") {
+        return "Unknown argument $cmd, choose one of $cmdList";
+      } else {
+        return;
+      }      
     }
 
     # send commands
@@ -2471,8 +2583,8 @@ EnOcean_Parse($$)
   my ($err, $response);
   Log3 undef, 5, "EnOcean received $msg";
   my @msg = split(":", $msg);
-  my ($packetType, $rorg, $data, $id, $status, $odata, $destinationID, $fnNumber, $manufID, $RSSI, $delay, $subTelNum);
-  $packetType = hex($msg[1]);
+  my ($rorg, $data, $id, $status, $odata, $destinationID, $fnNumber, $manufID, $RSSI, $delay, $subTelNum);
+  my $packetType = hex($msg[1]);
   
   if ($packetType == 1) {
     # packet type RADIO
@@ -2488,6 +2600,7 @@ EnOcean_Parse($$)
     if($hash) {
       $name = $hash->{NAME};
       Log3 $name, 5, "EnOcean $name received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $id STATUS: $status";
+      $manufID = uc(AttrVal($name, "manufID", ""));
     } else {
       Log3 undef, 5, "EnOcean received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $id STATUS: $status";
       # SenderID unknown, created new device
@@ -2527,10 +2640,10 @@ EnOcean_Parse($$)
     if($hash) {
       $name = $hash->{NAME};
       Log3 $name, 2, "EnOcean $name received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $id
-                      DestinationID $destinationID FunctionNumber: $fnNumber ManufacturerID: $manufID";
+                      DestinationID $destinationID Function Number: $fnNumber ManufacturerID: $manufID";
     } else {
       Log3 undef, 2, "EnOcean received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $id
-                      DestinationID $destinationID FunctionNumber: $fnNumber ManufacturerID: $manufID";      
+                      DestinationID $destinationID Function Number: $fnNumber ManufacturerID: $manufID";      
       return "";
     }
     $fnNumber = hex($fnNumber);
@@ -2582,7 +2695,6 @@ EnOcean_Parse($$)
 
   my @event;
   my $model = AttrVal($name, "model", "");
-  $manufID = uc(AttrVal($name, "manufID", ""));
   my $st = AttrVal($name, "subType", "");
   my $subtypeReading = AttrVal($name, "subTypeReading", undef);
   $st = $subtypeReading if (defined $subtypeReading);
@@ -3978,7 +4090,7 @@ EnOcean_Parse($$)
       push @event, "3:voltage:$voltage";
       push @event, "3:state:C: $contact V: $vibration E: $lux U: $voltage";
 
-    } elsif ($st =~ m/^digitalInput/) {
+    } elsif ($st =~ m/^digitalInput\.0[12]$/) {
       # Digital Input (EEP A5-30-01, A5-30-02)
       my $contact;
       if ($st eq "digtalInput.01") {
@@ -3990,13 +4102,41 @@ EnOcean_Parse($$)
         $contact = $db[1] <= 195 ? "closed" : "open";
         push @event, "3:battery:$battery";
       } else {
-        # Single Input Contact (EEP A5-30-01)
+        # Single Input Contact (EEP A5-30-02)
         # $db[0]_bit_0 is the input state where 0 = closed, 1 = open
         $contact = $db[0] & 1 ? "open" : "closed";
       }
       push @event, "3:contact:$contact";
       push @event, "3:state:$contact";
 
+    } elsif ($st eq "digitalInput.03") {
+      # 4 digital inputs, wake, temperature (EEP A5-30-03)
+      my $in0 = $db[1] & 1;
+      my $in1 = ($db[1] & 2) > 1;
+      my $in2 = ($db[1] & 4) > 2;
+      my $in3 = ($db[1] & 8) > 3;
+      my $wake = ($db[1] & 16) > 4;
+      my $temperature = 40 - $db[2] * 40 / 255;
+      push @event, "3:in0:$in0";
+      push @event, "3:in1:$in1";
+      push @event, "3:in2:$in2";
+      push @event, "3:in3:$in3";
+      push @event, "3:wake:$wake";
+      push @event, "3:temperature:$temperature";
+      push @event, "3:state:T: $temperature I: " . $in0 . $in1 . $in2 . $in3 . " W: " . $wake;
+    
+    } elsif ($st eq "digitalInput.04") {
+      # 3 digital inputs, 1 digital input 8 bit (EEP A5-30-04)
+      my $in0 = $db[0] & 1;
+      my $in1 = ($db[0] & 2) > 1;
+      my $in2 = ($db[0] & 4) > 2;
+      my $in3 = $db[1];
+      push @event, "3:in0:$in0";
+      push @event, "3:in1:$in1";
+      push @event, "3:in2:$in2";
+      push @event, "3:in3:$in3";
+      push @event, "3:state:" . $in0 . $in1 . $in2 . " " . $in3;
+    
     } elsif ($st eq "gateway") {
       # Gateway (EEP A5-38-08)
       # $db[3] is the command ID ($gwCmdID)
@@ -4846,10 +4986,10 @@ EnOcean_Parse($$)
 
       if ($hash->{helper}{sysEx}{$seq}{fnNumber} == 0x604 || $hash->{helper}{sysEx}{$seq}{fnNumber} == 0x606) {
         # query ID answer, Ping answer
-        my $eep = substr($data, 0, 6) >> 3;
-        my $rorg = sprintf "%02X", $eep >> 13;
-        my $func = sprintf "%02X", ($eep & 0x1F80) >> 7;
-        my $type = sprintf "%02X", $eep & 127;
+        my $eep = hex(substr($data, 0, 6)) >> 3;
+        my $rorg = sprintf "%02X", ($eep >> 13);
+        my $func = sprintf "%02X", (($eep & 0x1F80) >> 7);
+        my $type = sprintf "%02X", ($eep & 127);
         my $mid = $hash->{helper}{sysEx}{$seq}{manufID};
         $attr{$name}{manufID} = $mid;
         $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
@@ -4877,22 +5017,20 @@ EnOcean_Parse($$)
         
       } elsif ($hash->{helper}{sysEx}{$seq}{fnNumber} == 0x608) {
         # last function
-        $data =~ m/^(.)(.)(....)(..)$/;
+        $data =~ m/^(.)(.)(.)(...)(..)$/;
         my $codeSetFlag = $1 >> 3;
         my $seqLast = $2;
-        my $fnNumberLast = $3;
-        my $fnRetCode = $4;
+        my $fnNumberLast = $4;
+        my $fnRetCode = $5;
         Log3 $name, 2, "EnOcean $name RMCC Answer Status: Code Set Flag: $codeSetFlag 
                         SEQ: $seqLast Function Number: $fnNumberLast Return Code $fnRetCode";    
       } else {
-        Log3 $name, 2, "EnOcean $name RMCC/RPC Function Number: " .
-                        sprintf "%03X", $hash->{helper}{sysEx}{$seq}{fnNumber} . " not supported.";      
+        Log3 $name, 2, "EnOcean $name RMCC/RPC Function Number " .
+                        sprintf ("%04X", $hash->{helper}{sysEx}{$seq}{fnNumber}) . " not supported.";      
       }
       delete $hash->{helper}{sysEx}{$seq};
     }
   } elsif ($packetType == 7) {
-    $data =~ m/^(..)(..)(.*)$/;
-    ($fnNumber, $manufID, $data) = (hex($1), $2, $3);  
     if ($fnNumber == 1) {
       Log3 $name, 2, "EnOcean $name RMCC Unlock Request with ManufacturerID: $manufID";
       
@@ -4903,7 +5041,11 @@ EnOcean_Parse($$)
       Log3 $name, 2, "EnOcean $name RMCC Set code Request with ManufacturerID: $manufID";
     
     } elsif ($fnNumber == 4) {
-      Log3 $name, 2, "EnOcean $name RMCC Query ID with ManufacturerID: $manufID";
+      my $eep = hex(substr($data, 0, 6)) >> 3;
+      my $rorg = sprintf "%02X", ($eep >> 13);
+      my $func = sprintf "%02X", (($eep & 0x1F80) >> 7);
+      my $type = sprintf "%02X", ($eep & 127);
+      Log3 $name, 2, "EnOcean $name RMCC Query ID with EEP $rorg-$func-$type ManufacturerID: $manufID";
     
     } elsif ($fnNumber == 5) {
       Log3 $name, 2, "EnOcean $name RMCC Action Request with ManufacturerID: $manufID";
@@ -4923,10 +5065,10 @@ EnOcean_Parse($$)
       Log3 $name, 2, "EnOcean $name RPC Remote Learn with EEP $rorg-$func-$type ManufacturerID: $manufID Flag: $flag";
     
     } elsif ($fnNumber == 0x604 || $fnNumber == 0x606) {
-      my $eep = substr($data, 0, 6) >> 3;
-      my $rorg = sprintf "%02X", $eep >> 13;
-      my $func = sprintf "%02X", ($eep & 0x1F80) >> 7;
-      my $type = sprintf "%02X", $eep & 127;
+      my $eep = hex(substr($data, 0, 6)) >> 3;
+      my $rorg = sprintf "%02X", ($eep >> 13);
+      my $func = sprintf "%02X", (($eep & 0x1F80) >> 7);
+      my $type = sprintf "%02X", ($eep & 127);
       $attr{$name}{manufID} = $manufID;
       $manufID = $EnO_manuf{$manufID} if($EnO_manuf{$manufID});
       $attr{$name}{eep} = "$rorg-$func-$type";
@@ -4940,7 +5082,7 @@ EnOcean_Parse($$)
       CommandSave(undef, undef);
 
     } else {    
-      Log3 $name, 2, "EnOcean $name RMCC/RPC Function Number: " . sprintf "%03X", $fnNumber . " not supported.";
+      Log3 $name, 2, "EnOcean $name RMCC/RPC Function Number " . sprintf("%04X", $fnNumber) . " not supported.";
     }
   }
 
@@ -5046,6 +5188,14 @@ sub EnOcean_Attr(@) {
       CommandDeleteAttr(undef, "$name devUpdate");
     }
 
+  } elsif ($attrName eq "securityCode") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^[\dA-Fa-f]{8}$/ || $attrVal eq "00000000" || uc($attrVal) eq "FFFFFFFF") {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name devUpdate");
+    }
+
   } elsif ($attrName eq "summerMode") {
     if (!defined $attrVal){
     
@@ -5116,13 +5266,13 @@ sub EnOcean_Notify(@) {
 
 # ADT encapsulation
 sub
-EnOcean_encapsulation($$$$)
+EnOcean_Encapsulation($$$$)
 {
   my ($packetType, $rorg, $data, $destinationID) = @_;
   if ($destinationID eq "FFFFFFFF") {
     return ($rorg, $data);  
   } else {
-    $data = $rorg . $data . $destinationID;  
+    $data = $rorg . $data;  
     return ("A6", $data);
   }
 }
@@ -5767,25 +5917,29 @@ EnOcean_SndRadio($$$$$$$$)
       $status = substr($status, 0, 1) . "F";
     }
     my $securityLevel = AttrVal($hash->{NAME}, "securityLevel", 0);
-    if ($securityLevel eq "unencrypted") {$securityLevel = 0;}
-    if ($destinationID ne "FFFFFFFF" || $securityLevel) {
+    $securityLevel = 0 if ($securityLevel eq "unencrypted");
+    if ($rorg eq "A6") {
+      # ADT telegram
+      $data .= $destinationID;
+    } elsif ($destinationID ne "FFFFFFFF" || $securityLevel) {
       # SubTelNum = 03, DestinationID:8, RSSI = FF, SecurityLevel:2
       $odata = sprintf "03%sFF%02X", $destinationID, $securityLevel;
       $odataLength = 7;    
     }
     # Data Length:4 Optional Length:2 Packet Type:2
-    $header = sprintf "%04X%02X%02X", (length($data)/2 + 6), $odataLength, $packetType;    
+    $header = sprintf "%04X%02X%02X", (length($data) / 2 + 6), $odataLength, $packetType;    
     Log3 $hash->{NAME}, 5, "EnOcean $hash->{NAME} sent PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status ODATA: $odata";
     $data = $rorg . $data . $senderID . $status . $odata;
   } elsif ($packetType == 7) {
     my $delay = 0;
     $delay = 1 if ($destinationID eq "FFFFFFFF");
     $senderID = "00000000";
+    #$senderID = "00000000" if ($destinationID eq "FFFFFFFF");
     $odata = sprintf "%s%sFF%02X", $destinationID, $senderID, $delay;
     $odataLength = 10;    
     # Data Length:4 Optional Length:2 Packet Type:2
-    $header = sprintf "%04X%02X%02X", (length($data)/2 + 6), $odataLength, $packetType;
-    Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} sent PacketType: $packetType DATA: $data ODATA: $odata";
+    $header = sprintf "%04X%02X%02X", (length($data) / 2), $odataLength, $packetType;
+    Log3 $hash->{NAME}, 5, "EnOcean $hash->{NAME} sent PacketType: $packetType DATA: $data ODATA: $odata";
     $data .= $odata;  
   }  
   IOWrite($hash, $header, $data);
@@ -8310,9 +8464,41 @@ EnOcean_Undef($$)
        <li>open|closed</li>
        <li>battery: ok|low (only EEP A5-30-01)</li>
        <li>contact: open|closed</li>
-      <li>state: open|closed</li>
+       <li>state: open|closed</li>
      </ul><br>
         The attr subType must be digitalInput.01 or digitalInput.02. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Digital Input (EEP A5-30-03)<br>
+         4 digital Inputs, Wake, Temperature [untested]<br>
+     <ul>
+       <li>T: t/&#176C I: 0|1 0|1 0|1 0|1 W: 0|1</li>
+       <li>in0: 0|1</li>
+       <li>in1: 0|1</li>
+       <li>in2: 0|1</li>
+       <li>in3: 0|1</li>
+       <li>wake: 0|1</li>
+       <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
+       <li>state: T: t/&#176C I: 0|1 0|1 0|1 0|1 W: 0|1</li>
+     </ul><br>
+        The attr subType must be digitalInput.03. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Digital Input (EEP A5-30-04)<br>
+         3 digital Inputs, 1 digital Input 8 bits [untested]<br>
+     <ul>
+       <li>0|1 0|1 0|1 0...255</li>
+       <li>in0: 0|1</li>
+       <li>in1: 0|1</li>
+       <li>in2: 0|1</li>
+       <li>in3: 0...255</li>
+       <li>state: 0|1 0|1 0|1 0...255</li>
+     </ul><br>
+        The attr subType must be digitalInput.04. This is done if the device was
         created by autocreate.
      </li>
      <br><br>
