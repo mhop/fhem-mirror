@@ -40,7 +40,7 @@ dewpoint_Initialize($)
   $hash->{DefFn}   = "dewpoint_Define";
   $hash->{NotifyFn} = "dewpoint_Notify";
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
-  $hash->{AttrList} = "max_timediff disable:0,1";
+  $hash->{AttrList} = "disable:0,1 max_timediff absFeuchte";
 }
 
 
@@ -260,11 +260,13 @@ dewpoint_Notify($$)
   } 
 
   # We found temperature and humidity. so we can calculate dewpoint first
-  
-  if ($humidity == 0) { return undef; }  # humdidity is no valid value to calculate dewpoint
-
+  # Prüfen, ob humidity im erlaubten Bereich ist
+  if (($humidity <= 0) || ($humidity >= 110)){
+    Log 1, "Error dewpoint: humidity invalid: $humidity";
+    return undef;
+	}
   my $dewpoint = sprintf("%.1f", dewpoint_dewpoint($temperature,$humidity));
-  Log 1, "dewpoint_notify: dewpoint=$dewpoint" if ($dewpoint_debug == 1);
+   Log 1, "dewpoint_notify: dewpoint=$dewpoint" if ($dewpoint_debug == 1);
 
   if ($cmd_type eq "dewpoint") {
 	# >define <name> dewpoint dewpoint <devicename> [<temp_name> <hum_name> <new_name>]
@@ -278,11 +280,24 @@ dewpoint_Notify($$)
 	# Example:
 	# define dewtest1 dewpoint dewpoint .*
 	# define dewtest2 dewpoint dewpoint .* T H D
-	my $sensor = $new_name;
 	my $current;
+	my $sensor;
+	my $aFeuchte = AttrVal($hash->{NAME},"absFeuchte", undef);
+	if (defined($aFeuchte)) {
+		$sensor = "absFeuchte";
+		$current = sprintf("%.1f", dewpoint_absFeuchte($temperature,$humidity));
+        $tn = TimeNow();
+		$dev->{READINGS}{$sensor}{TIME} = $tn;
+		$dev->{READINGS}{$sensor}{VAL} = $current;
+		$dev->{CHANGED}[$n++] = $sensor . ": " . $current;		
+		Log 1,"dewpoint absFeuchte= $current" if ($dewpoint_debug == 1);
+		$aFeuchte = "A: " . $current;
+	}	
+	
+	$sensor = $new_name;
 	if ($temp_name ne "T") {
 		$current = $dewpoint;
-        	$tn = TimeNow();
+        $tn = TimeNow();
 		$dev->{READINGS}{$sensor}{TIME} = $tn;
 		$dev->{READINGS}{$sensor}{VAL} = $current;
 		$dev->{CHANGED}[$n++] = $sensor . ": " . $current;
@@ -297,6 +312,9 @@ dewpoint_Notify($$)
 			$current =~ s/<</$sensor:$dewpoint   <</g;
 		} else {
 			$current = $lastval." ".$sensor.": ".$dewpoint;
+			if (defined($aFeuchte)) {
+			$current = $current." ".$aFeuchte;
+			}
 		}
 		$dev->{STATE} = $current; 
 		$dev->{CHANGED}[$n++] = $current;
@@ -387,37 +405,54 @@ dewpoint_Notify($$)
 	Log 1, "Error notify_dewpoint: <2> unknown cmd_type ".$cmd_type;
 	return "";
   }
-
   return undef;
 }
-
 # -----------------------------
 # Dewpoint calculation.
 # see http://www.faqs.org/faqs/meteorology/temp-dewpoint/ "5. EXAMPLE"
 sub
 dewpoint_dewpoint($$)
 {
-        my ($temperature, $humidity) = @_;
+  my ($temperature, $humidity) = @_;
+  my $dp;
+  my $A = 17.2694;
+  my $B = ($temperature > 0) ? 237.3 : 265.5;
+  my $es = 610.78 * exp( $A * $temperature / ($temperature + $B) );
+  my $e = $humidity/ 100 * $es;
+  if ($e == 0) {
+    Log 1, "Error: dewpoint() e==0: temp=$temperature, hum=$humidity";
+    return 0;
+  }
+  my $e1 = $e / 610.78;
+  my $f = log( $e1 ) / $A;
+  my $f1 = 1 - $f;
+  if ($f1 == 0) {
+  Log 1, "Error: dewpoint() (1-f)==0: temp=$temperature, hum=$humidity";
+  return 0;
+  }
+  $dp = $B * $f / $f1  ;
+  return($dp);
+}
 
-        my $dp;
-
-        my $A = 17.2694;
-        my $B = ($temperature > 0) ? 237.3 : 265.5;
-        my $es = 610.78 * exp( $A * $temperature / ($temperature + $B) );
-        my $e = $humidity/ 100 * $es;
-        if ($e == 0) {
-                Log 1, "Error: dewpoint() e==0: temp=$temperature, hum=$humidity";
-                return 0;
-        }
-        my $e1 = $e / 610.78;
-        my $f = log( $e1 ) / $A;
-        my $f1 = 1 - $f;
-        if ($f1 == 0) {
-                Log 1, "Error: dewpoint() (1-f)==0: temp=$temperature, hum=$humidity";
-                return 0;
-        }
-        $dp = $B * $f / $f1  ;
-        return($dp);
+sub
+dewpoint_absFeuchte ($$)
+{
+	# Formeln von http://kellerlueftung.blogspot.de/p/blog-page_9.html
+	#             http://www.wettermail.de/wetter/feuchte.html
+  my ($T, $rh) = @_;
+  if (($rh < 0) || ($rh > 110)){
+    Log 1, "Error dewpoint: humidity invalid: $rh";
+    return "";
+	}
+	# a = 7.5, b = 237.3 für T >= 0
+	# a = 7.6, b = 240.7 für T < 0 über Wasser (Taupunkt)
+  my $a = ($T > 0) ? 7.5 : 7.6;
+  my $b = ($T > 0) ? 237.3 : 240.7;
+	my $SDD = 6.1078 * 10**(($a*$T)/($b+$T));
+	my $DD  = $rh/100 * $SDD;
+	my $AF  = (10**5) * (18.016 / 8314.3) * ($DD / (273.15 + $T));
+	my $af  = sprintf( "%.1f",$AF);
+  return($af); # $aF = absolute Feuchte in g Wasserdampf pro m3 Luft
 }
 
 1;
@@ -552,14 +587,24 @@ dewpoint_dewpoint($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li>absFeuchte</li><br>
+      <ul>
+        AbsFeuchte also becomes by the absolute humidity set the attribute into the Readings of all things.
+		One can by these show information also in the status.
+		Example: (<Adapter> = the FHEM name of the adapter this one you must change) 
+        <PRE>
+		 stateFormat:	
+		{sprintf("T: %.1f H: %.1f D: %.1f A: %.1f", ReadingsVal("<Adapter>","temperature",0), ReadingsVal("<Adapter>","H",0), ReadingsVal("<Adapter>","dewpoint",0), ReadingsVal("<Adapter>","absFeuchte",0))}
+		</PRE>
+      </ul>
     <li>max_timediff<br>
         Maximum time difference in seconds allowed between the temperature and humidity values for a device. dewpoint uses the Readings for temperature or humidity if they are not delivered in the event. This is necessary for using dewpoint with event-on-change-reading. Also needed for sensors that do deliver temperature and humidity in different events like for example technoline sensors TX3TH.<br>
-If not set default is 1 second.
+		If not set default is 1 second.
       <br><br>
       Examples:<PRE>
-# allow maximum time difference of 60 seconds
-define dew_all dewpoint dewpoint .*
-attr dew_all max_timediff 60
+		# allow maximum time difference of 60 seconds
+		define dew_all dewpoint dewpoint .*
+		attr dew_all max_timediff 60
     </li><br>
   </ul>
 </ul>
@@ -691,6 +736,16 @@ attr dew_all max_timediff 60
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li>absFeuchte</li><br>
+      <ul>
+        Durch setzen des Attributes absFeuchte wird in den Readings auch die absolute Feuchte mit ausgerechnet.
+		Durch <a href="#stateFormat">stateFormat</a> kann man diese Info auch im Status anzeigen.
+		 Beispiel: (<Adapter> = Der FHEM Name des Adapters der geändert werden muss)
+        <pre>
+		 stateFormat:	
+		{sprintf("T: %.1f H: %.1f D: %.1f A: %.1f", ReadingsVal("<Adapter>","temperature",0), ReadingsVal("<Adapter>","H",0), ReadingsVal("<Adapter>","dewpoint",0), ReadingsVal("<Adapter>","absFeuchte",0))}
+		</pre>
+      </ul>
     <li>max_timediff</li><br>
       <ul>
         Maximale erlaubter Zeitunterschied in Sekunden zwischen den Temperatur- und Luftfeuchtewerten eines 
