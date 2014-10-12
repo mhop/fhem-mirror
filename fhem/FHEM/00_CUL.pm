@@ -901,7 +901,8 @@ CUL_Parse($$$$@)
 
   $hash->{"${name}_MSGCNT"}++;
   $hash->{"${name}_TIME"} =
-  readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 0); # showtime attribute
+  # showtime attribute
+  readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 0);
   $hash->{RAWMSG} = $rmsg;
   my %addvals = (RAWMSG => $dmsg);
   if(defined($rssi)) {
