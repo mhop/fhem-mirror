@@ -57,9 +57,9 @@ LIRC_Define($$)
 
   $hash->{LircObj} = $lirc;
   
-  $hash->{FD} = $lirc->{sock};       # is not working and sets timeout to undefined 
+  $hash->{FD} = $lirc->{sock}->fileno; # is not working and sets timeout to undefined 
   $selectlist{"$name"} = $hash;      # 
-  $readyfnlist{"$name"} = $hash;     # thats why we start polling
+  #$readyfnlist{"$name"} = $hash;     # thats why we start polling
   $hash->{SelectObj} = $select;      
   $hash->{DeviceName} = $name;    
   $hash->{STATE} = "Opened";
