@@ -697,7 +697,9 @@ RESCAN:
         $val = $1 if($fld[$col] =~ m/^(\d+).*/o);
 
       } else {                              # evaluate
-        $val = eval($h->{fn});
+        $cmdFromAnalyze = $h->{fn};
+        $val = eval($cmdFromAnalyze);
+        $cmdFromAnalyze = undef;
 
       }
 
