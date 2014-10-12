@@ -30,6 +30,7 @@ my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
 );
 
 my %sets = (
+  "reopen"    => "",
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
   "raw"       => "",
@@ -115,7 +116,8 @@ CUL_Initialize($)
                      "showtime:1,0 model:CUL,CUN sendpool addvaltrigger ".
                      "rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S ".
                      "hmId ".
-                     "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ";
+                     "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger " .
+                     $readingFnAttributes;
 
   $hash->{ShutdownFn} = "CUL_Shutdown";
 
@@ -225,6 +227,15 @@ CUL_RemoveHMPair($)
 
 #####################################
 sub
+CUL_Reopen($)
+{
+  my ($hash) = @_;
+  DevIo_CloseDev($hash);
+  DevIo_OpenDev($hash, 1, "CUL_DoInit");
+}
+
+#####################################
+sub
 CUL_Set($@)
 {
   my ($hash, @a) = @_;
@@ -240,7 +251,10 @@ CUL_Set($@)
   return "This command is not valid in the current rfmode"
       if($sets{$type} && $sets{$type} ne AttrVal($name, "rfmode", "SlowRF"));
 
-  if($type eq "hmPairForSec") { ####################################
+  if($type eq "reopen") { ####################################
+    CUL_Reopen($hash);
+    
+  } elsif($type eq "hmPairForSec") { ####################################
     return "Usage: set $name hmPairForSec <seconds_active>"
         if(!$arg || $arg !~ m/^\d+$/);
     $hash->{hmPair} = 1;
@@ -271,7 +285,6 @@ CUL_Set($@)
     CUL_WriteInit($hash);   # Will reprogram the CC1101
 
   } elsif($type eq "bWidth") { ###################################### KHz
-
     my ($err, $ob);
     if(!IsDummy($hash->{NAME})) {
       CUL_SimpleWrite($hash, "C10");
@@ -392,8 +405,7 @@ CUL_Get($@)
 
   }
 
-  $hash->{READINGS}{$a[1]}{VAL} = $msg;
-  $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
+  readingsSingleUpdate($hash, $a[1], $msg, 0);
 
   return "$a[0] $a[1] => $msg";
 }
@@ -463,9 +475,7 @@ CUL_DoInit($)
     }
   }
 
-  $hash->{STATE} =
-  $hash->{READINGS}{state}{VAL} = "Initialized";
-  $hash->{READINGS}{state}{TIME} = TimeNow();
+  readingsSingleUpdate($hash, "state", "Initialized", 1);
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -891,7 +901,7 @@ CUL_Parse($$$$@)
 
   $hash->{"${name}_MSGCNT"}++;
   $hash->{"${name}_TIME"} =
-  $hash->{READINGS}{state}{TIME} = TimeNow();      # showtime attribute
+  readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 0); # showtime attribute
   $hash->{RAWMSG} = $rmsg;
   my %addvals = (RAWMSG => $dmsg);
   if(defined($rssi)) {
@@ -1148,6 +1158,8 @@ CUL_prefix($$$)
   <a name="CULset"></a>
   <b>Set </b>
   <ul>
+    <li>reopen<br>
+	Reopens the connection to the device and reinitializes it.</li><br>
     <li>raw<br>
         Issue a CUL firmware command.  See the <a
         href="http://culfw.de/commandref.html">this</a> document
@@ -1306,6 +1318,8 @@ CUL_prefix($$$)
         </code>
         </ul>
         </li><br>
+        
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
   </ul>
@@ -1406,6 +1420,8 @@ CUL_prefix($$$)
   <a name="CULset"></a>
   <b>Set </b>
   <ul>
+    <li>reopen<br>
+	&Ouml;ffnet die Verbindung zum Ger&auml;t neu und initialisiert es.</li><br>
     <li>raw<br>
         Sendet einen CUL Firmware Befehl. Siehe auch
         <a href="http://culfw.de/commandref.html">hier</a> f&uuml;r
@@ -1584,6 +1600,7 @@ CUL_prefix($$$)
         </code>
         </ul>
         </li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
   </ul>
