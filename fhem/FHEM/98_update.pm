@@ -85,6 +85,7 @@ update_Log2Event($$)
   my ($level, $text) = @_;
   return if($inLog || $level > $attr{global}{verbose});
   $inLog = 1;
+  $text =~ s/\n/ /g; # Multiline text causes havoc in Analyze
   BlockingInformParent("DoTrigger", ["global", $text, 1], 0);
   BlockingInformParent("Log", [$level, $text], 0);
   $inLog = 0;
@@ -245,7 +246,9 @@ doUpdate($$)
     uLog(1, "Please consider using the global attribute sendStatistics");
   } elsif(defined($ss) && lc($ss) eq "onupdate") {
     uLog(1, "");
-    uLog(1, AnalyzeCommandChain(undef, "fheminfo send"));
+    my $ret = AnalyzeCommandChain(undef, "fheminfo send");
+    $ret =~ s/.*server response:/server response:/ms;
+    uLog(1, "fheminfo $ret");
   }
 }
 
