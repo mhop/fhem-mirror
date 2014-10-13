@@ -28,7 +28,7 @@ FW_cmd(arg)     /* see also FW_devState */
 {
   arg = addcsrf(arg);
   var req = new XMLHttpRequest();
-  req.open("GET", arg, true);
+  req.open("POST", arg, true);
   req.send(null);
   req.onreadystatechange = function(){
     if(req.readyState == 4)
