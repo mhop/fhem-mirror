@@ -338,8 +338,8 @@ EnOcean_Initialize($)
                        "pollInterval rampTime repeatingAllowed:yes,no " .
                        "remoteManagement:off,on rlc rlcAlgo rlcTX " .
                        "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin " .
-                       "securityCode securityLevel:unencrypted sensorMode:switch,pushbutton " .
-                       "shutTime shutTimeCloses subDef " .
+                       "securityCode securityLevel:unencrypted sendDevStatus:no,yes sensorMode:switch,pushbutton " .
+                       "serviceOn:no,yes shutTime shutTimeCloses subDef " .
                        "subDef0 subDefI " .
                        "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
                        "summerMode:off,on switchMode:switch,pushbutton " .
@@ -1426,6 +1426,8 @@ EnOcean_Set($@)
             } else {
               return "Usage: $cmd variable is not numeric or out of range.";
             }
+            # angle und position value available
+            $setCmd |= 2;            
             shift(@a);
           } else {
             return "Usage: $cmd variable is not numeric or out of range.";
@@ -1484,6 +1486,8 @@ EnOcean_Set($@)
             } else {
               return "Usage: $cmd variable is not numeric or out of range.";
             }
+            # angle und position value available
+            $setCmd |= 2;            
             shift(@a);
           } else {
             return "Usage: $cmd variable is not numeric or out of range.";
@@ -1503,12 +1507,15 @@ EnOcean_Set($@)
             if ($a[1] < 0) {$blindParam1 |= 0x80;}
             $blindParam2 = abs($a[2]) / 2;
             if ($a[2] < 0) {$blindParam2 |= 0x80;}
+            # angle und position value available
+            $setCmd |= 2;            
           } else {
             return "Usage: $cmd variable is not numeric or out of range.";
           }
           readingsSingleUpdate($hash, "angleMin", $a[1], 1);
           readingsSingleUpdate($hash, "angleMax", $a[2], 1);
           splice (@a, 0, 2);
+          shift(@a);
           $updateState = 0;
         } elsif ($blindFuncID == 11) {
           # positionLogic
@@ -1519,10 +1526,12 @@ EnOcean_Set($@)
           } else {
             return "Usage: $cmd variable is unknown.";
           }
-          shift(@a);
           $updateState = 0;
         } else {
         }
+        ####
+        $setCmd |= 4 if (AttrVal($name, "sendDevStatus", "no") eq "yes");
+        $setCmd |= 1 if (AttrVal($name, "serviceOn", "no") eq "yes");
         $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $blindParam1, $blindParam2, $setCmd;
 
       } else {
@@ -3797,17 +3806,21 @@ EnOcean_Parse($$)
       # $db[3] is the Shutter Position where 0 = 0 % ... 100 = 100 %
       # $db[2]_bit_7 is the Angle sign where 0 = positive, 1 = negative
       # $db[2]_bit_6 ... $db[2]_bit_0 where 0 = 0° ... 90 = 180°
-      # $db[1]_bit_7 is the Positon Value Flag where 0 = no available, 1 = available
+      # $db[1]_bit_7 is the Position Value Flag where 0 = no available, 1 = available
       # $db[1]_bit_6 is the Angle Value Flag where 0 = no available, 1 = available
       # $db[1]_bit_5 ... $db[1]_bit_4 is the Error State (alarm)
       # $db[1]_bit_3 ... $db[1]_bit_2 is the End-position State
       # $db[1]_bit_1 ... $db[1]_bit_0 is the Shutter State
       # $db[0]_bit_7 is the Service Mode where 0 = no, 1 = yes
       # $db[0]_bit_6 is the Position Mode where 0 = normal, 1 = inverse
-      push @event, "3:positon:" . $db[3];
+      if ($db[1] & 0x80) {
+        push @event, "3:position:" . $db[3];
+      }
       my $anglePos = ($db[2] & 0x7F) << 1;
-      if ($db[2] & 80) {$anglePos *= -1;}
-      push @event, "3:anglePos:" . $anglePos;
+      if ($db[2] & 0x80) {$anglePos *= -1;}
+      if ($db[1] & 0x40) {
+        push @event, "3:anglePos:" . $anglePos;
+      }
       my $alarm = ($db[1] & 0x30) >> 4;
       if ($alarm == 0) {
         push @event, "3:alarm:off";
@@ -5121,7 +5134,7 @@ sub EnOcean_Attr(@) {
     } else {
       #RemoveInternalTimer($hash);    
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal is not a integer number";
-      CommandDeleteAttr(undef, "$name pollInterval");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
     
    } elsif ($attrName =~ m/^block.*/) {
@@ -5134,7 +5147,7 @@ sub EnOcean_Attr(@) {
       }
     } else {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "daylightSavingTime") {
@@ -5147,7 +5160,7 @@ sub EnOcean_Attr(@) {
       }    
     } else {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
 
@@ -5156,7 +5169,7 @@ sub EnOcean_Attr(@) {
     
     } elsif ($attrVal !~ m/^(off|auto|demand|polling|interrupt)$/) {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "displayContent") {
@@ -5169,7 +5182,7 @@ sub EnOcean_Attr(@) {
       }    
     } else {													      
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "eep") {
@@ -5177,7 +5190,7 @@ sub EnOcean_Attr(@) {
     
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{2}-[0-3][\dA-Fa-f]-[0-7][\dA-Fa-f]$/) {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "remoteManagement") {
@@ -5185,7 +5198,7 @@ sub EnOcean_Attr(@) {
     
     } elsif ($attrVal !~ m/^(off|on)$/) {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "securityCode") {
@@ -5193,7 +5206,23 @@ sub EnOcean_Attr(@) {
     
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{8}$/ || $attrVal eq "00000000" || uc($attrVal) eq "FFFFFFFF") {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
+  } elsif ($attrName eq "sendDevStatus") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^(no|yes)$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
+  } elsif ($attrName eq "serviceOn") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^(no|yes)$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "summerMode") {
@@ -5201,7 +5230,7 @@ sub EnOcean_Attr(@) {
     
     } elsif ($attrVal !~ m/^(off|on)$/) {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "temperatureScale") {
@@ -5214,7 +5243,7 @@ sub EnOcean_Attr(@) {
       }    
     } else {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "timeNotation") {
@@ -5227,7 +5256,7 @@ sub EnOcean_Attr(@) {
       }    
     } else {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName =~ m/^timeProgram[1-4]$/) {
@@ -5248,7 +5277,7 @@ sub EnOcean_Attr(@) {
       }
     } else {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name devUpdate");
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   }
@@ -7091,8 +7120,9 @@ EnOcean_Undef($$)
         Slat Angle: &alpha;|&alpha;o|&alpha;s = -180 &#176 ... 180 &#176<br>
         Position Logic, normal: Blinds fully opens corresponds to Position = 0 %<br>
         Position Logic, inverse: Blinds fully opens corresponds to Position = 100 %<br>
-        The attr subType must be gateway and gwCmd must be blindCmd. The profile
-        is linked with controller profile, see <a href="#Blind Status">Blind Status</a>.<br>
+        The attr subType must be gateway and gwCmd must be blindCmd.<br>
+        See also attributes <a href="#EnOcean_sendDevStatus">sendDevStatus and <a href="#EnOcean_serviceOn">serviceOn</a></a><br>
+        The profile is linked with controller profile, see <a href="#Blind Status">Blind Status</a>.<br>
      </li>
      <br><br>
 
@@ -7465,6 +7495,14 @@ EnOcean_Undef($$)
     </li>
     <li><a name="securityLevel">securityLevel</a> unencrypted, [securityLevel] = unencrypted is default<br>
       Type of Encryption
+    </li>
+    <li><a name="EnOcean_sendDevStatus">sendDevStatus</a> no|yes,
+      [sendDevStatus] = no is default.<br>
+      Send new status of the device.
+    </li>
+    <li><a name="EnOcean_serviceOn">serviceOn</a> no|yes,
+      [serviceOn] = no is default.<br>
+      Device in Service Mode.
     </li>
     <li><a name="sensorMode">switchMode</a> switch|pushbutton,
       [sensorMode] = switch is default.<br>
