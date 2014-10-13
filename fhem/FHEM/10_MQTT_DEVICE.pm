@@ -26,9 +26,6 @@
 use strict;
 use warnings;
 
-my %sets = (
-);
-
 my %gets = (
   "version"   => "",
 );
@@ -38,7 +35,7 @@ sub MQTT_DEVICE_Initialize($) {
   my $hash = shift @_;
 
   # Consumer
-  $hash->{DefFn}    = "MQTT::Client_Define";
+  $hash->{DefFn}    = "MQTT::DEVICE::Define";
   $hash->{UndefFn}  = "MQTT::Client_Undefine";
   $hash->{SetFn}    = "MQTT::DEVICE::Set";
   $hash->{AttrFn}   = "MQTT::DEVICE::Attr";
@@ -75,13 +72,18 @@ BEGIN {
   ))
 };
 
-sub Set($@) {
-  my ($hash, @a) = @_;
-  return "Need at least one parameters" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(" ", map {$sets{$_} eq "" ? $_ : "$_:$sets{$_}"} sort keys %sets)
-    if(!defined($sets{$a[1]}));
-  my $command = $a[1];
-  my $value = $a[2];
+sub Define() {
+  my ( $hash, $def ) = @_;
+  $hash->{sets} = {};
+  return MQTT::Client_Define($hash,$def);
+};
+
+sub Set($$$@) {
+  my ($hash,$name,$command,@values) = @_;
+  return "Need at least one parameters" unless defined $command;
+  return "Unknown argument $command, choose one of " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}})
+    if(!defined($hash->{sets}->{$command}));
+  my $value = join " ",@values;
   my $msgid;
   if (defined $value) {
     $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos}, retain => $hash->{retain});
@@ -149,19 +151,19 @@ sub Attr($$$$) {
         };
         if ($2 eq "") {
           foreach my $set (@values) {
-            $sets{$set}="";
+            $hash->{sets}->{$set}="";
           }
         } else {
-          $sets{$2}=join(",",@values);
+          $hash->{sets}->{$2}=join(",",@values);
         }
       } else {
         if ($2 eq "") {
           foreach my $set (@{$hash->{publishSets}->{$2}->{'values'}}) {
-            delete $sets{$set};
+            delete $hash->{sets}->{$set};
           }
         } else {
           CommandDeleteReading(undef,"$hash->{NAME} $2");
-          delete $sets{$2};
+          delete $hash->{sets}->{$2};
         }
         delete $hash->{publishSets}->{$2};
       }
