@@ -174,9 +174,11 @@ sub
 FBAHA_configInd($$)
 {
   my ($data, $onlyId) = @_;
-
+  #my $off = 288; #for old Client Id
+  my $off = 304;
   my @answer;
-  while(length($data) >= 288) {
+
+  while(length($data) >= $off) {
     my $id  = hex(substr($data,  0, 4)); 
     my $act = hex(substr($data,  4, 2));
     my $typ = hex(substr($data,  8, 8));
@@ -191,7 +193,7 @@ FBAHA_configInd($$)
     my %ll = (7=>"powerMeter",9=>"switch");
     $lsn = join ",", map { $ll{$_} if((1 << $_) & $lsn) } sort keys %ll;
 
-    my $dlen = hex(substr($data, 280, 8))*2; # DATA MSG
+    my $dlen = hex(substr($data, $off-8, 8))*2; # DATA MSG
 
     push @answer, "NAME:$nam, ID:$id, $act, TYPE:$typ PROP:$lsn"
       if(!$onlyId || $onlyId == $id);
@@ -203,10 +205,10 @@ FBAHA_configInd($$)
       push @answer, "  MANUF:$mnf";
       push @answer, "  UniqueID:$idf";
       push @answer, "  Firmware:$frm";
-      push @answer, substr($data, 288+$dlen);
+      push @answer, substr($data, $off, $dlen);
       return @answer;
     }
-    $data = substr($data, 288+$dlen); # rest
+    $data = substr($data, $off+$dlen); # rest
   }
   return @answer;
 }
