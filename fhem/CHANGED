@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: global ATTR/DELETEATTR/MODIFIED events
   - feature: 55_GDS.pm - attr disable added
   - bugfix: SYSMON: prevent endless loop at startup with 'disable' attribute  
   - feature: SYSMON: added FritzBox informations: DSL rate, DSLAM sync time, count of CRC an FEC

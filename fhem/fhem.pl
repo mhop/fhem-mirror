@@ -1193,6 +1193,7 @@ CommandRereadCfg($$)
   %attr = ();
   %selectlist = ();
   %readyfnlist = ();
+  my $informMe = $inform{$name};
   %inform = ();
 
   doGlobalDef($cfgfile);
@@ -1211,8 +1212,9 @@ CommandRereadCfg($$)
     }
   }
 
-  DoTrigger("global", "REREADCFG", 1);
   $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
+  $inform{$name} = $informMe if($informMe);
+  DoTrigger("global", "REREADCFG", 1);
 
   $init_done = 1;
   $reread_active=0;
@@ -1613,7 +1615,12 @@ CommandModify($$)
   $hash->{DEF} = $a[1];
   my $ret = CallFn($a[0], "DefFn", $hash,
         "$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]" : ""));
-  $hash->{DEF} = $hash->{OLDDEF} if($ret);
+  if($ret) {
+    $hash->{DEF} = $hash->{OLDDEF};
+  } else {
+    DoTrigger("global", "MODIFIED $a[0]", 1) if($init_done);
+  }
+
   delete($hash->{OLDDEF});
   $lastDefChange++ if(!$hash->{TEMPORARY});
   return $ret;
@@ -1752,8 +1759,12 @@ CommandDeleteAttr($$)
 
     if(@a == 1) {
       delete($attr{$sdev});
+      DoTrigger("global", "DELETEATTR $sdev", 1) if($init_done);
+
     } else {
       delete($attr{$sdev}{$a[1]}) if(defined($attr{$sdev}));
+      DoTrigger("global", "DELETEATTR $sdev $a[1]", 1) if($init_done);
+
     }
 
   }
@@ -2205,34 +2216,35 @@ CommandAttr($$)
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
 
-    my $hash =  $defs{$sdev};
+    my $hash = $defs{$sdev};
+    my $attrName = $a[1];
     if(!defined($hash)) {
       push @rets, "Please define $sdev first";
       next;
     }
 
     my $list = getAllAttr($sdev);
-    if($a[1] eq "?") {
-      push @rets, "$sdev: unknown attribute $a[1], choose one of $list";
+    if($attrName eq "?") {
+      push @rets, "$sdev: unknown attribute $attrName, choose one of $list";
       next;
     }
 
-    if(" $list " !~ m/ ${a[1]}[ :;]/) {
+    if(" $list " !~ m/ ${attrName}[ :;]/) {
        my $found = 0;
        foreach my $atr (split("[ \t]", $list)) { # is it a regexp?
-         if(${a[1]} =~ m/^$atr$/) {
+         if(${attrName} =~ m/^$atr$/) {
            $found++;
            last;
          }
       }
       if(!$found) {
-        push @rets, "$sdev: unknown attribute $a[1]. ".
+        push @rets, "$sdev: unknown attribute $attrName. ".
                         "Type 'attr $a[0] ?' for a detailed list.";
         next;
       }
     }
 
-    if($a[1] eq "userReadings") {
+    if($attrName eq "userReadings") {
 
       my %userReadings;
       # myReading1[:trigger1] [modifier1] { codecodecode1 }, ...
@@ -2265,7 +2277,7 @@ CommandAttr($$)
       $hash->{'.userReadings'}= \%userReadings;
     } 
 
-    if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
+    if($attrName eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
       push @rets,"$sdev: unknown IODev specified";
       next;
     }
@@ -2279,21 +2291,21 @@ CommandAttr($$)
       next;
     }
 
-    if(defined($a[2])) {
-      $attr{$sdev}{$a[1]} = $a[2];
-    } else {
-      $attr{$sdev}{$a[1]} = "1";
-    }
-    if($a[1] eq "IODev") {
+    my $val = $a[2];
+    $val = 1 if(!defined($val));
+    $attr{$sdev}{$attrName} = $val;
+
+    if($attrName eq "IODev") {
       my $ioname = $a[2];
       $hash->{IODev} = $defs{$ioname};
       $hash->{NR} = $devcount++
         if($defs{$ioname}{NR} > $hash->{NR});
       delete($defs{$ioname}{".clientArray"}); # Force a recompute
     }
-    if($a[1] eq "stateFormat" && $init_done) {
+    if($attrName eq "stateFormat" && $init_done) {
       evalStateFormat($hash);
     }
+    DoTrigger("global", "ATTR $sdev $attrName $val", 1) if($init_done);
 
   }
 
