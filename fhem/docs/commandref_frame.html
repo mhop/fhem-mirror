@@ -593,6 +593,7 @@ The following local attributes are used by a wider range of devices:
   Use "attr &lt;name&gt; ?" to get a list of possible attributes.
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.
+  After setting the attribute, the global event "ATTR" will be generated.
   <br><br>
 
   Examples:
@@ -688,6 +689,7 @@ The following local attributes are used by a wider range of devices:
   or all attributes for a device (if no &lt;attrname&gt; is defined).
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.<br>
+  After deleting the attribute, the global event "DELETEATTR" will be generated.
   <br>
 
   Examples:
@@ -891,6 +893,7 @@ The following local attributes are used by a wider range of devices:
   one argument to an at type definition, only the time part will be changed. In
   case of a notify type definition, only the regex part will be changed.  All
   other values (state, attributes, etc) will remain intact.
+  After modify, the global event "MODIFIED" will be generated.
   <br><br>
   Example:
   <ul>

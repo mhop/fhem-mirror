@@ -623,6 +623,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;te verwendet:
 
   Ger&auml;tespezifische Attribute sind in der Beschreibung zum jeweiligen
   Ger&auml;t aufgef&uuml;hrt.
+  Nach der Durchf&uuml;hrung das globale Ereignis "ATTR" wird generiert.
   <br>
 
   Beispiele:
@@ -687,8 +688,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;te verwendet:
   "lamp off" anstatt "Device 5673, Button 00, Code 00 (off)" als Text enth&auml;lt. <br>
   Geben Sie an der Befehlszeile "define &lt;name&gt; ?" ein, um eine Liste der 
   verf&uuml;gbaren &quot;types&quot; zu erhalten.<br>
-  Nach der Definition, wird das globale Ereignis "DEFINED" genriert. Genauere 
-  Beschreibung erhalten Sie im Abschnitt &quot;notify&quot;.<br>
+  Nach der Durchf&uuml;hrung das globale Ereignis "MODIFIED" wird generiert.
   <br><br>
 
   Jedes Ger&auml;t besitzt unterschiedliche hinzuf&uuml;gbare Argumente per Definition, 
@@ -727,6 +727,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;te verwendet:
   kein &lt;attrname&gt; angegeben wird).<br>
   Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
   f&uuml;r Details der &lt;devspec&gt;.<br>
+  Nach der Durchf&uuml;hrung das globale Ereignis "DELETEATTR" wird generiert.
   <br>
 
   Beispiele:
@@ -937,7 +938,10 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;te verwendet:
   ver&auml;ndern, dann wird nur der f&uuml;r die Zeit zust&auml;ndige Teil
   ge&auml;ndert. Im Falle der Ver&auml;nderung einer Definition vom Typ
   &quot;notify&quot; wird nur der&nbsp; regex Teil ge&auml;ndert. Alle anderen
-  Werte (Stati, Attribute,&nbsp; etc) bleiben erhalten.  <br><br>
+  Werte (Stati, Attribute,&nbsp; etc) bleiben erhalten.
+  After modify, the global event "MODIFIED" will be generated.
+  Nach der Durchf&uuml;hrung das globale Ereignis "MODIFIED" wird generiert.
+  <br><br>
 
   Beispiel:
   <ul>
