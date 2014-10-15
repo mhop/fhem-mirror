@@ -330,7 +330,7 @@ FileLog_fhemwebFn($$$$)
   if(@ra > 1) {
     foreach my $r (@ra) {
       $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
-      my $cmd = "cmd.X=set $d removeRegexpPart&val.X=$r";
+      my $cmd = "cmd.X= set $d removeRegexpPart&val.X=$r"; # =.set: avoid JS
       $ret .= "<td>$r</td>";
       $ret .= FW_pH("$cmd&detail=$d", "removeRegexpPart", 1,undef,1);
       $ret .= "</tr>";
