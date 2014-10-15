@@ -65,17 +65,21 @@ FBDECT_Define($$)
   my $name   = shift @a;
   my $type = shift(@a); # always FBDECT
 
-  my $u = "wrong syntax for $name: define <name> FBDECT id props";
+  my $u = "wrong syntax for $name: define <name> FBDECT [FBAHAname:]id props";
   return $u if(int(@a) != 2);
 
-  my $id = shift @a;
+  my $ioNameAndId = shift @a;
+  my ($ioName, $id) = (undef, $ioNameAndId);
+  if($ioNameAndId =~ m/^([^:]*):(.*)$/) {
+    $ioName = $1; $id = $2;
+  }
   return "define $name: wrong id ($id): need a number"
                    if( $id !~ m/^\d+$/i );
   $hash->{id} = $id;
   $hash->{props} = shift @a;
 
-  $modules{FBDECT}{defptr}{$id} = $hash;
-  AssignIoPort($hash);
+  $modules{FBDECT}{defptr}{$ioNameAndId} = $hash;
+  AssignIoPort($hash, $ioName);
   return undef;
 }
  
@@ -161,9 +165,10 @@ FBDECT_Parse($$@)
   }
 
   my $id = hex(substr($msg, 16, 4));
-  my $hash = $modules{FBDECT}{defptr}{$id};
+  my $hash = $modules{FBDECT}{defptr}{"$ioName:$id"};
+  $hash = $modules{FBDECT}{defptr}{$id} if(!$hash);
   if(!$hash) {
-    my $ret = "UNDEFINED FBDECT_$id FBDECT $id switch";
+    my $ret = "UNDEFINED FBDECT_$id FBDECT $ioName:$id switch";
     Log3 $ioName, 3, "$ret, please define it";
     DoTrigger("global", $ret);
     return "";
@@ -353,7 +358,7 @@ FBDECT_Undef($$)
   <a name="FBDECTdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FBDECT &lt;homeId&gt; &lt;id&gt; [classes]</code>
+    <code>define &lt;name&gt; FBDECT [&lt;FBAHAname&gt;:]&lt;homeId&gt; &lt;id&gt; [classes]</code>
   <br>
   <br>
   &lt;id&gt; is the id of the device, the classes argument ist ignored for now.
@@ -363,7 +368,9 @@ FBDECT_Undef($$)
     <code>define lamp FBDECT 16 switch,powerMeter</code><br>
   </ul>
   <b>Note:</b>Usually the device is created via
-  <a href="#autocreate">autocreate</a>
+  <a href="#autocreate">autocreate</a>. If you rename the corresponding FBAHA
+  device, take care to modify the FBDECT definitions, as it is not done
+  automatically.
   </ul>
   <br>
   <br>
@@ -439,7 +446,7 @@ FBDECT_Undef($$)
   <a name="FBDECTdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FBDECT &lt;homeId&gt; &lt;id&gt; [classes]</code>
+    <code>define &lt;name&gt; FBDECT [&lt;FBAHAname&gt;:]&lt;homeId&gt; &lt;id&gt; [classes]</code>
   <br>
   <br>
   &lt;id&gt; ist das Ger&auml;te-ID, das Argument wird z.Zt ignoriert.
@@ -449,7 +456,8 @@ FBDECT_Undef($$)
     <code>define lampe FBDECT 16 switch,powerMeter</code><br>
   </ul>
   <b>Achtung:</b>FBDECT Eintr&auml;ge werden noralerweise per 
-  <a href="#autocreate">autocreate</a> angelegt.
+  <a href="#autocreate">autocreate</a> angelegt. Falls sie die zugeordnete FBAHA
+  Instanz umbenennen, dann muss die FBDECT Definition manuell angepasst werden.
   </ul>
   <br>
   <br
