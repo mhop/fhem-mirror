@@ -82,7 +82,7 @@ FBAHA_Set($@)
     foreach my $arg (@arg) {
       if($arg =~ m/ID:(\d+).*PROP:(.*)/) {
         my ($i,$p) = ($1,$2,$3);
-        my $msg = "UNDEFINED FBDECT_$i FBDECT $i $p";
+        my $msg = "UNDEFINED FBDECT_$i FBDECT $name:$i $p";
         DoTrigger("global", $msg, 1);
         Log3 $name, 3, "$msg, please define it";
       }
