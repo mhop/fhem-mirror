@@ -60,8 +60,9 @@ sub GDS_Initialize($) {
 	$hash->{SetFn}		=	"GDS_Set";
 	$hash->{ShutdownFn}	=	"GDS_Shutdown";
 	$hash->{AttrFn}		=	"GDS_Attr";
-	$hash->{AttrList}	=	"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 ".
-							"gdsAll:0,1 gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
+	$hash->{AttrList}	=	"disable:0,1 ".
+							"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 gdsAll:0,1 ".
+							"gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
 							"gdsSetCond gdsPassiveFtp:0,1 ".
 							$readingFnAttributes;
 
@@ -161,6 +162,15 @@ sub GDS_Set($@) {
 
 	$hash->{LOCAL} = 1;
 
+	return $usage if $command eq '?';
+
+	if(IsDisabled($name)) {
+		readingsSingleUpdate($hash, 'state', 'disabled', 0);
+		return "GDS $name is disabled. Aborting..." if IsDisabled($name);
+	}
+
+	readingsSingleUpdate($hash, 'state', 'active', 0);
+
 	given($command) {
 		when("clear"){
 			CommandDeleteReading(undef, "$name a_.*");
@@ -223,6 +233,14 @@ sub GDS_Get($@) {
 				"warningsmap:"."Deutschland,Bodensee,".$bulaList." ".
 				"warnings:".$bulaList;
 
+	return $usage if $command eq '?';
+
+	if(IsDisabled($name)) {
+		readingsSingleUpdate($hash, 'state', 'disabled', 0);
+		return "GDS $name is disabled. Aborting..." if IsDisabled($name);
+	}
+
+	readingsSingleUpdate($hash, 'state', 'active', 0);
 	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
 
 	my ($result, $datensatz, $found);
@@ -334,6 +352,11 @@ sub GDS_Attr(@){
 			}
 		default {$attr{$name}{$attrName} = $attrValue;}
 	}
+	if(IsDisabled($name)) {
+		readingsSingleUpdate($hash, 'state', 'disabled', 0);
+	} else {
+		readingsSingleUpdate($hash, 'state', 'active', 0);
+	}
 	return "";
 }
 
@@ -342,10 +365,17 @@ sub GDS_GetUpdate($) {
 	my $name = $hash->{NAME};
 	my (@a, $next);
 
-	push @a, undef;
-	push @a, undef;
-	push @a, ReadingsVal($name, "c_stationName", "");
-	retrieveConditions($hash, "c", @a);
+	if(IsDisabled($name)) {
+		readingsSingleUpdate($hash, 'state', 'disabled', 0);
+		Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
+	} else {
+		readingsSingleUpdate($hash, 'state', 'active', 0);
+		push @a, undef;
+		push @a, undef;
+		push @a, ReadingsVal($name, "c_stationName", "");
+		retrieveConditions($hash, "c", @a);
+		Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
+	}
 
 	$next = gettimeofday()+$hash->{helper}{INTERVAL};
 	readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
@@ -1169,6 +1199,8 @@ sub initDropdownLists($){
 #	2014-05-23	added set <name> clear alerts|all
 #							fixed some typos in docu and help
 #
+#	2014-10-15	added:	attr disable
+#
 ####################################################################################################
 #
 # Further informations
@@ -1349,6 +1381,7 @@ sub initDropdownLists($){
 		<li><a href="#do_not_notify">do_not_notify</a></li>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 		<br/>
+		<li><b>disable</b> - if set, gds will not try to connect to internet</li>
 		<li><b>gdsAll</b> - defines filter for "all data" from alert message</li>
 		<li><b>gdsDebug</b> - defines filter for debug informations</li>
 		<li><b>gdsSetCond</b> - defines conditions area to be used after system restart</li>
