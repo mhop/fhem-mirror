@@ -684,7 +684,6 @@ sub
 ZWave_cleanString($$)
 {
   my ($c, $postfix) = @_;
-  $c =~ s/[.,].*$//g;
   $c =~ s/[^A-Z]+(.)/uc($1)/gei;
   $c =~ s/[^A-Z]//i;
   my $shortened=0;
