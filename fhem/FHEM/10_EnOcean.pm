@@ -125,154 +125,153 @@ my %EnO_manuf = (
   "7FF" => "Multi user Manufacturer ID",
 );
 
-my %EnO_subType = (
-  "A5.02.01" => "tempSensor.01",
-  "A5.02.02" => "tempSensor.02",
-  "A5.02.03" => "tempSensor.03",
-  "A5.02.04" => "tempSensor.04",
-  "A5.02.05" => "tempSensor.05",
-  "A5.02.06" => "tempSensor.06",
-  "A5.02.07" => "tempSensor.07",
-  "A5.02.08" => "tempSensor.08",
-  "A5.02.09" => "tempSensor.09",
-  "A5.02.0A" => "tempSensor.0A",
-  "A5.02.0B" => "tempSensor.0B",
-  "A5.02.10" => "tempSensor.10",
-  "A5.02.11" => "tempSensor.11",
-  "A5.02.12" => "tempSensor.12",
-  "A5.02.13" => "tempSensor.13",
-  "A5.02.14" => "tempSensor.14",
-  "A5.02.15" => "tempSensor.15",
-  "A5.02.16" => "tempSensor.16",
-  "A5.02.17" => "tempSensor.17",
-  "A5.02.18" => "tempSensor.18",
-  "A5.02.19" => "tempSensor.19",
-  "A5.02.1A" => "tempSensor.1A",
-  "A5.02.1B" => "tempSensor.1B",
-  "A5.02.20" => "tempSensor.20",
-  "A5.02.30" => "tempSensor.30",
-  "A5.04.01" => "roomSensorControl.01",
-  "A5.04.02" => "tempHumiSensor.02",
-  "A5.04.03" => "tempHumiSensor.03",
-  "A5.05.01" => "baroSensor.01",
-  "A5.06.01" => "lightSensor.01",
-  "A5.06.02" => "lightSensor.02",
-  "A5.06.03" => "lightSensor.03",
-  "A5.07.01" => "occupSensor.01",
-  "A5.07.02" => "occupSensor.02",
-  "A5.07.03" => "occupSensor.03",
-  "A5.08.01" => "lightTempOccupSensor.01",
-  "A5.08.02" => "lightTempOccupSensor.02",
-  "A5.08.03" => "lightTempOccupSensor.03",
-  "A5.09.01" => "COSensor.01",
-  "A5.09.02" => "COSensor.02",  
-  "A5.09.04" => "tempHumiCO2Sensor.01",
-  "A5.09.05" => "vocSensor.01",
-  "A5.09.06" => "radonSensor.01",
-  "A5.09.07" => "particlesSensor.01",
-  "A5.09.08" => "CO2Sensor.01",
-  "A5.10.01" => "roomSensorControl.05",
-  "A5.10.02" => "roomSensorControl.05",
-  "A5.10.03" => "roomSensorControl.05",
-  "A5.10.04" => "roomSensorControl.05",
-  "A5.10.05" => "roomSensorControl.05",
-  "A5.10.06" => "roomSensorControl.05",
-  "A5.10.07" => "roomSensorControl.05",
-  "A5.10.08" => "roomSensorControl.05",
-  "A5.10.09" => "roomSensorControl.05",
-  "A5.10.0A" => "roomSensorControl.05",
-  "A5.10.0B" => "roomSensorControl.05",
-  "A5.10.0C" => "roomSensorControl.05",
-  "A5.10.0D" => "roomSensorControl.05",
-  "A5.10.10" => "roomSensorControl.01",
-  "A5.10.11" => "roomSensorControl.01",
-  "A5.10.12" => "roomSensorControl.01",
-  "A5.10.13" => "roomSensorControl.01",
-  "A5.10.14" => "roomSensorControl.01",
-  "A5.10.15" => "roomSensorControl.02",
-  "A5.10.16" => "roomSensorControl.02",
-  "A5.10.17" => "roomSensorControl.02",
-  "A5.10.18" => "roomSensorControl.18",
-  "A5.10.19" => "roomSensorControl.19",
-  "A5.10.1A" => "roomSensorControl.1A",
-  "A5.10.1B" => "roomSensorControl.1B",
-  "A5.10.1C" => "roomSensorControl.1C",
-  "A5.10.1D" => "roomSensorControl.1D",
-  "A5.10.1E" => "roomSensorControl.1B",
-  "A5.10.1F" => "roomSensorControl.1F",
-  "A5.10.20" => "roomSensorControl.20",
-  "A5.10.21" => "roomSensorControl.20",  
-  "A5.11.01" => "lightCtrlState.01",
-  "A5.11.02" => "tempCtrlState.01",
-  "A5.11.03" => "shutterCtrlState.01",
-  "A5.11.04" => "lightCtrlState.02",
-  "A5.12.00" => "autoMeterReading.00",
-  "A5.12.01" => "autoMeterReading.01",
-  "A5.12.02" => "autoMeterReading.02",
-  "A5.12.03" => "autoMeterReading.03",
-  "A5.12.04" => "autoMeterReading.04",
-  "A5.12.05" => "autoMeterReading.05",
-  "A5.13.01" => "environmentApp",
-  "A5.13.02" => "environmentApp",
-  "A5.13.03" => "environmentApp",
-  "A5.13.04" => "environmentApp",
-  "A5.13.05" => "environmentApp",
-  "A5.13.06" => "environmentApp",
-  "A5.13.10" => "environmentApp",
-  "A5.14.01" => "multiFuncSensor",
-  "A5.14.02" => "multiFuncSensor",
-  "A5.14.03" => "multiFuncSensor",
-  "A5.14.04" => "multiFuncSensor",
-  "A5.14.05" => "multiFuncSensor",
-  "A5.14.06" => "multiFuncSensor",
-  "A5.20.01" => "hvac.01",
- #"A5.20.02" => "hvac.02",
- #"A5.20.03" => "hvac.03",
- #"A5.20.10" => "hvac.04",
- #"A5.20.11" => "hvac.11",
- #"A5.20.12" => "hvac.12",
-  "A5.30.01" => "digitalInput.01",
-  "A5.30.02" => "digitalInput.02",
-  "A5.30.03" => "digitalInput.03",
-  "A5.30.04" => "digitalInput.04",
-  "A5.38.08" => "gateway",
-  "A5.3F.7F" => "manufProfile",
-  "D2.01.00" => "actuator.01",
-  "D2.01.01" => "actuator.01",
-  "D2.01.02" => "actuator.01",
-  "D2.01.03" => "actuator.01",
-  "D2.01.04" => "actuator.01",
-  "D2.01.05" => "actuator.01",
-  "D2.01.06" => "actuator.01",
-  "D2.01.07" => "actuator.01",
-  "D2.01.08" => "actuator.01",
-  "D2.01.09" => "actuator.01",
-  "D2.01.0A" => "actuator.01",
-  "D2.01.10" => "actuator.01",
-  "D2.01.11" => "actuator.01",
-  "D2.03.00" => "switch.00",
-  "D2.03.10" => "windowHandle.10",  
-  "D2.10.00" => "roomCtrlPanel.00",  
-  "D2.10.01" => "roomCtrlPanel.00",  
-  "D2.10.02" => "roomCtrlPanel.00",  
-  "D5.00.01" => "contact",
-  "F6.02.01" => "switch",
-  "F6.02.02" => "switch",
-  "F6.02.03" => "switch",
- #"F6.02.04" => "switch.04",
-  "F6.03.01" => "switch",
-  "F6.03.02" => "switch",
-  "F6.04.01" => "keycard",
- #"F6.04.02" => "keycard.02",
-  "F6.05.01" => "liquidLeakage",
-  "F6.10.00" => "windowHandle",
- #"F6.10.01" => "windowHandle.01",
-  "F6.3F.7F" => "switch.7F",
- 
-  1          => "sensor",
-  2          => "FRW",
-  3          => "PM101",
-  4          => "raw",
+my %EnO_eepConfig = (
+  "A5.02.01" => {attr => {subType => "tempSensor.01"}},
+  "A5.02.02" => {attr => {subType => "tempSensor.02"}},
+  "A5.02.03" => {attr => {subType => "tempSensor.03"}},
+  "A5.02.04" => {attr => {subType => "tempSensor.04"}},
+  "A5.02.05" => {attr => {subType => "tempSensor.05"}},
+  "A5.02.06" => {attr => {subType => "tempSensor.06"}},
+  "A5.02.07" => {attr => {subType => "tempSensor.07"}},
+  "A5.02.08" => {attr => {subType => "tempSensor.08"}},
+  "A5.02.09" => {attr => {subType => "tempSensor.09"}},
+  "A5.02.0A" => {attr => {subType => "tempSensor.0A"}},
+  "A5.02.0B" => {attr => {subType => "tempSensor.0B"}},
+  "A5.02.10" => {attr => {subType => "tempSensor.10"}},
+  "A5.02.11" => {attr => {subType => "tempSensor.11"}},
+  "A5.02.12" => {attr => {subType => "tempSensor.12"}},
+  "A5.02.13" => {attr => {subType => "tempSensor.13"}},
+  "A5.02.14" => {attr => {subType => "tempSensor.14"}},
+  "A5.02.15" => {attr => {subType => "tempSensor.15"}},
+  "A5.02.16" => {attr => {subType => "tempSensor.16"}},
+  "A5.02.17" => {attr => {subType => "tempSensor.17"}},
+  "A5.02.18" => {attr => {subType => "tempSensor.18"}},
+  "A5.02.19" => {attr => {subType => "tempSensor.19"}},
+  "A5.02.1A" => {attr => {subType => "tempSensor.1A"}},
+  "A5.02.1B" => {attr => {subType => "tempSensor.1B"}},
+  "A5.02.20" => {attr => {subType => "tempSensor.20"}},
+  "A5.02.30" => {attr => {subType => "tempSensor.30"}},
+  "A5.04.01" => {attr => {subType => "roomSensorControl.01"}},
+  "A5.04.02" => {attr => {subType => "tempHumiSensor.02"}},
+  "A5.04.03" => {attr => {subType => "tempHumiSensor.03"}},
+  "A5.05.01" => {attr => {subType => "baroSensor.01"}},
+  "A5.06.01" => {attr => {subType => "lightSensor.01"}},
+  "A5.06.02" => {attr => {subType => "lightSensor.02"}},
+  "A5.06.03" => {attr => {subType => "lightSensor.03"}},
+  "A5.07.01" => {attr => {subType => "occupSensor.01"}},
+  "A5.07.02" => {attr => {subType => "occupSensor.02"}},
+  "A5.07.03" => {attr => {subType => "occupSensor.03"}},
+  "A5.08.01" => {attr => {subType => "lightTempOccupSensor.01"}},
+  "A5.08.02" => {attr => {subType => "lightTempOccupSensor.02"}},
+  "A5.08.03" => {attr => {subType => "lightTempOccupSensor.03"}},
+  "A5.09.01" => {attr => {subType => "COSensor.01"}},
+  "A5.09.02" => {attr => {subType => "COSensor.02"}},  
+  "A5.09.04" => {attr => {subType => "tempHumiCO2Sensor.01"}},
+  "A5.09.05" => {attr => {subType => "vocSensor.01"}},
+  "A5.09.06" => {attr => {subType => "radonSensor.01"}},
+  "A5.09.07" => {attr => {subType => "particlesSensor.01"}},
+  "A5.09.08" => {attr => {subType => "CO2Sensor.01"}},
+  "A5.10.01" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.02" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.03" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.04" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.05" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.06" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.07" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.08" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.09" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.0A" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.0B" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.0C" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.0D" => {attr => {subType => "roomSensorControl.05"}},
+  "A5.10.10" => {attr => {subType => "roomSensorControl.01"}},
+  "A5.10.11" => {attr => {subType => "roomSensorControl.01"}},
+  "A5.10.12" => {attr => {subType => "roomSensorControl.01"}},
+  "A5.10.13" => {attr => {subType => "roomSensorControl.01"}},
+  "A5.10.14" => {attr => {subType => "roomSensorControl.01"}},
+  "A5.10.15" => {attr => {subType => "roomSensorControl.02"}},
+  "A5.10.16" => {attr => {subType => "roomSensorControl.02"}},
+  "A5.10.17" => {attr => {subType => "roomSensorControl.02"}},
+  "A5.10.18" => {attr => {subType => "roomSensorControl.18"}},
+  "A5.10.19" => {attr => {subType => "roomSensorControl.19"}},
+  "A5.10.1A" => {attr => {subType => "roomSensorControl.1A"}},
+  "A5.10.1B" => {attr => {subType => "roomSensorControl.1B"}},
+  "A5.10.1C" => {attr => {subType => "roomSensorControl.1C"}},
+  "A5.10.1D" => {attr => {subType => "roomSensorControl.1D"}},
+  "A5.10.1E" => {attr => {subType => "roomSensorControl.1B"}},
+  "A5.10.1F" => {attr => {subType => "roomSensorControl.1F"}},
+  "A5.10.20" => {attr => {subType => "roomSensorControl.20"}},
+  "A5.10.21" => {attr => {subType => "roomSensorControl.20"}},  
+  "A5.11.01" => {attr => {subType => "lightCtrlState.01"}},
+  "A5.11.02" => {attr => {subType => "tempCtrlState.01"}},
+  "A5.11.03" => {attr => {subType => "shutterCtrlState.01", subDef => "getNextID", subTypeSet => "gateway", gwCmd => "blindCmd"}},
+  "A5.11.04" => {attr => {subType => "lightCtrlState.02"}},
+  "A5.12.00" => {attr => {subType => "autoMeterReading.00"}},
+  "A5.12.01" => {attr => {subType => "autoMeterReading.01"}},
+  "A5.12.02" => {attr => {subType => "autoMeterReading.02"}},
+  "A5.12.03" => {attr => {subType => "autoMeterReading.03"}},
+  "A5.12.04" => {attr => {subType => "autoMeterReading.04"}},
+  "A5.12.05" => {attr => {subType => "autoMeterReading.05"}},
+  "A5.13.01" => {attr => {subType => "environmentApp"}},
+  "A5.13.02" => {attr => {subType => "environmentApp"}},
+  "A5.13.03" => {attr => {subType => "environmentApp"}},
+  "A5.13.04" => {attr => {subType => "environmentApp"}},
+  "A5.13.05" => {attr => {subType => "environmentApp"}},
+  "A5.13.06" => {attr => {subType => "environmentApp"}},
+  "A5.13.10" => {attr => {subType => "environmentApp"}},
+  "A5.14.01" => {attr => {subType => "multiFuncSensor"}},
+  "A5.14.02" => {attr => {subType => "multiFuncSensor"}},
+  "A5.14.03" => {attr => {subType => "multiFuncSensor"}},
+  "A5.14.04" => {attr => {subType => "multiFuncSensor"}},
+  "A5.14.05" => {attr => {subType => "multiFuncSensor"}},
+  "A5.14.06" => {attr => {subType => "multiFuncSensor"}},
+  "A5.20.01" => {attr => {subType => "hvac.01"}},
+ #"A5.20.02" => {attr => {subType => "hvac.02"}},
+ #"A5.20.03" => {attr => {subType => "hvac.03"}},
+ #"A5.20.10" => {attr => {subType => "hvac.04"}},
+ #"A5.20.11" => {attr => {subType => "hvac.11"}},
+ #"A5.20.12" => {attr => {subType => "hvac.12"}},
+  "A5.30.01" => {attr => {subType => "digitalInput.01"}},
+  "A5.30.02" => {attr => {subType => "digitalInput.02"}},
+  "A5.30.03" => {attr => {subType => "digitalInput.03"}},
+  "A5.30.04" => {attr => {subType => "digitalInput.04"}},
+  "A5.38.08" => {attr => {subType => "gateway"}},
+  "A5.3F.7F" => {attr => {subType => "manufProfile"}},
+  "D2.01.00" => {attr => {subType => "actuator.01"}},
+  "D2.01.01" => {attr => {subType => "actuator.01"}},
+  "D2.01.02" => {attr => {subType => "actuator.01"}},
+  "D2.01.03" => {attr => {subType => "actuator.01"}},
+  "D2.01.04" => {attr => {subType => "actuator.01"}},
+  "D2.01.05" => {attr => {subType => "actuator.01"}},
+  "D2.01.06" => {attr => {subType => "actuator.01"}},
+  "D2.01.07" => {attr => {subType => "actuator.01"}},
+  "D2.01.08" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.09" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.0A" => {attr => {subType => "actuator.01"}},
+  "D2.01.10" => {attr => {subType => "actuator.01"}},
+  "D2.01.11" => {attr => {subType => "actuator.01"}},
+  "D2.03.00" => {attr => {subType => "switch.00"}},
+  "D2.03.10" => {attr => {subType => "windowHandle.10"}},  
+  "D2.10.00" => {attr => {subType => "roomCtrlPanel.00"}},  
+  "D2.10.01" => {attr => {subType => "roomCtrlPanel.00"}},  
+  "D2.10.02" => {attr => {subType => "roomCtrlPanel.00"}},  
+  "D5.00.01" => {attr => {subType => "contact"}},
+  "F6.02.01" => {attr => {subType => "switch"}},
+  "F6.02.02" => {attr => {subType => "switch"}},
+  "F6.02.03" => {attr => {subType => "switch"}},
+ #"F6.02.04" => {attr => {subType => "switch.04"}},
+  "F6.03.01" => {attr => {subType => "switch"}},
+  "F6.03.02" => {attr => {subType => "switch"}},
+  "F6.04.01" => {attr => {subType => "keycard"}},
+ #"F6.04.02" => {attr => {subType => "keycard.02"}},
+  "F6.05.01" => {attr => {subType => "liquidLeakage"}},
+  "F6.10.00" => {attr => {subType => "windowHandle"}},
+ #"F6.10.01" => {attr => {subType => "windowHandle.01"}},
+  "F6.3F.7F" => {attr => {subType => "switch.7F"}},
+  1          => {attr => {subType => "sensor"}},
+  2          => {attr => {subType => "FRW"}},
+  3          => {attr => {subType => "PM101"}},
+  4          => {attr => {subType => "raw"}},
 );
 
 my %EnO_getRemoteFunctionCode = (
@@ -306,9 +305,11 @@ EnOcean_Initialize($)
 {
   my ($hash) = @_;
   my %subTypeList;
-  my $subTypeList = join(",", sort grep { !$subTypeList{$_}++ } values %EnO_subType);
-  #my %subTypeSetList;
-  
+  my @subTypeList;
+  foreach my $eep (keys %EnO_eepConfig){
+    push @subTypeList, $EnO_eepConfig{$eep}{attr}{subType};
+  }
+  my $subTypeList = join(",", sort grep { !$subTypeList{$_}++ } @subTypeList);
 
   $hash->{Match}     = "^EnOcean:";
   $hash->{DefFn}     = "EnOcean_Define";
@@ -2883,15 +2884,28 @@ EnOcean_Parse($$)
         $mf = $EnO_manuf{$mf} if($EnO_manuf{$mf});
         my $st = "A5.$fn.$tp";
         $attr{$name}{eep} = "A5-$fn-$tp";
-        if($EnO_subType{$st}) {
-          $st = $EnO_subType{$st};
+        if($EnO_eepConfig{$st}{attr}) {
           push @event, "3:teach-in:EEP A5-$fn-$tp Manufacturer: $mf";          
           Log3 $name, 2, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf";
-          $attr{$name}{subType} = $st;
+          ####
+          foreach my $attrCntr (keys %{$EnO_eepConfig{$st}{attr}}) {
+            if ($attrCntr eq "subDef") {
+              if (!defined AttrVal($name, $attrCntr, undef)) {              
+                #$attr{$name}{$attrCntr} = EnOcean_CheckSenderID($EnO_eepConfig{$st}{attr}{$attrCntr}, $defs{$name}{IODev}{NAME}, "00000000");
+                CommandAttr(undef, "$name $attrCntr " . EnOcean_CheckSenderID($EnO_eepConfig{$st}{attr}{$attrCntr}, $defs{$name}{IODev}{NAME}, "00000000"));
+              }
+            } else {            
+              #$attr{$name}{$attrCntr} = $EnO_eepConfig{$st}{attr}{$attrCntr};
+              CommandAttr(undef, "$name $attrCntr $EnO_eepConfig{$st}{attr}{$attrCntr}");
+            }
+          }
+          $st = $EnO_eepConfig{$st}{attr}{subType};
+          #$attr{$name}{subType} = $st;
         } else {
           push @event, "3:teach-in:EEP A5-$fn-$tp Manufacturer: $mf not supported";          
           Log3 $name, 2, "EnOcean $name teach-in EEP A5-$fn-$tp Manufacturer: $mf not supported";
           $attr{$name}{subType} = "raw";        
+          $st = "raw";        
         }
 
         if ($st eq "hvac.01" || $st eq "MD15") {
@@ -2899,9 +2913,11 @@ EnOcean_Parse($$)
             # bidirectional Teach-In for EEP A5-20-01
             $attr{$name}{comMode} = "biDir";          
             $attr{$name}{destinationID} = "unicast";
-            my $subDef = "00000000";
-            $subDef = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, $subDef);
-            $attr{$name}{subDef} = $subDef;
+            my $subDef = AttrVal($name, "subDef", undef);
+            if (!defined $subDef) {
+              $subDef = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000");
+              $attr{$name}{subDef} = $subDef;
+            }
             # teach-in response
             EnOcean_SndRadio(undef, $hash, $packetType, $rorg, "800FFFF0", $subDef, "00", $hash->{DEF});
             EnOcean_hvac_01Cmd($hash, $packetType, 128); # 128 == 20 degree C
@@ -4895,10 +4911,13 @@ EnOcean_Parse($$)
       my $teachInReq = ($db[6] & 0x30) >> 4;
       if ($teachInReq == 0 || $teachInReq == 2) {
       # Teach-In Request
-        if($EnO_subType{$subType}) {
+        if($EnO_eepConfig{$subType}) {
           # EEP Teach-In
-          $subType = $EnO_subType{$subType};
-          $attr{$name}{subType} = $subType;
+          foreach my $attrCntr (keys %{$EnO_eepConfig{$subType}{attr}}) {
+            $attr{$name}{$attrCntr} = $EnO_eepConfig{$subType}{attr}{$attrCntr};
+          }
+          $subType = $EnO_eepConfig{$subType}{attr}{subType};
+          #$attr{$name}{subType} = $subType;
           $attr{$name}{manufID} = $mid;
           $attr{$name}{devChannel} = $devChannel;
           $attr{$name}{comMode} = $comMode;
@@ -4909,12 +4928,14 @@ EnOcean_Parse($$)
             # EEP Teach-In-Response expected
             # send EEP Teach-In Response message
             $data = (sprintf "%02X", $db[6] & 0x80 | 0x11) . substr($data, 2, 12);
-            my $subDef = "00000000";
+            my $subDef = AttrVal($name, "subDef", "00000000");
             if ($comMode eq "biDir") {
-              # select a free SenderID
-              $subDef = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, $subDef);
+              if (!defined AttrVal($name, "subDef", undef)) {              
+                # select a free SenderID
+                $subDef = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, $subDef);
+                $attr{$name}{subDef} = $subDef;
+              }
             } 
-            $attr{$name}{subDef} = $subDef;
             EnOcean_SndRadio(undef, $hash, $packetType, "D4", $data, $subDef, "00", $id);
             Log3 $name, 2, "EnOcean $name UTE teach-in response send to $id";
           }
@@ -5008,7 +5029,7 @@ EnOcean_Parse($$)
         $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
         $attr{$name}{eep} = "$rorg-$func-$type";
         my $subType = "$rorg.$func.$type";
-        $attr{$name}{subType} = $EnO_subType{$subType} if($EnO_manuf{$subType});
+        $attr{$name}{subType} = $EnO_eepConfig{$subType}{attr}{subType} if($EnO_manuf{$subType});
         if ($hash->{helper}{sysEx}{$seq}{fnNumber} == 0x606) {
           $hash->{RSSI} = - substr($data, 6, 2);
         }
@@ -5086,7 +5107,7 @@ EnOcean_Parse($$)
       $manufID = $EnO_manuf{$manufID} if($EnO_manuf{$manufID});
       $attr{$name}{eep} = "$rorg-$func-$type";
       my $subType = "$rorg.$func.$type";
-      $attr{$name}{subType} = $EnO_subType{$subType} if($EnO_manuf{$subType});
+      $attr{$name}{subType} = $EnO_eepConfig{$subType}{attr}{subType} if($EnO_manuf{$subType});
       if ($fnNumber == 0x606) {
         $hash->{RSSI} = - substr($data, 6, 2);
       }
@@ -6118,13 +6139,19 @@ sub EnOcean_sec_parseTeachIn($$) {
 		} else {
                        if ($info == 0) {
                          $attr{$name}{eep} = "D2-03-00";
-                         $attr{$name}{subType} = $EnO_subType{"D2.03.00"};
+                         foreach my $attrCntr (keys %{$EnO_eepConfig{"D2.03.00"}{attr}}) {
+			   $attr{$name}{$attrCntr} = $EnO_eepConfig{"D2.03.00"}{attr}{$attrCntr};
+			 }
+                         #$attr{$name}{subType} = $EnO_eepConfig{"D2.03.00"}{attr}{subType};
                          $attr{$name}{manufID} = "7FF";
                          readingsSingleUpdate($hash, "teach-in", "EEP D2-03-00 Manufacturer: " . $EnO_manuf{"7FF"}, 1);
                          Log3 $name, 2, "EnOcean $name teach-in EEP D2-03-00 Rocker A Manufacturer: " . $EnO_manuf{"7FF"};                         
                        } else {
                          $attr{$name}{eep} = "D2-03-00";
-                         $attr{$name}{subType} = $EnO_subType{"D2.03.00"};
+                         foreach my $attrCntr (keys %{$EnO_eepConfig{"D2.03.00"}{attr}}) {
+			   $attr{$name}{$attrCntr} = $EnO_eepConfig{"D2.03.00"}{attr}{$attrCntr};
+			 }
+                         #$attr{$name}{subType} = $EnO_eepConfig{"D2.03.00"}{attr}{subType};
                          $attr{$name}{manufID} = "7FF";
                          readingsSingleUpdate($hash, "teach-in", "EEP D2-03-00 Manufacturer: " . $EnO_manuf{"7FF"}, 1);
                          Log3 $name, 2, "EnOcean $name teach-in EEP D2-03-00 Rocker B Manufacturer: " . $EnO_manuf{"7FF"};                         
