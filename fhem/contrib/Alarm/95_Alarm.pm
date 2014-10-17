@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "1.4";
+my $alarmversion    = "1.6";
 
 #########################################################################################
 #
@@ -298,9 +298,6 @@ sub Alarm_Exec($$$$$){
          my $ntp = $hour*60+$min;
      
          if( ($ntp <= $etp) && ($ntp >= $stp) ){  
-            #-- calling actors 
-            $cmd = AttrVal($name, "level".$level."onact", 0);
-            fhem($cmd);
             #-- raised by sensor (attribute values have been controlled in CreateNotifiers)
             @sta = split('\|',  AttrVal($dev, "alarmSettings", 0));
             $mga = $sta[2]." ".AttrVal($name, "level".$level."msg", 0);
@@ -316,7 +313,10 @@ sub Alarm_Exec($$$$$){
             readingsSingleUpdate( $hash, "short", $mga, 0);
             $mga = Alarm_getstate($hash)." ".$mga;
             readingsSingleUpdate( $hash, "state", $mga, 0 );
-            $msg = "[Alarm $level] raised from device $dev with event $evt"; 
+            $msg = "[Alarm $level] raised from device $dev with event $evt";
+            #-- calling actors AFTER state update
+            $cmd = AttrVal($name, "level".$level."onact", 0);
+            fhem($cmd); 
             Log3 $hash,3,$msg;
          }else{
             $msg = "[Alarm $level] not raised, not in time slot";
@@ -338,7 +338,7 @@ sub Alarm_Exec($$$$$){
             #Log3 $hash,1,"[Alarm] Killing delayed action $name";
             CommandDelete(undef,"$mga");
          }
-         #-- calling actors 
+         #-- calling actors BEFORE state update
          $cmd = AttrVal($name, "level".$level."offact", 0);
          fhem($cmd);
          #-- readings
@@ -480,7 +480,7 @@ sub Alarm_CreateNotifiers($){
         CommandDefine(undef,$cmd);
         CommandAttr (undef,'alarm'.$level.'.off.N room '.$alarmpublicroom); 
         CommandAttr (undef,'alarm'.$level.'.off.N group alarmNotifier'); 
-        Log3 $hash,3,"[Alarm $level] Created cancel notifier";    
+        Log3 $hash,5,"[Alarm $level] Created cancel notifier";    
      
         #-- now set up the command for raising alarm - only if cancel exists
         $cmd        = '';
@@ -518,7 +518,7 @@ sub Alarm_CreateNotifiers($){
            CommandDefine(undef,$cmd);
            CommandAttr (undef,'alarm'.$level.'.on.N room '.$alarmpublicroom); 
            CommandAttr (undef,'alarm'.$level.'.on.N group alarmNotifier'); 
-           Log3 $hash,3,"[Alarm $level] Created raise notifier";
+           Log3 $hash,5,"[Alarm $level] Created raise notifier";
            
            #-- now set up the list of actors
            $cmd      = '';
@@ -551,7 +551,7 @@ sub Alarm_CreateNotifiers($){
                           $cmd  .= sprintf('define alarm%1ddly%1d at +00:%02d:%02d %s;',$level,$nonum,$tarr[0],$tarr[1],$aval[1]);
                        }      
                     }
-                    $cmd2 = $aval[2].';'
+                    $cmd2 .= $aval[2].';'
                       if( $aval[2] ne '' );
                     Log3 $hash,5,"[Alarm $level] Adding actor $d to action list";
                  }
