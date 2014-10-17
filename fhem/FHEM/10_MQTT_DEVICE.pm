@@ -83,9 +83,9 @@ sub Set($$$@) {
   return "Need at least one parameters" unless defined $command;
   return "Unknown argument $command, choose one of " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}})
     if(!defined($hash->{sets}->{$command}));
-  my $value = join " ",@values;
   my $msgid;
-  if (defined $value) {
+  if (@values) {
+    my $value = join " ",@values;
     $msgid = send_publish($hash->{IODev}, topic => $hash->{publishSets}->{$command}->{topic}, message => $value, qos => $hash->{qos}, retain => $hash->{retain});
     readingsSingleUpdate($hash,$command,$value,1);
   } else {
