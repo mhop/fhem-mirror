@@ -3261,20 +3261,18 @@ ReplaceEventMap($$$)
   foreach my $rv (@emList) {
     # Real-Event-Regexp:GivenName[:modifier]
     my ($re, $val, $modifier) = split(":", $rv, 3);
-    my $reIsWord = ($re =~ m/^\w*$/); # dim100% is not \w only, cant use \b
     next if(!defined($val));
     if($dir) {  # event -> GivenName
+      my $reIsWord = ($re =~ m/^\w*$/); # dim100% is not \w only, cant use \b
       if($reIsWord) {
         if($str =~ m/\b$re\b/) {
           $str =~ s/\b$re\b/$val/;
           $changed = 1;
-          last;
         }
       } else {
         if($str =~ m/$re/) {
           $str =~ s/$re/$val/;
           $changed = 1;
-          last;
         }
       }
 
@@ -3282,20 +3280,21 @@ ReplaceEventMap($$$)
       if($nstr eq $val) { # for special translations like <> and <<
         $nstr = $re;
         $changed = 1;
-        last;
-      } elsif($reIsWord) {
-        if($nstr =~ m/$val/) {
+      } else {
+        my $reIsWord = ($val =~ m/^\w*$/);
+        if($reIsWord) {
+          if($nstr =~ m/\b$val\b/) {
+            $nstr =~ s/\b$val\b/$re/;
+            $changed = 1;
+          }
+        } elsif($nstr =~ m/$val/) {
           $nstr =~ s/$val/$re/;
           $changed = 1;
-          last;
         }
-      } elsif($nstr =~ m/\b$val\b/) {
-        $nstr =~ s/\b$val\b/$re/;
-        $changed = 1;
-        last;
       }
-
     }
+    last if($changed);
+
   }
   return $str if($dir);
 
