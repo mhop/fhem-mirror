@@ -374,7 +374,6 @@ sub GDS_GetUpdate($) {
 		push @a, undef;
 		push @a, ReadingsVal($name, "c_stationName", "");
 		retrieveConditions($hash, "c", @a);
-		Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
 	}
 
 	$next = gettimeofday()+$hash->{helper}{INTERVAL};
