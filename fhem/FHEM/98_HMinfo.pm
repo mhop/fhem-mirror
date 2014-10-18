@@ -1211,7 +1211,7 @@ sub HMinfo_SetFn($@) {#########################################################
     return "please enter what to clear" if (! $type);
     if ($type eq "msgStat" || $type eq "all" ){
       foreach (keys %{$modules{CUL_HM}{stat}{r}}){
-        next if ($_ ne "dummy");
+        next if ($_ eq "dummy");
         delete $modules{CUL_HM}{stat}{$_};
         delete $modules{CUL_HM}{stat}{r}{$_};
         delete $modules{CUL_HM}{stat}{s}{$_};
