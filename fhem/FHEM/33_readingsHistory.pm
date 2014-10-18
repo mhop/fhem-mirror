@@ -237,7 +237,7 @@ readingsHistory_2html($)
 
   return undef if( !$hash );
 
-  if( $hash->{DEF} =~ m/=/ ) {
+  if( $hash->{DEF} && $hash->{DEF} =~ m/=/ ) {
     if( !$hash->{fhem}->{last_update}
         || gettimeofday() - $hash->{fhem}->{last_update} > 600 ) {
       readingsHistory_updateDevices($hash);
