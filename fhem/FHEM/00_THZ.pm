@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 08/2014
-my $thzversion = "0.109";
+my $thzversion = "0.110";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -694,73 +694,27 @@ sub THZ_ReadAnswer($)
 	my $name = $hash->{NAME};
 	
 	Log3 $hash->{NAME}, 5, "$hash->{NAME} start Funktion THZ_ReadAnswer";
-        my $buf = DevIo_SimpleReadWithTimeout($hash, 0.8);
+        my $buf = DevIo_SimpleReadWithTimeout($hash, 0.7); 
 	if(!defined($buf)) {
 	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
 	  return ("InterfaceNotRespondig", "");
 	}
 	
 	my $data =  uc(unpack('H*', $buf));
+	my $count =1;
 	
-	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, second read makes sure all the buffer is read.
-	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.005);
-	  Log3($hash->{NAME}, 5, "double read activated $data");
+	while ((length($data) > 4) and ($data !~ m/1003$/m ) and ($count <= 10))
+	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.05);
+	  Log3($hash->{NAME}, 5, "double read $count activated $data");
 	  if(defined($buf1))
-	  {
-	  $buf = ($buf . $buf1) ;
-	  $data =  uc(unpack('H*', $buf));
-	   Log3($hash->{NAME}, 5, "double read result with buf1  $data");
-	  }
+	    {
+	    $buf = ($buf . $buf1) ;
+	    $data =  uc(unpack('H*', $buf));
+	    Log3($hash->{NAME}, 5, "double read $count result with buf1  $data");
+	    }
+	$count ++;
 	}
-	
-	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, third read makes sure all the buffer is read.
-	{ my $buf2 = DevIo_SimpleReadWithTimeout($hash, 0.005);
-	  Log3($hash->{NAME}, 5, "3rd read activated $data");
-	  if(defined($buf2))
-	  {
-	  $buf = ($buf . $buf2) ;
-	  $data =  uc(unpack('H*', $buf));
-	   Log3($hash->{NAME}, 5, "3rd read result with buf2  $data");
-	  }
-	}
-	
-	
-	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, fourth read makes sure all the buffer is read.
-	{ my $buf3 = DevIo_SimpleReadWithTimeout($hash, 0.005);
-	  Log3($hash->{NAME}, 5, "4th read activated $data");
-	  if(defined($buf3))
-	  {
-	  $buf = ($buf . $buf3) ;
-	  $data =  uc(unpack('H*', $buf));
-	   Log3($hash->{NAME}, 5, "4th read result with buf3  $data");
-	  }
-	}
-	
-	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, fourth read makes sure all the buffer is read.
-	{ my $buf4 = DevIo_SimpleReadWithTimeout($hash, 0.005);
-	  Log3($hash->{NAME}, 5, "5th read activated $data");
-	  if(defined($buf4))
-	  {
-	  $buf = ($buf . $buf4) ;
-	  $data =  uc(unpack('H*', $buf));
-	   Log3($hash->{NAME}, 5, "5th read result with buf4  $data");
-	  }
-	}
-	
-	if ((length($data) > 4) and ($data !~ m/1003$/m )) # sometimes the first read gets a trunkated buffer, fourth read makes sure all the buffer is read.
-	{ my $buf5 = DevIo_SimpleReadWithTimeout($hash, 0.005);
-	  Log3($hash->{NAME}, 5, "6th read activated $data");
-	  if(defined($buf5))
-	  {
-	  $buf = ($buf . $buf5) ;
-	  $data =  uc(unpack('H*', $buf));
-	   Log3($hash->{NAME}, 5, "6th read result with buf5  $data");
-	  }
-	}
-	
-	
-	
-	
+	return ("WInterface max repeat limited to 10" , $data) if ($count == 11);
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
 }
