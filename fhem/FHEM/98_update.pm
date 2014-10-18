@@ -122,7 +122,6 @@ doUpdate($$)
       uLog 1, "update was canceled. Please check manually!";
       return;
     }
-    uLog 1, "Backup: $cmdret";
   }
 
   my $remCtrlFile = upd_getUrl($src);
