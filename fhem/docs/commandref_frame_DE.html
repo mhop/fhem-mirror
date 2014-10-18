@@ -1132,6 +1132,9 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;te verwendet:
   <ul>
     setreading lampe state on
   </ul>
+  Achtung: setreading generiert kein Event f&uuml;r ein Ger&auml;t X, falls es
+  aus einem notify f&uuml;r Ger&auml;t X aufgerufen wurde. In so einem Fall
+  k&ouml;nnte man auf "sleep 0.1; setreading X Y Z" ausweichen.
 </ul>
 
 <a name="setstate"></a>
