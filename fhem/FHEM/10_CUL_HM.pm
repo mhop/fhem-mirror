@@ -1926,7 +1926,8 @@ sub CUL_HM_Parse($$) {#########################################################
            }
         }
       }
-      elsif ($md eq "HM-OU-CFM-PL"){
+#      elsif ($md eq "HM-OU-CFM-PL"){
+      else{
         if ($chnHash){
           $shash = $chnHash;
           my $val = hex($mI[2])/2;
