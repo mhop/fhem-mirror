@@ -90,12 +90,21 @@ at_Define($$)
   } else {
     $hash->{VOLATILE} = 1;      # Write these entries to the statefile
   }
-  $hash->{NTM} = $ntm if($rel eq "+" || $fn);
-  $hash->{TRIGGERTIME} = $nt;
-  $hash->{TRIGGERTIME_FMT} = FmtDateTime($nt);
-  RemoveInternalTimer($hash);
-  InternalTimer($nt, "at_Exec", $hash, 0);
 
+  my $alTime = AttrVal($name, "alignTime", undef);
+    
+  if(!$data{AT_RECOMPUTE} && $alTime) {
+    my $ret = at_adjustAlign($hash, $alTime);
+    return $ret if($ret);
+
+  } else {
+    $hash->{TRIGGERTIME} = $nt;
+    $hash->{TRIGGERTIME_FMT} = FmtDateTime($nt);
+    RemoveInternalTimer($hash);
+    InternalTimer($nt, "at_Exec", $hash, 0);
+  }
+
+  $hash->{NTM} = $ntm if($rel eq "+" || $fn);
   $hash->{STATE} = AttrVal($name, "disable", undef) ?
                         "disabled" : ("Next: ".FmtTime($nt));
   return undef;
@@ -152,6 +161,38 @@ at_Exec($)
 }
 
 sub
+at_adjustAlign($$)
+{
+  my($hash, $attrVal) = @_;
+
+  my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal);
+  return "$hash->{NAME} alignTime: $alErr" if($alErr);
+  my ($tm, $command) = split("[ \t]+", $hash->{DEF}, 2);
+  $tm =~ m/^(\+)?(\*({\d+})?)?(.*)$/;
+  my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
+  return "startTimes: $hash->{NAME} is not relative" if(!$rel);
+  my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
+
+  my $now = time();
+  my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);
+  my $step = ($hr*60+$min)*60+$sec;
+  my $ttime = int($hash->{TRIGGERTIME});
+  my $off = ($ttime % 86400) - 86400;
+  while($off < $alTime) {
+    $off += $step;
+  }
+  $ttime += ($alTime-$off);
+  $ttime += $step if($ttime < $now);
+
+  RemoveInternalTimer($hash);
+  InternalTimer($ttime, "at_Exec", $hash, 0);
+  $hash->{TRIGGERTIME} = $ttime;
+  $hash->{TRIGGERTIME_FMT} = FmtDateTime($ttime);
+  $hash->{STATE} = "Next: " . FmtTime($ttime);
+  return undef;
+}
+
+sub
 at_Attr(@)
 {
   my ($cmd, $name, $attrName, $attrVal) = @_;
@@ -161,31 +202,8 @@ at_Attr(@)
 
   if($cmd eq "set" && $attrName eq "alignTime") {
     return "alignTime needs a list of timespec parameters" if(!$attrVal);
-    my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal);
-    return "$name alignTime: $alErr" if($alErr);
-
-    my ($tm, $command) = split("[ \t]+", $hash->{DEF}, 2);
-    $tm =~ m/^(\+)?(\*({\d+})?)?(.*)$/;
-    my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
-    return "startTimes: $name is not relative" if(!$rel);
-    my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
-
-    my $now = time();
-    my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);
-    my $step = ($hr*60+$min)*60+$sec;
-    my $ttime = int($hash->{TRIGGERTIME});
-    my $off = ($ttime % 86400) - 86400;
-    while($off < $alTime) {
-      $off += $step;
-    }
-    $ttime += ($alTime-$off);
-    $ttime += $step if($ttime < $now);
-
-    RemoveInternalTimer($hash);
-    InternalTimer($ttime, "at_Exec", $hash, 0);
-    $hash->{TRIGGERTIME} = $ttime;
-    $hash->{TRIGGERTIME_FMT} = FmtDateTime($ttime);
-    $hash->{STATE} = "Next: " . FmtTime($ttime);
+    my $ret = at_adjustAlign($hash, $attrVal);
+    return $ret if($ret);
   }
 
   if($cmd eq "set" && $attrName eq "disable") {
