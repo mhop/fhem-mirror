@@ -8,7 +8,7 @@
   <noscript>
     <link rel="stylesheet" type="text/css" href="../www/pgm2/style.css" />
   </noscript>
-  <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
+  <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
   <link rel="shortcut icon" href="/fhem/icons/favicon.ico"/>
 </head>
 
@@ -1456,6 +1456,10 @@ The following local attributes are used by a wider range of devices:
       <li>
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
         Return the reading (the value in the Readings section of "list device")
+        </li><br>
+      <li>
+        ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
+        Return the reading as a number, i.e. delete non-numerical values.
         </li><br>
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>

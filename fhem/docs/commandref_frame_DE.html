@@ -10,18 +10,16 @@
   </noscript>
   <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
   <link rel="shortcut icon" href="/fhem/icons/favicon.ico"/>
-
 </head>
 
 
 <body style="word-wrap: break-word;">
-
   <div id="menuScrollArea">
-  <div id="logo"></div>
-  <div id="menu">
-    <h3>fhem.pl Referenz</h3>
-    Version: <a href="commandref.html">EN</a>&nbsp;<b>DE</b>
-  </div>
+    <div id="logo"></div>
+    <div id="menu">
+      <h3>fhem.pl Referenz</h3>
+      Version: <a href="commandref.html">EN</a>&nbsp;<b>DE</b>
+    </div>
   </div>
 
   <div id="right">
@@ -1564,6 +1562,11 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;te verwendet:
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
         Gibt den Inhalt der &quot;readings&quot; zur&uuml;ck (den Inhalt der in
         dem &quot;Readings&quot;-Abschnitt von "list device" angezeigt wird)
+        </li><br>
+      <li>
+        ReadingsNum(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
+        Wie ReadingsVal, loescht aber alles, was kein Zahl it, um es fuer
+        Berechnungen verwenden zu koennen.
         </li><br>
       <li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
