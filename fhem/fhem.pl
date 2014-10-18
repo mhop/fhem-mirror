@@ -3348,9 +3348,11 @@ ReadingsVal($$$)
 
 sub
 ReadingsNum($$$)
-{ 
+{
   my ($d,$n,$default) = @_;
-  return ReadingsVal($d,$n,$default)+0;
+  my $val = ReadingsVal($d,$n,$default);
+  $val =~ s/[^-\.\d]//g;
+  return $val;
 }
 
 sub
