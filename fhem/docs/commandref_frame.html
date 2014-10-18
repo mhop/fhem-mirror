@@ -1063,6 +1063,8 @@ The following local attributes are used by a wider range of devices:
   <ul>
     setreading lamp state on
   </ul>
+  Note: setreading won't generate an event for device X, if it is called from a
+  notify for device X. Use "sleep 0.1; setreading X Y Z" in this case.
 </ul>
 
 <a name="setstate"></a>
