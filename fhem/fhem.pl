@@ -3261,12 +3261,21 @@ ReplaceEventMap($$$)
   foreach my $rv (@emList) {
     # Real-Event-Regexp:GivenName[:modifier]
     my ($re, $val, $modifier) = split(":", $rv, 3);
+    my $reIsWord = ($re =~ m/^\w*$/); # dim100% is not \w only, cant use \b
     next if(!defined($val));
     if($dir) {  # event -> GivenName
-      if($str =~ m/\b$re\b/) {
-        $str =~ s/\b$re\b/$val/;
-        $changed = 1;
-        last;
+      if($reIsWord) {
+        if($str =~ m/\b$re\b/) {
+          $str =~ s/\b$re\b/$val/;
+          $changed = 1;
+          last;
+        }
+      } else {
+        if($str =~ m/$re/) {
+          $str =~ s/$re/$val/;
+          $changed = 1;
+          last;
+        }
       }
 
     } else {    # GivenName -> set command
@@ -3274,6 +3283,12 @@ ReplaceEventMap($$$)
         $nstr = $re;
         $changed = 1;
         last;
+      } elsif($reIsWord) {
+        if($nstr =~ m/$val/) {
+          $nstr =~ s/$val/$re/;
+          $changed = 1;
+          last;
+        }
       } elsif($nstr =~ m/\b$val\b/) {
         $nstr =~ s/\b$val\b/$re/;
         $changed = 1;
