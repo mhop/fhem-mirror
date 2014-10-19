@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "1.6";
+my $alarmversion    = "1.7";
 
 #########################################################################################
 #
@@ -300,24 +300,29 @@ sub Alarm_Exec($$$$$){
          if( ($ntp <= $etp) && ($ntp >= $stp) ){  
             #-- raised by sensor (attribute values have been controlled in CreateNotifiers)
             @sta = split('\|',  AttrVal($dev, "alarmSettings", 0));
-            $mga = $sta[2]." ".AttrVal($name, "level".$level."msg", 0);
-            #-- replace some parts
-            my @evtpart = split(" ",$evt);
-            $mga =~ s/\$NAME/$dev/g;
-            $mga =~ s/\$EVENT/$evt/g;
-            for( my $i=1;$i<= int(@evtpart);$i++){
-               $mga =~ s/\$EVTPART$i/$evtpart[$i-1]/g;
-            }
-            #-- readings
-            readingsSingleUpdate( $hash, "level".$level,$dev,0 );
-            readingsSingleUpdate( $hash, "short", $mga, 0);
-            $mga = Alarm_getstate($hash)." ".$mga;
-            readingsSingleUpdate( $hash, "state", $mga, 0 );
-            $msg = "[Alarm $level] raised from device $dev with event $evt";
-            #-- calling actors AFTER state update
-            $cmd = AttrVal($name, "level".$level."onact", 0);
-            fhem($cmd); 
-            Log3 $hash,3,$msg;
+            if( $sta[2] ){
+              $mga = $sta[2]." ".AttrVal($name, "level".$level."msg", 0);
+              #-- replace some parts
+              my @evtpart = split(" ",$evt);
+              $mga =~ s/\$NAME/$dev/g;
+              $mga =~ s/\$EVENT/$evt/g;
+              for( my $i=1;$i<= int(@evtpart);$i++){
+                 $mga =~ s/\$EVTPART$i/$evtpart[$i-1]/g;
+              }
+              #-- readings
+              readingsSingleUpdate( $hash, "level".$level,$dev,0 );
+              readingsSingleUpdate( $hash, "short", $mga, 0);
+              $mga = Alarm_getstate($hash)." ".$mga;
+              readingsSingleUpdate( $hash, "state", $mga, 0 );
+              $msg = "[Alarm $level] raised from device $dev with event $evt";
+              #-- calling actors AFTER state update
+              $cmd = AttrVal($name, "level".$level."onact", 0);
+              fhem($cmd); 
+              Log3 $hash,3,$msg;
+           }else{  
+              $msg = "[Alarm $level] not raised, alarmSensor $dev has wrong settings";
+              Log3 $hash,1,$msg;            
+           }
          }else{
             $msg = "[Alarm $level] not raised, not in time slot";
             Log3 $hash,5,$msg;
