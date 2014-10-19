@@ -82,7 +82,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.20";
+my $owx_version="5.22";
 #-- flexible channel name
 my $owg_channel;
 
@@ -189,7 +189,7 @@ sub OWMULTI_Attr(@) {
           }
         }
         last;
-      };
+      }
     }
   }
   return $ret;
@@ -290,6 +290,14 @@ sub OWMULTI_Define ($$) {
   return undef;
 }
 
+########################################################################################
+#
+# OWMULTI_Notify - implements the Notify Function  
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
+
 sub OWMULTI_Notify ($$) {
   my ($hash,$dev) = @_;
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
@@ -297,6 +305,14 @@ sub OWMULTI_Notify ($$) {
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
 }
+
+########################################################################################
+#
+# OWMULTI_Init - implements the Init function  
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
 
 sub OWMULTI_Init ($) {
   my ($hash)=@_;
@@ -343,6 +359,7 @@ sub OWMULTI_ChannelNames($) {
     
   #-- put into readings
   $owg_channel = $cnama[0]; 
+  $hash->{READINGS}{$owg_channel}{VAL}      = " ";  
   $hash->{READINGS}{$owg_channel}{TYPE}     = $cnama[1];  
   $hash->{READINGS}{$owg_channel}{UNIT}     = $unarr[0];
   $hash->{READINGS}{$owg_channel}{UNITABBR} = $unarr[1];
@@ -354,12 +371,12 @@ sub OWMULTI_ChannelNames($) {
   $tfactor = 1.0;
   
   if( $tunit eq "Celsius" ){
-    $tabbr   = "&deg;C";
+    $tabbr   = "°C";
   } elsif ($tunit eq "Kelvin" ){
     $tabbr   = "K";
     $toffset += "273.16"
   } elsif ($tunit eq "Fahrenheit" ){
-    $tabbr   = "&deg;F";
+    $tabbr   = "°F";
     $toffset = ($toffset+32)/1.8;
     $tfactor = 1.8;
   } else {
@@ -418,7 +435,7 @@ sub OWMULTI_FormatValues($) {
   } elsif( $vfunc ne "" ){
     $vval = int( $vfunc*1000 )/1000;
   } else {
-    
+    #-- todo ?  
   }
   
   #-- string buildup for return value, STATE 
