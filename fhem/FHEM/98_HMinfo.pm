@@ -617,6 +617,7 @@ sub HMinfo_tempList(@) { ######################################################
       while(<aRead>){
         chomp;
         my $line = $_;
+        $line =~ s/\r//g;
         if ($line =~ m/entities:(.*)/){
           my $eFound = $1;
           if (grep /\b$eFound\b/,@chList){
@@ -1409,6 +1410,7 @@ sub HMinfo_verifyConfig($@) {##################################################
   while(<aSave>){
     chomp;
     my $line = $_;
+    $line =~ s/\r//g;
     next if (   $line !~ m/set .* (peerBulk|regBulk) .*/);
     my ($cmd1,$eN,$cmd,$param) = split(" ",$line,4);
     next if ($eN !~ m/$filter/);
@@ -1506,6 +1508,7 @@ sub HMinfo_loadConfig($@) {####################################################
   while(<aSave>){
     chomp;
     my $line = $_;
+    $line =~ s/\r//g;
     next if (   $line !~ m/set .* (peerBulk|regBulk) .*/
              && $line !~ m/setreading .*/);
     my ($cmd1,$eN,$cmd,$param) = split(" ",$line,4);
@@ -1581,6 +1584,7 @@ sub HMinfo_purgeConfig($) {####################################################
   while(<aSave>){
     chomp;
     my $line = $_;
+    $line =~ s/\r//g;
     next if (   $line !~ m/set (.*) (peerBulk|regBulk) (.*)/
              && $line !~ m/setreading .*/);
     my ($cmd,$eN,$typ,$p1,$p2) = split(" ",$line,5);
