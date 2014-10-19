@@ -7218,6 +7218,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   while(<aSave>){
     chomp;
     my $line = $_;
+    $line =~ s/\r//g;
     next if($line =~ m/#/);
     if($line =~ m/^entities:/){
       last if ($found != 0);
