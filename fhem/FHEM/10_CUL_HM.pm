@@ -1658,10 +1658,12 @@ sub CUL_HM_Parse($$) {#########################################################
           }
           else{                                #invalid PhysLevel
             $rSUpdt = 1;
+            CUL_HM_stateUpdatDly($name,5) if ($shash->{helper}{dlvl});# update to get level
             # CUL_HM_stateUpdatDly($name,5);     # update to get level
             # we have to relay on device. Ack may come from a conditional event (BM)
             # if condition is not met device will not send status. 
             # We need to avoid regular requests
+            # therefore only update if we initiated the request
           }
         }
       }
