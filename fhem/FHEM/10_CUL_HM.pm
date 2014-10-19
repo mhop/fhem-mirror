@@ -1883,6 +1883,7 @@ sub CUL_HM_Parse($$) {#########################################################
           ($mTp eq "10" && $mI[0] eq "06")){    #    or Info_Status message
       my ($msgChn,$msgState) = ((hex($mI[1])&0x1f),$mI[2]) if (@mI > 2);
       my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$msgChn)};
+      $chnHash = $shash if(!$chnHash && $msgChn && $msgChn == 1);
       if ($md eq "HM-OU-LED16") {
         #special: all LEDs map to device state
         my $devState = ReadingsVal($name,"color","00000000");
