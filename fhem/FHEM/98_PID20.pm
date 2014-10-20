@@ -40,7 +40,8 @@
 #
 #  26.03.2014   (betateilchen)
 #               code review, pod added, removed old version info (will be provided via SVN)
-
+# V 1.01
+#  19.10.2014   fix in sub PID20_Set : wrong parameter $hash instead of $name, when calling PID20_Calc
 ####################################################################################################
 package main;
 use strict;
@@ -355,7 +356,7 @@ sub PID20_Set($@)
          return "Set stop needs a <value> parameter"
            if ( @a != 2 );
          $hash->{helper}{stopped} =1; 
-         PID20_Calc($hash);
+         PID20_Calc($name);
       }
       
       when ("restart")  
@@ -377,7 +378,7 @@ sub PID20_Set($@)
       
       when ("calc")  # inofficial function, only for debugging purposes
       {
-        PID20_Calc($hash);  
+        PID20_Calc($name);  
       }
       
       default
