@@ -73,9 +73,9 @@ sub statistics_UpdateDevReading($$$$);
    ,["pressure", 4, 1] 
    ,["rain", 2] 
    ,["rain_rate", 1, 1] 
-   ,["rain_total", 2, 1] 
+   ,["rain_total", 2] 
    ,["temperature", 1, 1] 
-   ,["total", 2, 2] 
+   ,["total", 2] 
    ,["voltage", 1, 1] 
    ,["wind", 5, 0] 
    ,["wind_speed", 5, 1] 
@@ -268,7 +268,7 @@ statistics_PeriodChange($)
    my $dayChangeTime = timelocal(0,0,0,$th[3],$th[4],$th[5]+1900);
    if (AttrVal($name, "dayChangeTime", "00:00") =~ /(\d+):(\d+)/ && $1<24 && $1 >=0 && $2<60 && $2>=0) {
       $dayChangeDelay = $1 * 3600 + $2 * 60;
-      if ($dayChangeDelay == 0) { $dayChangeDelay = 24*3600; }
+      if ($dayChangeDelay == 0) { $dayChangeTime += 24*3600; } # Otherwise it would always lay in the past
       $dayChangeTime += $dayChangeDelay - $periodChangePreset;
    }
 
