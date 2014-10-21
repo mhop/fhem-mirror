@@ -102,11 +102,11 @@ at_Define($$)
     $hash->{TRIGGERTIME_FMT} = FmtDateTime($nt);
     RemoveInternalTimer($hash);
     InternalTimer($nt, "at_Exec", $hash, 0);
+    $hash->{NTM} = $ntm if($rel eq "+" || $fn);
+    $hash->{STATE} = AttrVal($name, "disable", undef) ?
+                          "disabled" : ("Next: ".FmtTime($nt));
   }
 
-  $hash->{NTM} = $ntm if($rel eq "+" || $fn);
-  $hash->{STATE} = AttrVal($name, "disable", undef) ?
-                        "disabled" : ("Next: ".FmtTime($nt));
   return undef;
 }
 
@@ -189,6 +189,7 @@ at_adjustAlign($$)
   $hash->{TRIGGERTIME} = $ttime;
   $hash->{TRIGGERTIME_FMT} = FmtDateTime($ttime);
   $hash->{STATE} = "Next: " . FmtTime($ttime);
+  $hash->{NTM} = FmtTime($ttime);
   return undef;
 }
 
