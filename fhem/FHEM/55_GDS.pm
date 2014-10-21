@@ -956,7 +956,7 @@ sub sepLine($) {
 sub _rgbd2h($) {
 	my ($input) = @_;
 	my @a = split(" ", $input);
-	my $output = sprintf( "%x%x%x", $a[0],$a[1],$a[2]);
+	my $output = sprintf( "%02x%02x%02x", $a[0],$a[1],$a[2]);
 	return $output;
 }
 
