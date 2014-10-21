@@ -969,8 +969,8 @@ statistics_FormatDuration($)
 sub ########################################
 statistics_maxDecPlaces($$)
 {
-   my ($value,$decMax) = @_;
-   $decMax = 0 if $decMax == undef;
+   my ($value, $decMax) = @_;
+   $decMax = 0 if ! defined $decMax;
    if ( $value =~ /.*\.(.*)/ ) {
       my $decPlaces = length($1);
       $decMax = $decPlaces >= $decMax ? $decPlaces : $decMax;
