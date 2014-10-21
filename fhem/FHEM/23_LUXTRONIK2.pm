@@ -1,4 +1,4 @@
-###############################################################
+  ###############################################################
 # $Id$
 #
 #  23_LUXTRONIK2.pm
@@ -767,18 +767,19 @@ LUXTRONIK2_UpdateDone($)
    #WM[kW] = delta_Temp [K] * Durchfluss [l/h] / ( 3.600 [kJ/kWh] / ( 4,179 [kJ/(kg*K)] (H2O Wärmekapazität bei 30 & 40°C) * 0,994 [kg/l] (H2O Dichte bei 35°C) )  
    my $thermalPower = 0;
    # 0=Heizen, 5=Brauchwasser, 7=Abtauen, 16=Durchflussüberwachung 
-   if ($a[3] =~ /^(0|5|16)$/ ) { 
-      $thermalPower = abs($flowTemperature - $returnTemperature) * $a[19] / 866.65; 
+   if ($a[3] =~ /^(0|5|16)$/) { 
+      if ($a[19] !~ /no/) { $thermalPower = abs($flowTemperature - $returnTemperature) * $a[19] / 866.65; } #Nur bei Wärmezählern
       $heatPumpPower = AttrVal($name, "heatPumpElectricalPowerWatt", -1);
       $heatPumpPower *= (1 + ($flowTemperature-35) * AttrVal($name, "heatPumpElectricalPowerFactor", 0));
    }
-   readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower);
+   if ($a[19] !~ /no/) { readingsBulkUpdate( $hash, "thermalPower", sprintf "%.1f", $thermalPower); } #Nur bei Wärmezählern
    if ($heatPumpPower >-1 ) {    readingsBulkUpdate( $hash, "heatPumpElectricalPowerEstimated", sprintf "%.0f", $heatPumpPower); }
-   if ($heatPumpPower > 0) {
+   if ($heatPumpPower > 0 && $a[19] !~ /no/) { #Nur bei Wärmezählern
      $cop = $thermalPower * 1000 / $heatPumpPower;
      readingsBulkUpdate( $hash, "COP", sprintf "%.2f", $cop);
    }
 
+   
    # if selected, do all the statistic calculations
    if ( $doStatistic == 1) { 
       #LUXTRONIK2_doStatisticBoilerHeatUp $hash, $currOpHours, $currHQ, $currTemp, $opState, $target
@@ -805,13 +806,13 @@ LUXTRONIK2_UpdateDone($)
             Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to '$value'";
          }
       }
-      
-   # LUXTRONIK2_doStatisticThermalPower: $hash, $MonitoredOpState, $currOpState, $currHeatQuantity, $currOpHours,  $currAmbTemp, $currHeatSourceIn, $TargetTemp, $electricalPower
+
+      # LUXTRONIK2_doStatisticThermalPower: $hash, $MonitoredOpState, $currOpState, $currHeatQuantity, $currOpHours,  $currAmbTemp, $currHeatSourceIn, $TargetTemp, $electricalPower
       $value = LUXTRONIK2_doStatisticThermalPower ($hash, 5, $a[3], $a[37]/10, $a[35], $ambientTemperature, $heatSourceIN,$hotWaterTemperatureTarget, $heatPumpPower);
       if ($value ne "") { readingsBulkUpdate($hash,"statThermalPowerBoiler",$value); }
       $value = LUXTRONIK2_doStatisticThermalPower ($hash, 0, $a[3], $a[36]/10, $a[34], $ambientTemperature, $heatSourceIN, $returnTemperatureTarget, $heatPumpPower);
       if ($value ne "") { readingsBulkUpdate($hash,"statThermalPowerHeating",$value); }
-
+      
     # LUXTRONIK2_doStatisticMinMax $hash, $readingName, $value
      LUXTRONIK2_doStatisticMinMax ( $hash, "statAmbientTemp", $ambientTemperature);
 
@@ -1725,7 +1726,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
-  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.69, V1.70.</i>
+  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70.</i>
   <br>
   More Info on the particular <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">page of FHEM-Wiki</a> (in German).
   <br>
@@ -1843,7 +1844,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   Siemens Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist.
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
-  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.69, V1.70.</i>
+  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70.</i>
   <br>
   Mehr Infos im entsprechenden <u><a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">Artikel der FHEM-Wiki</a></u>.
   <br>&nbsp;
