@@ -316,7 +316,7 @@ sub sendClientMessage($%) {
   sendMessage($hash->{IODev},%msg);
 }
 
-sub mapReading($$) {
+sub mapReading($$$$) {
   my($hash, $type, $childId, $value) = @_;
 
   if(defined (my $mapping = $hash->{typeMappings}->{$type})) {
