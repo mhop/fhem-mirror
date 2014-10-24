@@ -97,6 +97,7 @@ FHEM/21_OWTEMP.pm            mfr69bs              http://forum.fhem.de 1Wire (de
 FHEM/21_OWTHERM.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Snstiges
 FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
+FHEM/23_KOSTALPIKO.pm        john                 http://forum.fhem.de CodeSchnipsel
 FHEM/23_LUXTRONIK2.pm        tupol                http://forum.fhem.de Sonstiges (PM: http://forum.fhem.de/index.php?action=pm;sa=send;u=5432)
 FHEM/23_WEBIO.pm             sachag               http://forum.fhem.de Sonstiges
 FHEM/23_WEBIO_12DIGITAL.pm   sachag               http://forum.fhem.de Sonstiges
