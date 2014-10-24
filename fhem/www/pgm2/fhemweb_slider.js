@@ -36,6 +36,7 @@ FW_sliderCreate(slider, curr)
   var min = parseFloat(slider.getAttribute("min"));
   var stp = parseFloat(slider.getAttribute("stp"));
   var max = parseFloat(slider.getAttribute("max"));
+  var flt = parseFloat(slider.getAttribute("flt"));
   var cmd = slider.getAttribute("cmd");
 
   function
@@ -78,7 +79,8 @@ FW_sliderCreate(slider, curr)
       if(offX < 0) offX = 0;
       if(offX > maxX) offX = maxX;
       val = min+(offX/maxX * (max-min));
-      val = Math.floor(Math.floor(val/stp)*stp);
+      val = (flt ? Math.floor(val/stp)*stp :
+                   Math.floor(Math.floor(val/stp)*stp));
       sh.innerHTML = val;
       sh.setAttribute('style', 'left:'+offX+'px;');
       if(cmd && cmd.substring(0,3) == "js:") {
@@ -112,17 +114,20 @@ FW_sliderCreate(slider, curr)
 function
 FW_sliderSelChange(name, devName, vArr)
 {
-  if(vArr.length != 4 || vArr[0] != "slider")
+  if(vArr.length < 4 || vArr.length > 5 || vArr[0] != "slider")
     return undefined;
 
   var o = new Object();
   var min=parseFloat(vArr[1]),
       stp=parseFloat(vArr[2]),
-      max=parseFloat(vArr[3]);
+      max=parseFloat(vArr[3]),
+      flt=parseFloat(vArr[4]);
+  if(!flt) flt=0;
   o.newEl = document.createElement('div');
   o.newEl.innerHTML =
-    '<div class="slider" id="slider.'+devName+'" min="'+min+'" stp="'+stp+
-              '" max="'+max+'"><div class="handle">'+min+'</div></div>'+
+    '<div class="slider" id="slider.'+devName+
+        '" min="'+min+'" stp="'+stp+'" max="'+max+'" flt="'+flt+
+        '"><div class="handle">'+min+'</div></div>'+
     '<input type="hidden" name="'+name+'" value="'+min+'">';
   FW_sliderCreate(o.newEl.firstChild, undefined);
 
