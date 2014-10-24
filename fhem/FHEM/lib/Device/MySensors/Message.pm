@@ -12,14 +12,16 @@ use warnings;
 
 sub parseMsg($) {
   my $txt = shift;
-  my @fields = split(/;/,$txt);
-  my $msgRef = { radioId => $fields[0],
-                 childId => $fields[1],
-                 cmd     => $fields[2],
-                 ack     => $fields[3],
-                 subType => $fields[4],
-                 payload => $fields[5] };
-  return $msgRef;
+  if ($txt =~ /^(\d+);(\d+);(\d+);(\d+);(\d+);(.*)$/) {
+    return { radioId => $1,
+             childId => $2,
+             cmd     => $3,
+             ack     => $4,
+             subType => $5,
+             payload => $6 };
+  } else {
+    return undef;
+  };
 }
 
 sub createMsg(%) {
