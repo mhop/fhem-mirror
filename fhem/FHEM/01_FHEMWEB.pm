@@ -2439,9 +2439,10 @@ FW_sliderFn($$$$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
-  return undef if($values !~ m/^slider,(.*),(.*),(.*)$/);
+  return undef if($values !~ m/^slider,([\d.]*),([\d.]*),([\d.]*)(,1)?$/);
   return "" if($cmd =~ m/ /);   # webCmd pct 30 should generate a link
-  my ($min,$stp, $max) = ($1, $2, $3);
+  my ($min,$stp, $max, $flt) = ($1, $2, $3, $4);
+  $flt = ($flt ? 1 : 0);
   my $srf = $FW_room ? "&room=$FW_room" : "";
   my $cv = ReadingsVal($d, $cmd, Value($d));
   my $id = ($cmd eq "state") ? "" : "-$cmd";
@@ -2450,7 +2451,7 @@ FW_sliderFn($$$$$)
   $cv = 0 if($cv !~ m/\d/);
   return "<td colspan='2'>".
            "<div class='slider' id='slider.$d$id' min='$min' stp='$stp' ".
-                 "max='$max' cmd='$FW_ME?cmd=set $d $cmd %$srf'>".
+                 "max='$max' cmd='$FW_ME?cmd=set $d $cmd %$srf' flt='$flt'>".
              "<div class='handle'>$min</div>".
            "</div>".
            "<script type=\"text/javascript\">".
@@ -3085,8 +3086,10 @@ FW_widgetOverride($$)
             displayed.</li>
           <li>if the modifier is ":textField", an input field is displayed.</li>
           <li>if the modifier is of the form
-            ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", then a javascript
-            driven slider is displayed</li>
+            ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1]", then a
+            javascript driven slider is displayed. The optional ,1 at the end
+            avoids the rounding of floating-point numbers.</li>
+
           <li>if the modifier is of the form ":multiple,val1,val2,...", then
             multiple values can be selected and own values can be written, the
             result is comma separated.</li>
@@ -3651,8 +3654,9 @@ FW_widgetOverride($$)
               angezeigt.</li>
 
           <li>Ist der Modifier in der Form
-            ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", so wird ein in
-            JavaScript programmierter Slider angezeigt</li>
+            ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1]", so wird ein in
+            JavaScript programmierter Slider angezeigt. Das optionale 1
+            (isFloat) vermeidet eine Rundung der Fliesskommazahlen </li>
 
           <li>Ist der Modifier ":multiple,val1,val2,...", dann ist eine
             Mehrfachauswahl m&ouml;glich und es k&ouml;nnen neue Werte gesetzt
