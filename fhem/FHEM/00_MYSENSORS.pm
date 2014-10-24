@@ -59,6 +59,7 @@ sub MYSENSORS_Initialize($) {
     "autocreate:1 ".
     "requestAck:1 ".
     "first-sensorid ".
+    "last-sensorid ".
     "stateFormat";
 }
 
@@ -235,36 +236,39 @@ sub Read {
     my $txt;
     ($txt,$data) = split("\n", $data, 2);
     $txt =~ s/\r//;
-    my $msg = parseMsg($txt);
-    Log3 ($name,5,"MYSENSORS Read: ".dumpMsg($msg));
+    if (my $msg = parseMsg($txt)) {
+      Log3 ($name,5,"MYSENSORS Read: ".dumpMsg($msg));
 
-    if ($msg->{ack}) {
-      delete $hash->{messages}->{$txt};
-      $hash->{outstandingAck} = keys %{$hash->{messages}};
-    }
+      if ($msg->{ack}) {
+        delete $hash->{messages}->{$txt};
+        $hash->{outstandingAck} = keys %{$hash->{messages}};
+      }
 
-    my $type = $msg->{cmd};
-    MESSAGE_TYPE: {
-      $type == C_PRESENTATION and do {
-        onPresentationMsg($hash,$msg);
-        last;
-      };
-      $type == C_SET and do {
-        onSetMsg($hash,$msg);
-        last;
-      };
-      $type == C_REQ and do {
-        onRequestMsg($hash,$msg);
-        last;
-      };
-      $type == C_INTERNAL and do {
-        onInternalMsg($hash,$msg);
-        last;
-      };
-      $type == C_STREAM and do {
-        onStreamMsg($hash,$msg);
-        last;
-      };
+      my $type = $msg->{cmd};
+      MESSAGE_TYPE: {
+        $type == C_PRESENTATION and do {
+          onPresentationMsg($hash,$msg);
+          last;
+        };
+        $type == C_SET and do {
+          onSetMsg($hash,$msg);
+          last;
+        };
+        $type == C_REQ and do {
+          onRequestMsg($hash,$msg);
+          last;
+        };
+        $type == C_INTERNAL and do {
+          onInternalMsg($hash,$msg);
+          last;
+        };
+        $type == C_STREAM and do {
+          onStreamMsg($hash,$msg);
+          last;
+        };
+      }
+    } else {
+      Log3 ($name,5,"MYSENSORS Read: ".$txt."is no parsable mysensors message");
     }
   }
   $hash->{PARTIAL} = $data;
@@ -338,13 +342,13 @@ sub onInternalMsg($$) {
       };
       $type == I_ID_REQUEST and do {
         if ($hash->{'inclusion-mode'}) {
-          my %nodes = map {$_ => 1} (AttrVal($hash->{NAME},"first-sensorid",20) ... 254);
+          my %nodes = map {$_ => 1} (AttrVal($hash->{NAME},"first-sensorid",20) ... AttrVal($hash->{NAME},"last-sensorid",254));
           GP_ForallClients($hash,sub {
             my $client = shift;
             delete $nodes{$client->{radioId}};
           });
           if (keys %nodes) {
-            my $newid = (keys %nodes)[0];
+            my $newid = (sort keys %nodes)[0];
             sendMessage($hash,radioId => 255, childId => 255, cmd => C_INTERNAL, ack => 0, subType => I_ID_RESPONSE, payload => $newid);
             Log3($hash->{NAME},4,"MYSENSORS $hash->{NAME} assigned new nodeid $newid");
           } else {
