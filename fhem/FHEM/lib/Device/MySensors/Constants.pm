@@ -130,11 +130,14 @@ use constant {
   S_IR                    => 20,
   S_WATER                 => 21,
   S_AIR_QUALITY           => 22,
+  S_CUSTOM                => 23,
+  S_DUST                  => 24,
+  S_SCENE_CONTROLLER      => 25,
 };
 
 use constant sensorTypes => qw{ S_DOOR S_MOTION S_SMOKE S_LIGHT S_DIMMER S_COVER S_TEMP S_HUM S_BARO S_WIND
         S_RAIN S_UV S_WEIGHT S_POWER S_HEATER S_DISTANCE S_LIGHT_LEVEL S_ARDUINO_NODE
-        S_ARDUINO_REPEATER_NODE S_LOCK S_IR S_WATER S_AIR_QUALITY };
+        S_ARDUINO_REPEATER_NODE S_LOCK S_IR S_WATER S_AIR_QUALITY S_CUSTOM S_DUST S_SCENE_CONTROLLER };
 
 sub sensorTypeToStr($) {
   (sensorTypes)[shift];

@@ -42,9 +42,12 @@ sub MYSENSORS_DEVICE_Initialize($) {
   
   $hash->{AttrList} =
     "config:M,I ".
+    "mode:node,repeater ".
+    "version:1.4 ".
     "setCommands ".
-    "setReading_.+_\\d+ ".
+    "setReading_.+ ".
     "mapReadingType_.+ ".
+    "mapReading_.+ ".
     "requestAck:1 ". 
     "IODev ".
     $main::readingFnAttributes;
@@ -67,18 +70,90 @@ BEGIN {
   GP_Import(qw(
     AttrVal
     readingsSingleUpdate
+    CommandAttr
+    CommandDeleteAttr
     CommandDeleteReading
     AssignIoPort
     Log3
   ))
 };
 
+my %static_types = (
+  S_DOOR                  => { receives => [], sends => [V_TRIPPED] }, # BinarySwitchSensor
+  S_MOTION                => { receives => [], sends => [V_TRIPPED] }, # MotionSensor
+  S_SMOKE                 => { receives => [], sends => [] }, # Not used so far
+  S_LIGHT                 => { receives => [V_LIGHT], sends => [V_LIGHT] }, # BinarySwitchSensor
+  S_DIMMER                => { receives => [V_LIGHT,V_DIMMER], sends => [V_LIGHT,V_DIMMER] }, # DimmableLEDActuator
+  S_COVER                 => { receives => [V_DIMMER,V_UP,V_DOWN,V_STOP], sends => [V_DIMMER] }, # ServoActuator
+  S_TEMP                  => { receives => [], sends => [V_TEMP] }, # DallasTemperatureSensor
+  S_HUM                   => { receives => [], sends => [V_HUM] }, # HumiditySensor
+  S_BARO                  => { receives => [], sends => [V_PRESSURE,V_FORECAST] },
+  S_WIND                  => { receives => [], sends => [] }, # Not used so far
+  S_RAIN                  => { receives => [], sends => [] }, # Not used so far
+  S_UV                    => { receives => [], sends => [V_UV] }, # UVSensor
+  S_WEIGHT                => { receives => [], sends => [] }, # Not used so far
+  S_POWER                 => { receives => [V_VAR1], sends => [V_WATT,V_KWH,V_VAR1] }, # EnergyMeterPulseSensor
+  S_HEATER                => { receives => [], sends => [] }, # Not used so far
+  S_DISTANCE              => { receives => [], sends => [V_DISTANCE] }, # DistanceSensor
+  S_LIGHT_LEVEL           => { receives => [], sends => [V_LIGHT_LEVEL] }, # LightSensor
+  S_ARDUINO_NODE          => { receives => [], sends => [] }, # Not used so far
+  S_ARDUINO_REPEATER_NODE => { receives => [], sends => [] }, # Not used so far
+  S_LOCK                  => { receives => [V_LOCK_STATUS], sends => [V_LOCK_STATUS] }, #R FIDLockSensor
+  S_IR                    => { receives => [], sends => [] }, # Not used so far
+  S_WATER                 => { receives => [V_VAR1], sends => [V_FLOW,V_VOLUME] }, # WaterMeterPulseSensor
+  S_AIR_QUALITY           => { receives => [], sends => [V_VAR1] }, # AirQualitySensor
+  S_CUSTOM                => { receives => [], sends => [] }, # Not used so far
+  S_DUST                  => { receives => [], sends => [V_DUST_LEVEL] }, # Not used so far
+  S_SCENE_CONTROLLER      => { receives => [], sends => [V_SCENE_ON,V_SCENE_OFF] }, # TouchDisplaySceneControllerDisplaySensor
+);
+
 my %static_mappings = (
   V_TEMP        => { type => "temperature" },
-  V_HUM         => { type => "humidity" },
+  V_HUM         => { type => "humidity", range => { min => 0, max => 100 }},
   V_PRESSURE    => { type => "pressure" },
   V_LIGHT_LEVEL => { type => "brightness" },
   V_LIGHT       => { type => "switch", val => { 0 => 'off', 1 => 'on' }},
+  V_DIMMER      => { type => "dimmer", range => { min => 0, max => 100 }},
+  V_FORECAST    => { type => "forecast", val => { # PressureSensor, DP/Dt explanation
+                                                  0 => 'stable',       # 0 = "Stable Weather Pattern"
+                                                  1 => 'slow rising',  # 1 = "Slowly rising Good Weather", "Clear/Sunny "
+                                                  2 => 'slow falling', # 2 = "Slowly falling L-Pressure ", "Cloudy/Rain "
+                                                  3 => 'quick rising', # 3 = "Quickly rising H-Press",     "Not Stable"
+                                                  4 => 'quick falling',# 4 = "Quickly falling L-Press",    "Thunderstorm"
+                                                  5 => 'unknown' }},   # 5 = "Unknown (More Time needed) 
+  V_RAIN        => { type => "rain" },
+  V_RAINRATE    => { type => "rainrate" },
+  V_WIND        => { type => "wind" },
+  V_GUST        => { type => "gust" },
+  V_DIRECTION   => { type => "direction" },
+  V_UV          => { type => "uv" },
+  V_WEIGHT      => { type => "weight" },
+  V_DISTANCE    => { type => "distance" },
+  V_IMPEDANCE   => { type => "impedance" },
+  V_ARMED       => { type => "armed" },
+  V_TRIPPED     => { type => "tripped" },
+  V_WATT        => { type => "power" },
+  V_KWH         => { type => "energy" },
+  V_SCENE_ON    => { type => "button_on" },
+  V_SCENE_OFF   => { type => "button_off" },
+  V_HEATER      => { type => "heater" },
+  V_HEATER_SW   => { type => "heater_sw" },
+  V_VAR1        => { type => "value1" },
+  V_VAR2        => { type => "value2" },
+  V_VAR3        => { type => "value3" },
+  V_VAR4        => { type => "value4" },
+  V_VAR5        => { type => "value5" },
+  V_UP          => { type => "up" },
+  V_DOWN        => { type => "down" },
+  V_STOP        => { type => "stop" },
+  V_IR_SEND     => { type => "ir_send" },
+  V_IR_RECEIVE  => { type => "ir_receive" },
+  V_FLOW        => { type => "flow" },
+  V_VOLUME      => { type => "volume" },
+  V_LOCK_STATUS => { type => "lockstatus", val => { 0 => 'locked', 1 => 'unlocked' }},
+  V_DUST_LEVEL  => { type => "dustlevel" },
+  V_VOLTAGE     => { type => "voltage" },
+  V_CURRENT     => { type => "current" },
 );
 
 sub Define($$) {
@@ -88,11 +163,12 @@ sub Define($$) {
   $hash->{radioId} = $radioId;
   $hash->{sets} = {
     'time' => "",
-    clear  => "",
     reboot => "",
   };
   $hash->{ack} = 0;
   $hash->{typeMappings} = {map {variableTypeToIdx($_) => $static_mappings{$_}} keys %static_mappings};
+  $hash->{sensorMappings} = {map {sensorTypeToIdx($_) => $static_types{$_}} keys %static_types};
+  
   $hash->{readingMappings} = {};
   AssignIoPort($hash);
 };
@@ -121,26 +197,28 @@ sub Set($@) {
       sendClientMessage($hash, childId => 255, cmd => C_INTERNAL, subType => I_REBOOT);
       last;
     };
-    $command =~ /^(.+_\d+)$/ and do {
-      my $value = @values ? join " ",@values : "";
-      my ($type,$childId,$mappedValue) = readingToType($hash,$1,$value);
-      sendClientMessage($hash, childId => $childId, cmd => C_SET, subType => $type, payload => $mappedValue);
-      readingsSingleUpdate($hash,$command,$value,1) unless ($hash->{ack} or $hash->{IODev}->{ack});
-      last;
-    };
     (defined ($hash->{setcommands}->{$command})) and do {
       my $setcommand = $hash->{setcommands}->{$command};
-      my ($type,$childId,$mappedValue) = readingToType($hash,$setcommand->{var},$setcommand->{val});
-      sendClientMessage($hash,
-        childId => $childId,
-        cmd => C_SET,
-        subType => $type,
-        payload => $mappedValue,
-      );
-      readingsSingleUpdate($hash,$setcommand->{var},$setcommand->{val},1) unless ($hash->{ack} or $hash->{IODev}->{ack});
+      eval {
+        my ($type,$childId,$mappedValue) = mappedReadingToRaw($hash,$setcommand->{var},$setcommand->{val});
+        sendClientMessage($hash,
+          childId => $childId,
+          cmd => C_SET,
+          subType => $type,
+          payload => $mappedValue,
+        );
+        readingsSingleUpdate($hash,$setcommand->{var},$setcommand->{val},1) unless ($hash->{ack} or $hash->{IODev}->{ack});
+      };
+      return "$command not defined: ".GP_Catch($@) if $@;
       last;
     };
-    return "$command not defined by attr setCommands";
+    my $value = @values ? join " ",@values : "";
+    eval {
+      my ($type,$childId,$mappedValue) = mappedReadingToRaw($hash,$command,$value);
+      sendClientMessage($hash, childId => $childId, cmd => C_SET, subType => $type, payload => $mappedValue);
+      readingsSingleUpdate($hash,$command,$value,1) unless ($hash->{ack} or $hash->{IODev}->{ack});
+    };
+    return "$command not defined: ".GP_Catch($@) if $@;
   }
 }
 
@@ -151,12 +229,34 @@ sub Attr($$$$) {
   ATTRIBUTE_HANDLER: {
     $attribute eq "config" and do {
       if ($main::init_done) {
-        sendClientMessage($hash, cmd => C_INTERNAL, subType => I_CONFIG, payload => $command eq 'set' ? $value : "M");
+        sendClientMessage($hash, cmd => C_INTERNAL, childId => 255, subType => I_CONFIG, payload => $command eq 'set' ? $value : "M");
+      }
+      last;
+    };
+    $attribute eq "mode" and do {
+      if ($command eq "set" and $value eq "repeater") {
+        $hash->{repeater} = 1;
+        $hash->{sets}->{clear} = "";
+      } else {
+        $hash->{repeater} = 0;
+        delete $hash->{sets}->{clear};
+      }
+      last;
+    };
+    $attribute eq "version" and do {
+      if ($command eq "set") {
+        $hash->{protocol} = $value;
+      } else {
+        delete $hash->{protocol};
       }
       last;
     };
     $attribute eq "setCommands" and do {
-      if ($command eq "set") {
+      foreach my $set (keys %{$hash->{setcommands}}) {
+        delete $hash->{sets}->{$set};
+      }
+      $hash->{setcommands} = {};
+      if ($command eq "set" and defined $value) {
         foreach my $setCmd (split ("[, \t]+",$value)) {
           $setCmd =~ /^(.+):(.+_\d+):(.+)$/;
           $hash->{sets}->{$1}="";
@@ -165,17 +265,12 @@ sub Attr($$$$) {
             val => $3,
           };
         }
-      } else {
-        foreach my $set (keys %{$hash->{setcommands}}) {
-          delete $hash->{sets}->{$set};
-        }
-        $hash->{setcommands} = {};
       }
       last;
     };
-    $attribute =~ /^setReading_(.+_\d+)$/ and do {
+    $attribute =~ /^setReading_(.+)$/ and do {
       if ($command eq "set") {
-        $hash->{sets}->{$1}=join(",",split ("[, \t]+",$value));
+        $hash->{sets}->{$1}= (defined $value) ? join(",",split ("[, \t]+",$value)) : "";
       } else {
         CommandDeleteReading(undef,"$hash->{NAME} $1");
         delete $hash->{sets}->{$1};
@@ -196,7 +291,38 @@ sub Attr($$$$) {
         } else {
           delete $hash->{typeMappings}->{$type};
         }
-        CommandDeleteReading(undef,"$hash->{NAME} $1"); #TODO do propper remap of existing readings
+        my $readings = $hash->{READINGS};
+        my $readingMappings = $hash->{readingMappings};
+        foreach my $todelete (map {$readingMappings->{$_}->{name}} grep {$readingMappings->{$_}->{type} == $type} keys %$readingMappings) {
+          CommandDeleteReading(undef,"$hash->{NAME} $todelete"); #TODO do propper remap of existing readings
+        }
+      }
+      last;
+    };
+    $attribute =~ /^mapReading_(.+)/ and do {
+      my $readingMappings = $hash->{readingMappings};
+      FIND: foreach my $id (keys %$readingMappings) {
+        my $readingsForId = $readingMappings->{$id};
+        foreach my $type (keys %$readingsForId) {
+          if ($readingsForId->{$type} eq $1) {
+            delete $readingsForId->{$type};
+            unless (keys %$readingsForId) {
+              delete $readingMappings->{$id};
+            }
+            last FIND;
+          }
+        }
+      }
+      if ($command eq "set") {
+        my ($id,$typeStr) = split ("[, \t]",$value);
+        my $typeMappings = $hash->{typeMappings};
+        if (my @match = grep {$typeMappings->{$_}->{type} eq $typeStr} keys %$typeMappings) {
+          $hash->{readingMappings}->{$id}->{shift @match} = $1;
+        } else {
+          return "unknown reading type $typeStr";
+        }
+      } else {
+        CommandDeleteReading(undef,"$hash->{NAME} $1");
       }
       last;
     };
@@ -217,13 +343,62 @@ sub onGatewayStarted($) {
 
 sub onPresentationMessage($$) {
   my ($hash,$msg) = @_;
+  my $name = $hash->{NAME};
+  my $nodeType = $msg->{subType};
+  my $id = $msg->{childId};
+  if ($id == 255) { #special id
+    NODETYPE: {
+      $nodeType == S_ARDUINO_NODE and do {
+        CommandAttr(undef, "$name mode node");
+        last;
+      };
+      $nodeType == S_ARDUINO_REPEATER_NODE and do {
+        CommandAttr(undef, "$name mode repeater");
+        last;
+      };
+    };
+    CommandAttr(undef, "$name version $msg->{payload}");
+  };
+
+  my $readingMappings = $hash->{readingMappings};
+  my $typeMappings = $hash->{typeMappings};
+  if (my $sensorMappings = $hash->{sensorMappings}->{$nodeType}) {
+    my @ret = ();
+    foreach my $type (@{$sensorMappings->{sends}}) {
+      next if (defined $readingMappings->{$id}->{$type});
+      my $typeStr = $typeMappings->{$type}->{type};
+      if ($hash->{IODev}->{'inclusion-mode'}) {
+        if (my $ret = CommandAttr(undef,"$name mapReading_$typeStr$id $id $typeStr")) {
+          push @ret,$ret;
+        }
+      } else {
+        push @ret,"no mapReading for $id, $typeStr";
+      }
+    }
+    foreach my $type (@{$sensorMappings->{receives}}) {
+      my $typeMapping = $typeMappings->{$type};
+      my $typeStr = $typeMapping->{type};
+      next if (defined $hash->{sets}->{"$typeStr$id"});
+      if ($hash->{IODev}->{'inclusion-mode'}) {
+        if (my $ret = CommandAttr(undef,"$name setReading_$typeStr$id".($typeMapping->{val} ? " ".join (",",values %{$typeMapping->{val}}) : ""))) {
+          push @ret,$ret;
+        }
+      } else {
+        push @ret,"no setReading for $id, $typeStr";
+      }
+    }
+    Log3 ($hash->{NAME},4,"MYSENSORS_DEVICE $hash->{NAME}: errors on C_PRESENTATION-message for childId $id, subType ".sensorTypeToStr($nodeType)." ".join (", ",@ret)) if @ret;
+  }
 }
 
 sub onSetMessage($$) {
   my ($hash,$msg) = @_;
   if (defined $msg->{payload}) {
-    my ($reading,$value) = mapReading($hash,$msg->{subType},$msg->{childId},$msg->{payload});
-    readingsSingleUpdate($hash,$reading,$value,1);
+    eval {
+      my ($reading,$value) = rawToMappedReading($hash,$msg->{subType},$msg->{childId},$msg->{payload});
+      readingsSingleUpdate($hash,$reading,$value,1);
+    };
+    Log3 ($hash->{NAME},4,"MYSENSORS_DEVICE $hash->{NAME}: ignoring C_SET-message ".GP_Catch($@)) if $@;
   } else {
     Log3 ($hash->{NAME},5,"MYSENSORS_DEVICE $hash->{NAME}: ignoring C_SET-message without payload");
   }
@@ -252,7 +427,7 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_TIME and do {
-      sendClientMessage($hash,cmd => C_INTERNAL, subType => I_TIME, payload => time);
+      sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_TIME, payload => time);
       Log3 ($name,4,"MYSENSORS_DEVICE $name: update of time requested");
       last;
     };
@@ -273,7 +448,7 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_CONFIG and do {
-      sendClientMessage($hash,cmd => C_INTERNAL, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
+      sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
       Log3 ($name,4,"MYSENSORS_DEVICE $name: respond to config-request");
       last;
     };
@@ -316,28 +491,37 @@ sub sendClientMessage($%) {
   sendMessage($hash->{IODev},%msg);
 }
 
-sub mapReading($$$$) {
+sub rawToMappedReading($$$$) {
   my($hash, $type, $childId, $value) = @_;
 
-  if(defined (my $mapping = $hash->{typeMappings}->{$type})) {
-    return ("$mapping->{type}_$childId",defined $mapping->{val}->{$value} ? $mapping->{val}->{$value} : $value);
-  } else {
-    return (variableTypeToStr($type)."_$childId",$value);
+  my $name;
+  if (defined (my $name = $hash->{readingMappings}->{$childId}->{$type})) {
+    if(defined (my $mapping = $hash->{typeMappings}->{$type})) {
+      return ($name,defined $mapping->{val}->{$value} ? $mapping->{val}->{$value} : $value);
+    }
+    die "not type-mapping for type ".variableTypeToStr($type);
   }
+  die "no reading-mapping for childId $childId, type ".($hash->{typeMappings}->{$type}->{type} ? $hash->{typeMappings}->{$type}->{type} : variableTypeToStr($type));
 }
 
-sub readingToType($$$) {
+sub mappedReadingToRaw($$$) {
   my ($hash,$reading,$value) = @_;
-  $reading =~ /^(.+)_(\d+)$/;
-  if (my @types = grep {$hash->{typeMappings}->{$_}->{type} eq $1} keys %{$hash->{typeMappings}}) {
-    my $type = shift @types;
-    my $valueMappings = $hash->{typeMappings}->{$type}->{val};
-    if (my @mappedValues = grep {$valueMappings->{$_} eq $value} keys %$valueMappings) {
-      return ($type,$2,shift @mappedValues);
+  
+  my $readingsMapping = $hash->{readingMappings};
+  foreach my $id (keys %$readingsMapping) {
+    my $readingTypesForId = $readingsMapping->{$id};
+    foreach my $type (keys %$readingTypesForId) {
+      if ($readingTypesForId->{$type} eq $reading) {
+        if (my $valueMappings = $hash->{typeMappings}->{$type}->{val}) {
+          if (my @mappedValues = grep {$valueMappings->{$_} eq $value} keys %$valueMappings) {
+            return ($type,$id,shift @mappedValues);
+          }
+        }
+        return ($type,$id,$value);
+      }
     }
-    return ($type,$2,$value);
   }
-  return (variableTypeToIdx("V_$1"),$2,$value);
+  die "no mapping for reading $reading";
 }
 
 1;
@@ -392,9 +576,9 @@ sub readingToType($$$) {
          e.g.: <code>attr &lt;name&gt; setReading_switch_1 on,off</code></p>
     </li>
     <li>
-      <p><code>attr &lt;name&gt; mapReadingType_&lt;reading&gt; &lt;new reading name&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code><br/>
-         configures reading user names that should be used instead of technical names<br/>
-         E.g.: <code>attr xxx mapReadingType_LIGHT switch 0:on 1:off</code></p>
+      <p><code>attr &lt;name&gt; mapReading_&lt;reading&gt; &lt;childId&gt; &lt;readingtype&gt;</code><br/>
+         configures the reading-name for a given childId and sensortype<br/>
+         E.g.: <code>attr xxx mapReading_aussentemperatur 123 temperature</code></p>
     </li>
     <li>
       <p><code>att &lt;name&gt; requestAck</code><br/>
@@ -402,6 +586,12 @@ sub readingToType($$$) {
          if set the Readings of nodes are updated not before requested acknowledge is received<br/>
          if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).<br/>
          May also be configured on the gateway for all nodes at once</p>
+    </li>
+    <li>
+      <p><code>attr &lt;name&gt; mapReadingType_&lt;reading&gt; &lt;new reading name&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code><br/>
+         configures reading type names that should be used instead of technical names<br/>
+         E.g.: <code>attr xxx mapReadingType_LIGHT switch 0:on 1:off</code>
+         to be used for mysensor Variabletypes that have no predefined defaults (yet)</p>
     </li>
   </ul>
 </ul>
