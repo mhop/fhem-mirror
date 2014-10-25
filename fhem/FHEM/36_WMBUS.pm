@@ -13,30 +13,6 @@ use SetExtensions;
 use WMBus;
 
 
-#my %defaultAttrs = (
-#	# manufacturer
-#	FFD => { # FastForward AG, EnergyCam
-#		# type
-#		  2 => [ # electricity
-#		  # fhem commands to execute
-#			'attr %D% userreading energy:1:value { ReadingsVal("%D%","1:value",0)/1000 . " kWh";; }',
-#			'attr %D% stateformat {ReadingsVal("%D%","energy","") . " " . ReadingsTimestamp("%D%","energy","");;}',
-#			],
-#			3 => [ # gas
-#		  # fhem commands to execute
-#			'attr %D% userreading volume:1:value { ReadingsVal("%D%","1:value",0) . " " . ReadingsVal("%D%","1:unit","");; }',
-#			'attr %D% stateformat {ReadingsVal("%D%","volume","") . " " . ReadingsTimestamp("%D%","volume","");;}',
-#			],
-#			7 => [ # water
-#		  # fhem commands to execute
-#			'attr %D% userreading volume:1:value { ReadingsVal("%D%","1:value",0) . " " . ReadingsVal("%D%","1:unit","");; }',
-#			'attr %D% stateformat {ReadingsVal("%D%","volume","") . " " . ReadingsTimestamp("%D%","volume","");;}',
-#			],
-#		
-#		}
-#);
-			
-
 sub WMBUS_Parse($$);
 sub WMBUS_SetReadings($$$);
 sub WMBUS_SetRSSI($$$);
@@ -306,15 +282,18 @@ sub WMBUS_SetReadings($$$)
 		my $dataBlock;
 		
 		for $dataBlock ( @$dataBlocks ) {
-			readingsBulkUpdate($hash, "$dataBlock->{number}:storage_no", $dataBlock->{storageNo});
-			readingsBulkUpdate($hash, "$dataBlock->{number}:type", $dataBlock->{type}); 
-			readingsBulkUpdate($hash, "$dataBlock->{number}:value", $dataBlock->{value}); 
-			readingsBulkUpdate($hash, "$dataBlock->{number}:unit", $dataBlock->{unit});
+			readingsBulkUpdate($hash, "$dataBlock->{number}_storage_no", $dataBlock->{storageNo});
+			readingsBulkUpdate($hash, "$dataBlock->{number}_type", $dataBlock->{type}); 
+			readingsBulkUpdate($hash, "$dataBlock->{number}_value", $dataBlock->{value}); 
+			readingsBulkUpdate($hash, "$dataBlock->{number}_unit", $dataBlock->{unit});
 			if ($dataBlock->{errormsg}) {
-				readingsBulkUpdate($hash, "$dataBlock->{number}:errormsg", $dataBlock->{errormsg});
+				readingsBulkUpdate($hash, "$dataBlock->{number}_errormsg", $dataBlock->{errormsg});
 			}
 		}
-	}
+    readingsBulkUpdate($hash, "battery", $mb->{status} & 4 ? "low" : "ok");
+
+    WMBUS_SetDeviceSpecificReadings($hash, $name, $mb);
+  }
 	readingsBulkUpdate($hash, "is_encrypted", $mb->{isEncrypted});
 	readingsBulkUpdate($hash, "decryption_ok", $mb->{decrypted});
 	
@@ -328,6 +307,27 @@ sub WMBUS_SetReadings($$$)
 
 	return @list;
   
+}
+
+sub WMBUS_SetDeviceSpecificReadings($$$)
+{
+  my ($hash, $name, $mb) = @_;
+  
+  if ($mb->{manufacturer} eq 'FFD') {
+    # Fast Forward AG
+    if ($mb->{afield_ver} == 1) {
+      #EnergyCam
+      if ($mb->{afield_type} == 2) {
+        # electricity
+        readingsBulkUpdate($hash, "energy", ReadingsVal($name, "1_value", 0) / 1000);
+        readingsBulkUpdate($hash, "unit", "kWh");
+      } elsif ($mb->{afield_type} == 3 || $mb->{afield_type} == 7) {
+        # gas/water
+        readingsBulkUpdate($hash, "volume", ReadingsVal($name, "1_value", 0));
+        readingsBulkUpdate($hash, "unit", "m³");
+      }
+    }
+  }
 }
 
 #####################################
@@ -459,9 +459,9 @@ WMBUS_Attr(@)
   The readings are generated in blocks starting with block 1. A meter can send several data blocks.
   Each block has at least a type, a value and a unit, e.g. for an electricity meter it might look like<br>
   <ul>
-  <code>1:type VIF_ELECTRIC_ENERGY</code><br>
-  <code>1:unit Wh</code><br>
-  <code>1:value 2948787</code><br>
+  <code>1_type VIF_ELECTRIC_ENERGY</code><br>
+  <code>1_unit Wh</code><br>
+  <code>1_value 2948787</code><br>
 	</ul>
 	<br>
   There is also a fixed set of readings.
@@ -469,7 +469,9 @@ WMBUS_Attr(@)
   <li><code>is_encrypted</code> is 1 if the received message is encrypted.</li>
   <li><code>decryption_ok</code> is 1 if a message has either been successfully decrypted or if it is unencrypted.</li>
   <li><code>state</code> contains the state of the meter and may contain error message like battery low. Normally it contains 'no error'.</li>
+  <li><code>battery</code> contains ok or low.
   </ul>
+  For some well known devices specific readings like the energy consumption in kWh created.
   </ul>
   
   
@@ -564,9 +566,9 @@ WMBUS_Attr(@)
   Die Readings werden als Block dargestellt, beginnend mit Block 1. Ein Z&auml;hler kann mehrere Bl&ouml;cke senden.
   Jeder Block enth&auml;lt zumindest einen Typ, einen Wert und eine Einheit. F&uuml;r einen Elektrizit&auml;tsz&auml;hler k&ouml;nnte das z. B. so aussehen<br>
   <ul>
-  <code>1:type VIF_ELECTRIC_ENERGY</code><br>
-  <code>1:unit Wh</code><br>
-  <code>1:value 2948787</code><br>
+  <code>1_type VIF_ELECTRIC_ENERGY</code><br>
+  <code>1_unit Wh</code><br>
+  <code>1_value 2948787</code><br>
 	</ul>
 	<br>
 	Es gibt auch eine Anzahl von festen Readings.
@@ -574,7 +576,9 @@ WMBUS_Attr(@)
   <li><code>is_encrypted</code> ist 1 wenn die empfangene Nachricht verschl&uuml;sselt ist.</li>
   <li><code>decryption_ok</code> ist 1 wenn die Nachricht entweder erfolgreich entschl&uuml;sselt wurde oder gar nicht verschl&uuml;sselt war.</li>
   <li><code>state</code> enth&auml;lt den Status des Z&auml;hlers und kann Fehlermeldungen wie 'battery low' enthalten. Normalerweise ist der Wert 'no error'.</li>
+  <li><code>battery</code> enth&auml;lt ok oder low.
   </ul>
+  Für einige bekannte Gerätetypen werden zusätzliche Readings wie der Energieverbrauch in kWh erzeugt. 
   </ul>
   
   
