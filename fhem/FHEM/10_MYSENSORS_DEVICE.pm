@@ -366,7 +366,7 @@ sub onPresentationMessage($$) {
   my $readingMappings = $hash->{readingMappings};
   my $typeMappings = $hash->{typeMappings};
   if (my $sensorMappings = $hash->{sensorMappings}->{$nodeType}) {
-    my $idStr = ($id > 1 ? $id-1 : "");
+    my $idStr = ($id > 1 ? $id : "");
     my @ret = ();
     foreach my $type (@{$sensorMappings->{sends}}) {
       next if (defined $readingMappings->{$id}->{$type});
