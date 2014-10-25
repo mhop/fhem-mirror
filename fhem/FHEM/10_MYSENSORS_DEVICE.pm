@@ -366,12 +366,13 @@ sub onPresentationMessage($$) {
   my $readingMappings = $hash->{readingMappings};
   my $typeMappings = $hash->{typeMappings};
   if (my $sensorMappings = $hash->{sensorMappings}->{$nodeType}) {
+    my $idStr = ($id > 1 ? $id-1 : "");
     my @ret = ();
     foreach my $type (@{$sensorMappings->{sends}}) {
       next if (defined $readingMappings->{$id}->{$type});
       my $typeStr = $typeMappings->{$type}->{type};
       if ($hash->{IODev}->{'inclusion-mode'}) {
-        if (my $ret = CommandAttr(undef,"$name mapReading_$typeStr$id $id $typeStr")) {
+        if (my $ret = CommandAttr(undef,"$name mapReading_$typeStr$idStr $id $typeStr")) {
           push @ret,$ret;
         }
       } else {
@@ -381,9 +382,9 @@ sub onPresentationMessage($$) {
     foreach my $type (@{$sensorMappings->{receives}}) {
       my $typeMapping = $typeMappings->{$type};
       my $typeStr = $typeMapping->{type};
-      next if (defined $hash->{sets}->{"$typeStr$id"});
+      next if (defined $hash->{sets}->{"$typeStr$idStr"});
       if ($hash->{IODev}->{'inclusion-mode'}) {
-        if (my $ret = CommandAttr(undef,"$name setReading_$typeStr$id".($typeMapping->{val} ? " ".join (",",values %{$typeMapping->{val}}) : ""))) {
+        if (my $ret = CommandAttr(undef,"$name setReading_$typeStr$idStr".($typeMapping->{val} ? " ".join (",",values %{$typeMapping->{val}}) : ""))) {
           push @ret,$ret;
         }
       } else {
