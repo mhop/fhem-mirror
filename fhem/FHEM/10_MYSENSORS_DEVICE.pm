@@ -256,14 +256,17 @@ sub Attr($$$$) {
         delete $hash->{sets}->{$set};
       }
       $hash->{setcommands} = {};
-      if ($command eq "set" and defined $value) {
+      if ($command eq "set" and $value) {
         foreach my $setCmd (split ("[, \t]+",$value)) {
-          $setCmd =~ /^(.+):(.+_\d+):(.+)$/;
-          $hash->{sets}->{$1}="";
-          $hash->{setcommands}->{$1} = {
-            var => $2,
-            val => $3,
-          };
+          if ($setCmd =~ /^(.+):(.+):(.+)$/) {
+            $hash->{sets}->{$1}="";
+            $hash->{setcommands}->{$1} = {
+              var => $2,
+              val => $3,
+            };
+          } else {
+            return "unparsable value in setCommands for $name: $setCmd";
+          }
         }
       }
       last;
