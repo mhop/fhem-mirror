@@ -26,11 +26,11 @@ sub parseMsg($) {
 
 sub createMsg(%) {
   my %msgRef = @_;
-  my @fields = ( $msgRef{'radioId'} // "",
-                 $msgRef{'childId'} // "",
-                 $msgRef{'cmd'} // "",
-                 $msgRef{'ack'} // "",
-                 $msgRef{'subType'} // "",
+  my @fields = ( $msgRef{'radioId'} // -1,
+                 $msgRef{'childId'} // -1,
+                 $msgRef{'cmd'} // -1,
+                 $msgRef{'ack'} // -1,
+                 $msgRef{'subType'} // -1,
                  $msgRef{'payload'}  // "");
   return join(';', @fields);
 }
@@ -39,7 +39,7 @@ sub dumpMsg($) {
   my $msgRef = shift;
   my $cmd = defined $msgRef->{'cmd'} ? commandToStr($msgRef->{'cmd'}) : "''";
   my $st = (defined $msgRef->{'cmd'} and defined $msgRef->{'subType'}) ? subTypeToStr( $msgRef->{'cmd'}, $msgRef->{'subType'} ) : "''";
-  return sprintf("Rx: fr=%03d ci=%03d c=%03d(%-14s) st=%03d(%-16s) ack=%d %s\n", $msgRef->{'radioId'} // "", $msgRef->{'childId'} // "", $msgRef->{'cmd'} // "", $cmd, $msgRef->{'subType'} // "", $st, $msgRef->{'ack'} // "", "'".$msgRef->{'payload'} // ""."'");
+  return sprintf("Rx: fr=%03d ci=%03d c=%03d(%-14s) st=%03d(%-16s) ack=%d %s\n", $msgRef->{'radioId'} // -1, $msgRef->{'childId'} // -1, $msgRef->{'cmd'} // -1, $cmd, $msgRef->{'subType'} // -1, $st, $msgRef->{'ack'} // -1, "'".($msgRef->{'payload'} // "")."'");
 }
 
 sub gettime {
