@@ -331,6 +331,10 @@ harmony_Set($$@)
       $param = "01000081" if( $param eq "systempower" );
       $param = "01000082" if( $param eq "systemsleep" );
       $param = "01000083" if( $param eq "systemwake" );
+      $param = "0C0000B5" if( $param eq "nexttrack" );
+      $param = "0C0000B6" if( $param eq "previoustrack" );
+      $param = "0C0000B7" if( $param eq "stop" );
+      $param = "0C0000CD" if( $param eq "playpause" );
       $param = "0C0000E9" if( $param eq "volumeup" );
       $param = "0C0000EA" if( $param eq "volumedown" );
       $param = "0C0000E2" if( $param eq "mute" );
@@ -390,7 +394,7 @@ harmony_Set($$@)
     }
   }
 
-  $list .= " command getConfig:noArg getCurrentActivity:noArg off:noArg reconnect:noArg sleeptimer sync:noArg text cursor:Up,Down,Left,Right,PageUp,PageDown,Home,End special:VolumeUp,VolumeDown,Mute";
+  $list .= " command getConfig:noArg getCurrentActivity:noArg off:noArg reconnect:noArg sleeptimer sync:noArg text cursor:Up,Down,Left,Right,PageUp,PageDown,Home,End special:PreviousTrack,NextTrack,Stop,PlayPause,VolumeUp,VolumeDown,Mute";
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -1325,7 +1329,7 @@ harmony_Attr($$$)
     <li>cursor &lt;direction&gt;<br>
       moves the cursor by bluetooth/smart keaboard dongle. &lt;direction&gt; can be one of: Up, Down, Left, Right, PageUp, PageDown, Home, End.</li>
     <li>special &lt;key&gt;<br>
-      sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: VolumeUp, VolumeDown, Mute.</li>
+      sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: PreviousTrack,NextTrack,Stop,PlayPause, VolumeUp, VolumeDown, Mute.</li>
   </ul><br>
 
   <a name="harmony_Get"></a>
