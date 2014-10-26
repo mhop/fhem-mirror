@@ -2439,7 +2439,7 @@ FW_sliderFn($$$$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
-  return undef if($values !~ m/^slider,([\d.]*),([\d.]*),([\d.]*)(,1)?$/);
+  return undef if($values !~ m/^slider,([-\d.]*),([-\d.]*),([-\d.]*)(,1)?$/);
   return "" if($cmd =~ m/ /);   # webCmd pct 30 should generate a link
   my ($min,$stp, $max, $flt) = ($1, $2, $3, $4);
   $flt = ($flt ? 1 : 0);
