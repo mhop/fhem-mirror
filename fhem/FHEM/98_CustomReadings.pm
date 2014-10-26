@@ -66,7 +66,7 @@ sub CustomReadings_read($)
   readingsEndUpdate($hash, 1);
 
   foreach my $r (keys %{$hash->{READINGS}}) {
-    if (not $r ~~ @used   ) {
+    if (not $r ~~ @used) {
       delete $hash->{READINGS}{$r};   
     }
   }
@@ -84,6 +84,25 @@ CustomReadings_Undef($$)
   
   return undef;
 }
+
+sub CustomReadings_GetHTML ($)
+{
+	my ($name) = @_;
+  my $hash = $main::defs{$name};
+  my $result = "";
+  
+  $result .= "<table>";
+  foreach my $reading (keys %{$hash->{READINGS}}) {
+    $result .= "<tr>";
+    $result .= "<td>$reading:&nbsp;</td><td>" . ReadingsVal($name, $reading, "???") . "</td>";   
+    $result .= "</tr>";
+  }
+  $result .= "</table>";
+  
+	return $result;
+}
+
+
 
 
 1;
@@ -106,6 +125,7 @@ CustomReadings_Undef($$)
   <br><code>
 define myReadings CustomReadings<br>
 attr myReadings room 0-Test<br>
+attr myReadings group Readings<br>
 attr myReadings interval 2<br>
 attr myReadings readingDefinitions hdd_temperature:qx(hddtemp /dev/sda 2>&1),<br>
 ac_powersupply_voltage:qx(cat /sys/class/power_supply/ac/voltage_now 2>&1) / 1000000,<br>
@@ -116,6 +136,13 @@ kernel:qx(uname -r 2>&1),<br>
 device_name:$hash->{NAME},<br>
 bullshit: $hash->{bullshit},<br>
 fhem_backup_folder_size:qx(du -ch /opt/fhem/backup | grep total | cut -d 't' -f1 2>&1)<br>
+
+<br><br>
+<b>Optionally, to display the readings:</b><br>
+define myReadingsDisplay weblink htmlCode {CustomReadings_GetHTML('myReadings')}<br>
+attr myReadingsDisplay group Readings<br>
+attr myReadingsDisplay room 0-Test<br>
+
 
   <br>
   <u>Resulting readings:</u><br>
