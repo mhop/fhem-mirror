@@ -569,7 +569,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"              ,lit=>{15=>0,30=>1,60=>2,120=>3,240=>4}},
   captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"              ,lit=>{off=>0,on=>1}},
   brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter - ignore light at night"},
-  eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>1,t=>"event delay time"},
+  eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>1,t=>"filters short events, causes reporting delay"},
   ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>''         ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
   eventFilterTime =>{a=> 35  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
   eventFilterTimeB=>{a=> 35  ,s=>1  ,l=>1,min=>5  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
@@ -587,6 +587,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   cndTxThrhLo     =>{a=>139  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
   highHoldTime    =>{a=>143  ,s=>1  ,l=>1,min=>60 ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"hold time on high state"},
   evntRelFltTime  =>{a=>145  ,s=>1  ,l=>1,min=>1  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter release time "},
+  triggerMode     =>{a=>146.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>'s'   ,d=>0,t=>"define type of event report ",lit=>{unknown=>0,sensor=>1,switch=>2,button=>3}},
 
   #un-identified List1
 # SEC-WM55 08:01 (AES on?)
@@ -826,7 +827,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
   "HM-MOD-Em-8"       =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
                          ,ledMode         =>1
                          ,transmitTryMax  =>1,eventFilterTime =>1
-                         ,msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1      #General remove me                   
+                         ,msgScPosA       =>1,msgScPosA       =>1
+                         ,triggerMode     =>1
                          },
 
   "HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
