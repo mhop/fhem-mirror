@@ -587,7 +587,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   cndTxThrhLo     =>{a=>139  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
   highHoldTime    =>{a=>143  ,s=>1  ,l=>1,min=>60 ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"hold time on high state"},
   evntRelFltTime  =>{a=>145  ,s=>1  ,l=>1,min=>1  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter release time "},
-  triggerMode     =>{a=>146.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>'s'   ,d=>0,t=>"define type of event report ",lit=>{unknown=>0,sensor=>1,switch=>2,button=>3}},
+  triggerMode     =>{a=>146.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>'s'   ,d=>0,t=>"define type of event report ",lit=>{off=>0,sensor=>1,switch=>2,button=>3}},
 
   #un-identified List1
 # SEC-WM55 08:01 (AES on?)
