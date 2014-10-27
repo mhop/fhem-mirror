@@ -216,6 +216,20 @@ harmony_actionOfCommand($$)
   return undef;
 }
 
+sub
+harmony_hubOfDevice($)
+{
+  my ($id) = @_;
+
+  foreach my $d (sort keys %defs) {
+    next if( !defined($defs{$d}) );
+    next if( $defs{$d}->{TYPE} ne "harmony" );
+    next if( $defs{$d}->{id} );
+    next if( !harmony_deviceOfId($defs{$d}, $id) );
+    Log3 undef, 3, "harmony: found IODev $d for device $id" ;
+    return $d;
+  }
+}
 
 sub
 harmony_Set($$@)
@@ -232,6 +246,13 @@ harmony_Set($$@)
       return "no hub found for device $name ($param)" if( !$hash->{hub} );
     }
 
+    if( $cmd ne "?" ) {
+      my $device = harmony_deviceOfId( $defs{$hash->{hub}}, $hash->{id} );
+      if( harmony_actionOfCommand( $device, $cmd ) ) {
+        $param = $cmd;
+        $cmd = "command";
+      }
+    }
 
     if( $cmd eq "command" ) {
       $param2 = $param;
@@ -1257,20 +1278,6 @@ harmony_GetPower($$)
   }
 
   return $power;
-}
-sub
-harmony_hubOfDevice($)
-{
-  my ($id) = @_;
-
-  foreach my $d (sort keys %defs) {
-    next if( !defined($defs{$d}) );
-    next if( $defs{$d}->{TYPE} ne "harmony" );
-    next if( $defs{$d}->{id} );
-    next if( !harmony_deviceOfId($defs{$d}, $id) );
-    Log3 undef, 3, "harmony: found IODev $d for device $id" ;
-    return $d;
-  }
 }
 sub
 harmony_Get($$@)
