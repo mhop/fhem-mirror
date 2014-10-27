@@ -220,10 +220,15 @@ my %zwave_class = (
   WAKE_UP                  => { id => '84', 
     set   => { wakeupInterval => "04%06x%02x",
                wakeupNoMoreInformation => "08", },
-    get   => { wakeupInterval => "05" },
+    get   => { wakeupInterval => "05", 
+               wakeupIntervalCapabilities => "09", },
     parse => { "028407"    => 'wakeup:notification',
                "..8406(......)(..)" =>
-                '"wakeupReport:interval ".hex($1)." target ".hex($2)',}, },
+                '"wakeupReport:interval ".hex($1)." target ".hex($2)',
+               "..840a(......)(......)(......)(......)" =>
+                '"wakeupIntervalCapabilitiesReport:min ".hex($1).'.
+                         '" max ".hex($2)." default ".hex($3)." step ".hex($4)'
+             }, },
   ASSOCIATION              => { id => '85', 
     set   => { associationAdd => "01%02x%02x*",
                associationDel => "04%02x%02x*", },
@@ -1472,6 +1477,11 @@ s2Hex($)
     return the wakeup interval in seconds, in the form<br>
     wakeupReport:interval seconds target id
     </li>
+  <li>wakeupIntervalCapabilities (only versionClass 2)<br>
+    return the wake up interval capabilities in seconds, in the form<br>
+    wakeupIntervalCapabilitiesReport:min seconds max seconds default seconds
+    step seconds
+  </li>
 
 
    <br><br><b>Class BASIC_WINDOW_COVERING</b>
@@ -1640,6 +1650,7 @@ s2Hex($)
   <br><br><b>Class WAKE_UP</b>
   <li>wakeup:notification</li>
   <li>wakeupReport:interval:X target:Y</li>
+  <li>wakeupIntervalCapabilitiesReport:min W max X default Y step Z</li>
 
   </ul>
 </ul>
