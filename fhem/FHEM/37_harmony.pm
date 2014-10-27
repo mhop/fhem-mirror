@@ -1,8 +1,6 @@
 
 # $Id$
 
-#todo: smart keyboard
-
 package main;
 
 use strict;
@@ -53,7 +51,8 @@ harmony_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> harmony [username password] ip"  if(@a != 3 && @a != 5);
+  return "Usage: define <name> harmony [username password] ip"  if(@a < 3 || @a > 5);
+  return "Usage: define <name> harmony [username password] ip"  if(@a == 4 && $a[2] ne "DEVICE" );
 
   delete( $hash->{helper}{username} );
   delete( $hash->{helper}{password} );
@@ -64,6 +63,14 @@ harmony_Define($$)
     my $ip = $a[2];
 
     $hash->{ip} = $ip;
+
+  } elsif( @a == 4 ) {
+    my $id = $a[3];
+
+    return "$name: device '$id' already defined" if( defined($modules{$hash->{TYPE}}{defptr}{$id}) );
+
+    $hash->{id} = $id;
+    $modules{$hash->{TYPE}}{defptr}{$id} = $hash;
 
   } elsif( @a == 5 ) {
     my $username = $a[2];
@@ -84,7 +91,7 @@ harmony_Define($$)
   #$attr{$name}{nossl} = 1 if( !$init_done && harmony_isFritzBox() );
 
   if( $init_done ) {
-    harmony_connect($hash);
+    harmony_connect($hash) if( !defined($hash->{id}) );
   }
 
   return undef;
@@ -98,13 +105,19 @@ harmony_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  harmony_connect($hash);
+  harmony_connect($hash) if( !defined($hash->{id}) );
 }
 
 sub
 harmony_Undefine($$)
 {
   my ($hash, $arg) = @_;
+
+  if( defined($hash->{id}) ) {
+    delete( $modules{$hash->{TYPE}}{defptr}{$hash->{id}} );
+    return undef;
+  }
+
 
   RemoveInternalTimer($hash);
 
@@ -210,6 +223,7 @@ harmony_Set($$@)
   #$cmd = lc( $cmd );
 
   my $list = "";
+  return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
 
   if( $cmd eq 'off' ) {
     $cmd = "activity";
@@ -230,7 +244,7 @@ harmony_Set($$@)
       return "unknown activity" if( !$hash->{currentActivityID} );
       return "unknown command" if( !$param );
 
-      my $activity = harmony_activityOfId($hash, $hash->{currentActivityID} );
+      my $activity = harmony_activityOfId($hash, $hash->{currentActivityID});
       return "unknown activity" if( !$activity );
 
       $action = harmony_actionOfCommand( $activity, $param );
@@ -271,7 +285,7 @@ harmony_Set($$@)
     my $id = $param;
 
     if( !$id && $hash->{currentActivityID} ) {
-      my $activity = harmony_activityOfId($hash, $hash->{currentActivityID} );
+      my $activity = harmony_activityOfId($hash, $hash->{currentActivityID});
       return "unknown activity" if( !$activity );
 
       return "no KeyboardTextEntryActivityRole in current activity $activity->{label}" if( !$activity->{KeyboardTextEntryActivityRole} );
@@ -300,7 +314,7 @@ harmony_Set($$@)
     return "unknown command" if( !$param );
 
     if( !$hash->{hidDevice} ) {
-      my $activity = harmony_activityOfId($hash, $hash->{currentActivityID} );
+      my $activity = harmony_activityOfId($hash, $hash->{currentActivityID});
       return "unknown activity" if( !$activity );
 
       return "no KeyboardTextEntryActivityRole in current activity $activity->{label}" if( !$activity->{KeyboardTextEntryActivityRole} );
@@ -351,6 +365,11 @@ harmony_Set($$@)
 
     return undef;
 
+  } elsif( $cmd eq "autocreate" ) {
+    return harmony_autocreate($hash,$param);
+
+    return undef;
+
   } elsif( $cmd eq "sleeptimer" ) {
     my $interval = $param?$param*60:60*60;
     $interval = -1 if( $interval < 0 );
@@ -381,10 +400,17 @@ harmony_Set($$@)
     }
 
     my $hidDevices;
+    my $autocreateDevices;
     foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
-      next if( !$device->{IsKeyboardAssociated} );
-      $hidDevices .= "," if( $hidDevices );
-      $hidDevices .= harmony_labelOfDevice($hash, $device->{id} );
+      if( $device->{IsKeyboardAssociated} ) {
+        $hidDevices .= "," if( $hidDevices );
+        $hidDevices .= harmony_labelOfDevice($hash, $device->{id} );
+      }
+
+      if( !defined($modules{$hash->{TYPE}}{defptr}{$device->{id}}) ) {
+        $autocreateDevices .= "," if( $autocreateDevices );
+        $autocreateDevices .= harmony_labelOfDevice($hash, $device->{id} );
+      }
     }
 
     if( $hidDevices ) {
@@ -392,6 +418,13 @@ harmony_Set($$@)
 
       $list .= " hidDevice:$hidDevices";
     }
+
+    if( $autocreateDevices ) {
+      $autocreateDevices =~ s/ /./g;
+
+      $list .= " autocreate:$autocreateDevices";
+    }
+
   }
 
   $list .= " command getConfig:noArg getCurrentActivity:noArg off:noArg reconnect:noArg sleeptimer sync:noArg text cursor:Up,Down,Left,Right,PageUp,PageDown,Home,End special:PreviousTrack,NextTrack,Stop,PlayPause,VolumeUp,VolumeDown,Mute";
@@ -617,6 +650,18 @@ harmony_updateActivity($$;$)
 
     my $previous = harmony_labelOfActivity($hash,$id,$id);
     readingsSingleUpdate( $hash, "previousActivity", $previous, 0 );
+  }
+
+  if( !$modifier && defined($modules{$hash->{TYPE}}{defptr}) ) {
+    if( my $activity = harmony_activityOfId($hash, $id)) {
+      foreach my $id (keys %{$activity->{fixit}}) {
+        if( my $hash = $modules{$hash->{TYPE}}{defptr}{$id} ) {
+          my $state = $activity->{fixit}->{$id}->{Power};
+          $state = "Manual" if( !$state );
+          readingsSingleUpdate( $hash, "power", lc($state), 1 );
+        }
+      }
+    }
   }
 
   $hash->{currentActivityID} = $id;
@@ -921,7 +966,7 @@ harmony_connect($)
 
   harmony_disconnect($hash);
 
-  Log3 $name, 3, "$name: connect";
+  Log3 $name, 4, "$name: connect";
 
   harmony_getLoginToken($hash);
 
@@ -930,6 +975,7 @@ harmony_connect($)
     my $conn = IO::Socket::INET->new(PeerAddr => "$hash->{ip}:5222", Timeout => $timeout);
 
     if( $conn ) {
+      Log3 $name, 3, "$name: connected";
       $hash->{STATE} = "Connected";
       $hash->{ConnectionState} = "Connected";
       $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
@@ -1067,6 +1113,56 @@ harmony_dispatch($$$)
 }
 
 sub
+harmony_autocreate($;$)
+{
+  my($hash, $param) = @_;
+  my $name = $hash->{NAME};
+
+  return if( !defined($hash->{config}) );
+
+  my $id = $param;
+  $id = harmony_idOfDevice($hash, $id) if( $id && $id !~ m/^([\d-])+$/ );
+  return "unknown device $param" if( $param && !$id );
+
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "autocreate");
+    return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+  }
+
+  my $autocreated = 0;
+  foreach my $device (@{$hash->{config}->{device}}) {
+    next if( $id && $device->{id} != $id );
+
+    if( defined($modules{$hash->{TYPE}}{defptr}{$device->{id}}) ) {
+      Log3 $name, 4, "$name: device '$device->{id}' already defined";
+      next;
+    }
+
+    my $devname = "harmony_". $device->{id};
+    my $define = "$devname harmony DEVICE $device->{id}";
+
+    Log3 $name, 3, "$name: create new device '$devname' for device '$device->{id}'";
+    my $cmdret = CommandDefine(undef,$define);
+    if($cmdret) {
+      Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$device->{id}': $cmdret";
+
+    } else {
+      $cmdret = CommandAttr(undef,"$devname alias $device->{label}") if( defined($device->{label}) );
+      $cmdret = CommandAttr(undef,"$devname event-on-change-reading .*");
+      $cmdret = CommandAttr(undef,"$devname room $hash->{TYPE}");
+      $cmdret = CommandAttr(undef,"$devname stateFormat power");
+      #$cmdret = CommandAttr(undef,"$devname IODev $name");
+
+      $autocreated++;
+    }
+  }
+
+  CommandSave(undef,undef) if( $autocreated && AttrVal( "autocreate", "autosave", 1 ) );
+
+  return "created $autocreated devices";
+}
+
+sub
 harmony_parseToken($$)
 {
   my($hash, $json) = @_;
@@ -1111,8 +1207,9 @@ harmony_Get($$@)
   my ($hash, $name, $cmd, $param) = @_;
   #$cmd = lc( $cmd );
 
-  my $list;
-  $list = "activities:noArg devices:noArg commands deviceCommands currentActivity:noArg";
+  my $list = "";
+  return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
+
 
   my $ret;
   if( $cmd eq "activities" ) {
@@ -1127,11 +1224,11 @@ harmony_Get($$@)
 
       if( $param eq "power" ) {
         my $power = "";
-        foreach my $device ( keys %{$activity->{fixit}}) {
-          my $label = harmony_labelOfDevice($hash, $device );
+        foreach my $id (keys %{$activity->{fixit}}) {
+          my $label = harmony_labelOfDevice($hash, $id);
           $power .= "\n\t\t\t" if( $power );
           $power .= "$label: ";
-          if( my $state = $activity->{fixit}->{$device}->{Power} ) {
+          if( my $state = $activity->{fixit}->{$id}->{Power} ) {
             $power .= $state;
           } else {
             $power .= "Manual";
@@ -1143,6 +1240,23 @@ harmony_Get($$@)
     }
     #$ret = sprintf("%s\t\t%-24s\n", "ID", "LABEL"). $ret if( $ret );
     $ret .= "\n-1\t\tPowerOff";
+    if( $param eq "power" ) {
+      my $power = "";
+      if( my $activity = harmony_activityOfId($hash, -1) ) {
+        foreach my $id (keys %{$activity->{fixit}}) {
+          my $label = harmony_labelOfDevice($hash, $id);
+          $power .= "\n\t\t\t" if( $power );
+          $power .= "$label: ";
+          if( my $state = $activity->{fixit}->{$id}->{Power} ) {
+            $power .= $state;
+          } else {
+            $power .= "Manual";
+          }
+        }
+      }
+      $ret .= "\n\t\t\t$power" if( $power );
+    }
+
     return $ret;
 
   } elsif( $cmd eq "devices" ) {
@@ -1240,11 +1354,42 @@ harmony_Get($$@)
   } elsif( $cmd eq "currentActivity" ) {
       return "unknown activity" if( !$hash->{currentActivityID} );
 
-      my $activity = harmony_activityOfId($hash, $hash->{currentActivityID} );
+      my $activity = harmony_activityOfId($hash, $hash->{currentActivityID});
       return "unknown activity" if( !$activity );
 
       return $activity->{label};
   }
+
+  $list .= "activities:noArg devices:noArg";
+
+  if( $hash->{config} ) {
+    return undef if( !defined($hash->{config}) );
+
+    my $activities;
+    foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
+      next if( $activity->{label} eq "PowerOff" );
+      $activities .= "," if( $activities );
+      $activities .= $activity->{label};
+     }
+    if( $activities ) {
+      $activities =~ s/ /./g;
+
+      $list .= " commands:,$activities";
+    }
+
+    my $devices;
+    foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
+      $devices .= "," if( $devices );
+      $devices .= $device->{label};
+    }
+    if( $devices ) {
+      $devices =~ s/ /./g;
+
+      $list .= " deviceCommands:,$devices";
+    }
+  }
+
+  $list .= " currentActivity:noArg";
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -1366,6 +1511,9 @@ harmony_Attr($$$)
       moves the cursor by bluetooth/smart keaboard dongle. &lt;direction&gt; can be one of: Up, Down, Left, Right, PageUp, PageDown, Home, End.</li>
     <li>special &lt;key&gt;<br>
       sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: PreviousTrack,NextTrack,Stop,PlayPause, VolumeUp, VolumeDown, Mute.</li>
+    <li>autocreate [&lt;id&gt|&ltname&gt;]<br>
+      creates a fhem device for a single/all device(s) in the harmony hub. if activities are startet the state
+      of these devices will be updatet with the power state defined in these activites.</li>
   </ul><br>
 
   <a name="harmony_Get"></a>
