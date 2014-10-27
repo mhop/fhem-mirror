@@ -58,8 +58,6 @@ IT_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 
-  $val = $1 if($val =~ m/^(.*) \d+$/);
-  return "Undefined value $val" if(!defined($it_c2b{$val}));
   return undef;
 }
 
