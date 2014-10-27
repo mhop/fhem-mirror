@@ -12,7 +12,7 @@ sub ZWave_Parse($$@);
 sub ZWave_Set($@);
 sub ZWave_Get($@);
 sub ZWave_Cmd($$@);
-sub ZWave_ParseMeter($);
+sub ZWave_ParseMeter($$);
 sub ZWave_ParseScene($);
 sub ZWave_SetClasses($$$$);
 sub ZWave_getParse($$$);
@@ -92,8 +92,8 @@ my %zwave_class = (
     get   => { smStatus    => "04" },
     parse => { "..3105(..)(..)(.*)" => 'ZWave_ParseMultilevel($1,$2,$3)'},},
   METER                    => { id => '32',
-    get   => { meter       => "01", },
-    parse => { "..3202(.*)"=> 'ZWave_ParseMeter($1)' }, },
+    get   => { meter       => "01" },
+    parse => { "..3202(.*)"=> 'ZWave_ParseMeter($hash, $1)' }, },
   ZIP_ADV_SERVER           => { id => '33', },
   ZIP_ADV_CLIENT           => { id => '34', },
   METER_PULSE              => { id => '35', },
@@ -253,7 +253,7 @@ my %zwave_class = (
   MULTI_CHANNEL_ASSOCIATION=> { id => '8e', }, # aka MULTI_INSTANCE_ASSOCIATION
   MULTI_CMD                => { id => '8f', }, # Handled in Parse
   ENERGY_PRODUCTION        => { id => '90', },
-  MANUFACTURER_PROPRIETARY => { id => '91', }, # see zwave_manuf_proprietary
+  MANUFACTURER_PROPRIETARY => { id => '91', }, # see also zwave_deviceSpecial
   SCREEN_MD                => { id => '92', },
   SCREEN_ATTRIBUTES        => { id => '93', },
   SIMPLE_AV_CONTROL        => { id => '94', },
@@ -287,14 +287,24 @@ my %zwave_cmdArgs = (
 );
 
 my %zwave_modelConfig;
-my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222" );
-my %zwave_manuf_proprietary = ( # MANUFACTURER_PROPRIETARY ist model dependent
+my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
+                           "013c-0001-0003" => "Philio_PAN04" );
+
+# Patching certain devices.
+my %zwave_deviceSpecial = (
    Fibaro_FGRM222 => {
-    set   => { positionSlat=>"010f26010100%02x", 
-               positionBlinds=>"010f260102%02x00",},
-    get   => { position=>"010f2602020000", },
-    parse => { "010f260303(..)(..)" => 'sprintf("position:Blinds %d Slat %d",'.
-                                          'hex($1),hex($2))',  }, },
+     MANUFACTURER_PROPRIETARY => {
+      set   => { positionSlat=>"010f26010100%02x", 
+                 positionBlinds=>"010f260102%02x00",},
+      get   => { position=>"010f2602020000", },
+      parse => { "010f260303(..)(..)" =>'sprintf("position:Blinds %d Slat %d",'.
+                                            'hex($1),hex($2))' } } },
+   Philio_PAN04 => {
+     METER => {
+      get   => { meter       => "01",
+                 meterWatt   => "0110",       #Watt
+                 meterVoltage=> "0120",       #Voltage
+                 meterAmpere => "0128"  } } } #Ampere
 );
 
 sub
@@ -516,9 +526,9 @@ ZWave_HrvStatus($)
 }
 
 sub
-ZWave_ParseMeter($)
+ZWave_ParseMeter($$)
 {
-  my ($val) = @_;
+  my ($hash,$val) = @_;
   return if($val !~ m/^(..)(..)(.*)$/);
   my ($v1, $v2, $v3) = (hex($1) & 0x1f, hex($2), $3);
   my @prectab = (1,10,100,1000,10000,100000,1000000, 10000000);
@@ -533,6 +543,14 @@ ZWave_ParseMeter($)
   my $unit = $txt eq "undef" ? "undef" : $unit{$txt}[$scale];
   $txt = "power" if ($unit eq "W");
   $v3 = hex(substr($v3, 0, 2*$size))/$prec;
+
+  my $modelId = ReadingsVal($hash->{NAME}, "modelId", "");
+  $modelId = $zwave_modelIdAlias{$modelId} if($zwave_modelIdAlias{$modelId});
+  if($modelId eq "Philio_PAN04") {
+    if($prec==100 && $scale==1 && $size==2) { $unit="A"; $txt="current" }
+    if($prec== 10 && $scale==0 && $size==2) { $unit="V"; $txt="voltage" }
+  }
+
   return "$txt:$v3 $unit";
 }
 
@@ -848,12 +866,10 @@ ZWave_getHash($$$)
     }
   }
 
-  if($cl eq "MANUFACTURER_PROPRIETARY") {
-    my $modelId = ReadingsVal($hash->{NAME}, "modelId", "");
-    $modelId = $zwave_modelIdAlias{$modelId} if($zwave_modelIdAlias{$modelId});
-    my $p = $zwave_manuf_proprietary{$modelId};
-    $ptr = $p->{$type} if($p && $p->{$type});
-  }
+  my $modelId = ReadingsVal($hash->{NAME}, "modelId", "");
+  $modelId = $zwave_modelIdAlias{$modelId} if($zwave_modelIdAlias{$modelId});
+  my $p = $zwave_deviceSpecial{$modelId};
+  $ptr = $p->{$cl}{$type} if($p && $p->{$cl} && $p->{$cl}{$type});
 
   return $ptr;
 }
@@ -1356,6 +1372,15 @@ s2Hex($)
   <br><br><b>Class METER</b>
   <li>meter<br>
     request the meter report.
+    </li>
+  <li>meterWatt<br>
+    request the power report (Philio PHI_PAN04 only)
+    </li>
+  <li>meterVoltage<br>
+    request the voltage report (Philio PHI_PAN04 only)
+    </li>
+  <li>meterAmpere<br>
+    request the current report (Philio PHI_PAN04 only)
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
