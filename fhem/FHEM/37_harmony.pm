@@ -223,7 +223,44 @@ harmony_Set($$@)
   #$cmd = lc( $cmd );
 
   my $list = "";
-  return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
+  if( defined($hash->{id}) ) {
+    if( !$hash->{hub} ) {
+      $hash->{hub} = harmony_hubOfDevice($param);
+
+      return "no hub found for device $name ($param)" if( !$hash->{hub} );
+    }
+
+
+    if( $cmd eq "command" ) {
+      $param2 = $param;
+      $param = $hash->{id};
+
+      $hash = $defs{$hash->{hub}};
+
+    } elsif( $cmd eq "hidDevice" || $cmd eq "text" || $cmd eq "cursor" || $cmd eq "special" || $cmd eq "hid" ) {
+      my $id = $hash->{id};
+
+      $hash = $defs{$hash->{hub}};
+
+      my $device = harmony_deviceOfId( $hash, $id );
+      return "unknown device" if( !$device );
+
+      return "no keyboard associated with device $device->{label}" if( !$device->{IsKeyboardAssociated} );
+
+      if( !$hash->{hidDevice} || $hash->{hidDevice} ne $id ) {
+        $hash->{hidDevice} = $id;
+        harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.engine?sethiddevice' token=''>deviceId=$id</oa>");
+        sleep( 3 );
+      }
+
+      return if( $cmd eq "hidDevice" );
+
+    } else {
+      $list = "command hidDevice:noArg text cursor:Up,Down,Left,Right,PageUp,PageDown,Home,End special:PreviousTrack,NextTrack,Stop,PlayPause,VolumeUp,VolumeDown,Mute";
+      return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
+
+    }
+  }
 
   if( $cmd eq 'off' ) {
     $cmd = "activity";
@@ -416,13 +453,13 @@ harmony_Set($$@)
     if( $hidDevices ) {
       $hidDevices =~ s/ /./g;
 
-      $list .= " hidDevice:$hidDevices";
+      $list .= " hidDevice:,$hidDevices";
     }
 
     if( $autocreateDevices ) {
       $autocreateDevices =~ s/ /./g;
 
-      $list .= " autocreate:$autocreateDevices";
+      $list .= " autocreate:$autocreateDevices,";
     }
 
   }
@@ -1202,13 +1239,65 @@ harmony_data2string($)
    return Dumper $data;
 }
 sub
+harmony_GetPower($$)
+{
+  my ($hash, $activity) = @_;
+
+  my $power = "";
+  return $power if( !defined($activity->{fixit}) );
+
+  foreach my $id (keys %{$activity->{fixit}}) {
+    my $label = harmony_labelOfDevice($hash, $id);
+    my $state = $activity->{fixit}->{$id}->{Power};
+    $state = "Manual" if( !$state );
+
+    $power .= "\n\t\t\t$label: $state";
+  }
+
+  return $power;
+}
+sub
+harmony_hubOfDevice($)
+{
+  my ($id) = @_;
+
+  foreach my $d (sort keys %defs) {
+    next if( !defined($defs{$d}) );
+    next if( $defs{$d}->{TYPE} ne "harmony" );
+    next if( $defs{$d}->{id} );
+    next if( !harmony_deviceOfId($defs{$d}, $id) );
+    Log3 undef, 3, "harmony: found IODev $d for device $id" ;
+    return $d;
+  }
+}
+sub
 harmony_Get($$@)
 {
   my ($hash, $name, $cmd, $param) = @_;
   #$cmd = lc( $cmd );
 
   my $list = "";
-  return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
+
+  if( defined($hash->{id}) ) {
+    if( !$hash->{hub} ) {
+      $hash->{hub} = harmony_hubOfDevice($hash->{id});
+
+      return "no IODev found for device $name ($hash->{id})" if( !$hash->{hub} );
+    }
+
+    if( $cmd eq "commands" || $cmd eq "deviceCommands" ) {
+      $cmd = "deviceCommands";
+      $param = $hash->{id};
+
+      $hash = $defs{$hash->{hub}};
+
+    } else {
+      $list = "commands:noArg";
+      return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
+
+    }
+
+  }
 
 
   my $ret;
@@ -1223,38 +1312,17 @@ harmony_Get($$@)
       $ret .= "\t". harmony_data2string($activity->{$param}) if( $param && defined($activity->{$param}) );
 
       if( $param eq "power" ) {
-        my $power = "";
-        foreach my $id (keys %{$activity->{fixit}}) {
-          my $label = harmony_labelOfDevice($hash, $id);
-          $power .= "\n\t\t\t" if( $power );
-          $power .= "$label: ";
-          if( my $state = $activity->{fixit}->{$id}->{Power} ) {
-            $power .= $state;
-          } else {
-            $power .= "Manual";
-          }
-        }
-
-        $ret .= "\n\t\t\t$power" if( $power );
+        my $power = harmony_GetPower($hash, $activity);
+        $ret .= $power if( $power );
       }
     }
     #$ret = sprintf("%s\t\t%-24s\n", "ID", "LABEL"). $ret if( $ret );
     $ret .= "\n-1\t\tPowerOff";
     if( $param eq "power" ) {
-      my $power = "";
       if( my $activity = harmony_activityOfId($hash, -1) ) {
-        foreach my $id (keys %{$activity->{fixit}}) {
-          my $label = harmony_labelOfDevice($hash, $id);
-          $power .= "\n\t\t\t" if( $power );
-          $power .= "$label: ";
-          if( my $state = $activity->{fixit}->{$id}->{Power} ) {
-            $power .= $state;
-          } else {
-            $power .= "Manual";
-          }
-        }
+        my $power = harmony_GetPower($hash, $activity);
+        $ret .= $power if( $power );
       }
-      $ret .= "\n\t\t\t$power" if( $power );
     }
 
     return $ret;
@@ -1322,6 +1390,7 @@ harmony_Get($$@)
       }
     }
 
+    return "no commands found" if( !$ret );
     return $ret;
 
   } elsif( $cmd eq "activityDetail"
@@ -1510,11 +1579,12 @@ harmony_Attr($$$)
     <li>cursor &lt;direction&gt;<br>
       moves the cursor by bluetooth/smart keaboard dongle. &lt;direction&gt; can be one of: Up, Down, Left, Right, PageUp, PageDown, Home, End.</li>
     <li>special &lt;key&gt;<br>
-      sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: PreviousTrack,NextTrack,Stop,PlayPause, VolumeUp, VolumeDown, Mute.</li>
+      sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: PreviousTrack, NextTrack, Stop, PlayPause, VolumeUp, VolumeDown, Mute.</li>
     <li>autocreate [&lt;id&gt|&ltname&gt;]<br>
       creates a fhem device for a single/all device(s) in the harmony hub. if activities are startet the state
       of these devices will be updatet with the power state defined in these activites.</li>
-  </ul><br>
+  </ul>
+  The command, hidDevice, text, cursor and special commmands are also available for the autocreated devices. The &lt;id&gt|&ltname&gt; paramter hast to be omitted.<br><br>
 
   <a name="harmony_Get"></a>
   <b>Get</b>
@@ -1533,7 +1603,9 @@ harmony_Attr($$$)
     <li>configDetail</li>
     <li>currentActivity<br>
       returns the current activity name</li>
-  </ul><br>
+  </ul>
+  The commands commmand is also available for the autocreated devices. The &lt;id&gt|&ltname&gt; paramter hast to be omitted.<br><br>
+
 
   <a name="harmony_Attr"></a>
   <b>Attributes</b>
