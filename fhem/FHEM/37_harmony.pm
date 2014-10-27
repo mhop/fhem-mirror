@@ -200,9 +200,11 @@ harmony_actionOfCommand($$)
   my ($device, $command) = @_;
   return undef if( ref($device) ne "HASH" );
 
+  $command = lc($command);
+
   foreach my $group (@{$device->{controlGroup}}) {
     foreach my $function (@{$group->{function}}) {
-      if( $function->{name} eq $command ) {
+      if( lc($function->{name}) eq $command ) {
         return decode_json($function->{action}) if( harmony_isFritzBox() );
 
         return JSON->new->utf8(0)->decode($function->{action});
@@ -256,7 +258,7 @@ harmony_Set($$@)
       return if( $cmd eq "hidDevice" );
 
     } else {
-      $list = "command hidDevice:noArg text cursor:Up,Down,Left,Right,PageUp,PageDown,Home,End special:PreviousTrack,NextTrack,Stop,PlayPause,VolumeUp,VolumeDown,Mute";
+      $list = "command hidDevice:noArg text cursor:up,down,left,right,pageUp,pageDown,home,end special:previousTrack,nextTrack,stop,playPause,volumeUp,volumeDown,mute";
       return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
 
     }
@@ -464,7 +466,7 @@ harmony_Set($$@)
 
   }
 
-  $list .= " command getConfig:noArg getCurrentActivity:noArg off:noArg reconnect:noArg sleeptimer sync:noArg text cursor:Up,Down,Left,Right,PageUp,PageDown,Home,End special:PreviousTrack,NextTrack,Stop,PlayPause,VolumeUp,VolumeDown,Mute";
+  $list .= " command getConfig:noArg getCurrentActivity:noArg off:noArg reconnect:noArg sleeptimer sync:noArg text cursor:up,down,left,right,pageUp,pageDown,home,end special:previousTrack,nextTrack,stop,playPause,volumeUp,volumeDown,mute";
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -1577,9 +1579,9 @@ harmony_Attr($$$)
     <li>text &lt;text&gt;<br>
       sends &lt;text&gt; by bluetooth/smart keaboard dongle. a-z ,A-Z ,0-9, \n, \e, \t and space are currently possible</li>
     <li>cursor &lt;direction&gt;<br>
-      moves the cursor by bluetooth/smart keaboard dongle. &lt;direction&gt; can be one of: Up, Down, Left, Right, PageUp, PageDown, Home, End.</li>
+      moves the cursor by bluetooth/smart keaboard dongle. &lt;direction&gt; can be one of: up, down, left, right, pageUp, pageDown, home, end.</li>
     <li>special &lt;key&gt;<br>
-      sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: PreviousTrack, NextTrack, Stop, PlayPause, VolumeUp, VolumeDown, Mute.</li>
+      sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: previousTrack, nextTrack, stop, playPause, volumeUp, volumeDown, mute.</li>
     <li>autocreate [&lt;id&gt|&ltname&gt;]<br>
       creates a fhem device for a single/all device(s) in the harmony hub. if activities are startet the state
       of these devices will be updatet with the power state defined in these activites.</li>
