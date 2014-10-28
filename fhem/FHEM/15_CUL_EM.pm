@@ -23,6 +23,7 @@ CUL_EM_Initialize($)
   $hash->{ParseFn}   = "CUL_EM_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 " .
                         "model:EMEM,EMWZ,EMGZ ignore:0,1 ".
+                        "maxPeak ".
                         $readingFnAttributes;
   $hash->{AutoCreate}=
         { "CUL_EM.*" => { GPLOT => "power8:Power,", FILTER => "%NAME:CNT.*" } };
@@ -138,12 +139,6 @@ CUL_EM_Parse($$)
       $basis_cnt = $hash->{READINGS}{basis}{VAL};
     }
 
-    # correct counter wraparound
-    if($total_cnt < $total_cnt_last) {
-      # check: real wraparound or reset only
-      $basis_cnt += ($total_cnt_last > 65000 ? 65536 : $total_cnt_last);
-      $readings{basis} = $basis_cnt;
-    }
 
     #
     # translate into device units
@@ -151,18 +146,44 @@ CUL_EM_Parse($$)
     my $corr1 = $hash->{corr1}; # EMEM power correction factor
     my $corr2 = $hash->{corr2}; # EMEM energy correction factor
 
-    my $total    = ($basis_cnt+$total_cnt)*$corr2;
-    my $current  = $current_cnt*$corr1;
-    my $peak     = $peak_cnt*$corr1;
+    my $peak;
 
     if($tpe ne 2) {
-      $peak      = 3000/($peak_cnt > 1 ? $peak_cnt : 1)*$corr1;
-      $peak      = ($current > 0 ? $peak : 0);
+        $peak = $current_cnt && $peak_cnt ? 3000/$peak_cnt*$corr1 : 0;
+        # when EM detection toggles/glitches somewhere the internal
+        # EM-Counter increments by one and the device registers a
+        # very hi peak value
+        # Here we fix this by checking against a maximum peak
+        # level, removing the wrong counter increment and
+        # setting peak to the current value.
+        my $maxpeak = $attr{$n}{"maxPeak"};
+        if(defined $maxpeak and $peak > $maxpeak){
+            Log3 $n, 2, 
+            "CUL_EM $n: max peak detected: $peak kW > $maxpeak kW";
+            $current_cnt--;
+            # as total_cnt is "owned" by EM we decrement our basis_cnt
+            $basis_cnt--; 
+            $readings{basis} = $basis_cnt;
+            $peak = $current_cnt*$corr1;
+            $peak_cnt = $peak ? int(3000*$corr1/$peak) : 0;
+        }
+    } else {
+        $peak = $peak_cnt*$corr1;
     }
 
+    # correct counter wraparound
+    if($total_cnt < $total_cnt_last) {
+      # check: real wraparound or reset only
+      $basis_cnt += ($total_cnt_last > 65000 ? 65536 : $total_cnt_last);
+      $readings{basis} = $basis_cnt;
+    }
+
+    my $total    = ($basis_cnt+$total_cnt)*$corr2;
+    my $current  = $current_cnt*$corr1;
 
     $val = sprintf("CNT: %d CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
-                         $seqno, $total, $current, $peak);
+                   $seqno, $total, $current, $peak);
+
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "state", $val);
 
@@ -321,7 +342,15 @@ CUL_EM_Parse($$)
     <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#eventMap">eventMap</a></li><br>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+    <li><a name="maxPeak">maxPeak</a> &lt;number&gt;<br>
+      Specifies the maximum possible peak value for the EM meter
+      ("TOP:" value in logfile). Peak values greater than this value
+      are considered as EM read errors and are ignored.
+      For example if it's not possible to consume more than 40kW of
+      power set maxPeak to 40 to make the readings of the power meter
+      more robust.
+    </li>
   </ul>
   <br>
 </ul>
@@ -395,7 +424,15 @@ CUL_EM_Parse($$)
     <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#eventMap">eventMap</a></li><br>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+    <li><a name="maxPeak">maxPeak</a> &lt;number&gt;<br>
+      Gibt den maximal m&ouml;glichen Spitzenwert f&uumlr das EM-Meter an 
+      ("TOP:"-Wert in Logdatei). Spitzenwerte gr&ouml;&szlig;er als dieser 
+      Wert gelten als EM-Lesefehler und werden ignoriert.
+      Wenn es z.B. nicht m&ouml;glich ist mehr zu 40kW Leistung 
+      zu beziehen setzt man maxPeak auf 40 um das Auslesen des 
+      Stromz&auml;hlers robuster zu machen.
+      </li>
   </ul>
   <br>
 </ul>
