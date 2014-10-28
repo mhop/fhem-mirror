@@ -250,7 +250,10 @@ harmony_Set($$@)
       return "no hub found for device $name ($hash->{id})" if( !$hash->{hub} );
     }
 
-    if( $cmd ne "?" ) {
+    if( $cmd ne "?" && !$param ) {
+      $cmd = "PowerOn" if( $cmd eq "on" );
+      $cmd = "PowerOff" if( $cmd eq "off" );
+
       my $device = harmony_deviceOfId( $defs{$hash->{hub}}, $hash->{id} );
       if( harmony_actionOfCommand( $device, $cmd ) ) {
         $param = $cmd;
@@ -733,7 +736,7 @@ harmony_updateActivity($$;$)
   readingsSingleUpdate( $hash, "currentActivity", "$modifier$activity", 1 );
 
   $activity =~ s/ /./g;
-  readingsSingleUpdate( $hash, "activity", $activity, 1 ) if( !$modifier );
+  readingsSingleUpdate( $hash, "activity", $activity, 1 ) if( !$modifier && $activity ne ReadingsVal($hash->{NAME},"activity", "" ) );
 
   delete $hash->{hidDevice} if( $id == -1 );
 }
@@ -820,6 +823,11 @@ harmony_Read($)
 
         }
 
+        my $error = $decoded->{errorCode};
+        if( $error && $error != 200 ) {
+            Log3 $name, 2, "$name: error ($error): $decoded->{errorString}";
+        }
+
         if( ($tag eq "iq" &&  $content =~ m/statedigest\?get'/)
             || ($tag eq "message" && $content =~ m/type="connect.stateDigest\?notify"/) ) {
           Log3 $name, 4, "$name: notify: $cdata";
@@ -851,16 +859,9 @@ harmony_Read($)
             }
           }
         } elsif( $tag eq "message" ) {
+
           if( $content =~ m/type="harmony.engine\?startActivityFinished"/ ) {
-            my $id = 0;
-            my $error = 0;
-
-            if( $cdata =~ m/activityId=([\d\-]*).*errorCode=(\d*).*errorString=(\w)*/ ) {
-              $id = $1;
-              $error = $2;
-            }
-
-            harmony_updateActivity($hash, $id);
+            harmony_updateActivity($hash, $decoded->{activityId}) if( defined($decoded->{activityId}) );
 
           } else {
             Log3 $name, 2, "$name: unknown message: $content";
