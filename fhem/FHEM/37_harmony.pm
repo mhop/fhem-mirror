@@ -732,6 +732,9 @@ harmony_updateActivity($$;$)
   my $activity = harmony_labelOfActivity($hash,$id,$id);
   readingsSingleUpdate( $hash, "currentActivity", "$modifier$activity", 1 );
 
+  $activity =~ s/ /./g;
+  readingsSingleUpdate( $hash, "activity", $activity, 1 ) if( !$modifier );
+
   delete $hash->{hidDevice} if( $id == -1 );
 }
 
