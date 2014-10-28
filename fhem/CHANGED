@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 15_CUL_EM added attribute maxPeak (arnoaugustin)
+  - bugfix: 10_IT changed "setstate" to avoid eventMap errors (arnoaugustin)
   - feature: new module 37_harmony.pm added (justme1968)
   - change: WMBUS: use _ instead of : as readings separator, better support for EnergyCam
   - feature: new module 23_KOSTALPIKO added (john)
