@@ -176,6 +176,8 @@ harmony_labelOfDevice($$;$)
 {
   my ($hash, $id, $default) = @_;
 
+  return undef if( !defined($hash->{config}) );
+
   foreach my $device (@{$hash->{config}->{device}}) {
     return $device->{label} if( $device->{id} == $id );
   }
@@ -186,6 +188,8 @@ sub
 harmony_deviceOfId($$)
 {
   my ($hash, $id) = @_;
+
+  return undef if( !defined($hash->{config}) );
 
   foreach my $device (@{$hash->{config}->{device}}) {
     return $device if( $device->{id} == $id );
@@ -241,9 +245,9 @@ harmony_Set($$@)
   my $list = "";
   if( defined($hash->{id}) ) {
     if( !$hash->{hub} ) {
-      $hash->{hub} = harmony_hubOfDevice($param);
+      $hash->{hub} = harmony_hubOfDevice($hash->{id});
 
-      return "no hub found for device $name ($param)" if( !$hash->{hub} );
+      return "no hub found for device $name ($hash->{id})" if( !$hash->{hub} );
     }
 
     if( $cmd ne "?" ) {
@@ -682,7 +686,6 @@ sub
 harmony_char2hid($)
 {
   my ($char) = @_;
-Log 1, $char;
 
   my $ret;
   if( $char ge '1' && $char le '9' ) {
