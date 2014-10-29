@@ -304,6 +304,14 @@ harmony_Set($$@)
     harmony_sendEngineGet($hash, "startactivity", "activityId=$param:timestamp=0");
 
     return undef;
+  } elsif( $cmd eq "channel" ) {
+    return "no current activity" if( !defined($hash->{currentActivityID}) || $hash->{currentActivityID} == -1 );
+    return "missing channel" if( !$param );
+
+    harmony_sendEngineGet($hash, "changeChannel", "channel=$param:timestamp=0");
+
+    return undef;
+
   } elsif( $cmd eq "command" ) {
     my $action;
 
@@ -494,6 +502,8 @@ harmony_Set($$@)
 
   }
 
+  $list .= " channel" if( defined($hash->{currentActivityID}) && $hash->{currentActivityID} != -1 );
+
   $list .= " command getConfig:noArg getCurrentActivity:noArg off:noArg reconnect:noArg sleeptimer sync:noArg text cursor:up,down,left,right,pageUp,pageDown,home,end special:previousTrack,nextTrack,stop,playPause,volumeUp,volumeDown,mute";
 
   return "Unknown argument $cmd, choose one of $list";
@@ -587,7 +597,7 @@ harmony_CDATA2hash($)
       $value .= ":". $next;
     }
 
-    $params{$name} = $value;
+    $params{$name} = $value if( $name );
   }
 
   return \%params;
@@ -912,6 +922,8 @@ harmony_Read($)
             $hash->{current_fw_version} = $decoded->{current_fw_version} if( defined($decoded->{current_fw_version}) );
 
             harmony_sendEngineGet($hash, "config", "");
+
+          } elsif( $content =~ m/engine\?changeChannel/ && $decoded ) {
 
           } elsif( $content =~ m/engine\?gettimerinterval/ && $decoded ) {
             $hash->{sleeptimer} = FmtDateTime( gettimeofday() + $decoded->{interval} );
@@ -1571,8 +1583,10 @@ harmony_Attr($$$)
   <ul>
     <li>activity &lt;id&gt|&ltname&gt;<br>
       switch to this activity</li>
+    <li>channel &lt;channel&gt;<br>
+      switch to &lt;channel&gt; in the current activity</li>
     <li>command [&lt;id&gt|&ltname&gt;] &lt;command&gt;<br>
-      send the given ir command for the current activity or for the given device.</li>
+      send the given ir command for the current activity or for the given device</li>
     <li>getConfig<br>
       request the configuration from the hub</li>
     <li>getCurrentActivity<br>
