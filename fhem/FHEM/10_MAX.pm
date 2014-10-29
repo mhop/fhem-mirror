@@ -23,6 +23,7 @@ my %boost_durations = (0 => 0, 1 => 5, 2 => 10, 3 => 15, 4 => 20, 5 => 25, 6 => 
 my %boost_durationsInv = reverse %boost_durations;
 
 my %decalcDays = (0 => "Sat", 1 => "Sun", 2 => "Mon", 3 => "Tue", 4 => "Wed", 5 => "Thu", 6 => "Fri");
+my @weekDays = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
 my %decalcDaysInv = reverse %decalcDays;
 
 sub validWindowOpenDuration { return $_[0] =~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 60; }
@@ -463,14 +464,14 @@ MAX_Set($@)
     return MAX_WakeUp($hash);
 
   } elsif($setting eq "weekProfile" and $hash->{type} =~ /.*Thermostat.*/) {
-    return "Number of arguments must be even" if(@args%2 == 1);
+    return "Invalid arguments.  You must specify at least one: <weekDay> <temp[,hh:mm]>\nExample: Mon 10,06:00,17,09:00" if((@args%2 == 1)||(@args == 0));
 
     #Send wakeUp, so we can send the weekprofile pakets without preamble
     #Disabled for now. Seems like the first packet is lost. Maybe inserting a delay after the wakeup will fix this
     #MAX_WakeUp($hash) if( @args > 2 );
 
     for(my $i = 0; $i < @args; $i += 2) {
-      return "Expected day, got $args[$i]" if(!exists($decalcDaysInv{$args[$i]}));
+      return "Expected day (one of ".join (",",@weekDays)."), got $args[$i]" if(!exists($decalcDaysInv{$args[$i]}));
       my $day = $decalcDaysInv{$args[$i]};
       my @controlpoints = split(',',$args[$i+1]);
       return "Not more than 13 control points are allowed!" if(@controlpoints > 13*2);
@@ -488,7 +489,7 @@ MAX_Set($@)
         }
         my $temperature = $controlpoints[$j];
         return "Invalid time: $controlpoints[$j+1]" if(!defined($hour) || !defined($min) || $hour > 23 || $min > 59);
-        return "Invalid temperature" if(!validTemperature($temperature));
+        return "Invalid temperature (Must be one of: off|on|5|5.5|6|6.5..30)" if(!validTemperature($temperature));
         $temperature = MAX_ParseTemperature($temperature); #replace "on" and "off" by their values
         $newWeekprofilePart .= sprintf("%04x", (int($temperature*2) << 9) | int(($hour * 60 + $min)/5));
       }
@@ -553,9 +554,9 @@ MAX_Set($@)
       }
 
       if ($wallthermo eq 1) {
-        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist measurementOffset:$templistOffset windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist measurementOffset:$templistOffset windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset weekProfile";
       } else {
-        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset weekProfile";
       }
     } elsif($hash->{type} eq "WallMountedThermostat") {
       return "$ret associate:$assoclist deassociate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist minimumTemperature:$templist measurementOffset:$templistOffset windowOpenTemperature:$templist boostDuration:$boostDurVal boostValveposition ";
