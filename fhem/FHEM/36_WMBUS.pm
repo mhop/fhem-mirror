@@ -286,6 +286,7 @@ sub WMBUS_SetReadings($$$)
 			readingsBulkUpdate($hash, "$dataBlock->{number}_type", $dataBlock->{type}); 
 			readingsBulkUpdate($hash, "$dataBlock->{number}_value", $dataBlock->{value}); 
 			readingsBulkUpdate($hash, "$dataBlock->{number}_unit", $dataBlock->{unit});
+      readingsBulkUpdate($hash, "$dataBlock->{number}_value_type", $dataBlock->{functionFieldText});
 			if ($dataBlock->{errormsg}) {
 				readingsBulkUpdate($hash, "$dataBlock->{number}_errormsg", $dataBlock->{errormsg});
 			}
