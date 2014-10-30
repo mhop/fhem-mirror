@@ -287,7 +287,9 @@ harmony_Set($$@)
 
     } else {
       $list = "command hidDevice:noArg text cursor:up,down,left,right,pageUp,pageDown,home,end special:previousTrack,nextTrack,stop,playPause,volumeUp,volumeDown,mute";
-      return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
+      #my $device = harmony_deviceOfId( $defs{$hash->{hub}}, $hash->{id} );
+      #$list .= " on off" if( !defined($device->{isManualPower}) || $device->{isManualPower} eq "false" || !$device->{isManualPower} );
+      return "Unknown argument $cmd, choose one of $list";
 
     }
   }
@@ -306,6 +308,10 @@ harmony_Set($$@)
     return undef;
   } elsif( $cmd eq "channel" ) {
     return "no current activity" if( !defined($hash->{currentActivityID}) || $hash->{currentActivityID} == -1 );
+
+    my $activity = harmony_activityOfId($hash, $hash->{currentActivityID});
+    return "no device with 'channel changing role' in current activity $activity->{label}" if( !$activity->{isTuningDefault} );
+
     return "missing channel" if( !$param );
 
     harmony_sendEngineGet($hash, "changeChannel", "channel=$param:timestamp=0");
@@ -363,7 +369,7 @@ harmony_Set($$@)
       my $activity = harmony_activityOfId($hash, $hash->{currentActivityID});
       return "unknown activity" if( !$activity );
 
-      return "no KeyboardTextEntryActivityRole in current activity $activity->{label}" if( !$activity->{KeyboardTextEntryActivityRole} );
+      return "no device with 'keyboard text entry role' in current activity $activity->{label}" if( !$activity->{KeyboardTextEntryActivityRole} );
 
       $id = $activity->{KeyboardTextEntryActivityRole};
 
@@ -392,7 +398,7 @@ harmony_Set($$@)
       my $activity = harmony_activityOfId($hash, $hash->{currentActivityID});
       return "unknown activity" if( !$activity );
 
-      return "no KeyboardTextEntryActivityRole in current activity $activity->{label}" if( !$activity->{KeyboardTextEntryActivityRole} );
+      return "no device with 'keyboard text entry role' in current activity $activity->{label}" if( !$activity->{KeyboardTextEntryActivityRole} );
     }
 
     if( $cmd eq "text" ) {
@@ -457,6 +463,7 @@ harmony_Set($$@)
     harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='setup.sync' token=''/>");
 
     return undef;
+
   }
 
   if( $hash->{config} ) {
@@ -782,6 +789,7 @@ harmony_Read($)
         $hash->{STATE} = "LoggedIn";
         $hash->{ConnectionState} = "LoggedIn";
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
+        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.ping?get' token=''></oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.harmony/vnd.logitech.harmony.system?systeminfo' token=''></oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.deviceinfo?get' token=''></oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.setup/vnd.logitech.account?getProvisionInfo' token=''></oa>");
@@ -1275,7 +1283,7 @@ harmony_data2string($)
    return "" if( !defined($data) );
 
    return $data if( !ref($data) );
-   return $data if( ref($data) eq "JSON::XS::Boolean" );
+   return $data if( ref($data) =~ m/JSON::..::Boolean/ );
    return "[". join(',', @{$data}) ."]" if(ref($data) eq "ARRAY");
 
    return Dumper $data;
@@ -1301,7 +1309,8 @@ harmony_GetPower($$)
 sub
 harmony_Get($$@)
 {
-  my ($hash, $name, $cmd, $param) = @_;
+  my ($hash, $name, $cmd, @params) = @_;
+  my ($param) = @params;
   #$cmd = lc( $cmd );
 
   my $list = "";
@@ -1321,7 +1330,7 @@ harmony_Get($$@)
 
     } else {
       $list = "commands:noArg";
-      return "Unknown argument $cmd, choose one of $list" if( defined($hash->{id}) );
+      return "Unknown argument $cmd, choose one of $list";
 
     }
 
@@ -1337,7 +1346,9 @@ harmony_Get($$@)
       next if( $activity->{label} eq "PowerOff" );
       $ret .= "\n" if( $ret );
       $ret .= sprintf( "%s\t%-24s", $activity->{id}, $activity->{label});
-      $ret .= "\t". harmony_data2string($activity->{$param}) if( $param && defined($activity->{$param}) );
+      foreach my $param (@params) {
+        $ret .= "\t". harmony_data2string($activity->{$param}) if( $param && defined($activity->{$param}) );
+      }
 
       if( $param eq "power" ) {
         my $power = harmony_GetPower($hash, $activity);
@@ -1362,7 +1373,9 @@ harmony_Get($$@)
     foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
       $ret .= "\n" if( $ret );
       $ret .= sprintf( "%s\t%-20s\t%-20s\t%-15s\t%-15s", $device->{id}, $device->{label}, $device->{type}, $device->{manufacturer}, $device->{model});
-      $ret .= "\t". harmony_data2string($device->{$param}) if( $param && defined($device->{$param}) );
+      foreach my $param (@params) {
+        $ret .= "\t". harmony_data2string($device->{$param}) if( $param && defined($device->{$param}) );
+      }
     }
     #$ret = sprintf("%s\t\t%-20s\t%-20s\t%-15s\t%-15s\n", "ID", "LABEL", "TYPE", "MANUFACTURER", "MODEL"). $ret if( $ret );
     return $ret;
