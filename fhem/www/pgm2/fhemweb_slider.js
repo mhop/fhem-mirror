@@ -96,8 +96,12 @@ FW_sliderCreate(slider, curr)
       document.ontouchmove = oldFn3; document.ontouchend = oldFn4;
       if(cmd) {
         if(cmd.substring(0,3) != "js:")
-          if(typeof val != "undefined")
-            FW_cmd(cmd.replace('%',val)+"&XHR=1");
+          if(typeof val != "undefined") {
+            if(typeof FW_pollConn != "undefined")
+              FW_cmd(cmd.replace('%',val)+"&XHR=1");
+            else
+              window.location = addcsrf(cmd.replace('%',val));
+          }    
       } else {
         if(typeof val != "undefined")
           slider.nextSibling.setAttribute('value', val);
