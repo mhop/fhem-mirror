@@ -54,7 +54,7 @@ sub Pushover_Initialize($$)
   my ($hash) = @_;
   $hash->{DefFn}    = "Pushover_Define";
   $hash->{SetFn}    = "Pushover_Set";
-  $hash->{AttrList} = "disable:0,1 timestamp:0,1 title sound device priority:0,1,-1";
+  $hash->{AttrList} = "disable:0,1 timestamp:0,1 title sound device priority:0,1,-1 ssl:0,1";
   #a priority value of 2 is not predifined as for this also a value for retry and expire must be set
   #which will most likely not be used with default values.
 }
@@ -111,6 +111,44 @@ sub Pushover_Set($@)
 }
 
 #------------------------------------------------------------------------------
+sub Pushover_HTTP_Call
+#------------------------------------------------------------------------------
+{
+  my ($hash,$body,$ssl) = @_;
+  
+  my $url = "http";
+  
+  if (1 == $ssl)
+  {
+    $url = $url . "s";
+  }
+  
+  $url = $url . "://api.pushover.net/1/messages.json";
+  
+  $response = GetFileFromURL($url, 10, $body, 0, 5);
+  
+  if ($response =~ m/"status":(.*),/)
+  {
+  	if ($1 eq "1")
+  	{
+      return "OK";
+  	}
+  	elsif ($response =~ m/"errors":\[(.*)\]/)
+  	{
+      return "Error: " . $1;
+  	}
+  	else
+  	{
+      return "Error";
+  	}
+  }
+  else
+  {
+  	return "Error: No known response"
+  }
+}
+
+#------------------------------------------------------------------------------
 sub Pushover_Set_Message
 #------------------------------------------------------------------------------
 {
@@ -126,6 +164,7 @@ sub Pushover_Set_Message
   my $sound=AttrVal($hash->{NAME}, "sound", "");
   my $retry="";
   my $expire="";
+  my $ssl=AttrVal($hash->{NAME}, "ssl", 1);
 
 
   #Split parameters
@@ -235,7 +274,7 @@ sub Pushover_Set_Message
       $body = $body . "&" . "timestamp=" . time();
     }
     
-    my $result = Pushover_HTTP_Call($hash, $body);
+    my $result = Pushover_HTTP_Call($hash, $body, $ssl);
     
 	#Save result and data of the last call to the readings.
     readingsBeginUpdate($hash);
@@ -256,37 +295,6 @@ sub Pushover_Set_Message
 	{
 		return "Syntax: <Pushover_device> msg [title] <msg> [<device> <priority> <sound> [<retry> <expire>]]";
 	}
-  }
-}
-
-#------------------------------------------------------------------------------
-sub Pushover_HTTP_Call($$) 
-#------------------------------------------------------------------------------
-{
-  my ($hash,$body) = @_;
-  
-  my $url = "https://api.pushover.net/1/messages.json";
-  
-  $response = GetFileFromURL($url, 10, $body, 0, 5);
-  
-  if ($response =~ m/"status":(.*),/)
-  {
-  	if ($1 eq "1")
-  	{
-      return "OK";
-  	}
-  	elsif ($response =~ m/"errors":\[(.*)\]/)
-  	{
-      return "Error: " . $1;
-  	}
-  	else
-  	{
-      return "Error";
-  	}
-  }
-  else
-  {
-  	return "Error: No known response"
   }
 }
 
@@ -374,6 +382,10 @@ sub Pushover_HTTP_Call($$)
     <a name="sound"></a>
     <li>sound<br>
         Will be used as the default sound if sound argument is missing. If left blank the adjusted sound of the app will be used. 
+    </li><br>
+    <a name="ssl"></a>
+    <li>ssl<br>
+        Send the requests over HTTP or HTTPS. Valid values are 0 = HTTP / 1 = HTTPS. Default is 1.
     </li><br>
   </ul>
   <br>
@@ -464,6 +476,10 @@ sub Pushover_HTTP_Call($$)
     <a name="sound"></a>
     <li>sound<br>
         Wird beim Senden als Titel verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, dann wird der eingestellte Ton der App verwendet.
+    </li><br>
+    <a name="ssl"></a>
+    <li>ssl<br>
+        Sende die Requests über HTTP oder HTTPS. Zulässige Werte sind 0 = HTTP / 1 = HTTPS. Standard ist 1.
     </li><br>
   </ul>
   <br>
