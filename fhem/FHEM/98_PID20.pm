@@ -42,6 +42,8 @@
 #               code review, pod added, removed old version info (will be provided via SVN)
 # V 1.01
 #  19.10.2014   fix in sub PID20_Set : wrong parameter $hash instead of $name, when calling PID20_Calc
+# V 1.0.0.2     30.10.14 - fix in PID20_Calc when setting $retStr (thanks to Thorsten Pferdekaemper)
+#
 ####################################################################################################
 package main;
 use strict;
@@ -51,6 +53,8 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
+
+my $PID20_Version="1.0.0.2"; 
 
 sub PID20_Calc($);
 
@@ -682,8 +686,9 @@ sub PID20_Calc($)
         # note timestamp
         $hash->{helper}{actorTimestamp}=TimeNow();
         $actuationDone=$actuation; 
-        my $retStr="" if (!$ret);      
-        PID20_Log $hash, 3, "<$cmd> with ret:$retStr";    
+        my $retStr="";
+        $retStr = " with return-value:".$ret if (defined($ret) && ($ret ne ''));      
+        PID20_Log $hash, 3, "<$cmd> ".$retStr;    
      }
    
      my $updateAlive= ($actuation ne "") 
@@ -838,10 +843,10 @@ sub PID20_Calc($)
 	</ul>
 	<br/><br/>
 
-	<b>Additional informations</b><br/><br/>
+	<b>Additional information</b><br/><br/>
 	<ul>
 		<li><a href="http://forum.fhem.de/index.php/topic,17067.0.html">Discussion in FHEM forum</a></li><br/>
-		<li><a href="http://www.fhemwiki.de/wiki/PID20_-_Der_PID-Regler">WIKI information in FHEM wiki</a></li><br/>
+		<li><a href="http://www.fhemwiki.de/wiki/PID20_-_Der_PID-Regler">Information in FHEM wiki</a></li><br/>
 	</ul>
 
 </ul>
