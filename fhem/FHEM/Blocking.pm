@@ -81,7 +81,10 @@ BlockingCall($$@)
 
   # Child here
 
-  foreach my $d (sort keys %defs) {   # Close all kind of FD
+  # Close all kind of FD. Reasons:
+  # - cannot restart FHEM if child keeps TCP Serverports open
+  # ...?
+  foreach my $d (sort keys %defs) {
     my $h = $defs{$d};
     $h->{DBH}->{InactiveDestroy} = 1 if($h->{TYPE} eq 'DbLog');
     TcpServer_Close($h) if($h->{SERVERSOCKET});
