@@ -27,6 +27,14 @@ my $curReadingType = 0;
      ,"stark" => 3
   );
   
+  my @knownNoneIDs = ( ["Temperatur", "temperature"] 
+      ,["relative Feuchte", "humidity"]
+      ,["Sichtweite", "visibility"]
+      ,["Windgeschwindigkeit", "wind"]
+      ,["Luftdruck", "pressure"]
+      ,["Taupunkt", "dewpoint"]
+  );
+
   # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type
   # Tag-Types: 1 = Number Col 2, 2 = Number Col 2-5, 3 = Number Col 2|4|6|8, 4 = Intensity-Text Col 2-5
   my @knownIDs = ( ["GS", "rad", 3] 
@@ -53,16 +61,48 @@ sub text
    my $readingName;
    if ( $curTag =~ $lookupTag )
    {
+      $curTextPos++;
+
       $text =~ s/^\s+//;    # trim string
       $text =~ s/\s+$//;
-   # Tag-Type 1 = Number Col 2, 2 = Number Col 2-5, 3 = Number Col 2|4|6|8, 4 = Intensity-Text Col 2-5
-
+   # Tag-Type 0 = Check for readings without tag-ID
+      if ($curReadingType == 0)
+      {
+         if ($curCol == 1 && $curTextPos == 1)
+         {
+            foreach my $r (@knownNoneIDs) 
+            { 
+               if ( $$r[0] eq $text ) 
+               {
+                  $curReadingName = $$r[1];
+                  $curReadingType = 1;
+                  last;
+               }
+            }
+         }
+      }
+   # Tag-Type 1 = Number Col 2
+      elsif ($curReadingType == 1) 
+      {
+         if ( $curCol == 3 )
+         {
+            $readingName = $curReadingName;
+            if ( $text =~ m/([-,\+]?\d+[,\.]?\d*)/ )
+            {
+               $text = $1;
+               $text =~ tr/,/./;    # komma durch punkt ersetzen
+            }
+            push( @texte, $readingName."|".$text ); 
+            $curReadingType = 0;
+         }
+      }
    # Tag-Type 2 = Number Col 2-5
-      if ($curReadingType == 2) {
+      elsif ($curReadingType == 2) 
+      {
          if ( 1 < $curCol && $curCol <= 5 )
          {
             $readingName = "fc".($curCol-1)."_".$curReadingName;
-            if ( $text =~ m/([-,\+]?\d+\.?\d*)/ )
+            if ( $text =~ m/([-,\+]?\d+[,\.]?\d*)/ )
             {
                $text = $1;
                $text =~ tr/,/./;    # komma durch punkt ersetzen
@@ -71,8 +111,8 @@ sub text
          }
       }
    # Tag-Type 3 = Number Col 2|4|6|8
-      elsif ($curReadingType == 3) {
-         $curTextPos++;
+      elsif ($curReadingType == 3) 
+      {
          if ( 1 < $curCol && $curCol <= 5 )
          {
             if ( $curTextPos % 2 == 1 ) 
@@ -98,21 +138,25 @@ sub start
 {
    my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
    $curTag = $tagname;
-   if ( $tagname eq "tr" && defined( $attr->{id} ) ) 
+   if ( $tagname eq "tr" )
    {
-      foreach my $r (@knownIDs) 
-      { 
-         if ( $$r[0] eq $attr->{id} ) 
-         {
-            $curReadingName = $$r[1];
-            $curReadingType = $$r[2];
-            $curCol = 0;
-            $curTextPos = 0;
-            last;
+      $curReadingType = 0;
+      $curCol = 0;
+      $curTextPos = 0;
+      if ( defined( $attr->{id} ) ) 
+      {
+         foreach my $r (@knownIDs) 
+         { 
+            if ( $$r[0] eq $attr->{id} ) 
+            {
+               $curReadingName = $$r[1];
+               $curReadingType = $$r[2];
+               last;
+            }
          }
       }
    };
-  if ($tagname eq "td" && $curReadingType != 0) {
+  if ($tagname eq "td") {
       $curCol++;
       $curTextPos = 0;
    };
@@ -142,7 +186,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
-my $PROPLANTA_VERSION = "0.01";
+my $PROPLANTA_VERSION = "1.01";
 
 
 ########################################
