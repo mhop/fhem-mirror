@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "1.7";
+my $alarmversion    = "1.9";
 
 #########################################################################################
 #
@@ -266,6 +266,7 @@ sub Alarm_getstate($) {
 # Parameter name  = name of the Alarm definition
 #           level = Alarm level 
 #           dev   = name of the device calling the alarm
+#           evt   = event calling the alarm
 #           act   = action - "on" or "off"
 #
 #########################################################################################
@@ -286,8 +287,8 @@ sub Alarm_Exec($$$$$){
    #-- raising the alarm
    if( $act eq "on" ){
       my $xec   = AttrVal($name, "level".$level."xec", 0); 
-      #-- only if this level is sharp
-      if( $xec eq "sharp" ){ 
+      #-- only if this level is sharp and not yet active
+      if( ($xec eq "sharp") && ($hash->{READINGS}{"level".$level}{VAL} eq "off") ){ 
          #-- check for time (attribute values have been controlled in CreateNotifiers)
          my @st  = split(':',AttrVal($name, "level".$level."start", 0));
          my @et  = split(':',AttrVal($name, "level".$level."end", 0));
@@ -328,7 +329,7 @@ sub Alarm_Exec($$$$$){
             Log3 $hash,5,$msg;
          }
       }else{
-         $msg = "[Alarm $level] not raised, not sharp";
+         $msg = "[Alarm $level] not raised, not sharp or already active";
          Log3 $hash,5,$msg;
       } 
    }elsif( $act eq "off" ){
@@ -686,8 +687,8 @@ sub Alarm_Html($)
            for( my $k=0;$k<$alarmno;$k++ ){
               $ret .= sprintf("<input type=\"checkbox\" name=\"alarm$k\" value=\"$k\" %s/>&nbsp;",(index($aval[0],"alarm".$k) != -1)?"checked=\"checked\"":""); 
            }
-           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmnotify\" size=\"13\" maxlength=\"256\" value=\"$aval[1]\"/>";
-           $ret .= "<input type=\"text\" name=\"alarmmsg\" size=\"13\" maxlength=\"256\" value=\"$aval[2]\"/></td>\n"; 
+           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmnotify\" size=\"13\" maxlength=\"512\" value=\"$aval[1]\"/>";
+           $ret .= "<input type=\"text\" name=\"alarmmsg\" size=\"13\" maxlength=\"512\" value=\"$aval[2]\"/></td>\n"; 
            $ret .= sprintf("<td class=\"col4\"><select name=\"%sonoff\"><option value=\"on\" %s>Raise</option><option value=\"off\" %s>Cancel</option>",
                $d,($aval[3] eq "on")?"selected=\"selected\"":"",($aval[3] eq "off")?"selected=\"selected\"":"");
            $ret .= sprintf("<option value=\"sh\" %s>Sharpen</option><option value=\"unsh\" %s>Unsharpen</option><select></td></tr>\n",
@@ -717,8 +718,8 @@ sub Alarm_Html($)
            for( my $k=0;$k<$alarmno;$k++ ){
               $ret .= sprintf("<input type=\"checkbox\" name=\"alarm$k\"%s/>&nbsp;",(index($aval[0],"alarm".$k) != -1)?"checked=\"checked\"":""); 
            }
-           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmon\" size=\"13\" maxlength=\"256\" value=\"$aval[1]\"/>"; 
-           $ret .= "<input type=\"text\" name=\"alarmaoff\" size=\"13\" maxlength=\"256\" value=\"$aval[2]\"/></td>"; 
+           $ret .= "</td><td class=\"col3\"><input type=\"text\" name=\"alarmon\" size=\"13\" maxlength=\"512\" value=\"$aval[1]\"/>"; 
+           $ret .= "<input type=\"text\" name=\"alarmaoff\" size=\"13\" maxlength=\"512\" value=\"$aval[2]\"/></td>"; 
            $ret .= "<td class=\"col4\"><input type=\"text\" name=\"delay\" size=\"4\" maxlength=\"5\" value=\"$aval[3]\"/></td></tr>\n";
        }
     }  
