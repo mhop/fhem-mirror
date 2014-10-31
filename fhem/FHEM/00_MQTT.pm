@@ -436,7 +436,8 @@ sub Client_Define($$) {
   $client->{retain} = 0;
   $client->{subscribe} = [];
   $client->{subscribeExpr} = [];
-  
+  AssignIoPort($client);
+
   if ($main::init_done) {
     return client_start($client);
   } else {
@@ -485,7 +486,6 @@ sub client_attr($$$$$) {
 
 sub client_start($) {
   my $client = shift;
-  AssignIoPort($client);
   my $name = $client->{NAME};
   if (! (defined AttrVal($name,"stateFormat",undef))) {
     $main::attr{$name}{stateFormat} = "transmission-state";
