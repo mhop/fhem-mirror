@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added: PROPLANTA: captures weather forecast from www.proplanta.de
   - feature: 15_CUL_EM added attribute maxPeak (arnoaugustin)
   - bugfix: 10_IT changed "setstate" to avoid eventMap errors (arnoaugustin)
   - feature: new module 37_harmony.pm added (justme1968)
