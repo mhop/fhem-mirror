@@ -224,7 +224,7 @@ sub PROPLANTA_Define($$)
    my @a    = split( "[ \t][ \t]*", $def );
    if ( int(@a) < 3 ) 
    {
-      return "Wrong syntax: use define <name> PROPLANTA <city>";
+      return "Wrong syntax: use define <name> PROPLANTA <City>";
    }
    $hash->{URL} = "http://www.proplanta.de/Wetter/".$a[2]."-Wetter.html";
    
@@ -437,13 +437,13 @@ sub PROPLANTA_Timer($)
   <b>Define</b>
   <ul>
     <br>
-    <code>define &lt;name&gt; PROPLANTA &lt;city&gt;</code>
+    <code>define &lt;name&gt; PROPLANTA &lt;City&gt;</code>
     <br>
      The module extracts certain weather data from the above web page.<br/>
     <br>
     <b>Parameters:</b><br>
     <ul>    
-      <li><b>&lt;city&gt</b> - check www.proplanta.de if your city is known</li>
+      <li><b>&lt;City&gt</b> - check www.proplanta.de if your city is known. The city has to start with a <b>capital</b> letter.</li>
     </ul>
   </ul>
   <br>
