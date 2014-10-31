@@ -22,7 +22,9 @@ my $curTextPos = 0;
 my $curReadingType = 0;
 
   my %intensity = ( "keine" => 0
+     ,"nein" => 0
      ,"gering" => 1
+     ,"ja" => 1
      ,"m&auml;&szlig;ig" => 2
      ,"stark" => 3
   );
@@ -43,6 +45,8 @@ my $curReadingType = 0;
       ,["TMAX", "high_c", 2]
       ,["TMIN", "low_c", 2]
       ,["VERDUNST", "evapor", 4]
+      ,["TAUBILDUNG", "dew", 4]
+      ,["BF", "frost", 4]
       ,["T_0", "0000_c", 2]
       ,["T_3", "0300_c", 2]
       ,["T_6", "0600_c", 2]
@@ -165,6 +169,7 @@ sub start
 sub end
 {
    $curTag = "";
+
    if ( $tagname eq "tr" ) 
    {       
       $curReadingType = 0 
@@ -245,7 +250,7 @@ sub PROPLANTA_Set($@)
    my ( $hash, @a ) = @_;
    my $name    = $hash->{NAME};
    my $reUINT = '^([\\+]?\\d+)$';
-   my $usage   = "Unknown argument $a[1], choose one of captureWeatherData:noArg ";
+   my $usage   = "Unknown argument $a[1], choose one of update:noArg ";
  
    return $usage if ( @a < 2 );
    
@@ -256,7 +261,7 @@ sub PROPLANTA_Set($@)
       {
          return $usage;
       }
-      when ("captureweatherdata")
+      when ("update")
       {
          PROPLANTA_Log $hash, 3, "set command: " . $a[1];
          PROPLANTA_Start($hash);
@@ -365,32 +370,22 @@ sub PROPLANTA_Done($)
    return unless ( defined($string) );
    
    # all term are separated by "|" , the first is the name of the instance
-   my ( $name, @values ) = split( "\\|", $string );
+   my ( $name, %values ) = split( "\\|", $string );
    my $hash = $defs{$name};
-   return unless (defined($hash->{NAME}));
+   return unless ( defined($hash->{NAME}) );
    
    # delete the marker for running process
    delete( $hash->{helper}{RUNNING} );  
 
-   my $rdName     = "";
-
    # Wetterdaten speichern
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash,"state","Connected");
+   readingsBulkUpdate($hash,"state","T: ".$values{temperature}." H: ".$values{humidity}." W: ".$values{wind} );
 
    my $x = 0;
-   foreach my $text (@values)
+   while (my ($rName, $rValue) = each(%values) )
    {
-      $x++;
-      if ( $x % 2 == 1 )
-      {
-         $rdName = $text;
-      } 
-      else
-      {
-         readingsBulkUpdate( $hash, $rdName, $text );
-         PROPLANTA_Log $hash, 5, "tag:$rdName value:$text";
-      }
+      readingsBulkUpdate( $hash, $rName, $rValue );
+      PROPLANTA_Log $hash, 5, "tag:$rName value:$rValue";
    }
 
    readingsEndUpdate( $hash, 1 );
@@ -458,10 +453,10 @@ sub PROPLANTA_Timer($)
   <ul>
      
      <br/>
-     <code>set &lt;name&gt; captureWeatherData</code>
+     <code>set &lt;name&gt; update</code>
    	 <br/>
    	 <ul>
-          The weather data are immediately polled.
+          The weather data are immediately polled from the website.
      </ul><br/>
   </ul>  
   
