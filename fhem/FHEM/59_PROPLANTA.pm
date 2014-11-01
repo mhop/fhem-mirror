@@ -21,6 +21,19 @@ my $curCol = 0;
 my $curTextPos = 0;
 my $curReadingType = 0;
 
+   my %url_start =( "de" => "http://www.proplanta.de/Wetter/"
+   , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/"
+   , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/"
+   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/"
+   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/"
+   );
+   my %url_end = ( "de" => "-Wetter.html"
+   , "at" => "/"
+   , "ch" => "/"
+   , "fr" => "/"
+   , "it" => "/"
+   );
+
   my %intensity = ( "keine" => 0
      ,"nein" => 0
      ,"gering" => 1
@@ -29,32 +42,50 @@ my $curReadingType = 0;
      ,"stark" => 3
   );
   
-  my @knownNoneIDs = ( ["Temperatur", "temperature"] 
-      ,["relative Feuchte", "humidity"]
-      ,["Sichtweite", "visibility"]
-      ,["Windgeschwindigkeit", "wind"]
-      ,["Luftdruck", "pressure"]
-      ,["Taupunkt", "dewpoint"]
+  # 1 = Span Text, 2 = readingName, 3 = Tag-Type
+  # Tag-Types: 
+  #   1 = Number Col 3
+  #   2 = Number Col 2-5 
+  #   3 = Number Col 2|4|6|8
+  #   4 = Intensity-Text Col 2-5
+  #   5 = Time Col 2-5
+  #   6 = Time Col 3
+  my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
+      ,["relative Feuchte", "humidity", 1]
+      ,["Sichtweite", "visibility", 1]
+      ,["Windgeschwindigkeit", "wind", 1]
+      ,["Luftdruck", "pressure", 1]
+      ,["Taupunkt", "dewPoint", 1]
+      ,["Uhrzeit", "time", 6]
   );
 
-  # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type
-  # Tag-Types: 1 = Number Col 2, 2 = Number Col 2-5, 3 = Number Col 2|4|6|8, 4 = Intensity-Text Col 2-5
+  # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type (see above)
   my @knownIDs = ( ["GS", "rad", 3] 
       ,["UV", "uv", 2]
       ,["SD", "sun", 2]
-      ,["TMAX", "high_c", 2]
-      ,["TMIN", "low_c", 2]
+      ,["TMAX", "tempMaxC", 2]
+      ,["TMIN", "tempMinC", 2]
       ,["VERDUNST", "evapor", 4]
       ,["TAUBILDUNG", "dew", 4]
       ,["BF", "frost", 4]
-      ,["T_0", "t00_c", 2]
-      ,["T_3", "t03_c", 2]
-      ,["T_6", "t06_c", 2]
-      ,["T_9", "t09_c", 2]
-      ,["T_12", "t12_c", 2]
-      ,["T_15", "t15_c", 2]
-      ,["T_18", "t18_c", 2]
-      ,["T_21", "t21_c", 2]
+      ,["MA", "moonRise", 5]
+      ,["MU", "moonSet", 5]
+      ,["T_0", "temp00C", 2]
+      ,["T_3", "temp03C", 2]
+      ,["T_6", "temp06C", 2]
+      ,["T_9", "temp09C", 2]
+      ,["T_12", "temp12C", 2]
+      ,["T_15", "temp15C", 2]
+      ,["T_18", "temp18C", 2]
+      ,["T_21", "temp21C", 2]
+      ,["BD_0", "cloud00", 2]
+      ,["BD_3", "cloud03", 2]
+      ,["BD_6", "cloud06", 2]
+      ,["BD_9", "cloud09", 2]
+      ,["BD_12", "cloud12", 2]
+      ,["BD_15", "cloud15", 2]
+      ,["BD_18", "cloud18", 2]
+      ,["BD_21", "cloud21", 2]
   );
 
 # here HTML::text/start/end are overridden
@@ -69,6 +100,8 @@ sub text
 
       $text =~ s/^\s+//;    # trim string
       $text =~ s/\s+$//;
+      $text =~ s/&#48;/0/g;  # replace 0
+      
    # Tag-Type 0 = Check for readings without tag-ID
       if ($curReadingType == 0)
       {
@@ -79,13 +112,13 @@ sub text
                if ( $$r[0] eq $text ) 
                {
                   $curReadingName = $$r[1];
-                  $curReadingType = 1;
+                  $curReadingType = $$r[2];
                   last;
                }
             }
          }
       }
-   # Tag-Type 1 = Number Col 2
+   # Tag-Type 1 = Number Col 3
       elsif ($curReadingType == 1) 
       {
          if ( $curCol == 3 )
@@ -105,8 +138,8 @@ sub text
       {
          if ( 1 < $curCol && $curCol <= 5 )
          {
-            $readingName = "fc".($curCol-1)."_".$curReadingName;
-            if ( $text =~ m/([-,\+]?\d+[,\.]?\d*)/ )
+            $readingName = "fc".($curCol-2)."_".$curReadingName;
+            if ( $text =~ m/([-+]?\d+[,.]?\d*)/ )
             {
                $text = $1;
                $text =~ tr/,/./;    # komma durch punkt ersetzen
@@ -121,22 +154,54 @@ sub text
          {
             if ( $curTextPos % 2 == 1 ) 
             { 
-               $readingName = "fc".($curCol-1)."_".$curReadingName;
+               $readingName = "fc".($curCol-2)."_".$curReadingName;
                $text =~ tr/,/./;    # komma durch punkt ersetzen
                push( @texte, $readingName."|".$text ); 
             }
          }
       }
    # Tag-Type 4 = Intensity-Text Col 2-5
-      elsif ($curReadingType == 4) {
+      elsif ($curReadingType == 4) 
+      {
          if ( 1 < $curCol && $curCol <= 5 )
          {
-            $readingName = "fc".($curCol-1)."_".$curReadingName;
-            push( @texte, $readingName."|".$intensity{$text} ); 
+            $readingName = "fc".($curCol-2)."_".$curReadingName;
+            $text = $intensity{$text} if defined $intensity{$text};
+            push( @texte, $readingName . "|" . $text ); 
+         }
+      }
+   # Tag-Type 5 = Time Col 2-5
+      elsif ($curReadingType == 5) 
+      {
+         if ( 2 <= $curCol && $curCol <= 5 )
+         {
+            $readingName = "fc".($curCol-2)."_".$curReadingName;
+            if ( $text =~ m/([012]?\d[.:][0-5]\d)/ )
+            {
+               $text = $1;
+               $text =~ tr/./:/;    # Punkt durch Doppelpunkt ersetzen
+            }
+            push( @texte, $readingName."|".$text ); 
+         }
+      }
+   # Tag-Type 6 = Time Col 3
+      elsif ($curReadingType == 6) 
+      {
+         if ( $curCol == 3 )
+         {
+            $readingName = $curReadingName;
+            if ( $text =~ m/([012]?\d[.:][0-5]\d)/ )
+            {
+               $text = $1;
+               $text =~ tr/./:/;    # Punkt durch Doppelpunkt ersetzen
+            }
+            push( @texte, $readingName."|".$text ); 
          }
       }
    }
 }
+
+#{"50 %" =~ m/([-+]?\d+[,.]?\d*)/;;return $1;;}
 
 sub start
 {
@@ -221,14 +286,18 @@ sub PROPLANTA_Define($$)
 {
    my ( $hash, $def ) = @_;
    my $name = $hash->{NAME};
+   my $lang = "";
    my @a    = split( "[ \t][ \t]*", $def );
-   if ( int(@a) > 4 ) 
+   
+   return "Wrong syntax: use define <name> PROPLANTA [City] [CountryCode]" if int(@a) > 4;
+
+   $lang = "de" if int(@a) == 3;
+   $lang = lc( $a[3] ) if int(@a) == 4;
+
+   if ( $lang ne "")
    {
-      return "Wrong syntax: use define <name> PROPLANTA [City] [Country]";
-   }
-   elsif ( int(@a) == 3 ) 
-   {
-      $hash->{URL} = "http://www.proplanta.de/Wetter/".$a[2]."-Wetter.html";
+      return "Wrong country code '$lang': use " . join(" | ",  keys( %url_start ) ) unless defined( $url_start{$lang} );
+      $hash->{URL} = $url_start{$lang} . $a[2] . $url_end{$lang};
    }
 
    $hash->{STATE}          = "Initializing";
@@ -401,7 +470,7 @@ sub PROPLANTA_Done($)
 
    # Wetterdaten speichern
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash,"state","T: ".$values{temperature}." H: ".$values{humidity}." W: ".$values{wind} );
+   readingsBulkUpdate($hash, "state", sprintf "T: %.1f H: %.1f W: %.1f P: %.0f ", $values{temperature}, $values{humidity}, $values{wind}, $values{pressure} );
 
    my $x = 0;
    while (my ($rName, $rValue) = each(%values) )
@@ -429,18 +498,20 @@ sub PROPLANTA_Aborted($)
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
 <ul style="width:800px">
+  The module extracts certain weather data from www.proplanta.de.<br/>
   <a name="PROPLANTAdefine"></a>
   <b>Define</b>
   <ul>
-    <br>
-    <code>define &lt;name&gt; PROPLANTA &lt;City&gt;</code>
-    <br>
-     The module extracts certain weather data from the above web page.<br/>
-    <br>
-    <b>Parameters:</b><br>
-    <ul>    
-      <li><b>&lt;City&gt</b> - check www.proplanta.de if your city is known. The city has to start with a <b>capital</b> letter.</li>
-    </ul>
+    <code>define &lt;name&gt; PROPLANTA [City] [CountryCode]</code>
+    <br>&nbsp;
+    <li><code>[City]<code> (optional)
+      <br>
+      Check www.proplanta.de if your city is known. The city has to start with a <b>capital</b> letter.
+    </li><br>
+    <li><code>[CountryCode]<code> (optional)
+      <br>
+      Possible values: de (default), at, ch, fr, it 
+    </li><br>
   </ul>
   <br>
   
@@ -459,18 +530,23 @@ sub PROPLANTA_Aborted($)
     <a name="PROPLANTAattr"></a>
 	<b>Attributes</b><br/><br/>
 	<ul>
-		<li><b>Interval</b> - poll interval for weather data in seconds (default 3600)</li>
-		<li><b>URL</b> - url to extract information from</li>
-		<br/>
+      <li><code>Interval</code>
+      <br>
+      poll interval for weather data in seconds (default 3600)
+      </li><br>
+      <li><code>URL</code>
+      <br>
+      URL to extract information from. Overwrites the values in the 'define' term.
+      </li><br>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 	</ul>
 	<br/><br/>
 	
     <a name="PROPLANTAreading"></a>
-	<b>Generated Readings/Events</b><br/><br/>
+	<b>Generated Readings</b><br/><br/>
 	<ul>
-		<li><b>fc?_uv</b> - the UV Index</li>
-		<li><b>fc?_sun</b> - the sunshine duration</li>
+		<li><b>fc?_uv</b> - UV index</li>
+		<li><b>fc?_sun</b> - sunshine duration</li>
 	</ul>
 	<br/><br/>	
 
@@ -514,7 +590,7 @@ sub PROPLANTA_Aborted($)
 	<b>Attribute</b><br/><br/>
 	<ul>
 		<li><b>Interval</b> - poll interval for weather data in seconds (default 3600)</li>
-		<li><b>URL</b> - url to extract information from</li>
+		<li><b>URL</b> - url to extract the weather data from</li>
 		<br/>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 	</ul>
