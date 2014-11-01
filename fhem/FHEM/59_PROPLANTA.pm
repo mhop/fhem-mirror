@@ -176,7 +176,7 @@ sub text
          if ( 2 <= $curCol && $curCol <= 5 )
          {
             $readingName = "fc".($curCol-2)."_".$curReadingName;
-            if ( $text =~ m/([012]?\d[.:][0-5]\d)/ )
+            if ( $text =~ m/([012-]?[-0-9][.:][-0-5][-0-9])/ )
             {
                $text = $1;
                $text =~ tr/./:/;    # Punkt durch Doppelpunkt ersetzen
@@ -190,11 +190,11 @@ sub text
          if ( $curCol == 3 )
          {
             $readingName = $curReadingName;
-            if ( $text =~ m/([012]?\d[.:][0-5]\d)/ )
+            if ( $text =~ m/([012-]?[-0-9][.:][-0-5][-0-9])/ )
             {
                $text = $1;
                $text =~ tr/./:/;    # Punkt durch Doppelpunkt ersetzen
-            }
+            } 
             push( @texte, $readingName."|".$text ); 
          }
       }
