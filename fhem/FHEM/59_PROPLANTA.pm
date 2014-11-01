@@ -214,7 +214,7 @@ sub PROPLANTA_Initialize($)
    $hash->{DefFn}    = "PROPLANTA_Define";
    $hash->{UndefFn}  = "PROPLANTA_Undef";
    $hash->{SetFn}    = "PROPLANTA_Set";
-   $hash->{AttrList} = "delay " . "delayCounter " . "Interval " . "disable:0,1 " . $readingFnAttributes;
+   $hash->{AttrList} = "Interval URL disable:0,1 " . $readingFnAttributes;
 }
 ###################################
 sub PROPLANTA_Define($$)
@@ -222,15 +222,20 @@ sub PROPLANTA_Define($$)
    my ( $hash, $def ) = @_;
    my $name = $hash->{NAME};
    my @a    = split( "[ \t][ \t]*", $def );
-   if ( int(@a) < 3 ) 
+   if ( int(@a) > 4 ) 
    {
-      return "Wrong syntax: use define <name> PROPLANTA <City>";
+      return "Wrong syntax: use define <name> PROPLANTA [City] [Country]";
    }
-   $hash->{URL} = "http://www.proplanta.de/Wetter/".$a[2]."-Wetter.html";
-   
+   elsif ( int(@a) == 3 ) 
+   {
+      $hash->{URL} = "http://www.proplanta.de/Wetter/".$a[2]."-Wetter.html";
+   }
+
    $hash->{STATE}          = "Initializing";
-   $hash->{helper}{Timer}  = $name ;
-   InternalTimer( gettimeofday() + 20, "PROPLANTA_Timer",     $hash->{helper}{Timer},     0 );
+   
+   RemoveInternalTimer($hash);
+   InternalTimer( gettimeofday() + 12, "PROPLANTA_Start", $hash, 0 );
+
    return undef;
 }
 #####################################
@@ -238,8 +243,8 @@ sub PROPLANTA_Undef($$)
 {
    my ( $hash, $arg ) = @_;
 
-   RemoveInternalTimer( $hash->{helper}{TimerStatus} );
-   RemoveInternalTimer( $hash->{helper}{Timer} );
+   RemoveInternalTimer( $hash );
+   
    BlockingKill( $hash->{helper}{RUNNING} ) if ( defined( $hash->{helper}{RUNNING} ) );
    
    return undef;
@@ -275,18 +280,21 @@ sub PROPLANTA_Set($@)
 }
 
 #####################################
-# acquires the html page of Global radiation
+# acquires the html page
 sub PROPLANTA_HtmlAcquire($)
 {
    my ($hash)  = @_;
    my $name    = $hash->{NAME};
    return unless (defined($hash->{NAME}));
  
-   my $URL = $hash->{URL};
+   my $URL = AttrVal( $name, 'URL', "" );
+   $URL = $hash->{URL} if $URL eq "";
 
-   # abbrechen, wenn wichtig parameter nicht definiert sind
+   # abbrechen, wenn wichtige parameter nicht definiert sind
    return "" if ( !defined($URL) );
    return "" if ( $URL eq "" );
+
+   PROPLANTA_Log $hash, 5, "Start polling of ".$URL;
 
    my $err_log  = "";
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
@@ -309,13 +317,27 @@ sub PROPLANTA_HtmlAcquire($)
 #####################################
 sub PROPLANTA_Start($)
 {
-   my ($hash)  = @_;
-   my $name    = $hash->{NAME};
+   my ($hash) = @_;
+   my $name   = $hash->{NAME};
    
    return unless (defined($hash->{NAME}));
    
-   return if ($hash->{URL} eq "");
+   $hash->{Interval} = AttrVal( $name, "Interval",  3600 );
    
+   # setup timer
+   RemoveInternalTimer( $hash );
+   InternalTimer(
+      gettimeofday() + $hash->{Interval},
+      "PROPLANTA_Start",
+       $name,
+       0 );  
+
+   if ( AttrVal( $name, 'URL', '') eq '' && not defined( $hash->{URL} ) )
+   {
+      PROPLANTA_Log $hash, 3, "missing URL";
+      return;
+   }
+  
    $hash->{helper}{RUNNING} =
            BlockingCall( 
            "PROPLANTA_Run",   # callback worker task
@@ -397,32 +419,6 @@ sub PROPLANTA_Aborted($)
    delete( $hash->{helper}{RUNNING} );
 }
 
-#####################################
-sub PROPLANTA_Timer($)
-{
-   my ($timerpara) = @_;
-  # my ( $name, $func ) = split( /\./, $timerpara );
-   my $index = rindex($timerpara,".");  # rechter punkt
-   my $func  = substr $timerpara,$index+1,length($timerpara); # function extrahieren
-   my $name =  substr $timerpara,0,$index; # name extrahieren     
-   my $hash      = $defs{$name};
-   
-   return unless (defined($hash->{NAME}));
-  
-   $hash->{helper}{TimerInterval} = AttrVal( $name, "Interval",  3600 );
-      
-   PROPLANTA_Start($hash);
-   
-    # setup timer
-   RemoveInternalTimer( $hash->{helper}{Timer} );
-
-   InternalTimer(
-     gettimeofday() + $hash->{helper}{TimerInterval},
-    "PROPLANTA_Timer",
-     $hash->{helper}{Timer},
-     0 );  
-     
-}
 
 ##################################### 
 1;
@@ -464,6 +460,7 @@ sub PROPLANTA_Timer($)
 	<b>Attributes</b><br/><br/>
 	<ul>
 		<li><b>Interval</b> - poll interval for weather data in seconds (default 3600)</li>
+		<li><b>URL</b> - url to extract information from</li>
 		<br/>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 	</ul>
@@ -480,4 +477,58 @@ sub PROPLANTA_Timer($)
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="PROPLANTA"></a>
+<h3>PROPLANTA</h3>
+<ul style="width:800px">
+  <a name="PROPLANTAdefine"></a>
+  <b>Define</b>
+  <ul>
+    <br>
+    <code>define &lt;name&gt; PROPLANTA &lt;Stadt&gt;</code>
+    <br>
+     Das Modul extrahiert bestimmte Wetterdaten von der website www.proplanta.de.<br/>
+    <br>
+    <b>Parameters:</b><br>
+    <ul>    
+      <li><b>&lt;Stadt&gt</b> - Prüfe auf www.proplanta.de, ob die Stadt bekannt ist. Die Stadt muss mit <b>großem</b> Anfangsbuchstaben anfangen.</li>
+    </ul>
+  </ul>
+  <br>
+  
+  <a name="PROPLANTAset"></a>
+  <b>Set</b>
+  <ul>
+     
+     <br/>
+     <code>set &lt;name&gt; update</code>
+   	 <br/>
+   	 <ul>
+          The weather data are immediately polled from the website.
+     </ul><br/>
+  </ul>  
+  
+    <a name="PROPLANTAattr"></a>
+	<b>Attribute</b><br/><br/>
+	<ul>
+		<li><b>Interval</b> - poll interval for weather data in seconds (default 3600)</li>
+		<li><b>URL</b> - url to extract information from</li>
+		<br/>
+		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+	</ul>
+	<br/><br/>
+	
+    <a name="PROPLANTAreading"></a>
+	<b>Generated Readings/Events</b><br/><br/>
+	<ul>
+		<li><b>fc?_uv</b> - the UV Index</li>
+		<li><b>fc?_sun</b> - the sunshine duration</li>
+	</ul>
+	<br/><br/>	
+
+</ul>
+
+=end html_DE
 =cut
