@@ -62,7 +62,7 @@ sub JSONMETER_doStatisticDelta ($$$$$);
 sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
 # Modul Version for remote debugging
   my $modulVersion = "2014-04-29";
-
+  my $MODUL = "JSONMETER";
  ##############################################################
  # Syntax: meterType => port URL-Path
  ##############################################################
@@ -114,6 +114,19 @@ sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
    );
   ##############################################################
 
+sub ##########################################
+JSONMETER_Log($$$)
+{
+   my ( $hash, $loglevel, $text ) = @_;
+   my $xline       = ( caller(0) )[2];
+   
+   my $xsubroutine = ( caller(1) )[3];
+   my $sub         = ( split( ':', $xsubroutine ) )[2];
+   $sub =~ s/JSONMETER_//;
+
+   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
+   Log3 $hash, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
+}
 
 sub ##########################################
 JSONMETER_Initialize($)
@@ -188,7 +201,7 @@ JSONMETER_Define($$)
   $hash->{fhem}{jsonInterpreter} = "";
 
   $hash->{fhem}{modulVersion} = $modulVersion;
-  Log3 $hash,5,"$name: JSONMETER.pm version is $modulVersion.";
+  JSONMETER_Log $hash, 5, "JSONMETER.pm version is $modulVersion.";
  
  return undef;
 } #end JSONMETER_Define
@@ -218,7 +231,7 @@ JSONMETER_Attr($@)
       if ($aName eq "1allowSetParameter") {
          eval { qr/$aVal/ };
          if ($@) {
-            Log3 $name, 3, "JSONMETER: Invalid allowSetParameter in attr $name $aName $aVal: $@";
+            JSONMETER_Log $name, 3, "Invalid allowSetParameter in attr $name $aName $aVal: $@";
             return "Invalid allowSetParameter $aVal";
          }
       }
@@ -348,7 +361,7 @@ JSONMETER_GetUpdate($)
    
    if ( ( $type eq "url" || $type eq "file" ) && ! defined($attr{$name}{"pathString"}) )  
    {
-      Log3 $name,2,"$name - Error reading device: Please define the attribute 'pathString'";
+      JSONMETER_Log $name,2,"Error reading device: Please define the attribute 'pathString'";
       $hash->{STATE} = "pathString missing";
       return "$name|0|Error reading device: Please define the attribute 'pathString'.";
    }
@@ -402,15 +415,15 @@ JSONMETER_ReadFromFile($)
     my ($string) = @_;
     my ($name, $pathString) = split /\|/, $string; 
 
-    Log3 $name, 4, "$name: Open file '$pathString'";
+    JSONMETER_Log $name, 4, "Open file '$pathString'";
     if (open(IN, "<" . $pathString)) {
       my $message = join " ", <IN>;
       close(IN);
-      Log3 $name, 4, "$name: Close file";
+      JSONMETER_Log $name, 4, "Close file";
       $message = encode_base64($message,"");
       return "$name|1|$message" ;
     } else {
-      Log3 $name, 2, "$name Error: Cannot open file $pathString: $!";
+      JSONMETER_Log $name, 2, "Cannot open file $pathString: $!";
       return "$name|0|Error: Cannot open file $pathString: $!";;
     }
 } # end JSONMETER_ReadFromFile
@@ -426,7 +439,7 @@ JSONMETER_ReadFromUrl($)
  my $buf ;
  my $message ;
 
-   Log3 $name, 4, "$name: opening socket to host $ip port $port" ; 
+   JSONMETER_Log $name, 4, "opening socket to host $ip port $port" ; 
 
    my $socket = new IO::Socket::INET (
            PeerAddr => $ip,
@@ -436,22 +449,22 @@ JSONMETER_ReadFromUrl($)
            Timeout  => 9
          );
    if (!$socket) {
-     Log3 $name, 1, "$name Error: Could not open connection to ip $ip port $port";
+     JSONMETER_Log $name, 1, "Could not open connection to ip $ip port $port";
      return "$name|0|Can't connect to ip $ip port $port";
    }
 
    if (defined ($socket) and $socket and $socket->connected()) 
    {
       print $socket "GET /$pathString HTTP/1.0\r\n\r\n";
-      Log3 $name, 4, "$name: Get json file from http://$ip:$port/$pathString";
+      JSONMETER_Log $name, 4, "Get json file from http://$ip:$port/$pathString";
       $socket->autoflush(1);
       while ((read $socket, $buf, 1024) > 0)
       {
          $message .= $buf;
       }
-      Log3 $name, 5, "$name: received:\n $message";
+      JSONMETER_Log $name, 5, "received:\n $message";
       $socket->close();
-      Log3 $name, 4, "$name: Socket closed";
+      JSONMETER_Log $name, 4, "Socket closed";
       if ($message =~ /^HTTP\/1.\d 404 Not Found/) {
            return "$name|0|Error: URL 'http://$ip:$port/$pathString' returned 'Error 404: Page Not Found'";
       }
@@ -495,8 +508,8 @@ if ( $a[1] == 1 ){
   # value type and reading name in the jsonInterpreter
   ####################################
     if ( $jsonInterpreter eq "" || $alwaysAnalyse == 1 ) {
-      Log3 $name, 3, "$name: Analyse JSON pathString for known readings" if $alwaysAnalyse != 1;
-      Log3 $name, 4, "$name: Analyse JSON pathString for known readings" if $alwaysAnalyse == 1;
+      JSONMETER_Log $name, 3, "Analyse JSON pathString for known readings" if $alwaysAnalyse != 1;
+      JSONMETER_Log $name, 4, "Analyse JSON pathString for known readings" if $alwaysAnalyse == 1;
       foreach my $f (@jsonFields) 
       {
          for(my $i=0; $i<=$#fields; $i++) 
@@ -505,42 +518,36 @@ if ( $a[1] == 1 ){
             if ($$f[0] == 1) { 
                if ($fields[$i] =~ /"obis"\s*:\s*"($$f[1])"\s*[,}]/ && $fields[$i] =~ /"value"/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4]";
-                  Log3 $name,4,"$name: OBIS code \"$$f[1]\" will be stored in $$f[2]";
+                  JSONMETER_Log $name,4,"OBIS code \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 2) { 
                if ($fields[$i] =~ /"obis"\s*:\s*"($$f[1])"\s*[,}]/ && $fields[$i] =~ /"valueString"/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4]";
-                  Log3 $name,4,"$name: OBIS code \"$$f[1]\" will be stored in $$f[2]";
+                  JSONMETER_Log $name,4,"OBIS code \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
             } elsif ($$f[0] == 3) { 
                if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4] $$f[1]";
-                  Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
+                  JSONMETER_Log $name,4,"Property \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
               }
             } elsif ($$f[0] == 4) { 
                if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4] $$f[1]";
-                  Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
+                  JSONMETER_Log $name,4,"Property \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
                }
-            # } elsif ($$f[0] == 6) { 
-               # if ($fields[$i] =~ /"($$f[1])"\s*:/) {
-                  # $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4] $$f[1]";
-                  # Log3 $name,4,"$name: Property \"$$f[1]\" will be stored in $$f[2]";
-                  # $returnStr .= "Property \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
-               # }
             }   
          }
       }
       if ($jsonInterpreter ne "") {
-         Log3 $name, 3, "$name: Store results of JSON analysis for next device readings" if $alwaysAnalyse != 1;
+         JSONMETER_Log $name, 3, "Store results of JSON analysis for next device readings" if $alwaysAnalyse != 1;
          $jsonInterpreter = substr $jsonInterpreter, 1;
          $hash->{fhem}{jsonInterpreter} = $jsonInterpreter;
       } else {
-         Log3 $name, 2, "$name: Could not interpret the JSON file => please contact FHEM community" if $jsonInterpreter eq "";
+         JSONMETER_Log $name, 2, "Could not interpret the JSON file => please contact FHEM community" if $jsonInterpreter eq "";
       }
    } else {
       $jsonInterpreter = $hash->{fhem}{jsonInterpreter} if exists $hash->{fhem}{jsonInterpreter};
@@ -554,34 +561,34 @@ if ( $a[1] == 1 ){
   $returnStr .= "\n================= Extract JSON values ==================\n\n";
 
   my @a = split /\|/, $jsonInterpreter;
-   Log3 $name, 4, "$name: Extract ".($#a+1)." readings from ".($#fields+1)." json parts";
+   JSONMETER_Log $name, 4, "Extract ".($#a+1)." readings from ".($#fields+1)." json parts";
    foreach (@a) {
       $statisticType = 0;
-      Log3 $name, 5, "$name: Handle $_";
+      JSONMETER_Log $name, 5, "Handle $_";
       my @b = split / /, $_ ;
     #obis value
       if ($b[1] == 1) { 
          if ($fields[$b[0]] =~ /"value"\s*:\s*"(.*?)"\s*[,\}]/g || $fields[$b[0]] =~ /"value"\s*:\s*(.*?)\s*[,\}]/g) {
             $value = $1;
             # $value =~ s/^\s+|\s+$//g;
-            Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            JSONMETER_Log $name, 4, "Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             readingsBulkUpdate($hash,$b[2],$value);
             $statisticType = $b[3];
          } else {
-            Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+            JSONMETER_Log $name, 4, "Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
     #obis valueString
       } elsif ($b[1] == 2) { 
          if ($fields[$b[0]] =~ /"valueString"\s*:\s*"(.*?)"\s*[,}]/g ) {
             $value = $1;
-            Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            JSONMETER_Log $name, 4, "Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             readingsBulkUpdate($hash,$b[2],$value); 
             $statisticType = $b[3];
          } else {
-            Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+            JSONMETER_Log $name, 4, "Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
     # JSON-Property
@@ -589,25 +596,25 @@ if ( $a[1] == 1 ){
          if ($fields[$b[0]] =~ /"$b[5]"\s*:\s*"(.*?)"\s*[,}]/g || $fields[$b[0]] =~ /"$b[5]"\s*:\s*(.*?)\s*[,}]/g ) {
             $value = $1;
             $value =~ /^ *\d+(,\d\d\d)+/ && $value =~ s/,| //g;
-            Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            JSONMETER_Log $name, 4, "Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             readingsBulkUpdate($hash, $b[2], $value); 
             $statisticType = $b[3];
          } else {
-            Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+            JSONMETER_Log $name, 4, "Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
     # JSON-Property Time
       } elsif ($b[1] == 4) {  
          if ($fields[$b[0]] =~ /"$b[5]"\s*:\s"?(\d*)"?\s*[,}]/g ) {
             $value = $1;
-            Log3 $name, 4, "$name: Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
+            JSONMETER_Log $name, 4, "Value $value for reading $b[2] extracted from '$fields[$b[0]]'";
             $returnStr .= "Value \"$value\" for reading '$b[2]' extracted from part $b[0]:\n$fields[$b[0]]\n\n";
             $value =  strftime "%Y-%m-%d %H:%M:%S", localtime($value);
             readingsBulkUpdate($hash, $b[2], $value); 
             $statisticType = $b[3];
          } else {
-            Log3 $name, 4, "$name: Could not extract value for reading $b[2] from '$fields[$b[0]]'";
+            JSONMETER_Log $name, 4, "Could not extract value for reading $b[2] from '$fields[$b[0]]'";
             $returnStr .= "Could not extract value for reading '$b[2]' from part $b[0]:\n$fields[$b[0]]\n\n";
          }
       }
@@ -642,7 +649,7 @@ JSONMETER_UpdateAborted($)
   delete($hash->{helper}{RUNNING_PID});
   my $name = $hash->{NAME};
   my $host = $hash->{HOST};
-  Log3 $hash, 1, "$name Error: Timeout when connecting to host $host";
+  JSONMETER_Log $hash, 1, "Timeout when connecting to host $host";
 
 } # end JSONMETER_UpdateAborted
 
