@@ -473,7 +473,8 @@ DOIF_CheckCond($$)
 {
   my ($hash,$condition) = @_;
   my $err="";
-  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  my ($seconds, $microseconds) = gettimeofday();
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($seconds);
   my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
   my $hm = sprintf("%02d:%02d", $hour, $min);
   my $device;
@@ -635,7 +636,8 @@ DOIF_SetTimer($$)
   my ($err, $h, $m, $s, $fn) = GetTimeSpec($timeStr);
   return $err if($err);
   my $second = $h*3600+$m*60+$s;
-  my $now = time();
+  #my $now = time();
+  my ($now, $microseconds) = gettimeofday();
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
   my $isdst_now=$isdst;
   my $sec_today = $hour*3600+$min*60+$sec;
@@ -682,7 +684,8 @@ DOIF_SetSleepTimer($$$$$)
   if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or AttrVal($pn,"do","") eq "always")) {
     my @sleeptimer=split(/:/,AttrVal($pn,"wait",""));
     if ($sleeptimer[$nr]) {
-      my $next_time = time()+$sleeptimer[$nr];
+      my ($seconds, $microseconds) = gettimeofday();
+      my $next_time = $seconds+$sleeptimer[$nr];
       $hash->{helper}{sleeptimer}=$nr;
       $hash->{helper}{sleepdevice}=$device;
       my $cmd_nr=$nr+1;
@@ -1070,7 +1073,7 @@ Zeitintervalle über mehrere Tage müssen als Zeitpunkte angegeben werden, z. B.
 <br>
 Schalten bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
-<code>define di_light DOIF ([{sunset(0,"17:00","21:00")}-{sunset_abs()}]) (set outdoorlight off) DOELSE (set outdoorlight on)</code><br>
+<code>define di_light DOIF ([{sunrise_abs()}-{sunset(1800,"17:00","21:00")}])(set outdoorlight off) DOELSE (set outdoorlight on)</code><br>
 <br>
 <b>Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</b><br>
 <br>
