@@ -835,10 +835,10 @@ THRESHOLD_setValue($$)
     <code>set TH_room desired 21</code><br>
     <br>
     <br>
-    An example of time-dependent heating in combination with Heating_Control module:<br>
+    An example of time-dependent heating in combination with DOIF module:<br>
     <br>
-    <code>define TH_living_room THRESHOLD T_living_room heating</code><br>
-    <code>define HC_living_room Heating_Control TH_living_room 06:00|22 22:00|18 set @ desired %</code><br>
+    <code>define TH_room THRESHOLD T_living_room heating</code><br>
+    <code>define di_room DOIF ([05:30-23:00|8] or [07:00-23:00|7]) (set TH_room desired 20) DOELSE (set TH_room desired 18)</code><br>
     <br>
     <br>
     Examples of customized state output:<br>
@@ -971,10 +971,10 @@ THRESHOLD_setValue($$)
   <code>define TH_room THRESHOLD temp_room heating</code><br>
   <code>set TH_room desired 20</code><br>
   <br>
-  <b>Zeitgesteuertes Heizen mit Hilfe des Heating_Control-Moduls:</b><br>
+  <b>Zeitgesteuertes Heizen mit Hilfe des DOIF-Moduls:</b><br>
   <br>
   <code>define TH_room THRESHOLD temp_room heating</code><br>
-  <code>define HC_room Heating_Control TH_room 06:00|22 22:00|18 set @ desired %</code><br>
+  <code>define di_room DOIF ([05:30-23:00|8] or [07:00-23:00|7]) (set TH_room desired 20) DOELSE (set TH_room desired 18)</code><br>
   <br>
   <b>Steuerung einer Heizung durch ein Wandthermostat mit Übernahme der Soll- und Ist-Temperatur vom Wandthermostat:</b><br>
   <br>
@@ -1012,7 +1012,7 @@ THRESHOLD_setValue($$)
   Nachtabsenkung lässt sich zeitgesteuert durch das Setzen von "offset" realisieren.<br>
   Von 22:00 bis 5:00 Uhr soll die Vorlauftemperatur um 10 Grad herabgesetzt werden:<br>
   <br>
-  <code>define W_heating weekdaytimer TH_heating 05:00|0 22:00|-10 set @ offset %</code><br>
+  <code>define di_heating DOIF ([22:00-05:00]) (set TH_heating offset -10) DOELSE (set TH_heating offset 0)</code><br>
   <br>
   <br>
   <b><u>Beispiele für Belüftungssteuerung:</u></b><br>
@@ -1041,7 +1041,7 @@ THRESHOLD_setValue($$)
   In der Hauptzeit soll die Wassertemperatur im Rücklauf mindestens 38 Grad betragen.<br>
   <br>
   <code>define TH_circ TRHESHOLD return_w:temperature:0 circ_pump</code><br>
-  <code>define HC_circ Heating_Control TH_circ 12345|05:30|38 67|07:00|38 23:00|15 set @ desired %</code><br>
+  <code>define di_circ DOIF ([05:30-23:00|8] or [07:00-23:00|7]) (set TH_circ desired 38) DOELSE (set TH_circ desired 15)</code><br>
   <br>
   <b>Alternative Steuerung mit Sollwert-Vorgabe durch einen weiteren Sensor des Warmwasserspeichers:</b><br>
   <br>
@@ -1059,7 +1059,7 @@ THRESHOLD_setValue($$)
   will man von der Sonnenenergie profitieren und den Rollladen oben lassen.<br>
   <br>
   <code>define TH_shutter_room THRESHOLD T_room AND sun:state:on shutter_room|set @ 30||2</code><br>
-  <code>define HC_R_Keller Heating_Control TH_shutter_room 12:00|23 20:00|30  set @ desired %</code><br>
+  <code>define di_shutter DOIF ([12:00-20:00]) (set TH_shutter desired 23) DOELSE (set TH_shutter desired 30)</code><br>
   <br>
   Weitere Beispiele für Beschattung mit Verzögerung und automatischem Hochfahren des Rollladens: siehe <a href="http://fhem.de/commandref_DE.html#DOIF">DOIF</a>-Modul.<br>
   <br>
