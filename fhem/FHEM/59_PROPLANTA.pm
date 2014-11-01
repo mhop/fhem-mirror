@@ -338,7 +338,9 @@ sub PROPLANTA_Set($@)
       when ("update")
       {
          PROPLANTA_Log $hash, 3, "set command: " . $a[1];
+         $hash->{LOCAL} = 1;
          PROPLANTA_Start($hash);
+         $hash->{LOCAL} = 0;
       }
        default
       {
@@ -393,14 +395,16 @@ sub PROPLANTA_Start($)
    
    $hash->{Interval} = AttrVal( $name, "Interval",  3600 );
    
-   # setup timer
-   RemoveInternalTimer( $hash );
-   InternalTimer(
-      gettimeofday() + $hash->{Interval},
-      "PROPLANTA_Start",
-       $name,
-       0 );  
-
+   if(!$hash->{LOCAL} && $hash->{INTERVAL} > 0) {
+      # setup timer
+      RemoveInternalTimer( $hash );
+      InternalTimer(
+         gettimeofday() + $hash->{Interval},
+         "PROPLANTA_Start",
+          $name,
+          1 );  
+   }
+   
    if ( AttrVal( $name, 'URL', '') eq '' && not defined( $hash->{URL} ) )
    {
       PROPLANTA_Log $hash, 3, "missing URL";
@@ -420,8 +424,7 @@ sub PROPLANTA_Start($)
 #####################################
 sub PROPLANTA_Run($)
 {
-   my ($string) = @_;
-   my ( $name, $server ) = split( "\\|", $string );
+   my ($name) = @_;
    my $ptext=$name;
    
    return unless ( defined($name) );
