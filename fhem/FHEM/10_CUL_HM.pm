@@ -1755,7 +1755,7 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($st =~ m /^(remote|pushButton|swi)$/
       ||$md eq "HM-SEN-EP") { #################################################
-    if($mTp =~ m/^4./) {
+    if($mTp eq "40") {
       my ($chn, $bno) = map{hex($_)} ($mI[0],$mI[1]);# button/event count 
       my $buttonID = $chn&0x3f;# only 6 bit are valid
       my $btnName;
@@ -1795,6 +1795,36 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$chnHash,1,"trigger:".$trigType."_".$bno];
       push @evtEt,[$shash,1,"battery:". (($chn&0x80)?"low":"ok")];
       push @evtEt,[$shash,1,"state:$btnName $state$target"];
+    }
+    else{# could be an Em8
+      my($chn,$cnt,$state,$err);
+      if($mTp eq "41"){
+        ($chn,$cnt,$state)=(hex($mI[0]),$mI[1],$mI[2]);
+        my $err = $chn & 0x80;
+        $chn = sprintf("%02X",$chn & 0x3f);
+        $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+                               if($modules{CUL_HM}{defptr}{"$src$chn"});
+        push @evtEt,[$shash,1,"battery:". ($err?"low"  :"ok"  )];
+      }
+      elsif(($mTp eq "10" && $mI[0] eq "06") ||
+            ($mTp eq "02" && $mI[0] eq "01")) {
+        ($chn,$state,$err) = (hex($mI[1]), $mI[2], hex($mI[3]));
+        $chn = sprintf("%02X",$chn&0x3f);
+        $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+                               if($modules{CUL_HM}{defptr}{"$src$chn"});
+        push @evtEt,[$shash,1,"alive:yes"];
+        push @evtEt,[$shash,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
+      }
+      if (defined($state)){# if state was detected post events
+        my $txt;
+        if    ($shash->{helper}{lm} && $shash->{helper}{lm}{hex($state)}){$txt = $shash->{helper}{lm}{hex($state)}}
+        elsif ($lvlStr{md}{$md}){$txt = $lvlStr{md}{$md}{$state}}
+        elsif ($lvlStr{st}{$st}){$txt = $lvlStr{st}{$st}{$state}}
+        else                    {$txt = "unknown:$state"}
+      
+        push @evtEt,[$shash,1,"state:$txt"];
+        push @evtEt,[$shash,1,"contact:$txt$target"];
+      }
     }
   }
   elsif($st eq "powerMeter") {#################################################
