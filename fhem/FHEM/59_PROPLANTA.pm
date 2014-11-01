@@ -301,6 +301,8 @@ sub PROPLANTA_Define($$)
    }
 
    $hash->{STATE}          = "Initializing";
+   $hash->{LOCAL}          = 0;
+   $hash->{INTERVAL}       = 3600;
    
    RemoveInternalTimer($hash);
    InternalTimer( gettimeofday() + 12, "PROPLANTA_Start", $hash, 0 );
@@ -393,13 +395,13 @@ sub PROPLANTA_Start($)
    
    return unless (defined($hash->{NAME}));
    
-   $hash->{Interval} = AttrVal( $name, "Interval",  3600 );
+   $hash->{INTERVAL} = AttrVal( $name, "Interval",  $hash->{INTERVAL} );
    
    if(!$hash->{LOCAL} && $hash->{INTERVAL} > 0) {
       # setup timer
       RemoveInternalTimer( $hash );
       InternalTimer(
-         gettimeofday() + $hash->{Interval},
+         gettimeofday() + $hash->{INTERVAL},
          "PROPLANTA_Start",
           $name,
           1 );  
