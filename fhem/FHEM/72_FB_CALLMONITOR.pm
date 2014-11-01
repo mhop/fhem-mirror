@@ -268,9 +268,9 @@ FB_CALLMONITOR_Read($)
         {
             $hash->{helper}{TEMP}{$array[2]}{call_duration} = $array[3];
         
-            if($hash->{helper}{TEMP}{$array[2]}{direction} eq "incoming" and $array[3] eq "0")
+            if(exists($hash->{helper}{TEMP}{$array[2]}{direction}) and exists($hash->{helper}{TEMP}{$array[2]}{external_number}) and $hash->{helper}{TEMP}{$array[2]}{direction} eq "incoming" and $array[3] eq "0")
             {
-                $hash->{helper}{TEMP}{$array[2]}{missed_call} = $hash->{helper}{TEMP}{$array[2]}{external_number}.($hash->{helper}{TEMP}{$array[2]}{external_name} ne "unknown" ? " (".$hash->{helper}{TEMP}{$array[2]}{external_name}.")" : "");
+                $hash->{helper}{TEMP}{$array[2]}{missed_call} = $hash->{helper}{TEMP}{$array[2]}{external_number}.(exists($hash->{helper}{TEMP}{$array[2]}{external_name}) and $hash->{helper}{TEMP}{$array[2]}{external_name} ne "unknown" ? " (".$hash->{helper}{TEMP}{$array[2]}{external_name}.")" : "");
                 $hash->{helper}{TEMP}{$array[2]}{missed_call_line} = $hash->{helper}{TEMP}{$array[2]}{internal_number};
             }
         }    
