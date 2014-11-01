@@ -269,8 +269,8 @@ sub PROPLANTA_Log($$$)
    my $sub         = ( split( ':', $xsubroutine ) )[2];
    $sub =~ s/PROPLANTA_//;
 
-   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $MODUL;
-   Log3 $hash, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
+   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
+   Log3 $instName, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
 }
 ###################################
 sub PROPLANTA_Initialize($)
@@ -305,6 +305,8 @@ sub PROPLANTA_Define($$)
    $hash->{INTERVAL}       = 3600;
    
    RemoveInternalTimer($hash);
+   
+   #Get first data after 12 seconds
    InternalTimer( gettimeofday() + 12, "PROPLANTA_Start", $hash, 0 );
 
    return undef;
@@ -400,11 +402,8 @@ sub PROPLANTA_Start($)
    if(!$hash->{LOCAL} && $hash->{INTERVAL} > 0) {
       # setup timer
       RemoveInternalTimer( $hash );
-      InternalTimer(
-         gettimeofday() + $hash->{INTERVAL},
-         "PROPLANTA_Start",
-          $name,
-          1 );  
+      InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PROPLANTA_Start", $hash, 1 );  
+      return undef if( AttrVal($name, "disable", 0 ) == 1 );
    }
    
    if ( AttrVal( $name, 'URL', '') eq '' && not defined( $hash->{URL} ) )
@@ -475,7 +474,7 @@ sub PROPLANTA_Done($)
 
    # Wetterdaten speichern
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash, "state", sprintf "T: %.1f H: %.1f W: %.1f P: %.0f ", $values{temperature}, $values{humidity}, $values{wind}, $values{pressure} );
+   readingsBulkUpdate($hash, "state", sprintf "T: %.1f H: %.1f W: %.1f P: %.1f ", $values{temperature}, $values{humidity}, $values{wind}, $values{pressure} );
 
    my $x = 0;
    while (my ($rName, $rValue) = each(%values) )
