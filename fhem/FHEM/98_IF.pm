@@ -452,76 +452,19 @@ CommandIF($$)
   <br>
   Es werden <code>&lt;FHEM-Kommandos1&gt;</code> ausgeführt, wenn <code>&lt;Bedingung&gt;</code> erfüllt ist, sonst werden <code>&lt;FHEM-Kommanodos2&gt;</code> ausgeführt.<br>
   <br>
-  Beim IF-Befehl handelt es sich um einen FHEM-Befehl. Der Befehl kann überall dort genutzt werden, wo FHEM-Befehle vorkommen dürfen.
-  Im Gegensatz zu Perl-if bleibt man auf der FHEM-Ebene und muss nicht auf die Perl-Ebene, um FHEM-Befehle mit Hilfe der fhem-Funktion auszuführen.<br>
+  Beim IF-Befehl (IF in Großbuchstaben) handelt es sich um einen FHEM-Befehl. Der Befehl kann überall dort genutzt werden, wo FHEM-Befehle vorkommen dürfen.
+  Im Gegensatz zu Perl-if (if in Kleinbuchstaben) bleibt man auf der FHEM-Ebene und muss nicht auf die Perl-Ebene, um FHEM-Befehle mit Hilfe der fhem-Funktion auszuführen.<br>
   <br>
-  IF ist kein eigenständig arbeitendes Modul, sondern ein FHEM-Befehl, der nur in Kombination mit anderen Modulen, wie z. B. notify oder at, sinnvoll eingesetzt werden kann.<br>
+  IF ist kein eigenständig arbeitendes Modul, sondern ein FHEM-Befehl, der nur in Kombination mit anderen Modulen, wie z. B. notify oder at, sinnvoll eingesetzt werden kann.
   Es gibt inzwischen ein neueres <a href="http://fhem.de/commandref_DE.html#DOIF">DOIF</a>-Modul, welches auf der Syntax vom IF-Befehl aufbaut.
   Es arbeitet im Gegensatz zu IF als Modul selbstständig ereignis- und zeitgesteuert ohne notify bzw. at. Damit lassen sich viele Problemlösungen eleganter, jeweils mit einem einzigen Modul, realisieren.<br>
   <br>
-  In der Bedingung des IF-Befehls wird die vollständige Syntax des Perl-if unterstützt. Mögliche Operatoren sind u. a.:<br>
+  In der Bedingung des IF-Befehls wird die vollständige Syntax des Perl-if unterstützt. Stati und Readings von Devices werden in eckigen Klammern angegeben.<br>
   <br>
-  <ol>
-  ++ -- Inkrementieren, Dekrementieren<br>
-  ** Potenzierung<br>
-  ! ~ logische und bitweise Negation<br>
-  =~ !~ Bindung an Seite reguläre Ausdrücke<br>
-  * / % x Multiplikation, Division, Modulo-Operation, Zeichenkettenwiederholung<br>
-  + - . Addition, Subtraktion, Zeichenkettenaddition<br>
-  < <= > >= lt le gt ge Vergleich größer/kleiner<br>
-  == != eq ne Gleichheit/Ungleichheit<br>
-  & bitweises UND<br>
-  | ^ bitweises ODER - inklusiv/exklusiv<br>
-  && logisches UND<br>
-  || logisches ODER<br>
-  not                            logische Negation<br>
-  and                            logisches UND<br>
-  or xor                         logisches ODER (inklusiv/exklusiv)<br>
-  </ol>
-<br>
-<b>Features:</b><br>
-<br>
-<ul>
- <li>Angabe von Readings und Internals ist an beliebiger Stelle möglich<br></li>
-<br>
- <li>Filtern nach Zahlen oder beliebigen Ausdrücken über reguläre Ausdrücke ist möglich<br></li>
-<br>
- <li>IF kann beliebig mit anderen FHEM-Befehlen kombiniert werden (at, notify usw.)<br></li>
-<br>
- <li>es können beliebig viele IF-Befehle ineinander geschachtelt werden<br></li>
-<br>
- <li>Syntaxprüfung: fehlende Klammern werden erkannt<br></li>
-<br>
- <li>Definition über mehrere Zeilen mit Einrückung zwecks übersichtlicher Darstellung ist möglich<br></li>
-<br>
- <li>Überprüfung auf Existenz von Device und Reading bzw. Internal<br></li>
-<br>
- <li>Ausführung von Perl-Befehlen im dann- und sonst-Fall ist weiterhin möglich<br></li>
-<br>
- <li>Auswertung von Perl-Ausdrücken in geschweiften Klammen innerhalb eines FHEM-Befehls ist möglich<br></li>
-<br>
- <li>ELSE-Fall ist optional<br></li>
- </ul>
-<br>
-<br>
-  Die Syntax für die Nutzung von Readings oder Internals (ein Internal wird durch ein & gekennzeichnet)<br>
-  <br>
-  <code>[&lt;device&gt;:&lt;reading&gt;:&lt;format&gt;|[&lt;regulärer Ausdruck&gt]]</code>
-  bzw. <code>[&lt;device&gt;:&&lt;internal&gt;:&lt;format&gt;|[&lt;regulärer Ausdruck&gt]]<br></code>
-  <br>
-  <code>&lt;format&gt;</code> und <code>[&lt;regulärer Ausdruck&gt;]</code> sind Filteroptionen, sie können optional genutzt werden.<br>
-  <br>
-  Mögliche Formatangaben für <code>&lt;format&gt;</code> sind:<br>
-  <br>
-  <code>'d'</code> zum Filtern von positiven und negatien Dezimalzahlen. <code>[&lt;device&gt;:&lt;reading&gt;:d]</code> entspricht <code>[&lt;device&gt;:&lt;reading&gt;:[(-?\d+(\.\d+)?)]]<br></code>
-  <br>
-  Wenn nur der Status eines Devices genutzt werden soll, dann kann auch nur das Device angeben werden:<br>
-  <br>
-  <code>[&lt;device&gt;]</code> entspricht <code>[&lt;device&gt;:&STATE]</code><br>
   <br>
   <b>Beispiele:</b><br>
   <br>
-  IF in Kombination mit at-Modul, Readingangabe in der Bedingung:<br>
+  IF in Kombination mit at-Modul, Readingangabe [&lt;Device&gt;:&lt;Reading&gt;] in der Bedingung:<br>
   <br>
   <code>define check at +00:10 IF ([outdoor:humidity] > 70) (set switch1 off) ELSE (set switch1 on)<br></code>
   <br>
@@ -529,7 +472,7 @@ CommandIF($$)
   <br>
   <code>define check at +00:10 IF ([outdoor] eq "open") (set switch1 on)<br></code>
   <br>
-  entspricht mit Angabe des Internals:<br>
+  entspricht mit Angabe des Internals mit &:<br>
   <br>
   <code>define check at +00:10 IF ([outdoor:&STATE] eq "open") (set switch1 on)<br></code>
   <br>
@@ -539,7 +482,7 @@ CommandIF($$)
   <br>
   Geschachtelte Angabe von mehreren IF-Befehlen kann in mehreren Zeilen mit Einrückungen zwecks übersichtlicher 
   Darstellung über FHEM-Weboberfläche in der DEF-Eingabe eingegeben werden.<br>
-  Die erste Zeile "define test notify lamp " muss mit einem Leerzeichen enden, bevor die Zeile mit Enter umgebrochen wird - das ist eine Eigenschaft von FHEM und nicht von IF:<br>
+  Die erste Zeile "define test notify lamp " muss mit einem Leerzeichen enden, bevor die Zeile mit Enter umgebrochen wird - das ist eine Eigenschaft von notify und nicht von IF:<br>
   <br>
   <code>define test notify lamp <br>
   IF ([lamp] eq "on") (<br>
@@ -577,7 +520,6 @@ CommandIF($$)
      (set switch on)<br>
     </ol>
   <br></code>
-
   Filtern nach Zahlen im Reading "temperature":<br>
   <br>
   <code>define settemp at 22:00 IF ([tempsens:temperature:d] >= 10) (set heating on)<br></code>
@@ -586,9 +528,9 @@ CommandIF($$)
   <br>
   <code>define activity notify move IF ([move:&STATE:[(on|off)]] eq "on" and $we) (set lamp off)<br></code>
   <br>
-  Beispiel für die Nutzung von Readings im dann-Fall:<br>
+  Beispiel für die Nutzung des Status eines Devices im Ausführungsteil. Hier: "lamp1" wird mit dem Status von "lamp2" geschaltet:<br>
   <br>
-  <code>define temp at 18:00 IF ([outdoor:temperature] > 10) (set lampe [dummy])<br></code>
+  <code>define temp at 18:00 IF ([outdoor:temperature] > 10) (set lamp1 [lamp2])<br></code>
   <br>
   Falls bei einem FHEM-Befehl ein Perl-Ausdruck mit Readings zuvor ausgewertet werden soll, so muss er in geschweifte und runde Klammern gesetzt werden.<br>
   Beispiel: Wenn um 18:00 Uhr die Außentemperatur höher ist als 10 Grad, dann wird die Solltemperatur um 1 Grad erhöht.<br>
@@ -623,6 +565,31 @@ CommandIF($$)
   Kombination von Perl und FHEM-Befehlen ($NAME sowie $EVENT können ebenso benutzt werden):<br>
   <br>
   <code>define mail notify door:open IF ([alarm] eq "on")({system("wmail $NAME:$EVENT")},set alarm_signal on)<br></code>
-</ul>
+  <br>
+  Der IF-Befehl dient in erster Linie zur Vereinfachung der Schreibweise in Kombination mit anderen FHEM-Modulen wie at, notify oder DOIF.
+  Intern wird der IF-Befehl zur Ausführung in einen Perl if-Befehl umgesetzt. Das soll anhand von Beispielen verdeutlicht werden:<br>
+  <br>
+  <code>IF ([switch] eq "off") (set lamp on)</code><br>
+  <br>
+  entspricht:<br>
+  <br>
+  <code>{if (Value('switch') eq "off"){fhem('set lamp on')}}</code><br>
+  <br>
+  <br>
+  <code>IF ([living_room:temperature] > 12) (set lamp on, set lamp2 off)</code><br>
+  <br>
+  entspricht:<br>
+  <br>
+  <code>{if (ReadingVal('living_room','temperature','') > 12) {fhem('set lamp on');;fhem('set lamp2 off')}}</code><br>
+  <br>
+  <br>
+  <code>IF ([bathroom:humidity] > 70) (set led red) ELSE (set led green)</code><br>
+  <br>
+  entspricht:<br>
+  <br>
+  <code>{if (ReadingsVal('bathroom','humidity','') > 70) {fhem('set led red')} else {fhem('set led green')}}</code><br>
+  <br>
+  <br>
+  </ul>
 =end html_DE
 =cut
