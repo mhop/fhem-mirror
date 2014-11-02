@@ -566,10 +566,15 @@ sub PROPLANTA_Aborted($)
     <code>define &lt;name&gt; PROPLANTA [City] [CountryCode]</code>
     <br>
     Example: <code>define wetter PROPLANTA Bern ch</code>
+             <code>define wetter PROPLANTA Wittingen+(Niedersachsen)</code>
     <br>&nbsp;
     <li><code>[City]</code> <i>(optional)</i>
       <br>
-      City must be selectable on www.proplanta.de. Pay attention to the <b>Capital</b> letters in the city names.
+      City must be selectable on www.proplanta.de.
+      <br>
+      Pay attention to the <b>Capital</b> letters in the city names.
+      <br>
+      Spaces within the name are replaced by a + (plus).
     </li><br>
     <li><code>[CountryCode]</code> <i>(optional)</i>
       <br>
@@ -637,18 +642,24 @@ sub PROPLANTA_Aborted($)
 <h3>PROPLANTA</h3>
 <div  style="width:800px"> 
 <ul>
+  Das Modul extrahiert  Wetterdaten von der website www.proplanta.de.<br/>
   <a name="PROPLANTAdefine"></a>
   <b>Define</b>
   <ul>
     <br>
     <code>define &lt;Name&gt; PROPLANTA [Stadt] [L&auml;ndercode]</code>
     <br>
-     Das Modul extrahiert bestimmte Wetterdaten von der website www.proplanta.de.<br/>
-    <br>
+    Beispiel: <code>define wetter PROPLANTA Bern ch</code>
+              <code>define wetter PROPLANTA Wittingen+(Niedersachsen)</code>
+    <br>&nbsp;
     <ul>    
       <li><code>[Stadt]</code> <i>(optional)</i>
       <br>
-      Die Stadt muss auf www.proplanta.de ausw&auml;hlbar sein. Wichtig!! Auf die <b>gro&szig;en</b> Anfangsbuchstaben achten.
+      Die Stadt muss auf www.proplanta.de ausw&auml;hlbar sein. 
+      <br>
+      Wichtig!! Auf die <b>gro&szig;en</b> Anfangsbuchstaben achten.
+      <br>
+      Leerzeichen im Stadtnamen werden durch ein + (Plus) ersetzt.
       </li><br>
       <li><code>[L&auml;ndercode]</code> <i>(optional)</i>
       <br>
@@ -663,7 +674,7 @@ sub PROPLANTA_Aborted($)
   <ul>
      <li><code>set &lt;name&gt; update</code>
      <br>
-          Liest die Wetterdaten sofort von der Webseite aus.
+     Startet ein erneutes Auslesen der Wetterdaten.
      </li><br>
   </ul>  
   
