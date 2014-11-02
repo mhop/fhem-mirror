@@ -2,8 +2,9 @@ package main;
 use strict;
 use warnings;
 use POSIX;
-sub
-MyUtils_Initialize($$)
+use feature "state"; 
+
+sub MyUtils_Initialize($$)
 {
     my ($hash) = @_;
 }
@@ -23,13 +24,19 @@ my @rolls = (
     { roll => "ess.roll",       dir=>"S", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
     { roll => "kuch.rollBar",   dir=>"S", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
     { roll => "kuch.rollStr",   dir=>"O", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
-    { roll => "arb.rollTerr",   dir=>"W", typ=>"n", temp=>"studio.fht", tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "arb.rollTerr",   dir=>"W", typ=>"n", temp=>"studio.fht", tempS=>21, win=>"wohn.fenTerr", state=>STATE_IDLE, },
     { roll => "arb.rollWeg",    dir=>"S", typ=>"n", temp=>"studio.fht", tempS=>21, win=>"",             state=>STATE_IDLE, },
     { roll => "bad.roll",       dir=>"S", typ=>"n", temp=>"bad.fht",    tempS=>23, win=>"",             state=>STATE_IDLE, },
     { roll => "schlaf.rollWeg", dir=>"S", typ=>"s", temp=>"schlaf.fht", tempS=>18, win=>"",             state=>STATE_IDLE, },
-    { roll => "schlaf.rollStr", dir=>"O", typ=>"s", temp=>"schlaf.fht", tempS=>18, win=>"",             state=>STATE_IDLE, },
+    { roll => "schlaf.rollStr", dir=>"O", typ=>"s", temp=>"schlaf.fht", tempS=>18, win=>"wohn.fenTerr", state=>STATE_IDLE, },
 );
 
+#my %rollStates = (
+#  lastWeatherCode => 0,
+#  lastWaetherCodeTime => 0,
+#  timerNum => 0,
+#    );
+    
 
 my @rollHoch = (
   "bad.roll", 
@@ -42,6 +49,7 @@ my @rollHoch = (
   "wohn.rollTerrL",
   "wohn.rollTerrR"
 );
+
 
 my @rollRunter = ( 
   "wohn.rollTerrR", 
@@ -76,13 +84,13 @@ my @rollArb = (
   "arb.rollWeg", 
 );
 
-
+my $tc=0;
+my @blocktime=localtime;
+my $blocktimerRunning=0;
 
 sub myfhem($) {
-    #print "@_\n";
     #Log 1, "@_";
     fhem("@_");
-
 }
 
 sub RollCheckSkip($$)
@@ -164,78 +172,174 @@ sub RollWeck($) {
 #   myfhem("set wach 1");
 }
 
+#------------------------------------------
+
 sub Dbg($) {
     Log 1,$_[0];
 }
 
+sub RollRunterSchlitz($;$) {
+    my ($roll, $delay) = @_;
+    $delay ||= 0; 
+    
+    my @tparts = gmtime($delay);
+    my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
+    my @tparts2 = gmtime($delay+40);
+    my $t2=sprintf ("%02d:%02d:%02d",@tparts2[2,1,0]);
+    my $i=$tc++;
+
+    Dbg("RollChg: $roll - runter schlitz($delay)\n");
+    myfhem("define r".$i." at +".$t." set ".$roll." closes");
+    myfhem("define ru".$i." at +".$t2." set ".$roll." up 7");
+}
+
+sub RollHoch($;$) {
+    my ($roll, $delay) = @_;
+    $delay ||= 0; 
+    
+    my @tparts = gmtime($delay);
+    my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
+    my $i=$tc++;
+
+    Dbg("RollChg: $roll - hoch($delay)\n");
+    myfhem("define r".$i." at +".$t." set ".$roll." opens");
+}
+
+sub RollRunter($;$) {
+    my ($roll, $delay) = @_;
+    $delay ||= 0; 
+    
+    my @tparts = gmtime($delay);
+    my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
+    my $i=$tc++;
+
+    Dbg("RollChg: $roll - runter($delay)\n");
+    myfhem("define r".$i." at +".$t." set ".$roll." closes");
+}
+
+sub IsSunny($) {
+    my ($wett)=@_;
+    if($wett==30 || $wett==31 || $wett==32 || $wett==33 || $wett==34 || $wett==35 || $wett==36) { # sonnig, heiter, heiss
+	return(1);
+    }
+    return(0);
+}
+
+sub IsLater($) {
+    my($t)=@_;
+    #Dbg("Islater:$t");
+    my @time = localtime(time);    
+    if ($t =~ /(\d+):(\d+)/ and ($time[2]>=$1) and ($time[1]>=$2) ) {
+	Dbg("later:$t");
+	return(1);
+    }
+    return(0);
+}
+
+sub IsWetterSonneWait($)  {
+    my ($wett)=@_;
+
+    state $wettalt=0;
+    if($wett != $wettalt) {
+	if(!IsSunny($wett)) {
+	    if(IsSunny($wettalt)) {
+		@blocktime=localtime;
+		$blocktime[2]+=2; # +2Std
+                if($blocktime[2]>23) { $blocktime[2]=23; } # da nachts keine sonne scheint egal
+                $blocktimerRunning=1;
+		Dbg("son1");	
+	    }
+	}
+        else {
+	}
+	$wettalt=$wett;
+    }
+    if($blocktimerRunning) {
+	if(!IsLater("$blocktime[2]:$blocktime[1]")) {
+	    return(1);
+	}
+	else {
+	    $blocktimerRunning=0;
+	}
+    }
+    return(0);
+}
 
 sub RollCheck() {
 #    Dbg("RollCheck\n");
     my $temp=20;
-    my $wett;
-    my $twil;
     my $r;
-    my $sr;
     my $i=0;
     my $delay=11;
+    my $tag=0;
+
+    my $tempOut=ReadingsVal("wetter", "temp_c", 99);
+
+    my $twil=Value("twil");
+    if($twil>=3 && $twil<10) { # civil
+	$tag=1;
+    }
+
+    my $wett=ReadingsVal("wetter", "code", 99);
+    my $sr=Value("sonnenrichtung");
+
+    my $sonneblock=IsWetterSonneWait($wett);
 
     for $r ( @rolls ) {
 
 	my $fen="Closed";
 	my $tempH=0;
 	my $sonne=0;
-	my $tag=0;
         my $skipRunter=0;
         my $skipHoch=0;
-	my @tparts = gmtime($i*$delay+1);
-        my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
-	my @tparts2 = gmtime($i*$delay+40);
-        my $t2=sprintf ("%02d:%02d:%02d",@tparts2[2,1,0]);
+        my $ndelay=$i*$delay+1;
+	#Dbg("--------r:g ".$r->{roll}." / ".$r->{temp});
 
-#	Dbg("r:g ".$r->{roll}." / ".$r->{temp}."\n");
-
+        # Raum zu warm und aussentemp hoch ?
         $temp=ReadingsVal($r->{temp},"measured-temp", 99);
-	if($temp > $r->{tempS}) {
+	if($temp > $r->{tempS} && $tempOut > ($r->{tempS}-5)) {
 	    $tempH=1;
 	}
-	
-        $twil=Value("twil");
-	if($twil>=3 && $twil<10) { # civil
-	    $tag=1;
-	}
 
-        $wett=ReadingsVal("wetter", "code", 99);
-        $sr=Value("sonnenrichtung");
-        if($twil>=5 && $twil<8) { # indoor
-	    if($wett==30 || $wett==32 || $wett==34 || $wett==36) { # sonnig, heiter, heiss
-		if (index($sr, $r->{dir}) != -1) {
+	# Sonne scheint ins Fenster ?
+        if($twil>=5 && $twil<7) { # nur, wenn der Sonnenstand ueber 'weather' liegt
+	    # bei hoher Raum- und Aussentemperatur immer unten lassen
+	    if($temp > ($r->{tempS}+2) && $tempOut > $r->{tempS}) { 
+		$sonne=1;
+	    }
+	    elsif (index($sr, $r->{dir}) != -1) { # Sonnenrichtung ins Fenster
+		if($sonneblock) {
+		    $sonne=1;
+                }
+		elsif(IsSunny($wett)) {
 		    $sonne=1;
 		}
+		#Dbg("son3, $sonne");	
 	    }
 	}
 
+        # Offene Fenster nicht mit Rollaeden verschliessen
         if($r->{win} ne "") {
 	    $fen=Value($r->{win});
-            Dbg("test win:$r->{roll}-$fen");	
+            #Dbg("test win:$r->{roll}-$fen");	
             if ($fen eq "Open") {
-		Dbg("$r->{roll}:skipR");
+		#Dbg("$r->{roll}:skipR");
                 $skipRunter=1;
 	    }
         }
+        # Zur Schlafzeit nicht oeffnen
         if($r->{typ} eq "s") {
 	    if(Value("wach") eq "0") {
 		$skipHoch=1;
             }
 	}
 
-        Dbg("RollCheck:$r->{roll}-tempH:$tempH temp:$temp so:$sonne wett:$wett sr:$sr twil:$twil tag:$tag fen:$fen skipR:$skipRunter skipH:$skipHoch");
+        Dbg("RollCheck:$r->{roll}-tempH:$tempH temp:$temp tempO:$tempOut so:$sonne wett:$wett sr:$sr twil:$twil tag:$tag fen:$fen skipR:$skipRunter skipH:$skipHoch st:$r->{state}");
 
 	if( $tag and $sonne and $tempH) {
             if($r->{state}!=STATE_SCHLITZ) {
-                if(!$skipHoch && !$skipRunter) { 
-		    myfhem("define r".$i." at +".$t." set ".$r->{roll}." closes");
-		    myfhem("define ru".$i." at +".$t2." set ".$r->{roll}." up 7");
-		    Dbg("RollChg: $r->{roll} - runter schlitz\n");
+                if(!$skipHoch && !$skipRunter) {
+                    RollRunterSchlitz($r->{roll}, $ndelay);
                 }
                 $r->{state}=STATE_SCHLITZ;
 	    }
@@ -243,9 +347,8 @@ sub RollCheck() {
 	
 	if($tag && !$sonne) {
             if($r->{state}!=STATE_HOCH) {
-                if(!$skipHoch) { 
-		    myfhem("define r".$i." at +".$t." set ".$r->{roll}." opens");
-		    Dbg("RollChg: $r->{roll} - hoch\n");
+                if(!$skipHoch) {
+                    RollHoch($r->{roll}, $ndelay); 
 		    $r->{state}=STATE_HOCH;
 		}
 	    }
@@ -254,8 +357,7 @@ sub RollCheck() {
 	if(!$tag) {
             if($r->{state}!=STATE_RUNTER) {
 		if(!$skipRunter) {
-		    myfhem("define r".$i." at +".$t." set ".$r->{roll}." closes");
-		    Dbg("RollChg: $r->{roll} -  runter\n");
+                    RollRunter($r->{roll}, $ndelay);
 		}
                 $r->{state}=STATE_RUNTER;
 	    }
