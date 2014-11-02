@@ -635,6 +635,7 @@ sub PROPLANTA_Aborted($)
 
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
+<div  style="width:800px"> 
 <ul>
   <a name="PROPLANTAdefine"></a>
   <b>Define</b>
@@ -704,6 +705,7 @@ sub PROPLANTA_Aborted($)
    </ul>
    <br><br>
 </ul>
+</div> 
 
 =end html_DE
 =cut
