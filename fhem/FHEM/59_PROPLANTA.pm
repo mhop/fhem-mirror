@@ -37,6 +37,7 @@ my $curReadingType = 0;
   my %intensity = ( "keine" => 0
      ,"nein" => 0
      ,"gering" => 1
+     ,"leicht" => 1
      ,"ja" => 1
      ,"m&auml;&szlig;ig" => 2
      ,"stark" => 3
@@ -542,7 +543,7 @@ sub PROPLANTA_Aborted($)
 	<ul>
       <li><code>Interval</code>
       <br>
-      poll interval for weather data in seconds (default 3600)
+      poll interval for weather data in seconds (default 3600 = 1 hour)
       </li><br>
       <li><code>URL</code>
       <br>
@@ -553,10 +554,21 @@ sub PROPLANTA_Aborted($)
 	<br/><br/>
 	
     <a name="PROPLANTAreading"></a>
-	<b>Generated Readings</b><br/><br/>
-	<ul>
-		<li><b>fc?_uv</b> - UV index</li>
-		<li><b>fc?_sun</b> - sunshine duration</li>
+   <b>Forecast readings</b><br/><br/>
+   <ul>
+      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - cloud coverage <i>15:00</i> <i>today</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_dew</b> - dew formation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
+      <li><b>fc</b><i>0</i><b>_evapor</b> - evaporation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
+      <li><b>fc</b><i>0</i><b>_frost</b> - ground frost <i>today</i> (0=no, 1=yes)</li>
+      <li><b>fc</b><i>0</i><b>_moonRise</b> - moon rise <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_moonSet</b> - moon set <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_rad</b> - global radiation <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_sun</b> - relative sun shine duration <i>today</i> in % (between sun rise and set)</li>
+      <li><b>fc</b><i>0</i><b>_tempMaxC</b> - maximal temperature <i>today</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_tempMaxC</b> - minimal temperatur <i>today</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - temperatur at <i>15:00</i> <i>today</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
+      <li>etc.</li>
 	</ul>
 	<br/><br/>	
 
@@ -573,7 +585,7 @@ sub PROPLANTA_Aborted($)
   <b>Define</b>
   <ul>
     <br>
-    <code>define &lt;name&gt; PROPLANTA [Stadt] [Ländercode]</code>
+    <code>define &lt;Name&gt; PROPLANTA [Stadt] [Ländercode]</code>
     <br>
      Das Modul extrahiert bestimmte Wetterdaten von der website www.proplanta.de.<br/>
     <br>
@@ -598,25 +610,40 @@ sub PROPLANTA_Aborted($)
      <code>set &lt;name&gt; update</code>
    	 <br/>
    	 <ul>
-          The weather data are immediately polled from the website.
+          List die Wetterdaten sofort von der Webseite aus.
      </ul><br/>
   </ul>  
   
     <a name="PROPLANTAattr"></a>
 	<b>Attribute</b><br/><br/>
 	<ul>
-		<li><b>INTERVAL</b> - poll interval for weather data in seconds (default 3600)</li>
-		<li><b>URL</b> - url to extract the weather data from</li>
-		<br/>
-		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
+      <br>
+      Abfrageinterval in Sekunden (Standard 3600 = 1 Stunde)
+      </li><br>
+      <li><code>URL &lt;Internetadresse&gt;</code>
+      <br>Internetadresse, von der die Daten ausgelesen werden (&uuml;berschreibt die Werte im 'define'-Term</li>
+      </li><br>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 	</ul>
 	<br/><br/>
 	
     <a name="PROPLANTAreading"></a>
-	<b>Generated Readings/Events</b><br/><br/>
-	<ul>
-		<li><b>fc?_uv</b> - the UV Index</li>
-		<li><b>fc?_sun</b> - the sunshine duration</li>
+	<b>Vorhersagewerte</b><br/><br/>
+   <ul>
+      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - Wolkenbedeckungsgrad <i>15:00</i> Uhr <i>heute</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=m&auml;&szig;ig, 3=stark)</li>
+      <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=m&auml;&szig;ig, 3=stark)</li>
+      <li><b>fc</b><i>0</i><b>_frost</b> - Bodenfrost <i>heute</i> (0=nein, 1=ja)</li>
+      <li><b>fc</b><i>0</i><b>_moonRise</b> - Mondaufgang <i>heute</i></li>
+      <li><b>fc</b><i>0</i><b>_moonSet</b> - Monduntergang <i>heute</i></li>
+      <li><b>fc</b><i>0</i><b>_rad</b> - Globalstrahlung <i>heute</i></li>
+      <li><b>fc</b><i>0</i><b>_sun</b> - relative Sonnenscheindauer <i>heute</i> in % (zwischen Sonnenauf- und -untergang)</li>
+      <li><b>fc</b><i>0</i><b>_tempMaxC</b> - Maximaltemperatur <i>heute</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_tempMaxC</b> - Minimaltemperatur <i>heute</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - Temperatur <i>15:00</i> Uhr <i>heute</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
+      <li>etc.</li>
 	</ul>
 	<br/><br/>	
 
