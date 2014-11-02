@@ -279,7 +279,7 @@ sub PROPLANTA_Initialize($)
    $hash->{DefFn}    = "PROPLANTA_Define";
    $hash->{UndefFn}  = "PROPLANTA_Undef";
    $hash->{SetFn}    = "PROPLANTA_Set";
-   $hash->{AttrList} = "Interval URL disable:0,1 " . $readingFnAttributes;
+   $hash->{AttrList} = "INTERVAL URL disable:0,1 " . $readingFnAttributes;
 }
 ###################################
 sub PROPLANTA_Define($$)
@@ -318,7 +318,7 @@ sub PROPLANTA_Undef($$)
 
    RemoveInternalTimer( $hash );
    
-   BlockingKill( $hash->{helper}{RUNNING} ) if ( defined( $hash->{helper}{RUNNING} ) );
+   BlockingKill( $hash->{helper}{RUNNING_PID} ) if ( defined( $hash->{helper}{RUNNING_PID} ) );
    
    return undef;
 }
@@ -397,10 +397,10 @@ sub PROPLANTA_Start($)
    
    return unless (defined($hash->{NAME}));
    
-   $hash->{INTERVAL} = AttrVal( $name, "Interval",  $hash->{INTERVAL} );
+   $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
    
    if(!$hash->{LOCAL} && $hash->{INTERVAL} > 0) {
-      # setup timer
+    # set up timer if automatically call
       RemoveInternalTimer( $hash );
       InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PROPLANTA_Start", $hash, 1 );  
       return undef if( AttrVal($name, "disable", 0 ) == 1 );
@@ -412,7 +412,7 @@ sub PROPLANTA_Start($)
       return;
    }
   
-   $hash->{helper}{RUNNING} =
+   $hash->{helper}{RUNNING_PID} =
            BlockingCall( 
            "PROPLANTA_Run",   # callback worker task
            $name,                    # name of the device
@@ -469,8 +469,8 @@ sub PROPLANTA_Done($)
    my $hash = $defs{$name};
    return unless ( defined($hash->{NAME}) );
    
-   # delete the marker for running process
-   delete( $hash->{helper}{RUNNING} );  
+   # delete the marker for RUNNING_PID process
+   delete( $hash->{helper}{RUNNING_PID} );  
 
    # Wetterdaten speichern
    readingsBeginUpdate($hash);
@@ -480,7 +480,7 @@ sub PROPLANTA_Done($)
    while (my ($rName, $rValue) = each(%values) )
    {
       readingsBulkUpdate( $hash, $rName, $rValue );
-      PROPLANTA_Log $hash, 5, "tag:$rName value:$rValue";
+      PROPLANTA_Log $hash, 5, "reading:$rName value:$rValue";
    }
 
    readingsEndUpdate( $hash, 1 );
@@ -489,7 +489,7 @@ sub PROPLANTA_Done($)
 sub PROPLANTA_Aborted($)
 {
    my ($hash) = @_;
-   delete( $hash->{helper}{RUNNING} );
+   delete( $hash->{helper}{RUNNING_PID} );
 }
 
 
@@ -502,17 +502,22 @@ sub PROPLANTA_Aborted($)
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
 <ul style="width:800px">
-  The module extracts certain weather data from www.proplanta.de.<br/>
+  The module extracts certain weather data from www.proplanta.de.
+  <br>
+  &nbsp;
+  <br>
   <a name="PROPLANTAdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; PROPLANTA [City] [CountryCode]</code>
+    <br>
+    Example: <code>define wetter PROPLANTA Bern ch</code>
     <br>&nbsp;
-    <li><code>[City]<code> (optional)
+    <li><code>[City]</code> <i>(optional)</i>
       <br>
       Check www.proplanta.de if your city is known. The city has to start with a <b>capital</b> letter.
     </li><br>
-    <li><code>[CountryCode]<code> (optional)
+    <li><code>[CountryCode]<code> <i>(optional)</i>
       <br>
       Possible values: de (default), at, ch, fr, it 
     </li><br>
@@ -520,9 +525,8 @@ sub PROPLANTA_Aborted($)
   <br>
   
   <a name="PROPLANTAset"></a>
-  <b>Set-Commands</b>
+  <b>Set</b>
   <ul>
-     
      <br/>
      <code>set &lt;name&gt; update</code>
    	 <br/>
@@ -593,7 +597,7 @@ sub PROPLANTA_Aborted($)
     <a name="PROPLANTAattr"></a>
 	<b>Attribute</b><br/><br/>
 	<ul>
-		<li><b>Interval</b> - poll interval for weather data in seconds (default 3600)</li>
+		<li><b>INTERVAL</b> - poll interval for weather data in seconds (default 3600)</li>
 		<li><b>URL</b> - url to extract the weather data from</li>
 		<br/>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
