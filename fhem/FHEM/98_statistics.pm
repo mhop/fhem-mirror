@@ -1019,7 +1019,7 @@ statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
-<ul style="width:800px">
+<ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
   <br>
    Until now statistics for the following readings are automatically built:
@@ -1137,7 +1137,7 @@ statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
-<ul style="width:800px">
+<ul>
   Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
   <br>&nbsp;
   <br>

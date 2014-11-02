@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+# $Id: commandref_join.pl 5361 2014-03-29 06:24:20Z rudolfkoenig $
+
+use strict;
+use warnings;
+sub err($$);
+
+my $svnlook='/usr/bin/svnlook';
+my $repos=$ARGV[0];
+my $txn=$ARGV[1];
+my $arg="-t $txn";
+#my $arg="-r $txn";      # local testing
+my @lang = ("EN", "DE");
+my $exitCode = 0;
+use constant TAGS => qw{ul li code b};
+
+
+my $log = `$svnlook log $arg $repos`;
+if($log !~ m/^.*:.*$/s) {
+  print << 'EOF';
+A FHEM SVN comment must have the following format
+  module: text-describing-the-change
+or
+  module: text-describing-the-change (Forum #<forum.fhem.de threadnumber>)
+EOF
+  exit(1);
+}
+
+my $fList = `$svnlook changed $arg $repos`;
+foreach my $row (split("\n", $fList)) {
+  chomp($row);
+  my ($type, $fName) = split(" ", $row);
+  next if(!$fName || $fName !~ m+FHEM/\d\d_(.*).pm$+);
+  my $modName = $1;
+
+  foreach my $lang (@lang) {
+    my $suffix = ($lang eq "EN" ? "" : "_$lang");
+    my $tag;
+    my %tagcount= ();
+    my %llwct = (); # Last line with closed tag
+    open(MOD, "$svnlook $arg cat $repos $fName|") ||
+        die("Cant svnlook cat $fName:$!\n");
+    my $skip = 1;
+    my $line = 0;
+    my $docCount = 0;
+    my $hasLink = 0;
+    while(my $l = <MOD>) {
+      $line++;
+
+      err $fName, "DOS line encoding is not supported."
+        if($l =~ m/^=begin html$suffix.*\r/);
+
+      if($l =~ m/^=begin html$suffix$/) {
+        $l = <MOD>;    # skip one line, to be able to repeat join+split
+        err($fName, "$lang: nonempty line after =begin html.")
+          if($l =~ m/^...*$/);
+        $skip = 0; $line++;
+
+      } elsif($l =~ m/^=end html$suffix$/) {
+        $skip = 1;
+
+      } elsif(!$skip) {
+        $docCount++;
+        $hasLink = ($l =~ m/<a name="$modName"/) if(!$hasLink);
+        foreach $tag (TAGS) {
+          my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
+          $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
+          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
+          $llwct{$tag} = $line if(!$llwct{$tag} || ($ot && !$tagcount{$tag}));
+        }
+      }
+    }
+    close(MOD);
+
+    err $fName, "$lang: No document text found"
+      if(!$suffix && !$docCount);
+    err $fName, "$lang: No <a name=\"$modName\"> link"
+      if(!$suffix && $docCount && !$hasLink);
+    foreach $tag (TAGS) {
+      err $fName, "$lang: Unbalanced $tag ($tagcount{$tag}, last line ok: $llwct{$tag})"
+        if($tagcount{$tag});
+    }
+  }
+}
+
+exit($exitCode);
+
+sub
+err($$)
+{
+  my ($fName, $txt) = @_;
+  print "*** $fName: $txt\n";
+  $exitCode = 1;
+}

@@ -906,7 +906,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
-<ul style="width:800px">
+<ul>
   This module reads data from a measurement unit (so called smart meters for electricity, gas or heat)
   <br>
   that provides OBIS compliant data in JSON format on a webserver or on the FHEM file system.
@@ -1030,7 +1030,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
-<ul style="width:800px">
+<ul>
   Dieses Modul liest Daten von Messger&auml;ten (z.B. Stromz&auml;hler, Gasz&auml;hler oder W&auml;rmez&auml;hler, so genannte Smartmeter),
   welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
   <br>

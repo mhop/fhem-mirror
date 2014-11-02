@@ -91,11 +91,9 @@ foreach my $lang (@lang) {
         $docCount++;
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
-          my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
           $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
-          $llwct{$tag} = $line if(!$llwct{$tag} || ($ot && !$tagcount{$tag}));
-          #print "$mod $line $tag $tagcount{$tag}\n" if($tagcount{$tag} ne $ot);
+          $llwct{$tag} = $line if(!$tagcount{$tag});
         }
       }
     }
