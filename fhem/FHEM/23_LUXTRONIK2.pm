@@ -1,12 +1,12 @@
-  ###############################################################
+###############################################################
 # $Id$
 #
 #  23_LUXTRONIK2.pm
 #
-#  Copyright notice
-#
 #  (c) 2012,2014 Torsten Poitzsch (torsten poitzsch at gmx . de)
-#  (c) 2012-2013 Jan-Hinrich Fessel (oskar@fessel.org)
+#  (c) 2012-2013 Jan-Hinrich Fessel (oskar at fessel . org)
+#
+#  Copyright notice
 #
 #  The modul reads and writes parameters of the heat pump controller 
 #  Luxtronik 2.0 used in Alpha Innotec and Siemens Novelan (WPR NET) heat pumps.
@@ -50,10 +50,25 @@ sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 # Modul Version for remote debugging
   my $modulVersion = "2014-05-10";
 
-#List of firmware versions that are known to be compatible with this modul
+  #List of firmware versions that are known to be compatible with this modul
   my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#";
   my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#";
- 
+
+sub ##########################################
+LUXTRONIK2_Log($$$)
+{
+   my ( $hash, $loglevel, $text ) = @_;
+   my $xline       = ( caller(0) )[2];
+   
+   my $xsubroutine = ( caller(1) )[3];
+   my $sub         = ( split( ':', $xsubroutine ) )[2];
+   $sub =~ s/LUXTRONIK2_//;
+
+   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
+   Log3 $instName, $loglevel, "LUXTRONIK2 $instName: $sub.$xline " . $text;
+}
+
+
 sub ########################################
 LUXTRONIK2_Initialize($)
 {
@@ -113,7 +128,7 @@ LUXTRONIK2_Define($$)
   $hash->{fhem}{statBoilerCoolDownStep} = 0;
  
   $hash->{fhem}{modulVersion} = $modulVersion;
-  Log3 $hash,5,"$name: LUXTRONIK2.pm version is $modulVersion.";
+  LUXTRONIK2_Log $hash,5,"LUXTRONIK2.pm version is $modulVersion.";
        
   return undef;
 }
@@ -172,7 +187,7 @@ LUXTRONIK2_Notify(@) {
       while (($oldReading, $newReading) = each(%cleanUp)) {
          if ( exists( $hash->{READINGS}{$oldReading} ) ) {
             delete($hash->{READINGS}{$oldReading});
-            Log3 $name,2,"$name: !!! Change/fix in LUXTRONIK2-Modul: '$oldReading' is now '$newReading'";
+            LUXTRONIK2_Log $name,2,"!!! Change/fix in LUXTRONIK2-Modul: '$oldReading' is now '$newReading'";
          }
       }
    }
@@ -191,7 +206,7 @@ LUXTRONIK2_Attr(@)
       if ($aName eq "1allowSetParameter") {
          eval { qr/$aVal/ };
          if ($@) {
-            Log3 $name, 3, "LUXTRONIK2: Invalid allowSetParameter in attr $name $aName $aVal: $@";
+            LUXTRONIK2_Log $name, 3, "Invalid allowSetParameter in attr $name $aName $aVal: $@";
             return "Invalid allowSetParameter $aVal";
          }
       }
@@ -236,7 +251,7 @@ LUXTRONIK2_Set($$@)
          $resultStr = "$name: Statistic value(s) deleted:" . $resultStr;
          WriteStatefile();
       }
-      # Log3 $hash, 3, $resultStr;
+      # LUXTRONIK2_Log $hash, 3, $resultStr;
       return $resultStr;
    }
    elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
@@ -262,16 +277,16 @@ LUXTRONIK2_Set($$@)
     my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
      # stop in case of incompatible firmware
     if ($firmwareCheck eq "fwNotCompatible") {
-      Log3 $name, 3, $name." Error: Host firmware '$firmware' not compatible for parameter setting.";
+      LUXTRONIK2_Log $name, 3, " Error: Host firmware '$firmware' not compatible for parameter setting.";
        return "Firmware '$firmware' not compatible for parameter setting. ";
      # stop in case of untested firmware and firmware check enabled
     } elsif (AttrVal($name, "ignoreFirmwareCheck", 0)!= 1 &&
             $firmwareCheck eq "fwNotTested") {
-      Log3 $name, 3, $name." Error: Host firmware '$firmware' not tested for parameter setting. To test set attribute 'ignoreFirmwareCheck' to 1";
+      LUXTRONIK2_Log $name, 3, " Error: Host firmware '$firmware' not tested for parameter setting. To test set attribute 'ignoreFirmwareCheck' to 1";
        return "Firmware '$firmware' not compatible for parameter setting. To test set attribute 'ignoreFirmwareCheck' to 1.";
      # stop in case setting of parameters is not enabled
     } elsif ( AttrVal($name, "allowSetParameter", 0) != 1) {
-      Log3 $name, 3, $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 1";
+      LUXTRONIK2_Log $name, 3, " Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 1";
        return "Setting of parameters not allowed. To unlock, please set attribut 'allowSetParameter' to 1.";
      }
    }
@@ -280,7 +295,7 @@ LUXTRONIK2_Set($$@)
       $hash->{LOCAL} = 1;
       $resultStr = LUXTRONIK2_synchronizeClock($hash);
       $hash->{LOCAL} = 0;
-      Log3 $name, 3, "$name - $resultStr";
+      LUXTRONIK2_Log $name, 3, $resultStr;
       return $resultStr;
    } elsif(int(@_)==4 &&
          ($cmd eq 'hotWaterTemperatureTarget'
@@ -336,7 +351,7 @@ LUXTRONIK2_DoUpdate($)
   my $result="";
   my $readingStartTime = time();
   
-  Log3 $name, 5, "$name: Opening connection to host ".$host;
+  LUXTRONIK2_Log $name, 5, "Opening connection to host ".$host;
   my $socket = new IO::Socket::INET (  
                   PeerAddr => $host, 
                    PeerPort => 8888,
@@ -344,7 +359,7 @@ LUXTRONIK2_DoUpdate($)
                    Proto => 'tcp'
       );
   if (!$socket) {
-      Log3 $name, 1, "$name Error: Could not open connection to host ".$host;
+      LUXTRONIK2_Log $name, 1, "Could not open connection to host ".$host;
       return "$name|0|Can't connect to $host";
   }
   $socket->autoflush(1);
@@ -352,16 +367,16 @@ LUXTRONIK2_DoUpdate($)
 ############################ 
 #Fetch operational values (FOV)
 ############################ 
-  Log3 $name, 5, "$name: Ask host for operational values";
+  LUXTRONIK2_Log $name, 5, "Ask host for operational values";
   $socket->send(pack("N", 3004));
   $socket->send(pack("N", 0));
   
-  Log3 $name, 5, "$name: Start to receive operational values";
+  LUXTRONIK2_Log $name, 5, "Start to receive operational values";
  #(FOV) read first 4 bytes of response -> should be request_echo = 3004
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count != 3004) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: Fetching operational values - wrong echo of request 3004: ".length($result)." -> ".$count;
+      LUXTRONIK2_Log $name, 2, "Fetching operational values - wrong echo of request 3004: ".length($result)." -> ".$count;
        $socket->close();
       return "$name|0|3004 != $count";
   }
@@ -370,7 +385,7 @@ LUXTRONIK2_DoUpdate($)
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count > 0) {
-      Log3 $name, 4, "$name: Parameter on target changed, restart parameter reading after 5 seconds";
+      LUXTRONIK2_Log $name, 4, "Parameter on target changed, restart parameter reading after 5 seconds";
      $socket->close();
       return "$name|2|Status = $count - parameter on target changed, restart device reading after 5 seconds";
   }
@@ -379,7 +394,7 @@ LUXTRONIK2_DoUpdate($)
   $socket->recv($result,4);
   my $count_calc_values = unpack("N", $result);
   if($count_calc_values == 0) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error:  Fetching operational values - 0 values announced: ".length($result)." -> ".$count_calc_values;
+      LUXTRONIK2_Log $name, 2, "Fetching operational values - 0 values announced: ".length($result)." -> ".$count_calc_values;
      $socket->close();
       return "$name|0|0 values read";
   }
@@ -394,7 +409,7 @@ LUXTRONIK2_DoUpdate($)
      $i++;
   }
   if(length($result) != $count_calc_values*4) {
-      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: operational values length check: ".length($result)." should have been ". $count_calc_values * 4;
+      LUXTRONIK2_Log $name, 1, "Operational values length check: ".length($result)." should have been ". $count_calc_values * 4;
       $socket->close();
       return "$name|0|Number of values read mismatch ( $!)\n";
   }
@@ -402,27 +417,27 @@ LUXTRONIK2_DoUpdate($)
  #(FOV) unpack response in array
   @heatpump_values = unpack("N$count_calc_values", $result);
   if(scalar(@heatpump_values) != $count_calc_values) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by operation values: ".scalar(@heatpump_values)." instead of ".$count_calc_values;
+      LUXTRONIK2_Log $name, 2, "Unpacking problem by operation values: ".scalar(@heatpump_values)." instead of ".$count_calc_values;
       $socket->close();
       return "$name|0|Unpacking problem of operational values";
   
   }
 
-  Log3 $name, 5, "$name: $count_calc_values operational values received";
+  LUXTRONIK2_Log $name, 5, "$count_calc_values operational values received";
  
 ############################ 
 #Fetch set parameters (FSP)
 ############################ 
-  Log3 $name, 5, "$name: Ask host for set parameters";
+  LUXTRONIK2_Log $name, 5, "Ask host for set parameters";
   $socket->send(pack("N", 3003));
   $socket->send(pack("N", 0));
 
-  Log3 $name, 5, "$name: Start to receive set parameters";
+  LUXTRONIK2_Log $name, 5, "Start to receive set parameters";
  #(FSP) read first 4 bytes of response -> should be request_echo=3003
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count != 3003) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: wrong echo of request 3003: ".length($result)." -> ".$count;
+      LUXTRONIK2_Log $name, 2, "Wrong echo of request 3003: ".length($result)." -> ".$count;
       $socket->close();
       return "$name|0|3003 != 3003";
   }
@@ -431,7 +446,7 @@ LUXTRONIK2_DoUpdate($)
   $socket->recv($result,4);
   my $count_set_parameter = unpack("N", $result);
   if($count_set_parameter == 0) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: 0 parameter read: ".length($result)." -> ".$count_set_parameter;
+      LUXTRONIK2_Log $name, 2, "0 parameter read: ".length($result)." -> ".$count_set_parameter;
      $socket->close();
       return "$name|0|0 parameter read";
   }
@@ -446,33 +461,33 @@ LUXTRONIK2_DoUpdate($)
      $i++;
   }
   if(length($result) != $count_set_parameter*4) {
-      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: parameter length check: ".length($result)." should have been ". $count_set_parameter * 4;
+      LUXTRONIK2_Log $name, 1, "Parameter length check: ".length($result)." should have been ". $count_set_parameter * 4;
      $socket->close();
       return "$name|0|Number of parameters read mismatch ( $!)\n";
   }
 
   @heatpump_parameters = unpack("N$count_set_parameter", $result);
   if(scalar(@heatpump_parameters) != $count_set_parameter) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: unpacking problem by set parameter: ".scalar(@heatpump_parameters)." instead of ".$count_set_parameter;
+      LUXTRONIK2_Log $name, 2, "Unpacking problem by set parameter: ".scalar(@heatpump_parameters)." instead of ".$count_set_parameter;
      $socket->close();
       return "$name|0|Unpacking problem of set parameters";
   }
 
-  Log3 $name, 5, "$name: $count_set_parameter set values received";
+  LUXTRONIK2_Log $name, 5, "$count_set_parameter set values received";
 
 ############################ 
 #Fetch Visibility Attributes (FVA)
 ############################ 
-  Log3 $name, 5, "$name: Ask host for visibility attributes";
+  LUXTRONIK2_Log $name, 5, "Ask host for visibility attributes";
   $socket->send(pack("N", 3005));
   $socket->send(pack("N", 0));
 
-  Log3 $name, 5, "$name: Start to receive visibility attributes";
+  LUXTRONIK2_Log $name, 5, "Start to receive visibility attributes";
  #(FVA) read first 4 bytes of response -> should be request_echo=3005
   $socket->recv($result,4);
   $count = unpack("N", $result);
   if($count != 3005) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: wrong echo of request 3005: ".length($result)." -> ".$count;
+      LUXTRONIK2_Log $name, 2, "Wrong echo of request 3005: ".length($result)." -> ".$count;
       $socket->close();
       return "$name|0|3005 != $count";
   }
@@ -481,7 +496,7 @@ LUXTRONIK2_DoUpdate($)
   $socket->recv($result,4);
   my $countVisibAttr = unpack("N", $result);
   if($countVisibAttr == 0) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: 0 visibility attributes announced: ".length($result)." -> ".$countVisibAttr;
+      LUXTRONIK2_Log $name, 2, "0 visibility attributes announced: ".length($result)." -> ".$countVisibAttr;
      $socket->close();
       return "$name|0|0 visibility attributes announced";
   }
@@ -496,23 +511,23 @@ LUXTRONIK2_DoUpdate($)
      $i++;
   }
   if(length($result) != $countVisibAttr) {
-      Log3 $name, 1, "$name LUXTRONIK2_DoUpdate-Error: Visibility attributes length check: ".length($result)." should have been ". $countVisibAttr;
+      LUXTRONIK2_Log $name, 1, "Visibility attributes length check: ".length($result)." should have been ". $countVisibAttr;
      $socket->close();
       return "$name|0|Number of Visibility attributes read mismatch ( $!)\n";
   }
 
   @heatpump_visibility = unpack("C$countVisibAttr", $result);
   if(scalar(@heatpump_visibility) != $countVisibAttr) {
-      Log3 $name, 2, "$name LUXTRONIK2_DoUpdate-Error: Unpacking problem by visibility attributes: ".scalar(@heatpump_visibility)." instead of ".$countVisibAttr;
+      LUXTRONIK2_Log $name, 2, "Unpacking problem by visibility attributes: ".scalar(@heatpump_visibility)." instead of ".$countVisibAttr;
      $socket->close();
       return "$name|0|Unpacking problem of visibility attributes";
   }
 
-  Log3 $name, 5, "$name: $countVisibAttr visibility attributs received";
+  LUXTRONIK2_Log $name, 5, "$countVisibAttr visibility attributs received";
 
 ####################################  
 
-  Log3 $name, 5, "$name: Closing connection to host $host";
+  LUXTRONIK2_Log $name, 5, "Closing connection to host $host";
   $socket->close();
 
   my $readingEndTime = time();
@@ -666,7 +681,7 @@ LUXTRONIK2_UpdateDone($)
 
   my $cop = 0;
 
-  Log3 $hash, 5, "$name: LUXTRONIK2_UpdateDone: $string";
+  LUXTRONIK2_Log $hash, 5, $string;
 
   #Define Status Messages
   my %wpOpStat1 = ( 0 => "Waermepumpe laeuft",
@@ -740,7 +755,7 @@ LUXTRONIK2_UpdateDone($)
      }
     else {
        readingsSingleUpdate($hash,"state","Error: Reading skipped after $counterRetry tries",1);
-      Log3 $hash, 2, "$name Error: Device reading skipped after $counterRetry tries with parameter change on target";
+      LUXTRONIK2_Log $hash, 2, "Device reading skipped after $counterRetry tries with parameter change on target";
     }
   }
   elsif ($a[1]==1 )  {
@@ -786,24 +801,24 @@ LUXTRONIK2_UpdateDone($)
       $value = LUXTRONIK2_doStatisticBoilerHeatUp ($hash, $a[35], $a[37]/10, $hotWaterTemperature, $a[3],$hotWaterTemperatureTarget);
       if ($value ne "") {
          readingsBulkUpdate($hash,"statBoilerGradientHeatUp",$value); 
-         Log3 $name,3,"$name: statBoilerGradientHeatUp set to $value";
+         LUXTRONIK2_Log $name, 3, "statBoilerGradientHeatUp set to $value";
       }
 
       #LUXTRONIK2_doStatisticBoilerCoolDown $hash, $time, $currTemp, $opState, $target, $threshold
       $value = LUXTRONIK2_doStatisticBoilerCoolDown ($hash, $a[22], $hotWaterTemperature, $a[3], $hotWaterTemperatureTarget, $hotWaterTemperatureThreshold);
       if ($value ne "") {
          readingsBulkUpdate($hash,"statBoilerGradientCoolDown",$value); 
-         Log3 $name,3,"$name: statBoilerGradientCoolDown set to $value";
+         LUXTRONIK2_Log $name, 3, "statBoilerGradientCoolDown set to $value";
          my @new = split / /, $value;
          if ( exists( $hash->{READINGS}{statBoilerGradientCoolDownMin} ) ) {
             my @old = split / /, $hash->{READINGS}{statBoilerGradientCoolDownMin}{VAL};
             if ($new[5]>6 && $new[1]>$old[1] && $new[1] < 0) {
                readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value,1); 
-               Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to '$value'";
+               LUXTRONIK2_Log $name, 3, "statBoilerGradientCoolDownMin set to '$value'";
             }
          } elsif ($new[5]>6 && $new[1] < 0) {
             readingsBulkUpdate($hash,"statBoilerGradientCoolDownMin",$value,1); 
-            Log3 $name,3,"$name: statBoilerGradientCoolDownMin set to '$value'";
+            LUXTRONIK2_Log $name, 3, "statBoilerGradientCoolDownMin set to '$value'";
          }
       }
 
@@ -953,7 +968,7 @@ LUXTRONIK2_UpdateDone($)
      # if unknown firmware, ask at each startup to inform comunity
      if ($hash->{fhem}{alertFirmware} != 1 && $firmwareCheck eq "fwNotTested") {
       $hash->{fhem}{alertFirmware} = 1;
-      Log3 $hash, 2, "$name Alert: Host uses untested Firmware '$a[20]'. Please inform FHEM comunity about compatibility.";
+      LUXTRONIK2_Log $hash, 2, "Alert: Host uses untested Firmware '$a[20]'. Please inform FHEM comunity about compatibility.";
      }
      
    # Type of Heatpump  
@@ -995,28 +1010,28 @@ LUXTRONIK2_UpdateDone($)
      $autoSynchClock = 10 unless ($autoSynchClock >= 10 || $autoSynchClock == 0);
      $autoSynchClock = 600 unless $autoSynchClock <= 600;
      if ($autoSynchClock != 0 and abs($delayDeviceTimeCalc) > $autoSynchClock ) {
-      Log3 $name, 3, $name." - autoSynchClock triggered (delayDeviceTimeCalc ".abs($delayDeviceTimeCalc)." > $autoSynchClock).";
+      LUXTRONIK2_Log $name, 3, "autoSynchClock triggered (delayDeviceTimeCalc ".abs($delayDeviceTimeCalc)." > $autoSynchClock).";
       # Firmware not tested and Firmware Check not ignored
        if ($firmwareCheck eq "fwNotTested" && AttrVal($name, "ignoreFirmwareCheck", 0)!= 1) {
-         Log3 $name, 1, $name." Error: Host firmware '$firmware' not tested for clock synchronization. To test set 'ignoreFirmwareCheck' to 1.";
+         LUXTRONIK2_Log $name, 1, "Host firmware '$firmware' not tested for clock synchronization. To test set 'ignoreFirmwareCheck' to 1.";
           $attr{$name}{autoSynchClock} = 0;
-         Log3 $name, 3, $name." Attribute 'autoSynchClock' set to 0.";
+         LUXTRONIK2_Log $name, 3, "Attribute 'autoSynchClock' set to 0.";
       #Firmware not compatible
        } elsif ($firmwareCheck eq "fwNotCompatible") {
-         Log3 $name, 1, $name." Error: Host firmware '$firmware' not compatible for host clock synchronization.";
+         LUXTRONIK2_Log $name, 1, "Host firmware '$firmware' not compatible for host clock synchronization.";
           $attr{$name}{autoSynchClock} = 0;
-         Log3 $name, 3, $name." Attribute 'autoSynchClock' set to 0.";
+         LUXTRONIK2_Log $name, 3, "Attribute 'autoSynchClock' set to 0.";
       #Firmware OK -> Synchronize Clock
        } else {
          $value = LUXTRONIK2_synchronizeClock($hash, 600);
-         Log3 $hash, 3, "$name ".$value;
+         LUXTRONIK2_Log $hash, 3, $value;
        }
      }
    #End of Auto Synchronize Device Clock
      ############################ 
    }
    else {
-      Log3 $hash, 5, "$name LUXTRONIK2_DoUpdate-Error: Status = $a[1]";
+      LUXTRONIK2_Log $hash, 5, "Status = $a[1]";
    }
     $hash->{fhem}{counterRetry} = $counterRetry;
 
@@ -1029,7 +1044,7 @@ LUXTRONIK2_UpdateAborted($)
   delete($hash->{helper}{RUNNING_PID});
   my $name = $hash->{NAME};
   my $host = $hash->{HOST};
-  Log3 $hash, 1, "$name Error: Timeout when connecting to host $host";
+  LUXTRONIK2_Log $hash, 1, "Timeout when connecting to host $host";
 }
 
 
@@ -1109,28 +1124,28 @@ LUXTRONIK2_SetParameter($$$)
 # Send new parameter to host
 ############################ 
   if ($setParameter !=0) {
-     Log3 $name, 5, "$name: Opening connection to host ".$host;
+     LUXTRONIK2_Log $name, 5, "Opening connection to host ".$host;
      my $socket = new IO::Socket::INET (  PeerAddr => $host, 
                      PeerPort => 8888,
                      Proto => 'tcp'
        );
      if (!$socket) {
-        Log3 $name, 1, "$name LUXTRONIK2_SetParameter-Error: Could not open connection to host ".$host;
+        LUXTRONIK2_Log $name, 1, "Could not open connection to host ".$host;
         return "$name Error: Could not open connection to host ".$host;
      }
      $socket->autoflush(1);
      
-     Log3 $name, 5, "$name: Set parameter $parameterName ($setParameter) = $realValue ($setValue)";
+     LUXTRONIK2_Log $name, 5, "Set parameter $parameterName ($setParameter) = $realValue ($setValue)";
      $socket->send(pack("N", 3002));
      $socket->send(pack("N", $setParameter));
      $socket->send(pack("N", $setValue));
      
-     Log3 $name, 5, "$name: Receive confirmation";
+     LUXTRONIK2_Log $name, 5, "Receive confirmation";
     #read first 4 bytes of response -> should be request_echo = 3002
      $socket->recv($buffer,4);
      $result = unpack("N", $buffer);
      if($result != 3002) {
-        Log3 $name, 2, "$name LUXTRONIK2_SetParameter-Error: Set parameter $parameterName - wrong echo of request: $result instead of 3002";
+        LUXTRONIK2_Log $name, 2, "Set parameter $parameterName - wrong echo of request: $result instead of 3002";
         $socket->close();
         return "$name Error: Host did not confirm parameter setting";
      }
@@ -1139,11 +1154,11 @@ LUXTRONIK2_SetParameter($$$)
      $socket->recv($buffer,4);
      $result = unpack("N", $buffer);
      if($result !=$setParameter) {
-        Log3 $name, 2, "$name  LUXTRONIK2_SetParameter-Error: Set parameter $parameterName - missing confirmation: $result instead of $setParameter";
+        LUXTRONIK2_Log $name, 2, "Set parameter $parameterName - missing confirmation: $result instead of $setParameter";
         $socket->close();
         return "$name Error: Host did not confirm parameter setting";
      }
-     Log3 $name, 5, "$name: Parameter setting confirmed";
+     LUXTRONIK2_Log $name, 5, "Parameter setting confirmed";
      
      $socket->close();
      
@@ -1167,23 +1182,23 @@ LUXTRONIK2_synchronizeClock (@)
   $maxDelta = 60 unless $maxDelta >= 0;
   $maxDelta = 600 unless $maxDelta <= 600;
          
-   Log3 $name, 5, "$name: Open telnet connection to $host";
+   LUXTRONIK2_Log $name, 5, "Open telnet connection to $host";
      my $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>10, Errmode=>'return');
       if (!$telnet) {
-       Log3 $name, 1, "$name LUXTRONIK2_synchronizeClock-Error: ".$telnet->errmsg;
+       LUXTRONIK2_Log $name, 1, $telnet->errmsg;
         return "$name synchronizeDeviceClock-Error: ".$telnet->errmsg;
       }
   
-    Log3 $name, 5, "$name: Log into $host";
+    LUXTRONIK2_Log $name, 5, "Log into $host";
       if (!$telnet->login('root', '')) {
-        Log3 $name, 1, "$name LUXTRONIK2_synchronizeClock-Error: ".$telnet->errmsg;
+        LUXTRONIK2_Log $name, 1, $telnet->errmsg;
         return "$name synchronizeDeviceClock-Error: ".$telnet->errmsg;
       }
       
-   Log3 $name, 5, "$name: Read current time of host";
+   LUXTRONIK2_Log $name, 5, "Read current time of host";
       my @output = $telnet->cmd('date +%s');
      $delay = sprintf("%.1f",time() - $output[0]);
-   Log3 $name, 5, "$name: Current time is ".localtime($output[0])." Delay is $delay seconds.";
+   LUXTRONIK2_Log $name, 5, "Current time is ".localtime($output[0])." Delay is $delay seconds.";
 
      if (abs($delay)>$maxDelta && $maxDelta!=0) {
       $returnStr = "Do not dare to synchronize. Device clock of host $host differs by $delay seconds (max. is $maxDelta).";
@@ -1191,13 +1206,13 @@ LUXTRONIK2_synchronizeClock (@)
        $returnStr = "Internal clock of host $host has no delay. -> not synchronized";
     } else {
       my $newTime = strftime "%m%d%H%M%Y.%S", localtime();
-     Log3 $name, 5, "$name: Run command 'date ".$newTime."'";
+     LUXTRONIK2_Log $name, 5, "Run command 'date ".$newTime."'";
       @output=$telnet->cmd('date '.$newTime);
       $returnStr = "Internal clock of host $host corrected by $delay seconds. -> ".$output[0];
       readingsSingleUpdate($hash,"deviceTimeLastSync",TimeNow,1);
      }
    
-   Log3 $name, 5, "$name: Close telnet connection.";
+   LUXTRONIK2_Log $name, 5, "Close telnet connection.";
    $telnet->close;
    
    return $returnStr;
@@ -1294,7 +1309,7 @@ LUXTRONIK2_doStatisticBoilerHeatUp ($$$$$$)
   # step 0 = Initialize - if hot water preparation is off
    if ($step == 0) { 
      if ($opState != 5) { # wait till hot water preparation stopped
-        Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 0->1: Initializing Measurment";
+        LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 0->1: Initializing Measurment";
         $step = 1;
         $lastOpHours = $currOpHours;
         $lastHQ = $currHQ;
@@ -1304,14 +1319,14 @@ LUXTRONIK2_doStatisticBoilerHeatUp ($$$$$$)
   # step 1 = wait till hot water preparation starts -> monitor Tmin, take previous HQ and previous operating hours
    } elsif ($step == 1) { 
      if ($currTemp < $minTemp) { # monitor minimum temperature
-       Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 1: Monitor minimum temperature ($minTemp -> $currTemp)";
+       LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 1: Monitor minimum temperature ($minTemp -> $currTemp)";
        $minTemp = $currTemp;
      }
      if ($opState != 5) { # wait -> update operating hours and HQ to be used as start value in calculations
         $lastOpHours = $currOpHours; 
         $lastHQ = $currHQ;
      } else { # go to step 2 - if hot water preparation running
-         Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 1->2: Hot water preparation started ".($currOpHours-$lastOpHours)." s ago";
+         LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 1->2: Hot water preparation started ".($currOpHours-$lastOpHours)." s ago";
         $step = 2; 
         $maxTemp = $currTemp;
      }
@@ -1319,20 +1334,20 @@ LUXTRONIK2_doStatisticBoilerHeatUp ($$$$$$)
   # step 2 = wait till hot water preparation done and target reached
    } elsif ($step == 2) { 
      if ($currTemp < $minTemp) { # monitor minimal temperature
-       Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 2: Boiler temperature still decreasing ($minTemp -> $currTemp)";
+       LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 2: Boiler temperature still decreasing ($minTemp -> $currTemp)";
        $minTemp = $currTemp;
      }
      if ($currTemp > $maxTemp) { # monitor maximal temperature
-       Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 2: Boiler temperature increasing ($maxTemp -> $currTemp)";
+       LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 2: Boiler temperature increasing ($maxTemp -> $currTemp)";
        $maxTemp = $currTemp;
      }
      
      if ($opState != 5) { # wait till hot water preparation stopped
         if ($currTemp >= $target) {
-          Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 2->3: Hot water preparation stopped";
+          LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 2->3: Hot water preparation stopped";
            $step = 3; 
         } else {
-           Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 2->1: Measurement cancelled (hot water preparation stopped but target not reached, $currTemp < $target)";
+           LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 2->1: Measurement cancelled (hot water preparation stopped but target not reached, $currTemp < $target)";
            $step = 1; 
            $lastOpHours = $currOpHours; 
            $lastHQ = $currHQ;
@@ -1344,15 +1359,15 @@ LUXTRONIK2_doStatisticBoilerHeatUp ($$$$$$)
    } elsif ($step == 3) { 
      # cancel measurement - if hot water preparation has restarted
       if ($opState == 5) { 
-         Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 3->0: Measurement cancelled (hot water preparation restarted before maximum reached)";
+         LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 3->0: Measurement cancelled (hot water preparation restarted before maximum reached)";
         $step = 0; 
     # monitor maximal temperature
        } elsif ($currTemp > $maxTemp) { 
-        Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 3: Temperature still increasing ($maxTemp -> $currTemp)";
+        LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 3: Temperature still increasing ($maxTemp -> $currTemp)";
         $maxTemp = $currTemp;
     # else calculate temperature gradient 
       } else {
-        Log3 $name, 4, "$name: Statistic Boiler Heat-Up step 3->1: Boiler heat-up measurement finished";
+        LUXTRONIK2_Log $name, 4, "Statistic Boiler Heat-Up step 3->1: Boiler heat-up measurement finished";
         $value1 =  ( int(10 * $maxTemp) - int(10 * $minTemp) ) / 10; # delta hot water temperature
         $value2 = ( $currOpHours - $lastOpHours ) / 60; # delta time (minutes)
         $value3 = $currHQ - $lastHQ; # delta heat quantity, average thermal power
@@ -1403,9 +1418,9 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
   # step 0 = Initialize - if hot water preparation is off and target reached, 
    if ($step == 0) { 
      if ($opState == 5 || $currTemp < $target) { # -> stay step 0
-        # Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 0: Wait till hot water preparation stops and target is reached ($currTemp < $target)";
+        # LUXTRONIK2_Log $name, 4, "Statistic Boiler Cool-Down step 0: Wait till hot water preparation stops and target is reached ($currTemp < $target)";
      } else {
-        Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 0->1: Initializing, target reached ($currTemp >= $target)";
+        LUXTRONIK2_Log $name, 4, "Statistic Boiler Cool-Down step 0->1: Initializing, target reached ($currTemp >= $target)";
         $step = 1; 
         $startTime = $time; 
         $maxTemp = $currTemp;
@@ -1413,17 +1428,17 @@ LUXTRONIK2_doStatisticBoilerCoolDown ($$$$$$)
   # step 1 = wait till threshold is reached -> do calculation, monitor maximal temperature
    } elsif ($step == 1) { 
       if ($currTemp > $maxTemp) { # monitor maximal temperature
-         Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 1: Temperature still increasing ($currTemp > $maxTemp)";
+         LUXTRONIK2_Log $name, 4, "Statistic Boiler Cool-Down step 1: Temperature still increasing ($currTemp > $maxTemp)";
          $maxTemp = $currTemp;
          $startTime = $time; 
       }
       if ($opState == 5 || $currTemp <= $threshold) {
          if ($opState == 5) {
-            Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 1->0: Heat-up started, measurement finished";
+            LUXTRONIK2_Log $name, 4, "Statistic Boiler Cool-Down step 1->0: Heat-up started, measurement finished";
             $value1 =  $lastTemp - $maxTemp; # delta hot water temperature
             $value2 = ( $lastTime - $startTime ) / 3600; # delta time (hours)
          } elsif ($currTemp <= $threshold) {
-            Log3 $name, 4, "$name: Statistic Boiler Cool-Down step 1->0: Measurement finished, threshold reached ($currTemp <= $threshold)";
+            LUXTRONIK2_Log $name, 4, "Statistic Boiler Cool-Down step 1->0: Measurement finished, threshold reached ($currTemp <= $threshold)";
             $value1 =  $currTemp - $maxTemp; # delta hot water temperature
             $value2 = ( $time - $startTime ) / 3600; # delta time (hours)
          }
