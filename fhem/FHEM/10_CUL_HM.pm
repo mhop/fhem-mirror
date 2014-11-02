@@ -874,6 +874,7 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
                           ,"HM-SEC-WDS-2"    =>{"00"=>"dry"     ,"64"=>"damp"    ,"C8"=>"wet"        }
                           ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
                           ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
+                          ,"HM-MOD-Em-8"     =>{"00"=>"closed"                   ,"C8"=>"open"}
                          }
                   ,mdCh=>{ "HM-Sen-RD-O01"   =>{"00"=>"dry"                      ,"C8"=>"rain"}
                           ,"HM-Sen-RD-O02"   =>{"00"=>"off"                      ,"C8"=>"on"}
