@@ -17,7 +17,7 @@ use constant TAGS => qw{ul li code b};
 
 my $log = `$svnlook log $arg $repos`;
 if($log !~ m/^.*:.*$/s) {
-  print << 'EOF';
+  print STDERR << 'EOF';
 A FHEM SVN comment must have the following format
   module: text-describing-the-change
 or
@@ -89,6 +89,6 @@ sub
 err($$)
 {
   my ($fName, $txt) = @_;
-  print "*** $fName: $txt\n";
+  print STDERR "*** $fName: $txt\n";
   $exitCode = 1;
 }
