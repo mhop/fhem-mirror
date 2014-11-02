@@ -1736,7 +1736,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
-<ul style="width:800px">
+<ul>
   Luxtronik 2.0 is a heating controller used in <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, Siemens Novelan (WPR NET) and Wolf Heiztechnik (BWL/BWS) heat pumps.
   <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
@@ -1854,7 +1854,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
-<ul style="width:800px">
+<ul>
   Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, 
   Siemens Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist.
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
