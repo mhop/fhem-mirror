@@ -1,10 +1,31 @@
-# $Id: $
 ####################################################################################################
+# $Id: $
 #
-#	23_PROPLANTA.pm
+#  59_PROPLANTA.pm
+#
+#  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
 #  
 #  Weather forecast values for next 4 days are captured from http://www.proplanta.de/Wetter/<city>-Wetter.html
 #  inspired by 23_KOSTALPIKO.pm
+#
+#  Copyright notice
+#
+#  This script is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the text file GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  This copyright notice MUST APPEAR in all copies of the script!
 #
 ####################################################################################################
 
@@ -21,28 +42,6 @@ my $curCol = 0;
 my $curTextPos = 0;
 my $curReadingType = 0;
 
-   my %url_start =( "de" => "http://www.proplanta.de/Wetter/"
-   , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/"
-   , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/"
-   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/"
-   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/"
-   );
-   my %url_end = ( "de" => "-Wetter.html"
-   , "at" => "/"
-   , "ch" => "/"
-   , "fr" => "/"
-   , "it" => "/"
-   );
-
-  my %intensity = ( "keine" => 0
-     ,"nein" => 0
-     ,"gering" => 1
-     ,"leicht" => 1
-     ,"ja" => 1
-     ,"m&auml;&szlig;ig" => 2
-     ,"stark" => 3
-  );
-  
   # 1 = Span Text, 2 = readingName, 3 = Tag-Type
   # Tag-Types: 
   #   1 = Number Col 3
@@ -51,6 +50,7 @@ my $curReadingType = 0;
   #   4 = Intensity-Text Col 2-5
   #   5 = Time Col 2-5
   #   6 = Time Col 3
+  #   7 = Image Col 2-5
   my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
       ,["relative Feuchte", "humidity", 1]
       ,["Sichtweite", "visibility", 1]
@@ -61,16 +61,21 @@ my $curReadingType = 0;
   );
 
   # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type (see above)
-  my @knownIDs = ( ["GS", "rad", 3] 
-      ,["UV", "uv", 2]
-      ,["SD", "sun", 2]
-      ,["TMAX", "tempMaxC", 2]
+  my @knownIDs = (  
+      ["TMAX", "tempMaxC", 2]
       ,["TMIN", "tempMinC", 2]
+      ,["NW", "chOfRainDay", 2]
+      ,["NW_Nacht", "chOfRainNight", 2]
+      ,["BF", "frost", 4]
       ,["VERDUNST", "evapor", 4]
       ,["TAUBILDUNG", "dew", 4]
-      ,["BF", "frost", 4]
-      ,["MA", "moonRise", 5]
-      ,["MU", "moonSet", 5]
+      ,["SD", "sun", 2]
+      ,["UV", "uv", 2]
+      ,["GS", "rad", 3]
+      ,["WETTER_ID_MORGENS", "weatherMorning", 7]
+      ,["WETTER_ID_TAGSUEBER", "weatherDay", 7]
+      ,["WETTER_ID_ABENDS", "weatherEvening", 7]
+      ,["WETTER_ID_NACHT", "weatherNight", 7]
       ,["T_0", "temp00C", 2]
       ,["T_3", "temp03C", 2]
       ,["T_6", "temp06C", 2]
@@ -87,7 +92,32 @@ my $curReadingType = 0;
       ,["BD_15", "cloud15", 2]
       ,["BD_18", "cloud18", 2]
       ,["BD_21", "cloud21", 2]
+      ,["MA", "moonRise", 5]
+      ,["MU", "moonSet", 5]
   );
+
+   my %intensity = ( "keine" => 0
+     ,"nein" => 0
+     ,"gering" => 1
+     ,"leicht" => 1
+     ,"ja" => 1
+     ,"m&auml;&szlig;ig" => 2
+     ,"stark" => 3
+  );
+  
+   my %url_start =( "de" => "http://www.proplanta.de/Wetter/"
+   , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/"
+   , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/"
+   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/"
+   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/"
+   );
+
+   my %url_end = ( "de" => "-Wetter.html"
+   , "at" => "/"
+   , "ch" => "/"
+   , "fr" => "/"
+   , "it" => "/"
+   );
 
 # here HTML::text/start/end are overridden
 sub text
@@ -151,7 +181,7 @@ sub text
    # Tag-Type 3 = Number Col 2|4|6|8
       elsif ($curReadingType == 3) 
       {
-         if ( 1 < $curCol && $curCol <= 5 )
+         if ( 2 <= $curCol && $curCol <= 5 )
          {
             if ( $curTextPos % 2 == 1 ) 
             { 
@@ -164,7 +194,7 @@ sub text
    # Tag-Type 4 = Intensity-Text Col 2-5
       elsif ($curReadingType == 4) 
       {
-         if ( 1 < $curCol && $curCol <= 5 )
+         if ( 2 <= $curCol && $curCol <= 5 )
          {
             $readingName = "fc".($curCol-2)."_".$curReadingName;
             $text = $intensity{$text} if defined $intensity{$text};
@@ -225,11 +255,30 @@ sub start
             }
          }
       }
-   };
-  if ($tagname eq "td") {
+   }
+   elsif ($tagname eq "td") 
+   {
       $curCol++;
       $curTextPos = 0;
-   };
+   }
+   #wetterstate and icon
+   elsif ($tagname eq "img" && $curReadingType == 7) 
+   {
+      if ( 2 <= $curCol && $curCol <= 5 )
+      {
+       # Alternative text
+         $readingName = "fc".($curCol-2)."_".$curReadingName;
+         $text = $attr->{alt};
+         $text =~ s/Wetterzustand: //;
+         $text =~ s/ö/oe/;
+         $text =~ s/ä/ae/;
+         $text =~ s/ü/ue/;
+         $text =~ s/ß/ss/;
+         push( @texte, $readingName . "|" . $text ); 
+       # Image URL
+         push( @texte, $readingName."Icon" . "|" . $attr->{src} ); 
+      }
+   }
 }
 
 sub end
@@ -257,7 +306,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
-my $PROPLANTA_VERSION = "1.01";
+my $modulVersion = "1.01";
 
 
 ########################################
@@ -304,6 +353,7 @@ sub PROPLANTA_Define($$)
    $hash->{STATE}          = "Initializing";
    $hash->{LOCAL}          = 0;
    $hash->{INTERVAL}       = 3600;
+   $hash->{fhem}{modulVersion} = $modulVersion;
    
    RemoveInternalTimer($hash);
    
@@ -502,7 +552,7 @@ sub PROPLANTA_Aborted($)
 
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
-<ul style="width:800px">
+<ul>
   The module extracts certain weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
   <br>
    <i>Required perl moduls: HTTP::Request and LWP::UserAgent</i>
@@ -520,7 +570,7 @@ sub PROPLANTA_Aborted($)
       <br>
       City must be selectable on www.proplanta.de. Pay attention to the <b>Capital</b> letters in the city names.
     </li><br>
-    <li><code>[CountryCode]<code> <i>(optional)</i>
+    <li><code>[CountryCode]</code> <i>(optional)</i>
       <br>
       Possible values: de (default), at, ch, fr, it 
     </li><br>
@@ -530,17 +580,16 @@ sub PROPLANTA_Aborted($)
   <a name="PROPLANTAset"></a>
   <b>Set</b>
   <ul>
-     <br/>
-     <code>set &lt;name&gt; update</code>
-   	 <br/>
-   	 <ul>
-          The weather data are immediately polled from the website.
-     </ul><br/>
+     <br>
+     <li><code>set &lt;name&gt; update</code>
+      <br>
+      The weather data are immediately polled from the website.
+     </li><br>
   </ul>  
   
     <a name="PROPLANTAattr"></a>
-	<b>Attributes</b><br/><br/>
-	<ul>
+   <b>Attributes</b><br/><br/>
+   <ul>
       <li><code>Interval</code>
       <br>
       poll interval for weather data in seconds (default 3600 = 1 hour)
@@ -549,13 +598,15 @@ sub PROPLANTA_Aborted($)
       <br>
       URL to extract information from. Overwrites the values in the 'define' term.
       </li><br>
-		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-	</ul>
-	<br/><br/>
-	
-    <a name="PROPLANTAreading"></a>
-   <b>Forecast readings</b><br/><br/>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+   </ul>
+   <br><br>
+
+   <a name="PROPLANTAreading"></a>
+   <b>Forecast readings</b>
    <ul>
+      <li><b>fc</b><i>0</i><b>_chOfRainDay</b><i>15</i><b>C</b> - chance of rain by day <i>today</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_chOfRainNight</b><i>15</i><b>C</b> - chance of rain by night  <i>today</i> in %</li>
       <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - cloud coverage <i>15:00</i> <i>today</i> in %</li>
       <li><b>fc</b><i>0</i><b>_dew</b> - dew formation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - evaporation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
@@ -568,10 +619,12 @@ sub PROPLANTA_Aborted($)
       <li><b>fc</b><i>0</i><b>_tempMaxC</b> - minimal temperatur <i>today</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - temperatur at <i>15:00</i> <i>today</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i> - weather situation by <i>day</i> <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation by <i>day</i> <i>today</i></li>
       <li>etc.</li>
-	</ul>
-	<br/><br/>	
-
+   </ul>
+   <br>
+   <br>
 </ul>
 
 =end html
@@ -580,21 +633,21 @@ sub PROPLANTA_Aborted($)
 
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
-<ul style="width:800px">
+<ul>
   <a name="PROPLANTAdefine"></a>
   <b>Define</b>
   <ul>
     <br>
-    <code>define &lt;Name&gt; PROPLANTA [Stadt] [Ländercode]</code>
+    <code>define &lt;Name&gt; PROPLANTA [Stadt] [L&auml;ndercode]</code>
     <br>
      Das Modul extrahiert bestimmte Wetterdaten von der website www.proplanta.de.<br/>
     <br>
     <ul>    
       <li><code>[Stadt]</code> <i>(optional)</i>
       <br>
-      Die Stadt muss auf www.proplanta.de ausw&auml;hlbar sein. Wichtig!! Auf die <b>gro&szig;en</b> Anfangsbuchstaben achten.</li>
+      Die Stadt muss auf www.proplanta.de ausw&auml;hlbar sein. Wichtig!! Auf die <b>gro&szig;en</b> Anfangsbuchstaben achten.
       </li><br>
-      <li><code>[Ländercode]</code> <i>(optional)</i>
+      <li><code>[L&auml;ndercode]</code> <i>(optional)</i>
       <br>
       M&ouml;gliche Werte: de (Standard), at, ch, fr, it
       </li><br>
@@ -605,13 +658,10 @@ sub PROPLANTA_Aborted($)
   <a name="PROPLANTAset"></a>
   <b>Set</b>
   <ul>
-     
-     <br/>
-     <code>set &lt;name&gt; update</code>
-   	 <br/>
-   	 <ul>
-          List die Wetterdaten sofort von der Webseite aus.
-     </ul><br/>
+     <li><code>set &lt;name&gt; update</code>
+     <br>
+          Liest die Wetterdaten sofort von der Webseite aus.
+     </li><br>
   </ul>  
   
     <a name="PROPLANTAattr"></a>
@@ -622,7 +672,8 @@ sub PROPLANTA_Aborted($)
       Abfrageinterval in Sekunden (Standard 3600 = 1 Stunde)
       </li><br>
       <li><code>URL &lt;Internetadresse&gt;</code>
-      <br>Internetadresse, von der die Daten ausgelesen werden (&uuml;berschreibt die Werte im 'define'-Term</li>
+      <br>
+      Internetadresse, von der die Daten ausgelesen werden (&uuml;berschreibt die Werte im 'define'-Term
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 	</ul>
@@ -631,6 +682,8 @@ sub PROPLANTA_Aborted($)
     <a name="PROPLANTAreading"></a>
 	<b>Vorhersagewerte</b><br/><br/>
    <ul>
+      <li><b>fc</b><i>0</i><b>_chOfRainDay</b><i>15</i><b>C</b> - Niederschlagsrisiko tags&uuml;ber <i>heute</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_chOfRainNight</b><i>15</i><b>C</b> - Niederschlagsrisiko nachts  <i>heute</i> in %</li>
       <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - Wolkenbedeckungsgrad <i>15:00</i> Uhr <i>heute</i> in %</li>
       <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=m&auml;&szig;ig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=m&auml;&szig;ig, 3=stark)</li>
@@ -643,10 +696,11 @@ sub PROPLANTA_Aborted($)
       <li><b>fc</b><i>0</i><b>_tempMaxC</b> - Minimaltemperatur <i>heute</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - Temperatur <i>15:00</i> Uhr <i>heute</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i> - Wetterzustand <i>tagsüber</i> <i>heute</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>tagsüber</i> <i>heute</i></li>
       <li>etc.</li>
-	</ul>
-	<br/><br/>	
-
+   </ul>
+   <br><br>
 </ul>
 
 =end html_DE
