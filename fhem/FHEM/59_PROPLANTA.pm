@@ -502,7 +502,9 @@ sub PROPLANTA_Aborted($)
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
 <ul style="width:800px">
-  The module extracts certain weather data from www.proplanta.de.
+  The module extracts certain weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
+  <br>
+   <i>Required perl moduls: HTTP::Request and LWP::UserAgent</i>
   <br>
   &nbsp;
   <br>
@@ -515,7 +517,7 @@ sub PROPLANTA_Aborted($)
     <br>&nbsp;
     <li><code>[City]</code> <i>(optional)</i>
       <br>
-      Check www.proplanta.de if your city is known. The city has to start with a <b>capital</b> letter.
+      City must be selectable on www.proplanta.de. Pay attention to the <b>Capital</b> letters in the city names.
     </li><br>
     <li><code>[CountryCode]<code> <i>(optional)</i>
       <br>
@@ -571,13 +573,19 @@ sub PROPLANTA_Aborted($)
   <b>Define</b>
   <ul>
     <br>
-    <code>define &lt;name&gt; PROPLANTA &lt;Stadt&gt;</code>
+    <code>define &lt;name&gt; PROPLANTA [Stadt] [Ländercode]</code>
     <br>
      Das Modul extrahiert bestimmte Wetterdaten von der website www.proplanta.de.<br/>
     <br>
-    <b>Parameters:</b><br>
     <ul>    
-      <li><b>&lt;Stadt&gt</b> - Prüfe auf www.proplanta.de, ob die Stadt bekannt ist. Die Stadt muss mit <b>großem</b> Anfangsbuchstaben anfangen.</li>
+      <li><code>[Stadt]</code> <i>(optional)</i>
+      <br>
+      Die Stadt muss auf www.proplanta.de ausw&auml;hlbar sein. Wichtig!! Auf die <b>gro&szig;en</b> Anfangsbuchstaben achten.</li>
+      </li><br>
+      <li><code>[Ländercode]</code> <i>(optional)</i>
+      <br>
+      M&ouml;gliche Werte: de (Standard), at, ch, fr, it
+      </li><br>
     </ul>
   </ul>
   <br>
