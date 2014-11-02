@@ -84,6 +84,22 @@ my $curReadingType = 0;
       ,["T_15", "temp15C", 2]
       ,["T_18", "temp18C", 2]
       ,["T_21", "temp21C", 2]
+      ,["NW_0", "chOfRain00", 2]
+      ,["NW_3", "chOfRain03", 2]
+      ,["NW_6", "chOfRain06", 2]
+      ,["NW_9", "chOfRain09", 2]
+      ,["NW_12", "chOfRain12", 2]
+      ,["NW_15", "chOfRain15", 2]
+      ,["NW_18", "chOfRain18", 2]
+      ,["NW_21", "chOfRain21", 2]
+      ,["NS_0", "rain00", 2]
+      ,["NS_3", "rain03", 2]
+      ,["NS_6", "rain06", 2]
+      ,["NS_9", "rain09", 2]
+      ,["NS_12", "rain12", 2]
+      ,["NS_15", "rain15", 2]
+      ,["NS_18", "rain18", 2]
+      ,["NS_21", "rain21", 2]
       ,["BD_0", "cloud00", 2]
       ,["BD_3", "cloud03", 2]
       ,["BD_6", "cloud06", 2]
@@ -611,21 +627,22 @@ sub PROPLANTA_Aborted($)
    <a name="PROPLANTAreading"></a>
    <b>Forecast readings</b>
    <ul>
-      <li><b>fc</b><i>0</i><b>_chOfRainDay</b><i>15</i><b>C</b> - chance of rain by day <i>today</i> in %</li>
-      <li><b>fc</b><i>0</i><b>_chOfRainNight</b><i>15</i><b>C</b> - chance of rain by night  <i>today</i> in %</li>
-      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - cloud coverage <i>15:00</i> <i>today</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day</i> - chance of rain <i>today</i> by <i>day</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>15</i> - chance of rain <i>today</i> at <i>15:00</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - cloud coverage <i>today</i> at <i>15:00</i> in %</li>
       <li><b>fc</b><i>0</i><b>_dew</b> - dew formation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - evaporation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
       <li><b>fc</b><i>0</i><b>_frost</b> - ground frost <i>today</i> (0=no, 1=yes)</li>
       <li><b>fc</b><i>0</i><b>_moonRise</b> - moon rise <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_moonSet</b> - moon set <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - global radiation <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - amount of rainfall <i>today</i> at <i>15:00</i> in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative sun shine duration <i>today</i> in % (between sun rise and set)</li>
       <li><b>fc</b><i>0</i><b>_tempMaxC</b> - maximal temperature <i>today</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_tempMaxC</b> - minimal temperatur <i>today</i> in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - temperatur at <i>15:00</i> <i>today</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - temperatur <i>today</i> at <i>15:00</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
-      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i> - weather situation by <i>day</i> <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i> - weather situation <i>today</i> by <i>day</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation by <i>day</i> <i>today</i></li>
       <li>etc.</li>
    </ul>
@@ -696,22 +713,23 @@ sub PROPLANTA_Aborted($)
     <a name="PROPLANTAreading"></a>
 	<b>Vorhersagewerte</b><br/><br/>
    <ul>
-      <li><b>fc</b><i>0</i><b>_chOfRainDay</b><i>15</i><b>C</b> - Niederschlagsrisiko tags&uuml;ber <i>heute</i> in %</li>
-      <li><b>fc</b><i>0</i><b>_chOfRainNight</b><i>15</i><b>C</b> - Niederschlagsrisiko nachts  <i>heute</i> in %</li>
-      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - Wolkenbedeckungsgrad <i>15:00</i> Uhr <i>heute</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day</i> - Niederschlagsrisiko <i>heute tags&uuml;ber</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>15</i> - Niederschlagsrisiko <i>heute</i> um <i>15</i>:00 Uhr in %</li>
+      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - Wolkenbedeckungsgrad <i>heute</i> um <i>15</i>:00 Uhr in %</li>
       <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=m&auml;&szig;ig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=m&auml;&szig;ig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_frost</b> - Bodenfrost <i>heute</i> (0=nein, 1=ja)</li>
       <li><b>fc</b><i>0</i><b>_moonRise</b> - Mondaufgang <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_moonSet</b> - Monduntergang <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - Globalstrahlung <i>heute</i></li>
+      <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - Niederschlagsmenge <i>heute</i> um <i>15</i>:00 Uhr in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative Sonnenscheindauer <i>heute</i> in % (zwischen Sonnenauf- und -untergang)</li>
       <li><b>fc</b><i>0</i><b>_tempMaxC</b> - Maximaltemperatur <i>heute</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_tempMaxC</b> - Minimaltemperatur <i>heute</i> in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - Temperatur <i>15:00</i> Uhr <i>heute</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - Temperatur <i>heute</i> um <i>15</i>:00 Uhr in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
-      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i> - Wetterzustand <i>tagsüber</i> <i>heute</i></li>
-      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>tagsüber</i> <i>heute</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i> - Wetterzustand <i>heute tags&uuml;ber</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tags&uuml;ber</i></li>
       <li>etc.</li>
    </ul>
    <br><br>
