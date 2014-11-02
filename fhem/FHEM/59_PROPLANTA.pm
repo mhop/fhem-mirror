@@ -552,6 +552,7 @@ sub PROPLANTA_Aborted($)
 
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
+<div  style="width:800px"> 
 <ul>
   The module extracts certain weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
   <br>
@@ -626,6 +627,7 @@ sub PROPLANTA_Aborted($)
    <br>
    <br>
 </ul>
+</div>
 
 =end html
 
