@@ -3,11 +3,11 @@
 #
 #  98_statistic.pm
 #
-#  Copyright notice
-#
 #  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
 #
 #  This module computes statistic data of and for readings of other modules
+#
+#  Copyright notice
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -66,6 +66,7 @@ sub statistics_UpdateDevReading($$$$);
    ,["energy", 2] 
    ,["energy_current", 1, 1] 
    ,["energy_total", 2] 
+   ,["Total.Energy", 2] 
    ,["humidity", 1, 0]
    ,["lightsensor", 3] 
    ,["lock", 3] 
@@ -97,7 +98,7 @@ statistics_Log($$$)
    $sub =~ s/statistics_//;
 
    my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
-   Log3 $hash, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
+   Log3 $instName, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
 }
 
 sub ##########################################
@@ -146,6 +147,7 @@ statistics_Define($$)
   $hash->{DEV_REGEXP} = $devName;
 
   $hash->{STATE} = "Waiting for notifications";
+  $hash->{fhem}{modulVersion} = $modulVersion;
 
   RemoveInternalTimer($hash);
   
