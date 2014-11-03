@@ -294,9 +294,16 @@ harmony_Set($$@)
     }
   }
 
-  if( $cmd eq 'off' ) {
-    $cmd = "activity";
-    $param = "PowerOff";
+  if( $cmd ne "?" && !$param ) {
+    if( $cmd eq 'off' ) {
+      $cmd = "activity";
+      $param = "PowerOff";
+    } elsif( my $activity = harmony_activityOfId($hash, $hash->{currentActivityID}) ) {
+      if( harmony_actionOfCommand( $activity, $cmd ) ) {
+        $param = $cmd;
+        $cmd = "command";
+      }
+    }
   }
 
   if( $cmd eq 'activity' ) {
@@ -353,12 +360,12 @@ harmony_Set($$@)
 
     return undef;
   } elsif( $cmd eq "getCurrentActivity" ) {
-    harmony_sendEngineGet($hash, "getCurrentActivity", "");
+    harmony_sendEngineGet($hash, "getCurrentActivity");
 
     return undef;
 
   } elsif( $cmd eq "getConfig" ) {
-    harmony_sendEngineGet($hash, "config", "");
+    harmony_sendEngineGet($hash, "config");
 
     return undef;
 
@@ -461,6 +468,16 @@ harmony_Set($$@)
 
   } elsif( $cmd eq "sync" ) {
     harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='setup.sync' token=''/>");
+
+    return undef;
+
+  } elsif( $cmd eq "xxx" ) {
+    #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation?notify' token=''></oa>");
+    #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation?getState' token=''></oa>");
+    #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation.state?notify' token=''></oa>");
+    #harmony_sendIq($hash, "<query xmlns='jabber:iq:roster'/>");
+    #harmony_sendIq($hash, "<query xmlns='http://jabber.org/protocol/disco#info'/>");
+    #harmony_sendIq($hash, "<query xmlns='http://jabber.org/protocol/disco#items'/>");
 
     return undef;
 
@@ -794,12 +811,14 @@ harmony_Read($)
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.deviceinfo?get' token=''></oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.setup/vnd.logitech.account?getProvisionInfo' token=''></oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.statedigest?get' token=''>format=json</oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='nd.logtech.setup/vnd.logitech.firmware?check' token=''>format=json</oa>");
+        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?check' token=''>format=json</oa>");
+        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?status' token=''>format=json</oa>");
+        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?update' token=''>format=json</oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='proxy.resource?get' token=''>hetag= :uri=dynamite:://HomeAutomationService/Config/:encode=true</oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation?getstate' token=''></oa>");
 
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.pair'>name=1vm7ATw/tN6HXGpQcCs/A5MkuvI#iOS6.0.1#iPhone</oa>");
-        harmony_sendEngineGet($hash, "config", "");
+        harmony_sendEngineGet($hash, "config");
 
         RemoveInternalTimer($hash);
         InternalTimer(gettimeofday()+50, "harmony_ping", $hash, 0);
@@ -852,7 +871,7 @@ harmony_Read($)
 
           if( $decoded ) {
             if( defined($decoded->{syncStatus}) ) {
-              harmony_sendEngineGet($hash, "config", "") if( $hash->{syncStatus} && !$decoded->{syncStatus} );
+              harmony_sendEngineGet($hash, "config") if( $hash->{syncStatus} && !$decoded->{syncStatus} );
 
               $hash->{syncStatus} = $decoded->{syncStatus};
             }
@@ -898,7 +917,7 @@ harmony_Read($)
               harmony_connect($hash);
 
             } else {
-              harmony_sendEngineGet($hash, "config", "");
+              harmony_sendEngineGet($hash, "config");
 
             }
 
@@ -929,7 +948,7 @@ harmony_Read($)
 
             $hash->{current_fw_version} = $decoded->{current_fw_version} if( defined($decoded->{current_fw_version}) );
 
-            harmony_sendEngineGet($hash, "config", "");
+            harmony_sendEngineGet($hash, "config");
 
           } elsif( $content =~ m/engine\?changeChannel/ && $decoded ) {
 
@@ -955,7 +974,7 @@ harmony_Read($)
             #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='proxy.resource?get' token=''>hetag= :uri=content:://1.0/user;$hash->{config}->{content}->{householdUserProfileUri}:encode=true</oa>");
 
             harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.statedigest?get' token=''>format=json</oa>");
-            #harmony_sendEngineGet($hash, "getCurrentActivity", "");
+            #harmony_sendEngineGet($hash, "getCurrentActivity");
 
           } elsif( $cdata =~ m/result=(.*)/ ) {
             my $result = $1;
@@ -1108,9 +1127,10 @@ harmony_sendIq($$;$)
   harmony_send($hash,$iq);
 }
 sub
-harmony_sendEngineGet($$$)
+harmony_sendEngineGet($$;$)
 {
   my ($hash, $endpoint, $payload) = @_;
+  $payload = '' if ( !$payload );
 
   my $xml = "<oa xmlns='connect.logitech.com' mime='vnd.logitech.harmony/vnd.logitech.harmony.engine?$endpoint'>$payload</oa>";
 
