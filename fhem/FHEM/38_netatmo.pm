@@ -928,7 +928,7 @@ netatmo_Get($$@)
       my $station;
       $station = shift @args if( $args[0] && $args[0] =~ m/[\da-f]{2}(:[\da-f]{2}){5}/ );
 
-      if( $args[0] && ( $args[0] =~ m/\d{5}/
+      if( $args[0] && ( $args[0] =~ m/^\d{5}$/
                         || $args[0] =~ m/^a:/ ) ) {
         my $addr = shift @args;
         $addr = substr($addr,2) if( $addr =~ m/^a:/ );
