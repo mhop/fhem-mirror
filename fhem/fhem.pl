@@ -3653,12 +3653,13 @@ readingsBulkUpdate($$$@)
     my $threshold_reached = 1;
     if( $eocr
         && $eocrv[0] =~ m/.*:(.*)/ ) {
+      my $threshold = $1;
 
       $value =~ s/[^\d\.\-]//g; # We expect only numbers here.
       my $last_value = $hash->{".attreocr-threshold$reading"};
       if( !defined($last_value) ) {
         $hash->{".attreocr-threshold$reading"} = $value;
-      } elsif( abs($value-$last_value) < $1 ) {
+      } elsif( abs($value-$last_value) < $threshold ) {
         $threshold_reached = 0;
       } else {
         $hash->{".attreocr-threshold$reading"} = $value;
