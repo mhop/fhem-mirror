@@ -570,9 +570,9 @@ sub PROPLANTA_Aborted($)
 <h3>PROPLANTA</h3>
 <div  style="width:800px"> 
 <ul>
-  The module extracts certain weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
+  The module extracts weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
   <br>
-   <i>Required perl moduls: HTTP::Request and LWP::UserAgent</i>
+   It requires the perl moduls HTTP::Request and LWP::UserAgent.
   <br>
   &nbsp;
   <br>
@@ -581,15 +581,17 @@ sub PROPLANTA_Aborted($)
   <ul>
     <code>define &lt;name&gt; PROPLANTA [City] [CountryCode]</code>
     <br>
-    Example: <code>define wetter PROPLANTA Bern ch</code>
-             <code>define wetter PROPLANTA Wittingen+(Niedersachsen)</code>
+    Example:
+    <br>
+    <code>define wetter PROPLANTA Bern ch</code>
+    <br>
+    <code>define wetter PROPLANTA Wittingen+(Niedersachsen)</code>
     <br>&nbsp;
     <li><code>[City]</code> <i>(optional)</i>
       <br>
-      City must be selectable on www.proplanta.de.
+      The city must be selectable on <a href="http://www.proplanta.de">www.proplanta.de</a>.
       <br>
-      Pay attention to the <b>Capital</b> letters in the city names.
-      <br>
+      Please pay attention to the <b>Capital</b> letters in the city names.
       Spaces within the name are replaced by a + (plus).
     </li><br>
     <li><code>[CountryCode]</code> <i>(optional)</i>
@@ -599,54 +601,55 @@ sub PROPLANTA_Aborted($)
   </ul>
   <br>
   
-  <a name="PROPLANTAset"></a>
-  <b>Set</b>
-  <ul>
-     <br>
-     <li><code>set &lt;name&gt; update</code>
+   <a name="PROPLANTAset"></a>
+   <b>Set</b>
+   <br>
+   <ul>
+      <li><code>set &lt;name&gt; update</code>
       <br>
       The weather data are immediately polled from the website.
-     </li><br>
-  </ul>  
-  
-    <a name="PROPLANTAattr"></a>
-   <b>Attributes</b><br/><br/>
-   <ul>
-      <li><code>Interval</code>
-      <br>
-      poll interval for weather data in seconds (default 3600 = 1 hour)
       </li><br>
-      <li><code>URL</code>
+   </ul>  
+   <br>
+  
+   <a name="PROPLANTAattr"></a>
+   <b>Attributes</b>
+   <br>
+   <ul>
+      <li><code>Interval &lt;seconds&gt;</code>
+      <br>
+      Poll interval for weather data in seconds (default 3600 = 1 hour)
+      </li><br>
+      <li><code>URL &lt;internet address&gt;</code>
       <br>
       URL to extract information from. Overwrites the values in the 'define' term.
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
-   <br><br>
+   <br>
 
    <a name="PROPLANTAreading"></a>
    <b>Forecast readings</b>
+   <br>
    <ul>
-      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day</i> - chance of rain <i>today</i> by <i>day</i> in %</li>
+      <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2|3 days</i></li>
+      <li><b>fc</b><i>0|1|2|3</i><b>_chOfRain</b><i>Day|Night</i> - chance of rain <i>today|tommorrow|in 2|3 days</i> by <i>day|night</i> in %</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>15</i> - chance of rain <i>today</i> at <i>15:00</i> in %</li>
-      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - cloud coverage <i>today</i> at <i>15:00</i> in %</li>
+      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i> - cloud coverage <i>today</i> at <i>15:00</i> in %</li>
       <li><b>fc</b><i>0</i><b>_dew</b> - dew formation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - evaporation <i>today</i> (0=none, 1=small, 2=medium, 3=strong)</li>
       <li><b>fc</b><i>0</i><b>_frost</b> - ground frost <i>today</i> (0=no, 1=yes)</li>
-      <li><b>fc</b><i>0</i><b>_moonRise</b> - moon rise <i>today</i></li>
-      <li><b>fc</b><i>0</i><b>_moonSet</b> - moon set <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_moon</b><i>Rise|Set</i> - moon <i>rise|set today</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - global radiation <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - amount of rainfall <i>today</i> at <i>15:00</i> in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative sun shine duration <i>today</i> in % (between sun rise and set)</li>
-      <li><b>fc</b><i>0</i><b>_tempMaxC</b> - maximal temperature <i>today</i> in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_tempMaxC</b> - minimal temperatur <i>today</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp<i>Min|Max</i>C</b> - <i>minimal|maximal</i> temperature <i>today</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - temperatur <i>today</i> at <i>15:00</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
-      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i> - weather situation <i>today</i> by <i>day</i></li>
-      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation by <i>day</i> <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - weather situation <i>today morning|during day|in the evening|during night</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation <i>today</i> by <i>day</i></li>
       <li>etc.</li>
    </ul>
-   <br>
    <br>
 </ul>
 </div>
@@ -659,76 +662,81 @@ sub PROPLANTA_Aborted($)
 <h3>PROPLANTA</h3>
 <div  style="width:800px"> 
 <ul>
-  Das Modul extrahiert  Wetterdaten von der website www.proplanta.de.<br/>
-  <a name="PROPLANTAdefine"></a>
-  <b>Define</b>
-  <ul>
-    <br>
-    <code>define &lt;Name&gt; PROPLANTA [Stadt] [L&auml;ndercode]</code>
-    <br>
-    Beispiel: <code>define wetter PROPLANTA Bern ch</code>
-              <code>define wetter PROPLANTA Wittingen+(Niedersachsen)</code>
-    <br>&nbsp;
-    <ul>    
+   <a name="PROPLANTAdefine"></a>
+   Das Modul extrahiert  Wetterdaten von der website <a href="http://www.proplanta.de">www.proplanta.de</a>.<br/>
+   <br>
+   Es benötigt die Perlmodule HTTP::Request und LWP::UserAgent.
+   <br>
+   &nbsp;
+   <br>
+   <b>Define</b>
+   <ul>
+      <code>define &lt;Name&gt; PROPLANTA [Stadt] [L&auml;ndercode]</code>
+      <br>
+      Beispiel:
+      <br>
+      <code>define wetter PROPLANTA Bern ch</code>
+      <br>
+      <code>define wetter PROPLANTA Wittingen+(Niedersachsen)</code>
+      <br>&nbsp;
       <li><code>[Stadt]</code> <i>(optional)</i>
-      <br>
-      Die Stadt muss auf www.proplanta.de ausw&auml;hlbar sein. 
-      <br>
-      Wichtig!! Auf die <b>gro&szig;en</b> Anfangsbuchstaben achten.
-      <br>
-      Leerzeichen im Stadtnamen werden durch ein + (Plus) ersetzt.
+         <br>
+         Die Stadt muss auf <a href="http://www.proplanta.de">www.proplanta.de</a> ausw&auml;hlbar sein. 
+         <br>
+         Wichtig!! Auf die <b>gro&szlig;en</b> Anfangsbuchstaben achten.
+         Leerzeichen im Stadtnamen werden durch ein + (Plus) ersetzt.
       </li><br>
       <li><code>[L&auml;ndercode]</code> <i>(optional)</i>
-      <br>
-      M&ouml;gliche Werte: de (Standard), at, ch, fr, it
+         <br>
+         M&ouml;gliche Werte: de (Standard), at, ch, fr, it
       </li><br>
-    </ul>
-  </ul>
-  <br>
+   </ul>
+   <br>
   
-  <a name="PROPLANTAset"></a>
-  <b>Set</b>
-  <ul>
-     <li><code>set &lt;name&gt; update</code>
-     <br>
-     Startet ein erneutes Auslesen der Wetterdaten.
-     </li><br>
-  </ul>  
+   <a name="PROPLANTAset"></a>
+   <b>Set</b>
+   <ul>
+      <li><code>set &lt;name&gt; update</code>
+         <br>
+         Startet sofort ein neues Auslesen der Wetterdaten.
+      </li><br>
+   </ul>  
   
-    <a name="PROPLANTAattr"></a>
-	<b>Attribute</b><br/><br/>
-	<ul>
+   <a name="PROPLANTAattr"></a>
+   <b>Attribute</b>
+   <ul>
       <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
-      <br>
-      Abfrageinterval in Sekunden (Standard 3600 = 1 Stunde)
+         <br>
+         Abfrageinterval in Sekunden (Standard 3600 = 1 Stunde)
       </li><br>
       <li><code>URL &lt;Internetadresse&gt;</code>
-      <br>
-      Internetadresse, von der die Daten ausgelesen werden (&uuml;berschreibt die Werte im 'define'-Term
+         <br>
+         Internetadresse, von der die Daten ausgelesen werden (&uuml;berschreibt die Werte im 'define'-Term
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-	</ul>
-	<br/><br/>
-	
-    <a name="PROPLANTAreading"></a>
-	<b>Vorhersagewerte</b><br/><br/>
+   </ul>
+   <br><br>
+
+
+   <a name="PROPLANTAreading"></a>
+   <b>Vorhersagewerte</b>
    <ul>
-      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day</i> - Niederschlagsrisiko <i>heute tags&uuml;ber</i> in %</li>
-      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>15</i> - Niederschlagsrisiko <i>heute</i> um <i>15</i>:00 Uhr in %</li>
-      <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i><b>C</b> - Wolkenbedeckungsgrad <i>heute</i> um <i>15</i>:00 Uhr in %</li>
-      <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=m&auml;&szig;ig, 3=stark)</li>
-      <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=m&auml;&szig;ig, 3=stark)</li>
+      <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - Vorhersagewerte für <i>heute|morgen|&uuml;bermorgen|in 3 Tagen</i></li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - Niederschlagsrisiko <i>heute tags&uuml;ber|nachts</i> in %</li>
+      <li><b>fc</b><i>1</i><b>_chOfRain</b><i>15</i> - Niederschlagsrisiko <i>morgen</i> um <i>15</i>:00 Uhr in %</li>
+      <li><b>fc</b><i>2</i><b>_cloud</b><i>15</i> - Wolkenbedeckungsgrad <i>&uuml;bermorgen</i> um <i>15</i>:00 Uhr in %</li>
+      <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=m&auml;&szlig;ig, 3=stark)</li>
+      <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=m&auml;&szlig;ig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_frost</b> - Bodenfrost <i>heute</i> (0=nein, 1=ja)</li>
       <li><b>fc</b><i>0</i><b>_moonRise</b> - Mondaufgang <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_moonSet</b> - Monduntergang <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - Globalstrahlung <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - Niederschlagsmenge <i>heute</i> um <i>15</i>:00 Uhr in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative Sonnenscheindauer <i>heute</i> in % (zwischen Sonnenauf- und -untergang)</li>
-      <li><b>fc</b><i>0</i><b>_tempMaxC</b> - Maximaltemperatur <i>heute</i> in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_tempMaxC</b> - Minimaltemperatur <i>heute</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i><b>C</b> - <i>Minimal|Maximal</i>temperatur <i>heute</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - Temperatur <i>heute</i> um <i>15</i>:00 Uhr in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
-      <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i> - Wetterzustand <i>heute tags&uuml;ber</i></li>
+      <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tags&uuml;ber|abends|nachts</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tags&uuml;ber</i></li>
       <li>etc.</li>
    </ul>
