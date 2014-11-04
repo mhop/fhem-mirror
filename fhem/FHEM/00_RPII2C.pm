@@ -545,6 +545,11 @@ sub RPII2C_HWACCESS_ioctl($$) {
 				<ul><code>sudo apt-get install libmoose-perl<br>
 				sudo cpan Device::SMBus</code></ul><br>
 			</li>
+			<li>
+				<b>For Raspbian users only</b><br>
+				If you are using I2C-0 at P5 connector on Raspberry Pi model B with newer raspbian versions, including support for Raspberry Pi model B+, you must add following line to <code>/boot/cmdline.txt</code>:<br>
+				<ul><code>bcm2708.vc_i2c_override=1</code></ul><br>
+			</li>
 		</ul>
 	<a name="RPII2CDefine"></a><br>
 	<b>Define</b>
@@ -662,7 +667,7 @@ sub RPII2C_HWACCESS_ioctl($$) {
 					F&uumlr das Raspberry Pi kann alternativ das gpio Utility der <a href="http://wiringpi.com/download-and-install/">WiringPi</a> Bibliothek benutzt werden um FHEM Schreibrechte auf die I2C Schnittstelle zu bekommen.<br>
 					WiringPi Installation ist hier beschrieben: <a href="#RPI_GPIO">RPI_GPIO</a><br>
 					Das gpio Utility wird, wenn vorhanden, automatisch verwendet<br>
-					Wichtig: um den I2C-0 am P5 Stecker des Raspberry nutzen zu können muss das Attribut <code>swap_i2c0</code> verwendet werden.<br>
+					Wichtig: um den I2C-0 am P5 Stecker des Raspberry nutzen zu k&ouml;nnen muss das Attribut <code>swap_i2c0</code> verwendet werden.<br>
 				</li>
 				</ul>
 			</li><br>
@@ -671,6 +676,11 @@ sub RPII2C_HWACCESS_ioctl($$) {
 				Soll der Hardwarezugriff &uuml;ber das Perl Modul Device::SMBus erfolgen sind diese Schritte notwendig:<br>
 				<ul><code>sudo apt-get install libmoose-perl<br>
 				sudo cpan Device::SMBus</code></ul><br>
+			</li>
+			<li>
+				<b>Nur f&uuml;r Raspbian Nutzer</b><br>
+				Um I2C-0 am P5 Stecker auf Raspberry Pi modell B mit neueren Raspbian Versionen zu nutzen, welche auch das Raspberry Pi model B+ unterst&uuml;tzen, muss folgende Zeile in die <code>/boot/cmdline.txt</code> eingef&uuml;gt werden:<br>
+				<ul><code>bcm2708.vc_i2c_override=1</code></ul><br>
 			</li>
 		</ul>
 	<a name="RPII2CDefine"></a><br>
