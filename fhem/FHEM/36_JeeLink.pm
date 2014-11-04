@@ -759,8 +759,8 @@ JeeLink_Parse($$$$)
 
                 my( $addr, $type, $channel, $temperature, $humidity, $batInserted ) = 0.0;
 
-                $addr = sprintf( "%02X", ((hex(substr($dmsg,3,2)) & 0x0F) << 2) | ((hex(substr($dmsg,5,2)) & 0xC0) >> 6) );
-                $type = ((hex(substr($dmsg,5,2)) & 0xF0) >> 4); # not needed by LaCrosse Module
+                $addr = (hex(substr($dmsg,3,2)) & 0x0F) << 2) | ((hex(substr($dmsg,5,2)) & 0xC0) >> 6);
+                $type = (hex(substr($dmsg,5,2)) & 0xF0) >> 4; # not needed by LaCrosse Module
                 #$channel = 1; ## $channel = (hex(substr($dmsg,5,2)) & 0x0F);
 
                 $temperature = ( ( ((hex(substr($dmsg,5,2)) & 0x0F) * 100) + (((hex(substr($dmsg,7,2)) & 0xF0) >> 4) * 10) + (hex(substr($dmsg,7,2)) & 0x0F) ) / 10) - 40;
