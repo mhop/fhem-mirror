@@ -1231,10 +1231,10 @@ harmony_autocreate($;$)
   $id = harmony_idOfDevice($hash, $id) if( $id && $id !~ m/^([\d-])+$/ );
   return "unknown device $param" if( $param && !$id );
 
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "autocreate");
-    return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
-  }
+  #foreach my $d (keys %defs) {
+  #  next if($defs{$d}{TYPE} ne "autocreate");
+  #  return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+  #}
 
   my $autocreated = 0;
   foreach my $device (@{$hash->{config}->{device}}) {
