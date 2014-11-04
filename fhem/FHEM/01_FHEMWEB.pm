@@ -633,6 +633,7 @@ FW_answerCall($)
   FW_pO '<html xmlns="http://www.w3.org/1999/xhtml">';
   FW_pO "<head root=\"$FW_ME\">\n<title>$t</title>";
   FW_pO '<link rel="shortcut icon" href="'.FW_IconURL("favicon").'" />';
+  FW_pO "<meta charset=\"$FW_encoding\">"; # Forum 28666
 
   # Enable WebApps
   if($FW_tp || $FW_ss) {
