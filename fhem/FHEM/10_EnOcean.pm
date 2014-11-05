@@ -317,7 +317,7 @@ EnOcean_Initialize($)
   $hash->{ParseFn}   = "EnOcean_Parse";
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{GetFn}     = "EnOcean_Get";
- #$hash->{NotifyFn}  = "EnOcean_Notify";
+  $hash->{NotifyFn}  = "EnOcean_Notify";
   $hash->{AttrFn}    = "EnOcean_Attr";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 " .
@@ -5308,9 +5308,15 @@ sub EnOcean_Attr(@) {
 sub EnOcean_Notify(@) {
   my ($hash, $dev) = @_;
   my $name = $hash->{NAME}; 
-  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED$/,@{$dev->{CHANGED}})){
-    Log3($name, 2, "EnOcean $name initialized");
+  my $devName = $dev->{NAME};
+  if ($devName eq "global" && grep(m/^(INITIALIZED|REREADCFG$)/, @{$dev->{CHANGED}})) {
+    if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
+      CommandDeleteReading(undef, "$name waitingCmds");
+    } 
+    return undef;
   }
+  return undef if (AttrVal($name ,"disable", 0) > 0);
+  return undef if ($devName eq $name);
   return undef;
 }
 
