@@ -143,7 +143,7 @@ harmony_detailFn()
 
   my $hubName = $hash->{discoveryinfo}->{friendlyName};
   $hubName =~ s/ /%20/;
- 
+
   return "<a href=\"http://sl.dhg.myharmony.com/mobile/2/production/?locale=de-DE&clientId=$clientId&hubIP=$hubIP&hubName=$hubName&settings\" target=\"_blank\">myHarmony config</a><br>"
 }
 
@@ -495,7 +495,15 @@ harmony_Set($$@)
 
     return undef;
 
+  } elsif( $cmd eq "update" ) {
+    harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?update' token=''>format=json</oa>");
+
+    return undef;
+
   } elsif( $cmd eq "xxx" ) {
+    #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?check' token=''>format=json</oa>");
+    #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?status' token=''>format=json</oa>");
+    #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?update' token=''>format=json</oa>");
     #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation?notify' token=''></oa>");
     #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation?getState' token=''></oa>");
     #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation.state?notify' token=''></oa>");
@@ -553,6 +561,8 @@ harmony_Set($$@)
   $list .= " channel" if( defined($hash->{currentActivityID}) && $hash->{currentActivityID} != -1 );
 
   $list .= " command getConfig:noArg getCurrentActivity:noArg off:noArg reconnect:noArg sleeptimer sync:noArg text cursor:up,down,left,right,pageUp,pageDown,home,end special:previousTrack,nextTrack,stop,playPause,volumeUp,volumeDown,mute";
+
+  $list .= " update:noArg" if( $hash->{hubUpdate} );
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -844,7 +854,7 @@ harmony_Read($)
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.pair'>name=1vm7ATw/tN6HXGpQcCs/A5MkuvI#iOS6.0.1#iPhone</oa>");
 
         harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
-        harmony_sendEngineGet($hash, "config");
+        #harmony_sendEngineGet($hash, "config");
 
         RemoveInternalTimer($hash);
         InternalTimer(gettimeofday()+50, "harmony_ping", $hash, 0);
@@ -893,7 +903,7 @@ harmony_Read($)
 
         if( ($tag eq "iq" &&  $content =~ m/statedigest\?get'/)
             || ($tag eq "message" && $content =~ m/type="connect.stateDigest\?notify"/) ) {
-          Log3 $name, 4, "$name: notify: $cdata";
+          Log3 $name, 4, "$name: statedigest: $cdata";
 
           if( $decoded ) {
             if( defined($decoded->{syncStatus}) ) {
@@ -902,10 +912,14 @@ harmony_Read($)
               $hash->{syncStatus} = $decoded->{syncStatus};
             }
 
+            if( defined($decoded->{hubUpdate}) && $decoded->{hubUpdate} eq "true" && !$hash->{hubUpdate} ) {
+              harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?check' token=''>format=json</oa>");
+            }
+
             $hash->{activityStatus} = $decoded->{activityStatus} if( defined($decoded->{activityStatus}) );
 
             $hash->{hubSwVersion} = $decoded->{hubSwVersion} if( defined($decoded->{hubSwVersion}) );
-            $hash->{hubUpdate} = $decoded->{hubUpdate} if( defined($decoded->{hubUpdate}) );
+            $hash->{hubUpdate} = ($decoded->{hubUpdate} eq 'true'?1:0) if( defined($decoded->{hubUpdate}) );
 
             my $modifier = "";
             $modifier = "starting " if( $hash->{activityStatus} == 1 );
@@ -980,6 +994,23 @@ harmony_Read($)
 
           } elsif( $content =~ m/engine\?gettimerinterval/ && $decoded ) {
             $hash->{sleeptimer} = FmtDateTime( gettimeofday() + $decoded->{interval} );
+
+          } elsif( $content =~ m/firmware\?/ && $decoded ) {
+            Log3 $name, 4, "$name: firmware: $cdata";
+
+            if( $decoded->{status} && $decoded->{newVersion} ) {
+              $hash->{newVersion} = $decoded->{newVersion};
+
+              my $txt = $decoded->{newVersion};
+              $txt .= ", isCritical: $decoded->{isCritical}";
+              $txt .= ", bytes: $decoded->{totalBytes}";
+
+              readingsSingleUpdate( $hash, "newVersion", $txt, 1 ) if( $txt ne ReadingsVal($hash->{NAME},"newVersion", "" ) );
+
+            } else {
+              delete $hash->{newVersion};
+
+            }
 
           } elsif( $content =~ m/\?config/ && $decoded ) {
             $hash->{config} = $decoded;
@@ -1623,6 +1654,8 @@ harmony_Attr($$$)
       the name of the currently selected activity.</li>
     <li>previousActivity<br>
       the name of the previous selected activity. does not trigger an event.</li>
+    <li>newVersion<br>
+      will be set if a new firmware version is avaliable.</li>
   </ul><br>
 
   <a name="harmony_Internals"></a>
@@ -1672,6 +1705,8 @@ harmony_Attr($$$)
     <li>autocreate [&lt;id&gt|&ltname&gt;]<br>
       creates a fhem device for a single/all device(s) in the harmony hub. if activities are startet the state
       of these devices will be updatet with the power state defined in these activites.</li>
+    <li>update<br>
+      triggers a firmware update. only available if a new firmware is available.</li>
   </ul>
   The command, hidDevice, text, cursor and special commmands are also available for the autocreated devices. The &lt;id&gt|&ltname&gt; paramter hast to be omitted.<br><br>
 
