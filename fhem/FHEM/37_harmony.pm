@@ -39,7 +39,9 @@ harmony_Initialize($)
   $hash->{SetFn}    = "harmony_Set";
   $hash->{GetFn}    = "harmony_Get";
   $hash->{AttrFn}   = "harmony_Attr";
-  $hash->{AttrList} = "disable:1 nossl:1 $readingFnAttributes"
+  $hash->{AttrList} = "disable:1 nossl:1 $readingFnAttributes";
+
+  $hash->{FW_detailFn}  = "harmony_detailFn";
 }
 
 #####################################
@@ -125,6 +127,28 @@ harmony_Undefine($$)
 
   return undef;
 }
+
+sub
+harmony_detailFn()
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash = $defs{$d};
+
+  return if( !defined( $hash->{discoveryinfo} ) );
+
+  my $clientId = $hash->{discoveryinfo}->{setupSessionClient};
+  $clientId =~ s/^\w*-//;
+
+  my $hubIP = $hash->{discoveryinfo}->{ip};
+
+  my $hubName = $hash->{discoveryinfo}->{friendlyName};
+  $hubName =~ s/ /%20/;
+ 
+  return "<a href=\"http://sl.dhg.myharmony.com/mobile/2/production/?locale=de-DE&clientId=$clientId&hubIP=$hubIP&hubName=$hubName&settings\" target=\"_blank\">myHarmony config</a><br>"
+}
+
+
+
 
 sub
 harmony_idOfActivity($$;$)
@@ -805,7 +829,7 @@ harmony_Read($)
       if( $line eq "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>" ) {
         $hash->{STATE} = "LoggedIn";
         $hash->{ConnectionState} = "LoggedIn";
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
+
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.ping?get' token=''></oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.harmony/vnd.logitech.harmony.system?systeminfo' token=''></oa>");
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.deviceinfo?get' token=''></oa>");
@@ -818,6 +842,8 @@ harmony_Read($)
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation?getstate' token=''></oa>");
 
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.pair'>name=1vm7ATw/tN6HXGpQcCs/A5MkuvI#iOS6.0.1#iPhone</oa>");
+
+        harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
         harmony_sendEngineGet($hash, "config");
 
         RemoveInternalTimer($hash);
