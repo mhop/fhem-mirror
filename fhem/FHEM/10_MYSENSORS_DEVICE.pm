@@ -307,7 +307,7 @@ sub Attr($$$$) {
       FIND: foreach my $id (keys %$readingMappings) {
         my $readingsForId = $readingMappings->{$id};
         foreach my $type (keys %$readingsForId) {
-          if ($readingsForId->{$type} eq $1) {
+          if ($readingsForId->{$type}->{name} // "" eq $1) {
             delete $readingsForId->{$type};
             unless (keys %$readingsForId) {
               delete $readingMappings->{$id};
@@ -317,10 +317,16 @@ sub Attr($$$$) {
         }
       }
       if ($command eq "set") {
-        my ($id,$typeStr) = split ("[, \t]",$value);
+        my ($id,$typeStr,@values) = split ("[, \t]",$value);
         my $typeMappings = $hash->{typeMappings};
         if (my @match = grep {$typeMappings->{$_}->{type} eq $typeStr} keys %$typeMappings) {
-          $hash->{readingMappings}->{$id}->{shift @match} = $1;
+          my $type = shift @match;
+          $hash->{readingMappings}->{$id}->{$type} = {
+            name => $1,
+          };
+          if (@values) {
+            $hash->{readingMappings}->{$id}->{$type}->{val} = {map {$_ =~ /^(.+):(.+)$/; $1 => $2} @values}; #TODO range?
+          }
         } else {
           return "unknown reading type $typeStr";
         }
@@ -499,9 +505,9 @@ sub rawToMappedReading($$$$) {
   my($hash, $type, $childId, $value) = @_;
 
   my $name;
-  if (defined (my $name = $hash->{readingMappings}->{$childId}->{$type})) {
-    if(defined (my $mapping = $hash->{typeMappings}->{$type})) {
-      return ($name,defined $mapping->{val}->{$value} ? $mapping->{val}->{$value} : $value);
+  if (defined (my $mapping = $hash->{readingMappings}->{$childId}->{$type})) {
+    if(defined (my $val = $mapping->{val} // $hash->{typeMappings}->{$type}->{val})) {
+      return ($mapping->{name},$val->{$value} // $value);
     }
     die "not type-mapping for type ".variableTypeToStr($type);
   }
@@ -515,8 +521,8 @@ sub mappedReadingToRaw($$$) {
   foreach my $id (keys %$readingsMapping) {
     my $readingTypesForId = $readingsMapping->{$id};
     foreach my $type (keys %$readingTypesForId) {
-      if ($readingTypesForId->{$type} eq $reading) {
-        if (my $valueMappings = $hash->{typeMappings}->{$type}->{val}) {
+      if (($readingTypesForId->{$type}->{name} // "") eq $reading) {
+        if (my $valueMappings = $readingTypesForId->{$type}->{val} // $hash->{typeMappings}->{$type}->{val}) {
           if (my @mappedValues = grep {$valueMappings->{$_} eq $value} keys %$valueMappings) {
             return ($type,$id,shift @mappedValues);
           }
@@ -580,7 +586,7 @@ sub mappedReadingToRaw($$$) {
          e.g.: <code>attr &lt;name&gt; setReading_switch_1 on,off</code></p>
     </li>
     <li>
-      <p><code>attr &lt;name&gt; mapReading_&lt;reading&gt; &lt;childId&gt; &lt;readingtype&gt;</code><br/>
+      <p><code>attr &lt;name&gt; mapReading_&lt;reading&gt; &lt;childId&gt; &lt;readingtype&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code><br/>
          configures the reading-name for a given childId and sensortype<br/>
          E.g.: <code>attr xxx mapReading_aussentemperatur 123 temperature</code></p>
     </li>
