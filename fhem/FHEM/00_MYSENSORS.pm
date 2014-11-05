@@ -201,24 +201,38 @@ sub Init($) {
   my $name = $hash->{NAME};
   $hash->{'inclusion-mode'} = AttrVal($name,"autocreate",0);
   $hash->{ack} = AttrVal($name,"requestAck",0);
-  $hash->{messages} = {};
   $hash->{outstandingAck} = 0;
+  if ($hash->{ack}) {
+    GP_ForallClients($hash,sub {
+      my $client = shift;
+      $hash->{messagesForRadioId}->{$client->{radioId}} = {
+        lastseen => -1,
+        nexttry  => -1,
+        numtries => 1,
+        messages => [],
+      };
+    });
+  }
   readingsSingleUpdate($hash,"connection","connected",1);
-  Timer($hash);
   return undef;
 }
 
 sub Timer($) {
   my $hash = shift;
-  RemoveInternalTimer($hash);
   my $now = time;
-  foreach my $msg (keys %{$hash->{messages}}) {
-    if ($now > $hash->{messages}->{$msg}) {
-      Log3 ($hash->{NAME},5,"MYSENSORS outstanding ack, re-send: ".$msg);
-      DevIo_SimpleWrite($hash,"$msg\n", undef);
+  foreach my $radioid (keys %{$hash->{messagesForRadioId}}) {
+    my $msgsForId = $hash->{messagesForRadioId}->{$radioid};
+    if ($now > $msgsForId->{nexttry}) {
+      foreach my $msg (@{$msgsForId->{messages}}) {
+        my $txt = createMsg(%$msg);
+        Log3 ($hash->{NAME},5,"MYSENSORS outstanding ack, re-send: ".dumpMsg($msg));
+        DevIo_SimpleWrite($hash,"$txt\n",undef);
+      }
+      $msgsForId->{numtries}++;
+      $msgsForId->{nexttry} = gettimeofday()+$msgsForId->{numtries};
     }
   }
-  InternalTimer(gettimeofday()+1, "MYSENSORS::Timer", $hash, 0);
+  _scheduleTimer($hash);
 }
 
 sub Read {
@@ -240,8 +254,7 @@ sub Read {
       Log3 ($name,5,"MYSENSORS Read: ".dumpMsg($msg));
 
       if ($msg->{ack}) {
-        delete $hash->{messages}->{$txt};
-        $hash->{outstandingAck} = keys %{$hash->{messages}};
+        onAcknowledge($hash,$msg);
       }
 
       my $type = $msg->{cmd};
@@ -371,6 +384,25 @@ sub onStreamMsg($$) {
   my ($hash,$msg) = @_;
 };
 
+sub onAcknowledge($$) {
+  my ($hash,$msg) = @_;
+  my $ack;
+  if (defined (my $outstanding = $hash->{messagesForRadioId}->{$msg->{radioId}}->{messages})) {
+    my @remainMsg = grep {
+         $_->{childId} != $msg->{childId}
+      or $_->{cmd}     != $msg->{cmd}
+      or $_->{subType} != $msg->{subType}
+      or $_->{payload} ne $msg->{payload}
+    } @$outstanding;
+    if ($ack = @remainMsg < @$outstanding) {
+      $hash->{outstandingAck} -= 1;
+      @$outstanding = @remainMsg;
+    }
+    $hash->{messagesForRadioId}->{$msg->{radioId}}->{numtries} = 1;
+  }
+  Log3 ($hash->{NAME},4,"MYSENSORS Read: unexpected ack ".dumpMsg($msg)) unless $ack;
+}
+
 sub sendMessage($%) {
   my ($hash,%msg) = @_;
   $msg{ack} = $hash->{ack} unless $msg{ack};
@@ -378,10 +410,40 @@ sub sendMessage($%) {
   Log3 ($hash->{NAME},5,"MYSENSORS send: ".dumpMsg(\%msg));
   DevIo_SimpleWrite($hash,"$txt\n",undef);
   if ($msg{ack}) {
-    $hash->{messages}->{$txt} = gettimeofday() + 1,
-    $hash->{outstandingAck} = keys %{$hash->{messages}};
+    my $messagesForRadioId = $hash->{messagesForRadioId}->{$msg{radioId}};
+    unless (defined $messagesForRadioId) {
+      $messagesForRadioId = {
+        lastseen => -1,
+        numtries => 1,
+        messages => [],
+      };
+      $hash->{messagesForRadioId}->{$msg{radioId}} = $messagesForRadioId;
+    }
+    my $messages = $messagesForRadioId->{messages};
+    @$messages = grep {
+         $_->{childId} != $msg{childId}
+      or $_->{cmd}     != $msg{cmd}
+      or $_->{subType} != $msg{subType}
+    } @$messages;
+    push @$messages,\%msg;
+
+    $messagesForRadioId->{nexttry} = gettimeofday()+$messagesForRadioId->{numtries};
+    _scheduleTimer($hash);
   }
 };
+
+sub _scheduleTimer($) {
+  my ($hash) = @_;
+  $hash->{outstandingAck} = 0;
+  RemoveInternalTimer($hash);
+  my $next;
+  foreach my $radioid (keys %{$hash->{messagesForRadioId}}) {
+    my $msgsForId = $hash->{messagesForRadioId}->{$radioid};
+    $hash->{outstandingAck} += @{$msgsForId->{messages}};
+    $next = $msgsForId->{nexttry} unless (defined $next and $next < $msgsForId->{nexttry});
+  };
+  InternalTimer($next, "MYSENSORS::Timer", $hash, 0) if (defined $next);
+}
 
 sub matchClient($$) {
   my ($hash,$msg) = @_;
