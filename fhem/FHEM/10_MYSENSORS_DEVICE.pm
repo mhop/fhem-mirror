@@ -437,8 +437,12 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_TIME and do {
-      sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_TIME, payload => time);
-      Log3 ($name,4,"MYSENSORS_DEVICE $name: update of time requested");
+      if ($msg->{ack}) {
+        Log3 ($name,4,"MYSENSORS_DEVICE $name: respons to time-request acknowledged");
+      } else {
+        sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_TIME, payload => time);
+        Log3 ($name,4,"MYSENSORS_DEVICE $name: update of time requested");
+      }
       last;
     };
     $type == I_VERSION and do {
@@ -458,8 +462,12 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_CONFIG and do {
-      sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
-      Log3 ($name,4,"MYSENSORS_DEVICE $name: respond to config-request");
+      if ($msg->{ack}) {
+        Log3 ($name,4,"MYSENSORS_DEVICE $name: respons to config-request acknowledged");
+      } else {
+        sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
+        Log3 ($name,4,"MYSENSORS_DEVICE $name: respond to config-request");
+      }
       last;
     };
     $type == I_PING and do {
