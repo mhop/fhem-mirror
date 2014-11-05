@@ -131,7 +131,7 @@ my %static_mappings = (
   V_DISTANCE    => { type => "distance" },
   V_IMPEDANCE   => { type => "impedance" },
   V_ARMED       => { type => "armed" },
-  V_TRIPPED     => { type => "tripped" },
+  V_TRIPPED     => { type => "tripped", val => { 0 => 'off', 1 => 'on' }},
   V_WATT        => { type => "power" },
   V_KWH         => { type => "energy" },
   V_SCENE_ON    => { type => "button_on" },
