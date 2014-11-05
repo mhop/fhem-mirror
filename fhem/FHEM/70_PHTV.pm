@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.4
+# Version: 1.2.5
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -76,7 +76,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 "
+"disable:0,1 timeout sequentialQuery:0,1 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -92,8 +92,11 @@ sub PHTV_Initialize($) {
 #####################################
 sub PHTV_GetStatus($;$) {
     my ( $hash, $update ) = @_;
-    my $name     = $hash->{NAME};
-    my $interval = $hash->{INTERVAL};
+    my $name       = $hash->{NAME};
+    my $interval   = $hash->{INTERVAL};
+    my $sequential = ( defined( $attr{$name}{sequentialQuery} )
+          && $attr{$name}{sequentialQuery} == 1 ) ? 1 : 0;
+    my $querySent = 0;
 
     Log3 $name, 5, "PHTV $name: called function PHTV_GetStatus()";
 
@@ -108,65 +111,98 @@ sub PHTV_GetStatus($;$) {
       if ( defined( $attr{$name}{disable} ) && $attr{$name}{disable} == 1 );
 
     # try to fetch only some information to check device availability
-    PHTV_SendCommand( $hash, "audio/volume" ) if ( !$update );
+    if ( !$update ) {
+        PHTV_SendCommand( $hash, "audio/volume" );
+
+       # in case we should query the device gently, mark we already sent a query
+        $querySent = 1 if $sequential;
+        $hash->{helper}{sequentialQueryCounter} = 1 if $sequential;
+    }
 
     # fetch other info if device is on
     if (
-        (
-            defined( $hash->{READINGS}{state}{VAL} )
-            && $hash->{READINGS}{state}{VAL} eq "on"
+        !$querySent
+        && (
+            (
+                defined( $hash->{READINGS}{state}{VAL} )
+                && $hash->{READINGS}{state}{VAL} eq "on"
+            )
+            || $update
         )
-        || $update
       )
     {
 
         # Read device info every 15 minutes only
-        if ( !defined( $hash->{helper}{lastFullUpdate} )
-            || ( !$update && $hash->{helper}{lastFullUpdate} + 900 le time() ) )
+        if (
+            !$querySent
+            && (
+                !defined( $hash->{helper}{lastFullUpdate} )
+                || (  !$update
+                    && $hash->{helper}{lastFullUpdate} + 900 le time() )
+            )
+          )
         {
             PHTV_SendCommand( $hash, "system" );
             PHTV_SendCommand( $hash, "ambilight/topology" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
 
             # Update state
             $hash->{helper}{lastFullUpdate} = time();
         }
 
+        # read ambilight details
+        if ( !$querySent ) {
+
+            # read ambilight mode
+            PHTV_SendCommand( $hash, "ambilight/mode" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+
+            # read ambilight RGB value
+            PHTV_SendCommand( $hash, "ambilight/cached" )
+              if ( defined( $hash->{READINGS}{ambiMode}{VAL} )
+                && $hash->{READINGS}{ambiMode}{VAL} ne "internal" );
+        }
+
         # read all sources if not existing
-        if (   !defined( $hash->{helper}{device}{sourceName} )
-            || !defined( $hash->{helper}{device}{sourceID} ) )
+        if (
+            !$querySent
+            && (   !defined( $hash->{helper}{device}{sourceName} )
+                || !defined( $hash->{helper}{device}{sourceID} ) )
+          )
         {
             PHTV_SendCommand( $hash, "sources" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
         }
 
         # otherwise read current source
-        else {
+        elsif ( !$querySent ) {
             PHTV_SendCommand( $hash, "sources/current" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
         }
 
         # read all channels if not existing
-        if (   !defined( $hash->{helper}{device}{channelName} )
-            || !defined( $hash->{helper}{device}{channelID} ) )
+        if (
+            !$querySent
+            && (   !defined( $hash->{helper}{device}{channelName} )
+                || !defined( $hash->{helper}{device}{channelID} ) )
+          )
         {
             PHTV_SendCommand( $hash, "channels" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
         }
 
         # otherwise read current channel
-        else {
+        elsif ( !$querySent ) {
             PHTV_SendCommand( $hash, "channels/current" );
+            $querySent = 1 if $sequential;
+            $hash->{helper}{sequentialQueryCounter}++ if $sequential;
         }
 
-        # read all channellists if not existing
-        if ( !defined( $hash->{helper}{device}{channellists} ) ) {
-            PHTV_SendCommand( $hash, "channellists" );
-        }
-
-        # read ambilight mode
-        PHTV_SendCommand( $hash, "ambilight/mode" );
-
-        # read ambilight RGB value
-        PHTV_SendCommand( $hash, "ambilight/cached" )
-          if ( defined( $hash->{READINGS}{ambiMode}{VAL} )
-            && $hash->{READINGS}{ambiMode}{VAL} ne "internal" );
     }
 
     # Input alias handling
@@ -279,9 +315,12 @@ sub PHTV_Set($@) {
         my $count = scalar( keys %{ $hash->{helper}{device}{channelPreset} } );
         $count = 80 if ( $count > 80 );
         while ( $i <= $count ) {
+          if ( defined($hash->{helper}{device}{channelPreset}{$i}{name}) &&
+							 $hash->{helper}{device}{channelPreset}{$i}{name} != "" ) {
             $channels .=
               $hash->{helper}{device}{channelPreset}{$i}{name} . ",";
-            $i++;
+          }
+					$i++;
         }
     }
     if (   $channel ne ""
@@ -955,7 +994,7 @@ sub PHTV_Set($@) {
         Log3 $name, 2, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( lc( $a[1] ) eq "volumeUp" ) {
+            if ( lc( $a[1] ) eq "volumeup" ) {
                 $cmd = PHTV_GetRemotecontrolCommand("VOLUP");
             }
             else {
@@ -1359,10 +1398,12 @@ sub PHTV_SendCommand($$;$$) {
 ###################################
 sub PHTV_ReceiveCommand($$$) {
     my ( $param, $err, $data ) = @_;
-    my $hash    = $param->{hash};
-    my $name    = $hash->{NAME};
-    my $service = $param->{service};
-    my $cmd     = $param->{cmd};
+    my $hash       = $param->{hash};
+    my $name       = $hash->{NAME};
+    my $service    = $param->{service};
+    my $cmd        = $param->{cmd};
+    my $sequential = ( defined( $attr{$name}{sequentialQuery} )
+          && $attr{$name}{sequentialQuery} == 1 ) ? 1 : 0;
 
     my $state =
       ( $hash->{READINGS}{state}{VAL} )
@@ -1564,7 +1605,10 @@ sub PHTV_ReceiveCommand($$$) {
                     }
                 }
 
-                if ( $newstate eq "on" && $newstate ne $state ) {
+# trigger query cascade in case the device just came up or sequential query is enabled
+                if ( $sequential
+                    || ( $newstate eq "on" && $newstate ne $state ) )
+                {
                     PHTV_GetStatus( $hash, 1 );
                 }
             }
@@ -1642,6 +1686,9 @@ sub PHTV_ReceiveCommand($$$) {
                     $hash->{model} = $return->{model};
                 }
             }
+
+            # continue query cascade in case sequential query is enabled
+            PHTV_GetStatus( $hash, 1 ) if $sequential;
         }
 
         # sources
@@ -1668,6 +1715,7 @@ sub PHTV_ReceiveCommand($$$) {
                 }
 
                 PHTV_SendCommand( $hash, "sources/current" );
+                $hash->{helper}{sequentialQueryCounter}++ if $sequential;
             }
         }
 
@@ -1701,6 +1749,24 @@ sub PHTV_ReceiveCommand($$$) {
                 {
                     readingsBulkUpdate( $hash, "input", $cmd );
                 }
+            }
+
+            # SEQUENTIAL QUERY CASCADE - next: channels
+            #  read all channels if not existing
+            if (
+                $sequential
+                && (   !defined( $hash->{helper}{device}{channelName} )
+                    || !defined( $hash->{helper}{device}{channelID} ) )
+              )
+            {
+                PHTV_SendCommand( $hash, "channels" );
+                $hash->{helper}{sequentialQueryCounter}++;
+            }
+
+            #  otherwise read current channel
+            elsif ($sequential) {
+                PHTV_SendCommand( $hash, "channels/current" );
+                $hash->{helper}{sequentialQueryCounter}++;
             }
         }
 
@@ -1738,6 +1804,7 @@ sub PHTV_ReceiveCommand($$$) {
                 }
 
                 PHTV_SendCommand( $hash, "channels/current" );
+                $hash->{helper}{sequentialQueryCounter}++ if $sequential;
             }
         }
 
@@ -1764,8 +1831,17 @@ sub PHTV_ReceiveCommand($$$) {
                     readingsBulkUpdate( $hash, "channel", $cmd );
                 }
 
-                PHTV_SendCommand( $hash, "channels/" . $return->{id} )
-                  if ( defined( $return->{id} ) && $return->{id} ne "" );
+                # read channel details if type is known
+                if ( defined( $return->{id} ) && $return->{id} ne "" ) {
+                    PHTV_SendCommand( $hash, "channels/" . $return->{id} );
+                    $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+                }
+
+                # read all channellists if not existing
+                elsif ( !defined( $hash->{helper}{device}{channellists} ) ) {
+                    PHTV_SendCommand( $hash, "channellists" );
+                    $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+                }
             }
             elsif ( $return eq "ok" ) {
                 $cmd =
@@ -1779,8 +1855,17 @@ sub PHTV_ReceiveCommand($$$) {
                     readingsBulkUpdate( $hash, "channel", $cmd );
                 }
 
-                PHTV_SendCommand( $hash, "channels/" . $type )
-                  if ( defined($type) && $type ne "" );
+                # read channel details if type is known
+                if ( defined($type) && $type ne "" ) {
+                    PHTV_SendCommand( $hash, "channels/" . $type );
+                    $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+                }
+
+                # read all channellists if not existing
+                elsif ( !defined( $hash->{helper}{device}{channellists} ) ) {
+                    PHTV_SendCommand( $hash, "channellists" );
+                    $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+                }
             }
         }
 
@@ -1915,6 +2000,12 @@ sub PHTV_ReceiveCommand($$$) {
                 }
 
             }
+
+            # read all channellists if not existing
+            if ( !defined( $hash->{helper}{device}{channellists} ) ) {
+                PHTV_SendCommand( $hash, "channellists" );
+                $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+            }
         }
 
         # channellists
@@ -1930,6 +2021,7 @@ sub PHTV_ReceiveCommand($$$) {
                     PHTV_SendCommand( $hash, "channellists/$item", undef,
                         $item );
                 }
+                $hash->{helper}{sequentialQueryCounter}++ if $sequential;
             }
         }
 
@@ -2047,6 +2139,24 @@ sub PHTV_ReceiveCommand($$$) {
                 {
                     readingsBulkUpdate( $hash, "ambiMode", $type );
                 }
+            }
+
+            # SEQUENTIAL QUERY CASCADE - next: sources
+            #  read all sources if not existing
+            if (
+                $sequential
+                && (   !defined( $hash->{helper}{device}{sourceName} )
+                    || !defined( $hash->{helper}{device}{sourceID} ) )
+              )
+            {
+                PHTV_SendCommand( $hash, "sources" );
+                $hash->{helper}{sequentialQueryCounter}++;
+            }
+
+            #  otherwise read current source
+            elsif ($sequential) {
+                PHTV_SendCommand( $hash, "sources/current" );
+                $hash->{helper}{sequentialQueryCounter}++;
             }
         }
 
@@ -2373,11 +2483,11 @@ sub PHTV_ReceiveCommand($$$) {
                                 my $satF =
                                   ( $sat && $sat > 0 && $sat < 100 )
                                   ? $sat / 100
-                                  : 1;
+                                  : 0;
                                 my $briF =
                                   ( $bri && $bri > 0 && $bri < 100 )
                                   ? $bri / 100
-                                  : 1;
+                                  : 0;
 
                                 my ( $hDec, $sDec, $bDec, $h, $s, $b );
                                 if ( $countLEDs > 0 ) {
@@ -2744,6 +2854,11 @@ sub PHTV_ReceiveCommand($$$) {
     }
 
     readingsEndUpdate( $hash, 1 );
+
+    Log3 $name, 4,
+      "PHTV $name: sequentialQuery - finished round "
+      . $hash->{helper}{sequentialQueryCounter}
+      if $sequential;
 
     return;
 }
@@ -3309,6 +3424,7 @@ sub PHTV_min {
     <li><b>ambiHueLatency</b> - Controls the update interval for HUE devices in milliseconds; defaults to 200 ms.</li>
     <li><b>disable</b> - Disable polling (true/false)</li>
     <li><b>inputs</b> - Presents the inputs read from device. Inputs can be renamed by adding <code>,NewName</code> right after the original name.</li>
+    <li><b>sequentialQuery</b> - avoid parallel queries for low-performance devices</li>
     <li><b>timeout</b> - Set different polling timeout in seconds (default=7)</li>
   </ul></ul>
   <br>
