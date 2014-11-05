@@ -972,7 +972,7 @@ harmony_Read($)
 
             $hash->{discoveryinfo} = $decoded;
 
-            $hash->{current_fw_version} = $decoded->{current_fw_version} if( defined($decoded->{current_fw_version}) );
+            #$hash->{current_fw_version} = $decoded->{current_fw_version} if( defined($decoded->{current_fw_version}) );
 
             harmony_sendEngineGet($hash, "config");
 
