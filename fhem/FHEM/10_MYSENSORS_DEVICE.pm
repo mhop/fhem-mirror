@@ -63,6 +63,7 @@ use GPUtils qw(:all);
 
 use Device::MySensors::Constants qw(:all);
 use Device::MySensors::Message qw(:all);
+use SetExtensions qw/ :all /;
 
 BEGIN {
   MYSENSORS->import(qw(:all));
@@ -75,6 +76,7 @@ BEGIN {
     CommandDeleteReading
     AssignIoPort
     Log3
+    SetExtensions
   ))
 };
 
@@ -109,11 +111,11 @@ my %static_types = (
 
 my %static_mappings = (
   V_TEMP        => { type => "temperature" },
-  V_HUM         => { type => "humidity", range => { min => 0, max => 100 }},
+  V_HUM         => { type => "humidity" },
   V_PRESSURE    => { type => "pressure" },
   V_LIGHT_LEVEL => { type => "brightness" },
   V_LIGHT       => { type => "switch", val => { 0 => 'off', 1 => 'on' }},
-  V_DIMMER      => { type => "dimmer", range => { min => 0, max => 100 }},
+  V_DIMMER      => { type => "dimmer", range => { min => 0, step => 1, max => 100 }},
   V_FORECAST    => { type => "forecast", val => { # PressureSensor, DP/Dt explanation
                                                   0 => 'stable',       # 0 = "Stable Weather Pattern"
                                                   1 => 'slow rising',  # 1 = "Slowly rising Good Weather", "Clear/Sunny "
@@ -150,7 +152,7 @@ my %static_mappings = (
   V_IR_RECEIVE  => { type => "ir_receive" },
   V_FLOW        => { type => "flow" },
   V_VOLUME      => { type => "volume" },
-  V_LOCK_STATUS => { type => "lockstatus", val => { 0 => 'locked', 1 => 'unlocked' }},
+  V_LOCK_STATUS => { type => "lockstatus", val => { 0 => 'off', 1 => 'on' }},
   V_DUST_LEVEL  => { type => "dustlevel" },
   V_VOLTAGE     => { type => "voltage" },
   V_CURRENT     => { type => "current" },
@@ -168,22 +170,24 @@ sub Define($$) {
   $hash->{ack} = 0;
   $hash->{typeMappings} = {map {variableTypeToIdx($_) => $static_mappings{$_}} keys %static_mappings};
   $hash->{sensorMappings} = {map {sensorTypeToIdx($_) => $static_types{$_}} keys %static_types};
-  
+
   $hash->{readingMappings} = {};
   AssignIoPort($hash);
 };
 
 sub UnDefine($) {
   my ($hash) = @_;
-  
+
   return undef;
 }
 
 sub Set($@) {
   my ($hash,$name,$command,@values) = @_;
   return "Need at least one parameters" unless defined $command;
-  return "Unknown argument $command, choose one of " . join(" ", map {$hash->{sets}->{$_} ne "" ? "$_:$hash->{sets}->{$_}" : $_} sort keys %{$hash->{sets}})
-    if(!defined($hash->{sets}->{$command}));
+  if(!defined($hash->{sets}->{$command})) {
+    my $list = join(" ", map {$hash->{sets}->{$_} ne "" ? "$_:$hash->{sets}->{$_}" : $_} sort keys %{$hash->{sets}});
+    return grep (/(^on$)|(^off$)/,keys %{$hash->{sets}}) == 2 ? SetExtensions($hash, $list, $name, $command, @values) : "Unknown argument $command, choose one of $list";
+  }
   COMMAND_HANDLER: {
     $command eq "clear" and do {
       sendClientMessage($hash, childId => 255, cmd => C_INTERNAL, subType => I_CHILDREN, payload => "C");
@@ -390,7 +394,13 @@ sub onPresentationMessage($$) {
       my $typeStr = $typeMapping->{type};
       next if (defined $hash->{sets}->{"$typeStr$idStr"});
       if ($hash->{IODev}->{'inclusion-mode'}) {
-        if (my $ret = CommandAttr(undef,"$name setReading_$typeStr$idStr".($typeMapping->{val} ? " ".join (",",values %{$typeMapping->{val}}) : ""))) {
+        my @values = ();
+        if ($typeMapping->{range}) {
+          @values = ('slider',$typeMapping->{range}->{min},$typeMapping->{range}->{step},$typeMapping->{range}->{max});
+        } elsif ($typeMapping->{val}) {
+          @values = values %{$typeMapping->{val}};
+        }
+        if (my $ret = CommandAttr(undef,"$name setReading_$typeStr$idStr".(@values ? " ".join (",",@values) : ""))) {
           push @ret,$ret;
         }
       } else {
@@ -586,7 +596,8 @@ sub mappedReadingToRaw($$$) {
     <li>
       <p><code>attr &lt;name&gt; setCommands [&lt;command:reading:value&gt;]*</code><br/>
          configures one or more commands that can be executed by set.<br/>
-         e.g.: <code>attr &lt;name&gt; setCommands on:switch_1:on off:switch_1:off</code></p>
+         e.g.: <code>attr &lt;name&gt; setCommands on:switch_1:on off:switch_1:off</code><br/>
+         if list of commands contains both 'on' and 'off' <a href="#setExtensions">set extensions</a> are supported</p>
     </li>
     <li>
       <p><code>attr &lt;name&gt; setReading_&lt;reading&gt; [&lt;value&gt;]*</code><br/>
