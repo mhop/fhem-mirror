@@ -1019,23 +1019,29 @@ statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
+<div  style="width:800px">
 <ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
   <br>
    Until now statistics for the following readings are automatically built:
    <ul>
+      <br>
       <li><b>Min|Avg|Max</b> Minimum, average  and maximum of instantaneous values:
          <br>
-         over a period of day, month, year: <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         over a period of day, month and year: <i>brightness, current, energy_current, humidity, temperature, voltage</i>
          <br>
-         over a period of hour, day, month, year: <i>wind, wind_speed, windSpeed</i></li>
-      <li><b>Tendency</b> over 1h, 2h, 3h und 6h: <i>pressure</i></li>
-      <li><b>Delta</b> between start and end values over a period of hour, day, month, year:
+         over a period of hour, day, month and year: <i>wind, wind_speed, windSpeed</i>
+      </li><br>
+      <li><b>Tendency</b> over 1h, 2h, 3h und 6h: <i>pressure</i>
+      </li><br>
+      <li><b>Delta</b> between start and end values over a period of hour, day, month and year:
          <br>
-         <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i></li>
-      <li><b>Duration</b> of the states over a period of day, month, year:
+         <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i>
+      </li><br>
+      <li><b>Duration</b> of the states over a period of day, month and year:
          <br>
-         <i>lightsensor, lock, motion, Window, window, state (if no other reading is recognized)</i></li>
+         <i>lightsensor, lock, motion, Window, window, state (if no other reading is recognized)</i>
+      </li><br>
   </ul>
    Further readings can be added via the correspondent <a href="#statisticsattr">attribute</a>.
   <br>&nbsp;
@@ -1043,6 +1049,7 @@ statistics_UpdateDevReading($$$$)
   
   <b>Define</b>
   <ul>
+  <br>
     <code>define &lt;name&gt; statistics &lt;deviceNameRegExp&gt; [Prefix]</code>
     <br>
     Beispiel: <code>define Statistik statistics Sensor_.*|Wettersensor</code>
@@ -1055,11 +1062,12 @@ statistics_UpdateDevReading($$$$)
       <br>
       Optional. Prefix set is place before statistical data. Default is <i>stat</i>
     </li><br>
-  </ul>-
-  
+  </ul>
+
   <br>
   <b>Set</b>
    <ul>
+      <br>
       <li><code>resetStatistics &lt;All|DeviceName&gt;</code>
       <br>
       Resets the statistic values of the selected device.
@@ -1079,20 +1087,20 @@ statistics_UpdateDevReading($$$$)
   <a name="statisticsattr"></a>
    <b>Attributes</b>
    <ul>
-    <li><code>dayChangeTime &lt;time&gt;</code>
       <br>
-      Time of day change. Default is 00:00. For weather data the day change is e.g. 06:50. 
-      <br>
-    </li><br>
-    <li><code>deltaReadings &lt;readings&gt;</code>
-      <br>
-      Comma separated list of reading names for which a delta statistic shall be calculated. 
-    </li><br>
-    <li><code>durationReadings &lt;readings&gt;</code>
-      <br>
-      Comma separated list of reading names for which a duration statistic shall be calculated. 
-    </li><br>
-    <li><code>excludedReadings <code>&lt;DeviceRegExp:ReadingNameRegExp&gt;</code></code>
+      <li><code>dayChangeTime &lt;time&gt;</code>
+         <br>
+         Time of day change. Default is 00:00. For weather data the day change can be set e.g. to 06:50. 
+      </li><br>
+      <li><code>deltaReadings &lt;readings&gt;</code>
+         <br>
+         Comma separated list of reading names for which a delta statistic shall be calculated. 
+      </li><br>
+      <li><code>durationReadings &lt;readings&gt;</code>
+         <br>
+         Comma separated list of reading names for which a duration statistic shall be calculated. 
+      </li><br>
+      <li><code>excludedReadings <code>&lt;DeviceRegExp:ReadingNameRegExp&gt;</code></code>
       <br>
       Regular expression of the readings that shall be excluded from the statistics.<br>
       The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. "FritzDect:current|Sensor_.*:humidity"
@@ -1104,9 +1112,9 @@ statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>periodChangePreset &lt;seconds&gt;</code>
       <br>
-      Start of the calculation of periodical data, default is 5 Sekunden before each full hour,
+      Start of the calculation of periodical data before each full hour. Default is 5 Sekunden.
       <br>
-      Allows the correct timely assignment within plots, can be adapted to the cpu load.
+      Allows the correct timely assignment within plots, can be adapted to CPU load.
       <br>
     </li><br>
     <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes:period</i></code>
@@ -1117,26 +1125,27 @@ statistics_UpdateDevReading($$$$)
       <br>
       Regulare expression of statistic values, which shall not be shown in summary but also in singular readings. Eases the creation of plots.
       <br>
-      z.B. <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
+      E.g. <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
     </li><br>
    <li><code>specialDeltaPeriodHours &lt;hours&gt;</code>
       <br>
-      Adds for readings of delta statistics a singular reading for the given period of hours (e.g. for the rain of the last 72 hours)
+      Adds, for readings of delta statistics, a singular reading for the given period of hours (e.g. for the rain of the last 72 hours)
    </li><br>
     <li><code>tendencyReadings &lt;readings&gt;</code>
       <br>
-      Comma separated list of reading names for which a min/average/max statistic shall be calculated. 
+      Comma separated list of reading names for which a tendendy statistic shall be calculated. 
     </li><br>
   </ul>
 </ul>
-
+</div>
 =end html
 
 =begin html_DE
 
 <a name="statistics"></a>
 <h3>statistics</h3>
+<div  style="width:800px">
 <ul>
   Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
   <br>&nbsp;
@@ -1145,14 +1154,14 @@ statistics_UpdateDevReading($$$$)
    <ul>
       <li><b>Min|Avg|Max</b> Minimum, Durchschnitt und Maximum von Momentanwerten:
          <br>
-         &uuml;ber den Zeitraum Tag, Monat, Jahr: <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         &uuml;ber den Zeitraum Tag, Monat und Jahr: <i>brightness, current, energy_current, humidity, temperature, voltage</i>
          <br>
-         &uuml;ber den Zeitraum Stunde, Tag, Monat, Jahr: <i>wind, wind_speed, windSpeed</i></li>
+         &uuml;ber den Zeitraum Stunde, Tag, Monat und Jahr: <i>wind, wind_speed, windSpeed</i></li>
       <li><b>Tendency</b> Tendenz &uuml;ber 1h, 2h, 3h und 6h: <i>pressure</i></li>
       <li><b>Delta</b> Differenz zwischen Anfangs- und Endwerte innerhalb eines Zeitraums (Stunde, Tag, Monat, Jahr):
          <br>
          <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i></li>
-      <li><b>Duration</b> Dauer der Status innerhalb eines Zeitraums (Tag, Monat, Jahr):
+      <li><b>Duration</b> Dauer der Zust&auml;nde (on, off, open, closed ...) innerhalb eines Zeitraums (Tag, Monat, Jahr):
          <br>
          <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
@@ -1162,31 +1171,33 @@ statistics_UpdateDevReading($$$$)
   
   <b>Define</b>
   <ul>
-    <code>define &lt;Name&gt; statistics &lt;Ger&auml;teNameRegExp&gt; [Prefix]</code>
-    <br>
-    Beispiel: <code>define Statistik statistics Wettersensor|Badsensor</code>
-    <br>&nbsp;
-    <li><code>&lt;Ger&auml;teNameRegExp&gt;</code>
       <br>
-      Regul&auml;rer Ausdruck f&uuml;r den Ger&auml;tenamen. <b>!!! Nicht die Ger&auml;tewerte !!!</b>
-    </li><br>
-    <li><code>[Prefix]</code>
+      <code>define &lt;Name&gt; statistics &lt;Ger&auml;teNameRegExp&gt; [Prefix]</code>
       <br>
-      Optional. Der Prefix wird vor den Namen der statistischen Ger&auml;tewerte gesetzt. Standardm&auml;ssig <i>stat</i>
-    </li><br>
-  </ul>
+      Beispiel: <code>define Statistik statistics Wettersensor|Badsensor</code>
+      <br>&nbsp;
+      <li><code>&lt;Ger&auml;teNameRegExp&gt;</code>
+         <br>
+         Regul&auml;rer Ausdruck f&uuml;r den Ger&auml;tenamen. <b>!!! Nicht die Ger&auml;tewerte !!!</b>
+      </li><br>
+      <li><code>[Prefix]</code>
+         <br>
+         Optional. Der Prefix wird vor den Namen der statistischen Ger&auml;tewerte gesetzt. Standardm&auml;ssig <i>stat</i>
+      </li><br>
+   </ul>
   
-  <br>
-  <b>Set</b>
+   <br>
+   <b>Set</b>
    <ul>
+      <br>
       <li><code>resetStatistics &lt;All|Ger&auml;tename&gt;</code>
-      <br>
-      Setzt die Statistiken der ausgew&auml;hlten Ger&auml;te zur&uuml;ck.
-      <br></li>
+         <br>
+         Setzt die Statistiken der ausgew&auml;hlten Ger&auml;te zur&uuml;ck.
+      </li><br>
       <li><code>doStatistics</code>
-      <br>
-      Berechnet die aktuellen Statistiken aller beobachteten Ger&auml;te.
-      <br></li>
+         <br>
+         Berechnet die aktuellen Statistiken aller beobachteten Ger&auml;te.
+      </li><br>
   </ul>
   <br>
 
@@ -1198,62 +1209,63 @@ statistics_UpdateDevReading($$$$)
   <a name="statisticsattr"></a>
    <b>Attributes</b>
    <ul>
-    <li><code>dayChangeTime &lt;Zeit&gt;</code>
       <br>
-      Uhrzeit des Tageswechsels. Standardm&auml;ssig 00:00. Bei Wetterdaten erfolgt der Tageswechsel z.B. 6:50. 
-      <br>
-    </li><br>
-    <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
-      <br>
-      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
-    </li><br>
-    <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
-      <br>
-      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Dauer einzelner Ger&auml;tewerte innerhalb bestimmte Zeitr&auml;ume (Stunde/Tag/Monat/Jahr) erfasst wird.
-    </li><br>
-    <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
-      <br>
-      Regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
-      z.B. "<code>FritzDect:current|Sensor_.*:humidity</code>"
-      <br>
-    </li><br>
-    <li><code>hideAllSummaryReadings &lt;0 | 1&gt;</code>
-      <br>
-      noch nicht implementiert - Es werden keine gesammelten Statistiken angezeigt, sondern nur die unter "singularReadings" definierten Einzelwerte 
-    </li><br>
-    <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
-      <br>
-      Durch Kommas getrennte Liste von Ger&auml;tewerten, f&uuml;r die in bestimmten Zeitr&auml;umen (Tag, Monat, Jahr) Minimum, Mittelwert und Maximum erfasst werden. 
-    </li><br>
-    <li><code>periodChangePreset &lt;Sekunden&gt;</code>
-      <br>
-      Start der Berechnung der periodischen Daten, standardm&auml;ssig 5 Sekunden vor der vollen Stunde,
-      <br>
-      Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden.
-      <br>
-    </li><br>
-    <li><code>singularReadings &lt;Ger&auml;teNameRegExp:Ger&auml;teWertRegExp:Statistiktypen:Zeitraum&gt;</code>
-      <ul>
-         <li>Statistiktypen: Min|Avg|Max|Delta|Duration|<span style="color:blue;">Tendency</span></li>
-         <li>Zeitraum: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
-      </ul>
-      Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
-      Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify). 
-      <br>
-      z.B. <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
-    </li><br>
-    <li><code>specialDeltaPeriodHours &lt;Stunden&gt;</code>
-      <br>
-      F&uuml;gt den Delta-Statistiken einen singul&auml;ren Ger&auml;tewert f&uuml;r die angegebenen Stunden hinzu (z.b. f&uuml;r den Regen in den letzten 72 Stunden)
-    </li><br>
-    <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
-      <br>
-      Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r die innerhalb bestimmter Zeitr&auml;ume (1h, 2h, 3h, 6h) die Differenz zwischen Anfangs- und Endwert ermittelt wird. 
-    </li><br>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a>
-    </li><br>
+      <li><code>dayChangeTime &lt;Zeit&gt;</code>
+         <br>
+         Uhrzeit des Tageswechsels. Standardm&auml;ssig 00:00. Bei Wetterdaten kann der Tageswechsel z.B. auf 6:50 gesetzt werden. 
+      </li><br>
+      <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
+         <br>
+         Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
+      </li><br>
+      <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
+         <br>
+         Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Dauer einzelner Ger&auml;tewerte innerhalb bestimmte Zeitr&auml;ume (Stunde/Tag/Monat/Jahr) erfasst wird.
+      </li><br>
+      <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
+         <br>
+         Regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
+         z.B. "<code>FritzDect:current|Sensor_.*:humidity</code>"
+         <br>
+      </li><br>
+      <li><code>hideAllSummaryReadings &lt;0 | 1&gt;</code>
+         <br>
+         noch nicht implementiert - Es werden keine gesammelten Statistiken angezeigt, sondern nur die unter "singularReadings" definierten Einzelwerte 
+      </li><br>
+      <li><code>minAvgMaxReadings &lt;Ger&auml;tewerte&gt;</code>
+         <br>
+         Durch Kommas getrennte Liste von Ger&auml;tewerten, f&uuml;r die in bestimmten Zeitr&auml;umen (Tag, Monat, Jahr) Minimum, Mittelwert und Maximum erfasst werden. 
+      </li><br>
+      <li><code>periodChangePreset &lt;Sekunden&gt;</code>
+         <br>
+         Start der Berechnung der periodischen Daten, standardm&auml;ssig 5 Sekunden vor der vollen Stunde,
+         <br>
+         Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden.
+         <br>
+      </li><br>
+      <li><code>singularReadings &lt;Ger&auml;teNameRegExp:Ger&auml;teWertRegExp:Statistiktypen:Zeitraum&gt;</code>
+         <ul>
+            <li>Statistiktypen: Min|Avg|Max|Delta|Duration|<span style="color:blue;">Tendency</span></li>
+            <li>Zeitraum: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
+         </ul>
+         Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
+         Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify). 
+         <br>
+         z.B. <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
+      </li><br>
+      <li><code>specialDeltaPeriodHours &lt;Stunden&gt;</code>
+         <br>
+         F&uuml;gt den Delta-Statistiken einen singul&auml;ren Ger&auml;tewert f&uuml;r die angegebenen Stunden hinzu (z.b. f&uuml;r den Regen in den letzten 72 Stunden)
+      </li><br>
+      <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
+         <br>
+         Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r die innerhalb bestimmter Zeitr&auml;ume (1h, 2h, 3h, 6h) die Differenz zwischen Anfangs- und Endwert ermittelt wird. 
+      </li><br>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a>
+      </li><br>
    </ul>
 </ul>
+</div>
 
 =end html_DE
 
