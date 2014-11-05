@@ -1857,7 +1857,7 @@ CommandSetReading($$)
     }
     readingsSingleUpdate($defs{$sdev}, $a[1], $a[2], 1);
   }
-  return undef;
+  return join("\n", @rets);
 }
 
 
