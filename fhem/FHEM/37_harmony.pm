@@ -254,7 +254,7 @@ harmony_hubOfDevice($)
     next if( $defs{$d}->{TYPE} ne "harmony" );
     next if( $defs{$d}->{id} );
     next if( !harmony_deviceOfId($defs{$d}, $id) );
-    Log3 undef, 3, "harmony: found IODev $d for device $id" ;
+    Log3 undef, 3, "harmony: IODev for device $id is $d" ;
     return $d;
   }
 }
