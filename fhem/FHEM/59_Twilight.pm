@@ -432,23 +432,27 @@ sub Twilight_getWeatherHorizon($)
   my $xml = GetFileFromURL($url, 3, undef, 1);
 
   my $current, my $cond, my $temp, my $aktTemp;
-  if($xml=~/text="(.*)"(\ *)code="(.*)"(\ *)temp="(.*)"(\ *)date/){
-    if(defined($1)){
-      $cond   =$1;
-      $current=$3;
-      $temp   =$5;
-    }else{
-      $current=-1;
-   }
+  if (defined($xml)) {
+     if($xml=~/text="(.*)"(\ *)code="(.*)"(\ *)temp="(.*)"(\ *)date/){
+        if(defined($1)){
+          $cond   =$1;
+          $current=$3;
+          $temp   =$5;
+        }else{
+          $current=-1;
+        }
+     }  
+  }else{
+     $current=-1;
+  }   
 
-   if(($current>=0) && ($current <=47)) {
-     $hash->{WEATHER_CORRECTION} = $a_current[$current] / 25 * 20;
-     $hash->{WEATHER_HORIZON}    = $hash->{WEATHER_CORRECTION} + $hash->{INDOOR_HORIZON};
-     $hash->{CONDITION_TXT}      = $cond;
-     $hash->{CONDITION}          = $current;
-     $hash->{TEMPERATUR}         = $temp;
-     return 1;
-   }
+  if(($current>=0) && ($current <=47)) {
+    $hash->{WEATHER_CORRECTION} = $a_current[$current] / 25 * 20;
+    $hash->{WEATHER_HORIZON}    = $hash->{WEATHER_CORRECTION} + $hash->{INDOOR_HORIZON};
+    $hash->{CONDITION_TXT}      = $cond;
+    $hash->{CONDITION}          = $current;
+    $hash->{TEMPERATUR}         = $temp;
+    return 1;
   }
 
   Log3 $hash, 3, "[$hash->{NAME}] "
