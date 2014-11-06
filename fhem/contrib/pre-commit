@@ -12,7 +12,7 @@ my $arg="-t $txn";
 #my $arg="-r $txn";      # local testing
 my @lang = ("EN", "DE");
 my $exitCode = 0;
-use constant TAGS => qw{ul li code b};
+use constant TAGS => qw{ul li code b i u};
 
 
 my $log = `$svnlook log $arg $repos`;
