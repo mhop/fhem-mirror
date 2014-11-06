@@ -321,7 +321,7 @@ harmony_Set($$@)
   if( $cmd ne "?" && !$param ) {
     if( $cmd eq 'off' ) {
       $cmd = "activity";
-      $param = "PowerOff";
+      $param = "-1";
     } elsif( my $activity = harmony_activityOfId($hash, $hash->{currentActivityID}) ) {
       if( harmony_actionOfCommand( $activity, $cmd ) ) {
         $param = $cmd;
@@ -520,14 +520,20 @@ harmony_Set($$@)
 
     my $activities;
     foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
-      next if( $activity->{label} eq "PowerOff" );
+      next if( $activity->{id} == -1 );
       $activities .= "," if( $activities );
       $activities .= $activity->{label};
      }
+
+    if( my $activity = harmony_activityOfId($hash, -1) ) {
+      $activities .= "," if( $activities );
+      $activities .= $activity->{label};
+    }
+
     if( $activities ) {
       $activities =~ s/ /./g;
 
-      $list .= " activity:$activities,PowerOff";
+      $list .= " activity:$activities";
     }
 
     my $hidDevices;
@@ -1420,26 +1426,26 @@ harmony_Get($$@)
 
     my $ret = "";
     foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
-      next if( $activity->{label} eq "PowerOff" );
+      next if( $activity->{id} == -1  );
       $ret .= "\n" if( $ret );
       $ret .= sprintf( "%s\t%-24s", $activity->{id}, $activity->{label});
       foreach my $param (@params) {
         $ret .= "\t". harmony_data2string($activity->{$param}) if( $param && defined($activity->{$param}) );
       }
 
-      if( $param eq "power" ) {
+      if( $param && $param eq "power" ) {
+        my $power = harmony_GetPower($hash, $activity);
+        $ret .= $power if( $power );
+      }
+    }
+    if( my $activity = harmony_activityOfId($hash, -1) ) {
+      $ret .= "\n-1\t\t$activity->{label}";
+      if( $param && $param eq "power" ) {
         my $power = harmony_GetPower($hash, $activity);
         $ret .= $power if( $power );
       }
     }
     #$ret = sprintf("%s\t\t%-24s\n", "ID", "LABEL"). $ret if( $ret );
-    $ret .= "\n-1\t\tPowerOff";
-    if( $param eq "power" ) {
-      if( my $activity = harmony_activityOfId($hash, -1) ) {
-        my $power = harmony_GetPower($hash, $activity);
-        $ret .= $power if( $power );
-      }
-    }
 
     return $ret;
 
@@ -1554,7 +1560,7 @@ harmony_Get($$@)
 
     my $activities;
     foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
-      next if( $activity->{label} eq "PowerOff" );
+      next if( $activity->{id} == -1 );
       $activities .= "," if( $activities );
       $activities .= $activity->{label};
      }
@@ -1715,7 +1721,7 @@ harmony_Attr($$$)
   <ul>
     <li>activites [&lt;param&gt;]<br>
       lists all activities<br>
-      parm = power -> list power state for each device</li>
+      parm = power -> list power state for each device in activity</li>
     <li>devices [&lt;param&gt;]<br>
       lists all devices</li>
     <li>commands [&lt;id&gt;|&ltname&gt;]<br>
