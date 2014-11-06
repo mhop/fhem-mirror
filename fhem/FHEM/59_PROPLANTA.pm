@@ -248,8 +248,6 @@ sub text
    }
 }
 
-#{"50 %" =~ m/([-+]?\d+[,.]?\d*)/;;return $1;;}
-
 sub start
 {
    my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
@@ -436,10 +434,10 @@ sub PROPLANTA_HtmlAcquire($)
    return "" if ( !defined($URL) );
    return "" if ( $URL eq "" );
 
-   PROPLANTA_Log $hash, 5, "Start polling of ".$URL;
+   PROPLANTA_Log $hash, 5, "Start capturing of $URL";
 
    my $err_log  = "";
-   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
+   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
    my $header   = HTTP::Request->new( GET => $URL );
    my $request  = HTTP::Request->new( 'GET', $URL, $header );
    my $response = $agent->request($request);
@@ -448,10 +446,12 @@ sub PROPLANTA_HtmlAcquire($)
      
    if ( $err_log ne "" )
    {
+      readingsSingleUpdate($hash, "lastConnection", $response->status_line, 1);
       PROPLANTA_Log $hash, 1, "Error: $err_log";
-      return "";
+      return "Error|Error " . $response->status_line;
    }
 
+   PROPLANTA_Log $hash, 5, length($response->content)." characters captured";
    return $response->content;
 }
 
@@ -500,27 +500,28 @@ sub PROPLANTA_Run($)
    my $hash = $defs{$name};
    return unless (defined($hash->{NAME}));
    
-   while (1)
+   # acquire the html-page
+   my $response = PROPLANTA_HtmlAcquire($hash); 
+   
+   if ($response =~ /^Error\|/)
    {
-      # acquire the html-page
-      my $response = PROPLANTA_HtmlAcquire($hash); 
-      last if ($response eq "");
- 
+      $ptext .= "|".$response;
+   }
+   elsif ($response ne "")
+   {
       my $parser = MyProplantaParser->new;
       @MyProplantaParser::texte = ();
       # parsing the complete html-page-response, needs some time
-      # only <span> tags will be regarded   
+      PROPLANTA_Log $hash, 5, "Start HTML parsing";
       $parser->parse($response);
-      PROPLANTA_Log $hash, 4, "parsed terms:" . @MyProplantaParser::texte;
+      PROPLANTA_Log $hash, 4, "Found terms: " . @MyProplantaParser::texte;
       
       # pack the results in a single string
       if (@MyProplantaParser::texte > 0) 
       {
          $ptext .= "|". join('|', @MyProplantaParser::texte);
       }
-      PROPLANTA_Log $hash, 4, "parsed values:" . $ptext;
-      
-      last;
+      PROPLANTA_Log $hash, 4, "Parsed string: " . $ptext;
    }
    return $ptext;
 }
@@ -541,15 +542,31 @@ sub PROPLANTA_Done($)
 
    # Wetterdaten speichern
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash, "state", sprintf "Tmin: %.0f Tmax: %.0f T: %.1f H: %.1f W: %.1f P: %.1f", $values{fc0_tempMinC}, $values{fc0_tempMaxC}, $values{temperature}, $values{humidity}, $values{wind}, $values{pressure} );
 
-   my $x = 0;
-   while (my ($rName, $rValue) = each(%values) )
+   if ( defined $values{Error} )
    {
-      readingsBulkUpdate( $hash, $rName, $rValue );
-      PROPLANTA_Log $hash, 5, "reading:$rName value:$rValue";
+      readingsBulkUpdate( $hash, "lastConnection", $values{Error} );
    }
-
+   else
+   {
+      my $x = 0;
+      while (my ($rName, $rValue) = each(%values) )
+      {
+         readingsBulkUpdate( $hash, $rName, $rValue );
+         PROPLANTA_Log $hash, 5, "reading:$rName value:$rValue";
+      }
+      
+      if (keys %values > 0) 
+      {
+         readingsBulkUpdate($hash, "state", sprintf "Tmin: %.0f Tmax: %.0f T: %.1f H: %.1f W: %.1f P: %.1f", $values{fc0_tempMinC}, $values{fc0_tempMaxC}, $values{temperature}, $values{humidity}, $values{wind}, $values{pressure} );
+         readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured" );
+      }
+      else
+      {
+         readingsBulkUpdate( $hash, "lastConnection", "no data found" );
+         PROPLANTA_Log $hash, 1, "No data found. Check city name or URL.";
+      }
+   }
    readingsEndUpdate( $hash, 1 );
 }
 #####################################
@@ -723,8 +740,8 @@ sub PROPLANTA_Aborted($)
    <ul>
       <br>
       <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - Vorhersagewerte f&uumlr <i>heute|morgen|&uuml;bermorgen|in 3 Tagen</i></li>
-      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - Niederschlagsrisiko <i>heute tags&uuml;ber|nachts</i> in %</li>
-      <li><b>fc</b><i>1</i><b>_chOfRain</b><i>15</i> - Niederschlagsrisiko <i>morgen</i> um <i>15</i>:00 Uhr in %</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - <i>heutiges</i> Niederschlagsrisiko <i>tags&uuml;ber|nachts</i> in %</li>
+      <li><b>fc</b><i>1</i><b>_chOfRain</b><i>15</i> - <i>morgiges</i> Niederschlagsrisiko um <i>15</i>:00 Uhr in %</li>
       <li><b>fc</b><i>2</i><b>_cloud</b><i>15</i> - Wolkenbedeckungsgrad <i>&uuml;bermorgen</i> um <i>15</i>:00 Uhr in %</li>
       <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=m&auml;&szlig;ig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=m&auml;&szlig;ig, 3=stark)</li>
