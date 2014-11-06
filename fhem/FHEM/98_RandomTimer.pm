@@ -342,31 +342,6 @@ sub stopZeitErmitteln  ($$) {
 
 }
 ########################################################################
-#sub schaltzeitenErmitteln ($)
-#{
-#   my ($hash) = @_;
-#   my($sec,$min,$hour)=localtime(time);
-#
-#   my $timespec_stop  = $hash->{TIMESPEC_STOP};
-#
-#  Log3 ($hash, 3, "Wrong timespec_stop <$timespec_stop>, use \"[+][*]<time or func>\"" )
-#     if($timespec_stop !~ m/^(\+)?(\*)?(.*)$/i);
-#  my ($srel, $srep, $stspec) = ($1, $2, $3);
-#  my ($err, $h, $m, $s, $fn) = GetTimeSpec($stspec);
-#  Log3 ($hash, 3, $err) if($err);
-#  $h -=24  if ($h >= 24);
-#
-#  if ($hash->{S_REL}) {
-#     my ($thour, $tmin, $tsec) = split(/:/, $hash->{STARTTIME});
-#     my $timeToStart = time() + 3600*($thour-$hour) + 60*($tmin-$min) + ($tsec-$sec);
-#     my $timeToStop = $timeToStart + 3600*$h + 60*$m + $s;
-#     ($s,$m,$h)=localtime($timeToStop);
-#  }
-#
-#  my $timeToStop_st =  sprintf ("%02d:%02d:%2d", $h,$m,$s );
-#  return ($timeToStop_st);
-#}
-########################################################################
 sub RandomTimer_device_toggle ($)
 {
     my ($hash) = @_;
@@ -537,7 +512,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         <b>Examples</b>
         <pre>
         attr   ZufallsTimerZ         disableCond      (!isVerreist())
-        attr   ZufallsTimerZ         disableCond      (Value("presenceDummy" eq "notPresent"))        
+        attr   ZufallsTimerZ         disableCond      (Value("presenceDummy") ne "present"))        
         </pre>
     </li>
 
