@@ -322,7 +322,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
-my $modulVersion = "1.01";
+my $modulVersion = "2014-11-06";
 
 
 ########################################
@@ -541,7 +541,7 @@ sub PROPLANTA_Done($)
 
    # Wetterdaten speichern
    readingsBeginUpdate($hash);
-   readingsBulkUpdate($hash, "state", sprintf "T: %.1f H: %.1f W: %.1f P: %.1f ", $values{temperature}, $values{humidity}, $values{wind}, $values{pressure} );
+   readingsBulkUpdate($hash, "state", sprintf "Tmin: %.0f Tmax: %.0f T: %.1f H: %.1f W: %.1f P: %.1f", $values{fc0_tempMinC}, $values{fc0_tempMaxC}, $values{temperature}, $values{humidity}, $values{wind}, $values{pressure} );
 
    my $x = 0;
    while (my ($rName, $rValue) = each(%values) )
@@ -729,7 +729,7 @@ sub PROPLANTA_Aborted($)
       <li><b>fc</b><i>0</i><b>_dew</b> - Taubildung <i>heute</i> (0=keine, 1=leicht, 2=m&auml;&szlig;ig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_evapor</b> - Verdunstung <i>heute</i> (0=keine, 1=gering, 2=m&auml;&szlig;ig, 3=stark)</li>
       <li><b>fc</b><i>0</i><b>_frost</b> - Bodenfrost <i>heute</i> (0=nein, 1=ja)</li>
-      <li><b>fc</b><i>1</i><b>_moon</b><i>Rise|Set</p> - Mond<i>auf|unter</i>gang <i>morgen</i></li>
+      <li><b>fc</b><i>1</i><b>_moon</b><i>Rise|Set</i> - Mond<i>auf|unter</i>gang <i>morgen</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - Globalstrahlung <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - Niederschlagsmenge <i>heute</i> um <i>15</i>:00 Uhr in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative Sonnenscheindauer <i>heute</i> in % (zwischen Sonnenauf- und -untergang)</li>
