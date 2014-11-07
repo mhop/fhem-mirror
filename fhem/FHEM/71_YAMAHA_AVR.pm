@@ -844,7 +844,7 @@ YAMAHA_AVR_ParseResponse ($$$)
             }
             elsif($arg eq "systemConfig")
             {
-                if($data =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>.*<Main>(.+?)<\/Main>.*<Sub>(.+?)<\/Sub>.*<\/Version>/)
+                if($data =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>.*<Main>(.+?)<\/Main>.*<Sub>(.+?)<\/Sub>.*?<\/Version>/)
                 {
                     $hash->{MODEL} = $1;
                     $hash->{SYSTEM_ID} = $2;
@@ -896,7 +896,7 @@ YAMAHA_AVR_ParseResponse ($$$)
             }
             elsif($arg eq "basicStatus")
             {
-                if($data =~ /<Power>(.+)<\/Power>/)
+                if($data =~ /<Power>(.+?)<\/Power>/)
                 {
                     my $power = $1;
                    
@@ -909,7 +909,7 @@ YAMAHA_AVR_ParseResponse ($$$)
                 }
                 
                 # current volume and mute status
-                if($data =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Volume>/)
+                if($data =~ /<Volume><Lvl><Val>(.+?)<\/Val><Exp>(.+?)<\/Exp><Unit>.+?<\/Unit><\/Lvl><Mute>(.+?)<\/Mute>.*?<\/Volume>/)
                 {
                     readingsBulkUpdate($hash, "volumeStraight", ($1 / 10 ** $2));
                     readingsBulkUpdate($hash, "volume", YAMAHA_AVR_volume_abs2rel(($1 / 10 ** $2)));
@@ -917,7 +917,7 @@ YAMAHA_AVR_ParseResponse ($$$)
                     
                     $hash->{helper}{USE_SHORT_VOL_CMD} = "0";
                 }
-                elsif($data =~ /<Vol><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Vol>/)
+                elsif($data =~ /<Vol><Lvl><Val>(.+?)<\/Val><Exp>(.+?)<\/Exp><Unit>.+?<\/Unit><\/Lvl><Mute>(.+?)<\/Mute>.*?<\/Vol>/)
                 {
                     readingsBulkUpdate($hash, "volumeStraight", ($1 / 10 ** $2));
                     readingsBulkUpdate($hash, "volume", YAMAHA_AVR_volume_abs2rel(($1 / 10 ** $2)));
@@ -942,7 +942,7 @@ YAMAHA_AVR_ParseResponse ($$$)
                 }
                 
                 # current input same as the corresponding set command name
-                if($data =~ /<Input_Sel>(.+)<\/Input_Sel>/)
+                if($data =~ /<Input_Sel>(.+?)<\/Input_Sel>/)
                 {
                     readingsBulkUpdate($hash, "input", YAMAHA_AVR_Param2Fhem(lc($1), 0));
                     
@@ -963,11 +963,11 @@ YAMAHA_AVR_ParseResponse ($$$)
                 }
                 
                 # input name as it is displayed on the receivers front display
-                if($data =~ /<Input>.*?<Title>\s*(.+?)\s*<\/Title>.*<\/Input>/)
+                if($data =~ /<Input>.*?<Title>\s*(.+?)\s*<\/Title>.*?<\/Input>/)
                 {
                     readingsBulkUpdate($hash, "inputName", $1);
                 }
-                elsif($data =~ /<Input>.*?<Input_Sel_Title>\s*(.+?)\s*<\/Input_Sel_Title>.*<\/Input>/)
+                elsif($data =~ /<Input>.*?<Input_Sel_Title>\s*(.+?)\s*<\/Input_Sel_Title>.*?<\/Input>/)
                 {
                     readingsBulkUpdate($hash, "inputName", $1);
                 }
@@ -987,7 +987,7 @@ YAMAHA_AVR_ParseResponse ($$$)
                     readingsBulkUpdate($hash, "dsp", YAMAHA_AVR_Param2Fhem($1, 0));
                 }
                
-                if($data =~ /<Surround>.*?<_3D_Cinema_DSP>(.+?)<\/_3D_Cinema_DSP>*?<\/Surround>/)
+                if($data =~ /<Surround>.*?<_3D_Cinema_DSP>(.+?)<\/_3D_Cinema_DSP>.*?<\/Surround>/)
                 {
                     readingsBulkUpdate($hash, "3dCinemaDsp", lc($1));
                 }
