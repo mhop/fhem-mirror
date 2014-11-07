@@ -376,7 +376,7 @@ sub onPresentationMessage($$) {
   my $readingMappings = $hash->{readingMappings};
   my $typeMappings = $hash->{typeMappings};
   if (my $sensorMappings = $hash->{sensorMappings}->{$nodeType}) {
-    my $idStr = ($id > 1 ? $id : "");
+    my $idStr = ($id > 0 ? $id : "");
     my @ret = ();
     foreach my $type (@{$sensorMappings->{sends}}) {
       next if (defined $readingMappings->{$id}->{$type});
@@ -524,10 +524,8 @@ sub rawToMappedReading($$$$) {
 
   my $name;
   if (defined (my $mapping = $hash->{readingMappings}->{$childId}->{$type})) {
-    if(defined (my $val = $mapping->{val} // $hash->{typeMappings}->{$type}->{val})) {
-      return ($mapping->{name},$val->{$value} // $value);
-    }
-    die "no type-mapping for type ".variableTypeToStr($type);
+    my $val = $mapping->{val} // $hash->{typeMappings}->{$type}->{val};
+    return ($mapping->{name},defined $val ? ($val->{$value} // $value) : $value);
   }
   die "no reading-mapping for childId $childId, type ".($hash->{typeMappings}->{$type}->{type} ? $hash->{typeMappings}->{$type}->{type} : variableTypeToStr($type));
 }
