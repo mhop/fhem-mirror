@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.4.2";
+my $VERSION = "1.9.4.4";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -2533,8 +2533,7 @@ sub SYSMON_PowerAcInfo($$)
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
   $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA";
-  
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W";
   return $map;
 }
 
@@ -2557,7 +2556,7 @@ sub SYSMON_PowerUsbInfo($$)
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
   $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W";
   
   return $map;
 }
@@ -2585,7 +2584,7 @@ sub SYSMON_PowerBatInfo($$)
   #$map->{"power_".$type."_current"}=$d_current;
   #$map->{"power_".$type."_voltage"}=$d_voltage;
   $map->{"power_".$type."_stat"}="$d_online $d_present $d_voltage $d_current $d_capacity";
-  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, capacity: ".$d_capacity." %";
+  $map->{"power_".$type."_text"}=$type.": ".(($d_present eq "1") ? "present" : "absent")." / ".($d_online eq "1" ? "online" : "offline").", voltage: ".$d_voltage." V, current: ".$d_current." mA, ".(int(($d_voltage*$d_current/100+0.5))/10)." W, "."capacity: ".$d_capacity." %";
   
   if($d_present eq "1") {
     # Zusaetzlich: technology, capacity, status, health, temp (/10 => °C)
