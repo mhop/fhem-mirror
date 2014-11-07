@@ -558,7 +558,8 @@ sub PROPLANTA_Done($)
       
       if (keys %values > 0) 
       {
-         readingsBulkUpdate($hash, "state", sprintf "Tmin: %.0f Tmax: %.0f T: %.1f H: %.1f W: %.1f P: %.1f", $values{fc0_tempMinC}, $values{fc0_tempMaxC}, $values{temperature}, $values{humidity}, $values{wind}, $values{pressure} );
+        # Achtung! Um Mitternacht fehlen die aktuellen Werte
+         readingsBulkUpdate($hash, "state", "Tmin: " . $values{fc0_tempMinC} . " Tmax: " . $values{fc0_tempMaxC} . " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure} );
          readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured" );
       }
       else
