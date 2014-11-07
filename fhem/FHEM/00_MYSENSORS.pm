@@ -214,6 +214,7 @@ sub Init($) {
     });
   }
   readingsSingleUpdate($hash,"connection","connected",1);
+  sendMessage($hash, radioId => 0, childId => 0, cmd => C_INTERNAL, ack => 0, subType => I_VERSION, payload => '');
   return undef;
 }
 
@@ -349,6 +350,10 @@ sub onInternalMsg($$) {
         });
         last;
       };
+      $type == I_VERSION and do {
+        $hash->{version} = $msg->{payload};
+        last;
+      };
       $type == I_LOG_MESSAGE and do {
         Log3($hash->{NAME},5,"MYSENSORS gateway $hash->{NAME}: $msg->{payload}");
         last;
@@ -405,7 +410,7 @@ sub onAcknowledge($$) {
 
 sub sendMessage($%) {
   my ($hash,%msg) = @_;
-  $msg{ack} = $hash->{ack} unless $msg{ack};
+  $msg{ack} = $hash->{ack} unless defined $msg{ack};
   my $txt = createMsg(%msg);
   Log3 ($hash->{NAME},5,"MYSENSORS send: ".dumpMsg(\%msg));
   DevIo_SimpleWrite($hash,"$txt\n",undef);

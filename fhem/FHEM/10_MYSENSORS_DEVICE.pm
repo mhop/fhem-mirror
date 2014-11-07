@@ -515,7 +515,7 @@ sub onInternalMessage($$) {
 sub sendClientMessage($%) {
   my ($hash,%msg) = @_;
   $msg{radioId} = $hash->{radioId};
-  $msg{ack} = 1 if $hash->{ack};
+  $msg{ack} = $hash->{ack} unless defined $msg{ack};
   sendMessage($hash->{IODev},%msg);
 }
 
@@ -527,7 +527,7 @@ sub rawToMappedReading($$$$) {
     if(defined (my $val = $mapping->{val} // $hash->{typeMappings}->{$type}->{val})) {
       return ($mapping->{name},$val->{$value} // $value);
     }
-    die "not type-mapping for type ".variableTypeToStr($type);
+    die "no type-mapping for type ".variableTypeToStr($type);
   }
   die "no reading-mapping for childId $childId, type ".($hash->{typeMappings}->{$type}->{type} ? $hash->{typeMappings}->{$type}->{type} : variableTypeToStr($type));
 }
