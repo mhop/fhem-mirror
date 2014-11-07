@@ -2858,6 +2858,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         human readable additional information to the battery (if installed): technology, capacity, status, health, total capacity<br>
         Example:<br>
     		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
+    		The capacity must be defined in script.bin (e.g. ct-hdmi.bin). Parameter name pmu_battery_cap. Convert with bin2fex (bin2fex -> script.fex -> edit -> fex2bin -> script.bin).<br>
     </li>
     <br>    
   <br>
@@ -3410,6 +3411,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Menschenlesbare Zusatzinformationen  f&uuml;r die Batterie (wenn vorhanden): Technologie, Kapazit&auml;t, Status, Zustand, Gesamtkapazit&auml;t<br>
         Beispiel:<br>
     		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
+    		Die Kapazit&auml;t soll in script.bin (z.B. ct-hdmi.bin) eingestellt werden (Parameter pmu_battery_cap). Mit bin2fex konvertieren (bin2fex -> script.fex -> edit -> fex2bin -> script.bin)<br>
     </li>
     <br>    
   <br>
