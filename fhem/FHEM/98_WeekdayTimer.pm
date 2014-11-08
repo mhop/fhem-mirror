@@ -155,7 +155,7 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
       Define the weekly profile. All timings are separated by space. A switchingtime is defined by the following example:<br>
       <ul><b>[&lt;weekdays&gt;|]&lt;time&gt;|&lt;parameter&gt;</b></ul><br>
       <u>weekdays:</u> optional, if not set every day is used. Otherwise you can define a day as a number or as shortname.<br>
-      <u>time:</u>define the time to switch, format: HH:MM(HH in 24 hour format).<br>
+      <u>time:</u>define the time to switch, format: HH:MM(HH in 24 hour format). Within the {} you can use the variable $date(epoch) to get the exact switchingtimes of the week. Example: {sunrise_abs_dat($date)}<br>
       <u>parameter:</u>the parameter to be set, using any text value like <b>on</b>, <b>off</b>, <b>dim30%</b>, <b>eco</b> or <b>comfort</b> - whatever your device understands.<br>
     </ul>
     <p>
