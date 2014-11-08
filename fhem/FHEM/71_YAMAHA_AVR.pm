@@ -288,7 +288,7 @@ YAMAHA_AVR_Set($@)
             }
         }
     }
-    elsif($what =~ /(volumeStraight|volume|volumeUp|volumeDown)/)
+    elsif($what =~ /^(volumeStraight|volume|volumeUp|volumeDown)$/)
     {
         my $target_volume;
         
@@ -514,7 +514,7 @@ YAMAHA_AVR_Set($@)
     elsif($what eq "remoteControl")
     {
         # the RX-Vx75 series use a different tag name to access the remoteControl commands
-        my $control_tag = ($hash->{MODEL} =~ /RX-V\d75/ ? "Cursor_Control" : "List_Control");
+        my $control_tag = (exists($hash->{MODEL}) and $hash->{MODEL} =~ /RX-V\d75/ ? "Cursor_Control" : "List_Control");
         
         if($a[2] eq "up")
         {
@@ -644,7 +644,7 @@ YAMAHA_AVR_Define($$)
     # set the volume-smooth-change attribute only if it is not defined, so no user values will be overwritten
     #
     # own attribute values will be overwritten anyway when all attr-commands are executed from fhem.cfg
-    $attr{$name}{"volume-smooth-change"} = "1" unless(defined($attr{$name}{"volume-smooth-change"}));
+    $attr{$name}{"volume-smooth-change"} = "1" unless(exists($attr{$name}{"volume-smooth-change"}));
 
     unless(exists($hash->{helper}{AVAILABLE}) and ($hash->{helper}{AVAILABLE} == 0))
     {
