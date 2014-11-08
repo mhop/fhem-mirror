@@ -36,7 +36,7 @@ Ext.define('FHEM.controller.TableDataController', {
             checkedradio = Ext.ComponentQuery.query('radiogroup[name=tddynamictime]')[0],
             starttimepicker = Ext.ComponentQuery.query('datefield[name=tdstarttimepicker]')[0],
             endtimepicker = Ext.ComponentQuery.query('datefield[name=tdendtimepicker]')[0],
-            gridpanel = Ext.ComponentQuery.query('gridpanel[name=tabledatagridpanel]')[0];
+            gridpanel = Ext.ComponentQuery.query('gridpanel[name=tdgridpanel]')[0];
          
         //check if timerange or dynamic time should be used
         checkedradio.eachBox(function(box, idx){
