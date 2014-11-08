@@ -214,7 +214,7 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
   $daysRegExp =~ s/\|$//g;
   $daysRegExp .= ")";
 
-  my (@st, @days, $daylist, $time, $para);
+  my (@st, @days, $daylist, $time, $timeString, $para);
   for(my $i=0; $i<@{$switchingtimes}; $i++) {
 
     @st = split(/\|/, @{$switchingtimes}[$i]);
@@ -270,26 +270,37 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
     }
 
     @days = sort(SortNumber keys %hdays);
-
-    # Zeitangabe verarbeiten.
-    if($time =~  m/^\{.*\}$/g) {                              # Perlausdruck {*}
-      $time = eval($time);                                    # must deliver HH:MM[:SS]
-      $hash->{TIME_AS_PERL} = 1;
-    }
-
-    if      ($time =~  m/^[0-2][0-9]:[0-5][0-9]$/g) {         #  HH:MM
-      $time .= ":00";                                         #  HH:MM:SS erzeugen
-    } elsif ($time =~  m/^[0-2][0-9](:[0-5][0-9]){2,2}$/g) {  #  HH:MM:SS
-      ;                                                       #  ok.
-    } else {
-      Log3 $hash, 1, "[$name] invalid time <$time> HH:MM[:SS]";
-      return 0;
-    }
-
+    
+    if($time =~  m/^\{.*\}$/g) {
+       $hash->{TIME_AS_PERL} = 1;
+    } 
+    
+    my $now = time();
+    my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($now); 
     my $listOfDays = "";
     for (my $d=0; $d<@days; $d++) {
-      $listOfDays .= @{$$shortDays}[$days[$d]] . ",";
-      $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$time} = $para;
+       
+       # Zeitangabe verarbeiten.
+       if ($hash->{TIME_AS_PERL}) {                                     # Perlausdruck {*}
+         my $date    = $now+($d-$wday)*86400;
+         $timeString = '{ my $date='."$date;" .$time."}";
+         $timeString = eval( $timeString );                             # must deliver HH:MM[:SS]
+         $@ =~ s/\n/ /g; Log3 ($hash, 3, "[$hash->{NAME}] " . $@) if ($@); 
+       } else {
+         $timeString = $time;
+       }
+
+       if      ($timeString =~  m/^[0-2][0-9]:[0-5][0-9]$/g) {          #  HH:MM
+         $timeString .= ":00";                                          #  HH:MM:SS erzeugen
+       } elsif ($timeString =~  m/^[0-2][0-9](:[0-5][0-9]){2,2}$/g) {   #  HH:MM:SS
+         ;                                                       #  ok.
+       } else {
+         Log3 $hash, 1, "[$name] invalid time <$timeString> HH:MM[:SS]";
+         #return 0;
+       }
+    
+       $listOfDays .= @{$$shortDays}[$days[$d]] . ",";
+       $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$timeString} = $para;
     }
     $listOfDays =~ s/,$//g;
     Log3 $hash, 5, "[$name] Switchingtime: @{$switchingtimes}[$i] : $listOfDays -> $time -> $para ";
@@ -493,11 +504,9 @@ sub Heating_Control_akt_next_param($$) {
         }
         if ($secondsToSwitch<=0) {
           $newParam   = $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
-          $newParam   = sprintf("%.1f", $newParam)   if ($newParam =~ m/^[0-9]{1,3}$/i);
           $nowSwitch  = $next;
         } else {
           $nextParam  = $hash->{helper}{SWITCHINGTIME}{$wd}{$st};
-          $nextParam  = sprintf("%.1f", $nextParam)  if ($nextParam =~ m/^[0-9]{1,3}$/i);
           $nextSwitch = $next;
           last;
         }
@@ -507,7 +516,6 @@ sub Heating_Control_akt_next_param($$) {
 
   if ($now > $nextSwitch) {
      $nextSwitch  = max ($now+60,$nextSwitch);
-     Log 3, "nextSwitch-+60----------->" . strftime("%d.%m.%Y  %H:%M:%S",localtime($nextSwitch));
   }
   return ($nowSwitch,$nextSwitch,$newParam,$nextParam);
 }
@@ -530,9 +538,11 @@ sub Heating_Control_Device_Schalten($$$$) {
     $command = '{ fhem("set @ '. $setModifier .' %") }';
   }
 
-  my $aktParam = ReadingsVal($hash->{DEVICE}, $setModifier, 0);
-     $aktParam = sprintf("%.1f", $aktParam)   if ($aktParam =~ m/^[0-9]{1,3}$/i);
-
+  my $isHeating = $setModifier gt "";
+  my $aktParam  = ReadingsVal($hash->{DEVICE}, $setModifier, 0);
+     $aktParam  = sprintf("%.1f", $aktParam)   if ($isHeating && $aktParam =~ m/^[0-9]{1,3}$/i);
+     $newParam  = sprintf("%.1f", $newParam)   if ($isHeating && $newParam =~ m/^[0-9]{1,3}$/i);
+     
   Log3 $hash, 4, $mod .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; aktParam: $aktParam ; newParam: $newParam";
 
   my $disabled = AttrVal($hash->{NAME}, "disable", 0);
@@ -614,7 +624,6 @@ sub Heating_Control_isHeizung($) {
       } else {   
          $model = AttrVal($hash->{DEVICE}, $subTypeReading, "nF");
       }        
-      Log3 $hash, 5, "model------------>$model";
       
       if (defined($setmodifiers{$dType}{$model})) {
          $setModifier = $setmodifiers{$dType}{setModifier}
@@ -622,7 +631,6 @@ sub Heating_Control_isHeizung($) {
          $setModifier = "";
       }
   }
-  Log3 $hash, 5, "setModifier------------>$setModifier";
   return $setModifier;
 }
 
@@ -710,7 +718,7 @@ sub SortNumber {
       <ul><b>[&lt;weekdays&gt;|]&lt;time&gt;|&lt;parameter&gt;</b></ul><br>
       <u>weekdays:</u> optional, if not set every day is using.<br>
         Otherwise you can define one day as number or as shortname.<br>
-      <u>time:</u>define the time to switch, format: HH:MM:[SS](HH in 24 hour format) or a Perlfunction like {sunrise_abs()}<br>
+      <u>time:</u>define the time to switch, format: HH:MM:[SS](HH in 24 hour format) or a Perlfunction like {sunrise_abs()}. Within the {} you can use the variable $date(epoch) to get the exact switchingtimes of the week. Example: {sunrise_abs_dat($date)}<br>
       <u>parameter:</u>the temperature to be set, using a float with mask 99.9 or a sybolic value like <b>eco</b> or <b>comfort</b> - whatever your thermostat understands.
       The symbolic value can be added an additional parameter:  dayTemp:16 night-temp:15. See examples <br>
     </ul>
@@ -884,7 +892,7 @@ sub SortNumber {
       <u>Wochentage:</u> optionale Angabe, falls nicht gesetzt wird der Schaltpunkt jeden Tag ausgef&uumlhrt.
         F&uumlr die Tage an denen dieser Schaltpunkt aktiv sein soll, ist jeder Tag mit seiner
         Tagesnummer (Mo=1, ..., So=7) oder Name des Tages (Mo, Di, ..., So) einzusetzen.<br>
-      <u>Uhrzeit:</u>Angabe der Uhrzeit zu der geschaltet werden soll, Format: HH:MM:[SS](HH im 24 Stunden Format) oder eine Perlfunction wie {sunrise_abs()}<br>
+      <u>Uhrzeit:</u>Angabe der Uhrzeit zu der geschaltet werden soll, Format: HH:MM:[SS](HH im 24 Stunden Format) oder eine Perlfunction wie {sunrise_abs()}. In {} kannst du die Variable $date(epoch) nutzen, um die Schlatzeiten der Woche zu berechnen. Beispiel: {sunrise_abs_dat($date)}<br>
       <u>Parameter:</u>Angabe der zu setzenden Temperatur als Zahl mit Format 99.9 oder als symbolische Konstante <b>eco</b>
       or <b>comfort</b> - was immer das Heizk&oumlrperthermostat versteht.
       Symbolischen Werten kann ein zus&aumltzlicher Parameter angeh&aumlngt werden: dayTemp:16 night-temp:15. Unten folgen Beispiele<br><br>
