@@ -124,10 +124,15 @@ sub gcmsend_fillGeneralPayload($$) {
   if (AttrVal($name, "vibrate", "false") eq "true") {
     $vibrate = "true";
   }
+  my $playSound = "false";
+  if (AttrVal($name, "playSound", "false") eq "true") {
+    $playSound = "true";
+  }
   
   return $payloadString . "," .
     "\"source\":\"gcmsend_fhem\"," .
-    "\"vibrate\":\"$vibrate\"";  
+    "\"vibrate\":\"$vibrate\"," .
+    "\"playSound\":\"$playSound\"";
 }
 
 sub gcmsend_sendNotify($$$) {
