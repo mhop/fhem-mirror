@@ -156,8 +156,8 @@ Ext.define('FHEM.controller.ChartController', {
             var fileLogNames = [];
             
             Ext.each(FHEM.filelogs, function(log) {
-                if (log.REGEXP && log.REGEXP !== "fakelog" && log.NAME !== "") {
-                    var devObj = { "DEVICE": log.NAME};
+                if (log.Internals.REGEXP && log.Internals.REGEXP !== "fakelog" && log.Internals.NAME !== "") {
+                    var devObj = { "DEVICE": log.Internals.NAME};
                     fileLogNames.push(devObj);
                 }
             });
@@ -200,9 +200,9 @@ Ext.define('FHEM.controller.ChartController', {
             logname = selectionArray[0];
         }
         Ext.each(FHEM.filelogs, function(log) {
-            if (log.NAME === logname) {
+            if (log.Internals.NAME === logname) {
                 // found the filelog entry, getting the logfile to load values
-                currentlogfile = log.currentlogfile;
+                currentlogfile = log.Internals.currentlogfile;
                 return false;
             }
         });
@@ -759,9 +759,9 @@ Ext.define('FHEM.controller.ChartController', {
             cmd;
         if (logtype && logtype === "filelog") {
             Ext.each(FHEM.filelogs, function(log) {
-                if (log.NAME === device) {
+                if (log.Internals.NAME === device) {
                     // found the filelog entry, getting the logfile to load values
-                    currentlogfile = log.currentlogfile;
+                    currentlogfile = log.Internals.currentlogfile;
                     return false;
                 }
             });
@@ -2292,80 +2292,77 @@ Ext.define('FHEM.controller.ChartController', {
      * handling the moving of nodes in tree, saving new position of saved charts in db
      */
     movenodeintree: function(treeview, action, collidatingrecord) {
-        var me = this,
-            unsorted = Ext.ComponentQuery.query('treepanel button[name=unsortedtree]')[0].pressed;
+        var me = this;
         
         //only save orders when in sorted mode
-        if (!unsorted) {
-            Ext.ComponentQuery.query('treepanel')[0].setLoading(true);
-            var rec = action.records[0],
-            id = rec.raw.data.ID;
-        
-            if (rec.raw.data && rec.raw.data.ID &&
-                (rec.raw.data.TYPE === "savedchart" || rec.raw.data.TYPE === "savedfilelogchart") &&
-                !rec.raw.data.template) {
-                
-                var rootNode = this.getMaintreepanel().getRootNode();
-                rootNode.cascadeBy(function(node) {
-                    if (node.raw && node.raw.data && node.raw.data.ID && node.raw.data.ID === id) {
-                        //updating whole folder to get indexes right
-                        Ext.each(node.parentNode.childNodes, function(node) {
-                            var ownerfolder = node.parentNode.data.text,
-                            index = node.parentNode.indexOf(node);
+        Ext.ComponentQuery.query('treepanel')[0].setLoading(true);
+        var rec = action.records[0],
+        id = rec.raw.data.ID;
+    
+        if (rec.raw.data && rec.raw.data.ID &&
+            (rec.raw.data.TYPE === "savedchart" || rec.raw.data.TYPE === "savedfilelogchart") &&
+            !rec.raw.data.template) {
+            
+            var rootNode = this.getMaintreepanel().getRootNode();
+            rootNode.cascadeBy(function(node) {
+                if (node.raw && node.raw.data && node.raw.data.ID && node.raw.data.ID === id) {
+                    //updating whole folder to get indexes right
+                    Ext.each(node.parentNode.childNodes, function(node) {
+                        var ownerfolder = node.parentNode.data.text,
+                        index = node.parentNode.indexOf(node);
+                        
+            
+                        if (node.raw.data && node.raw.data.ID && node.raw.data.VALUE) {
+                            var chartid = node.raw.data.ID,
+                                chartconfig = node.raw.data.VALUE;
+                            chartconfig.parentFolder = ownerfolder;
+                            chartconfig.treeIndex = index;
+                            var encodedchartconfig = Ext.encode(chartconfig),
+                                url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+updatechart+""+""+' + chartid + '+' + encodedchartconfig + '&XHR=1'; 
                             
-                
-                            if (node.raw.data && node.raw.data.ID && node.raw.data.VALUE) {
-                                var chartid = node.raw.data.ID,
-                                    chartconfig = node.raw.data.VALUE;
-                                chartconfig.parentFolder = ownerfolder;
-                                chartconfig.treeIndex = index;
-                                var encodedchartconfig = Ext.encode(chartconfig),
-                                    url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+updatechart+""+""+' + chartid + '+' + encodedchartconfig + '&XHR=1'; 
+                            // check for filelog or dblog
+                            if (node.raw.data.TYPE === "savedfilelogchart") {
                                 
-                                // check for filelog or dblog
-                                if (node.raw.data.TYPE === "savedfilelogchart") {
-                                    
-                                    if (Ext.Array.contains(FHEM.filelogcharts, rec.raw.data) === true) {
-                                        Ext.Array.remove(FHEM.filelogcharts, rec.raw.data);
-                                        var newRec = rec.raw.data;
-                                        newRec.parentFolder = ownerfolder;
-                                        newRec.treeIndex = index;
-                                        FHEM.filelogcharts.push(newRec);
+                                if (Ext.Array.contains(FHEM.filelogcharts, rec.raw.data) === true) {
+                                    Ext.Array.remove(FHEM.filelogcharts, rec.raw.data);
+                                    var newRec = rec.raw.data;
+                                    newRec.parentFolder = ownerfolder;
+                                    newRec.treeIndex = index;
+                                    FHEM.filelogcharts.push(newRec);
 //                                      
-                                        me.updateFileLogCharts();
-                                    }
-                                    
-                                } else {
-                                    Ext.Ajax.request({
-                                        method: 'GET',
-                                        disableCaching: false,
-                                        url: url,
-                                        success: function(response){
-                                            Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
-                                            var json = Ext.decode(response.responseText);
-                                            if (json && json.success === "true" || json.data && json.data.length === 0) {
-                                                //be quiet
-                                            } else if (json && json.msg) {
-                                                Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
-                                            } else {
-                                                Ext.Msg.alert("Error", "The new position could not be saved!");
-                                            }
-                                        },
-                                        failure: function() {
-                                            Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
-                                            if (json && json.msg) {
-                                                Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
-                                            } else {
-                                                Ext.Msg.alert("Error", "The new position could not be saved!");
-                                            }
-                                        }
-                                    });
+                                    me.updateFileLogCharts();
                                 }
+                                
+                            } else {
+                                Ext.Ajax.request({
+                                    method: 'GET',
+                                    disableCaching: false,
+                                    url: url,
+                                    success: function(response){
+                                        Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
+                                        var json = Ext.decode(response.responseText);
+                                        if (json && json.success === "true" || json.data && json.data.length === 0) {
+                                            //be quiet
+                                        } else if (json && json.msg) {
+                                            Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
+                                        } else {
+                                            Ext.Msg.alert("Error", "The new position could not be saved!");
+                                        }
+                                    },
+                                    failure: function() {
+                                        Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
+                                        if (json && json.msg) {
+                                            Ext.Msg.alert("Error", "The new position could not be saved, error Message is:<br><br>" + json.msg);
+                                        } else {
+                                            Ext.Msg.alert("Error", "The new position could not be saved!");
+                                        }
+                                    }
+                                });
                             }
-                        });
-                    }
-                });
-            }
+                        }
+                    });
+                }
+            });
         }
         Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
     }

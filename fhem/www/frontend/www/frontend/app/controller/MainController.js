@@ -66,12 +66,6 @@ Ext.define('FHEM.controller.MainController', {
             'button[name=restartfhem]': {
                 click: this.restartFhem
             },
-            'button[name=unsortedtree]': {
-                click: this.setupTree
-            },
-            'button[name=sortedtree]': {
-                click: this.setupTree
-            },
             'panel[name=statuspanel]': {
                 saveconfig: this.saveObjectToUserConfig
             }
@@ -88,9 +82,6 @@ Ext.define('FHEM.controller.MainController', {
         me.createFHEMPanel();
         me.createDevicePanel();
         me.createLineChartPanel();
-        me.createDatabaseTablePanel();
-        
-        me.showFHEMStatusPanel();
         
         me.getMainviewport().show();
         me.getMainviewport().getEl().setOpacity(0);
@@ -101,18 +92,16 @@ Ext.define('FHEM.controller.MainController', {
             remove: false
         });
         
-        if (Ext.isDefined(FHEM.version)) {
-            var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 1.0.8 - 2014-01-12");
-        }
+        var sp = this.getStatustextfield();
+        sp.setText("Frontend Version: 1.1.0 - 2014-11-08");
         
-        this.setupTree(false);
+        this.setupTree();
     },
     
     /**
      * setup west accordion / treepanel
      */
-    setupTree: function(unsorted) {
+    setupTree: function() {
         var me = this,
             rootNode = { text:"root", expanded: true, children: []},
             oldRootNode = me.getMaintreepanel().getRootNode();
@@ -121,78 +110,50 @@ Ext.define('FHEM.controller.MainController', {
         if (oldRootNode) {
             oldRootNode.removeAll();
         }
-        if (unsorted && unsorted.name === 'unsortedtree') {
-            //setup the tree "unsorted"
-            Ext.each(FHEM.info.Results, function(result) {
-                if (result.list && !Ext.isEmpty(result.list)) {
-                    if (result.devices && result.devices.length > 0) {
-                        var blacklist = ['dummy', 'notify', 'Global', 'telnet', 'DbLog', 'FileLog', 'FHEMWEB', 'weblink'];
-                        if (Ext.Array.contains(blacklist, result.list)) {
-                            node = {text: result.list, expanded: false, children: []};
-                        } else {
-                            node = {text: result.list, expanded: true, children: []};
+        //sort / create items by room
+        var rooms = [];
+        Ext.each(FHEM.info.Results, function(result) {
+            
+            // get all rooms
+            if (result.Attributes && result.Attributes.room) {
+                var roomArray = result.Attributes.room.split(",");
+                Ext.each(roomArray, function(room) {
+                    if (!Ext.Array.contains(rooms, room)) {
+                        var roomfolder;
+                        if (room === "Unsorted") {
+                            roomfolder = {text: room, leaf: false, expanded: false, children: []};
+                            rootNode.children.push(roomfolder);
+                        } else if (room !== "hidden") {
+                            roomfolder = {text: room, leaf: false, expanded: true, children: []};
+                            rootNode.children.push(roomfolder);
                         }
-                        Ext.each(result.devices, function(device) {
-                            var subnode = {text: device.NAME, leaf: true, data: device};
-                            node.children.push(subnode);
-                        }, this);
-                    } else {
-                        node = {text: result.list, leaf: true};
+                        rooms.push(room);
                     }
-                    rootNode.children.push(node);
+                });
+            }
+        });
+        
+        Ext.each(FHEM.info.Results, function(result) {
+                if (result.Attributes && result.Attributes.room && result.Attributes.room !== "hidden") {
+                    //get room
+                    Ext.each(rootNode.children, function(room) {
+                        if (room.text === result.Attributes.room) {
+                            var subnode = {text: result.Internals.NAME, leaf: true, data: result};
+                            room.children.push(subnode);
+                            return false;
+                        }
+                    });
                 }
-            });
-            this.getMaintreepanel().setRootNode(rootNode);
-            this.addChartsToTree();
-        } else {
-            //sort / create items by room
-            me.getMaintreepanel().setRootNode(rootNode);
-            var root = me.getMaintreepanel().getRootNode();
-            Ext.each(FHEM.info.Results, function(result) {
-                if (result.list && !Ext.isEmpty(result.list)) {
-                    if (result.devices && result.devices.length > 0) {
-                        Ext.each(result.devices, function(device) {
-                            if (device.ATTR && device.ATTR.room) {
-                                //first we check if we have comma separated multiple rooms
-                                var roomArray = device.ATTR.room.split(",");
-                                Ext.each(roomArray, function(room) {
-                                  //check if room exists
-                                    var resultnode = root.findChild("text", room, true),
-                                        subnode = {text: device.NAME, leaf: true, data: device};
-                                    if (!resultnode) {
-                                        //create roomfolder
-                                        var roomfolder;
-                                        if (room !== "hidden") {
-                                            if (room === "Unsorted") {
-                                                roomfolder = {text: room, leaf: false, expanded: false, children: []};
-                                            } else {
-                                                roomfolder = {text: room, leaf: false, expanded: true, children: []};
-                                            }
-                                            roomfolder.children.push(subnode);
-                                            root.appendChild(roomfolder);
-                                        }
-                                    } else {
-                                        resultnode.appendChild(subnode);
-                                        root.appendChild(resultnode);
-                                    }
-                                });
-                            }
-                        }, this);
-                    } else {
-                        node = {text: result.list, leaf: true};
-                        root.appendChild(node);
-                    }
-                }
-            });
-            this.addChartsToTree();
-        }
+        });
+        me.getMaintreepanel().setRootNode(rootNode);
+        this.addChartsToTree();
     },
     
     /**
      * 
      */
     addChartsToTree: function() {
-      //load the saved charts store with configured dblog name
+        //load the saved charts store with configured dblog name
         var me = this,
             store = Ext.create('FHEM.store.SavedChartsStore', {});
         store.getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getcharts&XHR=1';
@@ -212,10 +173,9 @@ Ext.define('FHEM.controller.MainController', {
             }
             
             store.each(function(rec) {
-                var chartchild,
-                    unsortedMode = Ext.ComponentQuery.query('button[name=unsortedtree]')[0].pressed;
+                var chartchild;
                 
-                if (!unsortedMode && rec.raw && rec.raw.VALUE && rec.raw.VALUE.parentFolder) {
+                if (rec.raw && rec.raw.VALUE && rec.raw.VALUE.parentFolder) {
                     var ownerFolder = rec.raw.VALUE.parentFolder,
                         index = rec.raw.VALUE.treeIndex,
                         parentNode = rootNode.findChild("text", ownerFolder, true);
@@ -432,10 +392,10 @@ Ext.define('FHEM.controller.MainController', {
             Ext.Ajax.request({
                 method: 'GET',
                 disableCaching: false,
-                url: '../../../fhem?cmd=jsonlist&XHR=1',
+                url: '../../../fhem?cmd=jsonlist2&XHR=1',
             
                 success: function(response){
-                    if (response.responseText !== "Unknown command JsonList, try help↵") {
+                    if (response.responseText !== "Unknown command JsonList2, try help↵") {
                         //restarting the frontend
                         window.location.reload();
                     } else {
@@ -528,12 +488,12 @@ Ext.define('FHEM.controller.MainController', {
         if (record.raw.leaf === true) {
             var panel = Ext.ComponentQuery.query('devicepanel')[0];
             var title;
-            if (record.raw.ATTR && 
-                record.raw.ATTR.alias && 
-                !Ext.isEmpty(record.raw.ATTR.alias)) {
-                    title = record.raw.data.ATTR.alias;
+            if (record.raw.data.Attributes && 
+                record.raw.data.Attributes.alias && 
+                !Ext.isEmpty(record.raw.data.Attributes.alias)) {
+                    title = record.raw.data.Attributes.alias;
             } else {
-                title = record.raw.data.NAME;
+                title = record.raw.data.Internals.NAME;
             }
             panel.setTitle(title);
             panel.record = record;
@@ -564,6 +524,10 @@ Ext.define('FHEM.controller.MainController', {
      */
     showLineChartPanel: function() {
         var panel = Ext.ComponentQuery.query('linechartpanel')[0];
+        if (!panel) {
+            this.createLineChartPanel();
+            panel = Ext.ComponentQuery.query('linechartpanel')[0];
+        }
         this.hideCenterPanels();
         panel.show();
     },
@@ -602,6 +566,10 @@ Ext.define('FHEM.controller.MainController', {
      */
     showDatabaseTablePanel: function() {
         var panel = Ext.ComponentQuery.query('tabledatagridpanel')[0];
+        if (!panel) {
+            this.createDatabaseTablePanel();
+            panel = Ext.ComponentQuery.query('tabledatagridpanel')[0];
+        }
         this.hideCenterPanels();
         panel.show();
     },

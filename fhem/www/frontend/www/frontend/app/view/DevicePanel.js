@@ -132,7 +132,7 @@ Ext.define('FHEM.view.DevicePanel', {
             // Starting a task to update the device readings
             var task = {
                 run: function(){
-                    me.getDeviceData(me.record.raw.data.NAME);
+                    me.getDeviceData(me.title);
                 },
                 interval: 5000 //5 seconds
             };
@@ -150,7 +150,7 @@ Ext.define('FHEM.view.DevicePanel', {
      */
     sendCommand: function(command, value) {
         var me = this,
-            url = '../../../fhem?cmd=set ' + me.record.raw.data.NAME + ' '+ command;
+            url = '../../../fhem?cmd=set ' + me.record.raw.data.Internals.NAME + ' '+ command;
         
         if (value && !Ext.isEmpty(value)) {
             url += ' ' + value;
@@ -189,7 +189,7 @@ Ext.define('FHEM.view.DevicePanel', {
                     
                     // trigger an update nearly immediately to set new values
                     var task = new Ext.util.DelayedTask(function(){
-                        me.getDeviceData(me.record.raw.data.NAME);
+                        me.getDeviceData(me.record.raw.data.Internals.NAME);
                     });
                     task.delay(1000);
                     
@@ -209,20 +209,12 @@ Ext.define('FHEM.view.DevicePanel', {
     updateControls: function(results) {
 
         var me = this,
-            allSets = results.sets,
+            allSets = [],
             controlfieldset = me.down('panel[name=container] fieldset[name=controlfieldset]');
         
         if (controlfieldset.items.length <= 0) {
             
-            if (results.ATTR.webCmd) {
-                Ext.each(results.sets, function(set) {
-                    var split = set.split(":");
-                    if (split[0] === results.ATTR.webCmd) {
-                        // overriding all sets as we only need the user defined webcmd now
-                        allSets = set;
-                    }
-                });
-            } 
+            allSets = results.PossibleSets.split(" ");
             
             Ext.each(allSets, function(set) {
                 //check for button / slider
@@ -256,12 +248,10 @@ Ext.define('FHEM.view.DevicePanel', {
                             });
                             
                             var current;
-                            Ext.each(results.READINGS, function(reading) {
-                                Ext.iterate(reading, function(k,v) {
-                                    if (k === text) {
-                                        current = v;
-                                    }
-                                });
+                            Ext.iterate(results.Readings, function(k,v) {
+                                if (k === text) {
+                                    current = v.Value;
+                                }
                             });
                             
                             var combo = Ext.create('Ext.form.ComboBox', {
@@ -285,12 +275,10 @@ Ext.define('FHEM.view.DevicePanel', {
                             Ext.each(splitvals, function(val) {
                                 
                                 var pressed = false;
-                                Ext.each(results.READINGS, function(reading) {
-                                    Ext.iterate(reading, function(k,v) {
-                                        if (k === text && v === val || k === text && val === "0" && v === "null") {
-                                            pressed = true;
-                                        } 
-                                    });
+                                Ext.iterate(results.Readings, function(k,v) {
+                                    if (k === text && v.Value === val || k === text && val === "0" && v.Value === "null") {
+                                        pressed = true;
+                                    } 
                                 });
                                 
                                 var control = Ext.create('Ext.button.Button', {
@@ -323,12 +311,10 @@ Ext.define('FHEM.view.DevicePanel', {
                     var xtype = item.getXType(),
                         current;
                     
-                    Ext.each(results.READINGS, function(reading) {
-                        Ext.iterate(reading, function(k,v) {
-                            if (k === subfieldset.title) {
-                                current = v;
-                            }
-                        });
+                    Ext.iterate(results.Readings, function(k,v) {
+                        if (k === subfieldset.title) {
+                            current = v.Value;
+                        }
                     });
                     
                     if (xtype === "combobox") {
@@ -358,67 +344,45 @@ Ext.define('FHEM.view.DevicePanel', {
         
         var me = this,
             devicedata = [],
+            readingsdata = [],
             devicegrid = me.down('panel[name=container] grid[name=devicedata]'),
             devicestore = devicegrid.getStore(),
             readingsgrid = me.down('panel[name=container] grid[name=readingsgrid]'),
             readingsstore = readingsgrid.getStore();
         
-        Ext.iterate(readings, function(key, value) {
-            if (key !== 'ATTR' && key !== 'attrs' &&
-                key !== 'ATTRIBUTES' && key !== 'sets' && 
-                key !== 'READINGS' && key !== 'CHANGETIME') {
-                
-                if (typeof value === "object") {
-                    Ext.iterate(value, function(k, v) {
-                        var obj = {
-                                key: k,
-                                value: v
-                        };
-                        devicedata.push(obj);
-                    });
-                    
-                } else {
-                    var obj = {
-                            key: key,
-                            value: value
-                    };
-                    devicedata.push(obj);
-                }
-            }
+        Ext.iterate(readings.Internals, function(k, v) {
+            var obj = {
+                key: k,
+                value: v
+            };
+            devicedata.push(obj);
         });
         
         devicestore.loadData(devicedata);
         
-        var readingcollection = readings.READINGS,
-            readingsdata = [];
-        
-        Ext.each(readingcollection, function(readings) {
-            Ext.each(readings, function(reading) {
-                Ext.iterate(reading, function(key, value) {
-                    
-                    var obj;
-                    if (typeof value === "object") {
-                        obj = {
-                                key: key,
-                                value: value.VAL,
-                                measured: value.TIME
-                        };
-                        readingsdata.push(obj);
-                        
-                    } else if (key !== "measured") {
-                        obj = {
-                                key: key,
-                                value: value,
-                                measured: ''
-                        };
-                        readingsdata.push(obj);
-                    } else {
-                        // as the measured time belongs to the last dataset, we merge it..
-                        readingsdata[readingsdata.length - 1].measured = value;
-                    }
-                    
-                });
-            });
+        Ext.iterate(readings.Readings, function(key, value) {
+            
+            var obj;
+            if (typeof value === "object") {
+                obj = {
+                        key: key,
+                        value: value.Value,
+                        measured: value.Time
+                };
+                readingsdata.push(obj);
+                
+            } else if (key !== "measured") {
+                obj = {
+                        key: key,
+                        value: value,
+                        measured: ''
+                };
+                readingsdata.push(obj);
+            } else {
+                // as the measured time belongs to the last dataset, we merge it..
+                readingsdata[readingsdata.length - 1].measured = value;
+            }
+            
         });
         
         readingsstore.loadData(readingsdata);
@@ -432,7 +396,7 @@ Ext.define('FHEM.view.DevicePanel', {
         Ext.Ajax.request({
             method: 'GET',
             disableCaching: false,
-            url: '../../../fhem?cmd=jsonlist&XHR=1',
+            url: '../../../fhem?cmd=jsonlist2&XHR=1',
             scope: me,
             success: function(response){
                 me.setLoading(false);
@@ -441,11 +405,10 @@ Ext.define('FHEM.view.DevicePanel', {
                 
                 var devicejson;
                 Ext.each(json.Results, function(result) {
-                    Ext.each(result.devices, function(device) {
-                        if (device.NAME === name) {
-                            devicejson = device;
-                        }
-                    });
+                    if (result.Internals.NAME === name) {
+                        devicejson = result;
+                        return false;
+                    }
                 });
                 if (devicejson && devicejson !== "") {
                     me.updateControls(devicejson);
