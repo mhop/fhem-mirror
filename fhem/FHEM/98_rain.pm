@@ -102,8 +102,9 @@ rain_Notify($$)
     my $tm = TimeNow();
     my $tsecs= time();  # number of non-leap seconds since January 1, 1970, UTC
     
-    # The next instr wont work for empty hashes, so we init it now
-    $dev->{READINGS}{$txt[0]}{VAL} = 0 if(!$dev->{READINGS});
+    ##### disabled because of creating a READING rain in some definitions
+    ### The next instr wont work for empty hashes, so we init it now
+    # $dev->{READINGS}{$txt[0]}{VAL} = 0 if(!$dev->{READINGS});
     my $r = $dev->{READINGS};
     
   my $devName = $dev->{NAME};
