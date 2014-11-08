@@ -2612,7 +2612,12 @@ SignalHandling()
     my ($msg) = @_;
 
     return if($inWarnSub);
+    if(!$attr{global}{stacktrace} && $data{WARNING}{$msg}) {
+      $data{WARNING}{$msg}++;
+      return;
+    }
     $inWarnSub = 1;
+    $data{WARNING}{$msg}++;
     chomp($msg);
     Log 1, "PERL WARNING: $msg"; 
     Log 3, "eval: $cmdFromAnalyze" if($cmdFromAnalyze && $msg =~ m/\(eval /);
