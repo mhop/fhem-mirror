@@ -41,6 +41,7 @@ my %filelist2 = (
   "FHEM/FhemUtils/update-.*",   => { type=>",fhem,", dir=>"FHEM/FhemUtils"},
   "FHEM/lib/.*.pm"              => { type=>",fhem,", dir=>"FHEM/lib"},
   "FHEM/lib/.*.xml"             => { type=>",fhem,", dir=>"FHEM/lib"},
+  "FHEM/firmware/.*"            => { type=>",fhem,", dir=>"FHEM/firmware"},
   "FHEM/lib/SWAP/.*.xml"        => { type=>",fhem,", dir=>"FHEM/lib/SWAP"},
   "FHEM/lib/SWAP/panStamp/.*"   => { type=>",fhem,", dir=>"FHEM/lib/SWAP/panStamp"},
   "FHEM/lib/SWAP/justme/.*"     => { type=>",fhem,", dir=>"FHEM/lib/SWAP/justme"},
