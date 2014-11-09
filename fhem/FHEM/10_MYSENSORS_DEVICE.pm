@@ -77,6 +77,7 @@ BEGIN {
     AssignIoPort
     Log3
     SetExtensions
+    ReadingsVal
   ))
 };
 
