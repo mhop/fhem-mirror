@@ -1,5 +1,5 @@
-VERS=5.5
-DATE=2013-09-29
+VERS=5.6
+DATE=2014-11-09
 
 # used for nightly build
 DATEN=$(shell date +"%Y-%m-%d")
@@ -31,7 +31,6 @@ all:
 	@echo "    install       - to install fhem"
 	@echo "    dist          - to create a .tar.gz file"
 	@echo "    deb           - to create a .deb file"
-	@echo "    deb-nightly   - to create a nightly .deb file from current svn"
 	@echo "    synology      - to create an spk file"
 	@echo "    fb7390        - to create an AVM Fritz!Box 7390 imagefile"
 	@echo "    fb7270        - to create a zip file for the AVM Fritz!Box 7270"
@@ -71,25 +70,6 @@ install:
 	@echo "  perl $(BINDIR)/fhem.pl $(ETCDIR)/fhem.cfg"
 	@echo
 
-backup:
-	@echo
-	@echo "Saving fhem to the .backup directory in the current directory"
-	@-if [ ! -e .backup ]; then mkdir .backup; fi;
-	@tar czf .backup/fhem-backup_`date +%y%m%d%H%M`.tar.gz \
-		$(RETCDIR)/fhem* $(RBINDIR)/fhem* $(RDOCDIR)\
-                $(RMODDIR) $(RMANDIR)/fhem* $(RVARDIR)
-
-uninstall:backup
-	@echo
-	@echo "Remove fhem installation..."
-	rm -rf $(RETCDIR)/fhem.cfg
-	rm -rf $(RBINDIR)/fhem.pl
-	rm -rf $(RMODDIR)
-	rm -rf $(RMANDIR)/fhem.pl.*
-	rm -rf $(RVARDIR)
-	@echo done
-	@echo
-
 dist:
 	mkdir .f
 	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
@@ -104,36 +84,13 @@ dist:
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print | grep -v Makefile | grep -v SWAP |\
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
+	@echo "    deb-nightly   - to create a nightly .deb file from current svn"
 	rm -rf .f/www/SVGcache
 	mv .f $(DESTDIR)
 	tar cf - $(DESTDIR) | gzip -9 > $(DESTDIR).tar.gz
 	rm -rf $(DESTDIR)
 
-dist-clean:
-	rm -rf *.html $(DESTDIR).tar.gz
-
 deb:
-	@echo $(PWD)
-	rm -rf .f
-	make ROOT=`pwd`/.f install
-	cp -r contrib/DEBIAN .f
-	rm -rf .f/$(MODDIR)/contrib/FB7*/var
-	rm -rf .f/$(MODDIR)/contrib/FB7*/*.image
-	rm -rf .f/$(MODDIR)/contrib/FB7*/*.zip
-	find .f -name .svn -print | xargs rm -rf
-	find .f -name \*.orig -print | xargs rm -f
-	find .f -name .#\* -print | xargs rm -f
-	find .f -type f -print | grep -v Makefile |\
-		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
-	find .f -type f | xargs chmod 644
-	find .f -type d | xargs chmod 755
-	chmod 755 `cat contrib/executables`
-	chown -R root:root .f
-	mv .f $(DESTDIR)
-	dpkg-deb --build $(DESTDIR)
-	rm -rf $(DESTDIR)
-
-deb-nightly:
 	@echo $(PWD)
 	rm -rf .f
 	rm -rf $(DESTDIR)
@@ -155,6 +112,25 @@ deb-nightly:
 	mv .f $(DESTDIR)
 	dpkg-deb --build $(DESTDIR)
 	rm -rf $(DESTDIR)
+
+backup:
+	@echo
+	@echo "Saving fhem to the .backup directory in the current directory"
+	@-if [ ! -e .backup ]; then mkdir .backup; fi;
+	@tar czf .backup/fhem-backup_`date +%y%m%d%H%M`.tar.gz \
+		$(RETCDIR)/fhem* $(RBINDIR)/fhem* $(RDOCDIR)\
+                $(RMODDIR) $(RMANDIR)/fhem* $(RVARDIR)
+
+uninstall:backup
+	@echo
+	@echo "Remove fhem installation..."
+	rm -rf $(RETCDIR)/fhem.cfg
+	rm -rf $(RBINDIR)/fhem.pl
+	rm -rf $(RMODDIR)
+	rm -rf $(RMANDIR)/fhem.pl.*
+	rm -rf $(RVARDIR)
+	@echo done
+	@echo
 
 fb7390:
 	cd contrib/FB7390 && sh ./makeimage $(DESTDIR)

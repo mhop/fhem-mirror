@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - fhem 5.6 released
+
+- 2014-11-09 (5.6)
   - bugfix: FB_CALLMONITOR: fixing race condition of missing events while 
                             performing multiple calls
   - added: PROPLANTA: captures weather forecast from www.proplanta.de
