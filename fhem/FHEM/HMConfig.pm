@@ -1503,6 +1503,7 @@ $culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
                          ,tempListThu    =>"[prep|exec] HH:MM temp ..."
                          ,tempListWed    =>"[prep|exec] HH:MM temp ..."
                          ,tempListFri    =>"[prep|exec] HH:MM temp ..."
+                         ,tempListTmpl   =>"[verify|restore] [[<file>:]templateName] ..."
                          ,partyMode      =>"[prep|exec] HH:MM durationDays ..."
                          ,displayMode    =>"[temp-only|temp-hum]"
                          ,displayTemp    =>"[actual|setpoint]"
