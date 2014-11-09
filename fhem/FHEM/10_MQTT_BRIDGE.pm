@@ -189,7 +189,7 @@ sub onmessage($$$) {
 <ul>
   <p>acts as a bridge in between an fhem-device and <a href="http://mqtt.org/">mqtt</a>-topics.</p>
   <p>requires a <a href="#MQTT">MQTT</a>-device as IODev<br/>
-     Note: this module is based on module <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a>.</p>
+     Note: this module is based on <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a> which needs to be installed from CPAN first.</p>
   <a name="MQTT_BRIDGEdefine"></a>
   <p><b>Define</b></p>
   <ul>
