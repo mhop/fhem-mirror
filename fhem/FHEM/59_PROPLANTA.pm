@@ -42,7 +42,7 @@ my $curCol = 0;
 my $curTextPos = 0;
 my $curReadingType = 0;
 
-  # 1 = Span Text, 2 = readingName, 3 = Tag-Type
+  # 1 = span|b Text, 2 = readingName, 3 = Tag-Type
   # Tag-Types: 
   #   1 = Number Col 3
   #   2 = Number Col 2-5 
@@ -51,13 +51,15 @@ my $curReadingType = 0;
   #   5 = Time Col 2-5
   #   6 = Time Col 3
   #   7 = Image Col 2-5
+  #   8 = MinMaxNummer Col 3
   my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
       ,["relative Feuchte", "humidity", 1]
       ,["Sichtweite", "visibility", 1]
       ,["Windgeschwindigkeit", "wind", 1]
       ,["Luftdruck", "pressure", 1]
       ,["Taupunkt", "dewPoint", 1]
-      ,["Uhrzeit", "time", 6]
+      ,["Uhrzeit", "obs_time", 6]
+      ,["Höhe der", "cloudBase", 8]
   );
 
   # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type (see above)
@@ -121,19 +123,6 @@ my $curReadingType = 0;
      ,"stark" => 3
   );
   
-   my %url_start =( "de" => "http://www.proplanta.de/Wetter/"
-   , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/"
-   , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/"
-   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/"
-   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/"
-   );
-
-   my %url_end = ( "de" => "-Wetter.html"
-   , "at" => "/"
-   , "ch" => "/"
-   , "fr" => "/"
-   , "it" => "/"
-   );
 
 # here HTML::text/start/end are overridden
 sub text
@@ -245,6 +234,24 @@ sub text
             push( @texte, $readingName."|".$text ); 
          }
       }
+   # Tag-Type 8 = MinMaxNumber Col 3
+      elsif ($curReadingType == 8) 
+      {
+         if ( $curCol == 3 )
+         {
+            $readingName = $curReadingName;
+            if ( $text =~ m/(\d+)\s*-\s*(\d+)/ )
+            {
+               push( @texte, $readingName."Min|".$1 ); 
+               push( @texte, $readingName."Max|".$2 ); 
+            }
+            else
+            {
+               push( @texte, $readingName."Min|-" ); 
+               push( @texte, $readingName."Max|-" ); 
+            }
+         }
+      }
    }
 }
 
@@ -314,13 +321,28 @@ use warnings;
 use Data::Dumper;
 use LWP::UserAgent;
 use HTTP::Request;
+use HTML::Parser;
 require 'Blocking.pm';
 require 'HttpUtils.pm';
 use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
-my $modulVersion = "2014-11-06";
+my $modulVersion = '$Id $';
+
+   my %url_start =( "de" => "http://www.proplanta.de/Wetter/"
+   , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/"
+   , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/"
+   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/"
+   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/"
+   );
+
+   my %url_end = ( "de" => "-Wetter.html"
+   , "at" => "/"
+   , "ch" => "/"
+   , "fr" => "/"
+   , "it" => "/"
+   );
 
 
 ########################################
@@ -438,8 +460,7 @@ sub PROPLANTA_HtmlAcquire($)
 
    my $err_log  = "";
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
-   my $header   = HTTP::Request->new( GET => $URL );
-   my $request  = HTTP::Request->new( 'GET', $URL, $header );
+   my $request   = HTTP::Request->new( GET => $URL );
    my $response = $agent->request($request);
    $err_log = "Can't get $URL -- " . $response->status_line
      unless $response->is_success;
@@ -509,11 +530,15 @@ sub PROPLANTA_Run($)
    }
    elsif ($response ne "")
    {
+      PROPLANTA_Log $hash, 5, "Start HTML parsing";
+      
+# Can't locate object method "new" via package "
       my $parser = MyProplantaParser->new;
+      $parser->report_tags(qw(tr td span b img));
       @MyProplantaParser::texte = ();
       # parsing the complete html-page-response, needs some time
-      PROPLANTA_Log $hash, 5, "Start HTML parsing";
       $parser->parse($response);
+      
       PROPLANTA_Log $hash, 4, "Found terms: " . @MyProplantaParser::texte;
       
       # pack the results in a single string
@@ -522,6 +547,10 @@ sub PROPLANTA_Run($)
          $ptext .= "|". join('|', @MyProplantaParser::texte);
       }
       PROPLANTA_Log $hash, 4, "Parsed string: " . $ptext;
+   }
+   else
+   {
+      PROPLANTA_Log $hash, 1, "Error. No response string.";
    }
    return $ptext;
 }
@@ -577,6 +606,48 @@ sub PROPLANTA_Aborted($)
    delete( $hash->{helper}{RUNNING_PID} );
 }
 
+##### noch nicht fertig ###########
+sub #####################################
+PROPLANTA_Html($)
+{
+  my ($d) = @_;
+  $d = "<none>" if(!$d);
+  return "$d is not a PROPLANTA instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "PROPLANTA");
+
+  my $uselocal= 0; #AttrVal($d,"localicons",0);
+  my $isday;
+   if ( exists &isday) 
+   {
+      $isday = isday();
+   }
+   else 
+   {
+      $isday = 1; #($hour>6 && $hour<19);
+   }
+        
+  my $ret = "<table>";
+  $ret .= sprintf '<tr><td>%s</td><td><br></td></tr>', $defs{$d}{DEF};
+
+#  $ret .= sprintf('<tr><td>%s</td><td>%s %s<br>temp: %s °C, hum %s<br>wind: %s km/h %s<br>pressure: %s bar visibility: %s km</td></tr>',
+#        WWOIconIMGTag(ReadingsVal($d, "icon", ""),$uselocal,$isday),
+#        ReadingsVal($d, "localObsDateTime", ""),ReadingsVal($d, "weatherDesc", ""),
+#        ReadingsVal($d, "temp_C", ""), ReadingsVal($d, "humidity", ""),
+#        ReadingsVal($d, "windspeedKmph", ""), ReadingsVal($d, "winddir16Point", ""),
+#        ReadingsVal($d, "pressure", ""),ReadingsVal($d, "visibility", ""));
+
+  # for(my $i=0; $i<=4; $i++) {
+    # $ret .= sprintf('<tr><td>%s</td><td>%s: %s<br>min %s °C max %s °C<br>wind: %s km/h %s<br>precip: %s mm</td></tr>',
+        # WWOIconIMGTag(ReadingsVal($d, "fc${i}_weatherDayIcon", ""),$uselocal,$isday),
+        # ReadingsVal($d, "fc${i}_date", ""),
+        # ReadingsVal($d, "fc${i}_weatherDay", ""),
+        # ReadingsVal($d, "fc${i}_tempMinC", ""), ReadingsVal($d, "fc${i}_tempMaxC", ""),
+  # }
+  
+  $ret .= "</table>";
+
+  return $ret;
+}
 
 ##################################### 
 1;
@@ -757,6 +828,19 @@ sub PROPLANTA_Aborted($)
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tags&uuml;ber|abends|nachts</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tags&uuml;ber</i></li>
       <li>etc.</li>
+   </ul>
+   <br>
+   <b>Aktuelle Werte</b>
+   <ul>
+      <br>
+      <li><b>cloudBase</b><i>Min|Max</i> - H&ouml;he der <i>minimalen|maximalen</i> Wolkenuntergrenze in m</li>
+      <li><b>dewPoint</b> - Taupunkt in &deg;C</li>
+      <li><b>humidity</b> - relative Feuchtigkeit in %</li>
+      <li><b>obs_time</b> - Uhrzeit der Wetterbeobachtung</li>
+      <li><b>pressure</b> - Luftdruck in hPa</li>
+      <li><b>temperature</b> - Temperature in &deg;C</li>
+      <li><b>visibility</b> - Sichtweite in km</li>
+      <li><b>wind</b> - Windgeschwindigkeit in km/h</li>
    </ul>
    <br><br>
 </ul>
