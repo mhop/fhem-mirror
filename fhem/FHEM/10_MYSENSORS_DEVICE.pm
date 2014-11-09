@@ -426,13 +426,16 @@ sub onSetMessage($$) {
 sub onRequestMessage($$) {
   my ($hash,$msg) = @_;
 
-  my ($readingname,$val) = rawToMappedReading($hash, $msg->{subType}, $msg->{childId}, $msg->{payload});
-  sendClientMessage($hash,
-    childId => $msg->{childId},
-    cmd => C_SET,
-    subType => $msg->{subType},
-    payload => ReadingsVal($hash->{NAME},$readingname,$val)
-  );
+  eval {
+    my ($readingname,$val) = rawToMappedReading($hash, $msg->{subType}, $msg->{childId}, $msg->{payload});
+    sendClientMessage($hash,
+      childId => $msg->{childId},
+      cmd => C_SET,
+      subType => $msg->{subType},
+      payload => ReadingsVal($hash->{NAME},$readingname,$val)
+    );
+  };
+  Log3 ($hash->{NAME},4,"MYSENSORS_DEVICE $hash->{NAME}: ignoring C_REQ-message ".GP_Catch($@)) if $@;
 }
 
 sub onInternalMessage($$) {
