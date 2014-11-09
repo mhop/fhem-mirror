@@ -75,21 +75,20 @@
       Last released version: (as of =DATE=): 
       <a href="http://fhem.de/fhem-=VERS=.tar.gz">fhem-=VERS=.tar.gz</a>,
       <a href="http://fhem.de/fhem-=VERS=.deb">fhem-=VERS=.deb</a>,
-      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">fhem-=VERS=-fb7390.image</a>,
-      <a href="http://fhem.de/fhem-=VERS=-fb7270.zip">fhem-=VERS=-fb7270.zip</a>
       <br>
       See the <a href="CHANGED">CHANGED</a> file for the change history or the 
-      <a href="SVNLOG">svn log</a> for a more detailed log.<br>
+      <a href="SVNLOG">svn log</a> for a more detailed log.<br><br>
 
       <b>Note</b>: the FHEM development is a continuous one, and a release is
-      only a starting point for the update process. Please use the update
-      command to get the most recent version, especially if you want to report
-      issues in the forum.<br>
+      only a starting point for the update process.<br>
+      Use the <a href="commandref.html#update">update</a> command to get the
+      most recent version, especially if you want to report issues in the
+      forum.<br>
 
-      Nightly SVN version: a 
+      Nightly versions:
       <a href="http://www.dhs-computertechnik.de/downloads/fhem-cvs.tgz">
-      tarball</a>, or from the fhem commandline via <a
-      href="commandref.html#update">update</a>.  <br><br>
+      fhem-cvs.tgz</a>, <a href="http://debian.fhem.de/">debian.fhem.de</a>
+      <br><br>
 
 
       Please fill out our <a href="survey.pl">survey</a>,
@@ -185,7 +184,7 @@
       <li>lot of interfaces: simple text, JSON, XML, each of them over plain
           TCP/IP, SSL or HTTP.
           <div class="dist"></div>
-      <li>modular architecture with currently over 150 modules, easy to add
+      <li>modular architecture with currently over 250 modules, easy to add
           your special device</li>
           <div class="dist"></div>
       <li>lot of frontends, choose your favorite</li>
@@ -193,7 +192,7 @@
     </ul>
 
     <a name="Protocols"></a>
-    <h3>Supported protocols</h3>
+    <h3>Supported protocols (excerpt)</h3>
     <ul>
       <li>eQ3 specific: FS20, HomeMatic, MAX!, EM1000, FHT80b, HMS, S300,
           ESA2000</li>
@@ -222,10 +221,6 @@
       Heimautomatisierung-mit-fhem.pdf</a> (pdf, german)</div>
         <div class="dist"></div>
 
-      <div class="dist"><a href="HOWTO.html">HOWTO.html</a> for a short
-      installation/configuration.</div> 
-        <div class="dist"></div>
-
       <div class="dist"><a href="commandref.html">commandref.html</a>
       contains a detailed description of all features/modules.</div>
         <div class="dist"></div>
@@ -234,13 +229,17 @@
       href="http://fhemwiki.de/index.php/FHEM">fhemwiki.de</a></div>
         <div class="dist"></div>
 
+      <div class="dist">Forum: <a href="http://forum.fhem.de">
+      http://forum.fhem.de</a><br>Although most entries are in german here,
+      don't be afraid to ask something in english.</div>
+        <div class="dist"></div>
+
       <div class="dist">Frequently Asked Questions: <a
       href="faq.html">faq.html</a></div>
         <div class="dist"></div>
 
-      <div class="dist">Forum: <a href="http://forum.fhem.de">
-      http://forum.fhem.de</a><br>Although most entries are in german here,
-      don't be afraid to ask something in english.</div>
+      <div class="dist"><a href="HOWTO.html">HOWTO.html</a> for a short
+      installation/configuration.</div> 
         <div class="dist"></div>
 
       <div class="dist"><a href="README.contrib">contrib/README</a> describes
@@ -299,9 +298,7 @@
         <li>CUL:
           <a href=http://shop.busware.de/product_info.php?products_id=29">
           Hardware shop</a>,
-          <a href="http://culfw.de/culfw.html">firmware homepage</a>,
-          <a href="http://groups.google.com/group/cul-fans">
-          CUL fans google group</a></li>
+          <a href="http://culfw.de/culfw.html">firmware homepage</a>
       </ul>
     </ul>
 
@@ -310,23 +307,11 @@
     <h3>Installation</h3>
 
     <ul>
-    <h4>Fritz!Box</h4>
-    <ul>
-      <li>On the FB7390 or FB7490 install <a
-        href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> image. Note: it
-        is needed <i>additionally</i> to the OS image from AVM.<br>
-      <li>On the FB7270 unpack <a
-        href="http://fhem.de/fhem-=VERS=-fb7270.zip">this</a> zip file to a USB-Disk,
-        attach the disk to the FritzBox, log in, and start FHEM from there.
-      <li>See also the detailed documentation <a href="fritzbox.html">here</a>.
-     </ul>
-
     <h4>Debian/Ubuntu</h4>
     <ul>
       <li>Install <a href="http://fhem.de/fhem-=VERS=.deb">this</a> package.
-      <b>Note:</b> For upgrading from 5.2 or earlier it is necessary to purge
-      the old package (dpkg -P fhem), as the directory structure has changed to
-      be the same as with .tar.gz or fritzbox.
+      For a better integration check out <a
+      href="http://debian.fhem.de/">debian.fhem.de</a>
     </ul>
 
     <h4>Unix / OSX</h4>
@@ -347,6 +332,23 @@
       <li>If you are using cygwin for your perl installation you can
       follow the guidelines for Unix.</li>
     </ul>
+
+    <h4>Fritz!BOX</h4>
+    <ul>
+      As of Fritz!OS 6.20 AVM decided to remove all possibilities to start
+      "foreign" programs automaticall after a reboot, that is why I advise
+      against deploying FHEM on the Fritz!BOX, see also <a
+      href="http://forum.fhem.de/index.php?topic=25066.0">this</a> discussion
+      (in german). If you still insist:
+      <li>On the FB7390 or FB7490 install <a
+        href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> image. Note: it
+        is needed <i>additionally</i> to the OS image from AVM.<br>
+      <li>On the FB7270 unpack <a
+        href="http://fhem.de/fhem-=VERS=-fb7270.zip">this</a> zip file to a
+        USB-Disk, attach the disk to the FritzBox, log in, and start FHEM from
+        there.
+     </ul>
+
     <br><br>
 
     After the installation follow the <a href="HOWTO.html">HOWTO</a> for adding
@@ -364,12 +366,10 @@
         <li>Rudolf Koenig (r dot koenig at koeniglich dot de. Note: I <b>do
         not</b> provide fhem-support via private mail, use the forum
         instead)</li>
-        <li>Martin Haas (webfrontends/pgm3)</li>
-        <li>Olaf Droegehorn (webfrontends/pgm5)</li>
         <li><a href="MAINTAINER.txt">Numerous other people with their FHEM modules</a></li>
       </ul>
-      License: GPL (v2)<br>
-      Thanks to TOSTi for inspiration and numerous other people for help. <br>
+      License: GPL (v2)<br><br>
+      Thanks to TOSTi for inspiration. <br>
     </ul>  
 
 
