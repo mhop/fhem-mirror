@@ -148,7 +148,7 @@ sub structure_Notify($$)
     }
   }
 
-  return "" if(AttrVal($me,"disable", undef));
+  return "" if(IsDisabled($me));
 
   #pruefen ob Devices welches das notify ausgeloest hat Mitglied dieser
   # Struktur ist
@@ -396,7 +396,7 @@ structure_Attr($@)
 
   if($hash->{INATTR}) {
     Log3 $me, 1, "ERROR: endless loop detected in structure_Attr for $me";
-    next;
+    return;
   }
   $hash->{INATTR} = 1;
 
@@ -637,6 +637,9 @@ structure_Attr($@)
   <a name="structureattr"></a>
   <b>Attribute</b>
   <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li><br>
+
     <a name="clientstate_behavior"></a>
     <li>clientstate_behavior<br>
       Der Status einer Struktur h&auml;ngt von den Stati der zugef&uuml;gten
