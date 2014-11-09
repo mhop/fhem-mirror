@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#set -x
 set -e # required by lintian
 set +e # Don't know how to check presence of fhem in passwd with -e
 

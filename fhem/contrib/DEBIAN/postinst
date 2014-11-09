@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+#set -x
 
 if ! getent passwd fhem >/dev/null; then
     useradd --system --home /opt/fhem --gid dialout --shell /bin/false fhem
@@ -17,6 +18,6 @@ chmod ugo+x /etc/init.d/fhem
 update-rc.d fhem defaults
 
 if test -f /etc/init.d/fhem; then
-    invoke-rc.d fhem start
+    /etc/init.d/fhem start noaptmark
 fi
-
+exit 0
