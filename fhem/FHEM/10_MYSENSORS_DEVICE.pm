@@ -425,12 +425,13 @@ sub onSetMessage($$) {
 
 sub onRequestMessage($$) {
   my ($hash,$msg) = @_;
-  variableTypeToStr($msg->{subType}) =~ /^V_(.+)$/;
+
+  my ($readingname,$val) = rawToMappedReading($hash, $msg->{subType}, $msg->{childId}, $msg->{payload});
   sendClientMessage($hash,
     childId => $msg->{childId},
     cmd => C_SET,
     subType => $msg->{subType},
-    payload => ReadingsVal($hash->{NAME},"$1\_$msg->{childId}","")
+    payload => ReadingsVal($hash->{NAME},$readingname,$val)
   );
 }
 
