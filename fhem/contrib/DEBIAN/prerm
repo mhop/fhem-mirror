@@ -1,13 +1,14 @@
 #!/bin/sh
 
+#set -x
 set -e
 
 apt-mark unhold fhem
 
 # stop fhem if running
 if test -f /etc/init.d/fhem; then
-    invoke-rc.d fhem stop
+    /etc/init.d/fhem stop noaptmark
 fi
 
 # remove fhem autostart
-update-rc.d fhem remove
+update-rc.d -f fhem remove

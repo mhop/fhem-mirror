@@ -15,7 +15,9 @@ set -e
 cd /opt/fhem
 port=7072
 
-apt-mark hold fhem > /dev/null
+if test "$2" != "noaptmark"; then
+  apt-mark hold fhem > /dev/null
+fi
 
 case "$1" in
 'start')
