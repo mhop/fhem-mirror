@@ -67,11 +67,13 @@
       XML existieren ebenfalls.
       <br><br>
 
-      Um es zu verwenden ben&ouml;tigt man einen 24/7 Rechner (Fritz!Box, NAS,
-      RPi, PC, MacMini, etc) mit einem perl Interpreter und angeschlossene
+      Um es zu verwenden ben&ouml;tigt man einen 24/7 Rechner (NAS, RPi, PC,
+      MacMini, etc) mit einem perl Interpreter und angeschlossene
       Hardware-Komponenten wie CUL, FHZ1300PC, etc. f&uuml;r einen Zugang zu
       den Aktoren und Sensoren. Siehe den Hardware Abschnitt f&uuml;r mehr.
 
+      <br><br>
+      Ausgesprochen wird es wie fem.
     </ul>
 
     <a name="Download"></a>
@@ -80,23 +82,22 @@
       Letzte Version (vom =DATE=): 
       <a href="http://fhem.de/fhem-=VERS=.tar.gz">fhem-=VERS=.tar.gz</a>,
       <a href="http://fhem.de/fhem-=VERS=.deb">fhem-=VERS=.deb</a>,
-      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">fhem-=VERS=-fb7390.image</a>,
-      <a href="http://fhem.de/fhem-=VERS=-fb7270.zip">fhem-=VERS=-fb7270.zip</a>
       <br>
       Siehe auch das manuelle (<a href="CHANGED">CHANGED file</a>) oder 
       maschinelle (<a href="SVNLOG">SVNLOG</a>) &Auml;nderungsprotokoll
-      f&uuml;r mehr Details.<br>
+      f&uuml;r mehr Details.<br><br>
 
       <b>Achtung</b>: FHEM wird kontinuierlich weiterentwickelt, und die hier
-      herunterladbaren Versionen sind nur als Startpunkt fuer den update
-      Prozess gedacht.  Bitte das FHEM update Kommando ausfuehren, um den
-      aktuellen Stand herunterzuladen, insb. bevor man Probleme im Forum
-      meldet.<br>
+      herunterladbaren Versionen sind nur als Startpunkt f&uuml;r den update
+      Prozess gedacht.<br>
+      Bitte das FHEM <a href="commandref.html#update">update</a> Kommando
+      ausfuehren, um den aktuellen Stand herunterzuladen, insb. bevor man
+      Probleme im Forum meldet.<br>
 
-      Die n&auml;chtliche SVN Version ist verf&uuml;gbar als
+      N&auml;chtlich erstellte Versionen:
       <a href="http://www.dhs-computertechnik.de/downloads/fhem-cvs.tgz">
-      tar Datei</a>, oder in der Kommandozeile &uuml;ber das <a
-      href="commandref.html#update">update</a> Befehl.<br><br>
+      fhem-cvs.tgz</a>, <a href="http://debian.fhem.de/">debian.fhem.de</a>
+      <br><br>
 
       F&uuml;llen Sie bitte unsere <a href="survey.pl">Umfrage</a> aus, da wir gerne
       w&uuml;ssten, welche FHEM Module verwendet werden.  Hier sind die <a
@@ -235,31 +236,27 @@
     <a name="Documentation"></a>
     <h3>Dokumentation</h3>
     <ul>
-      <div class="dist"><a href="Heimautomatisierung-mit-fhem.pdf">
+      <div class="dist"> <a href="Heimautomatisierung-mit-fhem.pdf">
       Heimautomatisierung-mit-fhem.pdf</a></div>
-        <div class="dist"></div>
-
-      <div class="dist"><a href="HOWTO_DE.html">HOWTO_DE.html</a> f&uuml;r eine kurze
-      Installation/Konfiguration.</div> 
-        <div class="dist"></div>
 
       <div class="dist"><a href="commandref_DE.html">commandref_DE.html</a>
-      enth&auml;lt eine detaillierte Beschreibung aller Module und Features.</div>
-        <div class="dist"></div>
+      enth&auml;lt eine detaillierte Beschreibung aller Module und
+      Features.</div>
 
       <div class="dist">Unser wiki ist erreichbar unter <a
       href="http://fhemwiki.de/index.php/FHEM">fhemwiki.de</a></div>
-        <div class="dist"></div>
 
-      <div class="dist">Das F.A.Q. <a href="faq.html">faq.html</a> (englisch)</div>
-        <div class="dist"></div>
+      <div class="dist">Forum: <a
+      href="http://forum.fhem.de">http://forum.fhem.de</a>
 
-      <div class="dist">Forum: <a href="http://forum.fhem.de">http://forum.fhem.de</a>
-        <div class="dist"></div>
+      <div class="dist"><a href="HOWTO_DE.html">HOWTO_DE.html</a> f&uuml;r eine
+      kurze Installation/Konfiguration.</div> <div class="dist"></div>
 
-      <div class="dist"><a href="README.contrib">contrib/README</a> beschreibt einige
-      nicht aktiv gepflegte Module / Skripte.</div>
-        <div class="dist"></div>
+      <div class="dist">Das F.A.Q. <a href="faq.html">faq.html</a>
+      (englisch)</div>
+
+      <div class="dist"><a href="README.contrib">contrib/README</a> beschreibt
+      einige nicht aktiv gepflegte Module / Skripte.</div>
 
     </ul>
 
@@ -336,34 +333,18 @@
     <a name="Installation"></a>
     <h3>Installation</h3>
 
-    <ul>
-    <h4>Fritz!Box</h4>
-    <ul>
-      <li>FB7390/FB7490: Folgenden FHEM
-         <a href="http://fhem.de/fhem-=VERS=-fb7390.image">Image</a>
-         <i>zus&auml;tzlich</i> zum normalen oder labor Image von AVM installieren.
-         Beide sind vollkommen unabh&auml;ngig und deswegen jeweils austauschbar.
-      <li>FB7270: <a
-          href="http://fhem.de/fhem-=VERS=-fb7270.zip">Diese</a> zip Datei
-          auf dem USB-Disk auspacken, danach es ans FritzBox anschliessen, per
-          telnet anmelden, ins Verzeichnis wechseln, und FHEM von hier starten.
-      <li>Siehe auch die detaillierte Dokumentation <a href="fritzbox.html">hier</a>.
-     </ul>
-
     <h4>Debian/Ubuntu</h4>
     <ul>
-      <li><a href="http://fhem.de/fhem-=VERS=.deb">Dieses</a> FHEM Paket (.deb) installieren.
-      <b>Achtung:</b> Beim upgrade von einer FHEM Version vor 5.3 muss das alte
-      Paket vorher per "dpkg -P fhem" vollst&auml;ndig entfernt werden, da die
-      Verzeichnisstruktur sich ge&auml;ndert hat.  Ab Version 5.3 haben alle
-      FHEM Installations-Varianten die gleiche Verzeichnisstruktur.
+      <li><a href="http://fhem.de/fhem-=VERS=.deb">Dieses</a> FHEM Paket (.deb)
+      installieren. F&uuml;r eine bessere Integration siehe <a
+      href="http://debian.fhem.de/">debian.fhem.de</a>.
     </ul>
 
     <h4>Unix / OSX</h4>
     <ul>
-      <li>Zuerst sollte sichergestellt werden, da&szlig; perl installiert ist.
+      <li>Zuerst sollte sichergestellt werden, dass perl installiert ist.
         Vermutlich wird das Perl-Modul Device::SerialPort ben&ouml;tigt (falls
-        man mit fhem USB-Ger&auml;te ansprechen m&ouml;chte), diesen kann man
+        man mit FHEM USB-Ger&auml;te ansprechen m&ouml;chte), diesen kann man
         meist mit "sudo cpan Device::SerialPort" oder "apt-get install
         libdevice-serialport-perl" installieren.
         </li>
@@ -387,6 +368,27 @@
 
     </ul>
 
+    <h4>Fritz!Box</h4>
+    <ul>
+      Seit Fritz!OS 6.20 ist es <b>nicht mehr m&ouml;glich</b> "fremde"
+      Programme nach einem reboot <b>automatisch</b> zu starten, deswegen
+      empfehle ich den Einsatz dieser Ger&auml;te nicht f&uuml;r FHEM, siehe
+      auch diesen <a
+      href="http://forum.fhem.de/index.php?topic=25066.0">Beitrag</a> im Forum.
+      F&uuml;r die, die es trotzdem versuchen wollen:<br><br>
+
+      <li>FB7390/FB7490: Folgenden FHEM
+         <a href="http://fhem.de/fhem-=VERS=-fb7390.image">Image</a>
+         <i>zus&auml;tzlich</i> zum normalen oder labor Image von AVM installieren.
+         Beide sind vollkommen unabh&auml;ngig und deswegen jeweils austauschbar.
+      <li>FB7270: <a
+          href="http://fhem.de/fhem-=VERS=-fb7270.zip">Diese</a> zip Datei
+          auf dem USB-Disk auspacken, danach es ans FritzBox anschliessen, per
+          telnet anmelden, ins Verzeichnis wechseln, und FHEM von hier starten.
+      <li>Siehe auch die detaillierte Dokumentation <a href="fritzbox.html">hier</a>.
+     </ul>
+
+
     <br><br>
     Nach der Installation sollten sie das Dokument <a
     href="HOWTO_DE.html">HOWTO_DE</a> befolgen, um in FHEM Ger&auml;te zu
@@ -403,16 +405,16 @@
     <ul>
       Copyright:<br>
       <ul>
-        <li>Rudolf Koenig (r punkt koenig at koeniglich punkt de). Achtung: Ich leiste <b>
-        kein</b> FHEM support &uuml;ber Email, bitte verwenden sie das Forum f&uuml;r diesen Zweck.
+        <li>Rudolf Koenig (r punkt koenig at koeniglich punkt de). Achtung: Ich
+        leiste <b> kein</b> FHEM support &uuml;ber Email, bitte verwenden sie
+        das Forum f&uuml;r diesen Zweck.
         </li>
-        <li>Martin Haas (webfrontends/pgm3)</li>
-        <li>Olaf Droegehorn (webfrontends/pgm5)</li>
-        <li><a href="MAINTAINER.txt">Zahlreiche weitere Entwickler, die jeweils zu FHEM beigetragen haben.</a></li>
+        <li><a href="MAINTAINER.txt">Zahlreiche weitere Entwickler, die jeweils
+        zu FHEM beigetragen haben.</a></li>
       </ul>
       License: GPL (v2)<br>
-      Vielen Dank an TOSTi f&uuml;r die Inspiration und an die vielen Fhem
-      Entwickler und Anwender.<br>
+      <br>
+      Vielen Dank an TOSTi f&uuml;r die Inspiration.<br>
     </ul>  
 
   </body>
