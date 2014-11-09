@@ -173,6 +173,11 @@ sub SB_SERVER_Define( $$ ) {
 	$attr{$name}{maxcmdstack} = 200;
     }
 
+    # the port of the HTTP interface as needed for the coverart url
+    if( !defined( $attr{$name}{httpport} ) ) {
+	$attr{$name}{httpport} = "9000";
+    }
+
     # Preset our readings if undefined
     my $tn = TimeNow();
 
@@ -374,10 +379,6 @@ sub SB_SERVER_Ready( $ ) {
 
 	return( DevIo_OpenDev( $hash, 1, "SB_SERVER_DoInit") );
     }
-
-    #if( $hash->{TCPDev} ) {
-	#SB_SERVER_DoInit( $hash );
-    #}
 
 }
 
@@ -627,26 +628,15 @@ sub SB_SERVER_DoInit( $ ) {
 	    # and signal to our clients
 	    SB_SERVER_Broadcast( $hash, "SERVER",  "OFF" );
 	    SB_SERVER_Broadcast( $hash, "SERVER", 
-				 "IP " . $hash->{IP} . 
-				 ":9000" );
+				 "IP " . $hash->{IP} . ":" .
+				 AttrVal( $name, "httpport", "9000" ) );
 	}
 	return( "" );
     }
 
-    # subscribe us
-    DevIo_SimpleWrite( $hash, "listen 1\n", 0 );
-
-    # and get some info on the server
-    DevIo_SimpleWrite( $hash, "pref authorize ?\n", 0 );
-    DevIo_SimpleWrite( $hash, "version ?\n", 0 );
-    DevIo_SimpleWrite( $hash, "serverstatus 0 200\n", 0 );
-    DevIo_SimpleWrite( $hash, "favorites items 0 " . 
-		       AttrVal( $name, "maxfavorites", 100 ) . "\n", 0 );
-    DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
-
     SB_SERVER_Broadcast( $hash, "SERVER", 
-			 "IP " . $hash->{IP} . 
-			 ":9000" );
+			 "IP " . $hash->{IP} . ":" .
+			 AttrVal( $name, "httpport", "9000" ) );
 
     # start the alive checking mechanism
     $hash->{ALIVECHECK} = "?";
@@ -721,14 +711,42 @@ sub SB_SERVER_ParseCmds( $$ ) {
 	    # signal our players
 	    SB_SERVER_Broadcast( $hash, "SERVER", "ON" );
 	    SB_SERVER_Broadcast( $hash, "SERVER", 
-				 "IP " . $hash->{IP} . 
-				 ":9000" );
+				 "IP " . $hash->{IP} . ":" .
+				 AttrVal( $name, "httpport", "9000" ) );
 	}
 
     } elsif( $cmd eq "pref" ) {
 	if( $args[ 0 ] eq "authorize" ) {
 	    readingsSingleUpdate( $hash, "serversecure", $args[ 1 ], 0 );
+	    if( $args[ 1 ] eq "1" ) {
+		# username and password is required
+		if( ( $hash->{USERNAME} ne "?" ) && 
+		    ( $hash->{PASSWORD} ne "?" ) ) {
+		    DevIo_SimpleWrite( $hash, "login " . 
+				       $hash->{USERNAME} . " " . 
+				       $hash->{PASSWORD} . "\n", 
+				       0 );
+		} else {
+		    Log3( $hash, 3, "SB_SERVER_ParseCmds($name): login " . 
+			  "required but no username and password specified" );
+		}
+		# next step is to wait for the answer of the LMS server
+	    } elsif( $args[ 1 ] eq "0" ) {
+		# no username password required, go ahead directly
+		SB_SERVER_LMS_Status( $hash );
+	    } else {
+		Log3( $hash, 3, "SB_SERVER_ParseCmds($name): unkown " . 
+		      "result for authorize received. Should be 0 or 1" );
+	    }		
 	}
+
+    } elsif( $cmd eq "login" ) {
+	if( ( $args[ 1 ] eq $hash->{USERNAME} ) && 
+	    ( $args[ 2 ] eq "******" ) ) {
+	    # login has been succesful, go ahead
+	    SB_SERVER_LMS_Status( $hash );
+	}
+	
 
     } elsif( $cmd eq "fhemalivecheck" ) {
 	$hash->{ALIVECHECK} = "received";
@@ -844,9 +862,9 @@ sub SB_SERVER_Alive( $ ) {
 
 	    # just send something to the SB-Server. It will echo it
 	    # if we receive the echo, the server is still alive
+	    $hash->{ALIVECHECK} = "waiting";
 	    DevIo_SimpleWrite( $hash, "fhemalivecheck\n", 0 );
 	    
-	    $hash->{ALIVECHECK} = "waiting";
 	}
 
 
@@ -1530,6 +1548,7 @@ sub SB_SERVER_Notify( $$ ) {
 			 "SB_SERVER_Alive", 
 			 $hash, 
 			 0 );
+	  DevIo_CloseDev( $hash );
       } elsif( ReadingsVal( $hash->{RCCNAME}, "state", "off" ) eq "on" ) {
 	  RemoveInternalTimer( $hash );
 	  # do an update of the status, but SB CLI must come up
@@ -1548,11 +1567,74 @@ sub SB_SERVER_Notify( $$ ) {
 }
 
 
+# ----------------------------------------------------------------------------
+#  start up the LMS server status
+# ----------------------------------------------------------------------------
+sub SB_SERVER_LMS_Status( $ ) {
+    my ( $hash ) = @_;
+    my $name = $hash->{NAME}; # own name / hash
+
+    # subscribe us
+    DevIo_SimpleWrite( $hash, "listen 1\n", 0 );
+
+    # and get some info on the server
+    DevIo_SimpleWrite( $hash, "pref authorize ?\n", 0 );
+    DevIo_SimpleWrite( $hash, "version ?\n", 0 );
+    DevIo_SimpleWrite( $hash, "serverstatus 0 200\n", 0 );
+    DevIo_SimpleWrite( $hash, "favorites items 0 " . 
+		       AttrVal( $name, "maxfavorites", 100 ) . "\n", 0 );
+    DevIo_SimpleWrite( $hash, "playlists 0 200\n", 0 );
+
+    return( true );
+}
+
+
+
+
+# ############################################################################
+#  No PERL code beyond this line
+# ############################################################################
 1;
 
 =pod
-    =begin html
-    
-    
-    =end html
-    =cut
+=begin html
+
+<a name="SB_SERVER"></a>
+<h3>SB_SERVER</h3>
+<ul>
+  <a name="SBserverdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SB_SERVER &lt;ip[:cliserverport]&gt; [&lt;RCC&gt;] [&lt;WOL&gt;] [&lt;username&gt;] [&lt;password&gt;]</code>
+    <br><br>
+
+    This module allows you to control Logitech Media Server and connected Squeezebox Media Players.<br><br>
+   
+   Attention:  The <code>&lt;ip[:cliserverport]&gt;</code> parameter is optional. You just need to configure it if you changed it on the LMS. The default TCP port is 9090.<br>
+   
+   <b>Optional</b>
+   <ul>
+      <li><code>&lt;[RCC]&gt;</code>: You can define a FHEM RCC Device, if you want to wake it up when you set the SB_SERVER on.  </li>
+      <li><code>&lt;[WOL]&gt;</code>: You can define a FHEM WOL Device, if you want to wake it up when you set the SB_SERVER on.  </li>
+      <li><code>&lt;username&gt;</code> and <code>&lt;password&gt;</code>: If your LMS is password protected you can define the credentials here.  </li>
+   </ul><br><br>
+  <a name="SBserverset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;command&gt;</code>
+    <br><br>
+    This module supports the following commands:<br>
+   
+    SB_Server related commands:<br>
+   <ul>
+     <li><b>renew</b> -  Renewes the connection to the server</li>
+     <li><b>abort</b> -  Stops the connection to the server</li>
+     <li><b>cliraw &lt;command&gt;</b> -  Sends the &lt;command&gt; to the LMS CLI</li>
+     <li><b>rescan</b> -  Starts the scan of the music library of the server</li>
+     <li><b>statusRequest</b> -  Update of readings from server and configured players</li>
+   </ul>   
+   </ul>
+</ul>
+</ul>
+=end html
+=cut
