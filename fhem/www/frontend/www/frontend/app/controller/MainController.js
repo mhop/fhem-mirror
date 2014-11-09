@@ -93,7 +93,7 @@ Ext.define('FHEM.controller.MainController', {
         });
         
         var sp = this.getStatustextfield();
-        sp.setText("Frontend Version: 1.1.0 - 2014-11-08");
+        sp.setText("Frontend Version: 1.1.1 - 2014-11-09");
         
         this.setupTree();
     },
