@@ -33,7 +33,7 @@ sub FRAMEBUFFER_Initialize($);
 sub FRAMEBUFFER_rewindCounter($);
 sub FRAMEBUFFER_readLayout($);
 sub FRAMEBUFFER_Define($$);
-sub FRAMEBUFFER_updateDisplay($);
+sub FRAMEBUFFER_updateDisplay($$);
 sub FRAMEBUFFER_Set($@);
 sub FRAMEBUFFER_Attr(@);
 sub FRAMEBUFFER_returnPNG($);
@@ -45,7 +45,7 @@ FRAMEBUFFER_Initialize($) {
     $hash->{DefFn}   = "FRAMEBUFFER_Define";
     $hash->{AttrFn}  = "FRAMEBUFFER_Attr";
     $hash->{AttrList} = 'loglevel:0,1,2,3,4,5,6 update_interval:1,2,5,10,20,30 ' .
-	                'size layoutBasedir layoutList startLayoutNo debugFile bgcolor ' . $readingFnAttributes;
+	                'size layoutBasedir layoutList startLayoutNo debugFile bgcolor enableCmd disableCmd ' . $readingFnAttributes;
     $hash->{SetFn}   = "FRAMEBUFFER_Set";
     $hash->{UndefFn}  = 'FRAMEBUFFER_Undef';
 }
@@ -71,7 +71,7 @@ sub FRAMEBUFFER_rewindCounter($) {
 		Log3 $name, 5, "current $currentTime next trigger at $triggerTime";
 		InternalTimer($triggerTime, 'FRAMEBUFFER_rewindCounter', $hash, 0);
 	}
-	FRAMEBUFFER_updateDisplay($hash);
+	FRAMEBUFFER_updateDisplay($hash, 0);
 }
  
 ##################
@@ -122,8 +122,8 @@ sub FRAMEBUFFER_Define($$) {
 }
 
 ##################
-sub FRAMEBUFFER_updateDisplay($) {
-  my ($hash) = @_;
+sub FRAMEBUFFER_updateDisplay($$) {
+  my ($hash, $timeout) = @_;
   my $name = $hash->{NAME};
   my $fbv = '/usr/local/bin/fbvs';
   my $fd = $hash->{fd};
@@ -141,6 +141,15 @@ sub FRAMEBUFFER_updateDisplay($) {
 			$fbv = "tee $dfile | $fbv";
 		}
 	}  
+	
+	# check if this is a display with a timeout
+	if ($timeout) {
+    # yes, execute enable command (e.g. enable backlight)
+    fhem($hash->{enableCmd}) if $hash->{enableCmd};
+  } else {
+    # yes, execute enable command (e.g. enable backlight)
+    fhem($hash->{disableCmd}) if $hash->{disableCmd};
+  }
 
 	if (FRAMEBUFFER_readLayout($hash)) {
 		open($fd, "|".$fbv . ' -d '. $hash->{fhem}{fb_device});
@@ -172,7 +181,7 @@ FRAMEBUFFER_Set($@) {
   if (@a == 2) {
     if ($cmd eq "updateDisplay") {
 	# just display the current layout again
-      FRAMEBUFFER_updateDisplay($hash);
+      FRAMEBUFFER_updateDisplay($hash, 0);
       $usage = undef;
     }
   } elsif (@a == 3 || @a == 4) { 
@@ -184,7 +193,7 @@ FRAMEBUFFER_Set($@) {
 	if ($val < $noOfLayouts) {	
 		$hash->{fhem}{filename} = $layoutList[$layoutNo];
 		$hash->{fhem}{absLayoutNo} = $layoutNo;
-		FRAMEBUFFER_updateDisplay($hash);
+		FRAMEBUFFER_updateDisplay($hash, 0);
 		$usage = undef;
 	} else {
 		$usage = "absLayoutNo out of bounds, must be between 0 and $noOfLayouts";
@@ -202,7 +211,7 @@ FRAMEBUFFER_Set($@) {
 			$hash->{fhem}{absLayoutNo} = 0;
 		}
 		$hash->{fhem}{filename} = $layoutList[$hash->{fhem}{absLayoutNo}];
-		FRAMEBUFFER_updateDisplay($hash);
+		FRAMEBUFFER_updateDisplay($hash, 0);
 		$usage = undef;
 	} else {
 		$usage = "layoutList is empty, please set that attribute first";
@@ -211,7 +220,7 @@ FRAMEBUFFER_Set($@) {
 	my $timeout = (defined($val2) && looks_like_number($val2) && $val2 >= 0) ? $val2 : 0;
 	my $prevFilename = $hash->{fhem}{filename};
 	$hash->{fhem}{filename} = $val;
-	FRAMEBUFFER_updateDisplay($hash);
+	FRAMEBUFFER_updateDisplay($hash, $timeout);
 	if ($timeout > 0) {
 		# nach timeout Sekunden wieder das aktuelle Layout anzeigen
 		RemoveInternalTimer($hash);
@@ -272,7 +281,11 @@ FRAMEBUFFER_Attr(@)
 			fhem "set $name absLayoutNo $val" ;
 		}
 	} elsif ($attr eq 'bgcolor') {
-	}
+	} elsif ($attr eq 'enableCmd') {
+    $hash->{enableCmd} = $val;
+  } elsif ($attr eq 'disableCmd') {
+    $hash->{disableCmd} = $val;
+  }  
 	
 
 	return ($msg) ? $msg : undef;  
@@ -458,6 +471,12 @@ FRAMEBUFFER_returnPNG($) {
   <ul>bgcolor &lt;color&gt;<br>Sets the background color. &lt;color&gt; is 
     a 6-digit hex number, every 2 digits  determining the red, green and blue 
     color components as in HTML color codes (e.g.<code>FF0000</code> for red, <code>C0C0C0</code> for light gray).
+  </ul>
+  <ul>enableCmd &lt;fhem cmd&gt;<br>
+    if set this command is executed layout with a timeout is displayed. This can e.g. be used to enable a backlight.
+  </ul>
+  <ul>disableCmd &lt;fhem cmd&gt;<br>
+    if set this command is executed after a layout with a timeout has expired. This can e.g. be used to disable a backlight.
   </ul>
   <br><br>
 
