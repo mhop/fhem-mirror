@@ -30,8 +30,6 @@
 #  PLAYERID         the unique identifier of the player. Mostly the MAC
 #  SERVER           based on the IP and the port as given
 #  IP               the IP of the server
-#  PORT             the Port of the Server
-#  CLIPORT          the port for the CLI interface of the server
 #  PLAYERNAME       the name of the Player
 #  CONNECTION       the connection status to the server
 #  CANPOWEROFF      is the player supporting power off commands
@@ -89,7 +87,8 @@ sub SB_PLAYER_Initialize( $ ) {
     
     # the attributes we have. Space separated list of attribute values in 
     # the form name:default1,default2
-    $hash->{AttrList}  = "volumeStep volumeLimit "; 
+    $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 ";
+    $hash->{AttrList}  .= "volumeStep volumeLimit "; 
     $hash->{AttrList}  .= "ttslanguage:de,en,fr ttslink ";
     $hash->{AttrList}  .= "donotnotify:true,false ";
     $hash->{AttrList}  .= "idismac:true,false ";
@@ -457,13 +456,13 @@ sub SB_PLAYER_Parse( $$ ) {
 
 	if( SB_PLAYER_IsValidMAC( $idbuf ) == 1 ) {
 	    # the MAC Adress is valid
-	    Log3( undef, 3, "SB_PLAYER_Parse: the unkown ID $id is a valid " . 
+	    Log3( undef, 3, "SB_PLAYER_Parse: the unknown ID $id is a valid " . 
 		  "MAC Adress" );
 	    # this line supports autocreate
 	    return( "UNDEFINED SB_PLAYER_$id SB_PLAYER $idbuf" );
 	} else {
 	    # the MAC adress is not valid
-	    Log3( undef, 3, "SB_PLAYER_Parse: the unkown ID $id is NOT " . 
+	    Log3( undef, 3, "SB_PLAYER_Parse: the unknown ID $id is NOT " . 
 		  "a valid MAC Adress" );
 	    return( undef );
 	}
@@ -471,6 +470,7 @@ sub SB_PLAYER_Parse( $$ ) {
     
     # so the data is for us
     my $name = $hash->{NAME};
+    return "" if(IsIgnored($name));
 
     Log3( $hash, 5, "SB_PLAYER_Parse: $name CMD:$cmd ARGS:@args..." ); 
 
@@ -491,7 +491,12 @@ sub SB_PLAYER_Parse( $$ ) {
 	}
 
     } elsif( $cmd eq "remote" ) {
-	$hash->{ISREMOTESTREAM} = "$args[ 0 ]";
+	if( defined( $args[ 0 ] ) ) {
+	    $hash->{ISREMOTESTREAM} = "$args[ 0 ]";
+	} else { 
+	    $hash->{ISREMOTESTREAM} = "0";
+	}
+
 
     } elsif( $cmd eq "play" ) {
 	readingsBulkUpdate( $hash, "playStatus", "playing" );
@@ -1590,35 +1595,52 @@ sub SB_PLAYER_Amplifier( $ ) {
     my ( $hash ) = @_;
     my $name = $hash->{NAME};
 
-    if( ( $hash->{AMPLIFIER} eq "none" ) || (
-	    !defined( $defs{$hash->{AMPLIFIER}} ) ) ) {
-	# amplifier not specified
-	return;
+    if( ( $hash->{AMPLIFIER} eq "none" ) || 
+	(!defined( $defs{$hash->{AMPLIFIER}} ) ) ) {
+        # amplifier not specified
+        return;
     }
 
     my $setvalue = "off";
-
+    
     Log3( $hash, 4, "SB_PLAYER_Amplifier($name): called" );
 
     if( AttrVal( $name, "amplifier", "play" ) eq "play" ) {
-	my $thestatus = ReadingsVal( $name, "playStatus", "pause" );
-	if( ( $thestatus eq "playing" ) || ( $thestatus eq "paused" ) ) {
-	    $setvalue = "on";
+        my $thestatus = ReadingsVal( $name, "playStatus", "pause" );
+        if( $thestatus eq "playing" ) {
+            $setvalue = "on";
+        } elsif( ( $thestatus eq "paused" ) || 
+		 ( $thestatus eq "stopped" ) ) {
+            $setvalue = "off";
+	} else { 
+            $setvalue = "off";
 	}
     } elsif( AttrVal( $name, "amplifier", "on" ) eq "on" ) {
-	if( ReadingsVal( $name, "power", "off" ) eq "on" ) {
-	    $setvalue = "on";
+        if( ReadingsVal( $name, "power", "off" ) eq "on" ) {
+            $setvalue = "on";
+        } else {
+            $setvalue = "off";
 	}
     } else {
-	Log3( $hash, 4, "SB_PLAYER_Amplifier($name): ATTR amplifier " . 
-	      "set to wrong value [on|play]" );
+        Log3( $hash, 4, "SB_PLAYER_Amplifier($name): ATTR amplifier " .
+              "set to wrong value [on|play]" );
+	return;
     }
 
-    fhem( "set $hash->{AMPLIFIER} $setvalue" );
+    my $actualState = ReadingsVal( "$hash->{AMPLIFIER}", "state", "off" );
+
+    if ( $actualState ne $setvalue) {
+	fhem( "set $hash->{AMPLIFIER} $setvalue" );
+	fhem( "trigger $hash->{AMPLIFIER} $setvalue" );
+	Log3( $hash, 5, "SB_PLAYER_Amplifier($name): set " . 
+	      "$hash->{AMPLIFIER} $setvalue" );
+    } else {
+	Log3( $hash,5,"SB_PLAYER_Amplifier($name):no amplifier state change");
+    }
 
     return;
-
 }
+
 
 # ----------------------------------------------------------------------------
 #  update the coverart image
@@ -1876,55 +1898,111 @@ sub SB_SERVER_UpdateVolumeReadings( $$$ ) {
 }
 
 
-# DO NOT WRITE BEYOND THIS LINE
+# ############################################################################
+#  No PERL code beyond this line
+# ############################################################################
 1;
 
 =pod
-    =begin html
-
-    <a name="SB_PLAYER"></a>
-    <h3>SB_PLAYER</h3>
-    <ul>
-    Define a Squeezebox Player. Help needs to be done still.
+=begin html
+ 
+  <a name="SB_PLAYER"></a>
+<h3>SB_PLAYER</h3>
+<ul>
+  <a name="SBplayerdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SB_PLAYER &lt;player_mac_adress&gt; [&lt;ampl&gt;] [&lt;coverart&gt;]</code>
     <br><br>
+    This module allows you to control Squeezebox Media Players connected with an defined Logitech Media Server. A SB_SERVER device is need to work.<br>
+   Normally you don't need to define your SB_PLAYERS because autocreate will do that if enabled.<br><br>
 
-    <a name="SB_PLAYERdefine"></a>
-    <b>Define</b>
-    <ul>
-    <code>define &lt;name&gt; SB_PLAYER</code>
+   <ul>
+      <li><code>&lt;player_mac_adress&gt;</code>: Mac adress of the player found in the LMS.  </li>
+   </ul>   
+   <b>Optional</b>
+   <ul>
+      <li><code>&lt;[ampl]&gt;</code>: You can define a FHEM Device to react when an on or off event is received. With the attribute amplifier you can specify to turn the selected FHEM Device on|off or play|stop.  </li>
+      <li><code>&lt;[coverart]&gt;</code>: You can define a FHEM weblink. The player will update the weblink with the current coverart. Useful for putting coverarts in the floorplan  </li>
+   </ul><br><br>
+   
+  <a name="SBplayerset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
     <br><br>
+    This module supports the following commands:<br>
+   
+    SB_Player related commands:<br>
+   <ul>
+      <li><b>play</b> -  starts the playback (might only work if previously paused).</li>
+     <li><b>pause [&lt;0|1&gt;]</b> -  toggles between play and pause. With parameter 0 it unpause and with 1 it pause the player, doesn't matter which state it has before</li>
+     <li><b>stop</b> -  stop the playback</li>
+     <li><b>next|channelUp</b> -  jump to the next track</li> /* CHECK SYNTAX
+     <li><b>prev|channelDown</b> -  jump to the previous track or the beginning of the current track.</li> /* CHECK SYNTAX
+     <li><b>mute</b> -  toggels between mute and unmuted</li>
+     <li><b>volume &lt;n&gt;</b> -  sets the volume to &lt;n&gt;. &lt;n&gt; must be a number between 0 and 100</li>
+     <li><b>volumeStraight &lt;n&gt;</b> -  same as volume</li>
+     <li><b>volumeDown|volDown &lt;n&gt;</b> -  volume down</li> /* CHECK SYNTAX
+     <li><b>volumeUp|volUp &lt;n&gt;</b> -  volume up</li> /* CHECK SYNTAX
+     <li><b>on</b> -  set the player on if possible. Otherwise it does play</li>
+     <li><b>off</b> -  set the player off if possible. Otherwise it does stop</li>
+     <li><b>shuffle &lt;on|off&gt;</b> -  Enables/Disables shuffle mode</li>
+     <li><b>repeat &lt;one|all|off&gt;</b> -  Sets the repeat mode</li>
+     <li><b>sleep &lt;n&gt;</b> -  Sets the player off in &lt;n&gt; seconds and fade the player volume down</li>   
+     <li><b>favorites &lt;favorit&gt;</b> -  Empty the current playlist and start the selected playlist. Favorits are selectable through a dropdown list</li>   
+     <li><b>talk &lt;text&gt;</b> -  Empty the current playlist and speaks the selected text with google TTS</li>
+     <li><b>playlist &lt;track|album|artist&gt; &lt;x&gt;</b> -  Empty the current playlist starts the track album or artist &lt;x&gt;</li>
+     <li><b>playlist &lt;genre&gt; &lt;artist&gt; &lt;album&gt;</b> -  Empty the current playlist starts the track which will match the search. You can use * as wildcard for everything</li>
+     Example:
+     <code>set myplayer playlist * Whigfield *</code>
+     <li><b>statusRequest</b> -  Update of all readings</li>
+     <li><b>sync</b> -  Sync with other SB_Player for multiroom function. Other players are selectable through a dropdown list. The shown player is the master</li> /* CHECK BESCHREIBUNG
+     <li><b>unsync</b> -  Unsync the player from multiroom group</li>
+     <li><b>playlists</b> -  Empty the current playlist and start the selected playlist. Playlists are selectable through a dropdown list</li>
+     <li><b>cliraw &lt;command&gt;</b> -  Sends the &lt;command&gt; to the LMS CLI for selected player</li>
+   </ul>
+  <br>Show<br>
+   <ul>
+      <code>set sbradio show &lt;line1&gt; &lt;line2&gt; &lt;duration&gt;</code>
+     <li><b>line1</b> -  Text for first line</li>
+     <li><b>line2</b> -  Text for second line</li>
+     <li><b>duration</b> -  Duration for apperance in seconds</li>
+   </ul>
+  <br>Alarms<br>
+   <ul>
+   You can define up to 2 alarms.
+      <code>set sbradio alarm1 set &lt;weekday&gt; &lt;time&gt;</code>
+     <li><b>&lt;weekday&gt;</b> -  Number of weekday. The week starts with Sunday and is 0</li>
+     <li><b>&lt;time&gt;</b> -  Timeformat HH:MM:SS</li>
+   Example:<br>
+   <code>set sbradio alarm1 set 5 12:23:17<br>
+set sbradio alarm2 set 4 17:18:00</code>
+     <li><b>alarm&lt;1|2&gt; delete</b> -  Delete alarm</li>
+     <li><b>alarm&lt;1|2&gt; volume &lt;n&gt;</b> -  Set volume for alarm to &lt;n&gt;</li>
+     <li><b>alarm&lt;1|2&gt; &lt;enable|disable&gt;</b> -  Enable or disable alarm</li>
+     <li><b>allalarms &lt;enable|disable&gt;</b> -  Enable or disable all alarms</li>
+   </ul>
+   <br>
+      
+  <br>
+  <b>Generated Readings</b><br>
+  <ul>
+   <li><b>READING</b> - READING DESCRIPTIONS</li>  /* CHECK TODO
+  </ul>
 
-  Example:
-    <ul>
-    </ul>
-    </ul>
-    <br>
-
-    <a name="SB_PLAYERset"></a>
-    <b>Set</b>
-    <ul>
-    <code>set &lt;name&gt; &lt;value&gt</code><br>
-    Set any value.
-    </ul>
-    <br>
-
-    <a name="SB_PLAYERget"></a>
-    <b>Get</b> <ul>N/A</ul><br>
-
-    <a name="SB_PLAYERattr"></a>
-    <b>Attributes</b>
-    <ul>
-    <li><a name="setList">setList</a><br>
-    Space separated list of commands, which will be returned upon "set name ?",
-    so the FHEMWEB frontend can construct a dropdown and offer on/off
-    switches. Example: attr SB_PLAYERName setList on off
-    </li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    </ul>
-    <br>
-
-    </ul>
-
-    =end html
-    =cut
-
+  <br><br>
+  <a name="SBplayerattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>volumeLimit<br>
+      Sets the volume limit of the player between 0 and 100. 100 means the function is disabled.</li>
+    <li>amplifier<br>
+      ATTRIBUTE DESCRIPTION</li>  /* CHECK TODO
+  </ul>
+</ul>
+</ul>
+</ul>
+test
+=end html
+=cut
