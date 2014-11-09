@@ -47,6 +47,7 @@ my %filelist2 = (
   "FHEM/lib/SWAP/justme/.*"     => { type=>",fhem,", dir=>"FHEM/lib/SWAP/justme"},
   "FHEM/lib/Device/.*.pm"       => { type=>",fhem,", dir=>"FHEM/lib/Device"},
   "FHEM/lib/Device/Firmata/.*.pm"=>{ type=>",fhem,", dir=>"FHEM/lib/Device/Firmata"},
+  "FHEM/lib/Device/MySensors/.*.pm"=>{ type=>",fhem,", dir=>"FHEM/lib/Device/MySensors"},
   "www/pgm2/.*"                 => { type=>"fhem,",  dir=>"www/pgm2"},
   "www/jscolor/.*"              => { type=>"fhem,",  dir=>"www/pgm2"},
   "www/codemirror/.*"           => { type=>"fhem,",  dir=>"www/pgm2"},
