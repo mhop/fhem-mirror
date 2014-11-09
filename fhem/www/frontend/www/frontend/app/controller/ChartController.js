@@ -22,11 +22,20 @@ Ext.define('FHEM.controller.ChartController', {
      * minValue of Y2 Axis gets saved here as reference
      */
     minY2Value: 9999999,
+    
+    /**
+     * are we showing just a simple chart?
+     */
+    simplechartview: false,
 
     refs: [
            {
                selector: 'panel[name=chartformpanel]',
                ref: 'chartformpanel' //this.getChartformpanel()
+           },
+           {
+               selector: 'panel[name=chartpanel]',
+               ref: 'chartpanel' //this.getChartpanel()
            },
            {
                selector: 'datefield[name=starttimepicker]',
@@ -71,6 +80,10 @@ Ext.define('FHEM.controller.ChartController', {
            {
                selector: 'radiogroup[name=datasourceradio]',
                ref: 'datasourceradio' //this.getDatasourceradio()
+           },
+           {
+        	   selector: 'viewport[name=chartviewport]',
+        	   ref: 'simplechartviewport'
            }
     ],
 
@@ -99,6 +112,9 @@ Ext.define('FHEM.controller.ChartController', {
             },
             'menuitem[name=renamechartfromcontext]': {
                 click: this.renamechart
+            },
+            'menuitem[name=integratechartfromcontext]': {
+                click: this.integrateChart
             },
             'treepanel[name=maintreepanel]': {
                 itemclick: this.loadsavedchart
@@ -129,6 +145,9 @@ Ext.define('FHEM.controller.ChartController', {
             },
             'button[name=loadfullchart]': {
                 loadchart: this.loadsavedchart
+            },
+            'viewport[name=chartviewport]': {
+            	afterrender: this.loadAndShowSimpleChart
             }
         });
         
@@ -321,37 +340,38 @@ Ext.define('FHEM.controller.ChartController', {
                 yaxes = Ext.ComponentQuery.query('combobox[name=yaxiscombo]'),
                 rowFieldSets = Ext.ComponentQuery.query('fieldset[commonName=singlerowfieldset]'),
                 yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]'),
-                axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]');
-            
-            var starttime = me.getStarttimepicker().getValue(),
+                axissideradio = Ext.ComponentQuery.query('radiogroup[name=axisside]'),
+                starttime = me.getStarttimepicker().getValue(),
                 dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
                 endtime = me.getEndtimepicker().getValue(),
                 dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
                 dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
                 chartpanel = me.getLinechartpanel(),
-                hiddenchartdiv = Ext.get("hiddenchart");
-            
-            //cleanup chartpanel 
-            var existingchartgrid = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
-            if (!existingchartgrid) {
-                var chartdatagrid = Ext.create('FHEM.view.ChartGridPanel', {
-                    name: 'chartgridpanel',
-                    minHeight: 200,
-                    maxHeight: 200,
-                    collapsed: true
-                });
-                chartpanel.add(chartdatagrid);
-            } else {
-                existingchartgrid.down('grid').getStore().removeAll();
-            }
-            var existingchart = Ext.ComponentQuery.query('panel[name=chartpanel]')[0];
-            if (existingchart) {
-                existingchart.destroy();
-            }
-            var store = Ext.create('FHEM.store.ChartStore'),
+                hiddenchartdiv = Ext.get("hiddenchart"),
+                existingchart = Ext.ComponentQuery.query('panel[name=chartpanel]')[0],
+                store = Ext.create('FHEM.store.ChartStore'),
                 proxy = store.getProxy(),
                 chart;
             
+            //cleanup chartpanel 
+            if (!me.simplechartview) {
+            	var existingchartgrid = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
+                if (!existingchartgrid) {
+                    var chartdatagrid = Ext.create('FHEM.view.ChartGridPanel', {
+                        name: 'chartgridpanel',
+                        minHeight: 200,
+                        maxHeight: 200,
+                        collapsed: true
+                    });
+                    chartpanel.add(chartdatagrid);
+                } else {
+                    existingchartgrid.down('grid').getStore().removeAll();
+                }
+            }
+            
+            if (existingchart) {
+                existingchart.destroy();
+            }
             
             if (hidden === true) {
                 chart = me.createChart(store, hiddenchartdiv);
@@ -470,41 +490,48 @@ Ext.define('FHEM.controller.ChartController', {
                 i++;
             });
             
-        }, 300);
+        }, 	100);
     },
     
     /**
      * resize the chart to fit the centerpanel
      */
     resizeChart: function() {
-        var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
-        var lcv = Ext.ComponentQuery.query('chart')[0];
-        var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
-        var cdg = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0];
-        
+        var me = this,
+            lcp = Ext.ComponentQuery.query('linechartpanel')[0],
+            lcv = Ext.ComponentQuery.query('chart')[0],
+            cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0],
+            cdg = Ext.ComponentQuery.query('panel[name=chartgridpanel]')[0] || true;
+
         if (lcv) {
             if (lcp && lcv && cfp && cdg) {
                 var lcph = lcp.getHeight(),
                     lcpw = lcp.getWidth(),
                     cfph = cfp.getHeight(),
-                    cdgh = cdg.getHeight();
+                    cdgh = Ext.isObject(cdg) ? cdg.getHeight() : 0;
                 
-                if (lcph && lcpw && cfph && cdgh) {
-                    var chartheight = lcph - cfph - cdgh - 80;
-                    var chartwidth = lcpw - 5;
-                    lcv.height = chartheight;
-                    lcv.width = chartwidth;
-                    //render after 50ms to get component right
-                    window.setTimeout(function() {
-                        if (lcv.series.get(0).hideAll) {
-                            lcv.series.get(0).hideAll();
-                        }
-                        lcv.doComponentLayout();
-                        if (lcv.series.get(0).showAll) {
-                            lcv.series.get(0).showAll();
-                        }
-                        lcv.redraw();
-                    }, 50);
+                if (Ext.isNumeric(lcph) && 
+                    Ext.isNumeric(lcpw) && 
+                    Ext.isNumeric(cfph) && 
+                    Ext.isNumeric(cdgh)) {
+                	
+		                var chartheight = lcph - cfph - cdgh - 80;
+		                var chartwidth = lcpw - 5;
+		                lcv.height = chartheight;
+		                lcv.width = chartwidth;
+		                //render after 50ms to get component right
+		                window.setTimeout(function() {
+		                    if (lcv.series.get(0).hideAll) {
+		                        lcv.series.get(0).hideAll();
+		                    }
+		                    lcv.doComponentLayout();
+		                    if (lcv.series.get(0).showAll) {
+		                        lcv.series.get(0).showAll();
+		                    }
+		                    lcv.redraw();
+		                    
+		                    me.fireEvent("chartready");
+		                }, 50);
                 }
             }
         }
@@ -519,7 +546,7 @@ Ext.define('FHEM.controller.ChartController', {
         var chart = Ext.create('Ext.panel.Panel', {
             title: 'Chart',
             name: 'chartpanel',
-            collapsible: true,
+            collapsible: !me.simplechartview,
             titleCollapse: true,
             animCollapse: false,
             width: hidden ? 1 : false,
@@ -944,7 +971,6 @@ Ext.define('FHEM.controller.ChartController', {
                   }
                   
                   //as we have the valuetext, we can fill the grid
-                  //fill the grid with the data
                   me.fillChartGrid(json.data, valuetext);
                   
                   var timestamptext;
@@ -1170,6 +1196,7 @@ Ext.define('FHEM.controller.ChartController', {
         }
         
         me.getLinechartpanel().setLoading(false);
+        
     },
     
     /**
@@ -1180,6 +1207,11 @@ Ext.define('FHEM.controller.ChartController', {
         //setting axistitle and fontsize
         var chart = Ext.ComponentQuery.query('chart')[0],
             axis;
+        
+        // make chart visible before manipulating axes
+        if (!chart.isVisible()) {
+        	chart.up().up().show();
+        }
         
         if (axisside === "left") {
             axis = chart.axes.get(0);
@@ -2015,7 +2047,10 @@ Ext.define('FHEM.controller.ChartController', {
                 }
                 
                 this.requestChartData(false, hidden);
-                this.getLinechartpanel().setTitle(name);
+                // set title only in standard mode to master panel (not simple chart view)
+                if (!me.simplechartview) {
+                	this.getLinechartpanel().setTitle(name);
+                }
             } else {
                 Ext.Msg.alert("Error", "The Chart could not be loaded! RawChartdata was: <br>" + chartdata);
             }
@@ -2176,9 +2211,10 @@ Ext.define('FHEM.controller.ChartController', {
      * fill the charts grid with data
      */
     fillChartGrid: function(jsondata, valuetext) {
-        if (jsondata && jsondata[0]) {
-            //this.getChartformpanel().collapse();
-            
+    	
+    	var grid = this.getChartdatagrid();
+    	if (grid && jsondata && jsondata[0]) {
+    		
             var store = this.getChartdatagrid().getStore(),
                 columnwidth = 0,
                 storefields = [],
@@ -2365,5 +2401,101 @@ Ext.define('FHEM.controller.ChartController', {
             });
         }
         Ext.ComponentQuery.query('treepanel')[0].setLoading(false);
+    },
+    
+    /**
+     * method used to retrieve config of a saved chart and create the desired chart for
+     * simpler fhem integration (simple chart view)
+     */
+    loadAndShowSimpleChart: function() {
+    	// get the chartconfig for the given id
+    	var me = this,
+    	    chartid = me.getSimplechartviewport().chartid,
+    	    config = {};
+    	
+    	me.simplechartview = true;
+    	
+    	// first, check the filelogs
+    	Ext.each(FHEM.filelogcharts, function(log) {
+    		if (log.ID === parseInt(chartid,10)) {
+    			config.raw = {};
+    			config.raw.data = log;
+    			me.on("chartready", function() {
+    				var c = Ext.ComponentQuery.query('chart')[0];
+    				c.setHeight(c.getHeight() + 30);
+    				c.up().setTitle(log.NAME);
+    			});
+    			me.loadsavedchart(false, config, false);
+    			return false;
+    		}
+    	});
+    	
+    	// if no filelog found, search the db
+    	if (Ext.isEmpty(config.raw)) {
+    		//load the saved charts store with configured dblog name
+            var me = this,
+                store = Ext.create('FHEM.store.SavedChartsStore', {});
+            
+            store.getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getcharts&XHR=1';
+            store.load();
+            store.on("load", function() {
+            	store.each(function(rec) {
+            		if (rec.raw.NAME && rec.raw.NAME === chartid) {
+            			config = rec;
+            			me.on("chartready", function() {
+            				var c = Ext.ComponentQuery.query('chart')[0];
+            				c.setHeight(c.getHeight() + 30);
+            				c.up().setTitle(rec.raw.NAME);
+            			});
+            			me.loadsavedchart(false, config, false);
+            			return false;
+            		}
+            	});
+            	
+            	// if no match found, throw error
+            	if (Ext.isEmpty(config.raw)) {
+            		Ext.Msg.alert("Error", "The chart could not be found!");
+            		return;
+            	}
+            });
+    	}
+    },
+    
+    /**
+     * method shows an fhem definition for this chart
+     * to integrate it as an iframe in the fhem view
+     */
+    integrateChart: function(menu) {
+    	/**
+    	 *  define charttest weblink iframe http://192.168.0.111:8085/fhem/frontenddev/index.html?a=b&c=d&showchart=sdfsd
+			attr charttest htmlattr width="500" height="300"
+			attr charttest room Keller
+    	 */
+    	var me = this,
+    	    rec = menu.record,
+    	    url = window.location.href,
+    	    id;
+    	
+    	if (!rec || !rec.raw || !rec.raw.data) {
+    		Ext.Msg.alert("Error", "Invalid configuration, please report!");
+    		return false;
+    	}
+    	
+    	url += '?showchart=';
+    	
+    	if (rec.raw.data.TYPE === "savedfilelogchart") {
+    		url += rec.raw.data.ID;
+    	} else {
+    		url += rec.raw.data.NAME;
+    	}
+    	
+    	Ext.create('Ext.window.Window', {
+    		width: 600,
+    		height: 150,
+    		html: 'Copy the following code to your fhem.cfg and modify it to integrate this chart in your FHEM views:<br><br>' +
+    		      'define ' + rec.raw.data.NAME + ' weblink iframe ' + url + '<br>' +
+    		      'attr ' + rec.raw.data.NAME + ' htmlattr width="500" height="300"<br>' +
+			      'attr ' + rec.raw.data.NAME + ' room Keller<br>'
+    	}).show();
     }
 });

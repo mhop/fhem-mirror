@@ -159,6 +159,10 @@ Ext.define('FHEM.view.Viewport', {
                                                     text: 'Rename Chart',
                                                     name: 'renamechartfromcontext',
                                                     record: rec
+                                                }, '-', {
+                                                    text: 'Integrate in FHEM',
+                                                    name: 'integratechartfromcontext',
+                                                    record: rec
                                                 }
                                             ]
                                         }).showAt(e.xy);

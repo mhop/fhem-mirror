@@ -69,7 +69,12 @@ Ext.define('FHEM.view.LineChartPanel', {
     /**
      * the title
      */
-    title: 'Line Chart',
+    title: false,
+    
+    /**
+     * 
+     */
+    hideSettingsPanel: false,
     
     /**
      * init function
@@ -101,6 +106,7 @@ Ext.define('FHEM.view.LineChartPanel', {
             collapsible: true,
             titleCollapse: true,
             animCollapse: false,
+            hidden: me.hideSettingsPanel,
             items: [
                 {
                     xtype: 'fieldset',
