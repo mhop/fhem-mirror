@@ -311,7 +311,7 @@ sub Attr($$$$) {
       FIND: foreach my $id (keys %$readingMappings) {
         my $readingsForId = $readingMappings->{$id};
         foreach my $type (keys %$readingsForId) {
-          if ($readingsForId->{$type}->{name} // "" eq $1) {
+          if (($readingsForId->{$type}->{name} // "") eq $1) {
             delete $readingsForId->{$type};
             unless (keys %$readingsForId) {
               delete $readingMappings->{$id};
@@ -325,11 +325,9 @@ sub Attr($$$$) {
         my $typeMappings = $hash->{typeMappings};
         if (my @match = grep {$typeMappings->{$_}->{type} eq $typeStr} keys %$typeMappings) {
           my $type = shift @match;
-          $hash->{readingMappings}->{$id}->{$type} = {
-            name => $1,
-          };
+          $readingMappings->{$id}->{$type}->{name} = $1;
           if (@values) {
-            $hash->{readingMappings}->{$id}->{$type}->{val} = {map {$_ =~ /^(.+):(.+)$/; $1 => $2} @values}; #TODO range?
+            $readingMappings->{$id}->{$type}->{val} = {map {$_ =~ /^(.+):(.+)$/; $1 => $2} @values}; #TODO range?
           }
         } else {
           return "unknown reading type $typeStr";
