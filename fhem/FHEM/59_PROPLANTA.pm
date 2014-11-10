@@ -64,8 +64,8 @@ my $curReadingType = 0;
 
   # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type (see above)
   my @knownIDs = (  
-      ["TMAX", "tempMaxC", 2]
-      ,["TMIN", "tempMinC", 2]
+      ["TMAX", "tempMax", 2]
+      ,["TMIN", "tempMin", 2]
       ,["NW", "chOfRainDay", 2]
       ,["NW_Nacht", "chOfRainNight", 2]
       ,["BF", "frost", 4]
@@ -78,14 +78,14 @@ my $curReadingType = 0;
       ,["WETTER_ID_TAGSUEBER", "weatherDay", 7]
       ,["WETTER_ID_ABENDS", "weatherEvening", 7]
       ,["WETTER_ID_NACHT", "weatherNight", 7]
-      ,["T_0", "temp00C", 2]
-      ,["T_3", "temp03C", 2]
-      ,["T_6", "temp06C", 2]
-      ,["T_9", "temp09C", 2]
-      ,["T_12", "temp12C", 2]
-      ,["T_15", "temp15C", 2]
-      ,["T_18", "temp18C", 2]
-      ,["T_21", "temp21C", 2]
+      ,["T_0", "temp00", 2]
+      ,["T_3", "temp03", 2]
+      ,["T_6", "temp06", 2]
+      ,["T_9", "temp09", 2]
+      ,["T_12", "temp12", 2]
+      ,["T_15", "temp15", 2]
+      ,["T_18", "temp18", 2]
+      ,["T_21", "temp21", 2]
       ,["NW_0", "chOfRain00", 2]
       ,["NW_3", "chOfRain03", 2]
       ,["NW_6", "chOfRain06", 2]
@@ -304,6 +304,7 @@ sub start
 
 sub end
 {
+   my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
    $curTag = "";
 
    if ( $tagname eq "tr" ) 
@@ -588,7 +589,7 @@ sub PROPLANTA_Done($)
       if (keys %values > 0) 
       {
         # Achtung! Um Mitternacht fehlen die aktuellen Werte
-         readingsBulkUpdate($hash, "state", "Tmin: " . $values{fc0_tempMinC} . " Tmax: " . $values{fc0_tempMaxC} . " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure} );
+         readingsBulkUpdate($hash, "state", "Tmin: " . $values{fc0_tempMin} . " Tmax: " . $values{fc0_tempMax} . " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure} );
          readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured" );
       }
       else
@@ -661,7 +662,7 @@ PROPLANTA_Html($)
 <ul>
    The module extracts weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br>
-   It requires the perl moduls HTTP::Request and LWP::UserAgent.
+   It requires the perl moduls HTTP::Request, LWP::UserAgent and HTML::Parse.
    <br/><br/>
    <a name="PROPLANTAdefine"></a>
    <b>Define</b>
@@ -721,6 +722,7 @@ PROPLANTA_Html($)
    <ul>
       <br>
       <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2|3 days</i></li>
+      <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - forecast values for <i>today</i> at <i>00|03|06|09|12|15|18|21</i> o'clock</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - chance of rain <i>today</i> by <i>day|night</i> in %</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>15</i> - chance of rain <i>today</i> at <i>15:00</i> in %</li>
       <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i> - cloud coverage <i>today</i> at <i>15:00</i> in %</li>
@@ -729,10 +731,10 @@ PROPLANTA_Html($)
       <li><b>fc</b><i>0</i><b>_frost</b> - ground frost <i>today</i> (0=no, 1=yes)</li>
       <li><b>fc</b><i>0</i><b>_moon</b><i>Rise|Set</i> - moon <i>rise|set today</i></li>
       <li><b>fc</b><i>0</i><b>_rad</b> - global radiation <i>today</i></li>
-      <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - amount of rainfall <i>today</i> at <i>15:00</i> in mm</li>
+      <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - amount of rainfall <i>today</i> at <i>15:00</i> o'clock in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative sun shine duration <i>today</i> in % (between sun rise and set)</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i><b>C</b> - <i>minimal|maximal</i> temperature <i>today</i> in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - temperatur <i>today</i> at <i>15:00</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature <i>today</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - temperatur <i>today</i> at <i>15:00</i> o'clock in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - weather situation <i>today morning|during day|in the evening|during night</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation <i>today</i> by <i>day</i></li>
@@ -753,7 +755,7 @@ PROPLANTA_Html($)
    <a name="PROPLANTAdefine"></a>
    Das Modul extrahiert  Wetterdaten von der website <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br/>
-   Es ben&ouml;tigt die Perlmodule HTTP::Request und LWP::UserAgent.
+   Es ben&ouml;tigt die Perlmodule HTTP::Request, LWP::UserAgent und HTML::Parse.
    <br/><br/>
    <b>Define</b>
    <ul>
@@ -812,6 +814,7 @@ PROPLANTA_Html($)
    <ul>
       <br>
       <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - Vorhersagewerte f&uumlr <i>heute|morgen|&uuml;bermorgen|in 3 Tagen</i></li>
+      <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte f&uumlr <i>heute</i> um <i>00|03|06|09|12|15|18|21</i> Uhr</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - <i>heutiges</i> Niederschlagsrisiko <i>tags&uuml;ber|nachts</i> in %</li>
       <li><b>fc</b><i>1</i><b>_chOfRain</b><i>15</i> - <i>morgiges</i> Niederschlagsrisiko um <i>15</i>:00 Uhr in %</li>
       <li><b>fc</b><i>2</i><b>_cloud</b><i>15</i> - Wolkenbedeckungsgrad <i>&uuml;bermorgen</i> um <i>15</i>:00 Uhr in %</li>
@@ -822,8 +825,8 @@ PROPLANTA_Html($)
       <li><b>fc</b><i>0</i><b>_rad</b> - Globalstrahlung <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_rain</b><i>15</i> - Niederschlagsmenge <i>heute</i> um <i>15</i>:00 Uhr in mm</li>
       <li><b>fc</b><i>0</i><b>_sun</b> - relative Sonnenscheindauer <i>heute</i> in % (zwischen Sonnenauf- und -untergang)</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i><b>C</b> - <i>Minimal|Maximal</i>temperatur <i>heute</i> in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i><b>C</b> - Temperatur <i>heute</i> um <i>15</i>:00 Uhr in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Minimal|Maximal</i>temperatur <i>heute</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>15</i> - Temperatur <i>heute</i> um <i>15</i>:00 Uhr in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tags&uuml;ber|abends|nachts</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tags&uuml;ber</i></li>
