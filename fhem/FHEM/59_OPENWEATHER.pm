@@ -451,6 +451,8 @@ OPENWEATHER_UpdateAborted($)
       <li><code>&lt;cityCode&gt;</code>
          <br>
          Code of the location for which the forecast is requested. Can be obtained from the URL of the weather forecast page of the concerned city.
+         <br>
+         For example DE0009042 from <i>http://www.wetter.com/wetter_aktuell/aktuelles_wetter/deutschland/rostock/<u>DE0009042</u>.html</i>
       </li><br>
       <li><code>&lt;apiKey&gt;</code>
          <br>
@@ -536,6 +538,8 @@ OPENWEATHER_UpdateAborted($)
       <li><code>&lt;Ortscode&gt;</code>
          <br>
          Code des Ortes f&uuml;r den die Wettervorhersage ben&ouml;tigt wird. Er kann direkt aus der Adresszeile der jeweiligen Vorhersageseite genommen werden.
+         <br>
+         Zum Beispiel DE0009042 aus <i>http://www.wetter.com/wetter_aktuell/aktuelles_wetter/deutschland/rostock/<u>DE0009042</u>.html</i>
       </li><br>
       <li><code>&lt;apiSchl&uuml;ssel&gt;</code>
          <br>
