@@ -103,6 +103,7 @@ sub RPI_GPIO_Define($$) {
 	}
 	unless( $counter ) {																												#abbrechen wenn export fehlgeschlagen
 		Log3 $hash, 1, "$name: failed to export pin gpio$hash->{RPI_pin}";
+        return "$name: failed to export pin gpio$hash->{RPI_pin}";
 	}
 
  $hash->{fhem}{interfaces} = "switch";
@@ -193,6 +194,12 @@ sub RPI_GPIO_State($$$$) {	#reload readings at FHEM start
 			} 
 		} elsif ( AttrVal($hash->{NAME},"direction","") eq "input") {
 			if ($sname eq "Toggle") {
+        #wenn restoreOnStartup "on" oder "off" und der Wert mit dem im Statefile uebereinstimmt wird der Zeitstempel aus dem Statefile gesetzt
+				my $rval = AttrVal($hash->{NAME},"restoreOnStartup","last");
+				$rval = "last" if ( $rval ne "on" && $rval ne "off" );
+				$tim  = gettimeofday() if $rval ne "last" && $rval ne $sval;
+				$sval = $rval eq "last" ? $sval : $rval;
+		
 				$hash->{READINGS}{$sname}{VAL} = $sval;
 				$hash->{READINGS}{$sname}{TIME} = $tim;
 				Log3 $hash, 4, "INPUT $hash->{NAME}: $sname wiederhergestellt auf $sval";
@@ -204,10 +211,25 @@ sub RPI_GPIO_State($$$$) {	#reload readings at FHEM start
 					Log3 $hash, 4, "INPUT $hash->{NAME}: STATE wiederhergestellt auf $sval";
 				}
 			} elsif ($sname eq "Counter") {
-				$hash->{READINGS}{$sname}{VAL} = $sval;
-				$hash->{READINGS}{$sname}{TIME} = $tim;
-				Log3 $hash, 4, "INPUT $hash->{NAME}: $sname wiederhergestellt auf $sval";	
-			}
+          		$hash->{READINGS}{$sname}{VAL} = $sval;
+          		$hash->{READINGS}{$sname}{TIME} = $tim;
+          		Log3 $hash, 4, "INPUT $hash->{NAME}: $sname wiederhergestellt auf $sval";	
+			} elsif ( ($sname eq "state") && (AttrVal($hash->{NAME},"toggletostate","") ne "yes") ) {
+          		#my $rval = AttrVal($hash->{NAME},"restoreOnStartup","");
+          		#if ($rval eq "" && (AttrVal($hash->{NAME},"toggletostate","") ne "yes") ) {
+           		Log3 $hash, 4, "INPUT $hash->{NAME}: alter Pinwert war: $sval";
+            	my $val = RPI_GPIO_fileaccess($hash, "value");
+           		$val = $val eq "1" ? "on" :"off";
+           		Log3 $hash, 4, "INPUT $hash->{NAME}: aktueller Pinwert ist: $val";
+           		if ($val ne $sval) {
+              		Log3 $hash, 4, "INPUT $hash->{NAME}: Pinwerte ungleich...Timer gesetzt";
+              		InternalTimer(gettimeofday() + (10), 'RPI_GPIO_Poll', $hash, 0);
+           		} else {
+              		$hash->{READINGS}{$sname}{VAL} = $sval;
+              		$hash->{READINGS}{$sname}{TIME} = $tim;
+           		}
+          		#}
+      		}
 		}
 	}
 	return;
@@ -537,6 +559,7 @@ sub RPI_GPIO_exuexpin($$) {			#export, unexport and direction Pin via GPIO utili
 		$dir = "";
 	} else {
 		$sw = "export";
+        $dir = "out" if ( $dir eq "high" || $dir eq "low" );		#auf out zurueck, da gpio tool dies nicht unterstützt
 		$dir = " ".$dir;
 	}
 	if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {
