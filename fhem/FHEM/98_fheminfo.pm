@@ -75,7 +75,7 @@ CommandFheminfo($$)
   return "Argument 'send' is not useful, if global attribute 'sendStatistics' is set to 'never'."
     if(@args && lc($args[0]) eq "send" && lc(AttrVal("global","sendStatistics","")) eq "never");
 
-  my $ranch   = "DEVELOPMENT";
+  my $branch   = "DEVELOPMENT";
   my $release  = "5.6";
   my $os       = $^O;
   my $arch     = $Config{"archname"};
