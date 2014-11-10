@@ -329,7 +329,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
-my $modulVersion = '$Id $';
+my $modulVersion = '# $Id: $';
 
    my %url_start =( "de" => "http://www.proplanta.de/Wetter/"
    , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/"
