@@ -373,14 +373,14 @@ PRESENCE_Attr(@)
 
         if(defined($hash->{DeviceName}))
         {
+            $hash->{helper}{DISABLED} = 0;
+            
             if(defined($hash->{FD}))
             {
                 PRESENCE_DoInit($hash) if(exists($hash->{helper}{DISABLED}));
-                $hash->{helper}{DISABLED} = 0;
             }
             else
             {
-                $hash->{helper}{DISABLED} = 0;
                 DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
             }
         }
