@@ -234,7 +234,7 @@ OPENWEATHER_Set($$@)
    my ($hash, $name, $cmd, $val) = @_;
    my $resultStr = "";
    
-   if($cmd eq 'update') 
+   if(lc $cmd eq 'update') 
    {
       $hash->{LOCAL} = 1;
       OPENWEATHER_Start($hash);
@@ -254,7 +254,7 @@ OPENWEATHER_Get($@)
   my $result;
   my $message;
   
-  if ($cmd eq "apiResponse") 
+  if (lc $cmd eq "apiresponse") 
   {
       my $time = gettimeofday();
       $result = OPENWEATHER_Run $name;
@@ -276,20 +276,6 @@ OPENWEATHER_Get($@)
       return $message;
       
   }
-  # elsif ($cmd eq "jsonAnalysis") {
-      # my $time = gettimeofday();
-      # $hash->{fhem}{jsonInterpreter} = "";
-      # $result = OPENWEATHER_Run $name;
-      # my @a = split /\|/, $result;
-      # if ($a[1]==0) { return $a[2]; }
-      
-      # $result = OPENWEATHER_Done $result;
-      # my @a = split /\|/, $result;
-      # $time = gettimeofday() - $time;
-      # $message = sprintf( "Runtime: %.2f s\n_________________\n\n", $time);
-      # $message .= decode_base64($result); #$a[2]);
-      # return $message;
-  # }
   
   my $list = "apiResponse:noArg";
   return "Unknown argument $cmd, choose one of $list";
@@ -432,7 +418,7 @@ OPENWEATHER_UpdateAborted($)
    <br>
    It requires a registration on this website to obtain the necessary parameters.
    <br>
-   It requires the perl moduls HTTP::Request, LWP::UserAgent, HTML::Parse and Digest::MD5.
+   It uses the perl moduls HTTP::Request, LWP::UserAgent, HTML::Parse and Digest::MD5.
    <br/><br/>
    <a name="OPENWEATHERdefine"></a>
    <b>Define</b>
@@ -440,26 +426,28 @@ OPENWEATHER_UpdateAborted($)
       <br>
       <code>define &lt;name&gt; OPENWEATHER &lt;project&gt; &lt;cityCode&gt; &lt;apiKey&gt; </code>
       <br>
-      Example: <code>define wetter OPENWEATHER beispielprojekt DE0001020 3c551bc20819c19ee88c9ec94280a61d</code>
-      <br>&nbsp;
-      To obtain the below parameter a requistration of a personal project is necessary on <a href="http://www.wetter.com/apps_und_mehr/website/api/projekte/">www.wetter.com</a>.
+      Example:
       <br>
+      <code>define wetter OPENWEATHER projectx DE0001020 3c551bc20819c19ee88d</code>
+      <br/><br/>
+      To obtain the below parameter you have to create a new project on <a href="http://www.wetter.com/apps_und_mehr/website/api/projekte/">www.wetter.com</a>.
+      <br/><br/>
       <li><code>&lt;project&gt;</code>
          <br>
-         Name of the users 'openweather' project (create with a user account on the website).
+         Name of the 'openweather' project (create with a user account on wetter.com).
       </li><br>
       <li><code>&lt;cityCode&gt;</code>
          <br>
-         Code of the location for which the forecast is requested. Can be obtained from the URL of the weather forecast page of the concerned city.
+         Code of the location for which the forecast is requested. 
+         The code is part of the URL of the weather forecast page. For example <i>DE0009042</i> in:
          <br>
-         For example DE0009042 from <i>http://www.wetter.com/wetter_aktuell/aktuelles_wetter/deutschland/rostock/<u>DE0009042</u>.html</i>
+         <i>http://www.wetter.com/wetter_aktuell/aktuelles_wetter/deutschland/rostock/<u>DE0009042</u>.html</i>
       </li><br>
       <li><code>&lt;apiKey&gt;</code>
          <br>
-         Secret key the can be obtain after the users 'openweather' project is created on the web site.
+         Secret key that is provided when the user creates a 'openweather' project on wetter.com.
       </li><br>
    </ul>
-   <br>
   
    <a name="OPENWEATHERset"></a>
    <b>Set</b>
@@ -475,7 +463,7 @@ OPENWEATHER_UpdateAborted($)
    <b>Get</b>
    <ul>
       <br>
-      <li><code>set &lt;name&gt; apiResponse</code>
+      <li><code>get &lt;name&gt; apiResponse</code>
          <br>
          Shows the response of the web site.
       </li><br>
@@ -492,16 +480,17 @@ OPENWEATHER_UpdateAborted($)
    <a name="OPENWEATHERreading"></a>
    <b>Forecast readings</b>
    <ul>
+      Note! The forecast values have first to be selected on the project setup page on wetter.com.
       <br>
       <li><b>fc</b><i>0|1|2</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2 days</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - forecast values for <i>today</i> at <i>06|11|17|23</i> o'clock</li>
-      <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature <i>tommorrow</i> in &deg;C</li>
+      <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature for <i>tommorrow</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>minimal</i> temperatur <i>today</i> at <i>06:00</i> o'clock in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_presChange</b> - atmospheric pressure change <i>today</i></li>
-      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - validity period of the forecast values in hours</li>
+      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - validity period in hours of the forecast values starting at <i>06:00</i> o'clock</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - weather situation <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b> - wind speed <i>today</i> in km/h</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b> - wind direction <i>today</i> in &deg;</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b> - wind direction <i>today</i> in &deg; (degree)</li>
       <li><b>fc</b><i>0</i><b>_windDirTxt</b> - wind direction <i>today</i> in text form</li>
       <li>etc.</li>
    </ul>
@@ -518,28 +507,32 @@ OPENWEATHER_UpdateAborted($)
 <div  style="width:800px"> 
 <ul>
    <a name="OPENWEATHERdefine"></a>
-   Das Modul extrahiert  Wetterdaten &uuml;ber die <a href="http://www.wetter.com/apps_und_mehr/website/api/dokumentation">"openweather"-Schnittstelle</a> von <a href="http://www.wetter.com">www.wetter.com</a>.
+   Das Modul extrahiert  Wetterdaten &uuml;ber die <a href="http://www.wetter.com/apps_und_mehr/website/api/dokumentation">"openweather"-Schnittstelle (API)</a> von <a href="http://www.wetter.com">www.wetter.com</a>.
+   <br/>
    Zuvor ist eine Registrierung auf der Webseite notwendig.
    <br/>
-   Das Modul ben&ouml;tigt die Perlmodule HTTP::Request, LWP::UserAgent, HTML::Parse und Digest::MD5.
+   Das Modul nutzt die Perlmodule HTTP::Request, LWP::UserAgent, HTML::Parse und Digest::MD5.
    <br/><br/>
    <b>Define</b>
    <ul>
       <br>
-      <code>define &lt;name&gt; OPENWEATHER &lt;Projekt&gt; &lt;Ortscode&gt; &lt;apiSchl&uuml;ssel&gt; </code>
+      <code>define &lt;name&gt; OPENWEATHER &lt;Projekt&gt; &lt;Ortscode&gt; &lt;apiSchl&uuml;ssel&gt;</code>
       <br>
-      Beispiel: <code>define wetter OPENWEATHER beispielprojekt DE0001020 3c551bc20819c19ee88c9ec94280a61d</code>
+      Beispiel:
       <br>
-      Um die unteren Paramter zu erhalten, ist die  Registrierung eines eigenen Projektes auf <a href="http://www.wetter.com/apps_und_mehr/website/api/projekte/">www.wetter.com</a> notwendig.
+      <code>define wetter OPENWEATHER projektx DE0001020 3c551bc20819c19ee88c9ec94280a61d</code>
+      <br/><br/>
+      Um die unteren Parameter zu erhalten, ist die  Registrierung eines neuen Projektes auf <a href="http://www.wetter.com/apps_und_mehr/website/api/projekte/">www.wetter.com</a> notwendig.
+      <br/><br/>
       <li><code>&lt;Projekt&gt;</code>
          <br>
-         Name des benutzerspezifischen 'Openweather'-Projektes (erzeugt &uuml;ber ein Benutzerkonto auf der Website).
+         Name des benutzerspezifischen 'openweather'-Projektes (erzeugt &uuml;ber ein Konto auf wetter.com).
       </li><br>
       <li><code>&lt;Ortscode&gt;</code>
          <br>
-         Code des Ortes f&uuml;r den die Wettervorhersage ben&ouml;tigt wird. Er kann direkt aus der Adresszeile der jeweiligen Vorhersageseite genommen werden.
+         Code des Ortes f&uuml;r den die Wettervorhersage ben&ouml;tigt wird. Er kann direkt aus der Adresszeile der jeweiligen Vorhersageseite genommen werden. Zum Beispiel <i>DE0009042</i> aus:
          <br>
-         Zum Beispiel DE0009042 aus <i>http://www.wetter.com/wetter_aktuell/aktuelles_wetter/deutschland/rostock/<u>DE0009042</u>.html</i>
+         <i>http://www.wetter.com/wetter_aktuell/aktuelles_wetter/deutschland/rostock/<u>DE0009042</u>.html</i>
       </li><br>
       <li><code>&lt;apiSchl&uuml;ssel&gt;</code>
          <br>
@@ -561,7 +554,7 @@ OPENWEATHER_UpdateAborted($)
    <b>Get</b>
    <ul>
       <br>
-      <li><code>set &lt;name&gt; apiResponse</code>
+      <li><code>get &lt;name&gt; apiResponse</code>
          <br>
          Zeigt die R&uuml;ckgabewerte der Website an.
       </li><br>
@@ -578,20 +571,21 @@ OPENWEATHER_UpdateAborted($)
    <a name="OPENWEATHERreading"></a>
    <b>Vorhersagewerte</b>
    <ul>
+      Wichtig! Die Vorhersagewerte m&uuml;ssen zuerst in den Einstellungen des Projektes auf wetter.com ausgew&auml;hlt werden.
       <br>
       <li><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte f&uuml;r <i>heute|morgen|&uuml;bermorgen</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte f&uuml;r <i>heute</i> um <i>06|11|17|23</i> Uhr</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Mindest|Maximal</i>temperatur <i>heute</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>Mindest</i>temperatur <i>heute</i> um <i>06:00</i> Uhr in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_presChange</b> - <i>heutige</i> &Auml;nderung des Luftdruckes</li>
-      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute 6:00 Uhr</i> in Stunden</li>
+      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - Wetterzustand <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b> - Windgeschwindigkeit <i>heute</i> in km/h</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b> - Windrichtung <i>heute</i> in &deg;</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b> - Windrichtung <i>heute</i> in &deg; (Grad)</li>
       <li><b>fc</b><i>0</i><b>_windDirTxt</b> - Windrichtung <i>heute</i> in Textform</li>
       <li>etc.</li>
    </ul>
-   <br><br>
+   <br/>
 </ul>
 </div> 
 

@@ -722,7 +722,7 @@ PROPLANTA_Html($)
    <ul>
       <br>
       <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2|3 days</i></li>
-      <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - forecast values for <i>today</i> at <i>00|03|06|09|12|15|18|21</i> o'clock</li>
+      <li><b>fc</b><i>0</i><b>_...<i>00|03|06|09|12|15|18|21</i></b> - forecast values for <i>today</i> at <i>00|03|06|09|12|15|18|21</i> o'clock</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - chance of rain <i>today</i> by <i>day|night</i> in %</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>15</i> - chance of rain <i>today</i> at <i>15:00</i> in %</li>
       <li><b>fc</b><i>0</i><b>_cloud</b><i>15</i> - cloud coverage <i>today</i> at <i>15:00</i> in %</li>
@@ -814,7 +814,7 @@ PROPLANTA_Html($)
    <ul>
       <br>
       <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - Vorhersagewerte f&uumlr <i>heute|morgen|&uuml;bermorgen|in 3 Tagen</i></li>
-      <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte f&uumlr <i>heute</i> um <i>00|03|06|09|12|15|18|21</i> Uhr</li>
+      <li><b>fc</b><i>0</i><b>_...<i>00|03|06|09|12|15|18|21</i></b> - Vorhersagewerte f&uumlr <i>heute</i> um <i>00|03|06|09|12|15|18|21</i> Uhr</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - <i>heutiges</i> Niederschlagsrisiko <i>tags&uuml;ber|nachts</i> in %</li>
       <li><b>fc</b><i>1</i><b>_chOfRain</b><i>15</i> - <i>morgiges</i> Niederschlagsrisiko um <i>15</i>:00 Uhr in %</li>
       <li><b>fc</b><i>2</i><b>_cloud</b><i>15</i> - Wolkenbedeckungsgrad <i>&uuml;bermorgen</i> um <i>15</i>:00 Uhr in %</li>
