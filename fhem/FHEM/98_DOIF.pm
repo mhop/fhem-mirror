@@ -343,7 +343,7 @@ DOIF_CheckTimers($$$$)
       $nrs[$i++]=$nr;
       $timer=substr($timer,pos($timer)) if ($timer =~ /^\s*\-/g);
     }
-    $days = "" if (!$days);
+    $days = "" if (!defined ($days));
     for (my $j=0; $j<$i;$j++) {
       $nr=$nrs[$j];
       $time=$times[$j];
@@ -351,7 +351,7 @@ DOIF_CheckTimers($$$$)
       $hash->{timer}{$nr}=0;
       $hash->{time}{$nr}=$time;
       $hash->{timeCond}{$nr}=$condition;
-      $hash->{days}{$nr}=$days if ($days);
+      $hash->{days}{$nr}=$days if ($days ne "");
       ${$timerarray}[$nr]={hash=>$hash,nr=>$nr};
       $err=(DOIF_SetTimer("DOIF_TimerTrigger",\${$timerarray}[$nr]));
       return($hash->{time}{$nr},$err) if ($err);
@@ -388,7 +388,7 @@ DOIF_time($$$$$)
     } 
   }
   if ($ret == 1) {
-    return 1 if (!$days or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
+    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
   }
   return 0;
 }  
@@ -400,7 +400,7 @@ DOIF_time_once($$$)
   my ($flag,$wday,$days)=@_;
   my $we=DOIF_we($wday);
   if ($flag) {
-    return 1 if (!$days or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
+    return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
   }
   return 0;  
 }  
@@ -653,7 +653,7 @@ DOIF_SetTimer($$)
     }
   }
   my $next_time_str=strftime("%d.%m.%Y %H:%M:%S",localtime($next_time));
-  $next_time_str.="\|".$hash->{days}{$nr} if ($hash->{days}{$nr});
+  $next_time_str.="\|".$hash->{days}{$nr} if (defined ($hash->{days}{$nr}));
   readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),$next_time_str,0);
   $hash->{realtime}{$nr}=strftime("%H:%M:%S",localtime($next_time));
   RemoveInternalTimer($timer);
@@ -1164,7 +1164,7 @@ Wenn nur der DOIF-Fall angegeben wird, so wird, wenn Bedingung nicht erfüllt is
 <br>
 Reine Statusanzeige ohne Ausführung von Befehlen. Der Ausführungsteil kann jeweils ausgelassen werden:<br>
 <br>
-<code>define di_humiditystate DOIF ([outdoor:humidity]&gt;70) DOELSEIF ([outdoor:humidity]&gt;50) DOELSE<br>
+<code>define di_hum DOIF ([outdoor:humidity]&gt;70) DOELSEIF ([outdoor:humidity]&gt;50) DOELSE<br>
 attr di_hum cmdState wet|normal|dry</code><br>
 <br>
 Anpassung des Status mit Hilfe des Attributes "state". Es können beliebige Reading und Stati oder Internals angegeben werden:<br>
