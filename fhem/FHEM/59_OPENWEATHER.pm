@@ -38,8 +38,9 @@ package MyOPENWEATHERParser;
 use base qw(HTML::Parser);
 our %fcReadings = ();
 my $curTag      = "";
-my $day         = -1;
+my $day         = -2;
 my $time        = "";
+my $isError     = 0;
 # here HTML::text/start/end are overridden
 
 %knownTags = ( tn => "tempMin"
@@ -51,24 +52,24 @@ my $time        = "";
    , wd_txt => "windDirTxt"
    , pc => "presChange"
    , p => "valHours"
+   , title => "error"
+   , message => "errorMsg"
+   , name => "city"
+   , post_code => "postcode"
 );
 
 sub text
 {
    my ( $self, $text ) = @_;
 
-   if ($curTag eq "name")
+   my $rName = $knownTags{$curTag};
+   if (defined $rName)
    {
-      $fcReadings{"city"} = $text ; 
-   }
-   elsif ($curTag eq "post_code")
-   {
-      $fcReadings{"postCode"} = $text ; 
-   }
-   else
-   {
-      my $rName = $knownTags{$curTag};
-      if (defined $rName && $day >= 0)
+      if ($day == -2)
+      {
+         $fcReadings{$rName} = $text ; 
+      }
+      elsif ( $day >= 0 )
       {
          #Umlaute entfernen
          if ($curTag eq "w_txt") {$text =~ s/ö/oe/; $text =~ s/ä/ae/; $text =~ s/ü/ue/; $text =~ s/ß/ss/;}         
@@ -84,14 +85,14 @@ sub start
    
    if ($tagname eq "forecast")
    {
-      $day=-1;
+      $day = -1;
    }
-   if ($tagname eq "date")
+   elsif ( $tagname eq "date" && $day >= -1 )
    {
       $day++;
       $time = "";
    }
-   if ($tagname eq "time")
+   elsif ($tagname eq "time")
    {
       $time = substr($attr->{value}, 0, 2);
    }
@@ -176,16 +177,26 @@ OPENWEATHER_Define($$)
   $hash->{STATE}      = "Initializing" if $interval > 0;
   $hash->{STATE}      = "Manual mode" if $interval == 0;
   $hash->{INTERVAL}   = $interval;
-  $hash->{PROJECT}       = $args[2];
-  $hash->{CITYCODE}       = $args[3];
-  $hash->{APIKEY}       = $args[4];
-  $hash->{CREDIT}    = "Powered by wetter.com";
-  RemoveInternalTimer($hash);
-  #Get first data after 13 seconds
-  InternalTimer(gettimeofday() + 13, "OPENWEATHER_Start", $hash, 0) if $interval > 0;
+  $hash->{PROJECT}    = $args[2];
+  $hash->{CITYCODE}   = $args[3];
+  $hash->{APIKEY}     = $args[4];
+  $hash->{CREDIT}     = "Powered by wetter.com";
 
-  $hash->{fhem}{modulVersion} = '$ID $';
-  OPENWEATHER_Log $hash, 5, "OPENWEATHER.pm version is " . $hash->{fhem}{modulVersion};
+   my $checkSum = md5_hex( $args[2] . $args[4] . $args[3] );
+   
+   my $URL = 'http://api.wetter.com/forecast/weather';
+   $URL   .= '/city/'    . $args[3];
+   $URL   .= '/project/' . $args[2];
+   $URL   .= '/cs/'      . $checkSum;
+   
+   $hash->{URL}   = $URL;
+
+   RemoveInternalTimer($hash);
+ # Get first data after 7 seconds
+   InternalTimer(gettimeofday() + 7, "OPENWEATHER_Start", $hash, 0) if $interval > 0;
+
+   $hash->{fhem}{modulVersion} = '# $ID: $';
+   OPENWEATHER_Log $hash, 5, "OPENWEATHER.pm version is " . $hash->{fhem}{modulVersion};
  
  return undef;
 } #end OPENWEATHER_Define
@@ -311,18 +322,10 @@ OPENWEATHER_Run ($)
    my ($name) = @_;
    my $returnStr;
    my $hash = $defs{$name};
-   my $projectName = $hash->{PROJECT};
-   my $apiKey = $hash->{APIKEY};
-   my $cityCode = $hash->{CITYCODE};
-
-   my $checkSum = md5_hex( $projectName . $apiKey . $cityCode );
    
-   my $URL = 'http://api.wetter.com/forecast/weather';
-   $URL   .= '/city/' . $cityCode;
-   $URL   .= '/project/' . $projectName;
-   $URL   .= '/cs/' . $checkSum;
-   
-   $hash->{URL}   = $URL;
+   return $name."|0|Error: URL not created. Please re-define device."
+      unless defined $hash->{URL};
+   my $URL = $hash->{URL};
 
    OPENWEATHER_Log $hash, 5, "Start capturing data from $URL";
 
@@ -364,27 +367,36 @@ OPENWEATHER_Done($)
       my $message = decode_base64($result);
 
       OPENWEATHER_Log $hash, 5, "Start parsing of XML data.";
+
       my $parser = MyOPENWEATHERParser->new;
       %MyOPENWEATHERParser::fcReadings = ();
-      $MyOPENWEATHERParser::day        = -1;
+      $MyOPENWEATHERParser::day        = -2;
       $MyOPENWEATHERParser::time       = "";
+      $MyOPENWEATHERParser::isError    = 0;
       $parser->parse($message);
 
       OPENWEATHER_Log $hash, 4, "Captured values: " . keys (%MyOPENWEATHERParser::fcReadings);
  
-      readingsBulkUpdate($hash, "lastConnection", keys (%MyOPENWEATHERParser::fcReadings) . " values captured");
-      
-      while (my ($rName, $rValue) = each(%MyOPENWEATHERParser::fcReadings) )
+      if (defined $MyOPENWEATHERParser::fcReadings{error} )
       {
-         readingsBulkUpdate( $hash, $rName, $rValue );
-         OPENWEATHER_Log $hash, 5, "reading:$rName value:$rValue";
+         readingsBulkUpdate($hash, "lastConnection", $MyOPENWEATHERParser::fcReadings{error});
+         OPENWEATHER_Log $hash, 1, $MyOPENWEATHERParser::fcReadings{error}." - ".$MyOPENWEATHERParser::fcReadings{errorMsg};
       }
+      else
+      {
+         readingsBulkUpdate($hash, "lastConnection", keys (%MyOPENWEATHERParser::fcReadings) . " values captured");
+         
+         while (my ($rName, $rValue) = each(%MyOPENWEATHERParser::fcReadings) )
+         {
+            readingsBulkUpdate( $hash, $rName, $rValue );
+            OPENWEATHER_Log $hash, 5, "reading:$rName value:$rValue";
+         }
 
-      my $state = "Tmin: ".$MyOPENWEATHERParser::fcReadings{fc0_tempMin};
-      $state   .= " Tmax: ".$MyOPENWEATHERParser::fcReadings{fc0_tempMax};
-      readingsBulkUpdate ($hash, "state", $state);
-      
- }
+         my $state = "Tmin: ".$MyOPENWEATHERParser::fcReadings{fc0_tempMin};
+         $state   .= " Tmax: ".$MyOPENWEATHERParser::fcReadings{fc0_tempMax};
+         readingsBulkUpdate ($hash, "state", $state);
+      }
+   }
    else
    {
       readingsBulkUpdate($hash, "lastConnection", $result);
@@ -530,7 +542,7 @@ OPENWEATHER_UpdateAborted($)
       </li><br>
       <li><code>&lt;Ortscode&gt;</code>
          <br>
-         Code des Ortes f&uuml;r den die Wettervorhersage ben&ouml;tigt wird. Er kann direkt aus der Adresszeile der jeweiligen Vorhersageseite genommen werden. Zum Beispiel <i>DE0009042</i> aus:
+         Code des Ortes, f&uuml;r den die Wettervorhersage ben&ouml;tigt wird. Er kann direkt aus der Adresszeile der jeweiligen Vorhersageseite genommen werden. Zum Beispiel <i>DE0009042</i> aus:
          <br>
          <i>http://www.wetter.com/wetter_aktuell/aktuelles_wetter/deutschland/rostock/<u>DE0009042</u>.html</i>
       </li><br>
