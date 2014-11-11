@@ -372,6 +372,7 @@ sub Twilight_fireEvent($)
 
    $hash->{STATE} = $state;
    readingsBeginUpdate($hash);
+   readingsBulkUpdate ($hash, "state",           $state);
    readingsBulkUpdate ($hash, "light",           $light);
    readingsBulkUpdate ($hash, "horizon",         $deg);
    readingsBulkUpdate ($hash, "aktEvent",        $sx);
