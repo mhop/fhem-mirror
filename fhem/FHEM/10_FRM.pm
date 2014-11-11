@@ -663,24 +663,28 @@ package main;
 
 sub FRM_I2C_Write
 {
-	my ($hash,$package)  = @_;
-	
-	if (defined (my $firmata = $hash->{FirmataDevice})) {
-		COMMANDHANDLER: {
-			$package->{direction} eq "i2cwrite" and do {
-				$firmata->i2c_write($package->{i2caddress},split(" ",$package->{data}));
-				last;
-			};
-			$package->{direction} eq "i2cread" and do {
-				if (defined $package->{reg}) {
-					$firmata->i2c_readonce($package->{i2caddress},$package->{reg},defined $package->{nbyte} ? $package->{nbyte} : 1);
-				} else {
-					$firmata->i2c_readonce($package->{i2caddress},defined $package->{nbyte} ? $package->{nbyte} : 1);
-				}
-				last;
-			};
-		}
-	}
+  my ($hash,$package)  = @_;
+
+  if (defined (my $firmata = $hash->{FirmataDevice})) {
+    COMMANDHANDLER: {
+      $package->{direction} eq "i2cwrite" and do {
+        if (defined $package->{reg}) {
+          $firmata->i2c_write($package->{i2caddress},$package->{reg},split(" ",$package->{data}));
+        } else {
+          $firmata->i2c_write($package->{i2caddress},split(" ",$package->{data}));
+        }
+        last;
+      };
+      $package->{direction} eq "i2cread" and do {
+        if (defined $package->{reg}) {
+          $firmata->i2c_readonce($package->{i2caddress},$package->{reg},defined $package->{nbyte} ? $package->{nbyte} : 1);
+        } else {
+          $firmata->i2c_readonce($package->{i2caddress},defined $package->{nbyte} ? $package->{nbyte} : 1);
+        }
+        last;
+      };
+    }
+  }
 }
 
 sub
