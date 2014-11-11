@@ -50,7 +50,7 @@ my $isError     = 0;
    , ws => "wind"
    , wd => "windDir"
    , wd_txt => "windDirTxt"
-   , pc => "presChange"
+   , pc => "chOfRain"
    , p => "valHours"
    , title => "error"
    , message => "errorMsg"
@@ -498,7 +498,7 @@ OPENWEATHER_UpdateAborted($)
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - forecast values for <i>today</i> at <i>06|11|17|23</i> o'clock</li>
       <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature for <i>tommorrow</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>minimal</i> temperatur <i>today</i> at <i>06:00</i> o'clock in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_presChange</b> - atmospheric pressure change <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b> - chance of rain <i>today</i> in %</li>
       <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - validity period in hours of the forecast values starting at <i>06:00</i> o'clock</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - weather situation <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b> - wind speed <i>today</i> in km/h</li>
@@ -583,13 +583,13 @@ OPENWEATHER_UpdateAborted($)
    <a name="OPENWEATHERreading"></a>
    <b>Vorhersagewerte</b>
    <ul>
-      Wichtig! Die Vorhersagewerte m&uuml;ssen zuerst in den Einstellungen des Projektes auf wetter.com ausgew&auml;hlt werden.
+      Wichtig! Die Vorhersagewerte m&uuml;ssen zuerst in den Vorhersageeinstellungen des Projektes auf wetter.com ausgew&auml;hlt werden.
       <br>
       <li><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte f&uuml;r <i>heute|morgen|&uuml;bermorgen</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte f&uuml;r <i>heute</i> um <i>06|11|17|23</i> Uhr</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b> - <i>heutige</i> Niederschlagswahrscheinlichkeit in %</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Mindest|Maximal</i>temperatur <i>heute</i> in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>Mindest</i>temperatur <i>heute</i> um <i>06:00</i> Uhr in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_presChange</b> - <i>heutige</i> &Auml;nderung des Luftdruckes</li>
       <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - Wetterzustand <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b> - Windgeschwindigkeit <i>heute</i> in km/h</li>
