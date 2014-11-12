@@ -32,6 +32,7 @@ my %sets = (
   "createNode"=> { cmd   => "60%02x"  },     # ZW_REQUEST_NODE_INFO',
   "neighborUpdate" => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
   "sendNIF"   => { cmd   => "12%02x05@" },   # ZW_SEND_NODE_INFORMATION
+  "reopen"    => { cmd   => "" },
 );
 
 my %gets = (
@@ -161,7 +162,9 @@ ZWDongle_Initialize($)
   $hash->{DefFn}   = "ZWDongle_Define";
   $hash->{SetFn}   = "ZWDongle_Set";
   $hash->{GetFn}   = "ZWDongle_Get";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle";
+  $hash->{AttrFn}  = "ZWDongle_Attr";
+  $hash->{UndefFn} = "ZWDongle_Undef";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1";
 }
 
 #####################################
@@ -193,6 +196,7 @@ ZWDongle_Define($$)
     Log3 $name, 1, 
         "$name device is none (homeId:$1), commands will be echoed only";
     $attr{$name}{dummy} = 1;
+    $hash->{STATE} = "dummy";
     return undef;
 
   } elsif($dev !~ m/@/ && $dev !~ m/:/) {
@@ -205,10 +209,19 @@ ZWDongle_Define($$)
   $hash->{nrNAck} = 0;
   my @empty;
   $hash->{SendStack} = \@empty;
+  
   my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
   return $ret;
 }
 
+#####################################
+sub
+ZWDongle_Undef($$) 
+{
+  my ($hash,$arg) = @_;
+  DevIo_CloseDev($hash); 
+  return undef;
+}
 
 #####################################
 sub
@@ -226,6 +239,15 @@ ZWDongle_Set($@)
           push @r,($p ? "$_:".join(",",sort keys %{$p}) : $_)} sort keys %sets;
     return "Unknown argument $type, choose one of " . join(" ",@r);
   }
+
+  if($type eq "reopen") {
+    return if(AttrVal($name, "dummy",undef) || AttrVal($name, "disable",undef));
+    DevIo_CloseDev($hash);
+    sleep(1);
+    DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
+    return;
+  }
+
   my $cmd = $sets{$type}{cmd};
   my $par = $sets{$type}{param};
   if($par && !$par->{noArg}) {
@@ -391,7 +413,7 @@ ZWDongle_DoInit($)
   my $hash = shift;
   my $name = $hash->{NAME};
 
-  DevIo_SetHwHandshake($hash) if($hash->{USBDev});
+  DevIo_SetHwHandshake($hash) if($hash->{FD});
   ZWDongle_Clear($hash);
   ZWDongle_Get($hash, $name, "devList"); # Make the following query faster (?)
   ZWDongle_Get($hash, $name, "homeId");
@@ -582,12 +604,39 @@ ZWDongle_Parse($$$)
   Dispatch($hash, $rmsg, \%addvals);
 }
 
+#####################################
+sub
+ZWDongle_Attr($$$$)
+{
+  my ($cmd, $name, $attr, $value) = @_;
+  my $hash = $defs{$name};
+  
+  if($attr eq "disable") {
+    if($cmd eq "set" && ($value || !defined($value))) {
+      DevIo_CloseDev($hash) if(!AttrVal($name,"dummy",undef));
+      $hash->{STATE} = "disabled";
+
+    } else {
+      if(AttrVal($name,"dummy",undef)) {
+        $hash->{STATE} = "dummy";
+        return;
+      }
+      DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
+
+    }
+  }
+
+  return undef;  
+  
+}
 
 #####################################
 sub
 ZWDongle_Ready($)
 {
   my ($hash) = @_;
+
+  return undef if (IsDisabled($hash->{NAME}));
 
   return DevIo_OpenDev($hash, 1, "ZWDongle_DoInit")
                 if($hash->{STATE} eq "disconnected");
@@ -660,6 +709,10 @@ ZWDongle_Ready($)
     With the event "done" or "failed" ZWDongle will notify the end of the update process.
     To read node's neighbor list see neighborList get below.</li>
 
+  <li>reopen<br>
+    First close and then open the device. Used for debugging purposes.
+    </li>
+
   </ul>
   <br>
 
@@ -696,6 +749,7 @@ ZWDongle_Ready($)
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#model">model</a></li>
+    <li><a href="#disable">disable</a></li>
   </ul>
   <br>
 
