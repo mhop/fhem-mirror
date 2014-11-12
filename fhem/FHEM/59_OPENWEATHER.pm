@@ -40,7 +40,6 @@ our %fcReadings = ();
 my $curTag      = "";
 my $day         = -2;
 my $time        = "";
-my $isError     = 0;
 # here HTML::text/start/end are overridden
 
 %knownTags = ( tn => "tempMin"
@@ -372,7 +371,6 @@ OPENWEATHER_Done($)
       %MyOPENWEATHERParser::fcReadings = ();
       $MyOPENWEATHERParser::day        = -2;
       $MyOPENWEATHERParser::time       = "";
-      $MyOPENWEATHERParser::isError    = 0;
       $parser->parse($message);
 
       OPENWEATHER_Log $hash, 4, "Captured values: " . keys (%MyOPENWEATHERParser::fcReadings);
@@ -493,7 +491,7 @@ OPENWEATHER_UpdateAborted($)
    <b>Forecast readings</b>
    <ul>
       Note! The forecast values have first to be selected on the project setup page on wetter.com.
-      <br>
+      <br\><br\>
       <li><b>fc</b><i>0|1|2</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2 days</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - forecast values for <i>today</i> at <i>06|11|17|23</i> o'clock</li>
       <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature for <i>tommorrow</i> in &deg;C</li>
@@ -532,7 +530,7 @@ OPENWEATHER_UpdateAborted($)
       <br>
       Beispiel:
       <br>
-      <code>define wetter OPENWEATHER projektx DE0001020 3c551bc20819c19ee88c9ec94280a61d</code>
+      <code>define wetter OPENWEATHER projectx DE0001020 3c551bc20819c19ee88d</code>
       <br/><br/>
       Um die unteren Parameter zu erhalten, ist die  Registrierung eines neuen Projektes auf <a href="http://www.wetter.com/apps_und_mehr/website/api/projekte/">www.wetter.com</a> notwendig.
       <br/><br/>
@@ -584,7 +582,7 @@ OPENWEATHER_UpdateAborted($)
    <b>Vorhersagewerte</b>
    <ul>
       Wichtig! Die Vorhersagewerte m&uuml;ssen zuerst in den Vorhersageeinstellungen des Projektes auf wetter.com ausgew&auml;hlt werden.
-      <br>
+      <br\><br\>
       <li><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte f&uuml;r <i>heute|morgen|&uuml;bermorgen</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte f&uuml;r <i>heute</i> um <i>06|11|17|23</i> Uhr</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b> - <i>heutige</i> Niederschlagswahrscheinlichkeit in %</li>
