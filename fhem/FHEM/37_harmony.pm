@@ -1172,6 +1172,8 @@ harmony_send($$)
   my ($hash, $data) = @_;
   my $name = $hash->{NAME};
 
+  return undef if( !$hash->{CD} );
+
   Log3 $name, 4, "$name: send: $data";
 
   syswrite $hash->{CD}, $data;
