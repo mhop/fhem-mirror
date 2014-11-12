@@ -39,6 +39,7 @@ my $curTag    = "";
 my $curReadingName = "";
 my $curRowID = "";
 my $curCol = 0;
+our $startDay = 0;
 my $curTextPos = 0;
 my $curReadingType = 0;
 
@@ -138,10 +139,10 @@ sub text
       $text =~ s/\s+$//;
       $text =~ s/&#48;/0/g;  # replace 0
       
-   # Tag-Type 0 = Check for readings without tag-ID
+   # Tag-Type 0 = Check for readings without tag-ID (current readings)
       if ($curReadingType == 0)
       {
-         if ($curCol == 1 && $curTextPos == 1)
+         if ($startDay == 0 && $curCol == 1 && $curTextPos == 1)
          {
             foreach my $r (@knownNoneIDs) 
             { 
@@ -174,7 +175,7 @@ sub text
       {
          if ( 1 < $curCol && $curCol <= 5 )
          {
-            $readingName = "fc".($curCol-2)."_".$curReadingName;
+            $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
             if ( $text =~ m/([-+]?\d+[,.]?\d*)/ )
             {
                $text = $1;
@@ -190,7 +191,7 @@ sub text
          {
             if ( $curTextPos % 2 == 1 ) 
             { 
-               $readingName = "fc".($curCol-2)."_".$curReadingName;
+               $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
                $text =~ tr/,/./;    # komma durch punkt ersetzen
                push( @texte, $readingName."|".$text ); 
             }
@@ -201,7 +202,7 @@ sub text
       {
          if ( 2 <= $curCol && $curCol <= 5 )
          {
-            $readingName = "fc".($curCol-2)."_".$curReadingName;
+            $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
             $text = $intensity{$text} if defined $intensity{$text};
             push( @texte, $readingName . "|" . $text ); 
          }
@@ -211,7 +212,7 @@ sub text
       {
          if ( 2 <= $curCol && $curCol <= 5 )
          {
-            $readingName = "fc".($curCol-2)."_".$curReadingName;
+            $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
             if ( $text =~ m/([012-]?[-0-9][.:][-0-5][-0-9])/ )
             {
                $text = $1;
@@ -287,8 +288,8 @@ sub start
    {
       if ( 2 <= $curCol && $curCol <= 5 )
       {
-       # Alternative text
-         $readingName = "fc".($curCol-2)."_".$curReadingName;
+       # Alternativer text
+         $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
          $text = $attr->{alt};
          $text =~ s/Wetterzustand: //;
          $text =~ s/ö/oe/;
@@ -331,18 +332,18 @@ use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
 my $modulVersion = '# $Id: $';
 
-   my %url_start =( "de" => "http://www.proplanta.de/Wetter/"
-   , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/"
-   , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/"
-   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/"
-   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/"
+   my %url_template_1 =( "de" => "http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html"
+   , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/LOKALERORT/"
+   , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/LOKALERORT/"
+   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/LOKALERORT/"
+   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/LOKALERORT/"
    );
 
-   my %url_end = ( "de" => "-Wetter.html"
-   , "at" => "/"
-   , "ch" => "/"
-   , "fr" => "/"
-   , "it" => "/"
+   my %url_template_2 = ( "de" => "http://www.proplanta.de/Wetter/profi-wetter.php?SITEID=60&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter&wT="
+   , "at" => "http://www.proplanta.de/Wetter-Oesterreich/profi-wetter-at.php?SITEID=70&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter&wT="
+   , "ch" => "http://www.proplanta.de/Wetter-Schweiz/profi-wetter-ch.php?SITEID=80&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter&wT="
+   , "fr" => "http://www.proplanta.de/Wetter-Frankreich/profi-wetter-fr.php?SITEID=50&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter-Frankreich&wT="
+   , "it" => "http://www.proplanta.de/Wetter-Italien/profi-wetter-it.php?SITEID=40&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter-Italien&wT="
    );
 
 
@@ -382,9 +383,14 @@ sub PROPLANTA_Define($$)
    $lang = lc( $a[3] ) if int(@a) == 4;
 
    if ( $lang ne "")
-   {
-      return "Wrong country code '$lang': use " . join(" | ",  keys( %url_start ) ) unless defined( $url_start{$lang} );
-      $hash->{URL} = $url_start{$lang} . $a[2] . $url_end{$lang};
+   { # {my $test="http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html";; $test =~ s/LOKALERORT/München/g;; return $test;;}
+      return "Wrong country code '$lang': use " . join(" | ",  keys( %url_template_1 ) ) unless defined( $url_template_1{$lang} );
+      my $URL = $url_template_1{$lang};
+      $URL =~ s/LOKALERORT/$a[2]/g;
+      $hash->{URL} = $URL;
+      $URL = $url_template_2{$lang};
+      $URL =~ s/LOKALERORT/$a[2]/g;
+      $hash->{URL2} = $URL;
    }
 
    $hash->{STATE}          = "Initializing";
@@ -444,19 +450,12 @@ sub PROPLANTA_Set($@)
 
 #####################################
 # acquires the html page
-sub PROPLANTA_HtmlAcquire($)
+sub PROPLANTA_HtmlAcquire($$)
 {
-   my ($hash)  = @_;
+   my ($hash, $URL)  = @_;
    my $name    = $hash->{NAME};
    return unless (defined($hash->{NAME}));
  
-   my $URL = AttrVal( $name, 'URL', "" );
-   $URL = $hash->{URL} if $URL eq "";
-
-   # abbrechen, wenn wichtige parameter nicht definiert sind
-   return "" if ( !defined($URL) );
-   return "" if ( $URL eq "" );
-
    PROPLANTA_Log $hash, 5, "Start capturing of $URL";
 
    my $err_log  = "";
@@ -516,14 +515,27 @@ sub PROPLANTA_Run($)
 {
    my ($name) = @_;
    my $ptext=$name;
-   
+   my $URL;
    return unless ( defined($name) );
    
    my $hash = $defs{$name};
    return unless (defined($hash->{NAME}));
    
+   my $attrURL = AttrVal( $name, 'URL', "" );
+   if ($attrURL eq "")
+   {
+      $URL = $hash->{URL};
+   }
+   else
+   {
+      $URL = $attrURL;
+   }
+   # abbrechen, wenn wichtige parameter nicht definiert sind
+   # return "" if ( !defined($URL) );
+   # return "" if ( $URL eq "" );
+
    # acquire the html-page
-   my $response = PROPLANTA_HtmlAcquire($hash); 
+   my $response = PROPLANTA_HtmlAcquire($hash,$URL); 
    
    if ($response =~ /^Error\|/)
    {
@@ -537,8 +549,22 @@ sub PROPLANTA_Run($)
       my $parser = MyProplantaParser->new;
       $parser->report_tags(qw(tr td span b img));
       @MyProplantaParser::texte = ();
+      $MyProplantaParser::startDay = 0;
+
       # parsing the complete html-page-response, needs some time
       $parser->parse($response);
+
+   # add next periods
+      if ($attrURL eq "")
+      {
+         $URL = $hash->{URL2};
+         foreach (4, 7, 11)
+         {
+            $response = PROPLANTA_HtmlAcquire($hash,$URL . $_); 
+            $MyProplantaParser::startDay = $_;
+            $parser->parse($response);
+         }
+     }
       
       PROPLANTA_Log $hash, 4, "Found terms: " . @MyProplantaParser::texte;
       
@@ -662,7 +688,7 @@ PROPLANTA_Html($)
 <ul>
    The module extracts weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br>
-   It requires the perl moduls HTTP::Request, LWP::UserAgent and HTML::Parse.
+   It uses the perl moduls HTTP::Request, LWP::UserAgent and HTML::Parse.
    <br/><br/>
    <a name="PROPLANTAdefine"></a>
    <b>Define</b>
@@ -721,7 +747,7 @@ PROPLANTA_Html($)
    <b>Forecast readings</b>
    <ul>
       <br>
-      <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2|3 days</i></li>
+      <li><b>fc</b><i>0|1|2|3|...|13</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2|3|...|13 days</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>00|03|06|09|12|15|18|21</i></b> - forecast values for <i>today</i> at <i>00|03|06|09|12|15|18|21</i> o'clock</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - chance of rain <i>today</i> by <i>day|night</i> in %</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>15</i> - chance of rain <i>today</i> at <i>15:00</i> in %</li>
@@ -755,7 +781,7 @@ PROPLANTA_Html($)
    <a name="PROPLANTAdefine"></a>
    Das Modul extrahiert  Wetterdaten von der website <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br/>
-   Es ben&ouml;tigt die Perlmodule HTTP::Request, LWP::UserAgent und HTML::Parse.
+   Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent und HTML::Parse.
    <br/><br/>
    <b>Define</b>
    <ul>
@@ -813,7 +839,7 @@ PROPLANTA_Html($)
    <b>Vorhersagewerte</b>
    <ul>
       <br>
-      <li><b>fc</b><i>0|1|2|3</i><b>_...</b> - Vorhersagewerte f&uumlr <i>heute|morgen|&uuml;bermorgen|in 3 Tagen</i></li>
+      <li><b>fc</b><i>0|1|2|3...|13</i><b>_...</b> - Vorhersagewerte f&uumlr <i>heute|morgen|&uuml;bermorgen|in 3|...|13 Tagen</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>00|03|06|09|12|15|18|21</i></b> - Vorhersagewerte f&uumlr <i>heute</i> um <i>00|03|06|09|12|15|18|21</i> Uhr</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b><i>Day|Night</i> - <i>heutiges</i> Niederschlagsrisiko <i>tags&uuml;ber|nachts</i> in %</li>
       <li><b>fc</b><i>1</i><b>_chOfRain</b><i>15</i> - <i>morgiges</i> Niederschlagsrisiko um <i>15</i>:00 Uhr in %</li>
