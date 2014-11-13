@@ -47,8 +47,6 @@ sub LUXTRONIK2_storeReadings ($$$$$$);
 sub LUXTRONIK2_doStatisticDelta ($$$$$) ;
 sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 
-# Modul Version for remote debugging
-  my $modulVersion = '$Id$';
 
   #List of firmware versions that are known to be compatible with this modul
   my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#";
@@ -127,8 +125,7 @@ LUXTRONIK2_Define($$)
   $hash->{fhem}{statBoilerHeatUpStep} = 0;
   $hash->{fhem}{statBoilerCoolDownStep} = 0;
  
-  $hash->{fhem}{modulVersion} = $modulVersion;
-  LUXTRONIK2_Log $hash,5,"LUXTRONIK2.pm version is $modulVersion.";
+  $hash->{fhem}{modulVersion} = '$Date$';
        
   return undef;
 }
