@@ -630,7 +630,8 @@ sub _cfgDB_ReadCfg(@) {
 
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
-		$row = "$line[0] $line[1] $line[2] $line[3]";
+		$row  = "$line[0] $line[1] $line[2]";
+		$row .= " $line[3]" if defined($line[3]);
 		push @dbconfig, $row;
 	}
 	$fhem_dbh->disconnect();
