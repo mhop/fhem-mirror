@@ -75,6 +75,7 @@ my $curReadingType = 0;
       ,["SD", "sun", 2]
       ,["UV", "uv", 2]
       ,["GS", "rad", 3]
+      ,["WETTER_ID", "weather", 7]
       ,["WETTER_ID_MORGENS", "weatherMorning", 7]
       ,["WETTER_ID_TAGSUEBER", "weatherDay", 7]
       ,["WETTER_ID_ABENDS", "weatherEvening", 7]
@@ -456,7 +457,7 @@ sub PROPLANTA_HtmlAcquire($$)
    my $name    = $hash->{NAME};
    return unless (defined($hash->{NAME}));
  
-   PROPLANTA_Log $hash, 5, "Start capturing of $URL";
+   PROPLANTA_Log $hash, 4, "Start capturing of $URL";
 
    my $err_log  = "";
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
@@ -472,7 +473,7 @@ sub PROPLANTA_HtmlAcquire($$)
       return "Error|Error " . $response->status_line;
    }
 
-   PROPLANTA_Log $hash, 5, length($response->content)." characters captured";
+   PROPLANTA_Log $hash, 4, length($response->content)." characters captured";
    return $response->content;
 }
 
@@ -530,9 +531,6 @@ sub PROPLANTA_Run($)
    {
       $URL = $attrURL;
    }
-   # abbrechen, wenn wichtige parameter nicht definiert sind
-   # return "" if ( !defined($URL) );
-   # return "" if ( $URL eq "" );
 
    # acquire the html-page
    my $response = PROPLANTA_HtmlAcquire($hash,$URL); 
@@ -541,11 +539,10 @@ sub PROPLANTA_Run($)
    {
       $ptext .= "|".$response;
    }
-   elsif ($response ne "")
+   else
    {
-      PROPLANTA_Log $hash, 5, "Start HTML parsing";
-      
-# Can't locate object method "new" via package "
+      PROPLANTA_Log $hash, 4, "Start HTML parsing of captured page";
+
       my $parser = MyProplantaParser->new;
       $parser->report_tags(qw(tr td span b img));
       @MyProplantaParser::texte = ();
@@ -562,7 +559,11 @@ sub PROPLANTA_Run($)
          {
             $response = PROPLANTA_HtmlAcquire($hash,$URL . $_); 
             $MyProplantaParser::startDay = $_;
-            $parser->parse($response);
+            if ($response !~ /^Error\|/)
+            {
+               PROPLANTA_Log $hash, 4, "Start HTML parsing of captured page";
+               $parser->parse($response);
+            }
          }
      }
       
@@ -574,10 +575,6 @@ sub PROPLANTA_Run($)
          $ptext .= "|". join('|', @MyProplantaParser::texte);
       }
       PROPLANTA_Log $hash, 4, "Parsed string: " . $ptext;
-   }
-   else
-   {
-      PROPLANTA_Log $hash, 1, "Error. No response string.";
    }
    return $ptext;
 }
@@ -688,6 +685,8 @@ PROPLANTA_Html($)
 <ul>
    The module extracts weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br>
+   The website provides a forecast for 12 days, for the first 7 days in a 3-hours-interval.
+   <br>
    It uses the perl moduls HTTP::Request, LWP::UserAgent and HTML::Parse.
    <br/><br/>
    <a name="PROPLANTAdefine"></a>
@@ -779,8 +778,10 @@ PROPLANTA_Html($)
 <div  style="width:800px"> 
 <ul>
    <a name="PROPLANTAdefine"></a>
-   Das Modul extrahiert  Wetterdaten von der website <a href="http://www.proplanta.de">www.proplanta.de</a>.
+   Das Modul extrahiert Wetterdaten von der Website <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br/>
+   Es stellt eine Vorhersage f&uuml;r 12 Tage, w&aauml;hrend der ersten 7 Tage im 3-Stunden-Intervall, zur Verf&uuml;gung.
+   <br>
    Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent und HTML::Parse.
    <br/><br/>
    <b>Define</b>
