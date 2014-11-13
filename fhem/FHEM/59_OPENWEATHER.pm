@@ -38,8 +38,8 @@ package MyOPENWEATHERParser;
 use base qw(HTML::Parser);
 our %fcReadings = ();
 my $curTag      = "";
-my $day         = -2;
-my $time        = "";
+our $day         = -2;
+our $time        = "";
 # here HTML::text/start/end are overridden
 
 %knownTags = ( tn => "tempMin"
