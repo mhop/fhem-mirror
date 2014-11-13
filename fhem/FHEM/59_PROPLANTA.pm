@@ -331,7 +331,6 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
-my $modulVersion = '# $Id$';
 
    my %url_template_1 =( "de" => "http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html"
    , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/LOKALERORT/"
@@ -397,7 +396,7 @@ sub PROPLANTA_Define($$)
    $hash->{STATE}          = "Initializing";
    $hash->{LOCAL}          = 0;
    $hash->{INTERVAL}       = 3600;
-   $hash->{fhem}{modulVersion} = $modulVersion;
+   $hash->{fhem}{modulVersion} = '$Date$';
    
    RemoveInternalTimer($hash);
    

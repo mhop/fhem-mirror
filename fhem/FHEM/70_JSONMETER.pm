@@ -3,12 +3,12 @@
 #
 #  70_JSONMETER.pm
 #
-#  Copyright notice
-#
 #  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
 #
 #  This module reads data from devices that provide OBIS compatible data
 #  in json format (e.g. power meters)
+#
+#  Copyright notice
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -60,8 +60,7 @@ sub JSONMETER_doStatisticMinMax ($$$);
 sub JSONMETER_doStatisticMinMaxSingle ($$$$);
 sub JSONMETER_doStatisticDelta ($$$$$);
 sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
-# Modul Version for remote debugging
-  my $modulVersion = "2014-04-29";
+
   my $MODUL = "JSONMETER";
  ##############################################################
  # Syntax: meterType => port URL-Path
@@ -200,8 +199,7 @@ JSONMETER_Define($$)
   #Reset temporary values
   $hash->{fhem}{jsonInterpreter} = "";
 
-  $hash->{fhem}{modulVersion} = $modulVersion;
-  JSONMETER_Log $hash, 5, "JSONMETER.pm version is $modulVersion.";
+  $hash->{fhem}{modulVersion} = '$Date$';
  
  return undef;
 } #end JSONMETER_Define
@@ -906,6 +904,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
+<div style="width:800px">
 <ul>
   This module reads data from a measurement unit (so called smart meters for electricity, gas or heat)
   <br>
@@ -918,17 +917,14 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
   
   <b>Define</b>
   <ul>
+   <br>
     <code>define &lt;name&gt; JSONMETER &lt;deviceType&gt; [&lt;ip address&gt;] [poll-interval]</code>
    <br>
     Example: <code>define powermeter JSONMETER ITF 192.168.178.20 300</code>
    <br>&nbsp;
-   <li><code>[poll-interval]</code>
-   <br>
-   Default is 300 seconds. Smallest possible value is 10. With 0 it will only update on "manual" request.
-   </li><br>
    <li><code>&lt;deviceType&gt;</code>
      <br>
-     Used to define the path and port to extract the json file.
+     Mandatory. Used to define the path and port to extract the json file.
      <br>
      The attribute 'pathString' can be used to add login information to the URL path of predefined devices.
      <br>&nbsp;
@@ -944,6 +940,14 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
          <li><b>url</b> - use the URL defined via the attributes 'pathString' and 'port'</li>
          <li><b>file</b> - use the file defined via the attribute 'pathString' (positioned in the FHEM file system)</li>
      </ul>
+   </li><br>
+   <li><code>[&lt;ip address&gt;]</code>
+   <br>
+   IP address of the phyisical device. (not needed for 'url' and 'file')
+   </li><br>
+   <li><code>[poll-interval]</code>
+   <br>
+   Optional. Default is 300 seconds. Smallest possible value is 10. With 0 it will only update on "manual" request.
    </li>
   </ul>
   <br>
@@ -991,45 +995,46 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
   <a name="JSONMETERattr"></a>
    <b>Attributes</b>
    <ul>
-   <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
-      <br>
-      Repeats by each update the json analysis - use if structure of json data changes
-      <br>
-      Normally the once analysed structure is saved to reduce CPU load.
-      </li><br>
-    <li><code>doStatistics &lt; 0 | 1 &gt;</code>
-      <br>
-      Builds daily, monthly and yearly statistics for certain readings (average/min/max or cumulated values).
-      <br>
-      Logging and visualisation of the statistics should be done with readings of type 'stat<i>ReadingName</i><b>Last</b>'.
-      </li><br>
-   <li><code>pathString &lt;string&gt;</code>
-      <ul>
-        <li>if deviceType = 'file': specifies the local file name and path</li>
-        <li>if deviceType = 'url': specifies the url path</li>
-        <li>other deviceType: can be used to add login information to the url path of predefined devices</li>
-      </ul>
-      </li><br>
-   <li><code>port &lt;number&gt;</code>
-      <br>
-      Specifies the IP port for the deviceType 'url' (default is 80)
-      </li><br>
-   <li><code>timeOut &lt;seconds&gt;</code>
-      <br>
-      Specifies the timeout for the reading of the raw data. (default is 10)
-      <br>
-      The run time of the reading process can be measured via "get <device> jsonFile".
-      </li><br>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <li><code>alwaysAnalyse &lt; 0 | 1 &gt;</code>
+         <br>
+         Repeats by each update the json analysis - use if structure of json data changes
+         <br>
+         Normally the once analysed structure is saved to reduce CPU load.
+         </li><br>
+       <li><code>doStatistics &lt; 0 | 1 &gt;</code>
+         <br>
+         Builds daily, monthly and yearly statistics for certain readings (average/min/max or cumulated values).
+         <br>
+         Logging and visualisation of the statistics should be done with readings of type 'stat<i>ReadingName</i><b>Last</b>'.
+         </li><br>
+      <li><code>pathString &lt;string&gt;</code>
+         <ul>
+           <li>if deviceType = 'file': specifies the local file name and path</li>
+           <li>if deviceType = 'url': specifies the url path</li>
+           <li>other deviceType: can be used to add login information to the url path of predefined devices</li>
+         </ul>
+         </li><br>
+      <li><code>port &lt;number&gt;</code>
+         <br>
+         Specifies the IP port for the deviceType 'url' (default is 80)
+         </li><br>
+      <li><code>timeOut &lt;seconds&gt;</code>
+         <br>
+         Specifies the timeout for the reading of the raw data. (default is 10)
+         <br>
+         The run time of the reading process can be measured via "get <device> jsonFile".
+         </li><br>
+       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
-
+</div>
 =end html
 
 =begin html_DE
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
+<div style="width:800px">
 <ul>
   Dieses Modul liest Daten von Messger&auml;ten (z.B. Stromz&auml;hler, Gasz&auml;hler oder W&auml;rmez&auml;hler, so genannte Smartmeter),
   welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
@@ -1146,7 +1151,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
 </ul>
-
+</div>
 =end html_DE
 
 =cut
