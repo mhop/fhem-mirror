@@ -1,5 +1,5 @@
 ###############################################################
-# $Id: $
+# $Id$
 #
 #  59_OPENWEATHER.pm
 #
@@ -121,7 +121,7 @@ use HTML::Parser;
 
 # Modul Version for remote debugging
   my $MODUL = "OPENWEATHER";
-  my $modulVersion = '# $Id: $';
+  my $modulVersion = '# $Id$';
 
 sub OPENWEATHER_Log($$$);
 sub OPENWEATHER_Start($);

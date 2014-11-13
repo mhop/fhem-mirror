@@ -1,11 +1,11 @@
 ####################################################################################################
-# $Id: $
+# $Id$
 #
 #  59_PROPLANTA.pm
 #
 #  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
 #  
-#  Weather forecast values for next 4 days are captured from http://www.proplanta.de/Wetter/<city>-Wetter.html
+#  Weather forecast values for 12 days are captured from www.proplanta.de
 #  inspired by 23_KOSTALPIKO.pm
 #
 #  Copyright notice
@@ -331,7 +331,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
-my $modulVersion = '# $Id: $';
+my $modulVersion = '# $Id$';
 
    my %url_template_1 =( "de" => "http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html"
    , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/LOKALERORT/"
@@ -574,7 +574,7 @@ sub PROPLANTA_Run($)
       {
          $ptext .= "|". join('|', @MyProplantaParser::texte);
       }
-      PROPLANTA_Log $hash, 4, "Parsed string: " . $ptext;
+      PROPLANTA_Log $hash, 5, "Parsed string: " . $ptext;
    }
    return $ptext;
 }
@@ -614,6 +614,7 @@ sub PROPLANTA_Done($)
         # Achtung! Um Mitternacht fehlen die aktuellen Werte
          readingsBulkUpdate($hash, "state", "Tmin: " . $values{fc0_tempMin} . " Tmax: " . $values{fc0_tempMax} . " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure} );
          readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured" );
+         PROPLANTA_Log $hash, 4, keys( %values )." values captured";
       }
       else
       {
