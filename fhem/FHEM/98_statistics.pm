@@ -53,7 +53,6 @@ sub statistics_maxDecPlaces($$);
 sub statistics_UpdateDevReading($$$$);
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-07-06";
   my $MODUL        = "statistics";
 
 ##############################################################
@@ -147,7 +146,7 @@ statistics_Define($$)
   $hash->{DEV_REGEXP} = $devName;
 
   $hash->{STATE} = "Waiting for notifications";
-  $hash->{fhem}{modulVersion} = $modulVersion;
+  $hash->{fhem}{modulVersion} = '$Date$';
 
   RemoveInternalTimer($hash);
   
@@ -1019,7 +1018,7 @@ statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
-<div  style="width:800px">
+<div style="width:800px">
 <ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
   <br>
@@ -1117,7 +1116,7 @@ statistics_UpdateDevReading($$$$)
       Allows the correct timely assignment within plots, can be adapted to CPU load.
       <br>
     </li><br>
-    <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes:period</i></code>
+    <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes:period</code>
       <ul>
          <li>statTypes: Min|Avg|Max|Delta|Duration|<span style="color:blue;">Tendency</span></li>
          <li>period: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>

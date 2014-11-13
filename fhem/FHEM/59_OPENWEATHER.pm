@@ -119,9 +119,7 @@ use LWP::UserAgent;
 use HTTP::Request;
 use HTML::Parser;
 
-# Modul Version for remote debugging
   my $MODUL = "OPENWEATHER";
-  my $modulVersion = '# $Id$';
 
 sub OPENWEATHER_Log($$$);
 sub OPENWEATHER_Start($);
@@ -194,8 +192,7 @@ OPENWEATHER_Define($$)
  # Get first data after 7 seconds
    InternalTimer(gettimeofday() + 7, "OPENWEATHER_Start", $hash, 0) if $interval > 0;
 
-   $hash->{fhem}{modulVersion} = '# $ID: $';
-   OPENWEATHER_Log $hash, 5, "OPENWEATHER.pm version is " . $hash->{fhem}{modulVersion};
+   $hash->{fhem}{modulVersion} = '$Date$';
  
  return undef;
 } #end OPENWEATHER_Define
