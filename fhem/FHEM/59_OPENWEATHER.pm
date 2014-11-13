@@ -57,6 +57,16 @@ our $time        = "";
    , post_code => "postcode"
 );
 
+sub 
+get_wday($)
+{
+   my ($date) = @_;
+   my @wday_txt = qw(So Mo Di Mi Do Fr Sa);
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime $date;
+   
+   return $wday_txt [$wday];
+}
+
 sub text
 {
    my ( $self, $text ) = @_;
@@ -74,6 +84,10 @@ sub text
          if ($curTag eq "w_txt") {$text =~ s/ö/oe/; $text =~ s/ä/ae/; $text =~ s/ü/ue/; $text =~ s/ß/ss/;}         
          $fcReadings{"fc".$day."_".$rName.$time} = $text ; 
       }
+   }
+   elsif ($curTag eq "d" && $time eq "")
+   {
+      $fcReadings{"fc".$day."_wday"} = get_wday $text ; 
    }
 }
 
@@ -496,6 +510,7 @@ OPENWEATHER_UpdateAborted($)
       <li><b>fc</b><i>0</i><b>_chOfRain</b> - chance of rain <i>today</i> in %</li>
       <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - validity period in hours of the forecast values starting at <i>06:00</i> o'clock</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - weather situation <i>today</i></li>
+      <li><b>fc</b><i>0</i><b>_wday</b> - week day of <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b> - wind speed <i>today</i> in km/h</li>
       <li><b>fc</b><i>0</i><b>_windDir</b> - wind direction <i>today</i> in &deg; (degree)</li>
       <li><b>fc</b><i>0</i><b>_windDirTxt</b> - wind direction <i>today</i> in text form</li>
@@ -587,6 +602,7 @@ OPENWEATHER_UpdateAborted($)
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>Mindest</i>temperatur <i>heute</i> um <i>06:00</i> Uhr in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - Wetterzustand <i>heute</i></li>
+      <li><b>fc</b><i>0</i><b>_wday</b> - Wochentag von <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_wind</b> - Windgeschwindigkeit <i>heute</i> in km/h</li>
       <li><b>fc</b><i>0</i><b>_windDir</b> - Windrichtung <i>heute</i> in &deg; (Grad)</li>
       <li><b>fc</b><i>0</i><b>_windDirTxt</b> - Windrichtung <i>heute</i> in Textform</li>
