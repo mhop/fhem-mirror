@@ -48,7 +48,7 @@ sub LUXTRONIK2_doStatisticDelta ($$$$$) ;
 sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 
 # Modul Version for remote debugging
-  my $modulVersion = "2014-05-10";
+  my $modulVersion = '$Id$';
 
   #List of firmware versions that are known to be compatible with this modul
   my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#";
@@ -1904,9 +1904,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          </li><br>
      <li><code>returnTemperatureSetBack &lt;Temperatur&gt;</code>
          <br>
-         Absenkung oder Anhebung der R&uuml:cklauftemperatur von -5&deg;C bis + 5&deg;C
+         Absenkung oder Anhebung der R&uuml;cklauftemperatur von -5&deg;C bis + 5&deg;C
          </li><br>
-     <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
+     <li><code>INTERVAL &lt;Sekunden&gt;</code>
          <br>
          Abfrageinterval in Sekunden
          </li><br>
@@ -1959,7 +1959,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       und Absch&auml;tzung des elektrischen Verbrauches
       </li><br>
     <li><code>heatPumpElectricalPowerFactor</code><br>
-         &Auml;nderung der elektrischen Leistungsaufnahme per 1 K Vorlauftemperaturdifferenz zu 35 &deg;C
+         &Auml;nderung der elektrischen Leistungsaufnahme pro 1 K Vorlauftemperaturdifferenz zu 35 &deg;C
          <br>
          (z.B. 2% pro 1 K = 0,02)
          </li><br>
