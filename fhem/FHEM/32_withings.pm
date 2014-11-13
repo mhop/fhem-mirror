@@ -553,6 +553,9 @@ withings_pollUser($)
   $url .= "&userid=$hash->{User}&publickey=$hash->{Key}";
   $url .= "&lastupdate=$lastupdate" if( $lastupdate );
   my $ret = get($url);
+
+  return if( !$ret );
+
   #my $json = JSON->new->utf8(0)->decode($ret);
   my $json = ();
   $json = JSON->new->utf8->decode(encode('UTF-8', $ret)) if( $ret =~ m/^{.*}$/ );
