@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.4.4";
+my $VERSION = "1.9.4.5";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -932,6 +932,7 @@ SYSMON_getUserDefined($$$$)
 	logF($hash, "SYSMON_getUserDefined", "Name=[$uName] Cmd=[$uCmd]");
 	
 	my $out_str = SYSMON_execute($hash, $uCmd);
+  chomp $out_str;
 	$map->{$uName} = $out_str;
 	
 	return $map;
