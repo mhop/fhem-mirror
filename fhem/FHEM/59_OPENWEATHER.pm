@@ -501,19 +501,20 @@ OPENWEATHER_UpdateAborted($)
    <a name="OPENWEATHERreading"></a>
    <b>Forecast readings</b>
    <ul>
-      Note! The forecast values have first to be selected on the project setup page on wetter.com.
-      <br\><br\>
-      <li><b>fc</b><i>0|1|2</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2 days</i></li>
+      Note! The forecast values (in brackets) have first to be selected on the project setup page on wetter.com.
+      <br>
+      <li><br><b>fc</b><i>0|1|2</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2 days</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - forecast values for <i>today</i> at <i>06|11|17|23</i> o'clock</li>
-      <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature for <i>tommorrow</i> in &deg;C</li>
+      <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature for <i>tommorrow</i> in &deg;C (tn,tx)</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>minimal</i> temperatur <i>today</i> at <i>06:00</i> o'clock in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_chOfRain</b> - chance of rain <i>today</i> in %</li>
-      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - validity period in hours of the forecast values starting at <i>06:00</i> o'clock</li>
-      <li><b>fc</b><i>0</i><b>_weather</b> - weather situation <i>today</i></li>
-      <li><b>fc</b><i>0</i><b>_wday</b> - week day of <i>today</i></li>
-      <li><b>fc</b><i>0</i><b>_wind</b> - wind speed <i>today</i> in km/h</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b> - wind direction <i>today</i> in &deg; (degree)</li>
-      <li><b>fc</b><i>0</i><b>_windDirTxt</b> - wind direction <i>today</i> in text form</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b> - chance of rain <i>today</i> in % (pc)</li>
+      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - validity period in hours of the forecast values starting at <i>06:00</i> o'clock (p)</li>
+      <li><b>fc</b><i>0</i><b>_weather</b> - weather situation <i>today</i> (w_txt)</li>
+      <li><b>fc</b><i>0</i><b>_weatherCode</b> - code of weather situation <i>today</i> (w)</li>
+      <li><b>fc</b><i>0</i><b>_wday</b> - week day of <i>today</i> (d)</li>
+      <li><b>fc</b><i>0</i><b>_wind</b> - wind speed <i>today</i> in km/h (ws)</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b> - wind direction <i>today</i> in &deg; (degree) (wd)</li>
+      <li><b>fc</b><i>0</i><b>_windDirTxt</b> - wind direction <i>today</i> in text form (wd_txt</li>
       <li>etc.</li>
    </ul>
    <br>
@@ -593,19 +594,20 @@ OPENWEATHER_UpdateAborted($)
    <a name="OPENWEATHERreading"></a>
    <b>Vorhersagewerte</b>
    <ul>
-      Wichtig! Die Vorhersagewerte m&uuml;ssen zuerst in den Vorhersageeinstellungen des Projektes auf wetter.com ausgew&auml;hlt werden.
-      <br\><br\>
-      <li><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte f&uuml;r <i>heute|morgen|&uuml;bermorgen</i></li>
+      Wichtig! Die Vorhersagewerte m&uuml;ssen zuerst in den Vorhersageeinstellungen (in Klammern) des Projektes auf wetter.com ausgew&auml;hlt werden.
+      <br\>
+      <li><br><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte f&uuml;r <i>heute|morgen|&uuml;bermorgen</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte f&uuml;r <i>heute</i> um <i>06|11|17|23</i> Uhr</li>
-      <li><b>fc</b><i>0</i><b>_chOfRain</b> - <i>heutige</i> Niederschlagswahrscheinlichkeit in %</li>
-      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Mindest|Maximal</i>temperatur <i>heute</i> in &deg;C</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b> - <i>heutige</i> Niederschlagswahrscheinlichkeit in % (PC)</li>
+      <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Mindest|Maximal</i>temperatur <i>heute</i> in &deg;C (tn, tx)</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>Mindest</i>temperatur <i>heute</i> um <i>06:00</i> Uhr in &deg;C</li>
-      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden</li>
-      <li><b>fc</b><i>0</i><b>_weather</b> - Wetterzustand <i>heute</i></li>
-      <li><b>fc</b><i>0</i><b>_wday</b> - Wochentag von <i>heute</i></li>
-      <li><b>fc</b><i>0</i><b>_wind</b> - Windgeschwindigkeit <i>heute</i> in km/h</li>
-      <li><b>fc</b><i>0</i><b>_windDir</b> - Windrichtung <i>heute</i> in &deg; (Grad)</li>
-      <li><b>fc</b><i>0</i><b>_windDirTxt</b> - Windrichtung <i>heute</i> in Textform</li>
+      <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden (p)</li>
+      <li><b>fc</b><i>0</i><b>_weather</b> - Wetterzustand <i>heute</i> (w_txt)</li>
+      <li><b>fc</b><i>0</i><b>_weatherCode</b> - Code des Wetterzustand <i>heute</i> (w)</li>
+      <li><b>fc</b><i>0</i><b>_wday</b> - Wochentag von <i>heute</i> (d)</li>
+      <li><b>fc</b><i>0</i><b>_wind</b> - Windgeschwindigkeit <i>heute</i> in km/h (ws)</li>
+      <li><b>fc</b><i>0</i><b>_windDir</b> - Windrichtung <i>heute</i> in &deg; (Grad) (wd)</li>
+      <li><b>fc</b><i>0</i><b>_windDirTxt</b> - Windrichtung <i>heute</i> in Textform (wd_txt)</li>
       <li>etc.</li>
    </ul>
    <br/>
