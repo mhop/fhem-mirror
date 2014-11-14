@@ -64,7 +64,7 @@ sub WOL_Set($@) {
   }
 
   WOL_UpdateReadings($hash);
-  return undef      if($v eq "refresh");
+  return undef      if($v eq "refresh"); 
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_UpdateReadings", $hash, 0);
