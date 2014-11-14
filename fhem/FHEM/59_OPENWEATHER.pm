@@ -55,6 +55,7 @@ our $time        = "";
    , message => "errorMsg"
    , name => "city"
    , post_code => "postcode"
+   , url => "url"
 );
 
 sub 
@@ -146,7 +147,7 @@ use LWP::UserAgent;
 use HTTP::Request;
 use HTML::Parser;
 
-  my $MODUL = "OPENWEATHER";
+my $MODUL = "OPENWEATHER";
 
 sub OPENWEATHER_Log($$$);
 sub OPENWEATHER_Start($);
@@ -191,7 +192,7 @@ OPENWEATHER_Define($$)
   my ($hash, $def) = @_;
   my @args = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> OPENWEATHER <project> <cityCode> <apiKey>" if(@args <5 || @args >5);
+  return "Usage: define <name> OPENWEATHER <project> <cityCode> <apiKey> [language]" if(@args <5 || @args >6);
 
   my $name = $args[0];
   my $interval = 3600;
@@ -204,6 +205,7 @@ OPENWEATHER_Define($$)
   $hash->{PROJECT}    = $args[2];
   $hash->{CITYCODE}   = $args[3];
   $hash->{APIKEY}     = $args[4];
+  $hash->{LANGUAGE}   = $args[5] if defined $args[5];
   $hash->{CREDIT}     = "Powered by wetter.com";
 
    my $checkSum = md5_hex( $args[2] . $args[4] . $args[3] );
@@ -212,6 +214,7 @@ OPENWEATHER_Define($$)
    $URL   .= '/city/'    . $args[3];
    $URL   .= '/project/' . $args[2];
    $URL   .= '/cs/'      . $checkSum;
+   $URL   .= '/language/'. $args[5] if defined $args[5];
    
    $hash->{URL}   = $URL;
 
@@ -305,7 +308,7 @@ OPENWEATHER_Get($@)
       if ($time > AttrVal($name, "timeOut", 10)) { 
          $message =  sprintf( "Runtime: %.2f s (!!! Increase attribute 'timeOut' !!!)\n_________________\n\n", $time) . $message;
       } else {
-         $message =  sprintf( "Runtime: %.2f s\n_________________\n\n", $time) . $message;
+         $message =  sprintf( "Response of %s\nRuntime: %.2f s\n_________________\n\n %s", $hash->{URL}, $time, $message);
       }
       return $message;
       
@@ -500,7 +503,7 @@ OPENWEATHER_Html($)
    <b>Define</b>
    <ul>
       <br>
-      <code>define &lt;name&gt; OPENWEATHER &lt;project&gt; &lt;cityCode&gt; &lt;apiKey&gt; </code>
+      <code>define &lt;name&gt; OPENWEATHER &lt;project&gt; &lt;cityCode&gt; &lt;apiKey&gt; [language]</code>
       <br>
       Example:
       <br>
@@ -523,7 +526,11 @@ OPENWEATHER_Html($)
          <br>
          Secret key that is provided when the user creates a 'openweather' project on wetter.com.
       </li><br>
-      The function OPENWEATHER_Html creates a HTML code for a vertically arranged weather forecast (in German).
+      <li><code>[language]</code>
+         <br>
+         Optional. Default language of weather description is German. Change with <i>en</i> to English or <i>es</i> to Spanish.
+      </li><br>
+      The function OPENWEATHER_Html creates a HTML code for a vertically arranged weather forecast.
       <br>
       Example: <code>define MyWeatherWeblink weblink htmlCode { OPENWEATHER_Html("MyWeather") }</code>
       <br/><br/>
@@ -598,7 +605,7 @@ OPENWEATHER_Html($)
    <b>Define</b>
    <ul>
       <br>
-      <code>define &lt;name&gt; OPENWEATHER &lt;Projekt&gt; &lt;Ortscode&gt; &lt;apiSchl&uuml;ssel&gt;</code>
+      <code>define &lt;name&gt; OPENWEATHER &lt;Projekt&gt; &lt;Ortscode&gt; &lt;apiSchl&uuml;ssel&gt; [Sprache]</code>
       <br>
       Beispiel:
       <br>
@@ -619,6 +626,10 @@ OPENWEATHER_Html($)
       <li><code>&lt;apiSchl&uuml;ssel&gt;</code>
          <br>
          Geheimer Schl&uuml;ssel, den man erh&auml;lt, nachdem man ein neues 'Openweather'-Projekt auf der Website registriert hat.
+      </li><br>
+      <li><code>[Sprache]</code>
+         <br>
+         Optional. Standardsprache f&uuml;r die Wettersituation ist Deutsch. Mit <i>en</i> kann man zu Englisch und mit <i>es</i> zu Spanisch wechseln.
       </li><br>
       &Uuml;ber die Funktion OPENWEATHER_Html wird ein HTML-Code f&uuml;r ein vertikal arrangierte Wettervorhersage erzeugt.
       <br>
