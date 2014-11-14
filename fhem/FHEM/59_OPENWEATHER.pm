@@ -83,6 +83,19 @@ sub text
          #Umlaute entfernen
          if ($curTag eq "w_txt") {$text =~ s/ö/oe/; $text =~ s/ä/ae/; $text =~ s/ü/ue/; $text =~ s/ß/ss/;}         
          $fcReadings{"fc".$day."_".$rName.$time} = $text ; 
+        # icon erzeugen
+         # if ($curTag eq "w") 
+         # {
+            # if ($time != "23") 
+            # {
+               # $fcReadings{"fc".$day."_".$rName.$time} = "d_".$text."_L.png" ;
+            # }
+            # else
+            # {
+               # $fcReadings{"fc".$day."_".$rName.$time} = "n_".$text."_L.png" ;
+            # }
+         # }         
+         
       }
    }
    elsif ($curTag eq "d" && $time eq "")
@@ -426,6 +439,48 @@ OPENWEATHER_UpdateAborted($)
 
 } # end OPENWEATHER_UpdateAborted
 
+##### noch nicht fertig ###########
+sub #####################################
+OPENWEATHER_Html($)
+{
+  my ($d) = @_;
+  $d = "<none>" if(!$d);
+  return "$d is not a OPENWEATHER instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "OPENWEATHER");
+
+  my $uselocal= 0; #AttrVal($d,"localicons",0);
+  my $isday;
+   if ( exists &isday) 
+   {
+      $isday = isday();
+   }
+   else 
+   {
+      $isday = 1; #($hour>6 && $hour<19);
+   }
+        
+  my $ret = "<table>";
+  $ret .= sprintf '<tr><td colspan=2><b>Vorhersage %s</b></td></tr>', ReadingsVal($d, "city", "");
+
+   for(my $i=0; $i<=2; $i++) 
+   {
+     $ret .= sprintf('<tr><td valign=top><b>%s</b></td><td>%s<br>min. %s &deg;C max. %s &deg;C<br>Niederschlagsrisiko: %s %<br>Wind: %s km/h aus %s</td></tr>',
+         $i==0 ? "heute" : ReadingsVal($d, "fc".$i."_wday", "")
+         , ReadingsVal($d, "fc".$i."_weather", "")
+         , ReadingsVal($d, "fc".$i."_tempMin", ""), ReadingsVal($d, "fc".$i."_tempMax", "")
+         , ReadingsVal($d, "fc".$i."_chOfRain", "")
+         , ReadingsVal($d, "fc".$i."_wind", ""), ReadingsVal($d, "fc".$i."_windDirTxt", "")
+         );
+   }
+  
+   $ret .= "<tr><td colspan=2>powered by wetter.com</td></tr>";
+   $ret .= "</table>";
+
+  return $ret;
+}
+
+##################################### 
+
 1;
 
 =pod
@@ -468,6 +523,10 @@ OPENWEATHER_UpdateAborted($)
          <br>
          Secret key that is provided when the user creates a 'openweather' project on wetter.com.
       </li><br>
+      The function OPENWEATHER_Html creates a HTML code for a vertically arranged weather forecast (in German).
+      <br>
+      Example: <code>define MyWeatherWeblink weblink htmlCode { OPENWEATHER_Html("MyWeather") }</code>
+      <br/><br/>
    </ul>
   
    <a name="OPENWEATHERset"></a>
@@ -509,9 +568,9 @@ OPENWEATHER_UpdateAborted($)
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>minimal</i> temperatur <i>today</i> at <i>06:00</i> o'clock in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_chOfRain</b> - chance of rain <i>today</i> in % (pc)</li>
       <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - validity period in hours of the forecast values starting at <i>06:00</i> o'clock (p)</li>
-      <li><b>fc</b><i>0</i><b>_weather</b> - weather situation <i>today</i> (w_txt)</li>
+      <li><b>fc</b><i>0</i><b>_weather</b> - weather situation <i>today</i> in German (w_txt)</li>
       <li><b>fc</b><i>0</i><b>_weatherCode</b> - code of weather situation <i>today</i> (w)</li>
-      <li><b>fc</b><i>0</i><b>_wday</b> - week day of <i>today</i> (d)</li>
+      <li><b>fc</b><i>0</i><b>_wday</b> - German abbreviation of week day of <i>today</i> (d)</li>
       <li><b>fc</b><i>0</i><b>_wind</b> - wind speed <i>today</i> in km/h (ws)</li>
       <li><b>fc</b><i>0</i><b>_windDir</b> - wind direction <i>today</i> in &deg; (degree) (wd)</li>
       <li><b>fc</b><i>0</i><b>_windDirTxt</b> - wind direction <i>today</i> in text form (wd_txt</li>
@@ -561,6 +620,10 @@ OPENWEATHER_UpdateAborted($)
          <br>
          Geheimer Schl&uuml;ssel, den man erh&auml;lt, nachdem man ein neues 'Openweather'-Projekt auf der Website registriert hat.
       </li><br>
+      &Uuml;ber die Funktion OPENWEATHER_Html wird ein HTML-Code f&uuml;r ein vertikal arrangierte Wettervorhersage erzeugt.
+      <br>
+      Beispiel: <code>define MyWeatherWeblink weblink htmlCode { OPENWEATHER_Html("MyWeather") }</code>
+      <br/><br/>
    </ul>
 
    <a name="OPENWEATHERset"></a>
@@ -604,7 +667,7 @@ OPENWEATHER_UpdateAborted($)
       <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden (p)</li>
       <li><b>fc</b><i>0</i><b>_weather</b> - Wetterzustand <i>heute</i> (w_txt)</li>
       <li><b>fc</b><i>0</i><b>_weatherCode</b> - Code des Wetterzustand <i>heute</i> (w)</li>
-      <li><b>fc</b><i>0</i><b>_wday</b> - Wochentag von <i>heute</i> (d)</li>
+      <li><b>fc</b><i>0</i><b>_wday</b> - Abk&uuml;rzung des Wochentags von <i>heute</i> (d)</li>
       <li><b>fc</b><i>0</i><b>_wind</b> - Windgeschwindigkeit <i>heute</i> in km/h (ws)</li>
       <li><b>fc</b><i>0</i><b>_windDir</b> - Windrichtung <i>heute</i> in &deg; (Grad) (wd)</li>
       <li><b>fc</b><i>0</i><b>_windDirTxt</b> - Windrichtung <i>heute</i> in Textform (wd_txt)</li>
