@@ -32,7 +32,11 @@ my %models = (
     itswitch    => 'simple',
     itdimmer    => 'dimmer',
 );
-
+my %bintotristate=(
+  "00" => "0",
+  "01" => "F",
+  "11" => "1"
+);
 sub
 IT_Initialize($)
 {
@@ -42,12 +46,12 @@ IT_Initialize($)
     $it_c2b{$codes{$k}} = $k;
   }
 
-#  $hash->{Match}     = "";
+  $hash->{Match}     = "^i......\$";
   $hash->{SetFn}     = "IT_Set";
   $hash->{StateFn}   = "IT_SetState";
   $hash->{DefFn}     = "IT_Define";
   $hash->{UndefFn}   = "IT_Undef";
-#  $hash->{ParseFn}   = "IT_Parse";
+  $hash->{ParseFn}   = "IT_Parse";
   $hash->{AttrList}  = "IODev ITfrequency ITrepetition switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 dummy:1,0 model:itremote,itswitch,itdimmer loglevel:0,1,2,3,4,5,6";
 
 }
@@ -58,6 +62,8 @@ IT_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 
+  $val = $1 if($val =~ m/^(.*) \d+$/);
+  return "Undefined value $val" if(!defined($it_c2b{$val}));
   return undef;
 }
 
@@ -296,7 +302,54 @@ IT_Undef($$)
 sub
 IT_Parse($$)
 {
+  my ($hash, $msg) = @_;
+  my $housecode;
+  my $onoffcode;
+  my $def;
+  my $newstate;
+  my @list;
+  if (length($msg) != 7) {
+    Log3 undef,3,"message \"$msg\" to short!";
+    return "message \"$msg\" to short!";
+  }
+  my $bin=sprintf("%024b",hex(substr($msg,1,length($msg)-1)));
 
+  my $msgcode="";
+  while (length($bin)>=2) {
+    if (substr($bin,0,2) != "10") {
+      $msgcode=$msgcode.$bintotristate{substr($bin,0,2)};
+    } else {
+      Log3 undef,4,"unknown tristate in \"$bin\"";
+      return "unknown tristate in \"$bin\""
+    }
+    $bin=substr($bin,2,length($bin)-2);
+  }
+  
+  $housecode=substr($msgcode,0,length($msgcode)-2);
+  $onoffcode=substr($msgcode,length($msgcode)-2,2);
+
+  #Log3 $hash,3,$msg."->".$msgcode."->".$housecode." ".$onoffcode;
+  if(!defined($modules{IT}{defptr}{lc($housecode)})) {
+    Log3 undef,3,"$housecode not defined (Switch code: $onoffcode)";
+    return "$housecode not defined (Switch code: $onoffcode)!";
+  }
+  $def=$modules{IT}{defptr}{lc($housecode)};
+
+  foreach my $name (keys %{$def}) {
+    if ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
+      $newstate="on";
+    } elsif ($def->{$name}->{$it_c2b{"off"}} eq lc($onoffcode)) {
+      $newstate="off";
+    } else {
+      Log3 $def->{$name}{NAME},3,"Code $onoffcode not supported by $def->{$name}{NAME}.";
+      next;
+    }
+    Log3 $def->{$name}{NAME},3,"$def->{$name}{NAME} ".$def->{$name}->{STATE}."->".$newstate;
+    push(@list,$def->{$name}{NAME});
+    readingsSingleUpdate($def->{$name},"state",$newstate,1);
+    
+  }
+  return @list;
 }
 
 1;

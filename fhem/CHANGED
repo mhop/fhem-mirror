@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 10_IT empfang (by bjoernh)
   - bugfix: PRESENCE: fix race condition, when delete disabled attribute and
                       PRESENCE does not start to scan.
   - added: OPENWEATHER: captures weather forecast from API of www.wetter.com
