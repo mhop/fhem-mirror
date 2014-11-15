@@ -2509,17 +2509,27 @@ FW_dropdownFn()
 
     my $fpname = $FW_wname;
     $fpname =~ s/.*floorplan\/(\w+)$/$1/;  #allow usage of attr fp_setbutton
-    my $fwsel;
-    $fwsel = ($cmd eq "state" ? "" : "$cmd&nbsp;") .
-             FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown","submit()").
-             FW_hidden("cmd.$d", "set");
-    $fwsel .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
 
-    return "<td colspan='2'><form method=\"$FW_formmethod\">".
-      FW_hidden("arg.$d", $cmd) .
-      FW_hidden("dev.$d", $d) .
-      ($FW_room ? FW_hidden("room", $FW_room) : "") .
-      "$fwsel</form></td>";
+    my $readng = ($cmd eq "state" ? "" : "$cmd"." ");
+
+    # TODO in case of running in a floorplan split $FW_wname to get name of
+    # webInstance.  Actually in floorplan the dropdown will refresh the page
+    # always independently from setting in corresponding web instance, cause
+    # statement if( AttrVal($FW_wname, "longpoll", 0) == 1) will always fail.
+    my $selFunct="";
+    if( AttrVal($FW_wname, "longpoll", 0) == 1) {
+      $selFunct = "FW_cmd('$FW_ME?XHR=1&cmd.$d=set $d $readng '+ ".
+                  "this.options[this.selectedIndex].value+ ' &room=$FW_room')";
+
+    } else {
+      $selFunct = "window.location = addcsrf('$FW_ME?cmd.$d=set $d $readng '+".
+                  "this.options[this.selectedIndex].value+ ' &room=$FW_room')";
+
+   }
+    my $fwsel;
+   $fwsel = ($cmd eq "state" ? "" : "$cmd&nbsp;") .
+              FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown","$selFunct");
+    return "<td colspan='2'>$fwsel</td>";  
   }
   return undef;
 }
