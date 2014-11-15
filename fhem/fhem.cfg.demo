@@ -41,8 +41,10 @@ attr Logfile room System
 
 define autocreate autocreate
 attr autocreate room System
-define et eventTypes demolog/eventTypes.txt
-attr et room System
+define eventTypes eventTypes demolog/eventTypes.txt
+attr eventTypes room System
+define initialUsbCheck notify global:INITIALIZED usb create
+attr initialUsbCheck room System
 define CUL_0 CUL none 0000
 attr CUL_0 dummy 1
 attr CUL_0 room System
