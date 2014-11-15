@@ -32,7 +32,11 @@ SetExtensions($$@)
       $hasOn  = ($em =~ m/:on\b/)  if(!$hasOn);
       $hasOff = ($em =~ m/:off\b/) if(!$hasOff);
     }
-    $cmd = ReplaceEventMap($name, $cmd, 1) if($cmd ne "?"); # Fix B0-for-timer
+    # Following is fix for: /B0:on/on-for-timer 300:5 Minuten/
+    # $cmd = ReplaceEventMap($name, $cmd, 1) if($cmd ne "?");
+    # Has problem with (Forum #28855):
+    # /on-for-timer 300:5 Minuten/on:Ein/ -> Ein-for-timer
+    # Workaround for Problem#1 /on-for-timer 300:5 Minuten/B0:on/
     (undef, $value) = ReplaceEventMap($name, [$name, $value], 0);
   }
   if(!$hasOn || !$hasOff) { # No extension
