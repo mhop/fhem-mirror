@@ -388,6 +388,7 @@ DevIo_Disconnected($)
   DevIo_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";
+  setReadingsVal($hash, "state", "disconnected", TimeNow());
 
   DoTrigger($name, "DISCONNECTED");
 }

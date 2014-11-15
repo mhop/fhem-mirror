@@ -535,13 +535,15 @@ CUL_ReadAnswer($$$$)
       $mculdata .= $buf;
     }
 
-    # \n\n is socat special
-    if($mculdata =~ m/\r\n/ || $anydata || $mculdata =~ m/\n\n/ ) {
-      (undef, $mculdata) = CUL_prefix(0, $ohash, $mculdata); # Delete prefix
-      if($regexp && $mculdata !~ m/$regexp/) {
-        CUL_Parse($ohash, $hash, $ohash->{NAME}, $mculdata);
+    # Dispatch data in the buffer before the proper answer.
+    while(($mculdata =~ m/^([^\n]*\n)(.*)/s) || $anydata) {
+      my $line = ($anydata ? $mculdata : $1);
+      $mculdata = $2;
+      (undef, $line) = CUL_prefix(0, $ohash, $line); # Delete prefix
+      if($regexp && $line !~ m/$regexp/) {
+        CUL_Parse($ohash, $hash, $ohash->{NAME}, $line);
       } else {
-        return (undef, $mculdata)
+        return (undef, $line);
       }
     }
   }
