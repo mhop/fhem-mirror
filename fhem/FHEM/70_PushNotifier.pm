@@ -141,14 +141,14 @@ PushNotifier_Send_Message
   <a name="PushNotifierDefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PushNotifier &lt;apiToken&gt; &lt;appToken&gt; &lt;appName&gt; &lt;deviceID&gt;</code><br>
+    <code>define &lt;name&gt; PushNotifier &lt;apiToken&gt; &lt;appName&gt; &lt;user&gt; &lt;password&gt; &lt;deviceID&gt;</code><br>
     <br>
     You have to create an account to get the apiToken.<br>
     And you have to create an application to get the appToken.<br>
     <br>
     Example:
     <ul>
-      <code>define PushNotifier1 PushNotifier 01234 56789 appname 012</code>
+      <code>define PushNotifier1 PushNotifier 01234 appname user password 012</code>
     </ul>
   </ul>
   <br>
@@ -188,14 +188,14 @@ PushNotifier_Send_Message
   <a name="PushNotifierDefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PushNotifier &lt;apiToken&gt; &lt;appToken&gt; &lt;appName&gt; &lt;deviceID&gt;</code><br>
+    <code>define &lt;name&gt; PushNotifier &lt;apiToken&gt;  &lt;appName&gt; &lt;user&gt; &lt;password&gt; &lt;deviceID&gt;</code><br>
     <br>
     Du musst einen Account erstellen, um das apiToken zu bekommen.<br>
     Und du musst eine Anwendung erstellen, um einen appToken zu bekommen.<br>
     <br>
     Beispiel:
     <ul>
-      <code>define PushNotifier1 PushNotifier 01234 56789 appname 012</code>
+      <code>define PushNotifier1 PushNotifier 01234 appname user password 012</code>
     </ul>
   </ul>
   <br>
