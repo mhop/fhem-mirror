@@ -218,7 +218,8 @@ RSS_returnRSS($) {
   my $url= RSS_getURL($defs{$name}{fhem}{hostname});
   my $type = $defs{$name}{fhem}{style};
   my $mime = ($type eq 'png')? 'image/png' : 'image/jpeg';
-  my $code= "<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><title>$name</title><ttl>1</ttl><item><media:content url='$url/rss/$name.$type' type='$mime'/></item></channel></rss>";
+  my $now  = time();
+  my $code = "<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><title>$name</title><ttl>1</ttl><item><media:content url='$url/rss/$name.$type' type='$mime'/><guid isPermaLink='false'>item_$now</guid></item></channel></rss>";
   
   return ("application/xml; charset=utf-8", $code);
 }
@@ -363,8 +364,13 @@ RSS_itemImg {
   return unless(defined($arg));
   return if($arg eq "");
   my $I;
-  if($srctype eq "url") {
-    my $data = GetFileFromURL($arg,3,undef,1);
+  if($srctype eq "url" || $srctype eq "urlq") {
+    my $data;
+    if($srctype eq "url") {
+      $data= GetFileFromURL($arg,3,undef,1);
+    } else {
+      $data= GetFileFromURLQuiet($arg,3,undef,1);
+    }
     if($imgtype eq "gif") {
       $I= GD::Image->newFromGifData($data);
     } elsif($imgtype eq "png") {
@@ -986,8 +992,8 @@ RSS_CGI(){
     <li>img &lt;x&gt; &lt;y&gt; &lt;['w' or 'h']s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
     position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
     The picture is scaled by the factor &lt;s&gt; (a decimal value). If 'w' or 'h' is in front of scale-value the value is used to set width or height to the value in pixel. If &lt;srctype&gt; is <code>file</code>, the picture
-    is loaded from the filename &lt;arg&gt;, if &lt;srctype&gt; is <code>url</code>, the picture
-    is loaded from the URL &lt;arg&gt;, if &lt;srctype&gt; is <code>data</code>, the picture
+    is loaded from the filename &lt;arg&gt;, if &lt;srctype&gt; is <code>url</code> or <code>urlq</code>, the picture
+    is loaded from the URL &lt;arg&gt; (with or without logging the URL), if &lt;srctype&gt; is <code>data</code>, the picture
     is piped in from data &lt;arg&gt;. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;arg&gt. See below for example.
     Notice: do not load the image from URL that is served by fhem as it leads to a deadlock.<br></li>
