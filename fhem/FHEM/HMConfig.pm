@@ -1486,6 +1486,7 @@ $culHmModelSets{"HM-OU-CF-PL"}         = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
 $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
+$culHmModelSets{"HM-Dis-WM55"}         = $culHmModelSets{"HM-PB-4DIS-WM"};
 
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
