@@ -1,16 +1,12 @@
 ###############################################
-#$Id: 70_PushNotifier.pm 2014-07-22 11:07:00 xusader
+#$Id: 70_PushNotifier.pm 2014-11-14 10:00:00 xusader
 #
 #	download client-app http://pushnotifier.de/apps/
 #	create account http://pushnotifier.de/login/
 #	get apiToken from http://gidix.de/setings/api/ and add a new app 
-#	get appToken with:
-#	curl -s -F apiToken="apiToken=your apiToken" -F username="your username" -F password="your password" http://a.pushnotifier.de/1/login 
-#	get deviceID with:
-#	curl -s -F "apiToken=your apiToken" -F "appToken=your appToken" http://a.pushnotifier.de/1/getDevices
 #
 #	Define example:
-#	define yourname PushNotifier apiToken appToken appname deviceID
+#	define yourname PushNotifier apiToken appname user password deviceID
 #
 #	notify example:
 #	define LampON notify Lamp:on set yourDefineName message Your message!
@@ -36,17 +32,42 @@ PushNotifier_Define($$)
   my ($hash, $def) = @_;
   my @args = split("[ \t]+", $def);
 
-  my ($name, $type, $apiToken, $appToken, $app, $deviceID) = @args;
+  my ($name, $type, $apiToken, $app, $user, $passwd, $deviceID) = @args;
   
   $hash->{STATE} = 'Initialized';
 
- if(defined($apiToken) && defined($appToken)&& defined($app)&& defined($deviceID)) {
+ if(defined($apiToken) && defined($app)&& defined($user)&& defined($passwd)&& defined($deviceID)) {
   $hash->{apiToken} = $apiToken;
-  $hash->{appToken} = $appToken;
   $hash->{app} = $app;
+  $hash->{user} = $user;
+  $hash->{passwd} = $passwd;
   $hash->{deviceID} = $deviceID;
-  
-  return undef;
+
+  my %getAppToken = (
+        'apiToken' => $apiToken,
+        'username' => $user,
+        'password' => $passwd);
+
+  my $responseAT = LWP::UserAgent->new()->post("http://a.pushnotifier.de/1/login", \%getAppToken);
+  my $strg_chkAT = $responseAT->as_string;
+  $strg_chkAT =~ m{"appToken":"([\w]+)};
+  my $appToken = $1;
+  $hash->{appToken} = $appToken;
+
+  #my $name = $hash->{NAME};
+  #Log3 $name, 2, $appToken;
+
+  my %getDevices = (
+  'apiToken' => $apiToken,
+  'appToken' => $appToken);
+
+  my $responseID = LWP::UserAgent->new()->post("http://a.pushnotifier.de/1/getDevices", \%getDevices);
+  my $strg_chkID = $responseID->as_string;
+  $strg_chkID =~ m/":([\d].*)/; 
+  my $devices = $1;
+  $hash->{devices} = $devices;  
+
+  return undef; 
   }
 }
 
@@ -58,18 +79,22 @@ PushNotifier_Set($@)
 	my %sets = ('message' => 1);
 	if(!defined($sets{$cmd})) {
 		return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets);
-	}  
+	}
+
     return PushNotifier_Send_Message($hash, @a);
 }
 #####################################
 sub
-PushNotifier_Send_Message#($@)
+PushNotifier_Send_Message
 {
   my $hash = shift;
   my $msg = join(" ", @_);
+
   my $apiToken = $hash->{apiToken};
-  my $appToken = $hash->{appToken};
   my $app = $hash->{app};
+  my $user = $hash->{user};
+  my $passwd = $hash->{passwd};
+  my $appToken = $hash->{appToken};
   my $deviceID = $hash->{deviceID};
 
   my %settings = (
