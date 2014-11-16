@@ -39,6 +39,7 @@ sub SVG_substcfg($$$$$$);
 sub SVG_time_align($$);
 sub SVG_time_to_sec($);
 sub SVG_openFile($$$);
+sub SVG_doShowLog($$$$;$$);
 
 my %SVG_devs;       # hash of from/to entries per device
 
@@ -809,7 +810,7 @@ SVG_showLog($)
 }
 
 sub
-SVG_doShowLog($$$$$$)
+SVG_doShowLog($$$$;$$)
 {
   my ($wl, $d, $type, $file, $styleW, $styleH) = @_;
   my $pm = AttrVal($wl,"plotmode",$FW_plotmode);

@@ -20,7 +20,9 @@ FW_timeCreate(el,cmd)
   if(brOff > 0) {
     par.innerHTML = par.innerHTML.substring(0, brOff).replace('"-"','"+"');
     if(cmd) {
-      if(typeof FW_pollConn != "undefined")
+      if(typeof cmd == "function")
+        cmd(v);
+      else if(typeof FW_pollConn != "undefined")
         FW_cmd(cmd.replace('%',v)+"&XHR=1");
       else
         window.location = addcsrf(cmd.replace('%',v));

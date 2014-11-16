@@ -9,7 +9,7 @@ use IO::File;
 # This block is only needed when FileLog is loaded bevore FHEMWEB
 sub FW_pO(@);
 sub FW_pH(@);
-use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
+use vars qw($FW_ME);      # webname (default is fhem)
 use vars qw($FW_RET);     # Returned data (html)
 use vars qw($FW_RETTYPE); 
 use vars qw($FW_cmdret);  # error msg forwarding from toSVG
@@ -183,7 +183,6 @@ FileLog_Attr(@)
 }
 
 ###################################
-
 sub
 FileLog_Set($@)
 {
@@ -1259,26 +1258,22 @@ FileLog_sampleDataFn($$$$$)
   <ul>
     <li>reopen
       <ul>
-        Erneutes &Ouml;ffnen eines FileLogs nach h&auml;ndischen &Auml;nderungen in dieser Datei.
-      </ul>
-      </li>
+        Erneutes &Ouml;ffnen eines FileLogs nach h&auml;ndischen
+        &Auml;nderungen in dieser Datei.
+      </ul></li>
     <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
       <ul>
-        Hinzuf&uuml;gen eines regexp Teiles, der gem&auml;&szlig; device:regexp
-        aufgebaut ist. Die Teile werden mit einem | voneinander getrennt.
-        Achtung: Wenn die regexp-Teile umsortiert werden, k&ouml;nnen die
-        manuell erzeugten regexps ung&uuml;ltig werden.
-      </ul>
-      </li>
+        F&uuml;gt ein regexp Teil hinzu, der als device:regexp aufgebaut ist.
+        Die Teile werden nach Regexp-Regeln mit | getrennt.  Achtung: durch
+        hinzuf&uuml;gen k&ouml;nnen manuell erzeugte Regexps ung&uuml;ltig
+        werden.
+      </ul></li>
     <li>removeRegexpPart &lt;re&gt;
       <ul>
-        Entfernt ein regexp-Teil. Achtung: Wenn die regexp-Teile umsortiert
-        werden, k&ouml;nnen die manuell erzeugten regexps ung&uuml;ltig
-        werden.<br>
-        Die Inkonsistenz von addRegexpPart/removeRegexPart-Argumenten hat
-        seinen Ursprung in der Wiederverwendung von Javascript-Funktionen.
-      </ul>
-      </li>
+        Entfernt ein regexp Teil.  Die Inkonsistenz von addRegexpPart /
+        removeRegexPart-Argumenten hat seinen Ursprung in der Wiederverwendung
+        von Javascript-Funktionen.
+      </ul></li>
     <li>absorb secondFileLog 
       <ul>
         F&uuml;hrt den gegenw&auml;rtigen Log und den secondFileLog zu einer
@@ -1296,11 +1291,10 @@ FileLog_sampleDataFn($$$$$)
           <li>nur das aktuelle File wird zusammengef&uuml;hrt, keine
               archivierten Versionen.</li>
           <li>Weblinks, die das secondFilelog benutzen werden unbrauchbar, sie
-              m&uuml;ssen deshalb auf das neue Logfile angepasst oder gel&ouml;scht
-              werden.</li>
+              m&uuml;ssen deshalb auf das neue Logfile angepasst oder
+              gel&ouml;scht werden.</li>
         </ul>
-      </ul>
-      </li>
+      </ul></li>
       <br>
     </ul>
     <br>

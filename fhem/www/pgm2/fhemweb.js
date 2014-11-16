@@ -146,7 +146,7 @@ FW_longpoll()
     }
   }
   if(filter == "") {
-    var sa = document.location.search.substring(1).split("&");
+    var sa = location.search.substring(1).split("&");
     for(var i = 0; i < sa.length; i++) {
       if(sa[i].substring(0,5) == "room=")
         filter=sa[i];
@@ -172,7 +172,7 @@ FW_longpoll()
   if(iP != null)
     filter = filter +";iconPath="+iP;
 
-  var query = document.location.pathname+"?XHR=1"+
+  var query = location.pathname+"?XHR=1"+
                 "&inform=type=status;filter="+filter+
                 "&timestamp="+new Date().getTime();
   query = addcsrf(query);
@@ -292,7 +292,7 @@ FW_queryValue(cmd, qFn, qArg)
     eval(qFn.replace("%", qResp));
     delete qConn;
   }
-  var query = document.location.pathname+"?cmd="+cmd+"&XHR=1"
+  var query = location.pathname+"?cmd="+cmd+"&XHR=1"
   query = addcsrf(query);
   qConn.open("GET", query, true);
   qConn.send(null);
