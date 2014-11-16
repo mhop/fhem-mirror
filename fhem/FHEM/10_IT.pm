@@ -130,7 +130,7 @@ IT_Set($@)
   ## Do we need to change ITrepetition ??	
   if(defined($attr{$name}) && defined($attr{$name}{"ITrepetition"})) {
   	$message = "isr".$attr{$name}{"ITrepetition"};
-		CUL_SimpleWrite($io, $message);
+                CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", $message));
 		Log GetLogLevel($name,4), "IT set ITrepetition: $message for $io->{NAME}";
 	}
 
@@ -143,7 +143,7 @@ IT_Set($@)
     
     my $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
     Log GetLogLevel($name,4), "Setting ITfrequency (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz";
-    CUL_SimpleWrite($hash, "if$f2$f1$f0");
+    CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "if$f2$f1$f0"));
 	}
 	
   my $v = $name ." ". join(" ", @a);
@@ -164,14 +164,14 @@ IT_Set($@)
   ## Do we need to change ITrepetition back??	
   if(defined($attr{$name}) && defined($attr{$name}{"ITrepetition"})) {
   	$message = "isr".$it_defrepetition;
-		CUL_SimpleWrite($io, $message);
+                CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", $message));
 		Log GetLogLevel($name,4), "IT set ITrepetition back: $message for $io->{NAME}";
 	}
 
   ## Do we need to change ITfrequency back??	
   if(defined($attr{$name}) && defined($attr{$name}{"ITfrequency"})) {
     Log GetLogLevel($name,4), "Setting ITfrequency back to 433.92 MHz";
-    CUL_SimpleWrite($hash, "if0");
+    CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "if0"));
 	}
 
 	## Do we need to change RFMode back to HomeMatic??
