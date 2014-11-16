@@ -42,7 +42,7 @@ notify_Define($$)
   eval { "Hallo" =~ m/^$re$/ };
   return "Bad regexp: $@" if($@);
   $hash->{REGEXP} = $re;
-  $hash->{COMMAND} = $command;
+  $hash->{".COMMAND"} = $command;
   $hash->{STATE} = "active";
   notifyRegexpChanged($hash, $re);
 
@@ -83,7 +83,7 @@ notify_Exec($$)
                 "%TYPE" => $t,
                 "%EVENT" => $s
       );
-      my $exec = EvalSpecials($ntfy->{COMMAND}, %specials);
+      my $exec = EvalSpecials($ntfy->{".COMMAND"}, %specials);
 
       Log3 $ln, 4, "$ln exec $exec";
       my $r = AnalyzeCommandChain(undef, $exec);
@@ -140,7 +140,7 @@ notify_Set($@)
     eval { "Hallo" =~ m/^$re$/ };
     return "Bad regexp: $@" if($@);
     $hash->{REGEXP} = $re;
-    $hash->{DEF} = "$re $hash->{COMMAND}";
+    $hash->{DEF} = "$re ".$hash->{".COMMAND"};
     notifyRegexpChanged($hash, $re);
     
   } elsif($cmd eq "removeRegexpPart") {
@@ -154,7 +154,7 @@ notify_Set($@)
     eval { "Hallo" =~ m/^$re$/ };
     return "Bad regexp: $@" if($@);
     $hash->{REGEXP} = $re;
-    $hash->{DEF} = "$re $hash->{COMMAND}";
+    $hash->{DEF} = "$re ".$hash->{".COMMAND"};
     notifyRegexpChanged($hash, $re);
 
   }
