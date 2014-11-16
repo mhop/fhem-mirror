@@ -18,6 +18,7 @@ at_Initialize($)
   $hash->{StateFn}  = "at_State";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals ".
                         "skip_next:0,1 alignTime";
+  $hash->{FW_detailFn} = "at_fhemwebFn";
 }
 
 
@@ -69,6 +70,10 @@ at_Define($$)
   $rel = "" if(!defined($rel));
   $rep = "" if(!defined($rep));
   $cnt = "" if(!defined($cnt));
+  $hash->{RELATIVE} = ($rel ? "yes" : "no");
+  $hash->{PERIODIC} = ($rep ? "yes" : "no");
+  $hash->{TIMESPEC} = $tspec;
+  $hash->{COMMAND} = $command;
 
   my $ot = $data{AT_TRIGGERTIME} ? $data{AT_TRIGGERTIME} : gettimeofday();
   $ot = int($ot) if(!$rel);     # No way to specify subseconds
@@ -132,8 +137,8 @@ at_Exec($)
   my $disable = IsDisabled($name);
 
   delete $attr{$name}{skip_next} if($skip);
-  my (undef, $command) = split("[ \t]+", $hash->{DEF}, 2);
-  $command = SemicolonEscape($command);
+
+  my $command = SemicolonEscape($hash->{COMMAND});
   my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
   Log3 $name, 3, "$name: $ret" if($ret);
 
@@ -244,6 +249,74 @@ at_State($$$$)
   $hash->{STATE} = $val;
   
   return undef;
+}
+
+#########################
+sub
+at_fhemwebFn($$$$)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash = $defs{$d};
+
+  my $ts = $hash->{TIMESPEC}; $ts =~ s/'/\\'/g;
+  my $isPerl = ($ts =~ m/^{(.*)}/);
+  $ts = $1 if($isPerl);
+
+return "<br>Timespec wizard:".
+"<table id='atWizard' nm='$hash->{NAME}' ts='$ts' rl='$hash->{RELATIVE}' ".
+       "pr='$hash->{PERIODIC}' ip='$isPerl' class='block wide'>".<<'EOF';
+  <tr class="even">
+    <td>Relative &nbsp; <input type="checkbox" id="aw_rl" value="yes"></td>
+    <td>Periodic &nbsp; <input type="checkbox" id="aw_pr" value="yes"></td>
+  </tr><tr class="odd"><td>Use perl function for timespec</td>
+    <td><input type="checkbox" id="aw_ip"></td>
+  </tr><tr class="even"><td>Timespec</td>
+    <td><input type="text" id="aw_pts"></td>
+  </tr><tr class="even"><td>Timespec</td>
+    <td><input type="text" readonly id="aw_ts" size="5">
+        <input type='button' value='+' id="aw_tsb"></td>
+  </tr>
+  </tr><tr class="even">
+    <td colspan="2"><input type="button" id="aw_md" value="Modify"></td>
+  </tr>
+</table>
+<script type="text/javascript">
+  loadScript("pgm2/jquery.min.js", atDetails);
+  function
+  atDetails()
+  {
+    var t=$("#atWizard"), ip=$(t).attr("ip"), ts=$(t).attr("ts");
+
+    function tsClick() {
+      FW_timeCreate(this, function(val) { $("#aw_tsb").click(tsClick) })
+    }
+    function ipClick() {
+      var c = $("#aw_ip").prop("checked");
+      $("#aw_ts").closest("tr").css("display", !c ? "table-row" : "none");
+      $("#aw_pts").closest("tr").css("display", c ? "table-row" : "none");
+    }
+    $("#aw_rl").prop("checked", $(t).attr("rl")=="yes");
+    $("#aw_pr").prop("checked", $(t).attr("pr")=="yes");
+    $("#aw_ip").prop("checked", ip);
+    $("#aw_ts").val(ip ? "12:00" : ts);
+    $("#aw_pts").val(ip ? ts : 'sunset()');
+    $("#aw_tsb").click(tsClick);
+    $("#aw_ip").change(ipClick);
+    ipClick();
+    $("#aw_md").click(function(){
+      var nm = $(t).attr("nm");
+      var def = nm+" ";
+      def += $("#aw_rl").prop("checked") ? "+":"";
+      def += $("#aw_pr").prop("checked") ? "*":"";
+      def += $("#aw_ip").prop("checked") ? 
+               "{"+$("#aw_pts").val()+"}" : $("#aw_ts").val();
+      def = def.replace(/\+/g, "%2b");
+      def = def.replace(/;/g, ";;");
+      location = location.pathname+"detail="+nm+"&cmd=modify "+def;
+    });
+  }
+</script>
+EOF
 }
 
 1;

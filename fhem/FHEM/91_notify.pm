@@ -4,6 +4,7 @@ package main;
 
 use strict;
 use warnings;
+use vars qw($FW_ME);      # webname (default is fhem)
 
 #####################################
 sub
@@ -15,6 +16,8 @@ notify_Initialize($)
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals forwardReturnValue:0,1 showTriggerTime:0,1 addStateEvent:0,1";
+  $hash->{SetFn}    = "notify_Set";
+  $hash->{FW_detailFn} = "notify_fhemwebFn";
 }
 
 
@@ -39,6 +42,7 @@ notify_Define($$)
   eval { "Hallo" =~ m/^$re$/ };
   return "Bad regexp: $@" if($@);
   $hash->{REGEXP} = $re;
+  $hash->{COMMAND} = $command;
   $hash->{STATE} = "active";
   notifyRegexpChanged($hash, $re);
 
@@ -74,14 +78,12 @@ notify_Exec($$)
     }
     if($found) {
       Log3 $ln, 5, "Triggering $ln";
-      my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
-
       my %specials= (
                 "%NAME" => $n,
                 "%TYPE" => $t,
                 "%EVENT" => $s
       );
-      $exec= EvalSpecials($exec, %specials);
+      my $exec = EvalSpecials($ntfy->{COMMAND}, %specials);
 
       Log3 $ln, 4, "$ln exec $exec";
       my $r = AnalyzeCommandChain(undef, $exec);
@@ -111,6 +113,116 @@ notify_Attr(@)
   $defs{$a[1]}{STATE} = ($do == 1 ? "disabled" : "active");
   return undef;
 }
+
+###################################
+
+sub
+notify_Set($@)
+{
+  my ($hash, @a) = @_;
+  my $me = $hash->{NAME};
+
+  return "no set argument specified" if(int(@a) < 2);
+  my %sets = (addRegexpPart=>2, removeRegexpPart=>1);
+  
+  my $cmd = $a[1];
+  return "Unknown argument $cmd, choose one of " # No dropdown in FHEMWEB
+    if(!defined($sets{$cmd}));
+  return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
+
+  if($cmd eq "addRegexpPart") {
+    my %h;
+    my $re = "$a[2]:$a[3]";
+    map { $h{$_} = 1 } split(/\|/, $hash->{REGEXP});
+    $h{$re} = 1;
+    $re = join("|", sort keys %h);
+    return "Bad regexp: starting with *" if($re =~ m/^\*/);
+    eval { "Hallo" =~ m/^$re$/ };
+    return "Bad regexp: $@" if($@);
+    $hash->{REGEXP} = $re;
+    $hash->{DEF} = "$re $hash->{COMMAND}";
+    notifyRegexpChanged($hash, $re);
+    
+  } elsif($cmd eq "removeRegexpPart") {
+    my %h;
+    map { $h{$_} = 1 } split(/\|/, $hash->{REGEXP});
+    return "Cannot remove regexp part: not found" if(!$h{$a[2]});
+    return "Cannot remove last regexp part" if(int(keys(%h)) == 1);
+    delete $h{$a[2]};
+    my $re = join("|", sort keys %h);
+    return "Bad regexp: starting with *" if($re =~ m/^\*/);
+    eval { "Hallo" =~ m/^$re$/ };
+    return "Bad regexp: $@" if($@);
+    $hash->{REGEXP} = $re;
+    $hash->{DEF} = "$re $hash->{COMMAND}";
+    notifyRegexpChanged($hash, $re);
+
+  }
+  return undef;
+}
+
+
+#########################
+sub
+notify_fhemwebFn($$$$)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash = $defs{$d};
+
+  my $ret .= "<br>Regexp wizard";
+  my $row=0;
+  $ret .= "<br><table class=\"block wide\">";
+  my @ra = split(/\|/, $hash->{REGEXP});
+  if(@ra > 1) {
+    foreach my $r (@ra) {
+      $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
+      my $cmd = "cmd.X= set $d removeRegexpPart&val.X=$r"; # =.set: avoid JS
+      $ret .= "<td>$r</td>";
+      $ret .= FW_pH("$cmd&detail=$d", "removeRegexpPart", 1,undef,1);
+      $ret .= "</tr>";
+    }
+  }
+
+  my @et = devspec2array("TYPE=eventTypes");
+  if(!@et) {
+    $ret .= FW_pH("$FW_ME/docs/commandref.html#eventTypes",
+                  "To add a regexp an eventTypes definition is needed",
+                  1, undef, 1);
+  } else {
+    my %dh;
+    foreach my $l (split("\n", AnalyzeCommand(undef, "get $et[0] list"))) {
+      my @a = split(/[ \r\n]/, $l);
+      $a[1] = "" if(!defined($a[1]));
+      $a[1] =~ s/\.\*//g;
+      $a[1] =~ s/,.*//g;
+      next if(@a < 2);
+      $dh{$a[0]}{".*"} = 1;
+      $dh{$a[0]}{$a[1].".*"} = 1;
+    }
+    my $list = ""; my @al;
+    foreach my $dev (sort keys %dh) {
+      $list .= " $dev:" . join(",", sort keys %{$dh{$dev}});
+      push @al, $dev;
+    }
+    $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
+    $ret .= "<td colspan=\"2\"><form autocomplete=\"off\">";
+    $ret .= FW_hidden("detail", $d);
+    $ret .= FW_hidden("dev.$d", "$d addRegexpPart");
+    $ret .= FW_submit("cmd.$d", "set", "set");
+    $ret .= "<div class=\"set downText\">&nbsp;$d addRegexpPart&nbsp;</div>";
+    $list =~ s/(['"])/./g;
+    $ret .= FW_select("","arg.$d",\@al, undef, "set",
+        "FW_selChange(this.options[selectedIndex].text,'$list','val.$d')");
+    $ret .= FW_textfield("val.$d", 30, "set");
+    $ret .= "<script type=\"text/javascript\">" .
+              "FW_selChange('$al[0]','$list','val.$d')</script>";
+    $ret .= "</form></td></tr>";
+  }
+  $ret .= "</table>";
+
+  return $ret;
+}
+
 1;
 
 =pod
@@ -221,7 +333,27 @@ notify_Attr(@)
 
 
   <a name="notifyset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set </b>
+  <ul>
+    <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
+      <ul>
+        add a regexp part, which is constructed as device:regexp.  The parts
+        are separated by |.  Note: as the regexp parts are resorted, manually
+        constructed regexps may become invalid.
+      </ul>
+      </li>
+    <li>removeRegexpPart &lt;re&gt;
+      <ul>
+        remove a regexp part.  Note: as the regexp parts are resorted, manually
+        constructed regexps may become invalid.<br>
+        The inconsistency in addRegexpPart/removeRegexPart arguments originates
+        from the reusage of javascript functions.
+      </ul>
+      </li>
+      <br>
+    </ul>
+    <br>
+
 
   <a name="notifyget"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -395,7 +527,23 @@ notify_Attr(@)
 
 
   <a name="notifyset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set </b>
+  <ul>
+    <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
+      <ul>
+        F&uuml;gt ein regexp Teil hinzu, der als device:regexp aufgebaut ist.
+        Die Teile werden nach Regexp-Regeln mit | getrennt.  Achtung: durch
+        hinzuf&uuml;gen k&ouml;nnen manuell erzeugte Regexps ung&uuml;ltig
+        werden.
+      </ul></li>
+    <li>removeRegexpPart &lt;re&gt;
+      <ul>
+        Entfernt ein regexp Teil.  Die Inkonsistenz von addRegexpPart /
+        removeRegexPart-Argumenten hat seinen Ursprung in der Wiederverwendung
+        von Javascript-Funktionen.
+      </ul></li>
+    </ul>
+    <br>
 
   <a name="notifyget"></a>
   <b>Get</b> <ul>N/A</ul><br>
