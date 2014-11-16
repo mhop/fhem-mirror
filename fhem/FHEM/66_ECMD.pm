@@ -41,7 +41,7 @@ sub ECMD_Clear($);
 #sub ECMD_Parse($$$$$);
 sub ECMD_Read($);
 sub ECMD_ReadAnswer($$);
-#sub ECMD_Ready($);
+sub ECMD_Ready($);
 sub ECMD_Write($$$);
 
 
@@ -61,6 +61,7 @@ ECMD_Initialize($)
 # Consumer
   $hash->{DefFn}   = "ECMD_Define";
   $hash->{UndefFn} = "ECMD_Undef";
+  $hash->{ReadyFn} = "ECMD_Ready";
   $hash->{GetFn}   = "ECMD_Get";
   $hash->{SetFn}   = "ECMD_Set";
   $hash->{AttrFn}  = "ECMD_Attr";
@@ -149,6 +150,25 @@ ECMD_Log($$$)
   return unless(defined($loglevel)); 
   Log3 $hash, $loglevel , "$name: $logmsg";
 }
+
+#####################################
+sub
+ECMD_Ready($) 
+{
+  my ($hash) = @_;
+
+  return DevIo_OpenDev($hash, 1, "ECMD_DoInit")
+                if($hash->{STATE} eq "disconnected");
+
+  # This is relevant for windows/USB only
+  my $po = $hash->{USBDev};
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+  if($po) {
+    ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+  }
+  return ($InBytes && $InBytes>0);
+}
+
 
 #####################################
 sub
