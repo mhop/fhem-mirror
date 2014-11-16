@@ -64,7 +64,7 @@ MAXLAN_Define($$)
 
   if(@a < 3) {
     my $msg = "wrong syntax: define <name> MAXLAN ip[:port] [pollintervall [ondemand]]";
-    Log 2, $msg;
+    Log3 $hash, 2, $msg;
     return $msg;
   }
 
@@ -74,7 +74,7 @@ MAXLAN_Define($$)
   $dev .= ":62910" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
   if($dev eq "none") {
-    Log 1, "$name device is none, commands will be echoed only";
+    Log3 $hash, 1, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
@@ -88,7 +88,7 @@ MAXLAN_Define($$)
         $hash->{persistent} = 0;
       } else {
         my $msg = "unknown argument $arg";
-        Log 1, $msg;
+        Log3 $hash, 1, $msg;
         return $msg;
       }
     }
@@ -124,7 +124,7 @@ sub
 MAXLAN_Disconnect($)
 {
   my $hash = shift;
-  Log 5, "MAXLAN_Disconnect";
+  Log3 $hash, 5, "MAXLAN_Disconnect";
   #All operations here are no-op if already disconnected
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
@@ -143,7 +143,7 @@ MAXLAN_Connect($)
   DevIo_OpenDev($hash, 0, "");
   if(!MAXLAN_IsConnected($hash)) {
     my $msg = "MAXLAN_Connect: Could not connect";
-    Log 2, $msg;
+    Log3 $hash, 2, $msg;
     return $msg;
   }
 
@@ -237,9 +237,9 @@ MAXLAN_Set($@)
     my $timezones;
     if(exists($tz_list{$timezoneAttr})) {
       $timezones = $tz_list{$timezoneAttr};
-      Log 3, "MAX Cube is set to timezone $timezoneAttr";
+      Log3 $hash, 3, "MAX Cube is set to timezone $timezoneAttr";
     } else {
-      Log 2, "ERROR: Timezone $timezoneAttr of MAX Cube is invalid. Using CET-CEST";
+      Log3 $hash, 2, "ERROR: Timezone $timezoneAttr of MAX Cube is invalid. Using CET-CEST";
       $timezones = $tz_list{"CET-CEST"};
     }
 
@@ -277,13 +277,13 @@ MAXLAN_ExpectAnswer($$)
 
   if(!defined($rmsg)) {
     my $msg = "MAXLAN_ExpectAnswer: Error while waiting for answer $expectedanswer";
-    Log 1, $msg;
+    Log3 $hash, 1, $msg;
     return $msg;
   }
 
   my $ret = undef;
   if($rmsg !~ m/^$expectedanswer/) {
-    Log 2, "MAXLAN_ExpectAnswer: Got unexpected response, expected $expectedanswer";
+    Log3 $hash, 2, "MAXLAN_ExpectAnswer: Got unexpected response, expected $expectedanswer";
     MAXLAN_Parse($hash,$rmsg);
     return "Got unexpected response, expected $expectedanswer";
   }
@@ -317,7 +317,7 @@ MAXLAN_ReadSingleResponse($$)
     #Check timeout
     if(gettimeofday() > $maxTime) {
       if($waitForResponse) {
-        Log 1, "MAXLAN_ReadSingleResponse: timeout while reading from socket, disconnecting";
+        Log3 $hash, 1, "MAXLAN_ReadSingleResponse: timeout while reading from socket, disconnecting";
         MAXLAN_Disconnect($hash);
       }
       return undef;;
@@ -326,7 +326,7 @@ MAXLAN_ReadSingleResponse($$)
     #Wait for data
     my $nfound = select($rout=$rin, $wout=$win, $eout=$ein, $read_timeout);
     if($nfound == -1) {
-      Log 1, "MAXLAN_ReadSingleResponse: error during select, ret = $nfound";
+      Log3 $hash, 1, "MAXLAN_ReadSingleResponse: error during select, ret = $nfound";
       return undef;
     }
     last if($nfound == 0 and !$waitForResponse);
@@ -336,7 +336,7 @@ MAXLAN_ReadSingleResponse($$)
     my $buf;
     my $res = sysread($hash->{TCPDev}, $buf, 256);
     if(!defined($res)){
-      Log 1, "MAXLAN_ReadSingleResponse: error during read";
+      Log3 $hash, 1, "MAXLAN_ReadSingleResponse: error during read";
       return undef; #error occured
     }
 
@@ -385,7 +385,7 @@ MAXLAN_Read($)
     last if(!$rmsg);
     # The Msg N: .... is the only one that may come spontanously from
     # the cube while we are in pairmode
-    Log 2, "Unsolicated response from Cube: $rmsg" unless($hash->{pairmode} and substr($rmsg,0,2) eq "N:");
+    Log3 $hash, 2, "Unsolicated response from Cube: $rmsg" unless($hash->{pairmode} and substr($rmsg,0,2) eq "N:");
     MAXLAN_Parse($hash, $rmsg);
   }
 }
@@ -396,7 +396,7 @@ MAXLAN_SendMetadata($)
   my $hash = shift;
 
   if(defined($hash->{metadataVersionMismatch})){
-    Log 3,"MAXLAN_SendMetadata: current version of metadata unexpected, not overwriting!";
+    Log3 $hash, 3,"MAXLAN_SendMetadata: current version of metadata unexpected, not overwriting!";
     return;
   }
 
@@ -408,7 +408,7 @@ MAXLAN_SendMetadata($)
   my @devices = @{$hash->{devices}};
 
   if(@groups > $maxGroupCount || @devices > $maxDeviceCount) {
-    Log 1, "MAXLAN_SendMetadata: you got more than $maxGroupCount groups or $maxDeviceCount devices";
+    Log3 $hash, 1, "MAXLAN_SendMetadata: you got more than $maxGroupCount groups or $maxDeviceCount devices";
     return;
   }
 
@@ -417,7 +417,7 @@ MAXLAN_SendMetadata($)
   $metadata .= pack("C",scalar(@groups));
   foreach(@groups){
     if(length($_->{name}) > $maxNameLength) {
-      Log 1, "Group name $_->{name} is too long, maximum of $maxNameLength characters allowed";
+      Log3 $hash, 1, "Group name $_->{name} is too long, maximum of $maxNameLength characters allowed";
       return;
     }
     $metadata .= pack("CC/aH6",$_->{id}, $_->{name}, $_->{masterAddr});
@@ -425,7 +425,7 @@ MAXLAN_SendMetadata($)
   $metadata .= pack("C",scalar(@devices));
   foreach(@devices){
     if(length($_->{name}) > $maxNameLength) {
-      Log 1, "Device name $_->{name} is too long, maximum of $maxNameLength characters allowed";
+      Log3 $hash, 1, "Device name $_->{name} is too long, maximum of $maxNameLength characters allowed";
       return;
     }
     $metadata .= pack("CH6a[10]C/aC",$_->{type}, $_->{addr}, $_->{serial}, $_->{name}, $_->{groupid});
@@ -458,12 +458,9 @@ MAXLAN_Parse($$)
   my ($hash, $rmsg) = @_;
 
   my $name = $hash->{NAME};
-  my $ll3 = GetLogLevel($name,3);
-  my $ll5 = GetLogLevel($name,5);
-  Log $ll5, "Msg $rmsg";
+  Log3 $hash, 5, "Msg $rmsg";
   my $cmd = substr($rmsg,0,1); # get leading char
   my @args = split(',', substr($rmsg,2));
-  #Log $ll5, 'args '.join(" ",@args);
 
   if ($cmd eq 'H'){ #Hello
     $hash->{serial} = $args[0];
@@ -498,14 +495,14 @@ MAXLAN_Parse($$)
                           + $cubedatetime->{minute} - $min);
       $hash->{cubeTimeDifference} = $difference;
       if($difference > 1) {
-        Log 2, "MAXLAN_Parse: Cube thinks it is $cubedatetime->{day}.$cubedatetime->{month}.$cubedatetime->{year} $cubedatetime->{hour}:$cubedatetime->{minute}";
-        Log 2, "MAXLAN_Parse: Time difference is $difference minutes";
+        Log3 $hash, 2, "MAXLAN_Parse: Cube thinks it is $cubedatetime->{day}.$cubedatetime->{month}.$cubedatetime->{year} $cubedatetime->{hour}:$cubedatetime->{minute}";
+        Log3 $hash, 2, "MAXLAN_Parse: Time difference is $difference minutes";
       }
     } else {
-      Log 2, "MAXLAN_Parse: Cube has no time set";
+      Log3 $hash, 2, "MAXLAN_Parse: Cube has no time set";
     }
 
-    Log $ll5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $hash->{clockset}";
+    Log3 $hash, 5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $hash->{clockset}";
 
   } elsif($cmd eq 'M') {
     #Metadata, this is basically a readwrite part of the cube's memory.
@@ -522,12 +519,12 @@ MAXLAN_Parse($$)
       ($magic,$version,$numgroups,@groupsdevices) = unpack("CCCXC/(CC/aH6)C/(CH6a[10]C/aC)C",$bindata);
       1;
     } or do {
-      Log 1, "MAXLAN_Parse: Metadata response is malformed!";
+      Log3 $hash, 1, "MAXLAN_Parse: Metadata response is malformed!";
       return $name;
     };
     
     if($magic != $metadata_magic || $version != $metadata_version) {
-      Log 3, "MAXLAN_Parse: magic $magic/version $version are not $metadata_magic/$metadata_version as expected";
+      Log3 $hash, 3, "MAXLAN_Parse: magic $magic/version $version are not $metadata_magic/$metadata_version as expected";
       $hash->{metadataVersionMismatch} = 1;
     }
 
@@ -551,20 +548,19 @@ MAXLAN_Parse($$)
       $hash->{devices}[-1]->{groupid} = $groupsdevices[$i+4];
     }
 
-    #Log $ll5, "Got Metadata, hash: ".Dumper($hash);
 
   }elsif($cmd eq "C"){#Configuration
     return $name if(@args < 2);
     my $bindata = decode_base64($args[1]);
 
     if(length($bindata) < 18) {
-      Log 1, "Invalid C: response, not enough data";
+      Log3 $hash, 1, "Invalid C: response, not enough data";
       return $name;
     }
 
     #Parse the first 18 bytes, those are send for every device
     my ($len,$addr,$devicetype,$groupid,$firmware,$testresult,$serial) = unpack("CH6CCCCa[10]", $bindata);
-    Log $ll5, "MAXLAN_Parse: len $len, addr $addr, devicetype $devicetype, firmware $firmware, testresult $testresult, groupid $groupid, serial $serial";
+    Log3 $hash, 5, "MAXLAN_Parse: len $len, addr $addr, devicetype $devicetype, firmware $firmware, testresult $testresult, groupid $groupid, serial $serial";
 
     $len = $len+1; #The len field itself was not counted
 
@@ -604,7 +600,7 @@ MAXLAN_Parse($$)
       $valveoffset     = int($valveoffset*100/255 + 0.5); # + 0.5 for correct rounding
       my $decalcDay    = ($decalcifiction >> 5) & 0x07;
       my $decalcTime   = $decalcifiction & 0x1F;
-      Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
+      Log3 $hash, 5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
       Dispatch($hash, "MAX,1,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile,$boostValve,$boostDuration,$tempoffset,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime", {});
 
     }elsif($device_types{$devicetype} eq "WallMountedThermostat"){
@@ -613,24 +609,24 @@ MAXLAN_Parse($$)
       $ecotemp         = MAXLAN_ExtractTemperature($ecotemp);
       $maxsetpointtemp = MAXLAN_ExtractTemperature($maxsetpointtemp);
       $minsetpointtemp = MAXLAN_ExtractTemperature($minsetpointtemp);
-      Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp";
+      Log3 $hash, 5, "comfortemp $comforttemp, ecotemp $ecotemp, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp";
       if(defined($tempoffset)) { #With firmware 18 (opposed to firmware 16)
         $tempoffset = $tempoffset/2.0-3.5; #convert to degree
         my $boostValve = ($boost & 0x1F) * 5;
         my $boostDuration = $boost >> 5;
         $windowopentemp  = MAXLAN_ExtractTemperature($windowopentemp);
-        Log $ll5, "tempoffset $tempoffset, boostValve $boostValve, boostDuration $boostDuration, windowOpenTemp $windowopentemp";
+        Log3 $hash, 5, "tempoffset $tempoffset, boostValve $boostValve, boostDuration $boostDuration, windowOpenTemp $windowopentemp";
         Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile,$boostValve,$boostDuration,$tempoffset,$windowopentemp", {});
       } else {
         Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile", {});
       }
 
     }elsif($device_types{$devicetype} eq "ShutterContact"){
-      Log 2, "MAXLAN_Parse: ShutterContact send some configuration, but none was expected" if($len > 18);
+      Log3 $hash, 2, "MAXLAN_Parse: ShutterContact send some configuration, but none was expected" if($len > 18);
     }elsif($device_types{$devicetype} eq "PushButton"){
-      Log 2, "MAXLAN_Parse: PushButton send some configuration, but none was expected" if($len > 18);
+      Log3 $hash, 2, "MAXLAN_Parse: PushButton send some configuration, but none was expected" if($len > 18);
     }else{ #TODO
-      Log 2, "MAXLAN_Parse: Got configdata for unimplemented devicetype $devicetype";
+      Log3 $hash, 2, "MAXLAN_Parse: Got configdata for unimplemented devicetype $devicetype";
     }
 
     #Clear Error
@@ -666,14 +662,14 @@ MAXLAN_Parse($$)
       my $unkbit2 = vec($bits1,5,2);
       my $unkbit3 = vec($bits1,7,1);
   
-      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, error $error, errCmd $errCmd, answer $answer, unkbit ($unkbit1,$unkbit2,$unkbit3)";
+      Log3 $hash, 5, "len $len, addr $addr, initialized $initialized, valid $valid, error $error, errCmd $errCmd, answer $answer, unkbit ($unkbit1,$unkbit2,$unkbit3)";
 
       my $payload = unpack("H*",substr($bindata,6,$len-6+1)); #+1 because the len field is not counted
       if($valid) {
         my $shash = $modules{MAX}{defptr}{$addr};
 
         if(!$shash) {
-          Log 2, "Got List response for undefined device with addr $addr";
+          Log3 $hash, 2, "Got List response for undefined device with addr $addr";
         }elsif($shash->{type} =~ /HeatingThermostat.*/){
           Dispatch($hash, "MAX,1,ThermostatState,$addr,$payload", {});
         }elsif($shash->{type} eq "WallMountedThermostat"){
@@ -683,7 +679,7 @@ MAXLAN_Parse($$)
         }elsif($shash->{type} eq "PushButton"){
           Dispatch($hash, "MAX,1,PushButtonState,$addr,$payload", {});
         }else{
-          Log 2, "MAXLAN_Parse: Got status for unimplemented device type $shash->{type}";
+          Log3 $hash, 2, "MAXLAN_Parse: Got status for unimplemented device type $shash->{type}";
         }
       }
 
@@ -711,7 +707,7 @@ MAXLAN_Parse($$)
       return $name;
     }
     my ($type, $addr, $serial) = unpack("CH6a[10]", decode_base64($args[0]));
-    Log 2, "MAXLAN_Parse: Paired new device, type $device_types{$type}, addr $addr, serial $serial";
+    Log3 $hash, 2, "MAXLAN_Parse: Paired new device, type $device_types{$type}, addr $addr, serial $serial";
     Dispatch($hash, "MAX,1,define,$addr,$device_types{$type},$serial,0", {});
 
     #After a device has been paired, it automatically appears in the "L" and "C" commands,
@@ -724,13 +720,13 @@ MAXLAN_Parse($$)
 
     my $discarded = $args[1];
     $hash->{freememoryslot} = hex($args[2]);
-    Log 5, "MAXLAN_Parse: dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
+    Log3 $hash, 5, "MAXLAN_Parse: dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
 
-    Log 3, "MAXLAN_Parse: 1% rule: we sent too much, cmd is now in queue" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} > 0);
-    Log 2, "MAXLAN_Parse: 1% rule: we sent too much, queue is full" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} == 0);
-    Log 2, "MAXLAN_Parse: Command was discarded" if($discarded);
+    Log3 $hash, 3, "MAXLAN_Parse: 1% rule: we sent too much, cmd is now in queue" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} > 0);
+    Log3 $hash, 2, "MAXLAN_Parse: 1% rule: we sent too much, queue is full" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} == 0);
+    Log3 $hash, 2, "MAXLAN_Parse: Command was discarded" if($discarded);
   } else {
-    Log 2, "MAXLAN_Parse: Unknown command $cmd";
+    Log3 $hash, 2, "MAXLAN_Parse: Unknown command $cmd";
   }
   return $name;
 }
@@ -744,7 +740,7 @@ MAXLAN_SimpleWrite(@)
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
 
-  Log GetLogLevel($name,5), 'MAXLAN_SimpleWrite:  '.$msg;
+  Log3 $hash, 5, 'MAXLAN_SimpleWrite:  '.$msg;
   
   return "MAXLAN_SimpleWrite: Not connected" if(!MAXLAN_IsConnected($hash));
 
@@ -753,7 +749,7 @@ MAXLAN_SimpleWrite(@)
   my $ret = syswrite($hash->{TCPDev}, $msg);
   #TODO: none of those conditions detect if the connection is actually lost!
   if(!$hash->{TCPDev} || !defined($ret) || !$hash->{TCPDev}->connected) {
-    Log GetLogLevel($name,1), 'MAXLAN_SimpleWrite failed';
+    Log3 $hash, 1, 'MAXLAN_SimpleWrite failed';
     MAXLAN_Disconnect($hash);
     return "MAXLAN_SimpleWrite: syswrite failed";
   }
@@ -821,7 +817,7 @@ MAXLAN_Send(@)
 
   $flags = $opts{flags} if(exists($opts{flags}));
   $groupId = $opts{groupId} if(exists($opts{groupId}));
-  Log 2, "MAXLAN_Send: MAXLAN does not support src" if(exists($opts{src}));
+  Log3 $hash, 2, "MAXLAN_Send: MAXLAN does not support src" if(exists($opts{src}));
   $callbackParam = $opts{callbackParam} if(exists($opts{callbackParam}));
 
   $payload = pack("H*","00".$flags.$msgCmd2Id{$cmd}."000000".$dst.$groupId.$payload);
