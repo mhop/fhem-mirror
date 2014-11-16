@@ -281,6 +281,9 @@ SVG_PEdit($$$$)
   $ret .= FW_hidden("detail", $d); # go to detail after save
   $ret .= FW_hidden("gplotName", $gp);
   $ret .= FW_hidden("logdevicetype", $ldt);
+  if(defined($FW_pos{zoom}) && defined($FW_pos{off})) { # for showData
+    $ret .= FW_hidden("pos", "zoom=$FW_pos{zoom};off=$FW_pos{off}");
+  }
   $ret .= "<table class=\"block wide plotEditor\">";
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Plot title</td>";
@@ -331,7 +334,7 @@ SVG_PEdit($$$$)
   my @lineStyles;
   if(SVG_openFile($FW_cssdir,
                   AttrVal($FW_wname,"stylesheetPrefix",""), "svg_style.css")) {
-    map { push(@lineStyles,$1) if($_ =~ m/^\.(l[^{ ]*)/) } <FH>;
+    map { push(@lineStyles,$1) if($_ =~ m/^\.(l[^{ ]*)/) } <FH>; # } vim help
     close(FH);
   }
 
@@ -366,7 +369,9 @@ SVG_PEdit($$$$)
   $ret .= "Example lines for input:<br>$example</td></tr>";
 
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
-  $ret .= FW_submit("submit", "Write .gplot file")."</td></tr>";
+  $ret .= FW_submit("submit", "Write .gplot file")."&nbsp;".
+          FW_submit("showFileLogData", "Show preprocessed input").
+          "</td></tr>";
 
   $ret .= "</table></form>";
 }
@@ -435,13 +440,36 @@ SVG_zoomLink($$$)
 
 
 sub
+SVG_showData()
+{
+  my $wl = $FW_webArgs{detail};
+  my $hash = $defs{$wl};
+  my ($d, $gplotfile, $file) = split(":", $hash->{DEF});
+  $gplotfile = "$FW_gplotdir/$gplotfile.gplot";
+  my ($err, $cfg, $plot, $flog) = SVG_readgplotfile($wl, $gplotfile);
+  if($err) {
+    $FW_RET=$err;
+    return 1;
+  }
+  SVG_calcOffsets($d, $wl);
+  my ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
+  my $cmd = "get $d $file - $f $t " . join(" ", @{$flog});
+  my $ret = FW_fC($cmd, 1);
+  $ret =~ s/\n/<br>/gs;
+  $FW_RET = "$cmd<br><br>$ret";
+  return 1;
+}
+
+sub
 SVG_WriteGplot($)
 {
   my ($arg) = @_;
   FW_digestCgi($arg);
 
+  return SVG_showData() if($FW_webArgs{showFileLogData});
+
   if(!defined($FW_webArgs{par_0_0})) {
-    FW_pO "missing data in logfile: won't write incomplete .gplot definition";
+    $FW_RET="missing data in logfile: won't write incomplete .gplot definition";
     return 0;
   }
 
@@ -502,7 +530,7 @@ SVG_WriteGplot($)
   }
   
   my $err = FileWrite($fName, @rows);
-  FW_pO "SVG_WriteGplot: $err" if($err);
+  $FW_RET="SVG_WriteGplot: $err" if($err);
 
   return 0;
 }

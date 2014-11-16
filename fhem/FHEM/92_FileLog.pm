@@ -669,6 +669,8 @@ RESCAN:
 
       } elsif($t == 2) {                    # delta-h  or delta-d
 
+        next if($rescan);
+
         my $hd = $h->{didx};                # TimeStamp-Length
         my $ld = substr($fld[0],0,$hd);     # TimeStamp-Part (hour or date)
         if(!defined($h->{last1}) || $h->{last3} ne $ld) {
