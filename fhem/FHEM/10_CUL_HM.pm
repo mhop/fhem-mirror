@@ -1794,8 +1794,8 @@ sub CUL_HM_Parse($$) {#########################################################
       $shash->{helper}{addVal} = $chn;   #store to handle changesFread
       push @evtEt,[$chnHash,1,"state:".$state.$target] if ($shash ne $chnHash);
       push @evtEt,[$chnHash,1,"trigger:".$trigType."_".$bno];
-      push @evtEt,[$shash,1,"battery:". (($chn&0x80)?"low":"ok")];
-      push @evtEt,[$shash,1,"state:$btnName $state$target"];
+      push @evtEt,[$devH,1,"battery:". (($chn&0x80)?"low":"ok")];
+      push @evtEt,[$devH,1,"state:$btnName $state$target"];
     }
     else{# could be an Em8
       my($chn,$cnt,$state,$err);
@@ -1805,7 +1805,7 @@ sub CUL_HM_Parse($$) {#########################################################
         $chn = sprintf("%02X",$chn & 0x3f);
         $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                                if($modules{CUL_HM}{defptr}{"$src$chn"});
-        push @evtEt,[$shash,1,"battery:". ($err?"low"  :"ok"  )];
+        push @evtEt,[$devH,1,"battery:". ($err?"low"  :"ok"  )];
       }
       elsif(($mTp eq "10" && $mI[0] eq "06") ||
             ($mTp eq "02" && $mI[0] eq "01")) {
@@ -1813,8 +1813,8 @@ sub CUL_HM_Parse($$) {#########################################################
         $chn = sprintf("%02X",$chn&0x3f);
         $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                                if($modules{CUL_HM}{defptr}{"$src$chn"});
-        push @evtEt,[$shash,1,"alive:yes"];
-        push @evtEt,[$shash,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
+        push @evtEt,[$devH,1,"alive:yes"];
+        push @evtEt,[$devH,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
       }
       if (defined($state)){# if state was detected post events
         my $txt;
@@ -2054,11 +2054,11 @@ sub CUL_HM_Parse($$) {#########################################################
       $chn = sprintf("%02X",$chn&0x3f);
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-      push @evtEt,[$shash,1,"alive:yes"];
-      push @evtEt,[$shash,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
+      push @evtEt,[$devH,1,"alive:yes"];
+      push @evtEt,[$devH,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
       if (  $md =~ m/^(HM-SEC-SC.*|HM-Sec-RHS|Roto_ZEL-STG-RM-F.K)$/){
-                                 push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
-      elsif($md ne "HM-SEC-WDS"){push @evtEt,[$shash,1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
+                                 push @evtEt,[$devH,1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
+      elsif($md ne "HM-SEC-WDS"){push @evtEt,[$devH,1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
     }
     elsif($mTp eq "41"){
       ($chn,$cnt,$state)=(hex($1),$2,$3) if($p =~ m/^(..)(..)(..)/);
@@ -2066,7 +2066,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $chn = sprintf("%02X",$chn & 0x3f);
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
-      push @evtEt,[$shash,1,"battery:". ($err?"low"  :"ok"  )];
+      push @evtEt,[$devH,1,"battery:". ($err?"low"  :"ok"  )];
     }
     if (defined($state)){# if state was detected post events
       my $txt;
@@ -2078,7 +2078,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"state:$txt"];
       push @evtEt,[$shash,1,"contact:$txt$target"];
     }
-    elsif(!@evtEt){push @evtEt,[$shash,1,"3SSunknownMsg:$p"];}
+    elsif(!@evtEt){push @evtEt,[$devH,1,"3SSunknownMsg:$p"];}
   }
   elsif($st eq "winMatic") {  #################################################
     my($sType,$chn,$lvl,$stat) = @mI;
