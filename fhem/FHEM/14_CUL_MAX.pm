@@ -38,7 +38,7 @@ CUL_MAX_Initialize($)
   $hash->{SetFn}     = "CUL_MAX_Set";
   $hash->{AttrFn}    = "CUL_MAX_Attr";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
-                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
+                        "showtime:1,0 ".
                         $readingFnAttributes;
 
   $hash->{sendQueue} = [];
@@ -52,7 +52,7 @@ CUL_MAX_SetupCUL($)
   my $hash = $_[0];
   AssignIoPort($hash);
   if(!defined($hash->{IODev})) {
-    Log 1, "$hash->{NAME}: did not find suitable IODev (CUL etc. in rfmode MAX)! You may want to execute 'attr $hash->{NAME} IODev SomeCUL'";
+    Log3 $hash, 1, "$hash->{NAME}: did not find suitable IODev (CUL etc. in rfmode MAX)! You may want to execute 'attr $hash->{NAME} IODev SomeCUL'";
     return 0;
   }
 
@@ -80,13 +80,13 @@ CUL_MAX_Define($$)
   return "wrong syntax: define <name> CUL_MAX <srcAddr>" if(@a<3);
 
   if(exists($modules{CUL_MAX}{defptr})) {
-    Log 1, "There is already one CUL_MAX defined";
+    Log3 $hash, 1, "There is already one CUL_MAX defined";
     return "There is already one CUL_MAX defined";
   }
   $modules{CUL_MAX}{defptr} = $hash;
 
   if (length($a[2]) != 6) {
-	  Log 1, "The adress must be 6 hexadecimal digits";
+	  Log3 $hash, 1, "The adress must be 6 hexadecimal digits";
 	  return "The adress must be 6 hexadecimal digits";
   }
 
@@ -138,7 +138,7 @@ CUL_MAX_Check($@)
   my ($major_version,$minorversion) = ($1, $2);
   $version = 100*$major_version + $minorversion;
   if($version < 154) {
-    Log 2, "You are using an old version of the CUL firmware, which has known bugs with respect to MAX! support. Please update.";
+    Log3 $hash, 2, "You are using an old version of the CUL firmware, which has known bugs with respect to MAX! support. Please update.";
   }
   return $version;
 }
@@ -239,18 +239,17 @@ CUL_MAX_Parse($$)
   my ($hash, $rmsg) = @_;
 
   if(!exists($modules{CUL_MAX}{defptr})) {
-      Log 2, "No CUL_MAX defined";
+      Log3 $hash, 2, "No CUL_MAX defined";
       return "UNDEFINED CULMAX0 CUL_MAX 123456";
   }
   my $shash = $modules{CUL_MAX}{defptr};
-  my $ll5 = GetLogLevel($shash->{NAME}, 5);
 
   return () if($rmsg !~ m/Z(..)(..)(..)(..)(......)(......)(..)(.*)/);
 
   my ($len,$msgcnt,$msgFlag,$msgTypeRaw,$src,$dst,$groupid,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
   $len = hex($len);
   if(2*$len+3 != length($rmsg)) { #+3 = +1 for 'Z' and +2 for len field in hex
-    Log 1, "CUL_MAX_Parse: len mismatch";
+    Log3 $hash, 1, "CUL_MAX_Parse: len mismatch";
     return $shash->{NAME};
   }
 
@@ -260,12 +259,12 @@ CUL_MAX_Parse($$)
   $src = lc($src);
   $dst = lc($dst);
   my $msgType = exists($msgId2Cmd{$msgTypeRaw}) ? $msgId2Cmd{$msgTypeRaw} : $msgTypeRaw;
-  Log $ll5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
+  Log3 $hash, 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
   my $isToMe = ($dst eq $shash->{addr}) ? 1 : 0; # $isToMe is true if that packet was directed at us
 
   #Set RSSI on MAX device
   if(exists($modules{MAX}{defptr}{$src}) && exists($hash->{RSSI})) {
-    Log 5, "CUL_MAX_Parse: rssi: $hash->{RSSI}";
+    Log3 $hash, 5, "CUL_MAX_Parse: rssi: $hash->{RSSI}";
     $modules{MAX}{defptr}{$src}{RSSI} = $hash->{RSSI};
   }
 
@@ -284,7 +283,7 @@ CUL_MAX_Parse($$)
       for my $i (0 .. $#{$shash->{sendQueue}}) {
         my $packet = $shash->{sendQueue}[$i];
         if($packet->{src} eq $dst and $packet->{dst} eq $src and $packet->{cnt} == hex($msgcnt)) {
-          Log $ll5, "Got matching ack";
+          Log3 $hash, 5, "Got matching ack";
           my $isnak = unpack("C",pack("H*",$payload)) & 0x80;
           $packet->{sent} = $isnak ? 3 : 2;
         }
@@ -297,7 +296,7 @@ CUL_MAX_Parse($$)
     } elsif($msgType eq "TimeInformation") {
       if($isToMe) {
         #This is a request for TimeInformation send to us
-        Log $ll5, "Got request for TimeInformation, sending it";
+        Log3 $hash, 5, "Got request for TimeInformation, sending it";
         CUL_MAX_SendTimeInformation($shash, $src);
       } else {
         my ($f1,$f2,$f3,$f4,$f5) = unpack("CCCCC",pack("H*",$payload));
@@ -312,24 +311,24 @@ CUL_MAX_Parse($$)
         my $unk2 = $f4 >> 6;
         my $unk3 = $f5 >> 6;
         #I guess the unk1,2,3 encode if we are in DST?
-        Log $ll5, "CUL_MAX_Parse: Got TimeInformation: (in GMT) year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
+        Log3 $hash, 5, "CUL_MAX_Parse: Got TimeInformation: (in GMT) year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
       }
     } elsif($msgType eq "PairPing") {
       my ($firmware,$type,$testresult,$serial) = unpack("CCCa*",pack("H*",$payload));
       #What does testresult mean?
-      Log $ll5, "CUL_MAX_Parse: Got PairPing (dst $dst, pairmode $shash->{pairmode}), firmware $firmware, type $type, testresult $testresult, serial $serial";
+      Log3 $hash, 5, "CUL_MAX_Parse: Got PairPing (dst $dst, pairmode $shash->{pairmode}), firmware $firmware, type $type, testresult $testresult, serial $serial";
 
       #There are two variants of PairPing:
       #1. It has a destination address of "000000" and can be paired to any device.
       #2. It is sent after changing batteries or repressing the pair button (without factory reset) and has a destination address of the last paired device. We can answer it with PairPong and even get an Ack, but it will still not be paired to us. A factory reset (originating from the last paired device) is needed first.
       if(($dst ne "000000") and !$isToMe) {
-        Log $ll5, "Device want's to be re-paired to $dst, not to us";
+        Log3 $hash,5 , "Device want's to be re-paired to $dst, not to us";
         return $shash->{NAME};
       }
 
       #If $isToMe is true, this device is already paired and just wants to be reacknowledged
       if($shash->{pairmode} || $isToMe) {
-        Log 3, "CUL_MAX_Parse: " . ($isToMe ? "Re-Pairing" : "Pairing") . " device $src of type $device_types{$type} with serial $serial";
+        Log3 $hash, 3, "CUL_MAX_Parse: " . ($isToMe ? "Re-Pairing" : "Pairing") . " device $src of type $device_types{$type} with serial $serial";
         Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0", {});
 
         #Set firmware and testresult on device
@@ -356,10 +355,10 @@ CUL_MAX_Parse($$)
     } elsif(grep /^$msgType$/, ("ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState", "SetTemperature"))  {
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {});
     } else {
-      Log $ll5, "Unhandled message $msgType";
+      Log3 $hash,5 , "Unhandled message $msgType";
     }
   } else {
-    Log 2, "CUL_MAX_Parse: Got unhandled message type $msgTypeRaw";
+    Log3 $hash, 2, "CUL_MAX_Parse: Got unhandled message type $msgTypeRaw";
   }
   return $shash->{NAME};
 }
@@ -392,7 +391,7 @@ CUL_MAX_Send(@)
   #prefix length in bytes
   $packet = sprintf("%02x",length($packet)/2) . $packet;
 
-  Log GetLogLevel($hash->{NAME}, 5), "CUL_MAX_Send: enqueuing $packet";
+  Log3 $hash, 5, "CUL_MAX_Send: enqueuing $packet";
   my $timeout = gettimeofday()+$ackTimeout;
   my $aref = $hash->{sendQueue};
   push(@{$aref},  { "packet" => $packet,
@@ -431,14 +430,14 @@ CUL_MAX_SendQueueHandler($$)
   my $hash = shift;
   my $responseToShutterContact = shift;
 
-  Log GetLogLevel($hash->{NAME}, 5), "CUL_MAX_SendQueueHandler: " . @{$hash->{sendQueue}} . " items in queue";
+  Log3 $hash, 5, "CUL_MAX_SendQueueHandler: " . @{$hash->{sendQueue}} . " items in queue";
   return if(!@{$hash->{sendQueue}}); #nothing to do
 
   my $timeout = gettimeofday(); #reschedule immediatly
 
   #Check if we have an IODev
   if(!defined($hash->{IODev})) {
-      Log 1, "$hash->{NAME}: did not find suitable IODev (CUL etc. in rfmode MAX), cannot send! You may want to execute 'attr $hash->{NAME} IODev SomeCUL'";
+      Log3 $hash, 1, "$hash->{NAME}: did not find suitable IODev (CUL etc. in rfmode MAX), cannot send! You may want to execute 'attr $hash->{NAME} IODev SomeCUL'";
       #Maybe some CUL will appear magically in some seconds
       #At least we cannot quit here with an non-empty queue, so we have two alternatives:
       #1. Delete the packet from queue and quit -> packet is lost
@@ -465,7 +464,7 @@ CUL_MAX_SendQueueHandler($$)
     }
   }
   if($pktIdx == @{$hash->{sendQueue}} && !defined($responseToShutterContact)) {
-    Log 2, "There is a packet for ShutterContact $packetForShutterContactInQueue in queue. Please push the button on the respective ShutterContact so the packet can be send.";
+    Log3 $hash, 2, "There is a packet for ShutterContact $packetForShutterContactInQueue in queue. Please push the button on the respective ShutterContact so the packet can be send.";
     $timeout += 3;
     InternalTimer($timeout, "CUL_MAX_SendQueueHandler", $hash, 0);
     return undef;
@@ -479,25 +478,26 @@ CUL_MAX_SendQueueHandler($$)
           || $modules{MAX}{defptr}{$packet->{dst}}{wakeUpUntil} < gettimeofday()))) ? 1 : 0;
 
     #Send to CUL
-    my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
+	#my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
+	my $credit10ms = 900;
     if($credit10ms eq "No answer") {
-      Log 1, "Error in CUL_MAX_SendQueueHandler: CUL $hash->{IODev}{NAME} did not answer request for current credits. Waiting 5 seconds.";
+      Log3 $hash, 1, "Error in CUL_MAX_SendQueueHandler: CUL $hash->{IODev}{NAME} did not answer request for current credits. Waiting 5 seconds.";
       $timeout += 5;
     } else {
       # We need 1000ms for preamble + len in bits (=hex len * 4) ms for payload. Divide by 10 to get credit10ms units
       # keep this in sync with culfw's code in clib/rf_moritz.c!
       my $necessaryCredit = ceil(100*$needPreamble + (length($packet->{packet})*4)/10);
-      Log 5, "needPreamble: $needPreamble, necessaryCredit: $necessaryCredit, credit10ms: $credit10ms";
+      Log3 $hash, 5, "needPreamble: $needPreamble, necessaryCredit: $necessaryCredit, credit10ms: $credit10ms";
       if( defined($credit10ms) && $credit10ms < $necessaryCredit ) {
         my $waitTime = $necessaryCredit-$credit10ms; #we get one credit10ms every second
         $timeout += $waitTime;
-        Log 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
+        Log3 $hash, 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
       } else {
         #Update TimeInformation payload. It should reflect the current time when sending,
         #not the time when it was enqueued. A low credit10ms can defer such a packet for multiple
         #minutes
         if( $msgId2Cmd{substr($packet->{packet},6,2)} eq "TimeInformation" ) {
-          Log GetLogLevel($hash->{NAME}, 5), "Updating TimeInformation payload";
+          Log3 $hash, 5, "Updating TimeInformation payload";
           substr($packet->{packet},22) = CUL_MAX_GetTimeInformationPayload();
         }
         IOWrite($hash, "", ($needPreamble ? "Zs" : "Zf") . $packet->{packet});
@@ -515,12 +515,12 @@ CUL_MAX_SendQueueHandler($$)
     if( $packet->{sentTime} + $ackTimeout < gettimeofday() ) {
       # ackTimeout exceeded
       if( $packet->{retryCnt} > 0 ) {
-          Log GetLogLevel($hash->{NAME}, 5), "CUL_MAX_SendQueueHandler: Retry $packet->{dst} for $packet->{packet} count: $packet->{retryCnt}";
+          Log3 $hash, 5, "CUL_MAX_SendQueueHandler: Retry $packet->{dst} for $packet->{packet} count: $packet->{retryCnt}";
           $packet->{sent} = 0;
           $packet->{retryCnt}--;
           $timeout += 3;
       } else {
-          Log 2, "CUL_MAX_SendQueueHandler: Missing ack from $packet->{dst} for $packet->{packet}";
+          Log3 $hash, 2, "CUL_MAX_SendQueueHandler: Missing ack from $packet->{dst} for $packet->{packet}";
           splice @{$hash->{sendQueue}}, $pktIdx, 1; #Remove from array
           readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
      }
@@ -559,7 +559,7 @@ CUL_MAX_SendTimeInformation(@)
 {
   my ($hash,$addr,$payload) = @_;
   $payload = CUL_MAX_GetTimeInformationPayload() if(!defined($payload));
-  Log GetLogLevel($hash->{NAME}, 5), "broadcast time to $addr";
+  Log3 $hash, 5, "Broadcast time to $addr";
   CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, flags => "04");
 }
 
@@ -568,7 +568,7 @@ CUL_MAX_BroadcastTime(@)
 {
   my ($hash,$manual) = @_;
   my $payload = CUL_MAX_GetTimeInformationPayload();
-  Log GetLogLevel($hash->{NAME}, 5), "CUL_MAX_BroadcastTime: payload $payload ";
+  Log3 $hash, 5, "CUL_MAX_BroadcastTime: payload $payload ";
   my $i = 1;
 
   my @used_slots = ( 0, 0, 0, 0, 0, 0 );

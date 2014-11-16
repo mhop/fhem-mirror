@@ -66,14 +66,14 @@ MAX_Initialize($)
 {
   my ($hash) = @_;
 
-  Log GetLogLevel($hash->{NAME}, 5), "Calling MAX_Initialize";
+  Log3 $hash, 5, "Calling MAX_Initialize";
   $hash->{Match}     = "^MAX";
   $hash->{DefFn}     = "MAX_Define";
   $hash->{UndefFn}   = "MAX_Undef";
   $hash->{ParseFn}   = "MAX_Parse";
   $hash->{SetFn}     = "MAX_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 keepAuto:0,1 scanTemp:0,1 ".
+                       "showtime:1,0 keepAuto:0,1 scanTemp:0,1 ".
                        $readingFnAttributes;
   return undef;
 }
@@ -93,15 +93,15 @@ MAX_Define($$)
   my $addr = lc($a[3]); #all addr should be lowercase
   if(exists($modules{MAX}{defptr}{$addr})) {
     my $msg = "MAX_Define: Device with addr $addr is already defined";
-    Log 1, $msg;
+    Log3 $hash, 1, $msg;
     return $msg;
   }
   if($type eq "Cube") {
     my $msg = "MAX_Define: Device type 'Cube' is deprecated. All properties have been moved to the MAXLAN device.";
-    Log 1, $msg;
+    Log3 $hash, 1, $msg;
     return $msg;
   }
-  Log GetLogLevel($hash->{NAME}, 5), "Max_define $type with addr $addr ";
+  Log3 $hash, 5, "Max_define $type with addr $addr ";
   $hash->{type} = $type;
   $hash->{addr} = $addr;
   $modules{MAX}{defptr}{$addr} = $hash;
@@ -133,7 +133,7 @@ MAX_TypeToTypeId($)
   foreach (keys %device_types) {
     return $_ if($_[0] eq $device_types{$_});
   }
-  Log 1, "MAX_TypeToTypeId: Invalid type $_[0]";
+  Log3 $hash, 1, "MAX_TypeToTypeId: Invalid type $_[0]";
   return 0;
 }
 
@@ -179,7 +179,7 @@ MAX_ReadingsVal(@)
   #$readingDef{$name} array is [validatingFunc, defaultValue]
   if(exists($readingDef{$name}) and !$readingDef{$name}[0]->($val)) {
     #Error: invalid value
-    Log 2, "MAX: Invalid value $val for READING $name. Forcing to $readingDef{$name}[1]";
+    Log3 $hash, 2, "MAX: Invalid value $val for READING $name. Forcing to $readingDef{$name}[1]";
     $val = $readingDef{$name}[1];
 
     #Save default value to READINGS
@@ -261,7 +261,7 @@ MAX_Set($@)
 
     if(AttrVal($hash->{NAME},"keepAuto","0") ne "0"
       && MAX_ReadingsVal($hash,"mode") eq "auto") {
-      Log 5, "MAX_Set: staying in auto mode";
+      Log3 $hash, 5, "MAX_Set: staying in auto mode";
       $ctrlmode = 0; #auto
     }
 
@@ -311,7 +311,7 @@ MAX_Set($@)
 
     if(!MAX_Validate($setting, $val)) {
       my $msg = "Invalid value $args[0] for $setting";
-      Log 1, $msg;
+      Log3 $hash, 1, $msg;
       return $msg;
     }
 
@@ -345,7 +345,7 @@ MAX_Set($@)
 
     if(!MAX_Validate($setting, $args[0])) {
       my $msg = "Invalid value $args[0] for $setting";
-      Log 1, $msg;
+      Log3 $hash, 1, $msg;
       return $msg;
     }
 
@@ -395,14 +395,14 @@ MAX_Set($@)
 
     if($hash->{type} eq "ShutterContact") {
       return "Invalid number of arguments" if(@args != 2);
-      Log 2, "fake is deprectaed and will be removed. Please use CUL_MAX's fakeSC";
+      Log3 $hash, 2, "fake is deprectaed and will be removed. Please use CUL_MAX's fakeSC";
       my $state = $args[1] ? "12" : "10";
       return ($hash->{IODev}{Send})->($hash->{IODev},"ShutterContactState",$dest,$state, flags => "06", src => $hash->{addr});
     } elsif($hash->{type} eq "WallMountedThermostat") {
       return "Invalid number of arguments" if(@args != 3);
 
       return "desiredTemperature is invalid" if($args[1] < 4.5 || $args[2] > 30.5);
-      Log 2, "fake is deprectaed and will be removed. Please use CUL_MAX's fakeWT";
+      Log3 $hash, 2, "fake is deprectaed and will be removed. Please use CUL_MAX's fakeWT";
       $args[2] = 0 if($args[2] < 0); #Clamp temperature to minimum of 0 degree
 
       #Encode into binary form
@@ -442,7 +442,7 @@ MAX_Set($@)
       $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
     }
 
-    Log GetLogLevel($hash->{NAME}, 5), "Using dest $dest, destType $destType";
+    Log3 $hash, 5, "Using dest $dest, destType $destType";
     if($setting eq "associate") {
       return ($hash->{IODev}{Send})->($hash->{IODev},"AddLinkPartner",$hash->{addr},sprintf("%s%02x", $dest, $destType));
     } else {
@@ -493,7 +493,7 @@ MAX_Set($@)
         $temperature = MAX_ParseTemperature($temperature); #replace "on" and "off" by their values
         $newWeekprofilePart .= sprintf("%04x", (int($temperature*2) << 9) | int(($hour * 60 + $min)/5));
       }
-      Log GetLogLevel($hash->{NAME}, 5), "New Temperature part for $day: $newWeekprofilePart";
+      Log3 $hash, 5, "New Temperature part for $day: $newWeekprofilePart";
       #Each day has 2 bytes * 13 controlpoints = 26 bytes = 52 hex characters
       #we don't have to update the rest, because the active part is terminated by the time 0:00
 
@@ -507,7 +507,7 @@ MAX_Set($@)
           callbackParam => "$day,1,".substr($newWeekprofilePart,2*2*7,2*2*6))
             if(@controlpoints > 2*7);
     }
-    Log GetLogLevel($hash->{NAME}, 5), "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
+    Log3 $hash, 5, "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
 
   }else{
     my $templist = join(",",map { MAX_SerializeTemperature($_/2) }  (9..61));
@@ -595,7 +595,7 @@ MAX_Parse($$)
   #if we just snooped a message directed at a different device (by CUL_MAX).
   return () if($MAX ne "MAX");
 
-  Log 5, "MAX_Parse $msg";
+  Log3 $hash, 5, "MAX_Parse $msg";
   #Find the device with the given addr
   my $shash = $modules{MAX}{defptr}{$addr};
 
@@ -609,7 +609,7 @@ MAX_Parse($$)
     if($devicetype) {
       return "UNDEFINED MAX_$addr MAX $devicetype $addr";
     } else {
-      Log 2, "Got message for undefined device $addr, and failed to guess type from msg '$msgtype' - ignoring";
+      Log3 $hash, 2, "Got message for undefined device $addr, and failed to guess type from msg '$msgtype' - ignoring";
       return $hash->{NAME};
     }
   }
@@ -623,11 +623,11 @@ MAX_Parse($$)
   readingsBeginUpdate($shash);
   if($msgtype eq "define"){
     my $devicetype = $args[0];
-    Log 1, "Device changed type from $shash->{type} to $devicetype" if($shash->{type} ne $devicetype);
+    Log3 $hash, 1, "Device changed type from $shash->{type} to $devicetype" if($shash->{type} ne $devicetype);
     $shash->{type} = $devicetype;
     if(@args > 1){
       my $serial = $args[1];
-      Log 1, "Device changed serial from $shash->{serial} to $serial" if($shash->{serial} and ($shash->{serial} ne $serial));
+      Log3 $hash, 1, "Device changed serial from $shash->{serial} to $serial" if($shash->{serial} and ($shash->{serial} ne $serial));
       $shash->{serial} = $serial;
     }
     readingsBulkUpdate($shash, "groupid", $args[2]);
@@ -650,7 +650,7 @@ MAX_Parse($$)
     $untilStr = "" if($mode != 2);
 
     $desiredTemperature = ($desiredTemperature&0x7F)/2.0; #convert to degree celcius
-    Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, until $untilStr, curTemp $measuredTemperature";
+    Log3 $hash, 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, until $untilStr, curTemp $measuredTemperature";
 
     #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
     $measuredTemperature = "" if($measuredTemperature ne "" and $measuredTemperature < 1);
@@ -708,22 +708,22 @@ MAX_Parse($$)
       }
       $heaterTemperature = "" if(!defined($heaterTemperature));
 
-      Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature, untilStr $untilStr";
+      Log3 $hash, 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature, untilStr $untilStr";
       $shash->{rferror} = $rferror;
       readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
       readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
       readingsBulkUpdate($shash, "displayActualTemperature", ($displayActualTemperature) ? 1 : 0);
     } else {
-      Log 2, "Invalid $msgtype packet"
+      Log3 $hash, 2, "Invalid $msgtype packet"
     }
 
     my $desiredTemperature = ($desiredTemperatureRaw &0x7F)/2.0; #convert to degree celcius
     if(defined($temperature)) {
       $temperature = ((($desiredTemperatureRaw &0x80)<<1) + $temperature)/10;	# auch Temperaturen über 25.5 °C werden angezeigt !
-      Log GetLogLevel($shash->{NAME}, 5), "desiredTemperature $desiredTemperature, temperature $temperature";
+      Log3 $hash, 5, "desiredTemperature $desiredTemperature, temperature $temperature";
       readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$temperature));
     } else {
-      Log GetLogLevel($shash->{NAME}, 5), "desiredTemperature $desiredTemperature"
+      Log3 $hash, 5, "desiredTemperature $desiredTemperature"
     }
 
     #This formatting must match with in MAX_Set:$templist
@@ -735,7 +735,7 @@ MAX_Parse($$)
     my $unkbits = vec($bits,2,4);
     my $rferror = vec($bits,6,1);
     my $batterylow = vec($bits,7,1);
-    Log GetLogLevel($shash->{NAME}, 5), "ShutterContact isopen $isopen, rferror $rferror, battery $batterylow, unkbits $unkbits";
+    Log3 $hash, 5, "ShutterContact isopen $isopen, rferror $rferror, battery $batterylow, unkbits $unkbits";
 
     $shash->{rferror} = $rferror;
 
@@ -816,7 +816,7 @@ MAX_Parse($$)
     if($isToMe and (unpack("C",pack("H*",$args[0])) & 0x80)) {
       my $device = $addr;
       $device = $modules{MAX}{defptr}{$device}{NAME} if(exists($modules{MAX}{defptr}{$device}));
-      Log 1, "Device $device answered with: Invalid command/argument";
+      Log3 $hash, 1, "Device $device answered with: Invalid command/argument";
     }
     #with unknown meaning plus the data of a State broadcast from the same device
     #For HeatingThermostats, it does not contain the last three "until" bytes (or measured temperature)
@@ -831,7 +831,7 @@ MAX_Parse($$)
     } elsif($shash->{type} eq "Cube") {
       ; #Payload is always "00"
     } else {
-      Log 2, "MAX_Parse: Don't know how to interpret Ack payload for $shash->{type}";
+      Log3 $hash, 2, "MAX_Parse: Don't know how to interpret Ack payload for $shash->{type}";
     }
   } elsif(grep /^$msgtype$/,  ("SetTemperature")) { # SetTemperature is send by WallThermostat e.g. when pressing the boost button
     my $bits = unpack("C",pack("H*",$args[0]));
@@ -840,9 +840,9 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
     #This formatting must match with in MAX_Set:$templist
     readingsBulkUpdate($shash, "desiredTemperature", MAX_SerializeTemperature($desiredTemperature));
-    Log GetLogLevel($shash->{NAME}, 5), "SetTemperature mode  $ctrl_modes[$mode], desiredTemperature $desiredTemperature";
+    Log3 $hash, 5, "SetTemperature mode  $ctrl_modes[$mode], desiredTemperature $desiredTemperature";
   } else {
-    Log 1, "MAX_Parse: Unknown message $msgtype";
+    Log3 $hash, 1, "MAX_Parse: Unknown message $msgtype";
   }
 
   #Build state READING
