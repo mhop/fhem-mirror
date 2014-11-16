@@ -237,19 +237,19 @@ my %EnO_eepConfig = (
   "A5.30.04" => {attr => {subType => "digitalInput.04"}},
   "A5.38.08" => {attr => {subType => "gateway"}},
   "A5.3F.7F" => {attr => {subType => "manufProfile"}},
-  "D2.01.00" => {attr => {subType => "actuator.01"}},
-  "D2.01.01" => {attr => {subType => "actuator.01"}},
-  "D2.01.02" => {attr => {subType => "actuator.01"}},
-  "D2.01.03" => {attr => {subType => "actuator.01"}},
-  "D2.01.04" => {attr => {subType => "actuator.01"}},
-  "D2.01.05" => {attr => {subType => "actuator.01"}},
-  "D2.01.06" => {attr => {subType => "actuator.01"}},
-  "D2.01.07" => {attr => {subType => "actuator.01"}},
+  "D2.01.00" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.01" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.02" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.03" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.04" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.05" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.06" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.07" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.08" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.09" => {attr => {subType => "actuator.01", defaultChannel => 0}},
-  "D2.01.0A" => {attr => {subType => "actuator.01"}},
-  "D2.01.10" => {attr => {subType => "actuator.01"}},
-  "D2.01.11" => {attr => {subType => "actuator.01"}},
+  "D2.01.0A" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.10" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.11" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.03.00" => {attr => {subType => "switch.00"}},
   "D2.03.10" => {attr => {subType => "windowHandle.10"}},  
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00"}},  
@@ -4122,7 +4122,7 @@ EnOcean_Parse($$)
     } elsif ($st =~ m/^digitalInput\.0[12]$/) {
       # Digital Input (EEP A5-30-01, A5-30-02)
       my $contact;
-      if ($st eq "digtalInput.01") {
+      if ($st eq "digitalInput.01") {
         # Single Input Contact, Batterie Monitor (EEP A5-30-01)
         # [Thermokon SR65 DI, untested]
         # $db[2] is the supply voltage, if >= 121 = battery ok
@@ -8801,4 +8801,3 @@ EnOcean_Undef($$)
 
 =end html
 =cut
-           
