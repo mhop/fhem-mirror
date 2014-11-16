@@ -85,6 +85,11 @@ CUL_MAX_Define($$)
   }
   $modules{CUL_MAX}{defptr} = $hash;
 
+  if (length($a[2]) != 6) {
+	  Log 1, "The adress must be 6 hexadecimal digits";
+	  return "The adress must be 6 hexadecimal digits";
+  }
+
   $hash->{addr} = lc($a[2]);
   $hash->{STATE} = "Defined";
   $hash->{cnt} = 0;
