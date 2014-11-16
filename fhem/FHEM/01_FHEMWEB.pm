@@ -2094,11 +2094,11 @@ FW_dev2image($;$)
     foreach my $l (@list) {
       my ($re, $iconName, $link) = split(":", $l, 3);
       if(defined($re) && $state =~ m/^$re$/) {
-        if($iconName eq "") {
+        if(defined($iconName) && $iconName eq "") {
           $rlink = $link;
           last;
         }
-        if(defined(FW_iconName($iconName)))  {
+        if(defined($iconName) && defined(FW_iconName($iconName)))  {
           return ($iconName, $link, 0);
         } else {
           return ($state, $link, 1);
