@@ -560,7 +560,7 @@ logProxy_clipData($$$$;$)
   }
 
   if( $next_value ) {
-    my $value = $next_value;
+    my $value = $prev_value;
     $value = logProxy_linearInterpolate( SVG_time_to_sec($prev_timestamp), $prev_value, SVG_time_to_sec($next_timestamp), $next_value, $to ) if( $interpolate );
 
     my @t = localtime($to);
