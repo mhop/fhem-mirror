@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "1.9";
+my $alarmversion    = "2.0";
 
 #########################################################################################
 #
@@ -58,9 +58,9 @@ sub Alarm_Initialize ($) {
   $hash->{GetFn}       = "Alarm_Get";
   $hash->{UndefFn}     = "Alarm_Undef";   
   #$hash->{AttrFn}      = "Alarm_Attr";
-  my $attst            = "lockstate:lock,unlock statedisplay:simple,color,table,graphics,none";
+  my $attst            = "lockstate:lock,unlock statedisplay:simple,color,table,graphics,none sharpact unsharpact cancelact";
   for( my $level=0;$level<$alarmno;$level++ ){
-     $attst .=" level".$level."start level".$level."end level".$level."msg level".$level."xec:0,1 level".$level."onact level".$level."offact";
+     $attst .=" level".$level."start level".$level."end level".$level."msg level".$level."xec:0,1 level".$level."onact level".$level."offact ";
   }
   $hash->{AttrList}    = $attst;
   
@@ -347,6 +347,9 @@ sub Alarm_Exec($$$$$){
          #-- calling actors BEFORE state update
          $cmd = AttrVal($name, "level".$level."offact", 0);
          fhem($cmd);
+         $cmd = AttrVal($name, "cancelact", 0);
+         fhem($cmd)
+           if( $cmd );
          #-- readings
          readingsSingleUpdate( $hash, "level".$level,"off",0 );
          $mga = " Level $level canceled";
@@ -396,11 +399,17 @@ sub Alarm_Sharp($$$$$){
       #}
       $msg = "[Alarm $level] sharpened from device $dev with event $evt"; 
       CommandAttr(undef,$name.' level'.$level.'xec sharp'); 
+      $cmd = AttrVal($name, "sharpact", 0);
+      fhem($cmd) 
+        if( $cmd ); 
       Log3 $hash,3,$msg; 
    #-- unsharpening implies canceling as well
    }elsif( $act eq "unsharp"){
       $msg = "[Alarm $level] unsharpened from device $dev with event $evt";
       CommandAttr (undef,$name.' level'.$level.'xec unsharp'); 
+      $cmd = AttrVal($name, "unsharpact", 0);
+      fhem($cmd) 
+        if( $cmd ); 
       #-- calling actors 
       $cmd = AttrVal($name, "level".$level."offact", 0);
       fhem($cmd);
@@ -794,6 +803,12 @@ sub Alarm_Html($)
                     <li> none=no state display</li>
                 </ul>
                 </li>
+            <li><a name="alarm_sharpact"><code>attr &lt;name&gt; sharpact <i>action</i></code></a>
+                <br />FHEM action to be carried out on the sharpening of an alarm</li>
+            <li><a name="alarm_unsharpact"><code>attr &lt;name&gt; unsharpact <i>action</i></code></a>
+                <br />FHEM action to be carried out on the unsharpening of an alarm</li>
+            <li><a name="alarm_cancelact"><code>attr &lt;name&gt; cancelpact <i>action</i></code></a>
+                <br />FHEM action to be carried out on the canceling of an alarm</li>
             <li><a name="alarm_internals"/>For each of the 8 alarm levels, several attributes hold the alarm setup. 
                 They should not be changed by hand, but through the web interface to avoid confusion: 
                 <code>level&lt;level&gt;start, level&lt;level&gt;end, level&lt;level&gt;msg, level&lt;level&gt;xec, 
