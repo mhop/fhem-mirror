@@ -478,8 +478,7 @@ CUL_MAX_SendQueueHandler($$)
           || $modules{MAX}{defptr}{$packet->{dst}}{wakeUpUntil} < gettimeofday()))) ? 1 : 0;
 
     #Send to CUL
-	#my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
-	my $credit10ms = 900;
+	my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
     if($credit10ms eq "No answer") {
       Log3 $hash, 1, "Error in CUL_MAX_SendQueueHandler: CUL $hash->{IODev}{NAME} did not answer request for current credits. Waiting 5 seconds.";
       $timeout += 5;
