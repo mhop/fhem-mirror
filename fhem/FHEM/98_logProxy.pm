@@ -520,7 +520,7 @@ logProxy_clipData($$$$;$)
          }
 
       } else {
-        if( !$ret && $prev_value && $sec < $from ) {
+        if( !$ret && defined($prev_value) ) {
 
           my $value = $prev_value;
           $value = logProxy_linearInterpolate( SVG_time_to_sec($prev_timestamp), $prev_value, SVG_time_to_sec($d), $v, $from ) if( $interpolate );
@@ -543,7 +543,7 @@ logProxy_clipData($$$$;$)
   }
 
   #if predict is set -> extend bejond last value
-  if( defined($predict) && !$next_value ) {
+  if( defined($predict) && !defined($next_value) ) {
     $next_value = $prev_value;
 
     #if $predict = 0 -> predict to end of plot
@@ -559,7 +559,7 @@ logProxy_clipData($$$$;$)
     $next_timestamp = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
   }
 
-  if( $next_value ) {
+  if( defined($next_value) ) {
     my $value = $prev_value;
     $value = logProxy_linearInterpolate( SVG_time_to_sec($prev_timestamp), $prev_value, SVG_time_to_sec($next_timestamp), $next_value, $to ) if( $interpolate );
 
