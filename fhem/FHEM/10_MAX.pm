@@ -133,7 +133,7 @@ MAX_TypeToTypeId($)
   foreach (keys %device_types) {
     return $_ if($_[0] eq $device_types{$_});
   }
-  Log3 $hash, 1, "MAX_TypeToTypeId: Invalid type $_[0]";
+  Log 1, "MAX_TypeToTypeId: Invalid type $_[0]";
   return 0;
 }
 
