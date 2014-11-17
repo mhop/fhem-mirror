@@ -130,6 +130,14 @@ sub I2C_MCP23017_Init($$) {																										#Geraet beim anlegen/booten
 		}
 		
 	}
+    #Output level wieder setzen die zweite
+    #$sbyte = 0;
+	#foreach (reverse 0..7) {
+	#	$sbyte += $setsP{ReadingsVal($hash->{NAME},"PortA".$_,"off")} << ($_);		#Werte fuer PortA aus dem Reading holen
+	#	$sbyte += $setsP{ReadingsVal($hash->{NAME},"PortB".$_,"off")} << (8 + $_);
+	#}
+	#$msg = I2C_MCP23017_SetRegPair($hash, $sbyte, "GPIO") if $sbyte;
+    I2C_MCP23017_Get($hash, $hash->{NAME});
  $hash->{STATE} = 'Initialized';
  return ($msg) ? $msg : undef;
 }
@@ -500,7 +508,7 @@ sub I2C_MCP23017_UpdReadings($$$) {																						#nach Rueckmeldung read
 	<b>Set</b>
 	<ul>
 		<code>set &lt;name&gt; &lt;port[,port[...]]&gt; &lt;value&gt;</code><br><br>
-				where <code>&lt;port&gt;</code> is one of PortA0 to PortA7 / PortAB to PortB7 and <code>&lt;value&gt;</code> is one of:<br>
+				where <code>&lt;port&gt;</code> is one of PortA0 to PortA7 / PortB0 to PortB7 and <code>&lt;value&gt;</code> is one of:<br>
 				<ul>
 				<code>
 					off<br>
