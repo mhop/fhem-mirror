@@ -41,9 +41,18 @@ use Blocking;
 
 sub FRITZFON_Log($$$);
 sub FRITZFON_Init($);
+sub FRITZFON_Init_Reading($$$@);
 sub FRITZFON_Ring($$);
 sub FRITZFON_Exec($$);
   
+my %fonModel = ( 
+        '0x01' => "MT-D"
+      , '0x03' => "MT-F"
+      , '0x04' => "C3"
+      , '0x05' => "C4"
+      , '0x08' => "M2"
+   );
+ 
 sub ##########################################
 FRITZFON_Log($$$)
 {
@@ -198,7 +207,7 @@ FRITZFON_Init($)
    {
      # Dect-Telefonname
       FRITZFON_Init_Reading($hash, 
-         "dect".$_."_name", 
+         "dect".$_, 
          "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name");
      # Dect-Interne Nummer
       FRITZFON_Init_Reading($hash, 
@@ -213,16 +222,28 @@ FRITZFON_Init($)
          "dect".$_."_imagePath ", 
          "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath ");
      # Handset manufacturer
-      FRITZFON_Init_Reading($hash, 
+      my $brand = FRITZFON_Init_Reading($hash, 
          "dect".$_."_manufacturer", 
          "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer");   
+     if ($brand eq "AVM")
+     {
+        # Firmware Version
+         FRITZFON_Init_Reading($hash, 
+            "dect".$_."_fwVersion", 
+            "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion");   
+        # Phone Model
+         FRITZFON_Init_Reading($hash 
+            , "dect".$_."_model"
+            , "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model"
+            , "model");   
+      }
    }
-   foreach (0..3)
+   foreach (1..3)
    {
      # Analog-Telefonname
       if (FRITZFON_Init_Reading($hash, 
-         "fon".$_."_name", 
-         "ctlmgr_ctl r telcfg settings/MSN/Port".$_."/Name"))
+         "fon".$_, 
+         "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name"))
       {
          readingsBulkUpdate($hash, "fon".$_."_intern", $_);
       }
@@ -231,18 +252,23 @@ FRITZFON_Init($)
 }
 
 sub ##########################################
-FRITZFON_Init_Reading($$$)
+FRITZFON_Init_Reading($$$@)
 {
-   my ($hash, $rName, $cmd) = @_;
+   my ($hash, $rName, $cmd, $replace) = @_;
    my $result = FRITZFON_Exec( $hash, $cmd);
+   chomp ($result);
    if ($result) {
+      if ($replace eq "model")
+      {
+         $result = $fonModel{$result}
+            if defined $fonModel{$result};
+      }
       readingsBulkUpdate($hash, $rName, $result);
    } elsif (defined $hash->{READINGS}{$rName} ) {
       delete $hash->{READINGS}{$rName};
    }
    return $result;
 }
-
 
 sub ##########################################
 FRITZFON_Ring($$) 
