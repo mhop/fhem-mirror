@@ -187,7 +187,7 @@ sub STV_Define($$)
 "SUB_TITLE SVIDEO1 SVIDEO2 SVIDEO3 TOOLS TOPMENU TTX_MIX TTX_SUBFACE TURBO TV TV_MODE UP VCHIP VCR_MODE ".
 "VOLDOWN VOLUP WHEEL_LEFT WHEEL_RIGHT W_LINK YELLOW ZOOM1 ZOOM2 ZOOM_IN ZOOM_MOVE ZOOM_OUT";
     my $system = $^O;
-    my $result;
+    my $result = "";
     if($system =~ m/Win/) {
       $result = `ipconfig /all`;
       my @myarp=split(/\n/,$result);
