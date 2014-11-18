@@ -207,9 +207,22 @@ FRITZFON_Set($$@)
          return "Missing parameters after command 'set $name $cmd'";
       }
    }
+   elsif ( lc $cmd eq 'startradio')
+   {
+      if (int @val > 0) 
+      {
+         # FRITZFON_Ring $hash, @val; # join("|", @val);
+         return undef;
+      }
+      else
+      {
+         return "Missing parameters after command 'set $name $cmd'";
+      }
+   }
    my $list = "reinit:noArg"
             . " message"
-            . " ring";
+            . " ring"
+            . " startradio";
    return "Unknown argument $cmd, choose one of $list";
 
 } # end FRITZFON_Set
@@ -479,16 +492,21 @@ FRITZFON_Exec($$)
          <br>
          Reads in some information of the connected phone devices.
       </li><br>
-      <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration] [ringTone]</code>
-         <br>
-         Rings the internal number for duration (seconds) and (if possible) with the given ring tone.
-         <br>
-      </li><br>
       <li><code>set &lt;name&gt; message &lt;text&gt;</code>
       <br>
       Stores the text to show it later as 'caller' on the ringing phone.
       This is done by changing the name of the calling internal number.
       Maximal 30 characters are allowed.
+      </li><br>
+      <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration] [ringTone]</code>
+         <br>
+         Rings the internal number for duration (seconds) and (if possible) with the given ring tone.
+         <br>
+      </li><br>
+      <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
+         <br>
+         not implemented yet. Start the internet radio on the given Fritz!Fon
+         <br>
       </li><br>
    </ul>  
 
