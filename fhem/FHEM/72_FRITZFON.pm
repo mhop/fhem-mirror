@@ -52,6 +52,41 @@ my %fonModel = (
       , '0x05' => "C4"
       , '0x08' => "M2"
    );
+
+my %ringTone = ( 
+     0 => "Handset default"
+   , 1 => "Handset Internal Ton"
+   , 2 => "Handset External Ton"
+   , 3 => "Standard"
+   , 4 => "Eighties"
+   , 5 => "Alarm"
+   , 6 => "Ring"
+   , 7 => "Ring Ring"
+   , 8 => "News"
+   , 9 => "Personal Ring Ton"
+   , 10 => "Bamboo"
+   , 11 => "Andante"
+   , 12 => "Cha Cha"
+   , 13 => "Budapest"
+   , 14 => "Asia"
+   , 15 => "Kullabaloo"
+   , 16 => "lautlos"
+   , 17 => "Comedy"
+   , 18 => "Funky",
+   , 19 => "Fatboy"
+   , 20 => "Calypso"
+   , 21 => "Pingpong"
+   , 22 => "Melodica"
+   , 23 => "Minimal"
+   , 24 => "Signal"
+   , 25 => "Blok1"
+   , 26 => "Musicbox"
+   , 27 => "Blok2"
+   , 28 => "2Jazz"
+   , 33 => "Internet Radio"
+   , 34 => "Music List"
+   );
+
  
 sub ##########################################
 FRITZFON_Log($$$)
@@ -152,7 +187,7 @@ FRITZFON_Set($$@)
    {
       if (int @val > 0) 
       {
-         FRITZFON_Ring $hash, join("|", @val);
+         FRITZFON_Ring $hash, @val; # join("|", @val);
          return undef;
       }
       else
@@ -217,16 +252,21 @@ FRITZFON_Init($)
       FRITZFON_Init_Reading($hash, 
          "dect".$_."_intRingTone", 
          "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone");
-     # Dect-Internal Ring Tone
-      FRITZFON_Init_Reading($hash, 
-         "dect".$_."_imagePath ", 
-         "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath ");
      # Handset manufacturer
       my $brand = FRITZFON_Init_Reading($hash, 
          "dect".$_."_manufacturer", 
          "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer");   
      if ($brand eq "AVM")
      {
+        # Ring Tone Name
+         FRITZFON_Init_Reading($hash
+            , "dect".$_."_intRingToneName"
+            , "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone"
+            , "ringtone");
+        # Background image
+         FRITZFON_Init_Reading($hash, 
+         "dect".$_."_imagePath ", 
+         "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath ");
         # Firmware Version
          FRITZFON_Init_Reading($hash, 
             "dect".$_."_fwVersion", 
@@ -255,6 +295,8 @@ sub ##########################################
 FRITZFON_Init_Reading($$$@)
 {
    my ($hash, $rName, $cmd, $replace) = @_;
+   $replace = "" 
+      unless defined $replace;
    my $result = FRITZFON_Exec( $hash, $cmd);
    chomp ($result);
    if ($result) {
@@ -263,7 +305,12 @@ FRITZFON_Init_Reading($$$@)
          $result = $fonModel{$result}
             if defined $fonModel{$result};
       }
-      readingsBulkUpdate($hash, $rName, $result);
+      elsif ($replace eq "ringtone")
+      {
+         $result = $ringTone{$result};
+      }
+      readingsBulkUpdate($hash, $rName, $result)
+         if $result;
    } elsif (defined $hash->{READINGS}{$rName} ) {
       delete $hash->{READINGS}{$rName};
    }
@@ -271,13 +318,15 @@ FRITZFON_Init_Reading($$$@)
 }
 
 sub ##########################################
-FRITZFON_Ring($$) 
+FRITZFON_Ring($@) 
 {
-   my ($hash, $val) = @_;
+   my ($hash, @val) = @_;
    my $name = $hash->{NAME};
    
-   my $timeOut = 10;
- 
+   my $timeOut = 20;
+   $timeOut = $val[1] + 15 
+      if defined $val[1]; 
+
    if ( exists( $hash->{helper}{RUNNING_PID} ) )
    {
       FRITZFON_Log $hash, 5, "Killing existing background process ".$hash->{helper}{RUNNING_PID};
@@ -285,7 +334,7 @@ FRITZFON_Ring($$)
       delete($hash->{helper}{RUNNING_PID});
    }
  
-   $hash->{helper}{RUNNING_PID} = BlockingCall("FRITZFON_Ring_Run", $name."|".$val, 
+   $hash->{helper}{RUNNING_PID} = BlockingCall("FRITZFON_Ring_Run", $name."|".join("|", @val), 
                                        "FRITZFON_Ring_Done", $timeOut,
                                        "FRITZFON_Ring_Aborted", $hash);
 } # end FRITZFON_Ring
@@ -403,7 +452,7 @@ FRITZFON_Exec($$)
 
 <a name="FRITZFON"></a>
 <h3>FRITZFON</h3>
-<div  style="width:800px"> 
+<div  style="width:800px> 
 <ul>
    The module allows Fritz!Box owners to use a phone as a signaling device. It supports also some special features of the Fritz!Fons, e.g. MT-F.
    <br>
