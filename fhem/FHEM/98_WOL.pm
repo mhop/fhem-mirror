@@ -45,10 +45,10 @@ sub WOL_Set($@) {
   Log3 $hash, 3, "[$name] set $name $v";
   
   if      ($v eq "on")  {
-     readingsSingleUpdate($hash, "state", $v, 1);
+     readingsSingleUpdate($hash, "active", $v, 1);
      Log3 $hash, 3, "[$name] waking  $name with MAC $hash->{MAC} IP $hash->{IP} ";
   } elsif ($v eq "off") {
-     readingsSingleUpdate($hash, "state", $v, 1);
+     readingsSingleUpdate($hash, "active", $v, 1);
      my $cmd = AttrVal($name, "shutdownCmd", "");
      if ($cmd eq "") {
        Log3 $hash, 3, "[$name] no shutdown command given (see shutdownCmd attribute)!";
@@ -64,13 +64,13 @@ sub WOL_Set($@) {
   }
 
   WOL_UpdateReadings($hash);
-  return undef      if($v eq "refresh"); 
+  return undef      if($v eq "refresh");
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_UpdateReadings", $hash, 0);
+  InternalTimer(gettimeofday()+60, "WOL_UpdateReadings", $hash, 0);
 
-  my $state = ReadingsVal($hash->{NAME}, "state", "nF"); 
-  if ($state eq "on") {
+  my $active = ReadingsVal($hash->{NAME}, "active", "nF"); 
+  if ($active eq "on") {
       WOL_GetUpdate($hash);
   }
   return undef;
@@ -112,12 +112,15 @@ sub WOL_Define($$) {
 
   $hash->{INTERVAL} = AttrVal($hash->{NAME}, "interval", 900);
 
-  RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+5, "WOL_UpdateReadings", $hash, 0);
-  InternalTimer(gettimeofday()+30,"WOL_GetUpdate",      $hash, 0);
-
   readingsSingleUpdate($hash, "packet_via_EW",  "none",0);
   readingsSingleUpdate($hash, "packet_via_UDP", "none",0);
+  readingsSingleUpdate($hash, "state",          "none",0);
+  readingsSingleUpdate($hash, "active",         "off",0);
+
+  RemoveInternalTimer($hash);
+  
+  WOL_UpdateReadings($hash);
+  WOL_GetUpdate     ($hash);
   return undef;
 }
 ################################################################################
@@ -139,8 +142,10 @@ sub WOL_UpdateReadings($) {
 
   if (`ping -c 1 -w 2 $ip` =~ m/100%/) {
     readingsBulkUpdate   ($hash, "isRunning", "false");
+    readingsBulkUpdate   ($hash, "state",     "off");
   } else {
     readingsBulkUpdate   ($hash, "isRunning", "true");
+    readingsBulkUpdate   ($hash, "state",     "on");
   }
 
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
@@ -150,9 +155,9 @@ sub WOL_UpdateReadings($) {
 sub WOL_GetUpdate($) {
   my ($hash) = @_;
 
-  my $state = ReadingsVal($hash->{NAME}, "state", "nF"); 
-  if ($state eq "on") {
-     wake($hash);
+  my $active = ReadingsVal($hash->{NAME}, "active", "nF"); 
+  if ($active eq "on") {
+     WOL_wake($hash);
      if ($hash->{REPEAT} > 0) {
         InternalTimer(gettimeofday()+$hash->{REPEAT}, "WOL_GetUpdate", $hash, 0);
      }
@@ -160,7 +165,7 @@ sub WOL_GetUpdate($) {
 
 }
 ################################################################################
-sub wake($){
+sub WOL_wake($){
   my ($hash) = @_;
   my $name  = $hash->{NAME};
   my $mac   = $hash->{MAC};
@@ -171,18 +176,18 @@ sub wake($){
   Log3 $hash, 4, "[$name] keeping $name with MAC $mac IP $host busy";
 
   if ($hash->{MODE} eq "BOTH" || $hash->{MODE} eq "EW" ) {
-     wol_by_ew ($hash, $mac);
+     WOL_by_ew ($hash, $mac);
      readingsBulkUpdate   ($hash, "packet_via_EW", $mac);
   }
   if ($hash->{MODE} eq "BOTH" || $hash->{MODE} eq "UDP" ) {
-     wol_by_udp ($hash, $mac, $host);
+     WOL_by_udp ($hash, $mac, $host);
      readingsBulkUpdate   ($hash, "packet_via_UDP", $host);
   }
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
 }
 ################################################################################
 # method to wakevia lan, taken from Net::Wake package
-sub wol_by_udp {
+sub WOL_by_udp {
   my ($hash, $mac_addr, $host, $port) = @_;
   my $name  = $hash->{NAME};
 
@@ -209,7 +214,7 @@ sub wol_by_udp {
 }
 ################################################################################
 # method to wake via system command
-sub wol_by_ew($$) {
+sub WOL_by_ew($$) {
   my ($hash, $mac) = @_;
   my $name  = $hash->{NAME};
 
