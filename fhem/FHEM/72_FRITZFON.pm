@@ -301,6 +301,8 @@ FRITZFON_Init($)
          readingsBulkUpdate($hash, "fon".$_."_intern", $_);
       }
    }
+   # configd:settings/WEBRADIO/list(Name,URL)
+   # telcfg:settings/Foncontrol/User"..g_ctlmgr.idx.."/RadioRingID
    readingsEndUpdate( $hash, 1 );
 }
 
@@ -465,12 +467,11 @@ FRITZFON_Exec($$)
 
 <a name="FRITZFON"></a>
 <h3>FRITZFON</h3>
-<div  style="width:800px> 
+<div  style="width:800px"> 
 <ul>
    The module allows Fritz!Box owners to use a phone as a signaling device. It supports also some special features of the Fritz!Fons, e.g. MT-F.
    <br>
    It has to run in an FHEM process <b>on</b> the box.
-   <br>
    <br/><br/>
    <a name="FRITZFONdefine"></a>
    <b>Define</b>
