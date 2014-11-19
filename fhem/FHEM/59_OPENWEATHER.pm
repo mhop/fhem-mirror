@@ -63,9 +63,9 @@ get_wday($)
 {
    my ($date) = @_;
    my @wday_txt = qw(So Mo Di Mi Do Fr Sa);
-   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime $date;
-   
-   return $wday_txt [$wday];
+   my @th=localtime $date;
+  
+   return $wday_txt [$th[6]];
 }
 
 sub text
@@ -181,6 +181,7 @@ OPENWEATHER_Initialize($)
   $hash->{GetFn}    = "OPENWEATHER_Get";
   $hash->{AttrFn}   = "OPENWEATHER_Attr";
   $hash->{AttrList} = "disable:0,1 "
+                ."INTERVAL "
                 .$readingFnAttributes;
 
 } # end OPENWEATHER_Initialize
@@ -195,18 +196,16 @@ OPENWEATHER_Define($$)
   return "Usage: define <name> OPENWEATHER <project> <cityCode> <apiKey> [language]" if(@args <5 || @args >6);
 
   my $name = $args[0];
-  my $interval = 3600;
 
   $hash->{NAME} = $name;
 
-  $hash->{STATE}      = "Initializing" if $interval > 0;
-  $hash->{STATE}      = "Manual mode" if $interval == 0;
-  $hash->{INTERVAL}   = $interval;
-  $hash->{PROJECT}    = $args[2];
-  $hash->{CITYCODE}   = $args[3];
-  $hash->{APIKEY}     = $args[4];
-  $hash->{LANGUAGE}   = $args[5] if defined $args[5];
-  $hash->{CREDIT}     = "Powered by wetter.com";
+  $hash->{STATE}       = "Initializing";
+  $hash->{INTERVAL}    = 3600;
+  $hash->{PROJECT}     = $args[2];
+  $hash->{CITYCODE}    = $args[3];
+  $hash->{APIKEY}      = $args[4];
+  $hash->{LANGUAGE}    = $args[5] if defined $args[5];
+  $hash->{CREDIT}      = "Powered by wetter.com";
 
    my $checkSum = md5_hex( $args[2] . $args[4] . $args[3] );
    
@@ -218,13 +217,14 @@ OPENWEATHER_Define($$)
    
    $hash->{URL}   = $URL;
 
+   $hash->{fhem}{LOCAL} = 0;
+   $hash->{fhem}{modulVersion} = '$Date$';
+
    RemoveInternalTimer($hash);
  # Get first data after 7 seconds
-   InternalTimer(gettimeofday() + 7, "OPENWEATHER_Start", $hash, 0) if $interval > 0;
-
-   $hash->{fhem}{modulVersion} = '$Date$';
+   InternalTimer(gettimeofday() + 7, "OPENWEATHER_Start", $hash, 0);
  
- return undef;
+   return undef;
 } #end OPENWEATHER_Define
 
 
@@ -245,22 +245,41 @@ sub ##########################################
 OPENWEATHER_Attr($@)
 {
    my ($cmd,$name,$aName,$aVal) = @_;
-     # $cmd can be "del" or "set"
-   # $name is device name
-   # aName and aVal are Attribute name and value
-   if ($cmd eq "set") 
+      # $cmd can be "del" or "set"
+      # $name is device name
+      # aName and aVal are Attribute name and value
+   my $hash = $defs{$name};
+
+   if ($cmd eq "set")
    {
-      if ($aName eq "1allowSetParameter") 
+      if ($aName eq "INTERVAL")
       {
-         eval { qr/$aVal/ };
-         if ($@) 
+         if ($aVal < 3600 && $aVal != 0)
          {
-            OPENWEATHER_Log $name, 3, "Invalid allowSetParameter in attr $name $aName $aVal: $@";
-            return "Invalid allowSetParameter $aVal";
+            OPENWEATHER_Log $name, 3, "Error: Minimum of attribute INTERVAL is 3600 or 0";
+            return "Minimum of attribute INTERVAL is 3600 or 0";
+         }
+         else
+         {
+            # Internal Timer neu starten
+            RemoveInternalTimer($hash);
+            if ($aVal >0)
+            {
+               InternalTimer(gettimeofday()+7, "OPENWEATHER_Start", $hash, 0);
+            }
          }
       }
    }
-   
+   elsif ($cmd eq "del")
+   {
+      if ($aName eq "INTERVAL")
+      {
+         # Internal Timer neu starten
+         RemoveInternalTimer($hash);
+         InternalTimer(gettimeofday()+1, "OPENWEATHER_Start", $hash, 0);
+      }
+   }
+
    return undef;
 } # OPENWEATHER_Attr ende
 
@@ -273,9 +292,9 @@ OPENWEATHER_Set($$@)
    
    if(lc $cmd eq 'update') 
    {
-      $hash->{LOCAL} = 1;
+      $hash->{fhem}{LOCAL} = 1;
       OPENWEATHER_Start($hash);
-      $hash->{LOCAL} = 0;
+      $hash->{fhem}{LOCAL} = 0;
       return undef;
    }
    my $list = "update:noArg";
@@ -326,9 +345,11 @@ OPENWEATHER_Start($)
 {
    my ($hash) = @_;
    my $name = $hash->{NAME};
-   
-   
-   if(!$hash->{LOCAL} && $hash->{INTERVAL} > 0) {
+
+   $hash->{INTERVAL} = AttrVal( $name, "INTERVAL", 3600 );
+
+   if( $hash->{fhem}{LOCAL} != 1 && $hash->{INTERVAL} > 0 )
+   {
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OPENWEATHER_Start", $hash, 1);
       return undef if( AttrVal($name, "disable", 0 ) == 1 );
@@ -467,7 +488,7 @@ OPENWEATHER_Html($)
 
    for(my $i=0; $i<=2; $i++) 
    {
-     $ret .= sprintf('<tr><td valign=top><b>%s</b></td><td>%s<br>min. %s &deg;C max. %s &deg;C<br>Niederschlagsrisiko: %s %<br>Wind: %s km/h aus %s</td></tr>',
+     $ret .= sprintf('<tr><td valign=top><b>%s</b></td><td>%s<br>min. %s &deg;C max. %s &deg;C<br>Nieders.risiko: %s %<br>Wind: %s km/h aus %s</td></tr>',
          $i==0 ? "heute" : ReadingsVal($d, "fc".$i."_wday", "")
          , ReadingsVal($d, "fc".$i."_weather", "")
          , ReadingsVal($d, "fc".$i."_tempMin", ""), ReadingsVal($d, "fc".$i."_tempMax", "")
@@ -476,7 +497,7 @@ OPENWEATHER_Html($)
          );
    }
   
-   $ret .= "<tr><td colspan=2>powered by wetter.com</td></tr>";
+   $ret .= sprintf ('<tr><td colspan=2>powered by <a href="http://www.wetter.com/%s">wetter.com</a></td></tr>', ReadingsVal($d, "url", "") );
    $ret .= "</table>";
 
   return $ret;
@@ -530,9 +551,11 @@ OPENWEATHER_Html($)
          <br>
          Optional. Default language of weather description is German. Change with <i>en</i> to English or <i>es</i> to Spanish.
       </li><br>
-      The function OPENWEATHER_Html creates a HTML code for a vertically arranged weather forecast.
+      The function <code>OPENWEATHER_Html</code> creates a HTML code for a vertically arranged weather forecast.
       <br>
-      Example: <code>define MyWeatherWeblink weblink htmlCode { OPENWEATHER_Html("MyWeather") }</code>
+      Example:
+      <br>
+      <code>define MyForecast weblink htmlCode { OPENWEATHER_Html("MyWeather") }</code>
       <br/><br/>
    </ul>
   
@@ -560,6 +583,14 @@ OPENWEATHER_Html($)
    <b>Attributes</b>
    <ul>
       <br>
+      <li><code>disable &lt;0 | 1&gt;</code>
+      <br>
+      Automatic update is stopped if set to 1.
+      </li><br>
+      <li><code>INTERVAL &lt;seconds&gt;</code>
+         <br>
+         Polling interval for weather data in seconds (default and smallest value is 3600 = 1 hour). 0 will stop automatic updates.
+      </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
    <br>
@@ -568,8 +599,8 @@ OPENWEATHER_Html($)
    <b>Forecast readings</b>
    <ul>
       Note! The forecast values (in brackets) have first to be selected on the project setup page on wetter.com.
-      <br>
-      <li><br><b>fc</b><i>0|1|2</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2 days</i></li>
+      <br/>&nbsp;<br/>
+      <li><b>fc</b><i>0|1|2</i><b>_...</b> - forecast values for <i>today|tommorrow|in 2 days</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - forecast values for <i>today</i> at <i>06|11|17|23</i> o'clock</li>
       <li><b>fc</b><i>1</i><b>_temp</b><i>Min|Max</i> - <i>minimal|maximal</i> temperature for <i>tommorrow</i> in &deg;C (tn,tx)</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>minimal</i> temperatur <i>today</i> at <i>06:00</i> o'clock in &deg;C</li>
@@ -631,9 +662,11 @@ OPENWEATHER_Html($)
          <br>
          Optional. Standardsprache f&uuml;r die Wettersituation ist Deutsch. Mit <i>en</i> kann man zu Englisch und mit <i>es</i> zu Spanisch wechseln.
       </li><br>
-      &Uuml;ber die Funktion OPENWEATHER_Html wird ein HTML-Code f&uuml;r ein vertikal arrangierte Wettervorhersage erzeugt.
+      &Uuml;ber die Funktion <code>OPENWEATHER_Html</code> wird ein HTML-Code f&uuml;r ein vertikal arrangierte Wettervorhersage erzeugt.
       <br>
-      Beispiel: <code>define MyWeatherWeblink weblink htmlCode { OPENWEATHER_Html("MyWeather") }</code>
+      Beispiel:
+      <br>
+      <code>define MyForecast weblink htmlCode { OPENWEATHER_Html("MyWeather") }</code>
       <br/><br/>
    </ul>
 
@@ -661,6 +694,14 @@ OPENWEATHER_Html($)
    <b>Attribute</b>
    <ul>
       <br>
+      <li><code>disable &lt;0 | 1&gt;</code>
+      <br>
+      Automatische Aktuallisierung ist angehalten, wenn der Wert auf 1 gesetzt wird.
+      </li><br>
+      <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
+         <br>
+         Abfrageinterval in Sekunden (Standard und kleinster Wert ist 3600 = 1 Stunde). 0 stoppt die automatische Aktualisierung
+      </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
    <br/>
@@ -668,11 +709,11 @@ OPENWEATHER_Html($)
    <a name="OPENWEATHERreading"></a>
    <b>Vorhersagewerte</b>
    <ul>
-      Wichtig! Die Vorhersagewerte m&uuml;ssen zuerst in den Vorhersageeinstellungen (in Klammern) des Projektes auf wetter.com ausgew&auml;hlt werden.
-      <br\>
-      <li><br><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte f&uuml;r <i>heute|morgen|&uuml;bermorgen</i></li>
+      Wichtig! Die Vorhersagewerte (in Klammern) m&uuml;ssen zuerst in den Vorhersageeinstellungen des Projektes auf wetter.com ausgew&auml;hlt werden.
+      <br/>&nbsp;<br/>
+      <li><b>fc</b><i>0|1|2</i><b>_...</b> - Vorhersagewerte f&uuml;r <i>heute|morgen|&uuml;bermorgen</i></li>
       <li><b>fc</b><i>0</i><b>_...<i>06|11|17|23</i></b> - Vorhersagewerte f&uuml;r <i>heute</i> um <i>06|11|17|23</i> Uhr</li>
-      <li><b>fc</b><i>0</i><b>_chOfRain</b> - <i>heutige</i> Niederschlagswahrscheinlichkeit in % (PC)</li>
+      <li><b>fc</b><i>0</i><b>_chOfRain</b> - <i>heutige</i> Niederschlagswahrscheinlichkeit in % (pc)</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min|Max</i> - <i>Mindest|Maximal</i>temperatur <i>heute</i> in &deg;C (tn, tx)</li>
       <li><b>fc</b><i>0</i><b>_temp</b><i>Min06</i> - <i>Mindest</i>temperatur <i>heute</i> um <i>06:00</i> Uhr in &deg;C</li>
       <li><b>fc</b><i>0</i><b>_valHours</b><i>06</i> - G&uuml;ltigkeitszeitraum der Prognose von <i>heute</i> ab <i>6:00 Uhr</i> in Stunden (p)</li>
