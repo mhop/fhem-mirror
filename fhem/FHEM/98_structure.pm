@@ -81,6 +81,7 @@ structure_Define($$)
     }
   }
   $hash->{CONTENT} = \%list;
+  delete $hash->{".cachedHelp"};
 
   @a = ( "set", $devname, $stype, $devname );
   structure_Attr(@a);
@@ -142,7 +143,8 @@ sub structure_Notify($$)
           $hash->{DEF} =~ s/^ //;
           $hash->{DEF} =~ s/ $//;
 
-          delete( $hash->{CONTENT}{$name} );
+          delete $hash->{CONTENT}{$name};
+          delete $hash->{".cachedHelp"};
         }
       }
     }
@@ -288,6 +290,7 @@ CommandAddStruct($)
 
   @a = ( "set", $hash->{NAME}, $hash->{ATTR}, $hash->{NAME} );
   structure_Attr(@a);
+  delete $hash->{".cachedHelp"};
   return undef;
 }
 
@@ -315,6 +318,7 @@ CommandDelStruct($)
 
   @a = ( "del", $hash->{NAME}, $hash->{ATTR} );
   structure_Attr(@a);
+  delete $hash->{".cachedHelp"};
   return undef;
 }
 
@@ -327,6 +331,8 @@ structure_Set($@)
   my $ret = "";
   my %pars;
 
+  # see Forum # 28623 for .cachedHelp
+  return $hash->{".cachedHelp"} if($list[1] eq "?" && $hash->{".cachedHelp"});
   $hash->{INSET} = 1;
 
   my $filter;
@@ -357,9 +363,11 @@ structure_Set($@)
     if($filter) {
       my $ret;
       if(defined($defs{$list[0]}) && $defs{$list[0]}{TYPE} eq "structure") {
-        AnalyzeCommand(undef, "set $list[0] [$filter] ". join(" ", @list[1..@list-1]) );
+        AnalyzeCommand(undef, "set $list[0] [$filter] ".
+                                join(" ", @list[1..@list-1]) );
       } else {
-        AnalyzeCommand(undef, "set $list[0]:$filter ". join(" ", @list[1..@list-1]) );
+        AnalyzeCommand(undef, "set $list[0]:$filter ".
+                                join(" ", @list[1..@list-1]) );
       }
       $sret .= $ret if( $ret );
     } else {
@@ -376,9 +384,10 @@ structure_Set($@)
   }
   delete($hash->{INSET});
   Log3 $hash, 5, "SET: $ret" if($ret);
-  return $list[1] eq "?"
-           ? "Unknown argument ?, choose one of " . join(" ", sort keys(%pars))
-           : undef;
+  return undef if($list[1] ne "?");
+  $hash->{".cachedHelp"} = "Unknown argument ?, choose one of " .
+                join(" ", sort keys(%pars));
+  return $hash->{".cachedHelp"};
 }
 
 ###################################
