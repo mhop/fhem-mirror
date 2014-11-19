@@ -421,7 +421,7 @@ FW_closeConn($)
 {
   my ($hash) = @_;
   if(AttrVal($hash->{SNAME}, "closeConn",               # Forum #20294
-                              $FW_userAgent =~ m/(iPhone|iPad|iPod)/)) {
+                              $FW_userAgent =~ m/(iPhone|iPad|iPod|Darwin)/)) {
     TcpServer_Close($hash);
     delete($defs{$hash->{NAME}});
   }
@@ -507,8 +507,8 @@ FW_answerCall($)
     print $c "HTTP/1.1 302 Found\r\n",
              "Content-Length: 0\r\n", $FW_headercors,
              "Location: $FW_ME\r\n\r\n";
+    FW_closeConn($FW_chash);
     return -1;
-
   }
 
 
@@ -1465,6 +1465,7 @@ FW_returnFileAsStream($$$$$)
     if(defined($etag) && defined($if_none_match) && $etag eq $if_none_match) {
       FW_myPrint($c,"HTTP/1.1 304 Not Modified\r\n".
                     $FW_headercors . "\r\n");
+      FW_closeConn($FW_chash);
       return -1;
     }
   }
@@ -1472,6 +1473,7 @@ FW_returnFileAsStream($$$$$)
   if(!open(FH, $path)) {
     Log3 $FW_wname, 2, "FHEMWEB $FW_wname $path: $!";
     FW_pO "<div id=\"content\">$path: $!</div>";
+    FW_closeConn($FW_chash);
     return 0;
   }
   binmode(FH) if($type !~ m/text/); # necessary for Windows
@@ -1503,6 +1505,7 @@ FW_returnFileAsStream($$$$$)
     FW_myPrint($c,sprintf("%x\r\n",length($buf)).$buf."\r\n") if($buf);
   }
   FW_myPrint($c, "0\r\n\r\n");
+  FW_closeConn($FW_chash);
   return -1;
 }
 
