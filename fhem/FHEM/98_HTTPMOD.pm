@@ -29,6 +29,7 @@
 #   2014-3-13   added noShutdown and disable attributes
 #   2014-4-8    fixed noShutdown check
 #   2014-4-9    added Attribute timeout as suggested by Frank
+#   2014-11-18  fixed timeout attribute and redirects
 #
                     
 package main;
@@ -259,7 +260,8 @@ sub HTTPMOD_GetUpdate($)
     } else {
         delete $hash->{noshutdown};
     };
-    
+    $hash->{timeout}   = AttrVal($name, "timeout", 2);
+    $hash->{redirects} = 0;
     HttpUtils_NonblockingGet($hash);
 }
 
