@@ -32,7 +32,8 @@ FHEM_colorpickerFn($$$)
   my ($mode) = ($1);
   $mode = "RGB" if( !defined($mode) );
   my $srf = $FW_room ? "&room=$FW_room" : "";
-  my $cv = CommandGet("","$d $cmd");
+  my $cv = ReadingsVal($d,$cmd,"");
+  $cv = CommandGet("","$d $cmd") if( !$cv );
   $cmd = "" if($cmd eq "state");
   if( $args[1] ) {
     my $c = "cmd=set $d $cmd$srf";
