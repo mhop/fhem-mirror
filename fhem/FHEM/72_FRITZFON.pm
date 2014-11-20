@@ -54,23 +54,23 @@ my %fonModel = (
    );
 
 my %ringTone = ( 
-     0 => "Handset default"
-   , 1 => "Handset Internal Ton"
-   , 2 => "Handset External Ton"
+     0 => "HandsetDefault"
+   , 1 => "HandsetInternalTon"
+   , 2 => "HandsetExternalTon"
    , 3 => "Standard"
    , 4 => "Eighties"
    , 5 => "Alarm"
    , 6 => "Ring"
-   , 7 => "Ring Ring"
+   , 7 => "RingRing"
    , 8 => "News"
-   , 9 => "Personal Ring Ton"
+   , 9 => "CustomerRingTon"
    , 10 => "Bamboo"
    , 11 => "Andante"
-   , 12 => "Cha Cha"
+   , 12 => "ChaCha"
    , 13 => "Budapest"
    , 14 => "Asia"
    , 15 => "Kullabaloo"
-   , 16 => "lautlos"
+   , 16 => "silent"
    , 17 => "Comedy"
    , 18 => "Funky",
    , 19 => "Fatboy"
@@ -83,10 +83,17 @@ my %ringTone = (
    , 26 => "Musicbox"
    , 27 => "Blok2"
    , 28 => "2Jazz"
-   , 33 => "Internet Radio"
-   , 34 => "Music List"
+   , 33 => "InternetRadio"
+   , 34 => "MusicList"
    );
 
+my %ringToneNumber;
+while (my ($key, $value) = each %ringTone) {
+   $ringToneNumber{lc $value}=$key;
+}
+
+   
+my @radio=();
  
 sub ##########################################
 FRITZFON_Log($$$)
@@ -187,7 +194,7 @@ FRITZFON_Set($$@)
    {
       if (int @val > 0) 
       {
-         FRITZFON_Ring $hash, @val; # join("|", @val);
+         FRITZFON_Ring $hash, @val;
          return undef;
       }
       else
@@ -219,10 +226,22 @@ FRITZFON_Set($$@)
          return "Missing parameters after command 'set $name $cmd'";
       }
    }
+   elsif ( lc $cmd eq 'convertringtone')
+   {
+      if (int @val > 0) 
+      {
+         return FRITZFON_ConvertRingTone $hash, @val;
+      }
+      else
+      {
+         return "Missing parameters after command 'set $name $cmd'";
+      }
+   }
    my $list = "reinit:noArg"
+            . " convertRingTone"
             . " message"
             . " ring"
-            . " startradio";
+            . " startRadio";
    return "Unknown argument $cmd, choose one of $list";
 
 } # end FRITZFON_Set
@@ -231,13 +250,19 @@ FRITZFON_Set($$@)
 sub ##########################################
 FRITZFON_Get($@)
 {
-  my ($hash, $name, $cmd) = @_;
-  my $result;
-  my $message;
-  
-  my $list = "";
-  return "Unknown argument $cmd, choose one of $list";
+   my ($hash, $name, $cmd) = @_;
+   my $returnStr;
 
+   if (lc $cmd eq "ringtones") 
+   {
+      $returnStr  = "Ring tones to use with 'set <name> ring <intern> <duration> <ringTone>'\n";
+      $returnStr .= "----------------------------------------------------------------------\n";
+      $returnStr .= join "\n", sort values %ringTone;
+      return $returnStr;
+   }
+
+   my $list = "ringTones:noArg";
+   return "Unknown argument $cmd, choose one of $list";
 } # end FRITZFON_Get
 
 
@@ -251,6 +276,24 @@ FRITZFON_Init($)
    
    readingsBeginUpdate($hash);
 
+  # Box Firmware
+   FRITZFON_Init_Reading($hash
+      , "box_fwVersion"
+      , "ctlmgr_ctl r logic status/nspver"
+      , "fwupdate");
+
+  # Internetradioliste erzeugen
+   my $i = 0;
+   @radio = ();
+   while ()
+   {
+      last unless $result = FRITZFON_Init_Reading($hash, 
+         sprintf ("radio%02d",$i), 
+         "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name");
+      push @radio, $result;
+      $i++;
+   }
+
    foreach (1..6)
    {
      # Dect-Telefonname
@@ -262,9 +305,9 @@ FRITZFON_Init($)
          "dect".$_."_intern", 
          "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Intern");
      # Dect-Internal Ring Tone
-      FRITZFON_Init_Reading($hash, 
-         "dect".$_."_intRingTone", 
-         "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone");
+      # FRITZFON_Init_Reading($hash, 
+         # "dect".$_."_intRingTone", 
+         # "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone");
      # Handset manufacturer
       my $brand = FRITZFON_Init_Reading($hash, 
          "dect".$_."_manufacturer", 
@@ -273,17 +316,31 @@ FRITZFON_Init($)
      {
         # Ring Tone Name
          FRITZFON_Init_Reading($hash
-            , "dect".$_."_intRingToneName"
+            , "dect".$_."_intRingTone"
             , "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone"
             , "ringtone");
+        # Radio Name
+         FRITZFON_Init_Reading($hash
+            , "dect".$_."_radio"
+            , "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/RadioRingID"
+            , "radio");
         # Background image
-         FRITZFON_Init_Reading($hash, 
-         "dect".$_."_imagePath ", 
-         "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath ");
+         FRITZFON_Init_Reading($hash
+            , "dect".$_."_imagePath "
+            , "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath ");
+        # Customer Ring Tone
+         FRITZFON_Init_Reading($hash
+            , "dect".$_."_custRingTone"
+            , "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingTone");
+        # Customer Ring Tone Name
+         FRITZFON_Init_Reading($hash
+            , "dect".$_."_custRingToneName"
+            , "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingToneName");
         # Firmware Version
-         FRITZFON_Init_Reading($hash, 
-            "dect".$_."_fwVersion", 
-            "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion");   
+         FRITZFON_Init_Reading($hash
+            , "dect".$_."_fwVersion"
+            , "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion");   
+            
         # Phone Model
          FRITZFON_Init_Reading($hash 
             , "dect".$_."_model"
@@ -313,7 +370,6 @@ FRITZFON_Init_Reading($$$@)
    $replace = "" 
       unless defined $replace;
    my $result = FRITZFON_Exec( $hash, $cmd);
-   chomp ($result);
    if ($result) {
       if ($replace eq "model")
       {
@@ -324,6 +380,17 @@ FRITZFON_Init_Reading($$$@)
       {
          $result = $ringTone{$result};
       }
+      elsif ($replace eq "radio")
+      {
+         $result = $radio[$result];
+      }
+      elsif ($replace eq "fwupdate")
+      {
+         my $update = FRITZFON_Exec( $hash, "ctlmgr_ctl r updatecheck status/update_available_hint");
+         $result .= " (old)"
+            if $update == 1;
+      }
+            
       readingsBulkUpdate($hash, $rName, $result)
          if $result;
    } elsif (defined $hash->{READINGS}{$rName} ) {
@@ -377,7 +444,15 @@ FRITZFON_Ring_Run($$)
 
    $duration = 5 
       unless defined $duration;
-
+   
+   if (defined $ringTone)
+   {
+      my $temp = $ringTone;
+      $ringTone = $ringToneNumber{lc $ringTone};
+      return $name."|0|Error: Ring tone '$temp' not valid"
+         unless defined $ringTone;
+   }
+      
    my $msg = $hash->{Message};
    $msg = "FHEM"
       unless defined $msg;
@@ -450,12 +525,35 @@ FRITZFON_Ring_Aborted($$)
   FRITZFON_Log $hash, 1, "Timeout when ringing";
 }
 
+sub ############################################
+FRITZFON_ConvertRingTone ($@)
+{  
+   my ($hash, @val) = @_;
+   my $inFile = join " ", @val;
+   my $returnStr;
+   my $outFile = $inFile;
+   $outFile = substr($inFile,0,-4)
+      if (lc substr($inFile,-4) =~ /\.(mp3|wav)/);
+   $returnStr = FRITZFON_Exec ($hash,
+      "ffmpegconv  -i '$inFile' -o '$outFile.g722' --limit 240 --type 1");
+   return $returnStr;
+#pbd --set-image-url --book=255 --id=612 --url=/var/InternerSpeicher/FRITZ/fonring/1416431162.g722 --type=1
+#pbd --set-image-url --book=255 --id=612 --url=file://var/InternerSpeicher/fritzfontest.g722 --type=1
+#ctlmgr_ctl r user settings/user0/bpjm_filter_enable
+}
+
+
 # Executed the command on the FritzBox Shell
 sub ############################################
 FRITZFON_Exec($$)
 {
-	my ($hash, $cmd) = @_;
-  return qx($cmd);
+   my ($hash, $cmd) = @_;
+   FRITZFON_Log $hash, 5, "Execute '".$cmd."'";
+   my $result = qx($cmd);
+   chomp ($result);
+   FRITZFON_Log $hash, 5, "Result '".$result."'";
+   
+   return $result;
 }
 
 ##################################### 
@@ -469,9 +567,9 @@ FRITZFON_Exec($$)
 <h3>FRITZFON</h3>
 <div  style="width:800px"> 
 <ul>
-   The module allows Fritz!Box owners to use a phone as a signaling device. It supports also some special features of the Fritz!Fons, e.g. MT-F.
+   The module implements the Fritz!Fon's (MT-F, MT-D, C3, C4) as a signaling device.
    <br>
-   It has to run in an FHEM process <b>on</b> the box.
+   It has to run in an FHEM process <b>on</b> a Fritz!Box.
    <br/><br/>
    <a name="FRITZFONdefine"></a>
    <b>Define</b>
@@ -501,7 +599,7 @@ FRITZFON_Exec($$)
       </li><br>
       <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration] [ringTone]</code>
          <br>
-         Rings the internal number for duration (seconds) and (if possible) with the given ring tone.
+         Rings the internal number for duration (seconds) and (if possible) with the given ring tone name.
          <br>
       </li><br>
       <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
@@ -514,7 +612,10 @@ FRITZFON_Exec($$)
    <a name="FRITZFONget"></a>
    <b>Get</b>
    <ul>
-      not implemented yet
+      <li><code>get &lt;name&gt; ringTones</code>
+         <br>
+         Shows a list of ring tones that can be used.
+      </li><br>
    </ul>  
   
    <a name="FRITZFONattr"></a>
