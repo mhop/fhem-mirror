@@ -39,8 +39,8 @@ LaCrosse_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  if(@a != 3 ) {
-    my $msg = "wrong syntax: define <name> LaCrosse <addr>";
+  if(int(@a) < 3 || int(@a) > 5) {
+    my $msg = "wrong syntax: define <name> LaCrosse <addr> [corr1...corr2]";
     Log3 undef, 2, $msg;
     return $msg;
   }
@@ -50,6 +50,12 @@ LaCrosse_Define($$)
 
   my $name = $a[0];
   my $addr = $a[2];
+
+  $hash->{corr1} = ((int(@a) > 3) ? $a[3] : 0);
+  $hash->{corr2} = ((int(@a) > 4) ? $a[4] : 0);
+  #$hash->{corr3} = ((int(@a) > 5) ? $a[5] : 0);
+  #$hash->{corr4} = ((int(@a) > 6) ? $a[6] : 0);
+
 
   #return "$addr is not a 1 byte hex value" if( $addr !~ /^[\da-f]{2}$/i );
   #return "$addr is not an allowed address" if( $addr eq "00" );
@@ -263,12 +269,12 @@ LaCrosse_Parse($$)
       $temperature = int($temperature*10 + 0.5) / 10;
       $humidity = int($humidity*10 + 0.5) / 10;
 
-      readingsBulkUpdate($rhash, "temperature$channel", $temperature);
-      readingsBulkUpdate($rhash, "humidity$channel", $humidity) if( $humidity && $humidity <= 99 );
+      readingsBulkUpdate($rhash, "temperature$channel", $temperature + $rhash->{corr1});
+      readingsBulkUpdate($rhash, "humidity$channel", $humidity + $rhash->{corr2} ) if( $humidity && $humidity <= 99 );
 
       if( !$channel ) {
-        my $state = "T: $temperature";
-        $state .= " H: $humidity" if( $humidity && $humidity <= 99 );
+        my $state = "T: ". ($temperature + $rhash->{corr1});
+        $state .= " H: ". ($humidity + $rhash->{corr2}) if( $humidity && $humidity <= 99 );
         $state .= " D: $dewpoint" if( $dewpoint );
         readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
       }
@@ -314,9 +320,10 @@ LaCrosse_Attr(@)
   <a name="LaCrosseDefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; LaCrosse &lt;addr&gt;</code> <br>
+    <code>define &lt;name&gt; LaCrosse &lt;addr&gt; [corr1...corr2]</code> <br>
     <br>
-    addr is a 2 digit hex number to identify the LaCrosse device.<br><br>
+    addr is a 2 digit hex number to identify the LaCrosse device.<br>
+    corr1..corr2 are up to 2 numerical correction factors, which will be added to the respective value to calibrate the device.<br><br>
     Note: devices are autocreated only if LaCrossePairForSec is active for the <a href="#JeeLink">JeeLink</a> IODevice device.<br>
   </ul>
   <br>
