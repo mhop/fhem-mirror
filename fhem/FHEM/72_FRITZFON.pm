@@ -185,16 +185,27 @@ FRITZFON_Set($$@)
    my ($hash, $name, $cmd, @val) = @_;
    my $resultStr = "";
    
-   if( lc $cmd eq 'reinit' ) 
+   if ( lc $cmd eq 'customerringtone')
+   {
+      if (int @val > 0) 
+      {
+         return FRITZFON_SetCustomerRingTone $hash, @val;
+      }
+      else
+      {
+         return "Missing parameters after command 'set $name $cmd'";
+      }
+   }
+   elsif( lc $cmd eq 'reinit' ) 
    {
       FRITZFON_Init($hash);
       return undef;
    }
-   elsif ( lc $cmd eq 'ring')
+   elsif ( lc $cmd eq 'message')
    {
       if (int @val > 0) 
       {
-         FRITZFON_Ring $hash, @val;
+         $hash->{Message} = substr (join(" ", @val),0,30) ;
          return undef;
       }
       else
@@ -202,11 +213,11 @@ FRITZFON_Set($$@)
          return "Missing parameters after command 'set $name $cmd'";
       }
    }
-   elsif ( lc $cmd eq 'message')
+   elsif ( lc $cmd eq 'ring')
    {
       if (int @val > 0) 
       {
-         $hash->{Message} = substr (join(" ", @val),0,30) ;
+         FRITZFON_Ring $hash, @val;
          return undef;
       }
       else
@@ -238,6 +249,7 @@ FRITZFON_Set($$@)
       }
    }
    my $list = "reinit:noArg"
+            . " customerRingTone"
             . " convertRingTone"
             . " message"
             . " ring"
@@ -411,7 +423,7 @@ FRITZFON_Ring($@)
 
    if ( exists( $hash->{helper}{RUNNING_PID} ) )
    {
-      FRITZFON_Log $hash, 5, "Killing existing background process ".$hash->{helper}{RUNNING_PID};
+      FRITZFON_Log $hash, 1, "Double call. Killing old process ".$hash->{helper}{RUNNING_PID};
       BlockingKill( $hash->{helper}{RUNNING_PID} ); 
       delete($hash->{helper}{RUNNING_PID});
    }
@@ -526,20 +538,58 @@ FRITZFON_Ring_Aborted($$)
 }
 
 sub ############################################
+FRITZFON_SetCustomerRingTone($@)
+{  
+   my ($hash, $intern, @file) = @_;
+   my $returnStr;
+   my $inFile = join " ", @file;
+   my $uploadFile = '/tmp/fhem'.$intern.'.G722';
+   
+   $inFile =~ s/file:\/\///;
+   if (lc (substr($inFile,-4)) eq ".mp3")
+   {
+      # mp3 files are converted
+      $returnStr = FRITZFON_Exec ($hash,
+         'picconv.sh "file://'.$inFile.'" "'.$uploadFile.'" ringtonemp3');
+   }
+   elsif (lc (substr($inFile,-5)) eq ".g722")
+   {
+      # G722 files are copied
+      $returnStr = FRITZFON_Exec ($hash,
+         "cp '$inFile' '$uploadFile'");
+   }
+   else
+   {
+      return "Error: only MP3 or G722 files can be uploaded to the phone";
+   }
+   # trigger the loading of the file to the phone, file will be deleted as soon as the upload finished
+   $returnStr .= "\n".FRITZFON_Exec ($hash,
+      '/usr/bin/pbd --set-ringtone-url --book="255" --id="'.$intern.'" --url="file:///'.$uploadFile.'" --name="FHEM"');
+   return $returnStr;
+}
+
+sub ############################################
 FRITZFON_ConvertRingTone ($@)
 {  
    my ($hash, @val) = @_;
    my $inFile = join " ", @val;
-   my $returnStr;
+   $inFile =~ s/file:\/\///;
    my $outFile = $inFile;
    $outFile = substr($inFile,0,-4)
       if (lc substr($inFile,-4) =~ /\.(mp3|wav)/);
-   $returnStr = FRITZFON_Exec ($hash,
-      "ffmpegconv  -i '$inFile' -o '$outFile.g722' --limit 240 --type 1");
+   my $returnStr = FRITZFON_Exec ($hash,
+      'picconv.sh "file://'.$inFile.'" "'.$outFile.'.g722" ringtonemp3');
    return $returnStr;
+   
+#'picconv.sh "'.$inFile.'" "'.$outFile.'.g722" ringtonemp3'
+#picconv.sh "file://$dir/upload.mp3" "$dir/$filename" ringtonemp3   
+#"ffmpegconv  -i '$inFile' -o '$outFile.g722' --limit 240");
+#ffmpegconv -i "${in}" -o "${out}" --limit 240
 #pbd --set-image-url --book=255 --id=612 --url=/var/InternerSpeicher/FRITZ/fonring/1416431162.g722 --type=1
 #pbd --set-image-url --book=255 --id=612 --url=file://var/InternerSpeicher/fritzfontest.g722 --type=1
 #ctlmgr_ctl r user settings/user0/bpjm_filter_enable
+#CustomerRingTon 
+#/usr/bin/pbd --set-ringtone-url --book="255" --id="612" --url="file:///var/InternerSpeicher/claydermann.g722" --name="Claydermann"
 }
 
 
@@ -600,7 +650,14 @@ FRITZFON_Exec($$)
       <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration] [ringTone]</code>
          <br>
          Rings the internal number for duration (seconds) and (if possible) with the given ring tone name.
+      </li><br>
+      <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
          <br>
+         Uploads the file fullFilePath on the given handset. Only mp3 or G722 format is allowed.
+         <br>
+         The file has to be placed on the file system of the fritzbox.
+         <br>
+         The upload takes about one minute before the tone is available.
       </li><br>
       <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
          <br>
