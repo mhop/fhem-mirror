@@ -120,7 +120,6 @@ sub WOL_Define($$) {
   RemoveInternalTimer($hash);
   
   WOL_UpdateReadings($hash);
-  WOL_GetUpdate     ($hash);
   return undef;
 }
 ################################################################################
@@ -133,17 +132,28 @@ sub WOL_Undef($$) {
 }
 ################################################################################
 sub WOL_UpdateReadings($) {
+  
   my ($hash) = @_;
   $hash->{INTERVAL} = AttrVal($hash->{NAME}, "interval", 900);
-
+  
+  my $name = $hash->{NAME};
   my $ip = $hash->{IP};
 
   readingsBeginUpdate ($hash);
 
-  if (`ping -c 1 -w 2 $ip` =~ m/100%/) {
+  my $ping = "ping -c 1 -w 2 $ip"; 
+  my $res = qx ($ping);
+     $res = ""   if (!defined($res));
+  
+  Log3 $hash, 5, "[$name] executing: $ping";
+  Log3 $hash, 5, "[$name] result of ping:$res";
+  
+  if ( $res =~ m/100%/) {
+    Log3 $hash, 5, "[$name] ping not succesful - state = on";
     readingsBulkUpdate   ($hash, "isRunning", "false");
     readingsBulkUpdate   ($hash, "state",     "off");
   } else {
+    Log3 $hash, 5, "[$name] ping succesful - state = on";
     readingsBulkUpdate   ($hash, "isRunning", "true");
     readingsBulkUpdate   ($hash, "state",     "on");
   }
