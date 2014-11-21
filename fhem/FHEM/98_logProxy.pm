@@ -820,11 +820,14 @@ logProxy_Get($@)
     $main::data{"maxdate$j"} = $data{"maxdate$j"};
   }
 
-  $internal_data = \$ret;
+#Log 3, Dumper $ret;
 
-#Log 3, Dumper $internal_data;
+  if( $internal ) {
+    $internal_data = \$ret;
+    return undef;
+  }
 
-  return undef;
+  return $ret;
 }
 
 1;
