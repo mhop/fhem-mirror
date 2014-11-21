@@ -229,6 +229,7 @@ FHEM/98_apptime.pm           martinp876           http://forum.fhem.de Sonstiges
 FHEM/98_ComfoAir.pm          StefanStrobel        http://forum.fhem.de Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_DOIF.pm              damian-s             http://forum.fhem.de Automatisierung
+FHEM/98_FReplacer.pm         stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_GEOFANCY.pm          loredo               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de HomeMatic
 FHEM/98_Heating_Control.pm   dietmar63            http://forum.fhem.de Unterstuetzende Dienste
