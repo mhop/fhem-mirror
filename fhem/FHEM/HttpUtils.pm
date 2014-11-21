@@ -58,6 +58,7 @@ sub
 HttpUtils_ConnErr($)
 {
   my ($hash) = @_;
+  $hash = $hash->{hash};
   if(defined($hash->{FD})) {
     delete($hash->{FD});
     delete($selectlist{$hash});
@@ -70,6 +71,7 @@ sub
 HttpUtils_ReadErr($)
 {
   my ($hash) = @_;
+  $hash = $hash->{hash};
   if(defined($hash->{FD})) {
     delete($hash->{FD});
     delete($selectlist{$hash});
@@ -123,11 +125,13 @@ HttpUtils_Connect($)
         if($!{EINPROGRESS} || int($!)==10035) { # Nonblocking connect
 
           $hash->{FD} = $hash->{conn}->fileno();
+          my %timerHash = ( hash => $hash );
           $hash->{directWriteFn} = sub() {
             delete($hash->{FD});
             delete($hash->{directWriteFn});
             delete($selectlist{$hash});
 
+            RemoveInternalTimer(\%timerHash);
             my $packed = getsockopt($hash->{conn}, SOL_SOCKET, SO_ERROR);
             my $errno = unpack("I",$packed);
             return $hash->{callback}($hash, "$host: ".strerror($errno), "")
@@ -138,7 +142,7 @@ HttpUtils_Connect($)
           $hash->{NAME} = "" if(!defined($hash->{NAME})); #Delete might check it
           $selectlist{$hash} = $hash;
           InternalTimer(gettimeofday()+$hash->{timeout},
-                        "HttpUtils_ConnErr", $hash, 0);
+                        "HttpUtils_ConnErr", \%timerHash, 0);
           return undef;
         } else {
           return "connect: $!";
@@ -220,6 +224,8 @@ HttpUtils_Connect2($)
   if($hash->{callback}) { # Nonblocking read
     $hash->{FD} = $hash->{conn}->fileno();
     $hash->{buf} = "";
+    $hash->{NAME} = "" if(!defined($hash->{NAME})); 
+    my %timerHash = ( hash => {$hash} );
     $hash->{directReadFn} = sub() {
       my $buf;
       my $len = sysread($hash->{conn},$buf,65536);
@@ -228,6 +234,7 @@ HttpUtils_Connect2($)
         delete($hash->{FD});
         delete($hash->{directReadFn});
         delete($selectlist{$hash});
+        RemoveInternalTimer(\%timerHash);
         my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash, $hash->{buf});
         $hash->{callback}($hash, $err, $ret) if(!$redirect);
         return;
@@ -235,7 +242,7 @@ HttpUtils_Connect2($)
     };
     $selectlist{$hash} = $hash;
     InternalTimer(gettimeofday()+$hash->{timeout},
-                  "HttpUtils_ReadErr", $hash, 0);
+                  "HttpUtils_ReadErr", \%timerHash, 0);
     return undef;
   }
 
