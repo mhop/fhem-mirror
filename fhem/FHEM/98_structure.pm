@@ -42,8 +42,8 @@ structure_Initialize($)
   $hash->{SetFn}     = "structure_Set";
   $hash->{AttrFn}    = "structure_Attr";
   $hash->{AttrList}  = "clientstate_priority ".
-                       "clientstate_behavior:relative,relativeKnown,absolute,last ".
-                       $readingFnAttributes;
+                 "clientstate_behavior:relative,relativeKnown,absolute,last ".
+                 "disable disabledForIntervals $readingFnAttributes";
 
   my %ahash = ( Fn=>"CommandAddStruct",
                 Hlp=>"<structure> <devspec>,add <devspec> to <structure>" );
@@ -494,6 +494,9 @@ structure_Attr($@)
   <a name="structureattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li><br>
+
     <a name="clientstate_behavior"></a>
     <li>clientstate_behavior<br>
         The backward propagated status change from the devices to this structure
