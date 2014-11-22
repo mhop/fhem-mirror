@@ -1,5 +1,5 @@
 ###############################################################
-# $Id: $
+# $Id$
 #
 #  72_FRITZBOX.pm
 #
@@ -152,7 +152,7 @@ FRITZBOX_Define($$)
 
    $hash->{STATE}       = "Initializing";
    $hash->{Message}     = "FHEM";
-   $hash->{fhem}{modulVersion} = '$Date: $';
+   $hash->{fhem}{modulVersion} = '$Date$';
 
    RemoveInternalTimer($hash);
  # Get first data after 2 seconds
