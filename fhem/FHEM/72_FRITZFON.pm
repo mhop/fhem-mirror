@@ -59,7 +59,7 @@ my %ringTone = (
    , 2 => "HandsetExternalTon"
    , 3 => "Standard"
    , 4 => "Eighties"
-   , 5 => "Alarm"
+   , 5 => "Alert"
    , 6 => "Ring"
    , 7 => "RingRing"
    , 8 => "News"
@@ -122,6 +122,7 @@ FRITZFON_Initialize($)
   $hash->{AttrFn}   = "FRITZFON_Attr";
   $hash->{AttrList} = "disable:0,1 "
                 ."ringWithIntern:0,1,2 "
+                ."defaultUploadDir "
                 .$readingFnAttributes;
 
 } # end FRITZFON_Initialize
@@ -297,14 +298,18 @@ FRITZFON_Init($)
   # Internetradioliste erzeugen
    my $i = 0;
    @radio = ();
-   while ()
+   my $rName = sprintf ("radio%02d",$i);
+   do 
    {
-      last unless $result = FRITZFON_Init_Reading($hash, 
-         sprintf ("radio%02d",$i), 
-         "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name");
-      push @radio, $result;
+      $result = FRITZFON_Init_Reading($hash 
+         , $rName
+         , "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name");
+      push (@radio, $result)
+         if $result;
       $i++;
+      $rName = sprintf ("radio%02d",$i);
    }
+   while ( $result ne "" || defined $hash->{READINGS}{$rName} );
 
    foreach (1..6)
    {
@@ -326,10 +331,15 @@ FRITZFON_Init($)
          "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer");   
      if ($brand eq "AVM")
      {
-        # Ring Tone Name
+        # Intrnal Ring Tone Name
          FRITZFON_Init_Reading($hash
             , "dect".$_."_intRingTone"
             , "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone"
+            , "ringtone");
+        # Alarm Ring Tone Name
+         FRITZFON_Init_Reading($hash
+            , "dect".$_."_alarmRingTone"
+            , "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/AlarmRingTone0"
             , "ringtone");
         # Radio Name
          FRITZFON_Init_Reading($hash
@@ -370,8 +380,6 @@ FRITZFON_Init($)
          readingsBulkUpdate($hash, "fon".$_."_intern", $_);
       }
    }
-   # configd:settings/WEBRADIO/list(Name,URL)
-   # telcfg:settings/Foncontrol/User"..g_ctlmgr.idx.."/RadioRingID
    readingsEndUpdate( $hash, 1 );
 }
 
@@ -445,6 +453,7 @@ FRITZFON_Ring_Run($$)
    my $result;
    my $curIntRingTone;
    my $curCallerName;
+   my $cmd;
    
    if (610<=$intNo && $intNo<=615)
    {
@@ -469,8 +478,8 @@ FRITZFON_Ring_Run($$)
    $msg = "FHEM"
       unless defined $msg;
       
-   my $ringWithIntern = AttrVal( $name, "ringWithIntern",  0 );
-   
+   my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
+
    # uses name of virtual port 0 (dial port 1) to show message on ringing phone
    if ($ringWithIntern =~ /^(1|2)$/ )
    {
@@ -489,14 +498,19 @@ FRITZFON_Ring_Run($$)
          FRITZFON_Exec( $hash, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$fonTypeNo."/IntRingTone ".$ringTone);
          FRITZFON_Log $hash, 5, "Set internal ring tone of DECT ".$fonTypeNo." to ".$ringTone;
       }
-      sleep 0.5;
+      if ( $ringWithIntern != 0 ) 
+      {
+         FRITZFON_Exec( $hash, "ctlmgr_ctl w telcfg settings/DialPort ".$ringWithIntern);
+      }
       FRITZFON_Log $hash, 5, "Ringing $intNo for $duration seconds";
-      FRITZFON_Exec( $hash, "ctlmgr_ctl w telcfg settings/DialPort 1");
-      FRITZFON_Exec( $hash, "ctlmgr_ctl w telcfg command/Dial **".$intNo);
-      FRITZFON_Exec( $hash, "ctlmgr_ctl w telcfg settings/DialPort 50");
-      sleep $duration;
-      FRITZFON_Log $hash, 5, "Hangup ".$intNo;
-      FRITZFON_Exec( $hash, "ctlmgr_ctl w telcfg command/Hangup **".$intNo);
+      $cmd  = "ctlmgr_ctl w telcfg command/Dial **".$intNo."\n";
+      $cmd .= "sleep ".($duration+1)."\n";
+      $cmd .= "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
+      FRITZFON_Exec( $hash, $cmd);
+      if ( $ringWithIntern != 0 ) 
+      {
+         FRITZFON_Exec( $hash, "ctlmgr_ctl w telcfg settings/DialPort 50");
+      }
       if (defined $ringTone)
       {
          FRITZFON_Log $hash, 5, "Set internal ring tone of DECT ".$fonTypeNo." back to ".$curIntRingTone;
@@ -542,17 +556,32 @@ FRITZFON_SetCustomerRingTone($@)
 {  
    my ($hash, $intern, @file) = @_;
    my $returnStr;
+   my $name = $hash->{NAME};
+
+   my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
+   $uploadDir .= "/"
+      unless $uploadDir =~ /\/$|^$/;
+
    my $inFile = join " ", @file;
-   my $uploadFile = '/tmp/fhem'.$intern.'.G722';
+   $inFile = $uploadDir.$inFile
+      unless $inFile =~ /^\//;
    
-   $inFile =~ s/file:\/\///;
-   if (lc (substr($inFile,-4)) eq ".mp3")
+   return "Error: Please give a complete file path or the attribute 'defaultUploadDir'"
+      unless $inFile =~ /^\//;
+   
+   return "Error: Only MP3 or G722 files can be uploaded to the phone."
+      unless $inFile =~ /\.mp3$|.g722$/i;
+   
+   my $uploadFile = '/var/InternerSpeicher/FRITZ/fonring/'.time().'.g722';
+   
+   $inFile =~ s/file:\/\///i;
+   if ( $inFile =~ /\.mp3$/i )
    {
       # mp3 files are converted
-      $returnStr = FRITZFON_Exec ($hash,
-         'picconv.sh "file://'.$inFile.'" "'.$uploadFile.'" ringtonemp3');
+      $returnStr = FRITZFON_Exec ($hash
+      , 'picconv.sh "file://'.$inFile.'" "'.$uploadFile.'" ringtonemp3');
    }
-   elsif (lc (substr($inFile,-5)) eq ".g722")
+   elsif ( $inFile =~ /\.g722$/i )
    {
       # G722 files are copied
       $returnStr = FRITZFON_Exec ($hash,
@@ -564,21 +593,38 @@ FRITZFON_SetCustomerRingTone($@)
    }
    # trigger the loading of the file to the phone, file will be deleted as soon as the upload finished
    $returnStr .= "\n".FRITZFON_Exec ($hash,
-      '/usr/bin/pbd --set-ringtone-url --book="255" --id="'.$intern.'" --url="file:///'.$uploadFile.'" --name="FHEM"');
+      '/usr/bin/pbd --set-ringtone-url --book="255" --id="'.$intern.'" --url="file://'.$uploadFile.'" --name="FHEM'.time().'"');
    return $returnStr;
 }
 
 sub ############################################
 FRITZFON_ConvertRingTone ($@)
 {  
-   my ($hash, @val) = @_;
-   my $inFile = join " ", @val;
+   my ($hash, @file) = @_;
+
+   my $name = $hash->{NAME};
+
+   my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
+   $uploadDir .= "/"
+      unless $uploadDir =~ /\/$|^$/;
+
+   my $inFile = join " ", @file;
+   $inFile = $uploadDir.$inFile
+      unless $inFile =~ /^\//;
+   
+   return "Error: You have to give a complete file path or to set the attribute 'defaultUploadDir'"
+      unless $inFile =~ /^\//;
+   
+   return "Error: only MP3 or WAV files can be converted"
+      unless $inFile =~ /\.mp3$|.wav$/i;
+   
    $inFile =~ s/file:\/\///;
+
    my $outFile = $inFile;
    $outFile = substr($inFile,0,-4)
       if (lc substr($inFile,-4) =~ /\.(mp3|wav)/);
-   my $returnStr = FRITZFON_Exec ($hash,
-      'picconv.sh "file://'.$inFile.'" "'.$outFile.'.g722" ringtonemp3');
+   my $returnStr = FRITZFON_Exec ($hash
+      , 'picconv.sh "file://'.$inFile.'" "'.$outFile.'.g722" ringtonemp3');
    return $returnStr;
    
 #'picconv.sh "'.$inFile.'" "'.$outFile.'.g722" ringtonemp3'
@@ -619,7 +665,7 @@ FRITZFON_Exec($$)
 <ul>
    The module implements the Fritz!Fon's (MT-F, MT-D, C3, C4) as a signaling device.
    <br>
-   It has to run in an FHEM process <b>on</b> a Fritz!Box.
+   For the current version FHEM has to run on a Fritz!Box.
    <br/><br/>
    <a name="FRITZFONdefine"></a>
    <b>Define</b>
@@ -629,7 +675,7 @@ FRITZFON_Exec($$)
       <br>
       Example:
       <br>
-      <code>define Telefon FRITZFON</code>
+      <code>define Fritzfons FRITZFON</code>
       <br/><br/>
    </ul>
   
@@ -682,6 +728,12 @@ FRITZFON_Exec($$)
       <li><code>ringWithIntern &lt;internalNumber&gt;</code>
       <br>
       To show a message during a ring the caller needs to be an internal phone number.
+      </li><br>
+      <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
+      <br>
+      This is the default path that will be used if a file name does not start with / (slash).
+      <br>
+      It needs to be the name of the path on the Fritz!Box, so it should start with /var/InternerSpeicher if it equals in windows \\ip-address\fritz.nas
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
