@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 08/2014
-my $thzversion = "0.110";
+# by immi 11/2014
+my $thzversion = "0.111";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -65,52 +65,58 @@ sub THZ_Set($@);
 ########################################################################################
 
 my %sets = (
-    "pOpMode"				=> {cmd2=>"0A0112", type =>"2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
-    "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p01RoomTempDayHC1SummerMode"	=> {cmd2=>"0B0569", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p13GradientHC1"			=> {cmd2=>"0B010E", argMin => "0",  argMax =>  "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
-    "p14LowEndHC1"			=> {cmd2=>"0B059E", argMin => "0",  argMax => "20", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
-    "p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin => "0",  argMax => "100",	type =>"0clean",  unit =>" %"},
-    "p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin => "0",  argMax => "100",	type =>"1clean",  unit =>" %"}, #in % 0..100%
-    "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin => "13", argMax => "28", 	type =>"5temp",  unit =>" °C"},
-    "p01RoomTempDayHC2SummerMode"	=> {cmd2=>"0C0569", argMin => "13", argMax => "28",	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin => "13", argMax => "28",	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin => "13", argMax => "28",	type =>"5temp",  unit =>" °C"},
-    "p16GradientHC2"			=> {cmd2=>"0C010E", argMin => "0",  argMax =>  "5",	type =>"6gradient",  unit =>""}, # /100
-    "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin => "0",  argMax => "20", 	type =>"5temp",  unit =>" K"},
-    "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin => "0",  argMax => "100",	type =>"1clean", unit =>" %"}, 
-    "p04DHWsetDayTemp"			=> {cmd2=>"0A0013", argMin => "13", argMax => "49",	type =>"5temp",  unit =>" °C"},
-    "p05DHWsetNightTemp"		=> {cmd2=>"0A05BF", argMin => "13", argMax => "49",	type =>"5temp",  unit =>" °C"},
-    "p83DHWsetSolarTemp"		=> {cmd2=>"0A05BE", argMin => "13", argMax => "75",	type =>"5temp",  unit =>" °C"},
-    "p06DHWsetStandbyTemp"		=> {cmd2=>"0A0581", argMin => "13", argMax => "49",	type =>"5temp",  unit =>" °C"},
-    "p11DHWsetManualTemp"		=> {cmd2=>"0A0580", argMin => "13", argMax => "54",	type =>"5temp",  unit =>" °C"},
-    "p07FanStageDay"			=> {cmd2=>"0A056C", argMin =>  "0", argMax =>  "3",	type =>"1clean",  unit =>""},
-    "p08FanStageNight"			=> {cmd2=>"0A056D", argMin =>  "0", argMax =>  "3",	type =>"1clean",  unit =>""},
-    "p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>  "0", argMax =>  "3",	type =>"1clean",  unit =>""},
-    "p99FanStageParty"			=> {cmd2=>"0A0570", argMin =>  "0", argMax =>  "3",	type =>"1clean",  unit =>""},
-    "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>  "0", argMax =>  "2",	type =>"1clean",  unit =>""},
+    "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
+    "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC1SummerMode"	=> {cmd2=>"0B0569", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p13GradientHC1"			=> {cmd2=>"0B010E", argMin =>   "0", argMax =>    "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
+    "p14LowEndHC1"			=> {cmd2=>"0B059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
+    "p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean",  unit =>" %"},
+    "p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin =>   "0", argMax =>  "100",	type =>"1clean",  unit =>" %"}, #in % 0..100%
+    "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC2SummerMode"	=> {cmd2=>"0C0569", argMin =>  "13", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "13", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "13", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p16GradientHC2"			=> {cmd2=>"0C010E", argMin =>   "0", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
+    "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},
+    "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"1clean", unit =>" %"}, 
+    "p04DHWsetDayTemp"			=> {cmd2=>"0A0013", argMin =>  "13", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
+    "p05DHWsetNightTemp"		=> {cmd2=>"0A05BF", argMin =>  "13", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
+    "p83DHWsetSolarTemp"		=> {cmd2=>"0A05BE", argMin =>  "13", argMax =>   "75",	type =>"5temp",  unit =>" °C"},
+    "p06DHWsetStandbyTemp"		=> {cmd2=>"0A0581", argMin =>  "13", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
+    "p11DHWsetManualTemp"		=> {cmd2=>"0A0580", argMin =>  "13", argMax =>   "54",	type =>"5temp",  unit =>" °C"},
+    "p07FanStageDay"			=> {cmd2=>"0A056C", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
+    "p08FanStageNight"			=> {cmd2=>"0A056D", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
+    "p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
+    "p99FanStageParty"			=> {cmd2=>"0A0570", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
+    "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "2",	type =>"1clean",  unit =>""},
+    "p21Hist1"				=> {cmd2=>"0A05C0", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
+    "p22Hist2"				=> {cmd2=>"0A05C1", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
+    "p23Hist3"				=> {cmd2=>"0A05C2", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
+    "p24Hist4"				=> {cmd2=>"0A05C3", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
+    "p25Hist5"				=> {cmd2=>"0A05C4", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
+    "p29HistAsymmetry"			=> {cmd2=>"0A05C5", argMin =>   "1", argMax =>    "5",	type =>"1clean",  unit =>""}, 
     "p30integralComponent"		=> {cmd2=>"0A0162", argMin =>  "10", argMax =>  "999",	type =>"1clean",  unit =>" Kmin"}, 
-    "p33BoosterTimeoutDHW"		=> {cmd2=>"0A0588", argMin =>  "0", argMax =>  "200",	type =>"1clean",  unit =>" min"}, #during DHW heating
-    "p79BoosterTimeoutHC"		=> {cmd2=>"0A05A0", argMin =>  "0", argMax =>  "60" ,	type =>"1clean",  unit =>" min"}, #delayed enabling of booster heater
-    "p46UnschedVent0"			=> {cmd2=>"0A0571", argMin =>  "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
-    "p45UnschedVent1"			=> {cmd2=>"0A0572", argMin =>  "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
-    "p44UnschedVent2"			=> {cmd2=>"0A0573", argMin =>  "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
-    "p43UnschedVent3"			=> {cmd2=>"0A0574", argMin =>  "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
+    "p33BoosterTimeoutDHW"		=> {cmd2=>"0A0588", argMin =>   "0", argMax =>  "200",	type =>"1clean",  unit =>" min"}, #during DHW heating
+    "p79BoosterTimeoutHC"		=> {cmd2=>"0A05A0", argMin =>   "0", argMax =>   "60",	type =>"1clean",  unit =>" min"}, #delayed enabling of booster heater
+    "p46UnschedVent0"			=> {cmd2=>"0A0571", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
+    "p45UnschedVent1"			=> {cmd2=>"0A0572", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
+    "p44UnschedVent2"			=> {cmd2=>"0A0573", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
+    "p43UnschedVent3"			=> {cmd2=>"0A0574", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
     "p37Fanstage1AirflowInlet"		=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#zuluft 
     "p38Fanstage2AirflowInlet"		=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#zuluft 
     "p39Fanstage3AirflowInlet"		=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#zuluft 
     "p40Fanstage1AirflowOutlet"		=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
     "p41Fanstage2AirflowOutlet"		=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
     "p42Fanstage3AirflowOutlet"		=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
-    "p49SummerModeTemp"			=> {cmd2=>"0A0116", argMin =>  "11", argMax =>  "24",	type =>"5temp",  unit =>" °C"},		#threshold for summer mode !! 
-    "p50SummerModeHysteresis"		=> {cmd2=>"0A05A2", argMin =>  "0.5", argMax =>  "5",	type =>"5temp",  unit =>" K"},		#Hysteresis for summer mode !! 
-    "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin =>  "-10", argMax =>  "20",	type =>"5temp",  unit =>" °C"},
+    "p49SummerModeTemp"			=> {cmd2=>"0A0116", argMin =>  "11", argMax =>   "24",	type =>"5temp",  unit =>" °C"},		#threshold for summer mode !! 
+    "p50SummerModeHysteresis"		=> {cmd2=>"0A05A2", argMin => "0.5", argMax =>    "5",	type =>"5temp",  unit =>" K"},		#Hysteresis for summer mode !! 
+    "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin => "-10", argMax =>   "20",	type =>"5temp",  unit =>" °C"},
     "p54MinPumpCycles"			=> {cmd2=>"0A05B8", argMin =>  "1", 	argMax =>  "24",	type =>"1clean",  unit =>""},
     "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", 	argMax => "200",	type =>"1clean",  unit =>""},
     "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "1", 	argMax =>  "20",	type =>"5temp",  unit =>" °C"},
@@ -1000,7 +1006,7 @@ my %parsinghash = (
 	      [" dewPoint: ",			82, 4, "hex2int", 10],
 	      [" P_Nd: ",			86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
 	      [" actualPower_Qc: ",		94, 8, "hex2int", 1],	[" actualPower_Pel: ",		102, 8, "hex2int", 1],
-	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10]
+	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
   "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
 	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
