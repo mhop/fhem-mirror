@@ -225,7 +225,7 @@ HttpUtils_Connect2($)
     $hash->{FD} = $hash->{conn}->fileno();
     $hash->{buf} = "";
     $hash->{NAME} = "" if(!defined($hash->{NAME})); 
-    my %timerHash = ( hash => {$hash} );
+    my %timerHash = ( hash => $hash );
     $hash->{directReadFn} = sub() {
       my $buf;
       my $len = sysread($hash->{conn},$buf,65536);
