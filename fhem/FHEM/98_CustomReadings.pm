@@ -43,13 +43,22 @@ sub CustomReadings_read($)
   # Get the readingDefinitions and remove all newlines from the attribute
   my $readingDefinitions = AttrVal( $name, "readingDefinitions", "");
   $readingDefinitions =~ s/\n//g;
-    
-  my @definitionList = split(',', $readingDefinitions);
+
   my @used = ("state");
   
   readingsBeginUpdate($hash);
-  foreach (@definitionList) {
-    my @definition = split(':', $_, 2);
+  
+  my @definitionList = split(",", $readingDefinitions);
+  while (@definitionList) {
+    my $param = shift(@definitionList);
+
+    while ($param && $param =~ /{/ && $param !~ /}/ ) {
+      my $next = shift(@definitionList);
+      last if( !defined($next) );
+      $param .= ",". $next;
+    }
+    
+    my @definition = split(':', $param, 2);
     push(@used, $definition[0]);
     
     my $value = eval($definition[1]);
@@ -62,7 +71,7 @@ sub CustomReadings_read($)
     
     readingsBulkUpdate($hash, $definition[0], $value);
   }
-  
+
   readingsEndUpdate($hash, 1);
 
   foreach my $r (keys %{$hash->{READINGS}}) {
