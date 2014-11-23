@@ -30,6 +30,7 @@ my $fList = `$svnlook changed $arg $repos`;
 foreach my $row (split("\n", $fList)) {
   chomp($row);
   my ($type, $fName) = split(" ", $row);
+  next if($type eq "D");
   next if(!$fName || $fName !~ m+FHEM/\d\d_(.*).pm$+);
   my $modName = $1;
 
