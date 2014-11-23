@@ -58,7 +58,6 @@ setstate TV 2013-08-26 18:01:06 state on
 setstate anyViews_weblink initialized
 setstate autocreate active
 setstate dew_all active
-setstate et active
 setstate global <no definition>
 setstate outdoorNotifier active
 setstate rg_Guest1 none
