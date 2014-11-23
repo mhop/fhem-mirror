@@ -683,7 +683,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     my $tmplDev;
     $tmplDev = $tmpl ? $tmpl
                      : AttrVal($name,"tempListTmpl",
-                       AttrVal($hiN,"configDir",".")."/tempList.cfg:$name");
+                               ($fName?$fName:AttrVal($hiN,"configDir",".")."/tempList.cfg").":$name");
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
     push @rs,  ($r ? "fail  : $tmplDev for $name: $r"
                    : "passed: $tmplDev for $name")
