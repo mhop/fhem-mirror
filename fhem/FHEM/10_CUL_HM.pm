@@ -740,7 +740,8 @@ sub CUL_HM_Attr(@) {#################################
       return "use $attrName only for devices" if (!$hash->{helper}{role}{dev});
       my ($ioCCU,$prefIO) = split(":",$attrVal,2);
       $hash->{helper}{io}{vccu}   = $ioCCU;
-      $hash->{helper}{io}{prefIO} = $prefIO;
+      my @prefIOA = split(",",$prefIO);
+      $hash->{helper}{io}{prefIO} = \@prefIOA;
     }
     else{
       $hash->{helper}{io}{vccu} = "";
@@ -6005,7 +6006,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   } elsif($conv eq "fltCvT60"){$data = CUL_HM_CvTflt60($data);
   } elsif($conv eq "min2time"){$data = CUL_HM_min2time($data);
   } elsif($conv eq "m10s3"   ){$data = ($data+3)/10;
-  } elsif($conv eq "hex"     ){$data = sprintf("0x%X",$data);
+  } elsif($conv eq "hex"     ){$data = sprintf("0x%06X",$data);#06 only for paired to. Currently not used by others
   } else { return " conv undefined - please contact admin";
   }
   $data /= $factor if ($factor);# obey factor after possible conversion
@@ -6859,7 +6860,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
     return; 
   }
     
-  my ($ioCCU,$prefIO) = ($hash->{helper}{io}{vccu},$hash->{helper}{io}{prefIO});
+  my $ioCCU = $hash->{helper}{io}{vccu};
   if (   defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"
       && ref($defs{$ioCCU}{helper}{io}{ioList}) eq 'ARRAY'){
     my @ioccu = @{$defs{$ioCCU}{helper}{io}{ioList}};
@@ -6867,7 +6868,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
                     $hash->{helper}{mRssi}{io}{$a} } 
                     grep {defined $hash->{helper}{mRssi}{io}{$_}} @ioccu)
                   ,(grep {!defined $hash->{helper}{mRssi}{io}{$_}} @ioccu));
-    unshift @ios,$prefIO if ($prefIO);# set prefIO to first choice
+    unshift @ios,@{$hash->{helper}{io}{prefIO}} if ($hash->{helper}{io}{prefIO});# set prefIO to first choice
     foreach my $iom (@ios){
       if (  !$defs{$iom}
           || $defs{$iom}{STATE} eq "disconnected" 
@@ -8335,12 +8336,13 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         CCU will take care of the assignment to the best suitable IO. It is necessary that a
         virtual CCU is defined and all relevant IO devices are assigned to it. Upon sending the CCU will
         check which IO is operational and has the best RSSI performance for this device.<br>
-        Optional a prefered IO can be added. In case this IO is operational it willge selected regardless
+        Optional a prefered IO - perfIO can be given. In case this IO is operational it will be selected regardless
         of rssi values. <br>
         Example:<br>
         <ul><code>
           attr myDevice1 IOgrp vccu<br>
           attr myDevice2 IOgrp vccu:prefIO<br>
+          attr myDevice2 IOgrp vccu:prefIO1,prefIO2,prefIO3<br>
         </code></ul>
         </li>
     <li><a name="#CUL_HMlevelRange">levelRange</a><br>
@@ -9572,7 +9574,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         Beispiel:<br>
         <ul><code>
           attr myDevice1 IOgrp vccu<br>
-          attr myDevice2 IOgrp vccu:prefIO<br>
+          attr myDevice2 IOgrp vccu:prefIO1,prefIO2,prefIO3<br>
         </code></ul>
         </li>
     <li><a name="#CUL_HMlevelRange">levelRange</a><br>
