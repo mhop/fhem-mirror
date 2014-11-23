@@ -90,6 +90,7 @@ TcpServer_Accept($$)
       SSL_server    => 1, 
       SSL_key_file  => "$mp/certs/server-key.pem",
       SSL_cert_file => "$mp/certs/server-cert.pem",
+      SSL_version   => 'SSLv23:!SSLv3:!SSLv2', #Forum #27565
       Timeout       => 4,
       });
     if(!$ret && $! ne "Socket is not connected") {
