@@ -42,7 +42,7 @@ use Blocking;
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_Init($);
 sub FRITZBOX_Init_Reading($$$@);
-sub FRITZBOX_Ring($$);
+sub FRITZBOX_Ring($@);
 sub FRITZBOX_Exec($$);
   
 my %fonModel = ( 
@@ -196,6 +196,15 @@ FRITZBOX_Set($$@)
    my ($hash, $name, $cmd, @val) = @_;
    my $resultStr = "";
    
+   my $list = "update:noArg"
+            . " customerRingTone"
+            . " convertRingTone"
+            . " guestWlan:on,off"
+            . " message"
+            . " ring"
+            . " startRadio"
+            . " wlan:on,off";
+
    if ( lc $cmd eq 'convertringtone')
    {
       if (int @val > 0) 
@@ -226,7 +235,7 @@ FRITZBOX_Set($$@)
          return undef;
       }
    }
-   elsif( lc $cmd eq 'reinit' ) 
+   elsif( lc $cmd eq 'update' ) 
    {
       FRITZBOX_Init($hash);
       return undef;
@@ -260,14 +269,6 @@ FRITZBOX_Set($$@)
       }
    }
 
-   my $list = "reinit:noArg"
-            . " customerRingTone"
-            . " convertRingTone"
-            . " guestWlan:on,off"
-            . " message"
-            . " ring"
-            . " startRadio"
-            . " wlan:on,off";
    return "Unknown argument $cmd or wrong parameter, choose one of $list";
 
 } # end FRITZBOX_Set
@@ -299,6 +300,9 @@ FRITZBOX_Init($)
    my ($hash) = @_;
    my $name = $hash->{NAME};
    my $result;
+   my $rName;
+   my @cmdArray;
+   my @resultArray;
    
    readingsBeginUpdate($hash);
 
@@ -307,10 +311,12 @@ FRITZBOX_Init($)
       , "box_fwVersion"
       , "ctlmgr_ctl r logic status/nspver"
       , "fwupdate");
+  # WLAN
    FRITZBOX_Init_Reading($hash
       , "box_wlan"
       , "ctlmgr_ctl r wlan settings/ap_enabled"
       , "onoff");
+  # Gäste WLAN
    FRITZBOX_Init_Reading($hash
       , "box_guestWlan"
       , "ctlmgr_ctl r wlan settings/guest_ap_enabled"
@@ -319,7 +325,7 @@ FRITZBOX_Init($)
   # Internetradioliste erzeugen
    my $i = 0;
    @radio = ();
-   my $rName = sprintf ("radio%02d",$i);
+   $rName = "radio00";
    do 
    {
       $result = FRITZBOX_Init_Reading($hash 
@@ -332,6 +338,7 @@ FRITZBOX_Init($)
    }
    while ( $result ne "" || defined $hash->{READINGS}{$rName} );
 
+# Dect Telefon
    foreach (1..6)
    {
      # Dect-Telefonname
@@ -392,6 +399,7 @@ FRITZBOX_Init($)
       }
    }
 
+# Analog telefon
    foreach (1..3)
    {
      # Analog-Telefonname
@@ -403,6 +411,7 @@ FRITZBOX_Init($)
       }
    }
 
+# Alarm clock
    foreach (0..2)
    {
      # Alarm clock state
@@ -431,7 +440,40 @@ FRITZBOX_Init($)
          , "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Name");
    }
 
+# user profiles
+   $i=0;
+   $rName = "user01";
+   do 
+   {
+    # User Name
+      $result = FRITZBOX_Init_Reading($hash
+         , $rName
+         , "ctlmgr_ctl r user settings/user".$i."/name"
+         );
+      FRITZBOX_Init_Reading($hash
+         , $rName."_thisMonthTime"
+         , "ctlmgr_ctl r user settings/user".$i."/this_month_time"
+         , "timeinhours");
+      FRITZBOX_Init_Reading($hash
+         , $rName."_todayTime"
+         , "ctlmgr_ctl r user settings/user".$i."/today_time"
+         , "timeinhours");
+      FRITZBOX_Init_Reading($hash
+         , $rName."_type"
+         , "ctlmgr_ctl r user settings/user".$i."/type"
+         );
+      $i++;
+      $rName = sprintf ("user%02d",$i+1);
+   }
+   while ($i<100 && ($result ne "" || defined $hash->{READINGS}{$rName} ));
+   
    readingsEndUpdate( $hash, 1 );
+
+
+   RemoveInternalTimer($hash);
+ # Get next data after 60 minutes
+   InternalTimer(gettimeofday() + 3600, "FRITZBOX_Init", $hash, 1);
+   
 }
 
 sub ##########################################
@@ -450,7 +492,7 @@ FRITZBOX_Init_Reading($$$@)
       {
          if ($result == 0) 
          {
-            $result = "only once";
+            $result = "once";
          }
          elsif ($result == 127)
          {
@@ -493,10 +535,14 @@ FRITZBOX_Init_Reading($$$@)
       {
          $result = $ringTone{$result};
       }
-            
+      elsif ($replace eq "timeinhours")
+      {
+         $result = sprintf "%d h %d min", int $result/3600, int( ($result %3600) / 60);
+      }
       readingsBulkUpdate($hash, $rName, $result)
          if $result;
-   } elsif (defined $hash->{READINGS}{$rName} ) {
+   } elsif (defined $hash->{READINGS}{$rName} ) 
+   {
       delete $hash->{READINGS}{$rName};
    }
    return $result;
@@ -717,7 +763,6 @@ FRITZBOX_ConvertRingTone ($@)
 #pbd --set-image-url --book=255 --id=612 --url=/var/InternerSpeicher/FRITZ/fonring/1416431162.g722 --type=1
 #pbd --set-image-url --book=255 --id=612 --url=file://var/InternerSpeicher/FRITZBOXtest.g722 --type=1
 #ctlmgr_ctl r user settings/user0/bpjm_filter_enable
-#CustomerRingTon 
 #/usr/bin/pbd --set-ringtone-url --book="255" --id="612" --url="file:///var/InternerSpeicher/claydermann.g722" --name="Claydermann"
 }
 
@@ -726,13 +771,24 @@ FRITZBOX_ConvertRingTone ($@)
 sub ############################################
 FRITZBOX_Exec($$)
 {
-   my ($hash, $cmd) = @_;
-   FRITZBOX_Log $hash, 5, "Execute '".$cmd."'";
-   my $result = qx($cmd);
-   chomp ($result);
-   FRITZBOX_Log $hash, 5, "Result '".$result."'";
+   my ($hash, @cmd) = @_;
    
-   return $result;
+   FRITZBOX_Log $hash, 5, "Execute '".(join "|", @cmd)."'";
+   my $cmdStr = (join "\n", @cmd);
+   my $result = qx($cmdStr);
+   
+   if (int @cmd > 1)
+   {
+      my @resultArray = split "\n".$result;;
+      FRITZBOX_Log $hash, 5, "Result '".join "|", @resultArray."'";
+      return @resultArray;
+   }
+   else
+   {
+      chomp $result;
+      FRITZBOX_Log $hash, 5, "Result '$result'";
+      return $result;
+   }
 }
 
 ##################################### 
@@ -758,7 +814,7 @@ FRITZBOX_Exec($$)
       <br>
       Example:
       <br>
-      <code>define FRITZBOXs FRITZBOX</code>
+      <code>define fritzbox FRITZBOX</code>
       <br/><br/>
    </ul>
   
@@ -770,12 +826,12 @@ FRITZBOX_Exec($$)
          <br>
          Switches the guest WLAN on or off.
       </li><br>
-      <li><code>set &lt;name&gt; reinit</code>
+      <li><code>set &lt;name&gt; update</code>
          <br>
-         Reads in some information of the connected phone devices.
+         Updates the readings of the device immediately.
       </li><br>
       <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration [ringTone]] [msg(yourMessage)]</code>
-         Example: <code>set FRITZBOXs ring 612 5 Budapest msg:It is raining</code>
+         Example: <code>set fritzbox ring 612 5 Budapest msg:It is raining</code>
          <br>
          Rings the internal number for "duration" seconds with the given "ring tone" name.
          <br>
