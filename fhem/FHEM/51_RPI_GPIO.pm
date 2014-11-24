@@ -102,8 +102,18 @@ sub RPI_GPIO_Define($$) {
 		$counter --;
 	}
 	unless( $counter ) {																												#abbrechen wenn export fehlgeschlagen
-		Log3 $hash, 1, "$name: failed to export pin gpio$hash->{RPI_pin}";
-        return "$name: failed to export pin gpio$hash->{RPI_pin}";
+		#nochmal probieren wenn keine Schreibrechte##########
+		if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {							#Abbbruch da kein gpio utility vorhanden
+			Log3 $hash, 1, "$name: can't export gpio$hash->{RPI_pin}, no write access to $gpiodir/export and " . $ret;
+			Log3 $hash, 1, "$name: failed to export pin gpio$hash->{RPI_pin}";
+        	return "$name: failed to export pin gpio$hash->{RPI_pin}";
+		} else {														#nutze GPIO Utility?
+			Log3 $hash, 4, "$name: using gpio utility to export pin (first export failed)";
+			RPI_GPIO_exuexpin($hash, "in");
+		}
+		#####################################################
+#		Log3 $hash, 1, "$name: failed to export pin gpio$hash->{RPI_pin}";
+#       return "$name: failed to export pin gpio$hash->{RPI_pin}";
 	}
 
  $hash->{fhem}{interfaces} = "switch";
@@ -140,10 +150,10 @@ sub RPI_GPIO_Set($@) {
 	if(defined($attr{$name}) && defined($attr{$name}{"direction"})) {
 		my $mt = $attr{$name}{"direction"};
 		if($mt && $mt eq "output") {
-			if ($cmd eq 'toggle') {
-				my $val = RPI_GPIO_fileaccess($hash, "value");     #alten Wert des GPIO direkt auslesen
-				$cmd = $val eq "0" ? "on" :"off";
-			}
+			#if ($cmd eq 'toggle') {
+			#	my $val = RPI_GPIO_fileaccess($hash, "value");     #alten Wert des GPIO direkt auslesen
+			#	$cmd = $val eq "0" ? "on" :"off";
+			#}
 			if ($cmd eq 'on') {
 				RPI_GPIO_fileaccess($hash, "value", "1");
 				#$hash->{STATE} = 'on';
@@ -160,6 +170,7 @@ sub RPI_GPIO_Set($@) {
 				readingsEndUpdate($hash, 1);
 			} else {
 				my $slist = join(' ', keys %setsoutp);
+                Log3 $hash, 5, "wird an setextensions gesendet: @a";
 				return SetExtensions($hash, $slist, @a);
 			}
 		} else {
@@ -559,7 +570,7 @@ sub RPI_GPIO_exuexpin($$) {			#export, unexport and direction Pin via GPIO utili
 		$dir = "";
 	} else {
 		$sw = "export";
-        $dir = "out" if ( $dir eq "high" || $dir eq "low" );		#auf out zurueck, da gpio tool dies nicht unterstützt
+        $dir = "out" if ( $dir eq "high" || $dir eq "low" );		#auf out zurueck, da gpio tool dies nicht unterst?tzt
 		$dir = " ".$dir;
 	}
 	if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {
@@ -622,7 +633,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 	<a name="RPI_GPIO"></a>
 		Raspberry Pi offers direct access to several GPIO via header P1 (and P5 on V2). The Pinout is shown in table under define. 
 		With this module you are able to access these GPIO's directly as output or input. For input you can use either polling or interrupt mode<br>
-		In addition to the Raspberry Pi, also BBB, Cubie and almost every linux system which provides gpio access in userspace is supported.<br>
+		In addition to the Raspberry Pi, also BBB, Cubie, Banana Pi and almost every linux system which provides gpio access in userspace is supported.<br>
 		<b>Warning: Never apply any external voltage to an output configured pin! GPIO's internal logic operate with 3,3V. Don't exceed this Voltage!</b><br><br>
 		<b>preliminary:</b><br>
 		GPIO Pins accessed by sysfs. The files are located in folder <code>/system/class/gpio</code> and belong to the gpio group (on actual Raspbian distributions since jan 2014).<br>
@@ -631,8 +642,8 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 			sudo adduser fhem gpio<br>
 			sudo reboot
 		</code></ul><br>
-		On older Raspbian distributions and if attribute <code>pud_resistor</code> shall be used, aditionally gpio utility from <a href="http://wiringpi.com/download-and-install/">WiringPi</a>
-		library must be installed to export and change access rights of GPIO's, or to set the internal pullup/down resistor.<br>
+		If attribute <code>pud_resistor</code> shall be used and on older Raspbian distributions, aditionally gpio utility from <a href="http://wiringpi.com/download-and-install/">WiringPi</a>
+		library must be installed to set the internal pullup/down resistor or export and change access rights of GPIO's (for the second case active_low does <b>not</b> work).<br>
 		Installation WiringPi:<br>
 		<ul><code>
 			sudo apt-get update<br>
@@ -647,7 +658,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 	<ul><code>
 		echo 22 > /sys/class/gpio/export<br>
 		echo 23 > /sys/class/gpio/export<br>
-		chown -R fhem:root /sys/devices/virtual/gpio/*<br>
+		chown -R fhem:root /sys/devices/virtual/gpio/* (or chown -R fhem:gpio /sys/devices/platform/gpio-sunxi/gpio/* for Banana Pi)<br>
 		chown -R fhem:root /sys/class/gpio/*<br>
 	</code></ul><br> 
 	<a name="RPI_GPIODefine"></a>
@@ -811,7 +822,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
   <a name="RPI_GPIO"></a>
     Das Raspberry Pi erm&ouml;glicht direkten Zugriff zu einigen GPIO's &uuml;ber den Pfostenstecker P1 (und P5 bei V2). Die Steckerbelegung ist in den Tabellen unter Define zu finden.
     Dieses Modul erm&ouml;glicht es, die herausgef&uuml;hrten GPIO's direkt als Ein- und Ausgang zu benutzen. Die Eing&auml;nge k&ouml;nnen zyklisch abgefragt werden oder auch sofort bei Pegelwechsel gesetzt werden.<br>
-		Neben dem Raspberry Pi k&ouml;nnen auch die GPIO's von BBB, Cubie und jedem Linuxsystem, das diese im Userspace zug&auml;gig macht, genutzt werden.<br>
+		Neben dem Raspberry Pi k&ouml;nnen auch die GPIO's von BBB, Cubie, Banana Pi und jedem Linuxsystem, das diese im Userspace zug&auml;gig macht, genutzt werden.<br>
     <b>Wichtig: Niemals Spannung an einen GPIO anlegen, der als Ausgang eingestellt ist! Die interne Logik der GPIO's arbeitet mit 3,3V. Ein &uuml;berschreiten der 3,3V zerst&ouml;rt den GPIO und vielleicht auch den ganzen Prozessor!</b><br><br>
     <b>Vorbereitung:</b><br>
 		Auf GPIO Pins wird im Modul &uuml;ber sysfs zugegriffen. Die Dateien befinden sich unter <code>/system/class/gpio</code> und sind in der aktuellen Raspbian Distribution (ab Jan 2014) in der Gruppe gpio.<br>
@@ -820,8 +831,8 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 			sudo adduser fhem gpio<br>
 			sudo reboot
 		</code></ul><br>
-		F&uuml;r &auml;ltere Raspbian Distributionen und wenn das Attribut <code>pud_resistor</code> verwendet werden soll, muss zus&auml;tzlich das gpio Tool der <a href="http://wiringpi.com/download-and-install/">WiringPi</a>
-		Bibliothek installiert werden, um GPIO's zu exportieren und die korrekten Nutzerrechte zu setzen, bzw. den internen Pullup/down Widerstand zu aktivieren.<br>
+		Wenn das Attribut <code>pud_resistor</code> verwendet werden soll und f&uuml;r &auml;ltere Raspbian Distributionen, muss zus&auml;tzlich das gpio Tool der <a href="http://wiringpi.com/download-and-install/">WiringPi</a>
+		Bibliothek installiert werden, um den internen Pullup/down Widerstand zu aktivieren, bzw. GPIO's zu exportieren und die korrekten Nutzerrechte zu setzen (f&uuml;r den zweiten Fall funktioniert das active_low Attribut <b>nicht</b>).<br>
 		Installation WiringPi:<br>
 		<ul><code>
 			sudo apt-get update<br>
@@ -836,7 +847,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 		<ul><code>
 			echo 22 > /sys/class/gpio/export<br>
 			echo 23 > /sys/class/gpio/export<br>
-			chown -R fhem:root /sys/devices/virtual/gpio/*<br>
+			chown -R fhem:root /sys/devices/virtual/gpio/* (oder chown -R fhem:gpio /sys/devices/platform/gpio-sunxi/gpio/* f&uuml;r Banana Pi)<br>
 			chown -R fhem:root /sys/class/gpio/*<br>
 		</code></ul><br>
 	<a name="RPI_GPIODefine"></a>
