@@ -377,7 +377,7 @@ structure_Set($@)
 
     } else {
       my $async_delay = AttrVal($hash->{NAME}, "async_delay", undef);
-      if(defined($async_delay)) {
+      if(defined($async_delay) && $list[1] ne "?") {
         $startAsyncProcessing = $async_delay if(!@{$hash->{".asyncQueue"}});
         push @{$hash->{".asyncQueue"}}, join(" ", @list);
 
