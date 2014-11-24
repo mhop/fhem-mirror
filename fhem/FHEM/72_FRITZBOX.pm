@@ -339,7 +339,10 @@ FRITZBOX_Init($)
    while ( $result ne "" || defined $hash->{READINGS}{$rName} );
 
 # Dect Telefon
-   # %handset = ();
+   foreach (610..615) { delete $hash->{fhem}{$_} if defined $hash->{fhem}{$_}; }
+   
+   # Init Foncontrol
+   FRITZBOX_Exec ($hash, "ctlmgr_ctl r telcfg settings/Foncontrol");
    foreach (1..6)
    {
      # Dect-Interne Nummer
@@ -352,7 +355,7 @@ FRITZBOX_Init($)
       $result = FRITZBOX_Init_Reading($hash, 
          "dect".$_, 
          "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name");
-      $hash->{fhem}{$intern}{Name} = $result;
+      $hash->{fhem}{$intern}{name} = $result;
      # Handset manufacturer
       $result = FRITZBOX_Init_Reading($hash, 
          "dect".$_."_manufacturer", 
@@ -396,7 +399,7 @@ FRITZBOX_Init($)
             , "dect".$_."_model"
             , "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model"
             , "model");   
-         $hash->{fhem}{$intern}{Model} = $result;
+         $hash->{fhem}{$intern}{model} = $result;
       }
    }
 
@@ -431,7 +434,7 @@ FRITZBOX_Init($)
          , "altime");
      # Alarm clock number
       FRITZBOX_Init_Reading($hash
-         , "alarm".($_+1)."_number"
+         , "alarm".($_+1)."_target"
          , "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Number"
          , "alnumber");
      # Alarm clock weekdays
@@ -470,7 +473,6 @@ FRITZBOX_Init($)
    
    readingsEndUpdate( $hash, 1 );
 
-
    RemoveInternalTimer($hash);
  # Get next data after 5 minutes
    InternalTimer(gettimeofday() + 300, "FRITZBOX_Init", $hash, 1);
@@ -487,7 +489,7 @@ FRITZBOX_Init_Reading($$$@)
    if ($result ne "") {
       if ($replace eq "altime")
       {
-         $result = substr($result,0,2).":".substr($result,-2);
+         $result =~ s/(\d\d)(\d\d)/$1:$2/;
       }
       if ($replace eq "aldays")
       {
@@ -511,6 +513,19 @@ FRITZBOX_Init_Reading($$$@)
       }
       if ($replace eq "alnumber")
       {
+         if (60 <= $result && $result <= 65)
+         {
+            my $intern = $result + 550;
+            $result = $hash->{fhem}{$intern}{name}." (DECT $intern)";
+         }
+         elsif ($result == 9)
+         {
+            $result = "all DECT";
+         }
+         elsif ($result == 50)
+         {
+            $result = "all";
+         }
       }
       elsif ($replace eq "fwupdate")
       {
@@ -582,6 +597,19 @@ FRITZBOX_Update_Readings($@)
       }
       if ($replace eq "alnumber")
       {
+         if (60 <= $result && $result =>65)
+         {
+            my $intern = $result + 550;
+            $result = $hash->{fhem}{$intern}{name}." - DECT $intern";
+         }
+         elsif ($result == 9)
+         {
+            $result = "all DECT";
+         }
+         elsif ($result == 50)
+         {
+            $result = "all";
+         }
       }
       elsif ($replace eq "fwupdate")
       {
@@ -648,7 +676,7 @@ sub ##########################################
 FRITZBOX_Ring_Run($) 
 {
    my ($string) = @_;
-   my ($name, $intNo, $duration, $ringTone) = split /\|/, $string;
+   my ($name, @val) = split /\|/, $string;
    my $hash = $defs{$name};
    
    my $fonType;
@@ -659,28 +687,53 @@ FRITZBOX_Ring_Run($)
    my $cmd;
    my @cmdArray;
 
+   my $intNo;
+   $intNo = $val[0]
+      if $val[0] =~ /^\d+$/;
+   return $name."|0|Error: Parameter '".$val[0]."' not a number"
+      unless defined $intNo;
+   shift @val;
+   
    $fonType = $hash->{fhem}{$intNo}{brand};
-
    return $name."|0|Error: Internal number '$intNo' not a DECT number" 
       unless defined $fonType;
-
    $fonTypeNo = $intNo - 609;
    
-   $duration = 5 
-      unless defined $duration;
    
-   $ringTone = undef
-      if ($fonType ne "AVM" );
-
-   if (defined $ringTone)
+   my $duration = 5;
+   if ($val[0] !~ /^msg:/i)
    {
-      my $temp = $ringTone;
-      $ringTone = $ringToneNumber{lc $ringTone};
-      return $name."|0|Error: Ring tone '$temp' not valid"
-         unless defined $ringTone;
+      $duration = $val[0]
+         if defined $val[0];
+      shift @val;
+      return $name."|0|Error: Duration '".$val[0]."' not a positiv integer" 
+         unless $duration =~ /^\d+$/;
+   }
+   
+   my $ringTone;
+   if ($val[0] !~ /^msg:/i)
+   {
+      $ringTone = $val[0]
+         unless $fonType ne "AVM";
+      if (defined $ringTone)
+      {
+         $ringTone = $ringToneNumber{lc $val[0]};
+         return $name."|0|Error: Ring tone '".$val[0]."' not valid"
+            unless defined $ringTone;
+      }
+      shift @val;
    }
       
    my $msg = AttrVal( $name, "defaultCallerName", "FHEM" );
+   if (int @val > 0)
+   {
+      return $name."|0|Error: Too many parameter. Message has to start with 'msg:'"
+         if ($val[0] !~ /^msg:/i);
+      $msg = join " ", @val;
+      $msg =~ s/^msg:\s*//;
+      $msg = substr($msg, 0, 30);
+   }
+
    my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
 
    # uses name of virtual port 0 (dial port 1) to show message on ringing phone
@@ -714,21 +767,13 @@ FRITZBOX_Ring_Run($)
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
    push @cmdArray, "sleep ".($duration+1);
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
-   FRITZBOX_Exec( $hash, \@cmdArray );
-
-# Reset everything
-   @cmdArray = ();
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
       if $ringWithIntern != 0;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$curCallerName'"
       if $ringWithIntern =~ /^(1|2)$/ ;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$fonTypeNo."/IntRingTone ".$curIntRingTone
       if (defined $ringTone);
-   if (int @cmdArray >0)
-   {
-      FRITZBOX_Log $hash, 4, "Reset all temporary changes";
-      FRITZBOX_Exec( $hash, \@cmdArray );
-   }
+   FRITZBOX_Exec( $hash, \@cmdArray );
 
    return $name."|1|Ringing done";
 }
@@ -833,7 +878,7 @@ FRITZBOX_ConvertRingTone ($@)
 
    my $outFile = $inFile;
    $outFile = substr($inFile,0,-4)
-      if (lc substr($inFile,-4) =~ /\.(mp3|wav)/);
+      if ($inFile =~ /\.(mp3|wav)$/i);
    my $returnStr = FRITZBOX_Exec ($hash
       , 'picconv.sh "file://'.$inFile.'" "'.$outFile.'.g722" ringtonemp3');
    return $returnStr;
@@ -893,9 +938,9 @@ FRITZBOX_Exec($$)
 <h3>FRITZBOX</h3>
 <div  style="width:800px"> 
 <ul>
-   The modul allows to control some features of a Fritz!Box and to use connected Fritz!Fon's (MT-F, MT-D, C3, C4) as signaling devices.
+   Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as signaling devices.
    <br>
-   FHEM has to run on a Fritz!Box.
+   Note!! To use it, FHEM has to run on a Fritz!Box.
    <br/><br/>
    <a name="FRITZBOXdefine"></a>
    <b>Define</b>
@@ -919,9 +964,9 @@ FRITZBOX_Exec($$)
       </li><br>
       <li><code>set &lt;name&gt; update</code>
          <br>
-         Updates the readings of the device immediately.
+         Starts an update of the device readings.
       </li><br>
-      <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration [ringTone]] [msg(yourMessage)]</code>
+      <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration [ringTone]] [msg:yourMessage]</code>
          Example: <code>set fritzbox ring 612 5 Budapest msg:It is raining</code>
          <br>
          Rings the internal number for "duration" seconds with the given "ring tone" name.
