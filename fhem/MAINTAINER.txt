@@ -148,6 +148,7 @@ FHEM/51_Netzer.pm            klausw               http://forum.fhem.de Sonstige 
 FHEM/51_RPI_GPIO.pm          klausw               http://forum.fhem.de Einplatinencomputer
 FHEM/52_I2C_DS1307           ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_LCD              ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/52_I2C_MCP23008         klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_MCP23017         klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_PCA9532          klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_PCF8574          klausw               http://forum.fhem.de Sonstige Systeme
