@@ -575,7 +575,7 @@ FRITZBOX_Update_Readings($@)
       {
          $result = substr($result,0,2).":".substr($result,-2);
       }
-      if ($replace eq "aldays")
+      elsif ($replace eq "aldays")
       {
          if ($result == 0) 
          {
@@ -595,7 +595,7 @@ FRITZBOX_Update_Readings($@)
             }
          }
       }
-      if ($replace eq "alnumber")
+      elsif ($replace eq "alnumber")
       {
          if (60 <= $result && $result =>65)
          {
@@ -641,7 +641,8 @@ FRITZBOX_Update_Readings($@)
       }
       readingsBulkUpdate($hash, $rName, $result)
          if $result;
-   } elsif (defined $hash->{READINGS}{$rName} ) 
+   }
+   elsif (defined $hash->{READINGS}{$rName} ) 
    {
       delete $hash->{READINGS}{$rName};
    }
@@ -659,17 +660,18 @@ FRITZBOX_Ring($@)
 
    if ( exists( $hash->{helper}{RUNNING_PID} ) )
    {
-      FRITZBOX_Log $hash, 1, "Double call. Killing old process ".$hash->{helper}{RUNNING_PID};
+      FRITZBOX_Log $hash, 1, "Old process still running. Killing old process ".$hash->{helper}{RUNNING_PID};
       BlockingKill( $hash->{helper}{RUNNING_PID} ); 
       delete($hash->{helper}{RUNNING_PID});
    }
    
-   my $timeout = $val[1] + 5;
+   my $timeout = $val[1] + 30;
    my $handover = $name . "|" . join( "|", @val );
    
    $hash->{helper}{RUNNING_PID} = BlockingCall("FRITZBOX_Ring_Run", $handover,
                                        "FRITZBOX_Ring_Done", $timeout,
-                                       "FRITZBOX_Ring_Aborted", $hash);
+                                       "FRITZBOX_Ring_Aborted", $hash)
+                              unless exists $hash->{helper}{RUNNING_PID};
 } # end FRITZBOX_Ring
 
 sub ##########################################
@@ -734,46 +736,51 @@ FRITZBOX_Ring_Run($)
       $msg = substr($msg, 0, 30);
    }
 
-   my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
 
-   # uses name of virtual port 0 (dial port 1) to show message on ringing phone
-   if ($ringWithIntern =~ /^(1|2)$/ )
-   {
-      @cmdArray = ();
-      push @cmdArray, "ctlmgr_ctl r telcfg settings/MSN/Port".($ringWithIntern-1)."/Name";
-      push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$msg'";
-      $result = FRITZBOX_Exec( $hash, \@cmdArray );
-      $curCallerName = $result->[0];
-      FRITZBOX_Log $hash, 4, "Change name of ringing number $ringWithIntern from '$curCallerName' to '$msg'";
-   }
-   
-
+#Preparing 1st command array
+   @cmdArray = ();
 # Change ring tone of Fritz!Fons
    if (defined $ringTone)
    {
-      @cmdArray = ();
       push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$fonTypeNo."/IntRingTone";
       push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$fonTypeNo."/IntRingTone ".$ringTone;
-      $result = FRITZBOX_Exec( $hash, \@cmdArray );
-      $curIntRingTone = $result->[0];
-      FRITZBOX_Log $hash, 4, "Change internal ring tone of DECT ".$fonTypeNo." from ".$curIntRingTone." to ".$ringTone;
+      FRITZBOX_Log $hash, 4, "Change temporarily internal ring tone of DECT ".$fonTypeNo." to ".$ringTone;
+   }
+
+# uses name of virtual port 0 (dial port 1) to show message on ringing phone
+   my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
+   if ($ringWithIntern =~ /^(1|2)$/ )
+   {
+      push @cmdArray, "ctlmgr_ctl r telcfg settings/MSN/Port".($ringWithIntern-1)."/Name";
+      push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$msg'";
+      FRITZBOX_Log $hash, 4, "Change temporarily name of calling number $ringWithIntern to '$msg'";
    }
 
 # Ring
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
-   @cmdArray = ();
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort ".$ringWithIntern
       if $ringWithIntern != 0 ;
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
    push @cmdArray, "sleep ".($duration+1);
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
-      if $ringWithIntern != 0;
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$curCallerName'"
-      if $ringWithIntern =~ /^(1|2)$/ ;
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$fonTypeNo."/IntRingTone ".$curIntRingTone
-      if (defined $ringTone);
-   FRITZBOX_Exec( $hash, \@cmdArray );
+      if $ringWithIntern != 0 ;
+   $result = FRITZBOX_Exec( $hash, \@cmdArray );
+
+#Preparing snd command array to reset everything
+   @cmdArray = ();
+   if (defined $ringTone)
+   {
+      push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$fonTypeNo."/IntRingTone ".$result->[0];
+      push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2]."'"
+         if $ringWithIntern =~ /^(1|2)$/;
+   }
+   elsif ($ringWithIntern =~ /^(1|2)$/)
+   {
+      push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[0]."'";
+   }
+   FRITZBOX_Exec( $hash, \@cmdArray )
+      if int @cmdArray >0;
 
    return $name."|1|Ringing done";
 }
