@@ -14,8 +14,9 @@ font-weight:bold;
 fill:#4c566c;
 text-shadow: 0px 1px #FFFFFF;
 }
-text.copy { text-decoration:underline; stroke:none; fill:blue;}
-text.paste { text-decoration:underline; stroke:none; fill:blue;}
+text.legend{ cursor:pointer; }
+text.copy  { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
+text.paste { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 
 polyline { stroke:black; fill:none; }
 .border { stroke:black; fill:url(#gr_bg);}
