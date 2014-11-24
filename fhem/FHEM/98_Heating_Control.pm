@@ -203,7 +203,7 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
 
   my $name     = $hash->{NAME};
   my $language = $hash->{LANGUAGE};
-
+  
   my %dayNumber=();
   my $daysRegExp = "(";
   for(my $idx=0; $idx<7; $idx++) {
@@ -270,9 +270,11 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
     }
 
     @days = sort(SortNumber keys %hdays);
-    
+
+    my $TIME_AS_PERL = 0;
     if($time =~  m/^\{.*\}$/g) {
-       $hash->{TIME_AS_PERL} = 1;
+       $TIME_AS_PERL = 1;
+       $hash->{TIME_AS_PERL} |= 1;
     } 
     
     my $now = time();
@@ -281,7 +283,7 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
     for (my $d=0; $d<@days; $d++) {
        
        # Zeitangabe verarbeiten.
-       if ($hash->{TIME_AS_PERL}) {                                     # Perlausdruck {*}
+       if ($TIME_AS_PERL) {                                     # Perlausdruck {*}
          my $date    = $now+($d-$wday)*86400;
          $timeString = '{ my $date='."$date;" .$time."}";
          $timeString = eval( $timeString );                             # must deliver HH:MM[:SS]
@@ -289,7 +291,7 @@ sub Heating_Control_ParseSwitchingProfile($$$) {
        } else {
          $timeString = $time;
        }
-
+       
        if      ($timeString =~  m/^[0-2][0-9]:[0-5][0-9]$/g) {          #  HH:MM
          $timeString .= ":00";                                          #  HH:MM:SS erzeugen
        } elsif ($timeString =~  m/^[0-2][0-9](:[0-5][0-9]){2,2}$/g) {   #  HH:MM:SS
