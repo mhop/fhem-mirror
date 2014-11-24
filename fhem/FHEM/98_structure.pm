@@ -41,7 +41,7 @@ structure_Initialize($)
   $hash->{NotifyFn}  = "structure_Notify";
   $hash->{SetFn}     = "structure_Set";
   $hash->{AttrFn}    = "structure_Attr";
-  $hash->{AttrList}  = "clientstate_priority ".
+  $hash->{AttrList}  = "async_delay clientstate_priority ".
                  "clientstate_behavior:relative,relativeKnown,absolute,last ".
                  "disable disabledForIntervals $readingFnAttributes";
 
@@ -81,6 +81,8 @@ structure_Define($$)
     }
   }
   $hash->{CONTENT} = \%list;
+  my @arr = ();
+  $hash->{".asyncQueue"} = \@arr;
   delete $hash->{".cachedHelp"};
 
   @a = ( "set", $devname, $stype, $devname );
@@ -164,6 +166,7 @@ sub structure_Notify($$)
         if($attr{$me}{clientstate_priority});
 
   return "" if($hash->{INSET}); # Do not trigger for our own set
+  return "" if(@{$hash->{".asyncQueue"}}); # Do not trigger during async set 
 
   if($hash->{INNTFY}) {
     Log3 $me, 1, "ERROR: endless loop detected in structure_Notify $me";
@@ -334,6 +337,7 @@ structure_Set($@)
   # see Forum # 28623 for .cachedHelp
   return $hash->{".cachedHelp"} if($list[1] eq "?" && $hash->{".cachedHelp"});
   $hash->{INSET} = 1;
+  my $startAsyncProcessing;
 
   my $filter;
   if($list[1] ne "?") {
@@ -370,8 +374,17 @@ structure_Set($@)
                                 join(" ", @list[1..@list-1]) );
       }
       $sret .= $ret if( $ret );
+
     } else {
-      $sret .= CommandSet(undef, join(" ", @list));
+      my $async_delay = AttrVal($hash->{NAME}, "async_delay", undef);
+      if(defined($async_delay)) {
+        $startAsyncProcessing = $async_delay if(!@{$hash->{".asyncQueue"}});
+        push @{$hash->{".asyncQueue"}}, join(" ", @list);
+
+      } else {
+        $sret .= CommandSet(undef, join(" ", @list));
+
+      }
     }
     if($sret) {
       $ret .= "\n" if($ret);
@@ -384,10 +397,29 @@ structure_Set($@)
   }
   delete($hash->{INSET});
   Log3 $hash, 5, "SET: $ret" if($ret);
+
+  if(defined($startAsyncProcessing)) {
+    InternalTimer(gettimeofday()+$startAsyncProcessing,
+                                "structure_asyncQueue", $hash, 0);
+  }
   return undef if($list[1] ne "?");
   $hash->{".cachedHelp"} = "Unknown argument ?, choose one of " .
                 join(" ", sort keys(%pars));
   return $hash->{".cachedHelp"};
+}
+
+sub
+structure_asyncQueue(@) 
+{
+  my ($hash) = @_;
+
+  my $next_cmd = shift @{$hash->{".asyncQueue"}};
+  if(defined $next_cmd) {
+    CommandSet(undef, $next_cmd);
+    my $async_delay = AttrVal($hash->{NAME}, "async_delay", 0);
+    InternalTimer(gettimeofday()+$async_delay,"structure_asyncQueue",$hash,0);
+  }
+  return undef;
 }
 
 ###################################
@@ -395,10 +427,22 @@ sub
 structure_Attr($@)
 {
   my ($type, @list) = @_;
-  my %ignore = ("alias"=>1, "room"=>1, "group"=>1, "icon"=>1,
-                "devStateIcon"=>1, "webCmd"=>1, "stateFormat"=>1 );
+  my %ignore = (
+    alias=>1,
+    async_delay=>1,
+    clientstate_behavior=>1,
+    clientstate_priority=>1,
+    devStateIcon=>1,
+    disable=>1,
+    disabledForIntervals=>1,
+    group=>1,
+    icon=>1,
+    room=>1,
+    stateFormat=>1,
+    webCmd=>1
+  );
 
-  return undef if($ignore{$list[1]} || $list[1] =~ m/clientstate/);
+  return undef if($ignore{$list[1]});
 
   my $me = $list[0];
   my $hash = $defs{$me};
@@ -494,8 +538,19 @@ structure_Attr($@)
   <a name="structureattr"></a>
   <b>Attributes</b>
   <ul>
+    <a name="async_delay"></a>
+    <li>async_delay<br>
+        If this attribute is defined, unfiltered set commands will not be
+        executed in the clients immediately. Instead, they are added to a queue
+        to be executed later. The set command returns immediately, whereas the
+        clients will be set timer-driven, one at a time. The delay between two
+        timercalls is given by the value of async_delay (in seconds) and may be
+        0 for fastest possible execution.  This way, excessive delays often
+        known from large structures, can be broken down in smaller junks.
+        </li> 
+
     <li><a href="#disable">disable</a></li>
-    <li><a href="#disabledForIntervals">disabledForIntervals</a></li><br>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
     <a name="clientstate_behavior"></a>
     <li>clientstate_behavior<br>
@@ -649,8 +704,23 @@ structure_Attr($@)
   <a name="structureattr"></a>
   <b>Attribute</b>
   <ul>
+    <a name="async_delay"></a>
+    <li>async_delay<br>
+      Wenn dieses Attribut gesetzt ist, werden ungefilterte set Kommandos nicht
+      sofort an die Clients weitergereicht. Stattdessen werden sie einer
+      Warteschlange hinzugef&uuml;gt, um sp&auml;ter ausgef&uuml;hrt zu werden.
+      Das set Kommando kehrt sofort zur&uuml;ck, die Clients werden danach
+      timer-gesteuert einzeln abgearbeitet. Die Zeit zwischen den
+      Timer-Aufrufen ist dabei durch den Wert von async_delay (in Sekunden)
+      gegeben, ein Wert von 0 entspricht der schnellstm&ouml;glichen Abfolge.
+      So k&ouml;nnen besonders lange Verz&ouml;gerungen, die gerade bei
+      gro&szlig;en structures vorkommen k&ouml;nnen, in unproblematischere
+      H&auml;ppchen zerlegt werden. 
+
+      </li>
+
     <li><a href="#disable">disable</a></li>
-    <li><a href="#disabledForIntervals">disabledForIntervals</a></li><br>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
     <a name="clientstate_behavior"></a>
     <li>clientstate_behavior<br>
