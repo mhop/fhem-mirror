@@ -806,6 +806,7 @@ RESCAN:
     $data{"currdate$j"} = $lastd[$i];
     $data{"mindate$j"} = $mind[$i];
     $data{"maxdate$j"} = $maxd[$i];
+    $data{"lastraw$j"} = $h->{last2} if($h->{last2});
 
     Log3 $name, 4,
         "$name get: line $j, regexp:".$d[$i]->{re}.", col:".$d[$i]->{col}.
