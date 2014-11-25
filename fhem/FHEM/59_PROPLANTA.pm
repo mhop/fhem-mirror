@@ -394,7 +394,7 @@ sub PROPLANTA_Define($$)
    }
 
    $hash->{STATE}          = "Initializing";
-   $hash->{LOCAL}          = 0;
+   $hash->{fhem}{LOCAL}    = 0;
    $hash->{INTERVAL}       = 3600;
    $hash->{fhem}{modulVersion} = '$Date$';
    
@@ -436,9 +436,9 @@ sub PROPLANTA_Set($@)
       when ("update")
       {
          PROPLANTA_Log $hash, 3, "set command: " . $a[1];
-         $hash->{LOCAL} = 1;
+         $hash->{fhem}{LOCAL} = 1;
          PROPLANTA_Start($hash);
-         $hash->{LOCAL} = 0;
+         $hash->{fhem}{LOCAL} = 0;
       }
        default
       {
@@ -487,7 +487,7 @@ sub PROPLANTA_Start($)
    
    $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
    
-   if(!$hash->{LOCAL} && $hash->{INTERVAL} > 0) {
+   if(!$hash->{fhem}{LOCAL} && $hash->{INTERVAL} > 0) {
     # set up timer if automatically call
       RemoveInternalTimer( $hash );
       InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PROPLANTA_Start", $hash, 1 );  
@@ -730,7 +730,7 @@ PROPLANTA_Html($)
    <b>Attributes</b>
    <ul>
       <br>
-      <li><code>Interval &lt;seconds&gt;</code>
+      <li><code>INTERVAL &lt;seconds&gt;</code>
          <br>
          Poll interval for weather data in seconds (default 3600 = 1 hour)
       </li><br>
