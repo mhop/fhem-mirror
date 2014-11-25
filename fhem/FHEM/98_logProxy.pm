@@ -520,7 +520,7 @@ logProxy_clipData($$$$;$)
          }
 
       } else {
-        if( !$ret && defined($prev_value) ) {
+        if( !$ret && $sec > $from && defined($prev_value) ) {
 
           my $value = $prev_value;
           $value = logProxy_linearInterpolate( SVG_time_to_sec($prev_timestamp), $prev_value, SVG_time_to_sec($d), $v, $from ) if( $interpolate );
@@ -668,7 +668,7 @@ logProxy_Get($@)
           $predict = $value if( defined($value) );
 
         } else {
-          Log3 $hash->{NAME}, 2, "$hash->{NAME}: unknown option >$option<";
+          Log3 $hash->{NAME}, 2, "$hash->{NAME}: line $i: $fld[0]: unknown option >$option<";
 
         }
       }
@@ -804,6 +804,135 @@ logProxy_Get($@)
       $ret .= $r;
       $ret .= "#$a[$i]\n";
       next;
+
+    } elsif( $fld[0] eq "Polar" ) {
+
+      my $axis;
+      my $noaxis;
+      my $range;
+      my $segments;
+      my @options = split( ',', $fld[1] );
+      foreach my $option ( @options[0..@options-1] ) {
+        my ($name,$value) = split( '=', $option, 2 );
+
+        if( $value ) {
+          $value = eval $value;
+
+          if( $@ ) {
+            Log3 $hash->{NAME}, 1, "$hash->{NAME}: $option: $@";
+            $ret .= "#$a[$i]\n";
+            next;
+          }
+        }
+
+        if( $name eq "axis" ) {
+          $axis = 1;
+
+        } elsif( $name eq "noaxis" ) {
+          $noaxis = 1;
+
+        } elsif( 0 && $name eq "range" && defined($value) ) {
+          $range = $value;
+
+        } elsif( $name eq "segments" && defined($value) ) {
+          $segments = $value;
+
+
+        } else {
+          Log3 $hash->{NAME}, 2, "$hash->{NAME}: line $i: $fld[0]: unknown option >$option<";
+
+        }
+      }
+
+      my $values;
+      if( defined( $fld[2] ) ) {
+        $values = eval $fld[2];
+        if( $@ ) {
+          Log3 $hash->{NAME}, 1, "$hash->{NAME}: $fld[2]: $@";
+          next;
+        }
+      }
+      next if( !$values && !$segments );
+      next if( $values && ref($values) ne "ARRAY" );
+
+      $segments = scalar @{$values} if( !$segments );
+      my $isText = $values && @{$values}[0] !~ m/^[.\d+-]*$/;
+
+      $axis = 1 if( $isText );
+      $axis = 1 if( !defined($values) && $segments );
+
+      my $f = 3.14159265 / 180;
+      if( defined( $values ) ) {
+        my $segment = 0;
+        my $first;
+        $ret .= ";c 0\n";
+        for( my $a = 0; $a < 360; $a += (360/$segments) ) {
+          my $value = @{$values}[$segment++];
+          next if( !defined($value) );
+
+          my $r;
+          if( $isText ) {
+            $r = 32;
+            $r = 34 if( $a > 90 && $a < 270 );
+          } else {
+            $r = $value;
+          }
+
+          my $x = sin( $a * $f );
+          my $y = cos( $a * $f );
+
+          $x *= $r;
+          $y *= $r;
+
+          if( $value =~ m/^[.\d+-]*$/ ) {
+            $ret .= ";p $x $y\n";
+            $first .= ";p $x $y\n" if( !$first );
+          } else {
+            my $align = "middle";
+            $align = "start" if( $a > 30 && $a < 150 );
+            $align = "end" if( $a > 210 && $a < 330 );
+
+            $ret .= ";t $x $y $align $value\n";
+          }
+        }
+        $ret .= $first if( $first );
+
+      }
+
+      if( $axis && !$noaxis ) {
+        my $axis;
+        $ret .= ";\n" if( $ret );
+        $ret .= ";ls l7\n";
+        foreach my $r (10,20,30) {
+          $ret .= ";\n"; #FIXME: this is one to many at the end...
+          my $first;
+          for( my $a = 0; $a < 360; $a += (360/$segments) ) {
+            my $x = sin( $a * $f );
+            my $y = cos( $a * $f );
+
+            $x *= $r;
+            $y *= $r;
+
+            $ret .= ";p $x $y\n";
+            $ret .= ";t $x $y start $r\n" if( $a == 0 && ( $r == 10 || $r == 20 ) ) ;
+
+            $first .= ";p $x $y\n" if( !$first );
+
+            if( $r == 30 ) {
+              $axis .= ";\n" if( $axis );
+              $axis .= ";p 0 0\n";
+              $axis .= ";p $x $y\n";
+            }
+          }
+          $ret .= $first;
+        }
+
+        $ret .= ";\n";
+        $ret .= $axis;
+
+      }
+
+      $ret .= "#$a[0]\n";
     }
   }
 
@@ -883,7 +1012,9 @@ logProxy_Get($@)
   where &lt;column_spec&gt; can be one or more of the following:
   <ul>
     <li>FileLog:&lt;log device&gt;[,&lt;options&gt;]:&lt;column_spec&gt;<br></li><br>
+
     <li>DbLog:&lt;log device&gt;[,&lt;options&gt;]:&lt;column_spec&gt;<br></li><br>
+
     <li>ConstX:&lt;time&gt;,&lt;y&gt;[,&lt;y2&gt;]<br>
       Will draw a vertical line (or point) at &lttime&gt; between &lt;y&gt; to &lt;y2&gt;.<br>
       Everything after the : is evaluated as a perl expression that hast to return one time string and one or two y values.<br>
@@ -894,6 +1025,7 @@ logProxy_Get($@)
         <code>#logProxy ConstX:$data{maxdate1},$data{max1},$data{avg1}</code><br>
         <code>#logProxy ConstX:logProxy_shiftTime($from,60*60*2),$data{min1},$data{max1}</code><br>
       </ul></li><br>
+
     <li>ConstY:&ltvalue&gt;[,&lt;from&gt;[,&lt;to&gt;]]<br>
       Will draw a horizontal line at &ltvalue&gt;, optional only between the from and to times.<br>
       Everything after the : is evaluated as a perl expression that hast to return one value and optionaly one or two time strings.<br>
@@ -905,6 +1037,45 @@ logProxy_Get($@)
         <code>#logProxy ConstY:$data{avg2},$from,$to</code><br>
         <code>#logProxy ConstY:$data{avg2},logProxy_shiftTime($from,60*60*12),logProxy_shiftTime($from,-60*60*12)</code>
       </ul></li><br>
+
+    <li>Polar:[&ltoptions&gt;]:&lt;values&gt;<br>
+      Will draw a polar/spiderweb diagram with the given values. &lt;values&gt; has to evaluate to a perl array.<br>
+      If &lt;values&gt; contains numbers these values are plottet and the last value will be connected to the first.<br>
+      If &lt;values&gt; contains strings these strings are used as labels for the segments.<br>
+      The axis are drawn automaticaly if the values are strings or if no values are given but the segments option is set.<br>
+      The corrosponding SVG device should have the plotsize attribute set (eg: attr <mySvg> plotsize 340,300) and the used gplot file has to contain xrange and yrange entries and the x- and y-axis labes should be switched off with xtics, ytics  and y2tics entries.<br>
+      The following example will plot the temperature and desiredTemperature values of all devices named MAX.*:
+      <ul>
+        <code>set xtics ()</code><br>
+        <code>set ytics ()</code><br>
+        <code>set y2tics ()</code><br>
+
+        <code>set xrange [-40:40]</code><br>
+        <code>set yrange [-40:40]</code><br><br>
+
+        <code>#logProxy Polar::{[map{ReadingsVal($_,"temperature",0)}devspec2array("MAX.*")]}</code><br>
+        <code>#logProxy Polar::{[map{ReadingsVal($_,"desiredTemperature",0)}devspec2array("MAX.*")]}</code><br>
+        <code>#logProxy Polar::{[map{ReadingsVal($_,"temperature",0)}devspec2array("MAX.*")]}</code><br>
+        <code>#logProxy Polar::{[devspec2array("tc.*")]}</code><br><br>
+
+        <code>plot "<IN>" using 1:2 axes x1y1 title 'Ist' ls l0 lw 1 with lines,\</code><br>
+        <code>plot "<IN>" using 1:2 axes x1y1 title 'Soll' ls l1fill lw 1 with lines,\</code><br>
+        <code>plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with points,\</code><br>
+        <code>plot "<IN>" using 1:2 axes x1y1 notitle  ls l2 lw 1 with lines,\</code><br>
+      </ul><br>
+      options is a comma separated list of zero or more of:<br>
+        <ul>
+          <li>axis<br>
+            force to draw the axis</li>
+          <li>noaxis<br>
+            disable to draw the axis</li>
+          <li>range=&lt;value&gt;<br>
+            the range to use for the radial axis</li>
+          <li>segments=&lt;value&gt;<br>
+            the number of circle/spiderweb segments to use for the plot</li>
+        </ul>
+      </li><br>
+
     <li>Func:&ltperl expression&gt;<br>
       Specifies a perl expression that returns the data to be plotted and its min, max and last value. It can not contain
       space or : characters. The data has to be
@@ -947,8 +1118,11 @@ logProxy_Get($@)
             value -> extend the last plot value by &lt;value&gt; but maximal to now.<br></li>
         </ul>
       </li><br>
+
     </ul>
     Please see also the column_spec paragraphs of FileLog, DbLog and SVG.<br>
+  <br>
+  NOTE: spaces are not allowed inside the colums_specs.<br>
   <br>
   To use any of the logProxy features with an existing plot the associated SVG file hast to be changed to use the logProxy
   device and the  .gplot file has to be changed in the following way:<br>
