@@ -155,8 +155,8 @@ FRITZBOX_Define($$)
    $hash->{fhem}{modulVersion} = '$Date$';
 
    RemoveInternalTimer($hash);
- # Get first data after 2 seconds
-   InternalTimer(gettimeofday() + 2, "FRITZBOX_Init", $hash, 0);
+ # Get first data after 6 seconds
+   InternalTimer(gettimeofday() + 6, "FRITZBOX_Init", $hash, 0);
  
    return undef;
 } #end FRITZBOX_Define
@@ -302,25 +302,19 @@ FRITZBOX_Init($)
    my $result;
    my $rName;
    my @cmdArray;
-   my @resultArray;
+   my @readoutArray;
+   my $resultArray;
    
+   FRITZBOX_Log $hash, 4, "Start update of device readings.";
    readingsBeginUpdate($hash);
 
   # Box Firmware
-   FRITZBOX_Init_Reading($hash
-      , "box_fwVersion"
-      , "ctlmgr_ctl r logic status/nspver"
-      , "fwupdate");
+   push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver", "fwupdate" ];
   # WLAN
-   FRITZBOX_Init_Reading($hash
-      , "box_wlan"
-      , "ctlmgr_ctl r wlan settings/ap_enabled"
-      , "onoff");
+   push @readoutArray, [ "box_wlan", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
   # Gäste WLAN
-   FRITZBOX_Init_Reading($hash
-      , "box_guestWlan"
-      , "ctlmgr_ctl r wlan settings/guest_ap_enabled"
-      , "onoff");
+   push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
+   FRITZBOX_Array_Readout( $hash, \@readoutArray );
    
   # Internetradioliste erzeugen
    my $i = 0;
@@ -403,252 +397,174 @@ FRITZBOX_Init($)
       }
    }
 
-# Analog telefon
+# Analog telefons
    foreach (1..3)
    {
-     # Analog-Telefonname
-      if (FRITZBOX_Init_Reading($hash
-         , "fon".$_
-         , "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name"))
-      {
-         readingsBulkUpdate($hash, "fon".$_."_intern", $_);
-      }
+      push @readoutArray, ["fon".$_, "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name"];
    }
 
 # Alarm clock
    foreach (0..2)
    {
      # Alarm clock name
-      FRITZBOX_Init_Reading($hash
-         , "alarm".($_+1)
-         , "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Name");
+      push @readoutArray, ["alarm".($_+1), "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Name"];
      # Alarm clock state
-      FRITZBOX_Init_Reading($hash
-         , "alarm".($_+1)."_state"
-         , "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Active"
-         , "onoff");
+      push @readoutArray, ["alarm".($_+1)."_state", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Active", "onoff"];
      # Alarm clock time
-      FRITZBOX_Init_Reading($hash
-         , "alarm".($_+1)."_time"
-         , "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Time"
-         , "altime");
+      push @readoutArray, ["alarm".($_+1)."_time", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Time", "altime"];
      # Alarm clock number
-      FRITZBOX_Init_Reading($hash
-         , "alarm".($_+1)."_target"
-         , "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Number"
-         , "alnumber");
+      push @readoutArray, ["alarm".($_+1)."_target", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Number", "alnumber"];
      # Alarm clock weekdays
-      FRITZBOX_Init_Reading($hash
-         , "alarm".($_+1)."_wdays"
-         , "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays"
-         , "aldays");
+      push @readoutArray, ["alarm".($_+1)."_wdays", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays", "aldays"];
    }
-
+   $resultArray = FRITZBOX_Array_Readout( $hash, \@readoutArray );
+# Analog telefons number
+   foreach (1..3)
+   {
+      readingsBulkUpdate($hash, "fon".$_."_intern", $_)
+         if $resultArray->[$_-1];
+   }
+   
 # user profiles
    $i=0;
    $rName = "user01";
    do 
    {
-    # User Name
-      $result = FRITZBOX_Init_Reading($hash
-         , $rName
-         , "ctlmgr_ctl r user settings/user".$i."/name"
-         );
-      FRITZBOX_Init_Reading($hash
-         , $rName."_thisMonthTime"
-         , "ctlmgr_ctl r user settings/user".$i."/this_month_time"
-         , "timeinhours");
-      FRITZBOX_Init_Reading($hash
-         , $rName."_todayTime"
-         , "ctlmgr_ctl r user settings/user".$i."/today_time"
-         , "timeinhours");
-      FRITZBOX_Init_Reading($hash
-         , $rName."_type"
-         , "ctlmgr_ctl r user settings/user".$i."/type"
-         );
+      push @readoutArray, [$rName, "ctlmgr_ctl r user settings/user".$i."/name"];
+      push @readoutArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "timeinhours"];
+      push @readoutArray, [$rName."_todayTime", "ctlmgr_ctl r user settings/user".$i."/today_time", "timeinhours"];
+      push @readoutArray, [$rName."_type", "ctlmgr_ctl r user settings/user".$i."/type"];
+      $resultArray = FRITZBOX_Array_Readout( $hash, \@readoutArray );
       $i++;
       $rName = sprintf ("user%02d",$i+1);
    }
-   while ($i<100 && ($result ne "" || defined $hash->{READINGS}{$rName} ));
+   while ($i<100 && ($resultArray->[0] ne "" || defined $hash->{READINGS}{$rName} ));
    
    readingsEndUpdate( $hash, 1 );
+   FRITZBOX_Log $hash, 4, "Update of device readings finished.";
 
    RemoveInternalTimer($hash);
- # Get next data after 5 minutes
-   InternalTimer(gettimeofday() + 300, "FRITZBOX_Init", $hash, 1);
+ # Get next data after 15 minutes
+   InternalTimer(gettimeofday() + 900, "FRITZBOX_Init", $hash, 1);
    
 }
 
 sub ##########################################
 FRITZBOX_Init_Reading($$$@)
 {
-   my ($hash, $rName, $cmd, $replace) = @_;
-   $replace = "" 
-      unless defined $replace;
-   my $result = FRITZBOX_Exec( $hash, $cmd);
-   if ($result ne "") {
-      if ($replace eq "altime")
-      {
-         $result =~ s/(\d\d)(\d\d)/$1:$2/;
-      }
-      if ($replace eq "aldays")
-      {
-         if ($result == 0) 
-         {
-            $result = "once";
-         }
-         elsif ($result == 127)
-         {
-            $result = "daily";
-         }
-         else
-         {
-            my $bitStr = $result;
-            $result = "";
-            foreach (sort keys %alarmDays)
-            {
-               $result .= (($bitStr & $_) == $_) ? $alarmDays{$_}." " : "";
-            }
-         }
-      }
-      if ($replace eq "alnumber")
-      {
-         if (60 <= $result && $result <= 65)
-         {
-            my $intern = $result + 550;
-            $result = $hash->{fhem}{$intern}{name}." (DECT $intern)";
-         }
-         elsif ($result == 9)
-         {
-            $result = "all DECT";
-         }
-         elsif ($result == 50)
-         {
-            $result = "all";
-         }
-      }
-      elsif ($replace eq "fwupdate")
-      {
-         my $update = FRITZBOX_Exec( $hash, "ctlmgr_ctl r updatecheck status/update_available_hint");
-         $result .= " (old)"
-            if $update == 1;
-      }
-      if ($replace eq "model")
-      {
-         $result = $fonModel{$result}
-            if defined $fonModel{$result};
-      }
-      elsif ($replace eq "onoff")
-      {
-         $result =~ s/0/off/;
-         $result =~ s/1/on/;
-      }
-      elsif ($replace eq "radio")
-      {
-         $result = $radio[$result];
-      }
-      elsif ($replace eq "ringtone")
-      {
-         $result = $ringTone{$result};
-      }
-      elsif ($replace eq "timeinhours")
-      {
-         $result = sprintf "%d h %d min", int $result/3600, int( ($result %3600) / 60);
-      }
-      readingsBulkUpdate($hash, $rName, $result)
-         if $result;
-   } elsif (defined $hash->{READINGS}{$rName} ) 
+   my ($hash, $rName, $cmd, $rFormat) = @_;
+   
+   $rFormat = "" 
+      unless defined $rFormat;
+   
+   my $rValue = FRITZBOX_Exec( $hash, $cmd);
+   
+   $rValue = FRITZBOX_Format_Readout( $hash, $rFormat, $rValue );
+   if ($rValue)
    {
-      delete $hash->{READINGS}{$rName};
-   }
-   return $result;
-}
-sub ##########################################
-FRITZBOX_Update_Readings($@)
-{
-   my ($hash, $rName, $cmd, $replace) = @_;
-   $replace = "" 
-      unless defined $replace;
-   my $result = FRITZBOX_Exec( $hash, $cmd);
-   if ($result ne "") {
-      if ($replace eq "altime")
-      {
-         $result = substr($result,0,2).":".substr($result,-2);
-      }
-      elsif ($replace eq "aldays")
-      {
-         if ($result == 0) 
-         {
-            $result = "once";
-         }
-         elsif ($result == 127)
-         {
-            $result = "daily";
-         }
-         else
-         {
-            my $bitStr = $result;
-            $result = "";
-            foreach (sort keys %alarmDays)
-            {
-               $result .= (($bitStr & $_) == $_) ? $alarmDays{$_}." " : "";
-            }
-         }
-      }
-      elsif ($replace eq "alnumber")
-      {
-         if (60 <= $result && $result =>65)
-         {
-            my $intern = $result + 550;
-            $result = $hash->{fhem}{$intern}{name}." - DECT $intern";
-         }
-         elsif ($result == 9)
-         {
-            $result = "all DECT";
-         }
-         elsif ($result == 50)
-         {
-            $result = "all";
-         }
-      }
-      elsif ($replace eq "fwupdate")
-      {
-         my $update = FRITZBOX_Exec( $hash, "ctlmgr_ctl r updatecheck status/update_available_hint");
-         $result .= " (old)"
-            if $update == 1;
-      }
-      if ($replace eq "model")
-      {
-         $result = $fonModel{$result}
-            if defined $fonModel{$result};
-      }
-      elsif ($replace eq "onoff")
-      {
-         $result =~ s/0/off/;
-         $result =~ s/1/on/;
-      }
-      elsif ($replace eq "radio")
-      {
-         $result = $radio[$result];
-      }
-      elsif ($replace eq "ringtone")
-      {
-         $result = $ringTone{$result};
-      }
-      elsif ($replace eq "timeinhours")
-      {
-         $result = sprintf "%d h %d min", int $result/3600, int( ($result %3600) / 60);
-      }
-      readingsBulkUpdate($hash, $rName, $result)
-         if $result;
-   }
+      readingsBulkUpdate($hash, $rName, $rValue)
+   } 
    elsif (defined $hash->{READINGS}{$rName} ) 
    {
       delete $hash->{READINGS}{$rName};
    }
-   return $result;
+   return $rValue;
 }
 
+sub ##########################################
+FRITZBOX_Array_Readout($$)
+{
+   my ($hash, $readoutArray) = @_;
+   my @cmdArray;
+   my $rValue;
+   my $rName;
+   my $rFormat;
+      
+   my $count = int @{$readoutArray} -1;
+   for (0..$count)
+   {
+      push @cmdArray, $readoutArray->[$_][1];
+   }
+   
+   my $resultArray = FRITZBOX_Exec( $hash, \@cmdArray);
+   $count = int @{$resultArray} -1;
+   for (0..$count)
+   {
+      $rValue = $resultArray->[$_];
+      $rFormat = $readoutArray->[$_][2];
+      $rFormat = "" unless defined $rFormat;
+      $rValue = FRITZBOX_Format_Readout ($hash, $rFormat, $rValue);
+      $rName = $readoutArray->[$_][0];
+      if ($rValue ne "")
+      {
+         FRITZBOX_Log $hash, 5, "$rName: $rValue";
+         readingsBulkUpdate($hash, $rName, $rValue);
+      }
+      elsif (defined $hash->{READINGS}{$rName} ) 
+      {
+         FRITZBOX_Log $hash, 5, "Delete $rName";
+         delete $hash->{READINGS}{$rName};
+      }
+   }
+   @{$readoutArray} = ();
+   
+   return $resultArray;
+}
+
+sub ##########################################
+FRITZBOX_Format_Readout($$$) 
+{
+   my ($hash, $format, $readout) = @_;
+   
+   return $readout 
+      unless $readout ne "" && $format ne "" ;
+
+   if ($format eq "altime") {
+      $readout =~ s/(\d\d)(\d\d)/$1:$2/;
+   } elsif ($format eq "aldays") {
+      if ($readout == 0) {
+         $readout = "once";
+      } elsif ($readout == 127) {
+         $readout = "daily";
+      } else {
+         my $bitStr = $readout;
+         $readout = "";
+         foreach (sort keys %alarmDays)
+         {
+            $readout .= (($bitStr & $_) == $_) ? $alarmDays{$_}." " : "";
+         }
+      }
+   } elsif ($format eq "alnumber") {
+      if (60 <= $readout && $readout <=65) {
+         my $intern = $readout + 550;
+         $readout = $hash->{fhem}{$intern}{name}." - DECT $intern";
+      } elsif ($readout == 9) {
+         $readout = "all DECT";
+      } elsif ($readout == 50) {
+         $readout = "all";
+      }
+   } elsif ($format eq "fwupdate") {
+      my $update = FRITZBOX_Exec( $hash, "ctlmgr_ctl r updatecheck status/update_available_hint");
+      $readout .= " (old)" if $update == 1;
+   } elsif ($format eq "model") {
+      $readout = $fonModel{$readout} if defined $fonModel{$readout};
+   
+   } elsif ($format eq "onoff") {
+      $readout =~ s/0/off/;
+      $readout =~ s/1/on/;
+   
+   } elsif ($format eq "radio") {
+      $readout = $radio[$readout];
+   
+   } elsif ($format eq "ringtone") {
+      $readout = $ringTone{$readout};
+   
+   } elsif ($format eq "timeinhours") {
+      $readout = sprintf "%d h %d min", int $readout/3600, int( ($readout %3600) / 60);
+   }
+   return $readout;
+}
+   
 sub ##########################################
 FRITZBOX_Ring($@) 
 {
@@ -755,20 +671,18 @@ FRITZBOX_Ring_Run($)
       push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$msg'";
       FRITZBOX_Log $hash, 4, "Change temporarily name of calling number $ringWithIntern to '$msg'";
    }
-
-# Ring
-   FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort ".$ringWithIntern
       if $ringWithIntern != 0 ;
+   $result = FRITZBOX_Exec( $hash, \@cmdArray )
+      if @cmdArray > 0;
+
+#Preparing 2nd command array to ring and reset everything
+   FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
    push @cmdArray, "sleep ".($duration+1);
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
       if $ringWithIntern != 0 ;
-   $result = FRITZBOX_Exec( $hash, \@cmdArray );
-
-#Preparing snd command array to reset everything
-   @cmdArray = ();
    if (defined $ringTone)
    {
       push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$fonTypeNo."/IntRingTone ".$result->[0];
@@ -779,8 +693,7 @@ FRITZBOX_Ring_Run($)
    {
       push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[0]."'";
    }
-   FRITZBOX_Exec( $hash, \@cmdArray )
-      if int @cmdArray >0;
+   FRITZBOX_Exec( $hash, \@cmdArray );
 
    return $name."|1|Ringing done";
 }
@@ -926,8 +839,10 @@ FRITZBOX_Exec($$)
          $result =~ s/\n|\r//g;
          my @resultArray = split /\|#\|/, $result;
          foreach (keys @resultArray)
-         { $resultArray[$_] =~ s/\s$//;
+         { 
+            $resultArray[$_] =~ s/\s$//;
          }
+         @{$cmd} = ();
          FRITZBOX_Log $hash, 5, "Result '".join (" | ", @resultArray)."' (count: ".int (@resultArray).")";
          return \@resultArray;
       }
