@@ -596,10 +596,8 @@ MAX_Parse($$)
   return () if($MAX ne "MAX");
 
   Log3 $hash, 5, "MAX_Parse $msg";
-  #Find the device with the given addr
-  my $shash = $modules{MAX}{defptr}{$addr};
 
-  if(!$shash)
+  if(!exists($modules{MAX}{defptr}{$addr}))
   {
     my $devicetype = undef;
     $devicetype = $args[0] if($msgtype eq "define" and $args[0] ne "Cube");
@@ -613,6 +611,8 @@ MAX_Parse($$)
       return $hash->{NAME};
     }
   }
+
+  my $shash = $modules{MAX}{defptr}{$addr};
 
   #if $isToMe is true, then the message was directed at device $hash, thus we can also use it for sending
   if($isToMe) {
