@@ -452,7 +452,7 @@ readingsGroup_2html($)
       $regex = $device->[0];
     }
     next if( !$h );
-    my $name = $h->{NAME};
+    my $name = $h->{NAME};  #FIXME: name/name2 confusion
     my $name2 = $h->{NAME};
 
     my @list = (undef);
@@ -463,6 +463,8 @@ readingsGroup_2html($)
     my $cell_column = 1;
     #foreach my $regex (@list) {
     for( my $i = 0; $i <= $#list; ++$i ) {
+      my $name = $name;
+      my $name2 = $name2;
       my $regex = $list[$i];
       while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
@@ -880,8 +882,13 @@ readingsGroup_Notify($$)
             $regex .= ",". $list[$i];
           }
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
-          next if( $regex && $regex =~ m/^\+/ );
-          next if( $regex && $regex =~ m/^\?/ );
+          my $modifier = "";
+          if( $regex && $regex =~ m/^([+?!]*)(.*)/ ) {
+            $modifier = $1;
+            $regex = $2;
+          }
+          next if( $modifier =~ m/\+/ );
+          next if( $modifier =~ m/\?/ );
 
           if( $regex && $regex =~ m/^<(.*)>$/ ) {
             my $txt = $1;
