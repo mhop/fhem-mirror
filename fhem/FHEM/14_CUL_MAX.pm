@@ -290,7 +290,7 @@ CUL_MAX_Parse($$)
       }
       #Handle outgoing messages to that ShutterContact. It is only awake shortly
       #after sending an Ack to a PairPong
-      CUL_MAX_SendQueueHandler($shash, $src) if($modules{MAX}{defptr}{$src}{type} eq "ShutterContact");
+      CUL_MAX_SendQueueHandler($shash, $src) if(exists($modules{MAX}{defptr}{$src}) && $modules{MAX}{defptr}{$src}{type} eq "ShutterContact");
       return $shash->{NAME};
 
     } elsif($msgType eq "TimeInformation") {
@@ -479,7 +479,7 @@ CUL_MAX_SendQueueHandler($$)
 
     #Send to CUL
 	my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
-    if($credit10ms eq "No answer") {
+    if(!defined($credit10ms) || $credit10ms eq "No answer") {
       Log3 $hash, 1, "Error in CUL_MAX_SendQueueHandler: CUL $hash->{IODev}{NAME} did not answer request for current credits. Waiting 5 seconds.";
       $timeout += 5;
     } else {
