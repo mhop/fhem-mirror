@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 11/2014
-my $thzversion = "0.111";
+my $thzversion = "0.112";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -340,7 +340,7 @@ sub THZ_Initialize($)
 		    ."interval_sElectrHCDay:0,1200,3600,7200,28800,43200,86400 "
 		    ."interval_sElectrHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sBoostDHWTotal:0,3600,7200,28800,43200,86400 "
-		    ."interval_sBoostDHWTotal:0,3600,7200,28800,43200,86400 " 
+		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 " 
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 }
@@ -388,7 +388,8 @@ sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
  # unlink("data.txt");
   THZ_RemoveInternalTimer("THZ_GetRefresh");
-  my $timedelay= 5; 						#strart after 5 seconds
+  readingsSingleUpdate($hash, "state", "opened", 1); # copied from cul 26.11.2014
+  my $timedelay= 5; 						#start after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
     my %par = (  hash => $hash, command => $cmdhash );
     RemoveInternalTimer(\%par);
@@ -1109,17 +1110,19 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
- #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',); 
-  #my @numbers = (1..255);
+ #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
+  my @numbers=('09','01D4', '01D5', '0122', '0123', '0124', '2201'); 
+  #my @numbers = (1..256);
   #my @numbers = (1..65535);
-  my @numbers = (1..3179);
+  #my @numbers = (1..3179);
   my $indice= "FF";
   unlink("data.txt"); #delete  debuglog
   foreach $indice(@numbers) {	
     #my $cmd = sprintf("%02X", $indice);
-    my $cmd = "0A" . sprintf("%04X",  $indice);
-   # my $cmd = $indice;
-    my $cmdHex2 = THZ_encodecommand($cmd,"get");
+    #my $cmd = sprintf("%04X", $indice);
+    #my $cmd = "0A" . sprintf("%04X",  $indice);
+    my $cmd = $indice;
+    my $cmdHex2 = THZ_encodecommand($cmd,"get"); 
     #($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
     #STX start of text
     THZ_Write($hash,  "02");
