@@ -36,7 +36,7 @@ SetExtensions($$@)
     # $cmd = ReplaceEventMap($name, $cmd, 1) if($cmd ne "?");
     # Has problem with P#2 (Forum #28855): /on-for-timer 300:5Min/on:Ein/
     # Workaround for P#1 /on-for-timer 300:5Min/on-for-timer:on-for-timer/B0:on/
-    (undef, $value) = ReplaceEventMap($name, [$name, $value], 0);
+    (undef,$value) = ReplaceEventMap($name, [$name, $value], 0) if($cmd ne "?");
   }
   if(!$hasOn || !$hasOff) { # No extension
     return "Unknown argument $cmd, choose one of $list";
