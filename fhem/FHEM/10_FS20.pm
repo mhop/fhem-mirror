@@ -49,7 +49,7 @@ my %readonly = (
 
 use vars qw(%fs20_c2b);		# Peter would like to access it from outside
 
-my $fs20_simple ="off off-for-timer on on-for-timer on-till reset timer toggle";
+my $fs20_simple ="off off-for-timer on on-for-timer reset timer toggle";
 my %models = (
     fs20fms     => 'sender',
     fs20hgs     => 'sender',
@@ -121,8 +121,6 @@ FS20_Initialize($)
   foreach my $k (keys %codes) {
     $fs20_c2b{$codes{$k}} = $k;
   }
-  $fs20_c2b{"on-till"} = 99;
-
   $hash->{Match}     = "^81..(04|0c)..0101a001";
   $hash->{SetFn}     = "FS20_Set";
   $hash->{DefFn}     = "FS20_Define";
@@ -133,34 +131,6 @@ FS20_Initialize($)
                        "$readingFnAttributes " .
                        "model:".join(",", sort keys %models);
 }
-
-#############################
-sub
-Do_On_Till($@)
-{
-  my ($hash, @a) = @_;
-  return "Timespec (HH:MM[:SS]) needed for the on-till command" if(@a != 3);
-
-  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
-  return $err if($err);
-
-  my @lt = localtime;
-  my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
-  my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
-  if($hms_now ge $hms_till) {
-    Log3 $hash->{NAME}, 4,
-        "on-till: won't switch as now ($hms_now) is later than $hms_till";
-    return "";
-  }
-
-  my @b = ($a[0], "on");
-  FS20_Set($hash, @b);
-  my $tname = $hash->{NAME} . "_till";
-  CommandDelete(undef, $tname) if($defs{$tname});
-  CommandDefine(undef, "$tname at $hms_till set $a[0] off");
-
-}
-
 
 ###################################
 sub
@@ -195,8 +165,6 @@ FS20_Set($@)
     return SetExtensions($hash, $list, @a);
 
   }
-
-  return Do_On_Till($hash, @a) if($a[1] eq "on-till");
 
   return "Bad time spec" if($na == 3 && $a[2] !~ m/^\d*\.?\d+$/);
 
@@ -537,7 +505,6 @@ four2hex($$)
       sendstate<br>
       timer<br>
       toggle            # between off and previous dim val<br>
-      on-till           # Special, see the note<br>
     </code></ul>
     The <a href="#setExtensions"> set extensions</a> are also supported.<br>
     <br>
@@ -570,13 +537,6 @@ four2hex($$)
           from 4 to 8 sec, 1 sec from 8 to 16 sec and so on. If you need better
           precision for large values, use <a href="#at">at</a> which has a 1
           sec resolution.</li>
-      <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
-      or { &lt;perl code&gt; }, where the perl-code returns a time
-          specification).
-      If the current time is greater than the specified time, then the
-      command is ignored, else an "on" command is generated, and for the
-      given "till-time" an off command is scheduleld via the at command.
-      </li>
     </ul>
   </ul>
   <br>
@@ -778,7 +738,6 @@ four2hex($$)
       sendstate<br>
       timer<br>
       toggle            # zwischen aus und dem letztern Dim-Wert<br>
-      on-till           # Siehe Hinweise<br>
     </code></ul><br>
     Die<a href="#setExtensions"> set extensions</a> sind ebenfalls
     unterst&uuml;tzt.<br>
@@ -817,14 +776,6 @@ four2hex($$)
         Wenn eine h&ouml;here Genauigkeit bei gro&szlig;en Werten gebraucht
         wird, dann hilft <a href="#at">at</a> mit einer Aufl&ouml;sung von
         1Sek.</li>
-
-      <li>on-till setzt eine absolute Zeit im "at" Format voraus (HH:MM:SS,
-        HH:MM oder { &lt;perl code&gt; }, wobei der perl-code eine Zeit
-        zur&uuml;ck geben muss).  Wenn die aktuelle Zeit gr&ouml;&szlig;er ist
-        als die angegebene, dann wird der Befehl ignoriert und ein at-"on"
-        Befehl erzeugt, sowie f&uuml;r die angegebe "till-time" ein at-"off"
-        Befehl.
-      </li>
     </ul>
   </ul>
   <br>
