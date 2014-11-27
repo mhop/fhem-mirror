@@ -866,6 +866,7 @@ SVG_doShowLog($$$$;$$)
 
       my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
 
+      $plot =~ s/ls \w+//g;
       open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
       print FH $gplot_script, $xrange, $plot;
       close(FH);
@@ -892,6 +893,7 @@ SVG_doShowLog($$$$;$$)
 
       my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
 
+      $plot =~ s/ls \w+//g;
       open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
       print FH $gplot_script, $xrange, $plot;
       close(FH);
