@@ -15,7 +15,7 @@ watchdog_Initialize($)
   $hash->{DefFn} = "watchdog_Define";
   $hash->{UndefFn} = "watchdog_Undef";
   $hash->{NotifyFn} = "watchdog_Notify";
-  $hash->{AttrList} = "disable:0,1 disabledForIntervals ".
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals execOnActivate ".
                         "regexp1WontReactivate:0,1 addStateEvent:0,1";
 }
 
@@ -137,7 +137,7 @@ watchdog_Trigger($)
   }
 
   Log3 $name, 3, "Watchdog $name triggered";
-  my $exec = SemicolonEscape($watchdog->{CMD});;
+  my $exec = SemicolonEscape($watchdog->{CMD});
   $watchdog->{STATE} = "triggered";
   
   $watchdog->{READINGS}{Triggered}{TIME} = TimeNow();
@@ -154,7 +154,11 @@ watchdog_Activate($)
   my $nt = gettimeofday() + $watchdog->{TO};
   $watchdog->{STATE} = "Next: " . FmtTime($nt);
   RemoveInternalTimer($watchdog);
-  InternalTimer($nt, "watchdog_Trigger", $watchdog, 0)
+  InternalTimer($nt, "watchdog_Trigger", $watchdog, 0);
+
+  my $eoa = AttrVal($watchdog->{NAME}, "execOnActivate", undef);
+  return if(!$eoa);
+  AnalyzeCommandChain(undef, SemicolonEscape($eoa));
 }
 
 sub
@@ -180,7 +184,7 @@ watchdog_Undef($$)
   <ul>
     <code>define &lt;name&gt; watchdog &lt;regexp1&gt; &lt;timespec&gt; &lt;regexp2&gt; &lt;command&gt;</code><br>
     <br>
-    Start an arbitrary fhem.pl command if after &lt;timespec&gt; receiving an
+    Start an arbitrary FHEM command if after &lt;timespec&gt; receiving an
     event matching &lt;regexp1&gt; no event matching &lt;regexp2&gt; is
     received.<br>
     The syntax for &lt;regexp1&gt; and &lt;regexp2&gt; is the same as the
@@ -243,10 +247,14 @@ watchdog_Undef($$)
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+
     <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>
         When a watchdog is active, a second event matching regexp1 will
-        normally reset the timeout. Set this attribute to prevents this.
-    </li>
+        normally reset the timeout. Set this attribute to prevents this.</li>
+
+    <li><a href="#execOnActivate">execOnActivate</a>
+      If set, its value will be executed as a FHEM command when the watchdog is
+      activated by receiving an event matching regexp1.</li>
   </ul>
   <br>
 </ul>
@@ -267,7 +275,7 @@ watchdog_Undef($$)
     &lt;regexp2&gt; &lt;command&gt;</code><br>
     <br>
 
-    Startet einen beliebigen fhem.pl Befehl wenn nach dem Empfang des
+    Startet einen beliebigen FHEM Befehl wenn nach dem Empfang des
     Ereignisses &lt;regexp1&gt; nicht innerhalb von &lt;timespec&gt; ein
     &lt;regexp2&gt; Ereignis empfangen wird.<br>
 
@@ -347,10 +355,14 @@ watchdog_Undef($$)
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>
-        Wenn ein Watchdog aktiv ist, wird ein zweites Ereignis das auf regexp1
-        passt normalerweise den Timer zur&uuml;cksetzen. Dieses Attribut wird
-        das verhindern.
-    </li>
+      Wenn ein Watchdog aktiv ist, wird ein zweites Ereignis das auf regexp1
+      passt normalerweise den Timer zur&uuml;cksetzen. Dieses Attribut wird
+      das verhindern.</li>
+
+    <li><a href="#execOnActivate">execOnActivate</a>
+      Falls gesetzt, wird der Wert des Attributes als FHEM Befehl
+      ausgef&uuml;hrt, wenn ein regexp1 Ereignis den Watchdog
+      aktiviert.</li>
   </ul>
   <br>
 </ul>
