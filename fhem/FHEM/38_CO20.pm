@@ -81,7 +81,7 @@ CO20_Connect($)
 
   $hash->{USB} = Device::USB->new() if( !$hash->{USB} );
 
-  if( $hash->{ID} =~ m/(\d.*):(\d.*)/ ) {
+  if( $hash->{ID} && $hash->{ID} =~ m/(\d.*):(\d.*)/ ) {
     my $dirname = $1;
     my $filename = $2;
     delete $hash->{DEV};
@@ -280,7 +280,8 @@ CO20_Attr($$$)
 <h3>CO20</h3>
 <ul>
   Module for measuring air quality with usb sticks based on the AppliedSensor iAQ-Engine sensor.
-  Products currently know to work are the VOLTCRAFT CO-20 and the Sentinel Haus Institut RaumluftW&auml;chter.
+  Products currently know to work are the VOLTCRAFT CO-20, the Sentinel Haus Institut RaumluftW&auml;chter
+  and the VELUX Raumluftf&uuml;hler.<br>
   Probably works with all devices recognized as iAQ Stick (0x03eb:0x2013).<br><br>
 
   Notes:
