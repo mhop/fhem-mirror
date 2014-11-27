@@ -29,12 +29,19 @@ FHEM_colorpickerFn($$$)
   my @args = split("[ \t]+", $cmd);
 
   return undef if($values !~ m/^colorpicker,(.*)$/);
+
   my ($mode) = ($1);
   $mode = "RGB" if( !defined($mode) );
-  my $srf = $FW_room ? "&room=$FW_room" : "";
-  my $cv = ReadingsVal($d,$cmd,"");
-  $cv = CommandGet("","$d $cmd") if( !$cv );
+
+  my $trigger = $cmd;                   #default trigger is event from reading with the same name as the command
+  my $cv = ReadingsVal($d,$cmd,"");     #get default value from this reading
+  if( !$cv ) {                          #if this reading does not exist ->
+    $trigger = "RGB";                   #  trigger name will be RGB
+    $cv = CommandGet("","$d $cmd");     #  get default value from get command
+  }
+
   $cmd = "" if($cmd eq "state");
+  my $srf = $FW_room ? "&room=$FW_room" : "";
   if( $args[1] ) {
     my $c = "cmd=set $d $cmd$srf";
 
@@ -54,12 +61,12 @@ FHEM_colorpickerFn($$$)
     my $ci = $c;
     $ci = "$FW_ME?XHR=1&cmd=set $d $cmd % : transitiontime 0 : noUpdate$srf" if($defs{$d}->{TYPE} eq "HUEDevice");
     return '<td align="center">'.
-             "<input maxlength='6' size='6' id='colorpicker.$d-RGB' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red',command:'$ci',onImmediateChange:'colorpicker_setColor(this)'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
+             "<input maxlength='6' size='6' id='colorpicker.$d-$trigger' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red',command:'$ci',onImmediateChange:'colorpicker_setColor(this)'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
            '</td>';
   } else {
     my $c = "$FW_ME?XHR=1&cmd=set $d $cmd %$srf";
     return '<td align="center">'.
-             "<input maxlength='6' size='6' id='colorpicker.$d-RGB' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
+             "<input maxlength='6' size='6' id='colorpicker.$d-$trigger' class=\"color {pickerMode:'$mode',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'}\" value='$cv' onChange='colorpicker_setColor(this,\"$mode\",\"$c\")'>".
            '</td>';
   }
 }
