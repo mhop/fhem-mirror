@@ -168,21 +168,22 @@ CUL_FHTTK_Set($@)
 		return "Unknown argument $opt ($value), choose one of " . join(" ", @cList);
 	}
   
-  if($opt eq "Syncing" ) {
-    Log3 $name, 3, "CUL_FHTTK ($name) syncing with FHT80b.";
-	    
-    IOWrite($hash, "", sprintf("T%s0c", $hash->{CODE})); # 0x0c - sync
-	# window state switch to closed
-	
-  } elsif ($opt eq "Open" ) {
-    Log3 $name, 3, "CUL_FHTTK ($name) send open window state. ($opt)";
+  if ($opt eq "Open" ) {
+    Log3 $name, 3, "CUL_FHTTK ($name) changed window state to open.";
     IOWrite($hash, "", sprintf("T%s01", $hash->{CODE})); # 0x01 - open or 0x81
 
   } elsif ($opt eq "Closed" ) {
-    Log3 $name, 3, "CUL_FHTTK ($name) send closed window state. ($opt)";
+    Log3 $name, 3, "CUL_FHTTK ($name) changed window state to open.";
     
     IOWrite($hash, "", sprintf("T%s02", $hash->{CODE})); # 0x02 - closed or 0x82
 
+  } elsif($opt eq "Syncing" ) {
+    Log3 $name, 3, "CUL_FHTTK ($name) syncing with FHT80b.";
+	    
+    IOWrite($hash, "", sprintf("T%s0c", $hash->{CODE})); # 0x0c - sync
+	# window state switch to closed through cul FW implementation
+	$opt = "Closed";
+    
   } else {
     return "Unknown argument $a[1], choose one of Syncing Open Closed"
   }
