@@ -962,8 +962,8 @@ FRITZBOX_Exec($$)
 <div  style="width:800px"> 
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as signaling devices.
-   <br>
    Note!! To use it, FHEM has to run on a Fritz!Box.
+   <i>So fare, the module has been tested on Fritz!Box 7390 and Fritz!Fon MT-F.</i>
    <br/><br/>
    <a name="FRITZBOXdefine"></a>
    <b>Define</b>
@@ -994,11 +994,17 @@ FRITZBOX_Exec($$)
          <br>
          Rings the internal number for "duration" seconds with the given "ring tone" name.
          <br>
-         The text in msg() will be shown as the callers name. 
+         The text behind 'msg:' will be shown as the callers name. 
          Maximal 30 characters are allowed.
          The attribute "ringWithIntern" must also be specified.
          <br>
          Default duration is 5 seconds. Default ring tone is the internal ring tone of the device.
+      </li><br>
+      <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
+         <br>
+         Converts the mp3-file fullFilePath to a G722 format and puts it in the same path.
+         <br>
+         The file has to be placed on the file system of the fritzbox.
       </li><br>
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
          <br>
@@ -1010,7 +1016,7 @@ FRITZBOX_Exec($$)
       </li><br>
       <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
          <br>
-         not implemented yet. Start the internet radio on the given Fritz!Fon
+         not implemented yet. Starts the internet radio on the given Fritz!Fon
          <br>
       </li><br>
       <li><code>set &lt;name&gt; wlan &lt;on|off&gt;</code>
@@ -1022,6 +1028,7 @@ FRITZBOX_Exec($$)
    <a name="FRITZBOXget"></a>
    <b>Get</b>
    <ul>
+      <br>
       <li><code>get &lt;name&gt; ringTones</code>
          <br>
          Shows a list of ring tones that can be used.
@@ -1044,7 +1051,7 @@ FRITZBOX_Exec($$)
          <br>
          To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
          <br>
-         To show a message (default is "FHEM") during a ring the internal phone numbers 1 or 2 can be specified here.
+         To show a message (default: "FHEM") during a ring the internal phone numbers 1 or 2 can be specified here.
       </li><br>
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
          <br>
@@ -1059,10 +1066,25 @@ FRITZBOX_Exec($$)
    <a name="FRITZBOXreading"></a>
    <b>Readings</b>
    <ul><br>
-      <li><b>dect</b><i>1</i><b>_intRingTone</b> - Internal ring tone of the DECT device <i>1</i></li>
+      <li><b>alarm</b><i>1</i> - Internal name of the alarm <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_state</b> - Current state of the alarm <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_target</b> - Internal number of the alarm <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_time</b> - Time of alarm <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of alarm <i>1</i></li>
+      <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
+      <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
+      <li><b>box_wlan</b> - Current state of the WLAN</li>
+      <li><b>dect</b><i>1</i> - Internal name of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_custRingTone</b> - Customer ring tone of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_fwVersion</b> - Firmware Version of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_intRingTone</b> - Internal ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_manufacturer</b> - Manufacturer of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_name</b> - Internal name of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
+      <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
    </ul>
    <br>
 </ul>
