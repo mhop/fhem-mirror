@@ -490,15 +490,6 @@ readingsGroup_2html($)
           next if( !defined($txt) );
         }
 
-        my $value_format = lookup2($hash->{helper}{valueFormat},$name,$1,"");
-        next if( !defined($value_format) );
-        if(  $value_format =~ m/%/ ) {
-          $txt = sprintf( $value_format, $txt );
-        } elsif( $value_format ) {
-          $txt = $value_format;
-        }
-
-
         my $row_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,undef);
         my $cell_style0 = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,0);
         my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,$cell_column);
