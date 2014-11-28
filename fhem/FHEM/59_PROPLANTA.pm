@@ -554,7 +554,10 @@ sub PROPLANTA_Run($)
       if ($attrURL eq "")
       {
          $URL = $hash->{URL2};
-         foreach (4, 7, 11)
+         my @URL_days = (4, 7, 11);
+         unshift @URL_days, 0
+            if @MyProplantaParser::texte == 0; 
+         foreach (@URL_days)
          {
             $response = PROPLANTA_HtmlAcquire($hash,$URL . $_); 
             $MyProplantaParser::startDay = $_;
@@ -610,8 +613,11 @@ sub PROPLANTA_Done($)
       
       if (keys %values > 0) 
       {
-        # Achtung! Um Mitternacht fehlen die aktuellen Werte
-         readingsBulkUpdate($hash, "state", "Tmin: " . $values{fc0_tempMin} . " Tmax: " . $values{fc0_tempMax} . " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure} );
+         my $newState = "Tmin: " . $values{fc0_tempMin} . " Tmax: " . $values{fc0_tempMax};
+        # Achtung! Nach Mitternacht fehlen für 1 h die aktuellen Werte
+         $newState .= " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure}
+            if defined $values{temperature};
+         readingsBulkUpdate($hash, "state", $newState);
          readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured" );
          PROPLANTA_Log $hash, 4, keys( %values )." values captured";
       }
