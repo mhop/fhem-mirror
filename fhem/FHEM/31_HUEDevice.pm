@@ -348,6 +348,8 @@ HUEDevice_SetParam($$@)
         $obj->{'on'}  = JSON::true;
         $obj->{'xy'}  = [0+$x, 0+$y];
         $obj->{'bri'}  = int(254*$bri);
+      } else {
+        $obj->{'on'}  = JSON::false;
       }
     }
   } elsif( $cmd eq "hsv" && $value =~ m/^(..)(..)(..)/) {
