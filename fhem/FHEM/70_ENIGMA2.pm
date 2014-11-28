@@ -24,9 +24,12 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.3.6
+# Version: 1.4.0
 #
 # Major Version History:
+# - 1.4.0 - 2014-11-27
+# -- enhanced timerlist readings
+#
 # - 1.3.0 - 2013-12-21
 # -- rewrite for NonBlocking
 # -- add recordings indicator
@@ -1779,32 +1782,281 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
         # timerlist
         elsif ( $service eq "timerlist" ) {
-            my $recordings = 0;
+            my $activeRecordings = 0;
+            my %recordings;
+
+            my $recordingsNext_time       = "0";
+            my $recordingsNext_time_hr    = "-";
+            my $recordingsNext_counter    = "0";
+            my $recordingsNext_counter_hr = "-";
+            my $recordingsNextServicename = "-";
+            my $recordingsNextName        = "-";
+
+            my $recordingsError    = 0;
+            my $recordingsFinished = 0;
 
             if ( ref($return) eq "HASH" ) {
                 if ( ref( $return->{e2timer} ) eq "HASH" ) {
-                    $recordings++
-                      if ( defined( $return->{e2timer}{e2state} )
-                        && $return->{e2timer}{e2state} eq "2" );
+
+                    # queued recording
+                    if (   defined( $return->{e2timer}{e2state} )
+                        && $return->{e2timer}{e2state} eq "0"
+                        && defined( $return->{e2timer}{e2disabled} )
+                        && $return->{e2timer}{e2disabled} eq "0"
+                        && defined( $return->{e2timer}{e2eit} )
+                        && defined( $return->{e2timer}{e2servicename} )
+                        && defined( $return->{e2timer}{e2name} ) )
+                    {
+
+                        my $timeleft =
+                          $return->{e2timer}{e2startprepare} - time();
+
+                        # only add if starttime is smaller
+                        if (   $recordingsNext_time eq "0"
+                            || $timeleft < $recordingsNext_time - time() )
+                        {
+                            my @t =
+                              localtime( $return->{e2timer}{e2startprepare} );
+
+                            $recordingsNext_time =
+                              $return->{e2timer}{e2startprepare};
+                            $recordingsNext_time_hr    = sprintf( "%02d:%02d:%02d", $t[2], $t[1], $t[0] );
+                            $recordingsNext_counter    = $timeleft;
+                            $recordingsNextServicename =
+                              $return->{e2timer}{e2servicename};
+                            $recordingsNextName = $return->{e2timer}{e2name};
+
+														# human readable
+                            my @t2 = localtime( $timeleft );
+                            $recordingsNext_counter_hr = sprintf( "%02d:%02d:%02d",
+                                  $t2[2] - 1,
+                                  $t2[1], $t2[0] );
+                        }
+                    }
+
+                    # failed recording
+                    if ( defined( $return->{e2timer}{e2state} )
+                        && $return->{e2timer}{e2state} eq "1" )
+                    {
+                        $recordingsError++;
+                    }
+
+                    # active recording
+                    if (   defined( $return->{e2timer}{e2state} )
+                        && $return->{e2timer}{e2state} eq "2"
+                        && defined( $return->{e2timer}{e2servicename} )
+                        && defined( $return->{e2timer}{e2name} ) )
+                    {
+                        $activeRecordings++;
+                        $recordings{$activeRecordings}{servicename} =
+                          $return->{e2timer}{e2servicename};
+                        $recordings{$activeRecordings}{name} =
+                          $return->{e2timer}{e2name};
+                    }
+
+                    # finished recording
+                    if ( defined( $return->{e2timer}{e2state} )
+                        && $return->{e2timer}{e2state} eq "3" )
+                    {
+                        $recordingsFinished++;
+                    }
                 }
                 elsif ( ref( $return->{e2timer} ) eq "ARRAY" ) {
                     my $i        = 0;
                     my $arr_size = @{ $return->{e2timer} };
 
                     while ( $i < $arr_size ) {
-                        $recordings++
-                          if ( defined( $return->{e2timer}[$i]{e2state} )
-                            && $return->{e2timer}[$i]{e2state} eq "2" );
+
+                        # queued recording
+                        if (   defined( $return->{e2timer}[$i]{e2state} )
+                            && $return->{e2timer}[$i]{e2state} eq "0"
+                            && defined( $return->{e2timer}[$i]{e2disabled} )
+                            && $return->{e2timer}[$i]{e2disabled} eq "0"
+                            && defined( $return->{e2timer}[$i]{e2eit} )
+                            && defined( $return->{e2timer}[$i]{e2servicename} )
+                            && defined( $return->{e2timer}[$i]{e2name} ) )
+                        {
+
+                            my $timeleft =
+                              $return->{e2timer}[$i]{e2startprepare} - time();
+
+			                        # only add if starttime is smaller
+			                        if (   $recordingsNext_time eq "0"
+			                            || $timeleft < $recordingsNext_time - time() )
+			                        {
+			                            my @t =
+			                              localtime( $return->{e2timer}[$i]{e2startprepare} );
+
+			                            $recordingsNext_time =
+			                              $return->{e2timer}[$i]{e2startprepare};
+			                            $recordingsNext_time_hr    = sprintf( "%02d:%02d:%02d", $t[2], $t[1], $t[0] );
+			                            $recordingsNext_counter    = $timeleft;
+			                            $recordingsNextServicename =
+			                              $return->{e2timer}[$i]{e2servicename};
+			                            $recordingsNextName = $return->{e2timer}[$i]{e2name};
+
+																	# human readable
+			                            my @t2 = localtime( $timeleft );
+			                            $recordingsNext_counter_hr = sprintf( "%02d:%02d:%02d",
+			                                  $t2[2] - 1,
+			                                  $t2[1], $t2[0] );
+                            }
+                        }
+
+                        # failed recording
+                        if ( defined( $return->{e2timer}[$i]{e2state} )
+                            && $return->{e2timer}[$i]{e2state} eq "1" )
+                        {
+                            $recordingsError++;
+                        }
+
+                        # active recording
+                        if (   defined( $return->{e2timer}[$i]{e2state} )
+                            && $return->{e2timer}[$i]{e2state} eq "2"
+                            && defined( $return->{e2timer}[$i]{e2servicename} )
+                            && defined( $return->{e2timer}[$i]{e2name} ) )
+                        {
+                            $activeRecordings++;
+                            $recordings{$activeRecordings}{servicename} =
+                              $return->{e2timer}[$i]{e2servicename};
+                            $recordings{$activeRecordings}{name} =
+                              $return->{e2timer}[$i]{e2name};
+                        }
+
+                        # finished recording
+                        if ( defined( $return->{e2timer}[$i]{e2state} )
+                            && $return->{e2timer}[$i]{e2state} eq "3" )
+                        {
+                            $recordingsFinished++;
+                        }
+
                         $i++;
                     }
                 }
             }
 
+            my $recordingsElementsCount = scalar( keys %recordings );
+            my $readingname;
+
             if ( !defined( $hash->{READINGS}{recordings}{VAL} )
-                || $hash->{READINGS}{recordings}{VAL} ne $recordings )
+                || $hash->{READINGS}{recordings}{VAL} ne
+                $recordingsElementsCount )
             {
-                readingsBulkUpdate( $hash, "recordings", $recordings );
+                readingsBulkUpdate( $hash, "recordings",
+                    $recordingsElementsCount );
             }
+
+            if ( $recordingsElementsCount > 0 ) {
+                my $i = 0;
+
+                while ( $i < $recordingsElementsCount ) {
+                    $i++;
+
+                    $readingname = "recordings" . $i . "_servicename";
+                    if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
+                        || $hash->{READINGS}{$readingname}{VAL} ne
+                        $recordings{$i}{servicename} )
+                    {
+                        readingsBulkUpdate( $hash, $readingname,
+                            $recordings{$i}{servicename} );
+                    }
+
+                    $readingname = "recordings" . $i . "_name";
+                    if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
+                        || $hash->{READINGS}{$readingname}{VAL} ne
+                        $recordings{$i}{name} )
+                    {
+                        readingsBulkUpdate( $hash, $readingname,
+                            $recordings{$i}{name} );
+                    }
+
+                }
+            }
+
+            # clear inactive recordingsX_* readings
+            my $i = $recordingsElementsCount + 1;
+            while ( $i < 21 ) {
+                $readingname = "recordings" . $i . "_name";
+                if ( defined( $hash->{READINGS}{$readingname}{VAL} )
+                    && $hash->{READINGS}{$readingname}{VAL} ne "-" )
+                {
+                    readingsBulkUpdate( $hash, $readingname, "-" );
+                }
+
+                $readingname = "recordings" . $i . "_servicename";
+                if ( defined( $hash->{READINGS}{$readingname}{VAL} )
+                    && $hash->{READINGS}{$readingname}{VAL} ne "-" )
+                {
+                    readingsBulkUpdate( $hash, $readingname, "-" );
+                }
+
+                $i++;
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings_next}{VAL} )
+                || $hash->{READINGS}{recordings_next}{VAL} ne
+                $recordingsNext_time )
+            {
+                readingsBulkUpdate( $hash, "recordings_next",
+                    $recordingsNext_time );
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings_next_hr}{VAL} )
+                || $hash->{READINGS}{recordings_next_hr}{VAL} ne
+                $recordingsNext_time_hr )
+            {
+                readingsBulkUpdate( $hash, "recordings_next_hr",
+                    $recordingsNext_time_hr );
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings_next_counter}{VAL} )
+                || $hash->{READINGS}{recordings_next_counter}{VAL} ne
+                $recordingsNext_counter )
+            {
+                readingsBulkUpdate( $hash, "recordings_next_counter",
+                    $recordingsNext_counter );
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings_next_counter_hr}{VAL} )
+                || $hash->{READINGS}{recordings_next_counter_hr}{VAL} ne
+                $recordingsNext_counter_hr )
+            {
+                readingsBulkUpdate( $hash, "recordings_next_counter_hr",
+                    $recordingsNext_counter_hr );
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings_next_servicename}{VAL} )
+                || $hash->{READINGS}{recordings_next_servicename}{VAL} ne
+                $recordingsNextServicename )
+            {
+                readingsBulkUpdate( $hash, "recordings_next_servicename",
+                    $recordingsNextServicename );
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings_next_name}{VAL} )
+                || $hash->{READINGS}{recordings_next_name}{VAL} ne
+                $recordingsNextName )
+            {
+                readingsBulkUpdate( $hash, "recordings_next_name",
+                    $recordingsNextName );
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings_error}{VAL} )
+                || $hash->{READINGS}{recordings_error}{VAL} ne
+                $recordingsError )
+            {
+                readingsBulkUpdate( $hash, "recordings_error",
+                    $recordingsError );
+            }
+
+            if ( !defined( $hash->{READINGS}{recordings_finished}{VAL} )
+                || $hash->{READINGS}{recordings_finished}{VAL} ne
+                $recordingsFinished )
+            {
+                readingsBulkUpdate( $hash, "recordings_finished",
+                    $recordingsFinished );
+            }
+
         }
 
         # volume
@@ -1935,11 +2187,50 @@ sub ENIGMA2_ReceiveCommand($$$) {
     # Set ENIGMA2 online+standby readings to "-" in case box is in
     # offline mode
     if ( $state eq "absent" || $state eq "undefined" ) {
-        foreach ( 'input', ) {
+        foreach (
+            'input',              'recordings_next_counter_hr',
+            'recordings_next_hr', 'recordings_next_name',
+            'recordings_next_servicename'
+          )
+        {
             if ( !defined( $hash->{READINGS}{$_}{VAL} )
                 || $hash->{READINGS}{$_}{VAL} ne "-" )
             {
                 readingsBulkUpdate( $hash, $_, "-" );
+            }
+        }
+
+        # special handling for recordingsX_* readings
+        my $i = 1;
+        while ( $i < 21 ) {
+            my $readingname = "recordings" . $i . "_name";
+            if ( defined( $hash->{READINGS}{$readingname}{VAL} )
+                && $hash->{READINGS}{$readingname}{VAL} ne "-" )
+            {
+                readingsBulkUpdate( $hash, $readingname, "-" );
+            }
+
+            $readingname = "recordings" . $i . "_servicename";
+            if ( defined( $hash->{READINGS}{$readingname}{VAL} )
+                && $hash->{READINGS}{$readingname}{VAL} ne "-" )
+            {
+                readingsBulkUpdate( $hash, $readingname, "-" );
+            }
+
+            $i++;
+        }
+
+        # special handling some scalar values
+        foreach (
+            'recordings',              'recordings_next',
+            'recordings_next_counter', 'recordings_error',
+            'recordings_finished'
+          )
+        {
+            if ( !defined( $hash->{READINGS}{$_}{VAL} )
+                || $hash->{READINGS}{$_}{VAL} ne "0" )
+            {
+                readingsBulkUpdate( $hash, $_, "0" );
             }
         }
     }
@@ -2924,6 +3215,36 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           </li>
           <li>
             <b>recordings</b> - Number of active recordings
+          </li>
+          <li>
+            <b>recordingsX_name</b> - name of active recording no. X
+          </li>
+          <li>
+            <b>recordingsX_servicename</b> - servicename of active recording no. X
+          </li>
+          <li>
+            <b>recordings_next</b> - Shows the time of next recording as UNIX timestamp
+          </li>
+          <li>
+            <b>recordings_next_hr</b> - Shows the time of next recording as human-readable format
+          </li>
+          <li>
+            <b>recordings_next_counter</b> - Shows the time until next recording starts in seconds
+          </li>
+          <li>
+            <b>recordings_next_counter_hr</b> - Shows the time until next recording starts human-readable format
+          </li>
+          <li>
+            <b>recordings_next_name</b> - name of next recording
+          </li>
+          <li>
+            <b>recordings_next_servicename</b> - servicename of next recording
+          </li>
+          <li>
+            <b>recordings_error</b> - counter for failed recordings in timerlist
+          </li>
+          <li>
+            <b>recordings_finished</b> - counter for finished recordings in timerlist
           </li>
           <li>
             <b>servicename</b> - Name for current channel
