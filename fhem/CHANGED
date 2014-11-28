@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new module FRITZBOX: controls Fritz!Box router and Fritz!Fon
   - feature: new module 52_I2C_EEPROM.pm added (klausw)
   - feature: readingsGroup: added ! flag,
                             added visibility and cellStyle attributes
@@ -12,13 +13,13 @@
   - feature: 10_IT empfang (by bjoernh)
   - bugfix: PRESENCE: fix race condition, when delete disabled attribute and
                       PRESENCE does not start to scan.
-  - added: OPENWEATHER: captures weather forecast from API of www.wetter.com
+  - feature: OPENWEATHER: captures weather forecast from API of www.wetter.com
   - fhem 5.6 released
 
 - 2014-11-09 (5.6)
   - bugfix: FB_CALLMONITOR: fixing race condition of missing events while 
                             performing multiple calls
-  - added: PROPLANTA: captures weather forecast from web page www.proplanta.de
+  - feature: PROPLANTA: captures weather forecast from web page www.proplanta.de
   - feature: 15_CUL_EM added attribute maxPeak (arnoaugustin)
   - bugfix: 10_IT changed "setstate" to avoid eventMap errors (arnoaugustin)
   - feature: new module 37_harmony.pm added (justme1968)
