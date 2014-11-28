@@ -490,7 +490,7 @@ readingsGroup_2html($)
           next if( !defined($txt) );
         }
 
-        my $value_format = lookup2($hash->{helper}{valueFormat},$name,$1,undef);
+        my $value_format = lookup2($hash->{helper}{valueFormat},$name,$1,"");
         next if( !defined($value_format) );
         if(  $value_format =~ m/%/ ) {
           $txt = sprintf( $value_format, $txt );
