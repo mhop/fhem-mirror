@@ -764,8 +764,10 @@ readingsGroup_2html($)
       }
     }
   }
-  $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
-  $ret .= "<td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></td></tr>" if( $disable > 0 );
+  if( $disable > 0 ) {
+    $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
+    $ret .= "<td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></td></tr>";
+  }
   $ret .= "</table></td></tr>";
   $ret .= "</table>";
 
