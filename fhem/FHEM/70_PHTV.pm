@@ -2387,7 +2387,7 @@ sub PHTV_ReceiveCommand($$$) {
                                     || !defined( $defs{$dev}{TYPE} )
                                     || $defs{$dev}{TYPE} ne "HUEDevice"
                                     || $defs{$dev}{READINGS}{reachable}{VAL} ne
-                                    "true" )
+                                    "1" )
                                 {
                                     next;
                                 }
@@ -2483,11 +2483,11 @@ sub PHTV_ReceiveCommand($$$) {
                                 my $satF =
                                   ( $sat && $sat > 0 && $sat < 100 )
                                   ? $sat / 100
-                                  : 0;
+                                  : 1;
                                 my $briF =
                                   ( $bri && $bri > 0 && $bri < 100 )
                                   ? $bri / 100
-                                  : 0;
+                                  : 1;
 
                                 my ( $hDec, $sDec, $bDec, $h, $s, $b );
                                 if ( $countLEDs > 0 ) {
