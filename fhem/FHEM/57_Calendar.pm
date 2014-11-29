@@ -32,17 +32,33 @@ use HttpUtils;
 package main;
 
 #
-# Note:
+# *** Potential isses:
 #
 # There might be issues when turning to daylight saving time and back that
 # need further investigation. For reference please see
-# http://forum.fhem.de/index.php?topic=18707.new
-# http://forum.fhem.de/index.php?topic=15827.new
+# http://forum.fhem.de/index.php?topic=18707
+# http://forum.fhem.de/index.php?topic=15827
 #
-# Potential future extensions: add support for EXDATE
-# http://forum.fhem.de/index.php?topic=24485.new#new
+# modeStarted triggered on calendar update
+# http://forum.fhem.de/index.php?topic=28516
 #
+# take care of unitialized value warnings
+# http://forum.fhem.de/index.php?topic=28409
 #
+# *** Potential future extensions: 
+# 
+# add support for EXDATE
+# http://forum.fhem.de/index.php?topic=24485
+#
+# nonblocking retrieval
+# http://forum.fhem.de/index.php?topic=29622
+#
+# sequence of events fired sorted by time
+# http://forum.fhem.de/index.php?topic=29112
+#
+# document ownCloud ical use
+# http://forum.fhem.de/index.php?topic=28667
+
 #####################################
 #
 # ICal
