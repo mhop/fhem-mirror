@@ -1043,6 +1043,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     CUL_HM_pushEvnts();
     $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
+    CUL_HM_sndIfOpen("x:$ioName");
     return (CUL_HM_pushEvnts(),$name,@entities); #return something to please dispatcher
   }
   $shash->{lastMsg} = $msgX;
@@ -2253,6 +2254,8 @@ sub CUL_HM_Parse($$) {#########################################################
     Log3 $name,5,"CUL_HM $name sent ACK:".(int(@ack));
   }
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
+  CUL_HM_sndIfOpen(".x:".$ioName);
+  
   #------------ process events ------------------
   push @evtEt,[$shash,1,"noReceiver:src:$src ".$mFlg.$mTp." $p"] 
         if(!@entities && !@evtEt);
@@ -5115,17 +5118,21 @@ sub CUL_HM_sndIfOpen($) {
       $modules{CUL_HM}{$io}{tmr} = 0;
     }
     else{
-         InternalTimer(gettimeofday()+$IOpoll,"CUL_HM_sndIfOpen",
+      if (@{$modules{CUL_HM}{$io}{pendDev}}){
+        InternalTimer(gettimeofday()+$IOpoll,"CUL_HM_sndIfOpen",
                                     "sndIfOpen:$io", 0);
+      }
     }
   }
   else{
     $modules{CUL_HM}{$io}{tmr} = 0;
-    my $name = shift(@{$modules{CUL_HM}{$io}{pendDev}});
-    CUL_HM_ProcessCmdStack($defs{$name});
-    if (@{$modules{CUL_HM}{$io}{pendDev}}){#tmr = 0, clearing queue slowly
-         InternalTimer(gettimeofday()+$IOpoll,"CUL_HM_sndIfOpen",
-                                    "sndIfOpen:$io", 0);
+    if ($modules{CUL_HM}{$io}{pendDev} && @{$modules{CUL_HM}{$io}{pendDev}}){
+      my $name = shift(@{$modules{CUL_HM}{$io}{pendDev}});
+      CUL_HM_ProcessCmdStack($defs{$name});
+      if (@{$modules{CUL_HM}{$io}{pendDev}}){#tmr = 0, clearing queue slowly
+        InternalTimer(gettimeofday()+$IOpoll,"CUL_HM_sndIfOpen",
+                                      "sndIfOpen:$io", 0);
+      }
     }
   }
 }
