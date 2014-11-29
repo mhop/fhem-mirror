@@ -170,8 +170,10 @@ HttpUtils_Connect2($)
       Log3 undef, $hash->{loglevel}, $@;
     } else {
       $hash->{conn}->blocking(1);
-      IO::Socket::SSL->start_SSL($hash->{conn}, Timeout=>$hash->{timeout})
-        || undef $hash->{conn};
+      IO::Socket::SSL->start_SSL($hash->{conn}, {
+          Timeout     => $hash->{timeout},
+          SSL_version => 'SSLv23:!SSLv3:!SSLv2', #Forum #27565
+        }) || undef $hash->{conn};
     }
   }
 
