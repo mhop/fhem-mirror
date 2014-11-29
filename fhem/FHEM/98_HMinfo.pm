@@ -527,8 +527,9 @@ sub HMinfo_paramCheck(@) { ####################################################
         }
         else{
           $ioHmId = $defs{$ioCCU}{DEF};
-          if ($prefIO && !$defs{$prefIO}){
-            push @perfIoUndef,"$eName ->$prefIO";
+          if ($prefIO){
+            my @pIOa = split(",",$prefIO);
+            push @perfIoUndef,"$eName ->$_"  foreach ( grep {!$defs{$_}} @pIOa);
           }            
         }
       }
