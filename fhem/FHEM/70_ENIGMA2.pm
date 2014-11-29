@@ -1821,7 +1821,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             $recordingsNext_time =
                               $return->{e2timer}{e2startprepare};
                             $recordingsNext_time_hr    = sprintf( "%02d:%02d:%02d", $t[2], $t[1], $t[0] );
-                            $recordingsNext_counter    = $timeleft;
+                            $recordingsNext_counter    = int( $timeleft + 0.5 );
                             $recordingsNextServicename =
                               $return->{e2timer}{e2servicename};
                             $recordingsNextName = $return->{e2timer}{e2name};
