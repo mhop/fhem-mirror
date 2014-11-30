@@ -880,7 +880,7 @@ FRITZBOX_Ring_Run($)
 
 #Preparing 2nd command array to ring and reset everything
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
+   push @cmdArray, " ".$intNo;
    push @cmdArray, "sleep ".($duration+1);
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
@@ -1014,8 +1014,10 @@ FRITZBOX_ConvertRingTone ($@)
 #pbd --set-image-url --book=255 --id=612 --url=file://var/InternerSpeicher/FRITZBOXtest.g722 --type=1
 #ctlmgr_ctl r user settings/user0/bpjm_filter_enable
 #/usr/bin/pbd --set-ringtone-url --book="255" --id="612" --url="file:///var/InternerSpeicher/claydermann.g722" --name="Claydermann"
-
-
+# telcfg:settings/MOHType
+# /usr/bin/moh_upload
+# ffmpegconv -i $file -o fx_moh --limit 32 --type 6
+# cat fx_moh >/var/flash/fx_moh
 
 # Opens a Telnet Connection to an external FritzBox
 sub ############################################
@@ -1123,9 +1125,23 @@ FRITZBOX_Exec($$)
          <br>
          The file has to be placed on the file system of the fritzbox.
       </li><br>
+      <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
+         <br>
+         <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
+         <br>
+         The file has to be placed on the file system of the fritzbox.
+      </li><br>
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
          <br>
          Uploads the file fullFilePath on the given handset. Only mp3 or G722 format is allowed.
+         <br>
+         The file has to be placed on the file system of the fritzbox.
+         <br>
+         The upload takes about one minute before the tone is available.
+      </li><br>
+      <li><code>set &lt;name&gt; musicOnHold &lt;fullFilePath&gt;</code>
+         <br>
+         <i>Not implemented yet.</i> Uploads the file fullFilePath as "Music on Hold". Only mp3 or the MOH-format is allowed.
          <br>
          The file has to be placed on the file system of the fritzbox.
          <br>
@@ -1136,15 +1152,17 @@ FRITZBOX_Exec($$)
          <br>
          Rings the internal number for "duration" seconds with the given "ring tone" name.
          <br>
+         Default duration is 5 seconds. Default ring tone is the internal ring tone of the device.
+         <br>
          The text behind 'msg:' will be shown as the callers name. 
          Maximal 30 characters are allowed.
          The attribute "ringWithIntern" must also be specified.
          <br>
-         Default duration is 5 seconds. Default ring tone is the internal ring tone of the device.
+         If the call is taken the callee hears the "music on hold" which can be used to transmit messages.
       </li><br>
       <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
          <br>
-         not implemented yet. Starts the internet radio on the given Fritz!Fon
+         <i>Not implemented yet.</i> Starts the internet radio on the given Fritz!Fon
          <br>
       </li><br>
       <li><code>set &lt;name&gt; tam &lt;number&gt; &lt;on|off&gt;</code>
