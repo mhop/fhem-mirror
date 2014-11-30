@@ -5129,7 +5129,8 @@ sub CUL_HM_sndIfOpen($) {
       ||(defined $ioHash->{XmitOpen} && $ioHash->{XmitOpen} != 1)
 #     ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
        ){#still no send allowed
-    if ($modules{CUL_HM}{$io}{tmrStart} < gettimeofday() - $modules{CUL_HM}{hmIoMaxDly}){
+    if ( $modules{CUL_HM}{$io}{tmrStart} &&
+        ($modules{CUL_HM}{$io}{tmrStart} < gettimeofday() - $modules{CUL_HM}{hmIoMaxDly})){
       # we need to clean up - this is way to long Stop delay
       if ($modules{CUL_HM}{$io}{pendDev}) {
         while(@{$modules{CUL_HM}{$io}{pendDev}}){
