@@ -262,7 +262,7 @@ FBAHA_Read($@)
 
   # drop old data
   if($data) {
-    $data = "" if(gettimeofday() - $hash->{READ_TS} > 1);
+    $data = "" if(gettimeofday() - $hash->{READ_TS} > 5);
     delete($hash->{READ_TS});
   }
 
