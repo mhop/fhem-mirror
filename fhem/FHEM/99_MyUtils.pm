@@ -297,7 +297,7 @@ sub RollCheck() {
 
         # Raum zu warm und aussentemp hoch ?
         $temp=ReadingsVal($r->{temp},"measured-temp", 99);
-	if($temp > $r->{tempS} && $tempOut > ($r->{tempS}-5)) {
+	if($temp > $r->{tempS} && $tempOut > ($r->{tempS}-3)) {
 	    $tempH=1;
 	}
 
