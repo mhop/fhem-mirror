@@ -2446,40 +2446,38 @@ sub CUL_HM_parseCommon(@){#####################################################
 
         # pairing requested - shall we?      
         my $ioId = CUL_HM_h2IoId($ioHash);
-        if( $mFlg.$mTp ne "0400") {
-          # pair now
-          Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
-                        ."$attr{$shash->{NAME}}{subType}, "
-                        ."model $attr{$shash->{NAME}}{model} "
-                        ."serialNr ".ReadingsVal($shash->{NAME},"D-serialNr","");
-          CUL_HM_RemoveHMPair("hmPairForSec:$ioOwn");# just in case...
-          delete $ioHash->{hmPair};
-          delete $ioHash->{hmPairSerial};
-          CUL_HM_respPendRm($shash); # remove all pending messages
-          delete $shash->{cmdStack};
-          delete $shash->{helper}{prt}{rspWait};
-          delete $shash->{helper}{prt}{rspWaitSec};
-          delete $shash->{READINGS}{"RegL_00:"};
-          delete $shash->{READINGS}{".RegL_00:"};
+        # pair now
+        Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
+                      ."$attr{$shash->{NAME}}{subType}, "
+                      ."model $attr{$shash->{NAME}}{model} "
+                      ."serialNr ".ReadingsVal($shash->{NAME},"D-serialNr","");
+        CUL_HM_RemoveHMPair("hmPairForSec:$ioOwn");# just in case...
+        delete $ioHash->{hmPair};
+        delete $ioHash->{hmPairSerial};
+        CUL_HM_respPendRm($shash); # remove all pending messages
+        delete $shash->{cmdStack};
+        delete $shash->{helper}{prt}{rspWait};
+        delete $shash->{helper}{prt}{rspWaitSec};
+        delete $shash->{READINGS}{"RegL_00:"};
+        delete $shash->{READINGS}{".RegL_00:"};
         
-          if (!$modules{CUL_HM}{helper}{hmManualOper}){
-            $attr{$shash->{NAME}}{IODev} = $ioN;
-            $attr{$shash->{NAME}}{IOgrp} = "$ioOwn:$ioHash->{NAME}" if($ioOwn);
-            CUL_HM_assignIO($shash) ;
-          }
-        
-          my ($idstr, $s) = ($ioId, 0xA);
-          $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
-          CUL_HM_pushConfig($shash, $ioId, $src,0,0,0,0, "0201$idstr");
-        
-          $attr{$shash->{NAME}}{autoReadReg}= 
-                AttrVal($shash->{NAME},"autoReadReg","4_reqStatus");
-          CUL_HM_qAutoRead($shash->{NAME},0);
-          CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
-        
-          $respRemoved = 1;#force command stack processing
-          $paired = 1;
+        if (!$modules{CUL_HM}{helper}{hmManualOper}){
+          $attr{$shash->{NAME}}{IODev} = $ioN;
+          $attr{$shash->{NAME}}{IOgrp} = "$ioOwn:$ioHash->{NAME}" if($ioOwn);
+          CUL_HM_assignIO($shash) ;
         }
+        
+        my ($idstr, $s) = ($ioId, 0xA);
+        $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
+        CUL_HM_pushConfig($shash, $ioId, $src,0,0,0,0, "0201$idstr");
+        
+        $attr{$shash->{NAME}}{autoReadReg}= 
+              AttrVal($shash->{NAME},"autoReadReg","4_reqStatus");
+        CUL_HM_qAutoRead($shash->{NAME},0);
+        CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
+        
+        $respRemoved = 1;#force command stack processing
+        $paired = 1;
       }
     }
 
@@ -5141,7 +5139,7 @@ sub CUL_HM_sndIfOpen($) {
       $modules{CUL_HM}{$io}{tmr} = 0;
     }
     else{
-      if (@{$modules{CUL_HM}{$io}{pendDev}}){
+      if ($modules{CUL_HM}{$io}{pendDev} && @{$modules{CUL_HM}{$io}{pendDev}}){
         InternalTimer(gettimeofday()+$IOpoll,"CUL_HM_sndIfOpen",
                                     "sndIfOpen:$io", 0);
       }
