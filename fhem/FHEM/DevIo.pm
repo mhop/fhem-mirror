@@ -12,6 +12,14 @@ sub DevIo_SimpleReadWithTimeout($$);
 sub DevIo_SimpleWrite($$$);
 sub DevIo_TimeoutRead($$);
 
+sub
+DevIo_setStates($$)
+{
+  my ($hash, $val) = @_;
+  $hash->{STATE} = $val;
+  setReadingsVal($hash, "state", $val, TimeNow());
+}
+
 ########################
 sub
 DevIo_DoSimpleRead($)
@@ -23,11 +31,11 @@ DevIo_DoSimpleRead($)
     $buf = $hash->{USBDev}->input();
 
   } elsif($hash->{DIODev}) {
-    $res = sysread($hash->{DIODev}, $buf, 256);
+    $res = sysread($hash->{DIODev}, $buf, 4096);
     $buf = undef if(!defined($res));
 
   } elsif($hash->{TCPDev}) {
-    $res = sysread($hash->{TCPDev}, $buf, 256);
+    $res = sysread($hash->{TCPDev}, $buf, 4096);
     $buf = "" if(!defined($res));
 
   }
@@ -35,6 +43,7 @@ DevIo_DoSimpleRead($)
 }
 
 ########################
+# If called directly after a select, it should not block.
 sub
 DevIo_SimpleRead($)
 {
@@ -44,7 +53,7 @@ DevIo_SimpleRead($)
   ###########
   # Lets' try again: Some drivers return len(0) on the first read...
   if(defined($buf) && length($buf) == 0) {
-    $buf = DevIo_DoSimpleRead($hash);
+    $buf = DevIo_SimpleReadWithTimeout($hash, 1);
   }
 
   if(!defined($buf) || length($buf) == 0) {
@@ -130,7 +139,7 @@ DevIo_Expect($$$)
   my $answer= DevIo_SimpleReadWithTimeout($hash, $timeout);
   return $answer unless($answer eq "");
     # the device has failed to deliver a result
-  $hash->{STATE}= "failed";
+  DevIo_setStates($hash, "failed");
   DoTrigger($name, "FAILED");
   # reopen device
   # unclear how to know whether the following succeeded
@@ -145,7 +154,7 @@ DevIo_Expect($$$)
   $answer= DevIo_SimpleReadWithTimeout($hash, $timeout);
   # success
   if($answer ne "") {
-    $hash->{STATE}= "opened";  
+    DevIo_setStates($hash, "opened");
     DoTrigger($name, "CONNECTED");
     return $answer;
   }
@@ -186,7 +195,7 @@ DevIo_OpenDev($$$)
     if(!$conn) {
       Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
       $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
+      DevIo_setStates($hash, "disconnected");
       return "";
     }
     $hash->{TCPDev} = $conn;
@@ -213,7 +222,7 @@ DevIo_OpenDev($$$)
     } else {
       Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
       $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
+      DevIo_setStates($hash, "disconnected");
       $hash->{NEXT_OPEN} = time()+60;
       return "";
     }
@@ -229,7 +238,7 @@ DevIo_OpenDev($$$)
       return undef if($reopen);
       Log3 $name, 3, "Can't open $dev: $!";
       $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
+      DevIo_setStates($hash, "disconnected");
       return "";
     }
 
@@ -266,7 +275,7 @@ DevIo_OpenDev($$$)
       return undef if($reopen);
       Log3 $name, 3, "Can't open $dev: $!";
       $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
+      DevIo_setStates($hash, "disconnected");
       return "";
     }
     $hash->{USBDev} = $po;
@@ -316,7 +325,7 @@ DevIo_OpenDev($$$)
     Log3 $name, 3, "$name device opened" if(!$hash->{DevioText});
   }
 
-  $hash->{STATE}="opened";
+  DevIo_setStates($hash, "opened");
 
   my $ret;
   if($initfn) {
@@ -387,8 +396,7 @@ DevIo_Disconnected($)
   Log3 $name, 1, "$dev disconnected, waiting to reappear ($name)";
   DevIo_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
-  $hash->{STATE} = "disconnected";
-  setReadingsVal($hash, "state", "disconnected", TimeNow());
+  DevIo_setStates($hash, "disconnected");
 
   DoTrigger($name, "DISCONNECTED");
 }
