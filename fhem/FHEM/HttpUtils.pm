@@ -90,7 +90,7 @@ HttpUtils_Connect($)
   $hash->{redirects}  = 0 if(!$hash->{redirects});
   $hash->{displayurl} = $hash->{hideurl} ? "<hidden>" : $hash->{url};
 
-  Log3 undef, $hash->{loglevel}, "HttpUtils url=$hash->{displayurl}";
+  Log3 $hash, $hash->{loglevel}, "HttpUtils url=$hash->{displayurl}";
 
   if($hash->{url} !~
            /^(http|https):\/\/(([^:\/]+):([^:\/]+)@)?([^:\/]+)(:\d+)?(\/.*)$/) {
@@ -167,7 +167,7 @@ HttpUtils_Connect2($)
   if($hash->{protocol} eq "https" && $hash->{conn}) {
     eval "use IO::Socket::SSL";
     if($@) {
-      Log3 undef, $hash->{loglevel}, $@;
+      Log3 $hash, $hash->{loglevel}, $@;
     } else {
       $hash->{conn}->blocking(1);
       IO::Socket::SSL->start_SSL($hash->{conn}, {
@@ -278,6 +278,7 @@ HttpUtils_ParseAnswer($$)
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
   return ("", $ret) if(!defined($1));
 
+  $hash->{HTTPHEADER} = $1;
   my @header= split("\r\n", $1);
   my @header0= split(" ", shift @header);
   my $code= $header0[1];
@@ -285,9 +286,10 @@ HttpUtils_ParseAnswer($$)
   if(!defined($code) || $code eq "") {
     return ("$hash->{displayurl}: empty answer received", "");
   }
-  Log3 undef,$hash->{loglevel}, "$hash->{displayurl}: HTTP response code $code";
+  Log3 $hash,$hash->{loglevel}, "$hash->{displayurl}: HTTP response code $code";
   $hash->{code} = $code;
-  if($code==301 || $code==302 || $code==303) { # redirect
+  if(($code==301 || $code==302 || $code==303) 
+	&& !$hash->{ignoreredirects}) { # redirect
     if(++$hash->{redirects} > 5) {
       return ("$hash->{displayurl}: Too many redirects", "");
 
@@ -295,7 +297,7 @@ HttpUtils_ParseAnswer($$)
       my $ra;
       map { $ra=$1 if($_ =~ m/Location:\s*(\S+)$/) } @header;
       $hash->{url} = ($ra =~ m/^http/) ? $ra: $hash->{addr}.$ra;
-      Log3 undef, $hash->{loglevel}, "HttpUtils $hash->{displayurl}: ".
+      Log3 $hash, $hash->{loglevel}, "HttpUtils $hash->{displayurl}: ".
           "Redirect to ".($hash->{hideurl} ? "<hidden>" : $hash->{url});
       if($hash->{callback}) {
         HttpUtils_NonblockingGet($hash);
@@ -307,13 +309,13 @@ HttpUtils_ParseAnswer($$)
   }
   
   # Debug
-  Log3 undef, $hash->{loglevel},
+  Log3 $hash, $hash->{loglevel},
        "HttpUtils $hash->{displayurl}: Got data, length: ".  length($ret);
   if(!length($ret)) {
-    Log3 undef, $hash->{loglevel}, "HttpUtils $hash->{displayurl}: ".
+    Log3 $hash, $hash->{loglevel}, "HttpUtils $hash->{displayurl}: ".
          "Zero length data, header follows:";
     for (@header) {
-      Log3 undef, $hash->{loglevel}, "  $_";
+      Log3 $hash, $hash->{loglevel}, "  $_";
     }
   }
   return ("", $ret);
@@ -324,7 +326,7 @@ HttpUtils_ParseAnswer($$)
 #    url, callback
 #  optional(default):
 #    hideurl(0),timeout(4),data(""),loglevel(4),header(""),
-#    noshutdown(1),shutdown(0),httpversion("1.0")
+#    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data ? "POST" : "GET")
 # Example:
 #   HttpUtils_NonblockingGet({
