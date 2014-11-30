@@ -505,7 +505,7 @@ statistics_doStatisticMinMax ($$$$$$)
   
   # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/^[\D]*([\d.]*).*/$1/eg;
+   $value =~ s/^[\D]*(-?[\d.]*).*/$1/eg;
 
    statistics_Log $hash, 4, "Calculating min/avg/max statistics for '".$dev->{NAME}.":$readingName = $value'";
   # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
@@ -606,7 +606,7 @@ statistics_doStatisticTendency ($$$$)
    
   # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/^[\D]*([\d.]*).*/$1/eg;
+   $value =~ s/^[\D]*(-?[\d.]*).*/$1/eg;
    statistics_Log $hash, 4, "Calculating hourly tendency statistics for '".$dev->{NAME}.":$readingName = $value'";
 
    my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . "Tendency";
@@ -672,7 +672,7 @@ statistics_doStatisticDelta ($$$$)
    
   # Get reading, extract first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/^[\D]*([\d.]*).*/$1/eg;
+   $value =~ s/^[\D]*(-?[\d.]*).*/$1/eg;
    statistics_Log $hash, 4, "Calculating delta statistics for '".$dev->{NAME}.":$readingName = $value'";
 
    my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName;
@@ -800,27 +800,32 @@ statistics_doStatisticSpecialPeriod ($$$$$)
    my $name = $hash->{NAME};
    
    my $specialPeriod = AttrVal($name, "specialDeltaPeriodHours", 0);
-   
-   return if $specialPeriod ==0;
+   return if $specialPeriod == 0;
 
    my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . "SpecialPeriod";
    my $hiddenReadingName = ".".$dev->{NAME} . ":" . $readingName . "SpecialPeriod";
-   
-   my $result = $value;
-   statistics_Log $hash, 4, "Add $value to $hiddenReadingName";
-   if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) { $result .= " " . $hash->{READINGS}{$hiddenReadingName}{VAL}; }
-   my @hidden = split / /, $result; # Internal values
-   if ( exists($hidden[$specialPeriod]) ) { 
-      statistics_Log $hash, 4, "Remove last value ".$hidden[$specialPeriod]." from '$hiddenReadingName'";
-      delete $hidden[$specialPeriod]; 
+
+  # Update hidden stack
+   my @hidden = ();
+   if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) 
+      { @hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; }
+
+   unshift @hidden, $value;
+      statistics_Log $hash, 4, "Add $value to $hiddenReadingName";
+   while ( $#hidden > $specialPeriod ) 
+   { 
+      my $lastValue = pop @hidden;
+      statistics_Log $hash, 4, "Remove last value '$lastValue' from '$hiddenReadingName'";
    }
    
-   $result = 0;
-   foreach my $val (@hidden) { $result += $val; }
+  # Calculate specialPeriodValue
+   my $result = 0;
+   foreach (@hidden) { $result += $_; }
    $result = sprintf "%.".$decPlaces."f", $result;
    if ($#hidden + 1 != $specialPeriod) { $result .= " (".($#hidden+1).".hours)"; }
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
    
+  # Store hidden stack
    $result = join( " ", @hidden );
    readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
    statistics_Log $hash, 4, "Set '$hiddenReadingName = $result'";
@@ -836,7 +841,7 @@ statistics_doStatisticDuration ($$$$)
    my $devName = $dev->{NAME};
    return if not exists ($dev->{READINGS}{$readingName});
   
-  # Get reading, cut out first number without units
+  # Get reading
    my $state = $dev->{READINGS}{$readingName}{VAL};
 
    statistics_Log $hash, 4, "Calculating duration statistics for '".$dev->{NAME}.":$readingName = $state'";
