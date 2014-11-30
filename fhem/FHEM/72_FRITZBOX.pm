@@ -221,6 +221,7 @@ FRITZBOX_Set($$@)
             . " message"
             . " ring"
             . " startRadio"
+            . " tam"
             . " update:noArg"
             . " wlan:on,off";
 
@@ -290,6 +291,18 @@ FRITZBOX_Set($$@)
       if (int @val > 0) 
       {
          # FRITZBOX_Ring $hash, @val; # join("|", @val);
+         return undef;
+      }
+   }
+   elsif ( lc $cmd eq 'tam')
+   {
+      if ( int @val == 2 && defined( $hash->{READINGS}{"tam".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
+      {
+         my $state = $val[1];
+         $state =~ s/on/1/;
+         $state =~ s/off/0/;
+         FRITZBOX_Exec( $hash, "ctlmgr_ctl w tam settings/TAM".( $val[0] - 1 )."/Active ".$state );
+         readingsSingleUpdate($hash,"tam".$val[0]."_state",$val[1], 1);
          return undef;
       }
    }
@@ -392,12 +405,13 @@ FRITZBOX_Readout_Run($)
    {
       
      # Init and Counters
-      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol"];
-      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol/User/count"];
-      push @readoutArray, ["", "ctlmgr_ctl r configd settings/WEBRADIO/count"];
-      push @readoutArray, ["", "ctlmgr_ctl r user settings/user/count"];
+      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol" ];
+      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol/User/count" ];
+      push @readoutArray, ["", "ctlmgr_ctl r configd settings/WEBRADIO/count" ];
+      push @readoutArray, ["", "ctlmgr_ctl r user settings/user/count" ];
       push @readoutArray, ["", 'echo $CONFIG_AB_COUNT'];
-      push @readoutArray, ["", "ctlmgr_ctl r landevice settings/landevice/count"];
+      push @readoutArray, ["", "ctlmgr_ctl r landevice settings/landevice/count" ];
+      push @readoutArray, ["", "ctlmgr_ctl r tam settings/TAM/count" ];
 
       # Box model and firmware
       push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT', "nounderline" ];
@@ -409,6 +423,7 @@ FRITZBOX_Readout_Run($)
       my $userCount = $resultArray->[3];
       my $fonCount = $resultArray->[4];
       my $lanDeviceCount = $resultArray->[5];
+      my $tamCount = $resultArray->[6];
       
       
    # Internetradioliste erzeugen
@@ -419,7 +434,7 @@ FRITZBOX_Readout_Run($)
          $rName = "radio00";
          do 
          {
-            push @readoutArray, [ $rName, "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name"];
+            push @readoutArray, [ $rName, "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name" ];
             $i++;
             $rName = sprintf ("radio%02d",$i);
          }
@@ -440,8 +455,8 @@ FRITZBOX_Readout_Run($)
       {
          for (0..$lanDeviceCount-1)
          {
-            push @readoutArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/ip"];
-            push @readoutArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/name"];
+            push @readoutArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/ip" ];
+            push @readoutArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/name" ];
          }
          $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
 
@@ -503,7 +518,7 @@ FRITZBOX_Readout_Run($)
    # Analog Fons Name
       foreach (1..$fonCount)
       {
-         push @readoutArray, ["fon".$_, "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name"];
+         push @readoutArray, ["fon".$_, "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name" ];
       }
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
    
@@ -514,15 +529,39 @@ FRITZBOX_Readout_Run($)
             if $resultArray->[$_-1];
       }
 
-   # user profiles
+   # Anrufbeantworter (TAM)
+      if ($tamCount > 0 )
+      {
+      # Check if TAM is displayed
+         for (0..$tamCount-1)
+         {
+            push @readoutArray, [ "", "ctlmgr_ctl r tam settings/TAM".$_."/Display" ];
+         }
+         $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      #Get TAM readings
+         for (0..$tamCount-1)
+         {
+            $rName = "tam".($_+1);
+            if ( $resultArray->[$_] == 1 || defined $hash->{READINGS}{$rName} )
+            {
+               push @readoutArray, [ $rName, "ctlmgr_ctl r tam settings/TAM". $_ ."/Name" ];
+               push @readoutArray, [ $rName."_state", "ctlmgr_ctl r tam settings/TAM".$_."/Active", "onoff" ];
+               push @readoutArray, [ $rName."_newMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumNewMessages" ];
+               push @readoutArray, [ $rName."_oldMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumOldMessages" ];
+            }
+         }
+         FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      }
+
+# user profiles
       $i=0;
       $rName = "user01";
       do 
       {
-         push @readoutArray, [$rName, "ctlmgr_ctl r user settings/user".$i."/name", "deviceip"];
-         push @readoutArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "timeinhours"];
-         push @readoutArray, [$rName."_todayTime", "ctlmgr_ctl r user settings/user".$i."/today_time", "timeinhours"];
-         push @readoutArray, [$rName."_type", "ctlmgr_ctl r user settings/user".$i."/type"];
+         push @readoutArray, [$rName, "ctlmgr_ctl r user settings/user".$i."/name", "deviceip" ];
+         push @readoutArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "timeinhours" ];
+         push @readoutArray, [$rName."_todayTime", "ctlmgr_ctl r user settings/user".$i."/today_time", "timeinhours" ];
+         push @readoutArray, [$rName."_type", "ctlmgr_ctl r user settings/user".$i."/type" ];
          $i++;
          $rName = sprintf ("user%02d",$i+1);
       }
@@ -538,15 +577,15 @@ FRITZBOX_Readout_Run($)
    foreach (0..2)
    {
      # Alarm clock name
-      push @readoutArray, ["alarm".($_+1), "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Name"];
+      push @readoutArray, ["alarm".($_+1), "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Name" ];
      # Alarm clock state
-      push @readoutArray, ["alarm".($_+1)."_state", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Active", "onoff"];
+      push @readoutArray, ["alarm".($_+1)."_state", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Active", "onoff" ];
      # Alarm clock time
-      push @readoutArray, ["alarm".($_+1)."_time", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Time", "altime"];
+      push @readoutArray, ["alarm".($_+1)."_time", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Time", "altime" ];
      # Alarm clock number
-      push @readoutArray, ["alarm".($_+1)."_target", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Number", "alnumber"];
+      push @readoutArray, ["alarm".($_+1)."_target", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Number", "alnumber" ];
      # Alarm clock weekdays
-      push @readoutArray, ["alarm".($_+1)."_wdays", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays", "aldays"];
+      push @readoutArray, ["alarm".($_+1)."_wdays", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays", "aldays" ];
    }
    $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
    
@@ -1011,7 +1050,8 @@ FRITZBOX_Exec($$)
    {
       if ( int (@{$cmd}) > 0 )
       {
-         FRITZBOX_Log $hash, 5, "Execute " . int ( @{$cmd} ) . " command(s): '" . join( " | ", @{$cmd} ) . "'";
+         FRITZBOX_Log $hash, 4, "Execute " . int ( @{$cmd} ) . " command(s)";
+         FRITZBOX_Log $hash, 5, "Commands: '" . join( " | ", @{$cmd} ) . "'";
          my $cmdStr = join "\necho ' |#|'\n", @{$cmd};
          $cmdStr .= "\necho ' |#|'";
          my $result = qx($cmdStr);
@@ -1022,7 +1062,8 @@ FRITZBOX_Exec($$)
             $resultArray[$_] =~ s/\s$//;
          }
          @{$cmd} = ();
-         FRITZBOX_Log $hash, 5, "Received ".int(@resultArray)." answer(s): '".join (" | ", @resultArray)."'";
+         FRITZBOX_Log $hash, 4, "Received ".int(@resultArray)." answer(s)";
+         FRITZBOX_Log $hash, 5, "Result: '" . join (" | ", @resultArray)."'";
          return \@resultArray;
       }
       else
@@ -1051,6 +1092,8 @@ FRITZBOX_Exec($$)
    Note!! To use it, FHEM has to run on a Fritz!Box.
    <br>
    <i>So fare, the module has been tested on Fritz!Box 7390 and Fritz!Fon MT-F only.</i>
+   <br>
+   Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br/><br/>
    <a name="FRITZBOXdefine"></a>
    <b>Define</b>
@@ -1068,26 +1111,11 @@ FRITZBOX_Exec($$)
       <br>
       <li><code>set &lt;name&gt; alarm &lt;number&gt; &lt;on|off&gt;</code>
          <br>
-         Switches the alarm number (1, 2 or 3 on or off.
+         Switches the alarm number (1, 2 or 3) on or off.
       </li><br>
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
          <br>
          Switches the guest WLAN on or off.
-      </li><br>
-      <li><code>set &lt;name&gt; update</code>
-         <br>
-         Starts an update of the device readings.
-      </li><br>
-      <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration [ringTone]] [msg:yourMessage]</code>
-         Example: <code>set fritzbox ring 612 5 Budapest msg:It is raining</code>
-         <br>
-         Rings the internal number for "duration" seconds with the given "ring tone" name.
-         <br>
-         The text behind 'msg:' will be shown as the callers name. 
-         Maximal 30 characters are allowed.
-         The attribute "ringWithIntern" must also be specified.
-         <br>
-         Default duration is 5 seconds. Default ring tone is the internal ring tone of the device.
       </li><br>
       <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
          <br>
@@ -1103,10 +1131,29 @@ FRITZBOX_Exec($$)
          <br>
          The upload takes about one minute before the tone is available.
       </li><br>
+      <li><code>set &lt;name&gt; ring &lt;internalNumber&gt; [duration [ringTone]] [msg:yourMessage]</code>
+         Example: <code>set fritzbox ring 612 5 Budapest msg:It is raining</code>
+         <br>
+         Rings the internal number for "duration" seconds with the given "ring tone" name.
+         <br>
+         The text behind 'msg:' will be shown as the callers name. 
+         Maximal 30 characters are allowed.
+         The attribute "ringWithIntern" must also be specified.
+         <br>
+         Default duration is 5 seconds. Default ring tone is the internal ring tone of the device.
+      </li><br>
       <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
          <br>
          not implemented yet. Starts the internet radio on the given Fritz!Fon
          <br>
+      </li><br>
+      <li><code>set &lt;name&gt; tam &lt;number&gt; &lt;on|off&gt;</code>
+         <br>
+         Switches the answering machine number (1-10) on or off.
+      </li><br>
+      <li><code>set &lt;name&gt; update</code>
+         <br>
+         Starts an update of the device readings.
       </li><br>
       <li><code>set &lt;name&gt; wlan &lt;on|off&gt;</code>
          <br>
@@ -1155,15 +1202,16 @@ FRITZBOX_Exec($$)
    <a name="FRITZBOXreading"></a>
    <b>Readings</b>
    <ul><br>
-      <li><b>alarm</b><i>1</i> - Internal name of the alarm <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_state</b> - Current state of the alarm <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_target</b> - Internal number of the alarm <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_time</b> - Time of alarm <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of alarm <i>1</i></li>
+      <li><b>alarm</b><i>1</i> - Name of the alarm clock <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_state</b> - Current state of the alarm clock <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_target</b> - Internal number of the alarm clock <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_time</b> - Alarm time of the alarm clock <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
+      <li><b>box_model</b> - Frit!Box model</li>
       <li><b>box_wlan</b> - Current state of the WLAN</li>
-      <li><b>dect</b><i>1</i> - Internal name of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i> - Name of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Customer ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_fwVersion</b> - Firmware Version of the DECT device <i>1</i></li>
@@ -1174,6 +1222,10 @@ FRITZBOX_Exec($$)
       <li><b>dect</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
+      <li><b>tam</b><i>1</i> - Name of the answering machine <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_newMsg</b> - New messages on the answering machine <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_oldMsg</b> - Old messages on the answering machine <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_state</b> - Current state of the answering machine <i>1</i></li>
    </ul>
    <br>
 </ul>
