@@ -836,8 +836,8 @@ FRITZBOX_Ring_Run($)
    }
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort ".$ringWithIntern
       if $ringWithIntern != 0 ;
-   $result = FRITZBOX_Exec_Exec( $hash, \@cmdArray )
-      if @cmdArray > 0;
+   $result = FRITZBOX_Exec( $hash, \@cmdArray )
+      if int( @cmdArray ) > 0;
 
 #Preparing 2nd command array to ring and reset everything
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
@@ -1009,9 +1009,9 @@ FRITZBOX_Exec($$)
    }
    elsif (ref \$cmd eq "REF")
    {
-      if (int @{$cmd} >0 )
+      if ( int (@{$cmd}) > 0 )
       {
-         FRITZBOX_Log $hash, 5, "Execute '".(join " | ", @{$cmd})."'";
+         FRITZBOX_Log $hash, 5, "Execute " . int ( @{$cmd} ) . " command(s): '" . join( " | ", @{$cmd} ) . "'";
          my $cmdStr = join "\necho ' |#|'\n", @{$cmd};
          $cmdStr .= "\necho ' |#|'";
          my $result = qx($cmdStr);
@@ -1022,9 +1022,17 @@ FRITZBOX_Exec($$)
             $resultArray[$_] =~ s/\s$//;
          }
          @{$cmd} = ();
-         FRITZBOX_Log $hash, 5, "Result '".join (" | ", @resultArray)."' (count: ".int (@resultArray).")";
+         FRITZBOX_Log $hash, 5, "Received ".int(@resultArray)." answer(s): '".join (" | ", @resultArray)."'";
          return \@resultArray;
       }
+      else
+      {
+         FRITZBOX_Log $hash, 4, "No shell command to execute.";
+      }
+   }
+   else
+   {
+      FRITZBOX_Log $hash, 1, "Error: wrong perl parameter";
    }
 }
 
