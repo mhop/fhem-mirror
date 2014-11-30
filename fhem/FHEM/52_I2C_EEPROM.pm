@@ -13,9 +13,14 @@ use SetExtensions;
 use Scalar::Util qw(looks_like_number);
 
 my %setsP = (
-'off' => 0,
-'on' => 1,
-); 
+'byte' => 0,
+'bit' => 1,
+'word' => 2,
+'dword' => 3,
+'qword' => 4,
+);
+
+my $sets = "byte bit word dword qword";
 
 ###############################################################################
 sub I2C_EEPROM_Initialize($) {
@@ -118,6 +123,10 @@ sub I2C_EEPROM_Set($@) {
 	my $cmd = $a[1];
     my $val = $a[2];
 	my $msg = undef;
+    
+    my $setList = " ";
+	return "Unknown argument, choose one of $setList" if(defined($a[1]) && $a[1] eq '?');
+    
     if (@a > 2) {   
     	if (@a == 4) {
     		if ($a[2] =~ m/^(B|b)(it|)((0|)[0-7])$/i) {
@@ -153,9 +162,8 @@ sub I2C_EEPROM_Set($@) {
 sub I2C_EEPROM_Get($@) {
 	my ($hash, @a) = @_;
 	my $name =$a[0];
-	#my $args = int(@$a);	GEHT NICHT
+
 	my $nbyte = ( (AttrVal($hash->{NAME}, "EEPROM_size", "128") eq "2k") ? 256 : 16 );
-	#my $reg  = 0;
 	my %sendpackage = ( i2caddress => $hash->{I2C_Address}, direction => "i2cread" );
 	$sendpackage{reg} = 0;
 	$sendpackage{nbyte} = $nbyte;
@@ -164,16 +172,22 @@ sub I2C_EEPROM_Get($@) {
 	my $pname = $phash->{NAME};
 	CallFn($pname, "I2CWrtFn", $phash, \%sendpackage);
 	
+    my $setList = " ";
+	return "Unknown argument, choose one of $setList" if(defined($a[1]) && $a[1] eq '?');
+    
 	if ( defined $a[1]) {
 	    $a[1] = $a[1] =~ /^0.*$/ ? oct($a[1]) : $a[1];
 	    if (looks_like_number($a[1]) ) {
 			return "$name error: $a[1] is outside of address range (". $nbyte - 1 .")" unless ($nbyte > $a[1] );
-            my $rbyte = I2C_EEPROM_BytefromReading($hash, $a[1]);
-			if ( defined $a[2]) {
-            	if ($a[2] =~ m/^B(it|)((0|)[0-7])$/i){
+            
+            my $num = (defined $a[2] && $a[2] =~ m/^(dec|bin|hex)$/i) ? $a[2] : undef;
+            
+            my $rbyte = I2C_EEPROM_BytefromReading($hash, $a[1], $num);
+			if ( defined $a[2] && $a[2] !~ m/^(dec|bin|hex)$/i ) {
+            	if ($a[2] =~ m/^b(it|)((0|)[0-7])$/i){
 					$a[2] =~ tr/(B|b)(it|)//d;			#Nummer aus String extrahieren
-					$rbyte = (( hex($rbyte) >> $a[2] ) & 1) == 1 ? 1 : 0 ;
-                } else {
+					$rbyte = (( hex($rbyte) >> $a[2] ) & 1) == 1 ? 1 : "0 " ;
+				}else {
                 	return "$name error: $a[2] is outside of range (Bit0..Bit7)";
                 }
 			}
@@ -255,11 +269,19 @@ sub I2C_EEPROM_SetReg {																									#set register
 }
 ###############################################################################
 sub I2C_EEPROM_BytefromReading($@) {
-	my ($hash, $reg) = @_;
+	my ($hash, $reg, $num) = @_;
+    #$num = "hex" unless defined $num ;
     my $regb = $reg >> 4;
 	my $regp = $reg & 15;
 	my $bank = ReadingsVal($hash->{NAME},"0x".sprintf("%02X",$regb)."x",".. .. .. .. .. .. .. .. .. .. .. .. .. .. .. ..");
-	return substr($bank,$regp * 3,2);
+    if ($num eq 'dec') {
+    	return hex(substr($bank,$regp * 3,2));
+    } elsif ($num eq 'bin') {
+    	return sprintf ('0b%08b', hex(substr($bank,$regp * 3,2)));
+    } else {
+    	return "0x" . substr($bank,$regp * 3,2);
+    }
+	
 }
 1;
 
@@ -384,7 +406,7 @@ sub I2C_EEPROM_BytefromReading($@) {
 			Standard: -, g&uuml;ltige Werte: Dezimalzahl<br><br>
 		</li>
 		<li>EEPROM_size<br>
-			Speichergr&ouml;ße des EEPROM<br>
+			Speichergröße des EEPROM<br>
 			Standard: 128, g&uuml;ltige Werte: 128 (128bit), 2k (2048bit)<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
