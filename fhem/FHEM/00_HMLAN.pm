@@ -435,7 +435,7 @@ sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
 
 sub HMLAN_Write($$$) {#########################################################
   my ($hash,$fn,$msg) = @_;
-  if ($fn eq "cmd"){
+  if (defined($fn) && $fn eq "cmd"){
     HMLAN_SimpleWrite($hash,$msg);
     return;
   }

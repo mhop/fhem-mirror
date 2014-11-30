@@ -740,8 +740,13 @@ sub CUL_HM_Attr(@) {#################################
       return "use $attrName only for devices" if (!$hash->{helper}{role}{dev});
       my ($ioCCU,$prefIO) = split(":",$attrVal,2);
       $hash->{helper}{io}{vccu}   = $ioCCU;
-      my @prefIOA = split(",",$prefIO);
-      $hash->{helper}{io}{prefIO} = \@prefIOA;
+      if ($prefIO){
+        my @prefIOA = split(",",$prefIO);
+        $hash->{helper}{io}{prefIO} = \@prefIOA;
+      }
+      else{
+        delete $hash->{helper}{io}{prefIO};
+      }
     }
     else{
       $hash->{helper}{io}{vccu} = "";
@@ -876,6 +881,7 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
                           ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
                           ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
                           ,"HM-MOD-Em-8"     =>{"00"=>"closed"                   ,"C8"=>"open"}
+                          ,"HM-WDS100-C6-O"  =>{"00"=>"quiet"                   ,"C8"=>"storm"}
                          }
                   ,mdCh=>{ "HM-Sen-RD-O01"   =>{"00"=>"dry"                      ,"C8"=>"rain"}
                           ,"HM-Sen-RD-O02"   =>{"00"=>"off"                      ,"C8"=>"on"}
@@ -1090,6 +1096,20 @@ sub CUL_HM_Parse($$) {#########################################################
       if(defined $s)  {$sM .= "S: $s "    ;push @evtEt,[$shash,1,"sunshine:$s"       ];}
       if(defined $b)  {$sM .= "B: $b "    ;push @evtEt,[$shash,1,"brightness:$b"     ];}
       push @evtEt,[$shash,1,$sM];
+    }
+    elsif ($mTp eq "41"){
+      my ($chn,$cnt,$state)=(hex($1),hex($2),$3) if($p =~ m/^(..)(..)(..)/);
+      my $err = $chn & 0x80;
+      $chn = sprintf("%02X",$chn & 0x3f);
+      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+                             if($modules{CUL_HM}{defptr}{"$src$chn"});
+      my $txt;
+      if    ($shash->{helper}{lm} && $shash->{helper}{lm}{hex($state)}){$txt = $shash->{helper}{lm}{hex($state)}}
+      elsif ($lvlStr{md}{$md})                                         {$txt = $lvlStr{md}{$md}{$state}}
+      elsif ($lvlStr{st}{$st})                                         {$txt = $lvlStr{st}{$st}{$state}}
+      else                                                             {$txt = "unknown:$state"}
+      push @evtEt,[$shash,1,"storm:$txt"];
+      #push @evtEt,[$devH,1,"battery:". ($err?"low"  :"ok"  )]; has no battery
     }
     else {
       push @evtEt,[$shash,1,"unknown:$p"];
@@ -1522,7 +1542,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $t = sprintf("%0.1f", $t/10);
       my $statemsg = "state:T: $t";
       push @evtEt,[$shash,1,"temperature:$t"];#temp is always there
-      push @evtEt,[$shash,1,"battery:".($d1 & 0x8000?"low":"ok")];
+      push @evtEt,[$devH,1,"battery:".($d1 & 0x8000?"low":"ok")];
       if($modules{CUL_HM}{defptr}{$src.$chn}){
         my $ch = $modules{CUL_HM}{defptr}{$src.$chn};
         push @evtEt,[$ch,1,$statemsg];
@@ -1533,8 +1553,8 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,$statemsg];
     }
     elsif ($mTp eq "53"){
-      my ($mChn,@dat) = unpack 'A2(A6)*',$p;
-      push @evtEt,[$shash,1,"battery:".(hex($mChn)&0x80?"low":"ok")];
+      my ($chn,@dat) = unpack 'A2(A6)*',$p;
+      push @evtEt,[$devH,1,"battery:".(hex($chn)&0x80?"low":"ok")];
       foreach (@dat){
         my ($a,$d) = unpack 'A2A4',$_;
         $d = hex($d);
@@ -2656,6 +2676,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($mTp =~ m /^4[01]/){ #someone is triggered##########
     my $chn = hex(substr($p,0,2));
+    my $cnt = hex(substr($p,2,2));
     my $long = ($chn & 0x40)?"long":"short";
     $chn = $chn & 0x3f;
     my $cHash = CUL_HM_id2Hash($src.sprintf("%02X",$chn));
@@ -2671,6 +2692,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     elsif($mTp eq "40"){
       $level = $long;
     }
+    push @evtEt,[$cHash,1,"trigger_cnt:$cnt"];
 
     my $peerIDs = AttrVal($cName,"peerIDs","");
     if ($peerIDs =~ m/$dst/){# dst is available in the ID list
