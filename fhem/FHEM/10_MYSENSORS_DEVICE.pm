@@ -103,7 +103,7 @@ my %static_types = (
   S_ARDUINO_REPEATER_NODE => { receives => [], sends => [] }, # Not used so far
   S_LOCK                  => { receives => [V_LOCK_STATUS], sends => [V_LOCK_STATUS] }, #R FIDLockSensor
   S_IR                    => { receives => [], sends => [] }, # Not used so far
-  S_WATER                 => { receives => [V_VAR1], sends => [V_FLOW,V_VOLUME] }, # WaterMeterPulseSensor
+  S_WATER                 => { receives => [V_VAR1], sends => [V_FLOW,V_VOLUME,V_VAR1] }, # WaterMeterPulseSensor
   S_AIR_QUALITY           => { receives => [], sends => [V_VAR1] }, # AirQualitySensor
   S_CUSTOM                => { receives => [], sends => [] }, # Not used so far
   S_DUST                  => { receives => [], sends => [V_DUST_LEVEL] }, # Not used so far
