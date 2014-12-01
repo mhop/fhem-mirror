@@ -15,7 +15,7 @@ watchdog_Initialize($)
   $hash->{DefFn} = "watchdog_Define";
   $hash->{UndefFn} = "watchdog_Undef";
   $hash->{NotifyFn} = "watchdog_Notify";
-  $hash->{AttrList} = "disable:0,1 disabledForIntervals execOnActivate ".
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals execOnReactivate ".
                         "regexp1WontReactivate:0,1 addStateEvent:0,1";
 }
 
@@ -140,8 +140,7 @@ watchdog_Trigger($)
   my $exec = SemicolonEscape($watchdog->{CMD});
   $watchdog->{STATE} = "triggered";
   
-  $watchdog->{READINGS}{Triggered}{TIME} = TimeNow();
-  $watchdog->{READINGS}{Triggered}{VAL} = $watchdog->{STATE};
+  setReadingsVal($watchdog, "Triggered", "triggered", TimeNow());
   
   my $ret = AnalyzeCommandChain(undef, $exec);
   Log3 $name, 3, $ret if($ret);
@@ -156,9 +155,16 @@ watchdog_Activate($)
   RemoveInternalTimer($watchdog);
   InternalTimer($nt, "watchdog_Trigger", $watchdog, 0);
 
-  my $eoa = AttrVal($watchdog->{NAME}, "execOnActivate", undef);
-  return if(!$eoa);
-  AnalyzeCommandChain(undef, SemicolonEscape($eoa));
+  my $eor = AttrVal($watchdog->{NAME}, "execOnReactivate", undef);
+  if($eor) {
+    my $wName = $watchdog->{NAME};
+    my $aTime = ReadingsTimestamp($wName, "Activated", "");
+    my $tTime = ReadingsTimestamp($wName, "Triggered", "");
+    $eor = undef if(!$aTime || !$tTime || $aTime ge $tTime)
+  }
+  setReadingsVal($watchdog, "Activated", "activated", TimeNow());
+
+  AnalyzeCommandChain(undef, SemicolonEscape($eor)) if($eor);
 }
 
 sub
@@ -252,9 +258,10 @@ watchdog_Undef($$)
         When a watchdog is active, a second event matching regexp1 will
         normally reset the timeout. Set this attribute to prevents this.</li>
 
-    <li><a href="#execOnActivate">execOnActivate</a>
+    <li><a href="#execOnReactivate">execOnActivate</a>
       If set, its value will be executed as a FHEM command when the watchdog is
-      activated by receiving an event matching regexp1.</li>
+      reactivated (after triggering) by receiving an event matching regexp1.
+      </li>
   </ul>
   <br>
 </ul>
@@ -359,10 +366,10 @@ watchdog_Undef($$)
       passt normalerweise den Timer zur&uuml;cksetzen. Dieses Attribut wird
       das verhindern.</li>
 
-    <li><a href="#execOnActivate">execOnActivate</a>
+    <li><a href="#execOnReactivate">execOnActivate</a>
       Falls gesetzt, wird der Wert des Attributes als FHEM Befehl
       ausgef&uuml;hrt, wenn ein regexp1 Ereignis den Watchdog
-      aktiviert.</li>
+      aktiviert nachdem er ausgel&ouml;st wurde.</li>
   </ul>
   <br>
 </ul>
