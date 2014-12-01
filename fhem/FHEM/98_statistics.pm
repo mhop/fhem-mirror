@@ -505,7 +505,7 @@ statistics_doStatisticMinMax ($$$$$$)
   
   # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/^[\D]*(-?[\d.]*).*/$1/eg;
+   $value =~ s/(-?[\d.]*).*/$1/e;
 
    statistics_Log $hash, 4, "Calculating min/avg/max statistics for '".$dev->{NAME}.":$readingName = $value'";
   # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
@@ -606,7 +606,7 @@ statistics_doStatisticTendency ($$$$)
    
   # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/^[\D]*(-?[\d.]*).*/$1/eg;
+   $value =~ s/([-\d.]*).*/$1/e;
    statistics_Log $hash, 4, "Calculating hourly tendency statistics for '".$dev->{NAME}.":$readingName = $value'";
 
    my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . "Tendency";
@@ -672,7 +672,7 @@ statistics_doStatisticDelta ($$$$)
    
   # Get reading, extract first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/^[\D]*(-?[\d.]*).*/$1/eg;
+   $value =~ s/([-\d.]*).*/$1/e;
    statistics_Log $hash, 4, "Calculating delta statistics for '".$dev->{NAME}.":$readingName = $value'";
 
    my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName;
