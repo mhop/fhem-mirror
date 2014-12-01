@@ -21,10 +21,13 @@ use Device::Firmata::Constants  qw/ :all /;
 
 my %sets = (
   "reset" => "noArg",
+  "offset"=> "",
 );
 
 my %gets = (
   "position" => "noArg",
+  "offset"   => "noArg",
+  "value"    => "noArg",
 );
 
 sub
@@ -38,7 +41,8 @@ FRM_ROTENC_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_ROTENC_Init";
   $hash->{UndefFn}   = "FRM_ROTENC_Undef";
-  
+  $hash->{StateFn}   = "FRM_ROTENC_State";
+
   $hash->{AttrList}  = "IODev $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
@@ -53,6 +57,7 @@ FRM_ROTENC_Init($$)
  	my $pinA = @$args[0];
  	my $pinB = @$args[1];
  	my $encoder = defined @$args[2] ? @$args[2] : 0;
+ 	my $name = $hash->{NAME};
  	
 	$hash->{PINA} = $pinA;
 	$hash->{PINB} = $pinB;
@@ -68,12 +73,15 @@ FRM_ROTENC_Init($$)
 	if ($@) {
 		$@ =~ /^(.*)( at.*FHEM.*)$/;
 		$hash->{STATE} = "error initializing: ".$1;
-		return "error initializing '".$hash->{NAME}."': ".$1;
+		return "error initializing '$name': $1";
 	}
 
-	if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
-		$main::attr{$hash->{NAME}}{"stateFormat"} = "position";
+	if (! (defined AttrVal($name,"stateFormat",undef))) {
+		$main::attr{$name}{"stateFormat"} = "position";
 	}
+
+  $hash->{offset} = ReadingsVal($name,"position",0);
+
 	main::readingsSingleUpdate($hash,"state","Initialized",1);
 	return undef;
 }
@@ -83,9 +91,10 @@ FRM_ROTENC_observer
 {
 	my ( $encoder, $value, $hash ) = @_;
 	my $name = $hash->{NAME};
-	Log3 $name,5,"onEncoderMessage for pins ".$hash->{PINA}.",".$hash->{PINB}." encoder: ".$encoder." position: ".$value."\n";
+	Log3 ($name,5,"onEncoderMessage for pins ".$hash->{PINA}.",".$hash->{PINB}." encoder: ".$encoder." position: ".$value."\n");
 	main::readingsBeginUpdate($hash);
-	main::readingsBulkUpdate($hash,"position",$value, 1);
+	main::readingsBulkUpdate($hash,"position",$value+$hash->{offset}, 1);
+	main::readingsBulkUpdate($hash,"value",$value, 1);
 	main::readingsEndUpdate($hash,1);
 }
 
@@ -108,6 +117,15 @@ FRM_ROTENC_Set
       eval {
         FRM_Client_FirmataDevice($hash)->encoder_reset_position($hash->{ENCODERNUM});
       };
+      main::readingsBeginUpdate($hash);
+      main::readingsBulkUpdate($hash,"position",$hash->{offset},1);
+      main::readingsBulkUpdate($hash,"value",0,1);
+      main::readingsEndUpdate($hash,1);
+      last;
+    };
+    $command eq "offset" and do {
+      $hash->{offset} = $value;
+      readingsSingleUpdate($hash,"position",ReadingsVal($hash->{NAME},"value",0)+$value,1);
       last;
     };
   }
@@ -132,6 +150,12 @@ FRM_ROTENC_Get($)
   ARGUMENT_HANDLER: {
     $cmd eq "position" and do {
       return ReadingsVal($hash->{NAME},"position","0");
+    };
+    $cmd eq "offset" and do {
+      return $hash->{offset};
+    };
+    $cmd eq "value" and do {
+      return ReadingsVal($hash->{NAME},"value","0");
     };
   }
   return undef;
@@ -185,6 +209,16 @@ FRM_ROTENC_Undef($$)
   return undef;
 }
 
+sub
+FRM_ROTENC_State($$$$)
+{
+  my ($hash, $tim, $sname, $sval) = @_;
+  if ($sname eq "position") {
+    $hash->{offset} = $sval;
+  }
+  return undef;
+}
+
 1;
 
 =pod
@@ -209,11 +243,20 @@ FRM_ROTENC_Undef($$)
   <b>Set</b><br>
     <li>reset<br>
     resets to value of 'position' to 0<br></li>
+    <li>offset &lt;value&gt;<br>
+    set offset value of 'position'<br></li>
   <a name="FRM_ROTENCget"></a>
   <b>Get</b>
   <ul>
     <li>position<br>
-    returns the position of the rotary-encoder attached to pinA and pinB of the arduino<br></li>
+    returns the position of the rotary-encoder attached to pinA and pinB of the arduino<br>
+    the 'position' is the sum of 'value' and 'offset'<br></li>
+    <li>offset<br>
+    returns the offset value<br>
+    on shutdown of fhem the latest position-value is saved as new offset.<br></li>
+    <li>value<br>
+    returns the raw position value as it's reported by the rotary-encoder attached to pinA and pinB of the arduino<br>
+    this value is reset to 0 whenever Arduino restarts or Firmata is reinitialized<br></li>
   </ul><br>
   <a name="FRM_ROTENCattr"></a>
   <b>Attributes</b><br>
