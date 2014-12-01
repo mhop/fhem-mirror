@@ -311,8 +311,8 @@ sub cfgDB_FileUpdate($) {
 	$fhem_dbh->disconnect();
 	if($id) {
 		my $filesize = -s $filename;
-		_cfgDB_binFileimport($filename,$filesize,1) if $id;
-		Log 5, "file $filename updated in configDB";
+		_cfgDB_binFileimport($filename,$filesize,1) if ($id) ;
+		Log(5, "file $filename updated in configDB");
 	}
 	return;
 }
