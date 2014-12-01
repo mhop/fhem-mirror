@@ -880,7 +880,7 @@ FRITZBOX_Ring_Run($)
 
 #Preparing 2nd command array to ring and reset everything
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
-   push @cmdArray, " ".$intNo;
+   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
    push @cmdArray, "sleep ".($duration+1);
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
@@ -1211,7 +1211,7 @@ FRITZBOX_Exec($$)
          <br>
          This is the default path that will be used if a file name does not start with / (slash).
          <br>
-         It needs to be the name of the path on the Fritz!Box, so it should start with /var/InternerSpeicher if it equals in windows \\ip-address\fritz.nas
+         It needs to be the name of the path on the Fritz!Box. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
