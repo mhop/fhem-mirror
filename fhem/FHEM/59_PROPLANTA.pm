@@ -520,7 +520,8 @@ sub PROPLANTA_Run($)
    
    my $hash = $defs{$name};
    return unless (defined($hash->{NAME}));
-   
+   my $readingStartTime = time();
+    
    my $attrURL = AttrVal( $name, 'URL', "" );
    if ($attrURL eq "")
    {
@@ -578,6 +579,9 @@ sub PROPLANTA_Run($)
       }
       PROPLANTA_Log $hash, 5, "Parsed string: " . $ptext;
    }
+   $ptext .= "|durationFetchReadings|";
+   $ptext .= sprintf "%.2f",  time() - $readingStartTime;
+   
    return $ptext;
 }
 #####################################
