@@ -152,23 +152,32 @@ FRITZBOX_Define($$)
 
    $hash->{NAME} = $name;
 
-   if ( FRITZBOX_Exec( $hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0" ) )
+   my $msg;
+   
+   unless ( -X "/usr/bin/ctlmgr_ctl" )
    {
-      $hash->{STATE}       = "Initializing";
-      $hash->{fhem}{modulVersion} = '$Date$';
-      $hash->{INTERVAL} = 300; 
-      $hash->{fhem}{lastHour} = 0;
-      $hash->{fhem}{LOCAL} = 0;
-
+      $msg = "Error - FHEM needs to run on a Fritz!Box to use the FRITZBOX module";
+      FRITZBOX_Log $hash, 1, $msg;
+      return $msg;
+   }
+   elsif ( $< != 0 ) 
+   {
+      $msg = "Error - FHEM is not running under root (currently " .
+          ( getpwuid( $< ) )[ 0 ] .
+          ") but we need to be root";
+      FRITZBOX_Log $hash, 1, $msg;
+      return $msg;
+   }
+   
+   $hash->{STATE}       = "Initializing";
+   $hash->{fhem}{modulVersion} = '$Date$';
+   $hash->{INTERVAL} = 300; 
+   $hash->{fhem}{lastHour} = 0;
+   $hash->{fhem}{LOCAL} = 0;
       
-      RemoveInternalTimer($hash);
-    # Get first data after 6 seconds
-      InternalTimer(gettimeofday() + 6, "FRITZBOX_Readout_Start", $hash, 0);
-   }
-   else
-   {
-      $hash->{STATE} = "Error: FHEM not running on a Fritz!Box";
-   }
+   RemoveInternalTimer($hash);
+ # Get first data after 6 seconds
+   InternalTimer(gettimeofday() + 6, "FRITZBOX_Readout_Start", $hash, 0);
  
    return undef;
 } #end FRITZBOX_Define
@@ -1091,7 +1100,7 @@ FRITZBOX_Exec($$)
 <div  style="width:800px"> 
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as signaling devices.
-   Note!! To use it, FHEM has to run on a Fritz!Box.
+   Note!! To use it, FHEM has to run on a Fritz!Box as root user.
    <br>
    <i>So fare, the module has been tested on Fritz!Box 7390 and Fritz!Fon MT-F only.</i>
    <br>
