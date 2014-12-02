@@ -7,7 +7,7 @@
 # Prof. Dr. Peter A. Henning
 # Norbert Truchsess
 #
-# $Id: 21_OWCOUNT.pm 2014-04 - pahenning $
+# $Id$
 #
 ########################################################################################
 #
@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.26";
+my $owx_version="5.27";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -274,6 +274,15 @@ sub OWCOUNT_Define ($$) {
   return undef; 
 }
 
+#######################################################################################
+#
+# OWCOUNT_Notify - Implements Notify function
+#
+#  Parameter hash = hash of device addressed
+#            dev  = device
+#
+########################################################################################
+
 sub OWCOUNT_Notify ($$) {
   my ($hash,$dev) = @_;
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
@@ -281,6 +290,14 @@ sub OWCOUNT_Notify ($$) {
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
 }
+
+#######################################################################################
+#
+# OWCOUNT_Init - Implements Init function
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
 
 sub OWCOUNT_Init ($) {
   my ($hash)=@_;
@@ -546,17 +563,17 @@ sub OWCOUNT_FormatValues($) {
           OWCOUNT_SetPage($hash,14+$i,$msg);
           
           #-- string buildup for monthly and yearly logging
-          $dvalue .= sprintf( " %s: %5.1f %s %sM: %%5.1f %s",  $owg_channel[$i],$dval,$unit,$owg_channel[$i],$unit); 
-          $mvalue .= sprintf( " %sM: %%5.1f %s %sY: %%5.1f %s", $owg_channel[$i],$unit,$owg_channel[$i],$unit); 
+          $dvalue .= sprintf( " %s: %5.2f %s %sM: %%5.2f %s",  $owg_channel[$i],$dval,$unit,$owg_channel[$i],$unit); 
+          $mvalue .= sprintf( " %sM: %%5.2f %s %sY: %%5.2f %s", $owg_channel[$i],$unit,$owg_channel[$i],$unit); 
         } #-- end daybreak
       
         #-- string buildup for return value and STATE
         #-- 1 decimal
         if( $factor == 1.0 ){
-          $svalue .= sprintf( "%s: %5.1f %s %s: %5.2f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
+          $svalue .= sprintf( "%s: %5.2f %s %s: %5.2f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
         #-- 3 decimals
         } else {
-          $svalue .= sprintf( "%s: %5.3f %s %s: %5.4f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
+          $svalue .= sprintf( "%s: %5.3f %s %s: %5.3f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
         }  
       }
       readingsBulkUpdate($hash,$owg_channel[$i],$vval);
@@ -597,7 +614,7 @@ sub OWCOUNT_FormatValues($) {
     readingsBulkUpdate($hash,"day",$dvalue);
     if ( $monthbreak == 1){
       $mvalue  = sprintf("M%02d ",$month+1).$mvalue;
-      $mvalue  = sprintf($mvalue,$total2,$total3); 
+      $mvalue  = sprintf($mvalue,$total0,$total2,$total1,$total3); 
       readingsBulkUpdate($hash,"month",$mvalue);
     }  
   }
