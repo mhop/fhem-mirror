@@ -78,6 +78,7 @@ FHT8V_Set($@)
         if(@a != 3 || $a[2] !~ m/^\d+$/ || $a[2] < 0 || $a[2] > 100);
     Log3 $n, 3, "FHT8V set $n $arg $a[2]";
     $hash->{STATE} = sprintf("%d %%", $a[2]);
+    readingsSingleUpdate($hash, "valve", $a[2], 1);
     IOWrite($hash, "", sprintf("T%s0026%02X", $hash->{addr}, $a[2]*2.55));
 
   } elsif ($arg eq "pair" ) {
