@@ -155,8 +155,13 @@ harmony_idOfActivity($$;$)
 {
   my ($hash, $label, $default) = @_;
 
+  my $quoted_label = $label;
+  #$quoted_label =~ s/\./ /g;
+  $quoted_label = quotemeta($quoted_label);
+
   foreach my $activity (@{$hash->{config}->{activity}}) {
     return $activity->{id} if( $activity->{label} =~ m/^$label$/ );
+    return $activity->{id} if( $activity->{label} =~ m/^$quoted_label$/ );
   }
 
   return $default;
@@ -189,8 +194,13 @@ harmony_idOfDevice($$;$)
 {
   my ($hash, $label, $default) = @_;
 
+  my $quoted_label = $label;
+  #$quoted_label =~ s/\./ /g;
+  $quoted_label = quotemeta($quoted_label);
+
   foreach my $device (@{$hash->{config}->{device}}) {
     return $device->{id} if( $device->{label} =~ m/^$label$/ );
+    return $device->{id} if( $device->{label} =~ m/^$quoted_label$/ );
   }
 
   return $default;
