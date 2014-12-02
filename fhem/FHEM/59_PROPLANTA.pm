@@ -367,7 +367,7 @@ sub PROPLANTA_Initialize($)
    $hash->{DefFn}    = "PROPLANTA_Define";
    $hash->{UndefFn}  = "PROPLANTA_Undef";
    $hash->{SetFn}    = "PROPLANTA_Set";
-   $hash->{AttrList} = "INTERVAL URL disable:0,1 " . $readingFnAttributes;
+   $hash->{AttrList} = "INTERVAL URL disable:0,1 forecastDays:4,7,11,14 " . $readingFnAttributes;
 }
 ###################################
 sub PROPLANTA_Define($$)
@@ -522,6 +522,7 @@ sub PROPLANTA_Run($)
    return unless (defined($hash->{NAME}));
    my $readingStartTime = time();
     
+   my $fcDays = AttrVal( $name, 'forecastDays', 14 );
    my $attrURL = AttrVal( $name, 'URL', "" );
    if ($attrURL eq "")
    {
@@ -560,6 +561,7 @@ sub PROPLANTA_Run($)
             if @MyProplantaParser::texte == 0; 
          foreach (@URL_days)
          {
+            last unless $_ < $fcDays;
             $response = PROPLANTA_HtmlAcquire($hash,$URL . $_); 
             $MyProplantaParser::startDay = $_;
             if ($response !~ /^Error\|/)
@@ -609,8 +611,15 @@ sub PROPLANTA_Done($)
    else
    {
       my $x = 0;
+      my $fcDays = AttrVal( $name, 'forecastDays', 14 );
       while (my ($rName, $rValue) = each(%values) )
       {
+         if ($fcDays < 14 && $rName =~ /^fc(\d+)_/)
+         {
+            my $rFcDay = $rName;
+            $rFcDay =~ s/^fc(\d+)_/$1/;
+            next unless $rFcDay < $fcDays;
+         }
          readingsBulkUpdate( $hash, $rName, $rValue );
          PROPLANTA_Log $hash, 5, "reading:$rName value:$rValue";
       }
@@ -740,6 +749,10 @@ PROPLANTA_Html($)
    <b>Attributes</b>
    <ul>
       <br>
+      <li><code>forecastDays &lt;4-14&gt;</code>
+         <br>
+         Number of days for which the forecast data shall be fetched. Default is 14 days (incl. today).
+      </li><br>
       <li><code>INTERVAL &lt;seconds&gt;</code>
          <br>
          Poll interval for weather data in seconds (default 3600 = 1 hour)
@@ -833,6 +846,10 @@ PROPLANTA_Html($)
    <b>Attribute</b>
    <ul>
       <br>
+      <li><code>forecastDays &lt;4-14&gt;</code>
+         <br>
+         Anzahl Tage, für die die Vorhersage ausgelesen werden soll. Standard ist 14 Tage (inkl. heute).
+      </li><br>
       <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
          Abfrageinterval in Sekunden (Standard 3600 = 1 Stunde)
