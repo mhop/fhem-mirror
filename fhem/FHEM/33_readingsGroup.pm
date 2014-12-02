@@ -712,7 +712,7 @@ readingsGroup_2html($)
               last if(defined($htmlTxt));
             }
 
-           if( $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
+           if( $htmlTxt && $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
               $v = $1;
 
               my $mapped = lookup($hash->{helper}{mapping},$name,$a,$set,"",$room,$group,$cell_row,undef);
