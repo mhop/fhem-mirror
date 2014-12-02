@@ -301,6 +301,8 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
 	    Hlp=>"<old> <new>,rename a definition" },
   "rereadcfg"  => { Fn=>"CommandRereadCfg",
 	    Hlp=>"[configfile],read in the config after deleting everything" },
+  "restore" => {
+            Hlp=>"[list] [<filename|directory>],restore files saved by update"},
   "save"    => { Fn=>"CommandSave",
 	    Hlp=>"[configfile],write the configfile and the statefile" },
   "set"     => { Fn=>"CommandSet",
@@ -318,7 +320,8 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<devspec> <state>,trigger notify command" },
   "update" => {
-            Hlp => "[development|stable] [<file>|check|fhem],update Fhem" },
+            Hlp => "[<fileName>|all|check|force] ".
+                                      "[http://.../controlfile],update FHEM" },
   "updatefhem" => { ReplacedBy => "update" },
   "version" => { Fn => "CommandVersion",
             Hlp=>"[filter],print SVN version of loaded modules" },
