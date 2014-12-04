@@ -404,7 +404,6 @@ OPENWEATHER_Done($)
 
    my ($name, $success, $result) = split("\\|", $string);
    my $hash = $defs{$name};
-   my $returnStr ="";
   
    delete($hash->{helper}{RUNNING_PID});
 
@@ -488,7 +487,7 @@ OPENWEATHER_Html($)
 
    for(my $i=0; $i<=2; $i++) 
    {
-     $ret .= sprintf('<tr><td valign=top><b>%s</b></td><td>%s<br>min. %s &deg;C max. %s &deg;C<br>Nieders.risiko: %s %<br>Wind: %s km/h aus %s</td></tr>',
+     $ret .= sprintf('<tr><td valign=top><b>%s</b></td><td>%s<br>min. %s &deg;C max. %s &deg;C<br>Nieders.risiko: %s %%<br>Wind: %s km/h aus %s</td></tr>',
          $i==0 ? "heute" : ReadingsVal($d, "fc".$i."_wday", "")
          , ReadingsVal($d, "fc".$i."_weather", "")
          , ReadingsVal($d, "fc".$i."_tempMin", ""), ReadingsVal($d, "fc".$i."_tempMax", "")
