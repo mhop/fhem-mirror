@@ -13,6 +13,7 @@
 #   2014-11-04  renamed some attributes and added PostCommand to make the module more flexible
 #   2014-11-08  added the attributes Reading.*, MaxAge.*, MinValue.*, MaxValue.* and Format.*
 #   2014-11-15  fixed bugs related to RepReading and InternalTimer
+#   2014-12-05  definierte Attribute werden der userattr list der Instanz hinzugefügt
 
 package main;
 
@@ -48,9 +49,8 @@ sub FReplacer_Initialize($)
                         "Rep[0-9]+Format " .        # optional Format string for Replacement
                         "Rep[0-9]+Expr " .          # optional Expression to be evaluated before using the replacement
                         "ReplacementEncode " .      # Ergebnis einer Ersetzung z.B. in UTF-8 Encoden
-                        "PostCommand";              # Systembefehl, der nach der Ersetzung ausgeführt wird,
-                                                    # z.B. um SVG in PNG zu konvertieren
-
+                        "PostCommand " .            # Systembefehl, der nach der Ersetzung ausgeführt wird
+                        $readingFnAttributes;  
 }
 
 
@@ -136,6 +136,7 @@ FReplacer_Attr(@)
                 return "Invalid Format $aVal";
             }
         } 
+        addToDevAttrList($name, $aName)
     }
     return undef;
 }
