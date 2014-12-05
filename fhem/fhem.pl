@@ -2604,7 +2604,7 @@ sub
 SignalHandling()
 {
   if($^O ne "MSWin32") {
-    $SIG{INT}  = sub { $sig_term = 1; };
+    $SIG{INT}  = sub { exit() };
     $SIG{TERM} = sub { $sig_term = 1; };
     $SIG{PIPE} = 'IGNORE';
     $SIG{CHLD} = 'IGNORE';
