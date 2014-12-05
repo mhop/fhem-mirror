@@ -762,7 +762,7 @@ sub ROOMMATE_DurationTimer($;$) {
 
     ROOMMATE_RemoveInternalTimer( "DurationTimer", $hash );
 
-		if ( !defined($attr{$name}{noDuration}) || $attr{$name}{noDuration} == 0 ) {
+		if ( !defined($attr{$name}{rr_noDuration}) || $attr{$name}{rr_noDuration} == 0 ) {
 
 	    # presence timer
 	    if ( defined( $hash->{READINGS}{presence}{VAL} )
