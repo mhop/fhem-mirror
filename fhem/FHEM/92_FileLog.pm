@@ -452,6 +452,7 @@ FileLog_logWrapper($)
     $cnt = FW_htmlEscape($cnt);
     FW_pO $cnt;
     FW_pO $suffix;
+    return 1;
 
   } else {
     FileLog_loadSVG();
