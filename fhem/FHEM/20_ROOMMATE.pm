@@ -56,7 +56,7 @@ sub ROOMMATE_Initialize($) {
     $hash->{DefFn}   = "ROOMMATE_Define";
     $hash->{UndefFn} = "ROOMMATE_Undefine";
     $hash->{AttrList} =
-"rr_locationHome rr_locationWayhome rr_locationUnderway rr_autoGoneAfter:12,16,24,26,28,30,36,48,60 rr_showAllStates:0,1 rr_realname:group,alias rr_states rr_locations rr_moods rr_moodDefault rr_moodSleepy rr_passPresenceTo "
+"rr_locationHome rr_locationWayhome rr_locationUnderway rr_autoGoneAfter:12,16,24,26,28,30,36,48,60 rr_showAllStates:0,1 rr_realname:group,alias rr_states rr_locations rr_moods rr_moodDefault rr_moodSleepy rr_passPresenceTo rr_noDuration:0,1 "
       . $readingFnAttributes;
 }
 
@@ -762,79 +762,82 @@ sub ROOMMATE_DurationTimer($;$) {
 
     ROOMMATE_RemoveInternalTimer( "DurationTimer", $hash );
 
-    # presence timer
-    if ( defined( $hash->{READINGS}{presence}{VAL} )
-        && $hash->{READINGS}{presence}{VAL} eq "present" )
-    {
-        if ( defined( $hash->{READINGS}{lastArrival}{VAL} )
-            && $hash->{READINGS}{lastArrival}{VAL} ne "-" )
-        {
-            $durPresence =
-              $timestampNow -
-              ROOMMATE_Datetime2Timestamp(
-                $hash->{READINGS}{lastArrival}{VAL} );
-        }
-    }
+		if ( !defined($attr{$name}{noDuration}) || $attr{$name}{noDuration} == 0 ) {
 
-    # absence timer
-    if ( defined( $hash->{READINGS}{presence}{VAL} )
-        && $hash->{READINGS}{presence}{VAL} eq "absent" )
-    {
-        if ( defined( $hash->{READINGS}{lastDeparture}{VAL} )
-            && $hash->{READINGS}{lastDeparture}{VAL} ne "-" )
-        {
-            $durAbsence =
-              $timestampNow -
-              ROOMMATE_Datetime2Timestamp(
-                $hash->{READINGS}{lastDeparture}{VAL} );
-        }
-    }
+	    # presence timer
+	    if ( defined( $hash->{READINGS}{presence}{VAL} )
+	        && $hash->{READINGS}{presence}{VAL} eq "present" )
+	    {
+	        if ( defined( $hash->{READINGS}{lastArrival}{VAL} )
+	            && $hash->{READINGS}{lastArrival}{VAL} ne "-" )
+	        {
+	            $durPresence =
+	              $timestampNow -
+	              ROOMMATE_Datetime2Timestamp(
+	                $hash->{READINGS}{lastArrival}{VAL} );
+	        }
+	    }
 
-    # sleep timer
-    if ( defined( $hash->{READINGS}{state}{VAL} )
-        && $hash->{READINGS}{state}{VAL} eq "asleep" )
-    {
-        if ( defined( $hash->{READINGS}{lastSleep}{VAL} )
-            && $hash->{READINGS}{lastSleep}{VAL} ne "-" )
-        {
-            $durSleep =
-              $timestampNow -
-              ROOMMATE_Datetime2Timestamp( $hash->{READINGS}{lastSleep}{VAL} );
-        }
-    }
+	    # absence timer
+	    if ( defined( $hash->{READINGS}{presence}{VAL} )
+	        && $hash->{READINGS}{presence}{VAL} eq "absent" )
+	    {
+	        if ( defined( $hash->{READINGS}{lastDeparture}{VAL} )
+	            && $hash->{READINGS}{lastDeparture}{VAL} ne "-" )
+	        {
+	            $durAbsence =
+	              $timestampNow -
+	              ROOMMATE_Datetime2Timestamp(
+	                $hash->{READINGS}{lastDeparture}{VAL} );
+	        }
+	    }
 
-    my $durPresence_hr =
-      ( $durPresence > 0 ) ? ROOMMATE_sec2time($durPresence) : "00:00:00";
-    my $durPresence_cr =
-      ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
-    my $durAbsence_hr =
-      ( $durAbsence > 0 ) ? ROOMMATE_sec2time($durAbsence) : "00:00:00";
-    my $durAbsence_cr =
-      ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
-    my $durSleep_hr =
-      ( $durSleep > 0 ) ? ROOMMATE_sec2time($durSleep) : "00:00:00";
-    my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
+	    # sleep timer
+	    if ( defined( $hash->{READINGS}{state}{VAL} )
+	        && $hash->{READINGS}{state}{VAL} eq "asleep" )
+	    {
+	        if ( defined( $hash->{READINGS}{lastSleep}{VAL} )
+	            && $hash->{READINGS}{lastSleep}{VAL} ne "-" )
+	        {
+	            $durSleep =
+	              $timestampNow -
+	              ROOMMATE_Datetime2Timestamp( $hash->{READINGS}{lastSleep}{VAL} );
+	        }
+	    }
 
-    readingsBeginUpdate($hash) if ( !$silent );
-    readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
-      if ( !defined( $hash->{READINGS}{durTimerPresence_cr}{VAL} )
-        || $hash->{READINGS}{durTimerPresence_cr}{VAL} ne $durPresence_cr );
-    readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
-      if ( !defined( $hash->{READINGS}{durTimerPresence}{VAL} )
-        || $hash->{READINGS}{durTimerPresence}{VAL} ne $durPresence_hr );
-    readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
-      if ( !defined( $hash->{READINGS}{durTimerAbsence_cr}{VAL} )
-        || $hash->{READINGS}{durTimerAbsence_cr}{VAL} ne $durAbsence_cr );
-    readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
-      if ( !defined( $hash->{READINGS}{durTimerAbsence}{VAL} )
-        || $hash->{READINGS}{durTimerAbsence}{VAL} ne $durAbsence_hr );
-    readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
-      if ( !defined( $hash->{READINGS}{durTimerSleep_cr}{VAL} )
-        || $hash->{READINGS}{durTimerSleep_cr}{VAL} ne $durSleep_cr );
-    readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
-      if ( !defined( $hash->{READINGS}{durTimerSleep}{VAL} )
-        || $hash->{READINGS}{durTimerSleep}{VAL} ne $durSleep_hr );
-    readingsEndUpdate( $hash, 1 ) if ( !$silent );
+	    my $durPresence_hr =
+	      ( $durPresence > 0 ) ? ROOMMATE_sec2time($durPresence) : "00:00:00";
+	    my $durPresence_cr =
+	      ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
+	    my $durAbsence_hr =
+	      ( $durAbsence > 0 ) ? ROOMMATE_sec2time($durAbsence) : "00:00:00";
+	    my $durAbsence_cr =
+	      ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
+	    my $durSleep_hr =
+	      ( $durSleep > 0 ) ? ROOMMATE_sec2time($durSleep) : "00:00:00";
+	    my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
+
+	    readingsBeginUpdate($hash) if ( !$silent );
+	    readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
+	      if ( !defined( $hash->{READINGS}{durTimerPresence_cr}{VAL} )
+	        || $hash->{READINGS}{durTimerPresence_cr}{VAL} ne $durPresence_cr );
+	    readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
+	      if ( !defined( $hash->{READINGS}{durTimerPresence}{VAL} )
+	        || $hash->{READINGS}{durTimerPresence}{VAL} ne $durPresence_hr );
+	    readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
+	      if ( !defined( $hash->{READINGS}{durTimerAbsence_cr}{VAL} )
+	        || $hash->{READINGS}{durTimerAbsence_cr}{VAL} ne $durAbsence_cr );
+	    readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
+	      if ( !defined( $hash->{READINGS}{durTimerAbsence}{VAL} )
+	        || $hash->{READINGS}{durTimerAbsence}{VAL} ne $durAbsence_hr );
+	    readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
+	      if ( !defined( $hash->{READINGS}{durTimerSleep_cr}{VAL} )
+	        || $hash->{READINGS}{durTimerSleep_cr}{VAL} ne $durSleep_cr );
+	    readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
+	      if ( !defined( $hash->{READINGS}{durTimerSleep}{VAL} )
+	        || $hash->{READINGS}{durTimerSleep}{VAL} ne $durSleep_hr );
+	    readingsEndUpdate( $hash, 1 ) if ( !$silent );
+		}
 
     ROOMMATE_InternalTimer( "DurationTimer", $timestampNow + 60,
         "ROOMMATE_DurationTimer", $hash, 1 );
@@ -1127,6 +1130,9 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>rr_moods</b> - list of moods to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces
           </li>
           <li>
+            <b>rr_noDuration</b> - may be used to disable duration timer calculation (see readings durTimer*)
+          </li>
+          <li>
             <b>rr_passPresenceTo</b> - synchronize presence state with other ROOMMATE or GUEST devices; separte devices by space
           </li>
           <li>
@@ -1392,6 +1398,9 @@ sub ROOMMATE_StartInternalTimers($$) {
           </li>
           <li>
             <b>rr_moods</b> - Liste von Stimmungen, wie sie in FHEMWEB angezeigt werden sollen; mehrere Einträge nur durch Komma trennen und KEINE Leerzeichen verwenden
+          </li>
+          <li>
+            <b>rr_noDuration</b> - deaktiviert die Berechnung der Zeitspannen (siehe Readings durTimer*)
           </li>
           <li>
             <b>rr_passPresenceTo</b> - synchronisiere die Anwesenheit mit anderen ROOMMATE oder GUEST Devices; mehrere Devices durch Leerzeichen trennen
