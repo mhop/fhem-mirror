@@ -866,6 +866,8 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
     }
+
+	readingsEndUpdate($hash, 1);
 }
 
 ###################################
