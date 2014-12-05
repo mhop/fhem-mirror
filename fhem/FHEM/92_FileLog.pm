@@ -343,7 +343,9 @@ FileLog_fhemwebFn($$$$)
                   1, undef, 1);
   } else {
     my %dh;
-    foreach my $l (split("\n", AnalyzeCommand(undef, "get $et[0] list"))) {
+    my $etList = AnalyzeCommand(undef, "get $et[0] list");
+    $etList = "" if(!$etList);
+    foreach my $l (split("\n", $etList)) {
       my @a = split(/[ \r\n]/, $l);
       $a[1] = "" if(!defined($a[1]));
       $a[1] =~ s/\.\*//g;
@@ -367,8 +369,9 @@ FileLog_fhemwebFn($$$$)
     $ret .= FW_select("","arg.$d",\@al, undef, "set",
         "FW_selChange(this.options[selectedIndex].text,'$list','val.$d')");
     $ret .= FW_textfield("val.$d", 30, "set");
+    my $al0 = (@al ? $al[0] : "");
     $ret .= "<script type=\"text/javascript\">" .
-              "FW_selChange('$al[0]','$list','val.$d')</script>";
+              "FW_selChange('$al0','$list','val.$d')</script>";
     $ret .= "</form></td></tr>";
   }
   $ret .= "</table>";
