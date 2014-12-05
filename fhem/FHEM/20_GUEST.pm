@@ -792,7 +792,7 @@ sub GUEST_DurationTimer($;$) {
 
     GUEST_RemoveInternalTimer( "DurationTimer", $hash );
 
-		if ( !defined($attr{$name}{noDuration}) || $attr{$name}{noDuration} == 0 ) {
+		if ( !defined($attr{$name}{rg_noDuration}) || $attr{$name}{rg_noDuration} == 0 ) {
 
 	    # presence timer
 	    if ( defined( $hash->{READINGS}{presence}{VAL} )
