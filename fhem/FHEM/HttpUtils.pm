@@ -354,7 +354,7 @@ HttpUtils_NonblockingGet($)
 {
   my ($hash) = @_;
   my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
-  return ($fErr, $fContent) if($isFile);
+  return $hash->{callback}($hash, $fErr, $fContent) if($isFile);
   my $err = HttpUtils_Connect($hash);
   $hash->{callback}($hash, $err, "") if($err);
 }
