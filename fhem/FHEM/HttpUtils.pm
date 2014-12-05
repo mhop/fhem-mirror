@@ -79,6 +79,21 @@ HttpUtils_ReadErr($)
   }
 }
 
+sub
+HttpUtils_File($)
+{
+  my ($hash) = @_;
+
+  return 0 if($hash->{url} !~ m+^file://(.*)$+);
+
+  my $fName = $1;
+  return (1, "Absolute URL is not supported") if($fName =~ m+^/+);
+  return (1, ".. in URL is not supported") if($fName =~ m+\.\.+);
+  open(FH, $fName) || return(1, "$fName: $!");
+  my $data = join("", <FH>);
+  close(FH);
+  return (1, undef, $data);
+}
 
 sub
 HttpUtils_Connect($)
@@ -338,6 +353,8 @@ sub
 HttpUtils_NonblockingGet($)
 {
   my ($hash) = @_;
+  my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
+  return ($fErr, $fContent) if($isFile);
   my $err = HttpUtils_Connect($hash);
   $hash->{callback}($hash, $err, "") if($err);
 }
@@ -349,6 +366,8 @@ sub
 HttpUtils_BlockingGet($)
 {
   my ($hash) = @_;
+  my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
+  return ($fErr, $fContent) if($isFile);
   my $err = HttpUtils_Connect($hash);
   return ($err, undef) if($err);
   
