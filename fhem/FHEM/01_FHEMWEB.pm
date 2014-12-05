@@ -1142,7 +1142,8 @@ FW_roomOverview($)
   # Rooms and other links
   foreach my $r (@FW_roomsArr) {
     next if($r eq "hidden" || $FW_hiddenroom{$r});
-    $FW_room = $r if(!$FW_room && $FW_ss);
+    $FW_room = AttrVal($FW_wname, "defaultRoom", $r)
+        if(!$FW_room && $FW_ss);
     my $lr = $r;
     $lr =~ s/</&lt;/g;
     $lr =~ s/>/&lt;/g;
