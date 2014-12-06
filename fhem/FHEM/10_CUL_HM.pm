@@ -499,6 +499,9 @@ sub CUL_HM_Undef($$) {###############################
   my ($hash, $name) = @_;
   my $devName = $hash->{device};
   my $HMid = $hash->{DEF};
+  CUL_HM_unQEntity($name,"qReqConf");
+  CUL_HM_unQEntity($name,"qReqStat");
+  CUL_HM_complConfigTestRm($name);
   my $chn = substr($HMid,6,2);
   if ($chn){# delete a channel
     my $devHash = $defs{$devName};
@@ -6967,8 +6970,8 @@ sub CUL_HM_unQEntity($$){# remove entity from q
     @chns = grep !/$chn/,@chns;
     $dq->{$q} = join",",@chns;
   }
-  my $mQ = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
-  $mQ = $modules{CUL_HM}{helper}{$q};
+  $q = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
+  my $mQ = $modules{CUL_HM}{helper}{$q};
   @{$mQ} = grep !/^$devN$/,@{$mQ} if ($dq->{$q} eq "");
 }
 sub CUL_HM_qEntity($$){  # add to queue
@@ -7212,6 +7215,13 @@ sub CUL_HM_complConfigTest($){# Q - check register consistancy some time later
     RemoveInternalTimer("CUL_HM_complConfigTO");
     InternalTimer(gettimeofday()+ 1800,"CUL_HM_complConfigTO","CUL_HM_complConfigTO", 0);
   }
+}
+sub CUL_HM_complConfigTestRm($){# Q - check register consistancy some time later
+  my $name = shift;
+  my $devN = CUL_HM_getDeviceName($name);
+  return if (AttrVal($devN,"subType","") eq "virtual");
+  my $mQ = $modules{CUL_HM}{helper}{confCheckArr};
+  @{$mQ} = grep !/^$name$/,@{$mQ};
 }
 sub CUL_HM_complConfigTO($)  {# now perform consistancy check of register
   my @arr = @{$modules{CUL_HM}{helper}{confCheckArr}};
