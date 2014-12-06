@@ -341,8 +341,8 @@ statistics_PeriodChange($)
 }
 
 ##########################
-sub
-statistics_DoStatisticsAll($$)
+# Take each notified reading and perform the calculation
+sub statistics_DoStatisticsAll($$)
 {
    my ($hash,$periodSwitch) = @_;
    my $name = $hash->{NAME};
@@ -360,8 +360,7 @@ statistics_DoStatisticsAll($$)
 
 
 ##########################
-sub
-statistics_DoStatistics($$$)
+sub statistics_DoStatistics($$$)
 {
    my ($hash, $dev, $periodSwitch) = @_;
    my $hashName = $hash->{NAME};
@@ -394,74 +393,86 @@ statistics_DoStatistics($$$)
    
    readingsBeginUpdate($dev);
    
-  # Loop through all known readings
-   foreach my $f (@knownReadings) 
+   while (1)
    {
-    # notifing device has known reading, no statistic for excluded readings
-      $readingName = $$f[0];
-      my $completeReadingName = $devName.":".$readingName;
-      next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
-      $statisticDone = 1;
-      if ($$f[1] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch, 0);}
-      if ($$f[1] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $periodSwitch );}
-      if ($$f[1] == 3) { statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch ); }
-      if ($$f[1] == 4 && $periodSwitch>=1) { statistics_doStatisticTendency ($hash, $dev, $readingName, $$f[2]);}
-      if ($$f[1] == 5) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch, 1);}
-   }
-    
-   my @specialReadings = split /,/, AttrVal($hashName, "deltaReadings", "");
-   foreach $readingName (@specialReadings) 
-   {
-      my $completeReadingName = $devName.":".$readingName;
-      next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
-      $statisticDone = 1;
-      statistics_doStatisticDelta ($hash, $dev, $readingName, $periodSwitch);
-   }
-   
-   @specialReadings = split /,/, AttrVal($hashName, "durationReadings", "");
-   foreach $readingName (@specialReadings) 
-   {
-      my $completeReadingName = $devName.":".$readingName;
-      next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
-      $statisticDone = 1;
-      statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch);
-   }
-
-   @specialReadings = split /,/, AttrVal($hashName, "minAvgMaxReadings", "");
-   foreach $readingName (@specialReadings) 
-   {
-      my $completeReadingName = $devName.":".$readingName;
-      next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
-      $statisticDone = 1;
-      statistics_doStatisticMinMax ($hash, $dev, $readingName, 1, $periodSwitch, 1);
-   }
-
-   if ($periodSwitch>=1) {
-      @specialReadings = split /,/, AttrVal($hashName, "tendencyReadings", "");
+     # Loop through all known readings
+      foreach my $f (@knownReadings) 
+      {
+       # notifing device has known reading, no statistic for excluded readings
+         $readingName = $$f[0];
+         my $completeReadingName = $devName.":".$readingName;
+         next if ($completeReadingName =~ m/^($exclReadings)$/ );
+         next if not exists ($dev->{READINGS}{$readingName});
+         if ($$f[1] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch, 0);}
+         if ($$f[1] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $periodSwitch );}
+         if ($$f[1] == 3) { statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch ); }
+         if ($$f[1] == 4 && $periodSwitch>=1) { statistics_doStatisticTendency ($hash, $dev, $readingName, $$f[2]);}
+         if ($$f[1] == 5) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch, 1);}
+         $statisticDone = 1;
+         last;
+      }
+      last if $statisticDone == 1;
+       
+      my @specialReadings = split /,/, AttrVal($hashName, "deltaReadings", "");
       foreach $readingName (@specialReadings) 
       {
          my $completeReadingName = $devName.":".$readingName;
          next if ($completeReadingName =~ m/^($exclReadings)$/ );
          next if not exists ($dev->{READINGS}{$readingName});
+         statistics_doStatisticDelta ($hash, $dev, $readingName, $periodSwitch);
          $statisticDone = 1;
-         statistics_doStatisticTendency ($hash, $dev, $readingName, 1);
+         last;
       }
-   }
-   
-   if ($statisticDone != 1) { 
+      last if $statisticDone == 1;
+      
+      @specialReadings = split /,/, AttrVal($hashName, "durationReadings", "");
+      foreach $readingName (@specialReadings) 
+      {
+         my $completeReadingName = $devName.":".$readingName;
+         next if ($completeReadingName =~ m/^($exclReadings)$/ );
+         next if not exists ($dev->{READINGS}{$readingName});
+         statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch);
+         $statisticDone = 1;
+         last;
+      }
+      last if $statisticDone == 1;
+
+      @specialReadings = split /,/, AttrVal($hashName, "minAvgMaxReadings", "");
+      foreach $readingName (@specialReadings) 
+      {
+         my $completeReadingName = $devName.":".$readingName;
+         next if ($completeReadingName =~ m/^($exclReadings)$/ );
+         next if not exists ($dev->{READINGS}{$readingName});
+         statistics_doStatisticMinMax ($hash, $dev, $readingName, 1, $periodSwitch, 1);
+         $statisticDone = 1;
+         last;
+      }
+      last if $statisticDone == 1;
+
+      if ($periodSwitch>=1) {
+         @specialReadings = split /,/, AttrVal($hashName, "tendencyReadings", "");
+         foreach $readingName (@specialReadings) 
+         {
+            my $completeReadingName = $devName.":".$readingName;
+            next if ($completeReadingName =~ m/^($exclReadings)$/ );
+            next if not exists ($dev->{READINGS}{$readingName});
+            statistics_doStatisticTendency ($hash, $dev, $readingName, 1);
+            $statisticDone = 1;
+            last;
+         }
+         last if $statisticDone == 1;
+      }
+
       if ( exists ($dev->{READINGS}{state}) && $dev->{READINGS}{state}{VAL} ne "defined" ) { 
          statistics_doStatisticDuration $hash, $dev, "state", $periodSwitch;
          $statisticDone = 1;
+         last;
       }
+      last;
    }
-
+   
    if ($periodSwitch >0) {readingsEndUpdate($dev,1);}
    else {readingsEndUpdate($dev,0);}
-   
 
    # Record device as monitored
    my $monReadingName;
