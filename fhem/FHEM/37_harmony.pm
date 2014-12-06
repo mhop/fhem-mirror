@@ -156,7 +156,7 @@ harmony_idOfActivity($$;$)
   my ($hash, $label, $default) = @_;
 
   my $quoted_label = $label;
-  #$quoted_label =~ s/\./ /g;
+  $quoted_label =~ s/\./ /g;
   $quoted_label = quotemeta($quoted_label);
 
   foreach my $activity (@{$hash->{config}->{activity}}) {
@@ -195,7 +195,7 @@ harmony_idOfDevice($$;$)
   my ($hash, $label, $default) = @_;
 
   my $quoted_label = $label;
-  #$quoted_label =~ s/\./ /g;
+  $quoted_label =~ s/\./ /g;
   $quoted_label = quotemeta($quoted_label);
 
   foreach my $device (@{$hash->{config}->{device}}) {
