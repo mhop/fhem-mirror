@@ -1067,7 +1067,7 @@ statistics_UpdateDevReading($$$$)
   <br>
     <code>define &lt;name&gt; statistics &lt;deviceNameRegExp&gt; [Prefix]</code>
     <br>
-    Beispiel: <code>define Statistik statistics Sensor_.*|Wettersensor</code>
+    Example: <code>define Statistik statistics Sensor_.*|Wettersensor</code>
     <br>&nbsp;
     <li><code>&lt;DeviceNameRegExp&gt;</code>
       <br>
@@ -1118,7 +1118,7 @@ statistics_UpdateDevReading($$$$)
       <li><code>excludedReadings <code>&lt;DeviceRegExp:ReadingNameRegExp&gt;</code></code>
       <br>
       Regular expression of the readings that shall be excluded from the statistics.<br>
-      The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. "FritzDect:current|Sensor_.*:humidity"
+      The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. <code>FritzDect:current|Sensor_.*:humidity</code>
       <br>
     </li><br>
     <li><code>minAvgMaxReadings &lt;readings&gt;</code>
@@ -1240,7 +1240,7 @@ statistics_UpdateDevReading($$$$)
       <li><code>excludedReadings &lt;Ger&auml;tenameRegExp:Ger&auml;tewertRegExp&gt;</code>
          <br>
          Regul&auml;rer Ausdruck der Ger&auml;tewerte die nicht ausgewertet werden sollen.
-         z.B. "<code>FritzDect:current|Sensor_.*:humidity</code>"
+         z.B. <code>FritzDect:current|Sensor_.*:humidity</code>
          <br>
       </li><br>
       <li><code>hideAllSummaryReadings &lt;0 | 1&gt;</code>
