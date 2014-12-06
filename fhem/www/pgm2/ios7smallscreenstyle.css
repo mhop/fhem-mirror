@@ -11,20 +11,39 @@ select   { font-family:Helvetica; font-weight:300; font-size:16px;}
 #back    { position:absolute; top: 2px; left:18px; }
 #logo    { position:absolute; top: 2px; left: 2px; 
            width:64px;  height:67px; background-image:url(../images/default/fhemicon_smallscreen.png); }
-#menu    { position:absolute; top: 2px; left:65px; }
+#menu    { position:absolute; top: 2px; left:65px; } 
 #console { width:100%; height:100%; position:absolute; overflow-y:auto;}
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
 #errmsg { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:0px; z-index: 10; }
 
+/* Header ohne Logo
+   Um den alten Header mit Logo zu reaktieren 
+   die letzten 2 Zeichen in dieser Zeile entfernen -->  */
+#logo    { background: none; display: none; }
+#menu    { position: relative; top: 0px; left:0px; right: 0px; width: 100%; }
+#menuScrollArea { width: 100%; }
+#menu select{ width: 100%; }
+#back { margin-top: 40px; margin-left: -10px; }
+.maininput { width: 100%; }
+#hdr     { position: relative; top:0px; left:0px; right: 0px; width: 95%; }
+textarea { width:100%; }
+/* Header ohne Logo Ende */
+
 .devType { padding-top:10px; font-size:16px;}
+
 a {  color: #151515; }
+table.block a { color: #151515; cursor: pointer; }
+table.assoc a { color: #147bff; cursor: pointer; }
+table.internals a { color: #147bff cursor: pointer; }
+div.dval a { color: #147bff; cursor: pointer; }
+
 img {  border-style: none; }
 .col2 { text-align:center; }
 tr.column td { padding:0; vertical-align:top;}
 
-div.col1 { width: 188px; height: 30px; white-space: nowrap; }
-div.col2 { width: 108px; height: 30px; 
+div.col1 { height: 30px; white-space: nowrap; }
+div.col2 { height: 30px; 
   -webkit-box-pack: center; -moz-box-pack: center; box-pack: center;
   white-space: wrap;
   font-size:16px;
@@ -40,19 +59,23 @@ div.col1, div.col2 {
   background: #fff;
 }
 
-div.dname, div.dval  {
-  width: 152px; 
+div.dname, div.dval  { 
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size:16px;
 }
 div.tiny { font-size:10px; }
 
-table.block { width: 320px; background: #fff; border-spacing:0px; } 
+table { width: 100%; }
+table.roomoverview { width: 100%; }
+table.block { width: 100%; }
+
+table.block { background: #fff; border-spacing:0px; } 
 table.block tr { border:1px solid gray; border-spacing:0px; }
 table.block tr.odd { background: #fff; }
 table.block tr.sel { background: #fff; }
-table.block td { width: 150px; border-bottom: 1px solid #cbcbcb; };
-table { -moz-border-radius:8px; border-radius:8px; }
+table.block td { border-bottom: 1px solid #cbcbcb; }
+table.block td:first-child  { width: 70%; }
+table.block td:nth-child(2) { width: 30%; }
 
 #menu #block { visibility: hidden; }
 #right { position:absolute; top:85px; left: 0px; right: 0px;
@@ -64,7 +87,7 @@ div.dist { padding-top:0.3em; }
 button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
 
 .makeTable { display:inline; float:left; clear:left;
-             margin-top:10px; margin-bottom:20px;}
+             margin-top:10px; margin-bottom:20px; width:100%;}
 .makeSelect { display:inline; float:left; clear:left; }
 
 .get,.set,.attr { margin-bottom:5px; float:left;}
@@ -76,4 +99,3 @@ button.dist { margin:5px; background:transparent; border:0px; cursor:pointer; }
           border:3px solid; color:#278727; text-align:center; } 
 
 svg { height:32px; width:32px; fill:#1c7efb; vertical-align:middle; margin:2px 0; }
-g.on { fill:red; }
