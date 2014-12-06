@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.4.5";
+my $VERSION = "1.9.4.6";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -174,7 +174,7 @@ SYSMON_updateCurrentReadingsMap($) {
 	  $rMap->{"cpu_freq"}        = "CPU frequency";
 	  $rMap->{"cpu1_freq"}        = "CPU frequency (second core)";
 	}
-	if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash)) {
+	if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash)) {
     #$rMap->{+CPU_TEMP}       = "CPU Temperatur";
     #$rMap->{"cpu_temp_avg"}  = "Durchschnittliche CPU Temperatur";
     $rMap->{+CPU_TEMP}        = "CPU temperature";
@@ -752,6 +752,9 @@ SYSMON_obtainParameters($$)
       if (SYSMON_isCPUTempBBB($hash)) {
         $map = SYSMON_getCPUTemp_BBB($hash, $map);
       }
+      if (SYSMON_isCPUTempFB($hash)) {
+        $map = SYSMON_getCPUTemp_FB($hash, $map);
+      }
       if(SYSMON_isCPUFreqRPiBBB($hash)) {
         $map = SYSMON_getCPUFreq($hash, $map);
       }
@@ -1107,6 +1110,27 @@ SYSMON_getCPUTemp_BBB($$)
   $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}="$t_avg";  
+	return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert CPU Temperature (FritzBox)
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPUTemp_FB($$)
+{
+	
+	my ($hash, $map) = @_;
+  my $val = SYSMON_execute($hash, "ctlmgr_ctl r cpu status/StatTemperature");  
+  
+  if($val=~m/,(\d+)$/) {
+    my $fval = $1;
+    my $val_txt = sprintf("%.2f", $fval);
+    $map->{+CPU_TEMP}="$val_txt";
+    my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
+    $map->{+CPU_TEMP_AVG}="$t_avg";
+  }
+
 	return $map;
 }
 
@@ -2447,6 +2471,12 @@ SYSMON_isCPUFreqRPiBBB($) {
   }
 
 	return $sys_cpu_freq_rpi_bbb;
+}
+
+# DUMMY
+sub SYSMON_isCPUTempFB($) {
+	my ($hash) = @_;
+	return SYSMON_isFB($hash);
 }
 
 my $sys_cpu1_freq = undef;
