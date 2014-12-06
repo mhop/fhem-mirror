@@ -51,8 +51,8 @@ my %fonModel = (
         '0x01' => "MT-D"
       , '0x03' => "MT-F"
       , '0x04' => "C3"
-      , '0x05' => "C4"
-      , '0x08' => "M2"
+      , '0x05' => "M2"
+      , '0x08' => "C4"
    );
 
 my %ringTone = ( 
@@ -408,6 +408,7 @@ FRITZBOX_Readout_Run($)
    my $resultArray;
    my @readoutReadings;
    my $i;
+   my $startTime = time();
    
    my $slowRun = 0;
    if ( int(time/3600) != $hash->{fhem}{lastHour} || $hash->{fhem}{LOCAL} == 1)
@@ -614,7 +615,10 @@ FRITZBOX_Readout_Run($)
    }
    $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
    
+   
    $returnStr .= join('|', @readoutReadings );
+   $returnStr .= "|readoutTime|";
+   $returnStr .= sprintf "%.2f", time()-$startTime;
 
    FRITZBOX_Telnet_Close ( $hash );
    
@@ -658,13 +662,15 @@ FRITZBOX_Readout_Done($)
                $hash->{$rName1}{$rName2} = $rValue;
             }
          }
-         else
+         elsif ($rName ne "readoutTime")
          {
             readingsBulkUpdate( $hash, $rName, $rValue );
          }
       }
-      
-      readingsBulkUpdate( $hash, "lastReadout", keys( %values )." values captured" );
+
+      my $msg = keys( %values )." values captured in ".$values{readoutTime}." s";
+      readingsBulkUpdate( $hash, "lastReadout", $msg );
+      FRITZBOX_Log $hash, 4, $msg;
       my $newState = "WLAN: ";
       if ($values{box_wlan_2GHz} eq "on" || $values{box_wlan_5GHz} eq "on")
       {
@@ -676,7 +682,6 @@ FRITZBOX_Readout_Done($)
       }
       $newState .=" gWLAN: ".$values{box_guestWlan} ;
       readingsBulkUpdate( $hash, "state", $newState);
-      FRITZBOX_Log $hash, 4, keys( %values )." values captured";
    }
 
    readingsEndUpdate( $hash, 1 );
@@ -893,6 +898,8 @@ FRITZBOX_Ring_Run($)
    }
 
 
+   FRITZBOX_Telnet_Open($hash);
+
 #Preparing 1st command array
    @cmdArray = ();
 # Change ring tone of Fritz!Fons
@@ -934,6 +941,8 @@ FRITZBOX_Ring_Run($)
       push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[0]."'";
    }
    FRITZBOX_Exec( $hash, \@cmdArray );
+
+   FRITZBOX_Telnet_Close( $hash );
 
    return $name."|1|Ringing done";
 }
@@ -1162,23 +1171,31 @@ FRITZBOX_Exec_Remote($$)
          my @resultArray;
          FRITZBOX_Log $hash, 4, "Execute " . int ( @{$cmd} ) . " command(s)";
 
-         # my $cmdStr = join "\necho ' |#|'\n", @{$cmd};
-         # $cmdStr .= "\n#|#|#|#\n";
+         # my $cmdStr = join "\n", @{$cmd};
+         # $cmdStr .= "\necho Ende1  Ende2\n";
          # $telnet->put( $cmdStr );
-         # my ( $result,$match ) = $telnet->waitfor('/#|#|#|#/');
-         # FRITZBOX_Log $hash, 1, "debug: ". $result;
-         # $result =~ s/\n|\r//g;
-         # @resultArray = split /\|#\|/, $result;
-         # foreach (keys @resultArray)
+         # my ( $result,$match ) = $telnet->waitfor('/Ende1\sEnde2/');
+         # my @test = split( /\n/, "# ".$result );
+         # my $lastValue = "";
+         # foreach (@test)
          # { 
-            # $resultArray[$_] =~ s/\s$//;
+            # if ($_ =~ /^# /)
+            # {
+               # push @resultArray, $lastValue;
+               # $lastValue = "";
+            # }
+            # else
+            # {
+               # $lastValue = $_;
+            # }
          # }
+         # shift @resultArray;
          # $telnet->buffer_empty;
     
          foreach (@{$cmd})
          {
             FRITZBOX_Log $hash, 5, "Execute '".$_."'";
-            if ($_ !~ /^sleep/)
+            unless ($_ =~ /^sleep/)
             {
                @output=$telnet->cmd($_);
                $result = $output[0];;
@@ -1273,7 +1290,7 @@ FRITZBOX_Exec_Local($$)
    <br>
    For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
    <br>
-   <i>So fare, the module has been tested on Fritz!Box 7390 and Fritz!Fon MT-F only.</i>
+   <i>So fare, the module has been tested on Fritz!Box 7390 and 7490 and Fritz!Fon MT-F and C4.</i>
    <br>
    Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
