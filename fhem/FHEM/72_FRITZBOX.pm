@@ -44,7 +44,9 @@ sub FRITZBOX_Log($$$);
 sub FRITZBOX_Init($);
 sub FRITZBOX_Ring_Start($@);
 sub FRITZBOX_Exec($$);
-  
+
+our $telnet;
+
 my %fonModel = ( 
         '0x01' => "MT-D"
       , '0x03' => "MT-F"
@@ -157,8 +159,10 @@ FRITZBOX_Define($$)
    unless ( -X "/usr/bin/ctlmgr_ctl" )
    {
       $msg = "Error - FHEM needs to run on a Fritz!Box to use the FRITZBOX module";
-      FRITZBOX_Log $hash, 1, $msg;
-      return $msg;
+      $hash->{REMOTE} = 1;
+      $hash->{HOST} = "fritz.box"; 
+     # FRITZBOX_Log $hash, 1, $msg;
+      # return $msg;
    }
    elsif ( $< != 0 ) 
    {
@@ -167,6 +171,10 @@ FRITZBOX_Define($$)
           ") but we need to be root";
       FRITZBOX_Log $hash, 1, $msg;
       return $msg;
+   }
+   else
+   {
+      $hash->{REMOTE} = 0;
    }
    
    $hash->{STATE}       = "Initializing";
@@ -322,8 +330,12 @@ FRITZBOX_Set($$@)
          my $state = $val[0];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
-         FRITZBOX_Exec( $hash, "ctlmgr_ctl w wlan settings/ap_enabled $state");
-         readingsSingleUpdate($hash,"box_wlan",$val[0], 1);
+         FRITZBOX_Exec( $hash, "ctlmgr_ctl w wlan settings/wlan_enable $state");
+
+         $hash->{fhem}{LOCAL}=2; #2 = short update without new trigger
+         FRITZBOX_Readout_Start($hash);
+         $hash->{fhem}{LOCAL}=0;
+
          return undef;
       }
    }
@@ -409,6 +421,8 @@ FRITZBOX_Readout_Run($)
       FRITZBOX_Log $hash, 4, "Start update of fast changing device readings.";
    }
    my $returnStr = "$name|";
+ 
+   FRITZBOX_Telnet_Open($hash);
    
    if ($slowRun == 1)
    {
@@ -425,7 +439,7 @@ FRITZBOX_Readout_Run($)
       # Box model and firmware
       push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT', "nounderline" ];
       push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver", "fwupdate" ];
-      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
 
       my $dectCount = $resultArray->[1];
       my $radioCount = $resultArray->[2];
@@ -579,7 +593,9 @@ FRITZBOX_Readout_Run($)
    }
    
 # WLAN
-   push @readoutArray, [ "box_wlan", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
+   push @readoutArray, [ "box_wlan_2GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
+# 2nd WLAN
+   push @readoutArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
 # Gäste WLAN
    push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
 # Alarm clock
@@ -598,9 +614,9 @@ FRITZBOX_Readout_Run($)
    }
    $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
    
-   readingsEndUpdate( $hash, 1 );
-   
    $returnStr .= join('|', @readoutReadings );
+
+   FRITZBOX_Telnet_Close ( $hash );
    
    return $returnStr
    
@@ -649,7 +665,17 @@ FRITZBOX_Readout_Done($)
       }
       
       readingsBulkUpdate( $hash, "lastReadout", keys( %values )." values captured" );
-      readingsBulkUpdate( $hash, "state", "WLAN: ".$values{box_wlan}." gWLAN: ".$values{box_guestWlan} );
+      my $newState = "WLAN: ";
+      if ($values{box_wlan_2GHz} eq "on" || $values{box_wlan_5GHz} eq "on")
+      {
+         $newState .= "on";
+      }
+      else
+      {
+         $newState .= "off";
+      }
+      $newState .=" gWLAN: ".$values{box_guestWlan} ;
+      readingsBulkUpdate( $hash, "state", $newState);
       FRITZBOX_Log $hash, 4, keys( %values )." values captured";
    }
 
@@ -840,17 +866,20 @@ FRITZBOX_Ring_Run($)
    }
    
    my $ringTone;
-   if ($val[0] !~ /^msg:/i)
+   if (int @val)
    {
-      $ringTone = $val[0]
-         unless $fonType ne "AVM";
-      if (defined $ringTone)
+      if ($val[0] !~ /^msg:/i)
       {
-         $ringTone = $ringToneNumber{lc $val[0]};
-         return $name."|0|Error: Ring tone '".$val[0]."' not valid"
-            unless defined $ringTone;
+         $ringTone = $val[0]
+            unless $fonType ne "AVM";
+         if (defined $ringTone)
+         {
+            $ringTone = $ringToneNumber{lc $val[0]};
+            return $name."|0|Error: Ring tone '".$val[0]."' not valid"
+               unless defined $ringTone;
+         }
+         shift @val;
       }
-      shift @val;
    }
       
    my $msg = AttrVal( $name, "defaultCallerName", "FHEM" );
@@ -1034,20 +1063,157 @@ FRITZBOX_Telnet_Open($)
 {
    my ($hash) = @_;
    my $host = $hash->{HOST};
-   my $pwd = $hash->{PASSWORD};
-   my $telnet = new Net::Telnet ( Timeout=>10, Errmode=>'die');
+   my $pwdFile = "fb_pwd.txt";
+   my $pwd;
+   
+   FRITZBOX_Log $hash, 5, "Open password file '$pwdFile' to extract password";
+   if (open(IN, "<" . $pwdFile)) {
+      $pwd = <IN>;
+      close(IN);
+     FRITZBOX_Log $hash, 5, "Close password file";
+   } else {
+      FRITZBOX_Log $hash, 2, "Cannot open password file '$pwdFile': $!";
+      return "Cannot open password file $pwdFile: $!";
+   }
+
+   $telnet = new Net::Telnet ( Timeout=>10, Errmode=>'die', Prompt=>'/# $/');
+
+   FRITZBOX_Log $hash, 4, "Open Telnet Connection to $host";
    $telnet->open( $host );
+
+   FRITZBOX_Log $hash, 5, "Telnet: Wait for password request";
    $telnet->waitfor( '/password: $/i' );
+
+   FRITZBOX_Log $hash, 5, "Telnet: Entering password";
    $telnet->print( $pwd );
+
+   FRITZBOX_Log $hash, 5, "Telnet: Wait for command prompt";
    $telnet->waitfor( '/# $/i' );
-   return $telnet;
+
+   return undef;
 } # end FRITZBOX_Telnet_Open
 
+   
+# Closes a Telnet Connection to an external FritzBox
+sub ############################################
+FRITZBOX_Telnet_Close($)
+{
+   my ($hash) = @_;
+   if (defined $telnet)
+   {
+      FRITZBOX_Log $hash, 4, "Close Telnet connection";
+      $telnet->close;
+      $telnet = undef;
+   }
+   else
+   {
+      FRITZBOX_Log $hash, 1, "Cannot close an undefined Telnet connection";
+   }
+} # end FRITZBOX_Telnet_Close
+   
 # Executed the command on the FritzBox Shell
 sub ############################################
 FRITZBOX_Exec($$)
 {
    my ($hash, $cmd) = @_;
+   my $openedTelnet = 0;
+   
+   if ($hash->{REMOTE} == 1)
+   {
+      unless (defined $telnet)
+      {
+         return undef
+            if (FRITZBOX_Telnet_Open($hash));
+         $openedTelnet = 1;
+      }
+      my $retVal = FRITZBOX_Exec_Remote($hash, $cmd);
+      FRITZBOX_Telnet_Close ( $hash ) if $openedTelnet;
+      return $retVal;
+   }
+   else
+   {
+      return FRITZBOX_Exec_Local($hash, $cmd);
+   }
+
+}
+
+# Executed the command via Telnet
+sub ############################################
+FRITZBOX_Exec_Remote($$)
+{
+   my ($hash, $cmd) = @_;
+   my @output;
+   my $result;
+
+      
+   if (ref \$cmd eq "SCALAR")
+   {
+      FRITZBOX_Log $hash, 4, "Execute '".$cmd."'";
+      @output=$telnet->cmd($cmd);
+      $result = $output[0];
+      chomp $result;
+      FRITZBOX_Log $hash, 4, "Result '$result'";
+      return $result;
+   }
+   elsif (ref \$cmd eq "REF")
+   {
+      if ( int (@{$cmd}) > 0 )
+      {
+         my @resultArray;
+         FRITZBOX_Log $hash, 4, "Execute " . int ( @{$cmd} ) . " command(s)";
+
+         # my $cmdStr = join "\necho ' |#|'\n", @{$cmd};
+         # $cmdStr .= "\n#|#|#|#\n";
+         # $telnet->put( $cmdStr );
+         # my ( $result,$match ) = $telnet->waitfor('/#|#|#|#/');
+         # FRITZBOX_Log $hash, 1, "debug: ". $result;
+         # $result =~ s/\n|\r//g;
+         # @resultArray = split /\|#\|/, $result;
+         # foreach (keys @resultArray)
+         # { 
+            # $resultArray[$_] =~ s/\s$//;
+         # }
+         # $telnet->buffer_empty;
+    
+         foreach (@{$cmd})
+         {
+            FRITZBOX_Log $hash, 5, "Execute '".$_."'";
+            if ($_ !~ /^sleep/)
+            {
+               @output=$telnet->cmd($_);
+               $result = $output[0];;
+               $result =~ s/\n|\r|\s$//g;
+            }
+            else
+            {
+               FRITZBOX_Log $hash, 4, "Do '$_' in perl.";
+               eval ($_);
+               $result = "";
+            }
+            push @resultArray, $result;
+            FRITZBOX_Log $hash, 5, "Result '$result'";
+         }
+         @{$cmd} = ();
+         FRITZBOX_Log $hash, 4, "Received ".int(@resultArray)." answer(s)";
+         return \@resultArray;
+      }
+      else
+      {
+         FRITZBOX_Log $hash, 4, "No shell command to execute.";
+      }
+   }
+   else
+   {
+      FRITZBOX_Log $hash, 1, "Error: wrong perl parameter";
+   }
+}
+
+# Executed the command on the FritzBox Shell
+sub ############################################
+FRITZBOX_Exec_Local($$)
+{
+   my ($hash, $cmd) = @_;
+   
    
    if (ref \$cmd eq "SCALAR")
    {
@@ -1100,11 +1266,18 @@ FRITZBOX_Exec($$)
 <div  style="width:800px"> 
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as signaling devices.
-   Note!! To use it, FHEM has to run on a Fritz!Box as root user.
+   <br>
+   The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). 
+   <br>
+   If FHEM does not run on a Fritz!Box, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box.
+   <br>
+   For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
    <br>
    <i>So fare, the module has been tested on Fritz!Box 7390 and Fritz!Fon MT-F only.</i>
    <br>
    Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
+   <br>
+   <i>The modul uses the Perl modul 'Net::Telnet' for remote access.</i>
    <br/><br/>
    <a name="FRITZBOXdefine"></a>
    <b>Define</b>
@@ -1236,8 +1409,9 @@ FRITZBOX_Exec($$)
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
-      <li><b>box_model</b> - Frit!Box model</li>
-      <li><b>box_wlan</b> - Current state of the WLAN</li>
+      <li><b>box_model</b> - Fritz!Box model</li>
+      <li><b>box_wlan_2GHz</b> - Current state of the 2,4 GHz WLAN</li>
+      <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
       <li><b>dect</b><i>1</i> - Name of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Customer ring tone of the DECT device <i>1</i></li>
