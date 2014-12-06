@@ -215,8 +215,8 @@ sub ReplaceAllReadingsDoIf($$$$)
         ($block,$err,$device,$reading,$internal)=ReplaceReadingDoIf($block);
         return ($block,$err) if ($err);
         if ($eval) {
-          return ($block,"reading does not exist: [$device:$reading]") if (defined ($reading) and !$defs{$device}{READINGS}{$reading});
-          return ($block,"internal does not exist: [$device:$internal]") if (defined ($internal) and !$defs{$device}{$internal});
+          return ($block,"reading does not exist: [$device:$reading]") if (defined ($reading) and !defined($defs{$device}{READINGS}{$reading}));
+          return ($block,"internal does not exist: [$device:$internal]") if (defined ($internal) and !defined($defs{$device}{$internal}));
           my $ret = eval $block;
           return($block." ",$@) if ($@);
           $block=$ret;
@@ -487,13 +487,13 @@ DOIF_CheckCond($$)
   if (defined ($hash->{readings}{$condition})) {
     foreach my $devReading (split(/ /,$hash->{readings}{$condition})) {
       ($device,$reading)=(split(":",$devReading));
-      return (0,"reading does not exist: [$device:$reading]") if ($devReading and !$defs{$device}{READINGS}{$reading});
+      return (0,"reading does not exist: [$device:$reading]") if ($devReading and !defined($defs{$device}{READINGS}{$reading}));
     }
   }
   if (defined ($hash->{internals}{$condition})) {
     foreach my $devInternal (split(/ /,$hash->{internals}{$condition})) {
       ($device,$internal)=(split(":",$devInternal));
-      return (0,"internal does not exist: [$device:$internal]") if ($devInternal and !$defs{$device}{$internal});
+      return (0,"internal does not exist: [$device:$internal]") if ($devInternal and !defined($defs{$device}{$internal}));
     }
   }
   my $ret = eval $hash->{condition}{$condition};
