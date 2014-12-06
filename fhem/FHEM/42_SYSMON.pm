@@ -30,7 +30,7 @@ package main;
 use strict;
 use warnings;
 
-my $VERSION = "1.9.4.6";
+my $VERSION = "1.9.4.7";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -1123,7 +1123,7 @@ SYSMON_getCPUTemp_FB($$)
 	my ($hash, $map) = @_;
   my $val = SYSMON_execute($hash, "ctlmgr_ctl r cpu status/StatTemperature");  
   
-  if($val=~m/,(\d+)$/) {
+  if($val=~m/(\d+),/) {
     my $fval = $1;
     my $val_txt = sprintf("%.2f", $fval);
     $map->{+CPU_TEMP}="$val_txt";
