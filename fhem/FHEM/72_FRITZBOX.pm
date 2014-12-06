@@ -1272,6 +1272,41 @@ FRITZBOX_Exec_Local($$)
 }
 
 ##################################### 
+sub FRITZBOX_fritztris($)
+{
+  my ($d) = @_;
+  $d = "<none>" if(!$d);
+  return "$d is not a FRITZBOX instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "FRITZBOX");
+
+   my $returnStr = '<script type="text/javascript" src="http://fritz.box/js/fritztris.js"></script>';
+   $returnStr .= '<link rel="stylesheet" type="text/css" href="http://fritz.box/css/default/fritztris.css"/>';
+   $returnStr .= '<style>#game table td {width:15px;height:15px;border-width:0px;background-repeat: no-repeat;background-position: center;-moz-border-radius: 4px;-webkit-border-radius: 4px;border-radius: 4px;}</style>';
+   $returnStr .= '<script type="text/javascript">';
+   $returnStr .= 'var game = null;';
+   $returnStr .= 'function play() {';
+   $returnStr .= 'if (game) {';
+   $returnStr .= 'game.stop();';
+   $returnStr .= 'game = null;';
+   $returnStr .= '}';
+   $returnStr .= 'var game = new FRITZtris(document.getElementById("game"));';
+   $returnStr .= 'game.start();';
+   $returnStr .= 'game.gameOverCb = gameOver;';
+   $returnStr .= '}';
+   $returnStr .= 'function gameOver() {';
+#   $returnStr .= 'alert("Das Spiel ist vorbei.");';
+   $returnStr .= 'game.stop();';
+   $returnStr .= 'game = null;';
+   $returnStr .= '}';
+   $returnStr .= '</script>';
+   $returnStr .= '<table><tr><td valign=top><u>FritzTris</u>';
+   $returnStr .= '<br><a href="#" onclick="play();">Start</a>';
+   $returnStr .= '<br><a href="#" onclick="gameOver();">Stop</a></td>';
+   $returnStr .= '<td><div id="game"></div></td></tr></table>';
+
+   return $returnStr;
+}
+##################################### 
 
 1;
 
@@ -1303,8 +1338,10 @@ FRITZBOX_Exec_Local($$)
       <code>define &lt;name&gt; FRITZBOX</code>
       <br/><br/>
       Example: <code>define fritzbox FRITZBOX</code>
-      <br/><br/>
    </ul>
+   The Fritz!Box OS has a hidden function. Test it with
+   <br><code>define MyEasterEgg weblink htmlCode { FRITZBOX_fritztris("MyEasterEgg") }</code>
+   <br/><br/>
   
    <a name="FRITZBOXset"></a>
    <b>Set</b>
