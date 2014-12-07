@@ -410,7 +410,7 @@ FRITZBOX_Readout_Run($)
    my @readoutReadings;
    my $i;
    my $startTime = time();
-   
+
    my $slowRun = 0;
    if ( int(time/3600) != $hash->{fhem}{lastHour} || $hash->{fhem}{LOCAL} == 1)
    {
@@ -422,10 +422,17 @@ FRITZBOX_Readout_Run($)
    {
       FRITZBOX_Log $hash, 4, "Start update of fast changing device readings.";
    }
+
    my $returnStr = "$name|";
  
-   FRITZBOX_Telnet_Open($hash);
+   $result = FRITZBOX_Telnet_Open( $hash );
+   if ($result)
+   {
+      $returnStr .= "Error|".$result;
+      return $returnStr;
+   }
    
+
    if ($slowRun == 1)
    {
       
@@ -1068,14 +1075,15 @@ FRITZBOX_ConvertRingTone ($@)
 # cat fx_moh >/var/flash/fx_moh
 
 # Opens a Telnet Connection to an external FritzBox
-sub ############################################
-FRITZBOX_Telnet_Open($)
+############################################
+sub FRITZBOX_Telnet_Open($)
 {
    my ($hash) = @_;
    my $name = $hash->{NAME};
    my $host = $hash->{HOST};
    my $pwdFile = "fb_pwd.txt";
    my $pwd;
+   my $msg;
    
    FRITZBOX_Log $hash, 5, "Open password file '$pwdFile' to extract password";
    if (open(IN, "<" . $pwdFile)) {
@@ -1083,41 +1091,59 @@ FRITZBOX_Telnet_Open($)
       close(IN);
      FRITZBOX_Log $hash, 5, "Close password file";
    } else {
-      FRITZBOX_Log $hash, 2, "Cannot open password file '$pwdFile': $!";
-      return "Cannot open password file $pwdFile: $!";
+      $msg = "Error: Cannot open password file '$pwdFile': $!";
+      FRITZBOX_Log $hash, 2, $msg;
+      return $msg;
    }
    
    my $user = AttrVal( $name, "telnetUser", "" );
 
-   $telnet = new Net::Telnet ( Timeout=>10, Errmode=>'die', Prompt=>'/# $/');
-
    FRITZBOX_Log $hash, 4, "Open Telnet Connection to $host";
-   $telnet->open( $host );
+   $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>10, Errmode=>'return', Prompt=>'/# $/');
+   if (!$telnet) {
+      $msg = "Error while opening telnet connection: ".$telnet->errmsg;
+      FRITZBOX_Log $hash, 2, $msg;
+      return $msg;
+   }
 
    if ( $user ne "" )
    {
-      FRITZBOX_Log $hash, 5, "Telnet: Wait for user request";
-      $telnet->waitfor( '/user: $/i' );
+      FRITZBOX_Log $hash, 5, "Telnet: Wait for user prompt";
+      unless ($telnet->waitfor( '/user: $/i' ))
+      {
+         $msg = "Error while waiting for user prompt: ".$telnet->errmsg;
+         FRITZBOX_Log $hash, 2, $msg;
+         return $msg;
+      }
       FRITZBOX_Log $hash, 5, "Telnet: Entering user";
       $telnet->print( $user );
    }
    
-   FRITZBOX_Log $hash, 5, "Telnet: Wait for password request";
-   $telnet->waitfor( '/password: $/i' );
-
+   FRITZBOX_Log $hash, 5, "Telnet: Wait for password prompt";
+   unless ($telnet->waitfor( '/password: $/i' ))
+   {
+      $msg = "Error while waiting for password prompt: ".$telnet->errmsg;
+      FRITZBOX_Log $hash, 2, $msg;
+      return $msg;
+   }
    FRITZBOX_Log $hash, 5, "Telnet: Entering password";
    $telnet->print( $pwd );
 
    FRITZBOX_Log $hash, 5, "Telnet: Wait for command prompt";
-   $telnet->waitfor( '/# $/i' );
+   unless ($telnet->waitfor( '/# $/i' ))
+   {
+      $msg = "Error while waiting for command prompt: ".$telnet->errmsg;
+      FRITZBOX_Log $hash, 2, $msg;
+      return $msg;
+   }
 
    return undef;
 } # end FRITZBOX_Telnet_Open
 
    
 # Closes a Telnet Connection to an external FritzBox
-sub ############################################
-FRITZBOX_Telnet_Close($)
+############################################
+sub FRITZBOX_Telnet_Close($)
 {
    my ($hash) = @_;
    if (defined $telnet)
