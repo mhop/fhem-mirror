@@ -133,10 +133,11 @@ FRITZBOX_Initialize($)
   $hash->{GetFn}    = "FRITZBOX_Get";
   $hash->{AttrFn}   = "FRITZBOX_Attr";
   $hash->{AttrList} = "disable:0,1 "
-                ."INTERVAL "
-                ."ringWithIntern:0,1,2 "
                 ."defaultCallerName "
                 ."defaultUploadDir "
+                ."INTERVAL "
+                ."ringWithIntern:0,1,2 "
+                ."telnetUser "
                 .$readingFnAttributes;
 
 } # end FRITZBOX_Initialize
