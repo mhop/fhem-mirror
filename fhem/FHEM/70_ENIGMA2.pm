@@ -1573,7 +1573,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                             if (
                                    defined( $servicetype[2] )
-                                && $servicetype[2] eq "2"
+                                && ( $servicetype[2] eq "2" || $servicetype[2] eq "10" )
                                 && ( !defined( $hash->{READINGS}{input}{VAL} )
                                     || $hash->{READINGS}{input}{VAL} ne
                                     "radio" )
