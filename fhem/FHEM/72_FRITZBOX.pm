@@ -1071,6 +1071,7 @@ sub ############################################
 FRITZBOX_Telnet_Open($)
 {
    my ($hash) = @_;
+   my $name = $hash->{NAME};
    my $host = $hash->{HOST};
    my $pwdFile = "fb_pwd.txt";
    my $pwd;
@@ -1084,12 +1085,22 @@ FRITZBOX_Telnet_Open($)
       FRITZBOX_Log $hash, 2, "Cannot open password file '$pwdFile': $!";
       return "Cannot open password file $pwdFile: $!";
    }
+   
+   my $user = AttrVal( $name, "telnetUser", "" );
 
    $telnet = new Net::Telnet ( Timeout=>10, Errmode=>'die', Prompt=>'/# $/');
 
    FRITZBOX_Log $hash, 4, "Open Telnet Connection to $host";
    $telnet->open( $host );
 
+   if ( $user ne "" )
+   {
+      FRITZBOX_Log $hash, 5, "Telnet: Wait for user request";
+      $telnet->waitfor( '/user: $/i' );
+      FRITZBOX_Log $hash, 5, "Telnet: Entering user";
+      $telnet->print( $user );
+   }
+   
    FRITZBOX_Log $hash, 5, "Telnet: Wait for password request";
    $telnet->waitfor( '/password: $/i' );
 
@@ -1299,7 +1310,7 @@ sub FRITZBOX_fritztris($)
    $returnStr .= 'game = null;';
    $returnStr .= '}';
    $returnStr .= '</script>';
-   $returnStr .= '<table><tr><td valign=top><u>FritzTris</u>';
+   $returnStr .= '<table><tr><td valign=top><u><b>FritzTris</b></u>';
    $returnStr .= '<br><a href="#" onclick="play();">Start</a>';
    $returnStr .= '<br><a href="#" onclick="gameOver();">Stop</a></td>';
    $returnStr .= '<td><div id="game"></div></td></tr></table>';
@@ -1317,17 +1328,14 @@ sub FRITZBOX_fritztris($)
 <h3>FRITZBOX</h3>
 <div  style="width:800px"> 
 <ul>
-   Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as signaling devices.
-   <br>
-   The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). 
-   <br>
-   If FHEM does not run on a Fritz!Box, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box.
-   <br>
-   For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
+   Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as
+   signaling devices. The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!).
+   <br/><br/>
+   If FHEM does not run on a Fritz!Box, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
+   <br/><br/>
+   Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
    <i>So fare, the module has been tested on Fritz!Box 7390 and 7490 and Fritz!Fon MT-F and C4.</i>
-   <br>
-   Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
    <i>The modul uses the Perl modul 'Net::Telnet' for remote access.</i>
    <br/><br/>
@@ -1337,11 +1345,13 @@ sub FRITZBOX_fritztris($)
       <br>
       <code>define &lt;name&gt; FRITZBOX</code>
       <br/><br/>
-      Example: <code>define fritzbox FRITZBOX</code>
+      Example: <code>define Fritzbox FRITZBOX</code>
+      <br/><br/>
+      The Fritz!Box OS has a hidden function (easter egg).
+      <br>
+      Test it with: <code>define MyEasterEgg weblink htmlCode { FRITZBOX_fritztris("Fritzbox") }</code>
+      <br/><br/>
    </ul>
-   The Fritz!Box OS has a hidden function. Test it with
-   <br><code>define MyEasterEgg weblink htmlCode { FRITZBOX_fritztris("MyEasterEgg") }</code>
-   <br/><br/>
   
    <a name="FRITZBOXset"></a>
    <b>Set</b>
@@ -1437,17 +1447,23 @@ sub FRITZBOX_fritztris($)
          <br>
          Maximal 30 characters are allowed. The attribute "ringWithIntern" must also be specified.
       </li><br>
-      <li><code>ringWithIntern &lt;internalNumber&gt;</code>
-         <br>
-         To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
-         <br>
-         To show a message (default: "FHEM") during a ring the internal phone numbers 1 or 2 can be specified here.
-      </li><br>
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
          <br>
          This is the default path that will be used if a file name does not start with / (slash).
          <br>
          It needs to be the name of the path on the Fritz!Box. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
+      </li><br>
+      <li><code>telnetUser &lt;user name&gt;</code>
+         <br>
+         User name that is used for telnet access. By default no user name is required to login.
+         <br>
+         If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
+      </li><br>
+      <li><code>ringWithIntern &lt;internalNumber&gt;</code>
+         <br>
+         To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
+         <br>
+         To show a message (default: "FHEM") during a ring the internal phone numbers 1 or 2 can be specified here.
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
