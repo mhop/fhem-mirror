@@ -1,8 +1,8 @@
-# $Id: 23_KOSTALPIKO.pm 6805 2014-10-24 18:00:00Z john $
+# $Id: 23_KOSTALPIKO.pm 7127 2014-12-07 18:00:00Z john $
 ####################################################################################################
 #
 #	23_KOSTALPIKO.pm
-#  
+#
 #  This modul supports the KOSTAL Piko Inverter.
 #  All Value of Piko's Home-page are captured.
 #
@@ -35,69 +35,137 @@
 # 2014-09-08 john  V2.04 : fix: device name with dot made trouble (checked against Kostal Pikos Firmware 10.1)
 #                          adjusting KOSTALPIKO_Log
 #                          Inital Checkin to FHEM ; docu revised
+# 2014-09-08 john  V2.05 : support of battery option; developed by  jannik_78
+
 ####################################################################################################
 
 # --------------------------------------------
 # parser for the site http://<ip-kostal>/index.fhtml
 package MyParser;
-   use base qw(HTML::Parser);
-   our @texte = ();
-   my $isTD     = 0;
-   my $takeNext = 0;
-
+use base qw(HTML::Parser);
+our @texte = ();
+my $isTD     = 0;
+my $takeNext = 0;
 
 # is called if a text content is detected
 # results in an array of string with alternating description / value
 sub text
 {
-   my ( $self, $text ) = @_;
-   if ( $isTD == 1 )    # if we are inside a TD-Tag
-   {
-      $text =~ s/^\s+//;    # trim string
-      $text =~ s/\s+$//;
-      if ( $takeNext == 1 )    # first text is description, next text is value
-      {
-         $takeNext = 0;
-         push( @texte, $text );
-      }
+  my ( $self, $text ) = @_;
+  if ( $isTD == 1 )    # if we are inside a TD-Tag
+  {
+    $text =~ s/^\s+//;    # trim string
+    $text =~ s/\s+$//;
+    if ( $takeNext == 1 )    # first text is description, next text is value
+    {
+      $takeNext = 0;
+      push( @texte, $text );
+    }
 
-      # filter only interesting captions
-      if (  $text eq "aktuell"
-         || $text eq "Gesamtenergie"
-         || $text eq "Tagesenergie"
-         || $text eq "Status"
-         || $text eq "Spannung"
-         || $text eq "Strom"
-         || $text eq "Leistung" )
-      {
-         $takeNext = 1;    # expect next tag as value
-         push( @texte, $text );
-      }
-   }
+    # filter only interesting captions
+    if ( $text eq "aktuell"
+      || $text eq "Gesamtenergie"
+      || $text eq "Tagesenergie"
+      || $text eq "Status"
+      || $text eq "Spannung"
+      || $text eq "Strom"
+      || $text eq "Leistung" )
+    {
+      $takeNext = 1;    # expect next tag as value
+      push( @texte, $text );
+    }
+  }
 }
-
 
 # callback, if start tag is detected
 sub start
 {
-   my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
+  my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
 
-   # we are only interested on TD-Tags
-   if ( $tagname eq 'td' )
-   {
-      $isTD = 1;
-   } else
-   {
-      $isTD = 0;
-   }
+  # we are only interested on TD-Tags
+  if ( $tagname eq 'td' )
+  {
+    $isTD = 1;
+  } else
+  {
+    $isTD = 0;
+  }
 }
 
 # after end-tag reset TD-marker
 sub end
 {
-   $isTD = 0;
+  $isTD = 0;
 }
 
+# --------------------------------------------
+# parser for the site http://<ip-kostal>/BA.fhtml
+package MyBatteryParser;
+use base qw(HTML::Parser);
+our @texte = ();
+my $isTD     = 0;
+my $isBold   = 0;
+my $takeNext = 0;
+
+# is called if a text content is detected
+# results in an array of string with alternating description / value
+sub text
+{
+
+  my ( $self, $text ) = @_;
+  if ( $isTD == 1 )    # if we are inside a TD-Tag
+  {
+    # filter only interesting captions
+    if ( $text eq "Ladezustand:"
+      || $text eq "Spannung:"
+      || $text eq "Ladestrom:"
+      || $text eq "Temperatur:"
+      || $text eq "Zyklenanzahl:"
+      || $text eq "Solargenerator:"
+      || $text eq "Batterie:"
+      || $text eq "Netz:"
+      || $text eq "Phase 1:"
+      || $text eq "Phase 2:"
+      || $text eq "Phase 3:" )
+    {
+      $takeNext = 1;    # expect next tag as value
+      push( @texte, $text );
+    }
+  }
+
+  if ( $isBold == 1 && $takeNext == 1 )
+  {
+    $takeNext = 0;
+    $text =~ s/[^0-9\.]//g;
+    push( @texte, $text );
+  }
+
+}
+
+# callback, if start tag is detected
+sub start
+{
+  my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
+
+  # we are only interested on TD-Tags
+  $isTD   = 0;
+  $isBold = 0;
+  if ( $tagname eq 'td' )
+  {
+    $isTD = 1;
+  }
+
+  if ( $tagname eq 'b' )
+  {
+    $isBold = 1;
+  }
+}
+
+# after end-tag reset TD-marker
+sub end
+{
+  $isTD = 0;
+}
 ###############################################
 # parser for the global radiation
 package MyRadiationParser;
@@ -110,103 +178,100 @@ my $takeNext  = 0;
 # here HTML::text/start/end are overridden
 sub text
 {
-   my ( $self, $text ) = @_;
-   if ( $curTag eq $lookupTag )
-   {
-      $text =~ s/^\s+//;    # trim string
-      $text =~ s/\s+$//;
-      if ( $takeNext == 1 )
-      {
-         $takeNext = 0;
-         push( @texte, $text );
-      }
-      if ( $text eq "Globalstrahlung" )
-      {
-         $takeNext = 1;
-         push( @texte, $text );
-      }
-      elsif ( $text eq "UV-Index" )
-      {
-         $takeNext = 1;
-         push( @texte, $text );         
-      }
-      elsif ( $text eq "rel. Sonnenscheindauer" )
-      {
-         $takeNext = 1;
-         push( @texte, $text );         
-      }
-   }
+  my ( $self, $text ) = @_;
+  if ( $curTag eq $lookupTag )
+  {
+    $text =~ s/^\s+//;    # trim string
+    $text =~ s/\s+$//;
+    if ( $takeNext == 1 )
+    {
+      $takeNext = 0;
+      push( @texte, $text );
+    }
+    if ( $text eq "Globalstrahlung" )
+    {
+      $takeNext = 1;
+      push( @texte, $text );
+    } elsif ( $text eq "UV-Index" )
+    {
+      $takeNext = 1;
+      push( @texte, $text );
+    } elsif ( $text eq "rel. Sonnenscheindauer" )
+    {
+      $takeNext = 1;
+      push( @texte, $text );
+    }
+  }
 }
 
 sub start
 {
-   my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
-   $curTag = $tagname;
+  my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
+  $curTag = $tagname;
 }
 
 sub end
 {
-   $curTag = "";
+  $curTag = "";
 }
 
 ##############################################
 # parser for the site http://<kostal-piko-ip>/Info.fhtml with sensor values
 package MyInfoParser;
-   use base qw(HTML::Parser);
-   our @texte = ();
-   my $isTD     = 0;
-   my $isBold   = 0;
-   my $takeNext = 0;
-
+use base qw(HTML::Parser);
+our @texte = ();
+my $isTD     = 0;
+my $isBold   = 0;
+my $takeNext = 0;
 
 # is called if a text content is detected
 sub text
 {
-   my ( $self, $text ) = @_;
-   if ( $isTD == 1 )    # if we are inside a TD-Tag
-   {
-      # filter only interesting captions
-       if ( $text =~ m/.*Eingang.*/)
-       {
-         $takeNext = 1;    # expect next tag as value
-         push( @texte, $text );
-      }
-   }
-   
-   if ( $isBold == 1 && $takeNext==1)
-   {
-      $takeNext = 0;
-      $text =~ s/^\s+//;    # trim string
-      $text =~ s/\s+$//;
-      $text=~ m/([0-9]+\.[0-9]+)/; # find substring 0.00V : 0.00
-      my $value=$1;
-      push( @texte, $value );
-   }
+  my ( $self, $text ) = @_;
+  if ( $isTD == 1 )    # if we are inside a TD-Tag
+  {
+    # filter only interesting captions
+    if ( $text =~ m/.*Eingang.*/ )
+    {
+      $takeNext = 1;    # expect next tag as value
+      push( @texte, $text );
+    }
+  }
+
+  if ( $isBold == 1 && $takeNext == 1 )
+  {
+    $takeNext = 0;
+    $text =~ s/^\s+//;               # trim string
+    $text =~ s/\s+$//;
+    $text =~ m/([0-9]+\.[0-9]+)/;    # find substring 0.00V : 0.00
+    my $value = $1;
+    push( @texte, $value );
+  }
 }
 
 # callback, if start tag is detected
 sub start
 {
-   my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
+  my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
 
-   # we are only interested on TD-Tags
-   $isTD = 0;
-   $isBold = 0;
-   if ( $tagname eq 'td' )
-   {
-      $isTD = 1;
-   }
-   
-   if ( $tagname eq 'b' )
-   {
-      $isBold = 1;
-   }
+  # we are only interested on TD-Tags
+  $isTD   = 0;
+  $isBold = 0;
+  if ( $tagname eq 'td' )
+  {
+    $isTD = 1;
+  }
+
+  if ( $tagname eq 'b' )
+  {
+    $isBold = 1;
+  }
 }
 
 # after end-tag reset TD-marker
 sub end
 {
-   $isTD = 0;
+  $isTD = 0;
 }
 
 ##############################################
@@ -223,141 +288,141 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "KOSTALPIKO";
-my $KOSTAL_VERSION = "2.04";
-
+my $KOSTAL_VERSION = "2.05";
 
 ########################################
 sub KOSTALPIKO_Log($$$)
 {
-   my ( $hash, $loglevel, $text ) = @_;
-   my $xline       = ( caller(0) )[2];
-   
-   my $xsubroutine = ( caller(1) )[3];
-   my $sub         = ( split( ':', $xsubroutine ) )[2];
-   $sub =~ s/KOSTALPIKO_//;
+  my ( $hash, $loglevel, $text ) = @_;
+  my $xline = ( caller(0) )[2];
 
-   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $MODUL;
-   Log3 $hash, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
+  my $xsubroutine = ( caller(1) )[3];
+  my $sub = ( split( ':', $xsubroutine ) )[2];
+  $sub =~ s/KOSTALPIKO_//;
+
+  my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $MODUL;
+  Log3 $hash, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
 }
 ###################################
 sub KOSTALPIKO_Initialize($)
 {
-   my ($hash) = @_;
-   $hash->{DefFn}    = "KOSTALPIKO_Define";
-   $hash->{UndefFn}  = "KOSTALPIKO_Undef";
-   $hash->{SetFn}    = "KOSTALPIKO_Set";
-   $hash->{AttrList} = "delay " . "delayCounter " . "GR.Link " . "GR.Interval " . "disable:0,1 " . $readingFnAttributes;
+  my ($hash) = @_;
+  $hash->{DefFn}   = "KOSTALPIKO_Define";
+  $hash->{UndefFn} = "KOSTALPIKO_Undef";
+  $hash->{SetFn}   = "KOSTALPIKO_Set";
+  $hash->{AttrList} =
+    "delay " . "delayCounter " . "GR.Link " . "GR.Interval " . "disable:0,1 " . "BAEnable:0,1 " . $readingFnAttributes;
 }
 ###################################
 sub KOSTALPIKO_Define($$)
 {
-   my ( $hash, $def ) = @_;
-   my $name = $hash->{NAME};
-   my @a    = split( "[ \t][ \t]*", $def );
-   my $host = $a[2];
-   my $user = $a[3];
-   my $pass = $a[4];
-   if ( int(@a) < 5 )
-   {
-      return "Wrong syntax: use define <name> KOSTALPIKO <ip-address> <user> <pass>";
-   }
-   $hash->{VERSION}             = $KOSTAL_VERSION;
-   $hash->{helper}{Host}        = $host;
-   $hash->{helper}{User}        = $user;
-   $hash->{helper}{Pass}        = $pass;
-   $hash->{helper}{GRHour}      = 25;
-   $hash->{helper}{TimerStatus} = $name . ".STATUS"; # like "Kostal.STATUS"
-   $hash->{helper}{TimerGR}     = $name . ".GR";
-   InternalTimer( gettimeofday() + 10, "KOSTALPIKO_StatusTimer", $hash->{helper}{TimerStatus}, 0 );
-   InternalTimer( gettimeofday() + 20, "KOSTALPIKO_GrTimer",     $hash->{helper}{TimerGR},     0 );
-   return undef;
+  my ( $hash, $def ) = @_;
+  my $name = $hash->{NAME};
+  my @a    = split( "[ \t][ \t]*", $def );
+  my $host = $a[2];
+  my $user = $a[3];
+  my $pass = $a[4];
+  if ( int(@a) < 5 )
+  {
+    return "Wrong syntax: use define <name> KOSTALPIKO <ip-address> <user> <pass>";
+  }
+  $hash->{VERSION}             = $KOSTAL_VERSION;
+  $hash->{helper}{Host}        = $host;
+  $hash->{helper}{User}        = $user;
+  $hash->{helper}{Pass}        = $pass;
+  $hash->{helper}{GRHour}      = 25;
+  $hash->{helper}{TimerStatus} = $name . ".STATUS";    # like "Kostal.STATUS"
+  $hash->{helper}{TimerGR}     = $name . ".GR";
+  InternalTimer( gettimeofday() + 10, "KOSTALPIKO_StatusTimer", $hash->{helper}{TimerStatus}, 0 );
+  InternalTimer( gettimeofday() + 20, "KOSTALPIKO_GrTimer",     $hash->{helper}{TimerGR},     0 );
+  return undef;
 }
 #####################################
 sub KOSTALPIKO_Undef($$)
 {
-   my ( $hash, $arg ) = @_;
+  my ( $hash, $arg ) = @_;
 
-   RemoveInternalTimer( $hash->{helper}{TimerStatus} );
-   RemoveInternalTimer( $hash->{helper}{TimerGR} );
-   BlockingKill( $hash->{helper}{RUNNING_STATUS} ) if ( defined( $hash->{helper}{RUNNING_STATUS} ) );
-   BlockingKill( $hash->{helper}{RUNNING_GR} ) if ( defined( $hash->{helper}{RUNNING_GR} ) );
-   
-   KOSTALPIKO_Log $hash, 3, "--- done ---";  
-   return undef;
+  RemoveInternalTimer( $hash->{helper}{TimerStatus} );
+  RemoveInternalTimer( $hash->{helper}{TimerGR} );
+  BlockingKill( $hash->{helper}{RUNNING_STATUS} ) if ( defined( $hash->{helper}{RUNNING_STATUS} ) );
+  BlockingKill( $hash->{helper}{RUNNING_GR} )     if ( defined( $hash->{helper}{RUNNING_GR} ) );
+
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
+  return undef;
 }
 #####################################
 sub KOSTALPIKO_Set($@)
 {
-   my ( $hash, @a ) = @_;
-   my $name    = $hash->{NAME};
-   my $reUINT = '^([\\+]?\\d+)$';
-   my $usage   = "Unknown argument $a[1], choose one of captureKostalData:noArg ";
-   my $URL     = AttrVal( $name, 'GR.Link', "" );
-   if ($URL)
-   {
-      $usage .= "captureGlobalRadiation:noArg ";
-   }
-   
-   # for debugging issues
+  my ( $hash, @a ) = @_;
+  my $name   = $hash->{NAME};
+  my $reUINT = '^([\\+]?\\d+)$';
+  my $usage  = "Unknown argument $a[1], choose one of captureKostalData:noArg ";
+  my $URL    = AttrVal( $name, 'GR.Link', "" );
+  if ($URL)
+  {
+    $usage .= "captureGlobalRadiation:noArg ";
+  }
+
+  # for debugging issues
   # $usage .= "test:noArg sleeper ";
-   
-   return $usage if ( @a < 2 );
-   
-   my $cmd = lc( $a[1] );
-   given ($cmd)
-   {
-      when ("?")
-      {
-         return $usage;
-      }
-      when ("capturekostaldata")
-      {
-         KOSTALPIKO_Log $hash, 3, "set command: " . $a[1] . " para:" . $hash->{helper}{TimerStatus};
-         KOSTALPIKO_StatusStart($hash);
-      }
-      when ("captureglobalradiation")
-      {
-         KOSTALPIKO_Log $hash, 3, "set command: " . $a[1];
-         KOSTALPIKO_GrStart($hash);
-      }
-      when ("test")
-      {
-         KOSTALPIKO_Log $hash, 3, "set command: " . $a[1];
-         KOSTALPIKO_GrStart($hash);
-      }
-      
-      when ("sleeper")
-      {
-         return "Set sleeper needs a <value> parameter"
-           if ( @a != 3 );
-          my $value=$a[2]; 
-         $value=($value=~ m/$reUINT/) ? $1:undef; 
-         return "value ".$a[2]." is not a number"
-           if (!defined($value));
-                      
-         KOSTALPIKO_Log $hash, 3, "set command: " . $a[1]." value:". $a[2];
-         $hash->{helper}{Sleeper} = $a[2];
-      }      
-      default
-      {
-         return $usage;
-      }
-   }
-   return;
+
+  return $usage if ( @a < 2 );
+
+  my $cmd = lc( $a[1] );
+  given ($cmd)
+  {
+    when ("?")
+    {
+      return $usage;
+    }
+    when ("capturekostaldata")
+    {
+      KOSTALPIKO_Log $hash, 3, "set command: " . $a[1] . " para:" . $hash->{helper}{TimerStatus};
+      KOSTALPIKO_StatusStart($hash);
+    }
+    when ("captureglobalradiation")
+    {
+      KOSTALPIKO_Log $hash, 3, "set command: " . $a[1];
+      KOSTALPIKO_GrStart($hash);
+    }
+    when ("test")
+    {
+      KOSTALPIKO_Log $hash, 3, "set command: " . $a[1];
+      KOSTALPIKO_GrStart($hash);
+    }
+
+    when ("sleeper")
+    {
+      return "Set sleeper needs a <value> parameter"
+        if ( @a != 3 );
+      my $value = $a[2];
+      $value = ( $value =~ m/$reUINT/ ) ? $1 : undef;
+      return "value " . $a[2] . " is not a number"
+        if ( !defined($value) );
+
+      KOSTALPIKO_Log $hash, 3, "set command: " . $a[1] . " value:" . $a[2];
+      $hash->{helper}{Sleeper} = $a[2];
+    }
+    default
+    {
+      return $usage;
+    }
+  }
+  return;
 }
 #############################################
 # get hour as number, input is a serial date
 sub KOSTAL_GetHourSD($)
 {
-   my @t = localtime(shift);
-   return $t[2];
+  my @t = localtime(shift);
+  return $t[2];
 }
 #############################################
 # current datetime round off to current hour
 sub KOSTAL_GetDateTrunc($)
 {
-   my @t = localtime(shift);
-   return sprintf( "%04d-%02d-%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], 0, 0 );
+  my @t = localtime(shift);
+  return sprintf( "%04d-%02d-%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], 0, 0 );
 }
 #############################################
 # converts string-datetime to serial-datetime
@@ -365,556 +430,615 @@ sub KOSTAL_GetDateTrunc($)
 # output: serial datetime
 sub KOSTAL_DateStr2Serial($)
 {
-   my $datestr = shift;
-   my ( $yyyy, $mm, $dd, $hh, $mi, $ss ) = $datestr =~ /(\d+)-(\d+)-(\d+) (\d+)[:](\d+)[:](\d+)/;
+  my $datestr = shift;
+  my ( $yyyy, $mm, $dd, $hh, $mi, $ss ) = $datestr =~ /(\d+)-(\d+)-(\d+) (\d+)[:](\d+)[:](\d+)/;
 
-   # months are zero based
-   my $t2 = fhemTimeLocal( $ss, $mi, $hh, $dd, $mm - 1, $yyyy - 1900 );
-   return $t2;
+  # months are zero based
+  my $t2 = fhemTimeLocal( $ss, $mi, $hh, $dd, $mm - 1, $yyyy - 1900 );
+  return $t2;
 }
 
 #####################################
 # acquires the sensor html page of kostalpiko
 sub KOSTALPIKO_SensorHtmlAcquire($)
 {
-   my ($hash)  = @_;
-   return unless (defined($hash->{NAME}));
-   
-   my $err_log = '';
-   
-   my $URL =
-     "http://" . $hash->{helper}{User} . ":" . $hash->{helper}{Pass} . "\@" . $hash->{helper}{Host} . "/Info.fhtml";
-     
-   KOSTALPIKO_Log $hash, 4, "$URL";
-   my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
-   my $header = HTTP::Request->new( GET => $URL );
-   my $request = HTTP::Request->new( 'GET', $URL, $header );
-   my $response = $agent->request($request);
-   $err_log .= "Can't get $URL -- " . $response->status_line
-     unless $response->is_success;
+  my ($hash) = @_;
+  return unless ( defined( $hash->{NAME} ) );
 
-   if ( $err_log ne "" )
-   {
-      KOSTALPIKO_Log $hash, 1, $err_log;
-      return "";
-   }
-   return $response->content;
+  my $err_log = '';
+
+  my $URL =
+    "http://" . $hash->{helper}{User} . ":" . $hash->{helper}{Pass} . "\@" . $hash->{helper}{Host} . "/Info.fhtml";
+
+  KOSTALPIKO_Log $hash, 4, "$URL";
+  my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
+  my $header = HTTP::Request->new( GET => $URL );
+  my $request = HTTP::Request->new( 'GET', $URL, $header );
+  my $response = $agent->request($request);
+  $err_log .= "Can't get $URL -- " . $response->status_line
+    unless $response->is_success;
+
+  if ( $err_log ne "" )
+  {
+    KOSTALPIKO_Log $hash, 1, $err_log;
+    return "";
+  }
+  return $response->content;
 }
+#####################################
+# acquires the battery html page of kostalpiko
+sub KOSTALPIKO_BatteryHtmlAcquire($)
+{
+  my ($hash) = @_;
+  return unless ( defined( $hash->{NAME} ) );
 
+  my $err_log = '';
+
+  my $URL =
+    "http://" . $hash->{helper}{User} . ":" . $hash->{helper}{Pass} . "\@" . $hash->{helper}{Host} . "/BA.fhtml";
+
+  # $URL = "http://192.168.178.20/XBA.html";    # for testing only uncomment
+
+  KOSTALPIKO_Log $hash, 4, "$URL";
+  my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
+  my $header = HTTP::Request->new( GET => $URL );
+  my $request = HTTP::Request->new( 'GET', $URL, $header );
+  my $response = $agent->request($request);
+  $err_log .= "Can't get $URL -- " . $response->status_line
+    unless $response->is_success;
+
+  if ( $err_log ne "" )
+  {
+    KOSTALPIKO_Log $hash, 1, $err_log;
+    return "";
+  }
+  return $response->content;
+}
 #####################################
 # acquires the html page of kostalpiko
 sub KOSTALPIKO_StatusHtmlAcquire($)
 {
-   my ($hash)  = @_;
-   my $name    = $hash->{NAME};
-   
-   return unless (defined($hash->{NAME}));
-   
-   my $err_log = '';
-   
-   my $URL =
-     "http://" . $hash->{helper}{User} . ":" . $hash->{helper}{Pass} . "\@" . $hash->{helper}{Host} . "/index.fhtml";
-     
-   KOSTALPIKO_Log $hash, 4, "$URL";
-   my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
-   my $header = HTTP::Request->new( GET => $URL );
-   my $request = HTTP::Request->new( 'GET', $URL, $header );
-   my $response = $agent->request($request);
-   $err_log .= "Can't get $URL -- " . $response->status_line
-     unless $response->is_success;
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
 
-   if ( $err_log ne "" )
-   {
-      KOSTALPIKO_Log $hash, 1, $err_log;
-      return "";
-   }
-   return $response->content;
+  return unless ( defined( $hash->{NAME} ) );
+
+  my $err_log = '';
+
+  my $URL =
+    "http://" . $hash->{helper}{User} . ":" . $hash->{helper}{Pass} . "\@" . $hash->{helper}{Host} . "/index.fhtml";
+
+  KOSTALPIKO_Log $hash, 4, "$URL";
+  my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
+  my $header = HTTP::Request->new( GET => $URL );
+  my $request = HTTP::Request->new( 'GET', $URL, $header );
+  my $response = $agent->request($request);
+  $err_log .= "Can't get $URL -- " . $response->status_line
+    unless $response->is_success;
+
+  if ( $err_log ne "" )
+  {
+    KOSTALPIKO_Log $hash, 1, $err_log;
+    return "";
+  }
+  return $response->content;
 }
 
 #####################################
 sub KOSTALPIKO_StatusStart($)
 {
-   my ($hash)  = @_;
-   my $name    = $hash->{NAME};
-   
-   return unless (defined($hash->{NAME}));
-  
-   my $err_log   = '';
-   my $sdCurTime = gettimeofday();
-   my $hour      = KOSTAL_GetHourSD($sdCurTime);
-   my $disable   = AttrVal( $name, "disable", 0 );
-   my $delay     = AttrVal( $name, "delay", 300 );
-   
-   while (1)
-   {
-      KOSTALPIKO_Log $hash, 3, "--- started ---";
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
 
-      # check disable attribute
-      if ( $disable == 1 )
-      {
-         KOSTALPIKO_Log $hash, 3, "disabled";
-         last;
-      }
-      
-      if (!defined($hash->{helper}{delayCounter}))
-      {
-        $hash->{helper}{delayCounter}=AttrVal( $name, "delayCounter", "0" ); 
-      }
-      
-      # wenn delayCounter aktiv
-      if ( $hash->{helper}{delayCounter} > 0 )
-      {
-         $hash->{helper}{delayCounter}--;
-      }
-   
-      $hash->{helper}{RUNNING_STATUS} =
-           BlockingCall( 
-           "KOSTALPIKO_StatusRun",   # callback worker task
-           $name,                    # name of the device
-           "KOSTALPIKO_StatusDone",  # callback result method
-           50,                       # timeout seconds
-           "KOSTALPIKO_StatusAborted", #  callback for abortion
-            $hash );                 # parameter for abortion
-            
-      last;      
-   }
-   KOSTALPIKO_Log $hash, 3, "--- done ---";
+  return unless ( defined( $hash->{NAME} ) );
+
+  my $err_log   = '';
+  my $sdCurTime = gettimeofday();
+  my $hour      = KOSTAL_GetHourSD($sdCurTime);
+  my $disable   = AttrVal( $name, "disable", 0 );
+  my $delay     = AttrVal( $name, "delay", 300 );
+
+  while (1)
+  {
+    KOSTALPIKO_Log $hash, 3, "--- started ---";
+
+    # check disable attribute
+    if ( $disable == 1 )
+    {
+      KOSTALPIKO_Log $hash, 3, "disabled";
+      last;
+    }
+
+    if ( !defined( $hash->{helper}{delayCounter} ) )
+    {
+      $hash->{helper}{delayCounter} = AttrVal( $name, "delayCounter", "0" );
+    }
+
+    # wenn delayCounter aktiv
+    if ( $hash->{helper}{delayCounter} > 0 )
+    {
+      $hash->{helper}{delayCounter}--;
+    }
+
+    $hash->{helper}{RUNNING_STATUS} = BlockingCall(
+      "KOSTALPIKO_StatusRun",        # callback worker task
+      $name,                         # name of the device
+      "KOSTALPIKO_StatusDone",       # callback result method
+      50,                            # timeout seconds
+      "KOSTALPIKO_StatusAborted",    #  callback for abortion
+      $hash
+    );                               # parameter for abortion
+
+    last;
+  }
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
 }
 
 #####################################
 sub KOSTALPIKO_StatusRun($)
 {
-   my ($string) = @_;
-   my ( $name, $server ) = split( "\\|", $string );
-   my $level = 5; 
-  
-   return unless ( defined($name) );
-   
-   my $hash = $defs{$name};
-   return unless (defined($hash->{NAME}));
-   
-   KOSTALPIKO_Log $hash, 3, "--- started ---";  
-   # acquire the html-page
-   my $response = KOSTALPIKO_StatusHtmlAcquire($hash); 
-   
-   # perform parsing
-   #KOSTALPIKO_Log $hash, $level, "before parsing of response-Len:".length($response);
-   my $parser = MyParser->new;
-   @MyParser::texte = ();
-   
-   # parsing the complete html-page-response, needs some time
-   # only <td> tags will be regarded   
-   $parser->parse($response);
-   
-   # for testing issues
-   if (defined($hash->{helper}{Sleeper}))
-   {
-     my $sleep =  $hash->{helper}{Sleeper};
-     $hash->{helper}{Sleeper}=0;
-     sleep($sleep) if ($sleep>0);
-   }
-   
-   # pack the results in a single string
-   my $ptext=$name;
-   foreach my $text (@MyParser::texte)
-   {
-      $ptext = $ptext . "|".$text;
-   }
-   
-   #---------------------------- Sensor values
-   $response = KOSTALPIKO_SensorHtmlAcquire($hash);
-   $parser = MyInfoParser->new;
-   @MyInfoParser::texte = ();
-   $parser->parse($response); 
-   foreach my $text (@MyInfoParser::texte)
-   {
-      $ptext = $ptext . "|".$text;
-   }
-   
-   #------------------------------ aquire is finished
-   KOSTALPIKO_Log $hash, 3, "--- done ---";  
-   return $ptext;
+  my ($string) = @_;
+  my ( $name, $server ) = split( "\\|", $string );
+  my $level = 5;
+
+  return unless ( defined($name) );
+
+  my $hash = $defs{$name};
+  return unless ( defined( $hash->{NAME} ) );
+
+  KOSTALPIKO_Log $hash, 3, "--- started ---";
+
+  # acquire the html-page
+  my $response = KOSTALPIKO_StatusHtmlAcquire($hash);
+
+  # perform parsing
+  #KOSTALPIKO_Log $hash, $level, "before parsing of response-Len:".length($response);
+  my $parser = MyParser->new;
+  @MyParser::texte = ();
+
+  # parsing the complete html-page-response, needs some time
+  # only <td> tags will be regarded
+  $parser->parse($response);
+
+  # for testing issues
+  if ( defined( $hash->{helper}{Sleeper} ) )
+  {
+    my $sleep = $hash->{helper}{Sleeper};
+    $hash->{helper}{Sleeper} = 0;
+    sleep($sleep) if ( $sleep > 0 );
+  }
+
+  # pack the results in a single string
+  my $ptext = $name;
+  foreach my $text (@MyParser::texte)
+  {
+    $ptext = $ptext . "|" . $text;
+  }
+
+  #---------------------------- Sensor values
+  $response            = KOSTALPIKO_SensorHtmlAcquire($hash);
+  $parser              = MyInfoParser->new;
+  @MyInfoParser::texte = ();
+  $parser->parse($response);
+  foreach my $text (@MyInfoParser::texte)
+  {
+    $ptext = $ptext . "|" . $text;
+  }
+
+  #---------------------------- battery values
+  if ( AttrVal( $name, 'BAEnable', 0 ) == 1 )
+  {
+    $response               = KOSTALPIKO_BatteryHtmlAcquire($hash);
+    $parser                 = MyBatteryParser->new;
+    @MyBatteryParser::texte = ();
+    $parser->parse($response);
+    foreach my $text (@MyBatteryParser::texte)
+    {
+      $ptext = $ptext . "|" . $text;
+    }
+  }
+
+  #------------------------------ aquire is finished
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
+  return $ptext;
 }
 #####################################
 # assyncronous callback by blocking
 sub KOSTALPIKO_StatusDone($)
 {
-   my ($string) = @_;
-   return unless ( defined($string) );
-   
-   # all term are separated by "|" , the first ist the name of the instance
-   my ( $name, @values ) = split( "\\|", $string );
-   my $hash = $defs{$name};
-   return unless (defined($hash->{NAME}));
-   KOSTALPIKO_Log $hash, 3, "--- started ---";
-      
-   # show the values
-   KOSTALPIKO_Log $hash, 5, "values:".join(', ', @values);
-   
-   # delete the marker for running process
-   delete( $hash->{helper}{RUNNING_STATUS} );
-   
-#------------------  
-   while (1)
-   {
-      my $tag    = "";    # der Name des parameters in der web site
-      my $index  = 0;     # laufindex von 1..4 f. String x und Lx
-      my $strang = 1;
-      my $rdName = "";     # name for reading
-      my $rdValue;         # value for reading
-      my %hashValues = (); # hash for name,value
-      my $sdCurTime = gettimeofday();
-      my $hour      = KOSTAL_GetHourSD($sdCurTime);
-      
-      foreach my $text (@values)
+  my ($string) = @_;
+  return unless ( defined($string) );
+
+  # all term are separated by "|" , the first ist the name of the instance
+  my ( $name, @values ) = split( "\\|", $string );
+  my $hash = $defs{$name};
+  return unless ( defined( $hash->{NAME} ) );
+  KOSTALPIKO_Log $hash, 3, "--- started ---";
+
+  # show the values
+  KOSTALPIKO_Log $hash, 5, "values:" . join( ', ', @values );
+
+  # delete the marker for running process
+  delete( $hash->{helper}{RUNNING_STATUS} );
+
+  #------------------
+  while (1)
+  {
+    my $tag    = "";    # der Name des parameters in der web site
+    my $index  = 0;     # laufindex von 1..4 f. String x und Lx
+    my $strang = 1;
+    my $rdName = "";    # name for reading
+    my $rdValue;        # value for reading
+    my %hashValues = ();                             # hash for name,value
+    my $sdCurTime  = gettimeofday();
+    my $hour       = KOSTAL_GetHourSD($sdCurTime);
+
+    foreach my $text (@values)
+    {
+      if ( $text eq "aktuell"
+        || $text eq "Gesamtenergie"
+        || $text eq "Tagesenergie"
+        || $text eq "Status"
+        || $text =~ m/.*analoger Eingang.*/
+        || $text eq "Ladezustand:"
+        || $text eq "Spannung:"
+        || $text eq "Ladestrom:"
+        || $text eq "Temperatur:"
+        || $text eq "Zyklenanzahl:"
+        || $text eq "Solargenerator:"
+        || $text eq "Batterie:"
+        || $text eq "Netz:"
+        || $text eq "Phase 1:"
+        || $text eq "Phase 2:"
+        || $text eq "Phase 3:" )
       {
-         if (  $text eq "aktuell"
-            || $text eq "Gesamtenergie"
-            || $text eq "Tagesenergie"
-            || $text eq "Status" 
-            || $text =~ m/.*analoger Eingang.*/
-            )
-         {
-            $tag = $text;     # remember the identifier
-         } 
-         elsif ( $text eq "Spannung" || $text eq "Strom" || $text eq "Leistung" )
-         {
-            $index++;
-            if ( $index > 4 )
-            {
-               $strang++;
-               $index = 1;
-            }
-            $tag = $text; # remember the identifier
-         } 
-         else
-         {
-            if ( $tag ne "" )  # last text was a identifier, so we expect a value
-            {
-               $rdValue = $text;
-               # translate the identifier of the html.page to internal identifiers
-               $rdName  = "AC.Power" if ( $tag eq "aktuell" );
-               $rdName  = "Total.Energy" if ( $tag eq "Gesamtenergie" );
-               $rdName  = "Daily.Energy" if ( $tag eq "Tagesenergie" );
-               $rdName  = "Mode" if ( $tag eq "Status" );
-               $rdName  = "generator.$strang.voltage" if ( $tag eq "Spannung" && $index == 1 );
-               $rdName  = "output.$strang.voltage" if ( $tag eq "Spannung" && $index == 2 );
-               $rdName  = "generator.$strang.current" if ( $tag eq "Strom" );
-               $rdName  = "output.$strang.power" if ( $tag eq "Leistung" );
-               $rdName  = "sensor.1" if ( $tag eq "1. analoger Eingang:" );
-               $rdName  = "sensor.2" if ( $tag eq "2. analoger Eingang:" );
-               $rdName  = "sensor.3" if ( $tag eq "3. analoger Eingang:" );
-               $rdName  = "sensor.4" if ( $tag eq "4. analoger Eingang:" );
- 
-               # set 0, if "x x x" is given
-               $rdValue = 0 if ( index( $rdValue, "x x x" ) != -1 );
-
-               # add the pair of identifier and value to the hash
-               $hashValues{$rdName} = $rdValue;
-
-               #special treatment for fast value
-               $hashValues{ $rdName . ".Fast" } = $rdValue if ( $rdName eq "AC.Power" );
-               $tag = "";   # next text will be an identifier
-               $rdName = "";
-            }
-         }
-      } # foreach
-
-      # add the state for reading update
-      $rdValue = "W: " . $hashValues{"AC.Power"} . " - " . $hashValues{"Mode"};
-      $hashValues{state} = $rdValue;
-
-      # set the ModeNum
-      my $NMode = 9;
-      $rdValue             = $hashValues{"Mode"};
-      $NMode               = 0 if ( $rdValue eq "Aus" );
-      $NMode               = 1 if ( $rdValue eq "Leerlauf" );
-      $NMode               = 2 if ( $rdValue eq "Einspeisen MPP" );
-      $hashValues{ModeNum} = $NMode;
-
-      # Daily.Energy.Last, remember the last value of dayly energy
-      # check from  23 hour
-      if ( defined( $hash->{READINGS}{"Daily.Energy"} ) && $hour == 23 )
+        $tag = $text;    # remember the identifier
+      } elsif ( $text eq "Spannung" || $text eq "Strom" || $text eq "Leistung" )
       {
-         my $ss = KOSTAL_GetDateTrunc($sdCurTime);        # string date rounded to hour
-         my $sdDateTrunc = KOSTAL_DateStr2Serial($ss);    # string date to serial date
-         $ss = ReadingsTimestamp( $name, "Daily.Energy.Last", $ss );    # determine reading timestamp
-         my $sdEnergyLast = KOSTAL_DateStr2Serial($ss);                 # serial format
-         KOSTALPIKO_Log $hash, 5, "DateTrunc : $ss  sdDateTrunc: $sdDateTrunc sdEnergyLast:$sdEnergyLast";
-         if ( $sdEnergyLast <= $sdDateTrunc )
-         {
-            KOSTALPIKO_Log $hash, 4, "update Daily.Energy.Last with " . $hash->{READINGS}{"Daily.Energy"}{VAL};
-            readingsSingleUpdate( $hash, "Daily.Energy.Last", $hash->{READINGS}{"Daily.Energy"}{VAL}, 1 );
-         }
+        $index++;
+        if ( $index > 4 )
+        {
+          $strang++;
+          $index = 1;
+        }
+        $tag = $text;    # remember the identifier
+      } else
+      {
+        if ( $tag ne "" )    # last text was a identifier, so we expect a value
+        {
+          $rdValue = $text;
+
+          # translate the identifier of the html.page to internal identifiers
+          $rdName = "AC.Power"                  if ( $tag eq "aktuell" );
+          $rdName = "Total.Energy"              if ( $tag eq "Gesamtenergie" );
+          $rdName = "Daily.Energy"              if ( $tag eq "Tagesenergie" );
+          $rdName = "Mode"                      if ( $tag eq "Status" );
+          $rdName = "generator.$strang.voltage" if ( $tag eq "Spannung" && $index == 1 );
+          $rdName = "output.$strang.voltage"    if ( $tag eq "Spannung" && $index == 2 );
+          $rdName = "generator.$strang.current" if ( $tag eq "Strom" );
+          $rdName = "output.$strang.power"      if ( $tag eq "Leistung" );
+          $rdName = "sensor.1"                  if ( $tag eq "1. analoger Eingang:" );
+          $rdName = "sensor.2"                  if ( $tag eq "2. analoger Eingang:" );
+          $rdName = "sensor.3"                  if ( $tag eq "3. analoger Eingang:" );
+          $rdName = "sensor.4"                  if ( $tag eq "4. analoger Eingang:" );
+
+          # BA.fhtml
+          $rdName = "Battery.StateOfCharge" if ( $tag eq "Ladezustand:" );
+          $rdName = "Battery.Voltage"       if ( $tag eq "Spannung:" );
+          $rdName = "Battery.ChargeCurrent" if ( $tag eq "Ladestrom:" );
+          $rdName = "Battery.Temperature"   if ( $tag eq "Temperatur:" );
+          $rdName = "Battery.CycleCount"    if ( $tag eq "Zyklenanzahl:" );
+          $rdName = "Power.Solar"           if ( $tag eq "Solargenerator:" );
+          $rdName = "Power.Battery"         if ( $tag eq "Batterie:" );
+          $rdName = "Power.Net"             if ( $tag eq "Netz:" );
+          $rdName = "Power.Phase1"          if ( $tag eq "Phase 1:" );
+          $rdName = "Power.Phase2"          if ( $tag eq "Phase 2:" );
+          $rdName = "Power.Phase3"          if ( $tag eq "Phase 3:" );
+
+          # set 0, if "x x x" is given
+          $rdValue = 0 if ( index( $rdValue, "x x x" ) != -1 );
+
+          # add the pair of identifier and value to the hash
+          $hashValues{$rdName} = $rdValue;
+
+          #special treatment for fast value
+          $hashValues{ $rdName . ".Fast" } = $rdValue if ( $rdName eq "AC.Power" );
+          $tag    = "";    # next text will be an identifier
+          $rdName = "";
+        }
       }
+    }    # foreach
 
-      # update readings
-      my $upd;
-      readingsBeginUpdate($hash);
-      foreach my $xxx ( sort keys %hashValues )
+    # add the state for reading update
+    $rdValue = "W: " . $hashValues{"AC.Power"} . " - " . $hashValues{"Mode"};
+    $hashValues{state} = $rdValue;
+
+    # set the ModeNum
+    my $NMode = 9;
+    $rdValue             = $hashValues{"Mode"};
+    $NMode               = 0 if ( $rdValue eq "Aus" );
+    $NMode               = 1 if ( $rdValue eq "Leerlauf" );
+    $NMode               = 2 if ( $rdValue eq "Einspeisen MPP" );
+    $hashValues{ModeNum} = $NMode;
+
+    # Daily.Energy.Last, remember the last value of dayly energy
+    # check from  23 hour
+    if ( defined( $hash->{READINGS}{"Daily.Energy"} ) && $hour == 23 )
+    {
+      my $ss          = KOSTAL_GetDateTrunc($sdCurTime);    # string date rounded to hour
+      my $sdDateTrunc = KOSTAL_DateStr2Serial($ss);         # string date to serial date
+      $ss = ReadingsTimestamp( $name, "Daily.Energy.Last", $ss );    # determine reading timestamp
+      my $sdEnergyLast = KOSTAL_DateStr2Serial($ss);                 # serial format
+      KOSTALPIKO_Log $hash, 5, "DateTrunc : $ss  sdDateTrunc: $sdDateTrunc sdEnergyLast:$sdEnergyLast";
+      if ( $sdEnergyLast <= $sdDateTrunc )
       {
-         $upd = 0;
-         # update if reading not exists or if new/old value differs
-         if ( !defined( $hash->{READINGS}{$xxx}{VAL} ) || $hash->{READINGS}{$xxx}{VAL} ne $hashValues{$xxx} )
-         {
-            # AC.Power.FAst will every time updated, the others only, if delaycount is 0
-            if ( $xxx eq "AC.Power.Fast" || $hash->{helper}{delayCounter} == 0 )
-            {
-               readingsBulkUpdate( $hash, $xxx, $hashValues{$xxx} );
-               $upd = 1;
-            }
-         }
-         KOSTALPIKO_Log $hash, 4, "$xxx: $hashValues{ $xxx } upd:$upd";
+        KOSTALPIKO_Log $hash, 4, "update Daily.Energy.Last with " . $hash->{READINGS}{"Daily.Energy"}{VAL};
+        readingsSingleUpdate( $hash, "Daily.Energy.Last", $hash->{READINGS}{"Daily.Energy"}{VAL}, 1 );
       }
-      readingsEndUpdate( $hash, 1 );
-      last;
-   }
-   
-   # wir arbeiten mit delay counter
-   if ( AttrVal( $name, "delayCounter", "0" ) ne "0" && $hash->{helper}{delayCounter}==0)
-   {
-      $hash->{helper}{delayCounter} = AttrVal( $name, "delayCounter", "0" );
-      KOSTALPIKO_Log $hash, 3, "delayCounter restarted";
-   }  
-    
-   KOSTALPIKO_Log $hash, 3, "--- done ---";  
-   
+    }
+
+    # update readings
+    my $upd;
+    readingsBeginUpdate($hash);
+    foreach my $xxx ( sort keys %hashValues )
+    {
+      $upd = 0;
+
+      # update if reading not exists or if new/old value differs
+      if ( !defined( $hash->{READINGS}{$xxx}{VAL} ) || $hash->{READINGS}{$xxx}{VAL} ne $hashValues{$xxx} )
+      {
+        # AC.Power.FAst will every time updated, the others only, if delaycount is 0
+        if ( $xxx eq "AC.Power.Fast" || $hash->{helper}{delayCounter} == 0 )
+        {
+          readingsBulkUpdate( $hash, $xxx, $hashValues{$xxx} );
+          $upd = 1;
+        }
+      }
+      KOSTALPIKO_Log $hash, 4, "$xxx: $hashValues{ $xxx } upd:$upd";
+    }
+    readingsEndUpdate( $hash, 1 );
+    last;
+  }
+
+  # wir arbeiten mit delay counter
+  if ( AttrVal( $name, "delayCounter", "0" ) ne "0" && $hash->{helper}{delayCounter} == 0 )
+  {
+    $hash->{helper}{delayCounter} = AttrVal( $name, "delayCounter", "0" );
+    KOSTALPIKO_Log $hash, 3, "delayCounter restarted";
+  }
+
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
+
 }
 #####################################
 sub KOSTALPIKO_StatusAborted($)
 {
-   my ($hash) = @_;
-   delete( $hash->{helper}{RUNNING_STATUS} );
-   KOSTALPIKO_Log $hash, 3, "--- done ---";  
+  my ($hash) = @_;
+  delete( $hash->{helper}{RUNNING_STATUS} );
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
 }
 #####################################
 sub KOSTALPIKO_StatusTimer($)
 {
-   my ($timerpara) = @_;
-   #my ( $name, $func ) = split( /\./, $timerpara );
-   my $index = rindex($timerpara,".");  # rechter punkt
-   my $func  = substr $timerpara,$index+1,length($timerpara); # function extrahieren
-   my $name =  substr $timerpara,0,$index; # name extrahieren   
-   my $hash      = $defs{$name};
-   
-   #KOSTALPIKO_Log "", 3, "--- started --- name:$name";
-   return unless (defined($hash->{NAME}));
-   KOSTALPIKO_Log $hash, 3, "--- started ---"; 
-   
-   KOSTALPIKO_StatusStart($hash);
-   $hash->{helper}{TimerInterval} = AttrVal( $name, "delay",  60 );   
-    # setup timer
-   RemoveInternalTimer( $hash->{helper}{TimerStatus} );
+  my ($timerpara) = @_;
 
-   InternalTimer(
-     gettimeofday() + $hash->{helper}{TimerInterval},
-    "KOSTALPIKO_StatusTimer",
-     $hash->{helper}{TimerStatus},
-     0 );  
+  #my ( $name, $func ) = split( /\./, $timerpara );
+  my $index = rindex( $timerpara, "." );    # rechter punkt
+  my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
+  my $name = substr $timerpara, 0, $index;                         # name extrahieren
+  my $hash = $defs{$name};
 
-   KOSTALPIKO_Log $hash, 3, "--- done ---";  
+  #KOSTALPIKO_Log "", 3, "--- started --- name:$name";
+  return unless ( defined( $hash->{NAME} ) );
+  KOSTALPIKO_Log $hash, 3, "--- started ---";
+
+  KOSTALPIKO_StatusStart($hash);
+  $hash->{helper}{TimerInterval} = AttrVal( $name, "delay", 60 );
+
+  # setup timer
+  RemoveInternalTimer( $hash->{helper}{TimerStatus} );
+
+  InternalTimer( gettimeofday() + $hash->{helper}{TimerInterval},
+    "KOSTALPIKO_StatusTimer", $hash->{helper}{TimerStatus}, 0 );
+
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
 }
 
 #####################################
 # acquires the html page of Global radiation
 sub KOSTALPIKO_GrHtmlAcquire($)
 {
-   my ($hash)  = @_;
-   my $name    = $hash->{NAME};
-   return unless (defined($hash->{NAME}));
- 
-   my $URL = AttrVal( $name, 'GR.Link', "" );
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  return unless ( defined( $hash->{NAME} ) );
 
-   # abbrechen, wenn wichtig parameter nicht definiert sind
-   return "" if ( !defined($URL) );
-   return "" if ( $URL eq "" );
+  my $URL = AttrVal( $name, 'GR.Link', "" );
 
-   my $err_log  = "";
-   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
-   my $header   = HTTP::Request->new( GET => $URL );
-   my $request  = HTTP::Request->new( 'GET', $URL, $header );
-   my $response = $agent->request($request);
-   $err_log = "Can't get $URL -- " . $response->status_line
-     unless $response->is_success;
-     
-   if ( $err_log ne "" )
-   {
-      KOSTALPIKO_Log $hash, 1, "Error: $err_log";
-      return "";
-   }
+  # abbrechen, wenn wichtig parameter nicht definiert sind
+  return "" if ( !defined($URL) );
+  return "" if ( $URL eq "" );
 
-   return $response->content;
+  my $err_log  = "";
+  my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
+  my $header   = HTTP::Request->new( GET => $URL );
+  my $request  = HTTP::Request->new( 'GET', $URL, $header );
+  my $response = $agent->request($request);
+  $err_log = "Can't get $URL -- " . $response->status_line
+    unless $response->is_success;
+
+  if ( $err_log ne "" )
+  {
+    KOSTALPIKO_Log $hash, 1, "Error: $err_log";
+    return "";
+  }
+
+  return $response->content;
 }
-
 
 #####################################
 sub KOSTALPIKO_GrStart($)
 {
-   my ($hash)  = @_;
-   my $name    = $hash->{NAME};
-   
-   return unless (defined($hash->{NAME}));
-   
-   return if (AttrVal( $name, 'GR.Link', "" ) eq "");
-   
-   while (1)
-   {
-      KOSTALPIKO_Log $hash, 3, "--- started ---";
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
 
-   
-      $hash->{helper}{RUNNING_GR} =
-           BlockingCall( 
-           "KOSTALPIKO_GrRun",   # callback worker task
-           $name,                    # name of the device
-           "KOSTALPIKO_GrDone",  # callback result method
-           50,                       # timeout seconds
-           "KOSTALPIKO_GrAborted", #  callback for abortion
-           $hash );                 # parameter for abortion
-            
-      last;      
-   }
-   KOSTALPIKO_Log $hash, 3, "--- done ---";
+  return unless ( defined( $hash->{NAME} ) );
+
+  return if ( AttrVal( $name, 'GR.Link', "" ) eq "" );
+
+  while (1)
+  {
+    KOSTALPIKO_Log $hash, 3, "--- started ---";
+
+    $hash->{helper}{RUNNING_GR} = BlockingCall(
+      "KOSTALPIKO_GrRun",        # callback worker task
+      $name,                     # name of the device
+      "KOSTALPIKO_GrDone",       # callback result method
+      50,                        # timeout seconds
+      "KOSTALPIKO_GrAborted",    #  callback for abortion
+      $hash
+    );                           # parameter for abortion
+
+    last;
+  }
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
 }
 
 #####################################
 sub KOSTALPIKO_GrRun($)
 {
-   my ($string) = @_;
-   my ( $name, $server ) = split( "\\|", $string );
-   my $ptext=$name;
-   
-   return unless ( defined($name) );
-   
-   my $hash = $defs{$name};
-   return unless (defined($hash->{NAME}));
-   
-   KOSTALPIKO_Log $hash, 3, "--- started ---";  
-   while (1)
-   {
-      # acquire the html-page
-      my $response = KOSTALPIKO_GrHtmlAcquire($hash); 
-      last if ($response eq "");
-     
-      my $parser = MyRadiationParser->new;
-      @MyRadiationParser::texte = ();
-      # parsing the complete html-page-response, needs some time
-      # only <td> tags will be regarded   
-      $parser->parse($response);
-      KOSTALPIKO_Log $hash, 4, "parsed terms:" . @MyRadiationParser::texte;
-      
-      # pack the results in a single string
-      foreach my $text (@MyRadiationParser::texte)
-      {
-         $ptext = $ptext . "|".$text;
-      }
-      
-      last;
-   }
+  my ($string) = @_;
+  my ( $name, $server ) = split( "\\|", $string );
+  my $ptext = $name;
 
-   KOSTALPIKO_Log $hash, 3, "--- done ---";  
-   return $ptext;
+  return unless ( defined($name) );
+
+  my $hash = $defs{$name};
+  return unless ( defined( $hash->{NAME} ) );
+
+  KOSTALPIKO_Log $hash, 3, "--- started ---";
+  while (1)
+  {
+    # acquire the html-page
+    my $response = KOSTALPIKO_GrHtmlAcquire($hash);
+    last if ( $response eq "" );
+
+    my $parser = MyRadiationParser->new;
+    @MyRadiationParser::texte = ();
+
+    # parsing the complete html-page-response, needs some time
+    # only <td> tags will be regarded
+    $parser->parse($response);
+    KOSTALPIKO_Log $hash, 4, "parsed terms:" . @MyRadiationParser::texte;
+
+    # pack the results in a single string
+    foreach my $text (@MyRadiationParser::texte)
+    {
+      $ptext = $ptext . "|" . $text;
+    }
+
+    last;
+  }
+
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
+  return $ptext;
 }
 #####################################
 # assyncronous callback by blocking
 sub KOSTALPIKO_GrDone($)
 {
-   my ($string) = @_;
-   return unless ( defined($string) );
-   
-   # all term are separated by "|" , the first ist the name of the instance
-   my ( $name, @values ) = split( "\\|", $string );
-   my $hash = $defs{$name};
-   return unless (defined($hash->{NAME}));
-   
-   KOSTALPIKO_Log $hash, 3, "--- started ---";   
-   
-    # show the values
-   KOSTALPIKO_Log $hash, 5, "values:".join(', ', @values);
-   
-   # delete the marker for running process
-   delete( $hash->{helper}{RUNNING_GR} );  
+  my ($string) = @_;
+  return unless ( defined($string) );
 
-   my $tag        = "";
-   my $rdName     = "";
-   my $rdValue    = "";
-   my %hashValues = ();
+  # all term are separated by "|" , the first ist the name of the instance
+  my ( $name, @values ) = split( "\\|", $string );
+  my $hash = $defs{$name};
+  return unless ( defined( $hash->{NAME} ) );
 
-   # nach myRadiation suchen
-   foreach my $text (@values)
-   {
-      if ( $text eq "Globalstrahlung" || $text eq "UV-Index" || $text eq "rel. Sonnenscheindauer" )
+  KOSTALPIKO_Log $hash, 3, "--- started ---";
+
+  # show the values
+  KOSTALPIKO_Log $hash, 5, "values:" . join( ', ', @values );
+
+  # delete the marker for running process
+  delete( $hash->{helper}{RUNNING_GR} );
+
+  my $tag        = "";
+  my $rdName     = "";
+  my $rdValue    = "";
+  my %hashValues = ();
+
+  # nach myRadiation suchen
+  foreach my $text (@values)
+  {
+    if ( $text eq "Globalstrahlung" || $text eq "UV-Index" || $text eq "rel. Sonnenscheindauer" )
+    {
+      $tag = $text;
+    } else
+    {
+      if ( $tag ne "" )
       {
-         $tag = $text;
-      } 
-      else
-      {
-         if ( $tag ne "" )
-         {
-            $rdValue = $text;
-            $rdValue =~ tr/,/./;    # komma gegen punkt tauschen
-            $rdValue=~ m/([-,\+]?\d+\.?\d*)/; # zahl extrahieren
-            $rdValue=$1;
-            $rdName = $tag;
-            $rdName = "Global.Radiation" if ( $tag eq "Globalstrahlung" );
-            $rdName = "UV.Index" if ( $tag eq "UV-Index" );
-            $rdName = "sunshine.duration" if ( $tag eq "rel. Sonnenscheindauer" );
-            $hashValues{$rdName} = $rdValue;
-            $tag = "";
-            KOSTALPIKO_Log $hash, 5, "tag:$rdName value:$rdValue";
-         }
+        $rdValue = $text;
+        $rdValue =~ tr/,/./;                  # komma gegen punkt tauschen
+        $rdValue =~ m/([-,\+]?\d+\.?\d*)/;    # zahl extrahieren
+        $rdValue             = $1;
+        $rdName              = $tag;
+        $rdName              = "Global.Radiation" if ( $tag eq "Globalstrahlung" );
+        $rdName              = "UV.Index" if ( $tag eq "UV-Index" );
+        $rdName              = "sunshine.duration" if ( $tag eq "rel. Sonnenscheindauer" );
+        $hashValues{$rdName} = $rdValue;
+        $tag                 = "";
+        KOSTALPIKO_Log $hash, 5, "tag:$rdName value:$rdValue";
       }
-   }
-   my $upd = 1;
+    }
+  }
+  my $upd = 1;
 
-   # hash sortieren und ausgeben, immer updaten, damit kurve angezeigt wird
-   readingsBeginUpdate($hash);
-   foreach my $xxx ( sort keys %hashValues )    # alle schluessel abfragen
-   {
-      readingsBulkUpdate( $hash, $xxx, $hashValues{$xxx} );    # alten zustand merken
-      KOSTALPIKO_Log $hash, 5, "$xxx: $hashValues{ $xxx } upd:$upd";
-   }
-   readingsEndUpdate( $hash, 1 );
-   
-   KOSTALPIKO_Log $hash, 3, "--- done ---";
+  # hash sortieren und ausgeben, immer updaten, damit kurve angezeigt wird
+  readingsBeginUpdate($hash);
+  foreach my $xxx ( sort keys %hashValues )    # alle schluessel abfragen
+  {
+    readingsBulkUpdate( $hash, $xxx, $hashValues{$xxx} );    # alten zustand merken
+    KOSTALPIKO_Log $hash, 5, "$xxx: $hashValues{ $xxx } upd:$upd";
+  }
+  readingsEndUpdate( $hash, 1 );
+
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
 }
 #####################################
 sub KOSTALPIKO_GrAborted($)
 {
-   my ($hash) = @_;
-   delete( $hash->{helper}{RUNNING_GR} );
-   KOSTALPIKO_Log $hash, 3, "--- done ---";  
+  my ($hash) = @_;
+  delete( $hash->{helper}{RUNNING_GR} );
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
 }
 
 #####################################
 sub KOSTALPIKO_GrTimer($)
 {
-   my ($timerpara) = @_;
-  # my ( $name, $func ) = split( /\./, $timerpara );
-   my $index = rindex($timerpara,".");  # rechter punkt
-   my $func  = substr $timerpara,$index+1,length($timerpara); # function extrahieren
-   my $name =  substr $timerpara,0,$index; # name extrahieren     
-   my $hash      = $defs{$name};
-   
-   return unless (defined($hash->{NAME}));
-   KOSTALPIKO_Log $hash, 3, "--- started ---";
-  
-   $hash->{helper}{TimerGRInterval} = AttrVal( $name, "GR.Interval",  3600 );
-      
-   KOSTALPIKO_GrStart($hash);
-   
-    # setup timer
-   RemoveInternalTimer( $hash->{helper}{TimerGR} );
+  my ($timerpara) = @_;
 
-   InternalTimer(
-     gettimeofday() + $hash->{helper}{TimerGRInterval},
-    "KOSTALPIKO_GrTimer",
-     $hash->{helper}{TimerGR},
-     0 );  
-     
-   KOSTALPIKO_Log $hash, 3, "--- done ---";  
+  # my ( $name, $func ) = split( /\./, $timerpara );
+  my $index = rindex( $timerpara, "." );    # rechter punkt
+  my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
+  my $name = substr $timerpara, 0, $index;                         # name extrahieren
+  my $hash = $defs{$name};
+
+  return unless ( defined( $hash->{NAME} ) );
+  KOSTALPIKO_Log $hash, 3, "--- started ---";
+
+  $hash->{helper}{TimerGRInterval} = AttrVal( $name, "GR.Interval", 3600 );
+
+  KOSTALPIKO_GrStart($hash);
+
+  # setup timer
+  RemoveInternalTimer( $hash->{helper}{TimerGR} );
+
+  InternalTimer( gettimeofday() + $hash->{helper}{TimerGRInterval}, "KOSTALPIKO_GrTimer", $hash->{helper}{TimerGR}, 0 );
+
+  KOSTALPIKO_Log $hash, 3, "--- done ---";
 }
 
-##################################### 
+#####################################
 1;
 
 =pod
@@ -936,7 +1060,7 @@ sub KOSTALPIKO_GrTimer($)
     <br/>
     
     <b>Parameters:</b><br/>
-    <ul>    
+    <ul>
     <li><b>&lt;ip-address&gt</b> - the ip address of the inverter</li>
     <li><b>&lt;user&gt</b> - the login-user for the inverter's web page</li>
     <li><b>&lt;password&gt</b> - the login-password for the inverter's web page</li>
@@ -974,6 +1098,7 @@ sub KOSTALPIKO_GrTimer($)
 	<ul>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 		<br/>
+		<li><b>BAEnable</b> - if 1, data from ../BA.fhtml site is captured</li>
 		<li><b>GR.Interval</b> - poll interval for global radiation in seconds</li>
 		<li><b>GR.Link</b> - regionalised link the to the proplanta web page (global radiation, UV-index and sunshine duration)<br/>
 		(see Wiki for further information)
@@ -1019,8 +1144,25 @@ sub KOSTALPIKO_GrTimer($)
 
 		<li><b>UV.Index</b> - the UV Index (proplanta) </li>
 		<li><b>sunshine.duration</b> - the sunshine duration (proplanta) </li>
+	</ul>
+	
+	<br/><b>Additional Readings/Events, if BAEnable=1</b><br/><br/>
+	<ul>
+		<li><b>Battery.CycleCount</b> - count of charge cycles </li>
+		<li><b>Battery.StateOfCharge</b> - State of charge for the battery in percent </li>
+		<li><b>Battery.Voltage</b> - the voltage of the battery </li>
+		<li><b>Battery.ChargeCurrent</b> - the charge current of the battery </li>
+		<li><b>Battery.Temperature</b> - the temperature of the battery </li>
+		<li><b>Power.Solar</b> - the sum of the power produced by the solarinverter </li>
+		<li><b>Power.Battery</b> - the power drawn from the battery </li>
+		<li><b>Power.Net</b> - the power drawn from the main </li>
+		<li><b>Power.Phase1</b> - the power used on phase L1 </li>
+		<li><b>Power.Phase2</b> - the power used on phase L2 </li>
+		<li><b>Power.Phase3</b> - the power used on phase L3 </li>
 	
 	</ul>
+
+
 	<br/><br/>	
 	
   <b>Additional information</b><br/><br/>
