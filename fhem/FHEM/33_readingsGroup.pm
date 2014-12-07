@@ -30,7 +30,7 @@ use vars qw(%FW_hiddenroom);
 use vars qw(%FW_visibleDeviceHash);
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
-my @mapping_attrs = qw( commands mapping nameIcon cellStyle nameStyle valueColumn valueColumns valueFormat valueIcon valueStyle );
+my @mapping_attrs = qw( commands mapping nameIcon cellStyle nameStyle valueColumn valueColumns valueFormat valuePrefix valueSuffix valueIcon valueStyle );
 
 sub readingsGroup_Initialize($)
 {
@@ -728,6 +728,20 @@ readingsGroup_2html($)
         }
         ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd) if( !$webCmdFn );
 
+        if( $hash->{helper}{valuePrefix} ) {
+          if( my $value_prefix = lookup2($hash->{helper}{valuePrefix},$name,$n,$v) ) {
+            $v = $value_prefix . $v;
+            $devStateIcon = $value_prefix . $devStateIcon if( $devStateIcon );
+          }
+        }
+
+        if( $hash->{helper}{valueSuffix} ) {
+          if( my $value_suffix = lookup2($hash->{helper}{valueSuffix},$name,$n,$v) ) {
+            $v .= $value_suffix;
+            $devStateIcon .= $value_suffix if( $devStateIcon );
+          }
+        }
+
         if( $first || $multi == 1 ) {
           $ret .= sprintf("<tr $row_style class=\"%s\">", ($row&1)?"odd":"even");
           $row++;
@@ -956,6 +970,18 @@ readingsGroup_Notify($$)
             if( $devStateIcon ) {
               (undef,$devStateIcon) = readingsGroup_makeLink(undef,$devStateIcon,$cmd);
 
+              if( $hash->{helper}{valuePrefix} ) {
+                if( my $value_prefix = lookup2($hash->{helper}{valuePrefix},$n,$reading,$value) ) {
+                  $devStateIcon = $value_prefix . $devStateIcon if( $devStateIcon );
+                }
+              }
+
+              if( $hash->{helper}{valueSuffix} ) {
+                if( my $value_suffix = lookup2($hash->{helper}{valueSuffix},$n,$reading,$value) ) {
+                  $devStateIcon .= $value_suffix if( $devStateIcon );
+                }
+              }
+
               DoTrigger( $name, "$n.$reading: $devStateIcon" );
               next;
             }
@@ -967,6 +993,20 @@ readingsGroup_Notify($$)
           }
 
           ($value,undef) = readingsGroup_makeLink($value,undef,$cmd);
+
+          if( $hash->{helper}{valuePrefix} ) {
+            if( my $value_prefix = lookup2($hash->{helper}{valuePrefix},$n,$reading,$value) ) {
+              $value = $value_prefix . $value;
+              $devStateIcon = $value_prefix . $devStateIcon if( $devStateIcon );
+            }
+          }
+
+          if( $hash->{helper}{valueSuffix} ) {
+            if( my $value_suffix = lookup2($hash->{helper}{valueSuffix},$n,$reading,$value) ) {
+              $value .= $value_suffix;
+              $devStateIcon .= $value_suffix if( $devStateIcon );
+            }
+          }
 
           $value = "<div $value_style>$value</div>" if( $value_style );
 
@@ -1036,7 +1076,11 @@ readingsGroup_Attr($$$;$)
       my $attrVal = $attrVal;
       if( $attrVal =~ m/^{.*}$/ ) {
         my $av = eval $attrVal;
-        $attrVal = $av if( ref($av) eq "HASH" );
+        if( $@ ) {
+          Log3 $hash->{NAME}, 3, $hash->{NAME} .": ". $@;
+        } else {  
+          $attrVal = $av if( ref($av) eq "HASH" );
+        }
       }
       $hash->{helper}{$attrName} = $attrVal;
     } else {
@@ -1215,8 +1259,14 @@ readingsGroup_Attr($$$;$)
         this reading will be skipped. Can be given as a string, a perl expression returning a hash or a perl
         expression returning a string, e.g.:<br>
           <code>attr temperatures valueFormat %.1f &deg;C</code><br>
-          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%.1f %" }</code><br>
+          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%i %" }</code><br>
           <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li>
+      <li>valuePrefix<br>
+        text to be prepended to the reading value</li>
+      <li>valueSuffix<br>
+        text to be appended after the reading value<br>
+          <code>attr temperatures valueFormat { temperature => "%.1f", humidity => "%i" }</code><br>
+          <code>attr temperatures valueSuffix { temperature => "&deg;C", humidity => " %" }</code></li>
       <li>nameIcon<br>
         Specify the icon to be used instead of the reading name. Can be a simple string or a perl expression enclosed
         in {} that returns a hash that maps reading names to the icon name. e.g.:<br>
