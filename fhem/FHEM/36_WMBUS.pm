@@ -203,9 +203,12 @@ WMBUS_Parse($$)
 			
 					return "UNDEFINED WMBUS_$addr WMBUS $msg";
 			}
+			
+      my $rname = $rhash->{NAME};
+      return "" if(IsIgnored($rname));
+			
 			WMBUS_SetRSSI($rhash, $mb, $rssi);
 
-			my $rname = $rhash->{NAME};
 			my $aeskey;
 
 			if ($aeskey = AttrVal($rname, 'AESkey', undef)) {
