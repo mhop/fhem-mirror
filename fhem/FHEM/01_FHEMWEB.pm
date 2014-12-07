@@ -122,7 +122,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
-  $hash->{NotifyFn}= "FW_SecurityCheck";
+  $hash->{NotifyFn}= ($init_done ? "FW_Notify" : "FW_SecurityCheck");
   $hash->{ActivateInformFn} = "FW_ActivateInform";
   no warnings 'qw';
   my @attrList = qw(
@@ -190,6 +190,12 @@ FHEMWEB_Initialize($)
   $data{webCmdFn}{noArg}      = "FW_noArgFn";
   $data{webCmdFn}{textField}  = "FW_textFieldFn";
   $data{webCmdFn}{"~dropdown"}= "FW_dropdownFn"; # Should be the last
+
+  if($init_done) {      # reload workaround
+    foreach my $pe ("fhemSVG", "openautomation", "default") {
+      FW_readIcons($pe);
+    }
+  }
 }
 
 #####################################
