@@ -451,9 +451,12 @@ sub statistics_DoStatistics($$$)
       }
    }
 
-   if ( exists ($dev->{READINGS}{state}) && $dev->{READINGS}{state}{VAL} ne "defined" ) { 
-      statistics_doStatisticDuration $hash, $dev, "state", $periodSwitch;
-      $statisticDone = 1;
+   if ($statisticDone != 1)
+   {
+      if ( exists ($dev->{READINGS}{state}) && $dev->{READINGS}{state}{VAL} ne "defined" ) { 
+         statistics_doStatisticDuration $hash, $dev, "state", $periodSwitch;
+         $statisticDone = 1;
+      }
    }
    
    if ($periodSwitch >0) {readingsEndUpdate($dev,1);}
