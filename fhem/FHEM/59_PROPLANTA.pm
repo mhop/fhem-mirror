@@ -848,7 +848,7 @@ PROPLANTA_Html($)
       <br>
       <li><code>forecastDays &lt;4-14&gt;</code>
          <br>
-         Anzahl Tage, für die die Vorhersage ausgelesen werden soll. Standard ist 14 Tage (inkl. heute).
+         Anzahl Tage, f&uuml;r die die Vorhersage ausgelesen werden soll. Standard ist 14 Tage (inkl. heute).
       </li><br>
       <li><code>INTERVAL &lt;Abfrageinterval&gt;</code>
          <br>
