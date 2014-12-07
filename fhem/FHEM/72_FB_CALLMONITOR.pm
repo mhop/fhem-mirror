@@ -88,7 +88,6 @@ FB_CALLMONITOR_Initialize($)
     $hash->{DefFn}   = "FB_CALLMONITOR_Define";
     $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
     $hash->{AttrFn}  = "FB_CALLMONITOR_Attr";
-
     $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:multiple-strict,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at reverse-search-cache:0,1 reverse-search-phonebook-file ".
                         $readingFnAttributes;
 }
@@ -399,7 +398,7 @@ FB_CALLMONITOR_reverseSearch($$)
     {
         if(defined($hash->{helper}{PHONEBOOK}{$number}))
         {
-            Log3 $name, 4, "FB_CALLMONITOR $name using internal phonebook for reverse search of $number";
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
             return $hash->{helper}{PHONEBOOK}{$number};
         }
     }
@@ -409,7 +408,7 @@ FB_CALLMONITOR_reverseSearch($$)
     {
         if(defined($hash->{helper}{CACHE}{$number}))
         {
-            Log3 $name, 4, "FB_CALLMONITOR $name using cache for reverse search of $number";
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - using cache for reverse search of $number";
             if($hash->{helper}{CACHE}{$number} ne "timeout")
             {
                 return $hash->{helper}{CACHE}{$number};
@@ -420,7 +419,7 @@ FB_CALLMONITOR_reverseSearch($$)
     # Ask klicktel.de
     if((grep { /^(all|klicktel\.de)$/ } @attr_list))
     { 
-        Log3 $name, 4, "FB_CALLMONITOR: $name using klicktel.de for reverse search of $number";
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
 
         $result = GetFileFromURL("http://www.klicktel.de/inverssuche/index/search?_dvform_posted=1&phoneNumber=".$number, 5, undef, 1);
         if(not defined($result))
@@ -444,7 +443,7 @@ FB_CALLMONITOR_reverseSearch($$)
             }
             elsif(not $result =~ /Leider wurde zu dieser Suche kein Eintrag gefunden/)
             {
-                Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from klicktel.de. Please contact the FHEM community.";
+                Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from klicktel.de. Please contact the FHEM community.";
             }
         }
     }
@@ -452,7 +451,7 @@ FB_CALLMONITOR_reverseSearch($$)
     # Ask dasoertliche.de
     if(grep { /^(all|dasoertliche\.de)$/ } @attr_list)
     {
-        Log3 $name, 4, "FB_CALLMONITOR: $name using dasoertliche.de for reverse search of $number";
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasoertliche.de for reverse search of $number";
 
         $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
         if(not defined($result))
@@ -477,7 +476,7 @@ FB_CALLMONITOR_reverseSearch($$)
             }
             elsif(not $result =~ /wir konnten keine Treffer finden/)
             {
-                Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
+                Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
             }
         }
     }
@@ -485,7 +484,7 @@ FB_CALLMONITOR_reverseSearch($$)
     # SWITZERLAND ONLY!!! Ask search.ch
     if(grep { /^search\.ch$/ } @attr_list)
     {
-        Log3 $name, 4, "FB_CALLMONITOR: $name using search.ch for reverse search of $number";
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - using search.ch for reverse search of $number";
 
         $result = GetFileFromURL("http://tel.search.ch/?tel=".$number, 5, undef, 1);
         if(not defined($result))
@@ -510,7 +509,7 @@ FB_CALLMONITOR_reverseSearch($$)
             }
             elsif(not $result =~ /Keine Eintr.ge gefunden/)
             {
-                Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from search.ch. Please contact the FHEM community.";
+                Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from search.ch. Please contact the FHEM community.";
             }
         }
     }
@@ -518,7 +517,7 @@ FB_CALLMONITOR_reverseSearch($$)
     # Austria ONLY!!! Ask dasschnelle.at
     if(grep { /^dasschnelle\.at$/ } @attr_list)
     {
-        Log3 $name, 4, "FB_CALLMONITOR: $name using dasschnelle.at for reverse search of $number";
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasschnelle.at for reverse search of $number";
 
         $result = GetFileFromURL("http://www.dasschnelle.at/result/index/results?PerPage=5&pageNum=1&what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
         if(not defined($result))
@@ -549,7 +548,7 @@ FB_CALLMONITOR_reverseSearch($$)
             }
             elsif(not $result =~ /Es wurden keine passenden Eintr.ge gefunden/)
             {
-                Log3 $name, 3, "FB_CALLMONITOR: the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
+                Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
             }
         }
     }
@@ -601,7 +600,7 @@ sub FB_CALLMONITOR_writeToCache($$$)
   
     if($file ne "")
     {
-        Log3 $name, 4, "FB_CALLMONITOR: $name opening cache file $file for writing $number ($txt)";
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - opening cache file $file for writing $number ($txt)";
         if(open(CACHEFILE, ">>$file"))
         {
             print CACHEFILE "$number|$txt\n";
@@ -609,7 +608,7 @@ sub FB_CALLMONITOR_writeToCache($$$)
         }
         else
         {
-            Log3 $name, 2, "FB_CALLMONITOR: $name could not open cache file for writing";
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - could not open cache file for writing";
         }
     }
 }
@@ -635,14 +634,14 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($;$$)
 
     return if($overwrite == 0 and exists($hash->{helper}{PHONEBOOK}));
 
-
     delete $hash->{helper}{PHONEBOOK} if(exists($hash->{helper}{PHONEBOOK}));
+    
     if(open(PHONEBOOK, "<$phonebook_file"))
     {
         $phonebook = join('', <PHONEBOOK>);
         if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/)
         {
-            Log3 $name, 2, "FB_CALLMONITOR: $name found FritzBox phonebook $phonebook_file";
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - found FritzBox phonebook $phonebook_file";
 
             while($phonebook =~ m/<contact[^>]*>(.+?)<\/contact>/gs)
             {
@@ -651,7 +650,7 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($;$$)
                 if($contact =~ m/<realName>(.+?)<\/realName>/)
                 {
                     $contact_name = $1; 
-                    Log3 $name, 4, "FB_CALLMONITOR: $name found $contact_name";
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - found $contact_name";
 
                     while($contact =~ m/<number[^>]*?type="([^<>"]+?)"[^<>]*?>([^<>"]+?)<\/number>/gs)
                     {
@@ -674,23 +673,28 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($;$$)
                             undef $number;
                         }
                     }
+                    
                     undef $contact_name;
                 }
             }
+            
             undef $phonebook;
             $count_contacts = scalar keys %{$hash->{helper}{PHONEBOOK}};
-            Log3 $name, 2, "FB_CALLMONITOR: $name read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from FritzBox phonebook";
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from FritzBox phonebook";
         }
         else
         {
-            Log3 $name, 2, "FB_CALLMONITOR: The file $phonebook_file is not a FritzBox phonebook";
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - the file $phonebook_file is not a FritzBox phonebook";
             return "The file $phonebook_file is not a FritzBox phonebook";
         }
     }
     else
     {
-       Log3 $name, 2, "FB_CALLMONITOR: $name could not read FritzBox phonebook file: $phonebook_file";
-       return "Could not read FritzBox phonebook file: $phonebook_file";
+        unless($phonebook_file eq "/var/flash/phonebook" and not -e "/usr/bin/ctlmgr_ctl")
+        {
+           Log3 $name, 2, "FB_CALLMONITOR ($name) - could not read FritzBox phonebook file: $phonebook_file";
+           return "Could not read FritzBox phonebook file: $phonebook_file";
+        }
     }
 }
 
@@ -712,7 +716,7 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
     { 
         delete($hash->{helper}{CACHE}) if(defined($hash->{helper}{CACHE}));
   
-        Log3 $hash->{NAME}, 3, "FB_CALLMONITOR: loading cache file $file";
+        Log3 $hash->{NAME}, 3, "FB_CALLMONITOR ($name) - loading cache file $file";
         if(open(CACHEFILE, "$file"))
         {
             @cachefile = <CACHEFILE>;
@@ -733,11 +737,11 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
             }
 
             $count_contacts = scalar keys %{$hash->{helper}{CACHE}};
-            Log3 $name, 2, "FB_CALLMONITOR: $name read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from Cache"; 
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from Cache"; 
         }
         else
         {
-            Log3 $name, 3, "FB_CALLMONITOR: could not open cache file";
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - could not open cache file";
         }
     }
 }
@@ -960,5 +964,4 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
 
 
 =end html_DE
-
 =cut
