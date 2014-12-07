@@ -121,8 +121,8 @@ FRITZBOX_Log($$$)
    Log3 $hash, $loglevel, "FRITZBOX $instName: $sub.$xline " . $text;
 }
 
-sub ##########################################
-FRITZBOX_Initialize($)
+##########################################
+sub FRITZBOX_Initialize($)
 {
   my ($hash) = @_;
 
@@ -143,8 +143,8 @@ FRITZBOX_Initialize($)
 } # end FRITZBOX_Initialize
 
 
-sub ##########################################
-FRITZBOX_Define($$)
+##########################################
+sub FRITZBOX_Define($$)
 {
    my ($hash, $def) = @_;
    my @args = split("[ \t][ \t]*", $def);
@@ -159,11 +159,9 @@ FRITZBOX_Define($$)
    
    unless ( -X "/usr/bin/ctlmgr_ctl" )
    {
-      $msg = "Error - FHEM needs to run on a Fritz!Box to use the FRITZBOX module";
       $hash->{REMOTE} = 1;
       $hash->{HOST} = "fritz.box"; 
-     # FRITZBOX_Log $hash, 1, $msg;
-      # return $msg;
+      FRITZBOX_Log $hash, 4, "FRITZBOX runs in remote mode";
    }
    elsif ( $< != 0 ) 
    {
@@ -176,6 +174,7 @@ FRITZBOX_Define($$)
    else
    {
       $hash->{REMOTE} = 0;
+      FRITZBOX_Log $hash, 4, "FRITZBOX runs in local mode";
    }
    
    $hash->{STATE}       = "Initializing";
@@ -1103,6 +1102,7 @@ sub FRITZBOX_Telnet_Open($)
    if (!$telnet) {
       $msg = "Error while opening telnet connection: ".$telnet->errmsg;
       FRITZBOX_Log $hash, 2, $msg;
+      $telnet = undef;
       return $msg;
    }
 
@@ -1113,6 +1113,8 @@ sub FRITZBOX_Telnet_Open($)
       {
          $msg = "Error while waiting for user prompt: ".$telnet->errmsg;
          FRITZBOX_Log $hash, 2, $msg;
+         $telnet->close;
+         $telnet = undef;
          return $msg;
       }
       FRITZBOX_Log $hash, 5, "Telnet: Entering user";
@@ -1124,6 +1126,8 @@ sub FRITZBOX_Telnet_Open($)
    {
       $msg = "Error while waiting for password prompt: ".$telnet->errmsg;
       FRITZBOX_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
       return $msg;
    }
    FRITZBOX_Log $hash, 5, "Telnet: Entering password";
@@ -1134,6 +1138,8 @@ sub FRITZBOX_Telnet_Open($)
    {
       $msg = "Error while waiting for command prompt: ".$telnet->errmsg;
       FRITZBOX_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
       return $msg;
    }
 
