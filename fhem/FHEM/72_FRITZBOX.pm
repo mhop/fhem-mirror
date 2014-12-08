@@ -178,11 +178,11 @@ sub FRITZBOX_Define($$)
       FRITZBOX_Log $hash, 4, "FRITZBOX runs in local mode";
    }
    
-   $hash->{STATE}       = "Initializing";
+   $hash->{STATE}              = "Initializing";
    $hash->{fhem}{modulVersion} = '$Date$';
-   $hash->{INTERVAL} = 300; 
-   $hash->{fhem}{lastHour} = 0;
-   $hash->{fhem}{LOCAL} = 0;
+   $hash->{INTERVAL}           = 300; 
+   $hash->{fhem}{lastHour}     = 0;
+   $hash->{fhem}{LOCAL}        = 0;
       
    RemoveInternalTimer($hash);
  # Get first data after 6 seconds
@@ -433,13 +433,15 @@ FRITZBOX_Readout_Run($)
 
    my $returnStr = "$name|";
  
-   $result = FRITZBOX_Telnet_Open( $hash );
-   if ($result)
+   if ($hash->{REMOTE})
    {
-      $returnStr .= "Error|".$result;
-      return $returnStr;
+      $result = FRITZBOX_Telnet_Open( $hash );
+      if ($result)
+      {
+         $returnStr .= "Error|".$result;
+         return $returnStr;
+      }
    }
-   
 
    if ($slowRun == 1)
    {
@@ -636,7 +638,8 @@ FRITZBOX_Readout_Run($)
    $returnStr .= "|readoutTime|";
    $returnStr .= sprintf "%.2f", time()-$startTime;
 
-   FRITZBOX_Telnet_Close ( $hash );
+   FRITZBOX_Telnet_Close ( $hash )
+      if $hash->{REMOTE};
    
    return $returnStr
    
@@ -688,7 +691,7 @@ FRITZBOX_Readout_Done($)
       readingsBulkUpdate( $hash, "lastReadout", $msg );
       FRITZBOX_Log $hash, 4, $msg;
       my $newState = "WLAN: ";
-      if ($values{box_wlan_2GHz} eq "on" || $values{box_wlan_5GHz} eq "on")
+      if ($values{"box_wlan_2.4GHz"} eq "on" || $values{box_wlan_5GHz} eq "on")
       {
          $newState .= "on";
       }
@@ -912,9 +915,11 @@ FRITZBOX_Ring_Run($)
       $msg =~ s/^msg:\s*//;
       $msg = substr($msg, 0, 30);
    }
-
-
-   FRITZBOX_Telnet_Open($hash);
+   if ($hash->{REMOTE})
+   {
+      $result = FRITZBOX_Telnet_Open( $hash );
+      return "$name|0|$result" if $result;
+   }
 
 #Preparing 1st command array
    @cmdArray = ();
@@ -958,7 +963,8 @@ FRITZBOX_Ring_Run($)
    }
    FRITZBOX_Exec( $hash, \@cmdArray );
 
-   FRITZBOX_Telnet_Close( $hash );
+   FRITZBOX_Telnet_Close( $hash )
+      if ($hash->{REMOTE});
 
    return $name."|1|Ringing done";
 }
@@ -1529,7 +1535,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
       <li><b>box_model</b> - Fritz!Box model</li>
-      <li><b>box_wlan_2GHz</b> - Current state of the 2,4 GHz WLAN</li>
+      <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
       <li><b>dect</b><i>1</i> - Name of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
