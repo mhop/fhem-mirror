@@ -558,15 +558,14 @@ sub Heating_Control_Device_Schalten($$$$) {
      Log3 $hash, 5, $mod."no switch of device in PERLTIMEUPDATEMODE at 00:10 o'clock";
      return;
   }
-
+  
+  my $setAllTempMode = defined ($hash->{setAllTempMode});
   if (defined $hash->{helper}{COMMAND} || ($nowSwitch gt "" && $aktParam ne $newParam )) {
-     if (!$setModifier && $secondsSinceSwitch < -60) {
+     if (!$setAllTempMode && !$setModifier && $secondsSinceSwitch < -60) {
         Log3 $hash, 5, $mod."no switch in the yesterdays because of the devices type($hash->{DEVICE} is not a heating).";
      } else {
         if ($command && !$disabled) {
           $newParam =~ s/:/ /g;
-         #$command  =~ s/@/$hash->{DEVICE}/g;    # übernimmt EvalSpecials()
-         #$command  =~ s/%/$newParam/g;          #
 
           $command  = SemicolonEscape($command);
           my %specials= (
@@ -650,7 +649,9 @@ sub Heating_Control_SetAllTemps() {            # {Heating_Control_SetAllTemps()}
      }
 
      my $myHash->{HASH}=$hash;
+     $hash->{setAllTempMode} = 1;
      Heating_Control_Update($myHash);
+     delete $hash->{setAllTempMode};
      Log3 undef, 3, "Heating_Control_Update() for $hash->{NAME} done!";
   }
   Log3 undef,  3, "Heating_Control_SetAllTemps() done!";

@@ -114,7 +114,9 @@ sub WeekdayTimer_SetAllParms() {  # {WeekdayTimer_SetAllParms()}
         }
      }
      my $myHash->{HASH}=$hash;
+     $hash->{setAllTempMode} = 1;
      WeekdayTimer_Update($myHash);
+     delete $hash->{setAllTempMode};     
      Log3 undef, 3, "WeekdayTimer_Update() for $hash->{NAME} done!";
   }
   Log3 undef,  3, "WeekdayTimer_SetAllParms() done!";
