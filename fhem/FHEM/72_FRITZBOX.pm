@@ -135,6 +135,7 @@ sub FRITZBOX_Initialize($)
   $hash->{AttrList} = "disable:0,1 "
                 ."defaultCallerName "
                 ."defaultUploadDir "
+                ."fritzBoxIP "
                 ."INTERVAL "
                 ."ringWithIntern:0,1,2 "
                 ."telnetUser "
@@ -156,11 +157,11 @@ sub FRITZBOX_Define($$)
    $hash->{NAME} = $name;
 
    my $msg;
-   
+ 
+#   unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
    unless ( -X "/usr/bin/ctlmgr_ctl" )
    {
       $hash->{REMOTE} = 1;
-      $hash->{HOST} = "fritz.box"; 
       FRITZBOX_Log $hash, 4, "FRITZBOX runs in remote mode";
    }
    elsif ( $< != 0 ) 
@@ -219,6 +220,14 @@ FRITZBOX_Attr($@)
 
    if ($cmd eq "set")
    {
+      if ($aName eq "fritzBoxIP" && $aVal ne "")
+      {
+         if ($hash->{REMOTE} == 0)
+         {
+            $hash->{REMOTE} = 1;
+            FRITZBOX_Log $hash, 3, "Changed to remote access because attribute 'fritzBoxIP' is defined.";
+         }
+      }
    }
 
    return undef;
@@ -445,7 +454,7 @@ FRITZBOX_Readout_Run($)
       push @readoutArray, ["", "ctlmgr_ctl r tam settings/TAM/count" ];
 
       # Box model and firmware
-      push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT', "nounderline" ];
+      push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
       push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver", "fwupdate" ];
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
 
@@ -573,7 +582,7 @@ FRITZBOX_Readout_Run($)
          for (0..$tamCount-1)
          {
             $rName = "tam".($_+1);
-            if ( $resultArray->[$_] == 1 || defined $hash->{READINGS}{$rName} )
+            if ($resultArray->[$_] == 1 || defined $hash->{READINGS}{$rName} )
             {
                push @readoutArray, [ $rName, "ctlmgr_ctl r tam settings/TAM". $_ ."/Name" ];
                push @readoutArray, [ $rName."_state", "ctlmgr_ctl r tam settings/TAM".$_."/Active", "onoff" ];
@@ -601,7 +610,7 @@ FRITZBOX_Readout_Run($)
    }
    
 # WLAN
-   push @readoutArray, [ "box_wlan_2GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
+   push @readoutArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
 # 2nd WLAN
    push @readoutArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
 # Gäste WLAN
@@ -702,8 +711,8 @@ FRITZBOX_Readout_Aborted($)
   FRITZBOX_Log $hash, 1, "Timeout when reading Fritz!Box data.";
 }
 
-sub ##########################################
-FRITZBOX_Readout_Query($$$)
+##########################################
+sub FRITZBOX_Readout_Query($$$)
 {
    my ($hash, $readoutArray, $readoutReadings) = @_;
    my @cmdArray;
@@ -1079,7 +1088,9 @@ sub FRITZBOX_Telnet_Open($)
 {
    my ($hash) = @_;
    my $name = $hash->{NAME};
-   my $host = $hash->{HOST};
+
+   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+
    my $pwdFile = "fb_pwd.txt";
    my $pwd;
    my $msg;
@@ -1165,8 +1176,8 @@ sub FRITZBOX_Telnet_Close($)
 } # end FRITZBOX_Telnet_Close
    
 # Executed the command on the FritzBox Shell
-sub ############################################
-FRITZBOX_Exec($$)
+############################################
+sub FRITZBOX_Exec($$)
 {
    my ($hash, $cmd) = @_;
    my $openedTelnet = 0;
@@ -1210,9 +1221,9 @@ FRITZBOX_Exec_Remote($$)
    }
    elsif (ref \$cmd eq "REF")
    {
+      my @resultArray = ();
       if ( int (@{$cmd}) > 0 )
       {
-         my @resultArray;
          FRITZBOX_Log $hash, 4, "Execute " . int ( @{$cmd} ) . " command(s)";
 
          # my $cmdStr = join "\n", @{$cmd};
@@ -1256,16 +1267,17 @@ FRITZBOX_Exec_Remote($$)
          }
          @{$cmd} = ();
          FRITZBOX_Log $hash, 4, "Received ".int(@resultArray)." answer(s)";
-         return \@resultArray;
       }
       else
       {
          FRITZBOX_Log $hash, 4, "No shell command to execute.";
       }
+      return \@resultArray;
    }
    else
    {
       FRITZBOX_Log $hash, 1, "Error: wrong perl parameter";
+      return undef;
    }
 }
 
@@ -1486,6 +1498,10 @@ sub FRITZBOX_fritztris($)
          <br>
          It needs to be the name of the path on the Fritz!Box. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
       </li><br>
+      <li><code>fritzBoxIP</code>
+         <br>
+         IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
+      </li><br>
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
          User name that is used for telnet access. By default no user name is required to login.
@@ -1537,4 +1553,4 @@ sub FRITZBOX_fritztris($)
 
 =end html
 
-=cut
+=cut-
