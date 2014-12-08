@@ -471,9 +471,11 @@ FRAMEBUFFER_returnPNG($) {
   <ul>bgcolor &lt;color&gt;<br>Sets the background color. &lt;color&gt; is 
     a 6-digit hex number, every 2 digits  determining the red, green and blue 
     color components as in HTML color codes (e.g.<code>FF0000</code> for red, <code>C0C0C0</code> for light gray).
+    <br><br>
   </ul>
   <ul>enableCmd &lt;fhem cmd&gt;<br>
-    if set this command is executed layout with a timeout is displayed. This can e.g. be used to enable a backlight.
+    if set this command is executed before a layout with a timeout is displayed. This can e.g. be used to enable a backlight.
+    <br><br>
   </ul>
   <ul>disableCmd &lt;fhem cmd&gt;<br>
     if set this command is executed after a layout with a timeout has expired. This can e.g. be used to disable a backlight.
