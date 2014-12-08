@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new module 52_I2C_MCP342x.pm added (klausw)
   - feature: SYSMON: read cpu temp on FritzBox
   - feature: ios7smallscreenstyle.css: table width based on screen width, new
                                        header, links colored in detail view
