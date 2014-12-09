@@ -936,8 +936,13 @@ ZWave_Parse($$@)
 
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash && $hash->{WakeUp} && @{$hash->{WakeUp}}) { # Always the base hash
-      IOWrite($hash, "00", shift @{$hash->{WakeUp}});
+      foreach my $wuCmd (@{$hash->{WakeUp}}) {
+        IOWrite($hash, "00", $wuCmd);
+        Log3 $hash, 4, "Sending stored command: $wuCmd";
+      }
+      @{$hash->{WakeUp}}=();
     }
+ 
     if(!$ret) {
       readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
       return $hash->{NAME};
@@ -945,10 +950,15 @@ ZWave_Parse($$@)
     return $ret;
 
   } elsif($cmd eq "ZW_SEND_DATA") {
-    if($id ne "00") {
-      Log3 $ioName, 2, "$ioName ERROR: SEND_DATA returned $id";
-    } else {
+    if ($id eq "00") {
       ZWave_HandleSendStack($iodev);
+      Log3 $ioName, 4,
+        "$ioName OK: SEND_DATA returned $id - TRANSMIT_COMPLETE_OK";
+    } else {
+      my %err = { "01" => "NO_ACK",   "02" => "FAIL",
+                  "03" => "NOT_IDLE", "04" => "NOROUTE" };
+      my $msg = $err{$id} ? "TRANSMIT_COMPLETE_".$err{$id} : "UNKOWN_ERROR";
+      Log3 $ioName, 2, "$ioName ERROR: SEND_DATA returned $id - $msg";
     }
     return "";
 
@@ -1038,9 +1048,16 @@ ZWave_Parse($$@)
   }
 
   my $wu = $baseHash->{WakeUp};
-  if($wu && @{$wu}) {
-    shift @{$wu} if($wu->[0] eq "");
-    IOWrite($hash, "00", shift @{$wu}) if(@{$wu});
+  if($arg =~ m/028407/ && $wu && @{$wu}) {
+    foreach my $wuCmd (@{$wu}) {
+      IOWrite($hash, "00", $wuCmd);
+      Log3 $hash, 4, "Sending stored command: $wuCmd";
+    }
+    @{$baseHash->{WakeUp}}=();
+    #send a final wakeupNoMoreInformation
+    my $nodeId = $baseHash->{id};
+    IOWrite($hash, "00", "13${nodeId}02840805");
+    Log3 $hash, 4, "Sending wakeupNoMoreInformation to node: $nodeId";
   }
   $baseHash->{lastMsgTimestamp} = time();
 
