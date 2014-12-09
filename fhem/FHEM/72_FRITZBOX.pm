@@ -137,6 +137,7 @@ sub FRITZBOX_Initialize($)
                 ."defaultUploadDir "
                 ."fritzBoxIP "
                 ."INTERVAL "
+                ."pwdFile "
                 ."ringWithIntern:0,1,2 "
                 ."telnetUser "
                 .$readingFnAttributes;
@@ -433,14 +434,10 @@ FRITZBOX_Readout_Run($)
 
    my $returnStr = "$name|";
  
-   if ($hash->{REMOTE})
+   if ($result = FRITZBOX_Open_Connection( $hash ) )
    {
-      $result = FRITZBOX_Telnet_Open( $hash );
-      if ($result)
-      {
-         $returnStr .= "Error|".$result;
-         return $returnStr;
-      }
+      $returnStr .= "Error|".$result;
+      return $returnStr;
    }
 
    if ($slowRun == 1)
@@ -638,8 +635,7 @@ FRITZBOX_Readout_Run($)
    $returnStr .= "|readoutTime|";
    $returnStr .= sprintf "%.2f", time()-$startTime;
 
-   FRITZBOX_Telnet_Close ( $hash )
-      if $hash->{REMOTE};
+   FRITZBOX_Close_Connection ( $hash );
    
    return $returnStr
    
@@ -915,11 +911,10 @@ FRITZBOX_Ring_Run($)
       $msg =~ s/^msg:\s*//;
       $msg = substr($msg, 0, 30);
    }
-   if ($hash->{REMOTE})
-   {
-      $result = FRITZBOX_Telnet_Open( $hash );
-      return "$name|0|$result" if $result;
-   }
+
+   $result = FRITZBOX_Open_Connection( $hash );
+   return "$name|0|$result" 
+      if $result;
 
 #Preparing 1st command array
    @cmdArray = ();
@@ -963,8 +958,7 @@ FRITZBOX_Ring_Run($)
    }
    FRITZBOX_Exec( $hash, \@cmdArray );
 
-   FRITZBOX_Telnet_Close( $hash )
-      if ($hash->{REMOTE});
+   FRITZBOX_Close_Connection( $hash );
 
    return $name."|1|Ringing done";
 }
@@ -1090,16 +1084,21 @@ FRITZBOX_ConvertRingTone ($@)
 
 # Opens a Telnet Connection to an external FritzBox
 ############################################
-sub FRITZBOX_Telnet_Open($)
+sub FRITZBOX_Open_Connection($)
 {
    my ($hash) = @_;
    my $name = $hash->{NAME};
 
+   return undef 
+      unless $hash->{REMOTE} == 1;
+   
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
 
-   my $pwdFile = "fb_pwd.txt";
+   my $pwdFile = AttrVal( $name, "pwdFile", "fb_pwd.txt");
    my $pwd;
    my $msg;
+   my $before;
+   my $match;
    
    FRITZBOX_Log $hash, 5, "Open password file '$pwdFile' to extract password";
    if (open(IN, "<" . $pwdFile)) {
@@ -1123,37 +1122,50 @@ sub FRITZBOX_Telnet_Open($)
       return $msg;
    }
 
-   if ( $user ne "" )
+   FRITZBOX_Log $hash, 5, "Wait for user or password prompt.";
+   unless ( ($before,$match) = $telnet->waitfor('/(user|password): $/i') )
    {
-      FRITZBOX_Log $hash, 5, "Telnet: Wait for user prompt";
-      unless ($telnet->waitfor( '/user: $/i' ))
-      {
-         $msg = "Error while waiting for user prompt: ".$telnet->errmsg;
-         FRITZBOX_Log $hash, 2, $msg;
-         $telnet->close;
-         $telnet = undef;
-         return $msg;
-      }
-      FRITZBOX_Log $hash, 5, "Telnet: Entering user";
-      $telnet->print( $user );
-   }
-   
-   FRITZBOX_Log $hash, 5, "Telnet: Wait for password prompt";
-   unless ($telnet->waitfor( '/password: $/i' ))
-   {
-      $msg = "Error while waiting for password prompt: ".$telnet->errmsg;
+      $msg = "Telnet error while waiting for user or password prompt: ".$telnet->errmsg;
       FRITZBOX_Log $hash, 2, $msg;
       $telnet->close;
       $telnet = undef;
       return $msg;
    }
-   FRITZBOX_Log $hash, 5, "Telnet: Entering password";
+   if ( $match eq "user: " && $user eq "")
+   {
+      $msg = "Telnet login requires user name but attribute 'telnetUser' not defined";
+      FRITZBOX_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
+      return $msg;
+   }
+   elsif ( $match eq "user: ")
+   {
+      FRITZBOX_Log $hash, 5, "Entering user name";
+      $telnet->print( $user );
+
+      FRITZBOX_Log $hash, 5, "Wait for password prompt";
+      unless ($telnet->waitfor( '/password: $/i' ))
+      {
+         $msg = "Telnet error while waiting for password prompt: ".$telnet->errmsg;
+         FRITZBOX_Log $hash, 2, $msg;
+         $telnet->close;
+         $telnet = undef;
+         return $msg;
+      }
+   }
+   elsif ( $match eq "password: " && $user ne "")
+   {
+      FRITZBOX_Log $hash, 3, "Attribute 'telnetUser' defined but telnet login did not prompt for user name.";
+   }
+
+   FRITZBOX_Log $hash, 5, "Entering password";
    $telnet->print( $pwd );
 
-   FRITZBOX_Log $hash, 5, "Telnet: Wait for command prompt";
+   FRITZBOX_Log $hash, 5, "Wait for command prompt";
    unless ($telnet->waitfor( '/# $/i' ))
    {
-      $msg = "Error while waiting for command prompt: ".$telnet->errmsg;
+      $msg = "Telnet error while waiting for command prompt: ".$telnet->errmsg;
       FRITZBOX_Log $hash, 2, $msg;
       $telnet->close;
       $telnet = undef;
@@ -1161,14 +1173,18 @@ sub FRITZBOX_Telnet_Open($)
    }
 
    return undef;
-} # end FRITZBOX_Telnet_Open
+} # end FRITZBOX_Open_Connection
 
    
 # Closes a Telnet Connection to an external FritzBox
 ############################################
-sub FRITZBOX_Telnet_Close($)
+sub FRITZBOX_Close_Connection($)
 {
    my ($hash) = @_;
+   
+   return undef 
+      unless $hash->{REMOTE} == 1;
+
    if (defined $telnet)
    {
       FRITZBOX_Log $hash, 4, "Close Telnet connection";
@@ -1179,7 +1195,7 @@ sub FRITZBOX_Telnet_Close($)
    {
       FRITZBOX_Log $hash, 1, "Cannot close an undefined Telnet connection";
    }
-} # end FRITZBOX_Telnet_Close
+} # end FRITZBOX_Close_Connection
    
 # Executed the command on the FritzBox Shell
 ############################################
@@ -1193,11 +1209,11 @@ sub FRITZBOX_Exec($$)
       unless (defined $telnet)
       {
          return undef
-            if (FRITZBOX_Telnet_Open($hash));
+            if (FRITZBOX_Open_Connection($hash));
          $openedTelnet = 1;
       }
       my $retVal = FRITZBOX_Exec_Remote($hash, $cmd);
-      FRITZBOX_Telnet_Close ( $hash ) if $openedTelnet;
+      FRITZBOX_Close_Connection ( $hash ) if $openedTelnet;
       return $retVal;
    }
    else
@@ -1507,6 +1523,12 @@ sub FRITZBOX_fritztris($)
       <li><code>fritzBoxIP</code>
          <br>
          IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
+      </li><br>
+      <li><code>pwdFile &lt;fileName&gt;</code>
+         <br>
+         File that contains the password for telnet access. Default is 'fb_pwd.txt' in the root directory of FHEM.
+         <br>
+         If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
       </li><br>
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
