@@ -421,7 +421,7 @@ FB_CALLMONITOR_reverseSearch($$)
     { 
         Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
 
-        $result = GetFileFromURL("http://www.klicktel.de/inverssuche/index/search?_dvform_posted=1&phoneNumber=".$number, 5, undef, 1);
+        $result = GetFileFromURL("http://www.klicktel.de/rueckwaertssuche/".$number, 5, undef, 1);
         if(not defined($result))
         {
             if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -433,7 +433,7 @@ FB_CALLMONITOR_reverseSearch($$)
         }
         else
         {
-            if($result =~ /<a href="http\:\/\/www\.klicktel\.de\/.*html" target="_self">1\. (.+?)<\/a>/)
+            if($result =~ /<a href="http\:\/\/www\.klicktel\.de\/.*html" target="_self">(.+?)<\/a>/)
             {
                 $invert_match = $1;
                 $invert_match = FB_CALLMONITOR_html2txt($invert_match);
