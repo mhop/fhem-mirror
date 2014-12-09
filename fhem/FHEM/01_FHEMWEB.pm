@@ -1340,7 +1340,7 @@ FW_showRoom()
           foreach my $cmd (split(":", $cmdlist)) {
             my $htmlTxt;
             my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
-            if(int(@c) && $allSets && $allSets =~ m/$c[0]:([^ ]*)/) {
+            if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
               my $values = $1;
               foreach my $fn (sort keys %{$data{webCmdFn}}) {
                 no strict "refs";
