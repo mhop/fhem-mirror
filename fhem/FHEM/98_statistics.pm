@@ -40,9 +40,9 @@ use Time::Local;
 sub statistics_PeriodChange($);
 sub statistics_DoStatisticsAll($$);
 sub statistics_DoStatistics ($$$);
-sub statistics_doStatisticMinMax ($$$$$$);
-sub statistics_doStatisticMinMaxSingle ($$$$$$$);
-sub statistics_doStatisticTendency ($$$$);
+sub statistics_doStatisticMinMax ($$$$$);
+sub statistics_doStatisticMinMaxSingle ($$$$$$);
+sub statistics_doStatisticTendency ($$$);
 sub statistics_doStatisticDelta ($$$$); 
 sub statistics_doStatisticDuration ($$$$); 
 sub statistics_doStatisticDurationSingle ($$$$$$); 
@@ -56,34 +56,47 @@ sub statistics_UpdateDevReading($$$$);
   my $MODUL        = "statistics";
 
 ##############################################################
-# Syntax: deviceType, readingName, statisticType, decimalPlaces
+# Syntax: readingName => statisticType
 #     statisticType: 0=noStatistic | 1=minMaxAvg(daily) | 2=delta | 3=stateDuration | 4=tendency | 5=minMaxAvg(hourly)
 ##############################################################
-  my @knownReadings = ( ["brightness", 1, 0] 
-   ,["count", 2] 
-   ,["current", 1, 3] 
-   ,["energy", 2] 
-   ,["energy_current", 1, 1] 
-   ,["energy_total", 2] 
-   ,["Total.Energy", 2] 
-   ,["humidity", 1, 0]
-   ,["lightsensor", 3] 
-   ,["lock", 3] 
-   ,["motion", 3] 
-   ,["power", 1, 1] 
-   ,["pressure", 4, 1] 
-   ,["rain", 2] 
-   ,["rain_rate", 1, 1] 
-   ,["rain_total", 2] 
-   ,["temperature", 1, 1] 
-   ,["total", 2] 
-   ,["voltage", 1, 1] 
-   ,["wind", 5, 0] 
-   ,["wind_speed", 5, 1] 
-   ,["windSpeed", 5, 0] 
-   ,["Window", 3] 
-   ,["window", 3] 
+  my %knownReadings = ( 
+    "brightness" => 1 
+   ,"count" => 2 
+   ,"current" => 1 
+   ,"energy" => 2 
+   ,"energy_current" => 1 
+   ,"energy_total" => 2 
+   ,"Total.Energy" => 2 
+   ,"humidity" => 1
+   ,"lightsensor" => 3 
+   ,"lock" => 3 
+   ,"motion" => 3 
+   ,"power" => 1 
+   ,"pressure" => 4 
+   ,"rain" => 2 
+   ,"rain_rate" => 1 
+   ,"rain_total" => 2 
+   ,"temperature" => 1 
+   ,"total" => 2 
+   ,"voltage" => 1 
+   ,"wind" => 5 
+   ,"wind_speed" => 5 
+   ,"windSpeed" => 5 
+   ,"Window" => 3 
+   ,"window" => 3 
   );
+
+##############################################################
+# Syntax: attributeName => statisticType
+#     statisticType: 0=noStatistic | 1=minMaxAvg(daily) | 2=delta | 3=stateDuration | 4=tendency | 5=minMaxAvg(hourly)
+##############################################################
+   my %addedReadingsAttr = (
+      "deltaReadings" => 2
+     ,"durationReadings" => 3
+     ,"minAvgMaxReadings" => 5
+     ,"tendencyReadings" => 4
+   );
+
 ##############################################################
 
 sub ##########################################
@@ -201,8 +214,8 @@ statistics_Set($$@)
   return "Unknown argument $cmd, choose one of $list";
 }
 
-sub ########################################
-statistics_Notify($$)
+########################################
+sub statistics_Notify($$)
 {
    my ($hash, $dev) = @_;
    my $name = $hash->{NAME};
@@ -268,8 +281,8 @@ statistics_Notify($$)
 }
 
 
-sub ########################################
-statistics_PeriodChange($)
+########################################
+sub statistics_PeriodChange($)
 {
    my ($hash) = @_;
    my $name = $hash->{NAME};
@@ -370,20 +383,20 @@ sub statistics_DoStatistics($$$)
   
    return if( AttrVal($hashName, "disable", 0 ) == 1 );
 
-   my $readingName;
    my $exclReadings = AttrVal($hashName, "excludedReadings", "");
    my $regExp = '^'.$devName.'$|^'.$devName.',|,'.$devName.'$|,'.$devName.',';
 
- # Return if the notifying device is already served by another statistics instance
-   if (exists ($dev->{helper}{_98_statistics})) {
-      my $servedBy = $dev->{helper}{_98_statistics};
+ # Return if the notifying device is already served by another statistics instance with same prefix
+   my $instanceMarker = "_98_statistics_".$hash->{PREFIX};
+   if (exists ($dev->{helper}{$instanceMarker})) {
+      my $servedBy = $dev->{helper}{$instanceMarker};
       if ($servedBy ne $hashName) {
          my $monReadingValue = ReadingsVal($hashName,"monitoredDevicesUnserved","");
          if ($monReadingValue !~ /$regExp/) {
             if($monReadingValue eq "") { $monReadingValue = $devName;}
             else {$monReadingValue .= ",".$devName;}
             readingsSingleUpdate($hash,"monitoredDevicesUnserved",$monReadingValue,1);
-            statistics_Log $hash, 3, "Device '$devName' identified as supported but already servered by '$servedBy'.";
+            statistics_Log $hash, 3, "Device '$devName' identified as supported but already servered by '$servedBy' with some reading prefix.";
          }
          return;
       }
@@ -391,66 +404,36 @@ sub statistics_DoStatistics($$$)
       $dev->{helper}{_98_statistics}=$hashName;
    }
    
-   readingsBeginUpdate($dev);
-   
-  # Loop through all known readings
-   foreach my $f (@knownReadings) 
+# Build up Statistic-Reading-Hash, add readings defined in attributes to Statistic-Reading-Hash
+   my %statReadings = %knownReadings;
+   while (my ($aName, $statType) = each (%addedReadingsAttr) )
    {
-    # notifing device has known reading, no statistic for excluded readings
-      $readingName = $$f[0];
-      my $completeReadingName = $devName.":".$readingName;
-      next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
-      if ($$f[1] == 1) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch, 0);}
-      if ($$f[1] == 2) { statistics_doStatisticDelta ($hash, $dev, $readingName, $periodSwitch );}
-      if ($$f[1] == 3) { statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch ); }
-      if ($$f[1] == 4 && $periodSwitch>=1) { statistics_doStatisticTendency ($hash, $dev, $readingName, $$f[2]);}
-      if ($$f[1] == 5) { statistics_doStatisticMinMax ($hash, $dev, $readingName, $$f[2], $periodSwitch, 1);}
-      $statisticDone = 1;
-   }
-       
-   my @specialReadings = split /,/, AttrVal($hashName, "deltaReadings", "");
-   foreach $readingName (@specialReadings) 
-   {
-      my $completeReadingName = $devName.":".$readingName;
-      next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
-      statistics_doStatisticDelta ($hash, $dev, $readingName, $periodSwitch);
-      $statisticDone = 1;
-   }
-      
-   @specialReadings = split /,/, AttrVal($hashName, "durationReadings", "");
-   foreach $readingName (@specialReadings) 
-   {
-      my $completeReadingName = $devName.":".$readingName;
-      next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
-      statistics_doStatisticDuration ($hash, $dev, $readingName, $periodSwitch);
-      $statisticDone = 1;
-   }
-
-   @specialReadings = split /,/, AttrVal($hashName, "minAvgMaxReadings", "");
-   foreach $readingName (@specialReadings) 
-   {
-      my $completeReadingName = $devName.":".$readingName;
-      next if ($completeReadingName =~ m/^($exclReadings)$/ );
-      next if not exists ($dev->{READINGS}{$readingName});
-      statistics_doStatisticMinMax ($hash, $dev, $readingName, 1, $periodSwitch, 1);
-      $statisticDone = 1;
-   }
-
-   if ($periodSwitch>=1) {
-      @specialReadings = split /,/, AttrVal($hashName, "tendencyReadings", "");
-      foreach $readingName (@specialReadings) 
+      my @addedReadings = split /,/, AttrVal($hashName, $aName, "");
+      foreach( keys @addedReadings )
       {
-         my $completeReadingName = $devName.":".$readingName;
-         next if ($completeReadingName =~ m/^($exclReadings)$/ );
-         next if not exists ($dev->{READINGS}{$readingName});
-         statistics_doStatisticTendency ($hash, $dev, $readingName, 1);
-         $statisticDone = 1;
+         $statReadings{$_} = $statType;
       }
    }
 
+   readingsBeginUpdate($dev);
+   
+# Loop through Statistic-Reading-Hash and start statistic calculation if the readings exists in the notifying device
+   while ( my ($rName, $statType) = each (%statReadings) ) 
+   {
+    # notifing device has known reading, no statistic for excluded readings
+      my $completeReadingName = $devName.":".$rName;
+      next if ($completeReadingName =~ m/^($exclReadings)$/ );
+      next if not exists ($dev->{READINGS}{$rName});
+      
+      if ($statType == 1) { statistics_doStatisticMinMax ($hash, $dev, $rName, $periodSwitch, 0);}
+      elsif ($statType == 2) { statistics_doStatisticDelta ($hash, $dev, $rName, $periodSwitch );}
+      elsif ($statType == 3) { statistics_doStatisticDuration ($hash, $dev, $rName, $periodSwitch ); }
+      elsif ($statType == 4 && $periodSwitch>=1) { statistics_doStatisticTendency ($hash, $dev, $rName);}
+      elsif ($statType == 5) { statistics_doStatisticMinMax ($hash, $dev, $rName, $periodSwitch, 1);}
+      $statisticDone = 1;
+   }
+       
+# If no statistic-reading has been found, do a duration stat for the device-state
    if ($statisticDone != 1)
    {
       if ( exists ($dev->{READINGS}{state}) && $dev->{READINGS}{state}{VAL} ne "defined" ) { 
@@ -495,9 +478,9 @@ sub statistics_DoStatistics($$$)
 
 # Calculates Min/Average/Max Values
 sub ######################################## 
-statistics_doStatisticMinMax ($$$$$$) 
+statistics_doStatisticMinMax ($$$$$) 
 {
-   my ($hash, $dev, $readingName, $decPlaces, $periodSwitch, $doHourly) = @_;
+   my ($hash, $dev, $readingName, $periodSwitch, $doHourly) = @_;
    my $name = $hash->{NAME};
    my $devName = $dev->{NAME};
    return if not exists ($dev->{READINGS}{$readingName});
@@ -507,25 +490,25 @@ statistics_doStatisticMinMax ($$$$$$)
    $value =~ s/(-?[\d.]*).*/$1/e;
 
    statistics_Log $hash, 4, "Calculating min/avg/max statistics for '".$dev->{NAME}.":$readingName = $value'";
-  # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast, decPlaces
+  # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
   # Hourly statistic (if needed)
-   if ($doHourly) { statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Hour", $value, ($periodSwitch >= 1), $decPlaces; }
+   if ($doHourly) { statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Hour", $value, ($periodSwitch >= 1); }
   # Daily statistic
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Day", $value, ($periodSwitch >= 2), $decPlaces;
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Day", $value, ($periodSwitch >= 2);
   # Monthly statistic 
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Month", $value, ($periodSwitch >= 3), $decPlaces;
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Month", $value, ($periodSwitch >= 3);
   # Yearly statistic 
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Year", $value, ($periodSwitch == 4), $decPlaces;
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Year", $value, ($periodSwitch == 4);
 
    return ;
 
 }
 
 # Calculates single MaxMin Values and informs about end of day and month
-sub ######################################## 
-statistics_doStatisticMinMaxSingle ($$$$$$$) 
+######################################## 
+sub statistics_doStatisticMinMaxSingle ($$$$$$) 
 {
-   my ($hash, $dev, $readingName, $period, $value, $saveLast, $decPlaces) = @_;
+   my ($hash, $dev, $readingName, $period, $value, $saveLast) = @_;
    my $result;
    my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName.$period;
    my $name=$hash->{NAME};
@@ -554,6 +537,8 @@ statistics_doStatisticMinMaxSingle ($$$$$$$)
       if ($hidden[3]>0) {$stat[3] = $hidden[1] / $hidden[3];} # Avg
       if ($value > $stat[5]) { $stat[5]=$value; } # Max
    }
+   
+   my $decPlaces = statistics_maxDecPlaces($value, $hidden[11]);
 
   # Prepare new current reading
    $result = sprintf( "Min: %.".$decPlaces."f Avg: %.".$decPlaces."f Max: %.".$decPlaces."f", $stat[1], $stat[3], $stat[5]);
@@ -587,20 +572,22 @@ statistics_doStatisticMinMaxSingle ($$$$$$$)
    }
 
   # Store hidden reading
-   $result = "Sum: $hidden[1] Time: $hidden[3] LastValue: ".$value." LastTime: ".int(gettimeofday())." ShowDate: $hidden[9]";
+   $result = "Sum: $hidden[1] Time: $hidden[3] LastValue: ".$value." LastTime: ".int(gettimeofday())." ShowDate: $hidden[9] DecPlaces: $decPlaces";
    readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
    statistics_Log $hash, 5, "Set '$hiddenReadingName'='$result'";
 
    return;
 }
 
+
 # Calculates tendency values 
-sub ######################################## 
-statistics_doStatisticTendency ($$$$) 
+######################################## 
+sub statistics_doStatisticTendency ($$$) 
 {
-   my ($hash, $dev, $readingName, $decPlaces) = @_;
+   my ($hash, $dev, $readingName) = @_;
    my $name = $hash->{NAME};
    my $devName = $dev->{NAME};
+   my $decPlaces = 0;
    return if not exists ($dev->{READINGS}{$readingName});
    
   # Get reading, cut out first number without units
@@ -626,6 +613,13 @@ statistics_doStatisticTendency ($$$$)
    statistics_Log $hash, 4, "Add $value to $hiddenReadingName";
    if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) { $result .= " " . $hash->{READINGS}{$hiddenReadingName}{VAL}; }
    @hidden = split / /, $result; # Internal values
+
+# determine decPlaces with stored values
+   foreach (@hidden)
+   {
+      $decPlaces = statistics_maxDecPlaces($_, $decPlaces);
+   }
+   
    if ( exists($hidden[7]) ) { 
       statistics_Log $hash, 4, "Remove last value ".$hidden[7]." from '$hiddenReadingName'";
       delete $hidden[7]; 
@@ -657,8 +651,8 @@ statistics_doStatisticTendency ($$$$)
 
 
 # Calculates deltas for day, month and year
-sub ######################################## 
-statistics_doStatisticDelta ($$$$) 
+######################################## 
+sub statistics_doStatisticDelta ($$$$) 
 {
    my ($hash, $dev, $readingName, $periodSwitch) = @_;
    my $dummy;
@@ -686,7 +680,7 @@ statistics_doStatisticDelta ($$$$)
   # Show since-Value and initialize all readings
       $showDate = 8;
       @stat = split / /, "Hour: 0 Day: 0 Month: 0 Year: 0";
-      $stat[9] = strftime ("%Y-%m-%d_%H:%M:%S",localtime()  );
+      $stat[9] = strftime "%Y-%m-%d_%H:%M:%S", localtime();
       @last = split / /,  "Hour: - Day: - Month: - Year: -";
       statistics_Log $hash, 4, "Initializing statistic of '$hiddenReadingName'.";
    } else {
@@ -792,8 +786,8 @@ statistics_doStatisticDelta ($$$$)
 }
 
 # Calculates deltas for period of several hours
-sub ######################################## 
-statistics_doStatisticSpecialPeriod ($$$$$) 
+######################################## 
+sub statistics_doStatisticSpecialPeriod ($$$$$) 
 {
    my ($hash, $dev, $readingName, $decPlaces, $value) = @_;
    my $name = $hash->{NAME};
@@ -832,8 +826,8 @@ statistics_doStatisticSpecialPeriod ($$$$$)
 }
 
 # Calculates single Duration Values and informs about end of day and month
-sub ######################################## 
-statistics_doStatisticDuration ($$$$) 
+######################################## 
+sub statistics_doStatisticDuration ($$$$) 
 {
    my ($hash, $dev, $readingName, $periodSwitch) = @_;
    my $name = $hash->{NAME};
@@ -854,8 +848,8 @@ statistics_doStatisticDuration ($$$$)
 }
 
 # Calculates single duration values
-sub ######################################## 
-statistics_doStatisticDurationSingle ($$$$$$) 
+######################################## 
+sub statistics_doStatisticDurationSingle ($$$$$$) 
 {
    my ($hash, $dev, $readingName, $period, $state, $saveLast) = @_;
    my $result;
@@ -931,8 +925,8 @@ statistics_doStatisticDurationSingle ($$$$$$)
 }
 
 
-sub ####################
-statistics_storeSingularReadings ($$$$$$$$$$)
+####################
+sub statistics_storeSingularReadings ($$$$$$$$$$)
 {
    my ($hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast) = @_;
    return if $singularReadings eq "";
@@ -951,8 +945,8 @@ statistics_storeSingularReadings ($$$$$$$$$$)
 }
 
 
-sub ####################
-statistics_getStoredDevices ($)
+####################
+sub statistics_getStoredDevices ($)
 {
    my ($hash) = @_;
    my $result="";
@@ -968,8 +962,8 @@ statistics_getStoredDevices ($)
    return $result;
 }
 
-sub ########################################
-statistics_FormatDuration($)
+########################################
+sub statistics_FormatDuration($)
 {
   my ($value) = @_;
   #Tage
@@ -986,8 +980,8 @@ statistics_FormatDuration($)
   return $returnstr;
 }
 
-sub ########################################
-statistics_maxDecPlaces($$)
+########################################
+sub statistics_maxDecPlaces($$)
 {
    my ($value, $decMax) = @_;
    $decMax = 0 if ! defined $decMax;
@@ -998,8 +992,8 @@ statistics_maxDecPlaces($$)
    return $decMax;
 }
 
-sub ########################################
-statistics_UpdateDevReading($$$$)
+########################################
+sub statistics_UpdateDevReading($$$$)
 {
    my ($dev, $rname, $val, $event) = @_;
    $dev->{READINGS}{$rname}{VAL} = $val;
@@ -1047,6 +1041,7 @@ statistics_UpdateDevReading($$$$)
       </li><br>
   </ul>
    Further readings can be added via the correspondent <a href="#statisticsattr">attribute</a>.
+   This allows also to assign a reading to another statistic type.
   <br>&nbsp;
   <br>
   
@@ -1168,7 +1163,8 @@ statistics_UpdateDevReading($$$$)
          <br>
          <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
-  Weitere Ger&auml;tewerte k&ouml;nnen &uuml;ber die entsprechenden <a href="#statisticsattr">Attribute</a> hinzugef&uuml;gt werden.
+  &Uuml;ber die entsprechenden <a href="#statisticsattr">Attribute</a> k&ouml;nnen weitere Ger&auml;tewerte hinzugef&uuml;gt oder
+  einem anderem Statistik-Typ zugeordnet werden. 
   <br>&nbsp;
   <br>
   
