@@ -626,10 +626,18 @@ sub PROPLANTA_Done($)
       
       if (keys %values > 0) 
       {
-         my $newState = "Tmin: " . $values{fc0_tempMin} . " Tmax: " . $values{fc0_tempMax};
-        # Achtung! Nach Mitternacht fehlen für 1 h die aktuellen Werte
-         $newState .= " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure}
-            if defined $values{temperature};
+         my $newState;
+         if (defined $values{fc0_tempMin} && defined $values{fc0_tempMax})
+         {
+            $newState = "Tmin: " . $values{fc0_tempMin} . " Tmax: " . $values{fc0_tempMax};
+           # Achtung! Nach Mitternacht fehlen für 1 h die aktuellen Werte
+            $newState .= " T: " . $values{temperature} . " H: " . $values{humidity} . " W: " . $values{wind} . " P: " .  $values{pressure}
+               if defined $values{temperature} && defined $values{humidity} && defined $values{wind} && defined $values{pressure};
+         }
+         else
+         {
+            $newState = "Error: Could not capture all data. Please check URL or city name.";
+         }
          readingsBulkUpdate($hash, "state", $newState);
          readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured" );
          PROPLANTA_Log $hash, 4, keys( %values )." values captured";
