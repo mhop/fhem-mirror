@@ -42,8 +42,6 @@ PRESENCE_Initialize($)
 {
     my ($hash) = @_;
 
-    require "$attr{global}{modpath}/FHEM/DevIo.pm";
-
     # Provider
     $hash->{ReadFn}  = "PRESENCE_Read";  
     $hash->{ReadyFn} = "PRESENCE_Ready";
@@ -229,8 +227,6 @@ PRESENCE_Define($$)
     {
         return DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
     }
-
-
 }
 
 
@@ -269,8 +265,8 @@ PRESENCE_Set($@)
         if($hash->{MODE} ne "lan-bluetooth")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting local scan";
-            PRESENCE_StartLocalScan($hash, 1);
-            return undef;
+            
+            return PRESENCE_StartLocalScan($hash, 1);
         }
         else
         {
@@ -468,13 +464,11 @@ PRESENCE_Read($)
     }
 
     readingsEndUpdate($hash, 1);
-
 }
 
 sub
 PRESENCE_DoInit($)
 {
-
     my ($hash) = @_;
 
     if( not exists($hash->{helper}{DISABLED}) or (exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 0))
@@ -488,7 +482,6 @@ PRESENCE_DoInit($)
     }
 
     return undef;
-
 }
 
 
@@ -498,7 +491,6 @@ PRESENCE_Ready($)
     my ($hash) = @_;
    
     return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit") if($hash->{MODE} eq "lan-bluetooth");
-
 }
 
 ##########################################################################################################################
@@ -517,41 +509,50 @@ sub PRESENCE_StartLocalScan($;$)
      
     if(not (exists($hash->{ADDRESS}) or exists($hash->{helper}{call})))
     {
-         return;
+         return undef;
     }
 
-    $hash->{STATE} = "active" if($hash->{STATE} eq "???" or $hash->{STATE} eq "defined");
+    unless(exists($hash->{helper}{RUNNING_PID}))
+    {
+        $hash->{STATE} = "active" if($hash->{STATE} eq "???" or $hash->{STATE} eq "defined");
 
-    if($local == 0)
-    {
-        Log3 $name, 5, "PRESENCE ($name) - stopping timer";
-        RemoveInternalTimer($hash);
-    }
+        if($local == 0)
+        {
+            Log3 $name, 5, "PRESENCE ($name) - stopping timer";
+            RemoveInternalTimer($hash);
+        }
 
-    if($mode eq "local-bluetooth")
-    {
-        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode local-bluetooth";
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        if($mode eq "local-bluetooth")
+        {
+            Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode local-bluetooth";
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+        }
+        elsif($mode eq "lan-ping")
+        {
+            Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode lan-ping";
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+        }
+        elsif($mode eq "fritzbox")
+        {
+            Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode fritzbox";
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzbox_speed", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+        }
+        elsif($mode eq "shellscript")
+        {
+            Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode shellscript";
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+        }
+        elsif($mode eq "function")
+        {
+            Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode function";
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+        }
+        
+        return undef;
     }
-    elsif($mode eq "lan-ping")
+    else
     {
-        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode lan-ping";
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalPingScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "ping_count", "4"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
-    }
-    elsif($mode eq "fritzbox")
-    {
-        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode fritzbox";
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFritzBoxScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "fritzbox_speed", "0"), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
-    }
-    elsif($mode eq "shellscript")
-    {
-        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode shellscript";
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalShellScriptScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
-    }
-    elsif($mode eq "function")
-    {
-        Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode function";
-        $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+        return "another check is currently running";
     }
 }
 
