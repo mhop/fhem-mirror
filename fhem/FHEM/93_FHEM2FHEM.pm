@@ -24,6 +24,7 @@ FHEM2FHEM_Initialize($)
   $hash->{ReadFn}  = "FHEM2FHEM_Read";
   $hash->{WriteFn} = "FHEM2FHEM_Write";
   $hash->{ReadyFn} = "FHEM2FHEM_Ready";
+  $hash->{SetFn}   = "FHEM2FHEM_Set";
   $hash->{noRawInform} = 1;
 
 # Normal devices
@@ -196,6 +197,7 @@ FHEM2FHEM_CloseDev($)
   
   $hash->{TCPDev}->close() if($hash->{TCPDev});
   $hash->{TCPDev2}->close() if($hash->{TCPDev2});
+  delete($hash->{NEXT_OPEN});
   delete($hash->{TCPDev});
   delete($hash->{TCPDev2});
   delete($selectlist{"$name.$dev"});
@@ -233,7 +235,8 @@ FHEM2FHEM_OpenDev($$)
   }
 
   if($conn) {
-    delete($hash->{NEXT_OPEN})
+    delete($hash->{NEXT_OPEN});
+    $conn->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1);
 
   } else {
     Log3($name, 3, "Can't connect to $dev: $!") if(!$reopen);
@@ -294,6 +297,21 @@ FHEM2FHEM_SimpleRead($)
     return undef;
   }
   return $buf;
+}
+
+sub
+FHEM2FHEM_Set($@)
+{
+  my ($hash, @a) = @_;
+
+  return "set needs at least one parameter" if(@a < 2);
+  return "Unknown argument $a[1], choose one of reopen:noArg"
+  	if($a[1] ne "reopen");
+
+  
+  FHEM2FHEM_CloseDev($hash);
+  FHEM2FHEM_OpenDev($hash, 0);
+  return undef;
 }
 
 1;
@@ -370,7 +388,11 @@ FHEM2FHEM_SimpleRead($)
   <br>
 
   <a name="FHEM2FHEMset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set </b>
+  <ul>
+    <li>reopen<br>
+	Reopens the connection to the device and reinitializes it.</li><br>
+  </ul>
 
   <a name="FHEM2FHEMget"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -463,7 +485,11 @@ FHEM2FHEM_SimpleRead($)
    <br>
 
    <a name="FHEM2FHEMset"></a>
-   <b>Set</b> <ul>N/A</ul><br>
+   <b>Set </b>
+   <ul>
+     <li>reopen<br>
+ 	&Ouml;ffnet die Verbindung erneut.</li>
+   </ul>
 
    <a name="FHEM2FHEMget"></a>
    <b>Get</b> <ul>N/A</ul><br>
