@@ -37,7 +37,8 @@ package main;
 use strict;
 use warnings;
 use Blocking;
-use Net::Telnet;
+my $missingModul;
+eval "use Net::Telnet;1" or $missingModul .= "Net::Telnet ";
 
 
 sub FRITZBOX_Log($$$);
@@ -244,6 +245,7 @@ FRITZBOX_Set($$@)
    my $list = "alarm"
             . " customerRingTone"
             . " convertRingTone"
+            . " diversity"
             . " guestWlan:on,off"
             . " message"
             . " ring"
@@ -276,6 +278,18 @@ FRITZBOX_Set($$@)
       if (int @val > 0) 
       {
          return FRITZBOX_SetCustomerRingTone $hash, @val;
+      }
+   }
+   elsif ( lc $cmd eq 'diversity')
+   {
+      if ( int @val == 2 && defined( $hash->{READINGS}{"diversity".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
+      {
+         my $state = $val[1];
+         $state =~ s/on/1/;
+         $state =~ s/off/0/;
+         FRITZBOX_Exec( $hash, "ctlmgr_ctl w telcfg settings/Diversity".( $val[0] - 1 )."/Active ".$state );
+         readingsSingleUpdate($hash,"diversity".$val[0]."_state",$val[1], 1);
+         return undef;
       }
    }
    elsif ( lc $cmd eq 'guestwlan')
@@ -451,6 +465,8 @@ FRITZBOX_Readout_Run($)
       push @readoutArray, ["", 'echo $CONFIG_AB_COUNT'];
       push @readoutArray, ["", "ctlmgr_ctl r landevice settings/landevice/count" ];
       push @readoutArray, ["", "ctlmgr_ctl r tam settings/TAM/count" ];
+      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/RefreshDiversity" ];
+      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Diversity/count" ];
 
       # Box model and firmware
       push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
@@ -463,30 +479,27 @@ FRITZBOX_Readout_Run($)
       my $fonCount = $resultArray->[4];
       my $lanDeviceCount = $resultArray->[5];
       my $tamCount = $resultArray->[6];
+      my $divCount = $resultArray->[8];
       
       
    # Internetradioliste erzeugen
-      if ($radioCount > 0 )
+      $i = 0;
+      @radio = ();
+      $rName = "radio00";
+      while ( $i<$radioCount || defined $hash->{READINGS}{$rName} )
       {
-         $i = 0;
-         @radio = ();
-         $rName = "radio00";
-         do 
-         {
-            push @readoutArray, [ $rName, "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name" ];
-            $i++;
-            $rName = sprintf ("radio%02d",$i);
-         }
-         while ( $radioCount > $i || defined $hash->{READINGS}{$rName} );
+         push @readoutArray, [ $rName, "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name" ];
+         $i++;
+         $rName = sprintf ("radio%02d",$i);
+      }
 
-         $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
 
-         for (0..$radioCount-1)
-         {
-            $radio[$_] = $result
-               if $resultArray->[$_] ne "";
-            
-         }
+      for (0..$radioCount-1)
+      {
+         $radio[$_] = $result
+            if $resultArray->[$_] ne "";
+         
       }
 
    # LanDevice-Liste erzeugen
@@ -511,46 +524,44 @@ FRITZBOX_Readout_Run($)
       }
 
       # Dect Phones
-      if ($dectCount>0)
+      for (610..615) { delete $hash->{fhem}{$_} if defined $hash->{fhem}{$_}; }
+      
+      for (1..$dectCount)
       {
-         for (610..615) { delete $hash->{fhem}{$_} if defined $hash->{fhem}{$_}; }
-         
-         for (1..6)
+        # 0 Dect-Interne Nummer
+         push @readoutArray, [ "dect".$_."_intern", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Intern" ];
+        # 1 Dect-Telefonname
+         push @readoutArray, [ "dect".$_, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name" ];
+        # 2 Handset manufacturer
+         push @readoutArray, [ "dect".$_."_manufacturer", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer" ];   
+        # 3 Internal Ring Tone Name
+         push @readoutArray, [ "dect".$_."_intRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone", "ringtone" ];
+        # 4 Alarm Ring Tone Name
+         push @readoutArray, [ "dect".$_."_alarmRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/AlarmRingTone0", "ringtone" ];
+        # 5 Radio Name
+         push @readoutArray, [ "dect".$_."_radio", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/RadioRingID", "radio" ];
+        # 6 Background image
+         push @readoutArray, [ "dect".$_."_imagePath ", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath " ];
+        # 7 Customer Ring Tone
+         push @readoutArray, [ "dect".$_."_custRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingTone" ];
+        # 8 Customer Ring Tone Name
+         push @readoutArray, [ "dect".$_."_custRingToneName", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingToneName" ];
+        # 9 Firmware Version
+         push @readoutArray, [ "dect".$_."_fwVersion", "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion" ];   
+        # 10 Phone Model
+         push @readoutArray, [ "dect".$_."_model", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model", "model" ];   
+      }
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      
+      for (0..$dectCount-1)
+      {
+         my $offset = $_ * 11;
+         my $intern = $resultArray->[ $offset ];
+         if ( $intern )
          {
-           # 0 Dect-Interne Nummer
-            push @readoutArray, [ "dect".$_."_intern", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Intern" ];
-           # 1 Dect-Telefonname
-            push @readoutArray, [ "dect".$_, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name" ];
-           # 2 Handset manufacturer
-            push @readoutArray, [ "dect".$_."_manufacturer", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer" ];   
-           # 3 Internal Ring Tone Name
-            push @readoutArray, [ "dect".$_."_intRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone", "ringtone" ];
-           # 4 Alarm Ring Tone Name
-            push @readoutArray, [ "dect".$_."_alarmRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/AlarmRingTone0", "ringtone" ];
-           # 5 Radio Name
-            push @readoutArray, [ "dect".$_."_radio", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/RadioRingID", "radio" ];
-           # 6 Background image
-            push @readoutArray, [ "dect".$_."_imagePath ", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath " ];
-           # 7 Customer Ring Tone
-            push @readoutArray, [ "dect".$_."_custRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingTone" ];
-           # 8 Customer Ring Tone Name
-            push @readoutArray, [ "dect".$_."_custRingToneName", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingToneName" ];
-           # 9 Firmware Version
-            push @readoutArray, [ "dect".$_."_fwVersion", "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion" ];   
-           # 10 Phone Model
-            push @readoutArray, [ "dect".$_."_model", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model", "model" ];   
-         }
-         $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
-         for (0..5)
-         {
-            my $offset = $_ * 11;
-            my $intern = $resultArray->[ $offset ];
-            if ( $intern )
-            {
-               push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ];
-               push @readoutReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 2 ];
-               push @readoutReadings, "fhem->$intern->model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
-            }
+            push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ];
+            push @readoutReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 2 ];
+            push @readoutReadings, "fhem->$intern->model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
          }
       }
 
@@ -569,33 +580,30 @@ FRITZBOX_Readout_Run($)
       }
 
    # Anrufbeantworter (TAM)
-      if ($tamCount > 0 )
+   # Check if TAM is displayed
+      for (0..$tamCount-1)
       {
-      # Check if TAM is displayed
-         for (0..$tamCount-1)
-         {
-            push @readoutArray, [ "", "ctlmgr_ctl r tam settings/TAM".$_."/Display" ];
-         }
-         $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
-      #Get TAM readings
-         for (0..$tamCount-1)
-         {
-            $rName = "tam".($_+1);
-            if ($resultArray->[$_] == 1 || defined $hash->{READINGS}{$rName} )
-            {
-               push @readoutArray, [ $rName, "ctlmgr_ctl r tam settings/TAM". $_ ."/Name" ];
-               push @readoutArray, [ $rName."_state", "ctlmgr_ctl r tam settings/TAM".$_."/Active", "onoff" ];
-               push @readoutArray, [ $rName."_newMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumNewMessages" ];
-               push @readoutArray, [ $rName."_oldMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumOldMessages" ];
-            }
-         }
-         FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+         push @readoutArray, [ "", "ctlmgr_ctl r tam settings/TAM".$_."/Display" ];
       }
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+   #Get TAM readings
+      for (0..$tamCount-1)
+      {
+         $rName = "tam".($_+1);
+         if ($resultArray->[$_] == 1 || defined $hash->{READINGS}{$rName} )
+         {
+            push @readoutArray, [ $rName, "ctlmgr_ctl r tam settings/TAM". $_ ."/Name" ];
+            push @readoutArray, [ $rName."_state", "ctlmgr_ctl r tam settings/TAM".$_."/Active", "onoff" ];
+            push @readoutArray, [ $rName."_newMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumNewMessages" ];
+            push @readoutArray, [ $rName."_oldMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumOldMessages" ];
+         }
+      }
+      FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
 
 # user profiles
       $i=0;
       $rName = "user01";
-      do 
+      while ($i<$userCount || defined $hash->{READINGS}{$rName})
       {
          push @readoutArray, [$rName, "ctlmgr_ctl r user settings/user".$i."/name", "deviceip" ];
          push @readoutArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "timeinhours" ];
@@ -604,7 +612,22 @@ FRITZBOX_Readout_Run($)
          $i++;
          $rName = sprintf ("user%02d",$i+1);
       }
-      while ($i<$userCount || defined $hash->{READINGS}{$rName});
+
+   # Diversity
+      $i=0;
+      $rName = "diversity1";
+      while ( $i < $divCount || defined $hash->{READINGS}{$rName} )
+      {
+        # Diversity number
+         push @readoutArray, [$rName, "ctlmgr_ctl r telcfg settings/Diversity".$i."/MSN" ];
+        # Diversity state
+         push @readoutArray, [$rName."_state", "ctlmgr_ctl r telcfg settings/Diversity".$i."/Active", "onoff" ];
+        # Diversity destination
+         push @readoutArray, [$rName."_dest", "ctlmgr_ctl r telcfg settings/Diversity".$i."/Destination"];
+         $i++;
+         $rName = "diversity".($i+1);
+      }
+      
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
    }
    
@@ -628,6 +651,7 @@ FRITZBOX_Readout_Run($)
      # Alarm clock weekdays
       push @readoutArray, ["alarm".($_+1)."_wdays", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays", "aldays" ];
    }
+
    $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
    
    
@@ -1092,6 +1116,9 @@ sub FRITZBOX_Open_Connection($)
    return undef 
       unless $hash->{REMOTE} == 1;
    
+   return "Error: Perl modul ".$missingModul."is missing on this system"
+      if $missingModul;
+      
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
 
    my $pwdFile = AttrVal( $name, "pwdFile", "fb_pwd.txt");
@@ -1359,7 +1386,12 @@ sub FRITZBOX_fritztris($)
 
    my $returnStr = '<script type="text/javascript" src="http://fritz.box/js/fritztris.js"></script>';
    $returnStr .= '<link rel="stylesheet" type="text/css" href="http://fritz.box/css/default/fritztris.css"/>';
-   $returnStr .= '<style>#game table td {width:15px;height:15px;border-width:0px;background-repeat: no-repeat;background-position: center;-moz-border-radius: 4px;-webkit-border-radius: 4px;border-radius: 4px;}</style>';
+#   $returnStr .= '<link rel="stylesheet" type="text/css" href="http://fritz.box/css/default/main.css"/>';
+   $returnStr .= '<link rel="stylesheet" type="text/css" href="http://fritz.box/css/default/static.css"/>';
+   $returnStr .= '<!--[if lte IE 8]>';
+   $returnStr .= '<link rel="stylesheet" type="text/css" href="http://fritz.box/css/default/ie_fix.css"/>';
+   $returnStr .= '<![endif]-->';
+   $returnStr .= '<style>#game table td {width: 10px;height: 10px;}</style>';
    $returnStr .= '<script type="text/javascript">';
    $returnStr .= 'var game = null;';
    $returnStr .= 'function play() {';
@@ -1380,7 +1412,8 @@ sub FRITZBOX_fritztris($)
    $returnStr .= '<table><tr><td valign=top><u><b>FritzTris</b></u>';
    $returnStr .= '<br><a href="#" onclick="play();">Start</a>';
    $returnStr .= '<br><a href="#" onclick="gameOver();">Stop</a></td>';
-   $returnStr .= '<td><div id="game"></div></td></tr></table>';
+   $returnStr .= '<td><div id="page_content" class="page_content">';
+   $returnStr .= '<div id="game" style="background:white;"></div></div></td></tr></table>';
 
    return $returnStr;
 }
@@ -1452,11 +1485,18 @@ sub FRITZBOX_fritztris($)
          <br>
          The upload takes about one minute before the tone is available.
       </li><br>
+      <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
+         <br>
+         Switches the call diversity number (1-10) on or off.
+         A call diversity for an incoming number has to be created with the Fritz!Box web interface.
+         <br>
+         Note! The Fritz!Box allows also forwarding in accordance to the calling number. This is not included in this feature. 
+      </li><br>
       <li><code>set &lt;name&gt; musicOnHold &lt;fullFilePath&gt;</code>
          <br>
          <i>Not implemented yet.</i> Uploads the file fullFilePath as "Music on Hold". Only mp3 or the MOH-format is allowed.
          <br>
-         The file has to be placed on the file system of the fritzbox.
+         The file has to be placed on the file system of the Fritz!Box.
          <br>
          The upload takes about one minute before the tone is available.
       </li><br>
@@ -1481,6 +1521,7 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; tam &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Switches the answering machine number (1-10) on or off.
+         The answering machine has to be created on the Fritz!Box web interface.
       </li><br>
       <li><code>set &lt;name&gt; update</code>
          <br>
@@ -1569,6 +1610,9 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
+      <li><b>diversity</b><i>1</i> - Incoming phone number of the call diversity <i>1</i></li>
+      <li><b>diversity</b><i>1</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
+      <li><b>diversity</b><i>1</i><b>_state</b> - Current state of the call diversity <i>1</i></li>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
       <li><b>tam</b><i>1</i> - Name of the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_newMsg</b> - New messages on the answering machine <i>1</i></li>
