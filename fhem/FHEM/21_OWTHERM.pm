@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.27";
+my $owx_version="5.28";
 
 my %gets = (
   "id"          => "",
@@ -217,7 +217,7 @@ sub OWTHERM_Define ($$) {
       CommandAttr (undef,"$name model DS1822"); 
     }elsif( $model eq "DS18B20" ){
       $fam = "28";
-      CommandAttr (undef,"$name model DS1822"); 
+      CommandAttr (undef,"$name model DS18B20"); 
     }else{
       return "OWTHERM: Wrong 1-Wire device model $model";
     }
