@@ -83,6 +83,7 @@ sub VCONTROL_ModusParse($);
 sub VCONTROL_DateParse($);
 sub VCONTROL_1ByteUConv($);
 sub VCONTROL_1ByteSConv($);
+sub VCONTROL_1ByteUx10Conv($);
 sub VCONTROL_2ByteUConv($);
 sub VCONTROL_2ByteSConv($);
 sub VCONTROL_DateConv($);
@@ -724,6 +725,9 @@ VCONTROL_Set($@)
         elsif ($$_[3] eq "1ByteS"){
            $send_additonal_param=VCONTROL_1ByteSConv($value);
         }
+        elsif ($$_[3] eq "1ByteUx10"){
+           $send_additonal_param=VCONTROL_1ByteUx10Conv($value);
+        }
         elsif ($$_[3] eq "2ByteU"){
            $send_additonal_param=VCONTROL_2ByteUConv($value);
         }
@@ -1033,7 +1037,7 @@ sub VCONTROL_DateParse($){
 sub VCONTROL_1ByteUConv($)
 {
   my $convvalue = shift;
-  return (sprintf "%X", $convvalue);
+  return (sprintf "%02X", $convvalue);
 }
 #####################################
 sub VCONTROL_1ByteSConv($)
@@ -1046,6 +1050,12 @@ sub VCONTROL_1ByteSConv($)
   else {
     return $cnvstrvalue;
   }
+}
+#####################################
+sub VCONTROL_1ByteUx10Conv($)
+{
+  my $convvalue = shift;
+  return (sprintf "%02X", $convvalue*10);
 }
 #####################################
 sub VCONTROL_2ByteUConv($)
