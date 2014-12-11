@@ -363,7 +363,7 @@ sub statistics_DoStatisticsAll($$)
    my $regexp = $hash->{DEV_REGEXP};
    foreach my $devName (sort keys %defs) {
      if ($devName ne $name && $devName =~ m/^($regexp)$/) {
-         statistics_Log $hash,4,"Doing statistics (type $periodSwitch) for device '$devName'";
+         statistics_Log $hash,4,"Doing statistics (period $periodSwitch) for device '$devName'";
          statistics_DoStatistics($hash, $defs{$devName}, $periodSwitch);
       }
    }
@@ -409,9 +409,10 @@ sub statistics_DoStatistics($$$)
    while (my ($aName, $statType) = each (%addedReadingsAttr) )
    {
       my @addedReadings = split /,/, AttrVal($hashName, $aName, "");
-      foreach( keys @addedReadings )
+      foreach( @addedReadings )
       {
-         $statReadings{$_} = $statType;
+             statistics_Log $hash, 5, "Assigned reading '$_' from attribute '$aName' to statistic type $statType.";
+             $statReadings{$_} = $statType;
       }
    }
 
