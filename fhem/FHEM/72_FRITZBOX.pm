@@ -45,6 +45,7 @@ sub FRITZBOX_Log($$$);
 sub FRITZBOX_Init($);
 sub FRITZBOX_Ring_Start($@);
 sub FRITZBOX_Exec($$);
+sub FRITZBOX_Send_Mail($@);
 
 our $telnet;
 
@@ -249,6 +250,7 @@ FRITZBOX_Set($$@)
             . " guestWlan:on,off"
             . " message"
             . " ring"
+            . " sendMail"
             . " startRadio"
             . " tam"
             . " update:noArg"
@@ -320,11 +322,9 @@ FRITZBOX_Set($$@)
          return undef;
       }
    }
-   elsif( lc $cmd eq 'update' ) 
+   elsif ( lc $cmd eq 'sendmail')
    {
-      $hash->{fhem}{LOCAL}=1;
-      FRITZBOX_Readout_Start($hash);
-      $hash->{fhem}{LOCAL}=0;
+      FRITZBOX_Send_Mail $hash, @val;
       return undef;
    }
    elsif ( lc $cmd eq 'startradio')
@@ -346,6 +346,13 @@ FRITZBOX_Set($$@)
          readingsSingleUpdate($hash,"tam".$val[0]."_state",$val[1], 1);
          return undef;
       }
+   }
+   elsif( lc $cmd eq 'update' ) 
+   {
+      $hash->{fhem}{LOCAL}=1;
+      FRITZBOX_Readout_Start($hash);
+      $hash->{fhem}{LOCAL}=0;
+      return undef;
    }
    elsif ( lc $cmd eq 'wlan')
    {
@@ -855,6 +862,9 @@ FRITZBOX_Ring_Start($@)
    $val[1] = 5 
       unless defined $val[1]; 
 
+   $val[1] = 5 
+      unless $val[1] =~/^\d+$/; 
+
    if ( exists( $hash->{helper}{RING_RUNNING_PID} ) )
    {
       FRITZBOX_Log $hash, 1, "Old process still running. Killing old process ".$hash->{helper}{RING_RUNNING_PID};
@@ -900,13 +910,11 @@ FRITZBOX_Ring_Run($)
    
    
    my $duration = 5;
-   if ($val[0] !~ /^msg:/i)
+   if (defined $val[0])
    {
       $duration = $val[0]
-         if defined $val[0];
+         if ($val[0] =~ /^\d+$/);
       shift @val;
-      return $name."|0|Error: Duration '".$val[0]."' not a positiv integer" 
-         unless $duration =~ /^\d+$/;
    }
    
    my $ringTone;
@@ -1377,6 +1385,47 @@ FRITZBOX_Exec_Local($$)
 }
 
 ##################################### 
+sub FRITZBOX_Send_Mail($@)
+{
+   my ($hash,@val) = @_;
+   my $lastField;
+   my %field;
+   my @cmdArray;
+   
+   foreach (@val)
+   {
+      if ($_ =~ /^(to|subject|body):/i)
+      {
+         $lastField = $1;
+         $_ =~ s/^$1://;
+      }
+      $field{$lastField} .= $_." "
+         if $lastField;
+   }
+
+   my $cmd = "/sbin/mailer send";
+   if ($field{body})
+   {
+      push @cmdArray, "/bin/echo \"".$field{body}."\" > /var/tmp/fhem_nachricht.txt";
+      $cmd .=  " -i '/var/tmp/fhem_nachricht.txt'";
+   }
+
+   $field{subject} = "Message from FHEM"
+      unless $field{subject};
+   $cmd .= " -s \"".$field{subject}."\"";
+   
+   $cmd .= " -t \"".$field{to}."\""
+      if $field{to} ne "";
+   push @cmdArray, $cmd;
+   push @cmdArray, "rm /var/tmp/fhem_nachricht.txt"
+      if $field{body};
+
+   FRITZBOX_Exec( $hash, \@cmdArray );
+   
+   return undef;
+}
+
+##################################### 
 sub FRITZBOX_fritztris($)
 {
   my ($d) = @_;
@@ -1512,6 +1561,12 @@ sub FRITZBOX_fritztris($)
          The attribute "ringWithIntern" must also be specified.
          <br>
          If the call is taken the callee hears the "music on hold" which can be used to transmit messages.
+      </li><br>
+      <li><code>set &lt;name&gt; sendMail [to:emailAddress] [subject:emailSubject] [body:emailText]</code>
+         <br>
+         Sends an email via the email notification service that is configured in push service of the Fritz!Box.
+         All parameters can be omitted. Make sure the messages are not classified as junk by your email client.
+         <br>
       </li><br>
       <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
          <br>
