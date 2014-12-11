@@ -1,5 +1,5 @@
 ###############################################
-#$Id: 70_PushNotifier.pm 2014-11-14 10:00:00 xusader
+#$Id: 70_PushNotifier.pm 2014-12-11 13:28:00 xusader
 #
 #	download client-app http://pushnotifier.de/apps/
 #	create account http://pushnotifier.de/login/
@@ -81,7 +81,7 @@ PushNotifier_Set($@)
 		return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets);
 	}
 
-    return PushNotifier_Send_Message($hash, @a);
+    return PushNotifier_Send_Message($hash, , @a);
 }
 #####################################
 sub
