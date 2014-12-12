@@ -486,7 +486,7 @@ FB_CALLMONITOR_reverseSearch($$)
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - using search.ch for reverse search of $number";
 
-        $result = GetFileFromURL("http://tel.search.ch/?tel=".$number, 5, undef, 1);
+        $result = GetFileFromURL("http://tel.search.ch/?was=".$number, 5, undef, 1);
         if(not defined($result))
         {
             if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -499,7 +499,7 @@ FB_CALLMONITOR_reverseSearch($$)
         else
         {
             #Log 2, $result;
-            if($result =~ /<h5><a href=".*?" class="fn">(.+?)<\/a><\/h5>/)
+            if($result =~ /<h5><a href=".*?" class="fn(?: org)?">(.+?)<\/a><\/h5>/)
             {
                 $invert_match = $1;
                 $invert_match = FB_CALLMONITOR_html2txt($invert_match);
