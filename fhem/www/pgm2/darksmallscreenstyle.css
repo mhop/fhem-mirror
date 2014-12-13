@@ -97,3 +97,23 @@ div.dname, div.dval  {
   font-size:16px;
 }
 div.tiny { font-size:10px; }
+
+/* Portrait mode */
+@media all and (orientation:portrait) {
+	table.block tr td:nth-child(n+3) { width: 0px; display: none; }
+	
+	table.block select,
+	table.block input,
+	.handle { width: 0px; display: none; }
+}
+
+/* Landscape mode */
+@media all and (orientation:landscape) {
+  table.block{ width: 600px; }
+	table.block input { text-align: center; }
+	table.block tr td:nth-child(3) { text-align: center; }
+
+	table.block div.slider { width: 108px; text-align: center; }
+	table.block slider { float: none; }
+	table.block select { text-align: center; }
+}
