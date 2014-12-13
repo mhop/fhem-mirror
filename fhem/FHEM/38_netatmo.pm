@@ -33,10 +33,8 @@ netatmo_Initialize($)
   $hash->{GetFn}    = "netatmo_Get";
   $hash->{AttrFn}   = "netatmo_Attr";
   $hash->{AttrList} = "IODev ".
-                      "debug:1 ".
                       "disable:1 ".
                       "interval ".
-                      "logfile ".
                       "nossl:1 ";
   $hash->{AttrList} .= $readingFnAttributes;
 }
