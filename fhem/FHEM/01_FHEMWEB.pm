@@ -162,6 +162,7 @@ FHEMWEB_Initialize($)
     roomIcons
     sortRooms
     smallscreen:unused
+    smallscreenCommands:0,1
     stylesheetPrefix
     touchpad:unused
     webname
@@ -1336,7 +1337,8 @@ FW_showRoom()
 
         ######
         # Commands, slider, dropdown
-        if(!$FW_ss && $cmdlist) {
+        my $smallscreenCommands = AttrVal($FW_wname, "smallscreenCommands", "");
+        if((!$FW_ss || $smallscreenCommands) && $cmdlist) {
           foreach my $cmd (split(":", $cmdlist)) {
             my $htmlTxt;
             my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
@@ -3180,6 +3182,12 @@ FW_widgetOverride($$)
         Default is not active.
         </li><br>
 
+     <a name="smallscreenCommands"></a>
+     <li>smallscreenCommands<br>
+        If set to 1, commands, slider and dropdown menues will appear in
+        smallscreen landscape mode.
+        </li><br>
+
 
     </ul>
   </ul>
@@ -3756,6 +3764,12 @@ FW_widgetOverride($$)
         generiert.
         Es dient zum Schutz von Cross Site Resource Forgery Angriffen.
         Default ist leer, also nicht aktiv.
+        </li><br>
+
+     <a name="smallscreenCommands"></a>
+     <li>smallscreenCommands<br>
+        Falls auf 1 gesetzt werden Kommandos, Slider und Dropdown Men&uuml;s im
+        Smallscreen Landscape Modus angezeigt.
         </li><br>
 
     </ul>

@@ -19,7 +19,8 @@ div.col2 { width: 108px; height: 30px;
   white-space: wrap;
   font-size:16px;
 }
-div.col1, div.col2 {
+
+div.col1, div.col2, div.col3 {
   overflow: hidden; text-overflow: ellipsis;
 
   padding-top: 10px; padding-bottom: 10px;
@@ -42,7 +43,7 @@ div.tiny { font-size:10px; }
 
 table.block { width: 320px; border-spacing:0px; border:0; } 
 table.block tr { border:1px solid gray; border-spacing:0px; }
-table.block td { width: 150px; };
+table.block td { width: 150px; }
 
 #menu #block { visibility: hidden; }
 button.dist { margin:5px; }
@@ -51,3 +52,26 @@ button.dist { margin:5px; }
 .set .slider,.get slider,.attr .slider { background:#F0F0D8; }
 
 #cloudfree { display:none; }
+
+/* Portrait mode */
+@media all and (orientation:portrait) {
+	table.block tr td:nth-child(n+3) { width: 0px; display: none; }
+	
+	table.block select,
+	table.block input,
+	.handle { width: 0px; display: none; }
+}
+
+/* Landscape mode */
+@media all and (orientation:landscape) {
+  div.col1 { width: 282px; }
+  div.col2 { width: 108px; }
+  div.col3 { width: 108px; height: 30px; }
+
+	table.block input { text-align: center; }
+	table.block tr td:nth-child(3) { text-align: center; }
+
+	table.block div.slider { width: 108px; text-align: center; }
+	table.block slider { float: none; }
+	table.block select { text-align: center; }
+}
