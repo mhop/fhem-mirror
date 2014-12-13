@@ -1476,7 +1476,7 @@ sub PIONEERAVR_Reopen($) {
 }
 #####################################
 # writing to the Pioneer AV receiver
-# connection check 3s after writing
+# connection check 13s after writing
 sub PIONEERAVR_Write($$) {
   my ($hash, $msg) = @_;
   my $name= $hash->{NAME};
@@ -1486,7 +1486,7 @@ sub PIONEERAVR_Write($$) {
   DevIo_SimpleWrite($hash, $msg, 0);
 
   if (AttrVal($name, "checkConnection", "enable") eq "enable" ) {
-	my $now3 = gettimeofday()+3;
+	my $now3 = gettimeofday()+13;
 	if ($hash->{helper}{nextConnectionCheck} > $now3) { 
 		$hash->{helper}{nextConnectionCheck} = $now3;
 		RemoveInternalTimer($hash);
@@ -1531,6 +1531,7 @@ sub PIONEERAVR_checkConnection ($) {
     # we got a reply -> connection is good -> restore state
 	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: ".$hash->{STATE}." restored to: ".$state;
 	$hash->{STATE} = $state;
+	$hash->{PARTIAL} .= $connState;
   } 
   if (AttrVal($name, "checkConnection", "enable") eq "enable" ) {
 	$hash->{helper}{nextConnectionCheck}  = gettimeofday()+120; 
@@ -1558,6 +1559,10 @@ sub PIONEERAVR_askForInputNames($$) {
 	my ($hash, $loglevel) = @_;
 	my $name = $hash->{NAME};
 	my $comstr = '';
+	
+	my $now120 = gettimeofday()+120;
+	RemoveInternalTimer($hash);
+	InternalTimer($now120, "PIONEERAVR_checkConnection", $hash, 0);
 	
 	# we ask for the inputs 1 to 59 if an input name exists (command: ?RGB00 ... ?RGB59)
 	# 	and if the input is disabled (command: ?SSC0003 ... ?SSC5903)
