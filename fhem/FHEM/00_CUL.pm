@@ -530,7 +530,7 @@ CUL_ReadAnswer($$$$)
 
     }
 
-    if($buf) {
+    if(defined($buf)) {
       Log3 $ohash->{NAME}, 5, "CUL/RAW (ReadAnswer): $buf";
       $mculdata .= $buf;
     }
