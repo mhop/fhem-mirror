@@ -71,6 +71,11 @@ FHEM2FHEM_Define($$)
     $dev = "$dev:7072";
     $hash->{Host} = $dev;
   }
+
+  if($hash->{OLDDEF} && $hash->{OLDDEF} =~ m/^([^ \t]+)/) {; # Forum #30242
+    delete($readyfnlist{"$hash->{NAME}.$1"});
+  }
+
   $hash->{Host} = $dev;
   $hash->{portpassword} = $a[4] if(@a == 5);
 
