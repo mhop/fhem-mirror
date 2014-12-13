@@ -106,7 +106,14 @@ my %alarmDays = (
    , 32 => "Sa"
    , 64 => "So"
 );
-   
+ 
+my %userType = (
+   1 => "IP"
+ , 2 => "PC User"
+ , 3 => "Default"
+ , 4 => "Guest"
+);
+
 my @radio = ();
 my %landevice = ();
 
@@ -596,7 +603,7 @@ FRITZBOX_Readout_Run($)
    # Check if user (parent control) is not completely blocked
       for (0..$userCount-1)
       {
-         push @readoutArray, ["", "ctlmgr_ctl r user settings/user".$_."/type" ];
+         push @readoutArray, ["", "ctlmgr_ctl r user settings/user".$_."/filter_profile_UID" ];
       }
    #!!! Execute commands !!!
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
@@ -621,12 +628,14 @@ FRITZBOX_Readout_Run($)
       $rName = "user01";
       while ($i<$userCount || defined $hash->{READINGS}{$rName})
       {
-         if ($resultArray->[$i+$tamCount] != 1 || defined $hash->{READINGS}{$rName} )
+   # do not show data for unlimited, blocked or default access rights
+         if ($resultArray->[$i+$tamCount] !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} )
          {
             push @readoutArray, [$rName, "ctlmgr_ctl r user settings/user".$i."/name", "deviceip" ];
-            push @readoutArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "timeinhours" ];
-            push @readoutArray, [$rName."_todayTime", "ctlmgr_ctl r user settings/user".$i."/today_time", "timeinhours" ];
-            push @readoutArray, [$rName."_type", "ctlmgr_ctl r user settings/user".$i."/type" ];
+            push @readoutArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "secondsintime" ];
+            push @readoutArray, [$rName."_todayTime", "ctlmgr_ctl r user settings/user".$i."/today_time", "secondsintime" ];
+            push @readoutArray, [$rName."_todaySeconds", "ctlmgr_ctl r user settings/user".$i."/today_time" ];
+            push @readoutArray, [$rName."_type", "ctlmgr_ctl r user settings/user".$i."/type", "usertype" ];
          }
          $i++;
          $rName = sprintf ("user%02d",$i+1);
@@ -807,9 +816,7 @@ FRITZBOX_Readout_Format($$$)
    return $readout 
       unless $readout ne "" && $format ne "" ;
 
-   if ($format eq "altime") {
-      $readout =~ s/(\d\d)(\d\d)/$1:$2/;
-   } elsif ($format eq "aldays") {
+   if ($format eq "aldays") {
       if ($readout == 0) {
          $readout = "once";
       } elsif ($readout == 127) {
@@ -822,6 +829,7 @@ FRITZBOX_Readout_Format($$$)
             $readout .= (($bitStr & $_) == $_) ? $alarmDays{$_}." " : "";
          }
       }
+   
    } elsif ($format eq "alnumber") {
       my $intern = $readout;
       if (1 <= $readout && $readout <=2) {
@@ -836,9 +844,18 @@ FRITZBOX_Readout_Format($$$)
       }
       $readout .= " (".$hash->{fhem}{$intern}{name}.")"
          if defined $hash->{fhem}{$intern}{name};
+   
+   } elsif ($format eq "altime") {
+      $readout =~ s/(\d\d)(\d\d)/$1:$2/;
+   
+   } elsif ($format eq "deviceip") {
+      $readout = $landevice{$readout}." ($readout)"
+         if defined $landevice{$readout};
+   
    } elsif ($format eq "fwupdate") {
       my $update = FRITZBOX_Exec( $hash, "ctlmgr_ctl r updatecheck status/update_available_hint");
       $readout .= " (old)" if $update == 1;
+   
    } elsif ($format eq "model") {
       $readout = $fonModel{$readout} if defined $fonModel{$readout};
    
@@ -855,13 +872,20 @@ FRITZBOX_Readout_Format($$$)
    } elsif ($format eq "ringtone") {
       $readout = $ringTone{$readout};
    
-   } elsif ($format eq "timeinhours") {
-      $readout = sprintf "%d h %d min", int $readout/3600, int( ($readout %3600) / 60);
-
-   } elsif ($format eq "deviceip") {
-      $readout = $landevice{$readout}." ($readout)"
-         if defined $landevice{$readout};
+   } elsif ($format eq "secondsintime") {
+      if ($readout < 243600)
+      {
+         $readout = sprintf "%d:%02d", int $readout/3600, int( ($readout %3600) / 60);
+      }
+      else
+      {
+         $readout = sprintf "%dd %d:%02d", int $readout/24/3600, int ($readout%24*3600)/3600, int( ($readout %3600) / 60);
+      }
+   } elsif ($format eq "usertype") {
+      $readout = $userType{$readout};
+   
    }
+
    $readout = "" unless defined $readout;
    return $readout;
 }
@@ -1678,6 +1702,10 @@ sub FRITZBOX_fritztris($)
       <li><b>tam</b><i>1</i><b>_newMsg</b> - New messages on the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_oldMsg</b> - Old messages on the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_state</b> - Current state of the answering machine <i>1</i></li>
+      <li><b>user</b><i>01</i> - Name of user/IP <i>1</i> that is under parental control</li>
+      <li><b>user</b><i>01</i>_thisMonthTime - this month internet usage of user/IP <i>1</i> (parental control)</li>
+      <li><b>user</b><i>01</i>_todaySeconds - today's internet usage in seconds of user/IP <i>1</i> (parental control)</li>
+      <li><b>user</b><i>01</i>_todayTime - today's internet usage of user/IP <i>1</i> (parental control)</li>
    </ul>
    <br>
 </ul>
