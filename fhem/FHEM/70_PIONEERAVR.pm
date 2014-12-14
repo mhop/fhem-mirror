@@ -1729,6 +1729,8 @@ RC_layout_PioneerAVR() {
 	inputs is read in during Fhem start and with <code>get <name> statusRequest</code></li>
 	<li>inputUp<br>change input to next input</li>
 	<li>inputDown<br>change input to previous input</li>
+	<li>signalSelect <auto|analog|digital|hdmi|cycle></li>
+	<li>speakers <off|A|B|A+B></li>
 	<li>listeningMode</li>
 	<li>play <br>starts playback for the following inputs: 
 	<ul>
@@ -1893,6 +1895,8 @@ RC_layout_PioneerAVR() {
 	Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen</li>
 	<li>inputUp<br>nächste Eingangsquelle der Main Zone auswählen</li>
 	<li>inputDown<br>vorherige Eingangsquelle der Main Zone auswählen</li>
+	<li>signalSelect <auto|analog|digital|hdmi|cycle></li>
+	<li>speakers <off|A|B|A+B></li>
 	<li>listeningMode</li>
 	<li>play <br>Startet die Wiedergabe für folgende Eingangsquellen: 
 	<ul>
