@@ -7,6 +7,7 @@ use warnings;
 use TcpServerUtils;
 use HttpUtils;
 use Time::HiRes qw(gettimeofday);
+use Errno qw(:POSIX);
 
 #########################
 # Forward declaration
@@ -27,7 +28,6 @@ sub FW_makeEdit($$$);
 sub FW_makeImage(@);
 sub FW_makeTable($$$@);
 sub FW_makeTableFromArray($$@);
-sub FW_myPrint($$);
 sub FW_pF($@);
 sub FW_pH(@);
 sub FW_pHPlain(@);
@@ -175,7 +175,7 @@ FHEMWEB_Initialize($)
   # Initialize internal structures
   map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon",
                               "widgetOverride",  "sortby", "devStateStyle");
-  InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
+  InternalTimer(time()+60, "FW_closeInactiveClients", 0, 0);
 
   $FW_dir      = "$attr{global}{modpath}/www";
   $FW_icondir  = "$FW_dir/images";
@@ -261,8 +261,10 @@ FW_Read($)
 
   if($hash->{SERVERSOCKET}) {   # Accept and create a child
     my $nhash = TcpServer_Accept($hash, "FHEMWEB");
+    return if(!$nhash);
     my $wt = AttrVal($name, "alarmTimeout", undef);
     $nhash->{ALARMTIMEOUT} = $wt if($wt);
+    $nhash->{CD}->blocking(0);
     return;
   }
 
@@ -292,14 +294,19 @@ FW_Read($)
   my $buf;
   my $ret = sysread($c, $buf, 1024);
 
-  if(!defined($ret) || $ret <= 0) {
+  if(!defined($ret) && $! == EWOULDBLOCK ){
+    $hash->{wantWrite} = 1
+      if(TcpServer_WantWrite($hash));
+    return;
+  } elsif(!$ret) { # 0==EOF, undef=error
     CommandDelete(undef, $name);
-    Log3 $FW_wname, 4, "Connection closed for $name";
+    Log3 $FW_wname, 4, "Connection closed for $name: ".
+                (defined($ret) ? 'EOF' : $!);
     return;
   }
 
   $hash->{BUF} .= $buf;
-  if($defs{$FW_wname}{SSL} && $c->can('pending')) {
+  if($hash->{SSL} && $c->can('pending')) {
     while($c->pending()) {
       sysread($c, $buf, 1024);
       $hash->{BUF} .= $buf;
@@ -351,20 +358,21 @@ FW_Read($)
       }
     }
     if($headerOptions[0]) {
-      print $c "HTTP/1.1 200 OK\r\n",
-             $FW_headercors,
-             "Content-Length: 0\r\n\r\n";
+      TcpServer_WriteBlocking($hash,
+             "HTTP/1.1 200 OK\r\n".
+             $FW_headercors.
+             "Content-Length: 0\r\n\r\n");
       delete $hash->{CONTENT_LENGTH};
       delete $hash->{BUF};
       return;
-      exit(1);
     };
     if(!$pwok) {
       my $msg = AttrVal($FW_wname, "basicAuthMsg", "Fhem: login required");
-      print $c "HTTP/1.1 401 Authorization Required\r\n",
-             "WWW-Authenticate: Basic realm=\"$msg\"\r\n",
-             $FW_headercors,
-             "Content-Length: 0\r\n\r\n";
+      TcpServer_WriteBlocking($hash,
+             "HTTP/1.1 401 Authorization Required\r\n".
+             "WWW-Authenticate: Basic realm=\"$msg\"\r\n".
+             $FW_headercors.
+             "Content-Length: 0\r\n\r\n");
       delete $hash->{CONTENT_LENGTH};
       delete $hash->{BUF};
       return;
@@ -383,22 +391,38 @@ FW_Read($)
   $arg = "" if(!defined($arg));
   Log3 $FW_wname, 4, "HTTP $name GET $arg";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
-  my $pid;
   my $pf = AttrVal($FW_wname, "plotfork", undef);
   if($pf) {   # 0 disables
     # Process SVG rendering as a parallel process
     my $p = $data{FWEXT};
     if(grep { $p->{$_}{FORKABLE} && $arg =~ m+^$FW_ME$_+ } keys %{$p}) {
-      if($pid = fork) {
+      my $pid = fork();
+      if($pid) { # success, parent
 	use constant PRIO_PROCESS => 0;
 	setpriority(PRIO_PROCESS, $pid, getpriority(PRIO_PROCESS,$pid) + $pf);
+        # a) while child writes a new request might arrive if client uses
+        # pipelining or
+        # b) parent doesn't know about ssl-session changes due to child writing
+        # to socket
+        # -> have to close socket in parent... so that its only used in this
+        # child.
+	TcpServer_Disown( $hash );
+	delete($defs{$name});
 	return;
-      }
+
+      } elsif(defined($pid)){ # child
+	$hash->{isChild} = 1;
+
+      } # fork failed and continue in parent
     }
   }
 
   my $cacheable = FW_answerCall($arg);
-  return if($cacheable == -1); # Longpoll / inform request;
+  if($cacheable == -1){
+    # Longpoll / inform request;
+    exit if($hash->{isChild});
+    return;
+  }
 
   my $compressed = "";
   if(($FW_RETTYPE =~ m/text/i ||
@@ -413,14 +437,20 @@ FW_Read($)
   my $length = length($FW_RET);
   my $expires = ($cacheable?
                         ("Expires: ".localtime($now+900)." GMT\r\n") : "");
-  Log3 $FW_wname, 4, "$arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
-  $hash->{pid} = $pid if(defined($pid));
-  addToWritebuffer($hash, 
+  Log3 $FW_wname, 4,
+        "$$:$name: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
+  if( ! addToWritebuffer($hash,
            "HTTP/1.1 200 OK\r\n" .
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headercors .
            "Content-Type: $FW_RETTYPE\r\n\r\n" .
-           $FW_RET, "FW_closeConn");
+           $FW_RET, "FW_closeConn") ){
+    Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read";
+    TcpServer_Close( $hash );
+    delete($defs{$name});
+  }
+
+  exit if($hash->{isChild});
 }
 
 sub
@@ -432,7 +462,7 @@ FW_closeConn($)
     TcpServer_Close($hash);
     delete($defs{$hash->{NAME}});
   }
-  exit if(defined($hash->{pid}));
+  exit if($hash->{isChild});
 }
 
 ###########################
@@ -509,11 +539,12 @@ FW_answerCall($)
     $arg = $1; # The stuff behind FW_ME, continue to check for commands/FWEXT
 
   } else {
-    my $c = $me->{CD};
     Log3 $FW_wname, 4, "$FW_wname: redirecting $arg to $FW_ME";
-    print $c "HTTP/1.1 302 Found\r\n",
-             "Content-Length: 0\r\n", $FW_headercors,
-             "Location: $FW_ME\r\n\r\n";
+    TcpServer_WriteBlocking($me,
+             "HTTP/1.1 302 Found\r\n".
+             "Content-Length: 0\r\n".
+             $FW_headercors.
+             "Location: $FW_ME\r\n\r\n");
     FW_closeConn($FW_chash);
     return -1;
   }
@@ -555,11 +586,11 @@ FW_answerCall($)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     %ntfyHash = ();
 
-    my $c = $me->{CD};
-    print $c "HTTP/1.1 200 OK\r\n",
-       $FW_headercors,
-       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n",
-       FW_roomStatesForInform($me);
+    TcpServer_WriteBlocking($me,
+       "HTTP/1.1 200 OK\r\n".
+       $FW_headercors.
+       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
+       FW_roomStatesForInform($me));
     return -1;
   }
 
@@ -619,11 +650,11 @@ FW_answerCall($)
     my $tgt = $FW_ME;
        if($FW_detail) { $tgt .= "?detail=$FW_detail" }
     elsif($FW_room)   { $tgt .= "?room=$FW_room" }
-    my $c = $me->{CD};
-    print $c "HTTP/1.1 302 Found\r\n",
-             "Content-Length: 0\r\n", $FW_headercors,
-             "Location: $tgt\r\n",
-             "\r\n";
+    TcpServer_WriteBlocking($me,
+             "HTTP/1.1 302 Found\r\n".
+             "Content-Length: 0\r\n". $FW_headercors.
+             "Location: $tgt\r\n".
+             "\r\n");
     return -1;
   }
 
@@ -1438,20 +1469,10 @@ FW_fileList($)
 sub
 FW_outputChunk($$$)
 {
-  my ($c, $buf, $d) = @_;
+  my ($hash, $buf, $d) = @_;
   $buf = $d->deflate($buf) if($d);
-  FW_myPrint($c, sprintf("%x\r\n", length($buf)).$buf."\r\n") if(length($buf));
-}
-
-sub
-FW_myPrint($$)
-{
-  my ($c, $buf) = @_;
-  my ($off, $len) = (0, length($buf));
-  while($off < $len) {
-    my $ret = syswrite($c, $buf, $len-$off, $off);
-    last if(!$ret || $ret < 0);
-    $off += $ret;
+  if( length($buf) ){
+    TcpServer_WriteBlocking($hash, sprintf("%x\r\n",length($buf)) .$buf."\r\n");
   }
 }
 
@@ -1462,7 +1483,6 @@ FW_returnFileAsStream($$$$$)
 
   my $etag;
 
-  my $c = $FW_chash->{CD};
   if($cacheable) {
     #Check for If-None-Match header (ETag)
     my @if_none_match_lines = grep /If-None-Match/, @FW_httpheader;
@@ -1474,7 +1494,7 @@ FW_returnFileAsStream($$$$$)
 
     $etag = (stat($path))[9]; #mtime
     if(defined($etag) && defined($if_none_match) && $etag eq $if_none_match) {
-      FW_myPrint($c,"HTTP/1.1 304 Not Modified\r\n".
+      TcpServer_WriteBlocking($FW_chash,"HTTP/1.1 304 Not Modified\r\n".
                     $FW_headercors . "\r\n");
       FW_closeConn($FW_chash);
       return -1;
@@ -1493,29 +1513,32 @@ FW_returnFileAsStream($$$$$)
   my $expires = $cacheable ? ("Expires: ".gmtime(time()+900)." GMT\r\n"): "";
   my $compr = ((int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) && $FW_use_zlib) ?
                 "Content-Encoding: gzip\r\n" : "";
-  FW_myPrint($c, "HTTP/1.1 200 OK\r\n".
+  TcpServer_WriteBlocking($FW_chash, "HTTP/1.1 200 OK\r\n".
                   $compr . $expires . $FW_headercors . $etag .
                   "Transfer-Encoding: chunked\r\n" .
                   "Content-Type: $type; charset=$FW_encoding\r\n\r\n");
 
   my $d = Compress::Zlib::deflateInit(-WindowBits=>31) if($compr);
-  FW_outputChunk($c, $FW_RET, $d);
+  FW_outputChunk($FW_chash, $FW_RET, $d);
   my $buf;
   while(sysread(FH, $buf, 2048)) {
     if($doEsc) { # FileLog special
       $buf =~ s/</&lt;/g;
       $buf =~ s/>/&gt;/g;
     }
-    FW_outputChunk($c, $buf, $d);
+    FW_outputChunk($FW_chash, $buf, $d);
   }
   close(FH);
-  FW_outputChunk($c, $suffix, $d);
+  FW_outputChunk($FW_chash, $suffix, $d);
 
   if($compr) {
     $buf = $d->flush();
-    FW_myPrint($c,sprintf("%x\r\n",length($buf)).$buf."\r\n") if($buf);
+    if($buf){
+      TcpServer_WriteBlocking($FW_chash,
+                sprintf("%x\r\n",length($buf)) .$buf."\r\n");
+    }
   }
-  FW_myPrint($c, "0\r\n\r\n");
+  TcpServer_WriteBlocking($FW_chash, "0\r\n\r\n");
   FW_closeConn($FW_chash);
   return -1;
 }
@@ -2267,8 +2290,15 @@ FW_Notify($$)
     }
   }
 
-  addToWritebuffer($ntfy, join("\n", map { s/\n/ /gm; $_ } @data)."\n")
-    if(@data);
+  if(@data){
+    if(!addToWritebuffer($ntfy, join("\n", map { s/\n/ /gm; $_ } @data)."\n") ){
+      my $name = $ntfy->{NAME};
+      Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
+      TcpServer_Close($ntfy);
+      delete($defs{$name});
+    }
+  }
+
   return undef;
 }
 
@@ -2423,18 +2453,18 @@ FW_Set($@)
 
 #####################################
 sub
-FW_closeOldClients()
+FW_closeInactiveClients()
 {
   my $now = time();
   foreach my $dev (keys %defs) {
     next if(!$defs{$dev}{TYPE} || $defs{$dev}{TYPE} ne "FHEMWEB" ||
             !$defs{$dev}{LASTACCESS} || $defs{$dev}{inform} ||
             ($now - $defs{$dev}{LASTACCESS}) < 60);
-    Log3 $FW_wname, 4, "Closing connection $dev";
+    Log3 $FW_wname, 4, "Closing inactive connection $dev";
     FW_Undef($defs{$dev}, "");
     delete $defs{$dev};
   }
-  InternalTimer($now+60, "FW_closeOldClients", 0, 0);
+  InternalTimer($now+60, "FW_closeInactiveClients", 0, 0);
 }
 
 sub

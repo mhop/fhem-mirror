@@ -34,6 +34,7 @@ use strict;
 use warnings;
 use IO::Socket;
 use Time::HiRes qw(gettimeofday);
+use Errno qw(:POSIX);
 
 
 ##################################################
@@ -541,9 +542,11 @@ while (1) {
     my $hash = $selectlist{$p};
     if(defined($hash->{FD})) {
       vec($rin, $hash->{FD}, 1) = 1
-        if(!defined($hash->{directWriteFn}));
+        if(!defined($hash->{directWriteFn}) && !$hash->{wantWrite} );
       vec($win, $hash->{FD}, 1) = 1
-        if(defined($hash->{directWriteFn}) || defined($hash->{$wbName}));
+        if( (defined($hash->{directWriteFn}) ||
+             defined($hash->{$wbName}) || 
+             $hash->{wantWrite} ) && !$hash->{wantRead} );
     }
     vec($ein, $hash->{EXCEPT_FD}, 1) = 1
         if(defined($hash->{"EXCEPT_FD"}));
@@ -595,6 +598,8 @@ while (1) {
     next if(!$isDev && !$isDirect);
 
     if(defined($hash->{FD}) && vec($rout, $hash->{FD}, 1)) {
+      delete $hash->{wantRead};
+
       if($hash->{directReadFn}) {
         $hash->{directReadFn}($hash);
       } else {
@@ -602,21 +607,28 @@ while (1) {
       }
     }
 
-    if((defined($hash->{$wbName}) || defined($hash->{directWriteFn})) &&
-        defined($hash->{FD}) && vec($wout, $hash->{FD}, 1)) {
+    if( defined($hash->{FD}) && vec($wout, $hash->{FD}, 1)) {
+      delete $hash->{wantWrite};
 
       if($hash->{directWriteFn}) {
         $hash->{directWriteFn}($hash);
 
-      } else {
+      } elsif(defined($hash->{$wbName})) {
         my $wb = $hash->{$wbName};
         alarm($hash->{ALARMTIMEOUT}) if($hash->{ALARMTIMEOUT});
         my $ret = syswrite($hash->{CD}, $wb);
+        my $werr = int($!);
         alarm(0) if($hash->{ALARMTIMEOUT});
-        if(!$ret || $ret < 0) {
+
+        if(!defined($ret) && $werr == EWOULDBLOCK ) {
+	  $hash->{wantRead} = 1
+	    if(TcpServer_WantRead($hash));
+
+        } elsif(!$ret) { # zero=EOF, undef=error
           Log 4, "Write error to $p, deleting $hash->{NAME}";
           TcpServer_Close($hash);
           CommandDelete(undef, $hash->{NAME});
+
         } else {
           if($ret == length($wb)) {
             delete($hash->{$wbName});
@@ -3855,13 +3867,8 @@ addToWritebuffer($$@)
 {
   my ($hash, $txt, $callback, $nolimit) = @_;
 
-  if(defined($hash->{pid})) {  # Wont go to the main select in a forked process
-    my ($off, $len) = (0, length($txt));
-    while($off < $len) {
-      my $ret = syswrite($hash->{CD}, $txt, $len-$off, $off);
-      last if(!$ret || $ret <= 0);
-      $off += $ret;
-    }
+  if($hash->{isChild}) {  # Wont go to the main select in a forked process
+    TcpServer_WriteBlocking( $hash, $txt );
     if($callback) {
       no strict "refs";
       my $ret = &{$callback}($hash);
@@ -3875,7 +3882,11 @@ addToWritebuffer($$@)
     $hash->{$wbName} = $txt;
   } elsif($nolimit || length($hash->{$wbName}) < 102400) {
     $hash->{$wbName} .= $txt;
+  } else {
+    return 0;
   }
+
+  return 1; # success
 }
 
 sub

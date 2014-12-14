@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use IO::Socket;
+use Errno qw(:POSIX);
 
 sub
 TcpServer_Open($$$)
@@ -93,8 +94,12 @@ TcpServer_Accept($$)
       SSL_version   => 'SSLv23:!SSLv3:!SSLv2', #Forum #27565
       Timeout       => 4,
       });
-    if(!$ret && $! ne "Socket is not connected") {
-      Log3 $name, 1, "$type SSL/HTTPS error: $!";
+    my $err = $!;
+    if( !$ret
+      && $err != EWOULDBLOCK
+      && $err ne "Socket is not connected") {
+
+      Log3 $name, 1, "$type SSL/HTTPS error: $err";
       close($clientinfo[0]);
       return undef;
     }
@@ -107,6 +112,7 @@ TcpServer_Accept($$)
   $nhash{FD}    = $clientinfo[0]->fileno();
   $nhash{CD}    = $clientinfo[0];     # sysread / close won't work on fileno
   $nhash{TYPE}  = $type;
+  $nhash{SSL}   = $hash->{SSL};
   $nhash{STATE} = "Connected";
   $nhash{SNAME} = $name;
   $nhash{TEMPORARY} = 1;              # Don't want to save it
@@ -155,4 +161,118 @@ TcpServer_Close($)
   }
   return undef;
 }
+
+# close a (SSL-)Socket in local process
+# avoids interfering with other processes using it
+# this is critical for SSL and helps with other issues, too 
+sub
+TcpServer_Disown($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  if( defined($hash->{CD}) ){
+    if( $hash->{SSL} ){
+      $hash->{CD}->close( SSL_no_shutdown => 1);
+    } else {
+      close( $hash->{CD} );
+    }
+    delete($hash->{CD});
+    delete($selectlist{$name});
+    delete($hash->{FD});  # Avoid Read->Close->Write
+  }
+
+  return;
+}
+
+# wait for a socket to become ready
+# takes IO::Socket::SSL + non-blocking into account
+sub
+TcpServer_Wait($$)
+{
+  my( $hash, $direction ) = @_;
+
+  my $read = '';
+  my $write ='';
+
+  if( $direction eq 'read' || $hash->{wantRead} ){
+    vec( $read, $hash->{FD}, 1) = 1;
+  } elsif( $direction eq 'write' || $hash->{wantWrite} ){
+    vec( $write, $hash->{FD}, 1) = 1;
+  } else {
+    return undef;
+  }
+
+  my $ret = select( $read, $write, undef, undef );
+  return if $ret == -1;
+
+  if( vec( $read, $hash->{FD}, 1) ){
+    delete $hash->{wantRead};
+  }
+  if( vec( $write, $hash->{FD}, 1) ){
+    delete $hash->{wantWrite};
+  }
+
+  # return true on success
+  return 1;
+}
+
+# WantRead/Write: keep ssl constants local
+sub
+TcpServer_WantRead($)
+{
+  my( $hash ) = @_;
+
+  return $hash->{SSL}
+	&& $hash->{CD}
+	&& $hash->{CD}->errstr == &IO::Socket::SSL::SSL_WANT_READ;
+}
+
+sub
+TcpServer_WantWrite($)
+{
+  my( $hash ) = @_;
+
+  return $hash->{SSL}
+	&& $hash->{CD}
+	&& $hash->{CD}->errstr == &IO::Socket::SSL::SSL_WANT_WRITE;
+}
+
+# write until all data is done.
+# hanldes both, blocking and non-blocking sockets
+# ... with or without SSL
+sub
+TcpServer_WriteBlocking($$)
+{
+  my( $hash, $txt ) = @_;
+
+  my $sock = $hash->{CD};
+  return undef if(!$sock);
+  my $off = 0;
+  my $len = length($txt);
+
+  while($off < $len) {
+    if(!TcpServer_Wait($hash, 'write')) {
+      TcpServer_Close($hash);
+      return undef;
+    }
+
+    my $ret = syswrite($sock, $txt, $len-$off, $off);
+
+    if( defined $ret ){
+      $off += $ret;
+
+    } elsif( $! == EWOULDBLOCK ){
+      $hash->{wantRead} = 1
+        if TcpServer_WantRead($hash);
+
+    } else {
+      TcpServer_Close($hash);
+      return undef; # error
+    }
+  }
+
+  return 1; # success
+}
+
 1;
