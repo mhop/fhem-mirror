@@ -747,12 +747,15 @@ FRITZBOX_Readout_Done($)
       readingsBulkUpdate( $hash, "lastReadout", $msg );
       FRITZBOX_Log $hash, 4, $msg;
       my $newState = "WLAN: ";
-      if ($values{"box_wlan_2.4GHz"} eq "on" || $values{box_wlan_5GHz} eq "on")
-      {
+      if ( $values{"box_wlan_2.4GHz"} eq "on" ) {
          $newState .= "on";
-      }
-      else
-      {
+      } elsif ( defined $values{box_wlan_5GHz} ) {
+         if ( $values{box_wlan_5GHz} eq "on") {
+            $newState .= "on";
+         } else {
+            $newState .= "off";
+         }
+      } else {
          $newState .= "off";
       }
       $newState .=" gWLAN: ".$values{box_guestWlan} ;
@@ -1251,7 +1254,7 @@ sub FRITZBOX_Open_Connection($)
    FRITZBOX_Log $hash, 5, "Wait for command prompt";
    unless ($telnet->waitfor( '/# $/i' ))
    {
-      $msg = "Telnet error while waiting for command prompt: ".$telnet->errmsg;
+      $msg = "Telnet error while waiting for command prompt (perhaps wrong password): ".$telnet->errmsg;
       FRITZBOX_Log $hash, 2, $msg;
       $telnet->close;
       $telnet = undef;
@@ -1737,7 +1740,7 @@ sub FRITZBOX_fritztris($)
 <h3>FRITZBOX</h3>
 <div  style="width:800px"> 
 <ul>
-   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-User!).
+   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!).
    <br/><br/>
    Wenn FHEM nicht auf einer Fritz!Box l&auml;uft, versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml; diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
    <br/><br/>
@@ -1889,29 +1892,29 @@ sub FRITZBOX_fritztris($)
       </li><br>
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
          <br>
-         This is the default path that will be used if a file name does not start with / (slash).
+         Dies ist der Standard-Pfad der f&uuml;r Dateinamen benutzt wird, die nicht mit einem / (Schr&auml;gstrich) beginnen.
          <br>
-         It needs to be the name of the path on the Fritz!Box. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
+         Es muss ein Pfad auf der Fritz!Box sein. D.h., es sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
       </li><br>
       <li><code>fritzBoxIP</code>
          <br>
-         IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
+         IP Adresse oder ULR der Fritz!Box f&uuml;r Fernzugriff per Telnet. Standard ist "fritz.box".
       </li><br>
       <li><code>pwdFile &lt;fileName&gt;</code>
          <br>
-         File that contains the password for telnet access. Default is 'fb_pwd.txt' in the root directory of FHEM.
+         Datei welche das Passwort für den Telnetzugang enth&auml;t. Der Standard ist 'fb_pwd.txt' im Wurzelverzeichnis von FHEM.
       </li><br>
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
-         User name that is used for telnet access. By default no user name is required to login.
+         Benutzername f&uuml;r den Telnetzugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
          <br>
-         If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
+         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribute definiert werden.
       </li><br>
       <li><code>ringWithIntern &lt;internalNumber&gt;</code>
          <br>
-         To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
+         Um ein Telephone anzurufen, muss eine Anrufer spezifiziert werden. Normalerweise ist dies in diesem Modul die Nummer 50 "ISDN:W&auml;hlhilfe".
          <br>
-         To show a message (default: "FHEM") during a ring the internal phone numbers 1 or 2 can be specified here.
+         Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interner Nummer 1 oder 2 angegeben werden.
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -1920,35 +1923,35 @@ sub FRITZBOX_fritztris($)
    <a name="FRITZBOXreading"></a>
    <b>Readings</b>
    <ul><br>
-      <li><b>alarm</b><i>1</i> - Name of the alarm clock <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_state</b> - Current state of the alarm clock <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_target</b> - Internal number of the alarm clock <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_time</b> - Alarm time of the alarm clock <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
-      <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
-      <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
-      <li><b>box_model</b> - Fritz!Box model</li>
-      <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
-      <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
-      <li><b>dect</b><i>1</i> - Name of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_custRingTone</b> - Customer ring tone of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_fwVersion</b> - Firmware Version of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_intRingTone</b> - Internal ring tone of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_manufacturer</b> - Manufacturer of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
-      <li><b>diversity</b><i>1</i> - Incoming phone number of the call diversity <i>1</i></li>
-      <li><b>diversity</b><i>1</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
-      <li><b>diversity</b><i>1</i><b>_state</b> - Current state of the call diversity <i>1</i></li>
-      <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
-      <li><b>tam</b><i>1</i> - Name of the answering machine <i>1</i></li>
-      <li><b>tam</b><i>1</i><b>_newMsg</b> - New messages on the answering machine <i>1</i></li>
-      <li><b>tam</b><i>1</i><b>_oldMsg</b> - Old messages on the answering machine <i>1</i></li>
-      <li><b>tam</b><i>1</i><b>_state</b> - Current state of the answering machine <i>1</i></li>
-      <li><b>user</b><i>01</i> - Name of user/IP <i>1</i> that is under parental control</li>
+      <li><b>alarm</b><i>1</i> - Name des Weckers <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_state</b> - Aktueller Status des Weckers <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_target</b> - Interne Nummer des Weckers <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_time</b> - Weckzeit des Weckers <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_wdays</b> - Wochentage des Weckers <i>1</i></li>
+      <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
+      <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
+      <li><b>box_model</b> - Fritz!Box-Modell</li>
+      <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
+      <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
+      <li><b>dect</b><i>1</i> - Name des DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton des Weckers f&uuml;r das DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_custRingTone</b> - Benutzerspezifischer Klingelton des DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_fwVersion</b> - Firmware-Version des DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_intern</b> - Interne Nummer des DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_intRingTone</b> - Interner Klingelton des DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_manufacturer</b> - Hersteller des DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_model</b> - Modell des DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i> - Interner Name des analogen Telefonanschlusses <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
+      <li><b>diversity</b><i>1</i> - Eigene Rufnummer der Rufumleitung <i>1</i></li>
+      <li><b>diversity</b><i>1</i><b>_dest</b> - Zielnummer der Rufumleitung <i>1</i></li>
+      <li><b>diversity</b><i>1</i><b>_state</b> - Aktueller Status der Rufumleitung <i>1</i></li>
+      <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
+      <li><b>tam</b><i>1</i> - Name des Anrufbeantworters <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_newMsg</b> - Anzahl neuer Nachrichten auf dem Anrufbeantworter <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_oldMsg</b> - Anzahl alter Nachrichten auf dem Anrufbeantworter <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_state</b> - Aktueller Status des Anrufbeantworters <i>1</i></li>
+      <li><b>user</b><i>01</i> - Name des Benutzers bzw. der IP <i>1</i> f&uuml;r die eine Zugangsbeschr&auml;nkung (Kindersicherung) eingerichtet ist</li>
       <li><b>user</b><i>01</i>_thisMonthTime - this month internet usage of user/IP <i>1</i> (parental control)</li>
       <li><b>user</b><i>01</i>_todaySeconds - today's internet usage in seconds of user/IP <i>1</i> (parental control)</li>
       <li><b>user</b><i>01</i>_todayTime - today's internet usage of user/IP <i>1</i> (parental control)</li>
