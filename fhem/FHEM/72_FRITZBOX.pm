@@ -252,8 +252,9 @@ FRITZBOX_Set($$@)
    my $resultStr = "";
    
    my $list = "alarm"
-            . " customerRingTone"
             . " convertRingTone"
+            . " createPwdFile"
+            . " customerRingTone"
             . " diversity"
             . " guestWlan:on,off"
             . " message"
@@ -275,23 +276,32 @@ FRITZBOX_Set($$@)
          readingsSingleUpdate($hash,"alarm".$val[0]."_state",$val[1], 1);
          return undef;
       }
-   }
-   elsif ( lc $cmd eq 'convertringtone')
-   {
+
+   } elsif ( lc $cmd eq 'convertringtone') {
       if (int @val > 0) 
       {
          return FRITZBOX_ConvertRingTone $hash, @val;
       }
-   }
-   elsif ( lc $cmd eq 'customerringtone')
-   {
+      
+   } elsif ( lc $cmd eq 'createpwdfile') {
+      if (int @val > 0) 
+      {
+         my $pwdFile = AttrVal( $name, "pwdFile", "fb_pwd.txt");
+         open( FILE, ">".$pwdFile) 
+            or return "Error when opening password file '$pwdFile': ".$!;
+         print FILE join( " ", @val);
+         close FILE
+            or return "Error when closing password file '$pwdFile': ".$!;
+         return "Created password file '$pwdFile'";
+      }
+
+   } elsif ( lc $cmd eq 'customerringtone') {
       if (int @val > 0) 
       {
          return FRITZBOX_SetCustomerRingTone $hash, @val;
       }
-   }
-   elsif ( lc $cmd eq 'diversity')
-   {
+      
+   } elsif ( lc $cmd eq 'diversity') {
       if ( int @val == 2 && defined( $hash->{READINGS}{"diversity".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
       {
          my $state = $val[1];
@@ -301,9 +311,8 @@ FRITZBOX_Set($$@)
          readingsSingleUpdate($hash,"diversity".$val[0]."_state",$val[1], 1);
          return undef;
       }
-   }
-   elsif ( lc $cmd eq 'guestwlan')
-   {
+      
+   } elsif ( lc $cmd eq 'guestwlan') {
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
          my $state = $val[0];
@@ -1538,22 +1547,26 @@ sub FRITZBOX_fritztris($)
          <br>
          Switches the alarm number (1, 2 or 3) on or off.
       </li><br>
-      <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
-         <br>
-         Switches the guest WLAN on or off.
-      </li><br>
+
       <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
          <br>
-         Converts the mp3-file fullFilePath to a G722 format and puts it in the same path.
+         Converts the mp3-file fullFilePath to the G722 format and puts it in the same path.
          <br>
-         The file has to be placed on the file system of the fritzbox.
+         The file has to be placed on the file system of the Fritz!Box.
       </li><br>
+      
       <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
          <br>
          <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
          <br>
          The file has to be placed on the file system of the fritzbox.
       </li><br>
+
+      <li><code>set &lt;name&gt; createPwdFile &lt;password&gt;</code>
+         <br>
+         Creates a file that contains the telnet password. The file name corresponds to the one used for remote telnet access.
+      </li><br>
+
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
          <br>
          Uploads the file fullFilePath on the given handset. Only mp3 or G722 format is allowed.
@@ -1562,6 +1575,7 @@ sub FRITZBOX_fritztris($)
          <br>
          The upload takes about one minute before the tone is available.
       </li><br>
+
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Switches the call diversity number (1, 2 ...) on or off.
@@ -1569,6 +1583,12 @@ sub FRITZBOX_fritztris($)
          <br>
          Note! The Fritz!Box allows also forwarding in accordance to the calling number. This is not included in this feature. 
       </li><br>
+
+      <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
+         <br>
+         Switches the guest WLAN on or off.
+      </li><br>
+
       <li><code>set &lt;name&gt; musicOnHold &lt;fullFilePath&gt;</code>
          <br>
          <i>Not implemented yet.</i> Uploads the file fullFilePath as "Music on Hold". Only mp3 or the MOH-format is allowed.
@@ -1623,7 +1643,7 @@ sub FRITZBOX_fritztris($)
       <br>
       <li><code>get &lt;name&gt; ringTones</code>
          <br>
-         Shows a list of ring tones that can be used.
+         Shows the list of ring tones that can be used.
       </li><br>
    </ul>  
   
@@ -1710,5 +1730,233 @@ sub FRITZBOX_fritztris($)
 </div>
 
 =end html
+
+=begin html_DE
+
+<a name="FRITZBOX"></a>
+<h3>FRITZBOX</h3>
+<div  style="width:800px"> 
+<ul>
+   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-User!).
+   <br/><br/>
+   Wenn FHEM nicht auf einer Fritz!Box l&auml;uft, versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml; diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
+   <br/><br/>
+   Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
+   <br>
+   <i>Bisher wurde das Modul auf einer Fritz!Box 7390 und 7490 und auf den Fritz!Fon MT-F und C4 getestet.</i>
+   <br>
+   <i>Das Modul nutzt das Perlmodule 'Net::Telnet' f&uuml;r den Fernzugriff.</i>
+   <br/><br/>
+   <a name="FRITZBOXdefine"></a>
+   <b>Define</b>
+   <ul>
+      <br>
+      <code>define &lt;name&gt; FRITZBOX</code>
+      <br/><br/>
+      Beispiel: <code>define Fritzbox FRITZBOX</code>
+      <br/><br/>
+      Das Fritz!Box OS hat eine versteckte Funktion (Osterei).
+      <br>
+      Teste sie mit: <code>define MyEasterEgg weblink htmlCode { FRITZBOX_fritztris("Fritzbox") }</code>
+      <br/><br/>
+   </ul>
+  
+   <a name="FRITZBOXset"></a>
+   <b>Set</b>
+   <ul>
+      <br>
+      <li><code>set &lt;name&gt; alarm &lt;number&gt; &lt;on|off&gt;</code>
+         <br>
+         Schaltet den Wecker Nummer 1, 2 oder 3 an oder aus.
+      </li><br>
+
+      <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
+         <br>
+         Konvertiert die  mp3-Datei fullFilePath in das G722-Format und legt es im selben Pfad ab.
+         <br>
+         Die Datei muss im Dateisystem der Fritz!Box liegen.
+      </li><br>
+      
+      <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
+         <br>
+         <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
+         <br>
+         The file has to be placed on the file system of the fritzbox.
+      </li><br>
+
+      <li><code>set &lt;name&gt; createPwdFile &lt;password&gt;</code>
+         <br>
+         Erzeugt eine Datei welche das Telnet-Passwort enth&auml;lt. Der Dateiname entspricht demjenigen, der für den Telnetzugriff genutzt wird.
+      </li><br>
+
+      <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
+         <br>
+         L&auml;dt die Datei fullFilePath als Klingelton auf das angegebene Telefon. Nur das mp3- oder G722-Format ist erlaubt.
+         <br>
+         Die Datei muss im Dateisystem der Fritzbox liegen.
+         <br>
+         Das Hochladen dauert etwa eine Minute bis der Klingelton verf&uuml,gbar ist.
+      </li><br>
+
+      <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
+         <br>
+         Schaltet die Rufumleitung (Nummer 1, 2 ...) an oder aus.
+         Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden.
+         <br>
+         Achtung! Die Fritz!Box erm&oouml;glicht auch eine Weiterleitung in Abh&auml;ngigkeit von der anrufenden Nummer. Diese Art der Weiterleitung kann hiermit nicht geschaltet werden. 
+      </li><br>
+
+      <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
+         <br>
+         Schaltet das G&auml;ste-WLAN an oder aus.
+      </li><br>
+
+      <li><code>set &lt;name&gt; musicOnHold &lt;fullFilePath&gt;</code>
+         <br>
+         <i>Not implemented yet.</i> Uploads the file fullFilePath as "Music on Hold". Only mp3 or the MOH-format is allowed.
+         <br>
+         The file has to be placed on the file system of the Fritz!Box.
+         <br>
+         The upload takes about one minute before the tone is available.
+      </li><br>
+      
+      <li><code>set &lt;name&gt; ring &lt;interneNummern&gt; [Dauer [Klingelton]] [msg:Nachricht]</code>
+         Beispiel: <code>set fritzbox ring 611,612 5 Budapest msg:Es regnet</code>
+         <br>
+         L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
+         Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
+         <br>
+         Standard-Dauer ist 5 Sekunden. Standard-Klingelton ist der interne Klingelton des Ger&auml;tes.
+         Der Klingelton wird f&uuml;r Rundrufe (9 oder 50) ignoriert. 
+         <br>
+         Wenn das <a href=#FRITZBOXattr>Attribute</a> 'ringWithIntern' existiert, wird der Text hinter 'msg:' als Name des Anrufers angezeigt.
+         Er darf maximal 30 Zeichen lang sein.
+         <br>
+         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold) welche zur Nachrichten&uuml;bermittlung genutzt werden kann.
+      </li><br>
+
+      <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
+         <br>
+         Sendet eine Email &uuml;ber den Emailbenachrichtigungsservice der als Push Service auf der Fritz!Box konfiguriert wurde.
+         Alle Parameter k&ouml;nnen ausgelassen werden. Bitte kontrolliert, dass die Email nicht im Junk-Verzeichnis landet.
+         <br>
+      </li><br>
+      
+      <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
+         <br>
+         <i>Not implemented yet.</i> Starts the internet radio on the given Fritz!Fon
+         <br>
+      </li><br>
+      
+      <li><code>set &lt;name&gt; tam &lt;number&gt; &lt;on|off&gt;</code>
+         <br>
+         Schaltet den Anrufbeantworter (Nummer 1, 2 ...) an oder aus.
+         Der Anrufbeantworter muss zuvor auf der Fritz!Box eingerichtet werden.
+      </li><br>
+      
+      <li><code>set &lt;name&gt; update</code>
+         <br>
+         Startet eine Aktualisierung der Ger&auml;tewerte.
+      </li><br>
+      
+      <li><code>set &lt;name&gt; wlan &lt;on|off&gt;</code>
+         <br>
+         Schaltet WLAN an oder aus.
+      </li><br>
+   </ul>  
+
+   <a name="FRITZBOXget"></a>
+   <b>Get</b>
+   <ul>
+      <br>
+      <li><code>get &lt;name&gt; ringTones</code>
+         <br>
+         Zeigt die Liste der Klingelt&ouml;ne, die benutzt werden k&ouml;nnen.
+      </li><br>
+   </ul>  
+  
+   <a name="FRITZBOXattr"></a>
+   <b>Attributes</b>
+   <ul>
+      <br>
+      <li><code>defaultCallerName</code>
+         <br>
+         Standard-Text, der auf dem angerufenen internen Telefon als "Anrufer" gezeigt wird.
+         <br>
+         Dies erfolgt, indem w&auml;hrend des Klingelns kurzzeitige der Name der internen anrufenden Nummer ge&auml;ndert wird.
+         <br>
+         Es ist maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
+      </li><br>
+      <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
+         <br>
+         This is the default path that will be used if a file name does not start with / (slash).
+         <br>
+         It needs to be the name of the path on the Fritz!Box. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
+      </li><br>
+      <li><code>fritzBoxIP</code>
+         <br>
+         IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
+      </li><br>
+      <li><code>pwdFile &lt;fileName&gt;</code>
+         <br>
+         File that contains the password for telnet access. Default is 'fb_pwd.txt' in the root directory of FHEM.
+      </li><br>
+      <li><code>telnetUser &lt;user name&gt;</code>
+         <br>
+         User name that is used for telnet access. By default no user name is required to login.
+         <br>
+         If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
+      </li><br>
+      <li><code>ringWithIntern &lt;internalNumber&gt;</code>
+         <br>
+         To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
+         <br>
+         To show a message (default: "FHEM") during a ring the internal phone numbers 1 or 2 can be specified here.
+      </li><br>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+   </ul>
+   <br>
+
+   <a name="FRITZBOXreading"></a>
+   <b>Readings</b>
+   <ul><br>
+      <li><b>alarm</b><i>1</i> - Name of the alarm clock <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_state</b> - Current state of the alarm clock <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_target</b> - Internal number of the alarm clock <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_time</b> - Alarm time of the alarm clock <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
+      <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
+      <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
+      <li><b>box_model</b> - Fritz!Box model</li>
+      <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
+      <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
+      <li><b>dect</b><i>1</i> - Name of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_custRingTone</b> - Customer ring tone of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_fwVersion</b> - Firmware Version of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_intRingTone</b> - Internal ring tone of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_manufacturer</b> - Manufacturer of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
+      <li><b>diversity</b><i>1</i> - Incoming phone number of the call diversity <i>1</i></li>
+      <li><b>diversity</b><i>1</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
+      <li><b>diversity</b><i>1</i><b>_state</b> - Current state of the call diversity <i>1</i></li>
+      <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
+      <li><b>tam</b><i>1</i> - Name of the answering machine <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_newMsg</b> - New messages on the answering machine <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_oldMsg</b> - Old messages on the answering machine <i>1</i></li>
+      <li><b>tam</b><i>1</i><b>_state</b> - Current state of the answering machine <i>1</i></li>
+      <li><b>user</b><i>01</i> - Name of user/IP <i>1</i> that is under parental control</li>
+      <li><b>user</b><i>01</i>_thisMonthTime - this month internet usage of user/IP <i>1</i> (parental control)</li>
+      <li><b>user</b><i>01</i>_todaySeconds - today's internet usage in seconds of user/IP <i>1</i> (parental control)</li>
+      <li><b>user</b><i>01</i>_todayTime - today's internet usage of user/IP <i>1</i> (parental control)</li>
+   </ul>
+   <br>
+</ul>
+</div>
+
+=end html_DE
 
 =cut-
