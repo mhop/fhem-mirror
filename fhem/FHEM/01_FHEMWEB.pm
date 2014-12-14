@@ -1329,6 +1329,7 @@ FW_showRoom()
         }
         $row++;
 
+        $extPage{group} = $g;
         my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
         $allSets = FW_widgetOverride($d, $allSets);
 
@@ -1376,6 +1377,7 @@ FW_showRoom()
                         lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
                    @atEnds) {
     no strict "refs";
+    $extPage{group} = "atEnd";
     FW_pO &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, 
                                                         $FW_room, \%extPage);
     use strict "refs";
