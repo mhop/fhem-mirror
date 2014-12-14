@@ -463,12 +463,10 @@ FRITZBOX_Readout_Run($)
 
    my $returnStr = "$name|";
  
-   if ($result = FRITZBOX_Open_Connection( $hash ) )
-   {
-      $returnStr .= "Error|".$result;
-      return $returnStr;
-   }
-
+   $result = FRITZBOX_Open_Connection( $hash );
+   return "$name|Error|$result"
+      if $result;
+   
    if ($slowRun == 1)
    {
       
