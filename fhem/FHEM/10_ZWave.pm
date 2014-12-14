@@ -1351,7 +1351,7 @@ s2Hex($)
 
   <br><br><b>Class BATTERY</b>
   <li>battery<br>
-    return the charge of the battery in %, as battery:value %
+    return the charge of the battery in %, as battery:value % or battery:low
     </li>
 
   <br><br><b>Class CONFIGURATION</b>
