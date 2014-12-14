@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.4.0
+# Version: 1.4.1
 #
 # Major Version History:
 # - 1.4.0 - 2014-11-27
@@ -498,7 +498,10 @@ sub ENIGMA2_Set($@) {
 
     # remoteControl
     elsif ( lc( $a[1] ) eq "remotecontrol" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2]
+          if !defined( $a[3] );
+        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2] . " " . $a[3]
+          if defined( $a[3] );
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             if ( !defined( $a[2] ) ) {
@@ -527,6 +530,8 @@ sub ENIGMA2_Set($@) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand( $a[2] );
                 $cmd .= "&rcu=" . $attr{$name}{remotecontrol}
                   if defined( $attr{$name}{remotecontrol} );
+                $cmd .= "&type=long"
+                  if ( defined( $a[3] ) && lc( $a[3] ) eq "long" );
             }
             else {
                 my $commandKeys = "";
@@ -1572,8 +1577,9 @@ sub ENIGMA2_ReceiveCommand($$$) {
                               split( /:/, $return->{e2service}{$e2reading} );
 
                             if (
-                                   defined( $servicetype[2] )
-                                && ( $servicetype[2] eq "2" || $servicetype[2] eq "10" )
+                                defined( $servicetype[2] )
+                                && (   $servicetype[2] eq "2"
+                                    || $servicetype[2] eq "10" )
                                 && ( !defined( $hash->{READINGS}{input}{VAL} )
                                     || $hash->{READINGS}{input}{VAL} ne
                                     "radio" )
@@ -1820,17 +1826,19 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                             $recordingsNext_time =
                               $return->{e2timer}{e2startprepare};
-                            $recordingsNext_time_hr    = sprintf( "%02d:%02d:%02d", $t[2], $t[1], $t[0] );
-                            $recordingsNext_counter    = int( $timeleft + 0.5 );
+                            $recordingsNext_time_hr =
+                              sprintf( "%02d:%02d:%02d", $t[2], $t[1], $t[0] );
+                            $recordingsNext_counter = int( $timeleft + 0.5 );
                             $recordingsNextServicename =
                               $return->{e2timer}{e2servicename};
                             $recordingsNextName = $return->{e2timer}{e2name};
 
-														# human readable
-                            my @t2 = localtime( $timeleft );
-                            $recordingsNext_counter_hr = sprintf( "%02d:%02d:%02d",
-                                  $t2[2] - 1,
-                                  $t2[1], $t2[0] );
+                            # human readable
+                            my @t2 = localtime($timeleft);
+                            $recordingsNext_counter_hr =
+                              sprintf( "%02d:%02d:%02d",
+                                $t2[2] - 1,
+                                $t2[1], $t2[0] );
                         }
                     }
 
@@ -1880,26 +1888,31 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             my $timeleft =
                               $return->{e2timer}[$i]{e2startprepare} - time();
 
-			                        # only add if starttime is smaller
-			                        if (   $recordingsNext_time eq "0"
-			                            || $timeleft < $recordingsNext_time - time() )
-			                        {
-			                            my @t =
-			                              localtime( $return->{e2timer}[$i]{e2startprepare} );
+                            # only add if starttime is smaller
+                            if (   $recordingsNext_time eq "0"
+                                || $timeleft < $recordingsNext_time - time() )
+                            {
+                                my @t =
+                                  localtime(
+                                    $return->{e2timer}[$i]{e2startprepare} );
 
-			                            $recordingsNext_time =
-			                              $return->{e2timer}[$i]{e2startprepare};
-			                            $recordingsNext_time_hr    = sprintf( "%02d:%02d:%02d", $t[2], $t[1], $t[0] );
-			                            $recordingsNext_counter    = $timeleft;
-			                            $recordingsNextServicename =
-			                              $return->{e2timer}[$i]{e2servicename};
-			                            $recordingsNextName = $return->{e2timer}[$i]{e2name};
+                                $recordingsNext_time =
+                                  $return->{e2timer}[$i]{e2startprepare};
+                                $recordingsNext_time_hr =
+                                  sprintf( "%02d:%02d:%02d",
+                                    $t[2], $t[1], $t[0] );
+                                $recordingsNext_counter = $timeleft;
+                                $recordingsNextServicename =
+                                  $return->{e2timer}[$i]{e2servicename};
+                                $recordingsNextName =
+                                  $return->{e2timer}[$i]{e2name};
 
-																	# human readable
-			                            my @t2 = localtime( $timeleft );
-			                            $recordingsNext_counter_hr = sprintf( "%02d:%02d:%02d",
-			                                  $t2[2] - 1,
-			                                  $t2[1], $t2[0] );
+                                # human readable
+                                my @t2 = localtime($timeleft);
+                                $recordingsNext_counter_hr =
+                                  sprintf( "%02d:%02d:%02d",
+                                    $t2[2] - 1,
+                                    $t2[1], $t2[0] );
                             }
                         }
 
@@ -2988,7 +3001,8 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
             <b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device
           </li>
           <li>
-            <b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help
+            <b>remoteControl</b> UP,DOWN,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help for full command list<br />
+            Note: You may add the word "long" after the command to simulate a long key press.
           </li>
           <li>
             <b>showText</b> text &nbsp;&nbsp;-&nbsp;&nbsp; sends info message to screen to be displayed for 8 seconds
