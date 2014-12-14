@@ -39,10 +39,10 @@ sub readingsGroup_Initialize($)
   $hash->{DefFn}    = "readingsGroup_Define";
   $hash->{NotifyFn} = "readingsGroup_Notify";
   $hash->{UndefFn}  = "readingsGroup_Undefine";
-  #$hash->{SetFn}    = "readingsGroup_Set";
+  $hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 style timestampStyle ". join( " ", @mapping_attrs ) ." separator nolinks:1 noheading:1 nonames:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1 visibility:hidden,hideable";
+  $hash->{AttrList} = "disable:1,2,3 style timestampStyle ". join( " ", @mapping_attrs ) ." separator nolinks:1 noheading:1 nonames:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1 visibility:hidden,hideable,collapsed,collapsible";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -233,6 +233,19 @@ lookup($$$$$$$$$)
   my($mapping,$name,$alias,$reading,$value,$room,$group,$row,$default) = @_;
 
   if( $mapping ) {
+    if( !ref($mapping) && $mapping =~ m/^{.*}$/) {
+      my $DEVICE = $name;
+      my $READING = $reading;
+      my $VALUE = $value;
+      my $ROW = $row;
+      my $m = eval $mapping;
+      if( $@ ) {
+        Log 2, $@ if( $@ );
+      } else {
+        $mapping = $m;
+      }
+    }
+
     if( ref($mapping) eq 'HASH' ) {
       $default = $mapping->{$name} if( defined($mapping->{$name}) );
       $default = $mapping->{$reading} if( defined($mapping->{$reading}) );
@@ -243,13 +256,13 @@ lookup($$$$$$$$$)
     }
 
     if( !ref($default) && $default =~ m/^{.*}$/) {
-       my $DEVICE = $name;
-       my $READING = $reading;
-       my $VALUE = $value;
-       my $ROW = $row;
-       $default = eval $default;
-       $default = "" if( $@ );
-       Log 2, $@ if( $@ );
+      my $DEVICE = $name;
+      my $READING = $reading;
+      my $VALUE = $value;
+      my $ROW = $row;
+      $default = eval $default;
+      $default = "" if( $@ );
+      Log 2, $@ if( $@ );
     }
 
     return $default if( !defined($default) );
@@ -279,6 +292,20 @@ lookup2($$$$;$$)
   my($lookup,$name,$reading,$value,$row,$column) = @_;
 
   return "" if( !$lookup );
+
+  if( !ref($lookup) && $lookup =~ m/^{.*}$/) {
+    my $DEVICE = $name;
+    my $READING = $reading;
+    my $VALUE = $value;
+    my $ROW = $row;
+    my $COLUMN = $column;
+    my $l = eval $lookup;
+    if( $@ ) {
+      Log 2, $@ if( $@ );
+    } else {
+      $lookup = $l;
+    }
+  }
 
   if( ref($lookup) eq 'HASH' ) {
     my $vf = "";
@@ -406,30 +433,16 @@ readingsGroup_2html($)
   my $devices = $hash->{DEVICES};
 
   my $group = AttrVal( $d, "group", undef );
-
-  my $pgm = "Javascript:" .
-             "var rg = document.getElementById('readingsGroup-$d');".
-             "s=rg.style;".
-             "s.display = s.display=='none' ? 'block' : 'none';";
-
-  if( $group ) {
-    $pgm .= "var elArr = document.querySelectorAll('[groupId=$group]');".
-            "for(var k=0; k<elArr.length; k++){".
-            "  el = elArr[k];".
-            "  if( el != rg ) {".
-            "    el.style.display = 'none';".
-            "   }".
-            "}";
-  } else {
-    $group = "";
-  }
+  $group = "" if( !$group );
+  $group =~ s/,/_/g;
 
   my $show_hide = "";
+  my $visibility = AttrVal($d, "visibility", undef );
   if( !$FW_webArgs{"detail"} ) {
-    if( my $visibility = AttrVal($d, "visibility", undef ) ) {
+    if( $visibility && ( $visibility eq "hidden" || $visibility eq "hideable" ) ) {
       $style = 'style=""' if( !$style );
       $style =~ s/style=(.)/style=$1display:none;/ if( $visibility eq "hidden" );
-      $show_hide .= "<a style=\"cursor:pointer\" onClick=\"$pgm\">&gt; </a>";
+      $show_hide .= "<a style=\"cursor:pointer\" onClick=\"FW_readingsGroupToggle('$d')\">&gt;</a>";
     }
   }
 
@@ -439,7 +452,7 @@ readingsGroup_2html($)
   $ret .= "<table>";
   my $txt = AttrVal($d, "alias", $d);
   $txt = "<a href=\"$FW_ME$FW_subdir?detail=$d\">$txt</a>" if( $show_links );
-  $ret .= "<tr><td><div class=\"devType\">$show_hide$txt</a></div></td></tr>" if( $show_heading );
+  $ret .= "<tr><td><div class=\"devType\">$show_hide&nbsp;$txt</div></td></tr>" if( $show_heading );
   $ret .= "<tr><td><table $style id='readingsGroup-$d' groupId=\"$group\" class=\"block wide\">";
   $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
 
@@ -496,12 +509,49 @@ readingsGroup_2html($)
         my $name_style = lookup2($hash->{helper}{nameStyle},$name,$1,undef);
         my $value_columns = lookup2($hash->{helper}{valueColumns},$name,$1,undef);
 
+        if( !$FW_webArgs{"detail"} ) {
+          if( $visibility && $visibility eq "collapsed" && $txt ne '-' && $txt ne '+' && $txt ne '+-' ) {
+            $row_style = 'style=""' if( !$row_style );
+            $row_style =~ s/style=(.)/style=$1display:none;/;
+          }
+        }
+
         if( $txt eq 'br' ) {
           $ret .= sprintf("<tr class=\"%s\">", ($row-1&1)?"odd":"even");
           $ret .= "<td $value_columns><div $cell_style $name_style class=\"dname\"></div></td>";
           $first = 0;
           ++$cell_row;
           $cell_column = 1;
+          next;
+        } elsif( $txt eq '-' || $txt eq '+' || $txt eq '+-' ) {
+          my $collapsed = $visibility && ( $visibility eq "collapsed" ) && !$FW_webArgs{"detail"};
+
+          my $id = '';
+          if( ($txt eq '+' && !$collapsed)
+              || ($txt eq '-' && $collapsed ) ) {
+            $id = '';
+            $row_style = 'style=""' if( !$row_style );
+            $row_style =~ s/style=(.)/style=$1display:none;/;
+          } elsif( $txt eq '+-' ) {
+            if( $collapsed ) {
+              $txt = '+';
+            } else {
+              $txt = '-';
+            }
+            $id = "id='plusminus'";
+          } elsif( $txt ne '+' && $collapsed ) {
+            $row_style = 'style=""' if( !$row_style );
+            $row_style =~ s/style=(.)/style=$1display:none;/;
+          }
+
+          $ret .= sprintf("<tr $row_style class=\"%s\">", ($row-1&1)?"odd":"even") if( $first );
+          if( $visibility && ( $visibility eq "collapsed" || $visibility eq "collapsible" ) ) {
+            $ret .= "<td $value_columns><div $id style=\"cursor:pointer\" onClick=\"FW_readingsGroupToggle2('$d')\">$txt</div></td>";
+          } else {
+            $ret .= "<td $value_columns><div>$txt</div></td>";
+          }
+          $first = 0;
+          ++$cell_column;
           next;
         } elsif( $txt && $txt =~ m/^%([^%]*)(%(.*))?/ ) {
           my $icon = $1;
@@ -644,6 +694,13 @@ readingsGroup_2html($)
         my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,$cell_column);
         my $name_style = lookup2($hash->{helper}{nameStyle},$name,$n,$v);
         my $value_style = lookup2($hash->{helper}{valueStyle},$name,$n,$v);
+
+        if( !$FW_webArgs{"detail"} ) {
+          if( $visibility && $visibility eq "collapsed" ) {
+            $row_style = 'style=""' if( !$row_style );
+            $row_style =~ s/style=(.)/style=$1display:none;/;
+          }
+        }
 
         my $value_format = lookup2($hash->{helper}{valueFormat},$name,$n,$v);
         next if( !defined($value_format) );
@@ -1024,12 +1081,17 @@ readingsGroup_Set($@)
 {
   my ($hash, $name, $cmd, $param, @a) = @_;
 
-  my $list = "refresh:noArg";
+  my $list = "visibility:toggle,toggle2";
 
   if( $cmd eq "refresh" ) {
     readingsGroup_updateDevices($hash);
     return undef;
+  } elsif( $cmd eq "visibility" ) {
+    readingsGroup_updateDevices($hash);
+    DoTrigger( $hash->{NAME}, "visibility: $param" );
+    return undef;
   }
+
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -1074,11 +1136,11 @@ readingsGroup_Attr($$$;$)
 
     if( $cmd eq "set" ) {
       my $attrVal = $attrVal;
-      if( $attrVal =~ m/^{.*}$/ ) {
+      if( $attrVal =~ m/^{.*}$/ && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
         my $av = eval $attrVal;
         if( $@ ) {
           Log3 $hash->{NAME}, 3, $hash->{NAME} .": ". $@;
-        } else {  
+        } else {
           $attrVal = $av if( ref($av) eq "HASH" );
         }
       }
@@ -1129,6 +1191,7 @@ readingsGroup_Attr($$$;$)
     Notes:
     <ul>
       <li>&lt;device&gt; can be of the form INTERNAL=VALUE where INTERNAL is the name of an internal value and VALUE is a regex.</li>
+      <li>&lt;device&gt; can be of the form ATTRIBUTE&VALUE where ATTRIBUTE is the name of an attribute and VALUE is a regex.</li>
       <li>&lt;device&gt; can be of the form &lt;STRING&gt; or &lt;{perl}&gt; where STRING or the string returned by perl is
           inserted as a line in the readings list. skipped if STRING is undef.</li>
       <li>If regex is a comma separatet list the reading values will be shown on a single line.</li>
@@ -1206,23 +1269,23 @@ readingsGroup_Attr($$$;$)
     <b>Attributes</b>
     <ul>
       <li>alwaysTrigger<br>
-        1 -> alwaysTrigger update events. even if not visible.</li>
+        1 -> alwaysTrigger update events. even if not visible.</li><br>
       <li>disable<br>
         1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<br>
         2 -> also disable html table creation<br>
-        3 -> also disable html creation completely</li>
+        3 -> also disable html creation completely</li><br>
       <li>sortDevices<br>
         1 -> sort the device lines alphabetically. use the first of sortby or alias or name that is defined for each device.</li>
       <li>noheading<br>
-        If set to 1 the readings table will have no heading.</li>
+        If set to 1 the readings table will have no heading.</li><br>
       <li>nolinks<br>
-        Disables the html links from the heading and the reading names.</li>
+        Disables the html links from the heading and the reading names.</li><br>
       <li>nostate<br>
-        If set to 1 the state reading is excluded.</li>
+        If set to 1 the state reading is excluded.</li><br>
       <li>nonames<br>
-        If set to 1 the reading name / row title is not displayed.</li>
+        If set to 1 the reading name / row title is not displayed.</li><br>
       <li>notime<br>
-        If set to 1 the reading timestamp is not displayed.</li>
+        If set to 1 the reading timestamp is not displayed.</li><br>
       <li>mapping<br>
         Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names
         to the displayed name.  The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
@@ -1230,69 +1293,80 @@ readingsGroup_Attr($$$;$)
         group attribute and reading name respectively. You can also prefix these keywords with $ instead of %. Examples:<br>
           <code>attr temperatures mapping $DEVICE-$READING</code><br>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
-        </li>
+        </li><br>
       <li>separator<br>
         The separator to use between the device alias and the reading name if no mapping is given. Defaults to ':'
-        a space can be enteread as <code>&amp;nbsp;</code></li>
+        a space can be enteread as <code>&amp;nbsp;</code></li><br>
       <li>style<br>
         Specify an HTML style for the readings table, e.g.:<br>
-          <code>attr temperatures style style="font-size:20px"</code></li>
+          <code>attr temperatures style style="font-size:20px"</code></li><br>
       <li>cellStyle<br>
         Specify an HTML style for a cell of the readings table. regular rows and colums are counted starting with 1,
         the row headings are column number 0. perl code has access to $ROW and $COLUMN. keys for hash lookup can be
         r:#, c:# or r:#,c:# , e.g.:<br>
-          <code>attr temperatures cellStyle { "c:0" => 'style="text-align:right"' }</code></li>
+          <code>attr temperatures cellStyle { "c:0" => 'style="text-align:right"' }</code></li><br>
       <li>nameStyle<br>
         Specify an HTML style for the reading names, e.g.:<br>
-          <code>attr temperatures nameStyle style="font-weight:bold"</code></li>
+          <code>attr temperatures nameStyle style="font-weight:bold"</code></li><br>
       <li>valueStyle<br>
         Specify an HTML style for the reading values, e.g.:<br>
-          <code>attr temperatures valueStyle style="text-align:right"</code></li>
+          <code>attr temperatures valueStyle style="text-align:right"</code></li><br>
       <li>valueColumn<br>
         Specify the minimum column in which a reading should appear. <br>
-          <code>attr temperatures valueColumn { temperature => 2 }</code></li>
+          <code>attr temperatures valueColumn { temperature => 2 }</code></li><br>
       <li>valueColumns<br>
         Specify an HTML colspan for the reading values, e.g.:<br>
-          <code>attr wzReceiverRG valueColumns { eventdescription => 'colspan="4"' }</code></li>
+          <code>attr wzReceiverRG valueColumns { eventdescription => 'colspan="4"' }</code></li><br>
       <li>valueFormat<br>
         Specify an sprintf style format string used to display the reading values. If the format string is undef
         this reading will be skipped. Can be given as a string, a perl expression returning a hash or a perl
         expression returning a string, e.g.:<br>
           <code>attr temperatures valueFormat %.1f &deg;C</code><br>
           <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%i %" }</code><br>
-          <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li>
+          <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li><br>
       <li>valuePrefix<br>
-        text to be prepended to the reading value</li>
+        text to be prepended to the reading value</li><br>
       <li>valueSuffix<br>
         text to be appended after the reading value<br>
           <code>attr temperatures valueFormat { temperature => "%.1f", humidity => "%i" }</code><br>
-          <code>attr temperatures valueSuffix { temperature => "&deg;C", humidity => " %" }</code></li>
+          <code>attr temperatures valueSuffix { temperature => "&deg;C", humidity => " %" }</code></li><br>
       <li>nameIcon<br>
         Specify the icon to be used instead of the reading name. Can be a simple string or a perl expression enclosed
         in {} that returns a hash that maps reading names to the icon name. e.g.:<br>
-          <code>attr devices nameIcon $DEVICE</code></li>
+          <code>attr devices nameIcon $DEVICE</code></li><br>
       <li>valueIcon<br>
         Specify an icon to be used instead of the reading value. Can be a simple string or a perl expression enclosed
         in {} that returns a hash that maps reading value to the icon name. e.g.:<br>
           <code>attr devices valueIcon $VALUE</code><br>
           <code>attr devices valueIcon {state => '%VALUE'}</code><br>
           <code>attr devices valueIcon {state => '%devStateIcon'}</code>
-          <code>attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }</code></li>
+          <code>attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }</code></li><br>
       <li>commands<br>
         Can be used in to different ways:
         <ul>
         <li>To make a reading or icon clickable by directly specifying the command that should be executed. eg.:<br>
-        <code>attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }</code></li><br>
+        <code>attr rgMediaPlayer commands { "playStatus.paused" => "set %DEVICE play", "playStatus.playing" => "set %DEVICE pause" }</code></li>
         <li>Or if the mapped command is of the form &lt;command&gt;:[&lt;modifier&gt;] then the normal <a href="#FHEMWEB">FHEMWEB</a>
         webCmd widget for &lt;modifier&gt; will be used for this command. if &lt;modifier&gt; is omitted then the FHEMWEB lookup mechanism for &lt;command&gt; will be used. eg:<br>
         <code>attr rgMediaPlayer commands { volume => "volume:slider,0,1,100" }</code><br>
-        <code>attr lights commands { pct => "pct:", dim => "dim:" }</code></li>
+        <code>attr lights commands { pct => "pct:", dim => "dim:" }</code></li><br>
+        </ul></li>
       <li>visibility<br>
-        if set will display a small button to the left of the readingsGroup name to expand/collapse the contenst of the readingsGroup. if a readingsGroup is expanded then all others in the same group will be collapsed.<br>
-        hidden -> default state is hidden but can be expanded
-        hideable -> default state is visible but can be collapsed </li>
-    </ul>
-    </li>
+        if set to hidden or hideable will display a small button to the left of the readingsGroup name to expand/hide the contents of the readingsGroup. if a readingsGroup is expanded then all others in the same group will be hidden.<br>
+        <ul>
+        hidden -> default state is hidden but can be expanded<br>
+        hideable -> default state is visible but can be hidden<br><br>
+        </ul>
+        if set to collapsed or collapsible will recognise the specials &lt;-&gt;,&lt;+&gt; and &lt;+-&gt; as the first elements of 
+        a line to add a + or - symbol to this line. clicking on the + or - symbol will toggle between expanded and collapsed state. if a readingsGroup is expanded then all others in the same group will be collapsed.
+        <ul>
+        - -> line will be visible in expanded state<br>
+        + -> line will be visible in collapsed state<br>
+        +- -> line will be visible in both states<br>
+        <br>
+        collapsed-> default state is collapsed but can be expanded<br>
+        collapsible -> default state is visible but can be collapsed </li>
+        </ul>
     </ul><br>
 
       The style, nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style
