@@ -13,7 +13,6 @@ use POSIX;
 use JSON;
 #use Try::Tiny;
 use Data::Dumper;
-use MIME::Base64;
 
 sub HUEBridge_Initialize($)
 {
@@ -61,7 +60,7 @@ HUEBridge_Define($$)
 
     if( defined($ret) && $ret ne '' )
       {
-        my $obj = decode_json($ret);
+        my $obj = from_json($ret);
 
         if( defined($obj->[0])
             && defined($obj->[0]->{'internalipaddress'}) ) {
@@ -421,12 +420,12 @@ sub HUEBridge_HTTP_Call($$$)
   }
 
 #  try {
-#    decode_json($ret);
+#    from_json($ret);
 #  } catch {
 #    return undef;
 #  }
 
-  return HUEBridge_ProcessResponse($hash,decode_json($ret));
+  return HUEBridge_ProcessResponse($hash,from_json($ret));
 }
 
 #adapted version of the CustomGetFileFromURL subroutine from HttpUtils.pm
