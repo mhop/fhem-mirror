@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: readingsGroup: added valuePrefix and valueSuffix attributes
+                            added collapsed/collapsible to visibility attribute
+                            added visibility command
   - bugfix: FB_CALLMONITOR: fixing not working company numbers 
             reverse search for search.ch 
   - bugfix: 70_PushNotifier repair set function (xusader)
