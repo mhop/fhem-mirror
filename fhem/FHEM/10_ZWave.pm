@@ -213,7 +213,7 @@ my %zwave_class = (
   REMOTE_ASSOCIATION       => { id => '7d', },
   BATTERY                  => { id => '80',
     get   => { battery     => "02" },
-    parse => { "038003(..)"=> '"battery:".hex($1)." %"' }, },
+    parse => { "038003(..)"=> '"battery:".($1 eq "ff" ? "low":hex($1)." %")'},},
   CLOCK                    => { id => '81',
     parse => { "028105"=> "clock:get" }, },
   HAIL                     => { id => '82', },
