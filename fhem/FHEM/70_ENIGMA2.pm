@@ -519,6 +519,8 @@ sub ENIGMA2_Set($@) {
             }
 
             my $request = ENIGMA2_GetRemotecontrolCommand( uc( $a[2] ) );
+            $request = $a[2]
+              if ( $request eq "" && $a[2] =~ /^\d+$/ );
 
             if ( uc( $a[2] ) eq "POWER" ) {
                 return ENIGMA2_Set( $hash, $name, "toggle" );
@@ -527,7 +529,7 @@ sub ENIGMA2_Set($@) {
                 return ENIGMA2_Set( $hash, $name, "mute" );
             }
             elsif ( $request ne "" ) {
-                $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand( $a[2] );
+                $cmd = "command=" . $request;
                 $cmd .= "&rcu=" . $attr{$name}{remotecontrol}
                   if defined( $attr{$name}{remotecontrol} );
                 $cmd .= "&type=long"
