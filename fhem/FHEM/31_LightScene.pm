@@ -622,13 +622,13 @@ LightScene_Set($@)
         my $r = "";
         foreach my $entry (@{$state}) {
           $r .= "," if( $ret );
-          $r .= LightScene_RestoreDevice($hash,$d,$entry);
+          $r .= LightScene_RestoreDevice($hash,$d,$entry) // "";
         }
         $ret .= " " if( $ret );
         $ret .= $r;
       } else {
         $ret .= " " if( $ret );
-        $ret .= LightScene_RestoreDevice($hash,$d,$state);
+        $ret .= LightScene_RestoreDevice($hash,$d,$state) // "";
       }
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
