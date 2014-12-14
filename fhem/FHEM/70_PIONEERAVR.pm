@@ -348,6 +348,7 @@ PIONEERAVR_Define($$) {
 		'mute'                 => '?M',
 		'networkStandby'	   => '?STJ',
 		'power'                => '?P',
+		'signalSelect'         => '?DSA',
 		'softwareVersion'      => '?SSI',
 		'speakers'             => '?SPK',
 		'speakerSystem'        => '?SSF',
@@ -796,6 +797,7 @@ PIONEERAVR_Set($@)
 	. " volumeUp:noArg volumeDown:noArg mute:on,off,toggle tone:on,bypass bass:slider,-6,1,6"
 	. " treble:slider,-6,1,6 statusRequest:noArg volume:slider,0,1,100"
 	. " volumeStraight:slider,-80,1,12"
+	. " signalSelect:auto,analog,digital,hdmi,cycle"
 	. " speakers:off,A,B,A+B raw"
 	. " remoteControl:"
 	. join(',', sort keys (%{$hash->{helper}{REMOTECONTROL}}));
@@ -1046,6 +1048,27 @@ PIONEERAVR_Set($@)
 			return $err;			
 		}
 		return undef;
+	
+	####Signal select (auto|analog|digital|hdmi|cycle)
+	} elsif ( $cmd eq "signalSelect" ) {
+		Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
+		if ($arg eq "auto") {
+			PIONEERAVR_Write($hash, "0SDA");
+		} elsif ($arg eq "analog") {
+			PIONEERAVR_Write($hash, "1SDA");
+		} elsif ($arg eq "digital") {
+			PIONEERAVR_Write($hash, "2SDA");
+		} elsif ($arg eq "hdmi") {
+			PIONEERAVR_Write($hash, "3SDA");
+		} elsif ($arg eq "cycle") {
+			PIONEERAVR_Write($hash, "9SDA");
+		} else {
+			my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... signalSelect. Must be one of auto|analog|digital|hdmi|cycle !";
+			Log3 $name, 5, $err;
+			return $err;			
+		}
+		return undef;	
+		
 	####remoteControl
 	} elsif ( $cmd eq "remoteControl" ) {
 		Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
@@ -1235,7 +1258,28 @@ sub PIONEERAVR_Read($)
 			$hash->{helper}{INPUTNAMES}->{$1}{enabled} = 1;
 			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: InputNr: $1 is enabled";
 		}
-		
+	# Signal Select			
+	} elsif ( substr($line,0,3) eq "SDA" ) {
+		my $signalSelect = substr($line,3,1);
+		if ($signalSelect == "0") {
+			readingsBulkUpdate($hash, "signalSelect", "auto" );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: signalSelect: auto";
+		} elsif ($signalSelect == "1") {
+			readingsBulkUpdate($hash, "signalSelect", "analog" );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: signalSelect: analog";
+		} elsif ($signalSelect == "2") {
+			readingsBulkUpdate($hash, "signalSelect", "digital" );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: signalSelect: digital";
+		} elsif ($signalSelect == "3") {
+			readingsBulkUpdate($hash, "signalSelect", "hdmi" );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: signalSelect: hdmi";
+		} elsif ($signalSelect == "9") {
+			readingsBulkUpdate($hash, "signalSelect", "cyclic" );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: signalSelect: cycle";
+		} else {
+			readingsBulkUpdate($hash, "signalSelect", $signalSelect );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: signalSelect: ". dq($signalSelect);
+		}	
 	# Speaker			
 	} elsif ( substr($line,0,3) eq "SPK" ) {
 		my $speakers = substr($line,3,1);
