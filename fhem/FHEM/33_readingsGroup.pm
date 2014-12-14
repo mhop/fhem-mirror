@@ -370,9 +370,9 @@ readingsGroup_makeLink($$$)
 }
 
 sub
-readingsGroup_2html($)
+readingsGroup_2html($;$)
 {
-  my($hash) = @_;
+  my($hash,$extPage) = @_;
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
   return undef if( !$hash );
 
@@ -432,7 +432,9 @@ readingsGroup_2html($)
 
   my $devices = $hash->{DEVICES};
 
-  my $group = AttrVal( $d, "group", undef );
+  my $group;
+  $group = $extPage->{group} if( $extPage );
+  $group = AttrVal( $d, "group", undef ) if( !$group );
   $group = "" if( !$group );
   $group =~ s/,/_/g;
 
@@ -840,13 +842,13 @@ readingsGroup_2html($)
 sub
 readingsGroup_detailFn()
 {
-  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my ($FW_wname, $d, $room, $extPage) = @_; # extPage is set for summaryFn.
 
   my $hash = $defs{$d};
 
   $hash->{mayBeVisible} = 1;
 
-  return readingsGroup_2html($d);
+  return readingsGroup_2html($d,$extPage);
 }
 
 sub
@@ -1081,7 +1083,7 @@ readingsGroup_Set($@)
 {
   my ($hash, $name, $cmd, $param, @a) = @_;
 
-  my $list = "visibility:toggle,toggle2";
+  my $list = "visibility:toggle,toggle2,show,hide";
 
   if( $cmd eq "refresh" ) {
     readingsGroup_updateDevices($hash);
@@ -1258,6 +1260,14 @@ readingsGroup_Attr($$$;$)
   <a name="readingsGroup_Set"></a>
     <b>Set</b>
     <ul>
+      <li>hide<br>
+      will hide all visible instances of this readingsGroup</li>
+      <li>show<br>
+      will show all visible instances of this readingsGroup</li>
+      <li>toggle<br>
+      will toggle the hidden/shown state of all visible instances of this readingsGroup</li>
+      <li>toggle2<br>
+      will toggle the expanded/collapsed state of all visible instances of this readingsGroup</li>
     </ul><br>
 
   <a name="readingsGroup_Get"></a>
@@ -1357,7 +1367,7 @@ readingsGroup_Attr($$$;$)
         hidden -> default state is hidden but can be expanded<br>
         hideable -> default state is visible but can be hidden<br><br>
         </ul>
-        if set to collapsed or collapsible will recognise the specials &lt;-&gt;,&lt;+&gt; and &lt;+-&gt; as the first elements of 
+        if set to collapsed or collapsible will recognise the specials &lt;-&gt;,&lt;+&gt; and &lt;+-&gt; as the first elements of
         a line to add a + or - symbol to this line. clicking on the + or - symbol will toggle between expanded and collapsed state. if a readingsGroup is expanded then all others in the same group will be collapsed.
         <ul>
         - -> line will be visible in expanded state<br>

@@ -20,6 +20,18 @@ FW_readingsGroupToggle(d) {
 }
 
 function
+FW_readingsGroupShow(d,v) {
+  var rg = document.getElementById( 'readingsGroup-'+d );
+  if( rg ) {
+    s=rg.style;
+    if( s.display=='none' && v )
+      FW_readingsGroupToggle(d);
+    else if( s.display!='none' && !v )
+      FW_readingsGroupToggle(d);
+  }
+}
+
+function
 FW_readingsGroupToggle2(d) {
   var rg = document.getElementById( 'readingsGroup-'+d );
   if( rg ) {
@@ -65,15 +77,6 @@ FW_readingsGroupToggle2(d) {
 }
 
 function
-FW_readingsGroupHide(d) {
-}
-
-function
-FW_readingsGroupShow(d) {
-}
-
-
-function
 FW_readingsGroupUpdateLine(d){
   var dd = d[0].split("-", 3);
 
@@ -85,8 +88,10 @@ FW_readingsGroupUpdateLine(d){
 
   if( d[1] == 'toggle' ) FW_readingsGroupToggle( dd[0] );
   if( d[1] == 'toggle2' ) FW_readingsGroupToggle2( dd[0] );
+  if( d[1] == 'show' ) FW_readingsGroupShow( dd[0], 1 );
+  if( d[1] == 'hide' ) FW_readingsGroupShow( dd[0], 0 );
 
-  console.log("xxx: "+d[1]);
+  //console.log("xxx: "+d[1]);
 }
 
 FW_widgets['readingsGroup'] = {
