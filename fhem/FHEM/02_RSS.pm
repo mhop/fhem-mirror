@@ -33,6 +33,9 @@ my @valid_halign = qw(left center right justified);
 # use vars qw(%FW_pos);    # scroll position
 # use vars qw($FW_cname);  # Current connection name
 
+# http://blogs.perl.org/users/mike_b/2013/06/a-little-nicer-way-to-use-smartmatch-on-perl-518.html
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 #########################
 sub
 RSS_addExtension($$$) {
@@ -42,7 +45,7 @@ RSS_addExtension($$$) {
     $data{FWEXT}{$url}{FUNC} = $func;
     $data{FWEXT}{$url}{LINK} = $link;
     $data{FWEXT}{$url}{NAME} = $friendlyname;
-    #$data{FWEXT}{$url}{FORKABLE} = 1;
+    $data{FWEXT}{$url}{FORKABLE} = 0;
 }
 
 ##################
@@ -59,6 +62,7 @@ RSS_Initialize($) {
     return undef;
  }
 
+ 
 ##################
 sub
 RSS_readLayout($) {
@@ -100,13 +104,13 @@ RSS_Define($$) {
   eval "use GD::Text::Align";
   $hash->{fhem}{useTextAlign} = ($@ ? 0 : 1 );
   if(!($hash->{fhem}{useTextAlign})) { 
-    Log3 $hash, 1, "Cannot use text alignment: $@";
+    Log3 $hash, 2, "$name: Cannot use text alignment: $@";
   }
     
   eval "use GD::Text::Wrap";
   $hash->{fhem}{useTextWrap} = ($@ ? 0 : 1 );
   if(!($hash->{fhem}{useTextWrap})) { 
-    Log3 $hash, 1, "Cannot use text wrapping: $@";
+    Log3 $hash, 2, "$name: Cannot use text wrapping: $@";
   }
     
   RSS_readLayout($hash);
@@ -505,107 +509,113 @@ RSS_evalLayout($$@) {
           next unless($params{condition});
           
           #Debug "before command $line: x= " . $params{x} . ", y= " . $params{y};
-          
-          if($cmd eq "rgb") {
-            $def= "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
-            $params{rgb}= AnalyzePerlCommand(undef, $def);
-          } elsif($cmd eq "font") {
-            $params{font}= $def;
-          } elsif($cmd eq "pt") {
-	    $def= AnalyzePerlCommand(undef, $def);
-            if($def =~ m/^[+-]/) {
-              $params{pt} += $def;
-            } else {
-              $params{pt} =  $def;
-            }
-            $params{pt}  = 6 if($params{pt} < 0);
-          } elsif($cmd eq "moveto") {
-            my ($tox,$toy)= split('[ \t]+', $def, 2);
-            my ($x,$y)= RSS_xy($S, $tox,$toy,%params);
-            $params{x} = $x;
-            $params{y} = $y;
-          } elsif($cmd eq "moveby") {
-            my ($byx,$byy)= split('[ \t]+', $def, 2);
-            my ($x,$y)= RSS_xy($S, $byx,$byy,%params);
-            $params{x} += $x;
-            $params{y} += $y;
-          } elsif($cmd ~~ @cmd_halign) {
-                my $d = AnalyzePerlCommand(undef, $def);
-                if($d ~~ @valid_halign) { 
-                        $params{ihalign}= $d unless($cmd eq "thalign");
-                        $params{thalign}= $d unless($cmd eq "ihalign");
-                } else {
-                  Log3 $name, 2, "$name: Illegal horizontal alignment $d";
-                }
-          } elsif($cmd ~~ @cmd_valign) {
-                my $d = AnalyzePerlCommand(undef, $def);
-                if( $d ~~ @valid_valign) {
-                        $params{ivalign}= $d unless($cmd eq "tvalign");
-                        $params{tvalign}= $d unless($cmd eq "ivalign");
-                } else {
-                  Log3 $name, 2, "$name: Illegal vertical alignment $d";
-                }
-          } elsif($cmd eq "linespace") {
-            $params{linespace}= $def;
-          } elsif($cmd eq "text") {
-            ($x,$y,$text)= split("[ \t]+", $def, 3);
-            ($x,$y)= RSS_xy($S, $x,$y,%params);
-            $params{x} = $x;
-            $params{y} = $y;
-            my $txt= AnalyzePerlCommand(undef, $text);
-            #Debug "$name: ($x,$y) $txt";
-            RSS_itemText($S,$x,$y,$txt,%params);
-          } elsif($cmd eq "textbox") {
-            ($x,$y,$boxwidth,$text)= split("[ \t]+", $def, 4);
-            ($x,$y)= RSS_xy($S, $x,$y,%params);
-            my $txt= AnalyzePerlCommand(undef, $text);
-            #Debug "$name: ($x,$y) $txt";
-            $y= RSS_itemTextBox($S,$x,$y,$boxwidth,$txt,%params);
-            $params{x} = $x;
-            $params{y} = $y;
-          } elsif($cmd eq "line") {
-            ($x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 5);
-            ($x1,$y1)= RSS_xy($S, $x1,$y1,%params);
-            ($x2,$y2)= RSS_xy($S, $x2,$y2,%params);
-            $format //= 1; # set format to 1 as default thickness for the line
-            RSS_itemLine($S,$x1,$y1,$x2,$y2, $format,%params);
-          } elsif($cmd eq "rect") {
-            ($x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 5);
-            ($x1,$y1)= RSS_xy($S, $x1,$y1,%params);
-            ($x2,$y2)= RSS_xy($S, $x2,$y2,%params);
-            $format //= 0; # set format to 0 as default (not filled)
-            RSS_itemRect($S,$x1,$y1,$x2,$y2, $format,%params);
-          } elsif($cmd eq "time") {
-            ($x,$y)= split("[ \t]+", $def, 2);
-            ($x,$y)= RSS_xy($S, $x,$y,%params);
-            $params{x} = $x;
-            $params{y} = $y;
-            RSS_itemTime($S,$x,$y,%params);
-          } elsif($cmd eq "seconds") {
-            ($x,$y,$format) = split("[ \+]", $def,3);
-            ($x,$y)= RSS_xy($S, $x,$y,%params);
-            $params{x} = $x;
-            $params{y} = $y;
-            RSS_itemSeconds($S,$x,$y,$format,%params);
-          } elsif($cmd eq "date") {
-            ($x,$y)= split("[ \t]+", $def, 2);
-            ($x,$y)= RSS_xy($S, $x,$y,%params);
-            $params{x} = $x;
-            $params{y} = $y;
-            RSS_itemDate($S,$x,$y,%params);
-          }  elsif($cmd eq "img") {
-            ($x,$y,$scale,$imgtype,$srctype,$arg)= split("[ \t]+", $def,6);
-            ($x,$y)= RSS_xy($S, $x,$y,%params);
-            $params{x} = $x;
-            $params{y} = $y; 
-            my $arg= AnalyzePerlCommand(undef, $arg);
-            RSS_itemImg($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
-          } else {
-            Log3 $name, 1, "$name: Illegal command $cmd in layout definition.";
-          } 
-          
-          #Debug "after  command $line: x= " . $params{x} . ", y= " . $params{y};
 
+          eval {
+	    if($cmd eq "rgb") {
+	      $def= "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
+	      $params{rgb}= AnalyzePerlCommand(undef, $def);
+	    } elsif($cmd eq "font") {
+	      $params{font}= $def;
+	    } elsif($cmd eq "pt") {
+	      $def= AnalyzePerlCommand(undef, $def);
+	      if($def =~ m/^[+-]/) {
+		$params{pt} += $def;
+	      } else {
+		$params{pt} =  $def;
+	      }
+	      $params{pt}  = 6 if($params{pt} < 0);
+	    } elsif($cmd eq "moveto") {
+	      my ($tox,$toy)= split('[ \t]+', $def, 2);
+	      my ($x,$y)= RSS_xy($S, $tox,$toy,%params);
+	      $params{x} = $x;
+	      $params{y} = $y;
+	    } elsif($cmd eq "moveby") {
+	      my ($byx,$byy)= split('[ \t]+', $def, 2);
+	      my ($x,$y)= RSS_xy($S, $byx,$byy,%params);
+	      $params{x} += $x;
+	      $params{y} += $y;
+	    } elsif($cmd ~~ @cmd_halign) {
+		  my $d = AnalyzePerlCommand(undef, $def);
+		  if($d ~~ @valid_halign) { 
+			  $params{ihalign}= $d unless($cmd eq "thalign");
+			  $params{thalign}= $d unless($cmd eq "ihalign");
+		  } else {
+		    Log3 $name, 2, "$name: Illegal horizontal alignment $d";
+		  }
+	    } elsif($cmd ~~ @cmd_valign) {
+		  my $d = AnalyzePerlCommand(undef, $def);
+		  if( $d ~~ @valid_valign) {
+			  $params{ivalign}= $d unless($cmd eq "tvalign");
+			  $params{tvalign}= $d unless($cmd eq "ivalign");
+		  } else {
+		    Log3 $name, 2, "$name: Illegal vertical alignment $d";
+		  }
+	    } elsif($cmd eq "linespace") {
+	      $params{linespace}= $def;
+	    } elsif($cmd eq "text") {
+	      ($x,$y,$text)= split("[ \t]+", $def, 3);
+	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      $params{x} = $x;
+	      $params{y} = $y;
+	      my $txt= AnalyzePerlCommand(undef, $text);
+	      #Debug "$name: ($x,$y) $txt";
+	      RSS_itemText($S,$x,$y,$txt,%params);
+	    } elsif($cmd eq "textbox") {
+	      ($x,$y,$boxwidth,$text)= split("[ \t]+", $def, 4);
+	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      my $txt= AnalyzePerlCommand(undef, $text);
+	      #Debug "$name: ($x,$y) $txt";
+	      $y= RSS_itemTextBox($S,$x,$y,$boxwidth,$txt,%params);
+	      $params{x} = $x;
+	      $params{y} = $y;
+	    } elsif($cmd eq "line") {
+	      ($x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 5);
+	      ($x1,$y1)= RSS_xy($S, $x1,$y1,%params);
+	      ($x2,$y2)= RSS_xy($S, $x2,$y2,%params);
+	      $format //= 1; # set format to 1 as default thickness for the line
+	      RSS_itemLine($S,$x1,$y1,$x2,$y2, $format,%params);
+	    } elsif($cmd eq "rect") {
+	      ($x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 5);
+	      ($x1,$y1)= RSS_xy($S, $x1,$y1,%params);
+	      ($x2,$y2)= RSS_xy($S, $x2,$y2,%params);
+	      $format //= 0; # set format to 0 as default (not filled)
+	      RSS_itemRect($S,$x1,$y1,$x2,$y2, $format,%params);
+	    } elsif($cmd eq "time") {
+	      ($x,$y)= split("[ \t]+", $def, 2);
+	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      $params{x} = $x;
+	      $params{y} = $y;
+	      RSS_itemTime($S,$x,$y,%params);
+	    } elsif($cmd eq "seconds") {
+	      ($x,$y,$format) = split("[ \+]", $def,3);
+	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      $params{x} = $x;
+	      $params{y} = $y;
+	      RSS_itemSeconds($S,$x,$y,$format,%params);
+	    } elsif($cmd eq "date") {
+	      ($x,$y)= split("[ \t]+", $def, 2);
+	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      $params{x} = $x;
+	      $params{y} = $y;
+	      RSS_itemDate($S,$x,$y,%params);
+	    }  elsif($cmd eq "img") {
+	      ($x,$y,$scale,$imgtype,$srctype,$arg)= split("[ \t]+", $def,6);
+	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      $params{x} = $x;
+	      $params{y} = $y; 
+	      my $arg= AnalyzePerlCommand(undef, $arg);
+	      RSS_itemImg($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
+	    } else {
+	      Log3 $name, 2, "$name: Illegal command $cmd in layout definition.";
+	    } 
+	    
+	    #Debug "after  command $line: x= " . $params{x} . ", y= " . $params{y};
+	  };
+	  if($@) {
+	    my $msg= "$name: Error from line \'$line\' in layout definition: $@";
+	    chomp $msg;
+	    Log3 $name, 2, $msg;
+	  }
   }
 }
 
@@ -631,7 +641,7 @@ RSS_returnIMG($$) {
   #
   # create the image
   #
-  my $S;
+  our $S;
   # let's create a blank image, we will need it in most cases. 
   $S= GD::Image->newTrueColor($width,$height);
   my $bgcolor = AttrVal($name,'bgcolor','000000'); #default bg color = black
@@ -641,7 +651,6 @@ RSS_returnIMG($$) {
   # wrap to make problems with GD non-lethal
 
   eval {
-
     #
     # set the background
     #
@@ -701,11 +710,11 @@ RSS_returnIMG($$) {
 				  } else {
 					  # size is as required
 					  # kill the predefined image and take the original
-					  $S= undef;
+					  undef $S;
 					  $S= $bg;
 				  }
 				} else {
-				  $S= undef;
+				  undef $S;
 				  $reason= "Something was wrong with background image \"$bgfile\".";
 				}
 			}
@@ -717,17 +726,24 @@ RSS_returnIMG($$) {
     if(defined($S)) {
       RSS_evalLayout($S, $name, $defs{$name}{fhem}{layout});
     } else {
-      Log3 undef, 2, "$name: Could not create image. $reason";
+      Log3 $name, 2, "$name: Could not create image. $reason";
       $S= GD::Image->newTrueColor($width,$height); # return empty image
     }
     $defs{$name}{STATE} = localtime();
-  }; warn $@ if $@;
+
+    
+  }; #warn $@ if $@;
+  if($@) {
+    my $msg= $@;
+    chomp $msg;
+    Log3 $name, 2, $msg;
+  }
     
   #
   # return image
   #
-  return ("image/jpeg; charset=utf-8", $S->jpeg) if $type eq 'jpg';
-  return ("image/png; charset=utf-8", $S->png) if $type eq 'png';
+  return ("image/jpeg; charset=utf-8", $S->jpeg) if($type eq 'jpg');
+  return ("image/png; charset=utf-8", $S->png) if($type eq 'png');
 }
   
 ##################
@@ -737,7 +753,7 @@ sub
 RSS_CGI(){
 
   my ($request) = @_;   # /rss or /rss/name.rss or /rss/name.jpg or /rss/name.png
-
+  
   my ($name,$ext)= RSS_splitRequest($request); # name, ext (rss, jpg, png)
 
   if(defined($name)) {
