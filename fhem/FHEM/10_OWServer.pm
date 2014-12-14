@@ -259,9 +259,10 @@ OWServer_Read($@)
       close READER;
       $ret= OWNet::read($hash->{DEF},$path);
       $ret =~ s/^\s+//g if(defined($ret));
-      Log3 $hash, 5, "OWServer child read $path: $ret";
+      my $r= defined($ret) ? $ret : "<undefined>";
+      Log3 $hash, 5, "OWServer child read $path: $r";
       delete $hash->{".path"};
-      print WRITER $ret;
+      print WRITER $ret if(defined($ret)); 
       close WRITER;
       # see http://forum.fhem.de/index.php?t=tree&goto=94670
       # changed from
