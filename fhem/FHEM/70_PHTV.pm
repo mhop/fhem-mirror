@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.5
+# Version: 1.2.6
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -76,7 +76,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout sequentialQuery:0,1 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 "
+"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5 "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -315,12 +315,13 @@ sub PHTV_Set($@) {
         my $count = scalar( keys %{ $hash->{helper}{device}{channelPreset} } );
         $count = 80 if ( $count > 80 );
         while ( $i <= $count ) {
-          if ( defined($hash->{helper}{device}{channelPreset}{$i}{name}) &&
-							 $hash->{helper}{device}{channelPreset}{$i}{name} != "" ) {
-            $channels .=
-              $hash->{helper}{device}{channelPreset}{$i}{name} . ",";
-          }
-					$i++;
+            if ( defined( $hash->{helper}{device}{channelPreset}{$i}{name} )
+                && $hash->{helper}{device}{channelPreset}{$i}{name} != "" )
+            {
+                $channels .=
+                  $hash->{helper}{device}{channelPreset}{$i}{name} . ",";
+            }
+            $i++;
         }
     }
     if (   $channel ne ""
@@ -1323,9 +1324,11 @@ sub PHTV_Define($$) {
 ###################################
 sub PHTV_SendCommand($$;$$) {
     my ( $hash, $service, $cmd, $type ) = @_;
-    my $name      = $hash->{NAME};
-    my $address   = $hash->{helper}{ADDRESS};
-    my $port      = $hash->{helper}{PORT};
+    my $name    = $hash->{NAME};
+    my $address = $hash->{helper}{ADDRESS};
+    my $port    = $hash->{helper}{PORT};
+    my $protoV =
+      ( defined( $attr{$name}{jsversion} ) ? $attr{$name}{jsversion} : "1" );
     my $timestamp = gettimeofday();
     my $data;
     my $timeout;
@@ -1358,7 +1361,7 @@ sub PHTV_SendCommand($$;$$) {
         Log3 $name, 4, "PHTV $name: REQ $service/" . urlDecode($data);
     }
 
-    $URL = "http://" . $address . ":" . $port . "/1/" . $service;
+    $URL = "http://" . $address . ":" . $port . "/" . $protoV . "/" . $service;
 
     if ( defined( $attr{$name}{timeout} )
         && $attr{$name}{timeout} =~ /^\d+$/ )
@@ -1605,10 +1608,22 @@ sub PHTV_ReceiveCommand($$$) {
                     }
                 }
 
-# trigger query cascade in case the device just came up or sequential query is enabled
+                # trigger query cascade in case the device
+                # just came up or sequential query is enabled
                 if ( $sequential
                     || ( $newstate eq "on" && $newstate ne $state ) )
                 {
+                    # add some delay if the device just came up
+                    # and user set attribut for lazy devices
+                    if (   $newstate eq "on"
+                        && $newstate ne $state
+                        && defined( $attr{$name}{drippyFactor} )
+                        && $attr{$name}{drippyFactor} ne ""
+                        && $attr{$name}{drippyFactor} ge 0 )
+                    {
+                        fhem("sleep $attr{$name}{drippyFactor}");
+                    }
+
                     PHTV_GetStatus( $hash, 1 );
                 }
             }
@@ -3159,6 +3174,9 @@ sub PHTV_rgb2hsv($$$) {
     elsif ( $M == $b ) {
         $h = ( 60 * ( ( $r - $g ) / $c ) + 240 ) / 360;
     }
+    if ( $h < 0 ) {
+        $h = $h + 1;
+    }
 
     if ( $M == 0 ) {
         $s = 0;
@@ -3332,7 +3350,7 @@ sub PHTV_min {
           If you would like to specificly control color for individual sides or even individual LEDs, you may use special addressing to be used with set command 'rgb':<br>
           <br><br>
           LED addressing format:<br>
-          <code>&lt;Layer$gt;&lt;Side$gt;&lt;LED number$gt;</code>
+          <code>&lt;Layer&gt;&lt;Side&gt;&lt;LED number&gt;</code>
           <br><br>
           <u>Examples:</u><br>
           <div style="margin-left: 2em">
@@ -3361,7 +3379,8 @@ sub PHTV_min {
         <br>
         <div style="margin-left: 2em">
           Linking to your HUE devices within attributes ambiHueLeft, ambiHueTop, ambiHueRight and ambiHueBottom uses some defaults to calculate the actual color.<br>
-          The following settings can be fine tuned:<br>
+          More than one HUE device may be added using blank.<br>
+          The following settings can be fine tuned for each HUE device:<br>
           <br>
           <li>LED(s) to be used as color source<br>
           either 1 single LED or a few in a raw like 2-4. Defaults to use the middle LED and it's left and right partners. Counter starts at 1. See readings ambiLED* for how many LED's your TV has.</li>
@@ -3369,11 +3388,14 @@ sub PHTV_min {
           <li>brightness in percent of the original value (1-99, default=100)</li>
           <br><br>
           Use the following addressing format for fine tuning:<br>
-          <code>devicename:&lt;LEDs$gt;&lt;saturation$gt;&lt;brightness$gt;</code>
+          <code>devicename:&lt;LEDs$gt;:&lt;saturation$gt;:&lt;brightness$gt;</code>
           <br><br>
           <u>Examples:</u><br>
           <div style="margin-left: 2em">
-            <code># to use only LED 4 from the top as source<br>
+            <code># to push color from top to 2 HUE devices<br>
+            attr PhilipsTV ambiHueTop HUEDevice0 HUEDevice1
+            <br><br>
+            # to use only LED 4 from the top as source<br>
             attr PhilipsTV ambiHueTop HUEDevice0:4
             <br><br>
             # to use a combination of LED's 1+2 as source<br>
@@ -3423,7 +3445,9 @@ sub PHTV_min {
     <li><b>ambiHueBottom</b> - HUE devices that should get the color from bottom Ambilight.</li>
     <li><b>ambiHueLatency</b> - Controls the update interval for HUE devices in milliseconds; defaults to 200 ms.</li>
     <li><b>disable</b> - Disable polling (true/false)</li>
+    <li><b>drippyFactor</b> - Adds some delay in seconds after low-performance devices came up to allow more time to become responsive (default=0)</li>
     <li><b>inputs</b> - Presents the inputs read from device. Inputs can be renamed by adding <code>,NewName</code> right after the original name.</li>
+    <li><b>jsversion</b> - JointSpace protocol version; e.g. pre2014 devices use 1, 2014 devices (and later) 5. defaults to 1</li>
     <li><b>sequentialQuery</b> - avoid parallel queries for low-performance devices</li>
     <li><b>timeout</b> - Set different polling timeout in seconds (default=7)</li>
   </ul></ul>
