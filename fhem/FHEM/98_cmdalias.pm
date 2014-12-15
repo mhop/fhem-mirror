@@ -87,6 +87,7 @@ CommandCmdAlias($$$)
       return $r;
     }
   }
+  return undef if(!$a->{OrigFn});
   no strict "refs";
   return &{$a->{OrigFn} }($cl, $param, $alias);
   use strict "refs";
