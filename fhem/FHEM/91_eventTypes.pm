@@ -39,6 +39,7 @@ eventTypes_Define($$)
   foreach my $l (@content) {
     next if(!defined($l));
     next if($l =~ m/ CULHM (SND|RCV) /);
+    next if($l =~ m/RAWMSG/);
     next if($l =~ m/ UNKNOWNCODE /);
     next if($l =~ m/^\d+ global /);
     my @a = split(" ", $l, 3);
