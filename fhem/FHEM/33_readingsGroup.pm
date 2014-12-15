@@ -586,9 +586,10 @@ readingsGroup_2html($;$)
         } else {
           my $cmd = lookup2($hash->{helper}{commands},$name,$d,$txt);
 
-          if( $cmd && $cmd =~ m/^([\w-]*):(\S*)?$/ ) {
+          if( $cmd && $cmd =~ m/^([\w-]*):(\S*)?(\s(\S*))?$/ ) {
             my $set = $1;
             my $values = $2;
+            $set .= " $3" if( $3 );
 
             if( !$values ) {
               my %extPage = ();
@@ -748,9 +749,10 @@ readingsGroup_2html($;$)
         if( !$devStateIcon ) {
           $cmd = lookup2($hash->{helper}{commands},$name,$n,$v) if( !$devStateIcon );
 
-          if( $cmd && $cmd =~ m/^([\w-]*):(\S*)?$/ ) {
+          if( $cmd && $cmd =~ m/^([\w-]*):(\S*)?(\s(\S*))?$/ ) {
             my $set = $1;
             my $values = $2;
+            $set .= " $3" if( $3 );
 
             if( !$values ) {
               my %extPage = ();
