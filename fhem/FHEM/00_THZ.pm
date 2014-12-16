@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 11/2014
-my $thzversion = "0.112";
+# by immi 12/2014
+my $thzversion = "0.113";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -710,8 +710,8 @@ sub THZ_ReadAnswer($)
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
 	
-	while ((length($data) > 4) and ($data !~ m/1003$/m ) and ($count <= 10))
-	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.05);
+	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= 15))
+	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.04);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
 	  if(defined($buf1))
 	    {
@@ -721,7 +721,7 @@ sub THZ_ReadAnswer($)
 	    }
 	$count ++;
 	}
-	return ("WInterface max repeat limited to 10" , $data) if ($count == 11);
+	return ("WInterface max repeat limited to 15" , $data) if ($count == 16);
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
 }
@@ -1419,15 +1419,6 @@ return ($FW_RETTYPE, $ret);
       </code></ul>
      <br> 
    If the attributes interval_allFB and interval_history are not defined (or 0), their internal polling is disabled.  
-   Clearly you can also define the polling interval outside the module with the "at" command.
-    <br>
-      <ul><code>
-      define Mythz THZ /dev/ttyUSB0@115200 <br>
-      define atMythzFB at +*00:05:00 {fhem "get Mythz sGlobal","1";;return()}    <br>
-      define atMythz09 at +*08:00:00 {fhem "get Mythz sHistory","1";;return()}   <br>
-      define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
-      </code></ul>
-      
   </ul>
   <br>
 </ul>
@@ -1482,14 +1473,6 @@ return ($FW_RETTYPE, $ret);
       </code></ul>
      <br> 
    Wenn die Attribute interval_allFB und interval_history nicht definiert sind (oder 0), ist das interne Polling deaktiviert.
-   Nat&uuml;rlich kann das Polling auch mit dem "at" Befehl ausserhalb des Moduls definiert werden.
-    <br>
-      <ul><code>
-      define Mythz THZ /dev/ttyUSB0@115200 <br>
-      define atMythzFB at +*00:05:00 {fhem "get Mythz sGlobal","1";;return()}    <br>
-      define atMythz09 at +*08:00:00 {fhem "get Mythz sHistory","1";;return()}   <br>
-      define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
-      </code></ul>
       
   </ul>
   <br>
