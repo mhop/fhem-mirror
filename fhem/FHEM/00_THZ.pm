@@ -340,7 +340,8 @@ sub THZ_Initialize($)
 		    ."interval_sElectrHCDay:0,1200,3600,7200,28800,43200,86400 "
 		    ."interval_sElectrHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sBoostDHWTotal:0,3600,7200,28800,43200,86400 "
-		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 " 
+		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 "
+		    ."firmware:new,2.06 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 }
@@ -1033,6 +1034,90 @@ my %parsinghash = (
   "9holy"     => [["", 10, 2, "quater", 1]
               ]
 );
+my %parsinghash206 = (
+  #msgtype => parsingrule  
+  "09his"  => [["compressorHeating: ",	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
+	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
+	      [" boosterHeating: ",	20, 4, "hex", 1]
+	      ],
+  "16sol"  => [["collector_temp: ",	4, 4, "hex2int", 10],	[" dhw_temp: ", 	 8, 4, "hex2int", 10],
+	      [" flow_temp: ",		12, 4, "hex2int", 10],	[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
+	      [" x20: ",		20, 4, "hex2int", 1],	[" x24: ",		24, 4, "hex2int", 1], 
+	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
+	      ],
+  "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
+	      [" fault0CODE: ",		8, 2, "hex", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhex", 100],
+	      [" fault1CODE: ",		20, 2, "hex", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhex", 100],
+	      [" fault2CODE: ",		32, 2, "hex", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhex", 100],
+	      [" fault3CODE: ",		44, 2, "hex", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhex", 100]
+	      ],
+  "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
+	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
+	      [" x20: ", 		20, 4, "hex2int", 1],	[" heat_block_time: ", 	24, 4, "hex2int", 1], 
+	      [" x28: ",		28, 4, "hex2int", 1],	[" x32: ",		32, 4, "hex2int", 1],
+	      [" x36: ",		36, 4, "hex", 1]
+	      ],
+  "F4hc1"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
+	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
+	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
+	      [" heatTemp: ",		28, 4, "hex2int", 10],  #[" x32: ",		32, 4, "hex2int", 1],
+	      [" seasonMode: ",		38, 2, "somwinmode", 1],#[" x40: ",		40, 4, "hex2int", 1],
+	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
+	      #[" x52: ",		52, 4, "hex2int", 1],
+              [" roomSetTemp: ",	56, 4, "hex2int", 10]
+	     ],
+  "F5hc2"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" returnTemp: ",	8, 4, "hex2int", 10],
+	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
+	      [" heatTemp: ", 		20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
+	      [" seasonMode: ",		30, 2, "somwinmode", 1],[" opMode: ",		36, 2, "opmodehc", 1]
+	     ],
+  "FBglob" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flewTemp: ",		12, 4, "hex2int", 10],
+	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
+	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
+	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
+	      [" mixerOpen: ",		45, 1, "bit0", 1],  	[" mixerClosed: ",		45, 1, "bit1", 1],
+	      [" heatPipeValve: ",	45, 1, "bit2", 1],  	[" diverterValve: ",		45, 1, "bit3", 1],
+	      [" dhwPump: ",		44, 1, "bit0", 1],  	[" heatingCircuitPump: ",	44, 1, "bit1", 1],
+	      [" solarPump: ",		44, 1, "bit3", 1],  	[" compressor: ",		47, 1, "bit3", 1],
+	      [" boosterStage3: ",	46, 1, "bit0", 1],  	[" boosterStage2: ",		46, 1, "bit1", 1],
+	      [" boosterStage1: ",	46, 1, "bit2", 1],  	[" highPressureSensor: ",	49, 1, "nbit0", 1],
+	      [" lowPressureSensor: ",	49, 1, "nbit1", 1],  	[" evaporatorIceMonitor: ",	49, 1, "bit2", 1],
+	      [" signalAnode: ",	49, 1, "bit3", 1],  	[" rvuRelease: ",		48, 1, "bit0", 1],
+	      [" ovenFireplace: ",	48, 1, "bit1", 1],  	[" STB: ",			48, 1, "bit2", 1],
+	      [" outputVentilatorPower: ",	50, 4, "hex", 10],  	[" inputVentilatorPower: ",	54, 4, "hex", 10],	[" mainVentilatorPower: ",	58, 4, "hex", 10],
+	      [" outputVentilatorSpeed: ",	62, 4, "hex", 1],	[" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
+	      [" outside_tempFiltered: ",	74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
+	      [" dewPoint: ",			82, 4, "hex2int", 10],
+	      [" P_Nd: ",			86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
+	      [" actualPower_Qc: ",		94, 8, "hex2int", 1],	[" actualPower_Pel: ",		102, 8, "hex2int", 1],
+	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
+	      ],
+  "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
+	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
+	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
+	      ["/", 			16, 2, "hex", 1]
+	     ],
+  "FDfirm" => [["version: ", 	4, 4, "hex", 100]
+	     ],
+  "0clean"    => [["", 8, 2, "hex", 1]             
+              ],
+  "1clean"    => [["", 8, 4, "hex", 1]             
+              ],
+  "2opmode"   => [["", 8, 2, "opmode", 1]             
+              ],
+  "5temp"     => [["", 8, 4, "hex2int",10]             
+	      ],
+  "6gradient" => [["", 8, 4, "hex", 100]             
+              ],
+  "7prog"     => [["", 8, 2, "quater", 1], 	["--", 10, 2, "quater", 1]
+              ],
+  "8party"    => [["", 10, 2, "quater", 1],	["--", 8, 2, "quater", 1]
+              ],
+  "9holy"     => [["", 10, 2, "quater", 1]
+              ]
+);
+
+  
   my ($hash,$message) = @_;
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
   my $length = length($message);
@@ -1056,7 +1141,7 @@ my %parsinghash = (
 	 }
   }
   $parsingrule = $parsinghash{$msgtype} if(defined($msgtype));
-  
+  $parsingrule = $parsinghash206{$msgtype} if((defined($msgtype)) and (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06"));
   my $ParsedMsg = $message;
   if(defined($parsingrule)) {
     $ParsedMsg = "";
