@@ -932,7 +932,7 @@ sub ##########################################
 FRITZBOX_Ring_Run($) 
 {
    my ($string) = @_;
-   my ($name, @val) = split /\|/, $string;
+   my ($name, @val) = split "\\|", $string;
    my $hash = $defs{$name};
 
    return "$name|0|Error: At least one parameter must be defined."
@@ -1205,7 +1205,7 @@ sub FRITZBOX_Open_Connection($)
    FRITZBOX_Log $hash, 4, "Open Telnet Connection to $host";
    $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>10, Errmode=>'return', Prompt=>'/# $/');
    if (!$telnet) {
-      $msg = "Error while opening telnet connection: ".$telnet->errmsg;
+      $msg = "Could not open telnet connection to $host";
       FRITZBOX_Log $hash, 2, $msg;
       $telnet = undef;
       return $msg;
@@ -1515,6 +1515,7 @@ sub FRITZBOX_fritztris($)
 
 <a name="FRITZBOX"></a>
 <h3>FRITZBOX</h3>
+(en | <a href="commandref_DE.html#FRITZBOX">de</a>)
 <div  style="width:800px"> 
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as
@@ -1536,9 +1537,9 @@ sub FRITZBOX_fritztris($)
       <br/><br/>
       Example: <code>define Fritzbox FRITZBOX</code>
       <br/><br/>
-      The Fritz!Box OS has a hidden function (easter egg).
+      The FritzOS has a hidden function (easter egg).
       <br>
-      Test it with: <code>define MyEasterEgg weblink htmlCode { FRITZBOX_fritztris("Fritzbox") }</code>
+      <code>define MyEasterEgg weblink htmlCode { FRITZBOX_fritztris("Fritzbox") }</code>
       <br/><br/>
    </ul>
   
@@ -1715,7 +1716,7 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
-      <li><b>diversity</b><i>1</i> - Incoming phone number of the call diversity <i>1</i></li>
+      <li><b>diversity</b><i>1</i> - Own (incoming) phone number of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_state</b> - Current state of the call diversity <i>1</i></li>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
@@ -1738,11 +1739,12 @@ sub FRITZBOX_fritztris($)
 
 <a name="FRITZBOX"></a>
 <h3>FRITZBOX</h3>
+(<a href="commandref.html#FRITZBOX">en</a> | de)
 <div  style="width:800px"> 
 <ul>
    Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!).
    <br/><br/>
-   Wenn FHEM nicht auf einer Fritz!Box l&auml;uft, versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml; diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
+   Wenn FHEM nicht auf einer Fritz!Box l&auml;uft, versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
    <br/><br/>
    Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -1758,9 +1760,9 @@ sub FRITZBOX_fritztris($)
       <br/><br/>
       Beispiel: <code>define Fritzbox FRITZBOX</code>
       <br/><br/>
-      Das Fritz!Box OS hat eine versteckte Funktion (Osterei).
+      Das FritzOS hat eine versteckte Funktion (Osterei).
       <br>
-      Teste sie mit: <code>define MyEasterEgg weblink htmlCode { FRITZBOX_fritztris("Fritzbox") }</code>
+      <code>define MyEasterEgg weblink htmlCode { FRITZBOX_fritztris("Fritzbox") }</code>
       <br/><br/>
    </ul>
   
@@ -1789,7 +1791,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; createPwdFile &lt;password&gt;</code>
          <br>
-         Erzeugt eine Datei welche das Telnet-Passwort enth&auml;lt. Der Dateiname entspricht demjenigen, der für den Telnetzugriff genutzt wird.
+         Erzeugt eine Datei welche das Telnet-Passwort enth&auml;lt. Der Dateiname entspricht demjenigen, der f&uuml;r den Telnetzugriff genutzt wird.
       </li><br>
 
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
@@ -1832,10 +1834,10 @@ sub FRITZBOX_fritztris($)
          Standard-Dauer ist 5 Sekunden. Standard-Klingelton ist der interne Klingelton des Ger&auml;tes.
          Der Klingelton wird f&uuml;r Rundrufe (9 oder 50) ignoriert. 
          <br>
-         Wenn das <a href=#FRITZBOXattr>Attribute</a> 'ringWithIntern' existiert, wird der Text hinter 'msg:' als Name des Anrufers angezeigt.
+         Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'msg:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br>
-         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold) welche zur Nachrichten&uuml;bermittlung genutzt werden kann.
+         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche zur Nachrichten&uuml;bermittlung genutzt werden kann.
       </li><br>
 
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
@@ -1886,7 +1888,7 @@ sub FRITZBOX_fritztris($)
          <br>
          Standard-Text, der auf dem angerufenen internen Telefon als "Anrufer" gezeigt wird.
          <br>
-         Dies erfolgt, indem w&auml;hrend des Klingelns kurzzeitige der Name der internen anrufenden Nummer ge&auml;ndert wird.
+         Dies erfolgt, indem w&auml;hrend des Klingelns kurzzeitig der Name der internen anrufenden Nummer ge&auml;ndert wird.
          <br>
          Es ist maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
       </li><br>
@@ -1894,7 +1896,7 @@ sub FRITZBOX_fritztris($)
          <br>
          Dies ist der Standard-Pfad der f&uuml;r Dateinamen benutzt wird, die nicht mit einem / (Schr&auml;gstrich) beginnen.
          <br>
-         Es muss ein Pfad auf der Fritz!Box sein. D.h., es sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
+         Es muss ein Pfad auf der Fritz!Box sein. D.h., er sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
       </li><br>
       <li><code>fritzBoxIP</code>
          <br>
@@ -1902,19 +1904,18 @@ sub FRITZBOX_fritztris($)
       </li><br>
       <li><code>pwdFile &lt;fileName&gt;</code>
          <br>
-         Datei welche das Passwort für den Telnetzugang enth&auml;t. Der Standard ist 'fb_pwd.txt' im Wurzelverzeichnis von FHEM.
+         Damit kann die Datei ge&uuml;ndert werden, welche das Passwort f&uuml;r den Telnetzugang enth&auml;lt. Der Standard ist 'fb_pwd.txt' im Wurzelverzeichnis von FHEM.
       </li><br>
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
          Benutzername f&uuml;r den Telnetzugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
-         <br>
-         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribute definiert werden.
+         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
       </li><br>
       <li><code>ringWithIntern &lt;internalNumber&gt;</code>
          <br>
          Um ein Telephone anzurufen, muss eine Anrufer spezifiziert werden. Normalerweise ist dies in diesem Modul die Nummer 50 "ISDN:W&auml;hlhilfe".
          <br>
-         Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interner Nummer 1 oder 2 angegeben werden.
+         Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1 oder 2 angegeben werden.
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -1934,14 +1935,14 @@ sub FRITZBOX_fritztris($)
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
       <li><b>dect</b><i>1</i> - Name des DECT Telefons <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton des Weckers f&uuml;r das DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton beim Wecken &uuml;ber das DECT Telefon <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Benutzerspezifischer Klingelton des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_fwVersion</b> - Firmware-Version des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_intern</b> - Interne Nummer des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_intRingTone</b> - Interner Klingelton des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_manufacturer</b> - Hersteller des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_model</b> - Modell des DECT Telefons <i>1</i></li>
-      <li><b>dect</b><i>1</i> - Interner Name des analogen Telefonanschlusses <i>1</i></li>
+      <li><b>dect</b><i>1</i> - Name des analogen Telefonanschlusses <i>1</i> an der Fritz!Box</li>
       <li><b>dect</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
       <li><b>diversity</b><i>1</i> - Eigene Rufnummer der Rufumleitung <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_dest</b> - Zielnummer der Rufumleitung <i>1</i></li>
@@ -1951,10 +1952,10 @@ sub FRITZBOX_fritztris($)
       <li><b>tam</b><i>1</i><b>_newMsg</b> - Anzahl neuer Nachrichten auf dem Anrufbeantworter <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_oldMsg</b> - Anzahl alter Nachrichten auf dem Anrufbeantworter <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_state</b> - Aktueller Status des Anrufbeantworters <i>1</i></li>
-      <li><b>user</b><i>01</i> - Name des Benutzers bzw. der IP <i>1</i> f&uuml;r die eine Zugangsbeschr&auml;nkung (Kindersicherung) eingerichtet ist</li>
-      <li><b>user</b><i>01</i>_thisMonthTime - this month internet usage of user/IP <i>1</i> (parental control)</li>
-      <li><b>user</b><i>01</i>_todaySeconds - today's internet usage in seconds of user/IP <i>1</i> (parental control)</li>
-      <li><b>user</b><i>01</i>_todayTime - today's internet usage of user/IP <i>1</i> (parental control)</li>
+      <li><b>user</b><i>01</i> - Name von Nutzer/IP <i>1</i> f&uuml;r den eine Zugangsbeschr&auml;nkung (Kindersicherung) eingerichtet ist</li>
+      <li><b>user</b><i>01</i>_thisMonthTime - Internetnutzung des Nutzers/IP <i>1</i> im aktuellen Monat (Kindersicherung)</li>
+      <li><b>user</b><i>01</i>_todaySeconds - heutige Internetnutzung des Nutzers/IP <i>1</i> in Sekunden (Kindersicherung)</li>
+      <li><b>user</b><i>01</i>_todayTime - heutige Internetnutzung des Nutzers/IP <i>1</i> (Kindersicherung)</li>
    </ul>
    <br>
 </ul>
