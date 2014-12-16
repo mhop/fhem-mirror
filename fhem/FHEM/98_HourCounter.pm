@@ -1,4 +1,4 @@
-# $Id: 98_HourCounter.pm 7035 2014-11-21 22:00:00Z john $
+# $Id: 98_HourCounter.pm 7227 2014-12-16 18:00:00Z john $
 ####################################################################################################
 #
 #   98_HourCounter.pm
@@ -47,7 +47,14 @@
 #      reformating
 #  17.11.14 - 1.0.0.6
 #     cyclic calculation of pulse/pause-duration
-#     correctly restores correctly counter values after restart
+#     correctly restores counter values after restart
+#  10.12.14 - 1.0.1.0
+#     new readings pulseTimeEdge, pauseTimeEdge hold the last pusle*-Increment value
+#     all operative readings beside the tick*-readings are updated every cycle now
+#     new reading tickChanged is fired, if the value is changed
+#     new reading tickUpdated is fired each time the operative readings are updated
+#     some bug fixes concerning duration and calc calculations
+#     note, that also 99_UtilsHourCounter needs changes
 ####################################################################################################
 
 package main;
@@ -57,7 +64,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
-my $HourCounter_Version = "1.0.0.6 - 20.11.2014";
+my $HourCounter_Version = "1.0.1.0 - 09.12.2014";
 
 my @HourCounter_cmdQeue = ();
 
@@ -204,7 +211,7 @@ sub HourCounter_Initialize($)
   $hash->{GetFn}    = "HourCounter_Get";
   $hash->{NotifyFn} = "HourCounter_Notify";
   $hash->{AttrFn}   = "HourCounter_Attr";
-  $hash->{AttrList} = "disable:0,1 interval:5,10,15,20,30,60 " . $readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 interval:1,2,3,4,5,10,15,20,30,60 " . $readingFnAttributes;
   HourCounter_Log "", 3, "Init Done with Version $HourCounter_Version";
 }
 ##########################
@@ -492,24 +499,38 @@ sub HourCounter_Run($)
   my $valueOld = ReadingsVal( $name, 'value', 0 );
 
   # variable for reading update
-  my $value              = undef;
-  my $countsPerDay       = undef;
-  my $countsOverall      = undef;
-  my $pulseTimeIncrement = undef;
-  my $pulseTimePerDay    = undef;
-  my $pulseTimeOverall   = undef;
-  my $pauseTimePerDay    = undef;
-  my $pauseTimeOverall   = undef;
-  my $pauseTimeIncrement = undef;
-  my $state              = undef;
-  my $doUpdate           = undef;
-  my $fireEvents         = 1;
-  my $sdTickHour         = time_str2num( ReadingsTimestamp( $name, "tickHour", TimeNow() ) );
+  my $value = undef;
+
+  my $countsPerDay  = ReadingsVal( $name, "countsPerDay",  0 );
+  my $countsOverall = ReadingsVal( $name, "countsOverall", 0 );
+
+  my $pulseTimeIncrement = ReadingsVal( $name, "pulseTimeIncrement", 0 );
+  my $pulseTimePerDay    = ReadingsVal( $name, "pulseTimePerDay",    0 );
+  my $pulseTimeOverall   = ReadingsVal( $name, "pulseTimeOverall",   0 );
+  my $pulseTimeEdge      = ReadingsVal( $name, "pulseTimeEdge",      0 );
+
+  my $pauseTimeIncrement = ReadingsVal( $name, "pauseTimeIncrement", 0 );
+  my $pauseTimePerDay    = ReadingsVal( $name, "pauseTimePerDay",    0 );
+  my $pauseTimeOverall   = ReadingsVal( $name, "pauseTimeOverall",   0 );
+  my $pauseTimeEdge      = ReadingsVal( $name, "pauseTimeEdge",      0 );
+
+  my $tickUpdated = ReadingsVal( $name, "tickUpdated", 0 )+1;
+  $tickUpdated = 1 if ( $tickUpdated >= 1000 );
+  
+  my $tickChanged = ReadingsVal( $name, "tickChanged", 0 );
+  my $tickHour    = ReadingsVal( $name, "tickHour",    0 );
+  my $tickDay     = ReadingsVal( $name, "tickDay",     0 );
+  my $tickWeek    = ReadingsVal( $name, "tickWeek",    0 );
+  my $tickMonth   = ReadingsVal( $name, "tickMonth",   0 );
+  my $tickYear    = ReadingsVal( $name, "tickYear",    0 );
+
+  my $state = '';
+
+  my $sdTickHour = time_str2num( ReadingsTimestamp( $name, "tickHour", TimeNow() ) );
 
   # serial date for current hour
   my $sdRoundHour = HourCounter_RoundHour($sdCurTime);
 
-  #my $sdRoundHourLast = $hash->{helper}{sdRoundHourLast};
   my $sdRoundHourLast = HourCounter_RoundHour($sdTickHour);
   $sdRoundHourLast = $sdRoundHour if ( !$sdRoundHourLast );
   my $isHourChanged = ( $sdRoundHour != $sdRoundHourLast ) || $hash->{helper}{forceHourChange};
@@ -544,7 +565,6 @@ sub HourCounter_Run($)
     last if ( AttrVal( $name, 'disable', '0' ) eq '1' );
 
     # variables for controlling
-    my $resetDayCounter = '';
     HourCounter_Log $hash, 5, "value:$valuePara changedTimestamp:" . $hash->{helper}{changedTimestamp};
 
     # ------------ basic init, when first run
@@ -563,34 +583,16 @@ sub HourCounter_Run($)
       readingsEndUpdate( $hash, 0 );
 
       # set initial values
-      $value         = $valueOld;  # value als reading anlegen falls nicht vorhanden
-      $countsOverall = ReadingsVal( $name, "countsOverall", 0 );
-      $countsPerDay  = ReadingsVal( $name, "countsPerDay", 0 );
-
-      $pauseTimeIncrement = ReadingsVal( $name, "pauseTimeIncrement", 0 );
-      $pauseTimeOverall   = ReadingsVal( $name, "pauseTimeOverall",   0 );
-      $pauseTimePerDay    = ReadingsVal( $name, "pauseTimePerDay",    0 );
-
-      $pulseTimeIncrement = ReadingsVal( $name, "pulseTimeIncrement", 0 );
-      $pulseTimeOverall   = ReadingsVal( $name, "pulseTimeOverall",   0 );
-      $pulseTimePerDay    = ReadingsVal( $name, "pulseTimePerDay",    0 );
-
-      $state = ReadingsVal( $name, "state", 0 );
-
+      $value         = $valueOld;    # value als reading anlegen falls nicht vorhanden
       $timeIncrement = 0;
 
-      # do not fire any events, if first initialization
-      $fireEvents = 0;
       HourCounter_Log $hash, 0, "first run done countsOverall:" . $countsOverall;    #4
     }
 
-    # -------- force clear reqeust
+    # -------- force clear request
     if ( $hash->{helper}{forceClear} )
     {
-      # 4
-      HourCounter_Log $hash, 0, "force cleare request";
-
-      # fire only this event
+      HourCounter_Log $hash, 0, "force clear request";
       readingsSingleUpdate( $hash, 'clearDate', TimeNow(), 1 );
 
       # reset all counters
@@ -598,156 +600,166 @@ sub HourCounter_Run($)
       $countsPerDay  = 0;
 
       $pauseTimeIncrement = 0;
-      $pauseTimeOverall   = 0;
-      $pauseTimePerDay    = 0;
+      $pauseTimeEdge      = 0;
 
-      $pulseTimeIncrement         = 0;
-      $pulseTimeOverall           = 0;
-      $pulseTimePerDay            = 0;
+      $pauseTimeOverall = 0;
+      $pauseTimePerDay  = 0;
+
+      $pulseTimeIncrement = 0;
+      $pulseTimeEdge      = 0;
+
+      $pulseTimeOverall = 0;
+      $pulseTimePerDay  = 0;
+
       $hash->{helper}{forceClear} = '';
-      $timeIncrement              = 0;
-
-      # do not fire any events, if first initialization
-      $fireEvents = 0;
+      $timeIncrement = 0;
     }
 
     # -------------- handling of transitions
-    my $hasValueChanged = ( $isOffDefined && $valuePara == $valueOld ) ? '' : 1;
+    my $hasValueChanged = 0;
+    if ( $isOffDefined && $valuePara >= 0 && $valuePara != $valueOld )
+    {
+      $hasValueChanged = 1;
+    }
 
     # -------------- positive edge
     if ( $hasValueChanged && $valuePara == 1 )
     {
-      $hash->{helper}{changedTimestamp} = TimeNow();
-      $value                            = $valuePara;
-      $valueOld                         = $valuePara;
+      $value    = $valuePara;
+      $valueOld = $valuePara;
 
       # handling of counters
-      $countsPerDay  = ReadingsVal( $name, "countsPerDay",  0 ) + 1;
-      $countsOverall = ReadingsVal( $name, "countsOverall", 0 ) + 1;
+      $countsPerDay  += 1;
+      $countsOverall += 1;
 
       #..  handling of pause
       if ($isOffDefined)
       {
-        $pauseTimeIncrement = $timeIncrement;
-        $pauseTimePerDay    = ReadingsVal( $name, "pauseTimePerDay", 0 ) + $pauseTimeIncrement;
-        $pauseTimeOverall   = ReadingsVal( $name, "pauseTimeOverall", 0 ) + $pauseTimeIncrement;
-        my $pulsInc = ReadingsVal( $name, "pulseTimeIncrement", 0 );
+        $pauseTimeIncrement += $timeIncrement;
+        $pauseTimePerDay    += $timeIncrement;
+        $pauseTimeOverall   += $timeIncrement;
+        $pulseTimeIncrement = 0;
+        $pauseTimeEdge      = $pauseTimeIncrement;
       }
-      HourCounter_Log $hash, 4, "rising edge; countPerDay:$countsPerDay";
+      HourCounter_Log $hash, 4, "rising edge; pauseTimeIncr:$pauseTimeIncrement countPerDay:$countsPerDay";
     }
 
     # ------------ negative edge
-    elsif ( $isOffDefined && $hasValueChanged && $valuePara == 0 )
+    elsif ( $hasValueChanged && $valuePara == 0 )
     {
-      $hash->{helper}{changedTimestamp} = TimeNow();
-      $value                            = $valuePara;
-      $valueOld                         = $valuePara;
+      $value    = $valuePara;
+      $valueOld = $valuePara;
 
       # handling of pulse time
-      $pulseTimeIncrement = $timeIncrement;
-      $pulseTimePerDay    = ReadingsVal( $name, "pulseTimePerDay", 0 ) + $pulseTimeIncrement;
-      $pulseTimeOverall   = ReadingsVal( $name, "pulseTimeOverall", 0 ) + $pulseTimeIncrement;
+      $pulseTimeIncrement += $timeIncrement;
+      $pulseTimePerDay    += $timeIncrement;
+      $pulseTimeOverall   += $timeIncrement;
+      $pulseTimeEdge      = $pulseTimeIncrement;
+      $pauseTimeIncrement = 0;
       HourCounter_Log $hash, 4, "falling edge pulseTimeIncrement:$pulseTimeIncrement";
     }
 
     # --------------- no change
     elsif ( $valuePara == -1 )
     {
-      $doUpdate = 1;
-      HourCounter_Log $hash, 4, "force update";
-    }
-
-    # --------------- Day change, update pauseTime and pulseTime
-    if ( $isDayChanged || $doUpdate )
-    {
-      HourCounter_Log $hash, 4, "day change isDayChanged:$isDayChanged" if ($isDayChanged);
-      ### accumulate incurred times until day change
       if ( $valueOld == 0 )
       {
-        # update only,if not already defined (e.g. by clear)
-        $pauseTimeIncrement = $timeIncrement if ( !defined($pauseTimeIncrement) );
-        $pauseTimePerDay = ReadingsVal( $name, "pauseTimePerDay", 0 ) + $timeIncrement
-          if ( !defined($pauseTimePerDay) );
-        $pauseTimeOverall = ReadingsVal( $name, "pauseTimeOverall", 0 ) + $timeIncrement
-          if ( !defined($pauseTimeOverall) );
+        $pauseTimeIncrement += $timeIncrement;
+        $pauseTimePerDay    += $timeIncrement;
+        $pauseTimeOverall   += $timeIncrement;
       } elsif ( $valueOld == 1 )
       {
-        # update only,if not already defined
-        $pulseTimeIncrement = $timeIncrement if ( !defined($pulseTimeIncrement) );
-        $pulseTimePerDay = ReadingsVal( $name, "pulseTimePerDay", 0 ) + $timeIncrement
-          if ( !defined($pulseTimePerDay) );
-        $pulseTimeOverall = ReadingsVal( $name, "pulseTimeOverall", 0 ) + $timeIncrement
-          if ( !defined($pulseTimeOverall) );
+        $pulseTimeIncrement += $timeIncrement;
+        $pulseTimePerDay    += $timeIncrement;
+        $pulseTimeOverall   += $timeIncrement;
       }
-
-      # update timestamp of reading value with current time
-      $hash->{helper}{changedTimestamp} = TimeNow();
-      if ($isDayChanged)
-      {
-        # reset daycounter in case of daychange
-        $resetDayCounter = 1;
-      }
-
-      #..  set value
-      $value = $valueOld;
     }
 
-    # set state
-    $state = $countsPerDay
-      if ( defined($countsPerDay) && ReadingsVal( $name, "state", 0 ) != $countsPerDay );
+    $hash->{helper}{changedTimestamp} = TimeNow();
+
+    $value = $valueOld;
+
+    $state = $countsPerDay;
 
     # ---------update readings, if vars defined
     readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "countsPerDay",       $countsPerDay )       if defined($countsPerDay);
-    readingsBulkUpdate( $hash, "countsOverall",      $countsOverall )      if defined($countsOverall);
-    readingsBulkUpdate( $hash, "pulseTimeIncrement", $pulseTimeIncrement ) if defined($pulseTimeIncrement);
-    readingsBulkUpdate( $hash, "pulseTimePerDay",    $pulseTimePerDay )    if defined($pulseTimePerDay);
-    readingsBulkUpdate( $hash, "pulseTimeOverall",   $pulseTimeOverall )   if defined($pulseTimeOverall);
-    readingsBulkUpdate( $hash, "pauseTimeIncrement", $pauseTimeIncrement ) if defined($pauseTimeIncrement);
-    readingsBulkUpdate( $hash, "pauseTimePerDay",    $pauseTimePerDay )    if defined($pauseTimePerDay);
-    readingsBulkUpdate( $hash, "pauseTimeOverall",   $pauseTimeOverall )   if defined($pauseTimeOverall);
-    readingsBulkUpdate( $hash, "value",              $value )              if defined($value);
-    readingsBulkUpdate( $hash, 'state',              $state )              if defined($state);
-    readingsEndUpdate( $hash, $fireEvents );
+    readingsBulkUpdate( $hash, "countsPerDay",  $countsPerDay );
+    readingsBulkUpdate( $hash, "countsOverall", $countsOverall );
+
+    readingsBulkUpdate( $hash, "pulseTimeIncrement", $pulseTimeIncrement );
+    readingsBulkUpdate( $hash, "pulseTimeEdge",      $pulseTimeEdge );
+
+    readingsBulkUpdate( $hash, "pulseTimePerDay",  $pulseTimePerDay );
+    readingsBulkUpdate( $hash, "pulseTimeOverall", $pulseTimeOverall );
+
+    readingsBulkUpdate( $hash, "pauseTimeIncrement", $pauseTimeIncrement );
+    readingsBulkUpdate( $hash, "pauseTimeEdge",      $pauseTimeEdge );
+
+    readingsBulkUpdate( $hash, "pauseTimePerDay",  $pauseTimePerDay );
+    readingsBulkUpdate( $hash, "pauseTimeOverall", $pauseTimeOverall );
+
+    readingsBulkUpdate( $hash, "value", $value );
+    readingsBulkUpdate( $hash, 'state', $state );
+    readingsBulkUpdate( $hash, 'tickUpdated', $tickUpdated );
+    readingsEndUpdate( $hash, 1 );
 
     # --------------- fire time interval ticks for hour,day,month
+
+    if ($hasValueChanged)
+    {
+      $tickChanged++;
+      $tickChanged = 1 if ( $tickChanged >= 1000 );
+      readingsSingleUpdate( $hash, 'tickChanged', $tickChanged, 1 );
+      HourCounter_Log $hash, 4, 'tickChanged fired ';
+    }
     if ($isHourChanged)
     {
+      $tickHour++;
+      $tickHour = 1 if ( $tickHour >= 1000 );
       $hash->{helper}{forceHourChange} = '';
       $hash->{helper}{sdRoundHourLast} = $sdRoundHour;
-      readingsSingleUpdate( $hash, 'tickHour', 1, 1 );
+      readingsSingleUpdate( $hash, 'tickHour', $tickHour, 1 );
       HourCounter_Log $hash, 4, "tickHour fired";
     }
     if ($isDayChanged)
     {
+      $tickDay++;
+      $tickDay = 1 if ( $tickDay >= 1000 );
       $hash->{helper}{forceDayChange} = '';
-      readingsSingleUpdate( $hash, 'tickDay', 1, 1 );
+      readingsSingleUpdate( $hash, 'tickDay', $tickDay, 1 );
       HourCounter_Log $hash, 4, "tickDay fired";
     }
     if ($isWeekChanged)
     {
+      $tickWeek++;
+      $tickWeek = 1 if ( $tickWeek >= 1000 );
       $hash->{helper}{forceWeekChange} = '';
-      readingsSingleUpdate( $hash, 'tickWeek', 1, 1 );
+      readingsSingleUpdate( $hash, 'tickWeek', $tickWeek, 1 );
       HourCounter_Log $hash, 4, "tickWeek fired";
     }
     if ($isMonthChanged)
     {
+      $tickMonth++;
+      $tickMonth = 1 if ( $tickMonth >= 1000 );
       $hash->{helper}{forceMonthChange} = '';
-      readingsSingleUpdate( $hash, 'tickMonth', 1, 1 );
+      readingsSingleUpdate( $hash, 'tickMonth', $tickMonth, 1 );
       HourCounter_Log $hash, 4, "tickMonth fired";
     }
     if ($isYearChanged)
     {
+      $tickYear++;
+      $tickYear = 1 if ( $tickYear >= 1000 );
       $hash->{helper}{forceYearChange} = '';
-      readingsSingleUpdate( $hash, 'tickYear', 1, 1 );
+      readingsSingleUpdate( $hash, 'tickYear', $tickYear, 1 );
       HourCounter_Log $hash, 4, "tickYear fired";
     }
-    HourCounter_ExecQueue($hash);    # execute command queue
 
-    # ----------- pending request for resetting all day counters
-    if ($resetDayCounter)
+    # execute command queue
+    HourCounter_ExecQueue($hash);
+
+    # day change, so reset day readings
+    if ($isDayChanged)
     {
-      $resetDayCounter = undef;
       ### reset all day counters
       readingsBeginUpdate($hash);
       readingsBulkUpdate( $hash, "countsPerDay",    0 );
@@ -814,7 +826,7 @@ sub HourCounter_Run($)
   <br>
 
   <a name="HourCounterset"></a>
-  <b>Set-Commands</b>
+  <b>Set-Commands</b> 
   <ul>
         <br/>
 	  <code>set &lt;name&gt; calc</code>
@@ -846,7 +858,13 @@ sub HourCounter_Run($)
 	  <code>set &lt;name&gt; pauseTimeIncrement &lt;value&gt; </code>
 	 <br/><br/>
 	 <ul>Sets the reading pauseTimeIncrement to the given value.<br/> 
-	 This reading in seconds is automatically set after a rising edge of the property.</ul><br/>
+	 This reading in seconds is automatically set after a rising edge.</ul><br/>
+	 
+      <br/>
+	  <code>set &lt;name&gt; pauseTimeEdge &lt;value&gt; </code>
+	 <br/><br/>
+	 <ul>Sets the reading pauseTimeEdge to the given value.<br/> 
+	 This reading in seconds is automatically set after a rising edge.</ul><br/>	 
 	 
       <br/>
 	  <code>set &lt;name&gt; pauseTimeOverall &lt;value&gt; </code>
@@ -865,8 +883,14 @@ sub HourCounter_Run($)
 	 <br/><br/>
 	 <ul>Sets the reading pulseTimeIncrement to the given value.<br/>
 	 This reading in seconds is automatically set after a falling edge of the property.</ul><br/>
-
+	 
       <br/>
+	  <code>set &lt;name&gt; pulseTimeEdge &lt;value&gt; </code>
+	 <br/><br/>
+	 <ul>Sets the reading pulseTimeEdge to the given value.<br/> 
+	 This reading in seconds is automatically set after a rising edge.</ul><br/>	
+      <br/>
+      
 	  <code>set &lt;name&gt; pulseTimeOverall &lt;value&gt; </code>
 	 <br/><br/>
 	 <ul>Sets the reading pulseTimeOverall to the given value.<br/>
