@@ -1,5 +1,5 @@
 ###############################################
-#$Id: 70_PushNotifier.pm 2014-12-11 13:28:00 xusader
+#$Id: 70_PushNotifier.pm 2014-12-16 17:00:00 xusader
 #
 #	download client-app http://pushnotifier.de/apps/
 #	create account http://pushnotifier.de/login/
@@ -43,29 +43,32 @@ PushNotifier_Define($$)
   $hash->{passwd} = $passwd;
   $hash->{deviceID} = $deviceID;
 
-  my %getAppToken = (
-        'apiToken' => $apiToken,
+  my $responseAT = LWP::UserAgent->new()->post("http://a.pushnotifier.de/1/login", 
+	['apiToken' => $apiToken,
         'username' => $user,
-        'password' => $passwd);
+        'password' => $passwd]);
 
-  my $responseAT = LWP::UserAgent->new()->post("http://a.pushnotifier.de/1/login", \%getAppToken);
   my $strg_chkAT = $responseAT->as_string;
   $strg_chkAT =~ m{"appToken":"([\w]+)};
   my $appToken = $1;
   $hash->{appToken} = $appToken;
 
-  #my $name = $hash->{NAME};
-  #Log3 $name, 2, $appToken;
-
-  my %getDevices = (
-  'apiToken' => $apiToken,
-  'appToken' => $appToken);
-
-  my $responseID = LWP::UserAgent->new()->post("http://a.pushnotifier.de/1/getDevices", \%getDevices);
+  my $responseID = LWP::UserAgent->new()->post("http://a.pushnotifier.de/1/getDevices", 
+	['apiToken' => $apiToken,
+	'appToken' => $appToken]);
   my $strg_chkID = $responseID->as_string;
-  $strg_chkID =~ m/":([\d].*)/; 
-  my $devices = $1;
-  $hash->{devices} = $devices;  
+  $strg_chkID =~ s/[-"{}_]//g;
+
+  $re1='.*?';
+  $re2='(\\[.*?\\])';
+
+  $re=$re1.$re2;
+  if ($strg_chkID =~ m/$re/is)
+  {
+    $sbraces1=$1;
+    my $devices = $sbraces1;
+    $hash->{devices} = $devices;
+  }
 
   return undef; 
   }
@@ -75,13 +78,12 @@ PushNotifier_Define($$)
 sub
 PushNotifier_Set($@)
 {
-  my ($hash, $name, $cmd, @a) = @_;
+  my ($hash, $name, $cmd, @args) = @_;
 	my %sets = ('message' => 1);
 	if(!defined($sets{$cmd})) {
-		return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets);
+		return "Unknown argument ". $cmd . ", choose one of " . join(" ", sort keys %sets);
 	}
-
-    return PushNotifier_Send_Message($hash, , @a);
+    return PushNotifier_Send_Message($hash, @args);
 }
 #####################################
 sub
@@ -89,35 +91,25 @@ PushNotifier_Send_Message
 {
   my $hash = shift;
   my $msg = join(" ", @_);
+  $msg =~ s/\_/\n/g;
 
-  my $apiToken = $hash->{apiToken};
-  my $app = $hash->{app};
-  my $user = $hash->{user};
-  my $passwd = $hash->{passwd};
-  my $appToken = $hash->{appToken};
-  my $deviceID = $hash->{deviceID};
-
-  my %settings = (
-	'apiToken' => $apiToken,
-	'appToken' => $appToken,
-	'app' => $app,
-	'deviceID' => $deviceID,
+  my $response = LWP::UserAgent->new()->post('http://a.pushnotifier.de/1/sendToDevice', 
+	['apiToken' => $hash->{apiToken},
+	'appToken' => $hash->{appToken},
+	'app' => $hash->{app},
+	'deviceID' => $hash->{deviceID},
 	'type' => 'MESSAGE',
-	'content' => "$msg"
-    );
+	'content' => "$msg"]);
 
-    my $response = LWP::UserAgent->new()->post("http://a.pushnotifier.de/1/sendToDevice", \%settings);
- 
-    my $error_chk = $response->as_string;    
+    my $error_chk = $response->as_string; 
 
     if($error_chk =~ m/"status":"ok"/) {
-	return "OK";
+	return "OK!\n\n$msg";
 	}
 	else 
 	{
 	return $error_chk; 
-    }
-   
+    }   
 }
 
 1;
@@ -161,6 +153,10 @@ PushNotifier_Send_Message
     Examples:
     <ul>
       <code>set PushNotifier1 message This is a text.</code><br>
+    </ul>
+    Linebreak:
+    <ul>
+      <code>set PushNotifier1 message This is a text._New Line.</code><br>
     </ul>
   </ul>
   <br>
@@ -208,6 +204,10 @@ PushNotifier_Send_Message
     Beispiele:
     <ul>
       <code>set PushNotifier1 message Dies ist ein Text.</code><br>
+    </ul>
+    Zeilenumbruch:
+    <ul>
+      <code>set PushNotifier1 message Dies ist ein Text._Neue Zeile.</code><br>
     </ul>
   </ul>
   <br>
