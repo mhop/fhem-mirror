@@ -594,6 +594,7 @@ readingsGroup_2html($;$)
             if( !$values ) {
               my %extPage = ();
               my ($allSets, undef, undef) = FW_devState($name, "", \%extPage);
+              my ($set) = split( ' ', $set, 2 );
               if( $allSets && $allSets =~ m/$set:([^ ]*)/) {
                  $values = $1;
               }
@@ -757,6 +758,7 @@ readingsGroup_2html($;$)
             if( !$values ) {
               my %extPage = ();
               my ($allSets, undef, undef) = FW_devState($name, $room, \%extPage);
+              my ($set) = split( ' ', $set, 2 );
               if( $allSets && $allSets =~ m/$set:([^ ]*)/) {
                 $values = $1;
               }
