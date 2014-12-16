@@ -136,9 +136,12 @@ sub LW12_Set( $@ ) {
       return( "$name: set needs at least one parameter" );
   }
  
-#  if(!$hash->{LOCAL}) {
-#      RemoveInternalTimer($hash);
-#  }
+  if(!$hash->{LOCAL}) {
+      RemoveInternalTimer($hash);
+	   if ( ($attr{$name}{updateInterval}) != 0){
+		 InternalTimer(gettimeofday()+ $attr{$name}{updateInterval} , "LW12_updateStatus", $hash, 0);
+     }
+  }
  
   my $cmdList = "" . 
 	  "on off next:noArg prev:noArg animation mode speed run:noArg stop:noArg " . 
@@ -355,11 +358,6 @@ sub LW12_Set( $@ ) {
       return SetExtensions ($hash, $cmdList, $name, $cmd, @arg);
   }
   LW12_UpdateRGB( $hash );
-#  if(!$hash->{LOCAL}) {
-#	  if ( ($attr{$name}{updateInterval}) != 0){
-#		 InternalTimer(gettimeofday()+ $attr{$name}{updateInterval} , "LW12_updateStatus", $hash, 0);
-#     }
-#  }
   return( undef );
 }
 
