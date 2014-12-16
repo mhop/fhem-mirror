@@ -1,5 +1,4 @@
-##############################################  
-# $Id: 99_UtilsHourCounter.pm 6802 2014-10-25 18:00:00Z john $
+# $Id: 99_UtilsHourCounter.pm 2014-12-16 20:15:33 john $
 #
 #	This ist a reference implementation for enhanced features for modul hourCounter
 #
@@ -25,6 +24,9 @@
 #  04.02.14 - 1.00 modul created
 #  06.02.14 - 1.01 fixed: wrong timing in assignment appUtilization
 #  17.03.14 - 1.01 added: appHC_OnYear
+#  10.12.14 - 1.0.1.0 fixed: with integration of interval and support of cyclically updates
+#                     we need some changes: 
+#                     instead of value and countsOverall , now tickChanged is used
 
 
 package main;
@@ -37,7 +39,7 @@ use vars qw(%modules);
 
 #require "98_HourCounter.pm";
 
-my $UtilsHourCounter_Version="1.02 - 17.03.2014 (john)";
+my $UtilsHourCounter_Version="1.0.1.0 - 10.12.2014 (john)";
 sub Log3($$$);
 
 # --------------------------------------------------
@@ -201,7 +203,7 @@ sub appHC_OnCount($$$)
 
 # --------------------------------------------------
 # task on value change
-sub appHC_OnValueChanged($$$)
+sub appHC_OnUpdate($$$)
 {
    my ($name,$part0,$part1) = @_;  # object name, parameter name, parameter value
    $part0='' if (!defined($part0));
@@ -211,7 +213,7 @@ sub appHC_OnValueChanged($$$)
    # acquire needed values
    my $secs= HourCounter_SecondsOfDay();
    my $pulseTimePerDay = ReadingsVal($name,'pulseTimePerDay',0);
-   
+    
    # calc utilization
    $secs= 1 if ($secs==0);         # no zero division
    my $appUtilizationTempOld = ReadingsVal($name,'appUtilizationTemp',0);
@@ -228,7 +230,6 @@ sub appHC_OnValueChanged($$$)
    
 }
 
-
 # --------------------------------------------------
 # central event dispatcher
 sub appHCNotify($$$)
@@ -239,17 +240,20 @@ sub appHCNotify($$$)
     my $hash = $defs{$name}; 
     
     return undef if (!defined ($hash));
-    
-    # HourCounter_Log $hash, 2, "Name:$name part0:$part0 part1:$part1"; 
+    my $value = ReadingsVal($name,'value',0);
+    #HourCounter_Log ($hash, 2, "Name:$name part0:$part0 part1:$part1 value:$value"); 
      
-    # event dispatcher for delayed execution 
-    if ($part0 eq "value:")  # trigger CN.Test value: 1
+    if ($part0 eq "tickUpdated:")
     {
-       HourCounter_cmdQueueAdd($hash,"appHC_OnValueChanged q($name),q($part0),q($part1)");
+       HourCounter_cmdQueueAdd($hash,"appHC_OnUpdate q($name),q($part0),q($part1)");
     }
-    elsif ($part0 eq "countsOverall:")
+    elsif ($part0 eq "tickChanged:")
     {
-       HourCounter_cmdQueueAdd($hash,"appHC_OnCount q($name),q($part0),q($part1)");
+       # count only if rising edge
+       if ( $value == 1) 
+       { 
+         HourCounter_cmdQueueAdd($hash,"appHC_OnCount q($name),q($part0),q($part1)");
+       }
     }
     elsif ($part0 eq "tickHour:")  # trigger CN.Test tickHour: 1
     {
