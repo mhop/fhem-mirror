@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2014
-my $thzversion = "0.113";
+my $thzversion = "0.114";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -710,8 +710,8 @@ sub THZ_ReadAnswer($)
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
 	
-	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= 15))
-	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.04);
+	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= 20))
+	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.05);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
 	  if(defined($buf1))
 	    {
@@ -721,7 +721,7 @@ sub THZ_ReadAnswer($)
 	    }
 	$count ++;
 	}
-	return ("WInterface max repeat limited to 15" , $data) if ($count == 16);
+	return ("WInterface max repeat limited to 20" , $data) if ($count == 21);
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
 }
