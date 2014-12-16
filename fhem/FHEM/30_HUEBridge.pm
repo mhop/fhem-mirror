@@ -14,6 +14,16 @@ use JSON;
 #use Try::Tiny;
 use Data::Dumper;
 
+my $HUEBridge_isFritzBox = undef;
+sub
+HUEBridge_isFritzBox()
+{
+  $HUEBridge_isFritzBox = int( qx( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ) )  if( !defined( $HUEBridge_isFritzBox) );
+
+  return $HUEBridge_isFritzBox;
+}
+
+
 sub HUEBridge_Initialize($)
 {
   my ($hash) = @_;
@@ -424,6 +434,8 @@ sub HUEBridge_HTTP_Call($$$)
 #  } catch {
 #    return undef;
 #  }
+
+  return HUEBridge_ProcessResponse($hash,decode_json($ret)) if( HUEBridge_isFritzBox() );
 
   return HUEBridge_ProcessResponse($hash,from_json($ret));
 }
