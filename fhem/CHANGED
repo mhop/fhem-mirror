@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   42_SMARTMON: Frontend to smartctl (maintainer: hexenmeister)
   - feature: 70_PushNotifier added line break in Messages (xusader)
   - feature: readingsGroup: added valuePrefix and valueSuffix attributes
                             added collapsed/collapsible to visibility attribute
