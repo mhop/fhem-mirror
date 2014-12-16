@@ -426,11 +426,11 @@ sub statistics_DoStatistics($$$)
       next if ($completeReadingName =~ m/^($exclReadings)$/ );
       next if not exists ($dev->{READINGS}{$rName});
       
-      if ($statType == 1) { statistics_doStatisticMinMax ($hash, $dev, $rName, $periodSwitch, 0);}
-      elsif ($statType == 2) { statistics_doStatisticDelta ($hash, $dev, $rName, $periodSwitch );}
-      elsif ($statType == 3) { statistics_doStatisticDuration ($hash, $dev, $rName, $periodSwitch ); }
-      elsif ($statType == 4 && $periodSwitch>=1) { statistics_doStatisticTendency ($hash, $dev, $rName);}
-      elsif ($statType == 5) { statistics_doStatisticMinMax ($hash, $dev, $rName, $periodSwitch, 1);}
+      if ($statType == 1) { statistics_doStatisticMinMax ( $hash, $dev, $rName, $periodSwitch, 0 );}
+      elsif ($statType == 2) { statistics_doStatisticDelta ( $hash, $dev, $rName, $periodSwitch );}
+      elsif ($statType == 3) { statistics_doStatisticDuration ( $hash, $dev, $rName, $periodSwitch ); }
+      elsif ($statType == 4 && $periodSwitch>=1) { statistics_doStatisticTendency ( $hash, $dev, $rName );}
+      elsif ($statType == 5) { statistics_doStatisticMinMax ( $hash, $dev, $rName, $periodSwitch, 1 );}
       $statisticDone = 1;
    }
        
@@ -493,13 +493,13 @@ statistics_doStatisticMinMax ($$$$$)
    statistics_Log $hash, 4, "Calculating min/avg/max statistics for '".$dev->{NAME}.":$readingName = $value'";
   # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
   # Hourly statistic (if needed)
-   if ($doHourly) { statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Hour", $value, ($periodSwitch >= 1); }
+   if ($doHourly) { statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Hour", $value, ($periodSwitch != 0); }
   # Daily statistic
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Day", $value, ($periodSwitch >= 2);
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Day", $value, ( $periodSwitch >= 2 || $periodSwitch <= -2 );
   # Monthly statistic 
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Month", $value, ($periodSwitch >= 3);
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Month", $value, ( $periodSwitch >= 3 || $periodSwitch <= -3 );
   # Yearly statistic 
-   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Year", $value, ($periodSwitch == 4);
+   statistics_doStatisticMinMaxSingle $hash, $dev, $readingName, "Year", $value, ( $periodSwitch == 4 || $periodSwitch == -4 );
 
    return ;
 
@@ -548,7 +548,7 @@ sub statistics_doStatisticMinMaxSingle ($$$$$$)
   # Store current reading as last reading, Reset current reading
    if ($saveLast) {      
       readingsBulkUpdate($dev, $statReadingName . "Last", $result, 1); 
-      statistics_Log $hash, 5, "Set '".$statReadingName . "Last'='$result'";
+      statistics_Log $hash, 4, "Set '".$statReadingName . "Last'='$result'";
       $hidden[1] = 0; $hidden[3] = 0; $hidden[9] = 0; # No since value anymore
       $result = "Min: $value Avg: $value Max: $value";
    }
@@ -762,7 +762,7 @@ sub statistics_doStatisticDelta ($$$$)
    statistics_Log $hash, 5, "Set '$statReadingName'='$result'";
    
  # if changed, store previous visible statistic (delta) values
-   if ($periodSwitch >= 1) {
+   if ($periodSwitch != 0) {
       $result = "Hour: $last[1] Day: $last[3] Month: $last[5] Year: $last[7]";
       if ( $showDate =~ /1|3|5|7/ ) { $result .= " (since: $last[9] )"; }
       readingsBulkUpdate($dev,$statReadingName."Last",$result, 1); 
