@@ -864,7 +864,7 @@ PROPLANTA_Html($)
       </li><br>
       <li><code>URL &lt;Internetadresse&gt;</code>
          <br>
-         Internetadresse, von der die Daten ausgelesen werden (&uuml;berschreibt die Werte im 'define'-Term
+         Internetadresse, von der die Daten ausgelesen werden (&uuml;berschreibt die Werte im 'define'-Term)
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>

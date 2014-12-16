@@ -664,9 +664,10 @@ sub ########################################
 LUXTRONIK2_UpdateDone($)
 {
   my ($string) = @_;
+  return unless(defined($string));
+
   my $value = "";
   my $state = "";
-  return unless(defined($string));
 
   my @a = split("\\|",$string);
   my $hash = $defs{$a[0]};
