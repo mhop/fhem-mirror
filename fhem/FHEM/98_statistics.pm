@@ -969,7 +969,7 @@ sub statistics_FormatDuration($)
   my ($value) = @_;
   #Tage
   my $returnstr ="";
-  if ($value > 86400) { $returnstr = sprintf "%dd ", int($value/86400); }
+  if ($value >= 86400) { $returnstr = sprintf "%dd ", int($value/86400); }
   # Stunden
   $value %= 86400;
   $returnstr .= sprintf "%02d:", int($value/3600);
