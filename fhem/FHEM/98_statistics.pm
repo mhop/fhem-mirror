@@ -966,19 +966,22 @@ sub statistics_getStoredDevices ($)
 ########################################
 sub statistics_FormatDuration($)
 {
-  my ($value) = @_;
-  #Tage
-  my $returnstr ="";
-  if ($value >= 86400) { $returnstr = sprintf "%dd ", int($value/86400); }
-  # Stunden
-  $value %= 86400;
-  $returnstr .= sprintf "%02d:", int($value/3600);
-  $value %= 3600;
-  $returnstr .= sprintf "%02d:", int($value/60);
-  $value %= 60;
-  $returnstr .= sprintf "%02d", $value;
-  
-  return $returnstr;
+   my ($value) = @_;
+   #Tage
+   my $returnstr ="";
+   if ($value > 86400) { $returnstr = sprintf "%dd ", int($value/86400); }
+   # Stunden
+   if ($value == 86400) { 
+      $returnstr = "24:00:00";
+   } else {
+      $value %= 86400;
+      $returnstr .= sprintf "%02d:", int($value/3600);
+      $value %= 3600;
+      $returnstr .= sprintf "%02d:", int($value/60);
+      $value %= 60;
+      $returnstr .= sprintf "%02d", $value;
+   }
+   return $returnstr;
 }
 
 ########################################
