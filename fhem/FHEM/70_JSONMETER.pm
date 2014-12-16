@@ -371,9 +371,8 @@ JSONMETER_GetUpdate($)
                                 unless(exists($hash->{helper}{RUNNING_PID}));
 }
 
-
-sub ##########################################
-JSONMETER_GetJsonFile ($)
+##########################################
+sub JSONMETER_GetJsonFile ($)
 {
     my ($name) = @_;
     my $returnStr;
@@ -407,11 +406,12 @@ JSONMETER_GetJsonFile ($)
     return $returnStr;
 }
 
-sub ##########################################
-JSONMETER_ReadFromFile($)
+
+##########################################
+sub JSONMETER_ReadFromFile($)
 {
     my ($string) = @_;
-    my ($name, $pathString) = split /\|/, $string; 
+    my ($name, $pathString) = split "\\|", $string; 
 
     JSONMETER_Log $name, 4, "Open file '$pathString'";
     if (open(IN, "<" . $pathString)) {
@@ -432,7 +432,7 @@ JSONMETER_ReadFromUrl($)
 {
  
  my ($string) = @_;
- my ($name, $ip, $port, $pathString) = split /\|/, $string; 
+ my ($name, $ip, $port, $pathString) = split "\\|", $string; 
  
  my $buf ;
  my $message ;
