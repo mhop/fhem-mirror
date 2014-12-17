@@ -524,7 +524,7 @@ if ( $a[1] == 1 ){
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4]";
                   JSONMETER_Log $name,4,"OBIS code \"$$f[1]\" will be stored in $$f[2]";
                   $returnStr .= "OBIS code \"$$f[1]\" will be extracted as reading '$$f[2]' (statistic type: $$f[3]) from part $i:\n$fields[$i]\n\n";
-               }
+               } 
             } elsif ($$f[0] == 3) { 
                if ($fields[$i] =~ /"($$f[1])"\s*:/) {
                   $jsonInterpreter .= "|$i $$f[0] $$f[2] $$f[3] $$f[4] $$f[1]";
