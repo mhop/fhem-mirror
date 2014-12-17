@@ -38,6 +38,7 @@
 package main;
 use strict;
 use warnings;
+use feature qw/say switch/;
 
 use IO::Socket;
 # include this for the self-calling timer we use later on
@@ -67,10 +68,13 @@ sub LW12_Initialize( $ ) {
   $hash->{UndefFn}    = "LW12_Undefine";
   $hash->{SetFn}      = "LW12_Set";
   $hash->{GetFn}      = "LW12_Get";
+  $hash->{AttrFn}     = "LW12_Attr";
 
   # the attributes we have. Space separated list of attribute values in 
   # the form name:default1,default2
-  $hash->{AttrList}  = "timeout updateInterval verbose:0,1,2,3,4,5 " . $readingFnAttributes;
+  $hash->{AttrList}  = "disable:0,1 timeout updateInterval ".
+                       "verbose:0,1,2,3,4,5 ". 
+                       $readingFnAttributes;
 
   # initialize the color picker
   FHEM_colorpickerInit();
@@ -103,11 +107,9 @@ sub LW12_Define( $$ ) {
         channels => [(255) x 3],
     };
 
- 	$attr{$name}{timeout} = 2;
- 	$attr{$name}{updateInterval} = 60;
- 	$attr{$name}{verbose} = 3;
-
-	LW12_updateStatus($hash);
+# Erstes Update verzögern, falls beim fhem Start
+# ein Attribut gesetzt wird, damit nicht zwei Timer laufen.
+	InternalTimer(gettimeofday()+ 10, "LW12_updateStatus", $hash, 0);
 
 	return undef;
 }
@@ -116,8 +118,7 @@ sub LW12_Define( $$ ) {
 #  Undefinition of a module instance
 #  called when undefining an element via fhem.cfg
 # ----------------------------------------------------------------------------
-sub LW12_Undefine($$)
-{
+sub LW12_Undefine($$) {
   my ($hash,$arg) = @_;
 
   RemoveInternalTimer($hash);
@@ -136,16 +137,14 @@ sub LW12_Set( $@ ) {
       return( "$name: set needs at least one parameter" );
   }
  
-  if(!$hash->{LOCAL}) {
-      RemoveInternalTimer($hash);
-	   if ( ($attr{$name}{updateInterval}) != 0){
-		 InternalTimer(gettimeofday()+ $attr{$name}{updateInterval} , "LW12_updateStatus", $hash, 0);
-     }
-  }
+	RemoveInternalTimer($hash);
+	if ( AttrVal($name,'updateInterval',60) != 0) {
+		InternalTimer(gettimeofday()+ AttrVal($name,'updateInterval',60) , "LW12_updateStatus", $hash, 0);
+	}
  
   my $cmdList = "" . 
 	  "on off next:noArg prev:noArg animation mode speed run:noArg stop:noArg " . 
-	  "color dim:slider,0,1,100 " . 
+	  "color dim:slider,1,1,100 " . 
 	  "rgb:colorpicker,rgb hsv";
 	  
   # now parse the commands
@@ -344,7 +343,7 @@ sub LW12_Set( $@ ) {
 		  Log3 $name, 3, $msg ;
 		  return( $msg );
       } else {
-	
+		return 'Dim value 0 not allowed!';
         $hash->{".dim"}->{bri} = $arg[0];
         @{$hash->{".bri"}->{channels}} = Color::BrightnessToChannels($hash->{".dim"});
 		  LW12_Write( $hash, "\x{56}" .
@@ -382,6 +381,31 @@ sub LW12_Get( $@ ) {
   }  
 }
 
+sub LW12_Attr(@) {
+ 	my @a = @_;
+ 	my ($command, $name, $attrName, $attrValue) = @a;
+ 	my $hash = $defs{$name};
+ 
+ 	given($attrName) {
+ 		when("updateInterval") {
+			RemoveInternalTimer($hash);
+			if ($command eq 'set') {
+				$attr{$name}{$attrName} = $attrValue;
+			} else {
+				CommandDeleteAttr($name,$attrName);
+			}
+			InternalTimer(gettimeofday()+ $attrValue, "LW12_updateStatus", $hash, 0);
+ 		}
+ 		default {
+			if ($command eq 'set') {
+				$attr{$name}{$attrName} = $attrValue;
+			} else {
+				CommandDeleteAttr($name,$attrName);
+			}
+		}
+ 	}
+ 	return undef;
+}
 
 # ----------------------------------------------------------------------------
 #  write something to the WIFI LED
@@ -393,7 +417,7 @@ sub LW12_Write( $$ ) {
     my $s = new IO::Socket::INET( PeerAddr => $hash->{IP},
 				  PeerPort => 5577,
 				  Proto => 'tcp',
-				  Timeout => int( $attr{$name}{timeout} ) );
+				  Timeout => int( AttrVal($name,'timeout',2) ) );
 
     if( defined $s ) {
 		my $res = "";
@@ -412,7 +436,6 @@ sub LW12_Write( $$ ) {
 		Log3 $name, 3, "Can't connect to socket!";
 	}
 }
-
 
 # ----------------------------------------------------------------------------
 #  Update the RGB Readings for the color picker
@@ -443,12 +466,12 @@ sub LW12_updateStatus( $ ) {
     my ( $hash, @rest )  = @_;
     my $name = $hash->{NAME};
 	
-	if(!$hash->{LOCAL}) {
-	   RemoveInternalTimer($hash);
-	   if ( ($attr{$name}{updateInterval}) != 0){
-		InternalTimer(gettimeofday()+ $attr{$name}{updateInterval} , "LW12_updateStatus", $hash, 0);
-	   }
-	}	
+	RemoveInternalTimer($hash);
+	if ( AttrVal($name,'updateInterval',60) != 0) {
+		InternalTimer(gettimeofday()+ AttrVal($name,'updateInterval',60), "LW12_updateStatus", $hash, 0);
+	}
+	
+	return if IsDisabled($name);
 	
 	my $res = LW12_Write( $hash, "\x{EF}\x{01}\x{77}" );	
 	$res = uc($res);
@@ -476,14 +499,6 @@ sub LW12_updateStatus( $ ) {
 # DO NOT WRITE BEYOND THIS LINE
 1;
 
-=pod
-=begin html
-
-
-
-
-=end html
-=cut
 
 =pod
 =begin html
@@ -566,6 +581,8 @@ sub LW12_updateStatus( $ ) {
   <a name="LW12attr"></a>
   <b>Attributes</b>
     <ul>
+      <li>disabel<br>
+        Disable tcp connection and update process. Internal Timer remains active!</li>
       <li>updateInterval<br>
         The Interval of the Statusupdates in seconds. If &lt;updateInterval&gt = 0, the automatic updates are not active. Default is 60.</li>
       <li>Timeout<br>
