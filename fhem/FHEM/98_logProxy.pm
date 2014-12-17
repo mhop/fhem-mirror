@@ -889,8 +889,10 @@ logProxy_Get($@)
             $first .= ";p $x $y\n" if( !$first );
           } else {
             my $align = "middle";
-            $align = "start" if( $a > 30 && $a < 150 );
-            $align = "end" if( $a > 210 && $a < 330 );
+            #$align = "start" if( $a > 30 && $a < 150 );
+            #$align = "end" if( $a > 210 && $a < 330 );
+            $align = "start" if( $a > 0 && $a < 180 );
+            $align = "end" if( $a > 180 && $a < 360 );
 
             $ret .= ";t $x $y $align $value\n";
           }
