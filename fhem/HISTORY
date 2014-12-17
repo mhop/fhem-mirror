@@ -599,3 +599,6 @@
 - Tue Sep 23 2014 (eisler)
   - added new module 44_TEK603 to support the TEK603 Eco Monitor
  
+- Wed Dec 17 2014 (Reinerlein)
+  - added new module 00_SONOS and 21_SONOSPLAYER to support the Sonos Multiroom Audiosystem
+

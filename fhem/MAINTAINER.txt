@@ -1,4 +1,3 @@
-Files with a maintainer. If you wish to change a file, please contact the
 maintainer of the file to do the change.
 
 The third column specifies, where/how the maintainer should be contacted. If
@@ -29,6 +28,7 @@ FHEM/00_NetzerI2C.pm         klausw               http://forum.fhem.de Sonstige 
 FHEM/00_OWX.pm               pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/00_OWX_ASYNC            ntruchsess           http://forum.fhem.de 1Wire
 FHEM/00_RPII2C               klausw               http://forum.fhem.de Einplatinencomputer
+FHEM/00_SONOS.pm             Reinerlein           http://forum.fhem.de Multimedia
 FHEM/00_TCM.pm               klaus-schauer        http://forum.fhem.de EnOcean
 FHEM/00_THZ.pm               immiimmi             http://forum.fhem.de Sonstiges
 FHEM/00_TUL.pm               hotmaz               http://forum.fhem.de KNX/EIB
@@ -95,6 +95,7 @@ FHEM/21_OWMULTI.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_OWSWITCH.pm          pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/21_OWTEMP.pm            mfr69bs              http://forum.fhem.de 1Wire (deprecated)
 FHEM/21_OWTHERM.pm           pahenning/ntruchsess http://forum.fhem.de 1Wire
+FHEM/21_SONOSPLAYER          Reinerlein           http://forum.fhem.de Multimedia
 FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Snstiges
 FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
 FHEM/23_KOSTALPIKO.pm        john                 http://forum.fhem.de CodeSchnipsel
@@ -292,9 +293,13 @@ FHEM/SHC_parser.pm           rr2000               http://forum.fhem.de Sonstige 
 FHEM/TcpServerUtils.pm       rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/lib/Device/MySensors/*  ntruchsess           http://forum.fhem.de Sonstige Systeme
+FHEM/lib/Encode/*            Reinerlein           http://forum.fhem.de Multimedia
+FHEM/lib/MP3/*               Reinerlein           http://forum.fhem.de Multimedia
+FHRM/lib/Normalize           Reinerlein           http://forum.fhem.de Multimedia
 FHEM/lib/ProtoThreads.pm     ntruchsess           http://forum.fhem.de FHEM Development
 FHEM/lib/SHC_packet_layout.xml  rr2000            http://forum.fhem.de Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/lib/UPnP/*              Reinerlein           http://forum.fhem.de Multimedia
 FHEM/FhemUtils/*             mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/GPUtils.pm              ntruchsess           http://forum.fhem.de FHEM Development
 
