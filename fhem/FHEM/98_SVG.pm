@@ -559,6 +559,8 @@ SVG_readgplotfile($$)
     my $plotfn = undef;
     if($l =~ m/^#$ldType (.*)$/) {
       $plotfn = $1;
+      Log 3, "$wl: space is not allowed in $ldType definition: $plotfn"
+        if($plotfn =~ m/\s/);
     } elsif($l =~ "^plot" || $plot) {
       $plot .= $l;
     } else {
