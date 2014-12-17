@@ -38,8 +38,8 @@ use POSIX;
 use HttpUtils;
 use Math::Trig;
 
+
 sub Twilight_calc($$$$$$$);
-sub Twilight_getWeatherHorizon($);
 sub Twilight_my_gmt_offset();
 sub Twilight_midnight_seconds();
 
@@ -75,10 +75,9 @@ sub Twilight_Initialize($)
   $hash->{UndefFn} = "Twilight_Undef";
   $hash->{GetFn}   = "Twilight_Get";
   $hash->{AttrList}= "$readingFnAttributes " ."useExtWeather";
+  return undef;
 }
-#
-#
-#
+################################################################################
 sub Twilight_Get($@)
 {
   my ($hash, @a) = @_;
@@ -175,9 +174,9 @@ sub Twilight_midnight_seconds()
   return $secs;
 }
 ################################################################################
-sub Twilight_TwilightTimes($$)
+sub Twilight_TwilightTimes(@)
 {
-  my ($hash, $whitchTimes) = @_;
+  my ($hash, $whitchTimes, $xml) = @_;
   my $latitude   = $hash->{LATITUDE};
   my $longitude  = $hash->{LONGITUDE};
   my $horizon    = $hash->{HORIZON};
@@ -202,7 +201,7 @@ sub Twilight_TwilightTimes($$)
      $yesterday_offset=0;
   }
 
-  Twilight_getWeatherHorizon($hash);
+  Twilight_getWeatherHorizon($hash, $xml);
 
   if($hash->{WEATHER_HORIZON} > (89-$hash->{LATITUDE}+$declination) ){
      $hash->{WEATHER_HORIZON} =  89-$hash->{LATITUDE}+$declination;
@@ -298,21 +297,64 @@ sub myGetHashIndirekt ($$) {
   return $myHash->{HASH};  
 }
 ################################################################################
-sub Twilight_Midnight($) {
+sub Twilight_Midnight($)
+{
   my ($myHash) = @_;
-  my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+  my $location=$myHash->{HASH}->{WEATHER};
+  my $param = {
+    url        => "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c",
+    timeout    => 5,
+    hash       => $myHash->{HASH},
+    method     => "GET",
+    header     => "User-Agent: Mozilla/5.0\r\nAccept: application/xml",
+    callback   =>  \&Twilight_MidnightNB
+                };
+  HttpUtils_NonblockingGet($param);
+}
+################################################################################
+# the xml shoud be ready in data
+sub Twilight_MidnightNB(@) {
+  my ($param, $err, $xml) = @_;
+  my $hash = $param->{hash};
   return if (!defined($hash));
-
-  Twilight_TwilightTimes      ($hash, "Mid");
+  if ($err)
+  {
+    Log3 ($hash, 2, "$hash->{NAME} get weather result $err");
+    $xml = undef;
+  }
+  Twilight_TwilightTimes      ($hash, "Mid", $xml);
   Twilight_StandardTimerSet   ($hash);
 }
-################################ ################################################
-sub Twilight_WeatherTimerUpdate($) {
+################################################################################
+sub Twilight_WeatherTimerUpdate($)
+{
   my ($myHash) = @_;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+  return if (!defined($hash));  
+  
+  my $location=$hash->{WEATHER};
+  my $param = {
+    url        => "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c",
+    timeout    => 5,
+    hash       => $hash,
+    method     => "GET",
+    header     => "User-Agent: Mozilla/5.0\r\nAccept: application/xml",
+    callback   =>  \&Twilight_WeatherTimerUpdateNB
+                };
+  HttpUtils_NonblockingGet($param);
+}
+################################################################################
+sub Twilight_WeatherTimerUpdateNB(@) {
+  my ($param, $err, $data) = @_;
+  my $hash = $param->{hash};
   return if (!defined($hash));
-
-  Twilight_TwilightTimes      ($hash, "Wea");
+  if ($err)
+  {
+    Log3 ($hash, 2, "$hash->{NAME} get weather result $err");
+    $data = undef;
+  }
+  Log3 ($hash, 4, "$hash->{NAME} get weather");
+  Twilight_TwilightTimes      ($hash, "Wea", $data);
   Twilight_StandardTimerSet   ($hash);
 }
 ################################################################################
@@ -410,9 +452,9 @@ sub Twilight_calc($$$$$$$)
   return $sunrise, $sunset;
 }
 ################################################################################
-sub Twilight_getWeatherHorizon($)
+sub Twilight_getWeatherHorizon(@)
 {
-  my $hash=shift; # 0
+  my ($hash, $xml) = @_;
   
   my $location=$hash->{WEATHER};
   if ($location == 0)  {
@@ -429,8 +471,6 @@ sub Twilight_getWeatherHorizon($)
                     9,15, 8, 5,12, 6, 8, 8);
 
   # condition codes are described in FHEM wiki and in the documentation of the yahoo weather API
-  my $url = "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c";
-  my $xml = GetFileFromURL($url, 3, undef, 1);
 
   my $current, my $cond, my $temp, my $aktTemp;
   if (defined($xml)) {
@@ -455,12 +495,6 @@ sub Twilight_getWeatherHorizon($)
     $hash->{TEMPERATUR}         = $temp;
     return 1;
   }
-
-  Log3 $hash, 3, "[$hash->{NAME}] "
-    ."No Weather location found at yahoo weather for location ID: $location\n"
-    ."=======\n"
-    .$xml
-    ."\n=======";
 
   $hash->{WEATHER_HORIZON} = "0";
   $hash->{CONDITION}       = "-1";
