@@ -1,3 +1,4 @@
+$Id: $
 # ############################################################################
 #
 #  FHEM Modue for WLAN based LED Driver
@@ -581,7 +582,7 @@ sub LW12_updateStatus( $ ) {
   <a name="LW12attr"></a>
   <b>Attributes</b>
     <ul>
-      <li>disabel<br>
+      <li>disable<br>
         Disable tcp connection and update process. Internal Timer remains active!</li>
       <li>updateInterval<br>
         The Interval of the Statusupdates in seconds. If &lt;updateInterval&gt = 0, the automatic updates are not active. Default is 60.</li>
