@@ -13,8 +13,8 @@ use strict;
 use warnings;
 
 my %codes = (
-  "011e" => "ESAx000WZ",
-  "031e" => "ESA1000Z",
+  "01.e" => "ESAx000WZ",
+  "03.e" => "ESA1000Z",
 );
 
 
@@ -76,7 +76,7 @@ ESA2000_Parse($$)
 # S                                            Sensorkennung
 #   ss                                         Sequenze und Sequenzwiederhohlung mit gesetzten höchsten Bit
 #      dddd                                    Device
-#           cccc                               Code
+#           cccc                               Code + Batterystate
 #                vvvvvvvv vvvv vvvvvv vvvv     Valves
 #                tttttttt                      Gesamtimpules
 #                         aaaa                 Impule je Sequenz
@@ -106,7 +106,7 @@ ESA2000_Parse($$)
   Log3 $hash, 5, "ESA2000 device $dev";
   Log3 $hash, 5, "ESA2000 code $cde";
 
-  my $type = "";
+  my $type = "$cde";
   foreach my $c (keys %codes) {
     $c = lc($c);
     if($cde =~ m/$c/) {
@@ -131,19 +131,21 @@ ESA2000_Parse($$)
 #  ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = gmtime(time);
 #  $year = $year + 1900;
 
-#  0- 5     repeat, sequence, total_ticks, actual_ticks, ticks, raw
-#  6-12     total, actual, diff, diff_sec, diff_ticks, last_sec, raw_total
-# 13-17     max, day, month, year, rate
+#  0- 4     repeat, sequence, total_ticks, actual_ticks, ticks
+#  5-10     raw, total, actual, diff, diff_sec, diff_ticks
+# 11-17     last_sec, raw_total, max, day, month, year, rate
 # 18-23     day_hr, day_lr, month_hr, month_lr, year_hr, year_lr
 # 24-28     day_last, month_last, year_last, hour, hour_last
+# 29        battery
 
   if(($type eq "ESAx000WZ") || ($type eq "ESA1000Z")) {
 
-    @txt = ( "repeat", "sequence", "total_ticks", "actual_ticks", "ticks", "raw", 
-             "total", "actual", "diff", "diff_sec", "diff_ticks", "last_sec", "raw_total", 
-             "max", "day", "month", "year", "rate", 
-             "day_hr", "day_lr", "month_hr", "month_lr", "year_hr", "year_lr",
-             "day_last", "month_last", "year_last", "hour", "hour_last" );
+    @txt = ( "repeat", "sequence", "total_ticks", "actual_ticks", "ticks", 
+             "raw", "total", "actual", "diff", "diff_sec", "diff_ticks", 
+             "last_sec", "raw_total", "max", "day", "month", "year", "rate", 
+             "day_hr", "day_lr", "month_hr", "month_lr", "year_hr", "year_lr", 
+             "day_last", "month_last", "year_last", "hour", "hour_last", 
+             "battery" );
 
   } else {
 
@@ -153,6 +155,7 @@ ESA2000_Parse($$)
   }
 
     # Codierung Hex
+    $v[29]=  int(hex(substr($cde,2,2)) / 128) ? "low" : "ok";
     $v[0] =  int(hex($seq) / 128) ? "+" : "-";
     $v[1] =  hex($seq) % 128;
     $v[2] =  hex(substr($val,0,8));
