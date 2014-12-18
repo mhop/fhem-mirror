@@ -131,7 +131,7 @@ sub Pushover_HTTP_Call
   {
   	if ($1 eq "1")
   	{
-      return "OK";
+      return undef;
   	}
   	elsif ($response =~ m/"errors":\[(.*)\]/)
   	{
@@ -144,7 +144,7 @@ sub Pushover_HTTP_Call
   }
   else
   {
-  	return "Error: No known response"
+      return "Error: No known response\nResponse was: " . $response;
   }
 }
 
@@ -271,7 +271,7 @@ sub Pushover_Set_Message
     
     if (1 == $timestamp)
     {
-      $body = $body . "&" . "timestamp=" . time();
+      $body = $body . "&" . "timestamp=" . int(time());
     }
     
     my $result = Pushover_HTTP_Call($hash, $body, $ssl);
