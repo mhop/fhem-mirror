@@ -348,8 +348,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val > 0) 
       {
-         FRITZBOX_Start_Radio $hash, @val;
-         return undef;
+         return FRITZBOX_Start_Radio $hash, @val;
       }
    }
    elsif ( lc $cmd eq 'tam')
@@ -673,6 +672,8 @@ FRITZBOX_Readout_Run($)
    push @readoutArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
 # Gäste WLAN
    push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
+   push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
+
 # Alarm clock
    for (0..2)
    {
@@ -688,7 +689,7 @@ FRITZBOX_Readout_Run($)
       push @readoutArray, ["alarm".($_+1)."_wdays", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays", "aldays" ];
    }
 
-   $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+   FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
    
    
    $returnStr .= join('|', @readoutReadings );
@@ -696,9 +697,10 @@ FRITZBOX_Readout_Run($)
    $returnStr .= sprintf "%.2f", time()-$startTime;
 
    FRITZBOX_Close_Connection ( $hash );
-   
+
+   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
    return $returnStr
-   
+
 } # End FRITZBOX_Readout_Run
 
 sub ##########################################
@@ -759,6 +761,8 @@ FRITZBOX_Readout_Done($)
          $newState .= "off";
       }
       $newState .=" gWLAN: ".$values{box_guestWlan} ;
+      $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)" ;
+            $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} != 0;
       readingsBulkUpdate( $hash, "state", $newState);
    }
 
@@ -975,7 +979,7 @@ FRITZBOX_Ring_Run($)
    # Create a hash for the DECT devices whose ring tone can be changed
          foreach ( split( /,/, $intNo ) )
          {
-            if ("AVM" eq $hash->{fhem}{$_}{brand} or "")
+            if ("AVM" eq $hash->{fhem}{$_}{brand})
             {
                FRITZBOX_Log $hash, 5, "Internal number $_ seems to be a Fritz!Fon.";
                push @FritzFons, $_ - 609
@@ -1463,6 +1467,56 @@ FRITZBOX_Start_Radio($@)
 {
    my ($hash, @val) = @_;
    my @cmdArray;
+   my $name = $hash->{NAME};
+   my $intNo = $val[0];
+   my $radioStation;
+   my $result;
+   
+# Check if 1st parameter is a number
+   return "Error: 1st Parameter '$intNo' not an internal DECT number"
+      unless $intNo =~ /^61[012345]$/;
+
+# Check if the 1st parameter is a Fritz!Fon
+   return "Error: Internal number $intNo does not seem to be a Fritz!Fon."
+      unless $hash->{fhem}{$intNo}{brand} eq "AVM";
+
+# Check if 2nd parameter is an internet Radio Station
+   if (defined $val[1])
+   {
+      if ($val[1] =~ /^\d+$/)
+      {
+         $radioStation = $val[1];
+         return "Error: Unknown internet radio number $radioStation."
+            unless defined $radio[$radioStation];
+      }
+      else
+      {
+         foreach (keys @radio)
+         {
+            if (lc $radio[$_] eq lc $val[1])
+            {
+               $radioStation = $_;
+               last;
+            }
+         }
+         return "Error: Unknown internet radio station ".$val[1]
+            unless defined $radioStation;
+         
+      }
+   }
+
+   $result = FRITZBOX_Open_Connection( $hash );
+   return $result if $result;
+
+# Reset name of calling number
+   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".($intNo-609);
+
+# Execute command array
+   FRITZBOX_Exec( $hash, \@cmdArray );
+
+   FRITZBOX_Close_Connection( $hash );
+
+   return undef;
 }
 
 ##################################### 
@@ -1703,6 +1757,7 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
+      <li><b>box_guestWlanRemain</b> - Remaining time until the guest WLAN is switched off</li>
       <li><b>box_model</b> - Fritz!Box model</li>
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
@@ -1931,6 +1986,7 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Wochentage des Weckers <i>1</i></li>
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
+      <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
       <li><b>box_model</b> - Fritz!Box-Modell</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
