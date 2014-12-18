@@ -130,6 +130,7 @@ statistics_Initialize($)
                    ."deltaReadings "
                    ."durationReadings "
                    ."excludedReadings "
+                   ."ignoreDefaultAssignments:0,1 "
                    ."minAvgMaxReadings "
                    ."periodChangePreset "
                    ."specialDeltaPeriodHours "
@@ -380,9 +381,11 @@ sub statistics_DoStatistics($$$)
    my $devName = $dev->{NAME};
    my $devType = $dev->{TYPE};
    my $statisticDone = 0;
+   my %statReadings = ();
   
    return if( AttrVal($hashName, "disable", 0 ) == 1 );
 
+   my $ignoreDefAssign = AttrVal($hashName, "ignoreDefaultAssignments", 0);
    my $exclReadings = AttrVal($hashName, "excludedReadings", "");
    my $regExp = '^'.$devName.'$|^'.$devName.',|,'.$devName.'$|,'.$devName.',';
 
@@ -405,7 +408,8 @@ sub statistics_DoStatistics($$$)
    }
    
 # Build up Statistic-Reading-Hash, add readings defined in attributes to Statistic-Reading-Hash
-   my %statReadings = %knownReadings;
+   %statReadings = %knownReadings
+      unless $ignoreDefAssign == 1;
    while (my ($aName, $statType) = each (%addedReadingsAttr) )
    {
       my @addedReadings = split /,/, AttrVal($hashName, $aName, "");
@@ -435,7 +439,7 @@ sub statistics_DoStatistics($$$)
    }
        
 # If no statistic-reading has been found, do a duration stat for the device-state
-   if ($statisticDone != 1)
+   if ($statisticDone != 1 && $ignoreDefAssign != 1)
    {
       if ( exists ($dev->{READINGS}{state}) && $dev->{READINGS}{state}{VAL} ne "defined" ) { 
          statistics_doStatisticDuration $hash, $dev, "state", $periodSwitch;
@@ -1108,6 +1112,14 @@ sub statistics_UpdateDevReading($$$$)
       The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. <code>FritzDect:current|Sensor_.*:humidity</code>
       <br>
     </li><br>
+   
+   <li><code>ignoreDefaultAssignments <code>&lt;1 | 0&gt;</code></code>
+      <br>
+      Ignores the default assignments of readings to a statistic type (see above).<br>
+      So, only the readings that are listed in the specific attributes are evaluated.
+      <br>
+    </li><br>
+     
     <li><code>minAvgMaxReadings &lt;readings&gt;</code>
       <br>
       Comma separated list of reading names for which a min/average/max statistic shall be calculated. 
@@ -1231,6 +1243,14 @@ sub statistics_UpdateDevReading($$$$)
          z.B. <code>FritzDect:current|Sensor_.*:humidity</code>
          <br>
       </li><br>
+
+   <li><code>ignoreDefaultAssignments <code>&lt;1 | 0&gt;</code></code>
+      <br>
+      Ignoriert die oben beschriebene Standardzuordnung von Ger&auml;tewerten zu Statistiktypen..<br>
+      D.h., nur die Ger&auml;tewerte, die &uuml;ber Attribute den Statistiktypen zugeordnet sind, werden ausgewertet.
+      <br>
+    </li><br>
+     
       <li><code>hideAllSummaryReadings &lt;0 | 1&gt;</code>
          <br>
          noch nicht implementiert - Es werden keine gesammelten Statistiken angezeigt, sondern nur die unter "singularReadings" definierten Einzelwerte 
