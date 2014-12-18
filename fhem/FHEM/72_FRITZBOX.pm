@@ -114,7 +114,7 @@ my %userType = (
  , 4 => "Guest"
 );
 
-my @radio = ();
+# my @radio = ();
 my %landevice = ();
 
 sub ##########################################
@@ -505,7 +505,6 @@ FRITZBOX_Readout_Run($)
       
    # Internetradioliste erzeugen
       $i = 0;
-      @radio = ();
       $rName = "radio00";
       while ( $i<$radioCount || defined $hash->{READINGS}{$rName} )
       {
@@ -516,11 +515,14 @@ FRITZBOX_Readout_Run($)
 
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
 
+      # @radio = ();
       for (0..$radioCount-1)
       {
-         $radio[$_] = $result
-            if $resultArray->[$_] ne "";
-         
+         if ($resultArray->[$_] ne "")
+         {
+            # $radio[$_] = $resultArray->[$_];
+            push @readoutReadings, "fhem->radio->".$_."|".$resultArray->[$_];
+         }
       }
 
    # LanDevice-Liste erzeugen
@@ -761,8 +763,8 @@ FRITZBOX_Readout_Done($)
          $newState .= "off";
       }
       $newState .=" gWLAN: ".$values{box_guestWlan} ;
-      $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)" ;
-            $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} != 0;
+      $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)"
+         if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} != 0;
       readingsBulkUpdate( $hash, "state", $newState);
    }
 
@@ -881,7 +883,8 @@ FRITZBOX_Readout_Format($$$)
       $readout =~ s/1/on/;
    
    } elsif ($format eq "radio") {
-      $readout = $radio[$readout];
+      $readout = $hash->{fhem}{radio}{$readout}
+         if defined $hash->{fhem}{radio}{$readout};
   
    } elsif ($format eq "ringtone") {
       $readout = $ringTone{$readout};
@@ -1470,6 +1473,7 @@ FRITZBOX_Start_Radio($@)
    my $name = $hash->{NAME};
    my $intNo = $val[0];
    my $radioStation;
+   my $radioStationName;
    my $result;
    
 # Check if 1st parameter is a number
@@ -1480,26 +1484,29 @@ FRITZBOX_Start_Radio($@)
    return "Error: Internal number $intNo does not seem to be a Fritz!Fon."
       unless $hash->{fhem}{$intNo}{brand} eq "AVM";
 
-# Check if 2nd parameter is an internet Radio Station
-   if (defined $val[1])
+# Check if remaining parameter is an internet Radio Station
+   shift (@val);
+   if (@val)
    {
-      if ($val[1] =~ /^\d+$/)
+      $radioStationName = join (" ", @val);
+      if ($radioStationName =~ /^\d+$/)
       {
-         $radioStation = $val[1];
+         $radioStation = $radioStationName;
+         $radioStationName = $hash->{fhem}{radio}{$radioStation};
          return "Error: Unknown internet radio number $radioStation."
-            unless defined $radio[$radioStation];
+            unless defined $radioStationName;
       }
       else
       {
-         foreach (keys @radio)
+         foreach (keys $hash->{fhem}{radio})
          {
-            if (lc $radio[$_] eq lc $val[1])
+            if (lc $hash->{fhem}{radio}{$_} eq lc $radioStationName)
             {
                $radioStation = $_;
                last;
             }
          }
-         return "Error: Unknown internet radio station ".$val[1]
+         return "Error: Unknown internet radio station '$radioStationName'"
             unless defined $radioStation;
          
       }
@@ -1508,8 +1515,15 @@ FRITZBOX_Start_Radio($@)
    $result = FRITZBOX_Open_Connection( $hash );
    return $result if $result;
 
-# Reset name of calling number
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".($intNo-609);
+# Get current ringtone
+   my $userNo = $intNo-609;
+   my $curRingTone = FRITZBOX_Exec( $hash, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$userNo."/IntRingTone" );
+
+# Start Internet Radio and reset ring tone
+   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/IntRingTone 33";
+   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/RadioRingID $radioStation";
+   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
+   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/IntRingTone $curRingTone";
 
 # Execute command array
    FRITZBOX_Exec( $hash, \@cmdArray );
@@ -1675,9 +1689,10 @@ sub FRITZBOX_fritztris($)
          All parameters can be omitted. Make sure the messages are not classified as junk by your email client.
          <br>
       </li><br>
-      <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
+      <li><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [name or number]</code>
          <br>
-         <i>Not implemented yet.</i> Starts the internet radio on the given Fritz!Fon
+         Starts the internet radio on the given Fritz!Fon. Default is the current station of the phone. 
+         An available internet radio can be selected by its name or (reading) number.
          <br>
       </li><br>
       <li><code>set &lt;name&gt; tam &lt;number&gt; &lt;on|off&gt;</code>
@@ -1902,9 +1917,9 @@ sub FRITZBOX_fritztris($)
          <br>
       </li><br>
       
-      <li><code>set &lt;name&gt; startradio &lt;internalNumber&gt; [name]</code>
+      <li><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [Name oder Nummer]</code>
          <br>
-         <i>Not implemented yet.</i> Starts the internet radio on the given Fritz!Fon
+         Startet das Internetradio auf dem angegebenen Fritz!Fon. Ein verf&uuml;gbare Radiostation kann &uuml;ber den Namen oder die (Gerätewert)Nummer ausgew&auml;hlt werden. Ansonsten wird die aktuell eingestellte genommen.
          <br>
       </li><br>
       
