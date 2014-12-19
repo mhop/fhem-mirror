@@ -15,7 +15,7 @@ notify_Initialize($)
   $hash->{DefFn} = "notify_Define";
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
-  $hash->{AttrList} = "disable:0,1 disabledForIntervals forwardReturnValue:0,1 showTriggerTime:0,1 addStateEvent:0,1";
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals forwardReturnValue:0,1 showtime:0,1 addStateEvent:0,1";
   $hash->{SetFn}    = "notify_Set";
   $hash->{FW_detailFn} = "notify_fhemwebFn";
 }
@@ -90,7 +90,7 @@ notify_Exec($$)
       Log3 $ln, 3, "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
       $ntfy->{STATE} =
-        AttrVal($ln,'showTriggerTime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
+        AttrVal($ln,'showtime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
     }
   }
   
@@ -375,11 +375,6 @@ notify_fhemwebFn($$$$)
         FHEMWEB to display this value, when clicking "on" or "off", which is
         often not intended.</li>
 
-    <li>showTriggerTime<br/>
-        Show the timestamp of the last execution as the status (STATE) of the
-        notify instance. Default is 1 (on).
-        </li>
-
     <a name="addStateEvent"></a>
     <li>addStateEvent<br>
       The event associated with the state Reading is special, as the "state: "
@@ -560,11 +555,6 @@ notify_fhemwebFn($$$$)
         R&uuml;ckgabe der Werte eines ausgef&uuml;hrten Kommandos an den
         Aufrufer.  Die Voreinstellung ist 0 (ausgeschaltet), um weniger
         Meldungen im Log zu haben.
-        </li>
-
-    <li>showTriggerTime<br/>
-        Zeigt den Zeitstempel der letzten Ausf&uuml;hrung als Status an.
-        Voreinstellung ist 1 (an).
         </li>
 
     <a name="addStateEvent"></a>
