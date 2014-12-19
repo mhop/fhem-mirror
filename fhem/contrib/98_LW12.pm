@@ -1,4 +1,4 @@
-$Id: $
+# $Id: $
 # ############################################################################
 #
 #  FHEM Modue for WLAN based LED Driver
@@ -200,7 +200,7 @@ sub LW12_Set( $@ ) {
 			  readingsSingleUpdate( $hash, "mode", $arg[ 0 ], 1 );
 			  readingsSingleUpdate( $hash, "speed", $arg[ 1 ], 1 );
 		  } else { 
-		      LW12_Write( $hash, "\x{BB}" . chr( $arg[ 0 ] + $offset ) . chr ( 255 - $hash->{READINGS}{speed}{VAL} ) . "\x{44}" );
+		      LW12_Write( $hash, "\x{BB}" . chr( $arg[ 0 ] + $offset ) . chr ( 255 - ReadingsVal($name,'speed',0) ) . "\x{44}" );
 			  readingsSingleUpdate( $hash, "mode", $arg[ 0 ], 1 );
 		  }		  
       }
@@ -210,7 +210,7 @@ sub LW12_Set( $@ ) {
 		  Log3 $name, 3, $msg ;
 		  return( $msg );
       } else {		  
-		  if( ( $arg[ 1 ] < 0 ) || ( $arg[ 1 ] > 255 ) ) {
+		  if( ( $arg[ 0 ] < 0 ) || ( $arg[ 0 ] > 255 ) ) {
 			  my $msg = "LW12_Set: wrong speed value given";
 			  Log3 $name, 3, $msg ;
 			  return( $msg );
