@@ -174,6 +174,7 @@ FW_longpoll()
 
   var query = location.pathname+"?XHR=1"+
                 "&inform=type=status;filter="+filter+
+                        ";since="+document.body.getAttribute("generated")+
                 "&timestamp="+new Date().getTime();
   query = addcsrf(query);
   FW_pollConn.open("GET", query, true);

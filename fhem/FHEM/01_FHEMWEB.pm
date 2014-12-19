@@ -585,12 +585,14 @@ FW_answerCall($)
     # NTFY_ORDER is larger than the normal order (50-)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     %ntfyHash = ();
-
+    $me->{inform}{since} = time()-5
+        if(!defined($me->{inform}{since}) || $me->{inform}{since} !~ m/^\d+$/);
+    my $sinceTimestamp = FmtDateTime($me->{inform}{since});
     TcpServer_WriteBlocking($me,
        "HTTP/1.1 200 OK\r\n".
        $FW_headercors.
-       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n");
-#       FW_roomStatesForInform($me)); # Hope we dont need it
+       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
+       FW_roomStatesForInform($me, $sinceTimestamp));
     return -1;
   }
 
@@ -725,7 +727,8 @@ FW_answerCall($)
   my $onload = AttrVal($FW_wname, "longpoll", 1) ?
                       "onload=\"FW_delayedStart()\"" : "";
   my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
-  FW_pO "</head>\n<body name=\"$t\" $csrf $onload>";
+  FW_pO "</head>\n<body generated=\"".(time()-1)
+                        ."\" name=\"$t\" $csrf $onload>";
 
   if($FW_activateInform) {
     $cmd = "style eventMonitor $FW_activateInform";
@@ -2198,9 +2201,9 @@ FW_makeEdit($$$)
 
 
 sub
-FW_roomStatesForInform($)
+FW_roomStatesForInform($$)
 {
-  my ($me) = @_;
+  my ($me, $sinceTimestamp ) = @_;
   return "" if($me->{inform}{type} !~ m/status/);
 
   my %extPage = ();
@@ -2209,6 +2212,10 @@ FW_roomStatesForInform($)
     next if(!defined($defs{$dn}));
     my $t = $defs{$dn}{TYPE};
     next if(!$t || $modules{$t}{FW_atPageEnd});
+
+    my $lastChanged = OldTimestamp( $dn );
+    next if(!defined($lastChanged) || $lastChanged lt $sinceTimestamp);
+
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink") {
       push @data, "$dn<<$defs{$dn}{STATE}<<$txt";
