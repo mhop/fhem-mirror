@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2014
-my $thzversion = "0.115";
+my $thzversion = "0.116";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -1085,8 +1085,8 @@ my %parsinghash206 = (
 	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  	[" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
 	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" rvuRelease: ",		48, 1, "n.a.", 1],
 	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	[" STB: ",			48, 1, "n.a.", 1],
-	      [" outputVentilatorPower: ",	46, 2, "n.a.", 1],  	[" inputVentilatorPower: ",	48, 2, "n.a.", 1],	[" mainVentilatorPower: ",	50, 2, "n.a.", 1],
-	      [" outputVentilatorSpeed: ",	52, 2, "hex", 1],	[" inputVentilatorSpeed: ",	54, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	56, 2, "hex", 1],
+	      [" outputVentilatorPower: ",	48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
+	      [" outputVentilatorSpeed: ",	56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
 	      [" outside_tempFiltered: ",	64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
 	      [" dewPoint: ",			82, 4, "n.a.", 1],
 	      [" P_Nd: ",			86, 4, "n.a.", 1],	[" P_Hd: ",			90, 4, "n.a.", 1],
@@ -1120,9 +1120,10 @@ my %parsinghash206 = (
 
   
   my ($hash,$message) = @_;
-  #$message="A5FB00C50067010700DC011101B2000000E700AD00F3001C000000CE000000000063000000000000000000";
+  #$message= "A5FB00C50067010700DC011101B2000000E700AD00F3001C000000CE000000000063000000000000000000";
   #$message= "16FB00C5001901070103012101A2000000E3008A00FE001C000000C900000000001B00000000000000";
   #$message= "60FB00C50019013A0117031301A9000000E2FF98013D1118000099C800001200001F000000000000000100";
+  #$message=  "C3FB00C5006900EB00DD00F501AF000000E900B400E70004373A00CE1F1D00000065000000000000000000";
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
   my $length = length($message);
   Log3 $hash->{NAME}, 5, "Message length: $length";
