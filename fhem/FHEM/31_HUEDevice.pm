@@ -17,20 +17,23 @@ use JSON;
 use SetExtensions;
 
 my %hueModels = (
-  LCT001 => {name => 'HUE Bulb'             ,type => 'Extended color light'   ,subType => 'colordimmer',},
-  LCT002 => {name => 'HUE Bulb BR30'        ,type => 'Extended color light'   ,subType => 'colordimmer',},
-  LCT003 => {name => 'HUE Bulb GU10'        ,type => 'Extended color light'   ,subType => 'colordimmer',},
-  LLC001 => {name => 'LivingColors G2'      ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC005 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC006 => {name => 'LivingColors Iris'    ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC007 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC011 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC012 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LST001 => {name => 'LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LWB001 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
-  LWB003 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
-  LWB004 => {name => 'Hue Lux'              ,type => 'Dimmable light'         ,subType => 'dimmer',},
-  LWL001 => {name => 'LivingWhites Outlet'  ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
+  LCT001 => {name => 'Hue Bulb'                 ,type => 'Extended Color light'   ,subType => 'colordimmer',},
+  LCT002 => {name => 'Hue Bulb BR30'            ,type => 'Extended Color light'   ,subType => 'colordimmer',},
+  LCT003 => {name => 'Hue Bulb GU10'            ,type => 'Extended Color light'   ,subType => 'colordimmer',},
+  LLC001 => {name => 'Living Colors G2'         ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC005 => {name => 'Living Colors Bloom'      ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC006 => {name => 'Living Colors Gen3 Iris'  ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC007 => {name => 'Living Colors Gen3 Bloom' ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC010 => {name => 'Hue Living Colors Iris'   ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC011 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC012 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC013 => {name => 'Disney Living Colors'     ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLM001 => {name => 'Color Light Module'       ,type => 'Extended Color Light'   ,subType => 'colordimmer',},
+  LST001 => {name => 'Hue LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LWB001 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWB003 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWB004 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 );
 
 my %dim_values = (
