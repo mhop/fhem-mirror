@@ -4,7 +4,7 @@ FW_readingsGroupToggle(d) {
   var rg = document.getElementById( 'readingsGroup-'+d );
   if( rg ) {
     s=rg.style;
-    s.display = s.display=='none' ? 'block' : 'none';
+    s.display = s.display=='none' ? 'table' : 'none';
 
     var group = rg.getAttribute('groupId');
     if( group ) {
