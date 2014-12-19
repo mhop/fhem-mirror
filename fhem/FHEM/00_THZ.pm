@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2014
-my $thzversion = "0.114";
+my $thzversion = "0.115";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -66,22 +66,22 @@ sub THZ_Set($@);
 
 my %sets = (
     "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
-    "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p01RoomTempDayHC1SummerMode"	=> {cmd2=>"0B0569", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC1SummerMode"	=> {cmd2=>"0B0569", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
     "p13GradientHC1"			=> {cmd2=>"0B010E", argMin =>   "0", argMax =>    "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
     "p14LowEndHC1"			=> {cmd2=>"0B059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
     "p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean",  unit =>" %"},
     "p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin =>   "0", argMax =>  "100",	type =>"1clean",  unit =>" %"}, #in % 0..100%
-    "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "13", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p01RoomTempDayHC2SummerMode"	=> {cmd2=>"0C0569", argMin =>  "13", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "13", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "13", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC2SummerMode"	=> {cmd2=>"0C0569", argMin =>  "11", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "11", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "11", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
     "p16GradientHC2"			=> {cmd2=>"0C010E", argMin =>   "0", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
     "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},
     "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"1clean", unit =>" %"}, 
@@ -711,8 +711,8 @@ sub THZ_ReadAnswer($)
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
 	
-	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= 20))
-	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.05);
+	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= 24))
+	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.03);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
 	  if(defined($buf1))
 	    {
@@ -722,7 +722,7 @@ sub THZ_ReadAnswer($)
 	    }
 	$count ++;
 	}
-	return ("WInterface max repeat limited to 20" , $data) if ($count == 21);
+	return ("WInterface max repeat limited to 24" , $data) if ($count == 25);
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
 }
@@ -1034,6 +1034,7 @@ my %parsinghash = (
   "9holy"     => [["", 10, 2, "quater", 1]
               ]
 );
+
 my %parsinghash206 = (
   #msgtype => parsingrule  
   "09his"  => [["compressorHeating: ",	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
@@ -1075,21 +1076,21 @@ my %parsinghash206 = (
 	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
 	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
 	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
-	      [" mixerOpen: ",		45, 1, "bit0", 1],  	[" mixerClosed: ",		45, 1, "bit1", 1],
-	      [" heatPipeValve: ",	45, 1, "bit2", 1],  	[" diverterValve: ",		45, 1, "bit3", 1],
-	      [" dhwPump: ",		44, 1, "bit0", 1],  	[" heatingCircuitPump: ",	44, 1, "bit1", 1],
-	      [" solarPump: ",		44, 1, "bit3", 1],  	[" compressor: ",		47, 1, "bit3", 1],
-	      [" boosterStage3: ",	46, 1, "bit0", 1],  	[" boosterStage2: ",		46, 1, "bit1", 1],
-	      [" boosterStage1: ",	46, 1, "bit2", 1],  	[" highPressureSensor: ",	49, 1, "nbit0", 1],
-	      [" lowPressureSensor: ",	49, 1, "nbit1", 1],  	[" evaporatorIceMonitor: ",	49, 1, "bit2", 1],
-	      [" signalAnode: ",	49, 1, "bit3", 1],  	[" rvuRelease: ",		48, 1, "bit0", 1],
-	      [" ovenFireplace: ",	48, 1, "bit1", 1],  	[" STB: ",			48, 1, "bit2", 1],
-	      [" outputVentilatorPower: ",	50, 4, "hex", 10],  	[" inputVentilatorPower: ",	54, 4, "hex", 10],	[" mainVentilatorPower: ",	58, 4, "hex", 10],
-	      [" outputVentilatorSpeed: ",	62, 4, "hex", 1],	[" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
-	      [" outside_tempFiltered: ",	74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
-	      [" dewPoint: ",			82, 4, "hex2int", 10],
-	      [" P_Nd: ",			86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
-	      [" actualPower_Qc: ",		94, 8, "hex2int", 1],	[" actualPower_Pel: ",		102, 8, "hex2int", 1],
+	      [" mixerOpen: ",		45, 1, "n.a.", 1],  	[" mixerClosed: ",		45, 1, "n.a.", 1],
+	      [" heatPipeValve: ",	45, 1, "n.a.", 1],  	[" diverterValve: ",		45, 1, "n.a.", 1],
+	      [" dhwPump: ",		44, 1, "n.a.", 1],  	[" heatingCircuitPump: ",	44, 1, "n.a.", 1],
+	      [" solarPump: ",		44, 1, "n.a.", 1],  	[" compressor: ",		47, 1, "n.a.", 1],
+	      [" boosterStage3: ",	46, 1, "n.a.", 1],  	[" boosterStage2: ",		46, 1, "n.a.", 1],
+	      [" boosterStage1: ",	46, 1, "n.a.", 1],  	[" highPressureSensor: ",	49, 1, "n.a.", 1],
+	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  	[" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
+	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" rvuRelease: ",		48, 1, "n.a.", 1],
+	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	[" STB: ",			48, 1, "n.a.", 1],
+	      [" outputVentilatorPower: ",	46, 2, "n.a.", 1],  	[" inputVentilatorPower: ",	48, 2, "n.a.", 1],	[" mainVentilatorPower: ",	50, 2, "n.a.", 1],
+	      [" outputVentilatorSpeed: ",	52, 2, "hex", 1],	[" inputVentilatorSpeed: ",	54, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	56, 2, "hex", 1],
+	      [" outside_tempFiltered: ",	64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
+	      [" dewPoint: ",			82, 4, "n.a.", 1],
+	      [" P_Nd: ",			86, 4, "n.a.", 1],	[" P_Hd: ",			90, 4, "n.a.", 1],
+	      [" actualPower_Qc: ",		94, 8, "n.a.", 1],	[" actualPower_Pel: ",		102, 8, "n.a.", 1],
 	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
   "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
@@ -1119,6 +1120,9 @@ my %parsinghash206 = (
 
   
   my ($hash,$message) = @_;
+  #$message="A5FB00C50067010700DC011101B2000000E700AD00F3001C000000CE000000000063000000000000000000";
+  #$message= "16FB00C5001901070103012101A2000000E3008A00FE001C000000C900000000001B00000000000000";
+  #$message= "60FB00C50019013A0117031301A9000000E2FF98013D1118000099C800001200001F000000000000000100";
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
   my $length = length($message);
   Log3 $hash->{NAME}, 5, "Message length: $length";
@@ -1175,6 +1179,7 @@ my %parsinghash206 = (
 	when ("bit3")		{$value= (hex($value) &  0b1000) / 0b1000;}
 	when ("nbit0")		{$value= 1-((hex($value) &  0b0001) / 0b0001);}
 	when ("nbit1")		{$value= 1-((hex($value) &  0b0010) / 0b0010);}
+	when ("n.a.")		{$value= "n.a.";}
       }
       $value = $value/$divisor if ($divisor != 1); 
       $ParsedMsg = $ParsedMsg . $parsingtitle . $value; 
