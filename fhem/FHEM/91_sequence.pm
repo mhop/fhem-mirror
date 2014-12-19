@@ -47,7 +47,7 @@ sequence_Define($$)
   $hash->{RE} = $def[0];
   $hash->{IDX} = 0;
   $hash->{MAX} = int(@def);
-  $hash->{STATE} = "initialized";
+  $hash->{STATE} = "active";
   return undef;
 }
 
@@ -83,6 +83,7 @@ sequence_Notify($$)
       delete($hash->{EVENTS});
 
       Log3 $ln, 5, "sequence $ln $tt";
+      setReadingsVal($hash, "state", "active", TimeNow());
       DoTrigger($ln, $tt);
       $idx  = 0;
 
