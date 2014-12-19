@@ -344,7 +344,7 @@ sub LW12_Set( $@ ) {
 		  Log3 $name, 3, $msg ;
 		  return( $msg );
       } else {
-		return 'Dim value 0 not allowed!';
+		return 'Dim value 0 not allowed!' if( $arg[0] == 0);
         $hash->{".dim"}->{bri} = $arg[0];
         @{$hash->{".bri"}->{channels}} = Color::BrightnessToChannels($hash->{".dim"});
 		  LW12_Write( $hash, "\x{56}" .
