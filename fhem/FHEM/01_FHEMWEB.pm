@@ -589,8 +589,8 @@ FW_answerCall($)
     TcpServer_WriteBlocking($me,
        "HTTP/1.1 200 OK\r\n".
        $FW_headercors.
-       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
-       FW_roomStatesForInform($me));
+       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n");
+#       FW_roomStatesForInform($me)); # Hope we dont need it
     return -1;
   }
 
