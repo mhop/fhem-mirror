@@ -979,7 +979,7 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_attribut_generateInfoSummarize4"><code>attr &lt;name&gt; generateInfoSummarize4 &lt;string&gt;</code>
 </a><br /> Generates the reading 'InfoSummarize4' with the given format. More Information on this in the examples-section.</li>
 <li><a name="SONOSPLAYER_attribut_stateVariable"><code>attr &lt;name&gt; stateVariable &lt;string&gt;</code>
-</a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4). Defines, which variable has to be copied to the content of the state-variable.</li>
+</a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,<br />InfoSummarize2,InfoSummarize3,InfoSummarize4). Defines, which variable has to be copied to the content of the state-variable.</li>
 </ul></li>
 <li><b>Controloptions</b><ul>
 <li><a name="SONOSPLAYER_attribut_maxVolume"><code>attr &lt;name&gt; maxVolume &lt;int&gt;</code>
@@ -1005,7 +1005,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_examples_InfoSummarize">Format of InfoSummarize:</a><br />
 <code>infoSummarizeX := &lt;NormalAudio&gt;:summarizeElem:&lt;/NormalAudio&gt; &lt;StreamAudio&gt;:summarizeElem:&lt;/StreamAudio&gt;|:summarizeElem:</code><br />
 <code>:summarizeElem: := &lt;:variable:[ prefix=":text:"][ suffix=":text:"][ instead=":text:"][ ifempty=":text:"]/[ emptyVal=":text:"]&gt;</code><br />
-<code>:variable: := TransportState|NumberOfTracks|Track|TrackURI|TrackDuration|Title|Artist|Album|OriginalTrackNumber|AlbumArtist|Sender|SenderCurrent|SenderInfo|StreamAudio|NormalAudio|AlbumArtURI|nextTrackDuration|nextTrackURI|nextAlbumArtURI|nextTitle|nextArtist|nextAlbum|nextAlbumArtist|nextOriginalTrackNumber|Volume|Mute|Shuffle|Repeat|CrossfadeMode|Balance|HeadphoneConnected|SleepTimer|Presence|RoomName|SaveRoomName|PlayerType|Location|SoftwareRevision|SerialNum|InfoSummarize1|InfoSummarize2|InfoSummarize3|InfoSummarize4</code><br />
+<code>:variable: := TransportState|NumberOfTracks|Track|TrackURI|TrackDuration|Title|Artist|Album|OriginalTrackNumber|AlbumArtist|<br />Sender|SenderCurrent|SenderInfo|StreamAudio|NormalAudio|AlbumArtURI|nextTrackDuration|nextTrackURI|nextAlbumArtURI|<br />nextTitle|nextArtist|nextAlbum|nextAlbumArtist|nextOriginalTrackNumber|Volume|Mute|Shuffle|Repeat|CrossfadeMode|Balance|<br />HeadphoneConnected|SleepTimer|Presence|RoomName|SaveRoomName|PlayerType|Location|SoftwareRevision|SerialNum|InfoSummarize1|<br />InfoSummarize2|InfoSummarize3|InfoSummarize4</code><br />
 <code>:text: := [Any text without double-quotes]</code><br /></li>
 </ul>
 
@@ -1252,7 +1252,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_attribut_generateInfoSummarize4"><code>attr &lt;name&gt; generateInfoSummarize4 &lt;string&gt;</code>
 </a><br /> Erzeugt das Reading 'InfoSummarize4' mit dem angegebenen Format. Mehr Informationen dazu im Bereich Beispiele.</li>
 <li><a name="SONOSPLAYER_attribut_stateVariable"><code>attr &lt;name&gt; stateVariable &lt;string&gt;</code>
-</a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4). Gibt an, welche Variable in das Reading <code>state</code> kopiert werden soll.</li>
+</a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,I<br />nfoSummarize2,InfoSummarize3,InfoSummarize4). Gibt an, welche Variable in das Reading <code>state</code> kopiert werden soll.</li>
 </ul></li>
 <li><b>Steueroptionen</b><ul>
 <li><a name="SONOSPLAYER_attribut_maxVolume"><code>attr &lt;name&gt; maxVolume &lt;int&gt;</code>
@@ -1278,7 +1278,7 @@ Hier wird definiert, dass ein Event erzeugt werden soll, wenn innerhalb von 2 Se
 <li><a name="SONOSPLAYER_examples_InfoSummarize">Format von InfoSummarize:</a><br />
 <code>infoSummarizeX := &lt;NormalAudio&gt;:summarizeElem:&lt;/NormalAudio&gt; &lt;StreamAudio&gt;:summarizeElem:&lt;/StreamAudio&gt;|:summarizeElem:</code><br />
 <code>:summarizeElem: := &lt;:variable:[ prefix=":text:"][ suffix=":text:"][ instead=":text:"][ ifempty=":text:"]/[ emptyVal=":text:"]&gt;</code><br />
-<code>:variable: := TransportState|NumberOfTracks|Track|TrackURI|TrackDuration|Title|Artist|Album|OriginalTrackNumber|AlbumArtist|Sender|SenderCurrent|SenderInfo|StreamAudio|NormalAudio|AlbumArtURI|nextTrackDuration|nextTrackURI|nextAlbumArtURI|nextTitle|nextArtist|nextAlbum|nextAlbumArtist|nextOriginalTrackNumber|Volume|Mute|Shuffle|Repeat|CrossfadeMode|Balance|HeadphoneConnected|SleepTimer|Presence|RoomName|SaveRoomName|PlayerType|Location|SoftwareRevision|SerialNum|InfoSummarize1|InfoSummarize2|InfoSummarize3|InfoSummarize4</code><br />
+<code>:variable: := TransportState|NumberOfTracks|Track|TrackURI|TrackDuration|Title|Artist|Album|OriginalTrackNumber|AlbumArtist|<br />Sender|SenderCurrent|SenderInfo|StreamAudio|NormalAudio|AlbumArtURI|nextTrackDuration|nextTrackURI|nextAlbumArtURI|<br />nextTitle|nextArtist|nextAlbum|nextAlbumArtist|nextOriginalTrackNumber|Volume|Mute|Shuffle|Repeat|CrossfadeMode|Balance|<br />HeadphoneConnected|SleepTimer|Presence|RoomName|SaveRoomName|PlayerType|Location|SoftwareRevision|SerialNum|InfoSummarize1|<br />InfoSummarize2|InfoSummarize3|InfoSummarize4</code><br />
 <code>:text: := [Jeder beliebige Text ohne doppelte Anführungszeichen]</code><br /></li>
 </ul>
 
