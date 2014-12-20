@@ -293,9 +293,7 @@ FHEM/SHC_parser.pm           rr2000               http://forum.fhem.de Sonstige 
 FHEM/TcpServerUtils.pm       rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/lib/Device/MySensors/*  ntruchsess           http://forum.fhem.de Sonstige Systeme
-FHEM/lib/Encode/*            Reinerlein           http://forum.fhem.de Multimedia
 FHEM/lib/MP3/*               Reinerlein           http://forum.fhem.de Multimedia
-FHRM/lib/Normalize           Reinerlein           http://forum.fhem.de Multimedia
 FHEM/lib/ProtoThreads.pm     ntruchsess           http://forum.fhem.de FHEM Development
 FHEM/lib/SHC_packet_layout.xml  rr2000            http://forum.fhem.de Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           http://forum.fhem.de Sonstige Systeme
