@@ -552,6 +552,18 @@ sub PRESENCE_StartLocalScan($;$)
     }
     else
     {
+        Log3 $hash->{NAME}, 4, "PRESENCE ($name) - another check is currently running. skipping check";
+        
+        if($local == 0)
+        {
+            my $seconds = (ReadingsVal($name, "state", "absent") eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL});
+        
+            Log3 $hash->{NAME}, 4, "PRESENCE ($name) - rescheduling next check in $seconds seconds";
+        
+            RemoveInternalTimer($hash);
+            InternalTimer(gettimeofday()+$seconds, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+        }
+        
         return "another check is currently running";
     }
 }
