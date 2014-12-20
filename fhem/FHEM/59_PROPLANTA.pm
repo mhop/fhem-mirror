@@ -321,10 +321,12 @@ package main;
 use strict;
 use feature qw/say switch/;
 use warnings;
-use Data::Dumper;
-use LWP::UserAgent;
-use HTTP::Request;
-use HTML::Parser;
+
+my $missingModul;
+eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
+eval "use HTTP::Request;1" or $missingModul .= "HTTP::Request ";
+eval "use HTML::Parser;1" or $missingModul .= "HTML::Parser ";
+
 require 'Blocking.pm';
 require 'HttpUtils.pm';
 use vars qw($readingFnAttributes);
@@ -377,6 +379,8 @@ sub PROPLANTA_Define($$)
    my $lang = "";
    my @a    = split( "[ \t][ \t]*", $def );
    
+   return "Error: Perl moduls ".$missingModul."are missing on this system"
+      if $missingModul;
    return "Wrong syntax: use define <name> PROPLANTA [City] [CountryCode]" if int(@a) > 4;
 
    $lang = "de" if int(@a) == 3;

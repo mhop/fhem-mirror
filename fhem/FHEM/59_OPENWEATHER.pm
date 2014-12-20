@@ -138,14 +138,16 @@ sub end
 #######################################################################
 package main;
 
+
 use strict;
 use warnings;
 use Blocking;
-use MIME::Base64;
-use Digest::MD5 qw(md5_hex);
-use LWP::UserAgent;
-use HTTP::Request;
-use HTML::Parser;
+my $missingModul;
+eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
+eval "use Digest::MD5 'md5_hex';1" or $missingModul .= "Digest::MD5 ";
+eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
+eval "use HTTP::Request;1" or $missingModul .= "HTTP::Request ";
+eval "use HTML::Parser;1" or $missingModul .= "HTML::Parser ";
 
 my $MODUL = "OPENWEATHER";
 
@@ -190,11 +192,15 @@ OPENWEATHER_Initialize($)
 sub ##########################################
 OPENWEATHER_Define($$)
 {
-  my ($hash, $def) = @_;
-  my @args = split("[ \t][ \t]*", $def);
+   my ($hash, $def) = @_;
+   my @args = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> OPENWEATHER <project> <cityCode> <apiKey> [language]" if(@args <5 || @args >6);
+   return "Error: Perl moduls ".$missingModul."are missing on this system"
+      if $missingModul;
 
+   return "Usage: define <name> OPENWEATHER <project> <cityCode> <apiKey> [language]" if(@args <5 || @args >6);
+
+  
   my $name = $args[0];
 
   $hash->{NAME} = $name;
