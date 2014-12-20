@@ -32,37 +32,40 @@ chdir("$homedir/fhem");
 my $uploaddir2 = "fhemupdate4";
 system("mkdir -p $uploaddir2");
 
-my %filelist2 = (
-  "./fhem.pl.txt"               => { type=>",fhem,", dir=>"." },
-  "./CHANGED"                   => { type=>",fhem,", dir=>"." },
-  "./configDB.pm"               => { type=>",fhem,", dir=>"." },
-  "FHEM/.*.pm"                  => { type=>",fhem,", dir=>"FHEM" },
-  "FHEM/FhemUtils/.*.pm"        => { type=>",fhem,", dir=>"FHEM/FhemUtils"},
-  "FHEM/FhemUtils/update-.*",   => { type=>",fhem,", dir=>"FHEM/FhemUtils"},
-  "FHEM/lib/.*.pm"              => { type=>",fhem,", dir=>"FHEM/lib"},
-  "FHEM/lib/.*.xml"             => { type=>",fhem,", dir=>"FHEM/lib"},
-  "FHEM/firmware/.*"            => { type=>",fhem,", dir=>"FHEM/firmware"},
-  "FHEM/lib/SWAP/.*.xml"        => { type=>",fhem,", dir=>"FHEM/lib/SWAP"},
-  "FHEM/lib/SWAP/panStamp/.*"   => { type=>",fhem,", dir=>"FHEM/lib/SWAP/panStamp"},
-  "FHEM/lib/SWAP/justme/.*"     => { type=>",fhem,", dir=>"FHEM/lib/SWAP/justme"},
-  "FHEM/lib/Device/.*.pm"       => { type=>",fhem,", dir=>"FHEM/lib/Device"},
-  "FHEM/lib/Device/Firmata/.*.pm"=>{ type=>",fhem,", dir=>"FHEM/lib/Device/Firmata"},
-  "FHEM/lib/Device/MySensors/.*.pm"=>{ type=>",fhem,", dir=>"FHEM/lib/Device/MySensors"},
-  "www/pgm2/.*"                 => { type=>"fhem,",  dir=>"www/pgm2"},
-  "www/jscolor/.*"              => { type=>"fhem,",  dir=>"www/pgm2"},
-  "www/codemirror/.*"           => { type=>"fhem,",  dir=>"www/pgm2"},
-  "www/gplot/.*.gplot"          => { type=>"fhem,",  dir=>"www/pgm2"},
-  "www/images/fhemSVG/.*.svg"   => { type=>"fhem,",  dir=>"www/pgm2"},
-  "www/images/openautomation/.*.svg" => { type=>"fhem,",  dir=>"www/pgm2"},
-  "www/images/openautomation/.*.txt" => { type=>"fhem,",  dir=>"www/pgm2"},
-  "www/images/default/.*"       => { type=>"fhem,",  dir=>"www/pgm2"},
-  "www/images/default/remotecontrol/.*" => { type=>"fhem,",  dir=>"www/pgm2"},
-  "docs/commandref(_..)?.html"  => { type=>"fhem,",  dir=>"www/pgm2"},
-  "docs/faq(_..)?.html"         => { type=>"fhem,",  dir=>"www/pgm2"},
-  "docs/HOWTO(_..)?.html"       => { type=>"fhem,",  dir=>"www/pgm2"},
-  "docs/fhem.*.png"             => { type=>"fhem,",  dir=>"www/pgm2"},
-  "docs/.*.jpg"                 => { type=>"fhem,",  dir=>"www/pgm2"},
-  "docs/fhemdoc.js"             => { type=>"fhem,",  dir=>"www/pgm2"},
+my @filelist2 = (
+  "./fhem.pl.txt",
+  "./CHANGED",
+  "./configDB.pm",
+  "FHEM/.*.pm",
+  "FHEM/FhemUtils/.*.pm",
+  "FHEM/FhemUtils/update-.*",
+  "FHEM/lib/.*.pm",
+  "FHEM/lib/.*.xml",
+  "FHEM/firmware/.*",
+  "FHEM/lib/SWAP/.*.xml",
+  "FHEM/lib/SWAP/panStamp/.*",
+  "FHEM/lib/SWAP/justme/.*",
+  "FHEM/lib/Device/.*.pm",
+  "FHEM/lib/Device/Firmata/.*.pm",
+  "FHEM/lib/Device/MySensors/.*.pm",
+  "FHEM/lib/MP3/.*.pm",
+  "FHEM/lib/MP3/Tag/.*",
+  "FHEM/lib/UPnP/.*",
+  "www/pgm2/.*",
+  "www/jscolor/.*",
+  "www/codemirror/.*",
+  "www/gplot/.*.gplot",
+  "www/images/fhemSVG/.*.svg",
+  "www/images/openautomation/.*.svg",
+  "www/images/openautomation/.*.txt",
+  "www/images/default/.*",
+  "www/images/default/remotecontrol/.*",
+  "docs/commandref(_..)?.html",
+  "docs/faq(_..)?.html",
+  "docs/HOWTO(_..)?.html",
+  "docs/fhem.*.png",
+  "docs/.*.jpg",
+  "docs/fhemdoc.js",
 );
 
 
@@ -75,8 +78,7 @@ my %skiplist2 = (
 my %filetime2;
 my %filesize2;
 my %filedir2;
-my %filetype2;
-foreach my $fspec (keys %filelist2) {
+foreach my $fspec (@filelist2) {
   $fspec =~ m,^(.+)/([^/]+)$,;
   my ($dir,$pattern) = ($1, $2);
   my $tdir = $dir;
@@ -89,7 +91,6 @@ foreach my $fspec (keys %filelist2) {
                 $mt[5]+1900, $mt[4]+1, $mt[3], $mt[2], $mt[1], $mt[0];
     $filesize2{"$tdir/$file"} = $st[7];
     $filedir2{"$tdir/$file"} = $dir;
-    $filetype2{"$tdir/$file"} = $filelist2{$fspec}{type};
   }
   closedir(DH);
 }
