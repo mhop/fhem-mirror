@@ -7266,7 +7266,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   my %dlf = (1=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0},
              2=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0},
              3=>{Sat=>0,Sun=>0,Mon=>0,Tue=>0,Wed=>0,Thu=>0,Fri=>0});
-  return "unused" if ($template =~ m/$(none|0)$/);
+  return "unused" if ($template =~ m/^(none|0) *$/);
   my $ret = "";
   my @el = split",",$name;
   my ($fName,$tmpl) = split":",$template;
