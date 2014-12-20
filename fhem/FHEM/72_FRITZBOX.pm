@@ -114,7 +114,8 @@ my %userType = (
  , 4 => "Guest"
 );
 
-# my @radio = ();
+my @mohtype = qw(announcement music customer);
+
 my %landevice = ();
 
 sub ##########################################
@@ -148,7 +149,7 @@ sub FRITZBOX_Initialize($)
                 ."fritzBoxIP "
                 ."INTERVAL "
                 ."pwdFile "
-                ."ringWithIntern:0,1,2 "
+                ."ringWithIntern:0,1,2,3,4 "
                 ."telnetUser "
                 .$readingFnAttributes;
 
@@ -492,6 +493,7 @@ FRITZBOX_Readout_Run($)
       # Box model and firmware
       push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
       push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver", "fwupdate" ];
+      push @readoutArray, [ "box_moh", "ctlmgr_ctl r telcfg settings/MOHType", "mohtype" ];
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
 
       my $dectCount = $resultArray->[1];
@@ -822,8 +824,8 @@ sub FRITZBOX_Readout_Query($$$)
    return $resultArray;
 }
 
-sub ##########################################
-FRITZBOX_Readout_Format($$$) 
+##########################################
+sub FRITZBOX_Readout_Format($$$) 
 {
    my ($hash, $format, $readout) = @_;
    
@@ -874,6 +876,9 @@ FRITZBOX_Readout_Format($$$)
    
    } elsif ($format eq "model") {
       $readout = $fonModel{$readout} if defined $fonModel{$readout};
+   
+   } elsif ($format eq "mohtype") {
+      $readout = $mohtype[$readout] if defined $mohtype[$readout];
    
    } elsif ($format eq "nounderline") {
       $readout =~ s/_/ /g;
@@ -1016,9 +1021,9 @@ FRITZBOX_Ring_Run($)
       FRITZBOX_Log $hash, 4, "Change temporarily internal ring tone of Fritz!Fon DECT $_ to $ringTone";
    }
 
-# uses name of port 0 (dial port 1) to show message on ringing phone
+# uses name of port 0-3 (dial port 1-4) to show messages on ringing phone
    my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
-   if ($ringWithIntern =~ /^(1|2)$/ )
+   if ($ringWithIntern =~ /^([1-4])$/ )
    {
       push @cmdArray, "ctlmgr_ctl r telcfg settings/MSN/Port".($ringWithIntern-1)."/Name";
       push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$msg'";
@@ -1035,8 +1040,6 @@ FRITZBOX_Ring_Run($)
 #Preparing 2nd command array to ring and reset everything
    FRITZBOX_Log $hash, 3, "Ringing $intNo for $duration seconds";
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
-   push @cmdArray, "sleep ".($duration+1);
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
       if $ringWithIntern != 0 ;
 # Reset internal ring tones for the Fritz!Fons
@@ -1046,7 +1049,10 @@ FRITZBOX_Ring_Run($)
    }
 # Reset name of calling number
    push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'"
-      if $ringWithIntern =~ /^(1|2)$/;
+      if $ringWithIntern =~ /^([1-4])$/;
+
+   push @cmdArray, "sleep ".$duration;
+   push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
 
 # Execute command array
    FRITZBOX_Exec( $hash, \@cmdArray );
@@ -1170,7 +1176,6 @@ FRITZBOX_ConvertRingTone ($@)
 #pbd --set-image-url --book=255 --id=612 --url=file://var/InternerSpeicher/FRITZBOXtest.g722 --type=1
 #ctlmgr_ctl r user settings/user0/bpjm_filter_enable
 #/usr/bin/pbd --set-ringtone-url --book="255" --id="612" --url="file:///var/InternerSpeicher/claydermann.g722" --name="Claydermann"
-# telcfg:settings/MOHType
 # /usr/bin/moh_upload
 # ffmpegconv -i $file -o fx_moh --limit 32 --type 6
 # cat fx_moh >/var/flash/fx_moh
@@ -1669,6 +1674,7 @@ sub FRITZBOX_fritztris($)
          <br>
          The upload takes about one minute before the tone is available.
       </li><br>
+
       <li><code>set &lt;name&gt; ring &lt;internalNumbers&gt; [duration [ringTone]] [msg:yourMessage]</code>
          Example: <code>set fritzbox ring 611,612 5 Budapest msg:It is raining</code>
          <br>
@@ -1683,27 +1689,32 @@ sub FRITZBOX_fritztris($)
          <br>
          If the call is taken the callee hears the "music on hold" which can be used to transmit messages.
       </li><br>
+
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
          <br>
          Sends an email via the email notification service that is configured in push service of the Fritz!Box.
          All parameters can be omitted. Make sure the messages are not classified as junk by your email client.
          <br>
       </li><br>
+
       <li><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [name or number]</code>
          <br>
-         Starts the internet radio on the given Fritz!Fon. Default is the current station of the phone. 
+         Plays the internet radio on the given Fritz!Fon. Default is the current station of the phone. 
          An available internet radio can be selected by its name or (reading) number.
          <br>
       </li><br>
+
       <li><code>set &lt;name&gt; tam &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Switches the answering machine number (1, 2 ...) on or off.
          The answering machine has to be created on the Fritz!Box web interface.
       </li><br>
+
       <li><code>set &lt;name&gt; update</code>
          <br>
          Starts an update of the device readings.
       </li><br>
+
       <li><code>set &lt;name&gt; wlan &lt;on|off&gt;</code>
          <br>
          Switches WLAN on or off.
@@ -1732,31 +1743,37 @@ sub FRITZBOX_fritztris($)
          <br>
          Maximal 30 characters are allowed. The attribute "ringWithIntern" must also be specified.
       </li><br>
+
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
          <br>
          This is the default path that will be used if a file name does not start with / (slash).
          <br>
          It needs to be the name of the path on the Fritz!Box. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
       </li><br>
+
       <li><code>fritzBoxIP</code>
          <br>
          IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
       </li><br>
+
       <li><code>pwdFile &lt;fileName&gt;</code>
          <br>
          File that contains the password for telnet access. Default is 'fb_pwd.txt' in the root directory of FHEM.
       </li><br>
+
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
          User name that is used for telnet access. By default no user name is required to login.
          <br>
          If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
       </li><br>
-      <li><code>ringWithIntern &lt;internalNumber&gt;</code>
+
+      <li><code>ringWithIntern &lt;1 | 2 | 3 | 4&gt;</code>
          <br>
          To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
          <br>
-         To show a message (default: "FHEM") during a ring the internal phone numbers 1 or 2 can be specified here.
+         To show a message (default: "FHEM") during a ring the internal phone numbers 1-4 can be specified here.
+         The concerned analog phone socket isn't physical needed.
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -1770,12 +1787,15 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_target</b> - Internal number of the alarm clock <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_time</b> - Alarm time of the alarm clock <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
+
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
       <li><b>box_guestWlanRemain</b> - Remaining time until the guest WLAN is switched off</li>
       <li><b>box_model</b> - Fritz!Box model</li>
+      <li><b>box_moh</b> - music-on-hold setting</li>
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
+
       <li><b>dect</b><i>1</i> - Name of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Customer ring tone of the DECT device <i>1</i></li>
@@ -1784,16 +1804,22 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_intRingTone</b> - Internal ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_manufacturer</b> - Manufacturer of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_radio</b> - Current internet radio station of the DECT device <i>1</i></li>
+
+      <li><b>fon</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
+      <li><b>fon</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
+
       <li><b>diversity</b><i>1</i> - Own (incoming) phone number of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_state</b> - Current state of the call diversity <i>1</i></li>
+
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
+
       <li><b>tam</b><i>1</i> - Name of the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_newMsg</b> - New messages on the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_oldMsg</b> - Old messages on the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_state</b> - Current state of the answering machine <i>1</i></li>
+
       <li><b>user</b><i>01</i> - Name of user/IP <i>1</i> that is under parental control</li>
       <li><b>user</b><i>01</i>_thisMonthTime - this month internet usage of user/IP <i>1</i> (parental control)</li>
       <li><b>user</b><i>01</i>_todaySeconds - today's internet usage in seconds of user/IP <i>1</i> (parental control)</li>
@@ -1842,7 +1868,7 @@ sub FRITZBOX_fritztris($)
       <br>
       <li><code>set &lt;name&gt; alarm &lt;number&gt; &lt;on|off&gt;</code>
          <br>
-         Schaltet den Wecker Nummer 1, 2 oder 3 an oder aus.
+         Schaltet den Weckruf Nummer 1, 2 oder 3 an oder aus.
       </li><br>
 
       <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
@@ -1919,7 +1945,7 @@ sub FRITZBOX_fritztris($)
       
       <li><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [Name oder Nummer]</code>
          <br>
-         Startet das Internetradio auf dem angegebenen Fritz!Fon. Ein verf&uuml;gbare Radiostation kann &uuml;ber den Namen oder die (Gerätewert)Nummer ausgew&auml;hlt werden. Ansonsten wird die aktuell eingestellte genommen.
+         Startet das Internetradio auf dem angegebenen Fritz!Fon. Ein verf&uuml;gbare Radiostation kann &uuml;ber den Namen oder die (Ger&auml;tewert)Nummer ausgew&auml;hlt werden. Ansonsten wird die aktuell eingestellte genommen.
          <br>
       </li><br>
       
@@ -1976,16 +2002,19 @@ sub FRITZBOX_fritztris($)
          <br>
          Damit kann die Datei ge&uuml;ndert werden, welche das Passwort f&uuml;r den Telnetzugang enth&auml;lt. Der Standard ist 'fb_pwd.txt' im Wurzelverzeichnis von FHEM.
       </li><br>
+     
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
          Benutzername f&uuml;r den Telnetzugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
          Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
       </li><br>
-      <li><code>ringWithIntern &lt;internalNumber&gt;</code>
+    
+      <li><code>ringWithIntern &lt;1 | 2 | 3 | 4&gt;</code>
          <br>
-         Um ein Telephone anzurufen, muss eine Anrufer spezifiziert werden. Normalerweise ist dies in diesem Modul die Nummer 50 "ISDN:W&auml;hlhilfe".
+         Um ein Telefon klingeln zu lassen, muss eine Anrufer spezifiziert werden. Normalerweise ist dies die Nummer 50 "ISDN:W&auml;hlhilfe".
          <br>
-         Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1 oder 2 angegeben werden.
+         Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1-4 angegeben werden.
+         Der entsprechende analoge Telefonanschluss muss daf&uuml;r nicht vorhanden sein.
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -1994,17 +2023,20 @@ sub FRITZBOX_fritztris($)
    <a name="FRITZBOXreading"></a>
    <b>Readings</b>
    <ul><br>
-      <li><b>alarm</b><i>1</i> - Name des Weckers <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_state</b> - Aktueller Status des Weckers <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_target</b> - Interne Nummer des Weckers <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_time</b> - Weckzeit des Weckers <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_wdays</b> - Wochentage des Weckers <i>1</i></li>
+      <li><b>alarm</b><i>1</i> - Name des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_state</b> - Aktueller Status des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_target</b> - Interne Nummer des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_time</b> - Weckzeit des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>1</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
+      
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
       <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
       <li><b>box_model</b> - Fritz!Box-Modell</li>
+      <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
+      
       <li><b>dect</b><i>1</i> - Name des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton beim Wecken &uuml;ber das DECT Telefon <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Benutzerspezifischer Klingelton des DECT Telefons <i>1</i></li>
@@ -2013,16 +2045,22 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_intRingTone</b> - Interner Klingelton des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_manufacturer</b> - Hersteller des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_model</b> - Modell des DECT Telefons <i>1</i></li>
-      <li><b>dect</b><i>1</i> - Name des analogen Telefonanschlusses <i>1</i> an der Fritz!Box</li>
-      <li><b>dect</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_radio</b> - aktuelle Internet Radio Station des DECT Telefons <i>1</i></li>
+      
+      <li><b>fon</b><i>1</i> - Name des analogen Telefonanschlusses <i>1</i> an der Fritz!Box</li>
+      <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
+      
       <li><b>diversity</b><i>1</i> - Eigene Rufnummer der Rufumleitung <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_dest</b> - Zielnummer der Rufumleitung <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_state</b> - Aktueller Status der Rufumleitung <i>1</i></li>
+      
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
+      
       <li><b>tam</b><i>1</i> - Name des Anrufbeantworters <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_newMsg</b> - Anzahl neuer Nachrichten auf dem Anrufbeantworter <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_oldMsg</b> - Anzahl alter Nachrichten auf dem Anrufbeantworter <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_state</b> - Aktueller Status des Anrufbeantworters <i>1</i></li>
+      
       <li><b>user</b><i>01</i> - Name von Nutzer/IP <i>1</i> f&uuml;r den eine Zugangsbeschr&auml;nkung (Kindersicherung) eingerichtet ist</li>
       <li><b>user</b><i>01</i>_thisMonthTime - Internetnutzung des Nutzers/IP <i>1</i> im aktuellen Monat (Kindersicherung)</li>
       <li><b>user</b><i>01</i>_todaySeconds - heutige Internetnutzung des Nutzers/IP <i>1</i> in Sekunden (Kindersicherung)</li>
