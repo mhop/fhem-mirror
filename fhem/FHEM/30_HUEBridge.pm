@@ -202,10 +202,10 @@ HUEBridge_Set($@)
     $hash->{STATE} = "updating";
     return "starting update";
   } elsif($cmd eq 'autocreate') {
-    HUEBridge_Autocreate($hash);
+    HUEBridge_Autocreate($hash,1);
     return undef;
   } else {
-    my $list = "statusRequest:noArg";
+    my $list = "autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} == 2 );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -272,14 +272,16 @@ HUEBridge_GetUpdate($)
 }
 
 sub
-HUEBridge_Autocreate($)
+HUEBridge_Autocreate($;$)
 {
-  my ($hash)= @_;
+  my ($hash,$force)= @_;
   my $name = $hash->{NAME};
 
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "autocreate");
-    return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+  if( !$force ) {
+    foreach my $d (keys %defs) {
+      next if($defs{$d}{TYPE} ne "autocreate");
+      return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+    }
   }
 
   my $result =  HUEBridge_Call($hash, 'lights', undef);
@@ -583,6 +585,8 @@ HUEBridge_HTTP_Request($$$@)
   <a name="HUEBridge_Set"></a>
   <b>Set</b>
   <ul>
+    <li>autocreate<br>
+    Create fhem devices for all bridge devices.</li>
     <li>statusRequest<br>
     Update bridge status.</li>
     <li>swupdate<br>
