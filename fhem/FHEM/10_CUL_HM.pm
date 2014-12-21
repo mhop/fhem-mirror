@@ -3905,6 +3905,31 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   }
+  elsif($cmd eq "displayWM" ) { #################################################
+    # textNo color icon
+    my %color=(white=>0,red=>1,orange=>2,yellow=>3,green=>4,blue=>5);
+    my %icon=(off=>0,on=>1,open=>2,closed=>3,error=>4,ok=>5,noIcon=>99);
+    my %btn=(txt01_1=>0 ,txt01_2=>1 ,txt02_1=>2 ,txt02_2=>3 ,txt03_1=>4 ,txt03_2=>5,
+             txt04_1=>6 ,txt04_2=>7 ,txt05_1=>8 ,txt05_2=>9 ,txt06_1=>10,txt06_2=>11,
+             txt07_1=>12,txt07_2=>13,txt08_1=>14,txt08_2=>15,txt09_1=>16,txt09_2=>17,
+             txt10_1=>18,txt10_2=>19);
+    
+    
+    my $msg = "800102";
+    my $param = (scalar(@a)-2);
+    return "not enough parameter - always use txtNo, color and icon in a set"
+          if($param %3);
+    for (my $cnt=2;$cnt<$param;$cnt+=3){
+      return "color wrong ".$a[$cnt+1]." use:".join(",",sort keys %color) if (!defined $color{$a[$cnt+1]});
+      return "icon wrong " .$a[$cnt+2]." use:".join(",",sort keys %icon)  if (!defined $icon {$a[$cnt+2]});
+      return "text wrong " .$a[$cnt+0]." use:".join(",",sort keys %btn)   if (!defined $btn  {$a[$cnt+0]});
+      $msg .= sprintf("12%02X11%02X",$btn{$a[$cnt+0]}+0x80,$color{$a[$cnt+1]}+0x80);
+      $msg .= sprintf("13%02X",$icon{$a[$cnt+2]}+0x80) if ($icon{$a[$cnt+2]} != 99 );
+      $msg .= ($cnt<$param-1)?"0A":"0A03";
+      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
+      $msg = "8001";
+    }
+  }
 
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
     my $mode = $a[2];
@@ -8123,6 +8148,18 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          </li>
       </ul><br>
     </li>
+    <li>HM-Dis-WM55
+      <ul>
+      <li><B>displayWM &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;
+         </B><br>
+         up to 6 lines can be addressed.<br>
+         <B>textNo</B> is the text to be dispalyed in line No. The text is asotiated with the text defined for the buttons.
+         txt&lt;BtnNo&gt;_&lt;lineNo&gt; references the button 1 to 10 and their lines 1 or 2<br>
+         <B>color</B> is one white,red, orange,yellow,green,blue<br>
+         <B>icon</B> is one off,on,open,closed,error,ok,noIcon<br>
+         </li>
+      </ul><br>
+    </li>
     <li>keyMatic<br><br>
       <ul>The Keymatic uses the AES signed communication. Therefore the control
       of the Keymatic is only together with the HM-LAN adapter possible. But
@@ -9373,7 +9410,19 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             </li>
           </ul><br>
         </li>
-        
+        <li>HM-Dis-WM55
+          <ul>
+            <li><B>displayWM &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;
+            </B><br>
+             bis zu 6 Zeilen können addresiert werden. <br>
+             <B>textNo</B> ist der anzuzeigende Text. Der Inhalt des Texts wird in den Buttonds definiert. 
+             txt&lt;BtnNo&gt;_&lt;lineNo&gt; referenziert den Button und dessn jeweiligen Zeile<br>
+             <B>color</B> kann sein white,red, orange,yellow,green,blue<br>
+             <B>icon</B> kann sein off,on,open,closed,error,ok,noIcon<br>
+             </li>
+          </ul><br>
+        </li>
+
         <li>keyMatic<br><br>
           <ul>Keymatic verwendet eine AES-signierte Kommunikation. Deshalb ist die Steuerung von Keymatic
             nur mit dem HM-LAN m&ouml;glich. But
