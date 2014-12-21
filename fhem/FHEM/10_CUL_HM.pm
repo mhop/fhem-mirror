@@ -3908,7 +3908,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "displayWM" ) { #################################################
     # textNo color icon
     my %color=(white=>0,red=>1,orange=>2,yellow=>3,green=>4,blue=>5);
-    my %icon=(off=>0,on=>1,open=>2,closed=>3,error=>4,ok=>5,noIcon=>99);
+    my %icon=( off=>0,on=>1,open=>2,closed=>3,error=>4,ok=>5
+              ,ic6=>6,ic7=>7,ic8=>8,ic9=>9,i10=>10,signal=>11
+              ,ic12=>12,ic13=>13
+              ,noIcon=>99);
     my %btn=(txt01_1=>0 ,txt01_2=>1 ,txt02_1=>2 ,txt02_2=>3 ,txt03_1=>4 ,txt03_2=>5,
              txt04_1=>6 ,txt04_2=>7 ,txt05_1=>8 ,txt05_2=>9 ,txt06_1=>10,txt06_2=>11,
              txt07_1=>12,txt07_2=>13,txt08_1=>14,txt08_2=>15,txt09_1=>16,txt09_2=>17,
