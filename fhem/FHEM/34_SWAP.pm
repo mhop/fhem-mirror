@@ -86,6 +86,7 @@ SWAP_Initialize($)
   $hash->{AttrFn}    = "SWAP_Attr";
   $hash->{AttrList}  = "IODev".
                        " ignore:1,0".
+                       " createUnknownReadings:1,0".
                        " $readingFnAttributes" .
                        " ProductCode:".join(",", sort keys %{$products});
 
@@ -242,7 +243,7 @@ SWAP_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   if(@a != 3 && @a != 4 ) {
-    my $msg = "wrong syntax: define <name> SWAP <addr>[.<reg>] [<ProductCode>]";
+    my $msg = "wrong syntax: define <name> SWAP <addr>[.<reg>]";
     Log3 undef, 2, $msg;
     return $msg;
   }
@@ -298,6 +299,9 @@ SWAP_Define($$)
   }
 
   $hash->{product} = $products->{$productcode} if( defined($productcode) && defined($products->{$productcode} ) );
+
+  $hash->{DEF} = $hash->{addr};
+  $hash->{DEF} .= $hash->{reg} if( $hash->{reg} );
 
   SWAP_Send($hash, $addr, QUERY, "00" );
 
@@ -624,7 +628,6 @@ SWAP_Set($@)
       }
     }
 
-
   } elsif( $cmd eq "readDeviceXML" ) {
     my $productcode = $attr{$name}{ProductCode} if( defined($attr{$name}{ProductCode} ) );
     if( defined($products->{$productcode} ) ) {
@@ -633,9 +636,34 @@ SWAP_Set($@)
     } else {
       return "can't read deviceXML for unknown ProductCode";
     }
+
   } elsif( $cmd eq "clearUnconfirmed" ) {
     delete( $hash->{sentList} );
     delete ($hash->{SWAP_Sent_unconfirmed});
+
+  } elsif( $cmd eq "flash" ) {
+    my $firmwareFolder = "./FHEM/firmware/";
+    my $hexfile;
+    if ($cnt < 2) {
+      #No argument to flash
+      return "Device has no product code; you need to specify a firmeware to flash" if( !defined($attr{$name}{ProductCode} ) );
+      $hexfile = $firmwareFolder . "SWAP_$attr{$name}{ProductCode}.hex";
+    } else {
+      if ( substr($arg, 0, 1) eq "/" ) {
+        #absolute path provided
+        $hexfile = $arg;
+      } else {
+        #Product code provided
+        $hexfile = $firmwareFolder . "SWAP_$arg.hex";
+      }
+    }
+    open FILE, $hexfile or return "Could not open $hexfile";
+    Log3 $name, 1, "Flashing $hexfile to $name";
+    my @a = <FILE>;
+    @a = map { substr $_, 3, -1 } @a;
+    $hash->{HEXFILE} = [ @a ];
+    SWAP_Send($hash, $addr, COMMAND, "03", "05" ); #Set "System State" to "Flash"
+
   } else {
     return SetExtensions($hash, $list, $name, @aa);
     return "Unknown argument $cmd, choose one of ".$list;
@@ -840,7 +868,7 @@ SWAP_updateReadings($$$)
     readingsBulkUpdate($hash, "state", (substr($data,0,6) eq "000000"?"off":$data)) if( defined($attr{$name}{ProductCode}) && $attr{$name}{ProductCode} eq '0000002200000003' && $reg == 0x0B );
     readingsBulkUpdate($hash, "state", $data) if( $hash->{reg} && hex($hash->{reg}) == $reg );
     readingsEndUpdate($hash,1);
-  } else {
+  } elsif( AttrVal($name, "createUnknownReadings",0 ) )  {
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, $rid, $data);
     readingsBulkUpdate($hash, "state", $data) if( $hash->{reg} && hex($hash->{reg}) == $reg );
@@ -924,6 +952,18 @@ SWAP_Parse($$)
 
   Log3 $name, 4, $sname ." -> ". $dname ." ($hop,$secu-$nonce): ". $function_codes{$func} . " ". $rname . " ". $regname . ($data?":":"") . $data;
 
+  if( $raddr eq "01" and $func == QUERY and $rid eq "0B" and length($data) == 4 ) {
+    #Uploading firmware
+    my $lineno = hex($data);
+    Log3 $name, 4, "Serving firmware request of $src for line no. $lineno";
+    if (exists($shash->{HEXFILE})) {
+      SWAP_Send($shash, "00", STATUS, "0B", $data.$shash->{HEXFILE}[$lineno] );
+    } else {
+      Log3 $name, 1, "SWAP device $src is in flash mode, but no hex file is configured. Use 'set $name flash HEXFILE'";
+    }
+  }
+
+
   return $rname if( $raddr eq "01" );
   return $rname if( $func == QUERY );
 
@@ -944,10 +984,11 @@ SWAP_Parse($$)
 
   #product code
   if( $reg == 0x00 ) {
-    my $first = !defined($rhash->{"SWAP_00-ProductCode"});
 
     my $productcode = $data;
-    SWAP_Attr( "set", $rname, "ProductCode", $productcode ) if( !defined( $attr{$rname}{ProductCode} ) );
+    my $first = !defined($rhash->{"SWAP_00-ProductCode"}) || $rhash->{"SWAP_00-ProductCode"} ne $productcode;
+
+    SWAP_Attr( "set", $rname, "ProductCode", $productcode ) if( $first );
 
     if( !defined($products->{$productcode}->{registers}) ){
       SWAP_readDeviceXML( $rhash, $productcode );
@@ -1119,6 +1160,26 @@ SWAP_Attr(@)
     my $hash = $defs{$name};
     my $productcode = $attrVal;
 
+    #Product code changed (due to flash of different firmware or switch of addresses)
+    if( defined( $attr{$name}{ProductCode} ) && $attr{$name}{ProductCode} ne $productcode) {
+      my $oldproductcode = "None";
+      $oldproductcode = $attr{$name}{ProductCode} if( defined( $attr{$name}{ProductCode} ) );
+      Log3 $name, 3, "Device $name changed product code from $oldproductcode to $productcode";
+      #Delete all SWAP_HEX-
+      foreach my $key (keys %{$hash}) {
+        if ($key =~ "^SWAP_[0-9A-F][0-9A-F]-") {
+          Log3 $name, 5, "Deleting $key";
+          delete $hash->{$key};
+        }
+      }
+
+      #Delete all readings
+      foreach my $key (keys %{$hash->{READINGS}}) {
+        Log3 $name, 5, "Deleting reading $key";
+        delete $hash->{READINGS}{$key};
+      }
+    }
+
     if( !defined($products->{$productcode}->{registers}) ){
       SWAP_readDeviceXML( $hash, $productcode );
     }
@@ -1230,6 +1291,12 @@ SWAP_Attr(@)
     <li>clearUnconfirmed<br>
         clears the list of unconfirmed messages.
         </li><br>
+    <li>flash [&lt;productCode&gt|&lt;firmwareFile&gt;]<br>
+        will initiate an ota firmware update. only possible for panStamp NRG devices.<br>
+        no params -> will use the <code>SWAP_&lt;current productCode&gt;.hex</code> file from the FHEM/firmware directory.<br>
+        &lt;productCode&gt -> will use the <code>SWAP_&lt;productCode&gt;.hex</code> file from the FHEM/firmware directory.<br>
+        &lt;firmwareFile&gt; -> will use &lt;firmwareFile&gt; as the absolute file name of the hex file.<br>
+        </li><br>
   </ul>
 
   <a name="SWAP_Get"></a>
@@ -1255,6 +1322,9 @@ SWAP_Attr(@)
   <a name="SWAP_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>createUnknownReadings<br>
+        Create readings for unknown registers, i.e. registers not defined in the device xml file.
+        </li><br>
     <li>ProductCode<br>
         ProductCode of the device. used to read the register configuration from the device definition file.
         hast to be set manualy for devices that are in sleep mode during definition.
