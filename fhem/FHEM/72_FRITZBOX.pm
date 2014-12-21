@@ -46,6 +46,7 @@ sub FRITZBOX_Init($);
 sub FRITZBOX_Ring_Start($@);
 sub FRITZBOX_Exec($$);
 sub FRITZBOX_Send_Mail($@);
+sub FRITZBOX_SetMOH($@);
 sub FRITZBOX_Start_Radio($@);
 
 our $telnet;
@@ -114,7 +115,7 @@ my %userType = (
  , 4 => "Guest"
 );
 
-my @mohtype = qw(announcement music customer);
+my @mohtype = qw(default sound customer);
 
 my %landevice = ();
 
@@ -253,12 +254,13 @@ FRITZBOX_Set($$@)
    my $resultStr = "";
    
    my $list = "alarm"
+            . " convertMOH"
             . " convertRingTone"
             . " createPwdFile"
             . " customerRingTone"
             . " diversity"
             . " guestWlan:on,off"
-            . " message"
+            . " moh"
             . " ring"
             . " sendMail"
             . " startRadio"
@@ -270,6 +272,7 @@ FRITZBOX_Set($$@)
    {
       if ( int @val == 2 && $val[0] =~ /^(1|2|3)$/ && $val[1] =~ /^(on|off)$/ ) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -278,9 +281,17 @@ FRITZBOX_Set($$@)
          return undef;
       }
 
+   } elsif ( lc $cmd eq 'convertmoh') {
+      if (int @val > 0) 
+      {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         return FRITZBOX_ConvertMOH $hash, @val;
+      }
+
    } elsif ( lc $cmd eq 'convertringtone') {
       if (int @val > 0) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          return FRITZBOX_ConvertRingTone $hash, @val;
       }
       
@@ -299,12 +310,14 @@ FRITZBOX_Set($$@)
    } elsif ( lc $cmd eq 'customerringtone') {
       if (int @val > 0) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          return FRITZBOX_SetCustomerRingTone $hash, @val;
       }
       
    } elsif ( lc $cmd eq 'diversity') {
       if ( int @val == 2 && defined( $hash->{READINGS}{"diversity".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -316,6 +329,7 @@ FRITZBOX_Set($$@)
    } elsif ( lc $cmd eq 'guestwlan') {
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          my $state = $val[0];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -324,24 +338,35 @@ FRITZBOX_Set($$@)
          return undef;
       }
    }
-   elsif ( lc $cmd eq 'message')
+
+   elsif ( lc $cmd eq 'moh')
    {
       if (int @val > 0) 
       {
-         $hash->{Message} = substr (join(" ", @val),0,30) ;
-         return undef;
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         $resultStr = FRITZBOX_SetMOH $hash, @val;
+         unless ($resultStr)
+         {
+            $hash->{fhem}{LOCAL}=2; #2 = short update without new trigger
+            FRITZBOX_Readout_Start($hash);
+            $hash->{fhem}{LOCAL}=0;
+         }
+         return $resultStr;
       }
    }
+
    elsif ( lc $cmd eq 'ring')
    {
       if (int @val > 0) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          FRITZBOX_Ring_Start $hash, @val;
          return undef;
       }
    }
    elsif ( lc $cmd eq 'sendmail')
    {
+      Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
       FRITZBOX_Send_Mail $hash, @val;
       return undef;
    }
@@ -349,6 +374,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val > 0) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          return FRITZBOX_Start_Radio $hash, @val;
       }
    }
@@ -356,6 +382,7 @@ FRITZBOX_Set($$@)
    {
       if ( int @val == 2 && defined( $hash->{READINGS}{"tam".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -366,6 +393,7 @@ FRITZBOX_Set($$@)
    }
    elsif( lc $cmd eq 'update' ) 
    {
+      Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
       $hash->{fhem}{LOCAL}=1;
       FRITZBOX_Readout_Start($hash);
       $hash->{fhem}{LOCAL}=0;
@@ -375,6 +403,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
+         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
          my $state = $val[0];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -383,7 +412,6 @@ FRITZBOX_Set($$@)
          $hash->{fhem}{LOCAL}=2; #2 = short update without new trigger
          FRITZBOX_Readout_Start($hash);
          $hash->{fhem}{LOCAL}=0;
-
          return undef;
       }
    }
@@ -493,7 +521,6 @@ FRITZBOX_Readout_Run($)
       # Box model and firmware
       push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
       push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver", "fwupdate" ];
-      push @readoutArray, [ "box_moh", "ctlmgr_ctl r telcfg settings/MOHType", "mohtype" ];
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
 
       my $dectCount = $resultArray->[1];
@@ -677,6 +704,8 @@ FRITZBOX_Readout_Run($)
 # Gäste WLAN
    push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
    push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
+#Music on Hold
+   push @readoutArray, [ "box_moh", "ctlmgr_ctl r telcfg settings/MOHType", "mohtype" ];
 
 # Alarm clock
    for (0..2)
@@ -1091,8 +1120,86 @@ FRITZBOX_Ring_Aborted($)
   FRITZBOX_Log $hash, 1, "Timeout when ringing";
 }
 
-sub ############################################
-FRITZBOX_SetCustomerRingTone($@)
+############################################
+sub FRITZBOX_SetMOH($@)
+{  
+   my ($hash, $type, @file) = @_;
+   my $returnStr;
+   my @cmdArray;
+   my $result;
+   my $name = $hash->{NAME};
+
+   if (lc $type eq lc $mohtype[0] || $type eq "0")
+   {
+      FRITZBOX_Exec ($hash, 'ctlmgr_ctl w telcfg settings/MOHType 0');
+      return undef;
+   }
+   elsif (lc $type eq lc $mohtype[1] || $type eq "1")
+   {
+      FRITZBOX_Exec ($hash, 'ctlmgr_ctl w telcfg settings/MOHType 1');
+      return undef;
+   }
+   return "Error: Unvalid parameter '$type'" unless lc $type eq lc $mohtype[2] || $type eq "2";
+
+# Load customer MOH file
+   my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
+   $uploadDir .= "/"
+      unless $uploadDir =~ /\/$|^$/;
+
+   my $inFile = join " ", @file;
+   $inFile = $uploadDir.$inFile
+      unless $inFile =~ /^\//;
+   
+   return "Error: Please give a complete file path or define the attribute 'defaultUploadDir'"
+      unless $inFile =~ /^\//;
+   
+   return "Error: Only MP3 files can be used for 'music on hold'."
+      unless $inFile =~ /\.mp3$/i;
+   
+   $result = FRITZBOX_Open_Connection( $hash );
+   return "$name|0|$result" 
+      if $result;
+
+   my $uploadFile = '/var/tmp/moh_upload';
+   my $mohFile = '/var/tmp/fx_moh';
+   push @cmdArray, '[ -f "'.$uploadFile.'" ] && rm "'.$uploadFile.'"';
+   push @cmdArray, '[ -f "'.$mohFile.'" ] && rm "'.$mohFile.'"';
+   
+   if ($inFile =~ /^(ftp|http):\/\//)
+   {
+      push @cmdArray, 'wget -O "'.$uploadFile.'" "'.$inFile.'"';
+   } else {
+      push @cmdArray, 'cp "'.$inFile.'" "'.$uploadFile.'"';
+         
+   }
+   push @cmdArray, '[ -f "'.$uploadFile.'" ] && echo 1 || echo 0';
+# Execute command array
+   $result = FRITZBOX_Exec ( $hash, \@cmdArray );
+   return "Could not access '$inFile'"
+      unless $result->[3] == 1;
+
+#Prepare 2nd command array
+   push @cmdArray, 'ffmpegconv -i "'.$uploadFile.'" -o "'.$mohFile.'" --limit 32 --type 6';
+   push @cmdArray, '[ -f "'.$mohFile.'" ] && echo 1 || echo 0';
+# Execute 2nd command array
+   $result = FRITZBOX_Exec ( $hash, \@cmdArray );
+   return "Could not convert '$inFile'"
+      unless $result->[1] == 1;
+
+#Prepare 3rd command array
+   push @cmdArray, 'cat "'.$mohFile.'" >/var/flash/fx_moh';
+   push @cmdArray, 'killall -sigusr1 telefon';
+   push @cmdArray, 'rm "'.$uploadFile.'"';
+   push @cmdArray, 'rm "'.$mohFile.'"';
+# Execute 3rd command array
+   $result = FRITZBOX_Exec ( $hash, \@cmdArray );
+
+   FRITZBOX_Close_Connection( $hash );
+   return undef;
+}
+
+############################################
+sub FRITZBOX_SetCustomerRingTone($@)
 {  
    my ($hash, $intern, @file) = @_;
    my $returnStr;
@@ -1137,8 +1244,39 @@ FRITZBOX_SetCustomerRingTone($@)
    return $returnStr;
 }
 
-sub ############################################
-FRITZBOX_ConvertRingTone ($@)
+############################################
+sub FRITZBOX_ConvertMOH ($@)
+{  
+   my ($hash, @file) = @_;
+
+   my $name = $hash->{NAME};
+
+   my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
+   $uploadDir .= "/"
+      unless $uploadDir =~ /\/$|^$/;
+
+   my $inFile = join " ", @file;
+   $inFile = $uploadDir.$inFile
+      unless $inFile =~ /^\//;
+   
+   return "Error: You have to give a complete file path or to set the attribute 'defaultUploadDir'"
+      unless $inFile =~ /^\//;
+   
+   return "Error: only MP3 or WAV files can be converted"
+      unless $inFile =~ /\.mp3$|.wav$/i;
+   
+   $inFile =~ s/file:\/\///;
+
+   my $outFile = $inFile;
+   $outFile = substr($inFile,0,-4)
+      if ($inFile =~ /\.(mp3|wav)$/i);
+   my $returnStr = FRITZBOX_Exec ($hash
+      , 'ffmpegconv -i "'.$inFile.'" -o "'.$outFile.'.moh" --limit 32 --type 6');
+   return $returnStr;
+} # end FRITZBOX_ConvertMOH
+
+############################################
+sub FRITZBOX_ConvertRingTone ($@)
 {  
    my ($hash, @file) = @_;
 
@@ -1166,7 +1304,7 @@ FRITZBOX_ConvertRingTone ($@)
    my $returnStr = FRITZBOX_Exec ($hash
       , 'picconv.sh "file://'.$inFile.'" "'.$outFile.'.g722" ringtonemp3');
    return $returnStr;
-}
+} # end FRITZBOX_ConvertRingTone
 
 #'picconv.sh "'.$inFile.'" "'.$outFile.'.g722" ringtonemp3'
 #picconv.sh "file://$dir/upload.mp3" "$dir/$filename" ringtonemp3   
@@ -1177,8 +1315,6 @@ FRITZBOX_ConvertRingTone ($@)
 #ctlmgr_ctl r user settings/user0/bpjm_filter_enable
 #/usr/bin/pbd --set-ringtone-url --book="255" --id="612" --url="file:///var/InternerSpeicher/claydermann.g722" --name="Claydermann"
 # /usr/bin/moh_upload
-# ffmpegconv -i $file -o fx_moh --limit 32 --type 6
-# cat fx_moh >/var/flash/fx_moh
 
 # Opens a Telnet Connection to an external FritzBox
 ############################################
@@ -1503,7 +1639,7 @@ FRITZBOX_Start_Radio($@)
       }
       else
       {
-         foreach (keys $hash->{fhem}{radio})
+         foreach (keys %{$hash->{fhem}{radio}})
          {
             if (lc $hash->{fhem}{radio}{$_} eq lc $radioStationName)
             {
@@ -1768,12 +1904,12 @@ sub FRITZBOX_fritztris($)
          If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
       </li><br>
 
-      <li><code>ringWithIntern &lt;1 | 2 | 3 | 4&gt;</code>
+      <li><code>ringWithIntern &lt;1 | 2 | 3&gt;</code>
          <br>
          To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
          <br>
-         To show a message (default: "FHEM") during a ring the internal phone numbers 1-4 can be specified here.
-         The concerned analog phone socket isn't physical needed.
+         To show a message (default: "FHEM") during a ring the internal phone numbers 1-3 can be specified here.
+         The concerned analog phone socket must exist.
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
@@ -1912,13 +2048,10 @@ sub FRITZBOX_fritztris($)
          Schaltet das G&auml;ste-WLAN an oder aus.
       </li><br>
 
-      <li><code>set &lt;name&gt; musicOnHold &lt;fullFilePath&gt;</code>
+      <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;fullFilePath&gt;]</code>
          <br>
-         <i>Not implemented yet.</i> Uploads the file fullFilePath as "Music on Hold". Only mp3 or the MOH-format is allowed.
+         &Auml;ndert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden. Die Wartemusik hat eine maximale L&auml;nge von 7s. Sie wird w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 7s-Nachrichten vorgespielt werden.
          <br>
-         The file has to be placed on the file system of the Fritz!Box.
-         <br>
-         The upload takes about one minute before the tone is available.
       </li><br>
       
       <li><code>set &lt;name&gt; ring &lt;interneNummern&gt; [Dauer [Klingelton]] [msg:Nachricht]</code>
@@ -2009,12 +2142,12 @@ sub FRITZBOX_fritztris($)
          Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
       </li><br>
     
-      <li><code>ringWithIntern &lt;1 | 2 | 3 | 4&gt;</code>
+      <li><code>ringWithIntern &lt;1 | 2 | 3&gt;</code>
          <br>
          Um ein Telefon klingeln zu lassen, muss eine Anrufer spezifiziert werden. Normalerweise ist dies die Nummer 50 "ISDN:W&auml;hlhilfe".
          <br>
-         Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1-4 angegeben werden.
-         Der entsprechende analoge Telefonanschluss muss daf&uuml;r nicht vorhanden sein.
+         Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1-3 angegeben werden.
+         Der entsprechende analoge Telefonanschluss muss vorhanden sein.
       </li><br>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
