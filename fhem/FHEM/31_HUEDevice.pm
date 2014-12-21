@@ -76,7 +76,7 @@ sub HUEDevice_Initialize($)
                       "delayedUpdate:1 ".
                       "realtimePicker:1 ".
                       "color-icons:1,2 ".
-                      "model:".join(",", sort keys %hueModels)." ".
+                      "model:".join(",", sort map { $_ =~ s/ /#/g ;$_} keys %hueModels)." ".
                       "subType:extcolordimmer,colordimmer,ctdimmer,dimmer,switch ".
                       $readingFnAttributes;
 
@@ -739,6 +739,10 @@ HUEDevice_Parse($$)
   $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} unless( defined($attr{$name}{subType})
                                                                            || !defined($attr{$name}{model})
                                                                            || !defined($hueModels{$attr{$name}{model}}{subType}) );
+  if( defined($attr{$name}{subType}) && $attr{$name}{subType} eq "colordimmer" ) {
+    $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} unless( !defined($attr{$name}{model})
+                                                                             || !defined($hueModels{$attr{$name}{model}}{subType}) );
+  }
 
   $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
