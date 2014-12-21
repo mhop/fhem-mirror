@@ -847,7 +847,7 @@ sub Text2Speech_WriteStats($$$$){
 
   <li>TTS_FileMapping<br>
     Definition of mp3files with a custom templatedefinition. Separated by space.
-    All templatedefinitions can used in audiobricks by i>tts</i>. 
+    All templatedefinitions can used in audiobricks by <i>tts</i>. 
     The definition must begin and end with e colon. 
     The mp3files must saved in the given directory by <i>TTS_FIleTemplateDir</i>.<br>
     <code>attr myTTS TTS_FileMapping ring:ringtone.mp3 beep:MyBeep.mp3</code><br>
