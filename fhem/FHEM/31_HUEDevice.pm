@@ -16,6 +16,8 @@ use POSIX;
 use JSON;
 use SetExtensions;
 
+use vars qw(%FW_webArgs); # all arguments specified in the GET
+
 my %hueModels = (
   LCT001 => {name => 'Hue Bulb'                 ,type => 'Extended Color light'   ,subType => 'colordimmer',},
   LCT002 => {name => 'Hue Bulb BR30'            ,type => 'Extended Color light'   ,subType => 'colordimmer',},
@@ -454,7 +456,13 @@ HUEDevice_Set($@)
   $list .= " pct:slider,0,1,100 bri:slider,0,1,254 alert:none,select,lselect" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
   $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{group} && AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
-  $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+  if( defined($FW_webArgs{detail}) ) {
+    $list .= " rgb color:slider,2000,1,6500 ct" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+  } else {
+    $list .= " rgb:colorpicker,RGB color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+  }
+  $list .= " hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+
   return SetExtensions($hash, $list, $name, @aa);
 }
 
