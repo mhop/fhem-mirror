@@ -173,7 +173,7 @@ CUL_FHTTK_Set($@)
     IOWrite($hash, "", sprintf("T%s01", $hash->{CODE})); # 0x01 - open or 0x81
 
   } elsif ($opt eq "Closed" ) {
-    Log3 $name, 3, "CUL_FHTTK ($name) changed window state to open.";
+    Log3 $name, 3, "CUL_FHTTK ($name) changed window state to closed.";
     
     IOWrite($hash, "", sprintf("T%s02", $hash->{CODE})); # 0x02 - closed or 0x82
 
@@ -275,7 +275,7 @@ CUL_FHTTK_Parse($$)
     $defs{$name}{READINGS}{"Previous"}{TIME} = "";
   }
   
-  if (defined($defs{$name}{PREV}{STATE}) && $defs{$name}{PREV}{STATE} != $state) {
+  if (defined($defs{$name}{PREV}{STATE}) && $defs{$name}{PREV}{STATE} ne $state) {
     my $prevState = $defs{$name}{PREV}{STATE};
     my ($windowReading,$windowState) = split(/:/, $fhttfk_codes{$prevState});
     $defs{$name}{READINGS}{"Previous"}{VAL} = $windowState if defined($windowState) && $windowState ne "";
