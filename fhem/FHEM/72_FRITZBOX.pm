@@ -272,7 +272,7 @@ FRITZBOX_Set($$@)
    {
       if ( int @val == 2 && $val[0] =~ /^(1|2|3)$/ && $val[1] =~ /^(on|off)$/ ) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -284,14 +284,14 @@ FRITZBOX_Set($$@)
    } elsif ( lc $cmd eq 'convertmoh') {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          return FRITZBOX_ConvertMOH $hash, @val;
       }
 
    } elsif ( lc $cmd eq 'convertringtone') {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          return FRITZBOX_ConvertRingTone $hash, @val;
       }
       
@@ -310,14 +310,14 @@ FRITZBOX_Set($$@)
    } elsif ( lc $cmd eq 'customerringtone') {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          return FRITZBOX_SetCustomerRingTone $hash, @val;
       }
       
    } elsif ( lc $cmd eq 'diversity') {
       if ( int @val == 2 && defined( $hash->{READINGS}{"diversity".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -329,7 +329,7 @@ FRITZBOX_Set($$@)
    } elsif ( lc $cmd eq 'guestwlan') {
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          my $state = $val[0];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -343,7 +343,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          $resultStr = FRITZBOX_SetMOH $hash, @val;
          unless ($resultStr)
          {
@@ -359,14 +359,14 @@ FRITZBOX_Set($$@)
    {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          FRITZBOX_Ring_Start $hash, @val;
          return undef;
       }
    }
    elsif ( lc $cmd eq 'sendmail')
    {
-      Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+      Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
       FRITZBOX_Send_Mail $hash, @val;
       return undef;
    }
@@ -374,7 +374,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          return FRITZBOX_Start_Radio $hash, @val;
       }
    }
@@ -382,7 +382,7 @@ FRITZBOX_Set($$@)
    {
       if ( int @val == 2 && defined( $hash->{READINGS}{"tam".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -393,7 +393,7 @@ FRITZBOX_Set($$@)
    }
    elsif( lc $cmd eq 'update' ) 
    {
-      Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+      Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
       $hash->{fhem}{LOCAL}=1;
       FRITZBOX_Readout_Start($hash);
       $hash->{fhem}{LOCAL}=0;
@@ -403,7 +403,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
-         Log3 $name, 3, "FRITZBOX $name: $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
          my $state = $val[0];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -1052,7 +1052,7 @@ FRITZBOX_Ring_Run($)
 
 # uses name of port 0-3 (dial port 1-4) to show messages on ringing phone
    my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
-   if ($ringWithIntern =~ /^([1-4])$/ )
+   if ($ringWithIntern =~ /^([1-3])$/ )
    {
       push @cmdArray, "ctlmgr_ctl r telcfg settings/MSN/Port".($ringWithIntern-1)."/Name";
       push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$msg'";
@@ -1360,7 +1360,7 @@ sub FRITZBOX_Open_Connection($)
    }
 
    FRITZBOX_Log $hash, 5, "Wait for user or password prompt.";
-   unless ( ($before,$match) = $telnet->waitfor('/(user|password): $/i') )
+   unless ( ($before,$match) = $telnet->waitfor('/(user|login|password): $/i') )
    {
       $msg = "Telnet error while waiting for user or password prompt: ".$telnet->errmsg;
       FRITZBOX_Log $hash, 2, $msg;
@@ -1368,7 +1368,7 @@ sub FRITZBOX_Open_Connection($)
       $telnet = undef;
       return $msg;
    }
-   if ( $match eq "user: " && $user eq "")
+   if ( $match =~ /(user|login): / && $user eq "")
    {
       $msg = "Telnet login requires user name but attribute 'telnetUser' not defined";
       FRITZBOX_Log $hash, 2, $msg;
@@ -1376,7 +1376,7 @@ sub FRITZBOX_Open_Connection($)
       $telnet = undef;
       return $msg;
    }
-   elsif ( $match eq "user: ")
+   elsif ( $match =~ /(user|login): /)
    {
       FRITZBOX_Log $hash, 5, "Entering user name";
       $telnet->print( $user );
