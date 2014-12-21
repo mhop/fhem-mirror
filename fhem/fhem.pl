@@ -2865,7 +2865,7 @@ DoTrigger($$@)
     foreach my $n (@{$ntfyLst}) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
       my $r = CallFn($n, "NotifyFn", $defs{$n}, $hash);
-      $ret .= $r if($r);
+      $ret .= " $n:$r" if($r);
     }
     delete($hash->{NTFY_TRIGGERTIME});
 
