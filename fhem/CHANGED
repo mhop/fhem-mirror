@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: HUEDevice: allow ct presets in webCmd
   - added: SONOS and SONOSPLAYER to support Sonos Multiroom Audiosystems (Reinerlein)
   - change: 64_ESA2000.pm: add batterystate
   - added:   42_SMARTMON: Frontend to smartctl (maintainer: hexenmeister)

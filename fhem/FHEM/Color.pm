@@ -22,18 +22,32 @@ FHEM_colorpickerInit()
 }
 
 sub
-FHEM_colorpickerFn($$$)
+FHEM_colorpickerFn($$$$$)
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
   my @args = split("[ \t]+", $cmd);
 
-  return undef if($values !~ m/^colorpicker,(.*)$/);
+  my @value = split( ',', $values );
+  return undef if($values !~ m/^colorpicker,([^,]*)/);
 
-  my ($mode) = ($1);
+  my $mode = $1;
   $mode = "RGB" if( !defined($mode) );
 
-  my $trigger = $cmd;                   #default trigger is event from reading with the same name as the command
+  if( $mode eq "CT" ) {
+    if( !$args[1] && $data{webCmdFn}{slider} ) {
+      no strict "refs";
+      my $values = "slider,". join( ',', @value[2..4] );
+      my $htmlTxt = &{$data{webCmdFn}{slider}}($FW_wname, $d, $FW_room, $cmd, $values);
+      use strict "refs";
+
+      return $htmlTxt;
+    }
+
+    return undef if( !$args[1] );
+  }
+
+  my $trigger = $cmd;                   #default trigger is the event from the reading with the same name as the command
   my $cv = ReadingsVal($d,$cmd,"");     #get default value from this reading
   if( !$cv ) {                          #if this reading does not exist ->
     $trigger = "RGB";                   #  trigger name will be RGB
@@ -44,6 +58,13 @@ FHEM_colorpickerFn($$$)
   my $srf = $FW_room ? "&room=$FW_room" : "";
   if( $args[1] ) {
     my $c = "cmd=set $d $cmd$srf";
+
+    if( $mode eq "CT" ) {
+      my $ct = $args[1];
+      $ct = int(1000000/$args[1]) if( $ct > 1000 );
+      my ($r, $g, $b) = Color::ct2rgb( $ct );
+      $args[1] = Color::rgb2hex( $r, $g, $b );
+    }
 
     return '<td align="center">'.
              "<div onClick=\"FW_cmd('$FW_ME?XHR=1&$c')\" style=\"width:32px;height:19px;".
@@ -357,6 +378,43 @@ rgb2hex($$$) {
     my $return = sprintf( "%2.2X%2.2X%2.2X", $r, $g, $b );
 
     return uc($return);
+}
+
+sub
+ct2rgb($)
+{
+  my ($ct) = @_;
+
+  # calculation from http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code
+  # adjusted by 1000K
+  my $temp = (1000000/$ct)/100 + 10;
+
+  my $r = 0;
+  my $g = 0;
+  my $b = 0;
+
+  $r = 255;
+  $r = 329.698727446 * ($temp - 60) ** -0.1332047592 if( $temp > 66 );
+  $r = 0 if( $r < 0 );
+  $r = 255 if( $r > 255 );
+
+  if( $temp <= 66 ) {
+    $g = 99.4708025861 * log($temp) - 161.1195681661;
+  } else {
+    $g = 288.1221695283 * ($temp - 60) ** -0.0755148492;
+  }
+  $g = 0 if( $g < 0 );
+  $g = 255 if( $g > 255 );
+
+  $b = 255;
+  $b = 0 if( $temp <= 19 );
+  if( $temp < 66 ) {
+    $b = 138.5177312231 * log($temp-10) - 305.0447927307;
+  }
+  $b = 0 if( $b < 0 );
+  $b = 255 if( $b > 255 );
+
+  return( $r, $g, $b );
 }
 
 1;
