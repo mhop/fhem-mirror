@@ -1,4 +1,4 @@
-# $Id: 98_HourCounter.pm 7227 2014-12-16 18:00:00Z john $
+# $Id: 98_HourCounter.pm 7281 2014-12-21 12:00:00Z john $
 ####################################################################################################
 #
 #   98_HourCounter.pm
@@ -55,6 +55,9 @@
 #     new reading tickUpdated is fired each time the operative readings are updated
 #     some bug fixes concerning duration and calc calculations
 #     note, that also 99_UtilsHourCounter needs changes
+#  21.12.14 - 1.0.1.1
+#     bug: if OFF is not defined, nothing was counted
+#     html : check with tidy
 ####################################################################################################
 
 package main;
@@ -64,7 +67,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
-my $HourCounter_Version = "1.0.1.0 - 09.12.2014";
+my $HourCounter_Version = "1.0.1.1 - 21.12.2014";
 
 my @HourCounter_cmdQeue = ();
 
@@ -514,9 +517,9 @@ sub HourCounter_Run($)
   my $pauseTimeOverall   = ReadingsVal( $name, "pauseTimeOverall",   0 );
   my $pauseTimeEdge      = ReadingsVal( $name, "pauseTimeEdge",      0 );
 
-  my $tickUpdated = ReadingsVal( $name, "tickUpdated", 0 )+1;
+  my $tickUpdated = ReadingsVal( $name, "tickUpdated", 0 ) + 1;
   $tickUpdated = 1 if ( $tickUpdated >= 1000 );
-  
+
   my $tickChanged = ReadingsVal( $name, "tickChanged", 0 );
   my $tickHour    = ReadingsVal( $name, "tickHour",    0 );
   my $tickDay     = ReadingsVal( $name, "tickDay",     0 );
@@ -617,7 +620,8 @@ sub HourCounter_Run($)
 
     # -------------- handling of transitions
     my $hasValueChanged = 0;
-    if ( $isOffDefined && $valuePara >= 0 && $valuePara != $valueOld )
+    if ( ( $isOffDefined && $valuePara >= 0 && $valuePara != $valueOld )
+      || ( !$isOffDefined && $calledByEvent ) )
     {
       $hasValueChanged = 1;
     }
@@ -660,7 +664,7 @@ sub HourCounter_Run($)
     }
 
     # --------------- no change
-    elsif ( $valuePara == -1 )
+    elsif ( $valuePara == -1 && $isOffDefined )
     {
       if ( $valueOld == 0 )
       {
@@ -685,21 +689,22 @@ sub HourCounter_Run($)
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "countsPerDay",  $countsPerDay );
     readingsBulkUpdate( $hash, "countsOverall", $countsOverall );
+    if ($isOffDefined)
+    {
+      readingsBulkUpdate( $hash, "pulseTimeIncrement", $pulseTimeIncrement );
+      readingsBulkUpdate( $hash, "pulseTimeEdge",      $pulseTimeEdge );
 
-    readingsBulkUpdate( $hash, "pulseTimeIncrement", $pulseTimeIncrement );
-    readingsBulkUpdate( $hash, "pulseTimeEdge",      $pulseTimeEdge );
+      readingsBulkUpdate( $hash, "pulseTimePerDay",  $pulseTimePerDay );
+      readingsBulkUpdate( $hash, "pulseTimeOverall", $pulseTimeOverall );
 
-    readingsBulkUpdate( $hash, "pulseTimePerDay",  $pulseTimePerDay );
-    readingsBulkUpdate( $hash, "pulseTimeOverall", $pulseTimeOverall );
+      readingsBulkUpdate( $hash, "pauseTimeIncrement", $pauseTimeIncrement );
+      readingsBulkUpdate( $hash, "pauseTimeEdge",      $pauseTimeEdge );
 
-    readingsBulkUpdate( $hash, "pauseTimeIncrement", $pauseTimeIncrement );
-    readingsBulkUpdate( $hash, "pauseTimeEdge",      $pauseTimeEdge );
-
-    readingsBulkUpdate( $hash, "pauseTimePerDay",  $pauseTimePerDay );
-    readingsBulkUpdate( $hash, "pauseTimeOverall", $pauseTimeOverall );
-
-    readingsBulkUpdate( $hash, "value", $value );
-    readingsBulkUpdate( $hash, 'state', $state );
+      readingsBulkUpdate( $hash, "pauseTimePerDay",  $pauseTimePerDay );
+      readingsBulkUpdate( $hash, "pauseTimeOverall", $pauseTimeOverall );
+    }
+    readingsBulkUpdate( $hash, "value",       $value );
+    readingsBulkUpdate( $hash, 'state',       $state );
     readingsBulkUpdate( $hash, 'tickUpdated', $tickUpdated );
     readingsEndUpdate( $hash, 1 );
 
@@ -792,182 +797,215 @@ sub HourCounter_Run($)
 =pod
 =begin html
 
-<a name="HourCounter"></a>
-<h3>HourCounter</h3>
-<ul>
-  <a name="HourCounterdefine"></a>
-  <b>Define</b>
-  <ul>
-    <br/>
-    <code>define &lt;name&gt; HourCounter &lt;pattern_for_ON&gt; [&lt;pattern_for_OFF&gt;] </code>
-    <br/>
-    <br/>
-    Hourcounter can detect both the activiy-time and the inactivity-time of a property.<br/>
-    The "pattern_for_ON" identifies the events, that signal the activity of the desired property.<br/>
-    The "pattern_for_OFF" identifies the events, that signal the inactivity of the desired property.<br/>
-    <br/>
-    If "pattern_for_OFF" is not defined, any matching event of "patter_for_ON" will be counted.<br/> 
-    Otherwise only the rising edges of "pattern_for_ON" will be counted.<br/>
-    This means a "pattern_for_OFF"-event must be detected before a "pattern_for_ON"-event is accepted. <br/>
-    <br/>
-    "pattern_for_ON" and "pattern_for_OFF" must be formed using the following structure:<br/>
-    <br/>
-    <code>device:[regexp]</code>
-    <br/>
-    <br/>
-    The forming-rules are the same as for the notify-command.<br/>
-    <br/>
-    <b>Example:</b><br/>
-    <br/>
-    <ul>
-      <code>define BurnerCounter HourCounter SHUTTER_TEST:on SHUTTER_TEST:off</code>
-    </ul>
-  </ul>
-  <br>
+  <div id="includedContent">
+    <a name="HourCounter" id="HourCounter"></a>
 
-  <a name="HourCounterset"></a>
-  <b>Set-Commands</b> 
-  <ul>
-        <br/>
-	  <code>set &lt;name&gt; calc</code>
-	 <br/><br/>
-	 <ul>
-           starts the calculation of pulse/pause-time.<br/>
-      </ul><br/>
-      
-      <br/>
-	  <code>set &lt;name&gt; clear</code>
-	 <br/><br/>
-	 <ul>
-           clears the readings countsPerDay, countsOverall,pauseTimeIncrement, pauseTimePerDay, pauseTimeOverall,
-           pulseTimeIncrement, pulseTimePerDay, pulseTimeOverall by setting to 0.<br/>
-           The reading clearDate is set to the current Date/Time.
-      </ul><br/>
+    <h3>HourCounter</h3>
 
-      <br/>
-	  <code>set &lt;name&gt; countsOverall &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading countsOverall to the given value.This is the total-counter.</ul><br/>
+    <div style="margin-left: 2em">
+      <a name="HourCounterdefine" id="HourCounterdefine"></a> <b>Define</b>
 
-      <br/>
-	  <code>set &lt;name&gt; countsPerDay &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading countsPerDay to the given value. This reading will automatically be set to 0, after change of day.</ul><br/>
-	 
-      <br/>
-	  <code>set &lt;name&gt; pauseTimeIncrement &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading pauseTimeIncrement to the given value.<br/> 
-	 This reading in seconds is automatically set after a rising edge.</ul><br/>
-	 
-      <br/>
-	  <code>set &lt;name&gt; pauseTimeEdge &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading pauseTimeEdge to the given value.<br/> 
-	 This reading in seconds is automatically set after a rising edge.</ul><br/>	 
-	 
-      <br/>
-	  <code>set &lt;name&gt; pauseTimeOverall &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading pauseTimeOverall to the given value.<br/>
-	  This reading in seconds is automatically adjusted after a change of pauseTimeIncrement.</ul><br/>
+      <div style="margin-left: 2em">
+        <br />
+        <code>define &lt;name&gt; HourCounter &lt;pattern_for_ON&gt; [&lt;pattern_for_OFF&gt;]</code><br />
+        <br />
+        Hourcounter can detect both the activiy-time and the inactivity-time of a property.<br />
+        The "pattern_for_ON" identifies the events, that signal the activity of the desired property.<br />
+        The "pattern_for_OFF" identifies the events, that signal the inactivity of the desired property.<br />
+        <br />
+        If "pattern_for_OFF" is not defined, any matching event of "patter_for_ON" will be counted.<br />
+        Otherwise only the rising edges of "pattern_for_ON" will be counted.<br />
+        This means a "pattern_for_OFF"-event must be detected before a "pattern_for_ON"-event is accepted.<br />
+        <br />
+        "pattern_for_ON" and "pattern_for_OFF" must be formed using the following structure:<br />
+        <br />
+        <code>device:[regexp]</code><br />
+        <br />
+        The forming-rules are the same as for the notify-command.<br />
+        <br />
+        <b>Example:</b><br />
+        <br />
 
-      <br/>
-	  <code>set &lt;name&gt; pauseTimePerDay &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading pauseTimePerDay to the given value.<br/>
-	   This reading in seconds is automatically adjusted after a change of pauseTimeIncrement and set to 0 after change of day.</ul><br/>
-     
-      <br/>
-	  <code>set &lt;name&gt; pulseTimeIncrement &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading pulseTimeIncrement to the given value.<br/>
-	 This reading in seconds is automatically set after a falling edge of the property.</ul><br/>
-	 
-      <br/>
-	  <code>set &lt;name&gt; pulseTimeEdge &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading pulseTimeEdge to the given value.<br/> 
-	 This reading in seconds is automatically set after a rising edge.</ul><br/>	
-      <br/>
-      
-	  <code>set &lt;name&gt; pulseTimeOverall &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading pulseTimeOverall to the given value.<br/>
-	 This reading in seconds is automatically adjusted after a change of pulseTimeIncrement.</ul><br/>
+        <div style="margin-left: 2em">
+          <code>define BurnerCounter HourCounter SHUTTER_TEST:on SHUTTER_TEST:off</code>
+        </div>
+      </div><br />
+      <a name="HourCounterset" id="HourCounterset"></a> <b>Set-Commands</b>
 
-      <br/>
-	  <code>set &lt;name&gt; pulseTimePerDay &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Sets the reading pulseTimePerDay to the given value.<br/>
-	 This reading in seconds is automatically adjusted after a change of pulseTimeIncrement and set to 0 after change of day.</ul><br/>
-	 
-      <br/>
-	  <code>set &lt;name&gt; forceHourChange </code>
-	 <br/><br/>
-	 <ul>This modifies the reading tickHour, which is automatically modified after change of hour.</ul><br/>
-	 
-      <br/>
-	  <code>set &lt;name&gt; forceDayChange </code>
-	 <br/><br/>
-	 <ul>This modifies the reading tickDay, which is automatically modified after change of day.</ul><br/>
+      <div style="margin-left: 2em">
+        <br />
+        <code>set &lt;name&gt; calc</code><br />
+        <br />
 
-      <br/>
-	  <code>set &lt;name&gt; forceWeekChange </code>
-	 <br/><br/>
-	 <ul>This modifies the reading tickWeek, which is automatically modified after change of week.</ul><br/>
-	 
-      <br/>
-	  <code>set &lt;name&gt; forceMonthChange </code>
-	 <br/><br/>
-	 <ul>This modifies the reading tickMonth, which is automatically modified after change of month.</ul><br/>
-     
-      <br/>
-	  <code>set &lt;name&gt; forceYearChange </code>
-	 <br/><br/>
-	 <ul>This modifies the reading tickYear, which is automatically modified after change of year.</ul><br/>
-	 
-      <br/>
-	  <code>set &lt;name&gt; app.* &lt;value&gt; </code>
-	 <br/><br/>
-	 <ul>Any reading with the leading term "app", can be modified.<br/
-	 This can be useful for user-readings.
-	 </ul><br/>
-     
-  </ul>
-  <br/>
-  
-  <a name="HourCounterget"></a>
-  <b>Get-Commands</b><br/>
-  <ul>
-     <br/>
-     <code>get &lt;name&gt; version</code>
-     <br/><br/>
-     <ul>Get the current version of the module.</ul>
-     <br/>
-  </ul>
-  <br/>
+        <div style="margin-left: 2em">
+          starts the calculation of pulse/pause-time.<br />
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; clear</code><br />
+        <br />
 
-  <a name="HourCounterattr"></a>
-  <b>Attributes</b><br/><br/>
-  <ul>
-     <li><b>interval</b> <br/> the update interval for pulse/pause-time in minutes [default 60]</li>
-     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-  </ul>
-  <br/>
-   
-  <b>Additional information</b><br/><br/>
-  <ul>
-	<li><a href="http://forum.fhem.de/index.php/topic,12216.0.html">Discussion in FHEM forum</a></li><br/>
-	<li><a href="http://www.fhemwiki.de/wiki/HourCounter">WIKI information in FHEM Wiki</a></li><br/>
-	<li>
-	     The file 99_UtilsHourCounter.pm is a reference implementation for user defined extensions.<br/> 
-	     It shows how to create sum values for hours,days, weeks, months and years.<br/>
-	     This file is located in the sub-folder contrib. For further information take a look to FHEM Wiki.<br/>
-	</li>
-  </ul>
-</ul>
+        <div style="margin-left: 2em">
+          clears the readings countsPerDay, countsOverall,pauseTimeIncrement, pauseTimePerDay, pauseTimeOverall,
+          pulseTimeIncrement, pulseTimePerDay, pulseTimeOverall by setting to 0.<br />
+          The reading clearDate is set to the current Date/Time.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; countsOverall &lt;value&gt;</code><br />
+        <br />
 
+        <div style="margin-left: 2em">
+          Sets the reading countsOverall to the given value.This is the total-counter.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; countsPerDay &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading countsPerDay to the given value. This reading will automatically be set to 0, after change
+          of day.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; pauseTimeIncrement &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading pauseTimeIncrement to the given value.<br />
+          This reading in seconds is automatically set after a rising edge.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; pauseTimeEdge &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading pauseTimeEdge to the given value.<br />
+          This reading in seconds is automatically set after a rising edge.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; pauseTimeOverall &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading pauseTimeOverall to the given value.<br />
+          This reading in seconds is automatically adjusted after a change of pauseTimeIncrement.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; pauseTimePerDay &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading pauseTimePerDay to the given value.<br />
+          This reading in seconds is automatically adjusted after a change of pauseTimeIncrement and set to 0 after
+          change of day.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; pulseTimeIncrement &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading pulseTimeIncrement to the given value.<br />
+          This reading in seconds is automatically set after a falling edge of the property.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; pulseTimeEdge &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading pulseTimeEdge to the given value.<br />
+          This reading in seconds is automatically set after a rising edge.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; pulseTimeOverall &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading pulseTimeOverall to the given value.<br />
+          This reading in seconds is automatically adjusted after a change of pulseTimeIncrement.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; pulseTimePerDay &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Sets the reading pulseTimePerDay to the given value.<br />
+          This reading in seconds is automatically adjusted after a change of pulseTimeIncrement and set to 0 after
+          change of day.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; forceHourChange</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          This modifies the reading tickHour, which is automatically modified after change of hour.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; forceDayChange</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          This modifies the reading tickDay, which is automatically modified after change of day.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; forceWeekChange</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          This modifies the reading tickWeek, which is automatically modified after change of week.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; forceMonthChange</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          This modifies the reading tickMonth, which is automatically modified after change of month.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; forceYearChange</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          This modifies the reading tickYear, which is automatically modified after change of year.
+        </div><br />
+        <br />
+        <code>set &lt;name&gt; app.* &lt;value&gt;</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Any reading with the leading term "app", can be modified.<br />
+          This can be useful for user-readings.
+        </div><br />
+      </div><br />
+      <a name="HourCounterget" id="HourCounterget"></a> <b>Get-Commands</b><br />
+
+      <div style="margin-left: 2em">
+        <br />
+        <code>get &lt;name&gt; version</code><br />
+        <br />
+
+        <div style="margin-left: 2em">
+          Get the current version of the module.
+        </div><br />
+      </div><br />
+      <a name="HourCounterattr" id="HourCounterattr"></a> <b>Attributes</b>
+      <br />
+
+      <ul>
+        <li><p><b>interval</b><br />
+        the update interval for pulse/pause-time in minutes [default 60]</p></li>
+
+        <li><p><a href="#readingFnAttributes">readingFnAttributes</a></p></li>
+      </ul>
+      <b>Additional information</b>
+      <br />
+
+      <ul>
+        <li><p><a href="http://forum.fhem.de/index.php/topic,12216.0.html">Discussion in FHEM forum</a></p></li>
+        <li><p><a href="http://www.fhemwiki.de/wiki/HourCounter">WIKI information in FHEM Wiki</a></p></li>
+        <li><p>The file 99_UtilsHourCounter.pm is a reference implementation for user defined extensions.<br />
+        It shows how to create sum values for hours,days, weeks, months and years.<br />
+        This file is located in the sub-folder contrib. For further information take a look to FHEM Wiki.</p></li>
+      </ul>
+    </div>
+  </div>
 
 =end html
 =cut
