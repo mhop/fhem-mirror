@@ -19,9 +19,9 @@ use SetExtensions;
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my %hueModels = (
-  LCT001 => {name => 'Hue Bulb'                 ,type => 'Extended Color light'   ,subType => 'colordimmer',},
-  LCT002 => {name => 'Hue Bulb BR30'            ,type => 'Extended Color light'   ,subType => 'colordimmer',},
-  LCT003 => {name => 'Hue Bulb GU10'            ,type => 'Extended Color light'   ,subType => 'colordimmer',},
+  LCT001 => {name => 'Hue Bulb'                 ,type => 'Extended Color light'   ,subType => 'extcolordimmer',},
+  LCT002 => {name => 'Hue Bulb BR30'            ,type => 'Extended Color light'   ,subType => 'extcolordimmer',},
+  LCT003 => {name => 'Hue Bulb GU10'            ,type => 'Extended Color light'   ,subType => 'extcolordimmer',},
   LLC001 => {name => 'Living Colors G2'         ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC005 => {name => 'Living Colors Bloom'      ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC006 => {name => 'Living Colors Gen3 Iris'  ,type => 'Color Light'            ,subType => 'colordimmer',},
@@ -30,12 +30,15 @@ my %hueModels = (
   LLC011 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC012 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC013 => {name => 'Disney Living Colors'     ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLM001 => {name => 'Color Light Module'       ,type => 'Extended Color Light'   ,subType => 'colordimmer',},
+  LLM001 => {name => 'Color Light Module'       ,type => 'Extended Color Light'   ,subType => 'extcolordimmer',},
   LST001 => {name => 'Hue LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
   LWB001 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWB003 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWB004 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
+
+ 'PAR16 50 TW'      => {name => 'Lightify PAR16 50 TW'      ,type => 'Color Temperature Light'  ,subType => 'ctdimmer',},
+ 'Classic A60 RGBW' => {name => 'Lightify Classic A60 RGBW' ,type => 'Extended Color Light'  ,subType => 'extcolordimmer',},
 );
 
 my %dim_values = (
@@ -74,7 +77,7 @@ sub HUEDevice_Initialize($)
                       "realtimePicker:1 ".
                       "color-icons:1,2 ".
                       "model:".join(",", sort keys %hueModels)." ".
-                      "subType:colordimmer,dimmer,switch ".
+                      "subType:extcolordimmer,colordimmer,ctdimmer,dimmer,switch ".
                       $readingFnAttributes;
 
   #$hash->{FW_summaryFn} = "HUEDevice_summaryFn";
@@ -200,10 +203,14 @@ sub HUEDevice_Define($$)
     $hash->{helper}{RGB} = '';
 
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+
+    my $icon_path = AttrVal("WEB", "iconPath", "default:fhemSVG:openautomation" );
+    $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
+
   } else {
     $hash->{DEF} = "group $id $args[3]";
-    $attr{$name}{webCmd} = 'on:off' if( !defined( $attr{$name}{webCmd} ) );
     $attr{$name}{delayedUpdate} = 1 if( !defined( $attr{$name}{delayedUpdate} ) );
+
   }
 
   RemoveInternalTimer($hash);
@@ -452,16 +459,22 @@ HUEDevice_Set($@)
     return undef;
   }
 
+  my $subtype = AttrVal($name, "subType", "extcolordimmer");
+
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
-  $list .= " pct:slider,0,1,100 bri:slider,0,1,254 alert:none,select,lselect" if( AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
-  $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{group} && AttrVal($name, "subType", "colordimmer") =~ m/dimmer/ );
-  #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
+  $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( $subtype =~ m/dimmer/ );
+  $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{group} && $subtype =~ m/dimmer/ );
   if( defined($FW_webArgs{detail}) ) {
-    $list .= " rgb color:slider,2000,1,6500 ct" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+    $list .= " rgb" if( $subtype =~ m/color/ );
+    $list .= " color:slider,2000,1,6500 ct" if( $subtype =~ m/ct|ext/ );
   } else {
-    $list .= " rgb:colorpicker,RGB color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+    $list .= " rgb:colorpicker,RGB" if( $subtype =~ m/color/ );
+    $list .= " color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( $subtype =~ m/ct|ext/ );
   }
-  $list .= " hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+  $list .= " hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( $subtype =~ m/color/ );
+  $list .= " alert:none,select,lselect";
+
+  #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( $subtype =~ m/dimmer/ );
 
   return SetExtensions($hash, $list, $name, @aa);
 }
@@ -730,10 +743,14 @@ HUEDevice_Parse($$)
   $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
   if( !defined($attr{$name}{webCmd}) && defined($attr{$name}{subType}) ) {
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $attr{$name}{subType} eq "colordimmer" );
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:toggle:on:off' if( AttrVal($name, "model", "") eq "LCT001" );
-    $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $attr{$name}{subType} eq "dimmer" );
-    $attr{$name}{webCmd} = 'toggle:on:off' if( $attr{$name}{subType} eq "switch" || $hash->{helper}->{group} );
+    my $subtype = $attr{$name}{subType};
+
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "extcolordimmer" );
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $subtype eq "colordimmer" );
+    $attr{$name}{webCmd} = 'ct:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "ctdimmer" );
+    $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $subtype eq "dimmer" );
+    $attr{$name}{webCmd} = 'toggle:on:off' if( $subtype eq "switch" );
+    $attr{$name}{webCmd} = 'on:off' if( $hash->{helper}->{group} );
   }
 
   readingsBeginUpdate($hash);
@@ -937,14 +954,18 @@ HUEDevice_Parse($$)
       1 -> use lamp color as icon color and 100% shape as icon shape<br>
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>subType<br>
-      colordimmer, dimmer or switch, default is initialized according to device model.</li>
+      extcolordimmer -> device has rgb and color temperatur control<br>
+      colordimmer -> device has rgb controll<br>
+      ctdimmer -> device has color temperature control<br>
+      dimmer -> device has brightnes controll<br>
+      switch -> device has on/off controll<br></li>
     <li>delayedUpdate<br>
-      1 -> the update of the device status after a set command will be delayed for 1 second. usefull if multiple devices will ne switched.
+      1 -> the update of the device status after a set command will be delayed for 1 second. usefull if multiple devices will be switched.
 </li>
     <li>devStateIcon<br>
       will be initialized to <code>{(HUEDevice_devStateIcon($name),"toggle")}</code> to show device color as default in room overview.</li>
     <li>webCmd<br>
-      will be initialized to <code>rgb:rgb FF0000:rgb C8FF12:rgb 0000FF:toggle:on:off</code> to show colorpicker and 3 color preset buttons in room overview.</li>
+      will be initialized to a device specific value according to subType.</li>
   </ul>
 
 </ul><br>
