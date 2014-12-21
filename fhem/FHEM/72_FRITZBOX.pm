@@ -1728,9 +1728,9 @@ sub FRITZBOX_fritztris($)
 <div  style="width:800px"> 
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as
-   signaling devices. The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!).
+   signaling devices. MP3 files can be played as ring tone or when calling phones.
    <br/><br/>
-   If FHEM does not run on a Fritz!Box, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
+   The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
    <br/><br/>
    Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -1802,13 +1802,10 @@ sub FRITZBOX_fritztris($)
          Switches the guest WLAN on or off.
       </li><br>
 
-      <li><code>set &lt;name&gt; musicOnHold &lt;fullFilePath&gt;</code>
+      <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3FileIncludingPath&gt;]</code>
          <br>
-         <i>Not implemented yet.</i> Uploads the file fullFilePath as "Music on Hold". Only mp3 or the MOH-format is allowed.
+         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. The music on hold has a maximal length of 7 s. It is played during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 7 s.
          <br>
-         The file has to be placed on the file system of the Fritz!Box.
-         <br>
-         The upload takes about one minute before the tone is available.
       </li><br>
 
       <li><code>set &lt;name&gt; ring &lt;internalNumbers&gt; [duration [ringTone]] [msg:yourMessage]</code>
@@ -1974,9 +1971,9 @@ sub FRITZBOX_fritztris($)
 (<a href="commandref.html#FRITZBOX">en</a> | de)
 <div  style="width:800px"> 
 <ul>
-   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!).
+   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
    <br/><br/>
-   Wenn FHEM nicht auf einer Fritz!Box l&auml;uft, versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
+   Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
    <br/><br/>
    Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -2026,11 +2023,9 @@ sub FRITZBOX_fritztris($)
          Erzeugt eine Datei welche das Telnet-Passwort enth&auml;lt. Der Dateiname entspricht demjenigen, der f&uuml;r den Telnetzugriff genutzt wird.
       </li><br>
 
-      <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
+      <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;MP3DateiInklusivePfad&gt;</code>
          <br>
-         L&auml;dt die Datei fullFilePath als Klingelton auf das angegebene Telefon. Nur das mp3- oder G722-Format ist erlaubt.
-         <br>
-         Die Datei muss im Dateisystem der Fritzbox liegen.
+         L&auml;dt die MP3-Datei als Klingelton auf das angegebene Telefon. Die Datei muss im Dateisystem der Fritzbox liegen.
          <br>
          Das Hochladen dauert etwa eine Minute bis der Klingelton verf&uuml,gbar ist.
       </li><br>
@@ -2048,7 +2043,7 @@ sub FRITZBOX_fritztris($)
          Schaltet das G&auml;ste-WLAN an oder aus.
       </li><br>
 
-      <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;fullFilePath&gt;]</code>
+      <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3DateiInklusivePfad&gt;]</code>
          <br>
          &Auml;ndert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden. Die Wartemusik hat eine maximale L&auml;nge von 7s. Sie wird w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 7s-Nachrichten vorgespielt werden.
          <br>
