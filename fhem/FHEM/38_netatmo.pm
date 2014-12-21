@@ -190,6 +190,8 @@ netatmo_Notify($$)
   netatmo_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
   netatmo_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
   netatmo_initDevice($hash) if( $hash->{SUBTYPE} eq "MODULE" );
+
+  return undef;
 }
 
 sub

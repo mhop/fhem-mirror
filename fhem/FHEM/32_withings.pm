@@ -137,6 +137,8 @@ withings_Notify($$)
   withings_initUser($hash) if( $hash->{SUBTYPE} eq "USER" );
   withings_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );
   withings_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
+
+  return undef;
 }
 
 sub

@@ -120,6 +120,8 @@ mailcheck_Notify($$)
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
   mailcheck_Connect($hash);
+
+  return undef;
 }
 
 sub

@@ -108,6 +108,8 @@ harmony_Notify($$)
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
   harmony_connect($hash) if( !defined($hash->{id}) );
+
+  return undef;
 }
 
 sub
