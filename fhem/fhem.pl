@@ -3671,7 +3671,6 @@ readingsBulkUpdate($$$@)
     my $eour = $attreour && grep($reading =~ m/^$_$/, @{$attreour});
 
     # check if threshold is given
-    my $threshold_reached = 1;
     if( $eocr
         && $eocrv[0] =~ m/.*:(.*)/ ) {
       my $threshold = $1;
@@ -3681,11 +3680,10 @@ readingsBulkUpdate($$$@)
       if( !defined($last_value) ) {
         $hash->{".attreocr-threshold$reading"} = $value;
       } elsif( abs($value-$last_value) < $threshold ) {
-        $threshold_reached = 0;
+        $eocr = 0;
       } else {
         $hash->{".attreocr-threshold$reading"} = $value;
       }
-      #Log 1, "EOCR:$eocr value: $value last:$last_value  threshold: $1 reached: $threshold_reached";
     }
 
     # determine if an event should be created:
@@ -3696,7 +3694,7 @@ readingsBulkUpdate($$$@)
     # ...and the change greater then the threshold
     $changed= !($attreocr || $attreour)
               || $eour  
-              || ($eocr && ($value ne $readings->{VAL}) && $threshold_reached);
+              || ($eocr && ($value ne $readings->{VAL}));
     #Log 1, "EOCR:$eocr EOUR:$eour CHANGED:$changed";
 
     my @v = grep { my $l = $_;

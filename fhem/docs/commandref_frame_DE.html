@@ -476,9 +476,7 @@ Ger&auml;t dokumentiert.
     Wenn nicht gesetzt, erzeugt jede Ver&auml;nderung eines "readings" ein
     Ereignis, welches z.B. von <a href="#notify">notify</a> oder<a
     href="FileLog"> FileLog</a> ber&uuml;cksichtigt wird. Wenn gesetzt erzeugen
-    nur Aktualisierungen der eingetragenen "readings" ein Ereignis. Wenn hinter dem
-    Namen eines "readings" ein optionaler Schwellwert &uuml;ber [:threshold] angegeben ist
-    wird das event nur getriggert wenn die &Auml;nderungen >= threshold ist.
+    nur Aktualisierungen der eingetragenen "readings" ein Ereignis.
     </li>
 
     <a name="event-on-change-reading"></a>
@@ -486,7 +484,13 @@ Ger&auml;t dokumentiert.
     Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
     "readings".  Wenn gesetzt, erzeugen nur Ver&auml;nderungen der gelisteten
     "readings" ein Ereignis. Wenn die aktualiserten Werte der gelisteten
-    "readings" identisch sind, wird kein Ereignis generiert.</li>
+    "readings" identisch sind, wird kein Ereignis generiert.<br>
+
+    Wenn hinter dem Namen eines "readings" eine :Schwelle angegeben ist, wird
+    das Event nur getriggert wenn die &Auml;nderung gr&ouml;sser als diese
+    Schwelle ist.
+    </li>
+
 
     Die unterschiedlichen Bedeutungen von event-on-update-reading und
     event-on-change-reading sind folgende:
