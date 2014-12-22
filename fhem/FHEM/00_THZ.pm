@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2014
-my $thzversion = "0.116";
+my $thzversion = "0.117";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -507,7 +507,6 @@ sub THZ_Set($@){
   my ($hash, @a) = @_;
   my $dev = $hash->{DeviceName};
   my $name = $hash->{NAME};
-
   return "\"set $name\" needs at least two parameters: <device-parameter> and <value-to-be-modified>" if(@a < 2);
   my $cmd = $a[1];
   my $arg = $a[2];
@@ -519,6 +518,10 @@ sub THZ_Set($@){
   my $cmdHex2 = $cmdhash->{cmd2};
   my $argMax = $cmdhash->{argMax};
   my $argMin = $cmdhash->{argMin};
+  
+  #next line disables write back for old firmware if the attribute 206 is set.
+  return "set not allowed for old firmwares" if((AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06"));
+  
   # check the parameter range
   given ($cmdhash->{type}) {
     when (["7prog", "8party"]) {          
@@ -964,10 +967,10 @@ my %parsinghash = (
 	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
 	      ],
   "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
-	      [" fault0CODE: ",		8, 2, "hex", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhex", 100],
-	      [" fault1CODE: ",		20, 2, "hex", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhex", 100],
-	      [" fault2CODE: ",		32, 2, "hex", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhex", 100],
-	      [" fault3CODE: ",		44, 2, "hex", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhex", 100]
+	      [" fault0CODE: ",		8, 2, "hex", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhexdate", 100],
+	      [" fault1CODE: ",		20, 2, "hex", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhexdate", 100],
+	      [" fault2CODE: ",		32, 2, "hex", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhexdate", 100],
+	      [" fault3CODE: ",		44, 2, "hex", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhexdate", 100]
 	      ],
   "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
 	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
@@ -1000,7 +1003,7 @@ my %parsinghash = (
 	      [" boosterStage3: ",	46, 1, "bit0", 1],  	[" boosterStage2: ",		46, 1, "bit1", 1],
 	      [" boosterStage1: ",	46, 1, "bit2", 1],  	[" highPressureSensor: ",	49, 1, "nbit0", 1],
 	      [" lowPressureSensor: ",	49, 1, "nbit1", 1],  	[" evaporatorIceMonitor: ",	49, 1, "bit2", 1],
-	      [" signalAnode: ",	49, 1, "bit3", 1],  	[" rvuRelease: ",		48, 1, "bit0", 1],
+	      [" signalAnode: ",	49, 1, "bit3", 1],  	[" evuRelease: ",		48, 1, "bit0", 1],
 	      [" ovenFireplace: ",	48, 1, "bit1", 1],  	[" STB: ",			48, 1, "bit2", 1],
 	      [" outputVentilatorPower: ",	50, 4, "hex", 10],  	[" inputVentilatorPower: ",	54, 4, "hex", 10],	[" mainVentilatorPower: ",	58, 4, "hex", 10],
 	      [" outputVentilatorSpeed: ",	62, 4, "hex", 1],	[" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
@@ -1047,10 +1050,10 @@ my %parsinghash206 = (
 	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
 	      ],
   "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
-	      [" fault0CODE: ",		8, 2, "hex", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhex", 100],
-	      [" fault1CODE: ",		20, 2, "hex", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhex", 100],
-	      [" fault2CODE: ",		32, 2, "hex", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhex", 100],
-	      [" fault3CODE: ",		44, 2, "hex", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhex", 100]
+	      [" fault0CODE: ",		8, 4, "hex", 1],	[" fault0TIME: ",	12, 4, "hex2time", 1],  [" fault0DATE: ",	16, 4, "hexdate", 100],
+	      [" fault1CODE: ",		20, 4, "hex", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 100],
+	      [" fault2CODE: ",		32, 4, "hex", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 100],
+	      [" fault3CODE: ",		44, 4, "hex", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 100]
 	      ],
   "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
 	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
@@ -1072,7 +1075,7 @@ my %parsinghash206 = (
 	      [" heatTemp: ", 		20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
 	      [" seasonMode: ",		30, 2, "somwinmode", 1],[" opMode: ",		36, 2, "opmodehc", 1]
 	     ],
-  "FBglob" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flewTemp: ",		12, 4, "hex2int", 10],
+  "FBglob" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
 	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
 	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
 	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
@@ -1083,7 +1086,7 @@ my %parsinghash206 = (
 	      [" boosterStage3: ",	46, 1, "n.a.", 1],  	[" boosterStage2: ",		46, 1, "n.a.", 1],
 	      [" boosterStage1: ",	46, 1, "n.a.", 1],  	[" highPressureSensor: ",	49, 1, "n.a.", 1],
 	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  	[" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
-	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" rvuRelease: ",		48, 1, "n.a.", 1],
+	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" evuRelease: ",		48, 1, "n.a.", 1],
 	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	[" STB: ",			48, 1, "n.a.", 1],
 	      [" outputVentilatorPower: ",	48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
 	      [" outputVentilatorSpeed: ",	56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
@@ -1121,9 +1124,8 @@ my %parsinghash206 = (
   
   my ($hash,$message) = @_;
   #$message= "A5FB00C50067010700DC011101B2000000E700AD00F3001C000000CE000000000063000000000000000000";
-  #$message= "16FB00C5001901070103012101A2000000E3008A00FE001C000000C900000000001B00000000000000";
-  #$message= "60FB00C50019013A0117031301A9000000E2FF98013D1118000099C800001200001F000000000000000100";
   #$message=  "C3FB00C5006900EB00DD00F501AF000000E900B400E70004373A00CE1F1D00000065000000000000000000";
+  #$message= "46D101010017072F0322000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
   my $length = length($message);
   Log3 $hash->{NAME}, 5, "Message length: $length";
@@ -1147,6 +1149,7 @@ my %parsinghash206 = (
   }
   $parsingrule = $parsinghash{$msgtype} if(defined($msgtype));
   $parsingrule = $parsinghash206{$msgtype} if((defined($msgtype)) and (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06"));
+  
   my $ParsedMsg = $message;
   if(defined($parsingrule)) {
     $ParsedMsg = "";
@@ -1167,8 +1170,10 @@ my %parsinghash206 = (
         when ("hex")		{$value= hex($value);}
 	when ("year")		{$value= hex($value)+2000;}
         when ("hex2int")	{$value= hex2int($value);}
-	when ("turnhex")	{$value= hex(substr($value, 2,2) . substr($value, 0,2));}
+	when ("turnhexdate")	{$value= hex(substr($value, 2,2) . substr($value, 0,2));}
+	when ("hexdate")	{$value= hex(substr($value, 0,2) . substr($value, 2,2));}
 	when ("turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
+	when ("hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
 	when ("opmode")		{$value= $OpMode{hex($value)};}
 	when ("opmodehc")	{$value= $OpModeHC{hex($value)};}
 	when ("somwinmode")	{$value= $SomWinMode{($value)};}
@@ -1474,8 +1479,6 @@ return ($FW_RETTYPE, $ret);
    Tested on a THZ303/Sol (with serial speed 57600/115200@USB) and a THZ403 (with serial speed 115200) with the same Firmware 4.39. <br>
    Tested on a LWZ404 (with serial speed 115200) with Firmware 5.39. <br>
    Tested on fritzbox, nas-qnap, raspi and macos.<br>
-   This module is not working if you have an older firmware; Nevertheless, "parsing" could be easily updated, because now the registers are well described.
-  https://answers.launchpad.net/heatpumpmonitor/+question/100347  <br>
    Implemented: read of status parameters and read/write of configuration parameters.
    A complete description can be found in the 00_THZ wiki http://www.fhemwiki.de/wiki/Tecalor_THZ_Heatpump
   <br><br>
@@ -1509,7 +1512,14 @@ return ($FW_RETTYPE, $ret);
       define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
       </code></ul>
      <br> 
-   If the attributes interval_allFB and interval_history are not defined (or 0), their internal polling is disabled.  
+   If the attributes interval_allFB and interval_history are not defined (or 0), their internal polling is disabled.
+   <br>
+   This module is starting to support (read-only experimental mode) older firmware 2.06; the following attribute adapts decoding and blocks any write back to the heatpump  <br>
+    <br>
+      <ul><code>
+      attr Mythz firmware 2.06 <br>
+      </code></ul>
+     <br>
   </ul>
   <br>
 </ul>
