@@ -48,6 +48,7 @@ sub FRITZBOX_Exec($$);
 sub FRITZBOX_Send_Mail($@);
 sub FRITZBOX_SetMOH($@);
 sub FRITZBOX_Start_Radio($@);
+use URI::Escape;
 
 our $telnet;
 
@@ -272,7 +273,7 @@ FRITZBOX_Set($$@)
    {
       if ( int @val == 2 && $val[0] =~ /^(1|2|3)$/ && $val[1] =~ /^(on|off)$/ ) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -284,14 +285,14 @@ FRITZBOX_Set($$@)
    } elsif ( lc $cmd eq 'convertmoh') {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return FRITZBOX_ConvertMOH $hash, @val;
       }
 
    } elsif ( lc $cmd eq 'convertringtone') {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return FRITZBOX_ConvertRingTone $hash, @val;
       }
       
@@ -310,14 +311,14 @@ FRITZBOX_Set($$@)
    } elsif ( lc $cmd eq 'customerringtone') {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return FRITZBOX_SetCustomerRingTone $hash, @val;
       }
       
    } elsif ( lc $cmd eq 'diversity') {
       if ( int @val == 2 && defined( $hash->{READINGS}{"diversity".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -329,7 +330,7 @@ FRITZBOX_Set($$@)
    } elsif ( lc $cmd eq 'guestwlan') {
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          my $state = $val[0];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -343,7 +344,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          $resultStr = FRITZBOX_SetMOH $hash, @val;
          unless ($resultStr)
          {
@@ -359,14 +360,14 @@ FRITZBOX_Set($$@)
    {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          FRITZBOX_Ring_Start $hash, @val;
          return undef;
       }
    }
    elsif ( lc $cmd eq 'sendmail')
    {
-      Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+      Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
       FRITZBOX_Send_Mail $hash, @val;
       return undef;
    }
@@ -374,7 +375,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val > 0) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return FRITZBOX_Start_Radio $hash, @val;
       }
    }
@@ -382,7 +383,7 @@ FRITZBOX_Set($$@)
    {
       if ( int @val == 2 && defined( $hash->{READINGS}{"tam".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -393,7 +394,7 @@ FRITZBOX_Set($$@)
    }
    elsif( lc $cmd eq 'update' ) 
    {
-      Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+      Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
       $hash->{fhem}{LOCAL}=1;
       FRITZBOX_Readout_Start($hash);
       $hash->{fhem}{LOCAL}=0;
@@ -403,7 +404,7 @@ FRITZBOX_Set($$@)
    {
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
-         Log3 $name, 3, "FRITZBOX $name: set $cmd ".join(" ", @val);
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          my $state = $val[0];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
@@ -1128,6 +1129,9 @@ sub FRITZBOX_SetMOH($@)
    my @cmdArray;
    my $result;
    my $name = $hash->{NAME};
+   my $isTTS = 0;
+   my $uploadFile = '/var/tmp/moh_upload';
+   my $mohFile = '/var/tmp/fx_moh';
 
    if (lc $type eq lc $mohtype[0] || $type eq "0")
    {
@@ -1142,35 +1146,41 @@ sub FRITZBOX_SetMOH($@)
    return "Error: Unvalid parameter '$type'" unless lc $type eq lc $mohtype[2] || $type eq "2";
 
 # Load customer MOH file
+
+   my $inFile = join " ", @file;
    my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
    $uploadDir .= "/"
       unless $uploadDir =~ /\/$|^$/;
 
-   my $inFile = join " ", @file;
-   $inFile = $uploadDir.$inFile
-      unless $inFile =~ /^\//;
-   
-   return "Error: Please give a complete file path or define the attribute 'defaultUploadDir'"
-      unless $inFile =~ /^\//;
-   
-   return "Error: Only MP3 files can be used for 'music on hold'."
-      unless $inFile =~ /\.mp3$/i;
-   
+   if ($inFile !~ /^say:/i)
+   {
+      $inFile = $uploadDir.$inFile
+         unless $inFile =~ /^\//;
+      return "Error: Please give a complete file path or define the attribute 'defaultUploadDir'"
+         unless $inFile =~ /^\//;
+      return "Error: Only MP3 files can be used for 'music on hold'."
+         unless $inFile =~ /\.mp3$/i;
+   }
+
    $result = FRITZBOX_Open_Connection( $hash );
    return "$name|0|$result" 
       if $result;
 
-   my $uploadFile = '/var/tmp/moh_upload';
-   my $mohFile = '/var/tmp/fx_moh';
    push @cmdArray, '[ -f "'.$uploadFile.'" ] && rm "'.$uploadFile.'"';
    push @cmdArray, '[ -f "'.$mohFile.'" ] && rm "'.$mohFile.'"';
    
-   if ($inFile =~ /^(ftp|http):\/\//)
+   if ($inFile =~ /^say:/i)
+   {
+      FRITZBOX_Log $hash, 4, "Converting Text2Speech";
+      my $ttsText = $inFile;
+      $ttsText =~ s/^say:\s*//;
+      push @cmdArray, 'wget -U Mozilla -O "'.$uploadFile.'" "http://translate.google.com/translate_tts?tl=de&q='.uri_escape($ttsText).'"';
+   } 
+   elsif ($inFile =~ /^(ftp|http):\/\//)
    {
       push @cmdArray, 'wget -O "'.$uploadFile.'" "'.$inFile.'"';
    } else {
       push @cmdArray, 'cp "'.$inFile.'" "'.$uploadFile.'"';
-         
    }
    push @cmdArray, '[ -f "'.$uploadFile.'" ] && echo 1 || echo 0';
 # Execute command array
@@ -1802,9 +1812,9 @@ sub FRITZBOX_fritztris($)
          Switches the guest WLAN on or off.
       </li><br>
 
-      <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3FileIncludingPath&gt;]</code>
+      <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3FileIncludingPath|say:Text&gt;]</code>
          <br>
-         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. The music on hold has a maximal length of 7 s. It is played during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 7 s.
+         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has a maximal length of 7 s. It is played during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 7 s.
          <br>
       </li><br>
 
@@ -2035,7 +2045,7 @@ sub FRITZBOX_fritztris($)
          Schaltet die Rufumleitung (Nummer 1, 2 ...) an oder aus.
          Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden.
          <br>
-         Achtung! Die Fritz!Box erm&oouml;glicht auch eine Weiterleitung in Abh&auml;ngigkeit von der anrufenden Nummer. Diese Art der Weiterleitung kann hiermit nicht geschaltet werden. 
+         Achtung! Die Fritz!Box erm&ouml;glicht auch eine Weiterleitung in Abh&auml;ngigkeit von der anrufenden Nummer. Diese Art der Weiterleitung kann hiermit nicht geschaltet werden. 
       </li><br>
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
@@ -2043,9 +2053,10 @@ sub FRITZBOX_fritztris($)
          Schaltet das G&auml;ste-WLAN an oder aus.
       </li><br>
 
-      <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3DateiInklusivePfad&gt;]</code>
+      <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3DateiInklusivePfad|say:Text&gt;]</code>
          <br>
-         &Auml;ndert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden. Die Wartemusik hat eine maximale L&auml;nge von 7s. Sie wird w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 7s-Nachrichten vorgespielt werden.
+         &Auml;ndert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden.
+         Alternativ kann mit "say:" auch ein Text gesprochen werden. Die Wartemusik hat eine maximale L&auml;nge von 7s. Sie wird w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 7s-Nachrichten vorgespielt werden.
          <br>
       </li><br>
       
