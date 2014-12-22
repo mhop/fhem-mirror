@@ -602,3 +602,7 @@
 - Wed Dec 17 2014 (Reinerlein)
   - added new module 00_SONOS and 21_SONOSPLAYER to support the Sonos Multiroom Audiosystem
 
+- Mon Dec 22 2014 (mattwire)
+  - added new module 30_MilightBridge and 31_MilightDevice to support Milight LED lights/strips/controllers.
+
+

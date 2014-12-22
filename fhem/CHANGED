@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added: 30_MilightBridge / 31_MilightDevice: Support Milight 
+           (Applamp/LimitlessLED/EasyBulb) LED lights/strips/controllers.
   - feature: HUEDevice: allow ct presets in webCmd
                         new subTypes extcolordimer and ctdimer
                         start support for Lightify bulbs
