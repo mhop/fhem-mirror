@@ -988,7 +988,7 @@ SWAP_Parse($$)
     my $productcode = $data;
     my $first = !defined($rhash->{"SWAP_00-ProductCode"}) || $rhash->{"SWAP_00-ProductCode"} ne $productcode;
 
-    SWAP_Attr( "set", $rname, "ProductCode", $productcode ) if( $first );
+    CommandAttr(undef, "$rname ProductCode $productcode") if( $first );
     CommandSave(undef,undef) if( $first && AttrVal( "autocreate", "autosave", 1 ) );
 
     if( !defined($products->{$productcode}->{registers}) ){
