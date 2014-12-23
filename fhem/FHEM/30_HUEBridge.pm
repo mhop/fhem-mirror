@@ -535,6 +535,14 @@ HUEBridge_HTTP_Call($$$;$)
     return "HTTP Error Code " . $1;
   }
 
+  if( !$ret ) {
+    Log3 $name, 2, "$name: empty answer received";
+    return undef;
+  } elsif( $ret !~ m/^[\[{].*[\]}]$/ ) {
+    Log3 $name, 2, "$name: invalid json detected: $ret";
+    return undef;
+  }
+
 #  try {
 #    from_json($ret);
 #  } catch {
@@ -625,7 +633,10 @@ HUEBridge_dispatch($$$;$)
   if( $err ) {
     Log3 $name, 2, "$name: http request failed: $err";
   } elsif( $data || $json ) {
-    if( $data && $data !~ m/^[\[{].*[\]}]$/ ) {
+    if( !$data ) {
+      Log3 $name, 2, "$name: empty answer received";
+      return undef;
+    } elsif( $data && $data !~ m/^[\[{].*[\]}]$/ ) {
       Log3 $name, 2, "$name: invalid json detected: $data";
       return undef;
     }
