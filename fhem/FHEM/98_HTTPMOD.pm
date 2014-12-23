@@ -35,6 +35,8 @@
 #               an neues HttpUtils angepasst
 #   2014-12-05  definierte Attribute werden zu userattr der Instanz hinzugefügt
 #               use $hash->{HTTPHEADER} or $hash->{httpheader}
+#	2014-12-22	Warnung in Set korrigiert
+#
                     
 package main;
 
@@ -280,6 +282,7 @@ sub HTTPMOD_Set($@)
     # @a is an array with DeviceName, SetName, Rest of Set Line
     my ($name, $setName, $setVal) = @a;
     my (%rmap, $setNum, $setOpt, $setList, $rawVal);
+	$setList = "";
     
     Log3 $name, 5, "$name: set called with $setName " . ($setVal ? $setVal : "");
 
