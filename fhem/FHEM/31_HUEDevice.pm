@@ -481,6 +481,7 @@ HUEDevice_Set($@)
   if( scalar keys %obj ) {
     my $result;
     if( $hash->{helper}->{group} ) {
+      $hash->{helper}->{update} = 1;
       $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/action",\%obj);
     } else {
       $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/state",\%obj);
@@ -765,19 +766,22 @@ HUEDevice_Parse($$)
   my $name = $hash->{NAME};
 
   Log3 $name, 4, "parse status message for $name";
+  #Log3 $name, 5, Dumper $result;
 
   $hash->{name} = $result->{'name'};
   $hash->{type} = $result->{'type'};
 
   if( $hash->{helper}->{group} ) {
-    $hash->{lights} = join( ",", @{$result->{lights}} );
+    $hash->{lights} = join( ",", @{$result->{lights}} ) if( $result->{lights} );
 
     foreach my $id ( @{$result->{lights}} ) {
       my $code = $hash->{IODev}->{NAME} ."-". $id;
       my $chash = $modules{HUEDevice}{defptr}{$code};
 
-      #HUEDevice_GetUpdate($chash) if( defined($chash) );
+      HUEDevice_GetUpdate($chash) if( defined($chash) && defined($hash->{helper}->{update}) );
     }
+
+    delete $hash->{helper}->{update};
 
     return undef;
   }
