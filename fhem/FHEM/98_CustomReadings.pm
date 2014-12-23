@@ -45,6 +45,9 @@ sub CustomReadings_read($)
   $readingDefinitions =~ s/\n//g;
 
   my @used = ("state");
+  my $isCombined = 0;
+  my @combinedOutput = ();
+  my $hasErrors = 0;
   
   readingsBeginUpdate($hash);
   
@@ -59,18 +62,52 @@ sub CustomReadings_read($)
     }
     
     my @definition = split(':', $param, 2);
-    push(@used, $definition[0]);
+    if ($definition[0] eq "COMBINED") {
+      $isCombined = 1;
+      my $cmdStr = $definition[1];
+      my $cmdTemp = eval("$cmdStr");
+      if (ref $cmdTemp eq 'ARRAY') {
+        @combinedOutput = @{ $cmdTemp };
+      } else {
+        @combinedOutput = split(/^/, $cmdTemp);
+      }
+      Log 5, "Using combined mode for customReadings: $cmdStr";
+      next;
+    } 
+    else {
+      push(@used, $definition[0]);
+    }    
     
-    my $value = eval($definition[1]);
+    if($definition[1] ne "") {
+      $isCombined = 0;
+    }
+    
+    my $value = 0;
+    if ($isCombined) {
+      $value = shift @combinedOutput;
+            
+      if (!($value)) {  
+        $value = 0;
+        $hasErrors = 1;
+       	Log 3, "customReadings: Warning for $name: combined command for " . $definition[0] . " returned nothing or not enough lines.";
+      }
+    } 
+    else {
+      $value = eval($definition[1]);
+    }
+    
     if($value) {
       $value =~ s/^\s+|\s+$//g;
     }
     else {
       $value = "ERROR";
+      $hasErrors = 1;
     }
     
     readingsBulkUpdate($hash, $definition[0], $value);
   }
+  
+  readingsBulkUpdate($hash, "state", $hasErrors ? "Errors" : "OK");
 
   readingsEndUpdate($hash, 1);
 
@@ -101,7 +138,8 @@ sub CustomReadings_GetHTML ($)
   my $result = "";
   
   $result .= "<table>";
-  foreach my $reading (keys %{$hash->{READINGS}}) {
+  my @sortedReadings = sort keys %{$hash->{READINGS}};
+  foreach my $reading (@sortedReadings) {
     $result .= "<tr>";
     $result .= "<td>$reading:&nbsp;</td><td>" . ReadingsVal($name, $reading, "???") . "</td>";   
     $result .= "</tr>";
@@ -228,6 +266,18 @@ attr myReadingsDisplay room 0-Test<br>
     Example: <code>kernel:qx(uname -r 2>&1)</code><br>
     Defines a reading with the name "kernel" and evaluates the linux function uname -r<br>
     
+    Multiline output from commands, systemcall, scripts etc. can be use for  more than one reading with <br>
+    the keyword <code>COMBINED</code> as reading (which wont appear itself) while its command output<br>
+    will be put line by line in the following readings defined (so they don't need a function defined<br>
+    after the colon (it would be ignored)).But the lines given must match the number and order of the<br>
+    following readings.<br><br>
+    
+    COMBINED can be used together or lets say after or even in between normal expressions if the<br>
+    number of lines of the output matches exactly.
+    Example: <code>COMBINED:qx(cat /proc/sys/vm/dirty_background*),dirty_bytes:,dirty_ration:</code><br>
+    Defines two readings (dirty_bytes and dirty_ratio) which will get set by the lines of those <br>
+    two files the cat command will find in the kernel proc directory.<br>
+    In some cases this can give an noticeable performance boost as the readings are filled up all at once.    
     </li>
   </ul><br>
 </ul>
