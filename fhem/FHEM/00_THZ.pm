@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2014
-my $thzversion = "0.117";
+my $thzversion = "0.118";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -293,6 +293,7 @@ my %Rev_OpMode = reverse %OpMode;
 my %OpModeHC = ("1" =>"normal", "2" => "setback", "3" =>"standby", "4" =>"restart", "5" =>"restart");
 my %SomWinMode = ( "01" =>"winter", "02" => "summer");
 my %weekday = ( "0" =>"Monday", "1" => "Tuesday", "2" =>"Wednesday", "3" => "Thursday", "4" => "Friday", "5" =>"Saturday", "6" => "Sunday" );
+my %faultmap = ( "0" =>"n.a.", "1" => "F01_AnodeFault", "2" => "F02_SafetyTempDelimiterEngaged", "3" => "F03_HighPreasureGuardFault", "4" => "F04_LowPreasureGuardFault", "5" => "F05_OutletFanFault", "6" => "F06_InletFanFault", "7" => "F07_MainOutputFanFault", "11" => "F11_LowPreasureSensorFault", "12"=> "F12_HighPreasureSensorFault", "15" => "F15_DHW_TemperatureFault",  "17" => "F17_DefrostingDurationExceeded", "20" => "F20_SolarSensorFault", "21" => "F21_OutsideTemperatureSensorFault", "22" => "F22_HotGasTemperatureFault", "23" => "F23_CondenserTemperatureSensorFault", "24" => "F24_EvaporatorTemperatureSensorFault", "26" => "F26_ReturnTemperatureSensorFault", "28" => "F28_FlowTemperatureSensorFault", "29" => "F29_DHW_TemperatureSensorFault", "30" => "F30_SoftwareVersionFault" );
 my $firstLoadAll = 0;
 my $noanswerreceived = 0;
 my $internalHash;
@@ -967,10 +968,10 @@ my %parsinghash = (
 	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
 	      ],
   "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
-	      [" fault0CODE: ",		8, 2, "hex", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhexdate", 100],
-	      [" fault1CODE: ",		20, 2, "hex", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhexdate", 100],
-	      [" fault2CODE: ",		32, 2, "hex", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhexdate", 100],
-	      [" fault3CODE: ",		44, 2, "hex", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhexdate", 100]
+	      [" fault0CODE: ",		8, 2,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhexdate", 100],
+	      [" fault1CODE: ",		20, 2, "faultmap", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhexdate", 100],
+	      [" fault2CODE: ",		32, 2, "faultmap", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhexdate", 100],
+	      [" fault3CODE: ",		44, 2, "faultmap", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhexdate", 100]
 	      ],
   "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
 	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
@@ -1050,10 +1051,10 @@ my %parsinghash206 = (
 	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
 	      ],
   "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
-	      [" fault0CODE: ",		8, 4, "hex", 1],	[" fault0TIME: ",	12, 4, "hex2time", 1],  [" fault0DATE: ",	16, 4, "hexdate", 100],
-	      [" fault1CODE: ",		20, 4, "hex", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 100],
-	      [" fault2CODE: ",		32, 4, "hex", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 100],
-	      [" fault3CODE: ",		44, 4, "hex", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 100]
+	      [" fault0CODE: ",		8, 4,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "hex2time", 1],  [" fault0DATE: ",	16, 4, "hexdate", 100],
+	      [" fault1CODE: ",		20, 4, "faultmap", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 100],
+	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 100],
+	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 100]
 	      ],
   "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
 	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
@@ -1178,6 +1179,7 @@ my %parsinghash206 = (
 	when ("opmodehc")	{$value= $OpModeHC{hex($value)};}
 	when ("somwinmode")	{$value= $SomWinMode{($value)};}
 	when ("weekday")	{$value= $weekday{($value)};}
+	when ("faultmap")	{$value= $faultmap{(hex($value))};}
 	when ("quater")		{$value= quaters2time($value);}
 	when ("bit0")		{$value= (hex($value) &  0b0001) / 0b0001;}
 	when ("bit1")		{$value= (hex($value) &  0b0010) / 0b0010;}
@@ -1207,7 +1209,7 @@ sub THZ_debugread($){
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
  #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
-  my @numbers=('09','01D4', '01D5', '0122', '0123', '0124', '2201'); 
+  my @numbers=('09', '0A024B', '0A0112', 'FE', '0C0341');  
   #my @numbers = (1..256);
   #my @numbers = (1..65535);
   #my @numbers = (1..3179);
