@@ -1000,31 +1000,31 @@ sub fillMappingTables($){
 	$fmapList =	"Deutschland_heute_frueh,Deutschland_heute_mittag,Deutschland_heute_spaet,Deutschland_heute_nacht,".
 				"Deutschland_morgen_frueh,Deutschland_morgen_spaet,".
 				"Deutschland_ueberm_frueh,Deutschland_ueberm_spaet,".
-				"Deutschland_tag4_frueh,Deutschland_tag4_spaet".
+				"Deutschland_tag4_frueh,Deutschland_tag4_spaet,".
 				"Mitte_heute_frueh,Mitte_heute_mittag,Mitte_heute_spaet,Mitte_heute_nacht,".
 				"Mitte_morgen_frueh,Mitte_morgen_spaet,".
 				"Mitte_ueberm_frueh,Mitte_ueberm_spaet,".
-				"Mitte_tag4_frueh,Mitte_tag4_spaet".
+				"Mitte_tag4_frueh,Mitte_tag4_spaet,".
 				"Nordost_heute_frueh,Nordost_heute_mittag,Nordost_heute_spaet,Nordost_heute_nacht,".
 				"Nordost_morgen_frueh,Nordost_morgen_spaet,".
 				"Nordost_ueberm_frueh,Nordost_ueberm_spaet,".
-				"Nordost_tag4_frueh,Nordost_tag4_spaet".
+				"Nordost_tag4_frueh,Nordost_tag4_spaet,".
 				"Nordwest_heute_frueh,Nordwest_heute_mittag,Nordwest_heute_spaet,Nordwest_heute_nacht,".
 				"Nordwest_morgen_frueh,Nordwest_morgen_spaet,".
 				"Nordwest_ueberm_frueh,Nordwest_ueberm_spaet,".
-				"Nordwest_tag4_frueh,Nordwest_tag4_spaet".
+				"Nordwest_tag4_frueh,Nordwest_tag4_spaet,".
 				"Ost_heute_frueh,Ost_heute_mittag,Ost_heute_spaet,Ost_heute_nacht,".
 				"Ost_morgen_frueh,Ost_morgen_spaet,".
 				"Ost_ueberm_frueh,Ost_ueberm_spaet,".
-				"Ost_tag4_frueh,Ost_tag4_spaet".
+				"Ost_tag4_frueh,Ost_tag4_spaet,".
 				"Suedost_heute_frueh,Suedost_heute_mittag,Suedost_heute_spaet,Suedost_heute_nacht,".
 				"Suedost_morgen_frueh,Suedost_morgen_spaet,".
 				"Suedost_ueberm_frueh,Suedost_ueberm_spaet,".
-				"Suedost_tag4_frueh,Suedost_tag4_spaet".
+				"Suedost_tag4_frueh,Suedost_tag4_spaet,".
 				"Suedwest_heute_frueh,Suedwest_heute_mittag,Suedwest_heute_spaet,Suedwest_heute_nacht,".
 				"Suedwest_morgen_frueh,Suedwest_morgen_spaet,".
 				"Suedwest_ueberm_frueh,Suedwest_ueberm_spaet,".
-				"Suedwest_tag4_frueh,Suedwest_tag4_spaet".
+				"Suedwest_tag4_frueh,Suedwest_tag4_spaet,".
 				"West_heute_frueh,West_heute_mittag,West_heute_spaet,West_heute_nacht,".
 				"West_morgen_frueh,West_morgen_spaet,".
 				"West_ueberm_frueh,West_ueberm_spaet,".
