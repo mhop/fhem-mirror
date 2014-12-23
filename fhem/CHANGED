@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: HUEbridge: added group handling
+                        added pollDevices attribute
+                        added httpUtils for nonblocking mode
+  - feature: HUEDevice: added group handling
+                        added renaming of devices and groups in the bridge
   - added: 30_MilightBridge / 31_MilightDevice: Support Milight 
            (Applamp/LimitlessLED/EasyBulb) LED lights/strips/controllers.
   - feature: HUEDevice: allow ct presets in webCmd

@@ -156,9 +156,6 @@ sub HUEDevice_Define($$)
 
   my ($name, $type, $id, $interval) = @args;
 
-  $interval= 60 unless defined($interval);
-  if( $interval < 10 ) { $interval = 60; }
-
   $hash->{STATE} = 'Initialized';
   $hash->{helper}{interfaces}= "dimmer";
 
@@ -180,6 +177,14 @@ sub HUEDevice_Define($$)
              && $d->{NAME} ne $name );
 
   $modules{HUEDevice}{defptr}{$code} = $hash;
+
+  if( AttrVal($hash->{IODev}->{NAME}, "pollDevices", undef) ) {
+    $interval = 0 unless defined($interval);
+  } else {
+    $interval = 60 unless defined($interval);
+  }
+
+  $interval = 60 if( $interval && $interval < 10 );
 
   $args[3] = "" if( !defined( $args[3] ) );
   if( !$hash->{helper}->{group} ) {
@@ -214,7 +219,11 @@ sub HUEDevice_Define($$)
   }
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0) if( !$hash->{helper}->{group} );
+  if( $init_done ) {
+    HUEDevice_GetUpdate($hash);
+  } else {
+    InternalTimer(gettimeofday()+10, "HUEDevice_GetUpdate", $hash, 0);
+  }
 
   return undef;
 }
@@ -402,6 +411,43 @@ HUEDevice_Set($@)
 
   $hash->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 0);
 
+  if( $hash->{helper}->{group} ) {
+    if( $aa[0] eq 'lights' ) {
+      my @lights = ();
+      for my $param (@aa[1..@aa-1]) {
+        $param = $defs{$param}{ID} if( defined $defs{$param} && $defs{$param}{TYPE} eq 'HUEDevice' );
+        push( @lights, $param );
+      }
+
+      my $obj = { 'lights' => \@lights, };
+
+      my $result = HUEDevice_ReadFromServer($hash,$hash->{ID},$obj);
+      if( $result->{success} ) {
+        RemoveInternalTimer($hash);
+        HUEDevice_GetUpdate($hash);
+      }
+
+      return $result->{error}{description} if( $result->{error} );
+
+    }
+  }
+
+  if( $aa[0] eq 'rename' ) {
+    my $new_name =  join( ' ', @aa[1..@aa-1]);
+    my $obj = { 'name' => $new_name, };
+
+    my $result = HUEDevice_ReadFromServer($hash,$hash->{ID},$obj);
+    if( $result->{success} ) {
+      RemoveInternalTimer($hash);
+      HUEDevice_GetUpdate($hash);
+      CommandAttr(undef,"$name alias $new_name");
+      CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+    }
+
+    return $result->{error}{description} if( $result->{error} );
+    return undef;
+  }
+
   if( (my $joined = join(" ", @aa)) =~ /:/ ) {
     my @cmds = split(":", $joined);
     for( my $i = 0; $i <= $#cmds; ++$i ) {
@@ -475,6 +521,9 @@ HUEDevice_Set($@)
   $list .= " alert:none,select,lselect";
 
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( $subtype =~ m/dimmer/ );
+
+  $list .= " lights" if( $hash->{helper}->{group} );
+  $list .= " rename";
 
   return SetExtensions($hash, $list, $name, @aa);
 }
@@ -646,8 +695,8 @@ HUEDevice_ReadFromServer($@)
   no strict "refs";
   my $ret;
   unshift(@a,$name);
-  $ret = IOWrite($hash, @a);
-  #$ret = IOWrite($hash,$hash,@a);
+  #$ret = IOWrite($hash, @a);
+  $ret = IOWrite($hash,$hash,@a);
   use strict "refs";
   return $ret;
   return if(IsDummy($name) || IsIgnored($name));
@@ -717,6 +766,9 @@ HUEDevice_Parse($$)
 
   Log3 $name, 4, "parse status message for $name";
 
+  $hash->{name} = $result->{'name'};
+  $hash->{type} = $result->{'type'};
+
   if( $hash->{helper}->{group} ) {
     $hash->{lights} = join( ",", @{$result->{lights}} );
 
@@ -724,16 +776,15 @@ HUEDevice_Parse($$)
       my $code = $hash->{IODev}->{NAME} ."-". $id;
       my $chash = $modules{HUEDevice}{defptr}{$code};
 
-      HUEDevice_GetUpdate($chash) if( defined($chash) );
+      #HUEDevice_GetUpdate($chash) if( defined($chash) );
     }
 
     return undef;
   }
 
   $hash->{modelid} = $result->{'modelid'};
-  $hash->{name} = $result->{'name'};
-  $hash->{type} = $result->{'type'};
   $hash->{swversion} = $result->{'swversion'};
+
 
   $attr{$name}{model} = $result->{'modelid'} unless( defined($attr{$name}{model}) || $result->{'modelid'} eq '' );
   $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} unless( defined($attr{$name}{subType})
@@ -857,7 +908,10 @@ HUEDevice_Parse($$)
 
     This can be a hue bulb, a living colors light or a living whites bulb or dimmer plug.<br><br>
 
-    The device status will be updated every &lt;interval&gt; seconds. The default and minimum is 60. Groups are updated only on definition and statusRequest<br><br>
+    The device status will be updated every &lt;interval&gt; seconds. 0 means no updates.
+    The default and minimum is 60 if the IODev has not set pollDevices to 1.
+    The default ist 0 if the IODev has set pollDevices to 1.
+    Groups are updated only on definition and statusRequest<br><br>
 
     Examples:
     <ul>
@@ -927,9 +981,18 @@ HUEDevice_Parse($$)
       <li>effect [none|colorloop]</li>
       <li>transitiontime &lt;time&gt;<br>
         set the transitiontime to &lt;time&gt; 1/10s</li>
-      <li>rgb &lt;rrggbb&gt;</li>
+      <li>rgb &lt;rrggbb&gt;<br>
+        set the color to (the nearest equivalent of) &lt;rrggbb&gt;</li>
+      <br>
       <li>delayedUpdate</li>
       <li>immediateUpdate</li>
+      <br>
+      <li>lights &lt;light-1&gt[ &lt;light-2&gt;..&lt;light-n&gt;]<br>
+      Only valid for groups. Changes the list of lights in this group.
+      The lights can be given as fhem device names or bridge device numbers.</li>
+      <li>rename &lt;new name&gt;<br>
+      Renames the device in the bridge and changes the fhem alias.</li>
+      <br>
       <li><a href="#setExtensions"> set extensions</a> are supported.</li>
       <br>
       Note:
