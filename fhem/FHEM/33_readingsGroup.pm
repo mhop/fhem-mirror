@@ -595,7 +595,7 @@ readingsGroup_2html($;$)
               my %extPage = ();
               my ($allSets, undef, undef) = FW_devState($name, "", \%extPage);
               my ($set) = split( ' ', $set, 2 );
-              if( $allSets && $allSets =~ m/$set:([^ ]*)/) {
+              if( $allSets && $allSets =~ m/\b$set:([^ ]*)/) {
                  $values = $1;
               }
             }
@@ -634,9 +634,10 @@ readingsGroup_2html($;$)
         ++$cell_column;
         next;
       } else {
-        if( $regex && $regex =~ m/(.*)@(.*)/ ) {
+        if( $regex && $regex =~ m/(.*)@([!]?)(.*)/ ) {
           $regex = $1;
-          $name = $2;
+          my $force_device = $2;
+          $name = $3;
           if( $name =~ m/^{(.*)}$/ ) {
             my $DEVICE = $device->[0];
             $name = eval $name;
@@ -645,7 +646,7 @@ readingsGroup_2html($;$)
 
           $h = $defs{$name};
 
-          next if( !$h );
+          next if( !$h && !$force_device );
         }
 
         $force_show = 0;
@@ -659,7 +660,7 @@ readingsGroup_2html($;$)
         } elsif( $modifier =~ m/\?/ ) {
           $h = $attr{$name};
         } else {
-          $h = $h->{READINGS};
+          $h = $h->{READINGS} if( $h );
         }
 
         $force_show = 1 if( $modifier =~ m/\!/ );
@@ -759,7 +760,7 @@ readingsGroup_2html($;$)
               my %extPage = ();
               my ($allSets, undef, undef) = FW_devState($name, $room, \%extPage);
               my ($set) = split( ' ', $set, 2 );
-              if( $allSets && $allSets =~ m/$set:([^ ]*)/) {
+              if( $allSets && $allSets =~ m/\b$set:([^ ]*)/) {
                 $values = $1;
               }
             }
@@ -1204,7 +1205,9 @@ readingsGroup_Attr($$$;$)
       <li>If regex starts with a '+' it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a '?' it will be matched against the attributes of the device instead of the readings.</li>
       <li>If regex starts with a '!' the display of the value will be forced even if no reading with this name is available.</li>
-      <li>regex can be of the form &lt;regex&gt;@device to use readings from a different device.</li>
+      <li>regex can be of the form &lt;regex&gt;@device to use readings from a different device.<br>
+          if the device name part starts with a '!' the display will be foreced.
+          use in conjunction with ! in front of the reading name.</li>
       <li>regex can be of the form &lt;regex&gt;@{perl} to use readings from a different device.</li>
       <li>regex can be of the form &lt;STRING&gt; or &lt;{perl}[@readings]&gt; where STRING or the string returned by perl is
           inserted as a reading or:
