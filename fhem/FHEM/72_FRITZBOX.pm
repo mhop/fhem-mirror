@@ -38,8 +38,9 @@ use strict;
 use warnings;
 use Blocking;
 my $missingModul;
-eval "use Net::Telnet;1" or $missingModul .= "Net::Telnet ";
-
+my $missingModulRemote;
+eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
+eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
 
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_Init($);
@@ -48,7 +49,6 @@ sub FRITZBOX_Exec($$);
 sub FRITZBOX_Send_Mail($@);
 sub FRITZBOX_SetMOH($@);
 sub FRITZBOX_Start_Radio($@);
-use URI::Escape;
 
 our $telnet;
 
@@ -120,6 +120,8 @@ my @mohtype = qw(default sound customer);
 
 my %landevice = ();
 
+my $ttsCmdTemplate = 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]"';
+   
 sub ##########################################
 FRITZBOX_Log($$$)
 {
@@ -171,7 +173,13 @@ sub FRITZBOX_Define($$)
    $hash->{NAME} = $name;
 
    my $msg;
- 
+   if ( $missingModul ) 
+   {
+      $msg = "Cannot define a FRITZBOX device. Perl modul $missingModul is missing.";
+      FRITZBOX_Log $hash, 1, $msg;
+      return $msg;
+   }
+
 #   unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
    unless ( -X "/usr/bin/ctlmgr_ctl" )
    {
@@ -255,8 +263,6 @@ FRITZBOX_Set($$@)
    my $resultStr = "";
    
    my $list = "alarm"
-            . " convertMOH"
-            . " convertRingTone"
             . " createPwdFile"
             . " customerRingTone"
             . " diversity"
@@ -268,7 +274,8 @@ FRITZBOX_Set($$@)
             . " tam"
             . " update:noArg"
             . " wlan:on,off";
-
+            # . " convertMOH"
+            # . " convertRingTone"
    if ( lc $cmd eq 'alarm')
    {
       if ( int @val == 2 && $val[0] =~ /^(1|2|3)$/ && $val[1] =~ /^(on|off)$/ ) 
@@ -282,19 +289,19 @@ FRITZBOX_Set($$@)
          return undef;
       }
 
-   } elsif ( lc $cmd eq 'convertmoh') {
-      if (int @val > 0) 
-      {
-         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         return FRITZBOX_ConvertMOH $hash, @val;
-      }
+   # } elsif ( lc $cmd eq 'convertmoh') {
+      # if (int @val > 0) 
+      # {
+         # Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
+         # return FRITZBOX_ConvertMOH $hash, @val;
+      # }
 
-   } elsif ( lc $cmd eq 'convertringtone') {
-      if (int @val > 0) 
-      {
-         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         return FRITZBOX_ConvertRingTone $hash, @val;
-      }
+   # } elsif ( lc $cmd eq 'convertringtone') {
+      # if (int @val > 0) 
+      # {
+         # Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
+         # return FRITZBOX_ConvertRingTone $hash, @val;
+      # }
       
    } elsif ( lc $cmd eq 'createpwdfile') {
       if (int @val > 0) 
@@ -346,13 +353,15 @@ FRITZBOX_Set($$@)
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          $resultStr = FRITZBOX_SetMOH $hash, @val;
-         unless ($resultStr)
+         if ($resultStr =~ /^[012]$/ )
          {
-            $hash->{fhem}{LOCAL}=2; #2 = short update without new trigger
-            FRITZBOX_Readout_Start($hash);
-            $hash->{fhem}{LOCAL}=0;
+            readingsSingleUpdate($hash,"box_guestWlan",$mohtype[$resultStr], 1);
+            return undef;
          }
-         return $resultStr;
+         else
+         {
+            return $resultStr;
+         }
       }
    }
 
@@ -521,7 +530,9 @@ FRITZBOX_Readout_Run($)
 
       # Box model and firmware
       push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
-      push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver", "fwupdate" ];
+      push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ];
+      push @readoutArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ];
+
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
 
       my $dectCount = $resultArray->[1];
@@ -741,13 +752,19 @@ sub ##########################################
 FRITZBOX_Readout_Done($) 
 {
    my ($string) = @_;
-   return unless defined $string;
-
+   unless (defined $string)
+   {
+      Log3 "FRITZBOX_Readout_Done", 1, "Fatal Error: no parameter handed over";
+      return;
+   }
+   
    my ($name, %values) = split("\\|", $string);
    my $hash = $defs{$name};
    
    # delete the marker for RUNNING_PID process
    delete($hash->{helper}{READOUT_RUNNING_PID});
+
+   FRITZBOX_Log $hash, 5, "Processing ". keys(%values)." readouts.";
 
    readingsBeginUpdate($hash);
 
@@ -773,7 +790,12 @@ FRITZBOX_Readout_Done($)
                $hash->{$rName1}{$rName2} = $rValue;
             }
          }
-         elsif ($rName ne "readoutTime")
+         elsif ($rName eq "box_fwVersion")
+         {
+            $rValue .= " (old)" if $values{box_fwUpdate} == 1;
+            readingsBulkUpdate( $hash, $rName, $rValue );
+         }
+         elsif ($rName !~ /readoutTime|box_fwUpdate/)
          {
             readingsBulkUpdate( $hash, $rName, $rValue );
          }
@@ -872,10 +894,11 @@ sub FRITZBOX_Readout_Format($$$)
       } else {
          my $bitStr = $readout;
          $readout = "";
-         foreach (sort keys %alarmDays)
+         foreach (sort {$a <=> $b} keys %alarmDays)
          {
             $readout .= (($bitStr & $_) == $_) ? $alarmDays{$_}." " : "";
          }
+         chop $readout;
       }
    
    } elsif ($format eq "alnumber") {
@@ -899,10 +922,6 @@ sub FRITZBOX_Readout_Format($$$)
    } elsif ($format eq "deviceip") {
       $readout = $landevice{$readout}." ($readout)"
          if defined $landevice{$readout};
-   
-   } elsif ($format eq "fwupdate") {
-      my $update = FRITZBOX_Exec( $hash, "ctlmgr_ctl r updatecheck status/update_available_hint");
-      $readout .= " (old)" if $update == 1;
    
    } elsif ($format eq "model") {
       $readout = $fonModel{$readout} if defined $fonModel{$readout};
@@ -961,7 +980,7 @@ FRITZBOX_Ring_Start($@)
       delete($hash->{helper}{RING_RUNNING_PID});
    }
    
-   my $timeout = $val[1] + 30;
+   my $timeout = $val[1] + 60;
    my $handover = $name . "|" . join( "|", @val );
    
    $hash->{helper}{RING_RUNNING_PID} = BlockingCall("FRITZBOX_Ring_Run", $handover,
@@ -1006,7 +1025,7 @@ FRITZBOX_Ring_Run($)
  # Check if next parameter is a valid ring tone
    if (int @val)
    {
-      if ($val[0] !~ /^msg:/i)
+      if ($val[0] !~ /^(msg|show):/i)
       {
          $ringTone = $val[0];
          $ringTone = $ringToneNumber{lc $val[0]};
@@ -1030,10 +1049,10 @@ FRITZBOX_Ring_Run($)
    my $msg = AttrVal( $name, "defaultCallerName", "FHEM" );
    if (int @val)
    {
-      return $name."|0|Error: Too many parameter. Message has to start with 'msg:'"
-         if ($val[0] !~ /^msg:/i);
+      return $name."|0|Error: Too many parameter. Message has to start with 'show:'"
+         if ($val[0] !~ /^(msg|show):/i);
       $msg = join " ", @val;
-      $msg =~ s/^msg:\s*//;
+      $msg =~ s/^(msg|show):\s*//;
       $msg = substr($msg, 0, 30);
    }
 
@@ -1129,19 +1148,18 @@ sub FRITZBOX_SetMOH($@)
    my @cmdArray;
    my $result;
    my $name = $hash->{NAME};
-   my $isTTS = 0;
    my $uploadFile = '/var/tmp/moh_upload';
    my $mohFile = '/var/tmp/fx_moh';
 
    if (lc $type eq lc $mohtype[0] || $type eq "0")
    {
       FRITZBOX_Exec ($hash, 'ctlmgr_ctl w telcfg settings/MOHType 0');
-      return undef;
+      return 0;
    }
    elsif (lc $type eq lc $mohtype[1] || $type eq "1")
    {
       FRITZBOX_Exec ($hash, 'ctlmgr_ctl w telcfg settings/MOHType 1');
-      return undef;
+      return 1;
    }
    return "Error: Unvalid parameter '$type'" unless lc $type eq lc $mohtype[2] || $type eq "2";
 
@@ -1172,9 +1190,24 @@ sub FRITZBOX_SetMOH($@)
    if ($inFile =~ /^say:/i)
    {
       FRITZBOX_Log $hash, 4, "Converting Text2Speech";
+      # 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]"';
+      my $ttsCmd = $ttsCmdTemplate;
+      $ttsCmd =~ s/\[ZIEL\]/$uploadFile/;
       my $ttsText = $inFile;
-      $ttsText =~ s/^say:\s*//;
-      push @cmdArray, 'wget -U Mozilla -O "'.$uploadFile.'" "http://translate.google.com/translate_tts?tl=de&q='.uri_escape($ttsText).'"';
+      $ttsText =~ s/^say:\s*//i;
+      my $ttsLang = "de";
+      if ($ttsText =~ /^\((en|es|fr|nl)\)/i )
+      {
+         $ttsLang = $1;
+         $ttsText =~ s/^\($1\)\s*//i;
+      }
+      $ttsCmd =~ s/\[SPRACHE\]/$ttsLang/;
+      # $ttsText = ($ttsText." ") x int(60/length($ttsText))
+         # if length($ttsText) < 30;
+      $ttsText = substr($ttsText,0,70);
+      $ttsText = uri_escape($ttsText);
+      $ttsCmd =~ s/\[TEXT\]/$ttsText/;
+      push @cmdArray, $ttsCmd;
    } 
    elsif ($inFile =~ /^(ftp|http):\/\//)
    {
@@ -1189,7 +1222,7 @@ sub FRITZBOX_SetMOH($@)
       unless $result->[3] == 1;
 
 #Prepare 2nd command array
-   push @cmdArray, 'ffmpegconv -i "'.$uploadFile.'" -o "'.$mohFile.'" --limit 32 --type 6';
+   push @cmdArray, 'ffmpegconv -i "'.$uploadFile.'" -o "'.$mohFile.'" --limit 32 --type 7';
    push @cmdArray, '[ -f "'.$mohFile.'" ] && echo 1 || echo 0';
 # Execute 2nd command array
    $result = FRITZBOX_Exec ( $hash, \@cmdArray );
@@ -1205,7 +1238,7 @@ sub FRITZBOX_SetMOH($@)
    $result = FRITZBOX_Exec ( $hash, \@cmdArray );
 
    FRITZBOX_Close_Connection( $hash );
-   return undef;
+   return 2;
 }
 
 ############################################
@@ -1336,8 +1369,8 @@ sub FRITZBOX_Open_Connection($)
    return undef 
       unless $hash->{REMOTE} == 1;
    
-   return "Error: Perl modul ".$missingModul."is missing on this system"
-      if $missingModul;
+   return "Error: Perl modul ".$missingModulRemote."is missing on this system"
+      if $missingModulRemote;
       
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
 
@@ -1501,8 +1534,8 @@ FRITZBOX_Exec_Remote($$)
             unless ($_ =~ /^sleep/)
             {
                @output=$telnet->cmd($_);
-               $result = $output[0];;
-               $result =~ s/\n|\r|\s$//g;
+               $result = join(" ",@output);
+               $result =~ s/(\r\n|\n\r|\n|\r|\s)$//;
             }
             else
             {
@@ -1814,12 +1847,17 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3FileIncludingPath|say:Text&gt;]</code>
          <br>
-         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has a maximal length of 7 s. It is played during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 7 s.
+         Example: <code>set fritzbox moh customer say:Die Wanne ist voll</code>
+         <br>
+         <code>set fritzbox moh customer /var/InternerSpeicher/warnung.mp3</code>
+         <br>
+         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has a maximal length of 8 s. It is played during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 8 s.
          <br>
       </li><br>
 
-      <li><code>set &lt;name&gt; ring &lt;internalNumbers&gt; [duration [ringTone]] [msg:yourMessage]</code>
-         Example: <code>set fritzbox ring 611,612 5 Budapest msg:It is raining</code>
+      <li><code>set &lt;name&gt; ring &lt;internalNumbers&gt; [duration [ringTone]] [show:yourMessage]</code>
+         <br>
+         Example: <code>set fritzbox ring 611,612 5 Budapest show:It is raining</code>
          <br>
          Rings the internal numbers for "duration" seconds and (on Fritz!Fons) with the given "ring tone" name.
          Different internal numbers have to be separated by a comma (without spaces).
@@ -1827,7 +1865,7 @@ sub FRITZBOX_fritztris($)
          Default duration is 5 seconds. Default ring tone is the internal ring tone of the device.
          Ring tone will be ignored for collected calls (9 or 50). 
          <br>
-         If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'msg:' will be shown as the callers name.
+         If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'show:' will be shown as the callers name.
          Maximal 30 characters are allowed.
          <br>
          If the call is taken the callee hears the "music on hold" which can be used to transmit messages.
@@ -2055,13 +2093,17 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3DateiInklusivePfad|say:Text&gt;]</code>
          <br>
+         Beispiel: <code>set fritzbox moh customer say:Die Wanne ist voll</code>
+         <br>
+         <code>set fritzbox moh customer /var/InternerSpeicher/warnung.mp3</code>
+         <br>
          &Auml;ndert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden.
-         Alternativ kann mit "say:" auch ein Text gesprochen werden. Die Wartemusik hat eine maximale L&auml;nge von 7s. Sie wird w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 7s-Nachrichten vorgespielt werden.
+         Alternativ kann mit "say:" auch ein Text gesprochen werden. Die Wartemusik hat eine maximale L&auml;nge von 8,13 s. Sie wird w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 8s-Nachrichten vorgespielt werden.
          <br>
       </li><br>
       
-      <li><code>set &lt;name&gt; ring &lt;interneNummern&gt; [Dauer [Klingelton]] [msg:Nachricht]</code>
-         Beispiel: <code>set fritzbox ring 611,612 5 Budapest msg:Es regnet</code>
+      <li><code>set &lt;name&gt; ring &lt;interneNummern&gt; [Dauer [Klingelton]] [show:Nachricht]</code>
+         Beispiel: <code>set fritzbox ring 611,612 5 Budapest show:Es regnet</code>
          <br>
          L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
          Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
@@ -2069,7 +2111,7 @@ sub FRITZBOX_fritztris($)
          Standard-Dauer ist 5 Sekunden. Standard-Klingelton ist der interne Klingelton des Ger&auml;tes.
          Der Klingelton wird f&uuml;r Rundrufe (9 oder 50) ignoriert. 
          <br>
-         Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'msg:' als Name des Anrufers angezeigt.
+         Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br>
          Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche zur Nachrichten&uuml;bermittlung genutzt werden kann.
