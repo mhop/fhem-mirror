@@ -31,6 +31,10 @@
 ########################################################################################
 # Changelog
 #
+# SVN-History:
+#	26.12.2014:
+#		ReportUnresponsiveDevice hat manchmal versucht, die Mitteilung an "sich selbst" zu senden, was naturgemäß nicht klappen kann.
+#
 # 2.6:	Die Zeichenkodierung bei Datenübernahme vom Zoneplayer kann nun über das Attribut characterDecoding eingestellt werden
 #		Bei Gruppen-/LineIn-/SPDIF-Wiedergabe wird wieder die liefernde Zone angezeigt (als Albumname)
 #		SetCurrentPlaylist hatte einen Tippfehler, und konnte dementsprechend nicht ausgeführt werden
@@ -457,7 +461,7 @@ sub SONOS_getCoverTitleRG($;$$) {
 	
 	my $transportState = ReadingsVal($device, 'transportState', '');
 	
-	my $currentRuntime = 0;
+	my $currentRuntime = 1;
 	my $currentStarttime = 0;
 	my $currentPosition = 0;
 	my $normalAudio = ReadingsVal($device, 'currentNormalAudio', 0);
@@ -6399,6 +6403,8 @@ sub SONOS_Client_IsAlive() {
 					$toDeleteElem = $1;
 					SONOS_Log undef, 3, 'ReportUnresponsiveDevice: '.$toDeleteElem;
 					foreach my $udn (@{$SONOS_Client_Data{PlayerAlive}}) {
+						next if (!$udn);
+						
 						my %data;
 						$data{WorkType} = 'reportUnresponsiveDevice';
 						$data{UDN} = $udn;
