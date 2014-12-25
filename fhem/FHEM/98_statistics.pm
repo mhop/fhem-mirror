@@ -861,48 +861,60 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName.$period;
    my $name=$hash->{NAME};
    my $devName = $dev->{NAME};
+   $state =~ s/ /_/g;
    
    my $statReadingName = $hash->{PREFIX};
    $statReadingName .= ucfirst($readingName).$period;
    my %hidden;
    my $firstRun = not exists($hash->{READINGS}{$hiddenReadingName});
-   my $lastState = $state;
-   my $statValue = "00:00:00";
+   my $lastState;
+   my $statValue;
+   my $statCount;
    
    if ( $firstRun ) { 
   # Show since-Value
       $hidden{"showDate:"} = 1;
       $saveLast = 0;
+      $lastState = $state;
+      $statValue = "00:00:00";
+      $statCount = 1;
       $hidden{"(since:"} = strftime ("%Y-%m-%d_%H:%M:%S)",localtime()  );
+      $hidden{$state} = 0;
+      $hidden{$state."_Count"} = 1; 
    } else {
   # Do calculations if hidden reading exists
       %hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
       $lastState = $hidden{"lastState:"};
       my $timeDiff = int(gettimeofday())-$hidden{"lastTime:"};
       $hidden{$lastState.":"} += $timeDiff;
+      $hidden{$state."_Count:"}++
+         if $state ne $lastState;
+      $statCount = $hidden{$state."_Count:"};
       $statValue = statistics_FormatDuration ($hidden{$lastState.":"});
    }
    $hidden{"lastState:"} = $state;
    $hidden{"lastTime:"} = int(gettimeofday());
-
    
   # Prepare new current reading, delete hidden reading if it is used again
    $result = "";
-   while (my ($key, $duration) = each(%hidden)){
-      if ($key !~ /lastState:|lastTime:|showDate:|since:/) {
-         if ($result ne "") {$result .= " ";}
-         $result .= "$key ".statistics_FormatDuration($duration); 
+   foreach my $key (sort keys %hidden)
+   {
+      if ($key !~ /^(lastState|lastTime|showDate|\(since):$/) {
+         $result .= " " if $result;
+         $result .= "$key ".statistics_FormatDuration($hidden{$key})
+            if $key !~ /_Count:$/; 
+         $result .= "$key ".$hidden{$key}
+            if $key =~ /_Count:$/; 
          if ($saveLast) { delete $hidden{$key}; }
       }
    }
-   if ($result eq "") {$result = "$state: 0";} 
    if ($hidden{"showDate:"} == 1) { $result .= " (since: ".$hidden{"(since:"}; }
 
   # Store current reading as last reading, Reset current reading
     if ($saveLast) { 
       readingsBulkUpdate($dev, $statReadingName . "Last", $result, 1); 
       statistics_Log $hash, 5, "Set '".$statReadingName . "Last = $result'";
-      $result = "$state: 00:00:00";
+      $result = "$state: 00:00:00 ".$state."_Count: 1";
       $hidden{"showDate:"} = 0;
    }
 
@@ -913,14 +925,17 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
    if ($singularReadings ne "") {
-      # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$value,$saveLast
+      # statistics_storeSingularReadings for Duration 
+      # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$value,$saveLast
       statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,ucfirst($lastState),$period,$statValue,0,$saveLast);
+      # statistics_storeSingularReadings for Count
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName."_Count",$readingName,ucfirst($lastState)."_Count",$period,$statCount,0,$saveLast);
    }
 
   # Store hidden reading
    $result = "";
    while (my ($key, $duration) = each(%hidden)){
-      if ($result ne "") {$result .= " ";}
+      $result .= " " if $result;
       $result .= "$key $duration"; 
    }
    readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);

@@ -528,11 +528,13 @@ FRITZBOX_Readout_Run($)
       push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/RefreshDiversity" ];
       push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Diversity/count" ];
 
-      # Box model and firmware
+   # Box model and firmware
       push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
       push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ];
       push @readoutArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ];
+      push @readoutArray, [ "box_tr069", "ctlmgr_ctl r tr069 settings/enabled", "onoff" ];
 
+   # Execute commands
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
 
       my $dectCount = $resultArray->[1];
@@ -1974,6 +1976,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_guestWlanRemain</b> - Remaining time until the guest WLAN is switched off</li>
       <li><b>box_model</b> - Fritz!Box model</li>
       <li><b>box_moh</b> - music-on-hold setting</li>
+      <li><b>box_tr069</b> - provider remote access TR069 (safety issue!)</li>
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
 
@@ -2215,6 +2218,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
       <li><b>box_model</b> - Fritz!Box-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
+      <li><b>box_tr069</b> - Provider-Fernwartung TR069 (sicherheitsrelevant!)</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
       
