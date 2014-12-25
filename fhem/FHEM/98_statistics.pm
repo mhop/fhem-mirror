@@ -866,18 +866,15 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    my $statReadingName = $hash->{PREFIX};
    $statReadingName .= ucfirst($readingName).$period;
    my %hidden;
+   my %stat;
    my $firstRun = not exists($hash->{READINGS}{$hiddenReadingName});
    my $lastState;
-   my $statValue;
-   my $statCount;
    
    if ( $firstRun ) { 
   # Show since-Value
       $hidden{"showDate:"} = 1;
       $saveLast = 0;
       $lastState = $state;
-      $statValue = "00:00:00";
-      $statCount = 1;
       $hidden{"(since:"} = strftime ("%Y-%m-%d_%H:%M:%S)",localtime()  );
       $hidden{$state} = 0;
       $hidden{$state."_Count"} = 1; 
@@ -889,8 +886,6 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
       $hidden{$lastState.":"} += $timeDiff;
       $hidden{$state."_Count:"}++
          if $state ne $lastState;
-      $statCount = $hidden{$state."_Count:"};
-      $statValue = statistics_FormatDuration ($hidden{$lastState.":"});
    }
    $hidden{"lastState:"} = $state;
    $hidden{"lastTime:"} = int(gettimeofday());
@@ -900,12 +895,29 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    foreach my $key (sort keys %hidden)
    {
       if ($key !~ /^(lastState|lastTime|showDate|\(since):$/) {
+         # Create current summary reading
          $result .= " " if $result;
-         $result .= "$key ".statistics_FormatDuration($hidden{$key})
-            if $key !~ /_Count:$/; 
-         $result .= "$key ".$hidden{$key}
-            if $key =~ /_Count:$/; 
-         if ($saveLast) { delete $hidden{$key}; }
+         if ($key !~ /_Count:$/) 
+         {
+            #Store current value for single readings
+            $stat{$key} = statistics_FormatDuration($hidden{$key});
+            $result .= "$key ".$stat{$key};
+            # Reset hidden reading if period change
+            if ($saveLast) { delete $hidden{$key}; }
+         }
+         else
+         {
+            $result .= "$key ".$hidden{$key};
+            #Store current value for single readings
+            $stat{$key} = $hidden{$key};
+            # Reset hidden reading if period change
+            if ($saveLast && $key ne $state."_Count") {
+               delete $hidden{$key};
+            }
+            elsif ($saveLast && $key eq $state."_Count") {
+               $hidden{$key} = 1;
+            }
+         }
       }
    }
    if ($hidden{"showDate:"} == 1) { $result .= " (since: ".$hidden{"(since:"}; }
@@ -925,11 +937,25 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
    if ($singularReadings ne "") {
-      # statistics_storeSingularReadings for Duration 
-      # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$value,$saveLast
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,ucfirst($lastState),$period,0,$statValue,$saveLast);
-      # statistics_storeSingularReadings for Count
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName."_Count",$readingName,ucfirst($lastState)."_Count",$period,0,$statCount,$saveLast);
+      while (my ($statKey, $statValue) = each(%stat) )
+      {  
+         unless ($saveLast)
+         {
+            chop ($statKey);
+            # statistics_storeSingularReadings  
+            # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
+            statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,$statKey,$period,$statValue,0,$saveLast);
+         }
+         else
+         {
+            my $newValue = $hidden{$statKey};
+            chop ($statKey);
+            # statistics_storeSingularReadings  
+            # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
+            statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,$statKey,$period,$newValue,$statValue,$saveLast);
+         }
+      }
+      
    }
 
   # Store hidden reading
