@@ -927,9 +927,9 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    if ($singularReadings ne "") {
       # statistics_storeSingularReadings for Duration 
       # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$value,$saveLast
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,ucfirst($lastState),$period,$statValue,0,$saveLast);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,ucfirst($lastState),$period,0,$statValue,$saveLast);
       # statistics_storeSingularReadings for Count
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName."_Count",$readingName,ucfirst($lastState)."_Count",$period,$statCount,0,$saveLast);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName."_Count",$readingName,ucfirst($lastState)."_Count",$period,0,$statCount,$saveLast);
    }
 
   # Store hidden reading
@@ -1058,7 +1058,7 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i>
       </li><br>
-      <li><b>Duration</b> of the states over a period of day, month and year:
+      <li><b>Duration</b> (and counter) of the states over a period of day, month and year:
          <br>
          <i>lightsensor, lock, motion, Window, window, state (if no other reading is recognized)</i>
       </li><br>
@@ -1148,13 +1148,15 @@ sub statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes:period</code>
       <ul>
-         <li>statTypes: Min|Avg|Max|Delta|Duration|<span style="color:blue;">Tendency</span></li>
+         <li>statTypes: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
          <li>period: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
       </ul>
       <br>
-      Regulare expression of statistic values, which shall not be shown in summary but also in singular readings. Eases the creation of plots.
+      Regulare expression of statistic values, which shall not be shown in summary but also in singular readings. Eases the creation of plots. For duration readings the name of the state has to be used as statTypes.
       <br>
-      E.g. <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
+       Example: <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
+      <br>
+       <code>Badfenster:Window:(Open|Open_Count):Month</code>
       <br>
     </li><br>
    <li><code>specialDeltaPeriodHours &lt;hours&gt;</code>
@@ -1190,7 +1192,7 @@ sub statistics_UpdateDevReading($$$$)
       <li><b>Delta</b> Differenz zwischen Anfangs- und Endwerte innerhalb eines Zeitraums (Stunde, Tag, Monat, Jahr):
          <br>
          <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i></li>
-      <li><b>Duration</b> Dauer der Zust&auml;nde (on, off, open, closed ...) innerhalb eines Zeitraums (Tag, Monat, Jahr):
+      <li><b>Duration</b> Dauer und Anzahl der Zust&auml;nde (on, off, open, closed ...) innerhalb eines Zeitraums (Tag, Monat, Jahr):
          <br>
          <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
   </ul>
@@ -1283,13 +1285,15 @@ sub statistics_UpdateDevReading($$$$)
       </li><br>
       <li><code>singularReadings &lt;Ger&auml;teNameRegExp:Ger&auml;teWertRegExp:Statistiktypen:Zeitraum&gt;</code>
          <ul>
-            <li>Statistiktypen: Min|Avg|Max|Delta|Duration|<span style="color:blue;">Tendency</span></li>
+            <li>Statistiktypen: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
             <li>Zeitraum: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
          </ul>
          Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
-         Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify). 
+         Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify). F&uuml;r "duration"-Ger&auml;tewerte muss der Name des jeweiligen Statuswertes als Statistiktyp eingesetzt werden.
          <br>
-         z.B. <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
+          Beispiel: <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
+         <br>
+          <code>Badfenster:Window:(Open|Open_Count):Month</code>
       </li><br>
       <li><code>specialDeltaPeriodHours &lt;Stunden&gt;</code>
          <br>
