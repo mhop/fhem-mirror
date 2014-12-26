@@ -346,6 +346,7 @@ HUEBridge_Parse($$)
 
   $hash->{name} = $result->{name};
   $hash->{swversion} = $result->{swversion};
+  $hash->{apiversion} = $result->{apiversion};
 
   if( defined( $result->{swupdate} ) ) {
     my $txt = $result->{swupdate}->{text};

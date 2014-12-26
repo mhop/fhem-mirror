@@ -158,7 +158,6 @@ sub HUEDevice_Define($$)
   my ($name, $type, $id, $interval) = @args;
 
   $hash->{STATE} = 'Initialized';
-  $hash->{helper}{interfaces}= "dimmer";
 
   $hash->{ID} = $hash->{helper}->{group}.$id;
 
@@ -788,6 +787,7 @@ HUEDevice_Parse($$)
   }
 
   $hash->{modelid} = $result->{modelid};
+  $hash->{uniqueid} = $result->{uniqueid};
   $hash->{swversion} = $result->{swversion};
 
 
