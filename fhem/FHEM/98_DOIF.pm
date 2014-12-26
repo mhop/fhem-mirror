@@ -35,7 +35,7 @@ DOIF_Initialize($)
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always cmdState state";
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame waitsame cmdpause";
 }
 
 
@@ -90,7 +90,14 @@ InternalDoIf($$$)
       $element=$r;
     }
     return($element);
+}
 
+sub
+ReadingSecDoIf($$)
+{
+  my ($name,$reading)=@_;
+  my ($seconds, $microseconds) = gettimeofday();
+  return ($seconds - time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00")));
 }
 
 sub
@@ -122,12 +129,12 @@ EvalAllDoIf($)
     ($beginning,$eval,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\{\}]');
     return ($eval,$err) if ($err);
     if ($eval) {
-      if (substr($eval,0,1) eq "(") {
+      if ($eval =~ m/^[\d]+$/) {
+        $eval="{".$eval."}";
+      } else {
         my $ret = eval $eval;
         return($eval." ",$@) if ($@);
         $eval=$ret;
-      } else {
-        $eval="{".$eval."}";
       }
     }
     $cmd.=$beginning.$eval;
@@ -151,13 +158,15 @@ sub ReplaceReadingDoIf($)
       if ($format) {
         if ($format eq "d") {
           $regExp = '(-?\d+(\.\d+)?)';
+        } elsif ($format eq "sec") {
+          return("ReadingSecDoIf('$name','$reading')","",$name,$reading,undef);
         } elsif (substr($format,0,1) eq '[') {
-            ($beginning,$regExp,$err,$tailBlock)=GetBlockDoIf($format,'[\[\]]');
-            return ($regExp,$err) if ($err);
-            return ($regExp,"no round brackets in regular expression") if ($regExp !~ /.*\(.*\)/);
-          } else {
-            return($format,"unknown expression format");
-          }  
+          ($beginning,$regExp,$err,$tailBlock)=GetBlockDoIf($format,'[\[\]]');
+          return ($regExp,$err) if ($err);
+          return ($regExp,"no round brackets in regular expression") if ($regExp !~ /.*\(.*\)/);
+        } else {
+          return($format,"unknown expression format");
+        }  
       } 
       if ($internal) {
         return("InternalDoIf('$name','$internal','$regExp')","",$name,undef,$internal);
@@ -197,21 +206,26 @@ sub ReplaceAllReadingsDoIf($$$$)
   my $definition=$tailBlock;
   my $reading;
   my $internal;
+  my $trigger=1;
   while ($tailBlock ne "") {
+    $trigger=1;
     ($beginning,$block,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\[\]]');
     return ($block,$err) if ($err);
     if ($block ne "") {
+      if (substr($block,0,1) eq "?") {
+        $block=substr($block,1);
+        $trigger=0;
+      }
       if ($condition >= 0) {
-	      ($timer,$err)=DOIF_CheckTimers($hash,$block,$condition,\@timerarray);
+	      ($timer,$err)=DOIF_CheckTimers($hash,$block,$condition,$trigger,\@timerarray);
 		    return($timer,$err) if ($err);
         if ($timer) {
           $cmd.=$beginning.$timer;
-          $event=1;
+          $event=1 if ($trigger);
           next;
         }
       }
-      if ($block =~ /:/ or ($block =~ /[a-z]/i and $block =~ /^[a-z0-9._]*$/i))
-      {
+      if ($block =~ /:/ or ($block =~ /[a-z]/i and $block =~ /^[a-z0-9._]*$/i)) {
         ($block,$err,$device,$reading,$internal)=ReplaceReadingDoIf($block);
         return ($block,$err) if ($err);
         if ($eval) {
@@ -221,16 +235,18 @@ sub ReplaceAllReadingsDoIf($$$$)
           return($block." ",$@) if ($@);
           $block=$ret;
         } 
-        if ($condition >= 0) {
-          $hash->{devices}{$condition} = AddItemDoIf($hash->{devices}{$condition},$device);
-          $hash->{devices}{all} = AddItemDoIf($hash->{devices}{all},$device);
-          $hash->{readings}{$condition} = AddItemDoIf($hash->{readings}{$condition},"$device:$reading") if (defined ($reading));
-          $hash->{internals}{$condition} = AddItemDoIf($hash->{internals}{$condition},"$device:$internal") if (defined ($internal));
-          $hash->{readings}{all} = AddItemDoIf($hash->{readings}{all},"$device:$reading") if (defined ($reading));
-          $hash->{internals}{all} = AddItemDoIf($hash->{internals}{all},"$device:$internal") if (defined ($internal));
-          $event=1;
-        } elsif ($condition == -2) {
-          $hash->{state}{device} = AddItemDoIf($hash->{state}{device},$device) if ($device ne $hash->{NAME});
+        if ($trigger) {
+          if ($condition >= 0) {
+            $hash->{devices}{$condition} = AddItemDoIf($hash->{devices}{$condition},$device);
+            $hash->{devices}{all} = AddItemDoIf($hash->{devices}{all},$device);
+            $hash->{readings}{$condition} = AddItemDoIf($hash->{readings}{$condition},"$device:$reading") if (defined ($reading));
+            $hash->{internals}{$condition} = AddItemDoIf($hash->{internals}{$condition},"$device:$internal") if (defined ($internal));
+            $hash->{readings}{all} = AddItemDoIf($hash->{readings}{all},"$device:$reading") if (defined ($reading));
+            $hash->{internals}{all} = AddItemDoIf($hash->{internals}{all},"$device:$internal") if (defined ($internal));
+            $event=1;
+          } elsif ($condition == -2) {
+            $hash->{state}{device} = AddItemDoIf($hash->{state}{device},$device) if ($device ne $hash->{NAME});
+          }
         }
       } else {
         $block="[".$block."]";
@@ -238,7 +254,7 @@ sub ReplaceAllReadingsDoIf($$$$)
     }
     $cmd.=$beginning.$block;
   }
-  return ($definition,"no state, reading or time in condition") if ($condition >=0 and $event == 0);
+  return ($definition,"no trigger in condition") if ($condition >=0 and $event == 0);
   return ($cmd,"");
 }
 
@@ -259,6 +275,12 @@ ParseCommandsDoIf($$$)
     if ($tailBlock=~ /^\s*\{/) { # perl block
       ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\{\}]'); 
       return ($currentBlock,$err) if ($err);
+      if ($currentBlock ne "") {
+         ($currentBlock,$err)=ReplaceAllReadingsDoIf($hash,$currentBlock,-1,$eval);
+         return ($currentBlock,$err) if ($err);
+         ($currentBlock,$err)=EvalAllDoIf($currentBlock);
+         return ($currentBlock,$err) if ($err);
+      }
       $currentBlock="{".$currentBlock."}";
     } elsif ($tailBlock =~ /^\s*IF/) {
       my $ifcmd="";
@@ -306,20 +328,20 @@ ParseCommandsDoIf($$$)
 }
 
 sub
-DOIF_CheckTimers($$$$)
+DOIF_CheckTimers($$$$$)
 {
   my $i=0;
   my @nrs;
   my @times;
-  my $nr;
+  my $nr=0;
   my $days="";
   my $err;
   my $beginning;
   my $pos;
   my $time;
   my $block;
-  my ($hash,$timer,$condition,$timerarray)=@_;
-  if ($timer =~ /^((\{.*\})|([0-2][0-9](:[0-5][0-9]){1,2}))(\|[0-8]+$|-([0-2][0-9](:[0-5][0-9]){1,2})|-({.*})|$)(\|[0-8]+$|$)/) {
+  my ($hash,$timer,$condition,$trigger,$timerarray)=@_;
+  if ($timer =~ /^(\+)?((\{.*\})|([0-9][0-9](:[0-5][0-9]){1,2}))(\|[0-8]+$|-(\+)?([0-9][0-9](:[0-5][0-9]){1,2})|-(\+)?({.*})|$)(\|[0-8]+$|$)/) {
     while ($timer ne "") {
       if ($timer=~ /^\s*\{/) { 
         ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\{\}]'); 
@@ -338,16 +360,15 @@ DOIF_CheckTimers($$$$)
         ($time,$days)=split(/\|/,$timer);
         $timer="";
       }
-      $nr=$hash->{helper}{last_timer}++;
       $times[$i]=$time;
-      $nrs[$i++]=$nr;
+      $nrs[$i++]=$hash->{helper}{last_timer}++;
       $timer=substr($timer,pos($timer)) if ($timer =~ /^\s*\-/g);
     }
     $days = "" if (!defined ($days));
     for (my $j=0; $j<$i;$j++) {
       $nr=$nrs[$j];
       $time=$times[$j];
-      $time .=":00" if ($time =~ m/^[0-2][0-9]:[0-5][0-9]$/);
+      $time .=":00" if ($time =~ m/^[0-9][0-9]:[0-5][0-9]$/);
       $hash->{timer}{$nr}=0;
       $hash->{time}{$nr}=$time;
       $hash->{timeCond}{$nr}=$condition;
@@ -355,7 +376,7 @@ DOIF_CheckTimers($$$$)
       ${$timerarray}[$nr]={hash=>$hash,nr=>$nr};
       $err=(DOIF_SetTimer("DOIF_TimerTrigger",\${$timerarray}[$nr]));
       return($hash->{time}{$nr},$err) if ($err);
-      $hash->{timers}{$condition}.=" $nr ";
+      $hash->{timers}{$condition}.=" $nr " if ($trigger);
       $hash->{timerfunc}{$nr}=\${$timerarray}[$nr];
     }
     if ($i == 2) {
@@ -512,7 +533,49 @@ DOIF_cmd ($$$)
   my $ret;
   my $cmd;
   my $err="";
-  if ($hash->{do}{$nr}) {
+  my $repeatnr;
+  my $last_cmd=ReadingsVal($pn,"cmd_nr",0)-1;
+  my @repeatsame=split(/:/,AttrVal($pn,"repeatsame",""));
+  my @cmdpause=split(/:/,AttrVal($pn,"cmdpause",""));
+  my @waitsame=split(/:/,AttrVal($pn,"waitsame",""));
+  my ($seconds, $microseconds) = gettimeofday();
+  if ($cmdpause[$nr]) {
+    return undef if ($seconds - time_str2num(ReadingsTimestamp($pn, "state", "1970-01-01 01:00:00")) < $cmdpause[$nr]);
+  }
+  if (AttrVal($pn,"repeatsame","")) {
+    if ($repeatsame[$nr]) {
+      $repeatnr=ReadingsVal($pn,"cmd_count",0);
+      if ($last_cmd == $nr) {
+        if ($repeatnr < $repeatsame[$nr]) {
+          $repeatnr++;
+        } else {
+          return undef;
+        }
+      } else {
+        $repeatnr=1;
+      }
+      readingsSingleUpdate ($hash, "cmd_count", $repeatnr,1);
+    } else {
+      return undef if ($last_cmd == $nr and AttrVal($pn,"do","") ne "always");
+      delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
+    }
+  }
+  if (AttrVal($pn,"waitsame","")) {
+    if ($waitsame[$nr]) {
+      my $cmd_nr="cmd_".($nr+1);
+      if (ReadingsVal($pn,"waitsame","") eq $cmd_nr) {
+        if ($seconds - time_str2num(ReadingsTimestamp($pn, "waitsame", "1970-01-01 01:00:00"))  > $waitsame[$nr]) {
+          readingsSingleUpdate ($hash, "waitsame", $cmd_nr,1);
+          return undef;
+        }
+      } else {
+        readingsSingleUpdate ($hash, "waitsame", $cmd_nr,1);
+        return undef;
+      }
+    } 
+    delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
+  }
+  if ($hash->{do}{$nr}) { 
     ($cmd,$err)=ParseCommandsDoIf($hash,$hash->{do}{$nr},1);
   }
   DOIF_SetState ($hash,$nr,$event,$err);
@@ -560,15 +623,9 @@ DOIF_Trigger ($$$)
     }
   }
   if ($doelse) {  #DOELSE
-    if (defined ($hash->{do}{$max_cond})) {  #DOELSE does exist
+    if (defined ($hash->{do}{$max_cond}) or $max_cond == 1) {  #DOELSE
       if (DOIF_SetSleepTimer($hash,$last_cond,$max_cond,$device,$timerNr)) {
         DOIF_cmd ($hash,$max_cond,$event) ;
-        return 1;
-      }
-    }
-    elsif ($max_cond == 1) {
-      if (DOIF_SetSleepTimer($hash,$last_cond,$max_cond,$device,$timerNr)) {
-        DOIF_SetState($hash,$max_cond,$event,"");
         return 1;
       }
     }
@@ -602,6 +659,11 @@ DOIF_Notify($$)
         readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$internal,$defs{$device}{$internal},0) if ($item and $device eq $dev->{NAME} and $defs{$device}{$internal});
       }
     }
+    #my ($seconds, $microseconds) = gettimeofday();
+    #if ($hash->{helper}{last_event_time}) {
+    #  return undef if (($seconds-$hash->{helper}{last_event_time}) < AttrVal($pn,"eventpause",0));
+    #}
+    #$hash->{helper}{last_event_time}=$seconds;
     $ret=DOIF_Trigger($hash,$dev->{NAME},-1);
   }
   if (($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / and !$ret) {
@@ -617,7 +679,8 @@ my ($timer)=@_;
   my $nr=${$timer}->{nr};
   my $hash=${$timer}->{hash};
   my $ret;
-  if (!AttrVal($hash->{NAME},"disable","")) {$hash->{timer}{$nr}=1;
+  if (!AttrVal($hash->{NAME},"disable","")) {
+    $hash->{timer}{$nr}=1;
     $ret=DOIF_Trigger ($hash,"",$nr);
     $hash->{timer}{$nr}=0;
   }
@@ -633,6 +696,12 @@ DOIF_SetTimer($$)
   my $hash=${$timer}->{hash};
   my $timeStr=$hash->{time}{$nr};
   my $cond=$hash->{timeCond}{$nr};
+  my $rel=0;
+  my $next_time;
+  if (substr($timeStr,0,1) eq "+") {
+    $timeStr=substr($timeStr,1);
+    $rel=1;
+  }
   my ($err, $h, $m, $s, $fn) = GetTimeSpec($timeStr);
   return $err if($err);
   my $second = $h*3600+$m*60+$s;
@@ -642,8 +711,12 @@ DOIF_SetTimer($$)
   my $isdst_now=$isdst;
   my $sec_today = $hour*3600+$min*60+$sec;
   my $midnight = $now-$sec_today;
-  my $next_time = $midnight+$second;
-  $next_time+=86400 if ($sec_today>=$second);
+  if ($rel) {
+    $next_time =$now+$second;
+  } else {
+    $next_time = $midnight+$second;
+  }
+  $next_time+=86400 if ($sec_today>=$second and !$rel);
   ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($next_time);
   if ($isdst_now != $isdst) {
     if ($isdst_now == 1) {
@@ -667,7 +740,7 @@ DOIF_SetSleepTimer($$$$$)
   my ($hash,$last_cond,$nr,$device,$timerNr)=@_;
   my $pn = $hash->{NAME};
   return 1 if ($timerNr == -2); #Sleeptrigger
-  if ($hash->{helper}{sleeptimer} != -1 and $hash->{helper}{sleeptimer} != $nr) {
+  if ($hash->{helper}{sleeptimer} != -1 and ($hash->{helper}{sleeptimer} != $nr or AttrVal($pn,"do","") eq "resetwait")) {
     RemoveInternalTimer($hash);
     #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
     readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
@@ -675,13 +748,13 @@ DOIF_SetSleepTimer($$$$$)
   }
   
   if ($timerNr >= 0) {#Timer
-    if ($last_cond != $nr or AttrVal($pn,"do","") eq "always") {
+    if ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"repeatsame","")) {
       return 1;
     } else {
       return 0;
     }
   } 
-  if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or AttrVal($pn,"do","") eq "always")) {
+  if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"do","") eq "resetwait" or AttrVal($pn,"repeatsame",""))) {
     my @sleeptimer=split(/:/,AttrVal($pn,"wait",""));
     if ($sleeptimer[$nr]) {
       my ($seconds, $microseconds) = gettimeofday();
@@ -859,6 +932,11 @@ DOIF_Attr(@)
       #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
       readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
       $hash->{helper}{sleeptimer}=-1;
+  } elsif($a[0] eq "set" && $a[2] eq "initialize") {
+    readingsSingleUpdate ($hash,"state",$a[3],1);
+    readingsSingleUpdate ($hash,"cmd_nr","0",1);
+  } elsif($a[0] eq "del" && $a[2] eq "repeatsame") {
+    delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
   }
   return undef;
 }
@@ -901,11 +979,13 @@ DOIF is a universal module. It works event- and time-controlled.<br>
 <br>
 It combines the functionality of a notify, at-, watchdog command with logical queries.<br>
 <br>
-With the module complex problems to be solved that would otherwise be realized with individual modules in several places in FHEM. This leads to clear solutions and simplifies their maintenance.<br>
+Complex problems can be solved with this module, which would otherwise be solved only with several modules at different locations in FHEM. This leads to clear solutions and simplifies their maintenance.<br>
 <br>
-There is no need event in the event monitor to analyze. Instead, the status, readings or Internals of devices are specified.<br>
-<br>
-The state administration is an important distinguishing feature of DOIF to notify or at. In the module is executed last command detained and prevented repeatedly executing the same commands..<br>
+Logical queries are created in conditions using Perl operators.
+These are combined with information from states, readings, internals of devices or times in square brackets.
+Arbitrary Perl functions can also be specified that are defined in FHEM.<br>
+The module is triggered by time or by events information through the Devices specified in the condition.<br>
+If a condition is true, the associated FHEM- or Perl commands are executed.<br>
 <br>
 Syntax:<br>
 <br>
@@ -915,40 +995,23 @@ The commands are always processed from left to right. There is only one command 
 <br>
 <b>Features</b><br>
 <ol><br>
-+ Intuitive syntax, as used in branches (if-then-elseif-else) in higher-level languages<br>
-+ In the condition of any logical queries can be made as well as perl functions are used (full perl support)<br>
-+ It can be any FHEM commands and perl commands are executed<br>
-+ You can specify any number of Devices and times in the condition<br>
-+ Syntax checking at the time of definition are identified missing brackets<br>
-+ no filtering of events, like notify about regular expressions, required<br>
-+ Status is specified with <code>[&lt;devicename&gt;]</code>, readings with <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code><br>
-+ Time information on the condition: <code>[HH:MM:SS]</code> or <code>[HH:MM]</code> or <code>[{&lt;perl-function&gt;}]</code><br>
-+ Time intervals: <code>[&lt;begin&gt;-&lt;end&gt;]</code> for <code>&lt;begin&gt;</code> and <code>&lt;end&gt;</code>, the above time format can be selected.<br>
-+ Weekday control: <code>[&lt;time&gt;|012345678]</code> or <code>[&lt;begin&gt;-&lt;end&gt;|012345678]</code> (0-6 corresponds to Sunday through Saturday) such as 7 for $we and 8 for !$we<br>
-+ Any number DOELSEIF-cases<br>
-+ DOELSE at the end is optional<br>
-+ Execution only once after state change (the default) or always possible.<br>
-+ Delay specification with resetting is possible (watchdog function)<br>
-+ The execution part can be left out in each case. So that the module can be used for pure status display.<br>
-+ Definition of the status display with use of any readings or statuses<br>
++ intuitive syntax, as used in branches (if - elseif-....elseif - else) in higher-level languages<br>
++ in the condition of any logical queries can be made as well as perl functions are used (full perl support)<br>
++ it can be any FHEM commands and perl commands are executed<br>
++ syntax checking at the time of definition are identified missing brackets<br>
++ status is specified with <code>[&lt;devicename&gt;]</code>, readings with <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code> or internals with <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code><br>
++ time information on the condition: <code>[HH:MM:SS]</code> or <code>[HH:MM]</code> or <code>[{&lt;perl-function&gt;}]</code><br>
++ time intervals: <code>[&lt;begin&gt;-&lt;end&gt;]</code> for <code>&lt;begin&gt;</code> and <code>&lt;end&gt;</code>, the above time format can be selected.<br>
++ relative times preceded by a plus sign <code>[+&lt;time&gt;]</code> or <code>[+&lt;begin&gt;-+&lt;end&gt;]</code> combined with Perl functions<br>
++ weekday control: <code>[&lt;time&gt;|012345678]</code> or <code>[&lt;begin&gt;-&lt;end&gt;|012345678]</code> (0-6 corresponds to Sunday through Saturday) such as 7 for $we and 8 for !$we<br>
++ statuses, readings, internals und time intervals for only queries without trigger with [?...]<br>
++ DOELSEIF cases and DOELSE at the end are optional<br>
++ delay specification with resetting is possible (watchdog function)<br>
++ the execution part can be left out in each case. So that the module can be used for pure status display.<br>
++ definition of the status display with use of any readings or statuses<br>
 </ol><br>
-In the condition, but also in the execution part states, readings or internals are given in square brackets. The syntax is:<br>
 <br>
-<code>[&lt;device&gt;:&lt;reading&gt;:&lt;format&gt;|[&lt;regular expression&gt;]]</code> or <code>[&lt;device&gt;:&&lt;internal&gt;:&lt;format&gt;|[&lt;regular expression&gt;]]</code><br>
-<br>
-<code>&lt;format&gt;</code> and <code>[&lt;regular expression&gt;]</code> are filter options und are optional.<br>
-<br>
-possible <code>&lt;format&gt;</code>:<br>
-<br>
-<code>'d'</code>  for decimal number.<br>
-<br>
-<code>[&lt;device&gt;:&lt;reading&gt;:d]</code> corresponsed to <code>[&lt;device&gt;:&lt;reading&gt;:[(-?\d+(\.\d+)?)]]</code><br>
-<br>
-If only the state of a device is to be used, then only the device can be specified:<br>
-<br>
-<code>[&lt;device&gt;]</code> corresponsed to <code>[&lt;device&gt;:&STATE]</code><br>
-<br>
-Many examples - see german section. 
+Many examples with english identifiers - see german section. 
 <br>
 </ul>
 =end html
@@ -963,63 +1026,63 @@ Es vereinigt die Funktionalität eines notify-, at-, watchdog-Befehls in Kombina
 <br>
 Damit können insb. komplexere Problemstellungen innerhalb eines DOIF-Moduls gelöst werden, die sonst nur mit Hilfe einzelner Module an mehreren Stellen in FHEM vorgenommen werden müssten. Das führt zu übersichtlichen Lösungen und vereinfacht deren Pflege.<br>
 <br>
-Es müssen für die Abfragen nicht Events im Eventmonitor analysiert werden, stattdessen werden der Status bzw. Readings oder Internals von Devices angegeben.<br>
-<br>
-Ein wichtiges Unterscheidungsmerkmal von DOIF zu notify oder at ist die Zustandsverwaltung. Im Modul wird das zuletzt ausgeführt Kommando festgehalten und ein wiederholtes Ausführen desselben Kommandos unterbunden.<br>
+Logische Abfragen werden in Bedingungen mit Hilfe von Perl-Operatoren erstellt.
+Diese werden mit Angaben von Stati, Readings, Internals von Devices oder Zeiten in eckigen Klammern kombiniert. Ebenso können beliebige Perl-Funktionen angegeben werden, die in FHEM definiert sind.<br>
+Getriggert wird das Modul durch Zeitangaben bzw. durch Ereignisse ausgelöst durch die in der Bedingung angegebenen Devices.
+Wenn eine Bedingung wahr wird, so werden die dazugehörigen FHEM- bzw. Perl-Kommandos ausgeführt.<br>
 <br>
 Syntax:<br>
 <br>
 <code>define &lt;name&gt; DOIF (&lt;Bedingung&gt;) (&lt;Befehle&gt;) DOELSEIF (&lt;Bedingung&gt;) (&lt;Befehle&gt;) DOELSEIF ... DOELSE (&lt;Befehle&gt;)</code><br>
 <br>
-Die Angaben werden immer von links nach rechts abgearbeitet. Es wird immer nur ein Kommando ausgeführt, und zwar das erste, für das die dazugehörige Bedingung in der abgearbeiteten Reihenfolge wahr ist. Hinzu kommt, dass nur die Bedingungen überprüft werden, die zum ausgelösten Event auch ein Device beinhalten (Angaben in eckigen Klammern).<br>
+Die Angaben werden immer von links nach rechts abgearbeitet. Es wird immer nur ein Kommando ausgeführt, und zwar das erste, für das die dazugehörige Bedingung in der abgearbeiteten Reihenfolge wahr ist. Hinzu kommt, dass nur die Bedingungen überprüft werden, die zum ausgelösten Event auch das Device beinhalten.<br>
 <br>
 <b>Features</b><br>
 <ol><br>
-+ Intuitive Syntax, wie sie bei Verzweigungen (if-then-elseif-else) in höheren Sprachen üblich ist<br>
-+ In der Bedingung können beliebige logische Abfragen gemacht sowie Perl-Funktionen benutzt werden (volle Perl-Unterstützung)<br>
-+ Es können beliebige FHEM-Befehle sowie Perl-Kommandos ausgeführt werden<br>
-+ Es können beliebig viele Devices und Zeiten in der Bedingung angegeben werden<br>
-+ Syntaxüberprüfung zum Zeitpunkt der Definition: Es werden fehlende Klammern erkannt<br>
-+ keine Filterung von Ereignissen, wie bei notify über reguläre Ausdrücke, erforderlich<br>
-+ Status wird mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code> in der Bedingung sowie bei FHEM-Befehlen angegeben<br>
++ Syntax angelehnt an Verzweigungen if - elseif - ... - elseif - else in höheren Sprachen<br>
++ Bedingungen werden vom Perl-Interpreter ausgewertet, daher beliebige logische Abfragen möglich<br>
++ Die Perl-Syntax wird um Angaben von Stati, Readings, Internals und Zeitangaben in eckigen Klammern erweitert, diese führen zur Triggerung des Moduls<br>
++ Status wird mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code> und Internals mit <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code> angegeben<br>
 + Zeitangaben in der Bedingung: <code>[HH:MM:SS]</code> oder <code>[HH:MM]</code> oder <code>[{&lt;perl-function&gt;}]</code><br>
 + Zeitintervalle: <code>[&lt;begin&gt;-&lt;end&gt;]</code> für <code>&lt;begin&gt;</code> bzw. <code>&lt;end&gt;</code> kann das obige Zeitformat gewählt werden<br>
++ relative Zeitangaben mit vorangestelltem Pluszeichen <code>[+&lt;time&gt;]</code> oder <code>[+&lt;begin&gt;-+&lt;end&gt;]</code> kombinierbar mit Perl-Funktionen s. o.<br>
 + Wochentagsteuerung: <code>[&lt;time&gt;|012345678]</code> oder <code>[&lt;begin&gt;-&lt;end&gt;|012345678]</code> (0-6 entspricht Sonntag bis Samstag) sowie 7 für $we und 8 für !$we<br>
-+ Es können beliebig viele DOELSEIF-Angaben gemacht werden<br>
-+ DOELSE am Ende der Kette ist optional<br>
-+ Ausführung nur einmal nach Zustandswechsel (Standardeinstellung) oder immer wieder ist möglich<br>
-+ Verzögerungsangabe mit Zurückstellung ist möglich (watchdog Funktionalität)<br>
++ Stati, Readings, Internals und Zeitintervalle für Abfragen ohne Triggerung des Moduls, werden mit einem vorangestellen Fragezeichen angegeben <code>[?...]</code><br>
++ Es können beliebig viele DOELSEIF-Angaben gemacht werden, sie sind, wie DOELSE am Ende der Kette, optional<br>
++ Verzögerungsangaben mit Zurückstellung sind möglich (watchdog-Funktionalität)<br>
 + Der Ausführungsteil kann jeweils ausgelassen werden. Damit kann das Modul für reine Statusanzeige genutzt werden<br>
-+ Definition der Statusanzeige mit Nutzung beliebiger Readings bzw. Stati<br>
 </ol><br>
-In der Bedingung, aber auch im Ausführungsteil werden Stati, Readings oder Internals in eckigen Klammern angegeben. Die Syntax lautet:<br>
-<br>
-<code>[&lt;device&gt;:&lt;reading&gt;:&lt;format&gt;|[&lt;regulärer Ausdruck&gt;]]</code> bzw. <code>[&lt;device&gt;:&&lt;internal&gt;:&lt;format&gt;|[&lt;regulärer Ausdruck&gt;]]</code><br>
-<br>
-<code>&lt;format&gt;</code> und <code>[&lt;regulärer Ausdruck&gt;]</code> sind Filteroptionen, sie können optional genutzt werden.<br>
-<br>
-Mögliche Formatangaben für <code>&lt;format&gt;</code> sind:<br>
-<br>
-<code>'d'</code> zum Filtern von positiven und negativen Dezimalzahlen.<br>
-<br>
-<code>[&lt;device&gt;:&lt;reading&gt;:d]</code> entspricht <code>[&lt;device&gt;:&lt;reading&gt;:[(-?\d+(\.\d+)?)]]</code><br>
-<br>
-Wenn nur der Status eines Devices genutzt werden soll, dann kann auch nur das Device angeben werden:<br>
-<br>
-<code>[&lt;device&gt;]</code> entspricht <code>[&lt;device&gt;:&STATE]</code><br>
-<br>
 <br>
 <b>Ereignissteuerung</b><br>
 <br>
-Einfache Ereignissteuerung wie beim notify mit einmaliger Ausführung beim Zustandswechsel, "remotecontrol" ist hier ein Device, es wird in eckigen Klammern angegeben. Ausgewertet wird der Status des Devices - nicht das Event.<br>
+Vergleichende Abfragen werden, wie in Perl gewohnt, mit Operatoren <code>==, !=, <, <=, >, >=</code> bei Zahlen und mit <code>eq, ne, lt, le, gt, ge, =~</code> bei Zeichenketten angegeben.
+Logische Verknüpfungen sollten zwecks Übersichtlichkeit mit <code>and</code> bzw. <code>or</code> vorgenommen werden.
+Selbstverständlich lassen sich auch alle anderen Perl-Operatoren verwenden, da die Auswertung der Bedingung vom Perl-Interpreter vorgenommen wird.
+Die Reihenfolge der Auswertung wird, wie in höheren Sprachen üblich, durch runde Klammern beeinflusst.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Einfache Ereignissteuerung wie beim notify mit einmaliger Ausführung beim Zustandswechsel, "remotecontrol" ist hier ein Device, es wird in eckigen Klammern angegeben. Ausgewertet wird der Status des Devices - nicht das Event.<br>
 <br>
 <code>define di_garage DOIF ([remotecontrol] eq "on") (set garage on) DOELSEIF ([remotecontrol] eq "off")  (set garage off)</code><br>
 <br>
-Die Ausführung erfolgt standardmäßig nur nach Zustandswechsel des Moduls (nicht des Aktors). Das bedeutet, dass ein mehrmaliges Drücken der Fernbedienung auf "on" nur einmal "set garage on" ausführt. Wünscht man eine Ausführung bei jedem Trigger, weil z. B. Garage nicht nur über die Fernbedienung geschaltet wird, dann muss man das per "do always"-Attribut angeben:<br>
+Das Modul wird getriggert, sobald das angegebene Device hier "remotecontrol" ein Event erzeugt. Das geschieht, wenn irgendein Reading oder der Status von "remotecontrol" aktualisiert wird.
+Die Ausführung erfolgt standardmäßig nur nach Zustandswechsel des Moduls (nicht des Aktors).
+Das bedeutet, dass ein mehrmaliges Drücken der Fernbedienung auf "on" nur einmal "set garage on" ausführt.
+Wünscht man eine Ausführung bei jedem Trigger, weil z. B. Garage nicht nur über die Fernbedienung geschaltet wird, dann muss man das per "do always"-Attribut angeben:<br>
 <br>
 <code>attr di_garage do always</code><br>
 <br>
+Abfragen nach Vorkommen eines Wortes innerhalb einer Zeichenkette können mit Hilfe des Perl-Operators <code>=~</code> vorgenommen werden.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Garage soll beim langen Tastendruck öffnen, hier: wenn das Wort "Long" im Status vorkommt (bei HM-Komponenten stehen im Status noch weitere Informationen).<br>
+<br>
+<code>define di_garage DOIF ([remotecontrol] =~ "Long") (set garage on)<br>
+attr di_garage do always</code><br>
+<br>
+Weitere Möglichkeiten bei der Nutzung des Perl-Operators: <code>=~</code>, insbesondere in Verbindung mit regulären Ausdrücken, können in der Perl-Dokumentation nachgeschlagen werden.<br>
+<br>
 <b>Zeitsteuerung</b><br>
+<br>
+<u>Anwendungsbeispiele</u>:<br>
 <br>
 Einschalten um 8:00 Uhr, ausschalten um 10:00 Uhr. Mehrere FHEM-Befehle werden mit Komma, statt mit Semikolon voneinander getrennt:<br>
 <br>
@@ -1033,7 +1096,18 @@ Zeitsteuerung mit mehreren Zeitschaltpunkten:<br>
 <br>
 <code>define di_light DOIF ([08:00] or [10:00] or [20:00]) (set switch on) DOELSEIF ([09:00] or [11:00] or [00:00]) (set switch off)</code><br>
 <br>
-Zeitsteuerung mit Zeitintervallen:<br>
+<b>Relative Zeitangaben</b><br>
+<br>
+Zeitangaben, die mit Pluszeichen beginnen, werden relativ behandelt, d. h. die angegebene Zeit wird zum aktuellen Zeitpunkt hinzuaddiert.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Automatisches Speichern der Konfiguration im Stundentakt:<br>
+<br>
+<code>define di_save DOIF ([+01:00]) (save)<br>
+attr di_save do always</code><br>
+<br>
+<b>Zeitsteuerung mit Zeitintervallen</b><br>
+<br>
+<u>Anwendungsbeispiele</u>:<br>
 <br>
 Radio soll zwischen 8:00 und 10:00 Uhr an sein:<br>
 <br>
@@ -1067,7 +1141,9 @@ in Verbindung mit Wochentagen (einschalten am Freitag ausschalten am Folgetag):<
 <br>
 <code>define di_light DOIF ([22:00-07:00|5]) (set light on) DOELSE (set light off) </code><br>
 <br>
-Zeitintervalle über mehrere Tage müssen als Zeitpunkte angegeben werden, z. B. einschalten am Freitag ausschalten am Montag:<br>
+Zeitintervalle über mehrere Tage müssen als Zeitpunkte angegeben werden.<br>
+<br>
+Einschalten am Freitag ausschalten am Montag:<br>
 <br>
 <code>define di_light DOIF ([22:00|5]) (set light on) DOELSEIF ([10:00|1]) (set light off) </code><br>
 <br>
@@ -1077,35 +1153,46 @@ Schalten bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
 <b>Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</b><br>
 <br>
-Lampe soll ab 6:00 Uhr angehen, wenn es dunkel ist und wieder ausgehen, wenn es hell wird, spätestens aber um 9:00 Uhr:<br>
+<u>Anwendungsbeispiel</u>: Lampe soll ab 6:00 Uhr angehen, wenn es dunkel ist und wieder ausgehen, wenn es hell wird, spätestens aber um 9:00 Uhr:<br>
 <br>
 <code>define di_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
 <br>
-Rollläden sollen an Arbeitstagen nach 6:25 Uhr hochfahren, wenn es hell wird, am Wochenende erst um 9:00 Uhr, herunter sollen sie wieder, wenn es dunkel wird:<br>
+<u>Anwendungsbeispiel</u>: Rollläden sollen an Arbeitstagen nach 6:25 Uhr hochfahren, wenn es hell wird, am Wochenende erst um 9:00 Uhr, herunter sollen sie wieder, wenn es dunkel wird:<br>
 <br>
 <code>define di_shutters DOIF ([sensor:brightness]&gt;100 and [06:25-09:00|8] or [09:00|7]) (set shutters up) DOELSEIF ([sensor:brightness]&lt;50) (set shutters down)</code><br>
 <br>
-<b>Nutzung von Readings, Stati oder Internals im FHEM-Ausführungsteil</b><br>
+<b>Zeitintervalle, Readings und Stati ohne Trigger</b><br>
 <br>
-Wenn ein Taster betätigt wird, soll Lampe1 mit dem aktuellen Zustand der Lampe2 geschaltet werden:<br>
+Angaben in eckigen Klammern, die mit einem Fragezeichen beginnen, führen zu keiner Triggerung des Moduls, sie dienen lediglich der Abfrage.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Licht soll zwischen 06:00 und 10:00 angehen, getriggert wird nur durch den Bewegungssensor nicht um 06:00 bzw. 10:00 Uhr<br>
+<br>
+<code>define di_motion DOIF ([?06:00-10:00] and [BM] eq "motion")(set lamp on-for-timer 600)<br>
+attr di_motion do always</code><br>
+<br>
+<b>Nutzung von Readings, Stati oder Internals im Ausführungsteil</b><br>
+<br>
+<u>Anwendungsbeispiel</u>: Wenn ein Taster betätigt wird, soll Lampe1 mit dem aktuellen Zustand der Lampe2 geschaltet werden:<br>
 <br>
 <code>define di_button DOIF ([button]) (set lamp1 [lamp2])<br>
 attr di_button do always</code><br>
 <br>
-Benachrichtung beim Auslösen eines Alarms durch Öffnen eines Fensters:<br>
+<u>Anwendungsbeispiel</u>: Benachrichtung beim Auslösen eines Alarms durch Öffnen eines Fensters:<br>
 <br>
 <code>define di_pushmsg DOIF ([window] eq "open" and [alarm] eq "armed") (set Pushover msg 'alarm' 'open windows [window:LastDevice]' '' 2 'persistent' 30 3600)</code><br>
 <br>
-Berechnungen im FHEM-Ausführungsteil können mit geschweiften Klammern erfolgen. Aus Kompatibilitätsgründen zu bestehenden FHEM-Befehlen (insb. at) muss der Perlausdruck hinter der geschweiften Klammer auf mit einer runden Klammer beginnen. Innerhalb der Perlberechnung können Readings, Stati oder Internals wie gewohnt in eckigen Klammern angegeben werden.<br>
+<b>Berechnungen im Ausführungsteil</b><br>
 <br>
-Es soll ein Vorgabewert aus zwei verschiedenen Readings ermittelt werden und an das set Kommando übergeben werden:<br>
+Berechnungen können in geschweiften Klammern erfolgen. Innerhalb der Perlberechnung können Readings, Stati oder Internals wie gewohnt in eckigen Klammern angegeben werden.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Es soll ein Vorgabewert aus zwei verschiedenen Readings ermittelt werden und an das set Kommando übergeben werden:<br>
 <br>
 <code>define di_average DOIF ([08:00]) (set TH_Modul desired {([default:temperature]+[outdoor:temperature])/2})<br>
 attr di_average do always</code><br>
 <br>
 <b>Filtern nach Zahlen</b><br>
 <br>
-Es soll aus einem Reading, der z. B. ein Prozentzeichen beinhaltet, nur der Zahlenanteil für den Vergleich genutzt werden:<br>
+Es soll aus einem Reading, das z. B. ein Prozentzeichen beinhaltet, nur der Zahlenwert für den Vergleich genutzt werden:<br>
 <br>
 <code>define di_heating DOIF ([adjusting:actuator:d] &lt; 10) (set heating off) DOELSE (set heating on)</code><br>
 <br>
@@ -1117,7 +1204,7 @@ Verzögerungen für die Ausführung von Kommandos werden pro Kommando über das 
 <br>
 Die Sekundenangaben können von hinten ausgelassen werden. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein anders Kommando, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
 <br>
-Benachrichtung: "Waschmaschine fertig", wenn Verbrauch mindestens 5 Minuten unter 2 Watt (Perl-Code wird in geschweifte Klammern gesetzt):<br>
+<u>Anwendungsbeispiel</u>: Benachrichtung "Waschmaschine fertig", wenn Verbrauch mindestens 5 Minuten unter 2 Watt (Perl-Code wird in geschweifte Klammern gesetzt):<br>
 <br>
 <code>define di_washer DOIF ([power:watt]&lt;2) ({system("wmail washer finished")})<br>
 attr di_washer wait 300</code><br>
@@ -1129,12 +1216,12 @@ Rolladen um 20 Minuten zeitverzögert bei Sonne runter- bzw. hochfahren (wenn de
 <code>define di_shutters DOIF ([Sun] eq "on") (set shutters down) DOELSE (set shutters up) <br>
 attr di_shutters wait 1200:1200</code><br>
 <br>
-Beschattungssteuerung abhängig von der Temperatur. Der Rollladen soll runter von 11:00 Uhr bis Sonnenuntergang, wenn die Temperatur über 26 Grad ist. Temperaturschwankungen um 26 Grad werden mit Hilfe des wait-Attributes durch eine 15 minutige Verzögerung ausgeglichen. <br>
+<u>Anwendungsbeispiel</u>: Beschattungssteuerung abhängig von der Temperatur. Der Rollladen soll runter von 11:00 Uhr bis Sonnenuntergang, wenn die Temperatur über 26 Grad ist. Temperaturschwankungen um 26 Grad werden mit Hilfe des wait-Attributes durch eine 15 minutige Verzögerung ausgeglichen. <br>
 <br>
 <code>define di_shutters DOIF ([sensor:temperature] &gt; 26 and [11:00-{sunset_abs()}] (set shutters down) DOELSE (set shutters up)<br>
 attr di_shutters wait 900:900 </code><br>
 <br>
-Belüftung in Kombination mit einem Lichtschalter mit Nachlaufsteuerung. Der Lüfter soll angehen, wenn das Licht mindestens 2 Minuten lang brennt oder die Luftfeuchtigkeit 65 % überschreitet, der Lüfter soll ausgehen, drei Minuten nachdem die Luftfeuchtigkeit unter 60 % fällt und das Licht aus ist bzw. das Licht ausgeht und die Luftfeuchtigkeit unter 60% ist. Definitionen lassen sich über die Weboberfläche (DEF-Eingabebereich) übersichtlich gestalten:<br>
+<u>Anwendungsbeispiel</u>: Belüftung in Kombination mit einem Lichtschalter mit Nachlaufsteuerung. Der Lüfter soll angehen, wenn das Licht mindestens 2 Minuten lang brennt oder die Luftfeuchtigkeit 65 % überschreitet, der Lüfter soll ausgehen, drei Minuten nachdem die Luftfeuchtigkeit unter 60 % fällt und das Licht aus ist bzw. das Licht ausgeht und die Luftfeuchtigkeit unter 60% ist. Definitionen lassen sich über die Weboberfläche (DEF-Eingabebereich) übersichtlich gestalten:<br>
 <br>
 <code>define di_fan DOIF ([light] eq "on")<br>
    <ol>
@@ -1150,6 +1237,59 @@ DOELSEIF ([light] eq "off" and [sensor:humidity]&lt;60)<br>  <ol>
 <br>
 attr di_fan wait 120:0:180</code><br>
 <br>
+<b>Zurücksetzen des Waittimers mit "do resetwait"</b><br>
+<br>
+Im Gegensatz zu "do always" wird ein Waittimer mit "do resetwait" auch dann zurückgesetzt, wenn die gleiche Bedingung wiederholt wahr wird.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Meldung beim Ausbleiben eines Events<br>
+<br>
+<code>define di_push DOIF ([Tempsensor])(set pushmsg "sensor failed again")<br>
+attr di_push wait 1800<br>
+attr di_push do resetwait</code><br>
+<br>
+<b>Zwangspause für das Ausführen eines Kommandos seit der letzten Zustandsänderung</b><br>
+<br>
+Mit dem Attribut <code>cmdpause &lt;Sekunden für cmd_1&gt;:&lt;Sekunden für cmd_2&gt;:...</code> wird die Zeitspanne in Sekunden angegeben für eine Zwangspause seit der letzten Zustandsänderung.
+In der angegebenen Zeitspanne wird ein Kommando nicht ausgeführt, auch wenn die dazugehörige Bedingung wahr wird.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Meldung über Frostgefahr alle 60 Minuten<br>
+<br>
+<code>define di_frost DOIF ([outdoor:temperature] < 0) (set pushmsg "danger of frost")<br>
+attr di_frost cmdpause 3600<br>
+attr di_frost do always</code><br>
+<br>
+<b>Begrenzung von Wiederholungen eines Kommandos</b><br>
+<br>
+Mit dem Attribut <code>repeatsame &lt;maximale Anzahl von cmd_1&gt;:&lt;maximale Anzahl von cmd_2&gt;:...</code> wird die maximale Anzahl hintereinander folgenden Ausführungen festgelegt.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Die Meldung soll maximal drei mal erfolgen mit einer Pause von mindestens 10 Minuten <br>
+<br>
+<code>define di_washer DOIF ([Watt]<2) (set pushmeldung "washer finished")<br>
+attr di_washer repeatsame 3<br>
+attr di_washer cmdpause 600 </code><br>
+<br>
+<b>Ausführung eines Kommandos nach einer Wiederholung einer Bedingung</b><br>
+<br>
+Mit dem Attribut <code>waitsame &lt;Zeitspanne in Sekunden für cmd_1&gt;:&lt;Zeitspanne in Sekunden für das cmd_2&gt;:...</code> wird ein Kommando erst dann ausgeführt, wenn innerhalb einer definierten Zeitspanne die entsprechende Bedingung zwei mal hintereinander wahr wird.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Rollladen soll hoch, wenn innerhalb einer Zeitspanne von 2 Sekunden ein Taster betätigt wird:<br>
+<br>
+<code>define di_shutters DOIF ([Button])(set shutters up)<br>
+attr di_shutters waitsame 2<br>
+attr di_shutters do always</code><br>
+<br>
+<b>Zeitspanne eines Readings seit der letzten Änderung</b><br>
+<br>
+Bei Readingangaben kann die Zeitspanne mit <code>[&lt;Device&gt;:&lt;Reading&gt;:sec]</code> in Sekunden seit der letzten Änderung bestimmt werden<br>
+<br>
+<u>Anwendungsbeispiel</u>: Licht soll angehen, wenn der Status des Bewegungsmelders in den letzten fünf Sekunden upgedatet wurde.<br>
+<br>
+<code>define di_lamp DOIF ([BM:state:sec] < 5)(set lamp on-for-timer 300)<br>
+attr di_lamp do always</code><br>
+<br>
+Bei HM-Bewegungsmelder werden periodisch Readings aktualisiert, dadurch wird das Modul getrigger, auch wenn keine Bewegung stattgefunden hat.
+Der Status bleibt dabei auf "motion". Mit der obigen Abfrage lässt sich feststellen, ob der Status aufgrund einer Bewegung tatsächlich upgedatet wurde.<br>
+<br>
 <b>Status des Moduls</b><br>
 <br>
 Der Status des Moduls wird standardmäßig mit cmd_1, cmd_2, usw. belegt. Dieser lässt sich über das Attribut "cmdState" mit | getrennt umdefinieren:<br>
@@ -1162,25 +1302,43 @@ z. B.<br>
 <br>
 Wenn nur der DOIF-Fall angegeben wird, so wird, wenn Bedingung nicht erfüllt ist, ein cmd_2-Status gesetzt. Damit wird ein Zustandswechsel des Moduls erreicht, was zur Folge hat, dass beim nächsten Wechsel von false auf true das DOIF-Kommando erneut ausgeführt wird.<br>
 <br>
-Reine Statusanzeige ohne Ausführung von Befehlen. Der Ausführungsteil kann jeweils ausgelassen werden:<br>
+<b>Reine Statusanzeige ohne Ausführung von Befehlen</b><br>
+<br>
+Der Ausführungsteil kann jeweils ausgelassen werden.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Aktuelle Außenfeuchtigkeit im Status<br>
 <br>
 <code>define di_hum DOIF ([outdoor:humidity]&gt;70) DOELSEIF ([outdoor:humidity]&gt;50) DOELSE<br>
 attr di_hum cmdState wet|normal|dry</code><br>
 <br>
-Anpassung des Status mit Hilfe des Attributes "state". Es können beliebige Reading und Stati oder Internals angegeben werden:<br>
+<b>Anpassung des Status mit Hilfe des Attributes "state"</b><br>
+<br>
+Es können beliebige Reading und Stati oder Internals angegeben werden.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Aktuelle Außenfeuchtigkeit inkl. Klimazustand (Status des Moduls wurde mit cmdState definiert s. o.)<br>
 <br>
 <code>attr di_hum state The current humidity is [outdoor:humidity], it is [di_hum]</code><br>
 <br>
-Es können beim Attribut state ebenfalls, wie bei FHEM-Befehlen im Ausführungsteil, Berechnungen durchgeführt werden. <br>
+Es können beim Attribut state ebenfalls Berechnungen in geschweiften Klammern durchgeführt werden. <br>
 <br>
-Berechnung des Mittelwertes zweier Readings:<br>
+<u>Anwendungsbeispiel</u>: Berechnung des Mittelwertes zweier Readings:<br>
 <br>
 <code>define di_average DOIF <br>
 attr di_average state Average of the two rooms is {([room1:temperature]+[room2:temperature])/2}</code><br>
 <br>
+Der Status wird automatisch aktualisiert, sobald sich eine der Temperaturen ändert<br>
+<br>
 Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwert auf eine Stelle mit der Perlfunktion sprintf formatieren:<br>
 <br>
-<code>attr di_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
+<code>attr di_average state Average of the two rooms is {sprintf("%.1f",([room1:temperature]+[room2:temperature])/2)}</code><br>
+<br>
+<b>Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut "initialize"</b><br>
+<br>
+<u>Anwendungsbeispiel</u>: Nach dem Neustart soll der Zustand von <code>di_lamp</code> mit "initialized" vorbelegt werden. Das Reading <code>cmd_nr</code> wird auf 0 gesetzt, damit wird ein Zustandswechsel provoziert, das Modul wird initialisiert - der nächste Trigger führt zum Ausführen eines Kommandos.<br>
+<br>
+<code>attr di_lamp intialize initialized</code><br>
+<br>
+Das ist insb. dann sinnvoll, wenn das System ohne Sicherung der Konfiguration (unvorhergesehen) beendet wurde und nach dem Neustart die zuletzt gespeicherten Zustände des Moduls nicht mit den tatsächlichen übereinstimmen.<br>
 <br>
 <b>Weitere Anwendungsbeispiele</b><br>
 <br>
@@ -1211,7 +1369,7 @@ Die Beispiele stellen nur eine kleine Auswahl von möglichen Problemlösungen da
 <br>
 <b>Zu beachten</b><br>
 <br>
-In jeder Bedingung muss mindestens ein Reading oder ein Status (Internal) oder eine Zeitangabe gemacht werden (Angaben in eckigen Klammern). Die entsprechenden DO-Fälle werden nur dann ausgewertet, wenn auch das entsprechende Event oder Zeit-Trigger ausgelöst wird.<br>
+In jeder Bedingung muss mindestens ein Trigger angegeben sein (Angaben in eckigen Klammern). Die entsprechenden DO-Fälle werden nur dann ausgewertet, wenn auch das entsprechende Event oder Zeit-Trigger ausgelöst wird.<br>
 <br>
 Zeitangaben der Art: <br>
 <br>
@@ -1224,7 +1382,27 @@ Angaben, bei denen aufgrund der Definition kein Zustandswechsel erfolgen kann z.
 <code>define di_light DOIF ([08:00]) (set switch on)<br>
 attr di_light do always</code><br>
 <br>
-müssen mit Attribut "do always" definiert werden, damit sie nicht nur einmal, sondern jedes mal (hier jeden Tag) ausgeführt werden. <br>
+müssen mit Attribut "do always" definiert werden, damit sie nicht nur einmal, sondern jedes mal (hier jeden Tag) ausgeführt werden.<br>
+<br>
+Bei der Angabe von zyklisch sendenden Sensoren (Temperatur, Feuchtigkeit, Helligkeit usw.) wie z. B.:<br>
+<br>
+<code>define di_heating DOIF ([sens:temperature] < 20)(set heating on)</code><br>
+<br>
+ist die Nutzung des Attributes "do always" nicht sinnvoll, da das entsprechende Kommando hier: "set heating on" jedes mal ausgeführt wird,
+wenn der Temperatursensor in regelmäßigen Abständen eine Temperatur unter 20 Grad sendet.<br>
+<br>
+Rekursionen vermeiden<br>
+<br>
+Das Verändern des Status eines Devices z. B. durch set-Befehl, welches in der Bedingung bereits vorkommt, würde das Modul erneut triggern.
+Solche Rekursionen (Loops) werden zwar von FHEM unterbunden, können jedoch elegant durch Abfragen mit Fragezeichen [?...] gelöst werden:<br>
+<br>
+statt:<br>
+<br>
+<code>define di_lamp ([brightness] < 50 and [lamp] eq "off")(set lamp on)</code><br>
+<br>
+mit Fragezeichen abfragen:<br>
+<br>
+<code>define di_lamp ([brightness] < 50 and [?lamp] eq "off")(set lamp on)</code><br>
 <br>
 Bei Devices, die mit Zwischenzuständen arbeiten, insbesondere HM-Komponenten (Zwischenzustand: set_on, set_off), sollte die Definition möglichst genau formuliert werden, um unerwünschte Effekte zu vermeiden: <br>
 <br>
