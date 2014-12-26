@@ -33,6 +33,8 @@
 #
 # SVN-History:
 # 26.12.2014:
+#	DeleteFn für Sonos wurde implementiert. Das Sonos-Device löscht erst alle SonosPlayer-Devices und beendet den selbst gestarteten SubProzess. Danach wird das Sonos-Device selber von Fhem abgeräumt.
+#	DeleteFn für SonosPlayer wurde implementiert. Es werden erst alle automatisch erzeugten Devices (RemoteControl und ReadingsGroups) entfernt, sofern sie noch unter dem Originalnamen existieren.
 #	ReportUnresponsiveDevice hat manchmal versucht, die Mitteilung an "sich selbst" zu senden, was naturgemäß nicht klappen kann.
 #
 # 2.6:	Die Zeichenkodierung bei Datenübernahme vom Zoneplayer kann nun über das Attribut characterDecoding eingestellt werden
