@@ -175,6 +175,7 @@ sub SONOSPLAYER_Initialize ($) {
 	
 	$hash->{DefFn}   = "SONOSPLAYER_Define";
 	$hash->{UndefFn} = "SONOSPLAYER_Undef";
+	$hash->{DeleteFn} = "SONOSPLAYER_Delete";
 	$hash->{GetFn}   = "SONOSPLAYER_Get";
 	$hash->{SetFn}   = "SONOSPLAYER_Set";
 	$hash->{StateFn} = "SONOSPLAYER_State";
@@ -723,6 +724,43 @@ sub SONOSPLAYER_Undef ($) {
 	RemoveInternalTimer($hash);
   
 	return undef;
+}
+
+########################################################################################
+#
+#  SONOSPLAYER_Delete - Implements DeleteFn function
+#
+#  Parameter hash = hash of the master, name
+#
+########################################################################################
+sub SONOSPLAYER_Delete($$) {
+	my ($hash, $name) = @_;
+	
+	# Alle automatisch erzeugten Komponenten mit entfernen, sofern es sie noch gibt...
+	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RC_Notify');
+	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RC_Weblink');
+	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RC');
+	
+	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RG');
+	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RG_Favourites');
+	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RG_Playlists');
+	SONOSPLAYER_DeleteIfExists($hash->{NAME}.'RG_Radios');
+	
+	# Das Entfernen des Sonos-Devices selbst übernimmt Fhem
+	return undef;
+}
+
+########################################################################################
+#
+#  SONOSPLAYER_DeleteIfExists - Deletes the Device with the given Name
+#
+#  Parameter hash = hash of the master, name
+#
+########################################################################################
+sub SONOSPLAYER_DeleteIfExists($) {
+	my ($name) = @_;
+	
+	CommandDelete(undef, $name) if ($main::defs{$name});
 }
 
 ########################################################################################

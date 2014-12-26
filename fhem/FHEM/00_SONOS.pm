@@ -32,8 +32,8 @@
 # Changelog
 #
 # SVN-History:
-#	26.12.2014:
-#		ReportUnresponsiveDevice hat manchmal versucht, die Mitteilung an "sich selbst" zu senden, was naturgemäß nicht klappen kann.
+# 26.12.2014:
+#	ReportUnresponsiveDevice hat manchmal versucht, die Mitteilung an "sich selbst" zu senden, was naturgemäß nicht klappen kann.
 #
 # 2.6:	Die Zeichenkodierung bei Datenübernahme vom Zoneplayer kann nun über das Attribut characterDecoding eingestellt werden
 #		Bei Gruppen-/LineIn-/SPDIF-Wiedergabe wird wieder die liefernde Zone angezeigt (als Albumname)
@@ -407,6 +407,7 @@ sub SONOS_Initialize ($) {
 	# Normal Defines
 	$hash->{DefFn}   = 'SONOS_Define';
 	$hash->{UndefFn} = 'SONOS_Undef';
+	$hash->{DeleteFn} = 'SONOS_Delete';
 	$hash->{ShutdownFn} = 'SONOS_Shutdown';
 	$hash->{ReadFn}  = "SONOS_Read";
 	$hash->{ReadyFn} = "SONOS_Ready";
@@ -5682,12 +5683,43 @@ sub SONOS_getSonosPlayerByRoomName($) {
 ########################################################################################
 sub SONOS_Undef ($$) {
 	my ($hash, $name) = @_;
-  
+	
 	RemoveInternalTimer($hash);
 	
 	DevIo_SimpleWrite($hash, "disconnect\n", 0);
 	DevIo_CloseDev($hash);
-  
+	
+	return undef;
+}
+
+########################################################################################
+#
+#  SONOS_Delete - Implements DeleteFn function
+#
+#  Parameter hash = hash of the master, name
+#
+########################################################################################
+sub SONOS_Delete($$) {
+	my ($hash, $name) = @_;
+	
+	# Erst alle SonosPlayer-Devices löschen
+	for my $player (SONOS_getAllSonosplayerDevices()) {
+		CommandDelete(undef, $player->{NAME});
+	}
+	
+	# Den SubProzess beenden
+	# Wenn wir einen eigenen UPnP-Server gestartet haben, diesen hier auch wieder beenden, ansonsten nichts tun...
+	if ($SONOS_StartedOwnUPnPServer) {
+		# Da die Verbindung bereits durch UndefFn beendet wurde, muss sie hier neu aufgebaut werden, damit ich den Subprozess selbst beenden kann (vorher wurde nur die Verbindung beendet)...
+		DevIo_OpenDev($hash, 1, undef);
+		DevIo_SimpleWrite($hash, "shutdown\n", 0);
+		DevIo_CloseDev($hash);
+	}
+	
+	# Etwas warten...
+	select(undef, undef, undef, 1);
+	
+	# Das Entfernen des Sonos-Devices selbst übernimmt Fhem
 	return undef;
 }
 
@@ -5713,7 +5745,7 @@ sub SONOS_Shutdown ($$) {
 	DevIo_CloseDev($hash);
 	
 	select(undef, undef, undef, 2);
-  
+	
 	return undef;
 }
 
