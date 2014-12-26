@@ -37,8 +37,9 @@ my %hueModels = (
   LWB004 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 
- 'PAR16 50 TW'      => {name => 'Lightify PAR16 50 TW'      ,type => 'Color Temperature Light'  ,subType => 'ctdimmer',},
- 'Classic A60 RGBW' => {name => 'Lightify Classic A60 RGBW' ,type => 'Extended Color Light'  ,subType => 'extcolordimmer',},
+ 'PAR16 50 TW'      => {name => 'Lightify PAR16 50 tunable white'    ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
+ 'Classic A60 TW'   => {name => 'Lightify Classic A60 tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
+ 'Classic A60 RGBW' => {name => 'Lightify Classic A60 RGBW'          ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
 );
 
 my %dim_values = (
@@ -786,18 +787,30 @@ HUEDevice_Parse($$)
     return undef;
   }
 
-  $hash->{modelid} = $result->{'modelid'};
-  $hash->{swversion} = $result->{'swversion'};
+  $hash->{modelid} = $result->{modelid};
+  $hash->{swversion} = $result->{swversion};
 
 
-  $attr{$name}{model} = $result->{'modelid'} unless( defined($attr{$name}{model}) || $result->{'modelid'} eq '' );
-  $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} unless( defined($attr{$name}{subType})
-                                                                           || !defined($attr{$name}{model})
-                                                                           || !defined($hueModels{$attr{$name}{model}}{subType}) );
-  if( defined($attr{$name}{subType}) && $attr{$name}{subType} eq "colordimmer" ) {
-    $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} unless( !defined($attr{$name}{model})
-                                                                             || !defined($hueModels{$attr{$name}{model}}{subType}) );
+  $attr{$name}{model} = $result->{modelid} if( !defined($attr{$name}{model}) && $result->{modelid} );
+
+  if( defined($attr{$name}{model}) ) {
+    if( !defined($attr{$name}{subType}) ) {
+      if( defined($hueModels{$attr{$name}{model}}{subType}) ) {
+        $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType};
+
+      } elsif( $attr{$name}{model} =~ m/TW$/ ) {
+        $attr{$name}{subType} = 'ctdimmer';
+
+      } elsif( $attr{$name}{model} =~ m/RGBW$/ ) {
+        $attr{$name}{subType} = 'extcolordimmer';
+
+      }
+
+    } elsif( $attr{$name}{subType} eq "colordimmer" ) {
+      $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} if( defined($hueModels{$attr{$name}{model}}{subType}) );
+    }
   }
+
 
   $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
