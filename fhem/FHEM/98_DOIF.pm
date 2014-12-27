@@ -556,7 +556,7 @@ DOIF_cmd ($$$)
       }
       readingsSingleUpdate ($hash, "cmd_count", $repeatnr,1);
     } else {
-      return undef if ($last_cmd == $nr and AttrVal($pn,"do","") ne "always");
+      return undef if ($last_cmd == $nr and (AttrVal($pn,"do","") ne "always" and AttrVal($pn,"do","") ne "resetwait"));
       delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
     }
   }
@@ -1237,9 +1237,11 @@ DOELSEIF ([light] eq "off" and [sensor:humidity]&lt;60)<br>  <ol>
 <br>
 attr di_fan wait 120:0:180</code><br>
 <br>
-<b>Zurücksetzen des Waittimers mit "do resetwait"</b><br>
+<b>Zurücksetzen des Waittimers für das gleiche Kommando</b><br>
 <br>
-Im Gegensatz zu "do always" wird ein Waittimer mit "do resetwait" auch dann zurückgesetzt, wenn die gleiche Bedingung wiederholt wahr wird.<br>
+Im Gegensatz zu <code>do always</code> wird ein Waittimer mit dem Attribut <code>do resetwait</code> auch dann zurückgesetzt, wenn die gleiche Bedingung wiederholt wahr wird.<br>
+Damit können Ereignisse ausgelöst werden, wenn etwas innerhalb einer Zeitspanne nicht passiert.<br>
+Das Attribut <code>do resetwait</code> impliziert eine beliebige Wiederholung wie <code>do always</code>. Diese lässt sich allerdings mit dem Attribut <code>repeatsame</code> einschränken s. u.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Meldung beim Ausbleiben eines Events<br>
 <br>
@@ -1262,15 +1264,24 @@ attr di_frost do always</code><br>
 <br>
 Mit dem Attribut <code>repeatsame &lt;maximale Anzahl von cmd_1&gt;:&lt;maximale Anzahl von cmd_2&gt;:...</code> wird die maximale Anzahl hintereinander folgenden Ausführungen festgelegt.<br>
 <br>
-<u>Anwendungsbeispiel</u>: Die Meldung soll maximal drei mal erfolgen mit einer Pause von mindestens 10 Minuten <br>
+<u>Anwendungsbeispiel</u>: Die Meldung soll maximal dreimal erfolgen mit einer Pause von mindestens 10 Minuten <br>
 <br>
 <code>define di_washer DOIF ([Watt]<2) (set pushmeldung "washer finished")<br>
 attr di_washer repeatsame 3<br>
 attr di_washer cmdpause 600 </code><br>
 <br>
+Das Attribut <code>repeatsame</code> lässt sich mit <code>do always</code> oder <code>do resetwait</code> kombinieren.
+Wenn die maximale Anzahl für ein Kommando ausgelassen oder auf Null gesetzt wird, so gilt für dieses Kommando der Defaultwert "einmalige Wiederholung";
+in Kombination mit <code>do always</code> bzw. <code>do resetwait</code> gilt für dieses Kommando "beliebige Wiederholung".<br>
+<br>
+<u>Anwendungsbeispiel</u>: cmd_1 soll beliebig oft wiederholt werden, cmd_2 maximal zweimal<br>
+<br>
+<code>attr di_repeat repeatsame 0:2<br>
+attr di_repeat do always</code><br>
+<br>
 <b>Ausführung eines Kommandos nach einer Wiederholung einer Bedingung</b><br>
 <br>
-Mit dem Attribut <code>waitsame &lt;Zeitspanne in Sekunden für cmd_1&gt;:&lt;Zeitspanne in Sekunden für das cmd_2&gt;:...</code> wird ein Kommando erst dann ausgeführt, wenn innerhalb einer definierten Zeitspanne die entsprechende Bedingung zwei mal hintereinander wahr wird.<br>
+Mit dem Attribut <code>waitsame &lt;Zeitspanne in Sekunden für cmd_1&gt;:&lt;Zeitspanne in Sekunden für das cmd_2&gt;:...</code> wird ein Kommando erst dann ausgeführt, wenn innerhalb einer definierten Zeitspanne die entsprechende Bedingung zweimal hintereinander wahr wird.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Rollladen soll hoch, wenn innerhalb einer Zeitspanne von 2 Sekunden ein Taster betätigt wird:<br>
 <br>
