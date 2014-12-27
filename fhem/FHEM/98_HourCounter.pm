@@ -1,4 +1,4 @@
-# $Id: 98_HourCounter.pm 7281 2014-12-21 12:00:00Z john $
+# $Id: 98_HourCounter.pm 7336 2014-12-27 20:00:00Z john $
 ####################################################################################################
 #
 #   98_HourCounter.pm
@@ -58,6 +58,8 @@
 #  21.12.14 - 1.0.1.1
 #     bug: if OFF is not defined, nothing was counted
 #     html : check with tidy
+#  24.12.14 - 1.0.1.2
+#     bug: if cvent occurs without value change, wrong calculcation of pulseTimeIncrement, pauseTimeIncrement
 ####################################################################################################
 
 package main;
@@ -67,7 +69,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
-my $HourCounter_Version = "1.0.1.1 - 21.12.2014";
+my $HourCounter_Version = "1.0.1.2 - 24.12.2014";
 
 my @HourCounter_cmdQeue = ();
 
@@ -239,6 +241,10 @@ sub HourCounter_Define($$$)
     eval { "Hallo" =~ m/^$offRegexp/ };
     return "Bad regexp_for_ON : $@" if ($@);
   }
+
+  #
+  # some inits
+  $hash->{VERSION}                  = $HourCounter_Version;
   $hash->{helper}{ON_Regexp}        = $onRegexp;
   $hash->{helper}{OFF_Regexp}       = $offRegexp;
   $hash->{helper}{isFirstRun}       = 1;
@@ -626,45 +632,50 @@ sub HourCounter_Run($)
       $hasValueChanged = 1;
     }
 
-    # -------------- positive edge
-    if ( $hasValueChanged && $valuePara == 1 )
+    if ($hasValueChanged)
     {
       $value    = $valuePara;
       $valueOld = $valuePara;
 
-      # handling of counters
-      $countsPerDay  += 1;
-      $countsOverall += 1;
-
-      #..  handling of pause
-      if ($isOffDefined)
+      # -------------- positive edge
+      if ( $valuePara == 1 )
       {
-        $pauseTimeIncrement += $timeIncrement;
-        $pauseTimePerDay    += $timeIncrement;
-        $pauseTimeOverall   += $timeIncrement;
-        $pulseTimeIncrement = 0;
-        $pauseTimeEdge      = $pauseTimeIncrement;
+        # handling of counters
+        $countsPerDay  += 1;
+        $countsOverall += 1;
+
+        # handling of pause time
+        if ($isOffDefined)
+        {
+          # calc the rest of puse-time until edge
+          $pauseTimeIncrement += $timeIncrement;
+          $pauseTimePerDay    += $timeIncrement;
+          $pauseTimeOverall   += $timeIncrement;
+          $pulseTimeIncrement = 0;
+          $pauseTimeEdge      = $pauseTimeIncrement;
+        }
+        HourCounter_Log $hash, 4, "rising edge; pauseTimeIncr:$pauseTimeIncrement countPerDay:$countsPerDay";
       }
-      HourCounter_Log $hash, 4, "rising edge; pauseTimeIncr:$pauseTimeIncrement countPerDay:$countsPerDay";
+
+      # ------------ negative edge
+      elsif ( $valuePara == 0 )
+      {
+        # handlich of pulse time
+        if ($isOffDefined)
+        {
+          $pulseTimeIncrement += $timeIncrement;
+          $pulseTimePerDay    += $timeIncrement;
+          $pulseTimeOverall   += $timeIncrement;
+          $pauseTimeIncrement = 0;
+          $pulseTimeEdge      = $pulseTimeIncrement;
+        }
+        HourCounter_Log $hash, 4, "falling edge pulseTimeIncrement:$pulseTimeIncrement";
+      }
     }
 
-    # ------------ negative edge
-    elsif ( $hasValueChanged && $valuePara == 0 )
-    {
-      $value    = $valuePara;
-      $valueOld = $valuePara;
-
-      # handling of pulse time
-      $pulseTimeIncrement += $timeIncrement;
-      $pulseTimePerDay    += $timeIncrement;
-      $pulseTimeOverall   += $timeIncrement;
-      $pulseTimeEdge      = $pulseTimeIncrement;
-      $pauseTimeIncrement = 0;
-      HourCounter_Log $hash, 4, "falling edge pulseTimeIncrement:$pulseTimeIncrement";
-    }
-
-    # --------------- no change
-    elsif ( $valuePara == -1 && $isOffDefined )
+    # ------------ no value change
+    # it is possible to receive an event without change of value (e.g. Max Shutter does it hourly)
+    elsif ($isOffDefined)
     {
       if ( $valueOld == 0 )
       {
