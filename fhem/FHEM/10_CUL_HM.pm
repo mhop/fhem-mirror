@@ -6011,7 +6011,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     $size = int($size)*8 + ($size*10)%10;
     $conv = $reg->{c}; #unconvert formula
     $factor = $reg->{f};
-    $unit = " ".$reg->{u};
+    $unit = ($reg->{u}?" ".$reg->{u}:"");
   }
   else{
     return "invalid:regname or address"
@@ -6075,7 +6075,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   if ($conv ne "lit" && $reg->{litInv} && $reg->{litInv}{$data} ){
     $data = $reg->{litInv}{$data};#conv special value past to calculation
     $unit = "";
-  }
+  }     
   return $convFlg.$data.$unit;
 }
 sub CUL_HM_updtRegDisp($$$) {
