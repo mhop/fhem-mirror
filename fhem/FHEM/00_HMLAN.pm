@@ -129,7 +129,7 @@ sub HMLAN_Define($$) {#########################################################
   $hash->{helper}{assIdRep} = 0;
   $hash->{helper}{assIdCnt} = 0;
   HMLAN_condUpdate($hash,253);#set disconnected
-  $hash->{STATE} = "disconnected";
+  readingsSingleUpdate($hash,"state","disconnected",1);
   $hash->{owner} = "";
 
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
@@ -842,7 +842,7 @@ sub HMLAN_DoInit($) {##########################################################
   my $name = $hash->{NAME};
 
   my $id  = AttrVal($name, "hmId", "999999");
-  delete $hash->{READINGS}{state};
+#  readingsSingleUpdate($hash,"state","init",1);
 
   HMLAN_SimpleWrite($hash, "A$id") if($id ne "999999");
   HMLAN_assignIDs($hash);
@@ -995,10 +995,10 @@ sub HMLAN_condUpdate($$) {#####################################################
                                        !$hash->{helper}{cnd}{$HMcnd});
   $hash->{helper}{cnd}{$HMcnd}++;
   if ($HMcnd == 4){#HMLAN needs a rest. Supress all sends exept keep alive
-    $hash->{STATE} = "overload";
+    readingsSingleUpdate($hash,"state","overload",1);
   }
   else{
-    $hash->{STATE} = "opened"
+    readingsSingleUpdate($hash,"state","opened",1)
           if (InternalVal($name,"STATE","") eq "overload");
   }
 
