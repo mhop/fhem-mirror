@@ -40,6 +40,7 @@ my %hueModels = (
  'PAR16 50 TW'      => {name => 'Lightify PAR16 50 tunable white'    ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'Classic A60 TW'   => {name => 'Lightify Classic A60 tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'Classic A60 RGBW' => {name => 'Lightify Classic A60 RGBW'          ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
+ 'Gardenspot RGB'   => {name => 'Lightify Gardenspot Mini RGB'       ,type => 'Color Light'             ,subType => 'colordimmer',},
 );
 
 my %dim_values = (
@@ -800,6 +801,9 @@ HUEDevice_Parse($$)
 
       } elsif( $attr{$name}{model} =~ m/TW$/ ) {
         $attr{$name}{subType} = 'ctdimmer';
+
+      } elsif( $attr{$name}{model} =~ m/RGB$/ ) {
+        $attr{$name}{subType} = 'colordimmer';
 
       } elsif( $attr{$name}{model} =~ m/RGBW$/ ) {
         $attr{$name}{subType} = 'extcolordimmer';
