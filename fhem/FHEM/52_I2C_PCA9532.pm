@@ -340,7 +340,7 @@ sub I2C_PCA9532_Get($@) {
 	my $name =$a[0];
 
 	my %sendpackage = ( i2caddress => $hash->{I2C_Address}, direction => "i2cread" );
-	$sendpackage{reg} = 0; 																			#startadresse zum lesen
+	$sendpackage{reg} = 0x10; 																			#startadresse zum lesen (Adresse 0 mit Auto increment flag)
 	$sendpackage{nbyte} = 10;
 	return "$name: no IO device defined" unless ($hash->{IODev});
 	my $phash = $hash->{IODev};
