@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added: 00_HXB / 10_HXBDevice for Hexabus devices
   - feature: HUEbridge: added group handling
                         added pollDevices attribute
                         added httpUtils for nonblocking mode

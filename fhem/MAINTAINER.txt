@@ -19,6 +19,7 @@ FHEM/00_CUL.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/00_FBAHA.pm             rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/00_FHZ.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de HomeMatic
+FHEM/00_HXB.pm               borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/00_KM271.pm             physikus             http://forum.fhem.de Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/00_MAXLAN.pm            mgehre               http://forum.fhem.de MAX
@@ -47,6 +48,7 @@ FHEM/10_EnOcean.pm           klaus-schauer        http://forum.fhem.de EnOcean
 FHEM/10_FBDECT.pm            rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/10_FRM.pm               ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/10_FS20.pm              rudolfkoenig         http://forum.fhem.de SlowRF
+FHEM/00_HXBDevice.pm         borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/10_IT.pm                justme1968           http://forum.fhem.de InterTechno
 FHEM/10_Itach_IR             ulimaass             http://forum.fhem.de Sonstige Systeme
 FHEM/10_MAX.pm               mgehre               http://forum.fhem.de MAX
@@ -164,20 +166,20 @@ FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Unterstue
 FHEM/55_PIFACE.pm            klaus.schauer        http://forum.fhem.de Einplatinencomputer
 FHEM/55_weco.pm              betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
-FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Unterstützende Dienste
+FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/59_OPENWEATHER.pm       tupol                http://forum.fhem.de Unterstuetzende Dienste (Link senden: http://forum.fhem.de/index.php?action=pm;sa=send;u=5432)
 FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/59_PROPLANTA.pm         tupol                http://forum.fhem.de Unterstuetzende Dienste (Link senden: http://forum.fhem.de/index.php?action=pm;sa=send;u=5432)
 FHEM/59_WWO.pm               baumrasen            http://forum.fhem.de Sonstiges
-FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Unterstützende Dienste
+FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/60_EM.pm                rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/61_EMWZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/62_EMEM.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/63_EMGZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/64_ESA2000.pm           stromer-12           http://forum.fhem.de SlowRF
-FHEM/66_ECMD.pm              borisneubert         http://forum.fhem.de Sonstiges
-FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstiges
+FHEM/66_ECMD.pm              borisneubert         http://forum.fhem.de Sonstige Systeme
+FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/70_EGPM.pm              alexus               http://forum.fhem.de Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               http://forum.fhem.de Multimedia
 FHEM/70_Jabber.pm            BioS                 http://forum.fhem.de Unterstuetzende Dienste
@@ -205,11 +207,11 @@ FHEM/73_MPD.pm               wzut                 http://forum.fhem.de Multimedi
 FHEM/75_MSG.pm               ruebedo              http://forum.fhem.de Automatisierung
 FHEM/76_MSGFile.pm           ruebedo              http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           ruebedo              http://forum.fhem.de Automatisierung
-FHEM/80_M232.pm              borisneubert         http://forum.fhem.de Sonstiges
+FHEM/80_M232.pm              borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/80_xxLG7000.pm          painseeker           http://forum.fhem.de Sonstiges
-FHEM/81_M232Counter.pm       borisneubert         http://forum.fhem.de Sonstiges
+FHEM/81_M232Counter.pm       borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/82_LGTV.pm              painseeker           http://forum.fhem.de Sonstiges
-FHEM/82_M232Voltage.pm       borisneubert         http://forum.fhem.de Sonstiges
+FHEM/82_M232Voltage.pm       borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/87_WS2000.pm            tdressler            http://forum.fhem.de Sonstiges
 FHEM/88_ALL4000T.pm          sachag               http://forum.fhem.de Sonstiges
 FHEM/88_LINDY_HDMI_SWITCH.pm sachag               http://forum.fhem.de Multimedia
