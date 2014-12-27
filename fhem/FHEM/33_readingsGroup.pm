@@ -627,9 +627,9 @@ readingsGroup_2html($;$)
           }
         }
 
-        my $inform_id = "";
-        $inform_id = "informId=\"$d-$name.i$item.item\"" if( $readings );
-        $ret .= "<td $value_columns><div $cell_style $name_style $inform_id>$txt</div></td>";
+        my $informid = "";
+        $informid = "informId=\"$d-$name.i$item.item\"" if( $readings );
+        $ret .= "<td $value_columns><div $cell_style $name_style $informid>$txt</div></td>";
         $first = 0;
         ++$cell_column;
         next;
@@ -678,7 +678,7 @@ readingsGroup_2html($;$)
             Log3 $name, 3, $name .": ". $regex .": ". $@;
             last;
           }
-        next if( $n !~ m/^$regex$/);
+          next if( $n !~ m/^$regex$/);
         }
         my $val = $h->{$n};
 
@@ -694,6 +694,7 @@ readingsGroup_2html($;$)
           $v = FW_htmlEscape($val);
         }
 
+        my $informid = "informId=\"$d-$name.$n\"";
         my $row_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,undef);
         my $cell_style0 = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,0);
         my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,$cell_column);
@@ -776,6 +777,11 @@ readingsGroup_2html($;$)
               last if(defined($htmlTxt));
             }
 
+           if( $htmlTxt =~ m/$name-$set/ ) {
+             $htmlTxt =~ s/$name-$set/$d-$name.$n/g;
+             $informid = "";
+           }
+
            if( $htmlTxt && $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
               $v = $1;
 
@@ -783,6 +789,7 @@ readingsGroup_2html($;$)
               if( defined($mapped) ) {
                 $v =~ s/$set&nbsp;/$mapped&nbsp;/;
               }
+              $v =~ s/(.*)&nbsp;// if( !$informid );
               $webCmdFn = 1;
             } elsif( $htmlTxt ) {
               $v = $htmlTxt;
@@ -824,8 +831,8 @@ readingsGroup_2html($;$)
           }
         }
 
-        $ret .= "<td $value_columns informId=\"$d-$name.$n\">$devStateIcon</td>" if( $devStateIcon );
-        $ret .= "<td $value_columns><div $cell_style informId=\"$d-$name.$n\">$v</div></td>" if( !$devStateIcon );
+        $ret .= "<td $value_columns $informid>$devStateIcon</td>" if( $devStateIcon );
+        $ret .= "<td $value_columns><div $cell_style $informid>$v</div></td>" if( !$devStateIcon );
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
 
         $first = 0;
@@ -1053,6 +1060,7 @@ readingsGroup_Notify($$)
 
           $cmd = lookup2($hash->{helper}{commands},$n,$reading,$value);
           if( $cmd && $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
+            DoTrigger( $name, "$n.$reading: $value" );
             next;
           }
 
