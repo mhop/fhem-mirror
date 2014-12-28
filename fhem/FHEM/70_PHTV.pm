@@ -2469,9 +2469,10 @@ sub PHTV_ReceiveCommand($$$) {
                                         # to avoid huge color skips between LEDs
                                         if (
                                             (
-                                                   $countLEDs > 0
-                                                && $Hsum / $countLEDs -
-                                                $hsb->{h} < 4000
+                                                $countLEDs > 0 && abs(
+                                                    $Hsum / $countLEDs -
+                                                      $hsb->{h}
+                                                ) < 4000
                                             )
                                             || $countLEDs == 0
                                           )
