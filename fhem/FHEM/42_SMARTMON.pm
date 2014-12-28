@@ -31,7 +31,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-my $VERSION = "0.9.0.1";
+my $VERSION = "0.9.1.1";
 
 my $DEFAULT_INTERVAL = 60; # in minuten
 
@@ -57,7 +57,7 @@ sub SMARTMON_Initialize($)
   $hash->{GetFn}    = "SMARTMON_Get";
   #$hash->{SetFn}    = "SMARTMON_Set";
   $hash->{AttrFn}   = "SMARTMON_Attr";
-  $hash->{AttrList} = "show_raw:0,1,2 disable:0,1 include ".$readingFnAttributes;
+  $hash->{AttrList} = "show_raw:0,1,2 disable:0,1 include parameters ".$readingFnAttributes;
 }
 
 sub SMARTMON_Log($$$) {
@@ -135,6 +135,9 @@ sub SMARTMON_Get($@)
     return undef;
   }
 
+  my $param="";
+  if($hash->{PARAMETERS}) {$param=" ".$hash->{PARAMETERS};}
+  
   if($cmd eq "list")
   {
     if(@a<3) {return "$name: get list needs at least one parameter"; }
@@ -143,17 +146,17 @@ sub SMARTMON_Get($@)
     if($subcmd eq "info") {
       my $tdev = $hash->{DEVICE};
       if(@a>3) {$tdev=$a[3];}
-      $t = SMARTMON_execute($hash, "sudo smartctl -i ".$tdev);
+      $t = SMARTMON_execute($hash, "sudo smartctl -i".$param." ".$tdev);
     }
     if($subcmd eq "data") {
       my $tdev = $hash->{DEVICE};
       if(@a>3) {$tdev=$a[3];}
-      $t = SMARTMON_execute($hash, "sudo smartctl -A ".$tdev);
+      $t = SMARTMON_execute($hash, "sudo smartctl -A".$param." ".$tdev);
     }
     if($subcmd eq "health") {
       my $tdev = $hash->{DEVICE};
       if(@a>3) {$tdev=$a[3];}
-      $t = SMARTMON_execute($hash, "sudo smartctl -H ".$tdev);
+      $t = SMARTMON_execute($hash, "sudo smartctl -H".$param." ".$tdev);
     }
     if($subcmd eq "devices") {
       $t = SMARTMON_execute($hash, "sudo smartctl --scan");
@@ -191,6 +194,10 @@ sub SMARTMON_Attr($$$) {
         # NOP
       }
       
+      if($attrName eq "parameters") {
+        $hash->{PARAMETERS}=$attrVal;
+      }
+      
       if($attrName eq "show_raw") {
         SMARTMON_refreshReadings($hash);  
       }
@@ -213,6 +220,10 @@ sub SMARTMON_Attr($$$) {
     if($attrName eq "include") {
       delete $attr{$name}{$attrName};
       SMARTMON_refreshReadings($hash);  
+    }
+    
+    if($attrName eq "parameters") {
+        delete $hash->{PARAMETERS};
     }
   }
   
@@ -282,9 +293,11 @@ sub SMARTMON_obtainParameters($) {
   # /usr/sbin/smartctl in /etc/sudoers aufnehmen
   # fhem ALL=(ALL) NOPASSWD: [...,] /usr/sbin/smartctl 
   # Natuerlich muss der user auch der Gruppe "sudo" angehören.
-    
+
   # Health  
-  my $dev_health = SMARTMON_execute($hash, "sudo smartctl -H ".$hash->{DEVICE}." | grep 'test result:'");
+  my $param="";
+  if($hash->{PARAMETERS}) {$param=" ".$hash->{PARAMETERS};}
+  my $dev_health = SMARTMON_execute($hash, "sudo smartctl -H".$param." ".$hash->{DEVICE}." | grep 'test result:'");
   SMARTMON_Log($hash, 5, "health: $dev_health");
   if($dev_health=~m/test\s+result:\s+(\S+).*/) {
     $map->{"overall_health_test"} = $1;
@@ -353,8 +366,10 @@ sub SMARTMON_getSmartDataReadings($$) {
 
 sub SMARTMON_readDeviceData($%) {
   my ($hash, $map) = @_;
-  
-  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -i ".$hash->{DEVICE});
+
+  my $param="";
+  if($hash->{PARAMETERS}) {$param=" ".$hash->{PARAMETERS};}
+  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -i".$param." ".$hash->{DEVICE});
   SMARTMON_Log($hash, 5, "device data: ".Dumper(@dev_data));
   if(defined($dev_data[0])) {
     while(scalar(@dev_data)>0) {
@@ -465,7 +480,12 @@ sub SMARTMON_sec2Dauer($){
 # Ausrechnet aus der Zahl der Stunden Anzeige in Tagen:Stunden:Minuten:Sekunden.
 sub SMARTMON_hour2Dauer($){
   my ($t) = @_;
-  return SMARTMON_sec2Dauer($t*3600);
+  #return SMARTMON_sec2Dauer($t*3600);
+  my $d=int($t/24);
+  $t = $t-($d*24);
+  my $y=int($d/365);
+  $d = $d-($y*365);
+  return sprintf("%d Jahre %d Tage %d Std.",$y,$d,$t);
 }
 
 # liest RAW-Daten
@@ -476,8 +496,10 @@ sub SMARTMON_hour2Dauer($){
 sub SMARTMON_readSmartData($;$) {
   my ($hash, $include) = @_;
   my $map;
-  
-  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -A ".$hash->{DEVICE});
+
+  my $param="";
+  if($hash->{PARAMETERS}) {$param=" ".$hash->{PARAMETERS};}
+  my @dev_data = SMARTMON_execute($hash, "sudo smartctl -A".$param." ".$hash->{DEVICE});
   SMARTMON_Log($hash, 5, "device SMART data: ".Dumper(@dev_data));
   if(defined($dev_data[0])) {
     while(scalar(@dev_data)>0) {
@@ -603,6 +625,10 @@ sub SMARTMON_execute($$) {
     Valid values: 0: Module active (default), 1: module is disabled (no updates).
     </li>
     <br>
+    <li>parameters<br>
+    Additional values for smartctl.
+    </li>
+    <br>
     </ul><br>
     For more information see cmartctrl documentation.
   </ul>
@@ -685,6 +711,10 @@ sub SMARTMON_execute($$) {
     <br>
     <li>disable<br>
     G&uuml;ltige Werte: 0: Modul aktiv (default), 1: Modul deaktiviert (keine Aktualisierungen).
+    </li>
+    <br>
+    <li>parameters<br>
+    Zusatzparameter f&uuml;r den AUfruf von smartctl.
     </li>
     <br>
     </ul><br>
