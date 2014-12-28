@@ -1065,6 +1065,7 @@ sub statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
+(en | <a href="commandref_DE.html#statistics">de</a>)
 <div style="width:800px">
 <ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
@@ -1074,22 +1075,26 @@ sub statistics_UpdateDevReading($$$$)
       <br>
       <li><b>Min|Avg|Max</b> Minimum, average  and maximum of instantaneous values:
          <br>
-         over a period of day, month and year: <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         over a period of day, month and year:
          <br>
-         over a period of hour, day, month and year: <i>wind, wind_speed, windSpeed</i>
+         <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         <br>
+         over a period of hour, day, month and year:
+         <br>
+         <i>wind, wind_speed, windSpeed</i>
       </li><br>
       <li><b>Tendency</b> over 1h, 2h, 3h und 6h: <i>pressure</i>
       </li><br>
-      <li><b>Delta</b> between start and end values over a period of hour, day, month and year:
+      <li><b>Delta</b> between start and end values - over a period of hour, day, month and year:
          <br>
          <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i>
       </li><br>
-      <li><b>Duration</b> (and counter) of the states over a period of day, month and year:
+      <li><b>Duration</b> (and counter) of the states (on, off, open, closed...) over a period of day, month and year:
          <br>
          <i>lightsensor, lock, motion, Window, window, state (if no other reading is recognized)</i>
       </li><br>
   </ul>
-   Further readings can be added via the correspondent <a href="#statisticsattr">attribute</a>.
+   Further readings can be added via the correspondent <a href="#statisticsattr">attributes</a>.
    This allows also to assign a reading to another statistic type.
   <br>&nbsp;
   <br>
@@ -1118,19 +1123,19 @@ sub statistics_UpdateDevReading($$$$)
       <li><code>resetStatistics &lt;All|DeviceName&gt;</code>
       <br>
       Resets the statistic values of the selected device.
-      <br></li>
+      </li><br>
       <li><code>doStatistics</code>
       <br>
       Calculates the current statistic values of all monitored devices.
-      <br></li>
+      </li><br>
   </ul>
-  <br>
 
+  <br>
   <b>Get</b>
    <ul>not implemented yet
   </ul>
-  <br>
 
+  <br>
   <a name="statisticsattr"></a>
    <b>Attributes</b>
    <ul>
@@ -1147,14 +1152,16 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          Comma separated list of reading names for which a duration statistic shall be calculated. 
       </li><br>
-      <li><code>excludedReadings <code>&lt;DeviceRegExp:ReadingNameRegExp&gt;</code></code>
+      <li><code>excludedReadings &lt;DeviceRegExp:ReadingNameRegExp&gt;</code>
       <br>
       Regular expression of the readings that shall be excluded from the statistics.<br>
-      The reading have to be entered in the form <i>deviceName:readingName</i>. E.g. <code>FritzDect:current|Sensor_.*:humidity</code>
+      The reading have to be entered in the form <i>deviceName:readingName</i>.
+      <br>
+      E.g. <code>FritzDect:current|Sensor_.*:humidity</code>
       <br>
     </li><br>
    
-   <li><code>ignoreDefaultAssignments <code>&lt;1 | 0&gt;</code></code>
+   <li><code>ignoreDefaultAssignments <code>&lt; 0 | 1 &gt;</code></code>
       <br>
       Ignores the default assignments of readings to a statistic type (see above).<br>
       So, only the readings that are listed in the specific attributes are evaluated.
@@ -1167,9 +1174,9 @@ sub statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>periodChangePreset &lt;seconds&gt;</code>
       <br>
-      Start of the calculation of periodical data before each full hour. Default is 5 Sekunden.
+      Preponed start of the calculation of periodical data. Default is 5 seconds before each full hour.
       <br>
-      Allows the correct timely assignment within plots, can be adapted to CPU load.
+      Allows thus the correct timely assignment within plots. Should be adapted to the CPU speed or load of the server.
       <br>
     </li><br>
     <li><code>singularReadings &lt;DeviceRegExp:ReadingRegExp&gt;:statTypes:period</code>
@@ -1202,25 +1209,34 @@ sub statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
+(<a href="commandref.html#statistics">en</a> | de)
 <div  style="width:800px">
 <ul>
   Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
-  <br>&nbsp;
-  <br>
-  Derzeit werden die folgenden Statistik-Typen f&uuml;r bestimmte Ger&auml;tewerte vom Modul automatisch berechnet:
+   <br>&nbsp;
+   <br>
+   Es unterscheidet in vier Statistik-Typen denen bereits standardm&auml;ssig Ger&auml;tewerte zugeordnet sind:
    <ul>
       <li><b>Min|Avg|Max</b> Minimum, Durchschnitt und Maximum von Momentanwerten:
          <br>
-         &uuml;ber den Zeitraum Tag, Monat und Jahr: <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         &uuml;ber den Zeitraum Tag, Monat und Jahr:
          <br>
-         &uuml;ber den Zeitraum Stunde, Tag, Monat und Jahr: <i>wind, wind_speed, windSpeed</i></li>
-      <li><b>Tendency</b> Tendenz &uuml;ber 1h, 2h, 3h und 6h: <i>pressure</i></li>
+         <i>brightness, current, energy_current, humidity, temperature, voltage</i>
+         <br>
+         &uuml;ber den Zeitraum Stunde, Tag, Monat und Jahr:
+         <br>
+         <i>wind, wind_speed, windSpeed</i>
+      </li><br>
+      <li><b>Tendency</b> Tendenz &uuml;ber 1h, 2h, 3h und 6h: <i>pressure</i>
+      </li><br>
       <li><b>Delta</b> Differenz zwischen Anfangs- und Endwerte innerhalb eines Zeitraums (Stunde, Tag, Monat, Jahr):
          <br>
-         <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i></li>
-      <li><b>Duration</b> Dauer und Anzahl der Zust&auml;nde (on, off, open, closed ...) innerhalb eines Zeitraums (Tag, Monat, Jahr):
+         <i>count, energy, energy_total, power, total, rain, rain_rate, rain_total</i>
+      </li><br>
+      <li><b>Duration</b> Dauer und Anzahl der Zust&auml;nde (on, off, open, closed...) innerhalb eines Zeitraums (Tag, Monat, Jahr):
          <br>
-         <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i></li>
+         <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i>
+      </li><br>
   </ul>
   &Uuml;ber die entsprechenden <a href="#statisticsattr">Attribute</a> k&ouml;nnen weitere Ger&auml;tewerte hinzugef&uuml;gt oder
   einem anderem Statistik-Typ zugeordnet werden. 
@@ -1287,9 +1303,9 @@ sub statistics_UpdateDevReading($$$$)
          <br>
       </li><br>
 
-   <li><code>ignoreDefaultAssignments <code>&lt;1 | 0&gt;</code></code>
+   <li><code>ignoreDefaultAssignments <code>&lt;0 | 1&gt;</code></code>
       <br>
-      Ignoriert die oben beschriebene Standardzuordnung von Ger&auml;tewerten zu Statistiktypen..<br>
+      Ignoriert die Standardzuordnung von Ger&auml;tewerten zu Statistiktypen..<br>
       D.h., nur die Ger&auml;tewerte, die &uuml;ber Attribute den Statistiktypen zugeordnet sind, werden ausgewertet.
       <br>
     </li><br>
@@ -1309,15 +1325,19 @@ sub statistics_UpdateDevReading($$$$)
          Erlaubt die korrekte zeitliche Zuordnung in Plots, kann je nach Systemauslastung verringert oder vergr&ouml;&szlig;ert werden.
          <br>
       </li><br>
-      <li><code>singularReadings &lt;Ger&auml;teNameRegExp:Ger&auml;teWertRegExp:Statistiktypen:Zeitraum&gt;</code>
+      <li><code>singularReadings &lt;Ger&auml;tRegExp:Ger&auml;teWertRegExp:Statistiktyp:Zeitraum&gt;</code>
          <ul>
-            <li>Statistiktypen: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
+            <li>Statistiktyp: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
             <li>Zeitraum: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
          </ul>
          Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
-         Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify). F&uuml;r "duration"-Ger&auml;tewerte muss der Name des jeweiligen Statuswertes als Statistiktyp eingesetzt werden.
+         Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify).
          <br>
-          Beispiel: <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
+         F&uuml;r "duration"-Ger&auml;tewerte muss der Name des jeweiligen Statuswertes als <code>Statistiktyp</code> eingesetzt werden.
+         <br>
+          Beispiel:
+         <br>
+          <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
          <br>
           <code>Badfenster:Window:(Open|Open_Count):Month</code>
       </li><br>
