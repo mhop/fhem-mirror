@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2014
-my $thzversion = "0.118";
+my $thzversion = "0.119";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -64,7 +64,7 @@ sub THZ_Set($@);
 # 
 ########################################################################################
 
-my %sets = (
+my %setsnew = (
     "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
     "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
     "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
@@ -260,7 +260,6 @@ my %sets = (
 ########################################################################################
 
 my %getsonly = (
-#	"hallo"       			=> { },
 #	"debug_read_raw_register_slow"	=> { },
 	"sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
 	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
@@ -287,6 +286,7 @@ my %getsonly = (
 	"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
+my %sets=%setsnew;
 my %gets=(%getsonly, %sets);
 my %OpMode = ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setback", "5" =>"DHWmode", "14" =>"manual", "0" =>"emergency");   
 my %Rev_OpMode = reverse %OpMode;
@@ -345,6 +345,7 @@ sub THZ_Initialize($)
 		    ."firmware:new,2.06 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
+
 }
 
 
@@ -375,6 +376,9 @@ sub THZ_Define($$)
   }
   
   $hash->{DeviceName} = $dev;
+  
+ 
+  
   my $ret = DevIo_OpenDev($hash, 0, "THZ_Refresh_all_gets");
   return $ret;
 }
@@ -395,7 +399,7 @@ sub THZ_Refresh_all_gets($) {
   foreach  my $cmdhash  (keys %gets) {
     my %par = (  hash => $hash, command => $cmdhash );
     RemoveInternalTimer(\%par);
-    InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6s $timedelay++
+    InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
     $timedelay += 0.6;
   }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
 }
@@ -413,6 +417,13 @@ sub THZ_GetRefresh($) {
 	my $hash=$par->{hash};
 	my $command=$par->{command};
 	my $interval = AttrVal($hash->{NAME}, ("interval_".$command), 0);
+	#if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06") {
+	#  %sets = ();
+	#  %gets = %getsonly;
+	#  }
+	#open (MYFILE, '>>data.txt');
+        #print MYFILE ((keys %gets) . "\n");
+	#close (MYFILE); 
 	my $replyc = "";
 	if ($interval) {
 			  $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
@@ -714,9 +725,10 @@ sub THZ_ReadAnswer($)
 	
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
-	
-	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= 24))
-	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.03);
+	my $countmax = 28;
+	$countmax = 50	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
+	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= $countmax))
+	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
 	  if(defined($buf1))
 	    {
@@ -726,7 +738,7 @@ sub THZ_ReadAnswer($)
 	    }
 	$count ++;
 	}
-	return ("WInterface max repeat limited to 24" , $data) if ($count == 25);
+	return ("WInterface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
 }
@@ -1263,6 +1275,26 @@ sub THZ_debugread($){
 sub THZ_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
+  
+  if (( $attrName eq "firmware" ) and ($attrVal eq "2.06")) {
+    THZ_RemoveInternalTimer("THZ_GetRefresh");
+     %sets = ();
+     %gets = %getsonly;
+    THZ_Refresh_all_gets($hash);
+  }
+  
+  
+  if (( $attrName eq "firmware" ) and (($attrVal eq "new") or ($cmd eq "del")) ) {
+      THZ_RemoveInternalTimer("THZ_GetRefresh");
+      %sets=%setsnew;
+      %gets=(%getsonly, %sets);
+      THZ_Refresh_all_gets($hash);
+  }
+  
+
+  
+  
+  
   if( $attrName =~ /^interval_/ ) {
   #DevIo_CloseDev($hash);
   THZ_RemoveInternalTimer("THZ_GetRefresh");
