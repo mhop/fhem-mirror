@@ -32,6 +32,9 @@
 # Changelog
 #
 # SVN-History:
+# 28.12.2014
+#	Umlaute: Die Erkennung von Umlauten war wegen der Quelltextumstellung auf UTF8 fehlerhaft. Das betraf nur die Zonennamenumwandlung, wo z.B. aus 'Küche' ein 'Kueche' gemacht wird.
+#	Sonos-Coverlieferung: Es waren noch ein paar Return-Anweisungen zuviel drin.
 # 26.12.2014:
 #	DeleteFn für Sonos wurde implementiert. Das Sonos-Device löscht erst alle SonosPlayer-Devices und beendet den selbst gestarteten SubProzess. Danach wird das Sonos-Device selber von Fhem abgeräumt.
 #	DeleteFn für SonosPlayer wurde implementiert. Es werden erst alle automatisch erzeugten Devices (RemoteControl und ReadingsGroups) entfernt, sofern sie noch unter dem Originalnamen existieren.
@@ -552,9 +555,10 @@ sub SONOS_getCoverTitleRG($;$$) {
 #
 ########################################################################################
 sub SONOS_getCoverRG($;$) {
-	my ($device) = @_;
+	my ($device, $height) = @_;
+	$height = '175px' if (!defined($height));
 	
-	return '<img style="margin-right: 5px; border: 1px solid lightgray; height: 175px" src="'.ReadingsVal($device, 'currentAlbumArtURL', '').'" />';
+	return '<img style="margin-right: 5px; border: 1px solid lightgray; height: '.$height.'" src="'.ReadingsVal($device, 'currentAlbumArtURL', '').'" />';
 }
 
 ########################################################################################
@@ -750,17 +754,17 @@ sub SONOS_FhemWebCallback($) {
 		}
 		
 		if ($URL =~ m/^\/playlist.jpg/i) {
-			return FW_serveSpecial('sonos_playlist', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
+			FW_serveSpecial('sonos_playlist', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
 			return (undef, undef);
 		}
 		
 		if ($URL =~ m/^\/input_default.jpg/i) {
-			return FW_serveSpecial('sonos_input_default', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
+			FW_serveSpecial('sonos_input_default', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
 			return (undef, undef);
 		}
 		
 		if ($URL =~ m/^\/input_tv.jpg/i) {
-			return FW_serveSpecial('sonos_input_tv', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
+			FW_serveSpecial('sonos_input_tv', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
 			return (undef, undef);
 		}
 		
@@ -3593,24 +3597,27 @@ sub SONOS_Stringify {
 #
 ########################################################################################
 sub SONOS_UmlautConvert($) {
-	my ($var) = @_;
-	
-	if ($var eq 'ä') {
-		return 'ae';
-	} elsif ($var eq 'ö') {
-		return 'oe';
-	} elsif ($var eq 'ü') {
-		return 'ue';
-	} elsif ($var eq 'Ä') {
-		return 'Ae';
-	} elsif ($var eq 'Ö') {
-		return 'Oe';
-	} elsif ($var eq 'Ü') {
-		return 'Ue';
-	} elsif ($var eq 'ß') {
-		return 'ss';
-	} else {
-		return '_';
+	eval {
+		use utf8;
+		my ($var) = @_;
+		
+		if ($var eq 'ä') {
+			return 'ae';
+		} elsif ($var eq 'ö') {
+			return 'oe';
+		} elsif ($var eq 'ü') {
+			return 'ue';
+		} elsif ($var eq 'Ä') {
+			return 'Ae';
+		} elsif ($var eq 'Ö') {
+			return 'Oe';
+		} elsif ($var eq 'Ü') {
+			return 'Ue';
+		} elsif ($var eq 'ß') {
+			return 'ss';
+		} else {
+			return '_';
+		}
 	}
 }
 
@@ -3777,7 +3784,7 @@ sub SONOS_Discover_Callback($$$) {
 	if ($action eq 'deviceAdded') {
 		my $descriptionDocument;
 		eval {
-			$descriptionDocument = decode(SONOS_Client_Data_Retreive('undef', 'attr', 'characterDecoding', 'CP-1252'), $device->descriptionDocument());
+			$descriptionDocument = decode(SONOS_Client_Data_Retreive('undef', 'attr', 'characterDecoding', 'CP1252'), $device->descriptionDocument());
 		};
 		if ($@) {
 			# Das Descriptiondocument konnte nicht abgefragt werden
@@ -3808,7 +3815,10 @@ sub SONOS_Discover_Callback($$$) {
 		# RoomName ermitteln
 		$roomName = decode_entities($1) if ($descriptionDocument =~ m/<roomName>(.*?)<\/roomName>/im);
 		$saveRoomName = decode('UTF-8', $roomName);
-		$saveRoomName =~ s/([äöüÄÖÜß])/SONOS_UmlautConvert($1)/eg; # Hier erstmal Umlaute 'schön' machen, damit dafür nicht '_' verwendet werden...
+		eval {
+			use utf8;
+			$saveRoomName =~ s/([äöüÄÖÜß])/SONOS_UmlautConvert($1)/eg; # Hier erstmal Umlaute 'schön' machen, damit dafür nicht '_' verwendet werden...
+		};
 		$saveRoomName =~ s/[^a-zA-Z0-9]/_/g;
 		my $groupName = $saveRoomName;
 	
@@ -5145,11 +5155,14 @@ sub SONOS_DevicePropertiesCallback($$) {
 	# Raumname wurde angepasst?
 	my $roomName = SONOS_Client_Data_Retreive($udn, 'reading', 'roomName', '');
 	if (defined($properties{ZoneName}) && $properties{ZoneName} ne '') {
-		$roomName = decode(SONOS_Client_Data_Retreive('undef', 'attr', 'characterDecoding', 'CP-1252'), $properties{ZoneName});
+		$roomName = decode(SONOS_Client_Data_Retreive('undef', 'attr', 'characterDecoding', 'CP1252'), $properties{ZoneName});
 		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'roomName', $roomName);
 		
 		my $saveRoomName = decode('UTF-8', $roomName);
-		$saveRoomName =~ s/([äöüÄÖÜß])/SONOS_UmlautConvert($1)/eg; # Hier erstmal Umlaute 'schön' machen, damit dafür nicht '_' verwendet werden...
+		eval {
+			use utf8;
+			$saveRoomName =~ s/([äöüÄÖÜß])/SONOS_UmlautConvert($1)/eg; # Hier erstmal Umlaute 'schön' machen, damit dafür nicht '_' verwendet werden...
+		};
 		$saveRoomName =~ s/[^a-zA-Z0-9]/_/g;
 		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'saveRoomName', $saveRoomName);
 	}
