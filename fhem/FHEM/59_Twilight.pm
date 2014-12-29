@@ -38,7 +38,6 @@ use POSIX;
 use HttpUtils;
 use Math::Trig;
 
-
 sub Twilight_calc($$$$$$$);
 sub Twilight_my_gmt_offset();
 sub Twilight_midnight_seconds();
