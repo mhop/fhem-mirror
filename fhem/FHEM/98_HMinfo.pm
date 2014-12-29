@@ -344,18 +344,13 @@ sub HMinfo_regCheck(@) { ######################################################
     if ($ehash->{helper}{shadowReg}){
       foreach my $rl (keys %{$ehash->{helper}{shadowReg}}){
         delete $ehash->{helper}{shadowReg}{$rl} 
-              if ($ehash->{READINGS}{$rl} && 
-                  $ehash->{helper}{shadowReg} && 
-                  $ehash->{helper}{shadowReg}{$rl} && 
-                  $ehash->{READINGS}{$rl}{VAL} eq $ehash->{helper}{shadowReg}{$rl});
+              if (   (   $ehash->{READINGS}{$rl} 
+                      && $ehash->{READINGS}{$rl}{VAL} eq $ehash->{helper}{shadowReg}{$rl}
+                      )                                  # content is already displayed
+                   ||(!$ehash->{helper}{shadowReg}{$rl}) # content is missing
+                   );
       }
-      if (keys %{$ehash->{helper}{shadowReg}}){
-        push @regChPend,$eName;
-      }
-      else{
-        delete $ehash->{helper}{shadowReg};
-      }
-      
+      push @regChPend,$eName if (keys %{$ehash->{helper}{shadowReg}});
     }      
                                                       
     push @regMissing,$eName.":\t".join(",",@mReg) if (scalar @mReg);
@@ -560,7 +555,7 @@ sub HMinfo_tempList(@) { ######################################################
   $filter = "." if (!$filter);
   $action = "" if (!$action);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
-  my $ret;;
+  my $ret;
   if    ($action eq "save"){
 #    foreach my $eN(HMinfo_getEntities("d")){#search and select channel
 #      my $md = AttrVal($eN,"model","");

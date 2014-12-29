@@ -1841,7 +1841,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$devH,1,"alive:yes"];
         push @evtEt,[$devH,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
       }
-      if (defined($state)){# if state was detected post events
+      if (defined($state) && $chn ne "00"){# if state was detected post events
         my $txt;
         if    ($shash->{helper}{lm} && $shash->{helper}{lm}{hex($state)}){$txt = $shash->{helper}{lm}{hex($state)}}
         elsif ($lvlStr{md}{$md}){$txt = $lvlStr{md}{$md}{$state}}
@@ -7003,6 +7003,7 @@ sub CUL_HM_unQEntity($$){# remove entity from q
   }
   $q = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
   my $mQ = $modules{CUL_HM}{helper}{$q};
+  return if(!$mQ || scalar(@{$mQ}) == 0);
   @{$mQ} = grep !/^$devN$/,@{$mQ} if ($dq->{$q} eq "");
 }
 sub CUL_HM_qEntity($$){  # add to queue
