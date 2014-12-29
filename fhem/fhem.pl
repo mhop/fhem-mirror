@@ -1833,6 +1833,9 @@ CommandDeleteReading($$)
   my @a = split(" ", $def, 2);
   return "Usage: deletereading <name> <reading>\n$namedef" if(@a != 2);
 
+  eval { "" =~ m/$a[1]/ };
+  return "Bad regexp $a[1]: $@" if($@);
+
   %ntfyHash = ();
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
