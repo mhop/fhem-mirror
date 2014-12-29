@@ -53,6 +53,7 @@ my $curReadingType = 0;
   #   6 = Time Col 3
   #   7 = Image Col 2-5
   #   8 = MinMaxNummer Col 3
+  #   9 = Date Col 2-5
   my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
       ,["relative Feuchte", "humidity", 1]
       ,["Sichtweite", "visibility", 1]
@@ -65,7 +66,8 @@ my $curReadingType = 0;
 
   # 1 = Tag-ID, 2 = readingName, 3 = Tag-Type (see above)
   my @knownIDs = (  
-      ["TMAX", "tempMax", 2]
+      ["DATUM", "date", 9]
+      ,["TMAX", "tempMax", 2]
       ,["TMIN", "tempMin", 2]
       ,["NW", "chOfRainDay", 2]
       ,["NW_Nacht", "chOfRainNight", 2]
@@ -148,6 +150,15 @@ sub text
       $text =~ s/^\s+//;    # trim string
       $text =~ s/\s+$//;
       $text =~ s/&#48;/0/g;  # replace 0
+      $text =~ s/&#49;/1/g;  # replace 1
+      $text =~ s/&#50;/2/g;  # replace 2
+      $text =~ s/&#51;/3/g;  # replace 3
+      $text =~ s/&#52;/4/g;  # replace 4
+      $text =~ s/&#53;/5/g;  # replace 5
+      $text =~ s/&#54;/6/g;  # replace 6
+      $text =~ s/&#55;/7/g;  # replace 7
+      $text =~ s/&#56;/8/g;  # replace 8
+      $text =~ s/&#57;/9/g;  # replace 9
       
    # Tag-Type 0 = Check for readings without tag-ID (current readings)
       if ($curReadingType == 0)
@@ -261,6 +272,15 @@ sub text
                push( @texte, $readingName."Min|-" ); 
                push( @texte, $readingName."Max|-" ); 
             }
+         }
+      }
+   # Tag-Type 9 = Date Col 2-5
+      elsif ($curReadingType == 9) 
+      {
+         if ( 1 < $curCol && $curCol <= 5 )
+         {
+            $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
+            push( @texte, $readingName."|".$text ); 
          }
       }
    }
@@ -692,12 +712,12 @@ PROPLANTA_Html($)
         
   my $ret = "<table border=0><thead align=center>";
   $ret .= sprintf '<tr><th colspan=9 align=left>%s</th></tr>', $defs{$d}{DEF};
-  $ret .= sprintf '<tr><th>Tag</th><th>morgens</th><th>tags</th><th>abends</th><th>nachts</th><th>min</th><th>max</th><th>Regen tags</th><th>Frost</th></tr></thead>', $defs{$d}{DEF};
+  $ret .= sprintf '<tr><th>Tag</th><th>morgens</th><th>tagsueber</th><th>abends</th><th>nachts</th><th>min</th><th>max</th><th>Regen tags</th><th>Frost</th></tr></thead>', $defs{$d}{DEF};
   $ret .= "<tbody align=center>";
 # define MyForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter") }
    for(my $i=0; $i<=2; $i++) {
       $ret .= sprintf('<tr><td>%s</td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s&deg;C</td><td>%s&deg;C</td><td>%s %%</td><td>%s</td></tr>',
-          "Tag ".$i, 
+          ReadingsVal($d, "fc".$i."_date", ""), 
           ReadingsVal($d, "fc".$i."_weatherMorning", ""), ReadingsVal($d, "fc".$i."_weatherMorningIcon", ""),
           ReadingsVal($d, "fc".$i."_weatherDay", ""), ReadingsVal($d, "fc".$i."_weatherDayIcon", ""),
           ReadingsVal($d, "fc".$i."_weatherEvening", ""), ReadingsVal($d, "fc".$i."_weatherEveningIcon", ""),
