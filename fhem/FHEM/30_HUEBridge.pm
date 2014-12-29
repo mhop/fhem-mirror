@@ -210,6 +210,14 @@ HUEBridge_Set($@)
   } elsif($cmd eq 'autocreate') {
     return HUEBridge_Autocreate($hash,1);
 
+  } elsif($cmd eq 'autodetect') {
+    my $result = HUEBridge_Call($hash, undef, 'lights', undef, 'POST');
+
+    return $result->{success}{'/lights'} if( $result->{success} );
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef;
+
   } elsif($cmd eq 'creategroup') {
 
     my @lights = ();
@@ -882,17 +890,23 @@ HUEBridge_HTTP_Request($$$@)
   <b>Set</b>
   <ul>
     <li>autocreate<br>
-    Create fhem devices for all bridge devices.</li>
+      Create fhem devices for all bridge devices.</li>
+    <li>autodetect<br>
+      Initiate the detection of new ZigBee devices. After aproximately one minute any newly detected
+      devices can be listed with <code>get <bridge> devices</code> and the corresponding fhem devices
+      can be created by <code>set <bridge> autocreate</code>.</li>
     <li>creategroup &lt;name&gt; &lt;light-1&gt[ &lt;light-2&gt;..&lt;lignt-n&gt;]<br>
-    Create a group out of &lt;light-1&gt-&lt;light-n&gt in the bridge.
-    The lights can be given as fhem device names or bridge device numbers.</li>
+      Create a group out of &lt;light-1&gt-&lt;light-n&gt in the bridge.
+      The lights can be given as fhem device names or bridge device numbers.</li>
     <li>deletegroup &lt;name&gt;|&lt;id&gt;<br>
-    Deletes the given group in the bridge and deletes the associated fhem device.</li>
+      Deletes the given group in the bridge and deletes the associated fhem device.</li>
     <li>statusRequest<br>
-    Update bridge status.</li>
+      Update bridge status.</li>
     <li>swupdate<br>
-    Update bridge firmware. This command is only available if a new firmware is available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate.<br>
-    A notify of the form <code>define HUEUpdate notify bridge:swupdate.* {...}</code> can be used to be informed about available firmware updates.<br></li>
+      Update bridge firmware. This command is only available if a new firmware is
+      available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate.<br>
+      A notify of the form <code>define HUEUpdate notify bridge:swupdate.* {...}</code>
+      can be used to be informed about available firmware updates.<br></li>
   </ul><br>
 </ul><br>
 
