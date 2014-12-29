@@ -37,6 +37,8 @@ my %hueModels = (
   LWB004 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 
+ 'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended Color Light' ,subType => 'extcolordimmer',},
+
  'PAR16 50 TW'      => {name => 'Lightify PAR16 50 tunable white'    ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'Classic A60 TW'   => {name => 'Lightify Classic A60 tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'Classic A60 RGBW' => {name => 'Lightify Classic A60 RGBW'          ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
