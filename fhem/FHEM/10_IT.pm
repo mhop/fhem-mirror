@@ -331,7 +331,7 @@ IT_Parse($$)
 
   #Log3 $hash,3,$msg."->".$msgcode."->".$housecode." ".$onoffcode;
   if(!defined($modules{IT}{defptr}{lc($housecode)})) {
-    Log3 undef,3,"$housecode not defined (Switch code: $onoffcode)";
+    Log3 undef,4,"$housecode not defined (Switch code: $onoffcode)";
     return "$housecode not defined (Switch code: $onoffcode)!";
   }
   $def=$modules{IT}{defptr}{lc($housecode)};
