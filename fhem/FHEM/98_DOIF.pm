@@ -129,12 +129,12 @@ EvalAllDoIf($)
     ($beginning,$eval,$err,$tailBlock)=GetBlockDoIf($tailBlock,'[\{\}]');
     return ($eval,$err) if ($err);
     if ($eval) {
-      if ($eval =~ m/^[\d]+$/) {
-        $eval="{".$eval."}";
-      } else {
+      if (substr($eval,0,1) eq "(") {
         my $ret = eval $eval;
         return($eval." ",$@) if ($@);
         $eval=$ret;
+      } else {
+        $eval="{".$eval."}";
       }
     }
     $cmd.=$beginning.$eval;
@@ -1183,7 +1183,7 @@ attr di_button do always</code><br>
 <br>
 <b>Berechnungen im Ausführungsteil</b><br>
 <br>
-Berechnungen können in geschweiften Klammern erfolgen. Innerhalb der Perlberechnung können Readings, Stati oder Internals wie gewohnt in eckigen Klammern angegeben werden.<br>
+Berechnungen können in geschweiften Klammern erfolgen. Aus Kompatibilitätsgründen, muss die Berechnung mit einer runden Klammer beginnen. Innerhalb der Perlberechnung können Readings, Stati oder Internals wie gewohnt in eckigen Klammern angegeben werden.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Es soll ein Vorgabewert aus zwei verschiedenen Readings ermittelt werden und an das set Kommando übergeben werden:<br>
 <br>
@@ -1322,7 +1322,7 @@ Der Ausführungsteil kann jeweils ausgelassen werden.<br>
 <code>define di_hum DOIF ([outdoor:humidity]&gt;70) DOELSEIF ([outdoor:humidity]&gt;50) DOELSE<br>
 attr di_hum cmdState wet|normal|dry</code><br>
 <br>
-<b>Anpassung des Status mit Hilfe des Attributes "state"</b><br>
+<b>Anpassung des Status mit Hilfe des Attributes <code>state</code></b><br>
 <br>
 Es können beliebige Reading und Stati oder Internals angegeben werden.<br>
 <br>
@@ -1330,7 +1330,7 @@ Es können beliebige Reading und Stati oder Internals angegeben werden.<br>
 <br>
 <code>attr di_hum state The current humidity is [outdoor:humidity], it is [di_hum]</code><br>
 <br>
-Es können beim Attribut state ebenfalls Berechnungen in geschweiften Klammern durchgeführt werden. <br>
+Es können beim Attribut state ebenfalls Berechnungen in geschweiften Klammern durchgeführt werden. Aus Kompatibilitätsgründen, muss die Berechnung mit einer runden Klammer beginnen.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Berechnung des Mittelwertes zweier Readings:<br>
 <br>
@@ -1341,9 +1341,9 @@ Der Status wird automatisch aktualisiert, sobald sich eine der Temperaturen änd
 <br>
 Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwert auf eine Stelle mit der Perlfunktion sprintf formatieren:<br>
 <br>
-<code>attr di_average state Average of the two rooms is {sprintf("%.1f",([room1:temperature]+[room2:temperature])/2)}</code><br>
+<code>attr di_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
 <br>
-<b>Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut "initialize"</b><br>
+<b>Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></b><br>
 <br>
 <u>Anwendungsbeispiel</u>: Nach dem Neustart soll der Zustand von <code>di_lamp</code> mit "initialized" vorbelegt werden. Das Reading <code>cmd_nr</code> wird auf 0 gesetzt, damit wird ein Zustandswechsel provoziert, das Modul wird initialisiert - der nächste Trigger führt zum Ausführen eines Kommandos.<br>
 <br>
@@ -1393,13 +1393,13 @@ Angaben, bei denen aufgrund der Definition kein Zustandswechsel erfolgen kann z.
 <code>define di_light DOIF ([08:00]) (set switch on)<br>
 attr di_light do always</code><br>
 <br>
-müssen mit Attribut "do always" definiert werden, damit sie nicht nur einmal, sondern jedes mal (hier jeden Tag) ausgeführt werden.<br>
+müssen mit Attribut <code>do always</code> definiert werden, damit sie nicht nur einmal, sondern jedes mal (hier jeden Tag) ausgeführt werden.<br>
 <br>
 Bei der Angabe von zyklisch sendenden Sensoren (Temperatur, Feuchtigkeit, Helligkeit usw.) wie z. B.:<br>
 <br>
 <code>define di_heating DOIF ([sens:temperature] < 20)(set heating on)</code><br>
 <br>
-ist die Nutzung des Attributes "do always" nicht sinnvoll, da das entsprechende Kommando hier: "set heating on" jedes mal ausgeführt wird,
+ist die Nutzung des Attributes <code>do always</code> nicht sinnvoll, da das entsprechende Kommando hier: "set heating on" jedes mal ausgeführt wird,
 wenn der Temperatursensor in regelmäßigen Abständen eine Temperatur unter 20 Grad sendet.<br>
 <br>
 Rekursionen vermeiden<br>
@@ -1427,8 +1427,7 @@ konkreter spezifizieren:<br>
 <br>
 Namenskonvention: Da der Doppelpunkt bei Readingangaben als Trennzeichen gilt, darf er nicht im Namen des Devices vorkommen. In solchen Fällen bitte das Device umbenennen.<br>
 <br>
-Da innerhalb eines DOIF-Moduls festgehalten wird, welches Kommando zuletzt ausgeführt wurde (Zustandsverwaltung), so wird das Wiederholen desselben Kommmandos vom Modul unterbunden. 
-Daher sollte nach Möglichkeit eine Problemlösung mit Hilfe eines und nicht mehrerer DOIF-Module realisiert werden, getreu dem Motto "wer die Lampe einschaltet, soll sie auch wieder ausschalten".
+Standardmäßig, ohne das Attribut <code>do always</code>, wird das Wiederholen desselben Kommmandos vom Modul unterbunden. Daher sollte nach Möglichkeit eine Problemlösung mit Hilfe eines und nicht mehrerer DOIF-Module realisiert werden, getreu dem Motto "wer die Lampe einschaltet, soll sie auch wieder ausschalten".
 Dadurch wird erreicht, dass unnötiges (wiederholendes) Schalten vom Modul unterbunden werden kann, ohne dass sich der Anwender selbst darum kümmern muss.<br>
 <br>
 Mehrere Bedingungen, die zur Ausführung gleicher Kommandos führen, sollten zusammengefasst werden. Dadurch wird ein unnötiges Schalten aufgrund verschiedener Zustände verhindert.<br>
