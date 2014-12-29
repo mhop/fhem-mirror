@@ -153,7 +153,7 @@ sub FRITZBOX_Initialize($)
                 ."fritzBoxIP "
                 ."INTERVAL "
                 ."pwdFile "
-                ."ringWithIntern:0,1,2,3,4 "
+                ."ringWithIntern:0,1,2 "
                 ."telnetUser "
                 .$readingFnAttributes;
 
@@ -1371,7 +1371,7 @@ sub FRITZBOX_Open_Connection($)
    return undef 
       unless $hash->{REMOTE} == 1;
    
-   return "Error: Perl modul ".$missingModulRemote."is missing on this system"
+   return "Error: Perl modul ".$missingModulRemote."is missing on this system. Please install before using this modul."
       if $missingModulRemote;
       
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
@@ -1774,6 +1774,7 @@ sub FRITZBOX_fritztris($)
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as
    signaling devices. MP3 files can be played as ring tone or when calling phones.
+   <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki-Link</b></a>
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
    <br/><br/>
@@ -2023,6 +2024,7 @@ sub FRITZBOX_fritztris($)
 <div  style="width:800px"> 
 <ul>
    Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
+   <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki-Link</b></a>
    <br/><br/>
    Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
    <br/><br/>
