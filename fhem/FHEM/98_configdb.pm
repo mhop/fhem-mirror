@@ -781,7 +781,6 @@ Ver 0 bezeichnet immer die aktuell verwendete Konfiguration.<br/>
 			<b>Wichtig!</b><br/>
 			Die zur&uuml;ckgeholte Version wird <b>NICHT</b> automatisch aktiviert!<br/>
 			Ein <code>rereadcfg</code> oder - besser - <code>shutdown restart</code> muss manuell erfolgen.<br/>
-		</ul>
 		<br/>
 		<br/>
 
@@ -836,6 +835,7 @@ attr Melder_FAr peerIDs 00000000,2286BC03,
 		</ul>
 
 	</ul>
+</ul>
 
 =end html_DE
 
