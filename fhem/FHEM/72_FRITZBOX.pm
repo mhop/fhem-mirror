@@ -1445,9 +1445,17 @@ sub FRITZBOX_Open_Connection($)
    $telnet->print( $pwd );
 
    FRITZBOX_Log $hash, 5, "Wait for command prompt";
-   unless ($telnet->waitfor( '/# $/i' ))
+   unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
    {
-      $msg = "Telnet error while waiting for command prompt (perhaps wrong password): ".$telnet->errmsg;
+      $msg = "Telnet error while waiting for command prompt: ".$telnet->errmsg;
+      FRITZBOX_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
+      return $msg;
+   }
+   elsif ( $match eq "Login failed.")
+   {
+      $msg = "Telnet error: Login failed. Wrong password.";
       FRITZBOX_Log $hash, 2, $msg;
       $telnet->close;
       $telnet = undef;
