@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 12/2014
-my $thzversion = "0.119";
+my $thzversion = "0.120";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -571,20 +571,27 @@ sub THZ_Set($@){
 	$msg=THZ_Get($hash, $name, $cmd);
 	#take care of program of the week
 	given ($a[1]) {
-	 when (/Mo-So/)  	{
+	 when (/Mo-So/){
+	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/Mo-So/Mo-Fr/;	$msg.= "\n" . THZ_Set($hash, @a);
-	    select(undef, undef, undef, 0.2);
+	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/Mo-Fr/Sa-So/;	$msg.="\n" . THZ_Set($hash, @a);
 	  }
 	 when (/Mo-Fr/)  	{
 	    $a[1] =~ s/_Mo-Fr_/_Mo_/;	$msg.="\n" . THZ_Set($hash, @a);
+	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Mo_/_Tu_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Tu_/_We_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_We_/_Th_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Th_/_Fr_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
 	  }
-	 when (/Sa-So/)  	{
+	 when (/Sa-So/){
+	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Sa-So_/_Sa_/; 	$msg.="\n" . THZ_Set($hash, @a);
+	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Sa_/_So_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
 	  }
 	  default 	{}
@@ -1341,11 +1348,6 @@ sub THZ_RemoveInternalTimer($)
     delete($intAt{$a}) if($intAt{$a}{FN} eq $callingfun);
   }
 }
-
-
-
-
-
 
 
 
