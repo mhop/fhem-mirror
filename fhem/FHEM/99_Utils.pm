@@ -13,6 +13,58 @@ Utils_Initialize($$)
 }
 
 sub
+getUniqueId()
+{
+  my ($err, $uniqueID) = getKeyValue("uniqueID");
+  return $uniqueID if(!$err);
+  srand(time);
+  $uniqueID = join "",map { unpack "H*", chr(rand(256)) } 1..16;
+  setKeyValue("uniqueID", $uniqueID);
+  return $uniqueID;
+}
+
+sub
+getKeyValue($)
+{
+  my ($key) = @_;
+  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/uniqueID";
+  my ($err, @l) = FileRead($fName);
+  return ($err, undef) if($err);
+  for my $l (@l) {
+    return (undef, $1) if($l =~ m/^$key:(.*)/);
+  }
+  return ("Key not found", undef);
+}
+
+sub
+setKeyValue($$)
+{
+  my ($key,$value) = @_;
+  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/uniqueID";
+  my ($err, @old) = FileRead($fName);
+  my @new;
+  if($err) {
+    push(@new, "# This file is auto generated.",
+               "# Please do not modify, move or delete it.",
+               "");
+    @old = ();
+  }
+  
+  my $fnd;
+  foreach my $l (@old) {
+    if($l =~ m/^$key:/) {
+      $fnd = 1;
+      push @new, "$key:$value" if(defined($value));
+    } else {
+      push @new, $l;
+    }
+  }
+  push @new, "$key:$value" if(!$fnd && defined($value));
+
+  return FileWrite($fName, @new);
+}
+
+sub
 time_str2num($)
 {
   my ($str) = @_;
@@ -336,8 +388,26 @@ myUtils_Initialize($$)
       nc replacement.
       </li></br>
 
+    <li><b>getUniqueId()</b><br>
+      return the FHEM uniqueID used by the fheminfo command. Uses the
+      getKeyValue / setKeyValue functions.
+      </li></br>
+
+    <li><b>setKeyValue(keyName, value)</b><br>
+      store the value in the file $modpath/FHEM/FhemUtils/uniqueID (the name is
+      used for backward compatibility), or in the database, if using configDB.
+      value may not contain newlines, and only one value per key is stored.
+      The file/database entry will be written immediately, no explicit save is
+      required.  If the value is undef, the entry will be deleted.
+      Returns an error-string or undef.
+      </li></br>
+
+    <li><b>getKeyValue(keyName)</b><br>
+      return ($error, $value), stored previously by setKeyValue.
+      $error is undef if there was no error, otherwise $value is undef.
+      </li></br>
+
   </ul>
 </ul>
 =end html
 =cut
-

@@ -26,8 +26,8 @@ use strict;
 use warnings;
 use Config;
 
+
 sub CommandFheminfo($$);
-my %UPDATE;
 
 ########################################
 sub
@@ -37,11 +37,6 @@ fheminfo_Initialize($$)
     Fn  => "CommandFheminfo",
     Hlp => "[send],show or send Fhem statistics",
   );
-  $UPDATE{server}         = "http://fhem.de";
-  $UPDATE{path}           = "fhemupdate4";
-  $UPDATE{packages}       = "FHEM";
-  $UPDATE{FHEM}{control} = "controls_fhem.txt";
-
   $cmds{fheminfo} = \%hash;
 }
 
@@ -72,86 +67,35 @@ CommandFheminfo($$)
 
   return "Unknown argument $args[0], usage: fheminfo [send]"
     if(@args && lc($args[0]) ne "send");
-  return "Argument 'send' is not useful, if global attribute 'sendStatistics' is set to 'never'."
-    if(@args && lc($args[0]) eq "send" && lc(AttrVal("global","sendStatistics","")) eq "never");
 
-  my $branch   = "DEVELOPMENT";
+  return "Won't send, as sendStatistics is set to 'never'."
+    if(@args && 
+       lc($args[0]) eq "send" &&
+       lc(AttrVal("global","sendStatistics","")) eq "never");
+
+  my $branch   = "DEVELOPMENT"; # UNUSED
   my $release  = "5.6";
   my $os       = $^O;
   my $arch     = $Config{"archname"};
   my $perl     = $^V;
-  my $uniqueID = AttrVal("global","uniqueID",undef);
+  my $uniqueID = getUniqueId();
   my $sendStatistics = AttrVal("global","sendStatistics",undef);
   my $moddir   = $attr{global}{modpath}."/FHEM";
-  my $uidFile  = $moddir."/FhemUtils/uniqueID";
-  my $upTime;
-     $upTime   = fhemUptime();
+  my $upTime = fhemUptime();
+  
+  my %official_module;
 
-  if(defined($uniqueID) && $uniqueID eq $uidFile) {
-    my $fh;
-    if(open($fh,"<".$uidFile)) {
-      Log 5, "fheminfo get uniqueID from $uidFile";
-      while (my $line = <$fh>) {
-        chomp $line;
-        if($line =~ m/^uniqueID:[\da-fA-F]{32}$/) {
-          (undef,$uniqueID) = split(":",$line);
-        }
-      }
-      close $fh;
+  opendir(DH, $moddir) || return("$moddir: $!");
+  foreach my $file (grep /^controls.*.txt$/, readdir(DH)) {
+    open(FH, "$moddir/$file") || next;
+    while(my $l = <FH>) {
+      $official_module{$1} = 1 if($l =~ m+^UPD.* FHEM/\d\d_(.*).pm+);
     }
+    close(FH);
   }
-
-  if(!defined($uniqueID) || $uniqueID !~ m/^[\da-fA-F]{32}$/ || !-e $uidFile) {
-    my $fh;
-    if(!open($fh,">".$uidFile)) {
-      return "Can't open $uidFile: $!";
-    }
-    if(!defined($uniqueID) || defined($uniqueID) && $uniqueID !~ m/^[\da-fA-F]{32}$/) {
-      $uniqueID = join "",map { unpack "H*", chr(rand(256)) } 1..16;
-    }
-    print $fh "################################################################\n";
-    print $fh "# IMPORTANT NOTE:\n";
-    print $fh "# This file is auto generated from the fheminfo command.\n";
-    print $fh "# Please do not modify, move or delete this file!\n";
-    print $fh "#\n";
-    print $fh "# This file contains an unique ID for this installation. It is\n";
-    print $fh "# to be used for statistical purposes only.\n";
-    print $fh "# Based on this unique ID, no conclusions can be drawn to any\n";
-    print $fh "# personal information of this installation.\n";
-    print $fh "################################################################\n";
-    print $fh "\n";
-    print $fh "uniqueID:$uniqueID\n";
-    close $fh;
-    Log 5, "fheminfo 'uniqueID' generated and stored in file '$uidFile'";
-  }
-
-  $attr{global}{uniqueID} = $uidFile;
-
-  my $ret = checkConfigFile($uidFile);
-
-  return $ret if($ret);
-
-  # get list of files
-  my $fail;
-  my $control_ref = {};
-
-  my $pack = "FHEM";
-
-  if(!-e "$moddir/$UPDATE{$pack}{control}") {
-    my $server = $UPDATE{server};
-    my $BRANCH = "SVN";
-    my $srcdir = $UPDATE{path}."/".lc($BRANCH);
-    Log 5, "fheminfo get $server/$srcdir/$UPDATE{$pack}{control}";
-    my $controlFile = GetFileFromURL("$server/$srcdir/$UPDATE{$pack}{control}");
-    return "Can't get '$UPDATE{$pack}{control}' from $server" if (!$controlFile);
-    # parse remote controlfile
-    ($fail,$control_ref) = parseControlFile($pack,$controlFile,$control_ref,0);
-    return "$fail\nfheminfo canceled..." if ($fail);
-  } else {
-    Log 5, "fheminfo get $moddir/$UPDATE{$pack}{control}";
-    # parse local controlfile
-    ($fail,$control_ref) = parseControlFile($pack,"$moddir/$UPDATE{$pack}{control}",$control_ref,1);
-  }
+  closedir(DH);
+  return "Can't read FHEM/controls_fhem.txt, execute update first."
+        if(!%official_module);
 
   foreach my $d (sort keys %defs) {
     my $n = $defs{$d}{NAME};
@@ -159,8 +103,7 @@ CommandFheminfo($$)
     my $m = "unknown";
     $m = $defs{$d}{model} if( defined($defs{$d}{model}) );
     $m = AttrVal($n,"model",$m);
-    if(exists $control_ref->{$t}) {
-      Log 5, "fheminfo name:$n type:$t model:$m";
+    if($official_module{$t} && !$defs{$d}{TEMPORARY}) {
       $info{modules}{$t}{$n} = $m;
     }
   }
@@ -170,7 +113,6 @@ CommandFheminfo($$)
   my $str;
   $str  = "Fhem info:\n";
   $str .= sprintf("  Release%*s: %s\n",2," ",$release);
-  $str .= sprintf("  Branch%*s: %s\n",3," ",$branch);
   $str .= sprintf("  OS%*s: %s\n",7," ",$os);
   $str .= sprintf("  Arch%*s: %s\n",5," ",$arch);
   $str .= sprintf("  Perl%*s: %s\n",5," ",$perl);
@@ -185,7 +127,6 @@ CommandFheminfo($$)
   my $length = (reverse sort { $a <=> $b } map { length($_) } @modules)[0];
 
   $str .= "Defined modules:\n";
-
   foreach my $t (sort keys %{$info{modules}}) {
     my $c = scalar keys %{$info{modules}{$t}};
     my @models;
@@ -197,7 +138,8 @@ CommandFheminfo($$)
     }
     $str .= sprintf("  %s%*s: %d\n",$t,$length-length($t)+1," ",$c);
     if(@models != 0) {
-      $modStr .= sprintf("  %s%*s: %s\n",$t,$length-length($t)+1," ",join(",",sort @models));
+      $modStr .= sprintf("  %s%*s: %s\n",
+                        $t,$length-length($t)+1," ", join(",",sort @models));
       $contModels .= join(",",sort @models)."|";
     }
     $contModules .= "$t:$c|";
@@ -209,12 +151,12 @@ CommandFheminfo($$)
     $str .= $modStr;
   }
 
-  my $transmitData = ($attr{global}{sendStatistics}) ? $attr{global}{sendStatistics} : "not set";
-  $str .= "\n";
-  $str .= "Transmitting this information during an update:\n";
-  $str .= "  $transmitData (Note: You can change this via the global attribute sendStatistics)\n";
+  my $td = (lc(AttrVal("global", "sendStatistics", "")) eq "onupdate") ?
+                "yes" : "no";
 
-  $ret = $str;
+  $str .= "\n";
+  $str .= "Transmitting this information during an update: $td\n";
+  $str .= "You can change this via the global attribute sendStatistics\n";
 
   if(@args != 0 && $args[0] eq "send") {
     my $uri = "http://fhem.de/stats/statistics.cgi";
@@ -239,125 +181,15 @@ CommandFheminfo($$)
         timeout => 60);
     my $res = $ua->request($req);
 
-    $ret .= "\nserver response: ";
+    $str .= "\nserver response: ";
     if($res->is_success) {
-      $ret .= $res->content."\n";
+      $str .= $res->content."\n";
     } else {
-      $ret .= $res->status_line."\n";
+      $str .= $res->status_line."\n";
     }
   }
 
-  return $ret;
-}
-
-########################################
-sub parseControlFile($$$$) {
-  my ($pack,$controlFile,$control_ref,$local) = @_;
-  my %control = %$control_ref if ($control_ref && ref($control_ref) eq "HASH");
-  my $from = ($local ? "local" : "remote");
-  my $ret;
-
-  if ($local) {
-    my $str = "";
-    # read local controlfile in string
-    if (open FH, "$controlFile") {
-      $str = do { local $/; <FH> };
-    }
-    close(FH);
-    $controlFile = $str
-  }
-  # parse file
-  if ($controlFile) {
-    foreach my $l (split("[\r\n]", $controlFile)) {
-      chomp($l);
-      Log 5, "fheminfo $from controls_".lc($pack).".txt: $l";
-      my ($ctrl,$date,$size,$file,$move) = "";
-      if ($l =~ m/^(UPD) (20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d) (\d+) (\S+)$/) {
-        $ctrl = $1;
-        $date = $2;
-        $size = $3;
-        $file = $4;
-      } elsif ($l =~ m/^(DIR) (\S+)$/) {
-        $ctrl = $1;
-        $file = $2;
-      } elsif ($l =~ m/^(MOV) (\S+) (\S+)$/) {
-        $ctrl = $1;
-        $file = $2;
-        $move = $3;
-      } elsif ($l =~ m/^(DEL) (\S+)$/) {
-        $ctrl = $1;
-        $file = $2;
-      } else {
-        $ctrl = "ESC"
-      }
-      if ($ctrl eq "ESC") {
-        Log 1, "fheminfo File 'controls_".lc($pack).".txt' ($from) is corrupt";
-        $ret = "File 'controls_".lc($pack).".txt' ($from) is corrupt";
-      }
-      last if ($ret);
-      if ($l =~ m/^UPD/ && $file =~ m/^FHEM/) {
-        if ($file =~ m/^.*(\d\d_)(.*).pm$/) {
-          my $modName = $2;
-          $control{$modName} = $file;
-        }
-      }
-    }
-  }
-  return ($ret, \%control);
-}
-
-########################################
-sub checkConfigFile($) {
-  my $uidFile = shift;
-  my $name = "fheminfo";
-  my $configFile = AttrVal("global","configfile","");
-
-  if($configFile && !configDBUsed()) {
-    my $fh;
-    if(!open($fh,"<".$configFile)) {
-      return "Can't open $configFile: $!";
-    }
-
-    my @currentConfig = <$fh>;
-    close $fh;
-
-    my @newConfig;
-    my $done = 0;
-
-    if(grep {$_ =~ /uniqueID/} @currentConfig) {
-      Log 5, "fheminfo uniqueID in configfile";
-      foreach my $line (@currentConfig) {
-        if($line =~ m/uniqueID/ && $line =~ m/[\da-fA-F]{32}/) {
-          Log 5, "fheminfo uniqueID in configfile and hex";
-          $line = "attr global uniqueID $uidFile\n";
-          $done = 1;
-        }
-        push(@newConfig,$line);
-      }
-    } else {
-      Log 5, "fheminfo uniqueID not in configfile";
-      foreach my $line (@currentConfig) {
-        push(@newConfig,$line);
-        if($line =~ /modpath/ && $done == 0) {
-          push(@newConfig,"attr global uniqueID $uidFile\n");
-          $done = 1;
-        }
-      }
-    }
-
-    if($done) {
-      if(!open($fh,">".$configFile)) {
-        return "Can't open $configFile: $!";
-      }
-
-      foreach (@newConfig) {
-        print $fh $_;
-      }
-      close $fh;
-      Log 1, "$name global attributes 'uniqueID' added to configfile $configFile";
-    }
-  }
-
+  return $str;
 }
 
 ########################################
@@ -372,25 +204,29 @@ sub checkModule($) {
   }
 }
 
-sub fhemUptime {
-       my $diff = time - $fhem_started;
-       my ($d,$h,$m,$ret);
-       
-       ($d,$diff) = _myDiv($diff,86400);
-       ($h,$diff) = _myDiv($diff,3600);
-       ($m,$diff) = _myDiv($diff,60);
+sub 
+fhemUptime()
+{
+  my $diff = time - $fhem_started;
+  my ($d,$h,$m,$ret);
+  
+  ($d,$diff) = _myDiv($diff,86400);
+  ($h,$diff) = _myDiv($diff,3600);
+  ($m,$diff) = _myDiv($diff,60);
 
-       $ret  = "";
-       $ret .= "$d days, " if($d >  1);
-       $ret .= "1 day, "   if($d == 1);
-       $ret .= sprintf("%02s:%02s:%02s", $h, $m, $diff);
+  $ret  = "";
+  $ret .= "$d days, " if($d >  1);
+  $ret .= "1 day, "   if($d == 1);
+  $ret .= sprintf("%02s:%02s:%02s", $h, $m, $diff);
 
-       return $ret;
+  return $ret;
 }
 
-sub _myDiv($$) {
-       my ($p1,$p2) = @_;
-       return (int($p1/$p2), $p1 % $p2);
+sub 
+_myDiv($$)
+{
+  my ($p1,$p2) = @_;
+  return (int($p1/$p2), $p1 % $p2);
 }
 
 1;
@@ -420,7 +256,7 @@ sub _myDiv($$) {
       <li>Operating System Information</li>
       <li>Hardware architecture</li>
       <li>Installed Perl version</li>
-      <li>Installed FHEM release and branch</li>
+      <li>Installed FHEM release</li>
       <li>Defined modules (only official FHEM Modules are counted)</li>
       <li>Defined models per module</li>
     </ul>
@@ -430,7 +266,6 @@ sub _myDiv($$) {
       fhem&gt; fheminfo
       Fhem info:
         Release  : 5.3
-        Branch   : DEVELOPMENT
         OS       : linux
         Arch     : i686-linux-gnu-thread-multi-64int
         Perl     : v5.14.2
@@ -477,31 +312,6 @@ sub _myDiv($$) {
   <br>
   <br>
   <ul>
-    <li>uniqueID<br>
-      A randomly generated ID (16 pairs of hash values), e.g.
-      <code>87c5cca38dc75a4f388ef87bdcbfbf6f</code> which is assigned to the transmitted
-      data to prevent duplicate entries.
-      <br>
-      The <code>uniqueID</code> is stored automatically in a file named <code>FhemUtils/uniqueID</code>
-      in FHEM's modules path.
-      <br>
-      <strong>IMPORTANT NOTE:</strong>
-      <br>
-      Every installation of FHEM should have to have his own unique ID.
-      <br>
-      Please do not modify, move or delete this file! You should always backup this file
-      (this is normally done by the <code>update</code> command automatically) and please restore
-      this file to the same path (<code>FhemUtils</code> in FHEM's modules path), if you plan to
-      reinstall your FHEM installation. This prevents duplicate entries for identical
-      installations on the same hardware in the statistics.
-      <br>
-      Otherwise, please use different unique IDs for each installation of FHEM on different
-      hardware, e.g. one randomly generated unique ID for FRITZ!Box, another one for the first
-      Raspberry Pi, another one for the second Raspberry Pi, etc.
-      <br>
-      Thanks for your support!
-    </li>
-    <br>
     <li>sendStatistics<br>
       This attribute is used in conjunction with the <code>update</code> command.
       <br>
@@ -540,7 +350,7 @@ sub _myDiv($$) {
       <li>Eingesetztes Betriebssystem</li>
       <li>Hardware Architektur</li>
       <li>Installierte Perl Version</li>
-      <li>Installierte FHEM release und "branch"</li>
+      <li>Installierte FHEM release</li>
       <li>Definierte Module (nur offizielle FHEM Module werden ermittelt)</li>
       <li>Definierte Modelle je Modul</li>
     </ul>
@@ -550,7 +360,6 @@ sub _myDiv($$) {
       fhem&gt; fheminfo
       Fhem info:
         Release  : 5.3
-        Branch   : DEVELOPMENT
         OS       : linux
         Arch     : i686-linux-gnu-thread-multi-64int
         Perl     : v5.14.2
@@ -597,31 +406,6 @@ sub _myDiv($$) {
   <br>
   <br>
   <ul>
-    <li>uniqueID<br>
-      Eine zuf&auml;llig generierte ID (16 Paare aus Hash Werten), z.B.
-      <code>87c5cca38dc75a4f388ef87bdcbfbf6f</code> welche den &uuml;bertragenen Daten
-      zur Vermeidung von doppelten Eintr&auml;ge zugewiesen wird.
-      <br>
-      Die <code>uniqueID</code> wird automatisch in einer Datei namens <code>FHemUtils/uniqueID</code>
-      im FHEM Modulverzeichnis gespeichert.
-      <br>
-      <strong>WICHTIGER HINWEIS:</strong>
-      <br>
-      Jede Installation von FHEM sollte seine eigene eindeutige ID haben.
-      <br>
-      Bitte diese Datei nicht ver&auml;ndern, verschieben oder l&ouml;schen! Diese Datei sollte
-      immer gesichert (wird normalerweise automatisch durch den <code>update</code> Befehl
-      erledigt) und bei einer Neuinstallation auf der gleichen Hardware im gleichen Verzeichnis
-      (<code>FhemtUtils</code> im FHEM Modulverzeichnis) wieder hergestellt werden. Dies verhindert
-      doppelte Eintr&auml;ge identischer Installationen auf der gleichen Hardware in der Statistik.
-      <br>
-      Anderfalls, sollten bitte f&uuml;r jede Installation auf unterschiedlicher Hardware eigene
-      IDs genutzt werden, z.B. eine zuf&auml;llig erzeugte ID f&uuml;r FRITZ!Box, eine weitere f&uuml;r
-      den ersten Raspberry Pi, eine weitere f&uuml;r einen zweiten Raspberry Pi, usw.
-      <br>
-      Vielen Dank f&uuml;r die Unterst&uuml;tzung!
-    </li>
-    <br>
     <li>sendStatistics<br>
       Dieses Attribut wird in Verbindung mit dem <code>update</code> Befehl verwendet.
       <br>

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: fheminfo: report third-party modules
+  - feature: 99_Utils.pm: add getUniqueID, getKeyValue, setKeyValue
   - feature: SMARTMON: additional parameters for smartctl
   - added: 00_HXB / 10_HXBDevice for Hexabus devices
   - feature: HUEbridge: added group handling
@@ -12,7 +14,8 @@
   - feature: HUEDevice: allow ct presets in webCmd
                         new subTypes extcolordimer and ctdimer
                         start support for Lightify bulbs
-  - added: SONOS and SONOSPLAYER to support Sonos Multiroom Audiosystems (Reinerlein)
+  - added: SONOS and SONOSPLAYER to support Sonos Multiroom Audiosystems
+          (Reinerlein)
   - change: 64_ESA2000.pm: add batterystate
   - added:   42_SMARTMON: Frontend to smartctl (maintainer: hexenmeister)
   - feature: 70_PushNotifier added line break in Messages (xusader)
@@ -22,7 +25,8 @@
   - bugfix: FB_CALLMONITOR: fixing not working company numbers 
             reverse search for search.ch 
   - bugfix: 70_PushNotifier repair set function (xusader)
-  - bugfix: PRESENCE: fixing not working timer, when using set [...] statusRequest
+  - bugfix: PRESENCE: fixing not working timer, when using set [...]
+            statusRequest
   - bugfix: FB_CALLMONITOR: fixing reverse search for klicktel.de
   - feature: new module 52_I2C_MCP342x.pm added (klausw)
   - feature: SYSMON: read cpu temp on FritzBox
@@ -36,7 +40,8 @@
   - feature: new module 98_logProxy.pm added (justme1968)
   - change: 66_ECMD: ReadyFn added (fixes issue under Windows)
   - change: 02_RSS: use a GUID in RSS; urlq source for img command
-  - feature: 70_PushNotifier improve usebility, configuration without cURL (xusader)
+  - feature: 70_PushNotifier improve usebility, configuration without cURL
+            (xusader)
   - bugfix: SYSMON: prevent empty line im log by userReadings
   - feature: 10_IT empfang (by bjoernh)
   - bugfix: PRESENCE: fix race condition, when delete disabled attribute and
@@ -51,26 +56,32 @@
   - feature: 15_CUL_EM added attribute maxPeak (arnoaugustin)
   - bugfix: 10_IT changed "setstate" to avoid eventMap errors (arnoaugustin)
   - feature: new module 37_harmony.pm added (justme1968)
-  - change: WMBUS: use _ instead of : as readings separator, better support for EnergyCam
+  - change: WMBUS: use _ instead of : as readings separator, better support for
+            EnergyCam
   - feature: new module 23_KOSTALPIKO added (john)
-  - feature: new module 98_HourCounter added, 99_UtilsHourCounter.pm added to contrib (john)
+  - feature: new module 98_HourCounter added, 99_UtilsHourCounter.pm added to
+             contrib (john)
   - added: MYSENSORS: connect to serial or Ethernet MySensors Gateway
   - added: MYSENSORS_DEVICE: represent a MySensors sensor- or actor node
   - feature: global ATTR/DELETEATTR/MODIFIED events
   - feature: 55_GDS.pm - attr disable added
   - bugfix: SYSMON: prevent endless loop at startup with 'disable' attribute  
-  - feature: SYSMON: added FritzBox informations: DSL rate, DSLAM sync time, count of CRC an FEC
+  - feature: SYSMON: added FritzBox informations: DSL rate, DSLAM sync time,
+             count of CRC an FEC
   - bugfix: SYSMON: unwanted characters in dsl info lines
   - change: 57_Calendar: process continuation lines, get/set syntax checks
   - bugfix: SYSMON: fix availability of cpu/kernel_max
   - bugfix: SYSMON: numeric check
   - change: 59_Weather: change icons for conditions 31, 34, 36
   - added: MQTT: connect fhem with mqtt
-  - added: MQTT_BRIDGE: bidirectional mapping of existing fhem-device to mqtt-topic
-  - added: MQTT_DEVICE: fhem-device that can be controlled by and publishes to mqtt
+  - added: MQTT_BRIDGE: bidirectional mapping of existing fhem-device to
+           mqtt-topic
+  - added: MQTT_DEVICE: fhem-device that can be controlled by and publishes to
+           mqtt
   - added: I2C_LCD: module to drive PCF8574T based LCD connected via I2C
   - added: I2C_DS1307: module to read time and date from DS1307 connected by i2c
-  - added: OWX_ASYNC: asynchronous, non-blocking version of OWX for DS2480, DS9097 and FRM
+  - added: OWX_ASYNC: asynchronous, non-blocking version of OWX for DS2480,
+           DS9097 and FRM
   - feature FRM: work as physical IODev for I2C_XXX modules
     added: FRM_ROTENC: read rotary-encoders with FRM
     added: FRM_RGB: control rgb-leds with FRM
@@ -89,15 +100,16 @@
   - feature: 57_Calendar: deal with non-existent end times
   - bugfix: SOMFY: fix non-working on/off-for-timer methods
                    made positioning attributes optional
-  - feature: SOMFY: support for exact positioning (one-time setup of run times required)
-                    support for parse()-function, requires newest CULFW.
+  - feature: SOMFY: support for exact positioning (one-time setup of run times
+             required) support for parse()-function, requires newest CULFW.
   - feature: userattr is now also device attribute
   - feature: ZWave: Fibaro_FGRM222 MANUFACTURER_PROPRIETARY class
   - feature: sequence: reportEvents attribtue added
   - feature: SYSMON: RAM and SWAP Readings on OSX
   - change:  34_NUT: removed calculation of values. Use userReadings instead.
                      removed autogeneration of attr model and serNo.
-  - feature: SYSMON: improvement: support network information (IP, IPv6) on german linux
+  - feature: SYSMON: improvement: support network information (IP, IPv6) on
+             german linux
   - feature: Synology DiskStation NAS basic spk file creation
   - change:  34_NUT: readingFnAttributes added; creation of units deleted;
                 changed attr asReadings to use comma instead of space
