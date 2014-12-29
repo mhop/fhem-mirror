@@ -138,7 +138,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",} #:w  todo should be wakeup, does not react
  ,"003E" => {name=>"HM-WDS30-T-O"            ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p'            ,chn=>"",} #:w remark: this device behaves on wakeup
  ,"003F" => {name=>"HM-WDS40-TH-I"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",} #:w  todo should be wakeup, does not react
- ,"0040" => {name=>"HM-WDS100-C6-O"          ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c'      ,lst=>'p,1'          ,chn=>"",} #:w  todo should be wakeup, does not react
+ ,"0040" => {name=>"HM-WDS100-C6-O"          ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",} #:w  todo should be wakeup, does not react
  ,"0041" => {name=>"HM-WDC7000"              ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,4'          ,chn=>"",}
  ,"0042" => {name=>"HM-SEC-SD"               ,st=>'smokeDetector'     ,cyc=>'99:00' ,rxt=>'b'      ,lst=>'p'            ,chn=>"",}
  ,"0043" => {name=>"HM-SEC-TIS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}
@@ -321,8 +321,8 @@ my $K_actDetID = '000000'; # id of actionDetector
 %culHmRegDefShLg = (# register that are available for short AND long button press. Will be merged to rgister list at init
 #blindActuator mainly
   ActionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
-  OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode"                        ,lit=>{absolut=>0,minimal=>1}},
-  OnTimeMode      =>{a=> 10.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode"                         ,lit=>{absolut=>0,minimal=>1}},
+  OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time meant absolut or at least"   ,lit=>{absolut=>0,minimal=>1}},
+  OnTimeMode      =>{a=> 10.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time meant absolut or at least"    ,lit=>{absolut=>0,minimal=>1}},
   MaxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.5    ,c=>''         ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction."            ,lit=>{unused=>25.5}},
   DriveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
 #dimmer mainly
@@ -332,7 +332,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   OffTime         =>{a=>  9.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off time"                             ,lit=>{unused=>111600}},
 
   ActionTypeDim   =>{a=> 10.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
-  OffDlyBlink     =>{a=> 14.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{off=>0,on=>1}},
+  OffDlyBlink     =>{a=> 14.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"blink when in off delay"              ,lit=>{off=>0,on=>1}},
   OnLvlPrio       =>{a=> 14.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{high=>0,low=>1}},
   OnDlyMode       =>{a=> 14.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{setToOff=>0,NoChange=>1}},
   OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"PowerLevel off"},
@@ -350,9 +350,9 @@ my $K_actDetID = '000000'; # id of actionDetector
   DimMinLvl       =>{a=> 21.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"dimMinLevel"},
   DimMaxLvl       =>{a=> 22.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"dimMaxLevel"},
   DimStep         =>{a=> 23.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"dimStep"},
-
-  OffDlyNewTime   =>{a=> 25.0,s=>1.0,l=>3,min=>0.1,max=>25.6    ,c=>''         ,f=>10      ,u=>'s'   ,d=>0,t=>"off delay new time"},
-  OffDlyOldTime   =>{a=> 26.0,s=>1.0,l=>3,min=>0.1,max=>25.6    ,c=>''         ,f=>10      ,u=>'s'   ,d=>0,t=>"off delay old time"},
+  OffDlyStep      =>{a=> 24.0,s=>1.0,l=>3,min=>0.1,max=>25.6    ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"off delay step if blink is active"},
+  OffDlyNewTime   =>{a=> 25.0,s=>1.0,l=>3,min=>0.1,max=>25.6    ,c=>''         ,f=>10      ,u=>'s'   ,d=>0,t=>"off delay blink time for low"},
+  OffDlyOldTime   =>{a=> 26.0,s=>1.0,l=>3,min=>0.1,max=>25.6    ,c=>''         ,f=>10      ,u=>'s'   ,d=>0,t=>"off delay blink time for high"},
   DimElsOffTimeMd =>{a=> 38.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{absolut=>0,minimal=>1}},
   DimElsOnTimeMd  =>{a=> 38.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{absolut=>0,minimal=>1}},
   DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
@@ -766,7 +766,7 @@ my $K_actDetID = '000000'; # id of actionDetector
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
                          ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
-                         ,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
                          ,lgMultiExec     =>1
                         }
  ,switch              =>{ intKeyVisib     =>1,sign            =>1
