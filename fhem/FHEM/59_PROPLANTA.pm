@@ -125,6 +125,15 @@ my $curReadingType = 0;
      ,"stark" => 3
   );
   
+sub 
+get_wday($)
+{
+   my ($date) = @_;
+   my @wday_txt = qw(So Mo Di Mi Do Fr Sa);
+   my @th=localtime $date;
+  
+   return $wday_txt [$th[6]];
+}
 
 # here HTML::text/start/end are overridden
 sub text
@@ -681,16 +690,23 @@ PROPLANTA_Html($)
       $isday = 1; #($hour>6 && $hour<19);
    }
         
-  my $ret = "<table>";
-  $ret .= sprintf '<tr><td>%s</td><td><br></td></tr>', $defs{$d}{DEF};
-
-#  $ret .= sprintf('<tr><td>%s</td><td>%s %s<br>temp: %s °C, hum %s<br>wind: %s km/h %s<br>pressure: %s bar visibility: %s km</td></tr>',
-#        WWOIconIMGTag(ReadingsVal($d, "icon", ""),$uselocal,$isday),
-#        ReadingsVal($d, "localObsDateTime", ""),ReadingsVal($d, "weatherDesc", ""),
-#        ReadingsVal($d, "temp_C", ""), ReadingsVal($d, "humidity", ""),
-#        ReadingsVal($d, "windspeedKmph", ""), ReadingsVal($d, "winddir16Point", ""),
-#        ReadingsVal($d, "pressure", ""),ReadingsVal($d, "visibility", ""));
-
+  my $ret = "<table border=0><thead align=center>";
+  $ret .= sprintf '<tr><th colspan=9 align=left>%s</th></tr>', $defs{$d}{DEF};
+  $ret .= sprintf '<tr><th>Tag</th><th>morgens</th><th>tags</th><th>abends</th><th>nachts</th><th>min</th><th>max</th><th>Regen tags</th><th>Frost</th></tr></thead>', $defs{$d}{DEF};
+  $ret .= "<tbody align=center>";
+# define MyForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter") }
+   for(my $i=0; $i<=2; $i++) {
+      $ret .= sprintf('<tr><td>%s</td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s<br><img src="%s"></td><td>%s&deg;C</td><td>%s&deg;C</td><td>%s %%</td><td>%s</td></tr>',
+          "Tag ".$i, 
+          ReadingsVal($d, "fc".$i."_weatherMorning", ""), ReadingsVal($d, "fc".$i."_weatherMorningIcon", ""),
+          ReadingsVal($d, "fc".$i."_weatherDay", ""), ReadingsVal($d, "fc".$i."_weatherDayIcon", ""),
+          ReadingsVal($d, "fc".$i."_weatherEvening", ""), ReadingsVal($d, "fc".$i."_weatherEveningIcon", ""),
+          ReadingsVal($d, "fc".$i."_weatherNight", ""), ReadingsVal($d, "fc".$i."_weatherNightIcon", ""),
+          ReadingsVal($d, "fc".$i."_tempMin", ""), ReadingsVal($d, "fc".$i."_tempMax", ""),
+          ReadingsVal($d, "fc".$i."_chOfRainDay", ""), 
+          ReadingsVal($d, "fc".$i."_frost", "") ? "ja" : "nein"
+         );
+   }
   # for(my $i=0; $i<=4; $i++) {
     # $ret .= sprintf('<tr><td>%s</td><td>%s: %s<br>min %s °C max %s °C<br>wind: %s km/h %s<br>precip: %s mm</td></tr>',
         # WWOIconIMGTag(ReadingsVal($d, "fc${i}_weatherDayIcon", ""),$uselocal,$isday),
@@ -699,7 +715,7 @@ PROPLANTA_Html($)
         # ReadingsVal($d, "fc${i}_tempMinC", ""), ReadingsVal($d, "fc${i}_tempMaxC", ""),
   # }
   
-  $ret .= "</table>";
+  $ret .= "</tbody></table>";
 
   return $ret;
 }
@@ -743,6 +759,12 @@ PROPLANTA_Html($)
          <br>
          Optional. Possible values: de (default), at, ch, fr, it 
       </li><br>
+      The function <code>PROPLANTA_Html</code> creates a HTML code for a 3 day weather forecast.
+      <br>
+      Example:
+      <br>
+      <code>define HTMLForecast weblink htmlCode { OPENWEATHER_Html("ProPlanta_Wetter") }</code>
+      <br/><br/>
    </ul>
    <br>
   
@@ -841,6 +863,12 @@ PROPLANTA_Html($)
          <br>
          Optional. M&ouml;gliche Werte: de (Standard), at, ch, fr, it
       </li><br>
+      &Uuml;ber die Funktion <code>PROPLANTA_Html</code> wird ein HTML-Code f&uuml;r eine 3-Tages-Vorhersage erzeugt.
+      <br>
+      Beispiel:
+      <br>
+      <code>define HTMLVorschau weblink htmlCode { OPENWEATHER_Html("ProPlanta_Wetter") }</code>
+      <br/><br/>
    </ul>
    <br>
   
