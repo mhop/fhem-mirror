@@ -155,6 +155,7 @@ sub FRITZBOX_Initialize($)
                 ."pwdFile "
                 ."ringWithIntern:0,1,2 "
                 ."telnetUser "
+                ."telnetTimeOut "
                 .$readingFnAttributes;
 
 } # end FRITZBOX_Initialize
@@ -1396,7 +1397,8 @@ sub FRITZBOX_Open_Connection($)
    my $user = AttrVal( $name, "telnetUser", "" );
 
    FRITZBOX_Log $hash, 4, "Open Telnet Connection to $host";
-   $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>10, Errmode=>'return', Prompt=>'/# $/');
+   my $timeout = AttrVal( $name, "telnetTimeOut", "10");
+   $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
    if (!$telnet) {
       $msg = "Could not open telnet connection to $host";
       FRITZBOX_Log $hash, 2, $msg;
@@ -1967,6 +1969,12 @@ sub FRITZBOX_fritztris($)
          To show a message (default: "FHEM") during a ring the internal phone numbers 1-3 can be specified here.
          The concerned analog phone socket must exist.
       </li><br>
+      
+      <li><code>telnetTimeOut &lt;seconds&gt;</code>
+         <br>
+         Maximal time to wait for an answer during a telnet session. Default is 10 s.
+      </li><br>
+
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
    <br>
@@ -2210,6 +2218,12 @@ sub FRITZBOX_fritztris($)
          Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1-3 angegeben werden.
          Der entsprechende analoge Telefonanschluss muss vorhanden sein.
       </li><br>
+
+      <li><code>telnetTimeOut &lt;Sekunden&gt;</code>
+         <br>
+         Maximale Zeit, bis zu der w&auml;hrend einer Telnet-Sitzung auf Antwort gewartet wird. Standard ist 10 s.
+      </li><br>
+
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
    </ul>
    <br>
