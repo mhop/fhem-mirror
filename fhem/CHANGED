@@ -1,0 +1,1512 @@
+# Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
+# Do not insert empty lines here, update check depends on it.
+  - bugfix: 70_PIONEERAVR & 71_PIONEERAVRZONE: fixed not working set-extensions (on-for-timer,...)
+  - feature: fheminfo: report third-party modules
+  - feature: 99_Utils.pm: add getUniqueID, getKeyValue, setKeyValue
+  - feature: SMARTMON: additional parameters for smartctl
+  - added: 00_HXB / 10_HXBDevice for Hexabus devices
+  - feature: HUEbridge: added group handling
+                        added pollDevices attribute
+                        added httpUtils for nonblocking mode
+  - feature: HUEDevice: added group handling
+                        added renaming of devices and groups in the bridge
+  - added: 30_MilightBridge / 31_MilightDevice: Support Milight 
+           (Applamp/LimitlessLED/EasyBulb) LED lights/strips/controllers.
+  - feature: HUEDevice: allow ct presets in webCmd
+                        new subTypes extcolordimer and ctdimer
+                        start support for Lightify bulbs
+  - added: SONOS and SONOSPLAYER to support Sonos Multiroom Audiosystems (Reinerlein)
+  - change: 64_ESA2000.pm: add batterystate
+  - added:   42_SMARTMON: Frontend to smartctl (maintainer: hexenmeister)
+  - feature: 70_PushNotifier added line break in Messages (xusader)
+  - feature: readingsGroup: added valuePrefix and valueSuffix attributes
+                            added collapsed/collapsible to visibility attribute
+                            added visibility command
+  - bugfix: FB_CALLMONITOR: fixing not working company numbers 
+            reverse search for search.ch 
+  - bugfix: 70_PushNotifier repair set function (xusader)
+  - bugfix: PRESENCE: fixing not working timer, when using set [...] statusRequest
+  - bugfix: FB_CALLMONITOR: fixing reverse search for klicktel.de
+  - feature: new module 52_I2C_MCP342x.pm added (klausw)
+  - feature: SYSMON: read cpu temp on FritzBox
+  - feature: ios7smallscreenstyle.css: table width based on screen width, new
+                                       header, links colored in detail view
+  - feature: new module FRITZBOX: controls Fritz!Box router and Fritz!Fon
+  - feature: new module 52_I2C_EEPROM.pm added (klausw)
+  - feature: readingsGroup: added ! flag,
+                            added visibility and cellStyle attributes
+  - feature: new module 52_I2C_MCP23008.pm added (klausw)
+  - feature: new module 98_logProxy.pm added (justme1968)
+  - change: 66_ECMD: ReadyFn added (fixes issue under Windows)
+  - change: 02_RSS: use a GUID in RSS; urlq source for img command
+  - feature: 70_PushNotifier improve usebility, configuration without cURL (xusader)
+  - bugfix: SYSMON: prevent empty line im log by userReadings
+  - feature: 10_IT empfang (by bjoernh)
+  - bugfix: PRESENCE: fix race condition, when delete disabled attribute and
+                      PRESENCE does not start to scan.
+  - feature: OPENWEATHER: captures weather forecast from API of www.wetter.com
+  - fhem 5.6 released
+
+- 2014-11-09 (5.6)
+  - bugfix: FB_CALLMONITOR: fixing race condition of missing events while 
+                            performing multiple calls
+  - feature: PROPLANTA: captures weather forecast from web page www.proplanta.de
+  - feature: 15_CUL_EM added attribute maxPeak (arnoaugustin)
+  - bugfix: 10_IT changed "setstate" to avoid eventMap errors (arnoaugustin)
+  - feature: new module 37_harmony.pm added (justme1968)
+  - change: WMBUS: use _ instead of : as readings separator, better support for EnergyCam
+  - feature: new module 23_KOSTALPIKO added (john)
+  - feature: new module 98_HourCounter added, 99_UtilsHourCounter.pm added to contrib (john)
+  - added: MYSENSORS: connect to serial or Ethernet MySensors Gateway
+  - added: MYSENSORS_DEVICE: represent a MySensors sensor- or actor node
+  - feature: global ATTR/DELETEATTR/MODIFIED events
+  - feature: 55_GDS.pm - attr disable added
+  - bugfix: SYSMON: prevent endless loop at startup with 'disable' attribute  
+  - feature: SYSMON: added FritzBox informations: DSL rate, DSLAM sync time, count of CRC an FEC
+  - bugfix: SYSMON: unwanted characters in dsl info lines
+  - change: 57_Calendar: process continuation lines, get/set syntax checks
+  - bugfix: SYSMON: fix availability of cpu/kernel_max
+  - bugfix: SYSMON: numeric check
+  - change: 59_Weather: change icons for conditions 31, 34, 36
+  - added: MQTT: connect fhem with mqtt
+  - added: MQTT_BRIDGE: bidirectional mapping of existing fhem-device to mqtt-topic
+  - added: MQTT_DEVICE: fhem-device that can be controlled by and publishes to mqtt
+  - added: I2C_LCD: module to drive PCF8574T based LCD connected via I2C
+  - added: I2C_DS1307: module to read time and date from DS1307 connected by i2c
+  - added: OWX_ASYNC: asynchronous, non-blocking version of OWX for DS2480, DS9097 and FRM
+  - feature FRM: work as physical IODev for I2C_XXX modules
+    added: FRM_ROTENC: read rotary-encoders with FRM
+    added: FRM_RGB: control rgb-leds with FRM
+    added: FRM_STEPPER: control stepper-motors with FRM
+    added: FRM_AD: analog input for FRM
+    added: FRM_PWM: analog (pwm) output for FRM
+    added: FRM_SERVO: control servo-motors with FRM
+  - added: FRM_IN: digital input for FRM
+  - added: FRM_OUT: digital output for FRM
+  - added: FRM: connect Arduino with firmata to fhem
+  - change: 57_Calendar: line parsing rewritten, care for missing 
+                         modification timestamps
+  - change: SYSMON: support userReadings in SYSMON_ShowValues
+  - change: 59_Weather: change icon for condition clear to sunny.png
+  - bugfix: 57_Calendar: calendar event anymore in modeAlarmed if started
+  - feature: 57_Calendar: deal with non-existent end times
+  - bugfix: SOMFY: fix non-working on/off-for-timer methods
+                   made positioning attributes optional
+  - feature: SOMFY: support for exact positioning (one-time setup of run times required)
+                    support for parse()-function, requires newest CULFW.
+  - feature: userattr is now also device attribute
+  - feature: ZWave: Fibaro_FGRM222 MANUFACTURER_PROPRIETARY class
+  - feature: sequence: reportEvents attribtue added
+  - feature: SYSMON: RAM and SWAP Readings on OSX
+  - change:  34_NUT: removed calculation of values. Use userReadings instead.
+                     removed autogeneration of attr model and serNo.
+  - feature: SYSMON: improvement: support network information (IP, IPv6) on german linux
+  - feature: Synology DiskStation NAS basic spk file creation
+  - change:  34_NUT: readingFnAttributes added; creation of units deleted;
+                changed attr asReadings to use comma instead of space
+  - bugfix:  SYSMON: crash on FritzBox
+  - bugfix:  34_NUT: fixed possible buffer overflow, rewrote reception of data
+  - bugfix:  SYSMON: idletime on multicore, warnings
+  - change:  09_CUL_FHTTK.pm: modified set option for sync, open and closed
+  - feature: SYSMON: HTML/Text output for SYSMON-CloneDummies
+  - feature: SYSMON: Method for titled HTML/Text output
+  - added:   34_NUT.pm (maintainer: creideiki)
+  - feature: SYSMON: added new reading: perl_version
+  - feature: add toggle to SetExtensions (introduced for ZWave)
+  - bugfix:  plotEmbed FHEMWEB attribute (fix for an iOS8 bug)
+  - feature: SHC: support for analog inputs (EnvSensor) and new device
+                  RGB_Dimmer added (rr2000)
+  - feature: PRESENCE: MAC address support for mode fritzbox (by Markus M.)
+  - bugfix:  PRESENCE: fixing presence detection in mode fritzbox with new
+             Fritz!OS 6.20 (by Markus M.)
+  - feature: FB_CALLMONITOR: reverse-search attribute is now providing all
+             possible values, which are selectable (via fhemweb_multiple.js).
+             see commandref for all possible values
+  - feature: speed up through caching of postproc and regex in ECMDDevice
+  - bugfix:  fixed handling of autocreation for 10_OWServer.pm
+  - feature: option to cope with partial messages in ECMD/ECMDDevice
+  - bugfix:  SOMFY: add module to CUL client list, to set IODev automatically
+  - feature: sequence: triggerPartial Attribute added
+  - feature: 36_JeeLink: changed flash command to use fhem firmware
+                         directory (by HCS)
+  - feature: 70_ENIGMA2: new attribute lightMode for old/slow devices
+                         limited restricted functionality
+  - added:   98_CustomReadings.pm (maintainer: HCS)
+  - change:  98_Text2Speech.pm: fix a problem with microseconds in time()
+             by using mp3-templates or playing mp3 directly
+  - feature: state definition and split attribute added to 66_ECMD,
+             67_ECMDDevice
+  - FHEMWEB: JavaScripts and CssFiles attributes added
+  - change:  avoid updating weather information on get (59_Weather.pm)
+  - change:  removed noshutdown=0 for HTTP connections made in 57_Calendar.pm
+	     and 59_Weather.pm to address issues when FHEM is behind
+	     a web proxy
+  - feature: update rewritten, restore added
+  - feature: enabled JavaScript in 02_RSS to support WebViewControl
+  - added:   new module 36_WMBUS.pm (kaihs) Wireless M-Bus
+  - feature: SYSMON: aded new plots (power infos for cubietruck)
+  - feature: SYSMON: aded new readings for each network interface: ip and ip6
+  - feature: SYSMON: aded power supply informations to the text output method
+  - feature: SYSMON: power supply informations (ac, usb, battery)
+  - feature: added 70_PushNotifier.pm
+  - feature: 70_VIERA: Add parameter "HDMI1" - "HDMI4" for command remoteControl
+                      to select HDMI input directly.
+                      Add command "input" to select a HDMI port, TV or SD-Card
+                      as source
+  - bugfix:  LevelSender: Version 1.0.5: Could not get compiled by the Arduino
+             IDE
+  - feature: PRESENCE: new event "error" and "timeout" for state reading to
+             indicate a non successful check
+  - bugfix:  70_Jabber: fixed UTF8 encoding/decoding of messages
+  - feature: 10_OWServer autocreate coexists with OWXXX modules (Boris &
+             ntruchsess)
+  - feature: added 36_Level.pm
+  - feature: netatmo: added plz support for public stations
+  - change:  70_ENIGMA2: keep reading for recordings up-to-date during standby
+  - bugfix:  98_Text2Speech: - playing mp3files directly, eg: :ring.mp3:
+                             - playing any mp3file only text
+  - feature: FB_CALLMONITOR: new reading "direction" to differentiate
+             between incoming and outgoing call.
+  - feature: FB_CALLMONITOR: all informational readings about a call will be
+             triggered for each call event
+             (call, ring, connect and disconnect)
+  - feature: mailcheck: allow user and pssword as perl expression
+  - feature: netatmo: support for public stations
+  - feature: PRESENCE: new set command "power" to execute a FHEM command
+             which can power on or off the checked device (given via attribute)
+  - feature: readingsGroup: added valueColumn attribute
+  - feature: readingsGroup: added ...,<reading>@<device>,... argument format
+  - feature: 52_I2C_PCF8574.pm: added attribute OnStartup
+             52_I2C_PCA9532.pm: added attribute OnStartup,
+                added attribute OutputPorts as substitute for InputPorts
+             51_RPI_GPIO.pm: changed access to gpio via userspace by default
+                (for BBB and Cubie), access via gpio utility as fallback
+  - feature: PIONEERAVR: new attribute: checkConnection
+  - change:  do no parse empty lines in 57_Calendar.pm
+  - bugfix:  10_SOMFY.pm: save enc-key and rolling-code as reading instead of
+             attribute to prevent loss of control after FHEM restart.
+  - feature: new module 10_SOMFY.pm to support Somfy RTS blinds
+  - bugfix:  70_PIONEERAVR.pm: fix for STATE if connection is lost
+  - bugfix:  37_SHC.pm: Move xml file under subdir lib, otherwise it won't be
+             deployed during update
+  - bugfix:  70_PIONEERAVR.pm: player commands are now available for more inputs
+	     "play" was not in the drop down list of available set commands
+             check every 120s if the data connection to the Pioneer AV
+             receiver is still up
+             check if we get a reply from the Pioneer AV receiver not later
+             than 3s after a command was sent
+	     fix for alias names of inputs
+             more input presets (spotify, mhl, hdmi7, hdmi8), inputs are now
+             queried from 1 - 59
+             71_PIONEERAVRZONE.pm: bugfix:logging, set input
+  - change:  00_RPII2C.pm: hardware access changed to ioctl and syswrite/read
+             SMBus module not needed anymore but still usable, see attribute
+             useHWLib possibility to swap I2C-0 to P5 for Rev. B raspberries
+             via attribute swap_i2c0 (not tested yet)
+  - feature: 70_ENIGMA2: add attribute
+             remotecontrol=[standard,advanced,keyboard]
+  - bugfix:  70_PIONEERAVR.pm and PIONEERAVRZONE.pm: added "use SetExtensions",
+             commandref updates fixed RC_layout
+  - feature: new modules 70_PIONEERAVR.pm and PIONEERAVRZONE.pm
+  - feature: FLOORPLAN has new style 7 to display commands only.
+  - added:   89_HEATRONIC.pm (heikoranft)
+  - bugfix:  duration parsing of calendar events in 57_Calendar.pm fixed
+  - feature: LightScene: added followDevices attribute
+  - feature: non-blocking retrieval of data in 59_Weather.pm (Boris & herrmannj)
+  - feature: new modules 37_SHC.pm and 37_SHCdev.pm added (rr2000)
+  - feature: 36_EMT7110: added this new module
+  - feature: 36_JeeLink: added initCommands attribute and flash command (by HCS)
+  - feature: SYSMON: DECT Temperatur
+  - bugfix:  SYSMON: prevent some warnings
+  - change:  SYSMONremoved support for old format of filesystem reading
+  - change:  moved 98_openweathermap.pm to contrib
+             moved 98_geodata.pm to contrib
+             moved 55_BBB_BMP180.pm to contrib
+  - change:  honor DURATION in 57_Calendar.pm
+  - bugfix:  YAMAHA_AVR: don't let FHEM hang anymore, when the receiver
+             is not reachable
+  - change:  55_GDS.pm: use Blocking.pm for retrieval of large files
+  - change:  YAMAHA_BD: make YAMAHA_BD more performant by using non-blocking
+             HTTP request (from HttpUtils.pm)
+  - added:   YAMAHA_BD: new set command trickPlay and more remoteControl
+             commands. new reading trickPlay
+  - added:   new module 98_statistics.pm: hourly, daily, monthly, yearly
+             statistics for min/avg/max/delta/duration of selected readings
+  - added:   new module 52_I2C_MCP23017.pm (klausw)
+  - feature: Dashboard Configuration-Dialog for Tabs
+  - feature: new module 33_readingsHistory.pm added (justme1968)
+  - feature: new command copy (justme1968)
+  - feature: enabled GIF, PNG and JPG as background image formats, enabled
+             relative font size changed and perl specials for font size
+             in 02_RSS.pm
+  - feature: YAMAHA_AVR: new set commands and readings for controlling
+             the sound output behavior (Enhancer, DSP and straight
+             output) and sleep timer. For details, see commandref.
+  - bugfix:  configdb filemove not working after previous changes
+  - change:  IMPORTANT CHANGES TO configDB!
+             changed: all files will be imported as binary
+             changed: all existing textfiles will be moved to binary
+             removed: command binfileimport
+             added: sorted write and read of configuration data
+  - bugfix:  SYSMON: css class name (sysmon)
+  - feature: option to determine the number of icons from WeatherAsHtml
+  - feature: DbLog: (thanks to betateilchen)
+             * added new global modules function $hash->{DbLog_splitFn}
+               to let split the generated events by the own module
+               into readingsname, value and unit
+             * added SVG_sampleDataFn
+             * added FW_detailFn
+  - added:   new module contrib/97_SprinkleControl.pm (tobiasfaust)
+  - added:   new module contrib/98_Sprinkle.pm (tobiasfaust)
+             both modules helps to control the sprinkles in your garden
+             --> take a look to the Wiki-Article
+             http://www.fhemwiki.de/wiki/Bew%C3%A4sserungssteuerung
+  - feature: FB_CALLMONITOR: new reading "missed_call_line" indicating
+             the line number which received the missed call
+  - feature: YAMAHA_AVR current* readings will be erased in case they
+             not applicable
+  - feature: YAMAHA_AVR currentTitle available for TUNER
+  - feature: new Method: SYSMON_getValues([desired keys])
+  - feature: JSONMETER: hourly statistics
+  - feature: configdb: new command search
+  - feature: LUXTRONIK2: estimation of electrical power consumption,
+             considers time depending tariffs (activeTariff)
+  - added:   configDB functions for handling binary files
+  - feature: 02_RSS.pm: alpha channel for colors
+  - feature: JSONMETER: time depending tariffs added (activeTariff)
+  - updated: codemirror version 3.24
+  - feature: new module 35_SWAP_0000002200000008 for panstamp
+             indoor multi sensor board with tft
+  - added:   new module 36_EC3000.pm (justme1968)
+  - feature: IT: added support for set-extensions (justme1968)
+  - added:   new modules 10_Itach_IR and 88_Itach_IRDevice to
+             use Itach WF2IR or IP2IR to be used as universal
+             infrared remotecontrol
+  - added:   new module 51_I2C_TSL2561.pm (kaihs)
+  - added:   new module 02_FRAMEBUFFER.pm (kaihs)
+  - feature: SYSMON: many FritzBox specific readings:
+             wlan_state, wlan_guest_state, internet_ip, internet_state,
+             night_time_ctrl, num_new_messages, fw_version_info
+  - feature: configDB: added command fileshow
+  - feature: configDB: added commands filelist and filedelete
+  - feature: configDB: added commands fileimport and fileexport
+  - feature: 36_JeeLink: added LaCrosse, ETH200comfort, CUL_IR,
+             HX2272 and FS20 modes from ulli
+             added AliRF
+             added Clients and MatchList attribute
+  - feature: 02_RSS.pm: HTTPS enabled, png as image type added, autofreshing
+             HTML page with image map added
+  - feature: ECMD and ECMDDevice completely reworked, see
+             http://forum.fhem.de/index.php/topic,21515.0.html
+  - feature: new layout command rect and new attribute bgcolor for RSS
+  - added:   new module 55_weco.pm (betateilchen)
+  - added:   new module 70_Jabber.pm (BioS)
+  - bugfix:  Dashboard: use "loadScript" for load JavaScripts
+  - feature: new module 00_NetzerI2C.pm, 51_Netzer.pm added (klausw)
+  - feature: new command reload for 57_Calendar.pm forces cleanup
+  - changed: small update to the documentation of recurring events in
+             57_Calendar.pm
+  - bugfix:  PRESENCE: fixing wrong presence state for mode lan-ping
+             when device is unreachable
+  - feature: 10_EnOcean: new EEP profiles: D2-01-00 - D2-01-11 (VLD)
+  - changed: 00_TCM/10_EnOcean: learning mode (teach-in / teach-out) changed
+             and extended
+  - added:   new module 10_UNIRoll.pm (c-herrmann)
+  - feature: cloneDummy: new attribut cloneIgnore
+  - feature: cloneDummy: new optional parameter [reading]
+  - bugfix:  Dashboard: dashboard_showfullsize not applied in room "all"
+  - feature: new module 98_PID20.pm added (John / betateilchen)
+  - feature: new module 00_RPII2C.pm, 52_I2C_PCA9532.pm, 52_I2C_PCF8574.pm,
+             52_I2C_SHT21.pm added (klausw)
+  - change:  module 71_LISTENLIVE.pm moved to contrib
+             module 23_WEBTHERM.pm   moved to contrib
+  - change:  module 98_PID.pm        moved to contrib as preparation for
+             next major replace. Replaced by 98_PID20.pm (John/betateilchen)
+  - change:  openweathermap: added set command "clear"
+  - change:  MAX: interpret SetTemperature command from WT to HT
+  - feature: MAX: retry packets 3 times if missing an ack
+  - feature: new module 98_cloneDummy.pm added (Joachim)
+  - feature: STACKABLE_CC (busware.de device for the RPi) added
+  - feature: configdb export/import added for data security (betateilchen)
+  - feature: new module 38_netatmo.pm added (justme1968)
+  - change:  09_CUL_FHTTK.pm: clean up code to avoid "Use of uninitialized
+             value in concatenation.."
+  - change:  09_CUL_FHTTK.pm: extend module list to FHT80TF and FHT80TF-2
+             and update of documentation (matscher)
+  - feature: disabledForIntervals attribute added for at/notify/watchdog
+  - feature: jsonlist2 added, jsonlist is deprecated.
+  - feature: DbLog: Added new function : ReadingsVal/ReadingsTimestamp
+  - feature: Text2Speech: added new attribute TTS_VolumeAdjust
+  - feature: new module 70_PHTV.pm (loredo)
+  - feature: JSONMETER: added statistic functions
+  - feature: LightScene: added scene editor from UliM
+  - feature: SYSMON: New method: SYSMON_ShowValuesText
+  - feature: configDB.pm use sql database instead of fhem.cfg (betateilchen)
+  - feature: new module 98_geodata collect location based data (betateilchen)
+  - feature: 98_pilight: Added support for Elso protocol
+  - feature: readingsGroup: added sortDevices attribute
+  - feature: ENIGMA2: new reading 'recordings', new command record
+  - change:  ENIGMA2: rewrite for NonBlocking
+  - feature: SYSMOM: new Plot + Doc
+  - feature: Dashboard: Custom CSS Attribute. Max. 7 Tabs.
+  - bugfix:  Dashboard: Change Groupcontent sorting. Fix Bug that affect
+             new Groups.
+  - feature: 10_EnOcean: UTE protocol implemented
+  - feature: 00_TCM: new command teach
+  - bugfix:  SYSMOM: uninitialized value warning on FritzBox
+  - added:   09_CUL_FHTTK.pm: german module documentation (matscher)
+  - feature: readingsGroup: allow FHEMWEB slider and dropdown menus as commands
+  - feature  FB_CALLMONITOR: new attribute "disable" to
+             disable FB_CALLMONITOR
+  - feature: YAMAHA_BD: new attribute "disable" to disable cyclic status
+             updates of player
+  - change:  09_CUL_FHTTK.pm: added event-on...readings and event-min-interval
+             updated to reading update mechanism (matscher)
+  - feature: Dashboard: Groupstitel now can show icons,
+             Backbutton in Fullsize-Mode
+  - deleted: 51_BBB_WATCHDOG.pm - not really needed
+  - bugfix:  DbLog: adding ShutdownFunction
+  - feature: YAMAHA_AVR: new attribute "disable" to disable cyclic status
+             updates of receiver
+  - feature: LightScene: added attribute switchingOrder
+  - added:   new module 00_THZ.pm (immiimmi)
+  - added:   new module 98_HTTPMOD.pm (stefanstrobel)
+  - added:   new module 51_BBB_WATCHDOG.pm (betateilchen)
+  - bugfix:  SYSMON: Fix: uninitialized variable
+  - feature: new modul 73_MPD added (Wzut)
+  - bugfix:  SYSMON: Fix: root fs with /dev/mapper
+  - feature: Dashboard: The display of the dashboard can be limited to a
+             defined FHEMWEB. Change view of readingroups
+  - feature: new module 70_JSONMETER to read obis compatible data in json
+             format from so called smart meters for electricity, gas or heat
+  - feature: new modules 10_RESIDENTS, 20_ROOMMATE and 20_GUEST added (loredo)
+  - feature: LUXTRONIK2: attribute 'doStatistics' calculates boiler gradients
+  - feature: GEOFANCY: support both apps, Geofency.app and Geofancy.app
+  - feature: LightScene: added attribute lightSceneRestoreOnlyIfChanged
+  - bugfix:  SYSMON: Fix: CPUTemp & BogoMIPS for utilite-Box.
+  - bugfix:  PRESENCE: fix present-check-interval to be equal with normal
+             check-interval if not set in define statement and not 30 sec.
+  - feature: DASHBOARD: Tabs can show an icon.
+  - bugfix:  DASHBOARD: dashboard_showfullsize only in DashboardRoom.
+             Fix showhelper Bug on lock/unlock. The error that after a trigger
+                         action the curren tab is changed to the "old"
+                         activetab tab has been fixed.
+  - bugfix:  SYSMON: Filesystems (absent medium)
+  - feature: FLOORPLAN-menu-items can get icons attached by new
+             attribute fp_roomIcons
+  - feature: FLOORPLAN-specific icons can now be assigned by just
+             creating a folder under fhem/images with the flooplan-name
+  - feature: DASHBOARD:  Tabs can set on top, bottom or hidden.
+  - bugfix:  SYSMON: another format for ifconfig output
+  - feature: DASHBOARD: Use longpoll to update content.
+			 rowcentercolwidth can now be defined per column.
+                         Dashboard can hide FHEMWEB Roomliste and Header =>
+                         Fullsizemode.
+  - bugfix:  SYSMON: null reading for absent mount points
+  - feature: DbLog: jokers "%" in device/reading definition are now possible
+  - feature: SYSMON: new CPU Statistics and Plots
+  - feature: changed 10_OWServer.pm and 11_OWDevice.pm to use
+             NOTIFYDEV (justme1968)
+  - feature: LightScene: added setcmd command
+  - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group
+			 positioning.
+  - bugfix:  SYSMON: Log Warnings, unnoetige Readings erkenen und entfernen
+  - feature: LUXTRONIK2: Setting of controller parameter and internal clock
+  - feature: new module 71_YAMAHA_BD.pm to control Yamaha Blu-Ray
+             players over network.
+  - bugfix:  DbLog: fix for plotfork
+  - bugfix:  SYSMON: filesystems may be wrong on some systems
+  - feature: new module 98_pilight.pm added (andreas-fey)
+  - change:  LUXTRONIK2 - made compatible with current developer guidelines
+             (Blocking.pm, reading update mechanism)
+  - feature: readingsGroup: added icons and links/commands
+  - feature: new module 98_Text2Speech.pm added (Tobias Faust)
+             Google Translator Engine or ESpeak can be used
+  - feature: YAMAHA_AVR: define separate on and off status intervals for
+             cyclic status updates
+  - feature: Visualizations (Plots) for SYSMON added
+  - feature: new module 42_SYSMON.pm added (hexenmeister)
+  - feature: YAMAHA_AVR: new readings for radio stations, current title
+             and more. see commandref for more details.
+  - feature: new module 32_withings.pm added (justme1968)
+  - bugfix:  PRESENCE: fixing user detection on FritzBox!
+  - feature: new module 38_CO20.pm added (justme1968)
+  - feature: new module 98_GEOFANCY.pm added (loredo)
+  - feature: new module 70_XBMC.pm added (dbokermann)
+  - feature: new module 51_RPI_GPIO.pm added (klausw)
+  - bugfix:  Dashboard: fixed bug identification an existing Weblink.
+             fixed bug dashboard_sorting check. Buttonbar can now placed on
+             top or bottom of the Dashboard. Dashboard is always edited out
+             the Room Dashboard.
+  - bugfix:  VIERA: fixed bug related to set command remoteControl
+  - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old
+  	         Webif versions
+  - feature: readingsGroup: process events only if visible in browser,
+             allow <br> for line breaks in multi-reading lines
+  - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
+             even with longpoll; Text "desiredTemperature" will now
+             be eliminated - for MAX devices.
+  - feature: HCS has now MAX Thermostat support
+  - change:  integrated OWServer/OWDevice nonblocking and random start
+             time patches (justme1968 & Boris)
+  - feature: Add new module Dashboard
+  - change:  ONKYO_AVR: transfer command database into separate packet
+             ONKYOdb.pm
+  - feature: ENIGMA2: bouquet support e.g. for named channels
+  - feature: Add new module ONKYO_AVR
+  - feature: SYSSTAT: allow (remote) monitoring via snmp, support
+             for monitoring windows systems and synology system temperature
+  - feature: New module LINDY_HDMI_SWITCH.pm added
+  - change:  ENIGMA2: improved logging, default attributes for webCmd and
+             devStateIcon
+  - feature: ENIGMA2: support for option channels
+  - feature: mailcheck: decode non ascii subjet to utf-8, verify gpg signatures
+  - feature: PRESENCE: "statusRequest" command for lan-bluetooth mode
+             (collectord >= 1.4, presenced >= 1.1 required)
+  - feature: PRESENCE: new collectord package
+  - feature: devspec: removed range, added :FILTER and more general search
+  - feature: HUEBridge,HUEDevice: support for groups added
+  - feature: YAMAHA_AVR: new argument "toggle" for mute command
+  - feature: FB_CALLMONITOR: replace &amp; to & at reverse search
+  - feature: new module 33_readingsProxy to make (a subset of) a reading
+             from one device available as a new device. can be used to
+             separate channels from 1-wire, EnOcean or SWAP multichannel
+             devices (by justme1968)
+  - change:  improvements for OWDevice and OWServer (justme1968)
+  - feature: new attribute resolution for 1-wire temperature readings
+             (justme1968 & Boris)
+  - feature: new layout commands moveto, moveby and relative positioning
+             in 02_RSS.pm (Betateilchen & Boris)
+  - feature: FHEMWEB column attribute
+  - feature: new layout commands halign, valign, condition in 02_RSS.pm
+             (Betateilchen & Boris)
+  - bugfix:  PRESENCE: Fix nonworking initialization in mode "lan-bluetooth"
+  - bugfix:  fhem.pl: write-select to avoid blocking in inform/Event Monitor
+  - bugfix:  fix issue with DST changes in 57_Calendar.pm
+  - feature: new module 36_LaCrosse.pm for LaCrosse IT+ temperature and
+             humidity sensors with a JeeLabs JeeLink as RF modem.
+             The matching JeeNode sketch can be found in
+             .../36_LaCrosse-LaCrosseITPlusReader.zip (by ohweh&justme1968)
+  - feature: YAMAHA_AVR: new attribute request-timeout.
+  - bugfix:  YAMAHA_AVR: fix missing greater-than sign. Use different
+             Control-Tag name for RX-Vx75 series
+  - bugfix:  PRESENCE: fixing not working re-initialization when
+             disabled attribute is set to 0 in lan-bluetooth mode
+  - feature: LightScene: added attribute lightSceneParamsToSave for
+             device specific configuration of </command pairs
+             used to save/restore device state
+  - feature: cmdalias added
+  - feature: rain Module by baumrasen
+  - feature: endPlotNow attribute for SVG-Plots (ChrisD)
+  - feature: new module 51_BBB_BMP180.pm added (betateilchen)
+  - feature: readingsGroup: allow devStateIcon to be displayed
+  - feature: readingsGroup: allow multiple device readings in one line
+  - feature: YAMAHA_AVR - new remoteControl commands for Tuner Preset
+             selection
+  - feature: RSS amended (read image from pipe, scaling options, line width)
+  - feature: WWO Module by baumrasen
+  - feature: plotAsPng() in 98_SVG.pm (Boris & betateilchen)
+
+- 2013-09-29 (5.5)
+  - feature: new module 55_PIFACE.pm added (betateilchen)
+  - feature: Calendar can read from file and limit number of calendar events
+             retrieved in get command
+  - feature: new module 70_ENIGMA2.pm added (by loredo)
+  - change:  CustomGetFileFromURL() in HttpUtils.pm now reacts to
+             "301 Moved Permanently" return code
+  - change:  changed exit to POSIX::_exit in 10_OWServer.pm
+  - feature: new module 32_mailcheck.pm (by justme1968)
+  - feature: TCM: new commands added
+  - bugfix:  TCM: TCM_ReadAnswer(): response error corrected
+  - feature: readingsGroup: new attribute nolinks
+  - feature: readingsGroup: new attribute nameIcon
+  - feature: readingsGroup: allow device selecton by TYPE=xxx
+  - feature: new module Revolt for Revolt NC-5462 power metering devices.
+             (by mehf)
+  - feature: HUEDevice: added alert command
+  - change:  The DBLOG propagated Attribute DbLogExclude will work as
+             regexp to exclude defined readings to log.
+             If a MinInterval is set, the logentry is dropped if the
+             defined interval is not reached and value vs. lastvalue is eqal
+  - change:  readingsGroup added valueFormat
+  - feature: new modules JeeLink and PCA301 and for the ELV PCA 301 power
+             meter with a JeeLabs JeeLink as RF modem. The matching JeeNode
+             sketch can be found in .../contrib/36_PCA301-pcaSerial.zip
+             (by ohweh&justme1968)
+  - change:  PRESENCE: using ping command line utility to check presence on Windows
+             based machines.
+  - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
+  - feature: new module 33_readingsGroup to display a collection of readings
+             from one or more devices. this will replace weblink readings.
+             (by justme1968)
+  - feature: setreading command added
+  - feature: DbLog: by using DbLog a new Attribute DbLogExclude will be
+             propagated to all Devices. DbLogExclue will work as regexp to
+             exclude defined readings to log
+  - change:  loglevel attribute deprecated/replaced by the verbose attribute
+  - change:  VIERA: changed several readings/commands according to
+             DevelopmentGuidelinesAV. See FHEM Wiki and commandref for more
+             details.
+  - change:  YAMAHA_AVR: changed several readings/commands and introduced new
+             volume handling. please see the commandref for more details
+  - change:  weblink fileplot/dbplot converted to SVG device (+FHEMWEB cleanup)
+  - change:  VIERA: Added support for get dropdown
+  - change:  EnOcean: Manufacturer Specific Applications (EEP A5-3F-7F),
+             Shutter: readings position and anglePos are updated automatically,
+             if command position is sent and the reading state was changed
+             manually to open or closed
+  - bugfix:  EnOcean: profile MD15 now sends current temperature values
+  - feature: EnOcean: subtype roomSensorControl.05 (Room Sensor and Control
+             Unit): actor commands added
+  - feature: EnOcean: new sensor device Heating/Cooling Relay
+  - feature: EnOcean: new attr sensorMode, temperatureRefDev, humidityRefDev
+  - feature: EnOcean: EEP: MSC basic functions implemented (no teach-in)
+  - feature: EnOcean: 4BS teach-in with EEP number and Manufacturer ID
+  - bugfix:  EnOcean: subtypes tempSensor.??: calculations corrected
+  - feature: new module 55_GDS.pm added (betateilchen)
+  - feature: HUEDevice: special svg icon for unreachable (hard switched off)
+             devices
+  - feature: FHEMWEB detail screen with get dropdown
+  - feature: displayattr command added
+  - feature: SYSSTAT: allow (remote) monitoring system uptime
+  - feature: new module 98_openweathermap.pm added (betateilchen)
+  - feature: WeatherAsHtmlH(), WeatherAsHtmlD() added to 59_Weather.pm (Boris)
+  - feature: new module I2C_BMP180 for reading I2C digital pressure sensor
+             BMP180 or BMP085 connected to Raspberry Pi (Dirk)
+  - feature: new module 35_SWAP_0000002200000003 for panstamp rgb led driver
+             board with ir and dmx support
+  - feature: 95_remotecontrol does not require a weblink anymore (UliM)
+  - feature: optional sleep parameter quiet
+  - feature: additional buttons for use with 95_remotecontrol
+  - feature: new module 71_LISTENLIVE.pm for use with media players
+             (betateilchen)
+  - feature: use xhr for colorupdates by colorpicker and rgb presets
+  - feature: new module 34_SWAP for generic SWAP protocoll support using
+             a panStick and 34_panStamp as IODevice (by justme1968)
+  - feature: new module 34_panStamp to use a panStick as a RF modem
+             for panStamps using the SWAP protocoll (by justme1968)
+  - feature: EGPM2LAN module added for Gembird (R) Energenie LAN Support
+  - feature: FHEMWEB use widget module to update colorpicker in longpoll
+  - feature: FHEMWEB widget (slider/etc) javascript handler modularized
+  - feature: FHEMWEB longpoll in multiple browserwindows
+  - feature: fhem.pl: version command added
+  - feature: LightScene: add html overview of all configured scenes in
+             detail view. allow usage of overview in a weblink.
+  - feature: FLOORPLAN: enhanced detail-screen for floorplans in fhemweb,
+             arrange-mode has delete-button, new command
+			 "get <floorplan-name> config"
+  - feature: readings type added to weblink (justme1968)
+  - feature: offset and monotonic added to userReadings modifier (justme1968)
+  - feature: HUEDevice: support SVG icons for LWB001 living whites bulb
+  - feature: HUEDevice: support more than one bridge
+  - feature: updateInBackground global attribute
+  - feature: SYSSTAT: allow stateFormat
+  - feature: Module 70_VIERA supports now module 95_remotecontrol with own
+             layout for VIERA TV
+  - feature: InternalVal function added (like ReadingsVal)
+  - feature: new module speedtest to monitor internet connection speed with
+             speedtest-cli
+  - feature: new module "remotecontrol" to display a graphical remotecontrol
+             for any device
+  - feature: HUEDevice: new attribute color-icons to colored svg icons
+  - feature: FHEMWEB: longpoll is default now, longpollSVG (default off) added
+  - feature: HUEDevice: allow usage of openautomation svg icons
+  - feature: FHEMWEB: svg icons / iconPath / www/images/openautomation added
+  - feature: FHEMWEB: SVGcache attribute & clearSvgCache set command added
+  - feature: SYSSTAT: allow (remote) monitoring raspberry pi on cpu frequency
+  - feature: MANTAINER.txt added
+  - feature: PRESENCE: new mode "shellscript" to use own
+             scripts or binaries for presence recognition
+  - feature: YAMAHA_AVR: new set command to select scenes
+  - feature: PRESENCE: new attribute ping_count
+  - feature: userReadings may have a filter
+  - feature: HUEBridge: allow starting of bridge firmware update
+  - change:  EnOcean: profile PM101 changed, old profiles FAH, FBH, FTF, SR04
+             removed
+  - feature: TCM: new attr blockSenderID:
+             Block receiving telegrams with a TCM SenderID sent by repeaters
+  - feature: TCM: For TCM120 Transceiver now the transmission of RPS and 4BS
+             commands supported
+  - feature: EnOcean: Now all RPS / 1BS profiles, more than 90 4BS profiles and
+             some manufacturer specific profiles are supported
+  - feature: EnOcean: profiles (subType) are updated from EEP 2.1 to EEP 2.5
+  - feature: FHEMWEB attribute roomIcons added
+  - feature: SYSSTAT: optionaly calculate geometric average of last 4
+             temperature values
+  - feature: weblink details screen can be used to edit .gplot files
+  - feature: eventTypes module added, to help with FileLog details screen
+  - feature: FB_CALLMONITOR: new reverse search provider dasschnelle.at for
+             reverse search of austrian telephone numbers
+  - bugfix:  event-on-change-reading in combination with event-change-interval
+  - change:  HUEDevice: allow color preset buttons in webCmd
+  - feature: SYSSTAT: allow (remote) monitoring raspberry pi on chip temperature
+  - feature: HUEDevice: use webCmdFn for colorpicker
+             added jscolor for colorpicker
+  - feature: FHEMWEB: module specific summaryFn/detailFn + defineable webCmdFn
+  - change:  ESA2000: adapted device detection , rename readings
+  - change:  stucture triggers on each change, see event-on-change-reading
+  - feature: PRESENCE: new mode "function" to use own perl functions for
+             presence checks
+  - bugfix:  fixing not-working FHEM restart, when a PRESENCE check is running
+  - bugfix:  fixing memory overflow when "list" a PRESENCE definition
+  - bugfix:  fixing dead PRESENCE definitions in case of timeouts
+  - bugfix:  update: error while updating single files fixed. (M. Fischer)
+
+- 2013-04-08 (5.4)
+  - feature: updatefhem will be silently converted to update
+  - feature: FHEMWEB: save button replaced with the menu entry "Save config"
+  - feature: notify supports $NAME/$EVENT/$EVTPART0/etc. @/% is deprecated.
+  - feature: 93_DbLog extended to give more functions for the charting frontend.
+             This includes new queries for raw table data and also statistics,
+             which get sum/max/min/avg values from the database.
+             Documentation has been updated.
+  - feature: new module 31_LightScene to save and restore the state of a
+             group of lights and other actors
+  - feature: VIERA module added (by teevau)
+  - change:  FHEMWEB: the first webCmd argument is no longer used by the
+             state-icon, this can be implemented by the new devStateIcon
+  - change:  30_HUEDevice: allow autodetection of bridge with hue portal
+             services
+  - feature: THRESHOLD Module by Damian
+  - change:  30_HUEDevice: use new devStateIcon feature to show device color
+             in room overview
+  - feature: added example Setup SQL and configuration for SQLite
+  - change:  modified MySQL Setup SQL to use 512 characters in EVENT column
+  - feature: added new Javascript Frontend based on ExtJS (by Johannes)
+  - feature: new modules 30_HUEBridge and 31_HUEDevice for phillips hue and
+             smartlink devices (by justme1968)
+  - change:  SYSSTAT: allow remote monitoring by ssh
+  - change:  SYSSTAT: allow less frequent updates for diskusage
+  - feature: new module 32_SYSSTAT to monitor system load and disk usage
+             on linux FHEM hosts (by justme1968)
+  - feature: new Module 73_PRESENCE to make automatic presence detection of
+             mobile phones or other mobile devices (like tablets) via ping or
+             bluetooth checks (by M. Bloch)
+  - feature: new Module 98_Heating_Control to switch heatsinks automaticly
+             with a weekly profile (by D. Ortmann / T. Faust)
+  - feature: new Module 93_DbLog.pm for logging events into Databases.
+             Generating Plots with weblinks are supportet.
+             (by B. Neubert / T. Faust)
+  - feature: new Module 59_HCS.pm for monitoring heating valves (FHT, HM-CC-VD)
+             to contral a central heating unit. I thank Benjamin for his
+             support! (M.  Fischer)
+  - feature: new Module 72_FB_CALLMONITOR for receiving telephone call events
+             (Markus)
+  - feature: new Module 71_YAMAHA_AVR.pm for controlling Yamaha AV receivers
+             over network (by Markus)
+  - feature: optional second parameter to fhem() to make it silent
+  - feature: autoloading commands, XmlList/etc renamed from 99 to 98.
+  - feature: FHEMWEB returns external files in chunks to save memory
+  - feature: commandref.html splitted: documentation is now appended to the
+             modules.
+  - change:  introduced readingsBulkUpdate, readingsSingleUpdate
+  - change:  added GPLv2 licensing information
+  - feature: FLOORPLAN added fp_setbutton attribute
+  - bugfix:  FHEMWEB slider with min > 0
+  - change:  FHEMWEB CORS moved to options
+  - change:  FHEMWEB closing old TCP connections
+  - change:  FHEMWEB added "Associated with" to detail-screen (Uli)
+  - change:  FHEMWEB added ETag headers (Matthias)
+  - change:  FHEMWEB devStateIcon added
+  - change:  HOWTO auf deutsch (ilmtuelp0815)
+  - change:  98_update.pm due a (probable) bug in perl, modules are no longer
+             loading automatically. A restart is required now! (M. Fischer)
+  - feature: 98_update.pm saves the statefile before an update (M. Fischer)
+  - feature: FHEMWEB longpoll reconnect (Matthias)
+  - bugfix:  rename may overwrite other devices
+  - feature: FLOORPLAN longpoll (Matthias)
+  - feature: support for recurring events added in 57_Calendar.pm (Boris)
+  - feature: added support for OWL CM119,CM160 and CM180, energy sensors in
+             TRX_WEATHER using RFXtrx433 (Willi Herzig)
+  - feature: added support for KD101 smoke sensor (also set alert and pair) in
+             TRX_SECURITY using RFXtrx433 (Willi Herzig)
+  - change:  changed dewpoint to work with event-on-change-reading and
+             technoline TX3TH (Willi Herzig)
+  - feature: new command fheminfo. Shows system informations. (M. Fischer)
+  - feature: added support for UV sensors in TRX_LIGHT using RFXtrx433 (Willi
+             Herzig)
+  - feature: added on-till and on-timer for set in TRX_LIGHT using RFXtrx433
+             (Willi Herzig)
+  - feature: generate devices with hexcodes as state for unknown types in
+             TRX_ELSE using RFXtrx433 (Willi Herzig)
+  - feature: new modules 10_OWServer.pm and 11_OWDevice.pm to interface with
+             OWFS
+  - feature: stateFormat (readingsFn modules) and showInternalValues attributes
+  - feature: new readingsFn modules: FS20 CUL_WS HMS CUL_EM CUL_TX EnOcean ZWave
+  - change:  BS, USF1000, ECMDDevice, Weather, dummy migrated to readingsFN
+             (Boris)
+  - feature: telnet client mode
+  - bugfix:  FHEMWEB longpoll misses initial state change (HM: set_on vs. on)
+  - change:  20_OWFS.pm, 21_OWTEMP modules flagged as "deprecated". These
+             modules will be removed in a future release. Use OWServer /
+             OWDevice instead. (M. Fischer)
+  - feature: a lot of new features and known 1-wire slaves to OWServer /
+             OWDevice added (M. Fischer)
+  - feature: set-extensions (additional set commands) for FS20, EnOcean, ZWave
+  - feature: added new command 'notice'. (M. Fischer)
+  - change:  update supports the display and confirmation of system messages
+             via the new notice command (M. Fischer)
+  - feature: added new set commands and basicauth to 49_IPCAM.pm (M. Fischer)
+  - feature: userReadings
+  - feature: average supports more than one value in combined readings (T:x H:y)
+  - feature: FHEMWEB serves arbitrary files from the www directory
+  - feature: FB_checkPw now works with a distinct fritzbox user
+  - bugfix:  floorplan-correction for readings with longpoll. Requires local
+             change in css!
+  - feature: floorplan added js-extension from Dirk
+  - feature: hour resolution in SVG
+  - feature: ZWave support for MULTI_CHANNEL class
+  - feature: FHEMWEB: old-dir-support removed, image-indexing rebuilt,
+              smallscreen/touchpad moved to stylesheetPrefix, menuEntries
+              added, Extend devStateIcon, js setting of attr values in detail
+              screen, live slider update in detail and room view
+  - feature: added support for third-party packages to 98_update.pm (M. Fischer)
+  - feature: FBAHA/FBDECT for FRITZ!DECT devices
+  - feature: event-min-interval Attribute
+
+- 2012-10-28 (5.3)
+  - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
+    UntoggleIndirect
+  - feature: added functions FB_mail, FB_WLANswitch
+  - rework:  CUL_HM reworks with respect to protocol.  additions for several
+    devices and commands
+  - feature: rfmode supports to listen to MAX if fw>1.46, 00_CUL.pm (Jens)
+  - feature: Status and length on cmdStack in webinterface for 10_CUL_HM
+  - feature: devicepair in 10_CUL_HM.pm supports unset
+  - feature: devicepair for single Button in 10_CUL_HM.pm (by MartinP)
+  - feature: new Modules 75_MSG.pm, 76_MSGFile.pm and 76_MSGMail.pm (by
+    Ruediger)
+  - feature: new Module 59_Twilight.pm to calculate current daylight
+  - feature: internal NotifyOrderPrefix: 98_average.pm is more straightforward
+  - feature: the usb command tries to flash unflashed CULs on linux
+  - feature: FHEMWEB: jsonp support, .holiday and .cfg added to Edit Files
+  - feature: SVG: filled area support, some ls/lw fixes
+  - feature: WOL (wake on lan) module added (by Matthias)
+  - feature: additional groups from /etc/groups are applied (Christopher)
+  - feature: updatefhem backup is using tar+gzip now
+  - feature: EIB: introduce Get, interpret received values upon defined model
+    (by datapoint types) (Maz)
+  - feature: NetIO230B module by Andy
+  - feature: Retaining configfile comments (not within a define statement)
+  - feature: EnOcean PM101 by Ignaz
+  - feature: FHEMWEB redirectCmds attribute added
+  - feature: CUL_TX minsecs attribute (by Arno)
+  - feature: webCmd in smallScreen added
+  - feature: TRX modules by Willi
+  - feature: FHEMWEB icons (by Joerg)
+  - feature: FHEMWEB console (same as inform timer)
+  - feature: remove dependency on Google::Weather, major rewrite (Boris)
+  - feature: started experimental interface implementation (fhem API v2)
+    (Boris)
+  - feature: sleep issued in at/notify/etc is not blocking fhem anymore
+  - feature: dummy got a setList attribute
+  - feature: new module 02_RSS.pm
+  - feature: at attribute alignTime added
+  - feature: FHEMWEB attribute values via dropdown, slider for dimmer
+  - feature: new attribute group for FHEMWEB (Boris)
+  - change:  11_FHT.pm, 50_WS300.pm, 59_Weather.pm migrated to readingsUpdate
+    mechanism (Boris)
+  - change:  59_Weather.pm migrated from Google to Yahoo Weather API (Boris)
+  - change:  updatefhem modifications to support a clean install of fhem and
+    pgm2 installation, see commandref.html (M. Fischer)
+  - change:  FHEMWEB support for the new www/pgm2 directroy added (M. Fischer)
+  - change:  Makefile support for for the new www/pgm2 directroy and new
+    targets backup and uninstall added. More verbose output. (M. Fischer)
+  - change:  backup separated from updatefhem to a new command (M. Fischer)
+  - feature: new command backup added (M. Fischer) new global attribute
+    <backupsymlink> added new global attribute <backupcmd> added new global
+    attribute <backup_before_update> added
+  - feature: new module 57_Calendar.pm (Boris)
+  - feature: new parameter <changed> for updatefhem added (M. Fischer) new
+    global attribute <exclude_from_update> added (M. Fischer)
+  - feature: optional telnet password added / telnet port is optional
+  - feature: holiday returns all matches, not only the first.
+  - change:  CULflash separated from updatefhem to a new module (M. Fischer)
+  - feature: time and internet helper routines added to fhem.pl (Boris)
+  - change:  separating common functions used by the FHEM modules into
+    *Utils.pm files from fhem.pl
+  - feature: portpassword and basicAuth may use evaluated functions
+  - feature: motd with SecurityCheck added
+  - feature: telnet module added, attr global port moved. allowfrom changed.
+  - feature: FhemUtils/release.pm for the new update process added. (M.
+    Fischer)
+  - bugfix:  correct one-time relative at commands after reboot
+  - feature: ZWave added
+  - feature: module IPCAM added. (M. Fischer)
+  - feature: module HTTPSRV added (Boris)
+  - feature: module FLOORPLAN added (Uli Maass)
+  - bugfix:  FHEMWEB: weblink with group attribute is shown together with other
+    elements
+  - feature: FHEMWEB: timepicker added
+  - feature: FHEMWEB: support for modul specific icons added (M. Fischer)
+
+
+- 2011-12-31 (5.2)
+  - bugfix:  applying smallscreen attributes to firefox/opera
+  - feature: CUL_TX added (thanks to Peterp)
+  - feature: TCM120/TCM310 + EnOcean parser added
+  - feature: eventMap enhanced
+  - bugfix:  enabled logging for 59_Weather.pm (Boris)
+  - feature: language selection for 59_Weather.pm (Erwin)
+  - feature: .gplot files renamed from type to content
+  - bugfix:  FS20 on-for-timer error reporting only in the logfile
+  - bugfix:  FHEM2FHEM should work with CUL again, after syntax change
+  - feature: CUL directio mode (No Device::SerialPort needed)
+  - feature: FritzBox 7270 ZIP file
+  - bugfix:  prevent fhem from stalling if telnet times out in 66_ECMD.pm
+  - feature: added postproc ability to classdef in 66_ECMD.pm (Boris, Heinz)
+  - feature: FHEMWEB longpoll mode, small fixes, tuned smallscreen mode
+  - feature: average module added
+  - change:  moved the berliOS CVS repository to a sourceforge SVN repository
+  - feature: all FHEM modules have now a subversion id.
+  - bugfix:  new perl compiled for the FritzBox 7270
+  - feature: regexp1WontReactivate Attribute added
+  - bugfix:  XmlList special handling
+  - bugfix:  CUL_WS rain sensor corr1 fix
+  - feature: FHEMWEB stylesheet attribute repaced with stylesheetPrefix
+  - feature: notify attribute forwardReturnValue
+  - change:  move JsonList from contrib to main-modules
+  - change:  JsonList output optimized and more structured
+  - feature: FHEMWEB save button, smallscreen first screen fix
+  - feature: FHEMWEB encoding is now UTF-8, alias attribute is respected
+  - change:  HTTPS certs directory moved from cwd into modpath
+  - feature: shutdown parameter restart added
+  - feature: usb scan/create command added (part of autocreate).
+  - feature: SaveAs added to FHEMWEB Edit-Files
+  - feature: EnOcean ElTako dimmer by Marc.
+  - feature: fhem is started as user fhem on the FB7390
+
+
+- 2011-07-08 (5.1)
+  - feature: smallscreen optimizations for iPhone
+  - feature: FHT8V rewrite (and moved from contrib into the FHEM directory).
+  - feature: PID rewrite (and moved from contrib into the FHEM directory).
+  - feature: FHEM2FHEM module
+  - bugfix:  CUL get should not digest foreign events (fhtsoftbuffer)
+  - bugfix:  S300TH sanity check won't allow negative temperatures.
+  - feature: decode CUL uptime
+  - feature: USB doc changes, FHZ initFS20_02/stopHMS parameters by Andreas.
+  - feature: CUL_HM for some HomeMatic devices.
+  - bugfix:  HTML-Syntax check of the pgm2 output and documents (*.html)
+  - feature: added date alias for FHT80b (Boris)
+  - feature: attr may be a regexp (for CUL_IR)
+  - feature: Homepage moved from koeniglich.de/fhem to fhem.de
+  - feature: eventMap attribute
+  - feature: 64_ESA2000 added (by STefan/Gerd)
+  - feature: new modules 66_ECMD.pm and 67_ECMDDevice.pm for ethersex-enabled
+             devices and alike.
+  - bugfix:  serial port setting on Linux broken if running in the background
+  - feature: IPV6 support, FHEMWEB basicAuth and HTTPS support
+  - feature: createlog added to the autocreate module
+  - feature: contrib/tcptee.pl added
+  - feature: HMLAN support
+  - feature: Fritzbox7390 image
+  - feature: pgm2 tablet support, included into the default configuration
+  - feature: TUL/EIB Support (by Maz)
+  - feature: updatefhem/CULflash
+  - feature: $value{} => Value(), $oldvalue => OldValue()/OldTimestamp()
+
+
+- 2010-08-15 (5.0)
+  - **NOTE*: The default installation path is changed to satisfy lintian
+  - feature: KM271
+  - bugfix:  99_SUNRISE_EL endless loop bug
+  - feature: CUL: optional baudrate spec in definition
+  - feature: CUL: sendpool attribute
+  - feature: CUL_HOERMANN module added
+  - bugfix:  DST change: absolute at and relative sunrise fix
+  - feature: FHEMWEB javascript additions for SVG plots (click on lines/labels)
+  - feature: FHEMWEB smallscreen attribute (for smartphones)
+  - bugfix:  the internal fhem() used in perl oneliners does not return a value
+  - feature: Dimmer function of X10 module changed to match FS20
+  - feature: allow only meaningful readings (fill level > -5%) in USF1000
+  - feature: device attr links in commandref.html
+  - bugfix:  make BS known to CUL to avoid lost messages if both FHZ1300 and CUL
+             are connected, adjust matching rule
+  - feature: Copy&Paste in SVG
+  - feature: Debian/Ubuntu Package. Install-path changes to satisfy lintian
+  - feature: Allnet 3076/4027/4000T
+  - feature: RFXCOMM Module for Oregon Weatherstations
+  - feature: Davis VantagePro2
+  - feature: ELV USB-WDE1
+  - feature: addvaltriggers CUL attribute for adding RSSI as a trigger
+  - feature: CUL_WS sanity check for large temp differences.
+
+- 2010-03-13 (4.9)
+  - bugfix:  changed the fhem prompt from FHZ> to fhem>
+  - bugfix:  CUL_RFR fixes (chaining RFR's should work)
+  - bugfix:  Path in the examples fixed (got corrupted)
+  - bugfix:  PachLog fixes from Axel
+  - bugfix:  HOWTO/Examples revisited for correctness
+  - bugfix:  INITIALIZED, DEFINED, RENAMED, DELETED triggers
+  - feature: image weblinks from Stefan
+  - feature: OWFS support for passive Devices e.g. DS9097 (see commandref.html)
+  - bugfix:  OWFS crash fhem with PGM2/3, xmllist (M.Fischer)
+  - bugfix:  OWTEMP Defining a device without OWFS now fails (M.Fischer)
+  - bugfix:  21_OWTEMP.pm missing trigger fo notify/filelog (M.Fischer)
+  - feature: 99_getstate.pm get state from S555TH now (M.Fischer)
+  - feature: pgm3: automatic support for CUL_WS (S300TH) added (MartinH)
+  - bugfix:  21_OWTEMP.pm missing space within state logging (M.Fischer)
+  - bugfix:  21_OWTEMP.pm interval fixed (M.Fischer)
+  - bugfix:  21_OWTEMP.pm rewrite with errorcontrol and demo mode (M.Fischer)
+  - feature: ignore attribute
+  - bugfix:  [pgm3] table-format on Android-Browser optimized
+  - feature: [pgm3] Skinable - change the colors.
+  - feature: [pgm3] Rooms possible for Webcam and Google-Weather
+  - bugfix:  dummy/structure was listed twice in list and xmllist
+  - feature: 11_FHT.pm added new readings for warnings on battery, lowtemp,
+             window and windowsensor (M.Fischer)
+  - feature: autocreate.pm (create undefined RF devices, logs and plots)
+  - feature: on-for-timer added for X10 modules (Boris)
+  - bugfix:  pgm3: Better check of availability of google-weather (MartinH)
+  - feature: pgm3: DBLog added for everything except UserDefs
+  	     (Gerhard Pfeffer / MartinH)
+  - feature: pgm2 style changes, SVG in background, optional compression
+
+- 2009-11-28 (4.8)
+  - bugfix:  loosing data when sending FS20 messages in a group
+  - bugfix:  better handling of disconnected CUN
+  - feature: softfhtbuffer added to CUL
+  - bugfix:  pgm3: Pulldown-Menu FHTDEV with error-check (MartinH)
+  - feature: duplicate buffer added for multi-cul/-fhz setups
+  - feature: 20_OWFS.pm for 1-Wire via OWFS added (Martin Fischer)
+  - feature: 21_OWTEMP.pm for 1-Wire Digital Thermometer added (Martin Fischer)
+  - feature: CUL_FHTTK from Kai
+  - feature: pgm3: Google-Weather, Battery-Check, Log-View added (MartinH)
+  - feature: CUL_RFR (RF_ROUTING) added
+  - feature: Command save retains now the order of the old config file
+  - feature: List parameter added (list .* RFR_MSGCNT)
+
+- 2009-10-23 (4.7)
+  - bugfix:  Reattached corrupted CUL device caused uninitialized message
+  - bugfix:  CUL/HMS changes, HMS cleanup
+  - bugfix:  EM/EMWZ/EMGZ set changed to work in FHEMWEB
+  - bugfix:  Avoid unitialized in xmllist for corrupt readings, reporter Boris
+  - bugfix:  Add binmode to 01_fhemweb.pm for windows
+  - bugfix:  Uniform check for windows, enable CUL for windows.
+  - bugfix:  CUL/HMS parsing patches from Peter
+  - bugfix:  Fixes for Windows by Klaus
+  - bugfix:  Another "rereadcfg" bugfix
+  - feature: Update to the current (1.27) CUL FHT interface
+  - feature: suppress inplausible readings from USF1000
+  - feature: get time, fwrev, set reopen for CM11 (Boris 2009-09-12)
+  - bugfix:  FHZ_ReadAnswer bugfix for Windows (Klaus, 20.8.2009)
+  - feature: CUL: device access code reorganized, TCP/IP support added (CUN)
+  - feature: Pachube module from Axel
+  - feature: dumpdef module from Axel in contrib
+  - feature: javascripting support in FHEMWEB (Klaus/Axel)
+  - feature: Module 09_BS.pm for brightness sensor added (Boris 2009-09-20)
+
+- 2009-07-03 (4.6)
+  - bugfix:  fht actuator message clarification by Klaus
+  - feature: getstate command from Martin (25.12)
+  - bugfix:  at drifts for relative timespecs
+  - bugfix:  Add IODev to CUL/EM/CUL_WS/HMS/KS300
+  - bugfix:  FileLog get (pgm2 plots) wont find the first row in the file
+  - feature: 00_CUL: Answer CUR requests (status/time/fht)
+  - bugfix:  support for second correction factor for EMWZ in 15_CUL_EM added
+  - feature: CUL further sets/gets added
+  - feature: Removed msghist for multiple FHZ handling, IODev attribute added
+  - bugfix:  cut off string "(counter)" from fallback value in 13_KS300.pm
+  - feature: daily/monthly cumulated values for EMWZ/EMGZ/EMWM with 15_CUL_EM
+  - feature: 01_FHEMWEB.pm: multiple room assignments
+  - feature: 01_FHEMWEB.pm: fixedrange with optional [day|week|month|year]
+  - feature: 01_FHEMWEB.pm: attr title and label for flexible .gplot files
+  - feature: fhem.pl: attr global logdir used by wildcard %ld
+  - feature: do not block on disconnected devices (FHZ/CM11/CUL)
+  - bugfix:  deleting at definition in the at command
+  - bugfix:  deleting a notify/at/watchdog definition in a notify/at/watchdog
+  - feature: devspec <attr>=<value>. E.g. set room=kitchen off; list disabled=
+  - feature: Common Module calling for CUL/FHZ/CM11
+  - feature: Store CUL sensitivity info
+  - feature: avoid the "unknown/help me" message for unloaded devices
+  - feature: structure module for large installations
+  - feature: Cost Control in 15_CUL_EM (CostPerUnit, BasisFeePerMonth)
+  - feature: add counter differential per time in 81_M232Counter.pm
+  - feature: added USB compendium to documentation
+  - feature: pgm3: Documentation for pgm3 updated, HMS100CO added (and bugfix)
+  - bugfix:  Defining a repeated at job in a sunrise/sunset at job fails
+  - bugfix:  FHT "summer" fix (avoiding a lot of syncnow)
+  - feature: FHEMWEB modules added
+  - feature: holiday module + doc + example + holiday2we attribute
+  - bugfix:  sunrise stuff fixed, doc missing
+  - feature: CUL FHT sending added
+  - bugfix:  workaround to make M232 counter wraparound
+  - feature: sequence module added
+  - feature: Google Weather API support for FHEM (Boris 2009-06-01)
+  - feature: lazy attribute for FHT devices (Boris 2009-06-09)
+  - feature: tmpcorr attribute for FHT devices
+  - feature: CUL_EM generates an event for each of the READINGS
+  - feature: USF1000S support for FHEM added (Boris 2009-06-20)
+  - feature: CUL supports HMS (culfw >= 1.22 needed)
+  - feature: CUL shutdown procedure added
+  - feature: 14_CUL_WS: better error checking
+  - bugfix:  webpgm2 multi line editing is working again
+
+- 2008-12-23 (4.5)
+  - bugfix:  further 01_FHEMWEB cleanup
+  - feature: CUL support for FS20(r/w), FHT(readonly), KS300 and EM
+  - feature: command list outputs the device attributes too
+  - bugfix:  rename bugs fixed
+  - bugfix:  better integration of ReadyFn (Windows), slight overall speedup
+  - bugfix:  Ignore/correct casing when autoloading modules
+  - bugfix:  at is executed twice after a modify (rufus99, 2008-09-10)
+  - feature: FHT internal modifications (better protocol understanding)
+  - feature: add timestamp to inform
+  - feature: The strange stty settings in 00_FHEM.pm are optional
+  - bugfix:  webpgm2 iPhone fix
+  - feature: fullinit and reopen commands for FHZ added (Boris 2008-11-01)
+  - bugfix:  undefined NotifyFn in fhem.pl (Boris 2008-11-01)
+  - feature: new modules 00_CM11.pm and 20_X10.pm for integration of X10
+             devices in fhem (Boris 2008-11-02)
+  - feature: X10 support for pgm3 (Boris 2008-11-02)
+  - bugfix:  FHT short message warning
+  - bugfix:  rereadconfig crashes with active webpgm2 connections (2008-11-13)
+  - bugfix:  watchdog crash (2008-11-15)
+  - bugfix:  Strange call for nonexistent MyCUL: ReadFn
+  - feature: webpgm2: gplot output goes to /tmp/gnuplot.err
+  - feature: devspec TYPE,DEF,STATE. e.g. list TYPE:FS20, set DEF:123 on
+  - bugfix:  at schedules 2 events after the DST change (fix not verified)
+  - feature: commandref.html reorg. There are now device sections.
+  - feature: CUL / CUL_EM / CUL_WS documentation
+  - feature: do not block fhem when the CUR is disconnected
+  - bugfix:  correct correction factors for EMEM in 15_CUL_EM.pm
+  - bugfix:  more stable CUL initialization
+  - feature: reworked 15_CUL_EM.pm to account for timer wraparounds, more
+             readings added
+  - feature: speed gain through disabled refreshvalues query to all FHTs at
+             definition; if you want it back at a "set myFHT report1 255
+             report2 255" command to the config file.
+  - feature: fhem commands may be added in modules. XmlList is external now.
+  - bugfix:  rereadcfg from webpgm2 does not crash fhem.pl
+  - feature: jsonlist command from Martin (contrib/JsonList)
+  - feature: contrib/rotateShiftWork from Martin
+  - feature: contrib/fhem2speech from Martin
+  - bugfix:  attributes of at devices disappear
+  - feature: attribute rainadjustment for KS300 (Boris 2008-12-17)
+  - bugfix:  deleting at / watchdog while active creates an empty device
+  - feature: ExactId trigger added for wildcard HMS devices
+
+- 2008-08-04 (4.4)
+  - feature: RM100-2 battery empty warning (mare 23.07.08)
+  - feature: optimising the pgm2/SVG memory usage
+  - feature: autoloading FHEM modules
+  - bugfix:  STATE/$value is carrying again the correct value
+  - feature: enhancing the Makefile and the documentation
+  - feature: 90_at is using now InternalTimer, subsecond precision added
+  - feature: HMS100-FIT added (01.01.08 by Peter and 22.01.08 by Juergen)
+  - feature: 91_watchdog added to handle the HMS100-FIT
+  - feature: cum_kWh/cum_m3 added to EMWZ/EMGZ (11.01.08 by Peter)
+
+- 2008-07-12 (4.3)
+  - bugfix:  KS300 state was wrong after the STATE bugfix
+  - feature: HMS100CO (by Peter)
+  - feature: EMGZ (by Peter)
+  - feature: Generate warning if too many commands were sent in the last hour
+  - doc:     linux.html: Introduction (Peter S.)
+  - feature: contrib/82_M232Voltage.pm (by Boris, 24.12)
+  - feature: delattr renamed to deleteattr (Rudi, 29.12)
+  - feature: defattr renamed to setdefaultattr (Rudi, 29.12)
+  - feature: device spec (list/range/regexp) for most commands implemented
+  - feature: %NAME, %EVENT, %TYPE parameters in notify definition
+  - feature: added 93_DbLog.pm, database logging facility (Boris, 30.12.)
+  - feature: webfrontend/pgm2 converted to a FHEM module
+  - bugfix:  99_SUNRISE_EL.pm: may schedule double events
+  - bugfix:  62_EMEM.pl, contrib/em1010.pl: correct readings for energy_kWh
+             and energy_kWh_w (Boris, 06.01.08)
+  - feature: global attr allowfrom, as wished by Holger (8.1.2008)
+  - feature: FHT: multiple commands, softbuffer changes, cmd rename, doc
+  - feature: EM1010PC: automatic reset
+  - feature: contrib/00_LIRC.pm (25.3, by Bernhard)
+  - bugfix : 00_FHZ: additional stty settings for strange Linux versions
+  - bugfix : pgm2 wrong temp summary for FHT's (reported by O.D., 16.4.2008)
+  - feature: FHEM modules may live on a filesystem with "ignorant" casing (FAT)
+  - feature: FileLog "set reopen" for manual tweaking of logfiles.
+  - feature: multiline commands are supported through the command line
+  - feature: pgm2 installation changes, multiple instances, external css
+  - feature: 87_ws2000.pm (thomas 10.05.08)
+  - contrib: ws2000_reader.pl Standalone decoder and server (thomas 10.05.08)
+  - doc:     update fhem.html and commandline.html reflecting ws2000 and
+             windows installation(thomas 10.05.08)
+  - feature: add ReadyFn to fhem.pl in main loop to have an alternative for
+             select, which is not working on windows (thomas 11.05)
+  - feature: set timeout to 0.2s, if HandleTimeout returns undef=forever
+  - bugfix : WS2000:fixed serial port access on windows by replacing FD with
+             ReadyFn
+  - bugfix : FileLog: dont use FH->sync on windows (not implemented there)
+  - feature: EM, WS300, FHZ:Add Switch for Device::SerialPort and
+             Win32::SerialPort to get it running in Windows (sorry, untested)
+  - bugfix:  FileLog undefined $data in FileLog_Get
+  - feature: fhem.pl check modules for compiletime errors and do not initialize
+             them
+  - feature: M232 add windows support (thomas 12.05.08)
+  - feature: add simple ELV IPWE1 support (thomas 12.05.08)
+  - feature: FileLog get to read logfiles. Used heavily by webpgm2
+  - feature: webpgm2: gnuplot-scroll mode to navigate/zoom in logfiles
+  - bugfix:  deleting FS20 device won't result in unknown device (Daniel, 11.7)
+  - feature: webpgm2 generates SVG's from logs: no need for gnuplot
+  - bugfix:  examples corrected to work with current syntax
+
+- 2007-12-02 (4.2)
+  - feature: added archivedir/archivecmd to the the main logfile
+  - feature: 99_Sunrise_EL.pm (does not need any Date modules)
+  - bugfix:  seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)
+  - bugfix:  FHT mode holiday_short added (9.9, Dirk)
+  - bugfix:  Modifying a device from its own trigger crashes (Klaus, 10.9)
+  - feature: webpgm2 output reformatted
+  - feature: webpgm2 displaying multiple plots
+  - feature: FHT lime-protection code discovered by Dirk (7.10)
+  - feature: softwarebuffer for FHT devices (Dirk 17.10)
+  - feature: FHT low temperatur warning and offset (Dirk 17.10)
+  - change:  change FHT state into warnings (Dirk 17.10)
+         NOTE: you'll get an undefined type state &
+         undefined type unknown_85 after upgrade.
+  - feature: Softwarebuffer code simplified (Rudi 22.11)
+  - bugfix:  bug #12327 doppeltes my
+  - bugfix:  set STATE from trigger
+  - bugfix:  readings state vs STATE problem (xmllist/trigger)
+  - change:  SUNRISE doc changed (99_SUNRISE.pm -> 99_SUNRISE_EL.pm)
+  - feature: support for the M232 ELV device (Boris, 25.11)
+  - feature: alternativ Quad-based numbers for the FS20 (Matthias, 24.11)
+  - feature: dummy type added (contrib/99_dummy.pm)
+
+- 2007-08-05 (4.1)
+  - doc:     linux.html (private udev-rules, not 50-..., ATTRS)
+  - bugfix:  setting devices with "-" in their name did not work
+  - doc:     fhem.pl and commandref.html (notifyon -> notify, correction
+             of examples)
+  - feature: modify command added
+  - feature: The "-" in the name is not allowed any more
+  - bugfix:  disabled notify causes "uninitialized value" (STefan, 1.5)
+  - bugfix:  deleted FS20 items are still logging (zombie) (Gerhard, 16.5)
+  - bugfix:  added FS20S8, removed stty_parmrk (Martin, 24.5)
+  - feature: added archivedir/archivecmd to the FileLog
+  - feature: added EM1010PC/EM1000WZ/EM1000EM support
+  - bugfix:  undefined messages for unknown HMS devs (Peter, 8.6)
+  - bugfix:  em1010 and %oldvalue bugs (Peter, 9.6)
+  - bugfix:  SCIVT solar controller (peterp, 1.7)
+  - bugfix:  WS300 loglevel change (from 2 to 5 or device specific loglevel)
+  - feature: First steps for a Fritz!Box port. See the fritzbox.html
+
+- 2007-04-14 (4.0)
+  - bugfix:  deny at +{3}... (only +*{3} allowed), reported by Bernd, 25.01
+  - bugfix:  allow numbers greater then 9 in at +{<number>}
+  - feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.01)
+  - feature: renamed fhz1000 to fhem
+  - feature: added HISTORY and README.DEV
+  - doc:     Added description of attribute "model".
+  - bugfix:  delete the pidfile when terminating. (reported by Martin and Peter)
+  - feature: attribute showtime in web-pgm2 (show time instead of state)
+  - feature: defattr (default attribute for following defines)
+  - feature: added em1010.pl to the contrib directory
+  - doc:     added linux.html (multiple devices, udev-links)
+  - REORGANIZATION:
+    - at/notify "renamed" to "define <name> at/notify"
+    - logfile/modpath/pidfile/port/verbose "renamed" to "attr global xxx"
+    - savefile renamed to "attr global statefile"
+    - save command added, it writes the configfile and the statefile
+    - delattr added
+    - list/xmllist format changed
+    - disable attribute for at/notify/filelog
+    See HISTORY for details and reasoning
+  - added rename command
+  - webpgm2 adapted to the new syntax, added device specific attribute
+    and "set" support, gnuplot files are configurable, links to the
+    documentation added.
+  - bugfix: more thorough serial line initialization
+
+- 2007-01-25 (3.3)
+  - bugfix:  50_WS300.pm fix from Martin
+  - bugfix:  pidfile does not work as expected (reported by Martin)
+  - bugfix:  %U in the log-filename is wrong (bugreport by Juergen)
+  - feature: %V added to the log-filename
+  - feature: KS300 wind calibration possibility added
+  - feature: (software) filtering repeater messages (suggested by Martin)
+  - feature: the "client" fhz1000.pl can address another host
+  - bugfix:  empty FHT battery is not reported (by Holger)
+  - feature: new FHT codes, e.g. month/day/hour/minute setting (by Holger)
+
+- 2007-01-14 (3.2)
+  - bugfix:  example $state changed to $value (remco)
+  - bugfix:  sun*_rel does not work correctly with offset (Sebastian)
+  - feature: new HMS100TF codes (Sebastian)
+  - feature: logging unknown HMS with both unique and class ID (Sebastian)
+  - feature: WS300: "Wetter-Willi-Status", rain_raw/rain_cum added, historic
+             data (changes by Martin & Markus)
+  - bugfix:  broken rereadcfg / CommandChain after init
+             (reported by Sebastian and Peter)
+  - bugfix:  sunrise_coord returned "3", which is irritating
+
+- 2007-01-08 (3.1)
+  - bugfix:  delete checks the arg first "exactly", then as a regexp
+  - bugfix:  sun*_rel does not work correctly with offset (Martin)
+  - feature: FAQ entry on how to install the sunrise stuff.
+  - feature: the inner core is modified to be able to handle
+             more than one "IO" device, i.e multiple FHZ at the same time,
+	     or FHZ + FS10 + WS300. Consequences:
+    - "fhzdev <usbdevice>" replaced with "define <FHZNAME> FHZ <usbdevice>"
+    - "sendraw <fn> <code>" replaced with "set <FHZNAME> raw <fn> <code>"
+    - module function parameters changed (for module developers)
+    - set FHZ activefor dev
+    - select instead sleep after sending FHZ commands
+    - the at timer is more exact (around 1msec instead of 1 sec)
+    - ignoring FS20 device 0001/00/00
+  - feature: contrib/serial.pm to debug serial devices.
+  - feature: WS300 integrated: no external program needed (Martin)
+  - feature: updated to pgm3-0.7.0, see the CHANGELOG at Martins site
+
+- 2006-12-28 (3.0)
+  - bugfix:  KS300: Make the temperature negative, not the humidity
+  - bugfix:  generate correct xmllist even with fhzdev none (Martin, 12.12)
+  - feature: one set command can handle multiple devices (range and enumeration)
+  - feature: new FS20 command on-till
+  - feature: perl: the current state is stored in the %value hash
+  - feature: perl: sunset renamed to sunset_rel, sunset_abs added (for on-till)
+  - feature: perl: isday function added
+  - feature: follow-on-for-timer attribute added to set the state to off
+  - bugfix:  the ws300pc negative-temp bugfix included (from Martin Klerx)
+  - feature: version 0.6.2 of the webpgm3 included (from Martin Haas)
+
+- 2006-11-27 (2.9a)
+  - bugfix:  FileLog+Unknown device generates undefined messages
+  - bugfix:  trigger with unknown device generates undefined messages
+
+- 2006-11-19 (2.9)
+  - bugfix:  fhz1000.pl dies at startup if the savefile does not exist
+  - bugfix:  oldvalue hash is not initialized at startup (peter, Nov 09)
+  - feature: Notify reorganization (requested by juergen and matthias) :
+    - inform will be notified on both real events and set or trigger commands
+    - filelogs will additionally be notified on set or trigger commands
+    - the extra_notify flag is gone: it is default now, there is a
+      do_not_notify flag for the opposite behaviour.
+  - feature: at timespec as a function. Example: at +*{sunset()}
+    commandref.html and examples revisited.
+  - feature: 99_SUNRISE.pm added to use with the new at functionality
+    (replaces the old 99_SUNSET.pm)
+  - feature: webpgm2 "everything" room, at/notify section, arbitrary command
+  - bugfix:  resetting the KS300
+  - feature: updated ws300pc (from martin klerx, Nov 08)
+  - bugfix:  parsing timed commands implemented => thermo-off,thermo-on and
+             activate replaced with timed off-for-timer,on-for-timer and
+	     on-old-for-timer (reported by martin klerx, Nov 08)
+  - feature: pidfile (requested by peter, Nov 10)
+  - bugfix:  function 81 is not allowed
+
+- 2006-11-08 (2.8)
+  - feature: store oldvalue for triggers. perl only. requested by peter.
+  - feature: inform cmd. Patch by Martin. There are many Martins around here :-)
+  - bugfix:  XML: fix & and < and co
+  - bugfix:  Accept KS300 negative temperature values
+  - change:  the FS20 msg "rain-msg" is called now "activate"
+  - feature: start/stop rc script from Stefan (in the contrib directory)
+  - feature: attribute extra_notify: setting the device will trigger a notify
+  - feature: optional repeat count for the at command
+  - feature: skip_next attribute for the at command
+  - feature: WS300 support by Martin. Check the contrib/ws300 directory.
+  - bugfix:  91_DbLog.pm: retry if the connection is broken by Peter
+  - feature: Martin's pgm3-0.5.2 (see the CHANGELOG on his webpage)
+  - feature: RRD logging example by Peter (in the contrib/rrd directory)
+
+- 2006-10-03 (2.7)
+  - bugfix:  Another try on the > 25.5 problem. (Peters suggestion)
+  - feature: 99_ALARM.pm from Martin (in the contrib directory)
+  - feature: HMS100TFK von Peter P.
+  - feature: attribute loglevel
+  - feature: attribute dummy
+  - feature: attr command documented
+  - feature: the current version (0.5a) of the pgm3 from Martin.
+
+- 2006-09-13 (2.6a)
+  - bugfix:  the FHT > 25.5 problem again. A never ending story.
+
+- 2006-09-08 (2.6)
+  - bugfix:  updated the examples (hint from Juergen)
+  - bugfix:  leading and trailing whitespaces in commands are ignored now
+  - feature: making life easier for perl oneliners: see commandref.html
+             (motivated by STefans suggestions)
+  - feature: include command and multiline commands in the configfiles (\)
+  - bugfix:  web/pgm2 KS300 rain plot knows about the avg data
+  - bugfix:  the FHT > 25.5 problem. Needs to be tested.
+  - feature: log unknown devices (peters idea, see notifyon description)
+  - feature: HMS wildcard device id for all HMS devices. See the define/HMS
+             section in the commandref.html for details.
+	     NOTE: the wildcard for RM100-2 changed from 1001 to 1003.
+	     (peters idea)
+  - feature: rolwzo_no_off.sh contrib file (for those who were already closed
+             out by automatically closing rollades, by Martin)
+  - feature: the current version (0.4.5) of the pgm3 from Martin.
+
+- 2006-08-13 (2.5)
+  Special thanks to STefan Mayer for a lot of suggestions and bug reports
+  - If a command is enclosed in {}, then it will be evaluated as a perl
+    expression, if it is enclosed in "" then it is a shell command, else it is
+    a "normal" fhz1000 command.
+    "at" and "notifyon" follow this convention too.
+    Note: a shell command will always be issued in the background.
+  - won't die anymore if the at spec contains an unknown command
+  - rereadcfg added. Sending a HUP should work better now
+  - escaping % and @ in the notify argument is now possible with %% or @@
+  - new command trigger to test notify commands
+  - where you could specify an fhz command, now you can specify a list of
+    them, separated by ";". Escape is ;;
+  - KS300 sometimes reports "negative" rain when it begins to rain.  Filter
+    such values. israining is set when the raincounter changed or the ks300
+    israining bit is set.
+  - sleep command, with millisecond accuracy
+  - HMS 100MG support by Peter Stark.
+  - Making FHT and FS20 messages more uniform
+  - contrib/fs20_holidays.sh by STefan Mayer
+    (simulate presence while on holiday)
+  - webfrontends/pgm4 by STefan Mayer: fs20.php
+  - KS300 avg. monthly values fixed (hopefully)
+  - deleted undocumented "exec" function (you can write it now as {...})
+
+- 2006-07-23 (2.4)
+  - contrib/four2hex (to convert between ELV and our codes) by Peter Stark
+  - make dist added to set version (it won't work in a released version)
+  - reload function to reload (private) perl modules
+  - 20_FHT.pm fix: undef occures once without old data
+  - "setstate comment" is replaced with the attr command (i.e. attribute).
+    The corresponding xmllist COMMENT tag is replaced with the ATTR tag.
+    Devices or logs can have attr definitions.
+  - webfrontend/pgm2 (fhzweb.pl) updated to handle "room" attributes(showing
+    only devices in this room).
+  - version 0.4.2 of webfrontend/pgm3 integrated.
+  - contrib/ks300avg.pl to compute daily and monthly avarage values.
+  - the 40_KS300.pm module is computing daily and monthly avarages for the
+    temp/hum and wind values and sum of the rain. The cum_day and cum_month
+    state variables are used as helper values.  To log the avarage use the
+    .*avg.* regexp. The regexp for the intraday log will trigger it also.
+  - Added the contrib file garden.pl as a more complex example: garden
+    irrigation. The program computes the time for irrigation from the avarage
+    temperature reported by the ks300-2.
+  - Enable uppercase hex codes (Bug reported by STefan Mayer)
+  - Renamed the unknown_XX FHT80b codes to code_XXXXXX, this will produce
+    "Undefined type" messages when reading the old save file
+  - RM100-2 added (thanks for the codes from andikt).
+
+- 2006-6-22 (2.3)
+  - CRC checking (i.e. ignoring messages with bad CRC, message on verbose 4)
+  - contrib/checkmesg.pl added to check message consistency (debugging)
+  - FHT: unknown_aa, unknown_ba codes added. What they are for?
+  - Empty modpath / no modpath error messages added (some user think modpath is
+    superfluous)
+  - Unparsed messages (verbose 5) now printed as hex
+  - Try to reattach to the usb device if it disappears: no need to
+    restart the server if the device is pulled out from the USB socket and
+    plugged in again (old versions go into a busy loop here).
+  - Supressing the seldom (ca 1 out of 700) short KS300 messages.
+    (not sure how to interpret them)
+  - Added KS300 "israining" status flag. Note: this not always triggers when it
+    is raining, but there seems to be a correlation. To be evaluated in more
+    detail.
+  - notifyon can now execute "private" perl code as well (updated
+    commandref.html, added the file example/99_PRIV.pm)
+  - another "perl code" example is logging the data into the database
+    (with DBI), see the file contrib/91_DbLog.pm. Tested with an Oracle DB.
+  - logs added to the xmllist
+  - FHT80b: Fix measured-temp over 25.5 (handling the tempadd messages better)
+
+- 2006-05-20 (2.2)
+  - FHZ1300 support verified (+ doc changes)
+  - KS300 support added (with Temperature, Humidity, Wind speed, Rain).
+    Not verified/undecoded: subzero temp, weak battery, Is-raining flag,
+    wind speed > 100km/h
+  - webpgm2 log fix for "offed" FHT devices (with no actuator data)
+  - webpgm3 upgrade (by Martin Haas, see webpgm/pgm3/docs/CHANGES for details)
+  - HMS logging/state format changed to make it similar to KS300
+  - added HMS100WD (thanks to Sascha Pollok)
+  - ntfy/logging changed to be able to notify for multiple attributes
+    arriving in one message
+  - central FHTcode settable (see commandref.html)
+  - optionally listen for non-local requests (port <num> global)
+  - unknown logging
+  - FAQ
+
+- 2006-04-15 (2.1)
+  - webfrontend/pgm2 changes:
+    - make it work on Asus dsl-routers (no "use warnings")
+    - css/readonly configurable
+    - Formatting for HMS data
+  - comments can be added to each device (setstate <dev> comment:xxx)
+  - testbed to dry-test functionality (test directory)
+  - added an empty hull for the KS300 weather module
+  - added undocumented "exec" function to call arbitrary program parts
+    for debugging. Example: exec FhzDecode("81xx04xx0101a0011234030011");
+  - webfrontend/pgm3, contributed by Martin Haas
+  - fixed pgm1: changing values should work now
+
+- 2006-04-02 (2.0)
+  - XmlList and webfrontend/pgm1 programs from Raoul Matthiessen
+  - list tries to display the state and not the last command
+  - Both log facilities (FileLog and Log) take wildcards
+    (week, year, month, etc) to make logfile rotating easier
+  - webfrontend/pgm2
+
+- 2006-02-12 (1.9b)
+  - Bugfix: Fixing the same bug again (thanks to Martin)
+
+- 2006-02-12 (1.9a)
+  - Bugfix: wrong rights for HMS and wrong place for readonly
+    (thanks to Juergen)
+
+- 2006-02-10 (1.9)
+  (aka as the Juergen release)
+  - The FHZ1300 is reported to work
+  - Bugfix: spaces before comment in the config file should be ignored
+  - added FS20STR codes to 10_FS20.pm
+  - names restricted to A-Za-z0-9.:- (especially _ is not allowed)
+  - delete calles now an UndefFn in the module
+  - implementation of FS20 function group/local master/global master
+  - the list command tells you the definition of the device too
+
+- 2006-01-05 (1.8)
+  - Bugfix: detailed FS20 status was not set from external event
+  - Bugfix: setstate for FS20 returned the last state set
+  - Bugfix: undefined FS20 devices (can) crash the server
+  - HMS module added by Martin Mueller
+    (currently supporting the HMS100T & HMS100TF)
+  - Log modules added, the first one being a simple FileLog
+    (inspired by Martin Mueller)
+  - A little  gnuplot script to display temperature and actuator changes
+
+- 2006-01-04 (1.7)
+  - the at command can be used to execute something repeatedly with *
+  - ntfy can filter on device or on device+event with a regexp
+  - checking the delete and notify regexps if they make sense
+  - the FHT init string is now a set command (refreshvalues)
+  - shutdown saves the detailed device information too
+
+- 2006-01-03 (1.6)
+  - signal handling (to save the state on shutdown)
+  - module FHZ addded (for the FHZ1000PC device itself)
+  - added the get function (to make the initialization prettier)
+  - the module ST was renamed to FS20
+  - FS20 timer commands added
+  - modules command removed (we are loading everything from the modpath
+    directory)
+  - FHT80b module added (yes, it is already useful, you can set
+    and view a lot of values)
+  - documentation adapted
+  - Added a TODO file
+
+- 2005-12-26 (1.5)
+  - "modularized" in preparation for the FHT80B -> each device has a type
+  - added relative "at" commands (with +HH:MM:SS)
+  - multiple commands on one line separated with ;
+  - sleeping 0.22 seconds after an ST command
+  - some commands/syntax changed:
+    - switch => set
+    - device => fhzdevice
+    - define <name> ... => define <name> <type> ...
+  - the state of the devices and the at commands are saved
+  - at start always sending a "set 0001 00 01" to enable the FHZ receiever.
+    This is a workaround.
+  - doc rewrite, examples directory
+
+- 2005-11-10 (1.4)
+  - Reformatting the package and the documentation
+  - New links
+
+- 2005-10-27 (1.3)
+  - Bugfix: multiple at commands at the same time.
