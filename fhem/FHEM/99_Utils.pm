@@ -16,7 +16,7 @@ sub
 getUniqueId()
 {
   my ($err, $uniqueID) = getKeyValue("uniqueID");
-  return $uniqueID if(!$err);
+  return $uniqueID if(defined($uniqueID));
   srand(time);
   $uniqueID = join "",map { unpack "H*", chr(rand(256)) } 1..16;
   setKeyValue("uniqueID", $uniqueID);
@@ -33,7 +33,7 @@ getKeyValue($)
   for my $l (@l) {
     return (undef, $1) if($l =~ m/^$key:(.*)/);
   }
-  return ("Key not found", undef);
+  return (undef, undef);
 }
 
 sub
@@ -404,7 +404,8 @@ myUtils_Initialize($$)
 
     <li><b>getKeyValue(keyName)</b><br>
       return ($error, $value), stored previously by setKeyValue.
-      $error is undef if there was no error, otherwise $value is undef.
+      $error is set if there was an error.  Both are undef, if there is no
+      value yet for this key.
       </li></br>
 
   </ul>
