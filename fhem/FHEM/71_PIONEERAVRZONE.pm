@@ -106,7 +106,7 @@ sub
 PIONEERAVRZONE_Set($@)
 {
 	my ($hash, @a)= @_;
-
+	my @args= @a; shift @args; shift @args;
 	my $name= $hash->{NAME};
 	my $type= $hash->{TYPE};
 	return "set $name needs at least one argument" if(int(@a) < 2);
@@ -153,7 +153,7 @@ PIONEERAVRZONE_Set($@)
 	
 	if ( $cmd eq "?" ) {
 		Log3 $name, 5, "PIONEERAVRZONE set $name " . $cmd;
-		return SetExtensions($hash, $list, $name, $cmd, @a);
+		return SetExtensions($hash, $list, $name, $cmd, @args);
 	}
 
 
@@ -273,10 +273,10 @@ PIONEERAVRZONE_Set($@)
 			}
 			return undef;
 		} else {
-		return SetExtensions($hash, $list, $name, $cmd, @a);
+		return SetExtensions($hash, $list, $name, $cmd, @args);
 		}
 	} else {
-		return SetExtensions($hash, $list, $name, $cmd, @a);
+		return SetExtensions($hash, $list, $name, $cmd, @args);
 	}
 return undef;
 
@@ -592,8 +592,8 @@ PIONEERAVRZONE_Define($$)
     <br><br>
     where &lt;what&gt; is one of
 	<li>reopen</li>
-	<li>off <br>turn zone power on</li>
-	<li>on <br>turn zone power on</li>
+	<li>off <br>put zone into standby</li>
+	<li>on <br>turn zone on from standby</li>
 	<li>toggle <br>toggles zone power</li>
 	<li>volume <0 ... 100><br>zone volume in % of the maximum volume</li>
 	<li>volumeUp<br>increases the zone volume by 0.5dB</li>
@@ -604,7 +604,7 @@ PIONEERAVRZONE_Define($$)
 	inputs is read in during Fhem start and with <code>get <name> statusRequest</code></li>
 	<li>inputUp<br>change zone input to next input</li>
 	<li>inputDown<br>change zone input to previous input</li>
-	<li><a href="#setExtensions">set extensions</a> are supported (except <blink>)</li>
+	<li><a href="#setExtensions">set extensions</a> are supported (except <code>&lt;name&gt;</code>)</li>
    <br><br>
     Example:
     <ul>
@@ -667,10 +667,10 @@ PIONEERAVRZONE_Define($$)
     <br><br>
     wobei &lt;was&gt; eines der folgenden Befehle sein kann:
 	<li>reopen</li>
-	<li>off <br>Zone Ausschalten</li>
-	<li>on <br>Zone Einschalten</li>
+	<li>off <br>Zone in den Standby-Modus schalten</li>
+	<li>on <br>Zone aus dem Standby-Modus Einschalten</li>
 	<li>toggle <br>Zone Ein/Ausschalten</li>
-	<li>volume <0 ... 100><br>Zonenlautstärkein % der maximalen Lautstärke</li>
+	<li>volume <0 ... 100><br>Zonenlautstärke in % der maximalen Lautstärke</li>
 	<li>volumeUp<br>Zonenlautstärke um 0.5dB erhöhen</li>
 	<li>volumeDown<br>Zonenlautstärke um 0.5dB verringern</li>
 	<li>volumeStraight<-80.5 ... 12><br>Einstellen der Zonenlautstärke mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
@@ -679,7 +679,7 @@ PIONEERAVRZONE_Define($$)
 	Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen</li>
 	<li>inputUp<br>nächste Eingangsquelle für die Zone auswählen</li>
 	<li>inputDown<br>vorherige Eingangsquelle für die Zone auswählen</li>
-	<li><a href="#setExtensions">set extensions</a> (ausser <blink>) werden unterstützt</li>
+	<li><a href="#setExtensions">set extensions</a> (ausser <code>&lt;name&gt;</code>) werden unterstützt</li>
 
 	
    <br><br>
