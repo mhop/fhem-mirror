@@ -815,7 +815,7 @@ PIONEERAVR_Set($@)
 	$list .= " right:noArg left:noArg enter:noArg return:noArg menu:noArg";
   }  
   if ( $cmd eq "?" ) {
-	return SetExtensions($hash, $list, $name, $cmd, @a);
+	return SetExtensions($hash, $list, $name, $cmd, @args);
 		
   # set <name> blink is part of the setextensions
   # but blink does not make sense for an PioneerAVR so we disable it here
@@ -1082,10 +1082,10 @@ PIONEERAVR_Set($@)
 		}
 		return undef;
 	} else {
-		return SetExtensions($hash, $list, $name, $cmd, @a);
+		return SetExtensions($hash, $list, $name, $cmd, @args);
 	}
   } else {
-	return SetExtensions($hash, $list, $name, $cmd, @a);
+	return SetExtensions($hash, $list, $name, $cmd, @args);
   }
 }
 #####################################
@@ -1778,7 +1778,7 @@ RC_layout_PioneerAVR() {
 	</ul>
 	simulates the keys on the remote control. cursorXX does not work to control inputs -> use set <name> up ... instead
 	</li>
-	<li><a href="#setExtensions">set extensions</a> are supported (except <blink>)</li>
+	<li><a href="#setExtensions">set extensions</a> are supported (except <code>&lt;blink&gt;</code> )</li>
     <br><br>
     Example:
     <ul>
@@ -1944,7 +1944,7 @@ RC_layout_PioneerAVR() {
 		Simuliert die Tasten der Fernbedienung. Achtung: mit cursorXX können die Eingänge nicht beeinflusst werden -> set <name> up ... kann zur Steuerung der Inputs verwendet werden.
 	</ul>
 	</li>
-	<li><a href="#setExtensions">set extensions</a> (ausser <blink>) werden unterstützt</li>
+	<li><a href="#setExtensions">set extensions</a> (ausser <code>&lt;blink&gt;</code> ) werden unterstützt</li>
    <br><br>
     Beispiel:
     <ul>
