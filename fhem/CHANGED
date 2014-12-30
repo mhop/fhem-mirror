@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added: some new icons (hourglass, frost, sani_heating_level_XX)
+  - fix:   sani_heating_boost (possibility to colorize)
   - feature: FB_CALLMONITOR: add remote phonebook lookup via telnet connection
                              to FritzBox (JoWiemann). 
   - bugfix: 70_PIONEERAVR & 71_PIONEERAVRZONE: fixed not working set-extensions (on-for-timer,...)
