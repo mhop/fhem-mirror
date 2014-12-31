@@ -608,7 +608,7 @@ FRITZBOX_Readout_Run($)
         # 5 Radio Name
          push @readoutArray, [ "dect".$_."_radio", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/RadioRingID", "radio" ];
         # 6 Background image
-         push @readoutArray, [ "dect".$_."_imagePath ", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath " ];
+         push @readoutArray, [ "dect".$_."_imagePath", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath" ];
         # 7 Customer Ring Tone
          push @readoutArray, [ "dect".$_."_custRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingTone" ];
         # 8 Customer Ring Tone Name
@@ -666,7 +666,7 @@ FRITZBOX_Readout_Run($)
       for (0..$tamCount-1)
       {
          $rName = "tam".($_+1);
-         if ($resultArray->[$_] == 1 || defined $hash->{READINGS}{$rName} )
+         if ($resultArray->[$_] eq "1" || defined $hash->{READINGS}{$rName} )
          {
             push @readoutArray, [ $rName, "ctlmgr_ctl r tam settings/TAM". $_ ."/Name" ];
             push @readoutArray, [ $rName."_state", "ctlmgr_ctl r tam settings/TAM".$_."/Active", "onoff" ];
@@ -890,9 +890,9 @@ sub FRITZBOX_Readout_Format($$$)
       unless $readout ne "" && $format ne "" ;
 
    if ($format eq "aldays") {
-      if ($readout == 0) {
+      if ($readout eq "0") {
          $readout = "once";
-      } elsif ($readout == 127) {
+      } elsif ($readout eq "127") {
          $readout = "daily";
       } else {
          my $bitStr = $readout;
@@ -1090,7 +1090,7 @@ FRITZBOX_Ring_Run($)
    $intNo =~ s/,/#/g;
    
 #Preparing 2nd command array to ring and reset everything
-   FRITZBOX_Log $hash, 3, "Ringing $intNo for $duration seconds";
+   FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
       if $ringWithIntern != 0 ;
@@ -1099,11 +1099,11 @@ FRITZBOX_Ring_Run($)
    {
       push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/IntRingTone ".$result->[2*$_];
    }
+   push @cmdArray, "sleep ".$duration;
 # Reset name of calling number
    push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'"
       if $ringWithIntern =~ /^([1-4])$/;
 
-   push @cmdArray, "sleep ".$duration;
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
 
 # Execute command array
@@ -1222,7 +1222,7 @@ sub FRITZBOX_SetMOH($@)
 # Execute command array
    $result = FRITZBOX_Exec ( $hash, \@cmdArray );
    return "Could not access '$inFile'"
-      unless $result->[3] == 1;
+      unless $result->[3] eq "1";
 
 #Prepare 2nd command array
    push @cmdArray, 'ffmpegconv -i "'.$uploadFile.'" -o "'.$mohFile.'" --limit 32 --type 7';
@@ -1230,7 +1230,7 @@ sub FRITZBOX_SetMOH($@)
 # Execute 2nd command array
    $result = FRITZBOX_Exec ( $hash, \@cmdArray );
    return "Could not convert '$inFile'"
-      unless $result->[1] == 1;
+      unless $result->[1] eq "1";
 
 #Prepare 3rd command array
    push @cmdArray, 'cat "'.$mohFile.'" >/var/flash/fx_moh';
@@ -1642,16 +1642,21 @@ sub FRITZBOX_Send_Mail($@)
    my $cmd = "/sbin/mailer send";
    if ($field{body})
    {
-      push @cmdArray, "/bin/echo \"".$field{body}."\" > /var/tmp/fhem_nachricht.txt";
+      chop $field{body};
+      $field{body} =~ s/"/\\"/g;
+      push @cmdArray, '/bin/echo -e "'.$field{body}.'" >/var/tmp/fhem_nachricht.txt';
       $cmd .=  " -i '/var/tmp/fhem_nachricht.txt'";
    }
 
-   $field{subject} = "Message from FHEM"
-      unless $field{subject};
+   chop $field{subject} if $field{subject};
+   $field{subject} = "Message from FHEM " unless $field{subject};
    $cmd .= " -s \"".$field{subject}."\"";
    
-   $cmd .= " -t \"".$field{to}."\""
-      if $field{to} ne "";
+   if ($field{to})
+   {
+      chop $field{to};
+      $cmd .= " -t \"".$field{to}."\""
+   }
    push @cmdArray, $cmd;
    push @cmdArray, "rm /var/tmp/fhem_nachricht.txt"
       if $field{body};
@@ -1788,9 +1793,9 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
    <br/><br/>
-   Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
+   The commands are directly executed on the Fritz!Box shell. That means, no official API is used but mainly the internal interface program that links web interface and firmware. On update of FritzOS might hence lead to modul errors if AVM changes the interface.
    <br>
-   <i>So fare, the module has been tested on Fritz!Box 7390 and 7490 and Fritz!Fon MT-F and C4.</i>
+   Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
    <i>The modul uses the Perl modul 'Net::Telnet' for remote access.</i>
    <br/><br/>
@@ -1886,7 +1891,8 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
          <br>
-         Sends an email via the email notification service that is configured in push service of the Fritz!Box.
+         Sends an email via the email notification service that is configured in push service of the Fritz!Box. 
+         Use "\n" for line breaks in the body.
          All parameters can be omitted. Make sure the messages are not classified as junk by your email client.
          <br>
       </li><br>
@@ -2044,9 +2050,9 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
    <br/><br/>
-   Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
+   Die Steuerung erfolgt direkt &uuml;ber die Fritz!Box Shell. D.h. es wird keine offizielle API genutzt sondern vor allem die interne Schnittstelle der Box zwischen Webinterface und Firmware. Eine Aktualisierung des FritzOS kann also zu Modul-Fehlern f&uuml;hren, wenn AVM diese Schnittstelle &auml;ndert.
    <br>
-   <i>Bisher wurde das Modul auf einer Fritz!Box 7390 und 7490 und auf den Fritz!Fon MT-F und C4 getestet.</i>
+   Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
    <i>Das Modul nutzt das Perlmodule 'Net::Telnet' f&uuml;r den Fernzugriff.</i>
    <br/><br/>
@@ -2141,6 +2147,7 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
          <br>
          Sendet eine Email &uuml;ber den Emailbenachrichtigungsservice der als Push Service auf der Fritz!Box konfiguriert wurde.
+         Mit "\n" kann einen Zeilenumbruch im Textkörper erzeut werden.
          Alle Parameter k&ouml;nnen ausgelassen werden. Bitte kontrolliert, dass die Email nicht im Junk-Verzeichnis landet.
          <br>
       </li><br>
