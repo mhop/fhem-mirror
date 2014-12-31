@@ -1530,7 +1530,9 @@ FRITZBOX_Exec_Remote($$)
       @output=$telnet->cmd($cmd);
       $result = $output[0];
       chomp $result;
-      FRITZBOX_Log $hash, 4, "Result '$result'";
+      my $log = join " ", @output;
+      chomp $log;
+      FRITZBOX_Log $hash, 4, "Result '$log'";
       return $result;
    }
    elsif (ref \$cmd eq "REF")
@@ -1546,8 +1548,11 @@ FRITZBOX_Exec_Remote($$)
             unless ($_ =~ /^sleep/)
             {
                @output=$telnet->cmd($_);
-               $result = join(" ",@output);
-               $result =~ s/(\r\n|\n\r|\n|\r|\s)$//;
+               $result = $output[0];
+               chomp $result;
+               my $log = join " ", @output;
+               chomp $log;
+               FRITZBOX_Log $hash, 4, "Result '$log'";
             }
             else
             {
@@ -1556,7 +1561,6 @@ FRITZBOX_Exec_Remote($$)
                $result = "";
             }
             push @resultArray, $result;
-            FRITZBOX_Log $hash, 5, "Result '$result'";
          }
          @{$cmd} = ();
          FRITZBOX_Log $hash, 4, "Received ".int(@resultArray)." answer(s)";
