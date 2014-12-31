@@ -1,13 +1,11 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, 2014
+# SONOSPLAYER.pm (c) by Reiner Leins, December 2014
 # rleins at lmsoft dot de
 #
 # $Id$
 #
 # FHEM module to work with Sonos-Zoneplayers
-#
-# Internal Version 2.6 - December, 2014
 #
 # define <name> SONOSPLAYER <UDN>
 #
@@ -155,6 +153,8 @@ my %sets = (
 	'GroupVolume' => 'volumelevel',
 	'SnapshotGroupVolume' => '',
 	'GroupMute' => 'state',
+	'CreateStereoPair' => 'RightPlayer',
+	'SeparateStereoPair' => '',
 	'Reboot' => '',
 	'Wifi' => 'state',
 	'Name' => 'roomName',
@@ -641,6 +641,35 @@ sub SONOSPLAYER_Set($@) {
 			
 			return undef;
 		}
+	} elsif (lc($key) eq 'createstereopair') {
+		my $rightPlayer = InternalVal($value, 'UDN', '');
+		return 'RightPlayer not found!' if (!$rightPlayer);
+		
+		# UDN korrigieren
+		my $leftPlayerShort = $1 if ($udn =~ m/(.*)_MR/);
+		my $rightPlayerShort = $1 if ($rightPlayer =~ m/(.*)_MR/);
+		
+		# Anweisung an den neuen linken Lautsprecher absetzen
+		SONOS_DoWork($udn, 'createStereoPair', uri_escape($leftPlayerShort.':LF,LF;'.$rightPlayerShort.':RF,RF'));
+	} elsif (lc($key) eq 'separatestereopair') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+		
+		# UDN korrigieren
+		my $leftPlayerShort = $1 if ($udn =~ m/(.*)_MR/);
+		
+		# StereoPartner herausfinden
+		my $rightPlayer = '';
+		foreach my $dev (SONOS_getAllSonosplayerDevices()) {
+			$rightPlayer = $dev->{UDN} if ((ReadingsVal($dev->{NAME}, 'ZoneGroupID', '') =~ m/^$leftPlayerShort:/) && ($dev->{UDN} !~ m/^${leftPlayerShort}_MR/));
+		}
+		return 'RightPlayer not found!' if (!$rightPlayer);
+		
+		# UDN korrigieren
+		my $rightPlayerShort = $1 if ($rightPlayer =~ m/(.*)_MR/);
+		
+		# Anweisung an den alten linken Lautsprecher absetzen
+		SONOS_DoWork($udn, 'separateStereoPair', uri_escape($leftPlayerShort.':LF,LF;'.$rightPlayerShort.':RF,RF'));
 	} elsif (lc($key) eq 'reboot') {
 		readingsSingleUpdate($hash, 'LastActionResult', 'Reboot properly initiated', 1);
 	
@@ -934,6 +963,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_AddMember">
 <code>set &lt;name&gt; AddMember &lt;devicename&gt;</code></a>
 <br />Adds the given devicename to the current device as a groupmember. The current playing of the current device goes on and will be transfered to the given device (the new member).</li>
+<li><a name="SONOSPLAYER_setter_CreateStereoPair">
+<code>set &lt;name&gt; CreateStereoPair &lt;rightPlayerDevicename&gt;</code></a>
+<br />Adds the given devicename to the current device as the right speaker of a stereopair. The current playing of the current device goes on (as left-side speaker) and will be transfered to the given device (as right-side speaker).</li>
 <li><a name="SONOSPLAYER_setter_GroupMute">
 <code>set &lt;name&gt; GroupMute &lt;State&gt;</code></a>
 <br />Sets the mute state of the complete group in one step. The value can be on or off.</li>
@@ -943,6 +975,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_RemoveMember">
 <code>set &lt;name&gt; RemoveMember &lt;devicename&gt;</code></a>
 <br />Removes the given device, so that they both are not longer a group. The current playing of the current device goes on normally. The cutted device stops his playing and has no current playlist anymore (since Sonos Version 4.2 the old playlist will be restored).</li>
+<li><a name="SONOSPLAYER_setter_SeparateStereoPair">
+<code>set &lt;name&gt; SeparateStereoPair</code></a>
+<br />Divides the stereo-pair into two independant devices.</li>
 <li><a name="SONOSPLAYER_setter_SnapshotGroupVolume">
 <code>set &lt;name&gt; SnapshotGroupVolume</code></a>
 <br /> Save the current volume-relation of all players of the same group. It's neccessary for the use of "GroupVolume" and is stored until the next call of "SnapshotGroupVolume".</li>
@@ -1207,6 +1242,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_AddMember">
 <code>set &lt;name&gt; AddMember &lt;devicename&gt;</code></a>
 <br />Fügt dem Device das übergebene Device als Gruppenmitglied hinzu. Die Wiedergabe des aktuellen Devices bleibt erhalten, und wird auf das angegebene Device mit übertragen.</li>
+<li><a name="SONOSPLAYER_setter_CreateStereoPair">
+<code>set &lt;name&gt; CreateStereoPair &lt;rightPlayerDevicename&gt;</code></a>
+<br />Fügt dem Device das übergebene Device als rechtes Stereopaar-Element hinzu. Die Wiedergabe des aktuellen Devices bleibt erhalten (als linker Lautsprecher), und wird auf das angegebene Device mit übertragen (als rechter Lautsprecher).</li>
 <li><a name="SONOSPLAYER_setter_GroupMute">
 <code>set &lt;name&gt; GroupMute &lt;State&gt;</code></a>
 <br />Setzt den Mute-Zustand für die komplette Gruppe in einem Schritt. Der Wert kann on oder off sein.</li>
@@ -1216,6 +1254,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_RemoveMember">
 <code>set &lt;name&gt; RemoveMember &lt;devicename&gt;</code></a>
 <br />Entfernt dem Device das übergebene Device, sodass die beiden keine Gruppe mehr bilden. Die Wiedergabe des aktuellen Devices läuft normal weiter. Das abgetrennte Device stoppt seine Wiedergabe, und hat keine aktuelle Abspielliste mehr (seit Sonos Version 4.2 hat der Player wieder die Playliste von vorher aktiv).</li>
+<li><a name="SONOSPLAYER_setter_SeparateStereoPair">
+<code>set &lt;name&gt; SeparateStereoPair</code></a>
+<br />Trennt das Stereopaar wieder auf.</li>
 <li><a name="SONOSPLAYER_setter_SnapshotGroupVolume">
 <code>set &lt;name&gt; SnapshotGroupVolume</code></a>
 <br /> Legt das Lautstärkeverhältnis der aktuellen Player der Gruppe für folgende '''GroupVolume'''-Aufrufe fest. Dieses festgelegte Verhältnis wird bis zum nächsten Aufruf von '''SnapshotGroupVolume''' beibehalten.</li>
