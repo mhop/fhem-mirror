@@ -5363,7 +5363,7 @@ sub CUL_HM_respPendTout($) {
 
       if ($pHash->{rspWait}{Pending}){
         $pendCmd = "RESPONSE TIMEOUT:".$pHash->{rspWait}{Pending};
-        CUL_HM_complConfig($name);
+        CUL_HM_complConfig($name,1);# check with delay
       }
       CUL_HM_eventP($hash,"ResndFail");
       CUL_HM_UpdtReadSingle($hash,"state",$pendCmd,1);
@@ -7260,12 +7260,12 @@ sub CUL_HM_complConfigTO($)  {# now perform consistancy check of register
   @{$modules{CUL_HM}{helper}{confCheckArr}} = ();
   CUL_HM_complConfig($_) foreach (CUL_HM_noDup(@arr));
 }
-sub CUL_HM_complConfig($)    {# read config if enabled and not complete
-  my $name = shift;
+sub CUL_HM_complConfig($;$)    {# read config if enabled and not complete
+  my ($name,$dly) = @_;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   return if ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x07) < 5);
   if (CUL_HM_peerUsed($name) == 2){
-    CUL_HM_qAutoRead($name,0);
+    CUL_HM_qAutoRead($name,0) if(!$dly);
     CUL_HM_complConfigTest($name);
     delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
     Log3 $name,5,"CUL_HM $name queue configRead, peers incomplete";
@@ -7274,7 +7274,7 @@ sub CUL_HM_complConfig($)    {# read config if enabled and not complete
   my @regList = CUL_HM_reglUsed($name);
   foreach (@regList){
     if (ReadingsVal($name,$_,"") !~ m /00:00/){
-      CUL_HM_qAutoRead($name,0);
+      CUL_HM_qAutoRead($name,0) if(!$dly);
       CUL_HM_complConfigTest($name);
       delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
       Log3 $name,5,"CUL_HM $name queue configRead, register incomplete";
