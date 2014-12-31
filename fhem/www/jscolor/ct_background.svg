@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="20">
+  <linearGradient id="l" x1="0"  x2="250" gradientUnits="userSpaceOnUse">
+    <stop style="stop-color:#FFB16E" offset="0"/>
+    <stop style="stop-color:#FFE9D6" offset="0.5"/>
+    <stop style="stop-color:#E5EAFF" offset="1"/>
+  </linearGradient>
+  <rect style="fill:url(#l)" height="20" width="250"/>
+</svg>
