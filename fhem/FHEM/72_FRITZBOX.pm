@@ -1151,8 +1151,8 @@ sub FRITZBOX_SetMOH($@)
    my @cmdArray;
    my $result;
    my $name = $hash->{NAME};
-   my $uploadFile = '/var/tmp/moh_upload.mp3';
-   my $mohFile = '/var/tmp/fx_moh';
+   my $uploadFile = '/var/tmp/fhem_moh_upload';
+   my $mohFile = '/var/tmp/fhem_fx_moh';
 
    if (lc $type eq lc $mohtype[0] || $type eq "0")
    {
