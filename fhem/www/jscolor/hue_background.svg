@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="20">
+  <linearGradient id="l" x1="0"  x2="250" gradientUnits="userSpaceOnUse">
+    <stop style="stop-color:red" offset="0"/>
+    <stop style="stop-color:yellow" offset="0.18512578"/>
+    <stop style="stop-color:lime" offset="0.34256288"/>
+    <stop style="stop-color:aqua" offset="0.5"/>
+    <stop style="stop-color:blue" offset="0.65429997"/>
+    <stop style="stop-color:fuchsia" offset="0.8119877"/>
+    <stop style="stop-color:red" offset="1"/>
+  </linearGradient>
+  <rect style="fill:url(#l)" height="20" width="250"/>
+</svg>
