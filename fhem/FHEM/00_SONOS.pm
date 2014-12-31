@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, 2014
+# SONOS.pm (c) by Reiner Leins, December 2014
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -8,7 +8,7 @@
 # FHEM module to commmunicate with a Sonos-System via UPnP
 #
 # !WARNING!
-# This Module needs UPnP-Library
+# This Module needs additional Perl-Libraries.
 # Installation:
 #  * LWP::Simple
 #  * HTML::Entities
@@ -17,8 +17,6 @@
 #  * Time::HiRes
 #  * threads
 #  * Thread::Queue
-#
-# Internal Version 2.6 - December, 2014
 #
 # define <name> SONOS <host:port> [[[interval] waittime] delaytime]
 #
@@ -32,6 +30,8 @@
 # Changelog
 #
 # SVN-History:
+# 31.12.2014
+#	Das Bilden von Stereopaaren wird nun unterstützt. Dafür gibt es die Anweisungen 'CreateStereoPair' und 'SeparateStereoPair' an einem Playerdevice.
 # 28.12.2014
 #	Umlaute: Die Erkennung von Umlauten war wegen der Quelltextumstellung auf UTF8 fehlerhaft. Das betraf nur die Zonennamenumwandlung, wo z.B. aus 'Küche' ein 'Kueche' gemacht wird.
 #	Sonos-Coverlieferung: Es waren noch ein paar Return-Anweisungen zuviel drin.
@@ -2552,6 +2552,18 @@ sub SONOS_Discover() {
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_UPnPAnswerMessage($SONOS_AVTransportControlProxy{$udn}->BecomeCoordinatorOfStandaloneGroup(0)));
 					}
+				} elsif ($workType eq 'createStereoPair') {
+					my $pairString = uri_unescape($params[0]);
+				
+					if (SONOS_CheckProxyObject($udn, $SONOS_DevicePropertiesProxy{$udn})) {
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_UPnPAnswerMessage($SONOS_DevicePropertiesProxy{$udn}->CreateStereoPair($pairString)));
+					}
+				} elsif ($workType eq 'separateStereoPair') {
+					my $pairString = uri_unescape($params[0]);
+				
+					if (SONOS_CheckProxyObject($udn, $SONOS_DevicePropertiesProxy{$udn})) {
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_UPnPAnswerMessage($SONOS_DevicePropertiesProxy{$udn}->SeparateStereoPair($pairString)));
+					}
 				} elsif ($workType eq 'emptyPlaylist') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_UPnPAnswerMessage($SONOS_AVTransportControlProxy{$udn}->RemoveAllTracksFromQueue()));
@@ -2560,7 +2572,7 @@ sub SONOS_Discover() {
 					my $playlistName = $params[0];
 					my $playlistType = $params[1];
 					
-					$playlistName =~s/ $//g;
+					$playlistName =~ s/ $//g;
 					
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 						if ($playlistType eq ':m3ufile:') {
