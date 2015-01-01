@@ -88,9 +88,33 @@ fs20_set {
     fhem("set $prog_7_8dev off"); 
   } elsif ($v eq "8") {
     return "no 7_8 device set" if $prog_7_8dev eq "";
-    fhem("set $prog_7_8dev on"); 
+    fhem("set $prog_7_8dev on");
+  } elsif ($v eq "program_1") {
+    return "no 1_2 device set" if $prog_1_2dev eq "";
+    fs20_zdr_program($prog_1_2dev, "dimdown"); 
+  } elsif ($v eq "program_2") {
+    return "no 1_2 device set" if $prog_1_2dev eq "";
+    fs20_zdr_program($prog_1_2dev, "dimup"); 
+  } elsif ($v eq "program_3") {
+    return "no 3_4 device set" if $prog_3_4dev eq "";
+    fs20_zdr_program($prog_3_4dev, "dimdown"); 
+  } elsif ($v eq "program_4") {
+    return "no 3_4 device set" if $prog_3_4dev eq "";
+    fs20_zdr_program($prog_3_4dev, "dimup"); 
+  } elsif ($v eq "program_5") {
+    return "no 5_6 device set" if $prog_5_6dev eq "";
+    fs20_zdr_program($prog_5_6dev, "dimdown"); 
+  } elsif ($v eq "program_6") {
+    return "no 5_6 device set" if $prog_5_6dev eq "";
+    fs20_zdr_program($prog_5_6dev, "dimup"); 
+  } elsif ($v eq "program_7") {
+    return "no 7_8 device set" if $prog_7_8dev eq "";
+    fs20_zdr_program($prog_7_8dev, "dimdown"); 
+  } elsif ($v eq "program_8") {
+    return "no 7_8 device set" if $prog_7_8dev eq "";
+    fs20_zdr_program($prog_7_8dev, "dimup"); 
   } else {
-    return "unknown set value, choose one of on off toggle volume_up volume_down left right sleep ms 1 2 3 4 5 6 7 8";
+    return "unknown set value, choose one of on off toggle volume_up volume_down left right sleep ms 1 2 3 4 5 6 7 8 program_1 program_2 program_3 program_4 program_5 program_6 program_7 program_8";
   }
 
   if ($v eq "on" || $v eq "off") {
@@ -103,6 +127,18 @@ fs20_set {
       $hash->{STATE} = $v;
     }
   }   
+  return undef;
+}
+
+sub
+fs20_zdr_program($$)
+{
+  my ($deviceName, $command) = @_;
+  my $toSend = "";
+  for (my $i=0; $i<30; $i++) {
+   fhem("sleep 0.15");
+   fhem("set $deviceName $command");
+  }
   return undef;
 }
 
