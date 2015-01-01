@@ -817,7 +817,16 @@ FRITZBOX_Readout_Done($)
          }
          elsif ($rName !~ /readoutTime|box_fwUpdate/)
          {
-            readingsBulkUpdate( $hash, $rName, $rValue );
+            if ($rValue ne "") 
+            {
+               readingsBulkUpdate( $hash, $rName, $rValue );
+               FRITZBOX_Log $hash, 5, "$rName = '$rValue'";
+            }
+            elsif ( exists( $hash->{READINGS}{$rName} ) ) 
+            {  
+               delete $hash->{READINGS}{$rName};
+               FRITZBOX_Log $hash, 5, "Delete '$rName'.";
+            }
          }
       }
 
@@ -879,16 +888,8 @@ sub FRITZBOX_Readout_Query($$$)
       $rName = $readoutArray->[$_][0];
       if ($rName ne "")
       {
-         if ($rValue ne "")
-         {
-            FRITZBOX_Log $hash, 5, "$rName: $rValue";
-            push @{$readoutReadings}, $rName."|".$rValue;
-         }
-         elsif (defined $hash->{READINGS}{$rName} ) 
-         {
-            FRITZBOX_Log $hash, 5, "Delete $rName";
-            delete $hash->{READINGS}{$rName};
-         }
+         FRITZBOX_Log $hash, 5, "$rName: $rValue";
+         push @{$readoutReadings}, $rName."|".$rValue;
       }
    }
    @{$readoutArray} = ();
@@ -2005,7 +2006,7 @@ sub FRITZBOX_fritztris($)
          If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'show:' will be shown as the callers name.
          Maximal 30 characters are allowed.
          <br>
-         On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (and continue with the default ring tone of the handset). This feature creates a radio station 'fhemTTS' and uses the translate.google.com.
+         On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (and continue with the default ring tone of the handset). This feature creates the radio station 39 'fhemTTS' and uses the translate.google.com.
          <br>
          If the call is taken the callee hears the "music on hold" which can also be used to transmit messages.
       </li><br>
@@ -2262,7 +2263,7 @@ sub FRITZBOX_fritztris($)
          Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br>
-         Auf Fritz!Fons wird der Text hinter dem Parameter 'say:' direkt angesagt (gefolgt vom dem Standard Klingelton). Dieses Feature erzeugt eine Radiostation 'fhemTTS' und nutzt translate.google.com.
+         Auf Fritz!Fons wird der Text hinter dem Parameter 'say:' direkt angesagt (gefolgt vom dem Standard Klingelton). Dieses Feature erzeugt die Internetradiostation 39 'fhemTTS' und nutzt translate.google.com.
          <br>
          Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche zur Nachrichten&uuml;bermittlung genutzt werden kann.
       </li><br>
