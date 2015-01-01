@@ -925,8 +925,10 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
   # Store current reading as last reading, Reset current reading
     if ($saveLast) { 
       readingsBulkUpdate($dev, $statReadingName . "Last", $result, 1); 
-      statistics_Log $hash, 5, "Set '".$statReadingName . "Last = $result'";
-      $result = "$state: 00:00:00 ".$state."_Count: 1";
+      statistics_Log $hash, 4, "Set '".$statReadingName . "Last = $result'";
+      $result = $state.": 00:00:00 ".$state."_Count: 1";
+      $hidden{$state.":"} = 0;
+      $hidden{$state."_Count:"} = 1;
       $hidden{"showDate:"} = 0;
    }
 
