@@ -251,24 +251,25 @@ LUXTRONIK2_Set($$@)
       # LUXTRONIK2_Log $hash, 3, $resultStr;
       return $resultStr;
    }
+   
    elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
       $val = 30 if( $val < 30 );
       $hash->{INTERVAL}=$val;
       return "Polling interval set to $val seconds.";
    }
+   
    elsif($cmd eq 'activeTariff' && int(@_)==4 ) {
       $val = 0 if( $val < 1 || $val > 9 );
       readingsSingleUpdate($hash,"activeTariff",$val, 1);
       $hash->{LOCAL} = 1;
       LUXTRONIK2_GetUpdate($hash);
       $hash->{LOCAL} = 0;
-      return "$name: activeTariff set to $val.";
+      Log3 $name, 3, "LUXTRONIK2: set $name $cmd $val";
+      return undef;
    }
 
-  #Check Firmware and Set-Paramter-lock 
-  if ($cmd eq 'synchronizeClockHeatPump' ||
-         $cmd eq 'hotWaterTemperatureTarget' ||
-         $cmd eq 'opModeHotWater') 
+  #Check Firmware and Set-Parameter-lock 
+  if ( $cmd =~ /^(synchronizeClockHeatPump|hotWaterTemperatureTarget|opModeHotWater)$/i ) 
    {
     my $firmware = ReadingsVal($name,"firmware","");
     my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
@@ -294,10 +295,12 @@ LUXTRONIK2_Set($$@)
       $hash->{LOCAL} = 0;
       LUXTRONIK2_Log $name, 3, $resultStr;
       return $resultStr;
+      
    } elsif(int(@_)==4 &&
          ($cmd eq 'hotWaterTemperatureTarget'
             || $cmd eq 'opModeHotWater'
             || $cmd eq 'returnTemperatureSetBack')) {
+      Log3 $name, 3, "LUXTRONIK2: set $name $cmd $val";
       $hash->{LOCAL} = 1;
       $resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
       $hash->{LOCAL} = 0;
@@ -1087,7 +1090,9 @@ LUXTRONIK2_SetParameter($$$)
   if(AttrVal($name, "allowSetParameter", 0) != 1) {
    return $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 1";
   }
-  if ($parameterName eq "hotWaterTemperatureTarget") {
+  
+  if ($parameterName eq "hotWaterTemperatureTarget") 
+  {
      #parameter number
     $setParameter = 2;
     #limit temperature range
@@ -1097,14 +1102,18 @@ LUXTRONIK2_SetParameter($$$)
     $setValue = int($realValue * 2) * 5;
     $realValue = $setValue / 10;
   }
-  elsif ($parameterName eq "opModeHotWater") {
+  
+  elsif ($parameterName eq "opModeHotWater") 
+  {
     if (! exists($opMode{$realValue})) {
       return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
      }
      $setParameter = 4;
      $setValue = $opMode{$realValue};
   }
-  elsif ($parameterName eq "returnTemperatureSetBack") {
+  
+  elsif ($parameterName eq "returnTemperatureSetBack") 
+  {
      #parameter number
     $setParameter = 1;
     #limit temperature range
@@ -1114,14 +1123,15 @@ LUXTRONIK2_SetParameter($$$)
     $setValue = int($realValue * 2) * 5;
     $realValue = $setValue / 10;
   }
-  else {
+  else 
+  {
     return "$name LUXTRONIK2_SetParameter-Error: unknown parameter $parameterName";
   }
 
 ############################ 
 # Send new parameter to host
 ############################ 
-  if ($setParameter !=0) {
+  if ($setParameter != 0) {
      LUXTRONIK2_Log $name, 5, "Opening connection to host ".$host;
      my $socket = new IO::Socket::INET (  PeerAddr => $host, 
                      PeerPort => 8888,
@@ -1162,7 +1172,7 @@ LUXTRONIK2_SetParameter($$$)
      
      readingsSingleUpdate($hash,$parameterName,$realValue,1);
      
-     return "$name: Parameter $parameterName set to $realValue";
+     return undef;
    }
   
 }

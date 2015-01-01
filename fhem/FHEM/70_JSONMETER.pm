@@ -245,20 +245,21 @@ JSONMETER_Set($$@)
   my ($hash, $name, $cmd, $val) = @_;
   my $resultStr = "";
    
-  if($cmd eq 'statusRequest') {
+  if(lc $cmd eq 'update') {
     $hash->{LOCAL} = 1;
     JSONMETER_GetUpdate($hash);
     $hash->{LOCAL} = 0;
     return undef;
   }
-   elsif($cmd eq 'restartJsonAnalysis') {
+   elsif(lc $cmd eq 'restartjsonanalysis') {
       $hash->{fhem}{jsonInterpreter} = "";
       $hash->{LOCAL} = 1;
       JSONMETER_GetUpdate($hash);
       $hash->{LOCAL} = 0;
+      Log3 $name, 3, "JSONMETER: set $name $cmd";
       return undef;
    }
-   elsif ($cmd eq 'resetStatistics') {
+   elsif (lc $cmd eq 'resetstatistics') {
       if ($val =~ /all|statElectricityConsumed\.\.\.|statElectricityConsumedTariff\.\.\.|statElectricityPower\.\.\./) {
          my $regExp;
          if ($val eq "all") { $regExp = "stat"; } 
@@ -273,20 +274,22 @@ JSONMETER_Set($$@)
       WriteStatefile();
       return $resultStr;
    }
-   elsif($cmd eq 'INTERVAL' && int(@_)==4 ) {
+   elsif(lc $cmd eq 'interval' && int(@_)==4 ) {
       $val = 10 if( $val < 10 );
       $hash->{INTERVAL}=$val;
-      return "$name: Polling interval set to $val seconds.";
+      Log3 $name, 3, "JSONMETER: set $name $cmd $val";
+      return undef;
    }
-   elsif($cmd eq 'activeTariff' && int(@_)==4 ) {
+   elsif(lc $cmd eq 'activetariff' && int(@_)==4 ) {
       $val = 0 if( $val < 1 || $val > 9 );
       readingsSingleUpdate($hash,"activeTariff",$val, 1);
-       $hash->{LOCAL} = 1;
-       JSONMETER_GetUpdate($hash);
-       $hash->{LOCAL} = 0;
-      return "$name: activeTariff set to $val.";
+      $hash->{LOCAL} = 1;
+      JSONMETER_GetUpdate($hash);
+      $hash->{LOCAL} = 0;
+      Log3 $name, 3, "JSONMETER: set $name $cmd $val";
+      return undef;
    }
-   my $list = "statusRequest:noArg"
+   my $list = "update:noArg"
          ." activeTariff:0,1,2,3,4,5,6,7,8,9"
          ." resetStatistics:all,statElectricityConsumed...,statElectricityConsumedTariff...,statElectricityPower..."
          ." restartJsonAnalysis:noArg"
