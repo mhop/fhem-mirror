@@ -672,7 +672,7 @@ sub PROPLANTA_Done($)
             $newState = "Error: Could not capture all data. Please check URL or city name.";
          }
          readingsBulkUpdate($hash, "state", $newState);
-         readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured" );
+         readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured in ".$values{durationFetchReadings}." s" );
          PROPLANTA_Log $hash, 4, keys( %values )." values captured";
       }
       else
@@ -857,9 +857,9 @@ PROPLANTA_Html($)
    <a name="PROPLANTAdefine"></a>
    Das Modul extrahiert Wetterdaten von der Website <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br/>
-   Es stellt eine Vorhersage f&uuml;r 12 Tage, w&aauml;hrend der ersten 7 Tage im 3-Stunden-Intervall, zur Verf&uuml;gung.
+   Es stellt eine Vorhersage f&uuml;r 12 Tage zur Verf&uuml;gung - w&auml;hrend der ersten 7 Tage im 3-Stunden-Intervall.
    <br>
-   Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent und HTML::Parse.
+   <i>Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent und HTML::Parse</i>.
    <br/><br/>
    <b>Define</b>
    <ul>
@@ -887,7 +887,7 @@ PROPLANTA_Html($)
       <br>
       Beispiel:
       <br>
-      <code>define HTMLVorschau weblink htmlCode { OPENWEATHER_Html("ProPlanta_Wetter") }</code>
+      <code>define Vorschau weblink htmlCode {OPENWEATHER_Html("Wetter")}</code>
       <br/><br/>
    </ul>
    <br>
