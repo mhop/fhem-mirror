@@ -1495,7 +1495,7 @@ sub PIONEERAVR_Read($)
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Display update to: $display";	
 
 	# displayInformation
-	} elsif ( $line =~ m/^GEH|GEI(\d{2})(\d)(\d{2})\"(.*)\"$/ ) {
+	} elsif ( $line =~ m/^(GEH|GEI)(\d{2})(\d)(\d{2})\"(.*)\"$/ ) {
 		# Format: 
 		#   $1: Line number
 		#   $2: Focus (yes(1)/no(0)/greyed out(9)
@@ -1520,10 +1520,10 @@ sub PIONEERAVR_Read($)
 		#     32:Channel																				
 		#     33:Station																				
 		#   $4: Display line information (UTF8)
-		my $lineDataType = $hash->{helper}{LINEDATATYPES}{$3};
+		my $lineDataType = $hash->{helper}{LINEDATATYPES}{$4};
 	
-		readingsBulkUpdate($hash, $lineDataType, $4);
-		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: displayDataType $lineDataType: " . dq($4);	
+		readingsBulkUpdate($hash, $lineDataType, $5);
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: displayDataType $lineDataType: " . dq($5);	
 	# Tuner channel names
 	} elsif ( $line =~ m/^TQ(\w\d)\"(.{8})\"$/ ) {
 		$hash->{helper}{TUNERCHANNELNAMES}{$1} = $2;
