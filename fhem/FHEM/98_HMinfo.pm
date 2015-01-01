@@ -671,15 +671,15 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     push @el,$chN;
   }
   return "no entities selected" if (!scalar @el);
-  $tmpl = (!$tmpl) ? ""
-                   : ($fName ? $fName.":".$tmpl
-                             : $tmpl);
+
+  $fName = AttrVal($hiN,"configDir",".")."/tempList.cfg" if(!$fName);
+  $tmpl =  $fName.":".$tmpl                              if($tmpl);
   my @rs;
   foreach my $name (@el){
-    my $tmplDev;
-    $tmplDev = $tmpl ? $tmpl
-                     : AttrVal($name,"tempListTmpl",
-                               ($fName?$fName:AttrVal($hiN,"configDir",".")."/tempList.cfg").":$name");
+    my $tmplDev = $tmpl ? $tmpl
+                        : AttrVal($name,"tempListTmpl",$fName.":$name");
+    $tmplDev = $fName.":$tmplDev" if ($tmplDev !~ m/:/);
+  
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
     push @rs,  ($r ? "fail  : $tmplDev for $name: $r"
                    : "passed: $tmplDev for $name")

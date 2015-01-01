@@ -7302,15 +7302,17 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   my $ret = "";
   my @el = split",",$name;
   my ($fName,$tmpl) = split":",$template;
-  if (!$tmpl){
-    if(defined $tmpl){
-      $tmpl = $name;
-    }
-    else{#only template was given
-      $tmpl = $fName;
-      $fName = "tempList.cfg";
-    }
-  }
+  $tmpl = $name if(!$fName);
+  ($fName,$tmpl) = ("tempList.cfg",$fName) if(!defined $tmpl && defined $fName);
+#  if (!$tmpl){
+#    if(defined $tmpl){
+#      $tmpl = $name;
+#    }
+#    else{#only template was given
+#      $tmpl = $fName;
+#      $fName = "tempList.cfg";
+#    }
+#  }
   return "file: $fName for $name does not exist"  if (!(-e $fName));
   open(aSave, "$fName") || return("Can't open $fName: $!");
   my $found = 0;
