@@ -1054,7 +1054,7 @@ FRITZBOX_Ring_Run($)
    my %field;
    my $lastField;
    my $ttsLink;
-   my $fhemRadioStation;
+   my $fhemRadioStation = 39;
 
  # Check if 1st parameter are comma separated numbers
    return $name."|0|Error: Parameter '$intNo' not a number (only commas (,) are allowed to separate numbers)"
@@ -1144,24 +1144,11 @@ FRITZBOX_Ring_Run($)
    @cmdArray = ();
    
 # Creation fhemRadioStation for ttsLink
-   if (int (@FritzFons) && $ttsLink)
+   if (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "fhemTTS")
    {
-      foreach (keys %{$hash->{fhem}{radio}})
-      {
-         if ($hash->{fhem}{radio}{$_} eq "fhemTTS")
-         {
-            $fhemRadioStation = $_;
-            last;
-         }
-      }
-      unless (defined $fhemRadioStation)
-      {
-         FRITZBOX_Log $hash, 3, "Create new internet radio station 'fhemTTS' for ringing with text-to-speech";
-         $fhemRadioStation = int( keys %{$hash->{fhem}{radio}});
-         push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Name fhemTTS";
-         push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Bitmap 1023";
-      }
-      push @cmdArray, 'ctlmgr_ctl w configd settings/WEBRADIO'.$fhemRadioStation.'/URL "'.$ttsLink.'"';
+      FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'fhemTTS' for ringing with text-to-speech";
+      push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO39/Name fhemTTS";
+      push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO39/Bitmap 1023";
    #Execute command array
       FRITZBOX_Exec( $hash, \@cmdArray )
    }
@@ -1172,11 +1159,11 @@ FRITZBOX_Ring_Run($)
       push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/IntRingTone";
       push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/IntRingTone $ringTone";
       FRITZBOX_Log $hash, 4, "Change temporarily internal ring tone of Fritz!Fon DECT $_ to $ringTone";
-      if ($fhemRadioStation)
+      if ($ttsLink)
       {
          push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/RadioRingID";
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/RadioRingID $fhemRadioStation";
-         FRITZBOX_Log $hash, 4, "Change radio station of Fritz!Fon DECT $_ to $fhemRadioStation";
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/RadioRingID ".$fhemRadioStation;
+         FRITZBOX_Log $hash, 4, "Change radio station of Fritz!Fon DECT $_ to $fhemRadioStation (fhemTTS)";
       }
    }
 
@@ -1189,6 +1176,10 @@ FRITZBOX_Ring_Run($)
       FRITZBOX_Log $hash, 4, "Change temporarily name of calling number $ringWithIntern to '$msg'";
       push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort $ringWithIntern"
    }
+   
+# Set tts-Message
+   push @cmdArray, 'ctlmgr_ctl w configd settings/WEBRADIO'.$fhemRadioStation.'/URL "'.$ttsLink.'"'
+      if $ttsLink;
 
 #Execute command array
    $result = FRITZBOX_Exec( $hash, \@cmdArray )
@@ -1208,7 +1199,7 @@ FRITZBOX_Ring_Run($)
    {
       push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/IntRingTone ".$result->[2*$_];
    # Reset internet station for the Fritz!Fons
-      if ($fhemRadioStation)
+      if ($ttsLink)
       {
          push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/RadioRingID ".$result->[2*(int(@FritzFons)+$_)];
       }
@@ -1217,7 +1208,7 @@ FRITZBOX_Ring_Run($)
 # Reset name of calling number
    if ($ringWithIntern =~ /^([1-2])$/)
    {
-      if ($fhemRadioStation) {
+      if ($ttsLink) {
          push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[4*int(@FritzFons)]."'"
       } else {
          push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'"
@@ -1912,7 +1903,7 @@ sub FRITZBOX_fritztris($)
 <div  style="width:800px"> 
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as
-   signaling devices. MP3 files can be played as ring tone or when calling phones.
+   signaling devices. MP3 files and Text2Speech can be played as ring tone or when calling phones.
    <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki-Link</b></a>
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
@@ -2175,7 +2166,7 @@ sub FRITZBOX_fritztris($)
 (<a href="commandref.html#FRITZBOX">en</a> | de)
 <div  style="width:800px"> 
 <ul>
-   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
+   Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien und Text (Text2Speech) k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
    <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki-Link</b></a>
    <br/><br/>
    Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
