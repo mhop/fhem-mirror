@@ -44,11 +44,11 @@ eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
 
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_Init($);
-sub FRITZBOX_Ring_Start($@);
+sub FRITZBOX_Cmd_Start($);
 sub FRITZBOX_Exec($$);
-sub FRITZBOX_Send_Mail($@);
+sub FRITZBOX_SendMail($@);
 sub FRITZBOX_SetMOH($@);
-sub FRITZBOX_Start_Radio($@);
+sub FRITZBOX_StartRadio($@);
 
 our $telnet;
 
@@ -120,7 +120,12 @@ my @mohtype = qw(default sound customer);
 
 my %landevice = ();
 
+# FIFO Buffer for commands
+my @cmdBuffer=();
+my $cmdBufferTimeout=0;
+
 my $ttsCmdTemplate = 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]"';
+my $ttsLinkTemplate = 'http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]';
    
 sub ##########################################
 FRITZBOX_Log($$$)
@@ -206,10 +211,13 @@ sub FRITZBOX_Define($$)
    $hash->{INTERVAL}           = 300; 
    $hash->{fhem}{lastHour}     = 0;
    $hash->{fhem}{LOCAL}        = 0;
-      
-   RemoveInternalTimer($hash);
+
+   $hash->{helper}{TimerReadout} = $name.".Readout";
+   $hash->{helper}{TimerCmd} = $name.".Cmd";
+   
+   RemoveInternalTimer($hash->{helper}{TimerReadout});
  # Get first data after 6 seconds
-   InternalTimer(gettimeofday() + 6, "FRITZBOX_Readout_Start", $hash, 0);
+   InternalTimer(gettimeofday() + 6, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
  
    return undef;
 } #end FRITZBOX_Define
@@ -220,13 +228,14 @@ FRITZBOX_Undefine($$)
 {
   my ($hash, $args) = @_;
 
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash->{helper}{TimerReadout});
+  RemoveInternalTimer($hash->{helper}{TimerCmd});
 
    BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} )
       if exists $hash->{helper}{READOUT_RUNNING_PID}; 
 
-   BlockingKill( $hash->{helper}{RING_RUNNING_PID} )
-      if exists $hash->{helper}{RING_RUNNING_PID}; 
+   BlockingKill( $hash->{helper}{CMD_RUNNING_PID} )
+      if exists $hash->{helper}{CMD_RUNNING_PID}; 
 
   return undef;
 } # end FRITZBOX_Undefine
@@ -371,14 +380,15 @@ FRITZBOX_Set($$@)
       if (int @val > 0) 
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         FRITZBOX_Ring_Start $hash, @val;
+         push @cmdBuffer, "ring ".join(" ", @val);
+         FRITZBOX_Cmd_Start $hash->{helper}{TimerCmd};
          return undef;
       }
    }
    elsif ( lc $cmd eq 'sendmail')
    {
       Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-      FRITZBOX_Send_Mail $hash, @val;
+      FRITZBOX_SendMail $hash, @val;
       return undef;
    }
    elsif ( lc $cmd eq 'startradio')
@@ -386,7 +396,7 @@ FRITZBOX_Set($$@)
       if (int @val > 0) 
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         return FRITZBOX_Start_Radio $hash, @val;
+         return FRITZBOX_StartRadio $hash, @val;
       }
    }
    elsif ( lc $cmd eq 'tam')
@@ -406,7 +416,7 @@ FRITZBOX_Set($$@)
    {
       Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
       $hash->{fhem}{LOCAL}=1;
-      FRITZBOX_Readout_Start($hash);
+      FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
       $hash->{fhem}{LOCAL}=0;
       return undef;
    }
@@ -421,7 +431,7 @@ FRITZBOX_Set($$@)
          FRITZBOX_Exec( $hash, "ctlmgr_ctl w wlan settings/wlan_enable $state");
 
          $hash->{fhem}{LOCAL}=2; #2 = short update without new trigger
-         FRITZBOX_Readout_Start($hash);
+         FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
          $hash->{fhem}{LOCAL}=0;
          return undef;
       }
@@ -454,16 +464,21 @@ FRITZBOX_Get($@)
 sub ##########################################
 FRITZBOX_Readout_Start($)
 {
-   my ($hash) = @_;
-   my $name = $hash->{NAME};
+   my ($timerpara) = @_;
+
+   # my ( $name, $func ) = split( /\./, $timerpara );
+   my $index = rindex( $timerpara, "." );    # rechter punkt
+   my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
+   my $name = substr $timerpara, 0, $index;                         # name extrahieren
+   my $hash = $defs{$name};
       
    $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
    $hash->{INTERVAL} = 60 
       if $hash->{INTERVAL} < 60 && $hash->{INTERVAL} != 0;
    
    if(!$hash->{fhem}{LOCAL} && $hash->{INTERVAL} != 0) {
-    RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "FRITZBOX_Readout_Start", $hash, 1);
+    RemoveInternalTimer($hash->{helper}{TimerReadout});
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
     return undef if( AttrVal($name, "disable", 0 ) == 1 );
   }
 
@@ -721,6 +736,8 @@ FRITZBOX_Readout_Run($)
    push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
 #Music on Hold
    push @readoutArray, [ "box_moh", "ctlmgr_ctl r telcfg settings/MOHType", "mohtype" ];
+#Power Rate
+   push @readoutArray, [ "box_powerRate", "ctlmgr_ctl r power status/rate_sumact"];
 
 # Alarm clock
    for (0..2)
@@ -964,33 +981,58 @@ sub FRITZBOX_Readout_Format($$$)
    return $readout;
 }
 
-sub ##########################################
-FRITZBOX_Ring_Start($@) 
+##########################################
+sub FRITZBOX_Cmd_Start($) 
 {
-   my ($hash, @val) = @_;
-   my $name = $hash->{NAME};
+  my ($timerpara) = @_;
+
+   # my ( $name, $func ) = split( /\./, $timerpara );
+   my $index = rindex( $timerpara, "." );    # rechter punkt
+   my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
+   my $name = substr $timerpara, 0, $index;                         # name extrahieren
+   my $hash = $defs{$name};
    
-   $val[1] = 5 
-      unless defined $val[1]; 
+   return unless int @cmdBuffer;
 
-   $val[1] = 5 
-      unless $val[1] =~/^\d+$/; 
-
-   if ( exists( $hash->{helper}{RING_RUNNING_PID} ) )
+ # kill old process if timeout + 10s is reached
+   if ( exists( $hash->{helper}{CMD_RUNNING_PID}) && time()> $cmdBufferTimeout + 10 )
    {
-      FRITZBOX_Log $hash, 1, "Old process still running. Killing old process ".$hash->{helper}{RING_RUNNING_PID};
-      BlockingKill( $hash->{helper}{RING_RUNNING_PID} ); 
-      delete($hash->{helper}{RING_RUNNING_PID});
+      FRITZBOX_Log $hash, 1, "Old command still running. Killing old command: ".$cmdBuffer[0];
+      shift @cmdBuffer;
+      BlockingKill( $hash->{helper}{CMD_RUNNING_PID} ); 
+      delete $hash->{helper}{CMD_RUNNING_PID};
+      return unless int @cmdBuffer;
    }
    
-   my $timeout = $val[1] + 60;
-   my $handover = $name . "|" . join( "|", @val );
+ # (re)start timer if command buffer is still filled
+   if (int @cmdBuffer >1)
+   {
+      RemoveInternalTimer($hash->{helper}{TimerCmd});
+      InternalTimer(gettimeofday()+1, "FRITZBOX_Cmd_Start", $hash->{helper}{TimerCmd}, 1);
+   }
    
-   $hash->{helper}{RING_RUNNING_PID} = BlockingCall("FRITZBOX_Ring_Run", $handover,
-                                       "FRITZBOX_Ring_Done", $timeout,
-                                       "FRITZBOX_Ring_Aborted", $hash)
-                              unless exists $hash->{helper}{RING_RUNNING_PID};
-} # end FRITZBOX_Ring_Start
+# do not continue until running command has finished or is aborted
+   return if exists $hash->{helper}{CMD_RUNNING_PID};
+
+   my @val = split / /, $cmdBuffer[0];
+   
+   if ($val[0] eq "ring")
+   {
+      shift @val;
+      
+      my $timeout = 5;
+      $timeout = $val[1]
+         if $val[1] =~/^\d+$/; 
+      $timeout += 60;
+      $cmdBufferTimeout = time() + $timeout;
+
+      my $handover = $name . "|" . join( "|", @val );
+      $hash->{helper}{CMD_RUNNING_PID} = BlockingCall("FRITZBOX_Ring_Run", $handover,
+                                          "FRITZBOX_Cmd_Done", $timeout,
+                                          "FRITZBOX_Cmd_Aborted", $hash)
+                                 unless exists $hash->{helper}{CMD_RUNNING_PID};
+   }
+} # end FRITZBOX_Cmd_Start
 
 sub ##########################################
 FRITZBOX_Ring_Run($) 
@@ -1009,11 +1051,25 @@ FRITZBOX_Ring_Run($)
    my $intNo = $val[0];
    my @FritzFons;
    my $ringTone;
+   my %field;
+   my $lastField;
+   my $ttsLink;
+   my $fhemRadioStation;
 
  # Check if 1st parameter are comma separated numbers
    return $name."|0|Error: Parameter '$intNo' not a number (only commas (,) are allowed to separate numbers)"
       unless $intNo =~ /^[\d,]+$/;
    
+# Create a hash for the DECT devices whose ring tone (or radio station) can be changed
+   foreach ( split( /,/, $intNo ) )
+   {
+      if ("AVM" eq $hash->{fhem}{$_}{brand})
+      {
+         FRITZBOX_Log $hash, 5, "Internal number $_ seems to be a Fritz!Fon.";
+         push @FritzFons, $_ - 609
+      }
+   }
+      
  # Check if 2nd parameter is the duration
    shift @val;
    if (int @val)
@@ -1021,6 +1077,7 @@ FRITZBOX_Ring_Run($)
       if ($val[0] =~ /^\d+$/ && int $val[0] > 0)
       {
          $duration = $val[0];
+         FRITZBOX_Log $hash, 5, "Extracted ring duration of $duration s.";
          shift @val;
       }
    }
@@ -1028,35 +1085,55 @@ FRITZBOX_Ring_Run($)
  # Check if next parameter is a valid ring tone
    if (int @val)
    {
-      if ($val[0] !~ /^(msg|show):/i)
+      if ($val[0] !~ /^(msg|show|say):/i)
       {
          $ringTone = $val[0];
          $ringTone = $ringToneNumber{lc $val[0]};
          return $name."|0|Error: Ring tone '".$val[0]."' not valid"
             unless defined $ringTone;
          shift @val;
-
-   # Create a hash for the DECT devices whose ring tone can be changed
-         foreach ( split( /,/, $intNo ) )
-         {
-            if ("AVM" eq $hash->{fhem}{$_}{brand})
-            {
-               FRITZBOX_Log $hash, 5, "Internal number $_ seems to be a Fritz!Fon.";
-               push @FritzFons, $_ - 609
-            }
-         }
       }
    }
 
+# Extract text to say or show
+   foreach (@val)
+    {
+      if ($_ =~ /^(show|msg|say):/i)
+      {
+         $lastField = $1;
+         $_ =~ s/^$1://;
+      }
+      $field{$lastField} .= $_." "
+         if $lastField;
+    }
 
    my $msg = AttrVal( $name, "defaultCallerName", "FHEM" );
-   if (int @val)
-   {
-      return $name."|0|Error: Too many parameter. Message has to start with 'show:'"
-         if ($val[0] !~ /^(msg|show):/i);
-      $msg = join " ", @val;
-      $msg =~ s/^(msg|show):\s*//;
-      $msg = substr($msg, 0, 30);
+   if ( $field{show} ) {
+      chop $field{show};
+      $msg = $field{show};
+   } elsif ( $field{msg} ) {
+      chop $field{msg};
+      $msg = $field{msg};
+   }
+   $msg = substr($msg, 0, 30);
+   
+   if ( $field{say} ) {
+      $ringTone = 33;
+      chop $field{say};
+      # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
+      $ttsLink = $ttsLinkTemplate;
+      my $ttsText = $field{say};
+      my $ttsLang = "de";
+      if ($ttsText =~ /^\((en|es|fr|nl)\)/i )
+      {
+         $ttsLang = $1;
+         $ttsText =~ s/^\($1\)\s*//i;
+      }
+      $ttsLink =~ s/\[SPRACHE\]/$ttsLang/;
+      $ttsText = substr($ttsText,0,70);
+      $ttsText = uri_escape($ttsText);
+      $ttsLink =~ s/\[TEXT\]/$ttsText/;
+      FRITZBOX_Log $hash, 5, "Created Text2Speech internet link: $ttsLink";
    }
 
    $result = FRITZBOX_Open_Connection( $hash );
@@ -1065,12 +1142,42 @@ FRITZBOX_Ring_Run($)
 
 #Preparing 1st command array
    @cmdArray = ();
+   
+# Creation fhemRadioStation for ttsLink
+   if (int (@FritzFons) && $ttsLink)
+   {
+      foreach (keys %{$hash->{fhem}{radio}})
+      {
+         if ($hash->{fhem}{radio}{$_} eq "fhemTTS")
+         {
+            $fhemRadioStation = $_;
+            last;
+         }
+      }
+      unless (defined $fhemRadioStation)
+      {
+         FRITZBOX_Log $hash, 3, "Create new internet radio station 'fhemTTS' for ringing with text-to-speech";
+         $fhemRadioStation = int( keys %{$hash->{fhem}{radio}});
+         push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Name fhemTTS";
+         push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Bitmap 1023";
+      }
+      push @cmdArray, 'ctlmgr_ctl w configd settings/WEBRADIO'.$fhemRadioStation.'/URL "'.$ttsLink.'"';
+   #Execute command array
+      FRITZBOX_Exec( $hash, \@cmdArray )
+   }
+   
 # Change ring tone of Fritz!Fons
    foreach (@FritzFons)
    {
       push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/IntRingTone";
       push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/IntRingTone $ringTone";
       FRITZBOX_Log $hash, 4, "Change temporarily internal ring tone of Fritz!Fon DECT $_ to $ringTone";
+      if ($fhemRadioStation)
+      {
+         push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/RadioRingID";
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/RadioRingID $fhemRadioStation";
+         FRITZBOX_Log $hash, 4, "Change radio station of Fritz!Fon DECT $_ to $fhemRadioStation";
+      }
    }
 
 # uses name of port 0-3 (dial port 1-4) to show messages on ringing phone
@@ -1092,20 +1199,31 @@ FRITZBOX_Ring_Run($)
 #Preparing 2nd command array to ring and reset everything
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
+   push @cmdArray, "sleep ".($duration+2); # 2s added because it takes sometime until it starts ringing
+   push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
       if $ringWithIntern != 0 ;
 # Reset internal ring tones for the Fritz!Fons
    foreach (keys @FritzFons)
    {
       push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/IntRingTone ".$result->[2*$_];
+   # Reset internet station for the Fritz!Fons
+      if ($fhemRadioStation)
+      {
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/RadioRingID ".$result->[2*(int(@FritzFons)+$_)];
+      }
    }
-   push @cmdArray, "sleep ".$duration;
+   
 # Reset name of calling number
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'"
-      if $ringWithIntern =~ /^([1-4])$/;
-
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
-
+   if ($ringWithIntern =~ /^([1-2])$/)
+   {
+      if ($fhemRadioStation) {
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[4*int(@FritzFons)]."'"
+      } else {
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'"
+      }
+   }
+   
 # Execute command array
    FRITZBOX_Exec( $hash, \@cmdArray );
 
@@ -1115,7 +1233,7 @@ FRITZBOX_Ring_Run($)
 }
 
 sub ##########################################
-FRITZBOX_Ring_Done($) 
+FRITZBOX_Cmd_Done($) 
 {
    my ($string) = @_;
    return unless defined $string;
@@ -1123,7 +1241,8 @@ FRITZBOX_Ring_Done($)
    my ($name, $success, $result) = split("\\|", $string);
    my $hash = $defs{$name};
    
-   delete($hash->{helper}{RING_RUNNING_PID});
+   shift (@cmdBuffer);
+   delete($hash->{helper}{CMD_RUNNING_PID});
 
    if ($success != 1)
    {
@@ -1135,12 +1254,13 @@ FRITZBOX_Ring_Done($)
    }
 }
 
-sub ##########################################
-FRITZBOX_Ring_Aborted($) 
+##########################################
+sub FRITZBOX_Cmd_Aborted($) 
 {
   my ($hash) = @_;
-  delete($hash->{helper}{RING_RUNNING_PID});
-  FRITZBOX_Log $hash, 1, "Timeout when ringing";
+  my $lastCmd = shift (@cmdBuffer);
+  delete($hash->{helper}{CMD_RUNNING_PID});
+  FRITZBOX_Log $hash, 1, "Timeout reached for: $lastCmd";
 }
 
 ############################################
@@ -1625,7 +1745,7 @@ FRITZBOX_Exec_Local($$)
 }
 
 ##################################### 
-sub FRITZBOX_Send_Mail($@)
+sub FRITZBOX_SendMail($@)
 {
    my ($hash,@val) = @_;
    my $lastField;
@@ -1671,7 +1791,7 @@ sub FRITZBOX_Send_Mail($@)
 }
 
 sub ##########################################
-FRITZBOX_Start_Radio($@) 
+FRITZBOX_StartRadio($@) 
 {
    my ($hash, @val) = @_;
    my @cmdArray;
@@ -1797,7 +1917,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
    <br/><br/>
-   The commands are directly executed on the Fritz!Box shell. That means, no official API is used but mainly the internal interface program that links web interface and firmware. On update of FritzOS might hence lead to modul errors if AVM changes the interface.
+   The commands are directly executed on the Fritz!Box shell. That means, no official API is used but mainly the internal interface program that links web interface and firmware. An update of FritzOS might hence lead to modul errors if AVM changes the interface.
    <br>
    Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -1877,9 +1997,13 @@ sub FRITZBOX_fritztris($)
          <br>
       </li><br>
 
-      <li><code>set &lt;name&gt; ring &lt;internalNumbers&gt; [duration [ringTone]] [show:yourMessage]</code>
+      <li><code>set &lt;name&gt; ring &lt;internalNumbers&gt; [duration [ringTone]] [show:Text] [say:Text]</code>
          <br>
-         Example: <code>set fritzbox ring 611,612 5 Budapest show:It is raining</code>
+         Example:
+         <br>
+         <code>set fritzbox ring 611,612 5 Budapest show:It is raining</code>
+         <br>
+         <code>set fritzbox ring 611 say:(en)It is raining</code>
          <br>
          Rings the internal numbers for "duration" seconds and (on Fritz!Fons) with the given "ring tone" name.
          Different internal numbers have to be separated by a comma (without spaces).
@@ -1890,7 +2014,9 @@ sub FRITZBOX_fritztris($)
          If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'show:' will be shown as the callers name.
          Maximal 30 characters are allowed.
          <br>
-         If the call is taken the callee hears the "music on hold" which can be used to transmit messages.
+         On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (and continue with the default ring tone of the handset). This feature creates a radio station 'fhemTTS' and uses the translate.google.com.
+         <br>
+         If the call is taken the callee hears the "music on hold" which can also be used to transmit messages.
       </li><br>
 
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
@@ -2145,6 +2271,8 @@ sub FRITZBOX_fritztris($)
          Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br>
+         Auf Fritz!Fons wird der Text hinter dem Parameter 'say:' direkt angesagt (gefolgt vom dem Standard Klingelton). Dieses Feature erzeugt eine Radiostation 'fhemTTS' und nutzt translate.google.com.
+         <br>
          Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche zur Nachrichten&uuml;bermittlung genutzt werden kann.
       </li><br>
 
@@ -2292,4 +2420,4 @@ sub FRITZBOX_fritztris($)
 
 =end html_DE
 
-=cut-
+=cut--
