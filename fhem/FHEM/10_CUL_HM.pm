@@ -1287,13 +1287,6 @@ sub CUL_HM_Parse($$) {#########################################################
           push @evtEt,[$wHash,1,"measured-temp:$actTemp"];
           push @evtEt,[$wHash,1,"state:$actTemp"];
         }
-#        if($devH->{helper}{getBatState}){
-#          CUL_HM_Set(CUL_HM_name2Hash($devH->{channel_04}),
-#                      $devH->{channel_04},
-#                      "desired-temp",ReadingsVal($devH->{channel_04}
-#                      ,"desired-temp"
-#                      ,""));
-#        }
       }
       else{
         $chn        =  $mI[1];
@@ -4831,11 +4824,11 @@ sub CUL_HM_getConfig($){
     delete $cHash->{READINGS}{$_}
           foreach (grep /^[\.]?(RegL_)/,keys %{$cHash->{READINGS}});
     my $lstAr = $culHmModel->{CUL_HM_getMId($cHash)}{lst};
-    if($lstAr){
-      my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2.3p ,6:2"
+    if($lstAr){ 
       my $pReq = 0; # Peer request not issued, do only once for channel
       $cHash->{helper}{getCfgListNo}= "";
-      foreach my $listEntry (@list){# each list that is define for this channel
+      foreach my $listEntry (split(",",$lstAr)){#lists define for this channel
+                                                # e.g."1, 5:2.3p ,6:2"
         my ($peerReq,$chnValid)= (0,0);
         my ($listNo,$chnLst1) = split(":",$listEntry);
         if (!$chnLst1){
@@ -7304,15 +7297,6 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   my ($fName,$tmpl) = split":",$template;
   $tmpl = $name if(!$fName);
   ($fName,$tmpl) = ("tempList.cfg",$fName) if(!defined $tmpl && defined $fName);
-#  if (!$tmpl){
-#    if(defined $tmpl){
-#      $tmpl = $name;
-#    }
-#    else{#only template was given
-#      $tmpl = $fName;
-#      $fName = "tempList.cfg";
-#    }
-#  }
   return "file: $fName for $name does not exist"  if (!(-e $fName));
   open(aSave, "$fName") || return("Can't open $fName: $!");
   my $found = 0;
