@@ -40,7 +40,7 @@ use Math::Trig;
 
 sub Twilight_calc($$$$$$$);
 sub Twilight_my_gmt_offset();
-sub Twilight_midnight_seconds();
+sub Twilight_midnight_seconds($);
 
 sub Twilight_my_gmt_offset()
 {
@@ -166,9 +166,9 @@ sub Twilight_Undef($$) {
   return undef;
 }
 ################################################################################
-sub Twilight_midnight_seconds()
-{
-  my @time = localtime();
+sub Twilight_midnight_seconds($) {
+  my ($now) = @_;
+  my @time = localtime($now);
   my $secs = ($time[2] * 3600) + ($time[1] * 60) + $time[0];
   return $secs;
 }
@@ -180,7 +180,12 @@ sub Twilight_TwilightTimes(@)
   my $longitude  = $hash->{LONGITUDE};
   my $horizon    = $hash->{HORIZON};
   my $now        = time();
-  my $midnight   = Twilight_midnight_seconds();
+  
+ #my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($now);
+ #   $now -=($hour*3600+$min*60+$sec)-30;
+ #Log3 $hash, 3, "now------------>".FmtDateTime($now);
+  
+  my $midnight   = Twilight_midnight_seconds($now);
   my $midseconds = $now-$midnight;
 
   my $doy        = strftime("%j",localtime);
@@ -296,70 +301,70 @@ sub myGetHashIndirekt ($$) {
   return $myHash->{HASH};  
 }
 ################################################################################
-sub Twilight_Midnight($)
-{
-  my ($myHash) = @_;
-  my $location=$myHash->{HASH}->{WEATHER};
-  my $param = {
-    url        => "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c",
-    timeout    => 5,
-    hash       => $myHash->{HASH},
-    method     => "GET",
-    header     => "User-Agent: Mozilla/5.0\r\nAccept: application/xml",
-    callback   =>  \&Twilight_MidnightNB
-                };
-  HttpUtils_NonblockingGet($param);
+sub Twilight_Midnight($) {
+  my ($myHash) = @_;  
+  my $param = Twilight_CreateHttpParameterAndGetData($myHash, "Mid");
 }
 ################################################################################
-# the xml shoud be ready in data
-sub Twilight_MidnightNB(@) {
-  my ($param, $err, $xml) = @_;
-  my $hash = $param->{hash};
-  return if (!defined($hash));
-  if ($err)
-  {
-    Log3 ($hash, 2, "$hash->{NAME} get weather result $err");
-    $xml = undef;
-  }
-  Twilight_TwilightTimes      ($hash, "Mid", $xml);
-  Twilight_StandardTimerSet   ($hash);
-}
-################################################################################
-sub Twilight_WeatherTimerUpdate($)
-{
+sub Twilight_WeatherTimerUpdate($) {
   my ($myHash) = @_;
+  my $param = Twilight_CreateHttpParameterAndGetData($myHash, "Wea");
+}   
+################################################################################
+sub Twilight_CreateHttpParameterAndGetData($$) {
+  my ($myHash, $mode) = @_;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
-  return if (!defined($hash));  
+  return if (!defined($hash));   
   
-  my $location=$hash->{WEATHER};
+  my $location = $hash->{WEATHER};
+  my $verbose = AttrVal($hash->{NAME}, "verbose", 3 );
+
+#  my $xml = GetFileFromURL("http://weather.yahooapis.com/forecastrss?w=".
+#                            $location."&u=c",4.0, undef, 1);
+#                                                  xxxxxxxx
+#$param->{noshutdown}
+#optional
+#	   Wenn $param->{noshutdown} auf 1 gesetzt ist, wird dem HTTP-Server nicht implizit 
+#    mitgeteilt, dass die Verbindung nach dem Request geschlossen werden soll. Viele 
+#    Webserver schließen in solch einem Fall die Verbindung bevor sie die Antwort senden. 
+#    Bei 0 wird dem Webserver mitgeteilt, dass der Sendevorgang beendet ist und nun die 
+#    Antwort abgewartet wird.
+#    Standardwert: 1 wie undef 
+#                  0 schliest die Verbindung explizit. 
   my $param = {
     url        => "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c",
-    timeout    => 5,
+    timeout    => ($mode eq "Mid") ? 7 : 5,
     hash       => $hash,
     method     => "GET",
+    noshutdown => 1,
+    loglevel   => 4-($verbose-3),
     header     => "User-Agent: Mozilla/5.0\r\nAccept: application/xml",
-    callback   =>  \&Twilight_WeatherTimerUpdateNB
-                };
+    callback   =>  \&Twilight_WeatherCallback,
+    mode       =>  $mode
+  };
   HttpUtils_NonblockingGet($param);
 }
 ################################################################################
-sub Twilight_WeatherTimerUpdateNB(@) {
-  my ($param, $err, $data) = @_;
+sub Twilight_WeatherCallback(@) {
+  my ($param, $err, $xml) = @_;
+  
   my $hash = $param->{hash};
   return if (!defined($hash));
-  if ($err)
-  {
-    Log3 ($hash, 2, "$hash->{NAME} get weather result $err");
-    $data = undef;
+  
+  if ($err) {
+    Log3 $hash, 3, "[$hash->{NAME}] got no weather info from yahoo. Error code: $err";
+    $xml = undef;
+  } else {
+     Log3 $hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}";
   }
-  Log3 ($hash, 4, "$hash->{NAME} get weather");
-  Twilight_TwilightTimes      ($hash, "Wea", $data);
+  
+  Twilight_TwilightTimes      ($hash, $param->{mode}, $xml);
   Twilight_StandardTimerSet   ($hash);
 }
 ################################################################################
 sub Twilight_StandardTimerSet($) {
   my ($hash) = @_;
-  my $midnight = time() - Twilight_midnight_seconds() + 24*3600 + 30;
+  my $midnight = time() - Twilight_midnight_seconds(time()) + 24*3600 + 30;
 
   myRemoveInternalTimer       ("Midnight", $hash);
   myInternalTimer             ("Midnight", $midnight, "Twilight_Midnight", $hash, 0);
