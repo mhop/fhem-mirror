@@ -146,6 +146,8 @@ sub Twilight_Define($$)
   $hash->{WEATHER}        = $weather;
   $hash->{SUNPOS_OFFSET}  = 5*60;
  
+  $attr{$name}{verbose} = 4    if ($name =~ /^tst.*$/ );
+ 
   my $mHash = { HASH=>$hash };
   Twilight_sunpos($mHash);  
   Twilight_Midnight($mHash);
