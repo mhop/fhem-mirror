@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, December 2014
+# SONOS.pm (c) by Reiner Leins, January 2015
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -30,6 +30,8 @@
 # Changelog
 #
 # SVN-History:
+# 01.01.2015
+#	Anzeige in der Player-ReadingsGroup für die Darstellung von disappeared angepasst, dabei auch gleich die Höhenverhältnisse etwas angepasst.
 # 31.12.2014
 #	Das Bilden von Stereopaaren wird nun unterstützt. Dafür gibt es die Anweisungen 'CreateStereoPair' und 'SeparateStereoPair' an einem Playerdevice.
 # 28.12.2014
@@ -466,6 +468,8 @@ sub SONOS_getCoverTitleRG($;$$) {
 	$width = 500 if (!defined($width));
 	
 	my $transportState = ReadingsVal($device, 'transportState', '');
+	my $presence = ReadingsVal($device, 'presence', 'disappeared');
+	$presence = 'disappeared' if ($presence =~ m/~~NotLoadedMarker~~/i);
 	
 	my $currentRuntime = 1;
 	my $currentStarttime = 0;
@@ -488,7 +492,7 @@ sub SONOS_getCoverTitleRG($;$$) {
 	$transportState = FW_makeImage('audio_pause', 'Paused', 'SONOS_Transportstate') if ($transportState eq 'PAUSED_PLAYBACK');
 	$transportState = FW_makeImage('audio_stop', 'Stopped', 'SONOS_Transportstate') if ($transportState eq 'STOPPED');
 	
-	my $fullscreenDiv = '<style type="text/css">.SONOS_Transportstate { height: 0.8em; margin-top: -6px; margin-left: 2px; }</style><div id="cover_current'.$device.'" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 10000; background-color: rgb(20,20,20);" onclick="document.getElementById(\'cover_current'.$device.'\').style.display = \'none\'; document.getElementById(\'global_fulldiv_'.$device.'\').innerHTML = \'\';"><div style="width: 100%; top 5px; text-align: center; font-weight: bold; color: lightgray; font-size: 200%;">'.ReadingsVal($device, 'roomName', $device).$transportState.'</div><div style="position: relative; top: 8px; height: 86%; max-width: 100%; text-align: center;"><img style="height: 100%; width: auto; border: 1px solid lightgray;" src="'.ReadingsVal($device, 'currentAlbumArtURL', '').'"/></div><div style="position: absolute; width: 100%; bottom: 8px; padding: 5px; text-align: center; font-weight: bold; color: lightgray; background-color: rgb(20,20,20); font-size: 120%;">'.ReadingsVal($device, 'infoSummarize1', '').'</div><div id="hash_'.$device.'" style="display: none; color: white;">'.md5_hex(ReadingsVal($device, 'roomName', $device).ReadingsVal($device, 'infoSummarize2', '').ReadingsVal($device, 'currentTrackPosition', '').ReadingsVal($device, 'currentAlbumArtURL', '')).'</div>'.(($normalAudio) ? '<div id="prog_runtime_'.$device.'" style="display: none; color: white;">'.$currentRuntime.'</div><div id="prog_starttime_'.$device.'" style="display: none; color: white;">'.$currentStarttime.'</div><div id="prog_playing_'.$device.'" style="display: none; color: white;">'.$playing.'</div><div id="progress'.$device.'" style="position: absolute; bottom: 0px; width: 100%; height: 2px; border: 1px solid #000; overflow: hidden;"><div id="progressbar'.$device.'" style="width: '.(($currentPosition * 100) / $currentRuntime).'%; height: 2px; border-right: 1px solid #000000; background: #d65946;"></div></div>' : '').'</div>';
+	my $fullscreenDiv = '<style type="text/css">.SONOS_Transportstate { height: 0.8em; margin-top: -6px; margin-left: 2px; }</style><div id="cover_current'.$device.'" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 10000; background-color: rgb(20,20,20);" onclick="document.getElementById(\'cover_current'.$device.'\').style.display = \'none\'; document.getElementById(\'global_fulldiv_'.$device.'\').innerHTML = \'\';"><div style="width: 100%; top 5px; text-align: center; font-weight: bold; color: lightgray; font-size: 200%;">'.ReadingsVal($device, 'roomName', $device).$transportState.'</div><div style="position: relative; top: 8px; height: 86%; max-width: 100%; text-align: center;"><img style="height: 100%; width: auto; border: 1px solid lightgray;" src="'.((lc($presence) eq 'disappeared') ? '/fhem/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'"/></div><div style="position: absolute; width: 100%; bottom: 8px; padding: 5px; text-align: center; font-weight: bold; color: lightgray; background-color: rgb(20,20,20); font-size: 120%;">'.((lc($presence) eq 'disappeared') ? 'Player disappeared' : ReadingsVal($device, 'infoSummarize1', '')).'</div><div id="hash_'.$device.'" style="display: none; color: white;">'.md5_hex(ReadingsVal($device, 'roomName', $device).ReadingsVal($device, 'infoSummarize2', '').ReadingsVal($device, 'currentTrackPosition', '').ReadingsVal($device, 'currentAlbumArtURL', '')).'</div>'.(($normalAudio) ? '<div id="prog_runtime_'.$device.'" style="display: none; color: white;">'.$currentRuntime.'</div><div id="prog_starttime_'.$device.'" style="display: none; color: white;">'.$currentStarttime.'</div><div id="prog_playing_'.$device.'" style="display: none; color: white;">'.$playing.'</div><div id="progress'.$device.'" style="position: absolute; bottom: 0px; width: 100%; height: 2px; border: 1px solid #000; overflow: hidden;"><div id="progressbar'.$device.'" style="width: '.(($currentPosition * 100) / $currentRuntime).'%; height: 2px; border-right: 1px solid #000000; background: #d65946;"></div></div>' : '').'</div>';
 	
 	my $javascriptTimer = 'function refreshTime'.$device.'() {
 		var playing = document.getElementById("prog_playing_'.$device.'");
@@ -556,9 +560,12 @@ sub SONOS_getCoverTitleRG($;$$) {
 ########################################################################################
 sub SONOS_getCoverRG($;$) {
 	my ($device, $height) = @_;
-	$height = '175px' if (!defined($height));
+	$height = '10.75em' if (!defined($height));
 	
-	return '<img style="margin-right: 5px; border: 1px solid lightgray; height: '.$height.'" src="'.ReadingsVal($device, 'currentAlbumArtURL', '').'" />';
+	my $presence = ReadingsVal($device, 'presence', 'disappeared');
+	$presence = 'disappeared' if ($presence =~ m/~~NotLoadedMarker~~/i);
+	
+	return '<img style="margin-right: 5px; border: 1px solid lightgray; height: '.$height.'" src="'.((lc($presence) eq 'disappeared') ? '/fhem/sonos/cover/empty.jpg' : ReadingsVal($device, 'currentAlbumArtURL', '')).'" />';
 }
 
 ########################################################################################
@@ -568,7 +575,15 @@ sub SONOS_getCoverRG($;$) {
 ########################################################################################
 sub SONOS_getTitleRG($;$) {
 	my ($device, $space) = @_;
-	$space = 20 if (!defined($space));
+	$space = '1em' if (!defined($space));
+	$space .= 'px' if (looks_like_number($space));
+	
+	# Wenn der Player weg ist, nur eine Kurzinfo dazu anzeigen
+	my $presence = ReadingsVal($device, 'presence', 'disappeared');
+	$presence = 'disappeared' if ($presence =~ m/~~NotLoadedMarker~~/i);
+	if (lc($presence) eq 'disappeared') {
+		return '<div style="margin-left: -150px;">Player disappeared</div>';
+	}
 	
 	my $infoString = '';
 	
@@ -576,11 +591,12 @@ sub SONOS_getTitleRG($;$) {
 	$transportState = 'Spiele' if ($transportState eq 'PLAYING');
 	$transportState = 'Pausiere' if ($transportState eq 'PAUSED_PLAYBACK');
 	$transportState = 'Stop bei' if ($transportState eq 'STOPPED');
+	# 55
   
 	# Läuft Radio oder ein "normaler" Titel
 	if (ReadingsVal($device, 'currentNormalAudio', 1) == 1) {
 		my $showNext = ReadingsVal($device, 'nextTitle', '') || ReadingsVal($device, 'nextArtist', '') || ReadingsVal($device, 'nextAlbum', '');
-		$infoString = sprintf('<div style="margin-left: -150px;">%s Titel %s von %s<br />Titel: <b>%s</b><br />Interpret: <b>%s</b><br />Album: <b>%s</b>'.($showNext ? '<div style="height: %dpx;"></div>Nächste Wiedergabe:</div><div style="float: left; margin-left: 0px;"><img style="margin: 0px; padding: 0px; margin-right: 5px; border: 1px solid lightgray;" height="55"  border="0" src="%s" /></div><div style="margin-left: 0px;">Titel: %s<br />Artist: %s<br />Album: %s</div>' : ''),
+		$infoString = sprintf('<div style="margin-left: -150px;">%s Titel %s von %s<br />Titel: <b>%s</b><br />Interpret: <b>%s</b><br />Album: <b>%s</b>'.($showNext ? '<div style="height: %s;"></div>Nächste Wiedergabe:</div><div style="float: left; margin-left: 0px;"><img style="margin: 0px; padding: 0px; margin-right: 5px; border: 1px solid lightgray; height: 3.5em;" border="0" src="%s" /></div><div style="margin-left: 0px;">Titel: %s<br />Artist: %s<br />Album: %s</div>' : ''),
 				$transportState, 
 				ReadingsVal($device, 'currentTrack', ''), 
 				ReadingsVal($device, 'numberOfTracks', ''),
@@ -1012,7 +1028,7 @@ sub SONOS_Read($) {
 	}
 	
 	# Die aktuellen Abspielinformationen werden Schritt für Schritt übertragen, gesammelt und dann in einem Rutsch ausgewertet.
-	# Dafür eignet sich eine Sub-Statische Variable am Besten	
+	# Dafür eignet sich eine Sub-Statische Variable am Besten.
 	state %current;
 	
 	# Hier könnte jetzt eine ganze Liste von Anweisungen enthalten sein, die jedoch einzeln verarbeitet werden müssen
@@ -1096,6 +1112,39 @@ sub SONOS_Read($) {
 			CommandDefine(undef, $1);
 		} elsif ($line =~ m/CommandAttr:(.*)/) {
 			CommandAttr(undef, $1);
+		} elsif ($line =~ m/deleteCurrentNextTitleInformationAndDisappear:(.*)/) {
+			my $hash = SONOS_getSonosPlayerByUDN($1);
+			
+			# Start the updating...
+			readingsBeginUpdate($hash);
+			
+			# Updating...
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentTrack", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackURI", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackDuration", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPosition", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentTitle", 'Disappeared');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentArtist", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbum", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentOriginalTrackNumber", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbumArtist", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbumArtURL", '/fhem/sonos/cover/empty.jpg');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentSender", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentSenderCurrent", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentSenderInfo", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentStreamAudio", 0);
+			SONOS_readingsBulkUpdateIfChanged($hash, "currentNormalAudio", 1);
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextTrackDuration", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextTrackURI", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextTitle", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextArtist", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextAlbum", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextAlbumArtist", '');
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextAlbumArtURL", '/fhem/sonos/cover/empty.jpg');
+			SONOS_readingsBulkUpdateIfChanged($hash, "nextOriginalTrackNumber", '');
+			
+			# End the Bulk-Update, and trigger events...
+			SONOS_readingsEndUpdate($hash, 1);
 		} elsif ($line =~ m/GetReadingsToCurrentHash:(.*?):(.*)/) {
 			my $hash = SONOS_getSonosPlayerByUDN($1);
 			
@@ -4227,6 +4276,8 @@ sub SONOS_IsAlive($) {
 				$result = 0;
 				
 				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
+				# Brauchen wir das wirklich? Dabei werden die lokalen Infos nicht aktualisiert...
+				#SONOS_Client_Notifier('deleteCurrentNextTitleInformationAndDisappear:'.$udn);
 				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
 				$doDeleteProxyObjects = 1;
 			} else {
