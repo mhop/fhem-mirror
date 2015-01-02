@@ -712,7 +712,7 @@ readingsGroup_2html($;$)
         next if( !defined($value_format) );
         if(  $value_format =~ m/%/ ) {
           $v = sprintf( $value_format, $v );
-        } elsif( $value_format != "" ) {
+        } elsif( $value_format ne "" ) {
           $v = $value_format;
         }
 
@@ -1015,7 +1015,7 @@ readingsGroup_Notify($$)
               $value = "";
             } elsif( $value_format =~ m/%/ ) {
               $value = sprintf( $value_format, $value );
-            } elsif( $value_format != "" ) {
+            } elsif( $value_format ne "" ) {
               $value = $value_format;
             }
           }
