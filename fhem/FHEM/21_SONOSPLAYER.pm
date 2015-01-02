@@ -158,7 +158,7 @@ my %sets = (
 	'Reboot' => '',
 	'Wifi' => 'state',
 	'Name' => 'roomName',
-	'Icon' => 'iconName'
+	'RoomIcon' => 'iconName'
 );
 
 my @possibleRoomIcons = qw(bathroom library office foyer dining tvroom hallway garage garden guestroom den bedroom kitchen portable media family pool masterbedroom playroom patio living);
@@ -278,13 +278,35 @@ sub SONOSPLAYER_Get($@) {
 	
 	my $reading = $a[1];
 	my $name = $hash->{NAME};
-	my $udn = $hash->{UDN}; 
+	my $udn = $hash->{UDN};
+	
+	# for the ?-selector: which values are possible
+	if($reading eq '?') {
+		my @newGets = ();
+		for my $elem (sort keys %gets) {
+			my $newElem = $elem.(($gets{$elem} eq '') ? ':noArg' : '');
+			
+			$newElem = $elem.':0,1' if (lc($elem) eq 'ethernetportstatus');
+			
+			push @newGets, $newElem;
+		}
+		return "Unknown argument, choose one of ".join(" ", @newGets);
+	}
 	
 	# check argument
-	return "SONOSPLAYER: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets) if(!defined($gets{$reading}));
+	my $found = 0;
+	for my $elem (keys %gets) {
+		if (lc($reading) eq lc($elem)) {
+			$a[1] = $elem; # Korrekte Schreibweise behalten
+			$reading = $elem; # Korrekte Schreibweise behalten
+			$found = 1;
+			last;
+		}
+	}
+	return "SONOSPLAYER: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets) if(!$found);
 	
 	# some argument needs parameter(s), some not
-	return "SONOSPLAYER: $a[1] needs parameter(s): ".$gets{$a[1]} if (scalar(split(',', $gets{$a[1]})) > scalar(@a) - 2);
+	return "SONOSPLAYER: $a[1] needs parameter(s): ".$gets{$reading} if (scalar(split(',', $gets{$reading})) > scalar(@a) - 2);
 	
 	# getter
 	if (lc($reading) eq 'currenttrackposition') {
@@ -345,16 +367,30 @@ sub SONOSPLAYER_Set($@) {
 	if($a[1] eq '?') {
 		# %setCopy enthält eine Kopie von %sets, da für eine ?-Anfrage u.U. ein Slider zurückgegeben werden muss...
 		my %setcopy;
-		if (AttrVal($hash, 'generateVolumeSlider', 1) == 1) {
-			foreach my $key (keys %sets) {
-				my $oldkey = $key;
+		foreach my $key (keys %sets) {
+			my $oldkey = $key;
+			if (AttrVal($hash, 'generateVolumeSlider', 1) == 1) {
 				$key = $key.':slider,0,1,100' if ($key eq 'Volume');
+				$key = $key.':slider,0,1,100' if ($key eq 'GroupVolume');
+				$key = $key.':slider,0,1,100' if ($key eq 'Treble');
+				$key = $key.':slider,0,1,100' if ($key eq 'Bass');
 				$key = $key.':slider,-100,1,100' if ($key eq 'Balance');
-			
-				$setcopy{$key} = $sets{$oldkey};
 			}
-		} else {
-			%setcopy = %sets;
+			
+			# On/Off einsetzen
+			$key = $key.':off,on' if ((lc($key) eq 'crossfademode') || (lc($key) eq 'groupmute') || (lc($key) eq 'ledstate') || (lc($key) eq 'loudness') || (lc($key) eq 'lute') || (lc($key) eq 'repeat') || (lc($key) eq 'shuffle'));
+			
+			# Iconauswahl einsetzen
+			if (lc($key) eq 'roomicon') {
+				my $icons = SONOSPLAYER_Get($hash, ($hash->{NAME}, 'PossibleRoomIcons'));
+				$icons =~ s/ //g;
+				$key = $key.':'.$icons;
+			}
+			
+			# Wifi-Auswahl setzen
+			$key = $key.':off,on,persist-off' if (lc($key) eq 'wifi');
+			
+			$setcopy{$key} = $sets{$oldkey};
 		}
 		
 		my $sonosDev = SONOS_getDeviceDefHash(undef);
@@ -362,12 +398,29 @@ sub SONOSPLAYER_Set($@) {
 		$sets{Speak2} = 'volume language text' if (AttrVal($sonosDev->{NAME}, 'Speak2', '') ne '');
 		$sets{Speak3} = 'volume language text' if (AttrVal($sonosDev->{NAME}, 'Speak3', '') ne '');
 		$sets{Speak4} = 'volume language text' if (AttrVal($sonosDev->{NAME}, 'Speak4', '') ne '');
+		
+		# for the ?-selector: which values are possible
+		if($a[1] eq '?') {
+			my @newSets = ();
+			for my $elem (sort keys %setcopy) {
+				push @newSets, $elem.(($setcopy{$elem} eq '') ? ':noArg' : '');
+			}
+			return "Unknown argument, choose one of ".join(" ", @newSets);
+		}
 	
-		return join(" ", sort keys %setcopy);
+		#return join(" ", sort keys %setcopy);
 	}
 	
 	# check argument
-	return "SONOSPLAYER: Set with unknown argument $a[1], choose one of ".join(" ", sort keys %sets) if(!defined($sets{$a[1]}));
+	my $found = 0;
+	for my $elem (keys %sets) {
+		if (lc($a[1]) eq lc($elem)) {
+			$a[1] = $elem; # Korrekte Schreibweise behalten
+			$found = 1;
+			last;
+		}
+	}
+	return "SONOSPLAYER: Set with unknown argument $a[1], choose one of ".join(" ", sort keys %sets) if(!$found);
   
 	# some argument needs parameter(s), some not
 	return "SONOSPLAYER: $a[1] needs parameter(s): ".$sets{$a[1]} if (scalar(split(',', $sets{$a[1]})) > scalar(@a) - 2);
@@ -702,7 +755,7 @@ sub SONOSPLAYER_Set($@) {
 		}
 		
 		SONOS_DoWork($udn, 'setName', $text);
-	} elsif (lc($key) eq 'icon') {
+	} elsif (lc($key) eq 'roomicon') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
 		$value = lc($value);
@@ -835,8 +888,8 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
 <code>set &lt;name&gt; DailyIndexRefreshTime &lt;time&gt;</code></a>
 <br />Sets the current DailyIndexRefreshTime for the whole bunch of Zoneplayers.</li>
-<li><a name="SONOSPLAYER_setter_Icon">
-<code>set &lt;name&gt; Icon &lt;Iconname&gt;</code></a>
+<li><a name="SONOSPLAYER_setter_RoomIcon">
+<code>set &lt;name&gt; RoomIcon &lt;Iconname&gt;</code></a>
 <br />Sets the Icon for this Zone</li>
 <li><a name="SONOSPLAYER_setter_Name">
 <code>set &lt;name&gt; Name &lt;Zonename&gt;</code></a>
@@ -996,7 +1049,7 @@ sub SONOSPLAYER_Log($$$) {
 <br /> Gets the Ethernet-Portstatus of the given Port. Can be 'Active' or 'Inactive'.</li>
 <li><a name="SONOSPLAYER_getter_PossibleRoomIcons">
 <code>get &lt;name&gt; PossibleRoomIcons</code></a>
-<br /> Retreives a list of all possible Roomiconnames for the use with "set Icon".</li>
+<br /> Retreives a list of all possible Roomiconnames for the use with "set RoomIcon".</li>
 </ul></li>
 <li><b>Lists</b><ul>
 <li><a name="SONOSPLAYER_getter_Favourites">
@@ -1114,8 +1167,8 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
 <code>set &lt;name&gt; DailyIndexRefreshTime &lt;time&gt;</code></a>
 <br />Setzt die aktuell gültige DailyIndexRefreshTime für alle Zoneplayer.</li>
-<li><a name="SONOSPLAYER_setter_Icon">
-<code>set &lt;name&gt; Icon &lt;Iconname&gt;</code></a>
+<li><a name="SONOSPLAYER_setter_RoomIcon">
+<code>set &lt;name&gt; RoomIcon &lt;Iconname&gt;</code></a>
 <br />Legt das Icon für die Zone fest</li>
 <li><a name="SONOSPLAYER_setter_Name">
 <code>set &lt;name&gt; Name &lt;Zonename&gt;</code></a>
