@@ -947,7 +947,6 @@ FileLog_sampleDataFn($$$$$)
   FileLog_addTics($conf->{y2tics}, \%tickh);
   $colnums = join(",", sort keys %tickh).",$colnums" if(%tickh);
 
-  $max = 8 if($max > 8);
   my @htmlArr;
   for(my $r=0; $r < $max; $r++) {
     my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
