@@ -81,7 +81,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 "
+"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -819,6 +819,7 @@ sub ENIGMA2_SendCommand($$;$$) {
     my $address     = $hash->{helper}{ADDRESS};
     my $port        = $hash->{helper}{PORT};
     my $http_method = $attr{$name}{"http-method"};
+    my $http_noshutdown = ( defined($attr{$name}{"http-noshutdown"}) && $attr{$name}{"http-noshutdown"} eq "0" ) ? 0 : 1;
     my $timeout;
     $cmd = ( defined($cmd) ) ? $cmd : "";
 
@@ -888,13 +889,13 @@ sub ENIGMA2_SendCommand($$;$$) {
 
     # send request via HTTP-GET method
     if ( $http_method eq "GET" || $http_method eq "" || $cmd eq "" ) {
-        Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL);
+        Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL) . " (noshutdown=" . $http_noshutdown . ")";
 
         HttpUtils_NonblockingGet(
             {
                 url        => $URL,
                 timeout    => $timeout,
-                noshutdown => 1,
+                noshutdown => $http_noshutdown,
                 data       => undef,
                 hash       => $hash,
                 service    => $service,
@@ -912,13 +913,13 @@ sub ENIGMA2_SendCommand($$;$$) {
             "ENIGMA2 $name: GET "
           . $URL
           . " (POST DATA: "
-          . urlDecode($cmd) . ")";
+          . urlDecode($cmd) . ", noshutdown=" . $http_noshutdown . ")";
 
         HttpUtils_NonblockingGet(
             {
                 url        => $URL,
                 timeout    => $timeout,
-                noshutdown => 1,
+                noshutdown => $http_noshutdown,
                 data       => $cmd,
                 hash       => $hash,
                 service    => $service,
@@ -3071,6 +3072,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           </li>
           <li>
             <b>http-method</b> - HTTP access method to be used; e.g. a FritzBox might need to use POST instead of GET (GET/POST)
+          </li>
+          <li>
+            <b>http-noshutdown</b> - Set FHEM-internal HttpUtils connection close behaviour (defaults=1)
           </li>
           <li>
             <b>https</b> - Access box via secure HTTP (true/false)
