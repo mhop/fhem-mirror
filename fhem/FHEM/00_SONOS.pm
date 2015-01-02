@@ -30,6 +30,14 @@
 # Changelog
 #
 # SVN-History:
+# 02.01.2015
+#	Anzeige bei der Wiedergabe eines Docks verbessert. Dort werden nun der Titel und Album/Artist-Informationen und ein Dock-Cover angezeigt.
+#	Getter/Setter bei Bedarf um ":noArg" erweitert.
+#	Getter/Setter sind nun nicht mehr CaseSensitive
+#	Setter für "Treble" und "Bass" haben nun auch einen Slider
+#	Setter "Icon" in "RoomIcon" umbenannt, damit die Auswahlliste den aktuellen vorauswählt
+#	Beim Erzeugen der Sonosplayer-Devices wird nun das Attribut "alias" auf den Sonos-Raumnamen gesetzt.
+#	Zusätzlich zu "StopAll" oder "PauseAll" gibt es am Sonos-Device nun auch "Stop" und "Pause" mit der gleichen Funktionalität
 # 01.01.2015
 #	Anzeige in der Player-ReadingsGroup für die Darstellung von disappeared angepasst, dabei auch gleich die Höhenverhältnisse etwas angepasst.
 # 31.12.2014
@@ -318,7 +326,9 @@ my %gets = (
 my %sets = (
 	'Groups' => 'groupdefinitions',
 	'StopAll' => '',
-	'PauseAll' => ''
+	'Stop' => '',
+	'PauseAll' => '',
+	'Pause' => ''
 );
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
@@ -784,41 +794,10 @@ sub SONOS_FhemWebCallback($) {
 			return (undef, undef);
 		}
 		
-		# Wird im Prinzip einfach nicht mehr aufgerufen...
-		#if ($URL =~ m/^\/favorit\?res=(.*)/i) {
-		#	my $resURL = uri_unescape($1);
-		#	
-		#	if ($resURL =~ m/^(x-rincon-cpcontainer|x-sonos-spotify).*?(spotify.*?)(\?|$)/i) {
-		#		my $infos = get('https://embed.spotify.com/oembed/?url='.$2);
-		#		
-		#		if ($infos =~ m/"thumbnail_url":"(.*?)cover(.*?)"/i) {
-		#			$resURL = $1.'original'.$2;
-		#			$resURL =~ s/\\//g;
-		#		}
-		#	} elsif($URL =~ m/savedqueues.rsq/i) {
-		#		$resURL = $attr{global}{modpath}.'/FHEM/lib/UPnP/sonos_playlist.jpg';
-		#	} else {
-		#		my @player = SONOS_getAllSonosplayerDevices();
-		#		my $stream = 0;
-		#		$stream = 1 if ($resURL =~ /x-sonosapi-stream/);
-		#		$resURL = $1.'/getaa?'.($stream ? 's=1&' : '').'u='.uri_escape($resURL) if (ReadingsVal($player[0]->{NAME}, 'location', '') =~ m/^(http:\/\/.*?:.*?)\//i);
-		#	}
-		#		
-		#	if ($resURL) {
-		#		SONOS_Log undef, 5, 'Hole Cover: '.$resURL;
-		#		
-		#		if ($resURL =~ /^http/) {
-		#			# Bild holen...
-		#			my $ua = LWP::UserAgent->new(agent => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_2) AppleWebKit/537.11 (KHTML, likeGecko) Chrome/23.0.1271.64 Safari/537.11');
-		#			my $response = $ua->get($resURL);
-		#			if ($response->is_success) {
-		#				return ($response->header('Content-Type').'; charset=UTF8', $response->content);
-		#			}
-		#		} else {
-		#			return ('charset=UTF8', SONOS_ReadFile($resURL));
-		#		}
-		#	}
-		#}
+		if ($URL =~ m/^\/input_dock.jpg/i) {
+			FW_serveSpecial('sonos_input_dock', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
+			return (undef, undef);
+		}
 	}
 	
 	# Wenn wir hier ankommen, dann konnte nichts verarbeitet werden...
@@ -1654,8 +1633,25 @@ sub SONOS_Get($@) {
 	my $reading = $a[1];
 	my $name = $hash->{NAME};
 	
+	# for the ?-selector: which values are possible
+	if($a[1] eq '?') {
+		my @newGets = ();
+		for my $elem (sort keys %gets) {
+			push @newGets, $elem.(($gets{$elem} eq '') ? ':noArg' : '');
+		}
+		return "Unknown argument, choose one of ".join(" ", @newGets);
+	}
+	
 	# check argument
-	return "SONOS: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets) if(!defined($gets{$reading}));
+	my $found = 0;
+	for my $elem (keys %gets) {
+		if (lc($reading) eq lc($elem)) {
+			$reading = $elem; # Korrekte Schreibweise behalten
+			$found = 1;
+			last;
+		}
+	}
+	return "SONOS: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets) if(!$found);
 	
 	# some argument needs parameter(s), some not
 	return "SONOS: $a[1] needs parameter(s): ".$gets{$a[1]} if (scalar(split(',', $gets{$a[1]})) > scalar(@a) - 2);
@@ -1746,12 +1742,26 @@ sub SONOS_Set($@) {
 	} else {
 		%setcopy = %sets;
 	}
-
+	
 	# for the ?-selector: which values are possible
-	return join(" ", sort keys %setcopy) if($a[1] eq '?');
-  
+	if($a[1] eq '?') {
+		my @newSets = ();
+		for my $elem (sort keys %setcopy) {
+			push @newSets, $elem.(($setcopy{$elem} eq '') ? ':noArg' : '');
+		}
+		return "Unknown argument, choose one of ".join(" ", @newSets);
+	}
+	
 	# check argument
-	return "SONOS: Set with unknown argument $a[1], choose one of ".join(",", sort keys %sets) if(!defined($sets{$a[1]}));
+	my $found = 0;
+	for my $elem (keys %sets) {
+		if (lc($a[1]) eq lc($elem)) {
+			$a[1] = $elem; # Korrekte Schreibweise behalten
+			$found = 1;
+			last;
+		}
+	}
+	return "SONOS: Set with unknown argument $a[1], choose one of ".join(",", sort keys %sets) if(!$found);
   
 	# some argument needs parameter(s), some not
 	return "SONOS: $a[1] needs parameter(s): ".$sets{$a[1]} if (scalar(split(',', $sets{$a[1]})) > scalar(@a) - 2);
@@ -1841,7 +1851,7 @@ sub SONOS_Set($@) {
 		#}
 		#SONOS_Log undef, 5, "Current after List: ".Dumper(\@current);
 		
-	} elsif (lc($key) =~ m/(Stop|Pause)All/i) {
+	} elsif (lc($key) =~ m/(Stop|Pause)(All|)/i) {
 		my $commandType = $1;
 		
 		# Aktuellen Zustand holen
@@ -4053,6 +4063,7 @@ sub SONOS_Discover_Callback($$$) {
 			# Define SonosPlayer-Device with attributes
 			SONOS_Client_Notifier('CommandDefine:'.$name.' SONOSPLAYER '.$udn);
 			SONOS_Client_Notifier('CommandAttr:'.$name.' room '.$SONOS_Client_Data{SonosDeviceName});
+			SONOS_Client_Notifier('CommandAttr:'.$name.' alias '.$roomName);
 			SONOS_Client_Notifier('CommandAttr:'.$name.' group '.$groupName);
 			SONOS_Client_Notifier('CommandAttr:'.$name.' icon '.$iconPath);
 			SONOS_Client_Notifier('CommandAttr:'.$name.' sortby 1');
@@ -4064,6 +4075,7 @@ sub SONOS_Discover_Callback($$$) {
 				SONOS_Client_Notifier('CommandAttr:'.$name.' generateInfoSummarize2 <TransportState/><InfoSummarize1 prefix=" => "/>');
 				SONOS_Client_Notifier('CommandAttr:'.$name.' generateInfoSummarize3 <Volume prefix="Lautstärke: "/><Mute instead=" ~ Kein Ton" ifempty=" ~ Ton An" emptyval="0"/> ~ Balance: <Balance ifempty="Mitte" emptyval="0"/><HeadphoneConnected instead=" ~ Kopfhörer aktiv" ifempty=" ~ Kein Kopfhörer" emptyval="0"/>');
 				SONOS_Client_Notifier('CommandAttr:'.$name.' stateVariable Presence');
+				SONOS_Client_Notifier('CommandAttr:'.$name.' generateVolumeSlider 1');
 				SONOS_Client_Notifier('CommandAttr:'.$name.' getAlarms 1'); SONOS_Client_Data_Refresh('', $udn, 'getAlarms', 1);
 				SONOS_Client_Notifier('CommandAttr:'.$name.' minVolume 0'); SONOS_Client_Data_Refresh('', $udn, 'minVolume', 0);
 				
@@ -4644,6 +4656,14 @@ sub SONOS_ServiceCallback($$) {
 				SONOS_Client_Notifier('SetCurrent:Artist:');
 				
 				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_default.jpg:');
+			} elsif ($currentTrackURI =~ m/x-sonos-dock:(RINCON_[\dA-Z]+)/) {
+				# Dock-Wiedergabe feststellen, und dann andere Informationen anzeigen
+				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentAlbum', SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1)));
+				my $tmpTitle = SONOS_replaceSpecialStringCharacters(decode_entities($1)) if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i);
+				SONOS_Client_Notifier('SetCurrent:Title:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentTitle', $tmpTitle));
+				SONOS_Client_Notifier('SetCurrent:Artist:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentArtist', ''));
+				
+				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_dock.jpg:');
 			} elsif ($currentTrackURI =~ m/x-sonos-htastream:(RINCON_[\dA-Z]+):spdif/) {
 				# LineIn-Wiedergabe der Playbar feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1));
