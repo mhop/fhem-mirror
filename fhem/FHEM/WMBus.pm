@@ -38,6 +38,7 @@ use constant {
 	# CI field
 	CI_RESP_4 => 0x7a,  # Response from device, 4 Bytes
 	CI_RESP_12 => 0x72, # Response from device, 12 Bytes
+	CI_RESP_0 => 0x78,  # Response from device, 0 Byte header, variable length
 	
 	# DIF types (Data Information Field), see page 32
 	DIF_NONE => 0x00,
@@ -108,7 +109,7 @@ sub valueCalcDate($$) {
 	my $month = (($value & 0b111100000000) >> 8);
 	my $year = ((($value & 0b1111000000000000) >> 9) | (($value & 0b11100000) >> 5)) + 2000;
 	if ($day > 31 || $month > 12 || $year > 2099) {
-		return "invalid";
+		return sprintf("invalid: %x", $value);
 	} else {
 		return sprintf("%04d-%02d-%02d", $year, $month, $day);
 	}
@@ -145,7 +146,7 @@ sub valueCalcDateTime($$) {
 		my $hour = ($value >> 8) & 0b11111;
 		my $su = ($value & 0b1000000000000000);
 		if ($min > 59 || $hour > 23) {
-			$dateTime = 'invalid';
+			$dateTime = sprintf('invalid: %x', $value);
 		} else {
 			$dateTime .= sprintf(' %02d:%02d %s', $hour, $min, $su ? 'DST' : '');
 		}
@@ -356,7 +357,7 @@ my %VIFInfo = (
 		unit         => '',
 		calcFunc     => \&valueCalcDateTime,
 	},
-	VIF_HCA              =>  {                  # dimensionless
+	VIF_HCA              =>  {                  # Unit for Heat Cost Allocator, dimensonless
 	  typeMask     => 0b01111111,
 	  expMask      => 0b00000000,
 	  type         => 0b01101110,
@@ -1017,6 +1018,9 @@ sub decodeApplicationLayer($) {
 	  $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
    	$self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
 		$offset += 12;
+  } elsif ($self->{cifield} == CI_RESP_0) {
+    # no header
+    $self->{cw} = 0;
   } else {
 		# unsupported
 		$self->{errormsg} = 'Unsupported CI Field ' . sprintf("%x", $self->{cifield});
@@ -1024,48 +1028,47 @@ sub decodeApplicationLayer($) {
 		return 0;
 	}
 	$self->{statusstring} = join(", ", $self->state2string($self->{status}));
-	
-	$self->decodeConfigword();
-	
-	my $payload;
-	
-	$self->{encryptionMode} = $encryptionModes{$self->{cw_parts}{mode}};
-	if ($self->{cw_parts}{mode} == 0) {
-		# no encryption
-		$self->{isEncrypted} = 0;
-		$self->{decrypted} = 1;
-  	$payload = substr($applicationlayer, $offset);
-	} elsif ($self->{cw_parts}{mode} == 5) {
-		# data is encrypted with AES 128, dynamic init vector
-		# decrypt data before further processing
-		$self->{isEncrypted} = 1;
-		$self->{decrypted} = 0;
 
-		if ($self->{aeskey}) { 
-			$payload = $self->decrypt(substr($applicationlayer,$offset));
-			if (unpack('n', $payload) == 0x2f2f) {
-				$self->{decrypted} = 1;
-			} else {
-				# Decryption verification failed
-				$self->{errormsg} = 'Decryption failed, wrong key?';
-				$self->{errorcode} = ERR_DECRYPTION_FAILED;
-				#printf("%x\n", unpack('n', $payload));
-				return 0;
-			}
-		} else {
-			$self->{errormsg} = 'encrypted message and no aeskey provided';
-	  	$self->{errorcode} = ERR_NO_AESKEY;
-			return 0;
-		}
+  $self->decodeConfigword();
+  
+  my $payload;
+  $self->{encryptionMode} = $encryptionModes{$self->{cw_parts}{mode}};
+  if ($self->{cw_parts}{mode} == 0) {
+    # no encryption
+    $self->{isEncrypted} = 0;
+    $self->{decrypted} = 1;
+    $payload = substr($applicationlayer, $offset);
+  } elsif ($self->{cw_parts}{mode} == 5) {
+    # data is encrypted with AES 128, dynamic init vector
+    # decrypt data before further processing
+    $self->{isEncrypted} = 1;
+    $self->{decrypted} = 0;
 
-	} else {
-		# error, encryption mode not implemented
-		$self->{errormsg} = sprintf('Encryption %x mode not implemented', $self->{cw_parts}{mode});
-  	$self->{errorcode} = ERR_UNKNOWN_ENCRYPTION;
-		$self->{decrypted} = 0;
-		return 0;
-	}
-		
+    if ($self->{aeskey}) { 
+      $payload = $self->decrypt(substr($applicationlayer,$offset));
+      if (unpack('n', $payload) == 0x2f2f) {
+        $self->{decrypted} = 1;
+      } else {
+        # Decryption verification failed
+        $self->{errormsg} = 'Decryption failed, wrong key?';
+        $self->{errorcode} = ERR_DECRYPTION_FAILED;
+        #printf("%x\n", unpack('n', $payload));
+        return 0;
+      }
+    } else {
+      $self->{errormsg} = 'encrypted message and no aeskey provided';
+      $self->{errorcode} = ERR_NO_AESKEY;
+      return 0;
+    }
+
+  } else {
+    # error, encryption mode not implemented
+    $self->{errormsg} = sprintf('Encryption %x mode not implemented', $self->{cw_parts}{mode});
+    $self->{errorcode} = ERR_UNKNOWN_ENCRYPTION;
+    $self->{decrypted} = 0;
+    return 0;
+  }
+  
 	return $self->decodePayload($payload);	
 	
 }
