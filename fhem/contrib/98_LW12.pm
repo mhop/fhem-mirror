@@ -1,4 +1,4 @@
-# $Id: $
+# $Id$
 # ############################################################################
 #
 #  FHEM Modue for WLAN based LED Driver
@@ -590,6 +590,7 @@ sub LW12_updateStatus( $ ) {
         The Timeout of the connection to the RGB-controller in seconds. Default is 2.</li>
       <br>
     </ul><br>
+</ul>
 
 =end html
 =cut
