@@ -65,7 +65,7 @@ ECMD_Initialize($)
   $hash->{GetFn}   = "ECMD_Get";
   $hash->{SetFn}   = "ECMD_Set";
   $hash->{AttrFn}  = "ECMD_Attr";
-  $hash->{AttrList}= "classdefs split logTraffic:0,1,2,3,4,5 timeout partial";
+  $hash->{AttrList}= "classdefs split logTraffic:0,1,2,3,4,5 timeout partial requestSeparator responseSeparator";
 }
 
 #####################################
@@ -531,6 +531,9 @@ ECMD_Set($@)
 sub ECMD_Read($) 
 {
   my ($hash) = @_;
+  
+  return undef unless($hash->{state} eq "opened"); # avoid reading from closed device
+  
   my $buf = ECMD_SimpleRead($hash);
   return unless(defined($buf));
   return if($buf eq "");
@@ -547,8 +550,8 @@ ECMD_Write($$$)
   my $name= $hash->{NAME};
   my $answer;
   my $ret= "";
-  my $requestSeparator= "\000"; # AttrVal($hash, "requestSeparator", "\000");
-  my $responseSeparator= ""; # AttrVal($hash, "responseSeparator", "");
+  my $requestSeparator= AttrVal($hash, "requestSeparator", "\000");
+  my $responseSeparator= AttrVal($hash, "responseSeparator", "");
   my @ecmds= split $requestSeparator, $msg;
   ECMD_Log $hash, 5, "command split into " . ($#ecmds+1) . " parts." if($#ecmds>0);
   foreach my $ecmd (@ecmds) {
@@ -685,6 +688,17 @@ ECMD_Write($$$)
     <li>logTraffic &lt;loglevel&gt;<br>Enables logging of sent and received datagrams with the given loglevel. Control characters in the logged datagrams are escaped, i.e. a double backslash is shown for a single backslash, \n is shown for a line feed character, etc.</li>
     <li>timeout &lt;seconds&gt;<br>Time in seconds to wait for a reply from the physical ECMD device before FHEM assumes that something has gone wrong. The default is 3 seconds if this attribute is not set.</li> 
     <li>partial &lt;seconds&gt;<br>Some physical ECMD devices split readings and replies into several transmissions. If the partial attribute is set, this behavior is accounted for as follows: (a) If a reply is expected for a get or set command, FHEM collects transmissions from the physical ECMD device until either the reply matches the expected reply or the time in seconds given with the partial attribute has expired. (b) If a spontaneous transmission does not match the regular expression for any reading, the transmission is recorded and prepended to the next transmission. If the line is quiet for longer than the time in seconds given with the partial attribute, the recorded transmission is discarded. Use regular expressions that produce exact matches.</li> 
+    <li>requestSeparator<br>
+    A single request from FHEM to the device might need to be split in several datagrams. A command string is split at all
+    occurrences of the requestSeparator. The requestSeparator itself is removed from the command string and thus 
+    not part of the request. It defaults to the
+    value \000 (octal representation of control char with code zero).
+    </li>
+    <li>responseSeparator<br>
+    In order to identify the single responses from the device to FHEM for each part of a split command, a responseSeparator
+    can be appended to the response to each part. The responseSeparator is only appended to commands split by means of a
+    requestSeparator. The default is to have no responseSeparator, i.e. responses are simply concatenated.
+    </li>
     <li><a href="#verbose">verbose</a></li>
   </ul>
   <br><br>
@@ -738,8 +752,11 @@ ECMD_Write($$$)
             <code>get &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
             <br><br>
             Declares a new set or get command <code>&lt;commandname&gt;</code>. If the user invokes the set or get command <code>&lt;commandname&gt;</code>, the string that results from the execution of the &lt;perl special&gt; is sent to the physical device.<p>
-            A \000 (octal representation of control char with code zero) can be used to split the command into chunks. This is required for sending multiple <a href="http://www.ethersex.de/index.php/ECMD">Ethersex commands</a> for one command in the class definition. The result string for the command is the
-            concatenation of all responses received from the physical device. Use \x00 for literal zero bytes.
+            A request separator (see <a href="#ECMDattr">Attributes</a>)
+            can be used to split the command into chunks. This is required for sending multiple <a href="http://www.ethersex.de/index.php/ECMD">Ethersex commands</a> for one command in the class definition. 
+            The result string for the command is the
+            concatenation of all responses received from the physical device, optionally with response separators 
+            (see <a href="#ECMDattr">Attributes</a>) in between.
             <br><br>
             </li>
 
