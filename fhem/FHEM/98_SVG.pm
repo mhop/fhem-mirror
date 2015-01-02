@@ -314,7 +314,6 @@ SVG_PEdit($$$$)
   $ret .= "</tr>";
 
   my $max = @{$conf{lType}}+1;
-  $max = 8 if($max > 8);
   my ($desc, $htmlArr, $example) = ("Spec", undef, "");
   if($modules{$ldt}{SVG_sampleDataFn}) {
     no strict "refs";
@@ -474,11 +473,12 @@ SVG_WriteGplot($)
     return 0;
   }
 
-  my $hasTl;
-  for(my $i=0; $i <= 8; $i++) {
-    $hasTl = 1 if($FW_webArgs{"title_$i"});
+  my $maxLines = 0;
+  foreach my $i (keys %FW_webArgs) {
+    next if($i !~ m/^title_(.*)$/);
+    $maxLines = $1 if($1 > $maxLines);
   }
-  return 0 if(!$hasTl);
+  return 0 if(!$maxLines);
 
   my $fName = $FW_webArgs{gplotName};
   return if(!$fName);
@@ -503,7 +503,7 @@ SVG_WriteGplot($)
 
   my $ld = $FW_webArgs{logdevicetype};
   my @plot;
-  for(my $i=0; $i <= 8; $i++) {
+  for(my $i=0; $i <= $maxLines; $i++) {
     next if(!$FW_webArgs{"title_$i"});
     my $prf = "par_${i}_";
     my @v = map {$FW_webArgs{"$prf$_"}}
