@@ -888,15 +888,15 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
 <code>set &lt;name&gt; DailyIndexRefreshTime &lt;time&gt;</code></a>
 <br />Sets the current DailyIndexRefreshTime for the whole bunch of Zoneplayers.</li>
-<li><a name="SONOSPLAYER_setter_RoomIcon">
-<code>set &lt;name&gt; RoomIcon &lt;Iconname&gt;</code></a>
-<br />Sets the Icon for this Zone</li>
 <li><a name="SONOSPLAYER_setter_Name">
 <code>set &lt;name&gt; Name &lt;Zonename&gt;</code></a>
 <br />Sets the Name for this Zone</li>
 <li><a name="SONOSPLAYER_setter_Reboot">
 <code>set &lt;name&gt; Reboot</code></a>
 <br />Initiates a reboot on the Zoneplayer.</li>
+<li><a name="SONOSPLAYER_setter_RoomIcon">
+<code>set &lt;name&gt; RoomIcon &lt;Iconname&gt;</code></a>
+<br />Sets the Icon for this Zone</li>
 <li><a name="SONOSPLAYER_setter_Wifi">
 <code>set &lt;name&gt; Wifi &lt;State&gt;</code></a>
 <br />Sets the WiFi-State of the given Player. Can be 'off', 'persist-off' or 'on'.</li>
@@ -1167,15 +1167,15 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
 <code>set &lt;name&gt; DailyIndexRefreshTime &lt;time&gt;</code></a>
 <br />Setzt die aktuell gültige DailyIndexRefreshTime für alle Zoneplayer.</li>
-<li><a name="SONOSPLAYER_setter_RoomIcon">
-<code>set &lt;name&gt; RoomIcon &lt;Iconname&gt;</code></a>
-<br />Legt das Icon für die Zone fest</li>
 <li><a name="SONOSPLAYER_setter_Name">
 <code>set &lt;name&gt; Name &lt;Zonename&gt;</code></a>
 <br />Legt den Namen der Zone fest.</li>
 <li><a name="SONOSPLAYER_setter_Reboot">
 <code>set &lt;name&gt; Reboot</code></a>
 <br />Führt für den Zoneplayer einen Neustart durch.</li>
+<li><a name="SONOSPLAYER_setter_RoomIcon">
+<code>set &lt;name&gt; RoomIcon &lt;Iconname&gt;</code></a>
+<br />Legt das Icon für die Zone fest</li>
 <li><a name="SONOSPLAYER_setter_Wifi">
 <code>set &lt;name&gt; Wifi &lt;State&gt;</code></a>
 <br />Setzt den WiFi-Zustand des Players. Kann 'off', 'persist-off' oder 'on' sein.</li>
