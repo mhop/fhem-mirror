@@ -49,6 +49,7 @@ my $poll_now = POLL_PAUSED;
 my $get_timer_now = GET_TIMER_PAUSED;
 my $get_config_now = GET_CONFIG_PAUSED;
 my $command_config_file = "";
+my $poll_duration = 0;
 #Send Parameter
 my $send_now = NO_SEND;
 my $send_additonal_param="";
@@ -213,6 +214,9 @@ VCONTROL_Define($$)
 
   
   #set Internal Timer on Polling Interval
+   my $timer = gettimeofday()+1;
+   Log3($name, 5, "VCONTROL set InternalTimer +1 to $timer");
+
   InternalTimer(gettimeofday()+1, "VCONTROL_Poll", $hash, 0);
   return undef;
   
@@ -264,8 +268,13 @@ sub
 VCONTROL_Poll($)
 {
   my $hash = shift;
+  my $name = $hash->{NAME};
   #global Module Trigger that Polling is started
   $poll_now=POLL_ACTIVE;
+  $poll_duration = gettimeofday();
+  Log3 $name, 4, "VCONTROL: Start of Poll !";
+  my $timer = gettimeofday()+$hash->{INTERVAL};
+  Log3($name, 5, "VCONTROL: set InternalTimer to $timer");
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "VCONTROL_Poll", $hash, 0);
 }
 
@@ -394,7 +403,10 @@ VCONTROL_Read($)
   #End of Poll Interval
   if ($poll_now == POLL_ACTIVE && $last_cmd == $cmdcount)
   {
-     Log3 $name, 5, "VCONTROL: End of Poll";
+     $poll_duration = (gettimeofday() - $poll_duration);
+     my $duration = sprintf("%.2f", $poll_duration);
+     $hash->{DURATION} = "$duration";
+     Log3 $name, 4, "VCONTROL: End of Poll ! Duration: $duration";
      $poll_now = POLL_PAUSED;
      $last_cmd = 0;
      @cmd_list = @poll_cmd_list;
@@ -403,6 +415,8 @@ VCONTROL_Read($)
      #activate timer get list if questioned
      if ($get_timer_now == GET_TIMER_ACTIVE && $send_now == NO_SEND ){
         @cmd_list = @get_timer_cmd_list;
+        Log3 $name, 5, "VCONTROL: Poll TIMER!";
+        RemoveInternalTimer($hash);
         VCONTROL_Poll($hash);
         $get_timer_now = GET_TIMER_PAUSED;
      } 
@@ -630,7 +644,12 @@ VCONTROL_Parse($$$$)
              @cmd_list = @get_timer_cmd_list;
              $get_timer_now = GET_TIMER_PAUSED;
           }
-          VCONTROL_Poll($hash) if (substr($hexline, 0, 2) == "00");
+          
+          if (substr($hexline, 0, 2) == "00"){
+             Log3 $pn, 5, "VCONTROL: Poll SET!";
+             RemoveInternalTimer($hash);
+             VCONTROL_Poll($hash);
+          }
        }
        $send_now = $next_send;
      }
@@ -793,6 +812,8 @@ sub VCONTROL_Get($@) {
 
   if ($poll_now == POLL_PAUSED ){
      @cmd_list = @get_timer_cmd_list;
+     Log3 $pn, 5, "VCONTROL: Poll GET!";
+     RemoveInternalTimer($hash);
      VCONTROL_Poll($hash);
   }
   else { $get_timer_now = GET_TIMER_ACTIVE; }
