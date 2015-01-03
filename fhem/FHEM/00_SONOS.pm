@@ -9,14 +9,16 @@
 #
 # !WARNING!
 # This Module needs additional Perl-Libraries.
-# Installation:
+# Installation of:
 #  * LWP::Simple
-#  * HTML::Entities
-#  * Net::Ping
-#  * File::Path
-#  * Time::HiRes
-#  * threads
-#  * Thread::Queue
+#  * LWP::UserAgent
+#  * HTTP::Request
+#  * SOAP::Lite
+# 
+# e.g. as Debian-Packages (via "sudo apt-get install <packagename>")
+#  * LWP::Simple-Packagename (incl. LWP::UserAgent and HTTP::Request): libwww-perl
+#  * SOAP::Lite-Packagename: libsoap-lite-perl
+#
 #
 # define <name> SONOS <host:port> [[[interval] waittime] delaytime]
 #
@@ -30,6 +32,8 @@
 # Changelog
 #
 # SVN-History:
+# 03.01.2015
+#	Dokumentation angepasst (commandref und Installationsdoku im Dateiheader)
 # 02.01.2015
 #	Anzeige bei der Wiedergabe eines Docks verbessert. Dort werden nun der Titel und Album/Artist-Informationen und ein Dock-Cover angezeigt.
 #	Getter/Setter bei Bedarf um ":noArg" erweitert.
@@ -333,7 +337,7 @@ my %sets = (
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
 my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime);
-my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomIcon LineInConnected);
+my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomIcon LineInConnected currentAlbum currentArtist currentTitle);
 
 # Obsolete Einstellungen...
 my $SONOS_UseTelnetForQuestions = 1;
@@ -4660,6 +4664,7 @@ sub SONOS_ServiceCallback($$) {
 				# Dock-Wiedergabe feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentAlbum', SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1)));
 				my $tmpTitle = SONOS_replaceSpecialStringCharacters(decode_entities($1)) if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i);
+				$tmpTitle = '' if (!defined($tmpTitle));
 				SONOS_Client_Notifier('SetCurrent:Title:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentTitle', $tmpTitle));
 				SONOS_Client_Notifier('SetCurrent:Artist:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentArtist', ''));
 				
