@@ -243,7 +243,7 @@ sub GDS_Get($@) {
 	readingsSingleUpdate($hash, 'state', 'active', 0);
 	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
 
-	my ($result, $datensatz, $found);
+	my ($result, @datensatz, $found);
 
 	given($command) {
 
@@ -289,16 +289,29 @@ sub GDS_Get($@) {
 
 		when("alerts"){
 			if($parameter =~ y/0-9// == length($parameter)){
-				$datensatz = $capCellHash{$parameter};
+				while ( my( $key, $val ) = each %capCellHash ) {
+					push @datensatz,$val if $key =~ m/^$parameter/;
+				}
+#				push @datensatz,$capCellHash{$parameter};
 			} else {
-				$datensatz = $capCityHash{$parameter};
+				push @datensatz,$capCityHash{$parameter};
 			}
 			CommandDeleteReading(undef, "$name a_.*");
-			if($datensatz){
-				decodeCAPData($hash, $datensatz);
+			if($datensatz[0]){
+				my $anum = 0;
+				foreach(@datensatz) {
+					decodeCAPData($hash,$_,$anum);
+					$anum++;
+				};
+				readingsSingleUpdate($hash,'a_count',$anum,1);
 			} else {
 				$result = "Keine Warnmeldung für die gesuchte Region vorhanden.";
 			}
+			break;
+			}
+
+		when("headlines"){
+			$result = gdsHeadlines($name);
 			break;
 			}
 
@@ -493,14 +506,13 @@ sub buildCAPList(@){
 		};
     if ($@) {
       Log3(1,$name,'GDS: error analyzing alerts XML:'.$@);
-#      return (undef,undef) if(!defined($alertsXml));
       return (undef,undef);
     }
 	my $info		= 0;
 	my $area		= 0;
 	my $record		= 0;
 	my $n			= 0;
-	my ($capCity, $capCell, $capExit, @a, $list);
+	my ($capCity, $capCell, $capExit, $capEvt, @a, $list);
 
 	%capCityHash	= ();
 	%capCellHash	= ();
@@ -514,11 +526,11 @@ sub buildCAPList(@){
 			if(!$capCity) {last;}
 			$capCell = findCAPWarnCellId($info, $area);
 			$n = 100*$info+$area;
-			$capCity = latin1ToUtf8($capCity);
+			$capCity = latin1ToUtf8($capCity.' '.$capExit);
 			push @a, $capCity;
 			$capCity =~ s/\s/_/g;
 			$capCityHash{$capCity} = $n;
-			$capCellHash{"$capCell"} = $n;
+			$capCellHash{"$capCell$n"} = $n;
 			$area++;
 			$record++;
 			$capCity = undef;
@@ -534,8 +546,8 @@ sub buildCAPList(@){
 	return ($list, $record);
 }
 
-sub decodeCAPData($$){
-	my ($hash, $datensatz) = @_;
+sub decodeCAPData($$$){
+	my ($hash, $datensatz, $anum) = @_;
 	my $name		= $hash->{NAME};
 	my $info		= int($datensatz/100);
 	my $area		= $datensatz-$info*100;
@@ -552,23 +564,23 @@ sub decodeCAPData($$){
 # topLevel informations
 	@dummy = split(/\./, $alertsXml->{identifier});
 
-	$readings{a_identifier}		= $alertsXml->{identifier}	if($_gdsAll || $_gdsDebug);
-	$readings{a_idPublisher}	= $dummy[5]					if($_gdsAll);
-	$readings{a_idSysten}		= $dummy[6]					if($_gdsAll);
-	$readings{a_idTimeStamp}	= $dummy[7]					if($_gdsAll);
-	$readings{a_idIndex}		= $dummy[8]					if($_gdsAll);
-	$readings{a_sent}			= $alertsXml->{sent};
-	$readings{a_status}			= $alertsXml->{status};
-	$readings{a_msgType}		= $alertsXml->{msgType};
+	$readings{"a_".$anum."_identifier"}		= $alertsXml->{identifier}	if($_gdsAll || $_gdsDebug);
+	$readings{"a_".$anum."_idPublisher"}	= $dummy[5]					if($_gdsAll);
+	$readings{"a_".$anum."_idSysten"}		= $dummy[6]					if($_gdsAll);
+	$readings{"a_".$anum."_idTimeStamp"}	= $dummy[7]					if($_gdsAll);
+	$readings{"a_".$anum."_idIndex"}		= $dummy[8]					if($_gdsAll);
+	$readings{"a_".$anum."_sent"}			= $alertsXml->{sent};
+	$readings{"a_".$anum."_status"}			= $alertsXml->{status};
+	$readings{"a_".$anum."_msgType"}		= $alertsXml->{msgType};
 
 # infoSet informations
-	$readings{a_language}		= $alertsXml->{info}[$info]{language}		if($_gdsAll);
-	$readings{a_category}		= $alertsXml->{info}[$info]{category};
-	$readings{a_event}			= $alertsXml->{info}[$info]{event};
-	$readings{a_responseType}	= $alertsXml->{info}[$info]{responseType};
-	$readings{a_urgency}		= $alertsXml->{info}[$info]{urgency}		if($_gdsAll);
-	$readings{a_severity}		= $alertsXml->{info}[$info]{severity}		if($_gdsAll);
-	$readings{a_certainty}		= $alertsXml->{info}[$info]{certainty}		if($_gdsAll);
+	$readings{"a_".$anum."_language"}		= $alertsXml->{info}[$info]{language}		if($_gdsAll);
+	$readings{"a_".$anum."_category"}		= $alertsXml->{info}[$info]{category};
+	$readings{"a_".$anum."_event"}			= $alertsXml->{info}[$info]{event};
+	$readings{"a_".$anum."_responseType"}	= $alertsXml->{info}[$info]{responseType};
+	$readings{"a_".$anum."_urgency"}		= $alertsXml->{info}[$info]{urgency}		if($_gdsAll);
+	$readings{"a_".$anum."_severity"}		= $alertsXml->{info}[$info]{severity}		if($_gdsAll);
+	$readings{"a_".$anum."_certainty"}		= $alertsXml->{info}[$info]{certainty}		if($_gdsAll);
 
 # eventCode informations
 # loop through array
@@ -577,30 +589,32 @@ sub decodeCAPData($$){
 		($n, $v) = (undef, undef);
 		$n = $alertsXml->{info}[$info]{eventCode}[$i]{valueName};
 		if(!$n) {last;}
-		$n = "a_eventCode_".$n;
+		$n = "a_".$anum."_eventCode_".$n;
 		$v = $alertsXml->{info}[$info]{eventCode}[$i]{value};
 		$readings{$n} .= $v." " if($v);
 		$i++;
 	}
 
 # time/validity informations
-	$readings{a_effective}		= $alertsXml->{info}[$info]{effective}					if($_gdsAll);
-	$readings{a_onset}			= $alertsXml->{info}[$info]{onset};
-	$readings{a_expires}		= $alertsXml->{info}[$info]{expires};
-	$readings{a_valid}			= checkCAPValid($readings{a_expires});
-	$readings{a_onset_local}		= capTrans($readings{a_onset});
-	$readings{a_expires_local}	= capTrans($readings{a_expires});
-	$readings{a_sent_local}	= capTrans($readings{a_sent});
+	$readings{"a_".$anum."_effective"}		= $alertsXml->{info}[$info]{effective}					if($_gdsAll);
+	$readings{"a_".$anum."_onset"}			= $alertsXml->{info}[$info]{onset};
+	$readings{"a_".$anum."_expires"}		= $alertsXml->{info}[$info]{expires};
+	$readings{"a_".$anum."_valid"}			= checkCAPValid($readings{"a_".$anum."_expires"});
+	$readings{"a_".$anum."_onset_local"}	= capTrans($readings{"a_".$anum."_onset"});
+	$readings{"a_".$anum."_expires_local"}	= capTrans($readings{"a_".$anum."_expires"});
+	$readings{"a_".$anum."_sent_local"}		= capTrans($readings{"a_".$anum."_sent"});
+
+	$readings{a_valid} = ReadingsVal($name,'a_valid',0) || $readings{"a_".$anum."_valid"};
 
 # text informations
-	$readings{a_headline}		= $alertsXml->{info}[$info]{headline};
-	$readings{a_description}	= $alertsXml->{info}[$info]{description}				if($_gdsAll || $_gdsLong);
-	$readings{a_instruction}	= $alertsXml->{info}[$info]{instruction} 				if($readings{a_responseType} eq "Prepare" 
+	$readings{"a_".$anum."_headline"}		= $alertsXml->{info}[$info]{headline};
+	$readings{"a_".$anum."_description"}	= $alertsXml->{info}[$info]{description}				if($_gdsAll || $_gdsLong);
+	$readings{"a_".$anum."_instruction"}	= $alertsXml->{info}[$info]{instruction} 				if($readings{"a_".$anum."_responseType"} eq "Prepare" 
 																						&& ($_gdsAll || $_gdsLong));
 
 # area informations
-	$readings{a_areaDesc} 		=  $alertsXml->{info}[$info]{area}[$area]{areaDesc};
-	$readings{a_areaPolygon}	=  $alertsXml->{info}[$info]{area}[$area]{polygon}		if($_gdsAll || $_gdsPolygon);
+	$readings{"a_".$anum."_areaDesc"} 		=  $alertsXml->{info}[$info]{area}[$area]{areaDesc};
+	$readings{"a_".$anum."_areaPolygon"}	=  $alertsXml->{info}[$info]{area}[$area]{polygon}		if($_gdsAll || $_gdsPolygon);
 
 # area geocode informations
 # loop through array
@@ -609,21 +623,21 @@ sub decodeCAPData($$){
 		($n, $v) = (undef, undef);
 		$n = $alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{valueName};
 		if(!$n) {last;}
-		$n = "a_geoCode_".$n;
+		$n = "a_".$anum."_geoCode_".$n;
 		$v = $alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{value};
 		$readings{$n} .= $v." " if($v);
 		$i++;
 	}
 
-	$readings{a_altitude}		= $alertsXml->{info}[$info]{area}[$area]{altitude}		if($_gdsAll);
-	$readings{a_ceiling}		= $alertsXml->{info}[$info]{area}[$area]{ceiling}		if($_gdsAll);
+	$readings{"a_".$anum."_altitude"}		= $alertsXml->{info}[$info]{area}[$area]{altitude}		if($_gdsAll);
+	$readings{"a_".$anum."_ceiling"}		= $alertsXml->{info}[$info]{area}[$area]{ceiling}		if($_gdsAll);
 
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "_dataSource", "Quelle: Deutscher Wetterdienst");
 	while(($k, $v) = each %readings){
 		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)) if(defined($v)); }
 	readingsEndUpdate($hash, 1);
-	eval {readingsSingleUpdate($hash, 'a_eventCode_AREA_COLOR_hex', _rgbd2h(ReadingsVal($name, 'a_eventCode_AREA_COLOR', '')),0);};
+	eval {readingsSingleUpdate($hash, 'a_'.$anum.'_eventCode_AREA_COLOR_hex', _rgbd2h(ReadingsVal($name, 'a_'.$anum.'_eventCode_AREA_COLOR', '')),0);};
 
 	return;
 }
@@ -1148,6 +1162,16 @@ sub initDropdownLists($){
 	return;
 }
 
+sub gdsHeadlines($;$) {
+  my ($d,$sep) = @_;
+  my $text;
+  $sep = (defined($sep)) ? $sep : '|';
+  my $count = ReadingsVal($d,'a_count',0);
+  for (my $i = 0; $i < $count; $i++) {
+    $text .= utf8ToLatin1(ReadingsVal('gds','a_'.$i.'_headline','')).$sep;
+  }
+  return utf8ToLatin1($text);
+}
 
 1;
 
@@ -1195,14 +1219,16 @@ sub initDropdownLists($){
 #
 #	2014-02-26	added	attribute gdsPassiveFtp
 #
-#	2014-05-07	added readings a_onset_local & a_expires_local
+#	2014-05-07	added	readings a_onset_local & a_expires_local
 #
-#	2014-05-22	added reading a_sent_local
+#	2014-05-22	added	reading a_sent_local
 #
-#	2014-05-23	added set <name> clear alerts|all
-#							fixed some typos in docu and help
+#	2014-05-23	added	set <name> clear alerts|all
+#						fixed some typos in docu and help
 #
-#	2014-10-15	added:	attr disable
+#	2014-10-15	added	attr disable
+#
+#	2015-01-03	added	multiple alerts handling
 #
 ####################################################################################################
 #
@@ -1332,6 +1358,11 @@ sub initDropdownLists($){
 		<ul>Retrieve map (imagefile) showing forecasts for selected region</ul>
 		<br/>
 
+		<code>get &lt;name&gt; headlines</code>
+		<br/><br/>
+		<ul>Returns a string, containing all alert headlines separated by |</ul>
+		<br/>
+
 		<code>get &lt;name&gt; help</code>
 		<br/><br/>
 		<ul>Show a help text with available commands</ul>
@@ -1401,7 +1432,11 @@ sub initDropdownLists($){
 	<br/><br/>
 	<ul>
 		<li><b>_&lt;readingName&gt;</b> - debug informations</li>
-		<li><b>a_&lt;readingName&gt;</b> - weather data from CAP alert messages. Readings will NOT be updated automatically</li>
+		<li><b>a_X_&lt;readingName&gt;</b> - weather data from CAP alert messages. Readings will NOT be updated automatically<br/>
+			a_ readings contain a set of alert inforamtions, X represents a numeric set identifier starting with 0<br/>
+			that will be increased for every valid alert message in selected area<br/></li>
+		<li><b>a_count</b> - number of currently valid alert messages, can be used for own loop iterations on alert messages</li>
+		<li><b>a_valid</b> - returns 1 if at least one of decoded alert messages is valid</li>
 		<li><b>c_&lt;readingName&gt;</b> - weather data from SET weather conditions. Readings will be updated every 20 minutes</li>
 		<li><b>g_&lt;readingName&gt;</b> - weather data from GET weather conditions. Readings will NOT be updated automatically</li>
 	</ul>
