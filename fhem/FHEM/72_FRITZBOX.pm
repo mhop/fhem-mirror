@@ -466,7 +466,7 @@ FRITZBOX_Get($@)
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
-# Starts the data capturing and sets the new timer
+# Starts the data capturing and sets the new readout timer
 sub ##########################################
 FRITZBOX_Readout_Start($)
 {
@@ -542,7 +542,7 @@ sub FRITZBOX_Readout_Run($)
      # Init and Counters
       push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol" ];
       push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol/User/count" ];
-      push @readoutArray, ["", "ctlmgr_ctl r configd settings/WEBRADIO/count" ];
+      push @readoutArray, ["fhem->radioCount", "ctlmgr_ctl r configd settings/WEBRADIO/count" ];
       push @readoutArray, ["", "ctlmgr_ctl r user settings/user/count" ];
       push @readoutArray, ["", 'echo $CONFIG_AB_COUNT'];
       push @readoutArray, ["", "ctlmgr_ctl r landevice settings/landevice/count" ];
@@ -552,6 +552,7 @@ sub FRITZBOX_Readout_Run($)
 
    # Box model and firmware
       push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
+      push @readoutArray, [ "box_oem", 'echo $OEM' ];
       push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ];
       push @readoutArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ];
       push @readoutArray, [ "box_tr069", "ctlmgr_ctl r tr069 settings/enabled", "onoff" ];
@@ -840,7 +841,12 @@ sub FRITZBOX_Readout_Process($)
             $rValue .= " (old)" if $values{box_fwUpdate} == 1;
             readingsBulkUpdate( $hash, $rName, $rValue );
          }
-         elsif ($rName !~ /readoutTime|box_fwUpdate/)
+         elsif ($rName eq "box_model")
+         {
+            $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
+            readingsBulkUpdate( $hash, $rName, $rValue );
+         }
+         elsif ($rName !~ /readoutTime|box_fwUpdate|box_oem/)
          {
             if ($rValue ne "") 
             {
@@ -859,15 +865,12 @@ sub FRITZBOX_Readout_Process($)
          }
       }
 
-      my $msg = keys( %values )." values captured in ".$values{readoutTime}." s";
-      readingsBulkUpdate( $hash, "lastReadout", $msg );
-      FRITZBOX_Log $hash, 4, $msg;
-      if ( defined $values{box_wlan_5GHz} && defined $values{"box_wlan_2.4GHz"} && defined $values{box_guestWLan} )
+      if ( defined $values{"box_wlan_2.4GHz"} )
       {
          my $newState = "WLAN: ";
          if ( $values{"box_wlan_2.4GHz"} eq "on" ) {
             $newState .= "on";
-         } elsif ( defined $values{box_wlan_5GHz} ) {
+         } elsif ( $values{box_wlan_5GHz} ) {
             if ( $values{box_wlan_5GHz} eq "on") {
                $newState .= "on";
             } else {
@@ -880,8 +883,13 @@ sub FRITZBOX_Readout_Process($)
          $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)"
             if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} != 0;
          readingsBulkUpdate( $hash, "state", $newState);
+         FRITZBOX_Log $hash, 5, "SET state = '$newState'";
       }
    }
+
+   my $msg = keys( %values )." values captured in ".$values{readoutTime}." s";
+   readingsBulkUpdate( $hash, "lastReadout", $msg );
+   FRITZBOX_Log $hash, 4, $msg;
 
    readingsEndUpdate( $hash, 1 );
 }
@@ -1153,7 +1161,7 @@ sub FRITZBOX_Ring_Run($)
    my %field;
    my $lastField;
    my $ttsLink;
-   my $fhemRadioStation = 39;
+   my $fhemRadioStation = $hash->{fhem}{radioCount};
 
  # Check if 1st parameter are comma separated numbers
    return $name."|0|Error: Parameter '$intNo' not a number (only commas (,) are allowed to separate numbers)"
@@ -1216,7 +1224,8 @@ sub FRITZBOX_Ring_Run($)
    }
    $msg = substr($msg, 0, 30);
    
-   if ( $field{say} ) {
+   if ( $fhemRadioStation && $field{say} ) {
+      $fhemRadioStation -= 1;
       $ringTone = 33;
       chop $field{say};
       # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
@@ -1252,6 +1261,7 @@ sub FRITZBOX_Ring_Run($)
       FRITZBOX_Exec( $hash, \@cmdArray )
    }
    
+#Preparing 2nd command array
 # Change ring tone of Fritz!Fons
    foreach (@FritzFons)
    {
@@ -1286,7 +1296,7 @@ sub FRITZBOX_Ring_Run($)
 
    $intNo =~ s/,/#/g;
    
-#Preparing 2nd command array to ring and reset everything
+#Preparing 3rd command array to ring and reset everything
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
    push @cmdArray, "sleep ".($duration+2); # 2s added because it takes sometime until it starts ringing
