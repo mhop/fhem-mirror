@@ -1161,8 +1161,8 @@ sub FRITZBOX_Ring_Run($)
    my %field;
    my $lastField;
    my $ttsLink;
-   my $fhemRadioStation = $hash->{fhem}{radioCount};
-
+   my $fhemRadioStation;
+ 
  # Check if 1st parameter are comma separated numbers
    return $name."|0|Error: Parameter '$intNo' not a number (only commas (,) are allowed to separate numbers)"
       unless $intNo =~ /^[\d,]+$/;
@@ -1192,7 +1192,7 @@ sub FRITZBOX_Ring_Run($)
  # Check if next parameter is a valid ring tone
    if (int @val)
    {
-      if ($val[0] !~ /^(msg|show|say):/i)
+      if ($val[0] !~ /^(msg|show|say|play):/i)
       {
          $ringTone = $val[0];
          $ringTone = $ringToneNumber{lc $val[0]};
@@ -1202,10 +1202,10 @@ sub FRITZBOX_Ring_Run($)
       }
    }
 
-# Extract text to say or show
+# Extract text to say, play or show
    foreach (@val)
     {
-      if ($_ =~ /^(show|msg|say):/i)
+      if ($_ =~ /^(show|msg|say|play):/i)
       {
          $lastField = $1;
          $_ =~ s/^$1://;
@@ -1223,27 +1223,67 @@ sub FRITZBOX_Ring_Run($)
       $msg = $field{msg};
    }
    $msg = substr($msg, 0, 30);
-   
-   if ( $fhemRadioStation && $field{say} ) {
-      $fhemRadioStation -= 1;
-      $ringTone = 33;
-      chop $field{say};
-      # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
-      $ttsLink = $ttsLinkTemplate;
-      my $ttsText = $field{say};
-      my $ttsLang = "de";
-      if ($ttsText =~ /^\((en|es|fr|nl)\)/i )
+
+# Determine number of Internet Radio to play mp3 or say tts
+   if ( $field{say} || $field{play} )
+   {
+      foreach (keys %{$hash->{fhem}{radio}})
       {
-         $ttsLang = $1;
-         $ttsText =~ s/^\($1\)\s*//i;
+         if ($hash->{fhem}{radio}{$_} eq "FHEM")
+         {
+            $fhemRadioStation = $_;
+            last;
+         }
       }
-      $ttsLink =~ s/\[SPRACHE\]/$ttsLang/;
-      $ttsText = substr($ttsText,0,70);
-      $ttsText = uri_escape($ttsText);
-      $ttsLink =~ s/\[TEXT\]/$ttsText/;
-      FRITZBOX_Log $hash, 5, "Created Text2Speech internet link: $ttsLink";
+      if ( not defined $fhemRadioStation && $hash->{fhem}{radioCount} )
+      {
+         $fhemRadioStation = $hash->{fhem}{radioCount}-1;
+         $fhemRadioStation = 39 if $fhemRadioStation>39; # Because count cannot be reset
+      }
    }
 
+# Create tts link to play as internet radio
+   if ( $field{say} ) 
+   {
+      if ($fhemRadioStation)
+      {
+         $ringTone = 33;
+         chop $field{say};
+         # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
+         $ttsLink = $ttsLinkTemplate;
+         my $ttsText = substr $field{say},0,100;
+         my $ttsLang = "de";
+         if ($ttsText =~ /^\((en|es|fr|nl)\)/i )
+         {
+            $ttsLang = $1;
+            $ttsText =~ s/^\($1\)\s*//i;
+         }
+         $ttsLink =~ s/\[SPRACHE\]/$ttsLang/;
+         $ttsText = substr($ttsText,0,70);
+         $ttsText = uri_escape($ttsText);
+         $ttsLink =~ s/\[TEXT\]/$ttsText/;
+         FRITZBOX_Log $hash, 5, "Created Text2Speech internet link: $ttsLink";
+      }
+      else
+      {
+         FRITZBOX_Log $hash, 2, "Cannot do Text2Speech because box has no internet radio";
+      }
+   }
+
+   if ($field{play})
+   {
+      unless ($ttsLink)
+      {
+         $ringTone = 33;
+         chop $field{play};
+         $ttsLink = $field{play};
+         FRITZBOX_Log $hash, 5, "Extracted MP3 ring tone: $ttsLink";
+      }
+      else
+      {
+         FRITZBOX_Log $hash, 3, "Ignore 'play:' because Text2Speech already defined.";
+      }
+   }
    $result = FRITZBOX_Open_Connection( $hash );
    return "$name|0|$result" 
       if $result;
@@ -1252,27 +1292,30 @@ sub FRITZBOX_Ring_Run($)
    @cmdArray = ();
    
 # Creation fhemRadioStation for ttsLink
-   if (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "fhemTTS")
+   if (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM")
    {
-      FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'fhemTTS' for ringing with text-to-speech";
-      push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO39/Name fhemTTS";
-      push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO39/Bitmap 1023";
+      FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
+      push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Name FHEM";
+      push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Bitmap 1023";
    #Execute command array
       FRITZBOX_Exec( $hash, \@cmdArray )
    }
    
 #Preparing 2nd command array
 # Change ring tone of Fritz!Fons
-   foreach (@FritzFons)
+   if ($ringTone)
    {
-      push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/IntRingTone";
-      push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/IntRingTone $ringTone";
-      FRITZBOX_Log $hash, 4, "Change temporarily internal ring tone of Fritz!Fon DECT $_ to $ringTone";
-      if ($ttsLink)
+      foreach (@FritzFons)
       {
-         push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/RadioRingID";
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/RadioRingID ".$fhemRadioStation;
-         FRITZBOX_Log $hash, 4, "Change radio station of Fritz!Fon DECT $_ to $fhemRadioStation (fhemTTS)";
+         push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/IntRingTone";
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/IntRingTone $ringTone";
+         FRITZBOX_Log $hash, 4, "Change temporarily internal ring tone of Fritz!Fon DECT $_ to $ringTone";
+         if ($ttsLink)
+         {
+            push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/RadioRingID";
+            push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/RadioRingID ".$fhemRadioStation;
+            FRITZBOX_Log $hash, 4, "Change temporarily radio station of Fritz!Fon DECT $_ to $fhemRadioStation (FHEM)";
+         }
       }
    }
 
@@ -1304,23 +1347,29 @@ sub FRITZBOX_Ring_Run($)
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
       if $ringWithIntern != 0 ;
 # Reset internal ring tones for the Fritz!Fons
-   foreach (keys @FritzFons)
+   if ($ringTone)
    {
-      push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/IntRingTone ".$result->[2*$_];
-   # Reset internet station for the Fritz!Fons
-      if ($ttsLink)
+      foreach (keys @FritzFons)
       {
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/RadioRingID ".$result->[2*(int(@FritzFons)+$_)];
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/IntRingTone ".$result->[2*$_];
+      # Reset internet station for the Fritz!Fons
+         if ($ttsLink)
+         {
+            push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/RadioRingID ".$result->[2*(int(@FritzFons)+$_)];
+         }
       }
    }
-   
 # Reset name of calling number
    if ($ringWithIntern =~ /^([1-2])$/)
    {
       if ($ttsLink) {
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[4*int(@FritzFons)]."'"
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[4*int(@FritzFons)]."'";
+         push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
+         push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
+      } elsif ($ringTone) {
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'";
       } else {
-         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'"
+         push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[0]."'";
       }
    }
    
@@ -2121,13 +2170,15 @@ sub FRITZBOX_fritztris($)
          <br>
       </li><br>
 
-      <li><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text] [say:Text]</code>
+      <li><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text]  [say:Text | play:Link]</code>
          <br>
          Example:
          <br>
          <code>set fritzbox ring 611,612 5 Budapest show:It is raining</code>
          <br>
          <code>set fritzbox ring 611 say:(en)It is raining</code>
+         <br>
+         <code>set fritzbox ring 610 play:http://raspberrypi/sound.mp3</code>
          <br>
          Rings the internal numbers for "duration" seconds and (on Fritz!Fons) with the given "ring tone" name.
          Different internal numbers have to be separated by a comma (without spaces).
@@ -2138,8 +2189,9 @@ sub FRITZBOX_fritztris($)
          If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'show:' will be shown as the callers name.
          Maximal 30 characters are allowed.
          <br>
-         On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (and continue with the default ring tone of the handset). This feature creates the radio station 39 'fhemTTS' and uses the translate.google.com.
-         <br>
+         On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (max. 100 characters). 
+         Alternatively a MP3 link can be played with 'play:'. This creates the  internet radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
+        <br>
          If the call is taken the callee hears the "music on hold" which can also be used to transmit messages.
       </li><br>
 
@@ -2376,12 +2428,14 @@ sub FRITZBOX_fritztris($)
          <br>
       </li><br>
       
-      <li><code>set &lt;name&gt; ring &lt;intNummern&gt; [Dauer [Klingelton]] [show:Text] [say:Text]</code>
+      <li><code>set &lt;name&gt; ring &lt;intNummern&gt; [Dauer [Klingelton]] [show:Text] [say:Text | play:Link]</code>
          Beispiel:
          <br>
          <code>set fritzbox ring 611,612 5 Budapest show:Es regnet</code>
          <br>
          <code>set fritzbox ring 610 say:Es regnet</code>
+         <br>
+         <code>set fritzbox ring 610 play:http://raspberrypi/sound.mp3</code>
          <br>
          L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
          Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
@@ -2392,7 +2446,8 @@ sub FRITZBOX_fritztris($)
          Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br>
-         Auf Fritz!Fons wird der Text hinter dem Parameter 'say:' direkt angesagt (gefolgt vom dem Standard Klingelton). Dieses Feature erzeugt die Internetradiostation 39 'fhemTTS' und nutzt translate.google.com.
+         Auf Fritz!Fons wird der Text (max. 100 Zeichen) hinter dem Parameter 'say:' direkt angesagt. 
+         Alternativ kann mit 'play:' auch ein MP3-Link abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com f&uuml;r Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
          <br>
          Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichten&uuml;bermittlung genutzt werden kann.
       </li><br>
