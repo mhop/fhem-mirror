@@ -49,6 +49,7 @@ sub FRITZBOX_Exec($$);
 sub FRITZBOX_SendMail($@);
 sub FRITZBOX_SetMOH($@);
 sub FRITZBOX_StartRadio($@);
+sub FRITZBOX_Wlan_Run($);
 
 our $telnet;
 
@@ -275,6 +276,7 @@ FRITZBOX_Set($$@)
    my $list = "alarm"
             . " createPwdFile"
             . " customerRingTone"
+            . " dect:on,off"
             . " diversity"
             . " guestWlan:on,off"
             . " moh"
@@ -332,6 +334,18 @@ FRITZBOX_Set($$@)
          return FRITZBOX_SetCustomerRingTone $hash, @val;
       }
       
+   } elsif ( lc $cmd eq 'dect') {
+      if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
+      {
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
+         my $state = $val[0];
+         $state =~ s/on/1/;
+         $state =~ s/off/0/;
+         FRITZBOX_Exec( $hash, "ctlmgr_ctl w dect settings/enabled $state");
+         readingsSingleUpdate($hash,"box_dect",$val[0], 1);
+         return undef;
+      }
+
    } elsif ( lc $cmd eq 'diversity') {
       if ( int @val == 2 && defined( $hash->{READINGS}{"diversity".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) 
       {
@@ -381,8 +395,7 @@ FRITZBOX_Set($$@)
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          push @cmdBuffer, "ring ".join(" ", @val);
-         FRITZBOX_Cmd_Start $hash->{helper}{TimerCmd};
-         return undef;
+         return FRITZBOX_Cmd_Start $hash->{helper}{TimerCmd};
       }
    }
    elsif ( lc $cmd eq 'sendmail')
@@ -425,15 +438,8 @@ FRITZBOX_Set($$@)
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         my $state = $val[0];
-         $state =~ s/on/1/;
-         $state =~ s/off/0/;
-         FRITZBOX_Exec( $hash, "ctlmgr_ctl w wlan settings/wlan_enable $state");
-
-         $hash->{fhem}{LOCAL}=2; #2 = short update without new trigger
-         FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
-         $hash->{fhem}{LOCAL}=0;
-         return undef;
+         push @cmdBuffer, "wlan ".join(" ", @val);
+         return FRITZBOX_Cmd_Start $hash->{helper}{TimerCmd};
       }
    }
 
@@ -497,8 +503,8 @@ FRITZBOX_Readout_Start($)
 } # end FRITZBOX_Readout_Start
 
 # Starts the data capturing and sets the new timer
-sub ##########################################
-FRITZBOX_Readout_Run($)
+##########################################
+sub FRITZBOX_Readout_Run($)
 {
    my ($name) = @_;
    my $hash = $defs{$name};
@@ -734,9 +740,11 @@ FRITZBOX_Readout_Run($)
 # Gäste WLAN
    push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
    push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
-#Music on Hold
+# Dect
+   push @readoutArray, [ "box_dect", "ctlmgr_ctl r dect settings/enabled", "onoff" ];
+# Music on Hold
    push @readoutArray, [ "box_moh", "ctlmgr_ctl r telcfg settings/MOHType", "mohtype" ];
-#Power Rate
+# Power Rate
    push @readoutArray, [ "box_powerRate", "ctlmgr_ctl r power status/rate_sumact"];
 
 # Alarm clock
@@ -768,8 +776,8 @@ FRITZBOX_Readout_Run($)
 
 } # End FRITZBOX_Readout_Run
 
-sub ##########################################
-FRITZBOX_Readout_Done($) 
+##########################################
+sub FRITZBOX_Readout_Done($) 
 {
    my ($string) = @_;
    unless (defined $string)
@@ -777,13 +785,30 @@ FRITZBOX_Readout_Done($)
       Log3 "FRITZBOX_Readout_Done", 1, "Fatal Error: no parameter handed over";
       return;
    }
-   
+
+   my ($name) = split("\\|", $string);
+   my $hash = $defs{$name};
+
+# delete the marker for RUNNING_PID process
+   delete($hash->{helper}{READOUT_RUNNING_PID});
+
+   FRITZBOX_Readout_Process $string;
+
+}
+
+##########################################
+sub FRITZBOX_Readout_Process($) 
+{
+   my ($string) = @_;
+   unless (defined $string)
+   {
+      Log3 "FRITZBOX_Readout_Process", 1, "Fatal Error: no parameter handed over";
+      return;
+   }
+  
    my ($name, %values) = split("\\|", $string);
    my $hash = $defs{$name};
    
-   # delete the marker for RUNNING_PID process
-   delete($hash->{helper}{READOUT_RUNNING_PID});
-
    FRITZBOX_Log $hash, 5, "Processing ". keys(%values)." readouts.";
 
    readingsBeginUpdate($hash);
@@ -820,12 +845,16 @@ FRITZBOX_Readout_Done($)
             if ($rValue ne "") 
             {
                readingsBulkUpdate( $hash, $rName, $rValue );
-               FRITZBOX_Log $hash, 5, "$rName = '$rValue'";
+               FRITZBOX_Log $hash, 5, "SET $rName = '$rValue'";
             }
             elsif ( exists( $hash->{READINGS}{$rName} ) ) 
             {  
                delete $hash->{READINGS}{$rName};
-               FRITZBOX_Log $hash, 5, "Delete '$rName'.";
+               FRITZBOX_Log $hash, 5, "Delete reading $rName.";
+            }
+            else
+            {
+               FRITZBOX_Log $hash, 5, "Ignore reading $rName.";
             }
          }
       }
@@ -833,22 +862,25 @@ FRITZBOX_Readout_Done($)
       my $msg = keys( %values )." values captured in ".$values{readoutTime}." s";
       readingsBulkUpdate( $hash, "lastReadout", $msg );
       FRITZBOX_Log $hash, 4, $msg;
-      my $newState = "WLAN: ";
-      if ( $values{"box_wlan_2.4GHz"} eq "on" ) {
-         $newState .= "on";
-      } elsif ( defined $values{box_wlan_5GHz} ) {
-         if ( $values{box_wlan_5GHz} eq "on") {
+      if ( defined $values{box_wlan_5GHz} && defined $values{"box_wlan_2.4GHz"} && defined $values{box_guestWLan} )
+      {
+         my $newState = "WLAN: ";
+         if ( $values{"box_wlan_2.4GHz"} eq "on" ) {
             $newState .= "on";
+         } elsif ( defined $values{box_wlan_5GHz} ) {
+            if ( $values{box_wlan_5GHz} eq "on") {
+               $newState .= "on";
+            } else {
+               $newState .= "off";
+            }
          } else {
             $newState .= "off";
          }
-      } else {
-         $newState .= "off";
+         $newState .=" gWLAN: ".$values{box_guestWlan} ;
+         $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)"
+            if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} != 0;
+         readingsBulkUpdate( $hash, "state", $newState);
       }
-      $newState .=" gWLAN: ".$values{box_guestWlan} ;
-      $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)"
-         if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} != 0;
-      readingsBulkUpdate( $hash, "state", $newState);
    }
 
    readingsEndUpdate( $hash, 1 );
@@ -992,6 +1024,9 @@ sub FRITZBOX_Cmd_Start($)
    my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
    my $name = substr $timerpara, 0, $index;                         # name extrahieren
    my $hash = $defs{$name};
+   my $cmdFunction;
+   my $timeout;
+   my $handover;
    
    return unless int @cmdBuffer;
 
@@ -1017,26 +1052,89 @@ sub FRITZBOX_Cmd_Start($)
 
    my @val = split / /, $cmdBuffer[0];
    
+# Preparing SET RING
    if ($val[0] eq "ring")
    {
       shift @val;
-      
-      my $timeout = 5;
+      $timeout = 5;
       $timeout = $val[1]
          if $val[1] =~/^\d+$/; 
       $timeout += 60;
       $cmdBufferTimeout = time() + $timeout;
-
-      my $handover = $name . "|" . join( "|", @val );
-      $hash->{helper}{CMD_RUNNING_PID} = BlockingCall("FRITZBOX_Ring_Run", $handover,
-                                          "FRITZBOX_Cmd_Done", $timeout,
-                                          "FRITZBOX_Cmd_Aborted", $hash)
-                                 unless exists $hash->{helper}{CMD_RUNNING_PID};
+      $handover = $name . "|" . join( "|", @val );
+      $cmdFunction = "FRITZBOX_Ring_Run";
    }
+# Preparing SET WLAN
+   elsif ($val[0] eq "wlan")
+   {
+      shift @val;
+      $timeout = 10;
+      $cmdBufferTimeout = time() + $timeout;
+      $handover = $name . "|" . join( "|", @val );
+      $cmdFunction = "FRITZBOX_Wlan_Run";
+   }
+# No valid set operation
+   else
+   {
+      my $msg = "Unknown command '".join( " ", @val )."'";
+      FRITZBOX_Log $hash, 1, $msg;
+      return $msg;
+   }
+
+# Starting new command
+   $hash->{helper}{CMD_RUNNING_PID} = BlockingCall($cmdFunction, $handover,
+                                       "FRITZBOX_Cmd_Done", $timeout,
+                                       "FRITZBOX_Cmd_Aborted", $hash);
+   return undef;
 } # end FRITZBOX_Cmd_Start
 
-sub ##########################################
-FRITZBOX_Ring_Run($) 
+##########################################
+sub FRITZBOX_Wlan_Run($)
+{
+   my ($string) = @_;
+   my ($name, @val) = split "\\|", $string;
+   my $hash = $defs{$name};
+   my $result;
+   my @readoutArray;
+   my @readoutReadings;
+   my $startTime = time();
+   
+   my $state = $val[0];
+   $state =~ s/on/1/;
+   $state =~ s/off/0/;
+   
+   $result = FRITZBOX_Open_Connection( $hash );
+   return "$name|0|$result" 
+      if $result;
+
+   my $returnStr = "$name|2|";
+
+# Set WLAN
+   push @readoutArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable $state"];
+# Read WLAN
+   push @readoutArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
+# Read 2nd WLAN
+   push @readoutArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
+# Read Gäste WLAN
+   push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
+   push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
+
+# Execute commands
+   FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
+
+   $returnStr .= join('|', @readoutReadings );
+   $returnStr .= "|readoutTime|";
+   $returnStr .= sprintf "%.2f", time()-$startTime;
+
+   FRITZBOX_Close_Connection ( $hash );
+
+   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
+   return $returnStr
+
+} # end FRITZBOX_Wlan_Run
+
+##########################################
+sub FRITZBOX_Ring_Run($) 
 {
    my ($string) = @_;
    my ($name, @val) = split "\\|", $string;
@@ -1230,19 +1328,23 @@ FRITZBOX_Cmd_Done($)
    my ($string) = @_;
    return unless defined $string;
 
-   my ($name, $success, $result) = split("\\|", $string);
+   my ($name, $success, $result) = split("\\|", $string,3);
    my $hash = $defs{$name};
    
    shift (@cmdBuffer);
    delete($hash->{helper}{CMD_RUNNING_PID});
 
-   if ($success != 1)
+   if ( $success !~ /1|2/ )
    {
       FRITZBOX_Log $hash, 1, $result;
    }
-   else
+   elsif ( $success == 1 )
    {
       FRITZBOX_Log $hash, 4, $result;
+   }
+   elsif  ($success == 2 )
+   {
+      FRITZBOX_Readout_Process ( $name."|".$result );
    }
 }
 
@@ -1891,7 +1993,36 @@ sub FRITZBOX_fritztris($)
 
    return $returnStr;
 }
+
 ##################################### 
+
+      # <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
+         # <br>
+         # Converts the mp3-file fullFilePath to the G722 format and puts it in the same path.
+         # <br>
+         # The file has to be placed on the file system of the Fritz!Box.
+      # </li><br>
+      
+      # <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
+         # <br>
+         # <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
+         # <br>
+         # The file has to be placed on the file system of the fritzbox.
+      # </li><br>
+
+      # <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
+         # <br>
+         # Konvertiert die  mp3-Datei fullFilePath in das G722-Format und legt es im selben Pfad ab.
+         # <br>
+         # Die Datei muss im Dateisystem der Fritz!Box liegen.
+      # </li><br>
+      
+      # <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
+         # <br>
+         # <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
+         # <br>
+         # The file has to be placed on the file system of the fritzbox.
+      # </li><br>
 
 1;
 
@@ -1938,20 +2069,6 @@ sub FRITZBOX_fritztris($)
          Switches the alarm number (1, 2 or 3) on or off.
       </li><br>
 
-      <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
-         <br>
-         Converts the mp3-file fullFilePath to the G722 format and puts it in the same path.
-         <br>
-         The file has to be placed on the file system of the Fritz!Box.
-      </li><br>
-      
-      <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
-         <br>
-         <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
-         <br>
-         The file has to be placed on the file system of the fritzbox.
-      </li><br>
-
       <li><code>set &lt;name&gt; createPwdFile &lt;password&gt;</code>
          <br>
          Creates a file that contains the telnet password. The file name corresponds to the one used for remote telnet access.
@@ -1964,6 +2081,11 @@ sub FRITZBOX_fritztris($)
          The file has to be placed on the file system of the fritzbox.
          <br>
          The upload takes about one minute before the tone is available.
+      </li><br>
+
+      <li><code>set &lt;name&gt; dect &lt;on|off&gt;</code>
+         <br>
+         Switches the DECT base of the box on or off.
       </li><br>
 
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
@@ -1989,7 +2111,7 @@ sub FRITZBOX_fritztris($)
          <br>
       </li><br>
 
-      <li><code>set &lt;name&gt; ring &lt;internalNumbers&gt; [duration [ringTone]] [show:Text] [say:Text]</code>
+      <li><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text] [say:Text]</code>
          <br>
          Example:
          <br>
@@ -2095,7 +2217,7 @@ sub FRITZBOX_fritztris($)
          To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
          <br>
          To show a message (default: "FHEM") during a ring the internal phone numbers 1-3 can be specified here.
-         The concerned analog phone socket must exist.
+         The concerned analog phone socket <u>must</u> exist.
       </li><br>
       
       <li><code>telnetTimeOut &lt;seconds&gt;</code>
@@ -2116,6 +2238,7 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_time</b> - Alarm time of the alarm clock <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
 
+      <li><b>box_dect</b> - Current state of the DECT base</li>
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
       <li><b>box_guestWlanRemain</b> - Remaining time until the guest WLAN is switched off</li>
@@ -2201,20 +2324,6 @@ sub FRITZBOX_fritztris($)
          Schaltet den Weckruf Nummer 1, 2 oder 3 an oder aus.
       </li><br>
 
-      <li><code>set &lt;name&gt; convertRingTone &lt;fullFilePath&gt;</code>
-         <br>
-         Konvertiert die  mp3-Datei fullFilePath in das G722-Format und legt es im selben Pfad ab.
-         <br>
-         Die Datei muss im Dateisystem der Fritz!Box liegen.
-      </li><br>
-      
-      <li><code>set &lt;name&gt; convertMusicOnHold &lt;fullFilePath&gt;</code>
-         <br>
-         <i>Not implemented yet.</i> Converts the mp3-file fullFilePath to a format that can be used for "Music on Hold".
-         <br>
-         The file has to be placed on the file system of the fritzbox.
-      </li><br>
-
       <li><code>set &lt;name&gt; createPwdFile &lt;password&gt;</code>
          <br>
          Erzeugt eine Datei welche das Telnet-Passwort enth&auml;lt. Der Dateiname entspricht demjenigen, der f&uuml;r den Telnetzugriff genutzt wird.
@@ -2224,12 +2333,18 @@ sub FRITZBOX_fritztris($)
          <br>
          L&auml;dt die MP3-Datei als Klingelton auf das angegebene Telefon. Die Datei muss im Dateisystem der Fritzbox liegen.
          <br>
-         Das Hochladen dauert etwa eine Minute bis der Klingelton verf&uuml,gbar ist.
+         Das Hochladen dauert etwa eine Minute bis der Klingelton verf&uuml;gbar ist.
+      </li><br>
+
+      <li><code>set &lt;name&gt; dect &lt;on|off&gt;</code>
+         <br>
+         Schaltet die DECT-Basis der Box an oder aus.
       </li><br>
 
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Schaltet die Rufumleitung (Nummer 1, 2 ...) an oder aus.
+         <br>
          Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden.
          <br>
          Achtung! Die Fritz!Box erm&ouml;glicht auch eine Weiterleitung in Abh&auml;ngigkeit von der anrufenden Nummer. Diese Art der Weiterleitung kann hiermit nicht geschaltet werden. 
@@ -2251,8 +2366,12 @@ sub FRITZBOX_fritztris($)
          <br>
       </li><br>
       
-      <li><code>set &lt;name&gt; ring &lt;interneNummern&gt; [Dauer [Klingelton]] [show:Nachricht]</code>
-         Beispiel: <code>set fritzbox ring 611,612 5 Budapest show:Es regnet</code>
+      <li><code>set &lt;name&gt; ring &lt;intNummern&gt; [Dauer [Klingelton]] [show:Text] [say:Text]</code>
+         Beispiel:
+         <br>
+         <code>set fritzbox ring 611,612 5 Budapest show:Es regnet</code>
+         <br>
+         <code>set fritzbox ring 610 say:Es regnet</code>
          <br>
          L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
          Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
@@ -2265,7 +2384,7 @@ sub FRITZBOX_fritztris($)
          <br>
          Auf Fritz!Fons wird der Text hinter dem Parameter 'say:' direkt angesagt (gefolgt vom dem Standard Klingelton). Dieses Feature erzeugt die Internetradiostation 39 'fhemTTS' und nutzt translate.google.com.
          <br>
-         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche zur Nachrichten&uuml;bermittlung genutzt werden kann.
+         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichten&uuml;bermittlung genutzt werden kann.
       </li><br>
 
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
@@ -2368,6 +2487,7 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_time</b> - Weckzeit des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
       
+      <li><b>box_dect</b> - Aktueller Status des DECT-Basis</li>
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
       <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
