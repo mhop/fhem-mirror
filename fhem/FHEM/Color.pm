@@ -24,6 +24,7 @@ FHEM_colorpickerInit()
 sub
 FHEM_colorpickerFn($$$$$)
 {
+  #return undef;
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
   my @args = split("[ \t]+", $cmd);
@@ -61,7 +62,6 @@ FHEM_colorpickerFn($$$$$)
 
     if( $mode eq "CT" ) {
       my $ct = $args[1];
-      $ct = int(1000000/$args[1]) if( $ct > 1000 );
       my ($r, $g, $b) = Color::ct2rgb( $ct );
       $args[1] = Color::rgb2hex( $r, $g, $b );
     }
@@ -386,6 +386,10 @@ ct2rgb($)
   my ($ct) = @_;
 
   # calculation from http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code
+
+  # kelvin -> mired
+  $ct = 1000000/$ct if( $ct > 1000 );
+
   # adjusted by 1000K
   my $temp = (1000000/$ct)/100 + 10;
 
@@ -416,5 +420,82 @@ ct2rgb($)
 
   return( $r, $g, $b );
 }
+
+
+sub
+devStateIcon($$@)
+{
+  my($hash,$type,$rgb,$pct,$onoff) = @_;
+  $hash = $::defs{$hash} if( ref($hash) ne 'HASH' );
+
+  return undef if( !$hash );
+
+  my $name = $hash->{NAME};
+
+  if( $type && $type eq "switch" ) {
+    my $value;
+    if( $onoff ) {
+      $value = ::ReadingsVal($name,$onoff,undef);
+      $value = ::CommandGet("","$name $onoff") if( !$value );
+      $value = "on" if( $value && $value eq "1" );
+      $value = "off" if( $value && $value eq "0" );
+
+    } else {
+      $value = ::Value($name);
+    }
+
+    my $s = $value;
+
+    return ".*:light_question" if( !$s );
+    return ".*:$s:toggle";
+
+  } elsif( $type && $type eq "dimmer" ) {
+    my $percent;
+    if( $pct ) {
+      $percent = ::ReadingsVal($name,$pct, undef);
+      $percent = ::CommandGet("","$name $pct") if( !$percent );
+
+    } else {
+      $percent = ::Value($name);
+    }
+
+    return ".*:light_question" if( !defined($percent) );
+
+    my $s = $dim_values{int($percent/7)};
+    $s="off" if( $percent eq "0" );
+    $s="on" if( $percent eq "100" );
+
+    return ".*:$s:toggle";
+
+  } elsif( $type && $type eq "rgb" ) {
+    my $value;
+    if( $rgb ) {
+      $value = ::ReadingsVal($name,$rgb,undef);
+      $value = ::CommandGet("","$name $rgb") if( !$value );
+
+    } else {
+      $value = ::Value($name);
+
+    }
+
+    return ".*:light_question" if( !defined($value) );
+    return ".*:on:toggle" if( $value eq "on" );
+    return ".*:off:toggle" if( $value eq "off" );
+
+    my $s = 'on';
+    if( $pct ) {
+      my $percent = ::ReadingsVal($name,$pct, undef);
+      $percent = ::CommandGet("","$name $pct") if( !$percent );
+      return ".*:off:toggle" if( $percent eq "off" );
+      $percent = 100 if( $percent eq "on" );
+      $s = $dim_values{int($percent/7)} if( $percent && $percent < 100 );
+    }
+
+    return ".*:$s@#$value:toggle";
+  }
+
+  return undef;
+}
+
 
 1;
