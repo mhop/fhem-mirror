@@ -144,11 +144,12 @@ TCM_Write($$$)
       }
     }
     $bstring = "A55A" . $bstring . TCM_CSUM($bstring);
+    Log3 $name, 5, "TCM $name sending ESP2: $bstring";
   } else {
     # TCM 310 (ESP3)
     $bstring = "55" . $fn . TCM_CRC8($fn) . $msg . TCM_CRC8($msg);
+    Log3 $name, 5, "TCM $name sending ESP3: $bstring";
   }
-  Log3 $name, 5, "TCM $name sending $bstring";
   DevIo_SimpleWrite($hash, $bstring, 1);
   # next commands will be sent with a delay
   usleep(int(AttrVal($name, "sendInterval", 100)) * 1000);
@@ -252,7 +253,7 @@ TCM_Read($)
         if($orgmap{$org}) {
           $org = $orgmap{$org};
         } else {
-          Log3 undef, 1, "TCM unknown ORG mapping for $org";
+          Log3 undef, 2, "TCM unknown ORG mapping for $org";
         }
         if ($org ne "A5") {
           # extract db_0
@@ -275,7 +276,7 @@ TCM_Read($)
           if($orgmap{$org}) {
             $org = $orgmap{$org};
           } else {
-            Log3 undef, 1, "TCM unknown ORG mapping for $org";
+            Log3 undef, 2, "TCM unknown ORG mapping for $org";
           }
           if ($org ne "A5") {
             # extract db_0
@@ -372,23 +373,23 @@ TCM_Read($)
 
       } elsif($packetType == 3) {
         # packet type RADIO_SUB_TEL
-        Log3 $name, 1, "TCM $name packet type RADIO_SUB_TEL not supported: $data";
+        Log3 $name, 2, "TCM $name packet type RADIO_SUB_TEL not supported: $data";
 
       } elsif($packetType == 4) {
         # packet type EVENT
-        Log3 $name, 1, "TCM $name packet type EVENT not supported: $data";
+        Log3 $name, 2, "TCM $name packet type EVENT not supported: $data";
 
       } elsif($packetType == 5) {
         # packet type COMMON_COMMAND
-        Log3 $name, 1, "TCM $name packet type COMMON_COMMAND not supported: $data";
+        Log3 $name, 2, "TCM $name packet type COMMON_COMMAND not supported: $data";
 
       } elsif($packetType == 6) {
         # packet type SMART_ACK_COMMAND
-        Log3 $name, 1, "TCM $name packet type SMART_ACK_COMMAND not supported: $data";
+        Log3 $name, 2, "TCM $name packet type SMART_ACK_COMMAND not supported: $data";
 
       } elsif($packetType == 7) {
         # packet type REMOTE_MAN_COMMAND
-        #Log3 $name, 1, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
+        #Log3 $name, 2, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
         $mdata =~ m/^(....)(....)(.*)$/;
         my ($function, $manufID, $messageData) = ($1,$2,$3);
         $odata =~ m/^(........)(........)(..)(..)$/;
@@ -416,14 +417,14 @@ TCM_Read($)
 
       } elsif($packetType == 9) {
         # packet type RADIO_MESSAGE
-        Log3 $name, 1, "TCM: $name packet type RADIO_MESSAGE not supported: $data";
+        Log3 $name, 2, "TCM: $name packet type RADIO_MESSAGE not supported: $data";
 
       } elsif($packetType == 10) {
         # packet type RADIO_ADVANCED
-        Log3 $name, 1, "TCM: $name packet type RADIO_ADVANCED not supported: $data";
+        Log3 $name, 2, "TCM: $name packet type RADIO_ADVANCED not supported: $data";
 
       } else {
-        Log3 $name, 1, "TCM $name unknown packet type $packetType: $data";
+        Log3 $name, 2, "TCM $name unknown packet type $packetType: $data";
 
       }
 
@@ -598,7 +599,7 @@ TCM_Get($@)
     my $rawcmd = $gets120{$cmd};
     return "Unknown argument $cmd, choose one of " .
         join(" ", sort keys %gets120) if(!defined($rawcmd));
-    Log3 $name, 2, "TCM get $name $cmd";
+    Log3 $name, 3, "TCM get $name $cmd";
     $rawcmd .= "000000000000000000";
     TCM_Write($hash, "", $rawcmd);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
@@ -609,7 +610,7 @@ TCM_Get($@)
     my $cmdhash = $gets310{$cmd};
     return "Unknown argument $cmd, choose one of " .
         join(" ", sort keys %gets310) if(!defined($cmdhash));
-    Log3 $name, 2, "TCM get $name $cmd";
+    Log3 $name, 3, "TCM get $name $cmd";
     my $cmdHex = $cmdhash->{cmd};
     TCM_Write($hash, sprintf("%04X0005", length($cmdHex)/2), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
@@ -617,7 +618,7 @@ TCM_Get($@)
     $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
   }
   if($err) {
-    Log3 undef, 1, "TCM $name $err";
+    Log3 undef, 2, "TCM $name $err";
     return $err;
   }
   readingsSingleUpdate($hash, $cmd, $msg, 1);
@@ -681,7 +682,7 @@ TCM_Set($@)
       if($arg !~ m/$argre/i);
     $cmdHex .= $arg;
   }
-  Log3 $name, 2, "TCM set $name $cmd $arg";
+  Log3 $name, 3, "TCM set $name $cmd $arg";
 
   if($cmd eq "teach") {
     $hash->{Teach} = 1;
@@ -709,7 +710,7 @@ TCM_Set($@)
 
   }
   if($err) {
-    Log3 undef, 1, "TCM $name $err";
+    Log3 undef, 2, "TCM $name $err";
     return $err;
   }
   
@@ -1180,4 +1181,3 @@ TCM_Undef($$)
 
 =end html
 =cut
-                                                         
