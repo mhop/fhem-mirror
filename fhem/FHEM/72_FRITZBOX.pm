@@ -47,6 +47,7 @@ sub FRITZBOX_Init($);
 sub FRITZBOX_Cmd_Start($);
 sub FRITZBOX_Exec($$);
 sub FRITZBOX_SendMail($@);
+sub FRITZBOX_SetCustomerRingTone($@);
 sub FRITZBOX_SetMOH($@);
 sub FRITZBOX_StartRadio($@);
 sub FRITZBOX_Wlan_Run($);
@@ -303,7 +304,7 @@ FRITZBOX_Set($$@)
       if (int @val > 0) 
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         return FRITZBOX_SetCustomerRingTone $hash, @val;
+         return FRITZBOX_SetCustomerRingTone ($hash, @val);
       }
       
    } elsif ( lc $cmd eq 'dect') {
@@ -334,12 +335,8 @@ FRITZBOX_Set($$@)
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         my $state = $val[0];
-         $state =~ s/on/1/;
-         $state =~ s/off/0/;
-         FRITZBOX_Exec( $hash, "ctlmgr_ctl w wlan settings/guest_ap_enabled $state");
-         readingsSingleUpdate($hash,"box_guestWlan",$val[0], 1);
-         return undef;
+         push @cmdBuffer, "guestwlan ".join(" ", @val);
+         return FRITZBOX_Cmd_Start $hash->{helper}{TimerCmd};
       }
    }
 
@@ -1055,6 +1052,16 @@ sub FRITZBOX_Cmd_Start($)
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Wlan_Run";
    }
+# Preparing SET guestWLAN
+   elsif ($val[0] eq "guestwlan")
+   {
+      shift @val;
+      $timeout = 10;
+      $cmdBufferTimeout = time() + $timeout;
+      $handover = $name . "|" . join( "|", @val );
+      $cmdFunction = "FRITZBOX_GuestWlan_Run";
+   }
+
 # No valid set operation
    else
    {
@@ -1069,6 +1076,54 @@ sub FRITZBOX_Cmd_Start($)
                                        "FRITZBOX_Cmd_Aborted", $hash);
    return undef;
 } # end FRITZBOX_Cmd_Start
+
+##########################################
+sub FRITZBOX_GuestWlan_Run($)
+{
+   my ($string) = @_;
+   my ($name, @val) = split "\\|", $string;
+   my $hash = $defs{$name};
+   my $result;
+   my @readoutArray;
+   my @readoutReadings;
+   my $startTime = time();
+   
+   my $state = $val[0];
+   $state =~ s/on/1/;
+   $state =~ s/off/0/;
+   
+   $result = FRITZBOX_Open_Connection( $hash );
+   return "$name|0|$result" 
+      if $result;
+
+   my $returnStr = "$name|2|";
+   
+# Set WLAN on if guestWLAN on
+   push @readoutArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable 1"]
+      if $state == 1;
+# Set guestWLAN
+   push @readoutArray, [ "", "ctlmgr_ctl w wlan settings/guest_ap_enabled $state"];
+# Read WLAN
+   push @readoutArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
+# Read 2nd WLAN
+   push @readoutArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
+# Read Gäste WLAN
+   push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
+   push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
+
+# Execute commands
+   FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
+
+   $returnStr .= join('|', @readoutReadings );
+   $returnStr .= "|readoutTime|";
+   $returnStr .= sprintf "%.2f", time()-$startTime;
+
+   FRITZBOX_Close_Connection ( $hash );
+
+   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
+   return $returnStr
+
+} # end FRITZBOX_GuestWlan_Run
 
 ##########################################
 sub FRITZBOX_Wlan_Run($)
@@ -1233,7 +1288,6 @@ sub FRITZBOX_Ring_Run($)
             $ttsText =~ s/^\($1\)\s*//i;
          }
          $ttsLink =~ s/\[SPRACHE\]/$ttsLang/;
-         $ttsText = substr($ttsText,0,70);
          $ttsText = uri_escape($ttsText);
          $ttsLink =~ s/\[TEXT\]/$ttsText/;
          FRITZBOX_Log $hash, 5, "Created Text2Speech internet link: $ttsLink";
