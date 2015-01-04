@@ -61,38 +61,38 @@ my %fonModel = (
       , '0x08' => "C4"
    );
 
-my %ringTone = ( 
-     0 => "HandsetDefault"
-   , 1 => "HandsetInternalTon"
-   , 2 => "HandsetExternalTon"
-   , 3 => "Standard"
-   , 4 => "Eighties"
-   , 5 => "Alert"
-   , 6 => "Ring"
-   , 7 => "RingRing"
-   , 8 => "News"
-   , 9 => "CustomerRingTon"
-   , 10 => "Bamboo"
-   , 11 => "Andante"
-   , 12 => "ChaCha"
-   , 13 => "Budapest"
-   , 14 => "Asia"
-   , 15 => "Kullabaloo"
-   , 16 => "silent"
-   , 17 => "Comedy"
-   , 18 => "Funky",
-   , 19 => "Fatboy"
-   , 20 => "Calypso"
-   , 21 => "Pingpong"
-   , 22 => "Melodica"
-   , 23 => "Minimal"
-   , 24 => "Signal"
-   , 25 => "Blok1"
-   , 26 => "Musicbox"
-   , 27 => "Blok2"
-   , 28 => "2Jazz"
-   , 33 => "InternetRadio"
-   , 34 => "MusicList"
+my %ringTone =  qw( 
+    0 HandsetDefault 
+    1 HandsetInternalTon 
+    2 HandsetExternalTon 
+    3 Standard 
+    4 Eighties 
+    5 Alert 
+    6 Ring 
+    7 RingRing 
+    8 News 
+    9 CustomerRingTon 
+    10 Bamboo 
+    11 Andante 
+    12 ChaCha 
+    13 Budapest 
+    14 Asia 
+    15 Kullabaloo 
+    16 silent 
+    17 Comedy 
+    18 Funky 
+    19 Fatboy 
+    20 Calypso 
+    21 Pingpong 
+    22 Melodica 
+    23 Minimal 
+    24 Signal 
+    25 Blok1 
+    26 Musicbox 
+    27 Blok2 
+    28 2Jazz 
+    33 InternetRadio 
+    34 MusicList 
    );
 
 my %ringToneNumber;
@@ -789,6 +789,8 @@ sub FRITZBOX_Readout_Done($)
 
    my ($name) = split("\\|", $string);
    my $hash = $defs{$name};
+ 
+   FRITZBOX_Log $hash, 5, "Back at main process";
 
 # delete the marker for RUNNING_PID process
    delete($hash->{helper}{READOUT_RUNNING_PID});
@@ -1385,10 +1387,16 @@ sub ##########################################
 FRITZBOX_Cmd_Done($) 
 {
    my ($string) = @_;
-   return unless defined $string;
+  unless (defined $string)
+   {
+      Log3 "FRITZBOX_Cmd_Done", 1, "Fatal Error: no parameter handed over";
+      return;
+   }
 
    my ($name, $success, $result) = split("\\|", $string,3);
    my $hash = $defs{$name};
+
+   FRITZBOX_Log $hash, 5, "Back at main process";
    
    shift (@cmdBuffer);
    delete($hash->{helper}{CMD_RUNNING_PID});
@@ -2099,7 +2107,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
    <br/><br/>
-   The commands are directly executed on the Fritz!Box shell. That means, no official API is used but mainly the internal interface program that links web interface and firmware. An update of FritzOS might hence lead to modul errors if AVM changes the interface.
+   The commands are directly executed on the Fritz!Box shell. That means, no official API is used but mainly the internal interface program that links web interface and firmware kernel. An update of FritzOS might hence lead to modul errors if AVM changes the interface.
    <br>
    Check also the other Fritz!Box moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -2357,7 +2365,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
    <br/><br/>
-   Die Steuerung erfolgt direkt &uuml;ber die Fritz!Box Shell. D.h. es wird keine offizielle API genutzt sondern vor allem die interne Schnittstelle der Box zwischen Webinterface und Firmware. Eine Aktualisierung des FritzOS kann also zu Modul-Fehlern f&uuml;hren, wenn AVM diese Schnittstelle &auml;ndert.
+   Die Steuerung erfolgt direkt &uuml;ber die Fritz!Box Shell. D.h. es wird keine offizielle API genutzt sondern vor allem die interne Schnittstelle der Box zwischen Webinterface und Firmware Kern. Eine Aktualisierung des FritzOS kann also zu Modul-Fehlern f&uuml;hren, wenn AVM diese Schnittstelle &auml;ndert.
    <br>
    Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
