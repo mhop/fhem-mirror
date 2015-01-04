@@ -33,6 +33,7 @@
 #
 # SVN-History:
 # 04.01.2015
+#	Bei der Ermittlung des Readings "AlbumArtist" gab es einen Fehler, wenn dieser von Sonos nicht übermittelt wurde.
 #	Wenn ein Player einen Dock (iPod) wiedergibt, dann werden die Titelinformationen dort mitgesetzt. Damit entfällt die Anzeige des Titels z.B. mit 'iPod von Reinerlein'.
 # 03.01.2015
 #	Dokumentation angepasst (commandref und Installationsdoku im Dateiheader)
@@ -4566,8 +4567,6 @@ sub SONOS_ServiceCallback($$) {
 	# Variablen initialisieren
 	SONOS_Client_Notifier('GetReadingsToCurrentHash:'.$udn.':1');
 	
-	my $currentValue;
-
 	# Die Daten wurden uns HTML-Kodiert übermittelt... diese Entities nun in Zeichen umwandeln, da sonst die regulären Ausdrücke ziemlich unleserlich werden...
 	$properties{LastChangeDecoded} = decode_entities($properties{LastChange});
 	$properties{LastChangeDecoded} =~ s/[\r\n]//isg; # Komischerweise können hier unmaskierte Newlines auftauchen... wegmachen
@@ -4589,10 +4588,9 @@ sub SONOS_ServiceCallback($$) {
 		if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 			my $result = $SONOS_AVTransportControlProxy{$udn}->GetRemainingSleepTimerDuration();
 			my $currentValue = $result->getValue('RemainingSleepTimerDuration');
-			$currentValue = '' if (!defined($currentValue));
 			
 			# Wenn der Timer abgelaufen ist, wird nur ein Leerstring übergeben. Diesen durch das Wort off ersetzen.
-			$currentValue = 'off' if ($currentValue eq '');
+			$currentValue = 'off' if (!defined($currentValue) || ($currentValue eq ''));
 			
 			SONOS_Client_Notifier('SetCurrent:SleepTimer:'.$currentValue);
 			
@@ -4603,7 +4601,7 @@ sub SONOS_ServiceCallback($$) {
 	# Um einen XML-Parser zu vermeiden, werden hier einige reguläre Ausdrücke für die Ermittlung der Werte eingesetzt...
 	# Transportstate ermitteln	
 	if ($properties{LastChangeDecoded} =~ m/<TransportState val="(.*?)"\/>/i) {
-		$currentValue = decode_entities($1);
+		my $currentValue = decode_entities($1);
 		# Wenn der TransportState den neuen Wert 'Transitioning' hat, dann diesen auf Playing umsetzen, da das hier ausreicht.
 		$currentValue = 'PLAYING' if $currentValue eq 'TRANSITIONING';
 		SONOS_Client_Notifier('SetCurrent:TransportState:'.$currentValue);
@@ -4684,7 +4682,8 @@ sub SONOS_ServiceCallback($$) {
 			SONOS_Client_Notifier('SetCurrent:SenderCurrent:'.$1) if ($currentTrackMetaData =~ m/<r:radioShowMd>(.*?),p\d{6}<\/r:radioShowMd>/i);
 		  
 			# Sendungs-Informationen ermitteln
-			$currentValue = decode_entities($1) if ($currentTrackMetaData =~ m/<r:streamContent>(.*?)<\/r:streamContent>/i);
+			my $currentValue = decode_entities($1) if ($currentTrackMetaData =~ m/<r:streamContent>(.*?)<\/r:streamContent>/i);
+			$currentValue = '' if (!defined($currentValue));
 			# Wenn hier eine Buffering- oder Connecting-Konstante zurückkommt, dann durch vernünftigen Text ersetzen
 			$currentValue = 'Verbindung herstellen...' if ($currentValue eq 'ZPSTR_CONNECTING');
 			$currentValue = 'Wird gestartet...' if ($currentValue eq 'ZPSTR_BUFFERING');
@@ -4746,8 +4745,8 @@ sub SONOS_ServiceCallback($$) {
 			SONOS_Client_Notifier('SetCurrent:OriginalTrackNumber:'.decode_entities($1)) if ($currentTrackMetaData =~ m/<upnp:originalTrackNumber>(.*?)<\/upnp:originalTrackNumber>/i);
 			
 			# Album Artist ermitteln
-			$currentValue = decode_entities($1) if ($currentTrackMetaData =~ m/<r:albumArtist>(.*?)<\/r:albumArtist>/i);
-			$currentValue = $currentArtist if ($currentValue eq '');
+			my $currentValue = decode_entities($1) if ($currentTrackMetaData =~ m/<r:albumArtist>(.*?)<\/r:albumArtist>/i);
+			$currentValue = $currentArtist if (!defined($currentValue) || ($currentValue eq ''));
 			SONOS_Client_Notifier('SetCurrent:AlbumArtist:'.encode_entities($currentValue));
 		}
 		
