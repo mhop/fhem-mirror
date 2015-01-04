@@ -1043,7 +1043,7 @@ sub SONOSPLAYER_Log($$$) {
 <li><b>Common</b><ul>
 <li><a name="SONOSPLAYER_getter_Alarm">
 <code>get &lt;name&gt; Alarm &lt;ID&gt;</code></a>
-<br /> It's an exception to the normal getter semantics. Returns directly a Perl-Hash with the Alarm-Informations to the given id. It's just a shorthand for <code>eval(ReadingsVal(<Devicename>, 'Alarmlist', ()))->{<ID>};</code>.</li>
+<br /> It's an exception to the normal getter semantics. Returns directly a Perl-Hash with the Alarm-Informations to the given id. It's just a shorthand for <code>eval(ReadingsVal(&lt;Devicename&gt;, 'Alarmlist', ()))->{&lt;ID&gt;};</code>.</li>
 <li><a name="SONOSPLAYER_getter_EthernetPortStatus">
 <code>get &lt;name&gt; EthernetPortStatus &lt;PortNumber&gt;</code></a>
 <br /> Gets the Ethernet-Portstatus of the given Port. Can be 'Active' or 'Inactive'.</li>
@@ -1322,7 +1322,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><b>Grundsätzliches</b><ul>
 <li><a name="SONOSPLAYER_getter_Alarm">
 <code>get &lt;name&gt; Alarm &lt;ID&gt;</code></a>
-<br /> Ausnahmefall. Diese Get-Anweisung liefert direkt ein Hash zurück, in welchem die Informationen des Alarms mit der gegebenen ID enthalten sind. Es ist die Kurzform für <code>eval(ReadingsVal(<Devicename>, 'Alarmlist', ()))->{<ID>};</code>, damit sich nicht jeder ausdenken muss, wie er jetzt am einfachsten an die Alarm-Informationen rankommen kann.</li>
+<br /> Ausnahmefall. Diese Get-Anweisung liefert direkt ein Hash zurück, in welchem die Informationen des Alarms mit der gegebenen ID enthalten sind. Es ist die Kurzform für <code>eval(ReadingsVal(&lt;Devicename&gt;, 'Alarmlist', ()))->{&lt;ID&gt;};</code>, damit sich nicht jeder ausdenken muss, wie er jetzt am einfachsten an die Alarm-Informationen rankommen kann.</li>
 <li><a name="SONOSPLAYER_getter_EthernetPortStatus">
 <code>get &lt;name&gt; EthernetPortStatus &lt;PortNumber&gt;</code></a>
 <br /> Liefert den Ethernet-Portstatus des gegebenen Ports. Kann 'Active' oder 'Inactive' liefern.</li>
