@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 12/2014
-my $thzversion = "0.120";
+# by immi 01/2015
+my $thzversion = "0.121";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -66,22 +66,22 @@ sub THZ_Set($@);
 
 my %setsnew = (
     "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
-    "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p01RoomTempDayHC1SummerMode"	=> {cmd2=>"0B0569", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC1SummerMode"	=> {cmd2=>"0B0569", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
     "p13GradientHC1"			=> {cmd2=>"0B010E", argMin =>   "0", argMax =>    "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
     "p14LowEndHC1"			=> {cmd2=>"0B059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
     "p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean",  unit =>" %"},
     "p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin =>   "0", argMax =>  "100",	type =>"1clean",  unit =>" %"}, #in % 0..100%
-    "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "11", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-    "p01RoomTempDayHC2SummerMode"	=> {cmd2=>"0C0569", argMin =>  "11", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-    "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "11", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-    "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "11", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
+    "p01RoomTempDayHC2SummerMode"	=> {cmd2=>"0C0569", argMin =>  "10", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "10", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
+    "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "10", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
     "p16GradientHC2"			=> {cmd2=>"0C010E", argMin =>   "0", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
     "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},
     "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"1clean", unit =>" %"}, 
@@ -270,6 +270,7 @@ my %getsonly = (
         "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob", unit =>""},  #allFB
         "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime", unit =>""},
         "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm", unit =>""},
+	"sFirmware-Id" 			=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
 	"sBoostDHWTotal" 		=> {cmd2=>"0A0924", cmd3=>"0A0925",	type =>"1clean", unit =>" kWh"},
 	"sBoostHCTotal"	 		=> {cmd2=>"0A0928", cmd3=>"0A0929",	type =>"1clean", unit =>" kWh"},
 	"sHeatRecoveredDay" 		=> {cmd2=>"0A03AE", cmd3=>"0A03AF",	type =>"1clean", unit =>" Wh"},
@@ -285,6 +286,21 @@ my %getsonly = (
 	#"sAllE8"			=> {cmd2=>"E8"},
 	"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
+
+my %getsonly206 = (
+#	"debug_read_raw_register_slow"	=> { },
+	"sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
+	"sPxxxx"			=> {cmd2=>"17", type =>"", unit =>""},
+	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
+	"sHC1"				=> {cmd2=>"F4", type =>"F4hc1", unit =>""},
+	"sHC2"				=> {cmd2=>"F5", type =>"F5hc2", unit =>""},
+	"sHistory"			=> {cmd2=>"09", type =>"09his", unit =>""},
+	"sLast10errors"			=> {cmd2=>"D1", type =>"D1last", unit =>""},
+        "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob", unit =>""},  #allFB
+        "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime", unit =>""},
+        "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm", unit =>""},
+	"sFirmware-Id" 			=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
+ );
 
 my %sets=%setsnew;
 my %gets=(%getsonly, %sets);
@@ -416,14 +432,7 @@ sub THZ_GetRefresh($) {
 	my ($par)=@_;
 	my $hash=$par->{hash};
 	my $command=$par->{command};
-	my $interval = AttrVal($hash->{NAME}, ("interval_".$command), 0);
-	#if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06") {
-	#  %sets = ();
-	#  %gets = %getsonly;
-	#  }
-	#open (MYFILE, '>>data.txt');
-        #print MYFILE ((keys %gets) . "\n");
-	#close (MYFILE); 
+	my $interval = AttrVal($hash->{NAME}, ("interval_".$command), 0); 
 	my $replyc = "";
 	if ($interval) {
 			  $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
@@ -1040,6 +1049,9 @@ my %parsinghash = (
 	     ],
   "FDfirm" => [["version: ", 	4, 4, "hex", 100]
 	     ],
+  "FEfirmId" => [["Date: ", 	36, 22, "hex2ascii", 1]
+	     ],
+#	     68FE03B1839100010003310E0006674A02084D6172202039203230313120
   "0clean"    => [["", 8, 2, "hex", 1]             
               ],
   "1clean"    => [["", 8, 4, "hex", 1]             
@@ -1121,24 +1133,10 @@ my %parsinghash206 = (
 	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
 	      ["/", 			16, 2, "hex", 1]
 	     ],
-  "FDfirm" => [["version: ", 	4, 4, "hex", 100]
+  "FEfirmId" => [["Date: ", 	36, 22, "hex2ascii", 1]
 	     ],
-  "0clean"    => [["", 8, 2, "hex", 1]             
-              ],
-  "1clean"    => [["", 8, 4, "hex", 1]             
-              ],
-  "2opmode"   => [["", 8, 2, "opmode", 1]             
-              ],
-  "5temp"     => [["", 8, 4, "hex2int",10]             
-	      ],
-  "6gradient" => [["", 8, 4, "hex", 100]             
-              ],
-  "7prog"     => [["", 8, 2, "quater", 1], 	["--", 10, 2, "quater", 1]
-              ],
-  "8party"    => [["", 10, 2, "quater", 1],	["--", 8, 2, "quater", 1]
-              ],
-  "9holy"     => [["", 10, 2, "quater", 1]
-              ]
+  "FDfirm" => [["version: ", 	4, 4, "hex", 100]
+	     ]
 );
 
   
@@ -1194,6 +1192,7 @@ my %parsinghash206 = (
 	when ("hexdate")	{$value= hex(substr($value, 0,2) . substr($value, 2,2));}
 	when ("turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
 	when ("hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
+	when ("hex2ascii")	{$value= uc(pack('H*', $value));}
 	when ("opmode")		{$value= $OpMode{hex($value)};}
 	when ("opmodehc")	{$value= $OpModeHC{hex($value)};}
 	when ("somwinmode")	{$value= $SomWinMode{($value)};}
@@ -1228,7 +1227,7 @@ sub THZ_debugread($){
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
  #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
-  my @numbers=('09', '0A024B', '0A0112', 'FE', '0C0341');  
+  my @numbers=('09', '01', '02', 'FE', '17', '0F', '21');  
   #my @numbers = (1..256);
   #my @numbers = (1..65535);
   #my @numbers = (1..3179);
@@ -1246,11 +1245,11 @@ sub THZ_debugread($){
     ($err, $msg) = THZ_ReadAnswer($hash);  
     # send request
     THZ_Write($hash,  $cmdHex2);
-    select(undef, undef, undef, 0.01);
+    select(undef, undef, undef, 0.015);
     ($err, $msg) = THZ_ReadAnswer($hash);
     # ack datatranfer and read from the heatpump        
     THZ_Write($hash,  "10");
-    select(undef, undef, undef, 0.05);
+    select(undef, undef, undef, 0.06);
     ($err, $msg) = THZ_ReadAnswer($hash);
     THZ_Write($hash,  "10");
     
@@ -1270,7 +1269,7 @@ sub THZ_debugread($){
 		  print MYFILE ($cmd . "-" . $msg . "\n");
 		  close (MYFILE); 
     }    
-    select(undef, undef, undef, 0.05); #equivalent to sleep 50ms
+    select(undef, undef, undef, 0.35); #equivalent to sleep 50ms
   }
 }
 
@@ -1286,7 +1285,7 @@ sub THZ_Attr(@) {
   if (( $attrName eq "firmware" ) and ($attrVal eq "2.06")) {
     THZ_RemoveInternalTimer("THZ_GetRefresh");
      %sets = ();
-     %gets = %getsonly;
+     %gets = %getsonly206;
     THZ_Refresh_all_gets($hash);
   }
   
