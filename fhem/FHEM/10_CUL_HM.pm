@@ -1102,7 +1102,6 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     elsif ($mTp eq "41"){
       my ($chn,$cnt,$state)=(hex($1),hex($2),$3) if($p =~ m/^(..)(..)(..)/);
-      my $err = $chn & 0x80;
       $chn = sprintf("%02X",$chn & 0x3f);
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
@@ -1112,6 +1111,7 @@ sub CUL_HM_Parse($$) {#########################################################
       elsif ($lvlStr{st}{$st})                                         {$txt = $lvlStr{st}{$st}{$state}}
       else                                                             {$txt = "unknown:$state"}
       push @evtEt,[$shash,1,"storm:$txt"];
+      push @evtEt,[$devH,1,"trig_$chn:$dname"];
       #push @evtEt,[$devH,1,"battery:". ($err?"low"  :"ok"  )]; has no battery
     }
     else {
@@ -6767,7 +6767,8 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
 }
 sub CUL_HM_storeRssi(@){
   my ($name,$peerName,$val,$mNo) = @_;
-  return if (!$val);
+  return if (!$val || !defined  $defs{$name});
+  my $hash = $defs{$name};
   if (AttrVal($peerName,"subType","") eq "virtual"){
     my $h = InternalVal($name,"IODev","");#CUL_HM_name2IoName($peerName);
     return if (!$h);
@@ -6778,24 +6779,24 @@ sub CUL_HM_storeRssi(@){
   }
   
   if ($peerName =~ m/^at_/){
-    if ($defs{$name}{helper}{mRssi}{mNo} ne $mNo){# new message
-      delete $defs{$name}{helper}{mRssi};
-      $defs{$name}{helper}{mRssi}{mNo} = $mNo;
+    if ($hash->{helper}{mRssi}{mNo} ne $mNo){# new message
+      delete $hash->{helper}{mRssi};
+      $hash->{helper}{mRssi}{mNo} = $mNo;
     }
     
     my ($mVal,$mPn) = ($val,substr($peerName,3));
     if ($mPn =~ m /^rpt_(.*)/){# map repeater to io device, use max rssi
       $mPn = $1;
-      $mVal = $defs{$name}{helper}{mRssi}{io}{$mPn} 
-            if(   $defs{$name}{helper}{mRssi}{io}{$mPn} 
-               && $defs{$name}{helper}{mRssi}{io}{$mPn} > $mVal);
+      $mVal = $hash->{helper}{mRssi}{io}{$mPn} 
+            if(   $hash->{helper}{mRssi}{io}{$mPn} 
+               && $hash->{helper}{mRssi}{io}{$mPn} > $mVal);
     }
     $mVal +=2 if(CUL_HM_name2IoName($name) eq $mPn);
-    $defs{$name}{helper}{mRssi}{io}{$mPn} = $mVal;
+    $hash->{helper}{mRssi}{io}{$mPn} = $mVal;
   }
   
-  $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
-  my $rssiP = $defs{$name}{helper}{rssi}{$peerName};
+  $hash->{helper}{rssi}{$peerName}{lst} = $val;
+  my $rssiP = $hash->{helper}{rssi}{$peerName};
   $rssiP->{min} = $val if (!$rssiP->{min} || $rssiP->{min} > $val);
   $rssiP->{max} = $val if (!$rssiP->{max} || $rssiP->{max} < $val);
   $rssiP->{cnt} ++;
@@ -6805,7 +6806,6 @@ sub CUL_HM_storeRssi(@){
   else{
     $rssiP->{avg} += ($val - $rssiP->{avg}) /$rssiP->{cnt};
   }
-  my $hash = $defs{$name};
   my $rssi;
   foreach (keys %{$rssiP}){
     my $val = $rssiP->{$_}?$rssiP->{$_}:0;
@@ -7350,7 +7350,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           $val = join(" ",split(" ",$val));
           my $nv = ReadingsVal($eN,$tln,"empty");
           $nv = join(" ",split(" ",$nv));
-          push @entryFail,$eN." :".$tln." mismatch" if ($val ne $nv);
+          push @entryFail,$eN." :".$tln." mismatch $val ne $nv" if ($val ne $nv);
         }
         elsif($action eq "restore"){
           $val = lc($1)." ".$val if ($tln =~ m/(P.)_._tempList/);
@@ -7376,7 +7376,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       my @unprg = grep !/^$/,map {$dlf{$p}{$_}?"":$_} keys %{$dlf{$p}};
       my $cnt = scalar @unprg;
       if ($cnt > 0 && $cnt < 7) {$ret .= "\n $name: incomplete template for prog $p days:".join(",",@unprg);}
-      elsif ($cnt == 7) {$ret .= "\n $name: unprogrammed prog $p ";}
+      elsif ($cnt == 7)         {$ret .= "\n $name: unprogrammed prog $p ";}
+      else{
+        $ret .= "\n $name: tempList not verified " if (grep {$defs{$name}{READINGS}{$_}{VAL} ne "verified"}
+                                                       grep /tempList_State/, 
+                                                       keys %{$defs{$name}{READINGS}});
+      }
     }
   }
   foreach (@exec){
