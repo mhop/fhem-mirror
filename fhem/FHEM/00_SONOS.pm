@@ -1228,6 +1228,11 @@ sub SONOS_Read($) {
 							$currentElem{Title} = $current{Title};
 							$currentElem{Artist} = $current{Artist};
 							$currentElem{Album} = $current{Album};
+							$currentElem{AlbumArtist} = $current{AlbumArtist};
+							$currentElem{Track} = $current{Track};
+							$currentElem{NumberOfTracks} = $current{NumberOfTracks};
+							$currentElem{TrackDuration} = $current{TrackDuration};
+							$currentElem{TrackPosition} = $current{TrackPosition};
 							
 							# Loslegen
 							readingsBeginUpdate($elem);
@@ -1236,6 +1241,11 @@ sub SONOS_Read($) {
 							SONOS_readingsBulkUpdateIfChanged($elem, "currentTitle", $currentElem{Title});
 							SONOS_readingsBulkUpdateIfChanged($elem, "currentArtist", $currentElem{Artist});
 							SONOS_readingsBulkUpdateIfChanged($elem, "currentAlbum", $currentElem{Album});
+							SONOS_readingsBulkUpdateIfChanged($elem, "currentAlbumArtist", $currentElem{AlbumArtist});
+							SONOS_readingsBulkUpdateIfChanged($elem, "currentTrack", $currentElem{Track});
+							SONOS_readingsBulkUpdateIfChanged($elem, "numberOfTracks", $currentElem{NumberOfTracks});
+							SONOS_readingsBulkUpdateIfChanged($elem, "currentTrackDuration", $currentElem{TrackDuration});
+							SONOS_readingsBulkUpdateIfChanged($elem, "currentTrackPosition", $currentElem{TrackPosition});
 							
 							if (AttrVal($elem->{NAME}, 'generateSomethingChangedEvent', 0) == 1) {
 								readingsBulkUpdate($elem, "somethingChanged", 1);
