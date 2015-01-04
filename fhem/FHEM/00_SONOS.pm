@@ -32,8 +32,11 @@
 # Changelog
 #
 # SVN-History:
+# 04.01.2015
+#	Wenn ein Player einen Dock (iPod) wiedergibt, dann werden die Titelinformationen dort mitgesetzt. Damit entfällt die Anzeige des Titels z.B. mit 'iPod von Reinerlein'.
 # 03.01.2015
 #	Dokumentation angepasst (commandref und Installationsdoku im Dateiheader)
+#	Fehler bei der Dockbehandlung behoben
 # 02.01.2015
 #	Anzeige bei der Wiedergabe eines Docks verbessert. Dort werden nun der Titel und Album/Artist-Informationen und ein Dock-Cover angezeigt.
 #	Getter/Setter bei Bedarf um ":noArg" erweitert.
@@ -1213,6 +1216,45 @@ sub SONOS_Read($) {
 			  
 				# End the Bulk-Update, and trigger events
 				SONOS_readingsEndUpdate($hash, 1);
+				
+				# Wenn es ein Dock ist, dann noch jeden abspielenden Player mit aktualisieren
+				if (ReadingsVal($hash->{NAME}, 'playerType', '') eq 'WD100') {
+					my $shortUDN = $1 if ($hash->{UDN} =~ m/(.*)_MR/);
+					for my $elem (SONOS_getAllSonosplayerDevices()) {
+						# Wenn es ein Player ist, der gerade das Dock wiedergibt, dann diesen Befüllen...
+						if (ReadingsVal($elem->{NAME}, 'currentTrackURI', '') eq 'x-sonos-dock:'.$shortUDN) {
+							# Alte Werte holen, muss komplett sein, um infoSummarize füllen zu können
+							my %currentElem = SONOS_GetReadingsToCurrentHash($elem->{NAME}, 0);
+							$currentElem{Title} = $current{Title};
+							$currentElem{Artist} = $current{Artist};
+							$currentElem{Album} = $current{Album};
+							
+							# Loslegen
+							readingsBeginUpdate($elem);
+							
+							# Neue Werte setzen
+							SONOS_readingsBulkUpdateIfChanged($elem, "currentTitle", $currentElem{Title});
+							SONOS_readingsBulkUpdateIfChanged($elem, "currentArtist", $currentElem{Artist});
+							SONOS_readingsBulkUpdateIfChanged($elem, "currentAlbum", $currentElem{Album});
+							
+							if (AttrVal($elem->{NAME}, 'generateSomethingChangedEvent', 0) == 1) {
+								readingsBulkUpdate($elem, "somethingChanged", 1);
+							}
+							
+							# InfoSummarize befüllen
+							SONOS_ProcessInfoSummarize($elem, \%currentElem, 'InfoSummarize1', 1);
+							SONOS_ProcessInfoSummarize($elem, \%currentElem, 'InfoSummarize2', 1);
+							SONOS_ProcessInfoSummarize($elem, \%currentElem, 'InfoSummarize3', 1);
+							SONOS_ProcessInfoSummarize($elem, \%currentElem, 'InfoSummarize4', 1);
+							
+							# State-Reading befüllen
+							SONOS_readingsBulkUpdateIfChanged($elem, 'state', $currentElem{AttrVal($elem->{NAME}, 'stateVariable', 'TransportState')});
+							
+							# Alles verarbeiten lassen
+							SONOS_readingsEndUpdate($elem, 1);
+						}
+					}
+				}
 			} else {
 				SONOS_Log undef, 0, "Fehlerhafter Aufruf von CurrentBulkUpdate: $1";
 			}
@@ -6583,10 +6625,13 @@ sub SONOS_Client_IsAlive() {
 <li><code>LWP::Simple</code></li>
 <li><code>LWP::UserAgent</code></li>
 <li><code>SOAP::Lite</code></li>
-<li><code>HTTP::Request</code></li></ul></p>
+<li><code>HTTP::Request</code></li></ul>
+Installation e.g. as Debian-Packages (via "sudo apt-get install &lt;packagename&gt;"):<ul>
+<li>LWP::Simple-Packagename (incl. LWP::UserAgent and HTTP::Request): libwww-perl</li>
+<li>SOAP::Lite-Packagename: libsoap-lite-perl</li></ul></p>
 <p><b>Attention!</b><br />This Module will not be functioning on any platform, because of the use of Threads and the neccessary Perl-modules.</p>
 <p>More information is given in a (german) Wiki-article: <a href="http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel">http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel</a></p>
-<p>The system conists of two different components:<br />
+<p>The system consists of two different components:<br />
 1. A UPnP-Client which runs as a standalone process in the background and takes the communications to the sonos-components.<br />
 2. The FHEM-module itself which connects to the UPnP-client to make fhem able to work with sonos.<br /><br />
 The client will be startet by the module itself if not done in another way.<br />
@@ -6618,9 +6663,15 @@ You can start this client on your own (to let it run instantly and independent f
 <li><a name="SONOS_setter_PauseAll">
 <code>set &lt;name&gt; PauseAll</code></a>
 <br />Pause all Zoneplayer.</li>
+<li><a name="SONOS_setter_Pause">
+<code>set &lt;name&gt; Pause</code></a>
+<br />Alias for PauseAll.</li>
 <li><a name="SONOS_setter_StopAll">
 <code>set &lt;name&gt; StopAll</code></a>
 <br />Stops all Zoneplayer.</li>
+<li><a name="SONOS_setter_Stop">
+<code>set &lt;name&gt; Stop</code></a>
+<br />Alias for StopAll.</li>
 </ul></li>
 <li><b>Group-Commands</b><ul>
 <li><a name="SONOS_setter_Groups">
@@ -6699,7 +6750,10 @@ The order in the sublists are important, because the first entry defines the so-
 <li><code>LWP::Simple</code></li>
 <li><code>LWP::UserAgent</code></li>
 <li><code>SOAP::Lite</code></li>
-<li><code>HTTP::Request</code></li></ul></p>
+<li><code>HTTP::Request</code></li></ul>
+Installation z.B. als Debian-Pakete (mittels "sudo apt-get install &lt;packagename&gt;"):<ul>
+<li>LWP::Simple-Packagename (inkl. LWP::UserAgent und HTTP::Request): libwww-perl</li>
+<li>SOAP::Lite-Packagename: libsoap-lite-perl</li></ul></p>
 <p><b>Achtung!</b><br />Das Modul wird nicht auf jeder Plattform lauffähig sein, da Threads und die angegebenen Perl-Module verwendet werden.</p>
 <p>Mehr Informationen im (deutschen) Wiki-Artikel: <a href="http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel">http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel</a></p>
 <p>Das System besteht aus zwei Komponenten:<br />
@@ -6734,9 +6788,15 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 <li><a name="SONOS_setter_PauseAll">
 <code>set &lt;name&gt; PauseAll</code></a>
 <br />Pausiert die Wiedergabe in allen Zonen.</li>
+<li><a name="SONOS_setter_Pause">
+<code>set &lt;name&gt; Pause</code></a>
+<br />Synonym für PauseAll.</li>
 <li><a name="SONOS_setter_StopAll">
 <code>set &lt;name&gt; StopAll</code></a>
 <br />Stoppt die Wiedergabe in allen Zonen.</li>
+<li><a name="SONOS_setter_Stop">
+<code>set &lt;name&gt; Stop</code></a>
+<br />Synonym für StopAll.</li>
 </ul></li>
 <li><b>Gruppenbefehle</b><ul>
 <li><a name="SONOS_setter_Groups">
