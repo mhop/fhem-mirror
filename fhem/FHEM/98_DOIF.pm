@@ -35,7 +35,7 @@ DOIF_Initialize($)
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame waitsame cmdpause";
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame waitsame waitdel cmdpause";
 }
 
 
@@ -75,6 +75,29 @@ GetBlockDoIf ($$)
   } else {
     return ($cmd,"","","");
   }
+}
+
+sub
+EventDoIf($$$$)
+{
+  my ($n,$dev,$events,$NotifyExp)=@_;
+  return 0 if ($dev ne $n);
+  return 0 if(!$events); # Some previous notify deleted the array.
+  my $max = int(@{$events});
+  my $ret = 0;
+  return 1 if ($NotifyExp eq "");
+  for (my $i = 0; $i < $max; $i++) {
+    my $s = $events->[$i];
+    $s = "" if(!defined($s));
+    my $found = ($s =~ m/$NotifyExp/);
+    return 1 if ($found);
+    #if(!$found && AttrVal($n, "eventMap", undef)) {
+    #  my @res = ReplaceEventMap($n, [$n,$s], 0);
+    #  shift @res;
+    #  $s = join(" ", @res);
+    #  $found = ("$n:$s" =~ m/^$re$/);
+  }
+  return 0;
 }
 
 sub
@@ -151,10 +174,15 @@ sub ReplaceReadingDoIf($)
   my $regExp="";
   my ($name,$reading,$format)=split(":",$element);
   my $internal="";
+  my $notifyExp="";
   if ($name) {
     #return ($name,"unknown Device") if(!$defs{$name});
     if ($reading) {
-      $internal = substr($reading,1) if (substr($reading,0,1) eq "\&"); 
+      if (substr($reading,0,1) eq "\?") {
+        $notifyExp=substr($reading,1);
+        return("EventDoIf('$name',".'$hash->{helper}{triggerDev},'.'$hash->{helper}{triggerEvents},'."'$notifyExp')","",$name,undef,undef);
+      }  
+      $internal = substr($reading,1) if (substr($reading,0,1) eq "\&");
       if ($format) {
         if ($format eq "d") {
           $regExp = '(-?\d+(\.\d+)?)';
@@ -243,6 +271,7 @@ sub ReplaceAllReadingsDoIf($$$$)
             $hash->{internals}{$condition} = AddItemDoIf($hash->{internals}{$condition},"$device:$internal") if (defined ($internal));
             $hash->{readings}{all} = AddItemDoIf($hash->{readings}{all},"$device:$reading") if (defined ($reading));
             $hash->{internals}{all} = AddItemDoIf($hash->{internals}{all},"$device:$internal") if (defined ($internal));
+            $hash->{trigger}{all} = AddItemDoIf($hash->{trigger}{all},"$device") if (!defined ($internal) and !defined($reading));
             $event=1;
           } elsif ($condition == -2) {
             $hash->{state}{device} = AddItemDoIf($hash->{state}{device},$device) if ($device ne $hash->{NAME});
@@ -653,6 +682,7 @@ DOIF_Notify($$)
         readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$reading,$defs{$device}{READINGS}{$reading}{VAL},0) if ($item and $device eq $dev->{NAME} and $defs{$device}{READINGS}{$reading});
       }
     }
+    
     if ($hash->{internals}{all}) {
       foreach my $item (split(/ /,$hash->{internals}{all})) {
         ($device,$internal)=(split(":",$item));
@@ -664,6 +694,14 @@ DOIF_Notify($$)
     #  return undef if (($seconds-$hash->{helper}{last_event_time}) < AttrVal($pn,"eventpause",0));
     #}
     #$hash->{helper}{last_event_time}=$seconds;
+    if ($hash->{trigger}{all}) {
+      foreach my $item (split(/ /,$hash->{trigger}{all})) {
+        my $events = deviceEvents($dev, AttrVal($dev->{NAME}, "addStateEvent", 0));
+        $hash->{helper}{triggerEvents}=$events;
+        $hash->{helper}{triggerDev}=$dev->{NAME};
+        readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_events","@{$events}",0);
+      }
+    }
     $ret=DOIF_Trigger($hash,$dev->{NAME},-1);
   }
   if (($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / and !$ret) {
@@ -739,14 +777,17 @@ DOIF_SetSleepTimer($$$$$)
 {
   my ($hash,$last_cond,$nr,$device,$timerNr)=@_;
   my $pn = $hash->{NAME};
+  my $sleeptimer=$hash->{helper}{sleeptimer};
   return 1 if ($timerNr == -2); #Sleeptrigger
-  if ($hash->{helper}{sleeptimer} != -1 and ($hash->{helper}{sleeptimer} != $nr or AttrVal($pn,"do","") eq "resetwait")) {
+  my @waitdel=split(/:/,AttrVal($pn,"waitdel",""));
+  if ($sleeptimer != -1 and (($sleeptimer != $nr or AttrVal($pn,"do","") eq "resetwait") or ($sleeptimer == $nr and $waitdel[$sleeptimer]))) {
     RemoveInternalTimer($hash);
     #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
     readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
     $hash->{helper}{sleeptimer}=-1;
+    return 0 if ($sleeptimer == $nr and $waitdel[$sleeptimer]);
   }
-  
+    
   if ($timerNr >= 0) {#Timer
     if ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"repeatsame","")) {
       return 1;
@@ -756,9 +797,15 @@ DOIF_SetSleepTimer($$$$$)
   } 
   if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"do","") eq "resetwait" or AttrVal($pn,"repeatsame",""))) {
     my @sleeptimer=split(/:/,AttrVal($pn,"wait",""));
-    if ($sleeptimer[$nr]) {
+    my $sleeptime=0;
+    if ($waitdel[$nr]) { 
+      $sleeptime = $waitdel[$nr];
+    } elsif ($sleeptimer[$nr]) {
+      $sleeptime=$sleeptimer[$nr]
+    }
+    if ($sleeptime) {
       my ($seconds, $microseconds) = gettimeofday();
-      my $next_time = $seconds+$sleeptimer[$nr];
+      my $next_time = $seconds+$sleeptime;
       $hash->{helper}{sleeptimer}=$nr;
       $hash->{helper}{sleepdevice}=$device;
       my $cmd_nr=$nr+1;
@@ -829,6 +876,7 @@ CmdDoIf($$)
     delete ($hash->{days});
     delete ($hash->{readings});
     delete ($hash->{internals});
+    delete ($hash->{trigger});
     delete ($defs{$hash->{NAME}}{READINGS});
     readingsSingleUpdate ($hash,"state","initialized",1);
   }
@@ -937,6 +985,8 @@ DOIF_Attr(@)
     readingsSingleUpdate ($hash,"cmd_nr","0",1);
   } elsif($a[0] eq "del" && $a[2] eq "repeatsame") {
     delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
+  } elsif($a[0] eq "del" && $a[2] eq "waitsame") {
+    delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
   }
   return undef;
 }
@@ -1027,7 +1077,7 @@ Es vereinigt die Funktionalität eines notify-, at-, watchdog-Befehls in Kombina
 Damit können insb. komplexere Problemstellungen innerhalb eines DOIF-Moduls gelöst werden, die sonst nur mit Hilfe einzelner Module an mehreren Stellen in FHEM vorgenommen werden müssten. Das führt zu übersichtlichen Lösungen und vereinfacht deren Pflege.<br>
 <br>
 Logische Abfragen werden in Bedingungen mit Hilfe von Perl-Operatoren erstellt.
-Diese werden mit Angaben von Stati, Readings, Internals von Devices oder Zeiten in eckigen Klammern kombiniert. Ebenso können beliebige Perl-Funktionen angegeben werden, die in FHEM definiert sind.<br>
+Diese werden mit Angaben von Stati, Readings, Internals, Events von Devices oder Zeiten in eckigen Klammern kombiniert. Ebenso können beliebige Perl-Funktionen angegeben werden, die in FHEM definiert sind.<br>
 Getriggert wird das Modul durch Zeitangaben bzw. durch Ereignisse ausgelöst durch die in der Bedingung angegebenen Devices.
 Wenn eine Bedingung wahr wird, so werden die dazugehörigen FHEM- bzw. Perl-Kommandos ausgeführt.<br>
 <br>
@@ -1041,8 +1091,8 @@ Die Angaben werden immer von links nach rechts abgearbeitet. Es wird immer nur e
 <ol><br>
 + Syntax angelehnt an Verzweigungen if - elseif - ... - elseif - else in höheren Sprachen<br>
 + Bedingungen werden vom Perl-Interpreter ausgewertet, daher beliebige logische Abfragen möglich<br>
-+ Die Perl-Syntax wird um Angaben von Stati, Readings, Internals und Zeitangaben in eckigen Klammern erweitert, diese führen zur Triggerung des Moduls<br>
-+ Status wird mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code> und Internals mit <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code> angegeben<br>
++ Die Perl-Syntax wird um Angaben von Stati, Readings, Internals, Events oder Zeitangaben in eckigen Klammern erweitert, diese führen zur Triggerung des Moduls<br>
++ Stati werden mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code>, Internals mit <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code> oder Events mit <code>[&lt;devicename&gt;:?&lt;regexp&gt;]</code> angegeben<br>
 + Zeitangaben in der Bedingung: <code>[HH:MM:SS]</code> oder <code>[HH:MM]</code> oder <code>[{&lt;perl-function&gt;}]</code><br>
 + Zeitintervalle: <code>[&lt;begin&gt;-&lt;end&gt;]</code> für <code>&lt;begin&gt;</code> bzw. <code>&lt;end&gt;</code> kann das obige Zeitformat gewählt werden<br>
 + relative Zeitangaben mit vorangestelltem Pluszeichen <code>[+&lt;time&gt;]</code> oder <code>[+&lt;begin&gt;-+&lt;end&gt;]</code> kombinierbar mit Perl-Funktionen s. o.<br>
@@ -1079,6 +1129,21 @@ Abfragen nach Vorkommen eines Wortes innerhalb einer Zeichenkette können mit Hi
 attr di_garage do always</code><br>
 <br>
 Weitere Möglichkeiten bei der Nutzung des Perl-Operators: <code>=~</code>, insbesondere in Verbindung mit regulären Ausdrücken, können in der Perl-Dokumentation nachgeschlagen werden.<br>
+<br>
+<b>Ereignissteuerung über Auswertung von Events</b><br>
+<br>
+Eine Alternative zur Auswertung von Stati oder Readings ist das Auswerten von Ereignissen (Events) mit Hilfe von regulären Ausdrücken, wie beim notify. Eingeleitet wird die Angabe eines regulären Ausdrucks durch ein Fragezeichen<br>
+<br>
+<u>Anwendungsbeispiel</u>: wie oben, jedoch wird hier nur das Ereignis (welches im Eventmonitor erscheint) ausgewertet und nicht der Status von "remotecontrol" wie im vorherigen Beispiel<br>
+<br>
+<code>define di_garage DOIF ([remotecontrol:?on]) (set garage on) DOELSEIF ([remotecontrol] eq "off")  (set garage off)</code><br>
+<br>
+In diesem Beispiel wird nach dem Vorkommen von "on" innerhalb des Events gesucht.
+Falls "on" gefunden wird, wird der Ausdruck wahr und der DOIF-Fall wird ausgeführt, ansonsten wird der DOELSEIF-Fall ausgeführt.
+Die Auswertung von reinen Ereignissen bietet sich dann an, wenn ein Modul keinen Status oder Readings benutzt, die man abfragen kann, wie z. B. beim Modul "sequence".
+Die Angabe von regulären Ausdrücken kann recht komplex werden und würde die Aufzählung aller Möglichkeiten an dieser Stelle den Rahmen sprengen.
+Weitere Informationenen zu regulären Ausdrücken sollten in der Perl-Dokumentation nachgeschlagen werden.
+Die logische Verknüpfung "and" mehrerer Ereignisse ist nicht sinnvoll, da zu einem Zeitpunkt immer nur ein Ereignis zutreffen kann.<br>
 <br>
 <b>Zeitsteuerung</b><br>
 <br>
@@ -1202,7 +1267,7 @@ Verzögerungen für die Ausführung von Kommandos werden pro Kommando über das 
 <br>
 <code>attr &lt;Modulname&gt; wait &lt;Sekunden für das erste Kommando&gt;:&lt;Sekunden für das zweite Kommando&gt;:...<br></code>
 <br>
-Die Sekundenangaben können von hinten ausgelassen werden. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein anders Kommando, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
+Für Kommandos ohne Verzögerung werden Sekundenangaben ausgelassen oder auf Null gesetzt. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein anders Kommando, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Benachrichtung "Waschmaschine fertig", wenn Verbrauch mindestens 5 Minuten unter 2 Watt (Perl-Code wird in geschweifte Klammern gesetzt):<br>
 <br>
@@ -1282,12 +1347,33 @@ attr di_repeat do always</code><br>
 <b>Ausführung eines Kommandos nach einer Wiederholung einer Bedingung</b><br>
 <br>
 Mit dem Attribut <code>waitsame &lt;Zeitspanne in Sekunden für cmd_1&gt;:&lt;Zeitspanne in Sekunden für das cmd_2&gt;:...</code> wird ein Kommando erst dann ausgeführt, wenn innerhalb einer definierten Zeitspanne die entsprechende Bedingung zweimal hintereinander wahr wird.<br>
+Für Kommandos, für die <code>waitsame</code> nicht gelten soll, werden die entsprechenden Sekundenangaben ausgelassen oder auf Null gesetzt.<br>
 <br>
-<u>Anwendungsbeispiel</u>: Rollladen soll hoch, wenn innerhalb einer Zeitspanne von 2 Sekunden ein Taster betätigt wird:<br>
+<u>Anwendungsbeispiel</u>: Rollladen soll hoch, wenn innerhalb einer Zeitspanne von 2 Sekunden ein Taster betätigt wird<br>
 <br>
-<code>define di_shutters DOIF ([Button])(set shutters up)<br>
-attr di_shutters waitsame 2<br>
-attr di_shutters do always</code><br>
+<code>define di_shuttersup DOIF ([Button])(set shutters up)<br>
+attr di_shuttersup waitsame 2<br>
+attr di_shuttersup do always</code><br>
+<br>
+<b>Löschen des Waittimers nach einer Wiederholung einer Bedingung</b><br>
+<br>
+Das Gegenstück zum <code>repeatsame</code>-Attribut ist das Attribut <code>waitdel</code>. Die Syntax mit Sekundenangaben pro Kommando entspricht der, des wait-Attributs. Im Gegensatz zum wait-Attribut, wird ein laufender Timer gelöscht, falls eine Bedingung wiederholt wahr wird.
+Sekundenangaben können pro Kommando ausgelassen oder auf Null gesetzt werden.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Rollladen soll herunter, wenn ein Taster innerhalb von zwei Sekunden nicht wiederholt wird<br>
+<br>
+<code>define di_shuttersdown DOIF ([Button])(set shutters down)<br>
+attr di_shuttersdown waitdel 2<br>
+attr di_shuttersdown do always</code><br>
+<br>
+"di_shuttersdown" kann nicht mit dem vorherigen Anwendungsbeispiel "di_shuttersup" innerhalb eines DOIF-Moduls kombiniert werden, da in beiden Fällen die gleiche Bedingung vorkommt.<br>
+<br>
+Die Attribute <code>wait</code> und <code>waitdel</code> lassen sich für verschiedene Kommandos kombinieren. Falls das Attribut für ein Kommando nicht gesetzt werden soll, kann die entsprechende Sekundenzahl ausgelassen oder eine Null angegeben werden.<br>
+<br>
+<u>Beispiel</u>: Für cmd_1 soll <code>wait</code> gelten, für cmd_2 <code>waitdel</code><br>
+<br>
+<code>attr di_cmd wait 2:0<br>
+attr di_cmd waitdel 0:2</code><br>
 <br>
 <b>Zeitspanne eines Readings seit der letzten Änderung</b><br>
 <br>
