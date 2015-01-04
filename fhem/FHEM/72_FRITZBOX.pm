@@ -61,61 +61,33 @@ my %fonModel = (
       , '0x08' => "C4"
    );
 
-my %ringTone =  qw( 
-    0 HandsetDefault 
-    1 HandsetInternalTon 
-    2 HandsetExternalTon 
-    3 Standard 
-    4 Eighties 
-    5 Alert 
-    6 Ring 
-    7 RingRing 
-    8 News 
-    9 CustomerRingTon 
-    10 Bamboo 
-    11 Andante 
-    12 ChaCha 
-    13 Budapest 
-    14 Asia 
-    15 Kullabaloo 
-    16 silent 
-    17 Comedy 
-    18 Funky 
-    19 Fatboy 
-    20 Calypso 
-    21 Pingpong 
-    22 Melodica 
-    23 Minimal 
-    24 Signal 
-    25 Blok1 
-    26 Musicbox 
-    27 Blok2 
-    28 2Jazz 
-    33 InternetRadio 
-    34 MusicList 
-   );
+my %ringTone =  qw { 
+    0 HandsetDefault 1 HandsetInternalTon 
+    2 HandsetExternalTon 3 Standard 
+    4 Eighties   5 Alert 
+    6 Ring       7 RingRing 
+    8 News       9 CustomerRingTon 
+    10 Bamboo   11 Andante 
+    12 ChaCha   13 Budapest 
+    14 Asia     15 Kullabaloo 
+    16 silent   17 Comedy 
+    18 Funky    19 Fatboy 
+    20 Calypso  21 Pingpong 
+    22 Melodica 23 Minimal 
+    24 Signal   25 Blok1 
+    26 Musicbox 27 Blok2 
+    28 2Jazz   
+    33 InternetRadio 34 MusicList 
+   };
 
 my %ringToneNumber;
 while (my ($key, $value) = each %ringTone) {
    $ringToneNumber{lc $value}=$key;
 }
 
-my %alarmDays = ( 
-     1 => "Mo"
-   , 2 => "Tu"
-   , 4 => "We"
-   , 8 => "Th"
-   , 16 => "Fr"
-   , 32 => "Sa"
-   , 64 => "So"
-);
+my %alarmDays = qw{1 Mo 2 Tu 4 We 8 Th 16 Fr 32 Sa 64 So};
  
-my %userType = (
-   1 => "IP"
- , 2 => "PC User"
- , 3 => "Default"
- , 4 => "Guest"
-);
+my %userType = qw{1 IP 2 PC-User 3 Default 4 Guest};
 
 my @mohtype = qw(default sound customer);
 
@@ -482,7 +454,7 @@ FRITZBOX_Readout_Start($)
    $hash->{INTERVAL} = 60 
       if $hash->{INTERVAL} < 60 && $hash->{INTERVAL} != 0;
    
-   if(!$hash->{fhem}{LOCAL} && $hash->{INTERVAL} != 0) {
+   if($hash->{INTERVAL} != 0) {
     RemoveInternalTimer($hash->{helper}{TimerReadout});
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
     return undef if( AttrVal($name, "disable", 0 ) == 1 );
@@ -1175,7 +1147,7 @@ sub FRITZBOX_Ring_Run($)
       if ("AVM" eq $hash->{fhem}{$_}{brand})
       {
          FRITZBOX_Log $hash, 5, "Internal number $_ seems to be a Fritz!Fon.";
-         push @FritzFons, $_ - 609
+         push @FritzFons, $_ - 609;
       }
    }
       
