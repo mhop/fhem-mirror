@@ -144,14 +144,16 @@ readingsGroup_updateDevices($;$)
     my $multi = @list;
     for( my $i = 0; $i <= $#list; ++$i ) {
       my $regex = $list[$i];
-      while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && defined($list[++$i]) ) {
+      while ($regex
+             && ( ($regex =~ m/^</ && $regex !~ m/>$/)          #handle , in <...>
+                  || ($regex =~ m/@\{/ && $regex !~ m/}$/) )    #handle , in reading@{...}
+             && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
       }
 
       next if( !$regex );
 
       if( $regex =~ m/^<.*>$/ ) {
-        # handle <{...}@reading>@device
       } elsif( $regex =~ m/(.*)@(.*)/ ) {
         $regex = $1;
 
@@ -481,7 +483,10 @@ readingsGroup_2html($;$)
       my $name = $name;
       my $name2 = $name2;
       my $regex = $list[$i];
-      while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && defined($list[++$i]) ) {
+      while ($regex
+             && ( ($regex =~ m/^</ && $regex !~ m/>$/)          #handle , in <...>
+                  || ($regex =~ m/@\{/ && $regex !~ m/}$/) )    #handle , in reading@{...}
+             && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
       }
       my $h = $h;
@@ -956,9 +961,12 @@ readingsGroup_Notify($$)
         #foreach my $regex (@list) {
         for( my $i = 0; $i <= $#list; ++$i ) {
         my $regex = $list[$i];
-          while ($regex && $regex =~ m/^</ && $regex !~ m/>$/ && defined($list[++$i]) ) {
+          while ($regex
+                 && ( ($regex =~ m/^</ && $regex !~ m/>$/)          #handle , in <...>
+                      || ($regex =~ m/@\{/ && $regex !~ m/}$/) )    #handle , in reading@{...}
+                 && defined($list[++$i]) ) {
             $regex .= ",". $list[$i];
-          }
+          } 
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
           my $modifier = "";
           if( $regex && $regex =~ m/^([+?!]*)(.*)/ ) {
