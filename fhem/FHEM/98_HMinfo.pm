@@ -688,6 +688,173 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   $ret .= join "",sort @rs;
   return $ret;
 }
+sub HMinfo_tempListTmplView() { ###############################################
+  my %tlEntitys;
+  $tlEntitys{$_}{v} = 1 foreach ((devspec2array("TYPE=CUL_HM:FILTER=DEF=........:FILTER=model=HM-CC-RT.*:FILTER=chanNo=04")
+                              ,devspec2array("TYPE=CUL_HM:FILTER=DEF=........:FILTER=model=.*-TC.*:FILTER=chanNo=02")));
+  my @tlFiles = ("./tempList.cfg");
+  my @tlFileMiss;
+  my @tNfound;# templates found in files
+  my @dWoTmpl;# Device not using templates
+  foreach my $d (keys %tlEntitys){
+    my ($tf,$tn) = split(":",AttrVal($d,"tempListTmpl","empty"));
+    ($tf,$tn) = ("./tempList.cfg",$tf) if (!defined $tn); # no file given, switch parameter
+    if($tn =~ m/^(none|0) *$/){
+      push @dWoTmpl,$d;
+      delete $tlEntitys{$d};
+    }
+    else{
+      push @tlFiles,$tf;
+      $tlEntitys{$d}{t} = ("$tf:".($tn eq "empty"?$d:$tn));
+    }
+  }
+  @tlFiles = HMinfo_noDup(@tlFiles);
+  foreach my $fn (@tlFiles){#################################
+    if (!(-r $fn)){
+      push @tlFileMiss,$fn;
+      next;
+    }
+    open(aSave, "$fn") || return("Can't open $fn: $!");
+    push @tNfound,"$fn:";
+    my $l = length($fn)+3;
+    my $spc = sprintf("%${l}s"," ");
+    while(<aSave>){
+      chomp;
+      my $line = $_;
+      $line =~ s/\r//g;
+      next if($line =~ m/#/);
+      if($line =~ m/^entities:/){
+        $line =~s/.*://;
+        foreach my $eN (split(",",$line)){
+          $eN =~ s/ //g;
+          push @tNfound,$spc."$eN";
+        }
+      }  
+    }
+    close (aSave);
+  }
+  foreach my $d (keys %tlEntitys){
+    $tlEntitys{$d}{c} = CUL_HM_tempListTmpl($d,"verify",$tlEntitys{$d}{t});
+    if ($tlEntitys{$d}{c}){
+      $tlEntitys{$d}{c} =~ s/\n//g;
+    }
+    else{
+      $tlEntitys{$d}{c} = "ok" if !($tlEntitys{$d}{c});
+    }
+  }
+
+  ####################################################
+  my $ret = "";
+  $ret .= "\nfiles referenced but not found:\n   " .join("\n      =>  ",@tlFileMiss) if (@tlFileMiss);
+  $ret .= "\navailable templates\n   "             .join("\n   "       ,@tNfound)    if (@tNfound);
+  $ret .= "\n\n ---------components-----------\n  template : device : state\n";
+  $ret .= "\n     "        .join("\n     "        ,(sort map{"$tlEntitys{$_}{t} : $_ : $tlEntitys{$_}{c}" } keys %tlEntitys));
+  $ret .= "\ndevices not using tempList templates:\n      =>  "   .join("\n      =>  ",@dWoTmpl) if (@dWoTmpl);
+  return $ret;
+}
+sub HMinfo_tempListTmplGenLog($$) { ############################################
+  my ($hiN,$fN) = @_;
+
+  $fN = AttrVal($hiN,"configDir",".")."/tempList.cfg" if(!$fN);
+  open(fnRead, $fN) || return("Can't open file: $!");
+  my @eNl = ();
+  my %wdl = ( tempListSun =>"02"
+             ,tempListMon =>"03"
+             ,tempListTue =>"04"
+             ,tempListWed =>"05"
+             ,tempListThu =>"06"
+             ,tempListFri =>"07"
+             ,tempListSat =>"08");
+  my @plotL;
+  while(<fnRead>){
+    chomp;
+    my $line = $_;
+
+    next if($line =~ m/#/);
+    if($line =~ m/^entities:/){
+      @eNl = ();
+      my $eN = $line;
+      $line =~s/.*://;
+      foreach my $eN (split(",",$line)){
+        $eN =~ s/ //g;
+        push @eNl,$eN;
+      }
+    }
+    elsif($line =~ m/(R_)?(P[123])?(_?._)?(tempList[SMFWT]..)(.*)\>/){
+      my ($p,$wd,$lst) = ($2,$4,$line);
+      $lst =~s/.*>//;
+      $lst =~ tr/ +/ /;
+      $lst =~ s/^ //;
+      $lst =~ s/ $//;
+      my @tLst = split(" ","00:00 00.0 ".$lst);
+      $p = "" if (!defined $p);
+      for (my $cnt = 0;$cnt < scalar(@tLst);$cnt+=2){
+        last if ($tLst[$cnt] eq "24:00");
+        foreach my $e (@eNl){
+          push @plotL,"2000-01-$wdl{$wd}_$tLst[$cnt]:00 $e$p $tLst[$cnt+3]";
+        }        
+      }
+    }
+  }
+  close (fnRead);
+  open(fnSave, ">${fN}.log") || return("Can't openfile for write: $!");
+  my %eNh;
+  foreach (sort @plotL){
+    print fnSave "\n$_";
+    my (undef,$eN) = split " ",$_;
+    $eNh{$eN} = 1;
+  }
+  close (fnSave);
+  HMinfo_tempListTmplGenGplot($fN,keys %eNh);
+}
+sub HMinfo_tempListTmplGenGplot(@) { ##########################################
+  my ($fN,@eN) = @_;
+  my $fNfull = $fN;
+  $fN =~ s/.cfg$//; # remove extention
+  $fN =~ s/.*\///; # remove directory
+#define weekLogF FileLog ./setup/tempList.cfg.log none
+#define wp SVG weekLogF:tempList:CURRENT
+#attr wp fixedrange week
+#attr wp startDate 2000-01-02
+  if (!defined($defs{"${fN}_Log"})){
+    CommandDefine(undef,"${fN}_Log FileLog ${fNfull}.log none");
+  }
+  if (!defined($defs{"${fN}_SVG"})){
+    CommandDefine(undef,"${fN}_SVG SVG ${fN}_Log:${fN}:CURRENT");
+    CommandAttr(undef, "${fN}_SVG fixedrange week");
+    CommandAttr(undef, "${fN}_SVG startDate 2000-01-02");
+  }
+
+  $fN = "./www/gplot/$fN.gplot";
+  open(bSave, ">$fN") || return("Can't open $fN for write: $!");
+  print bSave "\n# Created by FHEM/98_HMInfo.pm, "
+             ."\nset terminal png transparent size <SIZE> crop"
+             ."\nset output '<OUT>.png'"
+             ."\nset xdata time"
+             ."\nset timefmt \"%Y-%m-%d_%H:%M:%S\""
+             ."\nset xlabel \" \""
+             ."\nset title 'weekplan'"
+             ."\nset ytics "
+             ."\nset grid ytics"
+             ."\nset ylabel \"Temperature\""
+             ."\nset y2tics "
+             ."\nset y2label \"invisib\""
+             ."\nset y2range [99:99]"
+             ."\n";
+
+  my $cnt = 0;
+  my ($func,$plot) = ("","\n\nplot");
+  foreach my $e (sort @eN){
+    $func .= "\n#FileLog 3:$e\.\*::";
+    if ($cnt++ < 8){
+      $plot .= (($cnt ==0)?"":",")
+               ."\\\n     \"<IN>\" using 1:2 axes x1y1 title '$e' ls l$cnt lw 0.5 with steps";
+    }
+  }
+  
+  print bSave  $func.$plot;
+  close (bSave);
+}
 
 sub HMinfo_getEntities(@) { ###################################################
   my ($filter,$re) = @_;
@@ -1107,71 +1274,7 @@ sub HMinfo_GetFn($@) {#########################################################
             .join"\n  ", @model;
   }
   elsif($cmd eq "help")       {
-    $ret = " Unknown argument $cmd, choose one of "
-           ."\n ---checks---"
-           ."\n get configCheck [<typeFilter>]                     # perform regCheck and regCheck"
-           ."\n get regCheck [<typeFilter>]                        # find incomplete or inconsistant register readings"
-           ."\n get peerCheck [<typeFilter>]                       # find incomplete or inconsistant peer lists"
-           ."\n ---actions---"
-           ."\n set saveConfig [<typeFilter>] [<file>]             # stores peers and register with saveConfig"
-           ."\n set archConfig [-a] [<file>]                       # as saveConfig but only if data of entity is complete"
-           ."\n set purgeConfig [<file>]                           # purge content of saved configfile "
-           ."\n set loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
-           ."\n set autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
-           ."\n set tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
-           ."\n set tempListTmpl[<typeFilter>][templateName][verify|restore][<filename>]# program a templist from a template in the file to one or multiple devices"
-           ."\n  ---infos---"
-           ."\n set update                                         # update HMindfo counts"
-           ."\n get register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
-           ."\n get peerXref [<typeFilter>]                        # peer cross-reference"
-           ."\n get models [<typeFilter>]                          # list of models incl native parameter"
-           ."\n get protoEvents [<typeFilter>] [short|long]        # protocol status - names can be filtered"
-           ."\n get msgStat                                        # view message statistic"
-           ."\n get param [<typeFilter>] [<param1>] [<param2>] ... # displays params for all entities as table"
-           ."\n get rssi [<typeFilter>]                            # displays receive level of the HM devices"
-           ."\n          last: most recent"
-           ."\n          avg:  average overall"
-           ."\n          range: min to max value"
-           ."\n          count: number of events in calculation"
-           ."\n  ---clear status---"
-           ."\n set clear [<typeFilter>] [Protocol|readings|msgStat|register|rssi|all]"
-           ."\n          Protocol     # delete all protocol-events"
-           ."\n          readings     # delete all readings"
-           ."\n          register     # delete all register-readings"
-           ."\n          rssi         # delete all rssi data"
-           ."\n          msgStat      # delete message statistics"
-           ."\n          all          # delete all of the above"
-           ."\n ---help---"
-           ."\n get help                            #"
-           ."\n ***footnote***"
-           ."\n [<nameFilter>]   : only matiching names are processed - partial names are possible"
-           ."\n [<modelsFilter>] : any match in the output are searched. "
-           ."\n"
-           ."\n set cpRegs <src:peer> <dst:peer>"
-           ."\n            copy register for a channel or behavior of channel/peer"
-           ."\n set templateDef <templateName> <param1[:<param2>...]> <description> <reg1>:<val1> [<reg2>:<val2>] ... "
-           ."\n                 define a template"
-           ."\n set templateSet <entity> <templateName> <peer:[long|short]> [<param1> ...] "
-           ."\n                 write register according to a given template"
-           ."\n get templateChk [<typeFilter>] <templateName> <peer:[long|short]> [<param1> ...] "
-           ."\n                 compare whether register match the template values"
-           ."\n get templateList [<templateName>]         # gives a list of templates or a description of the named template"
-           ."\n                  list all currently defined templates or the structure of a given template"
-           ."\n ======= typeFilter options: supress class of devices  ===="
-           ."\n set <name> <cmd> [-dcasev] [-f <filter>] [params]"
-           ."\n      entities according to list will be processed"
-           ."\n      d - device   :include devices"
-           ."\n      c - channels :include channels"
-           ."\n      i - ignore   :include devices marked as ignore"
-           ."\n      v - virtual  :supress fhem virtual"
-           ."\n      p - physical :supress physical"
-           ."\n      a - aktor    :supress actor"
-           ."\n      s - sensor   :supress sensor"
-           ."\n      e - empty    :include results even if requested fields are empty"
-           ."\n "
-           ."\n     -f - filter   :regexp to filter entity names "
-           ."\n "
-           ;
+    $ret = HMInfo_help();
   }
 
   else{
@@ -1258,13 +1361,22 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = HMinfo_tempList($name,$filter,$a[0],$fn);
   }
   elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file --------
-    if ($a[0] && $a[0] =~ m/(verify|restore)/){#allow default template - i.e. not specified
-      unshift @a,"";
+
+    if ($a[0] && $a[0] eq "status"){#show status
+      $ret = HMinfo_tempListTmplView();
     }
-    my $fn = $a[2]?$a[2]:"";
-    my $ac = $a[1]?$a[1]:"verify";
-    $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn && $fn !~ m/\//);
-    $ret = HMinfo_tempListTmpl($name,$filter,$a[0],$ac,$fn);
+    elsif ($a[0] && $a[0] eq "genPlot"){#generatelog and gplot file 
+      $ret = HMinfo_tempListTmplGenLog($name,$a[1]);
+    }
+    else{
+      if ($a[0] && $a[0] =~ m/(verify|restore)/){#allow default template - i.e. not specified
+        unshift @a,"";
+      }
+      my $fn = $a[2]?$a[2]:"";
+      my $ac = $a[1]?$a[1]:"verify";
+      $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn && $fn !~ m/\//);
+      $ret = HMinfo_tempListTmpl($name,$filter,$a[0],$ac,$fn);
+    }
   }
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
@@ -1339,7 +1451,7 @@ sub HMInfo_help(){ ############################################################
            ."\n set verifyConfig [<typeFilter>] <file>             # compare curent date with configfile,report differences"
            ."\n set autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
            ."\n set tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
-           ."\n set tempListTmpl[<typeFilter>][templateName][<filename>]# program a templist from a template in the file to one or multiple devices"
+           ."\n set tempListTmpl[<typeFilter>][templateName][verify|restore|status|genPlot] [<filename>]# program a templist from a template in the file to one or multiple devices"
            ."\n  ---infos---"
            ."\n set update                                         # update HMindfo counts"
            ."\n get register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
@@ -1360,6 +1472,7 @@ sub HMInfo_help(){ ############################################################
            ."\n          register     # delete all register-readings"
            ."\n          rssi         # delete all rssi data"
            ."\n          msgStat      # delete message statistics"
+           ."\n          all          # delete all of the above"
            ."\n ---help---"
            ."\n get help                            #"
            ."\n ***footnote***"
@@ -2155,13 +2268,24 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          </ul>
          <br>
      </li>
-      <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter] [templateName][verify|restore] [&lt;file&gt;]</a><br>
+      <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter] [templateName][verify|restore|status|genPlot] [&lt;file&gt;]</a><br>
             program one or more thermostat lists. The list of thermostats is selected by filter.<br>
         <ul>
           <li><B>templateName</B> is the name of the template as being named in the file. The file format ist 
             identical to <a ref="#HMinfotempList">tempList</a>. If the entity in the file matches templateName the subsequent
-            temp-settings from the file are bing programmed to all Thermostats that match the filter<br></li>
-        <li><B>file</B> name of the file to be used. Default: <B>tempList.cfg</B></li>
+            temp-settings from the file are bing programmed to all Thermostats that match the filter
+            <br></li>
+          <li><B>status</B> gives an overview of templates being used by any CUL_HM thermostat. It alls showes 
+            templates being defined in the relevant files.
+            <br></li>
+          <li><B>genPlot</B> generates a set of records to display templates graphicaly.<br>
+            Out of the given template-file it generates a .log extended file which contains log-formated template data. timestamps are 
+            set to begin Year 2000.<br>
+            A prepared .gplot file will be added to gplot directory.<br>
+            Logfile-entity <file>_Log will be added if not already present. It is necessary for plotting.<br>
+            SVG-entity <file>_SVG will be generated if not already present. It will display the graph.<br>
+            <br></li>
+          <li><B>file</B> name of the file to be used. Default: <B>tempList.cfg</B></li>
         </ul>
       </li>
          <br>
@@ -2567,14 +2691,24 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          <li><B>tempList...</B> Zeiten und Temperaturen sind genau wie im Befehl "set tempList" anzugeben</li>
          <br>
      </li>
-     <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName][verify|restore] [&lt;file&gt;]</a><br>
+     <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName][verify|restore|status|genPlot] [&lt;file&gt;]</a><br>
          programmiert eine oder mehrere Thermostatlisten (Vorlagen). Die Liste der Thermostate wird mittels Filter selektiert.<br>
         <ul>
-         <li><B>templateName</B> ist der Name wie in der Datei angegeben. Das Dateiformat ist identisch mit
+          <li><B>templateName</B> ist der Name wie in der Datei angegeben. Das Dateiformat ist identisch mit
                 dem Format von <a ref="#HMinfotempList">tempList</a>. Wenn die in der Datei angegebene Instanz mit templateName
                 &uuml;bereinstimmt, werden die Termperatureinstellungen aus der Datei an diejenigen Thermostate gesendet, die mittels
-                filter ausgew&auml;hlt sind.<br></li>
-        <li><B>file</B> Name der Datei. Vorgabe: <B>tempList.cfg</B></li>
+                filter ausgew&auml;hlt sind.
+                <br></li>
+          <li><B>status</B> gibt einen Ueberblick aller genutzten template files. Ferner werden vorhandene templates in den files gelistst.
+            <br></li>
+          <li><B>genPlot</B> erzeugt einen Satz Daten um temp-templates graphisch darzustellen<br>
+            Aus den gegebenen template-file wird ein .log erweitertes file erzeugt welches log-formatierte daten beinhaltet. 
+            Zeitmarken sind auf Beginn 2000 terminiert.<br>
+            Ein .gplot file wird in der gplt directory erzeugt.<br>
+            Eine Logfile-entity <file>_Log, falls nicht vorhanden, wird erzeugt.<br>
+            Eine SVG-entity <file>_SVG, falls nicht vorhanden, wird erzeugt.<br>
+            <br></li>
+          <li><B>file</B> Name der Datei. Vorgabe: <B>tempList.cfg</B></li>
         </ul>
       </li>
          <br>
