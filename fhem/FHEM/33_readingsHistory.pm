@@ -151,19 +151,34 @@ readingsHistory_lookup($$$$$$$$)
   my($mapping,$name,$alias,$reading,$value,$room,$group,$default) = @_;
 
   if( $mapping ) {
+    if( !ref($mapping) && $mapping =~ m/^{.*}$/) {
+      my $DEVICE = $name;
+      my $READING = $reading;
+      my $VALUE = $value;
+      my $m = eval $mapping;
+      if( $@ ) {
+        Log 2, $@ if( $@ );
+      } else {
+        $mapping = $m;
+      }
+    }
+
     if( ref($mapping) eq 'HASH' ) {
       $default = $mapping->{$name} if( defined($mapping->{$name}) );
       $default = $mapping->{$reading} if( defined($mapping->{$reading}) );
       $default = $mapping->{$name.".".$reading} if( defined($mapping->{$name.".".$reading}) );
       $default = $mapping->{$reading.".".$value} if( defined($mapping->{$reading.".".$value}) );
-    #} elsif( $mapping =~ m/^{.*}$/) {
-    #  my $DEVICE = $name;
-    #  my $READING = $reading;
-    #  my $VALUE = $value;
-    #  $mapping = eval $mapping;
-    #  $default = $mapping if( $mapping );
     } else {
       $default = $mapping;
+    }
+
+    if( !ref($default) && $default =~ m/^{.*}$/) {
+      my $DEVICE = $name;
+      my $READING = $reading;
+      my $VALUE = $value;
+      $default = eval $default;
+      $default = "" if( $@ );
+      Log 2, $@ if( $@ );
     }
 
     return $default if( !defined($default) );
@@ -192,10 +207,22 @@ readingsHistory_lookup2($$$$)
 
   return $lookup if( !$lookup );
 
+  if( !ref($lookup) && $lookup =~ m/^{.*}$/) {
+    my $DEVICE = $name;
+    my $READING = $reading;
+    my $VALUE = $value;
+    my $l = eval $lookup;
+    if( $@ ) {
+      Log 2, $@ if( $@ );
+    } else {
+      $lookup = $l;
+    }
+  }
+
   if( ref($lookup) eq 'HASH' ) {
     my $vf = "";
-    $vf = $lookup->{$reading} if( exists($lookup->{$reading}) );
-    $vf = $lookup->{$name.".".$reading} if( exists($lookup->{$name.".".$reading}) );
+    $vf = $lookup->{$reading} if( defined($reading) && exists($lookup->{$reading}) );
+    $vf = $lookup->{$name.".".$reading} if( defined($reading) && exists($lookup->{$name.".".$reading}) );
     $vf = $lookup->{$reading.".".$value} if( defined($value) && exists($lookup->{$reading.".".$value}) );
     $lookup = $vf;
   }
@@ -206,6 +233,7 @@ readingsHistory_lookup2($$$$)
     my $VALUE = $value;
     $lookup = eval $lookup;
     $lookup = "" if( $@ );
+    Log 2, $@ if( $@ );
   }
 
   return $lookup if( !defined($lookup) );
