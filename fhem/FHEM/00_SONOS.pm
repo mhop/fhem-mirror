@@ -32,6 +32,8 @@
 # Changelog
 #
 # SVN-History:
+# 05.01.2105
+#	Die Cover beim Abspielen "von diesem Gerät" (also iPad, oder Android-Tablet) wurden nicht angezeigt.
 # 04.01.2015
 #	Bei der Ermittlung des Readings "AlbumArtist" gab es einen Fehler, wenn dieser von Sonos nicht übermittelt wurde.
 #	Wenn ein Player einen Dock (iPod) wiedergibt, dann werden die Titelinformationen dort mitgesetzt. Damit entfällt die Anzeige des Titels z.B. mit 'iPod von Reinerlein'.
@@ -727,7 +729,7 @@ sub SONOS_FhemWebCallback($) {
 				last;
 			}
 		}
-		return ("text/html; charset=UTF8", 'Anfrage für Nicht-Sonos-Player: '.$URL) if ($ip && $URL !~ /\/original\//i);
+		return ("text/html; charset=UTF8", 'Anfrage für Nicht-Sonos-Player: '.$URL) if (defined($ip) && $albumurl !~ /\/original\//i && $albumurl !~ /\/music\/image\?/i);
 		
 		# Generierter Dateiname für die Cache-Funktionalitaet
 		my $albumHash;
@@ -4667,6 +4669,11 @@ sub SONOS_ServiceCallback($$) {
 		
 		my $tempURI = '';
 		$tempURI = ($1) if ($tempURIground =~ m/<upnp:albumArtURI>(.*?)<\/upnp:albumArtURI>/i);
+		# Wenn in der URI bereits ein kompletter Pfad drinsteht, dann diese Basis verwenden (passiert bei Wiedergabe vom iPad z.B.)
+		if ($tempURI =~ m/^(http:\/\/.*?\/)(.*)/) {
+			$groundURL = $1;
+			$tempURI = $2;
+		}
 		SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.$tempURI.':'.$groundURL);
 		
 		# Auch hier den XML-Parser verhindern, und alles per regulärem Ausdruck ermitteln...
