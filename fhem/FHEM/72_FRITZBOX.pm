@@ -1222,7 +1222,7 @@ sub FRITZBOX_Ring_Run($)
          $ringTone = $ringToneNumber{lc $val[0]};
          return $name."|0|Error: Ring tone '".$val[0]."' not valid"
             unless defined $ringTone;
-         FRITZBOX_Log $hash, 5, "Extracted ring tone $ringTone.";
+         FRITZBOX_Log $hash, 5, "Ring tone $ringTone will be used.";
          shift @val;
       }
    }
@@ -1571,7 +1571,8 @@ sub FRITZBOX_SetCustomerRingTone($@)
       unless $inFile =~ /\.mp3$|.g722$/i;
    
    my $uploadFile = '/var/InternerSpeicher/FRITZ/fonring/'.int(time()).'.g722';
-   push @cmdArray, 'if [! -d /var/InternerSpeicher/FRITZ/fonring ]; mkdir -p "/var/InternerSpeicher/FRITZ/fonring"; fi';
+   push @cmdArray, 'if [ ! -d /var/InternerSpeicher/FRITZ/fonring ]; then mkdir -p "/var/InternerSpeicher/FRITZ/fonring"; fi';
+   push @cmdArray, '[ -x /etc/init.d/rc.preaudio.sh ] && /etc/init.d/rc.preaudio.sh start';
    
    $inFile =~ s/file:\/\///i;
  
