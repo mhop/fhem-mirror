@@ -670,7 +670,7 @@ sub FB_CALLMONITOR_readPhonebook($;$$)
         ($err, @lines) = FileRead($phonebook_file);
        
         
-        if(defined($err))
+        if(defined($err) && $err)
         {
             Log3 $name, 2, "FB_CALLMONITOR ($name) - could not read FritzBox phonebook file - $err";
             return "Could not read FritzBox phonebook file - $err";

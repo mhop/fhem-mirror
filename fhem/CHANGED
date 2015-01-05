@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: FB_CALLMONITOR: fix phonebook file read when using configDb (Forum #30244)
   - feature: 70_XBMC: added commands: openmovieid, openepisodeid, addon, jsonraw (thanks to siggi85)
   - fix: 70_XBMC: made fork attribute to close file handles correctly
   - feature: 70_XBMC: added mechanism to detect disconnects (TCP)
