@@ -377,8 +377,8 @@ sub SONOSPLAYER_Set($@) {
 				$key = $key.':slider,-100,1,100' if ($key eq 'Balance');
 			}
 			
-			# On/Off einsetzen
-			$key = $key.':off,on' if ((lc($key) eq 'crossfademode') || (lc($key) eq 'groupmute') || (lc($key) eq 'ledstate') || (lc($key) eq 'loudness') || (lc($key) eq 'lute') || (lc($key) eq 'repeat') || (lc($key) eq 'shuffle'));
+			# On/Off einsetzen; Da das jeweilige Reading dazu 0,1 enthalten wird, auch mit 0,1 arbeiten, damit die Vorauswahl passt
+			$key = $key.':0,1' if ((lc($key) eq 'crossfademode') || (lc($key) eq 'groupmute') || (lc($key) eq 'ledstate') || (lc($key) eq 'loudness') || (lc($key) eq 'mute') || (lc($key) eq 'repeat') || (lc($key) eq 'shuffle'));
 			
 			# Iconauswahl einsetzen
 			if (lc($key) eq 'roomicon') {
