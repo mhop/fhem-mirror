@@ -37,7 +37,8 @@ my %hueModels = (
   LWB004 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 
- 'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended Color Light' ,subType => 'extcolordimmer',},
+ 'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
+ 'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
 
  'PAR16 50 TW'      => {name => 'Lightify PAR16 50 tunable white'    ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'Classic A60 TW'   => {name => 'Lightify Classic A60 tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
@@ -436,6 +437,9 @@ HUEDevice_Set($@)
   }
 
   if( $aa[0] eq 'rename' ) {
+
+Log 3, $hash->{ID};
+    return "can't rename group 0" if( $hash->{ID} eq 'G0' );
     my $new_name =  join( ' ', @aa[1..@aa-1]);
     my $obj = { 'name' => $new_name, };
 
