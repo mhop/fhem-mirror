@@ -1553,9 +1553,9 @@ sub FRITZBOX_SetMOH($@)
 sub FRITZBOX_SetCustomerRingTone($@)
 {  
    my ($hash, $intern, @file) = @_;
-   my $returnStr;
+   my @cmdArray;
+   my $result;
    my $name = $hash->{NAME};
-
    my $uploadDir = AttrVal( $name, "defaultUploadDir",  "" );
    $uploadDir .= "/"
       unless $uploadDir =~ /\/$|^$/;
@@ -1570,29 +1570,35 @@ sub FRITZBOX_SetCustomerRingTone($@)
    return "Error: Only MP3 or G722 files can be uploaded to the phone."
       unless $inFile =~ /\.mp3$|.g722$/i;
    
-   my $uploadFile = '/var/InternerSpeicher/FRITZ/fonring/'.time().'.g722';
+   my $uploadFile = '/var/InternerSpeicher/FRITZ/fonring/'.int(time()).'.g722';
+   push @cmdArray, 'if [! -d /var/InternerSpeicher/FRITZ/fonring ]; mkdir -p "/var/InternerSpeicher/FRITZ/fonring"; fi';
    
    $inFile =~ s/file:\/\///i;
-   if ( $inFile =~ /\.mp3$/i )
-   {
-      # mp3 files are converted
-      $returnStr = FRITZBOX_Exec ($hash
-      , 'picconv.sh "file://'.$inFile.'" "'.$uploadFile.'" ringtonemp3');
-   }
-   elsif ( $inFile =~ /\.g722$/i )
-   {
-      # G722 files are copied
-      $returnStr = FRITZBOX_Exec ($hash,
-         "cp '$inFile' '$uploadFile'");
-   }
-   else
-   {
+ 
+# mp3 files are converted
+   if ( $inFile =~ /\.mp3$/i ) { 
+      push @cmdArray, 'picconv.sh "file://'.$inFile.'" "'.$uploadFile.'" ringtonemp3';
+ 
+# G722 files are copied
+   } elsif ( $inFile =~ /\.g722$/i ) { 
+      push @cmdArray, "cp '$inFile' '$uploadFile'";
+
+# all other formats fail
+   } else {
       return "Error: only MP3 or G722 files can be uploaded to the phone";
    }
-   # trigger the loading of the file to the phone, file will be deleted as soon as the upload finished
-   $returnStr .= "\n".FRITZBOX_Exec ($hash,
-      '/usr/bin/pbd --set-ringtone-url --book="255" --id="'.$intern.'" --url="file://'.$uploadFile.'" --name="FHEM'.time().'"');
-   return $returnStr;
+   
+ # trigger the loading of the file to the phone, file will be deleted by the box as soon as the upload has finished
+   push @cmdArray, '/usr/bin/pbd --set-ringtone-url --book="255" --id="'.$intern.'" --url="file://'.$uploadFile.'" --name="FHEM'.int(time()).'"';
+   
+   $result = FRITZBOX_Open_Connection( $hash );
+   return $result if $result;
+   
+   FRITZBOX_Exec ($hash, \@cmdArray);
+   
+   FRITZBOX_Close_Connection( $hash );
+   
+   return "Upload of ring tone will take about 1 minute. Do not work with the phone until its done.";
 }
 
 ############################################
