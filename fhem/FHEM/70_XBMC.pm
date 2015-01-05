@@ -1038,7 +1038,7 @@ sub XBMC_Call($$$)
     $obj->{id} = XBMC_CreateId();
   }
   $obj->{jsonrpc} = "2.0"; #JSON RPC version has to be passed
-  my $json = encode_json($obj);
+  my $json = JSON->new->utf8(0)->encode($obj);
   Log3($name, 5, "XBMC_Call: Sending: " . $json); 
   if($hash->{Protocol} eq 'http') {
     return XBMC_HTTP_Call($hash,$json,$id);
