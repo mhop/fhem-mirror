@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 01/2015
-my $thzversion = "0.121";
+my $thzversion = "0.122";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -290,7 +290,7 @@ my %getsonly = (
 my %getsonly206 = (
 #	"debug_read_raw_register_slow"	=> { },
 	"sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
-	"sPxxxx"			=> {cmd2=>"17", type =>"", unit =>""},
+	"pXX"				=> {cmd2=>"17", type =>"17pxx", unit =>""},
 	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
 	"sHC1"				=> {cmd2=>"F4", type =>"F4hc1", unit =>""},
 	"sHC2"				=> {cmd2=>"F5", type =>"F5hc2", unit =>""},
@@ -742,7 +742,7 @@ sub THZ_ReadAnswer($)
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
 	my $countmax = 28;
-	$countmax = 50	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
+	$countmax = 60	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
 	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= $countmax))
 	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
@@ -780,7 +780,7 @@ sub THZ_checksum($) {
 
 #####################################
 #
-# hex2int - convert from hex to int with sign 16bit
+# hex2int - convert from hex to int with sign 16bit 
 #
 ########################################################################################
 sub hex2int($) {
@@ -1039,7 +1039,7 @@ my %parsinghash = (
 	      [" outside_tempFiltered: ",	74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
 	      [" dewPoint: ",			82, 4, "hex2int", 10],
 	      [" P_Nd: ",			86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
-	      [" actualPower_Qc: ",		94, 8, "hex2int", 1],	[" actualPower_Pel: ",		102, 8, "hex2int", 1],
+	      [" actualPower_Qc: ",		94, 8, "hex", 1],	[" actualPower_Pel: ",		102, 8, "hex", 1],
 	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
   "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
@@ -1081,6 +1081,13 @@ my %parsinghash206 = (
 	      [" x20: ",		20, 4, "hex2int", 1],	[" x24: ",		24, 4, "hex2int", 1], 
 	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
 	      ],
+  "17pxx" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
+	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetDayTemp: ",		16, 4,  "hex", 10], 
+	      [" p05DHWsetNightTemp: ",	20, 4,  "hex", 10], 	[" p06DHWsetStandbyTemp: ",	24, 4,  "hex", 10], 
+	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 4,  "hex", 1],
+	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	[" p10RoomTempManual: ",	34, 4,  "hex", 10],
+	      [" p11DHWsetManualTemp: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
+	     ],
   "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
 	      [" fault0CODE: ",		8, 4,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "hex2time", 1],  [" fault0DATE: ",	16, 4, "hexdate", 100],
 	      [" fault1CODE: ",		20, 4, "faultmap", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 100],
@@ -1144,6 +1151,8 @@ my %parsinghash206 = (
   #$message= "A5FB00C50067010700DC011101B2000000E700AD00F3001C000000CE000000000063000000000000000000";
   #$message=  "C3FB00C5006900EB00DD00F501AF000000E900B400E70004373A00CE1F1D00000065000000000000000000";
   #$message= "46D101010017072F0322000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+  #$message= "99FBFDA8001700B60097026D00A6FDA8FDA8FFA500A52008110000000002BC000000000013001B00000000011003C4409C79B33FA624DE"
+  #$message= "E01700DA00D5006401A4019F0064020000006401A401";
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
   my $length = length($message);
   Log3 $hash->{NAME}, 5, "Message length: $length";
@@ -1227,7 +1236,7 @@ sub THZ_debugread($){
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
  #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
-  my @numbers=('09', '01', '02', 'FE', '17', '0F', '21');  
+  my @numbers=('FB', '01', 'FB', 'FE', '17', '0A05D1', '0A010D');  
   #my @numbers = (1..256);
   #my @numbers = (1..65535);
   #my @numbers = (1..3179);
