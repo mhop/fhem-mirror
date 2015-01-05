@@ -600,7 +600,9 @@ sub FB_CALLMONITOR_writeToCache($$$)
     my ($hash, $number, $txt) = @_;
     my $name = $hash->{NAME};
     my $file = AttrVal($name, "reverse-search-cache-file", "");
- 
+    my $err;
+    my @cachefile;
+    
     $file =~ s/(^\s+|\s+$)//g;
   
     $hash->{helper}{CACHE}{$number} = $txt;
@@ -608,14 +610,17 @@ sub FB_CALLMONITOR_writeToCache($$$)
     if($file ne "")
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - opening cache file $file for writing $number ($txt)";
-        if(open(CACHEFILE, ">>$file"))
+        
+        foreach my $key (keys %{$hash->{helper}{CACHE}})
         {
-            print CACHEFILE "$number|$txt\n";
-            close(CACHEFILE); 
+            push @cachefile, "$key|".$hash->{helper}{CACHE}{$key};
         }
-        else
+        
+        $err = FileWrite($file,@cachefile);
+        
+        if(defined($err) && $err)
         {
-            Log3 $name, 2, "FB_CALLMONITOR ($name) - could not open cache file for writing";
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - could not write cache file: $err";
         }
     }
 }
@@ -676,8 +681,6 @@ sub FB_CALLMONITOR_readPhonebook($;$$)
             return "Could not read FritzBox phonebook file - $err";
         }
        
-
-
         $phonebook = join("", @lines);	
         
         Log3 $name, 2, "FB_CALLMONITOR ($name) - found FritzBox phonebook $phonebook_file";
@@ -776,7 +779,7 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
     my @tmpline;
     my $count_contacts;
     my $name = $hash->{NAME};
-
+    my $err;
     $file = AttrVal($hash->{NAME}, "reverse-search-cache-file", "") unless(defined($file));
     $file =~ s/(^\s+|\s+$)//g;
 
@@ -785,11 +788,11 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
         delete($hash->{helper}{CACHE}) if(defined($hash->{helper}{CACHE}));
   
         Log3 $hash->{NAME}, 3, "FB_CALLMONITOR ($name) - loading cache file $file";
-        if(open(CACHEFILE, "$file"))
-        {
-            @cachefile = <CACHEFILE>;
-            close(CACHEFILE);
-       
+        
+        ($err, @cachefile) = FileRead($file);
+        
+        unless(defined($err) and $err)
+        {      
             foreach my $line (@cachefile)
             {
                 if(not $line =~ /^\s*$/)
@@ -809,7 +812,7 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
         }
         else
         {
-            Log3 $name, 3, "FB_CALLMONITOR ($name) - could not open cache file";
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - could not open cache file: $err";
         }
     }
 }
