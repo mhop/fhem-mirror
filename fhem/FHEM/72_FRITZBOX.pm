@@ -46,6 +46,7 @@ sub FRITZBOX_Log($$$);
 sub FRITZBOX_Init($);
 sub FRITZBOX_Cmd_Start($);
 sub FRITZBOX_Exec($$);
+sub FRITZBOX_Readout_Process($$);
 sub FRITZBOX_SendMail($@);
 sub FRITZBOX_SetCustomerRingTone($@);
 sub FRITZBOX_SetMOH($@);
@@ -240,8 +241,8 @@ FRITZBOX_Attr($@)
 } # FRITZBOX_Attr ende
 
 
-sub ##########################################
-FRITZBOX_Set($$@) 
+##########################################
+sub FRITZBOX_Set($$@) 
 {
    my ($hash, $name, $cmd, @val) = @_;
    my $resultStr = "";
@@ -417,8 +418,8 @@ FRITZBOX_Set($$@)
 } # end FRITZBOX_Set
 
 
-sub ##########################################
-FRITZBOX_Get($@)
+##########################################
+sub FRITZBOX_Get($@)
 {
    my ($hash, $name, $cmd) = @_;
    my $returnStr;
@@ -436,8 +437,8 @@ FRITZBOX_Get($@)
 } # end FRITZBOX_Get
 
 # Starts the data capturing and sets the new readout timer
-sub ##########################################
-FRITZBOX_Readout_Start($)
+##########################################
+sub FRITZBOX_Readout_Start($)
 {
    my ($timerpara) = @_;
 
@@ -481,7 +482,7 @@ sub FRITZBOX_Readout_Run($)
    my $result;
    my $rName;
    my @cmdArray;
-   my @readoutArray;
+   my @readoutCmdArray;
    my $resultArray;
    my @readoutReadings;
    my $i;
@@ -509,25 +510,25 @@ sub FRITZBOX_Readout_Run($)
    {
       
      # Init and Counters
-      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol" ];
-      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol/User/count" ];
-      push @readoutArray, ["fhem->radioCount", "ctlmgr_ctl r configd settings/WEBRADIO/count" ];
-      push @readoutArray, ["", "ctlmgr_ctl r user settings/user/count" ];
-      push @readoutArray, ["", 'echo $CONFIG_AB_COUNT'];
-      push @readoutArray, ["", "ctlmgr_ctl r landevice settings/landevice/count" ];
-      push @readoutArray, ["", "ctlmgr_ctl r tam settings/TAM/count" ];
-      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/RefreshDiversity" ];
-      push @readoutArray, ["", "ctlmgr_ctl r telcfg settings/Diversity/count" ];
+      push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol" ];
+      push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol/User/count" ];
+      push @readoutCmdArray, ["fhem->radioCount", "ctlmgr_ctl r configd settings/WEBRADIO/count" ];
+      push @readoutCmdArray, ["", "ctlmgr_ctl r user settings/user/count" ];
+      push @readoutCmdArray, ["", 'echo $CONFIG_AB_COUNT'];
+      push @readoutCmdArray, ["", "ctlmgr_ctl r landevice settings/landevice/count" ];
+      push @readoutCmdArray, ["", "ctlmgr_ctl r tam settings/TAM/count" ];
+      push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/RefreshDiversity" ];
+      push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Diversity/count" ];
 
    # Box model and firmware
-      push @readoutArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
-      push @readoutArray, [ "box_oem", 'echo $OEM' ];
-      push @readoutArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ];
-      push @readoutArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ];
-      push @readoutArray, [ "box_tr069", "ctlmgr_ctl r tr069 settings/enabled", "onoff" ];
+      push @readoutCmdArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
+      push @readoutCmdArray, [ "box_oem", 'echo $OEM' ];
+      push @readoutCmdArray, [ "box_fwVersion", "ctlmgr_ctl r logic status/nspver" ];
+      push @readoutCmdArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ];
+      push @readoutCmdArray, [ "box_tr069", "ctlmgr_ctl r tr069 settings/enabled", "onoff" ];
 
    # Execute commands
-      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings);
 
       my $dectCount = $resultArray->[1];
       my $radioCount = $resultArray->[2];
@@ -543,12 +544,12 @@ sub FRITZBOX_Readout_Run($)
       $rName = "radio00";
       while ( $i<$radioCount || defined $hash->{READINGS}{$rName} )
       {
-         push @readoutArray, [ $rName, "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name" ];
+         push @readoutCmdArray, [ $rName, "ctlmgr_ctl r configd settings/WEBRADIO".$i."/Name" ];
          $i++;
          $rName = sprintf ("radio%02d",$i);
       }
 
-      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
 
       # @radio = ();
       for (0..$radioCount-1)
@@ -565,10 +566,10 @@ sub FRITZBOX_Readout_Run($)
       {
          for (0..$lanDeviceCount-1)
          {
-            push @readoutArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/ip" ];
-            push @readoutArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/name" ];
+            push @readoutCmdArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/ip" ];
+            push @readoutCmdArray, [ "", "ctlmgr_ctl r landevice settings/landevice".$_."/name" ];
          }
-         $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+         $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
 
          %landevice = ();
          for (0..$lanDeviceCount-1)
@@ -587,29 +588,29 @@ sub FRITZBOX_Readout_Run($)
       for (1..$dectCount)
       {
         # 0 Dect-Interne Nummer
-         push @readoutArray, [ "dect".$_."_intern", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Intern" ];
+         push @readoutCmdArray, [ "dect".$_."_intern", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Intern" ];
         # 1 Dect-Telefonname
-         push @readoutArray, [ "dect".$_, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name" ];
+         push @readoutCmdArray, [ "dect".$_, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name" ];
         # 2 Handset manufacturer
-         push @readoutArray, [ "dect".$_."_manufacturer", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer" ];   
+         push @readoutCmdArray, [ "dect".$_."_manufacturer", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer" ];   
         # 3 Internal Ring Tone Name
-         push @readoutArray, [ "dect".$_."_intRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone", "ringtone" ];
+         push @readoutCmdArray, [ "dect".$_."_intRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone", "ringtone" ];
         # 4 Alarm Ring Tone Name
-         push @readoutArray, [ "dect".$_."_alarmRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/AlarmRingTone0", "ringtone" ];
+         push @readoutCmdArray, [ "dect".$_."_alarmRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/AlarmRingTone0", "ringtone" ];
         # 5 Radio Name
-         push @readoutArray, [ "dect".$_."_radio", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/RadioRingID", "radio" ];
+         push @readoutCmdArray, [ "dect".$_."_radio", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/RadioRingID", "radio" ];
         # 6 Background image
-         push @readoutArray, [ "dect".$_."_imagePath", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath" ];
+         push @readoutCmdArray, [ "dect".$_."_imagePath", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath" ];
         # 7 Customer Ring Tone
-         push @readoutArray, [ "dect".$_."_custRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingTone" ];
+         push @readoutCmdArray, [ "dect".$_."_custRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingTone" ];
         # 8 Customer Ring Tone Name
-         push @readoutArray, [ "dect".$_."_custRingToneName", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingToneName" ];
+         push @readoutCmdArray, [ "dect".$_."_custRingToneName", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingToneName" ];
         # 9 Firmware Version
-         push @readoutArray, [ "dect".$_."_fwVersion", "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion" ];   
+         push @readoutCmdArray, [ "dect".$_."_fwVersion", "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion" ];   
         # 10 Phone Model
-         push @readoutArray, [ "dect".$_."_model", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model", "model" ];   
+         push @readoutCmdArray, [ "dect".$_."_model", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model", "model" ];   
       }
-      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
       
       for (0..$dectCount-1)
       {
@@ -626,14 +627,14 @@ sub FRITZBOX_Readout_Run($)
    # Analog Fons Name
       for (1..$fonCount)
       {
-         push @readoutArray, ["fon".$_, "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name" ];
+         push @readoutCmdArray, ["fon".$_, "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name" ];
       }
-      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
    
-   # Analog Fons Number
+   # Number of analog Fons 
       for (1..$fonCount)
       {
-         push @readoutReadings, "fon".$_."_intern", $_
+         push @readoutReadings, "fon".$_."_intern|".$_
             if $resultArray->[$_-1];
       }
 
@@ -641,15 +642,15 @@ sub FRITZBOX_Readout_Run($)
    # Check if TAM is displayed
       for (0..$tamCount-1)
       {
-         push @readoutArray, [ "", "ctlmgr_ctl r tam settings/TAM".$_."/Display" ];
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r tam settings/TAM".$_."/Display" ];
       }
    # Check if user (parent control) is not completely blocked
       for (0..$userCount-1)
       {
-         push @readoutArray, ["", "ctlmgr_ctl r user settings/user".$_."/filter_profile_UID" ];
+         push @readoutCmdArray, ["", "ctlmgr_ctl r user settings/user".$_."/filter_profile_UID" ];
       }
    #!!! Execute commands !!!
-      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
       
 
 # Prepare new command array
@@ -659,10 +660,10 @@ sub FRITZBOX_Readout_Run($)
          $rName = "tam".($_+1);
          if ($resultArray->[$_] eq "1" || defined $hash->{READINGS}{$rName} )
          {
-            push @readoutArray, [ $rName, "ctlmgr_ctl r tam settings/TAM". $_ ."/Name" ];
-            push @readoutArray, [ $rName."_state", "ctlmgr_ctl r tam settings/TAM".$_."/Active", "onoff" ];
-            push @readoutArray, [ $rName."_newMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumNewMessages" ];
-            push @readoutArray, [ $rName."_oldMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumOldMessages" ];
+            push @readoutCmdArray, [ $rName, "ctlmgr_ctl r tam settings/TAM". $_ ."/Name" ];
+            push @readoutCmdArray, [ $rName."_state", "ctlmgr_ctl r tam settings/TAM".$_."/Active", "onoff" ];
+            push @readoutCmdArray, [ $rName."_newMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumNewMessages" ];
+            push @readoutCmdArray, [ $rName."_oldMsg", "ctlmgr_ctl r tam settings/TAM".$_."/NumOldMessages" ];
          }
       }
 
@@ -674,11 +675,11 @@ sub FRITZBOX_Readout_Run($)
    # do not show data for unlimited, blocked or default access rights
          if ($resultArray->[$i+$tamCount] !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} )
          {
-            push @readoutArray, [$rName, "ctlmgr_ctl r user settings/user".$i."/name", "deviceip" ];
-            push @readoutArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "secondsintime" ];
-            push @readoutArray, [$rName."_todayTime", "ctlmgr_ctl r user settings/user".$i."/today_time", "secondsintime" ];
-            push @readoutArray, [$rName."_todaySeconds", "ctlmgr_ctl r user settings/user".$i."/today_time" ];
-            push @readoutArray, [$rName."_type", "ctlmgr_ctl r user settings/user".$i."/type", "usertype" ];
+            push @readoutCmdArray, [$rName, "ctlmgr_ctl r user settings/user".$i."/name", "deviceip" ];
+            push @readoutCmdArray, [$rName."_thisMonthTime", "ctlmgr_ctl r user settings/user".$i."/this_month_time", "secondsintime" ];
+            push @readoutCmdArray, [$rName."_todayTime", "ctlmgr_ctl r user settings/user".$i."/today_time", "secondsintime" ];
+            push @readoutCmdArray, [$rName."_todaySeconds", "ctlmgr_ctl r user settings/user".$i."/today_time" ];
+            push @readoutCmdArray, [$rName."_type", "ctlmgr_ctl r user settings/user".$i."/type", "usertype" ];
          }
          $i++;
          $rName = sprintf ("user%02d",$i+1);
@@ -690,58 +691,57 @@ sub FRITZBOX_Readout_Run($)
       while ( $i < $divCount || defined $hash->{READINGS}{$rName} )
       {
         # Diversity number
-         push @readoutArray, [$rName, "ctlmgr_ctl r telcfg settings/Diversity".$i."/MSN" ];
+         push @readoutCmdArray, [$rName, "ctlmgr_ctl r telcfg settings/Diversity".$i."/MSN" ];
         # Diversity state
-         push @readoutArray, [$rName."_state", "ctlmgr_ctl r telcfg settings/Diversity".$i."/Active", "onoff" ];
+         push @readoutCmdArray, [$rName."_state", "ctlmgr_ctl r telcfg settings/Diversity".$i."/Active", "onoff" ];
         # Diversity destination
-         push @readoutArray, [$rName."_dest", "ctlmgr_ctl r telcfg settings/Diversity".$i."/Destination"];
+         push @readoutCmdArray, [$rName."_dest", "ctlmgr_ctl r telcfg settings/Diversity".$i."/Destination"];
          $i++;
          $rName = "diversity".($i+1);
       }
       
    # !!! Execute commands !!!
-      FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+      FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
    }
    
 # WLAN
-   push @readoutArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
+   push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
 # 2nd WLAN
-   push @readoutArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
+   push @readoutCmdArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
 # Gäste WLAN
-   push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
-   push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
+   push @readoutCmdArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
+   push @readoutCmdArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
 # Dect
-   push @readoutArray, [ "box_dect", "ctlmgr_ctl r dect settings/enabled", "onoff" ];
+   push @readoutCmdArray, [ "box_dect", "ctlmgr_ctl r dect settings/enabled", "onoff" ];
 # Music on Hold
-   push @readoutArray, [ "box_moh", "ctlmgr_ctl r telcfg settings/MOHType", "mohtype" ];
+   push @readoutCmdArray, [ "box_moh", "ctlmgr_ctl r telcfg settings/MOHType", "mohtype" ];
 # Power Rate
-   push @readoutArray, [ "box_powerRate", "ctlmgr_ctl r power status/rate_sumact"];
+   push @readoutCmdArray, [ "box_powerRate", "ctlmgr_ctl r power status/rate_sumact"];
 
 # Alarm clock
    for (0..2)
    {
      # Alarm clock name
-      push @readoutArray, ["alarm".($_+1), "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Name" ];
+      push @readoutCmdArray, ["alarm".($_+1), "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Name" ];
      # Alarm clock state
-      push @readoutArray, ["alarm".($_+1)."_state", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Active", "onoff" ];
+      push @readoutCmdArray, ["alarm".($_+1)."_state", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Active", "onoff" ];
      # Alarm clock time
-      push @readoutArray, ["alarm".($_+1)."_time", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Time", "altime" ];
+      push @readoutCmdArray, ["alarm".($_+1)."_time", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Time", "altime" ];
      # Alarm clock number
-      push @readoutArray, ["alarm".($_+1)."_target", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Number", "alnumber" ];
+      push @readoutCmdArray, ["alarm".($_+1)."_target", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Number", "alnumber" ];
      # Alarm clock weekdays
-      push @readoutArray, ["alarm".($_+1)."_wdays", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays", "aldays" ];
+      push @readoutCmdArray, ["alarm".($_+1)."_wdays", "ctlmgr_ctl r telcfg settings/AlarmClock".$_."/Weekdays", "aldays" ];
    }
 
-   FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings );
+   FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
    
-   
+   push @readoutReadings, "readoutTime|" . sprintf( "%.2f", time()-$startTime);
    $returnStr .= join('|', @readoutReadings );
-   $returnStr .= "|readoutTime|";
-   $returnStr .= sprintf "%.2f", time()-$startTime;
 
    FRITZBOX_Close_Connection ( $hash );
 
-   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
+   FRITZBOX_Log $hash, 4, "Captured " . @readoutReadings . " values";
+   FRITZBOX_Log $hash, 5, "Handover (".length ($returnStr)."): ".$returnStr;
    return $returnStr
 
 } # End FRITZBOX_Readout_Run
@@ -756,32 +756,31 @@ sub FRITZBOX_Readout_Done($)
       return;
    }
 
-   my ($name) = split("\\|", $string);
+   my ($name,$string2) = split("\\|", $string, 2);
    my $hash = $defs{$name};
  
-   FRITZBOX_Log $hash, 5, "Back at main process";
+   FRITZBOX_Log $hash, 4, "Back at main process";
 
 # delete the marker for RUNNING_PID process
    delete($hash->{helper}{READOUT_RUNNING_PID});
 
-   FRITZBOX_Readout_Process $string;
+   FRITZBOX_Readout_Process ($hash, $string2);
 
 }
 
 ##########################################
-sub FRITZBOX_Readout_Process($) 
+sub FRITZBOX_Readout_Process($$) 
 {
-   my ($string) = @_;
-   unless (defined $string)
+   my ($hash,$string) = @_;
+   unless (defined $hash)
    {
-      Log3 "FRITZBOX_Readout_Process", 1, "Fatal Error: no parameter handed over";
+      Log3 "FRITZBOX_Readout_Process", 1, "Fatal Error: no hash parameter handed over";
       return;
    }
   
-   my ($name, %values) = split("\\|", $string);
-   my $hash = $defs{$name};
-   
-   FRITZBOX_Log $hash, 5, "Processing ". keys(%values)." readouts.";
+   my $name = $hash->{NAME};
+   my (%values) = split("\\|", $string);
+   FRITZBOX_Log $hash, 4, "Processing ". keys(%values)." readouts.";
 
    readingsBeginUpdate($hash);
 
@@ -865,8 +864,8 @@ sub FRITZBOX_Readout_Process($)
    readingsEndUpdate( $hash, 1 );
 }
 
-sub ##########################################
-FRITZBOX_Readout_Aborted($) 
+##########################################
+sub FRITZBOX_Readout_Aborted($) 
 {
   my ($hash) = @_;
   delete($hash->{helper}{READOUT_RUNNING_PID});
@@ -876,16 +875,16 @@ FRITZBOX_Readout_Aborted($)
 ##########################################
 sub FRITZBOX_Readout_Query($$$)
 {
-   my ($hash, $readoutArray, $readoutReadings) = @_;
+   my ($hash, $readoutCmdArray, $readoutReadings) = @_;
    my @cmdArray;
    my $rValue;
    my $rName;
    my $rFormat;
       
-   my $count = int @{$readoutArray} - 1;
+   my $count = int @{$readoutCmdArray} - 1;
    for (0..$count)
    {
-      push @cmdArray, $readoutArray->[$_][1];
+      push @cmdArray, $readoutCmdArray->[$_][1];
    }
 
    my $resultArray = FRITZBOX_Exec( $hash, \@cmdArray);
@@ -893,17 +892,17 @@ sub FRITZBOX_Readout_Query($$$)
    for (0..$count)
    {
       $rValue = $resultArray->[$_];
-      $rFormat = $readoutArray->[$_][2];
+      $rFormat = $readoutCmdArray->[$_][2];
       $rFormat = "" unless defined $rFormat;
       $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
-      $rName = $readoutArray->[$_][0];
+      $rName = $readoutCmdArray->[$_][0];
       if ($rName ne "")
       {
          FRITZBOX_Log $hash, 5, "$rName: $rValue";
          push @{$readoutReadings}, $rName."|".$rValue;
       }
    }
-   @{$readoutArray} = ();
+   @{$readoutCmdArray} = ();
    
    return $resultArray;
 }
@@ -1084,7 +1083,7 @@ sub FRITZBOX_GuestWlan_Run($)
    my ($name, @val) = split "\\|", $string;
    my $hash = $defs{$name};
    my $result;
-   my @readoutArray;
+   my @readoutCmdArray;
    my @readoutReadings;
    my $startTime = time();
    
@@ -1099,27 +1098,25 @@ sub FRITZBOX_GuestWlan_Run($)
    my $returnStr = "$name|2|";
    
 # Set WLAN on if guestWLAN on
-   push @readoutArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable 1"]
+   push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable 1"]
       if $state == 1;
 # Set guestWLAN
-   push @readoutArray, [ "", "ctlmgr_ctl w wlan settings/guest_ap_enabled $state"];
+   push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/guest_ap_enabled $state"];
 # Read WLAN
-   push @readoutArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
+   push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
 # Read 2nd WLAN
-   push @readoutArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
+   push @readoutCmdArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
 # Read Gäste WLAN
-   push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
-   push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
+   push @readoutCmdArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
+   push @readoutCmdArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
 
 # Execute commands
-   FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
-
-   $returnStr .= join('|', @readoutReadings );
-   $returnStr .= "|readoutTime|";
-   $returnStr .= sprintf "%.2f", time()-$startTime;
+   FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings);
 
    FRITZBOX_Close_Connection ( $hash );
 
+   push @readoutReadings, "readoutTime|" . sprintf( "%.2f", time()-$startTime);
+   $returnStr .= join('|', @readoutReadings );
    FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
    return $returnStr
 
@@ -1132,7 +1129,7 @@ sub FRITZBOX_Wlan_Run($)
    my ($name, @val) = split "\\|", $string;
    my $hash = $defs{$name};
    my $result;
-   my @readoutArray;
+   my @readoutCmdArray;
    my @readoutReadings;
    my $startTime = time();
    
@@ -1147,24 +1144,22 @@ sub FRITZBOX_Wlan_Run($)
    my $returnStr = "$name|2|";
 
 # Set WLAN
-   push @readoutArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable $state"];
+   push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable $state"];
 # Read WLAN
-   push @readoutArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
+   push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
 # Read 2nd WLAN
-   push @readoutArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
+   push @readoutCmdArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
 # Read Gäste WLAN
-   push @readoutArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
-   push @readoutArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
+   push @readoutCmdArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
+   push @readoutCmdArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
 
 # Execute commands
-   FRITZBOX_Readout_Query( $hash, \@readoutArray, \@readoutReadings);
-
-   $returnStr .= join('|', @readoutReadings );
-   $returnStr .= "|readoutTime|";
-   $returnStr .= sprintf "%.2f", time()-$startTime;
+   FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings);
 
    FRITZBOX_Close_Connection ( $hash );
 
+   push @readoutReadings, "readoutTime|" . sprintf( "%.2f", time()-$startTime);
+   $returnStr .= join('|', @readoutReadings );
    FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
    return $returnStr
 
@@ -1227,6 +1222,7 @@ sub FRITZBOX_Ring_Run($)
          $ringTone = $ringToneNumber{lc $val[0]};
          return $name."|0|Error: Ring tone '".$val[0]."' not valid"
             unless defined $ringTone;
+         FRITZBOX_Log $hash, 5, "Extracted ring tone $ringTone.";
          shift @val;
       }
    }
@@ -1333,6 +1329,8 @@ sub FRITZBOX_Ring_Run($)
 # Change ring tone of Fritz!Fons
    if ($ringTone)
    {
+      FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, ring tone will be ignored."
+         unless @FritzFons;
       foreach (@FritzFons)
       {
          push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/IntRingTone";
@@ -1422,7 +1420,7 @@ FRITZBOX_Cmd_Done($)
    my ($name, $success, $result) = split("\\|", $string,3);
    my $hash = $defs{$name};
 
-   FRITZBOX_Log $hash, 5, "Back at main process";
+   FRITZBOX_Log $hash, 4, "Back at main process";
    
    shift (@cmdBuffer);
    delete($hash->{helper}{CMD_RUNNING_PID});
@@ -1437,7 +1435,7 @@ FRITZBOX_Cmd_Done($)
    }
    elsif  ($success == 2 )
    {
-      FRITZBOX_Readout_Process ( $name."|".$result );
+      FRITZBOX_Readout_Process ( $hash, $result );
    }
 }
 
@@ -1703,7 +1701,7 @@ sub FRITZBOX_Open_Connection($)
    
    my $user = AttrVal( $name, "telnetUser", "" );
 
-   FRITZBOX_Log $hash, 4, "Open Telnet Connection to $host";
+   FRITZBOX_Log $hash, 4, "Open Telnet connection to $host";
    my $timeout = AttrVal( $name, "telnetTimeOut", "10");
    $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
    if (!$telnet) {
@@ -1859,7 +1857,7 @@ FRITZBOX_Exec_Remote($$)
                chomp $result;
                my $log = join " ", @output;
                chomp $log;
-               FRITZBOX_Log $hash, 4, "Result '$log'";
+               FRITZBOX_Log $hash, 5, "Result '$log'";
             }
             else
             {
@@ -2191,7 +2189,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
          <br>
-         Switches the guest WLAN on or off.
+         Switches the guest WLAN on or off. If necessary, the normal WLAN is also switched on.
       </li><br>
 
       <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3FileIncludingPath|say:Text&gt;]</code>
@@ -2448,7 +2446,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
          <br>
-         Schaltet das G&auml;ste-WLAN an oder aus.
+         Schaltet das G&auml;ste-WLAN an oder aus. Wenn notwendig wird auch das normale WLAN angeschaltet.
       </li><br>
 
       <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3DateiInklusivePfad|say:Text&gt;]</code>
