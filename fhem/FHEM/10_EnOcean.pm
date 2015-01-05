@@ -4479,6 +4479,14 @@ EnOcean_Parse($$)
       my $randomEnd = $db[0] & 2 ? "yes" : "no";
       my $powerUsageLevel = $db[0] & 1 ? "max" : "min";
       $hash->{helper}{powerUsageLevel} = ReadingsVal($name, "powerUsageLevel", undef);
+      my $drState;
+      if ($randomStart eq "yes" ||  $randomEnd eq "yes") {
+        push @event, "3:state:waiting";
+      } elsif ($drLevel == 15) {
+        push @event, "3:state:off";
+      } else {
+        push @event, "3:state:on";
+      }
       push @event, "3:drLevel:$drLevel";
       push @event, "3:powerUsage:$powerUsage";
       push @event, "3:powerUsageLevel:$powerUsageLevel";
@@ -4487,8 +4495,10 @@ EnOcean_Parse($$)
       push @event, "3:randomStart:$randomStart";
       push @event, "3:setpoint:$setpoint";
       push @event, "3:timeout:$timeout";
-      push @event, "3:state:$drLevel";
       my $actionCmd = AttrVal($name, "demandRespAction", undef);
+      my $randomTime = AttrVal($name, "demandRespRandomTime", 1);
+      my $threshold = AttrVal($name, "demandRespThreshold", 8);
+
       if ($randomStart eq "yes") {
         # gettimeofday()
       } else {
@@ -6516,12 +6526,11 @@ EnOcean_SndRadio($$$$$$$$)
     if ($rorg eq "A6") {
       # ADT telegram
       $data .= $destinationID;
-    }
-#    } elsif ($destinationID ne "FFFFFFFF" || $securityLevel) {
+    } elsif ($destinationID ne "FFFFFFFF" || $securityLevel) {
       # SubTelNum = 03, DestinationID:8, RSSI = FF, SecurityLevel:2
       $odata = sprintf "03%sFF%02X", $destinationID, $securityLevel;
       $odataLength = 7;    
-#    }
+    }
     # Data Length:4 Optional Length:2 Packet Type:2
     $header = sprintf "%04X%02X%02X", (length($data) / 2 + 6), $odataLength, $packetType;    
     Log3 $hash->{NAME}, 5, "EnOcean $hash->{NAME} sent PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status ODATA: $odata";
@@ -7376,8 +7385,8 @@ EnOcean_Undef($$)
     If the <a href="#EnOcean_observeLogic">observeLogic</a> attribute is set to "and", the monitoring is stopped when a telegram 
     was received by all devices (AND logic). Please note that the name of the own device has also to be entered in the
     <a href="#EnOcean_observeRefDev">observeRefDev</a> if required.<br>
-    If the send command was repeated twice and still no acknowledgment telegram has been received, the command can be executed,
-    that is stored in the <a href="#EnOcean_observeErrorAction">observeErrorAction</a> attribute.    
+    If the maximum number of retries is reached and still no all acknowledgment telegrams has been received, the command
+    can be executed, that is stored in the <a href="#EnOcean_observeErrorAction">observeErrorAction</a> attribute.    
     <br><br>
   </ul>
   
