@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 70_XBMC: added commands: openmovieid, openepisodeid, addon, jsonraw (thanks to siggi85)
+  - fix: 70_XBMC: made fork attribute to close file handles correctly
+  - feature: 70_XBMC: added mechanism to detect disconnects (TCP)
   - fix: 66_ECMD: avoid reading from a closed connection in ECMD_READ
   - feature: 70_PIONEERAVR: readings for currentAlbum etc., more internals (network settings, moved some from readings to internals), new attributes volumeLimit & volumeLimitStraight
   - added: some new icons (hourglass, frost, sani_heating_level_XX)
