@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 70_XBMC: added command 'connect' to connect instantly
   - change: FB_CALLMONITOR: use standard file read/write function to support use of configDb
   - bugfix: FB_CALLMONITOR: fix phonebook file read when using configDb (Forum #30244)
   - feature: 70_XBMC: added commands: openmovieid, openepisodeid, addon, jsonraw (thanks to siggi85)
