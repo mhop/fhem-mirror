@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 01/2015
-my $thzversion = "0.122";
+my $thzversion = "0.123";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -741,8 +741,8 @@ sub THZ_ReadAnswer($)
 	
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
-	my $countmax = 28;
-	$countmax = 60	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
+	my $countmax = 40;
+	$countmax = 80	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
 	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= $countmax))
 	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
@@ -1039,7 +1039,7 @@ my %parsinghash = (
 	      [" outside_tempFiltered: ",	74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
 	      [" dewPoint: ",			82, 4, "hex2int", 10],
 	      [" P_Nd: ",			86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
-	      [" actualPower_Qc: ",		94, 8, "hex", 1],	[" actualPower_Pel: ",		102, 8, "hex", 1],
+	      [" actualPower_Qc: ",		94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
 	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
   "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
@@ -1204,6 +1204,7 @@ my %parsinghash206 = (
 	when ("hex2ascii")	{$value= uc(pack('H*', $value));}
 	when ("opmode")		{$value= $OpMode{hex($value)};}
 	when ("opmodehc")	{$value= $OpModeHC{hex($value)};}
+	when ("esp_mant") 	{$value= sprintf("%.3f", unpack('f', pack( 'L',  reverse(hex($value)))));}
 	when ("somwinmode")	{$value= $SomWinMode{($value)};}
 	when ("weekday")	{$value= $weekday{($value)};}
 	when ("faultmap")	{$value= $faultmap{(hex($value))};}
@@ -1236,7 +1237,7 @@ sub THZ_debugread($){
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
  #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
-  my @numbers=('FB', '01', 'FB', 'FE', '17', '0A05D1', '0A010D');  
+  my @numbers=('FB', '01', 'FB', 'FE', '00', '0A05D1', '0A010D');  
   #my @numbers = (1..256);
   #my @numbers = (1..65535);
   #my @numbers = (1..3179);
