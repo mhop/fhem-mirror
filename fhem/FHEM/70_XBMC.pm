@@ -75,6 +75,34 @@ sub XBMC_Define($$)
   return undef;
 }
 
+# Force a connection attempt to XBMC as soon as possible 
+# (e.g. you know you just started it and want to connect immediately without waiting up to 60 s)
+sub XBMC_Connect($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  if($hash->{Protocol} ne 'tcp') {
+    # we dont have a persistent connection anyway
+    return undef;
+  }
+  
+  if(AttrVal($hash->{NAME},'fork','disable') eq 'enable') {
+    return undef unless $hash->{CHILDPID}; # nothing to do
+    # well, the fork process does not respond to SIGTERM
+    # so lets use SIGKILL to make things clear to it
+    if ((kill SIGKILL, $hash->{CHILDPID}) != 1) { 
+      Log3 3, $name, "XBMC_Connect: ERROR: Unable to kill fork process!";
+      return undef;
+    }
+    $hash->{CHILDPID} = undef; # undefg childpid so the Ready-func will fork again
+  } else {
+    $hash->{NEXT_OPEN} = 0; # force NEXT_OPEN used in DevIO
+  }
+    
+  return undef;
+}
+
 sub XBMC_Ready($)
 {
   my ($hash) = @_;
@@ -243,6 +271,7 @@ sub XBMC_Read($)
 {
   my ($hash) = @_;
   my $buffer = DevIo_SimpleRead($hash);
+  return if (not defined($buffer));
   return XBMC_ProcessRead($hash, $buffer);
 }
 
@@ -288,6 +317,7 @@ sub XBMC_ProcessRead($$)
   $hash->{PARTIAL} = $tail;
   Log3($name, 5, "XBMC_Read: Tail: " . $tail);
   Log3($name, 5, "XBMC_Read: PARTIAL: " . $hash->{PARTIAL});
+  return;
 }
 
 sub XBMC_PlayerOnPlay($$)
@@ -295,6 +325,7 @@ sub XBMC_PlayerOnPlay($$)
   my ($hash,$obj) = @_;
   my $name = $hash->{NAME};
   my $id = XBMC_CreateId();
+  my $playerId;
   my $type = $obj->{params}->{data}->{item}->{type};
   if(AttrVal($hash->{NAME},'compatibilityMode','xbmc') eq 'plex' || !defined($obj->{params}->{data}->{item}->{id}) || $type eq "picture" || $type eq "unknown") {
     readingsBeginUpdate($hash);
@@ -307,6 +338,13 @@ sub XBMC_PlayerOnPlay($$)
       }
     }
     readingsEndUpdate($hash, 1);
+    
+    if ($type eq "unknown") {
+        #   this is special. we get here for example when playing a stream
+        #   xbmc is not able to assign the correct player so the playerid might be wrong
+        #   http://forum.kodi.tv/showthread.php?tid=174872
+        $playerId = -1; #signal that we are unsure about the playerId and that we want to call Player.GetActivePlayers first
+    }
   } 
   elsif($type eq "song") {
     my $req = {
@@ -330,7 +368,7 @@ sub XBMC_PlayerOnPlay($$)
       "method" => "VideoLibrary.GetEpisodeDetails",
       "params" => { 
         "episodeid" => $obj->{params}->{data}->{item}->{id},
-    #http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Video.Fields.Episode
+        #http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Video.Fields.Episode
         "properties" => ["season","episode","title","showtitle","file"]
       },
       "id" => $id
@@ -348,7 +386,7 @@ sub XBMC_PlayerOnPlay($$)
       "method" => "VideoLibrary.GetMovieDetails",
       "params" => { 
         "movieid" => $obj->{params}->{data}->{item}->{id},
-    #http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Video.Fields.Movie
+        #http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Video.Fields.Movie
         "properties" => ["title","file","year","originaltitle"]
       },
       "id" => $id
@@ -366,7 +404,7 @@ sub XBMC_PlayerOnPlay($$)
       "method" => "VideoLibrary.GetMusicVideoDetails",
       "params" => { 
         "musicvideoid" => $obj->{params}->{data}->{item}->{id},
-    #http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Video.Fields.MusicVideo
+        #http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Video.Fields.MusicVideo
         "properties" => ["title","artist","album","file"]
       },
       "id" => $id
@@ -379,7 +417,13 @@ sub XBMC_PlayerOnPlay($$)
     $hash->{PendingEvents}{$id} = $event;
     XBMC_Call($hash, $req,1);
   }
-  XBMC_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
+
+  if (not defined($playerId)) {
+    # this happens when we did not had a type 'unknown'
+    # so basically always :)
+    $playerId = $obj->{params}->{data}->{player}->{playerid};
+  }
+  XBMC_PlayerUpdate($hash, $playerId);
 }
 
 sub XBMC_ProcessNotification($$) 
@@ -402,7 +446,7 @@ sub XBMC_ProcessNotification($$)
   }
   elsif($obj->{method} eq "Player.OnSeek") {
     #XBMC_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
-    Log3($name, 4, "Discard Player.OnSeek event because it is irrelevant");
+    Log3($name, 3, "Discard Player.OnSeek event because it is irrelevant");
   }
   elsif($obj->{method} eq "Player.OnSpeedChanged") {
     #XBMC_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
@@ -731,6 +775,9 @@ sub XBMC_Set($@)
         return XBMC_Simple_Call($hash,'AudioLibrary.Scan');
     }
   }
+  elsif($cmd eq 'connect') {
+    return XBMC_Connect($hash);
+  }
   my $res = "Unknown argument " . $cmd . ", choose one of " . 
     "off play:all,audio,video,picture playpause:all,audio,video,picture pause:all,audio,video,picture " . 
     "prev:all,audio,video,picture next:all,audio,video,picture goto stop:all,audio,video,picture " . 
@@ -766,7 +813,8 @@ sub XBMC_Set($@)
     "msg " . 
     "mute:toggle,on,off volume:slider,0,1,100 quit:noArg " . 
     "eject:noArg hibernate:noArg reboot:noArg shutdown:noArg suspend:noArg " . 
-    "videolibrary:scan,clean audiolibrary:scan,clean statusRequest jsonraw";
+    "videolibrary:scan,clean audiolibrary:scan,clean statusRequest jsonraw " .
+    "connect";
   return $res ;
 
 }
@@ -812,7 +860,7 @@ sub XBMC_Set_Open($@)
       },
       'options' => {
         'resume' => JSON::true
-      }
+       }
     };
   }
   my $obj = {
@@ -835,9 +883,9 @@ sub XBMC_Set_Addon($@)
   $params = { 
     'addonid' => $addonid,
     'params' => {
-      $paramname => $paramvalue
-    }
-  };
+        $paramname => $paramvalue
+      }
+    };
   my $obj = {
     'method' => 'Addons.ExecuteAddon',
     'params' => $params
@@ -992,6 +1040,8 @@ sub XBMC_PlayerCommand($$$)
       return XBMC_Call($hash, $obj,0);
     }
   }
+  
+  #we need to find out the correct player first
   my $id = XBMC_CreateId();
   $hash->{PendingPlayerCMDs}->{$id} = $obj;
   my $req = {
@@ -1328,8 +1378,9 @@ sub XBMC_HTTP_Request($$@)
     <li><b>shutdown</b> -  the XBMC host will be shut down</li>
     <li><b>suspend</b> -  the XBMC host will be put into stand by</li>
     <li><b>hibernate</b> -  the XBMC host will be put into hibernation</li>
-    <li><b>reboot</b> -  the XBMC host will be rebooted</li>  
-    </ul>
+    <li><b>reboot</b> -  the XBMC host will be rebooted</li>
+    <li><b>connect</b> -  try to connect to the XBMC host immediately</li>
+  </ul>
   </ul>
   <br><br>
 
