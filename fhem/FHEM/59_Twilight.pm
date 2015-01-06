@@ -144,6 +144,7 @@ sub Twilight_Define($$)
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
   $hash->{WEATHER}        = $weather;
+  $hash->{DEFINE}         = 1;
   $hash->{SUNPOS_OFFSET}  = 5*60;
  
   $attr{$name}{verbose} = 4    if ($name =~ /^tst.*$/ );
@@ -151,6 +152,8 @@ sub Twilight_Define($$)
   my $mHash = { HASH=>$hash };
   Twilight_sunpos($mHash);  
   Twilight_Midnight($mHash);
+
+  delete $hash->{DEFINE};
   
   return undef;
 }
@@ -319,32 +322,27 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
   return if (!defined($hash));   
   
   my $location = $hash->{WEATHER};
-  my $verbose = AttrVal($hash->{NAME}, "verbose", 3 );
+  my $verbose  = AttrVal($hash->{NAME}, "verbose", 3 );
 
-#  my $xml = GetFileFromURL("http://weather.yahooapis.com/forecastrss?w=".
-#                            $location."&u=c",4.0, undef, 1);
-#                                                  xxxxxxxx
-#$param->{noshutdown}
-#optional
-#	   Wenn $param->{noshutdown} auf 1 gesetzt ist, wird dem HTTP-Server nicht implizit 
-#    mitgeteilt, dass die Verbindung nach dem Request geschlossen werden soll. Viele 
-#    Webserver schließen in solch einem Fall die Verbindung bevor sie die Antwort senden. 
-#    Bei 0 wird dem Webserver mitgeteilt, dass der Sendevorgang beendet ist und nun die 
-#    Antwort abgewartet wird.
-#    Standardwert: 1 wie undef 
-#                  0 schliest die Verbindung explizit. 
   my $param = {
-    url        => "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c",
-    timeout    => ($mode eq "Mid") ? 7 : 5,
-    hash       => $hash,
-    method     => "GET",
-    noshutdown => 1,
-    loglevel   => 4-($verbose-3),
-    header     => "User-Agent: Mozilla/5.0\r\nAccept: application/xml",
-    callback   =>  \&Twilight_WeatherCallback,
-    mode       =>  $mode
-  };
-  HttpUtils_NonblockingGet($param);
+     #noshutdown => 1,
+      url        => "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c",
+      timeout    => defined($hash->{DEFINE}) ? 5 : 5,
+      hash       => $hash,
+      method     => "GET",
+      loglevel   => 4-($verbose-3),
+      header     => "User-Agent: Mozilla/5.0\r\nAccept: application/xml",
+      callback   => \&Twilight_WeatherCallback,
+      mode       => $mode };
+  
+  if (defined($hash->{DEFINE})) {
+    delete $param->{callback};
+    my ($err, $xml) = HttpUtils_BlockingGet($param);
+    Twilight_WeatherCallback($param, $err, $xml);
+  } else {
+    HttpUtils_NonblockingGet($param);
+  }  
+  
 }
 ################################################################################
 sub Twilight_WeatherCallback(@) {
@@ -380,7 +378,7 @@ sub Twilight_WeatherTimerSet($) {
   myRemoveInternalTimer    ("perlTime", $hash);
   foreach my $key ("ss_weather", "sr_weather" ) {
      my $tim = $hash->{TW}{$key}{TIME};
-     if ($tim-60*60>$now) {
+     if ($tim-60*60>$now+60) {
         myInternalTimer       ("perlTime", $tim-60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
      }
   }
