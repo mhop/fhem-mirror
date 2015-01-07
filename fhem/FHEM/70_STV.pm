@@ -85,6 +85,29 @@ sub getIP()
   return "$address";
 }
 
+# Force a connection attempt to STV as soon as possible 
+# (e.g. you know you just started it and want to connect immediately without waiting up to 60 s)
+sub STV_Connect($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  if(AttrVal($hash->{NAME},'fork','disable') eq 'enable') {
+    return undef unless $hash->{CHILDPID}; # nothing to do
+    # well, the fork process does not respond to SIGTERM
+    # so lets use SIGKILL to make things clear to it
+    if ((kill SIGKILL, $hash->{CHILDPID}) != 1) { 
+      Log3 3, $name, "STV_Connect: ERROR: Unable to kill fork process!";
+      return undef;
+    }
+    $hash->{CHILDPID} = undef; # undefg childpid so the Ready-func will fork again
+  } else {
+    $hash->{NEXT_OPEN} = 0; # force NEXT_OPEN used in DevIO
+  }
+    
+  return undef;
+}
+
 sub STV_Ready($)
 {
   my ($hash) = @_;
@@ -97,7 +120,7 @@ sub STV_Ready($)
       return if($hash->{CHILDPID} = fork);
       my $ppid = getppid();
 
-	  ### Copied from Blocking.pm
+      ### Copied from Blocking.pm
       foreach my $d (sort keys %defs) {   # Close all kind of FD
         my $h = $defs{$d};
         #the following line was added by vbs to not close parent's DbLog DB handle
@@ -185,7 +208,7 @@ sub STV_Define($$)
 "POWEROFF POWERON PRECH PRINT PROGRAM QUICK_REPLAY REC RED REPEAT RESERVED1 RETURN REWIND REWIND_ RIGHT RSS ".
 "RSURF SCALE SEFFECT SETUP_CLOCK_TIMER SLEEP SOUND_MODE SOURCE SRS STANDARD STB_MODE STILL_PICTURE STOP ".
 "SUB_TITLE SVIDEO1 SVIDEO2 SVIDEO3 TOOLS TOPMENU TTX_MIX TTX_SUBFACE TURBO TV TV_MODE UP VCHIP VCR_MODE ".
-"VOLDOWN VOLUP WHEEL_LEFT WHEEL_RIGHT W_LINK YELLOW ZOOM1 ZOOM2 ZOOM_IN ZOOM_MOVE ZOOM_OUT";
+"VOLDOWN VOLUP WHEEL_LEFT WHEEL_RIGHT W_LINK YELLOW ZOOM1 ZOOM2 ZOOM_IN ZOOM_MOVE ZOOM_OUT connect";
     my $system = $^O;
     my $result = "";
     if($system =~ m/Win/) {
@@ -579,6 +602,10 @@ sub STV_Set($@)
        return $hash->{".validcommands"};
   }
   if ($hash->{".validcommands"} =~ /$cmd/) {
+    if ($cmd eq "connect") {
+        return STV_Connect($hash);
+    }
+
     if ((AttrVal($name, "setWhenOffline", "execute") eq "ignore") and ($hash->{STATE} ne "opened")) {
       Log3 $name, 3, "[STV] Device seems offline. Set command ignored: $cmd";
       return;
@@ -587,7 +614,7 @@ sub STV_Set($@)
     if ($Port eq 55000 ){
         STV_55000($hash,$nam,$cmd);
     }
-    if ($Port eq 52235 ){
+    elsif ($Port eq 52235 ){
         STV_52235($hash,@_);
     }
   } else {
