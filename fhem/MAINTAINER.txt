@@ -202,6 +202,7 @@ FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedi
 FHEM/71_YAMAHA_BD.pm         markusbloch          http://forum.fhem.de Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/72_FRITZBOX.pm          tupol                http://forum.fhem.de FRITZBOX (Link senden: http://forum.fhem.de/index.php?action=pm;sa=send;u=5432)
+FHEM/73_km200.pm             sailor               http://forum.fhem.de Heizungssteuerung/Raumklima
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/73_MPD.pm               wzut                 http://forum.fhem.de Multimedia
 FHEM/75_MSG.pm               ruebedo              http://forum.fhem.de Automatisierung
