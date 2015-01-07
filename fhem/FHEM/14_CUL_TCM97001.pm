@@ -20,7 +20,7 @@ CUL_TCM97001_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                         $readingFnAttributes;
   $hash->{AutoCreate}=
-        { "CUL_TCM97001.*" => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME" } };
+        { "CUL_TCM97001.*" => { GPLOT => "temp4:Temp,", FILTER => "%NAME" } };
 }
 
 #############################
