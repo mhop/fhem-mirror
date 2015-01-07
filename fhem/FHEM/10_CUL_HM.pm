@@ -922,7 +922,7 @@ sub CUL_HM_Parse($$) {#########################################################
   return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
   # $shash will be replaced for multichannel commands
   my $shash  = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
-  my $devH   = $shash;                # source device hash
+  my $devH   = $shash;               # source device hash
   my $dstH   = CUL_HM_id2Hash($dst); # destination device hash
   my $id     = CUL_HM_h2IoId($iohash);
   my $ioName = $iohash->{NAME};
@@ -4278,6 +4278,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         CUL_HM_PushCmdStack($pHash,"++${peerFlag}40$dst$peer$pc");
         $snd = 1;
         foreach my $pCh(grep /$peer/,@peerLchn){
+          delete $modules{CUL_HM}{defptr}{$pCh}{helper}{dlvl};#stop desiredLevel supervision
           my $n = CUL_HM_id2Name($pCh);
           $n =~s/_chn:.*//;
           CUL_HM_stateUpdatDly($n,10);
