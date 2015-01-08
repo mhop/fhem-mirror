@@ -1,4 +1,4 @@
-# $Id:  $
+# $Id$
 ##############################################################################
 #
 #     10_HXBDevice.pm
@@ -226,7 +226,7 @@ HXBDevice_Parse($$)
     } elsif($hxb_dtype eq "HXB_DTYPE_DATETIME") {
         $v= "?";
     } elsif($hxb_dtype eq "HXB_DTYPE_FLOAT") {
-        $v= unpack("f", $value);
+        $v= unpack "f", pack "N", unpack "V", $value; #unpack("f", $value);
     } elsif($hxb_dtype eq "HXB_DTYPE_128STRING") {
         $v= "?";
     } elsif($hxb_dtype eq "HXB_DTYPE_TIMESTAMP") {
