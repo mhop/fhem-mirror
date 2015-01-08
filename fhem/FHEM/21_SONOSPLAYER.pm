@@ -600,27 +600,29 @@ sub SONOSPLAYER_Set($@) {
 		$udn = $hash->{UDN};
 	
 		# Prüfen, ob ein Sonosplayer-Device angegeben wurde, dann diesen AV Eingang als Quelle wählen
-		my $dHash = SONOS_getDeviceDefHash($value);
-		if (defined($dHash)) {
-			my $udnShort = $1 if ($dHash->{UDN} =~ m/(.*)_MR/); 
-			
-			# Wenn dieses Quell-Device eine Playbar ist, dann den optischen Eingang als Quelle wählen...
-			if (ReadingsVal($dHash->{NAME}, 'playerType', '') eq 'S9') {
-				# Das ganze geht nur bei dem eigenen Eingang, ansonsten eine Gruppenwiedergabe starten
-				if ($dHash->{NAME} eq $hash->{NAME}) {
-					$value = 'x-sonos-htastream:'.$udnShort.':spdif';
+		if (defined($defs{$value})) {
+			my $dHash = SONOS_getDeviceDefHash($value);
+			if (defined($dHash)) {
+				my $udnShort = $1 if ($dHash->{UDN} =~ m/(.*)_MR/); 
+				
+				# Wenn dieses Quell-Device eine Playbar ist, dann den optischen Eingang als Quelle wählen...
+				if (ReadingsVal($dHash->{NAME}, 'playerType', '') eq 'S9') {
+					# Das ganze geht nur bei dem eigenen Eingang, ansonsten eine Gruppenwiedergabe starten
+					if ($dHash->{NAME} eq $hash->{NAME}) {
+						$value = 'x-sonos-htastream:'.$udnShort.':spdif';
+					} else {
+						# Auf dem anderen Player den TV-Eingang wählen
+						SONOS_DoWork($dHash->{UDN}, 'playURI', 'x-sonos-htastream:'.$udnShort.':spdif', undef);
+						
+						# Gruppe bilden
+						SONOS_DoWork($hash->{UDN}, 'playURI', 'x-rincon:'.$udnShort, $value2); 
+						
+						# Wir sind hier fertig
+						return undef;
+					}
 				} else {
-					# Auf dem anderen Player den TV-Eingang wählen
-					SONOS_DoWork($dHash->{UDN}, 'playURI', 'x-sonos-htastream:'.$udnShort.':spdif', undef);
-					
-					# Gruppe bilden
-					SONOS_DoWork($hash->{UDN}, 'playURI', 'x-rincon:'.$udnShort, $value2); 
-					
-					# Wir sind hier fertig
-					return undef;
+					$value = 'x-rincon-stream:'.$udnShort;
 				}
-			} else {
-				$value = 'x-rincon-stream:'.$udnShort;
 			}
 		}
 	
