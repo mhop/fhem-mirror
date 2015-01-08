@@ -98,9 +98,9 @@ my %fhttfk_translatedcodes = (
 # set
 my %fhttfk_c2b;	# command->button hash
 my %canset = (
-	"01" => "Open",
-	"02" => "Closed",
-	"0c" => "Syncing");
+  "01" => "Open",
+  "02" => "Closed",
+  "0c" => "Syncing");
 
 # -wusel, 2009-11-06
 #
@@ -119,8 +119,8 @@ CUL_FHTTK_Initialize($)
   my ($hash) = @_;
   
   foreach my $k (keys %canset) {
-	my $v = $canset{$k};
-	$fhttfk_c2b{$v} = $k;
+  my $v = $canset{$k};
+  $fhttfk_c2b{$v} = $k;
   }
 
   $hash->{Match}     = "^T[A-F0-9]{8}";
@@ -130,7 +130,7 @@ CUL_FHTTK_Initialize($)
   $hash->{ParseFn}   = "CUL_FHTTK_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
                         "model:FHT80TF,FHT80TF-2,dummy ".
-						$readingFnAttributes;
+                        $readingFnAttributes;
   $hash->{AutoCreate}=
      { "CUL_FHTTK.*" => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" } };
 
@@ -147,26 +147,39 @@ CUL_FHTTK_Set($@)
   return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
   
   my $name = shift(@a);
+  my $opt = shift @a;
   
   # suppress SET option
   if(defined($attr{$name}) && defined($attr{$name}{"model"})) {
-	if($attr{$name}{"model"} ne "dummy") {
-		return $ret
-	}
+    if($attr{$name}{"model"} ne "dummy") {
+      return $ret;
+    }
+    
+    # check address of FHT TF
+    my $myaddr = hex($hash->{CODE});
+    my $boundary = hex(690000);
+        
+    if($myaddr < $boundary) {
+      Log3 $name, 3, "$name wrong housecode: The first digit must be equal or greater than 0x69.";
+      if($opt eq "?")
+      {
+        return $ret;
+      }
+      return "$name wrong housecode: The first digit must be equal or greater than 0x69.";
+    }
   }
   else {
-	return $ret;
-  }  
-  
-  my $opt = shift @a;
+    return $ret;
+  }
+    
   my $value = join("", @a);
   
   Log3 $name, 5, "$name option: $opt and value: $value";
   
   if(!defined($fhttfk_c2b{$opt})) {
-		my @cList = keys %fhttfk_c2b;
-		return "Unknown argument $opt ($value), choose one of " . join(" ", @cList);
-	}
+    my @cList = keys %fhttfk_c2b;
+    return "Unknown argument $opt ($value), choose one of " . join(" ", @cList);
+  }
   
   if ($opt eq "Open" ) {
     Log3 $name, 3, "CUL_FHTTK ($name) changed window state to open.";
@@ -179,11 +192,11 @@ CUL_FHTTK_Set($@)
 
   } elsif($opt eq "Syncing" ) {
     Log3 $name, 3, "CUL_FHTTK ($name) syncing with FHT80b.";
-	    
+
     IOWrite($hash, "", sprintf("T%s0c", $hash->{CODE})); # 0x0c - sync
-	# window state switch to closed through cul FW implementation
-	$opt = "Closed";
-    
+    # window state switch to closed through cul FW implementation
+    $opt = "Closed";
+
   } else {
     return "Unknown argument $a[1], choose one of Syncing Open Closed"
   }
@@ -208,9 +221,17 @@ CUL_FHTTK_Define($$)
   my $name     = $a[0];
   my $sensor   = lc($a[2]);
   if($sensor !~ /^[0-9a-f]{6}$/) {
-       return "wrong sensor specification $sensor, need a 6 digit hex number";
+    return "wrong sensor specification $sensor, need a 6 digit hex number!";
   }
 
+  # check address of FHT TF at definition step
+  my $myaddr = hex($sensor);
+  my $boundary = hex(690000);
+
+  if($myaddr < $boundary) {
+    return "wrong sensor specification $sensor, the fist two digits must be equal or greater than 0x69!";
+  }
+  
   $hash->{CODE} = $sensor;
   $modules{CUL_FHTTK}{defptr}{$sensor} = $hash;
 
@@ -248,8 +269,7 @@ CUL_FHTTK_Parse($$)
   return "" if(IsIgnored($name));
 
   if(!defined($fhttfk_translatedcodes{$state})) {
-        Log3 $name, 1, sprintf("FHTTK $def Unknown state $state");
-#      Log 3, sprintf("FHTTK $def Unknown state $state");
+      Log3 $name, 1, sprintf("FHTTK $def Unknown state $state");
       $defs{$name}{READINGS}{"Unknown"}{VAL} = $state;
       $defs{$name}{READINGS}{"Unknown"}{TIME} = TimeNow();
       return "";
@@ -347,7 +367,13 @@ CUL_FHTTK_Parse($$)
   usually temperature+humidity sensors (no clue, why ELV didn't label this one "TFK" like with
   FS20 and HMS).<br><br>
   As said before, FHEM can receive FHT80 TF radio (868.35 MHz) messages only through an
-  <a href="#CUL">CUL</a> device, so this must be defined first.<br><br>
+  <a href="#CUL">CUL</a> device, so this must be defined first.
+  <br><br>
+  With the latest build on <a href="http://sourceforge.net/p/culfw/code/HEAD/tree/trunk/culfw/Devices/">SVN</a> 
+  or next official version 1.62 or higher, it is possible to send out FHT80 TF data with a CUL or simular 
+  devices. So it can be simulate up to four window sensor with one device 
+  (see <a href="http://www.fhemwiki.de/wiki/CUL_FHTTK">FHEM Wiki</a>). To setup a window sensor, you have to
+  add and/or change the attribute "model" to dummy. The 6 digit hex number must start at 690000.<br><br>
 
   <a name="CUL_FHTTKdefine"></a>
   <b>Define</b>
@@ -367,9 +393,18 @@ CUL_FHTTK_Parse($$)
   <br>
 
   <a name="CUL_FHTTKset"></a>
-  <b>Set </b>
-    <ul> Nothing to set here yet ... </ul>
-  <br>
+  <b>Set</b>
+    <ul> Only available, if model is set to dummy.<br><br>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <ul><code>
+      Syncing     # start sync with FHT80B (activate FHT80B sync mode before) - state after is closed<br>
+      Closed      # set window state to closed<br>
+      Open        # set window state to open<br>
+    </code></ul>
+    </ul>
+    <br>
 
   <b>Get</b>
    <ul> No get implemented yet ...
@@ -380,12 +415,12 @@ CUL_FHTTK_Parse($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#verbose">verbose</a></li><br>
-    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2)</li><br>
+    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2, dummy)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#eventMap">eventMap</a></li><br>
-	<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 
@@ -405,7 +440,13 @@ CUL_FHTTK_Parse($$)
   Temperatur- und Feuchtigkeitssensoren suggeriert. (Keine Ahnung, warum ELV diesen Sensor nicht TFK genannt hat, 
   wie die Sensoren von FS20 und HMS).
   <br><br>
-  <a href="#CUL">CUL</a> device muss vorhr definiert sein.<br><br>
+  <a href="#CUL">CUL</a> device muss vorhr definiert sein.
+  <br><br>
+  Mit dem letzten Build auf <a href="http://sourceforge.net/p/culfw/code/HEAD/tree/trunk/culfw/Devices/">SVN</a> 
+  oder mit der naechsten offiziellen Version 1.62 oder hoeher, ist es moeglich, FHT80 TF Daten zu senden. Moeglich mit 
+  einem CUL oder aehnlichen Geraeten. So koennen bis zu vier Fenstersensoren mit einem Gerät simuliert werden  
+  (see <a href="http://www.fhemwiki.de/wiki/CUL_FHTTK">FHEM Wiki</a>). Es muss lediglich das Attribut model mit dem 
+  Wert "dummy" hinzugefuegt oder geaendert werdxen. Wichtig: Der Devicecode beginnt ab 690000 hex.<br><br>
 
   <a name="CUL_FHTTKdefine"></a>
   <b>D</b>
@@ -414,8 +455,8 @@ CUL_FHTTK_Parse($$)
     <br><br>
 
     <code>&lt;devicecode&gt;</code> Ist eine sechstellige Hexadezimalzahl, welche zum Zeitpunkt der Produktion 
-	des FHT80 TF gegeben wurde. Somit ist diese auch nicht mehr änderbar und bleibt auch nach einem Batteriewechsel 
-	erhalten.<br>
+  des FHT80 TF gegeben wurde. Somit ist diese auch nicht mehr änderbar und bleibt auch nach einem Batteriewechsel 
+  erhalten.<br>
 
     Examples:
     <ul>
@@ -425,9 +466,18 @@ CUL_FHTTK_Parse($$)
   <br>
 
   <a name="CUL_FHTTKset"></a>
-  <b>Set </b>
-    <ul> N/A </ul>
-  <br>
+  <b>Set</b>
+    <ul> Nur vorhanden, wenn das Attribut model mit dummy definiert wurde.<br><br>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
+    <br><br>
+    wobei <code>value</code> folgendes sein kann:<br>
+    <ul><code>
+      Syncing     # startet die Synchronisation mit dem FHT80B (FHT80B muss sich im Sync mode befinden) - danach ist der sate closed<br>
+      Closed      # setzt den Fensterstatus zu Closed<br>
+      Open        # setzt den Fensterstatus zu Open<br>
+    </code></ul>
+    </ul>
+    <br>
 
   <b>Get</b>
 	<ul> N/A </ul>
@@ -438,7 +488,7 @@ CUL_FHTTK_Parse($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#verbose">verbose</a></li><br>
-    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2)</li><br>
+    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2, dummy)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
