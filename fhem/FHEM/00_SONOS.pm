@@ -32,6 +32,8 @@
 # Changelog
 #
 # SVN-History:
+# 08.01.2015
+#	Bei der Wiedergabeanweisung "PlayURI" gab es einen Fehler
 # 05.01.2105
 #	Die Cover beim Abspielen "von diesem Gerät" (also iPad, oder Android-Tablet) wurden nicht angezeigt.
 # 04.01.2015
@@ -5793,6 +5795,7 @@ sub SONOS_getDeviceDefHash($) {
 	}
 	
 	SONOS_Log undef, 1, "The Method 'SONOS_getDeviceDefHash' cannot find the FHEM-Device according to '$devicename'. This should not happen!";
+	return undef;
 }
 
 ########################################################################################
