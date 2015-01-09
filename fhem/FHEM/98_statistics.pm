@@ -1187,7 +1187,7 @@ sub statistics_UpdateDevReading($$$$)
          <li>period: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
       </ul>
       <br>
-      Regulare expression of statistic values, which shall not be shown in summary but also in singular readings. Eases the creation of plots. For duration readings the name of the state has to be used as statTypes.
+      Regulare expression of statistic values, which for which singular readings are created <u>additionally</u>. Eases the creation of plots. For duration readings the name of the state has to be used as statTypes.
       <br>
        Example: <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
@@ -1332,7 +1332,7 @@ sub statistics_UpdateDevReading($$$$)
             <li>Statistiktyp: Min|Avg|Max|Delta|<i>DurationState</i>|<span style="color:blue;">Tendency</span></li>
             <li>Zeitraum: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
          </ul>
-         Regul&auml;rer Ausdruck statistischer Werte, die nicht nur in zusammengefassten sondern auch als einzelne Werte gespeichert werden sollen.
+         Regul&auml;rer Ausdruck statistischer Werte, die <u>zus&auml;tzlich</u> auch als einzelne Werte gespeichert werden sollen.
          Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify).
          <br>
          F&uuml;r "duration"-Ger&auml;tewerte muss der Name des jeweiligen Statuswertes als <code>Statistiktyp</code> eingesetzt werden.
