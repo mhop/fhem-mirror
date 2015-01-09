@@ -1102,7 +1102,11 @@ sub FRITZBOX_GuestWlan_Run($)
       if $result;
 
    my $returnStr = "$name|2|";
-   
+
+   $result = FRITZBOX_Exec $hash, "[ -n `ctlmgr_ctl r wlan settings/guest_pskvalue` ] && echo 1 || echo 0";
+   return "$name|0|Error: No password defined for guest WLAN." 
+      unless $result;
+
 # Set WLAN on if guestWLAN on
    push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable 1"]
       if $state == 1;
@@ -2210,7 +2214,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
          <br>
-         Switches the guest WLAN on or off. If necessary, the normal WLAN is also switched on.
+         Switches the guest WLAN on or off. The guest password must be set. If necessary, the normal WLAN is also switched on.
       </li><br>
 
       <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3FileIncludingPath|say:Text&gt;]</code>
@@ -2467,7 +2471,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
          <br>
-         Schaltet das G&auml;ste-WLAN an oder aus. Wenn notwendig wird auch das normale WLAN angeschaltet.
+         Schaltet das G&auml;ste-WLAN an oder aus. Das G&auml;ste-Passwort muss gesetzt sein. Wenn notwendig wird auch das normale WLAN angeschaltet.
       </li><br>
 
       <li><code>set &lt;name&gt; moh &lt;default|sound|customer&gt; [&lt;MP3DateiInklusivePfad|say:Text&gt;]</code>
@@ -2568,6 +2572,7 @@ sub FRITZBOX_fritztris($)
          <br>
          IP Adresse oder ULR der Fritz!Box f&uuml;r Fernzugriff per Telnet. Standard ist "fritz.box".
       </li><br>
+      
       <li><code>pwdFile &lt;fileName&gt;</code>
          <br>
          Damit kann die Datei ge&uuml;ndert werden, welche das Passwort f&uuml;r den Telnetzugang enth&auml;lt. Der Standard ist 'fb_pwd.txt' im Wurzelverzeichnis von FHEM.
