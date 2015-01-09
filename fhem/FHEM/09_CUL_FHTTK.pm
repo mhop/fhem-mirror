@@ -223,14 +223,6 @@ CUL_FHTTK_Define($$)
   if($sensor !~ /^[0-9a-f]{6}$/) {
     return "wrong sensor specification $sensor, need a 6 digit hex number!";
   }
-
-  # check address of FHT TF at definition step
-  my $myaddr = hex($sensor);
-  my $boundary = hex(690000);
-
-  if($myaddr < $boundary) {
-    return "wrong sensor specification $sensor, the fist two digits must be equal or greater than 0x69!";
-  }
   
   $hash->{CODE} = $sensor;
   $modules{CUL_FHTTK}{defptr}{$sensor} = $hash;
