@@ -456,7 +456,7 @@ Ver 0 always indicates the currently running configuration.<br/>
 
 		<li><code>configdb recover &lt;version&gt;</code></li><br/>
 			Restores an older version from database archive.<br/>
-			<code>set configDB recover 3</code> will <b>copy</b> version #3 from database 
+			<code>configdb recover 3</code> will <b>copy</b> version #3 from database 
 			to version #0.<br/>
 			Original version #0 will be lost.<br/><br/>
 			<b>Important!</b><br/>
@@ -775,7 +775,7 @@ Ver 0 bezeichnet immer die aktuell verwendete Konfiguration.<br/>
 
 		<li><code>configdb recover &lt;version&gt;</code></li><br/>
 			Stellt eine &auml;ltere Version aus dem Datenbankarchiv wieder her.<br/>
-			<code>set configDB recover 3</code>  <b>kopiert</b> die Version #3 aus der Datenbank 
+			<code>configdb recover 3</code>  <b>kopiert</b> die Version #3 aus der Datenbank 
 			zur Version #0.<br/>
 			Die urspr&uuml;ngliche Version #0 wird dabei gel&ouml;scht.<br/><br/>
 			<b>Wichtig!</b><br/>
