@@ -459,7 +459,7 @@ SYSSTAT_readOIDs($$)
 
     my @snmpoids = ();
     my @nextid   = keys %$response;
-    while ( $snmpoids && $nextid[0] =~ m/^$snmpoids/ ) {
+    while ( @nextid && $nextid[0] && $nextid[0] =~ m/^$snmpoids/ ) {
       push( @snmpoids, $nextid[0] );
 
       $response = $hash->{session}->get_next_request( $nextid[0] );
