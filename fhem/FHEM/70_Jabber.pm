@@ -25,6 +25,7 @@
 # Version: 1.1 - 2014-07-28
 #
 # Changelog:
+# v1.2 2015-01-09 hardening XML::Stream Process() call and fix of ssl_verify
 # v1.1 2014-07-28 Added UTF8 encoding / decoding to Messages
 # v1.0 2014-04-10 Stable Release - Housekeeping & Add to SVN
 # v0.3 2014-03-19 Fixed SetPresence() & Added extensive debugging capabilities by setting $debug to 1
@@ -221,6 +222,7 @@ Jabber_PollMessages($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  my $connectiondied = 0;
   RemoveInternalTimer($hash);
   
   if(!$init_done) {
@@ -281,10 +283,33 @@ Jabber_PollMessages($)
       }
     }
 
-    #We do Process() and if the connection died we reconnect. 
+    #We do Process() - if the connection has died we reconnect. 
     if ($doProcess == 1) {
       Log 0, "$hash->{NAME} DoProcess Call" if $debug;
-      if (!defined($hash->{JabberDevice}->Process(1))) {
+
+      #Check for previous errors in process(), before XMPP::Connection will break down FHEM
+      $connectiondied = 0;
+      if (defined($hash->{JabberDevice})) {
+        if (exists($hash->{JabberDevice}->{PROCESSERROR}) && ($hash->{JabberDevice}->{PROCESSERROR} == 1)) {
+          #XMPP::Connection would kill FHEM now.. But we try to handle it.
+          $hash->{STATE} = "Disconnected";
+          $hash->{CONNINFO} = "Jabber connection error (Previous XMPP Process() error!)";
+          Log 0, "$hash->{NAME} Jabber connection error (Previous XMPP Process() error!)" if $debug;
+          $connectiondied = 1;
+        } else {
+	  #Do Process(), if it is undef, connection is gone or some other problem...
+          if (!defined($hash->{JabberDevice}->Process(1))) {
+            $hash->{STATE} = "Disconnected";
+            $hash->{CONNINFO} = "Jabber connection died";
+            Log 0, "$hash->{NAME} Jabber connection error (Process() is undef!)" if $debug;
+            $connectiondied = 1;
+          }
+        }
+      } else {
+        $connectiondied = 1;
+      }
+
+      if ($connectiondied == 1) {
         #connection died
         Log 0, "$hash->{NAME} Connection died" if $debug;
         $hash->{JabberDevice} = undef;
@@ -317,7 +342,12 @@ sub Jabber_CheckConnection($)
       $dev = new Net::Jabber::Client();
     }
     $hash->{JabberDevice} = $dev;
-    
+
+    #Default to SSL = nonverify (0x00) - this has been changed in XML::Stream 1.23_04 and cause problems because you need a CA verify list.
+    if (defined($hash->{JabberDevice}->{STREAM}->{SIDS}->{default}->{ssl_verify})) {
+      $hash->{JabberDevice}->{STREAM}->{SIDS}->{default}->{ssl_verify} = 0x00;
+    }
+
     #Needed for Message handling:
     $hash->{JabberDevice}->SetMessageCallBacks(normal => sub { \&Jabber_INC_Message($hash,@_) }, chat => sub { \&Jabber_INC_Message($hash,@_) } );
     #Needed if someone wants to subscribe to us and is on the WhiteList
