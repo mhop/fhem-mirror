@@ -799,7 +799,7 @@ sub _cfgDB_Recover($) {
 			$sth->execute();
 			$sth2 = $fhem_dbh->prepare('INSERT INTO fhemconfig values (?, ?, ?, ?, ?, ?)');
 			while (@line = $sth->fetchrow_array()) {
-				$sth2->execute($line[0], $line[1], $line[2], $line[3], -1, $touuid);
+				$sth2->execute($line[0], $line[1], $line[2], $line[3], $line[4], $touuid);
 			}
 			$fhem_dbh->commit();
 			$fhem_dbh->disconnect();
