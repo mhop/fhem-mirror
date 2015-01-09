@@ -64,11 +64,11 @@ my %fonModel = (
    );
 
 my %ringTone =  qw { 
-    0 HandsetDefault 1 HandsetInternalTon 
+    0 HandsetDefault 1 HandsetInternalTone 
     2 HandsetExternalTon 3 Standard 
     4 Eighties   5 Alert 
     6 Ring       7 RingRing 
-    8 News       9 CustomerRingTon 
+    8 News       9 CustomerRingTone 
     10 Bamboo   11 Andante 
     12 ChaCha   13 Budapest 
     14 Asia     15 Kullabaloo 
@@ -520,6 +520,9 @@ sub FRITZBOX_Readout_Run($)
       push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/RefreshDiversity" ];
       push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Diversity/count" ];
 
+# Box Features
+      push @readoutCmdArray, [ "fhem->is_double_wlan", "ctlmgr_ctl r wlan settings/feature_flags/DBDC" ];
+
    # Box model and firmware
       push @readoutCmdArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
       push @readoutCmdArray, [ "box_oem", 'echo $OEM' ];
@@ -527,11 +530,14 @@ sub FRITZBOX_Readout_Run($)
       push @readoutCmdArray, [ "box_fwUpdate", "ctlmgr_ctl r updatecheck status/update_available_hint" ];
       push @readoutCmdArray, [ "box_tr069", "ctlmgr_ctl r tr069 settings/enabled", "onoff" ];
 
+
    # Execute commands
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings);
 
       my $dectCount = $resultArray->[1];
+      $dectCount = 0 unless $dectCount=~ /\d/;
       my $radioCount = $resultArray->[2];
+      $radioCount = 0 unless $radioCount=~ /\d/;
       my $userCount = $resultArray->[3];
       my $fonCount = $resultArray->[4];
       my $lanDeviceCount = $resultArray->[5];
@@ -582,9 +588,6 @@ sub FRITZBOX_Readout_Run($)
          }  
       }
 
-      # Dect Phones
-      for (610..615) { delete $hash->{fhem}{$_} if defined $hash->{fhem}{$_}; }
-      
       for (1..$dectCount)
       {
         # 0 Dect-Interne Nummer
@@ -959,11 +962,14 @@ sub FRITZBOX_Readout_Format($$$)
    
    } elsif ($format eq "mohtype") {
       $readout = $mohtype[$readout] if defined $mohtype[$readout];
+      $readout = "" if $readout eq "er";
    
    } elsif ($format eq "nounderline") {
       $readout =~ s/_/ /g;
 
    } elsif ($format eq "onoff") {
+      $readout =~ s/er//;
+      $readout =~ s/no-emu//;
       $readout =~ s/0/off/;
       $readout =~ s/1/on/;
    
@@ -1263,7 +1269,6 @@ sub FRITZBOX_Ring_Run($)
       if ( not defined $fhemRadioStation && $hash->{fhem}{radioCount} )
       {
          $fhemRadioStation = $hash->{fhem}{radioCount}-1;
-         $fhemRadioStation = 39 if $fhemRadioStation>39; # Because count cannot be reset
       }
    }
 
@@ -1316,7 +1321,11 @@ sub FRITZBOX_Ring_Run($)
    @cmdArray = ();
    
 # Creation fhemRadioStation for ttsLink
-   if (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM")
+   if (int (@FritzFons) == 0 && $ttsLink)
+   {
+      FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, parameter 'say:' will be ignored."
+   }
+   elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM")
    {
       FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
       push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Name FHEM";
@@ -1397,6 +1406,9 @@ sub FRITZBOX_Ring_Run($)
       } else {
          push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[0]."'";
       }
+   } elsif ($field{show})
+   {
+      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined."
    }
    
 # Execute command array
@@ -1853,16 +1865,18 @@ FRITZBOX_Exec_Remote($$)
       if ( int (@{$cmd}) > 0 )
       {
          FRITZBOX_Log $hash, 4, "Execute " . int ( @{$cmd} ) . " command(s)";
-  
+         
          foreach (@{$cmd})
          {
             FRITZBOX_Log $hash, 5, "Execute '".$_."'";
             unless ($_ =~ /^sleep/)
             {
-               @output=$telnet->cmd($_);
+               @output=$telnet->cmd($_.";echo ' |#|'");
                $result = $output[0];
                chomp $result;
+               $result = "" if $result eq " |#|";
                my $log = join " ", @output;
+               $log =~ s/\s*\|#\|\n//;
                chomp $log;
                FRITZBOX_Log $hash, 5, "Result '$log'";
             }
@@ -2205,7 +2219,7 @@ sub FRITZBOX_fritztris($)
          <br>
          <code>set fritzbox moh customer /var/InternerSpeicher/warnung.mp3</code>
          <br>
-         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has a maximal length of 8 s. It is played during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 8 s.
+         Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has <u>always</u> a length of 8.2 s. It is played continousely during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 8 s.
          <br>
       </li><br>
 
@@ -2463,7 +2477,7 @@ sub FRITZBOX_fritztris($)
          <code>set fritzbox moh customer /var/InternerSpeicher/warnung.mp3</code>
          <br>
          &Auml;ndert die Wartemusik ('music on hold') der Box. Mit dem Parameter 'customer' kann eine eigene MP3-Datei aufgespielt werden.
-         Alternativ kann mit "say:" auch ein Text gesprochen werden. Die Wartemusik hat eine maximale L&auml;nge von 8,13 s. Sie wird w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 8s-Nachrichten vorgespielt werden.
+         Alternativ kann mit "say:" auch ein Text gesprochen werden. Die Wartemusik hat <u>immer</u> eine L&auml;nge von 8,13 s. Sie wird kontinuierlich w&auml;hrend des Makelns von Gespr&auml;chen aber auch bei Nutzung der internen W&auml;hlhilfe bis zum Abheben des rufenden Telefons abgespielt. Dadurch k&ouml;nnen &uuml;ber FHEM dem Angerufenen 8s-Nachrichten vorgespielt werden.
          <br>
       </li><br>
       
