@@ -423,10 +423,12 @@ PRESENCE_Read($)
     if($buf eq "absence")
     {
         readingsBulkUpdate($hash, "state", "absent");
+        readingsBulkUpdate($hash, "presence", "absent");
     }
     elsif($buf =~ /present;(.+?)$/)
     {
         readingsBulkUpdate($hash, "state", "present");
+        readingsBulkUpdate($hash, "presence", "present");
 
         if($1 =~ /^(.*);(.+)$/)
         {
@@ -941,6 +943,7 @@ PRESENCE_ProcessLocalScan($)
     if($a[2] eq "present")
     {
         readingsBulkUpdate($hash, "state", "present");
+        readingsBulkUpdate($hash, "presence", "present");
         readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]) and $hash->{MODE} =~ /^(lan-bluetooth|local-bluetooth)$/ );
         
         if($hash->{MODE} eq "fritzbox" and defined($a[4]))
@@ -951,7 +954,7 @@ PRESENCE_ProcessLocalScan($)
     elsif($a[2] eq "absent")
     {
         readingsBulkUpdate($hash, "state", "absent");
-        
+        readingsBulkUpdate($hash, "presence", "absent");
         if($hash->{MODE} eq "fritzbox" and defined($a[4]))
         {
             readingsBulkUpdate($hash, "speed", $a[4]);
@@ -1243,7 +1246,8 @@ Options:
   <ul>
     <u>General Events:</u><br><br>
     <ul>
-    <li><b>state</b>: $state (absent|present|disabled|error|timeout) - The state of the device or "disabled" when the disable attribute is enabled</li>
+    <li><b>state</b>: (absent|present|disabled|error|timeout) - The state of the device or "disabled" when the disable attribute is enabled</li>
+    <li><b>presence</b>: (absent|present) - The state of the device</li>
     <li><b>powerCmd</b>: (executed|failed) - power command was executed or has failed</li>
     </ul><br><br>
     <u>Bluetooth specific events:</u><br><br>
@@ -1488,7 +1492,8 @@ Options:
   <ul>
     <u>Generelle Events:</u><br><br>
     <ul>
-    <li><b>state</b>: $state (absent|present|disabled|error|timeout) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das disable-Attribut aktiviert ist</li>
+    <li><b>state</b>: (absent|present|disabled|error|timeout) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das disable-Attribut aktiviert ist</li>
+    <li><b>presence</b>: (absent|present) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend)</li>
     <li><b>powerCmd</b>: (executed|failed) - Ausf&uuml;hrung des power-Befehls war erfolgreich.</li>
     </ul><br><br>
     <u>Bluetooth-spezifische Events:</u><br><br>
