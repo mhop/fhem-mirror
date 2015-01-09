@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 70_Jabber.pm: hardening XML::Stream Process() call and fix of ssl_verify
   - feature: readingsGroup: allow devspec :FILTER= expressions in device selection
   - added:   73_km200.pm for the Buderus KM200 heating controller (Sailor)
   - feature: 70_XBMC: added command 'connect' to connect instantly
