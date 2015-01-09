@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 01/2015
-my $thzversion = "0.123";
+my $thzversion = "0.124";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 # http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
@@ -290,7 +290,7 @@ my %getsonly = (
 my %getsonly206 = (
 #	"debug_read_raw_register_slow"	=> { },
 	"sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
-	"pXX"				=> {cmd2=>"17", type =>"17pxx", unit =>""},
+	"p01-p12"			=> {cmd2=>"17", type =>"17pxx", unit =>""},
 	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
 	"sHC1"				=> {cmd2=>"F4", type =>"F4hc1", unit =>""},
 	"sHC2"				=> {cmd2=>"F5", type =>"F5hc2", unit =>""},
@@ -559,7 +559,7 @@ sub THZ_Set($@){
     }
   }  
  
-  
+  # encode value depending on type
   given ($cmdhash->{type}) {
    when ("9holy") 		{$arg= time2quaters($arg)}
    when ("8party") 		{$arg= time2quaters($arg1) *256  + time2quaters($arg)}     #non funziona
@@ -570,9 +570,12 @@ sub THZ_Set($@){
    when ("1clean") 		{ }
    default 			{ } 
   }  
-
   Log3 $hash->{NAME}, 5, "THZ_Set: '$cmd $arg' ... Check if port is open. State = '($hash->{STATE})'";
   $cmdHex2=THZ_encodecommand(($cmdHex2 . substr((sprintf("%04X", $arg)), -4)),"set");  #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
+  
+  #per vecchi firmware  leggi 17, sovrascrivi parte del messaggio, encode; non so se lo implemento
+  
+  
   ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
   #$err=undef;
   if (defined($err))  { return ($cmdHex2 . "-". $msg ."--" . $err);}
@@ -1072,9 +1075,9 @@ my %parsinghash = (
 
 my %parsinghash206 = (
   #msgtype => parsingrule  
-  "09his"  => [["compressorHeating: ",	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
-	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
-	      [" boosterHeating: ",	20, 4, "hex", 1]
+  "09his"  => [["operatingHours1: ",	4, 4,  "hex", 1],	[" operatingHours2: ",  8, 4, "hex", 1],
+	      [" heatingHours: ",	12, 4, "hex", 1],	[" DHWhours: ",	16, 4, "hex", 1],
+	      [" coolingHours: ",	20, 4, "hex", 1]
 	      ],
   "16sol"  => [["collector_temp: ",	4, 4, "hex2int", 10],	[" dhw_temp: ", 	 8, 4, "hex2int", 10],
 	      [" flow_temp: ",		12, 4, "hex2int", 10],	[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
@@ -1153,6 +1156,9 @@ my %parsinghash206 = (
   #$message= "46D101010017072F0322000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
   #$message= "99FBFDA8001700B60097026D00A6FDA8FDA8FFA500A52008110000000002BC000000000013001B00000000011003C4409C79B33FA624DE"
   #$message= "E01700DA00D5006401A4019F0064020000006401A401";
+  #$message= "F9FBFDA8FFFC00B8009A021400A7FDA8FDA8FF8F00A82008110122012C02BC000F00160014000200000000010203CD40908DD33FA15811";
+  
+  #$message=  "eaFBfda8001601440108024901e6fda8fda8001c01176008110000000002bc000000000014001900000000014c05304600d58f3fd47ae207c500b1012a000001060144fff4ffde012300000000";
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
   my $length = length($message);
   Log3 $hash->{NAME}, 5, "Message length: $length";
@@ -1237,17 +1243,17 @@ sub THZ_debugread($){
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
  #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
-  my @numbers=('FB', '01', 'FB', 'FE', '00', '0A05D1', '0A010D');  
-  #my @numbers = (1..256);
+  #my @numbers=('0A033B', '0A064F', 'FB', 'FE', '00', '0A05D1', '0A010D');  
+  my @numbers = (1..256);
   #my @numbers = (1..65535);
   #my @numbers = (1..3179);
   my $indice= "FF";
   unlink("data.txt"); #delete  debuglog
   foreach $indice(@numbers) {	
-    #my $cmd = sprintf("%02X", $indice);
+    my $cmd = sprintf("%02X", $indice);
     #my $cmd = sprintf("%04X", $indice);
     #my $cmd = "0A" . sprintf("%04X",  $indice);
-    my $cmd = $indice;
+    #my $cmd = $indice;
     my $cmdHex2 = THZ_encodecommand($cmd,"get"); 
     #($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
     #STX start of text
@@ -1259,16 +1265,10 @@ sub THZ_debugread($){
     ($err, $msg) = THZ_ReadAnswer($hash);
     # ack datatranfer and read from the heatpump        
     THZ_Write($hash,  "10");
-    select(undef, undef, undef, 0.06);
+    select(undef, undef, undef, 0.110);
     ($err, $msg) = THZ_ReadAnswer($hash);
     THZ_Write($hash,  "10");
-    
-    #my $activatetrigger =1;
-	#	  readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
-	#	  open (MYFILE, '>>data.txt');
-	#	  print MYFILE ($cmdHex2 . "-" . $msg . "\n");
-	#	  close (MYFILE); 
-    
+
     if (defined($err))  {return ($msg ."\n" . $err);}
     else {   #clean up and remove footer and header
 	($err, $msg) = THZ_decode($msg);
@@ -1277,9 +1277,10 @@ sub THZ_debugread($){
 		 # readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
 		  open (MYFILE, '>>data.txt');
 		  print MYFILE ($cmd . "-" . $msg . "\n");
-		  close (MYFILE); 
+		  close (MYFILE);
+		  Log3 $hash->{NAME}, 3, "$cmd  -  $msg";
     }    
-    select(undef, undef, undef, 0.35); #equivalent to sleep 50ms
+    select(undef, undef, undef, 0.150); #equivalent to sleep 150ms
   }
 }
 
