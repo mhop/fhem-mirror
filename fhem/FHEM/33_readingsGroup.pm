@@ -96,7 +96,7 @@ readingsGroup_updateDevices($;$)
     } else {
       my @device = split(":", $param);
 
-      if( $device[1] =~ m/^FILTER=/ ) {
+      if( $device[1] && $device[1] =~ m/^FILTER=/ ) {
         my $devspec = shift(@device);
         while( @device && $device[0] =~ m/^FILTER=/ ) {
           $devspec .= ":";
