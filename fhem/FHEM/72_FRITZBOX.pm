@@ -858,11 +858,12 @@ sub FRITZBOX_Readout_Process($$)
          readingsBulkUpdate( $hash, "state", $newState);
          FRITZBOX_Log $hash, 5, "SET state = '$newState'";
       }
+
+      my $msg = keys( %values )." values captured in ".$values{readoutTime}." s";
+      readingsBulkUpdate( $hash, "lastReadout", $msg );
+      FRITZBOX_Log $hash, 4, $msg;
    }
 
-   my $msg = keys( %values )." values captured in ".$values{readoutTime}." s";
-   readingsBulkUpdate( $hash, "lastReadout", $msg );
-   FRITZBOX_Log $hash, 4, $msg;
 
    readingsEndUpdate( $hash, 1 );
 }
@@ -977,8 +978,14 @@ sub FRITZBOX_Readout_Format($$$)
       $readout =~ s/1/on/;
    
    } elsif ($format eq "radio") {
-      $readout = $hash->{fhem}{radio}{$readout}
-         if defined $hash->{fhem}{radio}{$readout};
+      if (defined $hash->{fhem}{radio}{$readout})
+      {
+         $readout = $hash->{fhem}{radio}{$readout};
+      }
+      else
+      {
+         $readout .= " (unknown)";
+      }
   
    } elsif ($format eq "ringtone") {
       $readout = $ringTone{$readout};
@@ -1794,9 +1801,16 @@ sub FRITZBOX_Open_Connection($)
       $telnet = undef;
       return $msg;
    }
+   FRITZBOX_Log $hash, 5, "Change command prompt";
    $telnet->prompt('/<xFHEMx> $/');
-   $telnet->cmd("PS1='<xFHEMx> '");
-   $telnet->buffer_empty;
+   unless ($telnet->cmd("PS1='<xFHEMx> '"))
+   {
+      $msg = "Telnet error: Could not change command prompt - ".$telnet->errmsg;
+      FRITZBOX_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
+      return $msg;
+   }
    
    return undef;
 } # end FRITZBOX_Open_Connection
@@ -2056,13 +2070,21 @@ FRITZBOX_StartRadio($@)
 
 # Get current ringtone
    my $userNo = $intNo-609;
-   my $curRingTone = FRITZBOX_Exec( $hash, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$userNo."/IntRingTone" );
+   push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$userNo."/IntRingTone";
+   push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$userNo."/RadioRingID";
+   $result = FRITZBOX_Exec( $hash, \@cmdArray );
+   
+   my $curRingTone = $result->[0];
+   my $curRadioStation = $result->[1];
 
 # Start Internet Radio and reset ring tone
    push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/IntRingTone 33";
-   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/RadioRingID $radioStation";
+   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/RadioRingID $radioStation"
+      if defined $radioStation;
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/IntRingTone $curRingTone";
+   push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$userNo."/RadioRingID $curRadioStation"
+      if defined $radioStation;
 
 # Execute command array
    FRITZBOX_Exec( $hash, \@cmdArray );
@@ -2266,7 +2288,8 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [name or number]</code>
          <br>
-         Plays the internet radio on the given Fritz!Fon. Default is the current station of the phone. 
+         Plays the internet radio on the given Fritz!Fon. Default is the current <u>ring tone</u> radio station of the phone. 
+         So, <b>not</b> the station that is selected at the handset.
          An available internet radio can be selected by its name or (reading) number.
          <br>
       </li><br>
@@ -2379,7 +2402,7 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_intRingTone</b> - Internal ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_manufacturer</b> - Manufacturer of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_radio</b> - Current internet radio station of the DECT device <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_radio</b> - Current internet radio station ring tone of the DECT device <i>1</i></li>
 
       <li><b>fon</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
@@ -2523,7 +2546,7 @@ sub FRITZBOX_fritztris($)
       
       <li><code>set &lt;name&gt; startRadio &lt;internalNumber&gt; [Name oder Nummer]</code>
          <br>
-         Startet das Internetradio auf dem angegebenen Fritz!Fon. Ein verf&uuml;gbare Radiostation kann &uuml;ber den Namen oder die (Ger&auml;tewert)Nummer ausgew&auml;hlt werden. Ansonsten wird die aktuell eingestellte genommen.
+         Startet das Internetradio auf dem angegebenen Fritz!Fon. Eine verf&uuml;gbare Radiostation kann &uuml;ber den Namen oder die (Ger&auml;tewert)Nummer ausgew&auml;hlt werden. Ansonsten wird die in der Box als Internetradio-Klingelton eingestellte Station abgespielt. (Also <b>nicht</b> die am Telefon ausgew&auml;hlte.)
          <br>
       </li><br>
       
@@ -2632,7 +2655,7 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_intRingTone</b> - Interner Klingelton des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_manufacturer</b> - Hersteller des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_model</b> - Modell des DECT Telefons <i>1</i></li>
-      <li><b>dect</b><i>1</i><b>_radio</b> - aktuelle Internet Radio Station des DECT Telefons <i>1</i></li>
+      <li><b>dect</b><i>1</i><b>_radio</b> - aktueller Internet-Radio-Klingelton des DECT Telefons <i>1</i></li>
       
       <li><b>fon</b><i>1</i> - Name des analogen Telefonanschlusses <i>1</i> an der Fritz!Box</li>
       <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
