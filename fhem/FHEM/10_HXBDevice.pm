@@ -156,9 +156,18 @@ HXBDevice_Define($$)
         
         $hash->{fhem}{ipv6}= $ipv6;
         AssignIoPort($hash);
-        $modules{$hash->{TYPE}}{defptr}{"$ipv6"}= $hash;
+        
+        my @devarray= ();
+        my $devarrayref= $modules{$hash->{TYPE}}{defptr}{"$ipv6"};
+        if(defined($devarrayref)) {
+	  @devarray= @{$devarrayref};
+	}
+        push @devarray, $hash;
+        $modules{$hash->{TYPE}}{defptr}{"$ipv6"}= \@devarray;
        
         return undef;
+        
+        # Todo: HXBDevice_Undefine
 }
 
 ###################################
@@ -194,59 +203,72 @@ sub
 HXBDevice_Parse($$)
 {
 
-  # we never come here if $msg does not match $hash->{MATCH} in the first place
+  # we never come here if $msg does not match $IOhash->{MATCH} in the first place
 
   my ($IOhash, $data) = @_;        # IOhash points to the HXB, not to the HXBDevice
 
   my $socket= $IOhash->{TCPDev};
   my $ipv6= $socket->peerhost;
-
-  my $hash= $modules{"HXBDevice"}{defptr}{"$ipv6"};
-  return "UNDEFINED HXB_$ipv6 HXBDevice $ipv6" unless(defined($hash));
   
-  my $n= length($data);
-  return undef if($n< 8);
+  my $hash;
   
-  my ($magic, $ptype, $flags, $payload, $crc)= unpack("A4CCa" . ($n-8) . "n", $data);
-  my $raw= unpack("a" . ($n-2), $data);
-  return undef unless($crc = crc16Kermit($raw));
-  my $hxb_ptype= $HXB_PTYPES_r{$ptype};
-  my $hxb_flag= $HXB_FLAGS_r{$flags};
-  if($hxb_ptype eq "HXB_PTYPE_INFO") {
-    my ($eid, $dtype, $value)= unpack("NCa*", $payload);
-    my $ep= $EP_r{$eid};
-    my $hxb_dtype= $HXB_DTYPES_r{$dtype};
-    my $v= "<unknown>";
-    if($hxb_dtype eq "HXB_DTYPE_BOOL") {
-        $v= unpack("b", $value);
-    } elsif($hxb_dtype eq "HXB_DTYPE_UINT8") {
-        $v= unpack("C", $value);
-    } elsif($hxb_dtype eq "HXB_DTYPE_UINT32") {
-        $v= unpack("N", $value);
-    } elsif($hxb_dtype eq "HXB_DTYPE_DATETIME") {
-        $v= "?";
-    } elsif($hxb_dtype eq "HXB_DTYPE_FLOAT") {
-        $v= unpack "f", pack "N", unpack "V", $value; #unpack("f", $value);
-    } elsif($hxb_dtype eq "HXB_DTYPE_128STRING") {
-        $v= "?";
-    } elsif($hxb_dtype eq "HXB_DTYPE_TIMESTAMP") {
-        $v= "?";
-    } elsif($hxb_dtype eq "HXB_DTYPE_65BYTES") {
-        $v= "?";
-    } elsif($hxb_dtype eq "HXB_DTYPE_16BYTES") {
-        $v= "?";
-    }
-    Log3 $hash,5, sprintf("%s: %s %s %s %s %s= %s", 
-      $hash->{NAME}, $hxb_ptype, $hxb_flag, 
-      $ep, $hxb_dtype, unpack("H*", $value), $v);
+  # array of device hash with that IPv6 address
+  my @devices= ();
 
-    readingsSingleUpdate($hash, "state", "$ep= $v", 1);
-    readingsSingleUpdate($hash, $ep, $v, 1);
-    
-    return $hash->{NAME};
-      
+  # matching devices
+  my @devarray= ();
+  my $devarrayref= $modules{"HXBDevice"}{defptr}{"$ipv6"};
+  if(defined($devarrayref)) {
+    @devarray= @{$devarrayref};
   }
-  return undef;
+  return "UNDEFINED HXB_$ipv6 HXBDevice $ipv6" if($#devarray< 0);
+  
+  foreach $hash (@devarray) {
+    
+    my $n= length($data);
+    return undef if($n< 8);
+    
+    my ($magic, $ptype, $flags, $payload, $crc)= unpack("A4CCa" . ($n-8) . "n", $data);
+    my $raw= unpack("a" . ($n-2), $data);
+    return undef unless($crc = crc16Kermit($raw));
+    my $hxb_ptype= $HXB_PTYPES_r{$ptype};
+    my $hxb_flag= $HXB_FLAGS_r{$flags};
+    if($hxb_ptype eq "HXB_PTYPE_INFO") {
+      my ($eid, $dtype, $value)= unpack("NCa*", $payload);
+      my $ep= $EP_r{$eid};
+      my $hxb_dtype= $HXB_DTYPES_r{$dtype};
+      my $v= "<unknown>";
+      if($hxb_dtype eq "HXB_DTYPE_BOOL") {
+	  $v= unpack("b", $value);
+      } elsif($hxb_dtype eq "HXB_DTYPE_UINT8") {
+	  $v= unpack("C", $value);
+      } elsif($hxb_dtype eq "HXB_DTYPE_UINT32") {
+	  $v= unpack("N", $value);
+      } elsif($hxb_dtype eq "HXB_DTYPE_DATETIME") {
+	  $v= "?";
+      } elsif($hxb_dtype eq "HXB_DTYPE_FLOAT") {
+	  $v= unpack "f", pack "N", unpack "V", $value; #unpack("f", $value);
+      } elsif($hxb_dtype eq "HXB_DTYPE_128STRING") {
+	  $v= "?";
+      } elsif($hxb_dtype eq "HXB_DTYPE_TIMESTAMP") {
+	  $v= "?";
+      } elsif($hxb_dtype eq "HXB_DTYPE_65BYTES") {
+	  $v= "?";
+      } elsif($hxb_dtype eq "HXB_DTYPE_16BYTES") {
+	  $v= "?";
+      }
+      Log3 $hash,5, sprintf("%s: %s %s %s %s %s= %s", 
+	$hash->{NAME}, $hxb_ptype, $hxb_flag, 
+	$ep, $hxb_dtype, unpack("H*", $value), $v);
+
+      readingsSingleUpdate($hash, "state", "$ep= $v", 1);
+      readingsSingleUpdate($hash, $ep, $v, 1);
+      
+      push @devices, $hash->{NAME};
+    }
+     
+  }
+  return @devices;
   
 }
 
