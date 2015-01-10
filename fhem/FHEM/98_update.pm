@@ -165,7 +165,8 @@ doUpdate($$)
         return 1;
       }
       upd_mkDir($root, $r[2], 0);
-      uLog 4, "mv $root/$r[1] $root/$r[2]";
+      my $mvret =  mv "$root/$r[1]", "$root/$r[2]";
+      uLog 4, "mv $root/$r[1] $root/$r[2]". ($mvret ? " FAILED:$mvret":"");
     }
 
     next if($r[0] ne "UPD");
