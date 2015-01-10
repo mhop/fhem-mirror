@@ -4461,10 +4461,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                                          ($a[5]?$a[5]:"set"),
                                                          ($a[6]?$a[6]:"both"));
     $state = "";
-    return "$bNo is not a button number"                          if(($bNo < 1) && !$roleC);
+    if ($roleD){
+      $bNo = 1 if ($bNo == 0 && $roleC); # role device and channel => button=1
+      return "$bNo is not a button number"                        if($bNo < 1);
+    }
+    
     my $peerId = CUL_HM_name2Id($peerN);
     return "please enter peer"                                    if(!$peerId);
-    $peerId .= "01" if( length($peerId)==6);
+    $peerId .= "01" if( length($peerId) == 6);
 
     my @pCh;
     my ($peerHash,$dSet,$cmdB);
@@ -4499,7 +4503,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else                {$set = 1;$cmdB ="01";}
 
     my (@b,$nrCh2Pair);
-    $b[1] = ($roleC) ? hex($chn) : (($single eq "single")?$bNo : ($bNo*2 - 1));
+    $b[1] = ($roleD) ?(($single eq "single")?$bNo : ($bNo*2 - 1))
+                     : hex($chn)
+                       ;
     if ($single eq "single"){
       $b[2] = $b[1];
       $b[1] = 0 if ($st eq "smokeDetector" ||$pSt eq "smokeDetector");
