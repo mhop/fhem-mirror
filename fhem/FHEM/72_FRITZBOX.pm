@@ -872,7 +872,10 @@ sub FRITZBOX_Readout_Aborted($)
 {
   my ($hash) = @_;
   delete($hash->{helper}{READOUT_RUNNING_PID});
-  FRITZBOX_Log $hash, 1, "Timeout when reading Fritz!Box data.";
+  my $msg = "Error: Timeout when reading Fritz!Box data.";
+  readingsSingleUpdate($hash, "lastReadout", $msg, 1);
+  readingsSingleUpdate($hash, "state", $msg, 1);
+  FRITZBOX_Log $hash, 1, $msg;
 }
 
 ##########################################
@@ -1791,7 +1794,10 @@ sub FRITZBOX_Open_Connection($)
       $telnet = undef;
       return $msg;
    }
-
+   $telnet->prompt('/<xFHEMx> $/');
+   $telnet->cmd("PS1='<xFHEMx> '");
+   $telnet->buffer_empty;
+   
    return undef;
 } # end FRITZBOX_Open_Connection
 
@@ -1872,15 +1878,13 @@ FRITZBOX_Exec_Remote($$)
          
          foreach (@{$cmd})
          {
-            FRITZBOX_Log $hash, 5, "Execute '".$_."'";
+            FRITZBOX_Log $hash, 5, "Execute '$_'";
             unless ($_ =~ /^sleep/)
             {
-               @output=$telnet->cmd($_.";echo ' |#|'");
-               $result = $output[0];
+               @output=$telnet->cmd($_);
+               $result = $output[0] || "";
                chomp $result;
-               $result = "" if $result eq " |#|";
-               my $log = join " ", @output;
-               $log =~ s/\s*\|#\|\n//;
+               my $log = join "", @output;
                chomp $log;
                FRITZBOX_Log $hash, 5, "Result '$log'";
             }
