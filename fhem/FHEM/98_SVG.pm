@@ -55,7 +55,7 @@ SVG_Initialize($)
 
   $hash->{DefFn} = "SVG_Define";
   $hash->{AttrList} = "fixedoffset fixedrange startDate plotsize nrAxis ".
-                      "label title plotfunction";
+                      "label title plotfunction captionLeft:1,0";
   $hash->{SetFn}    = "SVG_Set";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
@@ -1328,7 +1328,9 @@ SVG_render($$$$$$$$$;$$)
   }
   $xtics = defined($conf{xtics}) ? $conf{xtics} : "";
 
+  my $caption_left = AttrVal($name, "captionLeft", 0);
   my ($txtoff1,$txtoff2) = ($off1, $off2);
+  $txtoff1 = $nr_left_axis*$axis_width+$th if( $caption_left );
 
   ######################
   # Loop over the input, digest dates, calculate min/max values
@@ -1878,6 +1880,7 @@ SVG_render($$$$$$$$$;$$)
 
   ######################
   # Plot caption (title) at the end, should be draw on top of the lines
+  my $caption_anchor = $caption_left?"beginning":"end";
   for my $i (0..int(@{$conf{lTitle}})-1) {
     my $j = $i+1;
     my $t = $conf{lTitle}[$i];
@@ -1889,8 +1892,8 @@ SVG_render($$$$$$$$$;$$)
     }
     my $style = $conf{lStyle}[$i];
     $style =~ s/class="/class="legend /;
-    SVG_pO "<text title=\"$desc\" line_id=\"line_$i\" " .
-          "x=\"$txtoff1\" y=\"$txtoff2\" text-anchor=\"end\" $style>$t</text>";
+    SVG_pO "<text title=\"$desc\" line_id=\"line_$i\" x=\"$txtoff1\" ".
+              "y=\"$txtoff2\" text-anchor=\"$caption_anchor\" $style>$t</text>";
     $txtoff2 += $th;
   }
 
@@ -2144,6 +2147,11 @@ plotAsPng(@)
       in the .gplot file. It defaults to the filename of the logfile.
     </li>
 
+    <a name="captionLeft"></a>
+    <li>captionLeft<br>
+      Show the legend on the left side.
+      </li><br>
+
     <a name="plotfunction"></a>
     <li>plotfunction<br>
       Space value separated list of values. The value will be used to replace
@@ -2339,6 +2347,11 @@ plotAsPng(@)
       Zeichenfolge &lt;TL&gt; in der .gplot-Datei ersetzt wird.
       Standardm&auml;&szlig;ig wird als &lt;TL&gt; der Dateiname des Logfiles
       eingesetzt.
+      </li><br>
+
+    <a name="captionLeft"></a>
+    <li>captionLeft<br>
+      Anzeigen der Legende auf der linken Seite
       </li><br>
 
     <a name="plotfunction"></a>
