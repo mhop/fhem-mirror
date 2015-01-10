@@ -1092,10 +1092,10 @@ SVG_getData($$$$$)
       my $r = $srcDesc->{rev}{$oi}{$li}+1;
       my $val = shift @vals;
       foreach my $k (@keys) {
-        $min = $val->{$k}
-                if($k eq "min" && defined($val->{$k}) && $val->{$k} < $min);
-        $max = $val->{$k}
-                if($k eq "max" && defined($val->{$k}) && $val->{$k} > $max);
+        $min = $val->{$k} if($k eq "min" && defined($val->{$k}) &&
+                                $val->{$k} =~ m/\d\.-/ && $val->{$k} < $min);
+        $max = $val->{$k} if($k eq "max" && defined($val->{$k}) &&
+                                $val->{$k} =~ m/\d\.-/ && $val->{$k} > $max);
         $data{"$k$r"} = $val->{$k};
       }
     }
