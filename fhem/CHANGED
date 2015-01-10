@@ -1,24 +1,35 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: fhemweb.js rewrite based on jQuery, single-widget-implementation
+  - feature: SVG: multiple sources allowed, Plot-Editor
+  - feature: textfield-long and knob widgets
   - added:   some new icons by Rampler
-  - feature: PRESENCE: new reading "presence" which contains the current (or last known)
-                       presence state (can be "absent" or "present")
-  - bugfix: 70_Jabber.pm: hardening XML::Stream Process() call and fix of ssl_verify
-  - feature: readingsGroup: allow devspec :FILTER= expressions in device selection
+  - feature: PRESENCE: new reading "presence" which contains the current (or
+    last known) presence state (can be "absent" or "present")
+  - bugfix: 70_Jabber.pm: hardening XML::Stream Process() call and fix of
+    ssl_verify
+  - feature: readingsGroup: allow devspec :FILTER= expressions in device
+    selection
   - added:   73_km200.pm for the Buderus KM200 heating controller (Sailor)
   - feature: 70_XBMC: added command 'connect' to connect instantly
-  - change: FB_CALLMONITOR: use standard file read/write function to support use of configDb
-  - bugfix: FB_CALLMONITOR: fix phonebook file read when using configDb (Forum #30244)
-  - feature: 70_XBMC: added commands: openmovieid, openepisodeid, addon, jsonraw (thanks to siggi85)
+  - change: FB_CALLMONITOR: use standard file read/write function to support
+    use of configDb
+  - bugfix: FB_CALLMONITOR: fix phonebook file read when using configDb (Forum
+    #30244)
+  - feature: 70_XBMC: added commands: openmovieid, openepisodeid, addon,
+    jsonraw (thanks to siggi85)
   - fix: 70_XBMC: made fork attribute to close file handles correctly
   - feature: 70_XBMC: added mechanism to detect disconnects (TCP)
   - fix: 66_ECMD: avoid reading from a closed connection in ECMD_READ
-  - feature: 70_PIONEERAVR: readings for currentAlbum etc., more internals (network settings, moved some from readings to internals), new attributes volumeLimit & volumeLimitStraight
+  - feature: 70_PIONEERAVR: readings for currentAlbum etc., more internals
+    (network settings, moved some from readings to internals), new attributes
+    volumeLimit & volumeLimitStraight
   - added: some new icons (hourglass, frost, sani_heating_level_XX)
   - fix:   sani_heating_boost (possibility to colorize)
   - feature: FB_CALLMONITOR: add remote phonebook lookup via telnet connection
                              to FritzBox (JoWiemann). 
-  - bugfix: 70_PIONEERAVR & 71_PIONEERAVRZONE: fixed not working set-extensions (on-for-timer,...)
+  - bugfix: 70_PIONEERAVR & 71_PIONEERAVRZONE: fixed not working set-extensions
+    (on-for-timer,...)
   - feature: fheminfo: report third-party modules
   - feature: 99_Utils.pm: add getUniqueID, getKeyValue, setKeyValue
   - feature: SMARTMON: additional parameters for smartctl
@@ -33,7 +44,8 @@
   - feature: HUEDevice: allow ct presets in webCmd
                         new subTypes extcolordimer and ctdimer
                         start support for Lightify bulbs
-  - added: SONOS and SONOSPLAYER to support Sonos Multiroom Audiosystems (Reinerlein)
+  - added: SONOS and SONOSPLAYER to support Sonos Multiroom Audiosystems
+    (Reinerlein)
   - change: 64_ESA2000.pm: add batterystate
   - added:   42_SMARTMON: Frontend to smartctl (maintainer: hexenmeister)
   - feature: 70_PushNotifier added line break in Messages (xusader)
@@ -43,7 +55,8 @@
   - bugfix: FB_CALLMONITOR: fixing not working company numbers 
             reverse search for search.ch 
   - bugfix: 70_PushNotifier repair set function (xusader)
-  - bugfix: PRESENCE: fixing not working timer, when using set [...] statusRequest
+  - bugfix: PRESENCE: fixing not working timer, when using set [...]
+    statusRequest
   - bugfix: FB_CALLMONITOR: fixing reverse search for klicktel.de
   - feature: new module 52_I2C_MCP342x.pm added (klausw)
   - feature: SYSMON: read cpu temp on FritzBox
@@ -57,7 +70,8 @@
   - feature: new module 98_logProxy.pm added (justme1968)
   - change: 66_ECMD: ReadyFn added (fixes issue under Windows)
   - change: 02_RSS: use a GUID in RSS; urlq source for img command
-  - feature: 70_PushNotifier improve usebility, configuration without cURL (xusader)
+  - feature: 70_PushNotifier improve usebility, configuration without cURL
+    (xusader)
   - bugfix: SYSMON: prevent empty line im log by userReadings
   - feature: 10_IT empfang (by bjoernh)
   - bugfix: PRESENCE: fix race condition, when delete disabled attribute and

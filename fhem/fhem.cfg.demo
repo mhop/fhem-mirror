@@ -73,7 +73,7 @@ attr Livingroom icon light_pendant_light
 attr Livingroom model fs20di
 attr Livingroom room Light
 attr Livingroom webCmd dim
-define AllLights structure Light Alarm Livingroom Office Outdoor
+define AllLights structure Light Alarm Livingroom Office Outdoor CT RGB
 attr AllLights devStateIcon undefined:light_question
 attr AllLights group Structure
 attr AllLights icon light_light
@@ -164,7 +164,7 @@ attr ReadingLight eventMap off:dim0% on:dim100%
 attr ReadingLight group Light
 attr ReadingLight icon light_floor_lamp
 attr ReadingLight room Cinema
-attr ReadingLight webCmd on:off:dim
+attr ReadingLight webCmd on:off:dim:dim 50
 define wlCinema weblink htmlCode {LightScene_2html("lcCinema")}
 attr wlCinema room Cinema
 define lcCinema LightScene Projector Screen TV CeilingLight ReadingLight
@@ -185,6 +185,7 @@ attr anyViews dashboard_tab1name Dashboard Demo
 attr anyViews dashboard_tab1sorting t0c100,Light,true,518,129:t0c100,Home State,true,496,204:t0c0,Single Lights,true,522,209:t0c0,AV,true,221,170:
 attr anyViews dashboard_tabcount 1
 attr anyViews dashboard_width 80%
+attr anyViews room hidden
 
 define anyViews_weblink weblink htmlCode {DashboardAsHtml("anyViews")}
 attr anyViews_weblink room DashboardRoom
@@ -288,3 +289,29 @@ attr rr_Baby icon status_available
 attr rr_Baby room Residents
 attr rr_Baby sortby 0
 attr rr_Baby webCmd state
+define RGB readingsProxy RGB
+attr RGB userattr Light Light_map structexclude
+attr RGB Light AllLights
+attr RGB alias RGB Light
+attr RGB comment light with the ability to change RGB color
+attr RGB devStateIcon {Color::devStateIcon("RGB","rgb","rgb","state")}
+attr RGB group Color Lights
+attr RGB room Light
+attr RGB setFn {if( $CMD =~ m/on|off/ ) { $ARGS=$CMD;;$CMD = "state" } else {fhem ("setreading $DEVICE state on");;} if( $CMD =~ m/hue/ ) {my ($r,$g,$b) = Color::hsv2rgb($ARGS/360,1,1);; my $rgb = Color::rgb2hex( $r*255, $g*255, $b*255 );; fhem ("setreading $DEVICE rgb $rgb");;} if( $CMD =~ m/rgb/ && $ARGS =~ m/^(..)(..)(..)/ ) {my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);; my ($h,$s,$v) = Color::rgb2hsv($r,$g,$b);; my $hue = int($h*359);;  fhem ("setreading $DEVICE hue $hue");;} fhem ("setreading $DEVICE $CMD $ARGS");;return undef;;}
+attr RGB setList on:noArg off:noArg rgb:colorpicker,RGB hue:colorpicker,HUE,0,1,359
+attr RGB webCmd hue:rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:rgb ffffff:on:off
+define colorInit notify global:INITIALIZED {use Color;;Color_Initialize()}
+attr colorInit room hidden
+define CT readingsProxy CT
+attr CT userattr Light Light_map structexclude
+attr CT Light AllLights
+attr CT alias CT Light
+attr CT comment light with the ability to change the color temperature
+attr CT devStateIcon {Color::devStateIcon("CT","rgb","rgb","state")}
+attr CT getFn { my ($r,$g,$b) = Color::ct2rgb( ReadingsVal($DEVICE,"ct",333) );; return (Color::rgb2hex($r,$g,$b), 1);; }
+attr CT getList rgb:noArg
+attr CT group Color Lights
+attr CT room Light
+attr CT setFn {if( $CMD =~ m/on|off/ ) { $ARGS=$CMD;;$CMD = "state" } else {fhem ("setreading $DEVICE state on");;}  fhem ("setreading $DEVICE $CMD $ARGS");;return undef;;}
+attr CT setList on:noArg off:noArg ct:colorpicker,CT,2000,1,6500
+attr CT webCmd ct::ct 2040:ct 2630:ct 3703:ct 6250:on:off

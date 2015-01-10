@@ -1,13 +1,12 @@
-var xmlns="http://www.w3.org/2000/svg";
-var old_title;
-var old_sel;
-var svgdoc;
-var b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-var to;
+"use strict";
+var svgNS = "http://www.w3.org/2000/svg";
+var svg_b64 ="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+var svg_initialized={};
+
 
 // Base64 encode the xy points (12 bit x, 12 bit y).
 function
-compressPoints(pointList)
+svg_compressPoints(pointList)
 {
   var i, x, y, lx = -1, ly, ret = "";
   var pl_arr = pointList.replace(/^  */,'').split(/[, ]/);
@@ -17,24 +16,24 @@ compressPoints(pointList)
     if(pl_arr.length > 500 && lx != -1 && x-lx < 2)    // Filter the data.
       continue;
     ret = ret+
-          b64.charAt((x&0xfc0)>>6)+
-          b64.charAt((x&0x3f))+
-          b64.charAt((y&0xfc0)>>6)+
-          b64.charAt((y&0x3f));
+          svg_b64.charAt((x&0xfc0)>>6)+
+          svg_b64.charAt((x&0x3f))+
+          svg_b64.charAt((y&0xfc0)>>6)+
+          svg_b64.charAt((y&0x3f));
     lx = x; ly = y;
   }
   return ret;
 }
 
 function
-uncompressPoints(cmpData)
+svg_uncompressPoints(cmpData)
 {
   var i = 0, ret = "";
   while(i < cmpData.length) {
-    var x = (b64.indexOf(cmpData.charAt(i++))<<6)+
-            b64.indexOf(cmpData.charAt(i++));
-    var y = (b64.indexOf(cmpData.charAt(i++))<<6)+
-            b64.indexOf(cmpData.charAt(i++));
+    var x = (svg_b64.indexOf(cmpData.charAt(i++))<<6)+
+             svg_b64.indexOf(cmpData.charAt(i++));
+    var y = (svg_b64.indexOf(cmpData.charAt(i++))<<6)+
+             svg_b64.indexOf(cmpData.charAt(i++));
     ret += " "+x+","+y;
   }
   return ret;
@@ -42,130 +41,245 @@ uncompressPoints(cmpData)
 
 
 function
-get_cookie()
+svg_getcookie()
 {
-  var c = parent.document.cookie;
+  var c = document.cookie;
   if(c == null)
-    return "";
+    return [];
   var results = c.match('fhemweb=(.*?)(;|$)' );
-  return (results ? unescape(results[1]) : "");
+  return (results ? unescape(results[1]).split(":") : []);
 }
 
 function
-set_cookie(value)
+svg_prepareHash(el)
 {
-  parent.document.cookie="fhemweb="+escape(value);
-}
-
- 
-function
-svg_copy(evt)
-{
-  var d = evt.target.ownerDocument;
-  var cp = d.getElementById("svg_copy");
-  cp.firstChild.nodeValue = " ";
-  set_cookie(old_sel.getAttribute("y_min")+":"+
-             old_sel.getAttribute("y_mul")+":"+
-             compressPoints(old_sel.getAttribute("points")));
-}
-
-function
-svg_paste(evt)
-{
-  var d = evt.target.ownerDocument;
-  var ps = d.getElementById("svg_paste");
-  ps.firstChild.nodeValue = " ";
-
-  var o=d.createElementNS(xmlns, "polyline");
-  o.setAttribute("class", "pasted");
-  var data = get_cookie().split(":", 3);
-  o.setAttribute("points", uncompressPoints(data[2]));
-
-  var h  = parseFloat(old_sel.getAttribute("y_h"));
-  var ny_mul = parseFloat(data[1]);
-  var ny_min = parseInt(data[0]);
-  var y_mul  = parseFloat(old_sel.getAttribute("y_mul"));
-  var y_min  = parseInt(old_sel.getAttribute("y_min"));
-  var tr = 
-      "translate(0,"+ (h/y_mul+y_min-h/ny_mul-ny_min)*y_mul +") "+
-      "scale(1, "+ (y_mul/ny_mul) +") ";
-  o.setAttribute("transform", tr);
-  d.documentElement.appendChild(o);
-}
-
-function
-showOtherLines(d, lid, currval, maxval)
-{
-  for(var i=0; i < 9; i++) {
-    var id="line_"+i;
-    var el = d.getElementById(id);
-    if(el && id != lid) {
-      var h = parseFloat(el.getAttribute("y_h"));
-      el.setAttribute("transform", "translate(0,"+h*(1-currval)+") "+
-                                   "scale(1,"+currval+")");
-    }
-  }
-  if(currval != maxval) {
-    currval += (currval<maxval ? 0.02 : -0.02);
-    currval = Math.round(currval*100)/100;
-    to=setTimeout(function(){showOtherLines(d,lid,currval,maxval)},10);
-  }
-}
-
-function
-svg_labelselect(evt)
-{
-  var d = evt.target.ownerDocument;
-  var lid = evt.target.getAttribute("line_id");
-  var sel = d.getElementById(lid);
-  var tl = d.getElementById("svg_title");
-  var cp = d.getElementById("svg_copy");
-  var ps = d.getElementById("svg_paste");
-
-  clearTimeout(to);
-  if(old_sel == sel) {
-    sel.setAttribute("stroke-width", 1);
-    old_sel = null;
-    tl.firstChild.nodeValue = old_title;
-    cp.firstChild.nodeValue = " ";
-    ps.firstChild.nodeValue = " ";
-    showOtherLines(d, lid, 0, 1);
-
-  } else {
-    if(old_sel == null)
-      old_title = tl.firstChild.nodeValue;
-    else
-      old_sel.setAttribute("stroke-width", 1);
-    sel.setAttribute("stroke-width", 3);
-    old_sel = sel;
-    if(sel.getAttribute("points") != null) {
-      tl.firstChild.nodeValue = evt.target.getAttribute("title");
-      cp.firstChild.nodeValue = "Copy";
-      ps.firstChild.nodeValue = (get_cookie()==""?" ":"Paste");
-    }
-    showOtherLines(d, lid, 1, 0);
-
-  }
+  var obj = { y_mul:0,y_h:0,y_min:0, decimals:0, x_mul:0,x_off:0,x_min:0 };
+  for(var name in obj)
+    obj[name] = parseFloat($(el).attr(name));
+  return obj;
 }
 
 function
 svg_click(evt)
 {
-  var t=evt.target;
-  var y_mul = parseFloat(t.getAttribute("y_mul"));
-  var y_h   = parseFloat(t.getAttribute("y_h"));
-  var y_min = parseFloat(t.getAttribute("y_min"));
-  var y_fx  = parseFloat(t.getAttribute("decimals"));
-  var y_org = (((y_h-evt.clientY)/y_mul)+y_min).toFixed(y_fx);
+  var t = evt.target;
+  var o = svg_prepareHash(t);
 
-  var x_mul = parseFloat(t.getAttribute("x_mul"));
-  var x_off = parseFloat(t.getAttribute("x_off"));
-  var x_min = parseFloat(t.getAttribute("x_min"));
-  var d = new Date((((evt.clientX-x_min)/x_mul)+x_off) * 1000);
+  var y_org = (((o.y_h-evt.clientY)/o.y_mul)+o.y_min).toFixed(o.decimals);
+  var d = new Date((((evt.clientX-o.x_min)/o.x_mul)+o.x_off) * 1000);
   var ts = (d.getHours() < 10 ? '0' : '') + d.getHours() + ":"+
            (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 
   
-  var tl = evt.target.ownerDocument.getElementById('svg_title');
+  var tl = t.ownerDocument.getElementById('svg_title');
   tl.firstChild.nodeValue = t.getAttribute("title")+": "+y_org+" ("+ts+")";
 }
+
+function
+sv_menu(evt, embed)
+{
+  var label = evt.target;
+  var svg = $(label).closest("svg");
+  var svgNode = $(svg).get(0);
+  var lid = $(label).attr("line_id");
+  var data = svg_getcookie();
+  var sel = $(svg).find("#"+lid);
+  var selNode = $(sel).get(0);
+  var tl = $(svg).find("#svg_title");
+  var par = svgNode.par;
+
+  FW_menu(evt, label,
+    ["Copy", "Paste",
+      svgNode.isSingle ? "Show all lines":"Hide other lines",
+      selNode.showVal ? "Stop displaying values" : "Display plot values" ],
+    [undefined, data.length==0, undefined, selNode.nodeName!="polyline"],
+    function(arg) {
+
+      //////////////////////////////////// copy
+      if(arg == 0) {
+        document.cookie="fhemweb="+
+              $(sel).attr("y_min")+":"+$(sel).attr("y_mul")+":"+
+              svg_compressPoints($(sel).attr("points"));
+      }
+
+      //////////////////////////////////// paste
+      if(arg == 1) {
+        var doc = $(svg).get(0).ownerDocument;
+        var o=doc.createElementNS(svgNS, "polyline");
+        o.setAttribute("class", "pasted");
+        o.setAttribute("points", svg_uncompressPoints(data[2]));
+
+        var h  = parseFloat($(sel).attr("y_h"));
+        var ny_mul = parseFloat(data[1]);
+        var ny_min = parseInt(data[0]);
+        var y_mul  = parseFloat($(sel).attr("y_mul"));
+        var y_min  = parseInt($(sel).attr("y_min"));
+        var tr = 
+            "translate(0,"+ (h/y_mul+y_min-h/ny_mul-ny_min)*y_mul +") "+
+            "scale(1, "+ (y_mul/ny_mul) +") ";
+        o.setAttribute("transform", tr);
+        doc.documentElement.appendChild(o);
+      }
+
+      //////////////////////////////////// hide/show lines
+      if(arg == 2) {    
+        if(svgNode.isSingle) {
+          delete(svgNode.isSingle);
+          $(sel).attr("stroke-width", 1);
+          $(tl).html($(tl).attr("hiddentitle"));
+          showOtherLines(0, 1);
+
+        } else {
+          svgNode.isSingle = 1;
+          $(sel).attr("stroke-width", 3);
+          $(tl).attr("hiddentitle", $(tl).html());
+          if($(sel).attr("points") != null)
+            $(tl).html($(label).attr("title"));
+          showOtherLines(1, 0);
+        }
+      }
+
+      //////////////////////////////////// value display
+      if(arg == 3) {
+
+        var hadShowVal = selNode.showVal;
+        $(svg).find("[id]").each(function(){delete($(this).get(0).showVal)});
+        $(svg).off("mousemove");
+
+        if(par && par.circle) {
+          $(par.circle).remove();
+          $(par.div).remove();
+        }
+
+        if(!hadShowVal) {
+          selNode.showVal = true;
+          $(svg).mousemove(mousemove);
+          svgNode.par = par = svg_prepareHash(selNode);
+
+          par.circle =
+                $(svg).get(0).ownerDocument.createElementNS(svgNS, "circle");
+          $(par.circle).attr("id", "svgmarker").attr("r", "8");
+          $(svg).append(par.circle);
+
+          par.div = $('<div id="svgmarker">');
+          par.divoffY = $(embed ? embed : svg).offset().top -
+                       $("#content").offset().top-50;
+          $("#content").append(par.div);
+
+          var pl = selNode.points;
+          if(pl.length > 2)
+            mousemove({pageX:pl[pl.length-2].x});
+        }
+      }
+
+    }, embed);
+
+  function
+  mousemove(e)
+  {
+    var xRaw = e.pageX, pl = selNode.points, l = pl.length, i1;
+    if(!embed)
+      xRaw -= $(svg).offset().left;
+    for(i1=0; i1<l; i1++)
+      if(pl[i1].x > xRaw)
+        break;
+    if(i1==l || i1==0)
+      return;
+
+    var pp=pl[i1-1], pn=pl[i1];
+    var xR = (xRaw-pp.x)/(pn.x-pp.x);   // Compute interim values
+    var yRaw = pp.y+xR*(pn.y-pp.y); 
+
+    var y = (((par.y_h-yRaw)/par.y_mul)+par.y_min).toFixed(par.decimals);
+
+    var d = new Date((((xRaw-par.x_min)/par.x_mul)+par.x_off) * 1000);
+    var ts = (d.getHours() < 10 ? '0' : '') + d.getHours() + ":"+
+             (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+
+    $(par.circle).attr("cx", xRaw).attr("cy", yRaw);
+    var yd = Math.floor((yRaw+par.divoffY) / 20)*20;
+    $(par.div).html(ts+" "+y)
+              .css({ left:xRaw-20, top:yd });
+  }
+
+  function
+  showOtherLines(currval, maxval)
+  {
+    $(svg).find("[id]").each(function(){
+      var id = $(this).attr("id");
+      if(id.indexOf("line_") != 0 || id == lid)
+        return;
+      var h = parseFloat($(this).attr("y_h"));
+      $(this).attr("transform", "translate(0,"+h*(1-currval)+") "+
+                                "scale(1,"+currval+")");
+    });
+
+    if(currval != maxval) {
+      currval += (currval<maxval ? 0.02 : -0.02);
+      currval = Math.round(currval*100)/100;
+      setTimeout(function(){ showOtherLines(currval,maxval) }, 10);
+    }
+  }
+
+}
+
+function
+svg_init_one(embed, svg)
+{
+  var sid = $(svg).attr("id");
+  if(svg_initialized[sid])
+    return;
+  svg_initialized[sid] = true;
+  $("text.legend", svg).click(function(e){sv_menu(e, embed)});
+}
+
+function
+svg_init(par)    // also called directly from perl, in race condition
+{
+  $("embed").each(function(){
+    var e = this;
+    var src = $(e).attr("src");
+    var ed = e.getSVGDocument();
+    if(src.indexOf("SVG_showLog") < 0 || !ed)
+      return;
+    var sTag = $("svg", ed)[0];
+    if((par && $(sTag).attr("id") != par))
+      return;
+    svg_init_one(e, sTag);
+  });
+}
+
+$(document).ready(function(){
+  svg_init();                          // <embed><svg>
+  $("svg[id]").each(function(){        // <svg> (direct)
+    if($(this).attr("id").indexOf("SVGPLOT") == 0)
+      svg_init_one(undefined, this);
+  });
+});
+
+// longpollSVG code below
+function
+FW_svgUpdateDevs(devs)
+{
+  // if matches, refresh the SVG by removing and readding the embed tag
+  var embArr = document.getElementsByTagName("embed");
+  for(var i = 0; i < embArr.length; i++) {
+    var svg = embArr[i].getSVGDocument();
+    if(!svg || !svg.firstChild || !svg.firstChild.nextSibling)
+      continue;
+    var flog = svg.firstChild.nextSibling.getAttribute("flog");
+    for(var j=0; j < devs.length; j++) {
+      if(flog !== null && flog.match(" "+devs[j]+" ")) {
+        var e = embArr[i];
+        var newE = document.createElement("embed");
+        for(var k=0; k<e.attributes.length; k++)
+          newE.setAttribute(e.attributes[k].name, e.attributes[k].value);
+        e.parentNode.insertBefore(newE, e);
+        e.parentNode.removeChild(e);
+        break;
+      }
+    }
+  }
+}
+
+FW_widgets.SVG = { updateDevs:FW_svgUpdateDevs };
