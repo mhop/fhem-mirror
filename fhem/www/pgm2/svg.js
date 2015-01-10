@@ -126,15 +126,15 @@ sv_menu(evt, embed)
         if(svgNode.isSingle) {
           delete(svgNode.isSingle);
           $(sel).attr("stroke-width", 1);
-          $(tl).html($(tl).attr("hiddentitle"));
+          $(tl).text($(tl).attr("hiddentitle"));
           showOtherLines(0, 1);
 
         } else {
           svgNode.isSingle = 1;
           $(sel).attr("stroke-width", 3);
-          $(tl).attr("hiddentitle", $(tl).html());
+          $(tl).attr("hiddentitle", $(tl).text());
           if($(sel).attr("points") != null)
-            $(tl).html($(label).attr("title"));
+            $(tl).text($(label).attr("title"));
           showOtherLines(1, 0);
         }
       }
