@@ -2692,8 +2692,8 @@ sub CUL_HM_parseCommon(@){#####################################################
     if ($peerIDs =~ m/$dst/){# dst is available in the ID list
       foreach my $peer (grep /^$dst/,split(",",$peerIDs)){
         my $pName = CUL_HM_id2Name($peer);
-        $pName = CUL_HM_id2Name($dst) if (!$defs{$pName}); #$dst - device-id of $peer
-        next if (!$defs{$pName});
+        next if (!$pName || !$defs{$pName});
+        $pName = CUL_HM_id2Name($dst); #$dst - device-id of $peer
         push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
         push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
         
@@ -4280,7 +4280,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         CUL_HM_PushCmdStack($pHash,"++${peerFlag}40$dst$peer$pc");
         $snd = 1;
         foreach my $pCh(grep /$peer/,@peerLchn){
-          delete $modules{CUL_HM}{defptr}{$pCh}{helper}{dlvl};#stop desiredLevel supervision
+          delete $modules{CUL_HM}{defptr}{$pCh}{helper}{dlvl}
+                  if (defined $modules{CUL_HM}{defptr}{$pCh});#stop desiredLevel supervision
           my $n = CUL_HM_id2Name($pCh);
           next if (!$n);
           $n =~s/_chn:.*//;
@@ -5896,7 +5897,7 @@ sub CUL_HM_id2Name($) { #in: name or HMid out: name
 
   my $defPtr = $modules{CUL_HM}{defptr};
   if (length($p) == 8){
-    return $defPtr->{$p}{NAME}            if($defPtr->{$p});#channel
+    return $defPtr->{$p}{NAME}            if(defined $defPtr->{$p});#channel
     return $defPtr->{$devId}{NAME}."_chn:".substr($p,6,2)
                                           if($defPtr->{$devId});#dev, add chn
     return $p;                               #not defined, return ID only
@@ -5908,9 +5909,9 @@ sub CUL_HM_id2Name($) { #in: name or HMid out: name
 }
 sub CUL_HM_id2Hash($) { #in: id, out:hash
   my ($id) = @_;
-  return $modules{CUL_HM}{defptr}{$id} if ($modules{CUL_HM}{defptr}{$id});
+  return $modules{CUL_HM}{defptr}{$id} if (defined $modules{CUL_HM}{defptr}{$id});
   $id = substr($id,0,6);
-  return $modules{CUL_HM}{defptr}{$id}?($modules{CUL_HM}{defptr}{$id}):undef;
+  return defined $modules{CUL_HM}{defptr}{$id}?($modules{CUL_HM}{defptr}{$id}):undef;
 }
 sub CUL_HM_getDeviceHash($) {#in: hash out: devicehash
   my ($hash) = @_;
@@ -6926,7 +6927,8 @@ sub CUL_HM_assignIO($){ #check and assign IO
   }
     
   my $ioCCU = $hash->{helper}{io}{vccu};
-  if (   defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"
+  if (   $ioCCU
+      && defined $defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM"
       && ref($defs{$ioCCU}{helper}{io}{ioList}) eq 'ARRAY'){
     my @ioccu = @{$defs{$ioCCU}{helper}{io}{ioList}};
     my @ios = ((sort {$hash->{helper}{mRssi}{io}{$b} <=> 
