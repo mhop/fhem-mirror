@@ -1186,12 +1186,11 @@ sub PIONEERAVR_Read($)
   while($buf =~ m/^(.*?)\r\n(.*)\Z/s ) {
 	my $line = $1;
 	$buf = $2;
-
 	Log3 $name, 5, "PIONEERAVR $name: processing ". dq($line) ." received from PIONEERAVR";
-	Log3 $name, 5, "PIONEERAVR $name: line to do soon: " . dq($buf) unless ($buf eq "");
+	#Log3 $name, 5, "PIONEERAVR $name: line to do soon: " . dq($buf) unless ($buf eq "");
 	if (( $line eq "R" ) ||( $line eq "" )) {
 		Log3 $hash, 5, "PIONEERAVR $name: Supressing received " . dq($line);
-		next;
+		next; 
 	# Main zone volume
 	} elsif ( substr($line,0,3) eq "VOL" ) {
 		my $volume = substr($line,3,3);
@@ -1260,11 +1259,11 @@ sub PIONEERAVR_Read($)
 		$hash->{helper}{main}{CURINPUTNR} = $inputNr;
 
 #		if($inputNr != "17" and $inputNr != "44" and $inputNr != "45"){
-		readingsBeginUpdate($hash);
+		#readingsBeginUpdate($hash);
 		foreach my $key ( keys %{$hash->{helper}{LINEDATATYPES}} ) {
 			readingsBulkUpdate($hash, $hash->{helper}{LINEDATATYPES}->{$key} , "");
 		}
-		readingsEndUpdate($hash, 1);
+		#readingsEndUpdate($hash, 1);
 		# input names
 		# RGBXXY(14char)
 		# XX -> input number
@@ -1607,7 +1606,7 @@ sub PIONEERAVR_Read($)
 		
 	# model
 	} elsif ( $line =~ m/^RGD<\d{3}><(.*)\/.*>$/ ) {
-		$hash->{model}= $1;			
+		#$hash->{model}= $1;			
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Model is " . $1;	
 		
 	# Software version
@@ -1679,6 +1678,7 @@ sub PIONEERAVR_Read($)
 		# dispatch "zone" - commands to other zones
 		Dispatch($hash, $line, undef);  # dispatch result to PIONEERAVRZONEs
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: not for the Main zone -> dispatch to PIONEERAVRZONEs zone: $msgForZone";	
+		$msgForZone = "";
 	}
   }
   # Connection still up?
