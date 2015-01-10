@@ -183,8 +183,12 @@ FHEMWEB_Initialize($)
   $FW_icondir  = "$FW_dir/images";
   $FW_cssdir   = "$FW_dir/pgm2";
   $FW_gplotdir = "$FW_dir/gplot";
+
+  # Blacklist is needed due to an update bug, where MOV was not implemented
+  my %bl = (_multiple=>1,_noArg=>1,_slider=>1,_svg=>1,_textField=>1,_time=>1);
   if(opendir(DH, "$FW_dir/pgm2")) {
-    @FW_fhemwebjs = sort grep /^fhemweb.*js$/, readdir(DH);
+    @FW_fhemwebjs = sort grep { $_ =~ m/^fhemweb(.*).js$/ && !$bl{$1}; }
+                        readdir(DH);
     closedir(DH);
   }
 
