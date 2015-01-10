@@ -25,6 +25,7 @@
 # Version: 1.1 - 2014-07-28
 #
 # Changelog:
+# v1.3 2015-01-10 Fixed DNS SRV resolving and resulting wrong to: address
 # v1.2 2015-01-09 hardening XML::Stream Process() call and fix of ssl_verify
 # v1.1 2014-07-28 Added UTF8 encoding / decoding to Messages
 # v1.0 2014-04-10 Stable Release - Housekeeping & Add to SVN
@@ -49,7 +50,6 @@ use warnings;
 use utf8;
 use Time::HiRes qw(gettimeofday);
 use Net::Jabber;
-
 
 sub Jabber_Set($@);
 sub Jabber_Define($$);
@@ -348,6 +348,9 @@ sub Jabber_CheckConnection($)
       $hash->{JabberDevice}->{STREAM}->{SIDS}->{default}->{ssl_verify} = 0x00;
     }
 
+    #Default to to SRV lookups, ugly hack because older versions of XMPP::Connection dont call the respective value in XML::Stream..
+    $hash->{JabberDevice}->{STREAM}->{SIDS}->{default}->{srv} = "_xmpp-client._tcp";
+
     #Needed for Message handling:
     $hash->{JabberDevice}->SetMessageCallBacks(normal => sub { \&Jabber_INC_Message($hash,@_) }, chat => sub { \&Jabber_INC_Message($hash,@_) } );
     #Needed if someone wants to subscribe to us and is on the WhiteList
@@ -364,11 +367,13 @@ sub Jabber_CheckConnection($)
   }
 
   if (!$hash->{JabberDevice}->Connected()) {
+    
     my $connectionstatus = $hash->{JabberDevice}->Connect(
                             hostname=>$hash->{helper}{server}, 
                             port=>$hash->{helper}{port}, 
                             tls=>$hash->{helper}{tls},
-                            ssl=>$hash->{helper}{ssl}
+                            ssl=>$hash->{helper}{ssl},
+                            componentname=>$hash->{helper}{server}
                             );
                             
     if (!defined($connectionstatus)) {
