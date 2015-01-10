@@ -409,7 +409,10 @@ sub RandomTimer_isDisabled($) {
    my $disableCond = AttrVal($hash->{NAME}, "disableCond", "");
    
    $disable = $disable || eval ($disableCond);
-   $@ =~ s/\n/ /g; Log3 ($hash, 3, "[$hash->{NAME}] " . $@) if ($@);   
+   if ($@) {
+      $@ =~ s/\n/ /g; 
+      Log3 ($hash, 3, "[$hash->{NAME}] " . $@);
+   }
    $disable = 0 if (!defined($disable));
    
    return $disable;
