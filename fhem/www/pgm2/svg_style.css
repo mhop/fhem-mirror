@@ -35,3 +35,5 @@ polyline { stroke:black; fill:none; }
 .l1fill_stripe {stroke:green; fill:url(#gr1_stripe);} text.l1fill_stripe {stroke:none; fill:green;}
 
 .l0fill_gyr {stroke:red; fill:url(#gr0_gyr);} text.l0fill_gyr {stroke:none; fill:red;}
+
+circle#svgmarker { fill:#278727; opacity:0.5; }

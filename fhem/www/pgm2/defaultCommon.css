@@ -37,13 +37,18 @@ div.block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
 .makeSelect { display:inline; float:left; clear:left; }
 select      { margin-left:5px; margin-right:5px; }
 .slider     { float:left; width:250px; height:26px; }
+.colorpicker_ct .slider { background: url(../jscolor/ct_background.svg); }
+.colorpicker_hue .slider { background: url(../jscolor/hue_background.svg); }
 .get,.set,.attr { margin-bottom:5px; float:left; }
+select.svgSrc     { width:100px; }
+select.svgColumn  { width:50px;  }
+select.svgRegexp  { width:120px; }
+
 .handle { position:relative; cursor:pointer; width:50px;
           height:20px; line-height:20px;
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
           border:3px solid; color:#278727; text-align:center; }
 .downText { margin-top:2px; }
-.makeSelect .slider {background:#F0F0D8; border-radius:8px;} /* detail only */
 .set .set { margin-bottom:2px; margin-top:3px; }             /* timepicker */
 
 pre { white-space: pre-wrap; }
@@ -60,8 +65,23 @@ svg.on,svg.FS20_on { fill:orange; }
                  border-color:transparent; }
 .rc_button img:active { border-color: gray; }
 
+table#atWizard td:first-child { width: 240px; }
 
 /* jQuery-UI mods */
 div.ui-dialog { border:3px solid #278727; padding: 0.2em; }
 div.ui-dialog div.ui-dialog-titlebar { display:none; }
 div.ui-widget-content { background:#FFFFE7; }
+#fwmenu {
+  position: absolute; z-index:1005;
+  text-align:left; max-width:600px;
+  font-weight: normal; font-size: 100%; 
+  background:#FFFFE7; border:1px solid #278727;
+}
+#fwmenu li a { color:#278727; }
+
+div#svgmarker {
+  position: absolute; z-index:1005; padding: 6px 10px;
+  text-align:left; max-width:600px;
+  color:#278727; background:#FFFFE7;
+  border:2px solid #278727; border-radius:4px;
+}

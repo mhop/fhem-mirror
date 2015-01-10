@@ -273,23 +273,18 @@ return "<br>Timespec wizard:".
   </tr><tr class="even"><td>Timespec</td>
     <td><input type="text" id="aw_pts"></td>
   </tr><tr class="even"><td>Timespec</td>
-    <td><input type="text" readonly id="aw_ts" size="5">
-        <input type='button' value='+' id="aw_tsb"></td>
+    <td><input type="text" name="aw_ts" id="aw_ts" size="5"></td>
   </tr>
   </tr><tr class="even">
     <td colspan="2"><input type="button" id="aw_md" value="Modify"></td>
   </tr>
 </table>
 <script type="text/javascript">
-  loadScript("pgm2/jquery.min.js", atDetails);
-  function
-  atDetails()
   {
     var t=$("#atWizard"), ip=$(t).attr("ip"), ts=$(t).attr("ts");
+    FW_replaceWidget("#aw_ts", "aw_ts", ["time"], "12:00");
+    $("[informid=aw_ts] input[type=text]").attr("id", "aw_ts");
 
-    function tsClick() {
-      FW_timeCreate(this, function(val) { $("#aw_tsb").click(tsClick) })
-    }
     function ipClick() {
       var c = $("#aw_ip").prop("checked");
       $("#aw_ts").closest("tr").css("display", !c ? "table-row" : "none");
@@ -300,7 +295,6 @@ return "<br>Timespec wizard:".
     $("#aw_ip").prop("checked", ip);
     $("#aw_ts").val(ip ? "12:00" : ts);
     $("#aw_pts").val(ip ? ts : 'sunset()');
-    $("#aw_tsb").click(tsClick);
     $("#aw_ip").change(ipClick);
     ipClick();
     $("#aw_md").click(function(){

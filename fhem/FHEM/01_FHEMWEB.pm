@@ -16,6 +16,7 @@ sub FW_answerCall($);
 sub FW_dev2image($;$);
 sub FW_devState($$@);
 sub FW_digestCgi($);
+sub FW_directNotify($$);
 sub FW_doDetail($);
 sub FW_fatal($);
 sub FW_fileList($);
@@ -187,11 +188,7 @@ FHEMWEB_Initialize($)
     closedir(DH);
   }
 
-  $data{webCmdFn}{slider}     = "FW_sliderFn";
-  $data{webCmdFn}{timepicker} = "FW_timepickerFn";
-  $data{webCmdFn}{noArg}      = "FW_noArgFn";
-  $data{webCmdFn}{textField}  = "FW_textFieldFn";
-  $data{webCmdFn}{"~dropdown"}= "FW_dropdownFn"; # Should be the last
+  $data{webCmdFn}{"~"} = "FW_widgetFallbackFn"; # Should be the last
 
   if($init_done) {      # reload workaround
     foreach my $pe ("fhemSVG", "openautomation", "default") {
@@ -531,7 +528,9 @@ FW_answerCall($)
     $ldir = "$FW_dir/pgm2" if($dir eq "css" || $dir eq "js"); # FLOORPLAN compat
     $ldir = "$attr{global}{modpath}/docs" if($dir eq "docs");
 
-    if(-r "$ldir/$file.$ext") {                # no return for FLOORPLAN
+    # pgm2 check is for jquery-ui images
+    my $static = ($ext =~ m/(css|js|png|jpg)/i || $dir =~ m/^pgm2/);
+    if(-r "$ldir/$file.$ext" || $static) {  # no return for FLOORPLAN
       return FW_serveSpecial($file, $ext, $ldir, ($arg =~ m/nocache/) ? 0 : 1);
     }
     $arg = "/$dir/$ofile";
@@ -617,7 +616,6 @@ FW_answerCall($)
     }
     return 0;
   }
-
   ##############################
   # FHEMWEB extensions (FLOORPLOAN, SVG_WriteGplot, etc)
   my $FW_contentFunc;
@@ -696,18 +694,26 @@ FW_answerCall($)
     FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   }
 
+  ########################
+  # CSS
   my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>";
   FW_pO sprintf($cssTemplate, "pgm2/style.css");
-  my @cssFiles = split(" ", AttrVal($FW_wname, "CssFiles", ""));
-  map { FW_pO sprintf($cssTemplate, $_); } @cssFiles;
+  FW_pO sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
+  map { FW_pO sprintf($cssTemplate, $_); }
+                        split(" ", AttrVal($FW_wname, "CssFiles", ""));
+
+  ########################
+  # JavaScripts
+  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
+  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery.min.js");
+  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery-ui.min.js");
 
   ########################
   # FW Extensions
-  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
-      next if($h !~ m/HASH/ || !$h->{SCRIPT});
+      next if($h !~ m/HASH/ || !$h->{SCRIPT} || $h->{SCRIPT} =~ m+pgm2/jquery+);
       my $script = $h->{SCRIPT};
       $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
       FW_pO sprintf($jsTemplate, $script);
@@ -715,21 +721,18 @@ FW_answerCall($)
   }
 
   #######################
-  # Other JavaScripts
-  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
+  # Other JavaScripts + their Attributes
   map { FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$_") } @FW_fhemwebjs;
-
   $jsTemplate = '<script attr=\'%s\' type="text/javascript" src="%s"></script>';
   map {
     my $n = $_; $n =~ s+.*/++; $n =~ s/.js$//; $n =~ s/fhem_//; $n .= "Param";
     FW_pO sprintf($jsTemplate, AttrVal($FW_wname, $n, ""), "$FW_ME/$_");
   } split(" ", AttrVal($FW_wname, "JavaScripts", ""));
 
-  my $onload = AttrVal($FW_wname, "longpoll", 1) ?
-                      "onload=\"FW_delayedStart()\"" : "";
   my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
-  FW_pO "</head>\n<body generated=\"".(time()-1)
-                        ."\" name=\"$t\" $csrf $onload>";
+  my $gen = 'generated="'.(time()-1).'"';
+  my $lp  = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
+  FW_pO "</head>\n<body name=\"$t\" $gen $lp $csrf>";
 
   if($FW_activateInform) {
     $cmd = "style eventMonitor $FW_activateInform";
@@ -921,7 +924,7 @@ FW_makeTable($$$@)
     } else {
       if( $title eq "Attributes" ) {
         FW_pO "<td><div class=\"dname\">".
-                "<a onClick='FW_querySetSelected(\"sel.attr$name\",\"$n\")'>".
+                "<a onClick='FW_querySetSelected(\"sel_attr$name\",\"$n\")'>".
               "$n</a></div></td>";
       } else {
          FW_pO "<td><div class=\"dname\">$n</div></td>";
@@ -978,7 +981,7 @@ FW_makeTable($$$@)
 ##############################
 # Used only for set or attr lists.
 sub
-FW_makeSelect($$$$)
+FW_detailSelect($$$$)
 {
   my ($d, $cmd, $list,$class) = @_;
   return if(!$list || $FW_hiddenroom{input});
@@ -987,8 +990,9 @@ FW_makeSelect($$$$)
   my $selEl = (defined($al[0]) ? $al[0] : " ");
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
   $selEl = "room" if($list =~ m/room:/);
+  $list =~ s/"/&quot;/g;
 
-  FW_pO "<div class='makeSelect'>";
+  FW_pO "<div class='makeSelect' dev=\"$d\" cmd=\"$cmd\" list=\"$list\">";
   FW_pO "<form method=\"$FW_formmethod\" ".
                 "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
   FW_pO FW_hidden("detail", $d);
@@ -996,12 +1000,8 @@ FW_makeSelect($$$$)
   FW_pO FW_hidden("dev.$cmd$d", $d);
   FW_pO FW_submit("cmd.$cmd$d", $cmd, $class);
   FW_pO "<div class=\"$class downText\">&nbsp;$d&nbsp;</div>";
-  FW_pO FW_select("sel.$cmd$d","arg.$cmd$d",\@al, $selEl, $class,
-        "FW_selChange(this.options[selectedIndex].text,'$list','val.$cmd$d')");
+  FW_pO FW_select("sel_$cmd$d","arg.$cmd$d",\@al, $selEl, $class);
   FW_pO FW_textfield("val.$cmd$d", 30, $class);
-  # Initial setting
-  FW_pO "<script type=\"text/javascript\">" .
-        "FW_selChange('$selEl','$list','val.$cmd$d')</script>";
   FW_pO "</form></div>";
 }
 
@@ -1037,12 +1037,8 @@ FW_doDetail($)
     use strict "refs";
   }
 
-  FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
-  FW_pO FW_hidden("detail", $d);
-  FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
-
-  FW_makeSelect($d, "set", FW_widgetOverride($d, getAllSets($d)), "set");
-  FW_makeSelect($d, "get", FW_widgetOverride($d, getAllGets($d)), "get");
+  FW_detailSelect($d, "set", FW_widgetOverride($d, getAllSets($d)), "set");
+  FW_detailSelect($d, "get", FW_widgetOverride($d, getAllGets($d)), "get");
 
   FW_makeTable("Internals", $d, $h);
   FW_makeTable("Readings", $d, $h->{READINGS});
@@ -1057,7 +1053,7 @@ FW_doDetail($)
   $attrList = FW_widgetOverride($d, $attrList);
   $attrList =~ s/\\/\\\\/g;
   $attrList =~ s/'/\\'/g;
-  FW_makeSelect($d, "attr", $attrList,"attr");
+  FW_detailSelect($d, "attr", $attrList,"attr");
 
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
   ## dependent objects
@@ -1070,7 +1066,6 @@ FW_doDetail($)
       push(@dob, $dn);
     }
   }
-  FW_pO "</form>";
   FW_makeTableFromArray("Probably associated with", "assoc", @dob,);
 
   FW_pO "</td></tr></table>";
@@ -1078,6 +1073,7 @@ FW_doDetail($)
   FW_pH "cmd=style iconFor $d", "Select icon";
   FW_pH "cmd=style showDSI $d", "Extend devStateIcon";
   FW_pH "$FW_ME/docs/commandref.html#${t}", "Device specific help";
+  FW_pH "cmd=delete $d", "Delete this device ($d)" if($d ne "global");
   FW_pO "<br><br>";
   FW_pO "</div>";
 
@@ -1300,7 +1296,7 @@ FW_showRoom()
     $FW_hiddengroup{$r} = 1;
   }
 
-  FW_pO "<form method=\"$FW_formmethod\" ".
+  FW_pO "<form method=\"$FW_formmethod\" ".  # Why do we need a form here?
                 "action=\"$FW_ME\" autocomplete=\"off\">";
   FW_pO "<div id=\"content\" room=\"$FW_room\">";
   FW_pO "<table class=\"roomoverview\">";  # Need for equal width of subtables
@@ -1358,7 +1354,7 @@ FW_showRoom()
         $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
         if($FW_hiddenroom{detail}) {
-          FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
+          FW_pO "<td><div class=\"col1\">$icon$devName</div></td>" if(!$usuallyAtEnd{$d});
         } else {
           FW_pH "detail=$d", "$icon$devName", 1, "col1" if(!$usuallyAtEnd{$d});
         }
@@ -1506,8 +1502,10 @@ FW_returnFileAsStream($$$$$)
   }
 
   if(!open(FH, $path)) {
-    Log3 $FW_wname, 2, "FHEMWEB $FW_wname $path: $!";
-    FW_pO "<div id=\"content\">$path: $!</div>";
+    Log3 $FW_wname, 4, "FHEMWEB $FW_wname $path: $!";
+    TcpServer_WriteBlocking($FW_chash, 
+        "HTTP/1.1 404 Not Found\r\n".
+        "Content-Length:0\r\n\r\n");
     FW_closeConn($FW_chash);
     return 0;
   }
@@ -1569,12 +1567,12 @@ FW_hidden($$)
 sub
 FW_select($$$$$@)
 {
-  my ($id, $n, $va, $def, $class, $jSelFn) = @_;
+  my ($id, $name, $valueArray, $selected, $class, $jSelFn) = @_;
   $jSelFn = ($jSelFn ? "onchange=\"$jSelFn\"" : "");
   $id = ($id ? "id=\"$id\" informId=\"$id\"" : "");
-  my $s = "<select $jSelFn $id name=\"$n\" class=\"$class\">";
-  foreach my $v (@{$va}) {
-    if(defined($def) && $v eq $def) {
+  my $s = "<select $jSelFn $id name=\"$name\" class=\"$class\">";
+  foreach my $v (@{$valueArray}) {
+    if(defined($selected) && $v eq $selected) {
       $s .= "<option selected=\"selected\" value='$v'>$v</option>\n";
     } else {
       $s .= "<option value='$v'>$v</option>\n";
@@ -1750,14 +1748,16 @@ FW_style($$)
     my $filePath = FW_fileNameToPath($fileName);
 
     $FW_data =~ s/\r//g;
-    my $err = FileWrite({FileName=>$filePath, ForceType=>$forceType}, split("\n", $FW_data));
+    my $err = FileWrite({FileName=>$filePath, ForceType=>$forceType},
+                        split("\n", $FW_data));
     if($err) {
       FW_pO "<div id=\"content\">$filePath: $!</div>";
       return;
     }
     my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
     $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
-    $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fileName to $forceType");
+    $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" :
+                "Saved the file $fileName to $forceType");
     FW_style("style list", $ret);
     $ret = "";
 
@@ -2202,6 +2202,16 @@ FW_makeEdit($$$)
 
 
 sub
+FW_longpollInfo($$$)
+{
+  my ($dev, $state, $html) = @_;
+  $dev =~ s/([\\"])/\\$1/g;
+  $state =~ s/([\\"])/\\$1/g;
+  $html =~ s/([\\"])/\\$1/g;
+  return "[\"$dev\",\"$state\",\"$html\"]";
+}
+
+sub
 FW_roomStatesForInform($$)
 {
   my ($me, $sinceTimestamp ) = @_;
@@ -2219,7 +2229,7 @@ FW_roomStatesForInform($$)
 
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink") {
-      push @data, "$dn<<$defs{$dn}{STATE}<<$txt";
+      push @data, FW_longpollInfo($dn, $defs{$dn}{STATE}, $txt);
     }
   }
   my $data = join("\n", map { s/\n/ /gm; $_ } @data)."\n";
@@ -2265,7 +2275,7 @@ FW_Notify($$)
     if( !$modules{$defs{$dn}{TYPE}}{FW_atPageEnd} ) {
       my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
       ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
-      push @data, "$dn<<$dev->{STATE}<<$txt";
+      push @data, FW_longpollInfo($dn, $dev->{STATE}, $txt);
     }
 
     #Add READINGS
@@ -2277,8 +2287,8 @@ FW_Notify($$)
           next; #ignore 'set' commands
         }
         my ($readingName,$readingVal) = split(": ",$events->[$i],2);
-        push @data, "$dn-$readingName<<$readingVal<<$readingVal";
-        push @data, "$dn-$readingName-ts<<$tn<<$tn";
+        push @data, FW_longpollInfo("$dn-$readingName",$readingVal,$readingVal);
+        push @data, FW_longpollInfo("$dn-$readingName-ts", $tn, $tn);
       }
     }
   }
@@ -2308,6 +2318,24 @@ FW_Notify($$)
   }
 
   return undef;
+}
+
+sub
+FW_directNotify($$) # Notify without the event overhead (Forum #31293)
+{
+  my ($dev, $msg) = @_;
+  foreach my $ntfy (values(%defs)) {
+    next if(!$ntfy->{TYPE} ||
+            $ntfy->{TYPE} ne "FHEMWEB" ||
+            !$ntfy->{inform} ||
+            !$ntfy->{inform}{devices}{$dev});
+    if(!addToWritebuffer($ntfy, FW_longpollInfo($dev, $msg, "")."\n")){
+      my $name = $ntfy->{NAME};
+      Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
+      TcpServer_Close($ntfy);
+      delete($defs{$name});
+    }
+  }
 }
 
 ###################
@@ -2371,16 +2399,7 @@ FW_devState($$@)
       }
       $link .= "&room=$room";
     }
-    if(AttrVal($FW_wname, "longpoll", 1)) {
-      $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
-
-    } elsif($FW_ss || $FW_tp) {
-      $txt ="<a onClick=\"location.href='$FW_ME$FW_subdir?$link$rf$FW_CSRF'\">$txt</a>";
-
-    } else {
-      $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>";
-
-    }
+    $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>";
   }
 
   my $style = AttrVal($d, "devStateStyle", "");
@@ -2487,125 +2506,32 @@ FW_htmlEscape($)
 
 ###########################
 # Widgets START
-sub
-FW_sliderFn($$$$$)
-{
-  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
-
-  return undef if($values !~ m/^slider,([-\d.]*),([-\d.]*),([-\d.]*)(,1)?$/);
-  return "" if($cmd =~ m/ /);   # webCmd pct 30 should generate a link
-  my ($min,$stp, $max, $flt) = ($1, $2, $3, $4);
-  $flt = ($flt ? 1 : 0);
-  my $srf = $FW_room ? "&room=$FW_room" : "";
-  my $cv = ReadingsVal($d, $cmd, Value($d));
-  my $id = ($cmd eq "state") ? "" : "-$cmd";
-  $cmd = "" if($cmd eq "state");
-  $cv =~ s/.*?([.\-\d]+).*/$1/; # get first number
-  $cv = 0 if($cv !~ m/\d/);
-  return "<td colspan='2'>".
-           "<div class='slider' id='slider.$d$id' min='$min' stp='$stp' ".
-                 "max='$max' cmd='$FW_ME?cmd=set $d $cmd %$srf' flt='$flt'>".
-             "<div class='handle'>$min</div>".
-           "</div>".
-           "<script type=\"text/javascript\">".
-             "FW_sliderCreate(document.getElementById('slider.$d$id'),'$cv');".
-           "</script>".
-         "</td>";
-}
-
-sub
-FW_noArgFn($$$$$)
-{
-  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
-
-  return undef if($values !~ m/^noArg$/);
-  return "";
-}
-
-sub
-FW_timepickerFn()
-{
-  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
-
-  return undef if($values ne "time");
-  return "" if($cmd =~ m/ /);   # webCmd on-for-timer 30 should generate a link
-  my $srf = $FW_room ? "&room=$FW_room" : "";
-  my $cv = ReadingsVal($d, $cmd, Value($d));
-  $cmd = "" if($cmd eq "state");
-  my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
-  return "<td colspan='2'>".
-            "<input name='time.$d' value='$cv' type='text' readonly size='5'>".
-            "<input type='button' value='+' onclick='FW_timeCreate(this,$c)'>".
-          "</td>";
-}
-
 sub 
-FW_dropdownFn()
+FW_widgetFallbackFn()
 {
   my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
 
-  return "" if($cmd =~ m/ /);   # webCmd temp 30 should generate a link
-  my @tv = split(",", $values);
-  # Hack: eventmap (translation only) should not result in a
-  # dropdown.  eventMap/webCmd/etc handling must be cleaned up.
-  if(@tv > 1) {
-    my $txt;
-    if($cmd eq "desired-temp" || $cmd eq "desiredTemperature") {
-      $txt = ReadingsVal($d, $cmd, 20);
-      $txt =~ s/ .*//;        # Cut off Celsius
-      $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-    } else {
-      $txt = ReadingsVal($d, $cmd, Value($d));
-      $txt =~ s/$cmd //;
+  # webCmd "temp 30" should remain text
+  # noArg is needed for fhem.cfg.demo / Cinema
+  return "" if(!$values || $values eq "noArg");
+
+  my($reading) = split( ' ', $cmd, 2 );
+  my $current;
+  if($cmd eq "desired-temp" || $cmd eq "desiredTemperature") {
+    $current = ReadingsVal($d, $cmd, 20);
+    $current =~ s/ .*//;        # Cut off Celsius
+    $current = sprintf("%2.1f", int(2*$current)/2) if($current =~ m/[0-9.-]/);
+  } else {
+    $current = ReadingsVal($d, $reading, undef);
+    if( !defined($current) ) {
+      $reading = 'state';
+      $current = Value($d);
     }
-
-    my $fpname = $FW_wname;
-    $fpname =~ s/.*floorplan\/(\w+)$/$1/;  #allow usage of attr fp_setbutton
-
-    my $readng = ($cmd eq "state" ? "" : "$cmd"." ");
-
-    # TODO in case of running in a floorplan split $FW_wname to get name of
-    # webInstance.  Actually in floorplan the dropdown will refresh the page
-    # always independently from setting in corresponding web instance, cause
-    # statement if( AttrVal($FW_wname, "longpoll", 0) == 1) will always fail.
-    my $selFunct="";
-    if( AttrVal($FW_wname, "longpoll", 0) == 1) {
-      $selFunct = "FW_cmd('$FW_ME?XHR=1&cmd.$d=set $d $readng '+ ".
-                  "this.options[this.selectedIndex].value+ ' &room=$FW_room')";
-
-    } else {
-      $selFunct = "window.location = addcsrf('$FW_ME?cmd.$d=set $d $readng '+".
-                  "this.options[this.selectedIndex].value+ ' &room=$FW_room')";
-
-   }
-    my $fwsel;
-   $fwsel = ($cmd eq "state" ? "" : "$cmd&nbsp;") .
-              FW_select("$d-$cmd","val.$d", \@tv, $txt,"dropdown","$selFunct");
-    return "<td colspan='2'>$fwsel</td>";  
+    $current =~ s/$cmd //;
   }
-  return undef;
+  return "<td><div class='fhemWidget' cmd='$cmd' reading='$reading' ".
+                "dev='$d' arg='$values' current='$current'></div></td>";
 }
-
-sub
-FW_textFieldFn($$$$)
-{
-  my ($FW_wname, $d, $FW_room, $cmd, $values) = @_;
-
-  my @args = split("[ \t]+", $cmd);
-
-  return undef if($values !~ m/^textField$/);
-  return "" if($cmd =~ m/ /);
-  my $srf = $FW_room ? "&room=$FW_room" : "";
-  my $cv = ReadingsVal($d, $cmd, "");
-  my $id = ($cmd eq "state") ? "" : "-$cmd";
-
-  my $c = "$FW_ME?XHR=1&cmd=setreading $d $cmd %$srf";
-  return '<td align="center">'.
-           "<div>$cmd:<input id='textField.$d$id' type='text' value='$cv' ".
-                        "onChange='textField_setText(this,\"$c\")'></div>".
-         '</td>';
-}
-
 # Widgets END
 ###########################
 
@@ -3148,18 +3074,23 @@ FW_widgetOverride($$)
           <li>if the modifier is ":time", then a javascript driven timepicker is
             displayed.</li>
           <li>if the modifier is ":textField", an input field is displayed.</li>
+          <li>if the modifier is ":textField-long", is like textField, but upon
+            clicking on the input field a textArea (60x25) will be opened.</li>
+
           <li>if the modifier is of the form
             ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1]", then a
             javascript driven slider is displayed. The optional ,1 at the end
             avoids the rounding of floating-point numbers.</li>
-
           <li>if the modifier is of the form ":multiple,val1,val2,...", then
             multiple values can be selected and own values can be written, the
             result is comma separated.</li>
-          <li>if the modifier is of the form ":multiple-strict,val1,val2,...", then
-            multiple values can be selected and no new values can be added, the
-            result is comma separated.</li>
-
+          <li>if the modifier is of the form ":multiple-strict,val1,val2,...",
+            then multiple values can be selected and no new values can be
+            added, the result is comma separated.</li>
+          <li>if the modifier is of the form ":knob,min:1,max:100,...", then
+            the jQuery knob widget will be displayed. The parameters are
+            specified as a comma separated list of key:value pairs, where key
+            does not have to contain the "data-" prefix.</li>
           <li>else a dropdown with all the modifier values is displayed</li>
         </ul>
         If this attribute is specified for a FHEMWEB instance, then it is
@@ -3167,6 +3098,7 @@ FW_widgetOverride($$)
         <ul>
           attr FS20dev widgetOverride on-till:time<br>
           attr WEB widgetOverride room:textField<br>
+          attr dimmer widgetOverride dim:knob,min:1,max:100,step:1,linecap:round<br>
         </ul>
         </li>
         <br>
@@ -3714,13 +3646,17 @@ FW_widgetOverride($$)
         vorgesehene Widgets aendern kann.
         <ul>
           <li>Ist der Modifier ":noArg", wird kein weiteres Eingabefeld
-              angezeigt.</li>
+            angezeigt.</li>
 
           <li>Ist der Modifier ":time", wird ein in Javaskript geschreibenes
-              Zeitauswahlmen&uuml; angezeigt.</li>
+            Zeitauswahlmen&uuml; angezeigt.</li>
 
           <li>Ist der Modifier ":textField", wird ein Eingabefeld
-              angezeigt.</li>
+            angezeigt.</li>
+
+          <li>Ist der Modified ":textField-long" ist wie textField, aber beim
+            Click im Eingabefeld ein Dialog mit einer HTML textarea
+            (60x25) wird ge&ouml;ffnet.</li>
 
           <li>Ist der Modifier in der Form
             ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1]", so wird ein in
@@ -3735,8 +3671,15 @@ FW_widgetOverride($$)
             Mehrfachauswahl m&ouml;glich, es k&ouml;nnen jedoch keine neuen
             Werte definiert werden. Das Ergebnis ist Komma-separiert.</li>
 
-          <li>In allen anderen F&auml;llen erscheint ein Dropdown mit allen
-            Modifier Werten.</li>
+          <li>Ist der Modifier ":knob,min:1,max:100,...", dass ein
+            jQuery knob Widget wird angezeigt. Die Parameter werden als eine
+            Komma separierte Liste von Key:Value Paaren spezifiziert, wobei das
+            data- Pr&auml;fix entf&auml;llt. </li>
+
+          <li>In allen anderen F&auml;llen (oder falls der Modified explizit
+            mit :select anfaegt) erscheint ein HTML select mit allen Modifier
+            Werten.</li>
+
         </ul>
         Falls das Attribut f&uuml;r eine WEB Instanz gesetzt wurde, dann wird
         es bei allen von diesem Web-Instan angezeigten Ger&auml;ten angewendet.
@@ -3744,6 +3687,7 @@ FW_widgetOverride($$)
         <ul>
           attr FS20dev widgetOverride on-till:time<br>
           attr WEB widgetOverride room:textField<br>
+          attr dimmer widgetOverride dim:knob,min:1,max:100,step:1,linecap:round<br>
         </ul>
         </li><br>
 
