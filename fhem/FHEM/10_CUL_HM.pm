@@ -4272,7 +4272,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       foreach my $peer (sort @peerList){
         my ($pHash,$peerFlag,$rxt);
         $pHash = CUL_HM_id2Hash($peer);
-        next if (!$pHash->{helper}{role}{prs});
+        next if (   !$pHash 
+                 || !$pHash->{helper}{role}
+                 || !$pHash->{helper}{role}{prs});
         $rxt = CUL_HM_getRxType($pHash);
         $peerFlag = ($rxt & 0x02)?"B4":"A4" if($vChn ne "noBurst");#burst
         CUL_HM_PushCmdStack($pHash,"++${peerFlag}40$dst$peer$pc");
@@ -4280,6 +4282,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         foreach my $pCh(grep /$peer/,@peerLchn){
           delete $modules{CUL_HM}{defptr}{$pCh}{helper}{dlvl};#stop desiredLevel supervision
           my $n = CUL_HM_id2Name($pCh);
+          next if (!$n);
           $n =~s/_chn:.*//;
           CUL_HM_stateUpdatDly($n,10);
         }
