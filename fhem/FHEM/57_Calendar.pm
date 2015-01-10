@@ -943,6 +943,17 @@ sub Calendar_GetUpdate($$) {
 
   my @entries= @{$ical->{entries}};
   if($#entries<0) {
+    eval { require Compress::Zlib; };
+    if($@) {
+      Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Maybe gzip data, but cannot load Compress::Zlib";
+    }
+    else {
+      $ics = Compress::Zlib::memGunzip($ics);
+      $ical->parse(split("\n",$ics));
+      @entries= @{$ical->{entries}};
+    }
+  };
+  if($#entries<0) {
     Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Not an ical file at URL";
     $hash->{STATE}= "Not an ical file at URL";
     return 0;
