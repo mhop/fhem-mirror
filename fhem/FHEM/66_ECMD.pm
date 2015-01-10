@@ -532,7 +532,7 @@ sub ECMD_Read($)
 {
   my ($hash) = @_;
   
-  return undef unless($hash->{state} eq "opened"); # avoid reading from closed device
+  return undef unless($hash->{STATE} eq "opened"); # avoid reading from closed device
   
   my $buf = ECMD_SimpleRead($hash);
   return unless(defined($buf));
