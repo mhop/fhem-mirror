@@ -1,0 +1,50 @@
+font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+
+rgb c0c0c0                      # HTML color notation, RGB
+pt 18
+date 25 470
+pt 48                           # font size in points
+time 20 525                     # time @ (0.1*width, 0.9*height)
+pt 18
+
+img 20 525 0.5 png file { "www/images/default/weather/" . ReadingsVal("Weather","icon","") . ".png" } 
+
+pt 18
+
+text 104 548 { ReadingsVal("Weather","temperature","?"). "°C" }
+text 104 570 { ReadingsVal("Weather","humidity","?"). "%" }
+
+pt 10
+
+text 35 590 { ReadingsVal("Weather","wind","?") ."km/h" }
+text 90 590 { ReadingsVal("Weather","pressure","?"). "hPa " . ReadingsVal("Weather","pressure_trend_sym","?") }
+
+
+
+text 350 525 { ReadingsVal("Weather","fc1_day_of_week","?") }
+img  330 525 0.5 png file { "www/images/default/weather/" . ReadingsVal("Weather","fc1_icon","") . ".png" }
+text 330 590 { ReadingsVal("Weather","fc1_low_c","?")."°C" }
+text 370 590 { ReadingsVal("Weather","fc1_high_c","?")."°C" }
+
+text 440 525 { ReadingsVal("Weather","fc2_day_of_week","?") }
+img  420 525 0.5 png file { "www/images/default/weather/" . ReadingsVal("Weather","fc2_icon","") . ".png" }
+text 420 590 { ReadingsVal("Weather","fc2_low_c","?")."°C" }
+text 460 590 { ReadingsVal("Weather","fc2_high_c","?")."°C" }
+
+text 530 525 { ReadingsVal("Weather","fc3_day_of_week","?") }
+img  510 525 0.5 png file { "www/images/default/weather/" . ReadingsVal("Weather","fc3_icon","") . ".png" }
+text 510 590 { ReadingsVal("Weather","fc3_low_c","?")."°C" }
+text 550 590 { ReadingsVal("Weather","fc3_high_c","?")."°C" }
+
+text 620 525 { ReadingsVal("Weather","fc4_day_of_week","?") }
+img  600 525 0.5 png file { "www/images/default/weather/" . ReadingsVal("Weather","fc4_icon","") . ".png" }
+text 600 590 { ReadingsVal("Weather","fc4_low_c","?")."°C" }
+text 640 590 { ReadingsVal("Weather","fc4_high_c","?")."°C" }
+
+text 710 525 { ReadingsVal("Weather","fc5_day_of_week","?") }
+img  690 525 0.5 png file { "www/images/default/weather/" . ReadingsVal("Weather","fc5_icon","") . ".png" }
+text 690 590 { ReadingsVal("Weather","fc5_low_c","?")."°C" }
+text 730 590 { ReadingsVal("Weather","fc5_high_c","?")."°C" }
+
+text 735 15 { sunrise_abs("REAL") }
+text 735 30 { sunset_abs("REAL") }
