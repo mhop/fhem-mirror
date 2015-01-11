@@ -7,7 +7,10 @@ HOWTO:
     perl fhem.pl fhem.cfg.demo
   (typed in a terminal) and point your browser to http://YourFhemHost:8083
   Use the startfhemDemo skript on the FritzBox.
-
+  If you'd like to see the RSS demo, you have to install the Perl GD library,
+  e.g. with:
+    sudo apt-get install libgd-gd2-perl
+    sudo apt-get install libgd-text-perl
 
 Stopping:
   - type shutdown in the browser command window, followed by RETURN
