@@ -1229,11 +1229,11 @@ sub THZ_debugread($){
     ($err, $msg) = THZ_ReadAnswer($hash);  
     # send request
     THZ_Write($hash,  $cmdHex2);
-    select(undef, undef, undef, 0.015);
+    select(undef, undef, undef, 0.05);
     ($err, $msg) = THZ_ReadAnswer($hash);
     # ack datatranfer and read from the heatpump        
     THZ_Write($hash,  "10");
-    select(undef, undef, undef, 0.10);
+    select(undef, undef, undef, 0.01);
     ($err, $msg) = THZ_ReadAnswer($hash);
     THZ_Write($hash,  "10");
 
@@ -1248,7 +1248,7 @@ sub THZ_debugread($){
 		  close (MYFILE);
 		  Log3 $hash->{NAME}, 3, "$cmd  -  $msg";
     }    
-    select(undef, undef, undef, 0.150); #equivalent to sleep 150ms
+    select(undef, undef, undef, 0.250); #equivalent to sleep 250ms
   }
 }
 
