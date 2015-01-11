@@ -59,25 +59,26 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
 
   var inp = $(newEl).find("[type=text]");
 
-  var myPicker = new jscolor.color(inp.get(0),
+  loadScript("jscolor/jscolor.js",
+  function() {
+    var myPicker = new jscolor.color(inp.get(0),
                                    {pickerMode:'RGB',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'});
-  inp.get(0).color = myPicker;
+    inp.get(0).color = myPicker;
 
-  if( currVal ) {
-    if( currVal.length > 6 ) currVal = currVal.slice(0,6);
-    myPicker.fromString(currVal);
-  }
+    if( elName )
+      $(inp).attr("name", elName);
 
-  if( elName )
-    $(inp).attr("name", elName);
+    if( cmd )
+      $(newEl).change(function(arg) { cmd( myPicker.toString() ) });
+    else
+      $(newEl).change(function(arg) { $(inp).attr("value", myPicker.toString() ) });
 
-  if( cmd )
-    $(newEl).change(function(arg) { cmd( myPicker.toString() ) });
-  else
-    $(newEl).change(function(arg) { $(inp).attr("value", myPicker.toString() ) });
+    newEl.setValueFn = function(arg){ if( arg.length > 6 ) arg = arg.slice(0,6);
+                                      myPicker.fromString(arg); };
 
-  newEl.setValueFn = function(arg){ if( arg.length > 6 ) arg = arg.slice(0,6);
-                                    myPicker.fromString(arg); };
+    if( currVal )
+      newEl.setValueFn(currVal);
+  });
 
   return newEl;
 }

@@ -11,13 +11,13 @@ use vars qw($FW_ME);
 sub
 Color_Initialize()
 {
-  FHEM_colorpickerInit();
+  #FHEM_colorpickerInit();
 }
 
 sub
 FHEM_colorpickerInit()
 {
-  $data{FWEXT}{colorpicker}{SCRIPT} = "/jscolor/jscolor.js";
+  #$data{FWEXT}{colorpicker}{SCRIPT} = "/jscolor/jscolor.js";
 }
 
 my %dim_values = (
