@@ -328,7 +328,7 @@ EnOcean_Initialize($)
                        "showtime:1,0 " .
                        "actualTemp angleMax:slider,-180,20,180 alarmAction:no,stop,opens,closes " .
                        "angleMin:slider,-180,20,180 " .
-                       "angleTime blockUnknownMSC:no,yes blockMotion:no,yes " .
+                       "angleTime setCmdTrigger:man,refDev blockUnknownMSC:no,yes blockMotion:no,yes " .
                        "blockTemp:no,yes blockDisplay:no,yes blockDateTime:no,yes " .
                        "blockTimeProgram:no,yes blockOccupancy:no,yes blockSetpointTemp:no,yes " .
                        "blockFanSpeed:no,yes blockKey:no,yes comMode:biDir,uniDir " .
@@ -336,10 +336,10 @@ EnOcean_Initialize($)
                        "defaultChannel:" . join(",", @EnO_defaultChannel) . " " .
                        "demandRespAction demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
                        "demandRespMin:A0,AI,B0,BI,C0,CI,D0,DI demandRespRandomTime " .
-                       "demandRespThreshold:slider,0,1,15 destinationID " .
+                       "demandRespThreshold:slider,0,1,15 demandRespTimeoutLevel:max,last destinationID " .
                        "devChannel devUpdate:off,auto,demand,polling,interrupt dimValueOn " .
                        "disable:0,1 disabledForIntervals " .
-                       "displayContent:humidity,off,setPointTemp,tempertureExtern,temperatureIntern,time,default,no_change " .
+                       "displayContent:default,humidity,off,setPointTemp,tempertureExtern,temperatureIntern,time,no_change " .
                        "eep gwCmd:" . join(",", sort @EnO_gwCmd) . " humidityRefDev " .
                        "key macAlgo " .
                        "manufID:" . join(",", sort keys %EnO_manuf) . " " . 
@@ -763,7 +763,8 @@ EnOcean_Set($@)
       $cmdID = 0x201;
       $manufID = 0x7FF;
       $rorg = "C5";
-      my $seq = int(rand(2) + 1) << 6;
+      # SEQ = 0...3
+      my $seq = int(rand(4)) << 6;
       shift(@a);
       my $cntr = (((4 << 11) | $manufID) << 12) | $cmdID;
       ####
@@ -1584,6 +1585,95 @@ EnOcean_Set($@)
     } elsif ($st eq "energyManagement.01") {
       # Energy Management, Demand Response
       # (A5-37-01)
+      $rorg = "A5";
+      $updateState = 0;
+      my $drLevel = 15;
+      my $powerUsage = 100;
+      my $powerUsageLevel = 1;
+      my $powerUsageScale = 0;
+      my $randomStart = 0;
+      my $randomEnd = 0;
+      my $randomTime = rand(AttrVal($name, "demandRespRandomTime", 1));
+      my $setpoint = 255;
+      my $timeout = 0;
+      my $threshold = AttrVal($name, "demandRespThreshold", 8);
+      
+      if($cmd eq "teach") {
+        # teach-in EEP A5-37-01, Manufacturer "Multi user Manufacturer ID"
+        $data = "940FFF80";
+        ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef");
+        readingsSingleUpdate($hash, "state", "teach", 1);
+        Log3 $name, 3, "EnOcean set $name demand response $cmd";
+
+      } elsif ($cmd eq "level") {
+        return "Usage: $cmd 0...15 [yes|no [yes|no [timeout/min]]]]"
+          if(@a < 2 || $a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 15 );
+        $drLevel = $a[1];
+        $powerUsage = $a[1] / 15 * 100;
+        $powerUsageLevel = $drLevel >= $threshold ? 1 : 0;
+        $setpoint = $a[1] * 17;
+        shift(@a);
+      
+      } elsif ($cmd eq "max") {
+
+      } elsif ($cmd eq "min") {
+        $drLevel = 0;
+        $powerUsage = 0;
+        $powerUsageLevel = 0;
+        $setpoint = 0;
+     
+      } elsif ($cmd eq "power") {
+        return "Usage: $cmd 0...100 [yes|no [yes|no [timeout/min]]]]"
+          if(@a < 2 || $a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 100);
+        $drLevel = $a[1] / 100 * 15;
+        $powerUsage = $a[1];
+        $powerUsageLevel = $drLevel >= $threshold ? 1 : 0;
+        $setpoint = $a[1] * 2.55;
+        shift(@a);
+      
+      } elsif ($cmd eq "setpoint") {
+        return "Usage: $cmd 0...255 [yes|no [yes|no [timeout/min]]]]"
+          if(@a < 2 || $a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 255 );
+        $drLevel = $a[1] / 255 * 15 ;
+        $powerUsage = $a[1] / 255 * 100;
+        $powerUsageLevel = $drLevel >= $threshold ? 1 : 0;
+        $setpoint = $a[1];
+        shift(@a);
+      
+      } else {
+        return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "level:slider,0,1,15 max:noArg min:noArg power:slider,0,5,100 setpoint:slider,0,5,255 teach:noArg"
+      }
+
+      if ($cmd ne "teach") {
+        if (@a > 1) {
+          return "Usage: $cmd [<cmdValue>] [max|rel [yes|no [yes|no [timeout/min]]]]" if($a[1] !~ m/^max|rel$/);
+          $powerUsageScale = $a[1] eq "rel" ? 0x80 : 0;
+          shift(@a);
+        }
+        if (@a > 1) {
+          return "Usage: $cmd [<cmdValue>] [max|rel [yes|no [yes|no [timeout/min]]]]" if($a[1] !~ m/^yes|no$/);
+          $randomStart = $a[1] eq "yes" ? 4 : 0;
+          shift(@a);
+        }
+        if (@a > 1) {
+          return "Usage: $cmd [<cmdValue>] [max|rel [yes|no [yes|no [timeout/min]]]]" if($a[1] !~ m/^yes|no$/);
+          $randomEnd = $a[1] eq "yes" ? 2 : 0;
+          shift(@a);
+        }
+        if (@a > 1) {
+          return "Usage: $cmd [<cmdValue>] [max|rel [yes|no [yes|no [timeout/min]]]]"
+            if($a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 3825);
+          $timeout = int($a[1] / 15);
+          shift(@a);
+        }
+        $data = sprintf "%02X%02X%02X%02X", $setpoint, $powerUsageScale | $powerUsage, $timeout,
+                                            $drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel;
+        my @db = ($drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel,
+                  $timeout, $powerUsageScale | $powerUsage, $setpoint);
+        EnOcean_energyManagement_01Parse($hash, @db);
+      }
+      shift(@a);
+      Log3 $name, 3, "EnOcean $name data: $data";
     
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
@@ -4466,56 +4556,8 @@ EnOcean_Parse($$)
     } elsif ($st eq "energyManagement.01") {
       # Energy Management, Demand Response
       # (A5-37-01)
-      my $setpoint = $db[3];
-      $hash->{helper}{setpoint} = ReadingsVal($name, "setpoint", undef);
-      my $powerUsage = $db[2] & 0x7F;
-      $hash->{helper}{powerUsage} = ReadingsVal($name, "powerUsage", undef);
-      my $powerUsageScale = $db[2] & 0x80 ? "rel" : "abs";
-      $hash->{helper}{powerUsageScale} = ReadingsVal($name, "powerUsageScale", undef);
-      my $timeout = $db[1] * 15 * 60;
-      my $drLevel = $db[0] & 0xF0 >> 4;
-      $hash->{helper}{drLevel} = ReadingsVal($name, "drLevel", undef);
-      my $randomStart = $db[0] & 4 ? "yes" : "no";
-      my $randomEnd = $db[0] & 2 ? "yes" : "no";
-      my $powerUsageLevel = $db[0] & 1 ? "max" : "min";
-      $hash->{helper}{powerUsageLevel} = ReadingsVal($name, "powerUsageLevel", undef);
-      my $drState;
-      if ($randomStart eq "yes" ||  $randomEnd eq "yes") {
-        push @event, "3:state:waiting";
-      } elsif ($drLevel == 15) {
-        push @event, "3:state:off";
-      } else {
-        push @event, "3:state:on";
-      }
-      push @event, "3:drLevel:$drLevel";
-      push @event, "3:powerUsage:$powerUsage";
-      push @event, "3:powerUsageLevel:$powerUsageLevel";
-      push @event, "3:powerUsageScale:$powerUsageScale";
-      push @event, "3:randomEnd:$randomEnd";
-      push @event, "3:randomStart:$randomStart";
-      push @event, "3:setpoint:$setpoint";
-      push @event, "3:timeout:$timeout";
-      my $actionCmd = AttrVal($name, "demandRespAction", undef);
-      my $randomTime = AttrVal($name, "demandRespRandomTime", 1);
-      my $threshold = AttrVal($name, "demandRespThreshold", 8);
+      EnOcean_energyManagement_01Parse($hash, @db);
 
-      if ($randomStart eq "yes") {
-        # gettimeofday()
-      } else {
-        if (defined $actionCmd) {
-          # action exec
-          my %specials= ("%NAME"  => $name,
-                         "%TYPE"  => $hash->{TYPE},
-                         "%EVENT" => ($drLevel, $setpoint, $powerUsage, $powerUsageScale, $powerUsageLevel,
-                                      $randomStart, $randomEnd, $timeout)
-          );
-          $actionCmd = EvalSpecials($actionCmd, %specials);
-          #$actionCmd = SemicolonEscape($actionCmd);
-          my $ret = AnalyzeCommandChain(undef, $actionCmd);
-          Log3 $name, 2, "$name: $ret" if($ret);
-        }
-      }
-    
     } elsif ($st eq "manufProfile") {
       # Manufacturer Specific Applications (EEP A5-3F-7F)
       if ($manufID eq "002") {
@@ -5452,7 +5494,7 @@ sub EnOcean_Attr(@) {
       if (AttrVal($name, "subType", "") eq "blindsCtrl.00") {
         # no rotation
         $data = "7FFF000705";
-        EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "FFFFFFFF"), "00", $hash->{DEF});
+        EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
       }
     } elsif (AttrVal($name, "subType", "") eq "blindsCtrl.00" && $attrVal =~ m/^[+-]?\d+(\.\d+)?$/ && $attrVal >= 0 && $attrVal <= 2.54) {
       if ($attrVal < 1) {
@@ -5462,7 +5504,7 @@ sub EnOcean_Attr(@) {
       } 
       $data = sprintf "7FFF%02X0705", $attrVal;        
       #EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, $subDef, $status, $destinationID);
-      EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "FFFFFFFF"), "00", $hash->{DEF});   
+      EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});   
     } elsif (AttrVal($name, "subType", "") eq "manufProfile" && AttrVal($name, "manufID", "") eq "00D" &&
              $attrVal =~ m/^[+-]?\d+?$/ && $attrVal >= 1 && $attrVal <= 6) {
 
@@ -5477,7 +5519,7 @@ sub EnOcean_Attr(@) {
       if (AttrVal($name, "subType", "") eq "blindsCtrl.00") {
         # no alarm action
         $data = "7FFFFF0005";
-        EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "FFFFFFFF"), "00", $hash->{DEF});
+        EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
       }
     } elsif ($attrVal =~ m/(no|stop|opens|closes)$/) {
       if (AttrVal($name, "subType", "") eq "blindsCtrl.00") {
@@ -5493,13 +5535,21 @@ sub EnOcean_Attr(@) {
         }
         $data = sprintf "7FFFFF%02X05", $alarmAction;        
         #EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, $subDef, $status, $destinationID);
-        EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "FFFFFFFF"), "00", $hash->{DEF});
+        EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
       }    
     } else {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
     
+  } elsif ($attrName eq "setCmdTrigger") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^man|refDev$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
   } elsif ($attrName =~ m/^block.*/) {
     if (!defined $attrVal){
     
@@ -5663,13 +5713,13 @@ sub EnOcean_Attr(@) {
       if (AttrVal($name, "subType", "") eq "blindsCtrl.00") {
         # set shutTime to max
         $data = "7530FF0705";
-        EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "FFFFFFFF"), "00", $hash->{DEF});
+        EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
       }
     } elsif (AttrVal($name, "subType", "") eq "blindsCtrl.00" && $attrVal =~ m/^[+-]?\d+$/ && $attrVal >= 5 && $attrVal <= 300) {
       $attrVal = int($attrVal * 100);
       $data = sprintf "%04XFF0705", $attrVal;        
       #EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, $subDef, $status, $destinationID);
-      EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "FFFFFFFF"), "00", $hash->{DEF});   
+      EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});   
     } elsif (AttrVal($name, "subType", "") eq "manufProfile" && AttrVal($name, "manufID", "") eq "00D" &&
              $attrVal =~ m/^[+-]?\d+$/ && $attrVal >= 1 && $attrVal <= 255) {
 
@@ -5773,6 +5823,10 @@ sub EnOcean_Notify(@) {
         if (AttrVal($name, "observeRefDev", undef) eq $1) {
           CommandAttr(undef, "$name observeRefDev $2");
         }
+      } elsif (defined AttrVal($name, "demandRespRefDev", undef)) {
+        if (AttrVal($name, "demandRespRefDev", undef) eq $1) {
+          CommandAttr(undef, "$name demandRespRefDev $2");
+        }
       }      
       #Log3($name, 5, "EnOcean $name <notify> RENAMED old: $1 new: $2");
       
@@ -5789,6 +5843,10 @@ sub EnOcean_Notify(@) {
       } elsif (defined AttrVal($name, "observeRefDev", undef)) {
         if (AttrVal($name, "observeRefDev", undef) eq $1) {
           CommandDeleteAttr(undef, "$name observeRefDev");        
+        }
+      } elsif (defined AttrVal($name, "demandRespRefDev", undef)) {
+        if (AttrVal($name, "demandRespRefDev", undef) eq $1) {
+          CommandDeleteAttr(undef, "$name demandRespRefDev");        
         }
       }      
       #Log3($name, 5, "EnOcean $name <notify> DELETED $1");
@@ -5824,11 +5882,12 @@ sub EnOcean_Notify(@) {
       #Log3($name, 5, "EnOcean $name <notify> SHUTDOWN");
 
     } else {
-      my (@parts, $reading, $value) = (undef, "", "");
+      my @parts = split(/: | /, $s);
+      
       if (defined AttrVal($name, "observeRefDev", undef)) {
         my @observeRefDev = split("[ \t][ \t]*", AttrVal($name, "observeRefDev", undef));       
         if (grep /^$devName$/, @observeRefDev) {
-          @parts = split(/: /, $s);
+          my ($reading, $value) = ("", "");
           $reading = shift @parts;
           if (!defined($parts[0]) || @parts > 1) {
             $value = $s;
@@ -5838,11 +5897,112 @@ sub EnOcean_Notify(@) {
           }
           my @cmdObserve = ($devName, $reading, $value);
           EnOcean_observeParse(2, $hash, @cmdObserve);      
-          #Log3($name, 5, "EnOcean $name <notify> observeRefDev $devName $reading: $value");
+          #Log3($name, 5, "EnOcean $name <notify> observeRefDev: $devName $reading: $value");
         }
-      } else {    
-        #Log3($name, 5, "EnOcean $name <notify> $devName $s");
       }
+      
+      if (defined AttrVal($name, "demandRespRefDev", undef)) {
+        my @demandRespRefDev = split("[ \t][ \t]*", AttrVal($name, "demandRespRefDev", undef));       
+        if (grep /^$devName$/, @demandRespRefDev) {
+          my @cmdDemandResponse;
+          my $actionCmd = AttrVal($name, "demandRespAction", undef);          
+          if (defined $actionCmd) {
+            if ($parts[0] =~ m/^on|off$/) {
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set $parts[0]");
+              my %specials= ("%NAME" => $name,
+                             "%DEMANDRESPNAME" => $devName,
+                             "%TYPE" => $hash->{TYPE},
+                             "%DEMANDRESPTYPE" => $dev->{TYPE},
+                             "%LEVEL" => ReadingsVal($devName, "level", 15),                   
+                             "%SETPOINT"  => ReadingsVal($devName, "setpoint", 255),
+                             "%POWERUSAGE"  => ReadingsVal($devName, "powerUsage", 100),
+                             "%POWERUSAGESCALE"  => ReadingsVal($devName, "powerUsageScale", "max"),
+                             "%POWERUSAGELEVEL"  => ReadingsVal($devName, "powerUsageLevel", "max"),
+                             "%STATE" => ReadingsVal($name, "state", "off")
+                            );
+              # action exec
+              $actionCmd = EvalSpecials($actionCmd, %specials);
+              my $ret = AnalyzeCommandChain(undef, $actionCmd);
+              Log3 $name, 2, "$name: $ret" if($ret);
+            }
+          
+          } elsif (AttrVal($name, "subType", "") eq "switch" || AttrVal($name, "subTypeSet", "") eq "switch") {
+            if ($parts[0] eq "powerUsageLevel" && $parts[1] eq "max") {
+              @cmdDemandResponse = ($name, AttrVal($name, "demandRespMax", "B0"));
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            } elsif ($parts[0] eq "powerUsageLevel" && $parts[1] eq "min") {
+              @cmdDemandResponse = ($name, AttrVal($name, "demandRespMin", "BI"));           
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            }
+            
+          } elsif (AttrVal($name, "subType", "") eq "gateway" && AttrVal($name, "gwCmd", "") eq "switching") {
+            if ($parts[0] eq "powerUsageLevel" && $parts[1] eq "max") {
+              @cmdDemandResponse = ($name, "on");
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            } elsif ($parts[0] eq "powerUsageLevel" && $parts[1] eq "min") {
+              @cmdDemandResponse = ($name, "off");           
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            }
+            
+          } elsif ((AttrVal($name, "subType", "") eq "gateway" && AttrVal($name, "gwCmd", "") eq "dimming")
+                   || AttrVal($name, "subType", "") eq "actuator.01") {
+            if ($parts[0] eq "powerUsage") {
+              if (ReadingsVal($devName, "powerUsageScale", "max") eq "rel") {
+                @cmdDemandResponse = ($name, "dim", $parts[1] * ReadingsVal($name, "dimValueLast", 100) / 100);
+              } else {
+                @cmdDemandResponse = ($name, "dim", $parts[1]);
+              }
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            }
+          
+          } elsif ((AttrVal($name, "subType", "") eq "roomSensorControl.05" && AttrVal($name, "manufID", "") eq "00D")) {
+            if ($parts[0] eq "level") {
+              @cmdDemandResponse = ($name, "nightReduction", int(5 - 1/3 * $parts[1]));
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            }
+          
+          } elsif (AttrVal($name, "subType", "") eq "roomSensorControl.05") {
+            if ($parts[0] eq "setpoint") {            
+              @cmdDemandResponse = ($name, $parts[0], $parts[1]);
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            }
+          
+          } elsif (AttrVal($name, "subType", "") eq "roomCtrlPanel.00") {
+            if ($parts[0] eq "powerUsageLevel" && $parts[1] eq "max") {
+              @cmdDemandResponse = ($name, "roomCtrlMode", "comfort");
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            } elsif ($parts[0] eq "powerUsageLevel" && $parts[1] eq "min") {
+              @cmdDemandResponse = ($name, "roomCtrlMode", "economy");           
+              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              EnOcean_Set($hash, @cmdDemandResponse);      
+            }
+          }
+        }
+      }
+
+      if (defined(AttrVal($name, "temperatureRefDev", undef)) && AttrVal($name, "setCmdTrigger", "man") eq "refDev") {
+        if ($devName eq AttrVal($name, "temperatureRefDev", "")) {
+          if ($parts[0] eq "temperature") {         
+            if (AttrVal($name, "subType", "") eq "roomSensorControl.05" && AttrVal($name, "manufID", "") eq "00D") {
+              my @setCmd = ($name, "setpointTemp");           
+              EnOcean_Set($hash, @setCmd);      
+            } elsif (AttrVal($name, "subType", "") eq "roomSensorControl.05") {
+              my @setCmd = ($name, "setpoint");           
+              EnOcean_Set($hash, @setCmd);      
+            }
+          }
+        }
+      #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
+      }
+      
     }
   }
   return undef;
@@ -6065,22 +6225,6 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
       $response = "room control setup send $data";
       $logLevel = 2;
     
-#    } elsif ($waitingCmds & 4) {
-#      # configuration message (set time) waiting
-#      my ($sec, $min, $hour, $day, $month, $year) = localtime();
-#      $month += 1;
-#      $year += 1900;
-#      my ($db7, $db6, $db5, $db4, $db1, $db0) = (64, 0, 0, 0, $min << 2, $hour << 3 | 1);
-#      my $db32 = ($day << 4 | $month) << 7 | $year - 2000;    
-#      $data = sprintf "%02X%02X%02X%02X%04X%02X%02X", $db7, $db6, $db5, $db4, $db32, $db1, $db0;
-#      $min = $min < 10 ? $min = "0" . $min : $min;
-#      $hour = $hour < 10 ? $hour = "0" . $hour : $hour;
-#      $day = $day < 10 ? $day = "0" . $day : $day;
-#      $month = $month < 10 ? $month = "0". $month : $month;
-#      # clear command
-#      $waitingCmds = $waitingCmds & 251 + 256;
-#      $response = "configuration message send $year-$month-$day $hour:$min $data";
-
     } elsif ($waitingCmds & 64 || $waitingCmds & 4) {
       # configuration message waiting
       my ($sec, $min, $hour, $day, $month, $year) = localtime();
@@ -6613,6 +6757,7 @@ sub EnOcean_InternalTimer($$$$$)
   }
   InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
   Log3 $hash->{NAME}, 5, "EnOcean setting timer $timerName at " . strftime("%Y-%m-%d %H:%M:%S", localtime($tim));
+  return;
 }
 
 #
@@ -6631,6 +6776,7 @@ sub EnOcean_RemoveInternalTimer($$)
     }
   }
   Log3 $hash->{NAME}, 5, "EnOcean removing timer $timerName";
+  return;
 }
 
 #
@@ -6663,6 +6809,7 @@ sub EnOcean_observeInit($$@)
     $hash->{helper}{observeCmds}{$cmdValue[1]} = $cmdValue[1];
   }
   $hash->{helper}{observeCntr} = 1;
+  CommandDeleteReading(undef, "$name observeFailedDev");
   my %functionHash = (hash => $hash, function => "observe");
   RemoveInternalTimer(\%functionHash);
   InternalTimer(gettimeofday() + 1, "EnOcean_observeRepeat", \%functionHash, 0);
@@ -6750,27 +6897,213 @@ sub EnOcean_observeRepeat($)
     InternalTimer(gettimeofday() + 1, "EnOcean_observeRepeat", $functionHash, 0);
   } else {
     # reached the maximum number of retries, clear last command
-    Log3 $name, 2, "EnOcean set " . join(" ", @{$hash->{helper}{lastCmdValue}}) . " observing failed";
+    Log3 $name, 2, "EnOcean set " . join(" ", @{$hash->{helper}{lastCmdValue}}) .
+                   " observing " . join(" ", @{$hash->{helper}{observeRefDev}}) . " failed";
     #splice(@{$hash->{helper}{observeRefDev}}, 0);
     my $actionCmd = AttrVal($name, "observeErrorAction", undef);    
     if (defined $actionCmd) {
       # error action exec
       my %specials= (
-                "%NAME"  => shift(@{$hash->{helper}{lastCmdValue}}),
+                "%NAME" => shift(@{$hash->{helper}{lastCmdValue}}),
+                "%FAILEDDEV" => join(" ", @{$hash->{helper}{observeRefDev}}),
                 "%TYPE"  => $hash->{TYPE},
                 "%EVENT" => ReplaceEventMap($name, join(" ", @{$hash->{helper}{lastCmdValue}}), 1)
       );
       $actionCmd = EvalSpecials($actionCmd, %specials);
-      #$actionCmd = SemicolonEscape($actionCmd);
       my $ret = AnalyzeCommandChain(undef, $actionCmd);
       Log3 $name, 2, "$name: $ret" if($ret);
     }
+    readingsSingleUpdate($hash, "observeFailedDev", join(" ", @{$hash->{helper}{observeRefDev}}), 1);
     delete $hash->{helper}{observeCmds};
     delete $hash->{helper}{observeCntr};
     delete $hash->{helper}{observeRefDev};
     delete $hash->{helper}{lastCmdFunction};
     delete $hash->{helper}{lastCmdValue};
     RemoveInternalTimer($functionHash);
+  }
+  return;
+}
+#
+sub EnOcean_energyManagement_01Parse($@)
+{
+  my ($hash, @db) = @_;
+  my $name = $hash->{NAME};
+  # [drLevel] = 15 : no requests for reduction in power consumptions
+  my $drLevel = ($db[0] & 0xF0) >> 4;
+  my $powerUsage = $db[2] & 0x7F;
+  my $powerUsageLevel = $db[0] & 1 ? "max" : "min";
+  my $powerUsageScale = $db[2] & 0x80 ? "rel" : "max";
+  my $randomStart = $db[0] & 4 ? "yes" : "no";
+  my $randomEnd = $db[0] & 2 ? "yes" : "no";
+  my $randomTime = rand(AttrVal($name, "demandRespRandomTime", 1));
+  my $setpoint = $db[3];
+  my $timeout = $db[1] * 15 * 60;
+  $randomTime = $randomTime > $timeout && $timeout > 0 ? rand($timeout) : rand($randomTime);
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "randomEnd", $randomEnd);
+  readingsBulkUpdate($hash, "randomStart", $randomStart);
+  my %timeoutHash = (hash => $hash, function => "demandResponseTimeout");
+  my %functionHash = (hash            => $hash,
+                      function        => "demandResponseExec",
+                      drLevel         => $drLevel,
+                      powerUsage      => $powerUsage,
+                      powerUsageLevel => $powerUsageLevel,
+                      powerUsageScale => $powerUsageScale,
+                      setpoint        => $setpoint
+                     );      
+  RemoveInternalTimer(\%timeoutHash);
+  RemoveInternalTimer(\%functionHash);
+  if ($timeout > 0 && $drLevel < 15) {
+    # timeout timer
+    InternalTimer(gettimeofday() + $timeout, "EnOcean_demandResponseTimeout", \%timeoutHash, 0);
+    my ($sec, $min, $hour, $day, $month, $year) = localtime(time + $timeout);
+    $month += 1;
+    $year += 1900;
+    $min = $min < 10 ? $min = "0" . $min : $min;
+    $hour = $hour < 10 ? $hour = "0" . $hour : $hour;
+    $day = $day < 10 ? $day = "0" . $day : $day;
+    $month = $month < 10 ? $month = "0". $month : $month;
+    readingsBulkUpdate($hash, "timeout", "$year-$month-$day $hour:$min:$sec");
+  } else {
+    CommandDeleteReading(undef, "$name timeout");    
+  }
+  if ($randomStart eq "yes" && ReadingsVal($name, "level", 15) == 15) {
+    readingsBulkUpdate($hash, "state", "waiting_for_start");
+    Log3 $name, 3, "EnOcean set $name demand response waiting for start";
+    InternalTimer(gettimeofday() + $randomTime, "EnOcean_demandResponseExec", \%functionHash, 0);      
+  } elsif ($randomEnd eq "yes" && ReadingsVal($name, "level", 15) < 15) {
+    readingsBulkUpdate($hash, "state", "waiting_for_stop");
+    Log3 $name, 3, "EnOcean set $name demand response waiting for stop";
+    InternalTimer(gettimeofday() + $randomTime, "EnOcean_demandResponseExec", \%functionHash, 0);        
+  } else {
+    EnOcean_demandResponseExec(\%functionHash);
+  }
+  readingsEndUpdate($hash, 1);
+  return;
+}
+
+#
+sub EnOcean_demandResponseExec($)
+{
+  my ($functionHash) = @_;
+  my $function = $functionHash->{function};
+  my $hash = $functionHash->{hash};
+  my $drLevel = $functionHash->{drLevel};
+  my $powerUsage = $functionHash->{powerUsage};
+  my $powerUsageLevel = $functionHash->{powerUsageLevel};  
+  my $powerUsageScale = $functionHash->{powerUsageScale};
+  my $setpoint = $functionHash->{setpoint};
+  my $name = $hash->{NAME}; 
+  my $actionCmd = AttrVal($name, "demandRespAction", undef);
+  # save old values
+  $hash->{helper}{drLevel} = ReadingsVal($name, "level", 15);
+  $hash->{helper}{powerUsage} = ReadingsVal($name, "powerUsage", 100);
+  $hash->{helper}{powerUsageLevel} = ReadingsVal($name, "powerUsageLevel", "max");
+  $hash->{helper}{powerUsageScale} = ReadingsVal($name, "powerUsageScale", "max");
+  $hash->{helper}{setpoint} = ReadingsVal($name, "setpoint", 255); 
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "level", $drLevel);
+  readingsBulkUpdate($hash, "powerUsage", $powerUsage);
+  readingsBulkUpdate($hash, "powerUsageLevel", $powerUsageLevel);
+  readingsBulkUpdate($hash, "powerUsageScale", $powerUsageScale);
+  readingsBulkUpdate($hash, "setpoint", $setpoint);
+  if ($drLevel == 15) {
+    readingsBulkUpdate($hash, "state", "off");
+    Log3 $name, 3, "EnOcean set $name demand response off";
+  } else {
+    readingsBulkUpdate($hash, "state", "on");
+    Log3 $name, 3, "EnOcean set $name demand response on";
+  }
+  readingsEndUpdate($hash, 1);
+  if (defined $actionCmd) {
+    # action exec
+#    my %specials= ("%NAME"  => $name,
+#                   "%TYPE"  => $hash->{TYPE},
+#                   "%EVENT" => "$drLevel $setpoint $powerUsage $powerUsageScale $powerUsageLevel"
+#                  );
+    my %specials= ("%NAME"  => $name,
+                   "%TYPE"  => $hash->{TYPE},
+                   "%LEVEL"  => $drLevel,                   
+                   "%SETPOINT"  => $setpoint,
+                   "%POWERUSAGE"  => $powerUsage,
+                   "%POWERUSAGESCALE"  => $powerUsageScale,
+                   "%POWERUSAGELEVEL"  => $powerUsageLevel,
+                   "%STATE" => ReadingsVal($name, "state", "off")
+                  );
+    $actionCmd = EvalSpecials($actionCmd, %specials);
+    my $ret = AnalyzeCommandChain(undef, $actionCmd);
+    Log3 $name, 2, "$name: $ret" if($ret);
+  }
+  return;
+}
+
+#
+sub EnOcean_demandResponseTimeout($)
+{
+  my ($functionHash) = @_;
+  my $function = $functionHash->{function};
+  my $hash = $functionHash->{hash};
+  my $name = $hash->{NAME};
+  my $actionCmd = AttrVal($name, "demandRespAction", undef);
+  my $data;
+  my $timeoutLevel = AttrVal($name, "demandRespTimeoutLevel", "max");
+  RemoveInternalTimer($functionHash);
+  CommandDeleteReading(undef, "$name timeout");
+  my $drLevel = 15;
+  my $powerUsage = 100;
+  my $powerUsageLevel = "max";
+  my $powerUsageScale = "max";
+  my $setpoint = 255;
+  my $timeout = 0;
+  if ($timeoutLevel eq "last" && defined($hash->{helper}{drLevel})) {
+    # restore old values
+    $drLevel = $hash->{helper}{drLevel};
+    $powerUsage = $hash->{helper}{powerUsage};
+    $powerUsageScale = $hash->{helper}{powerUsageLevel};
+    $powerUsageLevel = $hash->{helper}{powerUsageScale};
+    $setpoint = $hash->{helper}{setpoint}; 
+  }
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "level", $drLevel);
+  readingsBulkUpdate($hash, "powerUsage", $powerUsage);
+  readingsBulkUpdate($hash, "powerUsageLevel", $powerUsageLevel);
+  readingsBulkUpdate($hash, "powerUsageScale", $powerUsageScale);
+  readingsBulkUpdate($hash, "setpoint", $setpoint);
+  if ($drLevel == 15) {
+    readingsBulkUpdate($hash, "state", "off");
+    Log3 $name, 3, "EnOcean set $name demand response off";
+  } else {
+    readingsBulkUpdate($hash, "state", "on");
+    Log3 $name, 3, "EnOcean set $name demand response on";
+  }
+  readingsEndUpdate($hash, 1);
+  #my %specials= ("%NAME"  => $name,
+  #               "%TYPE"  => $hash->{TYPE},
+  #               "%EVENT" => "$drLevel $setpoint $powerUsage $powerUsageScale $powerUsageLevel"
+  #              );
+    my %specials= ("%NAME"  => $name,
+                   "%TYPE"  => $hash->{TYPE},
+                   "%LEVEL"  => $drLevel,                   
+                   "%SETPOINT"  => $setpoint,
+                   "%POWERUSAGE"  => $powerUsage,
+                   "%POWERUSAGESCALE"  => $powerUsageScale,
+                   "%POWERUSAGELEVEL"  => $powerUsageLevel,
+                   "%STATE" => ReadingsVal($name, "state", "off")
+                  );
+  $powerUsageLevel = $powerUsageLevel eq "max" ? 1 : 0;
+  $powerUsageScale = $powerUsageScale eq "rel" ? 0x80 : 0;
+  my $randomStart = ReadingsVal($name, "randomStart", "no") eq "yes" ? 4 : 0;
+  my $randomEnd = ReadingsVal($name, "randomEnd", "no") eq "yes" ? 2 : 0;
+  $data = sprintf "%02X%02X%02X%02X", $setpoint, $powerUsageScale | $powerUsage, $timeout,
+                                      $drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel;
+  #EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, $subDef, $status, $destinationID);
+  EnOcean_SndRadio(undef, $hash, 1, "A5", $data, AttrVal($name, "subDef", $hash->{DEF}), "00", "FFFFFFFF");
+
+  if (defined $actionCmd) {
+    # action exec
+    $actionCmd = EvalSpecials($actionCmd, %specials);
+    my $ret = AnalyzeCommandChain(undef, $actionCmd);
+    Log3 $name, 2, "$name: $ret" if($ret);
   }
   return;
 }
@@ -7385,8 +7718,9 @@ EnOcean_Undef($$)
     If the <a href="#EnOcean_observeLogic">observeLogic</a> attribute is set to "and", the monitoring is stopped when a telegram 
     was received by all devices (AND logic). Please note that the name of the own device has also to be entered in the
     <a href="#EnOcean_observeRefDev">observeRefDev</a> if required.<br>
-    If the maximum number of retries is reached and still no all acknowledgment telegrams has been received, the command
-    can be executed, that is stored in the <a href="#EnOcean_observeErrorAction">observeErrorAction</a> attribute.    
+    If the maximum number of retries is reached and still no all acknowledgment telegrams has been received, the reading
+    "observeFailedDev" shows the faulty devices and the command can be executed, that is stored in the
+    <a href="#EnOcean_observeErrorAction">observeErrorAction</a> attribute.    
     <br><br>
   </ul>
   
@@ -8297,7 +8631,7 @@ EnOcean_Undef($$)
       Command being executed after an error.  If &lt;command&gt; is enclosed in {},
       then it is a perl expression, if it is enclosed in "", then it is a shell command,
       else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the set
-      command. $TYPE, $NAME, $EVENT, $EVTPART0, $EVTPART1, $EVTPART2, etc. contains the space separated
+      command. $TYPE, $NAME, $FAILEDDEV, $EVENT, $EVTPART0, $EVTPART1, $EVTPART2, etc. contains the space separated
       set parts. The <a href="#eventMap">eventMap</a> replacements are taken into account. This data
       is available as a local variable in perl, as environment variable for shell
       scripts, and will be textually replaced for Fhem commands.
@@ -8356,6 +8690,11 @@ EnOcean_Undef($$)
       The status "released" will be shown in the reading state if the
       attribute is set to "pushbutton".
     </li>
+    <li><a name="EnOcean_setCmdTrigger">setCmdTrigger</a> man|refDev, [setCmdTrigger] = man is default.<br>
+      Operation mode to send set commands<br>
+      If the attribute is set to "refDev", a device-specific set command is sent when the reference device is updated.
+      For the subType "roomsensorcontrol.05" the reference "temperatureRefDev" is supported.
+      </li>
     <li><a href="#showtime">showtime</a></li>
     <li><a name="shutTime">shutTime</a> t/s<br>
       subType blindsCtrl.00: [shutTime] = 5 ... 300, 300 is default.<br>
