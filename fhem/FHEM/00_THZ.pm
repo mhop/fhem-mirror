@@ -2,10 +2,10 @@
 # 00_THZ
 # $Id$
 # by immi 01/2015
-my $thzversion = "0.124";
+my $thzversion = "0.125";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
-# http://heatpumpmonitor.penz.name/heatpumpmonitorwiki/
+# http://heatpumpmonitor.penz.name/heatpumpmonit	orwiki/
 ########################################################################################
 #
 #  This programm is free software; you can redistribute it and/or modify
@@ -64,7 +64,7 @@ sub THZ_Set($@);
 # 
 ########################################################################################
 
-my %setsnew = (
+my %sets439 = (
     "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
     "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
     "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
@@ -84,7 +84,7 @@ my %setsnew = (
     "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "10", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
     "p16GradientHC2"			=> {cmd2=>"0C010E", argMin =>   "0", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
     "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},
-    "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"1clean", unit =>" %"}, 
+    "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"}, 
     "p04DHWsetDayTemp"			=> {cmd2=>"0A0013", argMin =>  "13", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
     "p05DHWsetNightTemp"		=> {cmd2=>"0A05BF", argMin =>  "13", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
     "p83DHWsetSolarTemp"		=> {cmd2=>"0A05BE", argMin =>  "13", argMax =>   "75",	type =>"5temp",  unit =>" °C"},
@@ -259,7 +259,7 @@ my %setsnew = (
 #
 ########################################################################################
 
-my %getsonly = (
+my %getsonly439 = (
 #	"debug_read_raw_register_slow"	=> { },
 	"sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
 	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
@@ -287,23 +287,30 @@ my %getsonly = (
 	"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
+
+my %getsonly539 = (
+  "sFlowRate"                     => {cmd2=>"0A033B", cmd3=>"0A033B",     type =>"1clean", unit =>" cl/min"},
+  "sHumMaskingTime"               => {cmd2=>"0A064F", cmd3=>"0A033B",     type =>"1clean", unit =>" min"},
+  "sHumThreshold"		  => {cmd2=>"0A0650", cmd3=>"0A033B",     type =>"1clean", unit =>" %"},
+ );
+%getsonly539=(%getsonly539, %getsonly439);
+
 my %getsonly206 = (
-#	"debug_read_raw_register_slow"	=> { },
 	"sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
-	"p01-p12"			=> {cmd2=>"17", type =>"17pxx", unit =>""},
+	"p01-p12"			=> {cmd2=>"17", type =>"17pxx206", unit =>""},
 	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
 	"sHC1"				=> {cmd2=>"F4", type =>"F4hc1", unit =>""},
 	"sHC2"				=> {cmd2=>"F5", type =>"F5hc2", unit =>""},
-	"sHistory"			=> {cmd2=>"09", type =>"09his", unit =>""},
-	"sLast10errors"			=> {cmd2=>"D1", type =>"D1last", unit =>""},
-        "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob", unit =>""},  #allFB
+	"sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
+	"sLast10errors"			=> {cmd2=>"D1", type =>"D1last206", unit =>""},
+        "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  #allFB
         "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime", unit =>""},
         "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm", unit =>""},
 	"sFirmware-Id" 			=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
  );
 
-my %sets=%setsnew;
-my %gets=(%getsonly, %sets);
+my %sets=%sets439;
+my %gets=(%getsonly439, %sets);
 my %OpMode = ("1" =>"standby", "11" => "automatic", "3" =>"DAYmode", "4" =>"setback", "5" =>"DHWmode", "14" =>"manual", "0" =>"emergency");   
 my %Rev_OpMode = reverse %OpMode;
 my %OpModeHC = ("1" =>"normal", "2" => "setback", "3" =>"standby", "4" =>"restart", "5" =>"restart");
@@ -313,7 +320,7 @@ my %faultmap = ( "0" =>"n.a.", "1" => "F01_AnodeFault", "2" => "F02_SafetyTempDe
 my $firstLoadAll = 0;
 my $noanswerreceived = 0;
 my $internalHash;
-
+ 
 ########################################################################################
 #
 # THZ_Initialize($)
@@ -358,7 +365,8 @@ sub THZ_Initialize($)
 		    ."interval_sElectrHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sBoostDHWTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 "
-		    ."firmware:new,2.06 "
+		    ."interval_sFlowRate:0,3600,7200,28800,43200,86400 "
+		    ."firmware:4.39,2.06,5.39 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 
@@ -541,7 +549,7 @@ sub THZ_Set($@){
   my $argMin = $cmdhash->{argMin};
   
   #next line disables write back for old firmware if the attribute 206 is set.
-  return "set not allowed for old firmwares" if((AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06"));
+  return "set not allowed for old firmwares" if((AttrVal($hash->{NAME}, "firmware" , "4.39") eq "2.06"));
   
   # check the parameter range
   given ($cmdhash->{type}) {
@@ -993,16 +1001,33 @@ my %parsinghash = (
 	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
 	      [" boosterHeating: ",	20, 4, "hex", 1]
 	      ],
+  "09his206" => [["operatingHours1: ",	4, 4,  "hex", 1],	[" operatingHours2: ",  8, 4, "hex", 1],
+	      [" heatingHours: ",	12, 4, "hex", 1],	[" DHWhours: ",	16, 4, "hex", 1],
+	      [" coolingHours: ",	20, 4, "hex", 1]
+	      ],
   "16sol"  => [["collector_temp: ",	4, 4, "hex2int", 10],	[" dhw_temp: ", 	 8, 4, "hex2int", 10],
 	      [" flow_temp: ",		12, 4, "hex2int", 10],	[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
 	      [" x20: ",		20, 4, "hex2int", 1],	[" x24: ",		24, 4, "hex2int", 1], 
 	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
 	      ],
+  "17pxx206" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
+	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetDayTemp: ",		16, 4,  "hex", 10], 
+	      [" p05DHWsetNightTemp: ",	20, 4,  "hex", 10], 	[" p06DHWsetStandbyTemp: ",	24, 4,  "hex", 10], 
+	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 4,  "hex", 1],
+	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	[" p10RoomTempManual: ",	34, 4,  "hex", 10],
+	      [" p11DHWsetManualTemp: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
+	     ],
   "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
 	      [" fault0CODE: ",		8, 2,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhexdate", 100],
 	      [" fault1CODE: ",		20, 2, "faultmap", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhexdate", 100],
 	      [" fault2CODE: ",		32, 2, "faultmap", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhexdate", 100],
 	      [" fault3CODE: ",		44, 2, "faultmap", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhexdate", 100]
+	      ],
+  "D1last206" => [["number_of_faults: ",	4, 2, "hex", 1],	
+	      [" fault0CODE: ",		8, 4,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "hex2time", 1],  [" fault0DATE: ",	16, 4, "hexdate", 100],
+	      [" fault1CODE: ",		20, 4, "faultmap", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 100],
+	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 100],
+	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 100]
 	      ],
   "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
 	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
@@ -1045,6 +1070,27 @@ my %parsinghash = (
 	      [" actualPower_Qc: ",		94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
 	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
+  "FBglob206" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
+	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
+	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
+	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
+	      [" mixerOpen: ",		47, 1, "bit1", 1],  	[" mixerClosed: ",		47, 1, "bit0", 1],
+	      [" heatPipeValve: ",	45, 1, "bit3", 1],  	[" diverterValve: ",		45, 1, "bit2", 1],
+	      [" dhwPump: ",		45, 1, "bit1", 1],  	[" heatingCircuitPump: ",	45, 1, "bit0", 1],
+	      [" solarPump: ",		44, 1, "bit2", 1],  	[" compressor: ",		44, 1, "bit0", 1],
+	      [" boosterStage3: ",	44, 1, "bit3", 1],  	[" boosterStage2: ",		44, 1, "n.a.", 1],
+	      [" boosterStage1: ",	44, 1, "bit1", 1],  	[" highPressureSensor: ",	49, 1, "n.a.", 1],
+	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  	[" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
+	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" evuRelease: ",		48, 1, "n.a.", 1],
+	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	[" STB: ",			48, 1, "n.a.", 1],
+	      [" outputVentilatorPower: ",	48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
+	      [" outputVentilatorSpeed: ",	56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
+	      [" outside_tempFiltered: ",	64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
+	      [" dewPoint: ",			82, 4, "n.a.", 1],
+	      [" P_Nd: ",			86, 4, "n.a.", 1],	[" P_Hd: ",			90, 4, "n.a.", 1],
+	      [" actualPower_Qc: ",		94, 8, "n.a.", 1],	[" actualPower_Pel: ",		102, 8, "n.a.", 1],
+	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
+	      ],
   "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
 	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
 	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
@@ -1072,83 +1118,6 @@ my %parsinghash = (
   "9holy"     => [["", 10, 2, "quater", 1]
               ]
 );
-
-my %parsinghash206 = (
-  #msgtype => parsingrule  
-  "09his"  => [["operatingHours1: ",	4, 4,  "hex", 1],	[" operatingHours2: ",  8, 4, "hex", 1],
-	      [" heatingHours: ",	12, 4, "hex", 1],	[" DHWhours: ",	16, 4, "hex", 1],
-	      [" coolingHours: ",	20, 4, "hex", 1]
-	      ],
-  "16sol"  => [["collector_temp: ",	4, 4, "hex2int", 10],	[" dhw_temp: ", 	 8, 4, "hex2int", 10],
-	      [" flow_temp: ",		12, 4, "hex2int", 10],	[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
-	      [" x20: ",		20, 4, "hex2int", 1],	[" x24: ",		24, 4, "hex2int", 1], 
-	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
-	      ],
-  "17pxx" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
-	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetDayTemp: ",		16, 4,  "hex", 10], 
-	      [" p05DHWsetNightTemp: ",	20, 4,  "hex", 10], 	[" p06DHWsetStandbyTemp: ",	24, 4,  "hex", 10], 
-	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 4,  "hex", 1],
-	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	[" p10RoomTempManual: ",	34, 4,  "hex", 10],
-	      [" p11DHWsetManualTemp: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
-	     ],
-  "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
-	      [" fault0CODE: ",		8, 4,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "hex2time", 1],  [" fault0DATE: ",	16, 4, "hexdate", 100],
-	      [" fault1CODE: ",		20, 4, "faultmap", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 100],
-	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 100],
-	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 100]
-	      ],
-  "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
-	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
-	      [" x20: ", 		20, 4, "hex2int", 1],	[" heat_block_time: ", 	24, 4, "hex2int", 1], 
-	      [" x28: ",		28, 4, "hex2int", 1],	[" x32: ",		32, 4, "hex2int", 1],
-	      [" x36: ",		36, 4, "hex", 1]
-	      ],
-  "F4hc1"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
-	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
-	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
-	      [" heatTemp: ",		28, 4, "hex2int", 10],  #[" x32: ",		32, 4, "hex2int", 1],
-	      [" seasonMode: ",		38, 2, "somwinmode", 1],#[" x40: ",		40, 4, "hex2int", 1],
-	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
-	      #[" x52: ",		52, 4, "hex2int", 1],
-              [" roomSetTemp: ",	56, 4, "hex2int", 10]
-	     ],
-  "F5hc2"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" returnTemp: ",	8, 4, "hex2int", 10],
-	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
-	      [" heatTemp: ", 		20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
-	      [" seasonMode: ",		30, 2, "somwinmode", 1],[" opMode: ",		36, 2, "opmodehc", 1]
-	     ],
-  "FBglob" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
-	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
-	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
-	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
-	      [" mixerOpen: ",		45, 1, "n.a.", 1],  	[" mixerClosed: ",		45, 1, "n.a.", 1],
-	      [" heatPipeValve: ",	45, 1, "n.a.", 1],  	[" diverterValve: ",		45, 1, "n.a.", 1],
-	      [" dhwPump: ",		44, 1, "n.a.", 1],  	[" heatingCircuitPump: ",	44, 1, "n.a.", 1],
-	      [" solarPump: ",		44, 1, "n.a.", 1],  	[" compressor: ",		47, 1, "n.a.", 1],
-	      [" boosterStage3: ",	46, 1, "n.a.", 1],  	[" boosterStage2: ",		46, 1, "n.a.", 1],
-	      [" boosterStage1: ",	46, 1, "n.a.", 1],  	[" highPressureSensor: ",	49, 1, "n.a.", 1],
-	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  	[" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
-	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" evuRelease: ",		48, 1, "n.a.", 1],
-	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	[" STB: ",			48, 1, "n.a.", 1],
-	      [" outputVentilatorPower: ",	48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
-	      [" outputVentilatorSpeed: ",	56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
-	      [" outside_tempFiltered: ",	64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
-	      [" dewPoint: ",			82, 4, "n.a.", 1],
-	      [" P_Nd: ",			86, 4, "n.a.", 1],	[" P_Hd: ",			90, 4, "n.a.", 1],
-	      [" actualPower_Qc: ",		94, 8, "n.a.", 1],	[" actualPower_Pel: ",		102, 8, "n.a.", 1],
-	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
-	      ],
-  "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
-	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
-	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
-	      ["/", 			16, 2, "hex", 1]
-	     ],
-  "FEfirmId" => [["Date: ", 	36, 22, "hex2ascii", 1]
-	     ],
-  "FDfirm" => [["version: ", 	4, 4, "hex", 100]
-	     ]
-);
-
   
   my ($hash,$message) = @_;
   #$message= "A5FB00C50067010700DC011101B2000000E700AD00F3001C000000CE000000000063000000000000000000";
@@ -1181,7 +1150,6 @@ my %parsinghash206 = (
 	 }
   }
   $parsingrule = $parsinghash{$msgtype} if(defined($msgtype));
-  $parsingrule = $parsinghash206{$msgtype} if((defined($msgtype)) and (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06"));
   
   my $ParsedMsg = $message;
   if(defined($parsingrule)) {
@@ -1265,7 +1233,7 @@ sub THZ_debugread($){
     ($err, $msg) = THZ_ReadAnswer($hash);
     # ack datatranfer and read from the heatpump        
     THZ_Write($hash,  "10");
-    select(undef, undef, undef, 0.110);
+    select(undef, undef, undef, 0.10);
     ($err, $msg) = THZ_ReadAnswer($hash);
     THZ_Write($hash,  "10");
 
@@ -1293,19 +1261,27 @@ sub THZ_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
   
-  if (( $attrName eq "firmware" ) and ($attrVal eq "2.06")) {
-    THZ_RemoveInternalTimer("THZ_GetRefresh");
-     %sets = ();
-     %gets = %getsonly206;
-    THZ_Refresh_all_gets($hash);
-  }
   
   
-  if (( $attrName eq "firmware" ) and (($attrVal eq "new") or ($cmd eq "del")) ) {
-      THZ_RemoveInternalTimer("THZ_GetRefresh");
-      %sets=%setsnew;
-      %gets=(%getsonly, %sets);
-      THZ_Refresh_all_gets($hash);
+  if ( $attrName eq "firmware" )  {  
+      if ($attrVal eq "2.06") {
+        THZ_RemoveInternalTimer("THZ_GetRefresh");
+         %sets = ();
+         %gets = %getsonly206;
+        THZ_Refresh_all_gets($hash);
+      }
+      if ($attrVal eq "5.39") {
+        THZ_RemoveInternalTimer("THZ_GetRefresh");
+        %sets=%sets439;
+        %gets=(%getsonly539, %sets);
+        THZ_Refresh_all_gets($hash);
+      }
+      if (($attrVal eq "4.39") or ($cmd eq "del") or (($attrVal ne "5.39") and ($attrVal ne "2.06")) )  {
+          THZ_RemoveInternalTimer("THZ_GetRefresh");
+          %sets=%sets439;
+          %gets=(%getsonly439, %sets);
+          THZ_Refresh_all_gets($hash);
+      }
   }
   
 
@@ -1565,6 +1541,14 @@ return ($FW_RETTYPE, $ret);
       <ul><code>
       attr Mythz firmware 2.06 <br>
       </code></ul>
+     <br>
+    This module is starting to support newer firmware 5.39; the following attribute adapts decoding <br>
+    <br>
+      <ul><code>
+      attr Mythz firmware 5.39 <br>
+      </code></ul>
+     <br>
+     If no attribute firmware is set, it is assumed your firmware is compatible with 4.39.
      <br>
   </ul>
   <br>
