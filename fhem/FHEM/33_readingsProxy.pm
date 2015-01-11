@@ -37,7 +37,7 @@ sub readingsProxy_Initialize($)
   $hash->{AttrList} = "disable:1 "
                       ."getList "
                       ."setList "
-                      ."getFn setFn valueFn "
+                      ."getFn:textField-long setFn:textField-long valueFn:textField-long "
                       .$readingFnAttributes;
 }
 

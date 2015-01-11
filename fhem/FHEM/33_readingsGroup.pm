@@ -30,7 +30,7 @@ use vars qw(%FW_hiddenroom);
 use vars qw(%FW_visibleDeviceHash);
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
-my @mapping_attrs = qw( commands mapping nameIcon cellStyle nameStyle valueColumn valueColumns valueFormat valuePrefix valueSuffix valueIcon valueStyle );
+my @mapping_attrs = qw( commands:textField-long mapping:textField-long nameIcon:textField-long cellStyle:textField-long nameStyle:textField-long valueColumn:textField-long valueColumns:textField-long valueFormat:textField-long valuePrefix:textField-long valueSuffix:textField-long valueIcon:textField-long valueStyle:textField-long );
 
 sub readingsGroup_Initialize($)
 {
