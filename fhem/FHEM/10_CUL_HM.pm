@@ -4280,11 +4280,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         CUL_HM_PushCmdStack($pHash,"++${peerFlag}40$dst$peer$pc");
         $snd = 1;
         foreach my $pCh(grep /$peer/,@peerLchn){
-          delete $modules{CUL_HM}{defptr}{$pCh}{helper}{dlvl}
-                  if (defined $modules{CUL_HM}{defptr}{$pCh});#stop desiredLevel supervision
           my $n = CUL_HM_id2Name($pCh);
           next if (!$n);
           $n =~s/_chn:.*//;
+          delete $defs{$n}{helper}{dlvl};#stop desiredLevel supervision
           CUL_HM_stateUpdatDly($n,10);
         }
         if ($rxt & 0x80){#burstConditional
