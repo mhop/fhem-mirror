@@ -179,7 +179,7 @@ MAX_ReadingsVal(@)
   #$readingDef{$name} array is [validatingFunc, defaultValue]
   if(exists($readingDef{$name}) and !$readingDef{$name}[0]->($val)) {
     #Error: invalid value
-    Log3 $hash, 2, "MAX: Invalid value $val for READING $name. Forcing to $readingDef{$name}[1]";
+    Log3 $hash, 2, "MAX: Invalid value $val for READING $name on $hash->{NAME}. Forcing to $readingDef{$name}[1]";
     $val = $readingDef{$name}[1];
 
     #Save default value to READINGS
