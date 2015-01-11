@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 09_CUL_FHTTK: small update to the documentation in order to
+             simulate the same
   - fix: 66_ECMD: use STATE not state for connection checking (forum #31307)
   - feature: 57_Calendar: enable gzipped ical files (forum #31845)
   - bugfix: 70_Jabber.pm: XMPP DNS SVR record query added

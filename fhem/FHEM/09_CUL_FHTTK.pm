@@ -154,19 +154,6 @@ CUL_FHTTK_Set($@)
     if($attr{$name}{"model"} ne "dummy") {
       return $ret;
     }
-    
-    # check address of FHT TF
-    my $myaddr = hex($hash->{CODE});
-    my $boundary = hex(690000);
-        
-    if($myaddr < $boundary) {
-      Log3 $name, 3, "$name wrong housecode: The first digit must be equal or greater than 0x69.";
-      if($opt eq "?")
-      {
-        return $ret;
-      }
-      return "$name wrong housecode: The first digit must be equal or greater than 0x69.";
-    }
   }
   else {
     return $ret;
@@ -174,7 +161,7 @@ CUL_FHTTK_Set($@)
     
   my $value = join("", @a);
   
-  Log3 $name, 5, "$name option: $opt and value: $value";
+  Log3 $name, 5, "CUL_FHTTK ($name) option: $opt and value: $value";
   
   if(!defined($fhttfk_c2b{$opt})) {
     my @cList = keys %fhttfk_c2b;
@@ -365,7 +352,7 @@ CUL_FHTTK_Parse($$)
   or next official version 1.62 or higher, it is possible to send out FHT80 TF data with a CUL or simular 
   devices. So it can be simulate up to four window sensor with one device 
   (see <a href="http://www.fhemwiki.de/wiki/CUL_FHTTK">FHEM Wiki</a>). To setup a window sensor, you have to
-  add and/or change the attribute "model" to dummy. The 6 digit hex number must start at 690000.<br><br>
+  add and/or change the attribute "model" to dummy. The 6 digit hex number must not equal to FHTID.<br><br>
 
   <a name="CUL_FHTTKdefine"></a>
   <b>Define</b>
@@ -387,13 +374,13 @@ CUL_FHTTK_Parse($$)
   <a name="CUL_FHTTKset"></a>
   <b>Set</b>
     <ul> Only available, if model is set to dummy.<br><br>
-    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is one of:<br>
     <ul><code>
-      Syncing     # start sync with FHT80B (activate FHT80B sync mode before) - state after is closed<br>
-      Closed      # set window state to closed<br>
-      Open        # set window state to open<br>
+      Syncing     # start the sync with FHT80B (activate FHT80B sync mode before) - state after syncing is Closed<br>
+      Closed      # set window state to Closed<br>
+      Open        # set window state to Open<br>
     </code></ul>
     </ul>
     <br>
@@ -407,7 +394,7 @@ CUL_FHTTK_Parse($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#verbose">verbose</a></li><br>
-    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2, dummy)</li><br>
+    <li><a href="#model">model</a><br>Possible values are: FHT80TF, FHT80TF-2, dummy (value, which allow to simulate a window sensor)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
@@ -435,10 +422,10 @@ CUL_FHTTK_Parse($$)
   <a href="#CUL">CUL</a> device muss vorhr definiert sein.
   <br><br>
   Mit dem letzten Build auf <a href="http://sourceforge.net/p/culfw/code/HEAD/tree/trunk/culfw/Devices/">SVN</a> 
-  oder mit der naechsten offiziellen Version 1.62 oder hoeher, ist es moeglich, FHT80 TF Daten zu senden. Moeglich mit 
-  einem CUL oder aehnlichen Geraeten. So koennen bis zu vier Fenstersensoren mit einem Gerät simuliert werden  
-  (see <a href="http://www.fhemwiki.de/wiki/CUL_FHTTK">FHEM Wiki</a>). Es muss lediglich das Attribut model mit dem 
-  Wert "dummy" hinzugefuegt oder geaendert werdxen. Wichtig: Der Devicecode beginnt ab 690000 hex.<br><br>
+  oder mit der n&auml;chsten offiziellen Version 1.62 oder h&ouml;her, ist es m&ouml;glich, FHT80 TF Daten zu senden. 
+  M&ouml;glich mit einem CUL oder &auml;hnlichen Ger&auml;ten. So k&ouml;nnen bis zu vier Fenstersensoren mit einem Ger&auml;t
+  simuliert werden (siehe <a href="http://www.fhemwiki.de/wiki/CUL_FHTTK">FHEM Wiki</a>). Es muss lediglich das Attribut model mit dem 
+  Wert "dummy" hinzugef&uuml;gt oder ge&auml;ndert werden. Wichtig: Der Devicecode sollte nicht der FHTID entsprechen.<br><br>
 
   <a name="CUL_FHTTKdefine"></a>
   <b>D</b>
@@ -447,7 +434,7 @@ CUL_FHTTK_Parse($$)
     <br><br>
 
     <code>&lt;devicecode&gt;</code> Ist eine sechstellige Hexadezimalzahl, welche zum Zeitpunkt der Produktion 
-  des FHT80 TF gegeben wurde. Somit ist diese auch nicht mehr änderbar und bleibt auch nach einem Batteriewechsel 
+  des FHT80 TF gegeben wurde. Somit ist diese auch nicht mehr &auml;nderbar und bleibt auch nach einem Batteriewechsel 
   erhalten.<br>
 
     Examples:
@@ -460,11 +447,11 @@ CUL_FHTTK_Parse($$)
   <a name="CUL_FHTTKset"></a>
   <b>Set</b>
     <ul> Nur vorhanden, wenn das Attribut model mit dummy definiert wurde.<br><br>
-    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     wobei <code>value</code> folgendes sein kann:<br>
     <ul><code>
-      Syncing     # startet die Synchronisation mit dem FHT80B (FHT80B muss sich im Sync mode befinden) - danach ist der sate closed<br>
+      Syncing     # startet die Synchronisation mit dem FHT80B (FHT80B muss sich im Sync mode befinden) - danach wird der state auf "Closed" gesetzt<br>
       Closed      # setzt den Fensterstatus zu Closed<br>
       Open        # setzt den Fensterstatus zu Open<br>
     </code></ul>
@@ -480,7 +467,7 @@ CUL_FHTTK_Parse($$)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#verbose">verbose</a></li><br>
-    <li><a href="#model">model</a> (FHT80TF, FHT80TF-2, dummy)</li><br>
+    <li><a href="#model">model</a><br>M&ouml;gliche Werte sind: FHT80TF, FHT80TF-2, dummy (zum simulieren eines Fensterkontaktes)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
