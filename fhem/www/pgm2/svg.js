@@ -268,8 +268,12 @@ FW_svgUpdateDevs(devs)
     if(!svg || !svg.firstChild || !svg.firstChild.nextSibling)
       continue;
     var flog = svg.firstChild.nextSibling.getAttribute("flog");
+    if(!flog)
+      continue;
+    log("longpollSVG filter:"+flog);
     for(var j=0; j < devs.length; j++) {
-      if(flog !== null && flog.match(" "+devs[j]+" ")) {
+      var ev = devs[0]+":"+devs[1];
+      if(ev.match(flog)) {
         var e = embArr[i];
         var newE = document.createElement("embed");
         for(var k=0; k<e.attributes.length; k++)

@@ -334,7 +334,7 @@ FW_doUpdate()
         FW_widgets[w].updateLine(d);
 
     if(d[0].indexOf("-") == -1) // Wont contain -
-      devs.push(d[0]);
+      devs.push(d);
   }
 
   for(var w in FW_widgets)
