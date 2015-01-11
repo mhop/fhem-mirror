@@ -1,4 +1,23 @@
 
+//$(document).ready(FW_readingsGroupReadyFn);
+$(FW_readingsGroupReadyFn);
+
+function
+FW_readingsGroupReadyFn() {
+  // replace all informIds of the form devName-readingName with rgName-devName.readingName
+  $(".readingsGroup").each(function() {
+    var name = $(this).attr('id').split("-")[1];
+    $(this).find("[informId]").each(function() {
+      var informId = $(this).attr('informId');
+      var parts = informId.split("-");
+      if( parts[0] != name ) {
+        informId = name+'-'+informId.replace('-','.');
+        $(this).attr('informId', informId);
+      }
+    });
+  });
+}
+
 function
 FW_readingsGroupToggle(d) {
   var rg = document.getElementById( 'readingsGroup-'+d );
