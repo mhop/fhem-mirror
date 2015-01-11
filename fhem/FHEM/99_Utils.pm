@@ -13,58 +13,6 @@ Utils_Initialize($$)
 }
 
 sub
-getUniqueId()
-{
-  my ($err, $uniqueID) = getKeyValue("uniqueID");
-  return $uniqueID if(defined($uniqueID));
-  srand(time);
-  $uniqueID = join "",map { unpack "H*", chr(rand(256)) } 1..16;
-  setKeyValue("uniqueID", $uniqueID);
-  return $uniqueID;
-}
-
-sub
-getKeyValue($)
-{
-  my ($key) = @_;
-  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/uniqueID";
-  my ($err, @l) = FileRead($fName);
-  return ($err, undef) if($err);
-  for my $l (@l) {
-    return (undef, $1) if($l =~ m/^$key:(.*)/);
-  }
-  return (undef, undef);
-}
-
-sub
-setKeyValue($$)
-{
-  my ($key,$value) = @_;
-  my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/uniqueID";
-  my ($err, @old) = FileRead($fName);
-  my @new;
-  if($err) {
-    push(@new, "# This file is auto generated.",
-               "# Please do not modify, move or delete it.",
-               "");
-    @old = ();
-  }
-  
-  my $fnd;
-  foreach my $l (@old) {
-    if($l =~ m/^$key:/) {
-      $fnd = 1;
-      push @new, "$key:$value" if(defined($value));
-    } else {
-      push @new, $l;
-    }
-  }
-  push @new, "$key:$value" if(!$fnd && defined($value));
-
-  return FileWrite($fName, @new);
-}
-
-sub
 time_str2num($)
 {
   my ($str) = @_;
