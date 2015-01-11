@@ -72,6 +72,9 @@ my %DayHash;
 my @mode = ("WW","RED","NORM","H+WW","H+WW FS","ABSCHALT");
 my $temp_mode=0;
 
+#define LAN Hardware (1) or USB device (0)
+my $LAN_HW = 0;
+
 ######################################################################################
 sub VCONTROL_1ByteUParse($$);
 sub VCONTROL_1ByteSParse($$);
@@ -116,7 +119,7 @@ VCONTROL_Initialize($)
 }
 
 #####################################
-# define <name> VIESSMANN <port> <commad_config> [<interval>] 
+# define <name> VIESSMANN <port> <command_config> [<interval>] 
 
 sub
 VCONTROL_Define($$)
@@ -136,6 +139,10 @@ VCONTROL_Define($$)
   if (index($a[2], ':') == -1) {
      delete $hash->{USBDev};
      delete $hash->{FD};
+  }
+  else {
+    ###LAN Hardware found
+    $LAN_HW = 1;
   }
   DevIo_CloseDev($hash);
 
@@ -175,6 +182,7 @@ VCONTROL_Define($$)
   #Opening USB Device
   Log3($name, 3, "VCONTROL opening VCONTROL device $dev");
   
+  my $ret = undef;
       ###USB
   if (index($a[2], ':') == -1) {
 
@@ -208,17 +216,16 @@ VCONTROL_Define($$)
      
   }
   else {
-     DevIo_OpenDev($hash, 0, undef);
-     VCONTROL_DoInit($hash, undef);
+     $ret = DevIo_OpenDev($hash, 0, "VCONTROL_DoInit");
   }
 
-  
+ 
   #set Internal Timer on Polling Interval
    my $timer = gettimeofday()+1;
    Log3($name, 5, "VCONTROL set InternalTimer +1 to $timer");
 
   InternalTimer(gettimeofday()+1, "VCONTROL_Poll", $hash, 0);
-  return undef;
+  return $ret;
   
 }
 
@@ -316,7 +323,7 @@ VCONTROL_Clear($)
 sub
 VCONTROL_DoInit($$)
 {
-  #Initialisation -> Send one 0x04 so the heating started to send 0x05 Synchonity-Bytes
+  #Initialisation -> Send one 0x04 so the heating started to send 0x05 Synchronity-Bytes
   my ($hash,$po) = @_;
   my $name = $hash->{NAME};
   my $init = pack('H*', "04");
@@ -347,7 +354,6 @@ VCONTROL_DoInit($$)
 sub
 VCONTROL_Read($)
 {
-
   my ($hash) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 5,"VCONTROL_READ";
@@ -357,13 +363,14 @@ VCONTROL_Read($)
   #Read on Device
   my $mybuf = DevIo_SimpleRead($hash);
 
+  if ($LAN_HW == 0) {
   #USB device is disconnected try to connect again
   if(!defined($mybuf) || length($mybuf) == 0) {
     my $dev = $hash->{DeviceName};
     Log3 $name, 3,"VCONTROL: USB device $dev disconnected, waiting to reappear";
     $hash->{USBDev}->close();
     DoTrigger($name, "DISCONNECTED");
-
+    DevIo_Disconnected($hash);
     delete($hash->{USBDev});
     delete($selectlist{"$name.$dev"});
     $readyfnlist{"$name.$dev"} = $hash; # Start polling
@@ -373,6 +380,16 @@ VCONTROL_Read($)
     # and following opens block infinitely. Only a reboot helps.
     sleep(5);
     return "";
+  }
+  }
+  else {
+    if(!defined($mybuf) || length($mybuf) == 0) {
+    my $dev = $hash->{DeviceName};
+    Log3 $name, 3,"VCONTROL: LAN device $dev disconnected, waiting to reappear";
+    DevIo_Disconnected($hash);
+    $hash->{STATE} = "disconnected";
+    return "";
+  }
   }
 
   #msg read on device
@@ -697,12 +714,15 @@ VCONTROL_Ready($)
      }
   } else {
       $hash->{PARTIAL} = "";
-      DevIo_OpenDev($hash, 1, undef);
-      return undef if(!exists($hash->{FD}));
-      return undef if(!defined($_[0]->{TCPDev})); 
-      VCONTROL_DoInit($hash, undef);
-      DoTrigger($name, "CONNECTED");
-      return undef;
+      return DevIo_OpenDev($hash, 1, "VCONTROL_DoInit")
+                if($hash->{STATE} eq "disconnected");
+      #  This is relevant for windows/USB only
+      my $po = $hash->{USBDev};
+      my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+      if($po) {
+          ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+      }
+      return ($InBytes && $InBytes>0);
   }
    
 
@@ -1174,14 +1194,14 @@ sub VCONTROL_TimerConv($$){
 <a name="VCONTROL"></a>
 <h3>VCONTROL</h3>
 <ul>
-    VCONTROL is the fhem-Modul to control and read information from a VIESSMANN heating via Optolink-adapter.<br><br>
+    VCONTROL is a fhem-Modul to control and read information from a VIESSMANN heating via Optolink-adapter.<br><br>
     
     An Optolink-Adapter is necessary (USB or LAN), you will find information here:<br>
-    <a href="http://http://openv.wikispaces.com/">http://openv.wikispaces.com/</a><br><br>
+    <a href="http://openv.wikispaces.com/">http://openv.wikispaces.com/</a><br><br>
     
     Additionaly you need to know Memory-Adresses for the div. heating types (e.g. V200KW1, VScotHO1, VPlusHO1 ....),<br>
     that will be read by the module to get the measurements or to set the actual state.<br>
-    Additional information you will fin in the forum <a href="http://http://openv.wikispaces.com/">http://openv.wikispaces.com/</a> and on the following wiki page <a href="http://http://openv.wikispaces.com/">http://openv.wikispaces.com/</a><br><br><br>
+    Additional information you will find in the forum <a href="http://forum.fhem.de/index.php/topic,20280.0.html">http://forum.fhem.de/index.php/topic,20280.0.html</a> und auf der wiki Seite <a href="http://www.fhemwiki.de/wiki/Vitotronic_200_%28Viessmann_Heizungssteuerung%29">http://www.fhemwiki.de/wiki/Vitotronic_200_%28Viessmann_Heizungssteuerung%29</a><br><br><br>
     
     <a name="VCONTROLdefine"><b>Define</b></a>
     <ul>
@@ -1222,13 +1242,13 @@ sub VCONTROL_TimerConv($$){
         get &lt;name&gt; CONFIG<br><br>
         reload the module specific configfile<br><br>
 
-        More commands will be configured in the configuartion file.
+        More commands will be configured in the configuration file.
     </ul>
     <br><br>
 
     <a name="VCONTROLparameter"><b>configfile</b></a>
     <ul>
-       You will find Examples for the configuration file for the heating types V200KW1, VScotHO1, VPlusHO1 on the wiki page <a href="http://http://openv.wikispaces.com/">http://openv.wikispaces.com/</a>.<br><br>
+       You will find example configuration files for the heating types V200KW1, VScotHO1, VPlusHO1 on the wiki page <a href="http://www.fhemwiki.de/wiki/Vitotronic_200_%28Viessmann_Heizungssteuerung%29">http://www.fhemwiki.de/wiki/Vitotronic_200_%28Viessmann_Heizungssteuerung%29</a>.<br><br>
 
        The lines of the configuration file can have the following structure:<br><br>
 
@@ -1434,7 +1454,7 @@ sub VCONTROL_TimerConv($$){
     <ul>
        Im configfile hat man nun die folgenden Konfigurations M&ouml;glichkeiten.<br><br>
        
-       Beispieldateien f&uml;r die Ger&auml;te-Typen V200KW1, VScotHO1, VPlusHO1 sind auf der wiki Seite <a href="http://http://openv.wikispaces.com/">http://openv.wikispaces.com/</a> zu finden.<br><br>
+       Beispieldateien f&uml;r die Ger&auml;te-Typen V200KW1, VScotHO1, VPlusHO1 sind auf der wiki Seite <a href="http://www.fhemwiki.de/wiki/Vitotronic_200_%28Viessmann_Heizungssteuerung%29">http://www.fhemwiki.de/wiki/Vitotronic_200_%28Viessmann_Heizungssteuerung%29</a> zu finden.<br><br>
 
        <li>Zeilen die mit "#" beginnen sind Kommentar!<br></li>
        <li>Polling Commandos (POLL) zum Lesen von Werten k&ouml;nnen konfiguriert werden.<br></li>
