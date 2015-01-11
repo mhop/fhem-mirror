@@ -605,6 +605,7 @@ readingsGroup_2html($;$)
             $ret .= "<td $value_columns><div $cell_style0 $name_style class=\"dname\">$txt</div></td>" if( $show_names );
           }
         } else {
+          my $webCmdFn = 0;
           my $cmd = lookup2($hash->{helper}{commands},$name,$d,$txt);
 
           if( $cmd && $cmd =~ m/^([\w-]*):(\S*)?(\s\S*)?$/ ) {
@@ -632,20 +633,16 @@ readingsGroup_2html($;$)
               last if(defined($htmlTxt));
             }
 
-           if( $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
-              $txt = $1;
+            if( $htmlTxt && $htmlTxt =~ m/^<td>(.*)<\/td>$/ ) {
+              $htmlTxt = $1;
+             }
 
-              my $a = AttrVal($name, "alias", $name);
-              my $room = AttrVal($name, "room", "");
-              my $group = AttrVal($name, "group", "");
-              my $mapped = lookup($hash->{helper}{mapping},$name,$a,$set,"",$room,$group,$cell_row,undef);
-              if( defined($mapped) ) {
-                $txt =~ s/$set&nbsp;/$mapped&nbsp;/;
-              }
-            } elsif( $htmlTxt ) {
+            if( $htmlTxt ) {
               $txt = $htmlTxt;
+              $webCmdFn = 1;
             }
           }
+          ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd) if( !$webCmdFn );
         }
 
         my $informid = "";
@@ -798,21 +795,15 @@ readingsGroup_2html($;$)
               last if(defined($htmlTxt));
             }
 
-           if( $htmlTxt =~ m/$name-$set/ ) {
-             $htmlTxt =~ s/$name-$set/$d-$name.$n/g;
+           if( $htmlTxt && $htmlTxt =~ m/^<td>(.*)<\/td>$/ ) {
+              $htmlTxt = $1;
+             }
+           if( $htmlTxt && $htmlTxt =~ m/class='fhemWidget'/ ) {
+             $htmlTxt =~ s/class='fhemWidget'/class='fhemWidget' informId='$d-$name.$n'/;
              $informid = "";
            }
 
-           if( $htmlTxt && $htmlTxt =~ m/<td colspan='2'>(.*)<\/td>/s ) {
-              $v = $1;
-
-              my $mapped = lookup($hash->{helper}{mapping},$name,$a,$set,"",$room,$group,$cell_row,undef);
-              if( defined($mapped) ) {
-                $v =~ s/$set&nbsp;/$mapped&nbsp;/;
-              }
-              $v =~ s/(.*)&nbsp;// if( !$informid );
-              $webCmdFn = 1;
-            } elsif( $htmlTxt ) {
+           if( $htmlTxt ) {
               $v = $htmlTxt;
               $webCmdFn = 1;
             }
@@ -1170,7 +1161,7 @@ readingsGroup_Attr($$$;$)
       delete $hash->{alwaysTrigger};
     }
 
-  } elsif( grep { $attrName eq $_ }  @mapping_attrs ) {
+  } elsif( grep { $_ =~ m/$attrName(:.*)?/ }  @mapping_attrs ) {
     my $hash = $defs{$name};
 
     if( $cmd eq "set" ) {
