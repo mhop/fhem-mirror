@@ -324,7 +324,7 @@ attr Weather room Weather
 #attr Weather.weblink alias Weather Forecast
 #attr Weather.weblink room Weather
 
-define Display RSS jpg localhost ./demolog/layout
+define -ignoreErr Display RSS jpg localhost ./demolog/layout
 attr Display room System
 attr Display size 800x600
 attr Display bg ./demolog/pictures

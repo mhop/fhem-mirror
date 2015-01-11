@@ -71,7 +71,7 @@ sub IsDisabled($);
 sub IsDummy($);
 sub IsIgnored($);
 sub IsIoDummy($);
-sub LoadModule($);
+sub LoadModule($;$);
 sub Log($$);
 sub Log3($$$);
 sub OldTimestamp($);
@@ -139,7 +139,7 @@ sub CommandInform($$);
 sub CommandList($$);
 sub CommandModify($$);
 sub CommandQuit($$);
-sub CommandReload($$);
+sub CommandReload($$;$);
 sub CommandRename($$);
 sub CommandRereadCfg($$);
 sub CommandSave($$);
@@ -456,7 +456,7 @@ if(configDBUsed()) {
 
 } else {
   my $ret = CommandInclude(undef, $attr{global}{configfile});
-  $cfgRet .= "configfile: $ret\n" if($ret);
+  $cfgRet .= "configfile: $ret" if($ret);
 
   if($attr{global}{statefile} && -r $attr{global}{statefile}) {
     $ret = CommandInclude(undef, $attr{global}{statefile});
@@ -1522,15 +1522,15 @@ CommandGet($$)
 
 #####################################
 sub
-LoadModule($)
+LoadModule($;$)
 {
-  my ($m) = @_;
+  my ($m, $ignoreErr) = @_;
 
   if($modules{$m} && !$modules{$m}{LOADED}) {   # autoload
     my $o = $modules{$m}{ORDER};
-    my $ret = CommandReload(undef, "${o}_$m");
+    my $ret = CommandReload(undef, "${o}_$m", $ignoreErr);
     if($ret) {
-      Log 0, $ret;
+      Log 0, $ret if(!$ignoreErr);
       return "UNDEFINED";
     }
 
@@ -1553,6 +1553,12 @@ CommandDefine($$)
 {
   my ($cl, $def) = @_;
   my @a = split("[ \t][ \t]*", $def, 3);
+  my $ignoreErr;
+  if($a[0] eq "-ignoreErr") {   # RSS in fhem.cfg.demo, with no GD installed
+    $def =~ s/\s*-ignoreErr\s*//;
+    @a = split("[ \t][ \t]*", $def, 3);
+    $ignoreErr = 1;
+  }
   my $name = $a[0];
   return "Usage: define <name> <type> <type dependent arguments>"
   					if(int(@a) < 2);
@@ -1570,7 +1576,7 @@ CommandDefine($$)
     }
   }
 
-  my $newm = LoadModule($m);
+  my $newm = LoadModule($m, $ignoreErr);
   return "Cannot load module $m" if($newm eq "UNDEFINED");
   $m = $newm;
 
@@ -1992,9 +1998,9 @@ CommandList($$)
 
 #####################################
 sub
-CommandReload($$)
+CommandReload($$;$)
 {
-  my ($cl, $param) = @_;
+  my ($cl, $param, $ignoreErr) = @_;
   my %hash;
   $param =~ s,/,,g;
   $param =~ s,\.pm$,,g;
@@ -2022,7 +2028,7 @@ CommandReload($$)
     my $ret=do "$file";
     unlink($file) if($cfgDB eq 'X'); # delete temp file
     if(!$ret) {
-      Log 1, "reload: Error:Modul $param deactivated:\n $@";
+      Log 1, "reload: Error:Modul $param deactivated:\n $@" if(!$ignoreErr);
       return $@;
     }
 
@@ -2238,7 +2244,7 @@ CommandAttr($$)
     my $hash = $defs{$sdev};
     my $attrName = $a[1];
     if(!defined($hash)) {
-      push @rets, "Please define $sdev first";
+      push @rets, "Please define $sdev first" if($init_done);#define -ignoreErr
       next;
     }
 
