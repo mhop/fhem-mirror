@@ -1239,9 +1239,13 @@ SVG_render($$$$$$$$$;$$)
   my $w = $ow-$nr_left_axis*$axis_width-$nr_right_axis*$axis_width;
   my $h = $oh-2*$y;   # Rect size
 
-  my $filter = $srcDesc->{all};
-  $filter =~ s/[^: ]*:([^: ]):[^ ]*/$1/g;
-  $filter = AttrVal($parent_name, "longpollSVG", 0) ? "flog=\" $filter \"" : "";
+  my $filter = $srcDesc->{all}." ";
+  $filter =~ s/ [^: ]*:/ /g;
+  $filter =~ s/:[^ ]* / /g;
+  $filter =~ s/(^ | $)//g;
+  $filter =~ s/ /|/g;
+  $filter =~ s/"/./g;
+  $filter = AttrVal($parent_name, "longpollSVG", 0) ? "flog=\"$filter\"" : "";
 
   my %dataIdx;   # Build a reverse Index for the dataSource
 
@@ -1250,7 +1254,7 @@ SVG_render($$$$$$$$$;$$)
   # SVG Header
   my $svghdr = 'version="1.1" xmlns="http://www.w3.org/2000/svg" '.
                'xmlns:xlink="http://www.w3.org/1999/xlink" '.
-               'id="SVGPLOT_'.(++$SVG_id).'"'.$filter;
+               'id="SVGPLOT_'.(++$SVG_id).'" '.$filter;
   if(!$styleW) {
     SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
     SVG_pO '<!DOCTYPE svg>';
