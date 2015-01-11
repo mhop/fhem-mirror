@@ -774,7 +774,7 @@ FW_createTime(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).append('<div class="timeSlider">');
     var ts = $(newEl).find(".timeSlider");
 
-    hh = FW_createSlider(undefined, devName+"HH", ["slider", 0, 1, 12],
+    hh = FW_createSlider(undefined, devName+"HH", ["slider", 0, 1, 23],
                 hhmm[0], undefined, params, function(arg) { tSet(0, arg) });
     mm = FW_createSlider(undefined, devName+"MM", ["slider", 0, 5, 55],
                 hhmm[1], undefined, params, function(arg) { tSet(1, arg) });
