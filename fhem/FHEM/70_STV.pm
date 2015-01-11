@@ -180,10 +180,10 @@ sub STV_Define($$)
   $hash->{Host} = $args[2];
   if (defined $args[3]) { 
     $hash->{Port} = $args[3];
-    $hash->{".validcommands"} = "mute volume call sms date";
+    $hash->{".validcommands"} = "mute:on,off volume:slider,0,1,100 call sms date";
   } else {
     $hash->{Port} = 52235;
-    $hash->{".validcommands"} = "mute volume call sms date";
+    $hash->{".validcommands"} = "mute:on,off volume:slider,0,1,100 call sms date";
     Log3 undef, 3, "[STV] defined with host: $hash->{Host} port: $hash->{Port}";
   }
 
@@ -586,7 +586,7 @@ sub STV_52235($@)
   if ( $kind ne 0 ){
     connection($message, $TV);
   }else{
-    return "Unknown argument $name, choose one of mute volume call sms date";
+    return "Unknown argument $name, choose one of mute:on,off volume:slider,0,1,100 call sms date";
   }
 }
 
