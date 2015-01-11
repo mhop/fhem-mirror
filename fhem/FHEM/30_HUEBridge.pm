@@ -50,6 +50,8 @@ HUEBridge_Read($@)
 
   if( $id =~ m/^G(\d.*)/ ) {
     return HUEBridge_Call($hash, $chash, 'groups/' . $1, $obj);
+  } elsif( $id =~ m/^S(\d.*)/ ) {
+    return HUEBridge_Call($hash, $chash, 'sensors/' . $1, $obj);
   }
   return HUEBridge_Call($hash, $chash, 'lights/' . $id, $obj);
 }
@@ -299,8 +301,20 @@ HUEBridge_Get($@)
     $ret = sprintf( "%2s  %-15s %-15s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE", "LIGHTS" ) .$ret if( $ret );
     return $ret;
 
+  } elsif($cmd eq 'sensors') {
+    my $result =  HUEBridge_Call($hash, undef, 'sensors', undef);
+    my $ret = "";
+    foreach my $key ( sort {$a<=>$b} keys %$result ) {
+      my $code = $name ."-S". $key;
+      my $fhem_name ="";
+      $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      $ret .= sprintf( "%2i: %-15s %-15s %-15s\n", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
+    }
+    $ret = sprintf( "%2s  %-15s %-15s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE", "LIGHTS" ) .$ret if( $ret );
+    return $ret;
+
   } else {
-    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg";
+    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg sensors:noArg";
   }
 }
 
@@ -671,6 +685,20 @@ HUEBridge_dispatch($$$;$)
       if( !defined($type) ) {
         HUEBridge_Parse($hash,$json->{config});
 
+        if( defined($json->{sensors}) ) {
+          my $sensors = $json->{sensors};
+          foreach my $id ( keys %{$sensors} ) {
+            my $code = $name ."-S". $id;
+            my $chash = $modules{HUEDevice}{defptr}{$code};
+
+            if( defined($chash) ) {
+              HUEDevice_Parse($chash,$sensors->{$id});
+            } else {
+              Log3 $name, 4, "$name: message for unknow sensor received: $code";
+            }
+          }
+        }
+
         if( defined($json->{groups}) ) {
           my $groups = $json->{groups};
           foreach my $id ( keys %{$groups} ) {
@@ -687,7 +715,6 @@ HUEBridge_dispatch($$$;$)
 
         $type = 'lights';
         $json = $json->{lights};
-
       }
 
       if( $type eq 'lights' ) {
@@ -716,6 +743,9 @@ HUEBridge_dispatch($$$;$)
       HUEDevice_Parse($param->{chash},$json);
 
     } elsif( $type =~ m/^groups\/(\d*)$/ ) {
+      HUEDevice_Parse($param->{chash},$json);
+
+    } elsif( $type =~ m/^sensors\/(\d*)$/ ) {
       HUEDevice_Parse($param->{chash},$json);
 
     } elsif( $type =~ m/^lights\/(\d*)\/state$/ ) {
@@ -884,6 +914,8 @@ HUEBridge_HTTP_Request($$$@)
     list the devices known to the bridge.</li>
     <li>groups<br>
     list the groups known to the bridge.</li>
+    <li>sensors<br>
+    list the sensors known to the bridge.</li>
   </ul><br>
 
   <a name="HUEBridge_Set"></a>
