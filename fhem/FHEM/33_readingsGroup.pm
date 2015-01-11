@@ -473,7 +473,7 @@ readingsGroup_2html($;$)
   my $txt = AttrVal($d, "alias", $d);
   $txt = "<a href=\"$FW_ME$FW_subdir?detail=$d\">$txt</a>" if( $show_links );
   $ret .= "<tr><td><div class=\"devType\">$show_hide&nbsp;$txt</div></td></tr>" if( $show_heading );
-  $ret .= "<tr><td><table $style id='readingsGroup-$d' groupId=\"$group\" class=\"block wide\">";
+  $ret .= "<tr><td><table $style id='readingsGroup-$d' groupId=\"$group\" class=\"block wide readingsGroup\">";
   $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
 
   foreach my $device (@{$devices}) {
