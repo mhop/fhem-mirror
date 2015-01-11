@@ -518,7 +518,7 @@ FW_answerCall($)
     $iconPath =~ m/(.*)\.([^.]*)/;
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
 
-  } elsif($arg =~ m,^$FW_ME/(.*)/([^/]*)$,) {          # the "normal" case
+  } elsif($arg =~ m,^$FW_ME/(.*)/([^/]*)$, && !$data{FWEXT}{"/$1"}) {
     my ($dir, $ofile, $ext) = ($1, $2, "");
     $dir =~ s/\.\.//g;
     $dir =~ s,www/,,g; # Want commandref.html to work from file://...
