@@ -56,13 +56,15 @@ CUL_MAX_SetupCUL($)
     return 0;
   }
 
-  if(CUL_MAX_Check($hash) >= 152) {
+  my $version = CUL_MAX_Check($hash);
+  Log3 $hash, 3, "CUL_MAX_Check: Detected firmware version $version of the CUL-compatible IODev";
+  if($version >= 152) {
     #Doing this on older firmware disables MAX mode
     IOWrite($hash, "", "Za". $hash->{addr});
     #Append to initString, so this is resend if cul disappears and then reappears
     $hash->{IODev}{initString} .= "\nZa". $hash->{addr};
   }
-  if(CUL_MAX_Check($hash) >= 153) {
+  if($version >= 153) {
     #Doing this on older firmware disables MAX mode
     my $cmd = "Zw". CUL_MAX_fakeWTaddr($hash);
     IOWrite($hash, "", $cmd);
@@ -127,20 +129,30 @@ sub
 CUL_MAX_Check($@)
 {
   my ($hash) = @_;
-  return if(!defined($hash->{IODev}));
-  return if(!defined($hash->{IODev}{TYPE}));
-  return if($hash->{IODev}{TYPE} ne "CUL");
-  return if(!defined($hash->{IODev}{VERSION}));
+  if(!defined($hash->{IODev})) {
+    Log3 $hash, 1, "CUL_MAX_Check: No IODev found.";
+    return 0;
+  }
+
+  if(!defined($hash->{IODev}{VERSION})) {
+    Log3 $hash, 1, "CUL_MAX_Check: No IODev has no VERSION";
+    return 0;
+  }
+
   my $version = $hash->{IODev}{VERSION};
 
   #Looks like "V 1.49 CUL868"
-  $version =~ m/V (.*)\.(.*) .*/;
-  my ($major_version,$minorversion) = ($1, $2);
-  $version = 100*$major_version + $minorversion;
-  if($version < 154) {
-    Log3 $hash, 2, "You are using an old version of the CUL firmware, which has known bugs with respect to MAX! support. Please update.";
+  if($version =~ m/V (.*)\.(.*) .*/) {
+    my ($major_version,$minorversion) = ($1, $2);
+    $version = 100*$major_version + $minorversion;
+    if($version < 154) {
+      Log3 $hash, 2, "CUL_MAX_Check: You are using an old version of the CUL firmware, which has known bugs with respect to MAX! support. Please update.";
+    }
+    return $version;
+  } else {
+    Log3 $hash, 1, "CUL_MAX_Check: Could not correctly parse IODev->{VERSION} = '$version'";
+    return 0;
   }
-  return $version;
 }
 
 sub
