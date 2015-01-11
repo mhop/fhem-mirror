@@ -708,9 +708,18 @@ FW_answerCall($)
 
   ########################
   # JavaScripts
-  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
-  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery.min.js");
-  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery-ui.min.js");
+  my $jsTemplate =
+        '<script attr=\'%s\' type="text/javascript" src="%s"></script>';
+  FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/jquery.min.js");
+  FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/jquery-ui.min.js");
+
+  #######################
+  # "Own" JavaScripts + their Attributes
+  map { FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/$_") } @FW_fhemwebjs;
+  map {
+    my $n = $_; $n =~ s+.*/++; $n =~ s/.js$//; $n =~ s/fhem_//; $n .= "Param";
+    FW_pO sprintf($jsTemplate, AttrVal($FW_wname, $n, ""), "$FW_ME/$_");
+  } split(" ", AttrVal($FW_wname, "JavaScripts", ""));
 
   ########################
   # FW Extensions
@@ -720,18 +729,9 @@ FW_answerCall($)
       next if($h !~ m/HASH/ || !$h->{SCRIPT} || $h->{SCRIPT} =~ m+pgm2/jquery+);
       my $script = $h->{SCRIPT};
       $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
-      FW_pO sprintf($jsTemplate, $script);
+      FW_pO sprintf($jsTemplate, "", $script);
     }
   }
-
-  #######################
-  # Other JavaScripts + their Attributes
-  map { FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$_") } @FW_fhemwebjs;
-  $jsTemplate = '<script attr=\'%s\' type="text/javascript" src="%s"></script>';
-  map {
-    my $n = $_; $n =~ s+.*/++; $n =~ s/.js$//; $n =~ s/fhem_//; $n .= "Param";
-    FW_pO sprintf($jsTemplate, AttrVal($FW_wname, $n, ""), "$FW_ME/$_");
-  } split(" ", AttrVal($FW_wname, "JavaScripts", ""));
 
   my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
   my $gen = 'generated="'.(time()-1).'"';
