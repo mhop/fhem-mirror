@@ -97,7 +97,7 @@ HUEDevice_devStateIcon($)
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
 
   return undef if( !$hash );
-  return undef if( $hash->{helper}->{group} );
+  return undef if( $hash->{helper}->{devtype} );
 
   my $name = $hash->{NAME};
 
@@ -139,9 +139,12 @@ sub HUEDevice_Define($$)
 
   my @args = split("[ \t]+", $def);
 
-  $hash->{helper}->{group} = "";
+  $hash->{helper}->{devtype} = "";
   if( $args[2] eq "group" ) {
-    $hash->{helper}->{group} = "G";
+    $hash->{helper}->{devtype} = "G";
+    splice( @args, 2, 1 );
+  } elsif( $args[2] eq "sensor" ) {
+    $hash->{helper}->{devtype} = "S";
     splice( @args, 2, 1 );
   }
 
@@ -157,13 +160,13 @@ sub HUEDevice_Define($$)
   }
 
 
-  return "Usage: define <name> HUEDevice [group] <id> [interval]"  if(@args < 3);
+  return "Usage: define <name> HUEDevice [group|sensor] <id> [interval]"  if(@args < 3);
 
   my ($name, $type, $id, $interval) = @args;
 
   $hash->{STATE} = 'Initialized';
 
-  $hash->{ID} = $hash->{helper}->{group}.$id;
+  $hash->{ID} = $hash->{helper}->{devtype}.$id;
 
   AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
   if(defined($hash->{IODev}->{NAME})) {
@@ -191,7 +194,7 @@ sub HUEDevice_Define($$)
   $interval = 60 if( $interval && $interval < 10 );
 
   $args[3] = "" if( !defined( $args[3] ) );
-  if( !$hash->{helper}->{group} ) {
+  if( !$hash->{helper}->{devtype} ) {
     $hash->{DEF} = "$id $args[3]";
 
     $hash->{INTERVAL} = $interval;
@@ -216,9 +219,13 @@ sub HUEDevice_Define($$)
     my $icon_path = AttrVal("WEB", "iconPath", "default:fhemSVG:openautomation" );
     $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
 
-  } else {
+  } elsif( $hash->{helper}->{devtype} eq 'G' ) {
     $hash->{DEF} = "group $id $args[3]";
     $attr{$name}{delayedUpdate} = 1 if( !defined( $attr{$name}{delayedUpdate} ) );
+
+  } elsif( $hash->{helper}->{devtype} eq 'S' ) {
+    $hash->{DEF} = "sensor $id $args[3]";
+    $hash->{INTERVAL} = $interval;
 
   }
 
@@ -415,7 +422,7 @@ HUEDevice_Set($@)
 
   $hash->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 0);
 
-  if( $hash->{helper}->{group} ) {
+  if( $hash->{helper}->{devtype} eq 'G' ) {
     if( $aa[0] eq 'lights' ) {
       my @lights = ();
       for my $param (@aa[1..@aa-1]) {
@@ -434,12 +441,18 @@ HUEDevice_Set($@)
       return $result->{error}{description} if( $result->{error} );
 
     }
+  } elsif( $hash->{helper}->{devtype} eq 'S' ) {
+
+    if( $aa[0] eq "statusRequest" ) {
+      RemoveInternalTimer($hash);
+      HUEDevice_GetUpdate($hash);
+      return undef;
+    }
+
+    return "Unknown argument $aa[0], choose one of statusRequest:noArg";
   }
 
   if( $aa[0] eq 'rename' ) {
-
-Log 3, $hash->{ID};
-    return "can't rename group 0" if( $hash->{ID} eq 'G0' );
     my $new_name =  join( ' ', @aa[1..@aa-1]);
     my $obj = { 'name' => $new_name, };
 
@@ -487,7 +500,7 @@ Log 3, $hash->{ID};
 
   if( scalar keys %obj ) {
     my $result;
-    if( $hash->{helper}->{group} ) {
+    if( $hash->{helper}->{devtype} eq 'G' ) {
       $hash->{helper}->{update} = 1;
       $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/action",\%obj);
     } else {
@@ -517,7 +530,7 @@ Log 3, $hash->{ID};
 
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
   $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( $subtype =~ m/dimmer/ );
-  $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{group} && $subtype =~ m/dimmer/ );
+  $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{devtype} && $subtype =~ m/dimmer/ );
   if( defined($FW_webArgs{detail}) ) {
     $list .= " rgb" if( $subtype =~ m/color/ );
     $list .= " color:slider,2000,1,6500 ct" if( $subtype =~ m/ct|ext/ );
@@ -530,7 +543,7 @@ Log 3, $hash->{ID};
 
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( $subtype =~ m/dimmer/ );
 
-  $list .= " lights" if( $hash->{helper}->{group} );
+  $list .= " lights" if( $hash->{helper}->{devtype} eq 'G' );
   $list .= " rename";
 
   return SetExtensions($hash, $list, $name, @aa);
@@ -731,7 +744,7 @@ HUEDevice_GetUpdate($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  if( $hash->{helper}->{group} ) {
+  if( $hash->{helper}->{devtype} eq 'G' ) {
     my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
 
     if( !defined($result) ) {
@@ -745,6 +758,7 @@ HUEDevice_GetUpdate($)
     HUEDevice_Parse($hash,$result);
 
     return undef;
+  } elsif( $hash->{helper}->{devtype} eq 'S' ) {
   }
 
   if(!$hash->{LOCAL}) {
@@ -778,7 +792,7 @@ HUEDevice_Parse($$)
   $hash->{name} = $result->{'name'};
   $hash->{type} = $result->{'type'};
 
-  if( $hash->{helper}->{group} ) {
+  if( $hash->{helper}->{devtype} eq 'G' ) {
     $hash->{lights} = join( ",", @{$result->{lights}} ) if( $result->{lights} );
 
     foreach my $id ( @{$result->{lights}} ) {
@@ -791,11 +805,33 @@ HUEDevice_Parse($$)
     delete $hash->{helper}->{update};
 
     return undef;
+
   }
 
   $hash->{modelid} = $result->{modelid};
   $hash->{uniqueid} = $result->{uniqueid};
   $hash->{swversion} = $result->{swversion};
+
+  if( $hash->{helper}->{devtype} eq 'S' ) {
+
+    if( $result->{state} ) {
+      substr( $result->{state}{lastupdated}, 10, 1, ' ' );
+      if( $result->{state}{lastupdated} ne 'none' ) {
+        if( $result->{state}{buttonevent}
+            && ReadingsTimestamp($name,"state","") ne $result->{state}{lastupdated} ) {
+          readingsBeginUpdate($hash);
+          $hash->{".updateTimestamp"} = $result->{state}{lastupdated};
+          $hash->{CHANGETIME}[0] = $result->{state}{lastupdated};
+          readingsBulkUpdate($hash, "state", $result->{state}{buttonevent}, 1);
+          readingsEndUpdate($hash,1);
+          delete $hash->{CHANGETIME};
+        }
+      }
+    }
+
+    return undef;
+
+  }
 
 
   $attr{$name}{model} = $result->{modelid} if( !defined($attr{$name}{model}) && $result->{modelid} );
@@ -827,12 +863,15 @@ HUEDevice_Parse($$)
   if( !defined($attr{$name}{webCmd}) && defined($attr{$name}{subType}) ) {
     my $subtype = $attr{$name}{subType};
 
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "extcolordimmer" );
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $subtype eq "colordimmer" );
-    $attr{$name}{webCmd} = 'ct:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "ctdimmer" );
-    $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $subtype eq "dimmer" );
-    $attr{$name}{webCmd} = 'toggle:on:off' if( $subtype eq "switch" );
-    $attr{$name}{webCmd} = 'on:off' if( $hash->{helper}->{group} );
+    if( !$hash->{helper}->{devtype} ) {
+      $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "extcolordimmer" );
+      $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $subtype eq "colordimmer" );
+      $attr{$name}{webCmd} = 'ct:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "ctdimmer" );
+      $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $subtype eq "dimmer" );
+      $attr{$name}{webCmd} = 'toggle:on:off' if( $subtype eq "switch" );
+    } elsif( $hash->{helper}->{devtype} eq 'G' ) {
+      $attr{$name}{webCmd} = 'on:off';
+    }
   }
 
   readingsBeginUpdate($hash);
@@ -928,7 +967,7 @@ HUEDevice_Parse($$)
   <a name="HUEDevice_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; HUEDevice [group] &lt;id&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; HUEDevice [group|sensor] &lt;id&gt; [&lt;interval&gt;]</code><br>
     <br>
 
     Defines a device connected to a <a href="#HUEBridge">HUEBridge</a>.<br><br>
