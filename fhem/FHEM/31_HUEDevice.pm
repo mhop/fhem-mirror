@@ -212,8 +212,6 @@ sub HUEDevice_Define($$)
 
     $hash->{helper}{percent} = -1;
 
-    $hash->{helper}{RGB} = '';
-
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
     my $icon_path = AttrVal("WEB", "iconPath", "default:fhemSVG:openautomation" );
@@ -531,14 +529,9 @@ HUEDevice_Set($@)
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
   $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( $subtype =~ m/dimmer/ );
   $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{devtype} && $subtype =~ m/dimmer/ );
-  if( defined($FW_webArgs{detail}) ) {
-    $list .= " rgb" if( $subtype =~ m/color/ );
-    $list .= " color:slider,2000,1,6500 ct" if( $subtype =~ m/ct|ext/ );
-  } else {
-    $list .= " rgb:colorpicker,RGB" if( $subtype =~ m/color/ );
-    $list .= " color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( $subtype =~ m/ct|ext/ );
-  }
-  $list .= " hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( $subtype =~ m/color/ );
+  $list .= " rgb:colorpicker,RGB" if( $subtype =~ m/color/ );
+  $list .= " color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( $subtype =~ m/ct|ext/ );
+  $list .= " hue:colorpicker,HUE,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( $subtype =~ m/color/ );
   $list .= " alert:none,select,lselect";
 
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( $subtype =~ m/dimmer/ );
@@ -948,11 +941,11 @@ HUEDevice_Parse($$)
   $hash->{helper}{percent} = $percent;
 
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
-  readingsEndUpdate($hash,defined($hash->{LOCAL} ? 0 : 1));
 
-  my $RGB = CommandGet("","$name rgb");
-  CommandTrigger( "", "$name RGB: $RGB" ) if( $RGB ne $hash->{helper}{RGB} );
-  $hash->{helper}{RGB} = $RGB;
+  readingsEndUpdate($hash,1);
+
+  readingsSingleUpdate($hash,"rgb", CommandGet("","$name rgb"),1 );
+
 }
 
 1;
