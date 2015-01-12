@@ -625,8 +625,9 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
   var stp = parseFloat(vArr[2]);
   var max = parseFloat(vArr[3]);
   var flt = vArr[4];
-  currVal = (currVal == undefined) ?
-                min : parseFloat(currVal.replace(/[^\d.\-]/g, ""));
+  if(currVal != undefined)
+    currVal = currVal.replace(/[^\d.\-]/g, "");
+  currVal = (currVal==undefined || currVal=="") ?  min : parseFloat(currVal);
   if(max==min)
     return undefined;
   if(currVal < min || currVal > max)
