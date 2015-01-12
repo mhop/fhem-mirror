@@ -2206,13 +2206,17 @@ FW_makeEdit($$$)
 
 
 sub
-FW_longpollInfo($$$)
+FW_longpollInfo($$$$)
 {
-  my ($dev, $state, $html) = @_;
-  $dev =~ s/([\\"])/\\$1/g;
-  $state =~ s/([\\"])/\\$1/g;
-  $html =~ s/([\\"])/\\$1/g;
-  return "[\"$dev\",\"$state\",\"$html\"]";
+  my ($dev, $state, $html, $fmt) = @_;
+  if($fmt && $fmt eq "JSON") {
+    $dev =~ s/([\\"])/\\$1/g;
+    $state =~ s/([\\"])/\\$1/g;
+    $html =~ s/([\\"])/\\$1/g;
+    return "[\"$dev\",\"$state\",\"$html\"]";
+  } else {
+    return "$dev<<$state<<$html";
+  }
 }
 
 sub
@@ -2233,7 +2237,8 @@ FW_roomStatesForInform($$)
 
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink") {
-      push @data, FW_longpollInfo($dn, $defs{$dn}{STATE}, $txt);
+      push @data,
+           FW_longpollInfo($dn, $defs{$dn}{STATE}, $txt, $me->{inform}{fmt});
     }
   }
   my $data = join("\n", map { s/\n/ /gm; $_ } @data)."\n";
@@ -2279,7 +2284,7 @@ FW_Notify($$)
     if( !$modules{$defs{$dn}{TYPE}}{FW_atPageEnd} ) {
       my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
       ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
-      push @data, FW_longpollInfo($dn, $dev->{STATE}, $txt);
+      push @data, FW_longpollInfo($dn, $dev->{STATE}, $txt, $h->{fmt});
     }
 
     #Add READINGS
@@ -2291,8 +2296,9 @@ FW_Notify($$)
           next; #ignore 'set' commands
         }
         my ($readingName,$readingVal) = split(": ",$events->[$i],2);
-        push @data, FW_longpollInfo("$dn-$readingName",$readingVal,$readingVal);
-        push @data, FW_longpollInfo("$dn-$readingName-ts", $tn, $tn);
+        push @data, FW_longpollInfo("$dn-$readingName",
+                                        $readingVal,$readingVal, $h->{fmt});
+        push @data, FW_longpollInfo("$dn-$readingName-ts", $tn, $tn, $h->{fmt});
       }
     }
   }
@@ -2333,7 +2339,8 @@ FW_directNotify($$) # Notify without the event overhead (Forum #31293)
             $ntfy->{TYPE} ne "FHEMWEB" ||
             !$ntfy->{inform} ||
             !$ntfy->{inform}{devices}{$dev});
-    if(!addToWritebuffer($ntfy, FW_longpollInfo($dev, $msg, "")."\n")){
+    if(!addToWritebuffer($ntfy, 
+        FW_longpollInfo($dev, $msg, "", $ntfy->{inform}{fmt})."\n")) {
       my $name = $ntfy->{NAME};
       Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
       TcpServer_Close($ntfy);
