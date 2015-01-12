@@ -100,6 +100,7 @@ sub computeClientArray($$);
 sub concatc($$$);
 sub configDBUsed();
 sub createNtfyHash();
+sub createUniqueId();
 sub devspec2array($);
 sub doGlobalDef($);
 sub escapeLogLine($);
@@ -111,6 +112,7 @@ sub fhemTzOffset($);
 sub getAllAttr($);
 sub getAllGets($);
 sub getAllSets($);
+sub getUniqueId();
 sub latin1ToUtf8($);
 sub myrename($$);
 sub notifyRegexpChanged($$);
@@ -4009,9 +4011,19 @@ getUniqueId()
 {
   my ($err, $uniqueID) = getKeyValue("uniqueID");
   return $uniqueID if(defined($uniqueID));
-  srand(time);
-  $uniqueID = join "",map { unpack "H*", chr(rand(256)) } 1..16;
+ my ($uniqueID) = createUniqueId();
   setKeyValue("uniqueID", $uniqueID);
+  return $uniqueID;
+}
+
+my $srandUsed;
+sub
+createUniqueId()
+{
+  my $uniqueID;
+  srand(time) if(!$srandUsed);
+  $srandUsed = 1;
+  $uniqueID = join "",map { unpack "H*", chr(rand(256)) } 1..16;
   return $uniqueID;
 }
 
