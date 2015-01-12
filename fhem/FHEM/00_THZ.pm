@@ -758,7 +758,7 @@ sub THZ_ReadAnswer($)
 	my $count =1;
 	my $countmax = 80;
 	#$countmax = 80	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
-	while (((length($data) = 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m )) and ($count <= $countmax))
+	while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax))
 	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
 	  if(defined($buf1)) {
