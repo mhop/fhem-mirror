@@ -2,10 +2,9 @@
 # 00_THZ
 # $Id$
 # by immi 01/2015
-my $thzversion = "0.125";
+my $thzversion = "0.126";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
-# http://heatpumpmonitor.penz.name/heatpumpmonit	orwiki/
 ########################################################################################
 #
 #  This programm is free software; you can redistribute it and/or modify
@@ -288,10 +287,15 @@ my %getsonly439 = (
   );
 
 
-my %getsonly539 = (
-  "sFlowRate"                     => {cmd2=>"0A033B", cmd3=>"0A033B",     type =>"1clean", unit =>" cl/min"},
-  "sHumMaskingTime"               => {cmd2=>"0A064F", cmd3=>"0A033B",     type =>"1clean", unit =>" min"},
-  "sHumThreshold"		  => {cmd2=>"0A0650", cmd3=>"0A033B",     type =>"1clean", unit =>" %"},
+my %getsonly539 = (  #info from belu and godmorgon
+  "sFlowRate"                     => {cmd2=>"0A033B",   type =>"1clean", unit =>" cl/min"},
+  "sHumMaskingTime"               => {cmd2=>"0A064F",   type =>"1clean", unit =>" min"},
+  "sHumThreshold"		  => {cmd2=>"0A0650",   type =>"1clean", unit =>" %"},
+  "sOutputReduction"              => {cmd2=>"0A06A4",   type =>"1clean", unit =>" %"},
+  "sOutputIncrease"               => {cmd2=>"0A06A5",   type =>"1clean", unit =>" %"},
+  "sHumProtection"		  => {cmd2=>"0A09D1",   type =>"1clean", unit =>""},
+  "sSetHumidityMin"               => {cmd2=>"0A09D2",   type =>"1clean", unit =>" %"},
+  "sSetHumidityMax"               => {cmd2=>"0A09D3",   type =>"1clean", unit =>" %"}
  );
 %getsonly539=(%getsonly539, %getsonly439);
 
@@ -752,18 +756,18 @@ sub THZ_ReadAnswer($)
 	
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
-	my $countmax = 40;
-	$countmax = 80	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
-	while (($data =~ m/^01/) and ($data !~ m/1003$/m ) and ($count <= $countmax))
+	my $countmax = 80;
+	#$countmax = 80	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
+	while (((length($data) = 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m )) and ($count <= $countmax))
 	{ my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
-	  if(defined($buf1))
-	    {
+	  if(defined($buf1)) {
 	    $buf = ($buf . $buf1) ;
 	    $data =  uc(unpack('H*', $buf));
 	    Log3($hash->{NAME}, 5, "double read $count result with buf1  $data");
+	    $count ++;
 	    }
-	$count ++;
+	  else{ $count += 5; }
 	}
 	return ("WInterface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
@@ -1119,14 +1123,7 @@ my %parsinghash = (
               ]
 );
   
-  my ($hash,$message) = @_;
-  #$message= "A5FB00C50067010700DC011101B2000000E700AD00F3001C000000CE000000000063000000000000000000";
-  #$message=  "C3FB00C5006900EB00DD00F501AF000000E900B400E70004373A00CE1F1D00000065000000000000000000";
-  #$message= "46D101010017072F0322000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-  #$message= "99FBFDA8001700B60097026D00A6FDA8FDA8FFA500A52008110000000002BC000000000013001B00000000011003C4409C79B33FA624DE"
-  #$message= "E01700DA00D5006401A4019F0064020000006401A401";
-  #$message= "F9FBFDA8FFFC00B8009A021400A7FDA8FDA8FF8F00A82008110122012C02BC000F00160014000200000000010203CD40908DD33FA15811";
-  
+  my ($hash,$message) = @_;  
   #$message=  "eaFBfda8001601440108024901e6fda8fda8001c01176008110000000002bc000000000014001900000000014c05304600d58f3fd47ae207c500b1012a000001060144fff4ffde012300000000";
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
   my $length = length($message);
@@ -1229,11 +1226,16 @@ sub THZ_debugread($){
     ($err, $msg) = THZ_ReadAnswer($hash);  
     # send request
     THZ_Write($hash,  $cmdHex2);
-    select(undef, undef, undef, 0.05);
+    select(undef, undef, undef, 0.02);
     ($err, $msg) = THZ_ReadAnswer($hash);
+    #expected 1002; if not following if takes care
+    if ($msg eq "10") {
+      select(undef, undef, undef, 0.02);
+      ($err, $msg) = THZ_ReadAnswer($hash);
+     }  
     # ack datatranfer and read from the heatpump        
     THZ_Write($hash,  "10");
-    select(undef, undef, undef, 0.01);
+    select(undef, undef, undef, 0.02);
     ($err, $msg) = THZ_ReadAnswer($hash);
     THZ_Write($hash,  "10");
 
@@ -1248,7 +1250,7 @@ sub THZ_debugread($){
 		  close (MYFILE);
 		  Log3 $hash->{NAME}, 3, "$cmd  -  $msg";
     }    
-    select(undef, undef, undef, 0.250); #equivalent to sleep 250ms
+    select(undef, undef, undef, 1); #equivalent to sleep 1000ms
   }
 }
 
