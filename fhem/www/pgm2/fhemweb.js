@@ -401,8 +401,8 @@ FW_longpoll()
     since = FW_serverLastMsg + (FW_serverGenerated-FW_serverFirstMsg);
 
   var query = location.pathname+"?XHR=1"+
-                "&inform=type=status;filter="+filter+";since="+since+
-                "&timestamp="+new Date().getTime();
+              "&inform=type=status;filter="+filter+";since="+since+";fmt=JSON"+
+              "&timestamp="+new Date().getTime();
   query = addcsrf(query);
   FW_pollConn.open("GET", query, true);
   FW_pollConn.onreadystatechange = FW_doUpdate;
