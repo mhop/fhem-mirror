@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: configDB.pm use fhem function createUniqueId()
+             configDB.pm do not show 99_Utils.pm in „Edit files“
   - fix: CUL_MAX: fix usage of advanced culfw features on non-CUL devices
   - changed: 09_CUL_FHTTK: small update to the documentation in order to
              simulate the same
