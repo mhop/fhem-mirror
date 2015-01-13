@@ -573,6 +573,70 @@ logProxy_clipData($$$$;$)
   return $ret;
 }
 
+#parse plot data to array
+sub
+logProxy_data2Array($)
+{
+  my ($dp) = @_;
+
+  my @ret = ();
+  my $comment;
+
+  my ($dpl,$dpoff,$l) = (length($$dp), 0, "");
+  while($dpoff < $dpl) {                # using split instead is memory hog
+    my $ndpoff = index($$dp, "\n", $dpoff);
+    if($ndpoff == -1) {
+      $l = substr($$dp, $dpoff);
+    } else {
+      $l = substr($$dp, $dpoff, $ndpoff-$dpoff);
+    }
+
+    if($l =~ m/^#/) {
+      $comment .= "$l\n";
+    } else {
+      my ($d, $v) = split(" ", $l);
+
+      my $sec = SVG_time_to_sec($d);
+
+      push( @ret, [$sec, $v, $d] );
+    }
+
+    $dpoff = $ndpoff+1;
+    last if($ndpoff == -1);
+  }
+
+  return (\@ret,$comment);
+}
+#parse create plot data from array
+sub
+logProxy_array2Data($$)
+{
+  my ($array,$comment) = @_;
+  my $ret = "";
+
+  my $min = 999999;
+  my $max = -999999;
+  my $last;
+
+  return ($ret,$min,$max,$last) if( !ref($array) eq "ARRAY" );
+
+  foreach my $point ( @{$array} ) {
+    my @t = localtime($point->[0]);
+    my $timestamp = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+
+    my $value = $point->[1];
+    $min = $value if( $value < $min );
+    $max = $value if( $value > $max );
+    $last = $value;
+
+    $ret .= $timestamp . " " . $value ."\n";
+  }
+
+  $ret .= $comment;
+
+  return (\$ret,$min,$max,$last);
+}
+
 sub
 logProxy_Get($@)
 {
@@ -621,6 +685,7 @@ logProxy_Get($@)
       my $interpolate;
       my $clip;
       my $predict;
+      my $postFn;
 
       if( !defined($defs{$log_dev}) ) {
         Log3 $hash->{NAME}, 1, "$hash->{NAME}: $log_dev does not exist";
@@ -667,6 +732,9 @@ logProxy_Get($@)
           $predict = 0;
           $predict = $value if( defined($value) );
 
+        } elsif( $name eq "postFn" ) {
+          $postFn = $value;
+
         } else {
           Log3 $hash->{NAME}, 2, "$hash->{NAME}: line $i: $fld[0]: unknown option >$option<";
 
@@ -698,7 +766,32 @@ logProxy_Get($@)
       # clip extended query range to plot range
       if( $clip || defined($predict) ) {
         $$internal_data = logProxy_clipData($internal_data,$fromsec,$tosec,$interpolate,$predict);
+      }
 
+      #call postprocessing function
+      if( $postFn ) {
+        my($data,$comment) = logProxy_data2Array($internal_data);
+
+        no strict "refs";
+        my $d = eval {&{$postFn}($a[$i],$data)};
+        if( $@ ) {
+          Log3 $hash->{NAME}, 1, "$hash->{NAME}: $a[$i]: $@";
+          $ret .= "#$a[$i]\n";
+          next;
+        }
+        use strict "refs";
+        
+        $data = $d;
+        $main::data{"avg1"} = undef;
+        $main::data{"sum1"} = undef;
+        $main::data{"sum1"} = undef;
+        $main::data{"cnt1"} = int(@{$data});
+        $main::data{"currdate1"} = undef;
+        $main::data{"mindate1"} = undef;
+        $main::data{"maxdate1"} = undef;
+
+        $comment = "#$a[$i]\n";
+        ($internal_data,$main::data{"min1"}, $main::data{"max1"},$main::data{"currval1"}) = logProxy_array2Data($data,$comment);
       }
 
       if( $$internal_data ) {
@@ -715,7 +808,7 @@ logProxy_Get($@)
         $data{"maxdate$j"} = $main::data{"maxdate1"};
 
       } else {
-        $ret .= "#$column_specs\n";
+        $ret .= "#$a[$i]\n";
 
       }
 
@@ -1118,6 +1211,12 @@ logProxy_Get($@)
           <li>predict[=&lt;value&gt;]<br>
             no value -> extend the last plot value to now.<br>
             value -> extend the last plot value by &lt;value&gt; but maximal to now.<br></li>
+          <li>postFn='&lt;myPostFn&gt;'<br>
+            myPostFn is the name of a postprocessing function that is called after all processing of the data by logProxy
+            has been done. it is called with two arguments: the devspec line from the gplot file and a reference to a data
+            array containing the points of the plot. each point is an array with three components: the point in time in seconds,
+            the value at this point and the point in time in string form. the return value must return a reference to an array
+            of the same format. the third component of each point can be omittet and is not evaluated.<br></li>
         </ul>
       </li><br>
 
