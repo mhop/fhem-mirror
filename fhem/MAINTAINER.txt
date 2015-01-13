@@ -168,6 +168,7 @@ FHEM/55_PIFACE.pm            klaus.schauer        http://forum.fhem.de Einplatin
 FHEM/55_weco.pm              betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Unterstuetzende Dienste
+FHEM/57_CALVIEW.pm	     chris1284            http://forum.fhem.de CodeSchnipsel
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/59_OPENWEATHER.pm       tupol                http://forum.fhem.de Unterstuetzende Dienste (Link senden: http://forum.fhem.de/index.php?action=pm;sa=send;u=5432)
 FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstuetzende Dienste
