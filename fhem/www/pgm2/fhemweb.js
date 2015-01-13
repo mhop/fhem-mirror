@@ -507,6 +507,7 @@ FW_replaceWidget(oldEl, devName, vArr, currVal, reading, set, params, cmd)
 function
 FW_queryValue(cmd, el)
 {
+  log("FW_queryValue:"+cmd);
   var query = location.pathname+"?cmd="+cmd+"&XHR=1";
   query = addcsrf(query);
   var qConn = new XMLHttpRequest();
