@@ -1068,10 +1068,10 @@ SVG_getData($$$$$)
     FW_fC($cmd);
     if($showData) {
       $ret .= "\n$cmd\n\n";
-      $ret .= $$internal_data;
+      $ret .= $$internal_data if(ref $internal_data eq "SCALAR");
+
     } else {
       push(@da, $internal_data);
-
       for(my $i = 0; $i<=$s->{idx}; $i++) {
         my %h;
         foreach my $k (@keys) {
