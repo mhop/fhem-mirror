@@ -195,11 +195,11 @@ sub getsummery($)
 <ul><code>set myView intervall 300</code></ul><br>
 <b>Attribute</b>
 <li>maxreadings<br>
-        bestimmt die Anzahl der Termine als Readings
+        defines the number of max term as readings
 </li><br>
 <li>oldStyledReadings<br>
-		1 aktiviert die Termindarstellung im "alten" Format "2015.06.21-00:00" with value "Start of Summer"
-		0 aktivert die Standarddarstellung bdate, btime, usw 
+		1 readings look like "2015.06.21-00:00" with value "Start of Summer"
+		0 the default style of readings
 </li><br>
 =end html
 
@@ -207,7 +207,7 @@ sub getsummery($)
 
 <a name="CALVIEW"></a>
 <h3>CALVIEW</h3>
-<ul>Dieses Modul erstellt ein Device welches als Readings Termine eines Kalenders, basierend auf dem 57_Calendar.pm Module, besitzt.</ul>
+<ul>Dieses Modul erstellt ein Device welches als Readings Termine eines Kalenders, basierend auf dem 57_Calendar.pm Modul, besitzt.</ul>
 <b>Define</b>
 <ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername&gt; &lt;0 für modeStarted Termine; 1 für modeStarted;modeUpcoming Termine&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender 1</code></ul><br>
@@ -221,11 +221,11 @@ sub getsummery($)
 <ul><code>set myView intervall 300</code></ul><br>
 <b>Attributes</b>
 <li>maxreadings<br>
-        defines the number of max term as readings
+        bestimmt die Anzahl der Termine als Readings
 </li><br>
 <li>oldStyledReadings<br>
-		1 readings look like "2015.06.21-00:00" with value "Start of Summer"
-		0 the default style of readings
+		1 aktiviert die Termindarstellung im "alten" Format "2015.06.21-00:00" mit Wert "Start of Summer"
+		0 aktivert die Standarddarstellung bdate, btime, usw 
 </li><br>
 =end html_DE
 =cut
