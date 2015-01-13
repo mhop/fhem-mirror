@@ -605,4 +605,5 @@
 - Mon Dec 22 2014 (mattwire)
   - added new module 30_MilightBridge and 31_MilightDevice to support Milight LED lights/strips/controllers.
 
-
+- Tue Jan 13 2015 (chri1284)
+  - added new module 57_CALVIEW
