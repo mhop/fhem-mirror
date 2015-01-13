@@ -530,7 +530,7 @@ SVG_showData()
     return 1;
   }
   SVG_calcOffsets($d, $wl);
-  $FW_RET = SVG_getData($d, $SVG_devs{$d}{from}, $SVG_devs{$d}{to}, $srcDesc,1);
+  $FW_RET = SVG_getData($wl,$SVG_devs{$d}{from}, $SVG_devs{$d}{to}, $srcDesc,1);
   $FW_RET =~ s/\n/<br>/gs;
   return 1;
 }
