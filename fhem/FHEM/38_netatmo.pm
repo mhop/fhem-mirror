@@ -58,7 +58,7 @@ netatmo_Define($$)
 
     $hash->{Device} = $device;
 
-    $hash->{INTERVAL} = 60*5;
+    $hash->{INTERVAL} = 60*5 if( !$hash->{INTERVAL} );
 
     my $d = $modules{$hash->{TYPE}}{defptr}{"D$device"};
     return "device $device already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
@@ -123,7 +123,7 @@ netatmo_Define($$)
       $modules{$hash->{TYPE}}{defptr}{"D$device"} = $hash;
     }
 
-    $hash->{INTERVAL} = 60*15;
+    $hash->{INTERVAL} = 60*15 if( !$hash->{INTERVAL} );
 
   } elsif( ($a[2] eq "MODULE" && @a == 5 ) ) {
     $subtype = "MODULE";
@@ -134,7 +134,7 @@ netatmo_Define($$)
     $hash->{Device} = $device;
     $hash->{Module} = $module;
 
-    $hash->{INTERVAL} = 60*5;
+    $hash->{INTERVAL} = 60*5 if( !$hash->{INTERVAL} );
 
     my $d = $modules{$hash->{TYPE}}{defptr}{"M$module"};
     return "module $module already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
@@ -1027,7 +1027,7 @@ netatmo_Attr($$$)
   if( $attrName eq "interval" ) {
     my $hash = $defs{$name};
     $hash->{INTERVAL} = $attrVal;
-    $hash->{INTERVAL} = 60*5 if( !$attrVal );
+    $hash->{INTERVAL} = 60*5 if( !$hash->{INTERVAL} );
   } elsif( $attrName eq "disable" ) {
     my $hash = $defs{$name};
     RemoveInternalTimer($hash);
