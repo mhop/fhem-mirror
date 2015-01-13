@@ -4011,7 +4011,7 @@ getUniqueId()
 {
   my ($err, $uniqueID) = getKeyValue("uniqueID");
   return $uniqueID if(defined($uniqueID));
- my ($uniqueID) = createUniqueId();
+  $uniqueID = createUniqueId();
   setKeyValue("uniqueID", $uniqueID);
   return $uniqueID;
 }
