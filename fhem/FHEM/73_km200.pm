@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0035 2015-01-06 20:00:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0036 2015-01-13 16:00:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -40,94 +40,107 @@
 #                                               CHANGELOG
 #
 #     Version	Date		Programmer			Subroutine						Description of Change
-#		1.00	28.08.2014	Sailor				All								Initial Release for collaborative programming work
-#		1.01	13.10.2014	Furban				km200_Define					Correcting "if (int(@a) == 6))" into "if (int(@a) == 6)"
-#		1.01	13.10.2014	Furban				km200_Define					Changing "if ($url =~ m/^((\d\d\d[01]\d\d2[0-4]\d25[0-5])\.){3}(\d\d\d[01]\d\d2[0-4]\d25[0-5])$/)" into "if ($url =~ m/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/)"
-#		1.02	20.10.2014	Sailor              km200_Encrypt       			Swapping over to Crypt::Rijndael
-#		1.02	20.10.2014	Sailor              km200_Decrypt       			Swapping over to Crypt::Rijndael
-#		1.03	21.10.2014	Sailor              All                 			Improving log3 functions for debugging
-#		1.04	22.10.2014	Sailor              All                 			New function for get status and implementing export to Readings
-#		1.05	23.10.2014	Sailor              km200_Define					Minimum interval changed to 20s since polling procedure lasts about 10s
-#		1.05	23.10.2014	Sailor              km200_Get						New subroutine to receive individual data adhoc
-#		1.06	25.10.2014	Sailor              km200_Set						First try
-#		1.07	26.10.2014	Nobody0472          ALL           					Add FailSafe & Error Handling + KM50 + Interval in Definition
-#		1.08    27.10.2014	Sailor				km200_GetData					Trying out whether 	"my $options = HTTP::Headers->new("Accept" => "application/json","User-Agent" => "TeleHeater/2.2.3", "agent" => "TeleHeater/2.2.3");" is the same as "$ua->agent('TeleHeater/2.2.3');"
-#		1.08    27.10.2014	Sailor				km200_Define					Lot's of commenting in order to improve readability	:-)
-#		1.08    27.10.2014	Sailor				km200_CompleteDataInit			Improvement of console output for easier debugging
-#		1.08    27.10.2014	Sailor				=pod							First Issue of description added
-#		1.09    27.10.2014	Sailor				km200_GetData					Try-out Failed and original code re enabled for: "Trying out whether "my $options = HTTP::Headers->new("Accept" => "application/json","User-Agent" => "TeleHeater/2.2.3", "agent" => "TeleHeater/2.2.3");" is the same as "$ua->agent('TeleHeater/2.2.3');""
-#		1.09    27.10.2014	Nobody0472			km200_Attr						First Issue
-#		1.09    27.10.2014	Sailor				km200_Attr						Adapted to double interval attributes "IntervalDynVal" and "IntervalStatVal"
-#		1.09    27.10.2014	Sailor				km200_Define					Adapted to double interval attributes "IntervalDynVal" and "IntervalStatVal" and deleted interval of being imported from the define line.
-#		1.09    27.10.2014	Sailor				km200_Define					Created list of known static services
-#		1.09    27.10.2014	Sailor				km200_Define					Calculated a list of responding services which are not static = responding dynamic services
-#		1.09    27.10.2014	Sailor				km200_CompleteDynData			Subroutine km200_CompleteData renamed to "km200_CompleteDynData" and only downloading responding dynamic services
-#		1.09    27.10.2014	Sailor				km200_CompleteStatData			Subroutine "km200_CompleteStatData" created only downloading responding static services
-#		1.10    28.10.2014	Sailor				km200_Define					Attribute check moved to km200_Attr
-#		1.10    28.10.2014	Sailor				km200_Attr						Attribute check included
-#		1.10    28.10.2014	Sailor				All								Clear-ups for comments and unused debug - print commands
-#		1.10    28.10.2014	Sailor				km200_Define					Decoding of passwords with base64 implemented to avoid bare passwords in fhem.cfg
-#		1.11    31.10.2014	Sailor				km200_Define					Added "/heatingCircuits/hc2" and subordinates 
-#		1.11    31.10.2014	Sailor				km200_CompleteDynData			First try-outs with fork() command - FAILED! All fork() commands deleted
-#		1.12	04.11.2014	Sailor	----------- Nearly all subroutines renamed! -----------------------------------------------------------------------------------------------------------------------
-#		1.12    04.11.2014	Sailor				All								Integration of  HttpUtils_NonblockingGet(). Nearly all Subroutines renamed due to new functionality
-#		1.13    05.11.2014	Sailor				All								Clearing up "print" and "log" command
-#		1.13    05.11.2014	Sailor				km200_ParseHttpResponseInit		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
-#		1.13    05.11.2014	Sailor				km200_ParseHttpResponseDyn		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
-#		1.13    05.11.2014	Sailor				km200_ParseHttpResponseStat		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
-#		1.13    05.11.2014	Sailor				km200_GetSingleService			New function used to obtain single value: HttpUtils_BlockingGet()
-#		1.13    05.11.2014	Sailor				km200_PostSingleService			New function used to write  single value: HttpUtils_BlockingGet() (Yes, even called "get" in the end, it allows to write (POST) as well
-#		1.14    06.11.2014	Sailor				km200_PostSingleService			Set value works! But only if no background download of dynamic or static values is active the same time
-#		1.15    06.11.2014	Sailor				km200_Get						Creating proper hash out of array of responding services
-#		1.15    07.11.2014	Sailor				km200_Set						Creating proper hash out of array of writeable services
-#		1.15    07.11.2014	Sailor				km200_Initialize				Adding DbLog_splitFn
-#		1.15    07.11.2014	Sailor				km200_DbLog_splitFn				First try-out. print function temporarily disabled
-#		1.15    07.11.2014	Sailor				All								Adding some print-commands for debugging
-#		1.15    07.11.2014	Sailor				km200_Set						Starting with blocking flags
-#		1.16    09.11.2014	Sailor				km200_GetDynService				Additional Log for debugging added
-#		1.16    09.11.2014	Sailor				km200_GetStatService			Additional Log for debugging added
-#		1.17    10.11.2014	Sailor				km200_Initialize				Corrected DbLog entry to $hash->{DbLog_splitFn}  = "km200_DbLog_splitFn";
-#		1.17    10.11.2014	Sailor				km200_Define					Password logging deleted. Too dangerous as soon a user posts its log seeking for help since gateway password cannot be changed
-#		1.17    10.11.2014	Sailor				km200_Define					Adding $hash->{DELAYDYNVAL} and $hash->{DELAYSTATVAL} to delay start of timer
-#		1.17    10.11.2014	Sailor				km200_Attr						Adding $hash->{DELAYDYNVAL} and $hash->{DELAYSTATVAL} to delay start of timer
-#		1.17    10.11.2014	Sailor				km200_PostSingleService			Error handling 
-#		1.17    10.11.2014	Sailor				km200_GetSingleService			Error handling 
-#		1.17    10.11.2014	Sailor				km200_Define					Added additional STATE information
-#		1.17    10.11.2014	Sailor				km200_GetDynService				Added additional STATE information
-#		1.17    10.11.2014	Sailor				km200_GetStatService			Added additional STATE information
-#		1.18    10.11.2014	Sailor				km200_Initialize				Implementing polling time-out attribute in $hash
-#		1.18    10.11.2014	Sailor				km200_Define					Implementing polling time-out attribute in $hash
-#		1.18    10.11.2014	Sailor				km200_Attr						Implementing polling time-out attribute in $hash
-#		1.18    10.11.2014	Sailor				km200_PostSingleService			Implementing polling time-out attribute in $hash
-#		1.18    10.11.2014	Sailor				km200_GetSingleService			Implementing polling time-out attribute in $hash
-#		1.18    10.11.2014	Sailor				km200_GetInitService			Implementing polling time-out attribute in $hash
-#		1.18    10.11.2014	Sailor				km200_GetDynService				Implementing polling time-out attribute in $hash
-#		1.18    10.11.2014	Sailor				km200_GetStatService			Implementing polling time-out attribute in $hash
-#		1.19    14.11.2014	Sailor				km200_GetInitService			Log Level for data not being available downgraded to Level 4		
-#		1.19    14.11.2014	Sailor				km200_GetSingleService			Log Level for data not being available downgraded to Level 4
-#		1.19    14.11.2014	Sailor				=pod							Description updated
-#		1.20    14.11.2014	Sailor				All							    Implement Console-Printouts only if attribute "ConsoleMessage" is set
-#		1.21    09.12.2014	Sailor				km200_GetDynService				Catching JSON parsing errors in order to prevent fhem crashes
-#		1.21    09.12.2014	Sailor				km200_GetStatService			Catching JSON parsing errors in order to prevent fhem crashes
-#		1.21    09.12.2014	Sailor				km200_GetInitService			Catching JSON parsing errors in order to prevent fhem crashes
-#		1.21    09.12.2014	Sailor				km200_GetSingleService			Catching JSON parsing errors in order to prevent fhem crashes
-#		1.22    09.12.2014	Sailor				All								Small format corrections
-#		1.23    12.12.2014	Sailor				km200_Define					Swapping service for test of communication from "/system/brand" to "/gateway/DateTime"
-#		1.24    12.12.2014	Sailor				km200_Initialize				Deactivating $hash->{DbLog_splitFn}
-#		1.25    07.01.2015	Sailor				Comments						Updating comments based on created WIKI
-#		1.25    07.01.2015	Sailor				km200_Attr						BugFix around ConsoleMessage Attribute
-#		1.25    07.01.2015	Sailor				All								Log Message of verbose level 2 improved
-#		1.25    07.01.2015	Sailor				=pod							Bugfix to be joined in commandref
+#		0010	28.08.2014	Sailor				All								Initial Release for collaborative programming work
+#		0011	13.10.2014	Furban				km200_Define					Correcting "if (int(@a) == 6))" into "if (int(@a) == 6)"
+#		0011	13.10.2014	Furban				km200_Define					Changing "if ($url =~ m/^((\d\d\d[01]\d\d2[0-4]\d25[0-5])\.){3}(\d\d\d[01]\d\d2[0-4]\d25[0-5])$/)" into "if ($url =~ m/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/)"
+#		0012	20.10.2014	Sailor              km200_Encrypt       			Swapping over to Crypt::Rijndael
+#		0012	20.10.2014	Sailor              km200_Decrypt       			Swapping over to Crypt::Rijndael
+#		0013	21.10.2014	Sailor              All                 			Improving log3 functions for debugging
+#		0014	22.10.2014	Sailor              All                 			New function for get status and implementing export to Readings
+#		0015	23.10.2014	Sailor              km200_Define					Minimum interval changed to 20s since polling procedure lasts about 10s
+#		0015	23.10.2014	Sailor              km200_Get						New subroutine to receive individual data adhoc
+#		0016	25.10.2014	Sailor              km200_Set						First try
+#		0017	26.10.2014	Nobody0472          ALL           					Add FailSafe & Error Handling + KM50 + Interval in Definition
+#		0018    27.10.2014	Sailor				km200_GetData					Trying out whether 	"my $options = HTTP::Headers->new("Accept" => "application/json","User-Agent" => "TeleHeater/2.2.3", "agent" => "TeleHeater/2.2.3");" is the same as "$ua->agent('TeleHeater/2.2.3');"
+#		0018    27.10.2014	Sailor				km200_Define					Lot's of commenting in order to improve readability	:-)
+#		0018    27.10.2014	Sailor				km200_CompleteDataInit			Improvement of console output for easier debugging
+#		0018    27.10.2014	Sailor				=pod							First Issue of description added
+#		0019    27.10.2014	Sailor				km200_GetData					Try-out Failed and original code re enabled for: "Trying out whether "my $options = HTTP::Headers->new("Accept" => "application/json","User-Agent" => "TeleHeater/2.2.3", "agent" => "TeleHeater/2.2.3");" is the same as "$ua->agent('TeleHeater/2.2.3');""
+#		0019    27.10.2014	Nobody0472			km200_Attr						First Issue
+#		0019    27.10.2014	Sailor				km200_Attr						Adapted to double interval attributes "IntervalDynVal" and "IntervalStatVal"
+#		0019    27.10.2014	Sailor				km200_Define					Adapted to double interval attributes "IntervalDynVal" and "IntervalStatVal" and deleted interval of being imported from the define line.
+#		0019    27.10.2014	Sailor				km200_Define					Created list of known static services
+#		0019    27.10.2014	Sailor				km200_Define					Calculated a list of responding services which are not static = responding dynamic services
+#		0019    27.10.2014	Sailor				km200_CompleteDynData			Subroutine km200_CompleteData renamed to "km200_CompleteDynData" and only downloading responding dynamic services
+#		0019    27.10.2014	Sailor				km200_CompleteStatData			Subroutine "km200_CompleteStatData" created only downloading responding static services
+#		0020    28.10.2014	Sailor				km200_Define					Attribute check moved to km200_Attr
+#		0020    28.10.2014	Sailor				km200_Attr						Attribute check included
+#		0020    28.10.2014	Sailor				All								Clear-ups for comments and unused debug - print commands
+#		0020    28.10.2014	Sailor				km200_Define					Decoding of passwords with base64 implemented to avoid bare passwords in fhem.cfg
+#		0021    31.10.2014	Sailor				km200_Define					Added "/heatingCircuits/hc2" and subordinates 
+#		0021    31.10.2014	Sailor				km200_CompleteDynData			First try-outs with fork() command - FAILED! All fork() commands deleted
+#		0022	04.11.2014	Sailor	----------- Nearly all subroutines renamed! -----------------------------------------------------------------------------------------------------------------------
+#		0022    04.11.2014	Sailor				All								Integration of  HttpUtils_NonblockingGet(). Nearly all Subroutines renamed due to new functionality
+#		0023    05.11.2014	Sailor				All								Clearing up "print" and "log" command
+#		0023    05.11.2014	Sailor				km200_ParseHttpResponseInit		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
+#		0023    05.11.2014	Sailor				km200_ParseHttpResponseDyn		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
+#		0023    05.11.2014	Sailor				km200_ParseHttpResponseStat		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
+#		0023    05.11.2014	Sailor				km200_GetSingleService			New function used to obtain single value: HttpUtils_BlockingGet()
+#		0023    05.11.2014	Sailor				km200_PostSingleService			New function used to write  single value: HttpUtils_BlockingGet() (Yes, even called "get" in the end, it allows to write (POST) as well
+#		0024    06.11.2014	Sailor				km200_PostSingleService			Set value works! But only if no background download of dynamic or static values is active the same time
+#		0025    06.11.2014	Sailor				km200_Get						Creating proper hash out of array of responding services
+#		0025    07.11.2014	Sailor				km200_Set						Creating proper hash out of array of writeable services
+#		0025    07.11.2014	Sailor				km200_Initialize				Adding DbLog_splitFn
+#		0025    07.11.2014	Sailor				km200_DbLog_splitFn				First try-out. print function temporarily disabled
+#		0025    07.11.2014	Sailor				All								Adding some print-commands for debugging
+#		0025    07.11.2014	Sailor				km200_Set						Starting with blocking flags
+#		0026    09.11.2014	Sailor				km200_GetDynService				Additional Log for debugging added
+#		0026    09.11.2014	Sailor				km200_GetStatService			Additional Log for debugging added
+#		0027    10.11.2014	Sailor				km200_Initialize				Corrected DbLog entry to $hash->{DbLog_splitFn}  = "km200_DbLog_splitFn";
+#		0027    10.11.2014	Sailor				km200_Define					Password logging deleted. Too dangerous as soon a user posts its log seeking for help since gateway password cannot be changed
+#		0027    10.11.2014	Sailor				km200_Define					Adding $hash->{DELAYDYNVAL} and $hash->{DELAYSTATVAL} to delay start of timer
+#		0027    10.11.2014	Sailor				km200_Attr						Adding $hash->{DELAYDYNVAL} and $hash->{DELAYSTATVAL} to delay start of timer
+#		0027    10.11.2014	Sailor				km200_PostSingleService			Error handling 
+#		0027    10.11.2014	Sailor				km200_GetSingleService			Error handling 
+#		0027    10.11.2014	Sailor				km200_Define					Added additional STATE information
+#		0027    10.11.2014	Sailor				km200_GetDynService				Added additional STATE information
+#		0027    10.11.2014	Sailor				km200_GetStatService			Added additional STATE information
+#		0028    10.11.2014	Sailor				km200_Initialize				Implementing polling time-out attribute in $hash
+#		0028    10.11.2014	Sailor				km200_Define					Implementing polling time-out attribute in $hash
+#		0028    10.11.2014	Sailor				km200_Attr						Implementing polling time-out attribute in $hash
+#		0028    10.11.2014	Sailor				km200_PostSingleService			Implementing polling time-out attribute in $hash
+#		0028    10.11.2014	Sailor				km200_GetSingleService			Implementing polling time-out attribute in $hash
+#		0028    10.11.2014	Sailor				km200_GetInitService			Implementing polling time-out attribute in $hash
+#		0028    10.11.2014	Sailor				km200_GetDynService				Implementing polling time-out attribute in $hash
+#		0028    10.11.2014	Sailor				km200_GetStatService			Implementing polling time-out attribute in $hash
+#		0029    14.11.2014	Sailor				km200_GetInitService			Log Level for data not being available downgraded to Level 4		
+#		0029    14.11.2014	Sailor				km200_GetSingleService			Log Level for data not being available downgraded to Level 4
+#		0029    14.11.2014	Sailor				=pod							Description updated
+#		0030    14.11.2014	Sailor				All							    Implement Console-Printouts only if attribute "ConsoleMessage" is set
+#		0031    09.12.2014	Sailor				km200_GetDynService				Catching JSON parsing errors in order to prevent fhem crashes
+#		0031    09.12.2014	Sailor				km200_GetStatService			Catching JSON parsing errors in order to prevent fhem crashes
+#		0031    09.12.2014	Sailor				km200_GetInitService			Catching JSON parsing errors in order to prevent fhem crashes
+#		0031    09.12.2014	Sailor				km200_GetSingleService			Catching JSON parsing errors in order to prevent fhem crashes
+#		0032    09.12.2014	Sailor				All								Small format corrections
+#		0033    12.12.2014	Sailor				km200_Define					Swapping service for test of communication from "/system/brand" to "/gateway/DateTime"
+#		0034    12.12.2014	Sailor				km200_Initialize				Deactivating $hash->{DbLog_splitFn}
+#		0035    07.01.2015	Sailor				Comments						Updating comments based on created WIKI
+#		0035    07.01.2015	Sailor				km200_Attr						BugFix around ConsoleMessage Attribute
+#		0035    07.01.2015	Sailor				All								Log Message of verbose level 2 improved
+#		0035    07.01.2015	Sailor				=pod							Bug-fix to be joined in commandref
+#		0036    13.01.2015	Sailor				Comments						Switched version system to fhem 4-digit version number scheme
+#		0036    13.01.2015	Sailor				km200_Define					Switched version system to fhem 4-digit version number scheme
+#		0036    13.01.2015	Sailor				km200_Define					Implementing DoNotPoll attribute
+#		0036    13.01.2015	Sailor				km200_Attribute					Implementing DoNotPoll attribute
+#		0036    13.01.2015	Sailor				km200_GetInitService			Implementing DoNotPoll attribute
+#		0036    13.01.2015	Sailor				km200_ParseHttpResponseInit		Implementing DoNotPoll attribute
+#		0036    13.01.2015	Sailor				km200_Initialize				Try-out DbLog Split (DbLog_Split is currently disabled)
+#		0036    13.01.2015	Sailor				km200_Define					Preparing DbLog Split
+#		0036    13.01.2015	Sailor				km200_DbLog_splitFn				Try-out DbLog Split
+#		0036    13.01.2015	Sailor				km200_GetSingleService			Preparing DbLog Split
+#		0036    13.01.2015	Sailor				km200_GetInitService			Preparing DbLog Split
+#		0036    13.01.2015	Sailor				km200_GetDynService				Preparing DbLog Split
+#		0036    13.01.2015	Sailor				km200_GetStatService			Preparing DbLog Split
+#		0036    13.01.2015	Sailor				=pod							Correction of errors and German description added
 ########################################################################################################################
 
 
 ########################################################################################################################
 # List of open Problems:
 #
-# *Many values in readings make no sense at all. 
-#  SOLUTION: Manual disable values by user attribute that are of no use.
-#
 # *DbLog: X_DbLog_splitFn not completely implemented in order to hand over the units of the readings to DbLog database
+#         Unfortunately the global %hash of this module will not be transferred to the DbLog function. Therefore this 
+#         function is useless.
 #
 ########################################################################################################################
 
@@ -171,6 +184,7 @@ sub km200_Initialize($)
 						       "IntervalStatVal " .
 						       "PollingTimeout " .
 							   "ConsoleMessage " .
+							   "DoNotPoll " .
 						       $readingFnAttributes;
 }
 ####END####### Initialize module ###############################################################################END#####
@@ -186,14 +200,14 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "v1.25";
+	my $ModuleVersion           = "0036";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
 
 	Log3 $name, 5, $name. " : km200 - Starting to define module with version: " . $ModuleVersion;
 		
-	###START###### Define provided services of gateway ########################################################START####
+	###START###### Define known services of gateway ###########################################################START####
 	my @KM200_AllServices = (
 	"/",
 	"/gateway",
@@ -316,6 +330,7 @@ sub km200_Define($$)
 	"/system/appliance/ChimneySweeper",
 	"/system/appliance/CHpumpModulation",
 	"/system/appliance/flameCurrent",
+	"/system/appliance/flameStatus",
 	"/system/appliance/gasAirPressure",
 	"/system/appliance/nominalBurnerLoad",
 	"/system/appliance/numberOfStarts",
@@ -358,7 +373,6 @@ sub km200_Define($$)
 	
 	my @KM200_StatServices = (
 	"/gateway/uuid",
-	"/gateway/instAccess",
 	"/gateway/versionFirmware",
 	"/gateway/versionHardware",
 	"/system/brand",
@@ -366,7 +380,7 @@ sub km200_Define($$)
 	"/system/info",
 	"/system/systemType"
 	);
-	####END####### Define provided services of gateway #########################################################END#####
+	####END####### Define known services of gateway ############################################################END#####
 
 	
     ###START### Check whether all variables are available #####################################################START####
@@ -502,6 +516,7 @@ sub km200_Define($$)
 	  $hash->{temp}{ServiceCounterInit}         = 0;
 	  $hash->{temp}{ServiceCounterDyn}          = 0;
 	  $hash->{temp}{ServiceCounterStat}         = 0;
+	  $hash->{temp}{ServiceDbLogSplitHash}      = ();
 	  $hash->{status}{FlagInitRequest}          = false;
 	  $hash->{status}{FlagGetRequest}           = false;
 	  $hash->{status}{FlagSetRequest}           = false;
@@ -513,10 +528,12 @@ sub km200_Define($$)
 	@{$hash->{Secret}{KM200STATSERVICES}}       = @KM200_StatServices;
 	@{$hash->{Secret}{KM200RESPONDINGSERVICES}} = ();
 	@{$hash->{Secret}{KM200WRITEABLESERVICES}}  = ();
+	@{$hash->{Secret}{KM200DONOTPOLL}}  		= ();
 	####END####### Writing values to global hash ################################################################END#####
 
 
 	###START###### For Debugging purpose only ##################################################################START####  
+	if ($hash->{CONSOLEMESSAGE} == true) {print("\n");}
 	Log3 $name, 5, $name. " : km200 - Define H                              : " .$hash;
 	Log3 $name, 5, $name. " : km200 - Define D                              : " .$def;
 	Log3 $name, 5, $name. " : km200 - Define A                              : " .@a;
@@ -553,26 +570,14 @@ sub km200_Define($$)
 		Log3 $name, 5, $name. " : km200 - /gateway/DateTime              : " .$Km200Info->{value};	## Communication OK and service is available ##
 	}
 	####END####### Check whether communication to the physical unit is possible ################################END#####
-	
 
-	###START###### Get complete set of responding services and first time readings ############################START####
-	if ($hash->{CONSOLEMESSAGE} == true) {print("\n");}
-	km200_GetInitService($hash);
-	####END####### Get complete set of responding services and first time readings #############################END#####
-	
 
-	###START###### Initiate the timer for continuous polling of dynamical values from KM200 but wait 60s ######START####
-	InternalTimer(gettimeofday()+$hash->{DELAYDYNVAL}, "km200_GetDynService", $hash, 0);
-	Log3 $name, 5, $name. " : km200 - Internal timer for dynamic values prepared with default interval.";
-	####END####### Initiate the timer for continuous polling of dynamical values from KM200 ####################END#####
+	###START###### Initiate the timer for first time polling of  values from KM200 but wait 5s ################START####
+	InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
+	Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services started for the first time.";
+	####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ################END#####
 
-	
-	###START###### Initiate the timer for continuous polling of static values from KM200 but wait 120s ########START####
-	InternalTimer(gettimeofday()+$hash->{DELAYSTATVAL}, "km200_GetStatService", $hash, 0);
-	Log3 $name, 5, $name. " : km200 - Internal timer for static values prepared with default interval.";
-	####END####### Initiate the timer for continuous polling of static values from KM200 #######################END#####
-	
-	
+
 	###START###### Set status of km200 fhem module to Initialized #############################################START####
 	$hash->{STATE}="Initialized";
 	####END####### Set status of km200 fhem module to Initialized ##############################################END#####
@@ -583,14 +588,23 @@ sub km200_Define($$)
 
 
 ###START###### To bind unit of value to DbLog entries #########################################################START####
-### This Function needs to be completed later
 sub km200_DbLog_split($)
 {
 	my ($event) = @_;
 	my ($reading, $value, $unit);
 
-#	print("km200_DbLog_splitFn - Test for event:" . $event ."\n");
+	### Get values being changed from hash
+#	$reading = $hash->{temp}{ServiceDbLogSplitHash}{id};
+#	$value   = $hash->{temp}{ServiceDbLogSplitHash}{value};
+#	$unit    = $hash->{temp}{ServiceDbLogSplitHash}{unit};
+	### Get values being changed from hash
+
+#print("DbLog_splitFn - event:" . $event . "; value: ". $value . "; unit: ". $unit . ".\n");
 	
+	### Delete temporary json-hash for DbLog-Split
+#	$hash->{temp}{ServiceDbLogSplitHash} = ();
+	### Delete temporary json-hash for DbLog-Split
+
     return ($reading, $value, $unit);
 }
 ####END####### To bind unit of value to DbLog entries ##########################################################END#####
@@ -624,6 +638,7 @@ sub km200_Attr(@)
 	my $IntervalStatVal        = $hash->{INTERVALSTATVAL};
 	my $DelayDynVal            = $hash->{DELAYDYNVAL};
 	my $DelayStatVal           = $hash->{DELAYSTATVAL};
+
 
 	### Check whether dynamic interval attribute has been provided
 	if($a[2] eq "IntervalDynVal") 
@@ -669,11 +684,6 @@ sub km200_Attr(@)
 			####END#### Check whether polling interval is not too short	
 		}
 	}
-	### Check whether room attribute have been provided
-	elsif($a[2] eq "room") 
-	{
-		### Do nothing
-	}
 	### Check whether polling timeout attribute has been provided
 	elsif($a[2] eq "PollingTimeout") 
 	{
@@ -698,6 +708,7 @@ sub km200_Attr(@)
 		{
 			$hash->{CONSOLEMESSAGE}	= true;
 			Log3 $name, 5, $name. " : km200 - Console printouts enabled";
+			print("\n");
 		}
 		### If messages on console shall NOT be visible
 		else
@@ -706,35 +717,51 @@ sub km200_Attr(@)
 			Log3 $name, 5, $name. " : km200 - Console printouts disabled";
 		}
 	}
+	### Check whether DoNotPoll attribute have been provided
+	elsif($a[2] eq "DoNotPoll") 
+	{
+		my @KM200_AllServices = @{$hash->{Secret}{KM200ALLSERVICES}};
+		my @KM200_DONOTPOLL   = ();
+		my @temp              = @a;
+		splice @temp, 0, 3;
+
+		### Insert empty field as minimum entry 
+		push @temp, "";
+		
+		### Transform string entries seperated by blank into array
+		@KM200_DONOTPOLL = split(/ /, $temp[0]);
+
+		### Save list of services not to be polled into hash
+		@{$hash->{Secret}{KM200DONOTPOLL}} = @KM200_DONOTPOLL;
+		
+		###START### Stop the current timer
+		RemoveInternalTimer($hash);
+		####END#### Stop the current timer
+
+		###START###### Filter all services not to be polled out of known services = AllServices (new) #############START####
+		foreach my $SearchWord(@KM200_DONOTPOLL)
+		{
+			my $FoundPosition = first_index{ $_ eq $SearchWord }@KM200_AllServices;
+			if ($FoundPosition >= 0)
+			{
+				splice(@KM200_AllServices, $FoundPosition, 1);
+			}
+		}
+		@{$hash->{Secret}{KM200ALLSERVICES}} = @KM200_AllServices;
+		####END####### Filter all services not to be polled out of known services = AllServices (new) ##############END#####
+
+		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". @KM200_DONOTPOLL;
+		
+		###START###### Initiate the timer for first time polling of  values from KM200 but wait 5s ################START####
+		InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
+		Log3 $name, 5, $name. " : km200 - Internal timer for Init of services restarted after services set by attribute not to be polled.";
+		####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ################END#####
+	}
 	### If no attributes of the above known ones have been selected
 	else
 	{
-		Log3 $name, 5, $name. " : km200 - Unknown attribute: $a[2]";
+		Log3 $name, 2, $name. " : km200 - Unknown attribute: $a[2]";
 	}
-
-
-	###START### Stop the current timer
-	RemoveInternalTimer($hash);
-	####END#### Stop the current timer
-
-	
-	###START###### Initiate the timer for continuous polling of dynamical values from KM200 ###################START####
-	InternalTimer(gettimeofday()+$DelayDynVal, "km200_GetDynService", $hash, 0);
-	Log3 $name, 4, $name. " : km200 - Define: InternalTimer for dynamic values started with interval of: ".$IntervalDynVal;
-	####END####### Initiate the timer for continuous polling of dynamical values from KM200 ####################END#####
-
-	
-	###START###### Initiate the timer for continuous polling of static values from KM200 ######################START####
-	if ($DisableStatValPolling == false)
-	{
-		InternalTimer(gettimeofday()+$DelayStatVal, "km200_GetStatService", $hash, 0);
-		Log3 $name, 4, $name. " : km200 - Define: InternalTimer for static values started with interval of: ".$IntervalStatVal;
-	}
-	else
-	{
-		Log3 $name, 4, $name. " : km200 - Define: No InternalTimer for static values since polling disabled by \"attr IntervalStatVal 0\" in fhem.cfg ";
-	}
-	####END####### Initiate the timer for continuous polling of static values from KM200 #######################END#####
 	
 	return undef;
 }
@@ -838,7 +865,6 @@ sub km200_Set($@)
 	if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $opt with value: $value\n");}
 
 	### Call set sub
-	km200_PostSingleService($hash);
 	km200_PostSingleService($hash);
 
 	### Return value
@@ -1013,7 +1039,6 @@ sub km200_PostSingleService($)
 sub km200_GetSingleService($)
 {
 	my ($hash, $def)            	= @_;
-
 	my $Service                 	= $hash->{temp}{service};
 	my $km200_gateway_host      	= $hash->{URL};
 	my $name                    	= $hash->{NAME};
@@ -1063,6 +1088,11 @@ sub km200_GetSingleService($)
 				my $JsonType       = $json->{type};
 				my $JsonValue      = $json->{value};
 
+
+				### Save json-hash for DbLog-Split
+				$hash->{temp}{ServiceDbLogSplitHash} = $json;
+				### Save json-hash for DbLog-Split
+				
 				### Write reading for fhem
 				readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 				### Write reading for fhem
@@ -1105,6 +1135,19 @@ sub km200_GetInitService($)
 	my $PollingTimeout               = $hash->{POLLINGTIMEOUT};
 	my $Service                      = $KM200_InitServices[$ServiceCounterInit];
 
+
+	### If this this loop is accessed for the first time, stop the timer
+	if ($ServiceCounterInit == 0)
+	{
+		### Console Message if enabled
+		if ($hash->{CONSOLEMESSAGE} == true) {print("\n" . "Sounding and importing of services started\n");}
+		
+		### Stop the current timer
+		RemoveInternalTimer($hash);
+	}
+
+
+	### Get the values
 	my $url ="http://" . $km200_gateway_host . $Service;
 
 	my $param = {
@@ -1180,6 +1223,10 @@ sub km200_ParseHttpResponseInit($)
 			push (@KM200_RespondingServices, $Service);
 			### Add service to the list of responding services
 
+			### Save json-hash for DbLog-Split
+			$hash->{temp}{ServiceDbLogSplitHash} = $json;
+			### Save json-hash for DbLog-Split
+
 			### Write reading for fhem
 			readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 			### Write reading for fhem
@@ -1251,6 +1298,28 @@ sub km200_ParseHttpResponseInit($)
 		### Save arrays of services in hash
 
 		$hash->{status}{FlagInitRequest}            = false;
+		
+		
+		###START###### Initiate the timer for continuous polling of dynamical values from KM200 ###################START####
+		InternalTimer(gettimeofday()+($hash->{INTERVALDYNVAL}), "km200_GetDynService", $hash, 0);
+		Log3 $name, 4, $name. " : km200 - Define: InternalTimer for dynamic values started with interval of: ".($hash->{INTERVALDYNVAL});
+		####END####### Initiate the timer for continuous polling of dynamical values from KM200 ####################END#####
+
+		
+		###START###### Initiate the timer for continuous polling of static values from KM200 ######################START####
+		if ($hash->{DISABLESTATVALPOLLING} == false)
+		{
+			InternalTimer(gettimeofday()+($hash->{INTERVALSTATVAL}), "km200_GetStatService", $hash, 0);
+			Log3 $name, 4, $name. " : km200 - Define: InternalTimer for static values started with interval of: ".($hash->{INTERVALSTATVAL});
+		}
+		else
+		{
+			Log3 $name, 4, $name. " : km200 - Define: No InternalTimer for static values since polling disabled by \"attr IntervalStatVal 0\" in fhem.cfg ";
+		}
+		####END####### Initiate the timer for continuous polling of static values from KM200 #######################END#####
+
+		### Console Message if enabled
+		if ($hash->{CONSOLEMESSAGE} == true) {print("Sounding and importing of services is completed\n___________________________________________________________________________________________________\n\n");}
 	}
 	### Clear up temporary variables
 	$hash->{temp}{decodedcontent} = "";	
@@ -1355,7 +1424,11 @@ sub km200_ParseHttpResponseDyn($)
 			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn: id               : " .$JsonId;
 			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn: value            : " .$JsonValue;
 			### Log entries for debugging purposes
-			
+
+			### Save json-hash for DbLog-Split
+			$hash->{temp}{ServiceDbLogSplitHash} = $json;
+			### Save json-hash for DbLog-Split
+
 			### Write reading
 			readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 			### Write reading
@@ -1389,7 +1462,7 @@ sub km200_ParseHttpResponseDyn($)
 	{
 		$hash->{STATE}                   = "Initialized";
 		$hash->{temp}{ServiceCounterDyn} = 0;
-		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n");}
+		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n___________________________________________________________________________________________________\n\n");}
 		###START###### Re-Start the timer #####################################START####
 		InternalTimer(gettimeofday()+$hash->{INTERVALDYNVAL}, "km200_GetDynService", $hash, 1);
 		####END####### Re-Start the timer ######################################END#####
@@ -1414,12 +1487,12 @@ sub km200_GetStatService($)
 
 	if (@KM200_StatServices != 0)
 	{
-		my $Service                      =   $KM200_StatServices[$ServiceCounterStat];
+		my $Service                  =   $KM200_StatServices[$ServiceCounterStat];
 
 		### Console outputs for debugging purposes
 		if ($ServiceCounterStat == 0)
 		{
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Starting download of static  services\n");}
+			if ($hash->{CONSOLEMESSAGE} == true) {print("Starting download of static services\n");}
 		}
 		
 		if ($hash->{CONSOLEMESSAGE} == true) {print("$Service\n");}
@@ -1495,6 +1568,12 @@ sub km200_ParseHttpResponseStat($)
 			Log3 $name, 5, $name. " : km200_parseHttpResponseStat: value            : " .$JsonValue;
 			### Log entries for debugging purposes
 			
+
+			### Save json-hash for DbLog-Split
+			$hash->{temp}{ServiceDbLogSplitHash} = $json;
+			### Save json-hash for DbLog-Split
+
+
 			### Write reading
 			readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 			### Write reading
@@ -1527,7 +1606,8 @@ sub km200_ParseHttpResponseStat($)
 	{
 		$hash->{STATE}                    = "Initialized";
 		$hash->{temp}{ServiceCounterStat} = 0;
-		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n");}
+		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n___________________________________________________________________________________________________\n\n");}
+		
 		###START###### Re-Start the timer #####################################START####
 		InternalTimer(gettimeofday()+$hash->{INTERVALSTATVAL}, "km200_GetStatService", $hash, 1);
 		####END####### Re-Start the timer ######################################END#####
@@ -1579,7 +1659,7 @@ sub km200_ParseHttpResponseStat($)
 <ul><ul>
 	<table>
 		<tr><td align="right" valign="top"><code>&lt;name&gt;</code> : </td><td align="left" valign="top">The name of the device. Recommendation: "myKm200".</td></tr>
-		<tr><td align="right" valign="top"><code>&lt;IPv4-address&gt;</code> : </td><td align="left" valign="top">A valid IPv4 address of the KM200 router. You might look into your browser which DHCP address has been given to the KM200/KM50.</td></tr>
+		<tr><td align="right" valign="top"><code>&lt;IPv4-address&gt;</code> : </td><td align="left" valign="top">A valid IPv4 address of the KM200. You might look into your router which DHCP address has been given to the KM200/KM50.</td></tr>
 		<tr><td align="right" valign="top"><code>&lt;GatewayPassword&gt;</code> : </td><td align="left" valign="top">The gateway password which is provided on the type sign of the KM200/KM50.</td></tr>
 		<tr><td align="right" valign="top"><code>&lt;PrivatePassword&gt;</code> : </td><td align="left" valign="top">The private password which has been defined by the user via <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a>.</td></tr>
 	</table>
@@ -1626,8 +1706,7 @@ sub km200_ParseHttpResponseStat($)
 		<tr>
 			<td align="right" valign="top"><code>&lt;service&gt;</code> : </td><td align="left" valign="top">The name of the service which value shall be obtained. E.g.: "<code>/heatingCircuits/hc1/operationMode</code>"<BR>
 																											&nbsp;&nbsp;It returns only the value but not the unit or the range or list of allowed values possible.<BR>
-																			</td>
-													
+			</td>
 		</tr>
 	</table>
 </ul></ul>
@@ -1650,7 +1729,6 @@ sub km200_ParseHttpResponseStat($)
 			<tr><td align="right" valign="top"><li><code>IntervalDynVal</code> : </li></td><td align="left" valign="top">A valid polling interval for the dynamically changing values of the KM200/KM50. The value must be >=20s to allow the km200 module to perform a full polling procedure. <BR>
 																												   The default value is 90s.<BR>
 			</td></tr>
-			
 			</td>
 		</tr>
 	</table>
@@ -1664,7 +1742,6 @@ sub km200_ParseHttpResponseStat($)
 																												   The default value is 3600s.<BR>
 																												   The value of "0" will disable the polling of statical values until the next fhem restart or a reload of the fhem.cfg - file.<BR>
 			</td></tr>
-			
 			</td>
 		</tr>
 	</table>
@@ -1677,7 +1754,6 @@ sub km200_ParseHttpResponseStat($)
 			<tr><td align="right" valign="top"><li><code>PollingTimeout</code> : </li></td><td align="left" valign="top">A valid time in order to allow the module to wait for a response of the KM200/KM50. Usually this value does not need to be changed but might in case of slow network or slow response.<BR>
 																												   The default and minimum value is 5s.<BR>
 			</td></tr>
-			
 			</td>
 		</tr>
 	</table>
@@ -1693,4 +1769,184 @@ sub km200_ParseHttpResponseStat($)
 			</td>
 		</tr>
 	</table>
-</ul></ul></ul>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td align="right" valign="top"><li><code>DoNotPoll</code> : </li></td><td align="left" valign="top">A list of services separated by blanks which shall not be downloaded due to repeatable crashes or irrelevant values.<BR>
+																												   The default value (empty) therefore nothing will be ignored.<BR>
+			</td></tr>			
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+</ul>
+=end html
+
+
+=begin html_DE
+
+<a name="km200"></a>
+<h3>KM200</h3>
+<ul>
+<table>
+	<tr>
+		<td>
+			The Buderus <a href="http://www.buderus.de/Logamatic_Web_KM200-4608125.html">KM200</a> or <a href="http://de.documents.buderus.com/sitemap/document/id/6720807675">KM50</a> is a communication device to establish a connection between the Buderus central heating control unit and the internet.<BR>
+			It has been designed in order to allow the inhabitants accessing their heating system via his Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a>.<BR>
+			Furthermore it allows the maintenance companies to access the central heating control system to read and change settings.<BR>
+			The km200 module enables read/write access to these parameters.<BR>
+			<BR>
+			In order to use the KM200 or KM50 with fhem, you must define the private password with the Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> first.<BR>
+			<BR>
+			<font color="#FF0000"><b><u>Remark:</u></b><BR></font>
+			Despite the instruction of the Buderus KM200 Installation guide, the ports 5222 and 5223 should not be opened and allow access to the KM200/KM50 module from outside.<BR>
+			You should configure (or leave) your internet router with the respective settings.<BR>
+			If you want to read or change settings on the heating system, you should access the central heating control system via your fhem system only.<BR>
+			<BR>
+			As soon the module has been defined within the fhem.cfg, the module is trying to obtain all known/possible services. <BR>
+			After this initial contact, the module differs between a set of continuous (dynamically) changing values (e.g.: temperatures) and not changing static values (e.g.: Firmware version).<BR>
+			This two different set of values can be bound to an individual polling interval. Refer to <a href="#KM200Attr">Attributes</a><BR> 
+			<BR>
+			</td>
+	</tr>
+</table>
+  
+<table>
+<tr><td><a name="KM200define"></a><b>Define</b></td></tr>
+</table>
+
+<table><tr><td><ul><code>define &lt;name&gt; km200 &lt;IPv4-address&gt; &lt;GatewayPassword&gt; &lt;PrivatePassword&gt;</code></ul></td></tr></table>
+
+<ul><ul>
+	<table>
+		<tr><td align="right" valign="top"><code>&lt;name&gt;</code> : </td><td align="left" valign="top">Der Name des Ger&auml;tes. Empfehlung: "myKm200".</td></tr>
+		<tr><td align="right" valign="top"><code>&lt;IPv4-address&gt;</code> : </td><td align="left" valign="top"Eine g&uuml;ltige IPv4 Adresse des KM200. Eventuell im router nachschauen welche DHCP - Addresse dem KM200/KM50 vergeben wurde.</td></tr>
+		<tr><td align="right" valign="top"><code>&lt;GatewayPassword&gt;</code> : </td><td align="left" valign="top">Das gateway Passwort, welches au dem Typenschild des KM200/KM50 zu finden ist.</td></tr>
+		<tr><td align="right" valign="top"><code>&lt;PrivatePassword&gt;</code> : </td><td align="left" valign="top">Das private Passwort, welches durch den user mit Hilfe der <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> - App vergeben wurde.</td></tr>
+	</table>
+</ul></ul>
+
+<BR>
+
+<table>
+	<tr><td><a name="KM200Set"></a><b>Set</b></td></tr>
+	<tr><td>
+		<ul>
+				Die set Funktion &auml;ndert die Werte der Services welche das Flag "schreibbar" innerhalb der KM200/KM50 Service Struktur besitzen.<BR>
+				Die meisten dieser beschreibbaren Werte haben eine exklusive Liste von m&ouml;glichen Werten innerhalb dessen sich der neue Wert bewegen muss.<BR>
+				Andere Flie&szlig;komma Werte haben einen maximum und minumum Wert, in dessen sich der neue Wert bewegen mu&szlig;.<BR>
+		</ul>
+	</td></tr>
+</table>
+
+<table><tr><td><ul><code>set &lt;service&gt; &lt;value&gt;</code></ul></td></tr></table>
+
+<ul><ul>
+	<table>
+		<tr><td align="right" valign="top"><code>&lt;service&gt;</code> : </td><td align="left" valign="top">Der Name des Service welcher gesetzt werden soll. Z.B.: "<code>/heatingCircuits/hc1/operationMode</code>"<BR></td></tr>
+		<tr><td align="right" valign="top"><code>&lt;value&gt;</code> : </td><td align="left" valign="top">Ein g&uuml;ltiger Wert f&uuml;r diesen Service.<BR></td></tr>
+	</table>
+</ul></ul>
+
+<BR>
+
+<table>
+	<tr><td><a name="KM200Get"></a><b>Get</b></td></tr>
+	<tr><td>
+		<ul>
+				Die get-Funktion ist in der Lage einen Wert eines Service innerhalb der KM200/KM50 Service Struktur auszulesen.<BR>
+				Die zus&auml;tzliche Liste von erlaubten Werten oder der Wertebereich zwischen Minimum und Maximum wird nicht zur&uuml;ck gegeben.<BR>
+		</ul>
+	</td></tr>
+</table>
+
+<table><tr><td><ul><code>get &lt;service&gt;</code></ul></td></tr></table>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td align="right" valign="top"><code>&lt;service&gt;</code> : </td><td align="left" valign="top">Der Name des Service welcher ausgelesen werden soll. Z.B.:  "<code>/heatingCircuits/hc1/operationMode</code>"<BR>
+																											&nbsp;&nbsp;Es gibt nur den Wert, aber nicht die Werteliste oder den m&ouml;glichen Wertebereich zur&uuml;ck.<BR>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<BR>
+
+<table>
+	<tr><td><a name="KM200Attr"></a><b>Attributes</b></td></tr>
+	<tr><td>
+		<ul>
+				Die folgenden Modul-spezifischen Attribute k&ouml;nnen neben den bekannten globalen Attributen gesetzt werden wie z.B.: <a href="#room">room</a>.<BR>
+		</ul>
+	</td></tr>
+</table>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td align="right" valign="top"><li><code>IntervalDynVal</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiges Abfrageintervall f&uuml;r die sich st&auml;ndig ver&auml;ndernden - dynamischen Werte der KM200/KM50 Services. Der Wert muss gr&ouml;&szlig;er gleich >=20s sein um dem Modul gen&uuml;gend Zeit einzur&auml;umen eine volle Abfrage auszuf&uuml;hren bevor die n&auml;chste Abfrage startet.<BR>
+																												   Der Default-Wert ist 90s.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+	
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td align="right" valign="top"><li><code>IntervalStatVal</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiges Abfrageintervall f&uuml;r die statischen Werte des KM200/KM50. Der Wert muss gr&ouml;&szlig;er gleich >=20s sein um dem Modul gen&uuml;gend Zeit einzur&auml;umen eine volle Abfrage auszuf&uuml;hren bevor die n&auml;chste Abfrage startet. <BR>
+																												   Der Default-Wert ist 3600s.<BR>
+																												   Der Wert "0" deaktiviert die wiederholte Abfrage der statischen Werte bis das fhem-System erneut gestartet wird oder die fhem.cfg neu geladen wird.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td align="right" valign="top"><li><code>PollingTimeout</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert um dem KM200/KM50 gen&uuml;gend Zeit zur Antwort einzelner Werte einzur&auml;umen. Normalerweise braucht dieser Wert nicht ver&auml;ndert werden, muss jedoch im Falle eines langsamen Netzwerks erh&ouml;ht werden<BR>
+																												   Der Default-Wert ist 5s.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td align="right" valign="top"><li><code>ConsoleMessage</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Boolean Wert (0 oder 1) welcher die Aktivit&auml;ten und Fehlermeldungen des Modul in der Konsole ausgibt. "0" (Deaktiviert) or "1" (Aktiviert)<BR>
+																												   Der Default-Wert ist 0 (Deaktiviert).<BR>
+			</td></tr>			
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td align="right" valign="top"><li><code>DoNotPoll</code> : </li></td><td align="left" valign="top">Eine durch Leerzeichen (Blank) getrennte Liste von Services welche von der Abfrage aufgrund irrelevanter Werte oder fhem - Abst&uuml;rzen ausgenommen werden sollen.<BR>
+																												   Der Default Wert ist (empty) somit werden alle bekannten Services abgefragt.<BR>
+			</td></tr>			
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+</ul>
+=end html_DE
