@@ -100,6 +100,7 @@ use DBI;
 #
 sub AnalyzeCommandChain($$;$);
 sub Log3($$$);
+sub createUniqueId();
 
 ##################################################
 # Forward declarations inside this library
@@ -548,7 +549,7 @@ sub cfgDB_FW_fileList($$@) {
 		next if( $f !~ m/^$dir/ );
 		$f =~ s,$dir\/,,;
 		next if($f !~ m,^$re$,);
-		push @ret, "$f.configDB";
+		push @ret, "$f.configDB" unless $f eq '99_Utils.pm';
 	}
 	return @ret;
 }
@@ -666,14 +667,19 @@ sub _cfgDB_Rotate($) {
 }
 
 # return a UUID based on DB-model
+#sub _cfgDB_Uuid() {
+#	my $fhem_dbh = _cfgDB_Connect;
+#	my $uuid;
+#	$uuid = $fhem_dbh->selectrow_array('select lower(hex(randomblob(16)))') if($cfgDB_dbtype eq 'SQLITE');
+#	$uuid = $fhem_dbh->selectrow_array('select uuid()') if($cfgDB_dbtype eq 'MYSQL');
+#	$uuid = $fhem_dbh->selectrow_array('select uuid_generate_v4()') if($cfgDB_dbtype eq 'POSTGRESQL');
+#	$fhem_dbh->disconnect();
+#	return $uuid;
+#}
+
+# 2015-01-12 use the fhem default function
 sub _cfgDB_Uuid() {
-	my $fhem_dbh = _cfgDB_Connect;
-	my $uuid;
-	$uuid = $fhem_dbh->selectrow_array('select lower(hex(randomblob(16)))') if($cfgDB_dbtype eq 'SQLITE');
-	$uuid = $fhem_dbh->selectrow_array('select uuid()') if($cfgDB_dbtype eq 'MYSQL');
-	$uuid = $fhem_dbh->selectrow_array('select uuid_generate_v4()') if($cfgDB_dbtype eq 'POSTGRESQL');
-	$fhem_dbh->disconnect();
-	return $uuid;
+	return createUniqueId();
 }
 
 ##################################################
