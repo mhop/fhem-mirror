@@ -927,8 +927,9 @@ FW_makeTable($$$@)
 
     } else {
       if( $title eq "Attributes" ) {
+        my $id = "sel_attr$name"; $id =~ s/\./_/g;
         FW_pO "<td><div class=\"dname\">".
-                "<a onClick='FW_querySetSelected(\"sel_attr$name\",\"$n\")'>".
+                "<a onClick='FW_querySetSelected(\"$id\",\"$n\")'>".
               "$n</a></div></td>";
       } else {
          FW_pO "<td><div class=\"dname\">$n</div></td>";
@@ -988,6 +989,7 @@ sub
 FW_detailSelect($$$$)
 {
   my ($d, $cmd, $list,$class) = @_;
+Log 1, "$cmd $d $list";
   return if(!$list || $FW_hiddenroom{input});
   my @al = sort map { s/:.*//;$_ } split(" ", $list);
 
@@ -1573,6 +1575,7 @@ FW_select($$$$$@)
 {
   my ($id, $name, $valueArray, $selected, $class, $jSelFn) = @_;
   $jSelFn = ($jSelFn ? "onchange=\"$jSelFn\"" : "");
+  $id =~ s/\./_/g;      # to avoid problems in JS DOM Search
   $id = ($id ? "id=\"$id\" informId=\"$id\"" : "");
   my $s = "<select $jSelFn $id name=\"$name\" class=\"$class\">";
   foreach my $v (@{$valueArray}) {
