@@ -498,20 +498,27 @@ SWAP_Set($@)
 
         my $len = $register->{endpoints}->[$ep]->{size};
         if( $len =~ m/^(\d+)\.(\d+)$/ ) {
-          return "only single bit endpoints are supported" if( $2 != 1 );
+          return "only single bit endpoints are supported in regSet" if( $1 != 0 && $2 != 1 );
           return "value has to 0 or 1" if( $arg2 ne "0" && $arg2 ne "1" );
         } else {
           return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
         }
       } else {
-        my $len = 0;
-        foreach my $endpoint ( @{$register->{endpoints}} ) {
-          if( !defined($endpoint->{position}) ) {
-            $len = $endpoint->{size};
-            last;
+        my $len = $register->{size};
+        if( !$len  ) {
+          my $max_position = 0;
+          foreach my $endpoint ( @{$register->{endpoints}} ) {
+            if( !defined($endpoint->{position}) ) {
+              $len = $endpoint->{size};
+              last;
+            }
+
+            $max_position = maxNum( $max_position, int($endpoint->{position}) );
+
+            $len += $endpoint->{size};
           }
 
-          $len += $endpoint->{size};
+          $len = maxNum( $len, $max_position+1 );
         }
 
         return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
@@ -559,19 +566,22 @@ SWAP_Set($@)
 
         $endpoint = $register->{endpoints}->[$ep];
 
-        if( defined( $endpoint->{position} ) ) {
-          if( $endpoint->{position} =~ m/^(\d+)\.(\d+)$/ ) {
-            my $byte = hex( substr( $value, length($value) - 2 - $1*2, 2 ) );
+        if( my $position = $endpoint->{position} ) {
+          my $size = $endpoint->{size};
+          if( $position =~ m/^(\d+)\.(\d+)$/ ) {
+            return "only single bit endpoints supported" if( $size ne "0.1" );
+            my $bytes = hex(substr($value, $1*2, 2));
             my $mask = 0x01 << $2;
-            $byte &= ~$mask if( $arg2 eq "0" );
-            $byte |=  $mask if( $arg2 eq "1" );
-            $byte &= 0xFF;
-            substr( $value, length($value) - 2 - $1*2, 2 , sprintf("%02X",$byte) );
+            $bytes &= ~$mask if( $arg2 eq "0" );
+            $bytes |=  $mask if( $arg2 eq "1" );
+            $bytes &= 0xFF;
+            substr( $value, $1*2, 2 , sprintf("%02X",$bytes) );
           } else {
             substr( $value, $endpoint->{position}*2, $endpoint->{size}*2, $arg2 );
           }
 
           $arg2 = $value;
+Log 3, $value;
         }
       }
     }
@@ -709,12 +719,13 @@ SWAP_Get($@)
   if( $cmd eq 'regList' || $cmd eq 'regListAll' ) {
     my $ret = "";
 
-    $ret .= sprintf( "reg.\t| size\t| dir.\t| name\n");
+    $ret .= sprintf( "reg.\t| pos\t| size\t| dir.\t| name\n");
 
     if( $cmd eq 'regListAll' ) {
       foreach my $reg ( sort { $a <=> $b } keys ( %default_registers ) ) {
         my $register = $default_registers{$reg};
-        $ret .= sprintf( "%02X\t| %s\t| %s\t|%s\n", $reg,
+        $ret .= sprintf( "%02X\t| %s\t| %s\t| %s\t|%s\n", $reg,
+                                                    "",
                                                     defined($register->{size})?$register->{size}:"",
                                                     defined($register->{direction})?($register->{direction}==OUT?"set":"get"):"",
                                                     $register->{name}  );
@@ -722,6 +733,7 @@ SWAP_Get($@)
         my $i = 0;
         foreach my $endpoint ( @{$register->{endpoints}} ) {
           $ret .= sprintf( "  .%i\t|   %s\t|   %s\t|  %s\n", $i,
+                                                         defined($endpoint->{position})?$endpoint->{position}:"",
                                                          defined($endpoint->{size})?$endpoint->{size}:"",
                                                          defined($endpoint->{direction})?($endpoint->{direction}==OUT?"set":"get"):"",
                                                          $endpoint->{name}  ) if($i > 0);
@@ -738,19 +750,23 @@ SWAP_Get($@)
 
         my $i = 0;
         foreach my $endpoint ( @{$register->{endpoints}} ) {
-          $ret .= sprintf( "%02X\t| %s\t| %s\t|%s\n", $reg,
+          $ret .= sprintf( "%02X\t| %s\t| %s\t| %s\t|%s\n", $reg,
+                                                      ($i!=0&&defined($endpoint->{position}))?$endpoint->{position}:"",
                                                       defined($register->{size})?$register->{size}:"",
                                                       defined($register->{direction})?($register->{direction}==OUT?"set":"get"):"",
                                                       $register->{name}  ) if($i == 0 && defined($endpoint->{position}));
-          $ret .= sprintf( "%02X\t| %s\t| %s\t|%s\n", $reg,
+          $ret .= sprintf( "%02X\t| %s\t| %s\t| %s\t|%s\n", $reg,
+                                                      "",
                                                       $endpoint->{size},
                                                       $endpoint->{direction}==OUT?"set":"get",
                                                       $endpoint->{name}  ) if($i == 0 && !defined($endpoint->{position}));
-          $ret .= sprintf( "  .%i\t|   %s\t|   %s\t|  %s\n", $i,
+          $ret .= sprintf( "  .%i\t|   %s\t|   %s\t|   %s\t|  %s\n", $i,
+                                                         defined($endpoint->{position})?$endpoint->{position}:"",
                                                          $endpoint->{size},
                                                          $endpoint->{direction}==OUT?"set":"get",
                                                          $endpoint->{name}  ) if($i == 0 && defined($endpoint->{position}));
-          $ret .= sprintf( "  .%i\t|   %s\t|   %s\t|  %s\n", $i,
+          $ret .= sprintf( "  .%i\t|   %s\t|   %s\t|   %s\t|  %s\n", $i,
+                                                         defined($endpoint->{position})?$endpoint->{position}:"",
                                                          $endpoint->{size},
                                                          $endpoint->{direction}==OUT?"set":"get",
                                                          $endpoint->{name}  ) if($i > 0);
@@ -840,17 +856,24 @@ SWAP_updateReadings($$$)
            && defined($register->{endpoints} ) ) {
     my $i = 0;
     readingsBeginUpdate($hash);
+    #my $nr_endpoints = keys(@{$register->{endpoints}});
     foreach my $endpoint (@{$register->{endpoints}}) {
-      my $position = 0;
       my $value = "";
+      my $size = $endpoint->{size};
+      my $position = 0;
       $position = $endpoint->{position} if( defined($endpoint->{position}) );
       if( $position =~ m/^(\d+)\.(\d+)$/ ) {
-        my $byte = hex( substr( $data, length($data) - 2 - $1*2, 2 ) );
+        if( $size ne "0.1" ) {
+          Log3 $name, 2, "$endpoint->{name}: only single bit endpoints are supported";
+          next;
+        }
+
+        my $bytes = substr($data, $1*2, 2);
         my $mask = 0x01 << $2;
         $value = "0";
-        $value = "1" if( $byte & $mask );
+        $value = "1" if( hex($bytes) & $mask );
       } else {
-        $value = substr($data, $position*2, $endpoint->{size}*2);
+        $value = substr($data, $position*2, $size*2);
       }
       if( $endpoint->{type} == STR ) {
         my $v = "";
