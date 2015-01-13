@@ -989,7 +989,6 @@ sub
 FW_detailSelect($$$$)
 {
   my ($d, $cmd, $list,$class) = @_;
-Log 1, "$cmd $d $list";
   return if(!$list || $FW_hiddenroom{input});
   my @al = sort map { s/:.*//;$_ } split(" ", $list);
 
@@ -1575,7 +1574,7 @@ FW_select($$$$$@)
 {
   my ($id, $name, $valueArray, $selected, $class, $jSelFn) = @_;
   $jSelFn = ($jSelFn ? "onchange=\"$jSelFn\"" : "");
-  $id =~ s/\./_/g;      # to avoid problems in JS DOM Search
+  $id =~ s/\./_/g if($id);      # to avoid problems in JS DOM Search
   $id = ($id ? "id=\"$id\" informId=\"$id\"" : "");
   my $s = "<select $jSelFn $id name=\"$name\" class=\"$class\">";
   foreach my $v (@{$valueArray}) {
