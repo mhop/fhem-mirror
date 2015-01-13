@@ -116,6 +116,17 @@ sub FRAMEBUFFER_Define($$) {
   }
   $hash->{fhem}{fb_device}= $fb_device;
 
+  eval "use GD::Text::Align";
+  $hash->{fhem}{useTextAlign} = ($@ ? 0 : 1 );
+  if(!($hash->{fhem}{useTextAlign})) { 
+    Log3 $hash, 2, "$name: Cannot use text alignment: $@";
+  }
+    
+  eval "use GD::Text::Wrap";
+  $hash->{fhem}{useTextWrap} = ($@ ? 0 : 1 );
+  if(!($hash->{fhem}{useTextWrap})) { 
+    Log3 $hash, 2, "$name: Cannot use text wrapping: $@";
+  }
 
   readingsSingleUpdate($hash, 'state', 'Initialized',1);
   return undef;
