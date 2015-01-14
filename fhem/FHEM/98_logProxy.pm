@@ -772,6 +772,13 @@ logProxy_Get($@)
       if( $postFn ) {
         my($data,$comment) = logProxy_data2Array($internal_data);
 
+        $main::data{"avg1"} = undef;
+        $main::data{"sum1"} = undef;
+        $main::data{"cnt1"} = int(@{$data});
+        $main::data{"currdate1"} = undef;
+        $main::data{"mindate1"} = undef;
+        $main::data{"maxdate1"} = undef;
+
         no strict "refs";
         my $d = eval {&{$postFn}($a[$i],$data)};
         if( $@ ) {
@@ -782,13 +789,6 @@ logProxy_Get($@)
         use strict "refs";
         
         $data = $d;
-        $main::data{"avg1"} = undef;
-        $main::data{"sum1"} = undef;
-        $main::data{"sum1"} = undef;
-        $main::data{"cnt1"} = int(@{$data});
-        $main::data{"currdate1"} = undef;
-        $main::data{"mindate1"} = undef;
-        $main::data{"maxdate1"} = undef;
 
         $comment = "#$a[$i]\n";
         ($internal_data,$main::data{"min1"}, $main::data{"max1"},$main::data{"currval1"}) = logProxy_array2Data($data,$comment);
