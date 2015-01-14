@@ -711,15 +711,14 @@ SVG_substcfg($$$$$$)
   my $fileesc = $file;
   $fileesc =~ s/\\/\\\\/g;      # For Windows, by MarkusRR
   my $title = AttrVal($wl, "title", "\"$fileesc\"");
-  my $allowed = AttrVal($FW_wname,"allowedCommands",undef);
 
-  $title = AnalyzeCommand(undef, "{ $title }", $allowed);
+  $title = AnalyzeCommand(undef, "{ $title }");
   my $label = AttrVal($wl, "label", undef);
   my @g_label;
   if ($label) {
     @g_label = split("::",$label);
     foreach (@g_label) {
-      $_ = AnalyzeCommand(undef, "{ $_ }", $allowed);
+      $_ = AnalyzeCommand(undef, "{ $_ }");
     }
   }
 
@@ -1549,7 +1548,6 @@ SVG_render($$$$$$$$$;$$)
 
   my (%hstep,%htics,%axdrawn);
 
-  my $allowed = AttrVal($FW_wname,"allowedCommands",undef);
   #-- yrange handling for axes x1y1..x1y8
   for my $idx (0..7)  {
     my $a = "x1y".($idx+1);
@@ -1558,7 +1556,7 @@ SVG_render($$$$$$$$$;$$)
     $yra="yrange" if ($yra eq "y1range");  
     #-- yrange is specified in plotfile
     if($conf{$yra}) {
-      $conf{$yra} = AnalyzeCommand(undef, $1, $allowed) 
+      $conf{$yra} = AnalyzeCommand(undef, $1)
                          if($conf{$yra} =~ /^({.*})$/);
       if($conf{$yra} =~ /\[(.*):(.*)\]/) {
         $hmin{$a} = $1 if($1 ne "");
