@@ -2382,7 +2382,7 @@ FW_devState($$@)
   $hasOnOff = ($allSets =~ m/(^| )on(:[^ ]*)?( |$)/ &&
                $allSets =~ m/(^| )off(:[^ ]*)?( |$)/);
   my $txt = $state;
-  my $dsi = AttrVal($d, "devStateIcon", undef);
+  my $dsi = ($attr{$d} && ($attr{$d}{stateFormat} || $attr{$d}{devStateIcon}));
 
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
