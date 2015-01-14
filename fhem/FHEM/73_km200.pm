@@ -1,10 +1,10 @@
-# $Id: 73_km200.pm 0036 2015-01-13 16:00:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0037 2015-01-14 16:00:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
 #     Creates the possibility to access the Buderus central heating system via
-#     Buderus KM200 or KM50 communication module. It uses HttpUtils_NonblockingGet
-#     from Rudolf Koenig to avoid a full blockage of the fhem main system during 
+#     Buderus KM200, KM100 or KM50 communication module. It uses HttpUtils_NonblockingGet
+#     from Rudolf Koenig to avoid a full blockage of the fhem main system during the
 #     polling procedure.
 #
 #     Author          : Matthias Deeke 
@@ -132,6 +132,9 @@
 #		0036    13.01.2015	Sailor				km200_GetDynService				Preparing DbLog Split
 #		0036    13.01.2015	Sailor				km200_GetStatService			Preparing DbLog Split
 #		0036    13.01.2015	Sailor				=pod							Correction of errors and German description added
+#		0037    14.01.2015	Sailor				km200_DbLog_splitFn				Try-out DbLog Split
+#		0037    14.01.2015	Sailor				=pod							Correction of errors
+#		0037    14.01.2015	Sailor				km200_Attr						Readings are being deleted if set not to be polled by attribute
 ########################################################################################################################
 
 
@@ -200,7 +203,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0036";
+	my $ModuleVersion           = "0037";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -533,7 +536,6 @@ sub km200_Define($$)
 
 
 	###START###### For Debugging purpose only ##################################################################START####  
-	if ($hash->{CONSOLEMESSAGE} == true) {print("\n");}
 	Log3 $name, 5, $name. " : km200 - Define H                              : " .$hash;
 	Log3 $name, 5, $name. " : km200 - Define D                              : " .$def;
 	Log3 $name, 5, $name. " : km200 - Define A                              : " .@a;
@@ -590,9 +592,19 @@ sub km200_Define($$)
 ###START###### To bind unit of value to DbLog entries #########################################################START####
 sub km200_DbLog_split($)
 {
-	my ($event) = @_;
+	my ($event)  = @_;
+#	my $name                   = $event[0];
+#	my $hash     = $defs{$name};
 	my ($reading, $value, $unit);
+	
+	
+print("DbLog_splitFn - event    : " . $event . "\n");
+#print("DbLog_splitFn - event[0] : " . $event[0] . "\n");
+#print("DbLog_splitFn - event[1] : " . $event[1] . "\n");
+#print("DbLog_splitFn - event[2] : " . $event[2] . "\n");
 
+#print("DbLog_splitFn - unit  : " . $hash->{temp}{ServiceDbLogSplitHash}{unit} ."\n");
+	
 	### Get values being changed from hash
 #	$reading = $hash->{temp}{ServiceDbLogSplitHash}{id};
 #	$value   = $hash->{temp}{ServiceDbLogSplitHash}{value};
@@ -723,6 +735,8 @@ sub km200_Attr(@)
 		my @KM200_AllServices = @{$hash->{Secret}{KM200ALLSERVICES}};
 		my @KM200_DONOTPOLL   = ();
 		my @temp              = @a;
+
+		### Delete the first 3 items of the array
 		splice @temp, 0, 3;
 
 		### Insert empty field as minimum entry 
@@ -744,7 +758,11 @@ sub km200_Attr(@)
 			my $FoundPosition = first_index{ $_ eq $SearchWord }@KM200_AllServices;
 			if ($FoundPosition >= 0)
 			{
+				### Remove Service not to be polled from list of services
 				splice(@KM200_AllServices, $FoundPosition, 1);
+
+				### Delete Reading
+				fhem( "deletereading $name $SearchWord" );
 			}
 		}
 		@{$hash->{Secret}{KM200ALLSERVICES}} = @KM200_AllServices;
@@ -762,7 +780,6 @@ sub km200_Attr(@)
 	{
 		Log3 $name, 2, $name. " : km200 - Unknown attribute: $a[2]";
 	}
-	
 	return undef;
 }
 ####END####### Handle attributes after changes via fhem GUI ####################################################END#####
@@ -1165,7 +1182,7 @@ sub km200_GetInitService($)
 
 
 ###START###### Subroutine to download complete initial data set from gateway ##################################START####
-# For all existing known services try reading the respective values from gateway
+# For all known, but not excluded services by attribute "DoNotPoll", try reading the respective values from gateway
 sub km200_ParseHttpResponseInit($)
 {
     my ($param, $err, $data)     = @_;
@@ -1795,23 +1812,23 @@ sub km200_ParseHttpResponseStat($)
 <table>
 	<tr>
 		<td>
-			The Buderus <a href="http://www.buderus.de/Logamatic_Web_KM200-4608125.html">KM200</a> or <a href="http://de.documents.buderus.com/sitemap/document/id/6720807675">KM50</a> is a communication device to establish a connection between the Buderus central heating control unit and the internet.<BR>
-			It has been designed in order to allow the inhabitants accessing their heating system via his Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a>.<BR>
-			Furthermore it allows the maintenance companies to access the central heating control system to read and change settings.<BR>
-			The km200 module enables read/write access to these parameters.<BR>
+			Das Buderus <a href="http://www.buderus.de/Logamatic_Web_KM200-4608125.html">KM200</a> or <a href="http://de.documents.buderus.com/sitemap/document/id/6720807675">KM50</a> ist eine Schnittstelle zwischen der Buderus Zentralheizungssteuerung un dem Internet.<BR>
+			Es wurde entwickelt um den Bewohnern den Zugang zu Ihrem Heizungssystem durch die Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl zu erlauben.</a>.<BR>
+			Dar&uuml;ber hinaus erlaubt es nach vorheriger Freigabe dem Heizungs- bzw. Wartungsbetrieb die Heizungsanlage von aussen zu warten und Werte zu ver&auml;ndern.<BR>
+			Das km200 Modul erlaubt den Lese-/Schreibzugriff dieser Parameter durch fhem.<BR>
 			<BR>
-			In order to use the KM200 or KM50 with fhem, you must define the private password with the Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> first.<BR>
+			Um das KM200 oder KM50 Ger&auml;t mit fhem nutzen zu k&ouml;nnen, mu&szlig; zun&auml;chst ein privates Passwort mit der Buderus Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> - App gesetzt werden.<BR>
 			<BR>
-			<font color="#FF0000"><b><u>Remark:</u></b><BR></font>
-			Despite the instruction of the Buderus KM200 Installation guide, the ports 5222 and 5223 should not be opened and allow access to the KM200/KM50 module from outside.<BR>
-			You should configure (or leave) your internet router with the respective settings.<BR>
-			If you want to read or change settings on the heating system, you should access the central heating control system via your fhem system only.<BR>
+			<font color="#FF0000"><b><u>Anmerkung:</u></b><BR></font>
+			Unabh&auml;ngig der Installationsanleitung des Buderus KM200 Ger&auml;ts, sollten die Ports 5222 und 5223 am Router geschlossen bleiben um keinen Zugriff von au&szlig;en auf das Ger&auml;t zu erlauben.<BR>
+			Der Router sollte entsprechend Konfiguriert bzw. so belassen werden.<BR>
+			Wenn der Lese-/Schreibzugriff von aussen gew&uuml;nscht ist, so sollte man ausschlie&szlig;lich &uuml;ber das fhem-System auf die Zentralheizung zugreifen.<BR>
 			<BR>
-			As soon the module has been defined within the fhem.cfg, the module is trying to obtain all known/possible services. <BR>
-			After this initial contact, the module differs between a set of continuous (dynamically) changing values (e.g.: temperatures) and not changing static values (e.g.: Firmware version).<BR>
-			This two different set of values can be bound to an individual polling interval. Refer to <a href="#KM200Attr">Attributes</a><BR> 
+			Sobald das Modul in der fhem.cfg definiert ist, wird das Modul versuchen alle bekannten Services abzuklopfen ob diese in der angeschlossenen Konstellation &uuml;berhaupt vorhanden sind.<BR>
+			Nach diesem Initial-Kontakt unterscheidet das Modul zwisachen einem Satz an Services die sich st&auml;ndig (dynamisch) &auml;ndern (z.B.: Vorlauftemperatur) sowie sich nicht st&auml;ndig (statisch) &auml;ndernden Werten (z.B.: Firmware Version).<BR>
+			Diese beiden S&auml;tze an Services k&ouml;nnen mir einem individuellen Abfrageintervall versehen werden. Siehe <a href="#KM200Attr">Attributes</a><BR> 
 			<BR>
-			</td>
+		</td>
 	</tr>
 </table>
   
@@ -1824,9 +1841,9 @@ sub km200_ParseHttpResponseStat($)
 <ul><ul>
 	<table>
 		<tr><td align="right" valign="top"><code>&lt;name&gt;</code> : </td><td align="left" valign="top">Der Name des Ger&auml;tes. Empfehlung: "myKm200".</td></tr>
-		<tr><td align="right" valign="top"><code>&lt;IPv4-address&gt;</code> : </td><td align="left" valign="top"Eine g&uuml;ltige IPv4 Adresse des KM200. Eventuell im router nachschauen welche DHCP - Addresse dem KM200/KM50 vergeben wurde.</td></tr>
-		<tr><td align="right" valign="top"><code>&lt;GatewayPassword&gt;</code> : </td><td align="left" valign="top">Das gateway Passwort, welches au dem Typenschild des KM200/KM50 zu finden ist.</td></tr>
-		<tr><td align="right" valign="top"><code>&lt;PrivatePassword&gt;</code> : </td><td align="left" valign="top">Das private Passwort, welches durch den user mit Hilfe der <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> - App vergeben wurde.</td></tr>
+		<tr><td align="right" valign="top"><code>&lt;IPv4-address&gt;</code> : </td><td align="left" valign="top">Eine g&uuml;ltige IPv4 Adresse des KM200. Eventuell im Router nachschauen welche DHCP - Addresse dem KM200/KM50 vergeben wurde.</td></tr>
+		<tr><td align="right" valign="top"><code>&lt;GatewayPassword&gt;</code> : </td><td align="left" valign="top">Das gateway Passwort, welches auf dem Typenschild des KM200/KM50 zu finden ist.</td></tr>
+		<tr><td align="right" valign="top"><code>&lt;PrivatePassword&gt;</code> : </td><td align="left" valign="top">Das private Passwort, welches durch den User mit Hilfe der <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> - App vergeben wurde.</td></tr>
 	</table>
 </ul></ul>
 
