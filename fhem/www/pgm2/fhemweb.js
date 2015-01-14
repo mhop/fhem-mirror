@@ -908,7 +908,8 @@ loadScript(sname, callback, force)
   } else {
     if(FW_isiOS) {
       FW_leaving = 1;
-      FW_pollConn.abort();
+      if(FW_pollConn)
+        FW_pollConn.abort();
     }
     script.onload = function(){
       scriptLoaded();
