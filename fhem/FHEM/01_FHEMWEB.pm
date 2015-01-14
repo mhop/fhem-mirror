@@ -504,8 +504,11 @@ FW_answerCall($)
 
   # /icons/... => current state of ...
   # also used for static images: unintended, but too late to change
-  if($arg =~ m,^$FW_ME/icons/(.*)$,) {
-    my ($icon,$cacheable) = (urlDecode($1), 1);
+
+  my ($dir1, $dirN, $ofile) = ($1, $2, $3)
+             if($arg =~ m,^$FW_ME/([^/]*)(.*/)([^/]*)$,);
+  if($dir1 && $dir1 eq "icons") {
+    my ($icon,$cacheable) = (urlDecode($ofile), 1);
     my $iconPath = FW_iconPath($icon);
 
     # if we do not have the icon, we convert the device state to the icon name
@@ -518,8 +521,9 @@ FW_answerCall($)
     $iconPath =~ m/(.*)\.([^.]*)/;
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
 
-  } elsif($arg =~ m,^$FW_ME/(.*)/([^/]*)$, && !$data{FWEXT}{"/$1"}) {
-    my ($dir, $ofile, $ext) = ($1, $2, "");
+  } elsif($dir1 && !$data{FWEXT}{"/$dir1"}) {
+    my $dir = "$dir1$dirN";
+    my $ext = "";
     $dir =~ s/\.\.//g;
     $dir =~ s,www/,,g; # Want commandref.html to work from file://...
 
