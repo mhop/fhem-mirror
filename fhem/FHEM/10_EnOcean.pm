@@ -237,7 +237,7 @@ my %EnO_eepConfig = (
   "A5.30.02" => {attr => {subType => "digitalInput.02"}},
   "A5.30.03" => {attr => {subType => "digitalInput.03"}},
   "A5.30.04" => {attr => {subType => "digitalInput.04"}},
-  "A5.37.01" => {attr => {subType => "energyManagement.01"}},
+  "A5.37.01" => {attr => {subType => "energyManagement.01", webCmd => "level:max"}},
   "A5.38.08" => {attr => {subType => "gateway"}},
   "A5.3F.7F" => {attr => {subType => "manufProfile"}},
   "D2.01.00" => {attr => {subType => "actuator.01", defaultChannel => 0}},
@@ -1080,6 +1080,7 @@ EnOcean_Set($@)
       $rorg = "A5";
       my %sets = (
         "desired-temp" => "\\d+(\\.\\d)?",
+        "setpointTemp" => "\\d+(\\.\\d)?",
         "actuator"     => "\\d+",
         "unattended"   => "",
         #"initialize"   => "",
@@ -1600,13 +1601,13 @@ EnOcean_Set($@)
       
       if($cmd eq "teach") {
         # teach-in EEP A5-37-01, Manufacturer "Multi user Manufacturer ID"
-        $data = "940FFF80";
+        $data = "DC0FFF80";
         ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef");
         readingsSingleUpdate($hash, "state", "teach", 1);
-        Log3 $name, 3, "EnOcean set $name demand response $cmd";
+        Log3 $name, 3, "EnOcean set $name $cmd";
 
       } elsif ($cmd eq "level") {
-        return "Usage: $cmd 0...15 [yes|no [yes|no [timeout/min]]]]"
+        return "Usage: $cmd 0...15 [max|rel [yes|no [yes|no [timeout/min]]]]"
           if(@a < 2 || $a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 15 );
         $drLevel = $a[1];
         $powerUsage = $a[1] / 15 * 100;
@@ -1623,7 +1624,7 @@ EnOcean_Set($@)
         $setpoint = 0;
      
       } elsif ($cmd eq "power") {
-        return "Usage: $cmd 0...100 [yes|no [yes|no [timeout/min]]]]"
+        return "Usage: $cmd 0...100 [max|rel [yes|no [yes|no [timeout/min]]]]"
           if(@a < 2 || $a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 100);
         $drLevel = $a[1] / 100 * 15;
         $powerUsage = $a[1];
@@ -1632,7 +1633,7 @@ EnOcean_Set($@)
         shift(@a);
       
       } elsif ($cmd eq "setpoint") {
-        return "Usage: $cmd 0...255 [yes|no [yes|no [timeout/min]]]]"
+        return "Usage: $cmd 0...255 [max|rel [yes|no [yes|no [timeout/min]]]]"
           if(@a < 2 || $a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 255 );
         $drLevel = $a[1] / 255 * 15 ;
         $powerUsage = $a[1] / 255 * 100;
@@ -1667,13 +1668,12 @@ EnOcean_Set($@)
           shift(@a);
         }
         $data = sprintf "%02X%02X%02X%02X", $setpoint, $powerUsageScale | $powerUsage, $timeout,
-                                            $drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel;
-        my @db = ($drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel,
+                                            $drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel | 8;
+        my @db = ($drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel | 8,
                   $timeout, $powerUsageScale | $powerUsage, $setpoint);
         EnOcean_energyManagement_01Parse($hash, @db);
       }
       shift(@a);
-      Log3 $name, 3, "EnOcean $name data: $data";
     
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
@@ -5908,17 +5908,18 @@ sub EnOcean_Notify(@) {
           my $actionCmd = AttrVal($name, "demandRespAction", undef);          
           if (defined $actionCmd) {
             if ($parts[0] =~ m/^on|off$/) {
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set $parts[0]");
-              my %specials= ("%NAME" => $name,
-                             "%DEMANDRESPNAME" => $devName,
-                             "%TYPE" => $hash->{TYPE},
-                             "%DEMANDRESPTYPE" => $dev->{TYPE},
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set $parts[0]");
+              my %specials= ("%TARGETNAME" => $name,
+                             "%NAME" => $devName,
+                             "%TARGETTYPE" => $hash->{TYPE},
+                             "%TYPE" => $dev->{TYPE},
                              "%LEVEL" => ReadingsVal($devName, "level", 15),                   
                              "%SETPOINT"  => ReadingsVal($devName, "setpoint", 255),
                              "%POWERUSAGE"  => ReadingsVal($devName, "powerUsage", 100),
                              "%POWERUSAGESCALE"  => ReadingsVal($devName, "powerUsageScale", "max"),
                              "%POWERUSAGELEVEL"  => ReadingsVal($devName, "powerUsageLevel", "max"),
-                             "%STATE" => ReadingsVal($name, "state", "off")
+                             "%TARGETSTATE" => ReadingsVal($name, "state", ""),
+                             "%STATE" => ReadingsVal($devName, "state", "off")
                             );
               # action exec
               $actionCmd = EvalSpecials($actionCmd, %specials);
@@ -5929,22 +5930,22 @@ sub EnOcean_Notify(@) {
           } elsif (AttrVal($name, "subType", "") eq "switch" || AttrVal($name, "subTypeSet", "") eq "switch") {
             if ($parts[0] eq "powerUsageLevel" && $parts[1] eq "max") {
               @cmdDemandResponse = ($name, AttrVal($name, "demandRespMax", "B0"));
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             } elsif ($parts[0] eq "powerUsageLevel" && $parts[1] eq "min") {
               @cmdDemandResponse = ($name, AttrVal($name, "demandRespMin", "BI"));           
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             }
             
           } elsif (AttrVal($name, "subType", "") eq "gateway" && AttrVal($name, "gwCmd", "") eq "switching") {
             if ($parts[0] eq "powerUsageLevel" && $parts[1] eq "max") {
               @cmdDemandResponse = ($name, "on");
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             } elsif ($parts[0] eq "powerUsageLevel" && $parts[1] eq "min") {
               @cmdDemandResponse = ($name, "off");           
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             }
             
@@ -5956,32 +5957,32 @@ sub EnOcean_Notify(@) {
               } else {
                 @cmdDemandResponse = ($name, "dim", $parts[1]);
               }
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             }
           
           } elsif ((AttrVal($name, "subType", "") eq "roomSensorControl.05" && AttrVal($name, "manufID", "") eq "00D")) {
             if ($parts[0] eq "level") {
               @cmdDemandResponse = ($name, "nightReduction", int(5 - 1/3 * $parts[1]));
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             }
           
           } elsif (AttrVal($name, "subType", "") eq "roomSensorControl.05") {
             if ($parts[0] eq "setpoint") {            
               @cmdDemandResponse = ($name, $parts[0], $parts[1]);
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             }
           
           } elsif (AttrVal($name, "subType", "") eq "roomCtrlPanel.00") {
             if ($parts[0] eq "powerUsageLevel" && $parts[1] eq "max") {
               @cmdDemandResponse = ($name, "roomCtrlMode", "comfort");
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             } elsif ($parts[0] eq "powerUsageLevel" && $parts[1] eq "min") {
               @cmdDemandResponse = ($name, "roomCtrlMode", "economy");           
-              Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
+              #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set " . join(" ", @cmdDemandResponse));
               EnOcean_Set($hash, @cmdDemandResponse);      
             }
           }
@@ -6044,7 +6045,7 @@ EnOcean_hvac_01Cmd($$$)
     readingsSingleUpdate($hash, "temperature", (sprintf "%0.1f", $actualTemp), 1);    
     if($cmd eq "actuator") {
       $msg = sprintf "%02X00%02X08", $arg1, ($summerMode eq "on" ? 8 : 0);      
-    } elsif($cmd eq "desired-temp") {
+    } elsif($cmd eq "desired-temp" || $cmd eq "setpointTemp") {
       $msg = sprintf "%02X%02X%02X08", $arg1 * 255 / 40, (40 - $actualTemp) * 255 / 40, ($summerMode eq "on" ? 12 : 4);      
     # Maintenance commands
     } elsif($cmd eq "runInit") {
@@ -7095,7 +7096,7 @@ sub EnOcean_demandResponseTimeout($)
   my $randomStart = ReadingsVal($name, "randomStart", "no") eq "yes" ? 4 : 0;
   my $randomEnd = ReadingsVal($name, "randomEnd", "no") eq "yes" ? 2 : 0;
   $data = sprintf "%02X%02X%02X%02X", $setpoint, $powerUsageScale | $powerUsage, $timeout,
-                                      $drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel;
+                                      $drLevel << 4 | $randomStart | $randomEnd | $powerUsageLevel | 8;
   #EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, $subDef, $status, $destinationID);
   EnOcean_SndRadio(undef, $hash, 1, "A5", $data, AttrVal($name, "subDef", $hash->{DEF}), "00", "FFFFFFFF");
 
@@ -7723,6 +7724,59 @@ EnOcean_Undef($$)
     <a href="#EnOcean_observeErrorAction">observeErrorAction</a> attribute.    
     <br><br>
   </ul>
+
+  <b>EnOcean Energy Management</b><br>
+  <ul>
+    <li><a href="#demand_response">Demand Response</a> (EEP A5-37-01)</li>
+    Demand Response (DR) is a standard to allow utility companies to send requests for reduction in power
+    consumption during peak usage times. It is also used as a means to allow users to reduce overall power
+    comsumption as energy prices increase. The EEP was designed with a very flexible setting for the level
+    (0...15) as well as a default level whereby the transmitter can specify a specific level for all
+    controllers to use (0...100 % of either maximum or current power output, depending on the load type).
+    The profile also includes a timeout setting to indicate how long the DR event should last if the
+    DR transmitting device does not send heartbeats or subsequent new DR levels.<br>
+    The DR actor controls the target actuators such as switches, dimmers etc. The DR actor
+    is linked to the FHEM target actors via the attribute <a href="#EnOcean_demandRespRefDev">demandRespRefDev</a>.<br>
+    <ul>
+    <li>Standard actions are available for the following profiles:</li>
+    <ul>
+    <li>switch (setting the switching command for min, max by the attribute <a href="#EnOcean_demandRespMin">demandRespMin</a>,
+    <a href="#EnOcean_demandRespMax">demandRespMax</a>)</li>
+    <li>gateway/switching (on, off)</li>
+    <li>gateway/dimming (dim 0...100, relative to the max or current set value)</li>
+    <li>actuator.01 (dim 0...100)</li>
+    <li>roomSensorControl.05 (setpoint 0...255 and nightReduction 0...5 for Eltako devices)</li>
+    <li>roomCtrlPanel.00 (roomCtrlMode comfort|economy)</li>
+    </ul>
+    <li>On the target actuator can be specified alternatively a freely definable command.
+    The command sequence is stored in the attribute <a href="#EnOcean_demandRespAction">demandRespAction</a>.
+    The command sequence can be designed similar to "notify". For the command sequence predefined variables can be used,
+    eg. $LEVEL. This actions can be executed very flexible depending on the given energy
+    reduction levels.
+    </li>
+    <li>Alternatively or additionally, a custom command sequence in the DR profile itself
+    can be stored.
+    </li>
+    </ul>
+    The profile has a master and slave mode.
+    <ul>
+    <li>In slave mode, demand response data telegrams received eg a control unit of the power utility,
+    evaluated and the corresponding commands triggered on the linked target actuators. The behavior in
+    slave mode can be changed by multiple attributes.
+    </li>
+    <li>In master mode, the demand response level is set by set commands and thus sends a corresponding
+    data telegram and the associated target actuators are controlled. The demand response control
+    value are specified by "level", "power", "setpoint" "max" or "min". Each other settings are
+    calculated proportionally. In normal operation, ie without power reduction, the control value (level)
+    is 15. Through the optional parameters "powerUsageScale", "randomStart", "randomEnd" and "timeout"
+    the control behavior can be customized. The threshold at which the reading "powerUsageLevel"
+    between "min" and "max" switch is specified with the attribute
+    <a href="#EnOcean_demandRespThreshold">demandRespThreshold</a>.
+    </li>
+    </ul>
+    Additional information about the profile itself can be found in the EnOcean EEP documentation.
+  <br><br>
+  </ul>
   
   <b>EnOcean Security features</b><br>
   <ul>
@@ -7978,7 +8032,7 @@ EnOcean_Undef($$)
     where <code>value</code> is
       <li>actuator setpoint/%<br>
           Set the actuator to the specifed setpoint (0-100)</li>
-      <li>desired-temp &lt;value&gt;<br>
+      <li>desired-temp t/&#176C<br>
           Use the builtin PI regulator, and set the desired temperature to the
           specified degree. The actual value will be taken from the temperature
           reported by the Battery Powered Actuator, the <a href="#temperatureRefDev">temperatureRefDev</a>
@@ -8002,12 +8056,40 @@ EnOcean_Undef($$)
     </li>
     <br><br>
 
-    <li><a name="Gateway">Gateway</a> (EEP A5-38-08)<br>
+    <li>Energy management, <a name="demand_response">demand response</a> (EEP A5-37-01)<br>
+      demand response master commands<br>
+      <ul>
+        <code>set &lt;name&gt; &lt;value&gt;</code>
+        <br><br>
+        where <code>value</code> is
+          <li>level 0...15 [&lt;powerUsageScale&gt; [&lt;randomStart&gt; [&lt;randomEnd&gt; [timeout]]]]<br>
+            set demand response level</li>
+          <li>max [&lt;powerUsageScale&gt; [&lt;randomStart&gt; [&lt;randomEnd&gt; [timeout]]]]<br>
+            set power usage level to max</li>
+          <li>min [&lt;powerUsageScale&gt; [&lt;randomStart&gt; [&lt;randomEnd&gt; [timeout]]]]<br>
+            set power usage level to min</li>
+          <li>power power/% [&lt;powerUsageScale&gt; [&lt;randomStart&gt; [&lt;randomEnd&gt; [timeout]]]]<br>
+            set power</li>
+          <li>setpoint 0...255 [&lt;powerUsageScale&gt; [&lt;randomStart&gt; [&lt;randomEnd&gt; [timeout]]]]<br>
+            set setpoint</li>
+          <li>teach<br>
+            initiate teach-in</li>
+      </ul><br>
+        [&lt;powerUsageScale&gt;] = max|rel, [&lt;powerUsageScale&gt;] = max is default<br>
+        [&lt;randomStart&gt;] = yes|no, [&lt;randomStart&gt;] = no is default<br>
+        [&lt;randomEnd&gt;] = yes|no, [&lt;randomEnd&gt;] = no is default<br>
+        [timeout] = 0/min | 15/min ... 3825/min, [timeout] = 0 is default<br>
+        The attr subType must be energyManagement.01.<br>
+        This is done if the device was created by autocreate.<br>
+      </li>
+      <br><br>
+ 
+      <li><a name="Gateway">Gateway</a> (EEP A5-38-08)<br>
         The Gateway profile include 7 different commands (Switching, Dimming,
         Setpoint Shift, Basic Setpoint, Control variable, Fan stage, Blind Central Command).
         The commands can be selected by the attribute gwCmd or command line. The attribute
         entry has priority.<br>
-    <ul>
+     <ul>
       <code>set &lt;name&gt; &lt;value&gt;</code>
       <br><br>
       where <code>value</code> is
@@ -8015,7 +8097,7 @@ EnOcean_Undef($$)
           initiate Gateway commands by command line</li>
         <li>&lt;cmd&gt; [subCmd]<br>
           initiate Gateway commands if attribute gwCmd is set.</li>
-    </ul><br>
+     </ul><br>
        The attr subType must be gateway. Attribute gwCmd can also be set to
        switching|dimming|setpointShift|setpointBasic|controlVar|fanStage|blindCmd.<br>
        This is done if the device was created by autocreate.<br>
@@ -8565,9 +8647,38 @@ EnOcean_Undef($$)
       involved to know the unique Sender ID of their partners. Bidirectional communication
       needs a teach-in / teach-out process, see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
     </li>
+    <li><a name="EnOcean_defaultChannel">defaultChannel</a> all|input|0 ... 29, [defaultChannel] = all is default<br>
+      Default device channel
+    </li>
     <li><a name="EnOcean_daylightSavingTime">daylightSavingTime</a> supported|not_supported, [daylightSavingTime] = supported is default.<br>
       daylightSavingTime is supported for roomCtrlPanel.00.
       </li>
+    <li><a name="EnOcean_demandRespAction">demandRespAction</a> &lt;command&gt;<br>
+      Command being executed after an demand response command is set.  If &lt;command&gt; is enclosed in {},
+      then it is a perl expression, if it is enclosed in "", then it is a shell command,
+      else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the demand response 
+      readings $TYPE, $NAME, $LEVEL, $SETPOINT, $POWERUSAGE, $POWERUSAGESCALE, $POWERUSAGELEVEL, $STATE. In addition,
+      the variables $TARGETNAME, $TARGETTYPE, $TARGETSTATE can be used if the action is executed
+      on the target device. This data is available as a local variable in perl, as environment variable for shell
+      scripts, and will be textually replaced for Fhem commands.
+    </li>
+    <li><a name="EnOcean_demandRespMax">demandRespMax</a> A0|AI|B0|BI|C0|CI|D0|DI, [demandRespMax] = B0 is default<br>
+      Switch command which is executed if the demand response switches to a maximum.
+    </li>
+    <li><a name="EnOcean_demandRespMin">demandRespMin</a> A0|AI|B0|BI|C0|CI|D0|DI, [demandRespMax] = BI is default<br>
+      Switch command which is executed if the demand response switches to a minimum.
+    </li>
+    <li><a name="EnOcean_demandRespRefDev">demandRespRefDev</a> &lt;name&gt;<br>
+    </li>
+    <li><a name="EnOcean_demandRespRandomTime">demandRespRandomTime</a> t/s [demandRespRandomTime] = 1 is default<br>
+      Maximum length of the random delay at the start or end of a demand respose event in slave mode.
+    </li>
+    <li><a name="EnOcean_demandRespThreshold">demandRespThreshold</a> 0...15 [demandRespTheshold] = 8 is default<br>
+      Threshold for switching the power usage level between minimum and maximum in the master mode.
+    </li>
+    <li><a name="EnOcean_demandRespTimeoutLevel">demandRespTimeoutLevel</a> max|last [demandRespTimeoutLevel] = max is default<br>
+      Demand response timeout level in slave mode.
+    </li>
     <li><a name="devChannel">devChannel</a> 00 ... FF, [devChannel] = FF is default<br>
       Number of the individual device channel, FF = all channels supported by the device 
     </li>
@@ -9734,6 +9845,25 @@ EnOcean_Undef($$)
        <li>state: 0|1 0|1 0|1 0...255</li>
      </ul><br>
         The attr subType must be digitalInput.04. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Energy management, demand response (EEP A5-37-01)<br>
+       <br> 
+     <ul>
+       <li>on|off|waiting_for_start|waiting_for_stop</li>
+       <li>level: 0...15</li>
+       <li>powerUsage: powerUsage/%</li>
+       <li>powerUsageLevel: max|min</li>
+       <li>powerUsageScale: rel|max</li>
+       <li>randomEnd: yes|no</li>
+       <li>randomStart: yes|no</li>
+       <li>setpoint: 0...255</li>
+       <li>timeout: yyyy-mm-dd hh:mm:ss</li>
+       <li>state: on|off|waiting_for_start|waiting_for_stop</li>
+     </ul><br>
+        The attr subType must be energyManagement.01. This is done if the device was
         created by autocreate.
      </li>
      <br><br>
