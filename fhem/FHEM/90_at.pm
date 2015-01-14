@@ -271,9 +271,9 @@ return "<br>Timespec wizard:".
   </tr><tr class="odd"><td>Use perl function for timespec</td>
     <td><input type="checkbox" id="aw_ip"></td>
   </tr><tr class="even"><td>Timespec</td>
-    <td><input type="text" id="aw_pts"></td>
+    <td><input type="text" name="aw_pts"></td>
   </tr><tr class="even"><td>Timespec</td>
-    <td><input type="text" name="aw_ts" id="aw_ts" size="5"></td>
+    <td><input type="text" name="aw_ts" size="5"></td>
   </tr>
   </tr><tr class="even">
     <td colspan="2"><input type="button" id="aw_md" value="Modify"></td>
@@ -282,19 +282,19 @@ return "<br>Timespec wizard:".
 <script type="text/javascript">
   {
     var t=$("#atWizard"), ip=$(t).attr("ip"), ts=$(t).attr("ts");
-    FW_replaceWidget("#aw_ts", "aw_ts", ["time"], "12:00");
-    $("[informid=aw_ts] input[type=text]").attr("id", "aw_ts");
+    FW_replaceWidget("[name=aw_ts]", "aw_ts", ["time"], "12:00");
+    $("[name=aw_ts] input[type=text]").attr("id", "aw_ts");
 
     function ipClick() {
       var c = $("#aw_ip").prop("checked");
-      $("#aw_ts").closest("tr").css("display", !c ? "table-row" : "none");
-      $("#aw_pts").closest("tr").css("display", c ? "table-row" : "none");
+      $("[name=aw_ts]") .closest("tr").css("display",!c ? "table-row" : "none");
+      $("[name=aw_pts]").closest("tr").css("display", c ? "table-row" : "none");
     }
     $("#aw_rl").prop("checked", $(t).attr("rl")=="yes");
     $("#aw_pr").prop("checked", $(t).attr("pr")=="yes");
     $("#aw_ip").prop("checked", ip);
-    $("#aw_ts").val(ip ? "12:00" : ts);
-    $("#aw_pts").val(ip ? ts : 'sunset()');
+    $("[name=aw_ts]").val(ip ? "12:00" : ts);
+    $("[name=aw_pts]").val(ip ? ts : 'sunset()');
     $("#aw_ip").change(ipClick);
     ipClick();
     $("#aw_md").click(function(){
@@ -303,7 +303,7 @@ return "<br>Timespec wizard:".
       def += $("#aw_rl").prop("checked") ? "+":"";
       def += $("#aw_pr").prop("checked") ? "*":"";
       def += $("#aw_ip").prop("checked") ? 
-               "{"+$("#aw_pts").val()+"}" : $("#aw_ts").val();
+               "{"+$("[name=aw_pts]").val()+"}" : $("[name=aw_ts]").val();
       def = def.replace(/\+/g, "%2b");
       def = def.replace(/;/g, ";;");
       location = location.pathname+"detail="+nm+"&cmd=modify "+def;
