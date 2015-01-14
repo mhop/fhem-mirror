@@ -181,7 +181,7 @@ sub SONOSPLAYER_Initialize ($) {
 	$hash->{StateFn} = "SONOSPLAYER_State";
 	$hash->{NotifyFn} = 'SONOSPLAYER_Notify';
 	
-	$hash->{AttrList}= "disable:0,1 generateVolumeSlider:0,1 generateVolumeEvent:0,1 generateSomethingChangedEvent:0,1 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:0,1 buttonEvents ".$readingFnAttributes;
+	$hash->{AttrList}= "disable:1,0 generateVolumeSlider:1,0 generateVolumeEvent:1,0 generateSomethingChangedEvent:1,0 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:1,0 buttonEvents ".$readingFnAttributes;
 	
 	return undef;
 }
@@ -648,7 +648,13 @@ sub SONOSPLAYER_Set($@) {
 		for(my $i = 4; $i < @a; $i++) {
 			$text .= ' '.$a[$i];
 		}
-		SONOS_DoWork($udn, lc($key), $value, $value2, $text);
+		
+		my $sonosName = SONOS_getDeviceDefHash(undef)->{NAME};
+		if ((ReadingsVal($sonosName, 'targetSpeakDir', '') eq '') || (ReadingsVal($sonosName, 'targetSpeakURL', '') eq '')) {
+			return $key.' not possible. Please define valid "targetSpeakDir" and "targetSpeakURL" for Device "'.$sonosName.'" first.';
+		} else {
+			SONOS_DoWork($udn, lc($key), $value, $value2, $text);
+		}
 	} elsif (lc($key) eq 'alarm') {
 		# Hier die komplette restliche Zeile in den zweiten Parameter packen, da damit auch Leerzeichen möglich sind
 		my $text = '';
@@ -1082,6 +1088,7 @@ sub SONOSPLAYER_Log($$$) {
 <br />
 <a name="SONOSPLAYERattr"></a>
 <h4>Attributes</h4>
+'''Attention'''<br />The attributes can only be used after a restart of fhem, because it must be initially transfered to the subprocess.
 <ul>
 <li><b>Common</b><ul>
 <li><a name="SONOSPLAYER_attribut_disable"><code>attr &lt;name&gt; disable &lt;int&gt;</code>
@@ -1361,6 +1368,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <br />
 <a name="SONOSPLAYERattr"></a>
 <h4>Attribute</h4>
+'''Hinweis'''<br />Die Attribute werden erst bei einem Neustart von Fhem verwendet, da diese dem SubProzess initial zur Verfügung gestellt werden müssen.
 <ul>
 <li><b>Grundsätzliches</b><ul>
 <li><a name="SONOSPLAYER_attribut_disable"><code>attr &lt;name&gt; disable &lt;int&gt;</code>
