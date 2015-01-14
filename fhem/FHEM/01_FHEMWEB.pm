@@ -507,8 +507,8 @@ FW_answerCall($)
 
   my ($dir1, $dirN, $ofile) = ($1, $2, $3)
              if($arg =~ m,^$FW_ME/([^/]*)(.*/)([^/]*)$,);
-  if($dir1 && $dir1 eq "icons") {
-    my ($icon,$cacheable) = (urlDecode($ofile), 1);
+  if($arg =~ m,^$FW_ME/icons/(.*)$,) {
+    my ($icon,$cacheable) = (urlDecode($1), 1);
     my $iconPath = FW_iconPath($icon);
 
     # if we do not have the icon, we convert the device state to the icon name
@@ -1464,7 +1464,7 @@ FW_fileList($)
   my @ret;
   return @ret if(!opendir(DH, $dir));
   while(my $f = readdir(DH)) {
-    next if($f !~ m,^$re$,);
+    next if($f !~ m,^$re$, || $f eq "99_Utils.pm");
     push(@ret, $f);
   }
   closedir(DH);
@@ -1512,12 +1512,15 @@ FW_returnFileAsStream($$$$$)
   }
 
   if(!open(FH, $path)) {
-    Log3 $FW_wname, 4, "FHEMWEB $FW_wname $path: $!";
-    TcpServer_WriteBlocking($FW_chash, 
-        "HTTP/1.1 404 Not Found\r\n".
-        "Content-Length:0\r\n\r\n");
-    FW_closeConn($FW_chash);
-    return 0;
+    my $npath = FW_fileNameToPath($1) if($path =~ m,([^/]*)$,);
+    if(!open(FH, $npath)) {     # Old style fake path
+      Log3 $FW_wname, 4, "FHEMWEB $FW_wname $path: $!";
+      TcpServer_WriteBlocking($FW_chash, 
+          "HTTP/1.1 404 Not Found\r\n".
+          "Content-Length:0\r\n\r\n");
+      FW_closeConn($FW_chash);
+      return 0;
+    }
   }
   binmode(FH) if($type !~ m/text/); # necessary for Windows
 
@@ -1687,7 +1690,7 @@ FW_style($$)
                                 if(!configDBUsed());
     FW_displayFileList("Own modules and helper files",
         FW_fileList("$MW_dir/^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday".
-                                  "|.*layout)\$"));
+                                  "|myUtilsTemplate.pm|.*layout)\$"));
     FW_displayFileList("gplot files",
         FW_fileList("$FW_gplotdir/^.*gplot\$"));
     FW_displayFileList("styles",
