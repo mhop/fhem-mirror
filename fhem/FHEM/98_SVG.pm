@@ -26,6 +26,7 @@ use vars qw(%FW_pos);     # scroll position
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw($FW_formmethod);
 use vars qw($FW_userAgent);
+use vars qw($FW_hiddenroom);
 
 my $SVG_RET;        # Returned data (SVG)
 sub SVG_calcOffsets($$);
@@ -541,6 +542,7 @@ SVG_WriteGplot($)
   my ($arg) = @_;
   FW_digestCgi($arg);
 
+  return if($FW_hiddenroom{detail});
   return SVG_showData() if($FW_webArgs{showFileLogData});
 
   if(!defined($FW_webArgs{par_0_0})) {
