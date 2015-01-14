@@ -30,6 +30,7 @@ my %hueModels = (
   LLC011 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC012 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLC013 => {name => 'Disney Living Colors'     ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC014 => {name => 'Living Colors Aura'       ,type => 'Color Light'            ,subType => 'colordimmer',},
   LLM001 => {name => 'Color Light Module'       ,type => 'Extended Color Light'   ,subType => 'extcolordimmer',},
   LST001 => {name => 'Hue LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
   LWB001 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
@@ -779,6 +780,11 @@ HUEDevice_Parse($$)
   my($hash,$result) = @_;
   my $name = $hash->{NAME};
 
+  if( ref($result) ne "HASH" ) {
+    Log3 $name, 2, "$name: got wrong status message for $name: $result";
+    return undef;
+  }
+
   Log3 $name, 4, "parse status message for $name";
   #Log3 $name, 5, Dumper $result;
 
@@ -842,6 +848,24 @@ HUEDevice_Parse($$)
 
       } elsif( $attr{$name}{model} =~ m/RGBW$/ ) {
         $attr{$name}{subType} = 'extcolordimmer';
+
+      } elsif( $attr{$name}{model} =~ m/RGBW$/ ) {
+        $attr{$name}{subType} = 'extcolordimmer';
+
+      } elsif( $hash->{type} ) {
+        if( $hash->{type} eq "Extended color light" ) {
+          $attr{$name}{subType} = 'extcolordimmer';
+
+        } elsif( $hash->{type} eq "Color light" ) {
+          $attr{$name}{subType} = 'colordimmer';
+
+        } elsif( $hash->{type} eq "Dimmable light" ) {
+          $attr{$name}{subType} = 'dimmer';
+
+        } elsif( $hash->{type} eq "Dimmable plug-in unit" ) {
+          $attr{$name}{subType} = 'dimmer';
+
+        }
 
       }
 
