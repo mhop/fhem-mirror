@@ -7,9 +7,10 @@
 #
 # FHEM module to commmunicate with a Sonos-System via UPnP
 #
-# !WARNING!
+########################################################################################
+# !ATTENTION!
 # This Module needs additional Perl-Libraries.
-# Installation of:
+# Install:
 #  * LWP::Simple
 #  * LWP::UserAgent
 #  * HTTP::Request
@@ -19,19 +20,42 @@
 #  * LWP::Simple-Packagename (incl. LWP::UserAgent and HTTP::Request): libwww-perl
 #  * SOAP::Lite-Packagename: libsoap-lite-perl
 #
+# e.g. as Windows ActivePerl (via Perl-Packagemanager)
+#  * Install Package LWP (incl. LWP::UserAgent and HTTP::Request)
+#  * Install Package SOAP::Lite
+#  * SOAP::Lite-Special for Versions after 5.18:
+#    * Add another Packagesource from suggestions or manual: Bribes de Perl (http://www.bribes.org/perl/ppm)
+#      * Install Package: SOAP::Lite
 #
-# define <name> SONOS <host:port> [[[interval] waittime] delaytime]
+# Windows ActivePerl 64Bit is not functioning due to missing SOAP::Lite
 #
-# where <name> may be replaced by any name string 
+########################################################################################
+# Configuration:
+# define <name> SONOS <host:port> [interval [waittime [delaytime]]]
+#
+# where <name> may be replaced by any fhem-devicename string 
 # <host:port> is the connection identifier to the internal server. Normally "localhost" with a locally free port e.g. "localhost:4711".
-# interval is the interval in s, for checking the existence of a ZonePlayer after definition
+# interval is the interval in s, for checking the existence of a ZonePlayer
 # waittime is the time to wait for the subprocess. defaults to 8.
 # delaytime is the Time for delaying the network- and subprocess-part of this module. If the port is longer than neccessary blocked on the subprocess-side, it may be useful.
+#
+##############################################
+# Example:
+# define Sonos SONOS localhost:4711 30
 #
 ########################################################################################
 # Changelog
 #
 # SVN-History:
+# 15.01.2015
+#	Beim Anlegen der neuen Devices werden die Aliasnamen nun mit der Funktion im Team erweitert
+#	Der Mechanismus zum Starten des SubProzesses wurde angepasst, um auf Synology-Begebenheiten Rücksicht zu nehmen
+#	Die Coverdarstellung für einige Spotify-Titel wurde korrigiert, indem eine andere Spotify-API verwendet wird
+#	Bei Playlist-Covern wird nun das Cover des ersten Titels mit AlbumArt angezeigt
+#	Bei Favourite-Covern werden nun Album-Favoriten auch mit Cover dargestellt (das Cover des ersten Titels mit AlbumArt)
+#	Ein Album aus der lokalen Bibliothek konnte mittels "StartFavourite" nicht korrekt gestartet werden (es wurde nicht als Liste übertragen, sondern als Titel gestartet)
+#	LogLevel für die "Connection accepted"-Meldungen auf 3 hochgesetzt
+#	Es gibt jetzt ein Attribut "disable" am Sonos-Device. Wird es auf 1 gesetzt, wird der SubProzess beendet und verarbeitet somit keine Sonos-Nachrichten mehr. Wird es auf 0 gesetzt (oder gelöscht), wird der SubProzess wieder gestartet.
 # 08.01.2015
 #	Bei der Wiedergabeanweisung "PlayURI" gab es einen Fehler
 # 05.01.2105
@@ -443,7 +467,7 @@ sub SONOS_Initialize ($) {
 	$hash->{GetFn}   = 'SONOS_Get';
 	$hash->{SetFn}   = 'SONOS_Set';
 	$hash->{AttrFn}  = 'SONOS_Attribute';
-	$hash->{NotifyFn}  = 'SONOS_Notify';
+	# $hash->{NotifyFn}  = 'SONOS_Notify';
 	
 	# CGI
 	my $name = "sonos";
@@ -455,7 +479,7 @@ sub SONOS_Initialize ($) {
 	eval {
 		no strict;
 		no warnings;
-		$hash->{AttrList}= 'pingType:'.join(',', @SONOS_PINGTYPELIST).' targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:0,1 targetSpeakFileHashCache:0,1 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:0,1 proxyCacheTime proxyCacheDir characterDecoding '.$readingFnAttributes;
+		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir characterDecoding '.$readingFnAttributes;
 		use strict;
 		use warnings;
 	};
@@ -707,13 +731,15 @@ sub SONOS_getGroupsRG() {
 sub SONOS_FhemWebCallback($) {
 	my ($URL) = @_;
 	
+	SONOS_Log undef, 5, 'FhemWebCallback: '.$URL;
+	
 	# Einfache Grundprüfungen
-	return ("text/html; charset=UTF8", 'Fehlerhafte Anfrage: '.$URL) if ($URL !~ m/^\/sonos\//i);
+	return ("text/html; charset=UTF8", 'Forbidden call: '.$URL) if ($URL !~ m/^\/sonos\//i);
 	$URL =~ s/^\/sonos//i;
 	
 	# Proxy-Features...
 	if ($URL =~ m/^\/proxy\//i) {
-		return ("text/html; charset=UTF8", 'Proxybetrieb nicht aktiviert: '.$URL) if (!AttrVal(SONOS_getDeviceDefHash(undef)->{NAME}, 'generateProxyAlbumArtURLs', 0));
+		return ("text/html; charset=UTF8", 'No Proxy configured: '.$URL) if (!AttrVal(SONOS_getDeviceDefHash(undef)->{NAME}, 'generateProxyAlbumArtURLs', 0));
 		
 		my $proxyCacheTime = AttrVal(SONOS_getDeviceDefHash(undef)->{NAME}, 'proxyCacheTime', 0);
 		my $proxyCacheDir = AttrVal(SONOS_getDeviceDefHash(undef)->{NAME}, 'proxyCacheDir', '/tmp');
@@ -721,6 +747,7 @@ sub SONOS_FhemWebCallback($) {
 		
 		# Zurückzugebende Adresse ermitteln...
 		my $albumurl = uri_unescape($1) if ($URL =~ m/^\/proxy\/aa\?url=(.*)/i);
+		$albumurl =~ s/&apos;/'/ig;
 		
 		# Nur für Sonos-Player den Proxy spielen (und für Spotify-Links)
 		my $ip = '';
@@ -731,7 +758,7 @@ sub SONOS_FhemWebCallback($) {
 				last;
 			}
 		}
-		return ("text/html; charset=UTF8", 'Anfrage für Nicht-Sonos-Player: '.$URL) if (defined($ip) && $albumurl !~ /\/original\//i && $albumurl !~ /\/music\/image\?/i);
+		return ("text/html; charset=UTF8", 'Call for No-Sonos-Player: '.$URL) if (defined($ip) && $albumurl !~ /\.cloudfront.net\//i && $albumurl !~ /\.scdn.co\/image\//i && $albumurl !~ /\/music\/image\?/i);
 		
 		# Generierter Dateiname für die Cache-Funktionalitaet
 		my $albumHash;
@@ -779,12 +806,19 @@ sub SONOS_FhemWebCallback($) {
 			FW_serveSpecial($2, $3, $1, 1);
 			
 			return (undef, undef);
+		} else {
+			SONOS_Log undef, 1, 'Cover couldn\'t be loaded: '.$albumurl;
+			
+			FW_serveSpecial('sonos_empty', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
+			return (undef, undef);
 		}
 	}
 	
 	# Cover-Features...
 	if ($URL =~ m/^\/cover\//i) {
 		$URL =~ s/^\/cover//i;
+		
+		SONOS_Log undef, 5, 'Cover: '.$URL;
 		
 		if ($URL =~ m/^\/empty.jpg/i) {
 			FW_serveSpecial('sonos_empty', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
@@ -813,7 +847,7 @@ sub SONOS_FhemWebCallback($) {
 	}
 	
 	# Wenn wir hier ankommen, dann konnte nichts verarbeitet werden...
-	return ("text/html; charset=UTF8", 'Fehlerhafte Anfrage: '.$URL);
+	return ("text/html; charset=UTF8", 'Call failure: '.$URL);
 }
 
 ########################################################################################
@@ -871,10 +905,12 @@ sub SONOS_Define($$) {
 	$hash->{DELAYTIME} = $delaytime;
 	$hash->{STATE} = 'waiting for subprocess...';
 	
-	if ($hash->{DELAYTIME}) {
-		InternalTimer(gettimeofday() + $hash->{DELAYTIME}, 'SONOS_DelayStart', $hash, 0);
-	} else {
-		SONOS_DelayStart($hash);
+	if (AttrVal($hash->{NAME}, 'disable', 0) == 0) {
+		if ($hash->{DELAYTIME}) {
+			InternalTimer(gettimeofday() + $hash->{DELAYTIME}, 'SONOS_DelayStart', $hash, 0);
+		} else {
+			InternalTimer(gettimeofday() + 1, 'SONOS_DelayStart', $hash, 0);
+		}
 	}
 	
 	return undef;
@@ -887,6 +923,8 @@ sub SONOS_Define($$) {
 ########################################################################################
 sub SONOS_DelayStart($) {
 	my ($hash) = @_;
+	
+	return undef if (AttrVal($hash->{NAME}, 'disable', 0));
 	
 	# Prüfen, ob ein Server erreichbar wäre, und wenn nicht, einen Server starten
 	SONOS_StartClientProcessIfNeccessary($hash->{DeviceName});
@@ -914,13 +952,74 @@ sub SONOS_DelayOpenDev($) {
 sub SONOS_Attribute($$$@) {
 	my ($mode, $devName, $attrName, $attrValue) = @_;
 	
+	my $disableChange = 0;
+	
 	if ($mode eq 'set') {
 		if ($attrName eq 'verbose') {
 			SONOS_DoWork('undef', 'setVerbose', $attrValue);
+		} elsif ($attrName eq 'disable') {
+			if ($attrValue && AttrVal($devName, $attrName, 0) != 1) {
+				SONOS_Log(undef, 5, 'Neu-Disabled');
+				$disableChange = 1;
+			}
+			
+			if (!$attrValue && AttrVal($devName, $attrName, 0) != 0) {
+				SONOS_Log(undef, 5, 'Neu-Enabled');
+				$disableChange = 1;
+			}
+		}
+	} elsif ($mode eq 'del') {
+		if ($attrName eq 'disable') {
+			if (AttrVal($devName, $attrName, 0) != 0) {
+				SONOS_Log(undef, 5, 'Deleted-Disabled');
+				$disableChange = 1;
+				$attrValue = 0;
+			}
+		}
+	}
+	
+	if ($disableChange) {
+		my $hash = SONOS_getDeviceDefHash(undef);
+		
+		# Wenn der Prozess beendet werden muss...
+		if ($attrValue) {
+			SONOS_Log undef, 5, 'Call AttributeFn: Stop SubProcess...';
+			
+			InternalTimer(gettimeofday() + 1, 'SONOS_StopSubProcess', $hash, 0);
+		}
+		
+		# Wenn der Prozess gestartet werden muss...
+		if (!$attrValue) {
+			SONOS_Log undef, 5, 'Call AttributeFn: Start SubProcess...';
+			
+			InternalTimer(gettimeofday() + 1, 'SONOS_DelayStart', $hash, 0);
 		}
 	}
 	
 	return undef;
+}
+
+########################################################################################
+#
+#  SONOS_StopSubProcess - Tries to stop the subprocess
+#
+########################################################################################
+sub SONOS_StopSubProcess($) {
+	my ($hash) = @_;
+	
+	# Den SubProzess beenden, wenn wir ihn selber gestartet haben
+	if ($SONOS_StartedOwnUPnPServer) {
+		# DevIo_OpenDev($hash, 1, undef);
+		DevIo_SimpleWrite($hash, "shutdown\n", 0);
+		DevIo_CloseDev($hash);
+		setReadingsVal($hash, "state", 'disabled', TimeNow());
+		$hash->{STATE} = 'disabled';
+		
+		# Alle SonosPlayer-Devices disappearen
+		for my $player (SONOS_getAllSonosplayerDevices()) {
+			SONOS_readingsSingleUpdateIfChanged($player, 'presence', 'disappeared', 1);
+		}
+	}
 }
 
 ########################################################################################
@@ -932,24 +1031,6 @@ sub SONOS_Notify() {
 	my ($hash, $notifyhash) = @_;
 	
 	return undef;
-	
-	#if (($notifyhash->{NAME} eq 'global') && ($notifyhash->{CHANGED}[0] eq 'REREADCFG')) {
-	#	SONOS_Log undef, 0, 'Detecting rereadcfg. Restart Sonos-Subprocess...';
-	#	
-	#	# Vorab warten, da im Hintergrund der Thread noch läuft und auch erstmal fertig werden muss...
-	#	select(undef, undef, undef, $hash->{WAITTIME});
-	#	
-	#	# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
-	#	RemoveInternalTimer($hash);
-	#	DevIo_SimpleWrite($hash, "disconnect\n", 0);
-	#	DevIo_CloseDev($hash);
-	#	
-	#	# Neu anstarten...
-	#	SONOS_StartClientProcessIfNeccessary($hash->{DeviceName}) if ($SONOS_StartedOwnUPnPServer);
-	#	InternalTimer(gettimeofday() + $hash->{WAITTIME}, 'SONOS_DelayOpenDev', $hash, 0);
-	#}
-	#
-	#return undef;
 }
 
 ########################################################################################
@@ -980,16 +1061,18 @@ sub SONOS_Read($) {
 	
 	# Wenn hier gar nichts gekommen ist, dann diesen Aufruf beenden...
 	if (!defined($buf) || ($buf eq '')) {
-		SONOS_Log undef, 1, 'Nothing could be read from TCP-Channel (the first level) even though the Read-Function was called.';
-		
-		# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
-		RemoveInternalTimer($hash);
-		DevIo_SimpleWrite($hash, "disconnect\n", 0);
-		DevIo_CloseDev($hash);
-		
-		# Neu anstarten...
-		SONOS_StartClientProcessIfNeccessary($hash->{DeviceName}) if ($SONOS_StartedOwnUPnPServer);
-		InternalTimer(gettimeofday() + $hash->{WAITTIME}, 'SONOS_DelayOpenDev', $hash, 0);
+		if (!AttrVal($hash->{NAME}, 'disable', 0)) {
+			SONOS_Log undef, 1, 'Nothing could be read from TCP-Channel (the first level) even though the Read-Function was called.';
+			
+			# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
+			RemoveInternalTimer($hash);
+			DevIo_SimpleWrite($hash, "disconnect\n", 0);
+			DevIo_CloseDev($hash);
+			
+			# Neu anstarten...
+			SONOS_StartClientProcessIfNeccessary($hash->{DeviceName}) if ($SONOS_StartedOwnUPnPServer);
+			InternalTimer(gettimeofday() + $hash->{WAITTIME}, 'SONOS_DelayOpenDev', $hash, 0);
+		}
 		
 		return;
 	}
@@ -1000,16 +1083,18 @@ sub SONOS_Read($) {
 		
 		# Wenn hier gar nichts gekommen ist, dann diesen Aufruf beenden...
 		if (!defined($newRead) || ($newRead eq '')) {
-			SONOS_Log undef, 1, 'Nothing could be read from TCP-Channel (the second level) even though the Read-Function was called. The client is now directed to shutdown and the connection should be re-initialized...';
-			
-			# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
-			RemoveInternalTimer($hash);
-			DevIo_SimpleWrite($hash, "disconnect\n", 0);
-			DevIo_CloseDev($hash);
-			
-			# Neu anstarten...
-			SONOS_StartClientProcessIfNeccessary($hash->{DeviceName}) if ($SONOS_StartedOwnUPnPServer);
-			InternalTimer(gettimeofday() + $hash->{WAITTIME}, 'SONOS_DelayOpenDev', $hash, 0);
+			if (!AttrVal($hash->{NAME}, 'disable', 0)) {
+				SONOS_Log undef, 1, 'Nothing could be read from TCP-Channel (the second level) even though the Read-Function was called. The client is now directed to shutdown and the connection should be re-initialized...';
+				
+				# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
+				RemoveInternalTimer($hash);
+				DevIo_SimpleWrite($hash, "disconnect\n", 0);
+				DevIo_CloseDev($hash);
+				
+				# Neu anstarten...
+				SONOS_StartClientProcessIfNeccessary($hash->{DeviceName}) if ($SONOS_StartedOwnUPnPServer);
+				InternalTimer(gettimeofday() + $hash->{WAITTIME}, 'SONOS_DelayOpenDev', $hash, 0);
+			}
 			
 			return;
 		}
@@ -1292,12 +1377,10 @@ sub SONOS_Read($) {
 			
 				my $srcURI = '';
 				if (defined($tempURI) && $tempURI ne '') {
-					if ($tempURI =~ m/getaa.*?x-sonos-spotify.*?(spotify.*)%3f/i) {
-						my $infos = get('https://embed.spotify.com/oembed/?url='.$1);
-						
-						if ($infos =~ m/"thumbnail_url":"(.*?)cover(.*?)"/i) {
-							$srcURI = $1.'original'.$2;
-							$srcURI =~ s/\\//g;
+					if ($tempURI =~ m/getaa.*?x-sonos-spotify%3aspotify%3atrack%3a(.*)%3f/i) {
+						my $infos = SONOS_getSpotifyCoverURL($1);
+						if ($infos ne '') {
+							$srcURI = $infos;
 							$currentValue = $attr{global}{modpath}.'/www/images/default/SONOSPLAYER/'.$name.'_'.$nextName.'AlbumArt.jpg';
 							SONOS_Log undef, 4, "Transport-Event: Spotify-Bilder-Download: SONOS_DownloadReplaceIfChanged('$srcURI', '".$currentValue."');";
 						} else {
@@ -1473,7 +1556,8 @@ sub SONOS_StartClientProcessIfNeccessary($) {
 			my $verboselevel = AttrVal(SONOS_getDeviceDefHash(undef)->{NAME}, 'verbose', $attr{global}{verbose});
 			
 			# Prozess anstarten...
-			exec('perl '.substr($0, 0, -7).'FHEM/00_SONOS.pm '.$port.' '.$verboselevel.' '.(($attr{global}{mseclog}) ? '1' : '0'));
+			# exec('perl '.substr($0, 0, -7).'FHEM/00_SONOS.pm '.$port.' '.$verboselevel.' '.(($attr{global}{mseclog}) ? '1' : '0'));
+			exec("$^X $attr{global}{modpath}/FHEM/00_SONOS.pm $port $verboselevel ".(($attr{global}{mseclog}) ? '1' : '0'));
 			exit(0);
 		}
 	} else {
@@ -1602,6 +1686,8 @@ sub SONOS_InitClientProcess($) {
 ########################################################################################
 sub SONOS_IsSubprocessAliveChecker() {
 	my ($hash) = @_;
+	
+	return undef if (AttrVal($hash->{NAME}, 'disable', 0));
 	
 	my $answer;
 	my $socket = new IO::Socket::INET(PeerAddr => $hash->{DeviceName}, Proto => 'tcp');
@@ -2454,7 +2540,7 @@ sub SONOS_Discover() {
 						
 						if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 							# Entscheiden, ob eine Abspielliste geladen und gestartet werden soll, oder etwas direkt abgespielt werden kann
-							if ($resultHash{$favouriteName}{METADATA} =~ m/<upnp:class>object.container.playlistContainer<\/upnp:class>/i) {
+							if ($resultHash{$favouriteName}{METADATA} =~ m/<upnp:class>object.container.(playlistContainer|album.musicAlbum)<\/upnp:class>/i) {
 	
 								SONOS_Log $udn, 5, 'StartFavourite AddToQueue-Res: "'.$resultHash{$favouriteName}{RES}.'", -Meta: "'.$resultHash{$favouriteName}{METADATA}.'"';
 								
@@ -3069,15 +3155,31 @@ sub SONOS_Discover() {
 sub SONOS_MakeCoverURL($$) {
 	my ($udn, $resURL) = @_;
 	
-	if ($resURL =~ m/^(x-rincon-cpcontainer|x-sonos-spotify).*?(spotify.*?)(\?|$)/i) {
-		my $infos = get('https://embed.spotify.com/oembed/?url='.$2);
+	SONOS_Log $udn, 5, 'MakeCoverURL-Before: '.$resURL;
+	
+	if ($resURL =~ m/^x-rincon-cpcontainer.*?(spotify.*?)(\?|$)/i) {
+		$resURL = SONOS_getSpotifyCoverURL($1, 1);
+	} elsif ($resURL =~ m/^x-sonos-spotify:spotify%3atrack%3a(.*?)(\?|$)/i) {
+		$resURL = SONOS_getSpotifyCoverURL($1);
+	} elsif (($resURL =~ m/x-rincon-playlist:.*?#(.*)/i) || ($resURL =~ m/savedqueues.rsq(#\d+)/i)) {
+		my $search = $1;
+		$search = 'SQ:'.$1 if ($search =~ m/#(\d+)/i);
 		
-		if ($infos =~ m/"thumbnail_url":"(.*?)cover(.*?)"/i) {
-			$resURL = $1.'original'.$2;
-			$resURL =~ s/\\//g;
-		}
-	} elsif($resURL =~ m/savedqueues/i) {
+		# Default, if nothing could be retreived...
 		$resURL = '/fhem/sonos/cover/playlist.jpg';
+		
+		if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
+			my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse($search, 'BrowseDirectChildren', '', 0, 5, '');
+			if ($result) {
+				my $tmp = $result->getValue('Result');
+				
+				if (defined($tmp) && $tmp =~ m/<item id=".+?".*?>.*?<upnp:albumArtURI>(.*?)<\/upnp:albumArtURI>.*?<\/item>/i) {
+					$resURL = $1;
+					
+					$resURL = $1.$resURL if (SONOS_Client_Data_Retreive($udn, 'reading', 'location', '') =~ m/^(http:\/\/.*?:.*?)\//i);
+				}
+			}
+		}
 	} else {
 		my $stream = 0;
 		$stream = 1 if ($resURL =~ /x-sonosapi-stream/);
@@ -3087,7 +3189,38 @@ sub SONOS_MakeCoverURL($$) {
 	# Alles über Fhem als Proxy laufen lassen?
 	$resURL = '/fhem/sonos/proxy/aa?url='.uri_escape($resURL) if (($resURL !~ m/^\//) && SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
 	
+	SONOS_Log $udn, 5, 'MakeCoverURL-After: '.$resURL;
+	
 	return $resURL;
+}
+
+########################################################################################
+#
+#  SONOS_getSpotifyCoverURL - Generates the approbriate cover-url for Spotify-Cover
+#
+########################################################################################
+sub SONOS_getSpotifyCoverURL($;$) {
+	my ($trackID, $oldStyle) = @_;
+	$oldStyle = 0 if (!defined($oldStyle));
+	
+	my $infos = '';
+	if ($oldStyle) {
+		$infos = $1 if (get('https://embed.spotify.com/oembed/?url='.$trackID) =~ m/"thumbnail_url":"(.*?)"/i);
+	} else {
+		$infos = $1 if (get('https://api.spotify.com/v1/tracks/'.$trackID) =~ m/"images".*?:.*?\[.*?{.*?"height".*?:.*?640,.*?"url".*?:.*?"(.*?)",.*?"width"/is);
+	}
+	
+	$infos =~ s/\\//g;
+	$infos = $1.'original'.$3 if ($infos =~ m/(.*?\/)(cover|default)(\/.*)/i);
+	
+	# Falls es ein Standardcover von Spotify geben soll, lieber das Thumbnail von Sonos verwenden...
+	return '' if ($infos =~ m/\/static\/img\/defaultCoverL.png/i);
+	
+	if ($infos ne '') {
+		return $infos;
+	}
+	
+	return '';
 }
 
 ########################################################################################
@@ -4065,13 +4198,24 @@ sub SONOS_Discover_Callback($$$) {
 				
 				$master = !$invisible || $isZoneBridge;
 			}
-			
-			# Wenn der aktuelle Player der Master ist, dann kein Kürzel anhängen, 
-			# damit gibt es immer einen Player, der den Raumnamen trägt, und die anderen enthalten Kürzel
-			if ($master) {
-				$topoType = '';
-			}
 		}
+		
+		# Für den Aliasnamen schöne Bezeichnungen ermitteln...
+		my $aliasSuffix = '';
+		$aliasSuffix = ' - Hinten Links' if ($topoType eq '_LR');
+		$aliasSuffix = ' - Hinten Rechts' if ($topoType eq '_RR');
+		$aliasSuffix = ' - Links' if ($topoType eq '_LF');
+		$aliasSuffix = ' - Rechts' if ($topoType eq '_RF');
+		$aliasSuffix = ' - Subwoofer' if ($topoType eq '_SW');
+		$aliasSuffix = ' - Mitte' if ($topoType eq '_LF_RF');
+		
+		# Wenn der aktuelle Player der Master ist, dann kein Kürzel anhängen, 
+		# damit gibt es immer einen Player, der den Raumnamen trägt, und die anderen enthalten Kürzel
+		if ($master) {
+			$topoType = '';
+		}
+		
+		# Raumnamen erweitern
 		$name .= $topoType;
 		$saveRoomName .= $topoType;
 		
@@ -4124,7 +4268,7 @@ sub SONOS_Discover_Callback($$$) {
 			# Define SonosPlayer-Device with attributes
 			SONOS_Client_Notifier('CommandDefine:'.$name.' SONOSPLAYER '.$udn);
 			SONOS_Client_Notifier('CommandAttr:'.$name.' room '.$SONOS_Client_Data{SonosDeviceName});
-			SONOS_Client_Notifier('CommandAttr:'.$name.' alias '.$roomName);
+			SONOS_Client_Notifier('CommandAttr:'.$name.' alias '.$roomName.$aliasSuffix);
 			SONOS_Client_Notifier('CommandAttr:'.$name.' group '.$groupName);
 			SONOS_Client_Notifier('CommandAttr:'.$name.' icon '.$iconPath);
 			SONOS_Client_Notifier('CommandAttr:'.$name.' sortby 1');
@@ -6174,7 +6318,7 @@ if (defined($SONOS_ListenPort)) {
 		 			my ($port, $iaddr) = sockaddr_in($addrinfo);
 		 			my $name = gethostbyaddr($iaddr, AF_INET);
 		 			
-		 			SONOS_Log undef, 1, "Connection accepted from $name:$port";
+		 			SONOS_Log undef, 3, "Connection accepted from $name:$port";
 		 			
 		 			# Von dort kommt die Anfrage, dort finde ich den Telnet-Port von Fhem :-)
 		 			$SONOS_UseTelnetForQuestions_Host = $name;
@@ -6663,7 +6807,7 @@ You can start this client on your own (to let it run instantly and independent f
 <br />
 <a name="SONOSdefine"></a>
 <h4>Define</h4>
-<code>define &lt;name&gt; SONOS [upnplistener] [[[interval] waittime] delaytime]</code>
+<code>define &lt;name&gt; SONOS [upnplistener [interval [waittime [delaytime]]]]</code>
         <br /><br /> Define a Sonos interface to communicate with a Sonos-System.<br />
 <p>
 <code>[upnplistener]</code><br />The name and port of the external upnp-listener. If not given, defaults to <code>localhost:4711</code>. The port has to be a free portnumber on your system. If you don't start a server on your own, the script does itself.<br />If you start it yourself write down the correct informations to connect.</p>
@@ -6712,10 +6856,13 @@ The order in the sublists are important, because the first entry defines the so-
 <br />
 <a name="SONOSattr"></a>
 <h4>Attributes</h4>
+'''Attention'''<br />The most of the attributes can only be used after a restart of fhem, because it must be initially transfered to the subprocess.
 <ul>
 <li><b>Common</b><ul>
 <li><a name="SONOS_attribut_characterDecoding"><code>attr &lt;name&gt; characterDecoding &lt;codingname&gt;</code>
 </a><br />With this attribute you can define a character-decoding-class. E.g. &lt;UTF-8&gt;. Default is &lt;CP-1252&gt;.</li>
+<li><a name="SONOS_attribut_disable"><code>attr &lt;name&gt; disable &lt;value&gt;</code>
+</a><br />One of (0,1). With this value you can disable the whole module. Works immediatly. If set to 1 the subprocess will be terminated and no message will be transmitted. If set to 0 the subprocess is again startet.<br />It is useful when you install new Sonos-Components and don't want any disgusting devices during the Sonos setup.</li>
 <li><a name="SONOS_attribut_pingType"><code>attr &lt;name&gt; pingType &lt;string&gt;</code>
 </a><br /> One of (none,tcp,udp,icmp,syn). Defines which pingType for alive-Checking has to be used. If set to 'none' no checks will be done.</li>
 </ul></li>
@@ -6788,7 +6935,7 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 <br />
 <a name="SONOSdefine"></a>
 <h4>Definition</h4>
-<code>define &lt;name&gt; SONOS [upnplistener] [[[interval] waittime] delaytime]</code>
+<code>define &lt;name&gt; SONOS [upnplistener [interval [waittime [delaytime]]]]</code>
         <br /><br /> Definiert das Sonos interface für die Kommunikation mit dem Sonos-System.<br />
 <p>
 <code>[upnplistener]</code><br />Name und Port eines externen UPnP-Client. Wenn nicht angegebenen wird <code>localhost:4711</code> festgelegt. Der Port muss eine freie Portnummer ihres Systems sein. <br />Wenn sie keinen externen Client gestartet haben, startet das Skript einen eigenen.<br />Wenn sie einen eigenen Dienst gestartet haben, dann geben sie hier die entsprechenden Informationen an.</p>
@@ -6837,12 +6984,15 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 <br />
 <a name="SONOSattr"></a>
 <h4>Attribute</h4>
+'''Hinweis'''<br />Die Attribute werden erst bei einem Neustart von Fhem verwendet, da diese dem SubProzess initial zur Verfügung gestellt werden müssen.
 <ul>
 <li><b>Grundsätzliches</b><ul>
 <li><a name="SONOS_attribut_characterDecoding"><code>attr &lt;name&gt; characterDecoding &lt;codingname&gt;</code>
 </a><br />Hiermit kann die Zeichendekodierung eingestellt werden. Z.b. &lt;UTF-8&gt;. Standardm&auml;&szlig;ig wird &lt;CP-1252&gt; verwendet.</li>
+<li><a name="SONOS_attribut_disable"><code>attr &lt;name&gt; disable &lt;value&gt;</code>
+</a><br />Eines von (0,1). Hiermit kann das Modul abgeschaltet werden. Wirkt sofort. Bei 1 wird der SubProzess beendet, und somit keine weitere Verarbeitung durchgeführt. Bei 0 wird der Prozess wieder gestartet.<br />Damit kann das Modul temporär abgeschaltet werden, um bei der Neueinrichtung von Sonos-Komponenten keine halben Zustände mitzubekommen.</li>
 <li><a name="SONOS_attribut_pingType"><code>attr &lt;name&gt; pingType &lt;string&gt;</code>
-</a><br /> One of (none,tcp,udp,icmp,syn). Gibt an, welche Methode für die Ping-Überprüfung verwendet werden soll. Wenn 'none' angegeben wird, dann wird keine Überprüfung gestartet.</li>
+</a><br /> Eines von (none,tcp,udp,icmp,syn). Gibt an, welche Methode für die Ping-Überprüfung verwendet werden soll. Wenn 'none' angegeben wird, dann wird keine Überprüfung gestartet.</li>
 </ul></li>
 <li><b>Proxy-Einstellungen</b><ul>
 <li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><code>attr &lt;name&gt; generateProxyAlbumArtURLs &lt;int&gt;</code>
