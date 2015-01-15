@@ -101,6 +101,10 @@ my $cmdBufferTimeout=0;
 
 my $ttsCmdTemplate = 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]"';
 my $ttsLinkTemplate = 'http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]';
+
+my $mohUpload = '/var/tmp/fhem_moh_upload';
+my $mohOld = '/var/tmp/fhem_fx_moh_old';
+my $mohNew = '/var/tmp/fhem_fx_moh_new';
    
 sub ##########################################
 FRITZBOX_Log($$$)
@@ -1072,8 +1076,9 @@ sub FRITZBOX_Cmd_Start($)
    {
       shift @val;
       $timeout = 5;
-      $timeout = $val[2]
-         if $val[2] =~/^\d+$/; 
+      if ($val[2]) {
+         $timeout = $val[2] if $val[2] =~/^\d+$/; 
+      }
       $timeout += 30;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
@@ -1226,7 +1231,8 @@ sub FRITZBOX_Ring_Run($)
  # Check if 1st parameter are comma separated numbers
    return $name."|0|Error: Parameter '$intNo' not a number (only commas (,) are allowed to separate numbers)"
       unless $intNo =~ /^[\d,]+$/;
-   
+   $intNo =~ s/#$//;
+  
 # Create a hash for the DECT devices whose ring tone (or radio station) can be changed
    foreach ( split( /,/, $intNo ) )
    {
@@ -1390,12 +1396,16 @@ sub FRITZBOX_Ring_Run($)
 
 # uses name of port 0-3 (dial port 1-4) to show messages on ringing phone
    my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
-   if ($ringWithIntern =~ /^([1-3])$/ )
+   if ( $ringWithIntern =~ /^([1-3])$/ )
    {
       push @cmdArray, "ctlmgr_ctl r telcfg settings/MSN/Port".($ringWithIntern-1)."/Name";
       push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$msg'";
       FRITZBOX_Log $hash, 4, "Change temporarily name of calling number $ringWithIntern to '$msg'";
       push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort $ringWithIntern"
+   } 
+   elsif ($field{show})
+   {
+      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined."
    }
    
 # Set tts-Message
@@ -1410,8 +1420,8 @@ sub FRITZBOX_Ring_Run($)
    
 #Preparing 3rd command array to ring and reset everything
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
-   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
-   push @cmdArray, "sleep ".($duration+2); # 2s added because it takes sometime until it starts ringing
+   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo."#";
+   push @cmdArray, "sleep ".($duration+0); # 0s added because it takes sometime until it starts ringing
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
       if $ringWithIntern != 0 ;
@@ -1440,9 +1450,6 @@ sub FRITZBOX_Ring_Run($)
       } else {
          push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[0]."'";
       }
-   } elsif ($field{show})
-   {
-      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined."
    }
    
 # Execute command array
@@ -1474,7 +1481,8 @@ sub FRITZBOX_Call_Run($)
  # Check if 1st parameter is a valid number
    return $name."|0|Error: Parameter '$extNo' not a valid phone number"
       unless $extNo =~ /^[\d\*\#+,]+$/;
-   
+   $extNo =~ s/#$//;
+       
  # Check if 2nd parameter is the duration
    shift @val;
    if (int @val)
@@ -1502,7 +1510,11 @@ sub FRITZBOX_Call_Run($)
 # Create tts link to say as moh
    if ( $field{say} ) 
    {
-      if ($hash->{READINGS}{box_moh})
+      unless ($hash->{READINGS}{box_moh})
+      {
+         FRITZBOX_Log $hash, 2, "Cannot do Text2Speech because box has no music on hold";
+      }
+      else
       {
          chop $field{say};
          # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
@@ -1518,10 +1530,6 @@ sub FRITZBOX_Call_Run($)
          $ttsText = uri_escape($ttsText);
          $ttsLink =~ s/\[TEXT\]/$ttsText/;
          FRITZBOX_Log $hash, 5, "Created Text2Speech internet link: $ttsLink";
-      }
-      else
-      {
-         FRITZBOX_Log $hash, 2, "Cannot do Text2Speech because box has no music on hold";
       }
    }
 
@@ -1542,110 +1550,78 @@ sub FRITZBOX_Call_Run($)
          FRITZBOX_Log $hash, 5, "Extracted MP3 ring tone: $ttsLink";
       }
    }
+   
    $result = FRITZBOX_Open_Connection( $hash );
    return "$name|0|$result" 
       if $result;
 
-#Preparing 1st command array
    @cmdArray = ();
    
 # Creation fhemRadioStation for ttsLink
-   # if (int (@FritzFons) == 0 && $ttsLink)
-   # {
-      # FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, parameter 'say:' will be ignored."
-   # }
-   # elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM")
-   # {
-      # FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
-      # push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Name FHEM";
-      # push @cmdArray, "ctlmgr_ctl w configd settings/WEBRADIO".$fhemRadioStation."/Bitmap 1023";
-   #Execute command array
-      # FRITZBOX_Exec( $hash, \@cmdArray )
-   # }
-   
-#Preparing 2nd command array
-# Change ring tone of Fritz!Fons
-   # if ($ringTone)
-   # {
-      # FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, ring tone will be ignored."
-         # unless @FritzFons;
-      # foreach (@FritzFons)
-      # {
-         # push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/IntRingTone";
-         # push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/IntRingTone $ringTone";
-         # FRITZBOX_Log $hash, 4, "Change temporarily internal ring tone of Fritz!Fon DECT $_ to $ringTone";
-         # if ($ttsLink)
-         # {
-            # push @cmdArray, "ctlmgr_ctl r telcfg settings/Foncontrol/User$_/RadioRingID";
-            # push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User$_/RadioRingID ".$fhemRadioStation;
-            # FRITZBOX_Log $hash, 4, "Change temporarily radio station of Fritz!Fon DECT $_ to $fhemRadioStation (FHEM)";
-         # }
-      # }
-   # }
+   if ($ttsLink)
+   {
+#Preparing 1st command array
+      push @cmdArray, '[ -f "'.$mohUpload.'" ] && rm "'.$mohUpload.'"';
+      push @cmdArray, '[ -f "'.$mohOld.'" ] && rm "'.$mohOld.'"';
+      push @cmdArray, '[ -f "'.$mohNew.'" ] && rm "'.$mohNew.'"';
+      push @cmdArray, 'wget -U Mozilla -O "'.$mohUpload.'" "'.$ttsLink.'"';
+      push @cmdArray, '[ -f "'.$mohUpload.'" ] && echo 1 || echo 0';
+      push @cmdArray, '[ -e /var/flash/fx_moh ] && echo 1 || echo 0';
+# Execute 1st command array
+      $result = FRITZBOX_Exec ( $hash, \@cmdArray );
+      return "$name|0|Could not access '$ttsLink'"
+         unless $result->[4] eq "1";
+      return "$name|0|Could locate '/var/flash/fx_moh'"
+         unless $result->[5] eq "1";
 
-# uses name of port 0-3 (dial port 1-4) to show messages on ringing phone
-   # my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
-   # if ($ringWithIntern =~ /^([1-3])$/ )
-   # {
-      # push @cmdArray, "ctlmgr_ctl r telcfg settings/MSN/Port".($ringWithIntern-1)."/Name";
-      # push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '$msg'";
-      # FRITZBOX_Log $hash, 4, "Change temporarily name of calling number $ringWithIntern to '$msg'";
-      # push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort $ringWithIntern"
-   # }
-   
-# Set tts-Message
-   # push @cmdArray, 'ctlmgr_ctl w configd settings/WEBRADIO'.$fhemRadioStation.'/URL "'.$ttsLink.'"'
-      # if $ttsLink;
+   #Prepare 2nd command array
+      push @cmdArray, 'if [ ! -f "/var/tmp/ffmpeg_mp3.tables" ]; then playerd_tables; fi';
+      push @cmdArray, 'ffmpegconv -i "'.$mohUpload.'" -o "'.$mohNew.'" --limit 32 --type 6';
+      push @cmdArray, '[ -f "'.$mohNew.'" ] && echo 1 || echo 0';
+   # Execute 2nd command array
+      $result = FRITZBOX_Exec ( $hash, \@cmdArray );
+      return "Could not convert '$ttsLink'"
+         unless $result->[2] eq "1";
 
-#Execute command array
-   # $result = FRITZBOX_Exec( $hash, \@cmdArray )
-      # if int( @cmdArray ) > 0;
+   #Execute 3rd command array
+      FRITZBOX_Exec( $hash, \@cmdArray );
 
-   # $intNo =~ s/,/#/g;
+   #Prepare 4th command array
+      push @cmdArray, 'cat /var/flash/fx_moh >"'.$mohOld.'"';
+      push @cmdArray, 'cat "'.$mohNew.'" >/var/flash/fx_moh';
+      push @cmdArray, 'killall -sigusr1 telefon';
+      push @cmdArray, 'rm "'.$mohUpload.'"';
+      push @cmdArray, 'rm "'.$mohNew.'"';
+   # Execute 4th command array
+      FRITZBOX_Exec ( $hash, \@cmdArray );
+   }
    
-#Preparing 3rd command array to ring and reset everything
-   # FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
-   # push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
-   # push @cmdArray, "sleep ".($duration+2); # 2s added because it takes sometime until it starts ringing
-   # push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
-   # push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
-      # if $ringWithIntern != 0 ;
-# Reset internal ring tones for the Fritz!Fons
-   # if ($ringTone)
-   # {
-      # foreach (keys @FritzFons)
-      # {
-         # push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/IntRingTone ".$result->[2*$_];
-      # Reset internet station for the Fritz!Fons
-         # if ($ttsLink)
-         # {
-            # push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/RadioRingID ".$result->[2*(int(@FritzFons)+$_)];
-         # }
-      # }
-   # }
-# Reset name of calling number
-   # if ($ringWithIntern =~ /^([1-2])$/)
-   # {
-      # if ($ttsLink) {
-         # push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[4*int(@FritzFons)]."'";
-         # push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo;
-         # push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
-      # } elsif ($ringTone) {
-         # push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[2*int(@FritzFons)]."'";
-      # } else {
-         # push @cmdArray, "ctlmgr_ctl w telcfg settings/MSN/Port".($ringWithIntern-1)."/Name '".$result->[0]."'";
-      # }
-   # } elsif ($field{show})
-   # {
-      # FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined."
-   # }
+#Preparing 4th command array
+# switch to (dial port 1-3) to avoid ringing of internal phone
+   my $ringWithIntern = AttrVal( $name, "ringWithIntern", 1 );
+   # push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 60";
+   push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort $ringWithIntern"
+         if $ringWithIntern =~ /^([1-3])$/ ;
    
+   FRITZBOX_Log $hash, 4, "Call $extNo for $duration seconds";
+   push @cmdArray, "ctlmgr_ctl w telcfg command/Dial ".$extNo."#";
+   push @cmdArray, "sleep ".($duration+0); # 0s added because it takes sometime until it starts ringing
+   push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup $ringWithIntern";
+   push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50";
+   if ($ttsLink)
+   {
+      push @cmdArray, 'cat "'.$mohOld.'" >/var/flash/fx_moh';
+      push @cmdArray, 'killall -sigusr1 telefon';
+      push @cmdArray, 'rm "'.$mohOld.'"';
+   }
+      
 # Execute command array
-   # FRITZBOX_Exec( $hash, \@cmdArray );
+   FRITZBOX_Exec( $hash, \@cmdArray );
 
-   # FRITZBOX_Close_Connection( $hash );
+   FRITZBOX_Close_Connection( $hash );
 
-   # return $name."|1|Ringing done";
+   return $name."|1|Calling done";
+
 } # End FRITZBOX_Call_Run
 
 ##########################################
@@ -1761,8 +1737,8 @@ sub FRITZBOX_SetMOH($@)
       push @cmdArray, $ttsCmd;
    } 
    elsif ($inFile =~ /^(ftp|http):\/\//)
-   {
-      push @cmdArray, 'wget -O "'.$uploadFile.'" "'.$inFile.'"';
+   { 
+      push @cmdArray, 'wget -U Mozilla -O "'.$uploadFile.'" "'.$inFile.'"';
    } else {
       push @cmdArray, 'cp "'.$inFile.'" "'.$uploadFile.'"';
    }
@@ -1773,12 +1749,13 @@ sub FRITZBOX_SetMOH($@)
       unless $result->[3] eq "1";
 
 #Prepare 2nd command array
-   push @cmdArray, 'ffmpegconv -i "'.$uploadFile.'" -o "'.$mohFile.'" --limit 32 --type 7';
+   push @cmdArray, 'if [ ! -f "/var/tmp/ffmpeg_mp3.tables" ]; then playerd_tables; fi';
+   push @cmdArray, 'ffmpegconv -i "'.$uploadFile.'" -o "'.$mohFile.'" --limit 32 --type 6';
    push @cmdArray, '[ -f "'.$mohFile.'" ] && echo 1 || echo 0';
 # Execute 2nd command array
    $result = FRITZBOX_Exec ( $hash, \@cmdArray );
    return "Could not convert '$inFile'"
-      unless $result->[1] eq "1";
+      unless $result->[2] eq "1";
 
 #Prepare 3rd command array
    push @cmdArray, 'cat "'.$mohFile.'" >/var/flash/fx_moh';
