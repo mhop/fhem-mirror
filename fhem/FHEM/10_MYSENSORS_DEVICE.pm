@@ -19,6 +19,7 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
+
 # $Id$
 #
 ##############################################
@@ -91,21 +92,21 @@ my %static_types = (
   S_TEMP                  => { receives => [], sends => [V_TEMP] }, # DallasTemperatureSensor
   S_HUM                   => { receives => [], sends => [V_HUM] }, # HumiditySensor
   S_BARO                  => { receives => [], sends => [V_PRESSURE,V_FORECAST] },
-  S_WIND                  => { receives => [], sends => [] }, # Not used so far
-  S_RAIN                  => { receives => [], sends => [] }, # Not used so far
+  S_WIND                  => { receives => [], sends => [V_WIND,V_GUST,V_DIRECTION] }, # Not used so far
+  S_RAIN                  => { receives => [], sends => [V_RAIN,V_RAINRATE] }, # Not used so far
   S_UV                    => { receives => [], sends => [V_UV] }, # UVSensor
-  S_WEIGHT                => { receives => [], sends => [] }, # Not used so far
+  S_WEIGHT                => { receives => [], sends => [V_WEIGHT] }, # Not used so far
   S_POWER                 => { receives => [V_VAR1], sends => [V_WATT,V_KWH,V_VAR1] }, # EnergyMeterPulseSensor
-  S_HEATER                => { receives => [], sends => [] }, # Not used so far
+  S_HEATER                => { receives => [], sends => [V_HEATER,V_HEATER_SW] }, # Not used so far
   S_DISTANCE              => { receives => [], sends => [V_DISTANCE] }, # DistanceSensor
   S_LIGHT_LEVEL           => { receives => [], sends => [V_LIGHT_LEVEL] }, # LightSensor
   S_ARDUINO_NODE          => { receives => [], sends => [] }, # Not used so far
   S_ARDUINO_REPEATER_NODE => { receives => [], sends => [] }, # Not used so far
   S_LOCK                  => { receives => [V_LOCK_STATUS], sends => [V_LOCK_STATUS] }, #R FIDLockSensor
-  S_IR                    => { receives => [], sends => [] }, # Not used so far
+  S_IR                    => { receives => [V_IR_SEND], sends => [V_IR_RECEIVE] }, # Not used so far
   S_WATER                 => { receives => [V_VAR1], sends => [V_FLOW,V_VOLUME,V_VAR1] }, # WaterMeterPulseSensor
   S_AIR_QUALITY           => { receives => [], sends => [V_VAR1] }, # AirQualitySensor
-  S_CUSTOM                => { receives => [], sends => [] }, # Not used so far
+  S_CUSTOM                => { receives => [], sends => [V_VAR1,V_VAR2,V_VAR3] }, # Not used so far
   S_DUST                  => { receives => [], sends => [V_DUST_LEVEL] }, # Not used so far
   S_SCENE_CONTROLLER      => { receives => [], sends => [V_SCENE_ON,V_SCENE_OFF] }, # TouchDisplaySceneControllerDisplaySensor
 );
@@ -628,3 +629,4 @@ sub mappedReadingToRaw($$$) {
 
 =end html
 =cut
+
