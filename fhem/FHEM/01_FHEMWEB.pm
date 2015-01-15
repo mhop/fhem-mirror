@@ -524,6 +524,7 @@ FW_answerCall($)
   } elsif($dir1 && !$data{FWEXT}{"/$dir1"}) {
     my $dir = "$dir1$dirN";
     my $ext = "";
+    $dir =~ s,/$,,;
     $dir =~ s/\.\.//g;
     $dir =~ s,www/,,g; # Want commandref.html to work from file://...
 
