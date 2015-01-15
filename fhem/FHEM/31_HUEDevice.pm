@@ -41,10 +41,11 @@ my %hueModels = (
  'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
 
- 'PAR16 50 TW'      => {name => 'Lightify PAR16 50 tunable white'    ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
- 'Classic A60 TW'   => {name => 'Lightify Classic A60 tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
- 'Classic A60 RGBW' => {name => 'Lightify Classic A60 RGBW'          ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
- 'Gardenspot RGB'   => {name => 'Lightify Gardenspot Mini RGB'       ,type => 'Color Light'             ,subType => 'colordimmer',},
+ 'Classic A60 RGBW' => {name => 'LIGHTIFY Classic A60 RGBW'            ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
+ 'Gardenspot RGB'   => {name => 'LIGHTIFY Gardenspot Mini RGB'         ,type => 'Color Light'             ,subType => 'colordimmer',},
+ 'Surface Light TW' => {name => 'LIGHTIFY Surface light tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
+ 'Classic A60 TW'   => {name => 'LIGHTIFY Classic A60 tunable white'   ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
+ 'PAR16 50 TW'      => {name => 'LIGHTIFY PAR16 50 tunable white'      ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
 );
 
 my %dim_values = (
