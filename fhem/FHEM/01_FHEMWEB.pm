@@ -2213,23 +2213,15 @@ FW_makeEdit($$$)
 }
 
 
-my %jsTab = (
-  '\\' => '\\\\',
-  '"'  => '\\"',
-  '\t' => '\\t',
-  '\r' => '\\r',
-  '\n' => '\\n',
-  '\b' => '\\b',
-  '\v' => '\\v'
-);
+my %jsTab = ( 92=>'\\\\', 34=>'\\"', 9=>'\\t', 13=>'\\r', 10=>'\\n' );
 sub
 FW_longpollInfo($$$$)
 {
   my ($dev, $state, $html, $fmt) = @_;
   if($fmt && $fmt eq "JSON") {
-    $dev   =~ s/([\\"\t\r\n\b\v])/$jsTab{$1}/ge;
-    $state =~ s/([\\"\t\r\n\b\v])/$jsTab{$1}/ge;
-    $html  =~ s/([\\"\t\r\n\b\v])/$jsTab{$1}/ge;
+    $dev   =~ s/([\\"\t\r\n])/$jsTab{ord($1)}/ge;
+    $state =~ s/([\\"\t\r\n])/$jsTab{ord($1)}/ge;
+    $html  =~ s/([\\"\t\r\n])/$jsTab{ord($1)}/ge;
     return "[\"$dev\",\"$state\",\"$html\"]";
   } else {
     return "$dev<<$state<<$html";
