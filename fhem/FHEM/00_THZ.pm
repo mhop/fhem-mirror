@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 01/2015
-my $thzversion = "0.126";
+my $thzversion = "0.127";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -308,7 +308,7 @@ my %getsonly206 = (
 	"sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
 	"sLast10errors"			=> {cmd2=>"D1", type =>"D1last206", unit =>""},
         "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  #allFB
-        "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime", unit =>""},
+        "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
         "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm", unit =>""},
 	"sFirmware-Id" 			=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
  );
@@ -1099,6 +1099,11 @@ my %parsinghash = (
 	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
 	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
 	      ["/", 			16, 2, "hex", 1]
+	     ],
+ "FCtime206" => [["Weekday: ", 		7, 1,  "weekday", 1],	[" Hour: ",	8, 2, "hex", 1],
+	      [" Min: ",		10, 2,  "hex", 1], 	[" Sec: ",	12, 2, "hex", 1],
+	      [" Date: ", 		14, 2, "year", 1],	["/", 		18, 2, "hex", 1],
+	      ["/", 			20, 2, "hex", 1]
 	     ],
   "FDfirm" => [["version: ", 	4, 4, "hex", 100]
 	     ],
