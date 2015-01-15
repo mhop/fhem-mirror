@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7005 2015-01-13 20:15:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7006 2015-01-13 20:15:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -30,7 +30,6 @@ sub CALVIEW_Define($$){
 	my $calender	= $a[2];		
 	my $inter	= 43200; 
 	my $modes = $a[3];
-	my $test = qx(fhem(\"list $calender TYPE\"));
 	return "invalid Calendername \"$calender\", define it first" if((devspec2array("NAME=$calender")) != 1 );
 	$hash->{NAME} 	= $name;
 	$hash->{KALENDER} 	= $calender;
