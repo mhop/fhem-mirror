@@ -936,7 +936,7 @@ sub SONOSPLAYER_Log($$$) {
 <br />Uses the Google Text-To-Speech-Engine for generating MP3-Files of the given text and plays it on the SonosPlayer. Possible languages can be obtained from Google. e.g. "de", "en", "fr", "es"...</li>
 <li><a name="SONOSPLAYER_setter_StartFavourite">
 <code>set &lt;name&gt; StartFavourite &lt;Favouritename&gt; [NoStart]</code></a>
-<br /> Starts the named sonos-favorite. The parameter should be URL-encoded for proper naming of lists with special characters. If the Word 'NoStart' is given as second parameter, than the Loading will be done, but the playing-state is leaving untouched e.g. not started.</li>
+<br /> Starts the named sonos-favorite. The parameter should be URL-encoded for proper naming of lists with special characters. If the Word 'NoStart' is given as second parameter, than the Loading will be done, but the playing-state is leaving untouched e.g. not started.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/meine.hits/</code>.</li>
 <li><a name="SONOSPLAYER_setter_StartPlaylist">
 <code>set &lt;name&gt; StartPlaylist &lt;Playlistname&gt; [EmptyQueueBeforeImport]</code></a>
 <br /> Loads the given Playlist and starts playing immediately. For all Options have a look at "LoadPlaylist".</li>
@@ -1012,10 +1012,10 @@ sub SONOSPLAYER_Log($$$) {
 <br /> Clears the current queue</li>
 <li><a name="SONOSPLAYER_setter_LoadPlaylist">
 <code>set &lt;name&gt; LoadPlaylist &lt;Playlistname&gt; [EmptyQueueBeforeImport]</code></a>
-<br /> Loads the named playlist to the current playing queue. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistname can be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')<br />If EmptyQueueBeforeImport is given and set to 1, the queue will be emptied before the import process. If not given, the parameter will be interpreted as 1.</li>
+<br /> Loads the named playlist to the current playing queue. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistname can be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')<br />If EmptyQueueBeforeImport is given and set to 1, the queue will be emptied before the import process. If not given, the parameter will be interpreted as 1.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/hits.2014/</code>.</li>
 <li><a name="SONOSPLAYER_setter_LoadRadio">
 <code>set &lt;name&gt; LoadRadio &lt;Radiostationname&gt;</code></a>
-<br /> Loads the named radiostation (favorite). The current queue will not be touched but deactivated. The parameter should be URL-encoded for proper naming of lists with special characters.</li>
+<br /> Loads the named radiostation (favorite). The current queue will not be touched but deactivated. The parameter should be URL-encoded for proper naming of lists with special characters.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/radio/</code>.</li>
 <li><a name="SONOSPLAYER_setter_SavePlaylist">
 <code>set &lt;name&gt; SavePlaylist &lt;Playlistname&gt;</code></a>
 <br /> Saves the current queue as a playlist with the given name. An existing playlist with the same name will be overwritten. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistname can be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')</li>
@@ -1216,7 +1216,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <br /> Verwendet die Google Text-To-Speech-Engine um den angegebenen Text in eine MP3-Datei umzuwandeln und anschließend mittels <code>PlayURITemp</code> als Durchsage abzuspielen. Mögliche Sprachen können auf der Google-Seite nachgesehen werden. Möglich sind z.B. "de", "en", "fr", "es"...</li>
 <li><a name="SONOSPLAYER_setter_StartFavourite">
 <code>set &lt;name&gt; StartFavourite &lt;FavouriteName&gt; [NoStart]</code></a>
-<br /> Startet den angegebenen Favoriten. Der Name bezeichnet einen Eintrag in der Sonos-Favoritenliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Wenn das Wort 'NoStart' als zweiter Parameter angegeben wurde, dann wird der Favorit geladen und fertig vorbereitet, aber nicht explizit gestartet.</li>
+<br /> Startet den angegebenen Favoriten. Der Name bezeichnet einen Eintrag in der Sonos-Favoritenliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Wenn das Wort 'NoStart' als zweiter Parameter angegeben wurde, dann wird der Favorit geladen und fertig vorbereitet, aber nicht explizit gestartet.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/meine.hits/</code>.</li>
 <li><a name="SONOSPLAYER_setter_StartPlaylist">
 <code>set &lt;name&gt; StartPlaylist &lt;Playlistname&gt; [EmptyQueueBeforeImport]</code></a>
 <br /> Lädt die benannte Playlist und startet sofort die Wiedergabe. Zu den Parametern und Bemerkungen bitte unter "LoadPlaylist" nachsehen.</li>
@@ -1292,10 +1292,10 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <br /> Leert die aktuelle Abspielliste</li>
 <li><a name="SONOSPLAYER_setter_LoadPlaylist">
 <code>set &lt;name&gt; LoadPlaylist &lt;Playlistname&gt; [EmptyQueueBeforeImport]</code></a>
-<br /> Lädt die angegebene Playlist in die aktuelle Abspielliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).<br />Wenn der Parameter EmptyQueueBeforeImport mit ''1'' angegeben wirde, wird die aktuelle Abspielliste vor dem Import geleert. Standardmäßig wird hier ''1'' angenommen.</li>
+<br /> Lädt die angegebene Playlist in die aktuelle Abspielliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).<br />Wenn der Parameter EmptyQueueBeforeImport mit ''1'' angegeben wirde, wird die aktuelle Abspielliste vor dem Import geleert. Standardmäßig wird hier ''1'' angenommen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/hits.2014/</code>.</li>
 <li><a name="SONOSPLAYER_setter_LoadRadio">
 <code>set &lt;name&gt; LoadRadio &lt;Radiostationname&gt;</code></a>
-<br /> Startet den angegebenen Radiostream. Der Name bezeichnet einen Sender in der Radiofavoritenliste. Die aktuelle Abspielliste wird nicht verändert. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen.</li>
+<br /> Startet den angegebenen Radiostream. Der Name bezeichnet einen Sender in der Radiofavoritenliste. Die aktuelle Abspielliste wird nicht verändert. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/radio/</code>.</li>
 <li><a name="SONOSPLAYER_setter_SavePlaylist">
 <code>set &lt;name&gt; SavePlaylist &lt;Playlistname&gt;</code></a>
 <br /> Speichert die aktuelle Abspielliste unter dem angegebenen Namen. Eine bestehende Playlist mit diesem Namen wird überschrieben. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).</li>

@@ -48,6 +48,8 @@
 #
 # SVN-History:
 # 15.01.2015
+#	Für die Setter "LoadPlaylist", "StartPlaylist", "LoadRadio", "StartRadio" und "StartFavourite" kann man jetzt anstatt des Namens einen regulären Ausdruck verwenden.
+#	Beim Erkennen der Player werden einige Abspielreadings ("transportState", "currentTrackURI", "currentTrackDuration", "currentTrackPosition", "currentTrack", "numberOfTracks", "currentStreamAudio" und "currentNormalAudio") nun direkt abgeholt, und werden somit aktuell korrekt gesetzt.
 #	Beim Anlegen der neuen Devices werden die Aliasnamen nun mit der Funktion im Team erweitert
 #	Der Mechanismus zum Starten des SubProzesses wurde angepasst, um auf Synology-Begebenheiten Rücksicht zu nehmen
 #	Die Coverdarstellung für einige Spotify-Titel wurde korrigiert, indem eine andere Spotify-API verwendet wird
@@ -2488,7 +2490,18 @@ sub SONOS_Discover() {
 						$Data::Dumper::Indent = 2;
 					}
 				} elsif ($workType eq 'loadRadio') {
-					my $radioName = uri_unescape($params[0]);
+					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
+					my $radioName = $1 if ($regSearch);
+					$radioName = uri_unescape($params[0]) if (!$regSearch);
+					
+					# RegEx prüfen...
+					if ($regSearch) {
+						eval { "" =~ m/$radioName/ };
+						if($@) {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad RegExp "'.$radioName.'": '.$@);
+							return;
+						}
+					}
 					
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
 						my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('R:0/0', 'BrowseDirectChildren', '', 0, 0, '');
@@ -2498,12 +2511,22 @@ sub SONOS_Discover() {
 					
 						my %resultHash;
 						while ($tmp =~ m/(<item id="(R:0\/0\/\d+)".*?>)<dc:title>(.*?)<\/dc:title>.*?(<upnp:class>.*?<\/upnp:class>).*?<res.*?>(.*?)<\/res>.*?<\/item>/ig) {
-							$resultHash{$3}{TITLE} = $3;
-							$resultHash{$3}{RES} = decode_entities($5);
-							$resultHash{$3}{METADATA} = $SONOS_DIDLHeader.$1.'<dc:title>'.$3.'</dc:title>'.$4.'<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON65031_</desc></item>'.$SONOS_DIDLFooter;
+							my $name = $3;
+							$resultHash{$name}{TITLE} = $name;
+							$resultHash{$name}{RES} = decode_entities($5);
+							$resultHash{$name}{METADATA} = $SONOS_DIDLHeader.$1.'<dc:title>'.$name.'</dc:title>'.$4.'<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON65031_</desc></item>'.$SONOS_DIDLFooter;
+							
+							# Den ersten Match ermitteln, und sich den echten Namen für die Zukunft merken...
+							if ($regSearch) {
+								if ($name =~ m/$radioName/) {
+									$radioName = $name;
+									$regSearch = 0;
+								}
+							}
 						}
 						
-						if (!$resultHash{$radioName}) {
+						# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
+						if (!$resultHash{$radioName} || $regSearch) {
 							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Radio "'.$radioName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
 							return;
 						}
@@ -2514,7 +2537,19 @@ sub SONOS_Discover() {
 						}
 					}
 				} elsif ($workType eq 'startFavourite') {
-					my $favouriteName = uri_unescape($params[0]);
+					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
+					my $favouriteName = $1 if ($regSearch);
+					$favouriteName = uri_unescape($params[0]) if (!$regSearch);
+					
+					# RegEx prüfen...
+					if ($regSearch) {
+						eval { "" =~ m/$favouriteName/ };
+						if($@) {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad RegExp "'.$favouriteName.'": '.$@);
+							return;
+						}
+					}
+					
 					my $nostart = 0;
 					if (defined($params[1]) && lc($params[1]) eq 'nostart') {
 						$nostart = 1;
@@ -2528,12 +2563,22 @@ sub SONOS_Discover() {
 					
 						my %resultHash;
 						while ($tmp =~ m/(<item id="(FV:2\/\d+)".*?>)<dc:title>(.*?)<\/dc:title>.*?<res.*?>(.*?)<\/res>.*?<r:resMD>(.*?)<\/r:resMD>.*?<\/item>/ig) {
-							$resultHash{$3}{TITLE} = $3;
-							$resultHash{$3}{RES} = decode_entities($4);
-							$resultHash{$3}{METADATA} = decode_entities($5);
+							my $name = $3;
+							$resultHash{$name}{TITLE} = $name;
+							$resultHash{$name}{RES} = decode_entities($4);
+							$resultHash{$name}{METADATA} = decode_entities($5);
+							
+							# Den ersten Match ermitteln, und sich den echten Namen für die Zukunft merken...
+							if ($regSearch) {
+								if ($name =~ m/$favouriteName/) {
+									$favouriteName = $name;
+									$regSearch = 0;
+								}
+							}
 						}
 						
-						if (!$resultHash{$favouriteName}) {
+						# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
+						if (!$resultHash{$favouriteName} || $regSearch) {
 							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Favourite "'.$favouriteName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
 							return;
 						}
@@ -2565,7 +2610,20 @@ sub SONOS_Discover() {
 					}
 				} elsif ($workType eq 'loadPlaylist') {
 					my $answer = '';
-					my $playlistName = uri_unescape($params[0]);
+					
+					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
+					my $playlistName = $1 if ($regSearch);
+					$playlistName = uri_unescape($params[0]) if (!$regSearch);
+					
+					# RegEx prüfen...
+					if ($regSearch) {
+						eval { "" =~ m/$playlistName/ };
+						if($@) {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad RegExp "'.$playlistName.'": '.$@);
+							return;
+						}
+					}
+					
 					my $overwrite = $params[1];
 					
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn}) && SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
@@ -2635,10 +2693,20 @@ sub SONOS_Discover() {
 						
 							my %resultHash;
 							while ($tmp =~ m/<container id="(SQ:\d+)".*?<dc:title>(.*?)<\/dc:title>.*?<\/container>/ig) {
-								$resultHash{$2} = $1;
+								my $name = $2;
+								$resultHash{$name} = $1;
+								
+								# Den ersten Match ermitteln, und sich den echten Namen für die Zukunft merken...
+								if ($regSearch) {
+									if ($name =~ m/$playlistName/) {
+										$playlistName = $name;
+										$regSearch = 0;
+									}
+								}
 							}
 							
-							if (!$resultHash{$playlistName}) {
+							# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
+							if (!$resultHash{$playlistName} || $regSearch) {
 								SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Playlist "'.$playlistName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
 								return;
 							}
@@ -4351,6 +4419,30 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'softwareRevision', $displayVersion);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'serialNum', $serialNum);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'fieldType', $fieldType);
+		
+		# Abspielreadings vorab ermitteln, um darauf prüfen zu können...
+		if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+			eval {
+				my $result = SONOS_AVTransportControlProxy{$udn}->GetTransportInfo(0);
+				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'transportState', $result->getValue('CurrentTransportState'));
+				
+				$result = SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
+				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackURI', $result->getValue('TrackURI'));
+				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackDuration', $result->getValue('TrackDuration'));
+				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPosition', $result->getValue('RelTime'));
+				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrack', $result->getValue('Track'));
+				
+				$result = SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0);
+				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'numberOfTracks', $result->getValue('NrTracks'));
+				my $stream = ($result->getValue('CurrentURI') =~ m/^x-(sonosapi|rincon)-stream:.*?/);
+				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentStreamAudio', $stream);
+				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentNormalAudio', !$stream);
+			};
+			if ($@) {
+				SONOS_Log undef, 4, 'Couldn\'t retrieve Current Transportsettings: '. $@;
+			}
+		}
+		
 		SONOS_Client_Data_Refresh('', $udn, 'LastSubscriptionsRenew', SONOS_TimeNow());
 		SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
 		
