@@ -88,6 +88,11 @@
 #
 # 2014-09-30 - added     support for device based userattr
 #
+# 2015-01-12 - changed   use fhem function createUniqueId()
+#                        instead of database calls
+#
+# 2015-01-15 - changed   remove 99_Utils.pm from filelist
+#
 ##############################################################################
 #
 
@@ -548,8 +553,8 @@ sub cfgDB_FW_fileList($$@) {
 	foreach my $f (@files) {
 		next if( $f !~ m/^$dir/ );
 		$f =~ s,$dir\/,,;
-		next if($f !~ m,^$re$,);
-		push @ret, "$f.configDB" unless $f eq '99_Utils.pm';
+		next if($f !~ m,^$re$, || $f eq '99_Utils.pm');
+		push @ret, "$f.configDB";
 	}
 	return @ret;
 }
@@ -665,17 +670,6 @@ sub _cfgDB_Rotate($) {
 	$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
 	return $uuid;
 }
-
-# return a UUID based on DB-model
-#sub _cfgDB_Uuid() {
-#	my $fhem_dbh = _cfgDB_Connect;
-#	my $uuid;
-#	$uuid = $fhem_dbh->selectrow_array('select lower(hex(randomblob(16)))') if($cfgDB_dbtype eq 'SQLITE');
-#	$uuid = $fhem_dbh->selectrow_array('select uuid()') if($cfgDB_dbtype eq 'MYSQL');
-#	$uuid = $fhem_dbh->selectrow_array('select uuid_generate_v4()') if($cfgDB_dbtype eq 'POSTGRESQL');
-#	$fhem_dbh->disconnect();
-#	return $uuid;
-#}
 
 # 2015-01-12 use the fhem default function
 sub _cfgDB_Uuid() {
