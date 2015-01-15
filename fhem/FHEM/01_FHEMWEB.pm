@@ -1513,15 +1513,12 @@ FW_returnFileAsStream($$$$$)
   }
 
   if(!open(FH, $path)) {
-    my $npath = FW_fileNameToPath($1) if($path =~ m,([^/]*)$,);
-    if(!open(FH, $npath)) {     # Old style fake path
-      Log3 $FW_wname, 4, "FHEMWEB $FW_wname $path: $!";
-      TcpServer_WriteBlocking($FW_chash, 
-          "HTTP/1.1 404 Not Found\r\n".
-          "Content-Length:0\r\n\r\n");
-      FW_closeConn($FW_chash);
-      return 0;
-    }
+    Log3 $FW_wname, 4, "FHEMWEB $FW_wname $path: $!";
+    TcpServer_WriteBlocking($FW_chash, 
+        "HTTP/1.1 404 Not Found\r\n".
+        "Content-Length:0\r\n\r\n");
+    FW_closeConn($FW_chash);
+    return 0;
   }
   binmode(FH) if($type !~ m/text/); # necessary for Windows
 
