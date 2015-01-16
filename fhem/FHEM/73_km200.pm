@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0037 2015-01-14 16:00:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0038 2015-01-16 19:30:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -132,9 +132,13 @@
 #		0036    13.01.2015	Sailor				km200_GetDynService				Preparing DbLog Split
 #		0036    13.01.2015	Sailor				km200_GetStatService			Preparing DbLog Split
 #		0036    13.01.2015	Sailor				=pod							Correction of errors and German description added
-#		0037    14.01.2015	Sailor				km200_DbLog_splitFn				Try-out DbLog Split
+#		0037    14.01.2015	Sailor				km200_DbLog_splitFn				Try-out DbLog Split (Failed... no name of device handed over in event)
 #		0037    14.01.2015	Sailor				=pod							Correction of errors
 #		0037    14.01.2015	Sailor				km200_Attr						Readings are being deleted if set not to be polled by attribute
+#		0038    16.01.2015	Sailor				km200_Attr						Implementing hierarchy top-down in DoNotPoll 
+#		0038    16.01.2015	Sailor				km200_ParseHttpResponseInit		Implementing hierarchy top-down in DoNotPoll 
+#		0038    16.01.2015	Sailor				=pod							Implementing hierarchy top-down in DoNotPoll
+#		0038    16.01.2015	Sailor				del_double						Adding a helper to delete double entries in arrays
 ########################################################################################################################
 
 
@@ -203,7 +207,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0037";
+	my $ModuleVersion           = "0038";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -558,18 +562,17 @@ sub km200_Define($$)
 	if ($Km200Info eq "ERROR") 
 	{
 		## Communication with Gateway WRONG !! ##
-	
 		$hash->{STATE}="Error - No Communication";
 		return ($name .": km200 - ERROR - The communication between fhem and the Buderus KM200 failed! \n". 
-		               "                  Please check physical connection, IP-address and  passwords! \n");
+		               "                  Please check physical connection, IP-address and passwords! \n");
 	} 
-	elsif ($Km200Info eq "SERVICE NOT AVAILABLE") 
+	elsif ($Km200Info eq "SERVICE NOT AVAILABLE") ## Communication OK but service not available ##
 	{
-		Log3 $name, 5, $name. " : km200 -  /gateway/DateTime             : NOT AVAILABLE";			## Communication OK but service not available ##
+		Log3 $name, 5, $name. " : km200 -  /gateway/DateTime             : NOT AVAILABLE";
 	} 
-	else 
+	else ## Communication OK and service is available ##
 	{
-		Log3 $name, 5, $name. " : km200 - /gateway/DateTime              : " .$Km200Info->{value};	## Communication OK and service is available ##
+		Log3 $name, 5, $name. " : km200 - /gateway/DateTime              : AVAILABLE";				
 	}
 	####END####### Check whether communication to the physical unit is possible ################################END#####
 
@@ -752,7 +755,21 @@ sub km200_Attr(@)
 		RemoveInternalTimer($hash);
 		####END#### Stop the current timer
 
-		###START###### Filter all services not to be polled out of known services = AllServices (new) #############START####
+		
+		###START###### Filter all services not to be polled out of known services = AllServices (new) #########START####
+		
+		### Search for all Services in @KM200_AllServices which containing the Service(hierarchy) not to be polled
+		my @KM200_DONOTPOLLTEMP = @KM200_DONOTPOLL;
+		foreach my $SearchWord(@KM200_DONOTPOLLTEMP)
+		{
+			my @DONOTPOLLGREP = grep {/^$SearchWord/}@KM200_AllServices;			
+			@KM200_DONOTPOLL  = (@KM200_DONOTPOLL, @DONOTPOLLGREP);
+		}
+		
+		### Delete double entries in array
+		@KM200_DONOTPOLL = &del_double(@KM200_DONOTPOLL);
+		
+		### For each Service not to be polled: Delete the Service from @KM200_AllServices and delete the reading in fhem
 		foreach my $SearchWord(@KM200_DONOTPOLL)
 		{
 			my $FoundPosition = first_index{ $_ eq $SearchWord }@KM200_AllServices;
@@ -765,15 +782,18 @@ sub km200_Attr(@)
 				fhem( "deletereading $name $SearchWord" );
 			}
 		}
+		
+		### Save list of services to be polled to hash
 		@{$hash->{Secret}{KM200ALLSERVICES}} = @KM200_AllServices;
-		####END####### Filter all services not to be polled out of known services = AllServices (new) ##############END#####
+		
+		####END####### Filter all services not to be polled out of known services = AllServices (new) ##########END#####
 
 		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". @KM200_DONOTPOLL;
 		
-		###START###### Initiate the timer for first time polling of  values from KM200 but wait 5s ################START####
+		###START###### Initiate the timer for first time polling of  values from KM200 but wait 5s ############START####
 		InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
 		Log3 $name, 5, $name. " : km200 - Internal timer for Init of services restarted after services set by attribute not to be polled.";
-		####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ################END#####
+		####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ############END#####
 	}
 	### If no attributes of the above known ones have been selected
 	else
@@ -899,6 +919,16 @@ sub str_repeat($$)
     return(${string}x${count});
 }
 ####END######## Repeats "string" for "count" times #############################################################END#####
+
+
+###START####### Removes double entries in arrays ##############################################################START####
+sub del_double
+{
+my %all;
+$all{$_}=0 for @_;
+return (keys %all);
+} 
+####END######## Removes double entries in arrays ###############################################################END#####
 
 
 ###START###### Subroutine Encrypt Data ########################################################################START####
@@ -1124,7 +1154,7 @@ sub km200_GetSingleService($)
 		else 
 		{
 			Log3 $name, 4, $name. " : km200_GetSingleService: ". $Service . " NOT available";
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read              : $Service \n";}
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read                   : $Service \n";}
 
 		}
 		
@@ -1254,13 +1284,13 @@ sub km200_ParseHttpResponseInit($)
 			### Check whether service is writeable and write name of service in array
 			if ($json->{writeable} == 1)
 			{
-				if ($hash->{CONSOLEMESSAGE} == true) {print " and is writeable";}
+				if ($hash->{CONSOLEMESSAGE} == true) {print " and is writeable     ";}
 				push (@KM200_WriteableServices, $Service);
 			}
 			else
 			{
 				# Do nothing
-				if ($hash->{CONSOLEMESSAGE} == true) {print "                 ";}
+				if ($hash->{CONSOLEMESSAGE} == true) {print "                      ";}
 			}
 			### Check whether service is writeable and write name of service in array
 			
@@ -1276,7 +1306,7 @@ sub km200_ParseHttpResponseInit($)
 	else 
 	{
 		Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: ". $Service . " NOT available";
-		if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read              : $Service \n";}
+		if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read                   : $Service \n";}
 	}
 
 	### Log entries for debugging purposes
@@ -1308,10 +1338,25 @@ sub km200_ParseHttpResponseInit($)
 		}
 		####END####### Filter all static services out of responsive services = responsive dynamic services #########END#####
 
+		###START###### Filter all responsive services out of known static services = responsive static services ###START####
+		my @KM200_StatServices = ();
+
+		foreach my $SearchWord(@KM200_RespondingServices)
+		{
+			my $FoundPosition = first_index{ $_ eq $SearchWord }@{$hash->{Secret}{KM200STATSERVICES}};
+			if ($FoundPosition >= 0)
+			{
+				push (@KM200_StatServices, $SearchWord);
+			}
+		}
+		####END####### Filter all responsive services out of known static services = responsive static services ####END#####
+		
+		
 		### Save arrays of services in hash
 		@{$hash->{Secret}{KM200RESPONDINGSERVICES}} = @KM200_RespondingServices;
 		@{$hash->{Secret}{KM200WRITEABLESERVICES}}  = @KM200_WriteableServices;
 		@{$hash->{Secret}{KM200DYNSERVICES}}        = @KM200_DynServices;
+		@{$hash->{Secret}{KM200STATSERVICES}}       = @KM200_StatServices;
 		### Save arrays of services in hash
 
 		$hash->{status}{FlagInitRequest}            = false;
@@ -1793,7 +1838,8 @@ sub km200_ParseHttpResponseStat($)
 		<tr>
 			<td>
 			<tr><td align="right" valign="top"><li><code>DoNotPoll</code> : </li></td><td align="left" valign="top">A list of services separated by blanks which shall not be downloaded due to repeatable crashes or irrelevant values.<BR>
-																												   The default value (empty) therefore nothing will be ignored.<BR>
+																													The list can be filled with the name of the top - hierarchy service, which means everything below that service will also be ignored.<BR>
+																													The default value (empty) therefore nothing will be ignored.<BR>
 			</td></tr>			
 			</td>
 		</tr>
@@ -1887,7 +1933,7 @@ sub km200_ParseHttpResponseStat($)
 	<table>
 		<tr>
 			<td align="right" valign="top"><code>&lt;service&gt;</code> : </td><td align="left" valign="top">Der Name des Service welcher ausgelesen werden soll. Z.B.:  "<code>/heatingCircuits/hc1/operationMode</code>"<BR>
-																											&nbsp;&nbsp;Es gibt nur den Wert, aber nicht die Werteliste oder den m&ouml;glichen Wertebereich zur&uuml;ck.<BR>
+																											 &nbsp;&nbsp;Es gibt nur den Wert, aber nicht die Werteliste oder den m&ouml;glichen Wertebereich zur&uuml;ck.<BR>
 			</td>
 		</tr>
 	</table>
@@ -1909,7 +1955,7 @@ sub km200_ParseHttpResponseStat($)
 		<tr>
 			<td>
 			<tr><td align="right" valign="top"><li><code>IntervalDynVal</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiges Abfrageintervall f&uuml;r die sich st&auml;ndig ver&auml;ndernden - dynamischen Werte der KM200/KM50 Services. Der Wert muss gr&ouml;&szlig;er gleich >=20s sein um dem Modul gen&uuml;gend Zeit einzur&auml;umen eine volle Abfrage auszuf&uuml;hren bevor die n&auml;chste Abfrage startet.<BR>
-																												   Der Default-Wert ist 90s.<BR>
+																														 Der Default-Wert ist 90s.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1921,8 +1967,8 @@ sub km200_ParseHttpResponseStat($)
 		<tr>
 			<td>
 			<tr><td align="right" valign="top"><li><code>IntervalStatVal</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiges Abfrageintervall f&uuml;r die statischen Werte des KM200/KM50. Der Wert muss gr&ouml;&szlig;er gleich >=20s sein um dem Modul gen&uuml;gend Zeit einzur&auml;umen eine volle Abfrage auszuf&uuml;hren bevor die n&auml;chste Abfrage startet. <BR>
-																												   Der Default-Wert ist 3600s.<BR>
-																												   Der Wert "0" deaktiviert die wiederholte Abfrage der statischen Werte bis das fhem-System erneut gestartet wird oder die fhem.cfg neu geladen wird.<BR>
+																														  Der Default-Wert ist 3600s.<BR>
+																														  Der Wert "0" deaktiviert die wiederholte Abfrage der statischen Werte bis das fhem-System erneut gestartet wird oder die fhem.cfg neu geladen wird.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1934,7 +1980,7 @@ sub km200_ParseHttpResponseStat($)
 		<tr>
 			<td>
 			<tr><td align="right" valign="top"><li><code>PollingTimeout</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert um dem KM200/KM50 gen&uuml;gend Zeit zur Antwort einzelner Werte einzur&auml;umen. Normalerweise braucht dieser Wert nicht ver&auml;ndert werden, muss jedoch im Falle eines langsamen Netzwerks erh&ouml;ht werden<BR>
-																												   Der Default-Wert ist 5s.<BR>
+																														 Der Default-Wert ist 5s.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1946,7 +1992,7 @@ sub km200_ParseHttpResponseStat($)
 		<tr>
 			<td>
 			<tr><td align="right" valign="top"><li><code>ConsoleMessage</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Boolean Wert (0 oder 1) welcher die Aktivit&auml;ten und Fehlermeldungen des Modul in der Konsole ausgibt. "0" (Deaktiviert) or "1" (Aktiviert)<BR>
-																												   Der Default-Wert ist 0 (Deaktiviert).<BR>
+																														 Der Default-Wert ist 0 (Deaktiviert).<BR>
 			</td></tr>			
 			</td>
 		</tr>
@@ -1958,7 +2004,8 @@ sub km200_ParseHttpResponseStat($)
 		<tr>
 			<td>
 			<tr><td align="right" valign="top"><li><code>DoNotPoll</code> : </li></td><td align="left" valign="top">Eine durch Leerzeichen (Blank) getrennte Liste von Services welche von der Abfrage aufgrund irrelevanter Werte oder fhem - Abst&uuml;rzen ausgenommen werden sollen.<BR>
-																												   Der Default Wert ist (empty) somit werden alle bekannten Services abgefragt.<BR>
+																													Die Liste kann auch Hierarchien von services enthalten. Dies bedeutet, das alle Services unterhalb dieses Services ebenfalls gel&ouml;scht werden.<BR>
+																													Der Default Wert ist (empty) somit werden alle bekannten Services abgefragt.<BR>
 			</td></tr>			
 			</td>
 		</tr>
