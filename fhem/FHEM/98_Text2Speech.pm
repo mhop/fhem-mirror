@@ -24,6 +24,7 @@ use HttpUtils;
 use Digest::MD5 qw(md5_hex);
 use URI::Escape;
 use Data::Dumper;
+use lib ('./FHEM/lib', './lib');
 
 sub Text2Speech_OpenDev($);
 sub Text2Speech_CloseDev($);
@@ -270,7 +271,7 @@ sub Text2Speech_Write($$) {
   my $dev = $hash->{Host};
 
   #my $call = "set tts tts Das ist ein Test.";
-  my $call = "set $name tts $msg";
+  my $call = "set $name $msg"; 
 
   Text2Speech_OpenDev($hash) if(!$hash->{TCPDev});
   #lets try again
@@ -314,14 +315,18 @@ sub Text2Speech_Set($@)
       Text2Speech_PrepareSpeech($hash, join(" ", @a));
       $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", 60, "Text2Speech_AbortFn", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     } elsif ($hash->{MODE} eq "REMOTE") {
-      Text2Speech_Write($hash, join(" ", @a));
+      Text2Speech_Write($hash, "tts " . join(" ", @a));
     } else {return undef;}
   } elsif($cmd eq "volume") {
-      my $vol = join(" ", @a);
-      return "volume adjusting only available in direct mode" if($hash->{MODE} ne "DIRECT");
-      return "volume level expects 0..100 percent" if($vol !~ m/^([0-9]{1,3})$/ or $vol > 100);
+    my $vol = join(" ", @a);
+    return "volume level expects 0..100 percent" if($vol !~ m/^([0-9]{1,3})$/ or $vol > 100);
+    
+    if($hash->{MODE} eq "DIRECT") {
       $hash->{VOLUME} = $vol  if($vol <= 100);
       delete($hash->{VOLUME}) if($vol > 100);
+    } elsif ($hash->{MODE} eq "REMOTE") {
+      Text2Speech_Write($hash, "volume $vol");
+    } else {return undef;}  
   }
 
   return undef;
@@ -497,8 +502,44 @@ sub Text2Speech_BuildMplayerCmdString($$) {
 
   $cmd = $TTS_MplayerCall . " " . $mplayerAudioOpts . $AlsaDevice . " " .$NoDebug. " " . $mplayerOpts . " " . $file; 
 
+  my $mp3Duration =  Text2Speech_CalcMP3Duration($hash, $file);
+  BlockingInformParent("Text2Speech_readingsSingleUpdateByName", [$hash->{NAME}, "duration", "$mp3Duration"], 0);
+  BlockingInformParent("Text2Speech_readingsSingleUpdateByName", [$hash->{NAME}, "endTime", "00:00:00"], 0);
   return $cmd;
 }
+
+sub Text2Speech_readingsSingleUpdateByName($$$) {
+  my ($devName, $readingName, $readingVal) = @_;
+  my $hash = $defs{$devName};
+  Log3 $hash, 4, "Text2Speech_readingsSingleUpdateByName: Dev:$devName Reading:$readingName Val:$readingVal";
+  readingsSingleUpdate($defs{$devName}, $readingName, $readingVal, 1);
+}
+
+#####################################
+# param1: string: MP3 Datei inkl. Pfad
+# 
+# Ermittelt die Abspieldauer einer MP3 und gibt die Zeit in Sekunden zurück.
+# Die Abspielzeit wird auf eine ganze Zahl gerundet
+#####################################
+sub Text2Speech_CalcMP3Duration($$) {
+  my $time;
+  my ($hash, $file) = @_;
+  eval {
+    use MP3::Info;    
+    my $tag = get_mp3info($file);
+    if ($tag) {
+	  $time = int($tag->{SECS}+0.5);
+      Log3 $hash, 4, "Text2Speech_CalcMP3Duration: $file hat eine Länge von $time Sekunden.";
+    }
+  };
+  
+  if ($@) {
+	Log3 $hash, 2, "Text2Speech_CalcMP3Duration: Bei der MP3-Längenermittlung ist ein Fehler aufgetreten: $@";
+    return undef;
+  }
+  return $time;
+}
+
 
 #####################################
 # param1: hash  : Hash
