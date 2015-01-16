@@ -638,21 +638,21 @@ sub SONOSPLAYER_Set($@) {
 	
 		SONOS_DoWork($udn, 'addURIToQueue', $value);
 	} elsif ((lc($key) eq 'speak') || ($key =~ m/speak\d+/i)) {
-		$key = 'speak0' if (lc($key) eq 'speak');
-		
-		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
-		$udn = $hash->{UDN};
-		
-		# Hier die komplette restliche Zeile in den zweiten Parameter packen, da damit auch Leerzeichen möglich sind
-		my $text = '';
-		for(my $i = 4; $i < @a; $i++) {
-			$text .= ' '.$a[$i];
-		}
-		
 		my $sonosName = SONOS_getDeviceDefHash(undef)->{NAME};
-		if ((ReadingsVal($sonosName, 'targetSpeakDir', '') eq '') || (ReadingsVal($sonosName, 'targetSpeakURL', '') eq '')) {
-			return $key.' not possible. Please define valid "targetSpeakDir" and "targetSpeakURL" for Device "'.$sonosName.'" first.';
+		if ((AttrVal($sonosName, 'targetSpeakDir', '') eq '') || (AttrVal($sonosName, 'targetSpeakURL', '') eq '')) {
+			return $key.' not possible. Please define valid "targetSpeakDir"- and "targetSpeakURL"-Attribute for Device "'.$sonosName.'" first.';
 		} else {
+			$key = 'speak0' if (lc($key) eq 'speak');
+			
+			$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+			$udn = $hash->{UDN};
+			
+			# Hier die komplette restliche Zeile in den Text-Parameter packen, da damit auch Leerzeichen möglich sind
+			my $text = '';
+			for(my $i = 4; $i < @a; $i++) {
+				$text .= ' '.$a[$i];
+			}
+		
 			SONOS_DoWork($udn, lc($key), $value, $value2, $text);
 		}
 	} elsif (lc($key) eq 'alarm') {
