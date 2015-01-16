@@ -253,12 +253,12 @@ sub FRITZBOX_Set($$@)
    
    my $list = "alarm"
             . " call"
-            . " createPwdFile"
             . " customerRingTone"
             . " dect:on,off"
             . " diversity"
             . " guestWlan:on,off"
             . " moh"
+            . " password"
             . " ring"
             . " sendMail"
             . " startRadio"
@@ -302,18 +302,6 @@ sub FRITZBOX_Set($$@)
          # return FRITZBOX_ConvertRingTone $hash, @val;
       # }
       
-   } elsif ( lc $cmd eq 'createpwdfile') {
-      if (int @val > 0) 
-      {
-         my $pwdFile = AttrVal( $name, "pwdFile", "fb_pwd.txt");
-         open( FILE, ">".$pwdFile) 
-            or return "Error when opening password file '$pwdFile': ".$!;
-         print FILE join( " ", @val);
-         close FILE
-            or return "Error when closing password file '$pwdFile': ".$!;
-         return "Created password file '$pwdFile'";
-      }
-
    } elsif ( lc $cmd eq 'customerringtone') {
       if (int @val > 0) 
       {
@@ -368,6 +356,14 @@ sub FRITZBOX_Set($$@)
             return $resultStr;
          }
       }
+      
+# set password
+   } elsif ( lc $cmd eq 'password') {
+      if (int @val == 1) 
+      {
+         return FRITZBOX_storePassword ( $hash, $val[0] );
+      }
+
 #set Ring
    } elsif ( lc $cmd eq 'ring') {
       if (int @val > 0) 
@@ -440,8 +436,87 @@ sub FRITZBOX_Get($@)
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
-# Starts the data capturing and sets the new readout timer
+
+#####################################
+# checks and stores FritzBox password used for telnet connection
+sub FRITZBOX_storePassword($$)
+{
+    my ($hash, $password) = @_;
+     
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my $key = getUniqueId().$index;
+    
+    my $enc_pwd = "";
+    
+    if(eval "use Digest::MD5;1")
+    {
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }
+    
+    for my $char (split //, $password)
+    {
+        my $encode=chop($key);
+        $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }
+    
+    my $err = setKeyValue($index, $enc_pwd);
+    return "error while saving the password - $err" if(defined($err));
+    
+    return "password successfully saved";
+} # end FRITZBOX_storePassword
+
+   
+#####################################
+# reads the FritzBox password
+sub FRITZBOX_readPassword($)
+{
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+   my $key = getUniqueId().$index;
+
+   my ($password, $err);
+
+   FRITZBOX_Log $hash, 5, "Read FritzBox password from file";
+   ($err, $password) = getKeyValue($index);
+
+   if(defined($err))
+   {
+      FRITZBOX_Log $hash, 4, "unable to read FritzBox password from file: $err";
+      return undef;
+   }  
+    
+   if(defined($password))
+   {
+      if(eval "use Digest::MD5;1")
+      {
+         $key = Digest::MD5::md5_hex(unpack "H*", $key);
+         $key .= Digest::MD5::md5_hex($key);
+      }
+
+      my $dec_pwd = '';
+     
+      for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g))
+      {
+         my $decode=chop($key);
+         $dec_pwd.=chr(ord($char)^ord($decode));
+         $key=$decode.$key;
+      }
+     
+      return $dec_pwd;
+   }
+   else
+   {
+      FRITZBOX_Log $hash, 4, "No password in file";
+      return undef;
+   }
+} # end FRITZBOX_readPassword
+   
 ##########################################
+# Starts the data capturing and sets the new readout timer
 sub FRITZBOX_Readout_Start($)
 {
    my ($timerpara) = @_;
@@ -1909,21 +1984,24 @@ sub FRITZBOX_Open_Connection($)
       
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
 
-   my $pwdFile = AttrVal( $name, "pwdFile", "fb_pwd.txt");
-   my $pwd;
+   my $pwd = FRITZBOX_readPassword($hash);
    my $msg;
    my $before;
    my $match;
    
-   FRITZBOX_Log $hash, 5, "Open password file '$pwdFile' to extract password";
-   if (open(IN, "<" . $pwdFile)) {
-      $pwd = <IN>;
-      close(IN);
-     FRITZBOX_Log $hash, 5, "Close password file";
-   } else {
-      $msg = "Error: Cannot open password file '$pwdFile': $!";
-      FRITZBOX_Log $hash, 2, $msg;
-      return $msg;
+   unless (defined $pwd)
+   {
+      my $pwdFile = AttrVal( $name, "pwdFile", "fb_pwd.txt");
+      FRITZBOX_Log $hash, 5, "Open password file '$pwdFile' to extract password";
+      if (open(IN, "<" . $pwdFile)) {
+         $pwd = <IN>;
+         close(IN);
+        FRITZBOX_Log $hash, 5, "Close password file";
+      } else {
+         $msg = "Error: Cannot open password file '$pwdFile': $!";
+         FRITZBOX_Log $hash, 2, $msg;
+         return $msg;
+      }
    }
    
    my $user = AttrVal( $name, "telnetUser", "" );
@@ -2378,7 +2456,7 @@ sub FRITZBOX_fritztris($)
    signaling devices. MP3 files and Text2Speech can be played as ring tone or when calling phones.
    <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki-Link</b></a>
    <br/><br/>
-   The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must be stored in the file 'fb_pwd.txt' in the root directory of FHEM.
+   The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must once be set.
    <br/><br/>
    The commands are directly executed on the Fritz!Box shell. That means, no official API is used but mainly the internal interface program that links web interface and firmware kernel. An update of FritzOS might hence lead to modul errors if AVM changes the interface.
    <br>
@@ -2409,11 +2487,6 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; alarm &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Switches the alarm number (1, 2 or 3) on or off.
-      </li><br>
-
-      <li><code>set &lt;name&gt; createPwdFile &lt;password&gt;</code>
-         <br>
-         Creates a file that contains the telnet password. The file name corresponds to the one used for remote telnet access.
       </li><br>
 
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
@@ -2451,6 +2524,11 @@ sub FRITZBOX_fritztris($)
          <br>
          Changes the 'music on hold' of the Box. The parameter 'customer' allows to upload a mp3 file. Alternatively a text can be spoken with "say:". The music on hold has <u>always</u> a length of 8.2 s. It is played continousely during the broking of calls or if the modul rings a phone and the call is taken. So, it can be used to transmit little messages of 8 s.
          <br>
+      </li><br>
+
+      <li><code>set &lt;name&gt; password &lt;password&gt;</code>
+         <br>
+         Stores the password for remote telnet access.
       </li><br>
 
       <li><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text]  [say:Text | play:Link]</code>
@@ -2546,11 +2624,6 @@ sub FRITZBOX_fritztris($)
          IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
       </li><br>
 
-      <li><code>pwdFile &lt;fileName&gt;</code>
-         <br>
-         File that contains the password for telnet access. Default is 'fb_pwd.txt' in the root directory of FHEM.
-      </li><br>
-
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
          User name that is used for telnet access. By default no user name is required to login.
@@ -2639,7 +2712,7 @@ sub FRITZBOX_fritztris($)
    Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien und Text (Text2Speech) k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
    <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki-Link</b></a>
    <br/><br/>
-   Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss das Passwort in der Datei 'fb_pwd.txt' im Wurzelverzeichnis von FHEM gespeichert sein.
+   Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss einmalig das Passwort gesetzt werden.
    <br/><br/>
    Die Steuerung erfolgt direkt &uuml;ber die Fritz!Box Shell. D.h. es wird keine offizielle API genutzt sondern vor allem die interne Schnittstelle der Box zwischen Webinterface und Firmware Kern. Eine Aktualisierung des FritzOS kann also zu Modul-Fehlern f&uuml;hren, wenn AVM diese Schnittstelle &auml;ndert.
    <br>
@@ -2670,11 +2743,6 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; alarm &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Schaltet den Weckruf Nummer 1, 2 oder 3 an oder aus.
-      </li><br>
-
-      <li><code>set &lt;name&gt; createPwdFile &lt;password&gt;</code>
-         <br>
-         Erzeugt eine Datei welche das Telnet-Passwort enth&auml;lt. Der Dateiname entspricht demjenigen, der f&uuml;r den Telnetzugriff genutzt wird.
       </li><br>
 
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;MP3DateiInklusivePfad&gt;</code>
@@ -2714,6 +2782,11 @@ sub FRITZBOX_fritztris($)
          <br>
       </li><br>
       
+      <li><code>set &lt;name&gt; password &lt;Passwort&gt;</code>
+         <br>
+         Speichert das Passwort f&uuml;r den Fernzugriff &uuml;ber Telnet.
+      </li><br>
+
       <li><code>set &lt;name&gt; ring &lt;intNummern&gt; [Dauer [Klingelton]] [show:Text] [say:Text | play:Link]</code>
          Beispiel:
          <br>
@@ -2800,11 +2873,6 @@ sub FRITZBOX_fritztris($)
       <li><code>fritzBoxIP</code>
          <br>
          IP Adresse oder ULR der Fritz!Box f&uuml;r Fernzugriff per Telnet. Standard ist "fritz.box".
-      </li><br>
-      
-      <li><code>pwdFile &lt;fileName&gt;</code>
-         <br>
-         Damit kann die Datei ge&uuml;ndert werden, welche das Passwort f&uuml;r den Telnetzugang enth&auml;lt. Der Standard ist 'fb_pwd.txt' im Wurzelverzeichnis von FHEM.
       </li><br>
      
       <li><code>telnetUser &lt;user name&gt;</code>
