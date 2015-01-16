@@ -49,6 +49,7 @@
 # SVN-History:
 # 16.01.2015
 #	Speak hatte eine fehlerhafte Überprüfung der Attribute, und konnte nicht ausgeführt werden.
+#	Bei Streams wird das Reading "currentTrackPosition" nun fest auf "0:00:00" gesetzt, und nicht mehr beim Player angefragt
 # 15.01.2015
 #	Für die Setter "LoadPlaylist", "StartPlaylist", "LoadRadio", "StartRadio" und "StartFavourite" kann man jetzt anstatt des Namens einen regulären Ausdruck verwenden.
 #	Beim Erkennen der Player werden einige Abspielreadings ("transportState", "currentTrackURI", "currentTrackDuration", "currentTrackPosition", "currentTrack", "numberOfTracks", "currentStreamAudio" und "currentNormalAudio") nun direkt abgeholt, und werden somit aktuell korrekt gesetzt.
@@ -4862,6 +4863,8 @@ sub SONOS_ServiceCallback($$) {
 		SONOS_Client_Notifier('SetCurrent:AlarmRunningID:');
 	}
 	
+	my $isStream = 0;
+	
 	# Das nächste nur machen, wenn dieses Event die Track-Informationen auch enthält
 	if ($properties{LastChangeDecoded} =~ m/<TransportState val=".*?"\/>/i) {
 		# PlayMode ermitteln
@@ -4921,7 +4924,8 @@ sub SONOS_ServiceCallback($$) {
 			# Wenn es ein Stream ist, dann muss da was anderes erkannt werden
 			SONOS_Log $udn, 4, "Transport-Event: Stream erkannt!";
 			SONOS_Client_Notifier('SetCurrent:StreamAudio:1');
-					
+			$isStream = 1;
+			
 			# Sender ermitteln (per SOAP-Request an den SonosPlayer)
 			SONOS_Client_Notifier('SetCurrent:Sender:'.$1) if ($service->controlProxy()->GetMediaInfo(0)->getValue('CurrentURIMetaData') =~ m/<dc:title>(.*?)<\/dc:title>/i);
 			
@@ -5023,13 +5027,17 @@ sub SONOS_ServiceCallback($$) {
 		SONOS_Client_Notifier('SetCurrent:nextOriginalTrackNumber:'.decode_entities($1)) if ($nextTrackMetaData =~ m/<upnp:originalTrackNumber>(.*?)<\/upnp:originalTrackNumber>/i);
 	}
 	
-	# Current Trackposition ermitteln (durch Abfrage beim Player)
-	if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
-		my $trackPosition = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
-		if ($trackPosition !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
-			$trackPosition = '0:00:00';
+	# Current Trackposition ermitteln (durch Abfrage beim Player, bzw. bei Streams statisch)
+	if ($isStream) {
+		SONOS_Client_Notifier('SetCurrent:TrackPosition:0:00:00');
+	} else {
+		if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+			my $trackPosition = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
+			if ($trackPosition !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
+				$trackPosition = '0:00:00';
+			}
+			SONOS_Client_Notifier('SetCurrent:TrackPosition:'.$trackPosition);
 		}
-		SONOS_Client_Notifier('SetCurrent:TrackPosition:'.$trackPosition);
 	}
 	
 	# Trigger/Transfer the whole bunch and generate InfoSummarize
