@@ -47,6 +47,8 @@
 # Changelog
 #
 # SVN-History:
+# 16.01.2015
+#	Speak hatte eine fehlerhafte Überprüfung der Attribute, und konnte nicht ausgeführt werden.
 # 15.01.2015
 #	Für die Setter "LoadPlaylist", "StartPlaylist", "LoadRadio", "StartRadio" und "StartFavourite" kann man jetzt anstatt des Namens einen regulären Ausdruck verwenden.
 #	Beim Erkennen der Player werden einige Abspielreadings ("transportState", "currentTrackURI", "currentTrackDuration", "currentTrackPosition", "currentTrack", "numberOfTracks", "currentStreamAudio" und "currentNormalAudio") nun direkt abgeholt, und werden somit aktuell korrekt gesetzt.
