@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 73_km200.pm: DoNotPoll includes top-down hierarchy 
+  - bugfix : 73_km200.pm: Correction of commandref - entry 
   - changed: 98_Text2Speech (thanks to TeeVau): 
                              added calculate the MP3 Duration into Reading
                              adjust Volume now in indirect mode possible 
