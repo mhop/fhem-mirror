@@ -2624,6 +2624,11 @@ sub FRITZBOX_fritztris($)
          IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
       </li><br>
 
+     <li><code>INTERVAL &lt;seconds&gt;</code>
+         <br>
+         Polling-Interval. Default is 300 (seconds). Smallest possible value is 60.
+      </li><br>
+
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
          User name that is used for telnet access. By default no user name is required to login.
@@ -2864,17 +2869,24 @@ sub FRITZBOX_fritztris($)
          <br>
          Es ist maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
       </li><br>
+      
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
          <br>
          Dies ist der Standard-Pfad der f&uuml;r Dateinamen benutzt wird, die nicht mit einem / (Schr&auml;gstrich) beginnen.
          <br>
          Es muss ein Pfad auf der Fritz!Box sein. D.h., er sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
       </li><br>
+
       <li><code>fritzBoxIP</code>
          <br>
          IP Adresse oder ULR der Fritz!Box f&uuml;r Fernzugriff per Telnet. Standard ist "fritz.box".
       </li><br>
      
+      <li><code>INTERVAL &lt;Sekunden&gt;</code>
+         <br>
+         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste m&ouml;gliche Wert ist 60.
+      </li><br>
+
       <li><code>telnetUser &lt;user name&gt;</code>
          <br>
          Benutzername f&uuml;r den Telnetzugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
