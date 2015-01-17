@@ -37,7 +37,7 @@ sub FW_readIcons($);
 sub FW_readIconsFrom($$);
 sub FW_returnFileAsStream($$$$$);
 sub FW_roomOverview($);
-sub FW_roomStatesForInform($$);
+#sub FW_roomStatesForInform($$); # Forum 30515
 sub FW_select($$$$$@);
 sub FW_serveSpecial($$$$);
 sub FW_showRoom();
@@ -1726,7 +1726,7 @@ FW_style($$)
     my $forceType = ($cfgDB eq 'configDB') ? $cfgDB : "file";
     $fileName =~ s,.*/,,g;        # Little bit of security
     my $filePath = FW_fileNameToPath($fileName);
-    my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$forceType} );
+    my($err, @content) = FileRead({FileName=>$filePath, ForceType=>$forceType});
     if($err) {
       FW_pO "<div id=\"content\">$err</div>";
       return;
