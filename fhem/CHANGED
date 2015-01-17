@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 02_RSS.pm: improved frontpage for RSS
   - bugfix: FB_CALLMONITOR  regognize "user:" as login prompt for
             remote telnet connection (phonebook)
   - changed: 73_km200.pm: DoNotPoll includes top-down hierarchy 

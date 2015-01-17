@@ -172,15 +172,20 @@ sub
 RSS_Overview {
 
   my ($name, $url);
-  my $html= "<body>\n";
+  my $html= RSS_HTMLHead("RSS RSS_Overview") . "<body>\n";
   foreach my $def (sort keys %defs) {
     if($defs{$def}{TYPE} eq "RSS") {
         $name= $defs{$def}{NAME};
         $url= RSS_getURL($defs{$def}{fhem}{hostname});
-        $html.= " <a href='$url/rss/$name.rss'>$name</a><br>\n";
+        $html.= "$name<br>\n<ul>";
+        $html.= "<a href='$url/rss/$name.rss'>RSS</a><br>\n";
+        $html.= "<a href='$url/rss/$name.html'>HTML</a><br>\n";
+        $html.= "<a href='$url/rss/$name.png'>Portable Network Graphics</a><br>\n";
+        $html.= "<a href='$url/rss/$name.jpg'>JPEG Graphics</a><br>\n";
+        $html.= "</ul>\n<p>\n";
         }
   }
-  $html.="</body>";
+  $html.="</body>\n" . RSS_HTMLTail();
 
   return ("text/html; charset=utf-8", $html);
 }
@@ -246,6 +251,27 @@ RSS_getScript() {
   return $scripts; 
 }
 
+sub
+RSS_HTMLHead($$) {
+  my ($title,$refresh) = @_;
+  
+  my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
+  my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
+  my $r= defined($refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
+  # css and js header output should be coded only in one place
+  my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>\n";
+  my $css= sprintf($cssTemplate, "pgm2/style.css");
+  $css.= sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
+  map { $css.= sprintf($cssTemplate, $_); }
+                        split(" ", AttrVal($FW_wname, "CssFiles", ""));
+  my $scripts= RSS_getScript();
+  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$r$css$scripts</head>\n";
+}
+
+sub 
+RSS_HTMLTail() {
+  return "</html>";
+}
 
 sub
 RSS_returnHTML($) {
@@ -256,11 +282,9 @@ RSS_returnHTML($) {
   my $img= "$url/rss/$name.$type";
   my $refresh= AttrVal($name, 'refresh', 60);
   my $areas= AttrVal($name, 'areas', "");
-  my $mime = ($type eq 'png')? 'image/png' : 'image/jpeg';
-  my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
-  my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
-  my $scripts= RSS_getScript();
-  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$name</title>\n<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n$scripts</head>\n<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n<img src=\"$img\" usemap=\"#map\"/>\n<map name=\"map\" id=\"map\">\n$areas\n</map>\n</body>\n</html>";
+  my $code= RSS_HTMLHead($name, $refresh) . 
+	    "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n<img src=\"$img\" usemap=\"#map\"/>\n<map name=\"map\" id=\"map\">\n$areas\n</map>\n</body>\n" .
+	    RSS_HTMLTail();
   return ("text/html; charset=utf-8", $code);
 }
 
