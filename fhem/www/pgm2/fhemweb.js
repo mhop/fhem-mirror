@@ -317,17 +317,22 @@ FW_doUpdate()
     if(d.length != 3)
       continue;
 
-    $("[informId='"+d[0]+"']").each(function(){
-      if(this.setValueFn) {     // change the select/etc value
-        this.setValueFn(d[1]);
+    if( d[0].match(/^#FHEMWEB:/) ) {
+      eval(d[1]);
 
-      } else {
-        $(this).html(d[2]);     // Readings-Value
-        if(d[0].match(/-ts$/))  // timestamps
-          $(this).addClass('changed');
-        $(this).find("a[href]").each(function() { FW_replaceLink(this) });
-      }
-    });
+    } else {
+      $("[informId='"+d[0]+"']").each(function(){
+        if(this.setValueFn) {     // change the select/etc value
+          this.setValueFn(d[1]);
+
+        } else {
+          $(this).html(d[2]);     // Readings-Value
+          if(d[0].match(/-ts$/))  // timestamps
+            $(this).addClass('changed');
+          $(this).find("a[href]").each(function() { FW_replaceLink(this) });
+        }
+      });
+    }
 
     for(var w in FW_widgets)
       if(FW_widgets[w].updateLine) // updateLine is deprecated, use setValueFn

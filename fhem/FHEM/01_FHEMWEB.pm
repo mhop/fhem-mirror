@@ -16,7 +16,7 @@ sub FW_answerCall($);
 sub FW_dev2image($;$);
 sub FW_devState($$@);
 sub FW_digestCgi($);
-sub FW_directNotify($$);
+sub FW_directNotify($@);
 sub FW_doDetail($);
 sub FW_fatal($);
 sub FW_fileList($);
@@ -593,6 +593,7 @@ FW_answerCall($)
     $filter = "room!=.+" if($filter eq "room=Unsorted");
 
     my %h = map { $_ => 1 } devspec2array($filter);
+    $h{"#FHEMWEB:$FW_wname"} = 1;
     $me->{inform}{devices} = \%h;
     %FW_visibleDeviceHash = FW_visibleDevices();
 
@@ -1262,6 +1263,11 @@ FW_roomOverview($)
       } else {
         FW_pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
 
+        my $class = $l1;
+        $class =~ s/[^A-Z0-9]/_/gi;
+        $class .= ($lastDefChange>$lastSavedChange) ? " changed" : ""
+                        if($l1 eq "Save config");
+
         # image tag if we have an icon, else empty
         my $icoName = "ico$l1";
         map { my ($n,$v) = split(":",$_); $icoName=$v if($l1 =~ m/$n/); }
@@ -1273,7 +1279,7 @@ FW_roomOverview($)
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            FW_pO "<td><div><a href=\"$l2\">$icon$l1</a></div></td>";
         } else {
-          FW_pH $l2, "$icon$l1", 1;
+          FW_pH $l2, "$icon$l1", 1, $class;
         }
         FW_pO "</tr>";
       }
@@ -2216,16 +2222,15 @@ FW_makeEdit($$$)
 
 my %jsTab = ( 92=>'\\\\', 34=>'\\"', 9=>'\\t', 13=>'\\r', 10=>'\\n' );
 sub
-FW_longpollInfo($$$$)
+FW_longpollInfo($@)
 {
-  my ($dev, $state, $html, $fmt) = @_;
+  my $fmt = shift;
   if($fmt && $fmt eq "JSON") {
-    $dev   =~ s/([\\"\t\r\n])/$jsTab{ord($1)}/ge;
-    $state =~ s/([\\"\t\r\n])/$jsTab{ord($1)}/ge;
-    $html  =~ s/([\\"\t\r\n])/$jsTab{ord($1)}/ge;
-    return "[\"$dev\",\"$state\",\"$html\"]";
+    my @a;
+    map { my $x=$_; $x=~s/([\\"\t\r\n])/$jsTab{ord($1)}/ge; push @a,$x; } @_;
+    return '["'.join('","', @a).'"]';
   } else {
-    return "$dev<<$state<<$html";
+    return join('<<', @_);
   }
 }
 
@@ -2248,7 +2253,7 @@ FW_roomStatesForInform($$)
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
     if($defs{$dn} && $defs{$dn}{STATE} && $defs{$dn}{TYPE} ne "weblink") {
       push @data,
-           FW_longpollInfo($dn, $defs{$dn}{STATE}, $txt, $me->{inform}{fmt});
+           FW_longpollInfo($me->{inform}{fmt}, $dn, $defs{$dn}{STATE}, $txt);
     }
   }
   my $data = join("\n", map { s/\n/ /gm; $_ } @data)."\n";
@@ -2259,6 +2264,16 @@ sub
 FW_Notify($$)
 {
   my ($ntfy, $dev) = @_;
+
+  if( $dev->{NAME} eq "global" ) {
+    my $n = "#FHEMWEB:$ntfy->{NAME}";
+    if( grep(m/^SAVE|INITIALIZED|REREADCFG|SHUTDOWN$/, @{$dev->{CHANGED}}) ) {
+      FW_directNotify($n, '$(".Save_config a").removeClass("changed")', '');
+    } elsif( grep(m/^DEFINED|MODIFIED|DELETED|ATTR|DELETEATTR$/,
+                                                       @{$dev->{CHANGED}}) ) {
+      FW_directNotify($n, '$(".Save_config a").addClass("changed")', '');
+    }
+  }
 
   my $h = $ntfy->{inform};
   return undef if(!$h);
@@ -2294,7 +2309,7 @@ FW_Notify($$)
     if( !$modules{$defs{$dn}{TYPE}}{FW_atPageEnd} ) {
       my ($allSet, $cmdlist, $txt) = FW_devState($dn, "", \%extPage);
       ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
-      push @data, FW_longpollInfo($dn, $dev->{STATE}, $txt, $h->{fmt});
+      push @data, FW_longpollInfo($h->{fmt}, $dn, $dev->{STATE}, $txt);
     }
 
     #Add READINGS
@@ -2306,9 +2321,9 @@ FW_Notify($$)
           next; #ignore 'set' commands
         }
         my ($readingName,$readingVal) = split(": ",$events->[$i],2);
-        push @data, FW_longpollInfo("$dn-$readingName",
-                                        $readingVal,$readingVal, $h->{fmt});
-        push @data, FW_longpollInfo("$dn-$readingName-ts", $tn, $tn, $h->{fmt});
+        push @data, FW_longpollInfo($h->{fmt},
+                                "$dn-$readingName", $readingVal,$readingVal);
+        push @data, FW_longpollInfo($h->{fmt}, "$dn-$readingName-ts", $tn, $tn);
       }
     }
   }
@@ -2341,16 +2356,16 @@ FW_Notify($$)
 }
 
 sub
-FW_directNotify($$) # Notify without the event overhead (Forum #31293)
+FW_directNotify($@) # Notify without the event overhead (Forum #31293)
 {
-  my ($dev, $msg) = @_;
+  my $dev = $_[0];
   foreach my $ntfy (values(%defs)) {
     next if(!$ntfy->{TYPE} ||
             $ntfy->{TYPE} ne "FHEMWEB" ||
             !$ntfy->{inform} ||
             !$ntfy->{inform}{devices}{$dev});
     if(!addToWritebuffer($ntfy, 
-        FW_longpollInfo($dev, $msg, "", $ntfy->{inform}{fmt})."\n")) {
+        FW_longpollInfo($ntfy->{inform}{fmt}, @_)."\n")) {
       my $name = $ntfy->{NAME};
       Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
       TcpServer_Close($ntfy);
