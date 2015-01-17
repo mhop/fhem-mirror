@@ -267,18 +267,15 @@ sub FRITZBOX_Set($$@)
             . " wlan:on,off";
             # . " convertMOH"
             # . " convertRingTone"
-   if ( lc $cmd eq 'alarm')
-   {
-      if ( int @val == 2 && $val[0] =~ /^(1|2|3)$/ && $val[1] =~ /^(on|off)$/ ) 
+
+# set alarm
+   if ( lc $cmd eq 'alarm') {
+      if ( int @val > 0 && $val[0] =~ /^(1|2|3)$/ ) 
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         my $state = $val[1];
-         $state =~ s/on/1/;
-         $state =~ s/off/0/;
-         FRITZBOX_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".( $val[0] - 1 )."/Active ".$state );
-         readingsSingleUpdate($hash,"alarm".$val[0]."_state",$val[1], 1);
-         return undef;
+         return FRITZBOX_Set_Alarm ($hash, @val);
       }
+   
 # set call
    } elsif ( lc $cmd eq 'call') {
       if (int @val > 0) 
@@ -436,7 +433,81 @@ sub FRITZBOX_Get($@)
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
+##########################################
+sub FRITZBOX_Set_Alarm($@)
+{
+   my ($hash, @val) = @_;
+   my $name = $hash->{NAME};
+   
+   my $alarm = $val[0];
+   shift @val;
+   
+   my $para = " ".join(" ", @val);
+   
+   my $state = 1; 
+   my $stateTxt = "on";
+   if ($para =~ /off/i) 
+   {
+      $state = 0;
+      $stateTxt = "off";
+   }
+   
+   my $time;
+   my $timeTxt;
+   if ($para =~ /([0-2]?\d):([0-5]\d)/ )
+   {
+      if ($1<10)
+      {
+         $time = 0;
+         $timeTxt = "0";
+      }
+      $time .= $1.$2;
+      $timeTxt .= $1.":".$2;
+      $time = undef if $time > 2359;
+   }
 
+   my $day; my $dayTxt;
+   my %alDayValues = %alarmDays;
+   $alDayValues{0} = "once";
+   $alDayValues{127} = "daily";
+   while (my ($key, $value) = each(%alDayValues) )
+   {
+      if ($para =~ /$value/i)
+      {
+         $day += $key ;
+         $dayTxt .= $value." ";
+      }
+   }
+   
+   my $result = FRITZBOX_Open_Connection( $hash );
+   return "$name|Error|$result"
+      if $result;
+
+   readingsBeginUpdate($hash);
+
+   FRITZBOX_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Active ".$state );
+   readingsBulkUpdate($hash,"alarm".$alarm."_state",$stateTxt);
+
+   if (defined $time)
+   {
+      FRITZBOX_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Time ".$time );
+      readingsBulkUpdate($hash,"alarm".$alarm."_time",$timeTxt);
+   }
+
+   if (defined $day)
+   {
+      FRITZBOX_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Weekdays ".$day );
+      chop $dayTxt;
+      readingsBulkUpdate($hash,"alarm".$alarm."_wdays",$dayTxt);
+   }
+
+   readingsEndUpdate($hash, 1);
+
+   FRITZBOX_Close_Connection( $hash );
+   
+   return undef;
+} # end FRITZBOX_Set_Alarm
+   
 #####################################
 # checks and stores FritzBox password used for telnet connection
 sub FRITZBOX_storePassword($$)
@@ -1991,6 +2062,10 @@ sub FRITZBOX_Open_Connection($)
    
    unless (defined $pwd)
    {
+      $msg = "Error: No password set. Please define it with 'set $name password YourPassword'";
+      FRITZBOX_Log $hash, 2, $msg;
+      # return $msg;
+      
       my $pwdFile = AttrVal( $name, "pwdFile", "fb_pwd.txt");
       FRITZBOX_Log $hash, 5, "Open password file '$pwdFile' to extract password";
       if (open(IN, "<" . $pwdFile)) {
@@ -1998,7 +2073,6 @@ sub FRITZBOX_Open_Connection($)
          close(IN);
         FRITZBOX_Log $hash, 5, "Close password file";
       } else {
-         $msg = "Error: Cannot open password file '$pwdFile': $!";
          FRITZBOX_Log $hash, 2, $msg;
          return $msg;
       }
@@ -2484,9 +2558,14 @@ sub FRITZBOX_fritztris($)
    <b>Set</b>
    <ul>
       <br>
-      <li><code>set &lt;name&gt; alarm &lt;number&gt; &lt;on|off&gt;</code>
+      <li><code>set &lt;name&gt; alarm &lt;number&gt; [on|off] [time] [once|daily|Mo|Tu|We|Th|Fr|Sa|So]</code>
          <br>
-         Switches the alarm number (1, 2 or 3) on or off.
+         Switches the alarm number (1, 2 or 3) on or off (default is on). Sets the time and weekday. If no state is given it is switched on.
+      </li><br>
+
+      <li><code>set &lt;name&gt; call &lt;number&gt; [duration] [say:text|play:MP3URL]</code>
+         <br>
+         Calls for 'duration' seconds (default 60) the given number from an internal port (default 1 or attribute 'ringWithIntern'). If the call is taken a text or sound can be played as music on hold (moh). The internal port will also ring.
       </li><br>
 
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
@@ -2531,7 +2610,7 @@ sub FRITZBOX_fritztris($)
          Stores the password for remote telnet access.
       </li><br>
 
-      <li><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text]  [say:Text | play:Link]</code>
+      <li><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text]  [say:Text | play:MP3URL]</code>
          <br>
          Example:
          <br>
@@ -2745,9 +2824,15 @@ sub FRITZBOX_fritztris($)
    <b>Set</b>
    <ul>
       <br>
-      <li><code>set &lt;name&gt; alarm &lt;number&gt; &lt;on|off&gt;</code>
+      <li><code>set &lt;name&gt; alarm &lt;Nummer&gt; [on|off] [time] [once|daily|Mo|Tu|We|Th|Fr|Sa|So]</code>
          <br>
-         Schaltet den Weckruf Nummer 1, 2 oder 3 an oder aus.
+         Schaltet den Weckruf Nummer 1, 2 oder 3 an oder aus (Standard ist on). Setzt die Zeit und den Wochentag.
+      </li><br>
+
+      <li><code>set &lt;name&gt; call &lt;number&gt; [Dauer] [say:Text|play:MP3URL]</code>
+         <br>
+         Ruf f&uuml;r 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1 oder das Attribut 'ringWithIntern'). Wenn der Angerufene abnimmt h&auml;rt er die Wartemusik oder den angegebenen Text oder Klang.
+         Der interne Telefonanschluss klingelt ebenfalls.
       </li><br>
 
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;MP3DateiInklusivePfad&gt;</code>
