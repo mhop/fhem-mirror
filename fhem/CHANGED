@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added: 71_YAMAHA_NP.pm: New module for controlling Yamaha network players such as CRX-N560(D)
   - bugfix: FB_CALLMONITOR: fix not working telnet login, when user based
             authentication is configured in FritzBox
   - feature: 02_RSS.pm: improved frontpage for RSS
