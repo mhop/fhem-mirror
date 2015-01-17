@@ -93,11 +93,16 @@
 #
 # 2015-01-15 - changed   remove 99_Utils.pm from filelist
 #
+# 2015-01-17 - added     configdb diff all current
+#                        shows diff table between version 0
+#                        and currently running version (in memory)
+#
 ##############################################################################
 #
 
 use strict;
 use warnings;
+use Text::Diff;
 use DBI;
 
 ##################################################
@@ -119,14 +124,15 @@ sub cfgDB_FileWrite($@);
 sub cfgDB_FW_fileList($$@);
 sub cfgDB_Read99();
 sub cfgDB_ReadAll($);
-sub cfgDB_SaveCfg();
+sub cfgDB_SaveCfg(;$);
 sub cfgDB_SaveState();
 sub cfgDB_svnId();
 
 sub _cfgDB_binFileimport($$;$);
 sub _cfgDB_Connect();
+sub _cfgDB_DeleteTemp();
 sub _cfgDB_Diff($$);
-sub __cfgDB_Diff($$$);
+sub __cfgDB_Diff($$$$);
 sub _cfgDB_InsertLine($$$$);
 sub _cfgDB_Execute($@);
 sub _cfgDB_Filedelete($);
@@ -139,7 +145,7 @@ sub _cfgDB_ReadCfg(@);
 sub _cfgDB_ReadState(@);
 sub _cfgDB_Recover($);
 sub _cfgDB_Reorg(;$$);
-sub _cfgDB_Rotate($);
+sub _cfgDB_Rotate($$);
 sub _cfgDB_Search($$;$);
 sub _cfgDB_Uuid();
 
@@ -338,7 +344,11 @@ sub cfgDB_ReadAll($) {
 }
 
 # save running configuration to version 0
-sub cfgDB_SaveCfg() {
+sub cfgDB_SaveCfg(;$) {
+
+	my ($internal) = shift;
+	$internal = defined($internal) ? $internal : 0;
+
 	my (%devByNr, @rowList, %comments, $t, $out);
 
 	map { $devByNr{$defs{$_}{NR}} = $_ } keys %defs;
@@ -384,14 +394,6 @@ sub cfgDB_SaveCfg() {
 			push @rowList, "attr $d $a $val";
 		}
 
-#		foreach my $a (sort keys %{$attr{$d}}) {
-#			next if($d eq "global" &&
-#				($a eq "configfile" || $a eq "version"));
-#			my $val = $attr{$d}{$a};
-#			$val =~ s/;/;;/g;
-#			push @rowList, "attr $d $a $val";
-#		}
-
 	}
 
 		foreach my $a (sort keys %{$attr{configdb}}) {
@@ -402,7 +404,7 @@ sub cfgDB_SaveCfg() {
 
 # Insert @rowList into database table
 	my $fhem_dbh = _cfgDB_Connect;
-	my $uuid = _cfgDB_Rotate($fhem_dbh);
+	my $uuid = _cfgDB_Rotate($fhem_dbh,$internal);
 	$t = localtime;
 	$out = "#created $t";
 	push @rowList, $out;
@@ -415,7 +417,7 @@ sub cfgDB_SaveCfg() {
 	$fhem_dbh->disconnect();
 	my $maxVersions = $attr{configdb}{maxversions};
 	$maxVersions = ($maxVersions) ? $maxVersions : 0;
-	_cfgDB_Reorg($maxVersions,1) if($maxVersions);
+	_cfgDB_Reorg($maxVersions,1) if($maxVersions && $internal != -1);
 	return 'configDB saved.';
 }
 
@@ -663,11 +665,11 @@ sub _cfgDB_ReadState(@) {
 
 # rotate all versions to versionnum + 1
 # return uuid for new version 0
-sub _cfgDB_Rotate($) {
-	my ($fhem_dbh) = @_;
+sub _cfgDB_Rotate($$) {
+	my ($fhem_dbh,$newversion) = @_;
 	my $uuid = _cfgDB_Uuid;
-	$fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1");
-	$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
+	$fhem_dbh->do("UPDATE fhemversions SET VERSION = VERSION+1 where VERSION >= 0") if $newversion == 0;
+	$fhem_dbh->do("INSERT INTO fhemversions values ('$newversion', '$uuid')");
 	return $uuid;
 }
 
@@ -826,10 +828,23 @@ sub _cfgDB_Reorg(;$$) {
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version > $lastversion)");
 	$fhem_dbh->do("delete from fhemversions where version > $lastversion");
+	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version = -1)");
+	$fhem_dbh->do("delete from fhemversions where version = -1");
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 	return if(defined($quiet));
 	return " Result after database reorg:\n"._cfgDB_Info;
+}
+
+# delete temporary version
+sub _cfgDB_DeleteTemp() {
+	Log3('configDB', 4, "configDB: delete temporary Version -1");
+	my $fhem_dbh = _cfgDB_Connect;
+	$fhem_dbh->do("delete FROM fhemconfig   where versionuuid in (select versionuuid from fhemversions where version = -1)");
+	$fhem_dbh->do("delete from fhemversions where version = -1");
+	$fhem_dbh->commit();
+	$fhem_dbh->disconnect();
+	return;
 }
 
 # search for device or fulltext in db
@@ -858,11 +873,16 @@ sub _cfgDB_Search($$;$) {
 }
 
 # called from cfgDB_Diff
-sub __cfgDB_Diff($$$) {
-	my ($fhem_dbh,$search,$searchversion) = @_;
+sub __cfgDB_Diff($$$$) {
+	my ($fhem_dbh,$search,$searchversion,$svinternal) = @_;
 	my ($sql, $sth, @line, $ret);
+if($svinternal != -1) {
 	$sql =	"SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
 					"WHERE v.version = '$searchversion' AND device = '$search' ORDER BY command DESC";
+} else {
+	$sql =	"SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ".
+					"WHERE v.version = '$searchversion' ORDER BY command DESC";
+}
 	$sth = $fhem_dbh->prepare( $sql);
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
@@ -874,13 +894,23 @@ sub __cfgDB_Diff($$$) {
 # compare device configurations from 2 versions
 sub _cfgDB_Diff($$) {
 	my ($search,$searchversion) = @_;
-	use Text::Diff;
 	my ($ret, $v0, $v1);
+
+	if ($search eq 'all' && $searchversion eq 'current') {
+		_cfgDB_DeleteTemp();
+		cfgDB_SaveCfg(-1);
+		$searchversion = -1;
+	}
+
 	my $fhem_dbh = _cfgDB_Connect;
-		$v0 = __cfgDB_Diff($fhem_dbh,$search,0);
-		$v1 = __cfgDB_Diff($fhem_dbh,$search,$searchversion);
+		$v0 = __cfgDB_Diff($fhem_dbh,$search,0,$searchversion);
+		$v1 = __cfgDB_Diff($fhem_dbh,$search,$searchversion,$searchversion);
 	$fhem_dbh->disconnect();
 	$ret = diff \$v0, \$v1, { STYLE => "Table" };
+	if($searchversion == -1) {
+		_cfgDB_DeleteTemp();
+		$searchversion = "UNSAVED";
+	}
 	$ret = "\nNo differences found!" if !$ret;
 	$ret = "compare device: $search in current version 0 (left) to version: $searchversion (right)\n$ret\n";
 	return $ret;
