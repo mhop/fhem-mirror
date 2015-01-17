@@ -81,6 +81,7 @@ use vars qw($FW_room);    # currently selected room
 use vars qw($FW_formmethod);
 use vars qw(%FW_visibleDeviceHash);
 use vars qw(@FW_httpheader); # HTTP header, line by line
+use vars qw(%FW_httpheader); # HTTP header, as hash
 use vars qw($FW_userAgent); # user agent string
 
 $FW_formmethod = "post";
@@ -94,7 +95,6 @@ my $FW_lastHashUpdate = 0;
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
 # Note: for delivering SVG plots we fork
-my @FW_enc;        # Accepted encodings (browser header)
 my $FW_data;       # Filecontent from browser when editing a file
 my %FW_icons;      # List of icons
 my @FW_iconDirs;   # Directory search order for icons
@@ -326,10 +326,14 @@ FW_Read($)
   return if($hash->{CONTENT_LENGTH} &&
             length($hash->{BUF})<$hash->{CONTENT_LENGTH});
 
-  @FW_httpheader = split("[\r\n]", $hash->{HDR});
-  $FW_userAgent = join("", grep /^User-Agent:/, @FW_httpheader);
+  @FW_httpheader = split(/[\r\n]+/, $hash->{HDR});
+  %FW_httpheader = map {
+                         my ($k,$v) = split(/: */, $_, 2);
+                         $k=>(defined($v) ? $v : 1);
+                       } @FW_httpheader;
   delete($hash->{HDR});
 
+  $FW_userAgent = $FW_httpheader{"User-Agent"};
   my @origin = grep /Origin/, @FW_httpheader;
   $FW_headercors = (AttrVal($FW_wname, "CORS", 0) ?
               "Access-Control-Allow-".$origin[0]."\r\n".
@@ -341,12 +345,11 @@ FW_Read($)
 
   #############################
   # BASIC HTTP AUTH
+  my @headerOptions = grep /OPTIONS/, @FW_httpheader; # Need example
   my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
-  my @headerOptions = grep /OPTIONS/, @FW_httpheader;
   if($basicAuth) {
-    my @authLine = grep /Authorization: Basic/, @FW_httpheader;
-    my $secret = $authLine[0];
-    $secret =~ s/^Authorization: Basic // if($secret);
+    my $secret = $FW_httpheader{Authorization};
+    $secret =~ s/^Basic // if($secret);
     my $pwok = ($secret && $secret eq $basicAuth);
     if($secret && $basicAuth =~ m/^{.*}$/ || $headerOptions[0]) {
       eval "use MIME::Base64";
@@ -383,7 +386,6 @@ FW_Read($)
   #############################
 
   my $now = time();
-  @FW_enc = grep /Accept-Encoding/, @FW_httpheader;
   my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
   $arg .= "&".$hash->{BUF} if($hash->{CONTENT_LENGTH});
   delete $hash->{CONTENT_LENGTH};
@@ -430,7 +432,8 @@ FW_Read($)
   if(($FW_RETTYPE =~ m/text/i ||
       $FW_RETTYPE =~ m/svg/i ||
       $FW_RETTYPE =~ m/script/i) &&
-     (int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) &&
+     ($FW_httpheader{"Accept-Encoding"} &&
+      $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
      $FW_use_zlib) {
     $FW_RET = Compress::Zlib::memGzip($FW_RET);
     $compressed = "Content-Encoding: gzip\r\n";
@@ -460,6 +463,8 @@ FW_closeConn($)
 {
   my ($hash) = @_;
   if(AttrVal($hash->{SNAME}, "closeConn",               # Forum #20294
+                             !$FW_httpheader{Connection} ||
+                              $FW_httpheader{Connection} ne "keep-alive" ||
                               $FW_userAgent =~ m/(iPhone|iPad|iPod|Darwin)/)) {
     TcpServer_Close($hash);
     delete($defs{$hash->{NAME}});
@@ -1496,13 +1501,8 @@ FW_returnFileAsStream($$$$$)
 
   if($cacheable) {
     #Check for If-None-Match header (ETag)
-    my @if_none_match_lines = grep /If-None-Match/, @FW_httpheader;
-    my $if_none_match = undef;
-    if(@if_none_match_lines) {
-      $if_none_match = $if_none_match_lines[0];
-      $if_none_match =~ s/If-None-Match: \"(.*)\"/$1/;
-    }
-
+    my $if_none_match = $FW_httpheader{"If-None-Match"};
+    $if_none_match =~ s/"(.*)"/$1/ if($if_none_match);
     $etag = (stat($path))[9]; #mtime
     if(defined($etag) && defined($if_none_match) && $etag eq $if_none_match) {
       TcpServer_WriteBlocking($FW_chash,"HTTP/1.1 304 Not Modified\r\n".
@@ -1524,7 +1524,8 @@ FW_returnFileAsStream($$$$$)
 
   $etag = defined($etag) ? "ETag: \"$etag\"\r\n" : "";
   my $expires = $cacheable ? ("Expires: ".gmtime(time()+900)." GMT\r\n"): "";
-  my $compr = ((int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) && $FW_use_zlib) ?
+  my $compr = ($FW_httpheader{"Accept-Encoding"} &&
+               $FW_httpheader{"Accept-Encoding"} =~ m/gzip/ && $FW_use_zlib) ?
                 "Content-Encoding: gzip\r\n" : "";
   TcpServer_WriteBlocking($FW_chash, "HTTP/1.1 200 OK\r\n".
                   $compr . $expires . $FW_headercors . $etag .
