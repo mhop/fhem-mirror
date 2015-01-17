@@ -83,7 +83,7 @@ sub MilightDevice_Initialize(@)
   $hash->{GetFn} = "MilightDevice_Get";
   $hash->{AttrFn} = "MilightDevice_Attr";
   $hash->{NotifyFn} = "MilightDevice_Notify";
-  $hash->{AttrList} = "IODev dimStep defaultRampOn defaultRampOff ".$readingFnAttributes;
+  $hash->{AttrList} = "IODev dimStep defaultRampOn defaultRampOff presets ".$readingFnAttributes;
 
   FHEM_colorpickerInit();
     
@@ -159,20 +159,21 @@ sub MilightDevice_Define($$)
   }
 
   my $baseCmds = "on off toggle dim:slider,0,".round(100/MilightDevice_DimSteps($hash)).",100 dimup dimdown";
-  my $sharedCmds = "pair unpair restorePreviousState:noArg saveState:noArg restoreState:noArg";
-  $hash->{helper}->{COMMANDSET} = "$baseCmds hsv rgb:colorpicker,RGB discoModeUp:noArg discoSpeedUp:noArg discoSpeedDown:noArg $sharedCmds"
+  my $sharedCmds = "pair unpair";
+  my $rgbCmds = "restorePreviousState:noArg saveState:noArg restoreState:noArg preset";
+  $hash->{helper}->{COMMANDSET} = "$baseCmds hsv rgb:colorpicker,RGB hue:colorpicker,HUE,0,1,360 discoModeUp:noArg discoSpeedUp:noArg discoSpeedDown:noArg $sharedCmds $rgbCmds"
         if ($hash->{LEDTYPE} eq 'RGBW');
-  $hash->{helper}->{COMMANDSET} = "$baseCmds hsv rgb:colorpicker,RGB discoModeUp discoModeDown discoSpeedUp discoSpeedDown $sharedCmds"
+  $hash->{helper}->{COMMANDSET} = "$baseCmds hsv rgb:colorpicker,RGB hue:colorpicker,HUE,0,1,360 discoModeUp discoModeDown discoSpeedUp discoSpeedDown $sharedCmds $rgbCmds"
         if ($hash->{LEDTYPE} eq 'RGB');
         
-  $hash->{helper}->{COMMANDSET} = "$baseCmds colourTemperature:slider,1,1,10 $sharedCmds"
+  $hash->{helper}->{COMMANDSET} = "$baseCmds ct:colorpicker,CT,3000,350,6500 $sharedCmds"
         if ($hash->{LEDTYPE} eq 'White');
   
   # webCmds
   if (!defined($attr{$name}{webCmd}))
   {
     $attr{$name}{webCmd} = 'rgb:rgb ffffff:rgb ff2a00:rgb 00ff00:rgb 0000ff:rgb ffff00:on:off:dim' if (($hash->{LEDTYPE} eq 'RGB')|| ($hash->{LEDTYPE} eq 'RGBW'));
-    $attr{$name}{webCmd} = 'on:off:dim:colourTemperature' if ($hash->{LEDTYPE} eq 'White');
+    $attr{$name}{webCmd} = 'on:off:dim:ct' if ($hash->{LEDTYPE} eq 'White');
   }
     
   # Define devStateIcon
@@ -368,7 +369,7 @@ sub MilightDevice_Set(@)
     return $usage if ($args[0] !~ /^([0-9A-Fa-f]{1,2})([0-9A-Fa-f]{1,2})([0-9A-Fa-f]{1,2})$/);
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
     my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
-    $h *= 360; $s *= 100; $v *= 100;
+    $h = round($h * 360); $s = round($s * 100); $v = round($v * 100);
     if (defined($args[1]))
     {
       return $usage if (($args[1] !~ /^\d+$/) && ($args[1] > 0)); # Decimal value for ramp > 0
@@ -402,6 +403,14 @@ sub MilightDevice_Set(@)
     }
     return MilightDevice_HSV_Transition($hash, $h, $s, $v, $ramp, $flags);
   }
+
+  elsif ($cmd eq 'hue')
+  {
+    return $usage if ($args[0] !~ /^(\d{1,3})$/);
+    my $h = $args[0];
+    return "Invalid hue ($h): valid range 0..360" if !(($h >= 0) && ($h <= 360));
+    return MilightDevice_HSV_Transition($hash, $h, ReadingsVal($hash->{NAME}, "saturation", 0), ReadingsVal($hash->{NAME}, "brightness", 100), $ramp, $flags);
+  }
   
   elsif ($cmd eq 'discoModeUp')
   {
@@ -423,11 +432,11 @@ sub MilightDevice_Set(@)
     return MilightDevice_RGBW_DiscoModeSpeed($hash, 0);
   }
     
-  elsif ($cmd eq 'colourTemperature')
+  elsif ($cmd eq 'ct')
   {
     if (defined($args[0]))
     {
-      return "Usage: set $name colourTemperature <1=Cool..10=Warm>" if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [1..10])));
+      return "Usage: set $name ct <3000=Warm..6500=Cool>" if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [3000..6500])));
     }
     return MilightDevice_White_SetColourTemp($hash, $args[0]);
   }
@@ -449,6 +458,30 @@ sub MilightDevice_Set(@)
   elsif ($cmd eq 'restoreState')
   {
     my ($h, $s, $v) = MilightDevice_HSVFromStr($hash, ReadingsVal($hash->{NAME}, "savedState", MilightDevice_HSVToStr($hash, 0, 0, 0)));
+    return MilightDevice_HSV_Transition($hash, $h, $s, $v, 0, '');
+  }
+  elsif ($cmd eq 'preset')
+  {
+    return "Usage: set $name preset <0..X|+>" if (!defined($args[0]));
+    return "Usage: set $name preset <0..X|+>" if ($args[0] !~ /^(\d+|\+)$/);
+
+    # Get presets, if not defined default to 1 preset 0,0,100.
+    my @presets = split(/ /, AttrVal($hash->{NAME}, "presets", MilightDevice_HSVToStr($hash, 0, 0, 100)));
+
+    # If preset = "+" then load the next one
+    my $preset = $args[0];
+    
+    # Load the next preset (and loop back to the first) if "+" specified.
+    if ("$preset" eq "+")
+    {
+      $preset = (ReadingsVal($hash->{NAME}, "lastPreset", -1) + 1);
+      if ($#presets < $preset) { $preset = 0; }
+    }
+    return "No preset defined at index $preset" if ($#presets < $preset);
+
+    # Update reading and load preset
+    readingsSingleUpdate($hash, "lastPreset", $preset, 1);
+    my ($h, $s, $v) = MilightDevice_HSVFromStr($hash, $presets[$preset]);
     return MilightDevice_HSV_Transition($hash, $h, $s, $v, 0, '');
   }
 
@@ -496,6 +529,11 @@ sub MilightDevice_Attr(@)
   if ($cmd eq 'set' && (($attribName eq 'defaultRampOn') || ($attribName eq 'defaultRampOff')))
   {
     return "defaultRampOn/Off is required as numerical value [0..100]" if ($attribVal !~ /^[0-9]*\.?[0-9]*$/) || (($attribVal < 0) || ($attribVal > 100));
+  }
+  # List of presets in hsv separated by space.  Loaded by set command preset X
+  if ($cmd eq 'set' && ($attribName eq 'presets'))
+  {
+    return "presets is required as space separated list of hsv(h,s,v) (eg. 0,0,100, 0,100,50)" if ($attribVal !~ /^[(\d{1,3}),(\d{1,3}),(\d{1,3})(?:$|\s)]*$/);
   }
 
   return undef;
@@ -1003,10 +1041,8 @@ sub MilightDevice_White_Off(@)
 sub MilightDevice_White_Dim(@)
 {
   my ($hash, $level, $ramp, $flags) = @_;
-  my $h = ReadingsVal($hash->{NAME}, "hue", 0);
-  my $s = ReadingsVal($hash->{NAME}, "saturation", 0);
   Log3 ($hash, 4, "$hash->{NAME}_White_Dim: Brightness: $level; Ramp: $ramp; Flags: $flags"); 
-  return MilightDevice_HSV_Transition($hash, $h, $s, $level, $ramp, $flags);
+  return MilightDevice_HSV_Transition($hash, 0, 0, $level, $ramp, $flags);
 }
 
 #####################################
@@ -1035,7 +1071,7 @@ sub MilightDevice_White_SetHSV(@)
   }
 
   # Store new values for colourTemperature and Brightness
-  MilightDevice_SetHSV_Readings($hash, ReadingsVal($hash->{NAME}, "colourTemperature", 1), 0, $val);
+  MilightDevice_SetHSV_Readings($hash, ReadingsVal($hash->{NAME}, "ct", 1), 0, $val);
 
   # Make sure we actually send off command if we should be off
   if ($wl == 0)
@@ -1103,15 +1139,17 @@ sub MilightDevice_White_SetColourTemp(@)
   my ($hash, $hue) = @_;
   
   MilightDevice_CmdQueue_Clear($hash);
- 
-  # Validate colourTemperature (10 steps)
-  $hue = 10 if ($hue > 10);
-  $hue = 1 if ($hue < 1);
-  
-  my $oldHue = ReadingsVal($hash->{NAME}, "colourTemperature", 1);
-  
+
+  # Save old value of ct
+  my $oldHue = MilightDevice_White_ct_hwValue($hash, ReadingsVal($hash->{NAME}, "ct", 1));
   # Store new values for colourTemperature and Brightness
-  MilightDevice_SetHSV_Readings($hash, $hue, 0, ReadingsVal($hash->{NAME}, "brightness", 100));
+  MilightDevice_SetHSV_Readings($hash, $hue, 0, ReadingsVal($hash->{NAME}, "brightness", 100)); 
+  # Validate colourTemperature (10 steps)
+  # 3000-6500 (350 per step) Warm-White to Cool White
+  # Maps backwards 1=6500 10=3000
+  $hue = MilightDevice_White_ct_hwValue($hash, $hue);
+  
+  Log3 ($hash, 4, "$hash->{NAME}_setColourTemp: $oldHue to $hue");
   
   # Set colour temperature
   if ($oldHue != $hue)
@@ -1135,6 +1173,26 @@ sub MilightDevice_White_SetColourTemp(@)
     }
   }  
   return undef;
+}
+
+# Convert from 3000-6500 colourtemperature to hardware value
+sub MilightDevice_White_ct_hwValue(@)
+{
+  my ($hash, $ct) = @_;
+  
+  # Couldn't get switch statement to work so using if
+  
+  if ((3000 <= $ct) && ($ct < 3349)) { return 10; }
+  elsif ((3350 <= $ct) && ($ct < 3700)) { return 9; }
+  elsif ((3700 <= $ct) && ($ct < 4050)) { return 8; }
+  elsif ((4050 <= $ct) && ($ct < 4400)) { return 7; }
+  elsif ((4400 <= $ct) && ($ct < 4750)) { return 6; }
+  elsif ((4750 <= $ct) && ($ct < 5100)) { return 5; }
+  elsif ((5100 <= $ct) && ($ct < 5450)) { return 4; }
+  elsif ((5450 <= $ct) && ($ct < 5800)) { return 3; }
+  elsif ((5800 <= $ct) && ($ct < 6150)) { return 2; }
+  elsif ((6150 <= $ct) && ($ct <= 6500)) { return 1; }
+  else { return 1; }
 }
 
 ###############################################################################
@@ -1356,22 +1414,24 @@ sub MilightDevice_SetHSV_Readings(@)
   
   readingsBeginUpdate($hash); # Start update readings
   
-  # Store previous state if different to requested state
-  my $prevHue = ReadingsVal($hash->{NAME}, "hue", 0);
-  my $prevSat = ReadingsVal($hash->{NAME}, "saturation", 0);
-  my $prevVal = ReadingsVal($hash->{NAME}, "brightness", 0);
-  if (($prevHue != $hue) || ($prevSat != $sat) || ($prevVal != $val))
-  {
-    readingsBulkUpdate($hash, "previousState", MilightDevice_HSVToStr($hash, $prevHue, $prevSat, $prevVal)); 
-  }
   # Store requested values
-  readingsBulkUpdate($hash, "hue", $hue);
-  readingsBulkUpdate($hash, "saturation", $sat);
   readingsBulkUpdate($hash, "brightness", $val);
   # Store on brightness so we can turn on at a set brightness
   readingsBulkUpdate($hash, "brightness_on", $val_on);
   if (($hash->{LEDTYPE} eq 'RGB') || ($hash->{LEDTYPE} eq 'RGBW'))
   {
+    # Store previous state if different to requested state
+    my $prevHue = ReadingsVal($hash->{NAME}, "hue", 0);
+    my $prevSat = ReadingsVal($hash->{NAME}, "saturation", 0);
+    my $prevVal = ReadingsVal($hash->{NAME}, "brightness", 0);
+    if (($prevHue != $hue) || ($prevSat != $sat) || ($prevVal != $val))
+    {
+      readingsBulkUpdate($hash, "previousState", MilightDevice_HSVToStr($hash, $prevHue, $prevSat, $prevVal)); 
+    }
+
+    readingsBulkUpdate($hash, "saturation", $sat);
+    readingsBulkUpdate($hash, "hue", $hue);
+  	
     # Calc RGB values from HSV
     my ($r,$g,$b) = Color::hsv2rgb($hue/360.0,$sat/100.0,$val/100.0);
     $r *=255; $g *=255; $b*=255;
@@ -1382,7 +1442,7 @@ sub MilightDevice_SetHSV_Readings(@)
   }
   elsif ($hash->{LEDTYPE} eq 'White')
   {
-    readingsBulkUpdate($hash, "colourTemperature", $hue); 
+    readingsBulkUpdate($hash, "ct", $hue); 
   }
   readingsBulkUpdate($hash, "state", "on $val") if ($val > 0);
   readingsBulkUpdate($hash, "state", "off") if ($val == 0);
@@ -1610,6 +1670,7 @@ sub MilightDevice_CmdQueue_Clear(@)
   <p>This module represents a Milight LED Bulb or LED strip controller.  It is controlled by a <a href="#MilightBridge">MilightBridge</a>.</p>
   <p>The Milight system is sold under various brands around the world including "LimitlessLED, EasyBulb, AppLamp"</p>
   <p>The API documentation is available here: <a href="http://www.limitlessled.com/dev/">http://www.limitlessled.com/dev/</a></p>
+  <p>Requires perl module Math::Round</p>
 
   <a name="MilightDevice_define"></a>
   <p><b>Define</b></p>
@@ -1668,8 +1729,12 @@ sub MilightDevice_CmdQueue_Clear(@)
          [0|1]: 1 if discoSpeed is increased, 0 if decreased.  Does not mean much for RGBW
     </li>
     <li>
-      <b>colourTemperature</b><br/>
-         [1-10]: Current colour temperature (1=Cold,10=Warm) for White devices.
+      <b>lastPreset</b><br/>
+         [0..X]: Last selected preset.
+    </li>
+    <li>
+      <b>ct</b><br/>
+         [1-10]: Current colour temperature (3000=Warm,6500=Cold) for White devices.
     </li>
   </ul>
 
@@ -1717,12 +1782,20 @@ sub MilightDevice_CmdQueue_Clear(@)
          Set device to saved hsv state as stored in <b>savedState</b> reading.
     </li>
     <li>
+      <b>preset (0..X|+)</b><br/>
+         Load preset (+ for next preset).
+    </li>
+    <li>
       <b>hsv &lt;h(0..360)&gt;,&lt;s(0..100)&gt;,&lt;v(0..100)&gt; [seconds(0..x)] [flags(l=long path|q=don't clear queue)]</b><br/>
          Set hsv value directly
     </li>
     <li>
       <b>rgb RRGGBB [seconds(0..x)] [flags(l=long path|q=don't clear queue)]</b><br/>
          Set rgb value directly or using colorpicker.
+    </li>
+    <li>
+      <b>hue &lt;0..360&gt;</b><br/>
+         Set hue value.
     </li>
     <li>
       <b>discoModeUp</b><br/>
@@ -1741,8 +1814,8 @@ sub MilightDevice_CmdQueue_Clear(@)
          Decrease speed of disco mode (for RGB and RGBW).
     </li>
     <li>
-      <b>colourTemperature &lt;1-10&gt;</b><br/>
-         Colour temperature 1=Cold White,10=Warm White (for White devices only).
+      <b>ct &lt;3000-6500&gt;</b><br/>
+         Colour temperature 3000=Warm White,6500=Cold White (10 steps) (for White devices only).
     </li>
     <li>
       <a href="#setExtensions"> set extensions</a> are supported.
@@ -1777,6 +1850,10 @@ sub MilightDevice_CmdQueue_Clear(@)
     <li>
       <b>defaultRampOff</b><br/>
          Set the default ramp time if not specified for off command.
+    </li>
+    <li>
+      <b>presets</b><br/>
+         List of hsv presets separated by spaces (eg 0,0,100 9,0,50).
     </li>
   </ul>
 </ul>

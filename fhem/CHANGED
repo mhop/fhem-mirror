@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 31_MilightDevice.pm: Add hue/ct colorpickers.  Add "presets" set command.
   - feature: 70_XBMC.pm: new commands poweron,poweroff. configurable by attribute powerCmd
   - added: 71_YAMAHA_NP.pm: New module for controlling Yamaha network players such as CRX-N560(D)
   - bugfix: FB_CALLMONITOR: fix not working telnet login, when user based
