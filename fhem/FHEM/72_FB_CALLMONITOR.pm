@@ -858,7 +858,7 @@ sub FB_CALLMONITOR_readRemotePhonebook($;$)
     
     Log3 $name, 4, "FB_CALLMONITOR ($name) - connected to FritzBox via telnet";
     
-    my ($prematch, $match) = $telnet->waitfor('/(?:login|password):\s*$/i');
+    my ($prematch, $match) = $telnet->waitfor('/(?:login|user|password):\s*$/i');
     
     unless(defined($prematch) and defined($match)) 
     {
@@ -866,7 +866,7 @@ sub FB_CALLMONITOR_readRemotePhonebook($;$)
         return "Couldn't recognize login prompt: ".$telnet->errmsg;
     }
     
-    if($match =~ /login/ and defined($fb_user))
+    if($match =~ /(login|user):/ and defined($fb_user))
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - setting user to FritzBox: $fb_user";
         $telnet->print($fb_user);
@@ -876,12 +876,12 @@ sub FB_CALLMONITOR_readRemotePhonebook($;$)
             return "Error giving password to FritzBox: ".$telnet->errmsg;
         } 
     }
-    elsif($match =~ /login/ and not defined($fb_user))
+    elsif($match =~ /(login|user):/ and not defined($fb_user))
     {
         $telnet->close;
         return "FritzBox needs a username to login via telnet. Please provide a valid username/password combination";
     }
-    elsif($match =~ /password/)
+    elsif($match =~ /password:/)
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - giving password to FritzBox";
         $telnet->print($fb_pw);
