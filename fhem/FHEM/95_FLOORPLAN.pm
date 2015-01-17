@@ -156,7 +156,8 @@ FLOORPLAN_Initialize($)
   $hash->{FW_detailFn}  = "FP_detailFn";   #floorplan-specific detail-screen
   $hash->{AttrList}     = "refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 ".
                           "stylesheet fp_noMenu:1,0 fp_backgroundimg fp_setbutton:1,0 fp_viewport ".
-						  "fp_roomIcons";
+                          "CssFiles JavaScripts ".
+			  "fp_roomIcons";
   # CGI
   my $name = "floorplan";
   my $fhem_url = "/" . $name ;
@@ -366,8 +367,8 @@ FP_htmlHeader($) {
   $FW_RET = "";
   $FW_RET .= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'."\n";
   $FW_RET .= '<html xmlns="http://www.w3.org/1999/xhtml">'."\n";
-  FW_pO  "<head>";
-  FW_pO  "<title>".$title."</title>";
+  FW_pO "<head root=\"$FW_ME\">\n<title>$title</title>";
+  FW_pO "<meta charset=\"$FW_encoding\">"; # Forum 28666
   # Enable WebApp
   if($FW_tp || $FW_ss) { 
     FW_pO "<link rel=\"apple-touch-icon-precomposed\" href=\"" . FW_IconURL("fhemicon") . "\"/>";
@@ -381,29 +382,50 @@ FP_htmlHeader($) {
   # refresh-value
   my $rf = AttrVal($FW_wname, "refresh", "");
   FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf); # use refresh-value from Web-Instance
-  # stylesheet
+
+  ########################
+  # CSS
+  my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>";
+  #FW_pO sprintf($cssTemplate, "pgm2/style.css");
+  FW_pO sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
+  map { FW_pO sprintf($cssTemplate, $_); }
+                        split(" ", AttrVal($FP_name, "CssFiles", ""));
+
   my $defaultcss = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
   my $css= AttrVal($FP_name, "stylesheet", $defaultcss);
   FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";
-  #set sripts
-#  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
-#                        if($FW_plotmode eq "SVG");
-#  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
+
+  ########################
+  # JavaScripts
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
-  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/svg.js") if($FW_plotmode eq "SVG");
-  foreach my $js (@FW_fhemwebjs) {
-    FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$js");
-  }
+  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery.min.js");
+  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery-ui.min.js");
+
+  #######################
+  # Other JavaScripts + their Attributes
+  map { FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$_") } @FW_fhemwebjs;
+  $jsTemplate = '<script attr=\'%s\' type="text/javascript" src="%s"></script>';
+  map {
+    my $n = $_; $n =~ s+.*/++; $n =~ s/.js$//; $n =~ s/fhem_//; $n .= "Param";
+    FW_pO sprintf($jsTemplate, AttrVal($FP_name, $n, ""), "$FW_ME/$_");
+  } split(" ", AttrVal($FP_name, "JavaScripts", ""));  
+
+  ########################
   # FW Extensions
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
-      next if($h !~ m/HASH/ || !$h->{SCRIPT});
-      FW_pO "<script type=\"text/javascript\" ".
-                "src=\"$FW_ME/js/$h->{SCRIPT}\"></script>";
+      next if($h !~ m/HASH/ || !$h->{SCRIPT} || $h->{SCRIPT} =~ m+pgm2/jquery+);
+      my $script = $h->{SCRIPT};
+      $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
+      FW_pO sprintf($jsTemplate, $script);
     }
   }
-  FW_pO "</head>\n";
+
+  my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
+  my $gen = 'generated="'.(time()-1).'"';
+  my $lp  = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
+  FW_pO "</head>\n<body name=\"$title\" $gen $lp $csrf>";
 }
 
 
@@ -486,6 +508,7 @@ FP_show(){
 		FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name/$d\" autocomplete=\"off\">";
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"table-$d\" align=\"center\">";         # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
+                $allSets = FW_widgetOverride($d, $allSets);
 		$txt = ReadingsVal($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
 		my $cols = ($cmdlist ? (split(":", $cmdlist)) : 0);                                    # Need command-count for colspan of devicename+state
 		
@@ -556,38 +579,38 @@ FP_show(){
           my @cList = split(":", $cmdlist);
           my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
           my $firstIdx = 0;
-		  FW_pO "  <tr class=\"devicecommands\" id=\"$d-devicecommands\">";
+	  FW_pO "  <tr class=\"devicecommands\" id=\"$d-devicecommands\">";
 
-          # Special handling (slider, dropdown, timepicker)
-#		  my $FW_room = undef;  ##needed to be able to reuse code from FHEMWEB
-          my $cmd = $cList[0];
-          if($allSets && $allSets =~ m/$cmd:([^ ]*)/) {
-            my $values = $1;
-            my $oldMe = $FW_ME;
-            $FW_ME = "$FW_ME/floorplan/$FP_name";
-            foreach my $fn (sort keys %{$data{webCmdFn}}) {
-			  my $FW_room = ""; ##needed to be able to reuse code from FHEMWEB
-              no strict "refs";
-              my $htmlTxt = &{$data{webCmdFn}{$fn}}("$FW_ME",
-                                                 $d, $FW_room, $cmd, $values);
-              use strict "refs";
-              if(defined($htmlTxt)) {
-			    $htmlTxt =~ s/>desired-temp/>/;        #mod20130929
-				$htmlTxt =~ s/>desiredTemperature/>/;  #mod20131225
-				FW_pO $htmlTxt;
-                $firstIdx = 1;
-                last;
+          my $oldMe = $FW_ME;
+	  foreach my $cmd (sort @cList) {
+            # Special handling (slider, dropdown, timepicker, ...)
+            my $htmlTxt;
+            my @c = split(' ', $cmd);
+            if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
+              my $values = $1;
+              $FW_ME = "$FW_ME/floorplan/$FP_name";
+              foreach my $fn (sort keys %{$data{webCmdFn}}) {
+			    my $FW_room = ""; ##needed to be able to reuse code from FHEMWEB
+                no strict "refs";
+                $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_ME,
+                                                   $d, $FW_room, $cmd, $values);
+                use strict "refs";
+                last if(defined($htmlTxt));
               }
             }
+            if(defined($htmlTxt)) {
+		    $htmlTxt =~ s/>desired-temp/>/;        #mod20130929
+			$htmlTxt =~ s/>desiredTemperature/>/;  #mod20131225
+				FW_pO $htmlTxt;
+		  # END # Special handling (slider, dropdown, timepicker, ...)
+            } else {
+              FW_pH "cmd.$d=set $d $cmd",
+                  ReplaceEventMap($d,$cmd,1),1,"devicecommands";
+            }
+          }
             $FW_ME = $oldMe;
-          }
-		  # END # Special handling (slider, dropdown, timepicker)
+	  FW_pO "</tr>"; 
 		  
-          for(my $idx=$firstIdx; $idx < @cList; $idx++) {
-            FW_pH "cmd.$d=set $d $cList[$idx]",
-                ReplaceEventMap($d,$cList[$idx],1),1,"devicecommands";
-          }
-		  FW_pO "</tr>"; 
         } elsif($type eq "FileLog") {
 #          $row = FW_dumpFileLog($d, 1, $row);
         }
