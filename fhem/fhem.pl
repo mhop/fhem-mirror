@@ -219,6 +219,7 @@ use vars qw(%readyfnlist);      # devices which want a "readyfn"
 use vars qw(%selectlist);       # devices which want a "select"
 use vars qw(%value);            # Current values, see commandref.html
 use vars qw($lastDefChange);    # number of last def/attr change
+use vars qw($lastSavedChange);  # will be synced with lastDefChange on save
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
@@ -241,6 +242,7 @@ my @cmdList;                    # Remaining commands in a chain. Used by sleep
 
 $init_done = 0;
 $lastDefChange = 0;
+$lastSavedChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
 
@@ -506,6 +508,7 @@ foreach my $d (keys %defs) {
   }
 }
 
+$lastSavedChange = $lastDefChange;
 DoTrigger("global", "INITIALIZED", 1);
 $fhem_started = time;
 
@@ -1231,6 +1234,7 @@ CommandRereadCfg($$)
 
   $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
   $inform{$name} = $informMe if($informMe);
+  $lastSavedChange = $lastDefChange;
   DoTrigger("global", "REREADCFG", 1);
 
   $init_done = 1;
@@ -1408,6 +1412,8 @@ CommandSave($$)
     next if($fh{$key} eq "1"); ## R/O include files
     $ret .= "$key: $!" if(!close($fh{$key}));
   }
+
+  $lastSavedChange = $lastDefChange;
   return ($ret ? $ret : "Wrote configuration to $param");
 }
 
@@ -3576,8 +3582,9 @@ readingsEndUpdate($$)
       my $oldvalue= $userReadings{$userReading}{value};
       my $oldt= $userReadings{$userReading}{t};
       #Debug "Evaluating " . $userReadings{$userReading};
-      # evaluate perl code
+      $cmdFromAnalyze = $perlCode;      # For the __WARN__ sub
       my $value= eval $perlCode;
+      $cmdFromAnalyze = undef;
       my $result;
       # store result
       if($@) {
