@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: FB_CALLMONITOR: fix not working telnet login, when user based
+            authentication is configured in FritzBox
   - feature: 02_RSS.pm: improved frontpage for RSS
   - bugfix: FB_CALLMONITOR  regognize "user:" as login prompt for
             remote telnet connection (phonebook)

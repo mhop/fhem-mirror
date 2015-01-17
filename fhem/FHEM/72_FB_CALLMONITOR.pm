@@ -847,10 +847,10 @@ sub FB_CALLMONITOR_readRemotePhonebook($;$)
     
     return "no password available to access FritzBox" unless(defined($fb_pw));
     
-    my $telnet = new Net::Telnet ( Timeout=>5, Errmode=>'return');
+    my $telnet = new Net::Telnet ( Timeout=>10, Errmode=>'return');
     
-    $telnet->errmode("return");
     delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
+    
     unless($telnet->open($fb_ip))
     {
         return "Error Connecting to FritzBox: ".$telnet->errmsg;
@@ -866,7 +866,7 @@ sub FB_CALLMONITOR_readRemotePhonebook($;$)
         return "Couldn't recognize login prompt: ".$telnet->errmsg;
     }
     
-    if($match =~ /(login|user):/ and defined($fb_user))
+    if($match =~ /(login|user):/i and defined($fb_user))
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - setting user to FritzBox: $fb_user";
         $telnet->print($fb_user);
@@ -875,19 +875,22 @@ sub FB_CALLMONITOR_readRemotePhonebook($;$)
             $telnet->close;
             return "Error giving password to FritzBox: ".$telnet->errmsg;
         } 
+        
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - giving password to FritzBox";
+        $telnet->print($fb_pw);  
     }
-    elsif($match =~ /(login|user):/ and not defined($fb_user))
+    elsif($match =~ /(login|user):/i and not defined($fb_user))
     {
         $telnet->close;
         return "FritzBox needs a username to login via telnet. Please provide a valid username/password combination";
     }
-    elsif($match =~ /password:/)
+    elsif($match =~ /password:/i)
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - giving password to FritzBox";
         $telnet->print($fb_pw);
     }
     
-    unless($telnet->waitfor('/#\s*$/i')) 
+    unless($telnet->waitfor('/#\s*$/')) 
     {
         $telnet->close;
         my $err = $telnet->errmsg;
