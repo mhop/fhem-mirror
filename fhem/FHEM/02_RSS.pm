@@ -259,11 +259,11 @@ RSS_HTMLHead($$) {
   my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
   my $r= defined($refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
   # css and js header output should be coded only in one place
-  my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>\n";
-  my $css= sprintf($cssTemplate, "pgm2/style.css");
-  $css.= sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
-  map { $css.= sprintf($cssTemplate, $_); }
-                        split(" ", AttrVal($FW_wname, "CssFiles", ""));
+  my $css= "";
+  #my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>\n";
+  #$css= sprintf($cssTemplate, "pgm2/style.css");
+  #$css.= sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
+  #map { $css.= sprintf($cssTemplate, $_); } split(" ", AttrVal($FW_wname, "CssFiles", ""));
   my $scripts= RSS_getScript();
   my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$r$css$scripts</head>\n";
 }
