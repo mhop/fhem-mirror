@@ -34,7 +34,7 @@ THRESHOLD_Initialize($)
   $hash->{SetFn}   = "THRESHOLD_Set";
   $hash->{AttrFn}   = "THRESHOLD_Attr";
   $hash->{NotifyFn} = "THRESHOLD_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 state_format state_cmd1_gt state_cmd2_lt target_func number_format setOnDeactivated:cmd1_gt,cmd2_lt";
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 state_format state_cmd1_gt state_cmd2_lt target_func number_format setOnDeactivated:cmd1_gt,cmd2_lt desiredActivate:0,1";
 }
 
 
@@ -269,7 +269,6 @@ THRESHOLD_Set($@)
   my $mode;
   my $state_format = AttrVal($pn, "state_format", "_m _dv");
   my $cmd = AttrVal($pn, "setOnDeactivated", "");
- 
   if ($arg eq "desired" ) {
     return "$pn: set desired value:$value, desired value needs a numeric parameter" if(@a != 3 || $value !~ m/^[-\d\.]*$/);
     
@@ -283,17 +282,18 @@ THRESHOLD_Set($@)
     $state_format =~ s/\_s1v//g;
     $state_format =~ s/\_s2s//g;
     $state_format =~ s/\_sc//g;
-    
+    $ret=CommandDeleteAttr(undef, "$pn disable") if (AttrVal($pn, "desiredActivate", ""));
     readingsBeginUpdate  ($hash);
-    readingsBulkUpdate   ($hash, "mode", $mode);
-    readingsBulkUpdate   ($hash, "state", $state_format) if (!($state_format =~/^[ ]*$/));
+    if (!AttrVal($pn, "disable", "")) {
+      readingsBulkUpdate   ($hash, "mode", $mode);
+      readingsBulkUpdate   ($hash, "state", $state_format) if (!($state_format =~/^[ ]*$/));
+    }
+    readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
     readingsBulkUpdate   ($hash, "threshold_min",$value-$hash->{hysteresis}+$offset);
     readingsBulkUpdate   ($hash, "threshold_max", $value+$offset);
-    readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
     readingsBulkUpdate   ($hash, "desired_value", $value);
     readingsEndUpdate    ($hash, 1);
-    $ret=CommandDeleteAttr(undef, "$pn disable");
-    return THRESHOLD_Check($hash);
+    return THRESHOLD_Check($hash) if (!AttrVal($pn, "disable", ""));
   } elsif ($arg eq "deactivated" ) {
       $cmd = $value if ($value ne "");
       if ($cmd ne "") {
@@ -315,6 +315,7 @@ THRESHOLD_Set($@)
   } elsif ($arg eq "active" ) {
       return "$pn: set active, set desired value first" if ($desired_value eq "");
       $ret=CommandDeleteAttr(undef, "$pn disable");
+      return THRESHOLD_Check($hash);
   } elsif ($arg eq "external" ) {
       $ret=CommandDeleteAttr(undef, "$pn disable");
       if (!$ret) {
@@ -405,6 +406,9 @@ THRESHOLD_Check($)
 {
   my ($hash) = @_;
   my $pn = $hash->{NAME};
+ 
+  return "" if (AttrVal($pn, "disable", ""));
+ 
   my $sensor = $hash->{sensor};
   my $reading = $hash->{sensor_reading};
   my $target_sensor = $hash->{target_sensor};
@@ -920,6 +924,8 @@ THRESHOLD_setValue($$)
     <code>attr TH_heating target_func -0.578*_tv+33.56</code><br>
     <li>setOnDeactivated</li>
     Command to be executed before deactivating. Possible values: cmd1_gt, cmd2_lt<br>
+    <li>desiredActivate</li>
+    If the attribute is set to 1, a disabled module is automatically activated by "set ... desired <value>". "set ... active" is not needed in this case.<br>
   </ul>
   <br>
     
@@ -1265,8 +1271,10 @@ THRESHOLD_setValue($$)
     Hier kann ein Perlausdruck angegeben werden, um aus dem Vorgabewert eines externen Sensors (target_value) einen Sollwert zu berechnen.<br>
     Der Sensorwert wird mit "_tv" im Ausdruck angegeben. Siehe dazu Beispiele oben zur Steuerung der Heizung nach einer Heizkennlinie.<br>
     <li>setOnDeactivated</li>
-    Kommando, welches vor dem Deaktivieren ausgeführt werden soll. Mögliche Angaben: cmd1_gt, cmd2_lt<br>
-    </ul>
+    Kommando, welches durch das Deaktivieren per "set ... deactivated" automatisch ausgeführt werden soll. Mögliche Angaben: cmd1_gt, cmd2_lt<br>
+    <li>desiredActivate</li>
+    Wenn das Attribut auf 1 gesetzt ist, wird ein deaktiviertes Modul durch "set ... desired <value>" automatisch aktiviert. "set ... active" ist dann nicht erforderlich.<br>
+   </ul>
   <br>
     
 =end html_DE
