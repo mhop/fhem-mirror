@@ -17,7 +17,7 @@ define WEB FHEMWEB 8083 global
 attr WEB JavaScripts codemirror/fhem_codemirror.js
 attr WEB defaultRoom Light
 attr WEB hiddenroom DashboardRoom
-attr WEB iconPath openautomation:fhemSVG:$stylesheetPrefix:default
+attr WEB iconPath openautomation:fhemSVG:default
 attr WEB room System
 attr WEB sortRooms Light Cinema Residents Sensors System
 
