@@ -72,7 +72,7 @@ setstate colorInit 2015-01-04 16:19:04
 setstate dew_all active
 setstate eventTypes active
 setstate global <no definition>
-setstate initialUsbCheck 2015-01-04 16:19:04
+
 setstate lcCinema AllOff
 setstate lcCinema 2015-01-04 16:22:40 state AllOff
 setstate outdoorNotifier 2015-01-04 16:22:21
