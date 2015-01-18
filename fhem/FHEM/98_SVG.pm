@@ -45,7 +45,6 @@ sub SVG_getData($$$$$);
 sub SVG_sel($$$;$$);
 
 my %SVG_devs;       # hash of from/to entries per device
-my $SVG_id=0;
 
 
 #####################################
@@ -1255,7 +1254,7 @@ SVG_render($$$$$$$$$;$$)
   # SVG Header
   my $svghdr = 'version="1.1" xmlns="http://www.w3.org/2000/svg" '.
                'xmlns:xlink="http://www.w3.org/1999/xlink" '.
-               'id="SVGPLOT_'.(++$SVG_id).'" '.$filter;
+               "id='SVGPLOT_$name'$filter";
   if(!$styleW) {
     SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
     SVG_pO '<!DOCTYPE svg>';
@@ -1904,7 +1903,7 @@ SVG_render($$$$$$$$$;$$)
   my $fnName = SVG_isEmbed($FW_wname) ? "parent.window.svg_init" : "svg_init";
 
   SVG_pO "<script type='text/javascript'>if(typeof $fnName == 'function') ".
-                "$fnName('SVGPLOT_$SVG_id')</script>";
+                "$fnName('SVGPLOT_$name')</script>";
   SVG_pO "</svg>";
   return $SVG_RET;
 }
