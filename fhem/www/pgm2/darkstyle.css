@@ -92,7 +92,7 @@ g.on { fill:red; }
                   border-color: transparent; }
 .rc_button img:active { border-color: gray; }
 
-.changed { color:red; }
+.changed a, .changed { color:red; }
 
 
 .colorpicker_ct .slider { background: url(../jscolor/ct_background.svg); }

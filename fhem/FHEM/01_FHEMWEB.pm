@@ -2268,10 +2268,10 @@ FW_Notify($$)
   if( $dev->{NAME} eq "global" ) {
     my $n = "#FHEMWEB:$ntfy->{NAME}";
     if( grep(m/^SAVE|INITIALIZED|REREADCFG|SHUTDOWN$/, @{$dev->{CHANGED}}) ) {
-      FW_directNotify($n, '$(".Save_config a").removeClass("changed")', '');
+      FW_directNotify($n, '$(".Save_config").removeClass("changed")', '');
     } elsif( grep(m/^DEFINED|MODIFIED|DELETED|ATTR|DELETEATTR$/,
                                                        @{$dev->{CHANGED}}) ) {
-      FW_directNotify($n, '$(".Save_config a").addClass("changed")', '');
+      FW_directNotify($n, '$(".Save_config").addClass("changed")', '');
     }
   }
 
