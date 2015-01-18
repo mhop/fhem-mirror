@@ -93,8 +93,8 @@ sub RandomTimer_Define($$)
   return "invalid timeToSwitch <$timeToSwitch>, use 9999"
      if(!($timeToSwitch =~  m/^[0-9]{2,4}$/i));
 
-   get_switchmode($hash);
-
+  RandomTimer_set_switchmode ($hash, "800/200") if (!defined $hash->{SWITCHMODE});
+   
   $hash->{NAME}           = $name;
   $hash->{DEVICE}         = $device;
   $hash->{TIMESPEC_START} = $timespec_start;
@@ -105,9 +105,6 @@ sub RandomTimer_Define($$)
   $hash->{S_REP}          = $srep;
   $hash->{S_REL}          = $srel;
   $hash->{COMMAND}        = "off";
-
-  #???
-  $modules{RandomTimer}{defptr}{$hash->{NAME}} = $hash;
 
   myRemoveInternalTimer("SetTimer", $hash);
   myInternalTimer      ("SetTimer", time()+1, "RandomTimer_SetTimer", $hash, 0);
@@ -249,14 +246,36 @@ sub RandomTimer_setState($) {
 sub RandomTimer_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
+  my $hash = $defs{$name};
+  
+  if( $attrName ~~ ["switchmode"] ) {
+     RandomTimer_set_switchmode($hash, $attrVal);
+  }
+  
   if( $attrName ~~ ["disable","disableCond"] ) {
-     my $hash = $defs{$name};
      
      #RandomTimer_setState($hash); # funktioniert nicht, weil zu diesem Zeitpunkt der Attributwerte noch nicht gesetzt ist. 
      RemoveInternalTimer($hash);
      InternalTimer      (time()+1, "RandomTimer_setState", $hash, 0);       
   }
   return undef;
+}
+########################################################################
+sub RandomTimer_set_switchmode ($$) {
+
+   my ($hash, $attrVal) = @_;
+   my $mod = "[".$hash->{NAME} ."] ";
+
+                            
+   if(!($attrVal =~  m/^([0-9]{1,3})\/([0-9]{1,3})$/i)) {
+      Log3 undef, 3, $mod . "invalid switchMode <$attrVal>, use 999/999";
+   } else {
+      my ($sigmaoff, $sigmaon) = ($1, $2);
+      $hash->{SWITCHMODE}   = $attrVal;
+      $hash->{SIGMAON}      = $sigmaon;
+      $hash->{SIGMAOFF}     = $sigmaoff;
+      $attr{$hash->{NAME}}{switchmode} = $attrVal;
+   }
 }
 ########################################################################
 sub getSecsToNextAbschaltTest($)
@@ -381,27 +400,6 @@ sub RandomTimer_device_switch ($)
    Log3 ($hash, 3, $ret)                  if($ret)
 }
 ########################################################################
-sub get_switchmode ($) {
-
-   my ($hash) = @_;
-   my $mod = "[".$hash->{NAME} ."] ";
-
-   my $attr       = "switchmode";
-   my $default    = "800/200";
-   my $switchmode = AttrVal($hash->{NAME}, $attr, $default);
-
-   if(!($switchmode =~  m/^([0-9]{3,3})\/([0-9]{3,3})$/i)) {
-      Log3 undef, 3, $mod . "invalid switchMode <$switchmode>, use 999/999";
-      $attr{$hash->{NAME}}{$attr} = $default;
-   } else {
-      my ($sigmaoff, $sigmaon) = ($1, $2);
-      $hash->{SWITCHMODE}   = $switchmode;
-      $hash->{SIGMAON}      = $sigmaon;
-      $hash->{SIGMAOFF}     = $sigmaoff;
-
-   }
-}
-########################################################################
 sub RandomTimer_isDisabled($) {
    my ($hash) = @_;
 
@@ -444,9 +442,9 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
          Defines a device, that imitates the random switch functionality of a timer clock, like a <b>FS20 ZSU</b>.
          The idea to create it, came from the problem, that is was always a little bit tricky to install a timer clock before
          holiday: finding the manual, testing it the days before and three different timer clocks with three different manuals - a horror.<br>
-         By using it in conjunction with a dummy and a <a href="#disableCond">disableCond</a>, i'm able to switch the always defined timer on every weekend easily from all over the word.
+         By using it in conjunction with a dummy and a <a href="#disableCond">disableCond</a>, I'm able to switch the always defined timer on every weekend easily from all over the world.
          <br><br>
-         <h3>Deskrition</h3>
+         <h3>Descrition</h3>
           a RandomTimer device starts at timespec_start switching device. Every (timeToSwitch
           seconds +-10%) it trys to switch device on/off. The switching period stops when the
           next time to switch is greater than timespec_stop.
@@ -457,7 +455,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
               <b>timespec_start</b>
               <br>
                 The parameter <b>timespec_start</b> defines the start time of the timer with format: HH:MM:SS.
-                It can be a Perlfunction as known from the timespec <a href="#at">at</a> &nbsp;.
+                It can be a Perlfunction as known from the <a href="#at">at</a> timespec &nbsp;.
                 <br><br>
               <b>device</b>
               <br>
