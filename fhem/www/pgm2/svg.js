@@ -270,10 +270,12 @@ FW_svgUpdateDevs(devs)
     var flog = svg.firstChild.nextSibling.getAttribute("flog");
     if(!flog)
       continue;
+    flog = flog.replace(/\\x3a/g, ".");
     log("longpollSVG filter:"+flog);
     for(var j=0; j < devs.length; j++) {
       var ev = devs[0]+":"+devs[1];
       if(ev.match(flog)) {
+        log("longpollSVG: reload SVG");
         var e = embArr[i];
         var newE = document.createElement("embed");
         for(var k=0; k<e.attributes.length; k++)
