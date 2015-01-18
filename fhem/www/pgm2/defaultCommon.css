@@ -19,7 +19,7 @@ table { border-radius:8px; }
 table.room { border:1px solid gray; width: 100%; background: #D7FFFF; }
 table.room tr.sel { background: #A0FFFF; }
 tr.column td { padding:0; vertical-align:top;}
-.changed { color:red; }
+.changed a, .changed { color:red; }
 .col2 { text-align:center; }
 
 /* Documentation */

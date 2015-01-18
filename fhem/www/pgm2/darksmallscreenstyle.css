@@ -89,7 +89,7 @@ g.on { fill:red; }
                   border-color: transparent; }
 .rc_button img:active { border-color: gray; }
 
-.changed { color:red; }
+.changed a, .changed { color:red; }
 
 div.dname, div.dval  {
   width: 152px; 

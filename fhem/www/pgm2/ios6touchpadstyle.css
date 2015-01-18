@@ -469,7 +469,7 @@ table.room tr.sel a:hover svg {
 background-color:#333333;
 }
 
-.changed { color:red; }
+.changed a, .changed { color:red; }
 .dname {
 
 }
