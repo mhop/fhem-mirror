@@ -694,9 +694,13 @@ OWDevice_InitValues($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  my $model;
 
   $hash->{fhem}{bus}= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
-  $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
+  $model= OWDevice_ReadValue($hash, "type");
+  if(defined($model)) {
+    $attr{$name}{model}= $model if($model ne "");
+  }
 
   if($hash->{fhem}{interfaces} eq "id" && !defined($hash->{fhem}{interval})) {
     my $dir= OWDevice_ReadFromServer($hash,"dir","/");
