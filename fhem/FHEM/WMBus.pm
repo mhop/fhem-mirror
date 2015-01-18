@@ -162,6 +162,38 @@ sub valueCalcHex($$) {
 	return sprintf("%x", $value);
 }
 
+sub valueCalcu($$) {
+  my $value = shift;
+  my $dataBlock = shift;
+
+  my $result = '';
+  
+  $result = ($value & 0b00001000 ? 'upper' : 'lower') . ' limit';
+  return $result;
+}
+
+sub valueCalcufnn($$) {
+  my $value = shift;
+  my $dataBlock = shift;
+
+  my $result = '';
+  
+  $result = ($value & 0b00001000 ? 'upper' : 'lower') . ' limit';
+  $result .= ', ' . ($value & 0b00000100 ? 'first' : 'last');
+  $result .= sprintf(', duration %d', $value & 0b11);
+  return $result;
+}
+
+sub valueCalcMultCorr1000($$) {
+  my $value = shift;
+  my $dataBlock = shift;
+  
+  $dataBlock->{value} *= 1000;
+
+  return "correction by factor 1000";
+}
+
+
 my %TimeSpec = (
 	0b00 => 's', # seconds
 	0b01 => 'm', # minutes
@@ -179,7 +211,7 @@ sub valueCalcTimeperiod($$) {
 
 # VIF types (Value Information Field), see page 32
 my %VIFInfo = (
-	VIF_ELECTRIC_ENERGY  => {                     #  10(nnn-3) Wh  0.001Wh to 10000Wh
+	VIF_ENERGY_WATT  => {                     #  10(nnn-3) Wh  0.001Wh to 10000Wh
 	  typeMask     => 0b01111000,
 	  expMask      => 0b00000111,
 	  type         => 0b00000000,
@@ -187,7 +219,7 @@ my %VIFInfo = (
 		unit         => 'Wh',
 		calcFunc     => \&valueCalcNumeric,
 	},
-	VIF_THERMAL_ENERGY   => {                     #  10(nnn) J     0.001kJ to 10000kJ
+	VIF_ENERGY_JOULE   => {                     #  10(nnn) J     0.001kJ to 10000kJ
 	  typeMask     => 0b01111000,
 	  expMask      => 0b00000111,
 	  type         => 0b00001000,
@@ -309,6 +341,14 @@ my %VIFInfo = (
 		unit         => 'm³/s',
 		calcFunc     => \&valueCalcNumeric,
 	},
+  VIF_MASS_FLOW         => {                   #  10(nnn-3) kg/h 0.001kg/h to 10000kg/h
+    typeMask     => 0b01111000,
+    expMask      => 0b00000111,
+    type         => 0b01010000,
+    bias         => -3,
+    unit         => 'kg/h',
+    calcFunc     => \&valueCalcNumeric,
+  },
 	VIF_FLOW_TEMP         => {                   #  10(nn-3) °C 0.001°C to 1°C
 	  typeMask     => 0b01111100,
 	  expMask      => 0b00000011,
@@ -449,6 +489,14 @@ my %VIFInfo_FD = (
 		unit         => 'dBm',
 		calcFunc     => \&valueCalcNumeric,
 	},
+	VIF_FD_RESERVED => {                   # Reserved
+    typeMask     => 0b01110000,
+    expMask      => 0b00000000,
+    type         => 0b01110000,
+    bias         => 0,
+    unit         => 'Reserved',
+  },
+	
 );
 
 # Codes used with extension indicator $FB
@@ -463,6 +511,164 @@ my %VIFInfo_FB = (
 	},
 );
 
+
+# Codes used for an enhancement of VIFs other than $FD and $FB
+my %VIFInfo_other = (       
+  VIF_ERROR_NONE => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00000000,
+    bias         => 0,
+    unit         => 'No error',
+  },
+  VIF_TOO_MANY_DIFES => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00000001,
+    bias         => 0,
+    unit         => 'Too many DIFEs',
+  },
+
+  VIF_ILLEGAL_VIF_GROUP => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00001100,
+    bias         => 0,
+    unit         => 'Illegal VIF-Group',
+  },
+
+
+
+  VIF_PER_SECOND => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00100000,
+    bias         => 0,
+    unit         => 'per second',
+  },
+  VIF_PER_MINUTE => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00100001,
+    bias         => 0,
+    unit         => 'per minute',
+  },
+  VIF_PER_HOUR => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00100010,
+    bias         => 0,
+    unit         => 'per hour',
+  },
+  VIF_PER_DAY => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00100011,
+    bias         => 0,
+    unit         => 'per day',
+  },
+  VIF_PER_WEEK => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00100100,
+    bias         => 0,
+    unit         => 'per week',
+  },
+  VIF_PER_MONTH => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00100101,
+    bias         => 0,
+    unit         => 'per month',
+  },
+  VIF_PER_YEAR => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00100110,
+    bias         => 0,
+    unit         => 'per year',
+  },
+  VIF_PER_REVOLUTION => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00100111,
+    bias         => 0,
+    unit         => 'per revolution/measurement',
+  },
+  VIF_PER_INCREMENT_INPUT => {
+    typeMask     => 0b01111110,
+    expMask      => 0b00000000,
+    type         => 0b00101000,
+    bias         => 0,
+    unit         => 'increment per input pulse on input channnel #',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  VIF_PER_INCREMENT_OUTPUT => {
+    typeMask     => 0b01111110,
+    expMask      => 0b00000000,
+    type         => 0b00101010,
+    bias         => 0,
+    unit         => 'increment per output pulse on output channnel #',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  VIF_PER_LITER => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00101100,
+    bias         => 0,
+    unit         => 'per liter',
+  },
+
+  VIF_START_DATE_TIME => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00111001,
+    bias         => 0,
+    unit         => 'start date(/time) of',
+  },
+  
+  VIF_ACCUMULATION_IF_POSITIVE => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00111011,
+    bias         => 0,
+    unit         => 'Accumulation only if positive contribution',
+  },
+  
+  VIF_DURATION_NO_EXCEEDS => {
+    typeMask     => 0b01110111,
+    expMask      => 0b00000000,
+    type         => 0b01000001,
+    bias         => 0,
+    unit         => '# of exceeds',
+    calcFunc     => \&valueCalcu,
+  },
+
+  VIF_DURATION_LIMIT_EXCEEDED => {
+    typeMask     => 0b01110000,
+    expMask      => 0b00000000,
+    type         => 0b01010000,
+    bias         => 0,
+    unit         => 'duration of limit exceeded',
+    calcFunc     => \&valueCalcufnn,
+  },
+
+  VIF_MULTIPLICATIVE_CORRECTION_FACTOR => {
+    typeMask     => 0b01111000,
+    expMask      => 0b00000111,
+    type         => 0b01110000,
+    bias         => -6,
+    unit         => '',
+  },  
+  VIF_MULTIPLICATIVE_CORRECTION_FACTOR_1000 => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b01111101,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcMultCorr1000,
+  },  
+);
 
 # see 4.2.3, page 24
 my %validDeviceTypes = (
@@ -671,6 +877,38 @@ sub decodeBCD($$$) {
 	return $val;
 }
 
+sub findVIF($$$) {
+  my $vif = shift;
+  my $vifInfoRef = shift;
+  my $dataBlockRef = shift;
+  my $bias;
+  
+  if (defined $vifInfoRef) {
+    VIFID: foreach my $vifType ( keys $vifInfoRef ) { 
+    
+      #printf "vifType $vifType VIF $vif typeMask $vifInfoRef->{$vifType}{typeMask} type $vifInfoRef->{$vifType}{type}\n"; 
+    
+      if (($vif & $vifInfoRef->{$vifType}{typeMask}) == $vifInfoRef->{$vifType}{type}) {
+        #printf " match vifType $vifType\n"; 
+        
+        $bias = $vifInfoRef->{$vifType}{bias};
+        $dataBlockRef->{exponent} = $vif & $vifInfoRef->{$vifType}{expMask};
+        
+        $dataBlockRef->{type} = $vifType;
+        $dataBlockRef->{unit} = $vifInfoRef->{$vifType}{unit};
+        $dataBlockRef->{valueFactor} = 10 ** ($dataBlockRef->{exponent} + $bias);
+        $dataBlockRef->{calcFunc} = $vifInfoRef->{$vifType}{calcFunc};
+        
+        #printf("type %s bias %d exp %d valueFactor %d unit %s\n", $dataBlockRef->{type}, $bias, $dataBlockRef->{exponent}, $dataBlockRef->{valueFactor},$dataBlockRef->{unit});
+        return 1;
+      }
+    }
+    #printf "no match!\n";
+    return 0;
+  }
+  return 1;
+}
+
 sub decodeValueInformationBlock($$$) {
 	my $self = shift;
 	my $vib = shift;
@@ -678,24 +916,27 @@ sub decodeValueInformationBlock($$$) {
 	
 	my $offset = 0;
 	my $vif;
-	my $bias;
-	my $exponent;
 	my $vifInfoRef;
 	my $vifExtension = 0;
 	my $vifExtNo = 0;
 	my $isExtension;
-	
+	my $dataBlockExt;
+  my @VIFExtensions = ();
+  my $analyzeVIF = 1;
 
   $dataBlockRef->{type}	= '';
+  # The unit and multiplier is taken from the table for primary VIF
+  $vifInfoRef = \%VIFInfo;
 
 	EXTENSION: while (1) {
 		$vif = unpack('C', substr($vib,$offset++,1));
 		$isExtension = $vif & VIF_EXTENSION_BIT;
-  	#printf("vif: %x\n", $vif);
+  	#printf("vif: %x isExtension %d\n", $vif, $isExtension);
   	
-  	last EXTENSION if (defined $vifInfoRef);
-  	last EXTENSION if (!$isExtension && $dataBlockRef->{type} eq "MANUFACTURER SPECIFIC");
+  	# Is this an extension?
+  	last EXTENSION if (!$isExtension);
   	
+  	# yes, process extension
 
 		$vifExtNo++;
 		if ($vifExtNo > 10) {
@@ -708,10 +949,7 @@ sub decodeValueInformationBlock($$$) {
 		$vifExtension = $vif;
   	$vif &= ~VIF_EXTENSION_BIT;
   	#printf("vif ohne extension: %x\n", $vif);
-  	if ($vif <= 0b01111011) {
-			# The unit and multiplier is taken from the table for primary VIF
-			$vifInfoRef = \%VIFInfo;
-		} elsif ($vif == 0x7D) {
+    if ($vif == 0x7D) {
 			$vifInfoRef = \%VIFInfo_FD;
 		} elsif ($vif == 0x7B) {
 			$vifInfoRef = \%VIFInfo_FB;
@@ -721,43 +959,38 @@ sub decodeValueInformationBlock($$$) {
 			$dataBlockRef->{type} = "see unit";
 			$dataBlockRef->{unit} = unpack(sprintf("C%d",$vifLength), substr($vib, $offset, $vifLength));
 			$offset += $vifLength;
+      $analyzeVIF = 0;
+			last EXTENSION;
 		} elsif ($vif == 0x7F) {
 			# manufacturer specific data, can't be interpreted
 			$dataBlockRef->{type} = "MANUFACTURER SPECIFIC";
 			$dataBlockRef->{unit} = "";
+			$analyzeVIF = 0;
+			last EXTENSION;
 	  } else {
-			$dataBlockRef->{type} = 'unknown';
-			$dataBlockRef->{errormsg} = "unknown VIFE " . sprintf("%x", $vifExtension) . " at offset " . $offset-1;
-			$dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;		
+	    # enhancement of VIFs other than $FD and $FB (see page 84ff.)
+	    #print "other extension\n";
+      $dataBlockExt = {};
+      $dataBlockExt->{value} = $vif;
+      if (findVIF($vif, \%VIFInfo_other, $dataBlockExt)) {
+        push @VIFExtensions, $dataBlockExt;
+      } else {
+        $dataBlockRef->{type} = 'unknown';
+        $dataBlockRef->{errormsg} = "unknown VIFE " . sprintf("%x", $vifExtension) . " at offset " . ($offset-1);
+        $dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;    
+      }	  
 		}
-		last EXTENSION if (!$isExtension);
-
+    last EXTENSION if (!$isExtension);
 	}
 
-	
-	
-	#printf("vif w/o ext: %x\n", $vif);
-	if (defined $vifInfoRef) {
-		VIFID: foreach my $vifType ( keys $vifInfoRef ) { 
-		
-			#printf "vifType $vifType\n"; 
-		
-			if (($vif & $vifInfoRef->{$vifType}{typeMask}) == $vifInfoRef->{$vifType}{type}) {
-				#printf "vifType $vifType matches\n"; 
-				
-				$bias = $vifInfoRef->{$vifType}{bias};
-				$dataBlockRef->{exponent} = $vif & $vifInfoRef->{$vifType}{expMask};
-				
-				$dataBlockRef->{type} = $vifType;
-				$dataBlockRef->{unit} = $vifInfoRef->{$vifType}{unit};
-				$dataBlockRef->{valueFactor} = 10 ** ($dataBlockRef->{exponent} + $bias);
-				$dataBlockRef->{calcFunc} = $vifInfoRef->{$vifType}{calcFunc};
-				
-				#printf("type %s bias %d exp %d valueFactor %d unit %s\n", $dataBlockRef->{type}, $bias, $dataBlockRef->{exponent}, $dataBlockRef->{valueFactor},$dataBlockRef->{unit});
-				last VIFID;
-			}
-		}
-	}
+  if ($analyzeVIF) {  
+    if (findVIF($vif, $vifInfoRef, $dataBlockRef) == 0) {
+      $dataBlockRef->{errormsg} = "unknown VIF " . sprintf("%x", $vifExtension) . " at offset " . ($offset-1);
+      $dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;    
+    }
+  }
+  $dataBlockRef->{VIFExtensions} = \@VIFExtensions;
+
 	if ($dataBlockRef->{type} eq '') {
 		$dataBlockRef->{type} = 'unknown';
 		$dataBlockRef->{errormsg} = sprintf("in VIFExtension %x unknown VIF %x",$vifExtension, $vif);
@@ -805,7 +1038,7 @@ sub decodeDataInformationBlock($$$) {
 		$storageNo |= ($dif & 0b00001111) << ($difExtNo*4)+1;
 		$tariff    |= (($dif & 0b00110000 >> 4)) << (($difExtNo-1)*2);
 		$devUnit   |= (($dif & 0b01000000 >> 6)) << ($difExtNo-1);
-		#printf("dife %x storage %d\n", $dif, $storageNo);
+		#printf("dife %x extno %d storage %d\n", $dif, $difExtNo, $storageNo);
 	}
 	
 	$dataBlockRef->{functionField} = $functionField;
@@ -959,6 +1192,18 @@ sub decodePayload($$) {
 			$dataBlock->{value} = $value;
 		} else {
 			$dataBlock->{value} = "";
+		}
+		
+		my $VIFExtensions = $dataBlock->{VIFExtensions};
+		for my $VIFExtension (@$VIFExtensions) {
+		  $dataBlock->{extension} = $VIFExtension->{unit};
+      if (defined $VIFExtension->{calcFunc}) {
+        $dataBlock->{extension} .= ", " . $VIFExtension->{calcFunc}->($VIFExtension->{value}, $dataBlock); 
+      } elsif (defined $VIFExtension->{value}) {
+        $dataBlock->{extension} .= ", " . sprintf("%x",$VIFExtension->{value});
+      } else {
+        #$dataBlock->{extension} = "";
+      }
 		}
 		undef $value;
 		
