@@ -172,7 +172,7 @@ sub
 RSS_Overview {
 
   my ($name, $url);
-  my $html= RSS_HTMLHead("RSS RSS_Overview") . "<body>\n";
+  my $html= RSS_HTMLHead("RSS Overview", undef) . "<body>\n";
   foreach my $def (sort keys %defs) {
     if($defs{$def}{TYPE} eq "RSS") {
         $name= $defs{$def}{NAME};
