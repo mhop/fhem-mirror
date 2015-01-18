@@ -32,6 +32,7 @@ sub WMBUS_Initialize($) {
   $hash->{AttrList}  = "IODev".
                        " AESkey".
                        " ignore:0,1".
+                       " rawmsg_as_reading:0,1".
                        " $readingFnAttributes";
 }
 
@@ -290,6 +291,9 @@ sub WMBUS_SetReadings($$$)
 			readingsBulkUpdate($hash, "$dataBlock->{number}_value", $dataBlock->{value}); 
 			readingsBulkUpdate($hash, "$dataBlock->{number}_unit", $dataBlock->{unit});
       readingsBulkUpdate($hash, "$dataBlock->{number}_value_type", $dataBlock->{functionFieldText});
+      if (defined($dataBlock->{extension})) {
+          readingsBulkUpdate($hash, "$dataBlock->{number}_extension", $dataBlock->{extension});
+      }      
 			if ($dataBlock->{errormsg}) {
 				readingsBulkUpdate($hash, "$dataBlock->{number}_errormsg", $dataBlock->{errormsg});
 			}
@@ -306,6 +310,10 @@ sub WMBUS_SetReadings($$$)
 	} else {
 		readingsBulkUpdate($hash, "state", 'decryption failed');
 	}
+	
+	if (AttrVal($name, "rawmsg_as_reading", 0)) {
+    readingsBulkUpdate($hash, "rawmsg", unpack("H*",$mb->{msg}));
+  }
 	
 	readingsEndUpdate($hash,1);
 
@@ -448,9 +456,12 @@ WMBUS_Attr(@)
 	 </li><br>
 	 <li>AESKey<br>
 			A 16 byte AES-Key in hexadecimal digits. Used to decrypt messages from meters which have encryption enabled.
-	</li>
+	</li><br>
   <li>
     <a href="#ignore">ignore</a>
+  </li><br>
+  <li>rawmsg_as_reading<br>
+     If set to 1, received raw messages will be stored in the reading rawmsg. This can be used to log raw messages to help with debugging.
   </li>
   </ul>
 	<br>
@@ -463,7 +474,7 @@ WMBUS_Attr(@)
   The readings are generated in blocks starting with block 1. A meter can send several data blocks.
   Each block has at least a type, a value and a unit, e.g. for an electricity meter it might look like<br>
   <ul>
-  <code>1_type VIF_ELECTRIC_ENERGY</code><br>
+  <code>1_type VIF_ENERGY_WATT</code><br>
   <code>1_unit Wh</code><br>
   <code>1_value 2948787</code><br>
 	</ul>
@@ -554,11 +565,14 @@ WMBUS_Attr(@)
 	 <li>AESKey<br>
 			Ein 16 Bytes langer AES-Schl&uuml;ssel in hexadezimaler Schreibweise. Wird verwendet um Nachrichten von Z&auml;hlern zu entschl&uuml;sseln bei denen
 			die Verschl&uuml;sselung aktiviert ist.
-	</li>
+	</li><br>
   <li>
     <a href="#ignore">ignore</a>
+  </li><br>
+  <li>rawmsg_as_reading<br>
+     If set to 1, received raw messages will be stored in the reading rawmsg. This can be used to log raw messages to help with debugging.
   </li>
-	</ul>
+  </ul>
 	<br>
   <a name="WMBUSreadings"></a>
   <b>Readings</b><br>
@@ -570,7 +584,7 @@ WMBUS_Attr(@)
   Die Readings werden als Block dargestellt, beginnend mit Block 1. Ein Z&auml;hler kann mehrere Bl&ouml;cke senden.
   Jeder Block enth&auml;lt zumindest einen Typ, einen Wert und eine Einheit. F&uuml;r einen Elektrizit&auml;tsz&auml;hler k&ouml;nnte das z. B. so aussehen<br>
   <ul>
-  <code>1_type VIF_ELECTRIC_ENERGY</code><br>
+  <code>1_type VIF_ENERGY_WATT</code><br>
   <code>1_unit Wh</code><br>
   <code>1_value 2948787</code><br>
 	</ul>
