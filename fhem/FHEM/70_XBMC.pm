@@ -461,11 +461,11 @@ sub XBMC_ProcessNotification($$)
   }
   elsif($obj->{method} eq "Player.OnSeek") {
     #XBMC_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
-    Log3($name, 3, "Discard Player.OnSeek event because it is irrelevant");
+    Log3($name, 4, "Discard Player.OnSeek event because it is irrelevant");
   }
   elsif($obj->{method} eq "Player.OnSpeedChanged") {
     #XBMC_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
-    Log3($name, 3, "Discard Player.OnSpeedChanged event because it is irrelevant");
+    Log3($name, 4, "Discard Player.OnSpeedChanged event because it is irrelevant");
   }
   elsif($obj->{method} eq "Player.OnStop") {
     readingsSingleUpdate($hash,"playStatus",'stopped',1);
