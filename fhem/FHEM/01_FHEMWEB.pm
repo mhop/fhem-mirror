@@ -1263,7 +1263,7 @@ FW_roomOverview($)
       } else {
         FW_pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
 
-        my $class = $l1;
+        my $class = "menu_$l1";
         $class =~ s/[^A-Z0-9]/_/gi;
         $class .= ($lastDefChange>$lastSavedChange) ? " changed" : ""
                         if($l1 eq "Save config");
@@ -2268,10 +2268,10 @@ FW_Notify($$)
   if( $dev->{NAME} eq "global" ) {
     my $n = "#FHEMWEB:$ntfy->{NAME}";
     if( grep(m/^SAVE|INITIALIZED|REREADCFG|SHUTDOWN$/, @{$dev->{CHANGED}}) ) {
-      FW_directNotify($n, '$(".Save_config").removeClass("changed")', '');
+      FW_directNotify($n, '$(".menu_Save_config").removeClass("changed")', '');
     } elsif( grep(m/^DEFINED|MODIFIED|DELETED|ATTR|DELETEATTR$/,
                                                        @{$dev->{CHANGED}}) ) {
-      FW_directNotify($n, '$(".Save_config").addClass("changed")', '');
+      FW_directNotify($n, '$(".menu_Save_config").addClass("changed")', '');
     }
   }
 

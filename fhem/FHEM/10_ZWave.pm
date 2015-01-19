@@ -931,7 +931,7 @@ ZWave_Parse($$@)
     }
 
   } elsif($cmd eq "ZW_APPLICATION_UPDATE" && $arg =~ m/....(..)..(.*)$/) {
-    my ($type6,$classes) = ($1, $2, $3);
+    my ($type6,$classes) = ($1, $2);
     my $ret = ZWave_SetClasses($homeId, $id, $type6, $classes);
 
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
