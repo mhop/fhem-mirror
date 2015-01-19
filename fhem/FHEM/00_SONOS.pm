@@ -27,7 +27,7 @@
 #    * Add another Packagesource from suggestions or manual: Bribes de Perl (http://www.bribes.org/perl/ppm)
 #      * Install Package: SOAP::Lite
 #
-# Windows ActivePerl 64Bit is not functioning due to missing SOAP::Lite
+# Windows ActivePerl 64Bit is currently not functioning due to missing SOAP::Lite
 #
 ########################################################################################
 # Configuration:
@@ -47,6 +47,9 @@
 # Changelog
 #
 # SVN-History:
+# 19.01.2015
+#	Verweise auf die "alte" Wikiseite "Sonos Anwendungsbeispiel" in der commandref durch die "neue" Seite "SONOS" ersetzt.
+#	Wenn kein Pingtype definiert wurde, dann wurde fälschlicherweise nicht der Standard "syn" verwendet, sondern "none"
 # 16.01.2015
 #	Speak hatte eine fehlerhafte Überprüfung der Attribute, und konnte nicht ausgeführt werden.
 #	Bei Streams wird das Reading "currentTrackPosition" nun fest auf "0:00:00" gesetzt, und nicht mehr beim Player angefragt
@@ -1622,7 +1625,7 @@ sub SONOS_InitClientProcess($) {
 	}
 	
 	# Grundsätzliche Informationen bzgl. der konfigurierten Player übertragen...
-	my $setDataString = 'SetData:'.$hash->{NAME}.':'.AttrVal($hash->{NAME}, 'verbose', '3').':'.AttrVal($hash->{NAME}, 'pingType', 'none').':'.join(',', @playername).':'.join(',', @playerudn);
+	my $setDataString = 'SetData:'.$hash->{NAME}.':'.AttrVal($hash->{NAME}, 'verbose', '3').':'.AttrVal($hash->{NAME}, 'pingType', $SONOS_DEFAULTPINGTYPE).':'.join(',', @playername).':'.join(',', @playerudn);
 	SONOS_Log undef, 5, $setDataString;
 	DevIo_SimpleWrite($hash, $setDataString."\n", 0);
 	
@@ -6885,7 +6888,7 @@ sub SONOS_Client_IsAlive() {
 <a name="SONOS"></a>
 <h3>SONOS</h3>
 <p>FHEM-Module to communicate with the Sonos-System via UPnP</p>
-<p>For more informations have also a closer look at the wiki at <a href="http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel">http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel</a></p>
+<p>For more informations have also a closer look at the wiki at <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a></p>
 <p>For correct functioning of this module it is neccessary to have some Perl-Modules installed, which has eventually installed manually:<ul>
 <li><code>LWP::Simple</code></li>
 <li><code>LWP::UserAgent</code></li>
@@ -6895,7 +6898,7 @@ Installation e.g. as Debian-Packages (via "sudo apt-get install &lt;packagename&
 <li>LWP::Simple-Packagename (incl. LWP::UserAgent and HTTP::Request): libwww-perl</li>
 <li>SOAP::Lite-Packagename: libsoap-lite-perl</li></ul></p>
 <p><b>Attention!</b><br />This Module will not be functioning on any platform, because of the use of Threads and the neccessary Perl-modules.</p>
-<p>More information is given in a (german) Wiki-article: <a href="http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel">http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel</a></p>
+<p>More information is given in a (german) Wiki-article: <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a></p>
 <p>The system consists of two different components:<br />
 1. A UPnP-Client which runs as a standalone process in the background and takes the communications to the sonos-components.<br />
 2. The FHEM-module itself which connects to the UPnP-client to make fhem able to work with sonos.<br /><br />
@@ -7013,7 +7016,7 @@ The order in the sublists are important, because the first entry defines the so-
 <a name="SONOS"></a>
 <h3>SONOS</h3>
 <p>FHEM-Modul für die Anbindung des Sonos-Systems via UPnP</p>
-<p>Für weitere Hinweise und Beschreibungen bitte auch im Wiki unter <a href="http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel">http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel</a> nachschauen.</p>
+<p>Für weitere Hinweise und Beschreibungen bitte auch im Wiki unter <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a> nachschauen.</p>
 <p>Für die Verwendung sind Perlmodule notwendig, die unter Umständen noch nachinstalliert werden müssen:<ul>
 <li><code>LWP::Simple</code></li>
 <li><code>LWP::UserAgent</code></li>
@@ -7023,7 +7026,7 @@ Installation z.B. als Debian-Pakete (mittels "sudo apt-get install &lt;packagena
 <li>LWP::Simple-Packagename (inkl. LWP::UserAgent und HTTP::Request): libwww-perl</li>
 <li>SOAP::Lite-Packagename: libsoap-lite-perl</li></ul></p>
 <p><b>Achtung!</b><br />Das Modul wird nicht auf jeder Plattform lauffähig sein, da Threads und die angegebenen Perl-Module verwendet werden.</p>
-<p>Mehr Informationen im (deutschen) Wiki-Artikel: <a href="http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel">http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel</a></p>
+<p>Mehr Informationen im (deutschen) Wiki-Artikel: <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a></p>
 <p>Das System besteht aus zwei Komponenten:<br />
 1. Einem UPnP-Client, der als eigener Prozess im Hintergrund ständig läuft, und die Kommunikation mit den Sonos-Geräten übernimmt.<br />
 2. Dem eigentlichen FHEM-Modul, welches mit dem UPnP-Client zusammenarbeitet, um die Funktionalität in FHEM zu ermöglichen.<br /><br />
