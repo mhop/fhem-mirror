@@ -5,6 +5,7 @@ text.legend{ cursor:pointer; }
 text.copy  { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 text.paste { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 
+path     { stroke:black; fill:none; }
 polyline { stroke:black; fill:none; }
 .border { stroke:black; fill:url(#gr_bg);}
 .vgrid { stroke:gray; stroke-dasharray:2,6;}

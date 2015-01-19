@@ -397,8 +397,10 @@ SVG_PEdit($$$$)
     my $v = $conf{lAxis}[$idx];
     $o .= SVG_sel("axes_${idx}", "left,right", 
                     ($v && $v eq "x1y1") ? "left" : "right");
-    $o .= SVG_sel("type_${idx}", "lines,points,steps,fsteps,histeps,bars",
-                    $conf{lType}[$idx]);
+    $o .= SVG_sel("type_${idx}",
+                "lines,points,steps,fsteps,histeps,bars,".
+                        "cubic,cubicSmooth,quadratic,quadraticSmooth",
+                $conf{lType}[$idx]);
     my $ls = $conf{lStyle}[$idx]; 
     if($ls) {
       $ls =~ s/class=//g;
@@ -1627,7 +1629,8 @@ SVG_render($$$$$$$$$;$$)
     my $yp = $y + $h;
 
     #-- axis if not left or right axis
-    SVG_pO "<polyline points=\"$off3,$y $off3,$yp\" $cll/>" if( ($a ne "x1y1") && ($a ne "x1y2") );
+    SVG_pO "<polyline points=\"$off3,$y $off3,$yp\" $cll/>"
+        if($a ne "x1y1" && $a ne "x1y2");
 
     #-- tics handling
     my $tic = $htics{$a};
@@ -1716,7 +1719,8 @@ SVG_render($$$$$$$$$;$$)
 
     my ($lx, $ly) = (-1,-1);
 
-    if($conf{lType}[$idx] eq "points" ) {
+    my $lType = $conf{lType}[$idx];
+    if($lType eq "points" ) {
       foreach my $i (0..int(@{$dxp})-1) {
         my ($x1, $y1) = (int($x+$dxp->[$i]),
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
@@ -1727,7 +1731,7 @@ SVG_render($$$$$$$$$;$$)
         SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
       }
 
-    } elsif($conf{lType}[$idx] eq "steps" || $conf{lType}[$idx] eq "fsteps" ) {
+    } elsif($lType eq "steps" || $lType eq "fsteps" ) {
 
       $ret .=  sprintf(" %d,%d", $x+$dxp->[0], $y+$h) if($isFill && @{$dxp});
       if(@{$dxp} == 1) {
@@ -1740,7 +1744,7 @@ SVG_render($$$$$$$$$;$$)
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
           next if(int($x2) == $lx && int($y1) == $ly);
           $lx = int($x2); $ly = int($y2);
-          if($conf{lType}[$idx] eq "steps") {
+          if($lType eq "steps") {
             $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
           } else {
             $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x1,$y2, $x2,$y2);
@@ -1751,7 +1755,7 @@ SVG_render($$$$$$$$$;$$)
 
       SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
 
-    } elsif($conf{lType}[$idx] eq "histeps" ) {
+    } elsif($lType eq "histeps" ) {
       $ret .=  sprintf(" %d,%d", $x+$dxp->[0], $y+$h) if($isFill && @{$dxp});
       if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
@@ -1770,7 +1774,7 @@ SVG_render($$$$$$$$$;$$)
       $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
       SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
 
-    } elsif( $conf{lType}[$idx] eq "bars" ) {
+    } elsif( $lType eq "bars" ) {
        if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
           $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
@@ -1790,15 +1794,18 @@ SVG_render($$$$$$$$$;$$)
 
     } else {                            # lines and everything else
       my ($ymin, $ymax) = (99999999, -99999999);
-
+      my %lt =(cubic=>"C",cubicSmooth=>"S",quadratic=>"Q",quadraticSmooth=>"T");
+      my ($x1, $y1);
+      my $lt = ($lt{$lType} ? $lt{$lType} : "L"); # defaults to line
+      my $qs = ($lType eq "quadraticSmooth");
       foreach my $i (0..int(@{$dxp})-1) {
+
         if( !defined($dxp->[$i]) ) { # specials
           if(  $dyp->[$i] =~ m/^;$/ ) { # new line segment after newline
-            SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
+            SVG_pO "<path $attributes $lStyle d=\"$ret\"/>";
             $ret = "";
 
           } elsif( $dyp->[$i] =~ m/^;c (.*)/ ) {# close polyline ?
-
             $doClose = $1;
 
           } elsif( $dyp->[$i] =~ m/^;ls (\w+)?/ ) {# line style
@@ -1810,15 +1817,14 @@ SVG_render($$$$$$$$$;$$)
 
           # marker with optional text
           } elsif( $dyp->[$i] =~ m/^;m (\S+)\s(\S+)(\s(\S+)\s(.*))?/ ) {
-            my $x1;
             if( defined($xmin) ) {
               $x1 = int($x+($1-$xmin)*$xmul);
             } else {
               $x1 = ($tmul ? int((SVG_time_to_sec($1)-$fromsec)*$tmul) : $x);
             }
-            my $y1 = int($y+$h-($2-$min)*$hmul);
+            $y1 = int($y+$h-($2-$min)*$hmul);
 
-            my $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
+            my $ret = sprintf("%d,%d %d,%d %d,%d %d,%d %d,%d",
                          $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
             SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
 
@@ -1826,13 +1832,12 @@ SVG_render($$$$$$$$$;$$)
                         "</text>" if( $3 );
 
           } elsif( $dyp->[$i] =~ m/^;t (\S+)\s(\S+)\s(\S+)\s(.*)/ ) {# text
-            my $x1;
             if( defined($xmin) ) {
               $x1 = int($x+($1-$xmin)*$xmul);
             } else {
               $x1 = ($tmul ? int((SVG_time_to_sec($1)-$fromsec)*$tmul) : $x);
             }
-            my $y1 = int($y+$h-($2-$min)*$hmul);
+            $y1 = int($y+$h-($2-$min)*$hmul);
 
 
             SVG_pO "<text x=\"$x1\" y=\"$y1\" $lStyle text-anchor=\"$3\">$4".
@@ -1844,24 +1849,30 @@ SVG_render($$$$$$$$$;$$)
           }
 
           next;
-
         }
 
-        my ($x1, $y1) = (int($x+$dxp->[$i]),
+        ($x1, $y1) = (int($x+$dxp->[$i]),
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
 
         next if($x1 == $lx && $y1 == $ly);
 
 
         # calc ymin/ymax for points with the same x coordinates
-        if( $x1 == $lx ) {
-          $ymin = $y1 if( $y1 < $ymin );
-          $ymax = $y1 if( $y1 > $ymax );
+        if($x1 == $lx) {
+          $ymin = $y1 if($y1 < $ymin);
+          $ymax = $y1 if($y1 > $ymax);
           $ly = $y1;
           next;
         }
 
-        $ret .=  sprintf(" %d,%d", $x1, $y+$h) if($i == 0 && $doClose);
+        if($i == 0) {
+          if($doClose) {
+            $ret .= sprintf("M%d,%d L%d,%d $lt", $x1,$y+$h, $x1,$y1);
+          } else {
+            $ret .= sprintf("M%d,%d $lt", $x1,$y1);
+          }
+          next;
+        }
 
         # plot ymin/ymax range for points with the same x coordinates
         if( $ymin != 99999999 ) {
@@ -1874,9 +1885,9 @@ SVG_render($$$$$$$$$;$$)
         $lx = $x1; $ly = $y1;
       }
       #-- insert last point for filled line
-      $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($doClose && $lx > -1);
+      $ret .=  sprintf(" L%d,%d Z", $lx, $y+$h) if($doClose && $lx > -1);
 
-      SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
+      SVG_pO "<path $attributes $lStyle d=\"$ret\"/>";
     }
 
   }
