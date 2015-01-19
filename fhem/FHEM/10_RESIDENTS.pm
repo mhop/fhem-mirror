@@ -71,41 +71,15 @@ sub RESIDENTS_Define($$) {
 
     $hash->{TYPE} = "RESIDENTS";
 
-    # attr alias
-    $name_attr = "alias";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        $attr{$name}{$name_attr} = "Residents";
-    }
-
-    # attr devStateIcon
-    $name_attr = "devStateIcon";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        $attr{$name}{$name_attr} =
+    # set default settings on first define
+    if ($init_done) {
+        $attr{$name}{alias}         = "Residents";
+        $attr{$name}{devStateIcon}  =
 '.*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home';
-    }
-
-    # attr group
-    $name_attr = "group";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        $attr{$name}{$name_attr} = "Home State";
-    }
-
-    # attr icon
-    $name_attr = "icon";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        $attr{$name}{$name_attr} = "control_building_filled";
-    }
-
-    # attr room
-    $name_attr = "room";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        $attr{$name}{$name_attr} = "Residents";
-    }
-
-    # attr webCmd
-    $name_attr = "webCmd";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        $attr{$name}{$name_attr} = "state";
+        $attr{$name}{group}         = "Home State";
+        $attr{$name}{icon}          = "control_building_filled";
+        $attr{$name}{room}          = "Residents";
+        $attr{$name}{webCmd}        = "state";
     }
 
     return undef;
