@@ -28,6 +28,11 @@ use Time::HiRes qw(gettimeofday);
 ################################################################################
 sub WOL_Initialize($) {
   my ($hash) = @_;
+  
+  if(!$modules{Twilight}{LOADED} && -f "$attr{global}{modpath}/FHEM/59_Twilight.pm") {
+    my $ret = CommandReload(undef, "59_Twilight");
+    Log3 undef, 1, $ret if($ret);
+  }  
 
   $hash->{SetFn}     = "WOL_Set";
   $hash->{DefFn}     = "WOL_Define";
@@ -417,10 +422,10 @@ So, for example a Buffalo NAS can be kept awake.
     attr wol shutdownCmd    "/bin/echo "Teatime" > /dev/console"   # shell command
     </PRE>
     <li><code>attr &lt;name&gt; interval &lt;seconds&gt;</code></a>
-        <br>defines the time between two checks by a <i>ping</i> if state of &lt;name&gt is <i>on</i> By using 0 as parametr for interval you can switch off checking the device.</li>
-    <li><code>attr &lt;name&gt; useUdpBroadcast &lt;<broardcastAdress>&gt;</code>
+        <br>defines the time between two checks by a <i>ping</i> if state of &lt;name&gt is <i>on</i>. By using 0 as parameter for interval you can switch off checking the device.</li>
+    <li><code>attr &lt;name&gt; useUdpBroadcast &lt;broardcastAdress&gt;</code>
         <br>When using UDP then the magic packet can be send to one of the broardcastAdresses (x.x.x.255, x.x.255.255, x.255.255.255) instead of the target host address. 
-        Try using this, when you are trying to wake up a machine in your own subnet and the wakekup with the target adress is instable or doesn't work.</li>
+        Try using this, when you want to wake up a machine in your own subnet and the wakekup with the target adress is instable or doesn't work.</li>
   </ul>
 </ul>
 
