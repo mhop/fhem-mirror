@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added   73_km200: More services added. 
+  - changed 73_km200: Fhem get-command is able to return raw.
+  - bugfix  73_km200: Handling of unknown attributes corrected.
   - feature: 31_MilightDevice.pm: Add hue/ct colorpickers.  Add "presets" set command.
   - feature: 70_XBMC.pm: new commands poweron,poweroff. configurable by attribute powerCmd
   - added: 71_YAMAHA_NP.pm: New module for controlling Yamaha network players such as CRX-N560(D)
