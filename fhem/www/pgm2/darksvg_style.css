@@ -6,11 +6,12 @@ text.copy  { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 text.paste { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 
 
+path     { stroke:black; fill:none; }
 polyline { stroke:black; fill:none; }
-.border { stroke:black; fill:url(#gr_bg);}
-.vgrid { stroke:gray; stroke-dasharray:2,6;}
-.hgrid { stroke:gray; stroke-dasharray:2,6;}
-.pasted { stroke:black; stroke-dasharray:1,1;}
+.border  { stroke:black; fill:url(#gr_bg);}
+.vgrid   { stroke:gray; stroke-dasharray:2,6;}
+.hgrid   { stroke:gray; stroke-dasharray:2,6;}
+.pasted  { stroke:black; stroke-dasharray:1,1;}
 
 .l0 { stroke:red;     }  text.l0 { stroke:none; fill:red;     } 
 .l1 { stroke:green;   }  text.l1 { stroke:none; fill:green;   } 

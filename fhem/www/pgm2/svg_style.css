@@ -1,9 +1,11 @@
+.background { fill:#FFFFE7; }
+
 text       { font-family:Times; font-size:12px; }
 text.title { font-size:16px; }
-text.legend{ cursor:pointer; }
-text.copy  { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
-text.paste { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
+text.copy  { text-decoration:underline; stroke:none; fill:blue;    }
+text.paste { text-decoration:underline; stroke:none; fill:blue;    }
 
+path     { stroke:black; fill:none; }
 polyline { stroke:black; fill:none; }
 .border  { stroke:black; fill:url(#gr_bg); }
 .vgrid   { stroke:gray;  stroke-dasharray:2,6; }
@@ -35,5 +37,3 @@ polyline { stroke:black; fill:none; }
 .l1fill_stripe {stroke:green; fill:url(#gr1_stripe);} text.l1fill_stripe {stroke:none; fill:green;}
 
 .l0fill_gyr {stroke:red; fill:url(#gr0_gyr);} text.l0fill_gyr {stroke:none; fill:red;}
-
-circle#svgmarker { fill:#278727; opacity:0.5; }
