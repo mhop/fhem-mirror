@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0038 2015-01-16 19:30:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0039 2015-01-20 20:38:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -139,6 +139,11 @@
 #		0038    16.01.2015	Sailor				km200_ParseHttpResponseInit		Implementing hierarchy top-down in DoNotPoll 
 #		0038    16.01.2015	Sailor				=pod							Implementing hierarchy top-down in DoNotPoll
 #		0038    16.01.2015	Sailor				del_double						Adding a helper to delete double entries in arrays
+#		0039    19.01.2015	Sailor				km200_Attr						Bugfix:   Handling of unknown attributes
+#		0039    19.01.2015	Sailor				km200_Define					Added:    SC2 as copy of SC1
+#		0039    19.01.2015	Sailor				km200_Define					Added:    More services since apparently forgotten due to update on IP-Symcon site
+#		0039    19.01.2015	Sailor				km200_Get						Changed:  get-command is able to return raw data if valid json dataset is not existing to be returned
+#		0039    19.01.2015	Sailor				km200_GetSingleService			Changed:  get-command is able to return raw data if valid json dataset is not existing to be returned
 ########################################################################################################################
 
 
@@ -248,7 +253,13 @@ sub km200_Define($$)
 	"/heatingCircuits/hc1/suWiSwitchMode",
 	"/heatingCircuits/hc1/suWiThreshold",
 	"/heatingCircuits/hc1/switchPrograms",
+	"/heatingCircuits/hc1/switchPrograms/A",
+	"/heatingCircuits/hc1/switchPrograms/B",
 	"/heatingCircuits/hc1/temperatureLevels",
+	"/heatingCircuits/hc1/temperatureLevels/comfort2",
+	"/heatingCircuits/hc1/temperatureLevels/eco",
+	"/heatingCircuits/hc1/temperatureLevels/day",
+	"/heatingCircuits/hc1/temperatureLevels/night",
 	"/heatingCircuits/hc1/temperatureRoomSetpoint",
 	"/heatingCircuits/hc1/temporaryRoomSetpoint",
 	
@@ -274,7 +285,13 @@ sub km200_Define($$)
 	"/heatingCircuits/hc2/suWiSwitchMode",
 	"/heatingCircuits/hc2/suWiThreshold",
 	"/heatingCircuits/hc2/switchPrograms",
+	"/heatingCircuits/hc2/switchPrograms/A",
+	"/heatingCircuits/hc2/switchPrograms/B",
 	"/heatingCircuits/hc2/temperatureLevels",
+	"/heatingCircuits/hc2/temperatureLevels/day",
+	"/heatingCircuits/hc2/temperatureLevels/comfort2",
+	"/heatingCircuits/hc2/temperatureLevels/eco",
+	"/heatingCircuits/hc2/temperatureLevels/night",
 	"/heatingCircuits/hc2/temperatureRoomSetpoint",
 	"/heatingCircuits/hc2/temporaryRoomSetpoint",
 
@@ -292,10 +309,13 @@ sub km200_Define($$)
 	"/heatSources/nominalDHWPower",
 	"/heatSources/numberOfStarts",
 	"/heatSources/powerSetpoint",
-	"/heatSources/powerSetpoint",
 	"/heatSources/returnTemperature",
 	"/heatSources/systemPressure",
 	"/heatSources/workingTime",
+	"/heatSources/workingTime/totalSystem ",
+	"/heatSources/workingTime/secondBurner ",
+	"/heatSources/workingTime/centralHeating ",
+	
 
 	"/heatSources/hs1/energyReservoir",
 	"/heatSources/hs1/reservoirAlert",
@@ -325,10 +345,20 @@ sub km200_Define($$)
 
 	"/solarCircuits",
 	"/solarCircuits/sc1/",
+	"/solarCircuits/sc1/actuatorStatus",
 	"/solarCircuits/sc1/collectorTemperature",
+	"/solarCircuits/sc1/dhwTankTemperature",
 	"/solarCircuits/sc1/pumpModulation",
 	"/solarCircuits/sc1/solarYield",
 	"/solarCircuits/sc1/status",
+	
+	"/solarCircuits/sc2/",
+	"/solarCircuits/sc2/actuatorStatus",
+	"/solarCircuits/sc2/collectorTemperature",
+	"/solarCircuits/sc2/dhwTankTemperature",
+	"/solarCircuits/sc2/pumpModulation",
+	"/solarCircuits/sc2/solarYield",
+	"/solarCircuits/sc2/status",
 
 	"/system",
 	"/system/appliance",
@@ -344,6 +374,9 @@ sub km200_Define($$)
 	"/system/appliance/powerSetpoint",
 	"/system/appliance/systemPressure",
 	"/system/appliance/workingTime",
+	"/system/appliance/workingTime/centralHeating",
+	"/system/appliance/workingTime/secondBurner",
+	"/system/appliance/workingTime/totalSystem",
 
 	"/system/brand",
 	"/system/bus",
@@ -355,6 +388,7 @@ sub km200_Define($$)
 	"/system/heatSources/hs1/actualPower",
 	"/system/heatSources/hs1/energyReservoir",
 	"/system/heatSources/hs1/fuel",
+	"/system/heatSources/hs1/fuel/caloricValue",
 	"/system/heatSources/hs1/fuel/density",
 	"/system/heatSources/hs1/fuelConsmptCorrFactor",
 	"/system/heatSources/hs1/nominalFuelConsumption",
@@ -593,35 +627,35 @@ sub km200_Define($$)
 
 
 ###START###### To bind unit of value to DbLog entries #########################################################START####
-sub km200_DbLog_split($)
-{
-	my ($event)  = @_;
-#	my $name                   = $event[0];
+#sub km200_DbLog_split($)
+#{
+#	my ($event)  = @_;
+#	my $name     = $event[0];
 #	my $hash     = $defs{$name};
-	my ($reading, $value, $unit);
-	
-	
-print("DbLog_splitFn - event    : " . $event . "\n");
+#	my ($reading, $value, $unit);
+#	
+#	
+#print("DbLog_splitFn - event    : " . $event . "\n");
 #print("DbLog_splitFn - event[0] : " . $event[0] . "\n");
 #print("DbLog_splitFn - event[1] : " . $event[1] . "\n");
 #print("DbLog_splitFn - event[2] : " . $event[2] . "\n");
-
+#
 #print("DbLog_splitFn - unit  : " . $hash->{temp}{ServiceDbLogSplitHash}{unit} ."\n");
-	
-	### Get values being changed from hash
+#	
+#	### Get values being changed from hash
 #	$reading = $hash->{temp}{ServiceDbLogSplitHash}{id};
 #	$value   = $hash->{temp}{ServiceDbLogSplitHash}{value};
 #	$unit    = $hash->{temp}{ServiceDbLogSplitHash}{unit};
-	### Get values being changed from hash
-
+#	### Get values being changed from hash
+#
 #print("DbLog_splitFn - event:" . $event . "; value: ". $value . "; unit: ". $unit . ".\n");
-	
-	### Delete temporary json-hash for DbLog-Split
+#	
+#	### Delete temporary json-hash for DbLog-Split
 #	$hash->{temp}{ServiceDbLogSplitHash} = ();
-	### Delete temporary json-hash for DbLog-Split
-
-    return ($reading, $value, $unit);
-}
+#	### Delete temporary json-hash for DbLog-Split
+#
+#   return ($reading, $value, $unit);
+#}
 ####END####### To bind unit of value to DbLog entries ##########################################################END#####
 
 
@@ -798,7 +832,7 @@ sub km200_Attr(@)
 	### If no attributes of the above known ones have been selected
 	else
 	{
-		Log3 $name, 2, $name. " : km200 - Unknown attribute: $a[2]";
+		# Do nothing
 	}
 	return undef;
 }
@@ -822,12 +856,15 @@ sub km200_Get($@)
 	my $ReturnValue;
 	
 	### Get the list of possible services and create a hash out of it
-	my @RespondingServices = @{$hash->{Secret}{KM200RESPONDINGSERVICES}};
+	my @GetServices = @{$hash->{Secret}{KM200ALLSERVICES}};
 
-	foreach my $item(@RespondingServices) 	
+	foreach my $item(@GetServices) 	
 	{
 		$km200_gets{$item} = ("1");
 	}
+	
+	### Remove trailing slash if available
+	$opt = $1 if($opt=~/(.*)\/$/);
 	
 	### If service chosen in GUI does not exist
 	if(!$km200_gets{$opt}) 
@@ -843,19 +880,31 @@ sub km200_Get($@)
 	$hash->{status}{FlagGetRequest} = true;
 
 	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("Obtaining value of $opt \n");}
-	
+	if ($hash->{CONSOLEMESSAGE} == true) {print("Obtaining value of                                     : $opt \n");}
+
 	### Read service-hash
 	my $ReturnHash = km200_GetSingleService($hash);
 
 	### De-block other scheduled and unscheduled routines
 	$hash->{status}{FlagGetRequest} = false;
 
-	### Extract value
-	$ReturnValue = $ReturnHash->{value};	
-	
+	eval 
+	{
+		### Extract value
+		$ReturnValue = $ReturnHash->{value};
+		1;
+	}
+	or do 
+	{
+		### Just copy string
+		$ReturnValue = $ReturnHash;	
+	};
+
 	### Delete temporary value
 	$hash->{temp}{service} = "";
+		
+	### Console outputs for debugging purposes
+	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
 	
 	### Return value
 	return($ReturnValue);
@@ -1135,7 +1184,6 @@ sub km200_GetSingleService($)
 				my $JsonType       = $json->{type};
 				my $JsonValue      = $json->{value};
 
-
 				### Save json-hash for DbLog-Split
 				$hash->{temp}{ServiceDbLogSplitHash} = $json;
 				### Save json-hash for DbLog-Split
@@ -1155,16 +1203,24 @@ sub km200_GetSingleService($)
 		{
 			Log3 $name, 4, $name. " : km200_GetSingleService: ". $Service . " NOT available";
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read                   : $Service \n";}
-
 		}
 		
 		### Log entries for debugging purposes
 		Log3 $name, 5, $name. " : km200_GetSingleService        : " .$json;
 		### Log entries for debugging purposes
 
+		### Reset Flag
 		$hash->{status}{FlagGetRequest} = false;
 		
-		return $json;
+		### If json exists then return json otherwise return the raw decoded content
+		if( exists $json -> {"value"})
+		{
+			return $json;
+		}
+		else
+		{
+			return $decodedContent;
+		}
 	}
 }
 ####END####### Subroutine get individual data value ############################################################END#####
@@ -1381,7 +1437,7 @@ sub km200_ParseHttpResponseInit($)
 		####END####### Initiate the timer for continuous polling of static values from KM200 #######################END#####
 
 		### Console Message if enabled
-		if ($hash->{CONSOLEMESSAGE} == true) {print("Sounding and importing of services is completed\n___________________________________________________________________________________________________\n\n");}
+		if ($hash->{CONSOLEMESSAGE} == true) {print("Sounding and importing of services is completed\n________________________________________________________________________________________________________\n\n");}
 	}
 	### Clear up temporary variables
 	$hash->{temp}{decodedcontent} = "";	
@@ -1524,7 +1580,7 @@ sub km200_ParseHttpResponseDyn($)
 	{
 		$hash->{STATE}                   = "Initialized";
 		$hash->{temp}{ServiceCounterDyn} = 0;
-		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n___________________________________________________________________________________________________\n\n");}
+		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n________________________________________________________________________________________________________\n\n");}
 		###START###### Re-Start the timer #####################################START####
 		InternalTimer(gettimeofday()+$hash->{INTERVALDYNVAL}, "km200_GetDynService", $hash, 1);
 		####END####### Re-Start the timer ######################################END#####
@@ -1668,7 +1724,7 @@ sub km200_ParseHttpResponseStat($)
 	{
 		$hash->{STATE}                    = "Initialized";
 		$hash->{temp}{ServiceCounterStat} = 0;
-		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n___________________________________________________________________________________________________\n\n");}
+		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n________________________________________________________________________________________________________\n\n");}
 		
 		###START###### Re-Start the timer #####################################START####
 		InternalTimer(gettimeofday()+$hash->{INTERVALSTATVAL}, "km200_GetStatService", $hash, 1);
