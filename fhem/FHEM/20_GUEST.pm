@@ -128,75 +128,22 @@ sub GUEST_Define($$) {
 
     readingsBeginUpdate($hash);
 
-    # attr alias
-    $name_attr = "alias";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
+    # set default settings on first define
+    if ($init_done) {
         my $aliasname = $name;
         $aliasname =~ s/^rg_//;
-        Log3 $name, 4, "GUEST $name: created new attribute '$name_attr'";
+        $attr{$name}{alias} = $aliasname;
 
-        $attr{$name}{$name_attr} = $aliasname;
-    }
-
-    # attr devStateIcon
-    $name_attr = "devStateIcon";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "GUEST $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} =
+        $attr{$name}{devStateIcon}  =
 ".*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown";
-    }
+        $attr{$name}{group}         = "Guests";
+        $attr{$name}{icon}          = "scene_visit_guests";
+        $attr{$name}{rg_realname}   = "alias";
+        $attr{$name}{sortby}        = "1";
+        $attr{$name}{webCmd}        = "state";
 
-    # attr group
-    $name_attr = "group";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "GUEST $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "Guests";
-    }
-
-    # attr icon
-    $name_attr = "icon";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "GUEST $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "scene_visit_guests";
-    }
-
-    # attr icon
-    $name_attr = "rg_realname";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "GUEST $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "alias";
-    }
-
-    # attr room
-    $name_attr = "room";
-    if (   @registeredResidentgroups
-        && exists( $attr{ $registeredResidentgroups[0] }{$name_attr} )
-        && !exists( $attr{$name}{$name_attr} ) )
-    {
-        Log3 $name, 4, "GUEST $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} =
-          $attr{ $registeredResidentgroups[0] }{$name_attr};
-    }
-
-    # attr sortby
-    $name_attr = "sortby";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "GUEST $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "1";
-    }
-
-    # attr webCmd
-    $name_attr = "webCmd";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "GUEST $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "state:mood";
+        $attr{$name}{room}          = $attr{ $registeredResidentgroups[0] }{room}
+          if (@registeredResidentgroups && exists($attr{$registeredResidentgroups[0]}{room}));
     }
 
     # trigger for modified objects
