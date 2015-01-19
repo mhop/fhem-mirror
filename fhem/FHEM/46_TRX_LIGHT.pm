@@ -139,7 +139,7 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1905 => [ "down", "up", "stop"], # Media Mount
 	0x1906 => [ "open", "close", "stop", "confirm"], # DC/RMF/Yooda
 	0x1907 => [ "open", "close", "stop", "confirm_pair"], # Forest
-        0x1A00 => [ "stop", "up", "", "down", "", "", "", "program", "", "", "", "", "", "", "", "up < 0.5s", "down < 0.5s", "up > 2s", "down > 2s", "enable sun+wind", "disable sun"],
+        0x1A00 => [ "stop", "up", "", "down", "", "", "", "program", "", "", "", "", "", "", "", "up<0.5s", "down<0.5s", "up>2s", "down>2s", "enable_sun+wind", "disable_sun"],
         0x1A01 => [ "stop", "up", "", "down", "", "", "", "program"], # RTS RFY ext
 );
 
