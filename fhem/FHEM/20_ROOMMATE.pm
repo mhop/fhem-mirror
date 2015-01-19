@@ -129,67 +129,22 @@ sub ROOMMATE_Define($$) {
 
     readingsBeginUpdate($hash);
 
-    # attr alias
-    $name_attr = "alias";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "ROOMMATE $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "Status";
-    }
-
-    # attr devStateIcon
-    $name_attr = "devStateIcon";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "ROOMMATE $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} =
-".*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown";
-    }
-
-    # attr group
-    $name_attr = "group";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
+    # set default settings on first define
+    if ($init_done) {
         my $groupname = $name;
         $groupname =~ s/^rr_//;
-        Log3 $name, 4, "ROOMMATE $name: created new attribute '$name_attr'";
+        $attr{$name}{group} = $groupname;
 
-        $attr{$name}{$name_attr} = $groupname;
-    }
+        $attr{$name}{alias}         = "Status";
+        $attr{$name}{devStateIcon}  =
+".*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown";
+        $attr{$name}{icon}          = "people_sensor";
+        $attr{$name}{rr_realname}   = "alias";
+        $attr{$name}{sortby}        = "1";
+        $attr{$name}{webCmd}        = "state";
 
-    # attr icon
-    $name_attr = "icon";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "ROOMMATE $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "people_sensor";
-    }
-
-    # attr room
-    $name_attr = "room";
-    if (   @registeredResidentgroups
-        && exists( $attr{ $registeredResidentgroups[0] }{$name_attr} )
-        && !exists( $attr{$name}{$name_attr} ) )
-    {
-        Log3 $name, 4, "ROOMMATE $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} =
-          $attr{ $registeredResidentgroups[0] }{$name_attr};
-    }
-
-    # attr sortby
-    $name_attr = "sortby";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "ROOMMATE $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "0";
-    }
-
-    # attr webCmd
-    $name_attr = "webCmd";
-    unless ( exists( $attr{$name}{$name_attr} ) ) {
-        Log3 $name, 4, "ROOMMATE $name: created new attribute '$name_attr'";
-
-        $attr{$name}{$name_attr} = "state:mood";
+        $attr{$name}{room}          = $attr{ $registeredResidentgroups[0] }{room}
+          if (@registeredResidentgroups && exists($attr{$registeredResidentgroups[0]}{room}));
     }
 
     # trigger for modified objects
