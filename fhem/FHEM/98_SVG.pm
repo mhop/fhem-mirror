@@ -655,7 +655,7 @@ SVG_readgplotfile($$$)
     if($l =~ m/^#([^ ]*) (.*)$/) {
       if($1 eq $ldType) {
         $src = $ld; $plotfn = $2;
-      } elsif($defs{$1}) {
+      } elsif($1 && $defs{$1}) {
         $src = $1; $plotfn = $2;
       }
     } elsif($l =~ "^plot" || $plot) {
