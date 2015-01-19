@@ -88,18 +88,21 @@ sv_menu(evt, embed)
   var tl = $(svg).find("#svg_title");
   var par = svgNode.par;
 
+  var sn = selNode.nodeName,
+      pn = (sn=="path" ? "d" : "points"),
+      arrName = (sn=="path" ? "pathSegList" : "points");
   FW_menu(evt, label,
     ["Copy", "Paste",
       svgNode.isSingle ? "Show all lines":"Hide other lines",
       selNode.showVal ? "Stop displaying values" : "Display plot values" ],
-    [undefined, data.length==0, undefined, selNode.nodeName!="polyline"],
+    [undefined, data.length==0, undefined, sn!="polyline" && sn!="path"],
     function(arg) {
 
       //////////////////////////////////// copy
       if(arg == 0) {
         document.cookie="fhemweb="+
               $(sel).attr("y_min")+":"+$(sel).attr("y_mul")+":"+
-              svg_compressPoints($(sel).attr("points"));
+              svg_compressPoints($(sel).attr(pn));
       }
 
       //////////////////////////////////// paste
@@ -107,7 +110,7 @@ sv_menu(evt, embed)
         var doc = $(svg).get(0).ownerDocument;
         var o=doc.createElementNS(svgNS, "polyline");
         o.setAttribute("class", "pasted");
-        o.setAttribute("points", svg_uncompressPoints(data[2]));
+        o.setAttribute(pn, svg_uncompressPoints(data[2]));
 
         var h  = parseFloat($(sel).attr("y_h"));
         var ny_mul = parseFloat(data[1]);
@@ -133,7 +136,7 @@ sv_menu(evt, embed)
           svgNode.isSingle = 1;
           $(sel).attr("stroke-width", 3);
           $(tl).attr("hiddentitle", $(tl).text());
-          if($(sel).attr("points") != null)
+          if($(sel).attr(pn) != null)
             $(tl).text($(label).attr("title"));
           showOtherLines(1, 0);
         }
@@ -166,7 +169,7 @@ sv_menu(evt, embed)
                        $("#content").offset().top-50;
           $("#content").append(par.div);
 
-          var pl = selNode.points;
+          var pl = selNode[arrName];
           if(pl.length > 2)
             mousemove({pageX:pl[pl.length-2].x});
         }
@@ -177,7 +180,7 @@ sv_menu(evt, embed)
   function
   mousemove(e)
   {
-    var xRaw = e.pageX, pl = selNode.points, l = pl.length, i1;
+    var xRaw = e.pageX, pl = selNode[arrName], l = pl.length, i1;
     if(!embed)
       xRaw -= $(svg).offset().left;
     for(i1=0; i1<l; i1++)

@@ -1797,7 +1797,6 @@ SVG_render($$$$$$$$$;$$)
       my %lt =(cubic=>"C",cubicSmooth=>"S",quadratic=>"Q",quadraticSmooth=>"T");
       my ($x1, $y1);
       my $lt = ($lt{$lType} ? $lt{$lType} : "L"); # defaults to line
-      my $qs = ($lType eq "quadraticSmooth");
       foreach my $i (0..int(@{$dxp})-1) {
 
         if( !defined($dxp->[$i]) ) { # specials

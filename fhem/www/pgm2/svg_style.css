@@ -2,8 +2,8 @@
 
 text       { font-family:Times; font-size:12px; }
 text.title { font-size:16px; }
-text.copy  { text-decoration:underline; stroke:none; fill:blue;    }
-text.paste { text-decoration:underline; stroke:none; fill:blue;    }
+text.legend { cursor:pointer; }
+circle#svgmarker { color:#278727; opacity:0.5; }
 
 path     { stroke:black; fill:none; }
 polyline { stroke:black; fill:none; }
