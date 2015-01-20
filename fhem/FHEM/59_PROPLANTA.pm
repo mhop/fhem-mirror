@@ -492,7 +492,8 @@ sub PROPLANTA_HtmlAcquire($$)
    PROPLANTA_Log $hash, 4, "Start capturing of $URL";
 
    my $err_log  = "";
-   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
+   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10
+                                       , agent => "Mozilla/5.0 (Windows NT 5.1) [de-DE,de;q=0.8,en-US;q=0.6,en;q=0.4]" );
    my $request   = HTTP::Request->new( GET => $URL );
    my $response = $agent->request($request);
    $err_log = "Can't get $URL -- " . $response->status_line
