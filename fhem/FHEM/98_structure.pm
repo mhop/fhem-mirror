@@ -54,6 +54,23 @@ structure_Initialize($)
   $cmds{delstruct} = \%dhash;
 }
 
+sub structAdd($$);
+sub
+structAdd($$)
+{
+  my ($d, $attrList) = @_;
+  $defs{$d}{INstructAdd} = 1;
+  foreach my $c (keys %{$defs{$d}{CONTENT}}) {
+    if($defs{$c}{INstructAdd}) {
+      Log 1, "recursive structure definition"
+
+    } else {
+      addToDevAttrList($c, $attrList);
+      structAdd($c, $attrList) if($defs{$d}{TYPE} eq "structure");
+    }
+  }
+  delete $defs{$d}{INstructAdd};
+}
 
 #############################
 sub
@@ -72,12 +89,12 @@ structure_Define($$)
   $hash->{ATTR} = $stype;
 
   my %list;
+  my $attrList = "$stype ${stype}_map structexclude";
   foreach my $a (@a) {
     foreach my $d (devspec2array($a)) {
       $list{$d} = 1;
-      addToDevAttrList($d, $stype);
-      addToDevAttrList($d, $stype . "_map");
-      addToDevAttrList($d, "structexclude");
+      addToDevAttrList($d, $attrList);
+      structAdd($d, $attrList) if($defs{$d}{TYPE} eq "structure");
     }
   }
   $hash->{CONTENT} = \%list;
