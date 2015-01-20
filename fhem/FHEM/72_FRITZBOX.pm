@@ -1567,7 +1567,7 @@ sub FRITZBOX_Ring_Run($)
 #Preparing 3rd command array to ring and reset everything
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial **".$intNo."#";
-   push @cmdArray, "sleep ".($duration+0); # 0s added because it takes sometime until it starts ringing
+   push @cmdArray, "sleep ".($duration+1); # 1s added because it takes sometime until it starts ringing
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup **".$intNo;
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50"
       if $ringWithIntern != 0 ;
@@ -1751,7 +1751,7 @@ sub FRITZBOX_Call_Run($)
    
    FRITZBOX_Log $hash, 4, "Call $extNo for $duration seconds";
    push @cmdArray, "ctlmgr_ctl w telcfg command/Dial ".$extNo."#";
-   push @cmdArray, "sleep ".($duration+0); # 0s added because it takes sometime until it starts ringing
+   push @cmdArray, "sleep ".($duration+1); # 1s added because it takes sometime until it starts ringing
    push @cmdArray, "ctlmgr_ctl w telcfg command/Hangup $ringWithIntern";
    push @cmdArray, "ctlmgr_ctl w telcfg settings/DialPort 50";
    if ($ttsLink)
@@ -2831,7 +2831,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; call &lt;number&gt; [Dauer] [say:Text|play:MP3URL]</code>
          <br>
-         Ruf f&uuml;r 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1 oder das Attribut 'ringWithIntern'). Wenn der Angerufene abnimmt h&auml;rt er die Wartemusik oder den angegebenen Text oder Klang.
+         Ruf f&uuml;r 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1 oder das Attribut 'ringWithIntern'). Wenn der Angerufene abnimmt, h&ouml;rt er die Wartemusik oder den angegebenen Text oder Klang.
          Der interne Telefonanschluss klingelt ebenfalls.
       </li><br>
 
@@ -2849,7 +2849,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
          <br>
-         Schaltet die Rufumleitung (Nummer 1, 2 ...) an oder aus.
+         Schaltet die Rufumleitung (Nummer 1, 2 ...) für einzelne Rufnummern an oder aus.
          <br>
          Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden.
          <br>
