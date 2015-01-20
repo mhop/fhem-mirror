@@ -177,7 +177,10 @@ sub XBMC_Undefine($$)
 sub XBMC_Init($) 
 {
   my ($hash) = @_;
-  
+
+  XBMC_ResetMediaReadings($hash);
+  XBMC_ResetPlayerReadings($hash);
+        
   #since we just successfully connected to XBMC I guess its safe to assume the device is awake
   readingsSingleUpdate($hash,"system","wake",1);
   $hash->{LAST_PING} = $hash->{LAST_PONG} = time();
@@ -244,13 +247,7 @@ sub XBMC_Update($)
     }
   };
   XBMC_Call($hash,$obj,1);
-  #$obj  = {
-  #  "method" => "System.GetProperties",
-  #  "params" => { 
-  #    "properties" => ["canshutdown", "cansuspend", "canhibernate", "canreboot"]
-  #  }
-  #};
-  #XBMC_Call($hash,$obj,1);
+
   $obj  = {
     "method" => "GUI.GetProperties",
     "params" => { 
@@ -311,7 +308,7 @@ sub XBMC_ProcessRead($$)
   $buffer = $buffer  . $data;
   Log3($name, 5, "XBMC_Read: Current processing buffer (PARTIAL + incoming data): " . $buffer);
 
-  my ($msg,$tail) = XBMC_ParseMsg($buffer);
+  my ($msg,$tail) = XBMC_ParseMsg($hash, $buffer);
   #processes all complete messages
   while($msg) {
     Log3($name, 5, "XBMC_Read: Decoding JSON message. Length: " . length($msg) . " Content: " . $msg); 
@@ -327,12 +324,53 @@ sub XBMC_ProcessRead($$)
     else {
       XBMC_ProcessResponse($hash,$obj);
     }
-    ($msg,$tail) = XBMC_ParseMsg($tail);
+    ($msg,$tail) = XBMC_ParseMsg($hash, $tail);
   }
   $hash->{PARTIAL} = $tail;
   Log3($name, 5, "XBMC_Read: Tail: " . $tail);
   Log3($name, 5, "XBMC_Read: PARTIAL: " . $hash->{PARTIAL});
   return;
+}
+
+sub XBMC_ResetMediaReadings($)
+{
+  my ($hash) = @_;
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "currentMedia", "" );
+  readingsBulkUpdate($hash, "currentOriginaltitle", "" );
+  readingsBulkUpdate($hash, "currentShowtitle", "" );
+  readingsBulkUpdate($hash, "currentTitle", "" );
+  readingsBulkUpdate($hash, "episode", "" );
+  readingsBulkUpdate($hash, "episodeid", "" );
+  readingsBulkUpdate($hash, "season", "" );
+  readingsBulkUpdate($hash, "label", "" );
+  readingsBulkUpdate($hash, "movieid", "" );
+  readingsBulkUpdate($hash, "playlist", "" );
+  readingsBulkUpdate($hash, "type", "" );
+  readingsBulkUpdate($hash, "year", "" );
+  readingsBulkUpdate($hash, "is3DFile", "" );
+  
+  readingsBulkUpdate($hash, "currentAlbum", "" );
+  readingsBulkUpdate($hash, "currentArtist", "" );
+  readingsBulkUpdate($hash, "songid", "" );
+  readingsBulkUpdate($hash, "currentTrack", "" );
+  
+  readingsEndUpdate($hash, 1);
+}
+
+sub XBMC_ResetPlayerReadings($)
+{
+  my ($hash) = @_;
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "time", "" );
+  readingsBulkUpdate($hash, "totaltime", "" );
+  readingsBulkUpdate($hash, "shuffle", "" );
+  readingsBulkUpdate($hash, "repeat", "" );
+  readingsBulkUpdate($hash, "speed", "" );
+  readingsBulkUpdate($hash, "partymode", "" );
+  
+  readingsBulkUpdate($hash, "playStatus", "stopped" );
+  readingsEndUpdate($hash, 1);
 }
 
 sub XBMC_PlayerOnPlay($$)
@@ -468,26 +506,36 @@ sub XBMC_ProcessNotification($$)
     Log3($name, 4, "Discard Player.OnSpeedChanged event because it is irrelevant");
   }
   elsif($obj->{method} eq "Player.OnStop") {
+    XBMC_ResetMediaReadings($hash);
+    XBMC_ResetPlayerReadings($hash);
     readingsSingleUpdate($hash,"playStatus",'stopped',1);
   }
   elsif($obj->{method} eq "Player.OnPause") {
     readingsSingleUpdate($hash,"playStatus",'paused',1);
   }
   elsif($obj->{method} eq "Player.OnPlay") {
+    XBMC_ResetMediaReadings($hash);
     XBMC_PlayerOnPlay($hash, $obj);
   }
   elsif($obj->{method} =~ /(.*).On(.*)/) {
     readingsSingleUpdate($hash,lc($1),lc($2),1);
     
-    if ((lc($1) eq "system") and (lc($2) eq "sleep")) {
-      Log3($name, 3, "XBMC notified that it is going to sleep");
-      #if we immediatlely close our DevIO then fhem will instantly try to reconnect which might
-      #succeed because XBMC needs a moment to actually shutdown.
-      #So cancel the current timer, fake that the last pong has arrived ages ago
-      #and force a connection check in some seconds when we think XBMC actually has shut down
-      $hash->{LAST_PONG} = 0;
-      RemoveInternalTimer($hash);
-      XBMC_QueueCheckConnection($hash,  5);
+    if (lc($1) eq "system") {
+      if ((lc($2) eq "quit") or (lc($2) eq "restart") or (lc($2) eq "sleep")) {
+        XBMC_ResetMediaReadings($hash);
+        XBMC_ResetPlayerReadings($hash);
+      }
+      
+      if (lc($2) eq "sleep") {
+        Log3($name, 3, "XBMC notified that it is going to sleep");
+        #if we immediatlely close our DevIO then fhem will instantly try to reconnect which might
+        #succeed because XBMC needs a moment to actually shutdown.
+        #So cancel the current timer, fake that the last pong has arrived ages ago
+        #and force a connection check in some seconds when we think XBMC actually has shut down
+        $hash->{LAST_PONG} = 0;
+        RemoveInternalTimer($hash);
+        XBMC_QueueCheckConnection($hash,  5);
+      }
     }
   }
   return undef;
@@ -550,20 +598,26 @@ sub XBMC_ProcessResponse($$)
   return undef;
 }
 
+sub XBMC_is3DFile($$) {
+  my ($hash, $filename) = @_;
+  
+  return ($filename =~ /([-. _]3d[-. _]|.*3dbd.*)/i);
+}
+
 sub XBMC_CreateReading($$$) {
   my $hash = shift;
   my $key = shift;
   my $value = shift;
   if($key eq 'version') {
-  my $version = '';
-  $version = $value->{major};
-  $version .= '.' . $value->{minor} if(defined($value->{minor}));
-  $version .= '-' . $value->{revision} if(defined($value->{revision}));
-  $version .= ' ' . $value->{tag} if(defined($value->{tag}));
-  $value = $version;
+    my $version = '';
+    $version = $value->{major};
+    $version .= '.' . $value->{minor} if(defined($value->{minor}));
+    $version .= '-' . $value->{revision} if(defined($value->{revision}));
+    $version .= ' ' . $value->{tag} if(defined($value->{tag}));
+    $value = $version;
   }
   elsif($key eq 'skin') {
-  $value = $value->{name} . '(' . $value->{id} . ')';
+    $value = $value->{name} . '(' . $value->{id} . ')';
   }
   elsif($key eq 'totaltime' || $key eq 'time') {
     $value = sprintf('%02d:%02d:%02d.%03d',$value->{hours},$value->{minutes},$value->{seconds},$value->{milliseconds});
@@ -585,6 +639,9 @@ sub XBMC_CreateReading($$$) {
   }
   elsif($key eq 'file') {
     $key = 'currentMedia';
+    
+    my $is3D = XBMC_is3DFile($hash, $value);
+    XBMC_CreateReading($hash, "is3DFile", $is3D ? "on" : "off");
   }
   elsif($key =~ /(album|artist|track|title)/) {
     $key = 'current' . ucfirst($key);
@@ -600,9 +657,10 @@ sub XBMC_CreateReading($$$) {
 #Parses a given string and returns ($msg,$tail). If the string contains a complete message 
 #(equal number of curly brackets) the return value $msg will contain this message. The 
 #remaining string is return in form of the $tail variable.
-sub XBMC_ParseMsg($) 
+sub XBMC_ParseMsg($$) 
 {
-  my ($buffer) = @_;
+  my ($hash, $buffer) = @_;
+  my $name = $hash->{NAME};
   my $open = 0;
   my $close = 0;
   my $msg = '';
@@ -611,6 +669,9 @@ sub XBMC_ParseMsg($)
     foreach my $c (split //, $buffer) {
       if($open == $close && $open > 0) {
         $tail .= $c;
+      }
+      elsif(($open == $close) && ($c ne '{')) {
+        Log3($name, 5, "XBMC_ParseMsg: Garbage character before message: " . $c); 
       }
       else {
         if($c eq '{') {
