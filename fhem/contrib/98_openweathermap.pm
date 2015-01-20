@@ -14,6 +14,7 @@
 #
 #	All tasks can be accessed single or in any desired combination.
 #	Copyright: betateilchen ®
+#	e-mail   : fhem.development@betateilchen.de
 #
 #	This file is part of fhem.
 #
@@ -63,8 +64,6 @@
 #
 #	2014-03-22	added:	added set command 'clear'
 #
-#	2014-07-11	modi:	readingsFnAttr removed
-#
 
 package main;
 
@@ -102,8 +101,10 @@ sub openweathermap_Initialize($) {
 							"owoSrc00 owoSrc01 owoSrc02 owoSrc03 owoSrc04 ".
 							"owoSrc05 owoSrc06 owoSrc07 owoSrc08 owoSrc09 ".
 							"owoSrc10 owoSrc11 owoSrc12 owoSrc13 owoSrc14 ".
-							"owoSrc15 owoSrc16 owoSrc17 owoSrc18 owoSrc19 ";
+							"owoSrc15 owoSrc16 owoSrc17 owoSrc18 owoSrc19 ".
+							$readingFnAttributes;
 }
+
 
 sub OWO_Shutdown($) {
 	my ($hash) = @_;
@@ -115,7 +116,7 @@ sub OWO_Shutdown($) {
 sub OWO_Set($@){
 	my ($hash, @a)	= @_;
 	my $name		= $hash->{NAME};
-	my $usage		= "Unknown argument, choose one of clear:noArg stationById stationByGeo stationByName send:noArg";
+	my $usage		= "Unknown argument, choose one of clear:readings stationById stationByGeo stationByName send:noArg";
 	my $response;
 	
 	return "No Argument given" if(!defined($a[1]));
