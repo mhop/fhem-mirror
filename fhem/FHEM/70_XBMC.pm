@@ -604,6 +604,7 @@ sub XBMC_is3DFile($$) {
   return ($filename =~ /([-. _]3d[-. _]|.*3dbd.*)/i);
 }
 
+sub XBMC_CreateReading($$$);
 sub XBMC_CreateReading($$$) {
   my $hash = shift;
   my $key = shift;
