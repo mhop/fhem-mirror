@@ -70,7 +70,7 @@ HUEBridge_Define($$)
   if( !defined($host) ) {
     my $ret = HUEBridge_HTTP_Request(0,"http://www.meethue.com/api/nupnp","GET",undef,undef,undef);
 
-    if( defined($ret) && $ret ne '' )
+    if( defined($ret) && $ret ne '' && $ret =~ m/^[\[{].*[\]}]$/ )
       {
         my $obj = from_json($ret);
 
