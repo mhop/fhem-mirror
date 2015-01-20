@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: FB_CALLMONITOR: read phonebooks after all attributes are set
+            from fhem.cfg.
   - feature: 70_XBMC.pm: clear readings when stopping media
   - feature: 70_XBMC.pm: new reading is3DFile for 3D files
   - bugfix: 70_XBMC.pm: improved JSON separator

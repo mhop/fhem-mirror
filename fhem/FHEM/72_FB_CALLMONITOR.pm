@@ -81,14 +81,16 @@ FB_CALLMONITOR_Initialize($)
     my ($hash) = @_;
 
     # Provider
-    $hash->{ReadFn}  = "FB_CALLMONITOR_Read";  
-    $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
-    $hash->{GetFn}   = "FB_CALLMONITOR_Get";
-    $hash->{SetFn}   = "FB_CALLMONITOR_Set";
-    $hash->{DefFn}   = "FB_CALLMONITOR_Define";
-    $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-    $hash->{AttrFn}  = "FB_CALLMONITOR_Attr";
-    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:multiple-strict,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at reverse-search-cache:0,1 reverse-search-phonebook-file fritzbox-remote-phonebook:0,1 fritzbox-user ".
+    $hash->{ReadFn}    = "FB_CALLMONITOR_Read";  
+    $hash->{ReadyFn}   = "FB_CALLMONITOR_Ready";
+    $hash->{GetFn}     = "FB_CALLMONITOR_Get";
+    $hash->{SetFn}     = "FB_CALLMONITOR_Set";
+    $hash->{DefFn}     = "FB_CALLMONITOR_Define";
+    $hash->{UndefFn}   = "FB_CALLMONITOR_Undef";
+    $hash->{AttrFn}    = "FB_CALLMONITOR_Attr";
+    $hash->{NotifyFn}  = "FB_CALLMONITOR_Notify";
+    $hash->{NOTIFYDEV} = "global";
+    $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:multiple-strict,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at reverse-search-cache:0,1 reverse-search-phonebook-file fritzbox-remote-phonebook:0,1 fritzbox-user ".
                         $readingFnAttributes;
 }
 
@@ -334,7 +336,8 @@ FB_CALLMONITOR_Attr($@)
     
     if($cmd eq "set")
     {    
-        if(($attrib eq "reverse-search" and $value =~ /(all|internal|phonebook)/) or $attrib eq "reverse-search-phonebook-file" or $attrib eq "fritzbox-remote-phonebook")
+    
+        if((($attrib eq "reverse-search" and $value =~ /(all|internal|phonebook)/) or $attrib eq "reverse-search-phonebook-file" or $attrib eq "fritzbox-remote-phonebook") and $init_done == 1)
         {
             $attr{$name}{$attrib} = $value;   
             return FB_CALLMONITOR_readPhonebook($hash);
@@ -380,6 +383,17 @@ FB_CALLMONITOR_Attr($@)
     return undef;
 }
 
+
+sub
+FB_CALLMONITOR_Notify($$)
+{
+    my ($hash,$dev) = @_;
+
+    return if($dev->{NAME} ne "global");
+    return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
+  
+    FB_CALLMONITOR_readPhonebook($hash);
+}
 ############################################################################################################
 #
 #   Begin of helper functions
@@ -640,7 +654,6 @@ sub FB_CALLMONITOR_readPhonebook($;$$)
     
 	if(AttrVal($name, "fritzbox-remote-phonebook", "0") eq "1")
     {
-
 		($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebook($hash);
         
 		if(defined($err))
