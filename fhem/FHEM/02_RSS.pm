@@ -338,7 +338,7 @@ RSS_itemText {
 
 sub
 RSS_itemTextBox {
-        my ($S,$x,$y,$boxwidth,$text,%params)= @_;
+        my ($S,$x,$y,$boxwidth,$bgcolor,$text,%params)= @_;
         return unless(defined($text));
         
         if($params{useTextWrap}) {
@@ -350,7 +350,12 @@ RSS_itemTextBox {
                       );
               $wrapbox->set_font($params{font}, $params{pt});
               $wrapbox->set(align => $params{thalign}, width => $boxwidth);
-              my ($left, $top, $right, $bottom) = $wrapbox->draw($x, $y);
+              my ($left, $top, $right, $bottom);
+              ($left, $top, $right, $bottom) = $wrapbox->draw($x, $y);
+              if(defined($bgcolor)) {
+                $S->filledRectangle($left,$top,$right,$bottom,RSS_color($S,$bgcolor));
+                ($left, $top, $right, $bottom) = $wrapbox->draw($x, $y);
+              }
               return $bottom;
         } else {
               RSS_itemText($S,$x,$y,$text,%params);
@@ -507,7 +512,7 @@ RSS_evalLayout($$@) {
   $params{y}= 0;
   
 
-  my ($x,$y,$x1,$y1,$x2,$y2,$scale,$boxwidth,$text,$imgtype,$srctype,$arg,$format);
+  my ($x,$y,$x1,$y1,$x2,$y2,$scale,$bgcolor,$boxwidth,$text,$imgtype,$srctype,$arg,$format);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -585,11 +590,12 @@ RSS_evalLayout($$@) {
 	      #Debug "$name: ($x,$y) $txt";
 	      RSS_itemText($S,$x,$y,$txt,%params);
 	    } elsif($cmd eq "textbox") {
-	      ($x,$y,$boxwidth,$text)= split("[ \t]+", $def, 4);
+	      ($x,$y,$boxwidth,$bgcolor,$text)= split("[ \t]+", $def, 5);
 	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      $bgcolor = ($bgcolor ne "") ? AnalyzePerlCommand(undef,$bgcolor) : undef;
 	      my $txt= AnalyzePerlCommand(undef, $text);
 	      #Debug "$name: ($x,$y) $txt";
-	      $y= RSS_itemTextBox($S,$x,$y,$boxwidth,$txt,%params);
+	      $y= RSS_itemTextBox($S,$x,$y,$boxwidth,$bgcolor,$txt,%params);
 	      $params{x} = $x;
 	      $params{y} = $y;
 	    } elsif($cmd eq "line") {
