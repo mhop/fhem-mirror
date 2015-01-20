@@ -383,7 +383,8 @@ OPENWEATHER_Run ($)
    OPENWEATHER_Log $hash, 5, "Start capturing data from $URL";
 
    my $err_log  = "";
-   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
+   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10
+                                       , agent => "Mozilla/5.0 (FHEM)" );
    my $request  = HTTP::Request->new( GET => $URL );
    my $response = $agent->request($request);
    $err_log = "Can't get $URL -- " . $response->status_line
@@ -470,9 +471,23 @@ OPENWEATHER_UpdateAborted($)
 
 ##### noch nicht fertig ###########
 sub #####################################
-OPENWEATHER_Html($)
+OPENWEATHER_Html($@)
 {
-  my ($d) = @_;
+   my %fhemicons = (
+        0 => "sunny.png",      1 => "partly_cloudy.png", 2 => "cloudy.png",           3 => "overcast.png"
+      , 4 => "fog.png",        5 => "drizzle.png",       6 => "rain.png",             7 => "snow.png"
+      , 8 => "shower.png",     9 => "thunderstorm.png", 10 => "partly_cloudy.png",   20 => "cloudy.png"
+      , 30 => "overcast.png", 40 => "fog.png",          45 => "fog.png",             48 => "fog.png"
+      , 49 => "fog.png",      50 => "drizzle.png",      51 => "drizzle.png",         53 => "drizzle.png"
+      , 55 => "drizzle.png",  56 => "drizzle.png",      57 => "icy.png",             60 => "rain.png"
+      , 61 => "rain.png",     63 => "rain.png",         65 => "heavyrain.png",       66 => "rain.png"
+      , 67 => "icy.png",      68 => "sleet.png",        69 => "sleet.png",           70 => "snow.png"
+      , 71 => "snow.png",     73 => "snow.png",         75 => "snow.png",            80 => "scatteredshowers.png"
+      , 81 => "showers.png",  82 => "showers.png",      83 => "chance_of_sleet.png", 84 => "sleet.png"
+      , 85 => "chance_of_snow.png", 86 => "sleet.png",  90 => "thunderstorm.png",    95 => "scatteredthunderstorm.png"
+      , 96 => "thunderstorm.png", 999 => "na.png"
+   );
+  my ($d, $icons) = @_;
   $d = "<none>" if(!$d);
   return "$d is not a OPENWEATHER instance<br>"
         if(!$defs{$d} || $defs{$d}{TYPE} ne "OPENWEATHER");
