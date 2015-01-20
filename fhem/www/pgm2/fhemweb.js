@@ -615,7 +615,10 @@ FW_createNoArg(elName, devName, vArr, currVal, set, params, cmd)
 {
   if(vArr.length != 1 || vArr[0] != "noArg" || (params && params.length))
     return undefined;
-  return document.createElement('div');
+  var newEl = $('<div style="display:none">').get(0);
+  if(elName) 
+    $(newEl).append('<input type="hidden" name="'+elName+ '" value="">');
+  return(newEl);
 }
 
 /*************** slider **************/
