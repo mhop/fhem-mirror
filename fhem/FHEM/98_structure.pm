@@ -59,9 +59,10 @@ sub
 structAdd($$)
 {
   my ($d, $attrList) = @_;
+  return if(!$defs{$d});
   $defs{$d}{INstructAdd} = 1;
   foreach my $c (keys %{$defs{$d}{CONTENT}}) {
-    if($defs{$c}{INstructAdd}) {
+    if($defs{$c} && $defs{$c}{INstructAdd}) {
       Log 1, "recursive structure definition"
 
     } else {
@@ -69,7 +70,7 @@ structAdd($$)
       structAdd($c, $attrList) if($defs{$c} && $defs{$c}{TYPE} eq "structure");
     }
   }
-  delete $defs{$d}{INstructAdd};
+  delete $defs{$d}{INstructAdd} if($defs{$d});
 }
 
 #############################
@@ -93,10 +94,8 @@ structure_Define($$)
   foreach my $a (@a) {
     foreach my $d (devspec2array($a)) {
       $list{$d} = 1;
-      if($init_done) {
-        addToDevAttrList($d, $aList);
-        structAdd($d, $aList) if($defs{$d} && $defs{$d}{TYPE} eq "structure");
-      }
+      addToDevAttrList($d, $aList);
+      structAdd($d, $aList) if($defs{$d} && $defs{$d}{TYPE} eq "structure");
     }
   }
   $hash->{CONTENT} = \%list;
