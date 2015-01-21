@@ -66,7 +66,7 @@ structAdd($$)
 
     } else {
       addToDevAttrList($c, $attrList);
-      structAdd($c, $attrList) if($defs{$d} && $defs{$d}{TYPE} eq "structure");
+      structAdd($c, $attrList) if($defs{$c} && $defs{$c}{TYPE} eq "structure");
     }
   }
   delete $defs{$d}{INstructAdd};
