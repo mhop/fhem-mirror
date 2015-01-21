@@ -375,7 +375,7 @@ SVG_PEdit($$$$)
     close(FH);
   }
 
-  $ret .= "<tr class=\"odd\"><td>Diagramm label, Source</td>";
+  $ret .= "<tr class=\"odd\"><td>Diagram label, Source</td>";
   $ret .= "<td>$desc</td>";
   $ret .=" <td>Y-Axis,Plot-Type,Style,Width</td></tr>";
 

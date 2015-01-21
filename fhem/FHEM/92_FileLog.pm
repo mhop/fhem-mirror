@@ -936,7 +936,7 @@ FileLog_sampleDataFn($$$$$)
   }
   $fh->close();
 
-  my $colnums = $maxcols+1;
+  my $colnums = $maxcols;
   my $colregs = join(",", sort keys %h);
   my $example = join("<br>", grep /.+/,map { $h{$_} } sort keys %h);
 
