@@ -228,10 +228,16 @@ readingsProxy_Set($@)
     readingsSingleUpdate($hash, "lastCmd", $a[0], 0);
   }
 
-  Log3 $name, 4, "$name: set hash->{DEVICE} $v";
-  return CommandSet(undef,"$hash->{DEVICE} ".$v);
+  if( $hash->{INSET} ) {
+    Log3 $name, 2, "$name: ERROR: endless loop detected";
+    return "ERROR: endless loop detected for $hash->{NAME}";
+  }
 
-  return undef;
+  Log3 $name, 4, "$name: set hash->{DEVICE} $v";
+  $hash->{INSET} = 1;
+  my $ret = CommandSet(undef,"$hash->{DEVICE} ".$v);
+  delete($hash->{INSET});
+  return $ret;
 }
 
 sub
@@ -268,10 +274,16 @@ readingsProxy_Get($@)
     $v = $get_fn if( $get_fn );
   }
 
-  Log3 $name, 4, "$name: get hash->{DEVICE} $v";
-  return CommandGet(undef,"$hash->{DEVICE} ".$v);
+  if( $hash->{INGET} ) {
+    Log3 $name, 2, "$name: ERROR: endless loop detected";
+    return "ERROR: endless loop detected for $hash->{NAME}";
+  }
 
-  return undef;
+  Log3 $name, 4, "$name: get hash->{DEVICE} $v";
+  $hash->{INSET} = 1;
+  my$ret = CommandGet(undef,"$hash->{DEVICE} ".$v);
+  delete($hash->{INSET});
+  return $ret;
 }
 
 1;
