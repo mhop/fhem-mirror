@@ -41,6 +41,7 @@ my %hueModels = (
  'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
 
+ 'Flex RGBW'        => {name => 'LIGHTIFY Flex RGBW'                   ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
  'Classic A60 RGBW' => {name => 'LIGHTIFY Classic A60 RGBW'            ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
  'Gardenspot RGB'   => {name => 'LIGHTIFY Gardenspot Mini RGB'         ,type => 'Color Light'             ,subType => 'colordimmer',},
  'Surface Light TW' => {name => 'LIGHTIFY Surface light tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
