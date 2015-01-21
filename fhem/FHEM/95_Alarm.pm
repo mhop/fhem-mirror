@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.1";
+my $alarmversion    = "2.3";
 
 #########################################################################################
 #
@@ -166,28 +166,30 @@ sub Alarm_CreateEntry($) {
 sub Alarm_Set($@) {
    my ( $hash, $name, $cmd, @args ) = @_;
 
-   if ( ($cmd eq "cancel") || ($cmd eq "armed") || ($cmd eq "disarmed") ) {
+   if ( $cmd =~ /^(cancel|arm|disarm)(ed)?$/ ) {
       return "[Alarm] Invalid argument to set $cmd, must be numeric"
          if ( $args[0] !~ /\d+/ );
       return "[Alarm] Invalid argument to set $cmd, must be 0 < arg < $alarmno"
          if ( ($args[0] >= $alarmno)||($args[0]<0) );
-      if( $cmd eq "cancel" ){     
+      if( $cmd =~ /^cancel(ed)?$/ ){     
          Alarm_Exec($name,$args[0],"web","button","cancel");
-      }elsif ( $cmd eq "arm" ) {
+      }elsif ( $cmd =~ /^arm(ed)?$/ ) {
          Alarm_Arm($name,$args[0],"web","button","arm");
-      }else{
+      }elsif ( $cmd =~ /^disarm(ed)?$/ ){
          Alarm_Arm($name,$args[0],"web","button","disarm");
+      }else{
+         return "[Alarm] Invalid argument set $cmd";
       }
 	  return;
-   } elsif ( $cmd eq "lock" ) {
+   } elsif ( $cmd =~ /^lock(ed)?$/ ) {
 	  readingsSingleUpdate( $hash, "lockstate", "locked", 0 ); 
 	  return;
-   } elsif ( $cmd eq "unlock" ) {
+   } elsif ( $cmd =~ /^unlock(ed)?$/ ) {
 	  readingsSingleUpdate( $hash, "lockstate", "unlocked", 0 );
 	  return;
    } else {
      my $str =  join(",",(0..($alarmno-1)));
-	 return "[Alarm] Unknown argument " . $cmd . ", choose one of cancel:$str arm:$str disarm:$str lock:noArg unlock:noArg";
+	 return "[Alarm] Unknown argument " . $cmd . ", choose one of canceled:$str armed:$str disarmed:$str locked:noArg unlocked:noArg";
    }
 }
 
@@ -661,7 +663,7 @@ sub Alarm_Html($)
     $ret .= sprintf("<input type=\"text\" id=\"cancelaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "cancelact","")); 
     $ret .= "</td></tr></table></td></tr>";
     $ret .= "<tr class=\"odd\"><td class=\"col1\">Level</td><td class=\"col2\">Time [hh:mm]</td><td class=\"col3\">Message Part II</td>".
-            "<td class=\"col4\">Arm/Cancel</td></tr>\n";
+            "<td class=\"col4\">Armed/Cancel</td></tr>\n";
     for( my $k=0;$k<$alarmno;$k++ ){
       $row++;
       my $sval = AttrVal($name, "level".$k."start", 0);
@@ -765,19 +767,19 @@ sub Alarm_Html($)
         <h4>Set</h4>
         <ul>
             <li><a name="alarm_cancel">
-                    <code>set &lt;name&gt; cancel &lt;level&gt;</code>
+                    <code>set &lt;name&gt; canceled &lt;level&gt;</code>
                 </a>
                 <br/>cancels an alarm of level &lt;level&gt;, where &lt;level&gt; = 1..7
             </li>
             <li><a name="alarm_arm">
-                    <code>set &lt;name&gt; arm &lt;level&gt;</code><br/>
-                    <code>set &lt;name&gt; disarm &lt;level&gt;</code>
+                    <code>set &lt;name&gt; armed &lt;level&gt;</code><br/>
+                    <code>set &lt;name&gt; disarmed &lt;level&gt;</code>
                 </a>
                 <br/>sets the alarm of level &lt;level&gt; to armed (i.e., active) or disarmed (i.e., inactive), where &lt;level&gt; = 1..7
             </li>
             <li><a name="alarm_lock">
-                    <code>set &lt;name&gt; lock</code><br/>
-                    <code>set &lt;name&gt; unlock</code>
+                    <code>set &lt;name&gt; locked</code><br/>
+                    <code>set &lt;name&gt; unlocked</code>
                 </a>
                 <br/>sets the lockstate of the alarm module to <i>locked</i> (i.e., alarm setups may not be changed)
                 resp. <i>unlocked</i> (i.e., alarm setups may be changed>)</li>
