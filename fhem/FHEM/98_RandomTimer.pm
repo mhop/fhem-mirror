@@ -369,8 +369,6 @@ sub stopZeitErmitteln  ($$) {
 sub RandomTimer_device_toggle ($)
 {
     my ($hash) = @_;
-   #Log3 $hash, 3, "[".$hash->{NAME}."] "."RandomTimer_device_toggle------------>RandomTimer_device_toggle";
-    get_switchmode($hash);
 
     my $sigma = ($hash->{COMMAND} eq "on") ? $hash->{SIGMAON} : $hash->{SIGMAOFF};
 
