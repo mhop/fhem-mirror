@@ -66,7 +66,7 @@ structAdd($$)
 
     } else {
       addToDevAttrList($c, $attrList);
-      structAdd($c, $attrList) if($defs{$d}{TYPE} eq "structure");
+      structAdd($c, $attrList) if($defs{$d} && $defs{$d}{TYPE} eq "structure");
     }
   }
   delete $defs{$d}{INstructAdd};
@@ -89,12 +89,14 @@ structure_Define($$)
   $hash->{ATTR} = $stype;
 
   my %list;
-  my $attrList = "$stype ${stype}_map structexclude";
+  my $aList = "$stype ${stype}_map structexclude";
   foreach my $a (@a) {
     foreach my $d (devspec2array($a)) {
       $list{$d} = 1;
-      addToDevAttrList($d, $attrList);
-      structAdd($d, $attrList) if($defs{$d}{TYPE} eq "structure");
+      if($init_done) {
+        addToDevAttrList($d, $aList);
+        structAdd($d, $aList) if($defs{$d} && $defs{$d}{TYPE} eq "structure");
+      }
     }
   }
   $hash->{CONTENT} = \%list;
