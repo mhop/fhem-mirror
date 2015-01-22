@@ -203,6 +203,7 @@ sub GDS_Set($@) {
 		when("conditions"){
 			readingsSingleUpdate($hash, "state", "active",1);
 			retrieveConditions($hash, "c", @a);
+            $attr{$name}{gdsSetCond} = ReadingsVal($name,'c_stationName',undef);
 			$next = gettimeofday()+$hash->{helper}{INTERVAL};
 			readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
 			RemoveInternalTimer($hash);
