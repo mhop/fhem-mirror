@@ -178,7 +178,6 @@ sub XBMC_Init($)
 {
   my ($hash) = @_;
 
-  XBMC_ResetMediaReadings($hash);
   XBMC_ResetPlayerReadings($hash);
         
   #since we just successfully connected to XBMC I guess its safe to assume the device is awake
@@ -486,7 +485,7 @@ sub XBMC_ProcessNotification($$)
   #React on volume change - http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Application.OnVolumeChanged
   if($obj->{method} eq "Application.OnVolumeChanged") {
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash,'volume',$obj->{params}->{data}->{volume});
+    readingsBulkUpdate($hash,'volume',sprintf("%.2f", $obj->{params}->{data}->{volume}));
     readingsBulkUpdate($hash,'mute',($obj->{params}->{data}->{muted} ? 'on' : 'off'));
     readingsEndUpdate($hash, 1);
   } 
@@ -506,8 +505,6 @@ sub XBMC_ProcessNotification($$)
     Log3($name, 4, "Discard Player.OnSpeedChanged event because it is irrelevant");
   }
   elsif($obj->{method} eq "Player.OnStop") {
-    XBMC_ResetMediaReadings($hash);
-    XBMC_ResetPlayerReadings($hash);
     readingsSingleUpdate($hash,"playStatus",'stopped',1);
   }
   elsif($obj->{method} eq "Player.OnPause") {
@@ -522,8 +519,7 @@ sub XBMC_ProcessNotification($$)
     
     if (lc($1) eq "system") {
       if ((lc($2) eq "quit") or (lc($2) eq "restart") or (lc($2) eq "sleep")) {
-        XBMC_ResetMediaReadings($hash);
-        XBMC_ResetPlayerReadings($hash);
+          readingsBulkUpdate($hash, "playStatus", "stopped" );
       }
       
       if (lc($2) eq "sleep") {
