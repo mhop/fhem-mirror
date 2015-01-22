@@ -1075,7 +1075,11 @@ readingsGroup_Notify($$)
 
           $cmd = lookup2($hash->{helper}{commands},$n,$reading,$value);
           if( $cmd && $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
-            DoTrigger( $name, "$n.$reading: $value" );
+            if( $reading eq "state" ) {
+              DoTrigger( $name, "$n: $value" );
+            } else {
+              DoTrigger( $name, "$n.$reading: $value" );
+            }
             next;
           }
 
