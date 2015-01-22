@@ -139,7 +139,7 @@ sub WOL_UpdateReadings($) {
    my $blockingFn = "WOL_Ping";
    my $arg        = $hash->{NAME}."|".$hash->{IP};
    my $finishFn   = "WOL_PingDone";
-   my $timeout    = 3;
+   my $timeout    = 4;
    my $abortFn    = "WOL_PingAbort";
    
    if (!(exists($hash->{helper}{RUNNING_PID}))) {
