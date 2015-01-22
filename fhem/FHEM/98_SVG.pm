@@ -1802,7 +1802,7 @@ SVG_render($$$$$$$$$;$$)
 
       my(@xcp1, @xcp2, @ycp1, @ycp2);
   
-      SVG_getControlPoints(\@xcp1, \@xcp2, \@ycp1, \@ycp2, $dxp, $dyp, $x, $y, $h, $min, $hmul) if ($lt ne "L");
+      SVG_getControlPoints(\@xcp1, \@xcp2, \@ycp1, \@ycp2, $dxp, $dyp, $x, $y, $h, $min, $hmul) if (($lt ne "L") && (@{$dxp} > 1));
   
       foreach my $i (0..int(@{$dxp})-1) {
 
