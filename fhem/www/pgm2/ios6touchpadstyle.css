@@ -49,8 +49,6 @@ width: -webkit-calc(100% - 60px);
 width: -o-calc(100% - 60px);
 /* Standard */
 width: calc(100% - 60px);
-
-padding-left:30px;
 }
 
 
@@ -66,7 +64,6 @@ padding-left:30px;
 }
 
 /*iPhone Skalierung*/
-
 /* iPhone < 5(portrait) ----------- */
 @media only screen
 and (min-device-width : 320px)
@@ -74,6 +71,9 @@ and (max-device-width : 480px)
 and (orientation : portrait) {
 body {
 width:320px;
+}
+#content, #right {
+padding: 0px 10px 0px 10px !important;
 }
 }
 /* iPhone < 5(landscape) ----------- */
@@ -94,6 +94,9 @@ and (orientation : portrait) {
 body {
 width:320px;
 }
+#content, #right {
+padding: 0px 10px 0px 10px !important;
+}
 }
 /* iPhone 5(landscape) ----------- */
 @media only screen
@@ -112,6 +115,9 @@ and (max-device-width : 667px)
 and (orientation : portrait) {
 body {
 width:375px;
+}
+#content, #right {
+padding: 0px 10px 0px 10px !important;
 }
 }
 /* iPhone 6(landscape) ----------- */
