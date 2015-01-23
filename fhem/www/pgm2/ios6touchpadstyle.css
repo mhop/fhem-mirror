@@ -5,6 +5,11 @@
 @import url("ios6Common.css");
 @import url("ios6dashboard.css");
 
+body {
+	width:100%;
+}
+
+/*set standard for view without js*/
 #content, #right {
 width: 763px;
 /* Firefox */
@@ -16,6 +21,7 @@ width: -o-calc(100% - 261px);
 /* Standard */
 width: calc(100% - 261px);
 }
+
 #content, #menu, #right {
 /*old*/
 height: 704px;
@@ -31,6 +37,23 @@ height: calc(100vh - 44px);
 #hdr input {
 width: 80%;
 }
+
+/*hideMenu toggle*/
+.hideMenu #content, .hideMenu #right {
+width: 964px;
+/* Firefox */
+width: -moz-calc(100% - 60px);
+/* WebKit */
+width: -webkit-calc(100% - 60px);
+/* Opera */
+width: -o-calc(100% - 60px);
+/* Standard */
+width: calc(100% - 60px);
+
+padding-left:30px;
+}
+
+
 .SVGplot{
 	text-align:center;
 }
@@ -50,15 +73,6 @@ and (orientation : landscape) {
 body {
 width:1024px;
 }
-#content, #right {
-width: 763px;
-}
-#content, #menu, #right {
-height: 704px;
-}
-#hdr input {
-width: 773px;
-}
 }
 
 /* iPads (portrait) ----------- */
@@ -69,15 +83,88 @@ and (orientation : portrait) {
 body {
 width:768px;
 }
-#content, #menu, #right {
-height: 960px;
 }
-#content, #right {
-width: 507px;
+
+/*iPhone Skalierung*/
+
+/* iPhone < 5(portrait) ----------- */
+@media only screen
+and (min-device-width : 320px)
+and (max-device-width : 480px)
+and (orientation : portrait) {
+body {
+width:320px;
 }
-#hdr input {
-width: 517px;
 }
+/* iPhone < 5(landscape) ----------- */
+@media only screen
+and (min-device-width : 320px)
+and (max-device-width : 480px)
+and (orientation : landscape) {
+body {
+width:480px;
+}
+}
+
+/* iPhone 5(portrait) ----------- */
+@media only screen
+and (min-device-width : 320px)
+and (max-device-width : 568px)
+and (orientation : portrait) {
+body {
+width:320px;
+}
+}
+/* iPhone 5(landscape) ----------- */
+@media only screen
+and (min-device-width : 320px)
+and (max-device-width : 568px)
+and (orientation : landscape) {
+body {
+width:568px;
+}
+}
+
+/* iPhone 6(portrait) ----------- */
+@media only screen
+and (min-device-width : 375px) 
+and (max-device-width : 667px)
+and (orientation : portrait) {
+body {
+width:375px;
+}
+}
+/* iPhone 6(landscape) ----------- */
+@media only screen
+and (min-device-width : 375px) 
+and (max-device-width : 667px)
+and (orientation : landscape) {
+body {
+width:667px;
+}
+}
+
+/* iPhone 6+(portrait) ----------- */
+@media only screen
+and (min-device-width : 540px) 
+and (max-device-width : 960px)
+and (orientation : portrait) {
+body {
+width:540px;
+}
+}
+/* iPhone 6+(landscape) ----------- */
+@media only screen
+and (min-device-width : 540px) 
+and (max-device-width : 960px)
+and (orientation : landscape) {
+body {
+width:960px;
+}
+}
+
+.hideMenu #menu {
+	display:none;
 }
 
 html, body {
@@ -206,6 +293,30 @@ border-radius:5px;
 border: 1px solid #666666;
 background-color:#4b6dab;
 }
+
+.changed a, 
+.changed { color:#008700; }
+
+table.room .changed svg {
+
+background: #02a202; /* Old browsers */
+background: 
+-webkit-linear-gradient(top, rgba(255,255,255,0.7) 0%,rgba(255,255,255,0.2) 100%),
+-webkit-repeating-linear-gradient(135deg,  #02a202 0px,#00b900 2px, #02a202 3px); /* Chrome10+,Safari5.1+ */
+
+background: -moz-linear-gradient(top, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.2) 100%), -moz-repeating-linear-gradient(-45deg, rgba(2,162,2,1) 0px, rgba(0,185,0,1) 2px, rgba(2,162,2,1) 3px); /* FF3.6+ */
+background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(255,255,255,0.7)), color-stop(100%,rgba(255,255,255,0.2))), -webkit-gradient(linear, left top, right bottom, color-stop(0px,rgba(2,162,2,1)), color-stop(2px,rgba(0,185,0,1)), color-stop(3px,rgba(2,162,2,1))); /* Chrome,Safari4+ */
+background: -webkit-linear-gradient(top, rgba(255,255,255,0.7) 0%,rgba(255,255,255,0.2) 100%), -webkit-repeating-linear-gradient(-45deg, rgba(2,162,2,1) 0px,rgba(0,185,0,1) 2px,rgba(2,162,2,1) 3px); /* Chrome10+,Safari5.1+ */
+background: -o-linear-gradient(top, rgba(255,255,255,0.7) 0%,rgba(255,255,255,0.2) 100%), -o-repeating-linear-gradient(-45deg, rgba(2,162,2,1) 0px,rgba(0,185,0,1) 2px,rgba(2,162,2,1) 3px); /* Opera 11.10+ */
+background: -ms-linear-gradient(top, rgba(255,255,255,0.7) 0%,rgba(255,255,255,0.2) 100%), -ms-linear-gradient(-45deg, rgba(2,162,2,1) 0px,rgba(0,185,0,1) 2px,rgba(2,162,2,1) 3px); /* IE10+ */
+background: linear-gradient(top, rgba(255,255,255,0.7) 0%,rgba(255,255,255,0.2) 100%), repeating-linear-gradient(135deg, rgba(2,162,2,1) 0px,rgba(0,185,0,1) 2px,rgba(2,162,2,1) 3px); /* W3C */
+
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#b3ffffff', endColorstr='#33ffffff',GradientType=0 ); /* IE6-9 */
+background-size: 28px 12px, 28px 28px;
+background-repeat: no-repeat, repeat;
+fill: #F4F4F4;
+}
+
 table.room tr.sel a svg {
 border-color:#333333;
 background-color:#111111;
@@ -264,7 +375,7 @@ padding: 5px;
 #menu    {
 position: absolute;
 top:44px;
-overflow: scroll;
+overflow: auto;
 -webkit-overflow-scrolling: touch;
 float: left;
 width: 200px;
@@ -280,7 +391,7 @@ padding:0px;
 #content, #right {
 background-color:#e0e3e8;
 background:#e0e3e8;
-overflow: scroll;
+overflow: auto;
 -webkit-overflow-scrolling: touch;
 border-left: 1px solid #000000;
 float: right;
@@ -297,7 +408,11 @@ float: left;
 } 
 
 #right { margin-top:44px; }
-#console { width:100%; height:100%; position:absolute; overflow-y:auto;}
+
+#console {
+    font: 11px "Courier New",Courier,monospace;
+}
+
 #errmsg  { 
 padding:6px;
 width: 100%;
@@ -469,7 +584,6 @@ table.room tr.sel a:hover svg {
 background-color:#333333;
 }
 
-.changed a, .changed { color:red; }
 .dname {
 
 }
@@ -487,6 +601,9 @@ width: 100%;
 display:block;
 float:left;
 clear:left;
+}
+.textField_widget {
+display: block !important;
 }
 .makeSelect { 
 margin-top:20px;
@@ -613,3 +730,7 @@ background:#C8C8B0; font-size:6px;}
 .rc_button img { border-style:solid; border-width:1px;
 border-color:transparent; }
 .rc_button img:active { border-color: gray; }
+
+.colorpicker {
+	border-color: #4c566c;
+}
