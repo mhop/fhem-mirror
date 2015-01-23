@@ -9,6 +9,7 @@ $( document ).ready(function() {
 	*/
 	var menuwidth = 200;
 	var paddingwidth = 60;
+	var mobilepaddingwidth = 20;
 	var logowidth = 28;
 	var switchtomobilemode = 376;
 	var hdrheight = 44;
@@ -52,13 +53,16 @@ $( document ).ready(function() {
 		
 		if (switchtomobilemode > width) {
 			$("#hdr input").width(width-inputpadding+menuwidth-logowidth);
+			$("#content").width(width-mobilepaddingwidth);
+			$("#right").width(width-mobilepaddingwidth);	
 		} else {
 			$("#hdr input").width(width-inputpadding);
+			$("#content").width(width-paddingwidth);
+			$("#right").width(width-paddingwidth);	
 		}
 		
 		$("#menu").width(0);
-		$("#content").width(width-paddingwidth);
-		$("#right").width(width-paddingwidth);	
+		
 		$("#content").show()
 		$("#right").show();
 	};
