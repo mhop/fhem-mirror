@@ -1376,7 +1376,8 @@ FW_showRoom()
         $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
         if($FW_hiddenroom{detail}) {
-          FW_pO "<td><div class=\"col1\">$icon$devName</div></td>" if(!$usuallyAtEnd{$d});
+          FW_pO "<td><div class=\"col1\">$icon$devName</div></td>"
+                if(!$usuallyAtEnd{$d});
         } else {
           FW_pH "detail=$d", "$icon$devName", 1, "col1" if(!$usuallyAtEnd{$d});
         }
@@ -1775,6 +1776,7 @@ FW_style($$)
     }
     my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
     $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
+    DoTrigger("global", "FILEWRITE $filePath", 1) if(!$ret); # Forum #32592
     $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" :
                 "Saved the file $fileName to $forceType");
     FW_style("style list", $ret);
