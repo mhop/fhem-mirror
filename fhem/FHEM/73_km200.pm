@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0039 2015-01-20 20:38:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0040 2015-01-20 22:15:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -144,6 +144,7 @@
 #		0039    19.01.2015	Sailor				km200_Define					Added:    More services since apparently forgotten due to update on IP-Symcon site
 #		0039    19.01.2015	Sailor				km200_Get						Changed:  get-command is able to return raw data if valid json dataset is not existing to be returned
 #		0039    19.01.2015	Sailor				km200_GetSingleService			Changed:  get-command is able to return raw data if valid json dataset is not existing to be returned
+#		0040    20.01.2015	Sailor				km200_Define					Added /system/holidayModes
 ########################################################################################################################
 
 
@@ -212,7 +213,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0038";
+	my $ModuleVersion           = "0040";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -224,12 +225,17 @@ sub km200_Define($$)
 	"/",
 	"/gateway",
 	"/gateway/DateTime",
+	"/gateway/firmware",
+	"/gateway/haiPassword",
+	"/gateway/instPassword",
 	"/gateway/instAccess",
 	"/gateway/instWriteAccess",
+	"/gateway/userpassword",
 	"/gateway/uuid",
 	"/gateway/versionFirmware",
 	"/gateway/versionHardware",
 
+	
 	"/heatingCircuits",
 	"/heatingCircuits/hc1",
 	"/heatingCircuits/hc1/activeSwitchProgram",
@@ -344,7 +350,7 @@ sub km200_Define($$)
 	"/recordings/system/sensors/temperatures/outdoor_t1",
 
 	"/solarCircuits",
-	"/solarCircuits/sc1/",
+	"/solarCircuits/sc1",
 	"/solarCircuits/sc1/actuatorStatus",
 	"/solarCircuits/sc1/collectorTemperature",
 	"/solarCircuits/sc1/dhwTankTemperature",
@@ -352,7 +358,7 @@ sub km200_Define($$)
 	"/solarCircuits/sc1/solarYield",
 	"/solarCircuits/sc1/status",
 	
-	"/solarCircuits/sc2/",
+	"/solarCircuits/sc2",
 	"/solarCircuits/sc2/actuatorStatus",
 	"/solarCircuits/sc2/collectorTemperature",
 	"/solarCircuits/sc2/dhwTankTemperature",
@@ -382,7 +388,7 @@ sub km200_Define($$)
 	"/system/bus",
 	"/system/healthStatus",
 
-	"/system/heatSources/",
+	"/system/heatSources",
 	"/system/heatSources/hs1",
 	"/system/heatSources/hs1/actualModulation",
 	"/system/heatSources/hs1/actualPower",
@@ -393,11 +399,42 @@ sub km200_Define($$)
 	"/system/heatSources/hs1/fuelConsmptCorrFactor",
 	"/system/heatSources/hs1/nominalFuelConsumption",
 	"/system/heatSources/hs1/reservoirAlert",
+	
+	"/system/holidayModes",
+	
+	"/system/holidayModes/hm1",
+	"/system/holidayModes/hm1/startStop",
+	"/system/holidayModes/hm1/assignedTo",
+	"/system/holidayModes/hm1/hcMode",
+	"/system/holidayModes/hm1/dhwMode",
+	"/system/holidayModes/hm1/delete",
+	
+	"/system/holidayModes/hm2",
+	"/system/holidayModes/hm2/startStop",
+	"/system/holidayModes/hm2/assignedTo",
+	"/system/holidayModes/hm2/hcMode",
+	"/system/holidayModes/hm2/dhwMode",
+	"/system/holidayModes/hm2/delete",
+	
+	"/system/holidayModes/hm3",
+	"/system/holidayModes/hm3/startStop",
+	"/system/holidayModes/hm3/assignedTo",
+	"/system/holidayModes/hm3/hcMode",
+	"/system/holidayModes/hm3/dhwMode",
+	"/system/holidayModes/hm3/delete",
 
+	"/system/holidayModes/hm4",
+	"/system/holidayModes/hm4/startStop",
+	"/system/holidayModes/hm4/assignedTo",
+	"/system/holidayModes/hm4/hcMode",
+	"/system/holidayModes/hm4/dhwMode",
+	"/system/holidayModes/hm4/delete",
+		
+		
 	"/system/info",
-
+	
 	"/system/minOutdoorTemp",
-
+	
 	"/system/sensors",
 	"/system/sensors/temperatures",
 	"/system/sensors/temperatures/chimney",
