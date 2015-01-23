@@ -405,7 +405,7 @@ SVG_PEdit($$$$)
                 $conf{lType}[$idx]);
     my $ls = $conf{lStyle}[$idx]; 
     if($ls) {
-      $ls =~ s/class=//g;
+      $ls =~ s/class=.* //g;
       $ls =~ s/"//g; 
     }
     $o .= SVG_sel("style_$idx", join(",", @lineStyles), $ls);
