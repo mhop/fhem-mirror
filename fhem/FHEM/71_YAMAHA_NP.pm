@@ -46,15 +46,15 @@ use Time::Piece;
 use POSIX qw{strftime};
 use HttpUtils;
  
-sub YAMAHA_NP_Get($@);
-sub YAMAHA_NP_Define($$);
-sub YAMAHA_NP_GetStatus($;$);
-sub YAMAHA_NP_Attr(@);
-sub YAMAHA_NP_ResetTimer($;$);
-sub YAMAHA_NP_Undefine($$);
+#sub YAMAHA_NP_Get($@);
+#sub YAMAHA_NP_Define($$);
+#sub YAMAHA_NP_GetStatus($;$);
+#sub YAMAHA_NP_Attr(@);
+#sub YAMAHA_NP_ResetTimer($;$);
+#sub YAMAHA_NP_Undefine($$);
 
 ###################################
-sub YAMAHA_NP_Initialize($)
+sub YAMAHA_NP_Initialize
 {
   my ($hash) = @_;
 
@@ -68,7 +68,7 @@ sub YAMAHA_NP_Initialize($)
 }
 
 ###################################
-sub YAMAHA_NP_GetStatus($;$)
+sub YAMAHA_NP_GetStatus
 {
   my ($hash, $local) = @_;
   my $name = $hash->{NAME};
@@ -104,7 +104,7 @@ sub YAMAHA_NP_GetStatus($;$)
 }
 
 ###################################
-sub YAMAHA_NP_Get($@)
+sub YAMAHA_NP_Get
 {
   my ($hash, @a) = @_;
   my $what;
@@ -140,7 +140,7 @@ sub YAMAHA_NP_Get($@)
 
 
 ###################################
-sub YAMAHA_NP_Set($@)
+sub YAMAHA_NP_Set
 {
     my ($hash, @a) = @_;
     my $name = $hash->{NAME};
@@ -613,7 +613,7 @@ sub YAMAHA_NP_Set($@)
 }
 
 #############################
-sub YAMAHA_NP_Define($$)
+sub YAMAHA_NP_Define
 {
     my ($hash, $def) = @_;
     my @a = split("[ \t][ \t]*", $def);
@@ -666,12 +666,12 @@ sub YAMAHA_NP_Define($$)
     $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
     YAMAHA_NP_ResetTimer($hash,0);
   
-    return undef;
+    return;
 }
 
 
 ##########################
-sub YAMAHA_NP_Attr(@)
+sub YAMAHA_NP_Attr
 {
   my @a = @_;
   my $hash = $defs{$a[1]};
@@ -697,18 +697,17 @@ sub YAMAHA_NP_Attr(@)
   # Start/Stop Timer according to new disabled-Value
   YAMAHA_NP_ResetTimer($hash);
 
-  return undef;
+  return;
 }
 
 #############################
-sub
-YAMAHA_NP_Undefine($$)
+sub YAMAHA_NP_Undefine
 {
   my($hash, $name) = @_;
 
   # Stop the internal GetStatus-Loop and exit
   RemoveInternalTimer($hash);
-  return undef;
+  return;
 }
 
 
@@ -722,7 +721,7 @@ YAMAHA_NP_Undefine($$)
 
 #############################
 # sends a command to the receiver via HTTP
-sub YAMAHA_NP_SendCommand($@)
+sub YAMAHA_NP_SendCommand
 {
   my ($hash, $data,$cmd,$arg,$blocking) = @_;
   my $name = $hash->{NAME};
@@ -787,7 +786,7 @@ sub YAMAHA_NP_SendCommand($@)
 
 #############################
 # parses the receiver response
-sub YAMAHA_NP_ParseResponse ($$$)
+sub YAMAHA_NP_ParseResponse
 {
     my ( $param, $err, $data ) = @_;    
     
@@ -1162,7 +1161,7 @@ sub YAMAHA_NP_ParseResponse ($$$)
           
           YAMAHA_NP_ResetTimer($hash, 5);
           
-          return undef;
+          return;
         }
       }
       elsif($cmd eq "off")
@@ -1176,7 +1175,7 @@ sub YAMAHA_NP_ParseResponse ($$$)
           
           YAMAHA_NP_ResetTimer($hash, 3);
           
-          return undef;
+          return;
         }
       }
       elsif($cmd eq "mute")
@@ -1187,8 +1186,7 @@ sub YAMAHA_NP_ParseResponse ($$$)
         }
       }
       elsif($cmd eq "volume" or $cmd eq "volumeStraight" or $cmd eq "volumeUp" or $cmd eq "volumeDown")
-      {
-        
+      {        
         if($data =~ /RC="0"/)
         {
           readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
@@ -1207,7 +1205,7 @@ sub YAMAHA_NP_ParseResponse ($$$)
 
 #############################
 # Converts all Values to FHEM usable command lists
-sub YAMAHA_NP_Param2Fhem($$)
+sub YAMAHA_NP_Param2Fhem
 {
   my ($param, $replace_pipes) = @_;
   
@@ -1223,28 +1221,27 @@ sub YAMAHA_NP_Param2Fhem($$)
 
 #############################
 # Returns the Yamaha Parameter Name for the FHEM like equivalent
-sub YAMAHA_NP_getParamName($$$)
+sub YAMAHA_NP_getParamName
 {
   my ($hash, $name, $list) = @_;
-  my $item;
-
-  return undef if(not defined($list));
+  
+  return if(not defined($list));
 
   my @commands = split("\\|",  $list);
 
-  foreach $item (@commands)
+  foreach my $item (@commands)
   {
     if(YAMAHA_NP_Param2Fhem($item, 0) eq $name)
     {
       return $item;
     }
   }    
-  return undef;
+  return;
 }
 
 #############################
 # queries the receiver model, system-id, version and all available zones
-sub YAMAHA_NP_getModel($)
+sub YAMAHA_NP_getModel
 {
   my ($hash) = @_;
 
@@ -1254,7 +1251,7 @@ sub YAMAHA_NP_getModel($)
 
 #############################
 # queries the receiver model, system-id, version and all available zones
-sub YAMAHA_NP_getMediaRendererDesc($)
+sub YAMAHA_NP_getMediaRendererDesc
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -1278,7 +1275,7 @@ sub YAMAHA_NP_getMediaRendererDesc($)
 
 #############################
 # converts straight volume in percentage volume (volumestraightmin .. volumestraightmax => 0 .. 100%)
-sub YAMAHA_NP_volume_rel2abs($$)
+sub YAMAHA_NP_volume_rel2abs
 {
   my ($hash, $percentage) = @_;
   
@@ -1287,7 +1284,7 @@ sub YAMAHA_NP_volume_rel2abs($$)
 
 #############################
 # converts percentage volume in decibel volume (0 .. 100% => volumestraightmin .. volumestraightmax)
-sub YAMAHA_NP_volume_abs2rel($$)
+sub YAMAHA_NP_volume_abs2rel
 {
   my ($hash, $absolute) = @_;	
   
@@ -1304,7 +1301,7 @@ sub YAMAHA_NP_volume_abs2rel($$)
 
 #############################
 # queries all available inputs and scenes
-sub YAMAHA_NP_getInputs($)
+sub YAMAHA_NP_getInputs
 {
   my ($hash) = @_;  
   my $name = $hash->{NAME};
@@ -1316,7 +1313,7 @@ sub YAMAHA_NP_getInputs($)
 
 #############################
 # Restarts the internal status request timer according to the given interval or current receiver state
-sub YAMAHA_NP_ResetTimer($;$)
+sub YAMAHA_NP_ResetTimer
 {
   my ($hash, $interval) = @_;
 
@@ -1337,12 +1334,12 @@ sub YAMAHA_NP_ResetTimer($;$)
       InternalTimer(gettimeofday() + $hash->{helper}{OFF_INTERVAL}, "YAMAHA_NP_GetStatus", $hash, 0);
     }
   }  
-  return undef;
+  return;
 }
 
 #############################
 # convert all HTML entities into UTF-8 equivalent
-sub YAMAHA_NP_html2txt($)
+sub YAMAHA_NP_html2txt
 {
   my ($string) = @_;
 
