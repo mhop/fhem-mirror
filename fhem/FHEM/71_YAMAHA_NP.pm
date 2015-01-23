@@ -197,7 +197,7 @@ sub YAMAHA_NP_Set($@)
                  "timerVolume:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
                  "mute:on,off ".
                  (exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"").
-                 "statusRequest:basicStatus,networkInfo,playerStatus,systemConfig,timerStatus,tunerPresetDAB,tunerPresetFM,tunerStatus ".
+                 "statusRequest:basicStatus,mediaRendererDesc,playerStatus,systemConfig,timerStatus,tunerPresetDAB,tunerPresetFM,tunerStatus ".
                  "standbyMode:eco,normal ".
                  "cdTray:noArg ".
                  "timer:on,off ".
@@ -223,7 +223,7 @@ sub YAMAHA_NP_Set($@)
                  "timerVolume:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
                  "mute:on,off ".
                  (exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"").
-                 "statusRequest:basicStatus,networkInfo,playerStatus,systemConfig,timerStatus,tunerPresetFM,tunerStatus ".
+                 "statusRequest:basicStatus,mediaRendererDesc,networkInfo,playerStatus,systemConfig,timerStatus,tunerPresetFM,tunerStatus ".
                  "standbyMode:eco,normal ".
                  "cdTray:noArg ".
                  "timer:on,off ".
@@ -504,6 +504,10 @@ sub YAMAHA_NP_Set($@)
       elsif($a[2] eq "tunerPresetDAB")
       {
         YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+      }
+      elsif($a[2] eq "mediaRendererDesc")
+      {
+        YAMAHA_NP_getMediaRendererDesc($hash);
       }
       else
       {
@@ -822,10 +826,13 @@ sub YAMAHA_NP_ParseResponse ($$$)
       
       $hash->{helper}{AVAILABLE} = 1;
       
-      if(not $data =~ /RC="0"/)
+      if ($cmd ne "statusRequest" and $arg ne "systemConfig") # RC="0" is not delivered by that status Request
       {
-        # if the returncode isn't 0, than the command was not successful
-        Log3 $name, 3, "YAMAHA_NP ($name) - Could not execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
+        if(not $data =~ /RC="0"/)
+        {
+          # if the returncode isn't 0, than the command was not successful
+          Log3 $name, 3, "YAMAHA_NP ($name) - Could not execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
+        }
       }
       
       readingsBeginUpdate($hash);
@@ -998,6 +1005,31 @@ sub YAMAHA_NP_ParseResponse ($$$)
             {
               readingsBulkUpdate($hash, "tunerEnsembleLabelDAB", YAMAHA_NP_html2txt($1));
             }
+            if($data =~ /<Bit_Rate>(.+)<\/Bit_Rate>/)
+            {
+              readingsBulkUpdate($hash, "tunerBitRateDAB", $1." kbit\/s");
+            }
+            if($data =~ /<Audio_Mode>(.+)<\/Audio_Mode>/)
+            {
+              readingsBulkUpdate($hash, "tunerAudioModeDAB", $1);
+            }
+            if($data =~ /<DAB_PLUS>(.+)<\/DAB_PLUS>/)
+            {
+              if($1 eq "Negate")
+              {
+                readingsBulkUpdate($hash, "tunerModeDAB", "DAB");
+              }
+              elsif($1 eq "Assert")
+              {
+                readingsBulkUpdate($hash, "tunerModeDAB", "DAB+");
+              }
+            }
+            if($data =~ /<Signal_Info><Freq>(.+)<\/Freq>/)
+            {
+              my $frequency = $1;
+              $frequency =~ s/(\d{3})$/.$1/; # Insert '.' to frequency
+              readingsBulkUpdate($hash, "tunerFrequencyDAB", $frequency." MHz");
+            }
           }
           elsif($arg eq "timerStatus")
           {
@@ -1081,6 +1113,41 @@ sub YAMAHA_NP_ParseResponse ($$$)
               readingsBulkUpdate($hash, sprintf("tunerPresetDABItem_%02d", $i), $1);
             }                        
           }          
+        }
+        elsif ($arg eq "mediaRendererDesc")
+        {
+          if($data =~ /<friendlyName>(.+)<\/friendlyName>/)
+          {
+            $hash->{FRIENDLY_NAME} = $1;
+          }
+          
+          if($data =~ /<UDN>(.+)<\/UDN>/)
+          {
+            $hash->{UNIQUE_DEVICE_NAME} = $1;
+          }
+          
+          # Replace \n, \r, \t from the string for XML parsing
+          
+          # replace \n by ""
+          $data =~ s/\n//g;
+          
+          # replace \t by ""
+          $data =~ s/\t//g;
+          
+          # replace \r by ""
+          $data =~ s/\r//g;
+          
+          if($data =~ /<iconList>(.+?)<\/iconList>/)
+          {
+            my $address = $hash->{helper}{ADDRESS};
+            my $i = 1;
+            
+            while ($data =~ /<url>(.+?)<\/url>/g)
+            {
+              $hash->{"NP_ICON_$i"} = "http://".$address.":8080".$1;            
+              $i++;
+            }
+          }
         }
       }
       elsif($cmd eq "on")
@@ -1182,7 +1249,32 @@ sub YAMAHA_NP_getModel($)
   my ($hash) = @_;
 
   YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig");
+  YAMAHA_NP_getMediaRendererDesc($hash);
 }	
+
+#############################
+# queries the receiver model, system-id, version and all available zones
+sub YAMAHA_NP_getMediaRendererDesc($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $address = $hash->{helper}{ADDRESS};
+  
+  Log3 $name, 5, "YAMAHA_NP ($name) - execute nonblocking \"MediaRendererDesc\"";
+      
+  HttpUtils_NonblockingGet
+  ({
+    url        => "http://".$address.":8080/MediaRenderer/desc.xml",
+    timeout    => AttrVal($name, "request-timeout", 4),
+    noshutdown => 1,
+    data       => "",
+    loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
+    hash       => $hash,
+    cmd        => "statusRequest",
+    arg        => "mediaRendererDesc",
+    callback   => \&YAMAHA_NP_ParseResponse                        
+  });
+}
 
 #############################
 # converts straight volume in percentage volume (volumestraightmin .. volumestraightmax => 0 .. 100%)
@@ -1480,9 +1572,13 @@ sub YAMAHA_NP_html2txt($)
       <li><b>playerAlbumArtID</b> - Reports the album art ID (if available) of the currently played audio.</li>
       <li><b>playerAlbumArtFormat</b> - Reports the album art format (if available) of the currently played audio.</li>
       <br><br><u>Tuner related readings:</u><br><br>
+      <li><b>tunerAudioModeDAB</b> - Reports current audio mode (Mono|Stereo).</li>
       <li><b>tunerBand</b> - Reports the currently selected tuner band (FM|DAB). DAB if available.</li>
+      <li><b>tunerBitRateDAB</b> - Reports current DAB stream bit rate (kbit/s).</li>
       <li><b>tunerPresetFM</b> - Reports the currently selected FM preset. If stored as such (1...30).</li>
+      <li><b>tunerFrequencyDAB</b> - Reports the currently tuned DAB frequency. (xxx.xxx MHz)</li>
       <li><b>tunerFrequencyFM</b> - Reports the currently tuned FM frequency. (xxx.xx MHz)</li>
+      <li><b>tunerModeDAB</b> - Reports current DAB audio mode (Mono|Stereo).</li>
       <li><b>tunerProgramServiceFM</b> - Reports the FM service name.</li>
       <li><b>tunerRadioTextAFM</b> - Reports the Radio Text A of the selected FM service.</li>
       <li><b>tunerRadioTextBFM</b> - Reports the Radio Text B of the selected FM service.</li>
@@ -1700,7 +1796,11 @@ sub YAMAHA_NP_html2txt($)
         <li><b>playerAlbumArtID</b> - Abfrage der AlbumArtID (falls verf&uuml;gbar) der aktuellen Wiedergabe.</li>
         <li><b>playerAlbumArtFormat</b> - Abfrage des AlbumArt Formats (falls verf&uuml;gbar) der aktuellen Wiedergabe.</li>
         <br><br><u>Tuner Readings:</u><br><br>
+        <li><b>tunerAudioModeDAB</b> - Abfrage des aktuellen DAB Audio-Modus (Mono|Stereo)..</li>
         <li><b>tunerBand</b> - Abfrage des aktuellen Radio-Bandes (FM|DAB). DAB falls verf&uuml;gbar.</li>
+        <li><b>tunerBitRate</b> - Abfrage der aktuellen DAB Stream Bitrate (kbit/s).</li>
+        <li><b>tunerModeDAB</b> - Abfrage des aktuellen DAB Modus (DAB|DAB+).</li>
+        <li><b>tunerFrequencyDAB</b> - Abfrage der aktuellen DAB Frequenz. (xxx.xxx MHz)</li>
         <li><b>tunerPresetFM</b> - Abfrage der aktuellen FM Voreinstellung. Falls gespeichtert (1...30).</li>
         <li><b>tunerFrequencyFM</b> - Abfrage der aktuellen FM Frequenz. (xxx.xx MHz)</li>
         <li><b>tunerProgramServiceFM</b> - Abfrage des FM Sendernamen.</li>
