@@ -38,19 +38,19 @@ sub CommandConfigdb($$) {
 			Log3('configdb', 4, 'configdb: attr $param1 $param2 requested.');
 			if ($param1 eq "" && $param2 eq "") {
 			# list attributes
-				foreach my $c (sort keys %{$attr{configdb}}) {
-					my $val = $attr{configdb}{$c};
+				foreach my $c (sort keys %{$configDB{attr}}) {
+					my $val = $configDB{attr}{$c};
 					$val =~ s/;/;;/g;
 					$val =~ s/\n/\\\n/g;
-					$ret .= "attr configdb $c $val\n";
+					$ret .= "configdb attr $c $val\n";
 				}
 			} elsif($param2 eq "") {
 			# delete attribute
-				undef($attr{configdb}{$param1});
+				undef($configDB{attr}{$param1});
 				$ret = " attribute $param1 deleted";
 			} else {
 			# set attribute
-				$attr{configdb}{$param1} = $param2;
+				$configDB{attr}{$param1} = $param2;
 				$ret = " attribute $param1 set to value $param2";
 			}
 		}
