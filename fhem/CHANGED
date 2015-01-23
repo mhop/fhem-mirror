@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 71_YAMAHA_NP.pm: New readings: tunerModeDAB, tunerBitrateDAB, tunerAudioModeDAB, tunerFrequencyDAB. New internals: NP_ICON_x, UDN, Friendly_Name
   - changed: 73_km200.pm: More services found.
   - bugfix: FB_CALLMONITOR: read phonebooks after all attributes are set
             from fhem.cfg.
