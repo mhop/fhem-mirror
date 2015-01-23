@@ -97,6 +97,8 @@
 #                        shows diff table between version 0
 #                        and currently running version (in memory)
 #
+# 2015-01-23 - changed   attribute handling for internal configDB attrs
+#
 ##############################################################################
 #
 
@@ -160,6 +162,8 @@ if(!open(CONFIG, 'configDB.conf')) {
 my @config=<CONFIG>;
 close(CONFIG);
 
+use vars qw(%configDB);
+
 my %dbconfig;
 eval join("", @config);
 
@@ -181,7 +185,8 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype = "unknown";
 }
 
-$attr{configdb}{nostate} = 1 if($ENV{'cfgDB_nostate'});
+$configDB{attr}{nostate} = 1 if($ENV{'cfgDB_nostate'});
+
 
 ##################################################
 # Basic functions needed for DB configuration
@@ -274,7 +279,8 @@ sub cfgDB_AttrRead($) {
 	$sth->execute();
 	while (@line = $sth->fetchrow_array()) {
 		if($line[1] eq 'configdb') {
-			$attr{configdb}{$line[2]} = $line[3];
+           $configDB{attr}{$line[2]} = $line[3];
+#			$attr{configdb}{$line[2]} = $line[3];
 		} else {
 			push @rets, "attr $line[1] $line[2] $line[3]";
 		}
@@ -286,6 +292,11 @@ sub cfgDB_AttrRead($) {
 # generic file functions called from fhem.pl
 sub cfgDB_FileRead($) {
 	my ($filename) = @_;
+
+    if ($configDB{cache}{$filename}) {
+      Log3(undef, 4, "configDB serving from cache: $filename");
+      return (undef,split(/\n/,$configDB{cache}{$filename}));
+    }
 	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
 	my $fhem_dbh = _cfgDB_Connect;
@@ -296,6 +307,8 @@ sub cfgDB_FileRead($) {
 	$fhem_dbh->disconnect();
 	$counter = length($blobContent);
 	if($counter) {
+        Log3(undef,4,"configDB caching: $filename");
+        $configDB{cache}{$filename} = $blobContent;
 		@ret = split(/\n/,$blobContent);
 		$err = "";
 	} else {
@@ -306,6 +319,8 @@ sub cfgDB_FileRead($) {
 }
 sub cfgDB_FileWrite($@) {
 	my ($filename,@content) = @_;
+    Log3(undef,4,"configDB delete from cache: $filename");
+    $configDB{cache}{$filename} = undef;
 	Log3(undef, 4, "configDB writing file: $filename");
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
@@ -336,7 +351,7 @@ sub cfgDB_ReadAll($) {
 	# add Config Rows to commandfile
 	@dbconfig = _cfgDB_ReadCfg(@dbconfig);
 	# add State Rows to commandfile
-	@dbconfig = _cfgDB_ReadState(@dbconfig) unless $attr{configdb}{nostate};
+	@dbconfig = _cfgDB_ReadState(@dbconfig) unless $configDB{attr}{nostate};
 	# AnalyzeCommandChain for all entries
 	$ret = _cfgDB_Execute($cl, @dbconfig);
 	return $ret if($ret);
@@ -396,8 +411,9 @@ sub cfgDB_SaveCfg(;$) {
 
 	}
 
-		foreach my $a (sort keys %{$attr{configdb}}) {
-			my $val = $attr{configdb}{$a};
+		foreach my $a (sort keys %{$configDB{attr}}) {
+#		foreach my $a (sort keys %{$attr{configdb}}) {
+			my $val = $configDB{attr}{$a};
 			$val =~ s/;/;;/g;
 			push @rowList, "attr configdb $a $val";
 		}
@@ -415,7 +431,7 @@ sub cfgDB_SaveCfg(;$) {
 	}
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
-	my $maxVersions = $attr{configdb}{maxversions};
+	my $maxVersions = $configDB{attr}{maxversions};
 	$maxVersions = ($maxVersions) ? $maxVersions : 0;
 	_cfgDB_Reorg($maxVersions,1) if($maxVersions && $internal != -1);
 	return 'configDB saved.';
@@ -717,8 +733,8 @@ sub _cfgDB_Info() {
 	push @r, " ".cfgDB_svnId;
 	push @r, $l;
 	push @r, " dbconn: $cfgDB_dbconn";
-	push @r, " dbuser: $cfgDB_dbuser" if !$attr{configdb}{private};
-	push @r, " dbpass: $cfgDB_dbpass" if !$attr{configdb}{private};
+	push @r, " dbuser: $cfgDB_dbuser" if !$configDB{attr}{private};
+	push @r, " dbpass: $cfgDB_dbpass" if !$configDB{attr}{private};
 	push @r, " dbtype: $cfgDB_dbtype";
 	push @r, " Unknown dbmodel type in configuration file." if $cfgDB_dbtype eq 'unknown';
 	push @r, " Only Mysql, Postgresql, SQLite are fully supported." if $cfgDB_dbtype eq 'unknown';
@@ -728,7 +744,7 @@ sub _cfgDB_Info() {
 	my ($sql, $sth, @line, $row);
 
 # read versions table statistics
-	my $maxVersions = $attr{configdb}{maxversions};
+	my $maxVersions = $configDB{attr}{maxversions};
 	$maxVersions = ($maxVersions) ? $maxVersions : 0;
 	push @r, " max Versions: $maxVersions" if($maxVersions);
 	my $count;
@@ -989,7 +1005,7 @@ sub _cfgDB_binFileimport($$;$) {
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
 
-	unlink($filename) if(($attr{configdb}{deleteimported} || $doDelete) && $readBytes);
+	unlink($filename) if(($configDB{attr}{deleteimported} || $doDelete) && $readBytes);
 	return "$readBytes bytes written from file $filename to database";
 }
 
