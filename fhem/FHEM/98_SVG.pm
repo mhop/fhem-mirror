@@ -373,7 +373,7 @@ SVG_PEdit($$$$)
   my @lineStyles;
   if(SVG_openFile($FW_cssdir,
                   AttrVal($FW_wname,"stylesheetPrefix",""), "svg_style.css")) {
-    map { push(@lineStyles,$1) if($_ =~ m/^\.(l[^{ ]*)/) } <FH>; # } vim help
+    map { push(@lineStyles,$1) if($_ =~ m/^\.SVGplot.(l[^{ ]*)/) } <FH>; # }
     close(FH);
   }
 
