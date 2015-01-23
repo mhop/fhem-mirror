@@ -1145,7 +1145,8 @@ SVG_digestConf($$)
 
   for my $i (0..int(@lType)-1) {         # lAxis is optional
     $lAxis[$i] = "x1y2" if(!$lAxis[$i]);
-    $lStyle[$i] = "class=\"". (defined($lStyle[$i]) ? $lStyle[$i] : "l$i")."\"";
+    $lStyle[$i] = "class=\"SVGplot ".
+                        (defined($lStyle[$i]) ? $lStyle[$i] : "l$i")."\"";
     $lWidth[$i] = (defined($lWidth[$i]) ?
                         "style=\"stroke-width:$lWidth[$i]\"" :"");
   }
@@ -1622,7 +1623,7 @@ SVG_render($$$$$$$$$;$$)
         $off4 = $off3+5;
         $align = " text-anchor=\"end\"";
         $display = " display=\"none\" id=\"hline_$idx\"";
-        $cll = " class=\"l$idx\"";
+        $cll = " class=\"SVGplot l$idx\"";
       }
     };
 
@@ -1816,7 +1817,7 @@ SVG_render($$$$$$$$$;$$)
 
           } elsif( $dyp->[$i] =~ m/^;ls (\w+)?/ ) {# line style
             if( $1 ) {
-              $lStyle = "class='$1'";
+              $lStyle = "class='SVGplot $1'";
             } else {
               $lStyle = $conf{lStyle}[$idx];
             }
