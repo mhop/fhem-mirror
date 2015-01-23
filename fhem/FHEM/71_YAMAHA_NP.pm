@@ -948,7 +948,9 @@ sub YAMAHA_NP_ParseResponse
             }
             if($data =~ /<Album_ART><URL>(.+)<\/URL><ID>(.+)<\/ID><Format>(.+)<\/Format><\/Album_ART>/)
             {
-              readingsBulkUpdate($hash, "playerAlbumArtURL", YAMAHA_NP_html2txt($1));
+              my $address = $hash->{helper}{ADDRESS};
+              
+              readingsBulkUpdate($hash, "playerAlbumArtURL", "http://".$address."".YAMAHA_NP_html2txt($1));
               readingsBulkUpdate($hash, "playerAlbumArtID", YAMAHA_NP_html2txt($2));
               readingsBulkUpdate($hash, "playerAlbumArtFormat", YAMAHA_NP_html2txt($3));
             }            
