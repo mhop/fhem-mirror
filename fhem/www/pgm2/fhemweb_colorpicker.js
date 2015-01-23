@@ -8,6 +8,9 @@ FW_widgets['colorpicker'] = {
 function
 FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
 {
+  if(!vArr.length || vArr[0] != "colorpicker")
+    return undefined;
+
   if( 0 ) {
     console.log( "elName: "+elName );
     console.log( "devName: "+devName );
@@ -17,10 +20,6 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     console.log( "params: "+params );
     console.log( "cmd: "+cmd );
   }
-
-  if(!vArr.length || vArr[0] != "colorpicker")
-    return undefined;
-
 
   var mode = "RGB";
   if( vArr.length >= 1 )
@@ -58,6 +57,8 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
   $(newEl).append('<input type="text" id="colorpicker.'+ devName +'-'+set +'" maxlength="6" size="6">');
 
   var inp = $(newEl).find("[type=text]");
+
+  newEl.setValueFn = function(arg){ if( arg.length > 6 ) arg = arg.slice(0,6); $(inp).val(arg); }
 
   loadScript("jscolor/jscolor.js",
   function() {
