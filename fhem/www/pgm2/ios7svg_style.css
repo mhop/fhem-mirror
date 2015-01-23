@@ -5,27 +5,53 @@ text.legend{ cursor:pointer; }
 text.copy  { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 text.paste { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 
-path     { stroke:black; fill:none; }
-polyline { stroke:black; fill:none; }
+path.SVGplot     { stroke:black; fill:none; }
+polyline.SVGplot { stroke:black; fill:none; }
 .border { stroke:black; fill:url(#gr_bg);}
 .vgrid { stroke:gray; stroke-dasharray:2,6;}
 .hgrid { stroke:gray; stroke-dasharray:2,6;}
 .pasted { stroke:black; stroke-dasharray:1,1;}
 
-.l0 { stroke:#fc3e39;     }  text.l0 { stroke:none; fill:#fc3e39;     } 
-.l1 { stroke:#53d769;   }  text.l1 { stroke:none; fill:#53d769;   } 
-.l2 { stroke:#157efb;    }  text.l2 { stroke:none; fill:#157efb;    }
-.l3 { stroke:#c34ceb; }  text.l3 { stroke:none; fill:#c34ceb; }
-.l4 { stroke:brown;   }  text.l4 { stroke:none; fill:brown;   }
-.l5 { stroke:black;   }  text.l5 { stroke:none; fill:black;   }
-.l6 { stroke:olive;   }  text.l6 { stroke:none; fill:olive;   }
-.l7 { stroke:gray;    }  text.l7 { stroke:none; fill:gray;    }
-.l8 { stroke:#f7ab28;  }  text.l8 { stroke:none; fill:#f7ab28;  }
+.SVGplot.l0     { stroke:#fc3e39; }
+.SVGplot.l1     { stroke:#53d769; }
+.SVGplot.l2     { stroke:#157efb; }
+.SVGplot.l3     { stroke:#c34ceb; }
+.SVGplot.l4     { stroke:brown;   }
+.SVGplot.l5     { stroke:black;   }
+.SVGplot.l6     { stroke:olive;   }
+.SVGplot.l7     { stroke:gray;    }
+.SVGplot.l8     { stroke:#f7ab28; }
+.SVGplot.l0fill { stroke:#fc3e39; fill:url(#gr_0);    }
+.SVGplot.l1fill { stroke:#53d769; fill:url(#gr_1);    }
+.SVGplot.l2fill { stroke:#157efb; fill:url(#gr_2);    }
+.SVGplot.l3fill { stroke:#c34ceb; fill:url(#gr_3);    }
+.SVGplot.l4fill { stroke:#ff0; fill:url(#gr_4);       }
+.SVGplot.l5fill { stroke:#0ff; fill:url(#gr_5);       }
+.SVGplot.l6fill { stroke:#000; fill:url(#gr_6);       }
+.SVGplot.l0dot  { stroke:red;   stroke-dasharray:2,4; }
+.SVGplot.l1dot  { stroke:green; stroke-dasharray:2,4; }
+.SVGplot.l0fill_stripe {stroke:red;   fill:url(#gr0_stripe); }
+.SVGplot.l1fill_stripe {stroke:green; fill:url(#gr1_stripe); }
+.SVGplot.l0fill_gyr    {stroke:red;   fill:url(#gr0_gyr);    }
 
-.l0fill{ stroke:#fc3e39; fill:url(#gr_0); }  text.l0fill{ stroke:none; fill:#fc3e39; }
-.l1fill{ stroke:#53d769; fill:url(#gr_1); }  text.l1fill{ stroke:none; fill:#53d769; }
-.l2fill{ stroke:#157efb; fill:url(#gr_2); }  text.l2fill{ stroke:none; fill:#157efb; }
-.l3fill{ stroke:#c34ceb; fill:url(#gr_3); }  text.l3fill{ stroke:none; fill:#c34ceb; }
-.l4fill{ stroke:#ff0; fill:url(#gr_4); }  text.l4fill{ stroke:none; fill:#ff0; }
-.l5fill{ stroke:#0ff; fill:url(#gr_5); }  text.l5fill{ stroke:none; fill:#0ff; }
-.l6fill{ stroke:#000; fill:url(#gr_6); }  text.l6fill{ stroke:none; fill:#000; }
+text.SVGplot.l0     { stroke:none; fill:#fc3e39; } 
+text.SVGplot.l1     { stroke:none; fill:#53d769; } 
+text.SVGplot.l2     { stroke:none; fill:#157efb; }
+text.SVGplot.l3     { stroke:none; fill:#c34ceb; }
+text.SVGplot.l4     { stroke:none; fill:brown;   }
+text.SVGplot.l5     { stroke:none; fill:black;   }
+text.SVGplot.l6     { stroke:none; fill:olive;   }
+text.SVGplot.l7     { stroke:none; fill:gray;    }
+text.SVGplot.l8     { stroke:none; fill:#f7ab28; }
+text.SVGplot.l0fill { stroke:none; fill:#fc3e39; }
+text.SVGplot.l1fill { stroke:none; fill:#53d769; }
+text.SVGplot.l2fill { stroke:none; fill:#157efb; }
+text.SVGplot.l3fill { stroke:none; fill:#c34ceb; }
+text.SVGplot.l4fill { stroke:none; fill:#ff0;    }
+text.SVGplot.l5fill { stroke:none; fill:#0ff;    }
+text.SVGplot.l6fill { stroke:none; fill:#000;    }
+text.SVGplot.ldot   { stroke:none; fill:red;     } 
+text.SVGplot.ldot   { stroke:none; fill:green;   } 
+text.SVGplot.l0fill_stripe {stroke:none; fill:red;  }
+text.SVGplot.l1fill_stripe {stroke:none; fill:green;}
+text.SVGplot.l0fill_gyr    {stroke:none; fill:red;  }
