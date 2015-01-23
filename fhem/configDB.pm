@@ -99,6 +99,8 @@
 #
 # 2015-01-23 - changed   attribute handling for internal configDB attrs
 #
+# 2015-01-23 - added     FileRead() caching - experimental
+#
 ##############################################################################
 #
 
@@ -293,7 +295,7 @@ sub cfgDB_AttrRead($) {
 sub cfgDB_FileRead($) {
 	my ($filename) = @_;
 
-    if ($configDB{cache}{$filename}) {
+    if ($configDB{cache}{$filename} && $configDB{attr}{useCache}) {
       Log3(undef, 4, "configDB serving from cache: $filename");
       return (undef,split(/\n/,$configDB{cache}{$filename}));
     }
@@ -307,8 +309,10 @@ sub cfgDB_FileRead($) {
 	$fhem_dbh->disconnect();
 	$counter = length($blobContent);
 	if($counter) {
-        Log3(undef,4,"configDB caching: $filename");
-        $configDB{cache}{$filename} = $blobContent;
+	    if ($configDB{attr}{useCache}) {
+           Log3(undef,4,"configDB caching: $filename");
+           $configDB{cache}{$filename} = $blobContent;
+        }
 		@ret = split(/\n/,$blobContent);
 		$err = "";
 	} else {
@@ -319,8 +323,10 @@ sub cfgDB_FileRead($) {
 }
 sub cfgDB_FileWrite($@) {
 	my ($filename,@content) = @_;
-    Log3(undef,4,"configDB delete from cache: $filename");
-    $configDB{cache}{$filename} = undef;
+    if ($configDB{attr}{useCache}) {
+       Log3(undef,4,"configDB delete from cache: $filename");
+       $configDB{cache}{$filename} = undef;
+    }
 	Log3(undef, 4, "configDB writing file: $filename");
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
