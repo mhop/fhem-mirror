@@ -32,10 +32,6 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-#     
-#     2015-01-17 v1.0   Initial Release
-#
-##############################################################################
 
 package main;
 
@@ -45,13 +41,6 @@ use Time::HiRes qw(gettimeofday sleep);
 use Time::Piece;
 use POSIX qw{strftime};
 use HttpUtils;
- 
-#sub YAMAHA_NP_Get($@);
-#sub YAMAHA_NP_Define($$);
-#sub YAMAHA_NP_GetStatus($;$);
-#sub YAMAHA_NP_Attr(@);
-#sub YAMAHA_NP_ResetTimer($;$);
-#sub YAMAHA_NP_Undefine($$);
 
 ###################################
 sub YAMAHA_NP_Initialize
@@ -65,6 +54,8 @@ sub YAMAHA_NP_Initialize
   $hash->{UndefFn}   = "YAMAHA_NP_Undefine";
 
   $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 ".$readingFnAttributes;
+  
+  return;
 }
 
 ###################################
@@ -76,7 +67,7 @@ sub YAMAHA_NP_GetStatus
 
   $local = 0 unless(defined($local));
 
-  return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{OFF_INTERVAL}) or !defined($hash->{helper}{ON_INTERVAL}));
+  return "" if((!defined($hash->{helper}{ADDRESS})) or (!defined($hash->{helper}{OFF_INTERVAL})) or (!defined($hash->{helper}{ON_INTERVAL})));
 
   my $device = $hash->{helper}{ADDRESS};
 
@@ -101,6 +92,7 @@ sub YAMAHA_NP_GetStatus
   
   YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", "statusRequest", "basicStatus");  
   YAMAHA_NP_ResetTimer($hash) unless($local == 1);
+  return;
 }
 
 ###################################
@@ -258,6 +250,7 @@ sub YAMAHA_NP_Set
             if($a[2] =~ /^($inputs_piped)$/)
             {
               my $command = YAMAHA_NP_getParamName($hash, $a[2], $hash->{helper}{INPUTS});
+              
               if(defined($command) and length($command) > 0)
               {
                 YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Input><Input_Sel>".$command."</Input_Sel></Input></System></YAMAHA_AV>", $what, $a[2]);
@@ -316,7 +309,7 @@ sub YAMAHA_NP_Set
     {
       my $target_volume;
       
-      if($what eq "volume" and $a[2] >= 0 &&  $a[2] <= 100)
+      if(($what eq "volume") and ($a[2] >= 0) and ($a[2] <= 100))
       {
           $target_volume = YAMAHA_NP_volume_rel2abs($hash, $a[2]);
       }
@@ -609,7 +602,9 @@ sub YAMAHA_NP_Set
     else
     {
         return $usage;
-    }    
+    }
+    
+    return;
 }
 
 #############################
@@ -782,6 +777,8 @@ sub YAMAHA_NP_SendCommand
                           
     }); 
   }
+  
+  return;  
 }
 
 #############################
@@ -804,7 +801,7 @@ sub YAMAHA_NP_ParseResponse
     {
       Log3 $name, 5, "YAMAHA_NP ($name) - could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $err";
 
-      if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
+      if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} == 1))
       {
         Log3 $name, 3, "YAMAHA_NP ($name) - could not execute command on device $name. Please turn on your device in case of deactivated network standby or check for correct hostaddress.";
         readingsSingleUpdate($hash, "presence", "absent", 1);
@@ -1083,20 +1080,20 @@ sub YAMAHA_NP_ParseResponse
         }
         elsif($arg eq "tunerPresetFM")
         {
-           {
-          # May be also an empty string <Item_#></Item_#>
-          for (my $i = 1; $i < 31; $i++)
           {
-            if ($data =~ /<Item_$i><\/Item_$i>/)
+            # May be also an empty string <Item_#></Item_#>
+            for (my $i = 1; $i < 31; $i++)
             {
-              readingsBulkUpdate($hash, sprintf("tunerPresetFMItem_%02d", $i), "No Preset");
-            }
-            elsif($data =~ /<Item_$i>(.+?)<\/Item_$i>/)
-            {
-              readingsBulkUpdate($hash, sprintf("tunerPresetFMItem_%02d", $i), $1);
-            }                        
-          }          
-        }           
+              if ($data =~ /<Item_$i><\/Item_$i>/)
+              {
+                readingsBulkUpdate($hash, sprintf("tunerPresetFMItem_%02d", $i), "No Preset");
+              }
+              elsif($data =~ /<Item_$i>(.+?)<\/Item_$i>/)
+              {
+                readingsBulkUpdate($hash, sprintf("tunerPresetFMItem_%02d", $i), $1);
+              }                        
+            }          
+          }           
         }
         elsif($arg eq "tunerPresetDAB")
         {
@@ -1201,6 +1198,7 @@ sub YAMAHA_NP_ParseResponse
       
       YAMAHA_NP_ResetTimer($hash, 0) if($cmd ne "statusRequest" and $cmd ne "on" and $cmd ne "volume");
     }
+    return;
 }
 
 #############################
@@ -1240,17 +1238,18 @@ sub YAMAHA_NP_getParamName
 }
 
 #############################
-# queries the receiver model, system-id, version and all available zones
+# queries the NP model, system-id and version
 sub YAMAHA_NP_getModel
 {
   my ($hash) = @_;
 
   YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig");
   YAMAHA_NP_getMediaRendererDesc($hash);
+  return;
 }	
 
 #############################
-# queries the receiver model, system-id, version and all available zones
+# queries the addition model descriptions
 sub YAMAHA_NP_getMediaRendererDesc
 {
   my ($hash) = @_;
@@ -1271,6 +1270,7 @@ sub YAMAHA_NP_getMediaRendererDesc
     arg        => "mediaRendererDesc",
     callback   => \&YAMAHA_NP_ParseResponse                        
   });
+  return;
 }
 
 #############################
@@ -1300,7 +1300,7 @@ sub YAMAHA_NP_volume_abs2rel
 }
 
 #############################
-# queries all available inputs and scenes
+# queries all available inputs
 sub YAMAHA_NP_getInputs
 {
   my ($hash) = @_;  
@@ -1309,6 +1309,7 @@ sub YAMAHA_NP_getInputs
 
   # query all inputs
   YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","getInputs");
+  return;
 }
 
 #############################

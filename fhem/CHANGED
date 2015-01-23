@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - chamged: 71_YAMAHA_NP.pm: Perl code clean-up after 'perlcritic' check.
+  - changed: 71_YAMAHA_NP.pm: Minor code improvements.
+  - changed: 71_YAMAHA_NP.pm: Perl code clean-up after 'perlcritic' check.
   - feature: 71_YAMAHA_NP.pm: New readings: tunerModeDAB, tunerBitrateDAB, tunerAudioModeDAB, tunerFrequencyDAB. New internals: NP_ICON_x, UDN, Friendly_Name
   - changed: 73_km200.pm: More services found.
   - bugfix: FB_CALLMONITOR: read phonebooks after all attributes are set
