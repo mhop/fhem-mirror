@@ -2317,6 +2317,7 @@ CommandAttr($$)
     }
 
     $a[0] = $sdev;
+    my $oVal = ($attr{$sdev} ? $attr{$sdev}{$attrName} : "");
     $ret = CallFn($sdev, "AttrFn", "set", @a);
     if($ret) {
       push @rets, $ret;
@@ -2325,12 +2326,6 @@ CommandAttr($$)
 
     my $val = $a[2];
     $val = 1 if(!defined($val));
-
-    addStructChange("attr", $sdev, $param)
-      if(!($attr{$sdev} &&
-           defined($attr{$sdev}{$attrName}) &&
-           $attr{$sdev}{$attrName} eq $val));
-
     $attr{$sdev}{$attrName} = $val;
 
     if($attrName eq "IODev") {
@@ -2343,6 +2338,7 @@ CommandAttr($$)
     if($attrName eq "stateFormat" && $init_done) {
       evalStateFormat($hash);
     }
+    addStructChange("attr", $sdev, $param) if(!defined($oVal) || $oVal ne $val);
     DoTrigger("global", "ATTR $sdev $attrName $val", 1) if($init_done);
 
   }
@@ -4088,7 +4084,7 @@ addStructChange($$$)
   return if(!$defs{$dev} || $defs{$dev}{TEMPORARY});
 
   $lastDefChange++;
-  shift @structChangeHist if(@structChangeHist > 10);
+  shift @structChangeHist if(@structChangeHist > 9);
   $param = substr($param, 0, 40)."..." if(length($param) > 40);
   push @structChangeHist, "$cmd $param";
 }
