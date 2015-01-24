@@ -181,6 +181,7 @@ sub YAMAHA_NP_Set
                  "on:noArg ".
                  "off:noArg ".
                  "timerRepeat:once,every ".
+                 "timerSet:noArg ".
                  "sleep:off,30min,60min,90min,120min ".
                  "volumeStraight:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
                  "volume:slider,0,1,100 ".
@@ -207,6 +208,7 @@ sub YAMAHA_NP_Set
                  "on:noArg ".
                  "off:noArg ".
                  "timerRepeat:once,every ".
+                 "timerSet:noArg ".
                  "sleep:off,30min,60min,90min,120min ".
                  "volumeStraight:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
                  "volume:slider,0,1,100 ".
@@ -511,17 +513,7 @@ sub YAMAHA_NP_Set
     {
       if($a[2] eq "on")
       {
-        if(defined($hash->{helper}{timerHour}) and defined($hash->{helper}{timerMinute}) and defined($hash->{helper}{timerRepeat}) and defined($hash->{helper}{timerVolume}))
-        {
-            # Configure Timer according to provided parameters
-            YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Param><Start_Time>".sprintf("%02d", $hash->{helper}{timerHour}).":".sprintf("%02d", $hash->{helper}{timerMinute})."</Start_Time><Volume>".$hash->{helper}{timerVolume}."</Volume><Repeat>".$hash->{helper}{timerRepeat}."</Repeat></Param></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);
-            # Switch on timer
-            YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Mode>".ucfirst($a[2])."</Mode></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);
-        }
-        else
-        {
-          return "Please, define timerHour, timerMinute, timerRepeat and timerVolume first."
-        }
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Mode>".ucfirst($a[2])."</Mode></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);
       }
       elsif($a[2] eq "off")
       {
@@ -576,6 +568,18 @@ sub YAMAHA_NP_Set
         {
           return "Please use straight device volume range :".$hash->{helper}{VOLUMESTRAIGHTMIN}."...".$hash->{helper}{VOLUMESTRAIGHTMAX}.".";
         }
+    }
+    elsif($what eq "timerSet")
+    {
+      if(defined($hash->{helper}{timerHour}) and defined($hash->{helper}{timerMinute}) and defined($hash->{helper}{timerRepeat}) and defined($hash->{helper}{timerVolume}))
+      {
+        # Configure Timer according to provided parameters
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Param><Start_Time>".sprintf("%02d", $hash->{helper}{timerHour}).":".sprintf("%02d", $hash->{helper}{timerMinute})."</Start_Time><Volume>".$hash->{helper}{timerVolume}."</Volume><Repeat>".$hash->{helper}{timerRepeat}."</Repeat></Param></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);            
+      }
+      else
+      {
+        return "Please, define timerHour, timerMinute, timerRepeat and timerVolume first.";
+      }
     }
     elsif($what eq "tunerPresetDAB")
     {
@@ -705,14 +709,11 @@ sub YAMAHA_NP_Undefine
   return;
 }
 
-
 ############################################################################################################
 #
 #   Begin of helper functions
 #
 ############################################################################################################
-
-
 
 #############################
 # sends a command to the receiver via HTTP
@@ -1469,8 +1470,9 @@ sub YAMAHA_NP_html2txt
       <li><b>timerHour</b> [0...23] &nbsp;&nbsp;-&nbsp;&nbsp; sets hour of device's internal wake-up timer</li>
       <li><b>timerMinute</b> [0...59] &nbsp;&nbsp;-&nbsp;&nbsp; sets minutes of device's internal wake-up timer</li>
       <li><b>timerRepeat</b> [once|every] &nbsp;&nbsp;-&nbsp;&nbsp; sets repetition mode of device's internal wake-up timer</li>
+      <li><b>timerSet</b> &nbsp;&nbsp;-&nbsp;&nbsp; configures the timer according to timerHour, timerMinute, timerRepeat, timerVolume. (ALL parameters must be set before. This command does not switch on the timer. &rarr; 'timer on'.)</li>
       <li><b>timerVolume</b> [&lt;VOL_MIN&gt;...&lt;VOL_MAX&gt;] &nbsp;&nbsp;-&nbsp;&nbsp; sets volume of device's internal wake-up timer</li>
-      <li><b>timer</b> [on|off] &nbsp;&nbsp;-&nbsp;&nbsp; sets device's internal wake-up timer. <i>(Note: before timer activation timerHour, timerMinute, timerRepeat and timerVolume must be set.)</i></li>
+      <li><b>timer</b> [on|off] &nbsp;&nbsp;-&nbsp;&nbsp; sets device's internal wake-up timer. <i>(Note: The timer will be activated according to the last stored timer parameters in the device. In order to modify please use the 'timerSet' command.)</i></li>
       <li><b>tuner [&lt;parameter&gt;] </b> &nbsp;&nbsp;-&nbsp;&nbsp; sets tuner related commands.</li>
       <ul>
         <li><b>bandDAB</b>&nbsp;&nbsp;-&nbsp;&nbsp; sets the tuner band to DAB (if available).</li>
@@ -1696,8 +1698,9 @@ sub YAMAHA_NP_html2txt
       <li><b>timerHour</b> [0...23] &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Stunde des internen Wake-up Timers</li>
       <li><b>timerMinute</b> [0...59] &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Minute des internen Wake-up Timers</li>
       <li><b>timerRepeat</b> [once|every] &nbsp;&nbsp;-&nbsp;&nbsp; Setzt den Wiederholungsmodus des internen Wake-up Timers</li>
+      <li><b>timerSet</b> &nbsp;&nbsp;-&nbsp;&nbsp; konfiguriert den Timer nach den Vorgaben: timerHour, timerMinute, timerRepeat, timerVolume. (ALLE Paremeter m&uuml;ssen zuvor gesetzt werden. Dieser Befehl schaltet den Timer nicht ein &rarr; 'timer on'.)</li>
       <li><b>timerVolume</b> [&lt;VOL_MIN&gt;...&lt;VOL_MAX&gt;] &nbsp;&nbsp;-&nbsp;&nbsp; Setzt die Lautst&auml;rke des internen Wake-up Timers</li>
-      <li><b>timer</b> [on|off] &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet ein/aus den internen Wake-up Timer. <i>(Bemerkung: Bevor der Wake-Up Timer gesetzt werden kann, m&uuml;ssen timerHour, timerMinute, timerRepeat and timerVolume zuvor gesetzt werden.)</i></li>
+      <li><b>timer</b> [on|off] &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet ein/aus den internen Wake-up Timer. <i>(Bemerkung: Der Timer wird basierend auf den im Gerät gespeicherten Parametern aktiviert. Um diese zu &auml;ndern, bitte den 'timerSet' Befehl benutzen.)</i></li>
       <li><b>tuner [&lt;parameter&gt;] </b> &nbsp;&nbsp;-&nbsp;&nbsp; Tuner-relevante Befehle.</li>
       <ul>
         <li><b>bandDAB</b>&nbsp;&nbsp;-&nbsp;&nbsp; Setzt das Tuner-Band auf DAB (falls verf&uuml;gbar).</li>
