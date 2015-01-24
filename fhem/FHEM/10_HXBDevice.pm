@@ -247,6 +247,7 @@ HXBDevice_Parse($$)
       } elsif($hxb_dtype eq "HXB_DTYPE_DATETIME") {
 	  $v= "?";
       } elsif($hxb_dtype eq "HXB_DTYPE_FLOAT") {
+	  #Debug unpack "V", $value;
 	  $v= unpack "f", pack "N", unpack "V", $value; #unpack("f", $value);
       } elsif($hxb_dtype eq "HXB_DTYPE_128STRING") {
 	  $v= "?";
@@ -260,9 +261,11 @@ HXBDevice_Parse($$)
       Log3 $hash,5, sprintf("%s: %s %s %s %s %s= %s", 
 	$hash->{NAME}, $hxb_ptype, $hxb_flag, 
 	$ep, $hxb_dtype, unpack("H*", $value), $v);
-
-      readingsSingleUpdate($hash, "state", "$ep= $v", 1);
-      readingsSingleUpdate($hash, $ep, $v, 1);
+  
+      my $fmtDateTime= readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "state", $fmtDateTime, 1); # we do not want an extra event for state
+      readingsBulkUpdate($hash, $ep, $v, 1);
+      readingsEndUpdate($hash, 1);
       
       push @devices, $hash->{NAME};
     }
