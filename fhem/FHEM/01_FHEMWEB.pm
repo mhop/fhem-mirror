@@ -996,9 +996,9 @@ FW_makeTable($$$@)
 ##############################
 # Used only for set or attr lists.
 sub
-FW_detailSelect($$$$)
+FW_detailSelect(@)
 {
-  my ($d, $cmd, $list,$class) = @_;
+  my ($d, $cmd, $list, $param) = @_;
   return if(!$list || $FW_hiddenroom{input});
   my @al = sort map { s/:.*//;$_ } split(" ", $list);
 
@@ -1007,17 +1007,20 @@ FW_detailSelect($$$$)
   $selEl = "room" if($list =~ m/room:/);
   $list =~ s/"/&quot;/g;
 
-  FW_pO "<div class='makeSelect' dev=\"$d\" cmd=\"$cmd\" list=\"$list\">";
-  FW_pO "<form method=\"$FW_formmethod\" ".
-                "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
-  FW_pO FW_hidden("detail", $d);
-  FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
-  FW_pO FW_hidden("dev.$cmd$d", $d);
-  FW_pO FW_submit("cmd.$cmd$d", $cmd, $class);
-  FW_pO "<div class=\"$class downText\">&nbsp;$d&nbsp;</div>";
-  FW_pO FW_select("sel_$cmd$d","arg.$cmd$d",\@al, $selEl, $class);
-  FW_pO FW_textfield("val.$cmd$d", 30, $class);
-  FW_pO "</form></div>";
+  my $ret ="";
+  $ret .= "<div class='makeSelect' dev=\"$d\" cmd=\"$cmd\" list=\"$list\">";
+  $ret .= "<form method=\"$FW_formmethod\" ".
+                  "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
+  $ret .= FW_hidden("detail", $d);
+  $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
+  $ret .= FW_hidden("dev.$cmd$d", $d.($param ? " $param":""));
+  $ret .= FW_submit("cmd.$cmd$d", $cmd, $cmd);
+  $ret .= "<div class=\"$cmd downText\">&nbsp;$d&nbsp;".
+                ($param ? "&nbsp;$param":"")."</div>";
+  $ret .= FW_select("sel_$cmd$d","arg.$cmd$d",\@al, $selEl, $cmd);
+  $ret .= FW_textfield("val.$cmd$d", 30, $cmd);
+  $ret .= "</form></div>";
+  return $ret;
 }
 
 ##############################
@@ -1053,8 +1056,8 @@ FW_doDetail($)
     use strict "refs";
   }
 
-  FW_detailSelect($d, "set", FW_widgetOverride($d, getAllSets($d)), "set");
-  FW_detailSelect($d, "get", FW_widgetOverride($d, getAllGets($d)), "get");
+  FW_pO FW_detailSelect($d, "set", FW_widgetOverride($d, getAllSets($d)));
+  FW_pO FW_detailSelect($d, "get", FW_widgetOverride($d, getAllGets($d)));
 
   FW_makeTable("Internals", $d, $h);
   FW_makeTable("Readings", $d, $h->{READINGS});
@@ -1069,7 +1072,7 @@ FW_doDetail($)
   $attrList = FW_widgetOverride($d, $attrList);
   $attrList =~ s/\\/\\\\/g;
   $attrList =~ s/'/\\'/g;
-  FW_detailSelect($d, "attr", $attrList,"attr");
+  FW_pO FW_detailSelect($d, "attr", $attrList);
 
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
   ## dependent objects

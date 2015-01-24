@@ -325,8 +325,15 @@ FileLog_fhemwebFn($$$$)
 
   $ret .= "<br>Regexp parts";
   $ret .= "<br><table class=\"block wide\">";
-  my @ra = split(/\|/, $hash->{REGEXP});
-  if(@ra > 1) {
+  
+  my $regexp= $hash->{REGEXP};
+  my @ra= ();
+  while($regexp =~ /^(.+?:.+?)\|(.+?:.+)$/) {
+    push @ra, $1;
+    $regexp= $2;
+  }
+  push @ra, $regexp;
+  if(@ra > 0) {
     foreach my $r (@ra) {
       $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
       my $cmd = "cmd.X= set $d removeRegexpPart&val.X=$r"; # =.set: avoid JS
@@ -359,20 +366,12 @@ FileLog_fhemwebFn($$$$)
       $list .= " $dev:" . join(",", sort keys %{$dh{$dev}});
       push @al, $dev;
     }
-    $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
-    $ret .= "<td colspan=\"2\"><form autocomplete=\"off\">";
-    $ret .= FW_hidden("detail", $d);
-    $ret .= FW_hidden("dev.$d", "$d addRegexpPart");
-    $ret .= FW_submit("cmd.$d", "set", "set");
-    $ret .= "<div class=\"set downText\">&nbsp;$d addRegexpPart&nbsp;</div>";
     $list =~ s/(['"])/./g;
-    $ret .= FW_select("","arg.$d",\@al, undef, "set",
-        "FW_selChange(this.options[selectedIndex].text,'$list','val.$d')");
-    $ret .= FW_textfield("val.$d", 30, "set");
-    my $al0 = (@al ? $al[0] : "");
-    $ret .= "<script type=\"text/javascript\">" .
-              "FW_selChange('$al0','$list','val.$d')</script>";
-    $ret .= "</form></td></tr>";
+
+    $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
+    $ret .= '<td colspan="2">';
+    $ret .= FW_detailSelect($d, "set", $list, "addRegexpPart");
+    $ret .= "</td></tr>";
   }
   $ret .= "</table>";
 
