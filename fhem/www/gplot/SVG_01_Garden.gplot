@@ -1,4 +1,4 @@
-# Created by FHEM/98_SVG.pm, 2015-01-23 07:33:37
+# Created by FHEM/98_SVG.pm, 2015-01-24 09:25:23
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time
@@ -14,7 +14,9 @@ set y2label "Temperature"
 #Log.Garden 4:Garden.T\x3a:15:
 #Log.Garden 10:Garden.T\x3a:0:delta-h
 #Log.Garden 10:Garden.T\x3a:0:delta-d
+#Log.Predicted 4:predicted.*:15:
 
 plot "<IN>" using 1:2 axes x1y2 title 'Temperature' ls l0 lw 1 with lines,\
      "<IN>" using 1:2 axes x1y1 title 'Rain/hour' ls l1fill lw 1 with histeps,\
-     "<IN>" using 1:2 axes x1y1 title 'Rain/day' ls l2 lw 1 with histeps
+     "<IN>" using 1:2 axes x1y1 title 'Rain/day' ls l2 lw 1 with histeps,\
+     "<IN>" using 1:2 axes x1y2 title 'Predicted Temp' ls l3 lw 1 with quadratic

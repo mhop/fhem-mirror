@@ -1,0 +1,25 @@
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title 'Web'
+set ytics ()
+set y2tics ()
+set grid
+
+#set xtics ( 10 10, 20 20)
+set xtics ()
+
+set xrange [-40:40]
+set yrange [-40:40]
+
+#logProxy Polar::[11,15,21,14,16]
+#logProxy Polar::[11,15,21,14,16]
+#logProxy Polar::[14,16,23,24,21]
+#logProxy Polar::["Livingroom","Bath","Children","Kitchen","Floor"]
+
+plot "<IN>" using 1:2 axes x1y1 title 'Measured' ls l0 lw 1 with lines,\
+plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with points,\
+plot "<IN>" using 1:2 axes x1y1 title 'Desired' ls l1fill lw 1 with lines,\
+plot "<IN>" using 1:2 axes x1y1 notitle ls l2 lw 1 with lines,\

@@ -94,6 +94,8 @@ attr Garden group Sensors
 attr Garden room Sensors
 define Log.Garden FileLog demolog/garden.log Sens.Out:T:.*
 attr Log.Garden room Sensors
+define Log.Predicted FileLog demolog/predicted.log predicted:T:.*
+attr Log.Predicted room Sensors
 define Cellar CUL_WS 1 -1 -3.5
 attr Cellar group Sensors
 attr Cellar room Sensors
@@ -115,6 +117,16 @@ attr dew_all room Sensors
 define SVG_03_Dewpoint SVG Log.Dewpoint:SVG_03_Dewpoint:CURRENT
 attr SVG_03_Dewpoint room Sensors
 attr SVG_03_Dewpoint startDate 2013-08-13
+define logProxy logProxy
+attr logProxy room System
+define SVG_04_Sun SVG logProxy:SVG_04_Sun:CURRENT
+attr SVG_04_Sun room Sensors
+attr SVG_04_Sun fixedrange year
+attr SVG_04_Sun title {"".logProxy_dec2hms($data{min1})." - ".logProxy_dec2hms($data{max1})." - ".logProxy_dec2hms($data{min2})." - ".logProxy_dec2hms($data{max2})}
+define SVG_05_Polar SVG logProxy:SVG_05_Polar:CURRENT
+attr SVG_05_Polar room Sensors
+attr SVG_05_Polar plotsize 340,300
+
 define sunRise at *{sunrise()} set Office on
 attr sunRise group Timer
 attr sunRise icon weather_sunrise

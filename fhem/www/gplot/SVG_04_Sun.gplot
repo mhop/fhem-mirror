@@ -1,0 +1,22 @@
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics
+set y2tics
+set grid
+set ylabel "Sonnenaufgang"
+set y2label "Somnnenuntergang"
+
+set yrange [4:10]
+set y2range [16:23]
+
+#logProxy Func:logProxy_Func2Plot($from,$to,'{logProxy_hms2dec(sunrise_abs_dat($sec))}')
+#logProxy Func:logProxy_Func2Plot($from,$to,'{logProxy_hms2dec(sunset_abs_dat($sec))}')
+#logProxy ConstX:TimeNow(),4,10
+
+plot "<IN>" using 1:2 axes x1y1 title 'Sunrise' ls l2 lw 1 with steps,\
+plot "<IN>" using 1:2 axes x1y2 title 'Sunset' ls l0 lw 1 with steps,\
+plot "<IN>" using 1:2 axes x1y1 title notitle ls l5 lw 1 with steps,\
