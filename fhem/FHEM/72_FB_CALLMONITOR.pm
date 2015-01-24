@@ -145,18 +145,11 @@ FB_CALLMONITOR_Get($@)
 
     if($arguments[1] eq "search")
     {
-        if($arguments[2] =~ /^\d+$/)
-        {
-            return FB_CALLMONITOR_reverseSearch($hash, $arguments[2]);
-        }
-        else
-        {
-            return "given argument is not a telephone number";
-        }
+        return FB_CALLMONITOR_reverseSearch($hash, $arguments[2]);
     }
     else
     {
-       return "unknown argument ".$arguments[1].", choose one of search"; 
+        return "unknown argument ".$arguments[1].", choose one of search"; 
     }
 
 }
@@ -685,8 +678,7 @@ sub FB_CALLMONITOR_readPhonebook($;$$)
     {
 		$phonebook_file = AttrVal($name, "reverse-search-phonebook-file", "/var/flash/phonebook") unless(defined($phonebook_file));
 		
-        ($err, @lines) = FileRead($phonebook_file);
-       
+        ($err, @lines) = FileRead($phonebook_file); 
         
         if(defined($err) && $err)
         {
@@ -709,15 +701,11 @@ sub FB_CALLMONITOR_readPhonebook($;$$)
         {
             Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from $phonebook_file";
         }
-    
 	} 
     else
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - skipping local phonebook file";
     }
-    
-   
-
 }
 
 
@@ -738,7 +726,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
     
     if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/) 
     {
- 
+    
         while($phonebook =~ m/<contact[^>]*>(.+?)<\/contact>/gs) 
         {
             $contact = $1;
@@ -746,15 +734,13 @@ sub FB_CALLMONITOR_parsePhonebook($$)
             if($contact =~ m/<realName>(.+?)<\/realName>/) 
             {
                 $contact_name = $1; 
-                Log3 $name, 4, "FB_CALLMONITOR ($name) - found $contact_name";
-
+                
                 while($contact =~ m/<number[^>]*?type="([^<>"]+?)"[^<>]*?>([^<>"]+?)<\/number>/gs) 
                 {
                     if($1 ne "intern" and $1 ne "memo") 
                     {
                         $number = $2;
                         $number =~ s/^\+\d\d/0/g; # quick'n'dirty fix in case of international number format.
-                        $number =~ s/\D//g unless($number =~ /@/);
                         $number =~ s/\s//g if($number =~ /@/);
             
                         if(not $number =~ /^0/ and not $number =~ /@/ and $area_code ne "") 
@@ -764,6 +750,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
                             }
                         }
                         $count_contacts++;
+                        Log3 $name, 4, "FB_CALLMONITOR ($name) - found $contact_name with number $number";
                         $hash->{helper}{PHONEBOOK}{$number} = FB_CALLMONITOR_html2txt($contact_name) if(not defined($hash->{helper}{PHONEBOOK}{$number}));
                         undef $number;
                     }
