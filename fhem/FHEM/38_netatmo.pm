@@ -29,7 +29,7 @@ netatmo_Initialize($)
   $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "netatmo_Notify";
   $hash->{UndefFn}  = "netatmo_Undefine";
-  #$hash->{SetFn}    = "netatmo_Set";
+  $hash->{SetFn}    = "netatmo_Set";
   $hash->{GetFn}    = "netatmo_Get";
   $hash->{AttrFn}   = "netatmo_Attr";
   $hash->{AttrList} = "IODev ".
@@ -210,7 +210,13 @@ netatmo_Set($$@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  my $list = "";
+  my $list = "autocreate:noArgs";
+
+  if( $cmd eq "autocreate" ) {
+    return netatmo_autocreate($hash, 1 );
+    return undef;
+  }
+
   return "Unknown argument $cmd, choose one of $list";
 }
 
@@ -596,19 +602,21 @@ netatmo_dispatch($$$)
 }
 
 sub
-netatmo_autocreate($)
+netatmo_autocreate($;$)
 {
-  my($hash) = @_;
+  my($hash,$force) = @_;
   my $name = $hash->{NAME};
 
   if( !$hash->{helper}{devices} ) {
     netatmo_getDevices($hash);
-    return undef;
+    return undef if( !$force );
   }
 
-  foreach my $d (keys %defs) {
-    next if($defs{$d}{TYPE} ne "autocreate");
-    return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+  if( !$force ) {
+    foreach my $d (keys %defs) {
+      next if($defs{$d}{TYPE} ne "autocreate");
+      return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+    }
   }
 
   my $autocreated = 0;
@@ -646,6 +654,8 @@ netatmo_autocreate($)
   }
 
   CommandSave(undef,undef) if( $autocreated && AttrVal( "autocreate", "autosave", 1 ) );
+
+  return "created $autocreated devices";
 }
 
 sub
@@ -1068,7 +1078,7 @@ netatmo_Attr($$$)
 <a name="netatmo"></a>
 <h3>netatmo</h3>
 <ul>
-  xxx<br><br>
+  A Fhem module for netatmo weatherstations.<br><br>
 
   Notes:
   <ul>
@@ -1079,12 +1089,12 @@ netatmo_Attr($$$)
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; netatmo &lt;device&gt;</code><br>
-    <code>define &lt;name&gt; netatmo PUBLIC &lt;device&gt; &lt;latitude&gt; &lt;longitude&gt; [&lt;radius&gt;]</code><br>
     <code>define &lt;name&gt; netatmo [ACCOUNT] &lt;username&gt; &lt;password&gt; &lt;client_id&gt; &lt;client_secret&gt;</code><br>
     <br>
 
     Defines a netatmo device.<br><br>
-    If a netatmo device of the account type is created all fhem devices for the netatmo devices are automaticaly created.
+    If a netatmo device of the account type is created all fhem devices for the netatmo devices are automaticaly created
+    (if autocreate is not disabled).
     <br>
 
     Examples:
@@ -1100,9 +1110,18 @@ netatmo_Attr($$$)
   <ul>
   </ul><br>
 
+  <a name="netatmo_Set"></a>
+  <b>Set</b>
+  <ul>
+    <li>autocreate<br>
+      Create fhem devices for all netatmo devices.</li>
+  </ul><br>
+
   <a name="netatmo_Get"></a>
   <b>Get</b>
   <ul>
+    <li>devices<br>
+      list the netatmo devices for this account</li>
     <li>update<br>
       trigger an update</li>
     <li>public [&lt;station&gt;] [&lt;address&gt;] &lt;args&gt;<br>
