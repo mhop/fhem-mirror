@@ -31,6 +31,8 @@ use HttpUtils;
 
 package main;
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 #
 # *** Potential isses:
 #
