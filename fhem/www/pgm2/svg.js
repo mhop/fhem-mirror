@@ -276,7 +276,8 @@ FW_svgUpdateDevs(devs)
     flog = flog.replace(/\\x3a/g, ".");
     log("longpollSVG filter:"+flog);
     for(var j=0; j < devs.length; j++) {
-      var ev = devs[0]+":"+devs[1];
+      var d = devs[j];
+      var ev = d[0]+":"+d[1];
       if(ev.match(flog)) {
         log("longpollSVG: reload SVG");
         var e = embArr[i];
