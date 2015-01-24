@@ -47,6 +47,8 @@
 # Changelog
 #
 # SVN-History:
+# 24.01.2015
+#	Wenn man seine Player umbenannt hatte, wurde ein Attribut-Kommando (für das Model-Attribut) falsch aufgerufen und hat eine Fehlermeldung im Fhem-Log verursacht (z.B. "Please define Sonos_Wohnzimmer first")
 # 19.01.2015
 #	Verweise auf die "alte" Wikiseite "Sonos Anwendungsbeispiel" in der commandref durch die "neue" Seite "SONOS" ersetzt.
 #	Wenn kein Pingtype definiert wurde, dann wurde fälschlicherweise nicht der Standard "syn" verwendet, sondern "none"
@@ -1196,6 +1198,10 @@ sub SONOS_Read($) {
 			CommandDefine(undef, $1);
 		} elsif ($line =~ m/CommandAttr:(.*)/) {
 			CommandAttr(undef, $1);
+		} elsif ($line =~ m/CommandAttrWithUDN:(.*?):(.*)/) {
+			my $hash = SONOS_getSonosPlayerByUDN($1);
+			
+			CommandAttr(undef, $hash->{NAME}.' '.$2);
 		} elsif ($line =~ m/deleteCurrentNextTitleInformationAndDisappear:(.*)/) {
 			my $hash = SONOS_getSonosPlayerByUDN($1);
 			
@@ -4452,7 +4458,7 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Client_Data_Refresh('', $udn, 'LastSubscriptionsRenew', SONOS_TimeNow());
 		SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
 		
-		SONOS_Client_Notifier('CommandAttr:'.$name.' model Sonos_'.$modelNumber);
+		SONOS_Client_Notifier('CommandAttrWithUDN:'.$udn.':model Sonos_'.$modelNumber);
 		
 		$SONOS_Client_SendQueue_Suspend = 0;
 		SONOS_Log undef, 2, "SonosPlayer '$saveRoomName' is now updated";
