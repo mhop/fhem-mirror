@@ -43,7 +43,7 @@ sub SVG_openFile($$$);
 sub SVG_doShowLog($$$$;$$);
 sub SVG_getData($$$$$);
 sub SVG_sel($$$;$$);
-sub SVG_getControlPoints($$$$$$$$$$$);
+sub SVG_getControlPoints($);
 sub SVG_calcControlPoints($$$);
 
 my %SVG_devs;       # hash of from/to entries per device
@@ -401,7 +401,7 @@ SVG_PEdit($$$$)
                     ($v && $v eq "x1y1") ? "left" : "right");
     $o .= SVG_sel("type_${idx}",
                 "lines,points,steps,fsteps,histeps,bars,".
-                        "cubic,quadratic",
+                        "cubic,quadratic,quadraticSmooth",
                 $conf{lType}[$idx]);
     my $ls = $conf{lStyle}[$idx]; 
     if($ls) {
@@ -1797,21 +1797,25 @@ SVG_render($$$$$$$$$;$$)
 
     } else {                            # lines and everything else
       my ($ymin, $ymax) = (99999999, -99999999);
-      my %lt =(cubic=>"C",quadratic=>"Q");
+      my %lt =(cubic=>"C",quadratic=>"Q",quadraticSmooth=>"T");
       my ($x1, $y1);
       my $lt = ($lt{$lType} ? $lt{$lType} : "L"); # defaults to line
 
-      my(@xcp1, @xcp2, @ycp1, @ycp2);
-  
-      SVG_getControlPoints(\@xcp1, \@xcp2, \@ycp1, \@ycp2, $dxp, $dyp, $x, $y, $h, $min, $hmul) if (($lt ne "L") && (@{$dxp} > 1));
-  
       foreach my $i (0..int(@{$dxp})-1) {
 
         if( !defined($dxp->[$i]) ) { # specials
           if(  $dyp->[$i] =~ m/^;$/ ) { # new line segment after newline
+ 
+            my @tvals = split("[ ,]", $ret);
+            if (@tvals > 2) {
+                if ($tvals[0] ne "M") { # just points, no M/L
+                    $ret = sprintf("M %d %d $lt $ret", $tvals[1],$tvals[2]);
+                }
+            }
+
             SVG_pO "<path $attributes $lStyle d=\"$ret\"/>";
             $ret = "";
-
+            
           } elsif( $dyp->[$i] =~ m/^;c (.*)/ ) {# close polyline ?
             $doClose = $1;
 
@@ -1874,10 +1878,11 @@ SVG_render($$$$$$$$$;$$)
 
         if($i == 0) {
           if($doClose) {
-            $ret .= sprintf("M%d,%d L%d,%d $lt", $x1,$y+$h, $x1,$y1);
+            $ret .= sprintf("M %d,%d L %d,%d $lt", $x1,$y+$h, $x1,$y1);
           } else {
-            $ret .= sprintf("M%d,%d $lt", $x1,$y1);
+            $ret .= sprintf("M %d,%d $lt", $x1,$y1);
           }
+          $lx = $x1; $ly = $y1;
           next;
         }
 
@@ -1888,13 +1893,24 @@ SVG_render($$$$$$$$$;$$)
           $ret .=  sprintf(" %d,%d", $lx, $ly);
           ($ymin, $ymax) = (99999999, -99999999);
         }
-        $ret .=  sprintf(" %d,%d", $x1, $y1) if ($lt eq "L");
-        $ret .=  sprintf(" %d,%d,%d,%d,%d,%d", $xcp1[$i-1], $ycp1[$i-1], $xcp2[$i-1], $ycp2[$i-1], $x1, $y1) if ($lt eq "C");
-        $ret .=  sprintf(" %d,%d,%d,%d", $xcp2[$i-1], $ycp2[$i-1], $x1, $y1) if ($lt eq "Q");
+
+        $ret .=  sprintf(" %d,%d", $x1, $y1) if ($lt ne "T");
+        $ret .=  sprintf(" %d,%d", int(($lx+$x1)/2+0.5), int(($ly+$y1)/2+0.5))
+                if (($lt eq "T") && ($lx > -1));
         $lx = $x1; $ly = $y1;
       }
+
+      #-- calculate control points for interpolation
+      $ret = SVG_getControlPoints($ret) if (($lt eq "C") || ($lt eq "Q"));
+  
       #-- insert last point for filled line
-      $ret .=  sprintf(" L%d,%d Z", $lx, $y+$h) if($doClose && $lx > -1);
+      $ret .= sprintf(" %d,%d", $x1, $y+$h) if(($lt eq "T") && defined($x1));
+      $ret .= sprintf(" L %d,%d Z", $x1, $y+$h) if($doClose && defined($x1));
+
+      if($ret =~ m/^ (\d+),(\d+)/) { # just points, no M/L
+        $ret = sprintf("M %d,%d $lt ", $1, $2).$ret;
+      }
+      $ret = "" if(@{$dxp} == 1);
 
       SVG_pO "<path $attributes $lStyle d=\"$ret\"/>";
     }
@@ -1931,25 +1947,44 @@ SVG_render($$$$$$$$$;$$)
 ######################
 # Derives control points for interpolation of bezier curves for SVG "path"
 sub
-SVG_getControlPoints($$$$$$$$$$$)
+SVG_getControlPoints($)
 {
-  my ($xcp1, $xcp2, $ycp1, $ycp2, $dxp, $dyp, $x, $y, $h, $min, $hmul) = @_;
+  my ($ret) = @_;
   my (@xa, @ya);
+  my (@vals) = split("[ ,]", $ret);
+  my (@xcp1, @xcp2, @ycp1, @ycp2);
+  my $header = "";
+  
+  foreach my $i (0..int(@vals)-1) {
+    $header .= $vals[$i] . " ";
+    if ($vals[$i] eq "C" || $vals[$i] eq "Q") {
+      my $lt = $vals[$i];
+      $i++;
 
-  foreach my $i (0..int(@{$dxp})-1) {
-    
-    if( defined($dxp->[$i]) ) { # non specials
-      ($xa[$i], $ya[$i]) = (int($x+$dxp->[$i]),
-                               int($y+$h-($dyp->[$i]-$min)*$hmul));
-    } else {
-      ($xa[$i], $ya[$i]) = ($xa[$i-1], $ya[$i-1]) if ($xa[$i-1] && $ya[$i-1]);
+      my $ii = 0;
+      
+      while (defined($vals[$i])) {
+        ($xa[$ii], $ya[$ii]) = ($vals[$i], $vals[$i+1]);
+        $i += 2;
+        $ii++;
+      }
+
+      return(1) if (@xa < 2);
+      
+      SVG_calcControlPoints(\@xcp1, \@xcp2, \@xa);
+      SVG_calcControlPoints(\@ycp1, \@ycp2, \@ya);
+
+      $ret = $header;
+      foreach my $i (1..int(@xa)-1) {
+        $ret .= sprintf(" %d,%d,%d,%d,%d,%d", $xcp1[$i-1], $ycp1[$i-1], $xcp2[$i-1], $ycp2[$i-1], $xa[$i], $ya[$i]) if ($lt eq "C");
+        $ret .= sprintf(" %d,%d,%d,%d", $xcp2[$i-1], $ycp2[$i-1], $xa[$i], $ya[$i]) if ($lt eq "Q");
+      }
+
+
     }
   }
   
-  SVG_calcControlPoints($xcp1, $xcp2, \@xa);
-  SVG_calcControlPoints($ycp1, $ycp2, \@ya);
-
-  return(1);
+  return($ret);
 }
 
 ######################
@@ -1985,15 +2020,15 @@ SVG_calcControlPoints($$$)
     $r[$i] = $r[$i] - $m*$r[$i-1];
   }
   
-  $p1->[$n-1] = SVG_doround($r[$n-1]/$b[$n-1], 0.5, 1);
+  $p1->[$n-1] = int($r[$n-1]/$b[$n-1]+0.5);
   for (my $i=$n-2; $i>=0; --$i) {
-    $p1->[$i] = SVG_doround(($r[$i] - $c[$i]*$p1->[$i+1]) / $b[$i], 0.5, 1);
+    $p1->[$i] = int(($r[$i] - $c[$i]*$p1->[$i+1]) / $b[$i]+0.5);
   }
   
   for (my $i=0; $i<$n-1; $i++) {
-    $p2->[$i] = SVG_doround($input->[$i+1]*2-$p1->[$i+1], 0.5, 1);
+    $p2->[$i] = int($input->[$i+1]*2-$p1->[$i+1]+0.5);
   }
-  $p2->[$n-1] = SVG_doround(($input->[$n]+$p1->[$n-1])*0.5, 0.5, 1);
+  $p2->[$n-1] = int(($input->[$n]+$p1->[$n-1])*0.5+0.5);
 
   return (1);
 }
