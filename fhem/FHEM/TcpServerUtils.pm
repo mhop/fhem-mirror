@@ -5,7 +5,6 @@ package main;
 use strict;
 use warnings;
 use IO::Socket;
-use Errno qw(:POSIX);
 
 sub
 TcpServer_Open($$$)
@@ -57,7 +56,7 @@ TcpServer_Accept($$)
   my $name = $hash->{NAME};
   my @clientinfo = $hash->{SERVERSOCKET}->accept();
   if(!@clientinfo) {
-    Log3 $name, 1, "Accept failed ($name: $!)" if($! != EAGAIN());
+    Log3 $name, 1, "Accept failed ($name: $!)" if($! != EAGAIN);
     return undef;
   }
   $hash->{CONNECTS}++;

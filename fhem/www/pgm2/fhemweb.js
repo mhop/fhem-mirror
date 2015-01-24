@@ -112,6 +112,13 @@ FW_jqueryReadyFn()
   });
   */
 
+  $("#saveCheck")
+    .css("cursor", "pointer")
+    .click(function(){
+      FW_cmd(FW_root+"?cmd=save ?&XHR=1", function(data) {
+        FW_okDialog('<pre>'+data+'</pre>');
+      });
+    });
 }
 
 

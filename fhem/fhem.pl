@@ -219,7 +219,7 @@ use vars qw(%readyfnlist);      # devices which want a "readyfn"
 use vars qw(%selectlist);       # devices which want a "select"
 use vars qw(%value);            # Current values, see commandref.html
 use vars qw($lastDefChange);    # number of last def/attr change
-use vars qw($lastSavedChange);  # will be synced with lastDefChange on save
+use vars qw(@structChangeHist); # Contains the last 10 structural changes
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
@@ -242,7 +242,6 @@ my @cmdList;                    # Remaining commands in a chain. Used by sleep
 
 $init_done = 0;
 $lastDefChange = 0;
-$lastSavedChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
 
@@ -508,7 +507,6 @@ foreach my $d (keys %defs) {
   }
 }
 
-$lastSavedChange = $lastDefChange;
 DoTrigger("global", "INITIALIZED", 1);
 $fhem_started = time;
 
@@ -1234,7 +1232,7 @@ CommandRereadCfg($$)
 
   $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
   $inform{$name} = $informMe if($informMe);
-  $lastSavedChange = $lastDefChange;
+  @structChangeHist = ();
   DoTrigger("global", "REREADCFG", 1);
 
   $init_done = 1;
@@ -1327,6 +1325,12 @@ CommandSave($$)
 {
   my ($cl, $param) = @_;
 
+  if($param eq "?") {
+    return "No structural changes." if(!@structChangeHist);
+    return "Last 10 structural changes:\n  ".join("\n  ", @structChangeHist);
+  }
+
+  @structChangeHist = ();
   DoTrigger("global", "SAVE", 1);
 
   my $ret =  WriteStatefile();
@@ -1413,7 +1417,6 @@ CommandSave($$)
     $ret .= "$key: $!" if(!close($fh{$key}));
   }
 
-  $lastSavedChange = $lastDefChange;
   return ($ret ? $ret : "Wrote configuration to $param");
 }
 
@@ -1619,9 +1622,9 @@ CommandDefine($$)
                 $modules{$m}{NotifyOrderPrefix} : "50-") . $name;
     }
     %ntfyHash = ();
+    addStructChange("define", $name, $def);
     DoTrigger("global", "DEFINED $name", 1) if($init_done);
   }
-  $lastDefChange++ if(!$hash{TEMPORARY});
   return $ret;
 }
 
@@ -1647,11 +1650,11 @@ CommandModify($$)
   if($ret) {
     $hash->{DEF} = $hash->{OLDDEF};
   } else {
+    addStructChange("modify", $a[0], $def);
     DoTrigger("global", "MODIFIED $a[0]", 1) if($init_done);
   }
 
   delete($hash->{OLDDEF});
-  $lastDefChange++ if(!$hash->{TEMPORARY});
   return $ret;
 }
 
@@ -1714,7 +1717,7 @@ CommandDelete($$)
   my ($cl, $def) = @_;
   return "Usage: delete <name>$namedef\n" if(!$def);
 
-  my (@rets, $isReal);
+  my @rets;
   foreach my $sdev (devspec2array($def)) {
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
@@ -1732,7 +1735,6 @@ CommandDelete($$)
       next;
     }
 
-    $isReal = 1 if(!$defs{$sdev}{TEMPORARY});
 
     # Delete releated hashes
     foreach my $p (keys %selectlist) {
@@ -1745,13 +1747,13 @@ CommandDelete($$)
         if($readyfnlist{$p} && $readyfnlist{$p}{NAME} eq $sdev);
     }
 
-    delete($attr{$sdev});
     my $temporary = $defs{$sdev}{TEMPORARY};
-    delete($defs{$sdev});       # Remove the main entry
+    addStructChange("delete", $sdev, $sdev) if(!$temporary);
+    delete($attr{$sdev});
+    delete($defs{$sdev});
     DoTrigger("global", "DELETED $sdev", 1) if(!$temporary);
 
   }
-  $lastDefChange++ if($isReal);
   return join("\n", @rets);
 }
 
@@ -1764,7 +1766,7 @@ CommandDeleteAttr($$)
   my @a = split(" ", $def, 2);
   return "Usage: deleteattr <name> [<attrname>]\n$namedef" if(@a < 1);
 
-  my (@rets, $isReal);
+  my @rets;
   foreach my $sdev (devspec2array($a[0])) {
 
     if(!defined($defs{$sdev})) {
@@ -1784,21 +1786,20 @@ CommandDeleteAttr($$)
       next;
     }
 
-    $isReal = 1 if(!$defs{$sdev}{TEMPORARY});
-
     if(@a == 1) {
       delete($attr{$sdev});
+      addStructChange("deleteAttr", $sdev, $def);
       DoTrigger("global", "DELETEATTR $sdev", 1) if($init_done);
 
     } else {
       delete($attr{$sdev}{$a[1]}) if(defined($attr{$sdev}));
+      addStructChange("deleteAttr", $sdev, $def);
       DoTrigger("global", "DELETEATTR $sdev $a[1]", 1) if($init_done);
 
     }
 
   }
 
-  $lastDefChange++ if($isReal);
   return join("\n", @rets);
 }
 
@@ -2101,8 +2102,8 @@ CommandRename($$)
 
   CallFn($new, "RenameFn", $new,$old);# ignore replies
 
+  addStructChange("rename", $new, $param);
   DoTrigger("global", "RENAMED $old $new", 1);
-  $lastDefChange++ if(!$defs{$new}{TEMPORARY});
   return undef;
 }
 
@@ -2239,7 +2240,7 @@ sub
 CommandAttr($$)
 {
   my ($cl, $param) = @_;
-  my ($ret, $isReal, @a);
+  my ($ret, @a);
 
   @a = split(" ", $param, 3) if($param);
 
@@ -2315,8 +2316,6 @@ CommandAttr($$)
       next;
     }
 
-    $isReal = 1 if(!$defs{$sdev}{TEMPORARY});
-
     $a[0] = $sdev;
     $ret = CallFn($sdev, "AttrFn", "set", @a);
     if($ret) {
@@ -2326,6 +2325,12 @@ CommandAttr($$)
 
     my $val = $a[2];
     $val = 1 if(!defined($val));
+
+    addStructChange("attr", $sdev, $param)
+      if(!($attr{$sdev} &&
+           defined($attr{$sdev}{$attrName}) &&
+           $attr{$sdev}{$attrName} eq $val));
+
     $attr{$sdev}{$attrName} = $val;
 
     if($attrName eq "IODev") {
@@ -2342,7 +2347,6 @@ CommandAttr($$)
 
   }
 
-  $lastDefChange++ if($isReal);
   Log 3, join(" ", @rets) if(!$cl && @rets);
   return join("\n", @rets);
 }
@@ -4075,5 +4079,18 @@ setKeyValue($$)
   return FileWrite($fName, @new);
 }
 
+sub
+addStructChange($$$)
+{
+  return if(!$init_done);
+
+  my ($cmd, $dev, $param) = @_;
+  return if(!$defs{$dev} || $defs{$dev}{TEMPORARY});
+
+  $lastDefChange++;
+  shift @structChangeHist if(@structChangeHist > 10);
+  $param = substr($param, 0, 40)."..." if(length($param) > 40);
+  push @structChangeHist, "$cmd $param";
+}
 
 1;

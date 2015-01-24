@@ -7,7 +7,6 @@ use warnings;
 use TcpServerUtils;
 use HttpUtils;
 use Time::HiRes qw(gettimeofday);
-use Errno qw(:POSIX);
 
 #########################
 # Forward declaration
@@ -1265,8 +1264,6 @@ FW_roomOverview($)
 
         my $class = "menu_$l1";
         $class =~ s/[^A-Z0-9]/_/gi;
-        $class .= ($lastDefChange>$lastSavedChange) ? " changed" : ""
-                        if($l1 eq "Save config");
 
         # image tag if we have an icon, else empty
         my $icoName = "ico$l1";
@@ -1275,12 +1272,18 @@ FW_roomOverview($)
         my $icon = FW_iconName($icoName) ?
                         FW_makeImage($icoName,$icoName,"icon")."&nbsp;" : "";
 
+        if($l1 eq "Save config") {
+          $l1 .= '</a> <a id="saveCheck" class="changed" style="visibility:'.
+                      (int(@structChangeHist) ? 'visible' : 'hidden').'">?</a>';
+        }
+
         # Force external browser if FHEMWEB is installed as an offline app.
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            FW_pO "<td><div><a href=\"$l2\">$icon$l1</a></div></td>";
         } else {
           FW_pH $l2, "$icon$l1", 1, $class;
         }
+
         FW_pO "</tr>";
       }
     }
@@ -2268,13 +2271,9 @@ FW_Notify($$)
   my ($ntfy, $dev) = @_;
 
   if( $dev->{NAME} eq "global" ) {
-    my $n = "#FHEMWEB:$ntfy->{NAME}";
-    if( grep(m/^SAVE|INITIALIZED|REREADCFG|SHUTDOWN$/, @{$dev->{CHANGED}}) ) {
-      FW_directNotify($n, '$(".menu_Save_config").removeClass("changed")', '');
-    } elsif( grep(m/^DEFINED|MODIFIED|DELETED|ATTR|DELETEATTR$/,
-                                                       @{$dev->{CHANGED}}) ) {
-      FW_directNotify($n, '$(".menu_Save_config").addClass("changed")', '');
-    }
+    my $vs = int(@structChangeHist) ? 'visible' : 'hidden';
+    FW_directNotify( "#FHEMWEB:$ntfy->{NAME}",
+                                "\$('#saveCheck').css('visibility','$vs')", '');
   }
 
   my $h = $ntfy->{inform};
