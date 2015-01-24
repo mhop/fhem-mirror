@@ -574,6 +574,9 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
 
     $("#td_longText").val($(inp).val());
 
+    if( typeof AddCodeMirror == 'function' )
+      AddCodeMirror($("#td_longText").get(0));
+
     $('#editdlg').dialog(
       { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
         maxHeight:$(window).height()*3/4,
