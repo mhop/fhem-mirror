@@ -1814,6 +1814,10 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$chnHash,1,"trigger:".$trigType."_".$bno];
       push @evtEt,[$devH,1,"battery:". (($chn&0x80)?"low":"ok")];
       push @evtEt,[$devH,1,"state:$btnName $state$target"];
+      if($md eq "HM-Dis-WM55"){
+        my $type = $trigType eq "Short"?"s":"l";
+        CUL_HM_PushCmdStack($shash,"++A011$id$src$_")foreach (@{$chnHash->{helper}{disp}{$type}});
+      }
     }
     else{# could be an Em8
       my($chn,$cnt,$state,$err);
@@ -1845,6 +1849,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$shash,1,"contact:$txt$target"];
       }
     }
+
   }
   elsif($st eq "powerMeter") {#################################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
@@ -3233,14 +3238,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     my $s = 54;
     $l1 =~ s/\\_/ /g;
-    $l1 = substr($l1."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 13);
+    $l1 = substr($l1."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 12);
     $l1 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
 
     $s = 70;
     $l2 =~ s/\\_/ /g;
-    $l2 = substr($l2."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 13);
+    $l2 = substr($l2."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 12);
     $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
-
     @a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
   }
   elsif($cmd =~ m /(displayMode|displayTemp|displayTempUnit|controlMode)/) {
@@ -3916,18 +3920,23 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     
     my $msg = "800102";
     my $param = (scalar(@a)-2);
+    return "$a[2] not valid - choose short or long" if($a[2] !~ m/(short|long)/);
     return "not enough parameter - always use txtNo, color and icon in a set"
-          if($param %3);
-    for (my $cnt=2;$cnt<$param;$cnt+=3){
+          if(($param-1) %3);
+    my @txtMsg;
+    for (my $cnt=3;$cnt<$param;$cnt+=3){
       return "color wrong ".$a[$cnt+1]." use:".join(",",sort keys %color) if (!defined $color{$a[$cnt+1]});
       return "icon wrong " .$a[$cnt+2]." use:".join(",",sort keys %icon)  if (!defined $icon {$a[$cnt+2]});
       return "text wrong " .$a[$cnt+0]." use:".join(",",sort keys %btn)   if (!defined $btn  {$a[$cnt+0]});
       $msg .= sprintf("12%02X11%02X",$btn{$a[$cnt+0]}+0x80,$color{$a[$cnt+1]}+0x80);
       $msg .= sprintf("13%02X",$icon{$a[$cnt+2]}+0x80) if ($icon{$a[$cnt+2]} != 99 );
       $msg .= ($cnt<$param-1)?"0A":"0A03";
-      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
+      push @txtMsg,$msg; 
       $msg = "8001";
     }
+    my $type = $a[2] eq "short"?"s":"l";
+    delete $hash->{helper}{disp}{$type} if ($hash->{helper}{disp});
+    $hash->{helper}{disp}{$type} = \@txtMsg;
   }
 
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
