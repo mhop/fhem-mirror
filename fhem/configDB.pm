@@ -420,6 +420,7 @@ sub cfgDB_SaveCfg(;$) {
 		foreach my $a (sort keys %{$configDB{attr}}) {
 #		foreach my $a (sort keys %{$attr{configdb}}) {
 			my $val = $configDB{attr}{$a};
+			next unless $val;
 			$val =~ s/;/;;/g;
 			push @rowList, "attr configdb $a $val";
 		}
