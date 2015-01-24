@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new helper module TimeSeries.pm (Boris)
   - feature: 71_YAMAHA_NP.pm: Make timer setting more convenient.
   - changed: FB_CALLMONITOR: allow chars in phone numbers for reverse search
   - changed: SYSMON: non-blocking
