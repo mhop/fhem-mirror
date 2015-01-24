@@ -681,8 +681,6 @@ sub CUL_HM_Attr(@) {#################################
     if ($cmd eq "set"){
       return "$attrName not usable for channels" if(!$hash->{helper}{role}{dev});#only for device
       return "value $attrVal ignored, must be an integer" if ($attrVal !~ m/^(\d+)$/);
-      return "$attrName not supported for model" if(!(CUL_HM_getRxType($hash) & 0xEB)
-                                                    && $attrVal != 1);# no repeat for confign only devices
     }
     return;
   }
@@ -2508,7 +2506,15 @@ sub CUL_HM_parseCommon(@){#####################################################
         my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn};
         $chnhash = $shash if (!$chnhash);
         my $chnName = $chnhash->{NAME};
-        my (undef,@peers) = unpack 'A2(A8)*',$p;
+        my @peers;
+        if($attr{$shash->{NAME}}{model} eq "HM-Dis-WM55"){
+          #how ugly - this device adds one byte at begin - remove it. 
+          (undef,@peers) = unpack 'A4(A8)*',$p;
+        }
+        else{
+          (undef,@peers) = unpack 'A2(A8)*',$p;
+        }
+
         $_ = '00000000' foreach (grep /^000000/,@peers);#correct bad term(6 chars) from rain sens)
         $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
 
@@ -2964,7 +2970,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       if    ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
       elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7)}
       elsif ($md =~ m/HM-TC-IT/    && $chn eq "02"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7,8,9)}
-      elsif ($md =~ m/^HM-PB-4DIS-WM/)             {$addInfo = CUL_HM_4DisText($hash)}
+      elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55)/){$addInfo = CUL_HM_4DisText($hash)}
       elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
 
       return $name." type:".$st." - \n".
@@ -3632,7 +3638,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my (undef,undef,$duration,$ramp) = @a; #date prepared extention to entdate
     if ($cmd eq "on-till"){
       # to be extended to handle end date as well
-      my ($eH,$eM,$eSec)  = split(':',$duration);
+      my ($eH,$eM,$eSec)  = split(':',$duration.":00:00");
       return "please enter time informat hh:mm:ss" if (!$eSec);
       $eSec += $eH*3600 + $eM*60;
       my @lt = localtime;
@@ -5369,8 +5375,8 @@ sub CUL_HM_respPendTout($) {
       CUL_HM_eventP($hash,"IOdly");
       CUL_HM_ProcessCmdStack($hash) if($rxt & 0x03);#burst/all
     }
-    elsif ($pHash->{rspWait}{reSent} > AttrVal($name,"msgRepeat",3)#too many
-           ||(!($rxt & 0x9B))){#config cannot retry
+    elsif ($pHash->{rspWait}{reSent} > AttrVal($name,"msgRepeat",($rxt & 0x9B)?3:0)#too many
+           ){#config cannot retry
       my $pendCmd = "MISSING ACK";
 
       if ($pHash->{rspWait}{Pending}){
@@ -6138,7 +6144,7 @@ sub CUL_HM_updtRegDisp($$$) {
   elsif ($md =~ m/HM-TC-IT-WM-W-EU/){#handle temperature readings
     CUL_HM_TCITRTtempReadings($hash,$md,$list)  if ($list >= 7 && $chn eq "02");
   }
-  elsif ($md =~ m/^HM-PB-4DIS-WM/){#add text
+  elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55)/){#add text
     CUL_HM_4DisText($hash)  if ($list == 1) ;
   }
   elsif ($st eq "repeater"){
@@ -6700,7 +6706,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
         }
       }
       elsif ($tSince gt $tLast){    #no message received in window
-        if ($actHash->{helper}{$devId}{start} lt $tLast){
+        if ($actHash->{helper}{$devId}{start} lt $tSince){
           $cntDead++; $state = "dead";
         }
         else{
