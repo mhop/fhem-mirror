@@ -606,6 +606,9 @@ sub HMLAN_Parse($$) {##########################################################
     if ($HMcnd == 0x01 && $mFld[3] ne "FF"){#HMLAN responded to AES request
       $CULinfo = "AESKey-".$mFld[3];
     }
+    
+    # config message: reset timer handling
+    $hash->{helper}{ids}{$src}{flg} = 0 if ($type eq "00");
 
     if ($stat){# message with status information
       HMLAN_condUpdate($hash,$HMcnd)if ($hash->{helper}{q}{HMcndN} != $HMcnd);
