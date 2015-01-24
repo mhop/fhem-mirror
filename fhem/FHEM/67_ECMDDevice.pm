@@ -109,10 +109,11 @@ ECMDDevice_ReplaceSpecials($%)
 {
         my ($s, %specials)= @_;
 
+        return $s unless(defined($s));
         # perform macro substitution
         foreach my $special (keys %specials) {
           $s =~ s/$special/$specials{$special}/g;
-        }
+        } 
         return $s;
 }
 
@@ -386,7 +387,7 @@ ECMDDevice_Parse($$)
 	# we run over all readings in that classdef
 	foreach my $r (keys %{$classDef->{readings}}) {
 	  my $regex= ECMDDevice_GetCachedReadingsMatch($hash, $classDef, $r);
-	  #Debug "      Trying to match reading $r with regular expressing \"$regex\".";
+	  #Debug "      Trying to match reading $r with regular expression \"$regex\" (device $d, classdef $classname, reading $r).";
 	  if($msg =~ m/^$regex$/) {
 	    # we found a match
 	    Log3 $IOhash, 5, "$name: match regex $regex for reading $r of device $d with class $classname";
@@ -394,7 +395,7 @@ ECMDDevice_Parse($$)
 	    push @matches, $d;
 	    my $command= ECMDDevice_GetCachedReadingsCommand($hash, $classDef, $r);
 	    my $value= ECMDDevice_EvalCommand($hash, $command, $msg);
-	    Log3 $hash, 5, "postprocessed value is $value";
+	    #Log3 $hash, 5, "postprocessed value is $value";
 	    ECMDDevice_Changed($hash, $r, $value);
 	  }
 	}
