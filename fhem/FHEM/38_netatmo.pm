@@ -634,9 +634,11 @@ netatmo_autocreate($;$)
 
     my $id = $device->{_id};
     my $devname = "netatmo_D". $id;
+    $devname =~ s/:/_/g;
     my $define= "$devname netatmo $id";
     if( $device->{main_device} ) {
       $devname = "netatmo_M". $id;
+      $devname =~ s/:/_/g;
       $define= "$devname netatmo MODULE $device->{main_device} $id";
     }
 
