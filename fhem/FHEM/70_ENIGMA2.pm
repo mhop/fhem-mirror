@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.4.1
+# Version: 1.4.4
 #
 # Major Version History:
 # - 1.4.0 - 2014-11-27
@@ -83,7 +83,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 "
+"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 macaddr:textField"
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -334,14 +334,20 @@ sub ENIGMA2_Set($@) {
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
             Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " (wakeup)";
 
-            if ( defined( $hash->{READINGS}{lanmac}{VAL} )
-                && $hash->{READINGS}{lanmac}{VAL} ne "-" )
+            if (
+                (
+                    defined( $hash->{READINGS}{lanmac}{VAL} )
+                    && $hash->{READINGS}{lanmac}{VAL} ne "-"
+                )
+                || ( defined( $attr{$name}{macaddr} )
+                    && $attr{$name}{macaddr} ne "" )
+              )
             {
                 $result = ENIGMA2_wake($hash);
             }
             else {
                 return
-"Device MAC address unknown. Please turn on the device manually once.";
+"Device MAC address unknown. Please turn on the device manually once or set attribute macaddr.";
             }
         }
         else {
@@ -817,11 +823,12 @@ sub ENIGMA2_Define($$) {
 ###################################
 sub ENIGMA2_SendCommand($$;$$) {
     my ( $hash, $service, $cmd, $type ) = @_;
-    my $name        = $hash->{NAME};
-    my $address     = $hash->{helper}{ADDRESS};
-    my $port        = $hash->{helper}{PORT};
-    my $http_method = $attr{$name}{"http-method"};
-    my $http_noshutdown = ( defined($attr{$name}{"http-noshutdown"}) && $attr{$name}{"http-noshutdown"} eq "0" ) ? 0 : 1;
+    my $name            = $hash->{NAME};
+    my $address         = $hash->{helper}{ADDRESS};
+    my $port            = $hash->{helper}{PORT};
+    my $http_method     = $attr{$name}{"http-method"};
+    my $http_noshutdown = ( defined( $attr{$name}{"http-noshutdown"} )
+          && $attr{$name}{"http-noshutdown"} eq "0" ) ? 0 : 1;
     my $timeout;
     $cmd = ( defined($cmd) ) ? $cmd : "";
 
@@ -891,7 +898,11 @@ sub ENIGMA2_SendCommand($$;$$) {
 
     # send request via HTTP-GET method
     if ( $http_method eq "GET" || $http_method eq "" || $cmd eq "" ) {
-        Log3 $name, 5, "ENIGMA2 $name: GET " . urlDecode($URL) . " (noshutdown=" . $http_noshutdown . ")";
+        Log3 $name, 5,
+            "ENIGMA2 $name: GET "
+          . urlDecode($URL)
+          . " (noshutdown="
+          . $http_noshutdown . ")";
 
         HttpUtils_NonblockingGet(
             {
@@ -915,7 +926,9 @@ sub ENIGMA2_SendCommand($$;$$) {
             "ENIGMA2 $name: GET "
           . $URL
           . " (POST DATA: "
-          . urlDecode($cmd) . ", noshutdown=" . $http_noshutdown . ")";
+          . urlDecode($cmd)
+          . ", noshutdown="
+          . $http_noshutdown . ")";
 
         HttpUtils_NonblockingGet(
             {
@@ -2273,9 +2286,12 @@ sub ENIGMA2_Undefine($$) {
 
 ###################################
 sub ENIGMA2_wake ($) {
-    my ($hash)   = @_;
-    my $name     = $hash->{NAME};
-    my $mac_addr = $hash->{READINGS}{lanmac}{VAL};
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $mac_addr =
+      ( defined( $attr{$name}{macaddr} ) )
+      ? $attr{$name}{macaddr}
+      : $hash->{READINGS}{lanmac}{VAL};
     my $address;
     my $port;
 
