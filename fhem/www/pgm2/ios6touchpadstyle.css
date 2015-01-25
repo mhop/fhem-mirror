@@ -303,6 +303,7 @@ background-color:#4b6dab;
 
 .changed a, 
 .changed { color:#008700; }
+#saveCheck { position: absolute; top: 14px; right: 16px; }
 
 table.room .changedicon svg {
 
