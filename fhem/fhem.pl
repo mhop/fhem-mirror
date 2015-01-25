@@ -36,7 +36,6 @@ use IO::Socket;
 use Time::HiRes qw(gettimeofday);
 use Errno qw(:POSIX);
 
-
 ##################################################
 # Forward declarations
 #
@@ -260,7 +259,7 @@ $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
 $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
-                      "event-min-interval stateFormat";
+		       "event-aggregator event-min-interval stateFormat";
 
 
 %cmds = (
@@ -3506,6 +3505,12 @@ readingsBeginUpdate($)
     my @a = split(/,/,$attrminint);
     $hash->{".attrminint"} = \@a;
   }
+  
+  my $attraggr = AttrVal($name, "event-aggregator", undef);
+  if($attraggr) {
+    my @a = split(/,/,$attraggr);
+    $hash->{".attraggr"} = \@a;
+  }
 
   my $attreocr= AttrVal($name, "event-on-change-reading", undef);
   if($attreocr) {
@@ -3633,6 +3638,7 @@ readingsEndUpdate($$)
   delete $hash->{".updateTime"};
   delete $hash->{".attreour"};
   delete $hash->{".attreocr"};
+  delete $hash->{".attraggr"};
   delete $hash->{".attrminint"};
 
 
@@ -3733,8 +3739,39 @@ readingsBulkUpdate($$$@)
         $changed = 1 if($eocr);
       }
     }
+    
   }
- 
+
+  if($changed) {
+    #Debug "Processing $reading: $value";
+    my @v = grep { my $l = $_;
+		  $l =~ s/:.*//;
+		  ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attraggr"}};
+    if(@v) {
+      # e.g. power:20:linear:avg
+      my (undef, $duration, $method, $function) = split(":", $v[0], 4);
+      my $ts;
+      if(defined($readings->{".ts"})) {
+	$ts= $readings->{".ts"};
+      } else {
+	require "TimeSeries.pm";
+	$ts= TimeSeries->new( { method => $method, autoreset => $duration } );
+	$readings->{".ts"}= $ts;
+	# access from command line:
+        # { $defs{"myClient"}{READINGS}{"myValue"}{".ts"}{max} }
+	#Debug "TimeSeries created.";
+      }
+      my $now = $hash->{".updateTime"};
+      $changed= $ts->elapsed($now);
+      $value= $ts->{$function} if($changed);
+      $ts->add($now, $value); 
+    } else {
+      # If no event-aggregator attribute, then remove stale series if any.
+      delete $readings->{".ts"};
+    }
+  }  
+  
+  
   setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"}); 
   
   my $rv = "$reading: $value";
