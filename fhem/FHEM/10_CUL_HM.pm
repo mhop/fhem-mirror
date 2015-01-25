@@ -3956,7 +3956,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       if ($a[4] eq "off"){ #no display in this line
         delete $dh->{txt};
       }
-      else{ # new text
+      elsif($a[4] ne "nc"){ # new text
         return "text wrong $a[4] use:".join(",",sort keys %btn)   if (!defined $btn{$a[4]});
         $dh->{txt}=$a[4];
       }
