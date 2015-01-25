@@ -144,7 +144,7 @@ sub LW12_Set( $@ ) {
 	}
  
   my $cmdList = "" . 
-	  "on off next:noArg prev:noArg animation mode speed:slider,1,0,255 run:noArg stop:noArg " . 
+	  "on off next:noArg prev:noArg animation mode speed:slider,0,1,255 run:noArg stop:noArg " . 
 	  "color dim:slider,1,1,100 " . 
 	  "rgb:colorpicker,rgb hsv";
 	  
