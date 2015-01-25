@@ -132,20 +132,20 @@ width:667px;
 
 /* iPhone 6+(portrait) ----------- */
 @media only screen
-and (min-device-width : 540px) 
-and (max-device-width : 960px)
+and (min-device-width : 414px) 
+and (max-device-width : 736px)
 and (orientation : portrait) {
 body {
-width:540px;
+width:414px;
 }
 }
 /* iPhone 6+(landscape) ----------- */
 @media only screen
-and (min-device-width : 540px) 
-and (max-device-width : 960px)
+and (min-device-width : 414px) 
+and (max-device-width : 736px)
 and (orientation : landscape) {
 body {
-width:960px;
+width:736px;
 }
 }
 
@@ -304,7 +304,7 @@ background-color:#4b6dab;
 .changed a, 
 .changed { color:#008700; }
 
-table.room .changed svg {
+table.room .changedicon svg {
 
 background: #02a202; /* Old browsers */
 background: 
