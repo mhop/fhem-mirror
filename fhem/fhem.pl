@@ -4081,7 +4081,7 @@ addStructChange($$$)
   return if(!$init_done);
 
   my ($cmd, $dev, $param) = @_;
-  return if(!$defs{$dev} || $defs{$dev}{TEMPORARY});
+  return if(!$defs{$dev} || $defs{$dev}{TEMPORARY} || $defs{$dev}{VOLATILE});
 
   $lastDefChange++;
   shift @structChangeHist if(@structChangeHist > 9);
