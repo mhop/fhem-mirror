@@ -4,6 +4,7 @@ var svg_b64 ="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 var svg_initialized={};
 
 
+
 // Base64 encode the xy points (12 bit x, 12 bit y).
 function
 svg_compressPoints(pointList)
@@ -177,6 +178,8 @@ sv_menu(evt, embed)
 
     }, embed);
 
+  function pad0(v) { return (v < 10 ? '0'+v  :v); }
+
   function
   mousemove(e)
   {
@@ -195,9 +198,14 @@ sv_menu(evt, embed)
 
     var y = (((par.y_h-yRaw)/par.y_mul)+par.y_min).toFixed(par.decimals);
 
-    var d = new Date((((xRaw-par.x_min)/par.x_mul)+par.x_off) * 1000);
-    var ts = (d.getHours() < 10 ? '0' : '') + d.getHours() + ":"+
-             (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+    var d = new Date((((xRaw-par.x_min)/par.x_mul)+par.x_off) * 1000), ts;
+    if(par.x_mul < 0.0001) {           // Year
+      ts = (d.getMonth()+1)+"."+pad0(d.getDate());
+    } else if(par.x_mul < 0.001) {     // Month
+      ts = d.getDate()+". "+pad0(d.getHours())+":"+pad0(d.getMinutes());
+    } else {
+      ts = pad0(d.getHours())+":"+pad0(d.getMinutes());
+    }
 
     $(par.circle).attr("cx", xRaw).attr("cy", yRaw);
     var yd = Math.floor((yRaw+par.divoffY) / 20)*20;
