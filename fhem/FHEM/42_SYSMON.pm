@@ -34,6 +34,9 @@ use Blocking;
 
 use Data::Dumper;
 
+my $missingModulRemote;
+eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
+
 my $VERSION = "1.9.5.0";
 
 use constant {
@@ -711,11 +714,21 @@ sub SYSMON_blockingCall($) {
 	
 	# Device-Name mitnehmen
   my $ret = "name|".$name;
+  
+  my $msg = $hash->{helper}{error_msg};
+	if($msg) {
+		# Problem mit der Verbindung
+		return $ret."|error|".$msg;
+	}
+
   # to String
   foreach my $aName (keys %{$map}) {
     my $value = $map->{$aName};
     # Nur wenn ein gueltiges Value vorliegt
     if(defined $value) {
+    	# Zeichen maskieren
+    	$value=~s/#/§²§/g;
+    	$value=~s/\|/§³§/g;
     	$ret.="|".$aName."|".$value;
     }
   }
@@ -746,6 +759,7 @@ sub SYSMON_test() {
     my $value = $map->{$aName};
     # Nur wenn ein gueltiges Value vorliegt
     if(defined $value) {
+    	$value=~s/#/§²§/g;
     	$ret.="|".$aName."|".$value;
     }
   }
@@ -761,9 +775,9 @@ sub SYSMON_test() {
 
 sub SYSMON_blockingAbort($) {
 	my ($hash) = @_;
-	SYSMON_Log($hash, 5, "");
-	$hash->{STATE} = "Error";
 	delete($hash->{helper}{READOUT_RUNNING_PID});
+	SYSMON_Log($hash, 5, "");
+	$hash->{STATE} = "Error: Blocking call aborted (timeout)";
 }
 
 sub SYSMON_blockingFinish($) {
@@ -779,12 +793,20 @@ sub SYSMON_blockingFinish($) {
 	delete $map->{name};
 	
 	my $hash = $main::defs{$name};
+	delete($hash->{helper}{READOUT_RUNNING_PID});
+	
 	SYSMON_Log($hash, 5, $map_str);
 	# Mark setzen 
   if(!$hash->{helper}{u_first_mark}) {
 	  $hash->{helper}{u_first_mark} = 1;
 	}
-	delete($hash->{helper}{READOUT_RUNNING_PID});
+	
+	my $msg = $map->{error};
+	if($msg) {
+		# Im Fehlerfall State ebtsprechend setzen und nichts aktualisieren.
+		$hash->{STATE} = "Error: ".$msg;
+		return;
+	}
 	
 	SYSMON_updateReadings($hash,$map);
 	$hash->{STATE} = "Active";
@@ -801,6 +823,9 @@ sub SYSMON_updateReadings($$) {
     my $value = $map->{$aName};
     # Nur aktualisieren, wenn ein gueltiges Value vorliegt
     if(defined $value) {
+    	# Maskierte Zeichen zuruechersetzen
+    	$value=~s/§²§/#/g;
+    	$value=~s/§³§/\|/g;
       readingsBulkUpdate($hash,$aName,$value);
     }
   }
@@ -1010,11 +1035,18 @@ SYSMON_obtainParameters($$)
 	     	   my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
 	     	   if($update_ud) {
 	     	 	   $map = SYSMON_getUserDefined($hash, $map, $uName, $uCmd);
+	     	   } else {
+	     	     SYSMON_Log($hash, 5, "User-Defined Reading: [$uName][$uInterval][$uComment][$uCmd] out of refresh interval");
 	     	   }
 	       }
 	    }
     }
   }
+  
+  #TEST
+  #my $rt = "#";
+  #$rt=~s/#/[]/g;
+  #$map->{SYS_TEST}=$rt;
   
   # Aktuelle Werte in ShattenHash mergen
   my %hashT = %{$map};
@@ -1063,7 +1095,9 @@ SYSMON_getUserDefined($$$$)
 	
 	my $out_str = SYSMON_execute($hash, $uCmd);
   chomp $out_str;
+  #$out_str=~s/#/§²§/g;
 	$map->{$uName} = $out_str;
+	SYSMON_Log($hash, 5, "User-Defined Result: $uName='$out_str'");
 	
 	return $map;
 }
@@ -2766,8 +2800,269 @@ sub
 SYSMON_execute($$)
 {
 	my ($hash, $cmd) = @_;
-  return qx($cmd);
+	return SYSMON_Exec($hash, $cmd);
+  #return qx($cmd);
 }
+
+#------------------------------------------------------------------------------
+
+# Opens a Telnet Connection to an external Machine
+############################################
+sub SYSMON_Open_Connection($)
+{
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   my $msg;
+ 
+   my $mode = AttrVal( $name, 'mode', 'local');
+   if ($mode eq 'local') {
+     return undef;
+   }
+
+   if($missingModulRemote) {
+     $msg="Error: Perl modul ".$missingModulRemote."is missing on this system. Please install before using this modul.";
+     SYSMON_Log $hash, 3, $msg;
+     return $msg;
+   }
+
+   my $host = AttrVal( $name, "remote_host", undef );
+  
+   if(!defined $host) {
+     $msg="Error: no remote host provided";
+     SYSMON_Log $hash, 3, $msg;
+     return $msg unless defined $host;
+   }
+   my $port = AttrVal( $name, "remote_port", 23 );
+   my $pwd = AttrVal( $name, "remote_password", undef );
+   my $user = AttrVal( $name, "remote_user", "" );
+  #test
+  $pwd="dummy";
+  #test
+   my $before;
+   my $match;
+   
+   if(!defined($pwd)) {
+     my $pwdFile = AttrVal( $name, "pwdFile", undef);
+     if(defined($pwdFile)) {
+       SYSMON_Log $hash, 5, "Open password file '$pwdFile' to extract password";
+       if (open(IN, "<" . $pwdFile)) {
+         $pwd = <IN>;
+         close(IN);
+         SYSMON_Log $hash, 5, "Close password file";
+       } else {
+         $msg = "Error: Cannot open password file '$pwdFile': $!";
+         SYSMON_Log $hash, 2, $msg;
+         return $msg;
+       }
+     }
+   }
+   
+   if(!defined($pwd)) {
+     $msg="Error: no passwort provided";
+     SYSMON_Log $hash, 3, $msg;
+     return $msg unless defined $pwd;
+   }
+ 
+   SYSMON_Log $hash, 5, "Open Telnet connection to $host:$port";
+   my $timeout = AttrVal( $name, "telnetTimeOut", "10");
+   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
+   if (!$telnet) {
+      $msg = "Could not open telnet connection to $host:$port";
+      SYSMON_Log $hash, 2, $msg;
+      $telnet = undef;
+      $hash->{telnet}=$telnet;
+      return $msg;
+   }
+   $hash->{telnet}=$telnet;
+
+   SYSMON_Log $hash, 5, "Wait for user or password prompt.";
+   unless ( ($before,$match) = $telnet->waitfor('/(user|login|password): $/i') )
+   {
+      $msg = "Telnet error while waiting for user or password prompt: ".$telnet->errmsg;
+      SYSMON_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
+      return $msg;
+   }
+   if ( $match =~ /(user|login): / && $user eq "")
+   {
+      $msg = "Telnet login requires user name but attribute 'telnetUser' not defined";
+      SYSMON_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
+      return $msg;
+   }
+   elsif ( $match =~ /(user|login): /)
+   {
+      SYSMON_Log $hash, 5, "Entering user name";
+      $telnet->print( $user );
+
+      SYSMON_Log $hash, 5, "Wait for password prompt";
+      unless ($telnet->waitfor( '/password: $/i' ))
+      {
+         $msg = "Telnet error while waiting for password prompt: ".$telnet->errmsg;
+         SYSMON_Log $hash, 2, $msg;
+         $telnet->close;
+         $telnet = undef;
+         return $msg;
+      }
+   }
+   elsif ( $match eq "password: " && $user ne "")
+   {
+      SYSMON_Log $hash, 3, "Attribute 'remote_user' defined but telnet login did not prompt for user name.";
+   }
+
+   SYSMON_Log $hash, 5, "Entering password";
+   $telnet->print( $pwd );
+
+   SYSMON_Log $hash, 5, "Wait for command prompt";
+   unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
+   {
+      $msg = "Telnet error while waiting for command prompt: ".$telnet->errmsg;
+      SYSMON_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
+      return $msg;
+   }
+   elsif ( $match eq "Login failed.")
+   {
+      $msg = "Telnet error: Login failed. Wrong password.";
+      SYSMON_Log $hash, 2, $msg;
+      $telnet->close;
+      $telnet = undef;
+      return $msg;
+   }
+
+   return undef;
+} # end SYSMON_Open_Connection
+
+   
+# Closes a Telnet Connection to an external Machine
+############################################
+sub SYSMON_Close_Connection($)
+{
+   my ($hash) = @_;
+   
+   my $name = $hash->{NAME};
+   my $mode = AttrVal( $name, 'mode', 'local');
+   if ($mode eq 'local') {
+     return undef;
+   }
+   
+   my $telnet = $hash->{telnet};
+   if (defined $telnet)
+   {
+      SYSMON_Log $hash, 5, "Close Telnet connection";
+      $telnet->close;
+      $telnet = undef;
+      $hash->{telnet}=$telnet;
+   }
+   else
+   {
+      SYSMON_Log $hash, 1, "Cannot close an undefined Telnet connection";
+   }
+} # end SYSMON_Close_Connection
+
+# Executed the command on the remote Shell
+############################################
+sub SYSMON_Exec($$)
+{
+   my ($hash, $cmd) = @_;
+   my $openedTelnet = 0;
+   my $telnet = $hash->{telnet};
+   
+   #TODO: SSH
+   
+   my $name = $hash->{NAME};
+   my $mode = AttrVal( $name, 'mode', 'local');
+   if ($mode eq 'telnet') {
+      unless (defined $telnet)
+      {
+        my $msg = SYSMON_Open_Connection($hash);
+        $hash->{helper}{error_msg}=$msg;
+        if ($msg) {
+          return undef;
+        }
+        $openedTelnet = 1;
+        $hash->{helper}{error_msg}=undef;
+      }
+      my @retVal = SYSMON_Exec_Remote($hash, $cmd);
+      SYSMON_Close_Connection ( $hash ) if $openedTelnet;
+      # Arrays als solche zurueckgeben
+      if(scalar(@retVal)>1) {
+        SYSMON_Log ($hash, 5, "Result '".Dumper(@retVal)."'");
+        return @retVal;	
+      }
+      # Einzeiler als normale Scalars
+      my $line = @retVal[0];
+      chomp $line;
+      SYSMON_Log ($hash, 5, "Result '$line'");
+      return $line;
+      #return $retVal;
+   } else {
+      return SYSMON_Exec_Local($hash, $cmd);
+   }
+
+}
+
+# Executed the command via Telnet
+sub ############################################
+SYSMON_Exec_Remote($$)
+{
+   my ($hash, $cmd) = @_;
+   my @output;
+   my $result;
+
+   my $telnet = $hash->{telnet};
+
+   SYSMON_Log $hash, 5, "Execute '".$cmd."'";
+   @output=$telnet->cmd($cmd);
+   return @output;
+   ## Arrays als solche zurueckgeben
+   #if(scalar(@output)>1) {
+   #  SYSMON_Log ($hash, 5, "Result '".Dumper(@output)."'");
+   #  return @output;	
+   #}
+   ## Einzeiler als normale Scalars
+   #my $line = @output[0];
+   #chomp $line;
+   #SYSMON_Log ($hash, 5, "Result '$line'");
+   #return $line;
+   
+   #$result = $output[0];
+   ##chomp $result;
+   #my $log = join " ", @output;
+   #chomp $log;
+   #SYSMON_Log $hash, 5, "Result '$log'";
+   #return $result;
+}
+
+# Executed the command on the remote Shell
+sub ############################################
+SYSMON_Exec_Local($$)
+{
+   my ($hash, $cmd) = @_;
+   
+   SYSMON_Log $hash, 5, "Execute '".$cmd."'";
+   #return qx($cmd);
+   my @result = qx($cmd);
+   # Arrays als solche zurueckgeben
+   if(scalar(@result)>1) {
+     SYSMON_Log ($hash, 5, "Result '".Dumper(@result)."'");
+     return @result;	
+   }
+   # Einzeiler als normale Scalars
+   my $line = @result[0];
+   chomp $line;
+   SYSMON_Log ($hash, 5, "Result '$line'");
+   return $line;
+   
+   #chomp $result;
+   #SYSMON_Log ($hash, 5, "Result '$result'");
+   #return $result;
+}
+#------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
 # Uebersetzt Sekunden (Dauer) in Tage/Stunden/Minuten/Sekunden
