@@ -1,4 +1,4 @@
-# $Id: 23_KOSTALPIKO.pm 7127 2014-12-07 18:00:00Z john $
+# $Id: 23_KOSTALPIKO.pm 7726 2015-01-25 18:00:00Z john $
 ####################################################################################################
 #
 #	23_KOSTALPIKO.pm
@@ -36,6 +36,8 @@
 #                          adjusting KOSTALPIKO_Log
 #                          Inital Checkin to FHEM ; docu revised
 # 2014-09-08 john  V2.05 : support of battery option; developed by  jannik_78
+# 2014-12-22 john  V2.06 : checked HTML
+# 2015-01-25 john  V2.07 : adjusted argument agent for http-request of proplanta (thanks to framller)
 
 ####################################################################################################
 
@@ -288,7 +290,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "KOSTALPIKO";
-my $KOSTAL_VERSION = "2.05";
+my $KOSTAL_VERSION = "2.07";
 
 ########################################
 sub KOSTALPIKO_Log($$$)
@@ -858,10 +860,18 @@ sub KOSTALPIKO_GrHtmlAcquire($)
   return "" if ( !defined($URL) );
   return "" if ( $URL eq "" );
 
-  my $err_log  = "";
-  my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
-  my $header   = HTTP::Request->new( GET => $URL );
-  my $request  = HTTP::Request->new( 'GET', $URL, $header );
+  my $err_log = "";
+  # my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
+  my $agent = LWP::UserAgent->new(
+    env_proxy         => 1,
+    keep_alive        => 1,
+    protocols_allowed => ['http'],
+    timeout           => 10,
+    agent             => "Mozilla/5.0 (Windows NT 5.1) [de-DE,de;q=0.8,en-US;q=0.6,en;q=0.4]"
+  );
+  
+  my $header = HTTP::Request->new( GET => $URL );
+  my $request = HTTP::Request->new( 'GET', $URL, $header );
   my $response = $agent->request($request);
   $err_log = "Can't get $URL -- " . $response->status_line
     unless $response->is_success;
@@ -1044,134 +1054,169 @@ sub KOSTALPIKO_GrTimer($)
 =pod
 =begin html
 
-<a name="KOSTALPIKO"></a>
-<h3>KOSTALPIKO</h3>
-<ul>
-  <a name="KOSTALPIKOdefine"></a>
-  <b>Define</b>
-  <ul>
-    <br/>
-    <code>define &lt;name&gt; KOSTALPIKO &lt;ip-address&gt; &lt;user&gt; &lt;password&gt;</code>
-    <br/>
-    <br/>
-     The module reads the current values from web page of a Kostal Piko inverter.<br/>
-     It  can also be used, to capture the values of global radiation, UV-index and sunshine duration<br/>
-     from a special web-site (proplanta) regardless of the existence of the inverter.<br/>
-    <br/>
-    
-    <b>Parameters:</b><br/>
+
+  <a name="KOSTALPIKO" id="KOSTALPIKO"></a>
+
+  <h3>KOSTALPIKO</h3>
+
+  <div style="margin-left: 2em">
+    <a name="KOSTALPIKOdefine" id="KOSTALPIKOdefine"></a> <b>Define</b>
+
+    <div style="margin-left: 2em">
+      <br />
+      <code>define &lt;name&gt; KOSTALPIKO &lt;ip-address&gt; &lt;user&gt; &lt;password&gt;</code><br />
+      <br />
+      The module reads the current values from web page of a Kostal Piko inverter.<br />
+      It can also be used, to capture the values of global radiation, UV-index and sunshine duration<br />
+      from a special web-site (proplanta) regardless of the existence of the inverter.<br />
+      <br />
+      <b>Parameters:</b><br />
+
+      <ul>
+        <li><b>&lt;ip-address&gt;</b> - the ip address of the inverter</li>
+
+        <li><b>&lt;user&gt;</b> - the login-user for the inverter's web page</li>
+
+        <li><b>&lt;password&gt;</b> - the login-password for the inverter's web page</li>
+      </ul><br />
+      <br />
+      <b>Example:</b><br />
+
+      <div style="margin-left: 2em">
+        <code>define Kostal KOSTALPIKO 192.168.2.4 pvserver pvwr</code><br />
+      </div>
+    </div><br />
+    <a name="KOSTALPIKOset" id="KOSTALPIKOset"></a> <b>Set-Commands</b>
+
+    <div style="margin-left: 2em">
+      <br />
+      <code>set &lt;name&gt; captureGlobalRadiation</code><br />
+
+      <div style="margin-left: 2em">
+        The values for global radiation, UV-index and sunshine duration are immediately polled.
+      </div><br />
+      <br />
+      <code>set &lt;name&gt; captureKostalData</code><br />
+
+      <div style="margin-left: 2em">
+        All values of the inverter are immediately polled.
+      </div><br />
+    </div><a name="KOSTALPIKOattr" id="KOSTALPIKOattr"></a> <b>Attributes</b><br />
+    <br />
+
     <ul>
-    <li><b>&lt;ip-address&gt</b> - the ip address of the inverter</li>
-    <li><b>&lt;user&gt</b> - the login-user for the inverter's web page</li>
-    <li><b>&lt;password&gt</b> - the login-password for the inverter's web page</li>
-    </ul>
-        
-    <br/><br/>
-    <b>Example:</b><br/>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+
+      <li><b>BAEnable</b> - if 1, data from ../BA.fhtml site is captured</li>
+
+      <li><b>GR.Interval</b> - poll interval for global radiation in seconds</li>
+
+      <li><b>GR.Link</b> - regionalised link the to the proplanta web page (global radiation, UV-index and sunshine
+      duration)<br />
+      (see Wiki for further information)</li>
+
+      <li><b>delay</b> - poll interval for the values of the inverter in seconds</li>
+
+      <li>
+        <b>delayCounter</b> - delay counter for poll of invert's values beside AC.Power;<br />
+          needed for fast acquisition scenarios to limit the log-output.
+      </li>
+
+      <li><b>disable</b> - if disable=1, the poll of inverter's values is disabled,<br /> ut not the the poll of proplanta-values</li>
+    </ul><br />
+    <br />
+    <a name="KOSTALPIKOreading" id="KOSTALPIKOreading"></a> <b>Generated Readings/Events</b><br />
+    <br />
+
     <ul>
-      <code>define Kostal KOSTALPIKO 192.168.2.4 pvserver pvwr</code><br>
+      <li><b>AC.Power</b> - the current power, captured only if the internal delayCounter = 0</li>
+
+      <li><b>AC.Power.Fast</b> - the current power, on each poll cycle; used for fast acquisition scenarios</li>
+
+      <li><b>Daily.Energie</b> - the current procduced energie of the day</li>
+
+      <li><b>Daily.Energie.Last</b> - the value of daily energy at 23:00 clock</li>
+
+      <li><b>Global.Radiation</b> - the value of global radiation (proplanta);useful for determing the expected energy amount of the day</li>
+
+      <li><b>ModeNum</b> - the current processing state of the inverter (1=off 2=idle 3=active)</li>
+
+      <li><b>Mode</b> - the german term for the current ModeNum</li>
+
+      <li><b>Total.Energy</b> - the total produced energie</li>
+
+      <li><b>generator.1.current</b> - the electrical current at string 1</li>
+
+      <li><b>generator.2.current</b> - the electrical current at string 2</li>
+
+      <li><b>generator.3.current</b> - the electrical current at string 3</li>
+
+      <li><b>generator.1.voltage</b> - the voltage at string 1</li>
+
+      <li><b>generator.2.voltage</b> - the voltage at string 2</li>
+
+      <li><b>generator.3.voltage</b> - the voltage at string 3</li>
+
+      <li><b>output.1.voltage</b> - the voltage at output 1</li>
+
+      <li><b>output.2.voltage</b> - the voltage at output 2</li>
+
+      <li><b>output.3.voltage</b> - the voltage at output 3</li>
+
+      <li><b>output.1.power</b> - the power at output 1</li>
+
+      <li><b>output.2.power</b> - the power at output 2</li>
+
+      <li><b>output.3.power</b> - the power at output 3</li>
+
+      <li><b>sensor.1</b> - the voltage at analog input 1</li>
+
+      <li><b>sensor.2</b> - the voltage at analog input 2</li>
+
+      <li><b>sensor.3</b> - the voltage at analog input 3</li>
+
+      <li><b>sensor.4</b> - the voltage at analog input 4</li>
+
+      <li><b>UV.Index</b> - the UV Index (proplanta)</li>
+
+      <li><b>sunshine.duration</b> - the sunshine duration (proplanta)</li>
+    </ul><br />
+    <b>Additional Readings/Events, if BAEnable=1</b><br />
+    <br />
+
+    <ul>
+      <li><b>Battery.CycleCount</b> - count of charge cycles</li>
+
+      <li><b>Battery.StateOfCharge</b> - State of charge for the battery in percent</li>
+
+      <li><b>Battery.Voltage</b> - the voltage of the battery</li>
+
+      <li><b>Battery.ChargeCurrent</b> - the charge current of the battery</li>
+
+      <li><b>Battery.Temperature</b> - the temperature of the battery</li>
+
+      <li><b>Power.Solar</b> - the sum of the power produced by the solarinverter</li>
+
+      <li><b>Power.Battery</b> - the power drawn from the battery</li>
+
+      <li><b>Power.Net</b> - the power drawn from the main</li>
+
+      <li><b>Power.Phase1</b> - the power used on phase L1</li>
+
+      <li><b>Power.Phase2</b> - the power used on phase L2</li>
+
+      <li><b>Power.Phase3</b> - the power used on phase L3</li>
+    </ul><br />
+    <br />
+    <b>Additional information</b><br />
+    <br />
+
+    <ul>
+      <li><a href="http://forum.fhem.de/index.php/topic,24409.msg175253.html#msg175253">Discussion in FHEM forum</a></li>
+      <li><a href="http://www.fhemwiki.de/wiki/KostalPiko#FHEM-Modul">Information in FHEM Wiki</a></li>
     </ul>
-  </ul>
-  <br>
-  
-  <a name="KOSTALPIKOset"></a>
-  <b>Set-Commands</b>
-  <ul>
-     
-     <br/>
-     <code>set &lt;name&gt; captureGlobalRadiation</code>
-   	 <br/>
-   	 <ul>
-          The values for global radiation, UV-index and sunshine duration are immediately polled.
-     </ul><br/>
-       
-     <br/>
-   	 <code>set &lt;name&gt; captureKostalData</code>
-   	 <br/>
-   	 <ul>
-          All values of the inverter are immediately polled.
-     </ul><br/>     
-  </ul>  
-  
-    <a name="KOSTALPIKOattr"></a>
-	<b>Attributes</b><br/><br/>
-	<ul>
-		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-		<br/>
-		<li><b>BAEnable</b> - if 1, data from ../BA.fhtml site is captured</li>
-		<li><b>GR.Interval</b> - poll interval for global radiation in seconds</li>
-		<li><b>GR.Link</b> - regionalised link the to the proplanta web page (global radiation, UV-index and sunshine duration)<br/>
-		(see Wiki for further information)
-		</li>
-		<li><b>delay</b> - poll interval for the values of the inverter in seconds</li>
-		<li><b>delayCounter</b> - delay counter for poll of invert's values beside AC.Power; <br/>
-		            needed for fast acquisition scenarios to limit the log-output. </li>
-		<li><b>disable</b> - if disable=1, the poll of inverter's values is disabled,<br/>
-		 but not the the poll of proplanta-values </li>
-	</ul>
-	<br/><br/>
-	
-    <a name="KOSTALPIKOreading"></a>
-	<b>Generated Readings/Events</b><br/><br/>
-	<ul>
-		<li><b>AC.Power</b> - the current power, captured only if the internal delayCounter = 0</li>
-		<li><b>AC.Power.Fast</b> - the current power, on each poll cycle; used for fast acquisition scenarios </li>
-		<li><b>Daily.Energie</b> - the current procduced energie of the day </li>
-		<li><b>Daily.Energie.Last</b> - the value of daily energy at 23:00 clock</li>
-		<li><b>Global.Radiation</b> - the value of global radiation (proplanta);useful for determing the expected energy amount of the day</li>
-		<li><b>ModeNum</b> - the current processing state of the inverter (1=off 2=idle 3=active)</li>
-		<li><b>Mode</b> - the german term for the current ModeNum</li>
-		<li><b>Total.Energy</b> - the total produced energie</li>
-		
-		<li><b>generator.1.current</b> - the electrical current at string 1 </li>
-		<li><b>generator.2.current</b> - the electrical current at string 2 </li>
-		<li><b>generator.3.current</b> - the electrical current at string 3 </li>
-		<li><b>generator.1.voltage</b> - the voltage at string 1 </li>
-		<li><b>generator.2.voltage</b> - the voltage at string 2 </li>
-		<li><b>generator.3.voltage</b> - the voltage at string 3 </li>
-		
-		<li><b>output.1.voltage</b> - the voltage at output 1 </li>
-		<li><b>output.2.voltage</b> - the voltage at output 2 </li>
-		<li><b>output.3.voltage</b> - the voltage at output 3 </li>
-		<li><b>output.1.power</b> - the power at output 1 </li>
-		<li><b>output.2.power</b> - the power at output 2 </li>
-		<li><b>output.3.power</b> - the power at output 3 </li>
+  </div>
 
-		<li><b>sensor.1</b> - the voltage at analog input 1 </li>
-		<li><b>sensor.2</b> - the voltage at analog input 2 </li>
-		<li><b>sensor.3</b> - the voltage at analog input 3 </li>
-		<li><b>sensor.4</b> - the voltage at analog input 4 </li>
-
-		<li><b>UV.Index</b> - the UV Index (proplanta) </li>
-		<li><b>sunshine.duration</b> - the sunshine duration (proplanta) </li>
-	</ul>
-	
-	<br/><b>Additional Readings/Events, if BAEnable=1</b><br/><br/>
-	<ul>
-		<li><b>Battery.CycleCount</b> - count of charge cycles </li>
-		<li><b>Battery.StateOfCharge</b> - State of charge for the battery in percent </li>
-		<li><b>Battery.Voltage</b> - the voltage of the battery </li>
-		<li><b>Battery.ChargeCurrent</b> - the charge current of the battery </li>
-		<li><b>Battery.Temperature</b> - the temperature of the battery </li>
-		<li><b>Power.Solar</b> - the sum of the power produced by the solarinverter </li>
-		<li><b>Power.Battery</b> - the power drawn from the battery </li>
-		<li><b>Power.Net</b> - the power drawn from the main </li>
-		<li><b>Power.Phase1</b> - the power used on phase L1 </li>
-		<li><b>Power.Phase2</b> - the power used on phase L2 </li>
-		<li><b>Power.Phase3</b> - the power used on phase L3 </li>
-	
-	</ul>
-
-
-	<br/><br/>	
-	
-  <b>Additional information</b><br/><br/>
-  <ul>
-	<li><a href="http://forum.fhem.de/index.php/topic,24409.msg175253.html#msg175253">Discussion in FHEM forum</a></li><br/>
-	<li><a href="http://www.fhemwiki.de/wiki/KostalPiko#FHEM-Modul">Information in FHEM Wiki</a></li><br/>
-  </ul>	
-
-</ul>
 
 =end html
 =cut
