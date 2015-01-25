@@ -3101,6 +3101,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
             <b>lightMode</b> - reduces regular queries (resulting in less functionality), e.g. for low performance devices. (true/false)
           </li>
           <li>
+            <b>macaddr</b> - manually set specific MAC address for device; overwrites value from reading "lanmac". (true/false)
+          </li>
+          <li>
             <b>remotecontrol</b> - Explicitly set specific remote control unit format. This will only be considered for set-command <strong>remoteControl</strong> as of now.
           </li>
           <li>
