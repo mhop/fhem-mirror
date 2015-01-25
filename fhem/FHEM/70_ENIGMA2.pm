@@ -58,6 +58,8 @@ use IO::Socket;
 use HttpUtils;
 use Encode;
 
+no warnings 'experimental::lexical_topic';
+
 sub ENIGMA2_Set($@);
 sub ENIGMA2_Get($@);
 sub ENIGMA2_GetStatus($;$);
