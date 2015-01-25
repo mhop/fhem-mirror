@@ -1896,7 +1896,7 @@ SVG_render($$$$$$$$$;$$)
         }
 
         $ret .=  sprintf(" %d,%d", $x1, $y1) if ($lt ne "T");
-        $ret .=  sprintf(" %d,%d", int(($lx+$x1)/2+0.5), int(($ly+$y1)/2+0.5))
+        $ret .=  sprintf(" %.1f,%.1f", (($lx+$x1)/2.0), (($ly+$y1)/2.0))
                 if (($lt eq "T") && ($lx > -1));
         $lx = $x1; $ly = $y1;
       }
@@ -1905,7 +1905,7 @@ SVG_render($$$$$$$$$;$$)
       $ret = SVG_getControlPoints($ret) if (($lt eq "C") || ($lt eq "Q"));
   
       #-- insert last point for filled line
-      $ret .= sprintf(" %d,%d", $x1, $y+$h) if(($lt eq "T") && defined($x1));
+      $ret .= sprintf(" %.1f,%.1f", $x1, $y1) if(($lt eq "T") && defined($x1));
       $ret .= sprintf(" L %d,%d Z", $x1, $y+$h) if($doClose && defined($x1));
 
       if($ret =~ m/^ (\d+),(\d+)/) { # just points, no M/L
