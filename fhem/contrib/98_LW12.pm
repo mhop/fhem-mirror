@@ -40,7 +40,7 @@ package main;
 use strict;
 use warnings;
 use feature qw/say switch/;
-
+ 
 use IO::Socket;
 # include this for the self-calling timer we use later on
 use Time::HiRes qw(gettimeofday);
@@ -144,7 +144,7 @@ sub LW12_Set( $@ ) {
 	}
  
   my $cmdList = "" . 
-	  "on off next:noArg prev:noArg animation mode speed run:noArg stop:noArg " . 
+	  "on off next:noArg prev:noArg animation mode speed:slider,1,0,255 run:noArg stop:noArg " . 
 	  "color dim:slider,1,1,100 " . 
 	  "rgb:colorpicker,rgb hsv";
 	  
