@@ -347,7 +347,7 @@ sub XBMC_ResetMediaReadings($)
   readingsBulkUpdate($hash, "playlist", "" );
   readingsBulkUpdate($hash, "type", "" );
   readingsBulkUpdate($hash, "year", "" );
-  readingsBulkUpdate($hash, "is3DFile", "" );
+  readingsBulkUpdate($hash, "3dfile", "" );
   
   readingsBulkUpdate($hash, "currentAlbum", "" );
   readingsBulkUpdate($hash, "currentArtist", "" );
@@ -638,7 +638,7 @@ sub XBMC_CreateReading($$$) {
     $key = 'currentMedia';
     
     my $is3D = XBMC_is3DFile($hash, $value);
-    XBMC_CreateReading($hash, "is3DFile", $is3D ? "on" : "off");
+    XBMC_CreateReading($hash, "3dfile", $is3D ? "on" : "off");
   }
   elsif($key =~ /(album|artist|track|title)/) {
     $key = 'current' . ucfirst($key);
@@ -1509,6 +1509,7 @@ sub XBMC_HTTP_Request($$@)
   <li><b>videolibrary</b> - Possible values: cleanfinished, cleanstarted, remove, scanfinished, scanstarted, update</li>
   <li><b>volume</b> - value between 0 and 100 stating the current volume setting</li>
   <li><b>year</b> - year of the movie being played</li>
+  <li><b>3dfile</b> - is a 3D movie according to filename</li>
   </ul>
   <br><br>
   <u>Remarks on the events</u><br><br>
