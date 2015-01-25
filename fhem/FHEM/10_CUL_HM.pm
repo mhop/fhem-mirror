@@ -3909,8 +3909,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   }
   elsif($cmd eq "displayWM" ) { ###############################################
+    $state = "";
     # textNo color icon
-    #  "HM-Dis-WM5501"     =>{ displayWM      =>"[long|short|help] <lineX> <textNo1> <color1> <icon1> [<textNo2> <color2> <icon2>] ...[<textNo6> <color6> <icon6>] "},
     my %color=(white=>0,red=>1,orange=>2,yellow=>3,green=>4,blue=>5);
     my %icon=( off =>0, on=>1, open=>2, closed=>3, error=>4, ok=>5
               ,info=>6, newMsg=>7, serviceMsg=>8
@@ -4005,10 +4005,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         my $dh = $hash->{helper}{dispi}{$t}{"$l"};
         my (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$dh->{txt});
         $ch = sprintf("%02X",$ch);
-
+        my $rd =  ($dh->{txt}?"$dh->{txt} ":"- ")
+                 .($dh->{col}?"$dh->{col} ":"- ") 
+                 .($dh->{icn}?"$dh->{icn} ":"- ")
+                 ."->";
         readingsSingleUpdate($hash,"disp_${ts}_$l",
-                           "$dh->{txt} $dh->{col} $dh->{icn} ->"
-                                .ReadingsVal(InternalVal($devName,"channel_$ch","no")
+                           $rd.ReadingsVal(InternalVal($devName,"channel_$ch","no")
                                 ,"text$ln","unkown")
                            ,0);
         $msg .= sprintf("12%02X",$btn{$dh->{txt}  }+0x80)if ($dh->{txt});
