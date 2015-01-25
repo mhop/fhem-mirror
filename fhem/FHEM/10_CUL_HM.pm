@@ -3910,6 +3910,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "displayWM" ) { ###############################################
     # textNo color icon
+    #  "HM-Dis-WM5501"     =>{ displayWM      =>"[long|short|help] <lineX> <textNo1> <color1> <icon1> [<textNo2> <color2> <icon2>] ...[<textNo6> <color6> <icon6>] "},
     my %color=(white=>0,red=>1,orange=>2,yellow=>3,green=>4,blue=>5);
     my %icon=( off =>0, on=>1, open=>2, closed=>3, error=>4, ok=>5
               ,info=>6, newMsg=>7, serviceMsg=>8
@@ -3924,25 +3925,103 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
              );
     
     
-    my $msg = "800102";
     my $param = (scalar(@a)-2);
-    return "$a[2] not valid - choose short or long" if($a[2] !~ m/(short|long)/);
-    return "not enough parameter - always use txtNo, color and icon in a set"
-          if(($param-1) %3);
-    my @txtMsg;
-    for (my $cnt=3;$cnt<$param;$cnt+=3){
-      return "color wrong ".$a[$cnt+1]." use:".join(",",sort keys %color) if (!defined $color{$a[$cnt+1]});
-      return "icon wrong " .$a[$cnt+2]." use:".join(",",sort keys %icon)  if (!defined $icon {$a[$cnt+2]});
-      return "text wrong " .$a[$cnt+0]." use:".join(",",sort keys %btn)   if (!defined $btn  {$a[$cnt+0]});
-      $msg .= sprintf("12%02X11%02X",$btn{$a[$cnt+0]}+0x80,$color{$a[$cnt+1]}+0x80);
-      $msg .= sprintf("13%02X",$icon{$a[$cnt+2]}+0x80) if ($icon{$a[$cnt+2]} != 99 );
-      $msg .= ($cnt<$param-1)?"0A":"0A03";
-      push @txtMsg,$msg; 
-      $msg = "8001";
+    if ($a[2] eq "help"){
+      my $ret = "text :";
+      foreach (sort keys %btn){
+        my (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$_);
+        $ch = sprintf("%02X",$ch);
+        $ret .= "\n      $_ ->" 
+                  .ReadingsVal( InternalVal($devName,"channel_$ch","no")
+                                ,"text$ln","unkown");
+      }
+      $ret .= "\n      off nc(no change)"
+             ."\ncolor:".join(",",sort keys %color)
+             ."\n      nc(no change)"
+             ."\nicon :".join(",",sort keys %icon)
+             ;
+      return $ret;
     }
+
+    return "$a[2] not valid - choose short or long" if($a[2] !~ m/(short|long)/);
     my $type = $a[2] eq "short"?"s":"l";
-    delete $hash->{helper}{disp}{$type} if ($hash->{helper}{disp});
-    $hash->{helper}{disp}{$type} = \@txtMsg;
+    
+    if($a[3] =~ m/^line(.)$/){
+      my $lnNr = $1;
+      return "line number wrong - use 1..6" if($lnNr !~ m/[1-6]/);
+      return "please add a text " if(!$a[4]);
+      my $lnRd = "disp_$a[2]_l$lnNr";# reading assotiated with this entry
+      $hash->{helper}{dispi}{$type}{"l$_"}{d}=1 foreach (1,2,3,4,5,6);
+      my $dh = $hash->{helper}{dispi}{$type}{"l$lnNr"};
+      if ($a[4] eq "off"){ #no display in this line
+        delete $dh->{txt};
+      }
+      else{ # new text
+        return "text wrong $a[4] use:".join(",",sort keys %btn)   if (!defined $btn{$a[4]});
+        $dh->{txt}=$a[4];
+      }
+
+      if($a[5]){ # set new color
+        if($a[5] eq "off"){ # set new color
+          delete $dh->{col};
+        }
+        elsif($a[5] ne "nc"){ # set new color
+          return "color wrong $a[5] use:".join(",",sort keys %color) if (!defined $color{$a[5]});
+          $dh->{col}=$a[5];
+        }
+      }
+
+      if($a[6]){ # new icon
+        if($a[6] eq "noIcon"){ # new icon
+          delete $dh->{icn};
+        }
+        elsif($a[6] ne "nc"){ # new icon
+          return "icon wrong $a[6] use:".join(",",sort keys %icon)  if (!defined $icon {$a[6]});
+          $dh->{icn}=$a[6];
+        }
+      }
+    }
+    else{
+      return "not enough parameter - always use txtNo, color and icon in a set"
+            if(($param-1) %3);
+      for (my $cnt=3;$cnt<$param;$cnt+=3){
+        my $lnNr = int($cnt/3);
+        $hash->{helper}{dispi}{$type}{"l$lnNr"}{d}=1;#define this hash
+        my $dh = $hash->{helper}{dispi}{$type}{"l$lnNr"};
+        return "color wrong ".$a[$cnt+1]." use:".join(",",sort keys %color) if (!defined $color{$a[$cnt+1]});
+        return "icon wrong " .$a[$cnt+2]." use:".join(",",sort keys %icon)  if (!defined $icon {$a[$cnt+2]});
+        return "text wrong " .$a[$cnt+0]." use:".join(",",sort keys %btn)   if (!defined $btn  {$a[$cnt+0]});
+        $dh->{txt} = $a[$cnt+0];
+        $dh->{col} = $a[$cnt+1];
+        $dh->{icn} = $a[$cnt+2];
+        delete $dh->{icn} if ($a[$cnt+2] ne "noIcon");
+      }
+    }
+    foreach my $t (keys %{$hash->{helper}{dispi}}){ # prepare the messages
+      my $ts = $t eq "s"?"short":"long";
+      my @txtMsg;
+      my $msg = "800102";
+      foreach my $l (sort keys %{$hash->{helper}{dispi}{$t}}){
+        my $dh = $hash->{helper}{dispi}{$t}{"$l"};
+        my (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$dh->{txt});
+        $ch = sprintf("%02X",$ch);
+
+        readingsSingleUpdate($hash,"disp_${ts}_$l",
+                           "$dh->{txt} $dh->{col} $dh->{icn} ->"
+                                .ReadingsVal(InternalVal($devName,"channel_$ch","no")
+                                ,"text$ln","unkown")
+                           ,0);
+        $msg .= sprintf("12%02X",$btn{$dh->{txt}  }+0x80)if ($dh->{txt});
+        $msg .= sprintf("11%02X",$color{$dh->{col}}+0x80)if ($dh->{col});
+        $msg .= sprintf("13%02X",$icon{$dh->{icn} }+0x80)if ($dh->{icn});
+        $msg .= "0A";# end of line indicator
+        push @txtMsg,$msg; 
+        $msg = "8001";
+      }
+      $txtMsg[scalar(@txtMsg)-1] .= "03" if(scalar(@txtMsg));# add end of message indicator
+      delete $hash->{helper}{disp}{$t} if ($hash->{helper}{disp});
+      $hash->{helper}{disp}{$t} = \@txtMsg;
+    }
   }
 
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
@@ -8174,13 +8253,24 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     </li>
     <li>HM-Dis-WM55
       <ul>
-      <li><B>displayWM &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;
-         </B><br>
+      <li><B>displayWM help </B>
+         <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B>
+         <B>displayWM [long|short] &lt;lineX&gt; &lt;text&gt; &lt;color&gt; &lt;icon&gt;</B>
+         <br>
          up to 6 lines can be addressed.<br>
-         <B>textNo</B> is the text to be dispalyed in line No. The text is asotiated with the text defined for the buttons.
-         txt&lt;BtnNo&gt;_&lt;lineNo&gt; references the button 1 to 10 and their lines 1 or 2<br>
-         <B>color</B> is one white,red, orange,yellow,green,blue<br>
-         <B>icon</B> is one off,on,open,closed,error,ok,noIcon<br>
+         <B>lineX</B> line number that shall be changed. If this is set the 3 parameter of a line can be adapted. <br>
+         <B>textNo</B> is the text to be dispalyed in line No. The text is assotiated with the text defined for the buttons.
+         txt&lt;BtnNo&gt;_&lt;lineNo&gt; references channel 1 to 10 and their lines 1 or 2<br>
+         <B>color</B> is one white, red, orange, yellow, green, blue<br>
+         <B>icon</B> is one off, on, open, closed, error, ok, noIcon<br>
+         Example:
+           <ul><code>
+           set disp01 displayWM short txt02_2 green noIcon txt10_1 red error txt05_2 yellow closed txt02_2 orange open <br>
+           set disp01 displayWM long line3 txt02_2 green noIcon<br>
+           set disp01 displayWM long line2 nc yellow noIcon<br>
+           set disp01 displayWM long line6 txt02_2<br>
+           set disp01 displayWM long line1 nc nc closed<br>
+           </ul></code>
          </li>
       </ul><br>
     </li>
@@ -9436,14 +9526,26 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         </li>
         <li>HM-Dis-WM55
           <ul>
-            <li><B>displayWM &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;
-            </B><br>
-             bis zu 6 Zeilen können addresiert werden. <br>
-             <B>textNo</B> ist der anzuzeigende Text. Der Inhalt des Texts wird in den Buttonds definiert. 
-             txt&lt;BtnNo&gt;_&lt;lineNo&gt; referenziert den Button und dessn jeweiligen Zeile<br>
-             <B>color</B> kann sein white,red, orange,yellow,green,blue<br>
-             <B>icon</B> kann sein off,on,open,closed,error,ok,noIcon<br>
-             </li>
+            <li><B>displayWM help </B>
+               <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B>
+               <B>displayWM [long|short] &lt;lineX&gt; &lt;text&gt; &lt;color&gt; &lt;icon&gt;</B>
+               <br>
+               es können bis zu 6 Zeilen programmiert werden.<br>
+               <B>lineX</B> legt die zu ändernde Zeilennummer fest. Es können die 3 Parameter der Zeile geändert werden.<br>
+               <B>textNo</B> ist der anzuzeigende Text. Der Inhalt des Texts wird in den Buttonds definiert. 
+               txt&lt;BtnNo&gt;_&lt;lineNo&gt; referenziert den Button und dessn jeweiligen Zeile<br>
+               <B>color</B> kann sein white, red, orange, yellow, green, blue<br>
+               <B>icon</B> kann sein off, on, open, closed, error, ok, noIcon<br>
+            
+               Example:
+                 <ul><code>
+                 set disp01 displayWM short txt02_2 green noIcon txt10_1 red error txt05_2 yellow closed txt02_2 orange open <br>
+                 set disp01 displayWM long line3 txt02_2 green noIcon<br>
+                 set disp01 displayWM long line2 nc yellow noIcon<br>
+                 set disp01 displayWM long line6 txt02_2<br>
+                 set disp01 displayWM long line1 nc nc closed<br>
+                 </ul></code>
+               </li>
           </ul><br>
         </li>
 

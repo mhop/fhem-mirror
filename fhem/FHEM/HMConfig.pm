@@ -1573,7 +1573,7 @@ $culHmModelSets{"HM-Dis-WM55"}         = $culHmModelSets{"HM-PB-4DIS-WM"};
                          ,statusRequest  =>""},
   "HM-CC-RT-DN06"     =>{ press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."
                          },
-  "HM-Dis-WM5501"     =>{ displayWM      =>"[long|short] <textNo1> <color1> <icon1> [<textNo2> <color2> <icon2>] ...[<textNo6> <color6> <icon6>] "},
+  "HM-Dis-WM5501"     =>{ displayWM      =>"[long|short|help] <lineX> <textNo1> <color1> <icon1> [<textNo2> <color2> <icon2>] ...[<textNo6> <color6> <icon6>] "},
   "CCU-FHEM00"        =>{ update       =>"",
                           hmPairForSec =>"<sec>",
                           hmPairSerial =>"<serial>",
