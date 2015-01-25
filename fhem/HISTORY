@@ -538,7 +538,7 @@
   - Added new module "WWO"
   
 - Mon Jan 13 2014 (A. Schulz alias hexenmeister)
-  - Added new module "SYSMON"
+  - Added new module "SYSMON" to provide some (Linux) system parameters
 
 - Fri Jan 16 2014 (andreas-fey)
   - Added new module "pilight"
@@ -598,6 +598,9 @@
 
 - Tue Sep 23 2014 (eisler)
   - added new module 44_TEK603 to support the TEK603 Eco Monitor
+
+- Tue Dec 16 2014 (hexenmeister)
+  - added new module 42_SMARTMON to support use of smartctl in FHEM
  
 - Wed Dec 17 2014 (Reinerlein)
   - added new module 00_SONOS and 21_SONOSPLAYER to support the Sonos Multiroom Audiosystem
