@@ -505,6 +505,54 @@ Ger&auml;t dokumentiert.
         "reading" auch in event-on-change-reading aufgelistet ist.</li>
     </ol>
 
+    <a name="event-aggregator"></a>
+    <li>event-aggregator</li>
+    The primary uses of this attribute are to calculate (time-weighted) averages of 
+    readings over time periods and to throttle the update rate of readings and thus 
+    the amount of data written to the logs.<p>
+
+    This attribute takes a comma-separated list of <code>reading:interval:method:function</code>
+    quadruples. You may use regular expressions for <code>reading</code>. If set, updates for the 
+    listed readings are ignored and associated events are suppressed for a black-out period of at 
+    least <code>interval</code> seconds.  After the black-out period has expired, the reading is 
+    updated with a value that is calculated from the values and timestamps of the previously ignored 
+    updates within the black-out period as follows: 
+    
+    <table>
+    <tr><th>function</th><th>description</th></tr>
+    <tr><td>v</td><td>the last value encountered</td></tr>
+    <tr><td>v0</td><td>the first value encountered</td></tr>
+    <tr><td>min</td><td>the smallest value encountered</td></tr>
+    <tr><td>max</td><td>the largest value encountered</td></tr>
+    <tr><td>mean</td><td>the arithmetic mean of all values</td></tr>
+    <tr><td>sd</td><td>the standard deviation from the mean</td></tr>
+    </table>
+    <p>
+
+    If <code>method</code> is <code>none</code>, then that's all there is. If <code>method</code> 
+    is <code>const</code> or <code>linear</code>, the time-weighted series of values is taken into 
+    account instead. The weight is the timespan between two subsequent updates. 
+    With the <code>const</code> method, the value is the value of the reading at the beginning of 
+    the timespan; with the <code>linear</code> method, the value is the arithmetic average of 
+    the values at the beginning and the end of the timespan. 
+    Rollovers of black-out periods are handled as one would expect it.<p>
+
+    One would typically use the <code>linear</code> method with the <code>mean</code> function for 
+    quantities continuously varying over time like electric power consumption, temperature or speed. 
+    For cumulative quantities like energy consumed, rain fallen or distance covered, 
+    the <code>none</code> method with the <code>v</code> function is used. The <code>constant</code> 
+    method is for discrete quantities that stay constant until the corresponding reading is updated, 
+    e.g. counters, switches and the like.<p>
+
+    The event aggregator only takes into consideration those updates that remain after preprocessing 
+    according to the <code>event-on-update-reading</code> and <code>event-on-change-reading</code> 
+    directives. Besides which, any update of a reading that occurs within a timespan from the preceding 
+    update that is smaller than the resolution of FHEM's time granularity is ditched.<p>
+
+    Example:<br>
+    <code>attr myPowerMeter event-aggregator EP_POWER_METER:300:linear:mean,EP_ENERGY_METER:300:none:v</code>
+    </li>
+    
     <a name="event-min-interval"></a>
     <li>event-min-interval<br>
     Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
