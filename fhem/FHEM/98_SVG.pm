@@ -368,7 +368,8 @@ SVG_PEdit($$$$)
   push @revIdx,int(@revIdx);
   push @srcHtml, $srcHtml[0];
   push @paramHtml, $paramHtml[0];
-  push @exampleHtml, $exampleHtml[0];
+  push @exampleHtml, "Set the label and 'Write .gplot file' first in order to ".
+                     "get example data and correct parameter choice";
 
   my @lineStyles;
   if(SVG_openFile($FW_cssdir,
