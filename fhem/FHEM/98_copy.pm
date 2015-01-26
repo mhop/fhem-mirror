@@ -32,7 +32,13 @@ CommandCopy($$)
   my $ret = CommandDefine($hash, $cmd );
   return $ret if( $ret );
 
+  my $a = 'userattr';
+  if( $attr{$args[0]} && $attr{$args[0]}{$a} ) {
+    CommandAttr($hash, "$args[1] $a $attr{$args[0]}{$a}");
+  }
+
   foreach my $a (keys %{$attr{$args[0]}}) {
+    next if( $a eq 'userattr' );
     CommandAttr($hash, "$args[1] $a $attr{$args[0]}{$a}");
   }
 }
