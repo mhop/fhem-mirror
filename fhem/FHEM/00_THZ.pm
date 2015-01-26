@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 01/2015
-my $thzversion = "0.127";
+my $thzversion = "0.128";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -300,16 +300,32 @@ my %getsonly539 = (  #info from belu and godmorgon
 %getsonly539=(%getsonly539, %getsonly439);
 
 my %getsonly206 = (
-	"sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
+  	"pFan"				=> {cmd2=>"01", type =>"01pxx206", unit =>""},
+	"pExpert"			=> {cmd2=>"02", type =>"02pxx206", unit =>""},
+	"pDefrostEva"			=> {cmd2=>"03", type =>"03pxx206", unit =>""},
+	"pDefrostAA"			=> {cmd2=>"04", type =>"04pxx206", unit =>""},
+	"pHeat1"			=> {cmd2=>"05", type =>"05pxx206", unit =>""},
+	"pHeat2"			=> {cmd2=>"06", type =>"06pxx206", unit =>""},
+	"pDHW"				=> {cmd2=>"07", type =>"07pxx206", unit =>""},
+	"pSolar"			=> {cmd2=>"08", type =>"08pxx206", unit =>""},
+	"pCircPump"			=> {cmd2=>"0A", type =>"0Apxx206", unit =>""},
+	"pHeatProg"			=> {cmd2=>"0B", type =>"0Bpxx206", unit =>""},
+	"pDHWProg"			=> {cmd2=>"0C", type =>"0Cpxx206", unit =>""},
+	"pFanProg"   			=> {cmd2=>"0D", type =>"0Dpxx206", unit =>""},
+	"pRestart"			=> {cmd2=>"0E", type =>"0Epxx206", unit =>""},
+	"pAbsence"			=> {cmd2=>"0F", type =>"0Fpxx206", unit =>""},
+	"pDryHeat"			=> {cmd2=>"10", type =>"10pxx206", unit =>""},
+	"sSol"				=> {cmd2=>"16", type =>"16sol",    unit =>""},
 	"p01-p12"			=> {cmd2=>"17", type =>"17pxx206", unit =>""},
-	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
-	"sHC1"				=> {cmd2=>"F4", type =>"F4hc1", unit =>""},
-	"sHC2"				=> {cmd2=>"F5", type =>"F5hc2", unit =>""},
+	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw",    unit =>""},
+	"sHC1"				=> {cmd2=>"F4", type =>"F4hc1",    unit =>""},
+	"sHC2"				=> {cmd2=>"F5", type =>"F5hc2",    unit =>""},
+	"sSystem"			=> {cmd2=>"F6", type =>"F6sys206", unit =>""},
 	"sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
 	"sLast10errors"			=> {cmd2=>"D1", type =>"D1last206", unit =>""},
         "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  #allFB
         "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
-        "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm", unit =>""},
+        "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
 	"sFirmware-Id" 			=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
  );
 
@@ -702,34 +718,35 @@ sub THZ_Get($@){
 #
 ########################################################################################
 sub THZ_Get_Comunication($$) {
-my ($hash, $cmdHex) = @_;
-my ($err, $msg) =("", " ");
-
- Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
- if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
+  my ($hash, $cmdHex) = @_;
+  my ($err, $msg) =("", " ");
+  Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
+  if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
  
-  THZ_Write($hash,  "02"); 			# STX start of text
-  ($err, $msg) = THZ_ReadAnswer($hash);		#Expectedanswer1    is  "10"  DLE data link escape
+  THZ_Write($hash,  "02"); 			# step1 --> STX start of text 	
+  ($err, $msg) = THZ_ReadAnswer($hash);
+						#Expectedanswer1    is  "10"  DLE data link escape
   
-   if ($msg eq "10")  {
+  if ($msg eq "10") 	{
+     THZ_Write($hash,  $cmdHex); 		# step2 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
+     ($err, $msg) = THZ_ReadAnswer($hash);
+  }
+  elsif ($msg eq "15") 	{Log3 $hash->{NAME}, 3, "$hash->{NAME} NAK!!"; }
+  if ((defined($err)))  { $err= $err . " error found at step1";}
+						# Expectedanswer2     is "1002",		DLE data link escape -- STX start of text    
 
-      THZ_Write($hash,  $cmdHex); 		# send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
-     ($err, $msg) = THZ_ReadAnswer($hash);	#Expectedanswer2     is "1002",		DLE data link escape -- STX start of text
-    }
-    
-  if ($msg eq "10") {
-    ($err, $msg) = THZ_ReadAnswer($hash);
-  }        
-
-  if($msg eq "1002" || $msg eq "02") {
-   THZ_Write($hash,  "10"); 		    	# DLE data link escape  // ack datatranfer
-   #select(undef,undef,undef,0.010);
-   ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
-   THZ_Write($hash,  "10");  
-   }
+  if ($msg eq "10") 	{ ($err, $msg) = THZ_ReadAnswer($hash);}
+  elsif ($msg eq "15") 	{Log3 $hash->{NAME}, 3, "$hash->{NAME} NAK!!"; }
+  if ($msg eq "1002" || $msg eq "02") {
+    THZ_Write($hash,  "10"); 		    	# step3 --> DLE data link escape  // ack datatranfer
+    #select(undef,undef,undef,0.010);
+    ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
+    THZ_Write($hash,  "10");  
+  }
+  if ((defined($err)))  { $err= $err . " error found at step2";}
    
-   if (!(defined($err)))  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
-   return($err, $msg) ;
+  if (!(defined($err)))  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
+  return($err, $msg) ;
 }
 
 
@@ -1001,6 +1018,36 @@ local $SIG{__WARN__} = sub
 sub THZ_Parse1($$) {
 my %parsinghash = (
   #msgtype => parsingrule  
+  "01pxx206" => [["p37Fanstage1AirflowInlet: ", 4, 2, "hex", 1],	[" p38Fanstage2AirflowInlet: ", 6, 2, "hex", 1],	[" p39Fanstage3AirflowInlet: ", 8, 2, "hex", 1],
+		[" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],	[" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
+		[" p43UnschedVent3: ", 16, 4, "hex", 1],	[" p44UnschedVent2: ", 20, 4, "hex", 1],	[" p45UnschedVent1: ", 24, 4, "hex", 1],
+      		[" p46UnschedVent0: ", 28, 4, "hex", 1],	[" p75PassiveCooling: ", 32, 2, "hex", 1]
+	      	 ],
+  "05pxx206" => [["p13GradientHC1: ", 4, 4, "hex", 10],		[" p14LowEndHC1: ", 8, 4, "hex", 10],		[" p15RoomInfluenceHC1: ", 12, 2, "hex", 10],
+		[" p16GradientHC2: ", 14, 4, "hex", 10],	[" p17LowEndHC2: ", 18, 4, "hex", 10],		[" p18RoomInfluenceHC2: ", 22, 2, "hex", 10],
+		[" p19FlowProportionHC1: ", 24, 4, "hex", 10],	[" p20FlowProportionHC2: ", 28, 4, "hex", 10],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
+		[" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],	[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10], [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
+		 ],
+  "06pxx206" => [["p21Hist1: ", 4, 2, "hex", 10],		[" p22Hist2: ", 6, 2, "hex", 10],		  [" p23Hist3: ", 8, 2, "hex", 10],
+		[" p24Hist4: ", 10, 2, "hex", 10],		[" p25Hist5: ", 12, 2, "hex", 10],		  [" p26Hist6: ", 14, 2, "hex", 10],
+		[" p27Hist7: ", 16, 2, "hex", 10],		[" p28Hist8: ", 18, 2, "hex", 10],		  [" p29HistAsymmetry: ", 20, 2, "hex", 1],
+		[" p30integralComponent: ", 22, 4, "hex", 1],	[" p31MaxBoostStages: ", 26, 2, "hex", 1],	  [" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
+		[" p49SummerModeTemp: ", 32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10], [" p77OutTempAdjust: ", 40, 4, "hex", 1],
+		[" p78DualModePoint: ", 44, 4, "hex", 10],	[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
+		 ],
+  "07pxx206" => [["p32HystDHW: ", 4, 2, "hex", 10],		[" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],	 [" p34TempLimitBoostDHW: ", 8, 4, "hex", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
+		[" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],	[" PasteurisationTemp: ", 16, 4, "hex", 10],	 [" MaxBoostStagesDHW: ", 20, 2, "hex", 1],
+		[" p84EnableDHWBuffer: ", 22, 2, "hex", 1]
+		 ],
+  "08pxx206" => [["p80EnableSolar: ", 4, 2, "hex", 1],		[" p81DiffTempSolarLoading: ", 6, 4, "hex", 10], [" p82DelayCompStartSolar: ", 10, 2, "hex", 1],
+		[" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	[" HystDiffTempSolar: ", 16, 4, "hex", 1],	 [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
+		 ],
+  "0Apxx206" => [["p54MinPumpCycles: ", 4, 2, "hex", 1],	  [" p55MaxPumpCycles: ", 6, 4, "hex", 1],	 [" p56OutTempMaxPumpCycles: ", 10, 4, "hex", 10],
+		[" p57OutTempMinPumpCycles: ", 14, 4, "hex", 10], [" p58SuppressTempCaptPumpStart: ", 18, 4, "hex", 1]
+		 ],
+  "10pxx206" => [["p70StartDryHeat: ", 4, 2, "hex", 1],		[" p71BaseTemp: ", 6, 4, "hex", 10],	[" p72PeakTemp: ", 10, 4, "hex", 10],
+		[" p73TempDuration: ", 14, 4, "hex", 1],	[" p74TempIncrease: ", 18, 4, "hex", 10]
+		 ],
   "09his"  => [["compressorHeating: ",	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
 	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
 	      [" boosterHeating: ",	20, 4, "hex", 1]
@@ -1017,7 +1064,7 @@ my %parsinghash = (
   "17pxx206" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
 	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetDayTemp: ",		16, 4,  "hex", 10], 
 	      [" p05DHWsetNightTemp: ",	20, 4,  "hex", 10], 	[" p06DHWsetStandbyTemp: ",	24, 4,  "hex", 10], 
-	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 4,  "hex", 1],
+	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 2,  "hex", 1],
 	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	[" p10RoomTempManual: ",	34, 4,  "hex", 10],
 	      [" p11DHWsetManualTemp: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
 	     ],
@@ -1036,9 +1083,9 @@ my %parsinghash = (
   "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
 	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
 	      [" x20: ", 		20, 4, "hex2int", 1],	[" heat_block_time: ", 	24, 4, "hex2int", 1], 
-	      [" x28: ",		28, 4, "hex2int", 1],	[" x32: ",		32, 4, "hex2int", 1],
-	      [" x36: ",		36, 4, "hex", 1]
-	      ],
+	      [" BoosterStage: ",	28, 2, "hex", 1],	[" x30: ",		30, 4, "hex", 1],
+	      [" OpMode: ",		34, 2, "opmodehc", 1],	[" x36: ",		36, 4, "hex", 1]
+ 	      ],
   "F4hc1"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
 	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
 	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
@@ -1052,6 +1099,8 @@ my %parsinghash = (
 	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
 	      [" heatTemp: ", 		20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
 	      [" seasonMode: ",		30, 2, "somwinmode", 1],[" opMode: ",		36, 2, "opmodehc", 1]
+	     ],
+  "F6sys206" => [["LüfterstufeManuell: ", 30, 2, "hex", 1],	[" RestlaufzeitLüfter: ", 36, 4, "hex", 1]
 	     ],
   "FBglob" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
 	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
@@ -1090,9 +1139,9 @@ my %parsinghash = (
 	      [" outputVentilatorPower: ",	48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
 	      [" outputVentilatorSpeed: ",	56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
 	      [" outside_tempFiltered: ",	64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
-	      [" dewPoint: ",			82, 4, "n.a.", 1],
-	      [" P_Nd: ",			86, 4, "n.a.", 1],	[" P_Hd: ",			90, 4, "n.a.", 1],
-	      [" actualPower_Qc: ",		94, 8, "n.a.", 1],	[" actualPower_Pel: ",		102, 8, "n.a.", 1],
+	      [" dewPoint: ",			5, 4, "n.a.", 1],
+	      [" P_Nd: ",			5, 4, "n.a.", 1],	[" P_Hd: ",			5, 4, "n.a.", 1],
+	      [" actualPower_Qc: ",		5, 8, "n.a.", 1],	[" actualPower_Pel: ",		5, 8, "n.a.", 1],
 	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
   "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
@@ -1100,7 +1149,7 @@ my %parsinghash = (
 	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
 	      ["/", 			16, 2, "hex", 1]
 	     ],
- "FCtime206" => [["Weekday: ", 		7, 1,  "weekday", 1],	[" Hour: ",	8, 2, "hex", 1],
+  "FCtime206" => [["Weekday: ", 		7, 1,  "weekday", 1],	[" Hour: ",	8, 2, "hex", 1],
 	      [" Min: ",		10, 2,  "hex", 1], 	[" Sec: ",	12, 2, "hex", 1],
 	      [" Date: ", 		14, 2, "year", 1],	["/", 		18, 2, "hex", 1],
 	      ["/", 			20, 2, "hex", 1]
@@ -1134,7 +1183,7 @@ my %parsinghash = (
   my $length = length($message);
   Log3 $hash->{NAME}, 5, "Message length: $length";
   my $parsingcmd = substr($message,2,2);
-  $parsingcmd = substr($message,2,6) if ($parsingcmd =~ m/(0A|0B|0C)/) ;
+  $parsingcmd = substr($message,2,6) if (($parsingcmd =~ m/(0A|0B|0C)/) and (AttrVal($hash->{NAME}, "firmware" , "4.39") ne "2.06"));
   my $msgtype;
   my $parsingrule;
   my $parsingelement;
