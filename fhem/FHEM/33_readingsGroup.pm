@@ -881,11 +881,14 @@ readingsGroup_Notify($$)
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
 
-  if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
+  my $events = deviceEvents($dev,1);
+  return if( !$events );
+
+  if( grep(m/^INITIALIZED$/, @{$events}) ) {
     readingsGroup_updateDevices($hash);
     return undef;
   }
-  elsif( grep(m/^REREADCFG$/, @{$dev->{CHANGED}}) ) {
+  elsif( grep(m/^REREADCFG$/, @{$events}) ) {
     readingsGroup_updateDevices($hash);
     return undef;
   }
@@ -898,9 +901,9 @@ readingsGroup_Notify($$)
   my $devices = $hash->{DEVICES};
   $devices = $hash->{DEVICES2} if( $hash->{DEVICES2} );
 
-  my $max = int(@{$dev->{CHANGED}});
+  my $max = int(@{$events});
   for (my $i = 0; $i < $max; $i++) {
-    my $s = $dev->{CHANGED}[$i];
+    my $s = $events->[$i];
     $s = "" if(!defined($s));
 
     if( $dev->{NAME} eq "global" && $s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
@@ -940,21 +943,12 @@ readingsGroup_Notify($$)
         }
       }
 
-      my @parts = split(/: /,$s);
-      my $reading = shift @parts;
-      my $value   = join(": ", @parts);
-
-      $reading = "" if( !defined($reading) );
+      my ($reading,$value) = split(": ",$events->[$i],2);
+      next if( !defined($value) );
       next if( $reading =~ m/^\./);
+      $reading = "" if( !defined($reading) );
       $value = "" if( !defined($value) );
-      my $show_state = 1;
-      if( $value eq "" ) {
-        $show_state = !AttrVal( $name, "nostate", "0" );
-        #next if( !$show_state );
-
-        $reading = "state";
-        $value = $s;
-      }
+      my $show_state = !AttrVal( $name, "nostate", "0" );
 
       foreach my $device (@{$devices}) {
         my $item = 0;
