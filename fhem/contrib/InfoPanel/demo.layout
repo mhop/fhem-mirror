@@ -185,7 +185,9 @@ rgb "5858587F" # dunkelgrau
 rect - 0 420 800 580 5 5 1
 
 # jetzt den Plot einbinden
-plot - 0 420 1 1 "SVG_out_Balkon;day"
+# bitte einen eigenen Plotnamen eintragen!
+#
+# plot - 0 420 1 1 "SVG_out_Balkon;day"
 
 
 rgb "FFFFFFFF"
