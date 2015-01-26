@@ -305,12 +305,12 @@ sub XBMC_ProcessRead($$)
   Log3($name, 5, "XBMC_Read: Incoming data: " . $data);
   
   $buffer = $buffer  . $data;
-  Log3($name, 5, "XBMC_Read: Current processing buffer (PARTIAL + incoming data): " . $buffer);
+  Log3($name, 4, "XBMC_Read: Current processing buffer (PARTIAL + incoming data): " . $buffer);
 
   my ($msg,$tail) = XBMC_ParseMsg($hash, $buffer);
   #processes all complete messages
   while($msg) {
-    Log3($name, 5, "XBMC_Read: Decoding JSON message. Length: " . length($msg) . " Content: " . $msg); 
+    Log3($name, 4, "XBMC_Read: Decoding JSON message. Length: " . length($msg) . " Content: " . $msg); 
     my $obj = JSON->new->utf8(0)->decode($msg);
     #it is a notification if a method name is present
     if(defined($obj->{method})) {
@@ -668,7 +668,7 @@ sub XBMC_ParseMsg($$)
         $tail .= $c;
       }
       elsif(($open == $close) && ($c ne '{')) {
-        Log3($name, 5, "XBMC_ParseMsg: Garbage character before message: " . $c); 
+        Log3($name, 3, "XBMC_ParseMsg: Garbage character before message: " . $c); 
       }
       else {
         if($c eq '{') {
