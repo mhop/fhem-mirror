@@ -47,6 +47,8 @@
 # Changelog
 #
 # SVN-History:
+# 26.01.2015
+#	Beim Setzen von "disable" am Sonos-Device wurde der "state" und "STATE" der Player nicht korrekt gesetzt. 
 # 24.01.2015
 #	Wenn man seine Player umbenannt hatte, wurde ein Attribut-Kommando (für das Model-Attribut) falsch aufgerufen und hat eine Fehlermeldung im Fhem-Log verursacht (z.B. "Please define Sonos_Wohnzimmer first")
 # 19.01.2015
@@ -1027,7 +1029,14 @@ sub SONOS_StopSubProcess($) {
 		
 		# Alle SonosPlayer-Devices disappearen
 		for my $player (SONOS_getAllSonosplayerDevices()) {
-			SONOS_readingsSingleUpdateIfChanged($player, 'presence', 'disappeared', 1);
+			readingsBeginUpdate($player);
+			SONOS_readingsBulkUpdateIfChanged($player, 'presence', 'disappeared');
+			SONOS_readingsBulkUpdateIfChanged($player, 'state', 'disappeared');
+			SONOS_readingsEndUpdate($player, 1);
+			
+			if (AttrVal($player->{NAME}, 'stateVariable', '') eq 'Presence') {
+				$player->{STATE} = 'disappeared';
+			}
 		}
 	}
 }
