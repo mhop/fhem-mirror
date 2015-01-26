@@ -128,11 +128,14 @@ readingsProxy_Notify($$)
   my ($hash,$dev) = @_;
   my $name  = $hash->{NAME};
 
-  if( grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}) ) {
+  my $events = deviceEvents($dev,1);
+  return if( !$events );
+
+  if( grep(m/^INITIALIZED$/, @{$events}) ) {
     readingsProxy_updateDevices($hash);
     return undef;
   }
-  elsif( grep(m/^REREADCFG$/, @{$dev->{CHANGED}}) ) {
+  elsif( grep(m/^REREADCFG$/, @{$events}) ) {
     readingsProxy_updateDevices($hash);
     return undef;
   }
@@ -141,9 +144,9 @@ readingsProxy_Notify($$)
 
   return if($dev->{NAME} eq $name);
 
-  my $max = int(@{$dev->{CHANGED}});
+  my $max = int(@{$events});
   for (my $i = 0; $i < $max; $i++) {
-    my $s = $dev->{CHANGED}[$i];
+    my $s = $events->[$i];
     $s = "" if(!defined($s));
 
     if( $dev->{NAME} eq "global" && $s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
