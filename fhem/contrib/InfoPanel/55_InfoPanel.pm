@@ -7,8 +7,6 @@
 ##############################################
 # $Id: $
 
-#<embed src="/fhem/SVG_showLog?dev=SVG_gdsLog_1&amp;logdev=gdsLog&amp;gplotfile=SVG_gdsLog_1&amp;logfile=CURRENT&amp;pos=" type="image/svg+xml" #width="800" height="160" name="SVG_gdsLog_1">
-
 package main;
 use strict;
 use warnings;
@@ -78,7 +76,7 @@ sub InfoPanel_Initialize($) {
     my ($hash) = @_;
     $hash->{DefFn}    = "btIP_Define";
     #$hash->{AttrFn}   = "btIP_Attr";
-    $hash->{AttrList} = "autoreload:1,0 bg bgcolor refresh size tmin";
+    $hash->{AttrList} = "autoreload:1,0 bg bgcolor refresh size title tmin";
     $hash->{SetFn}    = "btIP_Set";
     $hash->{NotifyFn} = "btIP_Notify";
 
@@ -367,17 +365,33 @@ sub btIP_itemText {
 }
 
 sub btIP_itemTextBox {
-  my ($id,$x,$y,$boxwidth,$text,%params)= @_;
+  my ($id,$x,$y,$boxwidth,$boxheight,$text,%params)= @_;
   return unless(defined($text));
   $id = ($id eq '-') ? createUniqueId() : $id;
-  my ($r,$g,$b,$a) = btIP_color($params{rgb});
-  
-  my $output = "<switch><foreignObject x=\"$x\" y=\"$y\" width=\"$boxwidth\" height=\"100\" ".
-               "requiredExtensions=\"http://www.w3.org/1999/xhtml\"> ".
-               "<p xmlns=\"http://www.w3.org/1999/xhtml\">$text</p>".
-               "</foreignObject></switch>\n";
+  my $color = substr($params{rgb},0,6);
+  my ($d,$output);
 
-  return $output; # btIP_itemText($id,$x,$y,'Textbox not supported',%params);
+  if(defined($params{boxcolor})) {
+     my $orgcolor = $params{rgb};
+     $params{rgb} = $params{boxcolor};
+     my $bx1 = $x - $params{padding};
+     my $by1 = $y - $params{padding};
+     my $bx2 = $x + $boxwidth  + $params{padding};
+     my $by2 = $y + $boxheight + $params{padding};
+     $output .= btIP_itemRect("box_$id",$bx1,$by1,$bx2,$by2,1,1,1,%params);
+     $params{rgb} = $orgcolor;
+  }
+
+  $d = "<div id=\"text_$id\" style=\"position:absolute; top:".$y."px; left:".$x."px; ".
+       "width:".$boxwidth."px; height:".$boxheight."px; z-index:2\" >\n".
+       "<p style=\"font-family:$params{font}; font-size:$params{pt}; color:#$color; ".
+       "margin-top:0px; text-align:justify; ".
+       "\">\n$text\n</p>\n".
+       "</div>\n";
+
+  $defs{$params{name}}{fhem}{div} .= $d;
+
+  return $output; 
 }
 
 sub btIP_itemTime {
@@ -535,6 +549,7 @@ sub btIP_evalLayout($$@) {
   my @layout= split("\n", $layout);
 
   my %params;
+  $params{name}= $name;
   $params{width}= $width;
   $params{height}= $height;
   $params{font}= "Arial";
@@ -548,12 +563,15 @@ sub btIP_evalLayout($$@) {
   $params{thalign} = 'start';
   $params{tvalign} = 'auto';
   $params{linespace} = 0;
+  $params{boxcolor} = undef;
+  $params{padding} = 0;
   $params{xx}= 0;
   $params{yy}= 0;
-  
+
+  $defs{$name}{fhem}{div} = undef;  
 
   my ($id,$x,$y,$x1,$y1,$x2,$y2,$r1,$r2);
-  my ($scale,$inline,$boxwidth,$boxheight);
+  my ($scale,$inline,$boxwidth,$boxheight,$boxcolor);
   my ($text,$imgtype,$srctype,$arg,$format);
   
   my $cont= "";
@@ -589,11 +607,17 @@ sub btIP_evalLayout($$@) {
 	      ($id,$x1,$y1,$x2,$y2,$arg)= split("[ \t]+", $def, 6);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
+	      my $arg = AnalyzePerlCommand(undef,$arg);
           $params{xx} = $x;
           $params{yy} = $y;
 	      $svg .= btIP_itemArea($id,$x1,$y1,$x2,$y2,$arg,%params);
 	    }
-	    
+
+        when("boxcolor"){
+	      $def = "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
+	      $params{boxcolor} = AnalyzePerlCommand(undef, $def);
+	    }
+
 	    when("circle") {
 	      ($id,$x1,$y1,$r1,$format)= split("[ \t]+", $def, 5);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
@@ -631,7 +655,7 @@ sub btIP_evalLayout($$@) {
         }
 
 	    when("img") {
-	      ($id,$x,$y,$scale,$srctype,$arg)= split("[ \t]+", $def,7);
+	      ($id,$x,$y,$scale,$srctype,$arg)= split("[ \t]+", $def,6);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y; 
@@ -663,6 +687,10 @@ sub btIP_evalLayout($$@) {
           my ($x,$y)= btIP_xy($tox,$toy,%params);
           $params{xx} = $x;
           $params{yy} = $y;
+        }
+
+        when("padding") {
+          $params{padding}= AnalyzePerlCommand(undef,$def);
         }
 
 	    when("plot") {
@@ -707,15 +735,6 @@ sub btIP_evalLayout($$@) {
           $svg .= btIP_itemSeconds($id,$x,$y,$format,%params);
 	    }
 	    
-# 	    when("svgimg") {
-# 	      ($x,$y,$widht,$height,$imgtype,$srctype,$arg)= split("[ \t]+", $def,6);
-# 	      ($x,$y)= btIP_xy( $x,$y,%params);
-# 	      $params{xx} = $x;
-# 	      $params{yy} = $y; 
-# 	      my $arg= AnalyzePerlCommand(undef, $arg);
-#           $svg .= btIP_itemSvgImg($id,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
-# 	    }
-	    
         when("text") {
           ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
 	      ($x,$y)= btIP_xy($x,$y,%params);
@@ -726,12 +745,13 @@ sub btIP_evalLayout($$@) {
         }
         
         when("textbox") {
-          ($id,$x,$y,$boxwidth,$text)= split("[ \t]+", $def, 5);
+          ($id,$x,$y,$boxwidth,$boxheight,$text)= split("[ \t]+", $def, 6);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      my $txt= AnalyzePerlCommand(undef, $text);
-	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$txt,%params);
-#	       $params{xx} = $x;
-#	       $params{yy} = $y;
+	      my $name = $params{name};
+	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$boxheight,$txt,%params);
+          $params{xx} = $x;
+          $params{yy} = $y + $boxheight;
         }
         
 	    when("time") {
@@ -800,7 +820,7 @@ sub btIP_CGI{
     if(!defined($defs{$name})) {
           return("text/plain; charset=utf-8", "Unknown InfoPanel device: $name");
     }
-    if($ext eq "info") {
+    if($ext eq "info" || $ext eq "html") {
           return btIP_returnHTML($name);
     }
   } else {
@@ -836,17 +856,19 @@ sub btIP_splitRequest($) {
 sub btIP_returnHTML($) {
   my ($name) = @_;
 
-  my $url= btIP_getURL($defs{$name}{fhem}{hostname});
-  my $refresh= AttrVal($name, 'refresh', 60);
-  my $areas= AttrVal($name, 'areas', "");
-
-  my $code  = btIP_HTMLHead($name,$refresh);
+  my $url     = btIP_getURL($defs{$name}{fhem}{hostname});
+  my $refresh = AttrVal($name, 'refresh', 60);
+  my $title   = AttrVal($name, 'title', $name);
+  
+  my $code    = btIP_HTMLHead($title,$refresh);
 
   $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n".
-#            "<img src=\"$img\" usemap=\"#map\"/>\n".
-#            "<map name=\"map\" id=\"map\">\n$areas\n</map>\n".
+            "<div id=\"svg_content\" z-index=\"1\" >\n".
             btIP_returnSVG($name).
-            "</body>\n". btIP_HTMLTail();
+            "\n</div>\n".
+            $defs{$name}{fhem}{div}.
+            "</body>\n". 
+            btIP_HTMLTail();
 
   return ("text/html; charset=utf-8", $code);
 }
@@ -871,7 +893,7 @@ sub btIP_HTMLHead($$) {
   my $r= (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
   # css and js header output should be coded only in one place
   my $css= "";
-  my $scripts= btIP_getScript();
+  my $scripts= ""; #btIP_getScript();
   my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$r$css$scripts</head>\n";
   return $code;
 }
