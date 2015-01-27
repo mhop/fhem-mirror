@@ -1,16 +1,3 @@
-############################################################
-#
-# Demo Layoutfile
-#
-# to use in fhem, copy this file into moddir ./FHEM/
-# and define an InfoPanel device:
-#
-# define demo InfoPanel <fhem-host> ./FHEM/demo.layout
-#
-############################################################
-
-
-#
 # Schriftartfamilie festlegen
 #
 
@@ -185,9 +172,7 @@ rgb "5858587F" # dunkelgrau
 rect - 0 420 800 580 5 5 1
 
 # jetzt den Plot einbinden
-# bitte einen eigenen Plotnamen eintragen!
-#
-# plot - 0 420 1 1 "SVG_out_Balkon;day"
+plot - 0 420 1 1 "SVG_out_Balkon;day"
 
 
 rgb "FFFFFFFF"
@@ -209,11 +194,41 @@ text - 710 150 "hanging"
 
 tvalign "baseline"
  
-
 # Sekunden anzeigen:
-# Format: seconds <id> <x> <y> [colon]
 #
-seconds - 300 350       # Sekunden ohne Doppelpunkt anzeigen
-seconds - 500 350 colon # Sekunden mit  Doppelpunkt anzeigen
+
+seconds - 300 350 # Sekunden ohne Doppelpunkt
+
+seconds - 500 350 colon # Sekunden mit Doppelpunkt
+
+
+## Textbox anlegen
+
+font arial
+rgb "FFFFFFFF"
+pt 12
+
+# boxcolor: Hintergrundfarbe der Textbox
+# Format: identisch zu rgb
+#
+
+boxcolor "FF0000FF"
+
+
+# padding: äußere Rahmenbreite der Hintergrundfarbe
+# Format: padding <n> (pixel)
+#
+
+padding "5"
+
+
+# textbox
+# Format: textbox <id> <x> <y> <width> <height> <text>
+#
+
+textbox - 210 50 180 50 "bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla bla"
+
+
+
 
 #
