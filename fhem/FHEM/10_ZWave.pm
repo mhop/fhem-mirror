@@ -811,7 +811,7 @@ ZWave_configCheckParam($$$$@)
   if($t eq "list") {
     my $v = $h->{Item}{$arg[0]};
     return ("Unknown parameter $arg[0] for $cmd, use one of ".
-                join(",", keys %{$h->{Item}}), "") if(!$v);
+                join(",", keys %{$h->{Item}}), "") if(!defined($v));
     return ("", sprintf("04%02x01%02x", $h->{index}, $v));
   }
   if($t eq "button") {
