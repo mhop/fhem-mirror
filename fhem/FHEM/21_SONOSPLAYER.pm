@@ -387,6 +387,13 @@ sub SONOSPLAYER_Set($@) {
 				$key = $key.':'.$icons;
 			}
 			
+			# Playerauswahl einsetzen
+			my @playerNames = ();
+			for my $player (SONOS_getAllSonosplayerDevices()) {
+				push @playerNames, $player->{NAME} if ($hash->{NAME} ne $player->{NAME});
+			}
+			$key = $key.':'.join(',', sort(@playerNames)) if ((lc($key) eq 'addmember') || (lc($key) eq 'createstereopair') || (lc($key) eq 'removemember'));
+			
 			# Wifi-Auswahl setzen
 			$key = $key.':off,on,persist-off' if (lc($key) eq 'wifi');
 			
@@ -803,6 +810,21 @@ sub SONOSPLAYER_GetRealTargetPlayerHash($) {
 
 ########################################################################################
 #
+#  SONOSPLAYER_GetMasterPlayerName - Retreives the Real Player Name for Device-Commands
+#			In Case of no grouping: the given name (the normal device)
+#			In Case of grouping: the name of the groupmaster
+#
+#  Parameter name = name of device, for which the master is searched
+#
+########################################################################################
+sub SONOSPLAYER_GetMasterPlayerName($) {
+	my ($name) = @_;
+	
+	return SONOSPLAYER_GetRealTargetPlayerHash(SONOS_getDeviceDefHash($name))->{NAME};
+}
+
+########################################################################################
+#
 #  SONOSPLAYER_Undef - Implements UndefFn function
 #
 #  Parameter hash = hash of device addressed
@@ -872,7 +894,7 @@ sub SONOSPLAYER_Log($$$) {
 <a name="SONOSPLAYER"></a>
 <h3>SONOSPLAYER</h3>
 <p>FHEM module to work with a Sonos Zoneplayer</p>
-<p>For more informations have also a closer look at the wiki at <a href="http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel">http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel</a></p>
+<p>For more informations have also a closer look at the wiki at <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a></p>
 <p>Normally you don't have to define a Sonosplayer-Device on your own, because the Sonos-Device will do this for you during the discovery-process.</p>
 <h4>Example</h4>
 <p>
@@ -1151,7 +1173,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <a name="SONOSPLAYER"></a>
 <h3>SONOSPLAYER</h3>
 <p>FHEM Modul für die Steuerung eines Sonos Zoneplayer</p>
-<p>Für weitere Hinweise und Beschreibungen bitte auch im Wiki unter <a href="http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel">http://www.fhemwiki.de/wiki/Sonos_Anwendungsbeispiel</a> nachschauen.</p>
+<p>Für weitere Hinweise und Beschreibungen bitte auch im Wiki unter <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a> nachschauen.</p>
 <p>Im Normalfall braucht man dieses Device nicht selber zu definieren, da es automatisch vom Discovery-Process des Sonos-Device erzeugt wird.</p>
 <h4>Example</h4>
 <p>

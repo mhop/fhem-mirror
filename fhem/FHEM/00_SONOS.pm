@@ -47,6 +47,9 @@
 # Changelog
 #
 # SVN-History:
+# 27.01.2015
+#	Bei den Befehlen "AddMember", "RemoveMember" und "CreateStereoPair" werden nun alle in Fhem verfügbaren Sonosplayer in einer Auswahl angeboten. Das erfolgt allerdings ungeachtet der Gültigkeit eines Players in diesem Kontext (z.B. kann man keinen Player aus der Gruppe entfernen, der nicht in der Gruppe ist, die Auswahl bietet aber alle an).
+#	Es gibt jetzt eine Prozedur "SONOSPLAYER_GetMasterPlayerName()" mit der man sich den Devicenamen des Masterplayer zu dem übergebenen Playernamen geben lassen kann.
 # 26.01.2015
 #	Beim Setzen von "disable" am Sonos-Device wurde der "state" und "STATE" der Player nicht korrekt gesetzt. 
 # 24.01.2015
@@ -4391,6 +4394,16 @@ sub SONOS_Discover_Callback($$$) {
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RG sortby 2');
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RG noheading 1');
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RG nonames 1');
+					
+					#SONOS_Client_Notifier('CommandDefine:'.$name.'RG2 ReadingsGroup '.$name.':infoSummarize2@{SONOSPLAYER_GetMasterPlayerName($DEVICE)}');
+					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 valueFormat {" "}');
+					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 valuePrefix {SONOS_getCoverTitleRG(SONOSPLAYER_GetMasterPlayerName($DEVICE))}');
+					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 room '.$SONOS_Client_Data{SonosDeviceName});
+					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 group '.$groupName);
+					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 sortby 4');
+					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 noheading 1');
+					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 nonames 1');
+					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 notime 1');
 				}
 				
 				# Define Readingsgroup Listen
