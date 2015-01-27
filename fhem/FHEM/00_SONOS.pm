@@ -50,6 +50,7 @@
 # 27.01.2015
 #	Bei den Befehlen "AddMember", "RemoveMember" und "CreateStereoPair" werden nun alle in Fhem verfügbaren Sonosplayer in einer Auswahl angeboten. Das erfolgt allerdings ungeachtet der Gültigkeit eines Players in diesem Kontext (z.B. kann man keinen Player aus der Gruppe entfernen, der nicht in der Gruppe ist, die Auswahl bietet aber alle an).
 #	Es gibt jetzt eine Prozedur "SONOSPLAYER_GetMasterPlayerName()" mit der man sich den Devicenamen des Masterplayer zu dem übergebenen Playernamen geben lassen kann.
+#	Es gibt einen neuen Setter "Mute" am Sonos-Device. Damit kann man mit einem Schritt bei allen Playern den Mute-Zustand setzen.
 # 26.01.2015
 #	Beim Setzen von "disable" am Sonos-Device wurde der "state" und "STATE" der Player nicht korrekt gesetzt. 
 # 24.01.2015
@@ -379,7 +380,8 @@ my %sets = (
 	'StopAll' => '',
 	'Stop' => '',
 	'PauseAll' => '',
-	'Pause' => ''
+	'Pause' => '',
+	'Mute' => 'state'
 );
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
@@ -1907,9 +1909,11 @@ sub SONOS_Set($@) {
 	if (AttrVal($hash, 'generateVolumeSlider', 1) == 1) {
 		foreach my $key (keys %sets) {
 			my $oldkey = $key;
-			$key = $key.':slider,0,1,100' if ($key eq 'Volume');
-			$key = $key.':slider,-100,1,100' if ($key eq 'Balance');
-		
+			$key = $key.':slider,0,1,100' if (lc($key) eq 'volume');
+			$key = $key.':slider,-100,1,100' if (lc($key) eq 'balance');
+			
+			$key = $key.':0,1' if ($key =~ m/mute(all|)/i);
+			
 			$setcopy{$key} = $sets{$oldkey};
 		}
 	} else {
@@ -2024,8 +2028,12 @@ sub SONOS_Set($@) {
 		#}
 		#SONOS_Log undef, 5, "Current after List: ".Dumper(\@current);
 		
-	} elsif (lc($key) =~ m/(Stop|Pause)(All|)/i) {
-		my $commandType = $1;
+	} elsif (lc($key) =~ m/(Stop|Pause|Mute)(All|)/i) {
+		my $commandType = lc($1);
+		my $commandValue = $value;
+		
+		$commandValue = 0 if ($commandType ne 'mute');
+		$commandType = 'setGroupMute' if ($commandType eq 'mute');
 		
 		# Aktuellen Zustand holen
 		my @current;
@@ -2036,10 +2044,10 @@ sub SONOS_Set($@) {
 			push @current, \@tmp;
 		}
 		
-		# Alle Gruppenkoordinatoren zum Stoppen/Pausieren aufrufen
+		# Alle Gruppenkoordinatoren zum Stoppen/Pausieren/Muten aufrufen
 		foreach my $cElem (@current) {
 			my @currentElem = @{$cElem};
-			SONOS_DoWork(SONOS_getDeviceDefHash($currentElem[0])->{UDN}, lc($commandType), 0);
+			SONOS_DoWork(SONOS_getDeviceDefHash($currentElem[0])->{UDN}, $commandType, $commandValue);
 		}
 	} else {
 		return 'Not implemented yet!';
@@ -6956,6 +6964,9 @@ You can start this client on your own (to let it run instantly and independent f
 <h4>Set</h4>
 <ul>
 <li><b>Control-Commands</b><ul>
+<li><a name="SONOS_setter_Mute">
+<code>set &lt;name&gt; Mute &lt;state&gt;</code></a>
+<br />Sets the mute-state on all players.</li>
 <li><a name="SONOS_setter_PauseAll">
 <code>set &lt;name&gt; PauseAll</code></a>
 <br />Pause all Zoneplayer.</li>
@@ -7084,6 +7095,9 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 <h4>Set</h4>
 <ul>
 <li><b>Steuerbefehle</b><ul>
+<li><a name="SONOS_setter_Mute">
+<code>set &lt;name&gt; Mute &lt;state&gt;</code></a>
+<br />Setzt den Mute-Zustand bei allen Playern.</li>
 <li><a name="SONOS_setter_PauseAll">
 <code>set &lt;name&gt; PauseAll</code></a>
 <br />Pausiert die Wiedergabe in allen Zonen.</li>
