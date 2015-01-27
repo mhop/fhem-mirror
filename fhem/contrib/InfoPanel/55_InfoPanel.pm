@@ -329,7 +329,7 @@ sub btIP_itemRect {
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
-  my $output = "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" rx=\”$rx\” ry=\"$ry\" ";
+  my $output = "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" rx=\"$rx\" ry=\"$ry\" ";
   if($filled) {
     my ($r,$g,$b,$a) = btIP_color($params{rgb});
     $output .= "style=\"fill:rgb($r,$g,$b); fill-opacity:$a; stroke-width:0;\" "
@@ -893,7 +893,7 @@ sub btIP_HTMLHead($$) {
   my $r= (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
   # css and js header output should be coded only in one place
   my $css= "";
-  my $scripts= ""; #btIP_getScript();
+  my $scripts= btIP_getScript();
   my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$r$css$scripts</head>\n";
   return $code;
 }
