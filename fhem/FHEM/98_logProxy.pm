@@ -638,7 +638,7 @@ logProxy_array2Data($$)
 }
 #create plot data from xy-array
 sub
-logProxy_xy2Data($)
+logProxy_xy2Plot($)
 {
   my ($array) = @_;
   my $ret = ";c 0\n";
@@ -1207,6 +1207,8 @@ Log 3, Dumper @a;
           function (3rd parameter) for a zoom factor dependent number of times. the current time is given in $sec.
           the step width can be given in an optional 4th parameter. either as a number or as an hash with the keys from
           the following list: hour,qday,day,week,month,year and the values representing the step with for the zoom level.</li>
+        <li>logProxy_xy2Plot(\@xyArray) is a sample implementation of a function that will accept a ref to an array
+          of xy-cordinate pairs as the data to be plotted.</li>
         <li>The perl expressions have access to $from and $to for the begining and end of the plot range and also to the
           SVG specials min, max, avg, cnt, sum, currval (last value) and currdate (last date) values of the individual curves
           already plotted are available as $data{&lt;special-n&gt;}.<br>
