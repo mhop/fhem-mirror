@@ -607,7 +607,7 @@ logProxy_data2Array($)
 
   return (\@ret,$comment);
 }
-#parse create plot data from array
+#create plot data from array
 sub
 logProxy_array2Data($$)
 {
@@ -636,13 +636,32 @@ logProxy_array2Data($$)
 
   return (\$ret,$min,$max,$last);
 }
+#create plot data from xy-array
+sub
+logProxy_xy2Data($)
+{
+  my ($array) = @_;
+  my $ret = ";c 0\n";
+
+  my $min = 999999;
+  my $max = -999999;
+  my $last;
+
+  return ($ret,$min,$max,$last) if( !ref($array) eq "ARRAY" );
+
+  foreach my $point ( @{$array} ) {
+    $ret .= ";p $point->[0] $point->[1]\n";
+  }
+
+  return ($ret,$min,$max,$last);
+}
 
 sub
 logProxy_Get($@)
 {
   my ($hash, $name, @a) = @_;
 #Log 3, "logProxy_Get";
-#Log 3, Dumper @a;
+Log 3, Dumper @a;
 
   my $inf  = shift @a;
   my $outf = shift @a;
@@ -787,7 +806,7 @@ logProxy_Get($@)
           next;
         }
         use strict "refs";
-        
+
         $data = $d;
 
         $comment = "#$a[$i]\n";
