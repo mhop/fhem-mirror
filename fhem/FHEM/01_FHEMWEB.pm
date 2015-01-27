@@ -2272,17 +2272,17 @@ sub
 FW_Notify($$)
 {
   my ($ntfy, $dev) = @_;
-
-  if( $dev->{NAME} eq "global" ) {
-    my $vs = int(@structChangeHist) ? 'visible' : 'hidden';
-    FW_directNotify( "#FHEMWEB:$ntfy->{NAME}",
-                                "\$('#saveCheck').css('visibility','$vs')", '');
-  }
-
   my $h = $ntfy->{inform};
   return undef if(!$h);
 
   my $dn = $dev->{NAME};
+  if($dn eq "global" && $h->{type} =~ m/status/) {
+    my $vs = int(@structChangeHist) ? 'visible' : 'hidden';
+    my $data = FW_longpollInfo($h->{fmt},
+        "#FHEMWEB:$ntfy->{NAME}","\$('#saveCheck').css('visibility','$vs')","");
+    addToWritebuffer($ntfy, $data."\n");
+  }
+
   if($h->{type} eq "raw") {
     return undef if($dn !~ m/$h->{filter}/);
   } else { # Status
