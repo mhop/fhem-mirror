@@ -661,7 +661,7 @@ logProxy_Get($@)
 {
   my ($hash, $name, @a) = @_;
 #Log 3, "logProxy_Get";
-Log 3, Dumper @a;
+#Log 3, Dumper @a;
 
   my $inf  = shift @a;
   my $outf = shift @a;
