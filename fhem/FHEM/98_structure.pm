@@ -457,7 +457,8 @@ structure_Attr($@)
     icon=>1,
     room=>1,
     stateFormat=>1,
-    webCmd=>1
+    webCmd=>1,
+    userattr=>1
   );
 
   return undef if($ignore{$list[1]});
