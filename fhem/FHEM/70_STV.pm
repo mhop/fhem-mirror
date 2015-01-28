@@ -49,7 +49,7 @@ STV_Initialize($)
   $hash->{AttrFn}   = "STV_Attr";
   $hash->{ReadFn}   = "STV_Read";  
   $hash->{ReadyFn}  = "STV_Ready";
-  $hash->{AttrList} = "MAC fork:enable,disable setWhenOffline:execute,ignore powerCmdOn powerCmdOff " . $readingFnAttributes;;
+  $hash->{AttrList} = "MAC fork:enable,disable setWhenOffline:execute,ignore " . $readingFnAttributes;;
 }
 
 sub STV_Undefine($$) 
@@ -208,8 +208,7 @@ sub STV_Define($$)
 "POWEROFF POWERON PRECH PRINT PROGRAM QUICK_REPLAY REC RED REPEAT RESERVED1 RETURN REWIND REWIND_ RIGHT RSS ".
 "RSURF SCALE SEFFECT SETUP_CLOCK_TIMER SLEEP SOUND_MODE SOURCE SRS STANDARD STB_MODE STILL_PICTURE STOP ".
 "SUB_TITLE SVIDEO1 SVIDEO2 SVIDEO3 TOOLS TOPMENU TTX_MIX TTX_SUBFACE TURBO TV TV_MODE UP VCHIP VCR_MODE ".
-"VOLDOWN VOLUP WHEEL_LEFT WHEEL_RIGHT W_LINK YELLOW ZOOM1 ZOOM2 ZOOM_IN ZOOM_MOVE ZOOM_OUT connect ".
-"powerCmdOn powerCmdOff";
+"VOLDOWN VOLUP WHEEL_LEFT WHEEL_RIGHT W_LINK YELLOW ZOOM1 ZOOM2 ZOOM_IN ZOOM_MOVE ZOOM_OUT connect";
     my $system = $^O;
     my $result = "";
     if($system =~ m/Win/) {
@@ -591,21 +590,6 @@ sub STV_52235($@)
   }
 }
 
-sub STV_PowerCmd($$)
-{
-  my ($hash, $power) = @_;
-  
-  my $attrName = $power ? "powerCmdOn" : "powerCmdOff";  
-  my $cmdToExec = AttrVal($hash->{NAME}, $attrName, '');
-  
-  return "Error: Attribute $attrName not set!" if (length($cmdToExec) == 0);
-  
-  # execute the power command
-  fhem($cmdToExec);
-  
-  return "Executed command: $cmdToExec";
-}
-
 sub STV_Set($@)
 {
   my ($hash, @a) = @_;
@@ -618,23 +602,13 @@ sub STV_Set($@)
        return $hash->{".validcommands"};
   }
   if ($hash->{".validcommands"} =~ /$cmd/) {
-    if ($cmd eq "powerCmdOn") {
-      return STV_PowerCmd($hash, 1);
+    if ($cmd eq "connect") {
+        return STV_Connect($hash);
     }
-    elsif ($cmd eq "powerCmdOff") {
-      return STV_PowerCmd($hash, 0);
-    }
-    
-    if ($hash->{STATE} ne "opened") {
-        if ($cmd eq "connect") {
-          return STV_Connect($hash);
-        }
-        elsif ((AttrVal($name, "setWhenOffline", "execute") eq "ignore") and ()) {
-          # problem was that FHEM blocks for about 3 seconds if setting commands when TV is offline
-          # so people might want to block commands when TV is off
-          Log3 $name, 3, "[STV] Device seems offline. Set command ignored: $cmd";
-          return;
-        }
+
+    if ((AttrVal($name, "setWhenOffline", "execute") eq "ignore") and ($hash->{STATE} ne "opened")) {
+      Log3 $name, 3, "[STV] Device seems offline. Set command ignored: $cmd";
+      return;
     }
     
     if ($Port eq 55000 ){
