@@ -34,13 +34,13 @@ sub SVG_doround($$$);
 sub SVG_fmtTime($$);
 sub SVG_pO($);
 sub SVG_readgplotfile($$$);
-sub SVG_render($$$$$$$$$;$$);
+sub SVG_render($$$$$$$$$$);
 sub SVG_showLog($);
 sub SVG_substcfg($$$$$$);
 sub SVG_time_align($$);
 sub SVG_time_to_sec($);
 sub SVG_openFile($$$);
-sub SVG_doShowLog($$$$;$$);
+sub SVG_doShowLog($$$$;$);
 sub SVG_getData($$$$$);
 sub SVG_sel($$$;$$);
 sub SVG_getControlPoints($);
@@ -209,17 +209,17 @@ SVG_FwFn($$$$)
                 "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
 
   if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
-    my ($w, $h) = split(",", SVG_getplotsize($d));
     $ret .= "<div class=\"SVGplot SVG_$d\">";
 
     if(SVG_isEmbed($FW_wname)) {
+      my ($w, $h) = split(",", SVG_getplotsize($d));
       $ret .= "<embed src=\"$arg\" type=\"image/svg+xml\" " .
             "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
     } else {
       my $oret=$FW_RET; $FW_RET="";
       my ($type, $data) = SVG_doShowLog($d, $hash->{LOGDEVICE},
-                $hash->{GPLOTFILE}, $hash->{LOGFILE}, $w, $h);
+                $hash->{GPLOTFILE}, $hash->{LOGFILE}, 1);
       $FW_RET=$oret;
       $ret .= $data;
 
@@ -923,9 +923,9 @@ SVG_showLog($)
 }
 
 sub
-SVG_doShowLog($$$$;$$)
+SVG_doShowLog($$$$;$)
 {
-  my ($wl, $d, $type, $file, $styleW, $styleH) = @_;
+  my ($wl, $d, $type, $file, $noHeader) = @_;
   my $pm = AttrVal($wl,"plotmode",$FW_plotmode);
   my $gplot_pgm = "$FW_gplotdir/$type.gplot";
 
@@ -1041,8 +1041,7 @@ SVG_doShowLog($$$$;$$)
       my $da = SVG_getData($wl, $f, $t, $srcDesc, 0); # substcfg needs it(!)
       ($cfg, $plot) = SVG_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
       my $ret = SVG_render($wl, $f, $t, $cfg, $da,
-                        $plot, $FW_wname, $FW_cssdir, $srcDesc,
-                        $styleW, $styleH);
+                        $plot, $FW_wname, $FW_cssdir, $srcDesc, $noHeader);
       $internal_data = "";
       FW_pO $ret;
       if($SVGcache) {
@@ -1206,8 +1205,9 @@ SVG_getSteps($$$)
 
   return ($step, $mi, $ma);
 }
+
 sub
-SVG_render($$$$$$$$$;$$)
+SVG_render($$$$$$$$$$)
 {
   my $name = shift;  # e.g. wl_8
   my $from = shift;  # e.g. 2008-01-01
@@ -1218,8 +1218,7 @@ SVG_render($$$$$$$$$;$$)
   my $parent_name = shift;  # e.g. FHEMWEB instance name
   my $parent_dir  = shift;  # FW_dir
   my $srcDesc     = shift;  # #FileLog lines, as array pointer
-  my $styleW      = shift;
-  my $styleH      = shift;
+  my $noHeader     = shift;
 
   $SVG_RET="";
   my $SVG_ss = AttrVal($parent_name, "smallscreen", 0);
@@ -1261,12 +1260,12 @@ SVG_render($$$$$$$$$;$$)
   my $svghdr = 'version="1.1" xmlns="http://www.w3.org/2000/svg" '.
                'xmlns:xlink="http://www.w3.org/1999/xlink" '.
                "id='SVGPLOT_$name' $filter";
-  if(!$styleW) {
+  if(!$noHeader) {
     SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
     SVG_pO '<!DOCTYPE svg>';
-    SVG_pO "<svg $svghdr>";
+    SVG_pO "<svg $svghdr width=\"${ow}px\" height=\"${oh}px\">";
   } else {
-    SVG_pO "<svg $svghdr style='width:${styleW}px; height:${styleH}px;'>";
+    SVG_pO "<svg $svghdr style='width:${ow}px; height:${oh}px;'>";
   }
 
   my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
