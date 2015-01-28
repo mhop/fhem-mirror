@@ -740,8 +740,9 @@ sub FB_CALLMONITOR_parsePhonebook($$)
                     if($1 ne "intern" and $1 ne "memo") 
                     {
                         $number = $2;
+                        $number =~ s/\s//g;
                         $number =~ s/^\+\d\d/0/g; # quick'n'dirty fix in case of international number format.
-                        $number =~ s/\s//g if($number =~ /@/);
+                        
             
                         if(not $number =~ /^0/ and not $number =~ /@/ and $area_code ne "") 
                         {
