@@ -99,6 +99,7 @@ sub btIP_Define($$) {
   $hash->{NOTIFYDEV} = 'global';
   $hash->{fhem}{hostname}= $hostname;
   $hash->{fhem}{filename}= $filename;
+  $hash->{fhem}{div} = '';
   $hash->{LAYOUTFILE} = $filename;
 
   btIP_readLayout($hash);
@@ -145,7 +146,22 @@ sub btIP_readLayout($) {
     Log 1, "InfoPanel $name: $err";
     $hash->{fhem}{layout}= ("text 0.1 0.1 'Error: $err'");
   } else {
-    $hash->{fhem}{layout}= join("\n", @layoutfile);
+    $hash->{fhem}{layout} = join("\n", @layoutfile);
+    while($hash->{fhem}{layout} =~ m/\@include/ ) {
+      my (@layout2,@include);
+      foreach my $ll (@layoutfile) {
+        if($ll !~ m/^\@include/) {
+          push(@layout2,$ll);
+        } else {
+          my ($cmd, $def)= split("[ \t]+", $ll, 2);
+          ($err,@include) = FileRead($def) if($def);
+          splice(@layout2,-1,0,@include) unless $err;          
+        }
+      }
+      @layoutfile = @layout2;
+      @layout2    = undef;
+      $hash->{fhem}{layout} = join("\n",@layoutfile);
+    }
     $hash->{fhem}{layout} =~ s/\n\n/\n/g;
   }
   return;
@@ -580,6 +596,7 @@ sub btIP_evalLayout($$@) {
 	chomp $line;
 	# kill comments and blank lines
 	$line=~ s/\#.*$//;
+	$line=~ s/\@.*$//;
 	$line=~ s/\s+$//;
 	$line= $cont . $line;
 	if($line=~ s/\\$//) { $cont= $line; undef $line; }
@@ -650,7 +667,7 @@ sub btIP_evalLayout($$@) {
 
 	    when("group") {
 	      ($id,$text,$arg) = split("[ \t]+", $def, 3);
-	      my $arg = AnalyzePerlCommand(undef, $arg);
+	      my $arg = AnalyzePerlCommand(undef, $arg) if($arg);
 	      $svg .= btIP_itemGroup($id,$text,$arg);
         }
 
@@ -748,6 +765,7 @@ sub btIP_evalLayout($$@) {
           ($id,$x,$y,$boxwidth,$boxheight,$text)= split("[ \t]+", $def, 6);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      my $txt= AnalyzePerlCommand(undef, $text);
+	      $txt =~ s/\n/<br\/>/g;
 	      my $name = $params{name};
 	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$boxheight,$txt,%params);
           $params{xx} = $x;
@@ -761,7 +779,9 @@ sub btIP_evalLayout($$@) {
 	      $params{yy} = $y;
 	      $svg .= btIP_itemTime($id,$x,$y,%params);
 	    }
-	    
+
+        when('@include') {}
+        	    
 	    default {
           if($cmd ~~ @cmd_halign) {
 	        my $d = AnalyzePerlCommand(undef, $def);
@@ -864,11 +884,9 @@ sub btIP_returnHTML($) {
 
   $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n".
             "<div id=\"svg_content\" z-index=\"1\" >\n".
-            btIP_returnSVG($name).
-            "\n</div>\n".
-            $defs{$name}{fhem}{div}.
-            "</body>\n". 
-            btIP_HTMLTail();
+            btIP_returnSVG($name)."\n</div>\n";
+  $code .=  $defs{$name}{fhem}{div} if($defs{$name}{fhem}{div});
+  $code .=  "</body>\n".btIP_HTMLTail();
 
   return ("text/html; charset=utf-8", $code);
 }
