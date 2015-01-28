@@ -25,24 +25,26 @@ sub ZWave_HandleSendStack($);
 # http://buzzdavidson.com/?p=68
 # https://bitbucket.org/bradsjm/aeonzstickdriver
 my %sets = (
-  "addNode"   => { cmd   => "4a%02x@",       # ZW_ADD_NODE_TO_NETWORK',
-                   param => {on=>0x81, off=>0x05 } },
-  "removeNode"=> { cmd   => "4b%02x@",       # ZW_REMOVE_NODE_FROM_NETWORK',
-                   param => {on=>0x81, off=>0x05 } },
-  "createNode"=> { cmd   => "60%02x"  },     # ZW_REQUEST_NODE_INFO',
-  "removeFailedNodeId" => { cmd => "61%02x" }, #ZW_REMOVE_FAILED_NODE_ID
-  "neighborUpdate" => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
-  "sendNIF"   => { cmd   => "12%02x05@" },   # ZW_SEND_NODE_INFORMATION
-  "reopen"    => { cmd   => "" },
+  "addNode"          => { cmd => "4a%02x@",    # ZW_ADD_NODE_TO_NETWORK'
+                        param => {on=>0x81, off=>0x05 } },
+  "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
+                        param => {on=>0x81, off=>0x05 } },
+  "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
+  "removeFailedNode" => { cmd => "61%02x" },   # ZW_REMOVE_FAILED_NODE_ID
+  "replaceFailedNode"=> { cmd => "64%02x" },   # ZW_REPLACE_FAILED_NODE
+  "neighborUpdate"   => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
+  "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
+  "reopen"           => { cmd => "" },
 );
 
 my %gets = (
-  "caps"      => "07",            # SERIAL_API_GET_CAPABILITIES
-  "ctrlCaps"  => "05",            # ZW_GET_CONTROLLER_CAPS
-  "nodeInfo"  => "41%02x",        # ZW_GET_NODE_PROTOCOL_INFO
-  "nodeList"  => "02",            # SERIAL_API_GET_INIT_DATA
-  "homeId"    => "20",            # MEMORY_GET_ID
-  "version"   => "15",            # ZW_GET_VERSION
+  "caps"            => "07",      # SERIAL_API_GET_CAPABILITIES
+  "ctrlCaps"        => "05",      # ZW_GET_CONTROLLER_CAPS
+  "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
+  "isFailedNode"    => "62%02x",  # ZW_IS_FAILED_NODE
+  "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
+  "homeId"          => "20",      # MEMORY_GET_ID
+  "version"         => "15",      # ZW_GET_VERSION
   "getVirtualNodes" => "a5",      # ZW_GET_VIRTUAL_NODES
   "neighborList" => "80%02x0101", # GET_ROUTING_TABLE_LINE include dead links,
                                   #              include non-routing neigbors
