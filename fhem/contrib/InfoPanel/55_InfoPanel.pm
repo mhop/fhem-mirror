@@ -13,6 +13,7 @@ use warnings;
 
 use MIME::Base64;
 use Image::Info qw(image_info dim);
+#use Data::Dumper;
 
 use feature qw/switch/;
 use vars qw(%data);
@@ -399,9 +400,10 @@ sub btIP_itemTextBox {
   }
 
   $d = "<div id=\"text_$id\" style=\"position:absolute; top:".$y."px; left:".$x."px; ".
-       "width:".$boxwidth."px; height:".$boxheight."px; z-index:2\" >\n".
+       "width:".$boxwidth."px; height:".$boxheight."px; text-overflow:ellipsis; z-index:2\" >\n".
        "<p style=\"font-family:$params{font}; font-size:$params{pt}; color:#$color; ".
-       "margin-top:0px; text-align:justify; ".
+       "width:".$boxwidth."px; height:".$boxheight."px; ".
+       "margin-top:0px; text-align:$params{tbalign}; text-overflow:ellipsis; ".
        "\">\n$text\n</p>\n".
        "</div>\n";
 
@@ -564,6 +566,8 @@ sub btIP_evalLayout($$@) {
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
   my @layout= split("\n", $layout);
 
+  my %h4params;
+  
   my %params;
   $params{name}= $name;
   $params{width}= $width;
@@ -578,6 +582,7 @@ sub btIP_evalLayout($$@) {
   $params{ivalign} = 'top';
   $params{thalign} = 'start';
   $params{tvalign} = 'auto';
+  $params{tbalign} = 'left';
   $params{linespace} = 0;
   $params{boxcolor} = undef;
   $params{padding} = 0;
@@ -619,6 +624,12 @@ sub btIP_evalLayout($$@) {
 
     eval {
       given($cmd) {
+
+	    when("push") {
+        }
+        
+	    when("pop") {
+        }
 
 	    when("area") {
 	      ($id,$x1,$y1,$x2,$y2,$arg)= split("[ \t]+", $def, 6);
@@ -728,7 +739,7 @@ sub btIP_evalLayout($$@) {
 	      }
           $params{pt} = 6 if($params{pt} < 0);
         }
-
+        
 	    when("rect") {
 	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$format)= split("[ \t]+", $def, 8);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
@@ -772,6 +783,10 @@ sub btIP_evalLayout($$@) {
           $params{yy} = $y + $boxheight;
         }
         
+        when("textboxalign") {
+          $params{tbalign} = $def;
+        }
+
 	    when("time") {
 	      ($id,$x,$y)= split("[ \t]+", $def, 3);
 	      ($x,$y)= btIP_xy($x,$y,%params);
@@ -780,8 +795,6 @@ sub btIP_evalLayout($$@) {
 	      $svg .= btIP_itemTime($id,$x,$y,%params);
 	    }
 
-        when('@include') {}
-        	    
 	    default {
           if($cmd ~~ @cmd_halign) {
 	        my $d = AnalyzePerlCommand(undef, $def);
