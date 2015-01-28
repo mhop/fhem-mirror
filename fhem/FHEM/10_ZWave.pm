@@ -1098,7 +1098,7 @@ ZWave_helpFn($$)
   return "" if(!$mc);
   my $h = $mc->{config}{$cmd};
   return "" if(!$h || !$h->{Help});
-  return "Help for $cmd:<br>".$h->{Help}."<br><br>";
+  return "Help for $cmd:<br>".$h->{Help};
 }
 
 sub
@@ -1106,34 +1106,22 @@ ZWave_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
-  return "<div id=\"Help_$d\" class=\"help\"></div>".<<JSEND
-  <script type="text/javascript">
-    var oldHelp={};
-    var helpDiv=document.querySelector("#Help_$d");
-
-    setTimeout(function() { // Wait for it to appear, thn move it
-      var w=document.querySelector("div.makeTable.wide");
-      w.insertBefore(helpDiv,w.firstChild);
-    }, 200);
-
-    function helpSet(val) { helpDiv.innerHTML=val; }
-    function
-    helpCheck(name)
-    {
-      var sel = document.querySelector("select."+name);
-      if(!sel)
-        return;
-      var newVal = sel.options[sel.selectedIndex].value;
-      if(oldHelp[name] && oldHelp[name] != newVal) {
-        FW_queryValue('{ZWave_helpFn("$d","'+newVal+'")}', 'helpSet("%")', '');
-      }
-      oldHelp[name] = newVal;
-    }
-
-    setInterval(function() {
-      helpCheck("set");
-      helpCheck("get");
-    }, 300);
+  return
+  '<div id="ZWHelp" class="makeTable help"></div>'.
+  '<script type="text/javascript">'.
+   "var d='$d';" . <<'JSEND'
+    $(document).ready(function() {
+      $("div#ZWHelp").insertBefore("div.makeTable.wide:first"); // Move
+      $("select.set,select.get").each(function(){
+        $(this).get(0).setValueFn = function(val) {
+          $("div#ZWHelp").html(val);
+        }
+        $(this).change(function(){
+          FW_queryValue('{ZWave_helpFn("'+d+'","'+$(this).val()+'")}',
+                        $(this).get(0));
+        });
+      });
+    });
   </script>
 JSEND
 }
