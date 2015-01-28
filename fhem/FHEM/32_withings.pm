@@ -562,6 +562,8 @@ withings_pollUser($)
   my $json = ();
   $json = JSON->new->utf8->decode(encode('UTF-8', $ret)) if( $ret =~ m/^{.*}$/ );
 
+  return undef if( !$json );
+
   $hash->{status} = $json->{status};
   if( $hash->{status} == 0 ) {
     my $i = 0;
