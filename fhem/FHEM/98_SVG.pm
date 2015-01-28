@@ -2129,6 +2129,7 @@ plotAsPng(@)
 
   my ($w, $h) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
   $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $w,$h"\/><\/svg>/;
+  $svgdata =~ s/\.SVGplot\./\./g;
 
   eval {
     require Image::LibRSVG;
