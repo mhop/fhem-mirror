@@ -29,7 +29,7 @@ sub XBMC_Initialize($$)
   $hash->{ReadFn}   = "XBMC_Read";  
   $hash->{ReadyFn}  = "XBMC_Ready";
   $hash->{UndefFn}  = "XBMC_Undefine";
-  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,standby pingInterval powerCmdOn powerCmdOff " . $readingFnAttributes;
+  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,standby pingInterval " . $readingFnAttributes;
   
   $data{RC_makenotify}{XBMC} = "XBMC_RCmakenotify";
   $data{RC_layout}{XBMC_RClayout}  = "XBMC_RClayout";
@@ -73,21 +73,6 @@ sub XBMC_Define($$)
   $attr{$hash->{NAME}}{"pingInterval"} = 60;
   
   return undef;
-}
-
-sub XBMC_PowerCmd($$)
-{
-  my ($hash, $power) = @_;
-  
-  my $attrName = $power ? "powerCmdOn" : "powerCmdOff";  
-  my $cmdToExec = AttrVal($hash->{NAME}, $attrName, '');
-  
-  return "Error: Attribute $attrName not set!" if (length($cmdToExec) == 0);
-  
-  # execute the power command
-  fhem($cmdToExec);
-  
-  return "Executed command: $cmdToExec";
 }
 
 # Force a connection attempt to XBMC as soon as possible 
@@ -851,12 +836,6 @@ sub XBMC_Set($@)
   elsif($cmd eq 'connect') {
     return XBMC_Connect($hash);
   }
-  elsif($cmd eq 'poweron') {
-    return XBMC_PowerCmd($hash, 1);
-  }
-  elsif($cmd eq 'poweroff') {
-    return XBMC_PowerCmd($hash, 0);
-  }
   my $res = "Unknown argument " . $cmd . ", choose one of " . 
     "off play:all,audio,video,picture playpause:all,audio,video,picture pause:all,audio,video,picture " . 
     "prev:all,audio,video,picture next:all,audio,video,picture goto stop:all,audio,video,picture " . 
@@ -893,7 +872,7 @@ sub XBMC_Set($@)
     "mute:toggle,on,off volume:slider,0,1,100 quit:noArg " . 
     "eject:noArg hibernate:noArg reboot:noArg shutdown:noArg suspend:noArg " . 
     "videolibrary:scan,clean audiolibrary:scan,clean statusRequest jsonraw " .
-    "connect poweron poweroff";
+    "connect";
   return $res ;
 
 }
@@ -1459,8 +1438,6 @@ sub XBMC_HTTP_Request($$@)
     <li><b>hibernate</b> -  the XBMC host will be put into hibernation</li>
     <li><b>reboot</b> -  the XBMC host will be rebooted</li>
     <li><b>connect</b> -  try to connect to the XBMC host immediately</li>
-    <li><b>poweron</b> -  executes power on command provided by the attribute powerCmd</li>
-    <li><b>poweroff</b> -  executes power off command provided by the attribute powerCmd</li>
   </ul>
   </ul>
   <br><br>
@@ -1538,10 +1515,6 @@ sub XBMC_HTTP_Request($$@)
       If XBMC does not run all the time it used to be the case that FHEM blocks because it cannot reach XBMC (only happened 
     if TCP was used). If you encounter problems like FHEM not responding for a few seconds then you should set <code>attr &lt;XBMC_device&gt; fork enable</code>
     which will move the search for XBMC into a separate process.</li>
-  <li>powerCmdOn<br>
-      Custom FHEM command to be executed when setting poweron. Is meant to be used in conjuction with devStateIcon</li>
-  <li>powerCmdOff<br>
-      Custom FHEM command to be executed when setting poweroff. Is meant to be used in conjuction with devStateIcon</li>
   </ul>
 </ul>
 
