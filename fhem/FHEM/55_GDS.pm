@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 55_GDS.pm 7699 2015-01-24 19:53:30Z betateilchen $
 ####################################################################################################
 #
 #	55_GDS.pm
@@ -1170,9 +1170,10 @@ sub gdsHeadlines($;$) {
   $sep = (defined($sep)) ? $sep : '|';
   my $count = ReadingsVal($d,'a_count',0);
   for (my $i = 0; $i < $count; $i++) {
-    $text .= utf8ToLatin1(ReadingsVal('gds','a_'.$i.'_headline','')).$sep;
+    $text .= $sep if $i;
+    $text .= ReadingsVal('gds','a_'.$i.'_headline','')
   }
-  return utf8ToLatin1($text);
+  return $text;
 }
 
 1;
