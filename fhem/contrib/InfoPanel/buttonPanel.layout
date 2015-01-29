@@ -1,0 +1,77 @@
+#
+
+# 50 Pixel für die Gestaltung
+# einer Kopfzeile freihalten
+#
+rgb "7F7F7FFF" # grau
+line - 0 50 800 50
+
+# Definiere Layout als ButtonPanel
+#
+buttonpanel
+
+# Farbe für ButtonText
+#
+rgb "4D4D4DFF"
+
+# Farbe für Button
+#
+boxcolor "FF0000FF"
+button 11   0  55 160 135 0 0 {"Button11Link"} {"Button11Text"}
+
+boxcolor "00FF00FF"
+button 12 160  55 320 135 0 0 {"+http://www.google.de"} {"Google in new"}
+boxcolor "FF0000FF"
+button 13 320  55 480 135 0 0 {"-http://www.google.de"} {"Google in same"}
+boxcolor "00FF00FF"
+button 14 480  55 640 135 0 0 {"http://www.google.de"} {"Google invisible"}
+boxcolor "FF0000FF"
+button 15 640  55 800 135 0 0 {"Button15Link"} {"Button15Text"}
+
+boxcolor "00FF00FF"
+button 21   0 135 160 215 0 0 {"Button21Link"} {"Button21Text"}
+boxcolor "FF0000FF"
+button 22 160 135 320 215 0 0 {"Button22Link"} {"Button22Text"}
+boxcolor "00FF00FF"
+button 23 320 135 480 215 0 0 {"Button23Link"} {"Button23Text"}
+boxcolor "FF0000FF"
+button 24 480 135 640 215 0 0 {"Button24Link"} {"Button24Text"}
+boxcolor "00FF00FF"
+button 25 640 135 800 215 0 0 {"Button25Link"} {"Button25Text"}
+
+boxcolor "FF0000FF"
+button 31   0 215 160 290 0 0 {"Button31Link"} {"Button31Text"}
+boxcolor "00FF00FF"
+button 32 160 215 320 290 0 0 {"Button32Link"} {"Button32Text"}
+boxcolor "FF0000FF"
+button 33 320 215 480 290 0 0 {"Button33Link"} {"Button33Text"}
+boxcolor "00FF00FF"
+button 34 480 215 640 290 0 0 {"Button34Link"} {"Button34Text"}
+boxcolor "FF0000FF"
+button 35 640 215 800 290 0 0 {"Button35Link"} {"Button35Text"}
+
+boxcolor "00FF00FF"
+button 41   0 290 160 370 0 0 {"Button41Link"} {"Button41Text"}
+boxcolor "FF0000FF"
+button 42 160 290 320 370 0 0 {"Button42Link"} {"Button42Text"}
+boxcolor "00FF00FF"
+button 43 320 290 480 370 0 0 {"Button43Link"} {"Button43Text"}
+boxcolor "FF0000FF"
+button 44 480 290 640 370 0 0 {"Button44Link"} {"Button44Text"}
+boxcolor "00FF00FF"
+button 45 640 290 800 370 0 0 {"Button45Link"} {"Button45Text"}
+
+boxcolor "999999FF"
+button 51   0 370 160 430 0 0 {"Button51Link"} {"Button51Text"}
+boxcolor "CCCCCCFF"
+button 52 160 370 320 430 0 0 {"Button52Link"} {"Button52Text"}
+boxcolor "999999FF"
+button 53 320 370 480 430 0 0 {"Button53Link"} {"Button53Text"}
+boxcolor "CCCCCCFF"
+button 54 480 370 640 430 0 0 {"Button54Link"} {"Button54Text"}
+boxcolor "999999FF"
+button 55 640 370 800 430 0 0 {"Button55Link"} {"Button55Text"}
+
+
+
+#

@@ -41,6 +41,7 @@ sub btIP_Notify;
 sub btIP_readLayout($);
 
 sub btIP_itemArea;
+sub btIP_itemButton;
 sub btIP_itemCircle;
 sub btIP_itemDate;
 sub btIP_itemEllipse;
@@ -184,6 +185,35 @@ sub btIP_itemArea {
   my $output  = "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" xlink:href=\"$target\" >\n";
      $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" opacity=\"0\" />\n";
      $output .= "</a>\n";
+  return $output;
+}
+
+sub btIP_itemButton {
+  my ($id,$x1,$y1,$x2,$y2,$rx,$ry,$link,$text,%params)= @_;
+  $id = ($id eq '-') ? createUniqueId() : $id;
+  my $width  = $x2 - $x1;
+  my $height = $y2 - $y1;
+  my ($r,$g,$b,$a) = btIP_color($params{boxcolor});
+  $text = AnalyzePerlCommand(undef,$text);
+  $link = AnalyzePerlCommand(undef,$link);
+  my $target = 'secret';
+     $target = '_top' if $link =~ s/^-//;
+     $target = '_blank' if $link =~ s/^\+//;
+
+  my $output  =  "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" ".
+                 "xlink:href=\"$link\" target=\"$target\" >\n";
+     $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" rx=\"$rx\" ry=\"$ry\" width=\"$width\" height=\"$height\" ".
+                "style=\"fill:rgb($r,$g,$b); fill-opacity:$a; stroke-width:0;\"  />\n";
+
+  my $oldhalign = $params{thalign};
+  my $oldvalign = $params{tvalign};
+  $params{thalign} = "middle";
+  $params{tvalign} = "middle";
+  $output .= btIP_itemText($id."_text",($x1+$x2)/2,($y1+$y2)/2,$text,%params);
+  $params{thalign} = $oldhalign;
+  $params{tvalign} = $oldvalign;
+  $output .= "</a>\n";
+
   return $output;
 }
 
@@ -591,7 +621,7 @@ sub btIP_evalLayout($$@) {
 
   my ($id,$x,$y,$x1,$y1,$x2,$y2,$r1,$r2);
   my ($scale,$inline,$boxwidth,$boxheight,$boxcolor);
-  my ($text,$imgtype,$srctype,$arg,$format);
+  my ($text,$link,$imgtype,$srctype,$arg,$format);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -637,6 +667,22 @@ sub btIP_evalLayout($$@) {
 	      $def = "\"$def\"" if(length($def) == 6 && $def =~ /[[:xdigit:]]{6}/);
 	      $params{boxcolor} = AnalyzePerlCommand(undef, $def);
 	    }
+
+        when("button") {
+	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$link,$text)= split("[ \t]+", $def, 9);
+	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
+	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
+	      my $arg = AnalyzePerlCommand(undef,$arg);
+          $params{xx} = $x;
+          $params{yy} = $y;
+	      $svg .= btIP_itemButton($id,$x1,$y1,$x2,$y2,$r1,$r2,$link,$text,%params);
+        }
+	    
+        when("buttonpanel"){
+           $defs{$params{name}}{fhem}{div} = "<div id=\"hiddenDiv\" ".
+              "style=\"display:none\" >".
+              "<iframe id=\"secretFrame\" name=\"secret\" src=\"\"></div>\n";
+        }
 
 	    when("circle") {
 	      ($id,$x1,$y1,$r1,$format)= split("[ \t]+", $def, 5);
