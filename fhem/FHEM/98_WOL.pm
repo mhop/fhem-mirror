@@ -255,7 +255,6 @@ sub WOL_by_udp {
      return 1;
   }
   
-  $host = '192.168.2.255';
   my $ip_addr   = inet_aton($host);
   my $sock_addr = sockaddr_in($port, $ip_addr);
   $mac_addr     =~ s/://g;
@@ -316,7 +315,8 @@ sub WOL_SetNextTimer($;$) {
 ################################################################################
 sub WOL_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
- 
+  $attrVal = ""    if(!defined $attrVal);
+  
   my $hash = $defs{$name};
   
   if ($attrName eq "useUdpBroadcast") {
