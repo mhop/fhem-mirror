@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 31_MilightDevice (Thanks to MarkusM):
+                     Saturation set/transition, set with command saturation
+                     Bugfix for long transition on hue=0 and hue = 360
+                     Set hardware brightness to minimum before off
   - bugfix: FB_CALLMONITOR: allow spaces in phone numbers stored in phonebooks
   - bugfix: SYSMON: Symbol '#' in Readings prevents update
   - feature: new helper module TimeSeries.pm (Boris)
