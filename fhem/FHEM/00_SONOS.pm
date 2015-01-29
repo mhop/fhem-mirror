@@ -47,6 +47,10 @@
 # Changelog
 #
 # SVN-History:
+# 30.01.2015
+#	Commandref wurde optisch übersichtlicher gestaltet, und die Windows-Hinweise eingefügt.
+#	Bei der Anzeige des nächsten Titels in der Standard-ReadingsGroup stand "Artist". Das wurde auf "Interpret" korrigiert.
+#	Es gibt jetzt eine Prozedur "SONOSPLAYER_GetSlavePlayerNames()", mit der man sich die Teilnehmer einer Gruppe liefern lassen kann. Der Master wird nicht mit zurückgegeben. Man kann den Namen eines beliebigen Teilnehmers angeben.
 # 27.01.2015
 #	Bei den Befehlen "AddMember", "RemoveMember" und "CreateStereoPair" werden nun alle in Fhem verfügbaren Sonosplayer in einer Auswahl angeboten. Das erfolgt allerdings ungeachtet der Gültigkeit eines Players in diesem Kontext (z.B. kann man keinen Player aus der Gruppe entfernen, der nicht in der Gruppe ist, die Auswahl bietet aber alle an).
 #	Es gibt jetzt eine Prozedur "SONOSPLAYER_GetMasterPlayerName()" mit der man sich den Devicenamen des Masterplayer zu dem übergebenen Playernamen geben lassen kann.
@@ -659,7 +663,7 @@ sub SONOS_getTitleRG($;$) {
 	# Läuft Radio oder ein "normaler" Titel
 	if (ReadingsVal($device, 'currentNormalAudio', 1) == 1) {
 		my $showNext = ReadingsVal($device, 'nextTitle', '') || ReadingsVal($device, 'nextArtist', '') || ReadingsVal($device, 'nextAlbum', '');
-		$infoString = sprintf('<div style="margin-left: -150px;">%s Titel %s von %s<br />Titel: <b>%s</b><br />Interpret: <b>%s</b><br />Album: <b>%s</b>'.($showNext ? '<div style="height: %s;"></div>Nächste Wiedergabe:</div><div style="float: left; margin-left: 0px;"><img style="margin: 0px; padding: 0px; margin-right: 5px; border: 1px solid lightgray; height: 3.5em;" border="0" src="%s" /></div><div style="margin-left: 0px;">Titel: %s<br />Artist: %s<br />Album: %s</div>' : ''),
+		$infoString = sprintf('<div style="margin-left: -150px;">%s Titel %s von %s<br />Titel: <b>%s</b><br />Interpret: <b>%s</b><br />Album: <b>%s</b>'.($showNext ? '<div style="height: %s;"></div>Nächste Wiedergabe:</div><div style="float: left; margin-left: 0px;"><img style="margin: 0px; padding: 0px; margin-right: 5px; border: 1px solid lightgray; height: 3.5em;" border="0" src="%s" /></div><div style="margin-left: 0px;">Titel: %s<br />Interpret: %s<br />Album: %s</div>' : ''),
 				$transportState, 
 				ReadingsVal($device, 'currentTrack', ''), 
 				ReadingsVal($device, 'numberOfTracks', ''),
@@ -6932,57 +6936,61 @@ sub SONOS_Client_IsAlive() {
 <li><code>HTTP::Request</code></li></ul>
 Installation e.g. as Debian-Packages (via "sudo apt-get install &lt;packagename&gt;"):<ul>
 <li>LWP::Simple-Packagename (incl. LWP::UserAgent and HTTP::Request): libwww-perl</li>
-<li>SOAP::Lite-Packagename: libsoap-lite-perl</li></ul></p>
+<li>SOAP::Lite-Packagename: libsoap-lite-perl</li></ul>
+<br />Installation e.g. as Windows ActivePerl (via Perl-Packagemanager)<ul>
+<li>Install Package LWP (incl. LWP::UserAgent and HTTP::Request)</li>
+<li>Install Package SOAP::Lite</li>
+<li>SOAP::Lite-Special for Versions after 5.18:<ul>
+  <li>Add another Packagesource from suggestions or manual: Bribes de Perl (http://www.bribes.org/perl/ppm)</li>
+  <li>Install Package: SOAP::Lite</li></ul></li></ul>
+<b>Windows ActivePerl 64Bit is currently not functioning due to missing SOAP::Lite</b></p>
 <p><b>Attention!</b><br />This Module will not be functioning on any platform, because of the use of Threads and the neccessary Perl-modules.</p>
 <p>More information is given in a (german) Wiki-article: <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a></p>
 <p>The system consists of two different components:<br />
 1. A UPnP-Client which runs as a standalone process in the background and takes the communications to the sonos-components.<br />
 2. The FHEM-module itself which connects to the UPnP-client to make fhem able to work with sonos.<br /><br />
-The client will be startet by the module itself if not done in another way.<br />
+The client will be started by the module itself if not done in another way.<br />
 You can start this client on your own (to let it run instantly and independent from FHEM):<br />
 <code>perl 00_SONOS.pm 4711</code>: Starts a UPnP-Client in an independant way who listens to connections on port 4711. This process can run a long time, FHEM can connect and disconnect to it.</p>
 <h4>Example</h4>
 <p>
 <code>define Sonos SONOS localhost:4711 30</code>
 </p>
-<br />
 <a name="SONOSdefine"></a>
 <h4>Define</h4>
-<code>define &lt;name&gt; SONOS [upnplistener [interval [waittime [delaytime]]]]</code>
+<b><code>define &lt;name&gt; SONOS [upnplistener [interval [waittime [delaytime]]]]</code></b>
         <br /><br /> Define a Sonos interface to communicate with a Sonos-System.<br />
 <p>
-<code>[upnplistener]</code><br />The name and port of the external upnp-listener. If not given, defaults to <code>localhost:4711</code>. The port has to be a free portnumber on your system. If you don't start a server on your own, the script does itself.<br />If you start it yourself write down the correct informations to connect.</p>
+<b><code>[upnplistener]</code></b><br />The name and port of the external upnp-listener. If not given, defaults to <code>localhost:4711</code>. The port has to be a free portnumber on your system. If you don't start a server on your own, the script does itself.<br />If you start it yourself write down the correct informations to connect.</p>
 <p>
-<code>[interval]</code><br /> The interval is for alive-checking of Zoneplayer-device, because no message come if the host disappear :-)<br />If omitted a value of 10 seconds is the default.</p>
+<b><code>[interval]</code></b><br /> The interval is for alive-checking of Zoneplayer-device, because no message come if the host disappear :-)<br />If omitted a value of 10 seconds is the default.</p>
 <p>
-<code>[waittime]</code><br /> With this value you can configure the waiting time for the starting of the Subprocess.</p>
+<b><code>[waittime]</code></b><br /> With this value you can configure the waiting time for the starting of the Subprocess.</p>
 <p>
-<code>[delaytime]</code><br /> With this value you can configure a delay time before starting the network-part.</p>
-<br />
-<br />
+<b><code>[delaytime]</code></b><br /> With this value you can configure a delay time before starting the network-part.</p>
 <a name="SONOSset"></a>
 <h4>Set</h4>
 <ul>
 <li><b>Control-Commands</b><ul>
 <li><a name="SONOS_setter_Mute">
-<code>set &lt;name&gt; Mute &lt;state&gt;</code></a>
+<b><code>Mute &lt;state&gt;</code></b></a>
 <br />Sets the mute-state on all players.</li>
 <li><a name="SONOS_setter_PauseAll">
-<code>set &lt;name&gt; PauseAll</code></a>
+<b><code>PauseAll</code></b></a>
 <br />Pause all Zoneplayer.</li>
 <li><a name="SONOS_setter_Pause">
-<code>set &lt;name&gt; Pause</code></a>
+<b><code>Pause</code></b></a>
 <br />Alias for PauseAll.</li>
 <li><a name="SONOS_setter_StopAll">
-<code>set &lt;name&gt; StopAll</code></a>
+<b><code>StopAll</code></b></a>
 <br />Stops all Zoneplayer.</li>
 <li><a name="SONOS_setter_Stop">
-<code>set &lt;name&gt; Stop</code></a>
+<b><code>Stop</code></b></a>
 <br />Alias for StopAll.</li>
 </ul></li>
 <li><b>Group-Commands</b><ul>
 <li><a name="SONOS_setter_Groups">
-<code>set &lt;name&gt; Groups &lt;GroupDefinition&gt;</code></a>
+<b><code>Groups &lt;GroupDefinition&gt;</code></b></a>
 <br />Sets the current groups on the whole Sonos-System. The format is the same as retreived by getter 'Groups'.</li>
 </ul></li>
 </ul>
@@ -6992,7 +7000,7 @@ You can start this client on your own (to let it run instantly and independent f
 <ul>
 <li><b>Group-Commands</b><ul>
 <li><a name="SONOS_getter_Groups">
-<code>get &lt;name&gt; Groups</code></a>
+<b><code>Groups</code></b></a>
 <br />Retreives the current group-configuration of the Sonos-System. The format is a comma-separated List of Lists with devicenames e.g. <code>[Sonos_Kueche], [Sonos_Wohnzimmer, Sonos_Schlafzimmer]</code>. In this example there are two groups: the first consists of one player and the second consists of two players.<br />
 The order in the sublists are important, because the first entry defines the so-called group-coordinator (in this case <code>Sonos_Wohnzimmer</code>), from which the current playlist and the current title playing transferred to the other member(s).</li>
 </ul></li>
@@ -7003,47 +7011,47 @@ The order in the sublists are important, because the first entry defines the so-
 '''Attention'''<br />The most of the attributes can only be used after a restart of fhem, because it must be initially transfered to the subprocess.
 <ul>
 <li><b>Common</b><ul>
-<li><a name="SONOS_attribut_characterDecoding"><code>attr &lt;name&gt; characterDecoding &lt;codingname&gt;</code>
+<li><a name="SONOS_attribut_characterDecoding"><b><code>characterDecoding &lt;codingname&gt;</code></b>
 </a><br />With this attribute you can define a character-decoding-class. E.g. &lt;UTF-8&gt;. Default is &lt;CP-1252&gt;.</li>
-<li><a name="SONOS_attribut_disable"><code>attr &lt;name&gt; disable &lt;value&gt;</code>
-</a><br />One of (0,1). With this value you can disable the whole module. Works immediatly. If set to 1 the subprocess will be terminated and no message will be transmitted. If set to 0 the subprocess is again startet.<br />It is useful when you install new Sonos-Components and don't want any disgusting devices during the Sonos setup.</li>
-<li><a name="SONOS_attribut_pingType"><code>attr &lt;name&gt; pingType &lt;string&gt;</code>
+<li><a name="SONOS_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
+</a><br />One of (0,1). With this value you can disable the whole module. Works immediatly. If set to 1 the subprocess will be terminated and no message will be transmitted. If set to 0 the subprocess is again started.<br />It is useful when you install new Sonos-Components and don't want any disgusting devices during the Sonos setup.</li>
+<li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> One of (none,tcp,udp,icmp,syn). Defines which pingType for alive-Checking has to be used. If set to 'none' no checks will be done.</li>
 </ul></li>
 <li><b>Proxy Configuration</b><ul>
-<li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><code>attr &lt;name&gt; generateProxyAlbumArtURLs &lt;int&gt;</code>
+<li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><b><code>generateProxyAlbumArtURLs &lt;int&gt;</code></b>
 </a><br />One of (0, 1). If defined, all Cover-Links (the readings "currentAlbumArtURL" and "nextAlbumArtURL") are generated as links to the internal Sonos-Module-Proxy. It can be useful if you access Fhem over an external proxy and therefore have no access to the local network (the URLs are direct URLs to the Sonosplayer instead).</li>
-<li><a name="SONOS_attribut_proxyCacheDir"><code>attr &lt;name&gt; proxyCacheDir &lt;Path&gt;</code>
+<li><a name="SONOS_attribut_proxyCacheDir"><b><code>proxyCacheDir &lt;Path&gt;</code></b>
 </a><br />Defines a directory where the cached Coverfiles can be placed. If not defined "/tmp" will be used.</li>
-<li><a name="SONOS_attribut_proxyCacheTime"><code>attr &lt;name&gt; proxyCacheTime &lt;int&gt;</code>
+<li><a name="SONOS_attribut_proxyCacheTime"><b><code>proxyCacheTime &lt;int&gt;</code></b>
 </a><br />A time in seconds. With a definition other than "0" the caching mechanism of the internal Sonos-Module-Proxy will be activated. If the filetime of the chached cover is older than this time, it will be reloaded from the Sonosplayer.</li>
 </ul></li>
 <li><b>Speak Configuration</b><ul>
-<li><a name="SONOS_attribut_targetSpeakDir"><code>attr &lt;name&gt; targetSpeakDir &lt;string&gt;</code>
+<li><a name="SONOS_attribut_targetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
 </a><br /> Defines, which Directory has to be used for the Speakfiles</li>
-<li><a name="SONOS_attribut_targetSpeakURL"><code>attr &lt;name&gt; targetSpeakURL &lt;string&gt;</code>
+<li><a name="SONOS_attribut_targetSpeakURL"><b><code>targetSpeakURL &lt;string&gt;</code></b>
 </a><br /> Defines, which URL has to be used for accessing former stored Speakfiles as seen from the SonosPlayer</li>
-<li><a name="SONOS_attribut_targetSpeakFileTimestamp"><code>attr &lt;name&gt; targetSpeakFileTimestamp &lt;int&gt;</code>
+<li><a name="SONOS_attribut_targetSpeakFileTimestamp"><b><code>targetSpeakFileTimestamp &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Defines, if the Speakfile should have a timestamp in his name. That makes it possible to store all historical Speakfiles.</li>
-<li><a name="SONOS_attribut_targetSpeakFileHashCache"><code>attr &lt;name&gt; targetSpeakFileHashCache &lt;int&gt;</code>
+<li><a name="SONOS_attribut_targetSpeakFileHashCache"><b><code>targetSpeakFileHashCache &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Defines, if the Speakfile should have a hash-value in his name. If this value is set to one an already generated file with the same hash is re-used and not newly generated.</li>
-<li><a name="SONOS_attribut_Speak1"><code>attr &lt;name&gt; Speak1 &lt;Fileextension&gt;:&lt;Commandline&gt;</code>
+<li><a name="SONOS_attribut_Speak1"><b><code>Speak1 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Defines a systemcall commandline for generating a speaking file out of the given text. If such an attribute is defined, an associated setter at the Sonosplayer-Device is available. The following placeholders are available:<br />'''%language%''': Will be replaced by the given language-parameter<br />'''%filename%''': Will be replaced by the complete target-filename (incl. fileextension).<br />'''%text%''': Will be replaced with the given text</li>
-<li><a name="SONOS_attribut_Speak2"><code>attr &lt;name&gt; Speak2 &lt;Fileextension&gt;:&lt;Commandline&gt;</code>
+<li><a name="SONOS_attribut_Speak2"><b><code>Speak2 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />See Speak1</li>
-<li><a name="SONOS_attribut_Speak3"><code>attr &lt;name&gt; Speak3 &lt;Fileextension&gt;:&lt;Commandline&gt;</code>
+<li><a name="SONOS_attribut_Speak3"><b><code>Speak3 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />See Speak1</li>
-<li><a name="SONOS_attribut_Speak4"><code>attr &lt;name&gt; Speak4 &lt;Fileextension&gt;:&lt;Commandline&gt;</code>
+<li><a name="SONOS_attribut_Speak4"><b><code>Speak4 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />See Speak1</li>
-<li><a name="SONOS_attribut_SpeakCover"><code>attr &lt;name&gt; SpeakCover &lt;Filename&gt;</code>
+<li><a name="SONOS_attribut_SpeakCover"><b><code>SpeakCover &lt;Filename&gt;</code></b>
 </a><br />Defines a Cover for use by the speak generation process. If not defined the Fhem-logo will be used.</li>
-<li><a name="SONOS_attribut_Speak1Cover"><code>attr &lt;name&gt; Speak1Cover &lt;Filename&gt;</code>
+<li><a name="SONOS_attribut_Speak1Cover"><b><code>Speak1Cover &lt;Filename&gt;</code></b>
 </a><br />See SpeakCover</li>
-<li><a name="SONOS_attribut_Speak2Cover"><code>attr &lt;name&gt; Speak2Cover &lt;Filename&gt;</code>
+<li><a name="SONOS_attribut_Speak2Cover"><b><code>Speak2Cover &lt;Filename&gt;</code></b>
 </a><br />See SpeakCover</li>
-<li><a name="SONOS_attribut_Speak3Cover"><code>attr &lt;name&gt; Speak3Cover &lt;Filename&gt;</code>
+<li><a name="SONOS_attribut_Speak3Cover"><b><code>Speak3Cover &lt;Filename&gt;</code></b>
 </a><br />See SpeakCover</li>
-<li><a name="SONOS_attribut_Speak4Cover"><code>attr &lt;name&gt; Speak4Cover &lt;Filename&gt;</code>
+<li><a name="SONOS_attribut_Speak4Cover"><b><code>Speak4Cover &lt;Filename&gt;</code></b>
 </a><br />See SpeakCover</li>
 </ul></li>
 </ul>
@@ -7063,7 +7071,14 @@ The order in the sublists are important, because the first entry defines the so-
 <li><code>HTTP::Request</code></li></ul>
 Installation z.B. als Debian-Pakete (mittels "sudo apt-get install &lt;packagename&gt;"):<ul>
 <li>LWP::Simple-Packagename (inkl. LWP::UserAgent und HTTP::Request): libwww-perl</li>
-<li>SOAP::Lite-Packagename: libsoap-lite-perl</li></ul></p>
+<li>SOAP::Lite-Packagename: libsoap-lite-perl</li></ul>
+<br />Installation z.B. als Windows ActivePerl (mittels Perl-Packagemanager)<ul>
+<li>Package LWP (incl. LWP::UserAgent and HTTP::Request)</li>
+<li>Package SOAP::Lite</li>
+<li>SOAP::Lite-Special für Versionen nach 5.18:<ul>
+  <li>Eine andere Paketquelle von den Vorschlägen oder manuell hinzufügen: Bribes de Perl (http://www.bribes.org/perl/ppm)</li>
+  <li>Package: SOAP::Lite</li></ul></li></ul>
+<b>Windows ActivePerl 64Bit kann momentan nicht verwendet werden, da es das Paket SOAP::Lite dort momentan nicht gibt.</b></p>
 <p><b>Achtung!</b><br />Das Modul wird nicht auf jeder Plattform lauffähig sein, da Threads und die angegebenen Perl-Module verwendet werden.</p>
 <p>Mehr Informationen im (deutschen) Wiki-Artikel: <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a></p>
 <p>Das System besteht aus zwei Komponenten:<br />
@@ -7076,44 +7091,41 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 <p>
 <code>define Sonos SONOS localhost:4711 30</code>
 </p>
-<br />
 <a name="SONOSdefine"></a>
 <h4>Definition</h4>
-<code>define &lt;name&gt; SONOS [upnplistener [interval [waittime [delaytime]]]]</code>
+<b><code>define &lt;name&gt; SONOS [upnplistener [interval [waittime [delaytime]]]]</code></b>
         <br /><br /> Definiert das Sonos interface für die Kommunikation mit dem Sonos-System.<br />
 <p>
-<code>[upnplistener]</code><br />Name und Port eines externen UPnP-Client. Wenn nicht angegebenen wird <code>localhost:4711</code> festgelegt. Der Port muss eine freie Portnummer ihres Systems sein. <br />Wenn sie keinen externen Client gestartet haben, startet das Skript einen eigenen.<br />Wenn sie einen eigenen Dienst gestartet haben, dann geben sie hier die entsprechenden Informationen an.</p>
+<b><code>[upnplistener]</code></b><br />Name und Port eines externen UPnP-Client. Wenn nicht angegebenen wird <code>localhost:4711</code> festgelegt. Der Port muss eine freie Portnummer ihres Systems sein. <br />Wenn sie keinen externen Client gestartet haben, startet das Skript einen eigenen.<br />Wenn sie einen eigenen Dienst gestartet haben, dann geben sie hier die entsprechenden Informationen an.</p>
 <p>
-<code>[interval]</code><br /> Das Interval wird für die Überprüfung eines Zoneplayers benötigt. In diesem Interval wird nachgeschaut, ob der Player noch erreichbar ist, da sich ein Player nicht mehr abmeldet, wenn er abgeschaltet wird :-)<br />Wenn nicht angegeben, wird ein Wert von 10 Sekunden angenommen.</p>
+<b><code>[interval]</code></b><br /> Das Interval wird für die Überprüfung eines Zoneplayers benötigt. In diesem Interval wird nachgeschaut, ob der Player noch erreichbar ist, da sich ein Player nicht mehr abmeldet, wenn er abgeschaltet wird :-)<br />Wenn nicht angegeben, wird ein Wert von 10 Sekunden angenommen.</p>
 <p>
-<code>[waittime]</code><br /> Hiermit wird die Wartezeit eingestellt, die nach dem Starten des SubProzesses darauf gewartet wird.</p>
+<b><code>[waittime]</code></b><br /> Hiermit wird die Wartezeit eingestellt, die nach dem Starten des SubProzesses darauf gewartet wird.</p>
 <p>
-<code>[delaytime]</code><br /> Hiermit kann eine Verzögerung eingestellt werden, die vor dem Starten des Netzwerks gewartet wird.</p>
-<br />
-<br />
+<b><code>[delaytime]</code></b><br /> Hiermit kann eine Verzögerung eingestellt werden, die vor dem Starten des Netzwerks gewartet wird.</p>
 <a name="SONOSset"></a>
 <h4>Set</h4>
 <ul>
 <li><b>Steuerbefehle</b><ul>
 <li><a name="SONOS_setter_Mute">
-<code>set &lt;name&gt; Mute &lt;state&gt;</code></a>
+<b><code>Mute &lt;state&gt;</code></b></a>
 <br />Setzt den Mute-Zustand bei allen Playern.</li>
 <li><a name="SONOS_setter_PauseAll">
-<code>set &lt;name&gt; PauseAll</code></a>
+<b><code>PauseAll</code></b></a>
 <br />Pausiert die Wiedergabe in allen Zonen.</li>
 <li><a name="SONOS_setter_Pause">
-<code>set &lt;name&gt; Pause</code></a>
+<b><code>Pause</code></b></a>
 <br />Synonym für PauseAll.</li>
 <li><a name="SONOS_setter_StopAll">
-<code>set &lt;name&gt; StopAll</code></a>
+<b><code>StopAll</code></b></a>
 <br />Stoppt die Wiedergabe in allen Zonen.</li>
 <li><a name="SONOS_setter_Stop">
-<code>set &lt;name&gt; Stop</code></a>
+<b><code>Stop</code></b></a>
 <br />Synonym für StopAll.</li>
 </ul></li>
 <li><b>Gruppenbefehle</b><ul>
 <li><a name="SONOS_setter_Groups">
-<code>set &lt;name&gt; Groups &lt;GroupDefinition&gt;</code></a>
+<b><code>Groups &lt;GroupDefinition&gt;</code></b></a>
 <br />Setzt die aktuelle Gruppierungskonfiguration der Sonos-Systemlandschaft. Das Format ist jenes, welches auch von dem Get-Befehl 'Groups' geliefert wird.</li>
 </ul></li>
 </ul>
@@ -7123,7 +7135,7 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 <ul>
 <li><b>Gruppenbefehle</b><ul>
 <li><a name="SONOS_getter_Groups">
-<code>get &lt;name&gt; Groups</code></a>
+<b><code>Groups</code></b></a>
 <br />Liefert die aktuelle Gruppierungskonfiguration der Sonos Systemlandschaft zurück. Das Format ist eine Kommagetrennte Liste von Listen mit Devicenamen, also z.B. <code>[Sonos_Kueche], [Sonos_Wohnzimmer, Sonos_Schlafzimmer]</code>. In diesem Beispiel sind also zwei Gruppen definiert, von denen die erste aus einem Player und die zweite aus Zwei Playern besteht.<br />
 Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintrag der sogenannte Gruppenkoordinator ist (in diesem Fall also <code>Sonos_Wohnzimmer</code>), von dem die aktuelle Abspielliste un der aktuelle Titel auf die anderen Gruppenmitglieder übernommen wird.</li>
 </ul></li>
@@ -7134,49 +7146,49 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 '''Hinweis'''<br />Die Attribute werden erst bei einem Neustart von Fhem verwendet, da diese dem SubProzess initial zur Verfügung gestellt werden müssen.
 <ul>
 <li><b>Grundsätzliches</b><ul>
-<li><a name="SONOS_attribut_characterDecoding"><code>attr &lt;name&gt; characterDecoding &lt;codingname&gt;</code>
+<li><a name="SONOS_attribut_characterDecoding"><b><code>characterDecoding &lt;codingname&gt;</code></b>
 </a><br />Hiermit kann die Zeichendekodierung eingestellt werden. Z.b. &lt;UTF-8&gt;. Standardm&auml;&szlig;ig wird &lt;CP-1252&gt; verwendet.</li>
-<li><a name="SONOS_attribut_disable"><code>attr &lt;name&gt; disable &lt;value&gt;</code>
+<li><a name="SONOS_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Hiermit kann das Modul abgeschaltet werden. Wirkt sofort. Bei 1 wird der SubProzess beendet, und somit keine weitere Verarbeitung durchgeführt. Bei 0 wird der Prozess wieder gestartet.<br />Damit kann das Modul temporär abgeschaltet werden, um bei der Neueinrichtung von Sonos-Komponenten keine halben Zustände mitzubekommen.</li>
-<li><a name="SONOS_attribut_pingType"><code>attr &lt;name&gt; pingType &lt;string&gt;</code>
+<li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> Eines von (none,tcp,udp,icmp,syn). Gibt an, welche Methode für die Ping-Überprüfung verwendet werden soll. Wenn 'none' angegeben wird, dann wird keine Überprüfung gestartet.</li>
 </ul></li>
 <li><b>Proxy-Einstellungen</b><ul>
-<li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><code>attr &lt;name&gt; generateProxyAlbumArtURLs &lt;int&gt;</code>
+<li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><b><code>generateProxyAlbumArtURLs &lt;int&gt;</code></b>
 </a><br /> Aus (0, 1). Wenn aktiviert, werden alle Cober-Links als Proxy-Aufrufe an Fhem generiert. Dieser Proxy-Server wird vom Sonos-Modul bereitgestellt. In der Grundeinstellung erfolgt kein Caching der Cover, sondern nur eine Durchreichung der Cover von den Sonosplayern (Damit ist der Zugriff durch einen externen Proxyserver auf Fhem möglich).</li>
-<li><a name="SONOS_attribut_proxyCacheDir"><code>attr &lt;name&gt; proxyCacheDir &lt;Path&gt;</code>
+<li><a name="SONOS_attribut_proxyCacheDir"><b><code>proxyCacheDir &lt;Path&gt;</code></b>
 </a><br /> Hiermit wird das Verzeichnis festgelegt, in dem die Cober zwischengespeichert werden. Wenn nicht festegelegt, so wird "/tmp" verwendet.</li>
-<li><a name="SONOS_attribut_proxyCacheTime"><code>attr &lt;name&gt; proxyCacheTime &lt;int&gt;</code>
+<li><a name="SONOS_attribut_proxyCacheTime"><b><code>proxyCacheTime &lt;int&gt;</code></b>
 </a><br /> Mit einer Angabe ungleich 0 wird der Caching-Mechanismus des Sonos-Modul-Proxy-Servers aktiviert. Dabei werden Cover, die im Cache älter sind als diese Zeitangabe in Sekunden, neu vom Sonosplayer geladen, alle anderen direkt ausgeliefert, ohne den Player zu fragen.</li>
 </ul></li>
 <li><b>Sprachoptionen</b><ul>
-<li><a name="SONOS_attribut_targetSpeakDir"><code>attr &lt;name&gt; targetSpeakDir &lt;string&gt;</code>
+<li><a name="SONOS_attribut_targetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
 </a><br /> Gibt an, welches Verzeichnis für die Ablage des MP3-Files der Textausgabe verwendet werden soll</li>
-<li><a name="SONOS_attribut_targetSpeakURL"><code>attr &lt;name&gt; targetSpeakURL &lt;string&gt;</code>
+<li><a name="SONOS_attribut_targetSpeakURL"><b><code>targetSpeakURL &lt;string&gt;</code></b>
 </a><br /> Gibt an, unter welcher Adresse der ZonePlayer das unter targetSpeakDir angegebene Verzeichnis erreichen kann.</li>
-<li><a name="SONOS_attribut_targetSpeakFileTimestamp"><code>attr &lt;name&gt; targetSpeakFileTimestamp &lt;int&gt;</code>
+<li><a name="SONOS_attribut_targetSpeakFileTimestamp"><b><code>targetSpeakFileTimestamp &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Gibt an, ob die erzeugte MP3-Sprachausgabedatei einen Zeitstempel erhalten soll (1) oder nicht (0).</li>
-<li><a name="SONOS_attribut_targetSpeakFileHashCache"><code>attr &lt;name&gt; targetSpeakFileHashCache &lt;int&gt;</code>
+<li><a name="SONOS_attribut_targetSpeakFileHashCache"><b><code>targetSpeakFileHashCache &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Gibt an, ob die erzeugte Sprachausgabedatei einen Hashwert erhalten soll (1) oder nicht (0). Wenn dieser Wert gesetzt wird, dann wird eine bereits bestehende Datei wiederverwendet, und nicht neu erzeugt.</li>
-<li><a name="SONOS_attribut_Speak1"><code>attr &lt;name&gt; Speak1 &lt;Fileextension&gt;:&lt;Commandline&gt;</code>
+<li><a name="SONOS_attribut_Speak1"><b><code>Speak1 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Hiermit kann ein Systemaufruf definiert werden, der zu Erzeugung einer Sprachausgabe verwendet werden kann. Sobald dieses Attribut definiert wurde, ist ein entsprechender Setter am Sonosplayer verfügbar.<br />Es dürfen folgende Platzhalter verwendet werden:<br />'''%language%''': Wird durch die eingegebene Sprache ersetzt<br />'''%filename%''': Wird durch den kompletten Dateinamen (inkl. Dateiendung) ersetzt.<br />'''%text%''': Wird durch den zu übersetzenden Text ersetzt.</li>
-<li><a name="SONOS_attribut_Speak2"><code>attr &lt;name&gt; Speak2 &lt;Fileextension&gt;:&lt;Commandline&gt;</code>
+<li><a name="SONOS_attribut_Speak2"><b><code>Speak2 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Siehe Speak1</li>
-<li><a name="SONOS_attribut_Speak3"><code>attr &lt;name&gt; Speak3 &lt;Fileextension&gt;:&lt;Commandline&gt;</code>
+<li><a name="SONOS_attribut_Speak3"><b><code>Speak3 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Siehe Speak1</li>
-<li><a name="SONOS_attribut_Speak4"><code>attr &lt;name&gt; Speak4 &lt;Fileextension&gt;:&lt;Commandline&gt;</code>
+<li><a name="SONOS_attribut_Speak4"><b><code>Speak4 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Siehe Speak1</li>
-<li><a name="SONOS_attribut_SpeakCover"><code>attr &lt;name&gt; SpeakCover &lt;Absolute-Imagepath&gt;</code>
+<li><a name="SONOS_attribut_SpeakCover"><b><code>SpeakCover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Hiermit kann ein JPG- oder PNG-Bild als Cover für die Sprachdurchsagen definiert werden.</li>
-<li><a name="SONOS_attribut_Speak1Cover"><code>attr &lt;name&gt; Speak1Cover &lt;Absolute-Imagepath&gt;</code>
+<li><a name="SONOS_attribut_Speak1Cover"><b><code>Speak1Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak1.</li>
-<li><a name="SONOS_attribut_Speak2Cover"><code>attr &lt;name&gt; Speak2Cover &lt;Absolute-Imagepath&gt;</code>
+<li><a name="SONOS_attribut_Speak2Cover"><b><code>Speak2Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak2.</li>
-<li><a name="SONOS_attribut_Speak3Cover"><code>attr &lt;name&gt; Speak3Cover &lt;Absolute-Imagepath&gt;</code>
+<li><a name="SONOS_attribut_Speak3Cover"><b><code>Speak3Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak3.</li>
-<li><a name="SONOS_attribut_Speak3Cover"><code>attr &lt;name&gt; Speak3Cover &lt;Absolute-Imagepath&gt;</code>
+<li><a name="SONOS_attribut_Speak3Cover"><b><code>Speak3Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak3.</li>
-<li><a name="SONOS_attribut_Speak4Cover"><code>attr &lt;name&gt; Speak4Cover &lt;Absolute-Imagepath&gt;</code>
+<li><a name="SONOS_attribut_Speak4Cover"><b><code>Speak4Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak4.</li>
 </ul></li>
 </ul>
