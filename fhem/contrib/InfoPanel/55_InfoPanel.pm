@@ -45,6 +45,7 @@ sub btIP_itemButton;
 sub btIP_itemCircle;
 sub btIP_itemDate;
 sub btIP_itemEllipse;
+sub btIP_itemGroup;
 sub btIP_itemImg;
 sub _btIP_imgData;
 sub _btIP_imgRescale;
@@ -249,11 +250,10 @@ sub btIP_itemEllipse {
 }
 
 sub btIP_itemGroup {
-  my($id,$type,$arg) = @_;
+  my($id,$type,$x,$y) = @_;
   return "</g>\n"               if $type eq 'close';
-  $arg = defined($arg) ? $arg : "";
   $id = ($id eq '-') ? createUniqueId() : $id;
-  return "<g id=\"$id\" $arg >" if $type eq 'open';
+  return "<g id=\"$id\" transform=\"translate($x,$y)\" >" if $type eq 'open';
 }
 
 sub btIP_itemImg {
@@ -715,9 +715,11 @@ sub btIP_evalLayout($$@) {
         }
 
 	    when("group") {
-	      ($id,$text,$arg) = split("[ \t]+", $def, 3);
-	      my $arg = AnalyzePerlCommand(undef, $arg) if($arg);
-	      $svg .= btIP_itemGroup($id,$text,$arg);
+	      ($id,$text,$x,$y) = split("[ \t]+", $def, 4);
+	         ($x,$y)= btIP_xy($x,$y,%params);
+	         $params{xx} = $x;
+	         $params{yy} = $y;
+	      $svg .= btIP_itemGroup($id,$text,$x,$y);
         }
 
 	    when("img") {
