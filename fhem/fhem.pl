@@ -1324,7 +1324,7 @@ CommandSave($$)
 {
   my ($cl, $param) = @_;
 
-  if($param eq "?") {
+  if($param && $param eq "?") {
     return "No structural changes." if(!@structChangeHist);
     return "Last 10 structural changes:\n  ".join("\n  ", @structChangeHist);
   }
