@@ -1,4 +1,4 @@
-# $Id: 55_GDS.pm 7699 2015-01-24 19:53:30Z betateilchen $
+# $Id: 55_GDS.pm 7758 2015-01-28 13:36:51Z betateilchen $
 ####################################################################################################
 #
 #	55_GDS.pm
@@ -68,9 +68,10 @@ sub GDS_Initialize($) {
 
 	$tempDir = "c:\\temp\\" if($^O eq "MSWin32");
 
+    GDS_addExtension("GDS_CGI","gds","GDS Files");
+
 	fillMappingTables($hash);
 	initDropdownLists($hash);
-	createIndexFile($hash);
 
 	if($name){
 		(undef, $found) = retrieveFile($hash,"conditions");
@@ -105,14 +106,8 @@ sub GDS_Define($$$) {
 	Log3($name, 3, "GDS $name: created");
 	Log3($name, 3, "GDS $name: tempDir=".$tempDir);
 
-	$dummy = "gds_web_".$name;
-	CommandDefine(undef, $dummy." HTTPSRV ".$name." ".$tempDir." GDS ".$name." Files");
-	$defs{$dummy}{TEMPORARY} = 1;
-	$attr{$dummy}{directoryindex} = $name.".html";
-	$attr{$dummy}{room} = 'hidden';
 	fillMappingTables($hash);
 	initDropdownLists($hash);
-	createIndexFile($hash);
 
 	(undef, $found) = retrieveFile($hash,"conditions");
 	if($found){
@@ -398,6 +393,91 @@ sub GDS_GetUpdate($) {
 	return 1;
 }
 
+sub GDS_addExtension($$$) {
+    my ($func,$link,$friendlyname)= @_;
+  
+    my $url = "/" . $link;
+    $data{FWEXT}{$url}{FUNC} = $func;
+    $data{FWEXT}{$url}{LINK} = "+$link";
+    $data{FWEXT}{$url}{NAME} = $friendlyname;
+    $data{FWEXT}{$url}{FORKABLE} = 0;
+}
+
+sub GDS_CGI {
+  my ($request) = @_;
+  my ($name,$ext)= GDS_splitRequest($request);
+  if(defined($name)) {
+     my $filename= "$tempDir/$name.$ext";
+     my $MIMEtype= filename2MIMEType($filename);
+     my @contents;
+     if(open(INPUTFILE, $filename)) {
+       binmode(INPUTFILE);
+       @contents= <INPUTFILE>;
+       close(INPUTFILE);
+       return("$MIMEtype; charset=utf-8", join("", @contents));
+     } else {
+       return("text/plain; charset=utf-8", "File not found: $filename");
+     }
+  } else {
+    return GDS_Overview();
+  }
+}
+
+sub GDS_splitRequest($) {
+  my ($request) = @_;
+
+  if($request =~ /^.*\/gds$/) {
+    # http://localhost:8083/fhem/gds2
+    return (undef,undef); # name, ext
+  } else {
+    my $call= $request;
+    $call =~ s/^.*\/gds\/([^\/]*)$/$1/;
+    my $name= $call;
+    $name =~ s/^(.*)\.(jpg)$/$1/;
+    my $ext= $call;
+    $ext =~ s/^$name\.(.*)$/$1/;
+    return ($name,$ext);
+  }
+}
+
+sub GDS_Overview {
+  my ($name, $url);
+  my $html= GDS_HTMLHead("GDS Overview") . "<body>\n\n";
+  foreach my $def (sort keys %defs) {
+     if($defs{$def}{TYPE} eq "GDS") {
+        $name= $defs{$def}{NAME};
+        $url   = GDS_getURL();
+        $html .= "$name<br>\n<ul>\n";
+        $html .= "<a href=\"$url/gds/$name\_conditionsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>\n";
+        $html .= "<a href=\"$url/gds/$name\_forecastsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>\n";
+        $html .= "<a href=\"$url/gds/$name\_warningsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Warnungen</a><br/>\n";
+        $html .= "<a href=\"$url/gds/$name\_radarmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Radarkarte</a><br/>\n";
+        $html.= "</ul>\n\n";
+    }
+  }
+  $html.="</body>\n" . GDS_HTMLTail();
+
+  return ("text/html; charset=utf-8", $html);
+}
+
+sub GDS_HTMLHead($) {
+  my ($title) = @_;
+  my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
+  my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
+  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n</head>\n";
+  return $code;
+}
+
+sub GDS_HTMLTail {
+  return "</html>";
+}
+
+sub GDS_getURL {
+  my $name = `hostname`;
+  chop($name);
+  my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
+  return $proto."://$name:" . $defs{$FW_wname}{PORT} . $FW_ME;
+}
 
 ####################################################################################################
 #
@@ -1232,6 +1312,8 @@ sub gdsHeadlines($;$) {
 #	2014-10-15	added	attr disable
 #
 #	2015-01-03	added	multiple alerts handling
+#
+#   2015-01-30  changed use own FWEXT instead of HTTPSRV
 #
 ####################################################################################################
 #
