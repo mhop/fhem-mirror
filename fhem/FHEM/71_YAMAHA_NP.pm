@@ -190,7 +190,7 @@ sub YAMAHA_NP_Set
                  "timerVolume:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
                  "mute:on,off ".
                  (exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"").
-                 "statusRequest:basicStatus,mediaRendererDesc,playerStatus,systemConfig,timerStatus,tunerPresetDAB,tunerPresetFM,tunerStatus ".
+                 "statusRequest:basicStatus,mediaRendererDesc,playerStatus,standbyMode,systemConfig,timerStatus,tunerPresetDAB,tunerPresetFM,tunerStatus ".
                  "standbyMode:eco,normal ".
                  "cdTray:noArg ".
                  "timer:on,off ".
@@ -217,7 +217,7 @@ sub YAMAHA_NP_Set
                  "timerVolume:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
                  "mute:on,off ".
                  (exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"").
-                 "statusRequest:basicStatus,mediaRendererDesc,networkInfo,playerStatus,systemConfig,timerStatus,tunerPresetFM,tunerStatus ".
+                 "statusRequest:basicStatus,mediaRendererDesc,networkInfo,playerStatus,standbyMode,systemConfig,timerStatus,tunerPresetFM,tunerStatus ".
                  "standbyMode:eco,normal ".
                  "cdTray:noArg ".
                  "timer:on,off ".
@@ -235,11 +235,11 @@ sub YAMAHA_NP_Set
     
     if($what eq "on")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Power>On</Power></Power_Control></System></YAMAHA_AV>" ,$what, undef);
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Power>On</Power></Power_Control></System></YAMAHA_AV>" ,$what, "On");
     }
     elsif($what eq "off")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Power>Standby</Power></Power_Control></System></YAMAHA_AV>", $what, undef);
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Power>Standby</Power></Power_Control></System></YAMAHA_AV>", $what, "Standby");
     }
     elsif($what eq "input")
     {
@@ -340,7 +340,7 @@ sub YAMAHA_NP_Set
         if($hash->{READINGS}{power}{VAL} eq "on")
         {
           $hash->{helper}{targetVolume} = $target_volume;
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".($target_volume)."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", undef);
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".($target_volume)."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", $a[2]);
         }
         else
         {
@@ -458,12 +458,12 @@ sub YAMAHA_NP_Set
     }
     elsif($what eq "cdTray")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Tray>Open/Close</Tray></Misc></System></YAMAHA_AV>", $what, undef);
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Tray>Open/Close</Tray></Misc></System></YAMAHA_AV>", $what, "Open/Close");
     }
     elsif($what eq "clockUpdate")
     {  
       my $clockUpdateCurrentTime = Time::Piece->new();
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Clock><Param>".($clockUpdateCurrentTime->strftime('%Y:%m:%d:%H:%M:%S'))."</Param></Clock></Misc></System></YAMAHA_AV>", $what, undef);
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Clock><Param>".($clockUpdateCurrentTime->strftime('%Y:%m:%d:%H:%M:%S'))."</Param></Clock></Misc></System></YAMAHA_AV>", $what, ($clockUpdateCurrentTime->strftime('%Y:%m:%d:%H:%M:%S')));
     }
     elsif($what eq "statusRequest")
     {
@@ -500,6 +500,10 @@ sub YAMAHA_NP_Set
       {
         YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
       }
+      elsif($a[2] eq "standbyMode")
+      {
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Power_Control><Saving>GetParam</Saving></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
+      }
       elsif($a[2] eq "mediaRendererDesc")
       {
         YAMAHA_NP_getMediaRendererDesc($hash);
@@ -513,7 +517,15 @@ sub YAMAHA_NP_Set
     {
       if($a[2] eq "on")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Mode>".ucfirst($a[2])."</Mode></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);
+        # Check if standbyMode == 'Normal'
+        if($hash->{READINGS}{standbyMode}{VAL} eq "normal")
+        {
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Mode>".ucfirst($a[2])."</Mode></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);        
+        }
+        else
+        {
+          return "Set 'standbyMode normal' first.";
+        }
       }
       elsif($a[2] eq "off")
       {
@@ -786,7 +798,7 @@ sub YAMAHA_NP_SendCommand
 # parses the receiver response
 sub YAMAHA_NP_ParseResponse
 {
-    my ( $param, $err, $data ) = @_;    
+    my ($param, $err, $data ) = @_;    
     
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
@@ -823,7 +835,7 @@ sub YAMAHA_NP_ParseResponse
       
       $hash->{helper}{AVAILABLE} = 1;
       
-      if ($cmd ne "statusRequest" and $arg ne "systemConfig") # RC="0" is not delivered by that status Request
+      if (($cmd ne "statusRequest") and ($arg ne "systemConfig")) # RC="0" is not delivered by that status Request
       {
         if(not $data =~ /RC="0"/)
         {
@@ -1113,6 +1125,13 @@ sub YAMAHA_NP_ParseResponse
             }                        
           }          
         }
+        elsif ($arg eq "standbyMode")
+        {
+          if($data =~ /<Saving>(.+)<\/Saving>/)
+          {
+            readingsBulkUpdate($hash, "standbyMode", lc($1));
+          }
+        }
         elsif ($arg eq "mediaRendererDesc")
         {
           if($data =~ /<friendlyName>(.+)<\/friendlyName>/)
@@ -1183,6 +1202,13 @@ sub YAMAHA_NP_ParseResponse
         if($data =~ /RC="0"/)
         {
           readingsBulkUpdate($hash, "mute", $arg);
+        }
+      }
+      elsif($cmd eq "standbyMode")
+      {
+        if($data =~ /RC="0"/)
+        {
+          readingsBulkUpdate($hash, "standbyMode", lc($arg));
         }
       }
       elsif($cmd eq "volume" or $cmd eq "volumeStraight" or $cmd eq "volumeUp" or $cmd eq "volumeDown")
@@ -1460,9 +1486,10 @@ sub YAMAHA_NP_html2txt
       <li><b>standbyMode</b> [eco|normal] &nbsp;&nbsp;-&nbsp;&nbsp; set the standby mode.</li>
       <li><b>statusRequest [&lt;parameter&gt;] </b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
       <ul>
-        <b><li>systemConfig</b>&nbsp;&nbsp;-&nbsp;&nbsp; requests the system configuration</li>
         <li><b>basicStatus</b>&nbsp;&nbsp;-&nbsp;&nbsp; requests the basic status such as volume input etc.</li>
         <li><b>playerStatus</b>&nbsp;&nbsp;-&nbsp;&nbsp; requests the player status such as play status, song info, artist info etc.</li>
+        <li><b>standbyMode</b>&nbsp;&nbsp;-&nbsp;&nbsp; requests the standby mode information</li>
+        <li><b>systemConfig</b>&nbsp;&nbsp;-&nbsp;&nbsp; requests the system configuration</li>
         <li><b>tunerStatus</b>&nbsp;&nbsp;-&nbsp;&nbsp; requests the tuner status such as FM frequency, preset number, DAB information etc.</li>
         <li><b>timerStatus</b>&nbsp;&nbsp;-&nbsp;&nbsp; requests device's internal wake-up timer status</li>
         <li><b>networkInfo</b>&nbsp;&nbsp;-&nbsp;&nbsp; requests device's network related information such as IP, Gateway, MAC address etc.</li>
@@ -1557,6 +1584,7 @@ sub YAMAHA_NP_html2txt
       <li><b>volume</b> - Reports the current volume level of the receiver in &#037; (0...100&#037;)</li>
       <li><b>volumeStraight</b> - Reports the current volume level of the receiver as used and displayed in the device (values device specific)</li>
       <li><b>sleep</b> - Reports the current sleep timer status (30min|60min|90min|120min|off).</li>
+      <li><b>standbyMode</b> - Reports the standby mode (eco|normal).</li>
       <li><b>state</b> - Reports the current power state and an absence of the device (on|off|absent)</li>
       <br><br><u>Player related readings:</u><br><br>
       <li><b>playerPlaybackInfo</b> - Reports current player state (play|stop|pause).</li>
@@ -1688,9 +1716,10 @@ sub YAMAHA_NP_html2txt
       <li><b>standbyMode</b> [eco|normal] &nbsp;&nbsp;-&nbsp;&nbsp; Umschaltung des Standby Modus.</li>
       <li><b>statusRequest [&lt;parameter&gt;] </b> &nbsp;&nbsp;-&nbsp;&nbsp; Abfrage des aktuellen Status des Network Players.</li>
       <ul>
-        <b><li>systemConfig</b>&nbsp;&nbsp;-&nbsp;&nbsp; Abfrage der Systemkonfiguration.</li>
         <li><b>basicStatus</b>&nbsp;&nbsp;-&nbsp;&nbsp; Abfrage der Elementarparameter (z.B. Lautst&auml;rke, Eingang, etc.)</li>
         <li><b>playerStatus</b>&nbsp;&nbsp;-&nbsp;&nbsp; Abfrage des Player-Status.</li>
+        <li><b>standbyMode</b>&nbsp;&nbsp;-&nbsp;&nbsp; Abfrage des standby Modus.</li>
+        <li><b>systemConfig</b>&nbsp;&nbsp;-&nbsp;&nbsp; Abfrage der Systemkonfiguration.</li>
         <li><b>tunerStatus</b>&nbsp;&nbsp;-&nbsp;&nbsp; Abfrage des Tuner-Status (z.B. FM Frequenz, Preset-Nummer, DAB Information etc.)</li>
         <li><b>timerStatus</b>&nbsp;&nbsp;-&nbsp;&nbsp; Abfrage des internen Wake-up timers.</li>
         <li><b>networkInfo</b>&nbsp;&nbsp;-&nbsp;&nbsp; Abfrage von Netzwerk-relevanten Informationen (z.B: IP-Adresse, Gateway-Adresse, MAC-address etc.)</li>
@@ -1782,6 +1811,7 @@ sub YAMAHA_NP_html2txt
         <li><b>volume</b> - Abfrage der aktuell eingestellten Lautst&auml;rke in &#037; (0...100&#037;)</li>
         <li><b>volumeStraight</b> - Abfrage der aktuellen absoluten Ger&auml;telautst&auml;rke im Ger&auml;t (ger&auml;tespezifisch)</li>
         <li><b>sleep</b> - Abfrage des Sleep-Timer Status (30min|60min|90min|120min|off).</li>
+        <li><b>standbyMode</b> - Abfrage des standby Modus (eco|normal).</li>
         <li><b>state</b> - Abfrage des aktuellen Power Zustands und Anwesenheit (on|off|absent).</li>
         <br><br><u>Player Readings:</u><br><br>
         <li><b>playerPlaybackInfo</b> - Abfrage des aktuellen Player Status (play|stop|pause).</li>
