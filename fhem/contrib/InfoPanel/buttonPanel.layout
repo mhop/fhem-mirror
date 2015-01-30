@@ -18,7 +18,6 @@ rgb "4D4D4DFF"
 #
 boxcolor "FF0000FF"
 button 11   0  55 160 135 0 0 {"Button11Link"} {"Button11Text"}
-
 boxcolor "00FF00FF"
 button 12 160  55 320 135 0 0 {"+http://www.google.de"} {"Google in new"}
 boxcolor "FF0000FF"
@@ -40,37 +39,37 @@ boxcolor "00FF00FF"
 button 25 640 135 800 215 0 0 {"Button25Link"} {"Button25Text"}
 
 boxcolor "FF0000FF"
-button 31   0 215 160 290 0 0 {"Button31Link"} {"Button31Text"}
+button 31   0 215 160 295 0 0 {"Button31Link"} {"Button31Text"}
 boxcolor "00FF00FF"
-button 32 160 215 320 290 0 0 {"Button32Link"} {"Button32Text"}
+button 32 160 215 320 295 0 0 {"Button32Link"} {"Button32Text"}
 boxcolor "FF0000FF"
-button 33 320 215 480 290 0 0 {"Button33Link"} {"Button33Text"}
+button 33 320 215 480 295 0 0 {"Button33Link"} {"Button33Text"}
 boxcolor "00FF00FF"
-button 34 480 215 640 290 0 0 {"Button34Link"} {"Button34Text"}
+button 34 480 215 640 295 0 0 {"Button34Link"} {"Button34Text"}
 boxcolor "FF0000FF"
-button 35 640 215 800 290 0 0 {"Button35Link"} {"Button35Text"}
+button 35 640 215 800 295 0 0 {"Button35Link"} {"Button35Text"}
 
 boxcolor "00FF00FF"
-button 41   0 290 160 370 0 0 {"Button41Link"} {"Button41Text"}
+button 41   0 295 160 375 0 0 {"Button41Link"} {"Button41Text"}
 boxcolor "FF0000FF"
-button 42 160 290 320 370 0 0 {"Button42Link"} {"Button42Text"}
+button 42 160 295 320 375 0 0 {"Button42Link"} {"Button42Text"}
 boxcolor "00FF00FF"
-button 43 320 290 480 370 0 0 {"Button43Link"} {"Button43Text"}
+button 43 320 295 480 375 0 0 {"Button43Link"} {"Button43Text"}
 boxcolor "FF0000FF"
-button 44 480 290 640 370 0 0 {"Button44Link"} {"Button44Text"}
+button 44 480 295 640 375 0 0 {"Button44Link"} {"Button44Text"}
 boxcolor "00FF00FF"
-button 45 640 290 800 370 0 0 {"Button45Link"} {"Button45Text"}
+button 45 640 295 800 375 0 0 {"Button45Link"} {"Button45Text"}
 
 boxcolor "999999FF"
-button 51   0 370 160 430 0 0 {"Button51Link"} {"Button51Text"}
+button 51   0 375 160 430 0 0 {"Button51Link"} {"Button51Text"}
 boxcolor "CCCCCCFF"
-button 52 160 370 320 430 0 0 {"Button52Link"} {"Button52Text"}
+button 52 160 375 320 430 0 0 {"Button52Link"} {"Button52Text"}
 boxcolor "999999FF"
-button 53 320 370 480 430 0 0 {"Button53Link"} {"Button53Text"}
+button 53 320 375 480 430 0 0 {"Button53Link"} {"Button53Text"}
 boxcolor "CCCCCCFF"
-button 54 480 370 640 430 0 0 {"Button54Link"} {"Button54Text"}
+button 54 480 375 640 430 0 0 {"Button54Link"} {"Button54Text"}
 boxcolor "999999FF"
-button 55 640 370 800 430 0 0 {"Button55Link"} {"Button55Text"}
+button 55 640 375 800 430 0 0 {"Button55Link"} {"Button55Text"}
 
 
 
