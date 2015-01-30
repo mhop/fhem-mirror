@@ -14,7 +14,9 @@
   - changed: 71_YAMAHA_NP.pm: Provide entire http link to Player AlbumArt.
   - changed: 71_YAMAHA_NP.pm: Minor code improvements.
   - changed: 71_YAMAHA_NP.pm: Perl code clean-up after 'perlcritic' check.
-  - feature: 71_YAMAHA_NP.pm: New readings: tunerModeDAB, tunerBitrateDAB, tunerAudioModeDAB, tunerFrequencyDAB. New internals: NP_ICON_x, UDN, Friendly_Name
+  - feature: 71_YAMAHA_NP.pm: New readings: tunerModeDAB, tunerBitrateDAB, 
+                                 tunerAudioModeDAB, tunerFrequencyDAB. 
+                              New internals: NP_ICON_x, UDN, Friendly_Name
   - changed: 73_km200.pm: More services found.
   - bugfix: FB_CALLMONITOR: read phonebooks after all attributes are set
             from fhem.cfg.
@@ -24,9 +26,12 @@
   - added   73_km200: More services added. 
   - changed 73_km200: Fhem get-command is able to return raw.
   - bugfix  73_km200: Handling of unknown attributes corrected.
-  - feature: 31_MilightDevice.pm: Add hue/ct colorpickers.  Add "presets" set command.
-  - feature: 70_XBMC.pm: new commands poweron,poweroff. configurable by attribute powerCmd
-  - added: 71_YAMAHA_NP.pm: New module for controlling Yamaha network players such as CRX-N560(D)
+  - feature: 31_MilightDevice.pm: Add hue/ct colorpickers.  
+                                  Add "presets" set command.
+  - feature: 70_XBMC.pm: new commands poweron,poweroff. 
+                         configurable by attribute powerCmd
+  - added: 71_YAMAHA_NP.pm: New module for controlling Yamaha 
+                            network players such as CRX-N560(D)
   - bugfix: FB_CALLMONITOR: fix not working telnet login, when user based
             authentication is configured in FritzBox
   - feature: 02_RSS.pm: improved frontpage for RSS
