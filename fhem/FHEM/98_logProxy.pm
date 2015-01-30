@@ -697,6 +697,7 @@ logProxy_Get($@)
       my $log_dev = $options[0];
       my $infile = $fld[0] eq "DbLog" ? "HISTORY" : "CURRENT";
       my $column_specs = $3;
+
       my $extend;
       my $extend_scale;
       my $offset;
@@ -705,6 +706,7 @@ logProxy_Get($@)
       my $clip;
       my $predict;
       my $postFn;
+      my $scale2reading;
 
       if( !defined($defs{$log_dev}) ) {
         Log3 $hash->{NAME}, 1, "$hash->{NAME}: $log_dev does not exist";
@@ -712,7 +714,16 @@ logProxy_Get($@)
         next;
       }
 
-      foreach my $option ( @options[1..@options-1] ) {
+      my @options = @options[1..@options-1];
+      while (@options) {
+        my $option = shift(@options);
+        while ($option && $option =~ m/={/ && $option !~ m/>}/ ) {
+          my $next = shift(@options);
+          last if( !defined($next) );
+          $option .= ",". $next;
+        }
+
+      #foreach my $option ( @options[1..@options-1] ) {
         my ($name,$value) = split( '=', $option, 2 );
 
         if( $value ) {
@@ -754,6 +765,9 @@ logProxy_Get($@)
         } elsif( $name eq "postFn" ) {
           $postFn = $value;
 
+        } elsif( $name eq "scale2reading" ) {
+          $scale2reading = $value if( defined($value) );
+
         } else {
           Log3 $hash->{NAME}, 2, "$hash->{NAME}: line $i: $fld[0]: unknown option >$option<";
 
@@ -772,6 +786,35 @@ logProxy_Get($@)
       # extend query range
       $from = logProxy_shiftTime($from,-$extend.$extend_scale) if( $extend );
       $to = logProxy_shiftTime($to,$extend.$extend_scale) if( $extend );
+
+      # zoom dependent reading
+      if( $scale2reading ) {
+        my @fld = split(':', $column_specs, 3);
+
+        my $reading;
+        my $zoom = logProxy_Range2Zoom($tosec-$fromsec);
+        if( ref($scale2reading) eq "HASH" ) {
+          $reading = $scale2reading->{$zoom};
+          $reading = $scale2reading->{"$fld[1].$zoom"} if( defined($scale2reading->{"$fld[1].$zoom"}) );
+        } elsif($scale2reading =~ m/^{.*}$/) {
+        } else {
+          no strict "refs";
+          $reading = eval {&{$scale2reading}($zoom,$fld[1])};
+          use strict "refs";
+          if( $@ ) {
+            Log3 $hash->{NAME}, 1, "$hash->{NAME}:readingOfScale $a[$i]: $@";
+          }
+        }
+
+        if( $reading
+            && $reading ne $fld[1] ) {
+          Log3 $hash->{NAME}, 4, "$hash->{NAME}:scale $zoom: using $reading instead of $fld[1]";
+          $fld[1] = $reading;
+          $column_specs = join( ':', @fld );
+        } else {
+          Log3 $hash->{NAME}, 5, "$hash->{NAME}:scale $zoom: keeping $fld[1]";
+        }
+      }
 
       $internal_data = "";
       my $cmd = "get $log_dev $infile INT $from $to $column_specs";
@@ -800,12 +843,12 @@ logProxy_Get($@)
 
         no strict "refs";
         my $d = eval {&{$postFn}($a[$i],$data)};
+        use strict "refs";
         if( $@ ) {
-          Log3 $hash->{NAME}, 1, "$hash->{NAME}: $a[$i]: $@";
+          Log3 $hash->{NAME}, 1, "$hash->{NAME}: postFn: $a[$i]: $@";
           $ret .= "#$a[$i]\n";
           next;
         }
-        use strict "refs";
 
         $data = $d;
 
@@ -1125,9 +1168,41 @@ logProxy_Get($@)
   <b>#logProxy &lt;column_spec&gt;</b><br>
   where &lt;column_spec&gt; can be one or more of the following:
   <ul>
-    <li>FileLog:&lt;log device&gt;[,&lt;options&gt;]:&lt;column_spec&gt;<br></li><br>
-
+    <li>FileLog:&lt;log device&gt;[,&lt;options&gt;]:&lt;column_spec&gt;<br></li>
     <li>DbLog:&lt;log device&gt;[,&lt;options&gt;]:&lt;column_spec&gt;<br></li><br>
+      options is a comma separated list of zero or more of:<br>
+        <ul>
+          <li>clip<br>
+            clip the plot data to the plot window</li>
+          <li>extend=&lt;value&gt;<br>
+            extend the query range to the log device by &lt;value&gt; seconds (or &lt;value&gt; months if &lt;value&gt; ends in m).
+            also activates cliping.</li>
+          <li>interpolate<br>
+            perform a linear interpolation to the values in the extended range to get the values at the plot boundary. only usefull
+            if plotfunction is lines.</li>
+          <li>offset=&lt;value&gt;<br>
+            shift plot by &lt;value&gt; seconds (or &lt;value&gt; months if &lt;value&gt; ends in m).
+            allows alignment of values calculated by average or statsitics module to the correct day, week or month.  </li>
+          <li>predict[=&lt;value&gt;]<br>
+            no value -> extend the last plot value to now.<br>
+            value -> extend the last plot value by &lt;value&gt; but maximal to now.<br></li>
+          <li>postFn='&lt;myPostFn&gt;'<br>
+            myPostFn is the name of a postprocessing function that is called after all processing of the data by logProxy
+            has been done. it is called with two arguments: the devspec line from the gplot file and a reference to a data
+            array containing the points of the plot. each point is an array with three components: the point in time in seconds,
+            the value at this point and the point in time in string form. the return value must return a reference to an array
+            of the same format. the third component of each point can be omittet and is not evaluated.<br></li>
+          <li>scale2reading=&lt;scaleHashRef&gt;<br>
+            Use zoom step dependent reading names. <br>
+            The reading name to be used is the result of a lookup with the current zoom step into <code>scaleHashRef</code>.
+            The keys can be from the following list: year, month, week, day, qday, hour<br>
+            Example:
+            <ul>
+              <code>#logProxy DbLog:dbLog,scale2reading={year=>'temperature_avg_day',month=>'temperature_avg_day'}:s300ht_1:temperature::</code><br>
+            </ul><br>
+            
+            <br></li>
+        </ul>
 
     <li>ConstX:&lt;time&gt;,&lt;y&gt;[,&lt;y2&gt;]<br>
       Will draw a vertical line (or point) at &lttime&gt; between &lt;y&gt; to &lt;y2&gt;.<br>
@@ -1216,29 +1291,6 @@ logProxy_Get($@)
         <li>SVG_time_to_sec($timestamp) can be used to convert the timestamp strings to epoch times for calculation.</li>
         </ul>
       </li><br>
-      options is a comma separated list of zero or more of:<br>
-        <ul>
-          <li>clip<br>
-            clip the plot data to the plot window</li>
-          <li>extend=&lt;value&gt;<br>
-            extend the query range to the log device by &lt;value&gt; seconds (or &lt;value&gt; months if &lt;value&gt; ends in m).
-            also activates cliping.</li>
-          <li>interpolate<br>
-            perform a linear interpolation to the values in the extended range to get the values at the plot boundary. only usefull
-            if plotfunction is lines.</li>
-          <li>offset=&lt;value&gt;<br>
-            shift plot by &lt;value&gt; seconds (or &lt;value&gt; months if &lt;value&gt; ends in m).
-            allows alignment of values calculated by average or statsitics module to the correct day, week or month.  </li>
-          <li>predict[=&lt;value&gt;]<br>
-            no value -> extend the last plot value to now.<br>
-            value -> extend the last plot value by &lt;value&gt; but maximal to now.<br></li>
-          <li>postFn='&lt;myPostFn&gt;'<br>
-            myPostFn is the name of a postprocessing function that is called after all processing of the data by logProxy
-            has been done. it is called with two arguments: the devspec line from the gplot file and a reference to a data
-            array containing the points of the plot. each point is an array with three components: the point in time in seconds,
-            the value at this point and the point in time in string form. the return value must return a reference to an array
-            of the same format. the third component of each point can be omittet and is not evaluated.<br></li>
-        </ul>
       </li><br>
 
     </ul>
