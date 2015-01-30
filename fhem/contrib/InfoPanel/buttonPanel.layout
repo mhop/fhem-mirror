@@ -3,6 +3,14 @@
 # 50 Pixel für die Gestaltung
 # einer Kopfzeile freihalten
 #
+
+thalign "middle"
+rgb "00FF00FF"
+pt 24
+text headLine 400 30 "Hier könnte Ihre Kopfzeile stehen..."
+
+
+pt 16
 rgb "7F7F7FFF" # grau
 line - 0 50 800 50
 
