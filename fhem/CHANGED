@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 70_Pushbullet.pm: new module 70_Pushbullet.pm
   - changed: 31_MilightDevice (Thanks to MarkusM):
                      Saturation set/transition, set with command saturation
                      Bugfix for long transition on hue=0 and hue = 360
