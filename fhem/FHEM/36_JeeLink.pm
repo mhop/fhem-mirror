@@ -77,6 +77,8 @@ JeeLink_Initialize($)
   $hash->{SetFn}        = "JeeLink_Set";
   $hash->{AttrFn}       = "JeeLink_Attr";
   $hash->{AttrList} = "Clients MatchList"
+                      ." sendpool"
+                      ." dummy"
                       ." initCommands"
                       ." flashCommand"
                       ." DebounceTime BeepLong BeepShort BeepDelay"
@@ -99,7 +101,7 @@ JeeLink_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   if(@a != 3) {
-    my $msg = "wrong syntax: define <name> JeeLink {devicename[\@baudrate] ".
+    my $msg = "wrong syntax: define <name> JeeLink {none | devicename[\@baudrate] ".
                         "| devicename\@directio}";
     Log3 undef, 2, $msg;
     return $msg;
@@ -108,9 +110,7 @@ JeeLink_Define($$)
   DevIo_CloseDev($hash);
 
   my $name = $a[0];
-
   my $dev = $a[2];
-  $dev .= "\@57600" if( $dev !~ m/\@/ );
 
   $hash->{Clients} = $clientsJeeLink;
   $hash->{MatchList} = \%matchListPCA301;
@@ -119,6 +119,12 @@ JeeLink_Define($$)
     $attr{$name}{flashCommand} = "avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]"
   }
 
+  if($dev eq "none") {
+    Log3 $name, 1, "$name device is none, commands will be echoed only";
+    $attr{$name}{dummy} = 1;
+    return undef;
+  }
+  $dev .= "\@57600" if( $dev !~ m/\@/ );
   $hash->{DeviceName} = $dev;
 
   my $ret = DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
@@ -354,6 +360,9 @@ JeeLink_Get($@)
 {
   my ($hash, $name, $cmd, @msg ) = @_;
   my $arg = join(" ", @msg);
+
+  my ($hash, @a) = @_;
+  return "No $a[1] for dummies" if(IsDummy($name));
 
   my $list = "devices:noArg initJeeLink:noArg RFMconfig:noArg updateAvailRam:noArg raw";
 
