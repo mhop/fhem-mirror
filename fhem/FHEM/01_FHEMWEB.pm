@@ -1281,8 +1281,10 @@ FW_roomOverview($)
         }
 
         # Force external browser if FHEMWEB is installed as an offline app.
-        if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
-           FW_pO "<td><div><a href=\"$l2\">$icon$l1</a></div></td>";
+        my $target = '';        # Forum 33066
+           $target = 'target=\"_blank\" ' if($l2 =~ s/\+//);
+        if($l2 =~ m/.html$/ || $l2 =~ m/^http/ || length($target)) {
+           FW_pO "<td><div><a href=\"$l2\" $target >$icon$l1</a></div></td>";
         } else {
           FW_pH $l2, "$icon$l1", 1, $class;
         }
