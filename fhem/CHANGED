@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   new dustbin icon
+  - bugfix:  SYSMON: some warnings
+  - changed: SYSMON: documentation
   - feature: SYSMON: query parameters from remote system (telnet)
   - feature: 71_YAMAHA_NP.pm Improved timer setting 
   - feature: 55_GDS uses own FWEXT instead HTTPSRV
