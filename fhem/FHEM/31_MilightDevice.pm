@@ -672,11 +672,15 @@ sub MilightDevice_RGB_Off(@)
   if (ReadingsVal($hash->{NAME}, "state", "off") ne "off")
   {
     readingsSingleUpdate($hash, "brightness_on", ReadingsVal($hash->{NAME}, "brightness", 100), 1);
+    # Dim down to min brightness then send off command (avoid flicker on turn on)
+    MilightDevice_RGB_Dim($hash, 100/MilightDevice_DimSteps($hash), $ramp, $flags);
+    return MilightDevice_RGB_Dim($hash, 0, 0, 'q');
   }
-  
-  # Dim down to min brightness then send off command (avoid flicker on turn on)
-  MilightDevice_RGB_Dim($hash, 100/MilightDevice_DimSteps($hash), $ramp, $flags);
-  return MilightDevice_RGB_Dim($hash, 0, 0, 'q');
+  else
+  {
+    # If we are already off just send the off command again
+    return MilightDevice_RGB_Dim($hash, 0, 0, '');
+  }
 }
 
 #####################################
@@ -837,11 +841,15 @@ sub MilightDevice_RGBW_Off(@)
   if (ReadingsVal($hash->{NAME}, "state", "off") ne "off")
   {
     readingsSingleUpdate($hash, "brightness_on", ReadingsVal($hash->{NAME}, "brightness", 100), 1);
+    # Dim down to min brightness then send off command (avoid flicker on turn on)
+    MilightDevice_RGBW_Dim($hash, 100/MilightDevice_DimSteps($hash), $ramp, $flags);
+    return MilightDevice_RGBW_Dim($hash, 0, 0, 'q');
   }
-  
-  # Dim down to min brightness then send off command (avoid flicker on turn on)
-  MilightDevice_RGBW_Dim($hash, 100/MilightDevice_DimSteps($hash), $ramp, $flags);
-  return MilightDevice_RGBW_Dim($hash, 0, 0, 'q');
+  else
+  {
+    # If we are already off just send the off command again
+    return MilightDevice_RGBW_Dim($hash, 0, 0, '');
+  }
 }
 
 #####################################
@@ -1065,10 +1073,15 @@ sub MilightDevice_White_Off(@)
   if (ReadingsVal($hash->{NAME}, "state", "off") ne "off")
   {
     readingsSingleUpdate($hash, "brightness_on", ReadingsVal($hash->{NAME}, "brightness", 100), 1);
+    # Dim down to min brightness then send off command (avoid flicker on turn on)
+    MilightDevice_White_Dim($hash, 100/MilightDevice_DimSteps($hash), $ramp, $flags);
+    return MilightDevice_White_Dim($hash, 0, 0, 'q');
   }
-  # Dim down to min brightness then send off command (avoid flicker on turn on)
-  MilightDevice_White_Dim($hash, 100/MilightDevice_DimSteps($hash), $ramp, $flags);
-  return MilightDevice_White_Dim($hash, 0, 0, 'q');
+  else
+  {
+    # If we are already off just send the off command again
+    return MilightDevice_White_Dim($hash, 0, 0, '');
+  }
 }
 
 #####################################
