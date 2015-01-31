@@ -361,8 +361,7 @@ JeeLink_Get($@)
   my ($hash, $name, $cmd, @msg ) = @_;
   my $arg = join(" ", @msg);
 
-  my ($hash, @a) = @_;
-  return "No $a[1] for dummies" if(IsDummy($name));
+  return "No $cmd for dummies" if(IsDummy($name));
 
   my $list = "devices:noArg initJeeLink:noArg RFMconfig:noArg updateAvailRam:noArg raw";
 
