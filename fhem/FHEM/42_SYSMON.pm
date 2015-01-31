@@ -3364,11 +3364,16 @@ sub SYSMON_Log($$$) {
 <!-- ================================ -->
 <a name="SYSMON"></a>
 <h3>SYSMON</h3>
+(en | <a href="commandref_DE.html#SYSMON">de</a>)
 <ul>
 This module provides statistics about the system running FHEM server. Furthermore, remote systems can be accessed (Telnet). Only Linux-based systems are supported. 
 Some informations are hardware specific and are not available on every platform. 
 So far, this module has been tested on the following systems: 
 Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390, WR703N under OpenWrt, CubieTruck and some others.
+  <br><br>
+  For more information on a FritzBox check other moduls: <a href="#FRITZBOX">FRITZBOX</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
+  <br>
+   <i>The modul uses the Perl modul 'Net::Telnet' for remote access. Please make sure that this module is installed.</i>
   <br><br>
   <b>Define</b>
   <br><br>
@@ -3916,6 +3921,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 
 <a name="SYSMON"></a>
 <h3>SYSMON</h3>
+(<a href="commandref.html#SYSMON">en</a> | de)
 <ul>
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
   Weiterhin k&ouml;nnen auch Remote-Systeme abgefragt werden (Telnet).
@@ -3923,6 +3929,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   verf&uuml;gbar.
   Bis jetzt wurde dieses Modul auf folgenden Systemen getestet: Raspberry Pi (Debian Wheezy), BeagleBone Black, 
   FritzBox 7390, WR703N unter OpenWrt, CubieTruck und einige andere.
+  <br>
+  <br>
+  F&uuml;r Informationen zu einer FritzBox beachten Sie bitte auch Module: <a href="#FRITZBOX">FRITZBOX</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
+  <i>Das Modul nutzt das Perlmodule 'Net::Telnet' f&uuml;r den Fernzugriff. Dieses muss ggf. nachinstalliert werden.</i>
   <br><br>
   <b>Define</b>
   <br><br>
