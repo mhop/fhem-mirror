@@ -67,11 +67,11 @@ sub btIP_CGI;
 sub btIP_splitRequest($);
 
 sub btIP_returnHTML($);
-sub btIP_getURL($);
 sub btIP_HTMLHead($$);
 sub btIP_getScript;
 sub btIP_HTMLTail;
 sub btIP_Overview;
+sub btIP_getURL;
 
 ######################################
 
@@ -94,14 +94,11 @@ sub btIP_Define($$) {
 
   my @a = split("[ \t]+", $def);
 
-  return "Usage: define <name> InfoPanel hostname filename"  if(int(@a) != 4);
+  return "Usage: define <name> InfoPanel filename"  if(int(@a) != 3);
   my $name= $a[0];
-  my $hostname= $a[2];
-  my $filename= $a[3];
+  my $filename= $a[2];
 
   $hash->{NOTIFYDEV} = 'global';
-  $hash->{fhem}{hostname}= $hostname;
-  $hash->{fhem}{filename}= $filename;
   $hash->{fhem}{div} = '';
   $hash->{LAYOUTFILE} = $filename;
 
@@ -141,7 +138,7 @@ sub btIP_Notify {
 sub btIP_readLayout($) {
 
   my ($hash)= @_;
-  my $filename= $hash->{fhem}{filename};
+  my $filename= $hash->{LAYOUTFILE};
   my $name= $hash->{NAME};
 
   my ($err, @layoutfile) = FileRead($filename);
@@ -427,6 +424,8 @@ sub btIP_itemTextBox {
      my $by2 = $y + $boxheight + $params{padding};
      $output .= btIP_itemRect("box_$id",$bx1,$by1,$bx2,$by2,1,1,1,%params);
      $params{rgb} = $orgcolor;
+  } else {
+     $output = "";
   }
 
   $d = "<div id=\"text_$id\" style=\"position:absolute; top:".$y."px; left:".$x."px; ".
@@ -494,7 +493,7 @@ sub btIP_returnSVG($) {
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
   my $bgcolor = AttrVal($name,'bgcolor','000000'); 
 
-  our $svg;
+  my $svg = "";
 
   eval {
 
@@ -573,7 +572,7 @@ sub btIP_returnSVG($) {
 	} # end defined()
 
     $svg .= "\" >\n\n";
-    $svg = btIP_evalLayout($svg, $name, $defs{$name}{fhem}{layout});
+    $svg .= btIP_evalLayout($svg, $name, $defs{$name}{fhem}{layout});
 
     $defs{$name}{STATE} = localtime();
 
@@ -647,7 +646,7 @@ sub btIP_evalLayout($$@) {
 	  next;
 	}  
     next unless($params{condition});
-	  
+
 # Debug "before command $line: x= " . $params{xx} . ", y= " . $params{yy};
 
     eval {
@@ -716,9 +715,11 @@ sub btIP_evalLayout($$@) {
 
 	    when("group") {
 	      ($id,$text,$x,$y) = split("[ \t]+", $def, 4);
-	         ($x,$y)= btIP_xy($x,$y,%params);
-	         $params{xx} = $x;
-	         $params{yy} = $y;
+	      $x //= 0;
+	      $y //= 0;
+	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $params{xx} = $x;
+	      $params{yy} = $y;
 	      $svg .= btIP_itemGroup($id,$text,$x,$y);
         }
 
@@ -817,7 +818,6 @@ sub btIP_evalLayout($$@) {
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      my $txt= AnalyzePerlCommand(undef, $text);
 	      $txt =~ s/\n/<br\/>/g;
-	      my $name = $params{name};
 	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$boxheight,$txt,%params);
           $params{xx} = $x;
           $params{yy} = $y + $boxheight;
@@ -875,7 +875,7 @@ sub btIP_addExtension($$$) {
   
     my $url = "/" . $link;
     $data{FWEXT}{$url}{FUNC} = $func;
-    $data{FWEXT}{$url}{LINK} = $link;
+    $data{FWEXT}{$url}{LINK} = "$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
     $data{FWEXT}{$url}{FORKABLE} = 0;
 }
@@ -929,7 +929,7 @@ sub btIP_splitRequest($) {
 sub btIP_returnHTML($) {
   my ($name) = @_;
 
-  my $url     = btIP_getURL($defs{$name}{fhem}{hostname});
+#  my $url     = btIP_getURL();
   my $refresh = AttrVal($name, 'refresh', 60);
   my $title   = AttrVal($name, 'title', $name);
   
@@ -942,13 +942,6 @@ sub btIP_returnHTML($) {
   $code .=  "</body>\n".btIP_HTMLTail();
 
   return ("text/html; charset=utf-8", $code);
-}
-
-sub btIP_getURL($) {
-  my ($hostname)= @_;
-  # http://hostname:8083/fhem
-  my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
-  return $proto."://$hostname:" . $defs{$FW_wname}{PORT} . $FW_ME;
 }
 
 sub btIP_HTMLHead($$) {
@@ -995,12 +988,9 @@ sub btIP_Overview {
   foreach my $def (sort keys %defs) {
     if($defs{$def}{TYPE} eq "InfoPanel") {
         $name= $defs{$def}{NAME};
-        $url= btIP_getURL($defs{$def}{fhem}{hostname});
+        $url= btIP_getURL();
         $html.= "$name<br>\n<ul>";
-#        $html.= "<a href='$url/btip/$name.rss'>RSS</a><br>\n";
-        $html.= "<a href='$url/btip/$name.info' target='_new'>HTML</a><br>\n";
-#        $html.= "<a href='$url/btip/$name.png'>Portable Network Graphics</a><br>\n";
-#        $html.= "<a href='$url/btip/$name.jpg'>JPEG Graphics</a><br>\n";
+        $html.= "<a href='$url/btip/$name.info' target='_blank'>HTML</a><br>\n";
         $html.= "</ul>\n<p>\n";
         }
   }
@@ -1008,6 +998,14 @@ sub btIP_Overview {
 
   return ("text/html; charset=utf-8", $html);
 }
+
+sub btIP_getURL {
+  my $name = `hostname`;
+  chop($name);
+  my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
+  return $proto."://$name:" . $defs{$FW_wname}{PORT} . $FW_ME;
+}
+
 
 
 1;
