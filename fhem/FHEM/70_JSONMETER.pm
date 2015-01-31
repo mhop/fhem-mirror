@@ -80,6 +80,9 @@ sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
     [3, "meterType", "meterType", 0, 0] # {"meterId": "0000000061015736", "meterType": "Simplex", "interval": 0, "entry": [
    ,[4, "timestamp", "deviceTime", 0, 0] # {"timestamp": 1389296286, "periodEntries": [
    ,[3, "cnt", "electricityConsumed", 3, 1] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
+   ,[3, "energy", "electricityConsumed", 3, 1] # {"status":"ok","result":[{"energy":ENERGY,"energyOut":ENERGYOUT,"time":TIME},...]}
+   ,[3, "energyOUT", "electricityProduced", 3, 1] # {"status":"ok","result":[{"energy":ENERGY,"energyOut":ENERGYOUT,"time":TIME},...]}
+   ,[3, "power", "electricityPower", 3, 1] # {"status":"ok","result":[{"power":POWER,"time":TIME}]}
    ,[3, "pwr", "electricityPower", 1, 0] # {"cnt":" 22,285","pwr":764,"lvl":0,"dev":"","det":"","con":"OK","sts":"(06)","raw":0}
    ,[1, "010000090B00", "deviceTime", 0, 0] #   { "obis":"010000090B00","value":"dd.mm.yyyy,hh:mm"}
    ,[2, "0.0.0", "meterID", 0, 0] # {"obis": "0.0.0", "scale": 0, "value": 1627477814, "unit": "", "valueString": "0000000061015736" }, 
