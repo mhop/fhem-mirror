@@ -1608,7 +1608,7 @@ sub YAMAHA_NP_html2txt
       <li><b>tunerPresetFM</b> - Reports the currently selected FM preset. If stored as such (1...30).</li>
       <li><b>tunerFrequencyDAB</b> - Reports the currently tuned DAB frequency. (xxx.xxx MHz)</li>
       <li><b>tunerFrequencyFM</b> - Reports the currently tuned FM frequency. (xxx.xx MHz)</li>
-      <li><b>tunerModeDAB</b> - Reports current DAB audio mode (Mono|Stereo).</li>
+      <li><b>tunerModeDAB</b> - Reports current DAB audio mode (DAB|DAB+).</li>
       <li><b>tunerProgramServiceFM</b> - Reports the FM service name.</li>
       <li><b>tunerRadioTextAFM</b> - Reports the Radio Text A of the selected FM service.</li>
       <li><b>tunerRadioTextBFM</b> - Reports the Radio Text B of the selected FM service.</li>
