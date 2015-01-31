@@ -3297,8 +3297,14 @@ SYSMON_Exec_Local($$)
    }
    # Einzeiler als normale Scalars
    my $line = $result[0];
-   chomp $line;
-   SYSMON_Log ($hash, 5, "Result '$line'");
+   
+   if(defined($line)) {
+     chomp $line;
+     SYSMON_Log ($hash, 5, "Result '$line'");
+   } else {
+  	 SYSMON_Log ($hash, 5, "Result undef");
+   }
+
    return $line;
    
    #chomp $result;
