@@ -78,6 +78,7 @@ sub btIP_getURL;
 sub InfoPanel_Initialize($) {
     my ($hash) = @_;
     $hash->{DefFn}    = "btIP_Define";
+	$hash->{UndefFn}  = "btIP_Undef";
     #$hash->{AttrFn}   = "btIP_Attr";
     $hash->{AttrList} = "autoreload:1,0 bg bgcolor refresh size title tmin";
     $hash->{SetFn}    = "btIP_Set";
@@ -106,6 +107,14 @@ sub btIP_Define($$) {
   
   $hash->{STATE} = 'defined';
   return undef;
+}
+
+sub btIP_Undef($$) {
+	my ($hash, $arg) = @_;
+    # check if last device
+    my $url = '/btip';
+    $data{FWEXT}{$url} = undef if int(devspec2array('TYPE=InfoPanel')) == 1;
+	return undef;
 }
 
 sub btIP_Set {
