@@ -473,10 +473,10 @@ sub GDS_HTMLTail {
 }
 
 sub GDS_getURL {
-  my $name = `hostname`;
-  chop($name);
+#  my $name = `hostname`;
+#  chop($name);
   my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
-  return $proto."://$name:" . $defs{$FW_wname}{PORT} . $FW_ME;
+  return $proto."://$FW_httpheader{Host}:" . $defs{$FW_wname}{PORT} . $FW_ME;
 }
 
 ####################################################################################################
