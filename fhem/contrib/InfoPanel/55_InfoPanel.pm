@@ -875,7 +875,7 @@ sub btIP_addExtension($$$) {
   
     my $url = "/" . $link;
     $data{FWEXT}{$url}{FUNC} = $func;
-    $data{FWEXT}{$url}{LINK} = "$link";
+    $data{FWEXT}{$url}{LINK} = "+$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
     $data{FWEXT}{$url}{FORKABLE} = 0;
 }
@@ -1000,10 +1000,8 @@ sub btIP_Overview {
 }
 
 sub btIP_getURL {
-  my $name = `hostname`;
-  chop($name);
   my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
-  return $proto."://$name:" . $defs{$FW_wname}{PORT} . $FW_ME;
+  return $proto."://$FW_httpheader{Host}$FW_ME";
 }
 
 

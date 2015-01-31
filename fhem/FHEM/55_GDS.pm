@@ -130,7 +130,6 @@ sub GDS_Define($$$) {
 sub GDS_Undef($$) {
 	my ($hash, $arg) = @_;
 	my $name = $hash->{NAME};
-	CommandDelete(undef, "gds_web_".$name);
 	RemoveInternalTimer($hash);
 	return undef;
 }
@@ -473,10 +472,8 @@ sub GDS_HTMLTail {
 }
 
 sub GDS_getURL {
-#  my $name = `hostname`;
-#  chop($name);
   my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
-  return $proto."://$FW_httpheader{Host}:" . $defs{$FW_wname}{PORT} . $FW_ME;
+  return $proto."://$FW_httpheader{Host}$FW_ME"; #".$FW_ME;
 }
 
 ####################################################################################################
