@@ -1084,7 +1084,7 @@ sub FRITZBOX_Readout_Format($$$)
    if ($format eq "aldays") {
       if ($readout eq "0") {
          $readout = "once";
-      } elsif ($readout eq "127") {
+      } elsif ($readout >= 127) {
          $readout = "daily";
       } else {
          my $bitStr = $readout;
@@ -2091,7 +2091,7 @@ sub FRITZBOX_Open_Connection($)
    my $timeout = AttrVal( $name, "telnetTimeOut", "10");
    $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
    if (!$telnet) {
-      $msg = "Could not open telnet connection to $host";
+      $msg = "Could not open telnet connection to $host: $!";
       FRITZBOX_Log $hash, 2, $msg;
       $telnet = undef;
       return $msg;
