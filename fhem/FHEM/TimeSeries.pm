@@ -1,4 +1,4 @@
-# $Id$
+# $Id $
 
 ##############################################################################
 #
@@ -27,7 +27,7 @@ package TimeSeries;
 
 use warnings;
 use strict;
-use Data::Dumper;
+#use Data::Dumper;
 
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -147,7 +147,7 @@ sub add($$$) {
   # autoreset 
   $self->reset() if($self->elapsed($t));
   
-  main::Debug("ADD ($t,$v)");  ###
+  #main::Debug("ADD ($t,$v)");  ###
 
   # count
   $self->{count}++;
@@ -198,7 +198,7 @@ sub add($$$) {
       $self->{sd}= sqrt($self->{_S}/ ($n-1)) / $T if($n> 1); 
     }  
   }
-  main::Debug(Dumper($self)); ###
+  #main::Debug(Dumper($self)); ###
   
 }
 
