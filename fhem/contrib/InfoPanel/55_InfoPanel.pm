@@ -270,13 +270,21 @@ sub btIP_itemImg {
   my ($data,$info,$width,$height,$mimetype,$output);
 
   if($srctype eq 'file') {
+     my (@d,$err);
+     $err = "";
+     
      Log3(undef,4,"InfoPanel img name: $arg");
-     my $length = -s "$arg";
-     Log3(undef,4,"InfoPanel img len : $length");
-     open(GRAFIK, "<", $arg) or die("File not found $!");
-     binmode(GRAFIK);
-     my $readBytes = read(GRAFIK, $data, $length);
-     close(GRAFIK);
+     ($err,@d) = FileRead($arg);
+     if($err && configDBUsed()) {
+        # not found in database, try to read from filesystem
+        Log3(undef,4,"Infopanel forced read $arg");
+        $err = undef;
+        ($err,@d) = FileRead({FileName => $arg, ForceType =>'file'});
+        Log3(undef,4,"Infopanel: forced read error file: $arg") if $err;
+        Log3(undef,4,"Infopanel: forced read found: $arg") if !$err;
+     }
+     $data = join("",@d) unless $err;
+
   } elsif ($srctype eq "url" || $srctype eq "urlq") {
      if($srctype eq "url") {
        $data= GetFileFromURL($arg,3,undef,1);
