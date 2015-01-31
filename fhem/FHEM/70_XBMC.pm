@@ -504,7 +504,7 @@ sub XBMC_ProcessNotification($$)
     
     if (lc($1) eq "system") {
       if ((lc($2) eq "quit") or (lc($2) eq "restart") or (lc($2) eq "sleep")) {
-          readingsBulkUpdate($hash, "playStatus", "stopped" );
+          readingsSingleUpdate($hash, "playStatus", "stopped", 1);
       }
       
       if (lc($2) eq "sleep") {
