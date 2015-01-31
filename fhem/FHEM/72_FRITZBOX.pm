@@ -131,7 +131,8 @@ sub FRITZBOX_Initialize($)
   $hash->{SetFn}    = "FRITZBOX_Set";
   $hash->{GetFn}    = "FRITZBOX_Get";
   $hash->{AttrFn}   = "FRITZBOX_Attr";
-  $hash->{AttrList} = "disable:0,1 "
+  $hash->{AttrList} = "allowShellCommand:0,1 "
+                ."disable:0,1 "
                 ."defaultCallerName "
                 ."defaultUploadDir "
                 ."fritzBoxIP "
@@ -418,7 +419,7 @@ sub FRITZBOX_Set($$@)
 ##########################################
 sub FRITZBOX_Get($@)
 {
-   my ($hash, $name, $cmd) = @_;
+   my ($hash, $name, $cmd, @val) = @_;
    my $returnStr;
 
    if (lc $cmd eq "ringtones") 
@@ -428,8 +429,14 @@ sub FRITZBOX_Get($@)
       $returnStr .= join "\n", sort values %ringTone;
       return $returnStr;
    }
-
+   elsif ( lc $cmd eq "shellcommand" && int @val && AttrVal( $name, "allowShellCommand", 0 ) ) 
+   {  
+      my $shCmd = join " ", @val;
+      return FRITZBOX_Exec( $hash, $shCmd );
+   }
    my $list = "ringTones:noArg";
+   $list .= " shellCommand" 
+      if AttrVal( $name, "allowShellCommand", 0 );
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
@@ -2676,13 +2683,26 @@ sub FRITZBOX_fritztris($)
          <br>
          Shows the list of ring tones that can be used.
       </li><br>
+
+      <li><code>get &lt;name&gt; shellCommand &lt;Command&gt;</code>
+         <br>
+         Runs the given command on the Fritz!Box shell and returns the result.
+         Can be used to run shell commands not included in this modul.
+         <br>
+         Only available if the attribute "allowShellCommand" is set.
+      </li><br>
    </ul>  
   
    <a name="FRITZBOXattr"></a>
    <b>Attributes</b>
    <ul>
       <br>
-      <li><code>defaultCallerName</code>
+      <li><code>allowShellCommand &lt;0 | 1&gt;</code>
+         <br>
+         Enables the get command "shellCommand"
+      </li><br>
+
+      <li><code>defaultCallerName &lt;Text&gt;</code>
          <br>
          The default text to show on the ringing phone as 'caller'.
          <br>
@@ -2698,7 +2718,7 @@ sub FRITZBOX_fritztris($)
          It needs to be the name of the path on the Fritz!Box. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
       </li><br>
 
-      <li><code>fritzBoxIP</code>
+      <li><code>fritzBoxIP &lt;IP Address&gt;</code>
          <br>
          IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
       </li><br>
@@ -2940,13 +2960,26 @@ sub FRITZBOX_fritztris($)
          <br>
          Zeigt die Liste der Klingelt&ouml;ne, die benutzt werden k&ouml;nnen.
       </li><br>
+
+      <li><code>get &lt;name&gt; shellCommand &lt;Befehl&gt;</code>
+         <br>
+         F&uuml;hrt den angegebenen Befehl auf der Fritz!Box-Shell aus und gibt das Ergebnis zur&uuml;ck.
+         Kann benuzt werden, um Shell-Befehle auszuf&uuml;hren, die nicht im Modul implementiert sind.
+         <br>
+         Muss zuvor &uuml;ber das Attribute "allowShellCommand" freigeschaltet werden.
+      </li><br>
    </ul>  
   
    <a name="FRITZBOXattr"></a>
    <b>Attributes</b>
    <ul>
       <br>
-      <li><code>defaultCallerName</code>
+      <li><code>allowShellCommand &lt;0 | 1&gt;</code>
+         <br>
+         Freischalten des get-Befehls "shellCommand"
+      </li><br>
+      
+      <li><code>defaultCallerName &lt;Text&gt;</code>
          <br>
          Standard-Text, der auf dem angerufenen internen Telefon als "Anrufer" gezeigt wird.
          <br>
@@ -2962,7 +2995,7 @@ sub FRITZBOX_fritztris($)
          Es muss ein Pfad auf der Fritz!Box sein. D.h., er sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
       </li><br>
 
-      <li><code>fritzBoxIP</code>
+      <li><code>fritzBoxIP &lt;IP-Adresse&gt;</code>
          <br>
          IP Adresse oder ULR der Fritz!Box f&uuml;r Fernzugriff per Telnet. Standard ist "fritz.box".
       </li><br>
