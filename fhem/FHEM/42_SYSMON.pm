@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "1.9.5.0";
+my $VERSION = "2.0.2";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -115,13 +115,52 @@ SYSMON_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> SYSMON [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
-
+  return "Usage: define <name> SYSMON [MODE[:[USER@]HOST][:PORT]] [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
+	# define sysmon SYSMON local
+	# define sysmon SYSMON local 1 1 1 10
+	# define sysmon SYSMON telnet:fritz.box
+	# define sysmon SYSMON telnet:fritz.box:23
+	# define sysmon SYSMON telnet:fritz.box:23 10 10 10 60
+	# define sysmon SYSMON telnet:user@fritz.box:23
+	
   if(int(@a)>=3)
   {
-    my @na = @a[2..scalar(@a)-1];
+  	my @na = @a[2..scalar(@a)-1];  
+  	
+  	# wenn das erste Element nicht numerisch
+  	if(!(@na[0] =~ /^\d+$/)) {
+  		# set mode/host/port
+  		my($mode, $host, $port) = split(/:/, @na[0]);
+  		$mode=lc($mode);
+  		# TODO SSH
+  		if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet')) {
+  		  $hash->{MODE} = $mode;
+  		  delete($hash->{HOST});
+  		  delete($hash->{USER});
+  		  # erkennen, wenn User angegeben ist
+  		  my($user,$th) = split(/@/,$host);
+  		  if(defined($th)) {
+  		  	$hash->{USER} = lc($user);
+  		  	$host = $th;
+  		  }
+  		  $hash->{HOST} = lc($host) if(defined($host));
+  		  # DefaultPort je nach Protokol
+  		  if(!defined($port)) {
+  		    $port = '23' if($mode eq 'telnet');
+  		    $port = '22' if($mode eq 'ssh');
+  		  }
+  		  $hash->{PORT} = lc($port);
+  	  } else {
+  	  	return "unexpected mode. use local or telnet only."; # TODO: SSH
+  	  }
+  		shift @na;
+  	} else {
+      $hash->{MODE}='local';
+    }
+
   	SYSMON_setInterval($hash, @na);
   } else {
+  	$hash->{MODE}='local';
     SYSMON_setInterval($hash, undef);
   }
 
@@ -173,7 +212,10 @@ SYSMON_updateCurrentReadingsMap($) {
   # Map aktueller Namen erstellen
 	
 	# Feste Werte
-	$rMap->{+PERL_VERSION}       = "Perl Version";
+	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
+	if($mode eq 'local'){
+	  $rMap->{+PERL_VERSION}       = "Perl Version";
+  }
 	$rMap->{+DATE}               = "Date";
 	$rMap->{+CPU_BOGOMIPS}       = "BogoMIPS";
 	if(SYSMON_isCPUFreqRPiBBB($hash)) {
@@ -538,6 +580,13 @@ SYSMON_Get($@)
   	  my $value = $map->{$name};
   	  $ret = "$ret\n".sprintf("%-20s %s", $name, $value);
     }
+    
+    my $msg = $hash->{helper}{error_msg};
+	  if($msg) {
+		  # Problem mit der Verbindung
+		  return $msg;
+	  }
+	
     return $ret;
   }
 
@@ -607,8 +656,15 @@ SYSMON_Set($@)
     
     return "missing parameter. use clear <reading name>";
   }
-
-  return "Unknown argument $cmd, choose one of interval_multipliers clean:noArg clear";
+  
+  if ( lc $cmd eq 'password') {
+  	my $subcmd = $a[2];
+	  if(defined $subcmd) {
+	     return SYSMON_storePassword ($hash, $subcmd);
+	  }
+  }
+  
+  return "Unknown argument $cmd, choose one of password interval_multipliers clean:noArg clear";
 }
 
 sub
@@ -621,9 +677,10 @@ SYSMON_Attr($$$)
 
   $attrVal= "" unless defined($attrVal);
   my $orig = AttrVal($name, $attrName, "");
-
-  if( $cmd eq "set" ) {# set, del
-    if( $orig ne $attrVal ) {
+  
+  if( $orig ne $attrVal ) {
+    
+    if( $cmd eq "set" ) {# set, del  
 
     	if($attrName eq "disable")
       {
@@ -709,9 +766,9 @@ sub SYSMON_blockingCall($) {
 	my ($name, $refresh_all) = split(/\|/,$tparam);
 	my $hash = $main::defs{$name};
 	SYSMON_Log($hash, 5, "$name, ".($refresh_all?$refresh_all:''));
-	
-	my $map = SYSMON_obtainParameters($hash, $refresh_all);
-	
+
+  my $map = SYSMON_obtainParameters($hash, $refresh_all);
+
 	# Device-Name mitnehmen
   my $ret = "name|".$name;
   
@@ -839,11 +896,54 @@ sub SYSMON_updateReadings($$) {
   readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);    
 }
 
+sub SYSMON_obtainParameters($$) {
+  my ($hash, $refresh_all) = @_;
+    
+	my $name = $hash->{NAME};
+  # ---
+  #TODO: SSH
+  my $msg = undef;
+  my $openedTelnet = 0;
+  my $telnet = $hash->{".telnet"};
+  #$telnet = undef;
+	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
+	# Wenn remote: open connection
+	if ($mode eq 'telnet') {
+		unless (defined $telnet) {
+			SYSMON_Log($hash, 5, "$name: Open shared telnet connection");
+      $msg = SYSMON_Open_Connection($hash);
+      $hash->{helper}{error_msg}=$msg;
+      if (!$msg) {
+        $openedTelnet = 1;
+        $hash->{helper}{error_msg}=undef;
+      }
+    }
+	}
+  # ---
+  
+  my $map;
+  if (!$msg) {
+    $map = SYSMON_obtainParameters_intern($hash, $refresh_all);
+  }
+  
+  # ---
+	# Wenn remote: close connection
+	if ($mode eq 'telnet') {
+		if($openedTelnet) {
+		  SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
+		  SYSMON_Close_Connection( $hash );
+	  }
+	}
+	# ---
+	
+	return $map;
+}
+
 
 # Schattenmap mit den zuletzt gesammelten Werten (merged)
 #my %shadow_map;
 sub
-SYSMON_obtainParameters($$)
+SYSMON_obtainParameters_intern($$)
 {
 	my ($hash, $refresh_all) = @_;
 	my $name = $hash->{NAME};
@@ -863,11 +963,14 @@ SYSMON_obtainParameters($$)
   my $ref =  int(time()/$base);
 	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
 	 
+	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
 	# Einmaliges
 	if(!$hash->{helper}{u_first_mark}) {
-		#TODO: nur local
-	  # Perl version
-	  $map->{+PERL_VERSION} = "$]";
+		# nur lokal abfragen (macht remote keinen Sinn)
+		if ($mode eq 'local') {
+	    # Perl version
+	    $map->{+PERL_VERSION} = "$]";
+	  }
 	  
 		if(SYSMON_isProcFS($hash)) {
   	  $map = SYSMON_getCPUBogoMIPS($hash, $map);
@@ -884,8 +987,11 @@ SYSMON_obtainParameters($$)
   } else {
   	$map = SYSMON_getUptime2($hash, $map);
   }
-  #TODO: nur local
-  $map = SYSMON_getFHEMUptime($hash, $map);
+  
+  # nur lokal abfragen
+  if ($mode eq 'local') {
+    $map = SYSMON_getFHEMUptime($hash, $map);
+  }
 
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg, procstat, iostat
@@ -1093,9 +1199,18 @@ SYSMON_getUserDefined($$$$)
 	my ($hash, $map, $uName, $uCmd) = @_;
 	SYSMON_Log($hash, 5, "Name=[$uName] Cmd=[$uCmd]");
 	
-	my $out_str = SYSMON_execute($hash, $uCmd);
-  chomp $out_str;
-  #$out_str=~s/#/§²§/g;
+	my @out_arr = SYSMON_execute($hash, $uCmd);
+	
+	my $out_str = "";
+	foreach my $k (@out_arr) {
+		chomp($k);
+		$out_str.=$k." ";
+	}
+	#my $out_str = join(" ",@out_arr);
+	##my $out_str = SYSMON_execute($hash, $uCmd);
+  ##chomp $out_str;
+  #$out_str=~s/\n/ /g;
+  #$out_str=~s/\r/ /g;
 	$map->{$uName} = $out_str;
 	SYSMON_Log($hash, 5, "User-Defined Result: $uName='$out_str'");
 	
@@ -2590,6 +2705,37 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   return $htmlcode;
 }
 
+#sub SYSMON_first($) {
+#	my (@d) = @_;
+#	return @d[0];
+#	
+#	#my ($d) = @_;
+#	#
+#	#return undef unless defined $d;
+#	
+#	##return ref ($d)." - ".ref(\$d);
+#	#if (ref $d eq "ARRAY") {
+#	# 	return @{$d}[0];
+#	#} else {
+#	#  return $d;
+#	#}
+#}
+#
+#sub SYSMON_last($) {
+#	my (@d) = @_;
+#	
+#	return undef unless defined @d;
+#	
+#	return @d[-1];
+#	
+#	#return ref ($d)." - ".ref(\$d);
+#	#if (ref $d eq "ARRAY") {
+#	# 	return @{$d}[-1];
+#	#} else {
+#	#  return $d;
+#	#}
+#}
+
 #my $proc_fs = undef;
 sub
 SYSMON_isProcFS($) {
@@ -2628,7 +2774,10 @@ sub
 SYSMON_isCPUFreqRPiBBB($) {
 	my ($hash) = @_;
 	if(!defined $hash->{helper}{sys_cpu_freq_rpi_bbb}) {
-	  $hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	  #$hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	  # Diese abenteuerliche Konstruktion ist noetig, weil bei zu langen Zeilen ueber Telnet der Rest der Zeile als erstes Element kommt
+	  my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
+	  $hash->{helper}{sys_cpu_freq_rpi_bbb} = int($t[-1]);
   }
 
 	return $hash->{helper}{sys_cpu_freq_rpi_bbb};
@@ -2645,7 +2794,10 @@ sub
 SYSMON_isCPU1Freq($) {
 	my ($hash) = @_;
 	if(!defined $hash->{helper}{sys_cpu1_freq}) {
-	  $hash->{helper}{sys_cpu1_freq} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	  #$hash->{helper}{sys_cpu1_freq} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+	  # s. o. 
+	  my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
+	  $hash->{helper}{sys_cpu1_freq} = int($t[-1]);
   }
 
 	return $hash->{helper}{sys_cpu1_freq};
@@ -2806,6 +2958,81 @@ SYSMON_execute($$)
 
 #------------------------------------------------------------------------------
 
+# checks and stores password used for remote connection
+sub SYSMON_storePassword($$)
+{
+    my ($hash, $password) = @_;
+     
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my $key = getUniqueId().$index;
+    
+    my $enc_pwd = "";
+    
+    if(eval "use Digest::MD5;1")
+    {
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }
+    
+    for my $char (split //, $password)
+    {
+        my $encode=chop($key);
+        $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }
+    
+    my $err = setKeyValue($index, $enc_pwd);
+    return "error while saving the password - $err" if(defined($err));
+    
+    return "password successfully saved";
+}
+
+# read password
+sub SYSMON_readPassword($)
+{
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+   my $key = getUniqueId().$index;
+
+   my ($password, $err);
+
+   SYSMON_Log($hash, 5, "Read password from file");
+   ($err, $password) = getKeyValue($index);
+
+   if(defined($err))
+   {
+      SYSMON_Log($hash, 3, "unable to read password from file: $err");
+      return undef;
+   }  
+
+   if(defined($password))
+   {
+      if(eval "use Digest::MD5;1")
+      {
+         $key = Digest::MD5::md5_hex(unpack "H*", $key);
+         $key .= Digest::MD5::md5_hex($key);
+      }
+
+      my $dec_pwd = '';
+     
+      for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g))
+      {
+         my $decode=chop($key);
+         $dec_pwd.=chr(ord($char)^ord($decode));
+         $key=$decode.$key;
+      }
+     
+      return $dec_pwd;
+   }
+   else
+   {
+      SYSMON_Log($hash, 2, "No password in file");
+      return undef;
+   }
+}
+
 # Opens a Telnet Connection to an external Machine
 ############################################
 sub SYSMON_Open_Connection($)
@@ -2815,7 +3042,7 @@ sub SYSMON_Open_Connection($)
 
    my $msg;
  
-   my $mode = AttrVal( $name, 'mode', 'local');
+   my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
    if ($mode eq 'local') {
      return undef;
    }
@@ -2826,37 +3053,38 @@ sub SYSMON_Open_Connection($)
      return $msg;
    }
 
-   my $host = AttrVal( $name, "remote_host", undef );
+   my $host = $hash->{HOST};#AttrVal( $name, "remote_host", undef );
   
    if(!defined $host) {
      $msg="Error: no remote host provided";
      SYSMON_Log($hash, 3, $msg);
      return $msg unless defined $host;
    }
-   my $port = AttrVal( $name, "remote_port", 23 );
-   my $pwd = AttrVal( $name, "remote_password", undef );
-   my $user = AttrVal( $name, "remote_user", "" );
+   my $port = $hash->{PORT};#AttrVal( $name, "remote_port", 23 );
+   my $pwd = SYSMON_readPassword($hash);#AttrVal( $name, "remote_password", undef );
+   my $user = $hash->{USER};#AttrVal( $name, "remote_user", "" );
+   $user="" unless defined($user);
   #test
-  $pwd="dummy";
+  #$pwd="dummy";
   #test
    my $before;
    my $match;
    
-   if(!defined($pwd)) {
-     my $pwdFile = AttrVal( $name, "pwdFile", undef);
-     if(defined($pwdFile)) {
-       SYSMON_Log($hash, 5, "Open password file '$pwdFile' to extract password");
-       if (open(IN, "<" . $pwdFile)) {
-         $pwd = <IN>;
-         close(IN);
-         SYSMON_Log($hash, 5, "Close password file");
-       } else {
-         $msg = "Error: Cannot open password file '$pwdFile': $!";
-         SYSMON_Log($hash, 2, $msg);
-         return $msg;
-       }
-     }
-   }
+   #if(!defined($pwd)) {
+   #  my $pwdFile = AttrVal( $name, "pwdFile", undef);
+   #  if(defined($pwdFile)) {
+   #    SYSMON_Log($hash, 5, "Open password file '$pwdFile' to extract password");
+   #    if (open(IN, "<" . $pwdFile)) {
+   #      $pwd = <IN>;
+   #      close(IN);
+   #      SYSMON_Log($hash, 5, "Close password file");
+   #    } else {
+   #      $msg = "Error: Cannot open password file '$pwdFile': $!";
+   #      SYSMON_Log($hash, 2, $msg);
+   #      return $msg;
+   #    }
+   #  }
+   #}
    
    if(!defined($pwd)) {
      $msg="Error: no passwort provided";
@@ -2871,10 +3099,10 @@ sub SYSMON_Open_Connection($)
       $msg = "Could not open telnet connection to $host:$port";
       SYSMON_Log($hash, 2, $msg);
       $telnet = undef;
-      $hash->{telnet}=$telnet;
+      $hash->{".telnet"}=$telnet;
       return $msg;
    }
-   $hash->{telnet}=$telnet;
+   $hash->{".telnet"}=$telnet;
 
    SYSMON_Log($hash, 5, "Wait for user or password prompt.");
    unless ( ($before,$match) = $telnet->waitfor('/(user|login|password): $/i') )
@@ -2910,7 +3138,7 @@ sub SYSMON_Open_Connection($)
    }
    elsif ( $match eq "password: " && $user ne "")
    {
-      SYSMON_Log($hash, 3, "Attribute 'remote_user' defined but telnet login did not prompt for user name.");
+      SYSMON_Log($hash, 3, "remote user was defined but telnet login did not prompt for user name.");
    }
 
    SYSMON_Log($hash, 5, "Entering password");
@@ -2945,18 +3173,18 @@ sub SYSMON_Close_Connection($)
    my ($hash) = @_;
    
    my $name = $hash->{NAME};
-   my $mode = AttrVal( $name, 'mode', 'local');
+   my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
    if ($mode eq 'local') {
      return undef;
    }
    
-   my $telnet = $hash->{telnet};
+   my $telnet = $hash->{".telnet"};
    if (defined $telnet)
    {
       SYSMON_Log ($hash, 5, "Close Telnet connection");
       $telnet->close;
       $telnet = undef;
-      $hash->{telnet}=$telnet;
+      $hash->{".telnet"}=$telnet;
    }
    else
    {
@@ -2970,15 +3198,16 @@ sub SYSMON_Exec($$)
 {
    my ($hash, $cmd) = @_;
    my $openedTelnet = 0;
-   my $telnet = $hash->{telnet};
+   my $telnet = $hash->{".telnet"};
    
    #TODO: SSH
    
    my $name = $hash->{NAME};
-   my $mode = AttrVal( $name, 'mode', 'local');
+   my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
    if ($mode eq 'telnet') {
       unless (defined $telnet)
       {
+      	SYSMON_Log($hash, 5, "$name: Open single telnet connection");
         my $msg = SYSMON_Open_Connection($hash);
         $hash->{helper}{error_msg}=$msg;
         if ($msg) {
@@ -2988,7 +3217,12 @@ sub SYSMON_Exec($$)
         $hash->{helper}{error_msg}=undef;
       }
       my @retVal = SYSMON_Exec_Remote($hash, $cmd);
-      SYSMON_Close_Connection ( $hash ) if $openedTelnet;
+      
+      if($openedTelnet) {
+      	SYSMON_Log($hash, 5, "$name: Close single telnet connection");
+        SYSMON_Close_Connection( $hash );
+      }
+      
       # Arrays als solche zurueckgeben
       if(scalar(@retVal)>1) {
         SYSMON_Log ($hash, 5, "Result '".Dumper(@retVal)."'");
@@ -2996,8 +3230,12 @@ sub SYSMON_Exec($$)
       }
       # Einzeiler als normale Scalars
       my $line = $retVal[0];
-      chomp $line;
-      SYSMON_Log ($hash, 5, "Result '$line'");
+      if(defined($line)) {
+        chomp $line;
+        SYSMON_Log ($hash, 5, "Result '$line'");
+      } else {
+      	SYSMON_Log ($hash, 5, "Result undef");
+      }
       return $line;
       #return $retVal;
    } else {
@@ -3014,7 +3252,7 @@ SYSMON_Exec_Remote($$)
    my @output;
    my $result;
 
-   my $telnet = $hash->{telnet};
+   my $telnet = $hash->{".telnet"};
 
    SYSMON_Log($hash, 5, "Execute '".$cmd."'");
    @output=$telnet->cmd($cmd);
@@ -3122,14 +3360,14 @@ sub SYSMON_Log($$$) {
 <a name="SYSMON"></a>
 <h3>SYSMON</h3>
 <ul>
-This module provides statistics about the system running FHEM server. Only Linux-based systems are supported. 
+This module provides statistics about the system running FHEM server. Furthermore, remote systems can be accessed (Telnet). Only Linux-based systems are supported. 
 Some informations are hardware specific and are not available on every platform. 
 So far, this module has been tested on the following systems: 
-Raspberry Pi (Debian Wheezy) BeagleBone Black, FritzBox 7390 (no CPU data), WR703N under OpenWrt (no CPU data).
+Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390, WR703N under OpenWrt, CubieTruck and some others.
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define &lt;name&gt; SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+    <code>define &lt;name&gt; SYSMON [MODE[:[USER@]HOST][:PORT]] [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
     
 This statement creates a new SYSMON instance. The parameters M1 to M4 define the refresh interval for various Readings (statistics). The parameters are to be understood as multipliers for the time defined by INTERVAL_BASE. Because this time is fixed at 60 seconds, the Mx-parameter can be considered as time intervals in minutes.<br>
@@ -3154,6 +3392,8 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
      fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text<br><br>
      </li>
     </ul>
+    To query a remote system at least the address (HOST) must be specified. Accompanied by the port and / or user name, if necessary. The password (if needed) has to be defined once with the command 'set password <password>'. For MODE parameter are 'telnet' and 'local' only allowed. 'local' does not require any other parameters and can also be omitted.
+    <br>
   <br>
 
   <b>Readings:</b>
@@ -3673,14 +3913,15 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 <h3>SYSMON</h3>
 <ul>
   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
+  Weiterhin k&ouml;nnen auch Remote-Systeme abgefragt werden (Telnet).
   Es werden nur Linux-basierte Systeme unterst&uuml;tzt. Manche Informationen sind hardwarespezifisch und sind daher nicht auf jeder Plattform 
   verf&uuml;gbar.
   Bis jetzt wurde dieses Modul auf folgenden Systemen getestet: Raspberry Pi (Debian Wheezy), BeagleBone Black, 
-  FritzBox 7390 (keine CPU-Daten), WR703N unter OpenWrt.
+  FritzBox 7390, WR703N unter OpenWrt, CubieTruck und einige andere.
   <br><br>
   <b>Define</b>
   <br><br>
-    <code>define &lt;name&gt; SYSMON [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+    <code>define &lt;name&gt; SYSMON [MODE[:[USER@]HOST][:PORT]] [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
     <br>
     Diese Anweisung erstellt eine neue SYSMON-Instanz.
     Die Parameter M1 bis M4 legen die Aktualisierungsintervalle f&uuml;r verschiedenen Readings (Statistiken) fest.
@@ -3706,6 +3947,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
      fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text<br><br>
      </li>
     </ul>
+    F&uuml;r Abfrage eines entfernten Systems muss mindestens deren Adresse (HOST) angegeben werden, bei Bedarf erg&auml;nzt durch den Port und/oder den Benutzernamen. 
+    Das eventuell ben&ouml;tigte Passwort muss einmalig mit dem Befehl 'set password &lt;pass&gt;' definiert werden.
+    Als MODE sind derzeit 'telnet' und 'local' erlaubt. 'local' erfordert keine weiteren Angaben und kann auch ganz weggelassen werden.
+    <br>
   <br>
 
   <b>Readings:</b>
