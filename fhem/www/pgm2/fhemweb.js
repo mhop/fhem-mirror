@@ -119,6 +119,20 @@ FW_jqueryReadyFn()
         FW_okDialog('<pre>'+data+'</pre>');
       });
     });
+
+  $("form").each(function(){                             // shutdown handling
+    var input = $(this).find("input.maininput");
+    if(!input.length)
+      return;
+    $(this).on("submit", function() {
+      if($(input).val().match(/^\s*shutdown/)) {
+        FW_cmd(FW_root+"?XHR=1&cmd="+$(input).val());
+        $(input).val("");
+        return false;
+      }
+      return true;
+    });
+  });
 }
 
 
