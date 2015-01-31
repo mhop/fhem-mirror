@@ -185,11 +185,16 @@ sub btIP_readLayout($) {
 ##### Items 
 
 sub btIP_itemArea {
-  my ($id,$x1,$y1,$x2,$y2,$target,%params)= @_;
+  my ($id,$x1,$y1,$x2,$y2,$link,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
-  my $output  = "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" xlink:href=\"$target\" >\n";
+
+  my $target = 'secret';
+     $target = '_top' if $link =~ s/^-//;
+     $target = '_blank' if $link =~ s/^\+//;
+
+  my $output  = "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" xlink:href=\"$link\" target=\"$target\" >\n";
      $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" opacity=\"0\" />\n";
      $output .= "</a>\n";
   return $output;
