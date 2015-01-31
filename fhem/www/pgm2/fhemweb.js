@@ -359,8 +359,7 @@ FW_doUpdate()
       if(FW_widgets[w].updateLine) // updateLine is deprecated, use setValueFn
         FW_widgets[w].updateLine(d);
 
-    if(d[0].indexOf("-") == -1) // Wont contain -
-      devs.push(d);
+    devs.push(d);
   }
 
   for(var w in FW_widgets)
