@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.0.2";
+my $VERSION = "2.0.3";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -128,9 +128,9 @@ SYSMON_Define($$)
   	my @na = @a[2..scalar(@a)-1];  
   	
   	# wenn das erste Element nicht numerisch
-  	if(!(@na[0] =~ /^\d+$/)) {
+  	if(!($na[0] =~ /^\d+$/)) {
   		# set mode/host/port
-  		my($mode, $host, $port) = split(/:/, @na[0]);
+  		my($mode, $host, $port) = split(/:/, $na[0]);
   		$mode=lc($mode);
   		# TODO SSH
   		if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet')) {
@@ -660,10 +660,14 @@ SYSMON_Set($@)
   if ( lc $cmd eq 'password') {
   	my $subcmd = $a[2];
 	  if(defined $subcmd) {
-	     return SYSMON_storePassword ($hash, $subcmd);
+	     my $ret = SYSMON_storePassword ($hash, $subcmd);
+	     if(!defined($hash->{helper}{error_msg})) {
+	       SYSMON_Update($hash, 1);
+	     }
+	     return $ret;
 	  }
   }
-  
+
   return "Unknown argument $cmd, choose one of password interval_multipliers clean:noArg clear";
 }
 
@@ -2982,6 +2986,7 @@ sub SYSMON_storePassword($$)
     }
     
     my $err = setKeyValue($index, $enc_pwd);
+    $hash->{helper}{error_msg}=$err;
     return "error while saving the password - $err" if(defined($err));
     
     return "password successfully saved";
