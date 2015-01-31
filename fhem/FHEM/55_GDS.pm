@@ -103,8 +103,8 @@ sub GDS_Define($$$) {
 	$hash->{helper}{URL}		= "ftp-outgoing2.dwd.de";
 	$hash->{helper}{INTERVAL} = 1200;
 
-	Log3($name, 3, "GDS $name: created");
-	Log3($name, 3, "GDS $name: tempDir=".$tempDir);
+	Log3($name, 4, "GDS $name: created");
+	Log3($name, 4, "GDS $name: tempDir=".$tempDir);
 
 	fillMappingTables($hash);
 	initDropdownLists($hash);
@@ -131,6 +131,15 @@ sub GDS_Undef($$) {
 	my ($hash, $arg) = @_;
 	my $name = $hash->{NAME};
 	RemoveInternalTimer($hash);
+    # check if last gds device
+    my $url = '/gds';
+    my $gdsPresent = 0;
+    foreach my $def (sort keys %defs) {
+       $gdsPresent += 1 if($defs{$def}{TYPE} eq "GDS");
+       last if $gdsPresent == 2;
+    }
+    # if last gds device, remove FWEXT
+    $data{FWEXT}{$url} = undef if $gdsPresent == 1;
 	return undef;
 }
 
