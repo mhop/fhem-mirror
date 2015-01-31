@@ -41,6 +41,8 @@ CommandCopy($$)
     next if( $a eq 'userattr' );
     CommandAttr($hash, "$args[1] $a $attr{$args[0]}{$a}");
   }
+
+  CallFn($args[1], "CopyFn", $args[0], $args[1]);
 }
 
 1;
