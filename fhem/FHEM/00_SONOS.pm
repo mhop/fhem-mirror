@@ -47,6 +47,10 @@
 # Changelog
 #
 # SVN-History:
+# .01.2015
+#	Es gibt jetzt drei Sonos-Vorlagen für RemoteControl: "Sonos", "SonosSVG_Buttons" und "SonosSVG_Icons". 
+#	Es gibt jetzt ein neues Standardlayout (SonosSVG_Buttons) für die Erzeugung der RemoteControl.
+#	Es gibt jetzt ein Attribut "ignoredIPs", mit dem man problematische oder unerwünschte IPs bei der UPnP-Erkennung ausschließen kann.
 # 30.01.2015
 #	Commandref wurde optisch übersichtlicher gestaltet, und die Windows-Hinweise eingefügt.
 #	Bei der Anzeige des nächsten Titels in der Standard-ReadingsGroup stand "Artist". Das wurde auf "Interpret" korrigiert.
@@ -332,7 +336,7 @@ use feature 'state';
 ########################################################
 # IP-Adressen, die vom UPnP-Modul ignoriert werden sollen
 ########################################################
-my %IgnoreIPs = ();
+my %ignoredIPs = ();
 
 
 ########################################################
@@ -500,12 +504,14 @@ sub SONOS_Initialize ($) {
 	eval {
 		no strict;
 		no warnings;
-		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir characterDecoding '.$readingFnAttributes;
+		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir characterDecoding '.$readingFnAttributes;
 		use strict;
 		use warnings;
 	};
 	
 	$data{RC_layout}{Sonos} = "SONOS_RCLayout";
+	$data{RC_layout}{SonosSVG_Buttons} = "SONOS_RCLayoutSVG1";
+	$data{RC_layout}{SonosSVG_Icons} = "SONOS_RCLayoutSVG2";
 	
 	return undef;
 }
@@ -519,6 +525,36 @@ sub SONOS_RCLayout() {
 	my @rows = ();
 	
 	push @rows, "Play:PLAY,Pause:PAUSE,Previous:REWIND,Next:FF,VolumeD:VOLDOWN,VolumeU:VOLUP,MuteT:MUTE";
+	push @rows, "attr rc_iconpath icons/remotecontrol";
+	push @rows, "attr rc_iconprefix black_btn_";
+	
+	return @rows;
+}
+
+########################################################################################
+#
+# SONOS_RCLayoutSVG1 - Returns the Standard-Layout-Definition for a RemoteControl-Device
+#
+########################################################################################
+sub SONOS_RCLayoutSVG1() {
+	my @rows = ();
+	
+	push @rows, "Play:rc_PLAY.svg,Pause:rc_PAUSE.svg,Previous:rc_PREVIOUS.svg,Next:rc_NEXT.svg,VolumeD:rc_VOLDOWN.svg,VolumeU:rc_VOLUP.svg,MuteT:rc_MUTE.svg";
+	push @rows, "attr rc_iconpath icons/remotecontrol";
+	push @rows, "attr rc_iconprefix black_btn_";
+	
+	return @rows;
+}
+
+########################################################################################
+#
+# SONOS_RCLayoutSVG2 - Returns the Standard-Layout-Definition for a RemoteControl-Device
+#
+########################################################################################
+sub SONOS_RCLayoutSVG2() {
+	my @rows = ();
+	
+	push @rows, "Play:audio_play.svg,Pause:audio_pause.svg,Previous:audio_rew.svg,Next:audio_ff.svg,VolumeD:audio_volume_low.svg,VolumeU:audio_volume_high.svg,MuteT:audio_volume_mute.svg";
 	push @rows, "attr rc_iconpath icons/remotecontrol";
 	push @rows, "attr rc_iconprefix black_btn_";
 	
@@ -1649,7 +1685,7 @@ sub SONOS_InitClientProcess($) {
 	}
 	
 	# Grundsätzliche Informationen bzgl. der konfigurierten Player übertragen...
-	my $setDataString = 'SetData:'.$hash->{NAME}.':'.AttrVal($hash->{NAME}, 'verbose', '3').':'.AttrVal($hash->{NAME}, 'pingType', $SONOS_DEFAULTPINGTYPE).':'.join(',', @playername).':'.join(',', @playerudn);
+	my $setDataString = 'SetData:'.$hash->{NAME}.':'.AttrVal($hash->{NAME}, 'verbose', '3').':'.AttrVal($hash->{NAME}, 'pingType', $SONOS_DEFAULTPINGTYPE).':'.AttrVal($hash->{NAME}, 'ignoredIPs', '').':'.join(',', @playername).':'.join(',', @playerudn);
 	SONOS_Log undef, 5, $setDataString;
 	DevIo_SimpleWrite($hash, $setDataString."\n", 0);
 	
@@ -3226,7 +3262,7 @@ sub SONOS_Discover() {
 	my $error;
 	do {
 		eval {
-			$SONOS_Controlpoint = UPnP::ControlPoint->new(SearchPort => 8008 + threads->tid() - 1, SubscriptionPort => 9009 + threads->tid() - 1, SubscriptionURL => '/eventSub', MaxWait => 30, IgnoreIP => \%IgnoreIPs);
+			$SONOS_Controlpoint = UPnP::ControlPoint->new(SearchPort => 8008 + threads->tid() - 1, SubscriptionPort => 9009 + threads->tid() - 1, SubscriptionURL => '/eventSub', MaxWait => 30, IgnoreIP => \%ignoredIPs);
 			$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
 			$SONOS_Controlpoint->handle;
 		};
@@ -3548,7 +3584,7 @@ sub SONOS_RestoreOldPlaystate() {
 	SONOS_Log undef, 1, 'Restore-Thread gestartet. Warte auf Arbeit...';
 	
 	my $runEndlessLoop = 1;
-	my $controlPoint = UPnP::ControlPoint->new(SearchPort => 8008 + threads->tid() - 1, SubscriptionPort => 9009 + threads->tid() - 1, SubscriptionURL => '/eventSub', MaxWait => 20, IgnoreIP => \%IgnoreIPs);
+	my $controlPoint = UPnP::ControlPoint->new(SearchPort => 8008 + threads->tid() - 1, SubscriptionPort => 9009 + threads->tid() - 1, SubscriptionURL => '/eventSub', MaxWait => 20, IgnoreIP => \%ignoredIPs);
 	
 	$SIG{'PIPE'} = 'IGNORE';
 	$SIG{'CHLD'} = 'IGNORE';
@@ -4432,7 +4468,7 @@ sub SONOS_Discover_Callback($$$) {
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RC group '.$SONOS_Client_Data{SonosDeviceName});
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RC rc_iconpath icons/remotecontrol');
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RC rc_iconprefix black_btn_');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC row00 Play:PLAY,Pause:PAUSE,Previous:REWIND,Next:FF,VolumeD:VOLDOWN,VolumeU:VOLUP,MuteT:MUTE');
+					SONOS_Client_Notifier('CommandAttr:'.$name.'RC row00 Play:rc_PLAY.svg,Pause:rc_PAUSE.svg,Previous:rc_PREVIOUS.svg,Next:rc_NEXT.svg,VolumeD:rc_VOLDOWN.svg,VolumeU:rc_VOLUP.svg,MuteT:rc_MUTE.svg');
 					
 					SONOS_Client_Notifier('CommandDefine:'.$name.'RC_Notify notify '.$name.'RC set '.$name.' $EVENT');
 					
@@ -6766,15 +6802,21 @@ sub SONOS_Client_ConsumeMessage($$) {
 		$SONOS_Client_Selector->remove($client);
 		shutdown($client, 2);
 		close($client);
-	} elsif ($msg =~ m/SetData:(.*?):(.*?):(.*?):(.*?):(.*)/i) {
+	} elsif ($msg =~ m/SetData:(.*?):(.*?):(.*?):(.*?):(.*?):(.*)/i) {
 		$SONOS_Client_Data{SonosDeviceName} = $1;
 		$SONOS_Client_LogLevel = $2;
 		$SONOS_Client_Data{pingType} = $3;
 		
-		my @names = split(/,/, $4);
+		my @ignoredIPs = split(/,/, $4);
+		$SONOS_Client_Data{ignoredIPs} = shared_clone(\@ignoredIPs);
+		for my $elem (@ignoredIPs) {
+			$ignoredIPs{$elem} = 1;
+		}
+		
+		my @names = split(/,/, $5);
 		$SONOS_Client_Data{PlayerNames} = shared_clone(\@names);
 		
-		my @udns = split(/,/, $5);
+		my @udns = split(/,/, $6);
 		$SONOS_Client_Data{PlayerUDNs} = shared_clone(\@udns);
 		
 		my @playeralive = ();
@@ -7015,6 +7057,8 @@ The order in the sublists are important, because the first entry defines the so-
 </a><br />With this attribute you can define a character-decoding-class. E.g. &lt;UTF-8&gt;. Default is &lt;CP-1252&gt;.</li>
 <li><a name="SONOS_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this value you can disable the whole module. Works immediatly. If set to 1 the subprocess will be terminated and no message will be transmitted. If set to 0 the subprocess is again started.<br />It is useful when you install new Sonos-Components and don't want any disgusting devices during the Sonos setup.</li>
+<li><a name="SONOS_attribut_ignoredIPs"><b><code>ignoredIPs &lt;IP-Address&gt;[,IP-Address]</code></b>
+</a><br />With this attribute you can define IP-addresses, which has to be ignored by the UPnP-System of this module. e.g. "192.168.0.11,192.168.0.37"</li>
 <li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> One of (none,tcp,udp,icmp,syn). Defines which pingType for alive-Checking has to be used. If set to 'none' no checks will be done.</li>
 </ul></li>
@@ -7150,6 +7194,8 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 </a><br />Hiermit kann die Zeichendekodierung eingestellt werden. Z.b. &lt;UTF-8&gt;. Standardm&auml;&szlig;ig wird &lt;CP-1252&gt; verwendet.</li>
 <li><a name="SONOS_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Hiermit kann das Modul abgeschaltet werden. Wirkt sofort. Bei 1 wird der SubProzess beendet, und somit keine weitere Verarbeitung durchgeführt. Bei 0 wird der Prozess wieder gestartet.<br />Damit kann das Modul temporär abgeschaltet werden, um bei der Neueinrichtung von Sonos-Komponenten keine halben Zustände mitzubekommen.</li>
+<li><a name="SONOS_attribut_ignoredIPs"><b><code>ignoredIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
+</a><br />Mit diesem Attribut können IP-Adressen angegeben werden, die vom UPnP-System ignoriert werden sollen. Z.B.: "192.168.0.11,192.168.0.37"</li>
 <li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> Eines von (none,tcp,udp,icmp,syn). Gibt an, welche Methode für die Ping-Überprüfung verwendet werden soll. Wenn 'none' angegeben wird, dann wird keine Überprüfung gestartet.</li>
 </ul></li>
