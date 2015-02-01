@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.3";
+my $alarmversion    = "2.4";
 
 #########################################################################################
 #
@@ -58,7 +58,7 @@ sub Alarm_Initialize ($) {
   $hash->{GetFn}       = "Alarm_Get";
   $hash->{UndefFn}     = "Alarm_Undef";   
   #$hash->{AttrFn}      = "Alarm_Attr";
-  my $attst            = "lockstate:lock,unlock statedisplay:simple,color,table,graphics,none armdelay armact disarmact cancelact";
+  my $attst            = "lockstate:lock,unlock statedisplay:simple,color,table,graphics,none armdelay armwait armact disarmact cancelact";
   for( my $level=0;$level<$alarmno;$level++ ){
      $attst .=" level".$level."start level".$level."end level".$level."msg level".$level."xec:0,1 level".$level."onact level".$level."offact ";
   }
@@ -277,7 +277,8 @@ sub Alarm_Exec($$$$$){
 
    my ($name,$level,$dev,$evt,$act) = @_;
    my $hash  = $defs{$name};
-   my $aclvl = $hash->{READINGS}{'level'.$level}{VAL};
+   my $xec   = AttrVal($name, "level".$level."xec", 0); 
+   my $xac   = $hash->{READINGS}{'level'.$level}{VAL};
    my $msg   = '';
    my $cmd;
    my $mga;
@@ -290,9 +291,8 @@ sub Alarm_Exec($$$$$){
 
    #-- raising the alarm
    if( $act eq "on" ){
-      my $xec   = AttrVal($name, "level".$level."xec", 0); 
       #-- only if this level is armed and not yet active
-      if( ($xec eq "armed") && ($hash->{READINGS}{"level".$level}{VAL} eq "off") ){ 
+      if( ($xec eq "armed") && ($xac eq "off") ){ 
          #-- check for time (attribute values have been controlled in CreateNotifiers)
          my @st  = split(':',AttrVal($name, "level".$level."start", 0));
          my @et  = split(':',AttrVal($name, "level".$level."end", 0));
@@ -338,7 +338,7 @@ sub Alarm_Exec($$$$$){
       } 
    }elsif( ($act eq "off")||($act eq "cancel") ){
       #-- only if this level is active
-      if( $hash->{READINGS}{"level".$level}{VAL} ne "off"){
+      if( $xac ne "off"){
          #-- deleting all running ats
          $dly = sprintf("alarm%1ddly",$level);
          foreach my $d (sort keys %intAt ) {
@@ -384,44 +384,61 @@ sub Alarm_Arm($$$$$){
 
    my ($name,$level,$dev,$evt,$act) = @_;
    my $hash  = $defs{$name};
-   my $aclvl = $hash->{READINGS}{"level"}{VAL};
+   my $xac   = $hash->{READINGS}{"level"}{VAL};
+   my $xec   = AttrVal($name, 'level'.$level.'xec', 0);
    my $msg   = '';
    my $mga;
    my $cmd;
          
    #-- arming the alarm
-   if( ($act eq "arm") && (AttrVal($name, 'level'.$level.'xec', 0) eq "disarmed")  ){
-      my @dly = split(':',(AttrVal($name, "armdelay", 0) ne '')?AttrVal($name, "armdelay", 0):'0:00');
-      if( int(@dly) == 1){   
-         if( $dly[0] > 59 ){
-            Log3 $hash,3,"[Alarm $level] Cannot be armed due to wrong time spec ".AttrVal($name, "armdelay", 0)." for armdelay";  
-            $dly[0] = 59;  
+   if( ($act eq "arm") && ( $xec ne "armed")  ){
+      my $xdl     = AttrVal($name, "armdelay", 0);
+      my $cmdwait = AttrVal($name, "armwait", 0);
+      my $cmdact  = AttrVal($name, "armact", 0);
+      if( ($xdl eq '')|($xdl eq '0:00')|($xdl eq '00:00') ){
+         CommandAttr(undef,$name.' level'.$level.'xec armed');
+         $msg = "[Alarm $level] armed from device $dev with event $evt"; 
+         Log3 $hash,3,$msg; 
+      } elsif( $xdl =~ /([0-9])?:([0-5][0-9])?/  ){
+         CommandAttr(undef,$name.' level'.$level.'xec armwait');
+         #--transform commands from fhem to perl level
+         my @cmdactarr = split(/;/,$cmdact);
+         my $cmdactf;
+         if( int(@cmdactarr) == 1 ){
+           $cmdactf   = "fhem(\"".$cmdact."\");;";
+         }else{
+           $cmdactf   = '';
+             for(my $i=0;$i<int(@cmdactarr);$i++){
+               $cmdactf.="fhem(\"".$cmdactarr[$i]."\");;";
+           }
          }
-         $msg = "[Alarm $level] armed from device $dev with event $evt, delay $dly[0] s"; 
-         $cmd = sprintf("define alarm%1d.arm.dly at +00:00:%02d attr %s level%1dxec armed",$level,$dly[0],$name,$level);           
-      }elsif( int(@dly) == 2){
-         if( ($dly[0] > 10) || ($dly[0] < 0) || ($dly[1] > 59) || ($dly[1] < 0) ){
-            Log3 $hash,1,"[Alarm $level] Cannot be armed due to wrong time spec ".AttrVal($name, "armdelay", 0)." for armdelay";
-            $dly[0] = 9;  
-            $dly[1] = 59;  
-         }
-         $msg = "[Alarm $level] armed from device $dev with event $evt, delay $dly[0]:$dly[1]"; 
-         $cmd = sprintf("define alarm%1d.arm.dly at +00:%02d:%02d attr %s level%1dxec armed",$level,$dly[0],$dly[1],$name,$level);
+         #-- compose commands
+         $cmd = sprintf("define alarm%1d.arm.dly at +00:%02d:%02d {fhem(\"attr %s level%1dxec armed\");;%s}",$level,$1,$2,$name,$level,$cmdactf);
+         $msg = "[Alarm $level] will be armed from device $dev with event $evt, delay $xdl"; 
+         #-- delete old delayed arm
+         fhem('delete alarm'.$level.'.arm.dly' )
+           if( defined $defs{'alarm'.$level.'.arm.dly'});
+         #-- define new delayed arm
+         fhem($cmd); 
+         #-- execute armwait action
+         fhem($cmdwait);
+         Log3 $hash,3,$msg; 
+      }else{
+         $msg = "[Alarm $level] cannot be armed due to wrong delay timespec"; 
+         Log3 $hash,1,$msg; 
       }
-      fhem($cmd); 
-      $cmd = AttrVal($name, "armact", 0);
-      fhem($cmd) 
-        if( $cmd );
-      Log3 $hash,3,$msg; 
    #-- disarming implies canceling as well
-   }elsif( ($act eq "disarm") &&  (AttrVal($name, 'level'.$level.'xec', 0) eq "armed")) {
+   }elsif( ($act eq "disarm") &&  ($xec ne "disarmed")) {
+      #-- delete old delayed arm
+      fhem('delete alarm'.$level.'.arm.dly' )
+         if( defined $defs{'alarm'.$level.'.arm.dly'});
       CommandAttr (undef,$name.' level'.$level.'xec disarmed');
       Alarm_Exec($name,$level,"program","disarm","cancel");
       #--
       $msg = "[Alarm $level] disarmed from device $dev with event $evt";
       $cmd = AttrVal($name, "disarmact", 0);
-      fhem("define alarm".$level.".disarm.T at +00:00:05 ".$cmd); 
-      #if( $cmd ); 
+      fhem("define alarm".$level.".disarm.T at +00:00:03 ".$cmd)
+        if( $cmd ); 
    }
    return $msg;
 }
@@ -653,15 +670,21 @@ sub Alarm_Html($)
     my $row=1;
     $ret .= "<tr><td><div class=\"devType\">Settings</div></td></tr>";
     $ret .= "<tr><td><table class=\"block wide\" id=\"settingstable\">\n"; 
-    $ret .= "<tr class=\"odd\"><td class=\"col1\" colspan=\"4\"><table id=\"armtable\" border=\"0\"><tr class==\"odd\"><td class=\"col1\" rowspan=\"3\" valign=\"top\">Arm Delay";
-    $ret .= sprintf("<input type=\"text\" id=\"armdelay\" size=\"4\" maxlength=\"5\" value=\"%s\"/>",AttrVal($name, "armdelay","")); 
-    $ret .= "</td><td class=\"col2\" align=\"right\"> Arm Action</td><td class=\"col3\" >";
+    $ret .= "<tr class=\"odd\"><td class=\"col1\" colspan=\"4\"><table id=\"armtable\" border=\"0\">\n";
+    $ret .= "<tr class==\"odd\"><td class=\"col1\" align=\"right\">Arm Button &#8608</td>";
+    $ret .=                    "<td class=\"col2\" align=\"right\"> Wait Action ";
+    $ret .= sprintf("<input type=\"text\" id=\"armwait\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "armwait","")); 
+    $ret .=               "</td><td class=\"col3\" rowspan=\"2\"> &#8628 Delay <br> &#8626";
+    $ret .= sprintf("<input type=\"text\" id=\"armdelay\" size=\"4\" maxlength=\"5\" value=\"%s\"/>",AttrVal($name, "armdelay",""));
+    $ret .=               "</td></tr>\n"; 
+    $ret .= "<tr class==\"even\"><td class=\"col1\"></td><td class=\"col2\" align=\"right\">Arm Action ";
     $ret .= sprintf("<input type=\"text\" id=\"armaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "armact","")); 
-    $ret .= "</td></tr><tr class==\"even\"><td class=\"col2\" align=\"right\">Disarm Action</td><td class=\"col3\">";
+    $ret .=               "</td></tr>\n";
+    $ret .="<tr class==\"odd\"><td class=\"col1\">Disarm Button &#8608</td><td class=\"col2\" align=\"right\">Disarm Action ";
     $ret .= sprintf("<input type=\"text\" id=\"disarmaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "disarmact","")); 
-    $ret .= "</td></tr><tr class==\"odd\"><td class=\"col2\" align=\"right\"> Cancel Action</td><td class=\"col3\">";
+    $ret .= "</td><td></td></tr><tr class==\"odd\"><td class=\"col1\">Cancel Button &#8608</td><td class=\"col2\" align=\"right\"> Cancel Action ";
     $ret .= sprintf("<input type=\"text\" id=\"cancelaction\" size=\"50\" maxlength=\"512\" value=\"%s\"/>",AttrVal($name, "cancelact","")); 
-    $ret .= "</td></tr></table></td></tr>";
+    $ret .= "</td><td></td></tr></table></td></tr>";
     $ret .= "<tr class=\"odd\"><td class=\"col1\">Level</td><td class=\"col2\">Time [hh:mm]</td><td class=\"col3\">Message Part II</td>".
             "<td class=\"col4\">Armed/Cancel</td></tr>\n";
     for( my $k=0;$k<$alarmno;$k++ ){
@@ -681,7 +704,7 @@ sub Alarm_Html($)
       $ret .= "<td class=\"col2\">Start&nbsp;<input type=\"text\" id=\"l".$k."s\" size=\"4\" maxlength=\"5\" value=\"$sval\"/>&nbsp;".
               "End&nbsp;<input type=\"text\" id=\"l".$k."e\" size=\"4\" maxlength=\"5\" value=\"$eval\"/></td>".
               "<td class=\"col3\"><input type=\"text\" id=\"l".$k."m\" size=\"25\" maxlength=\"256\" value=\"$mval\"/></td>";
-      $ret .= sprintf("<td class=\"col4\"><input type=\"checkbox\" id=\"l".$k."x\" %s/>",($xval eq "armed")?"checked=\"checked\"":"").
+      $ret .= sprintf("<td class=\"col4\"><input type=\"checkbox\" id=\"l".$k."x\" %s onclick=\"javascript:alarm_arm('$name','$k')\"/>",($xval eq "armed")?"checked=\"checked\"":"").
               "<input type=\"button\" value=\"Cancel\" onclick=\"javascript:alarm_cancel('$name','$k')\"/></td></tr>\n";
     }    
     $ret .= "</table></td></tr></tr>";
@@ -769,13 +792,13 @@ sub Alarm_Html($)
             <li><a name="alarm_cancel">
                     <code>set &lt;name&gt; canceled &lt;level&gt;</code>
                 </a>
-                <br/>cancels an alarm of level &lt;level&gt;, where &lt;level&gt; = 1..7
+                <br/>cancels an alarm of level &lt;level&gt;, where &lt;level&gt; = 0..7
             </li>
             <li><a name="alarm_arm">
                     <code>set &lt;name&gt; armed &lt;level&gt;</code><br/>
                     <code>set &lt;name&gt; disarmed &lt;level&gt;</code>
                 </a>
-                <br/>sets the alarm of level &lt;level&gt; to armed (i.e., active) or disarmed (i.e., inactive), where &lt;level&gt; = 1..7
+                <br/>sets the alarm of level &lt;level&gt; to armed (i.e., active) or disarmed (i.e., inactive), where &lt;level&gt; = 0..7
             </li>
             <li><a name="alarm_lock">
                     <code>set &lt;name&gt; locked</code><br/>
@@ -806,10 +829,12 @@ sub Alarm_Html($)
                     <li> none=no state display</li>
                 </ul>
                 </li>
-            <li><a name="alarm_armdelay"><code>attr &lt;name&gt; armdelay <i>seconds</i></code></a>
-                <br />seconds until the arming of an alarm becomes operative</li>
+            <li><a name="alarm_armdelay"><code>attr &lt;name&gt; armdelay <i>mm:ss</i></code></a>
+                <br />time until the arming of an alarm becomes operative (0:00 - 9:59 allowed)</li>
+            <li><a name="alarm_armwait"><code>attr &lt;name&gt; armwait <i>action</i></code></a>
+                <br />FHEM action to be carried out immediately after the arm event</li>
             <li><a name="alarm_armact"><code>attr &lt;name&gt; armact <i>action</i></code></a>
-                <br />FHEM action to be carried out on the arming of an alarm</li>
+                <br />FHEM action to be carried out at the arme event after the delay time </li>
             <li><a name="alarm_disarmact"><code>attr &lt;name&gt; disarmact <i>action</i></code></a>
                 <br />FHEM action to be carried out on the disarming of an alarm</li>
             <li><a name="alarm_cancelact"><code>attr &lt;name&gt; cancelact <i>action</i></code></a>

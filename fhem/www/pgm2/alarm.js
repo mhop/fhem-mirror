@@ -65,6 +65,22 @@ function alarm_cancel(name,level){
 
     FW_cmd(url+'?XHR=1&cmd.'+name+'={Alarm_Exec("'+name+'",'+level+',"web","button","off")}');
    }
+   
+function alarm_arm(name,level){
+    var val;
+    var nam;
+    var command = document.getElementById('l'+level+'x').checked;
+    if (command == true){
+        command="arm";
+    }else{
+        command="disarm";
+    }
+    var location = document.location.pathname;
+    if (location.substr(location.length-1,1) == '/') {location = location.substr(0,location.length-1);}
+	var url = document.location.protocol+"//"+document.location.host+location;
+
+    FW_cmd(url+'?XHR=1&cmd.'+name+'={Alarm_Arm("'+name+'",'+level+',"web","button","'+command+'")}');
+   }
     
 
 function alarm_set(name){
@@ -77,6 +93,7 @@ function alarm_set(name){
     
     // saving arm data
     FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armdelay '+document.getElementById('armdelay').value);
+    FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armwait '+document.getElementById('armwait').value);
     FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' armact '+document.getElementById('armaction').value);
     FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' disarmact '+document.getElementById('disarmaction').value);
     FW_cmd(url+'?XHR=1&cmd.'+name+'=attr '+name+' cancelact '+document.getElementById('cancelaction').value);
