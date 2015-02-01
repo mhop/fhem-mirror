@@ -1168,7 +1168,6 @@ SVG_openFile($$$)
   my $baseStyle = $prf;
   $baseStyle =~ s/(touchpad|smallscreen)//;
   if(open(FH, "$dir/${baseStyle}$fName") ||     # Forum #32530
-     open(FH, "$dir/${prf}$fName") ||
      open(FH, "$dir/$fName")) {
     return 1;
   }
