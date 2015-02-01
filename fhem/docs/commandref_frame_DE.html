@@ -627,20 +627,26 @@ Ger&auml;t dokumentiert.
 
 <h4>Allgemeine Attribute</h4>
 
-Die folgenden lokalen Attribute werden von mehreren Ger&auml;te verwendet:
+Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
 <ul>
 
     <a name="IODev"></a>
     <li>IODev<br>
-      Setzt das IO oder das physische Device welches zum Senden der Signale an
+      Setzt das IO oder das physische Device, welches zum Senden der Signale an
       dieses logische Device verwendet werden soll (Beispielsweise FHZ oder
       CUL).  Hinweis: Beim Start weist FHEM jedem logischen Device das letzte
       physische Device zu, das Daten von diesem Typ empfangen kann.  Das
-      Attribut IODev muss nur gesetzt werden wenn mehr als ein physisches
-      Device f&auml;hig ist Signale von diesem logischen Device zu empfangen.
+      Attribut IODev muss nur gesetzt werden, wenn mehr als ein physisches
+      Device f&auml;hig ist, Signale von diesem logischen Device zu empfangen.
       </li><br>
 
+    <li>Attribut "disable" umschalten<br/>
+      Das Attribut "disable" kann, sofern vom Ger&auml;temodul bereitgestellt,<br/>
+      mit folgendem Befehl einfach umgeschaltet werden:</br>
+      <br/>
+      <code>attr &lt;device&gt; disable toggle</code><br/>
+    </li>
 </ul>
 
 
