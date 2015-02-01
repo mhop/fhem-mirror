@@ -134,6 +134,8 @@ my %sets = (
 	'CrossfadeMode' => 'state',
 	'LEDState' => 'state',
 	'MuteT' => '',
+	'ShuffleT' => '',
+	'RepeatT' => '',
 	'VolumeD' => '',
 	'VolumeU' => '',
 	'Volume' => 'volumelevel',
@@ -500,11 +502,21 @@ sub SONOSPLAYER_Set($@) {
 		$udn = $hash->{UDN};
 	
 		SONOS_DoWork($udn, 'setShuffle', $value);
+	} elsif (lc($key) eq 'shufflet') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+	
+		SONOS_DoWork($udn, 'setShuffle', '~~');
 	} elsif (lc($key) eq 'repeat') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
 	
 		SONOS_DoWork($udn, 'setRepeat', $value);
+	} elsif (lc($key) eq 'repeatt') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+	
+		SONOS_DoWork($udn, 'setRepeat', '~~');
 	} elsif (lc($key) eq 'crossfademode') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -1030,9 +1042,15 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_Repeat">
 <b><code>Repeat &lt;State&gt;</code></b></a>
 <br /> Sets the repeat-state. Retrieves the new state as the result.</li>
+<li><a name="SONOSPLAYER_setter_RepeatT">
+<b><code>RepeatT</code></b></a>
+<br /> Toggles the repeat-state. Retrieves the new state as the result.</li>
 <li><a name="SONOSPLAYER_setter_Shuffle">
 <b><code>Shuffle &lt;State&gt;</code></b></a>
 <br /> Sets the shuffle-state. Retrieves the new state as the result.</li>
+<li><a name="SONOSPLAYER_setter_ShuffleT">
+<b><code>ShuffleT</code></b></a>
+<br /> Toggles the shuffle-state. Retrieves the new state as the result.</li>
 <li><a name="SONOSPLAYER_setter_SleepTimer">
 <b><code>SleepTimer &lt;Time&gt;</code></b></a>
 <br /> Sets the Sleeptimer to the given Time. It must be in the full format of "HH:MM:SS". Deactivate with "00:00:00" or "off".</li>
@@ -1305,9 +1323,15 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_Repeat">
 <b><code>Repeat &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des Repeat-Zustands fest. Liefert den aktuell gültigen Repeat-Zustand.</li>
+<li><a name="SONOSPLAYER_setter_RepeatT">
+<b><code>RepeatT</code></b></a>
+<br /> Schaltet den Zustand des Repeat-Zustands um. Liefert den aktuell gültigen Repeat-Zustand.</li>
 <li><a name="SONOSPLAYER_setter_Shuffle">
 <b><code>Shuffle &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des Shuffle-Zustands fest. Liefert den aktuell gültigen Shuffle-Zustand.</li>
+<li><a name="SONOSPLAYER_setter_ShuffleT">
+<b><code>ShuffleT</code></b></a>
+<br /> Schaltet den Zustand des Shuffle-Zustands um. Liefert den aktuell gültigen Shuffle-Zustand.</li>
 <li><a name="SONOSPLAYER_setter_SleepTimer">
 <b><code>SleepTimer &lt;Time&gt;</code></b></a>
 <br /> Legt den aktuellen SleepTimer fest. Der Wert muss ein kompletter Zeitstempel sein (HH:MM:SS). Zum Deaktivieren darf der Zeitstempel nur Nullen enthalten oder das Wort 'off'.</li>
