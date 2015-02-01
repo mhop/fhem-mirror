@@ -388,6 +388,7 @@ sub THZ_Initialize($)
 		    ."interval_sBoostDHWTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sFlowRate:0,3600,7200,28800,43200,86400 "
+		    ."interval_sDisplay:0,60,120,180,300 "
 		    ."firmware:4.39,2.06,5.39 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
