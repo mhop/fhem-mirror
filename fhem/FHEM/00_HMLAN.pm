@@ -26,6 +26,7 @@ sub HMLAN_KeepAlive($);
 sub HMLAN_secSince2000();
 sub HMLAN_relOvrLd($);
 sub HMLAN_condUpdate($$);
+sub HMLAN_getVerbLvl ($$$$);
 
 my %sets = ( "hmPairForSec" => "HomeMatic"
             ,"hmPairSerial" => "HomeMatic"
@@ -852,6 +853,7 @@ sub HMLAN_DoInit($) {##########################################################
   HMLAN_writeAesKey($name);
   my $s2000 = sprintf("%02X", HMLAN_secSince2000());
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
+  $hash->{helper}{setTime} = int(gettimeofday())>>15;
 
   delete $hash->{helper}{ref};
 
@@ -899,9 +901,16 @@ sub HMLAN_KeepAlive($) {#######################################################
   $hash->{helper}{q}{keepAliveRec} = 0; # reset indicator
 
   return if(!$hash->{FD});
-  HMLAN_SimpleWrite($hash, "K");
+  
   my $tn = gettimeofday();
   my $wdTimer = AttrVal($name,"wdTimer",25);
+  my $rht = int($tn)>>15 ;
+  if( $rht != $hash->{helper}{setTime}){# reset HMLAN watch about each 10h
+    $hash->{helper}{setTime} =  $rht;
+    my $s2000 = sprintf("%02X", HMLAN_secSince2000());
+    HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
+  }
+  HMLAN_SimpleWrite($hash, "K");
 
   my $kDly =  int(($tn - $hash->{helper}{k}{Next})*1000)/1000;
   $hash->{helper}{k}{DlyMax} =  $kDly if($hash->{helper}{k}{DlyMax} < $kDly);
