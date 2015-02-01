@@ -47,7 +47,10 @@
 # Changelog
 #
 # SVN-History:
-# .01.2015
+# 01.02.2015
+#	Es gibt nun zwei neue Befehle "ShuffleT" und "RepeatT", die jeweils den aktuellen Zustand von "Shuffle" und "Repeat" umschalten
+#	Das angelegte RemoteControl sowie die RemoteControl Vorlagen enthalten nun zwei neue Icons für Shuffle-Umschaltung und Repeat-Umschaltung
+# 31.01.2015
 #	Es gibt jetzt drei Sonos-Vorlagen für RemoteControl: "Sonos", "SonosSVG_Buttons" und "SonosSVG_Icons". 
 #	Es gibt jetzt ein neues Standardlayout (SonosSVG_Buttons) für die Erzeugung der RemoteControl.
 #	Es gibt jetzt ein Attribut "ignoredIPs", mit dem man problematische oder unerwünschte IPs bei der UPnP-Erkennung ausschließen kann.
@@ -524,7 +527,7 @@ sub SONOS_Initialize ($) {
 sub SONOS_RCLayout() {
 	my @rows = ();
 	
-	push @rows, "Play:PLAY,Pause:PAUSE,Previous:REWIND,Next:FF,VolumeD:VOLDOWN,VolumeU:VOLUP,MuteT:MUTE";
+	push @rows, "Play:PLAY,Pause:PAUSE,Previous:REWIND,Next:FF,VolumeD:VOLDOWN,VolumeU:VOLUP,MuteT:MUTE,ShuffleT:SHUFFLE,RepeatT:REPEAT";
 	push @rows, "attr rc_iconpath icons/remotecontrol";
 	push @rows, "attr rc_iconprefix black_btn_";
 	
@@ -539,7 +542,7 @@ sub SONOS_RCLayout() {
 sub SONOS_RCLayoutSVG1() {
 	my @rows = ();
 	
-	push @rows, "Play:rc_PLAY.svg,Pause:rc_PAUSE.svg,Previous:rc_PREVIOUS.svg,Next:rc_NEXT.svg,VolumeD:rc_VOLDOWN.svg,VolumeU:rc_VOLUP.svg,MuteT:rc_MUTE.svg";
+	push @rows, "Play:rc_PLAY.svg,Pause:rc_PAUSE.svg,Previous:rc_PREVIOUS.svg,Next:rc_NEXT.svg,VolumeD:rc_VOLDOWN.svg,VolumeU:rc_VOLUP.svg,MuteT:rc_MUTE.svg,ShuffleT:rc_SHUFFLE.svg,RepeatT:rc_REPEAT.svg";
 	push @rows, "attr rc_iconpath icons/remotecontrol";
 	push @rows, "attr rc_iconprefix black_btn_";
 	
@@ -554,7 +557,7 @@ sub SONOS_RCLayoutSVG1() {
 sub SONOS_RCLayoutSVG2() {
 	my @rows = ();
 	
-	push @rows, "Play:audio_play.svg,Pause:audio_pause.svg,Previous:audio_rew.svg,Next:audio_ff.svg,VolumeD:audio_volume_low.svg,VolumeU:audio_volume_high.svg,MuteT:audio_volume_mute.svg";
+	push @rows, "Play:audio_play.svg,Pause:audio_pause.svg,Previous:audio_rew.svg,Next:audio_ff.svg,VolumeD:audio_volume_low.svg,VolumeU:audio_volume_high.svg,MuteT:audio_volume_mute.svg,ShuffleT:audio_shuffle.svg,RepeatT:audio_repeat.svg";
 	push @rows, "attr rc_iconpath icons/remotecontrol";
 	push @rows, "attr rc_iconprefix black_btn_";
 	
@@ -2367,13 +2370,19 @@ sub SONOS_Discover() {
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($SONOS_GroupRenderingControlProxy{$udn}->GetGroupMute(0)->getValue('CurrentMute')));
 					}
 				} elsif ($workType eq 'setShuffle') {
-					my $value1 = SONOS_ConvertWordToNum($params[0]);
+					my $value1 =  undef;
+					
+					if ($params[0] ne '~~') {
+						$value1 = SONOS_ConvertWordToNum($params[0]);
+					}
 					
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 						my $result = $SONOS_AVTransportControlProxy{$udn}->GetTransportSettings(0)->getValue('PlayMode');
 						
 						my $shuffle = $result eq 'SHUFFLE' || $result eq 'SHUFFLE_NOREPEAT';
 						my $repeat = $result eq 'SHUFFLE' || $result eq 'REPEAT_ALL';
+						
+						$value1 = !$shuffle if (!$value1);
 						
 						my $newMode = 'NORMAL';
 						$newMode = 'SHUFFLE' if ($value1 && $repeat);
@@ -2387,13 +2396,19 @@ sub SONOS_Discover() {
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($result eq 'SHUFFLE' || $result eq 'SHUFFLE_NOREPEAT'));
 					}
 				} elsif ($workType eq 'setRepeat') {
-					my $value1 = SONOS_ConvertWordToNum($params[0]);
+					my $value1 =  undef;
+					
+					if ($params[0] ne '~~') {
+						$value1 = SONOS_ConvertWordToNum($params[0]);
+					}
 					
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 						my $result = $SONOS_AVTransportControlProxy{$udn}->GetTransportSettings(0)->getValue('PlayMode');
 						
 						my $shuffle = $result eq 'SHUFFLE' || $result eq 'SHUFFLE_NOREPEAT';
 						my $repeat = $result eq 'SHUFFLE' || $result eq 'REPEAT_ALL';
+						
+						$value1 = !$repeat if (!$value1);
 						
 						my $newMode = 'NORMAL';
 						$newMode = 'SHUFFLE' if ($value1 && $shuffle);
@@ -4468,7 +4483,7 @@ sub SONOS_Discover_Callback($$$) {
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RC group '.$SONOS_Client_Data{SonosDeviceName});
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RC rc_iconpath icons/remotecontrol');
 					SONOS_Client_Notifier('CommandAttr:'.$name.'RC rc_iconprefix black_btn_');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC row00 Play:rc_PLAY.svg,Pause:rc_PAUSE.svg,Previous:rc_PREVIOUS.svg,Next:rc_NEXT.svg,VolumeD:rc_VOLDOWN.svg,VolumeU:rc_VOLUP.svg,MuteT:rc_MUTE.svg');
+					SONOS_Client_Notifier('CommandAttr:'.$name.'RC row00 Play:rc_PLAY.svg,Pause:rc_PAUSE.svg,Previous:rc_PREVIOUS.svg,Next:rc_NEXT.svg,VolumeD:rc_VOLDOWN.svg,VolumeU:rc_VOLUP.svg,MuteT:rc_MUTE.svg,ShuffleT:rc_SHUFFLE.svg,RepeatT:rc_REPEAT.svg');
 					
 					SONOS_Client_Notifier('CommandDefine:'.$name.'RC_Notify notify '.$name.'RC set '.$name.' $EVENT');
 					
