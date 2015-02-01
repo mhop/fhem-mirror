@@ -80,7 +80,7 @@ sub InfoPanel_Initialize($) {
     $hash->{DefFn}    = "btIP_Define";
 	$hash->{UndefFn}  = "btIP_Undef";
     #$hash->{AttrFn}   = "btIP_Attr";
-    $hash->{AttrList} = "autoreload:1,0 bg bgcolor refresh size title tmin";
+    $hash->{AttrList} = "disable:0,1,toggle autoreload:1,0 bg bgcolor refresh size title tmin";
     $hash->{SetFn}    = "btIP_Set";
     $hash->{NotifyFn} = "btIP_Notify";
 
@@ -272,24 +272,24 @@ sub btIP_itemImg {
   $id = ($id eq '-') ? createUniqueId() : $id;
   return unless(defined($arg));
   return if($arg eq "");
-  my ($data,$info,$width,$height,$mimetype,$output);
+  my ($counter,$data,$info,$width,$height,$mimetype,$output);
 
   if($srctype eq 'file') {
-     my (@d,$err);
-     $err = "";
-     
-     Log3(undef,4,"InfoPanel img name: $arg");
-     ($err,@d) = FileRead($arg);
-     if($err && configDBUsed()) {
-        # not found in database, try to read from filesystem
-        Log3(undef,4,"Infopanel forced read $arg");
-        $err = undef;
-        ($err,@d) = FileRead({FileName => $arg, ForceType =>'file'});
-        Log3(undef,4,"Infopanel: forced read error file: $arg") if $err;
-        Log3(undef,4,"Infopanel: forced read found: $arg") if !$err;
-     }
-     $data = join("",@d) unless $err;
+     Log3(undef,4,"InfoPanel: looking for img $arg");
 
+     if(configDBUsed()){
+        Log3(undef,4,"InfoPanel: reading from configDB");
+        ($data,$counter) = _cfgDB_Fileexport($arg,1);
+     }
+
+     if(!$counter) {
+        Log3(undef,4,"InfoPanel: reading from filesystem");
+        my $length = -s "$arg";
+        open(GRAFIK, "<", $arg) or die("File not found $!");
+        binmode(GRAFIK);
+        $counter = read(GRAFIK, $data, $length);
+        close(GRAFIK);
+     }
   } elsif ($srctype eq "url" || $srctype eq "urlq") {
      if($srctype eq "url") {
        $data= GetFileFromURL($arg,3,undef,1);
@@ -303,8 +303,9 @@ sub btIP_itemImg {
      return "";
   }
 
-  ($width,$height,$data) = _btIP_imgData($data,$scale);
-  $output = "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$data\" />\n";
+  ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
+  $output  = "<!-- w: $width h: $height t: $mimetype-->\n";
+  $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$data\" />\n";
   return $output;
 }
 
@@ -316,7 +317,7 @@ sub _btIP_imgData {
   ($width,$height)= _btIP_imgRescale($width,$height,$scale) unless $scale eq '1';
   my $mimetype = $info->{file_media_type};
   my $data     = "data:$mimetype;base64,".encode_base64($arg);
-  return ($width,$height,$data);
+  return ($width,$height,$mimetype,$data);
 }
 
 sub _btIP_imgRescale {
@@ -515,13 +516,13 @@ sub btIP_returnSVG($) {
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
   my $bgcolor = AttrVal($name,'bgcolor','000000'); 
 
-  my $svg = "";
+  our $svg = "";
 
   eval {
 
     $svg = "\n<svg \n".
            "xmlns=\"http://www.w3.org/2000/svg\"\nxmlns:xlink=\"http://www.w3.org/1999/xlink\"\n".
-           "width=\"".$width."px\" height=\"".$height."px\" \n ".
+           "width=\"".$width."px\" height=\"".$height."px\" \n".
            "viewPort=\"0 0 $width $height\"\n".
            "style=\"stroke-width: 0px; background-color:$bgcolor; ";
 
@@ -594,7 +595,7 @@ sub btIP_returnSVG($) {
 	} # end defined()
 
     $svg .= "\" >\n\n";
-    $svg .= btIP_evalLayout($svg, $name, $defs{$name}{fhem}{layout});
+    $svg = btIP_evalLayout($svg, $name, $defs{$name}{fhem}{layout});
 
     $defs{$name}{STATE} = localtime();
 
