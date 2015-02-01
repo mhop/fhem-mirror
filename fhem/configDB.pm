@@ -1,4 +1,4 @@
-# $Id$
+# $Id: configDB.pm 7696 2015-01-24 18:16:54Z betateilchen $
 
 ##############################################################################
 #
@@ -140,7 +140,7 @@ sub __cfgDB_Diff($$$$);
 sub _cfgDB_InsertLine($$$$);
 sub _cfgDB_Execute($@);
 sub _cfgDB_Filedelete($);
-sub _cfgDB_Fileexport($);
+sub _cfgDB_Fileexport($;$);
 sub _cfgDB_Filelist(;$);
 sub _cfgDB_Info();
 sub _cfgDB_Migrate();
@@ -568,7 +568,7 @@ sub cfgDB_MigrationImport() {
 
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId() { 
-	return "# ".'$Id$' 
+	return "# ".'$Id: configDB.pm 7696 2015-01-24 18:16:54Z betateilchen $' 
 }
 
 # return filelist depending on directory and regexp
@@ -975,8 +975,8 @@ sub _cfgDB_Filedelete($) {
 }
 
 # export file from database to filesystem
-sub _cfgDB_Fileexport($) {
-	my ($filename) = @_;
+sub _cfgDB_Fileexport($;$) {
+	my ($filename,$raw) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
 	my $sth      = $fhem_dbh->prepare( "SELECT content FROM fhembinfilesave WHERE filename = '$filename'" );  
 	$sth->execute();
@@ -991,7 +991,8 @@ sub _cfgDB_Fileexport($) {
 
 	$sth->finish();
 	$fhem_dbh->disconnect();
-	return "$counter bytes written from database into file $filename";
+	return "$counter bytes written from database into file $filename" unless $raw;
+	return ($blobContent,$counter);
 }
 
 # import file into database
