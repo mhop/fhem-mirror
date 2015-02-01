@@ -6783,6 +6783,12 @@ sub CUL_HM_ActCheck($) {# perform supervision
   foreach my $devId (split(",",$peerIDs)){
     next if (!$devId);
     my $devName = CUL_HM_id2Name($devId);
+    
+    if(AttrVal($devName,"ignore",0)){
+      delete $actHash->{READINGS}{"status_".$devName};
+      next;
+    }
+    
     if(!$devName || !defined($attr{$devName}{actCycle})){
       CUL_HM_ActDel($devId);
       next;
