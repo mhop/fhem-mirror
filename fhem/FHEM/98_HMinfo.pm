@@ -1097,6 +1097,7 @@ sub HMinfo_GetFn($@) {#########################################################
               devspec2array("model=HM.*-TC.*:FILTER=chanNo=02:FILTER=tempListTmpl=.*"));
     my @tlr;
     foreach my $e (@td){
+      next if(!grep /$e/,@entities );
       my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl"
                                                          ,AttrVal($hash->{NAME},"configDir",".")."/tempList.cfg:$e"));
       next if ($tr eq "unused");
