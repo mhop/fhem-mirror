@@ -423,8 +423,12 @@ sub btIP_itemText {
 
   my $output = "<text id=\”$id\” x=\"$x\" y=\"$y\" ".
                "fill=\"rgb($r,$g,$b)\" fill-opacity=\"$a\" ".
-               "font-size=\"$params{pt}px\" font-family=\"$params{font}\" ".
+               "font-family=\"$params{font}\" ".
+               "font-style=\"$params{fontstyle}\" ".
+               "font-size=\"$params{pt}px\" ".
+               "font-weight=\"$params{fontweight}\" ".
                "text-anchor=\"$params{thalign}\" ".
+               "text-decoration=\"$params{textdecoration}\" ".
                "alignment-baseline=\"$params{tvalign}\" ".
                ">\n$text\n</text>\n";
 
@@ -638,6 +642,9 @@ sub btIP_evalLayout($$@) {
   $params{padding} = 0;
   $params{xx}= 0;
   $params{yy}= 0;
+  $params{fontstyle}      = "initial";
+  $params{fontweight}     = "normal";
+  $params{textdecoration} = "none";
 
   $defs{$name}{fhem}{div} = undef;  
 
@@ -848,6 +855,24 @@ sub btIP_evalLayout($$@) {
         
         when("textboxalign") {
           $params{tbalign} = $def;
+        }
+        
+        when("textdesign") {
+          my @args   = split(/,/,$def);
+          my @deco   = qw(underline overline line-through); #text-decoration
+          my @style  = qw(italic oblique); #font-style
+          my @weight = qw(bold); #font-weight
+          $params{fontstyle}      = "initial";
+          $params{fontweight}     = "initial";
+          $params{textdecoration} = "none";
+
+          foreach my $s (@args) {
+             if($s ne 'clear') {
+                $params{fontstyle}      = "$s " if($s ~~ @style);
+                $params{fontweight}     = "$s " if($s ~~ @weight);
+                $params{textdecoration} = "$s " if($s ~~ @deco);
+             }
+          }
         }
 
 	    when("time") {
