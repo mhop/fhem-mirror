@@ -282,7 +282,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00DB" => {name=>"HM-Sen-MDIR-WM55"        ,st=>'motionAndBtn'      ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Motion:3:3",}
  ,"00DC" => {name=>"HM-Sen-DB-PCB"           ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}
  ,"00DD" => {name=>"HM-PB-4DIS-WM-2"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:20",}
- ,"00DE" => {name=>"HM-ES-TX-WM"             ,st=>'powerSensor'       ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1'            ,chn=>"",} # strom/gassensor
+ ,"00DE" => {name=>"HM-ES-TX-WM"             ,st=>'powerSensor'       ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>"",} # strom/gassensor
  ,"00E3" => {name=>"HM-ES-PMSw1-Pl-DN-R3"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00E4" => {name=>"HM-ES-PMSw1-Pl-DN-R4"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
@@ -605,11 +605,11 @@ my $K_actDetID = '000000'; # id of actionDetector
   highHoldTime    =>{a=>143  ,s=>1  ,l=>1,min=>60 ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"hold time on high state"},
   evntRelFltTime  =>{a=>145  ,s=>1  ,l=>1,min=>1  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter release time "},
   triggerMode     =>{a=>146.0,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"define type of event report ",lit=>{off=>0,sensor=>33,switch=>34,button=>35}},
-  mtrType         =>{a=>149.0,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"type of measurement"         ,lit=>{gas=>1,IR=>2,LED=>4,unknown=>255}},
-  mtrConstIr      =>{a=>150.0,s=>2  ,l=>1,min=>0  ,max=>65536   ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"constant IR"},
-  mtrConstGas     =>{a=>152.0,s=>2  ,l=>1,min=>0  ,max=>655.36  ,c=>''         ,f=>'100'   ,u=>''    ,d=>0,t=>"constant gas"},
-  mtrConstLed     =>{a=>154.0,s=>2  ,l=>1,min=>0  ,max=>65536   ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"constant led"},
-  mtrSensIr       =>{a=>156.0,s=>1  ,l=>1,min=>-99,max=>99      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"sensiblity IR"},
+  mtrType         =>{a=>149.0,s=>1  ,l=>1,min=>0   ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"type of measurement"         ,lit=>{gas=>1,IR=>2,LED=>4,unknown=>255}},
+  mtrConstIr      =>{a=>150.0,s=>2  ,l=>1,min=>1   ,max=>65536   ,c=>''         ,f=>''      ,u=>'U/kWh',d=>0,t=>"constant IR"},
+  mtrConstGas     =>{a=>152.0,s=>2  ,l=>1,min=>0001,max=>65.536  ,c=>''         ,f=>1000    ,u=>'m3/I' ,d=>0,t=>"constant gas"},
+  mtrConstLed     =>{a=>154.0,s=>2  ,l=>1,min=>1   ,max=>65536   ,c=>''         ,f=>''      ,u=>'i/kWh',d=>0,t=>"constant led"},
+  mtrSensIr       =>{a=>156.0,s=>1  ,l=>1,min=>-99 ,max=>99      ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"sensiblity IR"},
 
   #un-identified List1
 # SEC-WM55 08:01 (AES on?)
@@ -1807,6 +1807,10 @@ $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
                      Val3=> '16,4,$val=(hex($val))',
                      Fld4=> "20,2",
                      Val4=> '24,4,$val=(hex($val))'} },
+  "54"          => { txt => "GasEvent"  , params => {
+                     energy   => '00,8,$val=((hex($val)) /1000)'
+                    ,power    => '06,6,$val=((hex($val)) /1000)'
+                     } },
   "58"          => { txt => "ClimateEvent", params => {
                      CMD      => "00,2",
                      ValvePos => '02,2,$val=(hex($val))', } },

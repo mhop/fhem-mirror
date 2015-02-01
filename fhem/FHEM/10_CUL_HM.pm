@@ -3914,7 +3914,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my %color=(white=>0,red=>1,orange=>2,yellow=>3,green=>4,blue=>5);
     my %icon=( off =>0, on=>1, open=>2, closed=>3, error=>4, ok=>5
               ,info=>6, newMsg=>7, serviceMsg=>8
-              ,sigGreen=>9, sigYellow=>10, sigred=>11
+              ,sigGreen=>9, sigYellow=>10, sigRed=>11
               ,ic12=>12, ic13=>13
               ,noIcon=>99
               );
@@ -3927,7 +3927,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     
     my $param = (scalar(@a)-2);
     if ($a[2] eq "help"){
-      my $ret = "text :";
+      my $ret = "text :\n      <text> max 2 char";
       foreach (sort keys %btn){
         my (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$_);
         $ch = sprintf("%02X",$ch);
@@ -3957,7 +3957,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         delete $dh->{txt};
       }
       elsif($a[4] ne "nc"){ # new text
-        return "text wrong $a[4] use:".join(",",sort keys %btn)   if (!defined $btn{$a[4]});
+        return "text too long " .$a[4]   if (length($a[4])>12);
         $dh->{txt}=$a[4];
       }
 
@@ -3984,23 +3984,25 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       return "not enough parameter - always use txtNo, color and icon in a set"
             if(($param-1) %3);
-      for (my $cnt=3;$cnt<$param;$cnt+=3){
+      for (my $cnt=3;$cnt<$param;$cnt+=3){ 
         my $lnNr = int($cnt/3);
         $hash->{helper}{dispi}{$type}{"l$lnNr"}{d}=1;#define this hash
         my $dh = $hash->{helper}{dispi}{$type}{"l$lnNr"};
         return "color wrong ".$a[$cnt+1]." use:".join(",",sort keys %color) if (!defined $color{$a[$cnt+1]});
         return "icon wrong " .$a[$cnt+2]." use:".join(",",sort keys %icon)  if (!defined $icon {$a[$cnt+2]});
-        return "text wrong " .$a[$cnt+0]." use:".join(",",sort keys %btn)   if (!defined $btn  {$a[$cnt+0]});
-        $dh->{txt} = $a[$cnt+0];
+        return "text too long " .$a[$cnt+0]   if (length($a[$cnt+0])>12);
+        if    ($a[$cnt+0] eq "nc") {} # nc = no change
+        elsif ($a[$cnt+0] eq "off"){ delete $dh->{txt}      } # off =  no text display
+        else                       {$dh->{txt} = $a[$cnt+0];} # nc = no change
+
         $dh->{col} = $a[$cnt+1];
         $dh->{icn} = $a[$cnt+2];
-        delete $dh->{icn} if ($a[$cnt+2] ne "noIcon");
+        delete $dh->{icn} if ($a[$cnt+2] eq "noIcon");
       }
     }
     foreach my $t (keys %{$hash->{helper}{dispi}}){ # prepare the messages
+      my $msg;
       my $ts = $t eq "s"?"short":"long";
-      my @txtMsg;
-      my $msg = "800102";
       foreach my $l (sort keys %{$hash->{helper}{dispi}{$t}}){
         my $dh = $hash->{helper}{dispi}{$t}{"$l"};
         my (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$dh->{txt});
@@ -4008,21 +4010,40 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         my $rd =  ($dh->{txt}?"$dh->{txt} ":"- ")
                  .($dh->{col}?"$dh->{col} ":"- ") 
                  .($dh->{icn}?"$dh->{icn} ":"- ")
-                 ."->";
-        readingsSingleUpdate($hash,"disp_${ts}_$l",
-                           $rd.ReadingsVal(InternalVal($devName,"channel_$ch","no")
-                                ,"text$ln","unkown")
+                 ;
+        $rd .= "->". ReadingsVal(InternalVal($devName,"channel_$ch","no")
+                                           ,"text$ln","unkown")
+                        if (defined $btn{$dh->{txt}  });
+        readingsSingleUpdate($hash,"disp_${ts}_$l"
+                           ,$rd
                            ,0);
-        $msg .= sprintf("12%02X",$btn{$dh->{txt}  }+0x80)if ($dh->{txt});
+
+        if($dh->{txt}){
+          if (defined $btn{$dh->{txt}  }){
+            $msg .= sprintf("12%02X",$btn{$dh->{txt}  }+0x80);
+          } 
+          else{
+            $msg .= "12";
+            $msg .= uc( unpack("H*",$dh->{txt})) if ($dh->{txt});
+          }
+        }
+        else{
+          $msg .= "12";
+        }
+
         $msg .= sprintf("11%02X",$color{$dh->{col}}+0x80)if ($dh->{col});
         $msg .= sprintf("13%02X",$icon{$dh->{icn} }+0x80)if ($dh->{icn});
         $msg .= "0A";# end of line indicator
-        push @txtMsg,$msg; 
-        $msg = "8001";
       }
-      $txtMsg[scalar(@txtMsg)-1] .= "03" if(scalar(@txtMsg));# add end of message indicator
-      delete $hash->{helper}{disp}{$t} if ($hash->{helper}{disp});
-      $hash->{helper}{disp}{$t} = \@txtMsg;
+      
+      my $msgh = "800102";
+      $msg .= "03";
+      my @txtMsg2;
+      foreach (unpack('(A28)*',$msg)){ 
+        push @txtMsg2,$msgh.$_;
+        $msgh = "8001";
+      }
+      $hash->{helper}{disp}{$t} = \@txtMsg2;
     }
   }
 
@@ -7457,7 +7478,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           $val = join(" ",split(" ",$val));
           my $nv = ReadingsVal($eN,$tln,"empty");
           $nv = join(" ",split(" ",$nv));
-          push @entryFail,$eN." :".$tln." mismatch $val ne $nv" if ($val ne $nv);
+          push @entryFail,$eN." :".$tln." mismatch" if ($val ne $nv);
         }
         elsif($action eq "restore"){
           $val = lc($1)." ".$val if ($tln =~ m/(P.)_._tempList/);
@@ -8262,7 +8283,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          up to 6 lines can be addressed.<br>
          <B>lineX</B> line number that shall be changed. If this is set the 3 parameter of a line can be adapted. <br>
          <B>textNo</B> is the text to be dispalyed in line No. The text is assotiated with the text defined for the buttons.
-         txt&lt;BtnNo&gt;_&lt;lineNo&gt; references channel 1 to 10 and their lines 1 or 2<br>
+         txt&lt;BtnNo&gt;_&lt;lineNo&gt; references channel 1 to 10 and their lines 1 or 2.
+         Alternaly a free text of up to 12 char can be used<br>
          <B>color</B> is one white, red, orange, yellow, green, blue<br>
          <B>icon</B> is one off, on, open, closed, error, ok, noIcon<br>
          Example:
@@ -9535,7 +9557,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                es können bis zu 6 Zeilen programmiert werden.<br>
                <B>lineX</B> legt die zu ändernde Zeilennummer fest. Es können die 3 Parameter der Zeile geändert werden.<br>
                <B>textNo</B> ist der anzuzeigende Text. Der Inhalt des Texts wird in den Buttonds definiert. 
-               txt&lt;BtnNo&gt;_&lt;lineNo&gt; referenziert den Button und dessn jeweiligen Zeile<br>
+               txt&lt;BtnNo&gt;_&lt;lineNo&gt; referenziert den Button und dessn jeweiligen Zeile. 
+               Alternativ kann ein bis zu 12 Zeichen langer Freitext angegeben werden<br>
                <B>color</B> kann sein white, red, orange, yellow, green, blue<br>
                <B>icon</B> kann sein off, on, open, closed, error, ok, noIcon<br>
             
