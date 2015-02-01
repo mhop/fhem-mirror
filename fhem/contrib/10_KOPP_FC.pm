@@ -12,6 +12,7 @@
 #
 # Date		   Who				Comment																												   
 # ----------  -------------   	-------------------------------------------------------------------------------------------------------------------------------
+# 2015-02-01  Claus M.			use small "k" to start Kopp FW, "K" was already used for raw data
 # 2014-12-21  Claus M.			V6 (fits to my FHEM.cfg V6) Removed timeout from define command, will add later to set command (best guess yet). 
 # 2014-12-13  Claus M.			first version with command set: "on, off, toggle, dim, stop". Added new Parameter ("N" for do not print) 
 # 2014-12-08  Claus M.			direct usage of set command @ FHEM.cfg works fine, but buttoms on/off do not appear, seems to be a setup/initialize issue in this routine 
@@ -146,7 +147,7 @@ sub KOPP_FC_SendCommand($@)
 	  . "N";								# N for do not print messages (FHEM will write error messages to log files if CCD/CUL sends status info
 
     ## Send Message to IODev using IOWrite
-	IOWrite( $hash, "K", $message );
+	IOWrite( $hash, "k", $message );
 
 	return $ret;
 } 
