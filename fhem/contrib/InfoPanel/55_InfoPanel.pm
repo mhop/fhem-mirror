@@ -56,6 +56,7 @@ sub btIP_itemSeconds;
 sub btIP_itemText;
 sub btIP_itemTextBox;
 sub btIP_itemTime;
+sub btIP_itemImg;
 sub btIP_color;
 sub btIP_xy;
 
@@ -475,6 +476,43 @@ sub btIP_itemTime {
   return btIP_itemText($id,$x,$y,sprintf("%02d:%02d", $hour, $min),%params);
 }
 
+sub btIP_itemTrash {
+  my ($id,$x,$y,$scale,$fgcolor,$bgcolor,%params)= @_;
+  $id = ($id eq '-') ? createUniqueId() : $id;
+
+  my ($counter,$data,$info,$width,$height,$mimetype,$output);
+
+$data = '<?xml version="1.0" encoding="utf-8"?>'.
+'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">'.
+'<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '.
+'width="66" height="84" style="enable-background:new 0 0 66 84;" xml:space="preserve">'.
+'<g>'.
+'	<path d="M60.093,9.797H48.984V2.578C48.984,1.125,47.812,0,46.359,0c-0.141,0-0.235,0.047-0.281,0.094'.
+'		C46.031,0.047,45.937,0,45.89,0H19.781h-0.187h-0.188c-1.453,0-2.578,1.125-2.578,2.578v7.219H5.672C2.484,9.797,0,12.281,0,15.469'.
+'		v4.125v5.156h4.922v52.827c0,3.188,2.437,5.625,5.625,5.625h44.671c3.188,0,5.672-2.437,5.672-5.625V24.75h4.875v-5.156v-4.125'.
+'		C65.765,12.281,63.28,9.797,60.093,9.797z M21.984,5.156h21.797v4.641H21.984V5.156z M55.687,77.577'.
+'		c0,0.329-0.141,0.469-0.469,0.469H10.547c-0.328,0-0.469-0.14-0.469-0.469V24.75h45.609V77.577z M60.562,19.594H5.203v-4.125'.
+'		c0-0.328,0.141-0.516,0.469-0.516h54.421c0.328,0,0.469,0.188,0.469,0.516V19.594z" stroke="fgcolor" stroke-width="3" fill="none"/>'.
+'	<rect x="18" y="31" width="6" height="42" stroke="fgcolor" stroke-width="3" fill="none"/>'.
+'	<rect x="30" y="31" width="6" height="42" stroke="fgcolor" stroke-width="3" fill="none"/>'.
+'	<rect x="42" y="31" width="6" height="42" stroke="fgcolor" stroke-width="3" fill="none"/>'.
+'</g>'.
+'</svg>';
+
+  my ($r,$g,$b,$a) = btIP_color($fgcolor);
+  $fgcolor = "rgb($r,$g,$b)";
+  $data =~ s/fgcolor/$fgcolor/g;
+
+  ($r,$g,$b,$a) = btIP_color($bgcolor);
+  $bgcolor = "rgb($r,$g,$b)";
+  ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
+  $output  = "<rect  id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" ".
+             "fill=\"$bgcolor\" fill-opacity=\"$a\" stroke=\"$bgcolor\" stroke-width=\"2\" stroke-opacity=\"$a\" />\n";
+  $output .= "<!-- w: $width h: $height t: $mimetype-->\n";
+  $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$data\" />\n";
+  return $output;
+}
+
 ##### Helper
 
 sub btIP_color {
@@ -883,6 +921,16 @@ sub btIP_evalLayout($$@) {
 	      $svg .= btIP_itemTime($id,$x,$y,%params);
 	    }
 
+	    when("trash") {
+	      ($id,$x,$y,$scale,$r1,$r2)= split("[ \t]+", $def,6);
+	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $params{xx} = $x;
+	      $params{yy} = $y;
+	      $r1 = AnalyzePerlCommand(undef,$r1);
+	      $r2 = AnalyzePerlCommand(undef,$r2);
+          $svg .= btIP_itemTrash($id,$x,$y,$scale,$r1,$r2,%params);
+	    }
+	    
 	    default {
           if($cmd ~~ @cmd_halign) {
 	        my $d = AnalyzePerlCommand(undef, $def);
