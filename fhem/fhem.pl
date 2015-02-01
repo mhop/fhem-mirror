@@ -2277,6 +2277,10 @@ CommandAttr($$)
       }
     }
 
+    if($attrName eq 'disable' and $a[2] eq 'toggle') {
+       $a[2] = IsDisabled($sdev) ? 0 : 1;
+    }
+
     if($attrName eq "userReadings") {
 
       my %userReadings;
