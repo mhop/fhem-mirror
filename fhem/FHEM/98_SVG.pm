@@ -647,8 +647,10 @@ SVG_readgplotfile($$$)
     $ld = $wl;
   }
 
-  my ($err, @svgplotfile) = FileRead($gplot_pgm);
-  return ("$err", undef) if($err);
+  my ($err1, $err2, @svgplotfile);
+  ($err1, @svgplotfile) = FileRead($gplot_pgm);
+  ($err2, @svgplotfile) = FileRead("$FW_gplotdir/template.gplot") if($err1);
+  return ($err1, undef) if($err2);
   my ($plotfnCnt, $srcNum) = (0,0);
   my @empty;
   $srcDesc{all} = "";
@@ -1801,7 +1803,8 @@ SVG_render($$$$$$$$$$)
       my ($x1, $y1);
       my $lt = ($lt{$lType} ? $lt{$lType} : "L"); # defaults to line
 
-      foreach my $i (0..int(@{$dxp})-1) {
+      my $maxIdx = int(@{$dxp})-1;
+      foreach my $i (0..$maxIdx) {
 
         if( !defined($dxp->[$i]) ) { # specials
           if(  $dyp->[$i] =~ m/^;$/ ) { # new line segment after newline
@@ -1869,7 +1872,7 @@ SVG_render($$$$$$$$$$)
 
 
         # calc ymin/ymax for points with the same x coordinates
-        if($x1 == $lx) {
+        if($x1 == $lx && $i < $maxIdx) {
           $ymin = $y1 if($y1 < $ymin);
           $ymax = $y1 if($y1 > $ymax);
           $ly = $y1;
@@ -1910,7 +1913,7 @@ SVG_render($$$$$$$$$$)
       if($ret =~ m/^ (\d+),(\d+)/) { # just points, no M/L
         $ret = sprintf("M %d,%d $lt ", $1, $2).$ret;
       }
-      $ret = "" if(@{$dxp} == 1);
+      $ret = "" if($maxIdx == 0);
 
       SVG_pO "<path $attributes $lStyle d=\"$ret\"/>";
     }
