@@ -1849,6 +1849,75 @@ sub CUL_HM_Parse($$) {#########################################################
     }
 
   }
+  elsif($st eq "powerSensor") {################################################
+    if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
+        ($mTp eq "10" && $p =~ m/^06/)) {  #    or Info_Status message here
+
+      my ($subType,$chn,$val,$err) = ($1,hex($2),hex($3)/2,hex($4))
+                          if($p =~ m/^(..)(..)(..)(..)/);
+      $chn = sprintf("%02X",$chn&0x3f);
+      my $chId = $src.$chn;
+      $shash = $modules{CUL_HM}{defptr}{$chId}
+                             if($modules{CUL_HM}{defptr}{$chId});
+
+      push @evtEt,[$shash,1,"state:$val"];
+    }
+    elsif ($mTp eq "53" ||$mTp eq "54" ) {  #    Gas_EVENT_CYCLIC
+      $shash = $modules{CUL_HM}{defptr}{$src."01"}
+                             if($modules{CUL_HM}{defptr}{$src."01"});
+      my ($eCnt,$P) = map{hex($_)} unpack 'A8A6',$p;
+      $eCnt = ($eCnt&0x7fffffff)/1000;       #0.0  ..2147483.647 m3
+      $P = $P   /1000;                       #0.0  ..16777.215 m3
+      push @evtEt,[$shash,1,"gasCnt:"   .$eCnt];
+      push @evtEt,[$shash,1,"gasPower:"    .$P];    
+      my $sumState = "eState:E: $eCnt P: $P";
+      push @evtEt,[$shash,1,$sumState];    
+      push @evtEt,[$shash,1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
+    }
+    elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
+      $shash = $modules{CUL_HM}{defptr}{$src."02"}
+                             if($modules{CUL_HM}{defptr}{$src."02"});
+      my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$p;
+      $eCnt = ($eCnt&0x7fffff)/10;          #0.0  ..838860.7  Wh
+      $P = $P   /100;                       #0.0  ..167772.15 W
+      push @evtEt,[$shash,1,"energy:"   .$eCnt];
+      push @evtEt,[$shash,1,"power:"    .$P];    
+
+      my $sumState = "eState:E: $eCnt P: $P";
+      if (defined $I){
+        $I = $I   /1;                         #0.0  ..65535.0   mA
+        push @evtEt,[$shash,1,"current:"  .$I];   
+        push @evtEt,[$defs{$devH->{channel_04}},1,"state:$I"   ] if ($devH->{channel_04});
+        $sumState .= " I: $I";        
+      }
+      if (defined $U){
+        $U = $U   /10;                        #0.0  ..6553.5    mV
+        push @evtEt,[$shash,1,"voltage:"  .$U];    
+        push @evtEt,[$defs{$devH->{channel_05}},1,"state:$U"   ] if ($devH->{channel_05});
+        $sumState .= " U: $U";        
+      }
+      if (defined $F){
+        $F -= 256 if ($F > 127);
+        $F = $F/100+50;                      # 48.72..51.27     Hz
+        push @evtEt,[$shash,1,"frequency:".$F];
+        push @evtEt,[$defs{$devH->{channel_06}},1,"state:$F"   ] if ($devH->{channel_06});
+        $sumState .= " f: $F";        
+      }
+      
+      push @evtEt,[$shash,1,$sumState];    
+      push @evtEt,[$shash,1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
+      
+      push @evtEt,[$defs{$devH->{channel_02}},1,"state:$eCnt"] if ($devH->{channel_02});
+      push @evtEt,[$defs{$devH->{channel_03}},1,"state:$P"   ] if ($devH->{channel_03});
+      
+      if($eCnt == 0 && hex($mNo) < 3 ){
+        push @evtEt,[$devH,1,"powerOn:$tn"];
+        my $eo = ReadingsVal($shash->{NAME},"energy",0)+
+                 ReadingsVal($shash->{NAME},"energyOffset",0);
+        push @evtEt,[$shash,1,"energyOffset:".$eo];
+      }
+    }
+  }
   elsif($st eq "powerMeter") {#################################################
     if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
         ($mTp eq "10" && $p =~ m/^06/)) {  #    or Info_Status message here
