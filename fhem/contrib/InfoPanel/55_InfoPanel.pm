@@ -305,7 +305,7 @@ sub btIP_itemImg {
   }
 
   ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
-  $output  = "<!-- w: $width h: $height t: $mimetype-->\n";
+  $output  = "<!-- w: $width h: $height t: $mimetype -->\n";
   $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$data\" />\n";
   return $output;
 }
@@ -317,6 +317,12 @@ sub _btIP_imgData {
   my $height   = $info->{height};
   ($width,$height)= _btIP_imgRescale($width,$height,$scale);
   my $mimetype = $info->{file_media_type};
+  
+  if($FW_userAgent =~ m/Trident/ && $mimetype =~ m/svg/) {
+     $arg =~ s/width=".*"//g;
+     $arg =~ s/height=".*"//g;
+  }
+  
   my $data     = "data:$mimetype;base64,".encode_base64($arg);
   return ($width,$height,$mimetype,$data);
 }
@@ -330,6 +336,15 @@ sub _btIP_imgRescale {
   $height = int($scale*$height);
   return ($width,$height);
 }
+
+sub _btIP_svgRescale {
+  my ($width,$height,$scale) = @_;
+  if ($scale =~ s/([whWH])([\d]*)/$2/) { 
+    $scale = (uc($1) eq "W") ? $scale/$width : $scale/$height;
+  }
+  return $scale;
+}
+
 
 sub btIP_itemLine {
   my ($id,$x1,$y1,$x2,$y2,$th,%params)= @_;
@@ -352,8 +367,8 @@ sub btIP_itemPlot {
     }
   }
 
-#  ($width,$height) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
-#  ($width,$height) = _btIP_imgRescale($width,$height,$scale) unless $scale eq '1';
+  ($width,$height) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
+  ($width,$height) = _btIP_imgRescale($width,$height,$scale) unless $scale eq '1';
 
   if($inline eq "1") {
 #
@@ -370,11 +385,17 @@ sub btIP_itemPlot {
     ($mimetype, $svgdata)   = SVG_showLog("unused");
     $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $width,$height"\/><\/svg>/;
 
-    ($width,$height,$mimetype,$svgdata) = _btIP_imgData($svgdata,$scale);
-    $output  = "<!-- w: $width h: $height t: $mimetype-->\n";
-    $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \n";
-    $output .= "xlink:href=\"$svgdata\" />\n";
+    ($width,$height,$mimetype,$svgdata) = _btIP_imgData($svgdata,1);
+    $scale = _btIP_svgRescale($width,$height,$scale);
+    
+    $output  = "<!-- w: $width h: $height t: $mimetype -->\n";
+#    $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \n";
+#    $output .= "xlink:href=\"$svgdata\" />\n";
 
+    $output .= "<defs><symbol id=\"sym_$id\">\n".
+               "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" ".
+               "xlink:href=\"$svgdata\" />\n</symbol></defs>\n".
+               "<use xlink:href=\"#sym_$id\" x=\"$x\" y=\"$y\" transform=\"scale($scale)\" />\n";
   } else {
 #
 # embed link to plot
