@@ -2773,7 +2773,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       foreach my $peer (grep /^$dst/,split(",",$peerIDs)){
         my $pName = CUL_HM_id2Name($peer);
         next if (!$pName || !$defs{$pName});
-        $pName = CUL_HM_id2Name($dst); #$dst - device-id of $peer
+        $pName = CUL_HM_id2Name($dst) if (!$defs{$pName}); #$dst - device-id of $peer
         push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
         push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
         
@@ -2916,7 +2916,7 @@ sub CUL_HM_pushEvnts(){########################################################
     if ($h ne ${$e}[0] || $x ne ${$e}[1]){
       push @ent,CUL_HM_UpdtReadBulk($h,$x,@evts);
       @evts = ();
-      ($h,$x) = (${$e}[0],${$e}[1])
+      ($h,$x) = (${$e}[0],${$e}[1]);
     }
     push @evts,${$e}[2] if (${$e}[2]);
   }
