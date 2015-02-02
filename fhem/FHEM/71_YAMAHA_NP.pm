@@ -148,7 +148,7 @@ sub YAMAHA_NP_Set
     
     if(not defined($hash->{helper}{VOLUMESTRAIGHTMIN}) and not defined($hash->{helper}{VOLUMESTRAIGHTMAX}))
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "basicStatus");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "systemConfig");
     }
 
     # get all available inputs if nothing is available
@@ -197,6 +197,7 @@ sub YAMAHA_NP_Set
                  "tuner:bandDAB,bandFM,presetUp,presetDown,tuneDown,tuneUp ".
                  "player:play,stop,pause,next,prev,shuffleToggle,repeatToggle ".
                  "clockUpdate:noArg ".
+                 "dimmer:1,2,3 ".
                  "tunerPresetDAB:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 ".
                  "tunerPresetFM:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 ".
                  "timerHour:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 ".
@@ -224,6 +225,7 @@ sub YAMAHA_NP_Set
                  "tuner:bandFM,presetUp,presetDown,tuneDown,tuneUp ".
                  "player:play,stop,pause,next,prev,shuffleToggle,repeatToggle ".
                  "clockUpdate:noArg ".
+                 "dimmer:1,2,3 ".
                  "tunerPresetFM:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 ".
                  "timerHour:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 ".
                  "timerMinute:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59 ";
@@ -305,6 +307,17 @@ sub YAMAHA_NP_Set
         {
             return "mute can only used when device is powered on";
         }
+      }
+    }
+    elsif($what eq "dimmer")
+    {
+      if($a[2] >= 1 and $a[2] <= 3)
+      {
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Display><FL_Dimmer>".$a[2]."</FL_Dimmer></Display></Misc></System></YAMAHA_AV>", $what, $a[2]);
+      }
+      else
+      {
+        return "Dimmer value must be 1..3";
       }
     }
     elsif($what =~ /^(volumeStraight|volume|volumeUp|volumeDown)$/)
@@ -1468,6 +1481,7 @@ sub YAMAHA_NP_html2txt
       <u>Available commands:</u><br><br>
       <li><b>cdTray</b>&nbsp;&nbsp;-&nbsp;&nbsp; open/close the CD tray.</li>
       <li><b>clockUpdate</b>&nbsp;&nbsp;-&nbsp;&nbsp; updates the system clock with current time. The time information is taken from the FHEM server.</li>
+      <li><b>dimmer</b> [1..3] &nbsp;&nbsp;-&nbsp;&nbsp; Sets the display brightnes.</li>
       <li><b>input</b> [&lt;parameter&gt;] &nbsp;&nbsp;-&nbsp;&nbsp; selects the input channel. The inputs are read dynamically from the device. Available inputs can be set (e.g. cd, tuner, aux1, aux2, ...).</li>
       <li><b>mute</b> [on|off] &nbsp;&nbsp;-&nbsp;&nbsp; activates/deactivates muting</li>
       <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; shuts down the device </li>
@@ -1698,6 +1712,7 @@ sub YAMAHA_NP_html2txt
       <u>Verf&uuml;gbare Befehle:</u><br><br>
       <li><b>cdTray</b>&nbsp;&nbsp;-&nbsp;&nbsp; &Ouml;ffnen und Schlie&szlig;en des CD-Fachs.</li>
       <li><b>clockUpdate</b>&nbsp;&nbsp;-&nbsp;&nbsp; Aktualisierung der Systemzeit des Network Players. Die Zeitinformation wird von dem FHEM Server bezogen, auf dem das Modul ausgef&uuml;hrt wird.</li>
+      <li><b>dimmer</b> [1..3] &nbsp;&nbsp;-&nbsp;&nbsp; Einstellung der Anzeigenhelligkeit.</li>
       <li><b>input</b> [&lt;parameter&gt;] &nbsp;&nbsp;-&nbsp;&nbsp; Auswahl des Eingangs des NP. Der aktive Eingang wird vom Ger&auml;t gelesen und in FHEM dynamisch dargestellt (z.B. cd, tuner, aux1, aux2, ...).</li>
       <li><b>mute</b> [on|off] &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert/Deaktiviert die Stummschaltung.</li>
       <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; Network Player ausschalten.</li>
