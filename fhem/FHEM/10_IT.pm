@@ -18,6 +18,9 @@ my %codes = (
   "XMITon" 			=> "on",		
   "XMITdimup" 	=> "dimup",
   "XMITdimdown" => "dimdown",
+  "XMITgroup"   => "group",
+  "XMITunit"   => "unit",
+  "XMITprotocol" => "protocol",
   "99" => "on-till",
  
 );
@@ -37,6 +40,11 @@ my %bintotristate=(
   "01" => "F",
   "11" => "1"
 );
+my %bintotristateV3=(
+  "10" => "1",
+  "01" => "0",
+  "11" => "D"
+);
 sub
 IT_Initialize($)
 {
@@ -46,14 +54,16 @@ IT_Initialize($)
     $it_c2b{$codes{$k}} = $k;
   }
 
-  $hash->{Match}     = "^i......\$";
+  $hash->{Match}     = "^i......";
   $hash->{SetFn}     = "IT_Set";
   $hash->{StateFn}   = "IT_SetState";
   $hash->{DefFn}     = "IT_Define";
   $hash->{UndefFn}   = "IT_Undef";
   $hash->{ParseFn}   = "IT_Parse";
-  $hash->{AttrList}  = "IODev ITfrequency ITrepetition switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 dummy:1,0 model:itremote,itswitch,itdimmer loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ITfrequency ITrepetition switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 dummy:1,0 model:itremote,itswitch,itdimmer protocol:V1,V3 loglevel:0,1,2,3,4,5,6";
 
+  $hash->{AutoCreate}=
+        { "IT.*" => { GPLOT => "", FILTER => "%NAME" } };
 }
 
 #####################################
@@ -147,8 +157,12 @@ IT_Set($@)
 	}
 	
   my $v = $name ." ". join(" ", @a);
-  $message = "is".uc($hash->{XMIT}.$hash->{$c});
-	
+  if ($hash->{$it_c2b{"protocol"}} eq "V3") {
+    $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{$it_c2b{"group"}}.$hash->{$c}.$hash->{$it_c2b{"unit"}});
+  } else {
+    $message = "is".uc($hash->{XMIT}.$hash->{$c});
+	}
+
 	## Log that we are going to switch InterTechno
   Log GetLogLevel($name,2), "IT set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
@@ -186,8 +200,8 @@ IT_Set($@)
   # Look for all devices with the same code, and set state, timestamp
   my $code = "$hash->{XMIT}";
   my $tn = TimeNow();
-  foreach my $n (keys %{ $modules{IT}{defptr}{$code} }) {
-
+  
+  foreach my $n (keys %{ $modules{IT}{defptr}{$code} }) { 
     my $lh = $modules{IT}{defptr}{$code}{$n};
     $lh->{CHANGED}[0] = $v;
     $lh->{STATE} = $v;
@@ -236,21 +250,50 @@ IT_Define($$)
   }
 
   my $u = "wrong syntax: define <name> IT 10-bit-housecode " .
-                        "off-code on-code [dimup-code] [dimdown-code]";
+                        "off-code on-code [dimup-code] [dimdown-code] or for protocol V3 " .
+                        "define <name> IT <26 bit Address> <1 bit group bit> <4 bit unit>";
 
   return $u if(int(@a) < 5);
-  return "Define $a[0]: wrong IT-Code format: specify a 10 digits 0/1/f "
-  		if( ($a[2] !~ m/^[f0-1]{10}$/i) );
 
-  return "Define $a[0]: wrong ON format: specify a 2 digits 0/1/f "
+  my $housecode;
+  
+  my $oncode;
+  my $offcode;
+  my $unitCode;
+  my $groupBit;
+
+  if (length($a[2]) == 26) {
+    # Is Protocol V3
+    return "Define $a[0]: wrong IT-Code format: specify a 26 digits 0/1 "
+  		if( ($a[2] !~ m/^[0-1]{26}$/i) );
+    return "Define $a[0]: wrong Bit Group format: specify a 1 digits 0/1 "
+  		if( ($a[3] !~ m/^[0-1]{1}$/i) );
+    return "Define $a[0]: wrong Unit format: specify 4 digits 0/1 "
+  		if( ($a[4] !~ m/^[0-1]{4}$/i) );
+    #return "Define $a[0]: wrong on/off/dimm format: specify a 1 digits 0/1/d "
+    #	if( ($a[3] !~ m/^[d0-1]{1}$/i) );
+    $housecode=$a[2].$a[3].$a[4];
+    $groupBit=$a[3];
+    $unitCode=$a[4];
+    $oncode = 1;
+    $offcode = 0;
+    $hash->{$it_c2b{"protocol"}}  = 'V3';
+    $hash->{$it_c2b{"unit"}}  = $unitCode;
+    $hash->{$it_c2b{"group"}}  = $groupBit;
+  } else {
+    return "Define $a[0]: wrong IT-Code format: specify a 10 digits 0/1/f "
+  		if( ($a[2] !~ m/^[f0-1]{10}$/i) );
+    return "Define $a[0]: wrong ON format: specify a 2 digits 0/1/f "
     	if( ($a[3] !~ m/^[f0-1]{2}$/i) );
 
-  return "Define $a[0]: wrong OFF format: specify a 2 digits 0/1/f "
+    return "Define $a[0]: wrong OFF format: specify a 2 digits 0/1/f "
     	if( ($a[4] !~ m/^[f0-1]{2}$/i) );
+    $housecode = $a[2];
+    $oncode = $a[3];
+    $offcode = $a[4];
+    $hash->{$it_c2b{"protocol"}}  = 'V1';
+  }
 
-  my $housecode = $a[2];
-  my $oncode = $a[3];
-  my $offcode = $a[4];
 
   $hash->{XMIT} = lc($housecode);
   $hash->{$it_c2b{"on"}}  = lc($oncode);
@@ -275,9 +318,10 @@ IT_Define($$)
   my $ncode = 1;
   my $name = $a[0];
 
+  
   $hash->{CODE}{$ncode++} = $code;
   $modules{IT}{defptr}{$code}{$name}   = $hash;
-
+  
   AssignIoPort($hash);
 }
 
@@ -292,6 +336,7 @@ IT_Undef($$)
 
     # As after a rename the $name my be different from the $defptr{$c}{$n}
     # we look for the hash.
+    
     foreach my $dname (keys %{ $modules{IT}{defptr}{$c} }) {
       delete($modules{IT}{defptr}{$c}{$dname})
         if($modules{IT}{defptr}{$c}{$dname} == $hash);
@@ -305,38 +350,95 @@ IT_Parse($$)
 {
   my ($hash, $msg) = @_;
   my $housecode;
+  my $unitCode;
+  my $groupBit;
   my $onoffcode;
   my $def;
   my $newstate;
   my @list;
-  if (length($msg) != 7) {
+  if (length($msg) != 7 && length($msg) != 17) {
     Log3 undef,3,"message \"$msg\" to short!";
     return "message \"$msg\" to short!";
   }
-  my $bin=sprintf("%024b",hex(substr($msg,1,length($msg)-1)));
+  my $bin = undef;
+  if ( length($msg) == 17 ) {
+        my $bin1=sprintf("%024b",hex(substr($msg,1,length($msg)-1-8)));
+        while (length($bin1) < 32) {
+          # suffix 0
+          $bin1 = '0'.$bin1;   
+        }
+        my $bin2=sprintf("%024b",hex(substr($msg,1+8,length($msg)-1)));
+        while (length($bin2) < 32) {
+          # suffix 0
+          $bin2 = '0'.$bin2;   
+        }
+        $bin = $bin1 . $bin2;
+  }
+  else {
+        $bin=sprintf("%024b",hex(substr($msg,1,length($msg)-1)));
+  }
 
+  if ((length($bin) % 2) != 0) {
+    # suffix 0 
+    $bin = '0'.$bin;   
+  }
+  #Log3 undef,4,"BIN: $bin";
   my $msgcode="";
   while (length($bin)>=2) {
-    if (substr($bin,0,2) != "10") {
-      $msgcode=$msgcode.$bintotristate{substr($bin,0,2)};
+    if (length($msg) == 7) {
+      if (substr($bin,0,2) != "10") {
+        $msgcode=$msgcode.$bintotristate{substr($bin,0,2)};
+      } else {
+        Log3 undef,4,"unknown tristate in \"$bin\"";
+        return "unknown tristate in \"$bin\""
+      }
     } else {
-      Log3 undef,4,"unknown tristate in \"$bin\"";
-      return "unknown tristate in \"$bin\""
+      $msgcode=$msgcode.$bintotristateV3{substr($bin,0,2)};
     }
     $bin=substr($bin,2,length($bin)-2);
   }
   
-  $housecode=substr($msgcode,0,length($msgcode)-2);
-  $onoffcode=substr($msgcode,length($msgcode)-2,2);
-
-  #Log3 $hash,3,$msg."->".$msgcode."->".$housecode." ".$onoffcode;
-  if(!defined($modules{IT}{defptr}{lc($housecode)})) {
-    Log3 undef,4,"$housecode not defined (Switch code: $onoffcode)";
-    return "$housecode not defined (Switch code: $onoffcode)!";
+  if (length($msg) == 7) {
+    $housecode=substr($msgcode,0,length($msgcode)-2);
+    $onoffcode=substr($msgcode,length($msgcode)-2,2);
+  } elsif (length($msg) == 17) {
+    $groupBit=substr($msgcode,26,1);
+    $onoffcode=substr($msgcode,27,1);
+    $unitCode=substr($msgcode,28,4);
+    $housecode=substr($msgcode,0,26).$groupBit.$unitCode;
+  } else {
+    Log3 undef,4,"Wrong IT message received: $msgcode";
+    return "Wrong IT message received: $msgcode";
+  }
+  
+  if(!defined($modules{IT}{defptr}{lc("$housecode")})) {
+    if(length($msg) == 7) {
+      Log3 undef,4,"$housecode not defined (Switch code: $onoffcode)";
+      #return "$housecode not defined (Switch code: $onoffcode)!";
+      if ($onoffcode eq "F0") { # on code IT
+        Log3 undef,4,"For autocreate please use the on button.";
+        return "$housecode not defined (Switch code: $onoffcode)! \n For autocreate please use the on button.";
+      } 
+      my $tmpOffCode = "F0";
+      my $tmpOnCode = "0F";
+      if ($onoffcode eq "FF") { # on code IT
+        $tmpOnCode = "FF";
+      } 
+      return "UNDEFINED IT_$housecode IT $housecode $tmpOnCode $tmpOffCode" if(!$def);
+    } else {
+      Log3 undef,4,"$housecode not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)";
+      #return "$housecode not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)!";
+      return "UNDEFINED IT_$housecode IT " . substr($msgcode,0,26) . " $groupBit $unitCode" if(!$def);
+    }
   }
   $def=$modules{IT}{defptr}{lc($housecode)};
 
   foreach my $name (keys %{$def}) {
+    if (length($msg) == 17) {
+      if ($def->{$name}->{$it_c2b{"group"}} != $groupBit || $def->{$name}->{$it_c2b{"unit"}} != $unitCode) {
+        next;
+      }
+    }
     if ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
       $newstate="on";
     } elsif ($def->{$name}->{$it_c2b{"off"}} eq lc($onoffcode)) {
@@ -362,9 +464,13 @@ IT_Parse($$)
 <h3>IT - InterTechno</h3>
 <ul>
   The InterTechno 433MHZ protocol is used by a wide range of devices, which are either of
-  the sender/sensor category or the receiver/actuator category. As we right now are only
-  able to SEND InterTechno commands, but CAN'T receive them, this module at the moment
+  the sender/sensor category or the receiver/actuator category. As we right now 
+  able to SEND and RECEIVE InterTechno commands
   supports just  devices like switches, dimmers, etc. through an <a href="#CUL">CUL</a> device, so this must be defined first.
+<br>
+  This module supports Intertechno protocol version 1 and version 3.
+  New received device packages are add in fhem category IT with autocreate.
+  Hint: IT protocol 1 devices are only created at pressed on button.
 
   <br><br>
 
@@ -375,6 +481,8 @@ IT_Parse($$)
     [&lt;dimup-code&gt;] [&lt;dimdown-code&gt;] </code>
     <br>or<br>
     <code>define &lt;name&gt; IT &lt;ITRotarySwitches|FLS100RotarySwitches&gt; </code>
+    <br>or<br>
+    <code>define &lt;name&gt; IT &lt;address 26 Bit&gt; &lt;group bit&gt; &lt;unit Code&gt;</code>
     <br><br>
 
    The value of housecode is a 10-digit InterTechno Code, consisting of 0/1/F as it is
@@ -392,7 +500,7 @@ IT_Parse($$)
 <br>
    The value of ITRotarySwitches and FLS100RotarySwitches is internaly translated
    into a houscode value.
-<br>
+
    <ul>
    <li><code>&lt;housecode&gt;</code> is a 10 digit tri-state number (0/1/F) depending on
 	 your device setting (see list below).</li>
@@ -405,9 +513,8 @@ IT_Parse($$)
    <li>The optional <code>&lt;dimdown-code&gt;</code> is a 2 digit tri-state number for dimming your device down;
      It is appended to the housecode to build the 12-digits IT-Message.</li>
    </ul>
-   <br>
-
-    Examples:
+<br>
+Examples:
     <ul>
       <code>define lamp IT 01FF010101 11 00 01 10</code><br>
       <code>define roll1 IT 111111111F 11 00 01 10</code><br>
@@ -416,8 +523,21 @@ IT_Parse($$)
       <code>define itswitch1 IT A1</code><br>
       <code>define lamp IT J10</code><br>
       <code>define flsswitch1 IT IV1</code><br>
-      <code>define lamp IT II2</code>
+      <code>define lamp IT II2</code><br>
     </ul>
+ <br>
+   For Intertechno protocol 3 is the &lt;housecode&gt; a 26-digits number. Additionaly there are a 4-digits unit code and a 1-digit group code used.
+   <ul>
+   <li><code>&lt;address&gt;</code> is a 26 digit number (0/1)</li>
+   <li><code>&lt;group&gt;</code> is a 1 digit number (0/1)</li>
+   <li><code>&lt;unit&gt;</code> is a 4 digit number (0/1)</li>
+   </ul>
+   <br>
+Examples:
+    <ul>
+      <code>define IT myITSwitch IT 00111100110101010110011111 0 0000</code>
+    </ul>
+    
   </ul>
   <br>
 
@@ -553,10 +673,13 @@ IT_Parse($$)
 <ul>
   Das InterTechno 433MHZ Protokoll wird von einer Vielzahl von Ger&auml;ten 
 	benutzt. Diese geh&ouml;ren entweder zur Kategorie Sender/Sensoren oder zur 
-	Kategorie Empf&auml;nger/Aktoren. Derzeit ist nur das SENDEN von InterTechno 
-	Befehlen m&ouml;glich, so dass dieses Modul nur die Bedienung von Ger&auml;ten wie 
-	Schalter, Dimmer usw. &uuml;ber ein <a href="#CUL">CUL</a> unterst&uuml;tzt; der 
-	CUL muss daher bereits definiert sein.
+	Kategorie Empf&auml;nger/Aktoren. Es ist das Senden sowie das Empfangen von InterTechno 
+	Befehlen m&ouml;glich. Ger&auml;ten können z.B.  
+	Schalter, Dimmer usw. sein.
+
+  Von diesem Modul wird sowohl das Protolkoll 1 sowie das Protokoll 3 unterstützt.
+  Neu empfangene Pakete werden per Autocreate in Fhem unter der Kategorie IT angelegt.
+  Hinweis: IT Protokoll 1 devices werden nur beim on Befehl angelegt.
 
   <br><br>
 
@@ -567,9 +690,11 @@ IT_Parse($$)
     [&lt;dimup-code&gt;] [&lt;dimdown-code&gt;] </code>
     <br>oder<br>
     <code>define &lt;name&gt; IT &lt;ITRotarySwitches|FLS100RotarySwitches&gt; </code>
+    <br>or<br>
+    <code>define &lt;name&gt; IT &lt;Adresse 26 Bit&gt; &lt;Group bit&gt; &lt;Unit Code&gt;</code>
     <br><br>
 
-   Der Wert von housecode ist abh&auml;ngig vom verwendeten Ger&auml;t und besteht aus zehn Ziffern InterTechno-Code. 
+   Der Wert von housecode ist abh&auml;ngig vom verwendeten Ger&auml;t und besteht aus zehn Ziffern InterTechno-Code Protokoll 1. 
    Da dieser ein tri-State-Protokoll ist, k&ouml;nnen die Ziffern jeweils 0/1/F annehmen.
    <br>
    Bit 11/12 werden f&uuml;r Schalten oder Dimmen verwendet. Da die Hersteller verschiedene Codes verwenden, k&ouml;nnen hier die 
@@ -583,6 +708,10 @@ IT_Parse($$)
 <br>
    Die Werte der ITRotary-Schalter und FLS100Rotary-Schalter werden intern in housecode-Werte umgewandelt.
 <br>
+   F&uuml;r Intertechno Protokoll 3 besteht der hauscode aus 26 Ziffern. Zusätzlich werden noch 4 Ziffern als Unit Code sowie eine Ziffer als Group code benötigt.
+<br> 
+   Neues IT Element in FHEM anlegen: define IT myITSwitch IT <Adresse 26 Bit> <Group bit> <Unit Code> 
+<br> 
    <ul>
    <li><code>&lt;housecode&gt;</code> 10 Ziffern lange tri-State-Zahl (0/1/F) abh&auml;ngig vom benutzten Ger&auml;t.</li>
    <li><code>&lt;on-code&gt;</code> 2 Ziffern lange tri-State-Zahl, die den Einschaltbefehl enth&auml;lt;
@@ -596,7 +725,7 @@ IT_Parse($$)
    </ul>
    <br>
 
-    Beispiele:
+Beispiele:
     <ul>
       <code>define lamp IT 01FF010101 11 00 01 10</code><br>
       <code>define roll1 IT 111111111F 11 00 01 10</code><br>
@@ -605,7 +734,21 @@ IT_Parse($$)
       <code>define itswitch1 IT A1</code><br>
       <code>define lamp IT J10</code><br>
       <code>define flsswitch1 IT IV1</code><br>
-      <code>define lamp IT II2</code>
+      <code>define lamp IT II2</code><br>
+    </ul>
+   <br>
+   F&uuml;r Intertechno Protokoll 3 ist der &lt;housecode&gt; eine 26-stellige Zahl. Zus&auml;tzlich wird noch ein 1 stelliger Gruppen-Code, sowie 
+   ein 4-stelliger unit code verwendet.
+   <ul>
+   <li><code>&lt;address&gt;</code> is a 26 digit number (0/1)</li>
+   <li><code>&lt;group&gt;</code> is a 1 digit number (0/1)</li>
+   <li><code>&lt;unit&gt;</code> is a 4 digit number (0/1)</li>
+   </ul>
+   <br>
+
+    Beispiele:
+    <ul>
+      <code>define IT myITSwitch IT 00111100110101010110011111 0 0000</code>
     </ul>
   </ul>
   <br>
