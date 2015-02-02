@@ -352,8 +352,8 @@ sub btIP_itemPlot {
     }
   }
 
-  ($width,$height) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
-  ($width,$height) = _btIP_imgRescale($width,$height,$scale) unless $scale eq '1';
+#  ($width,$height) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
+#  ($width,$height) = _btIP_imgRescale($width,$height,$scale) unless $scale eq '1';
 
   if($inline eq "1") {
 #
@@ -369,10 +369,11 @@ sub btIP_itemPlot {
 
     ($mimetype, $svgdata)   = SVG_showLog("unused");
     $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $width,$height"\/><\/svg>/;
-#    $svgdata =~ s/<svg/<svg width="$width" height="$height" /;
 
-    $output  = "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \n";
-    $output .= "xlink:href=\"data:$mimetype;base64,".encode_base64($svgdata)."\" />\n";
+    ($width,$height,$mimetype,$svgdata) = _btIP_imgData($svgdata,$scale);
+    $output  = "<!-- w: $width h: $height t: $mimetype-->\n";
+    $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."\" height=\"".$height."\" \n";
+    $output .= "xlink:href=\"$svgdata\" />\n";
 
   } else {
 #
