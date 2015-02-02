@@ -301,9 +301,18 @@ border: 1px solid #666666;
 background-color:#4b6dab;
 }
 
-.changed a, 
-.changed { color:#008700; }
-#saveCheck { position: absolute; top: 14px; right: 16px; }
+#saveCheck {
+position: absolute;
+top: 13px;
+right: 7px;
+padding-right: 10px;
+padding-left: 10px;
+padding-top: 2px;
+padding-bottom: 2px;
+background: #7887A4;
+border-radius: 10px;
+color: #F4FDFF;
+}
 
 table.room .changedicon svg {
 
