@@ -304,9 +304,23 @@ sub btIP_itemImg {
      return "";
   }
 
-  ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
+  ($width,$height,$mimetype,undef)    = _btIP_imgData($data,1);
+  if($mimetype eq 'image/svg+xml') {
+     if($data !~ m/viewBox/) {
+        $data =~ s/width=/viewBox="0 0 $width $height"\n\twidth=/;
+     } 
+     ($width,$height) = _btIP_imgRescale($width,$height,$scale);
+     $data =~ s/width=".*"/width="$width"/;
+     $data =~ s/height=".*"/height="$height"/;
+     $scale = 1;
+     (undef,undef,undef,$data) = _btIP_imgData($data,$scale);
+  } else {
+     ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
+  }
+
+#  $output  = "<!-- w: $width h: $height nw: $newWidth nh: $newHeight t: $mimetype -->\n";
   $output  = "<!-- s: $scale w: $width h: $height t: $mimetype -->\n";
-  $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$data\" />\n";
+  $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${width}px\" height=\"${height}px\" \nxlink:href=\"$data\" />\n";
   return $output;
 }
 
