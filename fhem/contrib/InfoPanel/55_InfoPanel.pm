@@ -315,7 +315,7 @@ sub _btIP_imgData {
   my $info     = image_info(\$arg);
   my $width    = $info->{width};
   my $height   = $info->{height};
-  ($width,$height)= _btIP_imgRescale($width,$height,$scale) unless $scale eq '1';
+  ($width,$height)= _btIP_imgRescale($width,$height,$scale);
   my $mimetype = $info->{file_media_type};
   my $data     = "data:$mimetype;base64,".encode_base64($arg);
   return ($width,$height,$mimetype,$data);
@@ -372,7 +372,7 @@ sub btIP_itemPlot {
 
     ($width,$height,$mimetype,$svgdata) = _btIP_imgData($svgdata,$scale);
     $output  = "<!-- w: $width h: $height t: $mimetype-->\n";
-    $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."\" height=\"".$height."\" \n";
+    $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \n";
     $output .= "xlink:href=\"$svgdata\" />\n";
 
   } else {
