@@ -6,6 +6,7 @@ div.ui-dialog div.ui-dialog-titlebar { display:none; }
 div.ui-widget-content { font-family:Helvetica; background:white; color:#151515;}
 
 .colorpicker_ct .slider { background: url(../jscolor/ct_background.svg); }
+.colorpicker_ct_mired .slider { background: url(../jscolor/ct_mired_background.svg); }
 .colorpicker_hue .slider { background: url(../jscolor/hue_background.svg); }
 .get,.set,.attr { margin-bottom:5px; float:left; }
 select.svgSrc     { width:100px; }
