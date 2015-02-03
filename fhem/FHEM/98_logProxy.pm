@@ -77,7 +77,7 @@ logProxy_sampleDataFn($$$$$)
 
   my $desc = "Type,Spec";
 
-  my $columns = "ConstX,ConstY,Func,FileLog,DbLog";
+  my $columns = "ConstX,ConstY,Func,Polar,FileLog,DbLog";
 
   my @htmlArr;
   $max = 16 if($max > 16);
@@ -694,7 +694,7 @@ logProxy_Get($@)
 
     if( $a[$i] =~ m/^(FileLog|DbLog):([^:]*):(.*)/ ) {
       my @options = split( ',', $fld[1] );
-      my $log_dev = $options[0];
+      my $log_dev = shift(@options);
       my $infile = $fld[0] eq "DbLog" ? "HISTORY" : "CURRENT";
       my $column_specs = $3;
 
@@ -714,7 +714,6 @@ logProxy_Get($@)
         next;
       }
 
-      my @options = @options[1..@options-1];
       while (@options) {
         my $option = shift(@options);
         while ($option && $option =~ m/={/ && $option !~ m/>}/ ) {
@@ -723,7 +722,6 @@ logProxy_Get($@)
           $option .= ",". $next;
         }
 
-      #foreach my $option ( @options[1..@options-1] ) {
         my ($name,$value) = split( '=', $option, 2 );
 
         if( $value ) {
@@ -1200,7 +1198,7 @@ logProxy_Get($@)
             <ul>
               <code>#logProxy DbLog:dbLog,scale2reading={year=>'temperature_avg_day',month=>'temperature_avg_day'}:s300ht_1:temperature::</code><br>
             </ul><br>
-            
+
             <br></li>
         </ul>
 
