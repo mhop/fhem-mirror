@@ -372,7 +372,7 @@ sub btIP_itemPlot {
     }
   }
 
-  ($width,$height) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
+  ($width,$height) = split(",", AttrVal($plotName[0],"plotsize","0,0"));
   ($newWidth,$newHeight) = _btIP_imgRescale($width,$height,$scale);
   $attr{$plotName[0]}{plotsize} = "$newWidth,$newHeight";
 
@@ -385,7 +385,8 @@ sub btIP_itemPlot {
   $FW_pos{off}            = ($plotName[2]) ? $plotName[2] : undef;
 
   ($mimetype, $svgdata)   = SVG_showLog("unused");
-  $attr{$plotName[0]}{plotsize} = "$width,$height";
+  $attr{$plotName[0]}{plotsize} = undef;
+  $attr{$plotName[0]}{plotsize} = "$width,$height" if($width || $height);
 
   $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $width,$height"\/><\/svg>/;
   (undef,undef,undef,$svgdata) = _btIP_imgData($svgdata,1);
