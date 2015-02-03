@@ -339,6 +339,11 @@ SVG_PEdit($$$$)
   $ret .= "<td>".SVG_txt("ytics", "left", $conf{ytics}, 16)."</td>";
   $ret .= "<td>".SVG_txt("y2tics","right", $conf{y2tics}, 16)."</td>";
   $ret .= "</tr>";
+  if( $conf{xtics} ) {
+    $ret .= "<tr class=\"even\"><td/><td>";
+    $ret .= SVG_txt("xtics", "x&nbsp;&nbsp;&nbsp;", $conf{xtics}, 16)."</td>";
+    $ret .= "<td/></tr>";
+  }
 
   my $max = @{$conf{lType}}+1;
   my ($desc, $cnt) = ("Spec", 0);
@@ -578,8 +583,9 @@ SVG_WriteGplot($)
   push @rows, "set timefmt \"%Y-%m-%d_%H:%M:%S\"";
   push @rows, "set xlabel \" \"";
   push @rows, "set title '$FW_webArgs{title}'";
-  push @rows, "set ytics ".$FW_webArgs{ytics}."";
-  push @rows, "set y2tics ".$FW_webArgs{y2tics}."";
+  push @rows, "set xtics ".$FW_webArgs{xtics} if($FW_webArgs{xtics});
+  push @rows, "set ytics ".$FW_webArgs{ytics};
+  push @rows, "set y2tics ".$FW_webArgs{y2tics};
   push @rows, "set grid".($FW_webArgs{gridy}  ? " ytics" :"").
                       ($FW_webArgs{gridy2} ? " y2tics":"")."";
   push @rows, "set ylabel \"$FW_webArgs{ylabel}\"";
