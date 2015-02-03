@@ -148,7 +148,7 @@ sub ENIGMA2_Get($@) {
     $what = $a[1];
 
     if ( $what =~
-/^(power|input|volume|mute|channel|currentMedia|currentTitle|serviceprovider|servicevideosize)$/
+/^(power|input|volume|mute|channel|currentMedia|currentTitle|nextTitle|providername|servicevideosize)$/
       )
     {
         if ( defined( $hash->{READINGS}{$what} ) ) {
