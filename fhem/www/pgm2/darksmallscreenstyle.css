@@ -103,8 +103,8 @@ div.tiny { font-size:10px; }
 	table.block tr td:nth-child(n+3) { width: 0px; display: none; }
 	
 	table.block select,
-	table.block input,
-	.handle { width: 0px; display: none; }
+	table.block input
+	{ width: 0px; display: none; }
 }
 
 /* Landscape mode */

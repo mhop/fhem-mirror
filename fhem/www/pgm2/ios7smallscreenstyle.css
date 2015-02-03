@@ -107,8 +107,8 @@ svg { height:32px; width:32px; fill:#1c7efb; vertical-align:middle; margin:2px 0
 	table.block svg.icon { margin-right: 5px; }
 	
 	table.block select,
-	table.block input,
-	.handle { width: 0px; display: none; }
+	table.block input
+	{ width: 0px; display: none; }
 }
 
 /* Landscape mode */
