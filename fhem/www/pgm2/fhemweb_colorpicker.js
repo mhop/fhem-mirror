@@ -27,6 +27,7 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
 
   //console.log( "mode: "+mode );
 
+  //preset ?
   if( params && params.length ) {
     var color = params[0];
     if( mode == "CT" )
@@ -39,8 +40,21 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
   }
 
   if( mode == "CT" ) {
+    if( currVal )
+      currVal = currVal.match(/[\d.\-]*/)[0];
+
     var newEl = FW_createSlider(elName, devName, ["slider",vArr[2],vArr[3],vArr[4]], currVal, set, params, cmd);
-    $(newEl).addClass("colorpicker_ct");
+    
+    old_set_fn = newEl.setValueFn;
+    newEl.setValueFn = function(arg) {
+      arg = arg.match(/[\d.\-]*/)[0];
+      old_set_fn(arg);
+    }
+
+    if( vArr[4] < 1000 )
+      $(newEl).addClass("colorpicker_ct_mired");
+    else
+      $(newEl).addClass("colorpicker_ct");
     return newEl;
 
   } else if( mode == "HUE" ) {
