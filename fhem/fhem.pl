@@ -1787,12 +1787,12 @@ CommandDeleteAttr($$)
 
     if(@a == 1) {
       delete($attr{$sdev});
-      addStructChange("deleteAttr", $sdev, $def);
+      addStructChange("deleteAttr", $sdev, $sdev);
       DoTrigger("global", "DELETEATTR $sdev", 1) if($init_done);
 
     } else {
       delete($attr{$sdev}{$a[1]}) if(defined($attr{$sdev}));
-      addStructChange("deleteAttr", $sdev, $def);
+      addStructChange("deleteAttr", $sdev, join(" ", @a));
       DoTrigger("global", "DELETEATTR $sdev $a[1]", 1) if($init_done);
 
     }
