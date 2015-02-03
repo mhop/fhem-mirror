@@ -81,7 +81,7 @@ sub InfoPanel_Initialize($) {
     $hash->{DefFn}    = "btIP_Define";
 	$hash->{UndefFn}  = "btIP_Undef";
     #$hash->{AttrFn}   = "btIP_Attr";
-    $hash->{AttrList} = "disable:0,1,toggle autoreload:1,0 bg bgcolor refresh size title tmin";
+    $hash->{AttrList} = "disable:0,1 autoreload:1,0 bg bgcolor refresh size title tmin";
     $hash->{SetFn}    = "btIP_Set";
     $hash->{NotifyFn} = "btIP_Notify";
 
@@ -541,6 +541,17 @@ sub btIP_xy {
   return($x,$y);
 }
 
+sub btIP_changeColor {
+  my($file,$oldcolor,$newcolor) = @_;
+  my ($data,$readBytes);
+  my $length = -s "$file";
+  open(GRAFIK, "<", $file) or die("File not found $!");
+  binmode(GRAFIK);
+  $readBytes = read(GRAFIK, $data, $length);
+  close(GRAFIK);
+  $data =~ s/#$oldcolor/#$newcolor/g;
+  return $data;
+}
 
 ##################
 #
