@@ -43,11 +43,18 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     if( currVal )
       currVal = currVal.match(/[\d.\-]*/)[0];
 
+   if( +currVal < +vArr[2]
+       || +currVal > +vArr[4] )
+     currVal = Math.round(1000000/currVal).toString();
+
     var newEl = FW_createSlider(elName, devName, ["slider",vArr[2],vArr[3],vArr[4]], currVal, set, params, cmd);
-    
+
     old_set_fn = newEl.setValueFn;
     newEl.setValueFn = function(arg) {
       arg = arg.match(/[\d.\-]*/)[0];
+      if( +arg < +vArr[2]
+          || +arg > +vArr[4] )
+        arg = Math.round(1000000/arg).toString();
       old_set_fn(arg);
     }
 
