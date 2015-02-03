@@ -1063,7 +1063,7 @@ sub btIP_HTMLHead($$) {
   
 #  my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
 #  my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
-  my $doctype= '<?xml version="1.0" standalone="no"?> '."\n".
+  my $doctype= '<?xml version="1.0" encoding="utf-8" standalone="no"?> '."\n".
                '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '.
                '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">'."\n";
   my $xmlns= "";
@@ -1072,6 +1072,7 @@ sub btIP_HTMLHead($$) {
   # css and js header output should be coded only in one place
   my $css= "";
   my $scripts= btIP_getScript();
+#  my $meta = "<meta charset=\"UTF-8\">\n";
   my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$r$css$scripts</head>\n";
   return $code;
 }
