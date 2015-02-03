@@ -1,7 +1,7 @@
 "use strict";
 var svgNS = "http://www.w3.org/2000/svg";
 var svg_b64 ="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-var svg_initialized={};
+var svg_initialized={}, lastHidden;
 
 
 
@@ -139,7 +139,8 @@ sv_menu(evt, embed)
           $(tl).attr("hiddentitle", $(tl).text());
           if($(sel).attr(pn) != null)
             $(tl).text($(label).attr("title"));
-          showOtherLines(1, 0);
+          lastHidden = lid;
+          showOtherLines(1, 0)
         }
       }
 
@@ -218,7 +219,7 @@ sv_menu(evt, embed)
   {
     $(svg).find("[id]").each(function(){
       var id = $(this).attr("id");
-      if(id.indexOf("line_") != 0 || id == lid)
+      if(id.indexOf("line_") != 0 || id == lastHidden)
         return;
       var h = parseFloat($(this).attr("y_h"));
       $(this).attr("transform", "translate(0,"+h*(1-currval)+") "+
