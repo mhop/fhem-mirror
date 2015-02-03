@@ -332,6 +332,7 @@ HUEDevice_SetParam($$@)
 
   } elsif($cmd eq "ct") {
     $obj->{'on'}  = JSON::true;
+    $value = int(1000000/$value) if( $value > 1000 );
     $obj->{'ct'}  = 0+$value;
     $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
   } elsif($cmd eq "hue") {
@@ -971,7 +972,6 @@ HUEDevice_Parse($$)
   readingsEndUpdate($hash,1);
 
   readingsSingleUpdate($hash,"rgb", CommandGet("","$name rgb"),1 );
-
 }
 
 1;
@@ -1055,7 +1055,7 @@ HUEDevice_Parse($$)
       <li>dimUp</li>
       <li>dimDown</li>
       <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
-        set colortemperature to &lt;value&gt; mireds; range is 154-500.</li>
+        set colortemperature to &lt;value&gt; in mireds (range is 154-500) or kelvin (rankge is 2000-6493).</li>
       <li>hue &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set hue to &lt;value&gt;; range is 0-65535.</li>
       <li>sat &lt;value&gt; [&lt;ramp-time&gt;]<br>
