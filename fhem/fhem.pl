@@ -2300,7 +2300,8 @@ CommandAttr($$)
         my $perlCode= $6;
         #Log 1, sprintf("userReading %s has perlCode %s with modifier %s%s",
         # $userReading,$perlCode,$modifier,$trigger?" and trigger $trigger":"");
-        if(grep { /$modifier/ } qw(none difference differential offset monotonic)) {
+        if(grep { /$modifier/ }
+                qw(none difference differential offset monotonic integral)) {
           $trigger =~ s/^:// if($trigger);
           $userReadings{$userReading}{trigger}= $trigger;
           $userReadings{$userReading}{modifier}= $modifier;
