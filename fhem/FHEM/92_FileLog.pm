@@ -458,6 +458,7 @@ FileLog_logWrapper($)
 
   } else {
     FileLog_loadSVG();
+    FW_pO "<script type='text/javascript' src='$FW_ME/pgm2/svg.js'></script>";
     FW_pO "<div id=\"content\">";
     FW_pO "<br>";
     if(AttrVal($d,"plotmode",$FW_plotmode) ne "gnuplot") {
