@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.130";
+my $thzversion = "0.131";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -120,7 +120,12 @@ my %sets439 = (
     "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", argMax =>  "200",	type =>"1clean",  unit =>""},
     "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "1",  argMax =>   "20",	type =>"5temp",  unit =>" °C"},
     "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "1",  argMax =>   "25",	type =>"5temp",  unit =>" °C"},
-    "p99RoomThermCorrection"		=> {cmd2=>"0A0109", argMin =>  "-3", argMax =>    "3", 	type =>"4temp",  unit =>" K"},
+    "p99RoomThermCorrection"		=> {cmd2=>"0A0109", argMin =>  "-5", argMax =>    "5", 	type =>"4temp",  unit =>" K"},
+    "p35PasteurisationInterval"		=> {cmd2=>"0A0586", argMin =>  "1",  argMax =>   "30", 	type =>"1clean",  unit =>""},
+    "p35PasteurisationTemp"		=> {cmd2=>"0A0587", argMin =>  "10", argMax =>   "65", 	type =>"5temp",  unit =>" °C"},
+    "p34BoosterDHWTempAct"		=> {cmd2=>"0A0589", argMin => "-10", argMax =>   "10", 	type =>"5temp",  unit =>" °C"},
+    "p99DHWmaxFlowTemp"			=> {cmd2=>"0A058C", argMin =>  "10", argMax =>   "75",	type =>"5temp",  unit =>" °C"}, 
+    "p89DHWeco"				=> {cmd2=>"0A058D", argMin =>  "0",  argMax =>   "1", 	type =>"1clean",  unit =>""},
     "pHolidayBeginDay"			=> {cmd2=>"0A011B", argMin =>  "1", 	argMax =>  "31", 	type =>"0clean",  unit =>""},
     "pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>  "1", 	argMax =>  "12",	type =>"0clean",  unit =>""},
     "pHolidayBeginYear"			=> {cmd2=>"0A011D", argMin =>  "12", 	argMax =>  "20",	type =>"0clean",  unit =>""},
@@ -1304,8 +1309,8 @@ sub THZ_debugread($){
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
  #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
-  #my @numbers=('0A0176', '0A0109', 'FB', 'FE', '00', '0A05D1', '0A010D');  
-  my @numbers = (1..256);
+  my @numbers=('0A0586', '0A0587', '0A058D', 'FE', '00', '0A05D1', '0A010D');  
+  #my @numbers = (1..256);
   #my @numbers = (1..65535);
   #my @numbers = (1..3179);
   my $indice= "FF";
@@ -1314,7 +1319,7 @@ sub THZ_debugread($){
     my $cmd = sprintf("%02X", $indice);
     #my $cmd = sprintf("%04X", $indice);
     #my $cmd = "0A" . sprintf("%04X",  $indice);
-    #my $cmd = $indice;
+    my $cmd = $indice;
     my $cmdHex2 = THZ_encodecommand($cmd,"get"); 
     #($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
     #STX start of text
