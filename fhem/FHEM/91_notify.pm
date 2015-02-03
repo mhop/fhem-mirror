@@ -201,25 +201,16 @@ notify_fhemwebFn($$$$)
       $dh{$a[0]}{".*"} = 1;
       $dh{$a[0]}{$a[1].".*"} = 1;
     }
-    my $list = ""; my @al;
+    my $list = "";
     foreach my $dev (sort keys %dh) {
       $list .= " $dev:" . join(",", sort keys %{$dh{$dev}});
-      push @al, $dev;
     }
-    $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
-    $ret .= "<td colspan=\"2\"><form autocomplete=\"off\">";
-    $ret .= FW_hidden("detail", $d);
-    $ret .= FW_hidden("dev.$d", "$d addRegexpPart");
-    $ret .= FW_submit("cmd.$d", "set", "set");
-    $ret .= "<div class=\"set downText\">&nbsp;$d addRegexpPart&nbsp;</div>";
     $list =~ s/(['"])/./g;
-    $ret .= FW_select("","arg.$d",\@al, undef, "set",
-        "FW_selChange(this.options[selectedIndex].text,'$list','val.$d')");
-    $ret .= FW_textfield("val.$d", 30, "set");
-    my $al0 = (@al ? $al[0] : "");
-    $ret .= "<script type=\"text/javascript\">" .
-              "FW_selChange('$al0','$list','val.$d')</script>";
-    $ret .= "</form></td></tr>";
+
+    $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
+    $ret .= '<td colspan="2">';
+    $ret .= FW_detailSelect($d, "set", $list, "addRegexpPart");
+    $ret .= "</td></tr>";
   }
   $ret .= "</table>";
 
