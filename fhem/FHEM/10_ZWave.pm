@@ -486,6 +486,10 @@ ZWave_Cmd($$@)
       return ($type eq "get" && AttrVal($name,"verbose",3) > 2 ? 
                   "Scheduled for sending after WAKEUP" : undef);
     }
+
+  } else {
+    $data .= $id  if($type eq "set"); # callback=>id
+
   }
   IOWrite($hash, "00", $data);
 
@@ -950,17 +954,23 @@ ZWave_Parse($$@)
     return $ret;
 
   } elsif($cmd eq "ZW_SEND_DATA") {
+    my $hash = $modules{ZWave}{defptr}{"$homeId $callbackid"};
+    my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
+               '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
+    my $msg = ($msg{$id} ? $msg{$id} : "UNKNOWN_ERROR");
     if ($id eq "00") {
       ZWave_HandleSendStack($iodev);
-      Log3 $ioName, 4,
-        "$ioName OK: SEND_DATA returned $id - TRANSMIT_COMPLETE_OK";
+      Log3 $ioName, 4, "$ioName transmit $msg for $callbackid";
+      readingsSingleUpdate($hash, "transmit", $msg, 0);
+      return "";
+
     } else {
-      my %err = { "01" => "NO_ACK",   "02" => "FAIL",
-                  "03" => "NOT_IDLE", "04" => "NOROUTE" };
-      my $msg = $err{$id} ? "TRANSMIT_COMPLETE_".$err{$id} : "UNKOWN_ERROR";
-      Log3 $ioName, 2, "$ioName ERROR: SEND_DATA returned $id - $msg";
+      Log3 $ioName, 2, "$ioName transmit $msg for $callbackid";
+      return "" if(!$hash);
+      readingsSingleUpdate($hash, "state", "TRANSMIT_$msg", 1);
+      readingsSingleUpdate($hash, "transmit", $msg, 1);
+      return $hash->{NAME};
     }
-    return "";
 
   } elsif($cmd eq "ZW_REQUEST_NODE_NEIGHBOR_UPDATE") {
     if ($id eq "21") {
