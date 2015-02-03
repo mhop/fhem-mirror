@@ -329,6 +329,11 @@ SVG_PEdit($$$$)
   $ret .= "<td>".SVG_txt("yrange", "left", $conf{yrange}, 16)."</td>";
   $ret .= "<td>".SVG_txt("y2range", "right", $conf{y2range}, 16)."</td>";
   $ret .= "</tr>";
+  if( $conf{xrange} ) {
+    $ret .= "<tr class=\"odd\"><td/><td>";
+    $ret .= SVG_txt("xrange", "x&nbsp;&nbsp;&nbsp;",$conf{xrange},16)."</td>";
+    $ret .= "<td/></tr>";
+  }
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Tics as (\"Txt\" val, ...)</td>";
   $ret .= "<td>".SVG_txt("ytics", "left", $conf{ytics}, 16)."</td>";
@@ -579,6 +584,7 @@ SVG_WriteGplot($)
                       ($FW_webArgs{gridy2} ? " y2tics":"")."";
   push @rows, "set ylabel \"$FW_webArgs{ylabel}\"";
   push @rows, "set y2label \"$FW_webArgs{y2label}\"";
+  push @rows, "set xrange $FW_webArgs{xrange}" if($FW_webArgs{xrange});
   push @rows, "set yrange $FW_webArgs{yrange}" if($FW_webArgs{yrange});
   push @rows, "set y2range $FW_webArgs{y2range}" if($FW_webArgs{y2range});
   push @rows, "";
@@ -1383,7 +1389,7 @@ SVG_render($$$$$$$$$$)
 
       } elsif( $l =~ /^;/ ) { #allow ;special lines
         if( $l =~ m/^;p (\S+)\s(\S+)/ ) {# point
-          my $xmul = $w/($xmax-$xmin);
+          my $xmul = $w/($xmax-$xmin) if( $conf{xrange} );
           my $x1;
           if( $conf{xrange} ) {
             $x1 = int(($1-$xmin)*$xmul);
