@@ -277,9 +277,9 @@ sub structure_Notify($$)
   Log3 $me, 5, "Update structure '$me' to $newState" .
               " because device $dev->{NAME} has changed";
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "LastDevice", $dev->{NAME});
+  readingsBulkUpdate($hash, "LastDevice", $dev->{NAME}, 0);
   readingsBulkUpdate($hash, "LastDevice_Abs",
-                                structure_getChangedDevice($dev->{NAME}));
+                                structure_getChangedDevice($dev->{NAME}), 0);
   readingsBulkUpdate($hash, "state", $newState);
   readingsEndUpdate($hash, 1);
 

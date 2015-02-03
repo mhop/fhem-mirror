@@ -361,10 +361,9 @@ FileLog_fhemwebFn($$$$)
       $dh{$a[0]}{".*"} = 1;
       $dh{$a[0]}{$a[1].".*"} = 1;
     }
-    my $list = ""; my @al;
+    my $list = "";
     foreach my $dev (sort keys %dh) {
       $list .= " $dev:" . join(",", sort keys %{$dh{$dev}});
-      push @al, $dev;
     }
     $list =~ s/(['"])/./g;
 

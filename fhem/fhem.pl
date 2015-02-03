@@ -2871,6 +2871,7 @@ DoTrigger($$@)
   my $max = int(@{$hash->{CHANGED}});
   Log 5, "Triggering $dev ($max changes)";
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
+  my $now = TimeNow();
 
   ################
   # Log/notify modules
@@ -2880,7 +2881,7 @@ DoTrigger($$@)
     $hash->{INTRIGGER}=1;
     Log 5, "Notify loop for $dev $hash->{CHANGED}->[0]";
     createNtfyHash() if(!%ntfyHash);
-    $hash->{NTFY_TRIGGERTIME} = TimeNow(); # Optimize FileLog
+    $hash->{NTFY_TRIGGERTIME} = $now; # Optimize FileLog
     my $ntfyLst = (defined($ntfyHash{$dev}) ? $ntfyHash{$dev} : $ntfyHash{"*"});
     foreach my $n (@{$ntfyLst}) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
@@ -2900,7 +2901,7 @@ DoTrigger($$@)
           next;
         }
         next if($inform{$c}{type} eq "raw");
-        my $tn = TimeNow();
+        my $tn = $now;
         if($attr{global}{mseclog}) {
           my ($seconds, $microseconds) = gettimeofday();
           $tn .= sprintf(".%03d", $microseconds/1000);
@@ -2922,7 +2923,7 @@ DoTrigger($$@)
   ####################
   # Used by triggered perl programs to check the old value
   # Not suited for multi-valued devices (KS300, etc)
-  $oldvalue{$dev}{TIME} = TimeNow();
+  $oldvalue{$dev}{TIME} = $now;
   $oldvalue{$dev}{VAL} = $hash->{STATE};
 
   if(!defined($hash->{INTRIGGER})) {
