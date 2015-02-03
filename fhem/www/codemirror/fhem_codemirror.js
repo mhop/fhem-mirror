@@ -1,24 +1,22 @@
 var cm_loaded = 0, cm_editor;
 
-loadScript("pgm2/jquery.min.js", function(){
-  $(document).ready(function(){
-    var els = document.getElementsByTagName("textarea");
-    if(els.length == 0)
-      return;
+$(document).ready(function(){
+  var els = document.getElementsByTagName("textarea");
+  if(els.length == 0)
+    return;
 
-    if($(els[0]).closest("div#edit").css("display")=="none") { // DEF special
-      $("table.internals a").each(function(){
-        var oc = $(this).attr("onclick");
-        if(oc) {
-          $(this).attr("onclick", oc+
-          's=document.getElementById("edit").getElementsByTagName("textarea");'+
-          'if(!s[0].editor) s[0].editor=AddCodeMirror(s[0]);');
-        }
-      });
-    } else {
-      AddCodeMirror(els[0]);
-    }
-  });
+  if($(els[0]).closest("div#edit").css("display")=="none") { // DEF special
+    $("table.internals a").each(function(){
+      var oc = $(this).attr("onclick");
+      if(oc) {
+        $(this).attr("onclick", oc+
+        's=document.getElementById("edit").getElementsByTagName("textarea");'+
+        'if(!s[0].editor) s[0].editor=AddCodeMirror(s[0]);');
+      }
+    });
+  } else {
+    AddCodeMirror(els[0]);
+  }
 });
 
 function
