@@ -114,7 +114,7 @@ sub btIP_Undef($$) {
 	my ($hash, $arg) = @_;
     # check if last device
     my $url = '/btip';
-    $data{FWEXT}{$url} = undef if int(devspec2array('TYPE=InfoPanel')) == 1;
+    delete $data{FWEXT}{$url} if int(devspec2array('TYPE=InfoPanel')) == 1;
 	return undef;
 }
 
@@ -323,19 +323,6 @@ sub btIP_itemImg {
   $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${width}px\" height=\"${height}px\" \nxlink:href=\"$data\" />\n";
   return $output;
 }
-
-# # embed link to plot
-# #
-#     my $url;
-#     $url  = "$FW_ME/SVG_showLog?dev=". $plotName[0].
-#           "&amp;logdev=".            InternalVal($plotName[0], "LOGDEVICE", "").
-#           "&amp;gplotfile=".         InternalVal($plotName[0], "GPLOTFILE", "").
-#           "&amp;logfile=".           InternalVal($plotName[0], "LOGFILE", "CURRENT").
-#           "&amp;plotsize=".          "$newWidth,$newHeight";
-#      $url .= "&amp;pos=".            ($plotName[1]) ? $plotName[1] : 'day';
-#      $url .= "&amp;zoom=".           ($plotName[2]) ? $plotName[2] : undef;
-# 
-#     $output = "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$url\" />\n";
 
 sub _btIP_imgData {
   my ($arg,$scale) = @_;
