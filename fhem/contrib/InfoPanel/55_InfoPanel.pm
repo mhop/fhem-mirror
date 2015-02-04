@@ -330,7 +330,8 @@ sub btIP_itemImg {
 #     $url  = "$FW_ME/SVG_showLog?dev=". $plotName[0].
 #           "&amp;logdev=".            InternalVal($plotName[0], "LOGDEVICE", "").
 #           "&amp;gplotfile=".         InternalVal($plotName[0], "GPLOTFILE", "").
-#           "&amp;logfile=".           InternalVal($plotName[0], "LOGFILE", "CURRENT");
+#           "&amp;logfile=".           InternalVal($plotName[0], "LOGFILE", "CURRENT").
+#           "&amp;plotsize=".          "$newWidth,$newHeight";
 #      $url .= "&amp;pos=".            ($plotName[1]) ? $plotName[1] : 'day';
 #      $url .= "&amp;zoom=".           ($plotName[2]) ? $plotName[2] : undef;
 # 
@@ -384,32 +385,44 @@ sub btIP_itemPlot {
     }
   }
 
-#  my ($hasPlotsize)     = split(",", AttrVal($plotName[0],"plotsize",0));
   ($width,$height)              = split(",", AttrVal($plotName[0],"plotsize","800,160"));
   ($newWidth,$newHeight)        = _btIP_imgRescale($width,$height,$scale);
-#  $attr{$plotName[0]}{plotsize} = "$newWidth,$newHeight";
 
-  $FW_RET                 = undef;
-  $FW_webArgs{dev}        = $plotName[0];
-  $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
-  $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
-  $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
-  $FW_pos{zoom}           = ($plotName[1]) ? $plotName[1] : 'day';
-  $FW_pos{off}            = ($plotName[2]) ? $plotName[2] : undef;
-  $FW_plotsize            = "$newWidth,$newHeight";
+  if($inline == 1) {
 
-  ($mimetype, $svgdata)   = SVG_showLog("unused");
-#  $attr{$plotName[0]}{plotsize} = undef;
-#  $attr{$plotName[0]}{plotsize} = "$width,$height" if $hasPlotsize;
+    $FW_RET                 = undef;
+    $FW_webArgs{dev}        = $plotName[0];
+    $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
+    $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
+    $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
+#    $FW_pos{zoom}           = ($plotName[1]) ? $plotName[1] : 'day';
+#    $FW_pos{off}            = ($plotName[2]) ? $plotName[2] : undef;
+    $FW_plotsize            = "$newWidth,$newHeight";
 
-  $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $width,$height"\/><\/svg>/;
-  (undef,undef,undef,$svgdata) = _btIP_imgData($svgdata,1);
+    ($mimetype, $svgdata)   = SVG_showLog("unused");
 
-  $output  = "<!-- w: $width h: $height nw: $newWidth nh: $newHeight t: $mimetype -->\n";
-  $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${newWidth}px\" height=\"${newHeight}px\" \n";
-  $output .= "xlink:href=\"$svgdata\" />\n";
+    $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $newWidth,$newHeight"\/><\/svg>/;
+    (undef,undef,undef,$svgdata) = _btIP_imgData($svgdata,1);
+
+    $output  = "<!-- w: $width h: $height nw: $newWidth nh: $newHeight t: $mimetype -->\n";
+    $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${newWidth}px\" height=\"${newHeight}px\" \n";
+    $output .= "xlink:href=\"$svgdata\" />\n";
+  } else {
+# embed link to plot
+#
+    my $url;
+    $url  = "$FW_ME/SVG_showLog?dev=". $plotName[0].
+            "&amp;logdev=".            InternalVal($plotName[0], "LOGDEVICE", "").
+            "&amp;gplotfile=".         InternalVal($plotName[0], "GPLOTFILE", "").
+            "&amp;logfile=".           InternalVal($plotName[0], "LOGFILE", "CURRENT").
+            "&amp;plotsize=".          "$newWidth,$newHeight";
+#     $url .= "&amp;pos=".            ($plotName[1]) ? $plotName[1] : 'day';
+#     $url .= "&amp;zoom=".           ($plotName[2]) ? $plotName[2] : undef;
+    $output = "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${newWidth}px\" height=\"${newHeight}px\" \nxlink:href=\"$url\" />\n";
+  }
 
   return $output; 
+
 }
 
 sub btIP_itemRect {
