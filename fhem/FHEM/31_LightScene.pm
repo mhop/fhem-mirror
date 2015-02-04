@@ -291,7 +291,7 @@ LightScene_Notify($$)
 
         my $matched = 0;
         foreach my $scene (sort keys %{ $hash->{SCENES} }) {
-          $matched = 1;
+          $matched = (scalar keys %{ $hash->{SCENES}{$scene} } > 0)?1:0;
           foreach my $d (sort keys %{ $hash->{SCENES}{$scene} }) {
             next if( !defined($hash->{SCENES}{$scene}{$d}));
             next if(!$defs{$d});
