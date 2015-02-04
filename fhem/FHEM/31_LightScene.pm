@@ -29,7 +29,7 @@ sub LightScene_Initialize($)
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
   $hash->{AttrFn}   = "LightScene_Attr";
-  $hash->{AttrList} = "followDevices:1 switchingOrder ". $readingFnAttributes;
+  $hash->{AttrList} = "followDevices:1,2 switchingOrder ". $readingFnAttributes;
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
   $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
@@ -311,8 +311,13 @@ LightScene_Notify($$)
           readingsSingleUpdate($hash, "state", $scene, 1 ) if( $matched );
           last if( $matched );
         }
-        DoTrigger( $name, "nomatch" ) if( !$matched );
-
+        if( !$matched ) {
+          if( $hash->{followDevices} == 2 ) {
+            readingsSingleUpdate($hash, "state", "unknown", 1 );
+          } else {
+            DoTrigger( $name, "nomatch" )
+          }
+        }
       }
     }
   }
@@ -943,11 +948,13 @@ LightScene_editTable($) {
       <li>lightSceneRestoreOnlyIfChanged<br>
         this attribute can be set on the lightscene and/or on the individual devices included in a scene.
         the device settings have precedence over the scene setting.<br>
-        1 -> for each device do nothing if current device state is the same as the saved state
+        1 -> for each device do nothing if current device state is the same as the saved state<br>
         0 -> always set the state even if the current state is the same as the saved state. this is the default</li>
       <li>followDevices<br>
-        1 -> the LightScene tries to follow the switching state of the devices and set its state to the name of the
-             scene that matches. if no match is found state will be unchanged.</li>
+        the LightScene tries to follow the switching state of the devices set its state to the name of the scene that matches.<br>
+        1 -> if no match is found state will be unchanged and a nomatch event will be triggered.<br>
+        2 -> if no match is found state will be set to unknown. depending on the scene and devices state can toggle multiple
+             times. use a watchdog if you want to handle this.</li>
       <li>switchingOrder<br>
         space separated list of &lt;scene&gt;:&lt;deviceList&gt; items that will give a per scene order
         in which the devices should be switched.<br>
