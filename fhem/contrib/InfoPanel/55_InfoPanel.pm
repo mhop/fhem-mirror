@@ -1072,7 +1072,7 @@ sub btIP_HTMLHead($$) {
   # css and js header output should be coded only in one place
   my $css= "";
   my $scripts= btIP_getScript();
-#  my $meta = "<meta charset=\"UTF-8\">\n";
+  my $meta = "<meta charset=\"UTF-8\">\n";
   my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$r$css$scripts</head>\n";
   return $code;
 }
