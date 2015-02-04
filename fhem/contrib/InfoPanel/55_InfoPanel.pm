@@ -36,6 +36,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 #sub InfoPanel_Initialize($);
 sub btIP_Define($$);
+sub btIP_Undef($$);
 sub btIP_Set;
 sub btIP_Notify;
 sub btIP_readLayout($);
@@ -56,9 +57,10 @@ sub btIP_itemSeconds;
 sub btIP_itemText;
 sub btIP_itemTextBox;
 sub btIP_itemTime;
-sub btIP_itemImg;
+sub btIP_itemTrash;
 sub btIP_color;
 sub btIP_xy;
+sub btIP_changeColor;
 
 sub btIP_ReturnSVG($);
 sub btIP_evalLayout($$@);
@@ -564,7 +566,12 @@ sub btIP_changeColor {
   binmode(GRAFIK);
   $readBytes = read(GRAFIK, $data, $length);
   close(GRAFIK);
-  $data =~ s/#$oldcolor/#$newcolor/g;
+  if($newcolor =~ /[[:xdigit:]]{6}/) {
+     $data =~ s/fill="#$oldcolor"/fill="#$newcolor"/g;
+     $data =~ s/fill:#$oldcolor/fill:$newcolor/g;
+  } else {
+     Log3(undef,4,"Infopanel: invalid rgb value for changeColor!");
+  }
   return $data;
 }
 
