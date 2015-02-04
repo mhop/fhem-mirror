@@ -324,6 +324,18 @@ sub btIP_itemImg {
   return $output;
 }
 
+# # embed link to plot
+# #
+#     my $url;
+#     $url  = "$FW_ME/SVG_showLog?dev=". $plotName[0].
+#           "&amp;logdev=".            InternalVal($plotName[0], "LOGDEVICE", "").
+#           "&amp;gplotfile=".         InternalVal($plotName[0], "GPLOTFILE", "").
+#           "&amp;logfile=".           InternalVal($plotName[0], "LOGFILE", "CURRENT");
+#      $url .= "&amp;pos=".            ($plotName[1]) ? $plotName[1] : 'day';
+#      $url .= "&amp;zoom=".           ($plotName[2]) ? $plotName[2] : undef;
+# 
+#     $output = "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$url\" />\n";
+
 sub _btIP_imgData {
   my ($arg,$scale) = @_;
   my $info     = image_info(\$arg);
@@ -372,10 +384,10 @@ sub btIP_itemPlot {
     }
   }
 
-  my ($haswidth,$hasheight)     = split(",", AttrVal($plotName[0],"plotsize","0,0"));
+#  my ($hasPlotsize)     = split(",", AttrVal($plotName[0],"plotsize",0));
   ($width,$height)              = split(",", AttrVal($plotName[0],"plotsize","800,160"));
   ($newWidth,$newHeight)        = _btIP_imgRescale($width,$height,$scale);
-  $attr{$plotName[0]}{plotsize} = "$newWidth,$newHeight";
+#  $attr{$plotName[0]}{plotsize} = "$newWidth,$newHeight";
 
   $FW_RET                 = undef;
   $FW_webArgs{dev}        = $plotName[0];
@@ -384,10 +396,11 @@ sub btIP_itemPlot {
   $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
   $FW_pos{zoom}           = ($plotName[1]) ? $plotName[1] : 'day';
   $FW_pos{off}            = ($plotName[2]) ? $plotName[2] : undef;
+  $FW_plotsize            = "$newWidth,$newHeight";
 
   ($mimetype, $svgdata)   = SVG_showLog("unused");
-  $attr{$plotName[0]}{plotsize} = undef;
-  $attr{$plotName[0]}{plotsize} = "$width,$height" if($haswidth || $hasheight);
+#  $attr{$plotName[0]}{plotsize} = undef;
+#  $attr{$plotName[0]}{plotsize} = "$width,$height" if $hasPlotsize;
 
   $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $width,$height"\/><\/svg>/;
   (undef,undef,undef,$svgdata) = _btIP_imgData($svgdata,1);
