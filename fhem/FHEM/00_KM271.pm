@@ -12,8 +12,6 @@ use strict;
 use warnings;
 use Time::HiRes qw( time );
 
-sub KM271_Read($);
-sub KM271_Ready($);
 sub KM271_crc($);
 sub KM271_setbits($$);
 sub KM271_SetReading($$$$);
@@ -303,7 +301,8 @@ KM271_Initialize($)
   $hash->{DefFn}   = "KM271_Define";
   $hash->{UndefFn} = "KM271_Undef";
   $hash->{SetFn}   = "KM271_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 all_km271_events loglevel:0,1,2,3,4,5,6 ww_timermode:automatik,tag";
+  $hash->{AttrFn}  = "KM271_Attr";
+  $hash->{AttrList}= "do_not_notify:1,0 all_km271_events loglevel:0,1,2,3,4,5,6 ww_timermode:automatik,tag readingsFilter";
   my @a = ();
   $hash->{SENDBUFFER} = \@a;
 
@@ -636,7 +635,7 @@ KM271_Read($)
   # Analyze the data
   my ($fn, $arg) = ($1, $2);
   my $msghash = $km271_rev{$fn};
-  my $all_events = AttrVal($name, "all_km271_events", "") ;
+  my $all_events = AttrVal($name, "all_km271_events", "");
 
   if($msghash) {
     foreach my $off (keys %{$msghash}) {
@@ -692,6 +691,24 @@ KM271_Ready($)
   my $po = $hash->{USBDev};
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   return ($InBytes>0);
+}
+
+#####################################
+sub
+KM271_Attr(@)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+  # $cmd can be "del" or "set"
+  # $name is device name
+  # attrName and attrVal are Attribute name and value
+  if ($cmd eq 'set' && $attrName eq 'readingsFilter') {
+    eval {qr/$attrVal/};
+    if ($@) {
+      Log 3, "$name: Invalid Regex for 'readingsFilter' <$attrVal>: $@";
+      return "Invalid Regex $attrVal";
+    }
+  }
+  return undef;
 }
 
 #####################################
@@ -811,7 +828,10 @@ KM271_SetReading($$$$)
 {
   my ($hash,$key,$val,$ntfy) = @_;
   my $name = $hash->{NAME};
-  Log GetLogLevel($name,4), "$name: $key $val" if($key ne "NoData");
+  my $filter = AttrVal($name, 'readingsFilter', '');
+  return if ($filter && $key !~ m/$filter/s);
+  
+  Log GetLogLevel($name,4), "$name: $key $val" if($key ne 'NoData');
   readingsSingleUpdate($hash, $key, $val, $ntfy);
 }
 
@@ -951,7 +971,7 @@ KM271_SetReading($$$$)
     <li>all_km271_events<br>
         If this attribute is set to 1, do not ignore following events:<br>
         HK1_Vorlaufisttemperatur, HK1_Mischerstellung, HK2_Vorlaufisttemperatur, HK2_Mischerstellung,
-		Kessel_Vorlaufisttemperatur, Kessel_Integral, Kessel_Integral1<br>
+        Kessel_Vorlaufisttemperatur, Kessel_Integral, Kessel_Integral1<br>
         These events account for ca. 92% of all events.<br>
         All UNKNOWN events are ignored too, most of them were only seen
         directly after setting the device into logmode.
@@ -960,6 +980,12 @@ KM271_SetReading($$$$)
     <li>ww_timermode [automatik|tag]<br>
         Defines the working mode for the ww_on-till command (default is tag).<br>
         ww_on-till will set the ww_betriebsart of the heater according to this attribute.
+        </li>
+    <a name="readingsFilter"></a>
+    <li>readingsFilter<br>
+        Regular expression for selection of desired readings:<br>
+        Only readings which will match the regular expression will be used. All other readings are
+        suppressed in the device and even in the logfile.
         </li>
   </ul>
   <br>
