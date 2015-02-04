@@ -132,7 +132,7 @@ sub GDS_Undef($$) {
 	my $name = $hash->{NAME};
 	RemoveInternalTimer($hash);
     my $url = '/gds';
-    $data{FWEXT}{$url} = undef if int(devspec2array('TYPE=GDS')) == 1;
+    delete $data{FWEXT}{$url} if int(devspec2array('TYPE=GDS')) == 1;
 	return undef;
 }
 
