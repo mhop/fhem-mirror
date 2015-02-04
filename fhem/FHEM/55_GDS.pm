@@ -68,8 +68,6 @@ sub GDS_Initialize($) {
 
 	$tempDir = "c:\\temp\\" if($^O eq "MSWin32");
 
-    GDS_addExtension("GDS_CGI","gds","GDS Files");
-
 	fillMappingTables($hash);
 	initDropdownLists($hash);
 
@@ -105,6 +103,8 @@ sub GDS_Define($$$) {
 
 	Log3($name, 4, "GDS $name: created");
 	Log3($name, 4, "GDS $name: tempDir=".$tempDir);
+
+    GDS_addExtension("GDS_CGI","gds","GDS Files");
 
 	fillMappingTables($hash);
 	initDropdownLists($hash);
@@ -398,6 +398,7 @@ sub GDS_addExtension($$$) {
     my ($func,$link,$friendlyname)= @_;
   
     my $url = "/" . $link;
+    Log3(undef,4,"Registering gds webservice in FWEXT";
     $data{FWEXT}{$url}{FUNC} = $func;
     $data{FWEXT}{$url}{LINK} = "+$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
