@@ -529,7 +529,7 @@ LightScene_RestoreDevice($$$)
     {
       my($state,undef,undef) = LightScene_SaveDevice($hash,$d);
 
-      return "" if( $state eq $cmd );
+      return ("",0) if( $state eq $cmd );
     }
 
   my $ret;
@@ -539,7 +539,7 @@ LightScene_RestoreDevice($$$)
     $ret = CommandSet(undef,"$d $cmd");
   }
 
-  return $ret;
+  return ($ret,1);
 }
 
 sub
@@ -594,7 +594,7 @@ LightScene_Set($@)
     @devices = @{$hash->{devices}};
   }
 
-  my $first = 1;
+  my $count = 0;
   foreach my $d (@devices) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
@@ -618,8 +618,6 @@ LightScene_Set($@)
       $ret .= $d .": ". $state ."\n" if( defined($FW_webArgs{room}) && $FW_webArgs{room} eq "all" ); #only if telnet
 
     } elsif ( $cmd eq "scene" ) {
-      readingsSingleUpdate($hash, "state", $scene, 1 ) if( $first && !$hash->{followDevices} );
-
       next if( !defined($hash->{SCENES}{$scene}{$d}));
 
       my $state = $hash->{SCENES}{$scene}{$d};
@@ -629,19 +627,26 @@ LightScene_Set($@)
         my $r = "";
         foreach my $entry (@{$state}) {
           $r .= "," if( $ret );
-          $r .= LightScene_RestoreDevice($hash,$d,$entry) // "";
+          my($rr,$switched) = LightScene_RestoreDevice($hash,$d,$entry);
+          $count += $switched;
+          $r .= $rr // "";
         }
         $ret .= " " if( $ret );
         $ret .= $r;
       } else {
         $ret .= " " if( $ret );
-        $ret .= LightScene_RestoreDevice($hash,$d,$state) // "";
+        my($rr,$switched) = LightScene_RestoreDevice($hash,$d,$state);
+        $count += $switched;
+        $ret .= $rr // "";
       }
     } else {
       $ret = "Unknown argument $cmd, choose one of save scene";
     }
 
-    $first = 0;
+  }
+
+  if( $cmd eq "scene" ) {
+    readingsSingleUpdate($hash, "state", $scene, 1 ) if( !$hash->{followDevices} || $count == 0 );
   }
 
   delete($hash->{INSET});
