@@ -44,7 +44,7 @@ sub SVG_doShowLog($$$$;$);
 sub SVG_getData($$$$$);
 sub SVG_sel($$$;$$);
 sub SVG_getControlPoints($);
-sub SVG_calcControlPoints($$$);
+sub SVG_calcControlPoints($$$$$$);
 
 my %SVG_devs;       # hash of from/to entries per device
 
@@ -1984,9 +1984,8 @@ SVG_getControlPoints($)
       }
 
       return(1) if (@xa < 2);
-      
-      SVG_calcControlPoints(\@xcp1, \@xcp2, \@xa);
-      SVG_calcControlPoints(\@ycp1, \@ycp2, \@ya);
+
+      SVG_calcControlPoints(\@xcp1, \@xcp2, \@ycp1, \@ycp2, \@xa, \@ya);
 
       $ret = $header;
       foreach my $i (1..int(@xa)-1) {
@@ -2004,46 +2003,70 @@ SVG_getControlPoints($)
 ######################
 # Calculate control points for interpolation of bezier curves for SVG "path"
 sub
-SVG_calcControlPoints($$$)
+SVG_calcControlPoints($$$$$$)
 {
-  my ($p1, $p2, $input) = @_;
+  my ($px1, $px2, $py1, $py2, $inputx, $inputy) = @_;
   
-  my (@a, @b, @c, @r);
-  my $n = @{$input}-1;
+  my $n = @{$inputx};
   
-  $a[0] = 0;
-  $b[0] = 2;
-  $c[0] = 1;
-  $r[0] = $input->[0] + $input->[1]*2;
-
-  for (my $i=1; $i<$n-1; $i++) {
-    $a[$i] = 1;
-    $b[$i] = 4;
-    $c[$i] = 1;
-    $r[$i] = $input->[$i]*4 + $input->[$i+1]*2;
-  }
-
-  $a[$n-1] = 2;
-  $b[$n-1] = 7;
-  $c[$n-1] = 0;
-  $r[$n-1] = $input->[$n-1]*8 + $input->[$n];
-
-  for (my $i=1; $i<$n; $i++) {
-    my $m = $a[$i]/$b[$i-1];
-    $b[$i] = $b[$i] - $m*$c[$i-1];
-    $r[$i] = $r[$i] - $m*$r[$i-1];
-  }
-  
-  $p1->[$n-1] = int($r[$n-1]/$b[$n-1]+0.5);
-  for (my $i=$n-2; $i>=0; --$i) {
-    $p1->[$i] = int(($r[$i] - $c[$i]*$p1->[$i+1]) / $b[$i]+0.5);
-  }
-  
+  # Loop over all Points in Input arrays
   for (my $i=0; $i<$n-1; $i++) {
-    $p2->[$i] = int($input->[$i+1]*2-$p1->[$i+1]+0.5);
-  }
-  $p2->[$n-1] = int(($input->[$n]+$p1->[$n-1])*0.5+0.5);
+    my (@lxp, @lyp);
 
+    # Loop over 4 Points around actual Point to calculate
+    my $iloc = 0;
+    for (my $ii=$i-1; $ii<=$i+2; $ii++) {
+      my $icorr = $ii;
+      $icorr = 0 if ($icorr < 0);
+      $icorr = $n-1 if ($icorr > $n-1);
+      $lxp[$iloc] = $inputx->[$icorr];
+      $lyp[$iloc] = $inputy->[$icorr];
+      $iloc++;
+    }
+
+    # Calulcation of first control Point using first 3 Points around actual Point
+    my $m1x = ($lxp[0]+$lxp[1])/2.0;
+    my $m1y = ($lyp[0]+$lyp[1])/2.0;
+    my $m2x = ($lxp[1]+$lxp[2])/2.0;
+    my $m2y = ($lyp[1]+$lyp[2])/2.0;
+    
+    my $l1 = sqrt(($lxp[0]-$lxp[1])*($lxp[0]-$lxp[1])+($lyp[0]-$lyp[1])*($lyp[0]-$lyp[1]));
+    my $l2 = sqrt(($lxp[1]-$lxp[2])*($lxp[1]-$lxp[2])+($lyp[1]-$lyp[2])*($lyp[1]-$lyp[2]));
+    
+    my $dxm = ($m1x - $m2x);
+    my $dym = ($m1y - $m2y);
+    
+    my $k = 0;
+    $k = $l2/($l1+$l2) if (($l1+$l2) != 0);
+    
+    my $tx = $lxp[1] - ($m2x + $dxm*$k);
+    my $ty = $lyp[1] - ($m2y + $dym*$k);
+    
+    $px1->[$i] = $m2x + $tx;
+    $py1->[$i] = $m2y + $ty;
+
+    # Calulcation of second control Point using last 3 Points around actual Point
+    $m1x = ($lxp[1]+$lxp[2])/2.0;
+    $m1y = ($lyp[1]+$lyp[2])/2.0;
+    $m2x = ($lxp[2]+$lxp[3])/2.0;
+    $m2y = ($lyp[2]+$lyp[3])/2.0;
+    
+    $l1 = sqrt(($lxp[1]-$lxp[2])*($lxp[1]-$lxp[2])+($lyp[1]-$lyp[2])*($lyp[1]-$lyp[2]));
+    $l2 = sqrt(($lxp[2]-$lxp[3])*($lxp[2]-$lxp[3])+($lyp[2]-$lyp[3])*($lyp[2]-$lyp[3]));
+    
+    $dxm = ($m1x - $m2x);
+    $dym = ($m1y - $m2y);
+    
+    $k=0;
+    $k = $l2/($l1+$l2) if (($l1+$l2) != 0);
+    
+    $tx = $lxp[2] - ($m2x + $dxm*$k);
+    $ty = $lyp[2] - ($m2y + $dym*$k);
+    
+    $px2->[$i] = $m1x + $tx;
+    $py2->[$i] = $m1y + $ty;
+  }
+  
   return (1);
 }
 
