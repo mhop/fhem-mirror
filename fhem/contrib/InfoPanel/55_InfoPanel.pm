@@ -1073,7 +1073,7 @@ sub btIP_HTMLHead($$) {
   my $css= "";
   my $scripts= btIP_getScript();
   my $meta = "<meta charset=\"UTF-8\">\n";
-  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$r$css$scripts</head>\n";
+  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta$r$css$scripts</head>\n";
   return $code;
 }
 
