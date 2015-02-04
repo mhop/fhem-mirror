@@ -568,7 +568,7 @@ sub btIP_changeColor {
   close(GRAFIK);
   if($newcolor =~ /[[:xdigit:]]{6}/) {
      $data =~ s/fill="#$oldcolor"/fill="#$newcolor"/g;
-     $data =~ s/fill:#$oldcolor/fill:$newcolor/g;
+     $data =~ s/fill:#$oldcolor/fill:#$newcolor/g;
   } else {
      Log3(undef,4,"Infopanel: invalid rgb value for changeColor!");
   }
