@@ -378,18 +378,18 @@ sub btIP_itemPlot {
   ($newWidth,$newHeight)        = _btIP_imgRescale($width,$height,$scale);
 
   if($inline == 1) {
+    # embed base64 data
 
     $FW_RET                 = undef;
     $FW_webArgs{dev}        = $plotName[0];
     $FW_webArgs{logdev}     = InternalVal($plotName[0], "LOGDEVICE", "");
     $FW_webArgs{gplotfile}  = InternalVal($plotName[0], "GPLOTFILE", "");
     $FW_webArgs{logfile}    = InternalVal($plotName[0], "LOGFILE", "CURRENT"); 
-#    $FW_pos{zoom}           = ($plotName[1]) ? $plotName[1] : 'day';
-#    $FW_pos{off}            = ($plotName[2]) ? $plotName[2] : undef;
+    $FW_pos{zoom}           = $plotName[1] if(length($plotName[1]));
+    $FW_pos{off}            = $plotName[2] if(length($plotName[2]));
     $FW_plotsize            = "$newWidth,$newHeight";
 
     ($mimetype, $svgdata)   = SVG_showLog("unused");
-
     $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $newWidth,$newHeight"\/><\/svg>/;
     (undef,undef,undef,$svgdata) = _btIP_imgData($svgdata,1);
 
@@ -397,17 +397,20 @@ sub btIP_itemPlot {
     $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${newWidth}px\" height=\"${newHeight}px\" \n";
     $output .= "xlink:href=\"$svgdata\" />\n";
   } else {
-# embed link to plot
-#
+    # embed link to plot
+
     my $url;
     $url  = "$FW_ME/SVG_showLog?dev=". $plotName[0].
             "&amp;logdev=".            InternalVal($plotName[0], "LOGDEVICE", "").
             "&amp;gplotfile=".         InternalVal($plotName[0], "GPLOTFILE", "").
             "&amp;logfile=".           InternalVal($plotName[0], "LOGFILE", "CURRENT").
             "&amp;plotsize=".          "$newWidth,$newHeight";
-#     $url .= "&amp;pos=".            ($plotName[1]) ? $plotName[1] : 'day';
-#     $url .= "&amp;zoom=".           ($plotName[2]) ? $plotName[2] : undef;
-    $output = "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${newWidth}px\" height=\"${newHeight}px\" \nxlink:href=\"$url\" />\n";
+    $url .= "&amp;pos=";
+    $url .= "zoom=".                   "$plotName[1];" if(length($plotName[1]));
+    $url .= "off=".                    $plotName[2] if(length($plotName[2]));
+
+    $output  = "<!-- $url -->\n";
+    $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${newWidth}px\" height=\"${newHeight}px\" \nxlink:href=\"$url\" />\n";
   }
 
   return $output; 
@@ -567,6 +570,7 @@ sub btIP_changeColor {
   $readBytes = read(GRAFIK, $data, $length);
   close(GRAFIK);
   if($newcolor =~ /[[:xdigit:]]{6}/) {
+     Log3(undef,4,"Infopanel: changing color from $oldcolor to $newcolor");
      $data =~ s/fill="#$oldcolor"/fill="#$newcolor"/g;
      $data =~ s/fill:#$oldcolor/fill:#$newcolor/g;
   } else {
