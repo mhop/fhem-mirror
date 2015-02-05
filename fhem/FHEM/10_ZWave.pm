@@ -961,7 +961,7 @@ ZWave_Parse($$@)
     if ($id eq "00") {
       ZWave_HandleSendStack($iodev);
       Log3 $ioName, 4, "$ioName transmit $msg for $callbackid";
-      readingsSingleUpdate($hash, "transmit", $msg, 0);
+      readingsSingleUpdate($hash, "transmit", $msg, 0) if($hash);
       return "";
 
     } else {
