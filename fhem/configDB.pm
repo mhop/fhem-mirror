@@ -982,17 +982,16 @@ sub _cfgDB_Fileexport($;$) {
 	$sth->execute();
 	my $blobContent = $sth->fetchrow_array();
 	my $counter = length($blobContent);
+	$sth->finish();
+	$fhem_dbh->disconnect();
 	return "No data found for file $filename" unless $counter;
-
+	return ($blobContent,$counter) if $raw;
+	
 	open( FILE,">$filename" );
 		binmode(FILE);
 		print FILE $blobContent;
 	close( FILE );
-
-	$sth->finish();
-	$fhem_dbh->disconnect();
-	return "$counter bytes written from database into file $filename" unless $raw;
-	return ($blobContent,$counter);
+	return "$counter bytes written from database into file $filename";
 }
 
 # import file into database
