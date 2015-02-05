@@ -587,7 +587,7 @@ sub buildCAPList(@){
 		$alertsXml		= $xml->XMLin($tempDir.$name.'_alerts', KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
 		};
     if ($@) {
-      Log3(1,$name,'GDS: error analyzing alerts XML:'.$@);
+      Log3($name,1,'GDS: error analyzing alerts XML:'.$@);
       return (undef,undef);
     }
 	my $info		= 0;
