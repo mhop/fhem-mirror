@@ -105,7 +105,7 @@ deb:
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print | grep -v Makefile |\
 		xargs perl -pi -e 's/=VERS=/$(VERSN)/g;s/=DATE=/$(DATEN)/g'
-	perl -pi -e 's/my \$$release\s+=.*/my \$$release = "$(VERS)";/' .f/FHEM/98_fheminfo.pm
+	perl -pi -e 's/my \$$release\s+=.*/my \$$release = "$(VERS)";/' .f/$(MODDIR)/FHEM/98_fheminfo.pm
 	wget -qO .f/$(MODDIR)/FHEM/controls_fhem.txt http://fhem.de/fhemupdate/controls_fhem.txt
 	find .f -type f | xargs chmod 644
 	find .f -type d | xargs chmod 755
