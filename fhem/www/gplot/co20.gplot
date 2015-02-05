@@ -1,0 +1,30 @@
+############################
+# Display the current voc (volatile organic compounds) value in three color gradients.
+# Corresponding FileLog definition: 
+# define <fileLogDefinitionName> FileLog ./log/co20-%Y-%m.log <co20 sensor name>
+# define <webLinkDefinitionName> SVG <fileLogDefinitionName>:co20:CURRENT
+# attr <webLinkDefinitionName> label "Air quality - Min $data{min1}, Max $data{max1}, Last $data{currval1}"
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<L1>'
+set ytics "good" 750, "ok" 1250, "bad" 1750
+set y2tics "" 1000,"" 1500
+set grid y2tics
+set ylabel ""
+set y2label "Air quality (ppm)"
+set yrange [450:2000]
+set y2range [450:2000]
+
+#FileLog 4:voc::
+#FileLog 4:voc::$fld[3]>1000?1000:$fld[3]
+#FileLog 4:voc::$fld[3]>1500?1500:$fld[3]
+#FileLog 4:voc::$fld[3]>2000?2000:$fld[3]
+
+plot "<IN>" using 1:2 axes x1y2 title 'Air quality (ppm)' ls l5 lw 0.2 with lines,\
+     "<IN>" using 1:2 axes x1y2 title ' ' ls l1fill lw 0.2 with lines,\
+     "<IN>" using 1:2 axes x1y2 title ' ' ls l4fill lw 0.2 with lines,\
+     "<IN>" using 1:2 axes x1y2 title ' ' ls l0fill lw 0.2 with lines
