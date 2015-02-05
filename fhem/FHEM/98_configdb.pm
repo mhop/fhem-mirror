@@ -35,7 +35,7 @@ sub CommandConfigdb($$) {
 	given ($cmd) {
 
 		when ('attr') {
-			Log3('configdb', 4, 'configdb: attr $param1 $param2 requested.');
+			Log3('configdb', 4, "configdb: attr $param1 $param2 requested.");
 			if ($param1 eq "" && $param2 eq "") {
 			# list attributes
 				foreach my $c (sort keys %{$configDB{attr}}) {
