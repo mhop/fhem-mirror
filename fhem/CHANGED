@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: YAMAHA_AVR: new commands play, pause, stop, skip, shuffle, repeat
   - feature: 71_YAMAHA_NP: New command set and readings for menu navigation
   - feature: 71_YAMAHA_NP: New command 'dimmer [1..3]'
   - bugfix: 31_MilightDevice: if we're already off don't turn on to set dim level!
