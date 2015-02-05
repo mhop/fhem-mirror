@@ -575,11 +575,15 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
     $(inp).attr('name', elName);
   if(currVal != undefined)
     $(inp).val(currVal);
-  if(cmd)
-    $(inp).blur(function() { cmd($(inp).val()) });
+
+  function addBlur() { if(cmd) $(inp).blur(function() { cmd($(inp).val()) }); };
+
   newEl.setValueFn = function(arg){ $(inp).val(arg) };
+  addBlur();
 
   var myFunc = function(){
+    
+    $(inp).unbind("blur");
     $('body').append(
       '<div id="editdlg" style="display:none">'+
         '<textarea id="td_longText" rows="25" cols="60" style="width:99%"/>'+
@@ -587,18 +591,25 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
 
     $("#td_longText").val($(inp).val());
 
-    if( typeof AddCodeMirror == 'function' )
-      AddCodeMirror($("#td_longText").get(0));
+    var cm;
+    if( typeof AddCodeMirror == 'function' ) 
+      AddCodeMirror($("#td_longText").get(0), function(pcm) {cm = pcm;});
 
     $('#editdlg').dialog(
       { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
         maxHeight:$(window).height()*3/4,
         buttons:[
-        { text:"Cancel", click:function(){ $('#editdlg').remove(); }},
+        { text:"Cancel", click:function(){
+          $('#editdlg').remove();
+          addBlur();
+        }},
         { text:"OK", click:function(){
+          if(cm)
+            $("#td_longText").val(cm.getValue());
           var res=$("#td_longText").val();
           $('#editdlg').remove();
           $(inp).val(res);
+          addBlur();
         }}]});
   };
 

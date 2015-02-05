@@ -1,4 +1,4 @@
-var cm_loaded = 0, cm_editor;
+var cm_loaded = 0;
 
 $(document).ready(function(){
   var els = document.getElementsByTagName("textarea");
@@ -11,7 +11,7 @@ $(document).ready(function(){
       if(oc) {
         $(this).attr("onclick", oc+
         's=document.getElementById("edit").getElementsByTagName("textarea");'+
-        'if(!s[0].editor) s[0].editor=AddCodeMirror(s[0]);');
+        'if(!s[0].editor) { s[0].editor=true; AddCodeMirror(s[0]);}');
       }
     });
   } else {
@@ -20,19 +20,23 @@ $(document).ready(function(){
 });
 
 function
-AddCodeMirror(e)
+AddCodeMirror(e, cb)
 {
-  cm_editor = e;
+  if(cm_loaded == 4)
+    return cm_wait(e, cb);
   loadLink("codemirror/codemirror.css");
   loadLink("codemirror/show-hint.css");
-  loadScript("codemirror/codemirror.js",   function(){cm_loaded++;} );
-  loadScript("codemirror/closebrackets.js",function(){cm_loaded++;} );
-  loadScript("codemirror/matchbrackets.js",function(){cm_loaded++;} );
-  loadScript("codemirror/show-hint.js",    function(){cm_loaded++;cm_wait()});
+  loadScript("codemirror/codemirror.js",   function(){ cm_loaded++;} );
+  loadScript("codemirror/closebrackets.js",function(){ cm_loaded++;} );
+  loadScript("codemirror/matchbrackets.js",function(){ cm_loaded++;} );
+  loadScript("codemirror/show-hint.js",    function(){
+    cm_loaded++;
+    cm_wait(e, cb);
+  });
 }
 
 function
-cm_wait()
+cm_wait(cm_editor, callback)
 {
   if(cm_loaded != 4) {
     setTimeout(cm_wait, 10);
@@ -67,6 +71,8 @@ cm_wait()
 
   loadScript("codemirror/"+type+".js", function(){
     log("Calling CodeMirror");
-    CodeMirror.fromTextArea(cm_editor, attr);
+    var cm = CodeMirror.fromTextArea(cm_editor, attr);
+    if(callback)
+      callback(cm);
   });
 }
