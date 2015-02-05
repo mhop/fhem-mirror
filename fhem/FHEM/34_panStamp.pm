@@ -43,7 +43,7 @@ panStamp_Initialize($)
   #$hash->{GetFn}   = "panStamp_Get";
   $hash->{SetFn}   = "panStamp_Set";
   #$hash->{AttrFn}  = "panStamp_Attr";
-  #$hash->{AttrList}= "";
+  $hash->{AttrList}= "dummy:1,0";
 
   $hash->{ShutdownFn} = "panStamp_Shutdown";
 }
@@ -60,7 +60,7 @@ panStamp_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   if(@a < 3 || @a > 6) {
-    my $msg = "wrong syntax: define <name> panStamp {devicename[\@baudrate] ".
+    my $msg = "wrong syntax: define <name> panStamp {none | devicename[\@baudrate] ".
                         "| devicename\@directio} [<address> [<channel> [<syncword>]]]";
     Log3 undef, 2, $msg;
     return $msg;
@@ -80,21 +80,26 @@ panStamp_Define($$)
 
   DevIo_CloseDev($hash);
 
-  my $name = $a[0];
+  $hash->{Clients} = $clientsPanStamp;
+  $hash->{MatchList} = \%matchListSWAP;
 
+  my $name = $a[0];
   my $dev = $a[2];
+
+  if($dev eq "none") {
+    Log3 $name, 1, "$name device is none, commands will be echoed only";
+    $attr{$name}{dummy} = 1;
+    return undef;
+  }
   $dev .= "\@38400" if( $dev !~ m/\@/ );
 
   $hash->{address} = uc($address);
   $hash->{channel} = uc($channel);
   $hash->{syncword} = uc($syncword);
 
-  $hash->{Clients} = $clientsPanStamp;
-  $hash->{MatchList} = \%matchListSWAP;
+  $hash->{nonce} = 0;
 
   $hash->{DeviceName} = $dev;
-
-  $hash->{nonce} = 0;
 
   my $ret = DevIo_OpenDev($hash, 0, "panStamp_DoInit");
   return $ret;
@@ -167,6 +172,9 @@ sub
 panStamp_Get($@)
 {
   my ($hash, @a) = @_;
+  my $name = $hash->{NAME};
+
+  return "No $a[1] for dummies" if(IsDummy($name));
 
   #$hash->{READINGS}{$a[1]}{VAL} = $msg;
   $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
