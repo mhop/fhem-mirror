@@ -173,8 +173,21 @@ YAMAHA_AVR_Set($@)
     return "No Argument given" if(!defined($a[1]));     
     
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg volumeStraight:slider,-80,1,16 volume:slider,0,1,100 volumeUp volumeDown ".(exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"")."mute:on,off,toggle remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".(exists($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"").(exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone" ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".(exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").(exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")."enhancer:on,off " : "")."sleep:off,30min,60min,90min,120min,last statusRequest:noArg";
-    
+    my $usage = "Unknown argument $what, choose one of ". "on:noArg ".
+                                                          "off:noArg ".
+                                                          "volumeStraight:slider,-80,1,16 ".
+                                                          "volume:slider,0,1,100 ".
+                                                          "volumeUp ".
+                                                          "volumeDown ".
+                                                          (exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"").
+                                                          "mute:on,off,toggle ".
+                                                          "remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".
+                                                          (exists($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"").
+                                                          (exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone" ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".(exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").(exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")."enhancer:on,off " : "").
+                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "play:noArg pause:noArg stop:noArg skip:reverse,forward ".(exists($hash->{helper}{PLAY_CONTROL}) ? "shuffle:on,off repeat:off,one,all " : "") : "").
+                                                          "sleep:off,30min,60min,90min,120min,last ".
+                                                          "statusRequest:noArg";
+
     Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a);
     
     if($what eq "on")
@@ -565,6 +578,67 @@ YAMAHA_AVR_Set($@)
             return $usage;
         }
     }
+    elsif($what eq "play" and exists($hash->{helper}{CURRENT_INPUT_TAG}))
+    {
+         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Play</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+    }
+    elsif($what eq "stop" and exists($hash->{helper}{CURRENT_INPUT_TAG}))
+    {
+         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Stop</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+    }
+    elsif($what eq "pause" and exists($hash->{helper}{CURRENT_INPUT_TAG}))
+    {
+         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Pause</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+    }
+    elsif($what eq "skip")
+    {
+        if($a[2] eq "forward")
+        {
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Skip Fwd</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+        }
+        elsif($a[2] eq "reverse")
+        {
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Skip Rev</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+        }
+        else
+        {
+            return $usage;
+        }
+    }
+    elsif($what eq "shuffle")
+    {
+        if($a[2] eq "on")
+        {
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Shuffle>On</Shuffle></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+        }
+        elsif($a[2] eq "off")
+        {
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Shuffle>Off</Shuffle></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+        }
+        else
+        {
+            return $usage;
+        }
+    }
+    elsif($what eq "repeat")
+    {
+        if($a[2] eq "one")
+        {
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Repeat>One</Repeat></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+        }
+        elsif($a[2] eq "off")
+        {
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Repeat>Off</Repeat></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+        }
+        elsif($a[2] eq "all")
+        {
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Repeat>All</Repeat></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+        }
+        else
+        {
+            return $usage;
+        }
+    }
     elsif($what eq "statusRequest")
     {
         YAMAHA_AVR_GetStatus($hash, 1);
@@ -782,6 +856,11 @@ YAMAHA_AVR_ParseResponse ($$$)
     if(exists($param->{code}))
     {
         Log3 $name, 5, "YAMAHA_AVR ($name) - received HTTP code ".$param->{code}." for command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
+        
+        if($cmd eq "statusRequest" and $arg eq "playShuffle" and $param->{code} ne "200")
+        {
+            delete($hash->{helper}{PLAY_CONTROL}) if(exists($hash->{helper}{PLAY_CONTROL}));
+        }
     }
     
     if($err ne "")
@@ -944,13 +1023,17 @@ YAMAHA_AVR_ParseResponse ($$$)
                 # current input same as the corresponding set command name
                 if($data =~ /<Input_Sel>(.+?)<\/Input_Sel>/)
                 {
+                    $hash->{helper}{CURRENT_INPUT_TAG} = $1;
+                    
                     readingsBulkUpdate($hash, "input", YAMAHA_AVR_Param2Fhem(lc($1), 0));
                     
                     if($data =~ /<Src_Name>(.+?)<\/Src_Name>/)
                     {
-                        Log3 $name, 4, "YAMAHA_AVR ($name) - check for extended informations";
+                        Log3 $name, 4, "YAMAHA_AVR ($name) - check for extended input informations on <$1>";
                     
                         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo");
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat");
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle");
                     }
                     else
                     {
@@ -1043,7 +1126,7 @@ YAMAHA_AVR_ParseResponse ($$$)
                 
                 if($data =~ /<Meta_Info>.*?<Channel>(.+?)<\/Channel>.*?<\/Meta_Info>/)
                 {
-                    readingsBulkUpdate($hash, "currentChannel", $1);
+                    readingsBulkUpdate($hash, "currentChannel", YAMAHA_AVR_html2txt($1));
                 }
                 else
                 {
@@ -1088,6 +1171,22 @@ YAMAHA_AVR_ParseResponse ($$$)
                 if($data =~ /<Playback_Info>(.+?)<\/Playback_Info>/)
                 {
                     readingsBulkUpdate($hash, "playStatus", lc($1));
+                }
+            }
+            elsif($arg eq "playShuffle")
+            {
+                if($data =~ /<Shuffle>(.+?)<\/Shuffle>/)
+                {
+                    $hash->{helper}{PLAY_CONTROL} = 1;
+                    readingsBulkUpdate($hash, "shuffle", lc($1));
+                }
+            }
+            elsif($arg eq "playRepeat")
+            {
+                if($data =~ /<Repeat>(.+?)<\/Repeat>/)
+                {
+                    $hash->{helper}{PLAY_CONTROL} = 1;
+                    readingsBulkUpdate($hash, "repeat", lc($1));
                 }
             }
         }
@@ -1476,6 +1575,12 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>straight</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses the internal codec converter and plays the original sound codec</li>
 <li><b>direct</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses all internal sound enhancement features and plays the sound straight directly</li> 
 <li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; activates the internal sleep timer</li>
+<li><b>shuffle</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; activates the shuffle mode on the current input</li>
+<li><b>repeat</b> one,all,off &nbsp;&nbsp;-&nbsp;&nbsp; activates the repeat mode on the current input for one or all titles</li>
+<li><b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp; pause playback on current input</li>
+<li><b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp; start playback on current input</li>
+<li><b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp; stop playback on current input</li>
+<li><b>skip</b> reverse,forward &nbsp;&nbsp;-&nbsp;&nbsp; skip track on current input</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands as listed below</li>
 
@@ -1517,20 +1622,22 @@ sub YAMAHA_AVR_html2txt($)
     # the initial definition.<br>
     define AV_receiver YAMAHA_AVR 192.168.0.3
     </code></ul><br><br>
-    And in your 99_MyUtils.pm the following function:<br><br>
+    And in your myUtils.pm (based on myUtilsTemplate.pm) the following function:<br><br>
     <ul><code>
-    sub startNetRadio()<br>
-    {<br>
-      &nbsp;&nbsp;fhem "set AV_Receiver on";<br>
-      &nbsp;&nbsp;sleep 5;<br>
-      &nbsp;&nbsp;fhem "set AV_Receiver input netradio";<br>
-      &nbsp;&nbsp;sleep 4;<br>
-      &nbsp;&nbsp;fhem "set AV_Receiver remoteControl enter";<br>
-      &nbsp;&nbsp;sleep 2;<br>
-      &nbsp;&nbsp;fhem "set AV_Receiver remoteControl enter";<br>
-    }
+        sub startNetRadio()<br>
+        {<br>
+        &nbsp;&nbsp;fhem("set AV_Receiver on;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 5;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver input netradio;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 4;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 2;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 2;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter");<br>
+        }<br>
     </code></ul><br><br>
-    The remote control commands must be separated with a sleep, because the receiver is loading meanwhile and don't accept commands.<br><br>
+    The remote control commands must be separated with a sleep, because the receiver is loading meanwhile and don't accept commands. These commands will be executed in background and does not harm the FHEM main process.<br><br>
     
     Now you can use this function by typing the following line in your FHEM command line or in your notify-definitions:<br><br>
     <ul><code>
@@ -1598,6 +1705,8 @@ sub YAMAHA_AVR_html2txt($)
   <li><b>currentArtist</b> - Artist name of the current song</li>
   <li><b>currentTitle</b> - Title of the current song</li>
   <li><b>playStatus</b> - indicates if the input plays music or not</li>
+  <li><b>shuffle</b> - indicates the shuffle status for the current input</li>
+  <li><b>repeat</b> - indicates the repeat status for the current input</li>
   </ul>
 <br>
   <b>Implementator's note</b><br>
@@ -1703,6 +1812,12 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
 <li><b>straight</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht die interne Codec-Umwandlung und gibt den Original-Codec wieder.</li>
 <li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den internen Sleep-Timer zum automatischen Abschalten</li>
+<li><b>shuffle</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert die Zufallswiedergabe des aktuellen Eingangs (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<li><b>repeat</b> one,all,off &nbsp;&nbsp;-&nbsp;&nbsp; Wiederholt den aktuellen (one) oder alle (all) Titel des aktuellen Eingangs (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<li><b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp; Wiedergabe pausieren (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<li><b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp; Wiedergabe starten (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<li><b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp; Wiedergabe stoppen (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
+<li><b>skip</b> reverse,forward &nbsp;&nbsp;-&nbsp;&nbsp; Aktuellen Titel &uuml;berspringen (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
 <li><b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; Fragt den aktuell Status des Receivers ab</li>
 <li><b>remoteControl</b> up,down,... &nbsp;&nbsp;-&nbsp;&nbsp; Sendet Fernbedienungsbefehle wie im n&auml;chsten Abschnitt beschrieben</li>
 </ul>
@@ -1743,20 +1858,22 @@ sub YAMAHA_AVR_html2txt($)
     # Die Ger&auml;tedefinition<br><br>
     define AV_receiver YAMAHA_AVR 192.168.0.3
     </code></ul><br><br>
-    Und in der 99_MyUtils.pm die folgende Funktion:<br><br>
+    Und in der myUtils.pm (basierend auf der myUtilsTemplate.pm) die folgende Funktion:<br><br>
     <ul><code>
-    sub startNetRadio<br>
-    {<br>
-      &nbsp;&nbsp;fhem "set AV_Receiver on";<br>
-      &nbsp;&nbsp;sleep 5;<br>
-      &nbsp;&nbsp;fhem "set AV_Receiver input netradio";<br>
-      &nbsp;&nbsp;sleep 4;<br>
-      &nbsp;&nbsp;fhem "set AV_Receiver remoteControl enter";<br>
-      &nbsp;&nbsp;sleep 2;<br>
-      &nbsp;&nbsp;fhem "set AV_Receiver remoteControl enter";<br>
-    }
+        sub startNetRadio()<br>
+        {<br>
+        &nbsp;&nbsp;fhem("set AV_Receiver on;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 5;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver input netradio;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 4;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 2;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 2;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter");<br>
+        }<br>
     </code></ul><br><br>
-    Die Kommandos der Fernbedienung m&uuml;ssen mit einem sleep pausiert werden, da der Receiver in der Zwischenzeit arbeitet und keine Befehle annimmt..<br><br>
+    Die Kommandos der Fernbedienung m&uuml;ssen mit einem sleep pausiert werden, da der Receiver in der Zwischenzeit arbeitet und keine Befehle annimmt. Diese Befehle werden alle im Hintergrund ausgef&uuml;hrt, so dass f&uuml;r den FHEM Hauptprozess keine Verz&ouml;gerung entsteht.<br><br>
     
     Nun kann man diese Funktion in der FHEM Kommandozeile oder in notify-Definitionen wie folgt verwenden.:<br><br>
     <ul><code>
@@ -1821,6 +1938,8 @@ sub YAMAHA_AVR_html2txt($)
   <li><b>currentArtist</b> - Interpret des aktuell gespielten Titel</li>
   <li><b>currentTitle</b> - Name des aktuell gespielten Titel</li>
   <li><b>playStatus</b> - Wiedergabestatus des Eingangs</li>
+  <li><b>shuffle</b> - Status der Zufallswiedergabe des aktuellen Eingangs</li>
+  <li><b>repeat</b> - Status der Titelwiederholung des aktuellen Eingangs</li>
   </ul>
 <br>
   <b>Hinweise des Autors</b>
