@@ -1,4 +1,4 @@
-# $Id: 55_GDS.pm 7758 2015-01-28 13:36:51Z betateilchen $
+# $Id$
 ####################################################################################################
 #
 #	55_GDS.pm
@@ -398,7 +398,7 @@ sub GDS_addExtension($$$) {
     my ($func,$link,$friendlyname)= @_;
   
     my $url = "/" . $link;
-    Log3(undef,4,"Registering gds webservice in FWEXT";
+    Log3(undef,4,"Register gds webservice in FWEXT");
     $data{FWEXT}{$url}{FUNC} = $func;
     $data{FWEXT}{$url}{LINK} = "+$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
