@@ -84,7 +84,7 @@ sub InfoPanel_Initialize($) {
     $hash->{DefFn}    = "btIP_Define";
 	$hash->{UndefFn}  = "btIP_Undef";
     #$hash->{AttrFn}   = "btIP_Attr";
-    $hash->{AttrList} = "autoreread:1,0 bgcenter:1,0 bgcolor bgdir refresh size title tmin";
+    $hash->{AttrList} = "autoreread:1,0 bgcenter:1,0 bgcolor bgdir bgopacity refresh size title tmin";
     $hash->{SetFn}    = "btIP_Set";
     $hash->{NotifyFn} = "btIP_Notify";
     return undef;
@@ -446,10 +446,11 @@ sub btIP_itemText {
 }
 
 sub btIP_itemTextBox {
-  my ($id,$x,$y,$boxwidth,$boxheight,$text,%params)= @_;
+  my ($id,$x,$y,$boxwidth,$boxheight,$text,$link,%params)= @_;
   return unless(defined($text));
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $color = substr($params{rgb},0,6);
+  $link =~ s/"//g;
   my ($d,$output);
 
   if(defined($params{boxcolor})) {
@@ -465,13 +466,16 @@ sub btIP_itemTextBox {
      $output = "";
   }
 
-  $d = "<div id=\"text_$id\" style=\"position:absolute; top:".$y."px; left:".$x."px; ".
-       "width:".$boxwidth."px; height:".$boxheight."px; text-overflow:ellipsis; z-index:2\" >\n".
-       "<p style=\"font-family:$params{font}; font-size:$params{pt}; color:#$color; ".
-       "width:".$boxwidth."px; height:".$boxheight."px; ".
-       "margin-top:0px; text-align:$params{tbalign}; text-overflow:ellipsis; ".
-       "\">\n$text\n</p>\n".
-       "</div>\n";
+  $d  = "<div id=\"text_$id\" style=\"position:absolute; top:".$y."px; left:".$x."px; ".
+        "width:".$boxwidth."px; height:".$boxheight."px; text-overflow:ellipsis; z-index:2\" >\n".
+        "<style type=\"text/css\">a {text-decoration: none;}</style>\n";
+  $d .= "<a href=\"$link\" target=\"_blank\">\n" if($link && length($link));
+  $d .= "<p style=\"font-family:$params{font}; font-size:$params{pt}; color:#$color; ".
+        "width:".$boxwidth."px; height:".$boxheight."px; ".
+        "margin-top:0px; text-align:$params{tbalign}; text-overflow:ellipsis; ".
+        "\">\n$text\n</p>\n";
+  $d .= "</a>" if($link && length($link));
+  $d .= "</div>\n";
 
   $defs{$params{name}}{fhem}{div} .= $d;
 
@@ -605,22 +609,23 @@ sub btIP_returnSVG($) {
   }
 
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
-  my $bgcolor = AttrVal($name,'bgcolor','000000'); 
+  my $bgcolor = AttrVal($name,'bgcolor','000000');
   my $output = "";
   our $svg = "";
 
   eval {
 
-    $svg = "\n<svg \n".
-           "xmlns=\"http://www.w3.org/2000/svg\"\nxmlns:xlink=\"http://www.w3.org/1999/xlink\"\n".
-           "width=\"".$width."px\" height=\"".$height."px\" \n".
-           "viewPort=\"0 0 $width $height\"\n".
-           "style=\"stroke-width: 0px; background-color:$bgcolor; ";
+    $svg  = "\n<svg \n".
+            "xmlns=\"http://www.w3.org/2000/svg\"\nxmlns:xlink=\"http://www.w3.org/1999/xlink\"\n".
+            "width=\"".$width."px\" height=\"".$height."px\" \n".
+            "viewPort=\"0 0 $width $height\"\n".
+            "style=\"stroke-width: 0px; ";
+    $svg .= "background-color:$bgcolor; " unless $bgcolor eq 'none';
 
     # set the background
     # check if background directory is set
     my $reason= "?"; # remember reason for undefined image
-    my $bgdir= AttrVal($name,"bgdir","undef");
+    my $bgdir= AttrVal($name,"bgdir",undef);
 	if(defined($bgdir)){
 		my $bgnr; # item number
 		if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
@@ -656,6 +661,8 @@ sub btIP_returnSVG($) {
                    $bgx        = ($width - $bgwidth/$u)/2   if AttrVal($name,'bgcenter',1);
                    $bgy        = ($height - $bgheight/$u)/2 if AttrVal($name,'bgcenter',1);
                    $output     = btIP_itemImg('-',$bgx,$bgy,$scale,'file',$bgfile,undef);
+                my $opacity    = AttrVal($name,'bgopacity',1);
+                   $output    =~ s/<image\ /<image\ opacity="$opacity" /;
  			}
  		} # end opendir()
 	} # end defined()
@@ -764,7 +771,7 @@ sub btIP_evalLayout($$@) {
 	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$link,$text)= split("[ \t]+", $def, 9);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
-	      my $arg = AnalyzePerlCommand(undef,$arg);
+#	      my $arg = AnalyzePerlCommand(undef,$arg);
           $params{xx} = $x;
           $params{yy} = $y;
 	      $svg .= btIP_itemButton($id,$x1,$y1,$x2,$y2,$r1,$r2,$link,$text,%params);
@@ -903,11 +910,11 @@ sub btIP_evalLayout($$@) {
         }
         
         when("textbox") {
-          ($id,$x,$y,$boxwidth,$boxheight,$text)= split("[ \t]+", $def, 6);
+          ($id,$x,$y,$boxwidth,$boxheight,$text,$link)= split("[ \t]+", $def, 7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      my $txt= AnalyzePerlCommand(undef, $text);
 	      $txt =~ s/\n/<br\/>/g;
-	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$boxheight,$txt,%params);
+	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$boxheight,$txt,$link,%params);
           $params{xx} = $x;
           $params{yy} = $y + $boxheight;
         }
@@ -1039,28 +1046,6 @@ sub btIP_splitRequest($) {
     return ($name,$ext);
   }
 }
-
-####################
-#
-# HTML Stuff
-#
-
-sub btIP_returnPNG($) {
-  my ($name) = @_;
-  my ($svgdata, $rsvg, $pngImg);
-
-  $svgdata = btIP_returnSVG($name);
-
-  eval {
-    require Image::LibRSVG;
-    $rsvg = new Image::LibRSVG();
-    $rsvg->loadImageFromString($svgdata);
-    $pngImg = $rsvg->getImageBitmap();
-  };
-  Log3($FW_wname,1,"InfoPanel: Cannot create png image") if($@ or !defined($pngImg) or ($pngImg eq ""));
-  return $pngImg if $pngImg;
-  return undef;
-}  
 
 ####################
 #
@@ -1219,8 +1204,9 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 		<li><b>title</b> - webpage title to be shown in Browser</li>
 		<br/>
 		<li><b>bgcenter</b> - background images will not be centered if attribute set to 0. Default: show centered</li>
-		<li><b>bgcolor</b> - defines the background color, use html-hexcodes to specify color, eg 00FF00 for green background</li>
+		<li><b>bgcolor</b> - defines the background color, use html-hexcodes to specify color, eg 00FF00 for green background. Default color is black. You can use bgcolor=none to disable use of any background color</li>
 		<li><b>bgdir</b> - directory containing background images</li>
+		<li><b>bgopacity</b> - set opacity for background image, values 0..1</li>
 		<li><b>tmin</b> - background picture will be shown at least <code>tmin</code> seconds, 
 		    no matter how frequently the RSS feed consumer accesses the page.</li>
 	</ul>
@@ -1236,7 +1222,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
     <a name="InfoPanellayout"></a>
 	<b>Layout definition</b><br/><br/>
 	<ul>
-       <li><code>area &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;link&gt;</code><br/>
+       <li><code>area &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;{link}&gt;</code><br/>
            <br/>
            <ul>create a responsive area which will call a link when clicked.<br/>
                <br/>
@@ -1246,7 +1232,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                link = url to be called<br/>
            </ul></li><br/>
        <br>
-       <li><code>boxcolor &lt;rgba&gt;</code><br/>
+       <li><code>boxcolor &lt;{rgba}&gt;</code><br/>
            <br/>
            <ul>define an rgb color code to be used for filling button and textbox<br/>
            </ul></li><br/>
@@ -1323,7 +1309,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                </code>
            </ul></li><br/>
        <br/>
-       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;sourceType&gt; &lt;dataSource&gt;</code><br/>
+       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;sourceType&gt; &lt;{dataSource}&gt;</code><br/>
            <br/>
            <ul>embed an image into InfoPanel<br/>
                <br/>
@@ -1354,7 +1340,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
            <ul>move x- and y-coordinates to the given positon<br/>
            </ul></li><br/>
        <br/>
-       <li><code>plot &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;inline&gt; &lt;plotName&gt;</code><br/>
+       <li><code>plot &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;inline&gt; &lt;{plotName}&gt;</code><br/>
            <br/>
            <ul>embed an SVG plot into InfoPanel<br/>
                <br/>
@@ -1387,7 +1373,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                fill = rectangle will be filled with "rgb" color if set to 1<br/>
            </ul></li><br/>
        <br/>
-       <li><code>rgb &lt;rgb[a]&gt;</code><br/>
+       <li><code>rgb &lt;{rgb[a]}&gt;</code><br/>
            <br/>
            <ul>define rgba value (hex digits!) used for text, lines, circles, ellipses<br/>
                <br/>
@@ -1406,7 +1392,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                format = seconds will be preceeded by ':' if set to 'colon'; optional<br/>
            </ul></li><br/>
        <br/>
-       <li><code>text &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;text&gt;</code><br/>
+       <li><code>text &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;{text}&gt;</code><br/>
            <br/>
            <ul>print text<br/>
                <br/>
@@ -1415,7 +1401,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                text = text content to be printed<br/>
            </ul></li><br/>
        <br/>
-       <li><code>textbox &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;boxWidth&gt; &lt;boxHeight&gt; &lt;text&gt;</code><br/>
+       <li><code>textbox &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;boxWidth&gt; &lt;boxHeight&gt; &lt;{text}&gt;</code><br/>
            <br/>
            <ul>create a textbox to print text with auto wrapping<br/>
                <br/>
@@ -1465,7 +1451,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
            </ul></li><br/>
        <br/>
 
-       <li><code>trash &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;foregroundColor&gt; &lt;backgroundColor&gt;</code><br/>
+       <li><code>trash &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;{foregroundColor}&gt; &lt;{backgroundColor}&gt;</code><br/>
            <br/>
            <ul>print a trashcan with selectable colors for foreground and background<br/>
                <br/>
