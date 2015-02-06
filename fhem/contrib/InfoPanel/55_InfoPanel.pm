@@ -61,6 +61,7 @@ sub btIP_itemTrash;
 sub btIP_color;
 sub btIP_xy;
 sub btIP_changeColor;
+sub btIP_FileRead;
 
 sub btIP_ReturnSVG($);
 sub btIP_evalLayout($$@);
@@ -83,21 +84,15 @@ sub InfoPanel_Initialize($) {
     $hash->{DefFn}    = "btIP_Define";
 	$hash->{UndefFn}  = "btIP_Undef";
     #$hash->{AttrFn}   = "btIP_Attr";
-    $hash->{AttrList} = "disable:0,1 autoreload:1,0 bg bgcolor refresh size title tmin";
+    $hash->{AttrList} = "autoreread:1,0 bgcenter:1,0 bgcolor bgdir refresh size title tmin";
     $hash->{SetFn}    = "btIP_Set";
     $hash->{NotifyFn} = "btIP_Notify";
-
-    btIP_addExtension("btIP_CGI","btip","InfoPanel");
-
     return undef;
 }
 
 sub btIP_Define($$) {
-
   my ($hash, $def) = @_;
-
   my @a = split("[ \t]+", $def);
-
   return "Usage: define <name> InfoPanel filename"  if(int(@a) != 3);
   my $name= $a[0];
   my $filename= $a[2];
@@ -106,9 +101,11 @@ sub btIP_Define($$) {
   $hash->{fhem}{div} = '';
   $hash->{LAYOUTFILE} = $filename;
 
+  btIP_addExtension("btIP_CGI","btip","InfoPanel");
   btIP_readLayout($hash);
   
-  $hash->{STATE} = 'defined';
+readingsSingleUpdate($hash,'state','defined',1);
+#  $hash->{STATE} = 'defined';
   return undef;
 }
 
@@ -278,21 +275,8 @@ sub btIP_itemImg {
   my ($counter,$data,$info,$width,$height,$mimetype,$output);
 
   if($srctype eq 'file') {
-     Log3(undef,4,"InfoPanel: looking for img $arg");
-
-     if(configDBUsed()){
-        Log3(undef,4,"InfoPanel: reading from configDB");
-        ($data,$counter) = _cfgDB_Fileexport($arg,1);
-     }
-
-     if(!$counter) {
-        Log3(undef,4,"InfoPanel: reading from filesystem");
-        my $length = -s "$arg";
-        open(GRAFIK, "<", $arg) or die("File not found $!");
-        binmode(GRAFIK);
-        $counter = read(GRAFIK, $data, $length);
-        close(GRAFIK);
-     }
+    ($counter,$data) = btIP_FileRead($arg);
+    return unless $counter;
   } elsif ($srctype eq "url" || $srctype eq "urlq") {
      if($srctype eq "url") {
        $data= GetFileFromURL($arg,3,undef,1);
@@ -302,7 +286,7 @@ sub btIP_itemImg {
   } elsif ($srctype eq 'data') {
      $data = $arg;
   } else {
-     Log3(undef,2,"InfoPanel: unknown sourcetype for image tag");
+     Log3(undef,4,"InfoPanel: unknown sourcetype $srctype for image tag");
      return "";
   }
 
@@ -563,20 +547,43 @@ sub btIP_xy {
 
 sub btIP_changeColor {
   my($file,$oldcolor,$newcolor) = @_;
-  my ($data,$readBytes);
-  my $length = -s "$file";
-  open(GRAFIK, "<", $file) or die("File not found $!");
-  binmode(GRAFIK);
-  $readBytes = read(GRAFIK, $data, $length);
-  close(GRAFIK);
+  Log3(undef,4,"InfoPanel: read file $file for changeColor");
+  my ($counter,$data) = btIP_FileRead($file);
+  return unless $counter;
   if($newcolor =~ /[[:xdigit:]]{6}/) {
-     Log3(undef,4,"Infopanel: changing color from $oldcolor to $newcolor");
+     Log3(undef,4,"InfoPanel: changing color from $oldcolor to $newcolor");
      $data =~ s/fill="#$oldcolor"/fill="#$newcolor"/g;
      $data =~ s/fill:#$oldcolor/fill:#$newcolor/g;
   } else {
-     Log3(undef,4,"Infopanel: invalid rgb value for changeColor!");
+     Log3(undef,4,"InfoPanel: invalid rgb value for changeColor!");
   }
   return $data;
+}
+
+sub btIP_FileRead {
+   my ($file) = @_;
+   my ($data,$counter);
+
+   Log3(undef,4,"InfoPanel: looking for img $file");
+
+   if(configDBUsed()){
+      Log3(undef,4,"InfoPanel: reading from configDB");
+      ($data,$counter) = _cfgDB_Fileexport($file,1);
+      Log3(undef,4,"InfoPanel: file not found in database") unless $counter;
+   }
+   
+   if(!$counter) {
+      Log3(undef,4,"InfoPanel: reading from filesystem");
+      my $length = -s "$file";
+      open(GRAFIK, "<", $file) or die("File not found $!");
+      binmode(GRAFIK);
+      $counter = read(GRAFIK, $data, $length);
+      close(GRAFIK);
+      Log3(undef,4,"InfoPanel: file not found in filesystem") unless $counter;
+   }
+   return "" unless $counter;
+   Log3(undef,4,"InfoPanel: file found.");
+   return ($counter,$data);
 }
 
 ##################
@@ -599,7 +606,7 @@ sub btIP_returnSVG($) {
 
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
   my $bgcolor = AttrVal($name,'bgcolor','000000'); 
-
+  my $output = "";
   our $svg = "";
 
   eval {
@@ -613,7 +620,7 @@ sub btIP_returnSVG($) {
     # set the background
     # check if background directory is set
     my $reason= "?"; # remember reason for undefined image
-    my $bgdir= AttrVal($name,"bg","undef");
+    my $bgdir= AttrVal($name,"bgdir","undef");
 	if(defined($bgdir)){
 		my $bgnr; # item number
 		if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
@@ -632,63 +639,39 @@ sub btIP_returnSVG($) {
 			$defs{$name}{fhem}{t}= $t1;
 			$bgnr++;
 		}
-		# detect pictures
-# 		if(opendir(BGDIR, $bgdir)){
-# 			my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
-# 			
-# 			#foreach my $f (@bgfiles) {
-# 			#  Debug sprintf("File \"%s\"\n", $f);
-# 			#}
-# 			closedir(BGDIR);
-# 			# get item number
-# 			if($#bgfiles>=0) {
-# 				if($bgnr > $#bgfiles) { $bgnr= 0; }
-# 				$defs{$name}{fhem}{bgnr}= $bgnr;
-# 				my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
-# 				my $filetype =(split(/\./,$bgfile))[-1];
-# 				my $bg;
-# 				$bg= newFromGif  GD::Image($bgfile) if $filetype =~ m/^gif$/i;
-# 				$bg= newFromJpeg GD::Image($bgfile) if $filetype =~ m/^jpe?g$/i;
-# 				$bg= newFromPng  GD::Image($bgfile) if $filetype =~ m/^png$/i;
-# 				if(defined($bg)) {
-# 				  my ($bgwidth,$bgheight)= $bg->getBounds();
-# 				  if($bgwidth != $width or $bgheight != $height) {
-# 					  # we need to resize
-# 					  my ($w,$h);
-# 					  my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
-# 					  if($u>$v) {
-# 						  $w= $width;
-# 						  $h= $bgheight/$u;
-# 					  } else {
-# 						  $h= $height;
-# 						  $w= $bgwidth/$v;
-# 					  }
-# 					  $svg->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
-# 				  } else {
-# 					  # size is as required
-# 					  # kill the predefined image and take the original
-# 					  undef $svg;
-# 					  $svg= $bg;
-# 				  }
-# 				} else {
-# 				  undef $svg;
-# 				  $reason= "Something was wrong with background image \"$bgfile\".";
-# 				}
-# 			}
-# 		} # end opendir()
+
+		if(opendir(BGDIR, $bgdir)){
+			my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
+			closedir(BGDIR);
+			if($#bgfiles>=0) {
+				if($bgnr > $#bgfiles) { $bgnr= 0; }
+				$defs{$name}{fhem}{bgnr}= $bgnr;
+				my $bgfile     = $bgdir . "/" . $bgfiles[$bgnr];
+				my $info       = image_info($bgfile);
+				my $bgwidth    = $info->{width};
+  				my $bgheight   = $info->{height};
+                my ($u,$v)     = ($bgwidth/$width, $bgheight/$height);
+                my $scale      = ($u>$v) ? 1/$u : 1/$v;
+                my ($bgx,$bgy) = (0,0);
+                   $bgx        = ($width - $bgwidth/$u)/2   if AttrVal($name,'bgcenter',1);
+                   $bgy        = ($height - $bgheight/$u)/2 if AttrVal($name,'bgcenter',1);
+                   $output     = btIP_itemImg('-',$bgx,$bgy,$scale,'file',$bgfile,undef);
+ 			}
+ 		} # end opendir()
 	} # end defined()
 
-    $svg .= "\" >\n\n";
+    $svg .= "\" >\n";
+    $svg .= "$output\n";
     $svg = btIP_evalLayout($svg, $name, $defs{$name}{fhem}{layout});
 
-    $defs{$name}{STATE} = localtime();
+    readingsSingleUpdate($defs{$name},'state',localtime(),1);
+#    $defs{$name}{STATE} = localtime();
 
-    
   }; #warn $@ if $@;
   if($@) {
     my $msg= $@;
     chomp $msg;
-    Log3 $name, 2, $msg;
+    Log3($name, 2, $msg);
   }
 
   $svg .= "Sorry, your browser does not support inline SVG.\n</svg>\n";
@@ -980,7 +963,7 @@ sub btIP_evalLayout($$@) {
               $params{ihalign}= $d unless($cmd eq "thalign");
               $params{thalign}= $d unless($cmd eq "ihalign");
             } else {
-              Log3 $name, 2, "InfoPanel: $name Illegal horizontal alignment $d";
+              Log3($name, 2, "InfoPanel: $name Illegal horizontal alignment $d");
             }
           } elsif($cmd ~~ @cmd_valign) {
             my $d = AnalyzePerlCommand(undef, $def);
@@ -988,10 +971,10 @@ sub btIP_evalLayout($$@) {
               $params{ivalign}= $d unless($cmd eq "tvalign");
               $params{tvalign}= $d unless($cmd eq "ivalign");
             } else {
-              Log3 $name, 2, "InfoPanel: $name: Illegal vertical alignment $d";
+              Log3($name, 2, "InfoPanel: $name: Illegal vertical alignment $d");
             }
           } else {
-            Log3 $name, 2, "InfoPanel $name: Illegal command $cmd in layout definition.";
+            Log3($name, 2, "InfoPanel $name: Illegal command $cmd in layout definition.");
           }
         } # default
       } # given
@@ -1031,6 +1014,9 @@ sub btIP_CGI{
     if(!defined($defs{$name})) {
           return("text/plain; charset=utf-8", "Unknown InfoPanel device: $name");
     }
+    if($ext eq "png") {
+          return btIP_returnPNG($name);
+    }
     if($ext eq "info" || $ext eq "html") {
           return btIP_returnHTML($name);
     }
@@ -1051,13 +1037,34 @@ sub btIP_splitRequest($) {
     my $call= $request;
     $call =~ s/^.*\/btip\/([^\/]*)$/$1/;
     my $name= $call;
-    $name =~ s/^(.*)\.(svg|info|html)$/$1/;
+    $name =~ s/^(.*)\.(png|svg|info|html)$/$1/;
     my $ext= $call;
     $ext =~ s/^$name\.(.*)$/$1/;
     return ($name,$ext);
   }
 }
 
+####################
+#
+# HTML Stuff
+#
+
+sub btIP_returnPNG($) {
+  my ($name) = @_;
+  my ($svgdata, $rsvg, $pngImg);
+
+  $svgdata = btIP_returnSVG($name);
+
+  eval {
+    require Image::LibRSVG;
+    $rsvg = new Image::LibRSVG();
+    $rsvg->loadImageFromString($svgdata);
+    $pngImg = $rsvg->getImageBitmap();
+  };
+  Log3($FW_wname,1,"InfoPanel: Cannot create png image") if($@ or !defined($pngImg) or ($pngImg eq ""));
+  return $pngImg if $pngImg;
+  return undef;
+}  
 
 ####################
 #
@@ -1129,7 +1136,7 @@ sub btIP_Overview {
         $name= $defs{$def}{NAME};
         $url= btIP_getURL();
         $html.= "$name<br>\n<ul>";
-        $html.= "<a href='$url/btip/$name.info' target='_blank'>HTML</a><br>\n";
+        $html.= "<a href='$url/btip/$name.html' target='_blank'>HTML</a><br>\n";
         $html.= "</ul>\n<p>\n";
         }
   }
@@ -1143,8 +1150,108 @@ sub btIP_getURL {
   return $proto."://$FW_httpheader{Host}$FW_ME";
 }
 
-
-
 1;
  
 #
+
+=pod
+=begin html
+
+<a name="InfoPanel"></a>
+<h3>InfoPanel</h3>
+
+<ul><b>!!! This module is "under development" as of 2015-02-06 !!!</b><br/>
+Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="_blank">&gt;&gt;&gt; the development thread &lt;&lt;&lt;</a> in fhem forum for actual informations.</ul>
+<br/>
+
+<ul>
+    InfoPanel is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use InfoPanel.<br/>
+    <br/>
+    <br/>
+	<b>Prerequesits</b><br/>
+	<br/>
+	<ul>
+	  <li>InfoPanel is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use InfoPanel.</li>
+	  <br/>
+	  <li>Module uses following additional Perl modules:<br/><br/>
+		<ul><code>MIME::Base64 Image::Info</code></ul><br/><br/>
+		If not already installed in your environment, please install them using appropriate commands from your environment.<br/><br/>
+		Package installation in debian environments: <code>apt-get install libmime-base64-perl libimage-info-perl</code></li>
+
+	</ul>
+	<br/><br/>
+	
+	<a name="InfoPaneldefine"></a>
+	<b>Define</b><br/><br/>
+    <ul>
+       <code>define &lt;name&gt; InfoPanel &lt;layoutFileName&gt;</code><br/>
+       <br/>
+       Example:<br/><br>
+       <ul><code>define myInfoPanel InfoPanel ./FHEM/panel.layout</code><br/></ul>
+    </ul>
+	<br/><br/>
+
+	<a name="InfoPanelset"></a>
+	<b>Set-Commands</b><br/><br/>
+    <ul>
+       <code>set &lt;name&gt; reread</code>
+       <ul><br/>
+          Rereads the <a href="#InfoPanellayout">layout definition</a> from the file.<br/><br/>
+          <b>Important:</b><br/>
+          <ul>
+             Layout will be reread automatically if edited via fhem's "Edit files" function.<br/>
+             Autoread can be disabled via <a href="#InfoPanelattr">attribute</a>.
+          </ul>
+       </ul>
+    </ul>
+	<br/><br/>
+
+	<a name="InfoPanelget"></a>
+	<b>Get-Commands</b><br/><br/>
+	<ul>
+	   n/a<br/>
+	</ul>
+	<br/><br/>
+
+	<a name="InfoPanelattr"></a>
+	<b>Attributes</b><br/><br/>
+	<ul>
+		<li><b>autoreread</b> - disables automatic layout reread after edit if set to 1</li>
+		<li><b>refresh</b> - time (in seconds) after which the HTML page will be reloaded automatically</li>
+		<li><b>size</b> - The dimensions of the picture in the format
+            <code>&lt;width&gt;x&lt;height&gt;</code></li>
+		<li><b>title</b> - webpage title to be shown in Browser</li>
+		<br/>
+		<li><b>bgcenter</b> - background images will not be centered if attribute set to 0. Default: show centered</li>
+		<li><b>bgcolor</b> - defines the background color, use html-hexcodes to specify color, eg 00FF00 for green background</li>
+		<li><b>bgdir</b> - directory containing background images</li>
+		<li><b>tmin</b> - background picture will be shown at least <code>tmin</code> seconds, 
+		    no matter how frequently the RSS feed consumer accesses the page.</li>
+	</ul>
+	<br/><br/>
+
+    <a name="InfoPanelreadings"></a>
+	<b>Generated Readings/Events:</b><br/><br/>
+	<ul>
+	   <li>state - show time and date of last layout evaluation</li>
+	</ul>
+	<br/><br/>
+
+	<b>Author's notes</b><br/>
+	<br/>
+	<ul>
+		<li>Have fun!</li><br/>
+	</ul>
+</ul>
+
+=end html
+=begin html_DE
+
+<a name="InfoPanel"></a>
+<h3>InfoPanel</h3>
+<ul>
+Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
+Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#InfoPanel'>GDS</a><br/>
+</ul>
+=end html_DE
+=cut
