@@ -106,7 +106,8 @@ my %gets = (
 	'RadiosWithCovers' => '',
 	'Alarm' => 'ID',
 	'EthernetPortStatus' => 'PortNum',
-	'PossibleRoomIcons' => ''
+	'PossibleRoomIcons' => '',
+	'SearchlistCategories' => ''
 );
 
 my %sets = (
@@ -121,7 +122,6 @@ my %sets = (
 	'CurrentPlaylist' => '',
 	'EmptyPlaylist' => '',
 	'StartFavourite' => 'favouritename',
-	'CreateThemeList' => 'searchField=searchValue',
 	'LoadRadio' => 'radioname',
 	'StartRadio' => 'radioname',
 	'PlayURI' => 'songURI',
@@ -160,7 +160,9 @@ my %sets = (
 	'Reboot' => '',
 	'Wifi' => 'state',
 	'Name' => 'roomName',
-	'RoomIcon' => 'iconName'
+	'RoomIcon' => 'iconName',
+	'LoadSearchlist' => 'category categoryElem titleFilter/albumFilter/artistFilter maxElems',
+	'StartSearchlist' => 'category categoryElem titleFilter/albumFilter/artistFilter maxElems'
 );
 
 my @possibleRoomIcons = qw(bathroom library office foyer dining tvroom hallway garage garden guestroom den bedroom kitchen portable media family pool masterbedroom playroom patio living);
@@ -307,7 +309,7 @@ sub SONOSPLAYER_Get($@) {
 	}
 	return "SONOSPLAYER: Get with unknown argument $a[1], choose one of ".join(" ", sort keys %gets) if(!$found);
 	
-	# some argument needs parameter(s), some not
+	# some arguments needs parameter(s), some not
 	return "SONOSPLAYER: $a[1] needs parameter(s): ".$gets{$reading} if (scalar(split(',', $gets{$reading})) > scalar(@a) - 2);
 	
 	# getter
@@ -325,6 +327,8 @@ sub SONOSPLAYER_Get($@) {
 		SONOS_DoWork($udn, 'getRadios');
 	} elsif (lc($reading) eq 'radioswithcovers') {
 		SONOS_DoWork($udn, 'getRadiosWithCovers');
+	} elsif (lc($reading) eq 'searchlistcategories') {
+		SONOS_DoWork($udn, 'getSearchlistCategories');
 	} elsif (lc($reading) eq 'ethernetportstatus') {
 		my $portNum = $a[2];
 		
@@ -348,7 +352,7 @@ sub SONOSPLAYER_Get($@) {
 			return eval(ReadingsVal($name, 'AlarmList', ()))->{$id};
 		}
 	} elsif (lc($reading) eq 'possibleroomicons') {
-		return join(', ', @possibleRoomIcons);
+		return '"'.join('", "', @possibleRoomIcons).'"';
 	}
   
 	return undef;
@@ -431,7 +435,7 @@ sub SONOSPLAYER_Set($@) {
 	}
 	return "SONOSPLAYER: Set with unknown argument $a[1], choose one of ".join(" ", sort keys %sets) if(!$found);
   
-	# some argument needs parameter(s), some not
+	# some arguments needs parameter(s), some not
 	return "SONOSPLAYER: $a[1] needs parameter(s): ".$sets{$a[1]} if (scalar(split(',', $sets{$a[1]})) > scalar(@a) - 2);
       
 	# define vars
@@ -612,8 +616,17 @@ sub SONOSPLAYER_Set($@) {
 		$udn = $hash->{UDN};
 	
 		SONOS_DoWork($udn, 'setCurrentPlaylist');
-	} elsif (lc($key) eq 'createthemelist') {
-		SONOS_DoWork($udn, 'createThemelist');
+	} elsif (lc($key) eq 'loadsearchlist') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+		
+		SONOS_DoWork($udn, 'loadSearchlist', $value, $value2, $a[4], $a[5]);
+	} elsif (lc($key) eq 'startsearchlist') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+		
+		SONOS_DoWork($udn, 'loadSearchlist', $value, $value2, $a[4], $a[5]);
+		SONOS_DoWork($udn, 'play');
 	} elsif (lc($key) eq 'playuri') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -1010,6 +1023,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_StartRadio">
 <b><code>StartRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Loads the named radiostation (favorite) and starts playing immediately. For all Options have a look at "LoadRadio".</li>
+<li><a name="SONOSPLAYER_setter_StartSearchlist">
+<b><code>StartSearchlist &lt;Categoryname&gt; &lt;CategoryElement&gt; [[TitlefilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [maxElem]]</code></b></a>
+<br /> Loads the searchlist and starts playing immediately. For all Options have a look at "LoadSearchlist".</li>
 <li><a name="SONOSPLAYER_setter_Stop">
 <b><code>Stop</code></b></a>
 <br /> Stops the playing</li>
@@ -1089,6 +1105,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_LoadRadio">
 <b><code>LoadRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Loads the named radiostation (favorite). The current queue will not be touched but deactivated. The parameter should be URL-encoded for proper naming of lists with special characters.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/radio/</code>.</li>
+<li><a name="SONOSPLAYER_setter_LoadSearchlist">
+<b><code>LoadSearchlist &lt;Categoryname&gt; &lt;CategoryElement&gt; [[TitlefilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [maxElem]]</code></b></a>
+<br /> Loads titles from the Sonos-Bibliothek into the current playlist according to the given category and filtervalues. Please consult the (german) Wiki for detailed informations.</li>
 <li><a name="SONOSPLAYER_setter_SavePlaylist">
 <b><code>SavePlaylist &lt;Playlistname&gt;</code></b></a>
 <br /> Saves the current queue as a playlist with the given name. An existing playlist with the same name will be overwritten. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistname can be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')</li>
@@ -1147,10 +1166,13 @@ sub SONOSPLAYER_Log($$$) {
 <br /> Retrieves a list with the stringrepresentation of a perl-hash which can easily be converted with "eval". It consists of the names and coverlinks of all of the playlists stored in Sonos e.g. {'SQ:14' => {'Cover' => 'urlzumcover', 'Title' => '1. Playlist'}}</li>
 <li><a name="SONOSPLAYER_getter_Radios">
 <b><code>Radios</code></b></a>
-<br /> Retrieves a list woth the names of all saved radiostations (favorites). This getter retrieves the same list on all Zoneplayer. The format is a comma-separated list with quoted names of radiostations. e.g. "Sender 1","Sender 2","Test"</li>
+<br /> Retrieves a list with the names of all saved radiostations (favorites). This getter retrieves the same list on all Zoneplayer. The format is a comma-separated list with quoted names of radiostations. e.g. "Sender 1","Sender 2","Test"</li>
 <li><a name="SONOSPLAYER_getter_RadiosWithCovers">
 <b><code>RadiosWithCovers</code></b></a>
 <br /> Retrieves a list with the stringrepresentation of a perl-hash which can easily be converted with "eval". It consists of the names and coverlinks of all of the radiofavourites stored in Sonos e.g. {'R:0/0/2' => {'Cover' => 'urlzumcover', 'Title' => '1. Radiosender'}}</li>
+<li><a name="SONOSPLAYER_getter_SearchlistCategories">
+<b><code>SearchlistCategories</code></b></a>
+<br /> Retrieves a list with the possible categories for the setter "LoadSearchlist". The Format is a comma-separated list with quoted names of categories.</li>
 </ul></li>
 <li><b>Informations on the current Title</b><ul>
 <li><a name="SONOSPLAYER_getter_CurrentTrackPosition">
@@ -1291,6 +1313,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_StartRadio">
 <b><code>StartRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Lädt den benannten Radiosender, genauer gesagt, den benannten Radiofavoriten und startet sofort die Wiedergabe. Dabei wird die bestehende Abspielliste beibehalten, aber deaktiviert. Der Parameter kann/muss URL-Encoded sein, um auch Leer- und Sonderzeichen angeben zu können.</li>
+<li><a name="SONOSPLAYER_setter_StartSearchlist">
+<b><code>StartSearchlist &lt;Kategoriename&gt; &lt;KategorieElement&gt; [[TitelfilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [maxElem]]</code></b></a>
+<br /> Lädt die Searchlist und startet sofort die Wiedergabe. Für nähere Informationen bitte unter "LoadSearchlist" nachschlagen.</li>
 <li><a name="SONOSPLAYER_setter_Stop">
 <b><code>Stop</code></b></a>
 <br /> Stoppt die Wiedergabe</li>
@@ -1370,6 +1395,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_LoadRadio">
 <b><code>LoadRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Startet den angegebenen Radiostream. Der Name bezeichnet einen Sender in der Radiofavoritenliste. Die aktuelle Abspielliste wird nicht verändert. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/radio/</code>.</li>
+<li><a name="SONOSPLAYER_setter_LoadSearchlist">
+<b><code>LoadSearchlist &lt;Kategoriename&gt; &lt;KategorieElement&gt; [[TitelfilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [maxElem]]</code></b></a>
+<br /> Lädt Titel nach diversen Kriterien in die aktuelle Abspielliste. Nähere Beschreibung bitte im Wiki nachlesen.</li>
 <li><a name="SONOSPLAYER_setter_SavePlaylist">
 <b><code>SavePlaylist &lt;Playlistname&gt;</code></b></a>
 <br /> Speichert die aktuelle Abspielliste unter dem angegebenen Namen. Eine bestehende Playlist mit diesem Namen wird überschrieben. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).</li>
@@ -1432,6 +1460,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_getter_RadiosWithCovers">
 <b><code>RadiosWithCovers</code></b></a>
 <br /> Liefert die Stringrepräsentation eines Hash mit den Namen und Covern aller gespeicherten Sonos-Radiofavoriten. Z.B.: {'R:0/0/2' => {'Cover' => 'urlzumcover', 'Title' => '1. Radiosender'}}. Dieser String kann einfach mit '''eval''' in eine Perl-Datenstruktur umgewandelt werden.</li>
+<li><a name="SONOSPLAYER_getter_SearchlistCategories">
+<b><code>SearchlistCategories</code></b></a>
+<br /> Liefert eine Liste mit den Namen alle möglichen Kategorien für den Aufruf von "LoadSearchlist". Das Format der Liste ist eine Komma-Separierte Liste, bei der die Namen in doppelten Anführungsstrichen stehen.</li>
 </ul></li>
 <li><b>Informationen zum aktuellen Titel</b><ul>
 <li><a name="SONOSPLAYER_getter_CurrentTrackPosition">
