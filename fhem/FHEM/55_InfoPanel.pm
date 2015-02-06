@@ -1206,7 +1206,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 		<li><b>bgcenter</b> - background images will not be centered if attribute set to 0. Default: show centered</li>
 		<li><b>bgcolor</b> - defines the background color, use html-hexcodes to specify color, eg 00FF00 for green background. Default color is black. You can use bgcolor=none to disable use of any background color</li>
 		<li><b>bgdir</b> - directory containing background images</li>
-		<li><b>bgopacity</b> - set opacity for background image, values 0..1</li>
+		<li><b>bgopacity</b> - set opacity for background image, values 0...1.0</li>
 		<li><b>tmin</b> - background picture will be shown at least <code>tmin</code> seconds, 
 		    no matter how frequently the RSS feed consumer accesses the page.</li>
 	</ul>
@@ -1401,7 +1401,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                text = text content to be printed<br/>
            </ul></li><br/>
        <br/>
-       <li><code>textbox &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;boxWidth&gt; &lt;boxHeight&gt; &lt;{text}&gt;</code><br/>
+       <li><code>textbox &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;boxWidth&gt; &lt;boxHeight&gt; &lt;{text}&gt; [&lt;link&gt;]</code><br/>
            <br/>
            <ul>create a textbox to print text with auto wrapping<br/>
                <br/>
@@ -1410,7 +1410,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                boxWidth,boxHeight = dimensions of textbox<br/>
                text = text to be printed in textbox<br/>
                <br/>
-               <b>Important:</b> textboxes can not be responsive!<br/>
+               <b>Important:</b> textboxes are not responsive via area tag. Use optional link parameter in textbox tag<br/>
            </ul></li><br/>
        <br/>
        <li><code>textboxalign &lt;align&gt;</code><br/>
