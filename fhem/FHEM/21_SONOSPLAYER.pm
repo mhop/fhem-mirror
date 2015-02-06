@@ -128,6 +128,7 @@ my %sets = (
 	'PlayURITemp' => 'songURI',
 	'AddURIToQueue' => 'songURI',
 	'Speak' => 'volume language text',
+	'OutputFixed' => 'state',
 	'Mute' => 'state',
 	'Shuffle' => 'state',
 	'Repeat' => 'state',
@@ -185,7 +186,7 @@ sub SONOSPLAYER_Initialize ($) {
 	$hash->{StateFn} = "SONOSPLAYER_State";
 	$hash->{NotifyFn} = 'SONOSPLAYER_Notify';
 	
-	$hash->{AttrList}= "disable:1,0 generateVolumeSlider:1,0 generateVolumeEvent:1,0 generateSomethingChangedEvent:1,0 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:1,0 buttonEvents ".$readingFnAttributes;
+	$hash->{AttrList}= "disable:1,0 generateVolumeSlider:1,0 generateVolumeEvent:1,0 generateSomethingChangedEvent:1,0 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,OutputFixed,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:1,0 buttonEvents ".$readingFnAttributes;
 	
 	return undef;
 }
@@ -290,7 +291,7 @@ sub SONOSPLAYER_Get($@) {
 		for my $elem (sort keys %gets) {
 			my $newElem = $elem.(($gets{$elem} eq '') ? ':noArg' : '');
 			
-			$newElem = $elem.':0,1' if (lc($elem) eq 'ethernetportstatus');
+			$newElem = $elem.':0,1,2,3' if (lc($elem) eq 'ethernetportstatus');
 			
 			push @newGets, $newElem;
 		}
@@ -384,7 +385,7 @@ sub SONOSPLAYER_Set($@) {
 			}
 			
 			# On/Off einsetzen; Da das jeweilige Reading dazu 0,1 enthalten wird, auch mit 0,1 arbeiten, damit die Vorauswahl passt
-			$key = $key.':0,1' if ((lc($key) eq 'crossfademode') || (lc($key) eq 'groupmute') || (lc($key) eq 'ledstate') || (lc($key) eq 'loudness') || (lc($key) eq 'mute') || (lc($key) eq 'repeat') || (lc($key) eq 'shuffle'));
+			$key = $key.':0,1' if ((lc($key) eq 'crossfademode') || (lc($key) eq 'groupmute') || (lc($key) eq 'ledstate') || (lc($key) eq 'loudness') || (lc($key) eq 'mute') || (lc($key) eq 'outputfixed')  || (lc($key) eq 'repeat') || (lc($key) eq 'shuffle'));
 			
 			# Iconauswahl einsetzen
 			if (lc($key) eq 'roomicon') {
@@ -497,6 +498,8 @@ sub SONOSPLAYER_Set($@) {
 		$udn = $hash->{UDN};
 	
 		SONOS_DoWork($udn, 'setGroupMute', $value);
+	} elsif (lc($key) eq 'outputfixed') {
+		SONOS_DoWork($udn, 'setOutputFixed', $value);
 	} elsif (lc($key) eq 'mute') {
 		SONOS_DoWork($udn, 'setMute', $value);
 	} elsif (lc($key) eq 'mutet') {
@@ -979,6 +982,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_Name">
 <b><code>Name &lt;Zonename&gt;</code></b></a>
 <br />Sets the Name for this Zone</li>
+<li><a name="SONOSPLAYER_setter_OutputFixed">
+<b><code>OutputFixed &lt;State&gt;</code></b></a>
+<br /> Sets the outputfixed-state. Retrieves the new state as the result.</li>
 <li><a name="SONOSPLAYER_setter_Reboot">
 <b><code>Reboot</code></b></a>
 <br />Initiates a reboot on the Zoneplayer.</li>
@@ -1269,6 +1275,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_Name">
 <b><code>Name &lt;Zonename&gt;</code></b></a>
 <br />Legt den Namen der Zone fest.</li>
+<li><a name="SONOSPLAYER_setter_OutputFixed">
+<b><code>OutputFixed &lt;State&gt;</code></b></a>
+<br /> Setzt den angegebenen OutputFixed-Zustand. Liefert den aktuell gültigen OutputFixed-Zustand.</li>
 <li><a name="SONOSPLAYER_setter_Reboot">
 <b><code>Reboot</code></b></a>
 <br />Führt für den Zoneplayer einen Neustart durch.</li>
