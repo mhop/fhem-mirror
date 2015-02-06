@@ -802,10 +802,6 @@ sub btIP_evalLayout($$@) {
           $params{font} = $def;
         }
 
-	    when("font") {
-          $params{font} = $def;
-        }
-
 	    when("group") {
 	      ($id,$text,$x,$y) = split("[ \t]+", $def, 4);
 	      $x //= 0;
@@ -1237,6 +1233,260 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 	</ul>
 	<br/><br/>
 
+    <a name="InfoPanellayout"></a>
+	<b>Layout definition</b><br/><br/>
+	<ul>
+       <li><code>area &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;link&gt;</code><br/>
+           <br/>
+           <ul>create a responsive area which will call a link when clicked.<br/>
+               <br/>
+               id = element id<br/>
+               x1,y1 = upper left corner<br/>
+               x2,y2 = lower right corner<br/>
+               link = url to be called<br/>
+           </ul></li><br/>
+       <br>
+       <li><code>boxcolor &lt;rgba&gt;</code><br/>
+           <br/>
+           <ul>define an rgb color code to be used for filling button and textbox<br/>
+           </ul></li><br/>
+       <br>
+       <li><code>button &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;r1&gt; &lt;r2&gt; &lt;link&gt; &lt;text&gt;</code><br/>
+           <br/>
+           <ul>create a responsive colored button which will call a link when clicked.<br/>
+               <br/>
+               id = element id<br/>
+               x1,y1 = upper left corner<br/>
+               x2,y2 = lower right corner<br/>
+               r1,r2 = radius for rounded corners<br/>
+               link  = url to be called<br/>
+               text  = text that will be written onto the button<br/>
+               <br/>
+               button will be filled with color defined by "boxcolor"<br/>
+               text color will be read from "rgb" value<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>buttonpanel</code><br/>
+           <br/>
+           <ul>needed once in your layout file if you intend to use buttons in the same layout.<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>circle &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r&gt; [&lt;fill&gt;]</code><br/>
+           <br/>
+           <ul>create a circle<br/>
+               <br/>
+               id = element id<br/>
+               x,y = center coordinates of circle<br/>
+               r = radius<br/>
+               fill = circle will be filled with "rgb" color if set to 1<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>date &lt;id&gt; &lt;x&gt; &lt;y&gt;</code><br/>
+           <br/>
+           <ul>print date<br/>
+               <br/>
+               id = element id<br/>
+               x,y = position<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>ellipse &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;]</code><br/>
+           <br/>
+           <ul>create an ellipse<br/>
+               <br/>
+               id = element id<br/>
+               x,y = center coordinates of circle<br/>
+               r1,r2 = radius<br/>
+               fill = ellipse will be filled with "rgb" color if set to 1<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>font &lt;font-family&gt;</code><br/>
+           <br/>
+           <ul>define font family used for text elements (text, date, time, seconds ...)<br/>
+               <br/>
+               Example: <code>font arial</code><br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>group &lt;id&gt; open &lt;x&gt; &lt;y&gt;<br/>
+                 group - close</code>&nbsp;&nbsp;(id will not be evaluated, just give any value)<br/>
+           <br/>
+           <ul>group items<br/>
+               <br/>
+               open|close = define start and end of group<br/>
+               x,y = upper left corner as reference for all grouped items, will be inherited to all elements.<br/>
+               <br/>
+               Examples:<br/>
+               <code>
+                 group - open 150 150<br/>
+                 rect ...<br/>
+                 img ...<br/>
+                 group - close<br/>
+               </code>
+           </ul></li><br/>
+       <br/>
+       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;sourceType&gt; &lt;dataSource&gt;</code><br/>
+           <br/>
+           <ul>embed an image into InfoPanel<br/>
+               <br/>
+               id = element id<br/>
+               x,y = upper left corner<br/>
+               scale = scale to be used for resizing; may be factor or defined by width or height<br/>
+               sourceType = file | url | data<br/>
+               dataSource = where to read data from, depends on sourceType<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>line &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;stroke&gt;]</code><br/>
+           <br/>
+           <ul>draw a line<br/>
+               <br/>
+               id = element id<br/>
+               x1,y1 = coordinates (start)<br/>
+               x2,y2 = coordinates (end)<br/>
+               stroke = stroke width for line; if omitted, default = 0<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>moveby &lt;x&gt; &lt;y&gt;</code><br/>
+           <br/>
+           <ul>move most recently x- and y-coordinates by given steps<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>moveto &lt;x&gt; &lt;y&gt;</code><br/>
+           <br/>
+           <ul>move x- and y-coordinates to the given positon<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>plot &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;inline&gt; &lt;plotName&gt;</code><br/>
+           <br/>
+           <ul>embed an SVG plot into InfoPanel<br/>
+               <br/>
+               id = element id<br/>
+               x,y = upper left corner<br/>
+               scale = scale to be used for resizing; may be factor or defined by width or height<br/>
+               inline = embed plot as data (inline=1) or as link (inline=0)<br/>
+               plotName = name of desired SVG device from your fhem installation<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>pt &lt;[+-]font-size&gt;</code><br/>
+           <br/>
+           <ul>define font size used for text elements (text, date, time, seconds ...)<br/>
+               can be given as absolute or relative value.<br/>
+               <br/>
+               Examples:<br/>
+               <code>pt 12</code><br/>
+               <code>pt +3</code><br/>
+               <code>pt -2</code><br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>rect &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;]</code><br/>
+           <br/>
+           <ul>create a rectangle<br/>
+               <br/>
+               id = element id<br/>
+               x1,y1 = upper left corner<br/>
+               x2,y2 = lower right corner<br/>
+               r1,r2 = radius for rounded corners<br/>
+               fill = rectangle will be filled with "rgb" color if set to 1<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>rgb &lt;rgb[a]&gt;</code><br/>
+           <br/>
+           <ul>define rgba value (hex digits!) used for text, lines, circles, ellipses<br/>
+               <br/>
+               <code>r = red value</code><br/>
+               <code>g = green value</code><br/>
+               <code>b = blue value</code><br/>
+               <code>a = alpha value used for opacity; optional</code><br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>seconds &lt;id&gt; &lt;x&gt; &lt;y&gt; [&lt;format&gt;]</code><br/>
+           <br/>
+           <ul>print seconds<br/>
+               <br/>
+               id = element id<br/>
+               x,y = position<br/>
+               format = seconds will be preceeded by ':' if set to 'colon'; optional<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>text &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;text&gt;</code><br/>
+           <br/>
+           <ul>print text<br/>
+               <br/>
+               id = element id<br/>
+               x,y = position<br/>
+               text = text content to be printed<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>textbox &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;boxWidth&gt; &lt;boxHeight&gt; &lt;text&gt;</code><br/>
+           <br/>
+           <ul>create a textbox to print text with auto wrapping<br/>
+               <br/>
+               id = element id<br/>
+               x,y = upper left corner<br/>
+               boxWidth,boxHeight = dimensions of textbox<br/>
+               text = text to be printed in textbox<br/>
+               <br/>
+               <b>Important:</b> textboxes can not be responsive!<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>textboxalign &lt;align&gt;</code><br/>
+           <br/>
+           <ul>define horizontal alignment for text inside textboxes<br/>
+               <br/>
+               valid values: left center right justify<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>textdesign &lt;align&gt;</code><br/>
+           <br/>
+           <ul>define comma-separated list for text design and decoration<br/>
+               <br/>
+               valid values: underline overline line-through bold italic oblique clear<br/>
+               <br/>
+               Examples:<br/>
+               <code>
+               textdesign underline<br/>
+               textdesign bold,italic,underline
+               </code><br/>
+               <br/>
+               <b>Important:</b> "clear" resets all to default values!<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>thalign &lt;align&gt;</code><br/>
+           <br/>
+           <ul>define horizontal alignment for text output<br/>
+               <br/>
+               valid values: start middle end<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>time &lt;id&gt; &lt;x&gt; &lt;y&gt;</code><br/>
+           <br/>
+           <ul>print time<br/>
+               <br/>
+               id = element id<br/>
+               x,y = position<br/>
+           </ul></li><br/>
+       <br/>
+
+       <li><code>trash &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;foregroundColor&gt; &lt;backgroundColor&gt;</code><br/>
+           <br/>
+           <ul>print a trashcan with selectable colors for foreground and background<br/>
+               <br/>
+               id = element id<br/>
+               x,y = position<br/>
+               scale = scale to be used for resizing; may be factor or defined by width or height<br/>
+               foregroundColor = hex digits used for foreground<br/>
+               backgroundColor = hex digits used for background<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>tvalign &lt;align&gt;</code><br/>
+           <br/>
+           <ul>define vertical alignment for text output<br/>
+               <br/>
+               valid values: auto baseline middle center hanging<br/>
+           </ul></li><br/>
+       <br/>
+
+	</ul>
+	<br/>
+
 	<b>Author's notes</b><br/>
 	<br/>
 	<ul>
@@ -1251,7 +1501,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 <h3>InfoPanel</h3>
 <ul>
 Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
-Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#InfoPanel'>GDS</a><br/>
+Die englische Doku gibt es hier: <a href='commandref.html#InfoPanel'>InfoPanel</a><br/>
 </ul>
 =end html_DE
 =cut
