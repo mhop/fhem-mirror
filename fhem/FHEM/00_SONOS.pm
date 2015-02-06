@@ -48,6 +48,8 @@
 #
 # SVN-History:
 # 06.02.2015
+#	Der Getter "EthernetPortStatus" hat jetzt auch die Portnummern 2 und 3 zur Auswahl.
+#	Es gibt ein neues Reading "OutputFixed" sowie ein zugehöriger Setter zum Setzen des Wertes.
 #	Es wurde im Standard-RemoteControl-Design ein :blank zwischen den Steuerbefehlen und den drei Umschaltbefehlen ("MuteT", "ShuffleT" und "RepeatT") eingefügt.
 #	Es gibt ein neues Reading "roomNameAlias", das den Namen enthält, der für das Attribut "alias" beim Erkennen des Players verwendet werden würde (z.B. "Wohnzimmer - Rechts"). Wird zu Laufzeit mit aktualisiert.
 #	Es gibt zwei neue Setter-Befehle "LoadSearchlist" und "StartSearchlist". Mit diesen kann eine dynamisch erzeugte Playliste mit Titeln aus der Sonos-Bibliothek geladen werden. Nähere Informationen dazu im Wiki.
@@ -402,7 +404,7 @@ my %sets = (
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
 my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime);
-my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected currentAlbum currentArtist currentTitle);
+my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected currentAlbum currentArtist currentTitle);
 
 # Obsolete Einstellungen...
 my $SONOS_UseTelnetForQuestions = 1;
@@ -2350,6 +2352,15 @@ sub SONOS_Discover() {
 					
 						# Wert wieder abholen, um das wahre Ergebnis anzeigen zu können
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($SONOS_RenderingControlProxy{$udn}->GetMute(0, 'Master')->getValue('CurrentMute')));
+					}
+				} elsif ($workType eq 'setOutputFixed') {
+					my $value1 = $params[0];
+					
+					if (SONOS_CheckProxyObject($udn, $SONOS_RenderingControlProxy{$udn})) {
+						$SONOS_RenderingControlProxy{$udn}->SetOutputFixed(0, SONOS_ConvertWordToNum($value1));
+					
+						# Wert wieder abholen, um das wahre Ergebnis anzeigen zu können
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($SONOS_RenderingControlProxy{$udn}->GetOutputFixed(0)->getValue('CurrentFixed')));
 					}
 				} elsif ($workType eq 'setMuteT') {
 					my $value1 = 'off';
@@ -5135,6 +5146,7 @@ sub SONOS_GetReadingsToCurrentHash($$) {
 	# Insert Variables scanned during Device Detection or other events (for simple Replacing-Option of InfoSummarize)
 	$current{Volume} = ReadingsVal($name, 'Volume', 0);
 	$current{Mute} = ReadingsVal($name, 'Mute', 0);
+	$current{OutputFixed} = ReadingsVal($name, 'OutputFixed', 0);
 	$current{Balance} = ReadingsVal($name, 'Balance', 0);
 	$current{HeadphoneConnected} = ReadingsVal($name, 'HeadphoneConnected', 0);
 	$current{SleepTimer} = ReadingsVal($name, 'SleepTimer', '');
@@ -5572,6 +5584,17 @@ sub SONOS_RenderingCallback($$) {
 			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'Treble', $treble);
 		} else {
 			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChangedNoTrigger', $udn, 'Treble', $treble);
+		}
+	}
+	
+	# OutputFixed?
+	my $outputFixed = SONOS_Client_Data_Retreive($udn, 'reading', 'OutputFixed', 0);
+	if ($properties{LastChangeDecoded} =~ m/<OutputFixed.*?val="([-]{0,1}\d+)".*?\/>/i) {
+		$outputFixed = $1;
+		if ($generateVolumeEvent) {
+			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'OutputFixed', $outputFixed);
+		} else {
+			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChangedNoTrigger', $udn, 'OutputFixed', $outputFixed);
 		}
 	}
 	
