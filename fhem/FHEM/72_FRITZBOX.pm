@@ -691,6 +691,8 @@ sub FRITZBOX_Readout_Run($)
    # Execute commands
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings);
 
+      return "$name|Error|No STDOUT from shell command." unless defined $resultArray;
+
       my $dectCount = $resultArray->[1];
       $dectCount = 0 unless $dectCount=~ /\d/;
       my $radioCount = $resultArray->[2];
@@ -1053,18 +1055,21 @@ sub FRITZBOX_Readout_Query($$$)
    }
 
    my $resultArray = FRITZBOX_Exec( $hash, \@cmdArray);
-   $count = int @{$resultArray} -1;
-   for (0..$count)
+   if (defined ($resultArray))
    {
-      $rValue = $resultArray->[$_];
-      $rFormat = $readoutCmdArray->[$_][2];
-      $rFormat = "" unless defined $rFormat;
-      $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
-      $rName = $readoutCmdArray->[$_][0];
-      if ($rName ne "")
+      $count = int @{$resultArray} -1;
+      for (0..$count)
       {
-         FRITZBOX_Log $hash, 5, "$rName: $rValue";
-         push @{$readoutReadings}, $rName."|".$rValue;
+         $rValue = $resultArray->[$_];
+         $rFormat = $readoutCmdArray->[$_][2];
+         $rFormat = "" unless defined $rFormat;
+         $rValue = FRITZBOX_Readout_Format ($hash, $rFormat, $rValue);
+         $rName = $readoutCmdArray->[$_][0];
+         if ($rName ne "")
+         {
+            FRITZBOX_Log $hash, 5, "$rName: $rValue";
+            push @{$readoutReadings}, $rName."|".$rValue;
+         }
       }
    }
    @{$readoutCmdArray} = ();
