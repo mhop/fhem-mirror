@@ -45,7 +45,7 @@ HXB_Initialize($)
   $hash->{ReadFn}  = "HXB_Read";
   $hash->{Clients} = ":HXBDevice:";
   $hash->{MatchList} = \%matchlist;
-  $hash->{ReadyFn} = "FHZ_Ready";
+  #$hash->{ReadyFn} = "HXB_Ready";
 
 # Consumer
   $hash->{DefFn}   = "HXB_Define";
