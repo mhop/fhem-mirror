@@ -514,6 +514,9 @@ sub cfgDB_MigrationImport() {
 
 # import templateDB.gplot
 	$filename  = $attr{global}{modpath};
+	$filename .= "/www/gplot/template.gplot";
+	push @files, $filename;
+	$filename  = $attr{global}{modpath};
 	$filename .= "/www/gplot/templateDB.gplot";
 	push @files, $filename;
 
@@ -539,6 +542,15 @@ sub cfgDB_MigrationImport() {
 	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=RSS','LAYOUTFILE');
+	foreach $filename (@def) {
+		next unless $filename;
+		push @files, $filename;
+	}
+
+# find InfoPanel layouts
+	$filename ='';
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=InfoPanel','LAYOUTFILE');
 	foreach $filename (@def) {
 		next unless $filename;
 		push @files, $filename;
