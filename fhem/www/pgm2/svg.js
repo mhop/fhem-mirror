@@ -89,14 +89,34 @@ sv_menu(evt, embed)
   var tl = $(svg).find("#svg_title");
   var par = svgNode.par;
 
+  var lines = $(svg).find("[line_id]");
+  var hidden = $(svg).find(".hidden");
+
+  function
+  showValOff() {
+    $(svg).find("[id]").each(function(){delete($(this).get(0).showVal)});
+    $(svg).off("mousemove");
+
+    if(par && par.circle) {
+      $(par.circle).remove();
+      $(par.div).remove();
+    }
+  }
+
   var sn = selNode.nodeName,
       pn = (sn=="path" ? "d" : "points"),
       arrName = (sn=="path" ? "pathSegList" : "points");
   FW_menu(evt, label,
     ["Copy", "Paste",
-      svgNode.isSingle ? "Show all lines":"Hide other lines",
+      selNode.isHidden ? "Show line" : "Hide line",
+      "Hide other lines",
+      "Show all lines",
       selNode.showVal ? "Stop displaying values" : "Display plot values" ],
-    [undefined, data.length==0, undefined, sn!="polyline" && sn!="path"],
+    [undefined, data.length==0,
+      !selNode.isHidden && (lines.length - hidden.length) == 1,
+      !selNode.isHidden && (lines.length - hidden.length) == 1,
+      hidden.length==0,
+      selNode.isHidden || (sn!="polyline" && sn!="path") ],
     function(arg) {
 
       //////////////////////////////////// copy
@@ -125,36 +145,50 @@ sv_menu(evt, embed)
         doc.documentElement.appendChild(o);
       }
 
-      //////////////////////////////////// hide/show lines
-      if(arg == 2) {    
-        if(svgNode.isSingle) {
-          delete(svgNode.isSingle);
-          $(sel).attr("stroke-width", 1);
-          $(tl).text($(tl).attr("hiddentitle"));
-          showOtherLines(0, 1);
+      //show/hide
+      if(arg == 2) {
+        setVisibility(lid, selNode.isHidden?1:0);
+        $(label).attr("opacity", selNode.isHidden?0.4:1);
+      }
 
-        } else {
-          svgNode.isSingle = 1;
-          $(sel).attr("stroke-width", 3);
-          $(tl).attr("hiddentitle", $(tl).text());
-          if($(sel).attr(pn) != null)
-            $(tl).text($(label).attr("title"));
-          lastHidden = lid;
-          showOtherLines(1, 0)
-        }
+      //hide other
+      if(arg == 3) {
+        $(svg).find("[id]").each(function(){
+          var id = $(this).attr("id");
+          if(id.indexOf("line_") != 0 )
+            return;
+          var label = $(svg).find('[line_id="'+id+'"]');
+          if( !label.length ) // ignore lines with label none
+            return;
+          var sel = $(svg).find("#"+id);
+          var selNode = $(sel).get(0);
+          if( (selNode.isHidden?false:true) != (id == lid) )
+            setVisibility(id, id == lid);
+          label.attr("opacity", id == lid?1:0.4);
+        } );
+      }
+
+      //show all
+      if(arg == 4) {
+        $(svg).find("[line_id]").attr("opacity",1);
+        $(svg).find("[id]").each(function(){
+          var id = $(this).attr("id");
+          if(id.indexOf("line_") != 0 )
+            return;
+          var sel = $(svg).find("#"+id);
+          var selNode = $(sel).get(0);
+          if( !selNode.isHidden )
+            return;
+          setVisibility(id, 1);
+          //$(svg).find('[line_id="'+id+'"]').attr("opacity",1);
+        } );
       }
 
       //////////////////////////////////// value display
-      if(arg == 3) {
+      if(arg == 5) {
 
         var hadShowVal = selNode.showVal;
-        $(svg).find("[id]").each(function(){delete($(this).get(0).showVal)});
-        $(svg).off("mousemove");
-
-        if(par && par.circle) {
-          $(par.circle).remove();
-          $(par.div).remove();
-        }
+        showValOff();
 
         if(!hadShowVal) {
           selNode.showVal = true;
@@ -174,6 +208,21 @@ sv_menu(evt, embed)
           var pl = selNode[arrName];
           if(pl.length > 2)
             mousemove({pageX:pl[pl.length-2].x});
+        }
+      }
+
+
+      if( arg >= 2 && arg <= 4 ) {
+        var hidden = $(svg).find(".hidden");
+        if( lines.length - hidden.length == 1 ) {
+            $(tl).attr("hiddentitle", $(tl).text());
+            if($(sel).attr(pn) != null)
+              $(tl).text($(label).attr("title"));
+
+        } else if( $(tl).attr("hiddentitle") ) {
+            $(tl).text($(tl).attr("hiddentitle"));
+            $(tl).removeAttr("hiddentitle")
+
         }
       }
 
@@ -215,21 +264,40 @@ sv_menu(evt, embed)
   }
 
   function
-  showOtherLines(currval, maxval)
+  setVisibility(id,visible)
   {
-    $(svg).find("[id]").each(function(){
-      var id = $(this).attr("id");
-      if(id.indexOf("line_") != 0 || id == lastHidden)
-        return;
-      var h = parseFloat($(this).attr("y_h"));
-      $(this).attr("transform", "translate(0,"+h*(1-currval)+") "+
+    var sel = $(svg).find("#"+id);
+    var selNode = $(sel).get(0);
+    var currval = visible?1:0;
+    var h = parseFloat(sel.attr("y_h"));
+    //sel.attr("transform", "translate(0,"+h*(1-currval)+") "+ "scale(1,"+currval+")");
+
+    if( !visible
+        && selNode.showVal )
+      showValOff();
+
+    animateVisibility(sel,visible?0:1, visible?1:0);
+
+    if( visible ) {
+      delete(selNode.isHidden);
+      sel.attr("class", sel.attr("class").replace(/ hidden/, "" ) );
+    } else {
+      selNode.isHidden = true;
+      sel.attr("class", sel.attr("class") + " hidden" );
+    }
+  }
+
+  function
+  animateVisibility(sel, currval, maxval)
+  {
+      var h = parseFloat(sel.attr("y_h"));
+      sel.attr("transform", "translate(0,"+h*(1-currval)+") "+
                                 "scale(1,"+currval+")");
-    });
 
     if(currval != maxval) {
       currval += (currval<maxval ? 0.02 : -0.02);
       currval = Math.round(currval*100)/100;
-      setTimeout(function(){ showOtherLines(currval,maxval) }, 10);
+      setTimeout(function(){ animateVisibility(sel,currval,maxval) }, 10);
     }
   }
 
