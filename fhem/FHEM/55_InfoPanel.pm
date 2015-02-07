@@ -1137,8 +1137,12 @@ sub btIP_getURL {
 <a name="InfoPanel"></a>
 <h3>InfoPanel</h3>
 
-<ul><b>!!! This module is "under development" as of 2015-02-06 !!!</b><br/>
+<ul>
+<b>!!! This module is "under development" as of 2015-02-06 !!!</b><br/>
+<br/>
 Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="_blank">&gt;&gt;&gt; the development thread &lt;&lt;&lt;</a> in fhem forum for actual informations.</ul>
+<br/>
+A lot of ideas,concepts and philosophy in this module were taken from module 02_RSS.pm, created by Boris.<br/>
 <br/>
 
 <ul>
