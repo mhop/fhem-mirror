@@ -345,7 +345,6 @@ SVG_PEdit($$$$)
     $ret .= "<td/></tr>";
   }
 
-  my $max = @{$conf{lType}}+1;
   my ($desc, $cnt) = ("Spec", 0);
   my (@srcHtml, @paramHtml, @exampleHtml, @revIdx);
   my @srcNames = grep { $modules{$defs{$_}{TYPE}}{SVG_sampleDataFn} }
@@ -376,8 +375,9 @@ SVG_PEdit($$$$)
   }
   # Last, empty line
   push @revIdx,int(@revIdx);
-  push @srcHtml, $srcHtml[0];
-  push @paramHtml, $paramHtml[0];
+  push @srcHtml, FW_select(undef,"src_".int(@srcHtml),\@srcNames,"","svgSrc");
+  push @paramHtml, (@paramHtml==0 ? 
+                      SVG_txt("par_0_0", "", "parameter", 10) : $paramHtml[0]);
   push @exampleHtml, "Set the label and 'Write .gplot file' first in order to ".
                      "get example data and correct parameter choice";
 
@@ -394,6 +394,7 @@ SVG_PEdit($$$$)
 
 
   my ($r, $example, @output) = (0, "");
+  my $max = int(@srcHtml);
   for($r=0; $r < $max; $r++) {
     my $idx = $revIdx[$r];
     $example .= "<div class='ex ex_$idx' style='display:".($idx?"none":"block").
@@ -560,7 +561,10 @@ SVG_WriteGplot($)
   return SVG_showData() if($FW_webArgs{showFileLogData});
 
   if(!defined($FW_webArgs{par_0_0})) {
-    $FW_RET="missing data in logfile: won't write incomplete .gplot definition";
+    $FW_RET .=
+      '<div id="errmsg">'.
+        "missing data in logfile: won't write incomplete .gplot definition".
+      '</div>';
     return 0;
   }
 
@@ -569,7 +573,6 @@ SVG_WriteGplot($)
     next if($i !~ m/^title_(.*)$/);
     $maxLines = $1 if($1 > $maxLines);
   }
-  return 0 if(!$maxLines);
 
   my $wlName = $FW_webArgs{detail};
   my $fName = "$FW_gplotdir/$defs{$wlName}{GPLOTFILE}.gplot";
@@ -625,7 +628,7 @@ SVG_WriteGplot($)
   }
 
   my $err = FileWrite($fName, @rows);
-  $FW_RET="SVG_WriteGplot: $err" if($err);
+  $FW_RET .= "<div id='errmsg'>SVG_WriteGplot: $err</div>" if($err);
 
   return 0;
 }
