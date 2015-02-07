@@ -2283,6 +2283,7 @@ FW_Notify($$)
     my $data = FW_longpollInfo($h->{fmt},
         "#FHEMWEB:$ntfy->{NAME}","\$('#saveCheck').css('visibility','$vs')","");
     addToWritebuffer($ntfy, $data."\n");
+    $dn = $1 if($dev->{CHANGED} && $dev->{CHANGED}->[0] =~ m/^MODIFIED (.*)$/);
   }
 
   if($h->{type} eq "raw") {
