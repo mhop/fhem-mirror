@@ -788,6 +788,7 @@ sub FRITZBOX_Readout_Run($)
       for (1..$fonCount)
       {
          push @readoutCmdArray, ["fon".$_, "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name" ];
+         push @readoutCmdArray, ["fon".$_."_out", "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/MSN" ];
       }
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
    
@@ -795,7 +796,7 @@ sub FRITZBOX_Readout_Run($)
       for (1..$fonCount)
       {
          push @readoutReadings, "fon".$_."_intern|".$_
-            if $resultArray->[$_-1];
+            if $resultArray->[($_-1)*2];
       }
 
 # Prepare new command array
@@ -2284,8 +2285,8 @@ FRITZBOX_Exec_Remote($$)
 }
 
 # Executed the command on the FritzBox Shell
-sub ############################################
-FRITZBOX_Exec_Local($$)
+############################################
+sub FRITZBOX_Exec_Local($$)
 {
    my ($hash, $cmd) = @_;
    
@@ -2307,6 +2308,11 @@ FRITZBOX_Exec_Local($$)
          my $cmdStr = join "\necho ' |#|'\n", @{$cmd};
          $cmdStr .= "\necho ' |#|'";
          my $result = qx($cmdStr);
+         unless (defined $result)
+         {
+            FRITZBOX_Log $hash, 1, "Error: No STDOUT from shell command.";
+            return undef;
+         }
          $result =~ s/\n|\r//g;
          my @resultArray = split /\|#\|/, $result;
          foreach (keys @resultArray)
