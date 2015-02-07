@@ -609,7 +609,7 @@ sub btIP_returnSVG($) {
   }
 
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
-  my $bgcolor = AnalyzePerlCommand(undef,AttrVal($name,'bgcolor','000000'));
+  my $bgcolor = AnalyzePerlCommand(undef,AttrVal($name,'bgcolor','"000000"'));
   my $output = "";
   our $svg = "";
 
@@ -707,7 +707,6 @@ sub btIP_evalLayout($$@) {
   $params{thalign} = 'start';
   $params{tvalign} = 'auto';
   $params{tbalign} = 'left';
-  $params{linespace} = 0;
   $params{boxcolor} = undef;
   $params{padding} = 0;
   $params{xx}= 0;
@@ -836,10 +835,6 @@ sub btIP_evalLayout($$@) {
 	      $svg .= btIP_itemLine($id,$x1,$y1,$x2,$y2, $format,%params);
 	    }
 	    
-        when("linespace") {
-          $params{linespace}= $def;
-        }
-
         when("moveby") {
           my ($byx,$byy)= split('[ \t]+', $def, 2);
           my ($x,$y)= btIP_xy($byx,$byy,%params);
@@ -910,11 +905,12 @@ sub btIP_evalLayout($$@) {
         }
         
         when("textbox") {
-          ($id,$x,$y,$boxwidth,$boxheight,$text,$link)= split("[ \t]+", $def, 7);
+          ($id,$x,$y,$boxwidth,$boxheight,$link,$text)= split("[ \t]+", $def, 7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
-	      my $txt= AnalyzePerlCommand(undef, $text);
-	      $txt =~ s/\n/<br\/>/g;
-	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$boxheight,$txt,$link,%params);
+	      $text =  AnalyzePerlCommand(undef, $text);
+	      $text =~ s/\n/<br\/>/g;
+          $link =  AnalyzePerlCommand(undef, $link);
+	      $svg .= btIP_itemTextBox($id,$x,$y,$boxwidth,$boxheight,$text,$link,%params);
           $params{xx} = $x;
           $params{yy} = $y + $boxheight;
         }
@@ -1345,6 +1341,11 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
            <ul>move x- and y-coordinates to the given positon<br/>
            </ul></li><br/>
        <br/>
+       <li><code>padding &lt;width&gt;</code><br/>
+           <br/>
+           <ul>border width (in pixel) to be used in textboxes<br/>
+           </ul></li><br/>
+       <br/>
        <li><code>plot &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;inline&gt; &lt;{plotName}&gt;</code><br/>
            <br/>
            <ul>embed an SVG plot into InfoPanel<br/>
@@ -1406,13 +1407,14 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                text = text content to be printed<br/>
            </ul></li><br/>
        <br/>
-       <li><code>textbox &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;boxWidth&gt; &lt;boxHeight&gt; &lt;{text}&gt; [&lt;link&gt;]</code><br/>
+       <li><code>textbox &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;boxWidth&gt; &lt;boxHeight&gt; &lt;{link}&gt; &lt;{text}&gt; </code><br/>
            <br/>
            <ul>create a textbox to print text with auto wrapping<br/>
                <br/>
                id = element id<br/>
                x,y = upper left corner<br/>
                boxWidth,boxHeight = dimensions of textbox<br/>
+               link = url to be used when clicked; use "" if not needed<br/>
                text = text to be printed in textbox<br/>
                <br/>
                <b>Important:</b> textboxes are not responsive via area tag. Use optional link parameter in textbox tag<br/>
