@@ -844,7 +844,9 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
     $p[3] = ($p[3]eq "")?"1E":$p[3];
   }
   $hash->{helper}{io}{newChn} = "";
-  $hash->{helper}{io}{rxt} = ($rxt & 0x18)?2:0;#wakeup || #lazyConfig
+  $hash->{helper}{io}{rxt} = (($rxt & 0x18)            #wakeup || #lazyConfig
+                             && AttrVal($hash->{NAME},"model",0) ne "HM-WDS100-C6-O") #Todo - not completely clear how it works
+                                 ?2:0;
   $hash->{helper}{io}{p} = \@p;
   CUL_HM_hmInitMsgUpdt($hash);
 }
