@@ -5,7 +5,7 @@
 # forked from 02_RSS.pm by Dr. Boris Neubert
 #
 ##############################################
-# $Id: $
+# $Id$
 
 package main;
 use strict;
