@@ -5,7 +5,7 @@
 # forked from 02_RSS.pm by Dr. Boris Neubert
 #
 ##############################################
-# $Id$
+# $Id: $
 
 package main;
 use strict;
@@ -451,6 +451,11 @@ sub btIP_itemTextBox {
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $color = substr($params{rgb},0,6);
   $link =~ s/"//g;
+
+  my $target = 'secret';
+     $target = '_top' if $link =~ s/^-//;
+     $target = '_blank' if $link =~ s/^\+//;
+
   my ($d,$output);
 
   if(defined($params{boxcolor})) {
@@ -469,7 +474,7 @@ sub btIP_itemTextBox {
   $d  = "<div id=\"text_$id\" style=\"position:absolute; top:".$y."px; left:".$x."px; ".
         "width:".$boxwidth."px; height:".$boxheight."px; text-overflow:ellipsis; z-index:2\" >\n".
         "<style type=\"text/css\">a {text-decoration: none;}</style>\n";
-  $d .= "<a href=\"$link\" target=\"_blank\">\n" if($link && length($link));
+  $d .= "<a href=\"$link\" target=\"$target\">\n" if($link && length($link));
   $d .= "<p style=\"font-family:$params{font}; font-size:$params{pt}; color:#$color; ".
         "width:".$boxwidth."px; height:".$boxheight."px; ".
         "margin-top:0px; text-align:$params{tbalign}; text-overflow:ellipsis; ".
@@ -1137,12 +1142,8 @@ sub btIP_getURL {
 <a name="InfoPanel"></a>
 <h3>InfoPanel</h3>
 
-<ul>
-<b>!!! This module is "under development" as of 2015-02-06 !!!</b><br/>
-<br/>
+<ul><b>!!! This module is "under development" as of 2015-02-06 !!!</b><br/>
 Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="_blank">&gt;&gt;&gt; the development thread &lt;&lt;&lt;</a> in fhem forum for actual informations.</ul>
-<br/>
-A lot of ideas,concepts and philosophy in this module were taken from module 02_RSS.pm, created by Boris.<br/>
 <br/>
 
 <ul>
