@@ -1,0 +1,273 @@
+# Schriftartfamilie festlegen
+#
+
+font arial
+
+
+# Farbe für die nächsten Aktionen festlegen
+# gültig bis zur nächsten Definition per rgb
+#
+# Format: rrggbbaa
+# rr gg bb = rgb Werte (hexadezimal)
+# aa = Deckkraft (hexadezimal) je höher der Wert,
+#      umso höher die Deckkraft
+#
+
+rgb "7F7F7FFF" # graue, voll deckend
+
+
+# Linien zeichnen
+#
+# Format: line <id> <x1> <y1> <x2> <y2> [<th>]
+# id = Name des Objekts
+# x1,y1 = obere linke Ecke des Rechtecks
+# x2 y2 = untere rechte Ecke des Rechtecks
+# th = Linienstärke (in Pixel), optional, default=1
+#
+line - 0 150 800 150 2
+line - 200 0 200 400 2
+
+line - 0 400 800 400
+line - 600 0 600 400
+
+rgb "00FF00FF" # Fadenkreuz in grün
+line - 400 100 400 400
+line - 100 300 700 300
+
+
+# pt Schriftgröße in Pixel
+# gültig bis zur nächsten Definition
+#
+pt 24
+ 
+rgb "FFFFFFFF" # Schriftfarbe weiß, voll deckend
+
+ 
+# Text zentriert ausgeben
+
+thalign "middle"
+ 
+# Text ausgeben
+# Format: text <id> <x> <y> {<text>}
+#
+text - 400 25 "InfoPanel"
+
+
+# Text linksbündig ausgeben
+#
+thalign "start"
+
+pt 12
+
+# Text kann mit textdesign auch gestaltet werden
+# mögliche Werte:
+# underline overline line-through bold italic oblique clear
+#
+textdesign underline
+text - 410  60 "Textdesign underline"
+
+textdesign bold
+text - 410  80 "Textdesign bold"
+
+textdesign bold,italic,underline
+text - 410 100 "Textdesign bold,italic,underline"
+
+# lösche alle textdesign Definitonen
+#
+textdesign clear
+text - 410 120 "Textdesign clear"
+
+
+pt 24
+
+# Datum ausgeben
+# Format: date <id> <x> <y>
+#
+date - 50 25
+ 
+ 
+# Text rechtsbündig ausgeben
+#
+thalign "end"
+ 
+ 
+# Uhrzeit ausgeben
+# Format: time <id> <x> <y>
+#
+time - 750 25
+ 
+ 
+# Rechteck zeichnen
+# Format: rect <id> <x1> <y1> <x2> <y2> <rx> <ry> [<filled>]
+# id = Name des Objekts
+# x1,y1 = obere linke Ecke des Rechtecks
+# x2 y2 = untere rechte Ecke des Rechtecks
+# rx,ry = Radien für abgerundete Ecken
+# filled = Rechteck füllen (0|1)
+#
+# 
+rgb FF00007F
+ 
+rect - 200 150 400 300 0 0 1 # rot gefüllt ohne Abrundung
+rect - 410 160 590 290 10 10 1 # rot gefüllt mit runden Ecken
+ 
+ 
+# Rechteck als Link festlegen
+# Format: area <id> <x1> <y1> <x2> <y2> <target>
+# id = Name des Objekts
+# x1,y1 = obere linke Ecke des Rechtecks
+# x2 y2 = untere rechte Ecke des Rechtecks
+# target = Ziel-URL
+#
+# 
+# wir verwenden das linke rote Rechteck
+# um zu fhem zu verlinken
+# 
+area - 200 150 400 300 "http://www.fhem.de"
+ 
+ 
+# condition funktioniert wie in 02_RSS.pm
+#
+# condition { ReadingsVal('HMinfo', 'ERR_battery', 0) }
+condition 1
+
+ 
+# Grafiken einbinden
+# Format: img <id> <x> <y> <scale> <srcType> <data>
+# id = Name des Objekts
+# x,y = obere linke Ecke der Grafik
+# #
+# 
+# wir legen ein rotes Quadrat 48x48 hinter das Bild
+rgb "FF0000FF"
+rect - 620 170 667 217 2 2 1
+
+# jetzt kommt das Bild in einer Skalierung
+# Breite = 46 Pixel
+#
+img - 621 171 w46 file "./www/images/fhemSVG/batterie.svg" 
+
+# nun zeichnen wir das gleiche Bild noch einmal,
+# allerdings soll das Batteriesymbol weiss statt schwarz
+# gezeichnet werden. Dazu gibt es die Funktion btIP_changeColor()
+#
+# Syntax: btIP_changeColor(<dateiname>,<alteFarbe>,<neueFarbe>)
+#
+rect - 620 220 667 267 2 2 1 
+img  - 621 221 w46 data { btIP_changeColor("./www/images/fhemSVG/batterie.svg","000000","FFFFFF") } 
+
+# nun zeichnen wir eine Mülltonne mit frei wählbaren Farben
+# für Vordergrund und Hintergrund
+# im Beispiel: weisse Tonne auf blauem Hintergrund
+#
+trash - 710 200 h50 "FFFFFF" "0000FF"
+
+
+# Kreis zeichnen
+# Format: circle <id> <x> <y> <r> [<filled>]
+# id = Name des Objekts
+# x,y = Mittelpunkt des Kreises
+# r = Radius
+# filled = Rechteck füllen (0|1)
+# #
+# 
+rgb "FFFF005F" # gelb
+ 
+circle - 700 350 50 1
+circle - 720 370 10 0
+ 
+ 
+# Ellipse zeichnen
+# Format: ellipse <id> <x> <y> <rx> <ry> [<filled>]
+# id = Name des Objekts
+# x,y = Mittelpunkt der Ellipse
+# rx,ry = Radien der Ellipse
+# r = Radius
+# filled = Rechteck füllen (0|1)
+# #
+# 
+rgb "0000FF5F" # blau
+ 
+ellipse - 100 300 50 70 1
+ellipse - 100 300 30 20 0
+ 
+ 
+# Plots aus fhem einbinden
+# Format: <id> <x> <y> <scale> <inline> <PlotName[;zoom][;offset]>
+# id = Name des Objekts
+# x,y = obere linke Ecke des Plots
+# scale = Skalierungsfaktor
+# inline = Plot als Link (0) oder als BASE64 (1) einfügen
+# Plotname = Name des SVG devices in fhem
+# zoom = Darstellungsbereich des Plots
+# offset = Offset des Plots
+
+ 
+# bei Bedarf ein farbiges Rechteck hinter den Plot legen:
+#
+rgb "5858587F" # dunkelgrau
+rect - 0 420 800 580 5 5 1
+ 
+# jetzt den Plot einbinden
+plot - 0 420 1 1 "SVG_owoLog_1"
+ 
+ 
+rgb "FFFFFFFF"
+thalign "start"
+ 
+# Textausrichtung vertikal
+# Darstellung ist browserabhängig!
+#
+tvalign "baseline"
+text - 10 150 "baseline"
+
+tvalign "middle"
+text - 110 150 "middle"
+
+tvalign "center"
+text - 610 150 "center"
+
+tvalign "hanging"
+text - 710 150 "hanging"
+
+tvalign "baseline"
+  
+# Sekunden anzeigen:
+#
+# 
+seconds - 300 350 # Sekunden ohne Doppelpunkt
+
+seconds - 500 350 colon # Sekunden mit Doppelpunkt
+
+ 
+# ## Textbox anlegen
+# 
+font arial
+rgb "FFFFFFFF"
+pt 12
+ 
+# boxcolor: Hintergrundfarbe der Textbox
+# Format: identisch zu rgb
+#
+# 
+boxcolor "FF0000FF"
+
+ 
+# padding: äußere Rahmenbreite der Hintergrundfarbe
+# Format: padding <n> (pixel)
+#
+# 
+padding "5"
+ 
+# textboxalign: Textausrichtung in der textbox
+# möglich: left center right justify
+#
+textboxalign justify
+ 
+# textbox
+# Format: textbox <id> <x> <y> <width> <height> {<link>} {<text>}
+#
+# 
+textbox - 210 50 180 50 "http://www.fhem.de" "Ich bin eine Textbox und wenn man mich anklickt geht es direkt zu www.fhem.de"
+
+#
