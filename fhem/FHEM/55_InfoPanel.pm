@@ -609,7 +609,7 @@ sub btIP_returnSVG($) {
   }
 
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
-  my $bgcolor = AttrVal($name,'bgcolor','000000');
+  my $bgcolor = AnalyzePerlCommand(undef,AttrVal($name,'bgcolor','000000'));
   my $output = "";
   our $svg = "";
 
@@ -625,7 +625,7 @@ sub btIP_returnSVG($) {
     # set the background
     # check if background directory is set
     my $reason= "?"; # remember reason for undefined image
-    my $bgdir= AttrVal($name,"bgdir",undef);
+    my $bgdir= AnalyzePerlCommand(undef,AttrVal($name,"bgdir",undef));
 	if(defined($bgdir)){
 		my $bgnr; # item number
 		if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
@@ -1209,6 +1209,8 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 		<li><b>bgopacity</b> - set opacity for background image, values 0...1.0</li>
 		<li><b>tmin</b> - background picture will be shown at least <code>tmin</code> seconds, 
 		    no matter how frequently the RSS feed consumer accesses the page.</li>
+		<br/>
+		<b>Important:</b> bgcolor and bgdir will be evaluated by <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> use quotes for absolute values!<br/>
 	</ul>
 	<br/><br/>
 
@@ -1220,8 +1222,11 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 	<br/><br/>
 
     <a name="InfoPanellayout"></a>
-	<b>Layout definition</b><br/><br/>
+	<b>Layout definition</b><br/>
+	<br/>
 	<ul>
+       All parameters in curly brackets can be evaluated by <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code></br>
+       <br/>
        <li><code>area &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;{link}&gt;</code><br/>
            <br/>
            <ul>create a responsive area which will call a link when clicked.<br/>
