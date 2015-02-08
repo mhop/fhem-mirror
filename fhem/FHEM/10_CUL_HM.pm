@@ -262,6 +262,13 @@ sub CUL_HM_updateConfig($){
     elsif ($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/){
       $hash->{helper}{oldDes} = "0";
     }
+    elsif ($md =~ m/(HM-Dis-WM55)/){
+      foreach my $t ("s","l"){
+        if(!defined $hash->{helper}{dispi}{$t}{"l1"}{d}){# setup if one is missing
+          $hash->{helper}{dispi}{$t}{"l$_"}{d}=1 foreach (1,2,3,4,5,6);
+        }
+      }
+    }
     elsif ($st eq "dimmer"  ) {#setup virtual dimmer channels
       my $mId = CUL_HM_getMId($hash);
       #configure Dimmer virtual channel assotiation
@@ -1835,7 +1842,6 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$devH,1,"state:$btnName $state$target"];
       if($md eq "HM-Dis-WM55"){
         my $type = $trigType eq "Short"?"s":"l";
-        Log 1,"General got trigger";
         CUL_HM_calcDisWm($chnHash,$devH->{NAME},($trigType eq "Long"?"l":"s"));
         CUL_HM_PushCmdStack($shash,"++A011$id$src$_")foreach (@{$chnHash->{helper}{disp}{$type}});
       }
@@ -4023,13 +4029,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     return "$a[2] not valid - choose short or long" if($a[2] !~ m/(short|long)/);
     my $type = $a[2] eq "short"?"s":"l";
-    
+
+    if(!defined $hash->{helper}{dispi}{$type}{"l1"}{d}){# setup if one is missing
+      $hash->{helper}{dispi}{$type}{"l$_"}{d}=1 foreach (1,2,3,4,5,6);
+    }
+
     if($a[3] =~ m/^line(.)$/){
       my $lnNr = $1;
       return "line number wrong - use 1..6" if($lnNr !~ m/[1-6]/);
       return "please add a text " if(!$a[4]);
       my $lnRd = "disp_$a[2]_l$lnNr";# reading assotiated with this entry
-      $hash->{helper}{dispi}{$type}{"l$_"}{d}=1 foreach (1,2,3,4,5,6);
       my $dh = $hash->{helper}{dispi}{$type}{"l$lnNr"};
       if ($a[4] eq "off"){ #no display in this line
         delete $dh->{txt};
@@ -4071,7 +4080,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             if(($param-1) %3);
       for (my $cnt=3;$cnt<$param;$cnt+=3){ 
         my $lnNr = int($cnt/3);
-        $hash->{helper}{dispi}{$type}{"l$lnNr"}{d}=1;#define this hash
         my $dh = $hash->{helper}{dispi}{$type}{"l$lnNr"};
         return "color wrong ".$a[$cnt+1]." use:".join(",",sort keys %disColor) if (!defined $disColor{$a[$cnt+1]});
         return "icon wrong " .$a[$cnt+2]." use:".join(",",sort keys %disIcon)  if (!defined $disIcon {$a[$cnt+2]});
@@ -5071,7 +5079,7 @@ sub CUL_HM_calcDisWm($$$){
     my ($ch,$ln);
     if($dh->{txt}){
       (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$dh->{txt});
-      $ch = sprintf("%02X",$ch);
+      $ch = sprintf("%02X",$ch) if ($ch =~ m/^\d+\d+$/);
       my $rd =  ($dh->{txt}?"$dh->{txt} ":"- ")
                .($dh->{col}?"$dh->{col} ":"- ") 
                .($dh->{icn}?"$dh->{icn} ":"- ")
