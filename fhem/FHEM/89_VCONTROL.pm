@@ -277,7 +277,13 @@ VCONTROL_Poll($)
   my $hash = shift;
   my $name = $hash->{NAME};
   #global Module Trigger that Polling is started
-  $poll_now=POLL_ACTIVE;
+  if( AttrVal($name, "disable", 0 ) == 1 )
+     {
+       $poll_now = POLL_PAUSED;
+       Log3 $name, 5, "VCONTROL: Poll disabled!";
+     }
+  else
+     {$poll_now=POLL_ACTIVE;}
   $poll_duration = gettimeofday();
   Log3 $name, 4, "VCONTROL: Start of Poll !";
   my $timer = gettimeofday()+$hash->{INTERVAL};
