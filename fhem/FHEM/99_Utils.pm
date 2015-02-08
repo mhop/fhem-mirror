@@ -237,6 +237,13 @@ fhemNc($$$)
   return $ret;
 }
 
+sub
+round($$)
+{
+  my($v,$n) = @_;
+  return sprintf("%.${n}f",$v);
+}
+
 1;
 
 =pod
@@ -245,47 +252,9 @@ fhemNc($$$)
 <a name="Utils"></a>
 <h3>Utils</h3>
 <ul>
-	<br/>
-	This is a collection of functions that can be used module-independant in all your own development<br/>
-	</br>
-	<pre>
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# IMPORTANT: do not insert your own functions inside
-# the file 99_Utils.pm!
-#
-# This file will be overwritten during an FHEM update and all
-# your own inserts will be lost.
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#
-# To avoid this, we recommend following procedure:
-#
-# 1. Create your own file 99_myUtils.pm from the template below, 
-#    e.g. with FHEMWEB, Edit files, Editing 99_Utils.pm, and saving it as 
-#    99_myUtils.pm
-# 2. Put this file inside the ./FHEM directory
-# 3. Put your own functions into this new file
-#
-<br/>
-<code>
-# start-of-template
-package main;
-
-use strict;
-use warnings;
-use POSIX;
-
-sub
-myUtils_Initialize($$)
-{
-  my ($hash) = @_;
-}
-
-1;
-
-</code>
-</pre>
-
-</br>
+  This is a collection of functions that can be used module-independant
+  in all your own development<br/>
+  </br>
   <b>Defined functions</b><br/><br/>
   <ul>
     <li><b>abstime2rel("HH:MM:SS")</b><br>tells you the difference as HH:MM:SS
@@ -334,6 +303,10 @@ myUtils_Initialize($$)
       sends textToSend to host:port, and if waitForReturn is set, then read
       the answer (wait up to 5 seconds) and return it. Intended as small
       nc replacement.
+      </li></br>
+
+    <li><b>round(value, digits)</b><br>
+      round &lt;value&gt; to given digits behind comma
       </li></br>
 
     <li><b>getUniqueId()</b><br>
