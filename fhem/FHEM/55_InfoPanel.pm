@@ -253,6 +253,8 @@ sub btIP_itemCircle {
        $output .= "fill:none; " if ($filled == 0);
     }
     $output .= "\" ";
+  } else {
+    $output .= "style=\"fill:none; stroke-width:0; \" ";
   }
   $output .= "/>\n";
   return $output;
@@ -281,6 +283,8 @@ sub btIP_itemEllipse {
        $output .= "fill:none; " if ($filled == 0);
     }
     $output .= "\" ";
+  } else {
+    $output .= "style=\"fill:none; stroke-width:0; \" ";
   }
   $output .= "/>\n";
   return $output;
@@ -451,6 +455,8 @@ sub btIP_itemRect {
        $output .= "fill:none; " if ($filled == 0);
     }
     $output .= "\" ";
+  } else {
+    $output .= "style=\"fill:none; stroke-width:0; \" ";
   }
   $output .= "/>\n";
   return $output;
