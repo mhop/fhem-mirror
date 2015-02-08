@@ -113,6 +113,7 @@ sub CUL_HM_qStateUpdatIfEnab($@);
 sub CUL_HM_getAttrInt($@);
 sub CUL_HM_appFromQ($$);
 sub CUL_HM_autoReadReady($);
+sub CUL_HM_calcDisWm($$$);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
@@ -893,6 +894,24 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
                           ,"threeStateSensor"=>{"00"=>"closed"  ,"64"=>"tilted"  ,"C8"=>"open"}
                          }
                   );
+                  
+    my %disColor=(white=>0,red=>1,orange=>2,yellow=>3,green=>4,blue=>5);
+    my %disIcon=( off =>0, on=>1, open=>2, closed=>3, error=>4, ok=>5
+                 ,info=>6, newMsg=>7, serviceMsg=>8
+                 ,sigGreen=>9, sigYellow=>10, sigRed=>11
+                 ,ic12=>12, ic13=>13
+                 ,noIcon=>99
+                );
+    my %disBtn=(  txt01_1=>0, txt01_2=>1, txt02_1=>2, txt02_2=>3, txt03_1=>4 
+                , txt03_2=>5, txt04_1=>6, txt04_2=>7, txt05_1=>8, txt05_2=>9
+                , txt06_1=>10,txt06_2=>11,txt07_1=>12,txt07_2=>13,txt08_1=>14
+                , txt08_2=>15,txt09_1=>16,txt09_2=>17,txt10_1=>18,txt10_2=>19
+                );
+                 
+                  
+                  
+                  
+                  
 sub CUL_HM_Parse($$) {#########################################################
   my ($iohash, $msgIn) = @_;
 
@@ -1816,6 +1835,8 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$devH,1,"state:$btnName $state$target"];
       if($md eq "HM-Dis-WM55"){
         my $type = $trigType eq "Short"?"s":"l";
+        Log 1,"General got trigger";
+        CUL_HM_calcDisWm($chnHash,$devH->{NAME},($trigType eq "Long"?"l":"s"));
         CUL_HM_PushCmdStack($shash,"++A011$id$src$_")foreach (@{$chnHash->{helper}{disp}{$type}});
       }
     }
@@ -3982,24 +4003,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "displayWM" ) { ###############################################
     $state = "";
     # textNo color icon
-    my %color=(white=>0,red=>1,orange=>2,yellow=>3,green=>4,blue=>5);
-    my %icon=( off =>0, on=>1, open=>2, closed=>3, error=>4, ok=>5
-              ,info=>6, newMsg=>7, serviceMsg=>8
-              ,sigGreen=>9, sigYellow=>10, sigRed=>11
-              ,ic12=>12, ic13=>13
-              ,noIcon=>99
-              );
-    my %btn=(  txt01_1=>0, txt01_2=>1, txt02_1=>2, txt02_2=>3, txt03_1=>4 
-             , txt03_2=>5, txt04_1=>6, txt04_2=>7, txt05_1=>8, txt05_2=>9
-             , txt06_1=>10,txt06_2=>11,txt07_1=>12,txt07_2=>13,txt08_1=>14
-             , txt08_2=>15,txt09_1=>16,txt09_2=>17,txt10_1=>18,txt10_2=>19
-             );
-    
-    
     my $param = (scalar(@a)-2);
     if ($a[2] eq "help"){
       my $ret = "text :\n      <text> max 2 char";
-      foreach (sort keys %btn){
+      foreach (sort keys %disBtn){
         my (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$_);
         $ch = sprintf("%02X",$ch);
         $ret .= "\n      $_ ->" 
@@ -4007,9 +4014,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                 ,"text$ln","unkown");
       }
       $ret .= "\n      off nc(no change)"
-             ."\ncolor:".join(",",sort keys %color)
+             ."\ncolor:".join(",",sort keys %disColor)
              ."\n      nc(no change)"
-             ."\nicon :".join(",",sort keys %icon)
+             ."\nicon :".join(",",sort keys %disIcon)
              ;
       return $ret;
     }
@@ -4027,6 +4034,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       if ($a[4] eq "off"){ #no display in this line
         delete $dh->{txt};
       }
+      elsif($a[4] =~ m/^e:/){ # equation
+        $dh->{d} = 2; # mark as equation
+        $dh->{exe} = $a[4];
+        $dh->{exe} =~ s/^e://;
+        ($dh->{txt},$a[5],$a[6]) = eval $dh->{exe};
+        return "define eval must return 3 values:" if(!defined $a[6]);
+      }
       elsif($a[4] ne "nc"){ # new text
         return "text too long " .$a[4]   if (length($a[4])>12);
         $dh->{txt}=$a[4];
@@ -4037,7 +4051,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           delete $dh->{col};
         }
         elsif($a[5] ne "nc"){ # set new color
-          return "color wrong $a[5] use:".join(",",sort keys %color) if (!defined $color{$a[5]});
+          return "color wrong $a[5] use:".join(",",sort keys %disColor) if (!defined $disColor{$a[5]});
           $dh->{col}=$a[5];
         }
       }
@@ -4047,7 +4061,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           delete $dh->{icn};
         }
         elsif($a[6] ne "nc"){ # new icon
-          return "icon wrong $a[6] use:".join(",",sort keys %icon)  if (!defined $icon {$a[6]});
+          return "icon wrong $a[6] use:".join(",",sort keys %disIcon)  if (!defined $disIcon {$a[6]});
           $dh->{icn}=$a[6];
         }
       }
@@ -4059,8 +4073,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         my $lnNr = int($cnt/3);
         $hash->{helper}{dispi}{$type}{"l$lnNr"}{d}=1;#define this hash
         my $dh = $hash->{helper}{dispi}{$type}{"l$lnNr"};
-        return "color wrong ".$a[$cnt+1]." use:".join(",",sort keys %color) if (!defined $color{$a[$cnt+1]});
-        return "icon wrong " .$a[$cnt+2]." use:".join(",",sort keys %icon)  if (!defined $icon {$a[$cnt+2]});
+        return "color wrong ".$a[$cnt+1]." use:".join(",",sort keys %disColor) if (!defined $disColor{$a[$cnt+1]});
+        return "icon wrong " .$a[$cnt+2]." use:".join(",",sort keys %disIcon)  if (!defined $disIcon {$a[$cnt+2]});
         return "text too long " .$a[$cnt+0]   if (length($a[$cnt+0])>12);
         if    ($a[$cnt+0] eq "nc") {} # nc = no change
         elsif ($a[$cnt+0] eq "off"){ delete $dh->{txt}      } # off =  no text display
@@ -4071,50 +4085,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         delete $dh->{icn} if ($a[$cnt+2] eq "noIcon");
       }
     }
+
     foreach my $t (keys %{$hash->{helper}{dispi}}){ # prepare the messages
-      my $msg;
-      my $ts = $t eq "s"?"short":"long";
-      foreach my $l (sort keys %{$hash->{helper}{dispi}{$t}}){
-        my $dh = $hash->{helper}{dispi}{$t}{"$l"};
-        my (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$dh->{txt});
-        $ch = sprintf("%02X",$ch);
-        my $rd =  ($dh->{txt}?"$dh->{txt} ":"- ")
-                 .($dh->{col}?"$dh->{col} ":"- ") 
-                 .($dh->{icn}?"$dh->{icn} ":"- ")
-                 ;
-        $rd .= "->". ReadingsVal(InternalVal($devName,"channel_$ch","no")
-                                           ,"text$ln","unkown")
-                        if (defined $btn{$dh->{txt}  });
-        readingsSingleUpdate($hash,"disp_${ts}_$l"
-                           ,$rd
-                           ,0);
-
-        if($dh->{txt}){
-          if (defined $btn{$dh->{txt}  }){
-            $msg .= sprintf("12%02X",$btn{$dh->{txt}  }+0x80);
-          } 
-          else{
-            $msg .= "12";
-            $msg .= uc( unpack("H*",$dh->{txt})) if ($dh->{txt});
-          }
-        }
-        else{
-          $msg .= "12";
-        }
-
-        $msg .= sprintf("11%02X",$color{$dh->{col}}+0x80)if ($dh->{col});
-        $msg .= sprintf("13%02X",$icon{$dh->{icn} }+0x80)if ($dh->{icn});
-        $msg .= "0A";# end of line indicator
-      }
-      
-      my $msgh = "800102";
-      $msg .= "03";
-      my @txtMsg2;
-      foreach (unpack('(A28)*',$msg)){ 
-        push @txtMsg2,$msgh.$_;
-        $msgh = "8001";
-      }
-      $hash->{helper}{disp}{$t} = \@txtMsg2;
+      CUL_HM_calcDisWm($hash,$devName,$t);
     }
   }
 
@@ -5064,6 +5037,72 @@ sub CUL_HM_getConfig($){
       }
     }
   }
+}
+
+sub CUL_HM_calcDisWmSet($){
+  my $dh = shift; 
+  my ($txt,$col,$icon) = eval $dh->{exe};
+  if ($txt eq "off")    { delete $dh->{txt};}
+  elsif($txt ne "nc"){ 
+    if (length($txt)>12){ delete $dh->{txt};}
+    else                { $dh->{txt} = $txt; }
+  }
+
+  if($col eq "off")              { delete $dh->{col};}
+  elsif($col ne "nc"){
+    if (!defined $disColor{$col}){ delete $dh->{col};}
+    else                         { $dh->{col}=$col; }
+  }
+
+  if($icon eq "noIcon"){           delete $dh->{icn};}
+  elsif($icon ne "nc"){ 
+    if (!defined $disIcon {$icon}){delete $dh->{icn}}
+    else                          {$dh->{icn}=$icon;}
+  }
+}
+sub CUL_HM_calcDisWm($$$){
+  my ($hash,$devName,$t)= @_; # t = s or l
+  my $msg;
+  my $ts = $t eq "s"?"short":"long";
+  foreach my $l (sort keys %{$hash->{helper}{dispi}{$t}}){
+    my $dh = $hash->{helper}{dispi}{$t}{"$l"};
+    CUL_HM_calcDisWmSet($dh) if ($dh->{d} == 2);
+
+    my ($ch,$ln);
+    if($dh->{txt}){
+      (undef,$ch,undef,$ln) = unpack('A3A2A1A1',$dh->{txt});
+      $ch = sprintf("%02X",$ch);
+      my $rd =  ($dh->{txt}?"$dh->{txt} ":"- ")
+               .($dh->{col}?"$dh->{col} ":"- ") 
+               .($dh->{icn}?"$dh->{icn} ":"- ")
+               ;
+      $rd .= "->". ReadingsVal(InternalVal($devName,"channel_$ch","no")
+                                         ,"text$ln","unkown")
+                      if (defined $disBtn{$dh->{txt}  });
+      readingsSingleUpdate($hash,"disp_${ts}_$l"
+                         ,$rd
+                         ,0);
+      if (defined $disBtn{$dh->{txt}  }){
+        $msg .= sprintf("12%02X",$disBtn{$dh->{txt}  }+0x80);
+      } 
+      else{
+        $msg .= "12";
+        $msg .= uc( unpack("H*",$dh->{txt})) if ($dh->{txt});
+      }
+    }
+
+    $msg .= sprintf("11%02X",$disColor{$dh->{col}}+0x80)if ($dh->{col});
+    $msg .= sprintf("13%02X",$disIcon{$dh->{icn} }+0x80)if ($dh->{icn});
+    $msg .= "0A";# end of line indicator
+  }
+  my $msgh = "800102";
+  $msg .= "03";
+  my @txtMsg2;
+  foreach (unpack('(A28)*',$msg)){ 
+    push @txtMsg2,$msgh.$_;
+    $msgh = "8001";
+  }
+  $hash->{helper}{disp}{$t} = \@txtMsg2;
 }
 
 sub CUL_HM_RemoveHMPair($) {####################################################
