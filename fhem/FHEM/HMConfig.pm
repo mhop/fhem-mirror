@@ -477,6 +477,8 @@ my $K_actDetID = '000000'; # id of actionDetector
 # BL1TPBU  02:01 21:FF
 # Dim1TPBU 02:01 21:FF 22:00
 # HM-MOD-Re-8 30:49
+# tx: D1E8  9158 
+
 #Keymatic 3.3 unknown, seen 1 here
 
 #--- list 1, Channel level------------------
@@ -657,14 +659,14 @@ my $K_actDetID = '000000'; # id of actionDetector
   displayTemp     =>{a=>  1.1,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{actual=>0,setpoint=>1}},
   displayTempUnit =>{a=>  1.2,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{celsius=>0,fahrenheit=>1}},
   controlMode     =>{a=>  1.3,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{manual=>0,auto=>1,central=>2,party=>3}},
-  decalcDay       =>{a=>  1.5,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Decalc weekday"                       ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
+  decalcDay       =>{a=>  1.5,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Decalc weekday"                       ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
   mdTempValve     =>{a=>  2.6,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{auto=>0,close=>1,open=>2}},
   "day-temp"      =>{a=>  3  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort or day temperatur"},
   "night-temp"    =>{a=>  4  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"lower or night temperatur"},
   tempWinOpen     =>{a=>  5  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open"},
   "party-temp"    =>{a=>  6  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
-  decalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>''         ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
-  decalHr         =>{a=>  8.3,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
+  decalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>''         ,f=>0.1     ,u=>'min' ,d=>0,t=>"Decalc min"},
+  decalHr         =>{a=>  8.3,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>0,t=>"Decalc hour"},
 
   partyEndHr      =>{a=> 97  ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end hour. Use cmd partyMode to set"},
   partyEndMin     =>{a=> 97.7,s=>0.1,l=>6,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"Party end min. Use cmd partyMode to set"   ,lit=>{"00"=>0,"30"=>1}},
@@ -675,12 +677,12 @@ my $K_actDetID = '000000'; # id of actionDetector
 
   dayTemp         =>{a=>  1  ,s=>0.6,l=>7,min=>15 ,max=>30      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"comfort or day temperatur"},
   nightTemp       =>{a=>  2  ,s=>0.6,l=>7,min=>5  ,max=>25      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"lower or night temperatur"},
-  tempMin         =>{a=>  3  ,s=>0.6,l=>7,min=>4.5,max=>14.5    ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"minimum temperatur"},
-  tempMax         =>{a=>  4  ,s=>0.6,l=>7,min=>15 ,max=>30.5    ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"maximum temperatur"},
-  winOpnTemp      =>{a=>  5  ,s=>0.6,l=>7,min=>5  ,max=>30      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>1,t=>"lowering temp whenWindow is opened"},
-  winOpnPeriod    =>{a=>  6  ,s=>0.4,l=>7,min=>0  ,max=>60      ,c=>''         ,f=>'0.2'   ,u=>'min' ,d=>1,t=>"period lowering when window is open"},
-  decalcWeekday   =>{a=>  7  ,s=>0.3,l=>7,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"decalc at day"                        ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
-  decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>'min2time' ,f=>''      ,u=>''    ,d=>1,t=>"decalc at hour"},
+  tempMin         =>{a=>  3  ,s=>0.6,l=>7,min=>4.5,max=>14.5    ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>0,t=>"minimum temperatur"},
+  tempMax         =>{a=>  4  ,s=>0.6,l=>7,min=>15 ,max=>30.5    ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>0,t=>"maximum temperatur"},
+  winOpnTemp      =>{a=>  5  ,s=>0.6,l=>7,min=>5  ,max=>30      ,c=>''         ,f=>'2'     ,u=>'C'   ,d=>0,t=>"lowering temp whenWindow is opened"},
+  winOpnPeriod    =>{a=>  6  ,s=>0.4,l=>7,min=>0  ,max=>60      ,c=>''         ,f=>'0.2'   ,u=>'min' ,d=>0,t=>"period lowering when window is open"},
+  decalcWeekday   =>{a=>  7  ,s=>0.3,l=>7,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"decalc at day"                        ,lit=>{Sat=>0,Sun=>1,Mon=>2,Tue=>3,Wed=>4,Thu=>5,Fri=>6}},
+  decalcTime      =>{a=>  8  ,s=>0.6,l=>7,min=>0  ,max=>1410    ,c=>'min2time' ,f=>''      ,u=>''    ,d=>0,t=>"decalc at hour"},
   tempOffset      =>{a=>  9  ,s=>0.4,l=>7,min=>0  ,max=>15      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"temperature offset"                   ,lit=>{"-3.5K"=>0,"-3.0K"=>1,"-2.5K"=>2,"-2.0K"=>3,"-1.5K"=>4,"-1.0K"=>5,"-0.5K"=>6,
                                                                                                                                         "0.0K"=>7, "0.5K"=>8, "1.0K"=>9, "1.5K"=>10, "2.0K"=>11, "2.5K"=>12, "3.0K"=>13, "3.5K"=>14}},
   btnNoBckLight   =>{a=>  9.4,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"button response without backlight"    ,lit=>{off=>0,on=>1}},
@@ -689,17 +691,17 @@ my $K_actDetID = '000000'; # id of actionDetector
   sendWeatherData =>{a=>  9.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"send  weather data"                   ,lit=>{off=>0,on=>1}},
 
   boostPos        =>{a=> 10.0,s=>0.5,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>'0.2'   ,u=>'%'   ,d=>1,t=>"valve boost position"},
-  boostPeriod     =>{a=> 10.5,s=>0.3,l=>7,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>1,t=>"boost period [min]"                   ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5,30=>6}},
+  boostPeriod     =>{a=> 10.5,s=>0.3,l=>7,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>'min' ,d=>0,t=>"boost period [min]"                   ,lit=>{0=>0,5=>1,10=>2,15=>3,20=>4,25=>5,30=>6}},
   valveOffsetRt   =>{a=> 11  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"offset for valve"},
-  valveMaxPos     =>{a=> 12  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve maximum position"},
-  valveErrPos     =>{a=> 13  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"valve error position"},
+  valveMaxPos     =>{a=> 12  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>0,t=>"valve maximum position"},
+  valveErrPos     =>{a=> 13  ,s=>0.7,l=>7,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'   ,d=>0,t=>"valve error position"},
 
   daylightSaveTime=>{a=> 14  ,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"set daylight saving time"             ,lit=>{off=>0,on=>1}},
   regAdaptive     =>{a=> 14.1,s=>0.2,l=>7,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"adaptive regu on or off with default or determined values",lit=>{offDefault=>0,offDeter=>1,on=>2}},
   showInfo        =>{a=> 14.3,s=>0.2,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show date or time"                    ,lit=>{time=>0,date=>1}},
   winOpnBoost     =>{a=> 14.5,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"boost after window closed"            ,lit=>{off=>0,on=>1}},
   noMinMax4Manu   =>{a=> 14.6,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"min/max is irrelevant for manual mode",lit=>{off=>0,on=>1}},
-  showWeekday     =>{a=> 14.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"show weekday"                         ,lit=>{off=>0,on=>1}},
+  showWeekday     =>{a=> 14.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"show weekday"                         ,lit=>{off=>0,on=>1}},
 
   hyst2point      =>{a=> 15.0,s=>0.5,l=>7,min=>0  ,max=>2       ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
   heatCool        =>{a=> 15.7,s=>0.1,l=>7,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select heating or cooling"            ,lit=>{heating=>0,cooling=>1}},
@@ -708,15 +710,15 @@ my $K_actDetID = '000000'; # id of actionDetector
   modePrioParty   =>{a=> 18.0,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for party only by: " ,lit=>{RT_TC_SC_SELF=>0,all=>1,RT_TC_CCU_SELF=>2,CCU=>3,self=>4}},
   modePrioManu    =>{a=> 18.3,s=>0.3,l=>7,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"allow tempChange for manual only by: ",lit=>{RT_TC_SC_SELF=>0,all=>1,RT_TC_CCU_SELF=>2,CCU=>3,self=>4}},
 
-  winOpnMode      =>{a=> 19.5,s=>0.3,l=>7,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable internal Windoe open in modes: ",lit=>{off=>0,auto=>1,auto_manu=>2,auto_party=>3,on=>4}},
-  winOpnDetFall   =>{a=> 19.0,s=>0.5,l=>7,min=>0.5,max=>2.5     ,c=>''         ,f=>'10'    ,u=>'K'   ,d=>1,t=>"detect Window Open if temp falls more then..."},
+  winOpnMode      =>{a=> 19.5,s=>0.3,l=>7,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"enable internal Windoe open in modes: ",lit=>{off=>0,auto=>1,auto_manu=>2,auto_party=>3,on=>4}},
+  winOpnDetFall   =>{a=> 19.0,s=>0.5,l=>7,min=>0.5,max=>2.5     ,c=>''         ,f=>'10'    ,u=>'K'   ,d=>0,t=>"detect Window Open if temp falls more then..."},
 
-  reguIntI        =>{a=>202.0,s=>1  ,l=>7,min=>10 ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator I-param internal mode"},
-  reguIntP        =>{a=>203.0,s=>1  ,l=>7,min=>25 ,max=>35      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param internal mode"},
-  reguIntPstart   =>{a=>204.0,s=>1  ,l=>7,min=>5  ,max=>45      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param internal mode start value"},
-  reguExtI        =>{a=>205.0,s=>1  ,l=>7,min=>10 ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator I-param extern mode"},
-  reguExtP        =>{a=>206.0,s=>1  ,l=>7,min=>25 ,max=>35      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param extern mode"},
-  reguExtPstart   =>{a=>207.0,s=>1  ,l=>7,min=>5  ,max=>45      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"regulator P-param extern mode start value"},
+  reguIntI        =>{a=>202.0,s=>1  ,l=>7,min=>10 ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"regulator I-param internal mode"},
+  reguIntP        =>{a=>203.0,s=>1  ,l=>7,min=>25 ,max=>35      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"regulator P-param internal mode"},
+  reguIntPstart   =>{a=>204.0,s=>1  ,l=>7,min=>5  ,max=>45      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"regulator P-param internal mode start value"},
+  reguExtI        =>{a=>205.0,s=>1  ,l=>7,min=>10 ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"regulator I-param extern mode"},
+  reguExtP        =>{a=>206.0,s=>1  ,l=>7,min=>25 ,max=>35      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"regulator P-param extern mode"},
+  reguExtPstart   =>{a=>207.0,s=>1  ,l=>7,min=>5  ,max=>45      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"regulator P-param extern mode start value"},
   );
 
 #'THSensor'
@@ -802,7 +804,8 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,sensRain            =>{ transmDevTryMax =>1,localResDis     =>1}
  ,tipTronic           =>{ cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1}
  ,powerMeter          =>{ intKeyVisib     =>1,localResDis     =>1}
- ,powerSensor         =>{ mtrType         =>1,mtrConstIr      =>1,mtrConstGas     =>1,mtrConstLed     =>1  
+ ,powerSensor         =>{ transmitTryMax  =>1,transmDevTryMax =>1
+                         ,mtrType         =>1,mtrConstIr      =>1,mtrConstGas     =>1,mtrConstLed     =>1  
                          ,mtrSensIr       =>1  
                         }
 );
