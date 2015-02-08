@@ -206,8 +206,8 @@ sv_menu(evt, embed)
           $("#content").append(par.div);
 
           var pl = selNode[arrName];
-          if(pl.length > 2)
-            mousemove({pageX:pl[pl.length-2].x});
+          if(pl.numberOfItems > 2)
+            mousemove({pageX:pl.getItem(pl.numberOfItems-2).x});
         }
       }
 
@@ -233,16 +233,16 @@ sv_menu(evt, embed)
   function
   mousemove(e)
   {
-    var xRaw = e.pageX, pl = selNode[arrName], l = pl.length, i1;
+    var xRaw = e.pageX, pl = selNode[arrName], l = pl.numberOfItems, i1;
     if(!embed)
       xRaw -= $(svg).offset().left;
     for(i1=0; i1<l; i1++)
-      if(pl[i1].x > xRaw)
+      if(pl.getItem(i1).x > xRaw)
         break;
     if(i1==l || i1==0)
       return;
 
-    var pp=pl[i1-1], pn=pl[i1];
+    var pp=pl.getItem(i1-1), pn=pl.getItem(i1);
     var xR = (xRaw-pp.x)/(pn.x-pp.x);   // Compute interim values
     var yRaw = pp.y+xR*(pn.y-pp.y); 
 
