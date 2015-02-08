@@ -4124,9 +4124,11 @@ addStructChange($$$)
   return if(!$init_done);
 
   my ($cmd, $dev, $param) = @_;
-  return if(!$defs{$dev} || $defs{$dev}{TEMPORARY} || $defs{$dev}{VOLATILE});
+  return if(!$defs{$dev} || $defs{$dev}{TEMPORARY});
 
   $lastDefChange++;
+  return if($defs{$dev}{VOLATILE});
+
   shift @structChangeHist if(@structChangeHist > 9);
   $param = substr($param, 0, 40)."..." if(length($param) > 40);
   push @structChangeHist, "$cmd $param";
