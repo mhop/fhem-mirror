@@ -95,7 +95,7 @@ DevIo_TimeoutRead($$)
     my $nfound = select($rin, undef, undef, $timeout);
     last if($nfound <= 0);
     my $r = DevIo_DoSimpleRead($hash);
-    last if(!defined($r));
+    last if(!defined($r) || $r == "");
     $answer .= $r;
   }
   return $answer;
