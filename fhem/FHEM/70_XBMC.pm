@@ -872,7 +872,7 @@ sub XBMC_Set($@)
     "mute:toggle,on,off volume:slider,0,1,100 quit:noArg " . 
     "eject:noArg hibernate:noArg reboot:noArg shutdown:noArg suspend:noArg " . 
     "videolibrary:scan,clean audiolibrary:scan,clean statusRequest jsonraw " .
-    "connect";
+    "connect:noArg";
   return $res ;
 
 }
