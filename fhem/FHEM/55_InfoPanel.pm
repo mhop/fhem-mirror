@@ -5,7 +5,7 @@
 # forked from 02_RSS.pm by Dr. Boris Neubert
 #
 ##############################################
-# $Id: 55_InfoPanel.pm 7910 2015-02-07 18:29:59Z betateilchen $
+# $Id: 55_InfoPanel.pm 7921 2015-02-08 20:34:48Z betateilchen $
 
 package main;
 use strict;
@@ -200,12 +200,8 @@ sub btIP_itemArea {
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
-
-#  my $target = 'secret';
-#     $target = '_top' if $link =~ s/^-//;
-#     $target = '_blank' if $link =~ s/^\+//;
-
-  my $target = btIP_findTarget($link);
+  my $target;
+  ($link,$target) = btIP_findTarget($link);
   
   my $output  = "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" xlink:href=\"$link\" target=\"$target\" >\n";
      $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" opacity=\"0\" />\n";
@@ -221,11 +217,8 @@ sub btIP_itemButton {
   my ($r,$g,$b,$a) = btIP_color($params{boxcolor});
   $text = AnalyzePerlCommand(undef,$text);
   $link = AnalyzePerlCommand(undef,$link);
-#  my $target = 'secret';
-#     $target = '_top' if $link =~ s/^-//;
-#     $target = '_blank' if $link =~ s/^\+//;
-
-  my $target = btIP_findTarget($link);
+  my $target;
+  ($link,$target) = btIP_findTarget($link);
   
   my $output  =  "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" ".
                  "xlink:href=\"$link\" target=\"$target\" >\n";
@@ -245,12 +238,21 @@ sub btIP_itemButton {
 }
 
 sub btIP_itemCircle {
-  my ($id,$x,$y,$r,$filled,%params)= @_;
+  my ($id,$x,$y,$r,$filled,$stroked,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $output = "<circle id=\”$id\” cx=\"$x\" cy=\"$y\" r=\"$r\" ";
-  if($filled) {
-    my ($r,$g,$b,$a) = btIP_color($params{rgb});
-    $output .= "style=\"fill:rgb($r,$g,$b); fill-opacity:$a; stroke-width:0;\" "
+  if($filled > 0 || $stroked > 0) {
+    $output .= "style=\"";
+    if($filled > 0) {
+       my ($r,$g,$b,$a) = btIP_color($params{rgb});
+       $output .= "fill:rgb($r,$g,$b); fill-opacity:$a; ";
+    }
+    if($stroked > 0) {
+       my ($r,$g,$b,$a) = btIP_color($params{rgb});
+       $output .= "stroke:rgb($r,$g,$b); stroke-width:$stroked; ";
+       $output .= "fill:none; " if ($filled == 0);
+    }
+    $output .= "\" ";
   }
   $output .= "/>\n";
   return $output;
@@ -264,12 +266,21 @@ sub btIP_itemDate {
 }
 
 sub btIP_itemEllipse {
-  my ($id,$x,$y,$rx,$ry,$filled,%params)= @_;
+  my ($id,$x,$y,$rx,$ry,$filled,$stroked,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $output = "<ellipse $id=\"$id\" cx=\"$x\" cy=\"$y\" rx=\"$rx\" ry=\"$ry\" ";
-  if($filled) {
-    my ($r,$g,$b,$a) = btIP_color($params{rgb});
-    $output .= "style=\"fill:rgb($r,$g,$b); fill-opacity:$a; stroke-width:0;\" "
+  if($filled > 0 || $stroked > 0) {
+    $output .= "style=\"";
+    if($filled > 0) {
+       my ($r,$g,$b,$a) = btIP_color($params{rgb});
+       $output .= "fill:rgb($r,$g,$b); fill-opacity:$a; ";
+    }
+    if($stroked > 0) {
+       my ($r,$g,$b,$a) = btIP_color($params{rgb});
+       $output .= "stroke:rgb($r,$g,$b); stroke-width:$stroked; ";
+       $output .= "fill:none; " if ($filled == 0);
+    }
+    $output .= "\" ";
   }
   $output .= "/>\n";
   return $output;
@@ -481,8 +492,8 @@ sub btIP_itemTextBox {
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $color = substr($params{rgb},0,6);
   $link =~ s/"//g;
-
-  my $target = btIP_findTarget($link);
+  my $target;
+  ($link,$target) = btIP_findTarget($link);
   
   my ($d,$output);
 
@@ -567,7 +578,7 @@ sub btIP_findTarget {
   my $target = 'secret';
      $target = '_top' if $link =~ s/^-//;
      $target = '_blank' if $link =~ s/^\+//;
-  return $target;
+  return ($link,$target);
 }
 
 sub btIP_color {
@@ -825,10 +836,11 @@ sub btIP_evalLayout($$@) {
         }
 
 	    when("circle") {
-	      ($id,$x1,$y1,$r1,$format)= split("[ \t]+", $def, 5);
+	      ($id,$x1,$y1,$r1,$filled,$stroked)= split("[ \t]+", $def, 6);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
-	      $format //= 0; # set format to 0 as default (not filled)
-	      $svg .= btIP_itemCircle($id,$x1,$y1,$r1,$format,%params);
+	      $filled  //= 0; 
+	      $stroked //= 0;
+	      $svg .= btIP_itemCircle($id,$x1,$y1,$r1,$filled,$stroked,%params);
 	    }
 	    
 	    when("date") {
@@ -840,10 +852,11 @@ sub btIP_evalLayout($$@) {
 	    }
 	    
 	    when("ellipse") {
-	      ($id,$x1,$y1,$r1,$r2,$format)= split("[ \t]+", $def, 6);
+	      ($id,$x1,$y1,$r1,$r2,$filled,$stroked)= split("[ \t]+", $def, 7);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
-	      $format //= 0; # set format to 0 as default (not filled)
-	      $svg .= btIP_itemEllipse($id,$x1,$y1,$r1,$r2,$format,%params);
+	      $filled  //= 0;
+	      $stroked //= 0;
+	      $svg .= btIP_itemEllipse($id,$x1,$y1,$r1,$r2,$filled,$stroked,%params);
 	    }
 	    
 	    when("font") {
@@ -1309,14 +1322,15 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
            <ul>needed once in your layout file if you intend to use buttons in the same layout.<br/>
            </ul></li><br/>
        <br/>
-       <li><code>circle &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r&gt; [&lt;fill&gt;]</code><br/>
+       <li><code>circle &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;]</code><br/>
            <br/>
            <ul>create a circle<br/>
                <br/>
                id = element id<br/>
                x,y = center coordinates of circle<br/>
                r = radius<br/>
-               fill = circle will be filled with "rgb" color if set to 1<br/>
+               fill = circle will be filled with "rgb" color if set to 1. Default = 0<br/>
+               stroke-width = defines stroke width to draw around the circle. Default = 0<br/>
            </ul></li><br/>
        <br/>
        <li><code>date &lt;id&gt; &lt;x&gt; &lt;y&gt;</code><br/>
@@ -1327,14 +1341,15 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                x,y = position<br/>
            </ul></li><br/>
        <br/>
-       <li><code>ellipse &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;]</code><br/>
+       <li><code>ellipse &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;]</code><br/>
            <br/>
            <ul>create an ellipse<br/>
                <br/>
                id = element id<br/>
                x,y = center coordinates of circle<br/>
                r1,r2 = radius<br/>
-               fill = ellipse will be filled with "rgb" color if set to 1<br/>
+               fill = ellipse will be filled with "rgb" color if set to 1. Default = 0<br/>
+               stroke-width = defines stroke width to draw around the ellipse. Default = 0<br/>
            </ul></li><br/>
        <br/>
        <li><code>font &lt;font-family&gt;</code><br/>
