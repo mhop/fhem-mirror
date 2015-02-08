@@ -2571,6 +2571,7 @@ FW_widgetFallbackFn()
       $current = Value($d);
     }
     $current =~ s/$cmd //;
+    $current = ReplaceEventMap($d, $current, 1);
   }
   return "<td><div class='fhemWidget' cmd='$cmd' reading='$reading' ".
                 "dev='$d' arg='$values' current='$current'></div></td>";
