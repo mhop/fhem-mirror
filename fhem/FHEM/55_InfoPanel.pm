@@ -5,14 +5,12 @@
 # forked from 02_RSS.pm by Dr. Boris Neubert
 #
 ##############################################
-# $Id: $
+# $Id: 55_InfoPanel.pm 7910 2015-02-07 18:29:59Z betateilchen $
 
 package main;
 use strict;
 use warnings;
 
-use MIME::Base64;
-use Image::Info qw(image_info dim);
 #use Data::Dumper;
 
 use feature qw/switch/;
@@ -23,6 +21,8 @@ my @cmd_halign= qw(thalign ihalign);
 my @cmd_valign= qw(tvalign ivalign);
 my @valid_valign = qw(auto baseline middle center hanging);
 my @valid_halign = qw(start middle end);
+
+my $useImgTools = 1;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
@@ -58,6 +58,7 @@ sub btIP_itemText;
 sub btIP_itemTextBox;
 sub btIP_itemTime;
 sub btIP_itemTrash;
+sub btIP_findTarget;
 sub btIP_color;
 sub btIP_xy;
 sub btIP_changeColor;
@@ -81,12 +82,22 @@ sub btIP_getURL;
 
 sub InfoPanel_Initialize($) {
     my ($hash) = @_;
-    $hash->{DefFn}    = "btIP_Define";
-	$hash->{UndefFn}  = "btIP_Undef";
-    #$hash->{AttrFn}   = "btIP_Attr";
-    $hash->{AttrList} = "autoreread:1,0 bgcenter:1,0 bgcolor bgdir bgopacity refresh size title tmin";
-    $hash->{SetFn}    = "btIP_Set";
-    $hash->{NotifyFn} = "btIP_Notify";
+
+    eval "use MIME::Base64";
+    $useImgTools = 0 if($@);
+    Log3(undef,4,"InfoPanel: MIME::Base64 missing.") unless $useImgTools;
+    eval "use Image::Info qw(image_info dim)";
+    $useImgTools = 0 if($@);
+    Log3(undef,4,"InfoPanel: Image::Info missing.") unless $useImgTools;
+
+    $hash->{DefFn}     = "btIP_Define";
+	$hash->{UndefFn}   = "btIP_Undef";
+    #$hash->{AttrFn}    = "btIP_Attr";
+    $hash->{SetFn}     = "btIP_Set";
+    $hash->{NotifyFn}  = "btIP_Notify";
+    $hash->{AttrList}  = "autoreread:1,0 bgcolor refresh size title";
+    $hash->{AttrList} .= " bgcenter:1,0 bgdir bgopacity tmin" if $useImgTools;
+
     return undef;
 }
 
@@ -190,10 +201,12 @@ sub btIP_itemArea {
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
 
-  my $target = 'secret';
-     $target = '_top' if $link =~ s/^-//;
-     $target = '_blank' if $link =~ s/^\+//;
+#  my $target = 'secret';
+#     $target = '_top' if $link =~ s/^-//;
+#     $target = '_blank' if $link =~ s/^\+//;
 
+  my $target = btIP_findTarget($link);
+  
   my $output  = "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" xlink:href=\"$link\" target=\"$target\" >\n";
      $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" opacity=\"0\" />\n";
      $output .= "</a>\n";
@@ -208,10 +221,12 @@ sub btIP_itemButton {
   my ($r,$g,$b,$a) = btIP_color($params{boxcolor});
   $text = AnalyzePerlCommand(undef,$text);
   $link = AnalyzePerlCommand(undef,$link);
-  my $target = 'secret';
-     $target = '_top' if $link =~ s/^-//;
-     $target = '_blank' if $link =~ s/^\+//;
+#  my $target = 'secret';
+#     $target = '_top' if $link =~ s/^-//;
+#     $target = '_blank' if $link =~ s/^\+//;
 
+  my $target = btIP_findTarget($link);
+  
   my $output  =  "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" ".
                  "xlink:href=\"$link\" target=\"$target\" >\n";
      $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" rx=\"$rx\" ry=\"$ry\" width=\"$width\" height=\"$height\" ".
@@ -268,6 +283,7 @@ sub btIP_itemGroup {
 }
 
 sub btIP_itemImg {
+  return unless $useImgTools;
   my ($id,$x,$y,$scale,$srctype,$arg,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
   return unless(defined($arg));
@@ -358,6 +374,11 @@ sub btIP_itemPlot {
     }
   }
 
+  if(!$useImgTools) {
+     $scale  = 1;
+     $inline = 0;
+  }
+
   ($width,$height)              = split(",", AttrVal($plotName[0],"plotsize","800,160"));
   ($newWidth,$newHeight)        = _btIP_imgRescale($width,$height,$scale);
 
@@ -402,14 +423,23 @@ sub btIP_itemPlot {
 }
 
 sub btIP_itemRect {
-  my ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,%params)= @_;
+  my ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
   my $output = "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" rx=\"$rx\" ry=\"$ry\" ";
-  if($filled) {
-    my ($r,$g,$b,$a) = btIP_color($params{rgb});
-    $output .= "style=\"fill:rgb($r,$g,$b); fill-opacity:$a; stroke-width:0;\" "
+  if($filled > 0 || $stroked > 0) {
+    $output .= "style=\"";
+    if($filled > 0) {
+       my ($r,$g,$b,$a) = btIP_color($params{rgb});
+       $output .= "fill:rgb($r,$g,$b); fill-opacity:$a; ";
+    }
+    if($stroked > 0) {
+       my ($r,$g,$b,$a) = btIP_color($params{rgb});
+       $output .= "stroke:rgb($r,$g,$b); stroke-width:$stroked; ";
+       $output .= "fill:none; " if ($filled == 0);
+    }
+    $output .= "\" ";
   }
   $output .= "/>\n";
   return $output;
@@ -452,10 +482,8 @@ sub btIP_itemTextBox {
   my $color = substr($params{rgb},0,6);
   $link =~ s/"//g;
 
-  my $target = 'secret';
-     $target = '_top' if $link =~ s/^-//;
-     $target = '_blank' if $link =~ s/^\+//;
-
+  my $target = btIP_findTarget($link);
+  
   my ($d,$output);
 
   if(defined($params{boxcolor})) {
@@ -495,6 +523,7 @@ sub btIP_itemTime {
 }
 
 sub btIP_itemTrash {
+  return unless $useImgTools;
   my ($id,$x,$y,$scale,$fgcolor,$bgcolor,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
 
@@ -532,6 +561,14 @@ $data = '<?xml version="1.0" encoding="utf-8"?>'.
 }
 
 ##### Helper
+
+sub btIP_findTarget {
+  my ($link) = shift;
+  my $target = 'secret';
+     $target = '_top' if $link =~ s/^-//;
+     $target = '_blank' if $link =~ s/^\+//;
+  return $target;
+}
 
 sub btIP_color {
   my ($rgb)= @_;
@@ -724,7 +761,7 @@ sub btIP_evalLayout($$@) {
 
   my ($id,$x,$y,$x1,$y1,$x2,$y2,$r1,$r2);
   my ($scale,$inline,$boxwidth,$boxheight,$boxcolor);
-  my ($text,$link,$imgtype,$srctype,$arg,$format);
+  my ($text,$link,$imgtype,$srctype,$arg,$format,$filled,$stroked);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -782,7 +819,7 @@ sub btIP_evalLayout($$@) {
         }
 	    
         when("buttonpanel"){
-           $defs{$params{name}}{fhem}{div} = "<div id=\"hiddenDiv\" ".
+           $defs{$params{name}}{fhem}{div} .= "<div id=\"hiddenDiv\" ".
               "style=\"display:none\" >".
               "<iframe id=\"secretFrame\" name=\"secret\" src=\"\"></div>\n";
         }
@@ -878,13 +915,14 @@ sub btIP_evalLayout($$@) {
         }
         
 	    when("rect") {
-	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$format)= split("[ \t]+", $def, 8);
+	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked)= split("[ \t]+", $def, 9);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
           $params{xx} = $x;
           $params{yy} = $y;
-	      $format //= 0; # set format to 0 as default (not filled)
-	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$r1,$r2,$format,%params);
+	      $filled  //= 0; # set 0 as default (not filled)
+          $stroked //= 0; # set 0 as default (not stroked)
+	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked,%params);
 	    }
 	    
         when("rgb"){
@@ -1156,10 +1194,18 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 	  <li>InfoPanel is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use InfoPanel.</li>
 	  <br/>
 	  <li>Module uses following additional Perl modules:<br/><br/>
-		<ul><code>MIME::Base64 Image::Info</code></ul><br/><br/>
+		<ul><code>MIME::Base64 Image::Info</code></ul><br/>
 		If not already installed in your environment, please install them using appropriate commands from your environment.<br/><br/>
 		Package installation in debian environments: <code>apt-get install libmime-base64-perl libimage-info-perl</code></li>
-
+	  <br/>
+	  <li>You can use this module without the two additional perl modules, but in this case, you have to accept some limitations:<br/>
+	      <br/>
+	      <ul>
+	         <li>layout tag img can not be used</li>
+	         <li>layout tag trash can not be used</li>
+	         <li>layout tag plot can only handle scale = 1 and inline = 0</li>
+	      </ul>
+	  </li>
 	</ul>
 	<br/><br/>
 	
@@ -1373,7 +1419,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                <code>pt -2</code><br/>
            </ul></li><br/>
        <br/>
-       <li><code>rect &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;]</code><br/>
+       <li><code>rect &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;]</code><br/>
            <br/>
            <ul>create a rectangle<br/>
                <br/>
@@ -1381,7 +1427,8 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                x1,y1 = upper left corner<br/>
                x2,y2 = lower right corner<br/>
                r1,r2 = radius for rounded corners<br/>
-               fill = rectangle will be filled with "rgb" color if set to 1<br/>
+               fill = rectangle will be filled with "rgb" color if set to 1. Default = 0<br/>
+               stroke-width = defines stroke width to draw around the rectangle. Default = 0<br/>
            </ul></li><br/>
        <br/>
        <li><code>rgb &lt;{rgb[a]}&gt;</code><br/>
