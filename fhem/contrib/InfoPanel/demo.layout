@@ -272,13 +272,4 @@ textboxalign justify
 # 
 textbox - 210 50 180 50 "http://www.fhem.de" "Ich bin eine Textbox und wenn man mich anklickt geht es direkt zu www.fhem.de"
 
-
-# ticker
-# Format: ticker <id> <x> <y> <width> <speed> <text>
-#
-
-pt 20
-rgb "FF0000FF"
-ticker - 10 100 180 0 "Ich bin ein Ticker"
-
 #
