@@ -1114,9 +1114,9 @@ SVG_getData($$$$$)
       my $val = shift @vals;
       foreach my $k (@keys) {
         $min = $val->{$k} if($k eq "min" && defined($val->{$k}) &&
-                                $val->{$k} =~ m/\d\.-/ && $val->{$k} < $min);
+                        $val->{$k} =~ m/[-+]?\d*\.?\d+/ && $val->{$k} < $min);
         $max = $val->{$k} if($k eq "max" && defined($val->{$k}) &&
-                                $val->{$k} =~ m/\d\.-/ && $val->{$k} > $max);
+                        $val->{$k} =~ m/[-+]?\d*\.?\d+/ && $val->{$k} > $max);
         $data{"$k$r"} = $val->{$k};
       }
     }
