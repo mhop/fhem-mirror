@@ -15,7 +15,7 @@ font arial
 #      umso höher die Deckkraft
 #
 
-rgb "7F7F7FFF" # graue, voll deckend
+rgb "7F7F7FFF" # grau, voll deckend
 
 
 # Linien zeichnen
@@ -100,18 +100,18 @@ time - 750 25
  
  
 # Rechteck zeichnen
-# Format: rect <id> <x1> <y1> <x2> <y2> <rx> <ry> [<filled>]
+# Format: rect <id> <x1> <y1> <x2> <y2> <rx> <ry> [<filled>] [<stroked>]
 # id = Name des Objekts
 # x1,y1 = obere linke Ecke des Rechtecks
 # x2 y2 = untere rechte Ecke des Rechtecks
 # rx,ry = Radien für abgerundete Ecken
 # filled = Rechteck füllen (0|1)
-#
+# stroked = Rechteck umranden (0|Strichstärke)
 # 
 rgb FF00007F
  
-rect - 200 150 400 300 0 0 1 # rot gefüllt ohne Abrundung
-rect - 410 160 590 290 10 10 1 # rot gefüllt mit runden Ecken
+rect - 200 150 400 300  0  0 1 0 # rot gefüllt, ohne Abrundung
+rect - 410 160 590 290 10 10 0 3 # rot umrandet, ohne Füllung, runde Ecken
  
  
 # Rechteck als Link festlegen
@@ -166,32 +166,33 @@ trash - 710 200 h50 "FFFFFF" "0000FF"
 
 
 # Kreis zeichnen
-# Format: circle <id> <x> <y> <r> [<filled>]
+# Format: circle <id> <x> <y> <r> [<filled>] [<stroked>]
 # id = Name des Objekts
 # x,y = Mittelpunkt des Kreises
 # r = Radius
-# filled = Rechteck füllen (0|1)
-# #
+# filled = Kreis füllen (0|1)
+# stroked = Kreis umranden (0|Strichstärke)
 # 
 rgb "FFFF005F" # gelb
  
-circle - 700 350 50 1
-circle - 720 370 10 0
+circle - 700 350 50 1 0
+circle - 720 370 10 0 1
  
  
 # Ellipse zeichnen
-# Format: ellipse <id> <x> <y> <rx> <ry> [<filled>]
+# Format: ellipse <id> <x> <y> <rx> <ry> [<filled>] [<stroked>]
 # id = Name des Objekts
 # x,y = Mittelpunkt der Ellipse
 # rx,ry = Radien der Ellipse
 # r = Radius
-# filled = Rechteck füllen (0|1)
-# #
+# filled = Ellipse füllen (0|1)
+# stroked = Ellipse umranden (0|Strichstärke)
 # 
 rgb "0000FF5F" # blau
- 
-ellipse - 100 300 50 70 1
-ellipse - 100 300 30 20 0
+ellipse - 100 300 50 70 1 0
+
+rgb "FFFF00FF"
+ellipse - 100 300 30 20 0 1
  
  
 # Plots aus fhem einbinden
@@ -268,8 +269,16 @@ textboxalign justify
  
 # textbox
 # Format: textbox <id> <x> <y> <width> <height> {<link>} {<text>}
-#
 # 
 textbox - 210 50 180 50 "http://www.fhem.de" "Ich bin eine Textbox und wenn man mich anklickt geht es direkt zu www.fhem.de"
+
+
+# ticker
+# Format: ticker <id> <x> <y> <width> <speed> <text>
+#
+
+pt 20
+rgb "FF0000FF"
+ticker - 10 100 180 0 "Ich bin ein Ticker"
 
 #
