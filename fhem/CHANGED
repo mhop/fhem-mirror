@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: SYSMON: telnet support improved
+  - feature: SYSMON: (partially) QNAP-support
+  - feature: SYSMON: user defined functions
+  - feature: SYSMON: list_lan_devices (FritzBox only)
+  - changed: SYSMON: improved support for FritzBox OS 6.23
+  - bugfix:  SYSMON: some warnings
   - added:   move 55_InfoPanel.pm from ./contrib to ./FHEM
   - feature: YAMAHA_AVR: new commands play, pause, stop, skip, shuffle, repeat
   - feature: 71_YAMAHA_NP: New command set and readings for menu navigation
