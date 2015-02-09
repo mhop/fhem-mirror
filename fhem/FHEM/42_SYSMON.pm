@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.0.3";
+my $VERSION = "2.1.3";
 
 use constant {
 	PERL_VERSION    => "perl_version",
@@ -102,6 +102,9 @@ SYSMON_Initialize($)
   $hash->{SetFn}    = "SYSMON_Set";
   $hash->{AttrFn}   = "SYSMON_Attr";
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
+                      "telnet-time-out ".
+                      "user-fn2 user-fn ".
+                      "telnet-prompt-regx telnet-login-prompt-regx ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -496,6 +499,19 @@ SYSMON_updateCurrentReadingsMap($) {
     }
   }
 
+  # User defined functions
+	my $userfn = AttrVal($name, "user-fn", undef);
+  if(defined $userfn) {
+  	my @userfn_list = split(/,\s*/, trim($userfn));
+    foreach (@userfn_list) {
+       # <fnName>:<Interval_Minutes>:<reading1>:<reading2>...
+	     my($fnName, $uInterval, @readings) = split(/:/, $_);
+	     foreach my $rName (@readings) {
+		    $rMap->{$rName} = "user defined: $fnName";
+	    }
+    }
+  }
+
 # TEST: TODO
 $rMap->{"io_sda_raw"}         = "TEST";
 $rMap->{"io_sda_diff"}         = "TEST";
@@ -604,8 +620,30 @@ SYSMON_Get($@)
   {
   	return $hash->{INTERVAL_MULTIPLIERS};
   }
+  
+  if($cmd eq "list_lan_devices")
+  {
+  	my $ret='';
+  	my $map = SYSMON_getFBLanDeviceList($hash);
+  	if(defined($map)) {
+  		foreach my $dname (sort keys %{$map}) {
+  	    my $dev_ip  =  $map->{$dname}{ip};
+  	    $dev_ip='' unless defined $dev_ip;
+  	    my $dev_mac =  $map->{$dname}{mac};
+  	    my $dev_active = $map->{$dname}{active};
+  	    my $dev_active_txt = $dev_active?'true':'false';
+  	    #$ret.="\n"."$dname : active: $dev_active_txt, IP: $dev_ip, MAC: $dev_mac";
+  	    $ret = "$ret\n".sprintf("%-25s : active: %-5s  IP: %-16s  MAC: %-17s", $dname, $dev_active_txt, $dev_ip, $dev_mac);
+  		}
+  	}
+  	return $ret;
+  }
 
-  return "Unknown argument $cmd, choose one of list:noArg update:noArg interval_base:noArg interval_multipliers:noArg version:noArg";
+  my $sfb='';
+  if(SYSMON_isFB($hash)) {
+  	$sfb=' list_lan_devices:noArg';
+  }
+  return "Unknown argument $cmd, choose one of list:noArg update:noArg interval_base:noArg interval_multipliers:noArg version:noArg".$sfb;
 }
 
 sub
@@ -667,6 +705,13 @@ SYSMON_Set($@)
 	     return $ret;
 	  }
   }
+  
+  # TEST
+  if($cmd eq "reset")
+  {
+  	delete $defs{$name}->{helper};
+  	return 'ok';
+  }
 
   return "Unknown argument $cmd, choose one of password interval_multipliers clean:noArg clear";
 }
@@ -718,7 +763,7 @@ SYSMON_Update($;$)
   
   $refresh_all="0" unless defined $refresh_all;
 
-  SYSMON_Log($hash, 5, "refresh_all: ".$refresh_all);
+  #SYSMON_Log($hash, 5, "refresh_all: ".$refresh_all);
 
   my $name = $hash->{NAME};
 
@@ -729,7 +774,7 @@ SYSMON_Update($;$)
 
   if( AttrVal($name, "disable", "") eq "1" )
   {
-  	SYSMON_Log($hash, 5, "disabled");
+  	#SYSMON_Log($hash, 5, "disabled");
   	$hash->{STATE} = "Inactive";
   } else {
   	# Beim ersten mal alles aktualisieren!
@@ -879,7 +924,18 @@ sub SYSMON_updateReadings($$) {
   my $name = $hash->{NAME};
   
   readingsBeginUpdate($hash);
-    
+  
+  
+  # Wenn UserFn benutzt wird, werden die erstellten Eintraege erfasst und die entsprechenden Readings nicht erhalten
+  my $h_keys;
+  my $uFnReadings = $map->{"xuser_fnr"};
+  my @a_keys;
+  if(defined($uFnReadings)) {
+    delete $map->{"xuser_fnr"};
+    @a_keys = split(/,\s*/, trim($uFnReadings));
+    #$h_keys = map { $_ => "1" } @a_keys;
+  }
+  
   foreach my $aName (keys %{$map}) {
     my $value = $map->{$aName};
     # Nur aktualisieren, wenn ein gueltiges Value vorliegt
@@ -893,8 +949,14 @@ sub SYSMON_updateReadings($$) {
     
   # Nicht mehr benoetigte Readings loeschen
   my $omap = SYSMON_getObsoleteReadingsMap($hash);
+  
+  # UserFn Keys entfernen
+  foreach my $aName (@a_keys) {
+  	delete($omap->{$aName});
+  }
   foreach my $aName (keys %{$omap}) {
-  	delete $defs{$name}{READINGS}{$aName};
+  	#  SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>> ".$aName."->".Dumper($defs{$name}{READINGS}{$aName}));
+  	  delete $defs{$name}{READINGS}{$aName};
 	}
 
   readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);    
@@ -910,7 +972,7 @@ sub SYSMON_obtainParameters($$) {
   my $openedTelnet = 0;
   my $telnet = $hash->{".telnet"};
   #$telnet = undef;
-	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
+	my $mode = $hash->{MODE};
 	# Wenn remote: open connection
 	if ($mode eq 'telnet') {
 		unless (defined $telnet) {
@@ -1091,7 +1153,7 @@ SYSMON_obtainParameters_intern($$)
       	$map = SYSMON_getFBDECTTemp($hash, $map);
       	
       	#DSL-Downstream und DSL-Upstream abfragen
-	      $map = SYSMON_getFBStreemRate($hash, $map);
+	      $map = SYSMON_getFBStreamRate($hash, $map);
 	      #Sync-Zeit mit Vermittlungsstelle abfragen
 	      $map = SYSMON_getFBSyncTime($hash, $map);
 	      #Uebertragungsfehler abfragen (nicht behebbar und behebbar)
@@ -1153,6 +1215,56 @@ SYSMON_obtainParameters_intern($$)
     }
   }
   
+  #Log 3, "SYSMON >>> USER_DEFINED FUNCTIONS >>>>>>>>>>>>>>> START";
+  my $userfn = AttrVal($name, "user-fn", undef);
+  if(defined $userfn) {
+  	my @userfn_list = split(/,\s*/, trim($userfn));
+    foreach my $ud (@userfn_list) {
+       # <fnName>:<Interval_Minutes>:<reading1>:<reading2>...
+	     my($fnName, $uInterval, @readings) = split(/:/, $ud);
+	     SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval]");
+	     if(defined $uInterval) {
+	     	 my $iInt = int($uInterval);
+	     	 if($iInt>0) {
+	     	   my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
+	     	   if($update_ud) {
+	     	 	   $map = SYSMON_getUserDefinedFn($hash, $map, $fnName, @readings);
+	     	   } else {
+	     	     SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval] out of refresh interval");
+	     	   }
+	       }
+	    }
+    }
+  }
+  
+  # User Functions2
+  my $uMap;
+  $userfn = AttrVal($name, "user-fn2", undef);
+  #TEST$userfn=undef;
+  if(defined $userfn) {
+  	my @userfn_list = split(/,\s*/, trim($userfn));
+    foreach (@userfn_list) {
+    	my $ufn = $_;
+    	SYSMON_Log($hash, 5, "User-Function Reading: [$ufn]");
+	    if(defined $ufn) {
+	      no strict "refs";
+        $uMap = &{$ufn}($hash, $uMap);
+        use strict "refs";
+	    }
+    }
+  }
+  # Werte umverpacken, KeyNamen sichern
+  my $uNames='';
+  if(defined($uMap)) {
+  	foreach my $uName (keys %{$uMap}) {
+  		$uNames.=','.$uName;
+  		$map->{$uName}=$uMap->{$uName};
+  	}
+  	# Erste Komma entfernen
+  	$uNames=substr($uNames,1);
+  	$map->{"xuser_fnr"}=$uNames;
+  }
+  
   #TEST
   #my $rt = "#";
   #$rt=~s/#/[]/g;
@@ -1166,6 +1278,16 @@ SYSMON_obtainParameters_intern($$)
   $hash->{helper}{shadow_map} = \%shadow_map;
 
   return $map;
+}
+
+# For test purpose only
+sub SYSMON_TestUserFn($$) {
+  my ($hash, $map) = @_;
+  
+  $map->{"my_test_reading"}="my test";
+  #$map->{"my"}="my";
+  
+  return $map;	
 }
 
 #------------------------------------------------------------------------------
@@ -1219,6 +1341,44 @@ SYSMON_getUserDefined($$$$)
 	SYSMON_Log($hash, 5, "User-Defined Result: $uName='$out_str'");
 	
 	return $map;
+}
+
+sub SYSMON_getUserDefinedFn($$$@) {
+  my($hash, $map, $fnName, @readings) = @_;
+  
+  SYSMON_Log($hash, 5, "call User-Function: [$fnName]");
+  if(defined $fnName) {
+    no strict "refs";
+    my @rarr;
+    if($fnName=~/^{/) {
+    	my $HASH = $hash;
+    	my $NAME = $hash->{NAME};
+      @rarr = eval($fnName);
+    } else {
+    	@rarr = &{$fnName}($hash);
+    }
+    use strict "refs";
+    SYSMON_Log($hash, 5, "result User-Function [$fnName]: ".Dumper(@rarr));
+    
+    my $cnt1 = scalar(@readings);
+    my $cnt2 = scalar(@rarr);
+    my $cnt = min($cnt1,$cnt2);
+    if($cnt1!=$cnt2) { # zu wenig readings geliefert ($cnt1>$cnt2) oder zu viel
+      SYSMON_Log($hash, 3, "User-Function [$fnName]: expected readings: [$cnt1], provided [$cnt2]");
+    }
+    #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: $cnt1 / $cnt2: $rarr[0]");
+    for (my $i=0;$i<$cnt;$i++) { 
+    	if(defined($rarr[$i])) {
+    		my $val = trim($rarr[$i]);
+    	  #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: put: '".$readings[$i]."' => '".$val."'");
+    	  $map->{$readings[$i]} = $val;
+    	  #$map->{$readings[$i]}="Dead OWTHERM devices: none";
+    	  #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: ok");
+    	}
+    }
+  }
+  
+  return $map;
 }
 
 #my $sys_cpu_core_num = undef;
@@ -1286,6 +1446,8 @@ SYSMON_getUptime2($$)
 
 #TODO
   my $uptime = SYSMON_execute($hash,"uptime");
+  
+  #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>".$uptime."<");
 
   #$uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+))/ );
   $uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+)).*load.*: (.*)/ );
@@ -1452,12 +1614,17 @@ SYSMON_getCPUBogoMIPS($$)
 	my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
 	# nur einmalig ermitteln (wird sich ja nicht aendern
 	if(!defined $old_val) {
-    my $val = SYSMON_execute($hash, "cat /proc/cpuinfo | grep -m 1 'BogoMIPS'");
-    #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
-    my ($dummy, $val_txt) = split(/:\s+/, $val);
-    if($val_txt) {
-      $val_txt = trim($val_txt);
-      $map->{+CPU_BOGOMIPS}="$val_txt";
+    my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
+    #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ".Dumper(@aval)); # TODO: Delete
+    my $val=@aval[0];
+    #SYSMON_Log($hash, 5, "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ".$val); # TODO: Delete
+    if(defined($val)){
+      #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
+      my ($dummy, $val_txt) = split(/:\s+/, $val);
+      if($val_txt) {
+        $val_txt = trim($val_txt);
+        $map->{+CPU_BOGOMIPS}="$val_txt";
+      }
     }
   } else {
   	$map->{+CPU_BOGOMIPS}=$old_val;
@@ -2124,7 +2291,7 @@ sub SYSMON_getNetworkInfo ($$$)
 
   #my @dataThroughput = qx($cmd);
   my @dataThroughput = SYSMON_execute($hash, $cmd);
-  #Log 3, "SYSMON>>>>>>>>>>>>>>>>> ".$dataThroughput[0];
+  SYSMON_Log ($hash, 5, "SYSMON_getNetworkInfo>>>>>>>>>>>>>>>>".Dumper(@dataThroughput));
   
   #--- DEBUG ---
   if($device eq "_test1") {
@@ -2367,6 +2534,79 @@ sub SYSMON_getFBDECTTemp($$)
 	return $map;
 }
 
+#------------------------------------------------------------------------------
+# Liefert Liste an der FritzBox bekannter Devices.
+# Parameter: HASH
+# Return Hash mit Devices
+#------------------------------------------------------------------------------
+sub SYSMON_getFBLanDeviceList($)
+{
+	my ($hash) = @_;
+	
+	if(!SYSMON_isFB($hash)) {
+		return undef;
+	}
+	
+	my $map;
+	
+	my $name = $hash->{NAME};
+	# ---
+  #TODO: SSH
+  my $msg = undef;
+  my $openedTelnet = 0;
+  my $telnet = $hash->{".telnet"};
+  #$telnet = undef;
+	my $mode = $hash->{MODE};
+	# Wenn remote: open connection
+	if ($mode eq 'telnet') {
+		unless (defined $telnet) {
+			SYSMON_Log($hash, 5, "$name: Open single telnet connection");
+      $msg = SYSMON_Open_Connection($hash);
+      $hash->{helper}{error_msg}=$msg;
+      if (!$msg) {
+        $openedTelnet = 1;
+        $hash->{helper}{error_msg}=undef;
+      }
+    }
+	}
+  # ---
+
+	my $count = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice/count");
+	if(defined($count)) {
+		for (my $i=0;$i<$count;$i++) { 
+			#landevice0/...  
+			# ip=192.168.178.12,  mac=00:1F:3F:MM:AA:CC, name=PC-192-168-178-12, manu_name=0,
+			# dhcp=0, static_dhcp=0, wlan=0, ethernet=1, active=1, online=0, speed=100,
+			# deleteable=2, wakeup=0, source=4096, neighbour_name=, is_double_neighbour_name=0
+			# ipv6addrs=, ipv6_ifid=
+
+  	  my $dev_name   = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/name");
+  	  my $dev_ip     = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/ip");
+  	  my $dev_mac    = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/mac");
+  	  my $dev_active = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/active");
+  	  
+  	  $map->{$dev_name}{id}     = $i;
+  	  $map->{$dev_name}{name}   = $dev_name;
+  	  $map->{$dev_name}{ip}     = $dev_ip;
+  	  $map->{$dev_name}{mac}    = $dev_mac;
+  	  $map->{$dev_name}{active} = $dev_active;
+    }
+  }
+  
+  # ---
+	# Wenn remote: close connection
+	if ($mode eq 'telnet') {
+		if($openedTelnet) {
+		  SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
+		  SYSMON_Close_Connection( $hash );
+	  }
+	}
+	# ---
+	
+	return $map;
+}
+
+
 # TODO: FritzBox-Infos: Dateien /var/env oder /proc/sys/urlader/environment. 
 
 #------------------------------------------------------------------------------
@@ -2379,7 +2619,10 @@ sub SYSMON_acquireInfo_intern($$;$)
 	
 	SYSMON_Log($hash, 5, "cmd: ".$cmd);
 	
-	my $str = trim(SYSMON_execute($hash, $cmd));
+	my $str = SYSMON_execute($hash, $cmd);
+	if(defined($str)) {
+	  $str = trim($str);
+	}
 	my $ret;
 	
 	if(!defined($art)) { $art= 0; }
@@ -2432,11 +2675,28 @@ sub SYSMON_FBVersionInfo($$)
 
 
 #DSL-Downstream und DSL-Upstream abfragen
-sub SYSMON_getFBStreemRate($$) {
+sub SYSMON_getFBStreamRate($$) {
 	my ($hash, $map) = @_;
 	
 	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_ds_rate");
+	unless($ds_rate) {
+		return SYSMON_getFBStreamRate2($hash, $map);
+	}
 	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_us_rate");
+	
+	if($ds_rate ne "" && $us_rate ne "") {
+    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
+  }
+  
+  return $map;
+}
+
+# DSL-Geschwindigkeit mit neuer FritzOS (6.23)
+sub SYSMON_getFBStreamRate2($$) {
+	my ($hash, $map) = @_;
+	
+	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/in")/1000;
+	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/out")/1000;
 	
 	if($ds_rate ne "" && $us_rate ne "") {
     $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
@@ -2462,10 +2722,26 @@ sub SYSMON_getFBSyncTime($$) {
 	my ($hash, $map) = @_;
 	
 	my $data = SYSMON_execute($hash, "ctlmgr_ctl r sar status/modem_ShowtimeSecs");
+	unless($data) {
+		return SYSMON_getFBSyncTime2($hash, $map);
+	}
 	
 	if($data ne "") {
 		my $idata = int($data);
     $map->{+FB_DSL_SYNCTIME}=SYSMON_sec2Dauer($idata);
+  }
+  
+  return $map;
+}
+
+#Sync-Zeit mit Vermittlungsstelle abfragen mit neuer FritzOS (6.23)
+sub SYSMON_getFBSyncTime2($$) {
+	my ($hash, $map) = @_;
+	
+	my $data = SYSMON_execute($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connect_time");
+	
+	if($data ne "") {
+    $map->{+FB_DSL_SYNCTIME}=$data;
   }
   
   return $map;
@@ -2481,11 +2757,11 @@ sub SYSMON_getFBCRCFEC($$) {
 	my $ds_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_fec_per15min");
 	my $us_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_fec_per15min");	
 	
-	if($ds_crc ne "") {
+	if(defined($ds_crc) && $ds_crc ne "") {
 	  # FB_DSL_CRC_15
     $map->{+FB_DSL_CRC_15}="down: ".int($ds_crc)." up: ".int($us_crc);
   }
-  if($ds_fec ne "") {
+  if(defined($ds_fec) && $ds_fec ne "") {
 	  # FB_DSL_FEC_15
     $map->{+FB_DSL_FEC_15}="down: ".int($ds_fec)." up: ".int($us_fec);
   }
@@ -2618,6 +2894,8 @@ sub SYSMON_ShowValuesFmt ($$$;@)
       }
     }
   }
+  
+  #TODO: UserDefinedFn?
   
   my $map;
   if($hash->{TYPE} eq 'SYSMON') {  
@@ -2811,9 +3089,11 @@ SYSMON_isCPU1Freq($) {
 sub
 SYSMON_isFB($) {
 	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_fb}) {
+	if(!defined ($hash->{helper}{sys_fb})) {
+		#SYSMON_Log($hash, 5, "TEST isFB >>> exe >>> "); # TODO: remove
 	  $hash->{helper}{sys_fb} = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
   } 
+  #SYSMON_Log($hash, 5, "TEST isFB >>> ret >>> '".$hash->{helper}{sys_fb}."'"); # TODO: remove
 	return $hash->{helper}{sys_fb};
 }
 
@@ -3098,8 +3378,10 @@ sub SYSMON_Open_Connection($)
    }
  
    SYSMON_Log($hash, 5, "Open Telnet connection to $host:$port");
-   my $timeout = AttrVal( $name, "telnetTimeOut", "10");
-   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
+   my $timeout = AttrVal( $name, "telnet-time-out", "10");
+   my $t_prompt=AttrVal($name,'telnet-prompt-regx','(#|\$)\s*$');
+   #my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/(#|\$) $/');
+   my $telnet = new Net::Telnet ( Host=>$host, Port => $port, Timeout=>$timeout, Errmode=>'return', Prompt=>'/'.$t_prompt.'/');
    if (!$telnet) {
       $msg = "Could not open telnet connection to $host:$port";
       SYSMON_Log($hash, 2, $msg);
@@ -3150,7 +3432,9 @@ sub SYSMON_Open_Connection($)
    $telnet->print( $pwd );
 
    SYSMON_Log($hash, 5, "Wait for command prompt");
-   unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
+   my $tlogin_prompt=AttrVal($name,'telnet-login-prompt-regx','(#|\$)\s*$|Login failed.');
+   #unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
+   unless ( ($before,$match) = $telnet->waitfor( '/'.$tlogin_prompt.'/i' ))
    {
       $msg = "Telnet error while waiting for command prompt: ".$telnet->errmsg;
       SYSMON_Log($hash, 2, $msg);
@@ -3166,7 +3450,17 @@ sub SYSMON_Open_Connection($)
       $telnet = undef;
       return $msg;
    }
-
+   #SYSMON_Log($hash, 2, "Prompt: ".Dumper($before)." > ".$match);
+   
+   # Promptzeile erkenen
+   if(!($hash->{helper}{recognized_prompt})) {
+     my @prompt = SYSMON_Exec_Remote($hash, '');
+     if(scalar(@prompt) == 1) {
+       $hash->{helper}{recognized_prompt}=$prompt[0];
+     }
+   }
+   #SYSMON_Log($hash, 2, "Prompt: '".Dumper(@retVal)."'");
+   
    return undef;
 } # end SYSMON_Open_Connection
 
@@ -3179,7 +3473,7 @@ sub SYSMON_Close_Connection($)
    
    my $name = $hash->{NAME};
    my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
-   if ($mode eq 'local') {
+   if (!defined($mode) || $mode eq 'local') {
      return undef;
    }
    
@@ -3199,9 +3493,9 @@ sub SYSMON_Close_Connection($)
 
 # Executed the command on the remote Shell
 ############################################
-sub SYSMON_Exec($$)
+sub SYSMON_Exec($$;$)
 {
-   my ($hash, $cmd) = @_;
+   my ($hash, $cmd,$is_arr) = @_;
    my $openedTelnet = 0;
    my $telnet = $hash->{".telnet"};
    
@@ -3227,17 +3521,29 @@ sub SYSMON_Exec($$)
       	SYSMON_Log($hash, 5, "$name: Close single telnet connection");
         SYSMON_Close_Connection( $hash );
       }
+
+      #Prompt-Zeile entfernen, falls vorhanden
+      my $recognized_prompt = $hash->{helper}{recognized_prompt};
+      if(defined($recognized_prompt)) {
+      	if(scalar(@retVal)>=1) {
+          if($retVal[-1] eq $recognized_prompt) {
+          	SYSMON_Log ($hash, 5, "remove prompt: ".$retVal[-1]."'");
+          	splice @retVal, -1, 1;# $retVal[-1];
+          }
+        }
+      }
       
       # Arrays als solche zurueckgeben
+      #if($is_arr && scalar(@retVal)>1) {
       if(scalar(@retVal)>1) {
-        SYSMON_Log ($hash, 5, "Result '".Dumper(@retVal)."'");
+        SYSMON_Log ($hash, 5, "Result A: '".Dumper(@retVal)."'");
         return @retVal;	
       }
       # Einzeiler als normale Scalars
       my $line = $retVal[0];
       if(defined($line)) {
         chomp $line;
-        SYSMON_Log ($hash, 5, "Result '$line'");
+        SYSMON_Log ($hash, 5, "Result L: '$line'");
       } else {
       	SYSMON_Log ($hash, 5, "Result undef");
       }
@@ -3247,6 +3553,39 @@ sub SYSMON_Exec($$)
       return SYSMON_Exec_Local($hash, $cmd);
    }
 
+}
+
+sub MYTEST() {
+	my @output=(
+	'',
+'[~] ',
+'',
+'[~] # ',
+'',
+'',
+'',
+'          Interrupt:16 Memory:c0100000-c0120000 ',
+'',
+'          RX bytes:483322579219 (450.1 GiB)  TX bytes:3757348645531 (3.4 TiB)',
+'',
+'          collisions:0 txqueuelen:1000 ',
+'',
+'          TX packets:3656315540 errors:0 dropped:0 overruns:0 carrier:0',
+'',
+'          RX packets:2817622543 errors:8 dropped:265294 overruns:0 frame:8',
+'',
+'          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1',
+'',
+'          inet addr:192.168.178.80  Bcast:192.168.178.255  Mask:255.255.255.0',
+'',
+'eth0      Link encap:Ethernet  HWaddr 00:08:9B:D3:8D:9E'
+	);
+	@output = reverse(@output);
+	for (my $i=0;$i<scalar(@output);$i++) {
+   	 if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
+   }
+   @output = grep{ defined($_) && trim($_) ne '' }@output;
+   return Dumper(@output);
 }
 
 # Executed the command via Telnet
@@ -3261,6 +3600,21 @@ SYSMON_Exec_Remote($$)
 
    SYSMON_Log($hash, 5, "Execute '".$cmd."'");
    @output=$telnet->cmd($cmd);
+   #SYSMON_Log($hash, 5, "Result '".Dumper(@output)."'"); # TODO: remove
+
+   # Sonderlocke fuer QNAP: letzten Zeilen mit "[~] " am Anfang entfernen
+   #while((scalar(@output)>0) && ($output[-1]=~ /^\[~\]/)) {
+   #	SYSMON_Log ($hash, 5, "Remove line: '".$output[-1]."'");
+   #  splice @output, -1, 1;
+   #}
+   for (my $i=0;$i<scalar(@output);$i++) {
+   	 #SYSMON_Log($hash, 5, "Result >>> Line >>> '".$output[$i]."'"); # TODO: remove
+   	 if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
+   }
+   #SYSMON_Log($hash, 5, "Result >>> vgrep >>>'".Dumper(@output)."'"); # TODO: remove
+   @output = grep{ defined($_) && trim($_) ne '' }@output;
+   #SYSMON_Log($hash, 5, "Result >>> ngrep >>>'".Dumper(@output)."'"); # TODO: remove
+   
    return @output;
    ## Arrays als solche zurueckgeben
    #if(scalar(@output)>1) {
@@ -3495,7 +3849,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>user defined<br>
-        These readings provide output of commands, which are passed to the operating system. 
+        These readings provide output of commands, which are passed to the operating system or delivered by user defined functions. 
     </li>
     <br>
     <b>FritzBox specific Readings</b>
@@ -3686,8 +4040,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 
   <b>Get:</b><br><br>
     <ul>
-    <li>interval<br>
+    <li>interval_base<br>
     Lists the specified polling intervalls.
+    </li>
+    <br>
+    <li>interval_multipliers<br>
+    Displays update intervals.
     </li>
     <br>
     <li>list<br>
@@ -3702,6 +4060,11 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Displays the version of SYSMON module.
     </li>
     <br>
+    <li>list_lan_devices<br>
+    Displays known LAN Devices (FritzBox only).
+    </li>
+    <br>
+    
     </ul><br>
 
   <b>Set:</b><br><br>
@@ -3716,6 +4079,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>clear &lt;reading name&gt;<br>
      Deletes the Reading entry with the given name. After an update this entry is possibly re-created (if defined). This mechanism allows the selective deleting unnecessary custom entries.<br>
+    </li>
+    <br>
+    <li>password &lt;Passwort&gt;<br>
+    Specify the password for remote access (usually only necessary once).
     </li>
     <br>
     </ul><br>
@@ -3750,8 +4117,21 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     the number of available updates is daily recorded as 'sys_updates'.
     </li>
     <br>
+    <li>user-fn &lt;fn_name&gt;:&lt;interval_minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;],...<br>
+    List of perl user subroutines.<br>
+    As &lt;fn_name&gt; can be used either the name of a Perl subroutine or a Perl expression.
+    The perl function gets the device hash as parameter and must provide an array of values.
+    These values are taken according to the parameter &lt;reading_nameX&gt; in Readings.<br>
+    A Perl expression must be enclosed in curly braces and can use the following parameters: $ HASH (device hash) and $ NAME (device name). 
+    Return is expected analogous to a Perl subroutine.
+    </li>
+    <br>
     <li>disable<br>
       Possible values: 0 and 1. '1' means that the update is stopped.
+    </li>
+    <br>
+    <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
+    RegExp to detect login and command line prompt. (Only for access via Telnet.)
     </li>
     <br>
     </ul><br>
@@ -4063,7 +4443,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>Benutzerdefinierte Eintr&auml;ge<br>
         Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
-        Die entsprechende Angaben werden im Attribut <code>user-defined</code> vorgenommen.
+        Die entsprechende Angaben werden durch Attributen <code>user-defined</code> und <code>user-fn</code> definiert.
     </li>
     <br>
     <b>FritzBox-spezifische Readings</b>
@@ -4258,6 +4638,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Listet die bei der Definition angegebene Polling-Intervalle auf.
     </li>
     <br>
+    <li>interval_multipliers<br>
+    Listet die definierten Multipliers.
+    </li>
+    <br>
     <li>list<br>
     Gibt alle Readings aus.
     </li>
@@ -4270,6 +4654,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Zeigt die Version des SYSMON-Moduls.
     </li>
     <br>
+    <br>
+    <li>list_lan_devices<br>
+    Listet bekannte Ger&auml;te im LAN (nur FritzBox).
+    </li>
     </ul><br>
 
   <b>Set:</b><br><br>
@@ -4286,6 +4674,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     L&ouml;scht den Reading-Eintrag mit dem gegebenen Namen. Nach einem Update (oder nach der automatischen Aktualisierung) 
     wird dieser Eintrag ggf. neu erstellt (falls noch definiert). Dieses Mechanismus erlaubt das gezielte L&ouml;schen nicht mehr ben&ouml;tigter 
     benutzerdefinierten Eintr&auml;ge.<br>
+    </li>
+    <br>
+    <li>password &lt;Passwort&gt;<br>
+    Definiert das Passwort f&uuml;r den Remote-Zugriff (i.d.R. nur einmalig notwendig).
     </li>
     <br>
     </ul><br>
@@ -4327,8 +4719,21 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Danach wird die Anzahl der verf&uuml;gbaren Aktualisierungen t&auml;glich als Reading 'sys_updates' protokolliert.
     </li>
     <br>
+    <li>user-fn &lt;fn_name&gt;:&lt;Interval_Minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;],...<br>
+    Liste der benutzerdefinierten Perlfunktionen.<br>
+    Als &lt;fn_name&gt; k&ouml;nnen entweder Name einer Perlfunktion oder ein Perlausdruck verwendet werden.
+    Die Perlfunktion bekommt den Device-Hash als &Uuml;bergabeparameter und muss ein Array mit Werte liefern. 
+    Diese Werte werden entsprechend den Parameter &lt;reading_nameX&gt; in Readings &uuml;bernommen.<br>
+    Ein Perlausdruck muss in geschweifte Klammer eingeschlossen werden und kann folgende Paramter verwenden: $HASH (Device-Hash) und $NAME (Device-Name).
+    R&uuml;ckgabe wird analog einer Perlfunktion erwartet.
+    </li>
+    <br>
     <li>disable<br>
     M&ouml;gliche Werte: <code>0,1</code>. Bei <code>1</code> wird die Aktualisierung gestoppt.
+    </li>
+    <br>
+    <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
+    RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur f&uuml;r Zugriffe &uuml;ber Telnet relevant.)
     </li>
     <br>
     </ul><br>
