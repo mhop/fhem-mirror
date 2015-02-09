@@ -5,7 +5,7 @@
 # forked from 02_RSS.pm by Dr. Boris Neubert
 #
 ##############################################
-# $Id: 55_InfoPanel.pm 7921 2015-02-08 20:34:48Z betateilchen $
+# $Id$
 
 package main;
 use strict;
@@ -478,17 +478,17 @@ sub btIP_itemText {
   $id = ($id eq '-') ? createUniqueId() : $id;
   my ($r,$g,$b,$a) = btIP_color($params{rgb});
 
-  my $output = "<text id=\”$id\” x=\"$x\" y=\"$y\" ".
-               "fill=\"rgb($r,$g,$b)\" fill-opacity=\"$a\" ".
-               "font-family=\"$params{font}\" ".
-               "font-style=\"$params{fontstyle}\" ".
-               "font-size=\"$params{pt}px\" ".
-               "font-weight=\"$params{fontweight}\" ".
-               "text-anchor=\"$params{thalign}\" ".
-               "text-decoration=\"$params{textdecoration}\" ".
-               "alignment-baseline=\"$params{tvalign}\" ".
-               ">\n$text\n</text>\n";
-
+  my $output =  "<text id=\”$id\” x=\"$x\" y=\"$y\" ".
+                "fill=\"rgb($r,$g,$b)\" fill-opacity=\"$a\" ".
+                "font-family=\"$params{font}\" ".
+                "font-style=\"$params{fontstyle}\" ".
+                "font-size=\"$params{pt}px\" ".
+                "font-weight=\"$params{fontweight}\" ".
+                "text-anchor=\"$params{thalign}\" ".
+                "text-decoration=\"$params{textdecoration}\" ".
+                "alignment-baseline=\"$params{tvalign}\" >\n".
+                "$text\n".
+                "</text>\n";
   return $output;
 }
 
@@ -530,6 +530,37 @@ sub btIP_itemTextBox {
   $defs{$params{name}}{fhem}{div} .= $d;
 
   return $output; 
+}
+
+sub btIP_itemTicker {
+# btIP_itemTicker($id,$x,$y,$width,$speed,$text,%params);
+  my ($id,$x,$y,$width,$speed,$text,%params)= @_;
+  return unless(defined($text));
+  $id = ($id eq '-') ? createUniqueId() : $id;
+  $speed = ($speed) ? $speed : AttrVal($params{name},'refresh',60);
+  my $end = $x+$width;
+  my ($r,$g,$b,$a) = btIP_color($params{rgb});
+
+  my $output  = "<defs><path id=\"tickerPath\" d=\"M$x,$y L$end,$y\" /></defs>\n";
+     $output .= "<text id=\”$id\” x=\"$x\" y=\"$y\" ".
+                "fill=\"rgb($r,$g,$b)\" fill-opacity=\"$a\" ".
+                "font-family=\"$params{font}\" ".
+                "font-style=\"$params{fontstyle}\" ".
+                "font-size=\"$params{pt}px\" ".
+                "font-weight=\"$params{fontweight}\" ".
+                "text-anchor=\"$params{thalign}\" ".
+                "text-decoration=\"$params{textdecoration}\" ".
+                "alignment-baseline=\"$params{tvalign}\" >\n".
+#                "$text\n".
+#                "</text>\n".
+                "<textPath xlink:href=\"#tickerPath\">\n$text\n".
+                "<animate attributeName=\"startOffset\" values=\"$end;$x\" dur=\"${speed}s\" repeatCount=\"indefinite\" />".
+                "</textPath>".
+                "</text>";
+#  my $animate = "<animate id=\"${id}_anim\" attributeName=\"x\" from=\"$end\" to=\"$x\" dur=\"${speed}s\" repeatCount=\"indefinite\" />";
+#  return btIP_itemText("${id}_text",$x,$y,"$text\n$animate",%params);
+
+ return $output;
 }
 
 sub btIP_itemTime {
@@ -998,6 +1029,15 @@ sub btIP_evalLayout($$@) {
              }
           }
         }
+
+	    when("ticker") {
+              ($id,$x,$y,$width,$arg,$text)= split("[ \t]+", $def, 6);
+	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $params{xx} = $x;
+	      $params{yy} = $y;
+	      $text= AnalyzePerlCommand(undef, $text);
+              $svg .= btIP_itemTicker($id,$x,$y,$width,$arg,$text,%params);
+            }
 
 	    when("time") {
 	      ($id,$x,$y)= split("[ \t]+", $def, 3);
