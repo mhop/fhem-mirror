@@ -58,8 +58,9 @@ sub btIP_itemText;
 sub btIP_itemTextBox;
 sub btIP_itemTime;
 sub btIP_itemTrash;
-sub btIP_findTarget;
+
 sub btIP_color;
+sub btIP_findTarget;
 sub btIP_xy;
 sub btIP_changeColor;
 sub btIP_FileRead;
@@ -164,7 +165,7 @@ sub btIP_readLayout($) {
   my ($err, @layoutfile) = FileRead($filename);
   if($err) {
     Log 1, "InfoPanel $name: $err";
-    $hash->{fhem}{layout}= ("text 0.1 0.1 'Error: $err'");
+    $hash->{fhem}{layout} = "text ERROR 50 50 \"Error on reading layout!\"";
   } else {
     $hash->{fhem}{layout} = join("\n", @layoutfile);
     while($hash->{fhem}{layout} =~ m/\@include/ ) {
@@ -198,14 +199,12 @@ sub btIP_readLayout($) {
 sub btIP_itemArea {
   my ($id,$x1,$y1,$x2,$y2,$link,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
-  my $width  = $x2 - $x1;
-  my $height = $y2 - $y1;
-  my $target;
-  ($link,$target) = btIP_findTarget($link);
-  
-  my $output  = "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" xlink:href=\"$link\" target=\"$target\" >\n";
-     $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" opacity=\"0\" />\n";
-     $output .= "</a>\n";
+
+  my $oldrgb = $params{rgb};
+  $params{rgb} = '00000000';
+  my $output = btIP_itemRect($id,$x1,$y1,$x2,$y2,0,0,1,0,$link,%params);
+  $params{rgb} = $oldrgb;
+
   return $output;
 }
 
@@ -238,9 +237,13 @@ sub btIP_itemButton {
 }
 
 sub btIP_itemCircle {
-  my ($id,$x,$y,$r,$filled,$stroked,%params)= @_;
+  my ($id,$x,$y,$r,$filled,$stroked,$link,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
-  my $output = "<circle id=\”$id\” cx=\"$x\" cy=\"$y\" r=\"$r\" ";
+  my $target;
+  ($link,$target) = btIP_findTarget($link);
+  my $output  = "";
+     $output .= "<a xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
+     $output .= "<circle id=\”$id\” cx=\"$x\" cy=\"$y\" r=\"$r\" ";
   if($filled > 0 || $stroked > 0) {
     $output .= "style=\"";
     if($filled > 0) {
@@ -257,6 +260,7 @@ sub btIP_itemCircle {
     $output .= "style=\"fill:none; stroke-width:0; \" ";
   }
   $output .= "/>\n";
+  $output .= "</a>\n" if($link && length($link));
   return $output;
 }
 
@@ -268,9 +272,13 @@ sub btIP_itemDate {
 }
 
 sub btIP_itemEllipse {
-  my ($id,$x,$y,$rx,$ry,$filled,$stroked,%params)= @_;
+  my ($id,$x,$y,$rx,$ry,$filled,$stroked,$link,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
-  my $output = "<ellipse $id=\"$id\" cx=\"$x\" cy=\"$y\" rx=\"$rx\" ry=\"$ry\" ";
+  my $target;
+  ($link,$target) = btIP_findTarget($link);
+  my $output  = "";
+     $output .= "<a xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
+     $output .= "<ellipse $id=\"$id\" cx=\"$x\" cy=\"$y\" rx=\"$rx\" ry=\"$ry\" ";
   if($filled > 0 || $stroked > 0) {
     $output .= "style=\"";
     if($filled > 0) {
@@ -287,6 +295,7 @@ sub btIP_itemEllipse {
     $output .= "style=\"fill:none; stroke-width:0; \" ";
   }
   $output .= "/>\n";
+  $output .= "</a>\n" if($link && length($link));
   return $output;
 }
 
@@ -438,11 +447,15 @@ sub btIP_itemPlot {
 }
 
 sub btIP_itemRect {
-  my ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,%params)= @_;
+  my ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
+  my $target;
+  ($link,$target) = btIP_findTarget($link);
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
-  my $output = "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" rx=\"$rx\" ry=\"$ry\" ";
+  my $output  = "";
+     $output .= "<a xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
+     $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" rx=\"$rx\" ry=\"$ry\" ";
   if($filled > 0 || $stroked > 0) {
     $output .= "style=\"";
     if($filled > 0) {
@@ -459,6 +472,7 @@ sub btIP_itemRect {
     $output .= "style=\"fill:none; stroke-width:0; \" ";
   }
   $output .= "/>\n";
+  $output .= "</a>\n" if($link && length($link));
   return $output;
 }
 
@@ -579,14 +593,6 @@ $data = '<?xml version="1.0" encoding="utf-8"?>'.
 
 ##### Helper
 
-sub btIP_findTarget {
-  my ($link) = shift;
-  my $target = 'secret';
-     $target = '_top' if $link =~ s/^-//;
-     $target = '_blank' if $link =~ s/^\+//;
-  return ($link,$target);
-}
-
 sub btIP_color {
   my ($rgb)= @_;
   my $alpha = 1;
@@ -596,6 +602,14 @@ sub btIP_color {
     $alpha = $alpha/255;
   }
   return (hex("$d[0]$d[1]"),hex("$d[2]$d[3]"),hex("$d[4]$d[5]"),$alpha);
+}
+
+sub btIP_findTarget {
+  my ($link) = shift;
+  my $target = 'secret';
+     $target = '_top' if $link =~ s/^-//;
+     $target = '_blank' if $link =~ s/^\+//;
+  return ($link,$target);
 }
 
 sub btIP_xy {
@@ -792,7 +806,7 @@ sub btIP_evalLayout($$@) {
 	if($line=~ s/\\$//) { $cont= $line; undef $line; }
 	next unless($line);
 	$cont= "";
-	#Debug "$name: evaluating >$line<";
+	Debug "$name: evaluating >$line<";
 	# split line into command and definition
 	my ($cmd, $def)= split("[ \t]+", $line, 2);
 
@@ -842,11 +856,12 @@ sub btIP_evalLayout($$@) {
         }
 
 	    when("circle") {
-	      ($id,$x1,$y1,$r1,$filled,$stroked)= split("[ \t]+", $def, 6);
+	      ($id,$x1,$y1,$r1,$filled,$stroked,$link)= split("[ \t]+", $def, 7);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      $filled  //= 0; 
 	      $stroked //= 0;
-	      $svg .= btIP_itemCircle($id,$x1,$y1,$r1,$filled,$stroked,%params);
+              $link = AnalyzePerlCommand(undef,$link);
+	      $svg .= btIP_itemCircle($id,$x1,$y1,$r1,$filled,$stroked,$link,%params);
 	    }
 	    
 	    when("date") {
@@ -858,11 +873,12 @@ sub btIP_evalLayout($$@) {
 	    }
 	    
 	    when("ellipse") {
-	      ($id,$x1,$y1,$r1,$r2,$filled,$stroked)= split("[ \t]+", $def, 7);
+	      ($id,$x1,$y1,$r1,$r2,$filled,$stroked,$link)= split("[ \t]+", $def, 8);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      $filled  //= 0;
 	      $stroked //= 0;
-	      $svg .= btIP_itemEllipse($id,$x1,$y1,$r1,$r2,$filled,$stroked,%params);
+              $link = AnalyzePerlCommand(undef,$link);
+	      $svg .= btIP_itemEllipse($id,$x1,$y1,$r1,$r2,$filled,$stroked,$link,%params);
 	    }
 	    
 	    when("font") {
@@ -934,14 +950,15 @@ sub btIP_evalLayout($$@) {
         }
         
 	    when("rect") {
-	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked)= split("[ \t]+", $def, 9);
+	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked,$link)= split("[ \t]+", $def, 10);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
           $params{xx} = $x;
           $params{yy} = $y;
 	      $filled  //= 0; # set 0 as default (not filled)
           $stroked //= 0; # set 0 as default (not stroked)
-	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked,%params);
+              $link = AnalyzePerlCommand(undef,$link);
+	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked,$link,%params);
 	    }
 	    
         when("rgb"){
@@ -1328,7 +1345,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
            <ul>needed once in your layout file if you intend to use buttons in the same layout.<br/>
            </ul></li><br/>
        <br/>
-       <li><code>circle &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;]</code><br/>
+       <li><code>circle &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;] [&lt;link&gt;]</code><br/>
            <br/>
            <ul>create a circle<br/>
                <br/>
@@ -1337,6 +1354,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                r = radius<br/>
                fill = circle will be filled with "rgb" color if set to 1. Default = 0<br/>
                stroke-width = defines stroke width to draw around the circle. Default = 0<br/>
+               link = URL to be linked to item<br/>
            </ul></li><br/>
        <br/>
        <li><code>date &lt;id&gt; &lt;x&gt; &lt;y&gt;</code><br/>
@@ -1347,7 +1365,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                x,y = position<br/>
            </ul></li><br/>
        <br/>
-       <li><code>ellipse &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;]</code><br/>
+       <li><code>ellipse &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;] [&lt;link&gt;]</code><br/>
            <br/>
            <ul>create an ellipse<br/>
                <br/>
@@ -1356,6 +1374,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                r1,r2 = radius<br/>
                fill = ellipse will be filled with "rgb" color if set to 1. Default = 0<br/>
                stroke-width = defines stroke width to draw around the ellipse. Default = 0<br/>
+               link = URL to be linked to item<br/>
            </ul></li><br/>
        <br/>
        <li><code>font &lt;font-family&gt;</code><br/>
@@ -1440,7 +1459,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                <code>pt -2</code><br/>
            </ul></li><br/>
        <br/>
-       <li><code>rect &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;]</code><br/>
+       <li><code>rect &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;] [&lt;link&gt;]</code><br/>
            <br/>
            <ul>create a rectangle<br/>
                <br/>
@@ -1450,6 +1469,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                r1,r2 = radius for rounded corners<br/>
                fill = rectangle will be filled with "rgb" color if set to 1. Default = 0<br/>
                stroke-width = defines stroke width to draw around the rectangle. Default = 0<br/>
+               link = URL to be linked to item<br/>
            </ul></li><br/>
        <br/>
        <li><code>rgb &lt;{rgb[a]}&gt;</code><br/>
