@@ -20,6 +20,12 @@
   Pachube module from Axel
 - 97_GROUP.pm
   Helper for FHEMWEB to display different groups of device READINGS at once
+- 98_WKRCD4.pm
+  Module to connect a Waterkotte heat pump with Resümat CD4 Control
+- 98_ArduCounter.pm
+  Module that uses an arduino (nano, uno or similar) as impulse counter, e.g. for enery meters with S0 interface
+  to be used with ArduCounter.ino in the arduino subdirectory. This sketch can be loaded into the 
+  arduino GUI and the installed onto an arduino board.
 - 99_dumpdef.pm
   Debugging helpers from Axel
 - 99_ALARM.pm
