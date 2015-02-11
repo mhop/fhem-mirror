@@ -26,16 +26,16 @@ my $useImgTools = 1;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-#sub InfoPanel_Initialize($);
-sub btIP_Define($$);
-sub btIP_Undef($$);
+sub btIP_Define;
+sub btIP_Undef;
 sub btIP_Set;
 sub btIP_Notify;
-sub btIP_readLayout($);
+sub btIP_readLayout;
 
 sub btIP_itemArea;
 sub btIP_itemButton;
 sub btIP_itemCircle;
+sub btIP_itemCounter;
 sub btIP_itemDate;
 sub btIP_itemEllipse;
 sub btIP_itemGroup;
@@ -57,15 +57,15 @@ sub btIP_xy;
 sub btIP_changeColor;
 sub btIP_FileRead;
 
-sub btIP_ReturnSVG($);
-sub btIP_evalLayout($$@);
+sub btIP_ReturnSVG;
+sub btIP_evalLayout;
 
-sub btIP_addExtension($$$);
+sub btIP_addExtension;
 sub btIP_CGI;
-sub btIP_splitRequest($);
+sub btIP_splitRequest;
 
-sub btIP_returnHTML($);
-sub btIP_HTMLHead($$);
+sub btIP_returnHTML;
+sub btIP_HTMLHead;
 sub btIP_getScript;
 sub btIP_HTMLTail;
 sub btIP_Overview;
@@ -93,7 +93,7 @@ sub InfoPanel_Initialize($) {
     return undef;
 }
 
-sub btIP_Define($$) {
+sub btIP_Define {
   my ($hash, $def) = @_;
   my @a = split("[ \t]+", $def);
   return "Usage: define <name> InfoPanel filename"  if(int(@a) != 3);
@@ -107,12 +107,11 @@ sub btIP_Define($$) {
   btIP_addExtension("btIP_CGI","btip","InfoPanel");
   btIP_readLayout($hash);
   
-readingsSingleUpdate($hash,'state','defined',1);
-#  $hash->{STATE} = 'defined';
+  readingsSingleUpdate($hash,'state','defined',1);
   return undef;
 }
 
-sub btIP_Undef($$) {
+sub btIP_Undef {
 	my ($hash, $arg) = @_;
     # check if last device
     my $url = '/btip';
@@ -147,8 +146,7 @@ sub btIP_Notify {
   return undef;
 }
 
-sub btIP_readLayout($) {
-
+sub btIP_readLayout {
   my ($hash)= @_;
   my $filename= $hash->{LAYOUTFILE};
   my $name= $hash->{NAME};
@@ -661,7 +659,7 @@ sub btIP_FileRead {
 # create SVG content
 #
 
-sub btIP_returnSVG($) {
+sub btIP_returnSVG {
   my ($name)= @_;
 
 
@@ -753,7 +751,7 @@ sub btIP_returnSVG($) {
 
 }
 
-sub btIP_evalLayout($$@) {
+sub btIP_evalLayout {
   my ($svg,$name,$layout)= @_;
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
   my @layout= split("\n", $layout);
@@ -1070,7 +1068,7 @@ sub btIP_evalLayout($$@) {
 # here we answer any request to http://host:port/fhem/rss and below
 #
 
-sub btIP_addExtension($$$) {
+sub btIP_addExtension {
     my ($func,$link,$friendlyname)= @_;
   
     my $url = "/" . $link;
@@ -1105,7 +1103,7 @@ sub btIP_CGI{
 
 }
 
-sub btIP_splitRequest($) {
+sub btIP_splitRequest {
 
   my ($request) = @_;
 
@@ -1128,7 +1126,7 @@ sub btIP_splitRequest($) {
 # HTML Stuff
 #
 
-sub btIP_returnHTML($) {
+sub btIP_returnHTML {
   my ($name) = @_;
 
 #  my $url     = btIP_getURL();
@@ -1146,7 +1144,7 @@ sub btIP_returnHTML($) {
   return ("text/html; charset=utf-8", $code);
 }
 
-sub btIP_HTMLHead($$) {
+sub btIP_HTMLHead {
   my ($title,$refresh) = @_;
   
 #  my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
