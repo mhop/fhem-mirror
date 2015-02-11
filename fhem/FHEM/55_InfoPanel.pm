@@ -26,14 +26,6 @@ my $useImgTools = 1;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-# we can 
-# use vars qw(%FW_types);  # device types,
-# use vars qw($FW_RET);    # Returned data (html)
-# use vars qw($FW_wname);  # Web instance
-# use vars qw($FW_subdir); # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
-# use vars qw(%FW_pos);    # scroll position
-# use vars qw($FW_cname);  # Current connection name
-
 #sub InfoPanel_Initialize($);
 sub btIP_Define($$);
 sub btIP_Undef($$);
@@ -93,7 +85,6 @@ sub InfoPanel_Initialize($) {
 
     $hash->{DefFn}     = "btIP_Define";
 	$hash->{UndefFn}   = "btIP_Undef";
-    #$hash->{AttrFn}    = "btIP_Attr";
     $hash->{SetFn}     = "btIP_Set";
     $hash->{NotifyFn}  = "btIP_Notify";
     $hash->{AttrList}  = "autoreread:1,0 bgcolor refresh size title";
@@ -213,26 +204,23 @@ sub btIP_itemButton {
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
-  my ($r,$g,$b,$a) = btIP_color($params{boxcolor});
   $text = AnalyzePerlCommand(undef,$text);
   $link = AnalyzePerlCommand(undef,$link);
-  my $target;
-  ($link,$target) = btIP_findTarget($link);
-  
-  my $output  =  "<a id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" ".
-                 "xlink:href=\"$link\" target=\"$target\" >\n";
-     $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" rx=\"$rx\" ry=\"$ry\" width=\"$width\" height=\"$height\" ".
-                "style=\"fill:rgb($r,$g,$b); fill-opacity:$a; stroke-width:0;\"  />\n";
+
+  my $oldrgb = $params{rgb};
+  $params{rgb} = $params{boxcolor};
+  my $output = btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,1,0,$link,%params);
+  $params{rgb} = $oldrgb;
 
   my $oldhalign = $params{thalign};
   my $oldvalign = $params{tvalign};
   $params{thalign} = "middle";
   $params{tvalign} = "middle";
-  $output .= btIP_itemText($id."_text",($x1+$x2)/2,($y1+$y2)/2,$text,%params);
+  my $textoutput .= btIP_itemText("${id}_text",($x1+$x2)/2,($y1+$y2)/2,$text,%params);
   $params{thalign} = $oldhalign;
   $params{tvalign} = $oldvalign;
-  $output .= "</a>\n";
 
+  $output =~ s/<\/a>/$textoutput<\/a>/;
   return $output;
 }
 
@@ -262,6 +250,12 @@ sub btIP_itemCircle {
   $output .= "/>\n";
   $output .= "</a>\n" if($link && length($link));
   return $output;
+}
+
+sub btIP_itemCounter {
+  my ($id,$x,$y,%params)= @_;
+  $id = ($id eq '-') ? createUniqueId() : $id;
+  return btIP_itemText($id,$x,$y,$defs{$params{name}}{fhem}{counter},%params);
 }
 
 sub btIP_itemDate {
@@ -344,7 +338,6 @@ sub btIP_itemImg {
      ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
   }
 
-#  $output  = "<!-- w: $width h: $height nw: $newWidth nh: $newHeight t: $mimetype -->\n";
   $output  = "<!-- s: $scale w: $width h: $height t: $mimetype -->\n";
   $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${width}px\" height=\"${height}px\" \nxlink:href=\"$data\" />\n";
   return $output;
@@ -422,7 +415,7 @@ sub btIP_itemPlot {
     $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $newWidth,$newHeight"\/><\/svg>/;
     (undef,undef,undef,$svgdata) = _btIP_imgData($svgdata,1);
 
-    $output  = "<!-- w: $width h: $height nw: $newWidth nh: $newHeight t: $mimetype -->\n";
+    $output  = "<!-- s: $scale ow: $width oh: $height nw: $newWidth nh: $newHeight t: $mimetype -->\n";
     $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${newWidth}px\" height=\"${newHeight}px\" \n";
     $output .= "xlink:href=\"$svgdata\" />\n";
   } else {
@@ -454,8 +447,8 @@ sub btIP_itemRect {
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
   my $output  = "";
-     $output .= "<a xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
-     $output .= "<rect id=\”$id\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" rx=\"$rx\" ry=\"$ry\" ";
+     $output .= "<a id=\”${id}_link\” xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
+     $output .= "<rect id=\”${id}_rect\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" rx=\"$rx\" ry=\"$ry\" ";
   if($filled > 0 || $stroked > 0) {
     $output .= "style=\"";
     if($filled > 0) {
@@ -862,6 +855,14 @@ sub btIP_evalLayout($$@) {
 	      $stroked //= 0;
               $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemCircle($id,$x1,$y1,$r1,$filled,$stroked,$link,%params);
+	    }
+	    
+	    when("counter") {
+	      ($id,$x,$y)= split("[ \t]+", $def, 3);
+	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $params{xx} = $x;
+	      $params{yy} = $y;
+	      $svg .= btIP_itemCounter($id,$x,$y,%params);
 	    }
 	    
 	    when("date") {
@@ -1355,6 +1356,14 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                fill = circle will be filled with "rgb" color if set to 1. Default = 0<br/>
                stroke-width = defines stroke width to draw around the circle. Default = 0<br/>
                link = URL to be linked to item<br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>counter &lt;id&gt; &lt;x&gt; &lt;y&gt;</code><br/>
+           <br/>
+           <ul>print internal counter<br/>
+               <br/>
+               id = element id<br/>
+               x,y = position<br/>
            </ul></li><br/>
        <br/>
        <li><code>date &lt;id&gt; &lt;x&gt; &lt;y&gt;</code><br/>
