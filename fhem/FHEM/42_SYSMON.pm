@@ -1507,15 +1507,17 @@ SYSMON_getLoadAvg($$)
 {
 	my ($hash, $map) = @_;
 
-	#my $la_str = qx(cat /proc/loadavg );
 	my $la_str = SYSMON_execute($hash, "cat /proc/loadavg");
-  my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
-
-	$map->{+LOADAVG}="$la1 $la5 $la15";
-  #$map->{"load"}="$la1";
-	#$map->{"load5"}="$la5";
-	#$map->{"load15"}="$la15";
-
+	if(defined($la_str)) {
+    my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
+    if(defined($la1) && defined($la5) && defined($la15)) {
+	    $map->{+LOADAVG}="$la1 $la5 $la15";
+      #$map->{"load"}="$la1";
+	    #$map->{"load5"}="$la5";
+	    #$map->{"load15"}="$la15";
+	  }
+  }
+  
 	return $map;
 }
 
