@@ -86,6 +86,13 @@ pt 24
 # Format: date <id> <x> <y>
 #
 date - 50 25
+
+
+text - 610 75 "Counter:"
+# Internen Zähler ausgeben
+# Format: counter <id> <x> <y>
+#
+counter - 710 75
  
  
 # Text rechtsbündig ausgeben
