@@ -768,27 +768,26 @@ sub btIP_evalLayout {
   my %pstack;
   my $pstackcount = 0;
   my %params;
-  $params{name}= $name;
-  $params{width}= $width;
-  $params{height}= $height;
-  $params{font}= "Arial";
-  $params{pt}= 12;
-  $params{rgb}= "ffffff";
+
+  $params{name}      = $name;
+  $params{xx}        = 0;
+  $params{yy}        = 0;
+  $params{width}     = $width;
+  $params{height}    = $height;
+  $params{rgb}       = 'FFFFFF';
   $params{condition} = 1;
-  # we need two pairs of align parameters
-  # due to different default values for text and img
-  $params{ihalign} = 'left';
-  $params{ivalign} = 'top';
-  $params{thalign} = 'start';
-  $params{tvalign} = 'auto';
-  $params{tbalign} = 'left';
-  $params{boxcolor} = undef;
-  $params{padding} = 0;
-  $params{xx}= 0;
-  $params{yy}= 0;
-  $params{fontstyle}      = "initial";
-  $params{fontweight}     = "normal";
-  $params{textdecoration} = "none";
+
+  $params{boxcolor}  = undef;
+  $params{tbalign}   = 'left';
+  $params{padding}   = 0;
+
+  $params{font}           = 'Arial';
+  $params{pt}             = 12;
+  $params{fontstyle}      = 'initial';
+  $params{fontweight}     = 'normal';
+  $params{textdecoration} = 'none';
+  $params{thalign}        = 'start';
+  $params{tvalign}        = 'auto';
 
   $defs{$name}{fhem}{div} = undef;  
 
@@ -825,21 +824,6 @@ sub btIP_evalLayout {
 
     eval {
       given($cmd) {
-
-when("push") {
-$pstackcount++;
-while ( my ($key, $value) = each(%params) ) {
-        $pstack{$pstackcount}{$key} = $value;
-    }
-}
-
-when("pop") {
-while ( my ($key, $value) = each($pstack{$pstackcount}) ) {
-        $params{$key} = $value;
-    }
-delete $pstack{$pstackcount};
-$pstackcount--;
-}
 
 	    when("area") {
 	      ($id,$x1,$y1,$x2,$y2,$link)= split("[ \t]+", $def, 6);
@@ -967,6 +951,15 @@ $pstackcount--;
 	      $svg .= btIP_itemPlot($id,$x,$y,$scale,$inline,$arg,%params);
 	    }
 	    
+        when("pop") {
+          return unless $pstackcount;
+          while ( my ($key, $value) = each($pstack{$pstackcount}) ) {
+            $params{$key} = $value;
+          }
+          delete $pstack{$pstackcount};
+          $pstackcount--;
+        }
+
         when("pt") {
           $def = AnalyzePerlCommand(undef, $def);
 	      if($def =~ m/^[+-]/) {
@@ -977,6 +970,13 @@ $pstackcount--;
           $params{pt} = 6 if($params{pt} < 0);
         }
         
+        when("push") {
+          $pstackcount++;
+          while ( my ($key, $value) = each(%params) ) {
+            $pstack{$pstackcount}{$key} = $value;
+          }
+        }
+
 	    when("rect") {
 	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked,$link)= split("[ \t]+", $def, 10);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
@@ -1007,8 +1007,8 @@ $pstackcount--;
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
-	      my $txt= AnalyzePerlCommand(undef, $text);
-          $svg .= btIP_itemText($id,$x,$y,$txt,%params);
+	      $text= AnalyzePerlCommand(undef, $text);
+          $svg .= btIP_itemText($id,$x,$y,$text,%params);
         }
         
         when("textbox") {
@@ -1486,6 +1486,11 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                plotName = name of desired SVG device from your fhem installation<br/>
            </ul></li><br/>
        <br/>
+       <li><code>pop</code><br/>
+           <br/>
+           <ul>fetch last parameter set from stack and set it actice<br/>
+           </ul></li><br/>
+       <br/>
        <li><code>pt &lt;[+-]font-size&gt;</code><br/>
            <br/>
            <ul>define font size used for text elements (text, date, time, seconds ...)<br/>
@@ -1495,6 +1500,11 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                <code>pt 12</code><br/>
                <code>pt +3</code><br/>
                <code>pt -2</code><br/>
+           </ul></li><br/>
+       <br/>
+       <li><code>push</code><br/>
+           <br/>
+           <ul>push active parameter set onto stack<br/>
            </ul></li><br/>
        <br/>
        <li><code>rect &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;] [&lt;link&gt;]</code><br/>
