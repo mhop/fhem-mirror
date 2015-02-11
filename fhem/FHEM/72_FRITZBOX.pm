@@ -1587,7 +1587,7 @@ sub FRITZBOX_Ring_Run($)
 # Reset internal ring tones for the Fritz!Fons
    if ($ringTone)
    {
-      foreach (keys @FritzFons)
+      for (0 .. $#FritzFons)
       {
          push @cmdArray, "ctlmgr_ctl w telcfg settings/Foncontrol/User".$FritzFons[$_]."/IntRingTone ".$result->[2*$_];
       # Reset internet station for the Fritz!Fons
@@ -2320,7 +2320,7 @@ sub FRITZBOX_Exec_Local($$)
          }
          $result =~ s/\n|\r//g;
          my @resultArray = split /\|#\|/, $result;
-         foreach (keys @resultArray)
+         for (0 .. $#resultArray)
          { 
             $resultArray[$_] =~ s/\s$//;
          }
@@ -2975,7 +2975,7 @@ sub FRITZBOX_fritztris($)
       <li><code>get &lt;name&gt; shellCommand &lt;Befehl&gt;</code>
          <br>
          F&uuml;hrt den angegebenen Befehl auf der Fritz!Box-Shell aus und gibt das Ergebnis zur&uuml;ck.
-         Kann benuzt werden, um Shell-Befehle auszuf&uuml;hren, die nicht im Modul implementiert sind.
+         Kann benutzt werden, um Shell-Befehle auszuf&uuml;hren, die nicht im Modul implementiert sind.
          <br>
          Muss zuvor &uuml;ber das Attribute "allowShellCommand" freigeschaltet werden.
       </li><br>
@@ -2996,7 +2996,7 @@ sub FRITZBOX_fritztris($)
          <br>
          Dies erfolgt, indem w&auml;hrend des Klingelns kurzzeitig der Name der internen anrufenden Nummer ge&auml;ndert wird.
          <br>
-         Es ist maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
+         Es sind maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
       </li><br>
       
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
