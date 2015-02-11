@@ -347,7 +347,8 @@ FW_svgUpdateDevs(devs)
     var svg = embArr[i].getSVGDocument();
     if(!svg || !svg.firstChild || !svg.firstChild.nextSibling)
       continue;
-    var flog = svg.firstChild.nextSibling.getAttribute("flog");
+    svg = svg.firstChild.nextSibling;
+    var flog = svg.getAttribute("flog");
     if(!flog)
       continue;
     flog = flog.replace(/\\x3a/g, ".");
@@ -357,6 +358,7 @@ FW_svgUpdateDevs(devs)
       var ev = d[0]+":"+d[1];
       if(ev.match(flog)) {
         log("longpollSVG: reload SVG");
+        delete(svg_initialized[$(svg).attr("id")]);
         var e = embArr[i];
         var newE = document.createElement("embed");
         for(var k=0; k<e.attributes.length; k++)
