@@ -493,7 +493,7 @@ sub PROPLANTA_HtmlAcquire($$)
 
    my $err_log  = "";
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10
-                                       , agent => "Mozilla/5.0 (Windows NT 5.1) [de-DE,de;q=0.8,en-US;q=0.6,en;q=0.4]" );
+                                       , agent => "Mozilla/5.0 (compatible, MSIE 11, Windows NT 6.3; Trident/7.0;  rv:11.0) like Gecko" );
    my $request   = HTTP::Request->new( GET => $URL );
    my $response = $agent->request($request);
    $err_log = "Can't get $URL -- " . $response->status_line
@@ -784,7 +784,7 @@ PROPLANTA_Html($)
       <br>
       Example:
       <br>
-      <code>define HTMLForecast weblink htmlCode { OPENWEATHER_Html("ProPlanta_Wetter") }</code>
+      <code>define HTMLForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter") }</code>
       <br/><br/>
    </ul>
    <br>
@@ -888,7 +888,7 @@ PROPLANTA_Html($)
       <br>
       Beispiel:
       <br>
-      <code>define Vorschau weblink htmlCode {OPENWEATHER_Html("Wetter")}</code>
+      <code>define Vorschau weblink htmlCode {PROPLANTA_Html("Wetter")}</code>
       <br/><br/>
    </ul>
    <br>
