@@ -765,6 +765,8 @@ sub btIP_evalLayout {
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
   my @layout= split("\n", $layout);
 
+  my %pstack;
+  my $pstackcount = 0;
   my %params;
   $params{name}= $name;
   $params{width}= $width;
@@ -823,6 +825,21 @@ sub btIP_evalLayout {
 
     eval {
       given($cmd) {
+
+when("push") {
+$pstackcount++;
+while ( my ($key, $value) = each(%params) ) {
+        $pstack{$pstackcount}{$key} = $value;
+    }
+}
+
+when("pop") {
+while ( my ($key, $value) = each($pstack{$pstackcount}) ) {
+        $params{$key} = $value;
+    }
+delete $pstack{$pstackcount};
+$pstackcount--;
+}
 
 	    when("area") {
 	      ($id,$x1,$y1,$x2,$y2,$link)= split("[ \t]+", $def, 6);
