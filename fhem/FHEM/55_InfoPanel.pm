@@ -202,8 +202,6 @@ sub btIP_itemButton {
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
-  $text = AnalyzePerlCommand(undef,$text);
-  $link = AnalyzePerlCommand(undef,$link);
 
   my $oldrgb = $params{rgb};
   $params{rgb} = $params{boxcolor};
@@ -295,12 +293,12 @@ sub btIP_itemGroup {
   my($id,$type,$x,$y) = @_;
   return "</g>\n"               if $type eq 'close';
   $id = ($id eq '-') ? createUniqueId() : $id;
-  return "<g id=\"$id\" transform=\"translate($x,$y)\" >" if $type eq 'open';
+  return "<g id=\"$id\" transform=\"translate($x,$y)\" >\n" if $type eq 'open';
 }
 
 sub btIP_itemImg {
   return unless $useImgTools;
-  my ($id,$x,$y,$scale,$srctype,$arg,%params)= @_;
+  my ($id,$x,$y,$scale,$srctype,$arg,$link,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
   return unless(defined($arg));
   return if($arg eq "");
@@ -336,8 +334,14 @@ sub btIP_itemImg {
      ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
   }
 
+  my $target;
+  ($link,$target) = btIP_findTarget($link);
+
   $output  = "<!-- s: $scale w: $width h: $height t: $mimetype -->\n";
+  $output .= "<a xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
   $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${width}px\" height=\"${height}px\" \nxlink:href=\"$data\" />\n";
+  $output .= "</a>\n" if($link && length($link));
+
   return $output;
 }
 
@@ -546,8 +550,10 @@ sub btIP_itemTime {
 
 sub btIP_itemTrash {
   return unless $useImgTools;
-  my ($id,$x,$y,$scale,$fgcolor,$bgcolor,%params)= @_;
+  my ($id,$x,$y,$scale,$fgcolor,$bgcolor,$link,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
+  my $target;
+  ($link,$target) = btIP_findTarget($link);
 
   my ($counter,$data,$info,$width,$height,$mimetype,$output);
 
@@ -575,10 +581,13 @@ $data = '<?xml version="1.0" encoding="utf-8"?>'.
   ($r,$g,$b,$a) = btIP_color($bgcolor);
   $bgcolor = "rgb($r,$g,$b)";
   ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
-  $output  = "<rect  id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" ".
+  $output  = "";
+  $output .= "<a xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
+  $output .= "<rect  id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" ".
              "fill=\"$bgcolor\" fill-opacity=\"$a\" stroke=\"$bgcolor\" stroke-width=\"2\" stroke-opacity=\"$a\" />\n";
-  $output .= "<!-- w: $width h: $height t: $mimetype-->\n";
   $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$data\" />\n";
+  $output .= "</a>\n" if($link && length($link));
+
   return $output;
 }
 
@@ -797,7 +806,7 @@ sub btIP_evalLayout {
 	if($line=~ s/\\$//) { $cont= $line; undef $line; }
 	next unless($line);
 	$cont= "";
-	Debug "$name: evaluating >$line<";
+#	Debug "$name: evaluating >$line<";
 	# split line into command and definition
 	my ($cmd, $def)= split("[ \t]+", $line, 2);
 
@@ -816,13 +825,13 @@ sub btIP_evalLayout {
       given($cmd) {
 
 	    when("area") {
-	      ($id,$x1,$y1,$x2,$y2,$arg)= split("[ \t]+", $def, 6);
+	      ($id,$x1,$y1,$x2,$y2,$link)= split("[ \t]+", $def, 6);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
-	      my $arg = AnalyzePerlCommand(undef,$arg);
+	      $link = AnalyzePerlCommand(undef,$link);
           $params{xx} = $x;
           $params{yy} = $y;
-	      $svg .= btIP_itemArea($id,$x1,$y1,$x2,$y2,$arg,%params);
+	      $svg .= btIP_itemArea($id,$x1,$y1,$x2,$y2,$link,%params);
 	    }
 
         when("boxcolor"){
@@ -834,9 +843,11 @@ sub btIP_evalLayout {
 	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$link,$text)= split("[ \t]+", $def, 9);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
-#	      my $arg = AnalyzePerlCommand(undef,$arg);
           $params{xx} = $x;
           $params{yy} = $y;
+          $link = AnalyzePerlCommand(undef,$link);
+          $link = (length($link)) ? $link : "-$params{name}.html";
+          $text = AnalyzePerlCommand(undef,$text);
 	      $svg .= btIP_itemButton($id,$x1,$y1,$x2,$y2,$r1,$r2,$link,$text,%params);
         }
 	    
@@ -851,7 +862,7 @@ sub btIP_evalLayout {
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      $filled  //= 0; 
 	      $stroked //= 0;
-              $link = AnalyzePerlCommand(undef,$link);
+          $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemCircle($id,$x1,$y1,$r1,$filled,$stroked,$link,%params);
 	    }
 	    
@@ -876,7 +887,7 @@ sub btIP_evalLayout {
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      $filled  //= 0;
 	      $stroked //= 0;
-              $link = AnalyzePerlCommand(undef,$link);
+          $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemEllipse($id,$x1,$y1,$r1,$r2,$filled,$stroked,$link,%params);
 	    }
 	    
@@ -895,12 +906,13 @@ sub btIP_evalLayout {
         }
 
 	    when("img") {
-	      ($id,$x,$y,$scale,$srctype,$arg)= split("[ \t]+", $def,6);
+	      ($id,$x,$y,$scale,$srctype,$arg,$link)= split("[ \t]+", $def,7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y; 
-	      my $arg= AnalyzePerlCommand(undef, $arg);
-          $svg .= btIP_itemImg($id,$x,$y,$scale,$srctype,$arg,%params);
+	      $arg  = AnalyzePerlCommand(undef, $arg);
+          $link = AnalyzePerlCommand(undef,$link);
+          $svg .= btIP_itemImg($id,$x,$y,$scale,$srctype,$arg,$link,%params);
 	    }
 	    
         when("line") {
@@ -956,7 +968,7 @@ sub btIP_evalLayout {
           $params{yy} = $y;
 	      $filled  //= 0; # set 0 as default (not filled)
           $stroked //= 0; # set 0 as default (not stroked)
-              $link = AnalyzePerlCommand(undef,$link);
+          $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked,$link,%params);
 	    }
 	    
@@ -1024,13 +1036,14 @@ sub btIP_evalLayout {
 	    }
 
 	    when("trash") {
-	      ($id,$x,$y,$scale,$r1,$r2)= split("[ \t]+", $def,6);
+	      ($id,$x,$y,$scale,$r1,$r2,$link)= split("[ \t]+", $def,7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $r1 = AnalyzePerlCommand(undef,$r1);
 	      $r2 = AnalyzePerlCommand(undef,$r2);
-          $svg .= btIP_itemTrash($id,$x,$y,$scale,$r1,$r2,%params);
+          $link = AnalyzePerlCommand(undef,$link);
+          $svg .= btIP_itemTrash($id,$x,$y,$scale,$r1,$r2,$link,%params);
 	    }
 	    
 	    default {
@@ -1408,7 +1421,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                </code>
            </ul></li><br/>
        <br/>
-       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;sourceType&gt; &lt;{dataSource}&gt;</code><br/>
+       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;sourceType&gt; &lt;{dataSource}&gt; [&lt;link&gt;]</code><br/>
            <br/>
            <ul>embed an image into InfoPanel<br/>
                <br/>
@@ -1417,6 +1430,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                scale = scale to be used for resizing; may be factor or defined by width or height<br/>
                sourceType = file | url | data<br/>
                dataSource = where to read data from, depends on sourceType<br/>
+               link = URL to be linked to item<br/>
            </ul></li><br/>
        <br/>
        <li><code>line &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;stroke&gt;]</code><br/>
@@ -1558,7 +1572,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
            </ul></li><br/>
        <br/>
 
-       <li><code>trash &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;{foregroundColor}&gt; &lt;{backgroundColor}&gt;</code><br/>
+       <li><code>trash &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;{foregroundColor}&gt; &lt;{backgroundColor}&gt; [&lt;link&gt;]</code><br/>
            <br/>
            <ul>print a trashcan with selectable colors for foreground and background<br/>
                <br/>
@@ -1567,6 +1581,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                scale = scale to be used for resizing; may be factor or defined by width or height<br/>
                foregroundColor = hex digits used for foreground<br/>
                backgroundColor = hex digits used for background<br/>
+               link = URL to be linked to item<br/>
            </ul></li><br/>
        <br/>
        <li><code>tvalign &lt;align&gt;</code><br/>
