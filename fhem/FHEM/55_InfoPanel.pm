@@ -49,11 +49,11 @@ sub btIP_itemTextBox;
 sub btIP_itemTime;
 sub btIP_itemTrash;
 
+sub btIP_changeColor;
 sub btIP_color;
+sub btIP_FileRead;
 sub btIP_findTarget;
 sub btIP_xy;
-sub btIP_changeColor;
-sub btIP_FileRead;
 
 sub btIP_ReturnSVG;
 sub btIP_evalLayout;
@@ -443,6 +443,8 @@ sub btIP_itemRect {
   ($link,$target) = btIP_findTarget($link);
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
+  $filled //= 0;
+  $stroked //= 0;
   my $output  = "";
      $output .= "<a id=\”${id}_link\” xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
      $output .= "<rect id=\”${id}_rect\” x=\"$x1\" y=\"$y1\" width=\"$width\" height=\"$height\" rx=\"$rx\" ry=\"$ry\" ";
@@ -588,35 +590,6 @@ $data = '<?xml version="1.0" encoding="utf-8"?>'.
 
 ##### Helper
 
-sub btIP_color {
-  my ($rgb)= @_;
-  my $alpha = 1;
-  my @d= split("", $rgb);
-  if(length($rgb) == 8) {
-    $alpha = hex("$d[6]$d[7]"); 
-    $alpha = $alpha/255;
-  }
-  return (hex("$d[0]$d[1]"),hex("$d[2]$d[3]"),hex("$d[4]$d[5]"),$alpha);
-}
-
-sub btIP_findTarget {
-  my ($link) = shift;
-  my $target = 'secret';
-     $target = '_top' if $link =~ s/^-//;
-     $target = '_blank' if $link =~ s/^\+//;
-  return ($link,$target);
-}
-
-sub btIP_xy {
-  my ($x,$y,%params)= @_;
-
-  $x = $params{xx} if($x eq 'x');
-  $y = $params{yy} if($y eq 'y');
-  if((-1 < $x) && ($x < 1)) { $x *= $params{width}; }
-  if((-1 < $y) && ($y < 1)) { $y *= $params{height}; }
-  return($x,$y);
-}
-
 sub btIP_changeColor {
   my($file,$oldcolor,$newcolor) = @_;
   Log3(undef,4,"InfoPanel: read file $file for changeColor");
@@ -630,6 +603,17 @@ sub btIP_changeColor {
      Log3(undef,4,"InfoPanel: invalid rgb value for changeColor!");
   }
   return $data;
+}
+
+sub btIP_color {
+  my ($rgb)= @_;
+  my $alpha = 1;
+  my @d= split("", $rgb);
+  if(length($rgb) == 8) {
+    $alpha = hex("$d[6]$d[7]"); 
+    $alpha = $alpha/255;
+  }
+  return (hex("$d[0]$d[1]"),hex("$d[2]$d[3]"),hex("$d[4]$d[5]"),$alpha);
 }
 
 sub btIP_FileRead {
@@ -656,6 +640,24 @@ sub btIP_FileRead {
    return "" unless $counter;
    Log3(undef,4,"InfoPanel: file found.");
    return ($counter,$data);
+}
+
+sub btIP_findTarget {
+  my ($link) = shift;
+  my $target = 'secret';
+     $target = '_top' if $link =~ s/^-//;
+     $target = '_blank' if $link =~ s/^\+//;
+  return ($link,$target);
+}
+
+sub btIP_xy {
+  my ($x,$y,%params)= @_;
+
+  $x = $params{xx} if($x eq 'x');
+  $y = $params{yy} if($y eq 'y');
+  if((-1 < $x) && ($x < 1)) { $x *= $params{width}; }
+  if((-1 < $y) && ($y < 1)) { $y *= $params{height}; }
+  return($x,$y);
 }
 
 ##################
@@ -759,8 +761,8 @@ sub btIP_evalLayout {
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
   my @layout= split("\n", $layout);
 
-  my %pstack;
   my $pstackcount = 0;
+  my %pstack;
   my %params;
 
   $params{name}      = $name;
@@ -956,7 +958,7 @@ sub btIP_evalLayout {
 	      $params{xx} = $x;
 	      $params{yy} = $y+$height;
 	    }
-	    
+
         when("pop") {
           return unless $pstackcount;
           while ( my ($key, $value) = each($pstack{$pstackcount}) ) {
@@ -1188,10 +1190,10 @@ sub btIP_HTMLHead {
                 '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">'."\n";
   my $xmlns   = "";
 
-  my $refresh = (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
+  my $r       = (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
   my $scripts = btIP_getScript();
   my $meta    = "<meta charset=\"UTF-8\">\n";
-  my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta$refresh$scripts</head>\n";
+  my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta$r$scripts</head>\n";
   return $code;
 }
 
