@@ -520,6 +520,11 @@ sub cfgDB_MigrationImport() {
 	$filename .= "/www/gplot/templateDB.gplot";
 	push @files, $filename;
 
+# import template.layout
+	$filename  = $attr{global}{modpath};
+	$filename .= "/FHEM/template.layout";
+	push @files, $filename;
+
 # find used gplot files
 	$filename ='';
 	@def = '';
