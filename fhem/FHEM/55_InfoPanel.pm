@@ -17,8 +17,6 @@ use feature qw/switch/;
 use vars qw(%data);
 use HttpUtils;
 
-my @cmd_halign= qw(thalign ihalign);
-my @cmd_valign= qw(tvalign ivalign);
 my @valid_valign = qw(auto baseline middle center hanging);
 my @valid_halign = qw(start middle end);
 
@@ -208,13 +206,10 @@ sub btIP_itemButton {
   my $output = btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,1,0,$link,%params);
   $params{rgb} = $oldrgb;
 
-  my $oldhalign = $params{thalign};
-  my $oldvalign = $params{tvalign};
-  $params{thalign} = "middle";
-  $params{tvalign} = "middle";
+  my ($oldhalign,$oldvalign)             = ($params{thalign},$params{tvalign});
+     ($params{thalign},$params{tvalign}) = ("middle","middle");
   my $textoutput .= btIP_itemText("${id}_text",($x1+$x2)/2,($y1+$y2)/2,$text,%params);
-  $params{thalign} = $oldhalign;
-  $params{tvalign} = $oldvalign;
+     ($params{thalign},$params{tvalign}) = ($oldhalign,$oldvalign);
 
   $output =~ s/<\/a>/$textoutput<\/a>/;
   return $output;
@@ -251,7 +246,7 @@ sub btIP_itemCircle {
 sub btIP_itemCounter {
   my ($id,$x,$y,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
-  return btIP_itemText($id,$x,$y,$defs{$params{name}}{fhem}{counter},%params);
+  return btIP_itemText($id,$x,$y,$params{counter},%params);
 }
 
 sub btIP_itemDate {
@@ -342,7 +337,7 @@ sub btIP_itemImg {
   $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${width}px\" height=\"${height}px\" \nxlink:href=\"$data\" />\n";
   $output .= "</a>\n" if($link && length($link));
 
-  return $output;
+  return ($output,$width,$height);
 }
 
 sub _btIP_imgData {
@@ -437,7 +432,7 @@ sub btIP_itemPlot {
     $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"${newWidth}px\" height=\"${newHeight}px\" \nxlink:href=\"$url\" />\n";
   }
 
-  return $output; 
+  return ($output,$newWidth,$newHeight); 
 
 }
 
@@ -733,7 +728,7 @@ sub btIP_returnSVG {
                 my ($bgx,$bgy) = (0,0);
                    $bgx        = ($width - $bgwidth/$u)/2   if AttrVal($name,'bgcenter',1);
                    $bgy        = ($height - $bgheight/$u)/2 if AttrVal($name,'bgcenter',1);
-                   $output     = btIP_itemImg('-',$bgx,$bgy,$scale,'file',$bgfile,undef);
+         ($output,undef,undef) = btIP_itemImg('bgImage',$bgx,$bgy,$scale,'file',$bgfile,undef);
                 my $opacity    = AttrVal($name,'bgopacity',1);
                    $output    =~ s/<image\ /<image\ opacity="$opacity" /;
  			}
@@ -745,7 +740,6 @@ sub btIP_returnSVG {
     $svg = btIP_evalLayout($svg, $name, $defs{$name}{fhem}{layout});
 
     readingsSingleUpdate($defs{$name},'state',localtime(),1);
-#    $defs{$name}{STATE} = localtime();
 
   }; #warn $@ if $@;
   if($@) {
@@ -770,6 +764,7 @@ sub btIP_evalLayout {
   my %params;
 
   $params{name}      = $name;
+  $params{counter}   = $defs{$name}{fhem}{counter};
   $params{xx}        = 0;
   $params{yy}        = 0;
   $params{width}     = $width;
@@ -789,15 +784,16 @@ sub btIP_evalLayout {
   $params{thalign}        = 'start';
   $params{tvalign}        = 'auto';
 
-  $defs{$name}{fhem}{div} = undef;  
+  $defs{$name}{fhem}{div} = undef;
 
-  my ($id,$x,$y,$x1,$y1,$x2,$y2,$r1,$r2);
+  my ($id,$x,$y,$x1,$y1,$x2,$y2,$radius,$rx,$ry);
   my ($scale,$inline,$boxwidth,$boxheight,$boxcolor);
+  my ($bgcolor,$fgcolor);
   my ($text,$link,$imgtype,$srctype,$arg,$format,$filled,$stroked);
   
   my $cont= "";
   foreach my $line (@layout) {
-    # kill trailing newline
+        # kill trailing newline
 	chomp $line;
 	# kill comments and blank lines
 	$line=~ s/\#.*$//;
@@ -807,7 +803,7 @@ sub btIP_evalLayout {
 	if($line=~ s/\\$//) { $cont= $line; undef $line; }
 	next unless($line);
 	$cont= "";
-#	Debug "$name: evaluating >$line<";
+# Debug "$name: evaluating >$line<";
 	# split line into command and definition
 	my ($cmd, $def)= split("[ \t]+", $line, 2);
 
@@ -830,8 +826,8 @@ sub btIP_evalLayout {
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
 	      $link = AnalyzePerlCommand(undef,$link);
-          $params{xx} = $x;
-          $params{yy} = $y;
+          $params{xx} = $x1;
+          $params{yy} = $y2;
 	      $svg .= btIP_itemArea($id,$x1,$y1,$x2,$y2,$link,%params);
 	    }
 
@@ -841,15 +837,16 @@ sub btIP_evalLayout {
 	    }
 
         when("button") {
-	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$link,$text)= split("[ \t]+", $def, 9);
+	      ($id,$x1,$y1,$x2,$y2,$rx,$ry,$link,$text)= split("[ \t]+", $def, 9);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
-          $params{xx} = $x;
-          $params{yy} = $y;
+	      ($rx,$ry)= btIP_xy($rx,$ry,%params);
+          $params{xx} = $x1;
+          $params{yy} = $y2;
           $link = AnalyzePerlCommand(undef,$link);
           $link = (length($link)) ? $link : "-$params{name}.html";
           $text = AnalyzePerlCommand(undef,$text);
-	      $svg .= btIP_itemButton($id,$x1,$y1,$x2,$y2,$r1,$r2,$link,$text,%params);
+	      $svg .= btIP_itemButton($id,$x1,$y1,$x2,$y2,$rx,$ry,$link,$text,%params);
         }
 	    
         when("buttonpanel"){
@@ -859,12 +856,14 @@ sub btIP_evalLayout {
         }
 
 	    when("circle") {
-	      ($id,$x1,$y1,$r1,$filled,$stroked,$link)= split("[ \t]+", $def, 7);
+	      ($id,$x1,$y1,$radius,$filled,$stroked,$link)= split("[ \t]+", $def, 7);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
+	      $params{xx} = $x1;
+	      $params{yy} = $y1+$radius;
 	      $filled  //= 0; 
 	      $stroked //= 0;
           $link = AnalyzePerlCommand(undef,$link);
-	      $svg .= btIP_itemCircle($id,$x1,$y1,$r1,$filled,$stroked,$link,%params);
+	      $svg .= btIP_itemCircle($id,$x1,$y1,$radius,$filled,$stroked,$link,%params);
 	    }
 	    
 	    when("counter") {
@@ -884,12 +883,15 @@ sub btIP_evalLayout {
 	    }
 	    
 	    when("ellipse") {
-	      ($id,$x1,$y1,$r1,$r2,$filled,$stroked,$link)= split("[ \t]+", $def, 8);
-	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
+	      ($id,$x1,$y1,$rx,$ry,$filled,$stroked,$link)= split("[ \t]+", $def, 8);
+	      ($x1,$y1) = btIP_xy($x1,$y1,%params);
+              ($rx,$ry) = btIP_xy($rx,$ry,%params);
+	      $params{xx} = $x1;
+	      $params{yy} = $y1+$ry;
 	      $filled  //= 0;
 	      $stroked //= 0;
           $link = AnalyzePerlCommand(undef,$link);
-	      $svg .= btIP_itemEllipse($id,$x1,$y1,$r1,$r2,$filled,$stroked,$link,%params);
+	      $svg .= btIP_itemEllipse($id,$x1,$y1,$rx,$ry,$filled,$stroked,$link,%params);
 	    }
 	    
 	    when("font") {
@@ -907,25 +909,28 @@ sub btIP_evalLayout {
         }
 
 	    when("img") {
-	      ($id,$x,$y,$scale,$srctype,$arg,$link)= split("[ \t]+", $def,7);
-	      ($x,$y)= btIP_xy($x,$y,%params);
+	      ($id,$x,$y,$scale,$srctype,$arg,$link) = split("[ \t]+", $def,7);
+	      ($x,$y) = btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y; 
 	      $arg  = AnalyzePerlCommand(undef, $arg);
-          $link = AnalyzePerlCommand(undef,$link);
-          $svg .= btIP_itemImg($id,$x,$y,$scale,$srctype,$arg,$link,%params);
+              $link = AnalyzePerlCommand(undef,$link);
+              my($output,$width,$height)= btIP_itemImg($id,$x,$y,$scale,$srctype,$arg,$link,%params);
+              $svg .= $output;
+	      $params{xx} = $x;
+	      $params{yy} = $y+$height;
 	    }
 	    
         when("line") {
-	      ($id,$x1,$y1,$x2,$y2,$format)= split("[ \t]+", $def, 6);
-	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
-	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
-	      $format //= 1; # set format to 1 as default thickness for the line
-	      $svg .= btIP_itemLine($id,$x1,$y1,$x2,$y2, $format,%params);
+	      ($id,$x1,$y1,$x2,$y2,$format) = split("[ \t]+", $def, 6);
+	      ($x1,$y1) = btIP_xy($x1,$y1,%params);
+	      ($x2,$y2) = btIP_xy($x2,$y2,%params);
+	      $format //= 1;
+	      $svg .= btIP_itemLine($id,$x1,$y1,$x2,$y2,$format,%params);
 	    }
 	    
         when("moveby") {
-          my ($byx,$byy)= split('[ \t]+', $def, 2);
+          my ($byx,$byy) = split('[ \t]+', $def, 2);
           my ($x,$y)= btIP_xy($byx,$byy,%params);
           $params{xx} += $x;
           $params{yy} += $y;
@@ -945,10 +950,11 @@ sub btIP_evalLayout {
 	    when("plot") {
 	      ($id,$x,$y,$scale,$inline,$arg)= split("[ \t]+", $def,6);
 	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $arg = AnalyzePerlCommand(undef, $arg);
+              my($output,$width,$height)= btIP_itemPlot($id,$x,$y,$scale,$inline,$arg,%params);
+              $svg .= $output;
 	      $params{xx} = $x;
-	      $params{yy} = $y; 
-	      my $arg = AnalyzePerlCommand(undef, $arg);
-	      $svg .= btIP_itemPlot($id,$x,$y,$scale,$inline,$arg,%params);
+	      $params{yy} = $y+$height;
 	    }
 	    
         when("pop") {
@@ -978,15 +984,16 @@ sub btIP_evalLayout {
         }
 
 	    when("rect") {
-	      ($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked,$link)= split("[ \t]+", $def, 10);
+	      ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link)= split("[ \t]+", $def, 10);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
-          $params{xx} = $x;
-          $params{yy} = $y;
+              ($rx,$ry) = btIP_xy($rx,$ry,%params);
+          $params{xx} = $x1;
+          $params{yy} = $y2;
 	      $filled  //= 0; # set 0 as default (not filled)
           $stroked //= 0; # set 0 as default (not stroked)
           $link = AnalyzePerlCommand(undef,$link);
-	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$r1,$r2,$filled,$stroked,$link,%params);
+	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link,%params);
 	    }
 	    
         when("rgb"){
@@ -1053,39 +1060,39 @@ sub btIP_evalLayout {
 	    }
 
 	    when("trash") {
-	      ($id,$x,$y,$scale,$r1,$r2,$link)= split("[ \t]+", $def,7);
+	      ($id,$x,$y,$scale,$fgcolor,$bgcolor,$link)= split("[ \t]+", $def,7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $fgcolor = AnalyzePerlCommand(undef,$fgcolor);
+	      $bgcolor = AnalyzePerlCommand(undef,$bgcolor);
+              $link    = AnalyzePerlCommand(undef,$link);
+              $svg .= btIP_itemTrash($id,$x,$y,$scale,$fgcolor,$bgcolor,$link,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
-	      $r1 = AnalyzePerlCommand(undef,$r1);
-	      $r2 = AnalyzePerlCommand(undef,$r2);
-          $link = AnalyzePerlCommand(undef,$link);
-          $svg .= btIP_itemTrash($id,$x,$y,$scale,$r1,$r2,$link,%params);
 	    }
-	    
+
+            when("thalign"){
+              my $d = AnalyzePerlCommand(undef, $def);
+              if($d ~~ @valid_halign) { 
+                $params{thalign}= $d;
+              } else {
+                Log3($name, 2, "InfoPanel: $name Illegal horizontal alignment $d");
+              }
+            }
+
+            when("tvalign"){
+              my $d = AnalyzePerlCommand(undef, $def);
+              if($d ~~ @valid_valign) { 
+                $params{tvalign}= $d;
+              } else {
+                Log3($name, 2, "InfoPanel: $name Illegal vertical alignment $d");
+              }
+            }
+
 	    default {
-          if($cmd ~~ @cmd_halign) {
-	        my $d = AnalyzePerlCommand(undef, $def);
-            if($d ~~ @valid_halign) { 
-              $params{ihalign}= $d unless($cmd eq "thalign");
-              $params{thalign}= $d unless($cmd eq "ihalign");
-            } else {
-              Log3($name, 2, "InfoPanel: $name Illegal horizontal alignment $d");
-            }
-          } elsif($cmd ~~ @cmd_valign) {
-            my $d = AnalyzePerlCommand(undef, $def);
-            if( $d ~~ @valid_valign) {
-              $params{ivalign}= $d unless($cmd eq "tvalign");
-              $params{tvalign}= $d unless($cmd eq "ivalign");
-            } else {
-              Log3($name, 2, "InfoPanel: $name: Illegal vertical alignment $d");
-            }
-          } else {
-            Log3($name, 2, "InfoPanel $name: Illegal command $cmd in layout definition.");
-          }
-        } # default
+              Log3($name, 2, "InfoPanel $name: Illegal command $cmd in layout definition.");
+            } # default
       } # given
-	} # eval
+    } # eval
 
 # Debug "after  command $line: x= " . $params{xx} . ", y= " . $params{yy};
 
@@ -1176,20 +1183,15 @@ sub btIP_returnHTML {
 
 sub btIP_HTMLHead {
   my ($title,$refresh) = @_;
-  
-#  my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
-#  my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
-  my $doctype= '<?xml version="1.0" encoding="utf-8" standalone="no"?> '."\n".
-               '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '.
-               '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">'."\n";
-  my $xmlns= "";
+  my $doctype = '<?xml version="1.0" encoding="utf-8" standalone="no"?> '."\n".
+                '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '.
+                '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">'."\n";
+  my $xmlns   = "";
 
-  my $r= (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
-  # css and js header output should be coded only in one place
-  my $css= "";
-  my $scripts= btIP_getScript();
-  my $meta = "<meta charset=\"UTF-8\">\n";
-  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta$r$css$scripts</head>\n";
+  my $refresh = (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
+  my $scripts = btIP_getScript();
+  my $meta    = "<meta charset=\"UTF-8\">\n";
+  my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta$refresh$scripts</head>\n";
   return $code;
 }
 
