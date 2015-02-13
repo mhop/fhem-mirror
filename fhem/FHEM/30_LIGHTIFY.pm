@@ -95,6 +95,7 @@ LIGHTIFY_Connect($)
   my @send_queue = ();
   $hash->{SEND_QUEUE} = \@send_queue;
   $hash->{UNCONFIRMED} = 0;
+  $hash->{PARTIAL} = "";
 
   my $socket = IO::Socket::INET->new( PeerAddr => $hash->{Host},
                                       PeerPort => 4000, #AttrVal($name, "port", 4000)
@@ -356,6 +357,7 @@ LIGHTIFY_Parse($$)
   my $name = $hash->{NAME};
 
   $hex = uc($hex);
+  Log3 $name, 4, "$name: parsing: $hex";
 
   my $length = hex(substr($hex,2*1,2*1).substr($hex,2*0,2*1));
   my $response = substr($hex,2*3,2*1);
@@ -452,9 +454,21 @@ LIGHTIFY_Read($)
   }
 
   my $hex = unpack('H*', $buf);
-  Log3 $name, 4, "$name: received: $hex";
+  Log3 $name, 5, "$name: received: $hex";
 
   LIGHTIFY_Parse($hash, $hex);
+  return undef;
+
+  $hash->{PARTIAL} .= $hex;
+  my $length = hex(substr($hash->{PARTIAL},2*1,2*1).substr($hash->{PARTIAL},2*0,2*1));
+
+  while( $length*2 <= length($hash->{PARTIAL})  ) {
+    $hex = substr($hash->{PARTIAL},0,$length*2);
+    $hash->{PARTIAL} = substr($hash->{PARTIAL},$length*2);
+    $length = hex(substr($hash->{PARTIAL},2*1,2*1).substr($hash->{PARTIAL},2*0,2*1));
+
+    LIGHTIFY_Parse($hash, $hex);
+  }
 }
 
 1;
