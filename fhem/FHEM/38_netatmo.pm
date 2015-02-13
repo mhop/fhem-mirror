@@ -210,7 +210,7 @@ netatmo_Set($$@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  my $list = "autocreate:noArgs";
+  my $list = "autocreate:noArg";
 
   if( $cmd eq "autocreate" ) {
     return netatmo_autocreate($hash, 1 );
