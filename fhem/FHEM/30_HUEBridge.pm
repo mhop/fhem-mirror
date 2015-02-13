@@ -887,7 +887,7 @@ HUEBridge_HTTP_Request($$$@)
 
 
   <br><br>
-  <a name="HUEBridge_Define_Define"></a>
+  <a name="HUEBridge_Define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; HUEBridge [&lt;host&gt;] [&lt;interval&gt;]</code><br>
