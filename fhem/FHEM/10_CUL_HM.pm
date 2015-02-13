@@ -5051,10 +5051,7 @@ sub CUL_HM_calcDisWmSet($){
   my $dh = shift; 
   my ($txt,$col,$icon) = eval $dh->{exe};
   if ($txt eq "off")    { delete $dh->{txt};}
-  elsif($txt ne "nc"){ 
-    if (length($txt)>12){ delete $dh->{txt};}
-    else                { $dh->{txt} = $txt; }
-  }
+  elsif($txt ne "nc")   { $dh->{txt} = substr($txt,0,12);}
 
   if($col eq "off")              { delete $dh->{col};}
   elsif($col ne "nc"){
