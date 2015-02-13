@@ -959,7 +959,7 @@ harmony_Read($)
             harmony_updateActivity($hash, $decoded->{activityId}) if( defined($decoded->{activityId}) );
 
           } else {
-            Log3 $name, 2, "$name: unknown message: $content";
+            Log3 $name, 4, "$name: unknown message: $content";
 
           }
 
