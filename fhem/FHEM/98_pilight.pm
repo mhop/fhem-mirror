@@ -13,7 +13,7 @@ pilight_Initialize($)
 
   $hash->{SetFn}     = "pilight_Set";
   $hash->{DefFn}     = "pilight_Define";
-  $hash->{AttrList}  = "protocol housecode number systemcode unitcode id remote_ip remote_port";
+  $hash->{AttrList}  = "protocol housecode number systemcode unitcode id remote_ip remote_port useOldVersion rawCodeOn rawCodeOff";
 }
 
 # housecode == id und number == unitcode
@@ -76,12 +76,15 @@ sub commit
   my ($hash, $on) = @_;
   my $name   = $hash->{NAME};
   my $protocol = $hash->{protocol};
+  my $rawCodeOn = AttrVal($name, "rawCodeOn", $hash->{rawCodeOn});
+  my $rawCodeOff = AttrVal($name, "rawCodeOff", $hash->{rawCodeOff});
   my $housecode = AttrVal($name, "id", AttrVal($name, "housecode", $hash->{housecode}));
   my $unit = AttrVal($name, "unitcode", $hash->{unitcode});
   my $systemcode = AttrVal($name, "systemcode", '0');
   my $param = $on ? "on" : "off";
   my $remote_ip = AttrVal($name, "remote_ip", '127.0.0.1');
   my $remote_port = AttrVal($name, "remote_port", '5000');
+  my $useOldVersion = AttrVal($name, "useOldVersion", undef);
   my ($socket,$client_socket);
   
   # flush after every write
@@ -92,16 +95,16 @@ sub commit
   PeerPort => $remote_port,
   Proto => 'tcp',
   ); 
-  
+
   if (!$socket) { 
-	Log 3, "pilight: ERROR. Can't open socket to pilight-daemon: $!\n";
+	Log 3, "pilight: ERROR. Can't open socket to pilight-daemon: $! See: https://github.com/andreas-fey/fhem-pilight/issues/3\n";
         return undef
   };
 
   my $data = '{ "message": "client sender" }';
   $socket->send($data);
   $socket->recv($data,1024);
-  
+
   $data =~ s/\n/ /g;
   if ( $data !~ /accept client/ ) {
 	Log 3, "pilight: ERROR. No handshake with pilight-daemon. Received: >>>$data<<<\n";
@@ -109,9 +112,53 @@ sub commit
   };
 
   my $code = "{\"protocol\":[ \"$protocol\" ],";
-  switch( $protocol ) {
-	case 'kaku_switch' { $code = $code . "\"id\":\"$housecode\", \"unit\":\"$unit\",\"$param\":\"1\""}
-	case 'elro'        { $code = $code . "\"systemcode\":\"$systemcode\", \"unitcode\":\"$unit\",\"$param\":\"1\""}
+  if($useOldVersion) {
+    switch( $protocol ) {
+	case 'kaku_switch' 	{ $code = $code . "\"id\":\"$housecode\", \"unit\":\"$unit\",\"$param\":\"1\""}
+	case 'quigg_switch' 	{ $code = $code . "\"id\":\"$housecode\", \"unit\":\"$unit\",\"$param\":\"1\""}
+	case 'elro'        	{ $code = $code . "\"systemcode\":\"$systemcode\", \"unitcode\":\"$unit\",\"$param\":\"1\""}
+	case 'elro_he'     	{ $code = $code . "\"systemcode\":\"$systemcode\", \"unitcode\":\"$unit\",\"$param\":\"1\""}
+	case 'elro_hc'     	{ $code = $code . "\"systemcode\":\"$systemcode\", \"unitcode\":\"$unit\",\"$param\":\"1\""}
+	case 'silvercrest'     	{ $code = $code . "\"systemcode\":\"$systemcode\", \"unitcode\":\"$unit\",\"$param\":\"1\""}
+	case 'pollin'     	{ $code = $code . "\"systemcode\":\"$systemcode\", \"unitcode\":\"$unit\",\"$param\":\"1\""}
+	case 'mumbi'     	{ $code = $code . "\"systemcode\":\"$systemcode\", \"unitcode\":\"$unit\",\"$param\":\"1\""}
+	case 'intertechno_old'  { $code = $code . "\"id\":\"$systemcode\", \"unit\":\"$unit\",\"$param\":\"1\""}
+    }
+  } 
+  else {
+    if( $protocol eq 'raw')
+    {
+        Log 3, "pilight protocol: $protocol";
+        Log 4, "pilight raw param: $param";
+        Log 4, "pilight rawCodeOn: $rawCodeOn";
+        Log 4, "piligth rawCodeCff: $rawCodeOff";
+       
+	switch( $param ) {
+          case 'on' 		{ $code = $code . "\"code\":\"$rawCodeOn\""} # on
+          case 'off' 		{ $code = $code . "\"code\":\"$rawCodeOff\""} #off	
+        }
+    }
+    else
+    {
+      switch( $protocol ) {
+	case 'kaku_switch' 	{ $code = $code . "\"id\":$housecode, \"unit\":$unit,\"$param\":1"}
+	case 'quigg_switch' 	{ $code = $code . "\"id\":$housecode, \"unit\":$unit,\"$param\":1"}
+	case 'elro'        	{ $code = $code . "\"systemcode\":$systemcode, \"unitcode\":$unit,\"$param\":1"}
+	case 'elro_he'     	{ $code = $code . "\"systemcode\":$systemcode, \"unitcode\":$unit,\"$param\":1"}
+	case 'elro_hc'     	{ $code = $code . "\"systemcode\":$systemcode, \"unitcode\":$unit,\"$param\":1"}
+	case 'silvercrest'     	{ $code = $code . "\"systemcode\":$systemcode, \"unitcode\":$unit,\"$param\":1"}
+	case 'pollin'     	{ $code = $code . "\"systemcode\":$systemcode, \"unitcode\":$unit,\"$param\":1"}
+	case 'brennenstuhl'    	{ $code = $code . "\"systemcode\":$systemcode, \"unitcode\":$unit,\"$param\":1"}
+	case 'mumbi'     	{ $code = $code . "\"systemcode\":$systemcode, \"unitcode\":$unit,\"$param\":1"}
+	case 'impuls'     	{ $code = $code . "\"systemcode\":$systemcode, \"programcode\":$unit,\"$param\":1"}
+	case 'rsl366'     	{ $code = $code . "\"systemcode\":$systemcode, \"programcode\":$unit,\"$param\":1"}
+	case 'intertechno_old'  { $code = $code . "\"id\":$systemcode, \"unit\":$unit,\"$param\":1"}
+	case 'clarus_switch'    { $code = $code . "\"id\":$systemcode, \"unit\":$unit,\"$param\":1"}
+	case 'rev1_switch' 	{ $code = $code . "\"id\":\"$systemcode\", \"unit\":$unit,\"$param\":1"}
+	case 'rev2_switch'	{ $code = $code . "\"id\":\"$systemcode\", \"unit\":$unit,\"$param\":1"}
+	case 'rev3_switch'	{ $code = $code . "\"id\":\"$systemcode\", \"unit\":$unit,\"$param\":1"}
+	}
+     }
   }
   $code = $code . '}';
 		  
@@ -139,7 +186,7 @@ sub commit
     <br/>
     <br/>
     Defines a module for setting pilight compartible switches on or off. See <a href="http://www.sweetpi.de/blog/258/funksteckdosen-mit-dem-raspberry-pi-und-pilight-schalten">Sweetpi</a>.<br><br>
-    Supported protocols: kaku_switch, elso. If you need more, just contact me!<br/><br/>
+    Supported protocols: kaku_switch, quigg_switch, elro_he, elro_hc, silvercrest, pollin, brennenstuhl, mumbi, impuls, rsl366, rev1_switch, rev2_switch, clarus_switch, raw, and intertechno_old. If you need more, just write an issue!<br/><br/>
     Example:
     <ul>
       <code>define Weihnachtsbaum pilight kaku_switch</code><br>
@@ -147,8 +194,10 @@ sub commit
       <code>attr Weihnachtsbaum unitcode 0</code><br>
     </ul>
     <br/>
-	If your pilight server does not run on localhost, please set both the attributes <b>remote_ip</b> and <b>remote_port</b>.
+	If your pilight server does not run on localhost, please set both the attributes <b>remote_ip</b> and <b>remote_port</b>. If you are running pilight >3.0, then please <b>define the port used by pilight</b> settings: http://www.pilight.org/getting-started/settings/; fhem-plight uses 5000 by default.
     <br/>
+    <b>This version is written for pilight 5.0. If you run a version < 3.0, please set the following attribute:</b>
+      <code> attr Weihnachtsbaum useOldVersion 1</code>
   </ul>
 
   <a name="pilight_Attr"></a>
@@ -156,18 +205,25 @@ sub commit
   <ul>
     <li><a name="protocol"><code>attr &lt;name&gt; protocol &lt;string&gt;</code></a>
                 <br />Protocol used in pilight, e.g. "kaku_switch"</li>
-    <li><a name="user"><code>attr &lt;name&gt; housecode &lt;string&gt;</code></a>
-                <br />Housecode used in pilight (for protocol kaku*)</li>
-    <li><a name="user"><code>attr &lt;name&gt; unitcode &lt;string&gt;</code></a>
-                <br />Unit code/device code used in pilight (for protocol kaku* or elso)</li>
+    <li><a name="housecode"><code>attr &lt;name&gt; housecode &lt;string&gt;</code></a>
+                <br />Housecode used in pilight (for protocol kaku*, clarus_switch, rev1_switch, rev2_switch, rev3_switch, quigg_switch)</li>
     <li><a name="systemcode"><code>attr &lt;name&gt; systemcode &lt;string&gt;</code></a>
-                <br />Systemcode of your switch (for protocol elso)</li>
-    <li><a name="numer"><code>attr &lt;name&gt; remote_ip &lt;string&gt;</code></a>
+                <br />Systemcode of your switch (for protocol elso, elro_he, elro_hc, silvercrest, impuls, rsl366, pollin, mumbi, brennenstuhl, intertechno_old)</li>
+    <li><a name="unitcode"><code>attr &lt;name&gt; unitcode &lt;string&gt;</code></a>
+                <br />Unit code/device code used in pilight (all protocols)</li>
+    <li><a name="rawCodeOn/rawCodeOff"><code>attr &lt;name&gt; rawCode &lt;string&gt;</code></a>
+                <br />Raw code to send on/off-command with protocol "raw"</li>
+    <li><a name="remote_ip"><code>attr &lt;name&gt; remote_ip &lt;string&gt;</code></a>
                 <br />Remote IP of you pilight server (127.0.0.1 is default)</li>
-    <li><a name="numer"><code>attr &lt;name&gt; remote_port &lt;string&gt;</code></a>
+    <li><a name="remote_port"><code>attr &lt;name&gt; remote_port &lt;string&gt;</code></a>
                 <br />Remote port of you pilight server (5000 is default)</li>
+    <li><a name="rawCodeOn"><code>attr &lt;name&gt; rawCodeOn &lt;string&gt;</code></a>
+                <br />Raw command to send to switch device ON (only used with protocol 'raw')</li>
+    <li><a name="rawCodeOff"><code>attr &lt;name&gt; rawCodeOff &lt;string&gt;</code></a>
+                <br />Raw command to send to switch device OFF (only used with protocol 'raw')</li>
   </ul>
 </ul>
 
 =end html
 =cut
+
