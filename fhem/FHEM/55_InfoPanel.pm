@@ -11,7 +11,7 @@ package main;
 use strict;
 use warnings;
 
-#use Data::Dumper;
+use Data::Dumper;
 
 use feature qw/switch/;
 use vars qw(%data);
@@ -160,10 +160,25 @@ sub btIP_readLayout {
       foreach my $ll (@layoutfile) {
         if($ll !~ m/^\@include/) {
           push(@layout2,$ll);
-        } else {
-          my ($cmd, $def)= split("[ \t]+", $ll, 2);
+        } elsif ($ll =~ m/^\@include/) {
+          my ($cmd, $def) = split("[ \t]+", $ll, 2);
           ($err,@include) = FileRead($def) if($def);
           splice(@layout2,-1,0,@include) unless $err;          
+        }
+      }
+      @layoutfile = @layout2;
+      @layout2    = undef;
+      $hash->{fhem}{layout} = join("\n",@layoutfile);
+    }
+    while($hash->{fhem}{layout} =~ m/\@finclude/ ) {
+      my (@layout2,@include);
+      foreach my $ll (@layoutfile) {
+        if($ll !~ m/^\@finclude/) {
+          push(@layout2,$ll);
+        } else {
+          my ($cmd, $def) = split("[ \t]+", $ll, 2);
+          @include = split("\n",AnalyzePerlCommand(undef,$def));
+          splice(@layout2,-1,0,@include);
         }
       }
       @layoutfile = @layout2;
@@ -680,6 +695,7 @@ sub btIP_returnSVG {
 
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
   my $bgcolor = AnalyzePerlCommand(undef,AttrVal($name,'bgcolor','"000000"'));
+     $bgcolor = substr($bgcolor,0,6);
   my $output = "";
   our $svg = "";
 
