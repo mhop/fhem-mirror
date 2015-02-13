@@ -578,7 +578,7 @@ sub btIP_itemTextBox {
 }
 
 sub btIP_itemTicker {
-  my ($id,$x,$y,$items,$speed,$arg,%params) = @_;
+  my ($id,$x,$y,$width,$items,$speed,$arg,%params) = @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $pause = 2 * $speed;
   my $color = substr($params{rgb},0,6);
@@ -589,9 +589,11 @@ sub btIP_itemTicker {
   "<script>\$(function() {\$('#${id}_ticker').vTicker('init', ".
   "{speed: $speed, pause: $pause, mousePause:true, showItems: $items, padding:$params{padding}});});</script>\n".
   "<div id=\"${id}_ticker\" style=\"position:relative; top:${y}px; left:${x}px; z-index:1; ".
+  "width:${width}px; ".
   "font-family:$params{font}; font-size:$params{pt}; color:#$color; \" >\n<ul>\n";
   foreach (@a) {$ticker .= sprintf($liTemplate,$_)};
   $ticker .= "</ul>\n</div>\n</div>\n";
+
   return $ticker;
 }
 
@@ -1116,12 +1118,12 @@ sub btIP_evalLayout {
         }
 
         when("ticker") {
-	      ($id,$x,$y,$format,$speed,$arg)= split("[ \t]+", $def, 6);
+	      ($id,$x,$y,$width,$format,$speed,$arg)= split("[ \t]+", $def, 7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	      $arg = AnalyzePerlCommand(undef,$arg);
-          $defs{$name}{fhem}{div} .= btIP_itemTicker($id,$x,$y,$format,$speed,$arg,%params);
+          $defs{$name}{fhem}{div} .= btIP_itemTicker($id,$x,$y,$width,$format,$speed,$arg,%params);
         }
 	    
 	    when("time") {
@@ -1137,8 +1139,8 @@ sub btIP_evalLayout {
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $fgcolor = AnalyzePerlCommand(undef,$fgcolor);
 	      $bgcolor = AnalyzePerlCommand(undef,$bgcolor);
-              $link    = AnalyzePerlCommand(undef,$link);
-              $svg .= btIP_itemTrash($id,$x,$y,$scale,$fgcolor,$bgcolor,$link,%params);
+          $link    = AnalyzePerlCommand(undef,$link);
+          $svg .= btIP_itemTrash($id,$x,$y,$scale,$fgcolor,$bgcolor,$link,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
 	    }
