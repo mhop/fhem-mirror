@@ -1,4 +1,4 @@
-##############################################
+#lt#############################################
 # $Id$
 package main;
 
@@ -1461,6 +1461,7 @@ FW_parseColumns()
     $colNo = 1;
     foreach my $groups (split(/\|/,$groupcolumn)) {
       foreach my $group (split(",",$groups)) {
+        $group =~ s/%20/ /g; # Forum #33612
         $columns{$group} = $colNo;
       }
       $colNo++;
