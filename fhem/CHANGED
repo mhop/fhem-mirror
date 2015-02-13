@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added: 30_LIGHTIFY.pm: New module for OSRAM LIGHTIFY gateways
   - changed: 98_pilight.pm: New protocols
   - feature: 55_InfoPanel - added direct link to rect,circle,ellipse,
                             img, trash
