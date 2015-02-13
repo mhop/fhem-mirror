@@ -5,6 +5,30 @@
 # forked from 02_RSS.pm by Dr. Boris Neubert
 #
 ##############################################
+#
+# This module uses vTicker, 
+# a jQuery plug-in that adds scrolling vertical tickers
+#
+# vTicker is published under MIT and BSD licenses
+#
+# Copyright (c) 2009–2011
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+##############################################
 # $Id$
 
 package main;
@@ -553,6 +577,24 @@ sub btIP_itemTextBox {
   return $output; 
 }
 
+sub btIP_itemTicker {
+  my ($id,$x,$y,$items,$speed,$arg,%params) = @_;
+  $id = ($id eq '-') ? createUniqueId() : $id;
+  my $pause = 2 * $speed;
+  my $color = substr($params{rgb},0,6);
+  my @a = split("\n",$arg);
+  my $liTemplate = '<li>%s</li>'."\n";
+
+  my $ticker = "<div id=\"${id}_tickercontent\" >\n".
+  "<script>\$(function() {\$('#${id}_ticker').vTicker('init', ".
+  "{speed: $speed, pause: $pause, mousePause:true, showItems: $items, padding:$params{padding}});});</script>\n".
+  "<div id=\"${id}_ticker\" style=\"position:relative; top:${y}px; left:${x}px; z-index:1; ".
+  "font-family:$params{font}; font-size:$params{pt}; color:#$color; \" >\n<ul>\n";
+  foreach (@a) {$ticker .= sprintf($liTemplate,$_)};
+  $ticker .= "</ul>\n</div>\n</div>\n";
+  return $ticker;
+}
+
 sub btIP_itemTime {
   my ($id,$x,$y,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
@@ -766,7 +808,7 @@ sub btIP_returnSVG {
     Log3($name, 2, $msg);
   }
 
-  $svg .= "Sorry, your browser does not support inline SVG.\n</svg>\n";
+  $svg .= "\nSorry, your browser does not support inline SVG.\n</svg>\n";
 
   return $svg;
 
@@ -806,7 +848,7 @@ sub btIP_evalLayout {
 
   my ($id,$x,$y,$x1,$y1,$x2,$y2,$radius,$rx,$ry);
   my ($scale,$inline,$boxwidth,$boxheight,$boxcolor);
-  my ($bgcolor,$fgcolor);
+  my ($speed,$bgcolor,$fgcolor);
   my ($text,$link,$imgtype,$srctype,$arg,$format,$filled,$stroked);
   
   my $cont= "";
@@ -965,6 +1007,10 @@ sub btIP_evalLayout {
           $params{padding}= AnalyzePerlCommand(undef,$def);
         }
 
+	    when("plain") {
+          $svg .= AnalyzePerlCommand(undef,$def);
+        }
+
 	    when("plot") {
 	      ($id,$x,$y,$scale,$inline,$arg)= split("[ \t]+", $def,6);
 	      ($x,$y)= btIP_xy($x,$y,%params);
@@ -1069,6 +1115,15 @@ sub btIP_evalLayout {
           }
         }
 
+        when("ticker") {
+	      ($id,$x,$y,$format,$speed,$arg)= split("[ \t]+", $def, 6);
+	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $params{xx} = $x;
+	      $params{yy} = $y;
+	      $arg = AnalyzePerlCommand(undef,$arg);
+          $defs{$name}{fhem}{div} .= btIP_itemTicker($id,$x,$y,$format,$speed,$arg,%params);
+        }
+	    
 	    when("time") {
 	      ($id,$x,$y)= split("[ \t]+", $def, 3);
 	      ($x,$y)= btIP_xy($x,$y,%params);
@@ -1191,7 +1246,7 @@ sub btIP_returnHTML {
   my $code    = btIP_HTMLHead($title,$refresh);
 
   $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n".
-            "<div id=\"svg_content\" z-index=\"1\" >\n".
+            "<div id=\"svg_content\" style=\"position:absolute; top:0px; left:0px; z-index:1\" >\n".
             btIP_returnSVG($name)."\n</div>\n";
   $code .=  $defs{$name}{fhem}{div} if($defs{$name}{fhem}{div});
   $code .=  "</body>\n".btIP_HTMLTail();
@@ -1223,9 +1278,12 @@ sub btIP_getScript {
       next if($h !~ m/HASH/ || !$h->{SCRIPT});
       my $script = $h->{SCRIPT};
       $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
-      $scripts .= sprintf($jsTemplate, $script) . "\n";
+      $scripts .= sprintf($jsTemplate, $script);
     }
   }
+  $scripts .= sprintf($jsTemplate,"$FW_ME/pgm2/jquery.min.js");
+  $scripts .= sprintf($jsTemplate,"http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"); 
+  $scripts =~ s/script>/script>\n/g;
   return $scripts; 
 }
 
