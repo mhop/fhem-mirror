@@ -128,7 +128,7 @@ sub btIP_Define {
 
   btIP_addExtension("btIP_CGI","btip","InfoPanel");
   btIP_readLayout($hash);
-  
+
   readingsSingleUpdate($hash,'state','defined',1);
   return undef;
 }
@@ -1186,6 +1186,10 @@ sub btIP_addExtension {
     $data{FWEXT}{$url}{LINK} = "+$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
     $data{FWEXT}{$url}{FORKABLE} = 0;
+    $data{FWEXT}{$url}{SCRIPT} = '/pgm2/jquery.min.js"></script>' .
+    '<script type="text/javascript" src="http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"></script>' .
+#                                 '<script type="text/javascript" src="/fhem/pgm2/jquery.vticker.min.js"></script>' .
+                                 '<script type="text/javascript" charset="UTF-8';
 }
 
 sub btIP_CGI{
@@ -1281,8 +1285,8 @@ sub btIP_getScript {
       $scripts .= sprintf($jsTemplate, $script);
     }
   }
-  $scripts .= sprintf($jsTemplate,"$FW_ME/pgm2/jquery.min.js");
-  $scripts .= sprintf($jsTemplate,"http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"); 
+#  $scripts .= sprintf($jsTemplate,"$FW_ME/pgm2/jquery.min.js");
+#  $scripts .= sprintf($jsTemplate,"http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"); 
   $scripts =~ s/script>/script>\n/g;
   return $scripts; 
 }
