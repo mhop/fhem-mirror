@@ -356,7 +356,6 @@ LIGHTIFY_Parse($$)
   my $name = $hash->{NAME};
 
   $hex = uc($hex);
-Log 3, $hex;
 
   my $length = hex(substr($hex,2*1,2*1).substr($hex,2*0,2*1));
   my $response = substr($hex,2*3,2*1);
