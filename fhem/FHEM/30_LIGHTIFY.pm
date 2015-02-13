@@ -367,6 +367,7 @@ LIGHTIFY_Parse($$)
     for( my $i = 0; $i < $nr_lights; ++$i ) {
       my $short = substr($hex,$i*42*2+2*11,2*2);
       my $id = substr($hex,$i*42*2+2*13,2*8);
+      my $type = substr($hex,$i*42*2+2*21,2*1);
       my $onoff = hex(substr($hex,$i*42*2+2*29,2*1));
       my $dim = hex(substr($hex,$i*42*2+2*30,2*1));
       my $ct = hex(substr($hex,$i*42*2+2*32,2*1).substr($hex,$i*42*2+2*31,2*1));
@@ -374,7 +375,7 @@ LIGHTIFY_Parse($$)
       my $g = (substr($hex,$i*42*2+2*34,2*1));
       my $b = (substr($hex,$i*42*2+2*35,2*1));
       my $alias = pack('H*', substr($hex,$i*42*2+2*37,2*16));
-Log 3, "$alias: $id:$short, onoff: $onoff, dim: $dim, ct: $ct, rgb: $r$g$b";
+Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, dim: $dim, ct: $ct, rgb: $r$g$b";
 
 
       #my $code = $id;
@@ -451,7 +452,7 @@ LIGHTIFY_Read($)
   }
 
   my $hex = unpack('H*', $buf);
-  Log3 $name, 3, "$name: received: $hex";
+  Log3 $name, 4, "$name: received: $hex";
 
   LIGHTIFY_Parse($hash, $hex);
 }
