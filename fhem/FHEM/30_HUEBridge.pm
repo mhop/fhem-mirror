@@ -908,7 +908,7 @@ HUEBridge_HTTP_Request($$$@)
   </ul><br>
 
   <a name="HUEBridge_Get"></a>
-  <b>Set</b>
+  <b>Get</b>
   <ul>
     <li>devices<br>
     list the devices known to the bridge.</li>
