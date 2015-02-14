@@ -332,7 +332,7 @@ sub btIP_itemGroup {
 
 sub btIP_itemImg {
   return unless $useImgTools;
-  my ($id,$x,$y,$scale,$srctype,$arg,$link,%params)= @_;
+  my ($id,$x,$y,$scale,$link,$srctype,$arg,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
   return unless(defined($arg));
   return if($arg eq "");
@@ -711,9 +711,10 @@ sub btIP_findTarget {
 
 sub btIP_xy {
   my ($x,$y,%params)= @_;
-
-  $x = $params{xx} if($x eq 'x');
-  $y = $params{yy} if($y eq 'y');
+  $x = $params{width}  if ($x eq 'max');
+  $y = $params{height} if ($y eq 'max');
+  $x = $params{xx}     if ($x eq 'x');
+  $y = $params{yy}     if ($y eq 'y');
   if((-1 < $x) && ($x < 1)) { $x *= $params{width}; }
   if((-1 < $y) && ($y < 1)) { $y *= $params{height}; }
   return($x,$y);
@@ -971,14 +972,14 @@ sub btIP_evalLayout {
         }
 
 	    when("img") {
-	      ($id,$x,$y,$scale,$srctype,$arg,$link) = split("[ \t]+", $def,7);
+	      ($id,$x,$y,$scale,$link,$srctype,$arg) = split("[ \t]+", $def,7);
 	      ($x,$y) = btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y; 
-	      $arg  = AnalyzePerlCommand(undef, $arg);
-              $link = AnalyzePerlCommand(undef,$link);
-              my($output,$width,$height)= btIP_itemImg($id,$x,$y,$scale,$srctype,$arg,$link,%params);
-              $svg .= $output;
+ 	      $arg  = AnalyzePerlCommand(undef,$arg);
+          $link = AnalyzePerlCommand(undef,$link);
+          my($output,$width,$height)= btIP_itemImg($id,$x,$y,$scale,$link,$srctype,$arg,%params);
+          $svg .= $output;
 	      $params{xx} = $x;
 	      $params{yy} = $y+$height;
 	    }
