@@ -1196,17 +1196,13 @@ sub btIP_evalLayout {
 
 sub btIP_addExtension {
     my ($func,$link,$friendlyname)= @_;
-
-    my $vtickerUrl = "http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15";
     my $url = "/" . $link;
-
-    $data{FWEXT}{$url}{FUNC} = $func;
-    $data{FWEXT}{$url}{LINK} = "+$link";
-    $data{FWEXT}{$url}{NAME} = $friendlyname;
-    $data{FWEXT}{$url}{FORKABLE} = 0;
+    $data{FWEXT}{$url}{FUNC}            = $func;
+    $data{FWEXT}{$url}{LINK}            = "+$link";
+    $data{FWEXT}{$url}{NAME}            = $friendlyname;
+    $data{FWEXT}{$url}{FORKABLE}        = 0;
 	$data{FWEXT}{jquery}{SCRIPT}        = "/pgm2/jquery.min.js"         unless $data{FWEXT}{jquery}{SCRIPT};
-	$data{FWEXT}{jqueryvticker}{SCRIPT} = $vtickerUrl unless $data{FWEXT}{jqueryvticker}{SCRIPT};
-
+	$data{FWEXT}{jqueryvticker}{SCRIPT} = "/pgm2/jquery.vticker.min.js" unless $data{FWEXT}{jqueryvticker}{SCRIPT};
 }
 
 sub btIP_CGI{
