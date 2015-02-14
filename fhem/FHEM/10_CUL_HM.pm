@@ -1842,6 +1842,15 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$devH,1,"state:$btnName $state$target"];
       if($md eq "HM-Dis-WM55"){
         my $type = $trigType eq "Short"?"s":"l";
+        if ($devH->{cmdStack}){# there are pending commands. we only send new ones
+          delete $devH->{cmdStack};
+          delete $devH->{helper}{prt}{rspWait};
+          delete $devH->{helper}{prt}{rspWaitSec};
+          delete $devH->{helper}{prt}{mmcA};
+          delete $devH->{helper}{prt}{mmcS};
+          delete $devH->{lastMsg};
+        }
+
         CUL_HM_calcDisWm($chnHash,$devH->{NAME},($trigType eq "Long"?"l":"s"));
         CUL_HM_PushCmdStack($shash,"++A011$id$src$_")foreach (@{$chnHash->{helper}{disp}{$type}});
       }
@@ -3736,8 +3745,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my (undef,undef,$duration,$ramp) = @a; #date prepared extention to entdate
     if ($cmd eq "on-till"){
       # to be extended to handle end date as well
-      my ($eH,$eM,$eSec)  = split(':',$duration.":00:00");
-      return "please enter time informat hh:mm:ss" if (!$eSec);
+      my (undef,$eH,$eM,$eSec)  = GetTimeSpec($duration);
       $eSec += $eH*3600 + $eM*60;
       my @lt = localtime;
       my $ltSec = $lt[2]*3600+$lt[1]*60+$lt[0];# actually strip of date
