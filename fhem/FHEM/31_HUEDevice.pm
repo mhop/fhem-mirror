@@ -886,7 +886,7 @@ HUEDevice_Parse($$)
 
     if( !$hash->{helper}->{devtype} ) {
       $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb DEFF26:rgb 0000ff:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "extcolordimmer" );
-      $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $subtype eq "colordimmer" );
+      $attr{$name}{webCmd} = 'hue:rgb:rgb ff0000:rgb 98FF23:rgb 0000ff:toggle:on:off' if( $subtype eq "colordimmer" );
       $attr{$name}{webCmd} = 'ct:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "ctdimmer" );
       $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $subtype eq "dimmer" );
       $attr{$name}{webCmd} = 'toggle:on:off' if( $subtype eq "switch" );
