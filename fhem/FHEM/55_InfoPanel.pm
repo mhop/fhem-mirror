@@ -29,6 +29,17 @@
 # THE SOFTWARE.
 #
 ##############################################
+#
+# 2015-02-06 - 7892 - module moved from ./contrib to ./FHEM
+# 2015-02-08 - 7921 - changed: additional modules are optional
+# 2015-02-10 - 7931 - added:   direct link to circle,ellipse,rect
+# 2015-02-11 - 7933 - added:   item counter
+# 2015-02-11 - 7944 - added:   items push/pop
+# 2015-02-12 - 7947 - changed: turtle added to new elements
+# 2015-02-14 - 7967 - added:   item ticker (experimantal
+#                     changed: img syntax
+#
+##############################################
 # $Id$
 
 package main;
@@ -1278,19 +1289,19 @@ sub btIP_HTMLHead {
 sub btIP_getScript {
 
   my $scripts= "";
-  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
-  if(defined($data{FWEXT})) {
-    foreach my $k (sort keys %{$data{FWEXT}}) {
-      my $h = $data{FWEXT}{$k};
-      next if($h !~ m/HASH/ || !$h->{SCRIPT});
-      my $script = $h->{SCRIPT};
-      $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
-      $scripts .= sprintf($jsTemplate, $script);
-    }
-  }
-#  $scripts .= sprintf($jsTemplate,"$FW_ME/pgm2/jquery.min.js");
-#  $scripts .= sprintf($jsTemplate,"http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"); 
-  $scripts =~ s/script>/script>\n/g;
+  my $jsTemplate = '<script type="text/javascript" src="%s"></script>'."\n";
+#  if(defined($data{FWEXT})) {
+#    foreach my $k (sort keys %{$data{FWEXT}}) {
+#      my $h = $data{FWEXT}{$k};
+#      next if($h !~ m/HASH/ || !$h->{SCRIPT});
+#      my $script = $h->{SCRIPT};
+#      $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
+#      $scripts .= sprintf($jsTemplate, $script);
+#    }
+#  }
+  $scripts .= sprintf($jsTemplate,"$FW_ME/pgm2/jquery.min.js");
+  $scripts .= sprintf($jsTemplate,"http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"); 
+#  $scripts =~ s/script>/script>\n/g;
   return $scripts; 
 }
 
@@ -1523,16 +1534,16 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                </code>
            </ul></li><br/>
        <br/>
-       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;sourceType&gt; &lt;{dataSource}&gt; [&lt;link&gt;]</code><br/>
+       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;link&gt; &lt;sourceType&gt; &lt;{dataSource}&gt; </code><br/>
            <br/>
            <ul>embed an image into InfoPanel<br/>
                <br/>
                id = element id<br/>
                x,y = upper left corner<br/>
                scale = scale to be used for resizing; may be factor or defined by width or height<br/>
+               link = URL to be linked to item, use "" if not needed<br/>
                sourceType = file | url | data<br/>
                dataSource = where to read data from, depends on sourceType<br/>
-               link = URL to be linked to item<br/>
            </ul></li><br/>
        <br/>
        <li><code>line &lt;id&gt; &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;stroke&gt;]</code><br/>
