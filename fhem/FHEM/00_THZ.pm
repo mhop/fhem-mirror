@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.131";
+my $thzversion = "0.132";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -52,9 +52,206 @@ sub THZ_Get_Comunication($$);
 sub THZ_PrintcurveSVG;
 sub THZ_RemoveInternalTimer($);
 sub THZ_Set($@);
+sub function_heatSetTemp($$);
 
+########################################################################################
+#
+# %parsinghash  - known type of message structure
+# 
+########################################################################################
 
-
+my %parsinghash = (
+  #msgtype => parsingrule  
+  "01pxx206" => [["p37Fanstage1AirflowInlet: ", 4, 2, "hex", 1],	[" p38Fanstage2AirflowInlet: ", 6, 2, "hex", 1],	[" p39Fanstage3AirflowInlet: ", 8, 2, "hex", 1],
+		[" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],	[" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
+		[" p43UnschedVent3: ", 16, 4, "hex", 1],	[" p44UnschedVent2: ", 20, 4, "hex", 1],	[" p45UnschedVent1: ", 24, 4, "hex", 1],
+      		[" p46UnschedVent0: ", 28, 4, "hex", 1],	[" p75PassiveCooling: ", 32, 2, "hex", 1]
+	      	 ],
+  "03pxx206" => [["UpTempLimitDefrostEvaporatorEnd: ", 4, 4, "hex", 10],  [" MaxTimeDefrostEvaporator: ", 8, 4, "hex", 1], 	[" LimitTempCondenserElectBoost: ", 12, 4, "hex", 10],
+		[" LimitTempCondenserDefrostTerm: ", 16, 4, "hex", 10],   [" CompressorRestartDelay: ", 20, 2, "hex", 1], 	[" MainFanSpeed: ", 22, 2, "hex", 1]
+		],
+  "04pxx206" => [["MaxDefrostDurationAAExchenger: ", 4, 2, "hex", 1],	[" DefrostStartThreshold: ", 6, 4, "hex", 10],		[" VolumeFlowFilterReplacement: ", 10, 4, "hex", 1]
+		],
+  "05pxx206" => [["p13GradientHC1: ", 4, 4, "hex", 10],		[" p14LowEndHC1: ", 8, 4, "hex", 10],		[" p15RoomInfluenceHC1: ", 12, 2, "hex", 10],
+		[" p16GradientHC2: ", 14, 4, "hex", 10],	[" p17LowEndHC2: ", 18, 4, "hex", 10],		[" p18RoomInfluenceHC2: ", 22, 2, "hex", 10],
+		[" p19FlowProportionHC1: ", 24, 4, "hex", 10],	[" p20FlowProportionHC2: ", 28, 4, "hex", 10],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
+		[" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],	[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10], [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
+		 ],
+  "06pxx206" => [["p21Hist1: ", 4, 2, "hex", 10],		[" p22Hist2: ", 6, 2, "hex", 10],		  [" p23Hist3: ", 8, 2, "hex", 10],
+		[" p24Hist4: ", 10, 2, "hex", 10],		[" p25Hist5: ", 12, 2, "hex", 10],		  [" p26Hist6: ", 14, 2, "hex", 10],
+		[" p27Hist7: ", 16, 2, "hex", 10],		[" p28Hist8: ", 18, 2, "hex", 10],		  [" p29HistAsymmetry: ", 20, 2, "hex", 1],
+		[" p30integralComponent: ", 22, 4, "hex", 1],	[" p31MaxBoostStages: ", 26, 2, "hex", 1],	  [" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
+		[" p49SummerModeTemp: ", 32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10], [" p77OutTempAdjust: ", 40, 4, "hex", 1],
+		[" p78DualModePoint: ", 44, 4, "hex", 10],	[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
+		 ],
+  "07pxx206" => [["p32HystDHW: ", 4, 2, "hex", 10],		[" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],	 [" p34TempLimitBoostDHW: ", 8, 4, "hex", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
+		[" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],	[" PasteurisationTemp: ", 16, 4, "hex", 10],	 [" MaxBoostStagesDHW: ", 20, 2, "hex", 1],
+		[" p84EnableDHWBuffer: ", 22, 2, "hex", 1]
+		 ],
+  "08pxx206" => [["p80EnableSolar: ", 4, 2, "hex", 1],		[" p81DiffTempSolarLoading: ", 6, 4, "hex", 10], [" p82DelayCompStartSolar: ", 10, 2, "hex", 1],
+		[" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	[" HystDiffTempSolar: ", 16, 4, "hex", 1],	 [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
+		 ],
+  "09his"  => [["compressorHeating: ",	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
+	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
+	      [" boosterHeating: ",	20, 4, "hex", 1]
+	      ],
+  "09his206" => [["operatingHours1: ",	4, 4,  "hex", 1],	[" operatingHours2: ",  8, 4, "hex", 1],
+	      [" heatingHours: ",	12, 4, "hex", 1],	[" DHWhours: ",	16, 4, "hex", 1],
+	      [" coolingHours: ",	20, 4, "hex", 1]
+	      ],
+  "0Apxx206" => [["p54MinPumpCycles: ", 4, 2, "hex", 1],	  [" p55MaxPumpCycles: ", 6, 4, "hex", 1],	 [" p56OutTempMaxPumpCycles: ", 10, 4, "hex", 10],
+		[" p57OutTempMinPumpCycles: ", 14, 4, "hex", 10], [" p58SuppressTempCaptPumpStart: ", 18, 4, "hex", 1]
+	      ],
+  "0Bpxx206" => [["pHTG1StartTime: ", 4, 4, "hex2time", 1],	[" pHTG1EndTime: ", 8, 4, "hex2time", 1],	[" pHTG1Weekdays: ", 12, 2, "hex2wday", 1],
+	        [" pHTG1Enable: ", 14, 2, "hex", 1],		[" pHTG2StartTime: ", 16, 4, "hex2time", 1],	[" pHTG2EndTime: ", 20, 4, "hex2time", 1],
+		[" pHTG2Weekdays: ", 24, 2, "hex2wday", 1],	[" pHTG2Enable: ", 26, 2, "hex", 1]
+	      ], 
+  "0Cpxx206" => [["pDHWStartTime: ", 4, 4, "hex2time", 1],	[" pDHWEndTime: ", 8, 4, "hex2time", 1],	[" pDHWWeekdays: ", 12, 2, "hex2wday", 1],
+		 [" pDHWEnable: ", 14, 2, "hex", 1],
+	      ], 
+  "0Dpxx206" => [["pFAN1StartTime: ", 4, 4, "hex2time", 1], 	[" pFAN1EndTime: ", 8, 4, "hex2time", 1], 	[" pFAN1Weekdays: ", 12, 2, "hex2wday", 1],
+		 [" pFAN1Enable: ", 14, 2, "hex", 1], 		[" pFAN2StartTime: ", 16, 4, "hex2time", 1],	[" pFAN2EndTime: ", 20, 4, "hex2time", 1],
+		 [" pFAN2Weekdays: ", 24, 2, "hex2wday", 1],	[" pFAN2Enable: ", 26, 2, "hex", 1]
+	      ], 
+  "0Epxx206" => [["p59RestartBeforeSetbackEnd: ", 4, 4, "hex", 1]
+	      ], 
+  "0Fpxx206" => [["pA0DurationUntilAbsenceStart: ", 4, 4, "hex", 10], [" pA0AbsenceDuration: ", 8, 4, "hex", 10], [" pA0EnableAbsenceProg: ", 12, 2, "hex", 1]
+	      ], 	 
+  "10pxx206" => [["p70StartDryHeat: ", 4, 2, "hex", 1],		[" p71BaseTemp: ", 6, 4, "hex", 10],	[" p72PeakTemp: ", 10, 4, "hex", 10],
+		[" p73TempDuration: ", 14, 4, "hex", 1],	[" p74TempIncrease: ", 18, 4, "hex", 10]
+	      ],
+  "16sol"  => [["collector_temp: ",	4, 4, "hex2int", 10],	[" dhw_temp: ", 	 8, 4, "hex2int", 10],
+	      [" flow_temp: ",		12, 4, "hex2int", 10],	[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
+	      [" x20: ",		20, 4, "hex2int", 1],	[" x24: ",		24, 4, "hex2int", 1], 
+	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
+	      ],
+  "17pxx206" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
+	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetDayTemp: ",		16, 4,  "hex", 10], 
+	      [" p05DHWsetNightTemp: ",	20, 4,  "hex", 10], 	[" p06DHWsetStandbyTemp: ",	24, 4,  "hex", 10], 
+	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 2,  "hex", 1],
+	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	[" p10RoomTempManual: ",	34, 4,  "hex", 10],
+	      [" p11DHWsetManualTemp: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
+	     ],
+  "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
+	      [" fault0CODE: ",		8, 2,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhexdate", 100],
+	      [" fault1CODE: ",		20, 2, "faultmap", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhexdate", 100],
+	      [" fault2CODE: ",		32, 2, "faultmap", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhexdate", 100],
+	      [" fault3CODE: ",		44, 2, "faultmap", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhexdate", 100]
+	      ],
+  "D1last206" => [["number_of_faults: ",	4, 2, "hex", 1],	
+	      [" fault0CODE: ",		8, 4,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "hex2time", 1],  [" fault0DATE: ",	16, 4, "hexdate", 100],
+	      [" fault1CODE: ",		20, 4, "faultmap", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 100],
+	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 100],
+	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 100]
+	      ],
+  "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
+	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
+	      [" x20: ", 		20, 4, "hex2int", 1],	[" heat_block_time: ", 	24, 4, "hex2int", 1], 
+	      [" BoosterStage: ",	28, 2, "hex", 1],	[" x30: ",		30, 4, "hex", 1],
+	      [" opMode: ",		34, 2, "opmodehc", 1],	[" x36: ",		36, 4, "hex", 1]
+ 	      ],
+  "F4hc1"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
+	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
+	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
+	      [" heatTemp: ",		28, 4, "hex2int", 10],  #[" x32: ",		32, 4, "hex2int", 1],
+	      [" seasonMode: ",		38, 2, "somwinmode", 1],#[" x40: ",		40, 4, "hex2int", 1],
+	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
+	      #[" x52: ",		52, 4, "hex2int", 1],
+              [" roomSetTemp: ",	56, 4, "hex2int", 10],  [" x60: ", 		60, 4, "hex2int", 10],
+	      [" x64: ", 		64, 4, "hex2int", 10],  [" insideTempRC: ",     68, 4, "hex2int", 10],
+	      [" x72: ", 		72, 4, "hex2int", 10],  [" x76: ", 		76, 4, "hex2int", 10],
+	   #  [" x80: ", 		80, 4, "hex2int", 10]
+	     ],
+  "F5hc2"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" returnTemp: ",	8, 4, "hex2int", 10],
+	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
+	      [" heatTemp: ", 		20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
+	      [" seasonMode: ",		30, 2, "somwinmode", 1],[" opMode: ",		36, 2, "opmodehc", 1]
+	     ],
+  "F6sys206" => [["LüfterstufeManuell: ", 30, 2, "hex", 1],	[" RestlaufzeitLüfter: ", 36, 4, "hex", 1]
+	     ],
+  "FBglob" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
+	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
+	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
+	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
+	      [" mixerOpen: ",		45, 1, "bit0", 1],  	[" mixerClosed: ",		45, 1, "bit1", 1],
+	      [" heatPipeValve: ",	45, 1, "bit2", 1],  	[" diverterValve: ",		45, 1, "bit3", 1],
+	      [" dhwPump: ",		44, 1, "bit0", 1],  	[" heatingCircuitPump: ",	44, 1, "bit1", 1],
+	      [" solarPump: ",		44, 1, "bit3", 1],  	[" compressor: ",		47, 1, "bit3", 1],
+	      [" boosterStage3: ",	46, 1, "bit0", 1],  	[" boosterStage2: ",		46, 1, "bit1", 1],
+	      [" boosterStage1: ",	46, 1, "bit2", 1],  	[" highPressureSensor: ",	49, 1, "nbit0", 1],
+	      [" lowPressureSensor: ",	49, 1, "nbit1", 1],  	[" evaporatorIceMonitor: ",	49, 1, "bit2", 1],
+	      [" signalAnode: ",	49, 1, "bit3", 1],  	[" evuRelease: ",		48, 1, "bit0", 1],
+	      [" ovenFireplace: ",	48, 1, "bit1", 1],  	[" STB: ",			48, 1, "bit2", 1],
+	      [" outputVentilatorPower: ",	50, 4, "hex", 10],  	[" inputVentilatorPower: ",	54, 4, "hex", 10],	[" mainVentilatorPower: ",	58, 4, "hex", 10],
+	      [" outputVentilatorSpeed: ",	62, 4, "hex", 1],	[" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
+	      [" outside_tempFiltered: ",	74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
+	      [" dewPoint: ",			82, 4, "hex2int", 10],
+	      [" P_Nd: ",			86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
+	      [" actualPower_Qc: ",		94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
+	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
+	      ],
+  "FBglob206" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
+	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
+	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
+	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
+	      [" mixerOpen: ",		47, 1, "bit1", 1],  	[" mixerClosed: ",		47, 1, "bit0", 1],
+	      [" heatPipeValve: ",	45, 1, "bit3", 1],  	[" diverterValve: ",		45, 1, "bit2", 1],
+	      [" dhwPump: ",		45, 1, "bit1", 1],  	[" heatingCircuitPump: ",	45, 1, "bit0", 1],
+	      [" solarPump: ",		44, 1, "bit2", 1],  	[" compressor: ",		44, 1, "bit0", 1],
+	      [" boosterStage3: ",	44, 1, "bit3", 1],  	[" boosterStage2: ",		44, 1, "n.a.", 1],
+	      [" boosterStage1: ",	44, 1, "bit1", 1],  	[" highPressureSensor: ",	49, 1, "n.a.", 1],
+	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  	[" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
+	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" evuRelease: ",		48, 1, "n.a.", 1],
+	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	[" STB: ",			48, 1, "n.a.", 1],
+	      [" outputVentilatorPower: ",	48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
+	      [" outputVentilatorSpeed: ",	56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
+	      [" outside_tempFiltered: ",	64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
+	      [" dewPoint: ",			5, 4, "n.a.", 1],
+	      [" P_Nd: ",			5, 4, "n.a.", 1],	[" P_Hd: ",			5, 4, "n.a.", 1],
+	      [" actualPower_Qc: ",		5, 8, "n.a.", 1],	[" actualPower_Pel: ",		5, 8, "n.a.", 1],
+	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
+	      ],
+  "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
+	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
+	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
+	      ["/", 			16, 2, "hex", 1]
+	     ],
+  "FCtime206" => [["Weekday: ", 	7, 1,  "weekday", 1],	[" Hour: ",	8, 2, "hex", 1],
+	      [" Min: ",		10, 2,  "hex", 1], 	[" Sec: ",	12, 2, "hex", 1],
+	      [" Date: ", 		14, 2, "year", 1],	["/", 		18, 2, "hex", 1],
+	      ["/", 			20, 2, "hex", 1]
+	     ],
+  "FDfirm" => [["version: ", 	4, 4, "hex", 100]
+	     ],
+  "FEfirmId" => [[" HW: ",	30,  2, "hex", 1], [" SW: ",	32,  4, "swver", 1],
+		 [" Date: ", 	36, 22, "hex2ascii", 1]
+	     ],
+  "0A0176Dis" => [[" switchingProg: ",	11, 1, "bit0", 1],  	[" compressor: ",	11, 1, "bit1", 1],
+	      [" heatingHC: ",		11, 1, "bit2", 1],  	[" heatingDHW: ",	10, 1, "bit0", 1],
+	      [" boosterHC: ",		10, 1, "bit1", 1],  	[" filterBoth: ",	9, 1, "bit0", 1],
+	      [" ventStage: ",		9, 1, "bit1", 1],  	[" pumpHC: ",		9, 1, "bit2", 1],
+	      [" defrost: ",		9, 1, "bit3", 1],  	[" filterUp: ",		8, 1, "bit0", 1],
+	      [" filterDown: ",	8, 1, "bit1", 1]
+	      ],
+  "0clean"    => [["", 8, 2, "hex", 1]             
+              ],
+  "1clean"    => [["", 8, 4, "hex", 1]             
+              ],
+  "2opmode"   => [["", 8, 2, "opmode", 1]             
+              ],
+  "4temp"     => [["", 8, 4, "hex2int",2560]             
+	      ],
+  "5temp"     => [["", 8, 4, "hex2int",10]             
+	      ],
+  "6gradient" => [["", 8, 4, "hex", 100]             
+              ],
+  "7prog"     => [["", 8, 2, "quater", 1], 	["--", 10, 2, "quater", 1]
+              ],
+  "8party"    => [["", 10, 2, "quater", 1],	["--", 8, 2, "quater", 1]
+              ],
+  "9holy"     => [["", 10, 2, "quater", 1]
+              ]
+);
 
 
 ########################################################################################
@@ -64,6 +261,7 @@ sub THZ_Set($@);
 ########################################################################################
 
 my %sets439 = (
+ #   "flowTem"				=> {parent=>"sGlobal", argMin =>  "1", argMax =>   "88", unit =>" °C"},
     "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
     "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
     "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
@@ -124,8 +322,9 @@ my %sets439 = (
     "p35PasteurisationInterval"		=> {cmd2=>"0A0586", argMin =>  "1",  argMax =>   "30", 	type =>"1clean",  unit =>""},
     "p35PasteurisationTemp"		=> {cmd2=>"0A0587", argMin =>  "10", argMax =>   "65", 	type =>"5temp",  unit =>" °C"},
     "p34BoosterDHWTempAct"		=> {cmd2=>"0A0589", argMin => "-10", argMax =>   "10", 	type =>"5temp",  unit =>" °C"},
-    "p99DHWmaxFlowTemp"			=> {cmd2=>"0A058C", argMin =>  "10", argMax =>   "75",	type =>"5temp",  unit =>" °C"}, 
+    "p99DHWmaxFlowTemp"			=> {cmd2=>"0A058C", argMin =>  "10", argMax =>   "75",	type =>"5temp",  unit =>" °C"},
     "p89DHWeco"				=> {cmd2=>"0A058D", argMin =>  "0",  argMax =>   "1", 	type =>"1clean",  unit =>""},
+    "p99startUnschedVent"		=> {cmd2=>"0A05DD", argMin =>  "0",  argMax =>   "3", 	type =>"1clean",  unit =>""},
     "pHolidayBeginDay"			=> {cmd2=>"0A011B", argMin =>  "1", 	argMax =>  "31", 	type =>"0clean",  unit =>""},
     "pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>  "1", 	argMax =>  "12",	type =>"0clean",  unit =>""},
     "pHolidayBeginYear"			=> {cmd2=>"0A011D", argMin =>  "12", 	argMax =>  "20",	type =>"0clean",  unit =>""},
@@ -257,6 +456,22 @@ my %sets439 = (
     "programFan_Mo-So_2"		=> {cmd2=>"0A1DA2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""}
   );
 
+my %sets206 = (
+    "p01RoomTempDay"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
+    "p02RoomTempNight"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
+    "p03RoomTempStandby"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
+    "p04DHWsetDayTemp"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
+    "p05DHWsetNightTemp"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
+    "p06DHWsetStandbyTemp"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
+    "p07FanStageDay"		=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
+    "p08FanStageNight"		=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
+    "p09FanStageStandby"	=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
+    "p10RoomTempManual"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
+    "p11DHWSetTempManual"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
+    "p12FANStageManual"		=> {parent=>"p01-p12", argMin =>   "0", argMax =>   "3",	unit =>""}
+);
+
+
 
 ########################################################################################
 #
@@ -307,6 +522,8 @@ my %getsonly539 = (  #info from belu and godmorgon
 %getsonly539=(%getsonly539, %getsonly439);
 
 my %getsonly206 = (
+#       "outsideTemp"			=> {parent=>"sGlobal", unit =>" °C"},
+#	"return"			=> {parent=>"sGlobal", unit =>" °C"},
   	"pFan"				=> {cmd2=>"01", type =>"01pxx206", unit =>""},
 	"pExpert"			=> {cmd2=>"02", type =>"02pxx206", unit =>""},
 	"pDefrostEva"			=> {cmd2=>"03", type =>"03pxx206", unit =>""},
@@ -595,6 +812,37 @@ sub THZ_Set($@){
     }
   }  
  
+  my $parent = $cmdhash->{parent};	#if I have a father read from it
+  if(defined($parent) ) {
+      my $parenthash=$gets{$parent}; my $parsingrule = $parsinghash{$parenthash->{type}};
+      my $i=0; 
+      for   (@$parsingrule) {
+	last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
+	$i++;
+      }
+      my $pos = @$parsingrule[$i]->[1];
+      my $len = @$parsingrule[$i]->[2];
+      my $pasringtype = @$parsingrule[$i]->[3];
+      my $dec = @$parsingrule[$i]->[4];
+      my $subst;
+      $cmdHex2 = $parenthash->{cmd2};	#overwrite $cmdHex2 with the parent
+      Log3 $hash->{NAME}, 3, "write register/pos/len/dec/arg to THZ: $cmdHex2 / $pos / $len / $dec / $arg";
+      #read before write the register
+      $cmdHex2=THZ_encodecommand($cmdHex2, "get");
+	($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
+	if (defined($err))     {
+		 Log3 $hash->{NAME}, 3, "THZ_Set: error reading register: '$err'";
+		 return ($msg ."\n msg " . $err);
+	}
+	Log3 $hash->{NAME}, 3, "answer from THZ: $msg";
+	return ("everything ok, no writing, I am tired. Rest of implementation tomorrow. look in the logs");
+  }
+ 
+ 
+ 
+ 
+ 
+ 
   # encode value depending on type
   given ($cmdhash->{type}) {
    when ("9holy") 		{$arg= time2quaters($arg)}
@@ -669,43 +917,56 @@ sub THZ_Get($@){
 
   return "\"get $name\" needs one parameter" if(@a != 2);
   my $cmd = $a[1];
-   my ($err, $msg2) =("", " ");
+  my ($err, $msg2) =("", " ");
 
   if ($cmd eq "debug_read_raw_register_slow") {
     THZ_debugread($hash);
     return ("all raw registers read and saved");
-    } 
+  } 
   
   my $cmdhash = $gets{$cmd};
   return "Unknown argument $cmd, choose one of " .
         join(" ", sort keys %gets) if(!defined($cmdhash));
 
   Log3 $hash->{NAME}, 5, "THZ_Get: Try to get '$cmd'";
-  my $cmdHex2 = $cmdhash->{cmd2};
-  if(defined($cmdHex2) ) {
-      $cmdHex2=THZ_encodecommand($cmdHex2,"get");
-      ($err, $msg2) = THZ_Get_Comunication($hash,  $cmdHex2);
-      if (defined($err))     {
+  
+  my $parent = $cmdhash->{parent};	#if I have a father read from it
+  if(defined($parent) ) {
+      # if ReadingsTimestamp(parent) +60s < timenow  $risultato =readingvalue(parent)
+      my $risultato=THZ_Get($hash, $hash->{NAME}, $parent);	#to be implemented:check last update of the parent: if under 60sec use the current value
+      my $parenthash=$gets{$parent}; my $parsingrule = $parsinghash{$parenthash->{type}};
+      my $i=0; 
+      for  (@$parsingrule) {
+      last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
+	$i++;}
+      $msg2=(split ' ', $risultato)[$i*2+1];
+  }
+  else { 
+      my $cmdHex2 = $cmdhash->{cmd2};
+      if(defined($cmdHex2) ) {
+          $cmdHex2=THZ_encodecommand($cmdHex2,"get");
+          ($err, $msg2) = THZ_Get_Comunication($hash,  $cmdHex2);
+          if (defined($err))     {
              Log3 $hash->{NAME}, 5, "THZ_Get: Error msg2: '$err'";
              return ($msg2 ."\n msg2 " . $err);
+          }
+          $msg2 = THZ_Parse1($hash,$msg2);
       }
-      $msg2 = THZ_Parse1($hash,$msg2);
-  }
   
-  my $cmdHex3 = $cmdhash->{cmd3};
-  if(defined($cmdHex3)) {
-      my $msg3= " ";
-      $cmdHex3=THZ_encodecommand($cmdHex3,"get");
-      ($err, $msg3) = THZ_Get_Comunication($hash,  $cmdHex3);
-       if (defined($err))     {
-             Log3 $hash->{NAME}, 5, "THZ_Get: Error msg3: '$err'";
-             return ($msg3 ."\n msg3 " . $err);
-      }
-      $msg2 = THZ_Parse1($hash,$msg3) * 1000 + $msg2  ;
-  }	            		
-   
+      my $cmdHex3 = $cmdhash->{cmd3};
+      if(defined($cmdHex3)) {
+          my $msg3= " ";
+          $cmdHex3=THZ_encodecommand($cmdHex3,"get");
+          ($err, $msg3) = THZ_Get_Comunication($hash,  $cmdHex3);
+           if (defined($err))     {
+                 Log3 $hash->{NAME}, 5, "THZ_Get: Error msg3: '$err'";
+                 return ($msg3 ."\n msg3 " . $err);
+          }
+          $msg2 = THZ_Parse1($hash,$msg3) * 1000 + $msg2  ;
+      }	            		
+  } 
   my $unit = $cmdhash->{unit};
-    $msg2 = $msg2 .  $unit  if(defined($unit)) ;
+  $msg2 = $msg2 .  $unit  if(defined($unit)) ;
     
     
   my $activatetrigger =1;
@@ -1028,199 +1289,6 @@ local $SIG{__WARN__} = sub
 #######################################
 
 sub THZ_Parse1($$) {
-my %parsinghash = (
-  #msgtype => parsingrule  
-  "01pxx206" => [["p37Fanstage1AirflowInlet: ", 4, 2, "hex", 1],	[" p38Fanstage2AirflowInlet: ", 6, 2, "hex", 1],	[" p39Fanstage3AirflowInlet: ", 8, 2, "hex", 1],
-		[" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],	[" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
-		[" p43UnschedVent3: ", 16, 4, "hex", 1],	[" p44UnschedVent2: ", 20, 4, "hex", 1],	[" p45UnschedVent1: ", 24, 4, "hex", 1],
-      		[" p46UnschedVent0: ", 28, 4, "hex", 1],	[" p75PassiveCooling: ", 32, 2, "hex", 1]
-	      	 ],
-  "03pxx206" => [["UpTempLimitDefrostEvaporatorEnd: ", 4, 4, "hex", 10],  [" MaxTimeDefrostEvaporator: ", 8, 4, "hex", 1], 	[" LimitTempCondenserElectBoost: ", 12, 4, "hex", 10],
-		[" LimitTempCondenserDefrostTerm: ", 16, 4, "hex", 10],   [" CompressorRestartDelay: ", 20, 2, "hex", 1], 	[" MainFanSpeed: ", 22, 2, "hex", 1]
-		],
-  "04pxx206" => [["MaxDefrostDurationAAExchenger: ", 4, 2, "hex", 1],	[" DefrostStartThreshold: ", 6, 4, "hex", 10],		[" VolumeFlowFilterReplacement: ", 10, 4, "hex", 1]
-		],
-  "05pxx206" => [["p13GradientHC1: ", 4, 4, "hex", 10],		[" p14LowEndHC1: ", 8, 4, "hex", 10],		[" p15RoomInfluenceHC1: ", 12, 2, "hex", 10],
-		[" p16GradientHC2: ", 14, 4, "hex", 10],	[" p17LowEndHC2: ", 18, 4, "hex", 10],		[" p18RoomInfluenceHC2: ", 22, 2, "hex", 10],
-		[" p19FlowProportionHC1: ", 24, 4, "hex", 10],	[" p20FlowProportionHC2: ", 28, 4, "hex", 10],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
-		[" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],	[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10], [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
-		 ],
-  "06pxx206" => [["p21Hist1: ", 4, 2, "hex", 10],		[" p22Hist2: ", 6, 2, "hex", 10],		  [" p23Hist3: ", 8, 2, "hex", 10],
-		[" p24Hist4: ", 10, 2, "hex", 10],		[" p25Hist5: ", 12, 2, "hex", 10],		  [" p26Hist6: ", 14, 2, "hex", 10],
-		[" p27Hist7: ", 16, 2, "hex", 10],		[" p28Hist8: ", 18, 2, "hex", 10],		  [" p29HistAsymmetry: ", 20, 2, "hex", 1],
-		[" p30integralComponent: ", 22, 4, "hex", 1],	[" p31MaxBoostStages: ", 26, 2, "hex", 1],	  [" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
-		[" p49SummerModeTemp: ", 32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10], [" p77OutTempAdjust: ", 40, 4, "hex", 1],
-		[" p78DualModePoint: ", 44, 4, "hex", 10],	[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
-		 ],
-  "07pxx206" => [["p32HystDHW: ", 4, 2, "hex", 10],		[" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],	 [" p34TempLimitBoostDHW: ", 8, 4, "hex", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
-		[" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],	[" PasteurisationTemp: ", 16, 4, "hex", 10],	 [" MaxBoostStagesDHW: ", 20, 2, "hex", 1],
-		[" p84EnableDHWBuffer: ", 22, 2, "hex", 1]
-		 ],
-  "08pxx206" => [["p80EnableSolar: ", 4, 2, "hex", 1],		[" p81DiffTempSolarLoading: ", 6, 4, "hex", 10], [" p82DelayCompStartSolar: ", 10, 2, "hex", 1],
-		[" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	[" HystDiffTempSolar: ", 16, 4, "hex", 1],	 [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
-		 ],
-  "09his"  => [["compressorHeating: ",	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
-	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
-	      [" boosterHeating: ",	20, 4, "hex", 1]
-	      ],
-  "09his206" => [["operatingHours1: ",	4, 4,  "hex", 1],	[" operatingHours2: ",  8, 4, "hex", 1],
-	      [" heatingHours: ",	12, 4, "hex", 1],	[" DHWhours: ",	16, 4, "hex", 1],
-	      [" coolingHours: ",	20, 4, "hex", 1]
-	      ],
-  "0Apxx206" => [["p54MinPumpCycles: ", 4, 2, "hex", 1],	  [" p55MaxPumpCycles: ", 6, 4, "hex", 1],	 [" p56OutTempMaxPumpCycles: ", 10, 4, "hex", 10],
-		[" p57OutTempMinPumpCycles: ", 14, 4, "hex", 10], [" p58SuppressTempCaptPumpStart: ", 18, 4, "hex", 1]
-	      ],
-  "0Bpxx206" => [["pHTG1StartTime: ", 4, 4, "hex2time", 1],	[" pHTG1EndTime: ", 8, 4, "hex2time", 1],	[" pHTG1Weekdays: ", 12, 2, "hex2wday", 1],
-	        [" pHTG1Enable: ", 14, 2, "hex", 1],		[" pHTG2StartTime: ", 16, 4, "hex2time", 1],	[" pHTG2EndTime: ", 20, 4, "hex2time", 1],
-		[" pHTG2Weekdays: ", 24, 2, "hex2wday", 1],	[" pHTG2Enable: ", 26, 2, "hex", 1]
-	      ], 
-  "0Cpxx206" => [["pDHWStartTime: ", 4, 4, "hex2time", 1],	[" pDHWEndTime: ", 8, 4, "hex2time", 1],	[" pDHWWeekdays: ", 12, 2, "hex2wday", 1],
-		 [" pDHWEnable: ", 14, 2, "hex", 1],
-	      ], 
-  "0Dpxx206" => [["pFAN1StartTime: ", 4, 4, "hex2time", 1], 	[" pFAN1EndTime: ", 8, 4, "hex2time", 1], 	[" pFAN1Weekdays: ", 12, 2, "hex2wday", 1],
-		 [" pFAN1Enable: ", 14, 2, "hex", 1], 		[" pFAN2StartTime: ", 16, 4, "hex2time", 1],	[" pFAN2EndTime: ", 20, 4, "hex2time", 1],
-		 [" pFAN2Weekdays: ", 24, 2, "hex2wday", 1],	[" pFAN2Enable: ", 26, 2, "hex", 1]
-	      ], 
-  "0Epxx206" => [["p59RestartBeforeSetbackEnd: ", 4, 4, "hex", 1]
-	      ], 
-  "0Fpxx206" => [["pA0DurationUntilAbsenceStart: ", 4, 4, "hex", 10], [" pA0AbsenceDuration: ", 8, 4, "hex", 10], [" pA0EnableAbsenceProg: ", 12, 2, "hex", 1]
-	      ], 	 
-  "10pxx206" => [["p70StartDryHeat: ", 4, 2, "hex", 1],		[" p71BaseTemp: ", 6, 4, "hex", 10],	[" p72PeakTemp: ", 10, 4, "hex", 10],
-		[" p73TempDuration: ", 14, 4, "hex", 1],	[" p74TempIncrease: ", 18, 4, "hex", 10]
-	      ],
-  "16sol"  => [["collector_temp: ",	4, 4, "hex2int", 10],	[" dhw_temp: ", 	 8, 4, "hex2int", 10],
-	      [" flow_temp: ",		12, 4, "hex2int", 10],	[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
-	      [" x20: ",		20, 4, "hex2int", 1],	[" x24: ",		24, 4, "hex2int", 1], 
-	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
-	      ],
-  "17pxx206" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
-	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetDayTemp: ",		16, 4,  "hex", 10], 
-	      [" p05DHWsetNightTemp: ",	20, 4,  "hex", 10], 	[" p06DHWsetStandbyTemp: ",	24, 4,  "hex", 10], 
-	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 2,  "hex", 1],
-	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	[" p10RoomTempManual: ",	34, 4,  "hex", 10],
-	      [" p11DHWsetManualTemp: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
-	     ],
-  "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
-	      [" fault0CODE: ",		8, 2,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhexdate", 100],
-	      [" fault1CODE: ",		20, 2, "faultmap", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhexdate", 100],
-	      [" fault2CODE: ",		32, 2, "faultmap", 1],	[" fault2TIME: ",	36, 4, "turnhex2time", 1],  [" fault2DATE: ",	40, 4, "turnhexdate", 100],
-	      [" fault3CODE: ",		44, 2, "faultmap", 1],	[" fault3TIME: ",	48, 4, "turnhex2time", 1],  [" fault3DATE: ",	52, 4, "turnhexdate", 100]
-	      ],
-  "D1last206" => [["number_of_faults: ",	4, 2, "hex", 1],	
-	      [" fault0CODE: ",		8, 4,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "hex2time", 1],  [" fault0DATE: ",	16, 4, "hexdate", 100],
-	      [" fault1CODE: ",		20, 4, "faultmap", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 100],
-	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 100],
-	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 100]
-	      ],
-  "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
-	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
-	      [" x20: ", 		20, 4, "hex2int", 1],	[" heat_block_time: ", 	24, 4, "hex2int", 1], 
-	      [" BoosterStage: ",	28, 2, "hex", 1],	[" x30: ",		30, 4, "hex", 1],
-	      [" opMode: ",		34, 2, "opmodehc", 1],	[" x36: ",		36, 4, "hex", 1]
- 	      ],
-  "F4hc1"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
-	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
-	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
-	      [" heatTemp: ",		28, 4, "hex2int", 10],  #[" x32: ",		32, 4, "hex2int", 1],
-	      [" seasonMode: ",		38, 2, "somwinmode", 1],#[" x40: ",		40, 4, "hex2int", 1],
-	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
-	      #[" x52: ",		52, 4, "hex2int", 1],
-              [" roomSetTemp: ",	56, 4, "hex2int", 10],  [" x60: ", 		60, 4, "hex2int", 10],
-	      [" x64: ", 		64, 4, "hex2int", 10],  [" insideTempRC: ",     68, 4, "hex2int", 10],
-	      [" x72: ", 		72, 4, "hex2int", 10],  [" x76: ", 		76, 4, "hex2int", 10],
-	   #  [" x80: ", 		80, 4, "hex2int", 10]
-	     ],
-  "F5hc2"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" returnTemp: ",	8, 4, "hex2int", 10],
-	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
-	      [" heatTemp: ", 		20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
-	      [" seasonMode: ",		30, 2, "somwinmode", 1],[" opMode: ",		36, 2, "opmodehc", 1]
-	     ],
-  "F6sys206" => [["LüfterstufeManuell: ", 30, 2, "hex", 1],	[" RestlaufzeitLüfter: ", 36, 4, "hex", 1]
-	     ],
-  "FBglob" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
-	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
-	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
-	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
-	      [" mixerOpen: ",		45, 1, "bit0", 1],  	[" mixerClosed: ",		45, 1, "bit1", 1],
-	      [" heatPipeValve: ",	45, 1, "bit2", 1],  	[" diverterValve: ",		45, 1, "bit3", 1],
-	      [" dhwPump: ",		44, 1, "bit0", 1],  	[" heatingCircuitPump: ",	44, 1, "bit1", 1],
-	      [" solarPump: ",		44, 1, "bit3", 1],  	[" compressor: ",		47, 1, "bit3", 1],
-	      [" boosterStage3: ",	46, 1, "bit0", 1],  	[" boosterStage2: ",		46, 1, "bit1", 1],
-	      [" boosterStage1: ",	46, 1, "bit2", 1],  	[" highPressureSensor: ",	49, 1, "nbit0", 1],
-	      [" lowPressureSensor: ",	49, 1, "nbit1", 1],  	[" evaporatorIceMonitor: ",	49, 1, "bit2", 1],
-	      [" signalAnode: ",	49, 1, "bit3", 1],  	[" evuRelease: ",		48, 1, "bit0", 1],
-	      [" ovenFireplace: ",	48, 1, "bit1", 1],  	[" STB: ",			48, 1, "bit2", 1],
-	      [" outputVentilatorPower: ",	50, 4, "hex", 10],  	[" inputVentilatorPower: ",	54, 4, "hex", 10],	[" mainVentilatorPower: ",	58, 4, "hex", 10],
-	      [" outputVentilatorSpeed: ",	62, 4, "hex", 1],	[" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
-	      [" outside_tempFiltered: ",	74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
-	      [" dewPoint: ",			82, 4, "hex2int", 10],
-	      [" P_Nd: ",			86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
-	      [" actualPower_Qc: ",		94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
-	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
-	      ],
-  "FBglob206" => [["outsideTemp: ", 	8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
-	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
-	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
-	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
-	      [" mixerOpen: ",		47, 1, "bit1", 1],  	[" mixerClosed: ",		47, 1, "bit0", 1],
-	      [" heatPipeValve: ",	45, 1, "bit3", 1],  	[" diverterValve: ",		45, 1, "bit2", 1],
-	      [" dhwPump: ",		45, 1, "bit1", 1],  	[" heatingCircuitPump: ",	45, 1, "bit0", 1],
-	      [" solarPump: ",		44, 1, "bit2", 1],  	[" compressor: ",		44, 1, "bit0", 1],
-	      [" boosterStage3: ",	44, 1, "bit3", 1],  	[" boosterStage2: ",		44, 1, "n.a.", 1],
-	      [" boosterStage1: ",	44, 1, "bit1", 1],  	[" highPressureSensor: ",	49, 1, "n.a.", 1],
-	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  	[" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
-	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" evuRelease: ",		48, 1, "n.a.", 1],
-	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	[" STB: ",			48, 1, "n.a.", 1],
-	      [" outputVentilatorPower: ",	48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
-	      [" outputVentilatorSpeed: ",	56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
-	      [" outside_tempFiltered: ",	64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
-	      [" dewPoint: ",			5, 4, "n.a.", 1],
-	      [" P_Nd: ",			5, 4, "n.a.", 1],	[" P_Hd: ",			5, 4, "n.a.", 1],
-	      [" actualPower_Qc: ",		5, 8, "n.a.", 1],	[" actualPower_Pel: ",		5, 8, "n.a.", 1],
-	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
-	      ],
-  "FCtime" => [["Weekday: ", 		4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
-	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
-	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
-	      ["/", 			16, 2, "hex", 1]
-	     ],
-  "FCtime206" => [["Weekday: ", 		7, 1,  "weekday", 1],	[" Hour: ",	8, 2, "hex", 1],
-	      [" Min: ",		10, 2,  "hex", 1], 	[" Sec: ",	12, 2, "hex", 1],
-	      [" Date: ", 		14, 2, "year", 1],	["/", 		18, 2, "hex", 1],
-	      ["/", 			20, 2, "hex", 1]
-	     ],
-  "FDfirm" => [["version: ", 	4, 4, "hex", 100]
-	     ],
-  "FEfirmId" => [[" HW: ",	30,  2, "hex", 1], [" SW: ",	32,  4, "swver", 1],
-		 [" Date: ", 	36, 22, "hex2ascii", 1]
-	     ],
-  "0A0176Dis" => [[" switchingProg: ",	11, 1, "bit0", 1],  	[" compressor: ",	11, 1, "bit1", 1],
-	      [" heatingHC: ",		11, 1, "bit2", 1],  	[" heatingDHW: ",	10, 1, "bit0", 1],
-	      [" boosterHC: ",		10, 1, "bit1", 1],  	[" filterBoth: ",	9, 1, "bit0", 1],
-	      [" ventStage: ",		9, 1, "bit1", 1],  	[" pumpHC: ",		9, 1, "bit2", 1],
-	      [" defrost: ",		9, 1, "bit3", 1],  	[" filterUp: ",		8, 1, "bit0", 1],
-	      [" filterDown: ",	8, 1, "bit1", 1]
-	      ],
-  "0clean"    => [["", 8, 2, "hex", 1]             
-              ],
-  "1clean"    => [["", 8, 4, "hex", 1]             
-              ],
-  "2opmode"   => [["", 8, 2, "opmode", 1]             
-              ],
-  "4temp"     => [["", 8, 4, "hex2int",2560]             
-	      ],
-  "5temp"     => [["", 8, 4, "hex2int",10]             
-	      ],
-  "6gradient" => [["", 8, 4, "hex", 100]             
-              ],
-  "7prog"     => [["", 8, 2, "quater", 1], 	["--", 10, 2, "quater", 1]
-              ],
-  "8party"    => [["", 10, 2, "quater", 1],	["--", 8, 2, "quater", 1]
-              ],
-  "9holy"     => [["", 10, 2, "quater", 1]
-              ]
-);
-  
   my ($hash,$message) = @_;  
   Log3 $hash->{NAME}, 5, "Parse message: $message";	  
   my $length = length($message);
@@ -1290,7 +1358,7 @@ my %parsinghash = (
 	when ("n.a.")		{$value= "n.a.";}
       }
       $value = $value/$divisor if ($divisor != 1); 
-      $ParsedMsg = $ParsedMsg . $parsingtitle . $value; 
+      $ParsedMsg .= $parsingtitle . $value; 
     }
   }
   return (undef, $ParsedMsg);
@@ -1369,8 +1437,8 @@ sub THZ_Attr(@) {
   if ( $attrName eq "firmware" )  {  
       if ($attrVal eq "2.06") {
         THZ_RemoveInternalTimer("THZ_GetRefresh");
-         %sets = ();
-         %gets = %getsonly206;
+         %sets = %sets206;
+         %gets = (%getsonly206, %sets);
         THZ_Refresh_all_gets($hash);
       }
       if ($attrVal eq "5.39") {
@@ -1430,18 +1498,43 @@ sub THZ_Undef($$) {
 # THZ_RemoveInternalTimer($) 
 # modified takes as an argument the function to be called, not the argument
 ########################################################################################
-sub THZ_RemoveInternalTimer($)
-{
+sub THZ_RemoveInternalTimer($){
   my ($callingfun) = @_;
   foreach my $a (keys %intAt) {
     delete($intAt{$a}) if($intAt{$a}{FN} eq $callingfun);
   }
 }
 
+################################
+#
 
-
-
-
+sub function_heatSetTemp($$) {
+  my ($start, $stop) = @_;
+  my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",24))[81];
+  $insideTemp="n.a." if ($insideTemp eq "-60"); #in case internal room sensor not connected
+  my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",24))[21];
+  $roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
+  my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
+  my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",17))[11];
+  my $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
+  my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
+  my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
+  my $p99RoomThermCorrection =(split ' ',ReadingsVal("Mythz","p99RoomThermCorrection",0))[0];
+  #########$insideTemp=23.8 ; $roomSetTemp = 20.5; $p13GradientHC1 = 0.31; $heatSetTemp = 25.4; $p15RoomInfluenceHC1 = 80; $outside_tempFiltered = 4.9; $p14LowEndHC1 =1.5; $p99RoomThermCorrection = -2.8;
+  
+  $insideTemp += $p99RoomThermCorrection if ($insideTemp ne "n.a."); 
+  $insideTemp = $roomSetTemp if ($insideTemp eq "n.a."); 
+  my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
+  my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
+  my $c= -1 * $p13GradientHC1 /75;
+  my $Simul_heatSetTemp; 
+  my @ret;
+  foreach my $i ($start..$stop) {
+   $Simul_heatSetTemp = $i * $i * $c + $i * $b + $a; 
+   push(@ret, [$i, $Simul_heatSetTemp]);
+  }
+  return \@ret;
+}
 
 #####################################
 # sub THZ_PrintcurveSVG
@@ -1504,24 +1597,24 @@ polyline { stroke:black; fill:none; }
 <text x="634" y="155" class="ylabel" text-anchor="middle">15</text>  <polyline points="634,19.2 634,140.8" class="hgrid"/>
 <text x="751" y="155" class="ylabel" text-anchor="middle">21</text>  <polyline points="751,19.2 751,140.8" class="hgrid"/>
 <g>
-  <polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">10</text>
+  <polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">15</text>
   <polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">20</text>
-  <polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">30</text>
-  <polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">40</text>
-  <polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">50</text>
+  <polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">25</text>
+  <polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">30</text>
+  <polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">35</text>
 </g>
 <g>
-  <polyline points="751,140 756,140"/> <text x="760.8" y="144" class="ylabel">10</text>
+  <polyline points="751,140 756,140"/> <text x="760.8" y="144" class="ylabel">15</text>
   <polyline points="751,110 756,110"/> <text x="760.8" y="114" class="ylabel">20</text>
-  <polyline points="751,80 756,80"/>   <text x="760.8" y="84" class="ylabel">30</text>
-  <polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">40</text>
-  <polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">50</text>
+  <polyline points="751,80 756,80"/>   <text x="760.8" y="84" class="ylabel">25</text>
+  <polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">30</text>
+  <polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">35</text>
 </g>
 END
 
-my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",14))[81];
+my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",24))[81];
 $insideTemp="n.a." if ($insideTemp eq "-60"); #in case internal room sensor not connected
-my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",0))[21];
+my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",24))[21];
 $roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
 my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
 my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",17))[11];
@@ -1541,10 +1634,6 @@ my $p99RoomThermCorrection =(split ' ',ReadingsVal("Mythz","p99RoomThermCorrecti
 #$p99RoomThermCorrection = -2.8;
 
 
-
-
-
-
 #labels ######################
 $ret .= '<text line_id="line_1" x="70" y="105.2" class="l1"> --- heat curve</text>' ;
 $ret .= '<text  line_id="line_0" x="70" y="121.2"  class="l0"> --- working point: outside_tempFiltered=';
@@ -1554,28 +1643,27 @@ $ret .=  $outside_tempFiltered . ' heatSetTemp=' . $heatSetTemp . '</text>';
 #title ######################
 $ret .= '<text id="svg_title" x="400" y="14.4" class="title" text-anchor="middle">';
 $insideTemp += $p99RoomThermCorrection if ($insideTemp ne "n.a."); 
-$ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  ' p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . " insideTemp=" . $insideTemp .' </text>';
+$ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  ' p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . " insideTemp=" . $insideTemp .' </text>' . "\n";
 
 #equation####################
 $insideTemp = $roomSetTemp if ($insideTemp eq "n.a."); 
-my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
-my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
-my $c= -1 * $p13GradientHC1 /75;
-my $Simul_heatSetTemp; 
 
 
 #point ######################
 $ret .='<polyline id="line_0"   style="stroke-width:2" class="l0" points="';
-my ($px,$py) = ((($outside_tempFiltered+15)*(750-49)/(15+21)+49),(($heatSetTemp-50)*(140-19)/(10-50)+19)); 
- $ret.= ($px-3) . "," . ($py)   ." " . ($px)  . "," . ($py-3) ." " . ($px+3) . "," . ($py) ." " . ($px)   . "," . ($py+3)  ." " . ($px-3)   . "," . ($py)  ." " . '"/>';
+my ($px,$py) = ((($outside_tempFiltered+15)*(750-49)/(15+21)+49),(($heatSetTemp-35)*(140-19)/(15-35)+19)); 
+ $ret.= ($px-3) . "," . ($py)   ." " . ($px)  . "," . ($py-3) ." " . ($px+3) . "," . ($py) ." " . ($px)   . "," . ($py+3)  ." " . ($px-3)   . "," . ($py)  ." " . '"/>' . "\n";
 
 #curve ######################
-$ret .='<polyline id="line_1"  title="Heat Curve" class="l1" points="';
-for(my $i = -15; $i < 22; $i++) {
- $Simul_heatSetTemp = $i * $i * $c + $i * $b + $a; 
- $ret.= (($i+15)*(750-49)/(15+21)+49) . "," . (($Simul_heatSetTemp-50)*(140-19)/(10-50)+19) ." ";
+$ret .='<polyline id="line_1"  title="Heat Curve" style="stroke-width:2" class="l1" points="';
+my $y = function_heatSetTemp(-15,21);
+foreach (@{$y}) {
+$ret.= (($_->[0]+15)*(750-49)/(15+21)+49) . "," . (($_->[1]-35)*(140-19)/(15-35)+19) ." ";
 }
-$ret .= '"/> </svg>';
+
+
+$ret .= '"/> ' . "\n";
+$ret .= '</svg>';
 
 my $FW_RETTYPE = "image/svg+xml";
 return ($FW_RETTYPE, $ret);
