@@ -81,6 +81,7 @@ sub btIP_itemRect;
 sub btIP_itemSeconds;
 sub btIP_itemText;
 sub btIP_itemTextBox;
+sub btIP_itemTicker;
 sub btIP_itemTime;
 sub btIP_itemTrash;
 
@@ -420,6 +421,7 @@ sub _btIP_imgRescale {
 sub btIP_itemLine {
   my ($id,$x1,$y1,$x2,$y2,$th,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
+  $th //= 1;
   my ($r,$g,$b,$a) = btIP_color($params{rgb});
   return "<line id=\"$id\" x1=\"$x1\" y1=\"$y1\" x2=\"$x2\" y2=\"$y2\" style=\"stroke:rgb($r,$g,$b); stroke-width:$th; stroke-opacity:$a; \" />\n";
 }
@@ -1194,20 +1196,17 @@ sub btIP_evalLayout {
 
 sub btIP_addExtension {
     my ($func,$link,$friendlyname)= @_;
-  
+
+    my $vtickerUrl = "http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15";
     my $url = "/" . $link;
+
     $data{FWEXT}{$url}{FUNC} = $func;
     $data{FWEXT}{$url}{LINK} = "+$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
     $data{FWEXT}{$url}{FORKABLE} = 0;
-#    $data{FWEXT}{$url}{SCRIPT} = '/pgm2/jquery.min.js"></script>' .
 	$data{FWEXT}{jquery}{SCRIPT}        = "/pgm2/jquery.min.js"         unless $data{FWEXT}{jquery}{SCRIPT};
-	$data{FWEXT}{jqueryvticker}{SCRIPT} = "/pgm2/jquery.vticker.min.js" unless $data{FWEXT}{jqueryvticker}{SCRIPT};
-    
-    
-##    '<script type="text/javascript" src="http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"></script>' .
-##                                 '<script type="text/javascript" src="/fhem/pgm2/jquery.vticker.min.js"></script>' .
-##                                 '<script type="text/javascript" charset="UTF-8';
+	$data{FWEXT}{jqueryvticker}{SCRIPT} = $vtickerUrl unless $data{FWEXT}{jqueryvticker}{SCRIPT};
+
 }
 
 sub btIP_CGI{
@@ -1299,12 +1298,12 @@ sub btIP_getScript {
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{SCRIPT});
       my $script = $h->{SCRIPT};
-      $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
+         $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script" unless ($script =~ m,^http,);
       $scripts .= sprintf($jsTemplate, $script);
     }
   }
-#  $scripts .= sprintf($jsTemplate,"$FW_ME/pgm2/jquery.min.js");
-#  $scripts .= sprintf($jsTemplate,"http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"); 
+#  $scripts .= sprintf($jsTemplate,"/fhem/pgm2/cordova-2.3.0.js"); 
+#  $scripts .= sprintf($jsTemplate,"/fhem/pgm2/webviewcontrol.js"); 
   $scripts =~ s/script>/script>\n/g;
   return $scripts; 
 }
@@ -1538,7 +1537,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                </code>
            </ul></li><br/>
        <br/>
-       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;link&gt; &lt;sourceType&gt; &lt;{dataSource}&gt; </code><br/>
+       <li><code>img &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;link&gt; &lt;sourceType&gt; &lt;{dataSource}&gt;s</code><br/>
            <br/>
            <ul>embed an image into InfoPanel<br/>
                <br/>
