@@ -47,6 +47,15 @@
 # Changelog
 #
 # SVN-History:
+# 14.02.2015
+#	Festen Lib-Pfad für Synology-Stations hinzugefügt.
+#	Im Modul 21_SONOSPLAYER wurde ein require auf das Modul 00_SONOS eingefügt.
+#	Es gibt jetzt einen neuen Setter "ResetAttributesToDefault", mit dem man die Attribute eines Devices auf den Standard beim Anlegen zurücksetzen lassen kann. Die notwendigen Informationen werden frisch vom Player angefordert, und können sich somit, auf den ursprünglichen Anlege-Zeitpunkt bezogen, verändert haben.
+#	Ein Fehler bei der Verarbeitung von Devicebeschreibungen wurde in der Datei "Common.pm" des UPnP-Moduls behoben.
+#	Es gibt jetzt zwei neue Readings "GroupVolume" und "GroupMute", die automatisch aktualisiert werden. Damit passt jetzt auch die Anzeige des Slider beim Setter "GroupVolume" und die Vorauswahl beim Setter "GroupMute".
+#	Fehlermeldungen für Speak wurden erweitert.
+#	Bei der Verwendung von "targetSpeakFileHashCache" wird nun auch Digest::SHA versucht, wenn Digest::SHA1 nicht funktioniert.
+#	Es gibt zwei neue Reading "currentTrackProvider" und "nextTrackProvider", in dem die 'Quelle' der aktuellen (bzw. nächsten) Wiedergabe abgelegt wird. Damit kann man sich Anzeigen lassen, ob der aktuelle Titel z.B. von Spotify oder aus der hausinternen Bibliothek kommt.
 # 06.02.2015
 #	Der Getter "EthernetPortStatus" hat jetzt auch die Portnummern 2 und 3 zur Auswahl.
 #	Es gibt ein neues Reading "OutputFixed" sowie ein zugehöriger Setter zum Setzen des Wertes.
@@ -380,7 +389,7 @@ BEGIN {
 if (lc(substr($0, -7)) eq 'fhem.pl') { 
 	$gPath = $attr{global}{modpath}.'/FHEM'; 
 }
-use lib ($gPath.'/lib', $gPath.'/FHEM/lib', './FHEM/lib', './lib', './FHEM', './');
+use lib ($gPath.'/lib', $gPath.'/FHEM/lib', './FHEM/lib', './lib', './FHEM', './', '/usr/local/FHEM/share/fhem/FHEM/lib');
 print 'Current: "'.$0.'", gPath: "'.$gPath."\"\n";
 use UPnP::ControlPoint;
 require 'DevIo.pm' if (lc(substr($0, -7)) eq 'fhem.pl');
@@ -402,9 +411,15 @@ my %sets = (
 	'Mute' => 'state'
 );
 
+my %SONOS_ProviderList = ('^http:(\/\/.*)' => 'Radio',
+						'^aac:(\/\/.*)' => 'Radio',
+						'^\/\/' => 'Bibliothek',
+						'^x-sonos-spotify:' => 'Spotify',
+						'^npsdy:' => 'Napster');
+
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
 my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime);
-my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected currentAlbum currentArtist currentTitle);
+my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected currentAlbum currentArtist currentTitle GroupVolume GroupMute);
 
 # Obsolete Einstellungen...
 my $SONOS_UseTelnetForQuestions = 1;
@@ -437,6 +452,9 @@ my $SONOS_GOOGLETRANSLATOR_CHUNKSIZE = 95;
 my $SONOS_Controlpoint;
 my $SONOS_Search;
 
+# Devices merken
+my %SONOS_UPnPDevice;
+
 # ControlProxies für spätere Aufrufe für jeden ZonePlayer extra sichern
 my %SONOS_AVTransportControlProxy;
 my %SONOS_RenderingControlProxy;
@@ -452,6 +470,7 @@ my %SONOS_ZoneGroupTopologyProxy;
 # Subscriptions müssen für die spätere Erneuerung aufbewahrt werden
 my %SONOS_TransportSubscriptions;
 my %SONOS_RenderingSubscriptions;
+my %SONOS_GroupRenderingSubscriptions;
 my %SONOS_AlarmSubscriptions; 
 my %SONOS_ZoneGroupTopologySubscriptions;
 my %SONOS_DevicePropertiesSubscriptions;
@@ -709,14 +728,16 @@ sub SONOS_getTitleRG($;$) {
 	# Läuft Radio oder ein "normaler" Titel
 	if (ReadingsVal($device, 'currentNormalAudio', 1) == 1) {
 		my $showNext = ReadingsVal($device, 'nextTitle', '') || ReadingsVal($device, 'nextArtist', '') || ReadingsVal($device, 'nextAlbum', '');
-		$infoString = sprintf('<div style="margin-left: -150px;">%s Titel %s von %s<br />Titel: <b>%s</b><br />Interpret: <b>%s</b><br />Album: <b>%s</b>'.($showNext ? '<div style="height: %s;"></div>Nächste Wiedergabe:</div><div style="float: left; margin-left: 0px;"><img style="margin: 0px; padding: 0px; margin-right: 5px; border: 1px solid lightgray; height: 3.5em;" border="0" src="%s" /></div><div style="margin-left: 0px;">Titel: %s<br />Interpret: %s<br />Album: %s</div>' : ''),
+		$infoString = sprintf('<div style="margin-left: -150px;">%s Titel %s von %s (%s)<br />Titel: <b>%s</b><br />Interpret: <b>%s</b><br />Album: <b>%s</b>'.($showNext ? '<div style="height: %s;"></div>Nächste Wiedergabe (%s):</div><div style="float: left; margin-left: 0px;"><img style="margin: 0px; padding: 0px; margin-right: 5px; border: 1px solid lightgray; height: 3.5em;" border="0" src="%s" /></div><div style="margin-left: 0px;">Titel: %s<br />Interpret: %s<br />Album: %s</div>' : ''),
 				$transportState, 
 				ReadingsVal($device, 'currentTrack', ''), 
 				ReadingsVal($device, 'numberOfTracks', ''),
+				ReadingsVal($device, 'currentTrackProvider', ''),
 				ReadingsVal($device, 'currentTitle', ''),
 				ReadingsVal($device, 'currentArtist', ''),
 				ReadingsVal($device, 'currentAlbum', ''),
 				$space,
+				ReadingsVal($device, 'nextTrackProvider', ''),
 				ReadingsVal($device, 'nextAlbumArtURL', ''),
 				ReadingsVal($device, 'nextTitle', ''),
 				ReadingsVal($device, 'nextArtist', ''),
@@ -837,6 +858,15 @@ sub SONOS_FhemWebCallback($) {
 				import Digest::SHA1 qw(sha1_hex);
 				$albumHash = $proxyCacheDir.'/SonosProxyCache_'.sha1_hex(lc($albumurl)).'.image';
 			};
+			if ($@ =~ /Can't locate Digest\/SHA1.pm in/i) {
+				require Digest::SHA;
+				import Digest::SHA qw(sha1_hex);
+				$albumHash = $proxyCacheDir.'/SonosProxyCache_'.sha1_hex(lc($albumurl)).'.image';
+			}
+			if ($@) {
+				SONOS_Log undef, 4, 'Problem while generating Hashvalue: '.$@;
+				$albumHash = '';
+			}
 			
 			if ((-e $albumHash) && ((stat($albumHash)->mtime) + $proxyCacheTime > gettimeofday())) {
 				SONOS_Log undef, 5, 'Cover wird aus Cache bedient: '.$albumHash.' ('.$albumurl.')';
@@ -1266,6 +1296,8 @@ sub SONOS_Read($) {
 			my $hash = SONOS_getSonosPlayerByUDN($1);
 			
 			CommandAttr(undef, $hash->{NAME}.' '.$2);
+		} elsif ($line =~ m/CommandDeleteAttr:(.*)/) {
+			CommandDeleteAttr(undef, $1);
 		} elsif ($line =~ m/deleteCurrentNextTitleInformationAndDisappear:(.*)/) {
 			my $hash = SONOS_getSonosPlayerByUDN($1);
 			
@@ -1342,6 +1374,7 @@ sub SONOS_Read($) {
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackURI", $current{TrackURI});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackDuration", $current{TrackDuration});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackPosition", $current{TrackPosition});
+				SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackProvider", $current{TrackProvider});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentTitle", $current{Title});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentArtist", $current{Artist});
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentAlbum", $current{Album});
@@ -1355,6 +1388,7 @@ sub SONOS_Read($) {
 				SONOS_readingsBulkUpdateIfChanged($hash, "currentNormalAudio", $current{NormalAudio});
 				SONOS_readingsBulkUpdateIfChanged($hash, "nextTrackDuration", $current{nextTrackDuration});
 				SONOS_readingsBulkUpdateIfChanged($hash, "nextTrackURI", $current{nextTrackURI});
+				SONOS_readingsBulkUpdateIfChanged($hash, "nextTrackProvider", $current{nextTrackProvider});
 				SONOS_readingsBulkUpdateIfChanged($hash, "nextTitle", $current{nextTitle});
 				SONOS_readingsBulkUpdateIfChanged($hash, "nextArtist", $current{nextArtist});
 				SONOS_readingsBulkUpdateIfChanged($hash, "nextAlbum", $current{nextAlbum});
@@ -1401,6 +1435,7 @@ sub SONOS_Read($) {
 							$currentElem{NumberOfTracks} = $current{NumberOfTracks};
 							$currentElem{TrackDuration} = $current{TrackDuration};
 							$currentElem{TrackPosition} = $current{TrackPosition};
+							$currentElem{TrackProvider} = $current{TrackProvider};
 							
 							# Loslegen
 							readingsBeginUpdate($elem);
@@ -1414,6 +1449,7 @@ sub SONOS_Read($) {
 							SONOS_readingsBulkUpdateIfChanged($elem, "numberOfTracks", $currentElem{NumberOfTracks});
 							SONOS_readingsBulkUpdateIfChanged($elem, "currentTrackDuration", $currentElem{TrackDuration});
 							SONOS_readingsBulkUpdateIfChanged($elem, "currentTrackPosition", $currentElem{TrackPosition});
+							SONOS_readingsBulkUpdateIfChanged($hash, "currentTrackProvider", $currentElem{TrackProvider});
 							
 							if (AttrVal($elem->{NAME}, 'generateSomethingChangedEvent', 0) == 1) {
 								readingsBulkUpdate($elem, "somethingChanged", 1);
@@ -2361,6 +2397,42 @@ sub SONOS_Discover() {
 					
 						# Wert wieder abholen, um das wahre Ergebnis anzeigen zu können
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($SONOS_RenderingControlProxy{$udn}->GetOutputFixed(0)->getValue('CurrentFixed')));
+					}
+				} elsif ($workType eq 'setResetAttributesToDefault') {
+					my $sonosDeviceName = $params[0];
+					my $deviceName = $params[1];
+					my $value1 = 0;
+					$value1 = $params[2] if ($params[2]);
+					
+					my $udnShort = $1 if ($udn =~ m/(.*?)_MR/i);
+					
+					if (SONOS_CheckProxyObject($udn, $SONOS_DevicePropertiesProxy{$udn})) {
+						# Sollen alle Attribute vorher entfernt werden?
+						if (SONOS_ConvertWordToNum($value1)) {
+							SONOS_Client_Notifier('CommandDeleteAttr:'.$deviceName);
+						}
+						
+						# Notwendige Daten vom Player ermitteln...
+						my ($isZoneBridge, $topoType, $fieldType, $master, $aliasSuffix) = SONOS_AnalyzeZoneGroupTopology($udn, $udnShort);
+						
+						my $roomName = $SONOS_DevicePropertiesProxy{$udn}->GetZoneAttributes()->getValue('CurrentZoneName');
+						
+						my $groupName = decode('UTF-8', $roomName);
+						eval {
+							use utf8;
+							$groupName =~ s/([äöüÄÖÜß])/SONOS_UmlautConvert($1)/eg; # Hier erstmal Umlaute 'schön' machen, damit dafür nicht '_' verwendet werden...
+						};
+						$groupName =~ s/[^a-zA-Z0-9]/_/g;
+						
+						my $iconPath = decode_entities($1) if ($SONOS_UPnPDevice{$udn}->descriptionDocument() =~ m/<iconList>.*?<icon>.*?<id>0<\/id>.*?<url>(.*?)<\/url>.*?<\/icon>.*?<\/iconList>/sim);
+						$iconPath =~ s/.*\/(.*)/icoSONOSPLAYER_$1/i;
+						
+						# Standard-Attribute am Player setzen
+						for my $elem (SONOS_GetDefineStringlist('SONOSPLAYER_Attributes', $sonosDeviceName, undef, $master, $deviceName, $roomName, $aliasSuffix, $groupName, $iconPath, $isZoneBridge)) {
+							SONOS_Client_Notifier($elem);
+						}
+						
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Successfully done...');
 					}
 				} elsif ($workType eq 'setMuteT') {
 					my $value1 = 'off';
@@ -3335,6 +3407,22 @@ sub SONOS_Discover() {
 						}
 					}
 					
+					if (defined($SONOS_GroupRenderingSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_GroupRenderingSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
+						eval {
+							$SONOS_GroupRenderingSubscriptions{$udn}->renew();
+							SONOS_Log $udn, 3, 'GroupRendering-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
+						};
+						if ($@) {
+							SONOS_Log $udn, 3, 'Error! GroupRendering-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
+							
+							# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
+							# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
+							if ($@ =~ m/Can.t connect to/) {
+								SONOS_DeleteProxyObjects($udn);
+							}
+						}
+					}
+					
 					if (defined($SONOS_AlarmSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_AlarmSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
 						eval {
 							$SONOS_AlarmSubscriptions{$udn}->renew();
@@ -3451,6 +3539,10 @@ sub SONOS_Discover() {
 					}
 					$text =~ s/^ *(.*) *$/$1/g;
 					$text = SONOS_Utf8ToLatin1($text);
+					
+					# Text in die einzelnen Bestandteile zerlegen...
+					#my @text = split(/|/, $text);
+					#SONOS_Log $udn, 0, 'Textarray: '.Dumper(@text);
 					
 					my $digest = '';
 					if (SONOS_Client_Data_Retreive('undef', 'attr', 'targetSpeakFileHashCache', 0) == 1) {
@@ -3739,7 +3831,7 @@ sub SONOS_GetSpeakFile($$$$$) {
 				SONOS_Log $udn, 1, 'MP3 Download-Error: '.$response->status_line;
 				unlink($destFileName.$counter);
 				
-				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': MP3-Creation ERROR during downloading.');
+				SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': MP3-Creation ERROR during downloading: '.$response->status_line);
 				return 0;
 			}
 		}
@@ -3754,12 +3846,14 @@ sub SONOS_GetSpeakFile($$$$$) {
 			unlink($destFileName.$i)
 		}
 		# Speichern
-		if (defined(open MPFILE, '>'.$destFileName)) {
+		eval {
+			open MPFILE, '>'.$destFileName;
 			binmode MPFILE ;
 			print MPFILE $newMP3File;
 			close MPFILE;
-		} else {
-			SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': MP3-Creation ERROR during combining.');
+		};
+		if ($@) {
+			SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': MP3-Creation ERROR during combining: '.$@);
 			return 0;
 		}
 		
@@ -4096,6 +4190,42 @@ sub SONOS_PlayURITemp($$$) {
 			$SONOS_PlayerRestoreRunningUDN{$udn} = 0;
 		}
 	}
+}
+
+########################################################################################
+#
+#  SONOS_GetTrackProvider - Retrieves a textual representation of the Provider of the given URI
+#
+#  Parameter $songURI = The URI that has to be converted
+#
+########################################################################################
+sub SONOS_GetTrackProvider($;$) {
+	my ($songURI, $songTitle) = @_;
+	
+	# Backslashe umwandeln
+	$songURI =~ s/\\/\//g;
+	
+	# Gruppen- und LineIn-Wiedergaben bereits hier erkennen
+	if ($songURI =~ m/x-rincon:(RINCON_[\dA-Z]+)/) {
+		return 'Gruppenwiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
+	} elsif ($songURI =~ m/x-rincon-stream:(RINCON_[\dA-Z]+)/) {
+		my $elem = 'LineIn';
+		$elem = $songTitle if ($songTitle);
+		return $songTitle.'-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
+	} elsif ($songURI =~ m/x-sonos-dock:(RINCON_[\dA-Z]+)/) {
+		return 'Dock-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
+	} elsif ($songURI =~ m/x-sonos-htastream:(RINCON_[\dA-Z]+):spdif/) {
+		return 'SPDIF-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
+	}
+	
+	# Hier die restlichen Erkennungen durchführen...
+	for my $elem (keys %SONOS_ProviderList) {
+		if ($songURI =~ /$elem/) {
+			return $SONOS_ProviderList{$elem};
+		}
+	}
+	
+	return '';
 }
 
 ########################################################################################
@@ -4524,7 +4654,7 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Log undef, 4, "Discover-Event: Description-Document: $descriptionDocument";
 		
 		$SONOS_Client_SendQueue_Suspend = 1;
-	
+		
 		# Variablen initialisieren
 		my $roomName = '';
 		my $saveRoomName = '';
@@ -4576,6 +4706,9 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Log undef, 4, "RoomName: '$roomName', SaveRoomName: '$saveRoomName', ModelNumber: '$modelNumber', DisplayVersion: '$displayVersion', SerialNum: '$serialNum', IconURI: '$iconURI', IconOrigPath: '$iconOrigPath', IconPath: '$iconPath'";
 	
 		SONOS_Log undef, 2, "Discover Sonosplayer '$roomName' ($modelNumber) Software Revision $displayVersion with ID '$udn'";
+		
+		# Device sichern...
+		$SONOS_UPnPDevice{$udn} = $device;
 	
 		# ServiceProxies für spätere Aufrufe merken
 		my $alarmService = $device->getService('urn:schemas-upnp-org:service:AlarmClock:1');
@@ -4597,8 +4730,10 @@ sub SONOS_Discover_Callback($$$) {
 		$SONOS_AVTransportControlProxy{$udn} = $transportService->controlProxy if ($transportService);
 		
 		my $renderingService;
-
-		# Hier die Subdevices durchgehen, da für die Anmeldung nur das "_MR"-Device (MediaRenderer) wichtig ist
+		
+		my $groupRenderingService;
+		
+		# Hier die Subdevices durchgehen...
 		for my $subdevice ($device->children) {
 			SONOS_Log undef, 4, 'SubDevice found: '.$subdevice->UDN;
 			
@@ -4610,19 +4745,20 @@ sub SONOS_Discover_Callback($$$) {
 	    		$renderingService = $subdevice->getService('urn:schemas-upnp-org:service:RenderingControl:1');
 	    		$SONOS_RenderingControlProxy{$udn} = $renderingService->controlProxy if ($renderingService);
 	    		
-	    		$SONOS_GroupRenderingControlProxy{$udn} = $subdevice->getService('urn:schemas-upnp-org:service:GroupRenderingControl:1')->controlProxy if ($subdevice->getService('urn:schemas-upnp-org:service:GroupRenderingControl:1'));
-	    }
-	    	
-    	if ($subdevice->UDN =~ /.*_MS/i) { 
-    		# Wir haben hier das Media-Server Subdevice
-    		$SONOS_ContentDirectoryControlProxy{$udn} = $subdevice->getService('urn:schemas-upnp-org:service:ContentDirectory:1')->controlProxy if ($subdevice->getService('urn:schemas-upnp-org:service:ContentDirectory:1'));
-    	}
-	  }
+				$groupRenderingService = $subdevice->getService('urn:schemas-upnp-org:service:GroupRenderingControl:1');
+	    		$SONOS_GroupRenderingControlProxy{$udn} = $groupRenderingService->controlProxy if ($groupRenderingService);
+			}
+			
+			if ($subdevice->UDN =~ /.*_MS/i) { 
+				# Wir haben hier das Media-Server Subdevice
+				$SONOS_ContentDirectoryControlProxy{$udn} = $subdevice->getService('urn:schemas-upnp-org:service:ContentDirectory:1')->controlProxy if ($subdevice->getService('urn:schemas-upnp-org:service:ContentDirectory:1'));
+			}
+		}
 		   
 		SONOS_Log undef, 4, 'ControlProxies wurden gesichert';
 		
 		# ZoneTopology laden, um die Benennung der Fhem-Devices besser an die Realität anpassen zu können
-		my ($topoType, $fieldType, $master, $aliasSuffix) = SONOS_AnalyzeZoneGroupTopology($udn, $udnShort);
+		my ($isZoneBridge, $topoType, $fieldType, $master, $aliasSuffix) = SONOS_AnalyzeZoneGroupTopology($udn, $udnShort);
 		
 		# Wenn der aktuelle Player der Master ist, dann kein Kürzel anhängen, 
 		# damit gibt es immer einen Player, der den Raumnamen trägt, und die anderen enthalten Kürzel
@@ -4637,24 +4773,26 @@ sub SONOS_Discover_Callback($$$) {
 		# Volume laden um diese im Reading ablegen zu können
 		my $currentVolume = 0;
 		my $balance = 0;
-		if ($SONOS_RenderingControlProxy{$udn}) {
-			eval {
-				$currentVolume = $SONOS_RenderingControlProxy{$udn}->GetVolume(0, 'Master')->getValue('CurrentVolume');
-				
-				# Balance ermitteln
-				my $volumeLeft = $SONOS_RenderingControlProxy{$udn}->GetVolume(0, 'LF')->getValue('CurrentVolume');
-				my $volumeRight = $SONOS_RenderingControlProxy{$udn}->GetVolume(0, 'RF')->getValue('CurrentVolume');
-				$balance = (-$volumeLeft) + $volumeRight;
-				
-				SONOS_Log undef, 4, 'Retrieve Current Volumelevels. Master: "'.$currentVolume.'", Balance: "'.$balance.'"';
-			};
-			if ($@) {
-				$currentVolume = 0;
-				$balance = 0;
-				SONOS_Log undef, 4, 'Couldn\'t retrieve Current Volumelevels: '. $@;
+		if (!$isZoneBridge) {
+			if ($SONOS_RenderingControlProxy{$udn}) {
+				eval {
+					$currentVolume = $SONOS_RenderingControlProxy{$udn}->GetVolume(0, 'Master')->getValue('CurrentVolume');
+					
+					# Balance ermitteln
+					my $volumeLeft = $SONOS_RenderingControlProxy{$udn}->GetVolume(0, 'LF')->getValue('CurrentVolume');
+					my $volumeRight = $SONOS_RenderingControlProxy{$udn}->GetVolume(0, 'RF')->getValue('CurrentVolume');
+					$balance = (-$volumeLeft) + $volumeRight;
+					
+					SONOS_Log undef, 4, 'Retrieve Current Volumelevels. Master: "'.$currentVolume.'", Balance: "'.$balance.'"';
+				};
+				if ($@) {
+					$currentVolume = 0;
+					$balance = 0;
+					SONOS_Log undef, 4, 'Couldn\'t retrieve Current Volumelevels: '. $@;
+				}
+			} else {
+				SONOS_Log undef, 4, 'Couldn\'t get any Volume Information due to missing RenderingControlProxy';
 			}
-		} else {
-			SONOS_Log undef, 4, 'Couldn\'t get any Volume Information due to missing RenderingControlProxy';
 		}
 		
 		# Load official icon from zoneplayer and copy it to local place for FHEM-use
@@ -4680,78 +4818,34 @@ sub SONOS_Discover_Callback($$$) {
 			my %elemValues = ();
 			$SONOS_Client_Data{Buffer}->{$udn} = shared_clone(\%elemValues);
 			
-			# Define SonosPlayer-Device with attributes
-			SONOS_Client_Notifier('CommandDefine:'.$name.' SONOSPLAYER '.$udn);
-			SONOS_Client_Notifier('CommandAttr:'.$name.' room '.$SONOS_Client_Data{SonosDeviceName});
-			SONOS_Client_Notifier('CommandAttr:'.$name.' alias '.$roomName.$aliasSuffix);
-			SONOS_Client_Notifier('CommandAttr:'.$name.' group '.$groupName);
-			SONOS_Client_Notifier('CommandAttr:'.$name.' icon '.$iconPath);
-			SONOS_Client_Notifier('CommandAttr:'.$name.' sortby 1');
-			SONOS_Client_Notifier('CommandAttr:'.$name.' userReadings Favourites:LastActionResult.*?GetFavouritesWithCovers.* { if (ReadingsVal("'.$name.'", "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Radios:LastActionResult.*?GetRadiosWithCovers.* { if (ReadingsVal("'.$name.'", "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Playlists:LastActionResult.*?GetPlaylistsWithCovers.* { if (ReadingsVal("'.$name.'", "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, currentTrackPosition:LastActionResult.*?GetCurrentTrackPosition.* { if (ReadingsVal("'.$name.'", "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }');
+			# Define SonosPlayer-Device...
+			for my $elem (SONOS_GetDefineStringlist('SONOSPLAYER', undef, $udn, undef, $name, undef, undef, undef, undef, undef)) {
+				SONOS_Client_Notifier($elem);
+			}
+			# ...and his attributes
+			for my $elem (SONOS_GetDefineStringlist('SONOSPLAYER_Attributes', $SONOS_Client_Data{SonosDeviceName}, undef, $master, $name, $roomName, $aliasSuffix, $groupName, $iconPath, $isZoneBridge)) {
+				SONOS_Client_Notifier($elem);
+			}
 			
-			# Das folgende nicht für Bridges machen
-			if ($modelNumber ne 'ZB100') {
-				SONOS_Client_Notifier('CommandAttr:'.$name.' generateInfoSummarize1 <NormalAudio><Artist prefix="(" suffix=")"/><Title prefix=" \'" suffix="\'" ifempty="[Keine Musikdatei]"/><Album prefix=" vom Album \'" suffix="\'"/></NormalAudio> <StreamAudio><Sender suffix=":"/><SenderCurrent prefix=" \'" suffix="\' -"/><SenderInfo prefix=" "/></StreamAudio>');
-				SONOS_Client_Notifier('CommandAttr:'.$name.' generateInfoSummarize2 <TransportState/><InfoSummarize1 prefix=" => "/>');
-				SONOS_Client_Notifier('CommandAttr:'.$name.' generateInfoSummarize3 <Volume prefix="Lautstärke: "/><Mute instead=" ~ Kein Ton" ifempty=" ~ Ton An" emptyval="0"/> ~ Balance: <Balance ifempty="Mitte" emptyval="0"/><HeadphoneConnected instead=" ~ Kopfhörer aktiv" ifempty=" ~ Kein Kopfhörer" emptyval="0"/>');
-				SONOS_Client_Notifier('CommandAttr:'.$name.' stateVariable Presence');
-				SONOS_Client_Notifier('CommandAttr:'.$name.' generateVolumeSlider 1');
-				SONOS_Client_Notifier('CommandAttr:'.$name.' getAlarms 1'); SONOS_Client_Data_Refresh('', $udn, 'getAlarms', 1);
-				SONOS_Client_Notifier('CommandAttr:'.$name.' minVolume 0'); SONOS_Client_Data_Refresh('', $udn, 'minVolume', 0);
-				
-				#SONOS_Client_Notifier('CommandAttr:'.$name.' webCmd Play:Pause:Previous:Next:VolumeD:VolumeU:MuteT');
-	
-				# Define Weblink for AlbumArt with attributes
-				#if ($master) {
-				#	SONOS_Client_Notifier('CommandDefine:AlbumArt_'.$saveRoomName.' weblink image /fhem/icons/SONOSPLAYER/'.$name.'_AlbumArt'."\n");
-				#	SONOS_Client_Notifier('CommandAttr:AlbumArt_'.$saveRoomName.' room '.$SONOS_Client_Data{SonosDeviceName});
-				#	SONOS_Client_Notifier('CommandAttr:AlbumArt_'.$saveRoomName.' htmlattr width=\'200\'');
-				#	SONOS_Client_Notifier('CommandAttr:AlbumArt_'.$saveRoomName.' group '.$groupName);
-				#}
-				
-				# Define ReadingsGroup
-				if ($master) {
-					SONOS_Client_Notifier('CommandDefine:'.$name.'RG readingsGroup '.$name.':<{SONOS_getCoverTitleRG($DEVICE)}@infoSummarize2>');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RG room '.$SONOS_Client_Data{SonosDeviceName});
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RG group '.$groupName);
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RG sortby 2');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RG noheading 1');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RG nonames 1');
-					
-					#SONOS_Client_Notifier('CommandDefine:'.$name.'RG2 readingsGroup '.$name.':infoSummarize2@{SONOSPLAYER_GetMasterPlayerName($DEVICE)}');
-					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 valueFormat {" "}');
-					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 valuePrefix {SONOS_getCoverTitleRG(SONOSPLAYER_GetMasterPlayerName($DEVICE))}');
-					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 room '.$SONOS_Client_Data{SonosDeviceName});
-					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 group '.$groupName);
-					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 sortby 4');
-					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 noheading 1');
-					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 nonames 1');
-					#SONOS_Client_Notifier('CommandAttr:'.$name.'RG2 notime 1');
-				}
-				
-				# Define Readingsgroup Listen
-				if ($master) {
-					SONOS_Client_Notifier('CommandDefine:'.$name.'RG_Favourites readingsGroup '.$name.':<{SONOS_getListRG($DEVICE,"Favourites",1)}@Favourites>');
-					SONOS_Client_Notifier('CommandDefine:'.$name.'RG_Radios readingsGroup '.$name.':<{SONOS_getListRG($DEVICE,"Radios",1)}@Radios>');
-					SONOS_Client_Notifier('CommandDefine:'.$name.'RG_Playlists readingsGroup '.$name.':<{SONOS_getListRG($DEVICE,"Playlists")}@Playlists>');
-				}
-				
-				# Define RemoteControl
-				if ($master) {
-					SONOS_Client_Notifier('CommandDefine:'.$name.'RC remotecontrol');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC room hidden');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC group '.$SONOS_Client_Data{SonosDeviceName});
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC rc_iconpath icons/remotecontrol');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC rc_iconprefix black_btn_');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC row00 Play:rc_PLAY.svg,Pause:rc_PAUSE.svg,Previous:rc_PREVIOUS.svg,Next:rc_NEXT.svg,:blank,VolumeD:rc_VOLDOWN.svg,VolumeU:rc_VOLUP.svg,:blank,MuteT:rc_MUTE.svg,ShuffleT:rc_SHUFFLE.svg,RepeatT:rc_REPEAT.svg');
-					
-					SONOS_Client_Notifier('CommandDefine:'.$name.'RC_Notify notify '.$name.'RC set '.$name.' $EVENT');
-					
-					SONOS_Client_Notifier('CommandDefine:'.$name.'RC_Weblink weblink htmlCode {fhem("get '.$name.'RC htmlcode", 1)}');
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC_Weblink room '.$SONOS_Client_Data{SonosDeviceName});
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC_Weblink group '.$groupName);
-					SONOS_Client_Notifier('CommandAttr:'.$name.'RC_Weblink sortby 3');
-				}
+			# Setting Internal-Data
+			if (!$isZoneBridge) {
+				SONOS_Client_Data_Refresh('', $udn, 'getAlarms', 1);
+				SONOS_Client_Data_Refresh('', $udn, 'minVolume', 0);
+			}
+			
+			# Define ReadingsGroup
+			for my $elem (SONOS_GetDefineStringlist('SONOSPLAYER_ReadingsGroup', $SONOS_Client_Data{SonosDeviceName}, undef, $master, $name, undef, undef, $groupName, undef, $isZoneBridge)) {
+				SONOS_Client_Notifier($elem);
+			}
+			
+			# Define ReadingsGroup-Listen
+			for my $elem (SONOS_GetDefineStringlist('SONOSPLAYER_ReadingsGroup_Listen', undef, undef, $master, $name, undef, undef, undef, undef, $isZoneBridge)) {
+				SONOS_Client_Notifier($elem);
+			}
+			
+			# Define RemoteControl
+			for my $elem (SONOS_GetDefineStringlist('SONOSPLAYER_Remotecontrol', $SONOS_Client_Data{SonosDeviceName}, undef, $master, $name, undef, undef, $groupName, undef, $isZoneBridge)) {
+				SONOS_Client_Notifier($elem);
 			}
 			
 			SONOS_Log undef, 1, "Successfully autocreated SonosPlayer '$saveRoomName' ($modelNumber) Software Revision $displayVersion with ID '$udn'";
@@ -4779,25 +4873,28 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'fieldType', $fieldType);
 		
 		# Abspielreadings vorab ermitteln, um darauf prüfen zu können...
-		if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
-			eval {
-				my $result = SONOS_AVTransportControlProxy{$udn}->GetTransportInfo(0);
-				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'transportState', $result->getValue('CurrentTransportState'));
-				
-				$result = SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
-				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackURI', $result->getValue('TrackURI'));
-				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackDuration', $result->getValue('TrackDuration'));
-				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPosition', $result->getValue('RelTime'));
-				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrack', $result->getValue('Track'));
-				
-				$result = SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0);
-				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'numberOfTracks', $result->getValue('NrTracks'));
-				my $stream = ($result->getValue('CurrentURI') =~ m/^x-(sonosapi|rincon)-stream:.*?/);
-				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentStreamAudio', $stream);
-				SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentNormalAudio', !$stream);
-			};
-			if ($@) {
-				SONOS_Log undef, 4, 'Couldn\'t retrieve Current Transportsettings: '. $@;
+		if (!$isZoneBridge) {
+			if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+				eval {
+					my $result = SONOS_AVTransportControlProxy{$udn}->GetTransportInfo(0);
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'transportState', $result->getValue('CurrentTransportState'));
+					
+					$result = SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackURI', $result->getValue('TrackURI'));
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackProvider', SONOS_GetTrackProvider($result->getValue('TrackURI')));
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackDuration', $result->getValue('TrackDuration'));
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPosition', $result->getValue('RelTime'));
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrack', $result->getValue('Track'));
+					
+					$result = SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0);
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'numberOfTracks', $result->getValue('NrTracks'));
+					my $stream = ($result->getValue('CurrentURI') =~ m/^x-(sonosapi|rincon)-stream:.*?/);
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentStreamAudio', $stream);
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentNormalAudio', !$stream);
+				};
+				if ($@) {
+					SONOS_Log undef, 4, 'Couldn\'t retrieve Current Transportsettings: '. $@;
+				}
 			}
 		}
 		
@@ -4810,16 +4907,18 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Log undef, 2, "SonosPlayer '$saveRoomName' is now updated";
 		
 		# AVTransport-Subscription
-		if ($transportService) {
-			$SONOS_TransportSubscriptions{$udn} = $transportService->subscribe(\&SONOS_ServiceCallback);
-			if (defined($SONOS_TransportSubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'Service-subscribing successful with SID="'.$SONOS_TransportSubscriptions{$udn}->SID.'" and Timeout="'.$SONOS_TransportSubscriptions{$udn}->timeout.'s"';
+		if (!$isZoneBridge) {
+			if ($transportService) {
+				$SONOS_TransportSubscriptions{$udn} = $transportService->subscribe(\&SONOS_ServiceCallback);
+				if (defined($SONOS_TransportSubscriptions{$udn})) {
+					SONOS_Log undef, 2, 'Service-subscribing successful with SID="'.$SONOS_TransportSubscriptions{$udn}->SID;
+				} else {
+					SONOS_Log undef, 1, 'Service-subscribing NOT successful';
+				}
 			} else {
-				SONOS_Log undef, 1, 'Service-subscribing NOT successful';
+				undef($SONOS_TransportSubscriptions{$udn});
+				SONOS_Log undef, 1, 'Service-subscribing not possible due to missing TransportService';
 			}
-		} else {
-			undef($SONOS_TransportSubscriptions{$udn});
-			SONOS_Log undef, 1, 'Service-subscribing not possible due to missing TransportService';
 		}
 		
 		# Rendering-Subscription, wenn eine untere oder obere Lautstärkegrenze angegeben wurde, und Lautstärke überhaupt geht
@@ -4827,19 +4926,31 @@ sub SONOS_Discover_Callback($$$) {
 	  		$SONOS_RenderingSubscriptions{$udn} = $renderingService->subscribe(\&SONOS_RenderingCallback);
 	  		$SONOS_ButtonPressQueue{$udn} = Thread::Queue->new();
 	  		if (defined($SONOS_RenderingSubscriptions{$udn})) {
-	  			SONOS_Log undef, 2, 'Rendering-Service-subscribing successful with SID="'.$SONOS_RenderingSubscriptions{$udn}->SID.'" and Timeout="'.$SONOS_RenderingSubscriptions{$udn}->timeout.'s"';
+	  			SONOS_Log undef, 2, 'Rendering-Service-subscribing successful with SID="'.$SONOS_RenderingSubscriptions{$udn}->SID;
 	  		} else {
 	  			SONOS_Log undef, 1, 'Rendering-Service-subscribing NOT successful';
 	  		}
 	    } else {
 	    	undef($SONOS_RenderingSubscriptions{$udn});
 	    }
-    
+	    
+		# GroupRendering-Subscription
+		if ($groupRenderingService && (SONOS_Client_Data_Retreive($udn, 'attr', 'minVolume', -1) != -1 || SONOS_Client_Data_Retreive($udn, 'attr', 'maxVolume', -1) != -1 || SONOS_Client_Data_Retreive($udn, 'attr', 'minVolumeHeadphone', -1) != -1 || SONOS_Client_Data_Retreive($udn, 'attr', 'maxVolumeHeadphone', -1)  != -1 )) {
+	  		$SONOS_GroupRenderingSubscriptions{$udn} = $groupRenderingService->subscribe(\&SONOS_GroupRenderingCallback);
+	  		if (defined($SONOS_GroupRenderingSubscriptions{$udn})) {
+	  			SONOS_Log undef, 2, 'GroupRendering-Service-subscribing successful with SID="'.$SONOS_GroupRenderingSubscriptions{$udn}->SID;
+	  		} else {
+	  			SONOS_Log undef, 1, 'GroupRendering-Service-subscribing NOT successful';
+	  		}
+	    } else {
+	    	undef($SONOS_GroupRenderingSubscriptions{$udn});
+	    }
+	    
 		# Alarm-Subscription
 		if ($alarmService && (SONOS_Client_Data_Retreive($udn, 'attr', 'getAlarms', 0) != 0)) {
 			$SONOS_AlarmSubscriptions{$udn} = $alarmService->subscribe(\&SONOS_AlarmCallback);
 			if (defined($SONOS_AlarmSubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'Alarm-Service-subscribing successful with SID="'.$SONOS_AlarmSubscriptions{$udn}->SID.'" and Timeout="'.$SONOS_AlarmSubscriptions{$udn}->timeout.'s"';
+				SONOS_Log undef, 2, 'Alarm-Service-subscribing successful with SID="'.$SONOS_AlarmSubscriptions{$udn}->SID;
 			} else {
 				SONOS_Log undef, 1, 'Alarm-Service-subscribing NOT successful';
 			}
@@ -4851,7 +4962,7 @@ sub SONOS_Discover_Callback($$$) {
 		if ($zoneGroupTopologyService) {
 			$SONOS_ZoneGroupTopologySubscriptions{$udn} = $zoneGroupTopologyService->subscribe(\&SONOS_ZoneGroupTopologyCallback);
 			if (defined($SONOS_ZoneGroupTopologySubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'ZoneGroupTopology-Service-subscribing successful with SID="'.$SONOS_ZoneGroupTopologySubscriptions{$udn}->SID.'" and Timeout="'.$SONOS_ZoneGroupTopologySubscriptions{$udn}->timeout.'s"';
+				SONOS_Log undef, 2, 'ZoneGroupTopology-Service-subscribing successful with SID="'.$SONOS_ZoneGroupTopologySubscriptions{$udn}->SID;
 			} else {
 				SONOS_Log undef, 1, 'ZoneGroupTopology-Service-subscribing NOT successful';
 			}
@@ -4863,7 +4974,7 @@ sub SONOS_Discover_Callback($$$) {
 		if ($devicePropertiesService) {
 			$SONOS_DevicePropertiesSubscriptions{$udn} = $devicePropertiesService->subscribe(\&SONOS_DevicePropertiesCallback);
 			if (defined($SONOS_DevicePropertiesSubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'DeviceProperties-Service-subscribing successful with SID="'.$SONOS_DevicePropertiesSubscriptions{$udn}->SID.'" and Timeout="'.$SONOS_DevicePropertiesSubscriptions{$udn}->timeout.'s"';
+				SONOS_Log undef, 2, 'DeviceProperties-Service-subscribing successful with SID="'.$SONOS_DevicePropertiesSubscriptions{$udn}->SID;
 			} else {
 				SONOS_Log undef, 1, 'DeviceProperties-Service-subscribing NOT successful';
 			}
@@ -4875,7 +4986,7 @@ sub SONOS_Discover_Callback($$$) {
 		if ($audioInService) {
 			$SONOS_AudioInSubscriptions{$udn} = $audioInService->subscribe(\&SONOS_AudioInCallback);
 			if (defined($SONOS_AudioInSubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'AudioIn-Service-subscribing successful with SID="'.$SONOS_AudioInSubscriptions{$udn}->SID.'" and Timeout="'.$SONOS_AudioInSubscriptions{$udn}->timeout.'s"';
+				SONOS_Log undef, 2, 'AudioIn-Service-subscribing successful with SID="'.$SONOS_AudioInSubscriptions{$udn}->SID;
 			} else {
 				SONOS_Log undef, 1, 'AudioIn-Service-subscribing NOT successful';
 			}
@@ -4896,6 +5007,97 @@ sub SONOS_Discover_Callback($$$) {
 	return 0;
 }
 
+
+########################################################################################
+#
+#  SONOS_GetDefineStringlist - Generates a list of define- or attr-commands acoording to the given desired-device
+#
+########################################################################################
+sub SONOS_GetDefineStringlist($$$$$$$$$$) {
+	my ($devicetype, $sonosDeviceName, $udn, $master, $name, $roomName, $aliasSuffix, $groupName, $iconPath, $isZoneBridge) = @_;
+	
+	my @defs = ();
+	
+	if (lc($devicetype) eq 'sonosplayer') {
+		push(@defs, 'CommandDefine:'.$name.' SONOSPLAYER '.$udn);
+	} elsif (lc($devicetype) eq 'sonosplayer_attributes') {
+		push(@defs, 'CommandAttr:'.$name.' room '.$sonosDeviceName);
+		push(@defs, 'CommandAttr:'.$name.' alias '.$roomName.$aliasSuffix);
+		push(@defs, 'CommandAttr:'.$name.' group '.$groupName);
+		push(@defs, 'CommandAttr:'.$name.' icon '.$iconPath);
+		push(@defs, 'CommandAttr:'.$name.' sortby 1');
+		
+		if (!$isZoneBridge) {
+			push(@defs, 'CommandAttr:'.$name.' userReadings Favourites:LastActionResult.*?GetFavouritesWithCovers.* { if (ReadingsVal("'.$name.'", "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Radios:LastActionResult.*?GetRadiosWithCovers.* { if (ReadingsVal("'.$name.'", "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, Playlists:LastActionResult.*?GetPlaylistsWithCovers.* { if (ReadingsVal("'.$name.'", "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }, currentTrackPosition:LastActionResult.*?GetCurrentTrackPosition.* { if (ReadingsVal("'.$name.'", "LastActionResult", "") =~ m/.*?: (.*)/) { return $1; } }');
+			push(@defs, 'CommandAttr:'.$name.' generateInfoSummarize1 <NormalAudio><Artist prefix="(" suffix=")"/><Title prefix=" \'" suffix="\'" ifempty="[Keine Musikdatei]"/><Album prefix=" vom Album \'" suffix="\'"/></NormalAudio> <StreamAudio><Sender suffix=":"/><SenderCurrent prefix=" \'" suffix="\' -"/><SenderInfo prefix=" "/></StreamAudio>');
+			push(@defs, 'CommandAttr:'.$name.' generateInfoSummarize2 <TransportState/><InfoSummarize1 prefix=" => "/>');
+			push(@defs, 'CommandAttr:'.$name.' generateInfoSummarize3 <Volume prefix="Lautstärke: "/><Mute instead=" ~ Kein Ton" ifempty=" ~ Ton An" emptyval="0"/> ~ Balance: <Balance ifempty="Mitte" emptyval="0"/><HeadphoneConnected instead=" ~ Kopfhörer aktiv" ifempty=" ~ Kein Kopfhörer" emptyval="0"/>');
+			push(@defs, 'CommandAttr:'.$name.' generateVolumeSlider 1');
+			push(@defs, 'CommandAttr:'.$name.' getAlarms 1');
+			push(@defs, 'CommandAttr:'.$name.' minVolume 0');
+			push(@defs, 'CommandAttr:'.$name.' stateVariable Presence');
+			
+			#push(@defs, 'CommandAttr:'.$name.' webCmd Play:Pause:Previous:Next:VolumeD:VolumeU:MuteT');
+		} else {
+			push(@defs, 'CommandAttr:'.$name.' stateFormat presence');
+		}
+	} elsif (lc($devicetype) eq 'sonosplayer_readingsgroup') {
+		if (!$isZoneBridge) {
+			if ($master) {
+				push(@defs, 'CommandDefine:'.$name.'RG readingsGroup '.$name.':<{SONOS_getCoverTitleRG($DEVICE)}@infoSummarize2>');
+				push(@defs, 'CommandAttr:'.$name.'RG room '.$sonosDeviceName);
+				push(@defs, 'CommandAttr:'.$name.'RG group '.$groupName);
+				push(@defs, 'CommandAttr:'.$name.'RG sortby 2');
+				push(@defs, 'CommandAttr:'.$name.'RG noheading 1');
+				push(@defs, 'CommandAttr:'.$name.'RG nonames 1');
+				
+				#push(@defs, 'CommandDefine:'.$name.'RG2 readingsGroup '.$name.':infoSummarize2@{SONOSPLAYER_GetMasterPlayerName($DEVICE)}');
+				#push(@defs, 'CommandAttr:'.$name.'RG2 valueFormat {" "}');
+				#push(@defs, 'CommandAttr:'.$name.'RG2 valuePrefix {SONOS_getCoverTitleRG(SONOSPLAYER_GetMasterPlayerName($DEVICE))}');
+				#push(@defs, 'CommandAttr:'.$name.'RG2 room '.$SONOS_Client_Data{SonosDeviceName});
+				#push(@defs, 'CommandAttr:'.$name.'RG2 group '.$groupName);
+				#push(@defs, 'CommandAttr:'.$name.'RG2 sortby 4');
+				#push(@defs, 'CommandAttr:'.$name.'RG2 noheading 1');
+				#push(@defs, 'CommandAttr:'.$name.'RG2 nonames 1');
+				#push(@defs, 'CommandAttr:'.$name.'RG2 notime 1');
+			}
+		}
+	} elsif (lc($devicetype) eq 'sonosplayer_readingsgroup_listen') {
+		if (!$isZoneBridge) {
+			if ($master) {
+				push(@defs, 'CommandDefine:'.$name.'RG_Favourites readingsGroup '.$name.':<{SONOS_getListRG($DEVICE,"Favourites",1)}@Favourites>');
+				push(@defs, 'CommandDefine:'.$name.'RG_Radios readingsGroup '.$name.':<{SONOS_getListRG($DEVICE,"Radios",1)}@Radios>');
+				push(@defs, 'CommandDefine:'.$name.'RG_Playlists readingsGroup '.$name.':<{SONOS_getListRG($DEVICE,"Playlists")}@Playlists>');
+			}
+		}
+	} elsif (lc($devicetype) eq 'sonosplayer_remotecontrol') {
+		if (!$isZoneBridge) {
+			if ($master) {
+				push(@defs, 'CommandDefine:'.$name.'RC remotecontrol');
+				push(@defs, 'CommandAttr:'.$name.'RC room hidden');
+				push(@defs, 'CommandAttr:'.$name.'RC group '.$sonosDeviceName);
+				push(@defs, 'CommandAttr:'.$name.'RC rc_iconpath icons/remotecontrol');
+				push(@defs, 'CommandAttr:'.$name.'RC rc_iconprefix black_btn_');
+				push(@defs, 'CommandAttr:'.$name.'RC row00 Play:rc_PLAY.svg,Pause:rc_PAUSE.svg,Previous:rc_PREVIOUS.svg,Next:rc_NEXT.svg,:blank,VolumeD:rc_VOLDOWN.svg,VolumeU:rc_VOLUP.svg,:blank,MuteT:rc_MUTE.svg,ShuffleT:rc_SHUFFLE.svg,RepeatT:rc_REPEAT.svg');
+				
+				push(@defs, 'CommandDefine:'.$name.'RC_Notify notify '.$name.'RC set '.$name.' $EVENT');
+				
+				push(@defs, 'CommandDefine:'.$name.'RC_Weblink weblink htmlCode {fhem("get '.$name.'RC htmlcode", 1)}');
+				push(@defs, 'CommandAttr:'.$name.'RC_Weblink room '.$sonosDeviceName);
+				push(@defs, 'CommandAttr:'.$name.'RC_Weblink group '.$groupName);
+				push(@defs, 'CommandAttr:'.$name.'RC_Weblink sortby 3');
+			}
+		}
+	}
+	
+	return @defs;
+}
+
+########################################################################################
+#
+#  SONOS_AnalyzeZoneGroupTopology - Analyzes the current Zoneplayertopology for better naming of the components
+#
+########################################################################################
 sub SONOS_AnalyzeZoneGroupTopology($$) {
 	my ($udn, $udnShort) = @_;
 	
@@ -4903,6 +5105,7 @@ sub SONOS_AnalyzeZoneGroupTopology($$) {
 	my $topoType = '';
 	my $fieldType = '';
 	my $master = 1;
+	my $isZoneBridge = 0;
 	if ($SONOS_ZoneGroupTopologyProxy{$udn}) {
 		my $zoneGroupState = $SONOS_ZoneGroupTopologyProxy{$udn}->GetZoneGroupState()->getValue('ZoneGroupState');
 		SONOS_Log undef, 5, 'ZoneGroupState: '.$zoneGroupState;
@@ -4928,7 +5131,6 @@ sub SONOS_AnalyzeZoneGroupTopology($$) {
 			my $invisible = 0;
 			$invisible = 1 if ($member =~ m/Invisible="1"/i);
 			
-			my $isZoneBridge = 0;
 			$isZoneBridge = 1 if ($member =~ m/IsZoneBridge="1"/i);
 			
 			$master = !$invisible || $isZoneBridge;
@@ -4944,7 +5146,7 @@ sub SONOS_AnalyzeZoneGroupTopology($$) {
 	$aliasSuffix = ' - Subwoofer' if ($topoType eq '_SW');
 	$aliasSuffix = ' - Mitte' if ($topoType eq '_LF_RF');
 	
-	return ($topoType, $fieldType, $master, $aliasSuffix);
+	return ($isZoneBridge, $topoType, $fieldType, $master, $aliasSuffix);
 }
 
 ########################################################################################
@@ -5036,7 +5238,7 @@ sub SONOS_IsAlive($) {
 sub SONOS_DeleteProxyObjects($) {
 	my ($udn) = @_;
 	
-	SONOS_Log $udn, 2, "DeleteProxyObjects for '$udn'";
+	SONOS_Log $udn, 4, "DeleteProxyObjects for '$udn'";
 	
 	delete $SONOS_AVTransportControlProxy{$udn};
 	delete $SONOS_RenderingControlProxy{$udn};
@@ -5051,8 +5253,12 @@ sub SONOS_DeleteProxyObjects($) {
 	delete $SONOS_TransportSubscriptions{$udn};
 	
 	delete $SONOS_RenderingSubscriptions{$udn};
+	delete $SONOS_GroupRenderingSubscriptions{$udn};
 	
-	SONOS_Log $udn, 2, "DeleteProxyObjects DONE for '$udn'";
+	# Am Ende noch das Device entfernen...
+	delete $SONOS_UPnPDevice{$udn};
+	
+	SONOS_Log $udn, 4, "DeleteProxyObjects DONE for '$udn'";
 }
 
 ########################################################################################
@@ -5078,6 +5284,7 @@ sub SONOS_GetReadingsToCurrentHash($$) {
 		$current{TrackURI} = '';
 		$current{TrackDuration} = '';
 		$current{TrackPosition} = '';
+		$current{TrackProvider} = '';
 		$current{TrackMetaData} = '';
 		$current{AlbumArtURI} = '';
 		$current{AlbumArtURL} = '';
@@ -5115,6 +5322,7 @@ sub SONOS_GetReadingsToCurrentHash($$) {
 		$current{TrackURI} = ReadingsVal($name, 'currentTrackURI', '');
 		$current{TrackDuration} = ReadingsVal($name, 'currentTrackDuration', '');
 		$current{TrackPosition} = ReadingsVal($name, 'currentTrackPosition', '');
+		$current{TrackProvider} = ReadingsVal($name, 'currentTrackProvider', '');
 		#$current{TrackMetaData} = '';
 		$current{AlbumArtURI} = ReadingsVal($name, 'currentAlbumArtURI', '');
 		$current{AlbumArtURL} = ReadingsVal($name, 'currentAlbumArtURL', '');
@@ -5128,6 +5336,7 @@ sub SONOS_GetReadingsToCurrentHash($$) {
 		$current{SenderInfo} = ReadingsVal($name, 'currentSenderInfo', '');
 		$current{nextTrackDuration} = ReadingsVal($name, 'nextTrackDuration', '');
 		$current{nextTrackURI} = ReadingsVal($name, 'nextTrackURI', '');
+		$current{nextTrackProvider} = ReadingsVal($name, 'nextTrackProvider', '');
 		$current{nextAlbumArtURI} = ReadingsVal($name, 'nextAlbumArtURI', '');
 		$current{nextAlbumArtURL} = ReadingsVal($name, 'nextAlbumArtURL', '');
 		$current{nextTitle} = ReadingsVal($name, 'nextTitle', '');
@@ -5335,7 +5544,10 @@ sub SONOS_ServiceCallback($$) {
 			$isStream = 1;
 			
 			# Sender ermitteln (per SOAP-Request an den SonosPlayer)
-			SONOS_Client_Notifier('SetCurrent:Sender:'.$1) if ($service->controlProxy()->GetMediaInfo(0)->getValue('CurrentURIMetaData') =~ m/<dc:title>(.*?)<\/dc:title>/i);
+			if ($service->controlProxy()->GetMediaInfo(0)->getValue('CurrentURIMetaData') =~ m/<dc:title>(.*?)<\/dc:title>/i) {
+				SONOS_Client_Notifier('SetCurrent:Sender:'.$1);
+				SONOS_Client_Notifier('SetCurrent:TrackProvider:'.SONOS_GetTrackProvider($currentTrackURI, $1));
+			}
 			
 			# Sender-Läuft ermitteln
 			SONOS_Client_Notifier('SetCurrent:SenderCurrent:'.$1) if ($currentTrackMetaData =~ m/<r:radioShowMd>(.*?),p\d{6}<\/r:radioShowMd>/i);
@@ -5358,6 +5570,7 @@ sub SONOS_ServiceCallback($$) {
 			SONOS_Client_Notifier('SetCurrent:NormalAudio:1');
 			
 			my $currentArtist = '';
+			my $currentTitle = '';
 			if ($currentTrackURI =~ m/x-rincon:(RINCON_[\dA-Z]+)/) {
 				# Gruppenwiedergabe feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1));
@@ -5366,7 +5579,11 @@ sub SONOS_ServiceCallback($$) {
 			} elsif ($currentTrackURI =~ m/x-rincon-stream:(RINCON_[\dA-Z]+)/) {
 				# LineIn-Wiedergabe feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1));
-				SONOS_Client_Notifier('SetCurrent:Title:'.SONOS_replaceSpecialStringCharacters(decode_entities($1))) if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i);
+				
+				if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i) {
+					SONOS_Client_Notifier('SetCurrent:Title:'.SONOS_replaceSpecialStringCharacters(decode_entities($1)));
+					$currentTitle = $1;
+				}
 				SONOS_Client_Notifier('SetCurrent:Artist:');
 				
 				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_default.jpg:');
@@ -5376,6 +5593,7 @@ sub SONOS_ServiceCallback($$) {
 				my $tmpTitle = SONOS_replaceSpecialStringCharacters(decode_entities($1)) if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i);
 				$tmpTitle = '' if (!defined($tmpTitle));
 				SONOS_Client_Notifier('SetCurrent:Title:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentTitle', $tmpTitle));
+				$currentTitle = $tmpTitle;
 				SONOS_Client_Notifier('SetCurrent:Artist:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentArtist', ''));
 				
 				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_dock.jpg:');
@@ -5388,7 +5606,10 @@ sub SONOS_ServiceCallback($$) {
 				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_tv.jpg:');
 			} else {
 				# Titel ermitteln
-				SONOS_Client_Notifier('SetCurrent:Title:'.$1) if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i);
+				if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i) {
+					SONOS_Client_Notifier('SetCurrent:Title:'.$1);
+					$currentTitle = $1;
+				}
 				
 				# Interpret ermitteln
 				if ($currentTrackMetaData =~ m/<dc:creator>(.*?)<\/dc:creator>/i) {
@@ -5398,7 +5619,9 @@ sub SONOS_ServiceCallback($$) {
 				
 				# Album ermitteln
 				SONOS_Client_Notifier('SetCurrent:Album:'.$1) if ($currentTrackMetaData =~ m/<upnp:album>(.*?)<\/upnp:album>/i);
-			} 
+			}
+			
+			SONOS_Client_Notifier('SetCurrent:TrackProvider:'.SONOS_GetTrackProvider($currentTrackURI, $currentTitle));
 			
 			# Original Tracknumber ermitteln
 			SONOS_Client_Notifier('SetCurrent:OriginalTrackNumber:'.decode_entities($1)) if ($currentTrackMetaData =~ m/<upnp:originalTrackNumber>(.*?)<\/upnp:originalTrackNumber>/i);
@@ -5415,7 +5638,10 @@ sub SONOS_ServiceCallback($$) {
 		
 		SONOS_Client_Notifier('SetCurrent:nextTrackDuration:'.decode_entities($1)) if ($nextTrackMetaData =~ m/<res.*?duration="(.*?)".*?>/i);
 		
-		SONOS_Client_Notifier('SetCurrent:nextTrackURI:'.SONOS_GetURIFromQueueValue($1)) if ($properties{LastChangeDecoded} =~ m/<r:NextTrackURI val="(.*?)"\/>/i);
+		if ($properties{LastChangeDecoded} =~ m/<r:NextTrackURI val="(.*?)"\/>/i) {
+			SONOS_Client_Notifier('SetCurrent:nextTrackURI:'.SONOS_GetURIFromQueueValue($1));
+			SONOS_Client_Notifier('SetCurrent:nextTrackProvider:'.SONOS_GetTrackProvider(SONOS_GetURIFromQueueValue($1)));
+		}
 		
 		$tempURIground = decode_entities($nextTrackMetaData);
 		$tempURIground =~ s/%25/%/ig;
@@ -5648,6 +5874,71 @@ sub SONOS_RenderingCallback($$) {
 	
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of Rendering-Event for Zone "'.$name.'".';
+	
+	return 0;
+}
+
+########################################################################################
+#
+#  SONOS_GroupRenderingCallback - GroupRendering-Callback, 
+#
+# Parameter $service = Service-Representing Object
+#						$properties = Properties, that have been changed in this event
+#
+########################################################################################
+sub SONOS_GroupRenderingCallback($$) {
+	my ($service, %properties) = @_;
+	
+	my $udn = $SONOS_Locations{$service->base};
+	my $udnShort = $1 if ($udn =~ m/(.*?)_MR/i);
+	
+	if (!$udn) {
+		SONOS_Log undef, 1, 'GroupRendering-Event receive error: SonosPlayer not found; Searching for \''.$service->eventSubURL.'\'!';
+		return;
+	}
+	
+	my $name = SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn);
+	
+	# If the Device is disabled, return here...
+	if (SONOS_Client_Data_Retreive($udn, 'attr', 'disable', 0) == 1) {
+		SONOS_Log $udn, 3, "GroupRendering-Event: device '$name' disabled. No Events/Data will be processed!";
+		return;
+	}
+	
+	SONOS_Log $udn, 3, 'Event: Received GroupRendering-Event for Zone "'.$name.'".';
+	$SONOS_Client_SendQueue_Suspend = 1;
+	
+	# Check if the correct ServiceType
+	if ($service->serviceType() ne 'urn:schemas-upnp-org:service:GroupRenderingControl:1') {
+		SONOS_Log $udn, 1, 'GroupRendering-Event receive error: Wrong Servicetype, was \''.$service->serviceType().'\'!';
+		return;
+	}
+	
+	SONOS_Log $udn, 4, "GroupRendering-Event: All correct with this service-call till now. UDN='uuid:".$udn."'";
+	my $generateVolumeEvent = SONOS_Client_Data_Retreive($udn, 'attr', 'generateVolumeEvent', 0);
+	
+	# GroupVolume...
+	my $groupVolume = SONOS_Client_Data_Retreive($udn, 'reading', 'GroupVolume', '~~');
+	if (defined($properties{GroupVolume}) && ($properties{GroupVolume} ne $groupVolume)) {
+		if ($generateVolumeEvent) {
+			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'GroupVolume', $properties{GroupVolume});
+		} else {
+			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChangedNoTrigger', $udn, 'GroupVolume', $properties{GroupVolume});
+		}
+	}
+	
+	# GroupMute...
+	my $groupMute = SONOS_Client_Data_Retreive($udn, 'reading', 'GroupMute', '~~');
+	if (defined($properties{GroupMute}) && ($properties{GroupMute} ne $groupMute)) {
+		if ($generateVolumeEvent) {
+			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'GroupMute', $properties{GroupMute});
+		} else {
+			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChangedNoTrigger', $udn, 'GroupMute', $properties{GroupMute});
+		}
+	}
+	
+	$SONOS_Client_SendQueue_Suspend = 0;
+	SONOS_Log $udn, 3, 'Event: End of GroupRendering-Event for Zone "'.$name.'".';
 	
 	return 0;
 }

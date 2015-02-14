@@ -216,6 +216,7 @@ sub parseDeviceElement {
 		}
 		elsif ($childName eq 'serviceList') {
 			my $services = $childElement->[2];
+                        next if (ref $services ne "ARRAY");
 			for my $serviceElement (@$services) {
 				my $service = $self->parseServiceElement($serviceElement,
 														 @_);
