@@ -142,10 +142,13 @@ condition 1
 
  
 # Grafiken einbinden
-# Format: img <id> <x> <y> <scale> <srcType> <data>
+# Format: img <id> <x> <y> <scale> <link> <srcType> <data>
 # id = Name des Objekts
 # x,y = obere linke Ecke der Grafik
-# #
+# scale = Vergrößerungsfaktor der Grafik
+# link = URL die beim Anklicken der Grafik aufgerufen werden soll
+# srctype = file | url | data
+# data = Datenquelle
 # 
 # wir legen ein rotes Quadrat 48x48 hinter das Bild
 rgb "FF0000FF"
@@ -154,7 +157,7 @@ rect - 620 170 667 217 2 2 1
 # jetzt kommt das Bild in einer Skalierung
 # Breite = 46 Pixel
 #
-img - 621 171 w46 file "./www/images/fhemSVG/batterie.svg" 
+img - 621 171 w46 "http://www.fhem.de" file "./www/images/fhemSVG/batterie.svg" 
 
 # nun zeichnen wir das gleiche Bild noch einmal,
 # allerdings soll das Batteriesymbol weiss statt schwarz
@@ -163,7 +166,7 @@ img - 621 171 w46 file "./www/images/fhemSVG/batterie.svg"
 # Syntax: btIP_changeColor(<dateiname>,<alteFarbe>,<neueFarbe>)
 #
 rect - 620 220 667 267 2 2 1 
-img  - 621 221 w46 data { btIP_changeColor("./www/images/fhemSVG/batterie.svg","000000","FFFFFF") } 
+img  - 621 221 w46 "" data { btIP_changeColor("./www/images/fhemSVG/batterie.svg","000000","FFFFFF") } 
 
 # nun zeichnen wir eine Mülltonne mit frei wählbaren Farben
 # für Vordergrund und Hintergrund
