@@ -45,12 +45,15 @@
 # 0034: iOS fullscreen app - navigating to other floorplan doesn't open safari anymore (Feb 15, 2014)
 # 0035: added allowedCommands-Attribute based on FHEMWEB (Feb 20, 2014)
 # 0036: added style "commands only", changed html-method "get" to "$FW_formmethod" (June 19, 2014)
+# 0037: updated to match fhemweb.js developments (Rudi, Jan 17, 2015)
+# 0038: added arrange by drag&drop provided by Markus (mluckey), added longpollfilter (nesges), 
+#       added processing of global userattr fp_<name> and their value per device for rename, copy, delete (Jan 31, 2015)
 #
 ################################################################
 #
 #  Copyright notice
 #
-#  (c) 2012-2014 Copyright: Ulrich Maass
+#  (c) 2012-2015 Copyright: Ulrich Maass
 #
 #  This file is part of fhem.
 # 
@@ -77,22 +80,23 @@
 # Example: define Groundfloor FLOORPLAN
 #
 # Step 2:
-# store picture fp_<name>.png in your modpath. This will be used as background-picture.
+# store picture fp_<name>.png in your imagepath. This will be used as background-picture.
 # Example: fhem/www/images/default/Groundfloor.png
 #
 # Step 3:
 # Activate 'Arrange-Mode' to have user-friendly fields to move items: 
 # attr <floorplanname> fp_arrange 1
+# Example: attr Groundfloor fp_arrange 1
 # Delete this attribute when you're done with setup
-# To make objects display, they will thereby get assigned
+# Arrange-Mode displays a popup to add and edit how devices will be shown. Arrange devices using drag&drop.
+# When adding objects to your floorplan, they will thereby get assigned
 # attr <device> fp_<name> <top>,<left>,<style>,<text>
 # displays <device> on floorplan <name> at position top:<top>,left:<left> with style <style> and description <text>
-# styles: 0: icon/state only, 1: name+icon, 2: name+icon+commands 3:Device-Readings(+name) 4:S300TH
 # Example: attr lamp fp_Groundfloor 100,100,1,TableLamp #displays lamp at position 100px,100px
 #
-# Repeat step 3 to add further devices. Delete attr fp_<name> when all devices are arranged on your screen. Enjoy.
+# Repeat step 3 to add further devices. Delete attr fp_arrange when all devices are arranged on your screen. Enjoy.
 #
-# Check the colorful pdf-docu in http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf
+# Check the colorful pdf-docu in http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf
 #
 ################################################################################
 
@@ -107,6 +111,10 @@ use vars qw(@FW_fhemwebjs);      # List of fhemweb*js scripts to load - from FHE
 # Forward declaration
 sub FLOORPLAN_Initialize($);     # Initialize
 sub FP_define();                 # define <name> FLOORPLAN
+sub FP_undefine($$);             # delete <name>
+sub FP_rename($$);               # rename <old> <new>
+sub FP_copy($$);                 # copy <old> <new>
+sub FP_copy_rename_delete($$$);  # exec for copy, rename, delete
 sub FP_Get($@);                  # get-command
 sub FP_CGI();                    # analyze URL
 sub FP_digestCgi($);             # digest CGI
@@ -147,34 +155,34 @@ my @styles = ("0 (Icon only)","1 (Name+Icon)","2 (Name+Icon+Commands)","3 (Devic
 
 
 #-------------------------------------------------------------------------------
+##################
+# method 'initialize'
 sub 
 FLOORPLAN_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn}        = "FP_define";
+  $hash->{UndefFn}      = "FP_undefine";
+  $hash->{RenameFn}     = "FP_rename";
+  $hash->{CopyFn}       = "FP_copy";
   $hash->{GetFn}        = "FP_Get";
   $hash->{FW_detailFn}  = "FP_detailFn";   #floorplan-specific detail-screen
   $hash->{AttrList}     = "refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 ".
                           "stylesheet fp_noMenu:1,0 fp_backgroundimg fp_setbutton:1,0 fp_viewport ".
-                          "CssFiles JavaScripts ".
-			  "fp_roomIcons";
+                          "CssFiles JavaScripts fp_roomIcons ";
   # CGI
   my $name = "floorplan";
   my $fhem_url = "/" . $name ;
   $data{FWEXT}{$fhem_url}{FUNC} = "FP_CGI";
   $data{FWEXT}{$fhem_url}{LINK} = $name;
   $data{FWEXT}{$fhem_url}{NAME} = "Floorplans";
- #$data{FWEXT}{$fhem_url}{EMBEDDED} = 1;               # not using embedded-mode to save screen-space
-  # Global-Config for CSS
-  $modules{_internal_}{AttrList} .= " VIEW_CSS";
-  
+  $modules{_internal_}{AttrList} .= " VIEW_CSS";       # Global-Config for CSS
+
   my $n = 0;
   @FW_zoom = ("qday", "day","week","month","year");    #copied from FHEMWEB - using local version to avoid global variable
   %FW_zoom = map { $_, $n++ } @FW_zoom;                #copied from FHEMWEB - using local version to avoid global variable
-  
   return undef;
 }
-
 
 #-------------------------------------------------------------------------------
 ##################
@@ -182,13 +190,76 @@ FLOORPLAN_Initialize($)
 sub 
 FP_define(){
   my ($hash, $def) = @_;
-  $hash->{STATE} = $hash->{NAME};
+  $hash->{STATE} = 'Defined';
   my $name = $hash->{NAME};
   if (AttrVal("global","userattr","") !~ m/fp_$name/) {
 	addToAttrList("fp_$name");                                                  # create userattr fp_<name> if it doesn't exist yet
-#	Log 3, "Floorplan - added global userattr fp_$name";
     Log3 $name, 3, "Floorplan - added global userattr fp_$name";
   }
+  return undef;
+}
+
+#-------------------------------------------------------------------------------
+##################
+# method 'undefine'
+sub 
+FP_undefine($$) {
+  my ($hash,$arg) = @_;
+  FP_copy_rename_delete('delete',$hash->{NAME},undef);
+  return undef;
+}
+
+#-------------------------------------------------------------------------------
+##################
+# FLOORPLAN rename
+sub 
+FP_rename($$) {
+  my ($new,$old) = @_;
+  FP_copy_rename_delete('rename',$old,$new);
+  return undef;
+}
+
+#-------------------------------------------------------------------------------
+##################
+# FLOORPLAN copy
+sub 
+FP_copy($$) {
+  my ($old,$new) = @_;
+  FP_copy_rename_delete('copy',$old,$new);
+  return undef;
+}
+
+#-------------------------------------------------------------------------------
+##################
+# FLOORPLAN copy_rename_delete
+sub
+FP_copy_rename_delete($$$) {
+  my ($cmd,$old,$new) = @_;
+  my $aold = "fp_$old";
+  my $anew = $new ? "fp_$new" : '';
+  Log3 $old, 3,  "Floorplan - $cmd $old - processing...";
+  if ( ($cmd =~ m/(copy|rename)/) && (AttrVal("global","userattr","") !~ m/$anew/) ) {
+    addToAttrList("$anew");                                                  # create userattr fp_<name> if it doesn't exist yet for $new
+    Log3 $old, 3, "Floorplan - added global userattr $anew";
+  }
+  foreach my $d (sort keys %defs) { 
+	next if (!$attr{$d}{"$aold"} && !$attr{$d}{"$anew"});
+	if ($cmd =~ m/(copy|rename)/) {
+      AnalyzeCommand(undef, "attr $d $anew ".AttrVal($d,$aold,""),AttrVal($FW_wname,"allowedCommands",undef));
+	  Log3 $new, 3, "Floorplan - added   attr $d $anew ".AttrVal($d,$anew,"");
+	}
+	if ($cmd =~ m/(rename|delete)/) {
+	  Log3 $old, 3, "Floorplan - deleted attr $d $aold ".AttrVal($d,$aold,"");
+	  AnalyzeCommand(undef, "deleteattr $d $aold",AttrVal($FW_wname,"allowedCommands",undef));
+	}
+  }
+  if ($cmd =~ m/(rename|delete)/) {
+    my $ua = $attr{global}{userattr};
+    $ua =~ s/ $aold//;
+    AnalyzeCommand(undef, "attr global userattr $ua",AttrVal($FW_wname,"allowedCommands",undef));
+    Log3 $old, 3, "Floorplan - deleted global userattr $aold";                # delete the global userattr if $old gets deleted
+  }
+  Log3 $old, 3, "Floorplan - $cmd $old - complete.";
   return undef;
 }
 
@@ -299,7 +370,7 @@ FP_CGI(){
   } else {
     FP_show();              # show floorplan
   }
-  # finish HTML & leave
+  # finish HTML & leave back to FHEMWEB
   FW_pO "</html>\n";
   $FW_subdir = "";
   return ("text/html; charset=$FW_encoding", $FW_RET); # $FW_RET composed by FW_pO, FP_pH etc
@@ -318,22 +389,23 @@ FP_digestCgi($) {
   %FP_webArgs = ();
   $FP_fwdetail = undef;
   $arg =~ s,^[?/],,;
-  foreach my $pv (split("&", $arg)) {                                   #per each URL-section devided by &
+  my ($atop, $aleft, $drop) = ""; #mod
+  foreach my $pv (split("&", $arg)) {                                   # per each URL-section devided by &
     next if($pv eq ""); # happens when post forgot to set FW_ME
     $pv =~ s/\+/ /g;
 	$pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
-    my ($p,$v) = split("=",$pv, 2);                                     #$p = parameter, $v = value
+    my ($p,$v) = split("=",$pv, 2);                                     # $p = parameter, $v = value
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");                 # Multiline: escape the NL for fhem
     $FP_webArgs{$p} = $v;
     if($p eq "arr.dev")        { $v =~ m,^([\.\w]*)\s\(,; $v = $1 if ($1); $FP_arrange_selected = $v; $FP_arrange_default = $v; }
-    if($p eq "add.dev")        { $v =~ m,^([\.\w]*)\s\(,; $v = $1 if ($1); $cmd = "attr $v fp_$FP_name 50,100"; }
+    if($p eq "add.dev")        { $v =~ m,^([\.\w]*)\s\(,; $v = $1 if ($1); $cmd = "attr $v fp_$FP_name 50,200,1"; }
     if($p eq "cmd")            { $cmd = $v; }
     if($p =~ m/^cmd\.(.*)$/)   { $cmd = $v; $c = $1; }
     if($p =~ m/^detl\.(.*)$/)  { $FP_fwdetail = $1; }
     if($p =~ m/^dev\.(.*)$/)   { $dev{$1}   = $v; }
     if($p =~ m/^arg\.(.*)$/)   { $arg{$1}   = $v; }
     if($p =~ m/^val\.(.*)$/)   { $val{$1}   = $v; }
-    if($p =~ m/^deva\.(.*)$/)  { $deva{$1}  = $v; $FP_arrange_selected = undef;}
+	if($p =~ m/^deva\.(.*)$/)  { $deva{$1}  = $v; $FP_arrange_selected = undef; }
     if($p =~ m/^attr\.(.*)$/)  { $attr{$1}  = $v; }
     if($p =~ m/^top\.(.*)$/)   { $top{$1}   = $v; }
     if($p =~ m/^left\.(.*)$/)  { $left{$1}  = $v; }
@@ -342,19 +414,18 @@ FP_digestCgi($) {
 	if($p eq "pos")            { %FW_pos =  split(/[=;]/, $v); }
   }
   my $dele = ($cmd =~ m/^deleteattr/);
-  $cmd.=" $dev{$c}"   if(defined($dev{$c}));              #FHT device
+  $cmd.=" $dev{$c}"   if(defined($dev{$c}));                          # FHT device
   $cmd.=" $arg{$c}"   if(defined($arg{$c})&&
-                       ($arg{$c} ne "state" || $cmd !~ m/^set/));     #FHT argument (e.g. desired-temp)
-  $cmd.=" $val{$c}"   if(defined($val{$c}));              #FHT value
-  $cmd.=" $deva{$c}"  if(defined($deva{$c}));             #arrange device
-  $cmd.=" $attr{$c}"  if(defined($attr{$c}));             #arrange attr
-  $cmd.=" $top{$c}"   if(defined($top{$c})  && !$dele);   #arrange top
-  $cmd.=",$left{$c}"  if(defined($left{$c}) && !$dele);   #arrange left
-  $cmd.=",$style{$c}" if(defined($style{$c})&& !$dele);   #arrange style
-  $cmd.=",$text{$c}"  if(defined($text{$c}) && !$dele);   #arrange text
+                       ($arg{$c} ne "state" || $cmd !~ m/^set/));     # FHT argument (e.g. desired-temp)
+  $cmd.=" $val{$c}"   if(defined($val{$c}));                          # FHT value
+  $cmd.=" $deva{$c}"  if(defined($deva{$c}));                         # arrange device
+  $cmd.=" $attr{$c}"  if(defined($attr{$c}));                         # arrange attr
+  $cmd.=" $top{$c}"   if(defined($top{$c})  && !$dele);               # arrange top
+  $cmd.=",$left{$c}"  if(defined($left{$c}) && !$dele);               # arrange left
+  $cmd.=",$style{$c}" if(defined($style{$c})&& !$dele);               # arrange style
+  $cmd.=",$text{$c}"  if(defined($text{$c}) && !$dele);               # arrange text
   return $cmd;
 }
-
 
 #-------------------------------------------------------------------------------
 ##################
@@ -400,6 +471,10 @@ FP_htmlHeader($) {
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery.min.js");
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery-ui.min.js");
+  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/floorplan_click.js");      #enlarge clickable area per widget
+  if ($FP_arrange && ($FP_arrange eq "1" || ($FP_arrange eq $FW_wname) || $FP_arrange eq "detail")) {
+     FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/floorplan_drag.js") ;   #arrange-mode drag&drop
+  }
 
   #######################
   # Other JavaScripts + their Attributes
@@ -418,14 +493,16 @@ FP_htmlHeader($) {
       next if($h !~ m/HASH/ || !$h->{SCRIPT} || $h->{SCRIPT} =~ m+pgm2/jquery+);
       my $script = $h->{SCRIPT};
       $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
-      FW_pO sprintf($jsTemplate, $script);
+      FW_pO sprintf($jsTemplate, $script) if ($script);
     }
   }
 
   my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
   my $gen = 'generated="'.(time()-1).'"';
   my $lp  = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
-  FW_pO "</head>\n<body name=\"$title\" $gen $lp $csrf>";
+  my $lpf = 'longpollfilter="fp_'.$FP_name.'=.%2B"'; #longpollfilter - only devices present on this floorplan shall be notified
+  $lpf =~ s/:/%3/g;
+  FW_pO "</head>\n<body name=\"$title\" $gen $lp $lpf $csrf>";
 }
 
 
@@ -444,7 +521,6 @@ FP_showStart() {
   FW_pO "<td><input type=\"text\" name=\"cmd\" size=\"30\"/></td>";   						  #input-field
   FW_pO "</tr></table>";
   FW_pO "</form></div>";
-  # add edit *floorplanstyle.css if FP_arrange ?
   # no floorplans defined? -> show message
   my $count=0;
   foreach my $f (sort keys %defs) {
@@ -471,7 +547,6 @@ FP_show(){
   FP_htmlHeader("$FP_name");
   ## body
   my $onload = $FW_longpoll ? "onload=\"FW_delayedStart()\"" : "";
-  FW_pO "<body id=\"$FP_name-body\" $onload>\n";
   FW_pO "<div id=\"backimg\" style=\"width: 99%; height: 99%;\">";
   FW_pO FW_makeImage(AttrVal($FP_name, "fp_backgroundimg", "fp_$FP_name"));
   FW_pO "</div>\n";
@@ -493,7 +568,7 @@ FP_show(){
    foreach my $d (sort keys %defs) {                                                          # loop all devices
 		my $type = $defs{$d}{TYPE};
 		my $attr = AttrVal("$d","fp_$FP_name", undef);
-		next if(!$attr || $type eq "weblink");                                               # skip if device-attribute not set for current floorplan-name
+		next if(!$attr || $type eq "weblink");                                                # skip if device-attribute not set for current floorplan-name
 		
 		my ($top, $left, $style, $text, $text2) = split(/,/ , $attr);
 		# $top   = position in px, top
@@ -504,7 +579,9 @@ FP_show(){
 		$left = 0 if (!$left);
 		$style = 0 if (!$style);
         # start device-specific table
-		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px;\" id=\"div-$d\">";
+        my $t2 = $text2 ? $text2 : " ";
+        # wrapper-div needed for floorplan_drag.js and for positioning
+        FW_pO "\n<div fp_style=\"$style\" fp_text=\"$text\" fp_text2=\"$t2\" fp_name=\"$FP_name\" class=\"fp_device_div\" style=\"position:absolute; top:".$top."px; left:".$left."px;\" id=\"div-$d\">"; 
 		FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name/$d\" autocomplete=\"off\">";
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"table-$d\" align=\"center\">";         # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
@@ -532,12 +609,11 @@ FP_show(){
 
     ########################
     # Device-state per device
-#	    FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                               # For css: class=devicestate, id=devicename
        if ($style != 7) {
 	    if ($style == 3 || $style == 6) {
 	      FW_pO "<tr class=\"devicereading fp_$FP_name\" id=\"$d"."-$text\">";                  # For css: class=devicereading, id=<devicename>-<reading>
 	    } else { 
-          FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                           # For css: class=devicestate, id=<devicename>
+          FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                             # For css: class=devicestate, id=<devicename>
 	    }
         $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;                                     # format FHT-temperature
 	    ### use device-specific icons according to userattr fp_image or fp_<floorplan>.image
@@ -568,7 +644,6 @@ FP_show(){
 		  $txt="";
     	  FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d-devicetimestamp\">";         # For css: class=devicetimestamp, id=<devicename>-devicetimestamp
 		  $txt = ReadingsTimestamp($d, $text, "Undefined Reading $d-<b>$text</b>");             # Style3+6 = DeviceReading given in $text
-#          FW_pO "<td><div colspan=\"$cols\" informId=\"$d-$text-ts\">$txt</div></td>";
 		  FW_pO "<td><div colspan=\"$cols\" informId=\"$d-$text-ts\">$txt</div>";
 	      FW_pO "</td></tr>";
 	    }
@@ -579,10 +654,10 @@ FP_show(){
           my @cList = split(":", $cmdlist);
           my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
           my $firstIdx = 0;
-	  FW_pO "  <tr class=\"devicecommands\" id=\"$d-devicecommands\">";
+	      FW_pO "  <tr class=\"devicecommands\" id=\"$d-devicecommands\">";
 
           my $oldMe = $FW_ME;
-	  foreach my $cmd (sort @cList) {
+	      foreach my $cmd (sort @cList) {
             # Special handling (slider, dropdown, timepicker, ...)
             my $htmlTxt;
             my @c = split(' ', $cmd);
@@ -590,7 +665,7 @@ FP_show(){
               my $values = $1;
               $FW_ME = "$FW_ME/floorplan/$FP_name";
               foreach my $fn (sort keys %{$data{webCmdFn}}) {
-			    my $FW_room = ""; ##needed to be able to reuse code from FHEMWEB
+			    my $FW_room = ''; ##needed to be able to reuse code from FHEMWEB
                 no strict "refs";
                 $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_ME,
                                                    $d, $FW_room, $cmd, $values);
@@ -599,17 +674,17 @@ FP_show(){
               }
             }
             if(defined($htmlTxt)) {
-		    $htmlTxt =~ s/>desired-temp/>/;        #mod20130929
-			$htmlTxt =~ s/>desiredTemperature/>/;  #mod20131225
-				FW_pO $htmlTxt;
-		  # END # Special handling (slider, dropdown, timepicker, ...)
+		    $htmlTxt =~ s/>desired-temp/>/;        #for FHT
+			$htmlTxt =~ s/>desiredTemperature/>/;  #for MAX!
+            FW_pO $htmlTxt;
+		    # END # Special handling (slider, dropdown, timepicker, ...)
             } else {
               FW_pH "cmd.$d=set $d $cmd",
                   ReplaceEventMap($d,$cmd,1),1,"devicecommands";
             }
           }
-            $FW_ME = $oldMe;
-	  FW_pO "</tr>"; 
+          $FW_ME = $oldMe;
+	      FW_pO "</tr>"; 
 		  
         } elsif($type eq "FileLog") {
 #          $row = FW_dumpFileLog($d, 1, $row);
@@ -617,7 +692,7 @@ FP_show(){
 
 	    FW_pO "</table></form>";
 	    FW_pO "</div>\n";
-	}
+	}  #end loop all decives
    
  	########################  
 	# Finally the weblinks
@@ -631,8 +706,13 @@ FP_show(){
 		next if(!$type);
         next if($type ne "weblink");
 		# set position per weblink
-		my ($top, $left, $style, $text) = split(/,/ , AttrVal("$d", "fp_$FP_name", undef));
-		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px\" id = \"div-$d\">";              # div to position the weblink
+		my ($top, $left, $style, $text, $text2) = split(/,/ , AttrVal("$d", "fp_$FP_name", undef));
+		$text = "" if (!$text);
+		$text2 = "" if (!$text2);
+		$left = 0 if (!$left);
+		$style = 0 if (!$style);
+		FW_pO "\n<div fp_style=\"$style\" fp_text=\"$text\" fp_text2=\"$text2\" fp_name=\"$FP_name\" class=\"fp_weblink_div style_$style\" style=\"position:absolute; top:".
+		      $top."px; left:".$left."px\" id = \"div-$d\">";                                                       # div to position the weblink
 		FW_pO "<div class = \"fp_$type fp_$FP_name weblink\" id = \"$d\">";											# div to make it accessible to arrangeByMouse
 		# print weblink
 		$buttons = FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, $buttons);
@@ -684,7 +764,7 @@ FP_menuArrange() {
 		my $type = $defs{$d}{TYPE};
 		$type = '?' if (!$type);
 		# exclude these types from list of available devices
-		next if ($type =~ m/^(WEB|CUL$|FHEM.*|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify|autocreate)/ );
+		next if ($type =~ m/^(WEB|CUL$|FHEM2FHEM|FHEMWEB|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify|autocreate)/ );
 		my $disp = $d;
 		$disp .= ' (' . AttrVal($d,"room","Unsorted").") $type";
 		my $alias = AttrVal($d, "alias", undef);
@@ -727,22 +807,7 @@ FP_menuArrange() {
 
 	# fields for top,left,style,text
 	if ($attrd) {
-	  if (!$FP_fwdetail) {                                                                                      # arrange-by-mouse not from fhemweb-screen floorplan-details
-	    #### arrangeByMouse by Torsten
-		FW_pO "<script type=\"text/javascript\">";
-		FW_pO "function show_coords(e){";
-		FW_pO "  var device = document.getElementById(\"fp_ar_input_top\").name.replace(/top\./,\"\");";		# get device-ID from 'top'-field
-		FW_pO "  var X = e.pageX;";    																		    # e is the event, pageX and pageY the click-ccordinates
-		FW_pO "  var Y = e.pageY;";
-		FW_pO "  document.getElementById(\"fp_ar_input_top\").value = Y;";									    # updates the input-fields top and left with the click-coordinates
-		FW_pO "  document.getElementById(\"fp_ar_input_left\").value = X;";
-		FW_pO "  document.getElementById(\"div-\"+device).style.top = Y+\"px\";"; 						    	# moves the device
-		FW_pO "  document.getElementById(\"div-\"+device).style.left = X+\"px\";"; 
-		FW_pO "}";
-		FW_pO "document.getElementById(\"backimg\").addEventListener(\"click\",show_coords,false);";			# attach event-handler to background-picture
-		FW_pO "</script>";
-      }
-	### build the form
+	    ### build the form
 		my $disp =  $FP_arrange eq "detail" ? $desc{$d} : $d;
 		FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name\">"; #form3
 		my ($top, $left, $style, $text, $text2) = split(",", $attrd);
@@ -753,8 +818,8 @@ FP_menuArrange() {
 			FP_input("deva.$d", $d, "hidden") . "\n" .
 			FP_input("dscr.$d", $disp, "text", "Selected device", 45, "", "disabled") . "\n<br>\n" . 
 			FP_input("attr.$d", "fp_$FP_name", "hidden") . "\n" .
-			FP_input("top.$d", $top ? $top : 10, "text", "Top", 4, 4, 'id="fp_ar_input_top"') . "\n" .
-			FP_input("left.$d", $left ? $left : 10, "text", "Left", 4, 4, 'id="fp_ar_input_left"' ) . "\n" .
+			FP_input("top.$d", $top ? $top : 10, "text", "Top", 4, 4, 'onkeydown="increment(event, this)" class="'.$d.'" id="fp_ar_input_top"') . "\n" .
+			FP_input("left.$d", $left ? $left : 10, "text", "Left", 4, 4, 'onkeydown="increment(event, this)" class="'.$d.'" id="fp_ar_input_left"' ) . "\n" .
 			FW_select("","style.$d", \@styles, $style ? $style : 0, "menu-arrange") . "\n" .
 			FP_input("text.$d", $text ? $text : "", "text", "Description", 15) . "\n" .
 			FW_submit("cmd.$d", "attr") . "\n" .
@@ -812,8 +877,6 @@ FP_detailFn($$$$) {
     $ret .= ($row/2==int($row/2))?"even":"odd";
     $ret .= '">';
     $ret .=   "<td><div class=\"dname\"><a href=\"$FW_ME?detail=$fpd\">$fpd</a></div></td>";
-#	FW_pH "detail=$_", $_;
-#	$ret = "<a href=\"$link\">$txt</a>";
     $ret .=   "<td><div class=\"dval\">$x</div></td>";
     $ret .=   "<td><div class=\"dval\">$y</div></td>";
     $ret .=   "<td><div class=\"dval\">";
@@ -973,12 +1036,12 @@ FP_pOfill($@) {
 
 
     <li><a name="fp_arrange">fp_arrange</a><br>
-  	  Activates the "arrange mode" which shows an additional menu on the screen,
+  	  Activates the "arrange mode" which shows an additional menu on the screen to choose style and description.<br>
+	  When the arrange-mode is activated, devices can be placed freely on the screen by drag&amp;drop.
 	  allowing to place devices easily on the screen.<br>
 	  Example:
 	<ul>
       <code>attr Groundfloor fp_arrange 1</code><br>
-	  <code>attr Groundfloor fp_arrange detail  #displays the devices with infos room, type, alias</code><br>
 	  <code>attr Groundfloor fp_arrange WEB     #activates arrange mode for frontend-device WEB only</code><br><br>
     </ul>
     </li>
@@ -1065,7 +1128,7 @@ FP_pOfill($@) {
 <a name="FLOORPLAN"></a>
 <h3>FLOORPLAN</h3>
 <ul>
-  Fügt dem fhem-Menü einen zusätzlichen Menüpunkt "Floorplans" hinzu, dre zu einer Anzeige ohne fhem-Menü, Räume oder device-Listen führt.
+  Fügt dem fhem-Menü einen zusätzlichen Menüpunkt "Floorplans" hinzu, der zu einer Anzeige ohne fhem-Menü, Räume oder device-Listen führt.
   Geräte können an einer festlegbaren Koordinate auf dem Bildschirm angezeigt werden, üblicherweise mit einem anklickbaren icon, das das Ein- oder Aus-Schalten
   des Geräts durch klicken erlaubt. Ein Hintergrundbild kann verwendet werden - z.B. ein Grundriss oder jegliches andere Bild.
   Mit floorplanstyle.css kann die Formatierung angepasst werden.<br>
@@ -1143,11 +1206,10 @@ FP_pOfill($@) {
 
     <li><a name="fp_arrange">fp_arrange</a><br>
   	  Aktiviert den "arrange-Modus" der ein zusätzliches Menü anzeigt,
-	  mit dem Geräte auf dem Bildschirm angeordnet werden können. Dabei können die Koordinaten auch durch Platzieren mit der Maus gesetzt werden.<br>
+	  mit dem Geräte auf dem Bildschirm angeordnet werden können. Bei aktiviertem arrange-mode können alle devices per drag&amp;drop platziert werden.<br>
 	  Beispiel:
 	<ul>
       <code>attr Erdgeschoss fp_arrange 1</code><br>
-	  <code>attr Erdgeschoss fp_arrange detail  #Zeigt die Geräte mit den Infos Raum, Typ und Alias</code><br>
 	  <code>attr Erdgeschoss fp_arrange WEB     #Aktiviert den arrange-Modus nur für die Webinstanz WEB</code><br><br>
     </ul>
     </li>
