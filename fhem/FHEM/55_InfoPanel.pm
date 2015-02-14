@@ -335,6 +335,16 @@ sub btIP_itemEllipse {
   return $output;
 }
 
+sub btIP_itemEmbed {
+  my ($id,$x,$y,$width,$height,$arg,%params) = @_;
+
+  my $embed = "<div id=\"${id}_embedded\" style=\"position:absolute; top:${y}px; left:${x}px; ".
+              "width:${width}px; height:${height}px; z-index:2; \" >\n".
+              "$arg\n".
+              "</div>\n";
+  return $embed;
+}
+
 sub btIP_itemGroup {
   my($id,$type,$x,$y) = @_;
   return "</g>\n"               if $type eq 'close';
@@ -970,6 +980,16 @@ sub btIP_evalLayout {
 	      $svg .= btIP_itemEllipse($id,$x1,$y1,$rx,$ry,$filled,$stroked,$link,%params);
 	    }
 	    
+	    when("embed") {
+	      ($id,$x,$y,$width,$height,$arg)= split("[ \t]+", $def, 6);
+	      ($x,$y)= btIP_xy($x,$y,%params);
+	      ($width,$height)= btIP_xy($width,$height,%params);
+	      $params{xx} = $x;
+	      $params{yy} = $y;
+	      $arg = AnalyzePerlCommand(undef,$arg);
+          $defs{$name}{fhem}{div} .= btIP_itemEmbed($id,$x,$y,$width,$height,$arg,%params);
+        }
+
 	    when("font") {
           $params{font} = $def;
         }
