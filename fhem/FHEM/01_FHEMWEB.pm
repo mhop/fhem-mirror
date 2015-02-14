@@ -142,6 +142,7 @@ FHEMWEB_Initialize($)
     closeConn:1,0
     column
     defaultRoom
+    editConfig:1,0
     endPlotNow:1,0
     endPlotToday:1,0
     fwcompress:0,1
@@ -1752,17 +1753,23 @@ FW_style($$)
 
     $data =~ s/&/&amp;/g;
 
+    $attr{global}{configfile} =~ m,([^/]*)$,;
+    my $readOnly = (AttrVal($FW_wname, "editConfig", ($1 ne $fileName)) ?
+                        "" : "readonly");
+
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
     FW_pO "<form method=\"$FW_formmethod\">";
-    FW_pO     FW_submit("save", "Save $fileName");
-    FW_pO     "&nbsp;&nbsp;";
-    FW_pO     FW_submit("saveAs", "Save as");
-    FW_pO     FW_textfieldv("saveName", 30, "saveName", $fileName);
-    FW_pO     "<br><br>";
+    if(!$readOnly) {
+      FW_pO     FW_submit("save", "Save $fileName");
+      FW_pO     "&nbsp;&nbsp;";
+      FW_pO     FW_submit("saveAs", "Save as");
+      FW_pO     FW_textfieldv("saveName", 30, "saveName", $fileName);
+      FW_pO     "<br><br>";
+    }
     FW_pO     FW_hidden("cmd", "style save $fileName $cfgDB");
     FW_pO     FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
-    FW_pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
+    FW_pO     "<textarea $readOnly name=\"data\" cols=\"$ncols\" rows=\"30\">" .
                 "$data</textarea>";
     FW_pO "</form>";
     FW_pO "</div>";
@@ -2746,6 +2753,14 @@ FW_widgetOverride($$)
         See also the clearSvgCache command for clearing the cache.
         </li><br>
 
+    <a name="editConfig"></a>
+    <li>editConfig<br>
+        If this FHEMWEB attribute is set to 1, then you will be able to edit
+        the FHEM configuration file (fhem.cfg) in the "Edit files" section.
+        After saving this file a rereadcfg is executed automatically, which has
+        a lot of side effects.<br>
+        </li><br>
+
     <a name="endPlotToday"></a>
     <li>endPlotToday<br>
         If this FHEMWEB attribute is set to 1, then week and month plots will
@@ -3325,6 +3340,14 @@ FW_widgetOverride($$)
         (www/SVGcache) gespeichert, um die erneute, rechenintensive
         Berechnung der Grafiken zu vermeiden. Default ist 0, d.h. aus.<br>
         Siehe den clearSvgCache Befehl um diese Daten zu l&ouml;schen.
+        </li><br>
+
+    <a name="editConfig"></a>
+    <li>editConfig<br>
+        Falls dieses FHEMWEB Attribut (auf 1) gesetzt ist, dann kann man die
+        FHEM Konfigurationsdatei in dem "Edit files" Abschnitt bearbeiten. Beim
+        Speichern dieser Datei wird automatisch rereadcfg ausgefuehrt, was
+        diverse Nebeneffekte hat.<br>
         </li><br>
 
     <a name="endPlotToday"></a>
