@@ -1487,8 +1487,8 @@ SVG_render($$$$$$$$$$)
       $step /= 2 if( $step > 10 );
       for(my $i = $mi; $i <= $ma; $i += $step) {
         $off1 = int($x+($i-$xmin)*$xmul);
-        SVG_pO "<polyline points=\"$off1,$y $off1,$off2\"/>";
-        SVG_pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>";
+        SVG_pO "<polyline class='SVGplot' points='$off1,$y $off1,$off2'/>";
+        SVG_pO "<polyline class='SVGplot' points='$off1,$off3 $off1,$off4'/>";
       }
     }
 
@@ -1497,8 +1497,8 @@ SVG_render($$$$$$$$$$)
     for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $tstep) {
       $i = SVG_time_align($i,$aligntics);
       $off1 = int($x+($i-$fromsec)*$tmul);
-      SVG_pO "<polyline points=\"$off1,$y $off1,$off2\"/>";
-      SVG_pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>";
+      SVG_pO "<polyline class='SVGplot' points='$off1,$y $off1,$off2'/>";
+      SVG_pO "<polyline class='SVGplot' points='$off1,$off3 $off1,$off4'/>";
     }
 
   }
