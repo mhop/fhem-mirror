@@ -1517,12 +1517,22 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                x,y = position<br/>
            </ul></li><br/>
        <br/>
+       <li><code>embed &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;width&gt; &lt;height&gt; &lt;{object}&gt;</code><br/>
+           <br/>
+           <ul>embed any object<br/>
+               <br/>
+               id = element id<br/>
+               x,y = position<br/>
+               width,height = containers's dimension<br/>
+               object = object to embed<br/>
+           </ul></li><br/>
+       <br/>
        <li><code>ellipse &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;r1&gt; &lt;r2&gt; [&lt;fill&gt;] [&lt;stroke-width&gt;] [&lt;link&gt;]</code><br/>
            <br/>
            <ul>create an ellipse<br/>
                <br/>
                id = element id<br/>
-               x,y = center coordinates of circle<br/>
+               x,y = center coordinates of ellipse<br/>
                r1,r2 = radius<br/>
                fill = ellipse will be filled with "rgb" color if set to 1. Default = 0<br/>
                stroke-width = defines stroke width to draw around the ellipse. Default = 0<br/>
@@ -1705,6 +1715,18 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                valid values: start middle end<br/>
            </ul></li><br/>
        <br/>
+       <li><code>ticker &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;width&gt; &lt;items&gt; &lt;speed&gt; &lt;{data}&gt;</code><br/>
+           <br/>
+           <ul>create a vertical ticker<br/>
+               <br/>
+               id = element id<br/>
+               x,y = position<br/>
+               width = width<br/>
+               items = number of items to be displayed simultanously<br/>
+               speed = scroll speed<br/>
+               data = list of text items, separated by <code>\n</code><br/>
+           </ul></li><br/>
+       <br/>
        <li><code>time &lt;id&gt; &lt;x&gt; &lt;y&gt;</code><br/>
            <br/>
            <ul>print time<br/>
@@ -1713,7 +1735,6 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                x,y = position<br/>
            </ul></li><br/>
        <br/>
-
        <li><code>trash &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;{foregroundColor}&gt; &lt;{backgroundColor}&gt; [&lt;link&gt;]</code><br/>
            <br/>
            <ul>print a trashcan with selectable colors for foreground and background<br/>
