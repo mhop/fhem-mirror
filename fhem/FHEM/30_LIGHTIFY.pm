@@ -397,7 +397,11 @@ Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, dim: $dim, ct: $ct, rgb
           $cmdret= CommandAttr(undef,"$devname alias ".$alias);
           $cmdret= CommandAttr(undef,"$devname room LIGHTIFY");
           $cmdret= CommandAttr(undef,"$devname IODev $name");
-          $cmdret= CommandAttr(undef,"$devname subType extcolordimmer");
+
+          my $subtype = 'extcolordimmer';
+          $subtype = 'colordimmer' if( $type eq '08' );
+          $subtype = 'ctdimmer' if( $type eq '0A' );
+          $cmdret= CommandAttr(undef,"$devname subType $subtype");
 
           $autocreated++;
         }
@@ -416,11 +420,10 @@ Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, dim: $dim, ct: $ct, rgb
                                 sat => int( $s * 254 ),
                                 bri => int( $v * 254 ),
 
-                                ct => int(1000000/$ct),
-
                                 bri => int($dim/100*254),
                    } };
 
+        $json->{state}->{ct} = int(1000000/$ct) if( $ct );
 
         HUEDevice_Parse( $chash, $json );
       }
