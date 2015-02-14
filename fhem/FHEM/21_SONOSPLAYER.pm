@@ -88,6 +88,7 @@ use URI::Escape;
 use Thread::Queue;
 
 require 'HttpUtils.pm';
+require $attr{global}{modpath}.'/FHEM/00_SONOS.pm';
 
 sub Log($$);
 sub Log3($$$);
@@ -148,6 +149,7 @@ my %sets = (
 	'Treble' => 'treblelevel',	
 	'CurrentTrackPosition' => 'timeposition',
 	'Track' => 'tracknumber|Random',
+	'currentTrack' => 'tracknumber',
 	'Alarm' => 'create|update|delete ID valueHash',
 	'DailyIndexRefreshTime' => 'timestamp',
 	'SleepTimer' => 'time',
@@ -163,7 +165,8 @@ my %sets = (
 	'Name' => 'roomName',
 	'RoomIcon' => 'iconName',
 	'LoadSearchlist' => 'category categoryElem titleFilter/albumFilter/artistFilter maxElems',
-	'StartSearchlist' => 'category categoryElem titleFilter/albumFilter/artistFilter maxElems'
+	'StartSearchlist' => 'category categoryElem titleFilter/albumFilter/artistFilter maxElems',
+	'ResetAttributesToDefault' => 'deleteOtherAttributes'
 );
 
 my @possibleRoomIcons = qw(bathroom library office foyer dining tvroom hallway garage garden guestroom den bedroom kitchen portable media family pool masterbedroom playroom patio living);
@@ -178,15 +181,15 @@ my @possibleRoomIcons = qw(bathroom library office foyer dining tvroom hallway g
 sub SONOSPLAYER_Initialize ($) {
 	my ($hash) = @_;
 	
-	$hash->{DefFn}   = "SONOSPLAYER_Define";
+	$hash->{DefFn} = "SONOSPLAYER_Define";
 	$hash->{UndefFn} = "SONOSPLAYER_Undef";
 	$hash->{DeleteFn} = "SONOSPLAYER_Delete";
-	$hash->{GetFn}   = "SONOSPLAYER_Get";
-	$hash->{SetFn}   = "SONOSPLAYER_Set";
+	$hash->{GetFn} = "SONOSPLAYER_Get";
+	$hash->{SetFn} = "SONOSPLAYER_Set";
 	$hash->{StateFn} = "SONOSPLAYER_State";
 	$hash->{NotifyFn} = 'SONOSPLAYER_Notify';
 	
-	$hash->{AttrList}= "disable:1,0 generateVolumeSlider:1,0 generateVolumeEvent:1,0 generateSomethingChangedEvent:1,0 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,OutputFixed,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:1,0 buttonEvents ".$readingFnAttributes;
+	$hash->{AttrList} = "disable:1,0 generateVolumeSlider:1,0 generateVolumeEvent:1,0 generateSomethingChangedEvent:1,0 generateInfoSummarize1 generateInfoSummarize2 generateInfoSummarize3 generateInfoSummarize4 stateVariable:TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,TrackProvider,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackProvider,nextTrackURI,nextAlbumArtURI,nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,OutputFixed,Shuffle,Repeat,CrossfadeMode,Balance,HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,InfoSummarize2,InfoSummarize3,InfoSummarize4 model minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone VolumeStep getAlarms:1,0 buttonEvents ".$readingFnAttributes;
 	
 	return undef;
 }
@@ -200,20 +203,20 @@ sub SONOSPLAYER_Initialize ($) {
 ########################################################################################
 sub SONOSPLAYER_Define ($$) {
 	my ($hash, $def) = @_;
-  
+	  
 	# define <name> SONOSPLAYER <udn>
 	# e.g.: define Sonos_Wohnzimmer SONOSPLAYER RINCON_000EFEFEFEF401400
 	my @a = split("[ \t]+", $def);
-  
+	 
 	my ($name, $udn);
-  
+	
 	# default
 	$name = $a[0];
 	$udn = $a[2];
-
+	
 	# check syntax
 	return "SONOSPLAYER: Wrong syntax, must be define <name> SONOSPLAYER <udn>" if(int(@a) < 3);
-  
+	
 	readingsSingleUpdate($hash, "state", 'init', 1);
 	readingsSingleUpdate($hash, "presence", 'disappeared', 0); # Grund-Initialisierung, falls der Player sich nicht zurückmelden sollte...
 	
@@ -382,10 +385,11 @@ sub SONOSPLAYER_Set($@) {
 				$key = $key.':slider,0,1,100' if ($key eq 'Treble');
 				$key = $key.':slider,0,1,100' if ($key eq 'Bass');
 				$key = $key.':slider,-100,1,100' if ($key eq 'Balance');
+				$key = $key.':slider,1,1,'.ReadingsVal($hash->{NAME}, 'numberOfTracks', 0) if ($key eq 'currentTrack');
 			}
 			
 			# On/Off einsetzen; Da das jeweilige Reading dazu 0,1 enthalten wird, auch mit 0,1 arbeiten, damit die Vorauswahl passt
-			$key = $key.':0,1' if ((lc($key) eq 'crossfademode') || (lc($key) eq 'groupmute') || (lc($key) eq 'ledstate') || (lc($key) eq 'loudness') || (lc($key) eq 'mute') || (lc($key) eq 'outputfixed')  || (lc($key) eq 'repeat') || (lc($key) eq 'shuffle'));
+			$key = $key.':0,1' if ((lc($key) eq 'crossfademode') || (lc($key) eq 'groupmute') || (lc($key) eq 'ledstate') || (lc($key) eq 'loudness') || (lc($key) eq 'mute') || (lc($key) eq 'outputfixed')  || (lc($key) eq 'resetattributestodefault')  || (lc($key) eq 'repeat') || (lc($key) eq 'shuffle'));
 			
 			# Iconauswahl einsetzen
 			if (lc($key) eq 'roomicon') {
@@ -435,10 +439,10 @@ sub SONOSPLAYER_Set($@) {
 		}
 	}
 	return "SONOSPLAYER: Set with unknown argument $a[1], choose one of ".join(" ", sort keys %sets) if(!$found);
-  
+	 
 	# some arguments needs parameter(s), some not
 	return "SONOSPLAYER: $a[1] needs parameter(s): ".$sets{$a[1]} if (scalar(split(',', $sets{$a[1]})) > scalar(@a) - 2);
-      
+	     
 	# define vars
 	my $key = $a[1];
 	my $value = $a[2];
@@ -556,7 +560,7 @@ sub SONOSPLAYER_Set($@) {
 		$udn = $hash->{UDN};
 	
 		SONOS_DoWork($udn, 'next');
-	} elsif (lc($key) eq 'track') {
+	} elsif ((lc($key) eq 'track') || (lc($key) eq 'currenttrack')) {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
 	
@@ -808,6 +812,8 @@ sub SONOSPLAYER_Set($@) {
 		} else {
 			return 'Wrong icon name. Use one of "'.join('", "', @possibleRoomIcons).'".';
 		}
+	} elsif (lc($key) eq 'resetattributestodefault') {
+		SONOS_DoWork($udn, 'setResetAttributesToDefault', SONOS_getDeviceDefHash(undef)->{NAME}, $hash->{NAME}, $value);
 	} else {
 		return 'Not implemented yet!';
 	}
@@ -896,9 +902,9 @@ sub SONOSPLAYER_GetSlavePlayerNames($) {
 ########################################################################################
 sub SONOSPLAYER_Undef ($) {
 	my ($hash) = @_;
-  
+	
 	RemoveInternalTimer($hash);
-  
+	
 	return undef;
 }
 
@@ -988,6 +994,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_Reboot">
 <b><code>Reboot</code></b></a>
 <br />Initiates a reboot on the Zoneplayer.</li>
+<li><a name="SONOSPLAYER_setter_ResetAttributesToDefault">
+<b><code>ResetAttributesToDefault &lt;DeleteAllOtherAttributes&gt;</code></b></a>
+<br />Sets the attributes to the inital state. If the parameter "DeleteAllOtherAttributes" is set to "1" or "on", all attributes will be deleted before the defaults will be newly retrieved from the player and set.</li>
 <li><a name="SONOSPLAYER_setter_RoomIcon">
 <b><code>RoomIcon &lt;Iconname&gt;</code></b></a>
 <br />Sets the Icon for this Zone</li>
@@ -1281,6 +1290,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_Reboot">
 <b><code>Reboot</code></b></a>
 <br />Führt für den Zoneplayer einen Neustart durch.</li>
+<li><a name="SONOSPLAYER_setter_ResetAttributesToDefault">
+<b><code>ResetAttributesToDefault &lt;DeleteAllOtherAttributes&gt;</code></b></a>
+<br />Setzt die Attribute eines Players auf die Voreinstellung zurück, wie sie beim Anlegen des Players gesetzt waren. Wenn der Parameter "DeleteAllOtherAttributes" mit "1" oder "on" angegeben wurde, werden vor dem Setzen alle Attribute gelöscht.</li>
 <li><a name="SONOSPLAYER_setter_RoomIcon">
 <b><code>RoomIcon &lt;Iconname&gt;</code></b></a>
 <br />Legt das Icon für die Zone fest</li>
