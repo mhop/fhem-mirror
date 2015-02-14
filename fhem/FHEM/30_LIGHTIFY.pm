@@ -403,16 +403,6 @@ Log 3, "$alias: $id:$short, type: $type (w:$has_w, rgb:$has_rgb), onoff: $onoff,
           $cmdret= CommandAttr(undef,"$devname room LIGHTIFY");
           $cmdret= CommandAttr(undef,"$devname IODev $name");
 
-          my $subtype = 'extcolordimmer';
-          if( $has_w && $has_rgb ) {
-            $subtype = 'extcolordimmer';
-          } elsif( $has_rgb ) {
-            $subtype = 'colordimmer';
-          } elsif( $has_w ) {
-            $subtype = 'ctdimmer';
-          }
-          $cmdret= CommandAttr(undef,"$devname subType $subtype");
-
           $autocreated++;
         }
       }
@@ -425,6 +415,14 @@ Log 3, "$alias: $id:$short, type: $type (w:$has_w, rgb:$has_rgb), onoff: $onoff,
                                 on => $onoff,
                               }
                    };
+
+        if( $has_rgb && $has_w ) {
+          $json->{type} = 'Extended color light';
+        } elsif( $has_rgb ) {
+          $json->{type} = 'Color light';
+        } elsif( $has_w ) {
+          $json->{type} = 'Color Temperature Light';
+        }
 
         if( !$has_rgb ) {
           $json->{state}->{colormode} = 'ct';
