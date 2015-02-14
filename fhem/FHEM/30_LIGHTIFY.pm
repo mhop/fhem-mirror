@@ -370,6 +370,7 @@ LIGHTIFY_Parse($$)
       my $short = substr($hex,$i*42*2+2*11,2*2);
       my $id = substr($hex,$i*42*2+2*13,2*8);
       my $type = substr($hex,$i*42*2+2*21,2*1);
+      my $mode = substr($hex,$i*42*2+2*27,2*1);
       my $onoff = hex(substr($hex,$i*42*2+2*29,2*1));
       my $dim = hex(substr($hex,$i*42*2+2*30,2*1));
       my $ct = hex(substr($hex,$i*42*2+2*32,2*1).substr($hex,$i*42*2+2*31,2*1));
@@ -377,7 +378,7 @@ LIGHTIFY_Parse($$)
       my $g = (substr($hex,$i*42*2+2*34,2*1));
       my $b = (substr($hex,$i*42*2+2*35,2*1));
       my $alias = pack('H*', substr($hex,$i*42*2+2*37,2*16));
-Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, dim: $dim, ct: $ct, rgb: $r$g$b";
+Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, mode?: $mode dim: $dim, ct: $ct, rgb: $r$g$b";
 
 
       #my $code = $id;
@@ -400,7 +401,7 @@ Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, dim: $dim, ct: $ct, rgb
 
           my $subtype = 'extcolordimmer';
           $subtype = 'colordimmer' if( $type eq '08' );
-          $subtype = 'ctdimmer' if( $type eq '0A' );
+          $subtype = 'ctdimmer' if( $type eq '02' );
           $cmdret= CommandAttr(undef,"$devname subType $subtype");
 
           $autocreated++;
@@ -412,18 +413,27 @@ Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, dim: $dim, ct: $ct, rgb
         my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
 
         my $json = { state => { reachable => ($short eq 'FFFF') ? 0 : 1,
-
                                 on => $onoff,
+                              }
+                   };
 
-                                colormode => 'hs',
-                                hue => int( $h * 65535 ),
-                                sat => int( $s * 254 ),
-                                bri => int( $v * 254 ),
+        if( $type eq '02' ) {
+          $json->{state}->{colormode} = 'ct';
 
-                                bri => int($dim/100*254),
-                   } };
+        } elsif( $type ne '08' && "$r$g$b" eq '111' ) {
+          $json->{state}->{colormode} = 'ct';
+
+        } else {
+          $json->{state}->{colormode} = 'hs';
+          $json->{state}->{hue} = int( $h * 65535 ),
+          $json->{state}->{sat} = int( $s * 254 ),
+          $json->{state}->{bri} = int( $v * 254 ),
+
+        }
 
         $json->{state}->{ct} = int(1000000/$ct) if( $ct );
+
+        $json->{state}->{bri} = int($dim/100*254);
 
         HUEDevice_Parse( $chash, $json );
       }
