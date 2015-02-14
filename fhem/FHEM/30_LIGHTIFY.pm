@@ -378,7 +378,11 @@ LIGHTIFY_Parse($$)
       my $g = (substr($hex,$i*42*2+2*34,2*1));
       my $b = (substr($hex,$i*42*2+2*35,2*1));
       my $alias = pack('H*', substr($hex,$i*42*2+2*37,2*16));
-Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, mode?: $mode dim: $dim, ct: $ct, rgb: $r$g$b";
+
+      my $has_w = (hex($type) & 0x02) ? 1: 0;
+      my $has_rgb = (hex($type) & 0x08) ? 1 : 0;
+      $has_w = 1 if( $type eq '00' );
+Log 3, "$alias: $id:$short, type: $type (w:$has_w, rgb:$has_rgb), onoff: $onoff, mode?: $mode dim: $dim, ct: $ct, rgb: $r$g$b";
 
 
       #my $code = $id;
@@ -400,8 +404,13 @@ Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, mode?: $mode dim: $dim,
           $cmdret= CommandAttr(undef,"$devname IODev $name");
 
           my $subtype = 'extcolordimmer';
-          $subtype = 'colordimmer' if( $type eq '08' );
-          $subtype = 'ctdimmer' if( $type eq '02' );
+          if( $has_w && $has_rgb ) {
+            $subtype = 'extcolordimmer';
+          } elsif( $has_rgb ) {
+            $subtype = 'colordimmer';
+          } elsif( $has_w ) {
+            $subtype = 'ctdimmer';
+          }
           $cmdret= CommandAttr(undef,"$devname subType $subtype");
 
           $autocreated++;
@@ -417,10 +426,10 @@ Log 3, "$alias: $id:$short, type?: $type, onoff: $onoff, mode?: $mode dim: $dim,
                               }
                    };
 
-        if( $type eq '02' ) {
+        if( !$has_rgb ) {
           $json->{state}->{colormode} = 'ct';
 
-        } elsif( $type ne '08' && "$r$g$b" eq '111' ) {
+        } elsif( $has_w && "$r$g$b" eq '111' ) {
           $json->{state}->{colormode} = 'ct';
 
         } else {
