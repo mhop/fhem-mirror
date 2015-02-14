@@ -1200,10 +1200,14 @@ sub btIP_addExtension {
     $data{FWEXT}{$url}{LINK} = "+$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
     $data{FWEXT}{$url}{FORKABLE} = 0;
-    $data{FWEXT}{$url}{SCRIPT} = '/pgm2/jquery.min.js"></script>' .
-    '<script type="text/javascript" src="http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"></script>' .
-#                                 '<script type="text/javascript" src="/fhem/pgm2/jquery.vticker.min.js"></script>' .
-                                 '<script type="text/javascript" charset="UTF-8';
+#    $data{FWEXT}{$url}{SCRIPT} = '/pgm2/jquery.min.js"></script>' .
+	$data{FWEXT}{jquery}{SCRIPT}        = "/pgm2/jquery.min.js"         unless $data{FWEXT}{jquery}{SCRIPT};
+	$data{FWEXT}{jqueryvticker}{SCRIPT} = "/pgm2/jquery.vticker.min.js" unless $data{FWEXT}{jqueryvticker}{SCRIPT};
+    
+    
+##    '<script type="text/javascript" src="http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"></script>' .
+##                                 '<script type="text/javascript" src="/fhem/pgm2/jquery.vticker.min.js"></script>' .
+##                                 '<script type="text/javascript" charset="UTF-8';
 }
 
 sub btIP_CGI{
@@ -1289,19 +1293,19 @@ sub btIP_HTMLHead {
 sub btIP_getScript {
 
   my $scripts= "";
-  my $jsTemplate = '<script type="text/javascript" src="%s"></script>'."\n";
-#  if(defined($data{FWEXT})) {
-#    foreach my $k (sort keys %{$data{FWEXT}}) {
-#      my $h = $data{FWEXT}{$k};
-#      next if($h !~ m/HASH/ || !$h->{SCRIPT});
-#      my $script = $h->{SCRIPT};
-#      $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
-#      $scripts .= sprintf($jsTemplate, $script);
-#    }
-#  }
-  $scripts .= sprintf($jsTemplate,"$FW_ME/pgm2/jquery.min.js");
-  $scripts .= sprintf($jsTemplate,"http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"); 
-#  $scripts =~ s/script>/script>\n/g;
+  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
+  if(defined($data{FWEXT})) {
+    foreach my $k (sort keys %{$data{FWEXT}}) {
+      my $h = $data{FWEXT}{$k};
+      next if($h !~ m/HASH/ || !$h->{SCRIPT});
+      my $script = $h->{SCRIPT};
+      $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
+      $scripts .= sprintf($jsTemplate, $script);
+    }
+  }
+#  $scripts .= sprintf($jsTemplate,"$FW_ME/pgm2/jquery.min.js");
+#  $scripts .= sprintf($jsTemplate,"http://richhollis.github.com/vticker/downloads/jquery.vticker.min.js?v=1.15"); 
+  $scripts =~ s/script>/script>\n/g;
   return $scripts; 
 }
 
