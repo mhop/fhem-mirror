@@ -838,8 +838,8 @@ HUEDevice_Parse($$)
 
   $attr{$name}{model} = $result->{modelid} if( !defined($attr{$name}{model}) && $result->{modelid} );
 
-  if( defined($attr{$name}{model}) ) {
-    if( !defined($attr{$name}{subType}) ) {
+  if( !defined($attr{$name}{subType}) ) {
+    if( defined($attr{$name}{model}) ) {
       if( defined($hueModels{$attr{$name}{model}}{subType}) ) {
         $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType};
 
@@ -852,29 +852,30 @@ HUEDevice_Parse($$)
       } elsif( $attr{$name}{model} =~ m/RGBW$/ ) {
         $attr{$name}{subType} = 'extcolordimmer';
 
-      } elsif( $hash->{type} ) {
-        if( $hash->{type} eq "Extended color light" ) {
-          $attr{$name}{subType} = 'extcolordimmer';
+      }
 
-        } elsif( $hash->{type} eq "Color light" ) {
-          $attr{$name}{subType} = 'colordimmer';
+    } elsif( $hash->{type} ) {
+      if( $hash->{type} eq "Extended color light" ) {
+        $attr{$name}{subType} = 'extcolordimmer';
 
-        } elsif( $hash->{type} eq "Color Temperature Light" ) {
-          $attr{$name}{subType} = 'ctdimmer';
+      } elsif( $hash->{type} eq "Color light" ) {
+        $attr{$name}{subType} = 'colordimmer';
 
-        } elsif( $hash->{type} eq "Dimmable light" ) {
-          $attr{$name}{subType} = 'dimmer';
+      } elsif( $hash->{type} eq "Color Temperature Light" ) {
+        $attr{$name}{subType} = 'ctdimmer';
 
-        } elsif( $hash->{type} eq "Dimmable plug-in unit" ) {
-          $attr{$name}{subType} = 'dimmer';
+      } elsif( $hash->{type} eq "Dimmable light" ) {
+        $attr{$name}{subType} = 'dimmer';
 
-        }
+      } elsif( $hash->{type} eq "Dimmable plug-in unit" ) {
+        $attr{$name}{subType} = 'dimmer';
 
       }
 
-    } elsif( $attr{$name}{subType} eq "colordimmer" ) {
-      $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} if( defined($hueModels{$attr{$name}{model}}{subType}) );
     }
+
+  } elsif( $attr{$name}{subType} eq "colordimmer" ) {
+    $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} if( defined($hueModels{$attr{$name}{model}}{subType}) );
   }
 
 
