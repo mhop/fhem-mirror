@@ -852,15 +852,15 @@ HUEDevice_Parse($$)
       } elsif( $attr{$name}{model} =~ m/RGBW$/ ) {
         $attr{$name}{subType} = 'extcolordimmer';
 
-      } elsif( $attr{$name}{model} =~ m/RGBW$/ ) {
-        $attr{$name}{subType} = 'extcolordimmer';
-
       } elsif( $hash->{type} ) {
         if( $hash->{type} eq "Extended color light" ) {
           $attr{$name}{subType} = 'extcolordimmer';
 
         } elsif( $hash->{type} eq "Color light" ) {
           $attr{$name}{subType} = 'colordimmer';
+
+        } elsif( $hash->{type} eq "Color Temperature Light" ) {
+          $attr{$name}{subType} = 'ctdimmer';
 
         } elsif( $hash->{type} eq "Dimmable light" ) {
           $attr{$name}{subType} = 'dimmer';
