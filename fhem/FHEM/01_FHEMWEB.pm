@@ -1760,17 +1760,21 @@ FW_style($$)
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
     FW_pO "<form method=\"$FW_formmethod\">";
-    if(!$readOnly) {
-      FW_pO     FW_submit("save", "Save $fileName");
-      FW_pO     "&nbsp;&nbsp;";
-      FW_pO     FW_submit("saveAs", "Save as");
-      FW_pO     FW_textfieldv("saveName", 30, "saveName", $fileName);
-      FW_pO     "<br><br>";
+    if($readOnly) {
+      FW_pO "You can enable saving this file by setting the editConfig ";
+      FW_pO "attribute, but read the documentation first for the side effects.";
+      FW_pO "<br><br>";
+    } else {
+      FW_pO FW_submit("save", "Save $fileName");
+      FW_pO "&nbsp;&nbsp;";
+      FW_pO FW_submit("saveAs", "Save as");
+      FW_pO FW_textfieldv("saveName", 30, "saveName", $fileName);
+      FW_pO "<br><br>";
     }
-    FW_pO     FW_hidden("cmd", "style save $fileName $cfgDB");
-    FW_pO     FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
-    FW_pO     "<textarea $readOnly name=\"data\" cols=\"$ncols\" rows=\"30\">" .
-                "$data</textarea>";
+    FW_pO FW_hidden("cmd", "style save $fileName $cfgDB");
+    FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
+    FW_pO "<textarea $readOnly name=\"data\" cols=\"$ncols\" rows=\"30\">" .
+            "$data</textarea>";
     FW_pO "</form>";
     FW_pO "</div>";
 
