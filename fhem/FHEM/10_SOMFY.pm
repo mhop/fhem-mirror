@@ -1,11 +1,10 @@
 ######################################################
-# $Id$
+# $Id: 10_SOMFY.pm 6645 2014-10-01 07:55:26Z thomyd $
 #
 # SOMFY RTS / Simu Hz protocol module for FHEM
 # (c) Thomas Dankert <post@thomyd.de>
 #
-# This will only work if you flashed your CUL with
-# the newest culfw (support for "Y" command).
+# Needs CULFW V 1.59 or higher (support for "Y" command).
 #
 # Published under GNU GPL License, v2
 #
@@ -27,6 +26,8 @@
 #
 #	1.4 	thomyd			Implemented fallback on/off-for-timer methods and only show warning about stop/go-my
 #							if the positioning attributes are set.
+#
+#	1.5		thomyd			Bugfix for wrong attribute names when calculating the updatetime (drive-up-...)
 
 ######################################################
 
@@ -388,7 +389,7 @@ sub SOMFY_CalcNewPos($) {
 			if($oldpos > 100) {
 				$dt = $dt - $t1up100;
 				$newpos = $oldpos - (100 * $dt / ($t1upopen - $t1up100));
-				$newpos = 100 if($newpos > 100), # driven only short between close and pos 100!
+				$newpos = 100 if($newpos > 100); # driven only short between close and pos 100!
 
 			} else {
 				$newpos = $oldpos - (100 * $dt / ($t1upopen - $t1up100));
@@ -469,7 +470,7 @@ sub SOMFY_Set($@) {
 		$cmd = 'off';
 		$hash->{move} = 'up';
 		$newpos = 0;
-		$updatetime = (AttrVal($name,'drive-up-time-open',25) - AttrVal($name,'drive-up-time-100',0)) * $oldpos / 100;
+		$updatetime = (AttrVal($name,'drive-up-time-to-open',25) - AttrVal($name,'drive-up-time-to-100',0)) * $oldpos / 100;
 
 	} elsif ($cmd eq 'on') {
 		$hash->{move} = 'down';

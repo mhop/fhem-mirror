@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: SOMFY: use correct attributename when calculating updatetime
   - feature: 95_FLOORPLAN.pm: arrange by drag&drop, 
              copy, rename, delete processes userattr fp_<name>
   - added: 30_LIGHTIFY.pm: New module for OSRAM LIGHTIFY gateways
