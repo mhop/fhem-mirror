@@ -216,7 +216,7 @@ rgb "5858587F" # dunkelgrau
 rect - 0 420 800 580 5 5 1
  
 # jetzt den Plot einbinden
-plot - 0 420 1 1 "SVG_owoLog_1"
+plot - 0 420 1 1 "SVG_out_Balkon"
  
  
 rgb "FFFFFFFF"
@@ -275,5 +275,12 @@ textboxalign justify
 # Format: textbox <id> <x> <y> <width> <height> {<link>} {<text>}
 # 
 textbox - 210 50 180 50 "http://www.fhem.de" "Ich bin eine Textbox und wenn man mich anklickt geht es direkt zu www.fhem.de"
+
+padding 0
+
+# ticker
+# Format: ticker <id> <x> <y> <width> <items> <speed> <textList>
+#
+ticker - 20 50 160 2 700 "Zeile 1 ABC\nZeile 2 DEF\nZeile 3 GHI\n" 
 
 #
