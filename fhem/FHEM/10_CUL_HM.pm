@@ -1911,6 +1911,12 @@ sub CUL_HM_Parse($$) {#########################################################
       my $sumState = "eState:E: $eCnt P: $P";
       push @evtEt,[$shash,1,$sumState];    
       push @evtEt,[$shash,1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
+      if($eCnt == 0 && hex($mNo) < 3 ){
+        push @evtEt,[$devH,1,"powerOn:$tn"];
+        my $eo = ReadingsVal($shash->{NAME},"gasCnt",0)+
+                 ReadingsVal($shash->{NAME},"gasCntOffset",0);
+        push @evtEt,[$shash,1,"gasCntOffset:".$eo];
+      }
     }
     elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
       $shash = $modules{CUL_HM}{defptr}{$src."02"}
@@ -4595,9 +4601,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my $peerFlag = ($rxt & 0x02)?"B4":"A4";#burst
       CUL_HM_PushCmdStack($pHash, sprintf("++%s41%s%s%02X%02X%02X"
                      ,$peerFlag,$dst,$peer
-                     ,$chn
+                     ,hex($chn)
                      ,$pressCnt
-                     ,$cndNo));
+                     ,hex($cndNo)));
       if ($rxt & 0x80){#burstConditional
         CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6));
       }
