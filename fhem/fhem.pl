@@ -3701,6 +3701,7 @@ readingsBulkUpdate($$$@)
     my $eour = $attreour && grep($reading =~ m/^$_$/, @{$attreour});
 
     # check if threshold is given
+    my $eocrExists = $eocr;
     if( $eocr
         && $eocrv[0] =~ m/.*:(.*)/ ) {
       my $threshold = $1;
@@ -3742,7 +3743,7 @@ readingsBulkUpdate($$$@)
         }
       } else {
         $hash->{".lastTime$reading"} = $now;
-        $changed = 1 if($eocr);
+        $changed = 1 if($eocrExists);
       }
     }
     
