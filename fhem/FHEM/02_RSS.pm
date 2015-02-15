@@ -43,7 +43,7 @@ RSS_addExtension($$$) {
   
     my $url = "/" . $link;
     $data{FWEXT}{$url}{FUNC} = $func;
-    $data{FWEXT}{$url}{LINK} = $link;
+    $data{FWEXT}{$url}{LINK} = "+$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
     $data{FWEXT}{$url}{FORKABLE} = 0;
 }
@@ -52,16 +52,15 @@ RSS_addExtension($$$) {
 sub
 RSS_Initialize($) {
     my ($hash) = @_;
-    $hash->{DefFn}   = "RSS_Define";
+    $hash->{DefFn}    = "RSS_Define";
+    $hash->{UndefFn}  = "RSS_Undefine";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList}= "size bg bgcolor tmin refresh areas";
-    $hash->{SetFn}   = "RSS_Set";
-
-    RSS_addExtension("RSS_CGI","rss","RSS");
+    $hash->{AttrList} = "size bg bgcolor tmin refresh areas autoreread:1,0";
+    $hash->{SetFn}    = "RSS_Set";
+    $hash->{NotifyFn} = "RSS_Notify";
 
     return undef;
  }
-
  
 ##################
 sub
@@ -100,6 +99,9 @@ RSS_Define($$) {
   $hash->{fhem}{hostname}= $hostname;
   $hash->{fhem}{filename}= $filename;
   $hash->{LAYOUTFILE} = $filename;
+  $hash->{NOTIFYDEV} = 'global';
+
+  RSS_addExtension("RSS_CGI","rss","RSS");
 
   eval "use GD::Text::Align";
   $hash->{fhem}{useTextAlign} = ($@ ? 0 : 1 );
@@ -116,6 +118,27 @@ RSS_Define($$) {
   RSS_readLayout($hash);
   
   $hash->{STATE} = 'defined'; #$name;
+  return undef;
+}
+
+sub RSS_Undefine($$) {
+	my ($hash, $arg) = @_;
+    # check if last device
+    my $url = '/rss';
+    $data{FWEXT}{$url} = undef if int(devspec2array('TYPE=RSS')) == 1;
+	return undef;
+}
+
+sub RSS_Notify {
+  my ($hash,$dev) = @_;
+
+  my $name= $hash->{NAME};
+  return unless AttrVal($name, 'autoreread',1);
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^FILEWRITE $hash->{LAYOUTFILE}$/, @{$dev->{CHANGED}}));
+
+  Log3(undef, 4, "RSS: $name reread layout after edit.");
+  RSS_readLayout($hash);
   return undef;
 }
 
@@ -178,10 +201,10 @@ RSS_Overview {
         $name= $defs{$def}{NAME};
         $url= RSS_getURL($defs{$def}{fhem}{hostname});
         $html.= "$name<br>\n<ul>";
-        $html.= "<a href='$url/rss/$name.rss'>RSS</a><br>\n";
-        $html.= "<a href='$url/rss/$name.html'>HTML</a><br>\n";
-        $html.= "<a href='$url/rss/$name.png'>Portable Network Graphics</a><br>\n";
-        $html.= "<a href='$url/rss/$name.jpg'>JPEG Graphics</a><br>\n";
+        $html.= "<a href='$url/rss/$name.rss' target='_blank' >RSS</a><br>\n";
+        $html.= "<a href='$url/rss/$name.html' target='_blank' >HTML</a><br>\n";
+        $html.= "<a href='$url/rss/$name.png' target='_blank' >Portable Network Graphics</a><br>\n";
+        $html.= "<a href='$url/rss/$name.jpg' target='_blank' >JPEG Graphics</a><br>\n";
         $html.= "</ul>\n<p>\n";
         }
   }
@@ -257,7 +280,7 @@ RSS_HTMLHead($$) {
   
   my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
   my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
-  my $r= defined($refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
+  my $r= (defined($refresh) && $refresh > 0) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
   # css and js header output should be coded only in one place
   my $css= "";
   #my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>\n";
@@ -282,8 +305,10 @@ RSS_returnHTML($) {
   my $img= "$url/rss/$name.$type";
   my $refresh= AttrVal($name, 'refresh', 60);
   my $areas= AttrVal($name, 'areas', "");
+  my $embed= $defs{$name}{".embed"};
+  $defs{$name}{".embed"} = undef;
   my $code= RSS_HTMLHead($name, $refresh) . 
-	    "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n<img src=\"$img\" usemap=\"#map\"/>\n<map name=\"map\" id=\"map\">\n$areas\n</map>\n</body>\n" .
+       "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n<div id=\"rss_$name\" style=\"z-index:1;\" >\n<img src=\"$img\" usemap=\"#map\"/>\n<map name=\"map\" id=\"map\">\n$areas\n</map>\n</div>\n$embed</body>\n" .
 	    RSS_HTMLTail();
   return ("text/html; charset=utf-8", $code);
 }
@@ -338,7 +363,7 @@ RSS_itemText {
 
 sub
 RSS_itemTextBox {
-        my ($S,$x,$y,$boxwidth,$text,%params)= @_;
+        my ($S,$x,$y,$boxwidth,$bgcolor,$text,%params)= @_;
         return unless(defined($text));
         
         if($params{useTextWrap}) {
@@ -350,7 +375,10 @@ RSS_itemTextBox {
                       );
               $wrapbox->set_font($params{font}, $params{pt});
               $wrapbox->set(align => $params{thalign}, width => $boxwidth);
-              my ($left, $top, $right, $bottom) = $wrapbox->draw($x, $y);
+              my ($left, $top, $right, $bottom);
+              ($left, $top, $right, $bottom) = $wrapbox->get_bounds($x,$y);
+              $S->filledRectangle($left,$top,$right,$bottom,RSS_color($S,$bgcolor)) if(defined($bgcolor));
+              ($left, $top, $right, $bottom) = $wrapbox->draw($x, $y);
               return $bottom;
         } else {
               RSS_itemText($S,$x,$y,$text,%params);
@@ -487,6 +515,8 @@ RSS_evalLayout($$@) {
 
   my @layout= split("\n", $layout);
 
+  my %pstack;
+  my $pstackcount = 0;
   my %params;
   $params{font}= "Arial";
   $params{pt}= 12;
@@ -507,8 +537,8 @@ RSS_evalLayout($$@) {
   $params{y}= 0;
   
 
-  my ($x,$y,$x1,$y1,$x2,$y2,$scale,$boxwidth,$text,$imgtype,$srctype,$arg,$format);
-  
+  my ($x,$y,$z,$x1,$y1,$x2,$y2,$scale,$bgcolor,$boxwidth,$text,$imgtype,$srctype,$arg,$format);
+
   my $cont= "";
   foreach my $line (@layout) {
           # kill trailing newline
@@ -588,8 +618,15 @@ RSS_evalLayout($$@) {
 	      ($x,$y,$boxwidth,$text)= split("[ \t]+", $def, 4);
 	      ($x,$y)= RSS_xy($S, $x,$y,%params);
 	      my $txt= AnalyzePerlCommand(undef, $text);
-	      #Debug "$name: ($x,$y) $txt";
-	      $y= RSS_itemTextBox($S,$x,$y,$boxwidth,$txt,%params);
+	      $y= RSS_itemTextBox($S,$x,$y,$boxwidth,undef,$txt,%params);
+	      $params{x} = $x;
+	      $params{y} = $y;
+	    } elsif($cmd eq "textboxf") {
+	      ($x,$y,$boxwidth,$bgcolor,$text)= split("[ \t]+", $def, 5);
+	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      $bgcolor = ($bgcolor ne "") ? AnalyzePerlCommand(undef,$bgcolor) : undef;
+	      my $txt= AnalyzePerlCommand(undef, $text);
+	      $y= RSS_itemTextBox($S,$x,$y,$boxwidth,$bgcolor,$txt,%params);
 	      $params{x} = $x;
 	      $params{y} = $y;
 	    } elsif($cmd eq "line") {
@@ -629,9 +666,28 @@ RSS_evalLayout($$@) {
 	      $params{y} = $y; 
 	      my $arg= AnalyzePerlCommand(undef, $arg);
 	      RSS_itemImg($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
-	    } else {
+	    } elsif($cmd eq "push") {
+	      $pstackcount++;
+	      while ( my ($key, $value) = each(%params) ) {
+		$pstack{$pstackcount}{$key} = $value;
+	      }
+	    } elsif($cmd eq "pop") {
+	      return unless $pstackcount;
+	      while ( my ($key, $value) = each($pstack{$pstackcount}) ) {
+		$params{$key} = $value;
+	      }
+	      delete $pstack{$pstackcount};
+	      $pstackcount--;
+	    } elsif($cmd eq "embed") {
+	      ($x,$y,$z,$format,$text,$arg) = split("[ \t]+", $def,6);
+	      ($x,$y)= RSS_xy($S, $x,$y,%params);
+	      my $arg= AnalyzePerlCommand(undef, $arg);
+	      $defs{$name}{".embed"} .= "<div id=\"$text\" style=\"position:".$format."; left:".$x."px; top:".$y."px; z-index:$z;\">\n";
+	      $defs{$name}{".embed"} .= $arg."\n";
+	      $defs{$name}{".embed"} .= "</div>\n";
+	  } else {
 	      Log3 $name, 2, "$name: Illegal command $cmd in layout definition.";
-	    } 
+	  } 
 	    
 	    #Debug "after  command $line: x= " . $params{x} . ", y= " . $params{y};
 	  };
@@ -803,6 +859,38 @@ RSS_CGI(){
 
 }
 
+sub
+plotFromUrl(@)
+{
+  my (@plotName) = @_;
+  my @webs;
+ 
+  @webs=devspec2array("TYPE=FHEMWEB");
+  foreach(@webs) {
+    if(!InternalVal($_,'TEMPORARY',undef)) {
+      $FW_wname=InternalVal($_,'NAME','');
+      last;
+    }
+  }
+
+  my ($w, $h) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
+
+  my $url;
+  $url  = "<embed src=\"".
+            "$FW_ME/SVG_showLog?dev=". $plotName[0].
+	    "&amp;logdev=".            InternalVal($plotName[0], "LOGDEVICE", "").
+	    "&amp;gplotfile=".         InternalVal($plotName[0], "GPLOTFILE", "").
+	    "&amp;logfile=".           InternalVal($plotName[0], "LOGFILE", "CURRENT");
+  $url .=   "&amp;pos=".               $plotName[1] if $plotName[1];
+  $url .=   "&amp;zoom=".              $plotName[2] if $plotName[2];
+  $url .= "\"";
+  $url .= " type=\"image/svg+xml\"";
+  $url .= " width=\"$w\"";
+  $url .= " height=\"$h\"";
+  $url .= " id=\"".$plotName[0]."\" >";
+  return $url;
+}
+
 
 #
 
@@ -893,6 +981,8 @@ RSS_CGI(){
   <b>Attributes</b>
   <br><br>
   <ul>
+    <li>autoreread<br>If set to 1, layout is automatically reread when layout file has been changed 
+    by FHEMWEB file editor.</li>
     <li>size<br>The dimensions of the picture in the format
     <code>&lt;width&gt;x&lt;height&gt;</code>.</li><br>
     <li>bg<br>The directory that contains the background pictures (must be in JPEG, GIF or PNG format, file 
@@ -900,7 +990,8 @@ RSS_CGI(){
     <li>bgcolor &lt;color&gt;<br>Sets the background color. </li><br>
     <li>tmin<br>The background picture is shown at least <code>tmin</code> seconds,
     no matter how frequently the RSS feed consumer accesses the page.</li><br>
-    <li>refresh<br>Time after which the HTML page is automatically reloaded.</li><br>
+    <li>refresh &lt;interval&gt;<br>Time in seconds after which the HTML page is automatically reloaded. Defaults to 60.
+    Set &lt;interval&gt; to 0 to disable reloading.</li><br>
     <li>areas<br>HTML code that goes into the image map.<br>
         Example: <code>attr FrameRSS areas &lt;area shape="rect" coords="0,0,200,200" href="http://fhem.de"/&gt;&lt;area shape="rect" coords="600,400,799,599" href="http://has:8083/fhem" target="_top"/&gt;</code>
     </li><br>
@@ -994,6 +1085,7 @@ RSS_CGI(){
     (e.g. <code>/usr/share/fonts/truetype/arial.ttf</code>),
     whatever works on your system.</li><br>
 
+    <a name="rss_rgb"></a>
     <li>rgb "&lt;color&gt;"<br>Sets the color. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;color&gt.</li><br>
 
@@ -1011,9 +1103,13 @@ RSS_CGI(){
     
     <li>linespace &lt;space&gt;<br>Sets the line spacing in pixels for text boxes (see textbox item below).</li><br>
     
-    <li>condition &lt;condition&gt;<br>Subsequent layout control and item placement commands except for another condition command 
-    are ignored if and only if &lt;condition&gt;
-    evaluates to false.</li><br>
+    <li>condition &lt;condition&gt;<br>Subsequent layout control and item placement commands except for another condition command are ignored if and only if &lt;condition&gt; evaluates to false.</li><br>
+    
+    <li>push<br>The current parameter set (position, color, font name and size, text alignment and line spacing) is
+    put (saved) on top of a stack.</li><br>
+    
+    <li>pop<br>The most recently saved (pushed) current parameter set is pulled from the top of the stack and restored.</li><br>
+    
     </ul>
 
     <i>Item placement commands</i><p>
@@ -1023,21 +1119,37 @@ RSS_CGI(){
     You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;text&gt; to fully
     access device readings and do some programming on the fly. See below for examples.</li><br>
-    <li>textbox &lt;x&gt; &lt;y&gt; &lt;boxwidth&gt; &lt;text&gt;<br>Same as before but text is rendered in a box of horizontal width &lt;boxwidth&gt;.</li><br> 
+
+    <li>textbox &lt;x&gt; &lt;y&gt; &lt;boxwidth&gt; &lt;text&gt;<br>Same as before but text is rendered 
+    in a box of horizontal width &lt;boxwidth&gt;.</li><br>
+    
+    <li>textboxf &lt;x&gt; &lt;y&gt; &lt;boxwidth&gt; &lt;bgcolor&gt; &lt;text&gt;<br>Same as before but 
+    the textbox will be filled with the given background color &lt;bgcolor&gt; before drawing the text. 
+    &lt;bgcolor&gt; can be used with <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> to evalute <a href="#rss_rgb">RGB</a> value.</li><br>
+    
     <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
+    
     <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe useful for a RSS Clock.</li><br>
-    <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD:MM:YYY format.</li><br>
+    
+    <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD.MM.YYYY format.</li><br>
+    
     <li>line &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;thickness&gt;]<br>Draws a line from position (&lt;x1&gt;, &lt;y1&gt;) to position (&lt;x2&gt;, &lt;y2&gt;) with optional thickness (default=1).</li><br>
     <li>rect &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;filled&gt;]<br>Draws a rectangle with corners at positions (&lt;x1&gt;, &lt;y1&gt;) and (&lt;x2&gt;, &lt;y2&gt;), which is filled if the &lt;filled&gt; parameter is set and not zero.</li><br>
+    
     <li>img &lt;x&gt; &lt;y&gt; &lt;['w' or 'h']s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
     position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
     The picture is scaled by the factor &lt;s&gt; (a decimal value). If 'w' or 'h' is in front of scale-value the value is used to set width or height to the value in pixel. If &lt;srctype&gt; is <code>file</code>, the picture
     is loaded from the filename &lt;arg&gt;, if &lt;srctype&gt; is <code>url</code> or <code>urlq</code>, the picture
     is loaded from the URL &lt;arg&gt; (with or without logging the URL), if &lt;srctype&gt; is <code>data</code>, the picture
     is piped in from data &lt;arg&gt;. You can use
-    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;arg&gt. See below for example.
-    Notice: do not load the image from URL that is served by fhem as it leads to a deadlock.<br></li>
-    <br>
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;arg&gt. See below for example.<br>
+    <b>Warning</b>: do not load the image from URL that is served by fhem as it leads to a deadlock.</li><br>
+
+    <li>embed &lt;x&gt; &lt;y&gt; &lt;z&gt; &lt;position&gt; &lt;id&gt; &lt;element&gt;<br>
+    For HTML output: embeds a <code>div</code> element into the HTML page at (&lt;x&gt;,&lt;y&gt;) with z-order &lt;z&gt; and positioning &lt;position&gt; (use <code>absolute</code>). &lt;id&gt; is the <code>id</code> attribute of the
+    <code>div</code> element and &lt;element&gt; is its content.<br>
+    <b>Note:</b> There are several issues with different browsers when using this.</li><br>
+    
     </ul>
 
     <i>Example</i><p>
@@ -1052,6 +1164,8 @@ RSS_CGI(){
     moveby 0 -25<br>
     text x y "Another text"<br>
     img 20 530 0.5 png file { "/usr/share/fhem/www/images/weather/" . ReadingsVal("MyWeather","icon","") . ".png" }<br>
+    embed 0 0 2 absolute plot1 { plotFromUrl('mySVG') }
+    embed 10 200 2 absolute iframe1 "&lt;iframe width=\"420\" height=\"315\" src=\"//www.youtube.com/embed/9HShl_ufOFI\" frameborder=\"0\" allowfullscreen&gt;&lt;/iframe&gt;"
     </code>
     <p>
     
@@ -1063,8 +1177,9 @@ RSS_CGI(){
     img 20 30 0.6 png data { plotAsPng("mySVGPlot","qday",-1) }
     </code>
     <p>
-    This requires the perl module Image::LibRSVG and librsvg. Debian-based systems can install these with <code>apt-get install libimage-librsvg-perl</code>.
-
+    This requires the perl module Image::LibRSVG and librsvg. Debian-based systems can install these with <code>apt-get install libimage-librsvg-perl</code>.<p>
+    
+    For HTML output, you can use <code>plotFromURL(&lt;name&gt;[,&lt;zoom&gt;[,&lt;offset&gt;]])</code> instead.
   </ul>
 
 

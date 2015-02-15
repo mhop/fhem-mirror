@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 02_RSS.pm: new attribut autoreread; new NotifyFn and UndefFN;
+	     new layout commands textboxf, embed, push, pop;
+	     FWext is automatically deleted after deletion of last
+	     RSS device; RSS Overview and elements opened in new tab; 
+	     refresh 0 to disable autorefresh; new function plotFromUrl
   - bugfix: SOMFY: use correct attributename when calculating updatetime
   - feature: 95_FLOORPLAN.pm: arrange by drag&drop, 
              copy, rename, delete processes userattr fp_<name>
