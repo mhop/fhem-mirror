@@ -34,6 +34,7 @@ use Time::HiRes qw(gettimeofday);
 use Digest::MD5;
 use HttpUtils;
 use DevIo;
+use FritzBoxUtils;
 
 my %connection_type = (
     0 => "0",
@@ -90,8 +91,21 @@ FB_CALLMONITOR_Initialize($)
     $hash->{AttrFn}    = "FB_CALLMONITOR_Attr";
     $hash->{NotifyFn}  = "FB_CALLMONITOR_Notify";
     $hash->{NOTIFYDEV} = "global";
-    $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:multiple-strict,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at reverse-search-cache:0,1 reverse-search-phonebook-file fritzbox-remote-phonebook:0,1 fritzbox-user ".
-                        $readingFnAttributes;
+    $hash->{AttrList}  = "do_not_notify:0,1 ".
+                         "disable:0,1 ".
+                         "unique-call-ids:0,1 ".
+                         "local-area-code ".
+                         "remove-leading-zero:0,1 ".
+                         "reverse-search-cache-file ".
+                         "reverse-search:multiple-strict,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at ".
+                         "reverse-search-cache:0,1 ".
+                         "reverse-search-phonebook-file ".
+                         "fritzbox-remote-phonebook:0,1 ".
+                         "fritzbox-remote-phonebook-via:web,telnet ".
+                         "fritzbox-remote-phonebook-exclude ".
+                         "fritzbox-remote-timeout ".
+                         "fritzbox-user ".
+                         $readingFnAttributes;
 }
 
 #####################################
@@ -147,9 +161,23 @@ FB_CALLMONITOR_Get($@)
     {
         return FB_CALLMONITOR_reverseSearch($hash, $arguments[2]);
     }
+    elsif($arguments[1] eq "showPhonebookIds" and exists($hash->{helper}{PHONEBOOK_NAMES}))
+    {
+        my $table = "";
+        my $head = "Id    Name";
+        my $width = 10;
+        foreach my $phonebookId (sort keys %{$hash->{helper}{PHONEBOOK_NAMES}})
+        {
+            my $string = sprintf("%-3s", $phonebookId)." - ".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}; 
+            $width = length($string) if(length($string) > $width);
+            $table .= $string."\n";
+        }
+        
+        return $head."\n".("-" x $width)."\n".$table;
+    }
     else
     {
-        return "unknown argument ".$arguments[1].", choose one of search"; 
+        return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds" : ""); 
     }
 
 }
@@ -164,7 +192,7 @@ FB_CALLMONITOR_Set($@)
     my $usage;
     my @sets = ();
     
-    push @sets, "rereadPhonebook" if(defined($hash->{helper}{PHONEBOOK}));
+    push @sets, "rereadPhonebook" if(defined($hash->{helper}{PHONEBOOK}) or AttrVal($name, "reverse-search" , "") =~ /(all|phonebook|internal)/);
     push @sets, "password" if($hash->{helper}{PWD_NEEDED});
     
     $usage = "Unknown argument ".$a[1].", choose one of ".join(" ", @sets) if(scalar @sets > 0);
@@ -609,6 +637,7 @@ sub FB_CALLMONITOR_writeToCache($$$)
     my $file = AttrVal($name, "reverse-search-cache-file", "");
     my $err;
     my @cachefile;
+    my $phonebook_file;
     
     $file =~ s/(^\s+|\s+$)//g;
   
@@ -634,39 +663,89 @@ sub FB_CALLMONITOR_writeToCache($$$)
 
 #####################################
 # reads a FritzBox phonebook
-sub FB_CALLMONITOR_readPhonebook($;$$)
+sub FB_CALLMONITOR_readPhonebook($;$)
 {
-    my ($hash, $clear, $phonebook_file) = @_;
+    my ($hash, $testPassword) = @_;
    
     my $name = $hash->{NAME};
     my ($err, $count_contacts, @lines, $phonebook);
     
-    $clear = 1 unless(defined($clear));
-    
-    delete $hash->{helper}{PHONEBOOK} if($clear == 1 and exists($hash->{helper}{PHONEBOOK}));
-    
 	if(AttrVal($name, "fritzbox-remote-phonebook", "0") eq "1")
     {
-		($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebook($hash);
-        
-		if(defined($err))
+        if(AttrVal($name, "fritzbox-remote-phonebook-via", "web") eq "telnet")
         {
-            Log3 $name, 2, "FB_CALLMONITOR ($name) - could not read remote FritzBox phonebook file - $err";
-            return "Could not read remote FritzBox phonebook file - $err";	
-		}
-        
-        Log3 $name, 2, "FB_CALLMONITOR ($name) - found remote FritzBox phonebook via telnet";
-        
-        ($err, $count_contacts) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
-        
-        if(defined($err))
-        {
-            Log3 $name, 2, "FB_CALLMONITOR ($name) - could not parse remote phonebook - $err";
-            return "Could not parse remote phonebook - $err";
+            ($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebookViaTelnet($hash, $testPassword);
+            
+            if(defined($err))
+            {
+                Log3 $name, 2, "FB_CALLMONITOR ($name) - could not read remote FritzBox phonebook file - $err";
+                return "Could not read remote FritzBox phonebook file - $err";	
+            }
+            
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - found remote FritzBox phonebook via telnet";
+            
+            ($err, $count_contacts) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
+            
+            if(defined($err))
+            {
+                Log3 $name, 2, "FB_CALLMONITOR ($name) - could not parse remote phonebook - $err";
+                return "Could not parse remote phonebook - $err";
+            }
+            else
+            {
+                Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from remote phonebook via telnet";
+            }
         }
-         else
+        elsif(AttrVal($name, "fritzbox-remote-phonebook-via", "web") eq "web")
         {
-            Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from remote phonebook via telnet";
+            $err = FB_CALLMONITOR_identifyPhoneBooksViaWeb($hash, $testPassword);
+            
+            if(defined($err))
+            {
+                Log3 $name, 2, "FB_CALLMONITOR ($name) - could not identify remote phonebooks - $err";
+                return "could not identify remote phonebooks - $err";
+            }
+            
+            unless(exists($hash->{helper}{PHONEBOOK_NAMES}))
+            {
+                Log3 $name, 2, "FB_CALLMONITOR ($name) - no phonebooks could be found";
+                return "no phonebooks could be found";
+            }
+            
+            my %excludedIds = map { trim($_) => 1 } split(",",AttrVal($name, "fritzbox-remote-phonebook-exclude", ""));
+            
+            foreach my $phonebookId (sort keys %{$hash->{helper}{PHONEBOOK_NAMES}})
+            {
+                if(exists($excludedIds{$phonebookId}))
+                {
+                    Log3 $name, 4, "FB_CALLMONITOR ($name) - skipping excluded phonebook id $phonebookId (".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}.")";
+                    next;
+                }
+            
+                Log3 $name, 4, "FB_CALLMONITOR ($name) - requesting phonebook id $phonebookId (".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}.")";
+                
+                ($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebookViaWeb($hash, $phonebookId, $testPassword);
+                
+                if(defined($err))
+                {
+                        Log3 $name, 2, "FB_CALLMONITOR ($name) - unable to retrieve phonebook \"".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}."\" from FritzBox - $err";
+                        return "unable to retrieve phonebook \"".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}."\" from FritzBox - $err";
+                }
+                else
+                {
+                    ($err, $count_contacts) = FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
+ 
+                    if(defined($err))
+                    {
+                        Log3 $name, 2, "FB_CALLMONITOR ($name) - could not parse remote phonebook ".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}." - $err";
+                        return "could not parse remote phonebook ".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}." - $err";
+                    }
+                    else
+                    {
+                        Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from remote phonebook \"".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}."\"";
+                    }
+                }
+            }
         }
 	}
     else
@@ -676,7 +755,7 @@ sub FB_CALLMONITOR_readPhonebook($;$$)
     
     if(-e "/usr/bin/ctlmgr_ctl" or ((not -e "/usr/bin/ctlmgr_ctl") and defined(AttrVal($name, "reverse-search-phonebook-file", undef))))
     {
-		$phonebook_file = AttrVal($name, "reverse-search-phonebook-file", "/var/flash/phonebook") unless(defined($phonebook_file));
+		my $phonebook_file = AttrVal($name, "reverse-search-phonebook-file", "/var/flash/phonebook");
 		
         ($err, @lines) = FileRead($phonebook_file); 
         
@@ -722,7 +801,6 @@ sub FB_CALLMONITOR_parsePhonebook($$)
     my $count_contacts = 0;
 
     my $area_code = AttrVal($name, "local-area-code", "");
-    
     
     if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/) 
     {
@@ -820,7 +898,7 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
 
 #####################################
 # loads phonebook from extern FritzBox
-sub FB_CALLMONITOR_readRemotePhonebook($;$)
+sub FB_CALLMONITOR_readRemotePhonebookViaTelnet($;$)
 {
     my ($hash, $testPassword) = @_;
 
@@ -837,20 +915,19 @@ sub FB_CALLMONITOR_readRemotePhonebook($;$)
         return "Error loading Net::Telnet. May be this module is not installed.";
     }
     
-    $hash->{helper}{READ_PWD} = 1;
-    
     my $phonebook_file = "/var/flash/phonebook";
     
     my ($fb_ip,undef) = split(/:/, ($hash->{DeviceName}), 2);
     
+    $hash->{helper}{READ_PWD} = 1;
+    
     my $fb_user = AttrVal($name, "fritzbox-user", undef);
     my $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
     
+    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
     return "no password available to access FritzBox" unless(defined($fb_pw));
     
     my $telnet = new Net::Telnet ( Timeout=>10, Errmode=>'return');
-    
-    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
     
     unless($telnet->open($fb_ip))
     {
@@ -925,6 +1002,153 @@ sub FB_CALLMONITOR_readRemotePhonebook($;$)
 }
 
 #####################################
+# identifys the phonebooks defined on the FritzBox via web interface (http)
+sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
+{
+    my ($hash, $testPassword) = @_;
+    my $name = $hash->{NAME};
+
+    my ($fb_ip,undef) = split(/:/, ($hash->{DeviceName}), 2);
+    my $fb_user = AttrVal($name, "fritzbox-user", undef);
+    my $fb_pw;
+    my $fb_sid;
+
+    $hash->{helper}{READ_PWD} = 1;
+    $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
+    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
+
+    return "no password available to access FritzBox" unless(defined($fb_pw));
+
+    $fb_sid = FB_doCheckPW($fb_ip, $fb_user, $fb_pw);
+    
+    unless(defined($fb_sid))
+    {
+        $hash->{helper}{PWD_NEEDED} = 1;
+        return "unable to login via webinterface, maybe wrong user/password?" 
+    }
+    
+    Log3 $name, 4, "FB_CALLMONITOR ($name) - identifying available phonebooks";
+
+    my $param;
+    $param->{url}        = "http://$fb_ip/fon_num/fonbook_select.lua?sid=$fb_sid";
+    $param->{noshutdown} = 1;
+    $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
+    $param->{loglevel}   = 4;
+
+    my ($err, $data)    = HttpUtils_BlockingGet($param);
+
+    if ($err ne "")
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebooks: $err";
+        return "error while requesting phonebooks: $err";
+    }
+
+    if($data eq "" and exists($param->{code}))
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting available phonebooks";
+        return  "received no data after requesting available phonebooks";
+    }
+
+    Log3 $name, 4, "FB_CALLMONITOR ($name) - phonebooks successfully identified";
+    
+    if($data =~ m/<form[^>]*name="mainform"[^>]*>(.+?)<\/form>/s)
+    {
+        $data = $1;
+    }
+
+    delete($hash->{helper}{PHONEBOOK_NAMES}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
+    
+    while($data =~ /<label[^>]*for="uiBookid:(\d+)"[^>]*>\s*(.+?)\s*<\/label>/gcs)
+    {
+        $hash->{helper}{PHONEBOOK_NAMES}{$1} = $2;
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - found phonebook: $2";
+    }
+    
+    Log3 $name, 3, "FB_CALLMONITOR ($name) - phonebooks found: ".join(", ", map { $hash->{helper}{PHONEBOOK_NAMES}{$_}." (id: $_)" } sort keys %{$hash->{helper}{PHONEBOOK_NAMES}}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
+
+    delete($hash->{helper}{PWD_NEEDED}) if(exists($hash->{helper}{PWD_NEEDED}));
+
+    return undef;
+}
+#####################################
+# loads internal and online phonebooks from extern FritzBox via web interface (http)
+sub FB_CALLMONITOR_readRemotePhonebookViaWeb($$;$)
+{
+    my ($hash, $phonebookId, $testPassword) = @_;
+    my $name = $hash->{NAME};
+
+    my ($fb_ip,undef) = split(/:/, ($hash->{DeviceName}), 2);
+    my $fb_user = AttrVal($name, "fritzbox-user", '');
+    my $fb_pw;
+    my $fb_sid;
+    
+    return "unknown phonebook id: $phonebookId" unless(exists($hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}));
+    
+    $hash->{helper}{READ_PWD} = 1;
+
+    $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
+    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
+    
+    return "no password available to access FritzBox" unless(defined($fb_pw));
+   
+    $fb_sid = FB_doCheckPW($fb_ip, $fb_user, $fb_pw);
+    
+    unless(defined($fb_sid))
+    {
+        $hash->{helper}{PWD_NEEDED} = 1;
+        return "no session id available to access FritzBox. Maybe wrong user/password?" 
+    }
+    
+    my $param;
+    $param->{url}        = "http://$fb_ip/cgi-bin/firmwarecfg";
+    $param->{noshutdown} = 1;
+    $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
+    $param->{loglevel}   = 4;
+    $param->{method}     = "POST";
+    $param->{header}     = "Content-Type: multipart/form-data; boundary=boundary";
+    
+    $param->{data} = "--boundary\r\n".
+                     "Content-Disposition: form-data; name=\"sid\"\r\n".
+                     "\r\n".
+                     "$fb_sid\r\n".
+                     "--boundary\r\n".
+                     "Content-Disposition: form-data; name=\"PhonebookId\"\r\n".
+                     "\r\n".
+                     "$phonebookId\r\n".
+                     "--boundary\r\n".
+                     "Content-Disposition: form-data; name=\"PhonebookExportName\"\r\n".
+                     "\r\n".
+                     $hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}."\r\n".
+                     "--boundary\r\n".
+                     "Content-Disposition: form-data; name=\"PhonebookExport\"\r\n".
+                     "\r\n".
+                     "\r\n".
+                     "--boundary--";
+                     
+    Log3 $name, 4, "FB_CALLMONITOR ($name) - get export for phonebook: $phonebookId";             
+    
+    my ($err, $phonebook) = HttpUtils_BlockingGet($param);
+    
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - received http response code ".$param->{code} if(exists($param->{code}));
+    
+    if ($err ne "") 
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - got error while requesting phonebook: $err";
+        return "got error while requesting phonebook: $err";
+    }
+
+    if($phonebook eq "" and exists($param->{code}))
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data";
+        return  "received http code ".$param->{code}." without any data";
+    }
+
+    delete($hash->{helper}{PWD_NEEDED}) if(exists($hash->{helper}{PWD_NEEDED}));
+
+    return (undef, $phonebook); 
+    
+}
+#####################################
 # checks and store FritzBox password used for telnet connection
 sub FB_CALLMONITOR_storePassword($$)
 {
@@ -948,12 +1172,12 @@ sub FB_CALLMONITOR_storePassword($$)
         $key=$encode.$key;
     }
     
-    my ($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebook($hash, $enc_pwd);
+    my $err = FB_CALLMONITOR_readPhonebook($hash, $enc_pwd);
+    
     return "unable to check password - $err" if(defined($err));
         
-    FB_CALLMONITOR_parsePhonebook($hash, $phonebook);
-    
     $err = setKeyValue($index, $enc_pwd);
+    
     return "error while saving the password - $err" if(defined($err));
     
     return "password successfully saved";
@@ -985,8 +1209,6 @@ sub FB_CALLMONITOR_readPassword($;$)
            Log3 $name, 4, "FB_CALLMONITOR ($name) - unable to read FritzBox password from file: $err";
            return undef;
         }  
-        
-        
     } 
     
     if(defined($password))
@@ -1064,6 +1286,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <b>Get</b>
   <ul>
   <li><b>search &lt;phone-number&gt;</b> - returns the name of the given number via reverse-search (internal phonebook, cache or internet lookup)</li>
+  <li><b>showPhonebookIds</b> - returns a list of all available phonebooks on the FritzBox (not available when using telnet to retrieve remote phonebook)</li>
   </ul>
   <br>
 
@@ -1105,11 +1328,18 @@ sub FB_CALLMONITOR_readPassword($;$)
     <li><a name="local-area-code">local-area-code</a></li>
     Use the given local area code for reverse search in case of a local call (e.g. 0228 for Bonn, Germany)<br><br>
     <li><a name="fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
-    If this attribute is activated, the phonebook should be obtained via telnet connection (in case FHEM is not running on a FritzBox). This is only possible if a password (and depending on configuration a username as well) is configured. To use this feature, telnet access has to be activated via telephone shortcode #96*7*.<br><br>
+    If this attribute is activated, the phonebook should be obtained direct from the FritzBox via remote network connection (in case FHEM is not running on a FritzBox). This is only possible if a password (and depending on configuration a username as well) is configured.<br><br>
     Possible values: 0 => off , 1 => on (use remote telnet connection to obtain FritzBox phonebook)<br>
     Default Value is 0 (off)<br><br>
+    <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
+    Set the method how the phonebook should be requested via network. When set to "web", the phonebook is obtained from the web interface via HTTP. When set to "telnet", it uses a telnet connection to login and retrieve the phonebook (telnet must be activated via dial shortcode #96*7*)<br><br>
+    Possible values: web,telnet<br>
+    Default Value is web (retrieve phonebooks via web interface)<br><br>
+    <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
+    A comma separated list of phonebook id's which should be excluded when retrieving all possible phonebooks via web method (see attribute <i>fritzbox-remote-phonebook-via</i>). All list possible values is provided by <a href="#FB_CALLMONITORget">get command</a> <i>showPhonebookIds</i>. This attribute is not applicable when using telnet method to obtain remote phonebook.<br><br>
+    Default Value: <i>empty</i> (all phonebooks should be used, no exclusions)<br><br>
     <li><a name="fritzbox-user">fritzbox-user</a></li>
-    Use the given user for telnet connect. This attribute is only needed, if you use multiple users on your FritzBox.<br><br>
+    Use the given user for remote connect to obtain the phonebook. This attribute is only needed, if you use multiple users on your FritzBox.<br><br>
     </ul>
   <br>
  
@@ -1168,7 +1398,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <b>Set-Kommandos</b>
   <ul>
   <li><b>rereadPhonebook</b> - Liest das Telefonbuch der FritzBox neu ein (per Datei, Telnet oder direkt lokal)</li>
-  <li><b>password</b> - speichert das FritzBox Passwort, welches f&uuml;r den Telnet-Zugang zur FritzBox ben&ouml;tigt wird. Dieses Kommando ist nur verf&uuml;gbar, wenn ein Passwort ben&ouml;tigt wird um das Telefonbuch via Netzwerk einzulesen, siehe dazu Attribut <a href="#fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>.</li>
+  <li><b>password</b> - speichert das FritzBox Passwort, welches f&uuml;r das Einlesen aller Telefonb&uuml;cher direkt von der FritzBox ben&ouml;tigt wird. Dieses Kommando ist nur verf&uuml;gbar, wenn ein Passwort ben&ouml;tigt wird um das Telefonbuch via Netzwerk einzulesen, siehe dazu Attribut <a href="#fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>.</li>
   </ul>
   <br>
 
@@ -1176,6 +1406,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <b>Get-Kommandos</b>
   <ul>
   <li><b>search &lt;Rufnummer&gt;</b> - gibt den Namen der Telefonnummer zur&uuml;ck (aus Cache, Telefonbuch oder R&uuml;ckw&auml;rtssuche)</li>
+  <li><b>showPhonebookIds</b> - gibt eine Liste aller verf&uuml;gbaren Telefonb&uuml;cher auf der FritzBox zur&uuml;ck (nicht verf&uuml;gbar wenn das Telefonbuch via Telnet-Verbindung eingelesen wird)</li>
   </ul>
   <br>
 
@@ -1221,9 +1452,18 @@ sub FB_CALLMONITOR_readPassword($;$)
     <li><a name="local-area-code">local-area-code</a></li>
     Verwendet die gesetze Vorwahlnummer bei R&uuml;ckw&auml;rtssuchen von Ortsgespr&auml;chen (z.B. 0228 f&uuml;r Bonn)<br><br>
     <li><a name="fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
-    Wenn dieses Attribut aktiviert ist, wird das FritzBox Telefonbuch via Telnet-Verbindung von der FritzBox gelesen. Dazu ist das FritzBox Passwort und je nach FritzBox Konfiguration auch ein Username notwendig, der in den entsprechenden Attributen konfiguriert sein muss.<br><br>
+    Wenn dieses Attribut aktiviert ist, wird das FritzBox Telefonbuch direkt von der FritzBox gelesen. Dazu ist das FritzBox Passwort und je nach FritzBox Konfiguration auch ein Username notwendig, der in den entsprechenden Attributen konfiguriert sein muss.<br><br>
+    M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
+    Standardwert ist 0 (deaktiviert)<br><br>  
+    <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
+    Setzt die Methode mit der das Telefonbuch von der FritzBox abgefragt werden soll. Bei der Methode "web", werden alle verf&uuml;gbaren Telefonbücher (lokales sowie alle konfigurierten Online-Telefonb&uuml;cher) &uuml;ber die Web-Oberfl&auml;che eingelesen. Bei der Methode "telnet" wird eine Telnet-Verbindung zur FritzBox aufgebaut um das lokale Telefonbuch abzufragen (keine Online-Telefonb&uuml;cher). Dazu muss die Telnet-Funktion aktiviert sein (Telefon Kurzwahl: #96*7*)<br><br>
+    M&ouml;gliche Werte: web,telnet<br>
+    Standardwert ist "web" (retrieve phonebooks via web interface)<br><br>
+    <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
+    Eine komma-separierte Liste von Telefonbuch-ID's welche beim einlesen &uuml;bersprungen werden sollen. Dieses Attribut greift nur beim einlesen der Telefonb&uuml;cher via "web"-Methode (siehe Attribut <i>fritzbox-remote-phonebook-via</i>). Eine Liste aller m&ouml;glichen Werte kann &uuml;ber das <a href="#FB_CALLMONITORget">Get-Kommando</a> <i>showPhonebookIds</i> angezeigt werden.<br><br>
+    Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (alle Telefonb&uuml;cher werden eingelesen)<br><br>
     <li><a name="fritzbox-user">fritzbox-user</a></li>
-    Der Username f&uuml;r das Telnet-Interface, sofern das Telefonbuch &uuml;ber Telnet geladen werden soll (Attribut: fritzbox-remote-phonebook). Dieses Attribut ist nur notwendig, wenn mehrere Benutzer auf der FritzBox konfiguriert sind.<br><br>
+    Der Username f&uuml;r das Telnet-Interface, sofern das Telefonbuch direkt von der FritzBox geladen werden soll (Attribut: fritzbox-remote-phonebook). Dieses Attribut ist nur notwendig, wenn mehrere Benutzer auf der FritzBox konfiguriert sind.<br><br>
     </ul>
   <br>
  
