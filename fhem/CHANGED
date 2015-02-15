@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLMONITOR: read all available phonebooks directly wia
+             web interface (also online phonebooks from Google, etc.).
+             new attributes fritzbox-remote-phonebook-via and 
+             fritzbox-remote-phonebook-exclude.
+             new get command showPhonebookIds. Details can be read in
+             commandref (by JoWiemann)
   - feature: 02_RSS.pm: new attribut autoreread; new NotifyFn and UndefFN;
 	     new layout commands textboxf, embed, push, pop;
 	     FWext is automatically deleted after deletion of last
