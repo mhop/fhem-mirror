@@ -39,9 +39,11 @@
 # 2015-02-14 - 7967 - added:   item ticker (experimental)
 #                     changed: img syntax
 # 2015-02-15 - 7989 - added:   item embed (experimental)
-#              7992 - added:   xcondition (can be overridden by set) 
+#              7995 - added:   xcondition (can be overridden by set) 
 #                              set ovClear,ovDisable,ovEnable
 #                              get counter, layout, overrides
+#              7997 - removed: trashcan due to performance issues
+#                   - added:   break condition for includes
 #
 ##############################################
 # $Id: 55_InfoPanel.pm 7990 2015-02-14 22:28:21Z betateilchen $
@@ -88,7 +90,6 @@ sub btIP_itemText;
 sub btIP_itemTextBox;
 sub btIP_itemTicker;
 sub btIP_itemTime;
-sub btIP_itemTrash;
 
 sub btIP_changeColor;
 sub btIP_color;
@@ -128,7 +129,7 @@ sub InfoPanel_Initialize($) {
     $hash->{SetFn}     = "btIP_Set";
     $hash->{GetFn}     = "btIP_Get";
     $hash->{NotifyFn}  = "btIP_Notify";
-    $hash->{AttrList}  = "autoreread:1,0 bgcolor refresh size title";
+    $hash->{AttrList}  = "autoreread:1,0 bgcolor refresh size title noscript ";
     $hash->{AttrList} .= " bgcenter:1,0 bgdir bgopacity tmin" if $useImgTools;
 
     return undef;
@@ -237,6 +238,7 @@ sub btIP_readLayout {
   my ($hash)= @_;
   my $filename= $hash->{LAYOUTFILE};
   my $name= $hash->{NAME};
+  my $level = 0;
 
   my ($err, @layoutfile) = FileRead($filename);
   if($err) {
@@ -244,7 +246,8 @@ sub btIP_readLayout {
     $hash->{fhem}{layout} = "text ERROR 50 50 \"Error on reading layout!\"";
   } else {
     $hash->{fhem}{layout} = join("\n", @layoutfile);
-    while($hash->{fhem}{layout} =~ m/\@include/ ) {
+    while($hash->{fhem}{layout} =~ m/\@include/ && $level < 1000) {
+      $level++;
       my (@layout2,@include);
       foreach my $ll (@layoutfile) {
         if($ll !~ m/^\@include/) {
@@ -259,7 +262,8 @@ sub btIP_readLayout {
       @layout2    = undef;
       $hash->{fhem}{layout} = join("\n",@layoutfile);
     }
-    while($hash->{fhem}{layout} =~ m/\@finclude/ ) {
+    while($hash->{fhem}{layout} =~ m/\@finclude/ && $level < 1000) {
+      $level++;
       my (@layout2,@include);
       foreach my $ll (@layoutfile) {
         if($ll !~ m/^\@finclude/) {
@@ -274,6 +278,7 @@ sub btIP_readLayout {
       @layout2    = undef;
       $hash->{fhem}{layout} = join("\n",@layoutfile);
     }
+    $hash->{fhem}{layout} = "text ERROR 50 50 \"Loop detected in includes!\"" if ($level >= 1000);
     $hash->{fhem}{layout} =~ s/\n\n/\n/g;
   }
   return;
@@ -680,49 +685,6 @@ sub btIP_itemTime {
   return btIP_itemText($id,$x,$y,sprintf("%02d:%02d", $hour, $min),%params);
 }
 
-sub btIP_itemTrash {
-  return unless $useImgTools;
-  my ($id,$x,$y,$scale,$fgcolor,$bgcolor,$link,%params)= @_;
-  $id = ($id eq '-') ? createUniqueId() : $id;
-  my $target;
-  ($link,$target) = btIP_findTarget($link);
-
-  my ($counter,$data,$info,$width,$height,$mimetype,$output);
-
-$data = '<?xml version="1.0" encoding="utf-8"?>'.
-'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">'.
-'<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '.
-'width="66" height="84" style="enable-background:new 0 0 66 84;" xml:space="preserve">'.
-'<g>'.
-'	<path d="M60.093,9.797H48.984V2.578C48.984,1.125,47.812,0,46.359,0c-0.141,0-0.235,0.047-0.281,0.094'.
-'		C46.031,0.047,45.937,0,45.89,0H19.781h-0.187h-0.188c-1.453,0-2.578,1.125-2.578,2.578v7.219H5.672C2.484,9.797,0,12.281,0,15.469'.
-'		v4.125v5.156h4.922v52.827c0,3.188,2.437,5.625,5.625,5.625h44.671c3.188,0,5.672-2.437,5.672-5.625V24.75h4.875v-5.156v-4.125'.
-'		C65.765,12.281,63.28,9.797,60.093,9.797z M21.984,5.156h21.797v4.641H21.984V5.156z M55.687,77.577'.
-'		c0,0.329-0.141,0.469-0.469,0.469H10.547c-0.328,0-0.469-0.14-0.469-0.469V24.75h45.609V77.577z M60.562,19.594H5.203v-4.125'.
-'		c0-0.328,0.141-0.516,0.469-0.516h54.421c0.328,0,0.469,0.188,0.469,0.516V19.594z" stroke="fgcolor" stroke-width="3" fill="none"/>'.
-'	<rect x="18" y="31" width="6" height="42" stroke="fgcolor" stroke-width="3" fill="none"/>'.
-'	<rect x="30" y="31" width="6" height="42" stroke="fgcolor" stroke-width="3" fill="none"/>'.
-'	<rect x="42" y="31" width="6" height="42" stroke="fgcolor" stroke-width="3" fill="none"/>'.
-'</g>'.
-'</svg>';
-
-  my ($r,$g,$b,$a) = btIP_color($fgcolor);
-  $fgcolor = "rgb($r,$g,$b)";
-  $data =~ s/fgcolor/$fgcolor/g;
-
-  ($r,$g,$b,$a) = btIP_color($bgcolor);
-  $bgcolor = "rgb($r,$g,$b)";
-  ($width,$height,$mimetype,$data) = _btIP_imgData($data,$scale);
-  $output  = "";
-  $output .= "<a xlink:href=\"$link\" target=\"$target\">\n" if($link && length($link));
-  $output .= "<rect  id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" ".
-             "fill=\"$bgcolor\" fill-opacity=\"$a\" stroke=\"$bgcolor\" stroke-width=\"2\" stroke-opacity=\"$a\" />\n";
-  $output .= "<image id=\"$id\" x=\"$x\" y=\"$y\" width=\"".$width."px\" height=\"".$height."px\" \nxlink:href=\"$data\" />\n";
-  $output .= "</a>\n" if($link && length($link));
-
-  return $output;
-}
-
 ##### Helper
 
 sub btIP_changeColor {
@@ -795,6 +757,7 @@ sub btIP_xy {
   if((-1 < $y) && ($y < 1)) { $y *= $params{height}; }
   return($x,$y);
 }
+
 
 ##################
 #
@@ -1061,8 +1024,8 @@ sub btIP_evalLayout {
 
 	    when("group") {
 	      ($id,$text,$x,$y) = split("[ \t]+", $def, 4);
-	      $x //= 0;
-	      $y //= 0;
+	      $x //= $params{xx};
+	      $y //= $params{yy};
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
@@ -1234,33 +1197,27 @@ sub btIP_evalLayout {
 	    }
 
 	    when("trash") {
-	      ($id,$x,$y,$scale,$fgcolor,$bgcolor,$link)= split("[ \t]+", $def,7);
-	      ($x,$y)= btIP_xy($x,$y,%params);
-	      $fgcolor = AnalyzePerlCommand(undef,$fgcolor);
-	      $bgcolor = AnalyzePerlCommand(undef,$bgcolor);
-          $link    = AnalyzePerlCommand(undef,$link);
-          $svg .= btIP_itemTrash($id,$x,$y,$scale,$fgcolor,$bgcolor,$link,%params);
-	      $params{xx} = $x;
-	      $params{yy} = $y;
+          $svg .= "\n<!-- Trashcan no longer provided by module due to perfomance issues. -->\n\n";
+          Log3($name, 2, "InfoPanel $name: command 'trash' no longer supported.");
 	    }
 
-            when("thalign"){
-              my $d = AnalyzePerlCommand(undef, $def);
-              if($d ~~ @valid_halign) { 
-                $params{thalign}= $d;
-              } else {
-                Log3($name, 2, "InfoPanel: $name Illegal horizontal alignment $d");
-              }
-            }
+        when("thalign"){
+          my $d = AnalyzePerlCommand(undef, $def);
+          if($d ~~ @valid_halign) { 
+             $params{thalign}= $d;
+          } else {
+             Log3($name, 2, "InfoPanel $name: Illegal horizontal alignment $d");
+          }
+        }
 
-            when("tvalign"){
-              my $d = AnalyzePerlCommand(undef, $def);
-              if($d ~~ @valid_valign) { 
-                $params{tvalign}= $d;
-              } else {
-                Log3($name, 2, "InfoPanel: $name Illegal vertical alignment $d");
-              }
-            }
+        when("tvalign"){
+           my $d = AnalyzePerlCommand(undef, $def);
+           if($d ~~ @valid_valign) { 
+              $params{tvalign}= $d;
+           } else {
+              Log3($name, 2, "InfoPanel $name: Illegal vertical alignment $d");
+           }
+        }
 
 	    default {
               Log3($name, 2, "InfoPanel $name: Illegal command $cmd in layout definition.");
@@ -1268,11 +1225,12 @@ sub btIP_evalLayout {
       } # given
     } # eval
 
-# Debug "after  command $line: x= " . $params{xx} . ", y= " . $params{yy};
+#Debug "after  command $line: x= " . $params{xx} . ", y= " . $params{yy};
 
   } # foreach
   return $svg;
 }
+
    
 ##################
 #
@@ -1333,6 +1291,7 @@ sub btIP_splitRequest {
   }
 }
 
+
 ####################
 #
 # HTML Stuff
@@ -1345,7 +1304,7 @@ sub btIP_returnHTML {
   my $refresh = AttrVal($name, 'refresh', 60);
   my $title   = AttrVal($name, 'title', $name);
   
-  my $code    = btIP_HTMLHead($title,$refresh);
+  my $code    = btIP_HTMLHead($name,$title,$refresh);
 
   $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n".
             "<div id=\"svg_content\" style=\"position:absolute; top:0px; left:0px; z-index:1\" >\n".
@@ -1357,20 +1316,22 @@ sub btIP_returnHTML {
 }
 
 sub btIP_HTMLHead {
-  my ($title,$refresh) = @_;
+  my ($name,$title,$refresh) = @_;
   my $doctype = '<?xml version="1.0" encoding="utf-8" standalone="no"?> '."\n".
                 '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '.
                 '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">'."\n";
   my $xmlns   = "";
 
   my $r       = (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
-  my $scripts = btIP_getScript();
+  my $scripts = btIP_getScript($name);
   my $meta    = "<meta charset=\"UTF-8\">\n";
   my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta$r$scripts</head>\n";
   return $code;
 }
 
 sub btIP_getScript {
+  my ($name) = shift;
+  return "" if AttrVal($name,'noscript',0);
 
   my $scripts= "";
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
@@ -1395,7 +1356,7 @@ sub btIP_HTMLTail {
 
 sub btIP_Overview {
   my ($name, $url);
-  my $html= btIP_HTMLHead("InfoPanel Overview", undef) . "<body>\n";
+  my $html= btIP_HTMLHead(undef, "InfoPanel Overview", undef) . "<body>\n";
   foreach my $def (sort keys %defs) {
     if($defs{$def}{TYPE} eq "InfoPanel") {
         $name= $defs{$def}{NAME};
@@ -1825,18 +1786,6 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
                <br/>
                id = element id<br/>
                x,y = position<br/>
-           </ul></li><br/>
-       <br/>
-       <li><code>trash &lt;id&gt; &lt;x&gt; &lt;y&gt; &lt;scale&gt; &lt;{foregroundColor}&gt; &lt;{backgroundColor}&gt; [&lt;link&gt;]</code><br/>
-           <br/>
-           <ul>print a trashcan with selectable colors for foreground and background<br/>
-               <br/>
-               id = element id<br/>
-               x,y = position<br/>
-               scale = scale to be used for resizing; may be factor or defined by width or height<br/>
-               foregroundColor = hex digits used for foreground<br/>
-               backgroundColor = hex digits used for background<br/>
-               link = URL to be linked to item<br/>
            </ul></li><br/>
        <br/>
        <li><code>tvalign &lt;align&gt;</code><br/>

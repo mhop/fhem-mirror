@@ -168,12 +168,6 @@ img - 621 171 w46 "http://www.fhem.de" file "./www/images/fhemSVG/batterie.svg"
 rect - 620 220 667 267 2 2 1 
 img  - 621 221 w46 "" data { btIP_changeColor("./www/images/fhemSVG/batterie.svg","000000","FFFFFF") } 
 
-# nun zeichnen wir eine Mülltonne mit frei wählbaren Farben
-# für Vordergrund und Hintergrund
-# im Beispiel: weisse Tonne auf blauem Hintergrund
-#
-trash - 710 200 h50 "FFFFFF" "0000FF"
-
 
 # Kreis zeichnen
 # Format: circle <id> <x> <y> <r> [<filled>] [<stroked>]
