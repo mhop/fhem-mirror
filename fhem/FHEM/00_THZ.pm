@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.132";
+my $thzversion = "0.133";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -74,7 +74,7 @@ my %parsinghash = (
 		],
   "05pxx206" => [["p13GradientHC1: ", 4, 4, "hex", 10],		[" p14LowEndHC1: ", 8, 4, "hex", 10],		[" p15RoomInfluenceHC1: ", 12, 2, "hex", 10],
 		[" p16GradientHC2: ", 14, 4, "hex", 10],	[" p17LowEndHC2: ", 18, 4, "hex", 10],		[" p18RoomInfluenceHC2: ", 22, 2, "hex", 10],
-		[" p19FlowProportionHC1: ", 24, 4, "hex", 10],	[" p20FlowProportionHC2: ", 28, 4, "hex", 10],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
+		[" p19FlowProportionHC1: ", 24, 4, "hex", 1],	[" p20FlowProportionHC2: ", 28, 4, "hex", 1],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
 		[" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],	[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10], [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
 		 ],
   "06pxx206" => [["p21Hist1: ", 4, 2, "hex", 10],		[" p22Hist2: ", 6, 2, "hex", 10],		  [" p23Hist3: ", 8, 2, "hex", 10],
@@ -82,15 +82,15 @@ my %parsinghash = (
 		[" p27Hist7: ", 16, 2, "hex", 10],		[" p28Hist8: ", 18, 2, "hex", 10],		  [" p29HistAsymmetry: ", 20, 2, "hex", 1],
 		[" p30integralComponent: ", 22, 4, "hex", 1],	[" p31MaxBoostStages: ", 26, 2, "hex", 1],	  [" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
 		[" p49SummerModeTemp: ", 32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10], [" p77OutTempAdjust: ", 40, 4, "hex", 1],
-		[" p78DualModePoint: ", 44, 4, "hex", 10],	[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
-		 ],
-  "07pxx206" => [["p32HystDHW: ", 4, 2, "hex", 10],		[" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],	 [" p34TempLimitBoostDHW: ", 8, 4, "hex", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
-		[" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],	[" PasteurisationTemp: ", 16, 4, "hex", 10],	 [" MaxBoostStagesDHW: ", 20, 2, "hex", 1],
+		[" p78DualModePoint: ", 44, 4, "hex2int", 10],	[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
+ 		 ],
+  "07pxx206" => [["p32HystDHW: ", 4, 2, "hex", 10],		[" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],	 [" p34TempLimitBoostDHW: ", 8, 4, "hex2int", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
+ 		[" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],	[" PasteurisationTemp: ", 16, 4, "hex", 10],	 [" MaxBoostStagesDHW: ", 20, 2, "hex", 1],
 		[" p84EnableDHWBuffer: ", 22, 2, "hex", 1]
 		 ],
   "08pxx206" => [["p80EnableSolar: ", 4, 2, "hex", 1],		[" p81DiffTempSolarLoading: ", 6, 4, "hex", 10], [" p82DelayCompStartSolar: ", 10, 2, "hex", 1],
-		[" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	[" HystDiffTempSolar: ", 16, 4, "hex", 1],	 [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
-		 ],
+		[" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	[" HystDiffTempSolar: ", 16, 4, "hex", 10],	 [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
+ 		 ],
   "09his"  => [["compressorHeating: ",	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
 	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
 	      [" boosterHeating: ",	20, 4, "hex", 1]
@@ -126,12 +126,12 @@ my %parsinghash = (
 	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
 	      ],
   "17pxx206" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
-	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetDayTemp: ",		16, 4,  "hex", 10], 
-	      [" p05DHWsetNightTemp: ",	20, 4,  "hex", 10], 	[" p06DHWsetStandbyTemp: ",	24, 4,  "hex", 10], 
+	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetTempDay: ",		16, 4,  "hex", 10], 
+	      [" p05DHWsetTempNight: ",	20, 4,  "hex", 10], 	[" p06DHWsetTempStandby: ",	24, 4,  "hex", 10], 
 	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 2,  "hex", 1],
 	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	[" p10RoomTempManual: ",	34, 4,  "hex", 10],
-	      [" p11DHWsetManualTemp: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
-	     ],
+	      [" p11DHWsetTempManual: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
+	      ],
   "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
 	      [" fault0CODE: ",		8, 2,  "faultmap", 1],	[" fault0TIME: ",	12, 4, "turnhex2time", 1],  [" fault0DATE: ",	16, 4, "turnhexdate", 100],
 	      [" fault1CODE: ",		20, 2, "faultmap", 1],	[" fault1TIME: ",	24, 4, "turnhex2time", 1],  [" fault1DATE: ",	28, 4, "turnhexdate", 100],
@@ -460,16 +460,16 @@ my %sets206 = (
     "p01RoomTempDay"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
     "p02RoomTempNight"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
     "p03RoomTempStandby"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
-    "p04DHWsetDayTemp"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
-    "p05DHWsetNightTemp"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
-    "p06DHWsetStandbyTemp"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
+    "p04DHWsetTempDay"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
+    "p05DHWsetTempNight"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
+    "p06DHWsetTempStandby"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
     "p07FanStageDay"		=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
     "p08FanStageNight"		=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
     "p09FanStageStandby"	=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
     "p10RoomTempManual"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
-    "p11DHWSetTempManual"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
-    "p12FANStageManual"		=> {parent=>"p01-p12", argMin =>   "0", argMax =>   "3",	unit =>""}
-);
+    "p11DHWsetTempManual"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
+    "p12FanStageManual"		=> {parent=>"p01-p12", argMin =>   "0", argMax =>   "3",	unit =>""}
+ );
 
 
 
@@ -1377,7 +1377,7 @@ sub THZ_debugread($){
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
  #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
-  my @numbers=('0A0586', '0A0587', '0A058D', 'FE', '00', '0A05D1', '0A010D');  
+  my @numbers=('0A05DD',  'FE');  
   #my @numbers = (1..256);
   #my @numbers = (1..65535);
   #my @numbers = (1..3179);
@@ -1530,7 +1530,7 @@ sub function_heatSetTemp($$) {
   my $Simul_heatSetTemp; 
   my @ret;
   foreach my $i ($start..$stop) {
-   $Simul_heatSetTemp = $i * $i * $c + $i * $b + $a; 
+   $Simul_heatSetTemp = sprintf("%.1f", ($i * $i * $c + $i * $b + $a));
    push(@ret, [$i, $Simul_heatSetTemp]);
   }
   return \@ret;
@@ -1545,6 +1545,11 @@ sub function_heatSetTemp($$) {
 #####################################
 
 sub THZ_PrintcurveSVG {
+my $ycurvevalues = function_heatSetTemp(-15,21);
+my $vstep= 5;
+$vstep= 10 if (($ycurvevalues->[0][1])>36); #change scale if out of scale
+my$v0min= 15;
+my $v1=$v0min+$vstep; my $v2=$v1+$vstep; my $v3=$v2+$vstep; my $v4=$v3+$vstep;
 my $ret =  <<'END';
 <?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="163" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 <style type="text/css"><![CDATA[
@@ -1597,20 +1602,21 @@ polyline { stroke:black; fill:none; }
 <text x="634" y="155" class="ylabel" text-anchor="middle">15</text>  <polyline points="634,19.2 634,140.8" class="hgrid"/>
 <text x="751" y="155" class="ylabel" text-anchor="middle">21</text>  <polyline points="751,19.2 751,140.8" class="hgrid"/>
 <g>
-  <polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">15</text>
-  <polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">20</text>
-  <polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">25</text>
-  <polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">30</text>
-  <polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">35</text>
-</g>
-<g>
-  <polyline points="751,140 756,140"/> <text x="760.8" y="144" class="ylabel">15</text>
-  <polyline points="751,110 756,110"/> <text x="760.8" y="114" class="ylabel">20</text>
-  <polyline points="751,80 756,80"/>   <text x="760.8" y="84" class="ylabel">25</text>
-  <polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">30</text>
-  <polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">35</text>
-</g>
 END
+
+$ret .= '<polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">' . $v0min . '</text>';
+$ret .= '<polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">' . $v1    . '</text>';
+$ret .= '<polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">'  . $v2    . '</text>';
+$ret .= '<polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">'  . $v3    . '</text>';
+$ret .= '<polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">'  . $v4    . '</text>';
+$ret .= '</g> <g>';
+$ret .= '<polyline points="751,140 756,140"/> <text x="760.8" y="144" class="ylabel">'. $v0min .'</text>';
+$ret .= '<polyline points="751,110 756,110"/> <text x="760.8" y="114" class="ylabel">'. $v1    .'</text>';
+$ret .= '<polyline points="751,80 756,80"/>   <text x="760.8" y="84" class="ylabel">' . $v2    .'</text>';
+$ret .= '<polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">' . $v3    .'</text>';
+$ret .= '<polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">' . $v4    .'</text>';
+$ret .= '</g>';
+
 
 my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",24))[81];
 $insideTemp="n.a." if ($insideTemp eq "-60"); #in case internal room sensor not connected
@@ -1651,14 +1657,13 @@ $insideTemp = $roomSetTemp if ($insideTemp eq "n.a.");
 
 #point ######################
 $ret .='<polyline id="line_0"   style="stroke-width:2" class="l0" points="';
-my ($px,$py) = ((($outside_tempFiltered+15)*(750-49)/(15+21)+49),(($heatSetTemp-35)*(140-19)/(15-35)+19)); 
+my ($px,$py) = (sprintf("%.1f", (($outside_tempFiltered+15)*(750-49)/(15+21)+49)),sprintf("%.1f", (($heatSetTemp-$v4)*(140-19)/($v0min-$v4)+19))); 
  $ret.= ($px-3) . "," . ($py)   ." " . ($px)  . "," . ($py-3) ." " . ($px+3) . "," . ($py) ." " . ($px)   . "," . ($py+3)  ." " . ($px-3)   . "," . ($py)  ." " . '"/>' . "\n";
 
 #curve ######################
-$ret .='<polyline id="line_1"  title="Heat Curve" style="stroke-width:2" class="l1" points="';
-my $y = function_heatSetTemp(-15,21);
-foreach (@{$y}) {
-$ret.= (($_->[0]+15)*(750-49)/(15+21)+49) . "," . (($_->[1]-35)*(140-19)/(15-35)+19) ." ";
+$ret .='<polyline id="line_1"  title="Heat Curve" style="stroke-width:1" class="l1" points="';
+foreach (@{$ycurvevalues}) {
+$ret.= (sprintf("%.1f", ($_->[0]+15)*(750-49)/(15+21)+49) ). "," . sprintf("%.1f", (($_->[1]-$v4)*(140-19)/($v0min-$v4)+19)) ." ";
 }
 
 
