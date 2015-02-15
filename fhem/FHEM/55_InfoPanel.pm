@@ -36,11 +36,15 @@
 # 2015-02-11 - 7933 - added:   item counter
 # 2015-02-11 - 7944 - added:   items push/pop
 # 2015-02-12 - 7947 - changed: turtle added to new elements
-# 2015-02-14 - 7967 - added:   item ticker (experimantal
+# 2015-02-14 - 7967 - added:   item ticker (experimental)
 #                     changed: img syntax
+# 2015-02-15 - 7989 - added:   item embed (experimental)
+#              7992 - added:   xcondition (can be overridden by set) 
+#                              set ovClear,ovDisable,ovEnable
+#                              get counter, layout, overrides
 #
 ##############################################
-# $Id$
+# $Id: 55_InfoPanel.pm 7990 2015-02-14 22:28:21Z betateilchen $
 
 package main;
 use strict;
@@ -62,6 +66,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 sub btIP_Define;
 sub btIP_Undef;
 sub btIP_Set;
+sub btIP_Get;
 sub btIP_Notify;
 sub btIP_readLayout;
 
@@ -105,6 +110,7 @@ sub btIP_HTMLTail;
 sub btIP_Overview;
 sub btIP_getURL;
 
+
 ######################################
 
 sub InfoPanel_Initialize($) {
@@ -120,6 +126,7 @@ sub InfoPanel_Initialize($) {
     $hash->{DefFn}     = "btIP_Define";
 	$hash->{UndefFn}   = "btIP_Undef";
     $hash->{SetFn}     = "btIP_Set";
+    $hash->{GetFn}     = "btIP_Get";
     $hash->{NotifyFn}  = "btIP_Notify";
     $hash->{AttrList}  = "autoreread:1,0 bgcolor refresh size title";
     $hash->{AttrList} .= " bgcenter:1,0 bgdir bgopacity tmin" if $useImgTools;
@@ -158,14 +165,60 @@ sub btIP_Set {
   my ($hash, @a) = @_;
   my $name = $a[0];
 
-  # usage check
-  my $usage= "Unknown argument, choose one of reread:noArg";
-  if((@a == 2) && ($a[1] eq "reread")) {
-     btIP_readLayout($hash);
-     return undef;
-  } else {
-    return $usage;
+  my $usage= "Unknown argument, choose one of reread:noArg ovClear ovEnable ovDisable";
+  my $ret = undef;
+
+  given ($a[1]) {
+  
+     when ("ovClear") {
+        if ($a[2] eq "all") {
+           delete $defs{$name}{fhem}{override};
+        } else {
+           delete $defs{$name}{fhem}{override}{$a[2]};
+        }
+     }
+     when ("ovDisable") {
+        $defs{$name}{fhem}{override}{$a[2]} = 0;
+     }
+     when ("ovEnable") {
+        $defs{$name}{fhem}{override}{$a[2]} = 1;
+     }
+     when ("reread") {
+        btIP_readLayout($hash);
+     }
+     default {
+        $ret = $usage;
+     }
   }
+  return $ret;
+}
+
+sub btIP_Get {
+
+  my ($hash, @a) = @_;
+  my $name = $a[0];
+
+  my $usage= "Unknown argument, choose one of reread:noArg counter:noArg layout:noArg overrides:noArg";
+  my $ret = undef;
+
+  given ($a[1]) {
+     when ("counter") {
+        $ret = $defs{$name}{fhem}{counter};
+     }
+     when ("layout") {
+        $ret = $defs{$name}{fhem}{layout};
+     }
+     when ("overrides") {
+        last if(!defined($defs{$name}{fhem}{override}));
+        while ( my ($key, $value) = each($defs{$name}{fhem}{override}) ) {
+          $ret .= "$key => $value \n";
+        }
+     }
+     default {
+        $ret = $usage;
+     }
+  }
+  return $ret;
 }
 
 sub btIP_Notify {
@@ -896,8 +949,20 @@ sub btIP_evalLayout {
 # Debug "CMD= \"$cmd\", DEF= \"$def\"";
 	  
     # separate condition handling
-    if($cmd eq 'condition') {
-	  $params{condition} = AnalyzePerlCommand(undef, $def);
+    if($cmd =~ m/condition/) {
+      if($cmd =~ m/^xcond/) {
+         ($id,$arg) = split("[ \t]+", $def, 2);
+         $params{condition} = AnalyzePerlCommand(undef,$arg);
+         my $override = $defs{$name}{fhem}{override}{$id};
+         $override //= $params{condition};
+         if($params{condition}) {
+            $params{condition} = AnalyzePerlCommand(undef,$arg) && $override;
+         } else {
+            $params{condition} = AnalyzePerlCommand(undef,$arg) || $override;
+         }
+      } else {
+         $params{condition} = AnalyzePerlCommand(undef,$def);
+      }
 	  next;
 	}  
     next unless($params{condition});
@@ -1402,7 +1467,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 	<a name="InfoPanelset"></a>
 	<b>Set-Commands</b><br/><br/>
     <ul>
-       <code>set &lt;name&gt; reread</code>
+       <li><code>set &lt;name&gt; reread</code>
        <ul><br/>
           Rereads the <a href="#InfoPanellayout">layout definition</a> from the file.<br/><br/>
           <b>Important:</b><br/>
@@ -1410,14 +1475,41 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
              Layout will be reread automatically if edited via fhem's "Edit files" function.<br/>
              Autoread can be disabled via <a href="#InfoPanelattr">attribute</a>.
           </ul>
-       </ul>
+       </ul></li><br/>
+       <li><code>set &lt;name&gt; ovEnable &lt;xconditionName&gt;</code>
+         <ul><br/>
+          set an override "1" to named xcondition 
+         </ul>
+       </li><br/>
+       <li><code>set &lt;name&gt; ovDisable &lt;xconditionName&gt;</code>
+         <ul><br/>
+          set an override "0" to named xcondition 
+         </ul>
+       </li><br/>
+       <li><code>set &lt;name&gt; ovClear &lt;xconditionName&gt|all;</code>
+         <ul><br/>
+          delete an existing overrides to named xcondition. "all" will clear all overrides.<br/>
+         </ul>
+       </li>
     </ul>
 	<br/><br/>
 
 	<a name="InfoPanelget"></a>
 	<b>Get-Commands</b><br/><br/>
 	<ul>
-	   n/a<br/>
+       <li><code>get &lt;name&gt; counter</code>
+       <ul><br/>
+          return value from internal counter<br/>
+       </ul></li><br/>
+       <li><code>get &lt;name&gt; layout</code>
+       <ul><br/>
+          return complete layout definition<br/>
+       </ul></li><br/>
+       <li><code>get &lt;name&gt; overrides</code>
+       <ul><br/>
+          return list of defined overrides<br/>
+       </ul></li><br/>
+       <br/>
 	</ul>
 	<br/><br/>
 
