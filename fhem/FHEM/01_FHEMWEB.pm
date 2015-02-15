@@ -774,6 +774,7 @@ FW_answerCall($)
         }
       }
 
+      $FW_cmdret =~ s/:\S+//g if($FW_cmdret =~ m/unknown.*choose one of/i);
       $FW_cmdret = "<pre>$FW_cmdret</pre>" if($FW_cmdret =~ m/\n/);
     }
 
