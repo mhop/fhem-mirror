@@ -284,9 +284,6 @@ my %km271_set_day = (
   "so"  => 0xc0,
 );
 
-# Internal hash for storing actual timing parameter of heater, populated by "logmode" command
-my %km271_timer;
-
 #####################################
 sub
 KM271_Initialize($)
@@ -302,9 +299,7 @@ KM271_Initialize($)
   $hash->{UndefFn} = "KM271_Undef";
   $hash->{SetFn}   = "KM271_Set";
   $hash->{AttrFn}  = "KM271_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 all_km271_events loglevel:0,1,2,3,4,5,6 ww_timermode:automatik,tag readingsFilter";
-  my @a = ();
-  $hash->{SENDBUFFER} = \@a;
+  $hash->{AttrList}= "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 all_km271_events ww_timermode:automatik,tag readingsFilter $readingFnAttributes";
 
   %km271_rev = ();
   foreach my $k (sort keys %km271_tr) {      # Reverse map
@@ -334,7 +329,13 @@ KM271_Define($$)
   }
   
   $hash->{DeviceName} = $dev;
-  my $ret = DevIo_OpenDev($hash, 0, "KM271_DoInit");
+  my @a = ();
+  $hash->{SENDBUFFER} = \@a;
+  # Internal hash for storing actual timing parameter of heater, populated by "logmode" command
+  my %b = ();
+  $hash->{PRG_TIMER} = \%b;
+
+  my $ret = DevIo_OpenDev($hash, 0, "KM271_DoInit");  
   return $ret;
 }
 
@@ -445,64 +446,66 @@ KM271_Set($@)
       return "On- and off timepoints must not be identical" if(substr($val, 2, 2) eq substr($offval, 2, 2) && $onday == $offday);
     }
     # Calculate offsets for command and internal timer hash
+    my $km271Timer = $hash->{PRG_TIMER};
     my $offset = int(($pos*2 + 1)/3)*7;
     my $keyoffset = $offset + ($a[1] =~ m/^hk1/ ? 0 : 15)*7;
     my $key = sprintf("01%02x", $keyoffset);
+    
     # Are two updates needed (interval is spread over two lines)?
     if (($pos + 1) % 3 == 0) {
       my $key2 = sprintf("01%02x", $keyoffset + 7);
       return "Internal timer-hash is not populated, use logmode command and try again later"
-             if (!defined($km271_timer{$key}{0}) || !defined($km271_timer{$key}{1}) || !defined($km271_timer{$key2}{1}) || !defined($km271_timer{$key2}{2}));
+             if (!defined($km271Timer->{$key}{0}) || !defined($km271Timer->{$key}{1}) || !defined($km271Timer->{$key2}{1}) || !defined($km271Timer->{$key2}{2}));
 
       # Check if update for key2 is needed
-	   if (defined($km271_timer{$key2}{0}) && $km271_timer{$key2}{0} eq $offval) {
+	   if (defined($km271Timer->{$key2}{0}) && $km271Timer->{$key2}{0} eq $offval) {
 	     Log 4, "$name: Update for second timer-part not needed";
 	   } else {
         # Update internal hash
-        $km271_timer{$key2}{0} = $offval;
-        $offval .= $km271_timer{$key2}{1} . $km271_timer{$key2}{2};
+        $km271Timer->{$key2}{0} = $offval;
+        $offval .= $km271Timer->{$key2}{1} . $km271Timer->{$key2}{2};
         # Dirty trick: Changes of the timer are not notified by the heater, so internal notification is added after the colon
         $offval = sprintf("%02x%s:%s%s", $offset + 7, $offval, $key2, $offval);
         # Push first command
         push @{$hash->{SENDBUFFER}}, sprintf($fmt, $offval);
 	   }
 	   # Check if update for key is needed
-	   if (defined($km271_timer{$key}{2}) && $km271_timer{$key}{2} eq $val) {
+	   if (defined($km271Timer->{$key}{2}) && $km271Timer->{$key}{2} eq $val) {
 	     Log 4, "$name: Update for first timer-part not needed";
 	     goto END_SET;
 	   } else {
         # Update internal hash
-        $km271_timer{$key}{2} = $val;
+        $km271Timer->{$key}{2} = $val;
 	   }
 	 } else {
       # Only one update needed
       if ($pos % 3 == 1) {
-        return "Internal timer-hash is not populated, use logmode command and try again later" if (!defined($km271_timer{$key}{2}));
+        return "Internal timer-hash is not populated, use logmode command and try again later" if (!defined($km271Timer->{$key}{2}));
 
         # Check if update for key is needed
-	     if (defined($km271_timer{$key}{0}) && defined($km271_timer{$key}{1}) && $km271_timer{$key}{0} eq $val && $km271_timer{$key}{1} eq $offval) {
+	     if (defined($km271Timer->{$key}{0}) && defined($km271Timer->{$key}{1}) && $km271Timer->{$key}{0} eq $val && $km271Timer->{$key}{1} eq $offval) {
           Log 4, "$name: Update for timer not needed";
           goto END_SET;
         } else {
           # Update internal hash
-          $km271_timer{$key}{0} = $val;
-          $km271_timer{$key}{1} = $offval;
+          $km271Timer->{$key}{0} = $val;
+          $km271Timer->{$key}{1} = $offval;
 		  }
       } else {
-        return "Internal timer-hash is not populated, use logmode command and try again later" if (!defined($km271_timer{$key}{0}));
+        return "Internal timer-hash is not populated, use logmode command and try again later" if (!defined($km271Timer->{$key}{0}));
 
 	     # Check if update for key is needed
-	     if (defined($km271_timer{$key}{1}) && defined($km271_timer{$key}{2}) && $km271_timer{$key}{1} eq $val && $km271_timer{$key}{2} eq $offval) {
+	     if (defined($km271Timer->{$key}{1}) && defined($km271Timer->{$key}{2}) && $km271Timer->{$key}{1} eq $val && $km271Timer->{$key}{2} eq $offval) {
 	       Log 4, "$name: Update for timer not needed";
 	       goto END_SET;
 	     } else {
           # Update internal hash
-          $km271_timer{$key}{1} = $val;
-          $km271_timer{$key}{2} = $offval;
+          $km271Timer->{$key}{1} = $val;
+          $km271Timer->{$key}{2} = $offval;
 		  }
       }
     }
-    $val = $km271_timer{$key}{0} . $km271_timer{$key}{1} . $km271_timer{$key}{2};
+    $val = $km271Timer->{$key}{0} . $km271Timer->{$key}{1} . $km271Timer->{$key}{2};
     # Dirty trick: Changes of the timer are not notified by the heater, so internal notification is added after the colon
     $val = sprintf("%02x%s:%s%s", $offset, $val, $key, $val);
   }
@@ -638,6 +641,7 @@ KM271_Read($)
   my $all_events = AttrVal($name, "all_km271_events", "");
 
   if($msghash) {
+    my $km271Timer = $hash->{PRG_TIMER};
     foreach my $off (keys %{$msghash}) {
 
       my $key = $msghash->{$off};
@@ -662,9 +666,9 @@ KM271_Read($)
                                                          , KM271_setprg(hex(substr($arg, ($off+2)*2, 2)), hex(substr($arg, ($off+3)*2, 2)))
                                                          , KM271_setprg(hex(substr($arg, ($off+4)*2, 2)), hex(substr($arg, ($off+5)*2, 2)))); 
                             # Fill internal timer hash
-                            $km271_timer{$fn}{0} = substr($arg, 0, 4);
-                            $km271_timer{$fn}{1} = substr($arg, 4, 4);
-                            $km271_timer{$fn}{2} = substr($arg, 8, 4); }
+                            $km271Timer->{$fn}{0} = substr($arg, 0, 4);
+                            $km271Timer->{$fn}{1} = substr($arg, 4, 4);
+                            $km271Timer->{$fn}{2} = substr($arg, 8, 4); }
         elsif($f eq "eh") { $val = KM271_seterror($arg); }
       }
       $key = ucfirst($key);   # Hack to match the original and the fake reading
@@ -826,7 +830,7 @@ KM271_crc($)
 sub
 KM271_SetReading($$$$)
 {
-  my ($hash,$key,$val,$ntfy) = @_;
+  my ($hash, $key, $val, $ntfy) = @_;
   my $name = $hash->{NAME};
   my $filter = AttrVal($name, 'readingsFilter', '');
   return if ($filter && $key !~ m/$filter/s);
@@ -983,7 +987,7 @@ KM271_SetReading($$$$)
         </li>
     <a name="readingsFilter"></a>
     <li>readingsFilter<br>
-        Regular expression for selection of desired readings:<br>
+        Regular expression for selection of desired readings.<br>
         Only readings which will match the regular expression will be used. All other readings are
         suppressed in the device and even in the logfile.
         </li>
