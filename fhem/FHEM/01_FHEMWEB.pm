@@ -2404,7 +2404,7 @@ FW_devState($$@)
   my ($hasOnOff, $link);
 
   my $cmdList = AttrVal($d, "webCmd", "");
-  my $allSets = getAllSets($d);
+  my $allSets = FW_widgetOverride($d, getAllSets($d));
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
@@ -2431,7 +2431,35 @@ FW_devState($$@)
     my ($icon, $isHtml);
     ($icon, $link, $isHtml) = FW_dev2image($d);
     $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if($icon);
-    $link = "cmd.$d=set $d $link" if(defined($link));
+
+    my $cmdlist = $link // "";
+    my $h = "";
+    foreach my $cmd (split(":", $cmdlist)) {
+      my $htmlTxt;
+      my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
+      if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
+        my $values = $1;
+        foreach my $fn (sort keys %{$data{webCmdFn}}) {
+          no strict "refs";
+          $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
+                                           $d, $FW_room, $cmd, $values);
+          use strict "refs";
+          last if(defined($htmlTxt));
+        }
+      }
+
+      if( $htmlTxt ) {
+        $h .= "<p>$htmlTxt</p>";
+      }
+    }
+
+    if( $h ) {
+      $link = undef;
+      $h =~ s/'/\\"/g;
+      $txt = "<a onClick='FW_okDialog(\"$h\",this)'\>$txt</a>";
+    } else {
+      $link = "cmd.$d=set $d $link" if(defined($link));
+    }
 
   }
 

@@ -30,6 +30,23 @@ window.onbeforeunload = function(e)
 }
 
 function
+FW_replaceWidgets(parent)
+{
+  parent.find("div.fhemWidget").each(function() {
+    var dev=$(this).attr("dev");
+    var cmd=$(this).attr("cmd");
+    var rd=$(this).attr("reading");
+    var params = cmd.split(" ");
+    FW_replaceWidget(this, dev, $(this).attr("arg").split(","),
+      $(this).attr("current"), rd, params[0], params.slice(1),
+      function(arg) {
+        FW_cmd(FW_root+"?cmd=set "+dev+(params[0]=="state" ? "":" "+params[0])+
+                        " "+arg+"&XHR=1");
+      });
+  });
+}
+
+function
 FW_jqueryReadyFn()
 {
   FW_docReady = true;
@@ -67,19 +84,8 @@ FW_jqueryReadyFn()
   var r = $("head").attr("root");
   if(r)
     FW_root = r;
-  $("div.fhemWidget").each(function() {
-    var dev=$(this).attr("dev");
-    var cmd=$(this).attr("cmd");
-    var rd=$(this).attr("reading");
-    var params = cmd.split(" ");
-    FW_replaceWidget(this, dev, $(this).attr("arg").split(","),
-      $(this).attr("current"), rd, params[0], params.slice(1),
-      function(arg) {
-        FW_cmd(FW_root+"?cmd=set "+dev+(params[0]=="state" ? "":" "+params[0])+
-                        " "+arg+"&XHR=1");
-      });
-  });
 
+  FW_replaceWidgets($("html"));
 
   // Fix the td count by setting colspan on the last column
   $("table.block.wide").each(function(){        // table
@@ -115,8 +121,9 @@ FW_jqueryReadyFn()
   $("#saveCheck")
     .css("cursor", "pointer")
     .click(function(){
+      var parent = this;
       FW_cmd(FW_root+"?cmd=save ?&XHR=1", function(data) {
-        FW_okDialog('<pre>'+data+'</pre>');
+        FW_okDialog('<pre>'+data+'</pre>',parent);
       });
     });
 
@@ -217,7 +224,7 @@ FW_errmsg(txt, timeout)
 }
 
 function
-FW_okDialog(txt)
+FW_okDialog(txt, parent)
 {
   var div = $("<div id='FW_okDialog'>");
   $(div).html(txt);
@@ -230,6 +237,14 @@ FW_okDialog(txt)
       $(div).remove();
     }}]
   });
+
+  FW_replaceWidgets(div);
+
+  if(parent)
+    $(div).dialog( "option", "position", {
+      my: "left top", at: "right bottom",
+      of: parent, collision: "flipfit"
+    });
 }
 
 function
