@@ -1618,7 +1618,7 @@ SYSMON_getCPUBogoMIPS($$)
 	if(!defined $old_val) {
     my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
     #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ".Dumper(@aval)); # TODO: Delete
-    my $val=@aval[0];
+    my $val=$aval[0];
     #SYSMON_Log($hash, 5, "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ".$val); # TODO: Delete
     if(defined($val)){
       #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
@@ -3092,10 +3092,8 @@ sub
 SYSMON_isFB($) {
 	my ($hash) = @_;
 	if(!defined ($hash->{helper}{sys_fb})) {
-		#SYSMON_Log($hash, 5, "TEST isFB >>> exe >>> "); # TODO: remove
 	  $hash->{helper}{sys_fb} = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
-  } 
-  #SYSMON_Log($hash, 5, "TEST isFB >>> ret >>> '".$hash->{helper}{sys_fb}."'"); # TODO: remove
+  }
 	return $hash->{helper}{sys_fb};
 }
 
