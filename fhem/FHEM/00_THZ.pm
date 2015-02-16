@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.133";
+my $thzversion = "0.133+";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -261,7 +261,7 @@ my %parsinghash = (
 ########################################################################################
 
 my %sets439 = (
- #   "flowTem"				=> {parent=>"sGlobal", argMin =>  "1", argMax =>   "88", unit =>" °C"},
+    "flowTem"				=> {parent=>"sGlobal", argMin =>  "1", argMax =>   "88", unit =>" °C"},
     "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
     "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
     "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
@@ -932,8 +932,10 @@ sub THZ_Get($@){
   
   my $parent = $cmdhash->{parent};	#if I have a father read from it
   if(defined($parent) ) {
-      # if ReadingsTimestamp(parent) +60s < timenow  $risultato =readingvalue(parent)
-      my $risultato=THZ_Get($hash, $hash->{NAME}, $parent);	#to be implemented:check last update of the parent: if under 60sec use the current value
+      my ($seconds, $microseconds) = gettimeofday();
+      my $seconds= abs($seconds - time_str2num(ReadingsTimestamp($name, $parent, "1970-01-01 01:00:00")));
+      my $risultato=ReadingsVal($name, $parent, 0);
+      $risultato=THZ_Get($hash, $name, $parent) if ($seconds > 29 );	#update of the parent: if under 29sec use the current value
       my $parenthash=$gets{$parent}; my $parsingrule = $parsinghash{$parenthash->{type}};
       my $i=0; 
       for  (@$parsingrule) {
@@ -1510,8 +1512,7 @@ sub THZ_RemoveInternalTimer($){
 
 sub function_heatSetTemp($$) {
   my ($start, $stop) = @_;
-  my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",24))[81];
-  $insideTemp="n.a." if ($insideTemp eq "-60"); #in case internal room sensor not connected
+  my $insideTemp=(split ' ',ReadingsVal("Mythz","sHC1",24))[27];
   my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",24))[21];
   $roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
   my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
@@ -1522,8 +1523,6 @@ sub function_heatSetTemp($$) {
   my $p99RoomThermCorrection =(split ' ',ReadingsVal("Mythz","p99RoomThermCorrection",0))[0];
   #########$insideTemp=23.8 ; $roomSetTemp = 20.5; $p13GradientHC1 = 0.31; $heatSetTemp = 25.4; $p15RoomInfluenceHC1 = 80; $outside_tempFiltered = 4.9; $p14LowEndHC1 =1.5; $p99RoomThermCorrection = -2.8;
   
-  $insideTemp += $p99RoomThermCorrection if ($insideTemp ne "n.a."); 
-  $insideTemp = $roomSetTemp if ($insideTemp eq "n.a."); 
   my $a= 1 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
   my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
   my $c= -1 * $p13GradientHC1 /75;
@@ -1618,8 +1617,7 @@ $ret .= '<polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylab
 $ret .= '</g>';
 
 
-my $insideTemp=(split ' ',ReadingsVal("Mythz","sGlobal",24))[81];
-$insideTemp="n.a." if ($insideTemp eq "-60"); #in case internal room sensor not connected
+my $insideTemp=(split ' ',ReadingsVal("Mythz","sHC1",24))[27];
 my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",24))[21];
 $roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
 my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
@@ -1648,7 +1646,6 @@ $ret .=  $outside_tempFiltered . ' heatSetTemp=' . $heatSetTemp . '</text>';
 
 #title ######################
 $ret .= '<text id="svg_title" x="400" y="14.4" class="title" text-anchor="middle">';
-$insideTemp += $p99RoomThermCorrection if ($insideTemp ne "n.a."); 
 $ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  ' p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . " insideTemp=" . $insideTemp .' </text>' . "\n";
 
 #equation####################
