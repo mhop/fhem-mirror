@@ -1313,8 +1313,6 @@ sub btIP_returnHTML {
   return ("text/html; charset=utf-8", $code);
 }
 
-#style="display: none;" onload="document.getElementsByTagName('BODY')[0].style.display='block';"
-
 sub btIP_HTMLHead {
   my ($name,$title,$refresh) = @_;
   my $doctype = '<?xml version="1.0" encoding="utf-8" standalone="no"?> '."\n".
