@@ -223,6 +223,7 @@ sub CommandConfigdb($$) {
 			Currently the fhem modules<br/>
 			<br/>
 			<li>02_RSS.pm</li>
+			<li>55_InfoPanel.pm</li>
 			<li>91_eventTypes</li>
 			<li>93_DbLog.pm</li>
 			<li>95_holiday.pm</li>
