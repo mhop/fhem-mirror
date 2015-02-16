@@ -261,7 +261,7 @@ my %parsinghash = (
 ########################################################################################
 
 my %sets439 = (
-    "flowTem"				=> {parent=>"sGlobal", argMin =>  "1", argMax =>   "88", unit =>" °C"},
+    #"flowTem"				=> {parent=>"sGlobal", argMin =>  "1", argMax =>   "88", unit =>" °C"},
     "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode" },  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
     "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
     "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
@@ -814,32 +814,38 @@ sub THZ_Set($@){
  
   my $parent = $cmdhash->{parent};	#if I have a father read from it
   if(defined($parent) ) {
-      my $parenthash=$gets{$parent}; my $parsingrule = $parsinghash{$parenthash->{type}};
-      my $i=0; 
-      for   (@$parsingrule) {
-	last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
-	$i++;
+      my $parenthash=$gets{$parent};
+      #read before write the register
+      $cmdHex2 = $parenthash->{cmd2};	#overwrite $cmdHex2 with the parent
+      $cmdHex2=THZ_encodecommand($cmdHex2, "get");
+      ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
+      if (defined($err))     {
+		 Log3 $hash->{NAME}, 3, "THZ_Set: error reading register: '$err'";
+		 return ($msg ."\n msg " . $err);
       }
-      my $pos = @$parsingrule[$i]->[1];
+      substr($msg, 0, 2, ""); 		#remove the checksum from the head of the payload
+      Log3 $hash->{NAME}, 3, "answer from THZ: $msg";
+      #--
+      my $parsingrule = $parsinghash{$parenthash->{type}};
+      my $i=0; 
+      for (@$parsingrule) {
+	      last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
+	      $i++;
+      }
+      my $pos = @$parsingrule[$i]->[1] ;
       my $len = @$parsingrule[$i]->[2];
       my $pasringtype = @$parsingrule[$i]->[3];
       my $dec = @$parsingrule[$i]->[4];
-      my $subst;
-      $cmdHex2 = $parenthash->{cmd2};	#overwrite $cmdHex2 with the parent
       Log3 $hash->{NAME}, 3, "write register/pos/len/dec/arg to THZ: $cmdHex2 / $pos / $len / $dec / $arg";
-      #read before write the register
-      $cmdHex2=THZ_encodecommand($cmdHex2, "get");
-	($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
-	if (defined($err))     {
-		 Log3 $hash->{NAME}, 3, "THZ_Set: error reading register: '$err'";
-		 return ($msg ."\n msg " . $err);
-	}
-	Log3 $hash->{NAME}, 3, "answer from THZ: $msg";
-	return ("everything ok, no writing, I am tired. Rest of implementation tomorrow. look in the logs");
   }
- 
- 
- 
+  else {
+    #my $parsingrule = $parsinghash{$cmdhash->{type}} if(defined($msgtype));
+    #my $pos = @$parsingrule[0]->[1] ;
+    #my $len = @$parsingrule[0]->[2];
+    #my $pasringtype = @$parsingrule[0]->[3];
+    #my $dec = @$parsingrule[0]->[4];
+    #$msg =  $cmdHex2 . "0000";   
+  }
  
  
  
