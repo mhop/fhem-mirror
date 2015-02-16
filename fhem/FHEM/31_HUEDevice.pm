@@ -874,7 +874,7 @@ HUEDevice_Parse($$)
 
     }
 
-  } elsif( $attr{$name}{subType} eq "colordimmer" ) {
+  } elsif( $attr{$name}{subType} eq "colordimmer" && defined($attr{$name}{model}) ) {
     $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} if( defined($hueModels{$attr{$name}{model}}{subType}) );
   }
 
