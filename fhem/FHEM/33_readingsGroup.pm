@@ -867,12 +867,17 @@ sub
 readingsGroup_detailFn()
 {
   my ($FW_wname, $d, $room, $extPage) = @_; # extPage is set for summaryFn.
-
   my $hash = $defs{$d};
+
+  return undef if( ${hash}->{inDetailFn} );
 
   $hash->{mayBeVisible} = 1;
 
-  return readingsGroup_2html($d,$extPage);
+  ${hash}->{inDetailFn} = 1;
+  my $html = readingsGroup_2html($d,$extPage);
+  delete ${hash}->{inDetailFn};
+
+  return $html;
 }
 
 sub
