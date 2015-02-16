@@ -1246,7 +1246,7 @@ sub initDropdownLists($){
 
 sub gdsHeadlines($;$) {
   my ($d,$sep) = @_;
-  my $text;
+  my $text = "";
   $sep = (defined($sep)) ? $sep : '|';
   my $count = ReadingsVal($d,'a_count',0);
   for (my $i = 0; $i < $count; $i++) {

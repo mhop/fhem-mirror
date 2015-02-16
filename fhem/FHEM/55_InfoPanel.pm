@@ -42,7 +42,7 @@
 #              7995 - added:   xcondition (can be overridden by set) 
 #                              set ovClear,ovDisable,ovEnable
 #                              get counter, layout, overrides
-#              7997 - removed: trashcan due to performance issues
+#                   - removed: trashcan due to performance issues
 #                   - added:   break condition for includes
 #
 ##############################################
@@ -670,7 +670,7 @@ sub btIP_itemTicker {
   "<script>\$(function() {\$('#${id}_ticker').vTicker('init', ".
   "{speed: $speed, pause: $pause, mousePause:true, showItems: $items, padding:$params{padding}});});</script>\n".
   "<div id=\"${id}_ticker\" style=\"position:relative; top:${y}px; left:${x}px; z-index:1; ".
-  "width:${width}px; ".
+  "width:${width}px; text-align:$params{tbalign}; ".
   "font-family:$params{font}; font-size:$params{pt}; color:#$color; \" >\n<ul>\n";
   foreach (@a) {$ticker .= sprintf($liTemplate,$_)};
   $ticker .= "</ul>\n</div>\n</div>\n";
@@ -1300,7 +1300,6 @@ sub btIP_splitRequest {
 sub btIP_returnHTML {
   my ($name) = @_;
 
-#  my $url     = btIP_getURL();
   my $refresh = AttrVal($name, 'refresh', 60);
   my $title   = AttrVal($name, 'title', $name);
   
@@ -1311,9 +1310,10 @@ sub btIP_returnHTML {
             btIP_returnSVG($name)."\n</div>\n";
   $code .=  $defs{$name}{fhem}{div} if($defs{$name}{fhem}{div});
   $code .=  "</body>\n".btIP_HTMLTail();
-
   return ("text/html; charset=utf-8", $code);
 }
+
+#style="display: none;" onload="document.getElementsByTagName('BODY')[0].style.display='block';"
 
 sub btIP_HTMLHead {
   my ($name,$title,$refresh) = @_;
@@ -1408,7 +1408,6 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 	      <br/>
 	      <ul>
 	         <li>layout tag img can not be used</li>
-	         <li>layout tag trash can not be used</li>
 	         <li>layout tag plot can only handle scale = 1 and inline = 0</li>
 	      </ul>
 	  </li>
