@@ -282,16 +282,20 @@ MAX_Set($@)
       }
 
       $ctrlmode = 0; #auto
-    } elsif($args[0] eq "boost") {
-      $temperature = 0;
-      $ctrlmode = 3;
-      #TODO: auto mode with temperature is also possible
-    } elsif($args[0] eq "eco") {
-      $temperature = MAX_ReadingsVal($hash,"ecoTemperature");
-    } elsif($args[0] eq "comfort") {
-      $temperature = MAX_ReadingsVal($hash,"comfortTemperature");
-    }else{
-      $temperature = MAX_ParseTemperature($args[0]);
+    } else {
+      return "To many parameters to desiredTemperature: expected one" if(@args > 1);
+
+      if($args[0] eq "boost") {
+        $temperature = 0;
+        $ctrlmode = 3;
+        #TODO: auto mode with temperature is also possible
+      } elsif($args[0] eq "eco") {
+        $temperature = MAX_ReadingsVal($hash,"ecoTemperature");
+      } elsif($args[0] eq "comfort") {
+        $temperature = MAX_ReadingsVal($hash,"comfortTemperature");
+      }else{
+        $temperature = MAX_ParseTemperature($args[0]);
+      }
     }
 
     if(@args > 1 and ($args[1] eq "until") and ($ctrlmode == 1)) {
