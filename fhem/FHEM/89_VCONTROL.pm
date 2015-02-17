@@ -92,12 +92,15 @@ sub VCONTROL_2ByteUConv($);
 sub VCONTROL_2ByteSConv($);
 sub VCONTROL_DateConv($);
 sub VCONTROL_TimerConv($$);
+sub VCONTROL_RegisterConv($);
 sub VCONTROL_Clear($);
 sub VCONTROL_Read($);
 sub VCONTROL_Ready($);
 sub VCONTROL_Parse($$$$);
 sub VCONTROL_Poll($);
 sub VCONTROL_CmdConfig($);
+sub VCONTROL_ReInit($);
+
 
 sub
 VCONTROL_Initialize($)
@@ -115,7 +118,7 @@ VCONTROL_Initialize($)
   $hash->{GetFn}   = "VCONTROL_Get";
   $hash->{StateFn} = "VCONTROL_SetState";
   $hash->{ShutdownFn} = "VCONTROL_Shutdown";
-  $hash->{AttrList}  = "disable:0,1 setList closedev:0,1 ". $readingFnAttributes;
+  $hash->{AttrList}  = "disable:0,1 init_every_poll:0,1 update_only_changes:0,1 setList closedev:0,1 ". $readingFnAttributes;
 }
 
 #####################################
@@ -278,12 +281,17 @@ VCONTROL_Poll($)
   my $name = $hash->{NAME};
   #global Module Trigger that Polling is started
   if( AttrVal($name, "disable", 0 ) == 1 )
-     {
-       $poll_now = POLL_PAUSED;
-       Log3 $name, 5, "VCONTROL: Poll disabled!";
-     }
+  {
+      $poll_now = POLL_PAUSED;
+      Log3 $name, 5, "VCONTROL: Poll disabled!";
+  }
   else
-     {$poll_now=POLL_ACTIVE;}
+  {   $poll_now=POLL_ACTIVE;
+      if( AttrVal($name, "init_every_poll", 0 ) == 1 )
+      {
+          VCONTROL_ReInit($hash);
+      }
+  }
   $poll_duration = gettimeofday();
   Log3 $name, 4, "VCONTROL: Start of Poll !";
   my $timer = gettimeofday()+$hash->{INTERVAL};
@@ -607,10 +615,12 @@ VCONTROL_Parse($$$$)
      if ($sec < 10) {$plotsec = "0$sec"};
   my $systime="$year-$plotmonth-$plotmday"."_"."$plothour:$plotmin:$plotsec";
     
-  #Start Update Readings 
+  #Start Update Readings
+  my $update_only_changes = AttrVal($pn, "update_only_changes", "0");  
   readingsBeginUpdate  ($hash);
-  readingsBulkUpdate   ($hash, "$valuename", $value);
-
+  if ( $update_only_changes == 0 || ($update_only_changes == 1 && (ReadingsVal($pn,"$valuename",0) ne $value)))
+     { readingsBulkUpdate ($hash, "$valuename", $value)};
+   
   #calculate Kumulation Readings and Day Readings
   
   if ("$cmd_list[$cmd][5]" eq "day"  ){
@@ -790,7 +800,17 @@ VCONTROL_Set($@)
           @get_timer_cmd_list = @timer_cmd_list;
           $get_timer_now = GET_TIMER_ACTIVE;
         }
-    
+        elsif ($$_[3] eq "Register"){
+          $send_additonal_param=VCONTROL_RegisterConv($value);
+          if ($send_additonal_param eq "")
+          {
+             Log3 $pn, 1, "VCONTROL: Register falsch eingegeben: $value";
+             return "";
+          }
+          else {
+             Log3 $pn, 1, "VCONTROL: Register gesetzt: $value (01F427$send_additonal_param)";
+          }
+        }
         return "";
      }
   }
@@ -848,6 +868,56 @@ sub VCONTROL_Get($@) {
   return "";
 }
 
+
+sub
+VCONTROL_ReInit($)
+{
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $dev  = $hash->{DeviceName};
+  delete $hash->{USBDev};
+  delete $hash->{FD};
+  DevIo_CloseDev($hash);
+
+  $hash->{PARTIAL} = "";
+  
+  #Opening USB Device
+  Log3($name, 3, "VCONTROL ReInit VCONTROL device $dev");
+  
+  my $ret = undef;
+  my $po;
+  ###USB
+  if ($^O=~/Win/) {
+     require Win32::SerialPort;
+     $po = new Win32::SerialPort ($dev);
+  } else  {
+     require Device::SerialPort;
+     $po = new Device::SerialPort ($dev);
+  }
+  if(!$po) {
+      my $msg = "Can't open $dev: $!";
+      Log3($name, 3, $msg) if($hash->{MOBILE});
+      return $msg if(!$hash->{MOBILE});
+      $readyfnlist{"$name.$dev"} = $hash;
+      return "";
+  }
+  Log3($name, 3, "VCONTROL opened VCONTROL device $dev");
+
+  $hash->{USBDev} = $po;
+  if( $^O =~ /Win/ ) {
+     $readyfnlist{"$name.$dev"} = $hash;
+  } else {
+     $hash->{FD} = $po->FILENO;
+     delete($readyfnlist{"$name.$dev"});
+     $selectlist{"$name.$dev"} = $hash;
+  }
+     
+  #Initialize to be able to receive data
+  VCONTROL_DoInit($hash, $po);
+
+  return $ret;
+
+}
 #####################################
 #####################################
 ## Load Config
@@ -1092,7 +1162,7 @@ sub VCONTROL_1ByteSConv($)
   my $convvalue = shift;
   my $cnvstrvalue = (sprintf "%02X", $convvalue);
   if ($convvalue <0){
-    return substr($cnvstrvalue,6,2);
+     return substr($cnvstrvalue,length($cnvstrvalue)-2,2);
   }
   else {
     return $cnvstrvalue;
@@ -1192,6 +1262,29 @@ sub VCONTROL_TimerConv($$){
    
    return $suffix;        
 }
+
+#####################################
+sub VCONTROL_RegisterConv($)
+{
+  my $convvalue = shift;
+  if (length($convvalue)==4 || (length($convvalue)==5 && substr($convvalue,2,1)eq"-"))
+    {
+        my $register=substr($convvalue,0,2);
+        my $value=substr($convvalue,2,3);
+        my $hexvalue=sprintf "%02X", $value;
+        if ($value <0)
+        {
+            $hexvalue = substr($hexvalue,length($hexvalue)-2,2);
+        }
+        return $register."01".$hexvalue;
+    }
+  else 
+    {
+        return "";
+    }
+}
+
+
 1;
 
 =pod
