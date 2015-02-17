@@ -239,6 +239,7 @@ FW_okDialog(txt, parent)
   });
 
   FW_replaceWidgets(div);
+  FW_replaceLink(div); // Forum #33766
 
   if(parent)
     $(div).dialog( "option", "position", {
