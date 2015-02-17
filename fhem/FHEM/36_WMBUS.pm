@@ -339,6 +339,18 @@ sub WMBUS_SetDeviceSpecificReadings($$$)
         readingsBulkUpdate($hash, "unit", "m³");
       }
     }
+  } elsif ($mb->{afield_type} == 3 || $mb->{afield_type} == 7) {
+    # general gas/water meter
+    my $dataBlock;
+    my $dataBlocks = $mb->{datablocks};
+    
+    for $dataBlock ( @$dataBlocks ) {
+      # search for VIF_VOLUME
+      if ($dataBlock->{type} eq 'VIF_VOLUME') {
+        readingsBulkUpdate($hash, "volume", $dataBlock->{value});
+        readingsBulkUpdate($hash, "unit", $dataBlock->{unit});
+      }
+    }
   }
 }
 
