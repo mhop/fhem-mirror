@@ -48,6 +48,7 @@
 # 0037: updated to match fhemweb.js developments (Rudi, Jan 17, 2015)
 # 0038: added arrange by drag&drop provided by Markus (mluckey), added longpollfilter (nesges), 
 #       added processing of global userattr fp_<name> and their value per device for rename, copy, delete (Jan 31, 2015)
+# 0039: added style 8 for commands-popup provided by André (justme68) (Feb 17, 2015)
 #
 ################################################################
 #
@@ -151,7 +152,8 @@ my $FW_plotmode="";              # like in FHEMWEB: SVG
 my $FW_plotsize;				 # like in FHEMWEB: like in fhemweb dependent on regular/smallscreen/touchpad
 my %FW_zoom;                     # copied from FHEMWEB - using local version to avoid global variable
 my @FW_zoom;                     # copied from FHEMWEB - using local version to avoid global variable
-my @styles = ("0 (Icon only)","1 (Name+Icon)","2 (Name+Icon+Commands)","3 (Device-Reading)","4 (S300TH-specific)","5 (Icon+Commands)","6 (Reading+Timestamp)","7 (Commands only)");
+my @styles = ("0 (Icon only)","1 (Name+Icon)","2 (Name+Icon+Commands)","3 (Device-Reading)","4 (S300TH-specific)","5 (Icon+Commands)",
+              "6 (Reading+Timestamp)","7 (Commands only)","8 (Icon+Commands popup)");
 
 
 #-------------------------------------------------------------------------------
@@ -338,12 +340,13 @@ FP_CGI(){
     $FP_arrange = AttrVal($FP_name, "fp_arrange", 0);
   }
   
-  ## process cgi
+  ### process cgi
   my $commands = FP_digestCgi($htmlpart[1]) if $htmlpart[1];                       # analyze URL-commands
   my $FP_ret = AnalyzeCommand(undef, $commands,
-                            AttrVal($FW_wname,"allowedCommands",undef)) if $commands;  #Execute commands
-  Log3 "FLOORPLAN", 1, "FLOORPLAN: regex-error. commands: $commands; FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #test
-  #####redirect URL - either back to fhemweb-detailscreen, or for redirectCmds to suppress repeated execution of commands upon browser refresh
+                              AttrVal($FW_wname,"allowedCommands",undef)) ;        # Execute commands
+  Log3 "FLOORPLAN", 1, "FLOORPLAN: regex-error. commands: $commands, FP_name: $FP_name, FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #errormessage
+
+  ### redirect URL - either back to fhemweb-detailscreen, or for redirectCmds to suppress repeated execution of commands upon browser refresh
   my $me = $defs{$FW_cname};                                                       # from FHEMWEB: Current connection name
   my $tgt = undef;
   if( !$htmlpart[0] || (AttrVal($FW_wname, "redirectCmds", 1) && $me && $commands && !$FP_ret)) {
@@ -471,7 +474,7 @@ FP_htmlHeader($) {
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery.min.js");
   FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/jquery-ui.min.js");
-  FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/floorplan_click.js");      #enlarge clickable area per widget
+# FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/floorplan_click.js");      #enlarge clickable area per widget
   if ($FP_arrange && ($FP_arrange eq "1" || ($FP_arrange eq $FW_wname) || $FP_arrange eq "detail")) {
      FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/floorplan_drag.js") ;   #arrange-mode drag&drop
   }
@@ -479,7 +482,7 @@ FP_htmlHeader($) {
   #######################
   # Other JavaScripts + their Attributes
   map { FW_pO sprintf($jsTemplate, "$FW_ME/pgm2/$_") } @FW_fhemwebjs;
-  $jsTemplate = '<script attr=\'%s\' type="text/javascript" src="%s"></script>';
+  $jsTemplate = '<script attr=\'%s\' type="text/javascript" src="%s"></script>'."\n";
   map {
     my $n = $_; $n =~ s+.*/++; $n =~ s/.js$//; $n =~ s/fhem_//; $n .= "Param";
     FW_pO sprintf($jsTemplate, AttrVal($FP_name, $n, ""), "$FW_ME/$_");
@@ -511,8 +514,7 @@ FP_htmlHeader($) {
 # show startscreen
 sub 
 FP_showStart() {
-  FP_htmlHeader("Floorplans");
-  FW_pO "<body>";  
+  FP_htmlHeader("Floorplans"); #  incl. body-tag
   FW_pO "<div id=\"logo\"></div>";
   FP_menu();
   FW_pO "<div class=\"screen\" id=\"hdr\">";
@@ -544,8 +546,7 @@ FP_showStart() {
 sub 
 FP_show(){
   ### Page start
-  FP_htmlHeader("$FP_name");
-  ## body
+  FP_htmlHeader("$FP_name");   ## incl. body-tag
   my $onload = $FW_longpoll ? "onload=\"FW_delayedStart()\"" : "";
   FW_pO "<div id=\"backimg\" style=\"width: 99%; height: 99%;\">";
   FW_pO FW_makeImage(AttrVal($FP_name, "fp_backgroundimg", "fp_$FP_name"));
@@ -573,7 +574,7 @@ FP_show(){
 		my ($top, $left, $style, $text, $text2) = split(/,/ , $attr);
 		# $top   = position in px, top
 		# $left  = position in px, left
-		# $style = style (0=icon only, 1=name+icon, 2=name+icon+commands, 3=device-Reading + name from $text2, 4=S300TH, 5=icon+commands, 6 device-Reading+timestamp)
+		# $style = style (0=icon only, 1=name+icon, 2=name+icon+commands, 3=device-Reading + name from $text2, 4=S300TH, 5=icon+commands, 6 device-Reading+timestamp, 7 command only, 8 icon+commands popup)
 		# $text  = alternativeCaption
 		# $text2 = special for style3+6: $text = ReadingID, $text2=alternativeCaption
 		$left = 0 if (!$left);
@@ -634,7 +635,9 @@ FP_show(){
 		if ($style == 3 || $style == 6) {
 		  FW_pO "<td><div informId=\"$d-$text\">$txt</div>";                                    # reading
 		} elsif ($style == 4) {
-		  FW_pO "<td>$txt";                                                                     # state style4
+		  FW_pO "<td>$txt";		                                                                # state style4
+		} elsif ($cmdlist && $style == 8) {                                                     
+		  # first collect the popup data
         } else {
 	      FW_pO "<td informId=\"$d\" colspan=\"$cols\">$txt";                                   # state
 		}
@@ -650,13 +653,14 @@ FP_show(){
 
     ########################
     # Commands per device		  
-        if($cmdlist && ( $style == 2 || $style == 5 || $style == 7) ) {
+        if($cmdlist && ( $style == 2 || $style == 5 || $style == 7 || $style == 8) ) {
           my @cList = split(":", $cmdlist);
           my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
           my $firstIdx = 0;
 	      FW_pO "  <tr class=\"devicecommands\" id=\"$d-devicecommands\">";
 
           my $oldMe = $FW_ME;
+		  my $h = "";
 	      foreach my $cmd (sort @cList) {
             # Special handling (slider, dropdown, timepicker, ...)
             my $htmlTxt;
@@ -673,17 +677,35 @@ FP_show(){
                 last if(defined($htmlTxt));
               }
             }
-            if(defined($htmlTxt)) {
-		    $htmlTxt =~ s/>desired-temp/>/;        #for FHT
-			$htmlTxt =~ s/>desiredTemperature/>/;  #for MAX!
-            FW_pO $htmlTxt;
-		    # END # Special handling (slider, dropdown, timepicker, ...)
+            if( $style == 8 ) {
+              if( $htmlTxt ) {
+                $h .= "<p>$htmlTxt</p>";
+              } elsif($cmd) {
+                my $link = "cmd.$d=set $d $cmd";
+                $h .= "<p><a href='$FW_ME$FW_subdir?$link$FW_CSRF'>$cmd</a></p>";
+              }
             } else {
-              FW_pH "cmd.$d=set $d $cmd",
-                  ReplaceEventMap($d,$cmd,1),1,"devicecommands";
+			  if(defined($htmlTxt)) {
+		        $htmlTxt =~ s/>desired-temp/>/;        #for FHT
+			    $htmlTxt =~ s/>desiredTemperature/>/;  #for MAX!
+                FW_pO $htmlTxt;
+		    # END # Special handling (slider, dropdown, timepicker, ...)
+              } else {
+                FW_pH "cmd.$d=set $d $cmd",
+                ReplaceEventMap($d,$cmd,1),1,"devicecommands";
+              }
             }
           }
           $FW_ME = $oldMe;
+          if( $style == 8 ) {
+            $h =~ s/'/\\"/g;
+            if( $txt =~ m/<div([^>]*)><a[^>]*>(.*)<\/a>/ ) {
+              $txt = "<div $1><a onClick='FW_okDialog(\"$h\",this.children[0]);\$(\"a[href]\").each(function() { FW_replaceLink(this); })'\><div informId=\"$d\">$2</div></a></div>";
+            } else {
+	          FW_pO "<td><div informId=\"$d-$text\">$txt</div>";                                    # reading
+            }
+	        FW_pO "<td><div informId=\"$d-$text\">$txt</div>";                                      # reading
+          }
 	      FW_pO "</tr>"; 
 		  
         } elsif($type eq "FileLog") {
@@ -1019,7 +1041,8 @@ FP_pOfill($@) {
 			<li>5  icon/state and commands</li>
 			<li>6  device-reading, reading-timestamp and optional description</li>
             <li>7  commands only</li>
-		</ul>
+            <li>8  commands popup</li>
+        </ul>
 	  </li>
       <li>description will be displayed instead of the original devicename</li>
     </ul></li><br>
@@ -1188,6 +1211,7 @@ FP_pOfill($@) {
 			<li>5  icon/Status und Kommandos (ohne Gerätename)</li>
 			<li>6  Geräte-reading, Zeitstempel und optionale Beschreibung</li>
             <li>7  nur Kommandos</li>
+            <li>8  popup für kommandos</li>
 		</ul>
 	  </li>
       <li>Eine ggf. angegebene Bschreibung wird anstelle des original-Gerätenamens angezeigt.</li>
