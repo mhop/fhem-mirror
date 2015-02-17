@@ -855,7 +855,6 @@ harmony_Read($)
       $data = $3;
 
       if( $line eq "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>" ) {
-        $hash->{STATE} = "LoggedIn";
         $hash->{ConnectionState} = "LoggedIn";
 
         #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.ping?get' token=''></oa>");
@@ -1123,8 +1122,8 @@ harmony_disconnect($)
   my $name = $hash->{NAME};
 
   RemoveInternalTimer($hash);
-  $hash->{STATE} = "Disconnected";
   $hash->{ConnectionState} = "Disconnected";
+  readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($hash->{NAME},"state", "" ) );
 
   return if( !$hash->{CD} );
   Log3 $name, 2, "$name: disconnect";
@@ -1157,8 +1156,8 @@ harmony_connect($)
 
     if( $conn ) {
       Log3 $name, 3, "$name: connected";
-      $hash->{STATE} = "Connected";
       $hash->{ConnectionState} = "Connected";
+      readingsSingleUpdate( $hash, "state", $hash->{ConnectionState}, 1 ) if( $hash->{ConnectionState} ne ReadingsVal($hash->{NAME},"state", "" ) );
       $hash->{LAST_CONNECT} = FmtDateTime( gettimeofday() );
 
       $hash->{FD}    = $conn->fileno();
@@ -1359,11 +1358,9 @@ harmony_parseToken($$)
   $hash->{helper}{UserAuthToken} = $json->{GetUserAuthTokenResult}->{UserAuthToken};
 
   if( $json->{GetUserAuthTokenResult} ) {
-    $hash->{STATE} = "GotToken";
     $hash->{ConnectionState} = "GotToken";
 
   } else {
-    $hash->{STATE} = "Error" if( !$hash->{helper}{UserAuthToken} );
     $hash->{ConnectionState} = "Error" if( !$hash->{helper}{UserAuthToken} );
 
     RemoveInternalTimer($hash);
