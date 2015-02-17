@@ -526,11 +526,11 @@ readingsGroup_2html($;$)
           next if( !defined($txt) );
         }
 
-        my $row_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,undef);
+        my $row_style = lookup2($hash->{helper}{rowStyle},$name,$1,undef,$cell_row,undef);
         my $cell_style0 = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,0);
         my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,$cell_column);
-        my $name_style = lookup2($hash->{helper}{nameStyle},$name,$1,undef);
-        my $value_columns = lookup2($hash->{helper}{valueColumns},$name,$1,undef);
+        my $name_style = lookup2($hash->{helper}{nameStyle},$name,$1,undef,$cell_row,$cell_column);
+        my $value_columns = lookup2($hash->{helper}{valueColumns},$name,$1,undef,$cell_row,$cell_column);
 
         if( !$FW_webArgs{"detail"} ) {
           if( $visibility && $visibility eq "collapsed" && $txt ne '-' && $txt ne '+' && $txt ne '+-' ) {
@@ -713,11 +713,11 @@ readingsGroup_2html($;$)
         }
 
         my $informid = "informId=\"$d-$name.$n\"";
-        my $row_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,undef);
-        my $cell_style0 = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,0);
-        my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,$cell_column);
-        my $name_style = lookup2($hash->{helper}{nameStyle},$name,$n,$v);
-        my $value_style = lookup2($hash->{helper}{valueStyle},$name,$n,$v);
+        my $row_style = lookup2($hash->{helper}{rowStyle},$name,$n,$v,$cell_row,undef);
+        my $cell_style0 = lookup2($hash->{helper}{cellStyle},$name,$n,$v,$cell_row,0);
+        my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$n,$v,$cell_row,$cell_column);
+        my $name_style = lookup2($hash->{helper}{nameStyle},$name,$n,$v,$cell_row,$cell_column);
+        my $value_style = lookup2($hash->{helper}{valueStyle},$name,$n,$v,$cell_row,$cell_column);
 
         if( !$FW_webArgs{"detail"} ) {
           if( $visibility && $visibility eq "collapsed" ) {
