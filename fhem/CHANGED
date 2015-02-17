@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: pahColor() added to Color.pm to convert temperatures
+             into rgb values. See forum thread #30128
   - feature: FB_CALLMONITOR: read all available phonebooks directly wia
              web interface (also online phonebooks from Google, etc.).
              new attributes fritzbox-remote-phonebook-via and 
