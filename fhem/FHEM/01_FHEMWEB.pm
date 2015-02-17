@@ -2432,7 +2432,7 @@ FW_devState($$@)
     ($icon, $link, $isHtml) = FW_dev2image($d);
     $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if($icon);
 
-    my $cmdlist = $link // "";
+    my $cmdlist = (defined($link) ? $link : "");
     my $h = "";
     foreach my $cmd (split(":", $cmdlist)) {
       my $htmlTxt;
