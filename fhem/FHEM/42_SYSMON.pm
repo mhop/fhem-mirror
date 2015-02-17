@@ -1897,16 +1897,27 @@ sub SYSMON_getRamAndSwap($$)
   if(!@speicher) {
   	return $map;
   }
-    
-  shift @speicher;
-  my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
-  shift @speicher;
-  my ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]));
 
-  if($fs_desc2 ne "Swap:")
-  {
-    shift @speicher;
-    ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]));
+  shift @speicher;
+  my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached);
+  if(defined ($speicher[0])) {
+  	($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
+  }
+  
+  shift @speicher;
+  my ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2);
+  
+  if(defined ($speicher[0])) {
+    ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]))	
+  }
+  
+  if(defined($fs_desc2)) {
+    if($fs_desc2 ne "Swap:") {
+      shift @speicher;
+      if(defined ($speicher[0])) {
+        ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]));
+      }
+    }
   }
 
   my $ram;
@@ -1914,7 +1925,7 @@ sub SYSMON_getRamAndSwap($$)
   #my $percentage_ram;
   #my $percentage_swap;
   
-  if($total > 0) {
+  if(defined($total) && $total > 0) {
   
     $total   = $total / 1024;
     $used    = $used / 1024;
@@ -1936,7 +1947,7 @@ sub SYSMON_getRamAndSwap($$)
   $map->{+RAM} = $ram;
   
   # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
-  if($total2 > 0)
+  if(defined($total2) && $total2 > 0)
   {
   	$total2   = $total2 / 1024;
     $used2    = $used2 / 1024;
@@ -2422,14 +2433,16 @@ sub SYSMON_getNetworkInfo ($$$)
       my $lastVal = ReadingsVal($hash->{NAME},$nName,"RX: 0 MB, TX: 0 MB, Total: 0 MB");
       my ($d0, $o_rx, $d1, $d2, $o_tx, $d3, $d4, $o_tt, $d5) = split(/\s+/, trim($lastVal));
 
-      my $d_rx = $rx-$o_rx;
-      if($d_rx<0) {$d_rx=0;}
-      my $d_tx = $tx-$o_tx;
-      if($d_tx<0) {$d_tx=0;}
-      my $d_tt = $totalRxTx-$o_tt;
-      if($d_tt<0) {$d_tt=0;}
-      my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
-      $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
+      if(defined($o_tx) && defined($o_tt)) {
+        my $d_rx = $rx-$o_rx;
+        if($d_rx<0) {$d_rx=0;}
+        my $d_tx = $tx-$o_tx;
+        if($d_tx<0) {$d_tx=0;}
+        my $d_tt = $totalRxTx-$o_tt;
+        if($d_tt<0) {$d_tt=0;}
+        my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
+        $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
+      }
     }
   } else {
   	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> NOK ";
