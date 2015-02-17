@@ -20,7 +20,7 @@ telnet_Initialize($)
   $hash->{UndefFn} = "telnet_Undef";
   $hash->{AttrFn}  = "telnet_Attr";
   $hash->{NotifyFn}= "telnet_SecurityCheck";
-  $hash->{AttrList} = "globalpassword password ".
+  $hash->{AttrList} = "globalpassword password prompt ".
                         "allowfrom SSL connectTimeout connectInterval ".
                         "encoding:utf8,latin1";
   $hash->{ActivateInformFn} = "telnet_ActivateInform";
@@ -185,7 +185,9 @@ telnet_Read($)
     my $chash = TcpServer_Accept($hash, "telnet");
     return if(!$chash);
     $chash->{encoding} = AttrVal($name, "encoding", "utf8");
-    syswrite($chash->{CD}, sprintf("%c%c%c", 255, 253, 0) ) if( AttrVal($name, "encoding", "") ); #DO BINARY
+    $chash->{prompt}  = AttrVal($name, "prompt", "fhem>");
+    syswrite($chash->{CD}, sprintf("%c%c%c", 255, 253, 0) )
+        if( AttrVal($name, "encoding", "") ); #DO BINARY
     $chash->{CD}->flush();
     syswrite($chash->{CD}, sprintf("%c%c%cPassword: ", 255, 251, 1)) # WILL ECHO
         if(telnet_pw($name, $chash->{NAME}));
@@ -264,7 +266,7 @@ telnet_Read($)
         push @ret, $ret if(defined($ret));
       }
     } else {
-      $hash->{prompt} = 1;                  # Empty return
+      $hash->{showPrompt} = 1;                  # Empty return
       if(!$hash->{motdDisplayed}) {
         my $motd = $attr{global}{motd};
         push @ret, $motd if($motd && $motd ne "none");
@@ -276,8 +278,8 @@ telnet_Read($)
 
   $ret = "";
   $ret .= (join("\n", @ret) . "\n") if(@ret);
-  $ret .= ($hash->{prevlines} ? "> " : "fhem> ")
-          if($gotCmd && $hash->{prompt} && !$hash->{rcvdQuit});
+  $ret .= ($hash->{prevlines} ? "> " : $hash->{prompt}." ")
+          if($gotCmd && $hash->{showPrompt} && !$hash->{rcvdQuit});
   if($ret) {
     $ret = utf8ToLatin1($ret) if( $hash->{encoding} eq "latin1" );
     $ret =~ s/\n/\r\n/g if($pw);  # only for DOS telnet 
@@ -429,6 +431,11 @@ telnet_ActivateInform($;$)
         non-local connections.
         </li><br>
 
+    <a name="prompt"></a>
+    <li>prompt<br>
+        Sets the string for the telnet prompt, the default is fhem&gt;
+        </li><br>
+
     <a name="SSL"></a>
     <li>SSL<br>
         Enable SSL encryption of the connection, see the description <a
@@ -574,6 +581,12 @@ telnet_ActivateInform($;$)
     <li>globalpassword<br>
         Entspricht dem Attribut password; ein Passwort wird aber
         ausschlie&szlig;lich f&uuml;r nicht-lokale Verbindungen verlangt.
+        </li><br>
+
+    <a name="prompt"></a>
+    <li>prompt<br>
+        Gibt die Zeichenkette an, welche in der Telnet-Sitzung als
+        Kommandoprompt ausgegeben wird. Die Voreinstellung ist fhem&gt;
         </li><br>
 
     <a name="SSL"></a>
