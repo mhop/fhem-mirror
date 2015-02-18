@@ -95,15 +95,32 @@ sub CommandHelp {
 =begin html
 
 <a name="help"></a>
-<h3>help</h3>
+<h3>?, help</h3>
   <ul>
+    <code>? [&lt;moduleName&gt;]</code><br/>
     <code>help [&lt;moduleName&gt;]</code><br/>
     <br/>
     <ul>
-      <li>returns a list of available commands, when called without a moduleName</li>
+      <li>returns a list of available commands, when called without a
+        moduleName</li>
       <li>returns a module dependent helptext, same as in commandref</li>
     </ul>
   </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="help"></a>
+<h3>?, help</h3>
+  <ul>
+    <code>? [&lt;moduleName&gt;]</code><br/>
+    <code>help [&lt;moduleName&gt;]</code><br/>
+    <br>
+    Liefert eine Liste aller Befehle mit einer Kurzbeschreibung zur&uuml;ck.
+    Falls moduleName spezifiziert ist, wird die modul-spezifische Hilfe
+    aus commandref zur&uuml;ckgeliefert.
+  </ul>
+=end html_DE
+
 =cut
