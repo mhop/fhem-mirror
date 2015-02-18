@@ -274,6 +274,7 @@ FHEM/98_CustomReadings.pm    HCS                  http://forum.fhem.de Unterstue
 FHEM/98_dewpoint.pm          Joachim              http://forum.fhem.de Automatisierung
 FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
+FHEM/98_help.pm              betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_HourCounter.pm       john                 http://forum.fhem.de MAX
 FHEM/98_logProxy.pm          justme1968           http://forum.fhem.de Frontends
 FHEM/98_notice.pm            mfr69bs              http://forum.fhem.de Sonstiges
