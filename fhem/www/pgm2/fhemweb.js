@@ -239,7 +239,7 @@ FW_okDialog(txt, parent)
   });
 
   FW_replaceWidgets(div);
-  FW_replaceLink(div); // Forum #33766
+  $(div).find("a[href]").each(function(){FW_replaceLink(this);}); //Forum #33766
 
   if(parent)
     $(div).dialog( "option", "position", {
@@ -765,8 +765,8 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
   sh.ontouchstart = function(e) { touchFn(e, mouseDown); }
 
   newEl.setValueFn = function(arg) {
-    arg = arg.replace(/[^\d.\-]/g, ""); // remove non numbers
-    currVal = (arg == "" ? min : parseFloat(arg));
+    var res = arg.match(/[\d.\-]+/); // extract first number
+    currVal = (res ? parseFloat(res[0]) : min);
     if(currVal < min || currVal > max)
       currVal = min;
     newEl.activateFn();
