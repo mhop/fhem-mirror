@@ -424,13 +424,15 @@ sub Pushbullet_getDeviceIden($$){
   
   while( ($nkey, $nvalue) = each%{$hash->{READINGS}} ){
     while( ($rkey, $rvalue) = each%{$hash->{READINGS}{$nkey}} ){
-       Log3 $hash, 4, $name . ": nkey:" . $nkey . " nvalue:" . $nvalue . " rkey:" . $rkey . " rvalue:" . $rvalue if( $rvalue eq $deviceNick );
+       Log3 $hash, 5, $name . ": nkey:" . $nkey . " nvalue:" . $nvalue . " rkey:" . $rkey . " rvalue:" . $rvalue if( $rvalue eq $deviceNick );
        $deviceIden = $nkey if( $rvalue eq $deviceNick );
     } 
   }
   
-  Log3 $hash, 3, "$name: deviceIden konnte nicht eingelesen werden." if( !$deviceIden );
-  return if( !defined($deviceIden) );
+  if( !$deviceIden ){
+    Log3 $hash, 3, "$name: Can not read deviceIden from $deviceNick.";
+    return;
+  }
     
   @deviceIdenSplit = split( /_name/, $deviceIden );
   $deviceIden      = $deviceIdenSplit[0];
@@ -444,26 +446,24 @@ sub Pushbullet_httpCall($$$$){
   my ($hash,$url,$jsonHash,$method) = @_;
   my ($json,$err,$data,$decoded);
   my $name = $hash->{NAME};
-
-  Log3 $hash, 5,"HASH: " . Dumper($jsonHash);
   
-   $json = JSON->new->latin1->encode($jsonHash) if( $jsonHash );  
+  $json = JSON->new->latin1->encode($jsonHash) if( $jsonHash ); 
    
   ($err,$data)    = HttpUtils_BlockingGet({
     url           => $url,
     method        => $method,
     header        => "Content-Type: application/json",
     data          => $json
-  }); 
-  Log3 $hash, 4, "JSON -> Pushbullet:" . Dumper($json);
-  Log3 $hash, 4, "Pushbullet -> FHEM: " . Dumper($data);
+  });
   
-   $data = "" if( !$data );
+  $json = "" if( !$json );
+  $data = "" if( !$data );
+  
+  Log3 $hash, 4, "FHEM -> Pushbullet.com: " . $json; 
+  Log3 $hash, 4, "Pushbullet.com -> FHEM: " . $data;
   
   Log3 $hash, 5, '$err: ' . $err;
   Log3 $hash, 5, '$method: ' . $method;
-  Log3 $hash, 5, '$url: ' . $url;
-  Log3 $hash, 5, '$data: ' . $data;
   
   Log3 $hash, 3, "Something gone wrong" if( $data =~ "<!DOCTYPE html>" );
   $err = 1 if( $data =~ "<!DOCTYPE html>" );
