@@ -127,9 +127,10 @@ sub
 ReadingValDoIf($$$)
 {
   my ($name,$reading,$regExp)=@_;
-  my $r="";
+  my $r;
   my $element;
     $r=$defs{$name}{READINGS}{$reading}{VAL};
+    $r="" if (!defined($r));
     if ($regExp) {
       $element = ($r =~  /$regExp/) ? $1 : "";
     } else {
@@ -307,8 +308,10 @@ ParseCommandsDoIf($$$)
       if ($currentBlock ne "") {
          ($currentBlock,$err)=ReplaceAllReadingsDoIf($hash,$currentBlock,-1,$eval);
          return ($currentBlock,$err) if ($err);
-         ($currentBlock,$err)=EvalAllDoIf($currentBlock);
-         return ($currentBlock,$err) if ($err);
+         if ($eval) {
+           ($currentBlock,$err)=EvalAllDoIf($currentBlock);
+           return ($currentBlock,$err) if ($err);
+         }
       }
       $currentBlock="{".$currentBlock."}";
     } elsif ($tailBlock =~ /^\s*IF/) {
@@ -341,8 +344,10 @@ ParseCommandsDoIf($$$)
       if ($currentBlock ne "") {
          ($currentBlock,$err)=ReplaceAllReadingsDoIf($hash,$currentBlock,-1,$eval);
          return ($currentBlock,$err) if ($err);
-         ($currentBlock,$err)=EvalAllDoIf($currentBlock);
-         return ($currentBlock,$err) if ($err);
+         if ($eval) {
+           ($currentBlock,$err)=EvalAllDoIf($currentBlock);
+           return ($currentBlock,$err) if ($err);
+         }
       }
     }
     if ($eval) {
@@ -825,11 +830,10 @@ DOIF_SleepTrigger ($)
 {
   my ($hash)=@_;
   $hash->{helper}{sleeptimer}=-1;
+  readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
   if (!AttrVal($hash->{NAME},"disable","")) {
     DOIF_Trigger($hash,$hash->{helper}{sleepdevice},-2);
   }
-  #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
-  readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
   return undef;
 }
 
