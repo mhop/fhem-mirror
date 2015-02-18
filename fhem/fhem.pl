@@ -133,7 +133,6 @@ sub CommandDeleteAttr($$);
 sub CommandDeleteReading($$);
 sub CommandDisplayAttr($$);
 sub CommandGet($$);
-sub CommandHelp($$);
 sub CommandIOWrite($$);
 sub CommandInclude($$);
 sub CommandInform($$);
@@ -249,7 +248,7 @@ $modules{Global}{LOADED} = 1;
 $modules{Global}{AttrList} =
   "archivecmd apiversion archivedir configfile lastinclude logfile " .
   "modpath nrarchive pidfilename port statefile title " .
-  "mseclog:1,0 version nofork:1,0 logdir holiday2we " .
+  "mseclog:1,0 version nofork:1,0 language:EN,DE logdir holiday2we " .
   "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
   "exclude_from_update motd restoreDirs uniqueID ".
@@ -263,24 +262,22 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
 
 
 %cmds = (
-  "?"       => { Fn=>"CommandHelp",
-	    Hlp=>",get this help" },
-  "attr" => { Fn=>"CommandAttr",
+  "?"       => { ReplacedBy => "help" },
+  "attr"    => { Fn=>"CommandAttr",
            Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>"},
   "define"  => { Fn=>"CommandDefine",
 	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
   "deleteattr" => { Fn=>"CommandDeleteAttr",
 	    Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
   "deletereading" => { Fn=>"CommandDeleteReading",
-            Hlp=>"<devspec> [<attrname>],delete user defined reading for <devspec>" },
+            Hlp=>"<devspec> [<attrname>],delete user defined reading for ".
+                 "<devspec>" },
   "delete"  => { Fn=>"CommandDelete",
 	    Hlp=>"<devspec>,delete the corresponding definition(s)"},
   "displayattr"=> { Fn=>"CommandDisplayAttr",
 	    Hlp=>"<devspec> [attrname],display attributes" },
   "get"     => { Fn=>"CommandGet",
 	    Hlp=>"<devspec> <type dependent>,request data from <devspec>" },
-  "help"    => { Fn=>"CommandHelp",
-	    Hlp=>",get this help" },
   "include" => { Fn=>"CommandInclude",
 	    Hlp=>"<filename>,read the commands from <filenname>" },
   "inform" => { Fn=>"CommandInform",
@@ -340,7 +337,6 @@ if(int(@ARGV) < 1) {
     print "install as windows service: fhem.pl configfile -i\n";
     print "uninstall the windows service: fhem.pl -u\n";
   }
-  CommandHelp(undef, undef);
   exit(1);
 }
 
@@ -1066,27 +1062,6 @@ devspec2array($)
   }
   return $name if(!@ret && !$isAttr);
   return @ret;
-}
-
-#####################################
-sub
-CommandHelp($$)
-{
-  my ($cl, $param) = @_;
-
-  my $str = "\n" .
-            "Possible commands:\n\n" .
-            "Command   Parameter                 Description\n" .
-	    "-----------------------------------------------\n";
-
-  for my $cmd (sort keys %cmds) {
-    next if(!$cmds{$cmd}{Hlp});
-    next if($cl && $cmds{$cmd}{ClientFilter} &&
-            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
-    my @a = split(",", $cmds{$cmd}{Hlp}, 2);
-    $str .= sprintf("%-9s %-25s %s\n", $cmd, $a[0], $a[1]);
-  }
-  return $str;
 }
 
 #####################################

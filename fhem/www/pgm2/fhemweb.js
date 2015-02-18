@@ -140,6 +140,23 @@ FW_jqueryReadyFn()
       return true;
     });
   });
+
+  $("div.devSpecHelp a").each(function(){       // Help on detail window
+    var dev = $(this).attr("href").split("#").pop();
+    $(this).attr("href", "#");
+    $(this).click(function(evt){
+      if($("#devSpecHelp").length) {
+        $("#devSpecHelp").remove();
+        return;
+      }
+      $("#content").append('<div id="devSpecHelp"></div>');
+      FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
+        $("#devSpecHelp").html(data);
+      });
+    });
+  });
+
+
 }
 
 

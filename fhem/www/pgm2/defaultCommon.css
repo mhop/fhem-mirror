@@ -86,3 +86,5 @@ div#svgmarker {
   color:#278727; background:#FFFFE7;
   border:2px solid #278727; border-radius:4px;
 }
+
+div.detLink { display:inline-block; margin-right:0.5em; }

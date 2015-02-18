@@ -52,6 +52,7 @@ my @filelist2 = (
   "FHEM/lib/MP3/Tag/.*",
   "FHEM/lib/UPnP/.*",
   "www/pgm2/.*",
+  "www/pgm2/images/.*.png",
   "www/jscolor/.*",
   "www/codemirror/.*",
   "www/gplot/.*.gplot",
