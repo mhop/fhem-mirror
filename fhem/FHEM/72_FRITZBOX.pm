@@ -41,6 +41,7 @@ my $missingModul;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
+eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
 
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_Init($);
@@ -657,10 +658,10 @@ sub FRITZBOX_Readout_Run($)
       FRITZBOX_Log $hash, 4, "Start update of fast changing device readings.";
    }
 
-   my $returnStr = "$name|";
+   my $returnStr;
  
    $result = FRITZBOX_Open_Connection( $hash );
-   return "$name|Error|$result"
+   return $name."|".encode_base64("Error|$result","")
       if $result;
    
    if ($slowRun == 1)
@@ -691,7 +692,8 @@ sub FRITZBOX_Readout_Run($)
    # Execute commands
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings);
 
-      return "$name|Error|No STDOUT from shell command." unless defined $resultArray;
+      return $name."|".encode_base64("Error|No STDOUT from shell command.","") 
+         unless defined $resultArray;
 
       my $dectCount = $resultArray->[1];
       $dectCount = 0 unless $dectCount=~ /\d/;
@@ -905,7 +907,7 @@ sub FRITZBOX_Readout_Run($)
 
    FRITZBOX_Log $hash, 4, "Captured " . @readoutReadings . " values";
    FRITZBOX_Log $hash, 5, "Handover (".length ($returnStr)."): ".$returnStr;
-   return $returnStr
+   return $name."|".encode_base64($returnStr,"");
 
 } # End FRITZBOX_Readout_Run
 
@@ -927,6 +929,7 @@ sub FRITZBOX_Readout_Done($)
 # delete the marker for RUNNING_PID process
    delete($hash->{helper}{READOUT_RUNNING_PID});
 
+   $string2 = decode_base64($string2);
    FRITZBOX_Readout_Process ($hash, $string2);
 
 }
@@ -1282,15 +1285,15 @@ sub FRITZBOX_GuestWlan_Run($)
    my $state = $val[0];
    $state =~ s/on/1/;
    $state =~ s/off/0/;
-   
+ 
    $result = FRITZBOX_Open_Connection( $hash );
    return "$name|0|$result" 
       if $result;
 
-   my $returnStr = "$name|2|";
+   my $returnStr;
 
    $result = FRITZBOX_Exec $hash, "[ -n `ctlmgr_ctl r wlan settings/guest_pskvalue` ] && echo 1 || echo 0";
-   return "$name|0|Error: No password defined for guest WLAN." 
+   return "$name|0|Error: No password defined for guest WLAN."
       unless $result;
 
 # Set WLAN on if guestWLAN on
@@ -1316,7 +1319,7 @@ sub FRITZBOX_GuestWlan_Run($)
    push @readoutReadings, "readoutTime|" . sprintf( "%.2f", time()-$startTime);
    $returnStr .= join('|', @readoutReadings );
    FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
-   return $returnStr
+   return $name."|2|".encode_base64($returnStr,"");
 
 } # end FRITZBOX_GuestWlan_Run
 
@@ -1339,7 +1342,7 @@ sub FRITZBOX_Wlan_Run($)
    return "$name|0|$result" 
       if $result;
 
-   my $returnStr = "$name|2|";
+   my $returnStr;
 
 # Set WLAN
    push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/wlan_enable $state"];
@@ -1361,7 +1364,7 @@ sub FRITZBOX_Wlan_Run($)
    push @readoutReadings, "readoutTime|" . sprintf( "%.2f", time()-$startTime);
    $returnStr .= join('|', @readoutReadings );
    FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
-   return $returnStr
+   return $name."|2|".encode_base64($returnStr,"");
 
 } # end FRITZBOX_Wlan_Run
 
@@ -1811,6 +1814,7 @@ sub FRITZBOX_Cmd_Done($)
    }
    elsif  ($success == 2 )
    {
+      $result = decode_base64($result);
       FRITZBOX_Readout_Process ( $hash, $result );
    }
 }
