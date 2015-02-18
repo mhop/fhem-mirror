@@ -69,6 +69,14 @@ sub CommandHelp {
     $output =~ s/\ \ +/\ /g;
     $output =~ s/\t+/ /g;
     $output =~ s/\n\n/\n/g;
+    $output =~ s/&auml;/ä/g;
+    $output =~ s/&Auml;/Ä/g;
+    $output =~ s/&ouml;/ö/g;
+    $output =~ s/&Ouml;/Ö/g;
+    $output =~ s/&uuml;/ü/g;
+    $output =~ s/&Uuml;/Ü/g;
+    $output =~ s/&szlig;/ß/g;
+
     return $output;
   }
 
