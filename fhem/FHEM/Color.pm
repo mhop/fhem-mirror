@@ -427,75 +427,70 @@ devStateIcon($$@)
 
 # see: http://forum.fhem.de/index.php/topic,30128.msg261174.html#msg261174
 sub pahColor {
-   my ($starttemp,$midtemp2,$endtemp,$temp,$opacity) = @_;
-
-   $opacity //= 255;
-
-   my($uval,$rval,$rval1,$rval2,$rval3);
-   my($gval,$gval1,$gval2,$gval3);
-   my($bval,$bval1,$bval2,$bval3);
-
-   my $startcolorR =   0;
-   my $startcolorG = 255;
-   my $startcolorB = 255;
-
-   my $midcolor1R =  30;
-   my $midcolor1G =  80;
-   my $midcolor1B = 255;
-
-   my $midcolor2R =  40;
-   my $midcolor2G = 255;
-   my $midcolor2B =  60;
-
-   my $midcolor3R = 160;
-   my $midcolor3G = 128;
-   my $midcolor3B =  10;
-
-   my $endcolorR = 255;
-   my $endcolorG =  69;
-   my $endcolorB =   0;
-
-   return sprintf("%02X%02X%02X%02X",$startcolorR,$startcolorG,$startcolorB,$opacity) if ($temp <= $starttemp);
-   return sprintf("%02X%02X%02X%02X",$endcolorR,$endcolorG,$endcolorB,$opacity)       if ($temp >  $endtemp);
-
-   if ($temp <= $midtemp2) {
-      $uval  = sprintf("%.5f",($temp - $starttemp) / ($midtemp2 - $starttemp));
-      $rval1 = sprintf("%.5f",(1-$uval)**2 * $startcolorR);
-      $rval2 = sprintf("%.5f",2*(1-$uval) * $uval * $midcolor1R);
-      $rval3 = sprintf("%.5f",$uval**2 * $midcolor2R);
-      $rval  = sprintf("%.0f",(100*($rval1 + $rval2 + $rval3)+0.5)/100);
-
-      $gval1 = sprintf("%.5f",(1-$uval)**2 * $startcolorG);
-      $gval2 = sprintf("%.5f",2*(1-$uval) * $uval * $midcolor1G);
-      $gval3 = sprintf("%.5f",$uval**2 * $midcolor2G);
-      $gval  = sprintf("%.0f",(100*($gval1 + $gval2 + $gval3)+0.5)/100);
-
-      $bval1 = sprintf("%.5f",(1-$uval)**2 * $startcolorB);
-      $bval2 = sprintf("%.5f",2*(1-$uval) * $uval * $midcolor1B);
-      $bval3 = sprintf("%.5f",$uval**2 * $midcolor2B);
-      $bval  = sprintf("%.0f",(100*($bval1 + $bval2 + $bval3)+0.5)/100);
-      return sprintf("%02X%02X%02X%02X",$rval,$gval,$bval,$opacity);
-   }
-
+  my ($starttemp,$midtemp,$endtemp,$temp,$colors,$opacity) = @_; 
+        
+  my @models = ([   0,255,255 ,
+                   30, 80,255 ,
+                   40,255, 60 ,
+                  160,128, 10 ,
+                  255, 69,  0 ],
+        
+                [   0,255,255 ,
+                  120,120,120 ,
+                   40,255, 60 ,
+                  255,255,  0 , 
+                  255, 69,  0 ],
+        
+                [   0,69, 255 ,
+                  120,180,180 ,
+                   40,255, 60 ,
+                  255,255,  0 , 
+                  255, 69,  0 ],);
+        
+  $opacity //= 255;     # set to 255 if no opacity provided in call
+        
+  if( ref($colors) ne "ARRAY" ) { 
+    my $model = $colors // 0;      # set to 0 if no model provided in call
+    $model = ($model < 0 || $model > int(@models)-1) ? 0 : $model; # check valid model
+    $colors = $models[$model];
+  }   
+        
+  my( $startcolorR, $startcolorG, $startcolorB,
+      $midcolor1R,$midcolor1G,$midcolor1B,
+      $midcolor2R,$midcolor2G,$midcolor2B,
+      $midcolor3R,$midcolor3G,$midcolor3B,
+      $endcolorR,$endcolorG,$endcolorB ) = @{$colors};
+        
+  return sprintf("%02X%02X%02X%02X",$startcolorR,$startcolorG,$startcolorB,$opacity) if ($temp < $starttemp);
+  return sprintf("%02X%02X%02X%02X",$endcolorR,$endcolorG,$endcolorB,$opacity)       if ($temp > $endtemp);
+        
+  sub interpol($$$$) {
+    my ($u,$c1,$c2,$c3) = @_; 
+        
+    my $c = $c1*(1-$u)**2 + $c2*2*(1-$u)*$u + $c3*$u**2;
+        
+    return (100*$c+0.5)/100;
+  }   
+        
+  if ($temp <= $midtemp) {
+     my $u  = ($temp - $starttemp) / ($midtemp - $starttemp);
+        
+     my $r = interpol($u,$startcolorR,$midcolor1R,$midcolor2R);
+     my $g = interpol($u,$startcolorG,$midcolor1G,$midcolor2G);
+     my $b = interpol($u,$startcolorB,$midcolor1B,$midcolor2B);
+        
+     return sprintf("%02X%02X%02X%02X",$r+0.5,$g+0.5,$b+0.5,$opacity);
+   }   
+        
    if ($temp <= $endtemp) {
-      $uval  = sprintf("%.5f",($temp - $midtemp2)/($endtemp - $midtemp2));
-      $rval1 = sprintf("%.5f",(1-$uval)**2 * $midcolor2R);
-      $rval2 = sprintf("%.5f",2 * (1-$uval) * $uval * $midcolor3R);
-      $rval3 = sprintf("%.5f",$uval**2 * $endcolorR);
-      $rval  = sprintf("%.0f",(100*($rval1+$rval2+$rval3)+0.5)/100);
-
-      $gval1 = sprintf("%.5f",(1-$uval)**2 * $midcolor2G);
-      $gval2 = sprintf("%.5f",2 * (1-$uval) * $uval * $midcolor3G);
-      $gval3 = sprintf("%.5f",$uval**2 * $endcolorG);
-      $gval  = sprintf("%.0f",(100*($gval1+$gval2+$gval3)+0.5)/100);
-
-      $bval1 = sprintf("%.5f",(1-$uval)**2 * $midcolor2B);
-      $bval2 = sprintf("%.5f",2*(1-$uval)*$uval*$midcolor3B);
-      $bval3 = sprintf("%.5f",$uval**2 *$endcolorB);
-      $bval  = sprintf("%.0f",(100*($bval1+$bval2+$bval3)+0.5)/100);
-      return sprintf("%02X%02X%02X%02X",$rval,$gval,$bval,$opacity);
-   }
-
+     my $u  = ($temp - $midtemp) / ($endtemp - $midtemp);
+        
+     my $r = interpol($u,$midcolor2R,$midcolor3R,$endcolorR);
+     my $g = interpol($u,$midcolor2G,$midcolor3G,$endcolorG);
+     my $b = interpol($u,$midcolor2B,$midcolor3B,$endcolorB);
+        
+     return sprintf("%02X%02X%02X%02X",$r+0.5,$g+0.5,$b+0.5,$opacity);
+  }   
 }
 
 1;
