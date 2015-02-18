@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 98_help.pm 8032 2015-02-18 18:36:37Z betateilchen $
 #
 package main;
 use strict;
@@ -13,8 +13,13 @@ sub help_Initialize($$) {
 }
 
 sub CommandHelp {
-  my ($cl, $mod) = @_;
+  my ($cl, $arg) = @_;
 
+  my ($mod,$lang) = split(" ",$arg);
+
+  $lang //= "";
+  $lang = (lc($lang) eq 'de') ? '_DE' : '';
+  
   if($mod) {
     $mod = lc($mod);
     my %mods;
@@ -37,9 +42,9 @@ sub CommandHelp {
     my ($err,@text) = FileRead({FileName => $mods{$mod}, ForceType => 'file'});
     return $err if $err;
     foreach my $l (@text) {
-      if($l =~ m/^=begin html$/) {
+      if($l =~ m/^=begin html$lang$/) {
 	    $skip = 0;
-      } elsif($l =~ m/^=end html$/) {
+      } elsif($l =~ m/^=end html$lang$/) {
 	    $skip = 1;
       } elsif(!$skip) {
 	  $output .= $l;
@@ -97,13 +102,15 @@ sub CommandHelp {
 <a name="help"></a>
 <h3>?, help</h3>
   <ul>
-    <code>? [&lt;moduleName&gt;]</code><br/>
-    <code>help [&lt;moduleName&gt;]</code><br/>
+    <code>? [&lt;moduleName&gt;] [de]</code><br/>
+    <code>help [&lt;moduleName&gt;] [de]</code><br/>
     <br/>
     <ul>
-      <li>returns a list of available commands, when called without a
-        moduleName</li>
-      <li>returns a module dependent helptext, same as in commandref</li>
+      <li>Returns a list of available commands, when called without a
+        moduleName.</li>
+      <li>Returns a module dependent helptext, same as in commandref.</li>
+      <li>When called with de as last parameter, module dependent help will be shown in German.<br/>
+          Please be aware: Not every modules provides a German documentation.</li>
     </ul>
   </ul>
 
@@ -114,12 +121,16 @@ sub CommandHelp {
 <a name="help"></a>
 <h3>?, help</h3>
   <ul>
-    <code>? [&lt;moduleName&gt;]</code><br/>
-    <code>help [&lt;moduleName&gt;]</code><br/>
+    <code>? [&lt;moduleName&gt;] [de]</code><br/>
+    <code>help [&lt;moduleName&gt;] [de]</code><br/>
     <br>
-    Liefert eine Liste aller Befehle mit einer Kurzbeschreibung zur&uuml;ck.
-    Falls moduleName spezifiziert ist, wird die modul-spezifische Hilfe
-    aus commandref zur&uuml;ckgeliefert.
+    <ul>
+      <li>Liefert eine Liste aller Befehle mit einer Kurzbeschreibung zur&uuml;ck.</li>
+      <li>Falls moduleName spezifiziert ist, wird die modul-spezifische Hilfe
+          aus commandref zur&uuml;ckgeliefert.</li>
+      <li>Wird die modulspezifische Hilfe mit Parameter de aufgerufen, wird nach der deutschen Doku gesucht.<br/>
+          Eine deutsche Hilfe ist allerdings nicht in jedem Modul verfügbar!</li>
+    </ul>
   </ul>
 =end html_DE
 
