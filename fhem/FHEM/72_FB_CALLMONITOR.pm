@@ -541,7 +541,7 @@ FB_CALLMONITOR_reverseSearch($$)
         else
         {
             #Log 2, $result;
-            if($result =~ /<h5><a href=".*?" class="fn(?: org)?">(.+?)<\/a><\/h5>/)
+            if($result =~ /<section[^>]*>.*?<h1>(.+?)<\/h1>.*?<\/section>/s)
             {
                 $invert_match = $1;
                 $invert_match = FB_CALLMONITOR_html2txt($invert_match);
