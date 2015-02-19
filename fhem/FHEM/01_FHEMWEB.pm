@@ -1091,10 +1091,14 @@ FW_doDetail($)
 
   FW_pO "</td></tr></table>";
 
-  FW_pH "cmd=style iconFor $d", "Select icon";
-  FW_pH "cmd=style showDSI $d", "Extend devStateIcon";
-  FW_pH "$FW_ME/docs/commandref.html#${t}", "Device specific help";
-  FW_pH "cmd=delete $d", "Delete this device ($d)" if($d ne "global");
+  my ($link, $txt, $td, $class, $doRet,$nonl) = @_;
+
+  FW_pH "cmd=style iconFor $d", "Select icon",         undef, "detLink iconFor";
+  FW_pH "cmd=style showDSI $d", "Extend devStateIcon", undef, "detLink showDSI";
+  FW_pH "cmd=delete $d", "Delete this device ($d)",    undef, "detLink delDev"
+         if($d ne "global");
+  FW_pH "$FW_ME/docs/commandref.html#${t}", "Device specific help", 
+         undef, "detLink devSpecHelp";
   FW_pO "<br><br>";
   FW_pO "</div>";
 
