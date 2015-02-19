@@ -72,6 +72,7 @@ use vars qw(%zw_type6);
   '16'  => 'ZW_SEND_DATA_ABORT',
   '17'  => 'ZW_R_F_POWER_LEVEL_SET',
   '18'  => 'ZW_SEND_DATA_META',
+  '1c'  => 'ZW_GET_RANDOM',
   '20'  => 'MEMORY_GET_ID',
   '21'  => 'MEMORY_GET_BYTE',
   '22'  => 'MEMORY_PUT_BYTE',
