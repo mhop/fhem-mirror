@@ -47,6 +47,9 @@
 # Changelog
 #
 # SVN-History:
+# 19.02.2015
+#	Das Attribut "verbose" am Sonos-Device wird nun zur Laufzeit an den SubProzess übertragen und wirkt dort sofort.
+#	Beim initialen Erkennen der wichtigsten Abspielparameter während des Discover-Prozesses gab es einen Fehler, der das Setzen verhindert hat
 # 14.02.2015
 #	Festen Lib-Pfad für Synology-Stations hinzugefügt.
 #	Im Modul 21_SONOSPLAYER wurde ein require auf das Modul 00_SONOS eingefügt.
@@ -482,7 +485,7 @@ my %SONOS_Locations;
 # Wenn der Prozess/das Modul nicht von fhem aus gestartet wurde, dann versuchen, den ersten Parameter zu ermitteln
 # Für diese Funktionalität werden einige Variablen benötigt
 my $SONOS_ListenPort = $ARGV[0] if (lc(substr($0, -7)) ne 'fhem.pl');
-my $SONOS_Client_LogLevel = -1;
+my $SONOS_Client_LogLevel :shared = -1;
 if ($ARGV[1]) {
 	$SONOS_Client_LogLevel = $ARGV[1];
 }
@@ -846,7 +849,7 @@ sub SONOS_FhemWebCallback($) {
 				last;
 			}
 		}
-		return ("text/html; charset=UTF8", 'Call for No-Sonos-Player: '.$URL) if (defined($ip) && $albumurl !~ /\.cloudfront.net\//i && $albumurl !~ /\.scdn.co\/image\//i && $albumurl !~ /\/music\/image\?/i);
+		return ("text/html; charset=UTF8", 'Call for Non-Sonos-Player: '.$URL) if (defined($ip) && $albumurl !~ /\.cloudfront.net\//i && $albumurl !~ /\.scdn.co\/image\//i && $albumurl !~ /\/music\/image\?/i);
 		
 		# Generierter Dateiname für die Cache-Funktionalitaet
 		my $albumHash;
@@ -859,13 +862,16 @@ sub SONOS_FhemWebCallback($) {
 				$albumHash = $proxyCacheDir.'/SonosProxyCache_'.sha1_hex(lc($albumurl)).'.image';
 			};
 			if ($@ =~ /Can't locate Digest\/SHA1.pm in/i) {
-				require Digest::SHA;
-				import Digest::SHA qw(sha1_hex);
-				$albumHash = $proxyCacheDir.'/SonosProxyCache_'.sha1_hex(lc($albumurl)).'.image';
+				# FallBack auf Digest::SHA durchführen...
+				eval {
+					require Digest::SHA;
+					import Digest::SHA qw(sha1_hex);
+					$albumHash = $proxyCacheDir.'/SonosProxyCache_'.sha1_hex(lc($albumurl)).'.image';
+				};
 			}
 			if ($@) {
-				SONOS_Log undef, 4, 'Problem while generating Hashvalue: '.$@;
-				$albumHash = '';
+				SONOS_Log undef, 1, 'Problem while generating Hashvalue: '.$@;
+				return(undef, undef);
 			}
 			
 			if ((-e $albumHash) && ((stat($albumHash)->mtime) + $proxyCacheTime > gettimeofday())) {
@@ -4876,24 +4882,24 @@ sub SONOS_Discover_Callback($$$) {
 		if (!$isZoneBridge) {
 			if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 				eval {
-					my $result = SONOS_AVTransportControlProxy{$udn}->GetTransportInfo(0);
+					my $result = $SONOS_AVTransportControlProxy{$udn}->GetTransportInfo(0);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'transportState', $result->getValue('CurrentTransportState'));
 					
-					$result = SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
+					$result = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackURI', $result->getValue('TrackURI'));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackProvider', SONOS_GetTrackProvider($result->getValue('TrackURI')));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackDuration', $result->getValue('TrackDuration'));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPosition', $result->getValue('RelTime'));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrack', $result->getValue('Track'));
 					
-					$result = SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0);
+					$result = $SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'numberOfTracks', $result->getValue('NrTracks'));
 					my $stream = ($result->getValue('CurrentURI') =~ m/^x-(sonosapi|rincon)-stream:.*?/);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentStreamAudio', $stream);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentNormalAudio', !$stream);
 				};
 				if ($@) {
-					SONOS_Log undef, 4, 'Couldn\'t retrieve Current Transportsettings: '. $@;
+					SONOS_Log undef, 1, 'Couldn\'t retrieve Current Transportsettings during Discovery: '. $@;
 				}
 			}
 		}
