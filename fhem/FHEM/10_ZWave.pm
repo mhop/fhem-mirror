@@ -469,7 +469,7 @@ ZWave_Cmd($$@)
 
   my $len = sprintf("%02x", length($cmdFmt)/2+1);
 
-  my $data = "13$id$len$cmdId${cmdFmt}05"; # 13==SEND_DATA
+  my $data = "13$id$len$cmdId${cmdFmt}05"; # 13==SEND_DATA, 05=AUTO_ROUTE+ACK
   if($baseClasses =~ m/WAKE_UP/) {
     if(!$baseHash->{WakeUp}) {
       my @arr = ();
