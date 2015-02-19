@@ -17,9 +17,9 @@ sub CommandHelp {
 
   my ($mod,$lang) = split(" ",$arg);
 
-  $lang //= "";
+  $lang //= AttrVal('global','language','en');
   $lang = (lc($lang) eq 'de') ? '_DE' : '';
-  
+
   if($mod) {
     $mod = lc($mod);
     my %mods;
@@ -50,6 +50,9 @@ sub CommandHelp {
 	  $output .= $l;
     }
   }
+
+  $output = "Keine deutsche Hilfe gefunden!\n\n".
+             CommandHelp(undef, "$mod en") unless $output;
 
   if( $cl  && $cl->{TYPE} eq 'telnet' ) { 
     $output =~ s/<br>/\n/g;
@@ -110,15 +113,20 @@ sub CommandHelp {
 <a name="help"></a>
 <h3>?, help</h3>
   <ul>
-    <code>? [&lt;moduleName&gt;] [de]</code><br/>
-    <code>help [&lt;moduleName&gt;] [de]</code><br/>
+    <code>? [&lt;moduleName&gt;] [<language>]</code><br/>
+    <code>help [&lt;moduleName&gt;] [<language>]</code><br/>
     <br/>
     <ul>
       <li>Returns a list of available commands, when called without a
         moduleName.</li>
       <li>Returns a module dependent helptext, same as in commandref.</li>
-      <li>When called with de as last parameter, module dependent help will be shown in German.<br/>
-          Please be aware: Not every modules provides a German documentation.</li>
+      <li>language will be determined in following order: 
+         <ul>
+         <li>valid parameter &lt;language&gt; given</li>
+         <li>global attribute language</li>
+         <li>nothing founde: return english</li>
+         </ul>
+      </li>
     </ul>
   </ul>
 
@@ -129,15 +137,20 @@ sub CommandHelp {
 <a name="help"></a>
 <h3>?, help</h3>
   <ul>
-    <code>? [&lt;moduleName&gt;] [de]</code><br/>
-    <code>help [&lt;moduleName&gt;] [de]</code><br/>
+    <code>? [&lt;moduleName&gt;] [<language>]</code><br/>
+    <code>help [&lt;moduleName&gt;] [<language>]</code><br/>
     <br>
     <ul>
       <li>Liefert eine Liste aller Befehle mit einer Kurzbeschreibung zur&uuml;ck.</li>
       <li>Falls moduleName spezifiziert ist, wird die modul-spezifische Hilfe
           aus commandref zur&uuml;ckgeliefert.</li>
-      <li>Wird die modulspezifische Hilfe mit Parameter de aufgerufen, wird nach der deutschen Doku gesucht.<br/>
-          Eine deutsche Hilfe ist allerdings nicht in jedem Modul verfügbar!</li>
+      <li>Die anzuzeigende Sprache wird in folgender Reihenfolge bestimmt: 
+         <ul>
+         <li>g&uuml;ltiger Parameter &lt;language&gt; beim Aufruf &uuml;bergeben</li>
+         <li>globales Attribut language</li>
+         <li>falls alles fehlt: englisch</li>
+         </ul>
+      </li>
     </ul>
   </ul>
 =end html_DE
