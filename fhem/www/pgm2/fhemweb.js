@@ -570,7 +570,7 @@ FW_queryValue(cmd, el)
   query = addcsrf(query);
   var qConn = new XMLHttpRequest();
   qConn.onreadystatechange = function() {
-    if(qConn.readyState != 3)
+    if(qConn.readyState != 4)
       return;
     var qResp = qConn.responseText.replace(/[\r\n]/g, "");
     if(el.setValueFn)
