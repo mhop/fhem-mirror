@@ -23,7 +23,8 @@ sub CommandHelp {
   if($mod) {
     $mod = lc($mod);
     my %mods;
-    my @modDir = ("FHEM");
+    my $modPath = AttrVal('global','modpath','.');
+    my @modDir = ("$modPath/FHEM");
     foreach my $modDir (@modDir) {
       opendir(DH, $modDir) || die "Cant open $modDir: $!\n";
       while(my $l = readdir DH) {
