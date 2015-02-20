@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.133+";
+my $thzversion = "0.134";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -62,8 +62,14 @@ sub function_heatSetTemp($$);
 
 my %parsinghash = (
   #msgtype => parsingrule  
-  "01pxx206" => [["p37Fanstage1AirflowInlet: ", 4, 2, "hex", 1],	[" p38Fanstage2AirflowInlet: ", 6, 2, "hex", 1],	[" p39Fanstage3AirflowInlet: ", 8, 2, "hex", 1],
-		[" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],	[" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
+ 
+  "01pxx206" => [["p37Fanstage1AirflowInlet: ", 4, 4, "hex", 1],       [" p38Fanstage2AirflowInlet: ", 8, 4, "hex", 1],        [" p39Fanstage3AirflowInlet: ", 12, 4, "hex", 1],
+                [" p40Fanstage1AirflowOutlet: ", 16, 4, "hex", 1],      [" p41Fanstage2AirflowOutlet: ", 20, 4, "hex", 1],      [" p42Fanstage3AirflowOutlet: ", 24, 4, "hex", 1],
+                [" p43UnschedVent3: ", 28, 4, "hex", 1],        [" p44UnschedVent2: ", 32, 4, "hex", 1],        [" p45UnschedVent1: ", 36, 4, "hex", 1],
+                [" p46UnschedVent0: ", 40, 4, "hex", 1],        [" p75PassiveCooling: ", 44, 4, "hex", 1]
+                ],
+  "01pxx214" => [["p37Fanstage1AirflowInlet: ", 4, 2, "hex", 1],       [" p38Fanstage2AirflowInlet: ", 6, 2, "hex", 1],        [" p39Fanstage3AirflowInlet: ", 8, 2, "hex", 1],
+  		[" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],	[" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
 		[" p43UnschedVent3: ", 16, 4, "hex", 1],	[" p44UnschedVent2: ", 20, 4, "hex", 1],	[" p45UnschedVent1: ", 24, 4, "hex", 1],
       		[" p46UnschedVent0: ", 28, 4, "hex", 1],	[" p75PassiveCooling: ", 32, 2, "hex", 1]
 	      	 ],
@@ -333,7 +339,7 @@ my %sets439 = (
     "pHolidayEndMonth"			=> {cmd2=>"0A011F", argMin =>  "1", 	argMax =>  "12",	type =>"0clean",  unit =>""},
     "pHolidayEndYear"			=> {cmd2=>"0A0120", argMin =>  "12", 	argMax =>  "20",	type =>"0clean",  unit =>""},
     "pHolidayEndTime"			=> {cmd2=>"0A05D4", argMin =>  "00:00", argMax =>  "23:59", 	type =>"9holy",  unit =>""}, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
-   # "party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
+    #"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
     "programHC1_Mo_0"			=> {cmd2=>"0B1410", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
     "programHC1_Mo_1"			=> {cmd2=>"0B1411", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
     "programHC1_Mo_2"			=> {cmd2=>"0B1412", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
@@ -504,7 +510,6 @@ my %getsonly439 = (
 	"sElectrDHWTotal" 		=> {cmd2=>"0A091C", cmd3=>"0A091D",	type =>"1clean", unit =>" kWh"},
 	"sElectrHCDay" 			=> {cmd2=>"0A091E", cmd3=>"0A091F",	type =>"1clean", unit =>" Wh"},
 	"sElectrHCTotal"		=> {cmd2=>"0A0920", cmd3=>"0A0921",	type =>"1clean", unit =>" kWh"},
-	#"sAllE8"			=> {cmd2=>"E8"},
 	"party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   );
 
@@ -521,10 +526,7 @@ my %getsonly539 = (  #info from belu and godmorgon
  );
 %getsonly539=(%getsonly539, %getsonly439);
 
-my %getsonly206 = (
-#       "outsideTemp"			=> {parent=>"sGlobal", unit =>" °C"},
-#	"return"			=> {parent=>"sGlobal", unit =>" °C"},
-  	"pFan"				=> {cmd2=>"01", type =>"01pxx206", unit =>""},
+my %getsonly2xx = (
 	"pExpert"			=> {cmd2=>"02", type =>"02pxx206", unit =>""},
 	"pDefrostEva"			=> {cmd2=>"03", type =>"03pxx206", unit =>""},
 	"pDefrostAA"			=> {cmd2=>"04", type =>"04pxx206", unit =>""},
@@ -541,6 +543,7 @@ my %getsonly206 = (
 	"pDryHeat"			=> {cmd2=>"10", type =>"10pxx206", unit =>""},
 	"sSol"				=> {cmd2=>"16", type =>"16sol",    unit =>""},
 	"p01-p12"			=> {cmd2=>"17", type =>"17pxx206", unit =>""},
+        "sProgram"                      => {cmd2=>"EE", type =>"EEprg206", unit =>""},
 	"sDHW"				=> {cmd2=>"F3", type =>"F3dhw",    unit =>""},
 	"sHC1"				=> {cmd2=>"F4", type =>"F4hc1",    unit =>""},
 	"sHC2"				=> {cmd2=>"F5", type =>"F5hc2",    unit =>""},
@@ -549,9 +552,17 @@ my %getsonly206 = (
 	"sLast10errors"			=> {cmd2=>"D1", type =>"D1last206", unit =>""},
         "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  #allFB
         "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
-        "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
+ );
+my %getsonly206 = (
+        "pFan"                          => {cmd2=>"01", type =>"01pxx206", unit =>""},
+        "sLast10errors"                 => {cmd2=>"D1", type =>"D1last206", unit =>""},
+	"sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
 	"sFirmware-Id" 			=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
  );
+my %getsonly214 = (
+       "pFan"                          => {cmd2=>"01", type =>"01pxx214", unit =>""},
+ );
+
 
 my %sets=%sets439;
 my %gets=(%getsonly439, %sets);
@@ -611,7 +622,7 @@ sub THZ_Initialize($)
 		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sFlowRate:0,3600,7200,28800,43200,86400 "
 		    ."interval_sDisplay:0,60,120,180,300 "
-		    ."firmware:4.39,2.06,5.39 "
+		    ."firmware:4.39,2.06,2.14,5.39 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 
@@ -794,7 +805,7 @@ sub THZ_Set($@){
   my $argMin = $cmdhash->{argMin};
   
   #next line disables write back for old firmware if the attribute 206 is set.
-  return "set not allowed for old firmwares" if((AttrVal($hash->{NAME}, "firmware" , "4.39") eq "2.06"));
+  #return "set not allowed for old firmwares" if((AttrVal($hash->{NAME}, "firmware" , "4.39") eq "2.06"));
   
   # check the parameter range
   given ($cmdhash->{type}) {
@@ -803,74 +814,63 @@ sub THZ_Set($@){
       return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg1 gt $argMax) or ($arg1 lt $argMin) or ($arg gt $argMax) or ($arg lt $argMin)) ) ;
     }
     when ("2opmode") {
-     $arg1=$arg;
+     $arg1=undef;
      $arg=$Rev_OpMode{$arg};
      return "Unknown argument $arg1: $cmd supports  " . join(" ", sort values %OpMode) 	if(!defined($arg));
     }
-    default {
+    default {$arg1=undef;
      return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
     }
   }  
- 
+  my $i=0;  my $parsingrule;
   my $parent = $cmdhash->{parent};	#if I have a father read from it
   if(defined($parent) ) {
       my $parenthash=$gets{$parent};
-      #read before write the register
       $cmdHex2 = $parenthash->{cmd2};	#overwrite $cmdHex2 with the parent
-      $cmdHex2=THZ_encodecommand($cmdHex2, "get");
+      $cmdHex2=THZ_encodecommand($cmdHex2, "get");  #read before write the register
       ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
       if (defined($err))     {
 		 Log3 $hash->{NAME}, 3, "THZ_Set: error reading register: '$err'";
 		 return ($msg ."\n msg " . $err);
       }
       substr($msg, 0, 2, ""); 		#remove the checksum from the head of the payload
-      Log3 $hash->{NAME}, 3, "answer from THZ: $msg";
+      Log3 $hash->{NAME}, 5, "read before write from THZ: $msg";
       #--
-      my $parsingrule = $parsinghash{$parenthash->{type}};
-      my $i=0; 
+      $parsingrule = $parsinghash{$parenthash->{type}};
       for (@$parsingrule) {
 	      last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
 	      $i++;
       }
-      my $pos = @$parsingrule[$i]->[1] ;
-      my $len = @$parsingrule[$i]->[2];
-      my $pasringtype = @$parsingrule[$i]->[3];
-      my $dec = @$parsingrule[$i]->[4];
-      Log3 $hash->{NAME}, 3, "write register/pos/len/dec/arg to THZ: $cmdHex2 / $pos / $len / $dec / $arg";
   }
   else {
-    #my $parsingrule = $parsinghash{$cmdhash->{type}} if(defined($msgtype));
-    #my $pos = @$parsingrule[0]->[1] ;
-    #my $len = @$parsingrule[0]->[2];
-    #my $pasringtype = @$parsingrule[0]->[3];
-    #my $dec = @$parsingrule[0]->[4];
-    #$msg =  $cmdHex2 . "0000";   
+    $msg =  $cmdHex2 . "0000";
+    my $msgtype =$cmdhash->{type};
+    $parsingrule = $parsinghash{$msgtype} if(defined($msgtype));
   }
- 
- 
- 
-  # encode value depending on type
-  given ($cmdhash->{type}) {
-   when ("9holy") 		{$arg= time2quaters($arg)}
-   when ("8party") 		{$arg= time2quaters($arg1) *256  + time2quaters($arg)}     #non funziona
-   when ("7prog")		{$arg= time2quaters($arg)  *256  + time2quaters($arg1)}
-   when ("6gradient")		{$arg=$arg*100} 
-   when ("5temp")		{$arg=$arg*10}
-   when ("4temp")		{$arg=$arg*10*256}  
-   when (["2opmode", "0clean"]) {$arg=$arg*256}  #doubble shift ;;; conversion done above for opmode
-   when ("1clean") 		{ }
-   default 			{ } 
-  }  
-  Log3 $hash->{NAME}, 5, "THZ_Set: '$cmd $arg' ... Check if port is open. State = '($hash->{STATE})'";
-  $cmdHex2=THZ_encodecommand(($cmdHex2 . substr((sprintf("%04X", $arg)), -4)),"set");  #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
+  my $pos = @$parsingrule[$i]->[1] -2; #I removed the checksum
+  my $len = @$parsingrule[$i]->[2];
+  my $parsingtype = @$parsingrule[$i]->[3];
+  my $dec = @$parsingrule[$i]->[4];
+  Log3 $hash->{NAME}, 5, "write command (parsed element/pos/len/dec/parsingtype): $i / $pos / $len / $dec / $parsingtype";
   
-  #per vecchi firmware  leggi 17, sovrascrivi parte del messaggio, encode; non so se lo implemento
-  
-  
+  $arg *= $dec if ($dec != 1);
+  $arg  = time2quaters($arg) if ($parsingtype eq "quater"); 
+  $arg  = substr((sprintf(("%0".$len."X"), $arg)), (-1*$len)); #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
+  substr($msg, $pos, $len, $arg);
+ 
+  if (defined($arg1))  {		#only in case of "8party" or "7prog" 
+    $arg1  = time2quaters($arg1);
+    $arg1  = substr((sprintf(("%02X"), $arg1)), -2);
+    $pos = @$parsingrule[($i+1)]->[1] -2;
+    substr($msg, $pos, $len, $arg1);
+  }
+  Log3 $hash->{NAME}, 5, "THZ_Set: '$cmd $arg $msg' ... Check if port is open. State = '($hash->{STATE})'";
+  $cmdHex2=THZ_encodecommand($msg,"set");
   ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
   #$err=undef;
   if (defined($err))  { return ($cmdHex2 . "-". $msg ."--" . $err);}
   else {
+	select(undef, undef, undef, 0.05);
 	$msg=THZ_Get($hash, $name, $cmd);
 	#take care of program of the week
 	given ($a[1]) {
@@ -939,7 +939,7 @@ sub THZ_Get($@){
   my $parent = $cmdhash->{parent};	#if I have a father read from it
   if(defined($parent) ) {
       my ($seconds, $microseconds) = gettimeofday();
-      my $seconds= abs($seconds - time_str2num(ReadingsTimestamp($name, $parent, "1970-01-01 01:00:00")));
+      $seconds= abs($seconds - time_str2num(ReadingsTimestamp($name, $parent, "1970-01-01 01:00:00")));
       my $risultato=ReadingsVal($name, $parent, 0);
       $risultato=THZ_Get($hash, $name, $parent) if ($seconds > 29 );	#update of the parent: if under 29sec use the current value
       my $parenthash=$gets{$parent}; my $parsingrule = $parsinghash{$parenthash->{type}};
@@ -1302,7 +1302,7 @@ sub THZ_Parse1($$) {
   my $length = length($message);
   Log3 $hash->{NAME}, 5, "Message length: $length";
   my $parsingcmd = substr($message,2,2);
-  $parsingcmd = substr($message,2,6) if (($parsingcmd =~ m/(0A|0B|0C)/) and (AttrVal($hash->{NAME}, "firmware" , "4.39") ne "2.06"));
+  $parsingcmd = substr($message,2,6) if (($parsingcmd =~ m/(0A|0B|0C)/) and (AttrVal($hash->{NAME}, "firmware" , "4.39") ne "2.06") and (AttrVal($hash->{NAME}, "firmware" , "4.39") ne "2.14"));
   my $msgtype;
   my $parsingrule;
   my $parsingelement;
@@ -1392,7 +1392,7 @@ sub THZ_debugread($){
   my $indice= "FF";
   unlink("data.txt"); #delete  debuglog
   foreach $indice(@numbers) {	
-    my $cmd = sprintf("%02X", $indice);
+    #my $cmd = sprintf("%02X", $indice);
     #my $cmd = sprintf("%04X", $indice);
     #my $cmd = "0A" . sprintf("%04X",  $indice);
     my $cmd = $indice;
@@ -1446,16 +1446,23 @@ sub THZ_Attr(@) {
       if ($attrVal eq "2.06") {
         THZ_RemoveInternalTimer("THZ_GetRefresh");
          %sets = %sets206;
-         %gets = (%getsonly206, %sets);
+         %gets = (%getsonly2xx, %getsonly206, %sets);
+         THZ_Refresh_all_gets($hash);
+      }
+      elsif ($attrVal eq "2.14") {
+        THZ_RemoveInternalTimer("THZ_GetRefresh");
+        %sets = %sets206;
+        %gets = (%getsonly2xx, %getsonly214, %sets);
         THZ_Refresh_all_gets($hash);
       }
-      if ($attrVal eq "5.39") {
+      elsif ($attrVal eq "5.39") {
         THZ_RemoveInternalTimer("THZ_GetRefresh");
         %sets=%sets439;
         %gets=(%getsonly539, %sets);
         THZ_Refresh_all_gets($hash);
       }
-      if (($attrVal eq "4.39") or ($cmd eq "del") or (($attrVal ne "5.39") and ($attrVal ne "2.06")) )  {
+      #--
+      if (($attrVal eq "4.39") or ($cmd eq "del") or (($attrVal ne "5.39") and ($attrVal ne "2.06") and ($attrVal ne "2.14")))  {
           THZ_RemoveInternalTimer("THZ_GetRefresh");
           %sets=%sets439;
           %gets=(%getsonly439, %sets);
@@ -1518,11 +1525,9 @@ sub THZ_RemoveInternalTimer($){
 
 sub function_heatSetTemp($$) {
   my ($start, $stop) = @_;
-  my $insideTemp=(split ' ',ReadingsVal("Mythz","sHC1",24))[27];
-  my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",24))[21];
+  my ($heatSetTemp, $roomSetTemp, $insideTemp) =(split ' ',ReadingsVal("Mythz","sHC1",0))[11,21,27];
   $roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
   my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
-  my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",17))[11];
   my $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
   my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
   my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
@@ -1623,16 +1628,14 @@ $ret .= '<polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylab
 $ret .= '</g>';
 
 
-my $insideTemp=(split ' ',ReadingsVal("Mythz","sHC1",24))[27];
-my $roomSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",24))[21];
-$roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
+my ($heatSetTemp, $roomSetTemp, $insideTemp) =(split ' ',ReadingsVal("Mythz","sHC1",0))[11,21,27];
+$roomSetTemp = 1 if ($roomSetTemp == 0); #division by 0 is bad
 my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
-my $heatSetTemp =(split ' ',ReadingsVal("Mythz","sHC1",17))[11];
 my $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
 my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
 my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
 my $p99RoomThermCorrection =(split ' ',ReadingsVal("Mythz","p99RoomThermCorrection",0))[0];
-
+ 
 ############rene data
 #$insideTemp=23.8 ;
 #$roomSetTemp = 20.5;
