@@ -21,41 +21,66 @@ sub CommandHelp {
   $lang = (lc($lang) eq 'de') ? '_DE' : '';
 
   if($mod) {
+
     $mod = lc($mod);
-    my %mods;
     my $modPath = AttrVal('global','modpath','.');
-    my @modDir = ("$modPath/FHEM");
-    foreach my $modDir (@modDir) {
-      opendir(DH, $modDir) || die "Cant open $modDir: $!\n";
-      while(my $l = readdir DH) {
-	    next if($l !~ m/^\d\d_.*\.pm$/);
-	    my $of = $l;
-	    $l =~ s/.pm$//;
-	    $l =~ s/^[0-9][0-9]_//;
-	    $mods{lc($l)} = "$modDir/$of";
-      }
-    }
+	my $output = "";
 
-    return "Module $mod not found" unless defined($mods{$mod});
+	if($mod ne 'global') {
+      my %mods;
+	  my @modDir = ("$modPath/FHEM");
 
-    my $output = "";
-    my $skip = 1;
-    my ($err,@text) = FileRead({FileName => $mods{$mod}, ForceType => 'file'});
-    return $err if $err;
-    foreach my $l (@text) {
-      if($l =~ m/^=begin html$lang$/) {
-	    $skip = 0;
-      } elsif($l =~ m/^=end html$lang$/) {
-	    $skip = 1;
-      } elsif(!$skip) {
-	  $output .= $l;
-    }
-  }
+	  foreach my $modDir (@modDir) {
+	    opendir(DH, $modDir) || die "Cant open $modDir: $!\n";
+	    while(my $l = readdir DH) {
+	      next if($l !~ m/^\d\d_.*\.pm$/);
+	      my $of = $l;
+	      $l =~ s/.pm$//;
+	      $l =~ s/^[0-9][0-9]_//;
+	      $mods{lc($l)} = "$modDir/$of";
+	    }
+	  }
 
-  $output = "Keine deutsche Hilfe gefunden!\n\n".
+      return "Module $mod not found" unless defined($mods{$mod});
+
+	  my $skip = 1;
+	  my ($err,@text) = FileRead({FileName => $mods{$mod}, ForceType => 'file'});
+	  return $err if $err;
+	  foreach my $l (@text) {
+	    if($l =~ m/^=begin html$lang$/) {
+	      $skip = 0;
+	    } elsif($l =~ m/^=end html$lang$/) {
+	      $skip = 1;
+	    } elsif(!$skip) {
+	      $output .= $l;
+	    }
+	  }
+
+    } else {
+
+      $output = '';
+	  my $i;
+	  my $f = "$modPath/docs/commandref_frame$lang.html";
+      my $skip = 1;
+	  my ($err,@text) = FileRead({FileName => $f, ForceType => 'file'});
+	  return $err if $err;
+
+	  foreach my $l (@text) {
+        if($l =~ m/name=.global./) { 
+           $skip = 0;
+        } elsif($l =~ m/^<!-- global.end/) {
+           $skip = 1;
+        } elsif (!$skip) {
+           $output .= $l;
+        }
+	  }   
+
+	}
+
+    $output = "Keine deutsche Hilfe gefunden!\n\n".
              CommandHelp(undef, "$mod en") unless $output;
 
-  if( $cl  && $cl->{TYPE} eq 'telnet' ) { 
+    if( $cl  && $cl->{TYPE} eq 'telnet' ) { 
     $output =~ s/<br>/\n/g;
     $output =~ s/<br\/>/\n/g;
     $output =~ s/<\/a>//g;
@@ -82,11 +107,11 @@ sub CommandHelp {
     $output =~ s/&szlig;/ß/g;
 
     return $output;
-  }
+    }
 
-  return "<html>$output</html>";
+    return "<html>$output</html>";
 
-  } else {
+  } else {   # mod
 
     my $str = "\n" .
 		"Possible commands:\n\n" .
