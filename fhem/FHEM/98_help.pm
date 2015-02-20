@@ -22,11 +22,12 @@ sub CommandHelp {
 
   if($mod) {
 
+    my $internals = "attributes command commands devspec global perl";
     $mod = lc($mod);
     my $modPath = AttrVal('global','modpath','.');
 	my $output = "";
 
-	if($mod ne 'global') {
+	if($internals !~ m/$mod/) {
       my %mods;
 	  my @modDir = ("$modPath/FHEM");
 
@@ -66,9 +67,9 @@ sub CommandHelp {
 	  return $err if $err;
 
 	  foreach my $l (@text) {
-        if($l =~ m/name=.global./) { 
+        if($l =~ m/name=\"$mod\"/) { 
            $skip = 0;
-        } elsif($l =~ m/^<!-- global.end/) {
+        } elsif($l =~ m/^<!-- $mod.end/) {
            $skip = 1;
         } elsif (!$skip) {
            $output .= $l;
