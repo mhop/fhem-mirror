@@ -4,11 +4,15 @@ package main;
 
 =pod
 ### Usage:
-sub TestBlocking   { BlockingCall("DoSleep", {h=>$defs{CUL}, to=>3,cmd=>"CmdTxt"}, 
-                     "SleepDone", 8, "AbortFn", "AbortArg"); }
+Define the following in your 99_myUtils.pm
+sub TestBlocking($){ BlockingCall("DoSleep", shift, "SleepDone", 5, "AbortFn", "AbortArg"); }
 sub DoSleep($)     { sleep(shift); return "I'm done"; }
 sub SleepDone($)   { Log 1, "SleepDone: " . shift; }
 sub AbortFn($)     { Log 1, "Aborted: " . shift; }
+Then call from the fhem prompt
+{ TestBlocking(3) }
+{ TestBlocking(6) }
+and watch the fhem log.
 =cut
 
 
