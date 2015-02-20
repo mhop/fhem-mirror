@@ -61,13 +61,13 @@ sub CommandHelp {
 
       $output = '';
 	  my $i;
-	  my $f = "$modPath/docs/commandref_frame$lang.html";
+	  my $f = "$modPath/docs/commandref$lang.html";
       my $skip = 1;
 	  my ($err,@text) = FileRead({FileName => $f, ForceType => 'file'});
 	  return $err if $err;
 
 	  foreach my $l (@text) {
-        if($l =~ m/name=\"$mod\"/) { 
+        if($l =~ m/^<a name=\"$mod\"/) { 
            $skip = 0;
         } elsif($l =~ m/^<!-- $mod.end/) {
            $skip = 1;
