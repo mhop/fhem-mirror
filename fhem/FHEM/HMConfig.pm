@@ -804,6 +804,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,sensRain            =>{ transmDevTryMax =>1,localResDis     =>1}
  ,tipTronic           =>{ cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1}
  ,powerMeter          =>{ intKeyVisib     =>1,localResDis     =>1}
+ ,outputUnit          =>{ intKeyVisib     =>1}
  ,powerSensor         =>{ transmitTryMax  =>1,transmDevTryMax =>1
                          ,mtrType         =>1,mtrConstIr      =>1,mtrConstGas     =>1,mtrConstLed     =>1  
                          ,mtrSensIr       =>1  

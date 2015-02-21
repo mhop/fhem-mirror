@@ -140,6 +140,7 @@ sub CUL_HM_Initialize($) {
                        ."actCycle "            # also for action detector                       
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
+                       ."actAutoTry:0_off,1_on "
                        ;
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
                         "serialNr firmware .stc .devInfo "
@@ -798,6 +799,11 @@ sub CUL_HM_Attr(@) {#################################
     }
     else{
       delete $hash->{helper}{lm};
+    }
+  }
+  elsif($attrName eq "actAutoTry" ){
+    if ($cmd eq "set"){
+      return "$attrName only usable for ActionDetector" if(CUL_HM_hash2Id($hash) ne "000000");#only for device
     }
   }
   
@@ -6908,7 +6914,8 @@ sub CUL_HM_ActCheck($) {# perform supervision
   my $peerIDs = $actHash->{helper}{peers}?$actHash->{helper}{peers}:"";
   my @event;
   my ($cntUnkn,$cntAliv,$cntDead,$cnt_Off) =(0,0,0,0);
-
+  my $autoTry = CUL_HM_getAttrInt($actName,"actAutoTry",0);
+  
   foreach my $devId (split(",",$peerIDs)){
     next if (!$devId);
     my $devName = CUL_HM_id2Name($devId);
@@ -6934,17 +6941,31 @@ sub CUL_HM_ActCheck($) {# perform supervision
       my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
                              $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
 
-      if (!$tLast){                #cannot determine time
+      if (!$tLast                  #cannot determine time
+          || $tSince gt $tLast){   #no message received in window
         if ($actHash->{helper}{$devId}{start} lt $tSince){  
-          $cntDead++; $state = "dead";
-        }
-        else{
-          $cntUnkn++; $state = "unknown";
-        }
-      }
-      elsif ($tSince gt $tLast){    #no message received in window
-        if ($actHash->{helper}{$devId}{start} lt $tSince){
-          $cntDead++; $state = "dead";
+          if($autoTry) { #try to send a statusRequest?
+            if (!$actHash->{helper}{$devId}{try} || $actHash->{helper}{$devId}{try}<2){
+              $actHash->{helper}{$devId}{try} = $actHash->{helper}{$devId}{try}
+                                                 ? ($actHash->{helper}{$devId}{try} +1)
+                                                 : 1;
+              if (CUL_HM_Set($defs{$devName},$devName,"help") =~ m/statusRequest/){
+                # send statusrequest if possible
+                CUL_HM_Set($defs{$devName},$devName,"statusRequest");
+                $cntUnkn++; $state = "unknown";
+              }
+              else{
+                $actHash->{helper}{$devId}{try} = 99;
+                $cntDead++; $state = "dead";
+              }
+            }
+            else{
+              $cntDead++; $state = "dead";
+            }
+          }
+          else{
+            $cntDead++; $state = "dead";
+          }
         }
         else{
           $cntUnkn++; $state = "unknown";
@@ -6952,6 +6973,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
       }
       else{                         #message in time
         $cntAliv++; $state = "alive";
+        delete $actHash->{helper}{$devId}{try};
       }
     }
     if ($oldState ne $state){
@@ -8619,6 +8641,11 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          if set HMLAN/USB is forced to request AES signature before sending ACK to the device.<br>
          This funktion strictly works with HMLAN/USB - it doesn't work for CUL type IOs.<br>
     </li>
+    <li><a name="#CUL_HMactAutoTry">actAutoTry</a>
+         actAutoTry 0_off,1_on<br>
+         setting this option enables Action Detector to send a statusrequest in case of a device is going to be marked dead.
+         The attribut may be useful in case a device is being checked that does not send messages regularely - e.g. an ordinary switch. 
+      </li>
     <li><a name="#CUL_HMactCycle">actCycle</a>
          actCycle &lt;[hhh:mm]|off&gt;<br>
          Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maximum silent time for the device. 
@@ -9884,6 +9911,11 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><a href="#dummy">dummy</a></li>
       <li><a href="#showtime">showtime</a></li>
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <li><a name="#CUL_HMactAutoTry">actAutoTry</a>
+         actAutoTry 0_off,1_on<br>
+         setzen der Option erlaubt dem ActionDetector ein statusrequest zu senden falls das Device dead markiert werden soll.
+         Das Attribut kann fuer Devices nützlich sein, welche sich nicht von selbst zyklisch melden.
+      </li>
       <li><a href="#actCycle">actCycle</a>
         actCycle &lt;[hhh:mm]|off&gt;<br>
         Bietet eine 'alive' oder besser 'not alive' Erkennung f&uuml;r Ger&auml;te. [hhh:mm] ist die maximale Zeit ohne Nachricht eines Ger&auml;ts. Wenn innerhalb dieser Zeit keine Nachricht empfangen wird so wird das Event"&lt;device&gt; is dead" generiert.
