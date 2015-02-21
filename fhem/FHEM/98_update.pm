@@ -149,6 +149,14 @@ doUpdate($$)
     $lh{$l[3]}{LEN} = $l[2];
   }
 
+  my ($canJoin, $needJoin);
+  my $cj = "$root/contrib/commandref_join.pl";
+  if(-f $cj &&
+     -f "$root/docs/commandref_frame.html" &&
+     -w "$root/docs/commandref.html") {
+    $canJoin = 1;
+  }
+
   my @excl = split(" ", AttrVal("global", "exclude_from_update", ""));
 
   my @rl = upd_getChanges($root, $basePath);
@@ -197,8 +205,12 @@ doUpdate($$)
 
     uLog 1, "List of new / modified files since last update:"
       if($arg eq "check" && $nChanged == 0);
-    uLog 1, "$r[0] $fName";
     $nChanged++;
+    if($fName =~ m,docs/commandref(_..)?.html, && $canJoin) {
+      $needJoin = 1;
+      next;
+    }
+    uLog 1, "$r[0] $fName";
     next if($arg eq "check");
 
     my $remFile = upd_getUrl("$basePath/$fName");
@@ -235,6 +247,13 @@ doUpdate($$)
   if($arg eq "all" || $arg eq "force") { # store the controlfile
     return if(!upd_writeFile($root, $restoreDir,
                            "FHEM/$ctrlFileName", $remCtrlFile));
+  }
+
+  if($canJoin && $needJoin) {
+    chdir($root);
+    uLog(1, "Calling $^X $cj, this may take a while");
+    my $ret = `$^X $cj`;
+    uLog(1, $ret) if($ret);
   }
 
   uLog(1, "");
