@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.134";
+my $thzversion = "0.135";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -53,6 +53,7 @@ sub THZ_PrintcurveSVG;
 sub THZ_RemoveInternalTimer($);
 sub THZ_Set($@);
 sub function_heatSetTemp($$);
+sub THZ_Get($@);
 
 ########################################################################################
 #
@@ -159,14 +160,15 @@ my %parsinghash = (
   "F4hc1"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
 	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
 	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
-	      [" heatTemp: ",		28, 4, "hex2int", 10],  #[" x32: ",		32, 4, "hex2int", 1],
+	      [" heatTemp: ",		28, 4, "hex2int", 10],  
 	      [" seasonMode: ",		38, 2, "somwinmode", 1],#[" x40: ",		40, 4, "hex2int", 1],
 	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
 	      #[" x52: ",		52, 4, "hex2int", 1],
               [" roomSetTemp: ",	56, 4, "hex2int", 10],  [" x60: ", 		60, 4, "hex2int", 10],
 	      [" x64: ", 		64, 4, "hex2int", 10],  [" insideTempRC: ",     68, 4, "hex2int", 10],
 	      [" x72: ", 		72, 4, "hex2int", 10],  [" x76: ", 		76, 4, "hex2int", 10],
-	   #  [" x80: ", 		80, 4, "hex2int", 10]
+	      [" onHysteresisNo: ", 	32, 2, "hex", 1],	[" offHysteresisNo: ", 34, 2, "hex", 1],
+	      [" HCBoosterStage: ",	36, 2, "hex", 1] 
 	     ],
   "F5hc2"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" returnTemp: ",	8, 4, "hex2int", 10],
 	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
@@ -1543,7 +1545,8 @@ sub function_heatSetTemp($$) {
    $Simul_heatSetTemp = sprintf("%.1f", ($i * $i * $c + $i * $b + $a));
    push(@ret, [$i, $Simul_heatSetTemp]);
   }
-  return \@ret;
+  my $titlestring =  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  ' p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . " insideTemp=" . $insideTemp ;
+  return (\@ret, $titlestring, $heatSetTemp, $outside_tempFiltered);
 }
 
 #####################################
@@ -1555,7 +1558,7 @@ sub function_heatSetTemp($$) {
 #####################################
 
 sub THZ_PrintcurveSVG {
-my $ycurvevalues = function_heatSetTemp(-15,21);
+my ($ycurvevalues, $titlestring, $heatSetTemp, $outside_tempFiltered) = function_heatSetTemp(-15,21);
 my $vstep= 5;
 $vstep= 10 if (($ycurvevalues->[0][1])>36); #change scale if out of scale
 my$v0min= 15;
@@ -1628,43 +1631,19 @@ $ret .= '<polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylab
 $ret .= '</g>';
 
 
-my ($heatSetTemp, $roomSetTemp, $insideTemp) =(split ' ',ReadingsVal("Mythz","sHC1",0))[11,21,27];
-$roomSetTemp = 1 if ($roomSetTemp == 0); #division by 0 is bad
-my $p13GradientHC1 = ReadingsVal("Mythz","p13GradientHC1",0.4);
-my $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
-my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
-my $p14LowEndHC1 =(split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
-my $p99RoomThermCorrection =(split ' ',ReadingsVal("Mythz","p99RoomThermCorrection",0))[0];
- 
-############rene data
-#$insideTemp=23.8 ;
-#$roomSetTemp = 20.5;
-#$p13GradientHC1 = 0.31;
-#$heatSetTemp = 25.4;
-#$p15RoomInfluenceHC1 = 80;
-#$outside_tempFiltered = 4.9;
-#$p14LowEndHC1 =1.5;
-#$p99RoomThermCorrection = -2.8;
-
-
 #labels ######################
 $ret .= '<text line_id="line_1" x="70" y="105.2" class="l1"> --- heat curve</text>' ;
-$ret .= '<text  line_id="line_0" x="70" y="121.2"  class="l0"> --- working point: outside_tempFiltered=';
-$ret .=  $outside_tempFiltered . ' heatSetTemp=' . $heatSetTemp . '</text>';
-
+$ret .= '<text  line_id="line_0" x="70" y="121.2"  class="l0"> --- working point: ';
+$ret .= 'outside_tempFiltered=' . $outside_tempFiltered . ' heatSetTemp=' . $heatSetTemp . '</text>';
 
 #title ######################
 $ret .= '<text id="svg_title" x="400" y="14.4" class="title" text-anchor="middle">';
-$ret .=  'roomSetTemp=' . $roomSetTemp . ' p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  ' p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . " insideTemp=" . $insideTemp .' </text>' . "\n";
-
-#equation####################
-$insideTemp = $roomSetTemp if ($insideTemp eq "n.a."); 
-
+$ret .=  $titlestring .' </text>' . "\n";
 
 #point ######################
 $ret .='<polyline id="line_0"   style="stroke-width:2" class="l0" points="';
 my ($px,$py) = (sprintf("%.1f", (($outside_tempFiltered+15)*(750-49)/(15+21)+49)),sprintf("%.1f", (($heatSetTemp-$v4)*(140-19)/($v0min-$v4)+19))); 
- $ret.= ($px-3) . "," . ($py)   ." " . ($px)  . "," . ($py-3) ." " . ($px+3) . "," . ($py) ." " . ($px)   . "," . ($py+3)  ." " . ($px-3)   . "," . ($py)  ." " . '"/>' . "\n";
+$ret.= ($px-3) . "," . ($py)   ." " . ($px)  . "," . ($py-3) ." " . ($px+3) . "," . ($py) ." " . ($px)   . "," . ($py+3)  ." " . ($px-3)   . "," . ($py)  ." " . '"/>' . "\n";
 
 #curve ######################
 $ret .='<polyline id="line_1"  title="Heat Curve" style="stroke-width:1" class="l1" points="';
@@ -1672,13 +1651,11 @@ foreach (@{$ycurvevalues}) {
 $ret.= (sprintf("%.1f", ($_->[0]+15)*(750-49)/(15+21)+49) ). "," . sprintf("%.1f", (($_->[1]-$v4)*(140-19)/($v0min-$v4)+19)) ." ";
 }
 
-
 $ret .= '"/> ' . "\n";
 $ret .= '</svg>';
 
 my $FW_RETTYPE = "image/svg+xml";
 return ($FW_RETTYPE, $ret);
-#return $ret;
 }
 
 
