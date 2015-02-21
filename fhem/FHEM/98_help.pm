@@ -4,7 +4,10 @@ package main;
 use strict;
 use warnings;
 
+my $ret;
+
 sub CommandHelp;
+sub cref_search;
 
 sub help_Initialize($$) {
   my %hash = (  Fn => "CommandHelp",
@@ -16,7 +19,7 @@ sub CommandHelp {
   my ($cl, $arg) = @_;
 
   my ($mod,$lang) = split(" ",$arg);
-
+  
   $lang //= AttrVal('global','language','en');
   $lang = (lc($lang) eq 'de') ? '_DE' : '';
 
@@ -25,9 +28,9 @@ sub CommandHelp {
     my $internals = "attributes command commands devspec global perl";
     $mod = lc($mod);
     my $modPath = AttrVal('global','modpath','.');
-	my $output = "";
+	my $output = '';
 
-	if($internals !~ m/$mod/) {
+	if($internals !~ m/$mod /) {
       my %mods;
 	  my @modDir = ("$modPath/FHEM");
 
@@ -44,18 +47,14 @@ sub CommandHelp {
 
       return "Module $mod not found" unless defined($mods{$mod});
 
-	  my $skip = 1;
-	  my ($err,@text) = FileRead({FileName => $mods{$mod}, ForceType => 'file'});
-	  return $err if $err;
-	  foreach my $l (@text) {
-	    if($l =~ m/^=begin html$lang$/) {
-	      $skip = 0;
-	    } elsif($l =~ m/^=end html$lang$/) {
-	      $skip = 1;
-	    } elsif(!$skip) {
-	      $output .= $l;
-	    }
-	  }
+      $output = cref_search($mods{$mod},$lang);
+Debug $output;      
+      unless($output) {
+         $output = cref_search($mods{$mod},"");
+         $output = "Keine deutsche Hilfe gefunden!<br/>$output" if $output;
+      }
+      
+      $output = "No help found for module: $mod" unless $output;
 
     } else {
 
@@ -78,10 +77,8 @@ sub CommandHelp {
 
 	}
 
-    $output = "Keine deutsche Hilfe gefunden!\n\n".
-             CommandHelp(undef, "$mod en") unless $output;
 
-    if( $cl  && $cl->{TYPE} eq 'telnet' ) { 
+    if( $cl  && $cl->{TYPE} eq 'telnet' ) {
     $output =~ s/<br>/\n/g;
     $output =~ s/<br\/>/\n/g;
     $output =~ s/<\/a>//g;
@@ -96,9 +93,8 @@ sub CommandHelp {
     $output =~ s/&gt;/>/g;
     $output =~ s/<[bui]>/\ /g;
     $output =~ s/<\/[bui]>/\ /g;
-    $output =~ s/\ \ +/\ /g;
-    $output =~ s/\t+/ /g;
-    $output =~ s/\n\n/\n/g;
+    $output =~ tr/ / /s;
+    $output =~ s/\n\n/\n/s;
     $output =~ s/&auml;/ä/g;
     $output =~ s/&Auml;/Ä/g;
     $output =~ s/&ouml;/ö/g;
@@ -107,9 +103,9 @@ sub CommandHelp {
     $output =~ s/&Uuml;/Ü/g;
     $output =~ s/&szlig;/ß/g;
 
-    return $output;
+    $ret = $output;
     }
-
+    
     return "<html>$output</html>";
 
   } else {   # mod
@@ -130,6 +126,24 @@ sub CommandHelp {
     return $str;
 
   }
+}
+
+sub cref_search {
+   my ($mod,$lang) = @_;
+   my $output = "";
+   my $skip = 1;
+   my ($err,@text) = FileRead({FileName => $mod, ForceType => 'file'});
+   return $err if $err;
+   foreach my $l (@text) {
+     if($l =~ m/^=begin html$lang$/) {
+	    $skip = 0;
+     } elsif($l =~ m/^=end html$lang$/) {
+        $skip = 1;
+     } elsif(!$skip) {
+        $output .= $l;
+     }
+   }
+   return $output;
 }
 
 1;
