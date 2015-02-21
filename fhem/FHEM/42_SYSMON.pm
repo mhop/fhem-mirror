@@ -1566,15 +1566,15 @@ SYSMON_getCPUTemp_FB($$)
 	
 	my ($hash, $map) = @_;
   my $val = SYSMON_execute($hash, "ctlmgr_ctl r cpu status/StatTemperature");  
-  
-  if($val=~m/(\d+),/) {
-    my $fval = $1;
-    my $val_txt = sprintf("%.2f", $fval);
-    $map->{+CPU_TEMP}="$val_txt";
-    my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
-    $map->{+CPU_TEMP_AVG}="$t_avg";
+  if(defined($val)) {
+    if($val=~m/(\d+),/) {
+      my $fval = $1;
+      my $val_txt = sprintf("%.2f", $fval);
+      $map->{+CPU_TEMP}="$val_txt";
+      my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
+      $map->{+CPU_TEMP_AVG}="$t_avg";
+    }
   }
-
 	return $map;
 }
 
@@ -2710,10 +2710,12 @@ sub SYSMON_getFBStreamRate($$) {
 sub SYSMON_getFBStreamRate2($$) {
 	my ($hash, $map) = @_;
 	
-	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/in")/1000;
-	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/out")/1000;
+	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/in");
+	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/out");
 	
-	if($ds_rate ne "" && $us_rate ne "") {
+	if(defined($ds_rate) && defined($us_rate) && $ds_rate ne "" && $us_rate ne "") {
+		$ds_rate = $ds_rate/1000;
+		$us_rate = $us_rate/1000;
     $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
   }
   
@@ -2755,7 +2757,7 @@ sub SYSMON_getFBSyncTime2($$) {
 	
 	my $data = SYSMON_execute($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connect_time");
 	
-	if($data ne "") {
+	if(defined($data) && $data ne "") {
     $map->{+FB_DSL_SYNCTIME}=$data;
   }
   
