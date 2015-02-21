@@ -806,12 +806,15 @@ FW_createTime(elName, devName, vArr, currVal, set, params, cmd)
 
   var inp = $(newEl).find("[type=text]");
   var btn = $(newEl).find("[type=button]");
-  $(inp).val(currVal ? currVal : "12:00");
+  currVal = (currVal ? currVal : "12:00")
+            .replace(/[^\d]*(\d\d):(\d\d).*/g,"$1:$2");
+  $(inp).val(currVal)
   if(elName)
     $(inp).attr("name", elName);
 
   var hh, mm;   // the slider elements
   newEl.setValueFn = function(arg) {
+    arg = arg.replace(/[^\d]*(\d\d):(\d\d).*/g,"$1:$2");
     $(inp).val(arg);
     var hhmm = arg.split(":");
     if(hhmm.length == 2 && hh && mm) {
