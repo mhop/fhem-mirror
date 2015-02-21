@@ -48,7 +48,7 @@ sub CommandHelp {
       return "Module $mod not found" unless defined($mods{$mod});
 
       $output = cref_search($mods{$mod},$lang);
-Debug $output;      
+
       unless($output) {
          $output = cref_search($mods{$mod},"");
          $output = "Keine deutsche Hilfe gefunden!<br/>$output" if $output;
