@@ -14,6 +14,7 @@ at_Initialize($)
 
   $hash->{DefFn}    = "at_Define";
   $hash->{UndefFn}  = "at_Undef";
+  $hash->{SetFn}    = "at_Set";
   $hash->{AttrFn}   = "at_Attr";
   $hash->{StateFn}  = "at_State";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals ".
@@ -24,6 +25,7 @@ at_Initialize($)
 
 my $at_stt_sec;
 my $at_stt_day;
+my $at_detailFnCalled;
 
 sub
 at_SecondsTillTomorrow($)  # 86400, if tomorrow is no DST change
@@ -199,6 +201,29 @@ at_adjustAlign($$)
 }
 
 sub
+at_Set($@)
+{
+  my ($hash, @a) = @_;
+
+  my $cmd = ($at_detailFnCalled ? "modifyTimeSpec" : "modifyTimeSpec:time");
+  $at_detailFnCalled = 0;
+  return "no set argument specified" if(int(@a) < 2);
+  return "Unknown argument $a[1], choose one of $cmd"
+    if($a[1] ne "modifyTimeSpec");
+
+  my ($err, undef) = GetTimeSpec($a[2]);
+  return $err if($err);
+
+  my $def = ($hash->{RELATIVE} eq "yes" ? "+":"").
+            ($hash->{PERIODIC} eq "yes" ? "*":"").
+            $a[2];
+  $hash->{OLDDEF} = $hash->{DEF};
+  my $ret = at_Define($hash, "$hash->{NAME} at $def");
+  delete $hash->{OLDDEF};
+  return $ret;
+}
+  
+sub
 at_Attr(@)
 {
   my ($cmd, $name, $attrName, $attrVal) = @_;
@@ -257,6 +282,8 @@ at_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
+
+  $at_detailFnCalled = 1 if(!$pageHash);
 
   my $ts = $hash->{TIMESPEC}; $ts =~ s/'/\\'/g;
   my $isPerl = ($ts =~ m/^{(.*)}/);
@@ -353,9 +380,9 @@ EOF
     define a4 at *17:00:00 set lamp on                           # every day
 
     # relative ones
-    define a5 at +00:00:10 set lamp on                  # switch on in 10 seconds
-    define a6 at +00:00:02 set lamp on-for-timer 1      # Blink once in 2 seconds
-    define a7 at +*{3}00:00:02 set lamp on-for-timer 1  # Blink 3 times
+    define a5 at +00:00:10 set lamp on                 # switch on in 10 seconds
+    define a6 at +00:00:02 set lamp on-for-timer 1     # Blink once in 2 seconds
+    define a7 at +*{3}00:00:02 set lamp on-for-timer 1 # Blink 3 times
 
     # Blink 3 times if the piri sends a command
     define n1 notify piri:on.* define a8 at +*{3}00:00:02 set lamp on-for-timer 1
@@ -403,7 +430,18 @@ EOF
 
 
   <a name="atset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b>
+  <ul>
+    <a name="modifyTimeSpec"></a>
+    <li>modifyTimeSpec &lt;timespec&gt;<br>
+        Change the execution time. Note: the N-times repetition is ignored.
+        It is intended to be used in combination with
+        <a href="#webCmd">webCmd</a>, for an easier modification from the room
+        overview in FHEMWEB.
+        </li>
+  </ul><br>
+
+
 
   <a name="atget"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -546,7 +584,17 @@ EOF
 
 
   <a name="atset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b>
+  <ul>
+    <a name="modifyTimeSpec"></a>
+    <li>modifyTimeSpec &lt;timespec&gt;<br>
+        &Auml;ndert die Ausf&uuml;hrungszeit. Achtung: die N-malige
+        Wiederholungseinstellung wird ignoriert. Gedacht zur einfacheren
+        Modifikation im FHEMWEB Raum&uuml;bersicht, dazu muss man
+        modifyTimeSpec in <a href="webCmd">webCmd</a> spezifizieren.
+        </li>
+  </ul><br>
+
 
   <a name="atget"></a>
   <b>Get</b> <ul>N/A</ul><br>

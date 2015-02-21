@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - added:   New module 71_PHILIPS_AUDIO.pm for Philips MCi, Streamium and Fidelio devices.
+  - feature: set command modifyTimeSpec for at, to be used in webCmd
+  - added:   New module 71_PHILIPS_AUDIO.pm for Philips MCi, Streamium and
+             Fidelio devices.
   - bugfix:  FB_CALLMONITOR: fixed reverse-search for search.ch
   - feature: help is now a separate module
   - feature: pahColor() added to Color.pm to convert temperatures
@@ -16,10 +18,10 @@
 	     FWext is automatically deleted after deletion of last
 	     RSS device; RSS Overview and elements opened in new tab; 
 	     refresh 0 to disable autorefresh; new function plotFromUrl
-  - bugfix: SOMFY: use correct attributename when calculating updatetime
+  - bugfix:  SOMFY: use correct attributename when calculating updatetime
   - feature: 95_FLOORPLAN.pm: arrange by drag&drop, 
              copy, rename, delete processes userattr fp_<name>
-  - added: 30_LIGHTIFY.pm: New module for OSRAM LIGHTIFY gateways
+  - added:   30_LIGHTIFY.pm: New module for OSRAM LIGHTIFY gateways
   - changed: 98_pilight.pm: New protocols
   - feature: 55_InfoPanel - added direct link to rect,circle,ellipse,
                             img, trash
@@ -34,7 +36,7 @@
   - feature: YAMAHA_AVR: new commands play, pause, stop, skip, shuffle, repeat
   - feature: 71_YAMAHA_NP: New command set and readings for menu navigation
   - feature: 71_YAMAHA_NP: New command 'dimmer [1..3]'
-  - bugfix: 31_MilightDevice: if already off don't turn on to set dim level!
+  - bugfix:  31_MilightDevice: if already off don't turn on to set dim level!
   - added:   new dustbin icon
   - bugfix:  SYSMON: some warnings
   - changed: SYSMON: documentation
@@ -47,8 +49,8 @@
                      Saturation set/transition, set with command saturation
                      Bugfix for long transition on hue=0 and hue = 360
                      Set hardware brightness to minimum before off
-  - bugfix: FB_CALLMONITOR: allow spaces in phone numbers stored in phonebooks
-  - bugfix: SYSMON: Symbol '#' in Readings prevents update
+  - bugfix:  FB_CALLMONITOR: allow spaces in phone numbers stored in phonebooks
+  - bugfix:  SYSMON: Symbol '#' in Readings prevents update
   - feature: new helper module TimeSeries.pm (Boris)
   - feature: 71_YAMAHA_NP.pm: Make timer setting more convenient.
   - changed: FB_CALLMONITOR: allow chars in phone numbers for reverse search
@@ -60,14 +62,14 @@
                                  tunerAudioModeDAB, tunerFrequencyDAB. 
                               New internals: NP_ICON_x, UDN, Friendly_Name
   - changed: 73_km200.pm: More services found.
-  - bugfix: FB_CALLMONITOR: read phonebooks after all attributes are set
-            from fhem.cfg.
+  - bugfix:  FB_CALLMONITOR: read phonebooks after all attributes are set
+             from fhem.cfg.
   - feature: 70_XBMC.pm: clear readings when stopping media
   - feature: 70_XBMC.pm: new reading is3DFile for 3D files
-  - bugfix: 70_XBMC.pm: improved JSON separator
-  - added   73_km200: More services added. 
-  - changed 73_km200: Fhem get-command is able to return raw.
-  - bugfix  73_km200: Handling of unknown attributes corrected.
+  - bugfix:  70_XBMC.pm: improved JSON separator
+  - added:   73_km200: More services added. 
+  - changed: 73_km200: Fhem get-command is able to return raw.
+  - bugfix:  73_km200: Handling of unknown attributes corrected.
   - feature: 31_MilightDevice.pm: Add hue/ct colorpickers.  
                                   Add "presets" set command.
   - feature: 70_XBMC.pm: new commands poweron,poweroff. 
