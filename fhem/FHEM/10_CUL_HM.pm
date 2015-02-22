@@ -898,7 +898,7 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
                           ,"HM-CC-SCD"       =>{"00"=>"normal"  ,"64"=>"added"   ,"C8"=>"addedStrong"}
                           ,"HM-Sen-RD-O"     =>{"00"=>"dry"                      ,"C8"=>"rain"}
                           ,"HM-MOD-Em-8"     =>{"00"=>"closed"                   ,"C8"=>"open"}
-                          ,"HM-WDS100-C6-O"  =>{"00"=>"quiet"                   ,"C8"=>"storm"}
+                          ,"HM-WDS100-C6-O"  =>{"00"=>"quiet"                    ,"C8"=>"storm"}
                          }
                   ,mdCh=>{ "HM-Sen-RD-O01"   =>{"00"=>"dry"                      ,"C8"=>"rain"}
                           ,"HM-Sen-RD-O02"   =>{"00"=>"off"                      ,"C8"=>"on"}
@@ -4609,7 +4609,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                      ,$peerFlag,$dst,$peer
                      ,hex($chn)
                      ,$pressCnt
-                     ,hex($cndNo)));
+                     ,$cndNo));
       if ($rxt & 0x80){#burstConditional
         CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6));
       }
