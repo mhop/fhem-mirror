@@ -754,17 +754,17 @@ HEATRONIC_DecodeMsg_SOL($$$)
     my $sol_Tcylinder_bottom = 0;
     if (hex(substr($string,5*2,2)) == 3)
     {
-      if (hex(substr($string,10*2,2)) != 255)
+      my $sol_Tcollector = hex(substr($string,10*2,2));
+      if ($sol_Tcollector != 255)
       {
-        $sol_Tcollector       = hex(substr($string,10*2,4))/10;
-        $sol_Tcylinder_bottom = hex(substr($string,12*2,4))/10;
+        $sol_Tcollector       = ($sol_Tcollector * 256 + hex(substr($string,11*2,2)))/10;
       }
       else
       {
         $sol_Tcollector       = hex(255-substr($string,11*2,2))/-10;
-        $sol_Tcylinder_bottom = hex(substr($string,12*2,4))/10;
       }
-	
+      $sol_Tcylinder_bottom = hex(substr($string,12*2,4))/10;	
+    
       my $sol_pump            = (hex(substr($string,14*2,2)) & 0x01) ? 1 : 0;
       my $sol_yield_last_hour = hex(substr($string,8*2,4));
       my $sol_yield_2         = hex(substr($string,6*2,4));
