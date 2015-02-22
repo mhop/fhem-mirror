@@ -3,15 +3,18 @@
 package main;
 use strict;
 use warnings;
+use Data::Dumper;
 
 my $ret;
 
 sub CommandHelp;
 sub cref_search;
+sub cref_search_cmd;
 
 sub help_Initialize($$) {
   my %hash = (  Fn => "CommandHelp",
-		   Hlp => "[<moduleName>],get help (this screen or module dependent docu)" );
+		   Hlp => "[<moduleName>],get help (this screen or module dependent docu)",
+		   InternalCmds => "attributes,command,commands,devspec,global,perl" );
   $cmds{help} = \%hash;
 }
 
@@ -25,17 +28,17 @@ sub CommandHelp {
 
   if($mod) {
 
-    my $internals = "attributes command commands devspec global perl";
+    my $internals = "attributes,command,commands,devspec,global,perl";
     $mod = lc($mod);
     my $modPath = AttrVal('global','modpath','.');
 	my $output = '';
 
-	if($internals !~ m/$mod /) {
+	if($cmds{help}{InternalCmds} !~ m/$mod\,/) {
       my %mods;
 	  my @modDir = ("$modPath/FHEM");
 
 	  foreach my $modDir (@modDir) {
-	    opendir(DH, $modDir) || die "Cant open $modDir: $!\n";
+	    eval { opendir(DH, $modDir); }; # || die "Cant open $modDir: $!\n";
 	    while(my $l = readdir DH) {
 	      next if($l !~ m/^\d\d_.*\.pm$/);
 	      my $of = $l;
@@ -47,6 +50,7 @@ sub CommandHelp {
 
       return "Module $mod not found" unless defined($mods{$mod});
 
+      # read commandref docu from file
       $output = cref_search($mods{$mod},$lang);
 
       unless($output) {
@@ -60,7 +64,7 @@ sub CommandHelp {
 
       $output = '';
 	  my $i;
-	  my $f = "$modPath/docs/commandref$lang.html";
+	  my $f = "$modPath/docs/commandref_frame$lang.html";
       my $skip = 1;
 	  my ($err,@text) = FileRead({FileName => $f, ForceType => 'file'});
 	  return $err if $err;
@@ -111,6 +115,8 @@ sub CommandHelp {
 
   } else {   # mod
 
+    cref_search_cmd(undef);
+
     my $str = "<html><pre>Possible commands:<br/><br/>" .
 		"Command        Parameter<br/>" .
 		"               Description<br/>" .
@@ -123,6 +129,7 @@ sub CommandHelp {
       my @a = split(",", $cmds{$cmd}{Hlp}, 2);
       $a[0] =~ s/</&lt;/g;
       $a[0] =~ s/>/&gt;/g;
+      $a[1] //= "";
       $a[1]  = "               $a[1]";
       $a[1] =~ s/</&lt;/g;
       $a[1] =~ s/>/&gt;/g;
@@ -151,6 +158,35 @@ sub cref_search {
    }
    return $output;
 }
+
+sub cref_search_cmd {
+   my $skip = 1;
+   my $mod = "./docs/commandref_frame.html";
+   my ($err,@text) = FileRead({FileName => $mod, ForceType => 'file'});
+   return $err if $err;
+   foreach my $l (@text) {
+     if($l =~ m/<b>Fhem commands<\/b>/) {
+	    $skip = 0;
+     } elsif($l =~ m/<\/ul>/) {
+        $skip = 1;
+     } elsif(!$skip && $l !~ m/<ul>/) {
+        $l =~ s/\?\,help//;
+        $l =~ s/<a.*">//;
+        $l =~ s/<\/a>.*//;
+        $l =~ s/ //g;
+        unless (defined($cmds{$l}{Hlp}) && $cmds{$l}{Hlp}) {
+           my %hash = ( Hlp => "use \"help $l\" for more help");
+           $cmds{$l} = \%hash if $l;
+        }
+     }
+   }
+   foreach my $i (split(",",$cmds{help}{InternalCmds})) {
+      my %hash = ( Hlp => "use \"help $i\" for more help");
+      $cmds{$i} = \%hash if $i;
+   }  
+   return;
+}
+
 
 1;
 
