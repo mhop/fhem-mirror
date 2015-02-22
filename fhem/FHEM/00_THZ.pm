@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.135";
+my $thzversion = "0.136";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -843,6 +843,7 @@ sub THZ_Set($@){
 	      last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
 	      $i++;
       }
+      select(undef, undef, undef, 0.25);
   }
   else {
     $msg =  $cmdHex2 . "0000";
@@ -872,7 +873,7 @@ sub THZ_Set($@){
   #$err=undef;
   if (defined($err))  { return ($cmdHex2 . "-". $msg ."--" . $err);}
   else {
-	select(undef, undef, undef, 0.05);
+	select(undef, undef, undef, 0.5);
 	$msg=THZ_Get($hash, $name, $cmd);
 	#take care of program of the week
 	given ($a[1]) {
@@ -943,7 +944,7 @@ sub THZ_Get($@){
       my ($seconds, $microseconds) = gettimeofday();
       $seconds= abs($seconds - time_str2num(ReadingsTimestamp($name, $parent, "1970-01-01 01:00:00")));
       my $risultato=ReadingsVal($name, $parent, 0);
-      $risultato=THZ_Get($hash, $name, $parent) if ($seconds > 29 );	#update of the parent: if under 29sec use the current value
+      $risultato=THZ_Get($hash, $name, $parent) if ($seconds > 15 );	#update of the parent: if under 20sec use the current value
       my $parenthash=$gets{$parent}; my $parsingrule = $parsinghash{$parenthash->{type}};
       my $i=0; 
       for  (@$parsingrule) {
@@ -1002,7 +1003,10 @@ sub THZ_Get_Comunication($$) {
   my ($err, $msg) =("", " ");
   Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
   if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
- 
+  
+  #slow down for old firmwares
+  select(undef, undef, undef, 0.25) if ((AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06") or (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.14"));
+  
   THZ_Write($hash,  "02"); 			# step1 --> STX start of text 	
   ($err, $msg) = THZ_ReadAnswer($hash);
 						#Expectedanswer1    is  "10"  DLE data link escape
