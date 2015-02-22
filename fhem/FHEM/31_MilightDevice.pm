@@ -177,11 +177,18 @@ sub MilightDevice_Define($$)
   }
     
   # Define devStateIcon
-  $attr{$name}{devStateIcon} = '{(MilightDevice_devStateIcon($name),"toggle")}' if(!defined( $attr{$name}{devStateIcon}));
+  $attr{$name}{devStateIcon} = '{(MilightDevice_devStateIcon($name),"toggle")}' if(!defined($attr{$name}{devStateIcon}));
   
   # Event on change reading
   $attr{$name}{"event-on-change-reading"} = "state,transitionInProgress" if (!defined($attr{$name}{"event-on-change-reading"}));
-  
+
+  # lightScene
+  if(!defined($attr{$name}{"lightSceneParamsToSave"}))
+  {
+    $attr{$name}{"lightSceneParamsToSave"} = "hsv" if (($hash->{LEDTYPE} eq 'RGBW')|| ($hash->{LEDTYPE} eq 'RGB'));
+    $attr{$name}{"lightSceneParamsToSave"} = "brightness" if ($hash->{LEDTYPE} eq 'White');
+  }
+
   # IODev
   $attr{$name}{IODev} = $hash->{IODev} if (!defined($attr{$name}{IODev}));
   
@@ -488,15 +495,17 @@ sub MilightDevice_Set(@)
   }
   elsif ($cmd eq 'preset')
   {
-    return "Usage: set $name preset <0..X|+>" if (!defined($args[0]));
-    return "Usage: set $name preset <0..X|+>" if ($args[0] !~ /^(\d+|\+)$/);
-
+    my $preset = "+";
+    # Default to "preset +" if no args defined
+    if (defined($args[0]))
+    {
+      return "Usage: set $name preset <0..X|+>" if ($args[0] !~ /^(\d+|\+)$/);
+      $preset = $args[0];
+    }
+       
     # Get presets, if not defined default to 1 preset 0,0,100.
     my @presets = split(/ /, AttrVal($hash->{NAME}, "presets", MilightDevice_HSVToStr($hash, 0, 0, 100)));
 
-    # If preset = "+" then load the next one
-    my $preset = $args[0];
-    
     # Load the next preset (and loop back to the first) if "+" specified.
     if ("$preset" eq "+")
     {
@@ -1266,8 +1275,8 @@ sub MilightDevice_HSVToStr(@)
   my ($hash, $h, $s, $v) = @_;
   
   $h=0 if (!defined($h));
-  $s=0 if (!defined($h));
-  $v=0 if (!defined($h));
+  $s=0 if (!defined($s));
+  $v=0 if (!defined($v));
   
   Log3 ($hash, 5, "MilightDevice_HSVToStr: h:$h,s:$s,v:$v");
   return "$h,$s,$v";
@@ -1479,6 +1488,7 @@ sub MilightDevice_SetHSV_Readings(@)
 
     readingsBulkUpdate($hash, "saturation", $sat);
     readingsBulkUpdate($hash, "hue", $hue);
+    readingsBulkUpdate($hash, "hsv", MilightDevice_HSVToStr($hash, $hue,$sat,$val));
   	
     # Calc RGB values from HSV
     my ($r,$g,$b) = Color::hsv2rgb($hue/360.0,$sat/100.0,$val/100.0);
