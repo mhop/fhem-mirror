@@ -392,7 +392,6 @@ FP_digestCgi($) {
   %FP_webArgs = ();
   $FP_fwdetail = undef;
   $arg =~ s,^[?/],,;
-  my ($atop, $aleft, $drop) = ""; #mod
   foreach my $pv (split("&", $arg)) {                                   # per each URL-section devided by &
     next if($pv eq ""); # happens when post forgot to set FW_ME
     $pv =~ s/\+/ /g;
@@ -496,7 +495,7 @@ FP_htmlHeader($) {
       next if($h !~ m/HASH/ || !$h->{SCRIPT} || $h->{SCRIPT} =~ m+pgm2/jquery+);
       my $script = $h->{SCRIPT};
       $script = ($script =~ m,^/,) ? "$FW_ME$script" : "$FW_ME/pgm2/$script";
-      FW_pO sprintf($jsTemplate, $script) if ($script);
+      FW_pO sprintf($jsTemplate, "", $script) if ($script);
     }
   }
 
@@ -622,7 +621,7 @@ FP_show(){
         my $fp_fpimage = AttrVal("$d","fp_$FP_name".".image", undef);                           # floorplan-dependent icon
         if ($fp_image) {
             my $state = ReadingsVal($d, "state", undef);
-	    $fp_image =~ s/\{state\}/$state/;                                                       # replace {state} by actual device-status
+	        $fp_image =~ s/\{state\}/$state/;                                                   # replace {state} by actual device-status
             $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;           # replace icon-link in html
             $txt =~ s/\<img\ (.*) src\=\"(.*)\"/\<img\ $1 src\=\"\/fhem\/images\/default\/$fp_image\"/;           # replace icon-link in html (new)
         }
