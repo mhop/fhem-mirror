@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id: $
+#  $Id:$
 #
 #  (c) 2014 Copyright: Wzut based on 98_EDIPLUG.pm tre (ternst)
 #  All rights reserved
@@ -26,6 +26,7 @@
 #	2014-12-08	add schedule and list (Wzut) 
 #	2014-12-09	add dellist (Wzut)
 #	2015-02-21	first svn version (Wzut)
+#	2015-02-22	add attr read-only, fix attr interval, update command.ref
 #
 ################################################################
 
@@ -90,7 +91,7 @@ sub EDIPLUG_Initialize($)
     $hash->{SetFn}    = "EDIPLUG_Set";
     $hash->{GetFn}    = "EDIPLUG_Get";
     $hash->{AttrFn}   = "EDIPLUG_Attr";
-    $hash->{AttrList} = "interval timeout disable:0,1 model:SP1101W,SP2101W,unknow interval user password ".$readingFnAttributes;
+    $hash->{AttrList} = "interval timeout disable:0,1 model:SP1101W,SP2101W,unknow read-only:0,1 user password ".$readingFnAttributes;
 }
 
 
@@ -199,7 +200,7 @@ sub EDIPLUG_Read($$$)
 
     readingsBeginUpdate($hash);
 
-    # EDIPLUGs geben ein nichtgueltigen Zeichensatz zurueck ( UTF8 instead utf-8 )
+    # EDIPLUGs geben ein nicht gueltigen Zeichensatz zurueck ( UTF8 instead utf-8 )
     $buffer =~s/UTF8/utf-8/g;
 
     my $xmlres = XMLin($buffer);
@@ -244,8 +245,8 @@ sub EDIPLUG_Read($$$)
      readingsBulkUpdate($hash, "power_day", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Day'}." kW/h");
      readingsBulkUpdate($hash, "power_week", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Week'}." kW/h");
      readingsBulkUpdate($hash, "power_month", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Month'}." kW/h");
-     
-     $state = $hash->{POWER}." / ".$hash->{helper}{power}. " W / ".$hash->{helper}{current}." A";
+
+     $state = ($hash->{POWER} ne "OFF") ? $hash->{POWER}." / ".$hash->{helper}{power}. " W / ".$hash->{helper}{current}." A" : $hash->{POWER};
     }
 
     
@@ -360,14 +361,16 @@ sub EDIPLUG_Attr(@)
 
 sub EDIPLUG_Set($@) {
    my ($hash, $name , @a) = @_;
- 
-   return "set $name needs at least one argument" if(int(@a) < 1);
-
    my $cmd = $a[0];
+   
+  return "set $name needs at least one argument" if(int(@a) < 1);
+  return  ($cmd eq "?") ? undef : "no set commands are allowed on a read-only device !" if ($attr{$name}{'read-only'} eq "1");
+
    my $list = "on off list addlist delete:0,1,2,3,4,5,6 dellist day clear_error";
- 
+
    return SetExtensions($hash, $list, $name, @a) if( $cmd eq "?" );
    return SetExtensions($hash, $list, $name, @a) if( !grep( $_ =~ /^$cmd($|:)/, split( ' ', $list)));
+
 
    $hash->{timeout} = AttrVal($name, "timeout", 2);
 
@@ -599,37 +602,36 @@ requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
   <ul>
   define &lt;name&gt; EDIPLUG &lt; IP_EDIMAX_Device (or FQDN) &gt;<br>
   Example:<br>
-  <pre>
-  define myediplug EDIPLUG 192.168.0.99
-  define myediplug EDIPLUG ediplug.myhome.net
-  </pre>
+  <li>define myediplug EDIPLUG 192.168.0.99</li>
+  <li>define myediplug EDIPLUG ediplug.myhome.net</li>
   </ul>
   <a name="EDIPLUGset"></a>
-  <b>Set</b><ul>
-    Currently, the following commands are defined<br>&nbsp;<br><pre>
-    on        => switch power on
-    off       => switch power off
-    list      => set a new list for one day with one entry : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) Command(on/off) e.g. 1 10:00 11:30 on
-    addlist   => add a new on/off time : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) Command(on/off) e.g. 1 10:00 11:30 on
-    dellist   => remove a existing on/off time : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) e.g. 1 10:00 11:30
-    delete    => delete timelist of one day : DayOfWeek(0-6)
-    day       => enable/disable timeschedule for one day : DayOfWeek(0-6) on/off
-    </pre>
-   </ul>
+  <b>Set</b>
+  <ul>
+  <li>on        => switch power on</li>
+  <li>off       => switch power off</li>
+  <li>list      => set a new list for one day with one entry : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) Command(on/off) e.g. 1 10:00 11:30 on</li>
+  <li>addlist   => add a new on/off time : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) Command(on/off) e.g. 1 10:00 11:30 on</li>
+  <li>dellist   => remove a existing on/off time : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) e.g. 1 10:00 11:30</li>
+  <li>delete    => delete timelist of one day : DayOfWeek(0-6)</li>
+  <li>day       => enable/disable timeschedule for one day : DayOfWeek(0-6) on/off</li>
+  </ul>
   <a name="EDIPLUGget"></a>
   <b>Get</b><ul>
-    Currently, the following commands are defined<br>&nbsp;<br><pre>
-    info     => shows MAC , Firmware Version , Model , Name
-    power    => shows all Power informations ( model SP-2101W only)
-    schedule => show all internal on/off timetables
-    status   => show on/off state
-    </pre>
+  <li>info     => shows MAC , Firmware Version , Model , Name</li>
+  <li>power    => shows all Power informations ( model SP-2101W only)</li>
+  <li>schedule => show all internal on/off timetables</li>
+  <li>status   => show on/off state</li>
   </ul>
   <a name="EDIPLUGattr"></a>
   <b>Attributes</b>
   <ul>
-      <li>interval , polling interval (default 60)</li>
-  </ul>
+  <li>interval  => polling interval (default 60)</li>
+  <li>timeout   => max. time to wait in seconds (default 2)</li>
+  <li>read-only => only read (Get) from device (default 0)</li>
+  <li>user      => username (default admin)</li>
+  <li>password  => password (default 1234)</li>
+ </ul>
   <br>
   <b>Readings</b>
   <ul>
@@ -664,44 +666,41 @@ ben&oml;ntigt XML:Simple -> sudo apt-get install libxml-simple-perl
  <a name="EDIPLUGdefine"></a>
   <b>Define</b>
   <ul>
-  define &lt;name&gt; EDIPLUG &lt; IP_des_EDIMAX (oder Name im Netz) INTERVAL (default 60) Device user (default admin) password (default 1234) &gt;<br>
+  define &lt;name&gt; EDIPLUG  IP_des_EDIPlug (oder FQDN Name)<br>
   Beispiel:<br>
-  <pre>
-  define myediplug EDIPLUG 192.168.0.99
-  define myediplug EDIPLUG ediplug.meinnetz.net
-  </pre>
+  <li>define myediplug EDIPLUG 192.168.0.99</li>
+  <li>define myediplug EDIPLUG ediplug.fritz.box</li>
   </ul>
   <br>
   <a name="EDIPLUGset"></a>
-  <b>Set</b><ul>
-    zur Zeit werden folgende Kommandos unterst&uuml;tzt<br>&nbsp;<br><pre>
-    on        => schalte an
-    off       => schalte aus
-    list      => erzeugt eine neue Zeitplan Liste mit einem Eintrag : Wochentag(0-6) Startzeit(hh:mm) Endezeit(hh:mm) Kommando(on/off) Bsp. 1 10:00 11:30 on
-    addlist   => f&uuml;gt eine neue Schaltzeit einer bestehenden Zeitplan Liste hinzu : Wochentag(0-6) Startzeit(hh:mm) Endtezeit(hh:mm) Kommando(on/off) Bsp. 1 10:00 11:30 on
-    dellist   => l&ouml;scht eine bestimmte Schaltzeit eines Tages : Wochentag(0-6) Startzeit(hh:mm) Endezeit(hh:mm) Bsp. 1 10:00 11:30
-    delete    => l&ouml;scht die Liste eines ganzen Tages : Wochentag(0-6)
-    day       => schaltet die Zeitplanung eines Tages ein oder aus : Wochentag(0-6) on/off Bsp. 5 on
-    </pre>
-   </ul>
+  <b>Set</b>
+  <ul>
+  <li>on        => schalte an</li>
+  <li>off       => schalte aus</li>
+  <li>list      => erzeugt eine neue Zeitplan Liste mit einem Eintrag : Wochentag(0-6) Startzeit(hh:mm) Endezeit(hh:mm) Kommando(on/off) Bsp. 1 10:00 11:30 on</li>
+  <li>addlist   => f&uuml;gt eine neue Schaltzeit einer bestehenden Zeitplan Liste hinzu : Wochentag(0-6) Startzeit(hh:mm) Endtezeit(hh:mm) Kommando(on/off) Bsp. 1 10:00 11:30 on</li>
+  <li>dellist   => l&ouml;scht eine bestimmte Schaltzeit eines Tages : Wochentag(0-6) Startzeit(hh:mm) Endezeit(hh:mm) Bsp. 1 10:00 11:30</li>
+  <li>delete    => l&ouml;scht die Liste eines ganzen Tages : Wochentag(0-6)</li>
+  <li>day       => schaltet die Zeitplanung eines Tages ein oder aus : Wochentag(0-6) on/off Bsp. 5 on</li>
+  </ul>
   <br>
   <a name="EDIPLUGget"></a>
-  <b>Get</b><ul>
-    zur Zeit werden folgende Kommandos unterst&uuml;tzt<br>&nbsp;<br><pre>
-    info     => Anzeige von MAC , Firmware Version , Modell , Name
-    power    => zeigt alle Stromverbrauchswerte ( nur Modell SP-2101W )
-    schedule => zeigt alle internen Schaltzeiten
-    status   => zeigt an/aus Status der Schaltdose
-    </pre>
+  <b>Get</b>
+  <ul>
+  <li>info     => Anzeige von MAC , Firmware Version , Modell , Name</li>
+  <li>power    => zeigt alle Stromverbrauchswerte ( nur Modell SP-2101W )</li>
+  <li>schedule => zeigt alle internen Schaltzeiten (ACHTUNG : Firmware Version beachten !)</li>
+  <li>status   => zeigt an/aus Status der Schaltdose</li>
   </ul>
   <br>
   <a name="EDIPLUGattr"></a>
   <b>Attributes</b>
   <ul>
-      <li>interval , polling interval (default 60)</li>
-      <li>timeout  , </li>
-      <li>user  , Username (default admin)</li>
-      <li>password  , Passwort (default 1234)</li>
+  <li>interval  => polling interval (default 60)</li>
+  <li>timeout   => max. Wartezeit in Sekunden (default 2)</li>
+  <li>read-only => es ist nur lesen (Get) erlaubt (default 0)</li>
+  <li>user      => Username (default admin)</li>
+  <li>password  => Passwort (default 1234)</li>
   </ul>
   <br>
   <b>Readings</b>
