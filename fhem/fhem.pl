@@ -853,7 +853,7 @@ AnalyzeCommandChain($$;$)
     return undef;
   }
 
-  $cmd =~ s/#.*$//s;
+  $cmd =~ s/^\s*#.*$//s; # Remove comments at the beginning of the line
 
   $cmd =~ s/;;/SeMiCoLoN/g;
   my @saveCmdList = @cmdList;   # Needed for recursive calls
