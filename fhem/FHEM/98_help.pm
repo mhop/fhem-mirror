@@ -1,4 +1,4 @@
-# $Id: 98_help.pm 8051 2015-02-21 12:02:26Z betateilchen $
+# $Id: 98_help.pm 8063 2015-02-22 10:20:03Z betateilchen $
 #
 package main;
 use strict;
@@ -77,7 +77,6 @@ sub CommandHelp {
 
 	}
 
-
     if( $cl  && $cl->{TYPE} eq 'telnet' ) {
     $output =~ s/<br>/\n/g;
     $output =~ s/<br\/>/\n/g;
@@ -89,12 +88,14 @@ sub CommandHelp {
     $output =~ s/<\/li>/\n/g;
     $output =~ s/<code>//g;
     $output =~ s/<\/code>//g;
+    $output =~ s/<pre>//ig;
+    $output =~ s/<\/pre>//ig;
     $output =~ s/&lt;/</g;
     $output =~ s/&gt;/>/g;
-    $output =~ s/<[bui]>/\ /g;
-    $output =~ s/<\/[bui]>/\ /g;
+    $output =~ s/<[bui]>//g;
+    $output =~ s/<\/[bui]>//g;
     $output =~ tr/ / /s;
-#    $output =~ s/\n\n/\n/s;
+    $output =~ s/\n\n\ /\n/g;
     $output =~ s/&auml;/ä/g;
     $output =~ s/&Auml;/Ä/g;
     $output =~ s/&ouml;/ö/g;
@@ -102,29 +103,33 @@ sub CommandHelp {
     $output =~ s/&uuml;/ü/g;
     $output =~ s/&Uuml;/Ü/g;
     $output =~ s/&szlig;/ß/g;
-
-    $ret = $output;
+    
+    return $output;
     }
     
-#    return "<html>$output</html>";
-    return $output;
+    return "<html>$output</html>";
 
   } else {   # mod
 
-    my $str = "<br/>" .
-		"Possible commands:<br/><br/>" .
-		"Command   Parameter                 Description<br/>" .
-	    "-----------------------------------------------<br/>";
+    my $str = "<html><pre>Possible commands:<br/><br/>" .
+		"Command        Parameter<br/>" .
+		"               Description<br/>" .
+	    "----------------------------------------------------------------------<br/>";
 
     for my $cmd (sort keys %cmds) {
       next if(!$cmds{$cmd}{Hlp});
       next if($cl && $cmds{$cmd}{ClientFilter} &&
            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
       my @a = split(",", $cmds{$cmd}{Hlp}, 2);
-      $str .= sprintf("%-9s %-25s %s<br/>", $cmd, $a[0], $a[1]);
+      $a[0] =~ s/</&lt;/g;
+      $a[0] =~ s/>/&gt;/g;
+      $a[1]  = "               $a[1]";
+      $a[1] =~ s/</&lt;/g;
+      $a[1] =~ s/>/&gt;/g;
+      $str .= sprintf("%-15s%-50s<br/>%s<br/>", $cmd, $a[0], $a[1]);
     }
 
-    return $str;
+    return "$str</pre></html>";
 
   }
 }
@@ -141,7 +146,7 @@ sub cref_search {
      } elsif($l =~ m/^=end html$lang$/) {
         $skip = 1;
      } elsif(!$skip) {
-        $output .= $l;
+        $output .= "$l\n";
      }
    }
    return $output;
