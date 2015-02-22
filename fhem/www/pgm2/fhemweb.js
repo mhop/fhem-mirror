@@ -152,6 +152,8 @@ FW_jqueryReadyFn()
       $("#content").append('<div id="devSpecHelp"></div>');
       FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
         $("#devSpecHelp").html(data);
+        var off = $("#devSpecHelp").position().top-20;
+        $('body, html').animate({scrollTop:off}, 500);
       });
     });
   });
