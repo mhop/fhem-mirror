@@ -1,4 +1,4 @@
-# $Id: 98_help.pm 8032 2015-02-18 18:36:37Z betateilchen $
+# $Id: 98_help.pm 8051 2015-02-21 12:02:26Z betateilchen $
 #
 package main;
 use strict;
@@ -81,8 +81,8 @@ sub CommandHelp {
     if( $cl  && $cl->{TYPE} eq 'telnet' ) {
     $output =~ s/<br>/\n/g;
     $output =~ s/<br\/>/\n/g;
-    $output =~ s/<\/a>//g;
-    $output =~ s/<a.*>//g;
+    $output =~ s/<a href.*\/a>//g;
+    $output =~ s/<a name.*\/a>//g;
     $output =~ s/<ul>/\n/g;
     $output =~ s/<\/ul>/\n/g;
     $output =~ s/<li>/-/g;
@@ -94,7 +94,7 @@ sub CommandHelp {
     $output =~ s/<[bui]>/\ /g;
     $output =~ s/<\/[bui]>/\ /g;
     $output =~ tr/ / /s;
-    $output =~ s/\n\n/\n/s;
+#    $output =~ s/\n\n/\n/s;
     $output =~ s/&auml;/ä/g;
     $output =~ s/&Auml;/Ä/g;
     $output =~ s/&ouml;/ö/g;
@@ -106,21 +106,22 @@ sub CommandHelp {
     $ret = $output;
     }
     
-    return "<html>$output</html>";
+#    return "<html>$output</html>";
+    return $output;
 
   } else {   # mod
 
-    my $str = "\n" .
-		"Possible commands:\n\n" .
-		"Command   Parameter                 Description\n" .
-	    "-----------------------------------------------\n";
+    my $str = "<br/>" .
+		"Possible commands:<br/><br/>" .
+		"Command   Parameter                 Description<br/>" .
+	    "-----------------------------------------------<br/>";
 
     for my $cmd (sort keys %cmds) {
       next if(!$cmds{$cmd}{Hlp});
       next if($cl && $cmds{$cmd}{ClientFilter} &&
            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
       my @a = split(",", $cmds{$cmd}{Hlp}, 2);
-      $str .= sprintf("%-9s %-25s %s\n", $cmd, $a[0], $a[1]);
+      $str .= sprintf("%-9s %-25s %s<br/>", $cmd, $a[0], $a[1]);
     }
 
     return $str;
