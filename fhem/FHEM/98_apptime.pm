@@ -18,7 +18,7 @@ sub apptime_Initialize($);
 
 sub apptime_Initialize($){
   $cmds{"apptime"}{Fn} = "apptime_CommandDispTiming";
-  $cmds{"apptime"}{Hlp} = "[clear|<field>] [top|all] [<filter>] application function calls and duration";
+  $cmds{"apptime"}{Hlp} = "[clear|<field>] [top|all] [<filter>],application function calls and duration";
 }
 
 sub HandleTimeout() {
