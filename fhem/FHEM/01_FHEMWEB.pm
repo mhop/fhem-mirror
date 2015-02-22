@@ -760,8 +760,10 @@ FW_answerCall($)
     $FW_detail = "";
     $FW_room = "";
 
-    # "linkify" output (e.g. for list)
-    if( $FW_cmdret !~ m/<html>.*<\/html>/ && $cmd !~ m/^help/) {
+    if( $FW_cmdret =~ m/^<html>(.*)<\/html>$/s ) {
+      $FW_cmdret = $1;
+
+    } else {             # "linkify" output (e.g. for list)
       $FW_cmdret = FW_htmlEscape($FW_cmdret);
 
       my @lines = split( /\n/, $FW_cmdret ); # Adding links
