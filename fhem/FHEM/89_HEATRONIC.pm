@@ -540,10 +540,11 @@ HEATRONIC_DecodeMsg_CH2($$$)
     if ($ch_Toutside != 255) { $ch_Toutside = ($ch_Toutside * 256 + hex(substr($string,5*2,2))) / 10 }
     else {$ch_Toutside = (255 - hex(substr($string,5*2,2)))/-10;}
 
-    my $ch_runtime_tot  = hex(substr($string,17*2,6));
-    my $ch_runtime_ch   = hex(substr($string,23*2,6));
-    my $ch_starts_tot   = hex(substr($string,14*2,6));
-    my $ch_starts_ch    = hex(substr($string,26*2,6));
+    my $ch_runtime_tot        = hex(substr($string,17*2,6));
+    my $ch_runtime_ch         = hex(substr($string,23*2,6));
+    my $ch_starts_tot         = hex(substr($string,14*2,6));
+    my $ch_starts_ch          = hex(substr($string,26*2,6));
+    my $ch_pump_heating_power = hex(substr($string,13*2,2));
 	
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "ch_Toutside", sprintf("%.1f",$ch_Toutside));
@@ -551,6 +552,7 @@ HEATRONIC_DecodeMsg_CH2($$$)
     readingsBulkUpdate($hash, "ch_runtime_ch", $ch_runtime_ch);
     readingsBulkUpdate($hash, "ch_starts_tot", $ch_starts_tot);
     readingsBulkUpdate($hash, "ch_starts_ch", $ch_starts_ch);
+    readingsBulkUpdate($hash, "ch_pump_heating_power" $ch_pump_heating_power);
     readingsEndUpdate($hash,1);
 
     return 1;
@@ -924,6 +926,9 @@ HEATRONIC_timeDiff($) {
 	     <li><B>ch_burner_power</B><br/>
 		   burner power in percent
 		 </li><br/>
+         <li><B>ch_pump_heating_power</B><br/>
+		   power of heating power in percent
+		 </li><br/>
 
 	     <li><B>ch_Toutside</B><br/>
 		   outside temperature
@@ -1056,7 +1061,10 @@ HEATRONIC_timeDiff($) {
 	     <li><B>ch_burner_power</B><br/>
 		   Brennerleistung in Prozent
 		 </li><br/>
-
+         <li><B>ch_pump_heating_power</B><br/>
+		   Leistung der Heizungspumpe in Prozent
+		 </li><br/>
+         
 	     <li><B>ch_Toutside</B><br/>
 		   Außentemperatur
 		 </li><br/>
