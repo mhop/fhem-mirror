@@ -46,7 +46,7 @@
 #                   - added:   break condition for includes
 #
 ##############################################
-# $Id: 55_InfoPanel.pm 7990 2015-02-14 22:28:21Z betateilchen $
+# $Id: 55_InfoPanel.pm 8013 2015-02-16 22:40:14Z betateilchen $
 
 package main;
 use strict;
@@ -618,6 +618,21 @@ sub btIP_itemText {
   return $output;
 }
 
+sub btIP_lpItemText {
+  my ($id,$x,$y,$text,%params)= @_;
+  return unless(defined($text));
+  $id = ($id eq '-') ? createUniqueId() : $id;
+  my $color = substr($params{rgb},0,6);
+
+  my $output =  "<div style=\"position:absolute; top:${y}px; left:${x}px; ".
+                "font-family:$params{font}; font-size:$params{pt}; color:#$color; ".
+                "margin-top:0px; z-index:3; \" >\n".
+                "<div informId=\"$id\">$text</div>\n".
+                "</div>\n";
+  $defs{$params{name}}{fhem}{div} .= $output;
+  return "";
+}
+
 sub btIP_itemTextBox {
   my ($id,$x,$y,$boxwidth,$boxheight,$text,$link,%params)= @_;
   return unless(defined($text));
@@ -1146,6 +1161,15 @@ sub btIP_evalLayout {
           $svg .= btIP_itemText($id,$x,$y,$text,%params);
         }
         
+        when("lptext") {
+          ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
+	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $params{xx} = $x;
+	      $params{yy} = $y;
+	      $text= AnalyzePerlCommand(undef, $text);
+          $svg .= btIP_lpItemText($id,$x,$y,$text,%params);
+        }
+        
         when("textbox") {
           ($id,$x,$y,$boxwidth,$boxheight,$link,$text)= split("[ \t]+", $def, 7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
@@ -1302,10 +1326,12 @@ sub btIP_returnHTML {
 
   my $refresh = AttrVal($name, 'refresh', 60);
   my $title   = AttrVal($name, 'title', $name);
-  
+  my $gen     = 'generated="'.(time()-1).'"';  
   my $code    = btIP_HTMLHead($name,$title,$refresh);
 
-  $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n".
+  $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\" ".
+            "$gen longpoll=\"1\" longpollfilter=\"room=all\" >\n".
+
             "<div id=\"svg_content\" style=\"position:absolute; top:0px; left:0px; z-index:1\" >\n".
             btIP_returnSVG($name)."\n</div>\n";
   $code .=  $defs{$name}{fhem}{div} if($defs{$name}{fhem}{div});
@@ -1344,6 +1370,7 @@ sub btIP_getScript {
   }
 #  $scripts .= sprintf($jsTemplate,"/fhem/pgm2/cordova-2.3.0.js"); 
 #  $scripts .= sprintf($jsTemplate,"/fhem/pgm2/webviewcontrol.js"); 
+  $scripts .= sprintf($jsTemplate,"/fhem/pgm2/fhemweb.js"); 
   $scripts =~ s/script>/script>\n/g;
   return $scripts; 
 }
