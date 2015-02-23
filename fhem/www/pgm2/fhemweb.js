@@ -759,9 +759,9 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
       offX += diff;
       if(offX < 0) offX = 0;
       if(offX > maxX) offX = maxX;
-      val = min+(offX/maxX * (max-min));
+      val = offX/maxX * (max-min);
       val = (flt ? Math.floor(val/stp)*stp :
-                   Math.floor(Math.floor(val/stp)*stp));
+                   Math.floor(Math.floor(val/stp)*stp))+min;
       sh.innerHTML = val;
       sh.setAttribute('style', 'left:'+offX+'px;');
     }
