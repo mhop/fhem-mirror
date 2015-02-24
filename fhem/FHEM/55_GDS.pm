@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 55_GDS.pm 8080 2015-02-24 14:36:53Z betateilchen $
 ####################################################################################################
 #
 #	55_GDS.pm
@@ -31,8 +31,8 @@ use warnings;
 use feature qw/say switch/;
 use Time::HiRes qw(gettimeofday);
 use Text::CSV;
-eval {use Coro::LWP;};
-Log 1,"GDS: using Coro::LWP" unless @$;
+eval "use Coro::LWP";
+Log 4,"GDS: using Coro::LWP" unless $@;
 use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
