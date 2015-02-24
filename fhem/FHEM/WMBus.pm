@@ -79,7 +79,7 @@ use constant {
 	ERR_NO_AESKEY => 9,
 	ERR_UNKNOWN_ENCRYPTION => 10,
 	ERR_TOO_MANY_VIFE => 11,
-	
+	ERR_MSG_TOO_SHORT => 12,
 	
 	
 };
@@ -777,8 +777,20 @@ my %validDeviceTypes = (
  0x1a => 'Smokedetector',
  0x1b => 'Room sensor (e.g. temperature or humidity)',
  0x1c => 'Gasdetector',
+ 0x1d => 'Reserved for sensors',
+ 0x1e => 'Reserved for sensors',
+ 0x1f => 'Reserved for sensors',
+ 0x20 => 'Breaker (electrcity',
+ 0x21 => 'Valve (gas)',
+ 0x22 => 'Reserved for switching devices',
+ 0x23 => 'Reserved for switching devices',
+ 0x24 => 'Reserved for switching devices',
+ 0x25 => 'Customer unit (Display device',
+ 0x26 => 'Reserved for customer units',
+ 0x27 => 'Reserved for customer units',
  0x28 => 'Waste water',
- 
+ 0x29 => 'Garbage',
+ 0x2a => 'Carbon dioxide',
 );
 
 
@@ -867,7 +879,7 @@ sub removeCRC($$)
 	
 	for ($i=0; $i < $noOfBlocks; $i++) {
 		$crcoffset = $blocksize_with_crc * $i + LL_BLOCK_SIZE;
-		#print "crc offset $crcoffset\n";
+		#print "$i: crc offset $crcoffset\n";
 		if ($rest > 0 && $crcoffset + CRC_SIZE > ($noOfBlocks - 1) * $blocksize_with_crc + $rest) {
 			# last block is smaller
 			$crcoffset = ($noOfBlocks - 1) * $blocksize_with_crc + $rest;
@@ -1344,6 +1356,8 @@ sub decodeApplicationLayer($) {
     $self->{cw} = 0;
   } else {
 		# unsupported
+    $self->{cw} = 0;
+    $self->decodeConfigword();
 		$self->{errormsg} = 'Unsupported CI Field ' . sprintf("%x", $self->{cifield});
 		$self->{errorcode} = ERR_UNKNOWN_CIFIELD;
 		return 0;
@@ -1426,8 +1440,11 @@ sub decodeLinkLayer($$)
 	#printf("calc len %d, actual %d\n", $self->{msglen}, length($self->{msg}));
 	if (length($self->{msg}) > $self->{msglen}) {
 		$self->{remainingData} = substr($self->{msg},$self->{msglen});
+	} elsif (length($self->{msg}) < $self->{msglen}) {
+    $self->{errormsg} = "message too short, expected " . $self->{msglen} . ", got " . length($self->{msg}) . " bytes";
+    $self->{errorcode} = ERR_MSG_TOO_SHORT;
+    return 0;
 	}
-	
 	# according to the MBus spec only upper case letters are allowed.
 	# some devices send lower case letters none the less
 	# convert to upper case to make them spec conformant
