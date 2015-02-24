@@ -31,6 +31,8 @@ use warnings;
 use feature qw/say switch/;
 use Time::HiRes qw(gettimeofday);
 use Text::CSV;
+eval {use Coro::LWP;};
+Log 1,"GDS: using Coro::LWP" unless @$;
 use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
