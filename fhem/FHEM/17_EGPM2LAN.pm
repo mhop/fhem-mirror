@@ -144,8 +144,9 @@ sub EGPM2LAN_Switch($$$$) {
   my $fritz = 0; #may be important for FritzBox-users
   my $data = "cte1=" . ($port == "1" ? $state : "") . "&cte2=" . ($port == "2" ? $state : "") . "&cte3=" . ($port == "3" ? $state : "") . "&cte4=". ($port == "4" ? $state : ""); 
   Log $logLevel, "EGPM2LAN $data"; 
-  eval {                 
-    CustomGetFileFromURL($hash ,"http://".$hash->{IP}."/",10 ,$data ,$fritz ,$logLevel); 
+  eval {
+    # Parameter:    $url, $timeout, $data, $noshutdown, $loglevel
+    GetFileFromURL("http://".$hash->{IP}."/", 5,$data ,$fritz ,$logLevel);
   }; 
   if ($@){ 
     ### catch block 
@@ -162,7 +163,7 @@ sub EGPM2LAN_Login($$) {
   Log $logLevel,"EGPM2LAN try to Login @".$hash->{IP};
 
   eval{
-  CustomGetFileFromURL($hash, "http://".$hash->{IP}."/login.html", 10, "pw=" . (defined($hash->{PASSWORD}) ? $hash->{PASSWORD} : ""), 0, $logLevel);  
+      GetFileFromURL("http://".$hash->{IP}."/login.html", 5,"pw=" . (defined($hash->{PASSWORD}) ? $hash->{PASSWORD} : ""),0 ,$logLevel);
   }; 
   if ($@){ 
       ### catch block 
@@ -213,7 +214,8 @@ sub EGPM2LAN_Statusrequest($$$) {
   my ($hash, $logLevel, $autoCr) = @_;
   my $name = $hash->{NAME}; 
   
-  my $response = CustomGetFileFromURL($hash, "http://".$hash->{IP}."/", 10, "", 0, $logLevel); 
+  my $response = GetFileFromURL("http://".$hash->{IP}."/", 5,"" , 0 ,$logLevel);
+  #CustomGetFileFromURL($hash, "http://".$hash->{IP}."/", 10, "", 0, $logLevel); 
   #Log 1,$response;
 	if(defined($response) && $response =~ /.,.,.,./) 
         { 
@@ -295,8 +297,7 @@ sub EGPM2LAN_Statusrequest($$$) {
 sub EGPM2LAN_Logoff($$) {
   my ($hash, $logLevel) = @_; 
 
-  #$quiet, $url, $timeout, $data, $noshutdown, $loglevel
-  CustomGetFileFromURL($hash, "http://".$hash->{IP}."/login.html", 10, "", 0, $logLevel);
+  GetFileFromURL("http://".$hash->{IP}."/login.html", 5,"" ,0 ,$logLevel);
   return 1; 
 } 
 
