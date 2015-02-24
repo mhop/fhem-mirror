@@ -497,16 +497,13 @@ sub btIP_itemLine {
 
 sub btIP_itemLongpoll {
   my ($id,$x,$y,$text,%params)= @_;
-  my ($iconURL,$color);
-  unless (defined($text)) {
-     my ($iconName,undef,undef) = FW_dev2image($id);
-     $iconURL = FW_IconURL($iconName);
-  } else {
-     $color = substr($params{rgb},0,6);
-  }
+  my ($iconName,undef,undef) = FW_dev2image($id);
+  my $iconURL = FW_IconURL($iconName);
+  my $color   = substr($params{rgb},0,6);
   my $output  = "<div informId=\"$id\" style=\"position:absolute; top:${y}px; left:${x}px; ";
      $output .= "font-family:$params{font}; font-size:$params{pt}; color:#$color; " if defined($text);
      $output .= "margin-top:0px; z-index:3; \" >\n";
+     $output .= "$text\n"                  if     defined($text);
      $output .= "<img src=\"$iconURL\">\n" unless defined($text);
      $output .= "</div>\n";
 
