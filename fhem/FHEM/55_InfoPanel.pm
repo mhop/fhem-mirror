@@ -83,6 +83,7 @@ sub btIP_itemImg;
 sub _btIP_imgData;
 sub _btIP_imgRescale;
 sub btIP_itemLine;
+sub btIP_itemLongpoll;
 sub btIP_itemPlot;
 sub btIP_itemRect;
 sub btIP_itemSeconds;
@@ -494,6 +495,25 @@ sub btIP_itemLine {
   return "<line id=\"$id\" x1=\"$x1\" y1=\"$y1\" x2=\"$x2\" y2=\"$y2\" style=\"stroke:rgb($r,$g,$b); stroke-width:$th; stroke-opacity:$a; \" />\n";
 }
 
+sub btIP_itemLongpoll {
+  my ($id,$x,$y,$text,%params)= @_;
+  my ($iconURL,$color);
+  unless (defined($text)) {
+     my ($iconName,undef,undef) = FW_dev2image($id);
+     $iconURL = FW_IconURL($iconName);
+  } else {
+     $color = substr($params{rgb},0,6);
+  }
+  my $output  = "<div informId=\"$id\" style=\"position:absolute; top:${y}px; left:${x}px; ";
+     $output .= "font-family:$params{font}; font-size:$params{pt}; color:#$color; " if defined($text);
+     $output .= "margin-top:0px; z-index:3; \" >\n";
+     $output .= "<img src=\"$iconURL\">\n" unless defined($text);
+     $output .= "</div>\n";
+
+  $defs{$params{name}}{fhem}{div} .= $output;
+  return "";
+}
+
 sub btIP_itemPlot {
   my ($id,$x,$y,$scale,$inline,$arg) = @_;
   my (@plotName) = split(";",$arg);
@@ -616,33 +636,6 @@ sub btIP_itemText {
                 "$text\n".
                 "</text>\n";
   return $output;
-}
-
-sub btIP_lpItemText {
-  my ($id,$x,$y,$text,%params)= @_;
-  return unless(defined($text));
-  $id = ($id eq '-') ? createUniqueId() : $id;
-  my $color = substr($params{rgb},0,6);
-
-  my $output =  "<div style=\"position:absolute; top:${y}px; left:${x}px; ".
-                "font-family:$params{font}; font-size:$params{pt}; color:#$color; ".
-                "margin-top:0px; z-index:3; \" >\n".
-                "<div informId=\"$id\">$text</div>\n".
-                "</div>\n";
-  $defs{$params{name}}{fhem}{div} .= $output;
-  return "";
-}
-
-sub btIP_itemLongpoll {
-  my ($id,$x,$y,%params)= @_;
-  my ($iconName,undef,undef) = FW_dev2image($id);
-  my $iconURL = FW_IconURL($iconName);
-  my $output =  "<div informId=\"$id\" style=\"position:absolute; top:${y}px; left:${x}px; ".
-                "margin-top:0px; z-index:3; \" >\n".
-                "<img src=\"$iconURL\">\n".
-                "</div>\n";
-  $defs{$params{name}}{fhem}{div} .= $output;
-  return "";
 }
 
 sub btIP_itemTextBox {
@@ -1174,20 +1167,18 @@ sub btIP_evalLayout {
         }
         
         when("lptext") {
-          ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
-	      ($x,$y)= btIP_xy($x,$y,%params);
-	      $params{xx} = $x;
-	      $params{yy} = $y;
-	      $text= AnalyzePerlCommand(undef, $text);
-          $svg .= btIP_lpItemText($id,$x,$y,$text,%params);
+          $svg .= "\n<!-- lptext no longer provided. Use longpoll instead. -->\n\n";
+          Log3($name, 2, "InfoPanel $name: command 'lptext' no longer supported.");
         }
 
         when("longpoll") {
-          ($id,$x,$y)= split("[ \t]+", $def, 3);
+          ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
+          $text //= undef;
+          $text = AnalyzePerlCommand(undef,$text);
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
-          $svg .= btIP_itemLongpoll($id,$x,$y,%params);
+          $svg .= btIP_itemLongpoll($id,$x,$y,$text,%params);
         }
         
         when("textbox") {
