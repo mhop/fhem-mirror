@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0040 2015-01-20 22:15:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0041 2015-02-24 22:13:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -8,7 +8,7 @@
 #     polling procedure.
 #
 #     Author          : Matthias Deeke 
-#     Contributions   :	Olaf Droegehorn, Andreas Hahn, Rudolf Koenig, Markus Bloch, Stefan M., Furban
+#     Contributions   :	Olaf Droegehorn, Andreas Hahn, Rudolf Koenig, Markus Bloch, Stefan M., Furban, KaiKr
 #     e-mail          :	matthias.deeke(AT)deeke(PUNKT)eu
 #     Fhem Forum      : http://forum.fhem.de/index.php/topic,25540.0.html
 #     Fhem Wiki       : http://www.fhemwiki.de/wiki/Buderus_Web_Gateway
@@ -145,6 +145,13 @@
 #		0039    19.01.2015	Sailor				km200_Get						Changed:  get-command is able to return raw data if valid json dataset is not existing to be returned
 #		0039    19.01.2015	Sailor				km200_GetSingleService			Changed:  get-command is able to return raw data if valid json dataset is not existing to be returned
 #		0040    20.01.2015	Sailor				km200_Define					Added /system/holidayModes
+#		0041    21.02.2015	Sailor				km200_Define					Added /heatingCircuits/hc1/heatingCurveSetting
+#		0041    21.02.2015	Sailor				km200_Define					Added /heatingCircuits/hc2/heatingCurveSetting
+#		0041    21.02.2015	Sailor				km200_Define					Added /heatingCircuits/hc1/holidayMode
+#		0041    21.02.2015	Sailor				km200_Define					Added /heatingCircuits/hc2/holidayMode
+#		0041    21.02.2015	Sailor				km200_Define					Added /gateway/language
+#		0041    21.02.2015	Sailor				km200_Define					Added /recordings/system/sensors/outdoorTemperatures
+#		0041    24.02.2015	Sailor				km200_Define					Added /dhwCircuits/*
 ########################################################################################################################
 
 
@@ -213,7 +220,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0040";
+	my $ModuleVersion           = "0041";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -223,6 +230,34 @@ sub km200_Define($$)
 	###START###### Define known services of gateway ###########################################################START####
 	my @KM200_AllServices = (
 	"/",
+	
+	"/dhwCircuits",
+    "/dhwCircuits/dhw1",
+    "/dhwCircuits/dhw1/operationMode",
+	"/dhwCircuits/dhw1/waterFlow",
+	"/dhwCircuits/dhw1/workingTime",
+	"/dhwCircuits/dhw1/activeSwitchProgram",
+	"/dhwCircuits/dhw1/switchPrograms",
+	"/dhwCircuits/dhw1/setTemperature",
+	"/dhwCircuits/dhw1/actualTemp",
+	"/dhwCircuits/dhw1/status",
+	"/dhwCircuits/dhw1/temperatureLevels",
+	"/dhwCircuits/dhw1/temperatureLevels/off",
+	"/dhwCircuits/dhw1/temperatureLevels/on",
+	
+	"/dhwCircuits/dhw2",
+    "/dhwCircuits/dhw2/operationMode",
+	"/dhwCircuits/dhw2/waterFlow",
+	"/dhwCircuits/dhw2/workingTime",
+	"/dhwCircuits/dhw2/activeSwitchProgram",
+	"/dhwCircuits/dhw2/switchPrograms",
+	"/dhwCircuits/dhw2/setTemperature",
+	"/dhwCircuits/dhw2/actualTemp",
+	"/dhwCircuits/dhw2/status",
+	"/dhwCircuits/dhw2/temperatureLevels",
+	"/dhwCircuits/dhw2/temperatureLevels/off",
+	"/dhwCircuits/dhw2/temperatureLevels/on",
+	
 	"/gateway",
 	"/gateway/DateTime",
 	"/gateway/firmware",
@@ -230,6 +265,7 @@ sub km200_Define($$)
 	"/gateway/instPassword",
 	"/gateway/instAccess",
 	"/gateway/instWriteAccess",
+	"/gateway/language",
 	"/gateway/userpassword",
 	"/gateway/uuid",
 	"/gateway/versionFirmware",
@@ -245,8 +281,10 @@ sub km200_Define($$)
 	"/heatingCircuits/hc1/currentRoomSetpoint",
 	"/heatingCircuits/hc1/designTemp",
 	"/heatingCircuits/hc1/fastHeatupFactor",
+	"/heatingCircuits/hc1/heatingCurveSetting",
 	"/heatingCircuits/hc1/heatCurveMax",
 	"/heatingCircuits/hc1/heatCurveMin",
+	"/heatingCircuits/hc1/holidayMode",
 	"/heatingCircuits/hc1/manualRoomSetpoint",
 	"/heatingCircuits/hc1/operationMode",
 	"/heatingCircuits/hc1/pumpModulation",
@@ -277,8 +315,10 @@ sub km200_Define($$)
 	"/heatingCircuits/hc2/currentRoomSetpoint",
 	"/heatingCircuits/hc2/designTemp",
 	"/heatingCircuits/hc2/fastHeatupFactor",
+	"/heatingCircuits/hc2/heatingCurveSetting",
 	"/heatingCircuits/hc2/heatCurveMax",
 	"/heatingCircuits/hc2/heatCurveMin",
+	"/heatingCircuits/hc2/holidayMode",
 	"/heatingCircuits/hc2/manualRoomSetpoint",
 	"/heatingCircuits/hc2/operationMode",
 	"/heatingCircuits/hc2/pumpModulation",
@@ -347,6 +387,7 @@ sub km200_Define($$)
 	"/recordings/system/heatSources/hs1/actualPower",
 	"/recordings/system/sensors",
 	"/recordings/system/sensors/temperatures",
+	"/recordings/system/sensors/outdoorTemperatures",
 	"/recordings/system/sensors/temperatures/outdoor_t1",
 
 	"/solarCircuits",
@@ -1344,7 +1385,7 @@ sub km200_ParseHttpResponseInit($)
 		or do 
 		{
 			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: ". $Service . " CANNOT be parsed";
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be parsed by JSON    : $Service \n";}
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be parsed by JSON         : $Service \n";}
 		};
 
 		if( exists $json -> {"value"})
