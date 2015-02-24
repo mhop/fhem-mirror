@@ -633,6 +633,16 @@ sub btIP_lpItemText {
   return "";
 }
 
+sub btIP_itemLongpoll {
+  my ($id,$x,$y,%params)= @_;
+  my $color = substr($params{rgb},0,6);
+  my $output =  "<div informId=\"$id\" style=\"position:absolute; top:${y}px; left:${x}px; ".
+                "margin-top:0px; z-index:3; \" >\n".
+                "</div>\n";
+  $defs{$params{name}}{fhem}{div} .= $output;
+  return "";
+}
+
 sub btIP_itemTextBox {
   my ($id,$x,$y,$boxwidth,$boxheight,$text,$link,%params)= @_;
   return unless(defined($text));
@@ -1168,6 +1178,14 @@ sub btIP_evalLayout {
 	      $params{yy} = $y;
 	      $text= AnalyzePerlCommand(undef, $text);
           $svg .= btIP_lpItemText($id,$x,$y,$text,%params);
+        }
+
+        when("longpoll") {
+          ($id,$x,$y)= split("[ \t]+", $def, 3);
+	      ($x,$y)= btIP_xy($x,$y,%params);
+	      $params{xx} = $x;
+	      $params{yy} = $y;
+          $svg .= btIP_itemLongpoll($id,$x,$y,%params);
         }
         
         when("textbox") {
