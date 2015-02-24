@@ -419,7 +419,7 @@ FW_longpoll()
   FW_leaving = 0;
 
   // Build the notify filter for the backend
-  var filter = document.body.getAttribute("longpollfilter");
+  var filter = $("body").attr("longpollfilter");
   if(filter == null)
     filter = "";
   if(filter == "") {
@@ -439,10 +439,8 @@ FW_longpoll()
     }
   }
 
-  if(filter == "" && document.getElementById("floorplan")) { //floorplan special
-    var name = document.body.getAttribute("id");
-    filter=".*;iconPath="+name.substring(0,name.length-5);
-  }
+  if($("#floorplan").length>0) //floorplan special
+    filter += ";iconPath="+$("body").attr("name");
 
   if(filter == "") {
     var content = document.getElementById("content");
