@@ -635,9 +635,11 @@ sub btIP_lpItemText {
 
 sub btIP_itemLongpoll {
   my ($id,$x,$y,%params)= @_;
-  my $color = substr($params{rgb},0,6);
+  my ($iconName,undef,undef) = FW_dev2image($id);
+  my $iconURL = FW_IconURL($iconName);
   my $output =  "<div informId=\"$id\" style=\"position:absolute; top:${y}px; left:${x}px; ".
                 "margin-top:0px; z-index:3; \" >\n".
+                "<img src=\"$iconURL\">\n".
                 "</div>\n";
   $defs{$params{name}}{fhem}{div} .= $output;
   return "";
