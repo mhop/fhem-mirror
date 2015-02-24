@@ -166,7 +166,7 @@ sub MilightDevice_Define($$)
   $hash->{helper}->{COMMANDSET} = "$baseCmds discoModeUp:noArg discoModeDown:noArg discoSpeedUp:noArg discoSpeedDown:noArg $sharedCmds $rgbCmds"
         if ($hash->{LEDTYPE} eq 'RGB');
         
-  $hash->{helper}->{COMMANDSET} = "$baseCmds ct:colorpicker,CT,3000,350,6500 $sharedCmds"
+  $hash->{helper}->{COMMANDSET} = "$baseCmds ct:colorpicker,CT,3000,320,6500 $sharedCmds"
         if ($hash->{LEDTYPE} eq 'White');
   
   # webCmds
@@ -1113,10 +1113,10 @@ sub MilightDevice_White_SetHSV(@)
   $val = 100 if ($val > 100);
   $val = 0 if ($val < 0);
   
-  # Calculate brightness hardware value (10 steps for white)
+  # Calculate brightness hardware value (11 steps for white)
   my $maxWl = (100 / MilightDevice_DimSteps($hash));
   my $wl = round($val / $maxWl);
-  
+
   # On first load, whiteLevel won't be defined, define it.
   $hash->{helper}->{whiteLevel} = $wl if (!defined($hash->{helper}->{whiteLevel}));
 
@@ -1200,9 +1200,9 @@ sub MilightDevice_White_SetColourTemp(@)
   my $oldHue = MilightDevice_White_ct_hwValue($hash, ReadingsVal($hash->{NAME}, "ct", 1));
   # Store new values for colourTemperature and Brightness
   MilightDevice_SetHSV_Readings($hash, $hue, 0, ReadingsVal($hash->{NAME}, "brightness", 100)); 
-  # Validate colourTemperature (10 steps)
+  # Validate colourTemperature (11 steps)
   # 3000-6500 (350 per step) Warm-White to Cool White
-  # Maps backwards 1=6500 10=3000
+  # Maps backwards 1=6500 11=3000
   $hue = MilightDevice_White_ct_hwValue($hash, $hue);
   
   Log3 ($hash, 4, "$hash->{NAME}_setColourTemp: $oldHue to $hue");
@@ -1238,16 +1238,17 @@ sub MilightDevice_White_ct_hwValue(@)
   
   # Couldn't get switch statement to work so using if
   
-  if ((3000 <= $ct) && ($ct < 3349)) { return 10; }
-  elsif ((3350 <= $ct) && ($ct < 3700)) { return 9; }
-  elsif ((3700 <= $ct) && ($ct < 4050)) { return 8; }
-  elsif ((4050 <= $ct) && ($ct < 4400)) { return 7; }
-  elsif ((4400 <= $ct) && ($ct < 4750)) { return 6; }
-  elsif ((4750 <= $ct) && ($ct < 5100)) { return 5; }
-  elsif ((5100 <= $ct) && ($ct < 5450)) { return 4; }
-  elsif ((5450 <= $ct) && ($ct < 5800)) { return 3; }
-  elsif ((5800 <= $ct) && ($ct < 6150)) { return 2; }
-  elsif ((6150 <= $ct) && ($ct <= 6500)) { return 1; }
+  if ((3000 <= $ct) && ($ct < 3320)) { return 11; }
+  elsif ((3320 <= $ct) && ($ct <= 3640)) { return 10; }
+  elsif ((3640 <= $ct) && ($ct < 3960)) { return 9; }
+  elsif ((3960 <= $ct) && ($ct < 4280)) { return 8; }
+  elsif ((4280 <= $ct) && ($ct < 4600)) { return 7; }
+  elsif ((4600 <= $ct) && ($ct < 4920)) { return 6; }
+  elsif ((4920 <= $ct) && ($ct < 5240)) { return 5; }
+  elsif ((5240 <= $ct) && ($ct < 5560)) { return 4; }
+  elsif ((5560 <= $ct) && ($ct < 5880)) { return 3; }
+  elsif ((5880 <= $ct) && ($ct < 6200)) { return 2; }
+  elsif ((6200 <= $ct) && ($ct <= 6500)) { return 1; }
   else { return 1; }
 }
 
@@ -1299,27 +1300,27 @@ sub MilightDevice_ValidateHSV(@)
 
 #####################################
 # Return number of steps for each type of bulb
-#  White: 10 steps (step = 10)
+#  White: 11 steps (step = 9.1)
 #  RGB: 9 steps (step = 11)
 #  RGBW: 25 steps (step = 4)
 sub MilightDevice_DimSteps(@)
 {
   my ($hash) = @_;
   return AttrVal($hash->{NAME}, "dimStep", 25) if ($hash->{LEDTYPE} eq 'RGBW');
-  return AttrVal($hash->{NAME}, "dimStep", 10) if ($hash->{LEDTYPE} eq 'White');
+  return AttrVal($hash->{NAME}, "dimStep", 11) if ($hash->{LEDTYPE} eq 'White');
   return AttrVal($hash->{NAME}, "dimStep", 9) if ($hash->{LEDTYPE} eq 'RGB');
 }
 
 #####################################
 # Return number of colour steps for each type of bulb
-#  White: 10 steps (this is colour temperature)
+#  White: 11 steps (this is colour temperature)
 #  RGB: 255 steps (not mentioned in API?)
 #  RGBW: 255 steps
 sub MilightDevice_ColourSteps(@)
 {
   my ($hash) = @_;
   return 255 if ($hash->{LEDTYPE} eq 'RGBW');
-  return 10 if ($hash->{LEDTYPE} eq 'White');
+  return 11 if ($hash->{LEDTYPE} eq 'White');
   return 255 if ($hash->{LEDTYPE} eq 'RGB');    
 }
 
