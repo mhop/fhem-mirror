@@ -36,17 +36,19 @@
 # 2015-02-11 - 7933 - added:   item counter
 # 2015-02-11 - 7944 - added:   items push/pop
 # 2015-02-12 - 7947 - changed: turtle added to new elements
-# 2015-02-14 - 7967 - added:   item ticker (experimental)
+# 2015-02-14 - 7967 - added:   item ticker
 #                     changed: img syntax
-# 2015-02-15 - 7989 - added:   item embed (experimental)
+# 2015-02-15 - 7989 - added:   item embed
 #              7995 - added:   xcondition (can be overridden by set) 
 #                              set ovClear,ovDisable,ovEnable
 #                              get counter, layout, overrides
 #                   - removed: trashcan due to performance issues
 #                   - added:   break condition for includes
+# 2015-02-24 - 8092 - added:   longpoll support (experimental)
+# 2015-02-25 -      - changed: iframe handling for secret div
 #
 ##############################################
-# $Id: 55_InfoPanel.pm 8013 2015-02-16 22:40:14Z betateilchen $
+# $Id$
 
 package main;
 use strict;
@@ -294,12 +296,12 @@ sub btIP_readLayout {
 ##### Items 
 
 sub btIP_itemArea {
-  my ($id,$x1,$y1,$x2,$y2,$link,%params)= @_;
+  my ($id,$x1,$y1,$x2,$y2,$link,$target,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
 
   my $oldrgb = $params{rgb};
   $params{rgb} = '00000000';
-  my $output = btIP_itemRect($id,$x1,$y1,$x2,$y2,0,0,1,0,$link,%params);
+  my $output = btIP_itemRect($id,$x1,$y1,$x2,$y2,0,0,1,0,$link,$target,%params);
   $params{rgb} = $oldrgb;
 
   return $output;
@@ -313,7 +315,7 @@ sub btIP_itemButton {
 
   my $oldrgb = $params{rgb};
   $params{rgb} = $params{boxcolor};
-  my $output = btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,1,0,$link,%params);
+  my $output = btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,1,0,$link,undef,%params);
   $params{rgb} = $oldrgb;
 
   my ($oldhalign,$oldvalign)             = ($params{thalign},$params{tvalign});
@@ -405,7 +407,7 @@ sub btIP_itemEmbed {
 }
 
 sub btIP_itemGroup {
-  my($id,$type,$x,$y) = @_;
+  my($id,$type,$x,$y,%params) = @_;
   return "</g>\n"               if $type eq 'close';
   $id = ($id eq '-') ? createUniqueId() : $id;
   return "<g id=\"$id\" transform=\"translate($x,$y)\" >\n" if $type eq 'open';
@@ -574,10 +576,10 @@ sub btIP_itemPlot {
 }
 
 sub btIP_itemRect {
-  my ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link,%params)= @_;
+  my ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link,$target,%params)= @_;
   $id = ($id eq '-') ? createUniqueId() : $id;
-  my $target;
-  ($link,$target) = btIP_findTarget($link);
+  $target //= "";
+  ($link,$target) = btIP_findTarget($link) unless ($target ne "");
   my $width  = $x2 - $x1;
   my $height = $y2 - $y1;
   $filled //= 0;
@@ -653,7 +655,7 @@ sub btIP_itemTextBox {
      my $by1 = $y - $params{padding};
      my $bx2 = $x + $boxwidth  + $params{padding};
      my $by2 = $y + $boxheight + $params{padding};
-     $output .= btIP_itemRect("box_$id",$bx1,$by1,$bx2,$by2,1,1,1,%params);
+     $output .= btIP_itemRect("box_$id",$bx1,$by1,$bx2,$by2,1,1,1,0,undef,undef,%params);
      $params{rgb} = $orgcolor;
   } else {
      $output = "";
@@ -886,6 +888,8 @@ sub btIP_evalLayout {
   $params{counter}   = $defs{$name}{fhem}{counter};
   $params{xx}        = 0;
   $params{yy}        = 0;
+  $params{groupx}    = 0;
+  $params{groupy}    = 0;
   $params{width}     = $width;
   $params{height}    = $height;
   $params{rgb}       = 'FFFFFF';
@@ -908,7 +912,7 @@ sub btIP_evalLayout {
   my ($id,$x,$y,$x1,$y1,$x2,$y2,$radius,$rx,$ry);
   my ($scale,$inline,$boxwidth,$boxheight,$boxcolor);
   my ($speed,$bgcolor,$fgcolor);
-  my ($text,$link,$imgtype,$srctype,$arg,$format,$filled,$stroked);
+  my ($text,$link,$target,$imgtype,$srctype,$arg,$format,$filled,$stroked);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -953,13 +957,14 @@ sub btIP_evalLayout {
       given($cmd) {
 
 	    when("area") {
-	      ($id,$x1,$y1,$x2,$y2,$link)= split("[ \t]+", $def, 6);
+	      ($id,$x1,$y1,$x2,$y2,$link,$target)= split("[ \t]+", $def, 7);
+              $target //= "";
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
 	      $link = AnalyzePerlCommand(undef,$link);
           $params{xx} = $x1;
           $params{yy} = $y2;
-	      $svg .= btIP_itemArea($id,$x1,$y1,$x2,$y2,$link,%params);
+	      $svg .= btIP_itemArea($id,$x1,$y1,$x2,$y2,$link,$target,%params);
 	    }
 
         when("boxcolor"){
@@ -983,7 +988,7 @@ sub btIP_evalLayout {
         when("buttonpanel"){
            $defs{$params{name}}{fhem}{div} .= "<div id=\"hiddenDiv\" ".
               "style=\"display:none\" >".
-              "<iframe id=\"secretFrame\" name=\"secret\" src=\"\"></div>\n";
+              "<iframe id=\"secretFrame\" name=\"secret\" src=\"\"></iframe></div>\n";
         }
 
 	    when("circle") {
@@ -1046,7 +1051,14 @@ sub btIP_evalLayout {
 	      ($x,$y)= btIP_xy($x,$y,%params);
 	      $params{xx} = $x;
 	      $params{yy} = $y;
-	      $svg .= btIP_itemGroup($id,$text,$x,$y);
+              if($text eq 'open') {
+                 $params{groupx} = $x;
+	         $params{groupy} = $y;
+              } else {
+                 $params{groupx} = 0;
+	         $params{groupy} = 0;
+              }
+	      $svg .= btIP_itemGroup($id,$text,$x,$y,%params);
         }
 
 	    when("img") {
@@ -1070,6 +1082,18 @@ sub btIP_evalLayout {
 	      $svg .= btIP_itemLine($id,$x1,$y1,$x2,$y2,$format,%params);
 	    }
 	    
+        when("longpoll") {
+          ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
+          $text //= undef;
+          $text = AnalyzePerlCommand(undef,$text);
+	      ($x,$y)= btIP_xy($x,$y,%params);
+              $x += $params{groupx};
+              $y += $params{groupy};
+	      $params{xx} = $x;
+	      $params{yy} = $y;
+          $svg .= btIP_itemLongpoll($id,$x,$y,$text,%params);
+        }
+        
         when("moveby") {
           my ($byx,$byy) = split('[ \t]+', $def, 2);
           my ($x,$y)= btIP_xy($byx,$byy,%params);
@@ -1138,7 +1162,7 @@ sub btIP_evalLayout {
 	      $filled  //= 0; # set 0 as default (not filled)
           $stroked //= 0; # set 0 as default (not stroked)
           $link = AnalyzePerlCommand(undef,$link);
-	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link,%params);
+	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link,undef,%params);
 	    }
 	    
         when("rgb"){
@@ -1168,16 +1192,6 @@ sub btIP_evalLayout {
           Log3($name, 2, "InfoPanel $name: command 'lptext' no longer supported.");
         }
 
-        when("longpoll") {
-          ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
-          $text //= undef;
-          $text = AnalyzePerlCommand(undef,$text);
-	      ($x,$y)= btIP_xy($x,$y,%params);
-	      $params{xx} = $x;
-	      $params{yy} = $y;
-          $svg .= btIP_itemLongpoll($id,$x,$y,$text,%params);
-        }
-        
         when("textbox") {
           ($id,$x,$y,$boxwidth,$boxheight,$link,$text)= split("[ \t]+", $def, 7);
 	      ($x,$y)= btIP_xy($x,$y,%params);
