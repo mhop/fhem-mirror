@@ -552,7 +552,7 @@ HEATRONIC_DecodeMsg_CH2($$$)
     readingsBulkUpdate($hash, "ch_runtime_ch", $ch_runtime_ch);
     readingsBulkUpdate($hash, "ch_starts_tot", $ch_starts_tot);
     readingsBulkUpdate($hash, "ch_starts_ch", $ch_starts_ch);
-    readingsBulkUpdate($hash, "ch_pump_heating_power" $ch_pump_heating_power);
+    readingsBulkUpdate($hash, "ch_pump_heating_power", $ch_pump_heating_power);
     readingsEndUpdate($hash,1);
 
     return 1;
