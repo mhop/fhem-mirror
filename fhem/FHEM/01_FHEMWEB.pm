@@ -2420,7 +2420,7 @@ FW_devState($$@)
   my $txt = $state;
   my $dsi = ($attr{$d} && ($attr{$d}{stateFormat} || $attr{$d}{devStateIcon}));
 
-  if(defined(AttrVal($d, "showtime", undef))) {
+  if(AttrVal($d, "showtime", undef)) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
     $txt = $v if(defined($v));
 
