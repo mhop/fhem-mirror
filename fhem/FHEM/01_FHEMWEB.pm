@@ -2306,6 +2306,14 @@ FW_Notify($$)
     $dn = $1 if($dev->{CHANGED} && $dev->{CHANGED}->[0] =~ m/^MODIFIED (.*)$/);
   }
 
+  if($dn eq $ntfy->{SNAME} &&
+     $dev->{CHANGED} &&
+     $dev->{CHANGED}->[0] =~ m/^JS:(.*)$/) {
+    my $data = FW_longpollInfo($h->{fmt}, "#FHEMWEB:$ntfy->{NAME}",$1,"");
+    addToWritebuffer($ntfy, $data."\n");
+    return;
+  }
+
   if($h->{type} eq "raw") {
     return undef if($dn !~ m/$h->{filter}/);
   } else { # Status
