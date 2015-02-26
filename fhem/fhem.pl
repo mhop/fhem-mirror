@@ -3837,7 +3837,7 @@ computeClientArray($$)
   my @a = ();
   my @mRe = split(":", $hash->{Clients} ? $hash->{Clients}:$module->{Clients});
 
-  foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
+  foreach my $m (sort { $modules{$a}{ORDER}.$a cmp $modules{$b}{ORDER}.$b }
                   grep { defined($modules{$_}{ORDER}) } keys %modules) {
     foreach my $re (@mRe) {
       if($m =~ m/^$re$/) {
