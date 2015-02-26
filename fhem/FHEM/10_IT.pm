@@ -356,9 +356,13 @@ IT_Parse($$)
   my $def;
   my $newstate;
   my @list;
+  if ((substr($msg, 0, 1)) ne 'i') {
+    Log3 undef,4,"message not supported by IT \"$msg\"!";
+    return undef;
+  }
   if (length($msg) != 7 && length($msg) != 17) {
-    Log3 undef,3,"message \"$msg\" to short!";
-    return "message \"$msg\" to short!";
+    Log3 undef,3,"message \"$msg\" too short!";
+    return undef;
   }
   my $bin = undef;
   if ( length($msg) == 17 ) {
@@ -464,13 +468,13 @@ IT_Parse($$)
 <h3>IT - InterTechno</h3>
 <ul>
   The InterTechno 433MHZ protocol is used by a wide range of devices, which are either of
-  the sender/sensor category or the receiver/actuator category. As we right now 
-  able to SEND and RECEIVE InterTechno commands
-  supports just  devices like switches, dimmers, etc. through an <a href="#CUL">CUL</a> device, so this must be defined first.
+  the sender/sensor or the receiver/actuator category.
+  Right now, we are able to SEND and RECEIVE InterTechno commands.
+  Supported are devices like switches, dimmers, etc. through an <a href="#CUL">CUL</a> device, this must be defined first.
 <br>
   This module supports Intertechno protocol version 1 and version 3.
-  New received device packages are add in fhem category IT with autocreate.
-  Hint: IT protocol 1 devices are only created at pressed on button.
+  Newly found devices are added into the category "IT" by autocreate.
+  Hint: IT protocol 1 devices are created on pressing the on-button.
 
   <br><br>
 
@@ -486,19 +490,19 @@ IT_Parse($$)
     <br><br>
 
    The value of housecode is a 10-digit InterTechno Code, consisting of 0/1/F as it is
-   defined as a tri-state protocol. These digits depend on your device you are using.
+   defined as a tri-state protocol. These digits depend on the device you are using.
    <br>
-   Bit 11/12 are used for switching/dimming. As different manufacturers are using
+   Bit 11 and 12 are used for switching/dimming. As different manufacturers are using
    different bit-codes you can specifiy here the 2-digit code for off/on/dimup/dimdown
    in the same form: 0/1/F.
 	<br>
-   The value of ITRotarySwitches consist of the value of the alpha switch A-P and
+   The value of ITRotarySwitches consists of the value of the alpha switch A-P and
    the numeric switch 1-16 as set on the intertechno device. E.g. A1 or G12.
 <br>
    The value of FLS100RotarySwitches consist of the value of the I,II,II,IV switch
    and the numeric 1,2,3,4 swicht. E.g. I2 or IV4.
 <br>
-   The value of ITRotarySwitches and FLS100RotarySwitches is internaly translated
+   The value of ITRotarySwitches and FLS100RotarySwitches are internaly translated
    into a houscode value.
 
    <ul>
@@ -526,7 +530,8 @@ Examples:
       <code>define lamp IT II2</code><br>
     </ul>
  <br>
-   For Intertechno protocol 3 is the &lt;housecode&gt; a 26-digits number. Additionaly there are a 4-digits unit code and a 1-digit group code used.
+   For Intertechno protocol 3 the &lt;housecode&gt; is a 26-digits number.
+   Additionaly there are a 4-digits unit code and a 1-digit group code used.
    <ul>
    <li><code>&lt;address&gt;</code> is a 26 digit number (0/1)</li>
    <li><code>&lt;group&gt;</code> is a 1 digit number (0/1)</li>
@@ -566,9 +571,8 @@ Examples:
     Notes:
     <ul>
       <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
-      or { &lt;perl code&gt; }, where the perl-code returns a time
-          specification).
-      If the current time is greater than the specified time, then the
+      or { &lt;perl code&gt; }, where the perl-code returns a time specification).
+      If the current time is greater than the specified time, the
       command is ignored, else an "on" command is generated, and for the
       given "till-time" an off command is scheduleld via the at command.
       </li>
@@ -583,18 +587,19 @@ Examples:
   <ul>
     <a name="IODev"></a>
     <li>IODev<br>
-        Set the IO or physical device which should be used for sending signals
-        for this "logical" device. An example for the physical device is a CUL.
-		Note: Upon startup fhem DOES NOT assigns an InterTechno device an
-		IODevice! The attribute IODev needs to be used AT ANY TIME!</li><br>
+        Set the IO device which will be used to send signals
+        for this device. An example for the physical device is a CUL.
+		Note: On startup, fhem DOES NOT assign an InterTechno device to an
+		IODevice! The attribute IODev needs to be used ALWAYS!</li><br>
 
     <a name="eventMap"></a>
     <li>eventMap<br>
         Replace event names and set arguments. The value of this attribute
-        consists of a list of space separated values, each value is a colon
+        consists of a list of space separated values. Each value is a colon
         separated pair. The first part specifies the "old" value, the second
-        the new/desired value. If the first character is slash(/) or komma(,)
-        then split not by space but by this character, enabling to embed spaces.
+        the new/desired value. If the first character is slash(/) or comma(,)
+        the values are not separated by space but by this character to
+        enable spaces in values.
         Examples:<ul><code>
         attr store eventMap on:open off:closed<br>
         attr store eventMap /on-for-timer 10:open/off:closed/<br>
@@ -617,16 +622,16 @@ Examples:
 
     <a name="model"></a>
     <li>model<br>
-        The model attribute denotes the model type of the device.
-        The attributes will (currently) not be used by the fhem.pl directly.
+        The model attribute denotes the type of the device.
+        This attribute will (currently) not be used by fhem.pl directly.
         It can be used by e.g. external programs or web interfaces to
         distinguish classes of devices and send the appropriate commands
         (e.g. "on" or "off" to a switch, "dim..%" to dimmers etc.).
-        The spelling of the model names are as quoted on the printed
-        documentation which comes which each device. This name is used
-        without blanks in all lower-case letters. Valid characters should be
+        The spelling of the model should match the modelname used in the
+        documentation that comes which the device. The name should consist of
+        lower-case characters without spaces. Valid characters are
         <code>a-z 0-9</code> and <code>-</code> (dash),
-        other characters should be ommited. Here is a list of "official"
+        other characters should not be used. Here is a list of "official"
         devices:<br>
           <b>Sender/Sensor</b>: itremote<br>
 
@@ -639,11 +644,11 @@ Examples:
     <a name="ignore"></a>
     <li>ignore<br>
         Ignore this device, e.g. if it belongs to your neighbour. The device
-        won't trigger any FileLogs/notifys, issued commands will silently
+        won't trigger any FileLogs/notifys, issued commands will be silently
         ignored (no RF signal will be sent out, just like for the <a
         href="#attrdummy">dummy</a> attribute). The device won't appear in the
         list command (only if it is explicitely asked for it), nor will it
-        appear in commands which use some wildcard/attribute as name specifiers
+        be affected by commands which use wildcards or attributes as name specifiers
         (see <a href="#devspec">devspec</a>). You still get them with the
         "ignored=1" special devspec.
         </li><br>
@@ -654,7 +659,7 @@ Examples:
   <a name="ITevents"></a>
   <b>Generated events:</b>
   <ul>
-     From an IT device you can receive one of the following events.
+     From an IT device you can receive the following events.
      <li>on</li>
      <li>off</li>
      <li>dimdown</li>
