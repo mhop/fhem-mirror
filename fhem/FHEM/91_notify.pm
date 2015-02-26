@@ -43,7 +43,7 @@ notify_Define($$)
   return "Bad regexp: $@" if($@);
   $hash->{REGEXP} = $re;
   $hash->{".COMMAND"} = $command;
-  $hash->{STATE} = "active";
+  readingsSingleUpdate($hash, "state", "active", 1);
   notifyRegexpChanged($hash, $re);
 
   return undef;
@@ -110,7 +110,7 @@ notify_Attr(@)
   $do = 2 if($a[0] eq "del" && (!$a[2] || $a[2] eq "disable"));
   return if(!$do);
 
-  $defs{$a[1]}{STATE} = ($do == 1 ? "disabled" : "active");
+  readingsSingleUpdate($defs{$a[1]}, "state", $do==1 ? "disabled":"active", 1);
   return undef;
 }
 

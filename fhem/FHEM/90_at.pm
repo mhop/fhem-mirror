@@ -110,8 +110,9 @@ at_Define($$)
     RemoveInternalTimer($hash);
     InternalTimer($nt, "at_Exec", $hash, 0);
     $hash->{NTM} = $ntm if($rel eq "+" || $fn);
-    $hash->{STATE} = AttrVal($name, "disable", undef) ?
+    my $val = AttrVal($name, "disable", undef) ?
                           "disabled" : ("Next: ".FmtTime($nt));
+    readingsSingleUpdate($hash, "state", $val, 1);
   }
 
   return undef;
@@ -242,10 +243,9 @@ at_Attr(@)
   }
   $do = 2 if($cmd eq "del" && (!$attrName || $attrName eq "disable"));
   return if(!$do);
-  $hash->{STATE} = ($do == 1 ?
-        "disabled" :
-        "Next: " . FmtTime($hash->{TRIGGERTIME}));
-
+  my $val = ($do == 1 ?  "disabled" :
+                         "Next: " . FmtTime($hash->{TRIGGERTIME}));
+  readingsSingleUpdate($hash, "state", $val, 1);
   return undef;
 }
 
