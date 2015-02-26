@@ -38,7 +38,7 @@ sub WOL_Initialize($) {
   $hash->{DefFn}     = "WOL_Define";
   $hash->{UndefFn}   = "WOL_Undef";
   $hash->{AttrFn}    = "WOL_Attr";
-  $hash->{AttrList}  = "interval shutdownCmd sysCmd useUdpBroadcast ".
+  $hash->{AttrList}  = "interval shutdownCmd sysCmd sysInterface useUdpBroadcast ".
                         $readingFnAttributes;
 }
 ################################################################################
@@ -283,20 +283,32 @@ sub WOL_by_ew($$) {
      }
   }
 
-  Log3 $hash, 5, "[$name] standard wol command: $standardEtherwake";
+  Log3 $hash, 4, "[$name] standard wol command: $standardEtherwake";
 
-  my $sysCmd = AttrVal($hash->{NAME}, "sysCmd", "");
-  Log3 $hash, 5, "[$name] user wol command(sysCmd): '$sysCmd'";
-  $sysCmd = $standardEtherwake     if ($sysCmd eq "");
-  if (-e $sysCmd) {
-     $sysCmd = "$sysCmd $mac";
-     Log3 $hash, 5, "[$name] executing $sysCmd";
+  my $sysCmd       = AttrVal($hash->{NAME}, "sysCmd",       "");
+  my $sysInterface = AttrVal($hash->{NAME}, "sysInterface", "");
+  
+  if ($sysCmd gt "") {
+     Log3 $hash, 4, "[$name] user wol command(sysCmd): '$sysCmd'";
+  } else {   
+     $sysCmd = $standardEtherwake;
+  }   
+  
+  # wenn noch keine $mac dann $mac anhängen. 
+  $sysCmd .= ' $mac'     if ($sysCmd !~  m/\$mac/g);
+  
+  # sysCmd splitten und den nur ersten Teil (-e teil[0])prüfen
+  my ($sysWake) = split (" ", $sysCmd);
+  if (-e $sysWake) {
+     $sysCmd =~ s/\$mac/$mac/;
+     $sysCmd =~ s/\$sysInterface/$sysInterface/;
+     Log3 $hash, 4, "[$name] executing $sysCmd";
      qx ($sysCmd);
   } else {
-     Log3 $hash, 1, "[$hash->{NAME}] system command '$sysCmd' not found";
+     Log3 $hash, 1, "[$hash->{NAME}] system command '$sysWake' not found";
   }
 
-  return 1;
+  return;
 }
 ################################################################################
 sub WOL_SetNextTimer($;$) {
