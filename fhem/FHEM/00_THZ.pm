@@ -1572,7 +1572,7 @@ sub function_heatSetTemp($$) {
 sub THZ_PrintcurveSVG {
 my ($ycurvevalues, $titlestring, $heatSetTemp, $outside_tempFiltered) = function_heatSetTemp(-15,20);
 my $vstep= 5;
-$vstep= 10 if (($ycurvevalues->[0][1])>36); #change scale if out of scale
+$vstep= 10 if ((($ycurvevalues->[0][1])>36) or (($ycurvevalues->[0][2])>36)); #change scale if out of scale
 my$v0min= 15;
 my $v1=$v0min+$vstep; my $v2=$v1+$vstep; my $v3=$v2+$vstep; my $v4=$v3+$vstep;
 my $ret =  <<'END';
