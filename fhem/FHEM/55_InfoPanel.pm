@@ -48,7 +48,7 @@
 # 2015-02-25 -      - changed: iframe handling for secret div
 #
 ##############################################
-# $Id$
+# $Id: 55_InfoPanel.pm 8095 2015-02-25 10:33:21Z betateilchen $
 
 package main;
 use strict;
@@ -502,8 +502,9 @@ sub btIP_itemLongpoll {
   my ($iconName,undef,undef) = FW_dev2image($id);
   my $iconURL = FW_IconURL($iconName);
   my $color   = substr($params{rgb},0,6);
+  my $opacity = hex(substr($params{rgb},6,2))/255;
   my $output  = "<div informId=\"$id\" style=\"position:absolute; top:${y}px; left:${x}px; ";
-     $output .= "font-family:$params{font}; font-size:$params{pt}; color:#$color; " if defined($text);
+     $output .= "font-family:$params{font}; font-size:$params{pt}; color:#$color; opacity:$opacity; " if defined($text);
      $output .= "margin-top:0px; z-index:3; \" >\n";
      $output .= "$text\n"                  if     defined($text);
      $output .= "<img src=\"$iconURL\">\n" unless defined($text);
