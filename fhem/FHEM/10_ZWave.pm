@@ -152,16 +152,11 @@ my %zwave_class = (
   THERMOSTAT_FAN_MODE      => { id => '44', },
   THERMOSTAT_FAN_STATE     => { id => '45', },
   CLIMATE_CONTROL_SCHEDULE => { id => '46',
-    get   => { ccsOverride  => "07", },
-    parse => { "0446080079" => "ccsOverride:no, frost protection",
-               "044608007a" => "ccsOverride:no, energy saving",
-               "044608007f" => "ccsOverride:no, unused",
-               "0446080179" => "ccsOverride:temporary, frost protection",
-               "044608017a" => "ccsOverride:temporary, energy saving",
-               "044608017f" => "ccsOverride:temporary, unused",
-               "0446080279" => "ccsOverride:permanent, frost protection",
-               "044608027a" => "ccsOverride:permanent, energy saving",
-               "044608027f" => "ccsOverride:permanent, unused", }, },
+    set   => { ccs                => 'ZWave_ccsSet("%s")' },
+    get   => { ccs                => 'ZWave_ccsGet("%s")',
+               ccsChanged         => "04",
+               ccsOverride        => "07" },
+    parse => { "..46(..)(.*)" => 'ZWave_ccsParse($1,$2)' }},
   THERMOSTAT_SETBACK       => { id => '47', },
   DOOR_LOCK_LOGGING        => { id => '4c', },
   SCHEDULE_ENTRY_LOCK      => { id => '4e', },
@@ -202,9 +197,9 @@ my %zwave_class = (
                protectionSeq => "0101",
                protectionOn  => "0102", },
     get   => { protection    => "02", },
-    parse => { "03750300"      => "protection:off",
-               "03750301"      => "protection:seq",
-               "03750302"      => "protection:on", }, },
+    parse => { "03750300"    => "protection:off",
+               "03750301"    => "protection:seq",
+               "03750302"    => "protection:on", }, },
   LOCK                     => { id => '76', },
   NODE_NAMING              => { id => '77', },
   FIRMWARE_UPDATE_MD       => { id => '7a', },
@@ -215,7 +210,10 @@ my %zwave_class = (
     get   => { battery     => "02" },
     parse => { "038003(..)"=> '"battery:".($1 eq "ff" ? "low":hex($1)." %")'},},
   CLOCK                    => { id => '81',
-    parse => { "028105"=> "clock:get" }, },
+    get   => { clock           => "05" },
+    set   => { clock           => 'ZWave_ClockSet()' },
+    parse => { "028105"        => "clock:get",
+               "048106(..)(..)"=> 'ZWave_ClockParse($1,$2)' }},
   HAIL                     => { id => '82', },
   WAKE_UP                  => { id => '84', 
     set   => { wakeupInterval => "04%06x%02x",
@@ -277,7 +275,7 @@ my %zwave_class = (
   SILENCE_ALARM            => { id => '9d', },
   SENSOR_CONFIGURATION     => { id => '9e', },
   MARK                     => { id => 'ef', },
-  NON_INTEROPERABLE        => { id => 'f0', },
+  NON_INTEROPERABLE        => { id => 'f0', },  # this is a flag, not a class
 );
 
 my %zwave_cmdArgs = (
@@ -424,13 +422,12 @@ ZWave_Cmd($$@)
 
   }
 
-  Log3 $name, 2, "ZWave $type $name $cmd";
-
   ################################
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
   my $id = $hash->{id};
   my $cmdFmt = $cmdList{$cmd}{fmt};
   my $cmdId  = $cmdList{$cmd}{id};
+
 
   my $nArg = 0;
   if($cmdFmt =~ m/%/) {
@@ -445,6 +442,10 @@ ZWave_Cmd($$@)
     return "$type $cmd needs at least $parTxt" if($nArg > int(@a));
     $cmdFmt .= ("%02x" x (int(@a)-$nArg));
 
+  } elsif($cmdFmt =~ m/%s/) {   # vararg for functions
+    $nArg = 0 if(!@a);
+    @a = (join(" ", @a));
+
   } else {
     return "$type $cmd needs $parTxt" if($nArg != int(@a));
   }
@@ -455,7 +456,12 @@ ZWave_Cmd($$@)
     $cmdFmt = $cmd;
   } else {
     $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
+    my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
+    return $err if($err);
+    $cmdFmt = $ncmd if(defined($ncmd));
   }
+
+  Log3 $name, 2, "ZWave $type $name $cmd";
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
   if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
@@ -482,7 +488,7 @@ ZWave_Cmd($$@)
       push @{$baseHash->{WakeUp}}, ""; # Block the next
 
     } else {
-      push @{$baseHash->{WakeUp}}, $data;
+      push @{$baseHash->{WakeUp}}, $data.$id;
       return ($type eq "get" && AttrVal($name,"verbose",3) > 2 ? 
                   "Scheduled for sending after WAKEUP" : undef);
     }
@@ -705,6 +711,100 @@ ZWave_mfsParse($$$$)
 
   }
   return sprintf("model:0x%s 0x%s 0x%s", $mf, $prod, $id);
+}
+
+my @zwave_wd = ("none","mon","tue","wed","thu","fri","sat","sun");
+
+sub
+ZWave_ccsSet($)
+{
+  my ($spec) = @_;
+  my @arg = split(/[ ,]/, $spec);
+  my $usage = "wrong arg, need: <weekday> HH:MM relTemp HH:MM relTemp ...";
+
+  return ($usage,"") if(@arg < 3 || int(@arg) > 19 || (int(@arg)-1)%2 != 0);
+  my $wds = shift(@arg);
+  my $ret;
+  map { $ret=sprintf("%02x",$_) if($zwave_wd[$_] eq $wds) }(1..int($#zwave_wd));
+  return ("Unknown weekday $wds, use one of ".join(" ", @zwave_wd), "")
+    if(!defined($ret));
+  for(my $i=0; $i<@arg; $i+=2) {
+    return ($usage, "") if($arg[$i] !~ m/^(\d\d):(\d\d)$/);
+    $ret .= sprintf("%02x%02x", $1, $2);
+    return ($usage, "") if($arg[$i+1] !~ m/^([-.\d]+)$/ || $1 < -12 || $1 > 12);
+    $ret .= sprintf("%02x", $1 < 0 ? (0x80 | (-$1*10)) : ($1*10));
+  }
+  for(my $i=@arg; $i<18; $i+=2) {
+    $ret .= "00007f";
+  }
+  return ("", "01$ret");
+}
+
+sub
+ZWave_ccsGet($)
+{
+  my ($wds, $wdn) = @_;
+  $wds = "" if($wds eq "%s");  # No parameter specified
+  map { $wdn = $_ if($zwave_wd[$_] eq $wds) } (1..int($#zwave_wd));
+  return ("Unknown weekday $wds, use one of ".join(" ", @zwave_wd), "")
+    if(!$wdn);
+  return ("", sprintf("02%02x", $wdn));
+}
+
+sub
+ZWave_ccsParse($$)
+{
+  my ($t, $p) = @_;
+
+  return "ccsChanged:$p" if($t == "05");
+
+  if($t == "08" && $p =~ m/^(..)(..)$/) {
+    my $ret = ($1 eq "00" ? "no" : ($1 eq "01" ? "temporary" : "permanent"));
+    $ret .= ", ". ($2 eq "79" ? "frost protection" : 
+                  ($2 eq "7a" ? "energy saving" : "unused"));
+    return "ccsOverride:$ret";
+  }
+
+  if($t == "03") {
+    $p =~ /^(..)(.*$)/;
+    my $n = "ccs_".$zwave_wd[hex($1)];
+    $p = $2;
+    my @v;
+    while($p =~ m/^(..)(..)(..)(.*)$/) {
+      last if($3 eq "7f"); # unused
+      $p = $4;
+      my $t = hex($3);
+      $t = ($t == 0x7a ? "EnergySave" : $t >= 0x80 ? -$t/10 : $t/10);
+      push @v, sprintf("%02d:%02d %0.1f", hex($1), hex($2), $t);
+    }
+    return "$n:".(@v ? join(" ",@v) : "N/A");
+  }
+
+  return "ccs: UNKNOWN $t$p";
+}
+
+sub
+ZWave_ClockAdjust($)
+{
+  my $d = shift;
+  return $d if($d !~ m/^13(..)048104....05$/);
+  my ($err, $nd) = ZWave_ClockSet();
+  return "13${1}0481${nd}05";
+}
+
+sub
+ZWave_ClockSet()
+{
+  my @l = localtime();
+  return ("", sprintf("04%02x%02x", ($l[6]<<5)|$l[2], $l[1]));
+}
+
+sub
+ZWave_ClockParse($$)
+{
+  my ($p1,$p2) = @_;
+  $p1 = hex($p1); $p2 = hex($p2);
+  return sprintf("clock:%s %02d:%02d", $zwave_wd[$p1>>5], $p1 & 0x1f, $p2);
 }
 
 sub
@@ -941,7 +1041,7 @@ ZWave_Parse($$@)
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash && $hash->{WakeUp} && @{$hash->{WakeUp}}) { # Always the base hash
       foreach my $wuCmd (@{$hash->{WakeUp}}) {
-        IOWrite($hash, "00", $wuCmd);
+        IOWrite($hash, "00", ZWave_ClockAdjust($wuCmd));
         Log3 $hash, 4, "Sending stored command: $wuCmd";
       }
       @{$hash->{WakeUp}}=();
@@ -1000,6 +1100,10 @@ ZWave_Parse($$@)
     return "" 
   }
 
+  if($arg =~ m/^(..)(..)(.*)/ && $2 eq "c6") { # Danfoss Living Strangeness
+    Log3 $ioName, 4, "Class mod for Danfoss ($2)";
+    $arg = sprintf("%s%02x%s", $1, hex($2) & 0x7f, $3);
+  }
 
   my $baseHash;
   if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP
@@ -1058,9 +1162,9 @@ ZWave_Parse($$@)
   }
 
   my $wu = $baseHash->{WakeUp};
-  if($arg =~ m/028407/ && $wu && @{$wu}) {
+  if($arg =~ m/^028407/ && $wu && @{$wu}) {
     foreach my $wuCmd (@{$wu}) {
-      IOWrite($hash, "00", $wuCmd);
+      IOWrite($hash, "00", ZWave_ClockAdjust($wuCmd));
       Log3 $hash, 4, "Sending stored command: $wuCmd";
     }
     @{$baseHash->{WakeUp}}=();
@@ -1212,6 +1316,20 @@ s2Hex($)
     Send value (0-255) to this device. The interpretation is device dependent,
     e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
 
+  <br><br><b>Class CLOCK</b>
+  <li>set<br>
+    set the clock to the current date/time (no argument required)
+    </li>
+
+  <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
+  <li>ccs [mon|tue|wed|thu|fri|sat|sun] HH:MM tempDiff HH:MM tempDiff ...<br>
+    set the climate control schedule for the given day.<br>
+    Up to 9 pairs of HH:MM tempDiff may be specified.<br>
+    HH:MM must occur in increasing order.
+    tempDiff is relative to the setpoint temperature, and may be between -12
+    and 12, with one decimal point, measured in Kelvin (or Centigrade).
+    </li>
+
   <br><br><b>Class CONFIGURATION</b>
   <li>configByte cfgAddress 8bitValue<br>
       configWord cfgAddress 16bitValue<br>
@@ -1352,6 +1470,19 @@ s2Hex($)
     return the charge of the battery in %, as battery:value % or battery:low
     </li>
 
+  <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
+  <li>ccsOverride<br>
+    request the climate control schedule override report
+    </li>
+  <li>ccs [mon|tue|wed|thu|fri|sat|sun]<br>
+    request the climate control schedule for the given day.
+    </li>
+
+  <br><br><b>Class CLOCK</b>
+  <li>get<br>
+    request the clock data
+    </li>
+
   <br><br><b>Class CONFIGURATION</b>
   <li>config cfgAddress<br>
     return the value of the configuration parameter cfgAddress. The value is
@@ -1473,11 +1604,6 @@ s2Hex($)
     request the setpoint
     </li>
 
-  <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
-  <li>ccsOverride<br>
-    request the climate control schedule override report
-    </li>
-
   <br><br><b>Class VERSION</b>
   <li>version<br>
     return the version information of this node in the form:<br>
@@ -1551,6 +1677,7 @@ s2Hex($)
 
   <br><br><b>Class CLOCK</b>
   <li>clock:get</li>
+  <li>clock:[mon|tue|wed|thu|fri|sat|sun] HH:MM</li>
 
   <br><br><b>Class CONFIGURATION</b>
   <li>config_X:Y<br>
@@ -1656,7 +1783,10 @@ s2Hex($)
   <li>temperature:$temp [C|F] [heating|cooling]</li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
-  <li>ccsOverride:[no|temporary|permanent], [frost protection|energy saving|unused]</li>
+  <li>ccsOverride:[no|temporary|permanent],
+                  [frost protection|energy saving|unused]</li>
+  <li>ccsChanged:<number></li>
+  <li>ccs_[mon|tue|wed|thu|fri|sat|sun]:HH:MM temp HH:MM temp...</li>
 
   <br><br><b>Class VERSION</b>
   <li>version:Lib A Prot x.y App a.b</li>
