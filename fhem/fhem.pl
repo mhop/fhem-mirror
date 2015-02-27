@@ -282,7 +282,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
 	    Hlp=>"<filename>,read the commands from <filenname>" },
   "inform" => { Fn=>"CommandInform",
             ClientFilter => "telnet",
-	    Hlp=>"{on|timer|raw|off},echo all events to this client" },
+	    Hlp=>"{on|off|raw|timer|status},echo all events to this client" },
   "iowrite" => { Fn=>"CommandIOWrite",
             Hlp=>"<iodev> <data>,write raw data with iodev" },
   "list"    => { Fn=>"CommandList",
@@ -2438,7 +2438,12 @@ CommandInform($$)
   my $name = $cl->{NAME};
 
   return "Usage: inform {on|timer|raw|off} [regexp]"
-        if($param !~ m/^(on|off|raw|timer)/);
+        if($param !~ m/^(on|off|raw|timer|status)/);
+
+  if($param eq "status") {
+    my $i = $inform{$name};
+    return $i ? ($i->{type} . ($i->{regexp} ? " ".$i->{regexp} : "")) : "off";
+  }
 
   delete($inform{$name});
   if($param !~ m/^off/) {
