@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7006 2015-01-13 20:15:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7007 2015-01-13 20:15:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -9,6 +9,7 @@ package main;
 use strict;
 use warnings;
 use POSIX;
+use Date::Parse;
 
 sub CALVIEW_Initialize($)
 {
@@ -27,16 +28,21 @@ sub CALVIEW_Define($$){
 	my @a = split( "[ \t][ \t]*", $def );
 	return "\"set CALVIEW\" needs at least an argument" if ( @a < 2 );
 	my $name 		= $a[0];   
-	my $calender	= $a[2];		
+	#my $calender	= $a[2];		
 	my $inter	= 43200; 
 	my $modes = $a[3];
-	return "invalid Calendername \"$calender\", define it first" if((devspec2array("NAME=$calender")) != 1 );
+	my @calendars = split( ",", $a[2] );
 	$hash->{NAME} 	= $name;
-	$hash->{KALENDER} 	= $calender;
+	my $calcounter = 1;
+	foreach my $calender (@calendars)
+	{
+		return "invalid Calendername \"$calender\", define it first" if((devspec2array("NAME=$calender")) != 1 );	
+	}
+	$hash->{KALENDER} 	= $a[2];
 	$hash->{STATE}	= "Initialized";
 	$hash->{INTERVAL} = $inter;
-	if($modes == 1)	{$hash->{MODES} = "modeStarted;modeUpcoming";	}
-	elsif($modes == 0){$hash->{MODES} = "modeStarted";}
+	if($modes == 1)	{$hash->{MODES} = "modeAlarm;modeStart;modeStarted;modeUpcoming";	}
+	elsif($modes == 0){$hash->{MODES} = "modeAlarm;modeStart;modeStarted";}
 	elsif($modes == 2){$hash->{MODES} = "all";	}
 	InternalTimer(gettimeofday()+2, "CALVIEW_GetUpdate", $hash, 0);
 	return undef;
@@ -62,7 +68,7 @@ sub CALVIEW_Set($@){
 }
 sub CALVIEW_GetUpdate($){	
 	my ($hash) = @_;
-	my $calendername = $hash->{KALENDER};
+	#my $calendername = $hash->{KALENDER};
 	my $name = $hash->{NAME};
 	#cleanup readings
 	delete ($hash->{READINGS});
@@ -84,30 +90,51 @@ sub CALVIEW_GetUpdate($){
 	my $date = "$mday.$mon.$year";
 	my $datenext = "$nextday.$mon.$year";
 	my @termineNew;
+	# foreach my $item (@termine ){
+		# my @tempstart=split(/\s+/,$item->[0]);
+		# my @tempend=split(/\s+/,$item->[2]);
+		# push @termineNew,{
+			# bdate => $tempstart[0],
+			# btime => $tempstart[1],
+			# summary => $item->[1],
+			# edate => $tempend[0],
+			# etime => $tempend[1]};}
 	foreach my $item (@termine ){
 		my @tempstart=split(/\s+/,$item->[0]);
 		my @tempend=split(/\s+/,$item->[2]);
+		my ($D,$M,$Y)=split(/\./,$tempstart[0]);
+		my @bts=str2time($M."/".$D."/".$Y." ".$tempstart[1]);
 		push @termineNew,{
 			bdate => $tempstart[0],
 			btime => $tempstart[1],
 			summary => $item->[1],
+			source => $item->[3],
+			location => $item->[4],
 			edate => $tempend[0],
-			etime => $tempend[1]};}
+			etime => $tempend[1],
+			btimestamp => $bts[0]};	}
 	#my $termin= \@termineNew;
 	my $todaycounter = 1;
 	my $tomorrowcounter = 1;
 	my $readingstyle = AttrVal($name,"oldStyledReadings",0);	
 	# sort the data in the array by bdate 
+	# my @sdata = map  $_->[0], 
+			# sort { $a->[1][2] <=> $b->[1][2] or  # year
+                   # $a->[1][1] <=> $b->[1][1] or  # month
+                   # $a->[1][0] <=> $b->[1][0] }   # day
+            # map  [$_, [split /\./, $_->{bdate}]], @termineNew;
+	# sort the array by btimestamp
 	my @sdata = map  $_->[0], 
-			sort { $a->[1][2] <=> $b->[1][2] or  # year
-                   $a->[1][1] <=> $b->[1][1] or  # month
-                   $a->[1][0] <=> $b->[1][0] }   # day
-            map  [$_, [split /\./, $_->{bdate}]], @termineNew;
+			sort { $a->[1][0] <=> $b->[1][0] }
+            map  [$_, [$_->{btimestamp}]], @termineNew;
+			
 	if($readingstyle == 0){		
 		for my $termin (@sdata){	#termin als reading term_[3steliger counter]
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_bdate", $termin->{bdate});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_btime", $termin->{btime});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_summary", $termin->{summary});
+			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_source", $termin->{source});
+			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_location", $termin->{location});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edate", $termin->{edate});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_etime", $termin->{etime});
 			last if ($counter++ == $max);
@@ -117,6 +144,8 @@ sub CALVIEW_GetUpdate($){
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime}); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
+				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_source", $termin->{source}); 
+				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edate", $termin->{edate}); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
 				$todaycounter ++;}
@@ -125,6 +154,8 @@ sub CALVIEW_GetUpdate($){
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_btime", "morgen"); 
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_btime", $termin->{btime}); 
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_summary", $termin->{summary}); 
+				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_source", $termin->{source});
+				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_location", $termin->{location});
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edate", $termin->{edate}); 
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_etime", $termin->{etime}); 
 				$tomorrowcounter++;}
@@ -159,17 +190,21 @@ sub getsummery($)
 	my ($hash) = @_;
 	my @terminliste ;
 	my $name = $hash->{NAME};
-	my $calendername  = $hash->{KALENDER};
+	# my $calendername  = $hash->{KALENDER};
+	my @calendernamen = split( ",", $hash->{KALENDER});
 	my $modi = $hash->{MODES};
 	my @modes = split(/;/,$modi);
-	foreach my $mode (@modes){
-		my $all = ReadingsVal($calendername, $mode, "");
-		my @uids=split(/;/,$all);
-		foreach my $uid (@uids){
-			my $terminstart = CallFn($calendername, "GetFn", $defs{$calendername},(" ","start", $uid));
-			my $termintext = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","summary", $uid));
-			my $terminend = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","end", $uid));
-			push(@terminliste, [$terminstart, $termintext, $terminend]);
+	foreach my $calendername (@calendernamen){
+		foreach my $mode (@modes){
+			my $all = ReadingsVal($calendername, $mode, "");
+			my @uids=split(/;/,$all);
+			foreach my $uid (@uids){
+				my $terminstart = CallFn($calendername, "GetFn", $defs{$calendername},(" ","start", $uid));
+				my $termintext = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","summary", $uid));
+				my $terminend = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","end", $uid));
+				my $terminort = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","location", $uid));
+				push(@terminliste, [$terminstart, $termintext, $terminend, $calendername, $terminort]);
+			};
 		};
 	};
 	return @terminliste;
@@ -180,9 +215,9 @@ sub getsummery($)
 
 <a name="CALVIEW"></a>
 <h3>CALVIEW</h3>
-<ul>This module creates a device with deadlines based on a calendar-device of the 57_Calendar.pm module.</ul>
+<ul>This module creates a device with deadlines based on calendar-devices of the 57_Calendar.pm module.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname&gt; &lt;0 for modeStarted Termine; 1 for modeStarted;modeUpcoming Termine&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeStarted Termine; 1 for modeStarted;modeUpcoming Termine&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar 1</code></ul><br>
 <a name="CALVIEW set"></a>
 <b>Set</b>
@@ -206,9 +241,9 @@ sub getsummery($)
 
 <a name="CALVIEW"></a>
 <h3>CALVIEW</h3>
-<ul>Dieses Modul erstellt ein Device welches als Readings Termine eines Kalenders, basierend auf dem 57_Calendar.pm Modul, besitzt.</ul>
+<ul>Dieses Modul erstellt ein Device welches als Readings Termine eines oder mehrere Kalender(s), basierend auf dem 57_Calendar.pm Modul, besitzt.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername&gt; &lt;0 für modeStarted Termine; 1 für modeStarted;modeUpcoming Termine&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeStarted Termine; 1 für modeStarted;modeUpcoming Termine&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender 1</code></ul><br>
 <a name="CALVIEW set"></a>
 <b>Set</b>
