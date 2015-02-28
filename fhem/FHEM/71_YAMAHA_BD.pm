@@ -54,6 +54,10 @@ YAMAHA_BD_Initialize($)
   $hash->{UndefFn}   = "YAMAHA_BD_Undefine";
   $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model ".
                       $readingFnAttributes;
+                      
+  $data{RC_layout}{YAMAHA_BluRay} = "YAMAHA_BD_RClayout";
+  $data{RC_makenotify}{YAMAHA_BD} = "YAMAHA_BD_RCmakenotify";
+
 }
 
 ###################################
@@ -143,7 +147,7 @@ YAMAHA_BD_Set($@)
     return "No Argument given" if(!defined($a[1]));  
    
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg statusRequest:noArg tray:open,close remoteControl:up,down,left,right,return,enter,OSDonScreen,OSDstatus,topMenu,popupMenu,red,green,blue,yellow,0,1,2,3,4,5,6,7,8,9,setup,home,clear,program,search,repeat,repeat-AB,subtitle,angle,audio,pictureInPicture,secondVideo,secondAudio fast:forward,reverse slow:forward,reverse skip:forward,reverse play:noArg pause:noArg stop:noArg trickPlay:normal,repeatChapter,repeatTitle,repeatFolder,repeat-AB,randomChapter,randomTitle,randomAll,shuffleChapter,shuffleTitle,shuffleAll,setApoint";
+    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg statusRequest:noArg tray:open,close remoteControl:eject,up,down,left,right,return,enter,OSDonScreen,OSDstatus,topMenu,popupMenu,red,green,blue,yellow,0,1,2,3,4,5,6,7,8,9,setup,home,clear,program,search,repeat,repeat-AB,subtitle,angle,audio,pictureInPicture,secondVideo,secondAudio,power fast:forward,reverse slow:forward,reverse skip:forward,reverse play:noArg pause:noArg stop:noArg trickPlay:normal,repeatChapter,repeatTitle,repeatFolder,repeat-AB,randomChapter,randomTitle,randomAll,shuffleChapter,shuffleTitle,shuffleAll,setApoint";
 
     if($what eq "on")
     {		
@@ -302,6 +306,14 @@ YAMAHA_BD_Set($@)
         elsif($a[2] eq "secondAudio")
         {
             YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Stream>2nd Audio</Stream></Play_Control></Main_Zone></YAMAHA_AV>","remoteControl","secondAudio");
+        }
+        elsif($a[2] eq "power")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7C80</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","repeat-AB");
+        }
+        elsif($a[2] eq "eject")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7C81</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","repeat-AB");
         }
         else
         {
@@ -769,6 +781,47 @@ YAMAHA_BD_ResetTimer($;$)
     }
 }
 
+#############################
+# define the layout for module 95_remotecontrol.pm
+sub YAMAHA_BD_RClayout() 
+{
+  my @row;
+
+  $row[0] = "remoteControl eject:EJECT,:blank,:blank,remoteControl power:POWEROFF3";
+  $row[1] = "remoteControl red:RED,remoteControl green:GREEN,remoteControl yellow:YELLOW,remoteControl blue:BLUE";
+  $row[2] = "remoteControl 1:1,remoteControl 2:2,remoteControl 3:3,remoteControl repeat-AB:REPEAT_AB";
+  $row[3] = "remoteControl 4:4,remoteControl 5:5,remoteControl 6:6,remoteControl subtitle:SUBTITLE";
+  $row[4] = "remoteControl 7:7,remoteControl 8:8,remoteControl 9:9,remoteControl angle:ANGLE";
+  $row[5] = "remoteControl clear:CLEAR,remoteControl 0:0,remoteControl search:SEARCH,remoteControl audio:AUDIO2";
+  $row[6] = ":blank,:blank,:blank,:blank";
+  $row[7] = "remoteControl pictureInPicture:PIP,:blank,:blank,:blank";
+  $row[8] = "remoteControl secondAudio:2ND_AUDIO,remoteControl home:HOMEtxt,remoteControl setup:SETUP,:blank";
+  $row[9] = ":blank,:blank,:blank,:blank";
+  $row[10] = "remoteControl topMenu:TOPMENU,remoteControl up:UP,remoteControl popupMenu:POPUP_MENU,:blank";
+  $row[11] = "remoteControl left:LEFT,remoteControl enter:ENTER3,remoteControl right:RIGHT,:blank";
+  $row[12] = "remoteControl return:RETURN,remoteControl down:DOWN,remoteControl OSDonScreen:ONSCREEN,:blank";
+  $row[13] = ":blank,:blank,:blank,:blank";
+  $row[14] = "stop:STOP,pause:PAUSE,play:PLAY,:blank";
+  $row[15] = "slow reverse:SLOW_REWIND,slow forward:SLOW_FORWARD,fast reverse:REWIND,fast forward:FF";
+  $row[16] = ":blank,remoteControl OSDstatus:STATUS,skip reverse:SKIP_REVERSE,skip forward:SKIP_FORWARD";
+
+
+  $row[17] = "attr rc_iconpath icons/remotecontrol";
+  $row[18] = "attr rc_iconprefix black_btn_";
+  return @row;
+}
+
+#####################################
+# Callback from 95_remotecontrol for command makenotify.
+sub YAMAHA_BD_RCmakenotify($$) 
+{
+  my ($name, $dev) = @_;
+  my $new_name="notify_$name";
+  
+  fhem("define $new_name notify $name set $dev ".'$EVENT',1);
+  Log3 undef, 2, "[remotecontrol:YAMAHA_BD] Notify created: $new_name";
+  return "Notify created by YAMAHA_BD: $new_name";
+}
 
 #############################
 # formats a 3 byte Hex Value into human readable time duration
