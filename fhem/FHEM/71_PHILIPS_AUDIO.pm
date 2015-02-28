@@ -37,6 +37,7 @@ use Time::HiRes qw(gettimeofday sleep);
 use Time::Piece;
 use POSIX qw{strftime};
 use HttpUtils;
+use IO::Socket::INET;
 
 ###################################
 sub PHILIPS_AUDIO_Initialize
@@ -48,6 +49,7 @@ sub PHILIPS_AUDIO_Initialize
   $hash->{SetFn}     = "PHILIPS_AUDIO_Set";
   $hash->{AttrFn}    = "PHILIPS_AUDIO_Attr";
   $hash->{UndefFn}   = "PHILIPS_AUDIO_Undefine";
+  $hash->{ReadFn}    = "PHILIPS_AUDIO_SocketRead";
 
   $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 ".$readingFnAttributes;
   
@@ -59,17 +61,73 @@ sub PHILIPS_AUDIO_GetStatus
 {
   my ($hash, $local) = @_;
   my $name = $hash->{NAME};
-  my $power;
-
+  
   $local = 0 unless(defined($local));
 
   return "" if((!defined($hash->{IP_ADDRESS})) or (!defined($hash->{helper}{OFF_INTERVAL})) or (!defined($hash->{helper}{ON_INTERVAL})));
 
-  my $device = $hash->{IP_ADDRESS};
-  
-  PHILIPS_AUDIO_SendCommand($hash, "/nowplay", "","nowplay", "noArg");
-  PHILIPS_AUDIO_ResetTimer($hash) unless($local == 1);
-  
+ if(!defined($hash->{MODEL}))
+  {
+    
+    if(!defined($hash->{helper}{UPNP_SSDP_RESPONSE}))
+    {
+      PHILIPS_AUDIO_GetDeviceDescription($hash);   
+      # Wait 5 seconds for UPNP renderers response
+      PHILIPS_AUDIO_ResetTimer($hash, 5);  
+      return;        
+    }
+    
+    if(!defined($hash->{UPNP_DEVICE_DESCRIPTION_URL}))
+    {
+      my $upnp_response = $hash->{helper}{UPNP_SSDP_RESPONSE};
+      my $ip_addr = $hash->{IP_ADDRESS};
+      
+      # Replace all \r\n by \n
+      $upnp_response =~ s/\r\n/\n/mg;
+
+      while($upnp_response =~ /Location: (.*)/ig)
+      {
+        my $url =  $1;
+
+        if($1 =~ /http:\/\/(.*):(\d.*?)(\/.*)/)
+        {
+          my $location_ip           = $1;
+          my $port                  = $2;
+          my $deviceDescriptionPath = $3;
+          
+          if($location_ip eq $ip_addr)
+          {
+            $hash->{UPNP_DEVICE_DESCRIPTION_URL} = $url;
+            Log3 $name, 5, "PHILIPS_AUDIO ($name) - Received model description URL: $url\r\n";
+            $hash->{UPNP_PORT} = $port;
+            $hash->{STATE} = "on";
+            # Empty receive buffer
+            $hash->{helper}{UPNP_SSDP_RESPONSE} = "";
+            # Close UDP in socket
+            close($hash->{CD});
+            delete($hash->{FD});
+            delete($hash->{CD});
+            delete($selectlist{$name});  
+            # Jump to the loop immidiately        
+            PHILIPS_AUDIO_ResetTimer($hash, 0);  
+            return;
+          }          
+        }
+      }
+    }
+    else
+    {
+      PHILIPS_AUDIO_GetModel($hash);
+      PHILIPS_AUDIO_ResetTimer($hash, 5);  
+      return;
+    }
+  }
+  else
+  {
+    PHILIPS_AUDIO_SendCommand($hash, "/nowplay", "","nowplay", "noArg");
+    PHILIPS_AUDIO_ResetTimer($hash) unless($local == 1);  
+    return;
+  }
   return;
 }
 
@@ -80,17 +138,10 @@ sub PHILIPS_AUDIO_Get
   my $what;
   my $return;
   
-  my $name = $hash->{NAME};
-  
+  my $name = $hash->{NAME};  
   my $address = $hash->{IP_ADDRESS};
-  $hash->{IP_ADDRESS} = $address;
-  
-  return "argument is missing" if(int(@a) != 2);
-  
-  if(not defined($hash->{MODEL}))
-  {
-    return "Please provide the model information as argument.";    
-  }  
+    
+  return "argument is missing" if(int(@a) != 2); 
   
   $what = $a[1];
   
@@ -123,12 +174,7 @@ sub PHILIPS_AUDIO_Set
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
-  my $port = $hash->{PORT};
-  
-  if(not defined($hash->{MODEL}))
-  {
-    return "Please provide the model information as argument.";
-  }
+  my $port = $hash->{PRESENTATION_PORT};
   
   return "No Argument given" if(!defined($a[1]));     
   
@@ -305,23 +351,18 @@ sub PHILIPS_AUDIO_Define
     
     if(! @a >= 4)
     {
-      my $msg = "Wrong syntax: define <name> PHILIPS_AUDIO <model> <ip-or-hostname> [<ON-statusinterval>] [<OFF-statusinterval>] ";
+      my $msg = "Wrong syntax: define <name> PHILIPS_AUDIO <ip-or-hostname> [<ON-statusinterval>] [<OFF-statusinterval>] ";
       Log3 $name, 2, $msg;
       return $msg;
     }
     
-    if(defined($a[2]))
-    {
-      $hash->{MODEL} = $a[2];
-    }
-    
-    $hash->{IP_ADDRESS} = $a[3];
-    $hash->{PORT}    = 8889;
+    $hash->{IP_ADDRESS} = $a[2];
+    $hash->{PRESENTATION_PORT}    = 8889;
     
     # if an update interval was given which is greater than zero, use it.
-    if(defined($a[4]) and $a[4] > 0)
+    if(defined($a[3]) and $a[3] > 0)
     {
-      $hash->{helper}{OFF_INTERVAL} = $a[4];
+      $hash->{helper}{OFF_INTERVAL} = $a[3];
       # Minimum interval 3 sec
       if($hash->{helper}{OFF_INTERVAL} < 3)
       {
@@ -333,9 +374,9 @@ sub PHILIPS_AUDIO_Define
       $hash->{helper}{OFF_INTERVAL} = 30;
     }
       
-    if(defined($a[5]) and $a[5] > 0)
+    if(defined($a[4]) and $a[4] > 0)
     {
-      $hash->{helper}{ON_INTERVAL} = $a[5];
+      $hash->{helper}{ON_INTERVAL} = $a[4];
       # Minimum interval 3 sec
       if($hash->{helper}{ON_INTERVAL} < 3)
       {
@@ -414,7 +455,7 @@ sub PHILIPS_AUDIO_SendCommand
   my ($hash,$url,$data,$cmd,$arg) = @_;
   my $name    = $hash->{NAME};
   my $address = $hash->{IP_ADDRESS};
-  my $port    = $hash->{PORT};
+  my $port    = $hash->{PRESENTATION_PORT};
 
   Log3 $name, 5, "PHILIPS_AUDIO ($name) - execute nonblocking \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\" on $name: $data";
     
@@ -663,17 +704,58 @@ sub PHILIPS_AUDIO_ParseResponse
           readingsBulkUpdate($hash, "playing", "no");
         }
       }
-      
-      # Eventual future UPNP implementation. Requests IO::Socket::Multicast non-standard module.      
       elsif ($cmd eq "getModel")
-      {
+      {        
+        # Get avail. services        
+        if($data =~ /<serviceList>(.+)<\/serviceList>/ims)
+        {
+          my $service = $1;
+          
+          while($service =~ /<service>(.+?)<\/service>/imsg)
+          {
+            my $serviceTypeLoop = $1;
+            my $serviceType;
+            
+            if($serviceTypeLoop =~ /<serviceType>(.+)<\/serviceType>/i)
+            {
+              if($1 eq "urn:schemas-upnp-org:service:RenderingControl:1")
+              {
+                $serviceType = "RenderingControl";
+              }
+              elsif($1 eq "urn:schemas-upnp-org:service:ConnectionManager:1")
+              {
+                $serviceType = "ConnectionManager";
+              }
+              elsif($1 eq "urn:schemas-upnp-org:service:AVTransport:1")
+              {
+                $serviceType = "AVTransport";
+              }
+            }
+            if($serviceTypeLoop =~ /<controlURL>(.+)<\/controlURL>/i)
+            {
+              $hash->{"UPNP_" . uc($serviceType) . "_URL"} = $1;
+            }            
+          }
+        }           
+        
         if($data =~ /<friendlyName>(.+)<\/friendlyName>/)
         {
           $hash->{FRIENDLY_NAME} = $1;
         }        
+        
+        if($data =~ /<manufacturer>(.+)<\/manufacturer>/)
+        {
+          $hash->{MANUFACTURER} = $1;
+        }
+        
+        if($data =~ /<manufacturerURL>(.+)<\/manufacturerURL>/)
+        {
+          $hash->{MANUFACTURER_URL} = $1;
+        } 
+        
         if($data =~ /<UDN>(.+)<\/UDN>/)
         {
-          $hash->{UNIQUE_DEVICE_NAME} = uc($1);
+          $hash->{UPNP_UNIQUE_DEVICE_NAME} = $1;
         }
         
         my $modelName   = "";
@@ -683,6 +765,12 @@ sub PHILIPS_AUDIO_ParseResponse
         {
           $modelName = $1;
         }       
+        
+        if($data =~ /<presentationURL>(.+)<\/presentationURL>/)
+        {
+          $hash->{PRESENTATION_URL} = $1;
+        }
+        
         if($data =~ /<modelNumber>(.+)<\/modelNumber>/)
         {
           $modelNumber = $1;
@@ -719,12 +807,11 @@ sub PHILIPS_AUDIO_ParseResponse
           
           while ($data =~ /<url>(.+?)<\/url>/g)
           {
-            $hash->{"NP_ICON_$i"} = "http://".$address.":".$arg."/".$1;            
+            $hash->{"MODEL_ICON_$i"} = "http://".$address.":".$arg."/".$1;            
             $i++;
           }
         }
-      }
-      
+      }      
       readingsEndUpdate($hash, 1);
     }
     return;
@@ -784,6 +871,152 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
   return $string;
 }
 
+#############################
+# Send UPNP Discovery UPD Multicast Message to the network
+# 239.255.255.250:1900
+#
+# M-SEARCH * HTTP/1.1
+# HOST: 239.255.255.250:1900
+# MAN: ssdp:discover
+# MX: 10
+# ST: ssdp:all
+#
+# UPNP Response includes the device description XML
+#
+# NP3900  : Port 49153 /nmrDescription.xml
+# NP3700  : Port 7123  /DeviceDescription.xml
+
+sub PHILIPS_AUDIO_GetDeviceDescription
+{
+  my ($hash) = @_;  
+  my $name = $hash->{NAME};
+  my ($socket_in_udp, $socket_out_udp);
+  
+  Log3 $name, 5, "PHILIPS_AUDIO ($name) - Opening UDP multicast socket for UPNP discovery...";
+  
+  $socket_out_udp = IO::Socket::INET->new(LocalPort => '1900', PeerAddr => '239.255.255.250', PeerPort => '1900', Proto => 'udp', Broadcast => '1', ReuseAddr => '1');
+    
+  if(!$socket_out_udp)
+  {
+    Log3 $name, 5, "PHILIPS_AUDIO ($name) - Opening UDP out socket unsuccessful...";
+    return; 
+  }
+  
+  # Check if incoming UDP socket exists
+  
+  if(!defined($hash->{CD}))
+  {  
+    Log3 $name, 5, "PHILIPS_AUDIO ($name) - Opening UDP incoming socket for UPNP discovery...";
+    
+    # Socket for UDP packet transmission. Port 1900 reserved for UPNP SSDP.    
+    $socket_in_udp  = IO::Socket::INET->new(LocalPort => '1900', Proto => 'udp', ReuseAddr => '1');
+    
+    if(!$socket_in_udp)
+    {
+      Log3 $name, 5, "PHILIPS_AUDIO ($name) - Opening UDP in socket unsuccessful...";
+      $socket_out_udp->close();
+      return; 
+    }
+    
+    $hash->{FD}        = $socket_in_udp->fileno();
+    $hash->{CD}        = $socket_in_udp;
+    $selectlist{$name} = $hash;
+  }
+  
+    # UPNP/DLNA spec: http://upnp.org/specs/arch/UPnP-arch-DeviceArchitecture-v1.1.pdf
+    # ssdp:all, upnp:rootdevice, uuid:xxxx-xxxx-xxxx, urn:schemas-upnp-org:device:MediaRenderer:1, 
+    
+  # Discover UPNP Digital Media Renderers
+  my $ssdp_header .= "M-SEARCH * HTTP/1.1\r\n";
+     $ssdp_header .= "HOST: 239.255.255.250:1900\r\n";
+     $ssdp_header .= "MAN: \"ssdp:discover\"\r\n";
+     $ssdp_header .= "MX: 2\r\n";
+     $ssdp_header .= "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n";
+     #$ssdp_header .= "ST: upnp:rootdevice\r\n";
+     $ssdp_header .= "\r\n"; # Acc. to UPNP protocol last empty line is mandatory.
+
+  Log3 $name, 5, "PHILIPS_AUDIO ($name) - Sending UPNP SSDP multicast message...\r\n".$ssdp_header;
+  
+  $socket_out_udp->send($ssdp_header);
+  $socket_out_udp->close();
+  
+  # The reply is processed by PHILIPS_AUDIO_SocketRead()    
+  return;  
+}
+
+#############################
+# ReadFn for UDP socket
+# 
+
+sub PHILIPS_AUDIO_SocketRead
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $buf;
+  
+  Log3 $name, 5, "PHILIPS_AUDIO ($name) - Incoming UDP packet.";
+  
+  if (!defined($hash->{helper}{UPNP_SSDP_RESPONSE}))
+  {
+    $hash->{helper}{UPNP_SSDP_RESPONSE} = "";
+  }
+  
+  Log3 $name, 5, "PHILIPS_AUDIO ($name) - UDP.";
+  
+  my $ret = sysread($hash->{CD}, $buf, 1024);
+  
+  # In case of a broken connection 
+  if(!defined($ret) || $ret <= 0)
+  {
+    Log3 $name, 5, "PHILIPS_AUDIO ($name) - UDP connection broken. Restarting device discovery.";  
+    PHILIPS_AUDIO_ResetTimer($hash);  
+    return;
+  }
+  
+  my $data = $hash->{helper}{UPNP_SSDP_RESPONSE};
+  
+  #Log3 $name, 5, "PHILIPS_AUDIO ($name) - Received UPNP SSDP response. \r\n".$buf; 
+  
+  # Filter out responses to own request.
+  if($buf =~ /^HTTP\/1.1 200 OK/)
+  {
+    $data .= $buf;
+    Log3 $name, 5, "PHILIPS_AUDIO ($name) - Received UPNP SSDP response. \r\n".$buf; 
+    $hash->{helper}{UPNP_SSDP_RESPONSE} = $data;
+  } 
+  # Evaluate the incoming info immy
+  PHILIPS_AUDIO_ResetTimer($hash, 0);  
+  return;
+} 
+
+#############################
+# Request Model Information
+# 
+
+sub PHILIPS_AUDIO_GetModel
+{
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $url    = $hash->{UPNP_DEVICE_DESCRIPTION_URL};
+      
+  Log3 $name, 5, "PHILIPS_AUDIO ($name) - execute nonblocking \"MediaRendererDesc\"";
+      
+  HttpUtils_NonblockingGet
+  ({
+    url        => $url,
+    timeout    => AttrVal($name, "request-timeout", 5),
+    noshutdown => 1,
+    data       => "",
+    loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
+    hash       => $hash,
+    cmd        => "getModel",
+    arg        => $hash->{UPNP_PORT},
+    callback   => \&PHILIPS_AUDIO_ParseResponse                        
+  });
+  return;
+}
+
 1;
 
 =pod
@@ -797,12 +1030,13 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
   <br><br>
   <ul>
     <code>
-      define &lt;name&gt; PHILIPS_AUDIO &lt;device model&gt; &lt;ip-address&gt; [&lt;status_interval&gt;]<br><br>
-      define &lt;name&gt; PHILIPS_AUDIO &lt;device model&gt; [&lt;off_status_interval&gt;] [&lt;on_status_interval&gt;]
+      define &lt;name&gt; PHILIPS_AUDIO &lt;ip-address&gt; [&lt;status_interval&gt;]<br><br>
+      define &lt;name&gt; PHILIPS_AUDIO [&lt;off_status_interval&gt;] [&lt;on_status_interval&gt;]
     </code>
     <br><br>
     This module controls a Philips Audio Player e.g. MCi, Streamium or Fidelio and (potentially) any other device including a navigation server.<br>
-    To check, open the following URL in the browser: http://[ip # of your device]:8889/index
+    To check, open the following URL in the browser: http://[ip # of your device]:8889/index<br>
+    The device will be discovered automatically according to the UPNP/DLNA protocol.
     <br><br>
     Currently implemented features:
     <br><br>
@@ -829,13 +1063,13 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
     <ul><br>
       Add the following code into the <b>fhem.cfg</b> configuration file and restart fhem:<br><br>
       <code>
-      define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15<br>
+      define PHAUDIO_player PHILIPS_AUDIO 192.168.0.15<br>
       attr PHAUDIO_player webCmd input:volume:mute:inetRadioPreset<br><br>
       # With custom status interval of 60 seconds<br>
-      define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15 <b>60</b><br>
+      define PHAUDIO_player PHILIPS_AUDIO 192.168.0.15 <b>60</b><br>
       attr PHAUDIO_player webCmd input:volume:mute:inetRadioPreset<br><br>
       # With custom "off"-interval of 60 seconds and "on"-interval of 10 seconds<br>
-      define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15 <b>60 10</b><br>
+      define PHAUDIO_player PHILIPS_AUDIO 192.168.0.15 <b>60 10</b><br>
       attr PHAUDIO_player webCmd input:volume:mute:inetRadioPreset<br><br>
       </code>
     </ul>   
@@ -871,7 +1105,7 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
     Add the following code into the <b>fhem.cfg</b> configuration file:<br><br><br>
     <ul>
       <code>
-        define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15 30 5<br>
+        define PHAUDIO_player PHILIPS_AUDIO 192.168.0.15 30 5<br>
         attr PHAUDIO_player webCmd volume:mute:inetRadioPreset
       </code>
     </ul><br><br>
@@ -952,12 +1186,13 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
   <b>Define</b><br><br>
   <ul>
     <code>
-      define &lt;name&gt; PHILIPS_AUDIO &lt;device model&gt; &lt;ip-address&gt; [&lt;status_interval&gt;]<br><br>
-      define &lt;name&gt; PHILIPS_AUDIO &lt;device model&gt; [&lt;off_status_interval&gt;] [&lt;on_status_interval&gt;]
+      define &lt;name&gt; PHILIPS_AUDIO &lt;ip-address&gt; [&lt;status_interval&gt;]<br><br>
+      define &lt;name&gt; PHILIPS_AUDIO [&lt;off_status_interval&gt;] [&lt;on_status_interval&gt;]
     </code>
     <br><br>
     Mit Hilfe dieses Moduls lassen sich Philips Audio Netzwerk Player wie z.B. MCi, Streamium oder Fidelio via Ethernet steuern.<br>
     Theoretisch sollten alle Ger&auml;te, die &uuml;ber einer implementierten HTTP Server am Port 8889 haben (http://[ip Nummer des Ger&auml;tes]:8889/index), bedient werden k&ouml;nnen.<br>
+    Das Ger&auml;t wird anhand des UPNP/DLNA Protokolls automatisch erkannt.
     <br>
     
     Die aktuelle Implementierung erm&ouml;glicht u.a. den folgenden Funktionsumfang:<br><br>
@@ -982,13 +1217,13 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
     <ul><br>
       Definition in der <b>fhem.cfg</b> Konfigurationsdatei:<br><br>
       <code>
-        define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15<br>
+        define PHAUDIO_player PHILIPS_AUDIO 192.168.0.15<br>
         attr PHAUDIO_player webCmd input:volume:mute:inetRadioPreset<br><br>
         # 60 Sekunden Intervall<br>
-        define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15 <b>60</b><br>
+        define PHAUDIO_player PHILIPS_AUDIO 192.168.0.15 <b>60</b><br>
         attr PHAUDIO_player webCmd input:volume:mute:inetRadioPreset<br><br>
         # 60 Sekunden Intervall f&uuml;r "off" und 10 Sekunden f&uuml;r "on"<br>
-        define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15 <b>60 10</b><br>
+        define PHAUDIO_player PHILIPS_AUDIO 192.168.0.15 <b>60 10</b><br>
         attr PHAUDIO_player webCmd input:volume:mute:inetRadioPreset
       </code>
     </ul>   
@@ -1022,7 +1257,7 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
       Beispieldefinition in der <b>fhem.cfg</b> Konfigurationsdatei:<br><br><br>
       <ul>
         <code>
-          define PHAUDIO_player PHILIPS_AUDIO NP3900 192.168.0.15 30 5<br>
+          define PHAUDIO_player PHILIPS_AUDIO 192.168.0.15 30 5<br>
           attr PHAUDIO_player webCmd input:volume:mute:inetRadioPreset
         </code>
       </ul><br><br>
