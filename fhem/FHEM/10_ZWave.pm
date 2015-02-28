@@ -146,7 +146,7 @@ my %zwave_class = (
     set   => { setpointHeating => "010101%02x",
                setpointCooling => "010201%02x"},
     get   => { setpoint => "02" },
-    parse => { "064303(..)(..)(....)" => 'sprintf("temperature:%0.1f %s %s", '.
+    parse => { "064303(..)(..)(....)" => 'sprintf("setpointTemp:%0.1f %s %s", '.
                  'hex($3)/(10**int(hex($2)/32)), '.
                  'hex($2)&8 ? "F":"C", $1==1 ? "heating":"cooling")' }, },
   THERMOSTAT_FAN_MODE      => { id => '44', },
@@ -729,10 +729,10 @@ ZWave_ccsSet($)
   return ("Unknown weekday $wds, use one of ".join(" ", @zwave_wd), "")
     if(!defined($ret));
   for(my $i=0; $i<@arg; $i+=2) {
-    return ($usage, "") if($arg[$i] !~ m/^(\d\d):(\d\d)$/);
+    return ($usage, "") if($arg[$i] !~ m/^(\d+):(\d\d)$/);
     $ret .= sprintf("%02x%02x", $1, $2);
     return ($usage, "") if($arg[$i+1] !~ m/^([-.\d]+)$/ || $1 < -12 || $1 > 12);
-    $ret .= sprintf("%02x", $1 < 0 ? (0x80 | (-$1*10)) : ($1*10));
+    $ret .= sprintf("%02x", $1 < 0 ? (255+$1*10) : ($1*10));
   }
   for(my $i=@arg; $i<18; $i+=2) {
     $ret .= "00007f";
@@ -774,7 +774,7 @@ ZWave_ccsParse($$)
       last if($3 eq "7f"); # unused
       $p = $4;
       my $t = hex($3);
-      $t = ($t == 0x7a ? "EnergySave" : $t >= 0x80 ? -$t/10 : $t/10);
+      $t = ($t == 0x7a ? "energySave" : $t >= 0x80 ? -(255-$t)/10 : $t/10);
       push @v, sprintf("%02d:%02d %0.1f", hex($1), hex($2), $t);
     }
     return "$n:".(@v ? join(" ",@v) : "N/A");
@@ -1780,7 +1780,7 @@ s2Hex($)
   <li>manual</li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
-  <li>temperature:$temp [C|F] [heating|cooling]</li>
+  <li>setpointTemp:$temp [C|F] [heating|cooling]</li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
   <li>ccsOverride:[no|temporary|permanent],
