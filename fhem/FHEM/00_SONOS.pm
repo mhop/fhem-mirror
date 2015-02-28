@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, January 2015
+# SONOS.pm (c) by Reiner Leins, February 2015
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -47,6 +47,10 @@
 # Changelog
 #
 # SVN-History:
+# 28.02.2015
+#	Der Speak-Befehl kann jetzt auch eingeschobene MP3-Datei-Verweise verarbeiten. Diese werden im Text mit "|" eingeschlossen, und mit Leerzeichen abgetrennt. z.B.: "Dies ist ein |/path/to/tada.mp3| Test.". Funktioniert nur bei "Speak" (und nicht bei eigenen Programmaufrufen wie "Speak1")
+#	Es gibt für die einfachere Handhabung der neuen Speakmöglichkeiten zwei neue Attribute "targetSpeakMP3FileDir" und "targetSpeakMP3FileConverter". Mit "targetSpeakMP3FileDir" kann ein Standardverzeichnis für die eingschobenen MP3-Dateien angegeben werden, und mit "targetSpeakMP3FileConverter" kann ein MP3-Konverter definiert werden, der am Ende die zusammengebaute Durchsage-MP3-Datei nochmal sauber durchkodiert (um z.B. Restzeitanzeigeprobleme zu beheben).
+#	Beim internen Entfernen der Player-Objekte (wenn z.B. die Subscription nicht erneuert werden konnte), werden nun alle Referenzen entfernt. Teilweise wurden Subscription-Referenzen noch aufbewahrt.
 # 19.02.2015
 #	Das Attribut "verbose" am Sonos-Device wird nun zur Laufzeit an den SubProzess übertragen und wirkt dort sofort.
 #	Beim initialen Erkennen der wichtigsten Abspielparameter während des Discover-Prozesses gab es einen Fehler, der das Setzen verhindert hat
@@ -344,6 +348,7 @@ use PerlIO::encoding;
 use Encode;
 use Digest::MD5 qw(md5_hex);
 use File::Temp;
+use File::Copy;
 
 use Data::Dumper;
 $Data::Dumper::Terse = 1;
@@ -421,7 +426,7 @@ my %SONOS_ProviderList = ('^http:(\/\/.*)' => 'Radio',
 						'^npsdy:' => 'Napster');
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
-my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime);
+my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime);
 my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected currentAlbum currentArtist currentTitle GroupVolume GroupMute);
 
 # Obsolete Einstellungen...
@@ -536,7 +541,7 @@ sub SONOS_Initialize ($) {
 	eval {
 		no strict;
 		no warnings;
-		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir characterDecoding '.$readingFnAttributes;
+		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir characterDecoding '.$readingFnAttributes;
 		use strict;
 		use warnings;
 	};
@@ -3546,10 +3551,6 @@ sub SONOS_Discover() {
 					$text =~ s/^ *(.*) *$/$1/g;
 					$text = SONOS_Utf8ToLatin1($text);
 					
-					# Text in die einzelnen Bestandteile zerlegen...
-					#my @text = split(/|/, $text);
-					#SONOS_Log $udn, 0, 'Textarray: '.Dumper(@text);
-					
 					my $digest = '';
 					if (SONOS_Client_Data_Retreive('undef', 'attr', 'targetSpeakFileHashCache', 0) == 1) {
 						eval {
@@ -3574,7 +3575,7 @@ sub SONOS_Discover() {
 					my $timestamp = '';
 					if (!$digest && SONOS_Client_Data_Retreive('undef', 'attr', 'targetSpeakFileTimestamp', 0) == 1) {
 						my @timearray = localtime;
-						$timestamp = sprintf("_%04d%02d%02d-%02d%02d%02d", $timearray[5]+1900,$timearray[4]+1,$timearray[3], $timearray[2],$timearray[1],$timearray[0]);
+						$timestamp = sprintf("_%04d%02d%02d-%02d%02d%02d", $timearray[5]+1900, $timearray[4]+1, $timearray[3], $timearray[2], $timearray[1], $timearray[0]);
 					}
 					
 					my $fileExtension = SONOS_GetSpeakFileExtension($workType);
@@ -3596,6 +3597,7 @@ sub SONOS_Discover() {
 								
 								require MP3::Tag;
 								my $mp3 = MP3::Tag->new($dest);
+								$mp3->config(write_v24 => 1);
 								
 								$mp3->title_set($text);
 								$mp3->artist_set('FHEM ~ Sonos');
@@ -3808,24 +3810,58 @@ sub SONOS_GetSpeakFileExtension($) {
 sub SONOS_GetSpeakFile($$$$$) {
 	my ($udn, $workType, $language, $text, $destFileName) = @_;
 	
-	if (lc($workType) eq 'speak0') {
-		# Chunks ermitteln...
-		# my @textList = ($text =~ m/(?:\b(?:[^ ]+)\W*){0,$SONOS_GOOGLETRANSLATOR_CHUNKSIZE}/g);
-		# pop @textList; # Letztes Element ist immer leer, deshalb abschneiden...
-		my @textList = ('');
-		for my $elem (split(/[ \t]/, $text)) {
-			if (length($textList[$#textList].' '.$elem) <= $SONOS_GOOGLETRANSLATOR_CHUNKSIZE) {
-				$textList[$#textList] .= ' '.$elem;
-			} else {
-				push(@textList, $elem);
-			}
+	my $targetSpeakMP3FileDir = SONOS_Client_Data_Retreive('undef', 'attr', 'targetSpeakMP3FileDir', '');
+	
+	# Chunks ermitteln...
+	# my @textList = ($text =~ m/(?:\b(?:[^ ]+)\W*){0,$SONOS_GOOGLETRANSLATOR_CHUNKSIZE}/g);
+	# pop @textList; # Letztes Element ist immer leer, deshalb abschneiden...
+	my @textList = ('');
+	for my $elem (split(/[ \t]/, $text)) {
+		# Files beibehalten...
+		if ($elem =~ m/\|(.*)\|/) {
+			my $filename = $1;
+			$filename = $targetSpeakMP3FileDir.'/'.$filename if ($filename !~ m/^(\/|[a-z]:)/i);
+			$filename = $filename.'.mp3' if ($filename !~ m/\.mp3$/i);
+			push(@textList, '|'.$filename.'|');
+			push(@textList, '');
+			next;
 		}
-		SONOS_Log $udn, 5, 'Chunks: '.SONOS_Stringify(\@textList);
 		
+		if (length($textList[$#textList].' '.$elem) <= $SONOS_GOOGLETRANSLATOR_CHUNKSIZE) {
+			$textList[$#textList] .= ' '.$elem;
+		} else {
+			push(@textList, $elem);
+		}
+	}
+	SONOS_Log $udn, 5, 'Chunks: '.SONOS_Stringify(\@textList);
+	
+	# Generating Speakfiles...
+	if (lc($workType) eq 'speak0') {
 		# Einzelne Chunks herunterladen...
 		my $counter = 0;
 		for my $text (@textList) {
+			# Leere Einträge überspringen...
+			next if ($text eq '');
+			
 			$counter++;
+			
+			# MP3Files direkt kopieren
+			if ($text =~ m/\|(.*)\|/) {
+				SONOS_Log $udn, 3, 'Copy MP3-File ('.$counter.'. Element) from "'.$1.'" to "'.$destFileName.$counter.'"';
+				
+				copy($1, $destFileName.$counter);
+				
+				# Etwaige ID-Tags entfernen...
+				eval {
+					use MP3::Info;
+					remove_mp3tag($destFileName.$counter, 'ALL');
+				};
+				if ($@) {
+					SONOS_Log $udn, 3, 'Copy MP3-File. ERROR during removing of ID3Tag: '.$@;
+				}
+				
+				next;
+			}
 			
 			my $url = 'http://translate.google.com/translate_tts?tl='.uri_escape(lc($language)).'&q='.uri_escape($text);
 		
@@ -3843,27 +3879,7 @@ sub SONOS_GetSpeakFile($$$$$) {
 		}
 		
 		# Heruntergeladene Chunks zusammenführen...
-		SONOS_Log $udn, 3, 'Combine loaded chunks into "'.$destFileName.'"';
-		
-		# Reinladen
-		my $newMP3File = '';
-		for(my $i = 1; $i <= $counter; $i++) {
-			$newMP3File .= SONOS_ReadFile($destFileName.$i);
-			unlink($destFileName.$i)
-		}
-		# Speichern
-		eval {
-			open MPFILE, '>'.$destFileName;
-			binmode MPFILE ;
-			print MPFILE $newMP3File;
-			close MPFILE;
-		};
-		if ($@) {
-			SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': MP3-Creation ERROR during combining: '.$@);
-			return 0;
-		}
-		
-		return 1;
+		return SONOS_CombineMP3Files($udn, $workType, $destFileName, $counter);
 	} elsif ($workType =~ m/speak\d+/i) {
 		$workType = ucfirst(lc($workType));
 		SONOS_Log $udn, 3, 'Load '.$workType.' generated SpeakFile to "'.$destFileName.'"';
@@ -3888,6 +3904,63 @@ sub SONOS_GetSpeakFile($$$$$) {
 	
 	SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Speaking not defined.');
 	return 0;
+}
+
+########################################################################################
+#
+#  SONOS_CombineMP3Files - Combine the loaded mp3-files
+#
+########################################################################################
+sub SONOS_CombineMP3Files($$$$) {
+	my ($udn, $workType, $destFileName, $counter) = @_;
+	
+	SONOS_Log $udn, 3, 'Combine loaded chunks into "'.$destFileName.'"';
+	
+	# Reinladen
+	my $newMP3File = '';
+	for(my $i = 1; $i <= $counter; $i++) {
+		$newMP3File .= SONOS_ReadFile($destFileName.$i);
+		unlink($destFileName.$i);
+	}
+	
+	# Speichern
+	eval {
+		open MPFILE, '>'.$destFileName;
+		binmode MPFILE ;
+		print MPFILE $newMP3File;
+		close MPFILE;
+	};
+	if ($@) {
+		SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': MP3-Creation ERROR during combining: '.$@);
+		return 0;
+	}
+	
+	# Konvertieren?
+	my $targetSpeakMP3FileConverter = SONOS_Client_Data_Retreive('undef', 'attr', 'targetSpeakMP3FileConverter', '');
+	if ($targetSpeakMP3FileConverter) {
+		SONOS_Log $udn, 3, 'Convert combined file "'.$destFileName.'" with "'.$targetSpeakMP3FileConverter.'"';
+		eval {
+			my $destFileNameTMP = $destFileName;
+			$destFileNameTMP =~ s/^(.*)\/(.*?)$/$1\/TMP_$2/;
+			
+			$targetSpeakMP3FileConverter =~ s/%infile%/$destFileName/gi;
+			$targetSpeakMP3FileConverter =~ s/%outfile%/$destFileNameTMP/gi;
+			
+			SONOS_Log $udn, 5, 'Execute: '.$targetSpeakMP3FileConverter;
+			system($targetSpeakMP3FileConverter);
+			
+			# "Alte" MP3-Datei entfernen, und die "neue" umbenennen...
+			unlink($destFileName);
+			move($destFileNameTMP, $destFileName);
+		};
+		if ($@) {
+			SONOS_Log $udn, 2, ucfirst($workType).': MP3-Creation ERROR during converting: '.$@;
+			SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': MP3-Creation ERROR during converting: '.$@);
+			return 0;
+		}
+	}
+	
+	return 1;
 }
 
 ########################################################################################
@@ -4048,7 +4121,7 @@ sub SONOS_RestoreOldPlaystate() {
 		# Ist das Ding fertig abgespielt?
 		my $result;
 		do {
-			select(undef, undef, undef, 0.5);
+			select(undef, undef, undef, 0.7);
 			$result = $AVProxy->GetTransportInfo(0);
 		} while ($result->getValue('CurrentTransportState') ne 'STOPPED');
 		
@@ -5244,7 +5317,7 @@ sub SONOS_IsAlive($) {
 sub SONOS_DeleteProxyObjects($) {
 	my ($udn) = @_;
 	
-	SONOS_Log $udn, 4, "DeleteProxyObjects for '$udn'";
+	SONOS_Log $udn, 4, "Delete ProxyObjects and SubscriptionObjects for '$udn'";
 	
 	delete $SONOS_AVTransportControlProxy{$udn};
 	delete $SONOS_RenderingControlProxy{$udn};
@@ -5257,14 +5330,17 @@ sub SONOS_DeleteProxyObjects($) {
 	delete $SONOS_ZoneGroupTopologyProxy{$udn};
 	
 	delete $SONOS_TransportSubscriptions{$udn};
-	
 	delete $SONOS_RenderingSubscriptions{$udn};
 	delete $SONOS_GroupRenderingSubscriptions{$udn};
+	delete $SONOS_AlarmSubscriptions{$udn}; 
+	delete $SONOS_ZoneGroupTopologySubscriptions{$udn};
+	delete $SONOS_DevicePropertiesSubscriptions{$udn};
+	delete $SONOS_AudioInSubscriptions{$udn};
 	
 	# Am Ende noch das Device entfernen...
 	delete $SONOS_UPnPDevice{$udn};
 	
-	SONOS_Log $udn, 4, "DeleteProxyObjects DONE for '$udn'";
+	SONOS_Log $udn, 4, "Delete of ProxyObjects and SubscriptionObjects DONE for '$udn'";
 }
 
 ########################################################################################
@@ -7735,6 +7811,10 @@ The order in the sublists are important, because the first entry defines the so-
 <li><b>Speak Configuration</b><ul>
 <li><a name="SONOS_attribut_targetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
 </a><br /> Defines, which Directory has to be used for the Speakfiles</li>
+<li><a name="SONOS_attribut_targetSpeakMP3FileConverter"><b><code>targetSpeakMP3FileConverter &lt;string&gt;</code></b>
+</a><br /> Defines an MP3-File converter, which properly converts the resulting speaking-file. With this option you can avoid timedisplay problems. Please note that the waittime before the speaking starts can increase with this option be set.</li>
+<li><a name="SONOS_attribut_targetSpeakMP3FileDir"><b><code>targetSpeakMP3FileDir &lt;string&gt;</code></b>
+</a><br /> The directory which should be used as a default for text-embedded MP3-Files.</li>
 <li><a name="SONOS_attribut_targetSpeakURL"><b><code>targetSpeakURL &lt;string&gt;</code></b>
 </a><br /> Defines, which URL has to be used for accessing former stored Speakfiles as seen from the SonosPlayer</li>
 <li><a name="SONOS_attribut_targetSpeakFileTimestamp"><b><code>targetSpeakFileTimestamp &lt;int&gt;</code></b>
@@ -7872,6 +7952,10 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 <li><b>Sprachoptionen</b><ul>
 <li><a name="SONOS_attribut_targetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
 </a><br /> Gibt an, welches Verzeichnis für die Ablage des MP3-Files der Textausgabe verwendet werden soll</li>
+<li><a name="SONOS_attribut_targetSpeakMP3FileConverter"><b><code>targetSpeakMP3FileConverter &lt;string&gt;</code></b>
+</a><br /> Hiermit kann ein MP3-Konverter angegeben werden, da am Ende der Verkettung der Speak-Ansage das resultierende MP3-File nochmal sauber durchkodiert. Damit können Restzeitanzeigeprobleme behoben werden. Dadurch vegrößert sich allerdings u.U. die Ansageverzögerung.</li>
+<li><a name="SONOS_attribut_targetSpeakMP3FileDir"><b><code>targetSpeakMP3FileDir &lt;string&gt;</code></b>
+</a><br /> Das Verzeichnis, welches als Standard für MP3-Fileangaben in Speak-Texten verwendet werden soll. Wird dieses Attribut definiert, können die Angaben bei Speak ohne Verzeichnis erfolgen.</li>
 <li><a name="SONOS_attribut_targetSpeakURL"><b><code>targetSpeakURL &lt;string&gt;</code></b>
 </a><br /> Gibt an, unter welcher Adresse der ZonePlayer das unter targetSpeakDir angegebene Verzeichnis erreichen kann.</li>
 <li><a name="SONOS_attribut_targetSpeakFileTimestamp"><b><code>targetSpeakFileTimestamp &lt;int&gt;</code></b>
