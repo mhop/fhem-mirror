@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 57_CALVIEW: added multiple CALENDAR support, reading source and location for terms
   - update : 73_km200 Update: New services found
   - feature: 89_HEATRONIC.pm: added power of heating pump
   - feature: 31_MilightDevice.pm: Support LightScene
