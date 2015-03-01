@@ -778,8 +778,8 @@ sub ENIGMA2_Define($$) {
     my $http_passwd = $a[6];
     $hash->{helper}{PASSWORD} = $http_passwd if $http_passwd;
 
-    # set default attributes
-    unless ( defined( AttrVal( $name, "http-method", undef ) ) ) {
+    # set default settings on first define
+    if ($init_done) {
 
         # use http-method POST for FritzBox environment as GET does not seem to
         # work properly. Might restrict use to newer
@@ -795,15 +795,9 @@ sub ENIGMA2_Define($$) {
         else {
             $attr{$name}{"http-method"} = 'GET';
         }
-    }
-    unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
         $attr{$name}{webCmd} = 'channel:input';
-    }
-    unless ( defined( AttrVal( $name, "devStateIcon", undef ) ) ) {
         $attr{$name}{devStateIcon} =
           'on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
-    }
-    unless ( defined( AttrVal( $name, "icon", undef ) ) ) {
         $attr{$name}{icon} = 'dreambox';
     }
 
