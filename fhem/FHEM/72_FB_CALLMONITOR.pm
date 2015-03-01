@@ -35,7 +35,6 @@ use Digest::MD5;
 use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
-use utf8;
 
 my %connection_type = (
     0 => "0",
