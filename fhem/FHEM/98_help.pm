@@ -117,10 +117,10 @@ sub CommandHelp {
 
     cref_search_cmd(undef);
 
-    my $str = "<html><pre>Possible commands:<br/><br/>" .
-		"Command        Parameter<br/>" .
-		"               Description<br/>" .
-	    "----------------------------------------------------------------------<br/>";
+    my $str = "Possible commands:\n\n" .
+		"Command        Parameter\n" .
+		"               Description\n" .
+	    "----------------------------------------------------------------------\n";
 
     for my $cmd (sort keys %cmds) {
       next if(!$cmds{$cmd}{Hlp});
@@ -133,10 +133,31 @@ sub CommandHelp {
       $a[1]  = "               $a[1]";
       $a[1] =~ s/</&lt;/g;
       $a[1] =~ s/>/&gt;/g;
-      $str .= sprintf("%-15s%-50s<br/>%s<br/>", $cmd, $a[0], $a[1]);
+      $str .= sprintf("%-15s%-50s\n%s\n", $cmd, $a[0], $a[1]);
     }
 
-    return "$str</pre></html>";
+    return $str;
+
+#     my $str = "<html><pre>Possible commands:<br/><br/>" .
+# 		"Command        Parameter<br/>" .
+# 		"               Description<br/>" .
+# 	    "----------------------------------------------------------------------<br/>";
+# 
+#     for my $cmd (sort keys %cmds) {
+#       next if(!$cmds{$cmd}{Hlp});
+#       next if($cl && $cmds{$cmd}{ClientFilter} &&
+#            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
+#       my @a = split(",", $cmds{$cmd}{Hlp}, 2);
+#       $a[0] =~ s/</&lt;/g;
+#       $a[0] =~ s/>/&gt;/g;
+#       $a[1] //= "";
+#       $a[1]  = "               $a[1]";
+#       $a[1] =~ s/</&lt;/g;
+#       $a[1] =~ s/>/&gt;/g;
+#       $str .= sprintf("%-15s%-50s<br/>%s<br/>", $cmd, $a[0], $a[1]);
+#     }
+# 
+#     return "$str</pre></html>";
 
   }
 }
