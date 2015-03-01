@@ -1297,14 +1297,11 @@ sub PHTV_Define($$) {
     $hash->{swversion} = $hash->{READINGS}{softwareversion}{VAL}
       if ( defined( $hash->{READINGS}{softwareversion}{VAL} ) );
 
-    unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
+    # set default settings on first define
+    if ($init_done) {
         $attr{$name}{webCmd} = 'volume:input:rgb';
-    }
-    unless ( defined( AttrVal( $name, "devStateIcon", undef ) ) ) {
         $attr{$name}{devStateIcon} =
           'on:rc_GREEN:off off:rc_YELLOW:on absent:rc_STOP:on';
-    }
-    unless ( defined( AttrVal( $name, "icon", undef ) ) ) {
         $attr{$name}{icon} = 'it_television';
     }
 
