@@ -1157,11 +1157,12 @@ sub btIP_evalLayout {
 	      ($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link)= split("[ \t]+", $def, 10);
 	      ($x1,$y1)= btIP_xy($x1,$y1,%params);
 	      ($x2,$y2)= btIP_xy($x2,$y2,%params);
-              ($rx,$ry) = btIP_xy($rx,$ry,%params);
+          ($rx,$ry) = btIP_xy($rx,$ry,%params);
           $params{xx} = $x1;
           $params{yy} = $y2;
 	      $filled  //= 0; # set 0 as default (not filled)
           $stroked //= 0; # set 0 as default (not stroked)
+          $link //= "";
           $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemRect($id,$x1,$y1,$x2,$y2,$rx,$ry,$filled,$stroked,$link,undef,%params);
 	    }
