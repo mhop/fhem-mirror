@@ -253,7 +253,7 @@ sub ENIGMA2_Set($@) {
 
     # statusRequest
     if ( lc($a[1]) eq "statusrequest" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $state ne "absent" ) {
             Log3 $name, 4,
@@ -267,7 +267,7 @@ sub ENIGMA2_Set($@) {
 
     # toggle
     elsif ( lc($a[1]) eq "toggle" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "on" ) {
             return ENIGMA2_Set( $hash, $name, "on" );
@@ -280,7 +280,7 @@ sub ENIGMA2_Set($@) {
 
     # shutdown
     elsif ( lc($a[1]) eq "shutdown" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         return "Recordings running"
           if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
@@ -297,7 +297,7 @@ sub ENIGMA2_Set($@) {
 
     # reboot
     elsif ( lc($a[1]) eq "reboot" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         return "Recordings running"
           if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
@@ -314,7 +314,7 @@ sub ENIGMA2_Set($@) {
 
     # restartGui
     elsif ( lc( $a[1] ) eq "restartgui" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         return "Recordings running"
           if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
@@ -332,7 +332,7 @@ sub ENIGMA2_Set($@) {
     # on
     elsif ( lc($a[1]) eq "on" ) {
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
-            Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " (wakeup)";
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " (wakeup)";
 
             if (
                 (
@@ -351,7 +351,7 @@ sub ENIGMA2_Set($@) {
             }
         }
         else {
-            Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
             $cmd = "newstate=4";
             $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "on" );
@@ -360,7 +360,7 @@ sub ENIGMA2_Set($@) {
 
     # off
     elsif ( lc($a[1]) eq "off" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             $cmd = "newstate=5";
@@ -373,7 +373,7 @@ sub ENIGMA2_Set($@) {
 
     # volume
     elsif ( lc($a[1]) eq "volume" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -395,7 +395,7 @@ sub ENIGMA2_Set($@) {
 
     # volumeUp/volumeDown
     elsif ( lc($a[1]) =~ /^(volumeup|volumedown)$/ ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( lc($a[1]) eq "volumeup" ) {
@@ -414,10 +414,10 @@ sub ENIGMA2_Set($@) {
     # mute
     elsif ( lc($a[1]) eq "mute" || lc($a[1]) eq "mutet" ) {
         if ( defined( $a[2] ) ) {
-            Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
         }
         else {
-            Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
         }
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
@@ -447,7 +447,7 @@ sub ENIGMA2_Set($@) {
 
     # msg
     elsif ( lc($a[1]) eq "msg" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             return
@@ -506,9 +506,9 @@ sub ENIGMA2_Set($@) {
 
     # remoteControl
     elsif ( lc( $a[1] ) eq "remotecontrol" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2]
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2]
           if !defined( $a[3] );
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2] . " " . $a[3]
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2] . " " . $a[3]
           if defined( $a[3] );
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
@@ -578,7 +578,7 @@ sub ENIGMA2_Set($@) {
             ENIGMA2_Set( $hash, $name, "on" );
         }
 
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         return
 "No argument given, choose one of channel channelNumber servicereference "
@@ -618,7 +618,7 @@ sub ENIGMA2_Set($@) {
 
     # channelUp/channelDown
     elsif ( lc($a[1]) =~ /^(channelup|channeldown)$/ ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( lc($a[1]) eq "channelup" ) {
@@ -647,7 +647,7 @@ sub ENIGMA2_Set($@) {
         return "No argument given, choose one of tv radio "
           if ( !defined( $a[2] ) );
 
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( lc($a[2]) eq "tv" ) {
@@ -673,7 +673,7 @@ sub ENIGMA2_Set($@) {
 
     # play / pause
     elsif ( lc($a[1]) =~ /^(play|pause)$/ ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("PLAYPAUSE");
@@ -686,7 +686,7 @@ sub ENIGMA2_Set($@) {
 
     # stop
     elsif ( lc($a[1]) eq "stop" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("STOP");
@@ -699,7 +699,7 @@ sub ENIGMA2_Set($@) {
 
     # record
     elsif ( lc($a[1]) eq "record" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $result = ENIGMA2_SendCommand( $hash, "recordnow" );
@@ -711,7 +711,7 @@ sub ENIGMA2_Set($@) {
 
     # showText
     elsif ( lc($a[1]) eq "showtext" ) {
-        Log3 $name, 2, "ENIGMA2 set $name " . $a[1];
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             return "No argument given, choose one of messagetext "
@@ -1036,7 +1036,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     NormaliseSpace => 2,
                     KeepRoot       => 0,
                     ForceArray     => 0,
-                    SuppressEmpty  => 1
+                    SuppressEmpty  => 1,
+                    KeyAttr        => {}
                 );
                 $return = $parser->XMLin( Encode::encode_utf8($data) );
             }
