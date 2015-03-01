@@ -265,6 +265,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "?"       => { ReplacedBy => "help" },
   "attr"    => { Fn=>"CommandAttr",
            Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>"},
+  "createlog"=> { ModuleName => "autocreate" },
   "define"  => { Fn=>"CommandDefine",
 	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
   "deleteattr" => { Fn=>"CommandDeleteAttr",
@@ -323,6 +324,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
             Hlp => "[<fileName>|all|check|force] ".
                                       "[http://.../controlfile],update FHEM" },
   "updatefhem" => { ReplacedBy => "update" },
+  "usb"     => { ModuleName => "autocreate" },
   "version" => { Fn => "CommandVersion",
             Hlp=>"[filter],print SVN version of loaded modules" },
 );
@@ -968,11 +970,16 @@ AnalyzeCommand($$;$)
 
   #############
   # autoload commands.
+  my $lcfn = lc($fn);
+  $fn = $lcfn if(defined($cmds{$lcfn}));
   if(!defined($cmds{$fn}) || !defined($cmds{$fn}{Fn})) {
-    map { $fn = $_ if(lc($fn) eq lc($_)); } keys %modules;
-    $fn = LoadModule($fn);
-    $fn = lc($fn) if(defined($cmds{lc($fn)}));
-    return "Unknown command $fn, try help." if(!defined($cmds{$fn}));
+    my $modName;
+    map { $modName = $_ if($lcfn eq lc($_)); } keys %modules;
+    $modName = $cmds{$lcfn}{ModuleName}
+                        if($cmds{$lcfn} && $cmds{$lcfn}{ModuleName});
+    LoadModule($modName) if($modName);
+    $fn = $lcfn if($cmds{$lcfn});
+    return "Unknown command $fn, try help." if(!$cmds{$fn} || !$cmds{$fn}{Fn});
   }
 
   if($cl && $cmds{$fn}{ClientFilter} &&
@@ -1539,7 +1546,9 @@ CommandDefine($$)
   my ($cl, $def) = @_;
   my @a = split("[ \t][ \t]*", $def, 3);
   my $ignoreErr;
-  if($a[0] eq "-ignoreErr") {   # RSS in fhem.cfg.demo, with no GD installed
+
+  # used by RSS in fhem.cfg.demo, with no GD installed
+  if($a[0] && $a[0] eq "-ignoreErr") {
     $def =~ s/\s*-ignoreErr\s*//;
     @a = split("[ \t][ \t]*", $def, 3);
     $ignoreErr = 1;
