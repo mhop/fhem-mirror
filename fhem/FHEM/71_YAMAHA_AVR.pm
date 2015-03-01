@@ -790,18 +790,16 @@ YAMAHA_AVR_Undefine($$)
 sub
 YAMAHA_AVR_SendCommand($@)
 {
-    my ($hash, $data,$cmd,$arg,$blocking) = @_;
+    my ($hash, $data,$cmd,$arg,$can_fail) = @_;
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
-
-    if(not defined($blocking) and $cmd ne "statusRequest" and $hash->{helper}{AVAILABLE} == 1)
+    my $blocking = 0;
+    
+    if($cmd ne "statusRequest" and $hash->{helper}{AVAILABLE} == 1)
     {
         $blocking = 1;
     }
-    else
-    {
-        $blocking = 0;
-    }
+
      
     # In case any URL changes must be made, this part is separated in this function".
     
@@ -816,7 +814,8 @@ YAMAHA_AVR_SendCommand($@)
                                     loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
                                     hash       => $hash,
                                     cmd        => $cmd,
-                                    arg        => $arg
+                                    arg        => $arg,
+                                    can_fail   => $can_fail
                                 };
                                 
         my ($err, $data) = HttpUtils_BlockingGet($param);
@@ -835,6 +834,7 @@ YAMAHA_AVR_SendCommand($@)
                                     hash       => $hash,
                                     cmd        => $cmd,
                                     arg        => $arg,
+                                    can_fail   => $can_fail,
                                     callback   => \&YAMAHA_AVR_ParseResponse
                                 }
         ); 
@@ -852,6 +852,7 @@ YAMAHA_AVR_ParseResponse ($$$)
     my $name = $hash->{NAME};
     my $cmd = $param->{cmd};
     my $arg = $param->{arg};
+    my $can_fail = $param->{can_fail};
     
     if(exists($param->{code}))
     {
@@ -863,7 +864,7 @@ YAMAHA_AVR_ParseResponse ($$$)
         }
     }
     
-    if($err ne "")
+    if($err ne "" and not $can_fail)
     {
         Log3 $name, 5, "YAMAHA_AVR ($name) - could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $err";
 
@@ -888,10 +889,10 @@ YAMAHA_AVR_ParseResponse ($$$)
         
         $hash->{helper}{AVAILABLE} = 1;
         
-        if(not $data =~ /RC="0"/)
+        if(not $data =~ / RC="0"/ and $data =~ / RC="(\d+)"/)
 		{
 			# if the returncode isn't 0, than the command was not successful
-			Log3 $name, 3, "YAMAHA_AVR ($name) - Could not execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
+			Log3 $name, 3, "YAMAHA_AVR ($name) - Could not execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": received return code $1";
 		}
         
         readingsBeginUpdate($hash);
@@ -1031,9 +1032,9 @@ YAMAHA_AVR_ParseResponse ($$$)
                     {
                         Log3 $name, 4, "YAMAHA_AVR ($name) - check for extended input informations on <$1>";
                     
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo");
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat");
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle");
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo", 1);
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat", 1);
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle", 1);
                     }
                     else
                     {
@@ -1420,7 +1421,7 @@ sub YAMAHA_AVR_getInputs($)
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>", "statusRequest","getInputs");
 
     # query all available scenes (only in mainzone available)
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes") if($hash->{ACTIVE_ZONE} eq "mainzone");
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes", 1) if($hash->{ACTIVE_ZONE} eq "mainzone");
 }
 
 #############################
