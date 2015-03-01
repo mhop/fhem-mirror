@@ -485,6 +485,8 @@ harmony_Set($$@)
     return undef;
 
   } elsif( $cmd eq "reconnect" ) {
+    delete $hash->{helper}{UserAuthToken} if( $param eq "all" );
+    delete $hash->{identity} if( $param eq "all" );
     harmony_connect($hash);
 
     return undef;
@@ -857,21 +859,25 @@ harmony_Read($)
       if( $line eq "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>" ) {
         $hash->{ConnectionState} = "LoggedIn";
 
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.ping?get' token=''></oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.harmony/vnd.logitech.harmony.system?systeminfo' token=''></oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.deviceinfo?get' token=''></oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.setup/vnd.logitech.account?getProvisionInfo' token=''></oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.statedigest?get' token=''>format=json</oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?check' token=''>format=json</oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?status' token=''>format=json</oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?update' token=''>format=json</oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='proxy.resource?get' token=''>hetag= :uri=dynamite:://HomeAutomationService/Config/:encode=true</oa>");
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation?getstate' token=''></oa>");
+        if( $hash->{helper}{UserAuthToken} ) {
+          harmony_getSessionToken($hash);
+        } else {
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.ping?get' token=''></oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.harmony/vnd.logitech.harmony.system?systeminfo' token=''></oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.deviceinfo?get' token=''></oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.setup/vnd.logitech.account?getProvisionInfo' token=''></oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.statedigest?get' token=''>format=json</oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?check' token=''>format=json</oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?status' token=''>format=json</oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logtech.setup/vnd.logitech.firmware?update' token=''>format=json</oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='proxy.resource?get' token=''>hetag= :uri=dynamite:://HomeAutomationService/Config/:encode=true</oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='harmony.automation?getstate' token=''></oa>");
 
-        #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.pair'>name=1vm7ATw/tN6HXGpQcCs/A5MkuvI#iOS6.0.1#iPhone</oa>");
+          #harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.pair'>name=1vm7ATw/tN6HXGpQcCs/A5MkuvI#iOS6.0.1#iPhone</oa>");
 
-        harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
-        #harmony_sendEngineGet($hash, "config");
+          harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
+          #harmony_sendEngineGet($hash, "config");
+        }
 
         RemoveInternalTimer($hash);
         InternalTimer(gettimeofday()+50, "harmony_ping", $hash, 0);
@@ -967,14 +973,14 @@ harmony_Read($)
             Log3 $name, 2, "$name: error ($1): $2";
 
           } elsif( $content =~ m/vnd.logitech.pair/ ) {
-#Log 3, Dumper $decoded;
 
             if( !$hash->{identity} && $decoded->{identity} ) {
               $hash->{identity} = $decoded->{identity};
               harmony_connect($hash);
 
             } else {
-              harmony_sendEngineGet($hash, "config");
+              harmony_sendIq($hash, "<oa xmlns='connect.logitech.com' mime='connect.discoveryinfo?get'>format=json</oa>");
+              #harmony_sendEngineGet($hash, "config");
 
             }
 
@@ -1097,7 +1103,7 @@ Log 3, Dumper decode_json($decoded->{resource}) if( !$json && $decoded->{resourc
     } elsif( $line =~ m/^<\?xml.*PLAIN.*>/ ) {
 
       my $identity = $hash->{identity}?$hash->{identity}:"guest";
-      my $auth = encode_base64("\0$identity\0$identity",'');
+      my $auth = encode_base64("\0$identity\@connect.logitech.com\0gatorade.",'');
       harmony_send($hash, "<auth xmlns='urn:ietf:params:xml:ns:xmpp-sasl' mechanism='PLAIN'>$auth</auth>");
 
       $data = "";
@@ -1106,7 +1112,7 @@ Log 3, Dumper decode_json($decoded->{resource}) if( !$json && $decoded->{resourc
       Log3 $name, 4, "$name: unknown: $line";
 
     } elsif( $line ) {
-      Log3 $name, 5, "$name: $line";
+      #Log3 $name, 5, "$name: $line";
 
     }
   }
@@ -1172,9 +1178,21 @@ harmony_connect($)
     } else {
       harmony_disconnect( $hash );
 
-      InternalTimer(gettimeofday()+2, "harmony_connect", $hash, 0);
+      InternalTimer(gettimeofday()+10, "harmony_connect", $hash, 0);
     }
   }
+}
+
+sub
+harmony_getSessionToken($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $unique_id = '1vm7ATw/tN6HXGpQcCs/A5MkuvI';
+  my $device = 'iOS6.0.1#iPhone';
+
+  harmony_sendPair($hash, "token=$hash->{helper}{UserAuthToken}:name=$unique_id#$device");
 }
 
 sub
@@ -1198,9 +1216,20 @@ harmony_sendIq($$;$)
 
   ++$id;
 
-  my $iq = "<iq type='$type' id='$id'>$xml</iq>";
+  my $iq = "<iq type='$type' id='$id' from='guest'>$xml</iq>";
+  $iq = "<iq type='$type' id='$id'>$xml</iq>";
 
   harmony_send($hash,$iq);
+}
+sub
+harmony_sendPair($$)
+{
+  my ($hash, $payload) = @_;
+  $payload = '' if ( !$payload );
+
+  my $xml = "<oa xmlns='connect.logitech.com' mime='vnd.logitech.connect/vnd.logitech.pair'>$payload</oa>";
+
+  harmony_sendIq($hash,$xml);
 }
 sub
 harmony_sendEngineGet($$;$)
@@ -1240,7 +1269,8 @@ harmony_sendEngineRender($$$)
 {
   my ($hash, $endpoint, $payload) = @_;
 
-  my $xml = "<oa xmlns='connect.logitech.com' mime='vnd.logitech.harmony/vnd.logitech.harmony.engine?$endpoint' token=''>$payload</oa>";
+  #my $xml = "<oa xmlns='connect.logitech.com' mime='vnd.logitech.harmony/vnd.logitech.harmony.engine?$endpoint' token=''>$payload</oa>";
+  my $xml = "<oa xmlns='connect.logitech.com' mime='vnd.logitech.harmony/vnd.logitech.harmony.engine?$endpoint'>$payload</oa>";
 
   harmony_sendIq($hash,$xml, "render");
 }
@@ -1282,10 +1312,6 @@ harmony_dispatch($$$)
       $json = decode_json($data);
     } else {
       $json = JSON->new->utf8(0)->decode($data);
-    }
-
-    if( $json->{error} ) {
-      #$hash->{lastError} = $json->{error}{message};
     }
 
     if( $param->{type} eq 'token' ) {
@@ -1349,19 +1375,28 @@ sub
 harmony_parseToken($$)
 {
   my($hash, $json) = @_;
+  my $name = $hash->{NAME};
 
   RemoveInternalTimer($hash);
 
+  my $error = $json->{ErrorCode};
+Log 1, $error;
+  if( $error && $error != 200 ) {
+    Log3 $name, 2, "$name: error ($error): $json->{Message}";
+    $hash->{lastError} = $json->{Message};
+  }
+
   my $had_token = $hash->{helper}{UserAuthToken};
 
-  #$hash->{helper}{AccountId} = $json->{GetUserAuthTokenResult}->{AccountId};
+  $hash->{helper}{AccountId} = $json->{GetUserAuthTokenResult}->{AccountId};
   $hash->{helper}{UserAuthToken} = $json->{GetUserAuthTokenResult}->{UserAuthToken};
 
-  if( $json->{GetUserAuthTokenResult} ) {
+  if( $hash->{helper}{UserAuthToken} ) {
     $hash->{ConnectionState} = "GotToken";
 
   } else {
-    $hash->{ConnectionState} = "Error" if( !$hash->{helper}{UserAuthToken} );
+    $hash->{STATE} = "Error";
+    $hash->{ConnectionState} = "Error";
 
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+60, "harmony_connect", $hash, 0);
@@ -1646,7 +1681,10 @@ harmony_Attr($$$)
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
-    <li>currently username and password are not used and should be omitted.</li>
+    <li>For hubs with firmware version 3.x.y &lt;username&gt; and &lt;password&gt; are not required as no authentication
+    with the logitech myharmony server is needed for the full functionality of this module.</li>
+    <li>For hubs with firmware version 4.x.y &lt;username&gt; and &lt;password&gt; are required for device level control.
+    Activit level control is (currently) still possible without authentication.</li>
     <li>activity and device names can be given as id or name. names can be given as a regex and spaces in names musst be replaced by a single '.' (dot).</li>
   </ul><br>
 
@@ -1702,8 +1740,8 @@ harmony_Attr($$$)
       request the current activity from the hub</li>
     <li>off<br>
       switch current activity off</li>
-    <li>reconnect<br>
-      close connection to the hub and reconnect</li>
+    <li>reconnect [all]<br>
+      close connection to the hub and reconnect, if <code>all</code> is given also reconnect to the logitech server</li>
     <li>sleeptimer [&lt;timeout&gt;]<br>
       &lt;timeout&gt; -> timeout in minutes<br>
       -1 -> timer off<br>
