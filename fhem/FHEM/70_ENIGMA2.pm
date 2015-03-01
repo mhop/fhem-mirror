@@ -252,7 +252,7 @@ sub ENIGMA2_Set($@) {
     my $result;
 
     # statusRequest
-    if ( lc($a[1]) eq "statusrequest" ) {
+    if ( lc( $a[1] ) eq "statusrequest" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $state ne "absent" ) {
@@ -266,7 +266,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # toggle
-    elsif ( lc($a[1]) eq "toggle" ) {
+    elsif ( lc( $a[1] ) eq "toggle" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "on" ) {
@@ -279,7 +279,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # shutdown
-    elsif ( lc($a[1]) eq "shutdown" ) {
+    elsif ( lc( $a[1] ) eq "shutdown" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         return "Recordings running"
@@ -296,7 +296,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # reboot
-    elsif ( lc($a[1]) eq "reboot" ) {
+    elsif ( lc( $a[1] ) eq "reboot" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         return "Recordings running"
@@ -330,7 +330,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # on
-    elsif ( lc($a[1]) eq "on" ) {
+    elsif ( lc( $a[1] ) eq "on" ) {
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " (wakeup)";
 
@@ -359,7 +359,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # off
-    elsif ( lc($a[1]) eq "off" ) {
+    elsif ( lc( $a[1] ) eq "off" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
@@ -372,7 +372,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # volume
-    elsif ( lc($a[1]) eq "volume" ) {
+    elsif ( lc( $a[1] ) eq "volume" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
@@ -394,11 +394,11 @@ sub ENIGMA2_Set($@) {
     }
 
     # volumeUp/volumeDown
-    elsif ( lc($a[1]) =~ /^(volumeup|volumedown)$/ ) {
+    elsif ( lc( $a[1] ) =~ /^(volumeup|volumedown)$/ ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( lc($a[1]) eq "volumeup" ) {
+            if ( lc( $a[1] ) eq "volumeup" ) {
                 $cmd = "set=up";
             }
             else {
@@ -412,7 +412,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # mute
-    elsif ( lc($a[1]) eq "mute" || lc($a[1]) eq "mutet" ) {
+    elsif ( lc( $a[1] ) eq "mute" || lc( $a[1] ) eq "mutet" ) {
         if ( defined( $a[2] ) ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
         }
@@ -424,12 +424,12 @@ sub ENIGMA2_Set($@) {
             if ( !defined( $a[2] ) || $a[2] eq "toggle" ) {
                 $cmd = "set=mute";
             }
-            elsif ( lc($a[2]) eq "off" ) {
+            elsif ( lc( $a[2] ) eq "off" ) {
                 if ( $hash->{READINGS}{mute}{VAL} ne "off" ) {
                     $cmd = "set=mute";
                 }
             }
-            elsif ( lc($a[2]) eq "on" ) {
+            elsif ( lc( $a[2] ) eq "on" ) {
                 if ( $hash->{READINGS}{mute}{VAL} ne "on" ) {
                     $cmd = "set=mute";
                 }
@@ -446,7 +446,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # msg
-    elsif ( lc($a[1]) eq "msg" ) {
+    elsif ( lc( $a[1] ) eq "msg" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
@@ -479,16 +479,16 @@ sub ENIGMA2_Set($@) {
                     $i++;
                 }
             }
-            if ( lc($a[2]) eq "yesno" ) {
+            if ( lc( $a[2] ) eq "yesno" ) {
                 $cmd = "type=0&timeout=" . $a[3] . "&text=" . urlEncode($text);
             }
-            elsif ( lc($a[2]) eq "info" ) {
+            elsif ( lc( $a[2] ) eq "info" ) {
                 $cmd = "type=1&timeout=" . $a[3] . "&text=" . urlEncode($text);
             }
-            elsif ( lc($a[2]) eq "message" ) {
+            elsif ( lc( $a[2] ) eq "message" ) {
                 $cmd = "type=2&timeout=" . $a[3] . "&text=" . urlEncode($text);
             }
-            elsif ( lc($a[2]) eq "attention" ) {
+            elsif ( lc( $a[2] ) eq "attention" ) {
                 $cmd = "type=3&timeout=" . $a[3] . "&text=" . urlEncode($text);
             }
             else {
@@ -569,7 +569,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # channel
-    elsif ( lc($a[1]) eq "channel" ) {
+    elsif ( lc( $a[1] ) eq "channel" ) {
         if (   defined( $a[2] )
             && $hash->{READINGS}{presence}{VAL} eq "present"
             && $hash->{READINGS}{state}{VAL} ne "on" )
@@ -617,11 +617,11 @@ sub ENIGMA2_Set($@) {
     }
 
     # channelUp/channelDown
-    elsif ( lc($a[1]) =~ /^(channelup|channeldown)$/ ) {
+    elsif ( lc( $a[1] ) =~ /^(channelup|channeldown)$/ ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( lc($a[1]) eq "channelup" ) {
+            if ( lc( $a[1] ) eq "channelup" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RIGHT");
             }
             else {
@@ -635,7 +635,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # input
-    elsif ( lc($a[1]) eq "input" ) {
+    elsif ( lc( $a[1] ) eq "input" ) {
         if (   defined( $a[2] )
             && $hash->{READINGS}{presence}{VAL} eq "present"
             && $hash->{READINGS}{state}{VAL} ne "on" )
@@ -650,11 +650,11 @@ sub ENIGMA2_Set($@) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( lc($a[2]) eq "tv" ) {
+            if ( lc( $a[2] ) eq "tv" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("TV");
                 $hash->{helper}{lastInput} = "tv";
             }
-            elsif ( lc($a[2]) eq "radio" ) {
+            elsif ( lc( $a[2] ) eq "radio" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RADIO");
                 $hash->{helper}{lastInput} = "radio";
             }
@@ -672,7 +672,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # play / pause
-    elsif ( lc($a[1]) =~ /^(play|pause)$/ ) {
+    elsif ( lc( $a[1] ) =~ /^(play|pause)$/ ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
@@ -685,7 +685,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # stop
-    elsif ( lc($a[1]) eq "stop" ) {
+    elsif ( lc( $a[1] ) eq "stop" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
@@ -698,7 +698,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # record
-    elsif ( lc($a[1]) eq "record" ) {
+    elsif ( lc( $a[1] ) eq "record" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
@@ -710,7 +710,7 @@ sub ENIGMA2_Set($@) {
     }
 
     # showText
-    elsif ( lc($a[1]) eq "showtext" ) {
+    elsif ( lc( $a[1] ) eq "showtext" ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
@@ -1486,38 +1486,43 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                 # Tuner
                 if ( defined( $return->{e2about}{e2tunerinfo}{e2nim} ) ) {
-                    my %tuner = %{ $return->{e2about}{e2tunerinfo}{e2nim} };
+
+                    # multiple
+                    if (
+                        ref( $return->{e2about}{e2tunerinfo}{e2nim} ) eq
+                        "ARRAY" )
+                    {
+                        foreach my $tuner (
+                            @{ $return->{e2about}{e2tunerinfo}{e2nim} } )
+                        {
+                            my $tuner_name = lc( $tuner->{name} );
+                            $tuner_name =~ s/\s/_/g;
+
+                            if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
+                                || $hash->{READINGS}{$tuner_name}{VAL} ne
+                                $tuner->{type} )
+                            {
+                                readingsBulkUpdate( $hash, $tuner_name,
+                                    $tuner->{type} );
+                            }
+                        }
+                    }
 
                     #  single
-                    if ( defined( $tuner{type} ) ) {
-                        my $tunerRef   = \%tuner;
-                        my $tuner_name = lc( $$tunerRef{name} );
+                    elsif (
+                        ref( $return->{e2about}{e2tunerinfo}{e2nim} ) eq
+                        "HASH" )
+                    {
+                        my $tuner_name =
+                          lc( $return->{e2about}{e2tunerinfo}{e2nim}{name} );
                         $tuner_name =~ s/\s/_/g;
 
                         if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
                             || $hash->{READINGS}{$tuner_name}{VAL} ne
-                            $$tunerRef{type} )
+                            $return->{e2about}{e2tunerinfo}{e2nim}{type} )
                         {
                             readingsBulkUpdate( $hash, $tuner_name,
-                                $$tunerRef{type} );
-                        }
-
-                    }
-
-                    #  multiple
-                    else {
-                        for ( keys %tuner ) {
-                            my $tuner_name = lc($_);
-                            $tuner_name =~ s/\s/_/g;
-                            my $tuner_type = $tuner{$_}{type};
-
-                            if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
-                                || $hash->{READINGS}{$tuner_name}{VAL} ne
-                                $tuner_type )
-                            {
-                                readingsBulkUpdate( $hash, $tuner_name,
-                                    $tuner_type );
-                            }
+                                $return->{e2about}{e2tunerinfo}{e2nim}{type} );
                         }
                     }
                 }
