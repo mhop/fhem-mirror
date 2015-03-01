@@ -35,6 +35,7 @@ use Digest::MD5;
 use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
+use utf8;
 
 my %connection_type = (
     0 => "0",
@@ -95,6 +96,7 @@ FB_CALLMONITOR_Initialize($)
                          "disable:0,1 ".
                          "unique-call-ids:0,1 ".
                          "local-area-code ".
+                         "country-code ".
                          "remove-leading-zero:0,1 ".
                          "reverse-search-cache-file ".
                          "reverse-search:multiple-strict,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at ".
@@ -175,9 +177,53 @@ FB_CALLMONITOR_Get($@)
         
         return $head."\n".("-" x $width)."\n".$table;
     }
+    elsif($arguments[1] eq "showPhonebookEntries" and exists($hash->{helper}{PHONEBOOK}))
+    {
+        my $table = "";
+       
+        my $number_width = 0;
+        my $name_width = 0;
+        
+        foreach my $number (keys %{$hash->{helper}{PHONEBOOK}})
+        {
+            $number_width = length($number) if($number_width < length($number));
+            $name_width = length($hash->{helper}{PHONEBOOK}{$number}) if($name_width < length($hash->{helper}{PHONEBOOK}{$number}));
+        }
+        my $head = sprintf("%-".$number_width."s   %s" ,"Number", "Name"); 
+        foreach my $number (sort { lc($hash->{helper}{PHONEBOOK}{$a}) cmp lc($hash->{helper}{PHONEBOOK}{$b}) } keys %{$hash->{helper}{PHONEBOOK}})
+        {
+            
+            my $string = sprintf("%-".$number_width."s - %s" , $number,$hash->{helper}{PHONEBOOK}{$number}); 
+            $table .= $string."\n";
+        }
+        
+        return $head."\n".("-" x ($number_width + $name_width + 3))."\n".$table;
+    }
+    elsif($arguments[1] eq "showCacheEntries" and exists($hash->{helper}{CACHE}))
+    {
+        my $table = "";
+       
+        my $number_width = 0;
+        my $name_width = 0;
+        
+        foreach my $number (keys %{$hash->{helper}{CACHE}})
+        {
+            $number_width = length($number) if($number_width < length($number));
+            $name_width = length($hash->{helper}{CACHE}{$number}) if($name_width < length($hash->{helper}{CACHE}{$number}));
+        }
+        my $head = sprintf("%-".$number_width."s   %s" ,"Number", "Name"); 
+        foreach my $number (sort { lc($hash->{helper}{CACHE}{$a}) cmp lc($hash->{helper}{CACHE}{$b}) } keys %{$hash->{helper}{CACHE}})
+        {
+            
+            my $string = sprintf("%-".$number_width."s - %s" , $number,$hash->{helper}{CACHE}{$number}); 
+            $table .= $string."\n";
+        }
+        
+        return $head."\n".("-" x ($number_width + $name_width + 3))."\n".$table;
+    }
     else
     {
-        return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds" : ""); 
+        return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds" : "").(exists($hash->{helper}{PHONEBOOK}) ? " showPhonebookEntries" : "").(exists($hash->{helper}{CACHE}) ? " showCacheEntries" : ""); 
     }
 
 }
@@ -801,7 +847,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
     my $count_contacts = 0;
 
     my $area_code = AttrVal($name, "local-area-code", "");
-    
+    my $country_code = AttrVal($name, "country-code", "0049");
     if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/) 
     {
     
@@ -818,16 +864,17 @@ sub FB_CALLMONITOR_parsePhonebook($$)
                     if($1 ne "intern" and $1 ne "memo") 
                     {
                         $number = $2;
-                        $number =~ s/\s//g;
-                        $number =~ s/^\+\d\d/0/g; # quick'n'dirty fix in case of international number format.
-                        
-            
-                        if(not $number =~ /^0/ and not $number =~ /@/ and $area_code ne "") 
+                        $number =~ s/\s//g;			                # Remove spaces
+                        $number =~ s/^\+/00/g;			            # Convert leading + to 00 country extension
+                        $number =~ s/^$country_code/0/g;            # Replace own country code with leading 0
+                        $number =~ s/^(\#[0-9]{1,10}\#)//g;	        # Remove phone control codes
+                        $number =~ s/\D//g if(not $number =~ /@/);	# Remove anything else isn't a number if it is no VoIP number
+
+                        if(not $number =~ /^0/ and not $number =~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
                         {
-                            if($area_code =~ /^0[1-9]\d+$/) {
                                 $number = $area_code.$number;
-                            }
-                        }
+                        }     
+                        
                         $count_contacts++;
                         Log3 $name, 4, "FB_CALLMONITOR ($name) - found $contact_name with number $number";
                         $hash->{helper}{PHONEBOOK}{$number} = FB_CALLMONITOR_html2txt($contact_name) if(not defined($hash->{helper}{PHONEBOOK}{$number}));
@@ -1287,6 +1334,8 @@ sub FB_CALLMONITOR_readPassword($;$)
   <ul>
   <li><b>search &lt;phone-number&gt;</b> - returns the name of the given number via reverse-search (internal phonebook, cache or internet lookup)</li>
   <li><b>showPhonebookIds</b> - returns a list of all available phonebooks on the FritzBox (not available when using telnet to retrieve remote phonebook)</li>
+  <li><b>showPhonebookEntries</b> - returns a list of all currently known phonebook entries (only available when using phonebook funktionality)</li>
+  <li><b>showCacheEntries</b> - returns a list of all currently known cache entries (only available when using reverse search caching funktionality)</li>
   </ul>
   <br>
 
@@ -1327,6 +1376,9 @@ sub FB_CALLMONITOR_readPassword($;$)
     Default Value is 0 (off)<br><br>
     <li><a name="local-area-code">local-area-code</a></li>
     Use the given local area code for reverse search in case of a local call (e.g. 0228 for Bonn, Germany)<br><br>
+    <li><a name="country-code">country-code</a></li>
+    Your local country code. This is needed to identify phonenumbers in your phonebook with your local country code as a national phone number instead of an international one (e.g. 0049 for Germany, 0043 for Austria or 001 for USA)<br><br>
+    Default Value is 0049 (Germany)<br><br>
     <li><a name="fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
     If this attribute is activated, the phonebook should be obtained direct from the FritzBox via remote network connection (in case FHEM is not running on a FritzBox). This is only possible if a password (and depending on configuration a username as well) is configured.<br><br>
     Possible values: 0 => off , 1 => on (use remote telnet connection to obtain FritzBox phonebook)<br>
@@ -1407,6 +1459,8 @@ sub FB_CALLMONITOR_readPassword($;$)
   <ul>
   <li><b>search &lt;Rufnummer&gt;</b> - gibt den Namen der Telefonnummer zur&uuml;ck (aus Cache, Telefonbuch oder R&uuml;ckw&auml;rtssuche)</li>
   <li><b>showPhonebookIds</b> - gibt eine Liste aller verf&uuml;gbaren Telefonb&uuml;cher auf der FritzBox zur&uuml;ck (nicht verf&uuml;gbar wenn das Telefonbuch via Telnet-Verbindung eingelesen wird)</li>
+  <li><b>showPhonebookEntries</b> - gibt eine Liste aller bekannten Telefonbucheintr&auml;ge zur&uuml;ck (nur verf&uuml;gbar, wenn eine R&uuml;ckw&auml;rtssuche via Telefonbuch aktiviert ist)</li>
+  <li><b>showCacheEntries</b> - gibt eine Liste aller bekannten Cacheeintr&auml;ge zur&uuml;ck (nur verf&uuml;gbar, wenn die Cache-Funktionalit&auml;t der R&uuml;ckw&auml;rtssuche aktiviert ist))</li>
   </ul>
   <br>
 
@@ -1451,14 +1505,17 @@ sub FB_CALLMONITOR_readPassword($;$)
     Standardwert ist 0 (deaktiviert)<br><br>
     <li><a name="local-area-code">local-area-code</a></li>
     Verwendet die gesetze Vorwahlnummer bei R&uuml;ckw&auml;rtssuchen von Ortsgespr&auml;chen (z.B. 0228 f&uuml;r Bonn)<br><br>
+    <li><a name="country-code">country-code</a></li>
+    Die Landesvorwahl wird ben&ouml;tigt um Telefonbucheintr&auml;ge mit lokaler Landesvorwahl als Inlands-Rufnummern zu erkennen (z.B. 0049 f&uuml;r Deutschland, 0043 f&uuml;r &Ouml;sterreich oder 001 f&uuml;r USA).<br><br>
+    Standardwert ist 0049 (Deutschland)<br><br>
     <li><a name="fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
     Wenn dieses Attribut aktiviert ist, wird das FritzBox Telefonbuch direkt von der FritzBox gelesen. Dazu ist das FritzBox Passwort und je nach FritzBox Konfiguration auch ein Username notwendig, der in den entsprechenden Attributen konfiguriert sein muss.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>  
     <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
-    Setzt die Methode mit der das Telefonbuch von der FritzBox abgefragt werden soll. Bei der Methode "web", werden alle verf&uuml;gbaren Telefonbücher (lokales sowie alle konfigurierten Online-Telefonb&uuml;cher) &uuml;ber die Web-Oberfl&auml;che eingelesen. Bei der Methode "telnet" wird eine Telnet-Verbindung zur FritzBox aufgebaut um das lokale Telefonbuch abzufragen (keine Online-Telefonb&uuml;cher). Dazu muss die Telnet-Funktion aktiviert sein (Telefon Kurzwahl: #96*7*)<br><br>
+    Setzt die Methode mit der das Telefonbuch von der FritzBox abgefragt werden soll. Bei der Methode "web", werden alle verf&uuml;gbaren Telefonb&uuml;cher (lokales sowie alle konfigurierten Online-Telefonb&uuml;cher) &uuml;ber die Web-Oberfl&auml;che eingelesen. Bei der Methode "telnet" wird eine Telnet-Verbindung zur FritzBox aufgebaut um das lokale Telefonbuch abzufragen (keine Online-Telefonb&uuml;cher). Dazu muss die Telnet-Funktion aktiviert sein (Telefon Kurzwahl: #96*7*)<br><br>
     M&ouml;gliche Werte: web,telnet<br>
-    Standardwert ist "web" (retrieve phonebooks via web interface)<br><br>
+    Standardwert ist "web" (Abfrage aller verf&uuml;gbaren Telefonb&uuml;cher &uuml;ber die Web-Oberfl&auml;che)<br><br>
     <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
     Eine komma-separierte Liste von Telefonbuch-ID's welche beim einlesen &uuml;bersprungen werden sollen. Dieses Attribut greift nur beim einlesen der Telefonb&uuml;cher via "web"-Methode (siehe Attribut <i>fritzbox-remote-phonebook-via</i>). Eine Liste aller m&ouml;glichen Werte kann &uuml;ber das <a href="#FB_CALLMONITORget">Get-Kommando</a> <i>showPhonebookIds</i> angezeigt werden.<br><br>
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (alle Telefonb&uuml;cher werden eingelesen)<br><br>

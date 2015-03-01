@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  FB_CALLMONITOR: new attribute "country-code" to import
+             phonebook entries with your local country code preceded as
+             a national phonenumber in a correct way.
+             Per default "0049" is used as country code. (by prodigy7)
+  - feature: FB_CALLMONITOR: new get commands showPhonebookEntries
+             and showCacheEntries to get all related entries
   - changed: enabled authentication with the logitech myharmony server
              for hub firmware version 4.x, version 3.x still works without.
   - feature: YAMAHA_BD: support 95_remotecontrol.pm module features
