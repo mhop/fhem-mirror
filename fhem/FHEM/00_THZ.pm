@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.137";
+my $thzversion = "0.138";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -84,9 +84,9 @@ my %parsinghash = (
 		[" p19FlowProportionHC1: ", 24, 4, "hex", 1],	[" p20FlowProportionHC2: ", 28, 4, "hex", 1],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
 		[" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],	[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10], [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
 		 ],
-  "06pxx206" => [["p21Hist1: ", 4, 2, "hex", 10],		[" p22Hist2: ", 6, 2, "hex", 10],		  [" p23Hist3: ", 8, 2, "hex", 10],
-		[" p24Hist4: ", 10, 2, "hex", 10],		[" p25Hist5: ", 12, 2, "hex", 10],		  [" p26Hist6: ", 14, 2, "hex", 10],
-		[" p27Hist7: ", 16, 2, "hex", 10],		[" p28Hist8: ", 18, 2, "hex", 10],		  [" p29HistAsymmetry: ", 20, 2, "hex", 1],
+  "06pxx206" => [["p21Hyst1: ", 4, 2, "hex", 10],		[" p22Hyst2: ", 6, 2, "hex", 10],		  [" p23Hyst3: ", 8, 2, "hex", 10],
+		[" p24Hyst4: ", 10, 2, "hex", 10],		[" p25Hyst5: ", 12, 2, "hex", 10],		  [" p26Hyst6: ", 14, 2, "hex", 10],
+		[" p27Hyst7: ", 16, 2, "hex", 10],		[" p28Hyst8: ", 18, 2, "hex", 10],		  [" p29HystAsymmetry: ", 20, 2, "hex", 1],
 		[" p30integralComponent: ", 22, 4, "hex", 1],	[" p31MaxBoostStages: ", 26, 2, "hex", 1],	  [" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
 		[" p49SummerModeTemp: ", 32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10], [" p77OutTempAdjust: ", 40, 4, "hex", 1],
 		[" p78DualModePoint: ", 44, 4, "hex2int", 10],	[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
@@ -300,13 +300,14 @@ my %sets439 = (
     "p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
     "p99FanStageParty"			=> {cmd2=>"0A0570", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
     "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "2",	type =>"1clean",  unit =>""},
-    "p21Hist1"				=> {cmd2=>"0A05C0", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
-    "p22Hist2"				=> {cmd2=>"0A05C1", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
-    "p23Hist3"				=> {cmd2=>"0A05C2", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
-    "p24Hist4"				=> {cmd2=>"0A05C3", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
-    "p25Hist5"				=> {cmd2=>"0A05C4", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
-    "p29HistAsymmetry"			=> {cmd2=>"0A05C5", argMin =>   "1", argMax =>    "5",	type =>"1clean",  unit =>""}, 
+    "p21Hyst1"				=> {cmd2=>"0A05C0", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
+    "p22Hyst2"				=> {cmd2=>"0A05C1", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
+    "p23Hyst3"				=> {cmd2=>"0A05C2", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
+    "p24Hyst4"				=> {cmd2=>"0A05C3", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
+    "p25Hyst5"				=> {cmd2=>"0A05C4", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
+    "p29HystAsymmetry"			=> {cmd2=>"0A05C5", argMin =>   "1", argMax =>    "5",	type =>"1clean",  unit =>""}, 
     "p30integralComponent"		=> {cmd2=>"0A0162", argMin =>  "10", argMax =>  "999",	type =>"1clean",  unit =>" Kmin"}, 
+    "p32HystDHW"			=> {cmd2=>"0A0140", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
     "p33BoosterTimeoutDHW"		=> {cmd2=>"0A0588", argMin =>   "0", argMax =>  "200",	type =>"1clean",  unit =>" min"}, #during DHW heating
     "p79BoosterTimeoutHC"		=> {cmd2=>"0A05A0", argMin =>   "0", argMax =>   "60",	type =>"1clean",  unit =>" min"}, #delayed enabling of booster heater
     "p46UnschedVent0"			=> {cmd2=>"0A0571", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
@@ -805,9 +806,6 @@ sub THZ_Set($@){
   my $cmdHex2 = $cmdhash->{cmd2};
   my $argMax = $cmdhash->{argMax};
   my $argMin = $cmdhash->{argMin};
-  
-  #next line disables write back for old firmware if the attribute 206 is set.
-  #return "set not allowed for old firmwares" if((AttrVal($hash->{NAME}, "firmware" , "4.39") eq "2.06"));
   
   # check the parameter range
   given ($cmdhash->{type}) {
@@ -1534,16 +1532,23 @@ sub THZ_RemoveInternalTimer($){
 sub function_heatSetTemp($$) {
   my ($start, $stop) = @_;
   my ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1);
-  if ((AttrVal("Mythz", "firmware" , "4.39")  eq "2.06") or (AttrVal("Mythz", "firmware" , "4.39")  eq "2.14")) {
-  ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1) = (split ' ',ReadingsVal("Mythz","pHeat1",0))[1,2,3];
+
+  my $devname; #normally Mythz but could be defined differently
+  foreach   (keys %defs) { 
+  $devname=$_;
+  last if(($defs{$_}{TYPE}) =~ "THZ");
+  }
+
+  if (AttrVal($devname, "firmware" , "4.39")  =~ "2.")  {
+  ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1) = (split ' ',ReadingsVal($devname,"pHeat1",0))[1,2,3];
   }  
   else {  
-  $p13GradientHC1 	  = ReadingsVal("Mythz","p13GradientHC1",0.4);
-  $p15RoomInfluenceHC1 = (split ' ',ReadingsVal("Mythz","p15RoomInfluenceHC1",0))[0];
-  $p14LowEndHC1 	  = (split ' ',ReadingsVal("Mythz","p14LowEndHC1",0))[0];
+  $p13GradientHC1 	  = ReadingsVal($devname,"p13GradientHC1",0.4);
+  $p15RoomInfluenceHC1 = (split ' ',ReadingsVal($devname,"p15RoomInfluenceHC1",0))[0];
+  $p14LowEndHC1 	  = (split ' ',ReadingsVal($devname,"p14LowEndHC1",0))[0];
   }
-  my ($heatSetTemp, $roomSetTemp, $insideTemp) = (split ' ',ReadingsVal("Mythz","sHC1",0))[11,21,27];
-  my $outside_tempFiltered =(split ' ',ReadingsVal("Mythz","sGlobal",0))[65];
+  my ($heatSetTemp, $roomSetTemp, $insideTemp) = (split ' ',ReadingsVal($devname,"sHC1",0))[11,21,27];
+  my $outside_tempFiltered =(split ' ',ReadingsVal($devname,"sGlobal",0))[65];
   $roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
   #########$insideTemp=23.8 ; $roomSetTemp = 20.5; $p13GradientHC1 = 0.31; $heatSetTemp = 25.4; $p15RoomInfluenceHC1 = 80; #$outside_tempFiltered = 4.9; $p14LowEndHC1 =1.5; $p99RoomThermCorrection = -2.8;
   
