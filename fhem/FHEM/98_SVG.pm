@@ -1374,6 +1374,7 @@ SVG_render($$$$$$$$$$)
     my $lIdx = 0;
     $idx = $srcDesc->{rev}{$dIdx}{$lIdx};
     my $dp = $da->[$dIdx];
+    next if(ref $dp ne "SCALAR");       # Avoid Crash, Forum #34523
     my ($dpl,$dpoff,$l) = (length($$dp), 0, "");
     while($dpoff < $dpl) {                # using split instead is memory hog
       my $ndpoff = index($$dp, "\n", $dpoff);
