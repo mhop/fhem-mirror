@@ -1141,11 +1141,9 @@ sub ONKYO_AVR_Define($$) {
         return "Invalid zone, choose one of main zone2 zone3 zone4 dock";
     }
 
-    # set default attributes
-    unless ( exists( $attr{$name}{webCmd} ) ) {
+    # set default settings on first define
+    if ($init_done) {
         $attr{$name}{webCmd} = 'volume:mute:input';
-    }
-    unless ( exists( $attr{$name}{devStateIcon} ) ) {
         $attr{$name}{devStateIcon} =
           'on:rc_GREEN:off off:rc_STOP:on absent:rc_RED';
     }
