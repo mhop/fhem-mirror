@@ -355,7 +355,7 @@ sub PHTV_Set($@) {
 
     # statusRequest
     if ( lc( $a[1] ) eq "statusrequest" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
+        Log3 $name, 3, "PHTV set $name " . $a[1];
 
         delete $hash->{helper}{device}
           if ( defined( $hash->{helper}{device} ) );
@@ -367,7 +367,7 @@ sub PHTV_Set($@) {
 
     # toggle
     elsif ( lc($a[1]) eq "toggle" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
+        Log3 $name, 3, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "on" ) {
             return PHTV_Set( $hash, $name, "on" );
@@ -381,7 +381,7 @@ sub PHTV_Set($@) {
     # off
     # on
     elsif ( lc($a[1]) eq "off" || lc($a[1]) eq "on" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
+        Log3 $name, 3, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             $cmd = PHTV_GetRemotecontrolCommand("STANDBY");
@@ -394,7 +394,7 @@ sub PHTV_Set($@) {
 
     # ambiHue
     elsif ( lc( $a[1] ) eq "ambihue" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -429,7 +429,7 @@ sub PHTV_Set($@) {
 
     # ambiMode
     elsif ( lc( $a[1] ) eq "ambimode" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -454,7 +454,7 @@ sub PHTV_Set($@) {
 
     # ambiPreset
     elsif ( lc( $a[1] ) eq "ambipreset" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -762,7 +762,7 @@ sub PHTV_Set($@) {
 
     # hue
     elsif ( lc($a[1]) eq "hue" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -799,7 +799,7 @@ sub PHTV_Set($@) {
 
     # sat
     elsif ( lc($a[1]) eq "sat" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -837,7 +837,7 @@ sub PHTV_Set($@) {
 
     # bri
     elsif ( lc($a[1]) eq "bri" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -875,7 +875,7 @@ sub PHTV_Set($@) {
 
     # pct
     elsif ( lc($a[1]) eq "pct" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -915,7 +915,7 @@ sub PHTV_Set($@) {
 
     # volume
     elsif ( lc($a[1]) eq "volume" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -955,7 +955,7 @@ sub PHTV_Set($@) {
 
     # volumeStraight
     elsif ( lc( $a[1] ) eq "volumestraight" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
 
@@ -992,7 +992,7 @@ sub PHTV_Set($@) {
 
     # volumeUp/volumeDown
     elsif ( lc( $a[1] ) =~ /^(volumeup|volumedown)$/ ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
+        Log3 $name, 3, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( lc( $a[1] ) eq "volumeup" ) {
@@ -1012,10 +1012,10 @@ sub PHTV_Set($@) {
     # mute
     elsif ( lc($a[1]) eq "mute" || lc($a[1]) eq "mutet" ) {
         if ( defined( $a[2] ) ) {
-            Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
         }
         else {
-            Log3 $name, 2, "PHTV set $name " . $a[1];
+            Log3 $name, 3, "PHTV set $name " . $a[1];
         }
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
@@ -1054,7 +1054,7 @@ sub PHTV_Set($@) {
 
     # remoteControl
     elsif ( lc( $a[1] ) eq "remotecontrol" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             if ( !defined( $a[2] ) ) {
@@ -1118,7 +1118,7 @@ sub PHTV_Set($@) {
             PHTV_Set( $hash, $name, "on" );
         }
 
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return
           "No argument given, choose one of channel presetNumber channelName "
@@ -1154,7 +1154,7 @@ sub PHTV_Set($@) {
 
     # channelUp/channelDown
     elsif ( lc( $a[1] ) =~ /^(channelup|channeldown)$/ ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
+        Log3 $name, 3, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( lc( $a[1] ) eq "channelup" ) {
@@ -1183,7 +1183,7 @@ sub PHTV_Set($@) {
 
         return "No 2nd argument given" if ( !defined( $a[2] ) );
 
-        Log3 $name, 2, "PHTV set $name " . $a[1] . " " . $a[2];
+        Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         # Alias handling
         $a[2] = $hash->{helper}{device}{inputNames}{ $a[2] }
@@ -1216,7 +1216,7 @@ sub PHTV_Set($@) {
 
     # play / pause
     elsif ( lc($a[1]) =~ /^(play|pause)$/ ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
+        Log3 $name, 3, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = PHTV_GetRemotecontrolCommand("PLAYPAUSE");
@@ -1229,7 +1229,7 @@ sub PHTV_Set($@) {
 
     # stop
     elsif ( lc($a[1]) eq "stop" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
+        Log3 $name, 3, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = PHTV_GetRemotecontrolCommand("STOP");
@@ -1242,7 +1242,7 @@ sub PHTV_Set($@) {
 
     # record
     elsif ( lc($a[1]) eq "record" ) {
-        Log3 $name, 2, "PHTV set $name " . $a[1];
+        Log3 $name, 3, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = PHTV_GetRemotecontrolCommand("RECORD");
