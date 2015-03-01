@@ -694,14 +694,14 @@ sub ONKYO_AVR_Set($@) {
 
     # statusRequest
     if ( lc($a[1]) eq "statusRequest" ) {
-        Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
+        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
         delete $hash->{helper}{receiver} if ( $state ne "absent" );
         ONKYO_AVR_GetStatus( $hash, 1 ) if ( !defined( $a[2] ) );
     }
 
     # toggle
     elsif ( lc($a[1]) eq "toggle" ) {
-        Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
+        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
 
         if ( $hash->{READINGS}{power}{VAL} eq "off" ) {
             $return = ONKYO_AVR_Set( $hash, $name, "on" );
@@ -713,7 +713,7 @@ sub ONKYO_AVR_Set($@) {
 
     # on
     elsif ( lc($a[1]) eq "on" ) {
-        Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
+        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
             $return =
@@ -739,7 +739,7 @@ sub ONKYO_AVR_Set($@) {
 
     # off
     elsif ( lc($a[1]) eq "off" ) {
-        Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
+        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
             $return =
@@ -769,7 +769,7 @@ sub ONKYO_AVR_Set($@) {
             $return = "No argument given, choose one of minutes off";
         }
         else {
-            Log3 $name, 2, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
 
             if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
                 $return =
@@ -804,10 +804,10 @@ sub ONKYO_AVR_Set($@) {
     # mute
     elsif ( lc($a[1]) eq "mute" || lc($a[1]) eq "mutet" ) {
         if ( defined( $a[2] ) ) {
-            Log3 $name, 2, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
         }
         else {
-            Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
+            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
         }
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
@@ -843,7 +843,7 @@ sub ONKYO_AVR_Set($@) {
             $return = "No argument given";
         }
         else {
-            Log3 $name, 2, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
 
             if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
                 my $_ = $a[2];
@@ -880,7 +880,7 @@ sub ONKYO_AVR_Set($@) {
 
     # volumeUp/volumeDown
     elsif ( lc($a[1]) =~ /^(volumeup|volumedown)$/ ) {
-        Log3 $name, 2, "ONKYO_AVR set $name " . $a[1];
+        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( lc($a[1]) eq "volumeup" ) {
@@ -910,7 +910,7 @@ sub ONKYO_AVR_Set($@) {
             $return = "No input given";
         }
         else {
-            Log3 $name, 2, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
 
             if ( $hash->{READINGS}{power}{VAL} eq "off" ) {
                 $return = ONKYO_AVR_Set( $hash, $name, "on" );
@@ -1025,7 +1025,7 @@ sub ONKYO_AVR_Set($@) {
 
                 # normal processing
                 else {
-                    Log3 $name, 2,
+                    Log3 $name, 3,
                         "ONKYO_AVR set $name "
                       . $a[1] . " "
                       . $a[2] . " "
@@ -1568,8 +1568,8 @@ sub ONKYO_AVR_RCmakenotify($$) {
     my $nname = "notify_$name";
 
     fhem( "define $nname notify $name set $ndev remoteControl " . '$EVENT', 1 );
-    Log3 $name, 2, "remotecontrol Notify for $ndev created: $nname";
-    return undef;
+    Log3 undef, 2, "[remotecontrol:ONKYO_AVR] Notify created: $nname";
+    return "Notify created by ENIGMA2: $nname";
 }
 
 #####################################
