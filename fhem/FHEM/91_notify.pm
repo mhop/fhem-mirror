@@ -43,7 +43,9 @@ notify_Define($$)
   return "Bad regexp: $@" if($@);
   $hash->{REGEXP} = $re;
   $hash->{".COMMAND"} = $command;
-  readingsSingleUpdate($hash, "state", "active", 1);
+
+  my $doTrigger = ($name !~ m/^$re$/);            # Forum #34516
+  readingsSingleUpdate($hash, "state", "active", $doTrigger);
   notifyRegexpChanged($hash, $re);
 
   return undef;
