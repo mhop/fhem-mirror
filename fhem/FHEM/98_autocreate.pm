@@ -70,11 +70,13 @@ autocreate_Initialize($)
   $hash->{AttrList}= "autosave filelog device_room weblink weblink_room " .
                      "disable ignoreTypes";
   my %ahash = ( Fn=>"CommandCreateLog",
-                Hlp=>"<device>,create log/weblink for <device>" );
+        Hlp=>"<device>,create log/weblink for <device>",
+        ModuleName => "autocreate" );
   $cmds{createlog} = \%ahash;
 
   my %bhash = ( Fn=>"CommandUsb",
-                Hlp=>"[scan|create],display or create fhem-entries for USB devices" );
+        Hlp=>"[scan|create],display or create fhem-entries for USB devices",
+        ModuleName => "autocreate" );
   $cmds{usb} = \%bhash;
 }
 

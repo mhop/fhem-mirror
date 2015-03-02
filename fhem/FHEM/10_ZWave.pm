@@ -46,7 +46,6 @@ my %zwave_class = (
                reportOn    => "03FF",
                reportOff   => "0300",     },
     get   => { swmStatus   => "02",     }, 
-    #03260363 reported in http://forum.fhem.de/index.php?t=rview&th=10216
     parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" : 
                                ($1 eq "ff" ? "state:on" : 
                                              "state:dim ".hex($1)))',}, },
