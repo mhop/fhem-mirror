@@ -5,6 +5,7 @@ use IO::File;
 
 use strict;
 use warnings;
+sub et_addEvt($$$;$);
 
 #####################################
 sub
@@ -22,6 +23,38 @@ eventTypes_Initialize($)
 }
 
 
+sub
+et_addEvt($$$;$)
+{
+  my ($h, $name, $evt, $cnt) = @_;
+  return 0 if($evt =~ m/ CULHM (SND|RCV) /); # HM
+  return 0 if($evt =~ m/RAWMSG/);            # HM
+  return 0 if($evt =~ m/^R-/);               # HM register values
+  return 0 if($evt =~ m/ UNKNOWNCODE /);
+  return 0 if($evt =~ m/^\d+ global /);      # update
+  return 0 if($evt =~ m/[<>]/);              # HTML
+  return 0 if(length($evt) > 80);            # Safety
+
+  $evt =~ s/: [0-9A-F]*$/: .*/;              # PANSTAMP
+  $evt =~ s/\b-?\d*\.?\d+\b/.*/g;            # Number to .*
+  $evt =~ s/\.\*.*\.\*/.*/g;                 # Multiple wildcards to one
+  $evt =~ s/set_\d+/set_.*/;                 # HM
+  $evt =~ s/^trigger: (.*_)\d+$/trigger: $1.*/; # HM
+  $evt =~ s/\.\* \(\d+K\)/.*/g;              # HUE: Kelvin
+
+  my $r = 1;
+  if($cnt) {
+    $r = 0 if($h->{$name}{$evt});
+    $h->{$name}{$evt} += $cnt;
+
+
+  } else {
+    $h->{$name}{$evt}++;
+
+  }
+  return $r;
+}
+
 #####################################
 sub
 eventTypes_Define($$)
@@ -36,19 +69,16 @@ eventTypes_Define($$)
   my $f = ResolveDateWildcards($a[2], @t);
 
   my ($err, @content) = FileRead($f);
+  my %h = ();
+  $modules{eventTypes}{ldata} = \%h;
   foreach my $l (@content) {
     next if(!defined($l));
-    next if($l =~ m/ CULHM (SND|RCV) /);
-    next if($l =~ m/RAWMSG/);
-    next if($l =~ m/ UNKNOWNCODE /);
-    next if($l =~ m/^\d+ global /);
-    my @a = split(" ", $l, 3);
-    if(@a != 3) {
+    my @l = split(" ", $l, 3);
+    if(@l != 3) {
       Log3 undef, 2, "eventTypes: $f: bogus line $l";
       next;
     }
-    $modules{eventTypes}{ldata}{$a[1]}{$a[2]} = $a[0];
-    $cnt++;
+    $cnt += et_addEvt(\%h, $l[1], $l[2], $l[0]);
   }
 
   Log3 undef, 2, "eventTypes: loaded $cnt events from $f";
@@ -73,18 +103,10 @@ eventTypes_Notify($$)
   return if(!defined($n) || !defined($t) || $n eq "global");
 
   my $ret = "";
+  my $h = $modules{eventTypes}{ldata};
   foreach my $oe (@{$events}) {
-    $oe = "" if(!defined($oe));
-    $oe =~ s/\n.*//s;
-    next if($oe =~ m/ CULHM (SND|RCV) /); # ignore CUL_HM debugging
-    next if($oe =~ m/ UNKNOWNCODE /);
-
-    my $ne = $oe;
-    $ne =~ s/\b-?\d*\.?\d+\b/.*/g;
-    $ne =~ s/set_\d+/set_.*/;              # another HM special :/
-    next if(!defined($ne) || $ne eq "");
-    Log3 $ln, 4, "$ln: $t $n $oe -> $ne";
-    $modules{eventTypes}{ldata}{$n}{$ne}++;
+    next if(!defined($oe) || $oe =~ m/^\s*$/);
+    et_addEvt($h, $n, $oe);
   }
   return undef;
 }
