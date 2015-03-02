@@ -1419,6 +1419,7 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
   blindActuator    =>{ on             =>""
                       ,off            =>""
                       ,toggle         =>""
+                      ,toggleDir      =>""
                       ,pct            =>"[<value>] ... [<ontime>]"
                       ,stop           =>""
                       ,press          =>"[long|short] [on|off|<peer>] [<repCount(long only)>] [<repDelay>] ..."
