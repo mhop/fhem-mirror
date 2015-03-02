@@ -467,6 +467,8 @@ sub _btIP_imgData {
   my $info     = image_info(\$arg);
   my $width    = $info->{width};
   my $height   = $info->{height};
+  $width  =~ s/px//;
+  $height =~ s/px//;
   ($width,$height)= _btIP_imgRescale($width,$height,$scale);
   my $mimetype = $info->{file_media_type};
   
@@ -500,7 +502,7 @@ sub btIP_itemLine {
 sub btIP_itemLongpoll {
   my ($id,$x,$y,$text,%params)= @_;
   my ($iconName,undef,undef) = FW_dev2image($id);
-  my $iconURL = FW_IconURL($iconName);
+  my $iconURL = FW_IconURL($iconName) if defined($iconName);
   my $color   = substr($params{rgb},0,6);
   my $opacity = hex(substr($params{rgb},6,2))/255;
   my $output  = "<div informId=\"$id\" style=\"position:absolute; top:${y}px; left:${x}px; ";
@@ -761,6 +763,7 @@ sub btIP_FileRead {
 
 sub btIP_findTarget {
   my ($link) = shift;
+  return unless length($link);
   my $target = 'secret';
      $target = '_top' if $link =~ s/^-//;
      $target = '_blank' if $link =~ s/^\+//;
@@ -815,7 +818,7 @@ sub btIP_returnSVG {
     # set the background
     # check if background directory is set
     my $reason= "?"; # remember reason for undefined image
-    my $bgdir= AnalyzePerlCommand(undef,AttrVal($name,"bgdir",undef));
+    my $bgdir= AnalyzePerlCommand(undef,AttrVal($name,"bgdir",""));
 	if(defined($bgdir)){
 		my $bgnr; # item number
 		if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
@@ -1086,7 +1089,7 @@ sub btIP_evalLayout {
         when("longpoll") {
           ($id,$x,$y,$text)= split("[ \t]+", $def, 4);
           $text //= undef;
-          $text = AnalyzePerlCommand(undef,$text);
+          $text = AnalyzePerlCommand(undef,$text) if defined($text);
 	      ($x,$y)= btIP_xy($x,$y,%params);
               $x += $params{groupx};
               $y += $params{groupy};
