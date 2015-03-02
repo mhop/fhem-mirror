@@ -387,6 +387,8 @@ devStateIcon($$@)
       $percent = ::Value($name);
     }
 
+    $percent =~ s/[^\d]//g if( $percent );
+
     return ".*:light_question" if( !defined($percent) );
 
     my $s = $dim_values{int($percent/7)};
