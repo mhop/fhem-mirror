@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 98_help.pm 8133 2015-03-02 14:31:53Z betateilchen $
 #
 package main;
 use strict;
@@ -36,6 +36,8 @@ sub CommandHelp {
 	if($cmds{help}{InternalCmds} !~ m/$mod\,/) {
       my %mods;
 	  my @modDir = ("$modPath/FHEM");
+
+      $mod = $cmds{$mod}{ModuleName} if defined($cmds{$mod}{ModuleName});
 
 	  foreach my $modDir (@modDir) {
 	    eval { opendir(DH, $modDir); }; # || die "Cant open $modDir: $!\n";
