@@ -693,7 +693,7 @@ sub ONKYO_AVR_Set($@) {
     readingsBeginUpdate($hash);
 
     # statusRequest
-    if ( lc($a[1]) eq "statusRequest" ) {
+    if ( lc($a[1]) eq "statusrequest" ) {
         Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
         delete $hash->{helper}{receiver} if ( $state ne "absent" );
         ONKYO_AVR_GetStatus( $hash, 1 ) if ( !defined( $a[2] ) );
