@@ -810,8 +810,9 @@ sub
 ZWave_cleanString($$)
 {
   my ($c, $postfix) = @_;
-  $c =~ s/[^A-Z]+(.)/uc($1)/gei;
-  $c =~ s/[^A-Z]//i;
+  $c =~ s/^[0-9.]+ //g;
+  $c =~ s/[^A-Z0-9]+/ /ig;
+  $c =~ s/ (.)/uc($1)/gei;
   my $shortened=0;
   while(length($c) > 32) {     # might be endless loop
     $c =~ s/[A-Z][^A-Z]*$//;
@@ -922,13 +923,9 @@ ZWave_configCheckParam($$$$@)
   }
 
   return ("Parameter is not decimal", "") if($arg[0] !~ m/^[0-9]+$/);
-  if($t eq "short") {
-    return ("", sprintf("04%02x02%04x", $h->{index}, $arg[0]));
-  }
-  if($t eq "byte") {
-    return ("", sprintf("04%02x01%02x", $h->{index}, $arg[0]));
-  }
-  return ("", sprintf("04%02x01%02x", $h->{index}, $arg[0]));
+
+  my $len = ($t eq "int" ? 8 : ($t eq "short" ? 4 : 2));
+  return ("", sprintf("04%02x02%0*x", $h->{index}, $len, $arg[0]));
 }
 
 sub
