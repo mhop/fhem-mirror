@@ -387,9 +387,12 @@ devStateIcon($$@)
       $percent = ::Value($name);
     }
 
-    $percent =~ s/[^\d]//g if( $percent );
-
     return ".*:light_question" if( !defined($percent) );
+
+    return ".*:on:toggle" if( $percent eq "on" );
+    return ".*:off:toggle" if( $percent eq "off" );
+
+    $percent =~ s/[^\d]//g if( $percent );
 
     my $s = $dim_values{int($percent/7)};
     $s="off" if( $percent eq "0" );
