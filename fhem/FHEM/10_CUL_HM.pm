@@ -386,7 +386,7 @@ sub CUL_HM_updateConfig($){
         if ($md =~ m/HM-CC-RT-DN/)                      {$webCmd.=":burstXmit";}
       }
       elsif($st eq "blindActuator"){
-        if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggle:on:off:up:down:stop";}
+        if ($hash->{helper}{role}{chn}){$webCmd="statusRequest:toggleDir:on:off:up:down:stop";}
         else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
       }
       elsif($st eq "dimmer"       ){
@@ -1323,11 +1323,11 @@ sub CUL_HM_Parse($$) {#########################################################
       else{
         $chn        =  $mI[1];
         $setTemp    = ($setTemp        );
+        $lBat       = $err&0x80?"low":"ok"; # prior to changes of $err!
         $err        = ($err        >> 1);
         $shash = $modules{CUL_HM}{defptr}{"$src$chn"} if($modules{CUL_HM}{defptr}{"$src$chn"});
         $actTemp = ReadingsVal($name,"measured-temp","");
         $vp      = ReadingsVal($name,"actuator","");
-        $lBat = $err&0x80?"low":"ok";
       }
       delete $devH->{helper}{getBatState};
       $setTemp    =(($setTemp        ) & 0x3f )/2;
@@ -1763,11 +1763,11 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       if ($st ne "switch"){
-        my $dir = $err & 0x30;
-        if   ($dir == 0x10){push @evtEt,[$shash,1,"$eventName:up:$vs"  ];}
-        elsif($dir == 0x20){push @evtEt,[$shash,1,"$eventName:down:$vs"];}
-        elsif($dir == 0x00){push @evtEt,[$shash,1,"$eventName:stop:$vs"];}
-        elsif($dir == 0x30){push @evtEt,[$shash,1,"$eventName:err:$vs" ];}
+        my $dir = ($err >> 4) & 3;
+        my %dirName = ( 0=>"stop" ,1=>"up" ,2=>"down" ,3=>"err" );
+        push @evtEt,[$shash,1,"$eventName:$dirName{$dir}:$vs"  ];
+        $shash->{helper}{dir}{rct} = $shash->{helper}{dir}{cur} if($shash->{helper}{dir}{cur} ne $dirName{$dir});
+        $shash->{helper}{dir}{cur} = $dirName{$dir};
       }
       if (!$rSUpdt){#dont touch if necessary for dimmer
         if(($err&0x70) == 0x10 || ($err&0x70) == 0x20){
@@ -3752,6 +3752,32 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                ."02$chn$hash->{helper}{dlvl}".'0000';
     CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
     $hash = $chnHash; # report to channel if defined
+  }
+  elsif($cmd eq "toggleDir") { ################################################
+    if ($hash->{helper}{dir}{cur} &&  $hash->{helper}{dir}{cur} ne "err"){
+      my $old = $hash->{helper}{dir}{cur};
+      $hash->{helper}{dir}{cur} = $hash->{helper}{dir}{cur} eq "stop" ?(($hash->{helper}{dir}{rct} 
+                                                                      && $hash->{helper}{dir}{rct} eq "up")?"down"
+                                                                                                           :"up")
+                                                                      :"stop";
+      $hash->{helper}{dir}{rct} = $old;
+    }
+    else{
+      $hash->{helper}{dir}{rct} = "stop";
+      $hash->{helper}{dir}{cur} = "up";
+    }
+    if     ($hash->{helper}{dir}{cur} eq "up"  ){
+      $hash->{helper}{dlvl} = "C8";
+      $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn".'C80000';
+      CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
+    }elsif ($hash->{helper}{dir}{cur} eq "down"){
+      $hash->{helper}{dlvl} = "00";
+      $hash->{helper}{dlvlCmd} = "++$flag"."11$id$dst"."02$chn".'000000';
+      CUL_HM_PushCmdStack($hash,$hash->{helper}{dlvlCmd});
+    }else                                       {
+      delete $hash->{helper}{dlvl};
+      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn);
+    }
   }
   elsif($cmd =~ m/^(on-for-timer|on-till)$/) { ################################
     my (undef,undef,$duration,$ramp) = @a; #date prepared extention to entdate
@@ -8011,48 +8037,48 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
      <B>subType dependent commands:</B>
   <ul>
      <br>
-    <li>switch
-       <ul>
-          <li><B>on</B> <a name="CUL_HMon"> </a> - set level to 100%</li>
-          <li><B>off</B><a name="CUL_HMoff"></a> - set level to 0%</li>
-          <li><B>on-for-timer &lt;sec&gt;</B><a name="CUL_HMonForTimer"></a> -
-              set the switch on for the given seconds [0-85825945].<br> Note:
-              off-for-timer like FS20 is not supported. It may to be programmed
-              thru channel register.</li>
-          <li><B>on-till &lt;time&gt;</B><a name="CUL_HMonTill"></a> - set the switch on for the given end time.<br>
-          <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
-          Currently a max of 24h is supported with endtime.<br>
-          </li>
-          <li><B>press &lt;[short|long]&gt; &lt;[on|off|&lt;peer&gt;]&gt; &lt;btnNo&gt;</B><a name="CUL_HMpress"></a><br>
-              simulate a press of the local button or direct connected switch of the actor.<br>
-              <B>[short|long]</B> select simulation of short or long press of the button.
-                                  Parameter is optional, short is default<br>
-              <B>[on|off|&lt;peer&gt;]</B> is relevant for devices with direct buttons per channel (blind or dimmer).
-              Those are available for dimmer and blind-actor, usually not for switches<br>
-              <B>&lt;peer&gt;</B> allows to stimulate button-press of any peer of the actor. 
-                                  i.e. if the actor is peered to any remote, virtual or io (HMLAN/CUL) 
-                                  press can trigger the action defined. <br>              
-              <B>[noBurst]</B> relevant for virtual only <br>
-              It will cause the command being added to the command queue of the peer. <B>No</B> burst is
-              issued subsequent thus the command is pending until the peer wakes up. It therefore 
-              <B>delays the button-press</B>, but will cause less traffic and performance cost. <br>
-              <B>Example:</B>
-              <code> 
-                 set actor press # trigger short of internal peer self assotiated to the channel<br>
-                 set actor press long # trigger long of internal peer self assotiated to the channel<br>
-                 set actor press on # trigger short of internal peer self related to 'on'<br>
-                 set actor press long off # trigger long of internal peer self related to 'of'<br>
-                 set actor press long FB_Btn01 # trigger long peer FB button 01<br>
-                 set actor press long FB_chn:8 # trigger long peer FB button 08<br>
-                 set actor press self01 # trigger short of internal peer 01<br>
-                 set actor press fhem02 # trigger short of FHEM channel 2<br>
-              </code>
-          </li>
-          <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggle the Actor. It will switch from any current
+      <li>switch
+         <ul>
+            <li><B>on</B> <a name="CUL_HMon"> </a> - set level to 100%</li>
+            <li><B>off</B><a name="CUL_HMoff"></a> - set level to 0%</li>
+            <li><B>on-for-timer &lt;sec&gt;</B><a name="CUL_HMonForTimer"></a> -
+                set the switch on for the given seconds [0-85825945].<br> Note:
+                off-for-timer like FS20 is not supported. It may to be programmed
+                thru channel register.</li>
+            <li><B>on-till &lt;time&gt;</B><a name="CUL_HMonTill"></a> - set the switch on for the given end time.<br>
+            <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
+            Currently a max of 24h is supported with endtime.<br>
+            </li>
+            <li><B>press &lt;[short|long]&gt; &lt;[on|off|&lt;peer&gt;]&gt; &lt;btnNo&gt;</B><a name="CUL_HMpress"></a><br>
+                simulate a press of the local button or direct connected switch of the actor.<br>
+                <B>[short|long]</B> select simulation of short or long press of the button.
+                                    Parameter is optional, short is default<br>
+                <B>[on|off|&lt;peer&gt;]</B> is relevant for devices with direct buttons per channel (blind or dimmer).
+                Those are available for dimmer and blind-actor, usually not for switches<br>
+                <B>&lt;peer&gt;</B> allows to stimulate button-press of any peer of the actor. 
+                                    i.e. if the actor is peered to any remote, virtual or io (HMLAN/CUL) 
+                                    press can trigger the action defined. <br>              
+                <B>[noBurst]</B> relevant for virtual only <br>
+                It will cause the command being added to the command queue of the peer. <B>No</B> burst is
+                issued subsequent thus the command is pending until the peer wakes up. It therefore 
+                <B>delays the button-press</B>, but will cause less traffic and performance cost. <br>
+                <B>Example:</B>
+                <code> 
+                   set actor press # trigger short of internal peer self assotiated to the channel<br>
+                   set actor press long # trigger long of internal peer self assotiated to the channel<br>
+                   set actor press on # trigger short of internal peer self related to 'on'<br>
+                   set actor press long off # trigger long of internal peer self related to 'of'<br>
+                   set actor press long FB_Btn01 # trigger long peer FB button 01<br>
+                   set actor press long FB_chn:8 # trigger long peer FB button 08<br>
+                   set actor press self01 # trigger short of internal peer 01<br>
+                   set actor press fhem02 # trigger short of FHEM channel 2<br>
+                </code>
+            </li>
+            <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggle the Actor. It will switch from any current
                  level to off or from off to 100%</li>
-       </ul>
-       <br>
-     </li>
+          </ul>
+         <br>
+       </li>
     <li>dimmer, blindActuator<br>
        Dimmer may support virtual channels. Those are autocrated if applicable. Usually there are 2 virtual channels
        in addition to the primary channel. Virtual dimmer channels are inactive by default but can be used in
@@ -8061,30 +8087,31 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
        Dimmer virtual channels are completely different from FHEM virtual buttons and actors but
        are part of the HM device. Documentation and capabilities for virtual channels is out of scope.<br>
        <ul>
-         <li><B>0 - 100 [on-time] [ramp-time]</B><br>
-             set the actuator to the given value (in percent)
-             with a resolution of 0.5.<br>
-             Optional for dimmer on-time and ramp time can be choosen, both in seconds with 0.1s granularity.<br>
-             On-time is analog "on-for-timer".<br>
-             Ramp-time default is 2.5s, 0 means instantanous<br>
-             </li>
-         <li><B><a href="#CUL_HMon">on</a></B></li>
-         <li><B><a href="#CUL_HMoff">off</a></B></li>
-         <li><B><a href="#CUL_HMpress">press &lt;[short|long]&gt;&lt;[on|off]&gt;</a></B></li>
-         <li><B><a href="#CUL_HMtoggle">toggle</a></B></li>
-         <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Dimmer only! <br></li>
-         <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
-         <li><B>stop</B> - stop motion (blind) or dim ramp</li>
-         <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - set actor to a desired <B>absolut level</B>.<br>
-                    Optional ontime and ramptime could be given for dimmer.<br>
-                    ontime may be time in seconds. It may also be entered as end-time in format hh:mm:ss
-                    </li>
-         <li><B>up [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step</li>
-         <li><B>down [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step<br>
-             changeValue is optional an gives the level to be changed up or down in percent. Granularity is 0.5%, default is 10%. <br>
-             ontime is optional an gives the duration of the level to be kept. '0' means forever and is default.<br>
-             ramptime is optional an defines the change speed to reach the new level. It is meaningful only for dimmer.
-             <br></li>
+           <li><B>0 - 100 [on-time] [ramp-time]</B><br>
+               set the actuator to the given value (in percent)
+               with a resolution of 0.5.<br>
+               Optional for dimmer on-time and ramp time can be choosen, both in seconds with 0.1s granularity.<br>
+               On-time is analog "on-for-timer".<br>
+               Ramp-time default is 2.5s, 0 means instantanous<br>
+               </li>
+           <li><B><a href="#CUL_HMon">on</a></B></li>
+           <li><B><a href="#CUL_HMoff">off</a></B></li>
+           <li><B><a href="#CUL_HMpress">press &lt;[short|long]&gt;&lt;[on|off]&gt;</a></B></li>
+           <li><B><a href="#CUL_HMtoggle">toggle</a></B></li>
+           <li><B>toggleDir</B><a name="CUL_HMtoggleDir"></a> - toggled drive direction between up/stop/down/stop</li>
+           <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Dimmer only! <br></li>
+           <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
+           <li><B>stop</B> - stop motion (blind) or dim ramp</li>
+           <li><B>pct &lt;level&gt [&lt;ontime&gt] [&lt;ramptime&gt]</B> - set actor to a desired <B>absolut level</B>.<br>
+                      Optional ontime and ramptime could be given for dimmer.<br>
+                      ontime may be time in seconds. It may also be entered as end-time in format hh:mm:ss
+                      </li>
+           <li><B>up [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step</li>
+           <li><B>down [changeValue] [&lt;ontime&gt] [&lt;ramptime&gt]</B> dim up one step<br>
+               changeValue is optional an gives the level to be changed up or down in percent. Granularity is 0.5%, default is 10%. <br>
+               ontime is optional an gives the duration of the level to be kept. '0' means forever and is default.<br>
+               ramptime is optional an defines the change speed to reach the new level. It is meaningful only for dimmer.
+               <br></li>
        </ul>
       <br>
     </li>
@@ -9384,6 +9411,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B><a href="#CUL_HMoff">off</a></B></li>
             <li><B><a href="#CUL_HMpress">press &lt;[short|long]&gt;&lt;[on|off]&gt;</a></B></li>
             <li><B><a href="#CUL_HMtoggle">toggle</a></B></li>
+            <li><B>toggleDir</B><a name="CUL_HMtoggleDir"></a> - toggelt die fahrtrichtung des Rollo-Aktors.
+              Es wird umgeschaltet zwischen auf/stop/ab/stop</li>
             <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Nur Dimmer! <br></li>
             <li><B><a href="#CUL_HMonTill">on-till &lt;time&gt;</a></B> - Nur Dimmer! <br></li>
             <li><B>stop</B> - Stopt Bewegung (Rollo) oder Dimmerrampe</li>
