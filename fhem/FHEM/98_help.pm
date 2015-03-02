@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 98_help.pm 8129 2015-03-01 20:29:21Z betateilchen $
 #
 package main;
 use strict;
@@ -36,6 +36,8 @@ sub CommandHelp {
 	if($cmds{help}{InternalCmds} !~ m/$mod\,/) {
       my %mods;
 	  my @modDir = ("$modPath/FHEM");
+
+      $mod = $cmds{$mod}{ModuleName} if defined($cmds{$mod}{ModuleName});
 
 	  foreach my $modDir (@modDir) {
 	    eval { opendir(DH, $modDir); }; # || die "Cant open $modDir: $!\n";
@@ -84,12 +86,6 @@ sub CommandHelp {
     if( $cl  && $cl->{TYPE} eq 'telnet' ) {
     $output =~ s/<br>/\n/g;
     $output =~ s/<br\/>/\n/g;
-    $output =~ s/<table>//g;
-    $output =~ s/<\/table>//g;
-    $output =~ s/<t.>//g;
-    $output =~ s/<\/t.>//g;
-    $output =~ s/<h.>//g;
-    $output =~ s/<\/h.>//g;
     $output =~ s/<a href.*\/a>//g;
     $output =~ s/<a name.*\/a>//g;
     $output =~ s/<ul>/\n/g;
@@ -133,8 +129,8 @@ sub CommandHelp {
       next if($cl && $cmds{$cmd}{ClientFilter} &&
            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
       my @a = split(",", $cmds{$cmd}{Hlp}, 2);
- #     $a[0] =~ s/</&lt;/g;
- #     $a[0] =~ s/>/&gt;/g;
+      $a[0] =~ s/</&lt;/g;
+      $a[0] =~ s/>/&gt;/g;
       $a[1] //= "";
       $a[1]  = "               $a[1]";
       $a[1] =~ s/</&lt;/g;
@@ -143,6 +139,27 @@ sub CommandHelp {
     }
 
     return $str;
+
+#     my $str = "<html><pre>Possible commands:<br/><br/>" .
+# 		"Command        Parameter<br/>" .
+# 		"               Description<br/>" .
+# 	    "----------------------------------------------------------------------<br/>";
+# 
+#     for my $cmd (sort keys %cmds) {
+#       next if(!$cmds{$cmd}{Hlp});
+#       next if($cl && $cmds{$cmd}{ClientFilter} &&
+#            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
+#       my @a = split(",", $cmds{$cmd}{Hlp}, 2);
+#       $a[0] =~ s/</&lt;/g;
+#       $a[0] =~ s/>/&gt;/g;
+#       $a[1] //= "";
+#       $a[1]  = "               $a[1]";
+#       $a[1] =~ s/</&lt;/g;
+#       $a[1] =~ s/>/&gt;/g;
+#       $str .= sprintf("%-15s%-50s<br/>%s<br/>", $cmd, $a[0], $a[1]);
+#     }
+# 
+#     return "$str</pre></html>";
 
   }
 }
