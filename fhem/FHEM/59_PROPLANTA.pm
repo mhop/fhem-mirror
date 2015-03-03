@@ -650,9 +650,7 @@ sub PROPLANTA_Done($)
       {
          if ($fcDays < 14 && $rName =~ /^fc(\d+)_/)
          {
-            my $rFcDay = $rName;
-            $rFcDay =~ s/^fc(\d+)_/$1/;
-            next unless $rFcDay < $fcDays;
+            next unless $1 < $fcDays;
          }
          readingsBulkUpdate( $hash, $rName, $rValue );
          PROPLANTA_Log $hash, 5, "reading:$rName value:$rValue";
