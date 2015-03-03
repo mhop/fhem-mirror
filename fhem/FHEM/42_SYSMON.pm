@@ -2374,16 +2374,19 @@ sub SYSMON_getNetworkInfo ($$$)
     }
     
     if(defined $ip) {
+	    $ip =~ s/addr://;
     	$map->{$nName.IP_SUFFIX} = $ip;
     }
     
     if(defined $ip6) {
+        $ip6 =~ s/addr://;
     	$map->{$nName.IP6_SUFFIX} = $ip6;
     }
 
-    my $rxRaw = -1;
-    my $txRaw = -1;
+    my $rxRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/rx_bytes")||-1;
+    my $txRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/tx_bytes")||-1;
     
+  if($rxRaw<0||$txRaw<0) {   
     if(defined $dataThroughput) {
       # remove RX bytes or TX bytes from string
       $dataThroughput =~ s/RX bytes://;
@@ -2397,20 +2400,21 @@ sub SYSMON_getNetworkInfo ($$$)
     	#
     	# an manchen Systemen kann die Ausgabe leider auch anders aussehen:
     	# enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1492
-      #         inet 192.168.2.7  netmask 255.255.255.0  broadcast 192.168.2.255
-      #         ether 00:21:85:5a:0d:e0  txqueuelen 1000  (Ethernet)
-      #         RX packets 1553313  bytes 651891540 (621.6 MiB)
-      #         RX errors 0  dropped 0  overruns 0  frame 0
-      #         TX packets 1915387  bytes 587386206 (560.1 MiB)
-      #         TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+        #         inet 192.168.2.7  netmask 255.255.255.0  broadcast 192.168.2.255
+        #         ether 00:21:85:5a:0d:e0  txqueuelen 1000  (Ethernet)
+        #         RX packets 1553313  bytes 651891540 (621.6 MiB)
+        #         RX errors 0  dropped 0  overruns 0  frame 0
+        #         TX packets 1915387  bytes 587386206 (560.1 MiB)
+        #         TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
     	#
-    	my $d;
-    	foreach $d (@dataThroughput) {
-    		if($d =~ m/RX\s.*\sbytes\s(\d*)\s/) {
-	        $rxRaw = $1;
-        }
-        if($d =~ m/TX\s.*\sbytes\s(\d*)\s/) {
-	        $txRaw = $1;
+    	  my $d;
+    	  foreach $d (@dataThroughput) {
+    		  if($d =~ m/RX\s.*\sbytes\s(\d*)\s/) {
+	          $rxRaw = $1;
+          }
+          if($d =~ m/TX\s.*\sbytes\s(\d*)\s/) {
+	          $txRaw = $1;
+          }
         }
       }
     }
@@ -2420,6 +2424,9 @@ sub SYSMON_getNetworkInfo ($$$)
     	$map->{$nName} = "unexpected format";
   	  $map->{$nName.DIFF_SUFFIX} = "unexpected format";
     } else {
+    	$map->{$nName."_rx"} = $rxRaw;       
+    	$map->{$nName."_tx"} = $txRaw;
+    	
       $rxRaw = $rxRaw / 1048576; # Bytes in MB
       $txRaw = $txRaw / 1048576;
     	
@@ -3716,11 +3723,11 @@ sub SYSMON_Log($$$) {
    
    my $xsubroutine = ( caller(1) )[3];
    my $sub         = ( split( ':', $xsubroutine ) )[2];
-   $sub =~ s/SMARTMON_//;
+   $sub =~ s/SYSMON_//;
 
    my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
    $instName="" unless $instName;
-   Log3 $hash, $loglevel, "SMARTMON $instName: $sub.$xline " . $text;
+   Log3 $hash, $loglevel, "SYSMON $instName: $sub.$xline " . $text;
 }
 
 #sub trim($)
