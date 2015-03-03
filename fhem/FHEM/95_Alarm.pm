@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.4";
+my $alarmversion    = "2.5";
 
 #########################################################################################
 #
@@ -289,20 +289,38 @@ sub Alarm_Exec($$$$$){
    return 
      if ($dev eq 'global');
 
-   #-- raising the alarm
+   #-- raising the alarmy 
    if( $act eq "on" ){
       #-- only if this level is armed and not yet active
       if( ($xec eq "armed") && ($xac eq "off") ){ 
-         #-- check for time (attribute values have been controlled in CreateNotifiers)
-         my @st  = split(':',AttrVal($name, "level".$level."start", 0));
-         my @et  = split(':',AttrVal($name, "level".$level."end", 0));
+         #-- check for time
+         my $start = AttrVal($name, "level".$level."start", 0);
+         if(  index($start, '{') != -1){
+           $start = eval($start);
+         }
+         my @st = split(':',$start);
+         if( (int(@st)>3) || (int(@st)<2) || ($st[0] > 23) || ($st[0] < 0) || ($st[1] > 59) || ($st[1] < 0) ){
+           Log3 $hash,1,"[Alarm $level] Cannot be executed due to wrong time spec $start for level".$level."start";
+           return;
+         }
+         
+         my $end   = AttrVal($name, "level".$level."end", 0);
+         if(  index($end, '{') != -1){
+           $end = eval($end);
+         }
+         my @et  = split(':',$end);
+         if( (int(@et)>3) || (int(@et)<2) || ($et[0] > 23) || ($et[0] < 0) || ($et[1] > 59) || ($et[1] < 0) ){
+           Log3 $hash,1,"[Alarm $level] Cannot be executed due to wrong time spec $end for level".$level."end";
+           return;
+         }
+         
          my $stp = $st[0]*60+$st[1];
          my $etp = $et[0]*60+$et[1];
      
          my ($sec, $min, $hour, $day, $month, $year, $wday, $yday, $isdst) = localtime(time);
          my $ntp = $hour*60+$min;
      
-         if( ($ntp <= $etp) && ($ntp >= $stp) ){  
+         if( (($stp < $etp) && ($ntp <= $etp) && ($ntp >= $stp)) ||  (($stp > $etp) && (($ntp <= $etp) || ($ntp >= $stp))) ){  
             #-- raised by sensor (attribute values have been controlled in CreateNotifiers)
             @sta = split('\|',  AttrVal($dev, "alarmSettings", 0));
             if( $sta[2] ){
@@ -476,18 +494,29 @@ sub Alarm_CreateNotifiers($){
      fhem('delete alarm'.$level.'.disarm.N' )
         if( defined $defs{'alarm'.$level.'.disarm.N'});
   
+     my $start = AttrVal($name, "level".$level."start", 0);
+     my @st;
+     if( index($start,'{')!=-1 ){
+        Log3 $hash,1,"[Alarm $level] perl function $start detected for level".$level."start, currently the function gives ".eval($start);
+     }else{
+        @st = split(':',($start ne '') ? $start :'0:00');
+        if( (int(@st)!=2) || ($st[0] > 23) || ($st[0] < 0) || ($st[1] > 59) || ($st[1] < 0) ){
+           Log3 $hash,1,"[Alarm $level] Will not be executed due to wrong time spec $start for level".$level."start";
+           next;
+        }
+     }
      
-     my @st = split(':',(AttrVal($name, "level".$level."start", 0) ne '')?AttrVal($name, "level".$level."start", 0):'0:00');
-     my @et = split(':',(AttrVal($name, "level".$level."end", 0) ne '')?AttrVal($name, "level".$level."end", 0):'23:59');
-  
-     if( (int(@st)!=2) || ($st[0] > 23) || ($st[0] < 0) || ($st[1] > 59) || ($st[1] < 0) ){
-      Log3 $hash,1,"[Alarm $level] Cannot be executed due to wrong time spec ".AttrVal($name, "level".$level."start", 0)." for level".$level."start";
-      next;
-    }
-    if( (int(@et)!=2) || ($et[0] > 23) || ($et[0] < 0) || ($et[1] > 59) || ($et[1] < 0) ){
-      Log3 $hash,1,"[Alarm $level] Cannot be executed due to wrong time spec ".AttrVal($name, "level".$level."end", 0)." for level".$level."end";
-      next;
-    }
+     my $end   = AttrVal($name, "level".$level."end", 0);
+     my @et;
+     if( index($end,'{')!=-1 ){
+        Log3 $hash,1,"[Alarm $level] perl function $end detected for level".$level."end, currently the function gives ".eval($end);
+     }else{
+        @et = split(':',($end ne '') ? $end :'23:59');
+        if( (int(@et)!=2) || ($et[0] > 23) || ($et[0] < 0) || ($et[1] > 59) || ($et[1] < 0) ){
+           Log3 $hash,1,"[Alarm $level] Will not be executed due to wrong time spec $end for level".$level."end";
+           next;
+        }
+     }
     
      #-- now set up the command for cancel alarm, and contained in this loop all other notifiers as well
      my $cmd = '';
@@ -701,8 +730,8 @@ sub Alarm_Html($)
 
       my $xval = AttrVal($name, "level".$k."xec", 0);
       $ret .= sprintf("<tr class=\"%s\"><td class=\"col1\">Alarm $k</td>\n", ($row&1)?"odd":"even"); 
-      $ret .= "<td class=\"col2\">Start&nbsp;<input type=\"text\" id=\"l".$k."s\" size=\"4\" maxlength=\"5\" value=\"$sval\"/>&nbsp;".
-              "End&nbsp;<input type=\"text\" id=\"l".$k."e\" size=\"4\" maxlength=\"5\" value=\"$eval\"/></td>".
+      $ret .= "<td class=\"col2\">Start&nbsp;<input type=\"text\" id=\"l".$k."s\" size=\"4\" maxlength=\"120\" value=\"$sval\"/>&nbsp;".
+              "End&nbsp;<input type=\"text\" id=\"l".$k."e\" size=\"4\" maxlength=\"120\" value=\"$eval\"/></td>".
               "<td class=\"col3\"><input type=\"text\" id=\"l".$k."m\" size=\"25\" maxlength=\"256\" value=\"$mval\"/></td>";
       $ret .= sprintf("<td class=\"col4\"><input type=\"checkbox\" id=\"l".$k."x\" %s onclick=\"javascript:alarm_arm('$name','$k')\"/>",($xval eq "armed")?"checked=\"checked\"":"").
               "<input type=\"button\" value=\"Cancel\" onclick=\"javascript:alarm_cancel('$name','$k')\"/></td></tr>\n";
