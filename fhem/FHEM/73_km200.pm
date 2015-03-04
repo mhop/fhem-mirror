@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0041 2015-02-24 22:13:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0042 2015-03-04 20:00:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -8,7 +8,7 @@
 #     polling procedure.
 #
 #     Author          : Matthias Deeke 
-#     Contributions   :	Olaf Droegehorn, Andreas Hahn, Rudolf Koenig, Markus Bloch, Stefan M., Furban, KaiKr
+#     Contributions   :	Olaf Droegehorn, Andreas Hahn, Rudolf Koenig, Markus Bloch, Stefan M., Furban, KaiKr, grossi33
 #     e-mail          :	matthias.deeke(AT)deeke(PUNKT)eu
 #     Fhem Forum      : http://forum.fhem.de/index.php/topic,25540.0.html
 #     Fhem Wiki       : http://www.fhemwiki.de/wiki/Buderus_Web_Gateway
@@ -152,6 +152,9 @@
 #		0041    21.02.2015	Sailor				km200_Define					Added /gateway/language
 #		0041    21.02.2015	Sailor				km200_Define					Added /recordings/system/sensors/outdoorTemperatures
 #		0041    24.02.2015	Sailor				km200_Define					Added /dhwCircuits/*
+#		0042    03.03.2015	Sailor				km200_Define					Added more services
+#		0042    03.03.2015	Sailor				km200_Set						Re-read of written value bug fixed.
+#		0042    04.03.2015	Sailor				km200_Set						Correction of type change for numeric values
 ########################################################################################################################
 
 
@@ -220,7 +223,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0041";
+	my $ModuleVersion           = "0042";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -237,27 +240,38 @@ sub km200_Define($$)
 	"/dhwCircuits/dhw1/waterFlow",
 	"/dhwCircuits/dhw1/workingTime",
 	"/dhwCircuits/dhw1/activeSwitchProgram",
-	"/dhwCircuits/dhw1/switchPrograms",
+	"/dhwCircuits/dhw1/activeDhwTimeProgram",
+	"/dhwCircuits/dhw1/currentSetpoint",
+	"/dhwCircuits/dhw1/dhwSpLevels",
+	"/dhwCircuits/dhw1/dhwTimePrograms",
+	"/dhwCircuits/dhw1/extraDhw",
 	"/dhwCircuits/dhw1/setTemperature",
+	"/dhwCircuits/dhw1/switchPrograms",
 	"/dhwCircuits/dhw1/actualTemp",
 	"/dhwCircuits/dhw1/status",
 	"/dhwCircuits/dhw1/temperatureLevels",
 	"/dhwCircuits/dhw1/temperatureLevels/off",
 	"/dhwCircuits/dhw1/temperatureLevels/on",
-	
-	"/dhwCircuits/dhw2",
+
+    "/dhwCircuits/dhw2",
     "/dhwCircuits/dhw2/operationMode",
 	"/dhwCircuits/dhw2/waterFlow",
 	"/dhwCircuits/dhw2/workingTime",
 	"/dhwCircuits/dhw2/activeSwitchProgram",
-	"/dhwCircuits/dhw2/switchPrograms",
+	"/dhwCircuits/dhw2/activeDhwTimeProgram",
+	"/dhwCircuits/dhw2/currentSetpoint",
+	"/dhwCircuits/dhw2/dhwSpLevels",
+	"/dhwCircuits/dhw2/dhwTimePrograms",
+	"/dhwCircuits/dhw2/extraDhw",
 	"/dhwCircuits/dhw2/setTemperature",
+	"/dhwCircuits/dhw2/switchPrograms",
 	"/dhwCircuits/dhw2/actualTemp",
 	"/dhwCircuits/dhw2/status",
 	"/dhwCircuits/dhw2/temperatureLevels",
 	"/dhwCircuits/dhw2/temperatureLevels/off",
 	"/dhwCircuits/dhw2/temperatureLevels/on",
-	
+
+
 	"/gateway",
 	"/gateway/DateTime",
 	"/gateway/firmware",
@@ -282,9 +296,14 @@ sub km200_Define($$)
 	"/heatingCircuits/hc1/designTemp",
 	"/heatingCircuits/hc1/fastHeatupFactor",
 	"/heatingCircuits/hc1/heatingCurveSetting",
+	"/heatingCircuits/hc1/heatingCurveSetting/percentage",
+	"/heatingCircuits/hc1/heatingCurveSetting/increment",
+	"/heatingCircuits/hc1/heatingCurveSetting/decrement",
 	"/heatingCircuits/hc1/heatCurveMax",
 	"/heatingCircuits/hc1/heatCurveMin",
 	"/heatingCircuits/hc1/holidayMode",
+	"/heatingCircuits/hc1/holidayMode/activated",
+	"/heatingCircuits/hc1/holidayMode/startStop",
 	"/heatingCircuits/hc1/manualRoomSetpoint",
 	"/heatingCircuits/hc1/operationMode",
 	"/heatingCircuits/hc1/pumpModulation",
@@ -316,9 +335,14 @@ sub km200_Define($$)
 	"/heatingCircuits/hc2/designTemp",
 	"/heatingCircuits/hc2/fastHeatupFactor",
 	"/heatingCircuits/hc2/heatingCurveSetting",
+	"/heatingCircuits/hc2/heatingCurveSetting/percentage",
+	"/heatingCircuits/hc2/heatingCurveSetting/increment",
+	"/heatingCircuits/hc2/heatingCurveSetting/decrement",
 	"/heatingCircuits/hc2/heatCurveMax",
 	"/heatingCircuits/hc2/heatCurveMin",
 	"/heatingCircuits/hc2/holidayMode",
+	"/heatingCircuits/hc2/holidayMode/activated",
+	"/heatingCircuits/hc2/holidayMode/startStop",
 	"/heatingCircuits/hc2/manualRoomSetpoint",
 	"/heatingCircuits/hc2/operationMode",
 	"/heatingCircuits/hc2/pumpModulation",
@@ -374,6 +398,7 @@ sub km200_Define($$)
 	"/notifications",
 
 	"/recordings",
+	"/recordings/dhwCircuits",
 	"/recordings/heatingCircuits",
 	"/recordings/heatingCircuits/hc1",
 	"/recordings/heatingCircuits/hc1/roomtemperature",
@@ -388,6 +413,7 @@ sub km200_Define($$)
 	"/recordings/system/sensors",
 	"/recordings/system/sensors/temperatures",
 	"/recordings/system/sensors/outdoorTemperatures",
+	"/recordings/system/sensors/outdoorTemperatures/t1",
 	"/recordings/system/sensors/temperatures/outdoor_t1",
 
 	"/solarCircuits",
@@ -693,11 +719,6 @@ sub km200_Define($$)
 	InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
 	Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services started for the first time.";
 	####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ################END#####
-
-
-	###START###### Set status of km200 fhem module to Initialized #############################################START####
-	$hash->{STATE}="Initialized";
-	####END####### Set status of km200 fhem module to Initialized ##############################################END#####
 	
 	return undef;
 }
@@ -1021,18 +1042,79 @@ sub km200_Set($@)
 		return "Unknown argument $opt, choose one of " . join(" ", @cList);
 	}
 
-	### Save chosen service and value into hash
+	### Save chosen service into hash
 	$hash->{temp}{service}  = $opt;
-	$hash->{temp}{postdata} = $value;
 	
-	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $opt with value: $value\n");}
+	
+	### Check whether value is numeric
+	if ($value =~ /^[0-9.-]+$/) 
+	{
+		### Save chosen value into hash
+		$hash->{temp}{postdata} = $value * 1;	
 
+		### Console outputs for debugging purposes
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Numeric value detected\n");}
+	}
+	else
+	{
+		### Save chosen value into hash
+		$hash->{temp}{postdata} = $value;	
+
+		### Console outputs for debugging purposes
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - String value detected\n");}
+	}
+
+
+	### Console outputs for debugging purposes
+	if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing value: $value to the service                     : $opt\n");}
+
+	
+	### Block other scheduled and unscheduled routines
+	$hash->{status}{FlagGetRequest} = true;
+	
 	### Call set sub
 	km200_PostSingleService($hash);
 
+	### Read service-hash
+	my $ReturnHash = km200_GetSingleService($hash);
+
+	### De-block other scheduled and unscheduled routines
+	$hash->{status}{FlagGetRequest} = false;
+	
+	### Find out what has been returned
+	my $ReadValue = "";
+	eval 
+	{
+		### Extract value
+		$ReadValue = $ReturnHash->{value};
+		1;
+	}
+	or do 
+	{
+		### Just copy string
+		$ReadValue = $ReturnHash;	
+	};
+
 	### Return value
-	my $ReturnValue = "The service " . $opt . " has been changed to: " . $value;
+	my $ReturnValue = "";
+	if ($ReadValue eq $value)
+	{	
+		$ReturnValue = "The service " . $opt . " has been changed to: " . $ReadValue;
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing $opt succesfully with value: $value\n");}
+	}
+	else
+	{
+		$ReturnValue = "ERROR - The service " . $opt . " could not changed to: " . $value . "\n" . "The curent value for the service " . $opt . " is: " . $ReadValue;
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing $opt was NOT successful\n");}
+	}
+
+	### Console outputs for debugging purposes
+	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
+	
+	### Delete temporary hash values
+	$hash->{temp}{postdata} = "";
+	$hash->{temp}{service}  = "";
+	
 	return($ReturnValue);
 }
 ####END####### Manipulate service after "Set" command by fhem ##################################################END#####
@@ -1323,6 +1405,9 @@ sub km200_GetInitService($)
 		### Console Message if enabled
 		if ($hash->{CONSOLEMESSAGE} == true) {print("\n" . "Sounding and importing of services started\n");}
 		
+		### Set status of km200 fhem module
+		$hash->{STATE} = "Sounding...";
+
 		### Stop the current timer
 		RemoveInternalTimer($hash);
 	}
@@ -1459,6 +1544,9 @@ sub km200_ParseHttpResponseInit($)
 	{
 		$hash->{temp}{ServiceCounterInit} = 0;
 
+		### Set status of km200 fhem module
+		$hash->{STATE} = "Standby";
+		
 		###START###### Filter all static services out of responsive services = responsive dynamic services ########START####
 		my @KM200_DynServices = @KM200_RespondingServices;
 
