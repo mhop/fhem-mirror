@@ -1,4 +1,4 @@
-# $Id: 98_help.pm 8133 2015-03-02 14:31:53Z betateilchen $
+# $Id$
 #
 package main;
 use strict;
@@ -25,6 +25,8 @@ sub CommandHelp {
   
   $lang //= AttrVal('global','language','en');
   $lang = (lc($lang) eq 'de') ? '_DE' : '';
+
+  $mod =~ s/\?/help/;
 
   if($mod) {
 
