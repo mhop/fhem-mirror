@@ -14,15 +14,15 @@ use Time::HiRes qw( time );
 
 my %km271_sets = (
   "hk1_nachtsoll"   => {SET => "07006565%02x656565:0700%02x", # 0.5 celsius
-                        OPT => ""},
+                        OPT => ":slider,10,0.5,30,1"},
   "hk1_tagsoll"     => {SET => "0700656565%02x6565:0701%02x", # 0.5 celsius
-                        OPT => ""},
+                        OPT => ":slider,10,0.5,30,1"},
   "hk1_betriebsart" => {SET => "070065656565%02x65:0702%02x",
                         OPT => ""},
   "hk2_nachtsoll"   => {SET => "08006565%02x656565:0800%02x", # 0.5 celsius
-                        OPT => ""},
+                        OPT => ":slider,10,0.5,30,1"},
   "hk2_tagsoll"     => {SET => "0800656565%02x6565:0801%02x", # 0.5 celsius
-                        OPT => ""},
+                        OPT => ":slider,10,0.5,30,1"},
   "hk2_betriebsart" => {SET => "080065656565%02x65:0802%02x",
                         OPT => ""},
 
