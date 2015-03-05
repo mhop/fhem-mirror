@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  57_CALVIEW: - fixed function 'set intervall'
+						 - see comandref for detail (now use the define for change intervall)
   - change:  73_km200 - More Services added
   - bugfix:  73_km200 - Re-Read bug in set function corrected
   - change:  SYSMON: improved network readings
