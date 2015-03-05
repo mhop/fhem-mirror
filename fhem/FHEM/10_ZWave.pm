@@ -810,11 +810,17 @@ sub
 ZWave_cleanString($$)
 {
   my ($c, $postfix) = @_;
+  my $shortened = 0;
+
   $c =~ s/^[0-9.]+ //g;
+  $c =~ s/Don.t/Dont/g; # Bugfix
+  if($c =~ m/^(.+)\.(.+)$/ && $2 !~ m/^[ \d]+$/) { # delete second sentence
+    $c = $1; $shortened++;
+  }
   $c =~ s/[^A-Z0-9]+/ /ig;
+  $c =~ s/ *$//g;
   $c =~ s/ (.)/uc($1)/gei;
-  my $shortened=0;
-  while(length($c) > 32) {     # might be endless loop
+  while(length($c) > 32 && $shortened < 999) {
     $c =~ s/[A-Z][^A-Z]*$//;
     $shortened++;
   }
