@@ -12,36 +12,53 @@ use strict;
 use warnings;
 use Time::HiRes qw( time );
 
-sub KM271_crc($);
-sub KM271_setbits($$);
-sub KM271_SetReading($$$$);
-
 my %km271_sets = (
-  "hk1_nachtsoll"   => "07006565%02x656565:0700%02x", # 0.5 celsius
-  "hk1_tagsoll"     => "0700656565%02x6565:0701%02x", # 0.5 celsius
-  "hk1_betriebsart" => "070065656565%02x65:0702%02x",
-  "hk2_nachtsoll"   => "08006565%02x656565:0800%02x", # 0.5 celsius
-  "hk2_tagsoll"     => "0800656565%02x6565:0801%02x", # 0.5 celsius
-  "hk2_betriebsart" => "080065656565%02x65:0802%02x",
+  "hk1_nachtsoll"   => {SET => "07006565%02x656565:0700%02x", # 0.5 celsius
+                        OPT => ""},
+  "hk1_tagsoll"     => {SET => "0700656565%02x6565:0701%02x", # 0.5 celsius
+                        OPT => ""},
+  "hk1_betriebsart" => {SET => "070065656565%02x65:0702%02x",
+                        OPT => ""},
+  "hk2_nachtsoll"   => {SET => "08006565%02x656565:0800%02x", # 0.5 celsius
+                        OPT => ""},
+  "hk2_tagsoll"     => {SET => "0800656565%02x6565:0801%02x", # 0.5 celsius
+                        OPT => ""},
+  "hk2_betriebsart" => {SET => "080065656565%02x65:0802%02x",
+                        OPT => ""},
 
-  "ww_soll"         => "0C07656565%02x6565:0c07%02x", # 1.0 celsius
-  "ww_betriebsart"  => "0C0E%02x6565656565:0c0e%02x",
-  "ww_on-till"      => "0C0E%02x6565656565:0c0e%02x",
-  "ww_zirkulation"  => "0C0E6565656565%02x:0c0f%02x",
+  "ww_soll"         => {SET => "0C07656565%02x6565:0c07%02x", # 1.0 celsius
+                        OPT => ":slider,30,1,60"},
+  "ww_betriebsart"  => {SET => "0C0E%02x6565656565:0c0e%02x",
+                        OPT => ""},
+  "ww_on-till"      => {SET => "0C0E%02x6565656565:0c0e%02x",
+                        OPT => ""},
+  "ww_zirkulation"  => {SET => "0C0E6565656565%02x:0c0f%02x",
+                        OPT => ":slider,0,1,7"},
 
-  "hk1_programm"    => "1100%02x6565656565",
-  "hk1_timer"       => "11%s",
-  "hk2_programm"    => "1200%02x6565656565",  
-  "hk2_timer"       => "12%s",
-  
-  "logmode"         => "EE0000",
+  "hk1_programm"    => {SET => "1100%02x6565656565",
+                        OPT => ""},
+  "hk1_timer"       => {SET => "11%s",
+                        OPT => ""},
+  "hk2_programm"    => {SET => "1200%02x6565656565",
+                        OPT => ""},
+  "hk2_timer"       => {SET => "12%s",
+                        OPT => ""},
+
+  "logmode"         => {SET => "EE0000",
+                        OPT => ":noArg"}
+);
+
+my %km271_gets = (
+  "l_fehler"               => ":noArg",
+  "l_fehlerzeitpunkt"      => ":noArg",
+  "l_fehleraktualisierung" => ":noArg"
 );
 
 # Message address:byte_offset in the message
 # Attributes:
 #   d:x (divide), p:x (add), bf:x (bitfield), a:x (array), ne (generate no event)
 #   mb:x (multi-byte-message, x-bytes, low byte), s (signed value)
-#   em (error message - special handling), t (timer - special handling), eh (error history - special handling)
+#   t (timer - special handling), eh (error history - special handling)
 my %km271_tr = (
   "CFG_Sommer_ab"                   => "0000:1,p:-9,a:8",
   "CFG_HK1_Nachttemperatur"         => "0000:2,d:2",
@@ -85,7 +102,7 @@ my %km271_tr = (
   "CFG_Max_Kesseltemperatur"        => "009a:3",
   "CFG_Pumplogik"                   => "00a1:0",
   "CFG_Abgastemperaturschwelle"     => "00a1:5,p:-9,a:5",
-  
+
   "PRG_HK1_Programm"                => "0100:0,a:2",
   "CFG_Urlaubstage"                 => "0100:3",
   "PRG_HK1_Timer01"                 => "0107:0,t",
@@ -118,7 +135,7 @@ my %km271_tr = (
   "PRG_HK2_Timer13"                 => "01c4:0,t",
   "PRG_HK2_Timer14"                 => "01cb:0,t",
   "CFG_Uhrzeit_Offset"              => "01e0:1,s",
-  
+
   "ERR_Fehlerspeicher1"             => "0300:0,eh",
   "ERR_Fehlerspeicher2"             => "0307:0,eh",
   "ERR_Fehlerspeicher3"             => "030e:0,eh",
@@ -179,7 +196,7 @@ my %km271_tr = (
   "Versionsnummer_NK"               => "893f:0",
   "Modulkennung"                    => "8940:0",
 
-  "ERR_Letzter_Fehlerstatus"        => "aa:0,em",
+  "ERR_Alarmstatus"                 => "aa42:0,bf:7"
 );
 
 my %km271_rev;
@@ -200,7 +217,7 @@ my @km271_bitarrays = (
   # 3 - WW_Betriebswerte2
   [ "-", "Laden", "Manuell", "Nachladen", "Ausschaltoptimierung",
          "Einschaltoptimierung", "Tag", "Warm", "Vorrang" ],
-  # 4 - Kessel_Betrieb 
+  # 4 - Kessel_Betrieb
   [ "-", "Abgastest", "Betrieb 1.Stufe", "Kesselschutz",
          "Unter Betrieb", "Leistung frei", "Leistung hoch", "Betrieb 2.Stufe", "Frei" ],
   # 5 - WW_Pumpentyp
@@ -209,6 +226,9 @@ my @km271_bitarrays = (
   # 6 - Kessel_Fehler
   [ "-", "Brennerstoerung", "Kesselfuehler", "Zusatzfuehler", "Kessel bleibt kalt",
         "Abgasfuehler", "Abgas ueber Grenzwert", "Sicherungskette ausgeloest", "Externe Stoerung" ],
+  # 7 - Alarmstatus
+  [ "-", "Abgasfuehler", "02", "Kesselvorlauffuehler", "08",
+        "10", "20", "HK2-Vorlauffuehler", "80" ]
 );
 
 my @km271_arrays = (
@@ -240,7 +260,7 @@ my @km271_arrays = (
   # 10 - Brenneransteuerung
   [ "Kessel aus", "1.Stufe an", "-", "-", "2.Stufe an bzw. Modulation frei" ],
   # 11 - CFG_Zirkulation
-  [ "Aus","1","2","3","4","5","6","An" ],
+  [ "Aus","1","2","3","4","5","6","An" ]
 );
 
 # PRG_HK1_TimerXX, PRG_HK2_TimerXX
@@ -251,13 +271,13 @@ my %km271_days = (
   0x60  => "Do",
   0x80  => "Fr",
   0xa0  => "Sa",
-  0xc0  => "So",
+  0xc0  => "So"
 );
 
 my %km271_set_betriebsart = (
   "nacht"     => 0,
   "tag"       => 1,
-  "automatik" => 2,
+  "automatik" => 2
 );
 
 # Used by set hk?_programm
@@ -270,7 +290,7 @@ my %km271_set_programm = (
   "nachmittag" => 5,
   "mittag"     => 6,
   "single"     => 7,
-  "senior"     => 8,
+  "senior"     => 8
 );
 
 # Used by set hk?_timer
@@ -281,7 +301,38 @@ my %km271_set_day = (
   "do"  => 0x60,
   "fr"  => 0x80,
   "sa"  => 0xa0,
-  "so"  => 0xc0,
+  "so"  => 0xc0
+);
+
+# Used by get last_error
+my %km271_errormsg = (
+   0 => "Kein Fehler",
+   2 => "Aussenfuehler defekt",
+   3 => "HK1-Vorlauffuehler defekt",
+   4 => "HK2-Vorlauffuehler defekt",
+   8 => "Warmwasserfuehler defekt",
+   9 => "Warmwasser bleibt kalt",
+  10 => "Stoerung thermische Desinfektion",
+  11 => "HK1-Fernbedienung defekt",
+  12 => "HK2-Fernbedienung defekt",
+  15 => "Keine Kommunikation mit HK1-Fernbedienung",
+  16 => "Keine Kommunikation mit HK2-Fernbedienung",
+  20 => "Stoerung Brenner 1",
+  24 => "Keine Verbindung mit Kessel 1",
+  30 => "Interner Fehler Nr. 1",
+  31 => "Interner Fehler Nr. 2",
+  32 => "Interner Fehler Nr. 3",
+  33 => "Interner Fehler Nr. 4",
+  49 => "Kesselvorlauffuehler defekt",
+  50 => "Kesselzusatzfuehler defekt",
+  51 => "Kessel bleibt kalt",
+  52 => "Stoerung Brenner",
+  53 => "Stoerung Sicherheitskette",
+  54 => "Externe Stoerung Kessel",
+  55 => "Abgasfuehler defekt",
+  56 => "Abgasgrenze ueberschritten",
+  87 => "Ruecklauffuehler defekt",
+  92 => "RESET"
 );
 
 #####################################
@@ -292,14 +343,15 @@ KM271_Initialize($)
 
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
-  $hash->{ReadFn}  = "KM271_Read";
-  $hash->{ReadyFn} = "KM271_Ready";
+  $hash->{ReadFn}   = "KM271_Read";
+  $hash->{ReadyFn}  = "KM271_Ready";
 
-  $hash->{DefFn}   = "KM271_Define";
-  $hash->{UndefFn} = "KM271_Undef";
-  $hash->{SetFn}   = "KM271_Set";
-  $hash->{AttrFn}  = "KM271_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 all_km271_events ww_timermode:automatik,tag readingsFilter $readingFnAttributes";
+  $hash->{DefFn}    = "KM271_Define";
+  $hash->{UndefFn}  = "KM271_Undef";
+  $hash->{SetFn}    = "KM271_Set";
+  $hash->{GetFn}    = "KM271_Get";
+  $hash->{AttrFn}   = "KM271_Attr";
+  $hash->{AttrList} = "do_not_notify:1,0 all_km271_events:1,0 ww_timermode:automatik,tag readingsFilter $readingFnAttributes";
 
   %km271_rev = ();
   foreach my $k (sort keys %km271_tr) {      # Reverse map
@@ -307,6 +359,14 @@ KM271_Initialize($)
     my ($addr, $b) = split("[:,]", $v);
     $km271_rev{$addr}{$b} = $k;
   }
+
+  my $optionList = join(",", sort keys %km271_set_betriebsart);
+  $km271_sets{"hk1_betriebsart"}{OPT} = ":$optionList";
+  $km271_sets{"hk2_betriebsart"}{OPT} = ":$optionList";
+  $km271_sets{"ww_betriebsart"}{OPT} = ":$optionList";
+  $optionList = join(",", sort keys %km271_set_programm);
+  $km271_sets{"hk1_programm"}{OPT} = ":$optionList";
+  $km271_sets{"hk2_programm"}{OPT} = ":$optionList";
 }
 
 #####################################
@@ -316,26 +376,28 @@ KM271_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> KM271 [devicename|none]"
-    if(@a != 3);
+  return "wrong syntax: define <name> KM271 [devicename|none]" if(@a != 3);
 
   DevIo_CloseDev($hash);
   my $name = $a[0];
   my $dev = $a[2];
 
   if($dev eq "none") {
-    Log 1, "$name: KM271 device is none, commands will be echoed only";
+    Log3 $name, 2, "$name: KM271 device is none, commands will be echoed only";
     return undef;
   }
-  
-  $hash->{DeviceName} = $dev;
-  my @a = ();
-  $hash->{SENDBUFFER} = \@a;
-  # Internal hash for storing actual timing parameter of heater, populated by "logmode" command
-  my %b = ();
-  $hash->{PRG_TIMER} = \%b;
 
-  my $ret = DevIo_OpenDev($hash, 0, "KM271_DoInit");  
+  $hash->{DeviceName} = $dev;
+  my @b = ();
+  $hash->{SENDBUFFER} = \@b;
+  # Internal hash for storing actual timing parameter of heater, populated by "logmode" command
+  my %c = ();
+  $hash->{PRG_TIMER} = \%c;
+  # Internal array for storing the last 4 error states and timestamps
+  my @d = ([0,0], [0,0], [0,0], [0,0]);
+  $hash->{ERR_STATE} = \@d;
+
+  my $ret = DevIo_OpenDev($hash, 0, "KM271_DoInit");
   return $ret;
 }
 
@@ -353,113 +415,117 @@ sub
 KM271_Set($@)
 {
   my ($hash, @a) = @_;
-  my $name = $hash->{NAME};
-
   return "\"set KM271\" needs at least an argument" if(@a < 2);
+  my $name = shift @a;
 
-  my $fmt = $km271_sets{$a[1]};
-  return "Unknown argument $a[1], choose one of " . 
-         join(" ", sort keys %km271_sets) if(!defined($fmt));
+  if(!defined($km271_sets{$a[0]})) {
+    my $msg = "";
+    foreach my $para (sort keys %km271_sets) {
+      $msg .= " $para" . $km271_sets{$para}{OPT};
+    }
+    return "Unknown argument $a[0], choose one of" . $msg;
+  }
 
+  my $cmd = $km271_sets{$a[0]}{SET};
   my ($err, $hr, $min, $sec, $fn);
   my ($val, $numeric_val);
-  if($fmt =~ m/%/) {
-    return "\"set KM271 $a[1]\" needs at least one parameter" if(@a < 3);
-    $val = $a[2];
+  if($cmd =~ m/%/) {
+    return "\"set KM271 $a[0]\" needs at least one parameter" if(@a < 2);
+    $val = $a[1];
     $numeric_val = ($val =~ m/^[.0-9]+$/);
   }
-  
-  if($a[1] =~ m/^hk.*soll$/) {
+
+  if($a[0] =~ m/^hk.*soll$/) {
     return "Argument must be numeric (between 10 and 30)" if(!$numeric_val || $val < 10 || $val > 30);
     $val *= 2;
   }
-  elsif($a[1] =~ m/^ww.*soll$/) {
+  elsif($a[0] =~ m/^ww.*soll$/) {
     return "Argument must be numeric (between 30 and 60)" if(!$numeric_val || $val < 30 || $val > 60);
   }
-  elsif($a[1] =~ m/_betriebsart$/) {
+  elsif($a[0] =~ m/_betriebsart$/) {
     $val = $km271_set_betriebsart{$val};
-    return "Unknown arg, use one of " .
+    return "Unknown parameter for $a[0], use one of " .
            join(" ", sort keys %km271_set_betriebsart) if(!defined($val));
   }
-  elsif($a[1] =~ m/_programm$/) {
+  elsif($a[0] =~ m/_programm$/) {
     $val = $km271_set_programm{$val};
-    return "Unknown arg, use one of " .
+    return "Unknown parameter for $a[0], use one of " .
            join(" ", sort keys %km271_set_programm) if(!defined($val));
   }
-  elsif($a[1] =~ m/^ww.*-till$/) {	# WW on-till command
+  elsif($a[0] =~ m/^ww.*-till$/) {	# WW on-till command
     ($err, $hr, $min, $sec, $fn) = GetTimeSpec($val);
     return $err if($err);
-    
+
     my @lt = localtime;
     my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
     my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
     if($hms_now ge $hms_till) {
-      Log 1, "$name: ww_on-till won't switch as now $hms_now is later than till $hms_till";
+      Log3 $name, 1, "$name: ww_on-till won't switch as now $hms_now is later than till $hms_till";
       return "Won't switch as now is later than $hms_till";
     }
 
     my $tname = $name . "_ww_autoOff";
     CommandDelete(undef, $tname) if($defs{$tname});
-    CommandDefine(undef, "$tname at $hms_till set $name ww_betriebsart nacht");    
+    CommandDefine(undef, "$tname at $hms_till set $name ww_betriebsart nacht");
     $val = $km271_set_betriebsart{AttrVal($name, "ww_timermode", "tag")};
   }
-  elsif($a[1] =~ m/^ww.*zirkulation$/) {
+  elsif($a[0] =~ m/^ww.*zirkulation$/) {
     return "Argument must be numeric (between 0 and 7)" if(!$numeric_val || $val < 0 || $val > 7);
   }
-  elsif($a[1] =~ m/^hk.*timer$/) {  # Timer calculation
-    return "\"set KM271 $a[1]\" needs typically 5 parameters (position on-day on-time off-day off-time)" if(@a < 4);
-    $val = $a[2];
+  elsif($a[0] =~ m/^hk.*timer$/) {  # Timer calculation
+    return "\"set KM271 $a[0]\" needs typically 5 parameters (position on-day on-time off-day off-time)" if(@a < 3);
+    $val = $a[1];
     $numeric_val = ($val =~ m/^[.0-9]+$/);
     # 42 slots for a timer, but each interval uses two of them (on and off)
     return "Position must be numeric (between 1 and 21)" if(!$numeric_val || $val < 1 || $val > 21);
     my $pos = $val;
     my $offval;
-    if ($a[3] eq "delete") {
+    if($a[2] eq "delete") {
       # Delete the interval
       $offval = "c290";   # Code for not used
       $val = $offval;
     } else {
       # Set interval: more arguments are needed
-      return "\"set KM271 $a[1]\" needs at least 5 parameters (position day on-time day off-time)" if(@a < 7);
-      my $offday = $km271_set_day{$a[5]};
+      return "\"set KM271 $a[0]\" needs at least 5 parameters (position day on-time day off-time)" if(@a < 6);
+      my $offday = $km271_set_day{$a[4]};
       return "Unknown day, use one of " .
              join(" ", sort keys %km271_set_day) if(!defined($offday));
 
       # Time validation off-time
-      ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[6]);
+      ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[5]);
       return $err if($err);
-      
+
       # Calculate off-day and -time (unit: 10 min) for heater
       $offval = sprintf("%02x%02x", $offday, int(($hr*60 + $min) / 10));
 
-      my $onday = $km271_set_day{$a[3]};
+      my $onday = $km271_set_day{$a[2]};
       return "Unknown day, use one of " .
              join(" ", sort keys %km271_set_day) if(!defined($onday));
 
       # Time validation on-time
-      ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[4]);
+      ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[3]);
       return $err if($err);
 
       # Calculate on-day and time (unit: 10 min) for heater
       $val = sprintf("%02x%02x", $onday | 0x01, int(($hr*60 + $min) / 10));
-      
+
       return "On- and off timepoints must not be identical" if(substr($val, 2, 2) eq substr($offval, 2, 2) && $onday == $offday);
     }
     # Calculate offsets for command and internal timer hash
     my $km271Timer = $hash->{PRG_TIMER};
     my $offset = int(($pos*2 + 1)/3)*7;
-    my $keyoffset = $offset + ($a[1] =~ m/^hk1/ ? 0 : 15)*7;
+    my $keyoffset = $offset + ($a[0] =~ m/^hk1/ ? 0 : 15)*7;
     my $key = sprintf("01%02x", $keyoffset);
-    
+
     # Are two updates needed (interval is spread over two lines)?
-    if (($pos + 1) % 3 == 0) {
+    if(($pos + 1) % 3 == 0) {
       my $key2 = sprintf("01%02x", $keyoffset + 7);
       return "Internal timer-hash is not populated, use logmode command and try again later"
-             if (!defined($km271Timer->{$key}{0}) || !defined($km271Timer->{$key}{1}) || !defined($km271Timer->{$key2}{1}) || !defined($km271Timer->{$key2}{2}));
+             if(!defined($km271Timer->{$key}{0}) || !defined($km271Timer->{$key}{1}) || !defined($km271Timer->{$key2}{1}) || !defined($km271Timer->{$key2}{2}));
 
       # Check if update for key2 is needed
-	   if (defined($km271Timer->{$key2}{0}) && $km271Timer->{$key2}{0} eq $offval) {
-	     Log 4, "$name: Update for second timer-part not needed";
+	   if(defined($km271Timer->{$key2}{0}) && $km271Timer->{$key2}{0} eq $offval) {
+	     Log3 $name, 5, "$name: Update for second timer-part not needed";
 	   } else {
         # Update internal hash
         $km271Timer->{$key2}{0} = $offval;
@@ -467,11 +533,11 @@ KM271_Set($@)
         # Dirty trick: Changes of the timer are not notified by the heater, so internal notification is added after the colon
         $offval = sprintf("%02x%s:%s%s", $offset + 7, $offval, $key2, $offval);
         # Push first command
-        push @{$hash->{SENDBUFFER}}, sprintf($fmt, $offval);
+        push @{$hash->{SENDBUFFER}}, sprintf($cmd, $offval);
 	   }
 	   # Check if update for key is needed
-	   if (defined($km271Timer->{$key}{2}) && $km271Timer->{$key}{2} eq $val) {
-	     Log 4, "$name: Update for first timer-part not needed";
+	   if(defined($km271Timer->{$key}{2}) && $km271Timer->{$key}{2} eq $val) {
+	     Log3 $name, 5, "$name: Update for first timer-part not needed";
 	     goto END_SET;
 	   } else {
         # Update internal hash
@@ -479,12 +545,12 @@ KM271_Set($@)
 	   }
 	 } else {
       # Only one update needed
-      if ($pos % 3 == 1) {
-        return "Internal timer-hash is not populated, use logmode command and try again later" if (!defined($km271Timer->{$key}{2}));
+      if($pos % 3 == 1) {
+        return "Internal timer-hash is not populated, use logmode command and try again later" if(!defined($km271Timer->{$key}{2}));
 
         # Check if update for key is needed
-	     if (defined($km271Timer->{$key}{0}) && defined($km271Timer->{$key}{1}) && $km271Timer->{$key}{0} eq $val && $km271Timer->{$key}{1} eq $offval) {
-          Log 4, "$name: Update for timer not needed";
+	     if(defined($km271Timer->{$key}{0}) && defined($km271Timer->{$key}{1}) && $km271Timer->{$key}{0} eq $val && $km271Timer->{$key}{1} eq $offval) {
+          Log3 $name, 5, "$name: Update for timer not needed";
           goto END_SET;
         } else {
           # Update internal hash
@@ -492,11 +558,11 @@ KM271_Set($@)
           $km271Timer->{$key}{1} = $offval;
 		  }
       } else {
-        return "Internal timer-hash is not populated, use logmode command and try again later" if (!defined($km271Timer->{$key}{0}));
+        return "Internal timer-hash is not populated, use logmode command and try again later" if(!defined($km271Timer->{$key}{0}));
 
 	     # Check if update for key is needed
-	     if (defined($km271Timer->{$key}{1}) && defined($km271Timer->{$key}{2}) && $km271Timer->{$key}{1} eq $val && $km271Timer->{$key}{2} eq $offval) {
-	       Log 4, "$name: Update for timer not needed";
+	     if(defined($km271Timer->{$key}{1}) && defined($km271Timer->{$key}{2}) && $km271Timer->{$key}{1} eq $val && $km271Timer->{$key}{2} eq $offval) {
+	       Log3 $name, 5, "$name: Update for timer not needed";
 	       goto END_SET;
 	     } else {
           # Update internal hash
@@ -509,14 +575,64 @@ KM271_Set($@)
     # Dirty trick: Changes of the timer are not notified by the heater, so internal notification is added after the colon
     $val = sprintf("%02x%s:%s%s", $offset, $val, $key, $val);
   }
-  my $data = sprintf($fmt, $val, $val);
+  my $data = sprintf($cmd, $val, $val);
   push @{$hash->{SENDBUFFER}}, $data;
 
   END_SET:
+  Log3 $name, 3, "$name: set " . join(" ", @a);
+
   if(!exists($hash->{WAITING}) && !exists($hash->{DATASENT})) {
     DevIo_DoSimpleRead($hash);
     DevIo_SimpleWrite($hash, "02", 1);
   }
+  return undef;
+}
+
+#####################################
+sub
+KM271_Get($@)
+{
+  my ($hash, @a) = @_;
+  return "\"get KM271\" needs at least an argument" if(@a < 2);
+  my $name = shift @a;
+  my $para = shift @a;
+
+  if(!defined($km271_gets{$para})) {
+    my $msg = "";
+    foreach my $p (sort keys %km271_gets) {
+      $msg .= " $p" . $km271_gets{$p};
+    }
+    return "Unknown argument $para, choose one of" . $msg;
+  }
+
+  my $lastTimestamp = 0;
+  if($para eq "l_fehler") {
+    my $lastError = 0;
+    foreach my $row (0..@{$hash->{ERR_STATE}}-1) {
+      $lastError = ${$hash->{ERR_STATE}}[$row][0];
+      last if($lastError);
+    }
+    my $errorMsg = $km271_errormsg{$lastError};
+    $errorMsg = "Unbekannter Fehler" if(!defined($errorMsg));
+    return sprintf("%02d: %s", $lastError, $errorMsg);
+  }
+  elsif($para eq "l_fehlerzeitpunkt") {
+    foreach my $row (0..@{$hash->{ERR_STATE}}-1) {
+      if(${$hash->{ERR_STATE}}[$row][0]) {
+        $lastTimestamp = ${$hash->{ERR_STATE}}[$row][1];
+        last;
+      }
+    }
+    return $lastTimestamp;
+  }
+  elsif($para eq "l_fehleraktualisierung") {
+    foreach my $row (0..@{$hash->{ERR_STATE}}-1) {
+      my $lts = ${$hash->{ERR_STATE}}[$row][1];
+      $lastTimestamp = $lts if($lts > $lastTimestamp);
+    }
+    return $lastTimestamp;
+  }
+
   return undef;
 }
 
@@ -533,10 +649,10 @@ KM271_Read($)
   return "" if(!defined($buf));
 
   $buf = unpack('H*', $buf);
-  Log 5, "$name: KM271RAW <$buf>";
+  Log3 $name, 5, "$name: KM271RAW <$buf>";
 
   # Check, if we are waiting for a message from the heater
-  if (exists($hash->{WAITING})) {
+  if(exists($hash->{WAITING})) {
     # After timeout get out of waiting mode
     delete($hash->{WAITING}) if(time - $hash->{WAITING} > 2.5);
   } else {
@@ -548,7 +664,7 @@ KM271_Read($)
           delete($hash->{RETRYCOUNT});
           # Delete the command from the list
           shift @{$hash->{SENDBUFFER}};
-          if ($hash->{NOTIFY}) {
+          if($hash->{NOTIFY}) {
             $data = $hash->{NOTIFY};
             delete($hash->{NOTIFY});
             goto INTERNAL_NOTIFY;                             # Timer changes are not reflected by the heater
@@ -567,7 +683,7 @@ KM271_Read($)
           $data .= $crc;
           $hash->{DATASENT} = $data;
           $hash->{RETRYCOUNT} = 0;
-          if (@dataList > 1) {
+          if(@dataList > 1) {
             # Set notify message
             $hash->{NOTIFY} = $dataList[1];
           } else {
@@ -577,19 +693,19 @@ KM271_Read($)
         }
       } else {
         if($hash->{DATASENT}) {
-          if ($buf eq "15") {
-            Log 1, "$name: NAK received";            # NACK from the KM271
+          if($buf eq "15") {
+            Log3 $name, 2, "$name: NAK received";            # NACK from the KM271
           } else {
-            Log 1, "$name: Bogus data after sending packet <$buf>";  # Strange response from the KM271
+            Log3 $name, 2, "$name: Bogus data after sending packet <$buf>";  # Strange response from the KM271
           }
           # Start all over again
           if(++$hash->{RETRYCOUNT} > 3) {
             # Abort sending the actual command
-            Log 1, "$name: Sending <$hash->{DATASENT}> aborted and not successful!";
+            Log3 $name, 1, "$name: Sending <$hash->{DATASENT}> aborted and not successful!";
             shift @{$hash->{SENDBUFFER}};
             delete($hash->{RETRYCOUNT});
           } else {
-            Log 1, "$name: Sending attempt for <$hash->{DATASENT}> failed, retrying";
+            Log3 $name, 2, "$name: Sending attempt for <$hash->{DATASENT}> failed, retrying";
           }
           delete($hash->{DATASENT});
           delete($hash->{NOTIFY});
@@ -599,7 +715,7 @@ KM271_Read($)
         }
       }
     } else {
-      if ($buf eq "02") {                       # KM271 Wants to send
+      if($buf eq "02") {                       # KM271 Wants to send
         DevIo_SimpleWrite($hash, "10", 1);      # We are ready
         $hash->{PARTIAL} = "";
         $hash->{WAITING} = time;
@@ -607,7 +723,7 @@ KM271_Read($)
     }
     return;
   }
-  
+
   $hash->{PARTIAL} .= $buf;
   return if($hash->{PARTIAL} !~ m/^(.*)1003(..)$/);
   ($data, $crc) = ($1, $2);
@@ -615,7 +731,7 @@ KM271_Read($)
   delete($hash->{WAITING});
 
   if(KM271_crc($data . "1003") ne $crc) {
-    Log 1, "$name: Wrong CRC in datapacket <$crc>";
+    Log3 $name, 1, "$name: Wrong CRC in datapacket <$crc>";
     DevIo_SimpleWrite($hash, "15", 1); # NAK
     DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}}); # Want to send
     return;
@@ -623,14 +739,12 @@ KM271_Read($)
 
   DevIo_SimpleWrite($hash, "10", 1);       # ACK, Data received ok
   $data = KM271_decode($data);
-  
+
   INTERNAL_NOTIFY:
   DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}}); # Want to send
 
-  # Check for Error-Messages beginning with 'aa' first
-  if($data =~ m/^(aa)(.*)/) {}
-  elsif($data !~ m/^(....)(.*)/) {
-    Log 1, "$name: Bogus message <$data>";
+  if($data !~ m/^(....)(.*)/) {
+    Log3 $name, 2, "$name: Bogus message <$data>";
     return;
   }
 
@@ -661,7 +775,6 @@ KM271_Read($)
         elsif($f eq "mb") {
           $val += ReadingsVal($name, $key."1", 0) * 256;
           $val += ReadingsVal($name, $key."2", 0) * 65536 if($farg == 3); }
-        elsif($f eq "em") { $val = "Fehlercode $val " . (hex(substr($arg, ($off+1)*2, 2)) == 0 ? "aufgehoben" : "aufgetreten"); }
         elsif($f eq "t")  { $val = sprintf("%s | %s | %s", KM271_setprg($val, hex(substr($arg, ($off+1)*2, 2)))
                                                          , KM271_setprg(hex(substr($arg, ($off+2)*2, 2)), hex(substr($arg, ($off+3)*2, 2)))
                                                          , KM271_setprg(hex(substr($arg, ($off+4)*2, 2)), hex(substr($arg, ($off+5)*2, 2)))); 
@@ -669,16 +782,16 @@ KM271_Read($)
                             $km271Timer->{$fn}{0} = substr($arg, 0, 4);
                             $km271Timer->{$fn}{1} = substr($arg, 4, 4);
                             $km271Timer->{$fn}{2} = substr($arg, 8, 4); }
-        elsif($f eq "eh") { $val = KM271_seterror($arg); }
+        elsif($f eq "eh") { $val = KM271_seterror($hash->{ERR_STATE}, substr($key, -1) -1, $arg); }
       }
       $key = ucfirst($key);   # Hack to match the original and the fake reading
       KM271_SetReading($hash, $key, $val, $ntfy);
     }
-    
+
   } elsif($fn eq "0400") {
     KM271_SetReading($hash, "NoData", $arg, 0);
 
-  } elsif($all_events) { 
+  } elsif($all_events) {
     KM271_SetReading($hash, "UNKNOWN_$fn", $data, 1);
   }
 }
@@ -705,11 +818,15 @@ KM271_Attr(@)
   # $cmd can be "del" or "set"
   # $name is device name
   # attrName and attrVal are Attribute name and value
-  if ($cmd eq 'set' && $attrName eq 'readingsFilter') {
-    eval {qr/$attrVal/};
-    if ($@) {
-      Log 3, "$name: Invalid Regex for 'readingsFilter' <$attrVal>: $@";
-      return "Invalid Regex $attrVal";
+  if($cmd eq 'set') {
+    if($attrName eq 'ww_timermode') {
+      return "Invalid $attrName <$attrVal>" if(!$km271_set_betriebsart{$attrVal});
+    } elsif($attrName eq 'readingsFilter') {
+      eval {qr/$attrVal/};
+      if($@) {
+        Log3 $name, 1, "$name: Invalid Regex for $attrName <$attrVal> '$@'";
+        return "Invalid Regex for $attrName <$attrVal>";
+      }
     }
   }
   return undef;
@@ -720,7 +837,7 @@ sub
 KM271_DoInit($)
 {
   my ($hash) = @_;
-  push @{$hash->{SENDBUFFER}}, $km271_sets{"logmode"};
+  push @{$hash->{SENDBUFFER}}, $km271_sets{"logmode"}{SET};
   DevIo_DoSimpleRead($hash);
   DevIo_SimpleWrite($hash, "02", 1);      # STX
   return undef;
@@ -746,7 +863,7 @@ KM271_setprg($$)
   my ($val, $time) = @_;
   my $ret = "-";
   my $switch = $val & 0x0f;
-  if ($switch < 2) {
+  if($switch < 2) {
     $ret = $switch == 0 ? "Aus: " : "An: ";
     $ret .= $km271_days{$val & 0xf0};
     $ret .= sprintf(" %02d:%02d", int($time / 6), ($time % 6)*10);
@@ -756,20 +873,37 @@ KM271_setprg($$)
 
 #####################################
 sub
-KM271_seterror($)
+KM271_seterror($$$)
 {
-  my $val = shift;
+  my ($errState, $slot, $val) = @_;
   my $error = hex(substr($val, 0, 2));
   my $ret = "Kein Fehler";
-  if ($error != 0) {
-    $ret = sprintf("Code %02d (+): %02d:%02dUhr vor ", $error, hex(substr($val, 2, 2)), hex(substr($val, 4, 2)));
-    $error = hex(substr($val, 8, 2));
-    if ($error == 0xff) {
-      $ret .= sprintf("%d Tagen | Fehler noch offen", hex(substr($val, 6, 2)));
+  my $timestamp = 0;
+  if($error) {
+    my $hr = hex(substr($val, 2, 2));
+    my $mi = hex(substr($val, 4, 2));
+    my $days = hex(substr($val, 6, 2));
+    $ret = sprintf("Code %02d (+): %02d:%02dUhr vor ", $error, $hr, $mi);
+    my $hr2 = hex(substr($val, 8, 2));
+    # get actual time
+    $timestamp = int(time);
+    my @ts = localtime($timestamp);
+    if($hr2 == 0xff) {
+      $ret .= sprintf("%d Tagen | Fehler noch offen", $days);
+      # time calculation without DateTime module
+      $timestamp -= (($ts[2] - $hr)*60 + $ts[1] - $mi)*60 + $days*86400;
     } else {
-      my $days = hex(substr($val, 12, 2));
-      $ret .= sprintf("%d Tagen | (-): %02d:%02dUhr vor %d Tagen", hex(substr($val, 6, 2)) + $days, $error, hex(substr($val, 10, 2)), $days);
+      $mi = hex(substr($val, 10, 2));
+      my $days2 = hex(substr($val, 12, 2));
+      $ret .= sprintf("%d Tagen | (-): %02d:%02dUhr vor %d Tagen", $days + $days2, $hr2, $mi, $days2);
+      # time calculation without DateTime module
+      $timestamp -= (($ts[2] - $hr2)*60 + $ts[1] - $mi)*60 + $days2*86400;
+      $error = 0;
     }
+  }
+  if($slot < 4 && $slot >= 0) {
+    $errState->[$slot][0] = $error;
+    $errState->[$slot][1] = $timestamp;
   }
   return $ret;
 }
@@ -799,8 +933,8 @@ KM271_decode($)
   my $flag = 0;
   foreach my $a (split("", pack('H*', $in))) {
     my $c = sprintf("%02x", ord($a));
-    if ($c eq "10") {
-      if ($flag) {
+    if($c eq "10") {
+      if($flag) {
         $flag = 0;
         $c = '';
       } else {
@@ -833,9 +967,9 @@ KM271_SetReading($$$$)
   my ($hash, $key, $val, $ntfy) = @_;
   my $name = $hash->{NAME};
   my $filter = AttrVal($name, 'readingsFilter', '');
-  return if ($filter && $key !~ m/$filter/s);
-  
-  Log GetLogLevel($name,4), "$name: $key $val" if($key ne 'NoData');
+  return if($filter && $key !~ m/$filter/s);
+
+  Log3 $name, 4, "$name: $key $val" if($key ne 'NoData');
   readingsSingleUpdate($hash, $key, $val, $ntfy);
 }
 
@@ -871,9 +1005,9 @@ KM271_SetReading($$$$)
   <br>
 
   <a name="KM271set"></a>
-  <b>Set </b>
+  <b>Set</b>
   <ul>
-    <code>set KM271  &lt;param&gt; [&lt;value&gt; [&lt;values&gt;]]</code><br><br>
+    <code>set KM271 &lt;param&gt; [&lt;value&gt; [&lt;values&gt;]]</code><br><br>
     where param is one of:
     <ul>
       <li>hk1_tagsoll &lt;temp&gt;<br>
@@ -962,7 +1096,16 @@ KM271_SetReading($$$$)
   <a name="KM271get"></a>
   <b>Get</b>
   <ul>
-    N/A
+    <code>get KM271 &lt;param&gt;</code><br><br>
+    where param is one of:
+    <ul>
+      <li>l_fehler<br>
+          gets the latest active error (code and message)</li>
+      <li>l_fehlerzeitpunkt<br>
+          gets the timestamp, when the latest active error occured (format of Perl-function 'time')</li>
+      <li>l_fehleraktualisierung<br>
+          gets the timestamp, of the latest update of an error status (format of Perl-function 'time')</li>
+    </ul>
   </ul>
   <br>
 
@@ -970,7 +1113,6 @@ KM271_SetReading($$$$)
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <a name="all_km271_events"></a>
     <li>all_km271_events<br>
         If this attribute is set to 1, do not ignore following events:<br>
@@ -1015,7 +1157,7 @@ KM271_SetReading($$$$)
     <li>ERR_Fehlerspeicher2</li>
     <li>ERR_Fehlerspeicher3</li>
     <li>ERR_Fehlerspeicher4</li>
-    <li>ERR_Letzter_Fehlerstatus</li>
+    <li>ERR_Alarmstatus</li>
     <li>HK1_Ausschaltoptimierung</li>
     <li>HK1_Betriebswerte1</li>
     <li>HK1_Betriebswerte2</li>
@@ -1081,8 +1223,6 @@ KM271_SetReading($$$$)
   each). Most parameters from these records are reverse engeneered, they
   all start with CFG_ for configuration and PRG_ for timer program information.
   </ul>
-
-
 
 =end html
 =cut
