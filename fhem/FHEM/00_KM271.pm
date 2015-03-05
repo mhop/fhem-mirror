@@ -31,7 +31,7 @@ my %km271_sets = (
   "ww_betriebsart"  => {SET => "0C0E%02x6565656565:0c0e%02x",
                         OPT => ""},
   "ww_on-till"      => {SET => "0C0E%02x6565656565:0c0e%02x",
-                        OPT => ""},
+                        OPT => ":time"},
   "ww_zirkulation"  => {SET => "0C0E6565656565%02x:0c0f%02x",
                         OPT => ":slider,0,1,7"},
 
