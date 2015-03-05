@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7007 2015-01-13 20:15:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7008 2015-03-05 06:15:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -28,8 +28,8 @@ sub CALVIEW_Define($$){
 	my @a = split( "[ \t][ \t]*", $def );
 	return "\"set CALVIEW\" needs at least an argument" if ( @a < 2 );
 	my $name 		= $a[0];   
-	#my $calender	= $a[2];		
 	my $inter	= 43200; 
+	$inter= $a[4] if($#a==4);
 	my $modes = $a[3];
 	my @calendars = split( ",", $a[2] );
 	$hash->{NAME} 	= $name;
@@ -56,19 +56,14 @@ sub CALVIEW_Undef($$){
 sub CALVIEW_Set($@){
 	my ( $hash, @a ) = @_;
 	return "\"set CALVIEW\" needs at least an argument" if ( @a < 2 );
-    return "\"set CALVIEW\" Unknown argument $a[1], choose one of update interval" if($a[1] eq '?'); 
+    return "\"set CALVIEW\" Unknown argument $a[1], choose update" if($a[1] eq '?'); 
 	my $name = shift @a;
 	my $opt = shift @a;
 	my $arg = join("", @a);
 	if($opt eq "update"){CALVIEW_GetUpdate($hash);}
-	if($opt eq "interval"){
-		if(defined $arg && $arg =~ /^[+-]?\d+$/)
-		{$hash->{INTERVAL} = $arg;}
-	}
 }
 sub CALVIEW_GetUpdate($){	
 	my ($hash) = @_;
-	#my $calendername = $hash->{KALENDER};
 	my $name = $hash->{NAME};
 	#cleanup readings
 	delete ($hash->{READINGS});
@@ -90,15 +85,6 @@ sub CALVIEW_GetUpdate($){
 	my $date = "$mday.$mon.$year";
 	my $datenext = "$nextday.$mon.$year";
 	my @termineNew;
-	# foreach my $item (@termine ){
-		# my @tempstart=split(/\s+/,$item->[0]);
-		# my @tempend=split(/\s+/,$item->[2]);
-		# push @termineNew,{
-			# bdate => $tempstart[0],
-			# btime => $tempstart[1],
-			# summary => $item->[1],
-			# edate => $tempend[0],
-			# etime => $tempend[1]};}
 	foreach my $item (@termine ){
 		my @tempstart=split(/\s+/,$item->[0]);
 		my @tempend=split(/\s+/,$item->[2]);
@@ -113,16 +99,9 @@ sub CALVIEW_GetUpdate($){
 			edate => $tempend[0],
 			etime => $tempend[1],
 			btimestamp => $bts[0]};	}
-	#my $termin= \@termineNew;
 	my $todaycounter = 1;
 	my $tomorrowcounter = 1;
 	my $readingstyle = AttrVal($name,"oldStyledReadings",0);	
-	# sort the data in the array by bdate 
-	# my @sdata = map  $_->[0], 
-			# sort { $a->[1][2] <=> $b->[1][2] or  # year
-                   # $a->[1][1] <=> $b->[1][1] or  # month
-                   # $a->[1][0] <=> $b->[1][0] }   # day
-            # map  [$_, [split /\./, $_->{bdate}]], @termineNew;
 	# sort the array by btimestamp
 	my @sdata = map  $_->[0], 
 			sort { $a->[1][0] <=> $b->[1][0] }
@@ -217,16 +196,14 @@ sub getsummery($)
 <h3>CALVIEW</h3>
 <ul>This module creates a device with deadlines based on calendar-devices of the 57_Calendar.pm module.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeStarted Termine; 1 for modeStarted;modeUpcoming Termine&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeStarted Termine; 1 for modeStarted;modeUpcoming Termine&gt; &lt;updateintervall in ms (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar 1</code></ul><br>
+<ul><code>define myView CALVIEW Googlecalendar,holiday 1 900</code></ul><br>
 <a name="CALVIEW set"></a>
 <b>Set</b>
 <ul>update readings:</ul>
 <ul><code>set &lt;Name&gt; update</code></ul>
 <ul><code>set myView update</code></ul><br>
-<ul>set updateintervall:</ul>
-<ul><code>set &lt;Name&gt; intervall &lt;[time]&gt;</code></ul>
-<ul><code>set myView intervall 300</code></ul><br>
 <b>Attribute</b>
 <li>maxreadings<br>
         defines the number of max term as readings
@@ -243,16 +220,14 @@ sub getsummery($)
 <h3>CALVIEW</h3>
 <ul>Dieses Modul erstellt ein Device welches als Readings Termine eines oder mehrere Kalender(s), basierend auf dem 57_Calendar.pm Modul, besitzt.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeStarted Termine; 1 für modeStarted;modeUpcoming Termine&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeStarted Termine; 1 für modeStarted;modeUpcoming Termine&gt; &lt;updateintervall in ms (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender 1</code></ul><br>
+<ul><code>define myView CALVIEW Googlekalender,holiday 1 900</code></ul><br>
 <a name="CALVIEW set"></a>
 <b>Set</b>
 <ul>update readings:</ul>
 <ul><code>set &lt;Name&gt; update</code></ul>
 <ul><code>set myView update</code></ul><br>
-<ul>set updateintervall:</ul>
-<ul><code>set &lt;Name&gt; intervall &lt;[Zeit]&gt;</code></ul>
-<ul><code>set myView intervall 300</code></ul><br>
 <b>Attributes</b>
 <li>maxreadings<br>
         bestimmt die Anzahl der Termine als Readings
