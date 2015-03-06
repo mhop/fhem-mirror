@@ -28,9 +28,9 @@ FW_knobCreate(elName, devName, vArr, currVal, set, params, cmd)
 
   loadScript("pgm2/jquery.knob.min.js",
   function() {
-    inp.knob({ 'release' : function(v){ if(cmd) cmd(v) } });
+    inp.knob({ 'release' : function(v){ if(cmd && !inp.block) cmd(v) } });
     newEl.setValueFn = function(arg){ inp.val(arg);
-                                      inp.trigger('change'); };
+                      inp.block=true; inp.trigger('change'); inp.block=false; };
     newEl.setValueFn(currVal);
   });
 
