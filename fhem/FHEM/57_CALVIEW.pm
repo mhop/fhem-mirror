@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7008 2015-03-05 06:15:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7009 2015-03-06 17:15:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -56,7 +56,7 @@ sub CALVIEW_Undef($$){
 sub CALVIEW_Set($@){
 	my ( $hash, @a ) = @_;
 	return "\"set CALVIEW\" needs at least an argument" if ( @a < 2 );
-    return "\"set CALVIEW\" Unknown argument $a[1], choose update" if($a[1] eq '?'); 
+    return "\"set CALVIEW\" Unknown argument $a[1], choose one of update" if($a[1] eq '?'); 
 	my $name = shift @a;
 	my $opt = shift @a;
 	my $arg = join("", @a);
