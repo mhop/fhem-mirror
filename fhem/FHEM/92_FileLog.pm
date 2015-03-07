@@ -950,10 +950,12 @@ FileLog_sampleDataFn($$$$$)
   for(my $r=0; $r < $max; $r++) {
     my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
     my $ret = "";
+    $f[1] =~ s/\\x(..)/chr(hex($1))/ge;       # Convert \x3a to :
+    $colregs .= ",$f[1]" if($f[1] && !$h{$f[1]});
     $ret .= SVG_sel("par_${r}_0", $colnums, $f[0], undef, "svgColumn");
     $ret .= SVG_sel("par_${r}_1", $colregs, $f[1], undef, "svgRegexp");
-    $ret .= SVG_txt("par_${r}_2", "", $f[2], 1);
-    $ret .= SVG_txt("par_${r}_3", "", $f[3], 6);
+    $ret .= SVG_txt("par_${r}_2", "", $f[2], 2);
+    $ret .= SVG_txt("par_${r}_3", "", $f[3],10);
     push @htmlArr, $ret;
   }
 
