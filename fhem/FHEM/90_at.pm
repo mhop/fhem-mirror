@@ -110,8 +110,9 @@ at_Define($$)
     RemoveInternalTimer($hash);
     InternalTimer($nt, "at_Exec", $hash, 0);
     $hash->{NTM} = $ntm if($rel eq "+" || $fn);
-    my $val = AttrVal($name, "disable", undef) ?
-                          "disabled" : ("Next: ".FmtTime($nt));
+    my $val = IsDisabled($name) ?
+                 (AttrVal($name, "disable", undef) ? "disabled" : "inactive") :
+                 ("Next: ".FmtTime($nt));
     readingsSingleUpdate($hash, "state", $val, 1);
   }
 
@@ -206,22 +207,36 @@ at_Set($@)
 {
   my ($hash, @a) = @_;
 
-  my $cmd = ($at_detailFnCalled ? "modifyTimeSpec" : "modifyTimeSpec:time");
+  my %sets = (modifyTimeSpec=>1, inactive=>0, active=>0);
+  my $cmd = join(" ", sort keys %sets);
+  $cmd =~ s/modifyTimeSpec/modifyTimeSpec:time/ if($at_detailFnCalled);
   $at_detailFnCalled = 0;
   return "no set argument specified" if(int(@a) < 2);
   return "Unknown argument $a[1], choose one of $cmd"
-    if($a[1] ne "modifyTimeSpec");
+    if(!defined($sets{$a[1]}));
+    
+  if($a[1] eq "modifyTimeSpec") {
+    my ($err, undef) = GetTimeSpec($a[2]);
+    return $err if($err);
 
-  my ($err, undef) = GetTimeSpec($a[2]);
-  return $err if($err);
+    my $def = ($hash->{RELATIVE} eq "yes" ? "+":"").
+              ($hash->{PERIODIC} eq "yes" ? "*":"").
+              $a[2];
+    $hash->{OLDDEF} = $hash->{DEF};
+    my $ret = at_Define($hash, "$hash->{NAME} at $def");
+    delete $hash->{OLDDEF};
+    return $ret;
 
-  my $def = ($hash->{RELATIVE} eq "yes" ? "+":"").
-            ($hash->{PERIODIC} eq "yes" ? "*":"").
-            $a[2];
-  $hash->{OLDDEF} = $hash->{DEF};
-  my $ret = at_Define($hash, "$hash->{NAME} at $def");
-  delete $hash->{OLDDEF};
-  return $ret;
+  } elsif($a[1] eq "inactive") {
+    readingsSingleUpdate($hash, "state", "inactive", 1);
+    return undef;
+
+  } elsif($a[1] eq "active") {
+    readingsSingleUpdate($hash,"state","Next: ".FmtTime($hash->{TRIGGERTIME}),1)
+      if(!AttrVal($hash->{NAME}, "disable", undef));
+    return undef;
+  }
+
 }
   
 sub
@@ -256,6 +271,11 @@ sub
 at_State($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
+
+  if($vt eq "state" && $val eq "inactive") {
+    readingsSingleUpdate($hash, "state", "inactive", 1);
+    return undef;
+  }
 
   return undef if($hash->{DEF} !~ m/^\+\d/ ||
                   $val !~ m/Next: (\d\d):(\d\d):(\d\d)/);
@@ -437,8 +457,17 @@ EOF
         Change the execution time. Note: the N-times repetition is ignored.
         It is intended to be used in combination with
         <a href="#webCmd">webCmd</a>, for an easier modification from the room
-        overview in FHEMWEB.
+        overview in FHEMWEB.</li>
+    <li>inactive<br>
+        Inactivates the current device. Note the slight difference to the
+        disable attribute: using set inactive the state is automatically saved
+        to the statefile on shutdown, there is no explicit save necesary.<br>
+        This command is intended to be used by scripts to temporarily
+        deactivate the at.<br>
+        The concurrent setting of the disable attribute is not recommended.
         </li>
+    <li>active<br>
+        Activates the current device (see inactive).</li>
   </ul><br>
 
 
@@ -488,7 +517,6 @@ EOF
 
   </ul>
   <br>
-
 </ul>
 
 =end html
@@ -593,6 +621,18 @@ EOF
         Modifikation im FHEMWEB Raum&uuml;bersicht, dazu muss man
         modifyTimeSpec in <a href="webCmd">webCmd</a> spezifizieren.
         </li>
+    <li>inactive<br>
+        Deaktiviert das entsprechende Ger&auml;t. Beachte den leichten
+        semantischen Unterschied zum disable Attribut: "set inactive"
+        wird bei einem shutdown automatisch in fhem.state gespeichert, es ist
+        kein save notwendig.<br>
+        Der Einsatzzweck sind Skripte, um das at tempor&auml;r zu
+        deaktivieren.<br>
+        Das gleichzeitige Verwenden des disable Attributes wird nicht empfohlen.
+        </li>
+    <li>active<br>
+        Aktiviert das entsprechende Ger&auml;t, siehe inactive.
+        </li>
   </ul><br>
 
 
@@ -604,7 +644,7 @@ EOF
   <ul>
     <a name="disable"></a>
     <li>disable<br>
-        Deaktiviert das entsprechende Ger&aauml;t.<br>
+        Deaktiviert das entsprechende Ger&auml;t.<br>
         Hinweis: Wenn angewendet auf ein <a href="#at">at</a>, dann wird der
         Befehl nicht ausgef&uuml;hrt, jedoch die n&auml;chste
         Ausf&uuml;hrungszeit berechnet.</li><br>
