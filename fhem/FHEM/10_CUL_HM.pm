@@ -1766,7 +1766,9 @@ sub CUL_HM_Parse($$) {#########################################################
         my $dir = ($err >> 4) & 3;
         my %dirName = ( 0=>"stop" ,1=>"up" ,2=>"down" ,3=>"err" );
         push @evtEt,[$shash,1,"$eventName:$dirName{$dir}:$vs"  ];
-        $shash->{helper}{dir}{rct} = $shash->{helper}{dir}{cur} if($shash->{helper}{dir}{cur} ne $dirName{$dir});
+        $shash->{helper}{dir}{rct} = $shash->{helper}{dir}{cur} 
+                  if($shash->{helper}{dir}{cur} &&
+                     $shash->{helper}{dir}{cur} ne $dirName{$dir});
         $shash->{helper}{dir}{cur} = $dirName{$dir};
       }
       if (!$rSUpdt){#dont touch if necessary for dimmer
