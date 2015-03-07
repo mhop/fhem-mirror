@@ -45,7 +45,8 @@
 #                   - removed: trashcan due to performance issues
 #                   - added:   break condition for includes
 # 2015-02-24 - 8092 - added:   longpoll support (experimental)
-# 2015-02-25 -      - changed: iframe handling for secret div
+# 2015-02-25 - 8095 - changed: iframe handling for secret div
+# 2015-03-07 -      - fixed:   handling for bg img (Bugzilla #8)
 #
 ##############################################
 # $Id: 55_InfoPanel.pm 8095 2015-02-25 10:33:21Z betateilchen $
@@ -848,12 +849,20 @@ sub btIP_returnSVG {
 				my $info       = image_info($bgfile);
 				my $bgwidth    = $info->{width};
   				my $bgheight   = $info->{height};
-                my ($u,$v)     = ($bgwidth/$width, $bgheight/$height);
-                my $scale      = ($u>$v) ? 1/$u : 1/$v;
-                my ($bgx,$bgy) = (0,0);
-                   $bgx        = ($width - $bgwidth/$u)/2   if AttrVal($name,'bgcenter',1);
-                   $bgy        = ($height - $bgheight/$u)/2 if AttrVal($name,'bgcenter',1);
-         ($output,undef,undef) = btIP_itemImg('bgImage',$bgx,$bgy,$scale,'file',$bgfile,undef);
+				my ($u,$v)     = ($bgwidth/$width, $bgheight/$height);
+				my ($w,$h);
+				if($u>$v) {
+				  $w= $width;
+				  $h= $bgheight/$u;
+				} else {
+				  $h= $height;
+				  $w= $bgwidth/$v;
+				}
+				my $scale      = ($u>$v) ? 1/$u : 1/$v;
+				my ($bgx,$bgy) = (0,0);
+				$bgx = ($width - $w)/2   if AttrVal($name,'bgcenter',1);
+				$bgy = ($height - $h)/2  if AttrVal($name,'bgcenter',1);
+		($output,undef,undef) = btIP_itemImg('bgImage',$bgx,$bgy,$scale,undef,'file',$bgfile,undef);
                 my $opacity    = AttrVal($name,'bgopacity',1);
                    $output    =~ s/<image\ /<image\ opacity="$opacity" /;
  			}
