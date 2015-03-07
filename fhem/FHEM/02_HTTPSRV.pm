@@ -44,7 +44,9 @@ HTTPSRV_Initialize($) {
     $hash->{DefFn}     = "HTTPSRV_Define";
     $hash->{UndefFn}   = "HTTPSRV_Undef";
     #$hash->{AttrFn}    = "HTTPSRV_Attr";
-    $hash->{AttrList}  = "directoryindex";
+    $hash->{AttrList}  = "directoryindex " .
+                        "readings";
+    $hash->{AttrFn}    = "HTTPSRV_Attr";                    
     #$hash->{SetFn}     = "HTTPSRV_Set";
 
     return undef;
@@ -86,6 +88,25 @@ HTTPSRV_Undef($$) {
 }
 
 ##################
+sub
+HTTPSRV_Attr(@)
+{
+    my ($cmd,$name,$aName,$aVal) = @_;
+    if ($cmd eq "set") {        
+        if ($aName =~ "readings") {
+            if ($aVal !~ /^[A-Z_a-z0-9\,]+$/) {
+                Log3 $name, 3, "$name: Invalid reading list in attr $name $aName $aVal (only A-Z, a-z, 0-9, _ and , allowed)";
+                return "Invalid reading name $aVal (only A-Z, a-z, 0-9, _ and , allowed)";
+            }
+        addToDevAttrList($name, $aName);
+        }
+    }
+    return undef;
+}
+
+
+
+##################
 #
 # here we answer any request to http://host:port/fhem/$infix and below
 
@@ -108,6 +129,17 @@ sub HTTPSRV_CGI() {
     # return error if no such device
     return("text/plain; charset=utf-8", "No HTTPSRV device for $link") unless($name);
 
+    my $fullName = $filename;
+    foreach my $reading (split (/,/, AttrVal($name, "readings", "")))  {
+        my $value   = "";
+        if ($fullName =~ /^([^\?]+)\?(.*)($reading)=([^;&]*)([&;].*)?$/) {
+            $filename = $1;
+            $value    = $4;
+            Log3 $name, 5, "$name: set Reading $reading = $value";
+            readingsSingleUpdate($defs{$name}, $reading, $value, 1);
+        }
+    };
+    
     # set directory index
     $filename= AttrVal($name,"directoryindex","index.html") unless($filename);
     my $MIMEtype= filename2MIMEType($filename);
@@ -147,7 +179,8 @@ sub HTTPSRV_CGI() {
 <a name="HTTPSRV"></a>
 <h3>HTTPSRV</h3>
 <ul>
-  Provides a mini HTTP server plugin for FHEMWEB. It serves files from a given directory.<p>
+  Provides a mini HTTP server plugin for FHEMWEB. It serves files from a given directory. 
+  It optionally accepts a query string to set readings of this device if an attribute allows the given reading<p>
 
   HTTPSRV is an extension to <a href="HTTPSRV">FHEMWEB</a>. You must install FHEMWEB to use HTTPSRV.</p>
 
@@ -163,6 +196,11 @@ sub HTTPSRV_CGI() {
     Example:
     <ul>
       <code>define myJSFrontend HTTPSRV jsf /usr/share/jsfrontend My little frontend</code><br>
+      or <br>
+      <code>
+        define kindleweb HTTPSRV kindle /opt/fhem/kindle Kindle Web<br>
+        attr kindleweb readings KindleBatt
+      </code><br>
     </ul>
     <br>
   </ul>
@@ -179,6 +217,7 @@ sub HTTPSRV_CGI() {
   <br><br>
   <ul>
     <li>directoryindex: if the request is sent with no filename, i.e. the infix (with or without trailing slash) only, the file given in this attribute is loaded. Defaults to <code>index.html</code>.</li>
+    <li>readings: a comma separated list of reading names. If the request ends with a querystring like <code>?Batt=43</code> and an attribute is set like <code>attr kindleweb readings Batt</code>, then a reading with the Name of this Attribute (here Batt) is created with the value from the request.</li>
   </ul>
   <br><br>
 
