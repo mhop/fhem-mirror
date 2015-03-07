@@ -1,20 +1,19 @@
 ##############################################
-#     $Id$
-#
-#     This file is part of fhem.
-#
-#     Fhem is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
-#
-#     Fhem is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+# $Id$
+# 
+# This file is part of fhem.
+# 
+# Fhem is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+# Fhem is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################
 
@@ -35,7 +34,7 @@ DOIF_Initialize($)
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame waitsame waitdel cmdpause";
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame waitsame waitdel cmdpause ".$readingFnAttributes;
 }
 
 
@@ -276,6 +275,8 @@ sub ReplaceAllReadingsDoIf($$$$)
             $event=1;
           } elsif ($condition == -2) {
             $hash->{state}{device} = AddItemDoIf($hash->{state}{device},$device) if ($device ne $hash->{NAME});
+          } elsif ($condition == -3) {
+              $hash->{itimer}{all} = AddItemDoIf($hash->{itimer}{all},$device);
           }
         }
       } else {
@@ -374,13 +375,25 @@ DOIF_CheckTimers($$$$$)
   my $pos;
   my $time;
   my $block;
+  my $result;
   my ($hash,$timer,$condition,$trigger,$timerarray)=@_;
-  if ($timer =~ /^(\+)?((\{.*\})|([0-9][0-9](:[0-5][0-9]){1,2}))(\|[0-8]+$|-(\+)?([0-9][0-9](:[0-5][0-9]){1,2})|-(\+)?({.*})|$)(\|[0-8]+$|$)/) {
+  if ($timer =~ /^(\+)?((\{.*\})|(\[.*\])|([0-9][0-9](:[0-5][0-9]){1,2}))(\|[0-8]+$|-(\+)?(([0-9][0-9](:[0-5][0-9]){1,2})|({.*})|(\[.*\]))|$)(\|[0-8]+$|$)/) {
     while ($timer ne "") {
       if ($timer=~ /^\s*\{/) { 
         ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\{\}]'); 
         return ($time,$err) if ($err);
         $time="{".$time."}";
+        if ($timer =~ /^\s*\|/g) {
+          $pos=pos($timer);
+          $days=substr($timer,$pos);
+          $timer="";
+        }
+      } elsif ($timer=~ /^\s*\[/) { 
+        ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\[\]]'); 
+        return ($time,$err) if ($err);
+        $time="[".$time."]";
+        ($result,$err)=ReplaceAllReadingsDoIf($hash,$time,-3,0);
+        return ($time,$err) if ($err);
         if ($timer =~ /^\s*\|/g) {
           $pos=pos($timer);
           $days=substr($timer,$pos);
@@ -408,8 +421,10 @@ DOIF_CheckTimers($$$$$)
       $hash->{timeCond}{$nr}=$condition;
       $hash->{days}{$nr}=$days if ($days ne "");
       ${$timerarray}[$nr]={hash=>$hash,nr=>$nr};
-      $err=(DOIF_SetTimer("DOIF_TimerTrigger",\${$timerarray}[$nr]));
-      return($hash->{time}{$nr},$err) if ($err);
+      if ($init_done) {
+        $err=(DOIF_SetTimer("DOIF_TimerTrigger",\${$timerarray}[$nr]));
+        return($hash->{time}{$nr},$err) if ($err);
+      }
       $hash->{timers}{$condition}.=" $nr " if ($trigger);
       $hash->{timerfunc}{$nr}=\${$timerarray}[$nr];
     }
@@ -420,6 +435,7 @@ DOIF_CheckTimers($$$$$)
     }
     return ($block,"");
   }
+  delete ($hash->{helper}{modify});
   return("","");
 }
 
@@ -673,25 +689,47 @@ DOIF_Notify($$)
   my ($hash, $dev) = @_;
   my $pn = $hash->{NAME};
   return "" if($attr{$pn} && $attr{$pn}{disable});
-  return "" if (!$hash->{devices}{all} and !$hash->{state}{device}) ;
   return "" if (!$dev->{NAME});
   my $device;
   my $reading;
   my $internal;
   my $ret;
+  my $err;
+  
+  if ($dev->{NAME} eq "global" and ((EventDoIf("global","global",deviceEvents($dev, AttrVal("global", "addStateEvent", 0)),"INITIALIZED")) or EventDoIf("global","global",deviceEvents($dev, AttrVal("global", "addStateEvent", 0)),"REREADCFG")))
+  {
+    if ($hash->{helper}{last_timer} > 0){
+      for (my $j=0; $j<$hash->{helper}{last_timer};$j++)
+      {
+        DOIF_SetTimer("DOIF_TimerTrigger",$hash->{timerfunc}{$j});
+      }
+    }
+    return undef;      
+  }
+  
+  if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
+    for (my $j=0; $j<$hash->{helper}{last_timer};$j++)
+    {
+      if ($hash->{time}{$j} =~ /\[$dev->{NAME}\]|\[$dev->{NAME}:/) {
+        DOIF_SetTimer("DOIF_TimerTrigger",$hash->{timerfunc}{$j});
+      } 
+    }
+  }
+  
+  return "" if (!$hash->{devices}{all} and !$hash->{state}{device}) ;
   
   if (($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) {
     if ($hash->{readings}{all}) {
       foreach my $item (split(/ /,$hash->{readings}{all})) {
         ($device,$reading)=(split(":",$item));
-        readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$reading,$defs{$device}{READINGS}{$reading}{VAL},0) if ($item and $device eq $dev->{NAME} and $defs{$device}{READINGS}{$reading});
+        readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$reading,$defs{$device}{READINGS}{$reading}{VAL},0) if ($item and $device eq $dev->{NAME} and defined ($defs{$device}{READINGS}{$reading}));
       }
     }
     
     if ($hash->{internals}{all}) {
       foreach my $item (split(/ /,$hash->{internals}{all})) {
         ($device,$internal)=(split(":",$item));
-        readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$internal,$defs{$device}{$internal},0) if ($item and $device eq $dev->{NAME} and $defs{$device}{$internal});
+        readingsSingleUpdate ($hash, "e_".$dev->{NAME}."_".$internal,$defs{$device}{$internal},0) if ($item and $device eq $dev->{NAME} and defined ($defs{$device}{$internal}));
       }
     }
     #my ($seconds, $microseconds) = gettimeofday();
@@ -711,7 +749,7 @@ DOIF_Notify($$)
   }
   if (($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / and !$ret) {
     DOIF_SetState($hash,"","","");
-  }    
+  }
   return undef;
 } 
   
@@ -745,7 +783,25 @@ DOIF_SetTimer($$)
     $timeStr=substr($timeStr,1);
     $rel=1;
   }
+  if ($timeStr=~ /^\s*\[/) {
+    my $err;
+    ($timeStr,$err)=ReplaceAllReadingsDoIf($hash,$timeStr,-3,1);
+    if ($err)
+    {
+      readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"error: ".$err,0);
+      RemoveInternalTimer($timer);
+      $hash->{realtime}{$nr}="00:00:00";
+      return $err;
+    }
+  }
   my ($err, $h, $m, $s, $fn) = GetTimeSpec($timeStr);
+  if ($err)
+  {
+    readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"error: ".$err,0);
+    RemoveInternalTimer($timer);
+    $hash->{realtime}{$nr}="00:00:00";
+    return $err;
+  }
   return $err if($err);
   my $second = $h*3600+$m*60+$s;
   #my $now = time();
@@ -859,7 +915,6 @@ CmdDoIf($$)
   } else {
     $tail =~ s/\n//g;
   }
-  
   if (defined $hash->{helper}) #def modify
   {
     RemoveInternalTimer($hash);
@@ -875,6 +930,7 @@ CmdDoIf($$)
     delete ($hash->{time});
     delete ($hash->{timer});
     delete ($hash->{timers});
+    delete ($hash->{itimer});
     delete ($hash->{timeCond});
     delete ($hash->{realtime});
     delete ($hash->{days});
@@ -1054,7 +1110,7 @@ The commands are always processed from left to right. There is only one command 
 + it can be any FHEM commands and perl commands are executed<br>
 + syntax checking at the time of definition are identified missing brackets<br>
 + status is specified with <code>[&lt;devicename&gt;]</code>, readings with <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code> or internals with <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code><br>
-+ time information on the condition: <code>[HH:MM:SS]</code> or <code>[HH:MM]</code> or <code>[{&lt;perl-function&gt;}]</code><br>
++ time information on the condition: <code>[HH:MM:SS]</code> or <code>[HH:MM]</code> or <code>[[&lt;devicename&gt;]]</code> or <code>[[&lt;devicename&gt;:&lt;readingname&gt;]]</code> or <code>[{&lt;perl-function&gt;}]</code><br>
 + time intervals: <code>[&lt;begin&gt;-&lt;end&gt;]</code> for <code>&lt;begin&gt;</code> and <code>&lt;end&gt;</code>, the above time format can be selected.<br>
 + relative times preceded by a plus sign <code>[+&lt;time&gt;]</code> or <code>[+&lt;begin&gt;-+&lt;end&gt;]</code> combined with Perl functions<br>
 + weekday control: <code>[&lt;time&gt;|012345678]</code> or <code>[&lt;begin&gt;-&lt;end&gt;|012345678]</code> (0-6 corresponds to Sunday through Saturday) such as 7 for $we and 8 for !$we<br>
@@ -1097,7 +1153,7 @@ Die Angaben werden immer von links nach rechts abgearbeitet. Es wird immer nur e
 + Bedingungen werden vom Perl-Interpreter ausgewertet, daher beliebige logische Abfragen möglich<br>
 + Die Perl-Syntax wird um Angaben von Stati, Readings, Internals, Events oder Zeitangaben in eckigen Klammern erweitert, diese führen zur Triggerung des Moduls<br>
 + Stati werden mit <code>[&lt;devicename&gt;]</code>, Readings mit <code>[&lt;devicename&gt;:&lt;readingname&gt;]</code>, Internals mit <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code> oder Events mit <code>[&lt;devicename&gt;:?&lt;regexp&gt;]</code> angegeben<br>
-+ Zeitangaben in der Bedingung: <code>[HH:MM:SS]</code> oder <code>[HH:MM]</code> oder <code>[{&lt;perl-function&gt;}]</code><br>
++ Zeitangaben in der Bedingung: <code>[HH:MM:SS]</code> oder <code>[HH:MM]</code> oder <code>[[&lt;devicename&gt;]]</code> oder <code>[[&lt;devicename&gt;:&lt;readingname&gt;]]</code> oder <code>[{&lt;perl-function&gt;}]</code><br>
 + Zeitintervalle: <code>[&lt;begin&gt;-&lt;end&gt;]</code> für <code>&lt;begin&gt;</code> bzw. <code>&lt;end&gt;</code> kann das obige Zeitformat gewählt werden<br>
 + relative Zeitangaben mit vorangestelltem Pluszeichen <code>[+&lt;time&gt;]</code> oder <code>[+&lt;begin&gt;-+&lt;end&gt;]</code> kombinierbar mit Perl-Funktionen s. o.<br>
 + Wochentagsteuerung: <code>[&lt;time&gt;|012345678]</code> oder <code>[&lt;begin&gt;-&lt;end&gt;|012345678]</code> (0-6 entspricht Sonntag bis Samstag) sowie 7 für $we und 8 für !$we<br>
@@ -1216,9 +1272,35 @@ Einschalten am Freitag ausschalten am Montag:<br>
 <br>
 <code>define di_light DOIF ([22:00|5]) (set light on) DOELSEIF ([10:00|1]) (set light off) </code><br>
 <br>
-Schalten bei Sonnenaufgang und Sonnenuntergang:<br>
+Schalten mit Zeitfunktionen, hier: bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
 <code>define di_light DOIF ([{sunrise_abs()}-{sunset(1800,"17:00","21:00")}])(set outdoorlight off) DOELSE (set outdoorlight on)</code><br>
+<br>
+<b>Schalten mit indirekten Zeitangaben</b><br>
+<br>
+Statt fester Zeitangaben können auch Stati, Readings oder Internals angegeben werden. Diese müssen eine Zeitangabe im Format HH:MM oder HH:MM:SS beinhalten.<br>
+<br>
+<u>Anwendungsbeispiel</u><br>
+<br>
+<code>define time dummy<br>
+set time 08:00<br>
+define di_time DOIF ([[time]])(set lamp on)</code><br>
+<br>
+oder Angaben mit Zeitintervallen<br>
+<br>
+<code>define begin dummy<br>
+set begin 08:00<br>
+<br>
+define end dummy<br>
+set end 10:00<br>
+<br>
+define di_time DOIF ([[begin]-[end]])(set radio on) DOELSE (set radio off)</code><br>
+<br>
+Bei einer Änderung des angebenen Status oder Readings wird die geänderte Zeit sofort im Modul aktualisiert.<br>
+<br>
+Die Endzeit soll abhängig von der Beginnzeit mit Hilfe einer eignen Perl-Funktion, hier: <code>OffTime()</code>, bestimmt werden. <code>begin</code> und <code>end</code> sind Dummys, wie oben definiert:<br>
+<br>
+<code>define di_time DOIF ([[begin]-[end]]) (set lamp on, set end_time {(OffTime("[begin]"))}) DOELSE (set lamp off)</code><br>
 <br>
 <b>Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</b><br>
 <br>
@@ -1234,9 +1316,9 @@ Schalten bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
 Angaben in eckigen Klammern, die mit einem Fragezeichen beginnen, führen zu keiner Triggerung des Moduls, sie dienen lediglich der Abfrage.<br>
 <br>
-<u>Anwendungsbeispiel</u>: Licht soll zwischen 06:00 und 10:00 angehen, getriggert wird nur durch den Bewegungssensor nicht um 06:00 bzw. 10:00 Uhr<br>
+<u>Anwendungsbeispiel</u>: Licht soll zwischen 06:00 und 10:00 angehen, getriggert wird nur durch den Taster nicht um 06:00 bzw. 10:00 Uhr<br>
 <br>
-<code>define di_motion DOIF ([?06:00-10:00] and [BM] eq "motion")(set lamp on-for-timer 600)<br>
+<code>define di_motion DOIF ([?06:00-10:00] and [button])(set lamp on-for-timer 600)<br>
 attr di_motion do always</code><br>
 <br>
 <b>Nutzung von Readings, Stati oder Internals im Ausführungsteil</b><br>
@@ -1280,10 +1362,18 @@ attr di_washer wait 300</code><br>
 <br>
 Eine erneute Benachrichtigung wird erst wieder ausgelöst, wenn zwischendurch der Verbrauch über 2 Watt angestiegen war.<br>
 <br>
-Rolladen um 20 Minuten zeitverzögert bei Sonne runter- bzw. hochfahren (wenn der Zustand der Sonne wechselt, wird die Verzögerungszeit zurückgesetzt):<br>
+<u>Anwendungsbeispiel</u>: Rolladen um 20 Minuten zeitverzögert bei Sonne runter- bzw. hochfahren (wenn der Zustand der Sonne wechselt, wird die Verzögerungszeit zurückgesetzt):<br>
 <br>
 <code>define di_shutters DOIF ([Sun] eq "on") (set shutters down) DOELSE (set shutters up) <br>
 attr di_shutters wait 1200:1200</code><br>
+<br>
+<u>Anwendungsbeispiel</u>: Rolladen nach Sonnenuntergang mit Zufallsverzögerung von 10 bis 20 Minuten herunterfahren:<br>
+<br>
+<code>define di_shutters DOIF ([{sunset_abs()}]) (set shutters down, attr di_shutters wait {(600+int(rand(600)))})<br>
+attr di_shutters do always<br>
+attr di_shutters wait 600</code><br>
+<br>
+Hier wird der wait-timer per wait-Attribut für die nächste Ausführung per Zufall vorbereitet.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Beschattungssteuerung abhängig von der Temperatur. Der Rollladen soll runter von 11:00 Uhr bis Sonnenuntergang, wenn die Temperatur über 26 Grad ist. Temperaturschwankungen um 26 Grad werden mit Hilfe des wait-Attributes durch eine 15 minutige Verzögerung ausgeglichen. <br>
 <br>
@@ -1458,7 +1548,7 @@ Die Nachbildung eines on-for-timers lässt sich mit zwei DOIF´s und einem Dummy
 <br>
 <code>define switch_d dummy<br>
 <br>
-define di_switch DOIF ([detector] eq "motion") (set switch_d on, set switch_d off)<br>
+define di_switch DOIF ([detector:?motion]) (set switch_d on, set switch_d off)<br>
 attr di_switch do always<br>
 <br>
 define di_light DOIF ([switch_d] eq "on") (set light on) DOELSE (set light off)<br>
