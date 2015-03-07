@@ -25,9 +25,9 @@
 #	2014-12-05	edit (Wzut)
 #	2014-12-08	add schedule and list (Wzut) 
 #	2014-12-09	add dellist (Wzut)
-#	2015-02-21	first svn version (Wzut)
-#	2015-02-22	add attr read-only, fix attr interval, update command.ref
-#
+#	2015-02-21	V1.00 first svn version (Wzut)
+#	2015-02-22	V1.01 add attr read-only, fix attr interval, update command.ref
+#	2015-03-07	V1.02 fix schedule
 ################################################################
 
 package main;
@@ -109,7 +109,7 @@ sub EDIPLUG_Define($$) {
     $hash->{INTERVAL}   = $attr{$a[0]}{interval};
 
     if( !defined( $attr{$a[0]}{user} ) ) { $attr{$a[0]}{user} = "admin"}
-    $hash->{user}        = $attr{$a[0]}{user};
+    $hash->{user}       = $attr{$a[0]}{user};
 
     if( !defined( $attr{$a[0]}{password} ) ) { $attr{$a[0]}{password} = "1234"}
     $hash->{pwd}        = $attr{$a[0]}{password};
@@ -173,7 +173,7 @@ sub EDIPLUG_Read($$$)
     if ($err) 
     {
         my $error = "error";
-        $error .=  " ".$hash->{code} if (defined($hash->{code})); 
+        $error .=  " ".$hash->{code} if (defined($hash->{code}) ne "200"); 
         $hash->{ERROR} = $err;
         $hash->{ERRORTIME} = TimeNow();
         Log3 $name, 3, "$name: return $error -> $err";
@@ -211,7 +211,7 @@ sub EDIPLUG_Read($$$)
         if ($hash->{MODEL} eq "SP2101W")
         {
           $hash->{POWER} = uc($xmlres->{CMD}->{'Device.System.Power.State'});
-          $state = $hash->{POWER}." / ".$hash->{helper}{power}. " W / ".$hash->{helper}{current}." A";
+          $state = ($hash->{POWER} ne "OFF") ? $hash->{POWER}." / ".$hash->{helper}{power}. " W / ".$hash->{helper}{current}." A" : $hash->{POWER};
         }
         else
         {
@@ -274,6 +274,7 @@ sub EDIPLUG_Read($$$)
         ($hash->{STATE}   eq "defined"))
      { 
        $hash->{LASTCMD} = "";
+       select(undef, undef, undef, 1); # TODO , sehr hässlich - aber irgend eine Wartezeit muss sein
        EDIPLUG_Get($hash,$name,"status");
      }    
      # und nach dem Status noch fuer die 2101 die aktuellen Power Werte
@@ -378,16 +379,16 @@ sub EDIPLUG_Set($@) {
 
       if($cmd eq "clear_error")
    {
-      $hash->{ERROR} = undef;
+      $hash->{ERROR}      = undef;
       $hash->{ERRORCOUNT} = 0;
-      $hash->{LASTCMD} = $cmd;
+      $hash->{LASTCMD}    = $cmd;
       return undef;
    }
 
    if(($cmd eq "on") || ($cmd eq "off"))
    {
     $hash->{LASTCMD} = $cmd;
-    $hash->{data} = $datas{$cmd};
+    $hash->{data}    = $datas{$cmd};
    }
    elsif(($cmd eq "list") || ($cmd eq "addlist") || ($cmd eq "dellist"))
    {
@@ -397,19 +398,19 @@ sub EDIPLUG_Set($@) {
       my $day = $a[0];
       shift @a;
 
-      return "set $name $cmd : wrong day $day, use 0-6" if (($day >6) || ($day <0));
-      return "set $name $cmd : wrong start time !" if (index($a[0],":") < 0);
-      return "set $name $cmd : wrong end time !" if (index($a[1],":") < 0);
-      return "set $name $cmd : don't use exact the same start and end time !" if ($a[0] eq $a[1]);
-      return "set $name $cmd : wrong on/off command , use on or off" if (($a[2] ne "on") && ($a[2] ne "off") && ($cmd ne "dellist")) ;
+      return "set $name $cmd : wrong day $day, please use 0-6" if (($day >6) || ($day <0));
+      return "set $name $cmd : wrong start time,missing : !" if (index($a[0],":") < 0);
+      return "set $name $cmd : wrong end time, missing :  !" if (index($a[1],":") < 0);
+      return "set $name $cmd : don't use the same start and end time !" if ($a[0] eq $a[1]);
+      return "set $name $cmd : wrong on/off command, use on or off" if (($a[2] ne "on") && ($a[2] ne "off") && ($cmd ne "dellist")) ;
 
       my $ret = encode_list(@a);
-      return "set $name $cmd : ".$ret if (length($ret) != 5);
+      return "set $name $cmd is to short ($ret)" if (length($ret) != 5);
 
       if ($cmd eq "addlist") 
       { 
-        return "set $name $cmd : schedule list is empty , please use 'get $name schedule' first" if($hash->{helper}{"list"}[7] eq "");
-        return "set $name $cmd : this start and end time block already exist" if (index($hash->{helper}{"list"}[$day],$ret) > -1) ;
+        return "set $name $cmd : internal schedule list is empty, please use 'get $name schedule' first" if($hash->{helper}{"list"}[7] eq "");
+        return "set $name $cmd : start and end time block already exist !" if (index($hash->{helper}{"list"}[$day],$ret) > -1) ;
 
         # Time Block schon vorhanden , aber jetzt on/off Umschaltung ?
         my $reverse_cmd = substr($ret,0,4);
@@ -432,10 +433,10 @@ sub EDIPLUG_Set($@) {
            $pos = index($hash->{helper}{"list"}[$day],$ret);
          }
  
-        return "set $name $cmd : day $day ,this start and end time block do not exist" if ($pos<0);
+        return "set $name $cmd : day $day, start and end time block do not exist" if ($pos<0);
 
         $hash->{helper}{"list"}[$day] =~ s/$ret//g; # raus aus der Liste
-        $hash->{helper}{"list"}[$day] =~ s/\--/\-/g; # eventuelle jetzt noch doppelte Minuszeichen bereinigen
+        $hash->{helper}{"list"}[$day] =~ s/\--/\-/g; # eventuelle jetzt noch vorhandene doppelte Minuszeichen bereinigen
         # war das erste von mehr als einem ?
         if (index($hash->{helper}{"list"}[$day], "-")  == 0) { $hash->{helper}{"list"}[$day] = substr($hash->{helper}{"list"}[$day],1); }
         # oder der letzte von mehr als einem ?
@@ -456,8 +457,8 @@ sub EDIPLUG_Set($@) {
       my $day    = $a[0];
       my $oocmd =  $a[1];
       return "set $name $cmd : wrong day $day, use 0-6" if (($day >6) || ($day <0));
-      return "set $name $cmd : wrong on/off command , use on or off" if (($oocmd ne "on") && ($oocmd ne "off"));
-      return "set $name $cmd : schedule list is empty , please use 'get $name schedule' first" if($hash->{helper}{"list"}[7] eq "");
+      return "set $name $cmd : wrong on/off command, please use on or off" if (($oocmd ne "on") && ($oocmd ne "off"));
+      return "set $name $cmd : schedule list is empty, please use 'get $name schedule' first" if($hash->{helper}{"list"}[7] eq "");
 
       $hash->{LASTCMD} = $cmd;
       $hash->{data}  = $data_s."setup\"><SCHEDULE><Device.System.Power.Schedule.".$day." value=\"".uc($oocmd)."\"></Device.System.Power.Schedule.".$day."></SCHEDULE".$data_e;
@@ -468,7 +469,7 @@ sub EDIPLUG_Set($@) {
       return "set $name $cmd : DayOfWeek(0-6)" if(int(@a) < 2);
       shift @a; 
       my $day    = $a[0];
-      return "set $name $cmd : wrong day $day, use 0-6" if (($day >6) || ($day <0));
+      return "set $name $cmd : wrong day $day, please use 0-6" if (($day >6) || ($day <0));
       $hash->{LASTCMD} = $cmd; 
 
       $hash->{data}  = $data_s."setup\"><SCHEDULE><Device.System.Power.Schedule.".$day.".List /".$data_e;
@@ -523,12 +524,15 @@ sub decode_list($)
   # Bsp : 10111-01020-nX001
   my ($string) = @_ ;
   return "" if (length($string)<5); # zu kurz
+  # die beiden Sonderfaelle - ganzer Tag an  oder aus 
+  return "00:00-24:00 on" if ($string eq "00001");
+  return "00:00-24:00 off" if ($string eq "00000");
 
   my @a = split("-",$string);
   my @sorted = sort @a;
   my $s="";  
 
-  my $timetab = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX";  # 0 - 59
+  my $timetab = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";  # nur 0 - 59 wird gebraucht
 
   foreach(@sorted)
   {
@@ -568,13 +572,16 @@ sub encode_list(@)
   
   my ($eh, $em) = split(":",$end);
   $eh++; $eh--; $em++; $em--; 
+  $eh = 0 if (($eh == 24) && ($em == 0)); # den Sonderfall 24:00 Uhr zulassen !
   return "wrong end hour !"   if ($eh > 23);
   return "wrong end minute !" if ($em > 59);
   return "starttime is after endtime !" if ($sh > $eh);
+  return "starttime is after endtime !" if (($sh == $eh) && ($sm > $em));
+
   $ret .= substr($timetab,$eh,1); 
   $ret .= substr($timetab,$em,1);
- 
-  return "don't use the same start and end time !" if (substr($ret,0,2) eq substr($ret,2,2));
+
+  return "don't use the same start and end time !" if (substr($ret,0,2) eq substr($ret,2,2)) && (($eh != 0) && ($em != 0));
 
   $ret .= ($cmd eq "on") ? "1" : "0";
   return $ret;
@@ -610,7 +617,8 @@ requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
   <ul>
   <li>on        => switch power on</li>
   <li>off       => switch power off</li>
-  <li>list      => set a new list for one day with one entry : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) Command(on/off) e.g. 1 10:00 11:30 on</li>
+  <li>list      => set a new list for one day with one entry : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) Command(on/off) e.g. 1 10:00 11:30 on<br>
+                   use (DayOfWeek) 00:00 24:00 on to switch the complete day on</li>
   <li>addlist   => add a new on/off time : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) Command(on/off) e.g. 1 10:00 11:30 on</li>
   <li>dellist   => remove a existing on/off time : DayOfWeek(0-6) Starttime(hh:mm) Endtime(hh:mm) e.g. 1 10:00 11:30</li>
   <li>delete    => delete timelist of one day : DayOfWeek(0-6)</li>
@@ -677,7 +685,8 @@ ben&oml;ntigt XML:Simple -> sudo apt-get install libxml-simple-perl
   <ul>
   <li>on        => schalte an</li>
   <li>off       => schalte aus</li>
-  <li>list      => erzeugt eine neue Zeitplan Liste mit einem Eintrag : Wochentag(0-6) Startzeit(hh:mm) Endezeit(hh:mm) Kommando(on/off) Bsp. 1 10:00 11:30 on</li>
+  <li>list      => erzeugt eine neue Zeitplan Liste mit einem Eintrag : Wochentag(0-6) Startzeit(hh:mm) Endezeit(hh:mm) Kommando(on/off) Bsp. 1 10:00 11:30 on<br>
+                   mit Wochentag 00:00 24:00 on kann man den kompletten Tag einschalten</li>
   <li>addlist   => f&uuml;gt eine neue Schaltzeit einer bestehenden Zeitplan Liste hinzu : Wochentag(0-6) Startzeit(hh:mm) Endtezeit(hh:mm) Kommando(on/off) Bsp. 1 10:00 11:30 on</li>
   <li>dellist   => l&ouml;scht eine bestimmte Schaltzeit eines Tages : Wochentag(0-6) Startzeit(hh:mm) Endezeit(hh:mm) Bsp. 1 10:00 11:30</li>
   <li>delete    => l&ouml;scht die Liste eines ganzen Tages : Wochentag(0-6)</li>
