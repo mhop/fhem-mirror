@@ -17,6 +17,7 @@ notify_Initialize($)
   $hash->{AttrFn}   = "notify_Attr";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals forwardReturnValue:0,1 showtime:0,1 addStateEvent:0,1";
   $hash->{SetFn}    = "notify_Set";
+  $hash->{StateFn}  = "notify_State";
   $hash->{FW_detailFn} = "notify_fhemwebFn";
 }
 
@@ -125,7 +126,7 @@ notify_Set($@)
   my $me = $hash->{NAME};
 
   return "no set argument specified" if(int(@a) < 2);
-  my %sets = (addRegexpPart=>2, removeRegexpPart=>1);
+  my %sets = (addRegexpPart=>2, removeRegexpPart=>1, inactive=>0, active=>0);
   
   my $cmd = $a[1];
   return "Unknown argument $cmd, choose one of " # No dropdown in FHEMWEB
@@ -159,7 +160,26 @@ notify_Set($@)
     $hash->{DEF} = "$re ".$hash->{".COMMAND"};
     notifyRegexpChanged($hash, $re);
 
+  } elsif($cmd eq "inactive") {
+    readingsSingleUpdate($hash, "state", "inactive", 1);
+
   }
+  elsif($cmd eq "active") {
+    readingsSingleUpdate($hash, "state", "active", 1)
+        if(!AttrVal($me, "disable", undef));
+  }
+  
+  return undef;
+}
+
+#############
+sub
+notify_State($$$$)
+{
+  my ($hash, $tim, $vt, $val) = @_;
+
+  return undef if($vt ne "state" || $val ne "inactive");
+  readingsSingleUpdate($hash, "state", "inactive", 1);
   return undef;
 }
 
@@ -331,22 +351,24 @@ notify_fhemwebFn($$$$)
   <a name="notifyset"></a>
   <b>Set </b>
   <ul>
-    <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
-      <ul>
+    <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;<br>
         add a regexp part, which is constructed as device:regexp.  The parts
         are separated by |.  Note: as the regexp parts are resorted, manually
-        constructed regexps may become invalid.
-      </ul>
-      </li>
-    <li>removeRegexpPart &lt;re&gt;
-      <ul>
+        constructed regexps may become invalid. </li>
+    <li>removeRegexpPart &lt;re&gt;<br>
         remove a regexp part.  Note: as the regexp parts are resorted, manually
         constructed regexps may become invalid.<br>
         The inconsistency in addRegexpPart/removeRegexPart arguments originates
-        from the reusage of javascript functions.
-      </ul>
-      </li>
-      <br>
+        from the reusage of javascript functions.</li>
+    <li>inactive<br>
+        Inactivates the current device. Note the slight difference to the
+        disable attribute: using set inactive the state is automatically saved
+        to the statefile on shutdown, there is no explicit save necesary.<br>
+        This command is intended to be used by scripts to temporarily
+        deactivate the notify.<br>
+        The concurrent setting of the disable attribute is not recommended.</li>
+    <li>active<br>
+        Activates the current device (see inactive).</li>
     </ul>
     <br>
 
@@ -520,19 +542,27 @@ notify_fhemwebFn($$$$)
   <a name="notifyset"></a>
   <b>Set </b>
   <ul>
-    <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;
-      <ul>
+    <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;<br>
         F&uuml;gt ein regexp Teil hinzu, der als device:regexp aufgebaut ist.
         Die Teile werden nach Regexp-Regeln mit | getrennt.  Achtung: durch
         hinzuf&uuml;gen k&ouml;nnen manuell erzeugte Regexps ung&uuml;ltig
-        werden.
-      </ul></li>
-    <li>removeRegexpPart &lt;re&gt;
-      <ul>
+        werden.</li>
+    <li>removeRegexpPart &lt;re&gt;<br>
         Entfernt ein regexp Teil.  Die Inkonsistenz von addRegexpPart /
         removeRegexPart-Argumenten hat seinen Ursprung in der Wiederverwendung
-        von Javascript-Funktionen.
-      </ul></li>
+        von Javascript-Funktionen.</li>
+    <li>inactive<br>
+        Deaktiviert das entsprechende Ger&auml;t. Beachte den leichten
+        semantischen Unterschied zum disable Attribut: "set inactive"
+        wird bei einem shutdown automatisch in fhem.state gespeichert, es ist
+        kein save notwendig.<br>
+        Der Einsatzzweck sind Skripte, um das notify tempor&auml;r zu
+        deaktivieren.<br>
+        Das gleichzeitige Verwenden des disable Attributes wird nicht empfohlen.
+        </li>
+    <li>active<br>
+        Aktiviert das entsprechende Ger&auml;t, siehe inactive.
+        </li>
     </ul>
     <br>
 

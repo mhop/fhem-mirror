@@ -695,6 +695,8 @@ IsDisabled($)
   return 0 if(!$devname || !defined($attr{$devname}));
 
   return 1 if($attr{$devname}{disable});
+  return 1 if($defs{$devname} && $defs{$devname}{STATE} &&
+              $defs{$devname}{STATE} eq "inactive");
 
   my $dfi = $attr{$devname}{disabledForIntervals};
   if(defined($dfi)) {
