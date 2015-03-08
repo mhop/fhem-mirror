@@ -1276,17 +1276,18 @@ Schalten mit Zeitfunktionen, hier: bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
 <code>define di_light DOIF ([{sunrise_abs()}-{sunset(1800,"17:00","21:00")}])(set outdoorlight off) DOELSE (set outdoorlight on)</code><br>
 <br>
-<b>Schalten mit indirekten Zeitangaben</b><br>
+<b>Indirekten Zeitangaben</b><br>
 <br>
-Statt fester Zeitangaben können auch Stati, Readings oder Internals angegeben werden. Diese müssen eine Zeitangabe im Format HH:MM oder HH:MM:SS beinhalten.<br>
+Oft möchte man keine festen Zeiten im Modul angeben, sondern Zeiten, die man z. B. über Dummys über die Weboberfläche verändern kann.
+Statt fester Zeitangaben können Stati, Readings oder Internals angegeben werden. Diese müssen eine Zeitangabe im Format HH:MM oder HH:MM:SS beinhalten.<br>
 <br>
-<u>Anwendungsbeispiel</u><br>
+<u>Anwendungsbeispiel</u>: Lampe soll zu einer bestimmten Zeit eingeschaltet werden. Die Zeit soll über den Dummy <code>time</code> einstellbar sein:<br>
 <br>
 <code>define time dummy<br>
 set time 08:00<br>
 define di_time DOIF ([[time]])(set lamp on)</code><br>
 <br>
-oder Angaben mit Zeitintervallen<br>
+Ebenfalls funktionieren indirekte Zeitangaben mit Zeitintervallen. Hier wird die Ein- und Ausschaltzeit jeweils über einen Dummy bestimmt:<br>
 <br>
 <code>define begin dummy<br>
 set begin 08:00<br>
@@ -1294,13 +1295,23 @@ set begin 08:00<br>
 define end dummy<br>
 set end 10:00<br>
 <br>
-define di_time DOIF ([[begin]-[end]])(set radio on) DOELSE (set radio off)</code><br>
+define di_time DOIF ([[begin]-[end]]) (set radio on) DOELSE (set radio off)</code><br>
 <br>
 Bei einer Änderung des angebenen Status oder Readings wird die geänderte Zeit sofort im Modul aktualisiert.<br>
 <br>
-Die Endzeit soll abhängig von der Beginnzeit mit Hilfe einer eignen Perl-Funktion, hier: <code>OffTime()</code>, bestimmt werden. <code>begin</code> und <code>end</code> sind Dummys, wie oben definiert:<br>
+Angabe eines Readings als Zeitangabe. Beispiel: Schalten anhand eines Twilight-Readings:<br> 
 <br>
-<code>define di_time DOIF ([[begin]-[end]]) (set lamp on, set end_time {(OffTime("[begin]"))}) DOELSE (set lamp off)</code><br>
+<code>define di_time DOIF ([[myTwilight:ss_weather]])(set lamp on)</code><br>
+<br>
+Dynamische Änderung einer Zeitangabe.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Die Endzeit soll abhängig von der Beginnzeit mit Hilfe einer eigenen Perl-Funktion, hier: <code>OffTime()</code>, bestimmt werden. <code>begin</code> und <code>end</code> sind Dummys, wie oben definiert:<br>
+<br>
+<code>define di_time DOIF ([[begin]-[end]]) (set lamp on, set end {(OffTime("[begin]"))}) DOELSE (set lamp off)</code><br>
+<br>
+Indirekte Zeitangaben lassen sich mit Wochentagangaben kombinieren, z. B.:<br>
+<br>
+<code>define di_time DOIF ([[begin]-[end]|7]) (set radio on) DOELSE (set radio off)</code><br>
 <br>
 <b>Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</b><br>
 <br>
