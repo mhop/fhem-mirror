@@ -1051,7 +1051,7 @@ sub ROOMMATE_StartInternalTimers($$) {
           <br>
           If you are using the <a href="#GEOFANCY">GEOFANCY</a> module, you can easily have your location updated with GEOFANCY events by defining a simple NOTIFY-trigger like this:<br>
           <br>
-          <code>define n_rr_Manfred.location notify geofancy:currLoc_Manfred.* set rr_Manfred location $EVTPART1</code><br>
+          <code>define n_rr_Manfred.location notify geofancy:currLoc_Manfred.* set rr_Manfred location:FILTER=STATE!=$EVTPART1 $EVTPART1</code><br>
           <br>
           By defining geofencing zones called 'home' and 'wayhome' in the iOS app, you automatically get all the features of automatic state changes described above.
         </div>
@@ -1321,7 +1321,7 @@ sub ROOMMATE_StartInternalTimers($$) {
           <br />
           Wenn Sie auch das <a href="#GEOFANCY">GEOFANCY</a> Modul verwenden, können Sie das Reading 'location' ganz einfach über GEOFANCY Ereignisse aktualisieren lassen. Definieren Sie dazu einen NOTIFY-Trigger wie diesen:<br />
           <br />
-          <code>define n_rr_Manfred.location notify geofancy:currLoc_Manfred.* set rr_Manfred location $EVTPART1</code><br />
+          <code>define n_rr_Manfred.location notify geofancy:currLoc_Manfred.* set rr_Manfred location:FILTER=STATE!=$EVTPART1 $EVTPART1</code><br />
           <br />
           Durch das Anlegen von Geofencing-Zonen mit den Namen 'home' und 'wayhome' in der iOS App werden zukünftig automatisch alle Statusänderungen wie oben beschrieben durchgeführt.
         </div>
