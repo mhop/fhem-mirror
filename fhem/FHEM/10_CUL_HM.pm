@@ -2231,9 +2231,9 @@ sub CUL_HM_Parse($$) {#########################################################
       # stateflag meaning unknown
       push @evtEt,[$shash,1,"state:".(($lvl eq "FF")?"locked":((hex($lvl)/2)))];
       if ($chn eq "01"){
-        my %err = (0=>"no",1=>"TurnError",2=>"TiltError");
+        my %err = (0=>"ok",1=>"TurnError",2=>"TiltError");
         my %dir = (0=>"no",1=>"up",2=>"down",3=>"undefined");
-        push @evtEt,[$shash,1,"motorError:".$err{(hex($stat)>>1)&0x03}];
+        push @evtEt,[$shash,1,"motorErr:"  .$err{(hex($stat)>>1)&0x03}];
         push @evtEt,[$shash,1,"direction:" .$dir{(hex($stat)>>4)&0x03}];
       }
       else{ #should be akku
@@ -9031,7 +9031,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   </li>
   <li><B>winMatic</B><br>
       [locked|$value]<br>
-      motorError [no|TurnError|TiltError]<br>
+      motorErr [ok|TurnError|TiltError]<br>
       direction [no|up|down|undefined]<br>
       charge [trickleCharge|charge|dischange|unknown]<br>
       airing [inactiv|$air]<br>
@@ -10310,7 +10310,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       </li>
       <li><B>winMatic</B><br>
         [locked|$value]<br>
-        motorError [no|TurnError|TiltError]<br>
+        motorErr [ok|TurnError|TiltError]<br>
         direction [no|up|down|undefined]<br>
         charge [trickleCharge|charge|dischange|unknown]<br>
         airing [inactiv|$air]<br>

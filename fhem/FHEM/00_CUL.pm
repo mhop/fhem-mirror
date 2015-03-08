@@ -19,6 +19,12 @@ sub CUL_Write($$$);
 sub CUL_SimpleWrite(@);
 sub CUL_WriteInit($);
 
+sub CUL_SendHMPing($);
+
+my $CUL_hmDestDel    = 120;  # destination Delay in ms for Answer Delay in HM
+my $CUL_hmMaxSysDly  = 180;  # max System delay for an Answer not to send
+my $CUL_hmSysACKwait = 0.1; # minimum wait in s before Answer in HM, Startvalue
+
 my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "ccconf"   => 1,
   "version"  => ["V", '^V .*'],
@@ -181,9 +187,12 @@ CUL_Define($$)
     $attr{$name}{dummy} = 1;
     return undef;
   }
-
+  
+  $hash->{helper}{ref}{hmSysACKwait} = $CUL_hmSysACKwait;
+  
   $hash->{DeviceName} = $dev;
   my $ret = DevIo_OpenDev($hash, 0, "CUL_DoInit");
+  
   return $ret;
 }
 
@@ -222,8 +231,12 @@ CUL_Shutdown($)
 sub
 CUL_RemoveHMPair($)
 {
-  my $hash = shift;
+  my($in ) = shift;
+  my(undef,$name) = split(':',$in);
+  my $hash = $defs{$name};
+  RemoveInternalTimer("hmPairForSec:$name");
   delete($hash->{hmPair});
+  delete($hash->{hmPairSerial});
 }
 
 #####################################
@@ -258,8 +271,9 @@ CUL_Set($@)
   } elsif($type eq "hmPairForSec") { ####################################
     return "Usage: set $name hmPairForSec <seconds_active>"
         if(!$arg || $arg !~ m/^\d+$/);
+    CUL_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
-    InternalTimer(gettimeofday()+$arg, "CUL_RemoveHMPair", $hash, 1);
+    InternalTimer(gettimeofday()+$arg, "CUL_RemoveHMPair", "hmPairForSec:$name", 1);
 
   } elsif($type eq "hmPairSerial") { ################################
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
@@ -269,7 +283,10 @@ CUL_Set($@)
     $hash->{HM_CMDNR} = $hash->{HM_CMDNR} ? ($hash->{HM_CMDNR}+1)%256 : 1;
     CUL_SimpleWrite($hash, sprintf("As15%02x8401%s000000010A%s",
                     $hash->{HM_CMDNR}, $id, unpack('H*', $arg)));
+    CUL_RemoveHMPair("hmPairForSec:$name");
+    $hash->{hmPair} = 1;
     $hash->{hmPairSerial} = $arg;
+    InternalTimer(gettimeofday()+20, "CUL_RemoveHMPair", "hmPairForSec:".$name, 1);
 
   } elsif($type eq "freq") { ######################################## MHz
 
@@ -449,16 +466,54 @@ CUL_DoInit($)
     Log3 $name, 1, $msg;
     return $msg;
   }
+
   $ver =~ s/[\r\n]//g;
   $hash->{VERSION} = $ver;
 
-  # Cmd-String feststellen
+  my $vh = "";
+  for (my $tr = 0;$tr<3;$tr++){
+    CUL_SimpleWrite($hash, "VH");
+    ($err, $vh) = CUL_ReadAnswer($hash, "Version_HW", 0, undef);
+    return "$name: $err" if($err && ($err !~ m/Timeout/ || $tr >= 2));
+    last if($vh);
+  }
+  $vh =~ s/[\r\n]//g;
+  $hash->{VERSION_HW} = $vh if ($vh ne $ver);
+   
+  # Cmd-String feststellen, detect TimeStamp
+  if($hash->{VERSION} =~ m/.* (\d+\.\d+).*/) {
+    if ($1 > 1.61) {
+
+      my $ts = "no";
+      for (my $trts = 0;$trts<3;$trts++){
+        CUL_SimpleWrite($hash, "ApTiMeStAmP");
+        ($err, $ts) = CUL_ReadAnswer($hash, "TimeStamp", 0, undef);
+        last if($ts);
+      }
+      $ts =~ s/[\r\n]//g;
+      if ($ts =~ m/TiMeStAmP/){
+	    $ts = "yes";
+      }
+      $hash->{VERSION_TS} = $ts;
+
+      if ($ts eq "yes"){
+        if (AttrVal($name,"rfmode","") eq "HomeMatic") {
+          if (InternalVal($name,"initString","") !~ m/At1/) {
+            $hash->{initString} .= "\nAt1";
+          }
+        }
+      }
+    }
+  }
 
   my $cmds = CUL_Get($hash, $name, "cmds", 0);
   $cmds =~ s/$name cmds =>//g;
   $cmds =~ s/ //g;
   $hash->{CMDS} = $cmds;
   Log3 $name, 3, "$name: Possible commands: " . $hash->{CMDS};
+  
+  CUL_SimpleWrite($hash, "Ax") if ($hash->{CMDS} =~ m/A/); # reset AskSin
+  CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
 
   CUL_WriteInit($hash);
 
@@ -582,38 +637,30 @@ CUL_XmitLimitCheck($$$)
 }
 
 sub
-CUL_XmitDlyHM($$$)
+CUL_XmitDlyHM($$$$)
 {
-  my ($hash,$fn,$now) = @_;
+  my ($hash,$did,$now,$nxt) = @_;
+  my $dDly = 0;
 
-  my (undef,$mTy,undef,$id) = unpack 'A8A2A6A6',$fn if(length($fn)>19);
+  $dDly = $nxt - $now;
+  $dDly -= $hash->{helper}{ref}{Sdly}*0.001;  # correct with current delay of system
+  delete($modules{CUL_HM}{defptr}{$did}{helper}{io}{nextSend});  # only on answer we have to wait
 
-  if($id &&
-     $modules{CUL_HM}{defptr}{$id} &&
-     $modules{CUL_HM}{defptr}{$id}{helper}{io} &&
-     $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend}) {
-    my $dDly = $modules{CUL_HM}{defptr}{$id}{helper}{io}{nextSend} - $now;
-    #$dDly -= 0.04 if ($mTy eq "02");# while HM devices need a rest there are
-                                     # still some devices that need faster
-                                     # reactionfor ack.
-                                     # Mode needs to be determined
-    if ($dDly > 0.01){# wait less then 10 ms will not work
-      $dDly = 0.1 if($dDly > 0.1);
-      Log3 $hash->{NAME}, 5, "CUL $id dly:".int($dDly*1000)."ms";
-      select(undef, undef, undef, $dDly);
-    }
+  if ($dDly > 0){
+    $dDly = $hash->{helper}{ref}{hmSysACKwait} if($dDly > $hash->{helper}{ref}{hmSysACKwait});
+  } else {
+    $dDly = 0;
   }
-  shift(@{$hash->{helper}{$id}{QUEUE}});
-  InternalTimer($now+0.1, "CUL_XmitDlyHMTo", "$hash->{NAME}:$id", 1)
-        if (scalar(@{$hash->{helper}{$id}{QUEUE}}));
-  return 0;
+  $modules{CUL_HM}{defptr}{$did}{helper}{io}{lastSndDly} = $dDly;
+
+  return $dDly; # s we have to wait
 }
 
 sub
 CUL_XmitDlyHMTo($)
 { # waited long enough - next send for this ID
-  my ($name,$id) = split(":",$_[0]);
-  CUL_SendFromQueue($defs{$name}, ${$defs{$name}{helper}{$id}{QUEUE}}[0]);
+  my ($name,$did) = split(":",$_[0]);
+  CUL_SendFromQueue($defs{$name}, ${$defs{$name}{helper}{$did}{QUEUE}}[0]);
 }
 
 #####################################
@@ -683,13 +730,34 @@ CUL_Write($$$)
 }
 
 sub
+CUL_SendHMPing($)
+{
+  my ($arg) = @_;
+  my ($name,$undef) = split(":", $arg);
+  my $hash = $defs{$name};
+  my $now = gettimeofday();
+
+  CUL_SimpleWrite($hash, "ApCE"); # Send a ASKSIN Ping to CUL
+  RemoveInternalTimer($arg);
+
+  if (defined($hash->{helper}{hmccredits}) &&
+      (AttrVal($name,"rfmode","") eq "HomeMatic")) {
+    if ($hash->{helper}{hmccredits} < 1) {
+      InternalTimer($now+5, "CUL_SendHMPing", $arg, 1); # send another ping in 5s
+    } elsif ($hash->{helper}{hmccredits} < 2) {
+      InternalTimer($now+10, "CUL_SendHMPing", $arg, 1); # send another ping in 10s
+    }
+  }
+}
+
+sub
 CUL_SendFromQueue($$)
 {
   my ($hash, $bstring) = @_;
+  my $now = gettimeofday();
   my $name = $hash->{NAME};
   my $hm = ($bstring =~ m/^A/);
   my $to = ($hm ? 0.15 : 0.3);
-  my $now = gettimeofday();
   if($bstring ne "") {
     my $sp = AttrVal($name, "sendpool", undef);
     if($sp) {   # Is one of the CUL-fellows sending data?
@@ -707,7 +775,71 @@ CUL_SendFromQueue($$)
     }
 
     if($hm) {
-      CUL_SimpleWrite($hash, $bstring) if(!CUL_XmitDlyHM($hash,$bstring,$now));
+      my ($fn,undef,$bs1,$did,$bs2) = unpack 'A1A1A14A6A*',$bstring;
+      my $burst = hex(substr($bstring,6,1)) & 0x1;
+      my $nxt;
+      if(defined($did)) { # message to any device?
+        #credit check
+        if ($burst) {
+          if (defined($hash->{helper}{hmccredits}) && ($hash->{helper}{hmccredits} < 2)) { # no credits for burst message
+            InternalTimer($now+140, "CUL_XmitDlyHMTo", "$name:$did", 1); # try later again and collect credits
+            my $lbstring = join(" ",unpack('A2A2A2A4A6A6A*',$bstring));
+            Log3 $name, 2, "CUL_send:  ".$name."  try to send burst   ".$lbstring."  in 140s, low credits";
+            CUL_SendHMPing("$hash->{NAME}:Ping"); #but ping to actualize credits state
+            return;
+          }
+        } else {
+          if (defined($hash->{helper}{hmccredits}) && ($hash->{helper}{hmccredits} < 1)) { # no credits for non burst message
+            InternalTimer($now+20, "CUL_XmitDlyHMTo", "$name:$did", 1); # try later again and collect credits
+            my $lbstring = join(" ",unpack('A2A2A2A4A6A6A*',$bstring));
+            Log3 $name, 2, "CUL_send:  ".$name."  try to send         ".$lbstring."  in 20s, low credits";
+            CUL_SendHMPing("$hash->{NAME}:Ping"); #but ping to actualize credits state
+            return;
+          }
+        }
+        if($did &&  #not on broadcasts
+           $modules{CUL_HM}{defptr}{$did} &&
+           $modules{CUL_HM}{defptr}{$did}{helper}{io} &&
+           $modules{CUL_HM}{defptr}{$did}{helper}{io}{nextSend}) {
+          if(!$burst) {
+            $nxt = $modules{CUL_HM}{defptr}{$did}{helper}{io}{nextSend};
+            if (($now - $nxt) > 10) { # after 10 seconds forget about any answer. to be optimized!
+              delete($modules{CUL_HM}{defptr}{$did}{helper}{io}{nextSend});
+              $nxt = undef;
+            }
+          } else { # burst can't be an answer
+            delete($modules{CUL_HM}{defptr}{$did}{helper}{io}{nextSend});
+          }
+        }
+      }
+      my $dDly;
+      my $wt;
+      if(defined($nxt)) {
+        if($hash->{helper}{ref}{Sdly} <= $CUL_hmMaxSysDly) {
+          $dDly = CUL_XmitDlyHM($hash,$did,$now,$nxt);
+          $wt = int($dDly*125+0.5); # wait time in 8ms units
+          if ($wt > 0) {
+            $wt = 15 if ($wt > 15);
+            $wt = sprintf("%X", $wt);
+            $bstring = $fn."w0".$wt.$bs1.$did.$bs2; # new send string with send wait command
+          }
+        } else { #don't send answer without a chance to be in time, wait next try of device
+          my $lbstring = join(" ",unpack('A2A2A2A4A6A6A*',$bstring));
+          Log3 $name, 4, "CUL_send:  ".$name."  didn't send         ".$lbstring."  SDly:".$hash->{helper}{ref}{Sdly}.">".$CUL_hmMaxSysDly;
+          $bstring = undef;
+          delete($modules{CUL_HM}{defptr}{$did}{helper}{io}{nextSend});
+        }
+      }
+      CUL_SimpleWrite($hash, $bstring) if(defined($bstring));
+      Log3 $name, 4, "CUL_send:  ".$name."  dly:".int($dDly*1000)." Sdly:".$hash->{helper}{ref}{Sdly}." id:".$did if(defined($dDly));
+      if ($did) {
+        if ($hash->{helper}{$did}{QUEUE}){
+          shift(@{$hash->{helper}{$did}{QUEUE}});
+#          InternalTimer($now+$hash->{helper}{ref}{hmSysACKwait}, "CUL_XmitDlyHMTo", "$name:$did", 1)
+          InternalTimer($now+0.03, "CUL_XmitDlyHMTo", "$name:$did", 1)
+               if (scalar(@{$hash->{helper}{$did}{QUEUE}}));
+        }
+      }
       return;
     } else {
       CUL_XmitLimitCheck($hash, $bstring, $now);
@@ -728,8 +860,8 @@ CUL_AddSendQueue($$)
   my ($hash, $bstring) = @_;
   my $qHash = $hash;
   if ($bstring =~ m/^A/){ # HM device
-    my $id = substr($bstring,16,6);#get HMID destination
-    $qHash = $hash->{helper}{$id};
+    my $did = substr($bstring,16,6);#get HMID destination
+    $qHash = $hash->{helper}{$did};
   }
   if(!$qHash->{QUEUE} || 0 == scalar(@{$qHash->{QUEUE}})) {
     $qHash->{QUEUE} = [ $bstring ];
@@ -788,43 +920,44 @@ sub
 CUL_Parse($$$$@)
 {
   my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
+  my $tn = gettimeofday(); # time of reception of message in s
 
-  if($rmsg =~ m/^\*/) {                           # STACKABLE_CC
+  if($rmsg =~ m/^\*/) {                            # STACKABLE_CC
     Dispatch($hash, $rmsg, undef);
     return;
   }
 
-  my $rssi;
-  my $dmsg = $rmsg;
-  my $dmsgLog = (AttrVal($name,"rfmode","") eq "HomeMatic")
-                   ? join(" ",(unpack'A1A2A2A4A6A6A*',$rmsg))
-                   :$dmsg;
-  if($dmsg =~ m/^[AFTKEHRStZrib]([A-F0-9][A-F0-9])+$/) { # RSSI
-    my $l = length($dmsg);
-    $rssi = hex(substr($dmsg, $l-2, 2));
-    $dmsg = substr($dmsg, 0, $l-2);
-    $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
-    Log3 $name, 4, "CUL_Parse: $name $dmsgLog $rssi";
-  } else {
-    Log3 $name, 4, "CUL_Parse: $name $dmsgLog";
+  my $dmsg = my $dmsgLog = $rmsg;
+  my $len = length($dmsg);
+  
+  if(!$dmsg || $len < 1){                          # Bogus messages
+    Log3 $name, 4, "CUL_Parse: $name  Bogus messages";
+    next;
+  }
+  
+  my $fn = substr($dmsg,0,1);
+  my $rssi = "";
+
+  if($fn =~ m/[AFTKEHRStZrib]/) {                  # RSSI
+    if($dmsg =~ m/^.([A-F0-9][A-F0-9])+[A-F0-9]*$/) {
+      $rssi = hex(substr($dmsg, $len-2, 2));
+      $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
+      $dmsg = substr($dmsg, 0, $len-2);
+      $len -= 2;
+    }
   }
 
   ###########################################
-  #Translate Message from CUL to FHZ
-  next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
+  #Translate Message from CUL to FHZ 
 
   if ($dmsg eq 'SMODE' || $dmsg eq 'TMODE') {      # brs/brt returns SMODE/TMODE
     Log3 $name, 5, "CUL_Parse: switched to $dmsg";
     return;
   }
-
   if($dmsg =~ m/^[0-9A-F]{4}U./) {                 # RF_ROUTER
     Dispatch($hash, $dmsg, undef);
     return;
   }
-
-  my $fn = substr($dmsg,0,1);
-  my $len = length($dmsg);
 
   if($fn eq "F" && $len >= 9) {                    # Reformat for 10_FS20.pm
     CUL_AddSendQueue($iohash, "");                 # Delay immediate replies
@@ -870,7 +1003,7 @@ CUL_Parse($$$$@)
     # Other K... Messages ar sent to CUL_WS
   } elsif($fn eq "r" && $len >= 23) {              # Revolt
     $dmsg = lc($dmsg);
-  } elsif($fn eq "i" && $len >= 7) {              # IT
+  } elsif($fn eq "i" && $len >= 7) {               # IT
     $dmsg = lc($dmsg);
   } elsif($fn eq "Y" && $len >= 3) {               # SOMFY RTS
     ;
@@ -882,18 +1015,108 @@ CUL_Parse($$$$@)
     ;
   } elsif($fn eq "I" && $len >= 12) {              # IR-CUL/CUN/CUNO
     ;
-  } elsif($fn eq "A" && $len >= 20) {              # AskSin/BidCos/HomeMatic
-    my $src = substr($dmsg,9,6);
-    if($modules{CUL_HM}{defptr}{$src}){
-      $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} =
-          gettimeofday() + 0.100;
-    }
-    $dmsg .= "::$rssi:$name" if(defined($rssi));
+  } elsif($fn eq "A"              ) {              # AskSin/BidCos/HomeMatic
 
+    my $tnms = int($tn*1000);  #"Reception" Timestamp in ms (time of computing received message)
+    my $tnl = $tnms % 1000000;
+    $tnl = sprintf("%06d", $tnl);  #"Reception" Timestamp for log in ms (999999ms max)
+    $dmsgLog = " ".$tnl;
+
+    my ($mId,$flg,$tc,$tp,$ts,$m) = unpack'A1A2A1A1A8A*',$dmsg; #$tc is credits coarse state
+    if($flg eq "FF"){#2: iocu1: unknown message AFF02 00135B12 01 12
+
+      $ts = (hex($ts) & 0x1fffffff) << 3;  #Timestamp ticks to ms, one tick -> 8ms
+
+      my $tsl = $ts & 0xffffff;     #Timestamp for log in ms (24bit)
+      $tsl = sprintf("%08d", $tsl); #Timestamp decimal in log in ms
+      $tsl = " ".$mId." ".$flg.$tc.$tp." ".$tsl." ";
+
+      # credit level Ids, are ored to Timestamp ID (here extracted in $tc) should be given to 10_CUL_HM.pm to plan send of messages
+      #  TS_ID_CREDIT_NONE		0x0 -> credits < 5 not clearly enough credits for another non burst message
+      #  TS_ID_CREDIT_NONBURST	0x1	-> credits >= 5 still enough credits for another non burst message
+      #  TS_ID_CREDIT_BURST	    0x2	-> credits >= 40 still enough credits for another burst message
+      #  TS_ID_CREDIT_10PCT		0x3	-> credits >= 10% of hourly credits left
+      #  TS_ID_CREDIT_20PCT	    0x4	-> credits >= 20% of hourly credits left
+      #  TS_ID_CREDIT_40PCT		0x5	-> credits >= 40% of hourly credits left
+      #  TS_ID_CREDIT_60PCT		0x6	-> credits >= 60% of hourly credits left
+      #  TS_ID_CREDIT_80PCT		0x7	-> credits >= 80% of hourly credits left
+      #  TS_ID_CREDIT_90PCT		0x8	-> credits >= 90% of hourly credits left
+      #  TS_ID_CREDIT_100PCT	0xF	-> credits == 100% of hourly credits left
+
+      if ($tp eq "1"){# 1: received message - dispatch
+        $dmsgLog .= $tsl.join(" ",(unpack'A2A2A4A6A6A*',$m));
+        # process received message - dispatch
+        CUL_dlytime($ts,$tnms,$hash);
+        $dmsg = $mId.$m;
+        $hash->{helper}{hmccredits} = hex($tc);
+      } elsif ($tp eq "2"){# 2: ping message - log, but don't dispatch
+        $dmsgLog .= $tsl.join(" ",(unpack'A2A*',$m));
+        # process pings - implementation pending
+        $dmsg = "";
+        $hash->{helper}{hmccredits} = hex($tc);
+      } elsif ($tp eq "3"){# 3: send timestamp success message, don't dispatch
+        my $did = substr($m,14,6);
+        if($modules{CUL_HM}{defptr}{$did}) {
+          if($modules{CUL_HM}{defptr}{$did}{helper}{io}{lhmRecTm}) {
+            my $dhmSt = ($ts - $modules{CUL_HM}{defptr}{$did}{helper}{io}{lhmRecTm})%4294967296;
+            delete($modules{CUL_HM}{defptr}{$did}{helper}{io}{lhmRecTm});
+            # delay auto adjust
+            if($modules{CUL_HM}{defptr}{$did}{helper}{io}{lastSndDly} &&
+               ($modules{CUL_HM}{defptr}{$did}{helper}{io}{lastSndDly} > 0) &&
+               ($modules{CUL_HM}{defptr}{$did}{helper}{io}{lastSndDly} < ($dhmSt*0.001)) &&
+               ($dhmSt < 384)) { # don't correct on strange delay, e.g. due to CCA
+               if ($dhmSt > ($CUL_hmDestDel)) {
+                 $hash->{helper}{ref}{hmSysACKwait} -= 0.002; # slowly decrease delay
+                 $hash->{helper}{ref}{hmSysACKwait} = 0 if ($hash->{helper}{ref}{hmSysACKwait} < 0);
+               }
+               if ($dhmSt < $CUL_hmDestDel) {
+                 $hash->{helper}{ref}{hmSysACKwait} += 0.004; # faster increase delay
+                 $hash->{helper}{ref}{hmSysACKwait} = 0.120 if ($hash->{helper}{ref}{hmSysACKwait} > 0.120);
+               }
+            }
+            Log3 $name, 4, "CUL_parse: ".$name."  dhmSt:".$dhmSt." hmSysACKwait:".$hash->{helper}{ref}{hmSysACKwait} if ($dhmSt < 5000);
+          }
+          if($modules{CUL_HM}{defptr}{$did}{helper}{io}{lastSndDly}) {
+            delete($modules{CUL_HM}{defptr}{$did}{helper}{io}{lastSndDly});
+          }
+        }
+        $dmsgLog .= $tsl.join(" ",(unpack'A2A2A4A6A6A*',$m));
+        $dmsg = "";
+        $hash->{helper}{hmccredits} = hex($tc);
+      } elsif ($tp eq "4"){# 4: send timestamp fail channel busy message - do not process
+        $dmsgLog .= $tsl.join(" ",(unpack'A2A2A4A6A6A*',$m));
+        $dmsg = "";
+        $hash->{helper}{hmccredits} = hex($tc);
+      } elsif ($tp eq "5"){# 5: send timestamp fail credits message - do not process
+        $dmsgLog .= $tsl.join(" ",(unpack'A2A2A4A6A6A*',$m));
+        $dmsg = "";
+        $hash->{helper}{hmccredits} = hex($tc);
+      } elsif ($tp eq "6"){# 6: send timestamp fail message length message - do not process
+        $dmsgLog .= $tsl.join(" ",(unpack'A2A2A4A6A6A*',$m));
+        $dmsg = "";
+        $hash->{helper}{hmccredits} = hex($tc);
+      } else { # unkown - do not process
+        $dmsgLog .= $tsl.join(" ",(unpack'A2A2A4A6A6A*',$m));
+        $dmsg = "";
+      }
+      $len = length($dmsg);
+    } else {
+      $dmsgLog .= "               ".join(" ",(unpack'A1A2A2A4A6A6A*',$dmsg));
+    }
+
+    if ( $len >= 20){
+      my $src = substr($dmsg,9,6);
+      if($modules{CUL_HM}{defptr}{$src}){
+        $modules{CUL_HM}{defptr}{$src}{helper}{io}{nextSend} = $tn + $hash->{helper}{ref}{hmSysACKwait};
+        $modules{CUL_HM}{defptr}{$src}{helper}{io}{lhmRecTm} = $ts;
+      }
+      $dmsg .= "::$rssi" if ($rssi ne "");
+      $dmsg .= ":$name";
+    }
   } elsif($fn eq "Z" && $len >= 21) {              # Moritz/Max
     ;
   } elsif($fn eq "b" && $len >= 24) {              # Wireless M-Bus
-    $dmsg .= "::$rssi" if (defined($rssi));
+    $dmsg .= "::$rssi" if ($rssi ne "");
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
     $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
   } elsif($fn eq "s" && $len >= 5)  {              # CUL_TCM97001
@@ -903,20 +1126,62 @@ CUL_Parse($$$$@)
     Log3 $name, 2, "$name: unknown message $dmsg";
     return;
   }
-
+  
+  Log3 $name, 4, "CUL_Parse: $name $dmsgLog $rssi";
+  return if(!$dmsg);
+  
   $hash->{"${name}_MSGCNT"}++;
   $hash->{"${name}_TIME"} =
   # showtime attribute
   readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 0);
   $hash->{RAWMSG} = $rmsg;
   my %addvals = (RAWMSG => $dmsg);
-  if(defined($rssi)) {
+  if($rssi ne "") {
     $hash->{RSSI} = $rssi;
     $addvals{RSSI} = $rssi;
   }
-  Dispatch($hash, $dmsg, \%addvals);
+#General  Dispatch($hash, $dmsg, \%addvals);
 }
 
+sub CUL_dlytime($$@) {#########################################################
+  my ($hmtC,$sysC,$hash) = @_;
+  # hmtC     : hometic timecounter in ms
+  # sysC     : system time in ms
+  # ref.hmtL : last timestamp of reception
+  # ref.sysL : system timestamp of last calculation
+  # ref.dly  : delay of system computing received data
+  # ref.kTs  : keep alive timestamp
+  # ref.offL : offset between time and HM timer
+
+  if (!defined $hash->{helper}{ref} ||
+      !defined $hash->{helper}{ref}{sysL} ||
+      !defined $hash->{helper}{ref}{hmtL}){
+    $hash->{helper}{ref}{sysL} = $sysC;
+    $hash->{helper}{ref}{hmtL} = $hmtC;
+  }
+  
+  my $ref = $hash->{helper}{ref};#shortcut
+  
+  my ($ds,$di) = (($sysC - $ref->{sysL}),
+                  ($hmtC - $ref->{hmtL})%4294967296);
+  if (($ds < 0) || ($di < 0)) { #strange differences
+    $ds = 0;
+    $di = 1; # force new reference
+  }
+
+  my $dly = $ds - $di;
+  if($dly >= 0) {$ref->{Sdly} = $dly;} # system is delayed with computing received data
+  else          {$ref->{Sdly} = 0;}    # minimal or less system delay
+
+  if(($dly <= 0) ||  # take a new reference to get better
+     (($ds > 360000) && ($dly < 10))) # force a new reference every 6 minutes, but only with low delay
+  {
+    $ref->{sysL} = $sysC;
+    $ref->{hmtL} = $hmtC;
+  }
+
+  return;
+}
 
 #####################################
 sub
@@ -956,7 +1221,15 @@ CUL_SimpleWrite(@)
 
   my $name = $hash->{NAME};
   if (AttrVal($name,"rfmode","") eq "HomeMatic"){
-    Log3 $name, 4, "CUL_send:  $name".join(" ",unpack('A2A2A2A4A6A6A*',$msg));
+    my $tnms = int(gettimeofday()*1000); #Send Timestamp in ms
+    my $tnl = $tnms % 1000000;
+    $tnl = sprintf("%06d", $tnl);  #Send Timestamp for log in ms (999999ms max)
+
+    if (substr($msg,1,1) eq "w") {
+      Log3 $name, 4, "CUL_send:  $name  ".$tnl."           ".join(" ",unpack('A2A2A2A2A4A6A6A*',$msg));
+    } else {
+      Log3 $name, 4, "CUL_send:  $name  ".$tnl."              ".join(" ",unpack('A2A2A2A4A6A6A*',$msg));
+    }
   }
   else{
     Log3 $name, 5, "SW: $msg";
@@ -994,6 +1267,12 @@ CUL_Attr(@)
         $hash->{MatchList} = \%matchListHomeMatic;
         CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
         $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
+        if (InternalVal($name,"VERSION_TS","") eq "yes"){
+          if ($hash->{initString} !~ m/At1/){
+            $hash->{initString} .= "\nAt1";
+          }
+        }
+
         CUL_WriteInit($hash);
 
       } else {
@@ -1039,8 +1318,6 @@ CUL_Attr(@)
         Log3 $name, 2, $msg;
         return $msg;
       }
-
-
     } else {
       return if($hash->{initString} eq "X21");
       $hash->{Clients} = $clientsSlowRF;
@@ -1057,9 +1334,11 @@ CUL_Attr(@)
     delete $hash->{".clientArray"};
   } elsif($aName eq "hmId"){
     if ($cmd eq "set"){
-	  return "wrong syntax: hmId must be 6-digit-hex-code (3 byte)"
-	       if ($aVal !~ m/^[A-F0-9]{6}$/i);
-	}
+      my $owner_ccu = InternalVal($name,"owner_CCU",undef);
+      return "device owned by $owner_ccu" if ($owner_ccu);
+      return "wrong syntax: hmId must be 6-digit-hex-code (3 byte)"
+        if ($aVal !~ m/^[A-F0-9]{6}$/i);
+    }
   }
 
   return undef;
@@ -1305,7 +1584,7 @@ CUL_prefix($$$)
         </ul>
         </li><br>
 
-    <li><a name="hmId">hmId</a><br>
+        <li><a name="hmId">hmId</a><br>
         Set the HomeMatic ID of this device. If this attribute is absent, the
         ID will be F1&lt;FHTID&gt;. Note 1: After setting or changing this
         attribute you have to relearn all your HomeMatic devices. Note 2: The

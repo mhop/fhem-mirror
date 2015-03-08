@@ -48,7 +48,7 @@ sub HMinfo_Define($$){#########################################################
                             .",overload:off"
                             .",overheat:off"
                             .",reduced:off"
-                            .",motorError:no"
+                            .",motorErr:ok"
                             .",error:none"
                             .",uncertain:yes"
                             .",smoke_detect:none"
@@ -136,6 +136,7 @@ sub HMinfo_status($){##########################################################
   }
   #--- used for IO, protocol  and communication (e.g. rssi)
   my @IOdev;
+  my %IOccu;
 
   my %protC = (ErrIoId_ =>0,ErrIoAttack =>0);
   my %protE = (NACK =>0,IOerr =>0,ResndFail =>0,CmdDel =>0);
@@ -171,6 +172,7 @@ sub HMinfo_status($){##########################################################
     if ($ehash->{helper}{role}{dev}){#---restrict to devices
       $nbrD++;
       push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev} && $ehash->{IODev}{NAME});
+      $IOccu{(split ":",AttrVal($eName,"IOgrp",""))[0]}=1;
       push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
 
       foreach (grep /ErrIoId_/, keys %{$ehash}){# detect addtional critical entries
@@ -203,32 +205,33 @@ sub HMinfo_status($){##########################################################
   my @updates;
   foreach my $read(grep {defined $sum{$_}} @info){       #--- disp crt count
     my $d;
-    $d .= "$_:$sum{$read}{$_};"foreach(keys %{$sum{$read}});
+    $d .= "$_:$sum{$read}{$_},"foreach(keys %{$sum{$read}});
     push @updates,"I_sum_$read:".$d;
   }
   foreach my $read(grep {defined $err{$_}} keys %errFlt){#--- disp err count
     my $d;
-    $d .= "$_:$err{$read}{$_};"foreach(keys %{$err{$read}});
+    $d .= "$_:$err{$read}{$_},"foreach(keys %{$err{$read}});
     push @updates,"ERR_$read:".$d;
   }
 
   @errNames = grep !/^$/,HMinfo_noDup(@errNames);
   $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
 
-  push @updates,"C_sumDefined:"."entities:$nbrE device:$nbrD channel:$nbrC virtual:$nbrV";
+  push @updates,"C_sumDefined:"."entities:$nbrE,device:$nbrD,channel:$nbrC,virtual:$nbrV";
   # ------- display status of action detector ------
-  push @updates,"I_actTotal:".$modules{CUL_HM}{defptr}{"000000"}{STATE};
+  push @updates,"I_actTotal:".join",",(split" ",$modules{CUL_HM}{defptr}{"000000"}{STATE});
   $hash->{ERRactNames} = join",",@Anames if (@Anames);
 
   # ------- what about IO devices??? ------
+  push @IOdev,split ",",AttrVal($_,"IOList","")foreach (keys %IOccu);
+
   my %tmp; # remove duplicates
-  $tmp{$_}=0 for @IOdev;
-  delete $tmp{""}; #remove empties if present
-  @IOdev = sort keys %tmp;
-  foreach (grep {$defs{$_}{READINGS}{cond}} @IOdev){
-    $_ .= ",:".$defs{$_}{READINGS}{cond}{VAL};
+  $hash->{I_HM_IOdevices} = "";
+  $tmp{ReadingsVal($_,"cond",
+       InternalVal($_,"STATE","unknown"))}{$_} = 1 foreach( @IOdev);
+  foreach my $IOstat (sort keys %tmp){
+    $hash->{I_HM_IOdevices} .= "$IOstat: ".join(",",sort keys %{$tmp{$IOstat}}).";";
   }
-  $hash->{I_HM_IOdevices}= join",",@IOdev;
 
   # ------- what about protocol events ------
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
@@ -2074,7 +2077,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li>CUL_HM related IO devices and condition</li>
       <li>Device protocol events which are related to communication errors</li>
       <li>count of certain readings (e.g. batterie) and conditions - <a href="#HMinfoattr">attribut controlled</a></li>
-      <li>count of error condition in readings (e.g. overheat, motorError) - <a href="#HMinfoattr">attribut controlled</a></li>
+      <li>count of error condition in readings (e.g. overheat, motorErr) - <a href="#HMinfoattr">attribut controlled</a></li>
   </ul>
   <br>
 
@@ -2502,7 +2505,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li>CUL_HM Ger&auml;te und Zust&auml;nde</li>
       <li>Ereignisse im Zusammenhang mit Kommunikationsproblemen</li>
       <li>Z&auml;hler f&uuml;r bestimmte Readings und Zust&auml;nde (z.B. battery) - <a href="#HMinfoattr">attribut controlled</a></li>
-      <li>Z&auml;hler f&uuml;r Readings, die auf Fehler hindeuten (z.B. overheat, motorError) - <a href="#HMinfoattr">attribut controlled</a></li>
+      <li>Z&auml;hler f&uuml;r Readings, die auf Fehler hindeuten (z.B. overheat, motorErr) - <a href="#HMinfoattr">attribut controlled</a></li>
   </ul>
   <br>
 
