@@ -113,7 +113,8 @@ at_Define($$)
     my $val = IsDisabled($name) ?
                  (AttrVal($name, "disable", undef) ? "disabled" : "inactive") :
                  ("Next: ".FmtTime($nt));
-    readingsSingleUpdate($hash, "state", $val, 1);
+    readingsSingleUpdate($hash, "state", $val,
+          !$hash->{READINGS}{state} || $hash->{READINGS}{state}{VAL} ne $val);
   }
 
   return undef;
