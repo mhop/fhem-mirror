@@ -316,7 +316,7 @@ sub PHTV_Set($@) {
         $count = 80 if ( $count > 80 );
         while ( $i <= $count ) {
             if ( defined( $hash->{helper}{device}{channelPreset}{$i}{name} )
-                && $hash->{helper}{device}{channelPreset}{$i}{name} != "" )
+                && $hash->{helper}{device}{channelPreset}{$i}{name} ne "" )
             {
                 $channels .=
                   $hash->{helper}{device}{channelPreset}{$i}{name} . ",";
