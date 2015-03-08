@@ -171,7 +171,7 @@ FHEM/55_PIFACE.pm            klaus.schauer        http://forum.fhem.de Einplatin
 FHEM/55_weco.pm              betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Unterstuetzende Dienste
-FHEM/57_CALVIEW.pm	     chris1284            http://forum.fhem.de CodeSchnipsel
+FHEM/57_CALVIEW.pm           chris1284            http://forum.fhem.de CodeSchnipsel
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/59_OPENWEATHER.pm       tupol                http://forum.fhem.de Unterstuetzende Dienste
 FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstuetzende Dienste
@@ -266,7 +266,7 @@ FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterstue
 FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_autocreate.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_average.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/98_backup.pm            rudlfkoenig          http://forum.fhem.de Sonstiges
+FHEM/98_backup.pm            rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_cloneDummy.pm        Joachim              http://forum.fhem.de Automatisierung
 FHEM/98_cmdalias.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_configdb.pm          betateilchen         http://forum.fhem.de Sonstiges
@@ -282,11 +282,11 @@ FHEM/98_logProxy.pm          justme1968           http://forum.fhem.de Frontends
 FHEM/98_notice.pm            mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_pilight.pm           andreas-fey          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_rain.pm              baumrasen            http://forum.fhem.de Sonstiges
-FHEM/98_restore.pm           rudolgkoenig         http://forum.fhem.de Sonstiges
+FHEM/98_restore.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_statistics.pm        tupol                http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_structure.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_telnet.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/98_update.pm            rudolgkoenig         http://forum.fhem.de Sonstiges
+FHEM/98_update.pm            rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_weblink.pm           rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/99_SUNRISE_EL.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/99_Utils.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
