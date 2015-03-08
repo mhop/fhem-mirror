@@ -54,7 +54,7 @@ sub GEOFANCY_addExtension($$$) {
     my ( $name, $func, $link ) = @_;
 
     my $url = "/$link";
-    Log3 $name, 3, "Registering GEOFANCY $name for URL $url...";
+    Log3 $name, 2, "Registering GEOFANCY $name for URL $url...";
     $data{FWEXT}{$url}{deviceName} = $name;
     $data{FWEXT}{$url}{FUNC}       = $func;
     $data{FWEXT}{$url}{LINK}       = $link;
@@ -66,7 +66,7 @@ sub GEOFANCY_removeExtension($) {
 
     my $url  = "/$link";
     my $name = $data{FWEXT}{$url}{deviceName};
-    Log3 $name, 3, "Unregistering GEOFANCY $name for URL $url...";
+    Log3 $name, 2, "Unregistering GEOFANCY $name for URL $url...";
     delete $data{FWEXT}{$url};
 }
 
@@ -343,7 +343,7 @@ sub GEOFANCY_CGI() {
       if ( $entry eq "exit" || $entry eq "0" );
 
     if ( $entry eq "enter" || $entry eq "1" || $entry eq "test" ) {
-        Log3 $name, 3, "GEOFANCY $name: $device arrived at $id";
+        Log3 $name, 4, "GEOFANCY $name: $device arrived at $id";
         readingsBulkUpdate( $hash, $device,                  "arrived " . $id );
         readingsBulkUpdate( $hash, "currLoc_" . $device,     $id );
         readingsBulkUpdate( $hash, "currLocLat_" . $device,  $lat );
@@ -354,7 +354,7 @@ sub GEOFANCY_CGI() {
         my $currReading;
         my $lastReading;
 
-        Log3 $name, 3, "GEOFANCY $name: $device left $id and is underway";
+        Log3 $name, 4, "GEOFANCY $name: $device left $id and is underway";
 
         # backup last known location if not "underway"
         $currReading = "currLoc_" . $device;
