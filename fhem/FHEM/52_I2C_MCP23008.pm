@@ -3,7 +3,7 @@
 ##############################################################################
 # Modul for I2C GPIO Extender MCP23008
 #
-# contributed by Klaus Wittstock (2013) email: klauswittstock bei gmail
+# contributed by Klaus Wittstock (2014) email: klauswittstock bei gmail
 ##############################################################################
 
 package main;
