@@ -72,14 +72,14 @@ sub I2C_BMP180_Initialize($) {
 	my ($hash) = @_;
 
 	eval "use HiPi::Device::I2C;";
-  $libcheck_hasHiPi = 0 if($@);
+	$libcheck_hasHiPi = 0 if($@);
 	
 	$hash->{DefFn}    = 'I2C_BMP180_Define';
 	$hash->{InitFn}   = 'I2C_BMP180_Init';
 	$hash->{AttrFn}   = 'I2C_BMP180_Attr';
 	$hash->{SetFn}    = 'I2C_BMP180_Set';
 	$hash->{UndefFn}  = 'I2C_BMP180_Undef';
-  $hash->{I2CRecFn} = 'I2C_BMP180_I2CRec';
+	$hash->{I2CRecFn} = 'I2C_BMP180_I2CRec';
 
 	$hash->{AttrList} = 'IODev do_not_notify:0,1 showtime:0,1 model:BMP180,BMP085 ' .
 	                    'poll_interval:1,2,5,10,20,30 oversampling_settings:0,1,2,3 ' .
@@ -119,10 +119,9 @@ sub I2C_BMP180_Define($$) {
 		return $msg;
 	}
 	if ($main::init_done || $hash->{HiPi_used}) {
-    eval { I2C_BMP180_Init( $hash, [ @a[ 2 .. scalar(@a) - 1 ] ] ); };
-    return I2C_BMP180_Catch($@) if $@;
-  }
-	
+		eval { I2C_BMP180_Init( $hash, [ @a[ 2 .. scalar(@a) - 1 ] ] ); };
+		return I2C_BMP180_Catch($@) if $@;
+	}
 }
 
 sub I2C_BMP180_Init($$) {
@@ -160,12 +159,12 @@ sub I2C_BMP180_Init($$) {
 }
 
 sub I2C_BMP180_Catch($) {
-  my $exception = shift;
-  if ($exception) {
-    $exception =~ /^(.*)( at.*FHEM.*)$/;
-    return $1;
-  }
-  return undef;
+	my $exception = shift;
+	if ($exception) {
+		$exception =~ /^(.*)( at.*FHEM.*)$/;
+		return $1;
+	}
+	return undef;
 }
 
 =head2 I2C_BMP180_Attr
@@ -260,7 +259,7 @@ sub I2C_BMP180_Undef($$) {
 
 sub I2C_BMP180_I2CRec ($$) {
 	my ($hash, $clientmsg) = @_;
-  my $name = $hash->{NAME};  
+	my $name = $hash->{NAME};  
 	my $pname = undef;
 	unless ($hash->{HiPi_used}) {#nicht nutzen wenn HiPi Bibliothek in Benutzung
 		my $phash = $hash->{IODev};
@@ -275,7 +274,7 @@ sub I2C_BMP180_I2CRec ($$) {
 				|| $hash->{HiPi_used}) ) {
 		if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) {
 			Log3 $hash, 5, "$name empfangen: $clientmsg->{received}";
-		  I2C_BMP180_GetCal   ($hash, $clientmsg->{received}) if $clientmsg->{reg} == hex("AA");
+			I2C_BMP180_GetCal   ($hash, $clientmsg->{received}) if $clientmsg->{reg} == hex("AA");
 			I2C_BMP180_GetTemp  ($hash, $clientmsg->{received}) if $clientmsg->{reg} == hex("F6") && $clientmsg->{nbyte} == 2;
 			I2C_BMP180_GetPress ($hash, $clientmsg->{received}) if $clientmsg->{reg} == hex("F6") && $clientmsg->{nbyte} == 3;
 		}
@@ -284,7 +283,7 @@ sub I2C_BMP180_I2CRec ($$) {
 
 sub I2C_BMP180_GetCal ($$) {
 	my ($hash, $rawdata) = @_;
-  my @raw = split(" ",$rawdata);
+	my @raw = split(" ",$rawdata);
 	my $n = 0;
 	Log3 $hash, 5, "in get cal: $rawdata";
 	$hash->{calibrationData}{ac1} = I2C_BMP180_GetCalVar($raw[$n++], $raw[$n++]);
@@ -317,23 +316,23 @@ sub I2C_BMP180_GetCalVar ($$;$) {
 
 sub I2C_BMP180_GetTemp ($$) {
 	my ($hash, $rawdata) = @_;
-  my @raw = split(" ",$rawdata);
-  $hash->{uncompTemp} = $raw[0] << 8 | $raw[1];
+	my @raw = split(" ",$rawdata);
+	$hash->{uncompTemp} = $raw[0] << 8 | $raw[1];
 }
 
 sub I2C_BMP180_GetPress ($$) {
 	my ($hash, $rawdata) = @_;
-  my @raw = split(" ",$rawdata);
+	my @raw = split(" ",$rawdata);
 	my $overSamplingSettings = AttrVal($hash->{NAME}, 'oversampling_settings', 3);
 	
-  my $ut = $hash->{uncompTemp};
+	my $ut = $hash->{uncompTemp};
 	delete $hash->{uncompTemp};
 	my $up = ( ( ($raw[0] << 16) | ($raw[1] << 8) | $raw[2] ) >> (8 - $overSamplingSettings) );
 
 	my $temperature = sprintf(
-			'%.' . AttrVal($hash->{NAME}, 'roundTemperatureDecimal', 1) . 'f',
-			I2C_BMP180_calcTrueTemperature($hash, $ut) / 10
-		);
+		'%.' . AttrVal($hash->{NAME}, 'roundTemperatureDecimal', 1) . 'f',
+		I2C_BMP180_calcTrueTemperature($hash, $ut) / 10
+	);
 		
 	my $pressure = sprintf(
 		'%.' . AttrVal($hash->{NAME}, 'roundPressureDecimal', 1) . 'f',
@@ -369,7 +368,7 @@ sub I2C_BMP180_GetPress ($$) {
 =cut
 sub I2C_BMP180_readUncompensatedTemperature($) {
 	my ($hash) = @_;
-	  
+
 	# Write 0x2E into Register 0xF4. This requests a temperature reading
 	I2C_BMP180_i2cwrite($hash, hex("F4"), hex("2E"));
 	
@@ -452,8 +451,8 @@ sub I2C_BMP180_i2cwrite($$$) {
 			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
 			direction  => "i2cwrite",
 			i2caddress => $hash->{I2C_Address},
-			reg => 				$reg,
-			data => 			join (' ',@data),
+			reg => $reg,
+			data => join (' ',@data),
 			});
 		} else {
 			return "no IODev assigned to '$hash->{NAME}'";
@@ -531,39 +530,39 @@ sub I2C_BMP180_calcTruePressure($$$) {
     via the i2c bus on Raspberry Pi.<br><br>
     <b>There are two possibilities connecting to I2C bus:</b><br>
     <ul>
-	<li><b>via RPII2C module</b><br>
-		The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
-		or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br>
-		<b>attribute IODev must be set</b><br><br>
+    <li><b>via RPII2C module</b><br>
+        The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
+        or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br>
+        <b>attribute IODev must be set</b><br><br>
     </li>
-	<li><b>via HiPi library</b><br>	
-		Add these two lines to your <b>/etc/modules</b> file to load the I2C relevant kernel modules
-		automaticly during booting your Raspberry Pi.<br>
-		<code><pre>	i2c-bcm2708 
+    <li><b>via HiPi library</b><br>	
+        Add these two lines to your <b>/etc/modules</b> file to load the I2C relevant kernel modules
+        automaticly during booting your Raspberry Pi.<br>
+        <code><pre>i2c-bcm2708 
         i2c-dev</pre></code>
-		Install HiPi perl modules:<br>
-		<code><pre>	wget http://raspberry.znix.com/hipifiles/hipi-install
+        Install HiPi perl modules:<br>
+        <code><pre>wget http://raspberry.znix.com/hipifiles/hipi-install
         perl hipi-install</pre></code>
-		To change the permissions of the I2C device create file:<br>
-		<code><pre>	/etc/udev/rules.d/98_i2c.rules</pre></code>
-		with this content:<br>
-		<code><pre>	SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
-		<b>Reboot</b><br><br>
+        To change the permissions of the I2C device create file:<br>
+        <code><pre>	/etc/udev/rules.d/98_i2c.rules</pre></code>
+        with this content:<br>
+        <code><pre>SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
+        <b>Reboot</b><br><br>
 
-		To use the sensor on the second I2C bus at P5 connector
-		(only for version 2 of Raspberry Pi) you must add the bold
-		line of following code to your FHEM start script:
-		<code><pre>	case "$1" in
+        To use the sensor on the second I2C bus at P5 connector
+        (only for version 2 of Raspberry Pi) you must add the bold
+        line of following code to your FHEM start script:
+        <code><pre>	case "$1" in
         'start')
         <b>sudo hipi-i2c e 0 1</b>
         ...</pre></code>
-	</li></ul>
-	<p>
+    </li></ul>
+    <p>
   
   <b>Define</b>
   <ul>
     <code>define BMP180 I2C_BMP180 [&lt;I2C device&gt;]</code><br><br>
-	&lt;I2C device&gt; must not be used if you connect via RPII2C module. For HiPi it's mandatory. <br>
+    &lt;I2C device&gt; must not be used if you connect via RPII2C module. For HiPi it's mandatory. <br>
     <br>
     Examples:
     <pre>
@@ -571,7 +570,7 @@ sub I2C_BMP180_calcTruePressure($$$) {
       attr BMP180 oversampling_settings 3
       attr BMP180 poll_interval 5
     </pre>
-	<pre>
+    <pre>
       define BMP180 I2C_BMP180
       attr BMP180 IODev RPiI2CMod
       attr BMP180 oversampling_settings 3
@@ -640,39 +639,39 @@ sub I2C_BMP180_calcTruePressure($$$) {
     Dieses Modul erm&ouml;glicht das Auslesen der digitalen (Luft)drucksensoren
     BMP085 und BMP180 &uuml;ber den I2C Bus des Raspberry Pi.<br><br>
     <b>Es gibt zwei M&ouml;glichkeiten das Modul mit dem I2C Bus zu verbinden:</b><br>
-	<ul>
-	<li><b>&Uuml;ber das RPII2C Modul</b><br>
-		I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
-		oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
-		<b>Das Attribut IODev muss definiert sein.</b><br><br>
-	</li>
-	<li><b>&Uuml;ber die HiPi Bibliothek</b><br>	
-		Diese beiden Zeilen m&uuml;ssen in die Datei <b>/etc/modules</b> angef&uuml;gt werden,
-		um die Kernel Module automatisch beim Booten des Raspberry Pis zu laden.<br>
-		<code><pre>	i2c-bcm2708 
+    <ul>
+    <li><b>&Uuml;ber das RPII2C Modul</b><br>
+        I2C-Botschaften werden &uuml;ber ein I2C Interface Modul wie beispielsweise das <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
+        oder <a href="#NetzerI2C">NetzerI2C</a> gesendet. Daher muss dieses vorher definiert werden.<br>
+        <b>Das Attribut IODev muss definiert sein.</b><br><br>
+    </li>
+    <li><b>&Uuml;ber die HiPi Bibliothek</b><br>	
+        Diese beiden Zeilen m&uuml;ssen in die Datei <b>/etc/modules</b> angef&uuml;gt werden,
+        um die Kernel Module automatisch beim Booten des Raspberry Pis zu laden.<br>
+        <code><pre>i2c-bcm2708 
         i2c-dev</pre></code>
-		Installation des HiPi Perl Moduls:<br>
-		<code><pre>	wget http://raspberry.znix.com/hipifiles/hipi-install
+        Installation des HiPi Perl Moduls:<br>
+        <code><pre>wget http://raspberry.znix.com/hipifiles/hipi-install
         perl hipi-install</pre></code>
-		Um die Rechte f&uuml;r die I2C Devices anzupassen, folgende Datei:<br>
-		<code><pre>	/etc/udev/rules.d/98_i2c.rules</pre></code>
-		mit diesem Inhalt anlegen:<br>
-		<code><pre>	SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
-		<b>Reboot</b><br><br>
-		Falls der Sensor am zweiten I2C Bus am Stecker P5 (nur in Version 2 des
-		Raspberry Pi) verwendet werden soll, muss die fett gedruckte Zeile
-		des folgenden Codes in das FHEM Start Skript aufgenommen werden:
-		<code><pre>	case "$1" in
+        Um die Rechte f&uuml;r die I2C Devices anzupassen, folgende Datei:<br>
+        <code><pre>	/etc/udev/rules.d/98_i2c.rules</pre></code>
+        mit diesem Inhalt anlegen:<br>
+        <code><pre>SUBSYSTEM=="i2c-dev", MODE="0666"</pre></code>
+        <b>Reboot</b><br><br>
+        Falls der Sensor am zweiten I2C Bus am Stecker P5 (nur in Version 2 des
+        Raspberry Pi) verwendet werden soll, muss die fett gedruckte Zeile
+        des folgenden Codes in das FHEM Start Skript aufgenommen werden:
+        <code><pre>	case "$1" in
         'start')
         <b>sudo hipi-i2c e 0 1</b>
         ...</pre></code>
-	</li></ul>
+    </li></ul>
   <p>
   
   <b>Define</b>
   <ul>
     <code>define BMP180 &lt;BMP180_name&gt; &lt;I2C_device&gt;</code><br><br>
-	&lt;I2C device&gt; darf nicht verwendet werden, wenn der I2C Bus &uuml;ber das RPII2C Modul angesprochen wird. For HiPi ist es allerdings notwendig. <br>
+    &lt;I2C device&gt; darf nicht verwendet werden, wenn der I2C Bus &uuml;ber das RPII2C Modul angesprochen wird. For HiPi ist es allerdings notwendig. <br>
     <br>
     Beispiel:
     <pre>
@@ -680,7 +679,7 @@ sub I2C_BMP180_calcTruePressure($$$) {
       attr BMP180 oversampling_settings 3
       attr BMP180 poll_interval 5
     </pre>
-	<pre>
+    <pre>
       define BMP180 I2C_BMP180
       attr BMP180 IODev RPiI2CMod
       attr BMP180 oversampling_settings 3

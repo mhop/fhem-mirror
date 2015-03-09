@@ -66,7 +66,6 @@ WS300_Initialize($)
 
   # Provider
   $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ws300 ".
-                       "loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 
   $hash->{DefFn}     = "WS300_Define";
@@ -669,7 +668,6 @@ NEXTPOLL:
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (ws300)</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
