@@ -40,7 +40,7 @@ eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 my $VERSION = "2.1.3";
 
 use constant {
-	PERL_VERSION    => "perl_version",
+  PERL_VERSION    => "perl_version",
   DATE            => "date",
   UPTIME          => "uptime",
   UPTIME_TEXT     => "uptime_text",
@@ -79,10 +79,10 @@ use constant {
   FB_FW_VERSION       => "fw_version_info",
   FB_DECT_TEMP        => "dect_temp",
     
-	FB_DSL_RATE         => "dsl_rate",
-	FB_DSL_SYNCTIME     => "dsl_synctime",
-	FB_DSL_FEC_15       => "dsl_fec_15",
-	FB_DSL_CRC_15       => "dsl_crc_15",
+  FB_DSL_RATE         => "dsl_rate",
+  FB_DSL_SYNCTIME     => "dsl_synctime",
+  FB_DSL_FEC_15       => "dsl_fec_15",
+  FB_DSL_CRC_15       => "dsl_crc_15",
 };
 
 use constant FS_PREFIX => "~ ";
@@ -119,51 +119,51 @@ SYSMON_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   return "Usage: define <name> SYSMON [MODE[:[USER@]HOST][:PORT]] [M1 [M2 [M3 [M4]]]]"  if(@a < 2);
-	# define sysmon SYSMON local
-	# define sysmon SYSMON local 1 1 1 10
-	# define sysmon SYSMON telnet:fritz.box
-	# define sysmon SYSMON telnet:fritz.box:23
-	# define sysmon SYSMON telnet:fritz.box:23 10 10 10 60
-	# define sysmon SYSMON telnet:user@fritz.box:23
-	
+  # define sysmon SYSMON local
+  # define sysmon SYSMON local 1 1 1 10
+  # define sysmon SYSMON telnet:fritz.box
+  # define sysmon SYSMON telnet:fritz.box:23
+  # define sysmon SYSMON telnet:fritz.box:23 10 10 10 60
+  # define sysmon SYSMON telnet:user@fritz.box:23
+  
   if(int(@a)>=3)
   {
-  	my @na = @a[2..scalar(@a)-1];  
-  	
-  	# wenn das erste Element nicht numerisch
-  	if(!($na[0] =~ /^\d+$/)) {
-  		# set mode/host/port
-  		my($mode, $host, $port) = split(/:/, $na[0]);
-  		$mode=lc($mode);
-  		# TODO SSH
-  		if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet')) {
-  		  $hash->{MODE} = $mode;
-  		  delete($hash->{HOST});
-  		  delete($hash->{USER});
-  		  # erkennen, wenn User angegeben ist
-  		  my($user,$th) = split(/@/,$host);
-  		  if(defined($th)) {
-  		  	$hash->{USER} = lc($user);
-  		  	$host = $th;
-  		  }
-  		  $hash->{HOST} = lc($host) if(defined($host));
-  		  # DefaultPort je nach Protokol
-  		  if(!defined($port)) {
-  		    $port = '23' if($mode eq 'telnet');
-  		    $port = '22' if($mode eq 'ssh');
-  		  }
-  		  $hash->{PORT} = lc($port);
-  	  } else {
-  	  	return "unexpected mode. use local or telnet only."; # TODO: SSH
-  	  }
-  		shift @na;
-  	} else {
+    my @na = @a[2..scalar(@a)-1];  
+    
+    # wenn das erste Element nicht numerisch
+    if(!($na[0] =~ /^\d+$/)) {
+      # set mode/host/port
+      my($mode, $host, $port) = split(/:/, $na[0]);
+      $mode=lc($mode);
+      # TODO SSH
+      if(defined($mode)&&($mode eq 'local' || $mode eq 'telnet')) {
+        $hash->{MODE} = $mode;
+        delete($hash->{HOST});
+        delete($hash->{USER});
+        # erkennen, wenn User angegeben ist
+        my($user,$th) = split(/@/,$host);
+        if(defined($th)) {
+          $hash->{USER} = lc($user);
+          $host = $th;
+        }
+        $hash->{HOST} = lc($host) if(defined($host));
+        # DefaultPort je nach Protokol
+        if(!defined($port)) {
+          $port = '23' if($mode eq 'telnet');
+          $port = '22' if($mode eq 'ssh');
+        }
+        $hash->{PORT} = lc($port);
+      } else {
+        return "unexpected mode. use local or telnet only."; # TODO: SSH
+      }
+      shift @na;
+    } else {
       $hash->{MODE}='local';
     }
 
-  	SYSMON_setInterval($hash, @na);
+    SYSMON_setInterval($hash, @na);
   } else {
-  	$hash->{MODE}='local';
+    $hash->{MODE}='local';
     SYSMON_setInterval($hash, undef);
   }
 
@@ -186,47 +186,47 @@ SYSMON_Define($$)
 sub
 SYSMON_setInterval($@)
 {
-	my ($hash, @a) = @_;
+  my ($hash, @a) = @_;
 
-	my $interval = $DEFAULT_INTERVAL_BASE;
-	$hash->{INTERVAL_BASE} = $interval;
+  my $interval = $DEFAULT_INTERVAL_BASE;
+  $hash->{INTERVAL_BASE} = $interval;
 
-	my $p1=1;
-	my $p2=1;
-	my $p3=1;
-	my $p4=10;
+  my $p1=1;
+  my $p2=1;
+  my $p3=1;
+  my $p4=10;
 
-	if(defined($a[0]) && int($a[0]) eq $a[0]) {$p1 = $a[0];}
-	if(defined($a[1]) && int($a[1]) eq $a[1]) {$p2 = $a[1];} else {$p2 = $p1;}
-	if(defined($a[2]) && int($a[2]) eq $a[2]) {$p3 = $a[2];} else {$p3 = $p1;}
-	if(defined($a[3]) && int($a[3]) eq $a[3]) {$p4 = $a[3];} else {$p4 = $p1*10;}
+  if(defined($a[0]) && int($a[0]) eq $a[0]) {$p1 = $a[0];}
+  if(defined($a[1]) && int($a[1]) eq $a[1]) {$p2 = $a[1];} else {$p2 = $p1;}
+  if(defined($a[2]) && int($a[2]) eq $a[2]) {$p3 = $a[2];} else {$p3 = $p1;}
+  if(defined($a[3]) && int($a[3]) eq $a[3]) {$p4 = $a[3];} else {$p4 = $p1*10;}
 
-	$hash->{INTERVAL_MULTIPLIERS} = $p1." ".$p2." ".$p3." ".$p4;
+  $hash->{INTERVAL_MULTIPLIERS} = $p1." ".$p2." ".$p3." ".$p4;
 }
 
 
 #my $cur_readings_map; => $hash->{helper}{cur_readings_map}
 sub
 SYSMON_updateCurrentReadingsMap($) {
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
   my $rMap;
   
   # Map aktueller Namen erstellen
-	
-	# Feste Werte
-	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
-	if($mode eq 'local'){
-	  $rMap->{+PERL_VERSION}       = "Perl Version";
+  
+  # Feste Werte
+  my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
+  if($mode eq 'local'){
+    $rMap->{+PERL_VERSION}       = "Perl Version";
   }
-	$rMap->{+DATE}               = "Date";
-	$rMap->{+CPU_BOGOMIPS}       = "BogoMIPS";
-	if(SYSMON_isCPUFreqRPiBBB($hash)) {
-	  #$rMap->{"cpu_freq"}       = "CPU Frequenz";
-	  $rMap->{"cpu_freq"}        = "CPU frequency";
-	  $rMap->{"cpu1_freq"}        = "CPU frequency (second core)";
-	}
-	if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash)) {
+  $rMap->{+DATE}               = "Date";
+  $rMap->{+CPU_BOGOMIPS}       = "BogoMIPS";
+  if(SYSMON_isCPUFreqRPiBBB($hash)) {
+    #$rMap->{"cpu_freq"}       = "CPU Frequenz";
+    $rMap->{"cpu_freq"}        = "CPU frequency";
+    $rMap->{"cpu1_freq"}        = "CPU frequency (second core)";
+  }
+  if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash)) {
     #$rMap->{+CPU_TEMP}       = "CPU Temperatur";
     #$rMap->{"cpu_temp_avg"}  = "Durchschnittliche CPU Temperatur";
     $rMap->{+CPU_TEMP}        = "CPU temperature";
@@ -234,31 +234,31 @@ SYSMON_updateCurrentReadingsMap($) {
   }
   
   if(SYSMON_isSysPowerAc($hash)) {
-  	#$rMap->{"power_ac_online"}  = "AC-Versorgung Status";
-		#$rMap->{"power_ac_present"} = "AC-Versorgung vorhanden";
-		#$rMap->{"power_ac_current"} = "AC-Versorgung Strom";
-		#$rMap->{"power_ac_voltage"} = "AC-Versorgung Spannung";
-		$rMap->{"power_ac_stat"}    = "AC-Versorgung Info";
-		$rMap->{"power_ac_text"}    = "AC-Versorgung Info";
+    #$rMap->{"power_ac_online"}  = "AC-Versorgung Status";
+    #$rMap->{"power_ac_present"} = "AC-Versorgung vorhanden";
+    #$rMap->{"power_ac_current"} = "AC-Versorgung Strom";
+    #$rMap->{"power_ac_voltage"} = "AC-Versorgung Spannung";
+    $rMap->{"power_ac_stat"}    = "AC-Versorgung Info";
+    $rMap->{"power_ac_text"}    = "AC-Versorgung Info";
   }
 
   if(SYSMON_isSysPowerUsb($hash)) {
-  	#$rMap->{"power_usb_online"}  = "USB-Versorgung Status";
-		#$rMap->{"power_usb_present"} = "USB-Versorgung vorhanden";
-		#$rMap->{"power_usb_current"} = "USB-Versorgung Strom";
-		#$rMap->{"power_usb_voltage"} = "USB-Versorgung Spannung";
-		$rMap->{"power_usb_stat"}    = "USB-Versorgung Info";
-		$rMap->{"power_usb_text"}    = "USB-Versorgung Info";
+    #$rMap->{"power_usb_online"}  = "USB-Versorgung Status";
+    #$rMap->{"power_usb_present"} = "USB-Versorgung vorhanden";
+    #$rMap->{"power_usb_current"} = "USB-Versorgung Strom";
+    #$rMap->{"power_usb_voltage"} = "USB-Versorgung Spannung";
+    $rMap->{"power_usb_stat"}    = "USB-Versorgung Info";
+    $rMap->{"power_usb_text"}    = "USB-Versorgung Info";
   }
   
   if(SYSMON_isSysPowerBat($hash)) {
-  	#$rMap->{"power_battery_online"}  = "Batterie-Versorgung Status";
-		#$rMap->{"power_battery_present"} = "Batterie-Versorgung vorhanden";
-		#$rMap->{"power_battery_current"} = "Batterie-Versorgung Strom";
-		#$rMap->{"power_battery_voltage"} = "Batterie-Versorgung Spannung";
-		$rMap->{"power_battery_stat"}    = "Batterie-Versorgung Info";
-		$rMap->{"power_battery_text"}    = "Batterie-Versorgung  Info";
-		$rMap->{"power_battery_info"}    = "Batterie-Versorgung  Zusatzinfo";
+    #$rMap->{"power_battery_online"}  = "Batterie-Versorgung Status";
+    #$rMap->{"power_battery_present"} = "Batterie-Versorgung vorhanden";
+    #$rMap->{"power_battery_current"} = "Batterie-Versorgung Strom";
+    #$rMap->{"power_battery_voltage"} = "Batterie-Versorgung Spannung";
+    $rMap->{"power_battery_stat"}    = "Batterie-Versorgung Info";
+    $rMap->{"power_battery_text"}    = "Batterie-Versorgung  Info";
+    $rMap->{"power_battery_info"}    = "Batterie-Versorgung  Zusatzinfo";
   }
 
   #$rMap->{"fhemuptime"}      = "Betriebszeit FHEM";
@@ -316,199 +316,199 @@ SYSMON_updateCurrentReadingsMap($) {
     $rMap->{"stat_cpu".$i."_text"} = "CPU".$i." statistics (text)";
   }
   
-	# Filesystems <readingName>[:<mountPoint>[:<Comment>]]
-	my $filesystems = AttrVal($name, "filesystems", undef);
+  # Filesystems <readingName>[:<mountPoint>[:<Comment>]]
+  my $filesystems = AttrVal($name, "filesystems", undef);
   if(defined $filesystems) {
     my @filesystem_list = split(/,\s*/, trim($filesystems));
     foreach (@filesystem_list) {
       my($fName, $fDef, $nComment) = split(/:/, $_);
       my $fPt; 
       if(defined $nComment) {
-      	$fPt = $nComment;
+        $fPt = $nComment;
       } else {
-	      if(defined $fDef) {
-	    	  # Benannte
-	    	  $fPt = "Filesystem ".$fDef;
-	      } else {
-	    	  # Unbenannte
-	    	  $fPt = "Mount point ".$fName;
-	      }
-	    }
-	    
-	    $rMap->{$fName}         =  $fPt;
-	    $rMap->{$fName."_used"} =  $fPt." (used)";
-	    $rMap->{$fName."_used_percent"} =  $fPt." (used %)";
-	    $rMap->{$fName."_free"} =  $fPt." (free)";
-	    
+        if(defined $fDef) {
+          # Benannte
+          $fPt = "Filesystem ".$fDef;
+        } else {
+          # Unbenannte
+          $fPt = "Mount point ".$fName;
+        }
+      }
+      
+      $rMap->{$fName}         =  $fPt;
+      $rMap->{$fName."_used"} =  $fPt." (used)";
+      $rMap->{$fName."_used_percent"} =  $fPt." (used %)";
+      $rMap->{$fName."_free"} =  $fPt." (free)";
+      
     }
   } else {
-  	$rMap->{"root"}     = "Filesystem /";
+    $rMap->{"root"}     = "Filesystem /";
   }
 
-	# Networkadapters: <readingName>[:<interfaceName>[:<Comment>]]
-	my $networkadapters = AttrVal($name, "network-interfaces", undef);
+  # Networkadapters: <readingName>[:<interfaceName>[:<Comment>]]
+  my $networkadapters = AttrVal($name, "network-interfaces", undef);
   if(defined $networkadapters) {
-  	my @networkadapters_list = split(/,\s*/, trim($networkadapters));
+    my @networkadapters_list = split(/,\s*/, trim($networkadapters));
     foreach (@networkadapters_list) {
       my($nName, $nDef, $nComment) = split(/:/, $_);
       my $nPt; 
       if(defined $nComment) {
-      	$nPt = $nComment;
+        $nPt = $nComment;
       } else {
-	      if(defined $nDef) {
-	    	  # Benannte
-	    	  $nPt = "Network ".$nDef;
-	      } else {
-	    	  # Unbenannte
-	    	  $nPt = "Network adapter ".$nName;
-	      }
-	    }
-	    
-	    $rMap->{$nName}           =  $nPt;
+        if(defined $nDef) {
+          # Benannte
+          $nPt = "Network ".$nDef;
+        } else {
+          # Unbenannte
+          $nPt = "Network adapter ".$nName;
+        }
+      }
+      
+      $rMap->{$nName}           =  $nPt;
       $rMap->{$nName."_diff"}   =  $nPt." (diff)";
-	    $rMap->{$nName."_rx"}     =  $nPt." (RX)";
-	    $rMap->{$nName."_tx"}     =  $nPt." (TX)";
-	    $rMap->{$nName."_ip"}     =  $nPt." (IP)";
-	    $rMap->{$nName."_ip6"}    =  $nPt." (IP6)";
-	    
+      $rMap->{$nName."_rx"}     =  $nPt." (RX)";
+      $rMap->{$nName."_tx"}     =  $nPt." (TX)";
+      $rMap->{$nName."_ip"}     =  $nPt." (IP)";
+      $rMap->{$nName."_ip6"}    =  $nPt." (IP6)";
+      
     }
   } else {
-  	# Default Networkadapters
-  	# Wenn nichts definiert, werden Default-Werte verwendet
-  	if(SYSMON_isFB($hash)) {
-  		my $nName = "ath0";
-		  $rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	    $nName = "ath1";
-		  $rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	    $nName = "cpmac0";
-		  $rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	    $nName = "dsl";
+    # Default Networkadapters
+    # Wenn nichts definiert, werden Default-Werte verwendet
+    if(SYSMON_isFB($hash)) {
+      my $nName = "ath0";
       $rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	    $nName = ETH0;
-		  $rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	    $nName = "guest";
-	  	$rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	    $nName = "hotspot";
-    	$rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	    $nName = "lan";
-		  $rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	    $nName = "vdsl";
-		  $rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
-	  } else {
-	  	my $nName = ETH0;
-	  	$rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
-	    
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+      $nName = "ath1";
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+      $nName = "cpmac0";
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+      $nName = "dsl";
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+      $nName = ETH0;
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+      $nName = "guest";
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+      $nName = "hotspot";
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+      $nName = "lan";
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+      $nName = "vdsl";
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
+    } else {
+      my $nName = ETH0;
+      $rMap->{$nName}         = "Network adapter ".$nName;
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      
       $nName = WLAN0;
       $rMap->{$nName}         = "Network adapter ".$nName;
-	    $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
-	    $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
-	    $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
-	    $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
-	    $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
+      $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
+      $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
+      $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
+      $rMap->{$nName."_ip6"} = "Network adapter ".$nName." (IP6)";
     }
   }
   
   if(SYSMON_isFB($hash)) {
     # FB WLAN state
-	  $rMap->{+FB_WLAN_STATE}       = "WLAN State";
-	  $rMap->{+FB_WLAN_GUEST_STATE} = "WLAN Guest State";
-	  $rMap->{+FB_INET_IP}          = "Internet IP";
-	  $rMap->{+FB_INET_STATE}       = "Internet connection state";
-	  $rMap->{+FB_N_TIME_CTRL}      = "night time control";
-	  $rMap->{+FB_NUM_NEW_MESSAGES} = "new messages";
-	  $rMap->{+FB_FW_VERSION}       = "firmware info";
-	  $rMap->{+FB_DECT_TEMP}        = "DECT temperatur";
-	  
-	  $rMap->{+FB_DSL_RATE}       = "DSL rate",
-	  $rMap->{+FB_DSL_SYNCTIME}   = "DSL synctime";
-	  $rMap->{+FB_DSL_FEC_15}     = "DSL recoverable errors per 15 minutes"; # forward error correction
-	  $rMap->{+FB_DSL_CRC_15}     = "DSL unrecoverable errors per 15 minutes"; # cyclic redundancy check
-	  
+    $rMap->{+FB_WLAN_STATE}       = "WLAN State";
+    $rMap->{+FB_WLAN_GUEST_STATE} = "WLAN Guest State";
+    $rMap->{+FB_INET_IP}          = "Internet IP";
+    $rMap->{+FB_INET_STATE}       = "Internet connection state";
+    $rMap->{+FB_N_TIME_CTRL}      = "night time control";
+    $rMap->{+FB_NUM_NEW_MESSAGES} = "new messages";
+    $rMap->{+FB_FW_VERSION}       = "firmware info";
+    $rMap->{+FB_DECT_TEMP}        = "DECT temperatur";
+    
+    $rMap->{+FB_DSL_RATE}       = "DSL rate",
+    $rMap->{+FB_DSL_SYNCTIME}   = "DSL synctime";
+    $rMap->{+FB_DSL_FEC_15}     = "DSL recoverable errors per 15 minutes"; # forward error correction
+    $rMap->{+FB_DSL_CRC_15}     = "DSL unrecoverable errors per 15 minutes"; # cyclic redundancy check
+    
   }
   
-	# User defined
-	my $userdefined = AttrVal($name, "user-defined", undef);
+  # User defined
+  my $userdefined = AttrVal($name, "user-defined", undef);
   if(defined $userdefined) {
-  	my @userdefined_list = split(/,\s*/, trim($userdefined));
+    my @userdefined_list = split(/,\s*/, trim($userdefined));
     foreach (@userdefined_list) {
        # <readingName>:<Interval_Minutes>:<Comment>:<Cmd>
-	     my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $_);
-	     if(defined $uComment) {
-	    	# Nur gueltige
-		    $rMap->{$uName} = $uComment;
-	    }
+       my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $_);
+       if(defined $uComment) {
+        # Nur gueltige
+        $rMap->{$uName} = $uComment;
+      }
     }
   }
 
   # User defined functions
-	my $userfn = AttrVal($name, "user-fn", undef);
+  my $userfn = AttrVal($name, "user-fn", undef);
   if(defined $userfn) {
-  	my @userfn_list = split(/,\s*/, trim($userfn));
+    my @userfn_list = split(/,\s*/, trim($userfn));
     foreach (@userfn_list) {
        # <fnName>:<Interval_Minutes>:<reading1>:<reading2>...
-	     my($fnName, $uInterval, @readings) = split(/:/, $_);
-	     foreach my $rName (@readings) {
-		    $rMap->{$rName} = "user defined: $fnName";
-	    }
+       my($fnName, $uInterval, @readings) = split(/:/, $_);
+       foreach my $rName (@readings) {
+        $rMap->{$rName} = "user defined: $fnName";
+      }
     }
   }
 
@@ -523,30 +523,30 @@ $rMap->{"io_sda"}         = "TEST";
 
 sub
 SYSMON_getObsoleteReadingsMap($) {
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	
-	my $rMap; 
-	
-	#return $rMap; # TODO TEST
-	
-	if(!defined($hash->{helper}{cur_readings_map})) {
-	  SYSMON_updateCurrentReadingsMap($hash);
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  my $rMap; 
+  
+  #return $rMap; # TODO TEST
+  
+  if(!defined($hash->{helper}{cur_readings_map})) {
+    SYSMON_updateCurrentReadingsMap($hash);
   }
 
-	# alle READINGS durchgehen
-	my @cKeys=keys (%{$defs{$name}{READINGS}});
+  # alle READINGS durchgehen
+  my @cKeys=keys (%{$defs{$name}{READINGS}});
   foreach my $aName (@cKeys) {
     if(defined ($aName)) {
-    	# alles hinzufuegen, was nicht in der Aktuellen Liste ist
-    	if(!defined($hash->{helper}{cur_readings_map}->{$aName})) {
-    		#Log 3, "SYSMON>>>>>>>>>>>>>>>>> SYSMON_getObsoleteReadingsMap >>> $aName";
-    		$rMap->{$aName} = 1;
-    	}
+      # alles hinzufuegen, was nicht in der Aktuellen Liste ist
+      if(!defined($hash->{helper}{cur_readings_map}->{$aName})) {
+        #Log 3, "SYSMON>>>>>>>>>>>>>>>>> SYSMON_getObsoleteReadingsMap >>> $aName";
+        $rMap->{$aName} = 1;
+      }
     }
   }
-	
-	return $rMap;
+  
+  return $rMap;
 }
 
 sub
@@ -573,7 +573,7 @@ SYSMON_Get($@)
 
   if(@a < 2)
   {
-  	SYSMON_Log($hash, 3, "@a: get needs at least one parameter");
+    SYSMON_Log($hash, 3, "@a: get needs at least one parameter");
     return "$name: get needs at least one parameter";
   }
 
@@ -583,65 +583,65 @@ SYSMON_Get($@)
 
   if($cmd eq "update")
   {
-  	#$hash->{LOCAL} = 1;
-  	SYSMON_Update($hash, 1);
-  	#delete $hash->{LOCAL};
-  	return undef;
+    #$hash->{LOCAL} = 1;
+    SYSMON_Update($hash, 1);
+    #delete $hash->{LOCAL};
+    return undef;
   }
 
   if($cmd eq "list") {
     my $map = SYSMON_obtainParameters($hash, 1);
     my $ret = "";
     foreach my $name (keys %{$map}) {
-  	  my $value = $map->{$name};
-  	  $ret = "$ret\n".sprintf("%-20s %s", $name, $value);
+      my $value = $map->{$name};
+      $ret = "$ret\n".sprintf("%-20s %s", $name, $value);
     }
     
     my $msg = $hash->{helper}{error_msg};
-	  if($msg) {
-		  # Problem mit der Verbindung
-		  return $msg;
-	  }
-	
+    if($msg) {
+      # Problem mit der Verbindung
+      return $msg;
+    }
+  
     return $ret;
   }
 
   if($cmd eq "version")
   {
-  	return $VERSION;
+    return $VERSION;
   }
 
   if($cmd eq "interval_base")
   {
-  	return $hash->{INTERVAL_BASE};
+    return $hash->{INTERVAL_BASE};
   }
 
   if($cmd eq "interval_multipliers")
   {
-  	return $hash->{INTERVAL_MULTIPLIERS};
+    return $hash->{INTERVAL_MULTIPLIERS};
   }
   
   if($cmd eq "list_lan_devices")
   {
-  	my $ret='';
-  	my $map = SYSMON_getFBLanDeviceList($hash);
-  	if(defined($map)) {
-  		foreach my $dname (sort keys %{$map}) {
-  	    my $dev_ip  =  $map->{$dname}{ip};
-  	    $dev_ip='' unless defined $dev_ip;
-  	    my $dev_mac =  $map->{$dname}{mac};
-  	    my $dev_active = $map->{$dname}{active};
-  	    my $dev_active_txt = $dev_active?'true':'false';
-  	    #$ret.="\n"."$dname : active: $dev_active_txt, IP: $dev_ip, MAC: $dev_mac";
-  	    $ret = "$ret\n".sprintf("%-25s : active: %-5s  IP: %-16s  MAC: %-17s", $dname, $dev_active_txt, $dev_ip, $dev_mac);
-  		}
-  	}
-  	return $ret;
+    my $ret='';
+    my $map = SYSMON_getFBLanDeviceList($hash);
+    if(defined($map)) {
+      foreach my $dname (sort keys %{$map}) {
+        my $dev_ip  =  $map->{$dname}{ip};
+        $dev_ip='' unless defined $dev_ip;
+        my $dev_mac =  $map->{$dname}{mac};
+        my $dev_active = $map->{$dname}{active};
+        my $dev_active_txt = $dev_active?'true':'false';
+        #$ret.="\n"."$dname : active: $dev_active_txt, IP: $dev_ip, MAC: $dev_mac";
+        $ret = "$ret\n".sprintf("%-25s : active: %-5s  IP: %-16s  MAC: %-17s", $dname, $dev_active_txt, $dev_ip, $dev_mac);
+      }
+    }
+    return $ret;
   }
 
   my $sfb='';
   if(SYSMON_isFB($hash)) {
-  	$sfb=' list_lan_devices:noArg';
+    $sfb=' list_lan_devices:noArg';
   }
   return "Unknown argument $cmd, choose one of list:noArg update:noArg interval_base:noArg interval_multipliers:noArg version:noArg".$sfb;
 }
@@ -655,7 +655,7 @@ SYSMON_Set($@)
 
   if(@a < 2)
   {
-  	SYSMON_Log($hash, 3, "@a: set needs at least one parameter");
+    SYSMON_Log($hash, 3, "@a: set needs at least one parameter");
     return "$name: set needs at least one parameter";
   }
 
@@ -665,52 +665,52 @@ SYSMON_Set($@)
 
   if($cmd eq "interval_multipliers")
   {
-  	if(@a < 3) {
-  		SYSMON_Log($hash, 3, "$name: not enought parameters");
+    if(@a < 3) {
+      SYSMON_Log($hash, 3, "$name: not enought parameters");
       return "$name: not enought parameters";
-  	}
+    }
 
-  	my @na = @a[2..scalar(@a)-1];
-  	SYSMON_setInterval($hash, @na);
-  	return $cmd ." set to ".($hash->{INTERVAL_MULTIPLIERS});
+    my @na = @a[2..scalar(@a)-1];
+    SYSMON_setInterval($hash, @na);
+    return $cmd ." set to ".($hash->{INTERVAL_MULTIPLIERS});
   }
 
   if($cmd eq "clean") {    
     # Nicht mehr benoetigte Readings loeschen
     my $omap = SYSMON_getObsoleteReadingsMap($hash);
     foreach my $aName (keys %{$omap}) {
-    	delete $defs{$name}{READINGS}{$aName};
-	  }
+      delete $defs{$name}{READINGS}{$aName};
+    }
     return;
   }
   
   if($cmd eq "clear")
   {
-  	my $subcmd = my $cmd= $a[2];
-  	if(defined $subcmd) {
-  		delete $defs{$name}{READINGS}{$subcmd};
-  		return;
+    my $subcmd = my $cmd= $a[2];
+    if(defined $subcmd) {
+      delete $defs{$name}{READINGS}{$subcmd};
+      return;
     }
     
     return "missing parameter. use clear <reading name>";
   }
   
   if ( lc $cmd eq 'password') {
-  	my $subcmd = $a[2];
-	  if(defined $subcmd) {
-	     my $ret = SYSMON_storePassword ($hash, $subcmd);
-	     if(!defined($hash->{helper}{error_msg})) {
-	       SYSMON_Update($hash, 1);
-	     }
-	     return $ret;
-	  }
+    my $subcmd = $a[2];
+    if(defined $subcmd) {
+       my $ret = SYSMON_storePassword ($hash, $subcmd);
+       if(!defined($hash->{helper}{error_msg})) {
+         SYSMON_Update($hash, 1);
+       }
+       return $ret;
+    }
   }
   
   # TEST
   if($cmd eq "reset")
   {
-  	delete $defs{$name}->{helper};
-  	return 'ok';
+    delete $defs{$name}->{helper};
+    return 'ok';
   }
 
   return "Unknown argument $cmd, choose one of password interval_multipliers clean:noArg clear";
@@ -731,16 +731,16 @@ SYSMON_Attr($$$)
     
     if( $cmd eq "set" ) {# set, del  
 
-    	if($attrName eq "disable")
+      if($attrName eq "disable")
       {
         RemoveInternalTimer($hash);
-      	if($attrVal ne "0")
-      	{
-      		InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
-      	}
-       	#$hash->{LOCAL} = 1;
-  	    #SYSMON_Update($hash);
-  	    #delete $hash->{LOCAL};
+        if($attrVal ne "0")
+        {
+          InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
+        }
+        #$hash->{LOCAL} = 1;
+        #SYSMON_Update($hash);
+        #delete $hash->{LOCAL};
       }
 
       $attr{$name}{$attrName} = $attrVal;
@@ -774,13 +774,13 @@ SYSMON_Update($;$)
 
   if( AttrVal($name, "disable", "") eq "1" )
   {
-  	#SYSMON_Log($hash, 5, "disabled");
-  	$hash->{STATE} = "Inactive";
+    #SYSMON_Log($hash, 5, "disabled");
+    $hash->{STATE} = "Inactive";
   } else {
-  	# Beim ersten mal alles aktualisieren!
-	  if(!$hash->{helper}{u_first_mark}) {
-	    $refresh_all = 1;
-	  }
+    # Beim ersten mal alles aktualisieren!
+    if(!$hash->{helper}{u_first_mark}) {
+      $refresh_all = 1;
+    }
 
     if(!AttrVal($name, "nonblocking", 1)) {
       # direkt call
@@ -790,9 +790,9 @@ SYSMON_Update($;$)
 
       # Mark setzen 
       if(!$hash->{helper}{u_first_mark}) {
-	      $hash->{helper}{u_first_mark} = 1;
-	    }
-	  
+        $hash->{helper}{u_first_mark} = 1;
+      }
+    
       SYSMON_updateReadings($hash,$map);
       $hash->{STATE} = "Active";
     } else {
@@ -811,31 +811,31 @@ SYSMON_Update($;$)
 }
 
 sub SYSMON_blockingCall($) {
-	my ($tparam) = @_;
-	my ($name, $refresh_all) = split(/\|/,$tparam);
-	my $hash = $main::defs{$name};
-	SYSMON_Log($hash, 5, "$name, ".($refresh_all?$refresh_all:''));
+  my ($tparam) = @_;
+  my ($name, $refresh_all) = split(/\|/,$tparam);
+  my $hash = $main::defs{$name};
+  SYSMON_Log($hash, 5, "$name, ".($refresh_all?$refresh_all:''));
 
   my $map = SYSMON_obtainParameters($hash, $refresh_all);
 
-	# Device-Name mitnehmen
+  # Device-Name mitnehmen
   my $ret = "name|".$name;
   
   my $msg = $hash->{helper}{error_msg};
-	if($msg) {
-		# Problem mit der Verbindung
-		return $ret."|error|".$msg;
-	}
+  if($msg) {
+    # Problem mit der Verbindung
+    return $ret."|error|".$msg;
+  }
 
   # to String
   foreach my $aName (keys %{$map}) {
     my $value = $map->{$aName};
     # Nur wenn ein gueltiges Value vorliegt
     if(defined $value) {
-    	# Zeichen maskieren
-    	$value=~s/#/§²§/g;
-    	$value=~s/\|/§³§/g;
-    	$ret.="|".$aName."|".$value;
+      # Zeichen maskieren
+      $value=~s/#/§²§/g;
+      $value=~s/\|/§³§/g;
+      $ret.="|".$aName."|".$value;
     }
   }
   
@@ -843,12 +843,12 @@ sub SYSMON_blockingCall($) {
 }
 
 sub SYSMON_test() {
-	
-	#foreach my $d (sort keys %defs) {
+  
+  #foreach my $d (sort keys %defs) {
   #  my $h = $defs{$d};
   #  if(defined ($h->{TYPE})) {} else {return $d."-".Dumper($h);}
   #}
-	
+  
   my $map;
   
   my $name="TESTNAME";
@@ -865,62 +865,62 @@ sub SYSMON_test() {
     my $value = $map->{$aName};
     # Nur wenn ein gueltiges Value vorliegt
     if(defined $value) {
-    	$value=~s/#/§²§/g;
-    	$ret.="|".$aName."|".$value;
+      $value=~s/#/§²§/g;
+      $ret.="|".$aName."|".$value;
     }
   }
   
   my @ta = split(/\|/,$ret);
   #return Dumper(@ta);
-	my %map2 = @ta;
-	
+  my %map2 = @ta;
+  
   return Dumper(\%map2);
   
   return $ret;
 }
 
 sub SYSMON_blockingAbort($) {
-	my ($hash) = @_;
-	delete($hash->{helper}{READOUT_RUNNING_PID});
-	SYSMON_Log($hash, 5, "");
-	$hash->{STATE} = "Error: Blocking call aborted (timeout)";
+  my ($hash) = @_;
+  delete($hash->{helper}{READOUT_RUNNING_PID});
+  SYSMON_Log($hash, 5, "");
+  $hash->{STATE} = "Error: Blocking call aborted (timeout)";
 }
 
 sub SYSMON_blockingFinish($) {
-	my ($map_str) = @_;
-	
-	my $map;
-	# to map
-	my @ta = split(/\|/,$map_str);
-	my %tm = @ta;
-	$map = \%tm;
-	
-	my $name=$map->{name};
-	delete $map->{name};
-	
-	my $hash = $main::defs{$name};
-	delete($hash->{helper}{READOUT_RUNNING_PID});
-	
-	SYSMON_Log($hash, 5, $map_str);
-	# Mark setzen 
+  my ($map_str) = @_;
+  
+  my $map;
+  # to map
+  my @ta = split(/\|/,$map_str);
+  my %tm = @ta;
+  $map = \%tm;
+  
+  my $name=$map->{name};
+  delete $map->{name};
+  
+  my $hash = $main::defs{$name};
+  delete($hash->{helper}{READOUT_RUNNING_PID});
+  
+  SYSMON_Log($hash, 5, $map_str);
+  # Mark setzen 
   if(!$hash->{helper}{u_first_mark}) {
-	  $hash->{helper}{u_first_mark} = 1;
-	}
-	
-	my $msg = $map->{error};
-	if($msg) {
-		# Im Fehlerfall State ebtsprechend setzen und nichts aktualisieren.
-		$hash->{STATE} = "Error: ".$msg;
-		return;
-	}
-	
-	SYSMON_updateReadings($hash,$map);
-	$hash->{STATE} = "Active";
+    $hash->{helper}{u_first_mark} = 1;
+  }
+  
+  my $msg = $map->{error};
+  if($msg) {
+    # Im Fehlerfall State ebtsprechend setzen und nichts aktualisieren.
+    $hash->{STATE} = "Error: ".$msg;
+    return;
+  }
+  
+  SYSMON_updateReadings($hash,$map);
+  $hash->{STATE} = "Active";
 }
 
 sub SYSMON_updateReadings($$) {
-	my ($hash,$map) = @_;
-	SYSMON_Log($hash, 5, "");
+  my ($hash,$map) = @_;
+  SYSMON_Log($hash, 5, "");
   my $name = $hash->{NAME};
   
   readingsBeginUpdate($hash);
@@ -940,9 +940,9 @@ sub SYSMON_updateReadings($$) {
     my $value = $map->{$aName};
     # Nur aktualisieren, wenn ein gueltiges Value vorliegt
     if(defined $value) {
-    	# Maskierte Zeichen zuruechersetzen
-    	$value=~s/§²§/#/g;
-    	$value=~s/§³§/\|/g;
+      # Maskierte Zeichen zuruechersetzen
+      $value=~s/§²§/#/g;
+      $value=~s/§³§/\|/g;
       readingsBulkUpdate($hash,$aName,$value);
     }
   }
@@ -952,12 +952,12 @@ sub SYSMON_updateReadings($$) {
   
   # UserFn Keys entfernen
   foreach my $aName (@a_keys) {
-  	delete($omap->{$aName});
+    delete($omap->{$aName});
   }
   foreach my $aName (keys %{$omap}) {
-  	#  SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>> ".$aName."->".Dumper($defs{$name}{READINGS}{$aName}));
-  	  delete $defs{$name}{READINGS}{$aName};
-	}
+    #  SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>> ".$aName."->".Dumper($defs{$name}{READINGS}{$aName}));
+      delete $defs{$name}{READINGS}{$aName};
+  }
 
   readingsEndUpdate($hash,defined($hash->{LOCAL}) ? 0 : 1);    
 }
@@ -965,18 +965,18 @@ sub SYSMON_updateReadings($$) {
 sub SYSMON_obtainParameters($$) {
   my ($hash, $refresh_all) = @_;
     
-	my $name = $hash->{NAME};
+  my $name = $hash->{NAME};
   # ---
   #TODO: SSH
   my $msg = undef;
   my $openedTelnet = 0;
   my $telnet = $hash->{".telnet"};
   #$telnet = undef;
-	my $mode = $hash->{MODE};
-	# Wenn remote: open connection
-	if ($mode eq 'telnet') {
-		unless (defined $telnet) {
-			SYSMON_Log($hash, 5, "$name: Open shared telnet connection");
+  my $mode = $hash->{MODE};
+  # Wenn remote: open connection
+  if ($mode eq 'telnet') {
+    unless (defined $telnet) {
+      SYSMON_Log($hash, 5, "$name: Open shared telnet connection");
       $msg = SYSMON_Open_Connection($hash);
       $hash->{helper}{error_msg}=$msg;
       if (!$msg) {
@@ -984,7 +984,7 @@ sub SYSMON_obtainParameters($$) {
         $hash->{helper}{error_msg}=undef;
       }
     }
-	}
+  }
   # ---
   
   my $map;
@@ -993,16 +993,16 @@ sub SYSMON_obtainParameters($$) {
   }
   
   # ---
-	# Wenn remote: close connection
-	if ($mode eq 'telnet') {
-		if($openedTelnet) {
-		  SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
-		  SYSMON_Close_Connection( $hash );
-	  }
-	}
-	# ---
-	
-	return $map;
+  # Wenn remote: close connection
+  if ($mode eq 'telnet') {
+    if($openedTelnet) {
+      SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
+      SYSMON_Close_Connection( $hash );
+    }
+  }
+  # ---
+  
+  return $map;
 }
 
 
@@ -1011,47 +1011,47 @@ sub SYSMON_obtainParameters($$) {
 sub
 SYSMON_obtainParameters_intern($$)
 {
-	my ($hash, $refresh_all) = @_;
-	my $name = $hash->{NAME};
+  my ($hash, $refresh_all) = @_;
+  my $name = $hash->{NAME};
 
-	my $map;
+  my $map;
 
-	my $base=$DEFAULT_INTERVAL_BASE; 
-	my $im = "1 1 1 10";
-	# Wenn wesentliche Parameter nicht definiert sind, soll aktualisierung immer vorgenommen werden
-	if((defined $hash->{INTERVAL_BASE})) {
-  	$base = $hash->{INTERVAL_BASE};
+  my $base=$DEFAULT_INTERVAL_BASE; 
+  my $im = "1 1 1 10";
+  # Wenn wesentliche Parameter nicht definiert sind, soll aktualisierung immer vorgenommen werden
+  if((defined $hash->{INTERVAL_BASE})) {
+    $base = $hash->{INTERVAL_BASE};
   }
   if((defined $hash->{INTERVAL_MULTIPLIERS})) {
-  	$im = $hash->{INTERVAL_MULTIPLIERS};
+    $im = $hash->{INTERVAL_MULTIPLIERS};
   }
 
   my $ref =  int(time()/$base);
-	my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
-	 
-	my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
-	# Einmaliges
-	if(!$hash->{helper}{u_first_mark}) {
-		# nur lokal abfragen (macht remote keinen Sinn)
-		if ($mode eq 'local') {
-	    # Perl version
-	    $map->{+PERL_VERSION} = "$]";
-	  }
-	  
-		if(SYSMON_isProcFS($hash)) {
-  	  $map = SYSMON_getCPUBogoMIPS($hash, $map);
-	  }
-	
-	  if(SYSMON_isFB($hash)) {
-	    $map = SYSMON_FBVersionInfo($hash, $map);
+  my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
+   
+  my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
+  # Einmaliges
+  if(!$hash->{helper}{u_first_mark}) {
+    # nur lokal abfragen (macht remote keinen Sinn)
+    if ($mode eq 'local') {
+      # Perl version
+      $map->{+PERL_VERSION} = "$]";
+    }
+    
+    if(SYSMON_isProcFS($hash)) {
+      $map = SYSMON_getCPUBogoMIPS($hash, $map);
+    }
+  
+    if(SYSMON_isFB($hash)) {
+      $map = SYSMON_FBVersionInfo($hash, $map);
     }
   }
 
-	# immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
-	if(SYSMON_isProcFS($hash)) {
+  # immer aktualisieren: uptime, uptime_text, fhemuptime, fhemuptime_text, idletime, idletime_text
+  if(SYSMON_isProcFS($hash)) {
     $map = SYSMON_getUptime($hash, $map);
   } else {
-  	$map = SYSMON_getUptime2($hash, $map);
+    $map = SYSMON_getUptime2($hash, $map);
   }
   
   # nur lokal abfragen
@@ -1062,9 +1062,9 @@ SYSMON_obtainParameters_intern($$)
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg, procstat, iostat
     if($refresh_all || ($ref % $m1) eq 0) {
-    	#Log 3, "SYSMON -----------> DEBUG: read CPU-Temp"; 
-    	if(SYSMON_isCPUTempRPi($hash)) { # Rasp
-    		 $map = SYSMON_getCPUTemp_RPi($hash, $map);
+      #Log 3, "SYSMON -----------> DEBUG: read CPU-Temp"; 
+      if(SYSMON_isCPUTempRPi($hash)) { # Rasp
+         $map = SYSMON_getCPUTemp_RPi($hash, $map);
       } 
       if (SYSMON_isCPUTempBBB($hash)) {
         $map = SYSMON_getCPUTemp_BBB($hash, $map);
@@ -1082,19 +1082,19 @@ SYSMON_obtainParameters_intern($$)
         $map = SYSMON_getLoadAvg($hash, $map);
         $map = SYSMON_getCPUProcStat($hash, $map);
       } else {
-      	#TODO: Ohne ProcFS
+        #TODO: Ohne ProcFS
       }
       #$map = SYSMON_getDiskStat($hash, $map);
       
       # Power info (cubietruck)
       if(SYSMON_isSysPowerAc($hash)) {
-      	$map = SYSMON_PowerAcInfo($hash, $map);
+        $map = SYSMON_PowerAcInfo($hash, $map);
       }
       if(SYSMON_isSysPowerUsb($hash)) {
-      	$map = SYSMON_PowerUsbInfo($hash, $map);
+        $map = SYSMON_PowerUsbInfo($hash, $map);
       }
       if(SYSMON_isSysPowerBat($hash)) {
-      	$map = SYSMON_PowerBatInfo($hash, $map);
+        $map = SYSMON_PowerBatInfo($hash, $map);
       }
     }
   }
@@ -1102,9 +1102,9 @@ SYSMON_obtainParameters_intern($$)
   if($m2 gt 0) { # Nur wenn > 0
     # M2: ram, swap
     if($refresh_all || ($ref % $m2) eq 0) {
-    	if(SYSMON_isOSX()){
-    	  $map = SYSMON_getRamAndSwapOSX($hash, $map);
-    	} else {
+      if(SYSMON_isOSX()){
+        $map = SYSMON_getRamAndSwapOSX($hash, $map);
+      } else {
         $map = SYSMON_getRamAndSwap($hash, $map);
       }
     }
@@ -1117,25 +1117,25 @@ SYSMON_obtainParameters_intern($$)
     my $networks = AttrVal($name, "network-interfaces", undef);
     if($update_ns) {
       if(defined $networks) {
-      	my @networks_list = split(/,\s*/, trim($networks));
+        my @networks_list = split(/,\s*/, trim($networks));
         foreach (@networks_list) {
-	        $map = SYSMON_getNetworkInfo($hash, $map, $_);
+          $map = SYSMON_getNetworkInfo($hash, $map, $_);
         }
       } else {
-      	# Wenn nichts definiert, werden Default-Werte verwendet
-      	#Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> NETWORK";
-      	if(SYSMON_isFB($hash)) {
-    		  $map = SYSMON_getNetworkInfo($hash, $map, "ath0");
-    		  $map = SYSMON_getNetworkInfo($hash, $map, "ath1");
-    		  $map = SYSMON_getNetworkInfo($hash, $map, "cpmac0");
+        # Wenn nichts definiert, werden Default-Werte verwendet
+        #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> NETWORK";
+        if(SYSMON_isFB($hash)) {
+          $map = SYSMON_getNetworkInfo($hash, $map, "ath0");
+          $map = SYSMON_getNetworkInfo($hash, $map, "ath1");
+          $map = SYSMON_getNetworkInfo($hash, $map, "cpmac0");
           $map = SYSMON_getNetworkInfo($hash, $map, "dsl");
-    		  $map = SYSMON_getNetworkInfo($hash, $map, "eth0");
-    	  	$map = SYSMON_getNetworkInfo($hash, $map, "guest");
-        	$map = SYSMON_getNetworkInfo($hash, $map, "hotspot");
-    		  $map = SYSMON_getNetworkInfo($hash, $map, "lan");
-    		  $map = SYSMON_getNetworkInfo($hash, $map, "vdsl");
-    	  } else {
-    	  	#Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".ETH0;
+          $map = SYSMON_getNetworkInfo($hash, $map, "eth0");
+          $map = SYSMON_getNetworkInfo($hash, $map, "guest");
+          $map = SYSMON_getNetworkInfo($hash, $map, "hotspot");
+          $map = SYSMON_getNetworkInfo($hash, $map, "lan");
+          $map = SYSMON_getNetworkInfo($hash, $map, "vdsl");
+        } else {
+          #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".ETH0;
           $map = SYSMON_getNetworkInfo($hash, $map, ETH0);
           #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".$map->{+ETH0};
           #Log 3, "SYSMON>>>>>>>>>>>>>>>>>>>>>>>>> ".WLAN0;
@@ -1144,20 +1144,20 @@ SYSMON_obtainParameters_intern($$)
         }
       }
       if(SYSMON_isFB($hash)) {
-      	$map = SYSMON_getFBWLANState($hash, $map);
-      	$map = SYSMON_getFBWLANGuestState($hash, $map);
-      	$map = SYSMON_getFBInetIP($hash, $map);
-      	$map = SYSMON_getFBInetConnectionState($hash, $map);
-      	$map = SYSMON_getFBNightTimeControl($hash, $map);
-      	$map = SYSMON_getFBNumNewMessages($hash, $map);
-      	$map = SYSMON_getFBDECTTemp($hash, $map);
-      	
-      	#DSL-Downstream und DSL-Upstream abfragen
-	      $map = SYSMON_getFBStreamRate($hash, $map);
-	      #Sync-Zeit mit Vermittlungsstelle abfragen
-	      $map = SYSMON_getFBSyncTime($hash, $map);
-	      #Uebertragungsfehler abfragen (nicht behebbar und behebbar)
-	      $map = SYSMON_getFBCRCFEC($hash, $map);
+        $map = SYSMON_getFBWLANState($hash, $map);
+        $map = SYSMON_getFBWLANGuestState($hash, $map);
+        $map = SYSMON_getFBInetIP($hash, $map);
+        $map = SYSMON_getFBInetConnectionState($hash, $map);
+        $map = SYSMON_getFBNightTimeControl($hash, $map);
+        $map = SYSMON_getFBNumNewMessages($hash, $map);
+        $map = SYSMON_getFBDECTTemp($hash, $map);
+        
+        #DSL-Downstream und DSL-Upstream abfragen
+        $map = SYSMON_getFBStreamRate($hash, $map);
+        #Sync-Zeit mit Vermittlungsstelle abfragen
+        $map = SYSMON_getFBSyncTime($hash, $map);
+        #Uebertragungsfehler abfragen (nicht behebbar und behebbar)
+        $map = SYSMON_getFBCRCFEC($hash, $map);
       }
     }
   }
@@ -1172,20 +1172,20 @@ SYSMON_obtainParameters_intern($$)
         my @filesystem_list = split(/,\s*/, trim($filesystems));
         foreach (@filesystem_list)
         {
-        	$map = SYSMON_getFileSystemInfo($hash, $map, $_);
+          $map = SYSMON_getFileSystemInfo($hash, $map, $_);
         }
       } else {
         $map = SYSMON_getFileSystemInfo($hash, $map, "root:/");
       }
     } else {
-    	# Workaround: Damit die Readings zw. den Update-Punkten nicht geloescht werden, werden die Schluessel leer angelegt
-    	# Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben,
-    	# damit werden die Readings in der Update-Methode nicht geloescht.
-    	# Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
-    	my @cKeys=keys (%{$defs{$name}{READINGS}});
+      # Workaround: Damit die Readings zw. den Update-Punkten nicht geloescht werden, werden die Schluessel leer angelegt
+      # Wenn noch keine Update notwendig, dan einfach alte Schluessel (mit undef als Wert) angeben,
+      # damit werden die Readings in der Update-Methode nicht geloescht.
+      # Die ggf. notwendige Loeschung findet nur bei tatsaechlichen Update statt.
+      my @cKeys=keys (%{$defs{$name}{READINGS}});
       foreach my $aName (@cKeys) {
-    	  #if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
-    	  if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
+        #if(defined ($aName) && (index($aName, FS_PREFIX) == 0 || index($aName, FS_PREFIX_N) == 0)) {
+        if(defined ($aName) && (index($aName, FS_PREFIX) == 0 )) {
           $map->{$aName} = undef;
         }
       }
@@ -1195,45 +1195,45 @@ SYSMON_obtainParameters_intern($$)
   #Log 3, "SYSMON >>> USER_DEFINED >>>>>>>>>>>>>>> START";
   my $userdefined = AttrVal($name, "user-defined", undef);
   if(defined $userdefined) {
-  	my @userdefined_list = split(/,\s*/, trim($userdefined));
+    my @userdefined_list = split(/,\s*/, trim($userdefined));
     foreach (@userdefined_list) {
        # <readingName>:<Interval_Minutes>:<Comment>:<Cmd>
        my $ud = $_;
-	     my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $ud);
-	     SYSMON_Log($hash, 5, "User-Defined Reading: [$uName][$uInterval][$uComment][$uCmd]");
-	     if(defined $uCmd) { # Also, wenn alle Parameter vorhanden
-	     	 my $iInt = int($uInterval);
-	     	 if($iInt>0) {
-	     	   my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
-	     	   if($update_ud) {
-	     	 	   $map = SYSMON_getUserDefined($hash, $map, $uName, $uCmd);
-	     	   } else {
-	     	     SYSMON_Log($hash, 5, "User-Defined Reading: [$uName][$uInterval][$uComment][$uCmd] out of refresh interval");
-	     	   }
-	       }
-	    }
+       my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $ud);
+       SYSMON_Log($hash, 5, "User-Defined Reading: [$uName][$uInterval][$uComment][$uCmd]");
+       if(defined $uCmd) { # Also, wenn alle Parameter vorhanden
+         my $iInt = int($uInterval);
+         if($iInt>0) {
+           my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
+           if($update_ud) {
+             $map = SYSMON_getUserDefined($hash, $map, $uName, $uCmd);
+           } else {
+             SYSMON_Log($hash, 5, "User-Defined Reading: [$uName][$uInterval][$uComment][$uCmd] out of refresh interval");
+           }
+         }
+      }
     }
   }
   
   #Log 3, "SYSMON >>> USER_DEFINED FUNCTIONS >>>>>>>>>>>>>>> START";
   my $userfn = AttrVal($name, "user-fn", undef);
   if(defined $userfn) {
-  	my @userfn_list = split(/,\s*/, trim($userfn));
+    my @userfn_list = split(/,\s*/, trim($userfn));
     foreach my $ud (@userfn_list) {
        # <fnName>:<Interval_Minutes>:<reading1>:<reading2>...
-	     my($fnName, $uInterval, @readings) = split(/:/, $ud);
-	     SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval]");
-	     if(defined $uInterval) {
-	     	 my $iInt = int($uInterval);
-	     	 if($iInt>0) {
-	     	   my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
-	     	   if($update_ud) {
-	     	 	   $map = SYSMON_getUserDefinedFn($hash, $map, $fnName, @readings);
-	     	   } else {
-	     	     SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval] out of refresh interval");
-	     	   }
-	       }
-	    }
+       my($fnName, $uInterval, @readings) = split(/:/, $ud);
+       SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval]");
+       if(defined $uInterval) {
+         my $iInt = int($uInterval);
+         if($iInt>0) {
+           my $update_ud = ($refresh_all || ($ref % $iInt) eq 0);
+           if($update_ud) {
+             $map = SYSMON_getUserDefinedFn($hash, $map, $fnName, @readings);
+           } else {
+             SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval] out of refresh interval");
+           }
+         }
+      }
     }
   }
   
@@ -1242,27 +1242,27 @@ SYSMON_obtainParameters_intern($$)
   $userfn = AttrVal($name, "user-fn2", undef);
   #TEST$userfn=undef;
   if(defined $userfn) {
-  	my @userfn_list = split(/,\s*/, trim($userfn));
+    my @userfn_list = split(/,\s*/, trim($userfn));
     foreach (@userfn_list) {
-    	my $ufn = $_;
-    	SYSMON_Log($hash, 5, "User-Function Reading: [$ufn]");
-	    if(defined $ufn) {
-	      no strict "refs";
+      my $ufn = $_;
+      SYSMON_Log($hash, 5, "User-Function Reading: [$ufn]");
+      if(defined $ufn) {
+        no strict "refs";
         $uMap = &{$ufn}($hash, $uMap);
         use strict "refs";
-	    }
+      }
     }
   }
   # Werte umverpacken, KeyNamen sichern
   my $uNames='';
   if(defined($uMap)) {
-  	foreach my $uName (keys %{$uMap}) {
-  		$uNames.=','.$uName;
-  		$map->{$uName}=$uMap->{$uName};
-  	}
-  	# Erste Komma entfernen
-  	$uNames=substr($uNames,1);
-  	$map->{"xuser_fnr"}=$uNames;
+    foreach my $uName (keys %{$uMap}) {
+      $uNames.=','.$uName;
+      $map->{$uName}=$uMap->{$uName};
+    }
+    # Erste Komma entfernen
+    $uNames=substr($uNames,1);
+    $map->{"xuser_fnr"}=$uNames;
   }
   
   #TEST
@@ -1287,7 +1287,7 @@ sub SYSMON_TestUserFn($$) {
   $map->{"my_test_reading"}="my test";
   #$map->{"my"}="my";
   
-  return $map;	
+  return $map;  
 }
 
 #------------------------------------------------------------------------------
@@ -1306,13 +1306,13 @@ SYSMON_getValues($;@)
   
   my $hash = $main::defs{$name};
   my %shadow_map = %{$hash->{helper}{shadow_map}};
-	if(scalar(@filter_keys)>0) {
-		my %clean_hash;
+  if(scalar(@filter_keys)>0) {
+    my %clean_hash;
     #@clean_hash{ @filter_keys } = @shadow_map{ @filter_keys };
-		@clean_hash{ @filter_keys } = @shadow_map{ @filter_keys };
+    @clean_hash{ @filter_keys } = @shadow_map{ @filter_keys };
     return \%clean_hash;
-	}
-	# alles liefern
+  }
+  # alles liefern
   return \%shadow_map;
 }
 
@@ -1322,25 +1322,25 @@ SYSMON_getValues($;@)
 sub
 SYSMON_getUserDefined($$$$)
 {
-	my ($hash, $map, $uName, $uCmd) = @_;
-	SYSMON_Log($hash, 5, "Name=[$uName] Cmd=[$uCmd]");
-	
-	my @out_arr = SYSMON_execute($hash, $uCmd);
-	
-	my $out_str = "";
-	foreach my $k (@out_arr) {
-		chomp($k);
-		$out_str.=$k." ";
-	}
-	#my $out_str = join(" ",@out_arr);
-	##my $out_str = SYSMON_execute($hash, $uCmd);
+  my ($hash, $map, $uName, $uCmd) = @_;
+  SYSMON_Log($hash, 5, "Name=[$uName] Cmd=[$uCmd]");
+  
+  my @out_arr = SYSMON_execute($hash, $uCmd);
+  
+  my $out_str = "";
+  foreach my $k (@out_arr) {
+    chomp($k);
+    $out_str.=$k." ";
+  }
+  #my $out_str = join(" ",@out_arr);
+  ##my $out_str = SYSMON_execute($hash, $uCmd);
   ##chomp $out_str;
   #$out_str=~s/\n/ /g;
   #$out_str=~s/\r/ /g;
-	$map->{$uName} = $out_str;
-	SYSMON_Log($hash, 5, "User-Defined Result: $uName='$out_str'");
-	
-	return $map;
+  $map->{$uName} = $out_str;
+  SYSMON_Log($hash, 5, "User-Defined Result: $uName='$out_str'");
+  
+  return $map;
 }
 
 sub SYSMON_getUserDefinedFn($$$@) {
@@ -1351,11 +1351,11 @@ sub SYSMON_getUserDefinedFn($$$@) {
     no strict "refs";
     my @rarr;
     if($fnName=~/^{/) {
-    	my $HASH = $hash;
-    	my $NAME = $hash->{NAME};
+      my $HASH = $hash;
+      my $NAME = $hash->{NAME};
       @rarr = eval($fnName);
     } else {
-    	@rarr = &{$fnName}($hash);
+      @rarr = &{$fnName}($hash);
     }
     use strict "refs";
     SYSMON_Log($hash, 5, "result User-Function [$fnName]: ".Dumper(@rarr));
@@ -1368,13 +1368,13 @@ sub SYSMON_getUserDefinedFn($$$@) {
     }
     #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: $cnt1 / $cnt2: $rarr[0]");
     for (my $i=0;$i<$cnt;$i++) { 
-    	if(defined($rarr[$i])) {
-    		my $val = trim($rarr[$i]);
-    	  #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: put: '".$readings[$i]."' => '".$val."'");
-    	  $map->{$readings[$i]} = $val;
-    	  #$map->{$readings[$i]}="Dead OWTHERM devices: none";
-    	  #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: ok");
-    	}
+      if(defined($rarr[$i])) {
+        my $val = trim($rarr[$i]);
+        #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: put: '".$readings[$i]."' => '".$val."'");
+        $map->{$readings[$i]} = $val;
+        #$map->{$readings[$i]}="Dead OWTHERM devices: none";
+        #SYSMON_Log($hash, 5, ">>>> User-Function [$fnName]: ok");
+      }
     }
   }
   
@@ -1385,19 +1385,19 @@ sub SYSMON_getUserDefinedFn($$$@) {
 sub
 SYSMON_getCPUCoreNum($)
 {
-	my ($hash) = @_;
-	
-	return $hash->{helper}{sys_cpu_core_num} if $hash->{helper}{sys_cpu_core_num};
-	
-	# nur wenn verfuegbar
-	if(SYSMON_isSysCpuNum($hash)) {
-	  my $str = SYSMON_execute($hash, "cat /sys/devices/system/cpu/kernel_max");
-	  if(defined($str)) {
-		  if($str ne "") {
+  my ($hash) = @_;
+  
+  return $hash->{helper}{sys_cpu_core_num} if $hash->{helper}{sys_cpu_core_num};
+  
+  # nur wenn verfuegbar
+  if(SYSMON_isSysCpuNum($hash)) {
+    my $str = SYSMON_execute($hash, "cat /sys/devices/system/cpu/kernel_max");
+    if(defined($str)) {
+      if($str ne "") {
         if(int($str)!=0) {
-        	$hash->{helper}{sys_cpu_core_num} = int($str)+1;
-	 	      return $hash->{helper}{sys_cpu_core_num};
-  	    }
+          $hash->{helper}{sys_cpu_core_num} = int($str)+1;
+          return $hash->{helper}{sys_cpu_core_num};
+        }
       }
     }
   }
@@ -1413,26 +1413,26 @@ SYSMON_getCPUCoreNum($)
 sub
 SYSMON_getUptime($$)
 {
-	my ($hash, $map) = @_;
+  my ($hash, $map) = @_;
 
-	#my $uptime_str = qx(cat /proc/uptime );
-	my $uptime_str = SYSMON_execute($hash, "cat /proc/uptime");
+  #my $uptime_str = qx(cat /proc/uptime );
+  my $uptime_str = SYSMON_execute($hash, "cat /proc/uptime");
   my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
   if(int($uptime)!=0) {
-  	# Anzahl Cores beruecksichtigen
-  	my $core_num = SYSMON_getCPUCoreNum($hash);
+    # Anzahl Cores beruecksichtigen
+    my $core_num = SYSMON_getCPUCoreNum($hash);
     my $idle_percent = $idle/($uptime*$core_num)*100;
 
-	  $map->{+UPTIME}=sprintf("%d",$uptime);
-	  #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
-	  $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
+    $map->{+UPTIME}=sprintf("%d",$uptime);
+    #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
+    $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
 
     $map->{+IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
-	  $map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
-	  #$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
+    $map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
+    #$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
   }
   
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1442,7 +1442,7 @@ SYSMON_getUptime($$)
 sub
 SYSMON_getUptime2($$)
 {
-	my ($hash, $map) = @_;
+  my ($hash, $map) = @_;
 
 #TODO
   my $uptime = SYSMON_execute($hash,"uptime");
@@ -1475,7 +1475,7 @@ SYSMON_getUptime2($$)
   $la1 =~ s/,/./; 
   $la5 =~ s/,/./; 
   $la15 =~ s/,/./; 
-	$map->{+LOADAVG}="$la1 $la5 $la15";
+  $map->{+LOADAVG}="$la1 $la5 $la15";
 
   return $map;
 }
@@ -1486,17 +1486,17 @@ SYSMON_getUptime2($$)
 sub
 SYSMON_getFHEMUptime($$)
 {
-	my ($hash, $map) = @_;
+  my ($hash, $map) = @_;
 
-	#if(defined ($hash->{DEF_TIME})) {
-	if(defined($fhem_started)) {
-	  #my $fhemuptime = time()-$hash->{DEF_TIME};
-	  my $fhemuptime = time()-$fhem_started;
-	  $map->{+FHEMUPTIME} = sprintf("%d",$fhemuptime);
-	  $map->{+FHEMUPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($fhemuptime));
+  #if(defined ($hash->{DEF_TIME})) {
+  if(defined($fhem_started)) {
+    #my $fhemuptime = time()-$hash->{DEF_TIME};
+    my $fhemuptime = time()-$fhem_started;
+    $map->{+FHEMUPTIME} = sprintf("%d",$fhemuptime);
+    $map->{+FHEMUPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($fhemuptime));
   }
 
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1505,20 +1505,20 @@ SYSMON_getFHEMUptime($$)
 sub
 SYSMON_getLoadAvg($$)
 {
-	my ($hash, $map) = @_;
+  my ($hash, $map) = @_;
 
-	my $la_str = SYSMON_execute($hash, "cat /proc/loadavg");
-	if(defined($la_str)) {
+  my $la_str = SYSMON_execute($hash, "cat /proc/loadavg");
+  if(defined($la_str)) {
     my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($la_str));
     if(defined($la1) && defined($la5) && defined($la15)) {
-	    $map->{+LOADAVG}="$la1 $la5 $la15";
+      $map->{+LOADAVG}="$la1 $la5 $la15";
       #$map->{"load"}="$la1";
-	    #$map->{"load5"}="$la5";
-	    #$map->{"load15"}="$la15";
-	  }
+      #$map->{"load5"}="$la5";
+      #$map->{"load15"}="$la15";
+    }
   }
   
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1527,8 +1527,8 @@ SYSMON_getLoadAvg($$)
 sub
 SYSMON_getCPUTemp_RPi($$)
 {
-	
-	my ($hash, $map) = @_;
+  
+  my ($hash, $map) = @_;
   my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp 2>&1");  
   $val = int($val);
   if($val>1000) { # Manche Systeme scheinen die Daten verschieden zu skalieren (z.B. utilite)...
@@ -1538,7 +1538,7 @@ SYSMON_getCPUTemp_RPi($$)
   $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}="$t_avg";
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1547,14 +1547,14 @@ SYSMON_getCPUTemp_RPi($$)
 sub
 SYSMON_getCPUTemp_BBB($$)
 {
-	my ($hash, $map) = @_;
- 	my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
- 	$val = int($val);
+  my ($hash, $map) = @_;
+  my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
+  $val = int($val);
   my $val_txt = sprintf("%.2f", $val/1000);
   $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}="$t_avg";  
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1563,8 +1563,8 @@ SYSMON_getCPUTemp_BBB($$)
 sub
 SYSMON_getCPUTemp_FB($$)
 {
-	
-	my ($hash, $map) = @_;
+  
+  my ($hash, $map) = @_;
   my $val = SYSMON_execute($hash, "ctlmgr_ctl r cpu status/StatTemperature");  
   if(defined($val)) {
     if($val=~m/(\d+),/) {
@@ -1575,7 +1575,7 @@ SYSMON_getCPUTemp_FB($$)
       $map->{+CPU_TEMP_AVG}="$t_avg";
     }
   }
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1584,12 +1584,12 @@ SYSMON_getCPUTemp_FB($$)
 sub
 SYSMON_getCPUFreq($$)
 {
-	my ($hash, $map) = @_;
-	my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>&1");
-	$val = int($val);
-	my $val_txt = sprintf("%d", $val/1000);
+  my ($hash, $map) = @_;
+  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>&1");
+  $val = int($val);
+  my $val_txt = sprintf("%d", $val/1000);
   $map->{+CPU_FREQ}="$val_txt";
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1598,12 +1598,12 @@ SYSMON_getCPUFreq($$)
 sub
 SYSMON_getCPU1Freq($$)
 {
-	my ($hash, $map) = @_;
-	my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq 2>&1");
-	$val = int($val);
-	my $val_txt = sprintf("%d", $val/1000);
+  my ($hash, $map) = @_;
+  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq 2>&1");
+  $val = int($val);
+  my $val_txt = sprintf("%d", $val/1000);
   $map->{+CPU1_FREQ}="$val_txt";
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1612,10 +1612,10 @@ SYSMON_getCPU1Freq($$)
 sub
 SYSMON_getCPUBogoMIPS($$)
 {
-	my ($hash, $map) = @_;
-	my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
-	# nur einmalig ermitteln (wird sich ja nicht aendern
-	if(!defined $old_val) {
+  my ($hash, $map) = @_;
+  my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
+  # nur einmalig ermitteln (wird sich ja nicht aendern
+  if(!defined $old_val) {
     my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
     #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ".Dumper(@aval)); # TODO: Delete
     my $val=$aval[0];
@@ -1629,10 +1629,10 @@ SYSMON_getCPUBogoMIPS($$)
       }
     }
   } else {
-  	$map->{+CPU_BOGOMIPS}=$old_val;
+    $map->{+CPU_BOGOMIPS}=$old_val;
   }
   
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1725,12 +1725,12 @@ SYSMON_getCPUBogoMIPS($$)
 sub
 SYSMON_getDiskStat($$)
 {
-	my ($hash, $map) = @_;
-	my @values = SYSMON_execute($hash, "cat /proc/diskstats");
+  my ($hash, $map) = @_;
+  my @values = SYSMON_execute($hash, "cat /proc/diskstats");
 
   for my $entry (@values){
-	  $map = SYSMON_getDiskStat_intern($hash, $map, $entry);
-	  #Log 3, "SYSMON-DEBUG-IOSTAT:   ".$entry;
+    $map = SYSMON_getDiskStat_intern($hash, $map, $entry);
+    #Log 3, "SYSMON-DEBUG-IOSTAT:   ".$entry;
   }
 
   return $map;
@@ -1739,76 +1739,76 @@ SYSMON_getDiskStat($$)
 sub
 SYSMON_getDiskStat_intern($$$) 
 {
-	my ($hash, $map, $entry) = @_;
-	
-	my ($d1, $d2, $pName, $nf1, $nf2, $nf3, $nf4, $nf5, $nf6, $nf7, $nf8, $nf9, $nf10, $nf11) = split(/\s+/, trim($entry));
-	
-	SYSMON_Log($hash, 5, "SYSMON-DEBUG-IOSTAT:   ".$pName." = ".$nf1." ".$nf2." ".$nf3." ".$nf4." ".$nf5." ".$nf6." ".$nf7." ".$nf8." ".$nf9." ".$nf10." ".$nf11);
-	
-	# Nur nicht-null-Werte
-	if($nf1 eq "0") {
-		return $map;
-	} 
-	
-	$pName = "io_".$pName;
-	#Log 3, "SYSMON-DEBUG-IOSTAT:   ".$pName;
-	
-	# Partition and 2.6-Kernel?
-	if(defined($nf5)) {
-	  # no
-	  $map->{$pName."_raw"}=$nf1." ".$nf2." ".$nf3." ".$nf4." ".$nf5." ".$nf6." ".$nf7." ".$nf8." ".$nf9." ".$nf10." ".$nf11;
+  my ($hash, $map, $entry) = @_;
+  
+  my ($d1, $d2, $pName, $nf1, $nf2, $nf3, $nf4, $nf5, $nf6, $nf7, $nf8, $nf9, $nf10, $nf11) = split(/\s+/, trim($entry));
+  
+  SYSMON_Log($hash, 5, "SYSMON-DEBUG-IOSTAT:   ".$pName." = ".$nf1." ".$nf2." ".$nf3." ".$nf4." ".$nf5." ".$nf6." ".$nf7." ".$nf8." ".$nf9." ".$nf10." ".$nf11);
+  
+  # Nur nicht-null-Werte
+  if($nf1 eq "0") {
+    return $map;
+  } 
+  
+  $pName = "io_".$pName;
+  #Log 3, "SYSMON-DEBUG-IOSTAT:   ".$pName;
+  
+  # Partition and 2.6-Kernel?
+  if(defined($nf5)) {
+    # no
+    $map->{$pName."_raw"}=$nf1." ".$nf2." ".$nf3." ".$nf4." ".$nf5." ".$nf6." ".$nf7." ".$nf8." ".$nf9." ".$nf10." ".$nf11;
   } else {
     $map->{$pName."_raw"}=$nf1." ".$nf2." ".$nf3." ".$nf4;
   }
   #$map->{"iostat_test"}="TEST";
-	my $lastVal = ReadingsVal($hash->{NAME},$pName."_raw",undef);
-	if(defined($lastVal)) {
-  	SYSMON_Log($hash,5, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal);
+  my $lastVal = ReadingsVal($hash->{NAME},$pName."_raw",undef);
+  if(defined($lastVal)) {
+    SYSMON_Log($hash,5, "SYSMON-DEBUG-IOSTAT:   lastVal: $pName=".$lastVal);
   }
-	if(defined $lastVal) {
-		# Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
-		my($af1, $af2, $af3, $af4, $af5, $af6, $af7, $af8, $af9, $af10, $af11) = split(/\s+/, $lastVal);
-	  
-	  SYSMON_Log($hash,5, "SYSMON-DEBUG-IOSTAT:   X: ".$pName." = ".$af1." ".$af2." ".$af3." ".$af4." ".$af5." ".$af6." ".$af7." ".$af8." ".$af9." ".$af10." ".$af11);
-	  
-	  my $sectorsRead;
-	  my $sectorsWritten;
-	
-	  my $df1 = $nf1-$af1;
-	  my $df2 = $nf2-$af2;
-	  my $df3 = $nf3-$af3;
-	  my $df4 = $nf4-$af4;
-	  # Partition and 2.6-Kernel?
-	  if(defined($nf5)) {
-	  	# no
-	    my $df5 = $nf5-$af5;
-	    my $df6 = $nf6-$af6;
-	    my $df7 = $nf7-$af7;
-	    my $df8 = $nf8-$af8;
-	    my $df9 = $nf9-$af9;
-	    my $df10 = $nf10-$af10;
-	    my $df11 = $nf11-$af11;
-	    $map->{$pName."_diff"}=$df1." ".$df2." ".$df3." ".$df4." ".$df5." ".$df6." ".$df7." ".$df8." ".$df9." ".$df10." ".$df11;
-	    
+  if(defined $lastVal) {
+    # Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
+    my($af1, $af2, $af3, $af4, $af5, $af6, $af7, $af8, $af9, $af10, $af11) = split(/\s+/, $lastVal);
+    
+    SYSMON_Log($hash,5, "SYSMON-DEBUG-IOSTAT:   X: ".$pName." = ".$af1." ".$af2." ".$af3." ".$af4." ".$af5." ".$af6." ".$af7." ".$af8." ".$af9." ".$af10." ".$af11);
+    
+    my $sectorsRead;
+    my $sectorsWritten;
+  
+    my $df1 = $nf1-$af1;
+    my $df2 = $nf2-$af2;
+    my $df3 = $nf3-$af3;
+    my $df4 = $nf4-$af4;
+    # Partition and 2.6-Kernel?
+    if(defined($nf5)) {
+      # no
+      my $df5 = $nf5-$af5;
+      my $df6 = $nf6-$af6;
+      my $df7 = $nf7-$af7;
+      my $df8 = $nf8-$af8;
+      my $df9 = $nf9-$af9;
+      my $df10 = $nf10-$af10;
+      my $df11 = $nf11-$af11;
+      $map->{$pName."_diff"}=$df1." ".$df2." ".$df3." ".$df4." ".$df5." ".$df6." ".$df7." ".$df8." ".$df9." ".$df10." ".$df11;
+      
       $sectorsRead = $df3;
       $sectorsWritten = $df7;
-	  } else {
-	    $map->{$pName."_diff"}=$df1." ".$df2." ".$df3." ".$df4;	  	
-	    
-	    $sectorsRead = $df2;
+    } else {
+      $map->{$pName."_diff"}=$df1." ".$df2." ".$df3." ".$df4;     
+      
+      $sectorsRead = $df2;
       $sectorsWritten = $df4;
-	  }
-	  
-	  my $sectorBytes = 512;
-	  
-	  my $BytesRead    = $sectorsRead*$sectorBytes;
-	  my $BytesWritten = $sectorsWritten*$sectorBytes;
-	  
-	  # TODO: Summenwerte
-	  $map->{$pName.""}=sprintf("bytes read: %d bytes written: %d",$BytesRead, $BytesWritten);
+    }
+    
+    my $sectorBytes = 512;
+    
+    my $BytesRead    = $sectorsRead*$sectorBytes;
+    my $BytesWritten = $sectorsWritten*$sectorBytes;
+    
+    # TODO: Summenwerte
+    $map->{$pName.""}=sprintf("bytes read: %d bytes written: %d",$BytesRead, $BytesWritten);
   }
 
-	return $map;
+  return $map;
 }
 
 
@@ -1825,11 +1825,11 @@ SYSMON_getDiskStat_intern($$$)
 sub
 SYSMON_getCPUProcStat($$)
 {
-	my ($hash, $map) = @_;
-	my @values = SYSMON_execute($hash, "cat /proc/stat");
-	
-	for my $entry (@values){
-	  if (index($entry, "cpu") < 0){
+  my ($hash, $map) = @_;
+  my @values = SYSMON_execute($hash, "cat /proc/stat");
+  
+  for my $entry (@values){
+    if (index($entry, "cpu") < 0){
       last;
     }
     $map = SYSMON_getCPUProcStat_intern($hash, $map, $entry);
@@ -1837,27 +1837,27 @@ SYSMON_getCPUProcStat($$)
   
   # Wenn nur eine CPU vorhanden ist, loeschen Werte fuer CPU0 (nur Gesamt belassen)
   if(!defined($map->{"stat_cpu1"})){
-  	delete $map->{"stat_cpu0"};
-  	delete $map->{"stat_cpu0_diff"};
-  	delete $map->{"stat_cpu0_percent"};
+    delete $map->{"stat_cpu0"};
+    delete $map->{"stat_cpu0_diff"};
+    delete $map->{"stat_cpu0_percent"};
   }
-	
-	return $map;
+  
+  return $map;
 }
 
 sub
 SYSMON_getCPUProcStat_intern($$$) 
 {
-	my ($hash, $map, $entry) = @_;
-	
-	my($pName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($entry));
-	$pName = "stat_".$pName;
-	$map->{$pName}=$neuCPUuser." ".$neuCPUnice." ".$neuCPUsystem." ".$neuCPUidle." ".$neuCPUiowait." ".$neuCPUirq." ".$neuCPUsoftirq;
-	
-	my $lastVal = ReadingsVal($hash->{NAME},$pName,undef);
-	if(defined $lastVal) {
-		# Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
-	  my($altCPUuser, $altCPUnice, $altCPUsystem, $altCPUidle, $altCPUiowait, $altCPUirq, $altCPUsoftirq) = split(/\s+/, $lastVal);
+  my ($hash, $map, $entry) = @_;
+  
+  my($pName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($entry));
+  $pName = "stat_".$pName;
+  $map->{$pName}=$neuCPUuser." ".$neuCPUnice." ".$neuCPUsystem." ".$neuCPUidle." ".$neuCPUiowait." ".$neuCPUirq." ".$neuCPUsoftirq;
+  
+  my $lastVal = ReadingsVal($hash->{NAME},$pName,undef);
+  if(defined $lastVal) {
+    # Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
+    my($altCPUuser, $altCPUnice, $altCPUsystem, $altCPUidle, $altCPUiowait, $altCPUirq, $altCPUsoftirq) = split(/\s+/, $lastVal);
     
     my $CPUuser    = $neuCPUuser    - $altCPUuser;
     my $CPUnice    = $neuCPUnice    - $altCPUnice;
@@ -1867,7 +1867,7 @@ SYSMON_getCPUProcStat_intern($$$)
     my $CPUirq     = $neuCPUirq     - $altCPUirq;
     my $CPUsoftirq = $neuCPUsoftirq - $altCPUsoftirq;
     $map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
-	  
+    
     my $GesammtCPU = $CPUuser + $CPUnice + $CPUsystem + $CPUidle + $CPUiowait + $CPUirq + $CPUsoftirq;
     my $PercentCPUuser    = ($CPUuser    / $GesammtCPU) * 100;
     my $PercentCPUnice    = ($CPUnice    / $GesammtCPU) * 100;
@@ -1881,7 +1881,7 @@ SYSMON_getCPUProcStat_intern($$$)
     $map->{$pName."_text"}=sprintf ("user: %.2f %%, nice: %.2f %%, sys: %.2f %%, idle: %.2f %%, io: %.2f %%, irq: %.2f %%, sirq: %.2f %%",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
   }
 
-	return $map;
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -1895,20 +1895,20 @@ sub SYSMON_getRamAndSwap($$)
   my @speicher = SYSMON_execute($hash, "free");
 
   if(!@speicher) {
-  	return $map;
+    return $map;
   }
 
   shift @speicher;
   my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached);
   if(defined ($speicher[0])) {
-  	($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
+    ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim($speicher[0]));
   }
   
   shift @speicher;
   my ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2);
   
   if(defined ($speicher[0])) {
-    ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]))	
+    ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim($speicher[0]))  
   }
   
   if(defined($fs_desc2)) {
@@ -1934,8 +1934,8 @@ sub SYSMON_getRamAndSwap($$)
     if(defined($cached)) {
       $cached  = $cached / 1024;
     } else {
-  	  # Bei FritzBox wird dieser Wert nicht ausgageben
-    	$cached  = 0;
+      # Bei FritzBox wird dieser Wert nicht ausgageben
+      $cached  = 0;
     }
 
     $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, ($used - $buffers - $cached), (($used - $buffers - $cached) / $total * 100), ($free + $buffers + $cached));
@@ -1949,7 +1949,7 @@ sub SYSMON_getRamAndSwap($$)
   # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
   if(defined($total2) && $total2 > 0)
   {
-  	$total2   = $total2 / 1024;
+    $total2   = $total2 / 1024;
     $used2    = $used2 / 1024;
     $free2    = $free2 / 1024;
   
@@ -1970,7 +1970,7 @@ sub SYSMON_getRamAndSwap($$)
 #------------------------------------------------------------------------------
 sub SYSMON_isOSX()
 {
-	return $^O eq 'darwin';
+  return $^O eq 'darwin';
 }
 
 #------------------------------------------------------------------------------
@@ -1978,7 +1978,7 @@ sub SYSMON_isOSX()
 #------------------------------------------------------------------------------
 sub SYSMON_isLinux()
 {
-	return $^O eq 'linux';
+  return $^O eq 'linux';
 }
 
 #------------------------------------------------------------------------------
@@ -1994,7 +1994,7 @@ sub SYSMON_getRamAndSwapOSX($$)
   my @amemsize = SYSMON_execute($hash, "sysctl hw.memsize");
   
   if($debug) {
-  	@amemsize = ("hw.memsize: 8589934592");
+    @amemsize = ("hw.memsize: 8589934592");
   }
   
   if($amemsize[0]=~m/hw.memsize:\s+(.+)/) {
@@ -2002,7 +2002,7 @@ sub SYSMON_getRamAndSwapOSX($$)
     
     my @avmstat = SYSMON_execute($hash, "vm_stat");
     if($debug) {
-  	  @avmstat = ('Mach Virtual Memory Statistics: (page size of 4096 bytes)',
+      @avmstat = ('Mach Virtual Memory Statistics: (page size of 4096 bytes)',
                   'Pages free:                                5268.',
                   'Pages active:                            440314.',
                   'Pages inactive:                          430905.',
@@ -2033,10 +2033,10 @@ sub SYSMON_getRamAndSwapOSX($$)
     my $inactive=0;
     my $blockSize = 4096;
     foreach my $k (@avmstat) {
-    	if($k=~m/page\s+size\s+of\s+(\d+)\s+bytes/) {
+      if($k=~m/page\s+size\s+of\s+(\d+)\s+bytes/) {
         $blockSize = $1;
       }
-    	if($k=~m/Pages\s+wired\s+down:\s+(.+)\./) {
+      if($k=~m/Pages\s+wired\s+down:\s+(.+)\./) {
         $wired_down = $1;
       }
       if($k=~m/Pages\s+active:\s+(.+)\./) {
@@ -2061,8 +2061,8 @@ sub SYSMON_getRamAndSwapOSX($$)
   
     my @avm = SYSMON_execute($hash, "sysctl vm.swapusage");
     if($debug) {
-    	@avm=(
-    	#'vm.loadavg: { 2.45 2.19 3.34 }',
+      @avm=(
+      #'vm.loadavg: { 2.45 2.19 3.34 }',
       'vm.swapusage: total = 1024.00M  used = 529.25M  free = 494.75M  (encrypted)',
       #'vm.cs_force_kill: 0',
       #'vm.cs_force_hard: 0',
@@ -2163,25 +2163,25 @@ sub SYSMON_getRamAndSwapOSX($$)
 }
 
 sub SYSMON_fmtStorageAmount_($) {
-	my ($t) = @_;
-	if($t=~m/([\d|\.]+)(.*)/) {
-		my $r=$1;
-		my $m=$2;
-		if($m) {
-			# Modifier testen
-			if($m eq 'M') {
-				# Megabyte ist OK,so lassen
-				return $r;
-			}
-			if($m eq 'G') {
-				# Gigabyte: in MB umwandeln
-				$r=$r*1024;
-			}
-			# K, oder P nehmen ich nicht mehr bzw. noch nicht an ;)
-			return $r;
-		}
-	}
-	return $t;
+  my ($t) = @_;
+  if($t=~m/([\d|\.]+)(.*)/) {
+    my $r=$1;
+    my $m=$2;
+    if($m) {
+      # Modifier testen
+      if($m eq 'M') {
+        # Megabyte ist OK,so lassen
+        return $r;
+      }
+      if($m eq 'G') {
+        # Gigabyte: in MB umwandeln
+        $r=$r*1024;
+      }
+      # K, oder P nehmen ich nicht mehr bzw. noch nicht an ;)
+      return $r;
+    }
+  }
+  return $t;
 }
 
 
@@ -2192,15 +2192,15 @@ sub SYSMON_fmtStorageAmount_($) {
 #------------------------------------------------------------------------------
 sub SYSMON_getFileSystemInfo ($$$)
 {
-	my ($hash, $map, $fs) = @_;
-	
-	SYSMON_Log($hash, 5, "get $fs");
-	
-	# Neue Syntax: benannte Filesystems: <name>:<definition>
-	my($fName, $fDef, $fComment) = split(/:/, $fs);
-	if(defined $fDef) {
-		$fs = $fDef;
-	}
+  my ($hash, $map, $fs) = @_;
+  
+  SYSMON_Log($hash, 5, "get $fs");
+  
+  # Neue Syntax: benannte Filesystems: <name>:<definition>
+  my($fName, $fDef, $fComment) = split(/:/, $fs);
+  if(defined $fDef) {
+    $fs = $fDef;
+  }
 
   #my $disk = "df ".$fs." -m 2>&1"; # in case of failure get string from stderr
   my $disk = "df ".$fs." -m 2>/dev/null";
@@ -2228,16 +2228,16 @@ sub SYSMON_getFileSystemInfo ($$$)
   #if(scalar(@filesystems) == 0) { return $map; } # Array leer
 
   if(defined($filesystems[0])) {
-  	SYSMON_Log($hash, 5, "recieved line0 $filesystems[0]");
+    SYSMON_Log($hash, 5, "recieved line0 $filesystems[0]");
   } else {
-  	SYSMON_Log($hash, 5, "recieved empty line");
+    SYSMON_Log($hash, 5, "recieved empty line");
   }
 
   shift @filesystems;
   
   # Falls kein Eintrag gefunden (z.B: kein Medium im Laufwerk), mit Nullen fuellen (damit die Plots richtig funktionieren).
   if(defined $fDef) {
-  	$map->{$fName} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs." (not available)";
+    $map->{$fName} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs." (not available)";
   } else {
     $map->{+FS_PREFIX.$fs} = "Total: 0 MB, Used: 0 MB, 0 %, Available: 0 MB at ".$fs." (not available)";
   }
@@ -2255,31 +2255,31 @@ sub SYSMON_getFileSystemInfo ($$$)
       SYSMON_Log($hash, 5, "analyse line $filesystems[0] for $fs");
     }
   } else {
-  	SYSMON_Log($hash, 5, "pattern ($fs) found");
+    SYSMON_Log($hash, 5, "pattern ($fs) found");
   }
   #if (index($filesystems[0], $fs) < 0) { shift @filesystems; } # Wenn die Bezeichnung so lang ist, dass die Zeile umgebrochen wird...
   #if (index($filesystems[0], $fs) >= 0) # check if filesystem available -> gives failure on console
   if (int(@filesystems)>0 && $filesystems[0]=~ /$fs$/)
   {
-  	SYSMON_Log($hash, 5, "use line $filesystems[0]");
-  	
+    SYSMON_Log($hash, 5, "use line $filesystems[0]");
+    
     my ($fs_desc, $total, $used, $available, $percentage_used, $mnt_point) = split(/\s+/, $filesystems[0]);
     $percentage_used =~ /^(.+)%$/;
     $percentage_used = $1;
     my $out_txt = "Total: ".$total." MB, Used: ".$used." MB, ".$percentage_used." %, Available: ".$available." MB at ".$mnt_point;
     if(defined $fDef) {
-    	$map->{$fName} = $out_txt;
+      $map->{$fName} = $out_txt;
     } else {
       $map->{+FS_PREFIX.$mnt_point} = $out_txt;
     }
   }
 
   # else {
-  #	if(defined $fDef) {
-  #		$map->{$fName} = "not available";
-  #	} else {
-  #	  $map->{+FS_PREFIX.$fs} = "not available";
-  #	}
+  # if(defined $fDef) {
+  #   $map->{$fName} = "not available";
+  # } else {
+  #   $map->{+FS_PREFIX.$fs} = "not available";
+  # }
   #}
 
   return $map;
@@ -2291,13 +2291,13 @@ sub SYSMON_getFileSystemInfo ($$$)
 #------------------------------------------------------------------------------
 sub SYSMON_getNetworkInfo ($$$)
 {
-	my ($hash, $map, $device) = @_;
-	SYSMON_Log($hash, 5, "get $device");
-	my($nName, $nDef) = split(/:/, $device);
-	if(!defined $nDef) {
-	  $nDef = $nName;
-	}
-	$device = $nDef;
+  my ($hash, $map, $device) = @_;
+  SYSMON_Log($hash, 5, "get $device");
+  my($nName, $nDef) = split(/:/, $device);
+  if(!defined $nDef) {
+    $nDef = $nName;
+  }
+  $device = $nDef;
 
   # in case of network not present get failure from stderr (2>&1)
   my $cmd="ifconfig ".$device." 2>&1";
@@ -2308,18 +2308,18 @@ sub SYSMON_getNetworkInfo ($$$)
   
   #--- DEBUG ---
   if($device eq "_test1") {
-  	@dataThroughput = (
-  	"enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1492",
-  	"        inet 192.168.2.7  netmask 255.255.255.0  broadcast 192.168.2.255",
-  	"        ether 00:21:85:5a:0d:e0  txqueuelen 1000  (Ethernet)",
-  	"        RX packets 1553313  bytes 651891540 (621.6 MiB)",
-  	"        RX errors 0  dropped 0  overruns 0  frame 0",
-  	"        TX packets 1915387  bytes 587386206 (560.1 MiB)",
-  	"        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0");
+    @dataThroughput = (
+    "enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1492",
+    "        inet 192.168.2.7  netmask 255.255.255.0  broadcast 192.168.2.255",
+    "        ether 00:21:85:5a:0d:e0  txqueuelen 1000  (Ethernet)",
+    "        RX packets 1553313  bytes 651891540 (621.6 MiB)",
+    "        RX errors 0  dropped 0  overruns 0  frame 0",
+    "        TX packets 1915387  bytes 587386206 (560.1 MiB)",
+    "        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0");
   }
   
   if($device eq "_test2") {
-  	@dataThroughput = (
+    @dataThroughput = (
     "eth0      Link encap:Ethernet  Hardware Adresse b8:27:eb:47:a9:8d",
     "          inet Adresse:192.168.2.118  Bcast:192.168.2.255  Maske:255.255.255.0",
     "          inet6-Adresse: 2003:46:b6b:3100:ba27:ebff:fe47:a98d/64 Gültigkeitsbereich:Global",
@@ -2335,7 +2335,7 @@ sub SYSMON_getNetworkInfo ($$$)
   # check if network available
   if (index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error') < 0)
   {
-  	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> OK >>>".$dataThroughput[0];
+    #Log 3, "SYSMON>>>>>>>>>>>>>>>>> OK >>>".$dataThroughput[0];
     my $dataThroughput = undef;
     
     # Suche nach der Daten in Form:
@@ -2350,22 +2350,22 @@ sub SYSMON_getNetworkInfo ($$$)
 
     my $ip = undef; my $ip6 = undef;
     foreach (@dataThroughput) {
-    	if($_=~ m/inet\s+(Adresse:)*(\S*)/) {
-    	  $ip=$2;
-    	}
-    	if(!$ip && $_=~ m/inet\s+(addr:)*(\S*)/) {
-    	  $ip=$2;
-    	}
-    	
-    	if($_=~ m/inet6-(Adresse:)*\s*(\S*)\s+G.ltigkeitsbereich:Verbindung/) {
-    	  $ip6=$2;
-    	}
-    	if(!$ip && $_=~ m/inet6\s+(addr:)*\s*(\S*)\s+Scope:Link/) {
-    	  $ip6=$2;
-    	}
-    	if(!$ip && $_=~ m/inet6\s+(addr:)*\s*(\S*)/) {
-    		$ip6=$2;
-    	}
+      if($_=~ m/inet\s+(Adresse:)*(\S*)/) {
+        $ip=$2;
+      }
+      if(!$ip && $_=~ m/inet\s+(addr:)*(\S*)/) {
+        $ip=$2;
+      }
+      
+      if($_=~ m/inet6-(Adresse:)*\s*(\S*)\s+G.ltigkeitsbereich:Verbindung/) {
+        $ip6=$2;
+      }
+      if(!$ip && $_=~ m/inet6\s+(addr:)*\s*(\S*)\s+Scope:Link/) {
+        $ip6=$2;
+      }
+      if(!$ip && $_=~ m/inet6\s+(addr:)*\s*(\S*)/) {
+        $ip6=$2;
+      }
 
       if(index($_, 'RX bytes') >= 0) {
         $dataThroughput = $_;
@@ -2374,17 +2374,21 @@ sub SYSMON_getNetworkInfo ($$$)
     }
     
     if(defined $ip) {
-	    $ip =~ s/addr://;
-    	$map->{$nName.IP_SUFFIX} = $ip;
+      $ip =~ s/addr://;
+      $map->{$nName.IP_SUFFIX} = $ip;
     }
     
     if(defined $ip6) {
         $ip6 =~ s/addr://;
-    	$map->{$nName.IP6_SUFFIX} = $ip6;
+      $map->{$nName.IP6_SUFFIX} = $ip6;
     }
 
-    my $rxRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/rx_bytes")||-1;
-    my $txRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/tx_bytes")||-1;
+    my $rxRaw = -1;
+    my $txRaw = -1;
+    if(-e "/sys/class/net/$nName/statistics/rx_bytes" && -e "/sys/class/net/$nName/statistics/tx_bytes") {
+        $rxRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/rx_bytes");
+        $txRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/tx_bytes");
+    }
     
   if($rxRaw<0||$txRaw<0) {   
     if(defined $dataThroughput) {
@@ -2397,39 +2401,39 @@ sub SYSMON_getNetworkInfo ($$$)
       $rxRaw = $dataThroughput[0] if(defined $dataThroughput[0]);
       $txRaw = $dataThroughput[4] if(defined $dataThroughput[4]);
     } else {
-    	#
-    	# an manchen Systemen kann die Ausgabe leider auch anders aussehen:
-    	# enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1492
+      #
+      # an manchen Systemen kann die Ausgabe leider auch anders aussehen:
+      # enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1492
         #         inet 192.168.2.7  netmask 255.255.255.0  broadcast 192.168.2.255
         #         ether 00:21:85:5a:0d:e0  txqueuelen 1000  (Ethernet)
         #         RX packets 1553313  bytes 651891540 (621.6 MiB)
         #         RX errors 0  dropped 0  overruns 0  frame 0
         #         TX packets 1915387  bytes 587386206 (560.1 MiB)
         #         TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
-    	#
-    	  my $d;
-    	  foreach $d (@dataThroughput) {
-    		  if($d =~ m/RX\s.*\sbytes\s(\d*)\s/) {
-	          $rxRaw = $1;
+      #
+        my $d;
+        foreach $d (@dataThroughput) {
+          if($d =~ m/RX\s.*\sbytes\s(\d*)\s/) {
+            $rxRaw = $1;
           }
           if($d =~ m/TX\s.*\sbytes\s(\d*)\s/) {
-	          $txRaw = $1;
+            $txRaw = $1;
           }
         }
       }
     }
     
     if($rxRaw<0) {
-    	# Daten nicht gefunden / Format unbekannt
-    	$map->{$nName} = "unexpected format";
-  	  $map->{$nName.DIFF_SUFFIX} = "unexpected format";
+      # Daten nicht gefunden / Format unbekannt
+      $map->{$nName} = "unexpected format";
+      $map->{$nName.DIFF_SUFFIX} = "unexpected format";
     } else {
-    	$map->{$nName."_rx"} = $rxRaw;       
-    	$map->{$nName."_tx"} = $txRaw;
-    	
+      $map->{$nName."_rx"} = $rxRaw;       
+      $map->{$nName."_tx"} = $txRaw;
+      
       $rxRaw = $rxRaw / 1048576; # Bytes in MB
       $txRaw = $txRaw / 1048576;
-    	
+      
       my $rx = sprintf ("%.2f", $rxRaw);
       my $tx = sprintf ("%.2f", $txRaw);
       my $totalRxTx = $rx + $tx;
@@ -2452,10 +2456,10 @@ sub SYSMON_getNetworkInfo ($$$)
       }
     }
   } else {
-  	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> NOK ";
-  	#Log 3, "SYSMON>>>>>>>>>>>>>>>>> >>> ".$nName;
-  	$map->{$nName} = "not available";
-  	$map->{$nName.DIFF_SUFFIX} = "not available";
+    #Log 3, "SYSMON>>>>>>>>>>>>>>>>> NOK ";
+    #Log 3, "SYSMON>>>>>>>>>>>>>>>>> >>> ".$nName;
+    $map->{$nName} = "not available";
+    $map->{$nName.DIFF_SUFFIX} = "not available";
   }
 
   return $map;
@@ -2467,13 +2471,13 @@ sub SYSMON_getNetworkInfo ($$$)
 #------------------------------------------------------------------------------
 sub SYSMON_getFBWLANState($$)
 {
-	my ($hash, $map) = @_;
-	
-	#SYSMON_Log($hash, 5, "");
-	
-	$map->{+FB_WLAN_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/ap_enabled",1);
-	
-	return $map;
+  my ($hash, $map) = @_;
+  
+  #SYSMON_Log($hash, 5, "");
+  
+  $map->{+FB_WLAN_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/ap_enabled",1);
+  
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -2482,13 +2486,13 @@ sub SYSMON_getFBWLANState($$)
 #------------------------------------------------------------------------------
 sub SYSMON_getFBWLANGuestState($$)
 {
-	my ($hash, $map) = @_;
-	
-	#SYSMON_Log($hash, 5, "");
-	
-	$map->{+FB_WLAN_GUEST_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/guest_ap_enabled",1);
-	
-	return $map;
+  my ($hash, $map) = @_;
+  
+  #SYSMON_Log($hash, 5, "");
+  
+  $map->{+FB_WLAN_GUEST_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r wlan settings/guest_ap_enabled",1);
+  
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -2497,11 +2501,11 @@ sub SYSMON_getFBWLANGuestState($$)
 #------------------------------------------------------------------------------
 sub SYSMON_getFBInetIP($$)
 {
-	my ($hash, $map) = @_;
-	
-	$map->{+FB_INET_IP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/ipaddr");
-	
-	return $map;
+  my ($hash, $map) = @_;
+  
+  $map->{+FB_INET_IP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/ipaddr");
+  
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -2510,11 +2514,11 @@ sub SYSMON_getFBInetIP($$)
 #------------------------------------------------------------------------------
 sub SYSMON_getFBInetConnectionState($$)
 {
-	my ($hash, $map) = @_;
-	
-	$map->{+FB_INET_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connection_status");
-	
-	return $map;
+  my ($hash, $map) = @_;
+  
+  $map->{+FB_INET_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connection_status");
+  
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -2523,11 +2527,11 @@ sub SYSMON_getFBInetConnectionState($$)
 #------------------------------------------------------------------------------
 sub SYSMON_getFBNightTimeControl($$)
 {
-	my ($hash, $map) = @_;
-	
-	$map->{+FB_N_TIME_CTRL}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r box settings/night_time_control_enabled",1);
-	
-	return $map;
+  my ($hash, $map) = @_;
+  
+  $map->{+FB_N_TIME_CTRL}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r box settings/night_time_control_enabled",1);
+  
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -2536,11 +2540,11 @@ sub SYSMON_getFBNightTimeControl($$)
 #------------------------------------------------------------------------------
 sub SYSMON_getFBNumNewMessages($$)
 {
-	my ($hash, $map) = @_;
-	
-	$map->{+FB_NUM_NEW_MESSAGES}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r tam status/NumNewMessages");
-	
-	return $map;
+  my ($hash, $map) = @_;
+  
+  $map->{+FB_NUM_NEW_MESSAGES}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r tam status/NumNewMessages");
+  
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -2549,11 +2553,11 @@ sub SYSMON_getFBNumNewMessages($$)
 #------------------------------------------------------------------------------
 sub SYSMON_getFBDECTTemp($$)
 {
-	my ($hash, $map) = @_;
-	
-	$map->{+FB_DECT_TEMP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dect status/Temperature");
-	
-	return $map;
+  my ($hash, $map) = @_;
+  
+  $map->{+FB_DECT_TEMP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dect status/Temperature");
+  
+  return $map;
 }
 
 #------------------------------------------------------------------------------
@@ -2563,26 +2567,26 @@ sub SYSMON_getFBDECTTemp($$)
 #------------------------------------------------------------------------------
 sub SYSMON_getFBLanDeviceList($)
 {
-	my ($hash) = @_;
-	
-	if(!SYSMON_isFB($hash)) {
-		return undef;
-	}
-	
-	my $map;
-	
-	my $name = $hash->{NAME};
-	# ---
+  my ($hash) = @_;
+  
+  if(!SYSMON_isFB($hash)) {
+    return undef;
+  }
+  
+  my $map;
+  
+  my $name = $hash->{NAME};
+  # ---
   #TODO: SSH
   my $msg = undef;
   my $openedTelnet = 0;
   my $telnet = $hash->{".telnet"};
   #$telnet = undef;
-	my $mode = $hash->{MODE};
-	# Wenn remote: open connection
-	if ($mode eq 'telnet') {
-		unless (defined $telnet) {
-			SYSMON_Log($hash, 5, "$name: Open single telnet connection");
+  my $mode = $hash->{MODE};
+  # Wenn remote: open connection
+  if ($mode eq 'telnet') {
+    unless (defined $telnet) {
+      SYSMON_Log($hash, 5, "$name: Open single telnet connection");
       $msg = SYSMON_Open_Connection($hash);
       $hash->{helper}{error_msg}=$msg;
       if (!$msg) {
@@ -2590,42 +2594,42 @@ sub SYSMON_getFBLanDeviceList($)
         $hash->{helper}{error_msg}=undef;
       }
     }
-	}
+  }
   # ---
 
-	my $count = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice/count");
-	if(defined($count)) {
-		for (my $i=0;$i<$count;$i++) { 
-			#landevice0/...  
-			# ip=192.168.178.12,  mac=00:1F:3F:MM:AA:CC, name=PC-192-168-178-12, manu_name=0,
-			# dhcp=0, static_dhcp=0, wlan=0, ethernet=1, active=1, online=0, speed=100,
-			# deleteable=2, wakeup=0, source=4096, neighbour_name=, is_double_neighbour_name=0
-			# ipv6addrs=, ipv6_ifid=
+  my $count = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice/count");
+  if(defined($count)) {
+    for (my $i=0;$i<$count;$i++) { 
+      #landevice0/...  
+      # ip=192.168.178.12,  mac=00:1F:3F:MM:AA:CC, name=PC-192-168-178-12, manu_name=0,
+      # dhcp=0, static_dhcp=0, wlan=0, ethernet=1, active=1, online=0, speed=100,
+      # deleteable=2, wakeup=0, source=4096, neighbour_name=, is_double_neighbour_name=0
+      # ipv6addrs=, ipv6_ifid=
 
-  	  my $dev_name   = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/name");
-  	  my $dev_ip     = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/ip");
-  	  my $dev_mac    = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/mac");
-  	  my $dev_active = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/active");
-  	  
-  	  $map->{$dev_name}{id}     = $i;
-  	  $map->{$dev_name}{name}   = $dev_name;
-  	  $map->{$dev_name}{ip}     = $dev_ip;
-  	  $map->{$dev_name}{mac}    = $dev_mac;
-  	  $map->{$dev_name}{active} = $dev_active;
+      my $dev_name   = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/name");
+      my $dev_ip     = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/ip");
+      my $dev_mac    = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/mac");
+      my $dev_active = SYSMON_execute($hash, "ctlmgr_ctl r landevice settings/landevice".$i."/active");
+      
+      $map->{$dev_name}{id}     = $i;
+      $map->{$dev_name}{name}   = $dev_name;
+      $map->{$dev_name}{ip}     = $dev_ip;
+      $map->{$dev_name}{mac}    = $dev_mac;
+      $map->{$dev_name}{active} = $dev_active;
     }
   }
   
   # ---
-	# Wenn remote: close connection
-	if ($mode eq 'telnet') {
-		if($openedTelnet) {
-		  SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
-		  SYSMON_Close_Connection( $hash );
-	  }
-	}
-	# ---
-	
-	return $map;
+  # Wenn remote: close connection
+  if ($mode eq 'telnet') {
+    if($openedTelnet) {
+      SYSMON_Log($hash, 5, "$name: Close shared telnet connection");
+      SYSMON_Close_Connection( $hash );
+    }
+  }
+  # ---
+  
+  return $map;
 }
 
 
@@ -2637,39 +2641,39 @@ sub SYSMON_getFBLanDeviceList($)
 #------------------------------------------------------------------------------
 sub SYSMON_acquireInfo_intern($$;$)
 {
-	my ($hash, $cmd, $art) = @_;
-	
-	SYSMON_Log($hash, 5, "cmd: ".$cmd);
-	
-	my $str = SYSMON_execute($hash, $cmd);
-	if(defined($str)) {
-	  $str = trim($str);
-	}
-	my $ret;
-	
-	if(!defined($art)) { $art= 0; }
+  my ($hash, $cmd, $art) = @_;
+  
+  SYSMON_Log($hash, 5, "cmd: ".$cmd);
+  
+  my $str = SYSMON_execute($hash, $cmd);
+  if(defined($str)) {
+    $str = trim($str);
+  }
+  my $ret;
+  
+  if(!defined($art)) { $art= 0; }
 
   $ret = $str;
   no warnings;
   if($art == 1) {
     if($str+0 == 1) {
-	   $ret="on";
+     $ret="on";
     } else {
       if($str+0 == 0) {
         $ret="off";
-	    }	else {
-	  	  $ret="unknown";
-	    }
+      } else {
+        $ret="unknown";
+      }
     }
   }
   use warnings;
-	return $ret;
+  return $ret;
 }
 
 sub SYSMON_FBVersionInfo($$)
 {
-	my ($hash, $map) = @_;
-	
+  my ($hash, $map) = @_;
+  
   my $data = SYSMON_execute($hash, "/etc/version --version --date");
   
   my($v, $d, $t) = split(/\s+/, $data);
@@ -2680,16 +2684,16 @@ sub SYSMON_FBVersionInfo($$)
   if(defined($t)) { $version.= " ".$t; }
   
   #if(defined($data[0])) {
-  #	#Version
-  #	$version = $data[0];
+  # #Version
+  # $version = $data[0];
   #}
   #if(defined($data[1])) {
-  #	#Date
-  #	$version = $version." ".$data[1];
+  # #Date
+  # $version = $version." ".$data[1];
   #}
   
   if($version ne "") {
-  	$map->{+FB_FW_VERSION}=$version;
+    $map->{+FB_FW_VERSION}=$version;
   }
   
   return $map;
@@ -2698,15 +2702,15 @@ sub SYSMON_FBVersionInfo($$)
 
 #DSL-Downstream und DSL-Upstream abfragen
 sub SYSMON_getFBStreamRate($$) {
-	my ($hash, $map) = @_;
-	
-	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_ds_rate");
-	unless($ds_rate) {
-		return SYSMON_getFBStreamRate2($hash, $map);
-	}
-	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_us_rate");
-	
-	if($ds_rate ne "" && $us_rate ne "") {
+  my ($hash, $map) = @_;
+  
+  my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_ds_rate");
+  unless($ds_rate) {
+    return SYSMON_getFBStreamRate2($hash, $map);
+  }
+  my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_us_rate");
+  
+  if($ds_rate ne "" && $us_rate ne "") {
     $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
   }
   
@@ -2715,14 +2719,14 @@ sub SYSMON_getFBStreamRate($$) {
 
 # DSL-Geschwindigkeit mit neuer FritzOS (6.23)
 sub SYSMON_getFBStreamRate2($$) {
-	my ($hash, $map) = @_;
-	
-	my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/in");
-	my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/out");
-	
-	if(defined($ds_rate) && defined($us_rate) && $ds_rate ne "" && $us_rate ne "") {
-		$ds_rate = $ds_rate/1000;
-		$us_rate = $us_rate/1000;
+  my ($hash, $map) = @_;
+  
+  my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/in");
+  my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/out");
+  
+  if(defined($ds_rate) && defined($us_rate) && $ds_rate ne "" && $us_rate ne "") {
+    $ds_rate = $ds_rate/1000;
+    $us_rate = $us_rate/1000;
     $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
   }
   
@@ -2743,15 +2747,15 @@ sub SYSMON_sec2Dauer($){
 
 #Sync-Zeit mit Vermittlungsstelle abfragen
 sub SYSMON_getFBSyncTime($$) {
-	my ($hash, $map) = @_;
-	
-	my $data = SYSMON_execute($hash, "ctlmgr_ctl r sar status/modem_ShowtimeSecs");
-	unless($data) {
-		return SYSMON_getFBSyncTime2($hash, $map);
-	}
-	
-	if($data ne "") {
-		my $idata = int($data);
+  my ($hash, $map) = @_;
+  
+  my $data = SYSMON_execute($hash, "ctlmgr_ctl r sar status/modem_ShowtimeSecs");
+  unless($data) {
+    return SYSMON_getFBSyncTime2($hash, $map);
+  }
+  
+  if($data ne "") {
+    my $idata = int($data);
     $map->{+FB_DSL_SYNCTIME}=SYSMON_sec2Dauer($idata);
   }
   
@@ -2760,11 +2764,11 @@ sub SYSMON_getFBSyncTime($$) {
 
 #Sync-Zeit mit Vermittlungsstelle abfragen mit neuer FritzOS (6.23)
 sub SYSMON_getFBSyncTime2($$) {
-	my ($hash, $map) = @_;
-	
-	my $data = SYSMON_execute($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connect_time");
-	
-	if(defined($data) && $data ne "") {
+  my ($hash, $map) = @_;
+  
+  my $data = SYSMON_execute($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connect_time");
+  
+  if(defined($data) && $data ne "") {
     $map->{+FB_DSL_SYNCTIME}=$data;
   }
   
@@ -2773,20 +2777,20 @@ sub SYSMON_getFBSyncTime2($$) {
 
 #Uebertragungsfehler abfragen (nicht behebbar und behebbar)
 sub SYSMON_getFBCRCFEC($$) {
-	my ($hash, $map) = @_;
-	
-	my $ds_crc = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_crc_per15min");
-	my $us_crc = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_crc_per15min");
-	
-	my $ds_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_fec_per15min");
-	my $us_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_fec_per15min");	
-	
-	if(defined($ds_crc) && $ds_crc ne "") {
-	  # FB_DSL_CRC_15
+  my ($hash, $map) = @_;
+  
+  my $ds_crc = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_crc_per15min");
+  my $us_crc = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_crc_per15min");
+  
+  my $ds_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_fec_per15min");
+  my $us_fec = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_fec_per15min");  
+  
+  if(defined($ds_crc) && $ds_crc ne "") {
+    # FB_DSL_CRC_15
     $map->{+FB_DSL_CRC_15}="down: ".int($ds_crc)." up: ".int($us_crc);
   }
   if(defined($ds_fec) && $ds_fec ne "") {
-	  # FB_DSL_FEC_15
+    # FB_DSL_FEC_15
     $map->{+FB_DSL_FEC_15}="down: ".int($ds_fec)." up: ".int($us_fec);
   }
   
@@ -2801,8 +2805,8 @@ sub SYSMON_getFBCRCFEC($$) {
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesHTML ($;@)
 {
-	my ($name, @data) = @_;
-	return SYSMON_ShowValuesFmt($name, undef, 1, @data);
+  my ($name, @data) = @_;
+  return SYSMON_ShowValuesFmt($name, undef, 1, @data);
 }
 
 #------------------------------------------------------------------------------
@@ -2814,10 +2818,10 @@ sub SYSMON_ShowValuesHTML ($;@)
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesHTMLTitled ($;$@)
 {
-	my ($name, $title, @data) = @_;
-	$title = $attr{$name}{'alias'} unless $title;
-	$title = $name unless $title;
-	return SYSMON_ShowValuesFmt($name, $title, 1, @data);
+  my ($name, $title, @data) = @_;
+  $title = $attr{$name}{'alias'} unless $title;
+  $title = $name unless $title;
+  return SYSMON_ShowValuesFmt($name, $title, 1, @data);
 }
 
 #------------------------------------------------------------------------------
@@ -2828,8 +2832,8 @@ sub SYSMON_ShowValuesHTMLTitled ($;$@)
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesText ($;@)
 {
-	my ($name, @data) = @_;
-	return SYSMON_ShowValuesFmt($name, undef, 0, @data);
+  my ($name, @data) = @_;
+  return SYSMON_ShowValuesFmt($name, undef, 0, @data);
 }
 
 #------------------------------------------------------------------------------
@@ -2841,10 +2845,10 @@ sub SYSMON_ShowValuesText ($;@)
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesTextTitled ($;$@)
 {
-	my ($name, $title, @data) = @_;
-	$title = $attr{$name}{'alias'} unless $title;
-	$title = $name unless $title;
-	return SYSMON_ShowValuesFmt($name, $title, 0, @data);
+  my ($name, $title, @data) = @_;
+  $title = $attr{$name}{'alias'} unless $title;
+  $title = $name unless $title;
+  return SYSMON_ShowValuesFmt($name, $title, 0, @data);
 }
 
 #------------------------------------------------------------------------------
@@ -2860,7 +2864,7 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   my ($name, $title, $format, @data) = @_;
     
   if($format != 0 && $format != 1) {
-  	return "unknown output format\r\n";
+    return "unknown output format\r\n";
   }
     
   my $hash = $main::defs{$name};
@@ -2872,49 +2876,49 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   #Log 3, "SYSMON $>name, @data<";
   my @dataDescription = @data;
   if(scalar(@data)<=0) {
-	  # Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
-	  my $deg = "°";
-	  if($format == 1) {
-	  	$deg = "&deg;";
-	  }
-	  # bei der Benutzung mit CloneDummies ist $cur_readings_map nicht unbedingt definiert
-	  @dataDescription = (DATE,
-	                      #CPU_TEMP.":".$hash->{helper}{cur_readings_map}->{+CPU_TEMP}.": ".$deg."C", 
-	                      CPU_TEMP.":"."CPU temperature".": ".$deg."C", 
-	                      #CPU_FREQ.":".$hash->{helper}{cur_readings_map}->{+CPU_FREQ}.": "."MHz", 
-	                      CPU_FREQ.":"."CPU frequency".": "."MHz", 
-	                      CPU_BOGOMIPS,
-	                      UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP, 
-	                      "power_ac_text", "power_usb_text", "power_battery_text");
+    # Array mit anzuzeigenden Parametern (Prefix, Name (in Map), Postfix)
+    my $deg = "°";
+    if($format == 1) {
+      $deg = "&deg;";
+    }
+    # bei der Benutzung mit CloneDummies ist $cur_readings_map nicht unbedingt definiert
+    @dataDescription = (DATE,
+                        #CPU_TEMP.":".$hash->{helper}{cur_readings_map}->{+CPU_TEMP}.": ".$deg."C", 
+                        CPU_TEMP.":"."CPU temperature".": ".$deg."C", 
+                        #CPU_FREQ.":".$hash->{helper}{cur_readings_map}->{+CPU_FREQ}.": "."MHz", 
+                        CPU_FREQ.":"."CPU frequency".": "."MHz", 
+                        CPU_BOGOMIPS,
+                        UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP, 
+                        "power_ac_text", "power_usb_text", "power_battery_text");
 
-	  # network-interfaces
-  	my $networks = AttrVal($name, "network-interfaces", undef);
+    # network-interfaces
+    my $networks = AttrVal($name, "network-interfaces", undef);
     if(defined $networks) {
       my @networks_list = split(/,\s*/, trim($networks));
       foreach (@networks_list) {
-      	my($nName, $nDef, $nComment) = split(/:/, $_);
-      	push(@dataDescription, $nName);
+        my($nName, $nDef, $nComment) = split(/:/, $_);
+        push(@dataDescription, $nName);
       }
     }
     
     # named filesystems
-  	my $filesystems = AttrVal($name, "filesystems", undef);
+    my $filesystems = AttrVal($name, "filesystems", undef);
     if(defined $filesystems) {
       my @filesystem_list = split(/,\s*/, trim($filesystems));
       foreach (@filesystem_list) {
         my($fName, $fDef, $fComment) = split(/:/, $_);
-  	    push(@dataDescription, $fName);
-  	  }
-  	} 	
+        push(@dataDescription, $fName);
+      }
+    }   
 
-  	# User defined
-	  my $userdefined = AttrVal($name, "user-defined", undef);
+    # User defined
+    my $userdefined = AttrVal($name, "user-defined", undef);
     if(defined $userdefined) {
-    	my @userdefined_list = split(/,\s*/, trim($userdefined));
+      my @userdefined_list = split(/,\s*/, trim($userdefined));
       foreach (@userdefined_list) {
          # <readingName>:<Interval_Minutes>:<Comment>:<Cmd>
-	       my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $_);
-	       push(@dataDescription, $uName);
+         my($uName, $uInterval, $uComment, $uCmd) = split(/:/, $_);
+         push(@dataDescription, $uName);
       }
     }
   }
@@ -2925,28 +2929,28 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   if($hash->{TYPE} eq 'SYSMON') {  
     $map = SYSMON_obtainParameters($hash, 1);
   } else {
-  	# Wenn nicht SYSMON, dann versuchen, die Daten aus den Readings auszulesen
-  	#$map = SYSMON_obtainReadings($hash);
-  	foreach my $rname (keys %{$hash->{READINGS}}) {
-  	  my $rval=$hash->{READINGS}->{$rname}->{VAL};
-  	  $map->{$rname}=$rval;
-  	}
+    # Wenn nicht SYSMON, dann versuchen, die Daten aus den Readings auszulesen
+    #$map = SYSMON_obtainReadings($hash);
+    foreach my $rname (keys %{$hash->{READINGS}}) {
+      my $rval=$hash->{READINGS}->{$rname}->{VAL};
+      $map->{$rname}=$rval;
+    }
   }
 
   my $div_class="sysmon";
 
   my $htmlcode;
   if($format == 1) {
-  	$htmlcode = "<div  class='".$div_class."'><table>";
+    $htmlcode = "<div  class='".$div_class."'><table>";
   } else {
-  	if($format == 0) {
-  	  $htmlcode = "";
-  	}
+    if($format == 0) {
+      $htmlcode = "";
+    }
   }
   
   if(defined $title) {
     if($format == 1) {
-  	  $htmlcode .= "<tr><td valign='top' colspan='2'>".$title."</td></tr>";
+      $htmlcode .= "<tr><td valign='top' colspan='2'>".$title."</td></tr>";
     } else {
       if($format == 0) {
         $htmlcode .= sprintf("%s\r\n", $title);
@@ -2956,26 +2960,26 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   
   # oben definierte Werte anzeigen
   foreach (@dataDescription) {
-  	my($rName, $rComment, $rPostfix) = split(/:/, $_);
-  	if(defined $rName) {
-  	  if(!defined $rComment) {
+    my($rName, $rComment, $rPostfix) = split(/:/, $_);
+    if(defined $rName) {
+      if(!defined $rComment) {
         $rComment = $hash->{helper}{cur_readings_map}->{$rName};
       }
       my $rVal = $map->{$rName};
       if(!defined $rVal) {
-      	# ggf. userReadings verarbeiten
-      	$rVal = ReadingsVal($name,$rName,undef);
+        # ggf. userReadings verarbeiten
+        $rVal = ReadingsVal($name,$rName,undef);
       }
       if($rName eq DATE) {
-      	# Datum anzeigen
-  	    $rVal = strftime("%d.%m.%Y %H:%M:%S", localtime());
-  	  }
-  	  if(!defined $rPostfix) { $rPostfix = ""; }
-  	  if(defined $rVal) {
-  	  	if($format == 1) {
-  	  	  $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
-  	  	} else {
-  	  		if($format == 0) {
+        # Datum anzeigen
+        $rVal = strftime("%d.%m.%Y %H:%M:%S", localtime());
+      }
+      if(!defined $rPostfix) { $rPostfix = ""; }
+      if(defined $rVal) {
+        if($format == 1) {
+          $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
+        } else {
+          if($format == 0) {
             $htmlcode .= sprintf("%-24s: %s%s\r\n", $rComment, $rVal,$rPostfix);
           }
         }
@@ -2987,12 +2991,12 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   if(scalar(@data)<=0) {
     # File systems
     foreach my $aName (sort keys %{$map}) {
-    	if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
+      if(defined ($aName) && index($aName, FS_PREFIX) == 0) {
         $aName =~ /^~ (.+)/;
         if($format == 1) {
           $htmlcode .= "<tr><td valign='top'>File System: ".$1."&nbsp;</td><td>".$map->{$aName}."</td></tr>";
         } else {
-        	if($format == 0) {
+          if($format == 0) {
             $htmlcode .= sprintf("%-24s: %s\r\n", "File System: ".$1,$map->{$aName});
           }
         }
@@ -3003,174 +3007,174 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   if($format == 1) {
     $htmlcode .= "</table></div><br>";
   } else {
-  	if($format == 0) {
-  	  $htmlcode .= "";
-  	}
+    if($format == 0) {
+      $htmlcode .= "";
+    }
   }
 
   return $htmlcode;
 }
 
 #sub SYSMON_first($) {
-#	my (@d) = @_;
-#	return @d[0];
-#	
-#	#my ($d) = @_;
-#	#
-#	#return undef unless defined $d;
-#	
-#	##return ref ($d)." - ".ref(\$d);
-#	#if (ref $d eq "ARRAY") {
-#	# 	return @{$d}[0];
-#	#} else {
-#	#  return $d;
-#	#}
+# my (@d) = @_;
+# return @d[0];
+# 
+# #my ($d) = @_;
+# #
+# #return undef unless defined $d;
+# 
+# ##return ref ($d)." - ".ref(\$d);
+# #if (ref $d eq "ARRAY") {
+# #   return @{$d}[0];
+# #} else {
+# #  return $d;
+# #}
 #}
 #
 #sub SYSMON_last($) {
-#	my (@d) = @_;
-#	
-#	return undef unless defined @d;
-#	
-#	return @d[-1];
-#	
-#	#return ref ($d)." - ".ref(\$d);
-#	#if (ref $d eq "ARRAY") {
-#	# 	return @{$d}[-1];
-#	#} else {
-#	#  return $d;
-#	#}
+# my (@d) = @_;
+# 
+# return undef unless defined @d;
+# 
+# return @d[-1];
+# 
+# #return ref ($d)." - ".ref(\$d);
+# #if (ref $d eq "ARRAY") {
+# #   return @{$d}[-1];
+# #} else {
+# #  return $d;
+# #}
 #}
 
 #my $proc_fs = undef;
 sub
 SYSMON_isProcFS($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{proc_fs}) {
-	  $hash->{helper}{proc_fs} = int(SYSMON_execute($hash, "[ -d /proc/ ] && echo 1 || echo 0"));
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{proc_fs}) {
+    $hash->{helper}{proc_fs} = int(SYSMON_execute($hash, "[ -d /proc/ ] && echo 1 || echo 0"));
   }
 
-	return $hash->{helper}{proc_fs};
+  return $hash->{helper}{proc_fs};
 }
 
 #my $sys_cpu_temp_rpi = undef;
 sub
 SYSMON_isCPUTempRPi($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_cpu_temp_rpi}) {
-	  $hash->{helper}{sys_cpu_temp_rpi} = int(SYSMON_execute($hash, "[ -f /sys/class/thermal/thermal_zone0/temp ] && echo 1 || echo 0"));
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_cpu_temp_rpi}) {
+    $hash->{helper}{sys_cpu_temp_rpi} = int(SYSMON_execute($hash, "[ -f /sys/class/thermal/thermal_zone0/temp ] && echo 1 || echo 0"));
   }
 
-	return $hash->{helper}{sys_cpu_temp_rpi};
+  return $hash->{helper}{sys_cpu_temp_rpi};
 }
 
 #my $sys_cpu_temp_bbb = undef;
 sub
 SYSMON_isCPUTempBBB($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_cpu_temp_bbb}) {
-	  $hash->{helper}{sys_cpu_temp_bbb} = int(SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/temp1_input ] && echo 1 || echo 0"));
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_cpu_temp_bbb}) {
+    $hash->{helper}{sys_cpu_temp_bbb} = int(SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/temp1_input ] && echo 1 || echo 0"));
   }
 
-	return $hash->{helper}{sys_cpu_temp_bbb};
+  return $hash->{helper}{sys_cpu_temp_bbb};
 }
 
 #my $sys_cpu_freq_rpi_bbb = undef;
 sub
 SYSMON_isCPUFreqRPiBBB($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_cpu_freq_rpi_bbb}) {
-	  #$hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
-	  # Diese abenteuerliche Konstruktion ist noetig, weil bei zu langen Zeilen ueber Telnet der Rest der Zeile als erstes Element kommt
-	  my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-	  $hash->{helper}{sys_cpu_freq_rpi_bbb} = int($t[-1]);
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_cpu_freq_rpi_bbb}) {
+    #$hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+    # Diese abenteuerliche Konstruktion ist noetig, weil bei zu langen Zeilen ueber Telnet der Rest der Zeile als erstes Element kommt
+    my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
+    $hash->{helper}{sys_cpu_freq_rpi_bbb} = int($t[-1]);
   }
 
-	return $hash->{helper}{sys_cpu_freq_rpi_bbb};
+  return $hash->{helper}{sys_cpu_freq_rpi_bbb};
 }
 
 # DUMMY
 sub SYSMON_isCPUTempFB($) {
-	my ($hash) = @_;
-	return SYSMON_isFB($hash);
+  my ($hash) = @_;
+  return SYSMON_isFB($hash);
 }
 
 #my $sys_cpu1_freq = undef;
 sub
 SYSMON_isCPU1Freq($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_cpu1_freq}) {
-	  #$hash->{helper}{sys_cpu1_freq} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
-	  # s. o. 
-	  my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-	  $hash->{helper}{sys_cpu1_freq} = int($t[-1]);
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_cpu1_freq}) {
+    #$hash->{helper}{sys_cpu1_freq} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
+    # s. o. 
+    my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
+    $hash->{helper}{sys_cpu1_freq} = int($t[-1]);
   }
 
-	return $hash->{helper}{sys_cpu1_freq};
+  return $hash->{helper}{sys_cpu1_freq};
 }
 
 #my $sys_fb = undef;
 sub
 SYSMON_isFB($) {
-	my ($hash) = @_;
-	if(!defined ($hash->{helper}{sys_fb})) {
-	  $hash->{helper}{sys_fb} = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
+  my ($hash) = @_;
+  if(!defined ($hash->{helper}{sys_fb})) {
+    $hash->{helper}{sys_fb} = int(SYSMON_execute($hash, "[ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0"));
   }
-	return $hash->{helper}{sys_fb};
+  return $hash->{helper}{sys_fb};
 }
 
 #-Power-------
 #my $sys_power_ac = undef;
 sub
 SYSMON_isSysPowerAc($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_power_ac}) {
-	  $hash->{helper}{sys_power_ac} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/ac/online ] && echo 1 || echo 0"));
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_power_ac}) {
+    $hash->{helper}{sys_power_ac} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/ac/online ] && echo 1 || echo 0"));
   }
 
-	return $hash->{helper}{sys_power_ac};
+  return $hash->{helper}{sys_power_ac};
 }
 
 #my $sys_power_usb = undef;
 sub
 SYSMON_isSysPowerUsb($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_power_usb}) {
-	  $hash->{helper}{sys_power_usb} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/usb/online ] && echo 1 || echo 0"));
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_power_usb}) {
+    $hash->{helper}{sys_power_usb} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/usb/online ] && echo 1 || echo 0"));
   }
 
-	return $hash->{helper}{sys_power_usb};
+  return $hash->{helper}{sys_power_usb};
 }
 
 #my $sys_power_bat = undef;
 sub
 SYSMON_isSysPowerBat($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_power_bat}) {
-	  $hash->{helper}{sys_power_bat} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/battery/online ] && echo 1 || echo 0"));
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_power_bat}) {
+    $hash->{helper}{sys_power_bat} = int(SYSMON_execute($hash, "[ -f /sys/class/power_supply/battery/online ] && echo 1 || echo 0"));
   }
 
-	return $hash->{helper}{sys_power_bat};
+  return $hash->{helper}{sys_power_bat};
 }
 
 #my $sys_cpu_num = undef;
 sub
 SYSMON_isSysCpuNum($) {
-	my ($hash) = @_;
-	if(!defined $hash->{helper}{sys_cpu_num}) {
-	  $hash->{helper}{sys_cpu_num} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/kernel_max ] && echo 1 || echo 0"));
+  my ($hash) = @_;
+  if(!defined $hash->{helper}{sys_cpu_num}) {
+    $hash->{helper}{sys_cpu_num} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/kernel_max ] && echo 1 || echo 0"));
   }
 
-	return $hash->{helper}{sys_cpu_num};
+  return $hash->{helper}{sys_cpu_num};
 }
 
 sub SYSMON_PowerAcInfo($$)
 {
-	#online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
-	my ($hash, $map) = @_;
-	my $type="ac";
-	my $base = "cat /sys/class/power_supply/".$type."/";
-		
+  #online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
+  my ($hash, $map) = @_;
+  my $type="ac";
+  my $base = "cat /sys/class/power_supply/".$type."/";
+    
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
   my $d_present = trim(SYSMON_execute($hash, $base."present"));
   my $d_current = SYSMON_execute($hash, $base."current_now");
@@ -3189,11 +3193,11 @@ sub SYSMON_PowerAcInfo($$)
 
 sub SYSMON_PowerUsbInfo($$)
 {
-	#online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
-	my ($hash, $map) = @_;
-	my $type="usb";
-	my $base = "cat /sys/class/power_supply/".$type."/";
-		
+  #online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
+  my ($hash, $map) = @_;
+  my $type="usb";
+  my $base = "cat /sys/class/power_supply/".$type."/";
+    
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
   my $d_present = trim(SYSMON_execute($hash, $base."present"));
   my $d_current = SYSMON_execute($hash, $base."current_now");
@@ -3213,11 +3217,11 @@ sub SYSMON_PowerUsbInfo($$)
 
 sub SYSMON_PowerBatInfo($$)
 {
-	#online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
-	my ($hash, $map) = @_;
-	my $type="battery";
-	my $base = "cat /sys/class/power_supply/".$type."/";
-		
+  #online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
+  my ($hash, $map) = @_;
+  my $type="battery";
+  my $base = "cat /sys/class/power_supply/".$type."/";
+    
   my $d_online = trim(SYSMON_execute($hash, $base."online"));
   my $d_present = trim(SYSMON_execute($hash, $base."present"));
   my $d_current = SYSMON_execute($hash, $base."current_now");
@@ -3227,7 +3231,7 @@ sub SYSMON_PowerBatInfo($$)
   
   my $d_capacity = trim(SYSMON_execute($hash, $base."capacity"));
   if($d_present ne "1") {
-  	$d_capacity = "0";
+    $d_capacity = "0";
   }
   #$map->{"power_".$type."_online"}=$d_online;
   #$map->{"power_".$type."_present"}=$d_present;
@@ -3247,7 +3251,7 @@ sub SYSMON_PowerBatInfo($$)
     
     # ggf. noch irgendwann: model_name, voltage_max_design, voltage_min_design
   } else {
-  	$map->{"power_".$type."_info"}=$type." info: n/a , capacity: n/a %, status: n/a , health: n/a , total capacity: n/a mAh";
+    $map->{"power_".$type."_info"}=$type." info: n/a , capacity: n/a %, status: n/a , health: n/a , total capacity: n/a mAh";
   }
   
   return $map;
@@ -3257,8 +3261,8 @@ sub SYSMON_PowerBatInfo($$)
 sub
 SYSMON_execute($$)
 {
-	my ($hash, $cmd) = @_;
-	return SYSMON_Exec($hash, $cmd);
+  my ($hash, $cmd) = @_;
+  return SYSMON_Exec($hash, $cmd);
   #return qx($cmd);
 }
 
@@ -3528,7 +3532,7 @@ sub SYSMON_Exec($$;$)
    if ($mode eq 'telnet') {
       unless (defined $telnet)
       {
-      	SYSMON_Log($hash, 5, "$name: Open single telnet connection");
+        SYSMON_Log($hash, 5, "$name: Open single telnet connection");
         my $msg = SYSMON_Open_Connection($hash);
         $hash->{helper}{error_msg}=$msg;
         if ($msg) {
@@ -3540,17 +3544,17 @@ sub SYSMON_Exec($$;$)
       my @retVal = SYSMON_Exec_Remote($hash, $cmd);
       
       if($openedTelnet) {
-      	SYSMON_Log($hash, 5, "$name: Close single telnet connection");
+        SYSMON_Log($hash, 5, "$name: Close single telnet connection");
         SYSMON_Close_Connection( $hash );
       }
 
       #Prompt-Zeile entfernen, falls vorhanden
       my $recognized_prompt = $hash->{helper}{recognized_prompt};
       if(defined($recognized_prompt)) {
-      	if(scalar(@retVal)>=1) {
+        if(scalar(@retVal)>=1) {
           if($retVal[-1] eq $recognized_prompt) {
-          	SYSMON_Log ($hash, 5, "remove prompt: ".$retVal[-1]."'");
-          	splice @retVal, -1, 1;# $retVal[-1];
+            SYSMON_Log ($hash, 5, "remove prompt: ".$retVal[-1]."'");
+            splice @retVal, -1, 1;# $retVal[-1];
           }
         }
       }
@@ -3559,7 +3563,7 @@ sub SYSMON_Exec($$;$)
       #if($is_arr && scalar(@retVal)>1) {
       if(scalar(@retVal)>1) {
         SYSMON_Log ($hash, 5, "Result A: '".Dumper(@retVal)."'");
-        return @retVal;	
+        return @retVal; 
       }
       # Einzeiler als normale Scalars
       my $line = $retVal[0];
@@ -3567,7 +3571,7 @@ sub SYSMON_Exec($$;$)
         chomp $line;
         SYSMON_Log ($hash, 5, "Result L: '$line'");
       } else {
-      	SYSMON_Log ($hash, 5, "Result undef");
+        SYSMON_Log ($hash, 5, "Result undef");
       }
       return $line;
       #return $retVal;
@@ -3578,8 +3582,8 @@ sub SYSMON_Exec($$;$)
 }
 
 sub MYTEST() {
-	my @output=(
-	'',
+  my @output=(
+  '',
 '[~] ',
 '',
 '[~] # ',
@@ -3601,10 +3605,10 @@ sub MYTEST() {
 '          inet addr:192.168.178.80  Bcast:192.168.178.255  Mask:255.255.255.0',
 '',
 'eth0      Link encap:Ethernet  HWaddr 00:08:9B:D3:8D:9E'
-	);
-	@output = reverse(@output);
-	for (my $i=0;$i<scalar(@output);$i++) {
-   	 if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
+  );
+  @output = reverse(@output);
+  for (my $i=0;$i<scalar(@output);$i++) {
+     if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
    }
    @output = grep{ defined($_) && trim($_) ne '' }@output;
    return Dumper(@output);
@@ -3626,12 +3630,12 @@ SYSMON_Exec_Remote($$)
 
    # Sonderlocke fuer QNAP: letzten Zeilen mit "[~] " am Anfang entfernen
    #while((scalar(@output)>0) && ($output[-1]=~ /^\[~\]/)) {
-   #	SYSMON_Log ($hash, 5, "Remove line: '".$output[-1]."'");
+   #  SYSMON_Log ($hash, 5, "Remove line: '".$output[-1]."'");
    #  splice @output, -1, 1;
    #}
    for (my $i=0;$i<scalar(@output);$i++) {
-   	 #SYSMON_Log($hash, 5, "Result >>> Line >>> '".$output[$i]."'"); # TODO: remove
-   	 if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
+     #SYSMON_Log($hash, 5, "Result >>> Line >>> '".$output[$i]."'"); # TODO: remove
+     if($output[$i]=~ /^\[~\]/) {undef ($output[$i]);}
    }
    #SYSMON_Log($hash, 5, "Result >>> vgrep >>>'".Dumper(@output)."'"); # TODO: remove
    @output = grep{ defined($_) && trim($_) ne '' }@output;
@@ -3641,7 +3645,7 @@ SYSMON_Exec_Remote($$)
    ## Arrays als solche zurueckgeben
    #if(scalar(@output)>1) {
    #  SYSMON_Log ($hash, 5, "Result '".Dumper(@output)."'");
-   #  return @output;	
+   #  return @output; 
    #}
    ## Einzeiler als normale Scalars
    #my $line = @output[0];
@@ -3669,7 +3673,7 @@ SYSMON_Exec_Local($$)
    # Arrays als solche zurueckgeben
    if(scalar(@result)>1) {
      SYSMON_Log ($hash, 5, "Result '".Dumper(@result)."'");
-     return @result;	
+     return @result;  
    }
    # Einzeiler als normale Scalars
    my $line = $result[0];
@@ -3678,7 +3682,7 @@ SYSMON_Exec_Local($$)
      chomp $line;
      SYSMON_Log ($hash, 5, "Result '$line'");
    } else {
-  	 SYSMON_Log ($hash, 5, "Result undef");
+     SYSMON_Log ($hash, 5, "Result undef");
    }
 
    return $line;
@@ -3712,7 +3716,7 @@ sub SYSMON_decode_time_diff($)
 #------------------------------------------------------------------------------
 #sub logF($$$)
 #{
-#	my ($hash, $fname, $msg) = @_;
+# my ($hash, $fname, $msg) = @_;
 #  #Log 5, "SYSMON $fname (".$hash->{NAME}."): $msg";
 #  Log 5, "SYSMON $fname $msg";
 #}
@@ -3807,19 +3811,19 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>fhemuptime<br>
-    	Time (in seconds) since the start of FHEM server.
+      Time (in seconds) since the start of FHEM server.
     </li>
     <br>
     <li>fhemuptime_text<br>
-    	Time since the start of the FHEM server: human-readable output (text representation).
+      Time since the start of the FHEM server: human-readable output (text representation).
     </li>
     <br>
     <li>idletime<br>
-    	Time spent by the system since the start in the idle mode (period of inactivity).
+      Time spent by the system since the start in the idle mode (period of inactivity).
     </li>
     <br>
     <li>idletime_text<br>
-    	The inactivity time of the system since system start in human readable form.
+      The inactivity time of the system since system start in human readable form.
     </li>
     <br>
     <li>loadavg<br>
@@ -3831,15 +3835,15 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>swap<br>
-    	swap usage.
+      swap usage.
     </li>
     <br>
     <li>uptime<br>
-    	System uptime.
+      System uptime.
     </li>
     <br>
     <li>uptime_text<br>
-    	System uptime (human readable).
+      System uptime (human readable).
     </li>
     <br>
     <li>Network statistics<br>
@@ -3856,15 +3860,15 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>File system information<br>
-    	Usage of the desired file systems.<br>
-    	Example:<br>
-    		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
+      Usage of the desired file systems.<br>
+      Example:<br>
+        <code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
     </li>
     <br>
     <li>CPU utilization<br>
-    		Information about the utilization of CPUs.<br>
-    		Example:<br>
-    		<code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
+        Information about the utilization of CPUs.<br>
+        Example:<br>
+        <code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
         <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
         <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
         <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
@@ -3908,7 +3912,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Information about the down und up stream rate
     </li>
     <br>
-	  <li>dsl_synctime<br>
+    <li>dsl_synctime<br>
         sync time with DSLAM
     </li>
     <br>
@@ -3916,7 +3920,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         number of uncorrectable errors (CRC) for the last 15 minutes
     </li>
     <br>
-		<li>dsl_fec_15<br>
+    <li>dsl_fec_15<br>
         number of correctable errors (FEC) for the last 15 minutes
     </li>
     <br>
@@ -3924,13 +3928,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>power_ac_stat<br>
         status information to the AC socket: present (0|1), online (0|1), voltage, current<br>
         Example:<br>
-    		<code>power_ac_stat: 1 1 4.807 264</code><br>
+        <code>power_ac_stat: 1 1 4.807 264</code><br>
     </li>
     <br>
     <li>power_ac_text<br>
         human readable status information to the AC socket<br>
         Example:<br>
-    		<code>power_ac_text ac: present / online, voltage: 4.807 V, current: 264 mA</code><br>
+        <code>power_ac_text ac: present / online, voltage: 4.807 V, current: 264 mA</code><br>
     </li>
     <br>
     <li>power_usb_stat<br>
@@ -3944,7 +3948,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>power_battery_stat<br>
         status information to the battery (if installed): present (0|1), online (0|1), voltage, current, actual capacity<br>
         Example:<br>
-    		<code>power_battery_stat: 1 1 4.807 264 100</code><br>
+        <code>power_battery_stat: 1 1 4.807 264 100</code><br>
     </li>
     <br>
     <li>power_battery_text<br>
@@ -3954,8 +3958,8 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>power_battery_info<br>
         human readable additional information to the battery (if installed): technology, capacity, status, health, total capacity<br>
         Example:<br>
-    		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
-    		The capacity must be defined in script.bin (e.g. ct-hdmi.bin). Parameter name pmu_battery_cap. Convert with bin2fex (bin2fex -> script.fex -> edit -> fex2bin -> script.bin).<br>
+        <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
+        The capacity must be defined in script.bin (e.g. ct-hdmi.bin). Parameter name pmu_battery_cap. Convert with bin2fex (bin2fex -> script.fex -> edit -> fex2bin -> script.bin).<br>
     </li>
     <br>    
   <br>
@@ -4395,20 +4399,20 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>fhemuptime<br>
-    		Zeit (in Sekunden) seit dem Start des FHEM-Servers.
+        Zeit (in Sekunden) seit dem Start des FHEM-Servers.
     </li>
     <br>
     <li>fhemuptime_text<br>
-    		Zeit seit dem Start des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
+        Zeit seit dem Start des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
     </li>
     <br>
     <li>idletime<br>
-    		Zeit (in Sekunden und in Prozent), die das System (nicht der FHEM-Server!)
-    		seit dem Start in dem Idle-Modus verbracht hat. Also die Zeit der Inaktivit&auml;t.
+        Zeit (in Sekunden und in Prozent), die das System (nicht der FHEM-Server!)
+        seit dem Start in dem Idle-Modus verbracht hat. Also die Zeit der Inaktivit&auml;t.
     </li>
     <br>
     <li>idletime_text<br>
-    		Zeit der Inaktivit&auml;t des Systems seit dem Systemstart in menschenlesbarer Form.
+        Zeit der Inaktivit&auml;t des Systems seit dem Systemstart in menschenlesbarer Form.
     </li>
     <br>
     <li>loadavg<br>
@@ -4420,15 +4424,15 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>swap<br>
-    		Benutzung und Auslastung der SWAP-Datei (bzw. Partition).
+        Benutzung und Auslastung der SWAP-Datei (bzw. Partition).
     </li>
     <br>
     <li>uptime<br>
-    		Zeit (in Sekenden) seit dem Systemstart.
+        Zeit (in Sekenden) seit dem Systemstart.
     </li>
     <br>
     <li>uptime_text<br>
-    		Zeit seit dem Systemstart in menschenlesbarer Form.
+        Zeit seit dem Systemstart in menschenlesbarer Form.
     </li>
     <br>
     <li>Netzwerkinformationen<br>
@@ -4446,18 +4450,18 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>Dateisysteminformationen<br>
-    		Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
-    		Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
-    		In diesem Fall werden f&uuml;r die diese Readings die angegebenen Namen verwendet.<br>
-    		Dies soll die &Uuml;bersicht verbessern und die Erstellung von Plots erleichten.<br>
-    		Beispiel:<br>
-    		<code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
+        Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
+        Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
+        In diesem Fall werden f&uuml;r die diese Readings die angegebenen Namen verwendet.<br>
+        Dies soll die &Uuml;bersicht verbessern und die Erstellung von Plots erleichten.<br>
+        Beispiel:<br>
+        <code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
     </li>
     <br>
     <li>CPU Auslastung<br>
-    		Informationen zu der Auslastung der CPU(s).<br>
-    		Beispiel:<br>
-    		<code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
+        Informationen zu der Auslastung der CPU(s).<br>
+        Beispiel:<br>
+        <code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
         <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
         <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
         <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
@@ -4502,7 +4506,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Down/Up Verbindungsgeschwindigkeit
     </li>
     <br>
-	  <li>dsl_synctime<br>
+    <li>dsl_synctime<br>
         Sync-Zeit mit Vermittlungsstelle
     </li>
     <br>
@@ -4510,7 +4514,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Nicht behebbare &Uuml;bertragungsfehler in den letzten 15 Minuten
     </li>
     <br>
-		<li>dsl_fec_15<br>
+    <li>dsl_fec_15<br>
         Behebbare &Uuml;bertragungsfehler in den letzten 15 Minuten
     </li>
     <br>
@@ -4518,13 +4522,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>power_ac_stat<br>
         Statusinformation f&uuml;r die AC-Buchse: present (0|1), online (0|1), voltage, current<br>
         Beispiel:<br>
-    		<code>power_ac_stat: 1 1 4.807 264</code><br>
+        <code>power_ac_stat: 1 1 4.807 264</code><br>
     </li>
     <br>
     <li>power_ac_text<br>
         Statusinformation f&uuml;r die AC-Buchse in menschenlesbarer Form<br>
         Beispiel:<br>
-    		<code>power_ac_text ac: present / online, Voltage: 4.807 V, Current: 264 mA</code><br>
+        <code>power_ac_text ac: present / online, Voltage: 4.807 V, Current: 264 mA</code><br>
     </li>
     <br>
     <li>power_usb_stat<br>
@@ -4538,7 +4542,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>power_battery_stat<br>
         Statusinformation f&uuml;r die Batterie (wenn vorhanden): present (0|1), online (0|1), voltage, current, actual capacity<br>
         Beispiel:<br>
-    		<code>power_battery_stat: 1 1 4.807 264 100</code><br>
+        <code>power_battery_stat: 1 1 4.807 264 100</code><br>
     </li>
     <br>
     <li>power_battery_text<br>
@@ -4548,8 +4552,8 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>power_battery_info<br>
         Menschenlesbare Zusatzinformationen  f&uuml;r die Batterie (wenn vorhanden): Technologie, Kapazit&auml;t, Status, Zustand, Gesamtkapazit&auml;t<br>
         Beispiel:<br>
-    		<code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
-    		Die Kapazit&auml;t soll in script.bin (z.B. ct-hdmi.bin) eingestellt werden (Parameter pmu_battery_cap). Mit bin2fex konvertieren (bin2fex -> script.fex -> edit -> fex2bin -> script.bin)<br>
+        <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
+        Die Kapazit&auml;t soll in script.bin (z.B. ct-hdmi.bin) eingestellt werden (Parameter pmu_battery_cap). Mit bin2fex konvertieren (bin2fex -> script.fex -> edit -> fex2bin -> script.bin)<br>
     </li>
     <br>    
   <br>
