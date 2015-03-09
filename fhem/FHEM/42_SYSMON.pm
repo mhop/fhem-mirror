@@ -1417,21 +1417,22 @@ SYSMON_getUptime($$)
 
   #my $uptime_str = qx(cat /proc/uptime );
   my $uptime_str = SYSMON_execute($hash, "cat /proc/uptime");
-  my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
-  if(int($uptime)!=0) {
-    # Anzahl Cores beruecksichtigen
-    my $core_num = SYSMON_getCPUCoreNum($hash);
-    my $idle_percent = $idle/($uptime*$core_num)*100;
-
-    $map->{+UPTIME}=sprintf("%d",$uptime);
-    #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
-    $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
-
-    $map->{+IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
-    $map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
-    #$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
-  }
-  
+  if(defined($uptime_str)) {
+    my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
+    if(defined($uptime) && int($uptime)!=0) {
+      # Anzahl Cores beruecksichtigen
+      my $core_num = SYSMON_getCPUCoreNum($hash);
+      my $idle_percent = $idle/($uptime*$core_num)*100;
+    
+      $map->{+UPTIME}=sprintf("%d",$uptime);
+      #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
+      $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
+    
+      $map->{+IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
+      $map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
+      #$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
+    }
+  }  
   return $map;
 }
 
@@ -1446,37 +1447,41 @@ SYSMON_getUptime2($$)
 
 #TODO
   my $uptime = SYSMON_execute($hash,"uptime");
-  
-  #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>".$uptime."<");
 
-  #$uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+))/ );
-  $uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+)).*load.*: (.*)/ );
-  $uptime = "0 days, $uptime" if( $uptime && !$2);
-
-  
+  if(defined($uptime)){
+    #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>".$uptime."<");
+    
+    #$uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+))/ );
+    $uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+)).*load.*: (.*)/ );
+    $uptime = "0 days, $uptime" if( $uptime && !$2);
+    
+    
     my $days = $3?$3:0;
     my $hours = $4;
     my $minutes = $5;
-
+    
     $uptime = $days * 24;
     $uptime += $hours;
     $uptime *= 60;
     $uptime += $minutes;
     $uptime *= 60;
+    
+    
+    $map->{+UPTIME}=sprintf("%d",$uptime);
+    $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
+    
+    my $loadavg=$6;
+    my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($loadavg));
+    if(defined($la1) && defined($la5) && defined($la15)) {
+      $la1 =~ s/,$//; 
+      $la5 =~ s/,$//; 
+      $la1 =~ s/,/./; 
+      $la5 =~ s/,/./; 
+      $la15 =~ s/,/./; 
+      $map->{+LOADAVG}="$la1 $la5 $la15";
+    }
+  }
   
- 
-  $map->{+UPTIME}=sprintf("%d",$uptime);
-  $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
-
-  my $loadavg=$6;
-  my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($loadavg));
-  $la1 =~ s/,$//; 
-  $la5 =~ s/,$//; 
-  $la1 =~ s/,/./; 
-  $la5 =~ s/,/./; 
-  $la15 =~ s/,/./; 
-  $map->{+LOADAVG}="$la1 $la5 $la15";
-
   return $map;
 }
 
@@ -1947,16 +1952,13 @@ sub SYSMON_getRamAndSwap($$)
   $map->{+RAM} = $ram;
   
   # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
-  if(defined($total2) && $total2 > 0)
-  {
+  if(defined($total2) && $total2 > 0 && defined($used2) && defined($free2)) {
     $total2   = $total2 / 1024;
     $used2    = $used2 / 1024;
     $free2    = $free2 / 1024;
   
     $swap = sprintf("Total: %.2f MB, Used: %.2f MB,  %.2f %%, Free: %.2f MB", $total2, $used2, ($used2 / $total2 * 100), $free2);
-  }
-  else
-  {
+  } else {
     $swap = "n/a"
   }
 
