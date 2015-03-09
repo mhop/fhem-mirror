@@ -190,7 +190,7 @@
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>deprecated</Validity>
 			<UIntValue>
 				<ID>Major</ID>
 				<Description>Different major version means incompatible changes.</Description>
@@ -221,6 +221,76 @@
 			</UIntValue>
 		</Message>
 		<Message>
+			<Name>DeviceInfo</Name>
+			<Description>Reports DeviceType and current firmware version. Version information is only available when set in source code, which is usually only done for official builds by the build robot.</Description>
+			<MessageID>2</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<EnumValue>
+				<ID>DeviceType</ID>
+				<Description>The DeviceType can be used to adapt the behavior or representation of the SHC device at the server software (e.g. FHEM).</Description>
+				<Bits>8</Bits>
+				<Element>
+					<Value>0</Value>
+					<Name>BaseStation</Name>
+				</Element>
+				<Element>
+					<Value>20</Value>
+					<Name>EnvSensor</Name>
+				</Element>
+				<Element>
+					<Value>40</Value>
+					<Name>PowerSwitch</Name>
+				</Element>
+				<Element>
+					<Value>50</Value>
+					<Name>RGBDimmer</Name>
+				</Element>
+				<Element>
+					<Value>60</Value>
+					<Name>Dimmer</Name>
+				</Element>
+				<Element>
+					<Value>70</Value>
+					<Name>SoilMoistureMeter</Name>
+				</Element>
+				<Element>
+					<Value>80</Value>
+					<Name>Thermostat</Name>
+				</Element>
+			</EnumValue>
+			<UIntValue>
+				<ID>VersionMajor</ID>
+				<Description>Different major version means incompatible changes.</Description>
+				<Bits>8</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>255</MaxVal>
+			</UIntValue>
+			<UIntValue>
+				<ID>VersionMinor</ID>
+				<Description>Different minor number means new functionality without breaking compatibility.</Description>
+				<Bits>8</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>255</MaxVal>
+			</UIntValue>
+			<UIntValue>
+				<ID>VersionPatch</ID>
+				<Description>The patch version is changed when backwards-compatible bug fixes are made.</Description>
+				<Bits>8</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>255</MaxVal>
+			</UIntValue>
+			<UIntValue>
+				<ID>VersionHash</ID>
+				<Description>The beginning of the revision ID hash (as reported by Git).</Description>
+				<Bits>32</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>4294967295</MaxVal>
+			</UIntValue>
+		</Message>
+		<Message>
 			<Name>BatteryStatus</Name>
 			<Description>Tells the current battery status in percent. Please note that the "Get" may not be answered because a device does not listen to requests.</Description>
 			<MessageID>5</MessageID>
@@ -242,8 +312,8 @@
 		<Description>This group contains messages for general I/O functions. The meaning of the values is not known to the SHC devices. It depends on the connected parts (e.g. switches). The values have to be processed by the user/server software appropriately.</Description>
 		<MessageGroupID>1</MessageGroupID>
 		<Message>
-			<Name>DigitalPin</Name>
-			<Description>This is the state of up to 8 pins.</Description>
+			<Name>DigitalPort</Name>
+			<Description>This is the state of the complete digital port, containing up to 8 pins.</Description>
 			<MessageID>1</MessageID>
 			<MessageType>0</MessageType>
 			<MessageType>1</MessageType>
@@ -261,9 +331,88 @@
 			</Array>
 		</Message>
 		<Message>
-			<Name>AnalogPin</Name>
-			<Description>This is the voltage of up to 8 ADC channels. The ATMega328 in the PDIP package has only 6 ADCs and one ADC may be blocked by the battery voltage measurement, so there may be less than 8 ADC values reported depending on the device and configuration.</Description>
+			<Name>DigitalPortTimeout</Name>
+			<Description>This is the state of the complete digital port, containing up to 8 pins, including a timeout value per pin.</Description>
 			<MessageID>2</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<Array>
+				<Length>8</Length>
+				<BoolValue>
+					<ID>On</ID>
+					<Description>Tells if the pin is on (at high level) or not (low level).</Description>
+				</BoolValue>
+				<UIntValue>
+					<ID>TimeoutSec</ID>
+					<Description>The time after which the switch is automatically toggled again. Use 0 to disable this.</Description>
+					<Bits>16</Bits>
+					<MinVal>0</MinVal>
+					<MaxVal>65535</MaxVal>
+				</UIntValue>
+			</Array>
+		</Message>
+		<Message>
+			<Name>DigitalPin</Name>
+			<Description>This represents the state of one pin of the digital port.</Description>
+			<MessageID>5</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>Pos</ID>
+				<Description>The number of the pin in the port.</Description>
+				<Bits>3</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>7</MaxVal>
+			</UIntValue>
+			<BoolValue>
+				<ID>On</ID>
+				<Description>Tells if the pin is on (at high level) or not (low level).</Description>
+			</BoolValue>
+		</Message>
+		<Message>
+			<Name>DigitalPinTimeout</Name>
+			<Description>This represents the state of one pin of the digital port, including a timeout value.</Description>
+			<MessageID>6</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>Pos</ID>
+				<Description>The number of the pin in the port.</Description>
+				<Bits>3</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>7</MaxVal>
+			</UIntValue>
+			<BoolValue>
+				<ID>On</ID>
+				<Description>Tells if the pin is on (at high level) or not (low level).</Description>
+			</BoolValue>
+			<UIntValue>
+				<ID>TimeoutSec</ID>
+				<Description>The time after which the switch is automatically toggled again. Use 0 to disable this.</Description>
+				<Bits>16</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>65535</MaxVal>
+			</UIntValue>
+		</Message>
+		<Message>
+			<Name>AnalogPort</Name>
+			<Description>This is the voltage of up to 8 ADC channels. The ATMega328 in the PDIP package has only 6 ADCs and one ADC may be blocked by the battery voltage measurement, so there may be less than 8 ADC values reported depending on the device and configuration.</Description>
+			<MessageID>10</MessageID>
 			<MessageType>0</MessageType>
 			<MessageType>1</MessageType>
 			<MessageType>2</MessageType>
@@ -277,9 +426,6 @@
 					<ID>On</ID>
 					<Description>Tells if the pin is on (voltage over trigger threshold) or not.</Description>
 				</BoolValue>
-			</Array>
-			<Array>
-				<Length>8</Length>
 				<UIntValue>
 					<ID>Voltage</ID>
 					<Description>This is the voltage level in mV.</Description>
@@ -356,6 +502,22 @@
 				<MaxVal>32767</MaxVal>
 			</IntValue>
 		</Message>
+		<Message>
+			<Name>Humidity</Name>
+			<Description>This is a message containing humidity.</Description>
+			<MessageID>4</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>Humidity</ID>
+				<Description>relative humidity permill, 0..1000 (other values not defined)</Description>
+				<Bits>10</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>1000</MaxVal>
+			</UIntValue>
+		</Message>
 	</MessageGroup>
 	<MessageGroup>
 		<Name>Environment</Name>
@@ -408,7 +570,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>deprecated</Validity>
 			<BoolValue>
 				<ID>On</ID>
 				<Description>Tells if the switch is on (active).</Description>
@@ -431,7 +593,7 @@
 			<MessageType>8</MessageType>
 			<MessageType>9</MessageType>
 			<MessageType>10</MessageType>
-			<Validity>test</Validity>
+			<Validity>deprecated</Validity>
 			<Array>
 				<Length>8</Length>
 				<BoolValue>

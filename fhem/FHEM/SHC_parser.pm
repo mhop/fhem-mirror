@@ -3,7 +3,7 @@
 ##########################################################################
 # This file is part of the smarthomatic module for FHEM.
 #
-# Copyright (c) 2014 Uwe Freese
+# Copyright (c) 2014, 2015 Uwe Freese
 #
 # You can find smarthomatic at www.smarthomatic.org.
 # You can find FHEM at www.fhem.de.
@@ -30,11 +30,12 @@
 # Receiving packets:
 # ------------------
 # 1.) Receive string from base station (over UART).
-# 2.) Parse received string:
-#     $parser->parse("Packet Data: SenderID=22;...");
-# 3.) Get MessageGroupName: my $grp = $parser->getMessageGroupName();
-# 4.) Get MessageName: my $msg = $parser->getMessageName();
-# 5.) Get data fields depending on MessageGroupName and MessageName, e.g.
+# 2.) Check CRC (last 8 characters, optional).
+# 3.) Parse received string:
+#     $parser->parse("PKT:SID=22;...");
+# 4.) Get MessageGroupName: my $grp = $parser->getMessageGroupName();
+# 5.) Get MessageName: my $msg = $parser->getMessageName();
+# 6.) Get data fields depending on MessageGroupName and MessageName, e.g.
 #     $val = $parser->getField("Temperature");
 #
 # Sending packets:
@@ -44,6 +45,7 @@
 # 2.) Set fields:
 #     $parser->setField("PowerSwitch", "SwitchState", "TimeoutSec", 8);
 # 3.) Get send string: $str = $parser->getSendString($receiverID);
+#     It includes a CRC32 as last 8 characters.
 # 4.) Send string to base station (over UART).
 ##########################################################################
 # $Id$
@@ -54,6 +56,7 @@ use strict;
 use feature qw(switch);
 use XML::LibXML;
 use SHC_datafields;
+use Digest::CRC qw(crc32); # linux packet libdigest-crc-perl
 
 # Hash for data field definitions.
 my %dataFields = ();
@@ -250,10 +253,10 @@ sub parse
   if (
     (
       $msg =~
-/^Packet Data: SenderID=(\d*);PacketCounter=(\d*);MessageType=(\d*);MessageGroupID=(\d*);MessageID=(\d*);MessageData=([^;]*);.*/
+/^PKT:SID=(\d+);PC=(\d+);MT=(\d+);MGID=(\d+);MID=(\d+);MD=([^;]+);.*/
     )
     || ($msg =~
-/^Packet Data: SenderID=(\d*);PacketCounter=(\d*);MessageType=(\d*);AckSenderID=\d*;AckPacketCounter=\d*;Error=\d*;MessageGroupID=(\d*);MessageID=(\d*);MessageData=([^;]*);.*/
+/^PKT:SID=(\d+);PC=(\d+);MT=(\d+);ASID=\d+;APC=\d+;E=\d+;MGID=(\d+);MID=(\d+);MD=([^;]+);.*/
     )
     )
   {
@@ -311,6 +314,9 @@ sub getMessageData
       $res .= sprintf("%02X", $_);
     }
 
+	# strip trailing zeros (pairwise)
+	$res =~ s/(00)+$//;
+
     return $res;
   } else {
     return $self->{_messageData};
@@ -365,8 +371,8 @@ sub setField
   $obj->setValue(\@msgData, $value, $index);
 }
 
-# sKK01RRRRGGMMDD
-# s0001003D3C0164 = SET    Dimmer Switch Brightness 50%
+# cKK01RRRRGGMMDD{CRC32}
+# c0001003D3C0164 = SET    Dimmer Switch Brightness 50%
 sub getSendString
 {
   my ($self, $receiverID, $aesKeyNr) = @_;
@@ -382,13 +388,15 @@ sub getSendString
     $aesKeyNr = 0;
   }
 
-  my $s = "s"
+  my $s = "c"
     . sprintf("%02X", $aesKeyNr)
     . sprintf("%02X", $self->{_messageTypeID})
     . sprintf("%04X", $receiverID)
     . sprintf("%02X", $self->{_messageGroupID})
     . sprintf("%02X", $self->{_messageID})
     . getMessageData();
+  
+  return $s . sprintf("%08x", crc32($s));
 }
 
 1;

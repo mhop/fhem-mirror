@@ -1,7 +1,8 @@
 ##########################################################################
 # This file is part of the smarthomatic module for FHEM.
 #
-# Copyright (c) 2014 Stefan Baumann, Uwe Freese
+# Copyright (c) 2014 Stefan Baumann
+#               2014..2015 Uwe Freese
 #
 # You can find smarthomatic at www.smarthomatic.org.
 # You can find FHEM at www.fhem.de.
@@ -33,37 +34,41 @@ use SHC_parser;
 my $parser = new SHC_parser();
 
 my %dev_state_icons = (
-  "PowerSwitch" => "on:on:toggle off:off:toggle set.*:light_question:off",
-  "Dimmer"      => "on:on off:off set.*:light_question:off",
-  "EnvSensor"   => undef,
-  "RGB_Dimmer"  => undef
+  "PowerSwitch"         => ".*1\\d{7}:on:off .*0\\d{7}:off:on set.*:light_question:off",
+  "Dimmer"              => "on:on off:off set.*:light_question:off",
+  "EnvSensor"           => undef,
+  "RGBDimmer"           => undef,
+  "SoilMoistureMeter"   => ".*H:\\s\\d\\..*:ampel_rot"
 );
 
 my %web_cmds = (
-  "PowerSwitch" => "on:off:toggle:statusRequest",
-  "Dimmer"      => "on:off:statusRequest",
-  "EnvSensor"   => undef,
-  "RGB_Dimmer"  => undef
+  "PowerSwitch"         => "on:off:toggle:statusRequest",
+  "Dimmer"              => "on:off:statusRequest",
+  "EnvSensor"           => undef,
+  "RGBDimmer"           => undef,
+  "SoilMoistureMeter"   => undef
 );
 
 # Array format: [ reading1, str_format1, reading2, str_format2 ... ]
 # "on" reading translates 0 -> "off"
 #                         1 -> "on"
 my %dev_state_format = (
-  "PowerSwitch" => ["on", ""],
-  "Dimmer"      => ["on", "", "brightness", "B: "],
-  "EnvSensor"   => [    # Results in "T: 23.4 H: 27.3 Baro: 978.34 B: 45"
+  "PowerSwitch"         => ["port", "Port: "],
+  "Dimmer"              => ["on", "", "brightness", "B: "],
+  "EnvSensor"           => [    # Results in "T: 23.4 H: 27.3 Baro: 978.34 B: 45"
     "temperature",         "T: ",
     "humidity",            "H: ",
     "barometric_pressure", "Baro: ",
     "brightness",          "B: ",
     "distance",            "D: ",
-    "dins",                "Din: ",
+    "port",                "Port: ",
     "ains",                "Ain: "
   ],
-  "RGB_Dimmer"  => [
-    "color",               "Color: "
-  ]
+  "RGBDimmer"           => [
+    "color",               "Color: ",
+    "brightness",          "Brightness: "
+  ],
+  "SoilMoistureMeter"   => ["humidity", "H: "]
 );
 
 # Supported set commands
@@ -71,19 +76,23 @@ my %dev_state_format = (
 # use "cmd_name:cmd_additional_info"
 #     cmd_additional_info: Description available at http://www.fhemwiki.de/wiki/DevelopmentModuleIntro#X_Set
 my %sets = (
-  "PowerSwitch" => "on:noArg off:noArg toggle:noArg statusRequest:noArg " .
-                   # Used from SetExtensions.pm
-                   "blink on-for-timer on-till off-for-timer off-till intervals",
-  "Dimmer"      => "on:noArg off:noArg toggle:noArg statusRequest:noArg pct:slider,0,1,100 ani " .
-                   # Used from SetExtensions.pm
-                   "blink on-for-timer on-till off-for-timer off-till intervals",
-  "EnvSensor"   => "",
-  "RGB_Dimmer"  => "Color " .
-                   "ColorAnimation",
-  "Custom"      => "PowerSwitch.SwitchState " .
-                   "PowerSwitch.SwitchStateExt " .
-                   "Dimmer.Brightness " .
-                   "Dimmer.Animation"
+  "PowerSwitch"         => "on:noArg off:noArg toggle:noArg statusRequest:noArg " .
+                           # Used from SetExtensions.pm
+                           "blink on-for-timer on-till off-for-timer off-till intervals " .
+                           "DigitalPort " .
+                           "DigitalPortTimeout " .
+                           "DigitalPin " .
+                           "DigitalPinTimeout",
+  "Dimmer"              => "on:noArg off:noArg toggle:noArg statusRequest:noArg pct:slider,0,1,100 ani " .
+                           # Used from SetExtensions.pm
+                           "blink on-for-timer on-till off-for-timer off-till intervals",
+  "EnvSensor"           => "",
+  "RGBDimmer"           => "Color " .
+                           "ColorAnimation " .
+                           "Dimmer.Brightness:slider,0,1,100",
+  "SoilMoistureMeter"   => "",
+  "Custom"              => "Dimmer.Brightness " .
+                           "Dimmer.Animation"
 );
 
 # Supported get commands
@@ -92,25 +101,8 @@ my %gets = (
   "PowerSwitch" => "",
   "Dimmer"      => "",
   "EnvSensor"   => "din:all,1,2,3,4,5,6,7,8 ain:all,1,2,3,4,5 ain_volt:1,2,3,4,5",
-  "RGB_Dimmer"  => "",
+  "RGBDimmer"   => "",
   "Custom"      => ""
-);
-
-# Hashtable for automatic device type assignment
-# Format:
-# "MessageGroupName:MessageName" => "Auto Device Type"
-my %auto_devtype = (
-  "Weather.Temperature"                   => "EnvSensor",
-  "Weather.HumidityTemperature"           => "EnvSensor",
-  "Weather.BarometricPressureTemperature" => "EnvSensor",
-  "Environment.Brightness"                => "EnvSensor",
-  "Environment.Distance"                  => "EnvSensor",
-  "GPIO.DigitalPin"                       => "EnvSensor",
-  "GPIO.AnalogPin"                        => "EnvSensor",
-  "PowerSwitch.SwitchState"               => "PowerSwitch",
-  "Dimmer.Brightness"                     => "Dimmer",
-  "Dimmer.Color"                          => "RGB_Dimmer",
-  "Dimmer.ColorAnimation"                 => "RGB_Dimmer"
 );
 
 sub SHCdev_Parse($$);
@@ -120,7 +112,7 @@ sub SHCdev_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}    = "^Packet Data: SenderID=[1-9]|0[1-9]|[1-9][0-9]|[0-9][0-9][0-9]|[0-3][0-9][0-9][0-9]|40[0-8][0-9]|409[0-6]";
+  $hash->{Match}    = "^PKT:SID=([1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-3][0-9][0-9][0-9]|40[0-8][0-9]|409[0-6]);";
   $hash->{SetFn}    = "SHCdev_Set";
   $hash->{GetFn}    = "SHCdev_Get";
   $hash->{DefFn}    = "SHCdev_Define";
@@ -130,7 +122,7 @@ sub SHCdev_Initialize($)
                        ." readonly:1"
                        ." forceOn:1"
                        ." $readingFnAttributes"
-                       ." devtype:EnvSensor,Dimmer,PowerSwitch,RGB_Dimmer";
+                       ." devtype:EnvSensor,Dimmer,PowerSwitch,RGBDimmer,SoilMoistureMeter";
 }
 
 #####################################
@@ -198,7 +190,7 @@ sub SHCdev_Parse($$)
   my $name = $hash->{NAME};
 
   if (!$parser->parse($msg)) {
-    Log3 $hash, 4, "SHC_TEMP: parser error: $msg";
+    Log3 $name, 1, "$name: Parser error: $msg";
     return "";
   }
 
@@ -210,7 +202,7 @@ sub SHCdev_Parse($$)
   my $rname        = $rhash ? $rhash->{NAME} : $raddr;
 
   if (!$modules{SHCdev}{defptr}{$raddr}) {
-    Log3 $name, 3, "SHC_TEMP: Unknown device $rname, please define it";
+    Log3 $name, 3, "$name: Unknown device $rname, please define it";
     return "UNDEFINED SHCdev_$rname SHCdev $raddr";
   }
 
@@ -234,9 +226,6 @@ sub SHCdev_Parse($$)
   given ($msggroupname) {
     when ('Generic') {
       given ($msgname) {
-        when ('BatteryStatus') {
-          readingsBulkUpdate($rhash, "battery", $parser->getField("Percentage"));
-        }
         when ('Version') {
           my $major = $parser->getField("Major");
           my $minor = $parser->getField("Minor");
@@ -245,21 +234,60 @@ sub SHCdev_Parse($$)
 
           readingsBulkUpdate($rhash, "version", "$major.$minor.$patch-$vhash");
         }
+		when ('DeviceInfo') {
+		  my $devtype = $parser->getField("DeviceType");
+          my $major = $parser->getField("VersionMajor");
+          my $minor = $parser->getField("VersionMinor");
+          my $patch = $parser->getField("VersionPatch");
+          my $vhash = $parser->getField("VersionHash");
+
+		  # Assign device type
+		  my $devtypeOld = AttrVal( $rname, "devtype", undef );
+		  if (!defined($devtypeOld)) {
+			$attr{$rname}{devtype} = $devtype;
+			Log3 $name, 3, "$rname: Assign device type = " . $attr{$rname}{devtype};
+		  }
+
+          readingsBulkUpdate($rhash, "version", "$major.$minor.$patch-$vhash");
+        }
+		when ('BatteryStatus') {
+          readingsBulkUpdate($rhash, "battery", $parser->getField("Percentage"));
+        }
       }
     }
     when ('GPIO') {
       given ($msgname) {
-        when ('DigitalPin') {
+        when ('DigitalPortTimeout') {
+          my $pins = "";
+          for (my $i = 0 ; $i < 8 ; $i++) {
+            my $pinx = $parser->getField("On", $i);
+            my $timeoutx = $parser->getField("TimeoutSec", $i);
+            my $channel = $i + 1;
+			if ($channel == 1)
+			{
+				readingsBulkUpdate($rhash, "on", $pinx);
+			}
+            readingsBulkUpdate($rhash, "pin" . $channel, $pinx);
+            readingsBulkUpdate($rhash, "timeout" . $channel, $timeoutx);
+            $pins .= $pinx;
+          }
+          readingsBulkUpdate($rhash, "port", $pins);
+        }
+        when ('DigitalPort') {
           my $pins = "";
           for (my $i = 0 ; $i < 8 ; $i++) {
             my $pinx = $parser->getField("On", $i);
             my $channel = $i + 1;
-            readingsBulkUpdate($rhash, "din" . $channel, $pinx);
+			if ($channel == 1)
+			{
+				readingsBulkUpdate($rhash, "on", $pinx);
+			}
+            readingsBulkUpdate($rhash, "pin" . $channel, $pinx);
             $pins .= $pinx;
           }
-          readingsBulkUpdate($rhash, "dins", $pins);
+          readingsBulkUpdate($rhash, "port", $pins);
         }
-        when ('AnalogPin') {
+        when ('AnalogPort') {
           my $pins = "";
           for (my $i = 0 ; $i < 5 ; $i++) {
             my $pinx_on = $parser->getField("On", $i);
@@ -294,6 +322,11 @@ sub SHCdev_Parse($$)
           readingsBulkUpdate($rhash, "barometric_pressure", $bar);
           readingsBulkUpdate($rhash, "temperature",         $tmp);
         }
+        when ('Humidity') {
+          my $hum = $parser->getField("Humidity") / 10;        # parser returns 1/10 percent
+
+          readingsBulkUpdate($rhash, "humidity",    $hum);
+        }
       }
     }
     when ('Environment') {
@@ -305,17 +338,6 @@ sub SHCdev_Parse($$)
         when ('Distance') {
           my $brt = $parser->getField("Distance");
           readingsBulkUpdate($rhash, "distance", $brt);
-        }
-      }
-    }
-    when ('PowerSwitch') {
-      given ($msgname) {
-        when ('SwitchState') {
-          my $on      = $parser->getField("On");
-          my $timeout = $parser->getField("TimeoutSec");
-
-          readingsBulkUpdate($rhash, "on",      $on);
-          readingsBulkUpdate($rhash, "timeout", $timeout);
         }
       }
     }
@@ -346,13 +368,6 @@ sub SHCdev_Parse($$)
         }
       }
     }
-  }
-
-  # Autoassign device type
-  my $devtype = AttrVal( $rname, "devtype", undef );
-  if (!defined($devtype) && (defined($auto_devtype{"$msggroupname.$msgname"}))) {
-    $attr{$rname}{devtype} = $auto_devtype{"$msggroupname.$msgname"};
-    Log3 $name, 3, "$rname: Autoassign device type = " . $attr{$rname}{devtype};
   }
 
   # If the devtype is defined add, if not already done, the according webCmds and devStateIcons
@@ -446,23 +461,56 @@ sub SHCdev_Set($@)
       # is able to do this as well. Even more it supports intervals, off-for-timer, off-till ...
 
       if ($cmd eq 'toggle') {
-        $cmd = ReadingsVal($name, "state", "on") eq "off" ? "on" : "off";
+		$cmd = ReadingsVal($name, "on", "0") eq "0" ? "on" : "off";
       }
 
       if (!$readonly && $cmd eq 'off') {
         readingsSingleUpdate($hash, "state", "set-$cmd", 1);
-        $parser->initPacket("PowerSwitch", "SwitchState", "SetGet");
-        $parser->setField("PowerSwitch", "SwitchState", "TimeoutSec", 0);
-        $parser->setField("PowerSwitch", "SwitchState", "On",         0);
+        $parser->initPacket("GPIO", "DigitalPin", "SetGet");
+        $parser->setField("GPIO", "DigitalPin", "Pos", 0);
+        $parser->setField("GPIO", "DigitalPin", "On", 0);
         SHCdev_Send($hash);
       } elsif (!$readonly && $cmd eq 'on') {
         readingsSingleUpdate($hash, "state", "set-$cmd", 1);
-        $parser->initPacket("PowerSwitch", "SwitchState", "SetGet");
-        $parser->setField("PowerSwitch", "SwitchState", "TimeoutSec", 0);
-        $parser->setField("PowerSwitch", "SwitchState", "On",         1);
+        $parser->initPacket("GPIO", "DigitalPin", "SetGet");
+        $parser->setField("GPIO", "DigitalPin", "Pos", 0);
+        $parser->setField("GPIO", "DigitalPin", "On", 1);
         SHCdev_Send($hash);
       } elsif ($cmd eq 'statusRequest') {
-        $parser->initPacket("PowerSwitch", "SwitchState", "Get");
+        $parser->initPacket("GPIO", "DigitalPin", "Get");
+        SHCdev_Send($hash);
+      } elsif ($cmd eq 'DigitalPort') {
+        $parser->initPacket("GPIO", "DigitalPort", "SetGet");
+        # if not enough (less than 8) pinbits are available use zero as default
+        my $pinbits = $arg . "00000000";
+        for (my $i = 0 ; $i < 8 ; $i = $i + 1) {
+          $parser->setField("GPIO", "DigitalPort", "On", substr($pinbits, $i , 1), $i);
+        }
+        SHCdev_Send($hash);
+      } elsif ($cmd eq 'DigitalPortTimeout') { # TODO implement correctly
+        $parser->initPacket("GPIO", "DigitalPortTimeout", "SetGet");
+        # if not enough (less than 8) pinbits are available use zero as default
+        my $pinbits = $arg . "00000000";
+        for (my $i = 0 ; $i < 8 ; $i = $i + 1) {
+          my $pintimeout = "0";   # default value for timeout
+          if (exists  $aa[$i + 2]) {
+            $pintimeout = $aa[$i + 2];
+          }
+          Log3 $name, 3, "$name: $i: Pin: " . substr($pinbits, $i , 1) . " Timeout: $pintimeout";
+          $parser->setField("GPIO", "DigitalPortTimeout", "On", substr($pinbits, $i , 1), $i);
+          $parser->setField("GPIO", "DigitalPortTimeout", "TimeoutSec", $pintimeout, $i);
+        }
+        SHCdev_Send($hash);
+      } elsif ($cmd eq 'DigitalPin') {
+        $parser->initPacket("GPIO", "DigitalPin", "SetGet");
+        $parser->setField("GPIO", "DigitalPin", "Pos", $arg);
+        $parser->setField("GPIO", "DigitalPin", "On", $arg2);
+        SHCdev_Send($hash);
+      } elsif ($cmd eq 'DigitalPinTimeout') {
+        $parser->initPacket("GPIO", "DigitalPinTimeout", "SetGet");
+        $parser->setField("GPIO", "DigitalPinTimeout", "Pos", $arg);
+        $parser->setField("GPIO", "DigitalPinTimeout", "On", $arg2);
+        $parser->setField("GPIO", "DigitalPinTimeout", "TimeoutSec", $arg3);
         SHCdev_Send($hash);
       } else {
         return SetExtensions($hash, "", $name, @aa);
@@ -519,7 +567,7 @@ sub SHCdev_Set($@)
         return SetExtensions($hash, "", $name, @aa);
       }
     }
-    when ('RGB_Dimmer') {
+    when ('RGBDimmer') {
       if ($cmd eq 'Color') {
         #TODO Verify argument values
         my $color = $arg;
@@ -561,6 +609,16 @@ sub SHCdev_Set($@)
           $parser->setField("Dimmer", "ColorAnimation", "Color", $curcolor, $i);
         }
         readingsSingleUpdate($hash, "state", "set-coloranimation", 1);
+        SHCdev_Send($hash);
+      } elsif ($cmd eq 'Dimmer.Brightness') {
+        my $brightness = $arg;
+
+        # DEBUG
+        # Log3 $name, 3, "$name: Args: $arg, $arg2, $arg3, $brightness";
+
+        readingsSingleUpdate($hash, "state", "set-brightness:$brightness", 1);
+        $parser->initPacket("Dimmer", "Brightness", "SetGet");
+        $parser->setField("Dimmer", "Brightness", "Brightness", $brightness);
         SHCdev_Send($hash);
       } else {
         return SetExtensions($hash, "", $name, @aa);
@@ -605,10 +663,10 @@ sub SHCdev_Get($@)
         }
         elsif ($arg eq "all")
         {
-          if ( defined($hash->{READINGS}{dins})
-            && defined($hash->{READINGS}{dins}{VAL}))
+          if ( defined($hash->{READINGS}{port})
+            && defined($hash->{READINGS}{port}{VAL}))
           {
-            return "$name.dins => " . $hash->{READINGS}{dins}{VAL};
+            return "$name.port => " . $hash->{READINGS}{port}{VAL};
           }
           return "Error: \"input all\" readings not yet available or not supported by device";
         }
@@ -676,7 +734,7 @@ sub SHCdev_Send($)
 <h3>SHCdev</h3>
 <ul>
   SHC is the device module that supports several device types available 
-  at <a href="http://http://www.smarthomatic.org">www.smarthomatic.org</a>.<br><br>
+  at <a href="http://www.smarthomatic.org">www.smarthomatic.org</a>.<br><br>
 
   These device are connected to the FHEM server through the SHC base station (<a href="#SHC">SHC</a>).<br><br>
   Currently supported are:<br>
@@ -684,6 +742,8 @@ sub SHCdev_Send($)
     <li>EnvSensor</li>
     <li>PowerSwitch</li>
     <li>Dimmer</li>
+    <li>RGBDimmer</li>
+    <li>SoilMoistureMeter</li>
   </ul><br>
 
   <a name="SHCdev_Define"></a>
@@ -707,10 +767,10 @@ sub SHCdev_Send($)
   <b>Set</b>
   <ul>
     <li>on<br>
-        Supported by Dimmer and PowerSwitch.
+        Supported by Dimmer and PowerSwitch (on always refers to pin1).
     </li><br>
     <li>off<br>
-        Supported by Dimmer, PowerSwitch.
+        Supported by Dimmer and PowerSwitch (off always refers to pin1).
     </li><br>
     <li>pct &lt;0..100&gt;<br>
         Sets the brightness in percent. Supported by Dimmer.
@@ -725,12 +785,36 @@ sub SHCdev_Send($)
     <li>Color &lt;ColorNumber&gt;<br>
         A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Dimmer_Color">www.smarthomatic.org</a>
         The color palette can be found <a href="http://www.smarthomatic.org/devices/rgb_dimmer.html">here</a>
-        Supported by RGB_Dimmer.
+        Supported by RGBDimmer.
     </li><br>
     <li>ColorAnimation &lt;Repeat&gt; &lt;AutoReverse&gt; &lt;Time0&gt; &lt;ColorNumber0&gt; &lt;Time1&gt; &lt;ColorNumber1&gt; ... up to 10 time/color pairs<br>
         A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Dimmer_ColorAnimation">www.smarthomatic.org</a>
         The color palette can be found <a href="http://www.smarthomatic.org/devices/rgb_dimmer.html">here</a>
-        Supported by RGB_Dimmer.
+        Supported by RGBDimmer.
+    </li><br>
+    <li>DigitalPin &lt;Pos&gt; &lt;On&gt;<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPin">www.smarthomatic.org</a>
+        Supported by PowerSwitch.
+    </li><br>
+    <li>DigitalPinTimeout &lt;Pos&gt; &lt;On&gt; &lt;Timeout&gt;<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPinTimeout">www.smarthomatic.org</a>
+        Supported by PowerSwitch.
+    </li><br>
+    <li>DigitalPort &lt;On&gt;<br>
+        &lt;On&gt;<br>
+        is a bit array (0 or 1) describing the port state. If less than eight bits were provided zero is assumed.
+        Example: set SHC_device DigitalPort 10110000 will set pin0, pin2 and pin3 to 1.<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPort">www.smarthomatic.org</a>
+        Supported by PowerSwitch.
+    </li><br>
+    <li>DigitalPortTimeout &lt;On&gt; &lt;Timeout0&gt; .. &lt;Timeout7&gt;<br>
+        &lt;On&gt;<br>
+        is a bit array (0 or 1) describing the port state. If less than eight bits were provided zero is assumed.
+        Example: set SHC_device DigitalPort 10110000 will set pin0, pin2 and pin3 to 1.<br>
+        &lt;Timeout0&gt; .. &lt;Timeout7&gt;<br>
+        are the timeouts for each pin. If no timeout is provided zero is assumed.
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#GPIO_DigitalPortTimeout">www.smarthomatic.org</a>
+        Supported by PowerSwitch.
     </li><br>
     <li><a href="#setExtensions"> set extensions</a><br>
         Supported by Dimmer and PowerSwitch.</li>
@@ -764,7 +848,7 @@ sub SHCdev_Send($)
   <ul>
     <li>devtype<br>
       The device type determines the command set, default web commands and the
-      default devStateicon. Currently supported are: EnvSensor, Dimmer, PowerSwitch, RGB_Dimmer.<br><br>
+      default devStateicon. Currently supported are: EnvSensor, Dimmer, PowerSwitch, RGBDimmer, SoilMoistureMeter.<br><br>
 
       Note: If the device is not set manually, it will be determined automatically
       on reception of a device type specific message. For example: If a

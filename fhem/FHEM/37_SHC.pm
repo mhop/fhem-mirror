@@ -2,6 +2,7 @@
 # This file is part of the smarthomatic module for FHEM.
 #
 # Copyright (c) 2014 Stefan Baumann
+#               2015 Uwe Freese
 #
 # You can find smarthomatic at www.smarthomatic.org.
 # You can find FHEM at www.fhem.de.
@@ -26,6 +27,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use Digest::CRC qw(crc32); # linux packet libdigest-crc-perl
 
 sub SHC_Parse($$$$);
 sub SHC_Read($);
@@ -37,7 +39,7 @@ sub SHC_SimpleWrite(@);
 my $clientsSHC = ":SHCdev:BASE:xxx:";
 
 my %matchListSHC = (
-  "1:SHCdev" => "^Packet Data: SenderID=[1-9]|0[1-9]|[1-9][0-9]|[0-9][0-9][0-9]|[0-3][0-9][0-9][0-9]|40[0-8][0-9]|409[0-6]",    #1-4096 with leading zeros
+  "1:SHCdev" => "^PKT:SID=([1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-3][0-9][0-9][0-9]|40[0-8][0-9]|409[0-6]);",    #1-4096
   "2:xxx"     => "^\\S+\\s+22",
   "3:xxx"     => "^\\S+\\s+11",
   "4:xxx"     => "^\\S+\\s+9 ",
@@ -269,11 +271,15 @@ sub SHC_Parse($$$$)
 
   next if (!$dmsg || length($dmsg) < 1);    # Bogus messages
 
-  if ($dmsg !~ m/^Packet Data: SenderID=/) {
+  if ($dmsg =~ m/^PKT:SID=0;/) { # "echo" from message sent by FHEM itself
+  	return;
+  }
+  	
+  if ($dmsg !~ m/^PKT:SID=/) {
 
     # Messages just to dipose
-    if ( $dmsg =~ m/^\*\*\* Enter AES key nr/
-      || $dmsg =~ m/^\*\*\* Received character/)
+    if ( $dmsg =~ m/^\*\*\* Enter data/
+      || $dmsg =~ m/^\*\*\* 0x/)
     {
       return;
     }
@@ -294,9 +300,16 @@ sub SHC_Parse($$$$)
     # -Verbosity level 4
     if ( $dmsg =~ m/^Request added to queue/
       || $dmsg =~ m/^Request Buffer/
-      || $dmsg =~ m/^Request (q|Q)ueue/)
+      || $dmsg =~ m/^Request Queue/)
     {
       Log3 $name, 4, "$name: $dmsg";
+      return;
+    }
+	
+    # -Verbosity level 1
+    if ( $dmsg =~ m/^CRC Error/ )
+    {
+      Log3 $name, 1, "$name: $dmsg";
       return;
     }
 
@@ -305,6 +318,16 @@ sub SHC_Parse($$$$)
     return;
   }
 
+  # check CRC of "PKT:..." message and ignore message if necessary
+  my $crc = crc32(substr($dmsg, 4, length($dmsg) - 12));
+  $crc = sprintf("%08x", $crc);
+  
+  if ($crc ne substr($dmsg, length($dmsg) - 8))
+  {
+	Log3 $name, 1, "$name: CRC Error (" . $crc . ") $dmsg";
+	return;
+  }
+  
   $hash->{"${name}_MSGCNT"}++;
   $hash->{"${name}_TIME"} = TimeNow();
   $hash->{RAWMSG} = $rmsg;
