@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  SYSMON: ethernet readings on bbb (thx to nesges)
   - changed: 37_SHC: now add all files for the previous commit (rr2000)
   - feature: 37_SHC: add new support for SoilMoistureMeter and add
              support for DigPort and DigPin in Powerswitch (rr2000)
