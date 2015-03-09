@@ -1,0 +1,147 @@
+* {
+	-webkit-touch-callout:			none;			/* prevent callout to copy image, etc when tap to hold */
+	-webkit-text-size-adjust:		none;			/* prevent webkit from resizing text to fit */
+	-webkit-tap-highlight-color:	rgba(0,0,0,0);	/* make transparent link selection, adjust last value opacity 0 to 1.0 */
+	*-webkit-user-select:			none;			/* prevent copy paste, to allow, change 'none' to 'text' or 'auto' */
+}
+input, textarea {
+	-webkit-user-select:			auto;
+}
+
+.batteryIconWrapper .batteryIcon {
+	display: block;
+	background: transparent url('../icons/batteryIconSprite.png') no-repeat;
+	height: 32px;
+	width: 18px;
+	position: relative;
+}
+
+.batteryIconWrapper .txtPercent {
+	padding-top: 32px;
+	margin-left: -2px;
+	font-family: sans-serif;
+	color: #999999;
+	width: 25px;
+	text-align: center;
+	font-size: 10px;
+}
+
+.batteryIconWrapper .bat10green { background-position: 0px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat20green { background-position: -20px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat30green { background-position: -40px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat40green { background-position: -60px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat50green { background-position: -80px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat60green { background-position: -100px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat70green { background-position: -120px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat80green { background-position: -139px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat90green { background-position: -159px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat100green { background-position: -179px 0; width: 18px; height: 32px}
+.batteryIconWrapper .bat10yellow { background-position: 0 -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat20yellow { background-position: -20px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat30yellow { background-position: -40px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat40yellow { background-position: -60px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat50yellow { background-position: -80px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat60yellow { background-position: -100px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat70yellow { background-position: -120px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat80yellow { background-position: -139px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat90yellow { background-position: -159px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat100yellow { background-position: -179px -33px; width: 18px; height: 32px}
+.batteryIconWrapper .bat10red { background-position: 0 -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat20red { background-position: -20px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat30red { background-position: -40px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat40red { background-position: -60px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat50red { background-position: -80px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat60red { background-position: -100px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat70red { background-position: -120px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat80red { background-position: -139px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat90red { background-position: -159px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat100red { background-position: -179px -65px; width: 18px; height: 32px}
+.batteryIconWrapper .bat0 { background-position: 0 -98px; width: 18px; height: 32px}
+
+.batteryIconWrapper .acConnected {
+	background: transparent url('../icons/batteryIconSprite.png') no-repeat;
+	background-position: -20px -98px;
+	position: absolute;
+	height: 31px;
+	width: 22px;
+	top: -2px;
+	left: 11px;
+}
+
+.onlineIconWrapper .onlineIcon {
+	display: block;
+	background: transparent url('../icons/onlineIconSprite.png') no-repeat;
+	background-position: -19px 0;
+	height: 18px;
+	width: 18px;
+	position: relative;
+	margin-bottom: 10px;
+}
+
+.onlineIconWrapper .online { background-position: 0px 0; width: 18px; height: 18px}
+.onlineIconWrapper .offline { background-position: -19px 0; width: 18px; height: 18px}
+
+
+#voiceRecOuterWrapper, #voiceRecWrapper, #voiceRecImg, #voiceRecRing {
+	display: -webkit-box;
+	-webkit-box-pack: center;
+	-webkit-box-align: center;
+	padding: 0;
+	margin: 0;
+}
+
+#voiceRecOuterWrapper {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+
+#voiceRecWrapper {
+	width: 180px;
+	height: 180px;
+	background-color: rgba(68,68,68,0.8);
+	border: 2px solid #009EEE;
+	-webkit-border-radius: 10px;
+}
+
+#voiceRecImg {
+	background: url('../icons/mic_sprite.png') no-repeat -2px -2px;
+	width: 180px;
+	height: 180px;
+}
+#voiceRecImg.error {
+	background-position: -2px -362px;
+}
+#voiceRecImg.success {
+	background-position: -2px -182px;
+}
+
+#voiceRecState {
+	width: 180px;
+	margin-top: 130px;
+	text-align: center;
+	color: #FFFFFF;
+	font-family: sans-serif;
+	font-size: 1em;
+}
+
+#voiceRecRing {
+	border: 3px solid #009EEE;
+	-webkit-border-radius: 110px;
+
+	height: 110px;
+	width: 110px;
+
+	-webkit-animation: pulse 2s linear infinite;
+	opacity: 0.0
+}
+
+@-webkit-keyframes pulse {
+	0% { -webkit-transform: scale(1.0); opacity: 0.0; }
+	10% { opacity: 0.7; }
+	50% { opacity: 1.0; }
+	90% { opacity: 0.7; }
+	100% { -webkit-transform: scale(1.0); opacity: 0.0; }
+}

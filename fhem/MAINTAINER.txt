@@ -324,6 +324,7 @@ contrib/71_LISTENLIVE.pm     betateilchen         http://forum.fhem.de Multimedi
 contrib/98_geodata.pm        betateilchen         http://forum.fhem.de Sonstiges
 contrib/98_openweathermap.pm betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 contrib/98_PID.pm            betateilchen         http://forum.fhem.de Automatisierung
+contrib/WebViewControl/*     Dirk                 http://forum.fhem.de Mobile Devices
 
 www/codemirror/*             betateilchen         http://forum.fhem.de Frontends
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends
