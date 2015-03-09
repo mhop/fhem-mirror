@@ -10,7 +10,7 @@ input, textarea {
 
 .batteryIconWrapper .batteryIcon {
 	display: block;
-	background: transparent url('../icons/batteryIconSprite.png') no-repeat;
+	background: transparent url('../images/default/batteryIconSprite.png') no-repeat;
 	height: 32px;
 	width: 18px;
 	position: relative;
@@ -59,7 +59,7 @@ input, textarea {
 .batteryIconWrapper .bat0 { background-position: 0 -98px; width: 18px; height: 32px}
 
 .batteryIconWrapper .acConnected {
-	background: transparent url('../icons/batteryIconSprite.png') no-repeat;
+	background: transparent url('../images/default/batteryIconSprite.png') no-repeat;
 	background-position: -20px -98px;
 	position: absolute;
 	height: 31px;
@@ -70,7 +70,7 @@ input, textarea {
 
 .onlineIconWrapper .onlineIcon {
 	display: block;
-	background: transparent url('../icons/onlineIconSprite.png') no-repeat;
+	background: transparent url('../images/default/onlineIconSprite.png') no-repeat;
 	background-position: -19px 0;
 	height: 18px;
 	width: 18px;
@@ -107,7 +107,7 @@ input, textarea {
 }
 
 #voiceRecImg {
-	background: url('../icons/mic_sprite.png') no-repeat -2px -2px;
+	background: url('../images/default/mic_sprite.png') no-repeat -2px -2px;
 	width: 180px;
 	height: 180px;
 }
