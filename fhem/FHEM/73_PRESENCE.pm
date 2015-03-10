@@ -755,7 +755,7 @@ PRESENCE_DoLocalBluetoothScan($)
 {
     my ($string) = @_;
     my ($name, $device, $local) = split("\\|", $string);
-    my $hcitool = qx(which hcitool);
+
     my $devname;
     my $return;
     my $wait = 1;
@@ -764,16 +764,18 @@ PRESENCE_DoLocalBluetoothScan($)
 
     if(qx(ps --help 2>&1) =~ /BusyBox/g)
     {
-        Log3 $name, 5, "PRESENCE ($name): found busybox variant of ps command, using \"w\" as parameter";
+        Log3 $name, 5, "PRESENCE ($name) - found busybox variant of ps command, using \"w\" as parameter";
         $psargs = "w";
     }
     else
     {
-        Log3 $name, 5, "PRESENCE ($name): found standard variant of ps command, using \"ax\" as parameter";
+        Log3 $name, 5, "PRESENCE ($name) - found standard variant of ps command, using \"ax\" as parameter";
         $psargs = "ax";
     }
-
-    Log3 $name, 4, "PRESENCE ($name): 'which hcitool' returns: $hcitool";
+    
+    Log3 $name, 4, "PRESENCE ($name) - executing: which hcitool";
+    my $hcitool = qx(which hcitool);
+    Log3 $name, 4, "PRESENCE ($name) - 'which hcitool' returns: $hcitool";
     chomp $hcitool;
 
     if(-x $hcitool)
@@ -792,7 +794,8 @@ PRESENCE_DoLocalBluetoothScan($)
                 $wait = 0;
             }
         }
-    
+        
+        Log3 $name, 5, "PRESENCE ($name) - executing: hcitool name $device";
         $devname = qx(hcitool name $device);
 
         chomp($devname);
