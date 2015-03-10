@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  37_SHC: go back to last release version v0.9.0 (rr2000)
   - change:  SYSMON: prevent some warnings
   - bugfix:  SYSMON: ethernet readings on bbb (thx to nesges)
   - changed: 37_SHC: now add all files for the previous commit (rr2000)
