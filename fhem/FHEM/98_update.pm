@@ -153,7 +153,8 @@ doUpdate($$)
   my $cj = "$root/contrib/commandref_join.pl";
   if(-f $cj &&
      -f "$root/docs/commandref_frame.html" &&
-     -w "$root/docs/commandref.html") {
+     -w "$root/docs/commandref.html" &&
+     (AttrVal('global','exclude_from_update','') !~ m/commandref/) ) {
     $canJoin = 1;
   }
 
@@ -500,7 +501,9 @@ upd_initRestoreDirs($)
     <a name="exclude_from_update"></a>
     <li>exclude_from_update<br>
         Contains a space separated list of fileNames (regexps) which will be
-        excluded by an update.<br>
+        excluded by an update. The special value commandref will disable calling
+        commandref_join at the end, i.e commandref.html will be out of date.
+        The module-only documentation is not affected and is up-to-date.<br>
         Example:<br>
         <ul>
           attr global exclude_from_update 21_OWTEMP.pm FS20.off.png
@@ -589,6 +592,10 @@ upd_initRestoreDirs($)
     <li>exclude_from_update<br>
         Enth&auml;lt eine Liste durch Leerzeichen getrennter Dateinamen
         (regexp), welche nicht im update ber&uuml;cksichtigt werden.<br>
+        Falls der Wert commandref enth&auml;lt, dann wird commandref_join.pl
+        nach dem update nicht aufgerufen, d.h. die Gesamtdokumentation ist
+        nicht mehr aktuell. Die Moduldokumentation bleibt weiterhin aktuell.
+        <br>
         Beispiel:<br>
         <ul>
           attr global exclude_from_update 21_OWTEMP.pm temp4hum4.gplot 
