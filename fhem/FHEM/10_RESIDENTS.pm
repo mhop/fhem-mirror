@@ -23,9 +23,12 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.0
+# Version: 1.2.0
 #
 # Major Version History:
+# - 1.2.0 - 2015-03-11
+# -- add RESIDENTStoolkit support
+#
 # - 1.1.0 - 2014-04-07
 # -- new readings in computer readable format (*_cr)
 # -- format of readings durTimer readings changed from minutes to HH:MM:ss
@@ -41,6 +44,7 @@ use strict;
 use warnings;
 use Time::Local;
 use Data::Dumper;
+require RESIDENTStk;
 
 sub RESIDENTS_Set($@);
 sub RESIDENTS_Define($$);
@@ -58,7 +62,8 @@ sub RESIDENTS_Initialize($) {
     $hash->{NotifyFn} = "RESIDENTS_Notify";
     $hash->{UndefFn}  = "RESIDENTS_Undefine";
     $hash->{AttrList} =
-      "rgr_showAllStates:0,1 rgr_states " . $readingFnAttributes;
+      "rgr_showAllStates:0,1 rgr_states rgr_wakeupDevice "
+      . $readingFnAttributes;
 }
 
 ###################################
@@ -73,13 +78,13 @@ sub RESIDENTS_Define($$) {
 
     # set default settings on first define
     if ($init_done) {
-        $attr{$name}{alias}         = "Residents";
-        $attr{$name}{devStateIcon}  =
+        $attr{$name}{alias} = "Residents";
+        $attr{$name}{devStateIcon} =
 '.*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home';
-        $attr{$name}{group}         = "Home State";
-        $attr{$name}{icon}          = "control_building_filled";
-        $attr{$name}{room}          = "Residents";
-        $attr{$name}{webCmd}        = "state";
+        $attr{$name}{group}  = "Home State";
+        $attr{$name}{icon}   = "control_building_filled";
+        $attr{$name}{room}   = "Residents";
+        $attr{$name}{webCmd} = "state";
     }
 
     return undef;
@@ -137,6 +142,11 @@ sub RESIDENTS_Notify($$) {
           if ( defined( $hash->{GUESTS} )
             && $hash->{GUESTS} ne "" );
 
+        my @registeredWakeupdevs =
+          split( /,/, $attr{$hashName}{rgr_wakeupDevice} )
+          if ( defined( $attr{$hashName}{rgr_wakeupDevice} )
+            && $attr{$hashName}{rgr_wakeupDevice} ne "" );
+
         # process only registered ROOMMATE or GUEST devices
         if (   ( @registeredRoommates && $devName ~~ @registeredRoommates )
             || ( @registeredGuests && $devName ~~ @registeredGuests ) )
@@ -183,6 +193,27 @@ sub RESIDENTS_Notify($$) {
                 }
             }
         }
+
+        # process only registered devices for wakeup function
+        if ( @registeredWakeupdevs && $devName ~~ @registeredWakeupdevs ) {
+
+            return
+              if ( !$dev->{CHANGED} ); # Some previous notify deleted the array.
+
+            foreach my $change ( @{ $dev->{CHANGED} } ) {
+
+                # state changed
+                if ( $change =~ /OFF|([0-9]{2}:[0-9]{2})/ ) {
+                    Log3 $hash, 4,
+                        "RESIDENTS "
+                      . $hashName . ": "
+                      . $devName
+                      . ": notify about change to $change";
+
+                    return RESIDENTStk_wakeupSet( $devName, $change );
+                }
+            }
+        }
     }
 
     return;
@@ -221,6 +252,7 @@ sub RESIDENTS_Set($@) {
     $usage .= " state:$states";
     $usage .= " removeRoommate:" . $roommates if ( $roommates ne "" );
     $usage .= " removeGuest:" . $guests if ( $guests ne "" );
+    $usage .= " create:wakeuptimer";
 
     # states
     if (   $a[1] eq "state"
@@ -476,6 +508,61 @@ sub RESIDENTS_Set($@) {
         }
 
         RESIDENTS_UpdateReadings($hash);
+    }
+
+    # create
+    elsif ( $a[1] eq "create" ) {
+        if ( defined( $a[2] ) && $a[2] eq "wakeuptimer" ) {
+            my $i               = "1";
+            my $wakeuptimerName = $name . "_wakeuptimer" . $i;
+            my $created         = 0;
+
+            until ($created) {
+                if ( defined( $defs{$wakeuptimerName} ) ) {
+                    $i++;
+                    $wakeuptimerName = $name . "_wakeuptimer" . $i;
+                }
+                else {
+
+                    # create new dummy device
+                    fhem "define $wakeuptimerName dummy";
+                    fhem "attr $wakeuptimerName alias Wake-up Timer $i";
+                    fhem "attr $wakeuptimerName comment Auto-created by RESIDENTS module for use with RESIDENTS Toolkit";
+                    fhem
+"attr $wakeuptimerName devStateIcon OFF:general_aus\@red .*:general_an\@green:OFF";
+                    fhem "attr $wakeuptimerName group " . $attr{$name}{group}
+                      if ( defined( $attr{$name}{group} ) );
+                    fhem "attr $wakeuptimerName icon time_clock";
+                    fhem "attr $wakeuptimerName room " . $attr{$name}{room}
+                      if ( defined( $attr{$name}{room} ) );
+                    fhem
+"attr $wakeuptimerName setList state:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45";
+                    fhem "attr $wakeuptimerName userattr wakeupUserdevice";
+                    fhem "attr $wakeuptimerName wakeupUserdevice $name";
+                    fhem "attr $wakeuptimerName webCmd state";
+
+                    # register slave device
+                    if ( defined( $attr{$name}{rgr_wakeupDevice} ) ) {
+                        fhem "attr $name rgr_wakeupDevice "
+                          . $attr{$name}{rgr_wakeupDevice}
+                          . ",$wakeuptimerName";
+                    }
+                    else {
+                        fhem "attr $name rgr_wakeupDevice $wakeuptimerName";
+                    }
+
+                    # trigger first update
+                    fhem "set $wakeuptimerName OFF";
+
+                    $created = 1;
+                    return
+"Dummy $wakeuptimerName and other pending devices created and pre-configured. You may edit Macro_$wakeuptimerName to define your wake-up actions.";
+                }
+            }
+        }
+        else {
+            return "Invalid 2nd argument, choose one of wakeuptimer ";
+        }
     }
 
     # return usage hint
@@ -841,7 +928,7 @@ sub RESIDENTS_UpdateReadings (@) {
 
     }
 
-	readingsEndUpdate($hash, 1);
+    readingsEndUpdate( $hash, 1 );
 }
 
 ###################################
@@ -935,6 +1022,9 @@ sub RESIDENTS_Datetime2Timestamp($) {
           </li>
           <li>
             <b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; switch between states for all group members at once; see attribute rgr_states to adjust list shown in FHEMWEB
+          </li>
+          <li>
+            <b>create</b> &nbsp;&nbsp;wakeuptimer&nbsp;&nbsp; add several pre-configurations provided by RESIDENTS Toolkit. See separate section for details.
           </li>
         </ul>
       </div><br>
@@ -1069,6 +1159,45 @@ sub RESIDENTS_Datetime2Timestamp($) {
           </li>
         </ul>
       </div>
+      <br>
+      <br>
+      <b>RESIDENTS Toolkit</b><br>
+      <div style="margin-left: 2em">
+        <ul>
+					Using set-command <code>create</code> you may add pre-configured configurations to your RESIDENTS, <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> devices for your convenience.<br>
+					The following commands are currently available:<br>
+					<br>
+					<li>
+						<b>wakeuptimer</b> &nbsp;&nbsp;-&nbsp;&nbsp; adds a wake-up timer dummy device with enhanced functions to start with wake-up automations
+						<ul>
+							A notify device is created to be used as a Macro to carry out your actual automations. The macro is triggered by a normal at device you may customize as well. However, a special RESIDENTS Toolkit function is handling the wake-up trigger event for you.<br>
+							<br>
+							The wake-up behaviour may be influenced by the following device attributes:<br>
+							<li>
+								<i>wakeupAutosave</i> - Triggers FHEM command 'save' after adjusting wake-up time value (defaults to 0=false)
+							</li>
+							<li>
+								<i>wakeupDays</i> - only trigger macro at these days. Mon=1,Tue=2,Wed=3,Thu=4,Fri=5,Sat=6,Sun=0 (optional)
+							</li>
+							<li>
+								<i>wakeupDefaultTime</i> - after triggering macro reset the wake-up time to this default value (optional)
+							</li>
+							<li>
+								<i>wakeupMacro</i> - name of the notify macro device (mandatory)
+							</li>
+							<li>
+								<i>wakeupOffset</i> - value in minutes to trigger your macro earlier than the user requested to be woken up, e.g. if you have a complex wake-up program over 30 minutes (defaults to 0)
+							</li>
+							<li>
+								<i>wakeupResetdays</i> - if wakeupDefaultTime is set you may restrict timer reset to specific days only. Mon=1,Tue=2,Wed=3,Thu=4,Fri=5,Sat=6,Sun=0 (optional)
+							</li>
+							<li>
+								<i>wakeupUserdevice</i> - backlink to RESIDENTS, ROOMMATE or GUEST device to check it's status (mandatory)
+							</li>
+						</ul>
+					</li>
+        </ul>
+      </div>
     </div>
 
 =end html
@@ -1116,6 +1245,9 @@ sub RESIDENTS_Datetime2Timestamp($) {
           </li>
           <li>
             <b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; wechselt den Status für alle Gruppenmitglieder gleichzeitig; siehe Attribut rgr_states, um die angezeigte Liste in FHEMWEB abzuändern
+          </li>
+          <li>
+            <b>create</b> &nbsp;&nbsp;wakeuptimer&nbsp;&nbsp; f&uuml;gt diverse Vorkonfigurationen auf Basis von RESIDENTS Toolkit hinzu. Siehe separate Sektion.
           </li>
         </ul>
       </div><br>
@@ -1248,6 +1380,45 @@ sub RESIDENTS_Datetime2Timestamp($) {
           <li>
             <b>state</b> - gibt den aktuellen Status wieder
           </li>
+        </ul>
+      </div>
+      <br>
+      <br>
+      <b>RESIDENTS Toolkit</b><br>
+      <div style="margin-left: 2em">
+        <ul>
+					Mit dem set-Kommando <code>create</code> k&ouml;nnen zur Vereinfachung vorkonfigurierte Konfigurationen zu RESIDENTS, <a href="#ROOMMATE">ROOMMATE</a> oder <a href="#GUEST">GUEST</a> Ger&auml;ten hinzugef&uuml;gt werden.<br>
+					The folgenden Kommandos sind momentan verf&uuml;gbar:<br>
+					<br>
+					<li>
+						<b>wakeuptimer</b> &nbsp;&nbsp;-&nbsp;&nbsp; f&uuml;gt ein Dummy Ger&auml;t mit erweiterten Funktionen als Wecker hinzu, um darauf Weck-Automationen aufzubauen.
+						<ul>
+							Ein notify Ger&auml;t wird als Makro erstellt, um die eigentliche Automation auszuf&uuml;hren. Das Makro wird durch ein normales at-Ger&auml;t ausgel&ouml;st und kann ebenfalls angepasst werden. Die Hauptfunktion wird dabei trotzdem von einer speziellen RESIDENTS Toolkit funktion gehandhabt.<br>
+							<br>
+							Die Weckfunktion kann wie folgt &uuml;ber Attribute beinflusst werden:<br>
+							<li>
+								<i>wakeupAutosave</i> - L&ouml;st das FHEM Kommando 'save' nach einer &Auml;nderung der Weckzeit aus (Standard 0=aus)
+							</li>
+							<li>
+								<i>wakeupDays</i> - Makro nur an bestimmten Tagen ausl&ouml;sen. Mon=1,Di=2,Mi=3,Do=4,Fr=5,Sa=6,So=0 (optional)
+							</li>
+							<li>
+								<i>wakeupDefaultTime</i> - Stellt die Weckzeit nach dem ausl&ouml;sen zur&uuml;ck auf diesen Standardwert (optional)
+							</li>
+							<li>
+								<i>wakeupMacro</i> - Name des notify Makro Ger&auml;tes (notwendig)
+							</li>
+							<li>
+								<i>wakeupOffset</i> - Wert in Minuten, die das Makro fr&uuml;her ausgel&ouml;st werden soll, z.B. bei komplexen Weckprogrammen &uuml;ber einen Zeitraum von 30 Minuten (Standard ist 0)
+							</li>
+							<li>
+								<i>wakeupResetdays</i> - sofern wakeupDefaultTime gesetzt ist, kann der Reset hier auf betimmte Tage begrenzt werden. Mon=1,Di=2,Mi=3,Do=4,Fr=5,Sa=6,So=0 (optional)
+							</li>
+							<li>
+								<i>wakeupUserdevice</i> - Backlink zum RESIDENTS, ROOMMATE oder GUEST Ger&auml;t, um dessen Status zu pr&uuml;fen (notwendig)
+							</li>
+						</ul>
+					</li>
         </ul>
       </div>
     </div>

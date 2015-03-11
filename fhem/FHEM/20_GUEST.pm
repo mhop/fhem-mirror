@@ -23,9 +23,12 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.0
+# Version: 1.2.0
 #
 # Major Version History:
+# - 1.2.0 - 2015-03-11
+# -- add RESIDENTStoolkit support
+#
 # - 1.1.0 - 2014-04-07
 # -- new readings in computer readable format (*_cr)
 # -- format of readings durTimer readings changed from minutes to HH:MM:ss
@@ -41,9 +44,11 @@ use strict;
 use warnings;
 use Time::Local;
 use Data::Dumper;
+require RESIDENTStk;
 
 sub GUEST_Set($@);
 sub GUEST_Define($$);
+sub GUEST_Notify($$);
 sub GUEST_Undefine($$);
 
 ###################################
@@ -52,11 +57,12 @@ sub GUEST_Initialize($) {
 
     Log3 $hash, 5, "GUEST_Initialize: Entering";
 
-    $hash->{SetFn}   = "GUEST_Set";
-    $hash->{DefFn}   = "GUEST_Define";
-    $hash->{UndefFn} = "GUEST_Undefine";
+    $hash->{SetFn}    = "GUEST_Set";
+    $hash->{DefFn}    = "GUEST_Define";
+    $hash->{NotifyFn} = "GUEST_Notify";
+    $hash->{UndefFn}  = "GUEST_Undefine";
     $hash->{AttrList} =
-"rg_locationHome rg_locationWayhome rg_locationUnderway rg_autoGoneAfter:12,16,24,26,28,30,36,48,60 rg_showAllStates:0,1 rg_realname:group,alias rg_states rg_locations rg_moods rg_moodDefault rg_moodSleepy rg_noDuration:0,1 "
+"rg_locationHome rg_locationWayhome rg_locationUnderway rg_autoGoneAfter:12,16,24,26,28,30,36,48,60 rg_showAllStates:0,1 rg_realname:group,alias rg_states rg_locations rg_moods rg_moodDefault rg_moodSleepy rg_noDuration:0,1 rg_wakeupDevice "
       . $readingFnAttributes;
 }
 
@@ -134,16 +140,17 @@ sub GUEST_Define($$) {
         $aliasname =~ s/^rg_//;
         $attr{$name}{alias} = $aliasname;
 
-        $attr{$name}{devStateIcon}  =
+        $attr{$name}{devStateIcon} =
 ".*home:user_available:absent .*absent:user_away:home .*none:control_building_empty:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown";
-        $attr{$name}{group}         = "Guests";
-        $attr{$name}{icon}          = "scene_visit_guests";
-        $attr{$name}{rg_realname}   = "alias";
-        $attr{$name}{sortby}        = "1";
-        $attr{$name}{webCmd}        = "state";
+        $attr{$name}{group}       = "Guests";
+        $attr{$name}{icon}        = "scene_visit_guests";
+        $attr{$name}{rg_realname} = "alias";
+        $attr{$name}{sortby}      = "1";
+        $attr{$name}{webCmd}      = "state";
 
-        $attr{$name}{room}          = $attr{ $registeredResidentgroups[0] }{room}
-          if (@registeredResidentgroups && exists($attr{$registeredResidentgroups[0]}{room}));
+        $attr{$name}{room} = $attr{ $registeredResidentgroups[0] }{room}
+          if ( @registeredResidentgroups
+            && exists( $attr{ $registeredResidentgroups[0] }{room} ) );
     }
 
     # trigger for modified objects
@@ -183,6 +190,45 @@ sub GUEST_Undefine($$) {
     }
 
     return undef;
+}
+
+###################################
+sub GUEST_Notify($$) {
+    my ( $hash, $dev ) = @_;
+    my $devName  = $dev->{NAME};
+    my $hashName = $hash->{NAME};
+    my $hashName_attr;
+
+    # process child notifies
+    if ( $devName ne $hashName ) {
+        my @registeredWakeupdevs =
+          split( /,/, $attr{$hashName}{rg_wakeupDevice} )
+          if ( defined( $attr{$hashName}{rg_wakeupDevice} )
+            && $attr{$hashName}{rg_wakeupDevice} ne "" );
+
+        # process only registered devices for wakeup function
+        if ( @registeredWakeupdevs && $devName ~~ @registeredWakeupdevs ) {
+
+            return
+              if ( !$dev->{CHANGED} ); # Some previous notify deleted the array.
+
+            foreach my $change ( @{ $dev->{CHANGED} } ) {
+
+                # state changed
+                if ( $change =~ /OFF|([0-9]{2}:[0-9]{2})/ ) {
+                    Log3 $hash, 4,
+                        "GUEST "
+                      . $hashName . ": "
+                      . $devName
+                      . ": notify about change to $change";
+
+                    return RESIDENTStk_wakeupSet( $devName, $change );
+                }
+            }
+        }
+    }
+
+    return;
 }
 
 ###################################
@@ -253,10 +299,9 @@ sub GUEST_Set($@) {
     $usage .= " state:$states";
     $usage .= " mood:$moods";
     $usage .= " location$locations";
+    $usage .= " create:wakeuptimer";
 
-#    $usage .=
-#" create:wuTimerWd,wuTimerWe,wuTimerMon,wuTimerTue,wuTimerWed,wuTimerThu,wuTimerFri,wuTimerSat,wuTimerSun";
-#    $usage .= " compactMode:noArg largeMode:noArg";
+    #    $usage .= " compactMode:noArg largeMode:noArg";
 
     # silentSet
     if ( $a[1] eq "silentSet" ) {
@@ -664,6 +709,61 @@ sub GUEST_Set($@) {
         }
     }
 
+    # create
+    elsif ( $a[1] eq "create" ) {
+        if ( defined( $a[2] ) && $a[2] eq "wakeuptimer" ) {
+            my $i               = "1";
+            my $wakeuptimerName = $name . "_wakeuptimer" . $i;
+            my $created         = 0;
+
+            until ($created) {
+                if ( defined( $defs{$wakeuptimerName} ) ) {
+                    $i++;
+                    $wakeuptimerName = $name . "_wakeuptimer" . $i;
+                }
+                else {
+
+                    # create new dummy device
+                    fhem "define $wakeuptimerName dummy";
+                    fhem "attr $wakeuptimerName alias Wake-up Timer $i";
+                    fhem "attr $wakeuptimerName comment Auto-created by GUEST module for use with RESIDENTS Toolkit";
+                    fhem
+"attr $wakeuptimerName devStateIcon OFF:general_aus\@red .*:general_an\@green:OFF";
+                    fhem "attr $wakeuptimerName group " . $attr{$name}{group}
+                      if ( defined( $attr{$name}{group} ) );
+                    fhem "attr $wakeuptimerName icon time_clock";
+                    fhem "attr $wakeuptimerName room " . $attr{$name}{room}
+                      if ( defined( $attr{$name}{room} ) );
+                    fhem
+"attr $wakeuptimerName setList state:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45";
+                    fhem "attr $wakeuptimerName userattr wakeupUserdevice";
+                    fhem "attr $wakeuptimerName wakeupUserdevice $name";
+                    fhem "attr $wakeuptimerName webCmd state";
+
+                    # register slave device
+                    if ( defined( $attr{$name}{rg_wakeupDevice} ) ) {
+                        fhem "attr $name rg_wakeupDevice "
+                          . $attr{$name}{rg_wakeupDevice}
+                          . ",$wakeuptimerName";
+                    }
+                    else {
+                        fhem "attr $name rg_wakeupDevice $wakeuptimerName";
+                    }
+
+                    # trigger first update
+                    fhem "set $wakeuptimerName OFF";
+
+                    $created = 1;
+                    return
+"Dummy $wakeuptimerName and other pending devices created and pre-configured. You may edit Macro_$wakeuptimerName to define your wake-up actions.";
+                }
+            }
+        }
+        else {
+            return "Invalid 2nd argument, choose one of wakeuptimer ";
+        }
+    }
+
     # return usage hint
     else {
         return $usage;
@@ -739,82 +839,86 @@ sub GUEST_DurationTimer($;$) {
 
     GUEST_RemoveInternalTimer( "DurationTimer", $hash );
 
-		if ( !defined($attr{$name}{rg_noDuration}) || $attr{$name}{rg_noDuration} == 0 ) {
+    if ( !defined( $attr{$name}{rg_noDuration} )
+        || $attr{$name}{rg_noDuration} == 0 )
+    {
 
-	    # presence timer
-	    if ( defined( $hash->{READINGS}{presence}{VAL} )
-	        && $hash->{READINGS}{presence}{VAL} eq "present" )
-	    {
-	        if ( defined( $hash->{READINGS}{lastArrival}{VAL} )
-	            && $hash->{READINGS}{lastArrival}{VAL} ne "-" )
-	        {
-	            $durPresence =
-	              $timestampNow -
-	              GUEST_Datetime2Timestamp( $hash->{READINGS}{lastArrival}{VAL} );
-	        }
-	    }
+        # presence timer
+        if ( defined( $hash->{READINGS}{presence}{VAL} )
+            && $hash->{READINGS}{presence}{VAL} eq "present" )
+        {
+            if ( defined( $hash->{READINGS}{lastArrival}{VAL} )
+                && $hash->{READINGS}{lastArrival}{VAL} ne "-" )
+            {
+                $durPresence =
+                  $timestampNow -
+                  GUEST_Datetime2Timestamp(
+                    $hash->{READINGS}{lastArrival}{VAL} );
+            }
+        }
 
-	    # absence timer
-	    if (   defined( $hash->{READINGS}{presence}{VAL} )
-	        && $hash->{READINGS}{presence}{VAL} eq "absent"
-	        && defined( $hash->{READINGS}{state}{VAL} )
-	        && $hash->{READINGS}{state}{VAL} eq "absent" )
-	    {
-	        if ( defined( $hash->{READINGS}{lastDeparture}{VAL} )
-	            && $hash->{READINGS}{lastDeparture}{VAL} ne "-" )
-	        {
-	            $durAbsence =
-	              $timestampNow -
-	              GUEST_Datetime2Timestamp( $hash->{READINGS}{lastDeparture}{VAL} );
-	        }
-	    }
+        # absence timer
+        if (   defined( $hash->{READINGS}{presence}{VAL} )
+            && $hash->{READINGS}{presence}{VAL} eq "absent"
+            && defined( $hash->{READINGS}{state}{VAL} )
+            && $hash->{READINGS}{state}{VAL} eq "absent" )
+        {
+            if ( defined( $hash->{READINGS}{lastDeparture}{VAL} )
+                && $hash->{READINGS}{lastDeparture}{VAL} ne "-" )
+            {
+                $durAbsence =
+                  $timestampNow -
+                  GUEST_Datetime2Timestamp(
+                    $hash->{READINGS}{lastDeparture}{VAL} );
+            }
+        }
 
-	    # sleep timer
-	    if ( defined( $hash->{READINGS}{state}{VAL} )
-	        && $hash->{READINGS}{state}{VAL} eq "asleep" )
-	    {
-	        if ( defined( $hash->{READINGS}{lastSleep}{VAL} )
-	            && $hash->{READINGS}{lastSleep}{VAL} ne "-" )
-	        {
-	            $durSleep =
-	              $timestampNow -
-	              GUEST_Datetime2Timestamp( $hash->{READINGS}{lastSleep}{VAL} );
-	        }
-	    }
+        # sleep timer
+        if ( defined( $hash->{READINGS}{state}{VAL} )
+            && $hash->{READINGS}{state}{VAL} eq "asleep" )
+        {
+            if ( defined( $hash->{READINGS}{lastSleep}{VAL} )
+                && $hash->{READINGS}{lastSleep}{VAL} ne "-" )
+            {
+                $durSleep =
+                  $timestampNow -
+                  GUEST_Datetime2Timestamp( $hash->{READINGS}{lastSleep}{VAL} );
+            }
+        }
 
-	    my $durPresence_hr =
-	      ( $durPresence > 0 ) ? GUEST_sec2time($durPresence) : "00:00:00";
-	    my $durPresence_cr =
-	      ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
-	    my $durAbsence_hr =
-	      ( $durAbsence > 0 ) ? GUEST_sec2time($durAbsence) : "00:00:00";
-	    my $durAbsence_cr =
-	      ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
-	    my $durSleep_hr =
-	      ( $durSleep > 0 ) ? GUEST_sec2time($durSleep) : "00:00:00";
-	    my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
+        my $durPresence_hr =
+          ( $durPresence > 0 ) ? GUEST_sec2time($durPresence) : "00:00:00";
+        my $durPresence_cr =
+          ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
+        my $durAbsence_hr =
+          ( $durAbsence > 0 ) ? GUEST_sec2time($durAbsence) : "00:00:00";
+        my $durAbsence_cr =
+          ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
+        my $durSleep_hr =
+          ( $durSleep > 0 ) ? GUEST_sec2time($durSleep) : "00:00:00";
+        my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
 
-	    readingsBeginUpdate($hash) if ( !$silent );
-	    readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
-	      if ( !defined( $hash->{READINGS}{durTimerPresence_cr}{VAL} )
-	        || $hash->{READINGS}{durTimerPresence_cr}{VAL} ne $durPresence_cr );
-	    readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
-	      if ( !defined( $hash->{READINGS}{durTimerPresence}{VAL} )
-	        || $hash->{READINGS}{durTimerPresence}{VAL} ne $durPresence_hr );
-	    readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
-	      if ( !defined( $hash->{READINGS}{durTimerAbsence_cr}{VAL} )
-	        || $hash->{READINGS}{durTimerAbsence_cr}{VAL} ne $durAbsence_cr );
-	    readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
-	      if ( !defined( $hash->{READINGS}{durTimerAbsence}{VAL} )
-	        || $hash->{READINGS}{durTimerAbsence}{VAL} ne $durAbsence_hr );
-	    readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
-	      if ( !defined( $hash->{READINGS}{durTimerSleep_cr}{VAL} )
-	        || $hash->{READINGS}{durTimerSleep_cr}{VAL} ne $durSleep_cr );
-	    readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
-	      if ( !defined( $hash->{READINGS}{durTimerSleep}{VAL} )
-	        || $hash->{READINGS}{durTimerSleep}{VAL} ne $durSleep_hr );
-	    readingsEndUpdate( $hash, 1 ) if ( !$silent );
-		}
+        readingsBeginUpdate($hash) if ( !$silent );
+        readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
+          if ( !defined( $hash->{READINGS}{durTimerPresence_cr}{VAL} )
+            || $hash->{READINGS}{durTimerPresence_cr}{VAL} ne $durPresence_cr );
+        readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
+          if ( !defined( $hash->{READINGS}{durTimerPresence}{VAL} )
+            || $hash->{READINGS}{durTimerPresence}{VAL} ne $durPresence_hr );
+        readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
+          if ( !defined( $hash->{READINGS}{durTimerAbsence_cr}{VAL} )
+            || $hash->{READINGS}{durTimerAbsence_cr}{VAL} ne $durAbsence_cr );
+        readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
+          if ( !defined( $hash->{READINGS}{durTimerAbsence}{VAL} )
+            || $hash->{READINGS}{durTimerAbsence}{VAL} ne $durAbsence_hr );
+        readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
+          if ( !defined( $hash->{READINGS}{durTimerSleep_cr}{VAL} )
+            || $hash->{READINGS}{durTimerSleep_cr}{VAL} ne $durSleep_cr );
+        readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
+          if ( !defined( $hash->{READINGS}{durTimerSleep}{VAL} )
+            || $hash->{READINGS}{durTimerSleep}{VAL} ne $durSleep_hr );
+        readingsEndUpdate( $hash, 1 ) if ( !$silent );
+    }
 
     GUEST_InternalTimer( "DurationTimer", $timestampNow + 60,
         "GUEST_DurationTimer", $hash, 1 )
@@ -986,6 +1090,9 @@ sub GUEST_StartInternalTimers($$) {
           </li>
           <li>
             <b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,none&nbsp;&nbsp; switch between states; see attribute rg_states to adjust list shown in FHEMWEB
+          </li>
+          <li>
+            <b>create</b> &nbsp;&nbsp;wakeuptimer&nbsp;&nbsp; add several pre-configurations provided by RESIDENTS Toolkit. See separate section in <a href="#RESIDENTS">RESIDENTS module commandref</a> for details.
           </li>
         </ul>
       </div><br>
@@ -1256,6 +1363,9 @@ sub GUEST_StartInternalTimers($$) {
           </li>
           <li>
             <b>state</b> &nbsp;&nbsp;home,gotosleep,asleep,awoken,absent,gone&nbsp;&nbsp; wechselt den Status; siehe auch Attribut rg_states, um die in FHEMWEB angezeigte Liste anzupassen
+          </li>
+          <li>
+            <b>create</b> &nbsp;&nbsp;wakeuptimer&nbsp;&nbsp; f&uuml;gt diverse Vorkonfigurationen auf Basis von RESIDENTS Toolkit hinzu. Siehe separate Sektion in der <a href="#RESIDENTS">RESIDENTS Modul Kommandoreferenz</a>.
           </li>
         </ul>
       </div><br>

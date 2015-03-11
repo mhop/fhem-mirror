@@ -302,6 +302,7 @@ FHEM/OWX_DS2480.pm           ntruchsess           http://forum.fhem.de 1Wire
 FHEM/OWX_DS9097.pm           ntruchsess           http://forum.fhem.de 1Wire
 FHEM/OWX_FRM.pm              ntruchsess           http://forum.fhem.de 1Wire
 FHEM/OWX_SER.pm              ntruchsess           http://forum.fhem.de 1Wire
+FHEM/RESIDENTStk.pm          loredo               http://forum.fhem.de Automatisierung
 FHEM/SetExtensions.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/SHC_datafields.pm       rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/SHC_parser.pm           rr2000               http://forum.fhem.de Sonstige Systeme
