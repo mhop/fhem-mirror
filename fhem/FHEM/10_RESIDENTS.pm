@@ -1388,7 +1388,7 @@ sub RESIDENTS_Datetime2Timestamp($) {
       <div style="margin-left: 2em">
         <ul>
 					Mit dem set-Kommando <code>create</code> k&ouml;nnen zur Vereinfachung vorkonfigurierte Konfigurationen zu RESIDENTS, <a href="#ROOMMATE">ROOMMATE</a> oder <a href="#GUEST">GUEST</a> Ger&auml;ten hinzugef&uuml;gt werden.<br>
-					The folgenden Kommandos sind momentan verf&uuml;gbar:<br>
+					Die folgenden Kommandos sind momentan verf&uuml;gbar:<br>
 					<br>
 					<li>
 						<b>wakeuptimer</b> &nbsp;&nbsp;-&nbsp;&nbsp; f&uuml;gt ein Dummy Ger&auml;t mit erweiterten Funktionen als Wecker hinzu, um darauf Weck-Automationen aufzubauen.
