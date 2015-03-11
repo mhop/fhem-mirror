@@ -1205,6 +1205,9 @@ sub ROOMMATE_StartInternalTimers($$) {
           <li>
             <b>rr_states</b> - list of states to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces; unsupported states will lead to errors though
           </li>
+          <li>
+            <b>rr_wakeupDevice</b> - reference to renslaved DUMMY devices used as a wake-up timer (part of RESIDENTS Toolkit's wakeuptimer)
+          </li>
         </ul>
       </div><br>
       <br>
@@ -1477,6 +1480,9 @@ sub ROOMMATE_StartInternalTimers($$) {
           </li>
           <li>
             <b>rr_states</b> - Liste aller in FHEMWEB angezeigter Status; Eintrage nur mit Komma trennen und KEINE Leerzeichen benutzen; nicht unterstützte Status führen zu Fehlern
+          </li>
+          <li>
+            <b>rr_wakeupDevice</b> - Referenz zu versklavten DUMMY Ger&auml;ten, welche als Wecker benutzt werden (Teil von RESIDENTS Toolkit's wakeuptimer)
           </li>
         </ul>
       </div><br />
