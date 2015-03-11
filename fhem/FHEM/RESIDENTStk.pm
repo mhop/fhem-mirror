@@ -34,43 +34,35 @@
 #####################################
 # Enslave DUMMY device to be used for alarm clock
 #
-sub RESIDENTStk_wakeupSet($$) {
+sub RESIDENTStk_wakeupSet($;$) {
     my ( $NAME, $VALUE ) = @_;
-    my $userattr     = AttrVal( $NAME, "userattr",       0 );
-    my $autosave     = AttrVal( $NAME, "wakeupAutosave", 0 );
-    my $wakeupMacro  = AttrVal( $NAME, "wakeupMacro",    0 );
-    my $wakeupOffset = AttrVal( $NAME, "wakeupOffset",   "0" );
-    my $room         = AttrVal( $NAME, "room",           "" );
-    my $atName       = "at_" . $NAME;
-    my $macroName    = "Macro_" . $NAME;
+    my $userattr          = AttrVal( $NAME, "userattr",          0 );
+    my $autosave          = AttrVal( $NAME, "wakeupAutosave",    0 );
+    my $wakeupDefaultTime = AttrVal( $NAME, "wakeupDefaultTime", 0 );
+    my $wakeupMacro       = AttrVal( $NAME, "wakeupMacro",       0 );
+    my $wakeupAtdevice    = AttrVal( $NAME, "wakeupAtdevice",    0 );
+    my $wakeupOffset      = AttrVal( $NAME, "wakeupOffset",      "0" );
+    my $room              = AttrVal( $NAME, "room",              0 );
+    my $macroName         = "Macro_" . $NAME;
+    my $atName            = "at_" . $NAME;
+
+    if ( !$VALUE ) {
+        if ($wakeupDefaultTime) {
+            Log3 $NAME, 4,
+              "RESIDENTStk $NAME: Resetting based on wakeupDefaultTime";
+            fhem
+              "set $NAME:FILTER=state!=$wakeupDefaultTime $wakeupDefaultTime";
+        }
+        return;
+    }
 
     # check for required userattr attribute
     my $userattributes =
-"wakeupOffset:slider,0,1,120 wakeupDefaultTime:time wakeupMacro wakeupUserdevice wakeupResetdays:multiple-strict,0,1,2,3,4,5,6 wakeupDays:multiple-strict,0,1,2,3,4,5,6 wakeupAutosave:1,0";
+"wakeupOffset:slider,0,1,120 wakeupDefaultTime:time wakeupMacro wakeupUserdevice wakeupAtdevice wakeupResetSwitcher wakeupResetdays:multiple-strict,0,1,2,3,4,5,6 wakeupDays:multiple-strict,0,1,2,3,4,5,6 wakeupAutosave:1,0";
     if ( !$userattr || $userattr ne $userattributes ) {
         Log3 $NAME, 3,
 "RESIDENTStk $NAME: adjusting dummy device for required attribute userattr";
         fhem "attr $NAME userattr $userattributes";
-    }
-
-    # check for required macro attribute
-    if ( !$wakeupMacro ) {
-        Log3 $NAME, 3,
-"RESIDENTStk $NAME: adjusting dummy device for required attribute wakeupMacro";
-        fhem "attr $NAME wakeupMacro $macroName";
-        $wakeupMacro = $macroName;
-    }
-
-    # check for existing macro
-    if ( !defined( $defs{$wakeupMacro} ) ) {
-        Log3 $NAME, 3,
-          "RESIDENTStk $NAME: new notify macro device $wakeupMacro created";
-        fhem "define $wakeupMacro notify $wakeupMacro {}";
-        if ($room) { fhem "attr $wakeupMacro room $room" }
-    }
-    elsif ( $defs{$wakeupMacro}{TYPE} ne "notify" ) {
-        Log3 $NAME, 3,
-"RESIDENTStk $NAME: WARNING - defined macro device '$wakeupMacro' is not a notify device!";
     }
 
     # check for required userdevice attribute
@@ -79,6 +71,60 @@ sub RESIDENTStk_wakeupSet($$) {
 "RESIDENTStk $NAME: WARNING - set attribute wakeupUserdevice before running wakeup function";
     }
 
+    # check for required wakeupMacro attribute
+    if ( !$wakeupMacro ) {
+        Log3 $NAME, 3,
+"RESIDENTStk $NAME: adjusting dummy device for required attribute wakeupMacro";
+        fhem "attr $NAME wakeupMacro $macroName";
+        $wakeupMacro = $macroName;
+    }
+
+    # check for existing macro notify device
+    if ( !defined( $defs{$wakeupMacro} ) ) {
+        Log3 $NAME, 3,
+          "RESIDENTStk $NAME: new notify macro device $wakeupMacro created";
+        fhem "define $wakeupMacro notify $wakeupMacro {}";
+        fhem
+          "attr $wakeupMacro comment Macro auto-created by RESIDENTS Toolkit";
+        if ($room) { fhem "attr $wakeupMacro room $room" }
+    }
+    elsif ( $defs{$wakeupMacro}{TYPE} ne "notify" ) {
+        Log3 $NAME, 3,
+"RESIDENTStk $NAME: WARNING - defined macro device '$wakeupMacro' is not a notify device!";
+    }
+
+    # check for required wakeupAtdevice attribute
+    if ( !$wakeupAtdevice ) {
+        Log3 $NAME, 3,
+"RESIDENTStk $NAME: adjusting dummy device for required attribute wakeupAtdevice";
+        fhem "attr $NAME wakeupAtdevice $atName";
+        $wakeupAtdevice = $atName;
+    }
+
+    # check for existing at device
+    if ( !defined( $defs{$wakeupAtdevice} ) ) {
+        Log3 $NAME, 3,
+          "RESIDENTStk $NAME: new at device $wakeupAtdevice created";
+        fhem
+"define $wakeupAtdevice at *08:00 { RESIDENTStk_wakeupRun(\"$NAME\") }";
+        fhem "attr $wakeupAtdevice comment Auto-created by RESIDENTS Toolkit";
+        if ($room) { fhem "attr $wakeupAtdevice room $room" }
+    }
+
+# Reset at device if wake-up timer was disabled and wakeupDefaultTime is present
+    if ( $VALUE eq "OFF" ) {
+        Log3 $NAME, 4, "RESIDENTStk $NAME: Wake-up timer disabled";
+        if ($wakeupDefaultTime) {
+            $VALUE = $wakeupDefaultTime;
+            Log3 $NAME, 4,
+"RESIDENTStk $NAME: Wake-up timer disabled and triggered at device reset";
+        }
+        else {
+            Log3 $NAME, 4, "RESIDENTStk $NAME: Wake-up timer disabled";
+        }
+    }
+
+    # Recalculate new wake-up value
     if ( $VALUE ne "OFF" ) {
         my @time     = split /:/, $VALUE;
         my $time_sec = $time[0] * 3600 + $time[1] * 60;
@@ -88,26 +134,18 @@ sub RESIDENTStk_wakeupSet($$) {
         my $min      = int( $leftover / 60 );
         if ( $time_sec < 1800 && $wakeupOffset > 0 ) { $hour = 23 }
 
-        if ( !defined( $defs{$atName} ) ) {
-            Log3 $NAME, 3, "RESIDENTStk $NAME: $atName created and set to "
-              . sprintf( "%02d:%02d", $hour, $min );
-            fhem "define $atName at *"
-              . sprintf( "%02d:%02d", $hour, $min )
-              . " { RESIDENTStk_wakeupRun(\"$NAME\") }";
-            if ($room) { fhem "attr $atName room $room" }
-        }
-        elsif ( $defs{$atName}{TYPE} ne "at" ) {
+        if ( $defs{$wakeupAtdevice}{TYPE} ne "at" ) {
             Log3 $NAME, 3,
-"RESIDENTStk $NAME: WARNING - defined device '$atName' is not an at device!";
+"RESIDENTStk $NAME: ERROR - defined device '$wakeupAtdevice' is not an at device!";
         }
         else {
-            Log3 $NAME, 4, "RESIDENTStk $NAME: $atName modified to "
+            fhem "modify $wakeupAtdevice *"
               . sprintf( "%02d:%02d", $hour, $min );
-            fhem "modify $atName *" . sprintf( "%02d:%02d", $hour, $min );
+
+            Log3 $NAME, 4,
+              "RESIDENTStk $NAME($wakeupAtdevice): Wake-up begin scheduled for "
+              . sprintf( "%02d:%02d", $hour, $min );
         }
-    }
-    else {
-        Log3 $NAME, 4, "RESIDENTStk $NAME: alarm set to OFF";
     }
 
     # autosave
@@ -122,11 +160,12 @@ sub RESIDENTStk_wakeupSet($$) {
 sub RESIDENTStk_wakeupRun($) {
     my ($NAME) = @_;
 
-    my $wakeupMacro       = AttrVal( $NAME, "wakeupMacro",       0 );
-    my $wakeupDefaultTime = AttrVal( $NAME, "wakeupDefaultTime", 0 );
-    my $wakeupUserdevice  = AttrVal( $NAME, "wakeupUserdevice",  0 );
-    my $wakeupDays        = AttrVal( $NAME, "wakeupDays",        0 );
-    my $wakeupResetdays   = AttrVal( $NAME, "wakeupResetdays",   0 );
+    my $wakeupMacro         = AttrVal( $NAME, "wakeupMacro",         0 );
+    my $wakeupDefaultTime   = AttrVal( $NAME, "wakeupDefaultTime",   0 );
+    my $wakeupUserdevice    = AttrVal( $NAME, "wakeupUserdevice",    0 );
+    my $wakeupDays          = AttrVal( $NAME, "wakeupDays",          0 );
+    my $wakeupResetdays     = AttrVal( $NAME, "wakeupResetdays",     0 );
+    my $wakeupResetSwitcher = AttrVal( $NAME, "wakeupResetSwitcher", 0 );
 
     my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
       localtime(time);
@@ -148,7 +187,6 @@ sub RESIDENTStk_wakeupRun($) {
     elsif ( ReadingsVal( $NAME, "state", "OFF" ) eq "OFF" ) {
         Log3 $NAME, 4,
           "RESIDENTStk $NAME: alarm set to OFF - not running any action";
-        return;
     }
     elsif ( !$wakeupUserdevice ) {
         Log3 $NAME, 4, "RESIDENTStk $NAME: missing attribute wakeupUserdevice";
@@ -198,10 +236,82 @@ sub RESIDENTStk_wakeupRun($) {
         }
     }
 
-    if ( $wakeupDefaultTime && $wday ~~ @rdays ) {
+    my $doReset = 1;
+    if (   $wakeupResetSwitcher
+        && defined( $defs{$wakeupResetSwitcher} )
+        && $defs{$wakeupResetSwitcher}{TYPE} eq "dummy"
+        && ReadingsVal( $wakeupResetSwitcher, "state", 0 ) eq "off" )
+    {
+        $doReset = 0;
+    }
+
+    if ( $wakeupDefaultTime && $wday ~~ @rdays && $doReset ) {
         Log3 $NAME, 4,
           "RESIDENTStk $NAME: Resetting based on wakeupDefaultTime";
-        fhem "set $NAME $wakeupDefaultTime";
+        fhem "set $NAME:FILTER=state!=$wakeupDefaultTime $wakeupDefaultTime";
+    }
+
+    return undef;
+}
+
+#####################################
+# AttFn for enslaved dummy devices
+#
+sub RESIDENTStk_AttrFnDummy(@) {
+    my ( $cmd, $name, $aName, $aVal ) = @_;
+
+		# set attribute
+    if ( $cmd eq "set" ) {
+
+        # wakeupResetSwitcher
+        if ( $aName eq "wakeupResetSwitcher" ) {
+            if ( !defined( $defs{$aVal} ) ) {
+                my $alias = AttrVal( $name, "alias", 0 );
+                my $group = AttrVal( $name, "group", 0 );
+                my $room  = AttrVal( $name, "room",  0 );
+
+                fhem "define $aVal dummy";
+                fhem "attr $aVal comment Auto-created by RESIDENTS Toolkit";
+                if ($alias) {
+                    fhem "attr $aVal alias $alias Reset";
+                }
+                else {
+                    fhem "attr $aVal alias Wake-up Timer Reset";
+                }
+                fhem
+"attr $aVal devStateIcon auto:time_automatic:off off:time_manual_mode:auto";
+                if ($group) { fhem "attr $aVal group $group" }
+                fhem "attr $aVal icon refresh";
+                if ($room) { fhem "attr $aVal room $room" }
+                fhem "attr $aVal setList state:auto,off";
+                fhem "attr $aVal webCmd state";
+                fhem "set $aVal auto";
+
+                Log3 $name, 3,
+                  "RESIDENTStk $name: new slave dummy device $aVal created";
+            }
+            elsif ( $defs{$aVal}{TYPE} ne "dummy" ) {
+                Log3 $name, 3,
+"RESIDENTStk $name: Defined device name in attr $aName is not a dummy device";
+                return "Existing device $aVal is not a dummy!";
+            }
+        }
+
+    }
+
+		# del attribute
+    elsif ( $cmd eq "del" ) {
+
+        # wakeupResetSwitcher
+        if ( $aName eq "wakeupResetSwitcher" ) {
+            if ( defined( $defs{$aVal} ) && $defs{$aVal}{TYPE} eq "dummy" ) {
+                fhem "delete $aVal";
+
+                Log3 $name, 3,
+                  "RESIDENTStk $name: slave dummy device $aVal deleted";
+            }
+        }
+
     }
 
     return undef;

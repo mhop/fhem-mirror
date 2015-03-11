@@ -62,7 +62,7 @@ sub ROOMMATE_Initialize($) {
     $hash->{NotifyFn} = "ROOMMATE_Notify";
     $hash->{UndefFn}  = "ROOMMATE_Undefine";
     $hash->{AttrList} =
-"rr_locationHome rr_locationWayhome rr_locationUnderway rr_autoGoneAfter:12,16,24,26,28,30,36,48,60 rr_showAllStates:0,1 rr_realname:group,alias rr_states rr_locations rr_moods rr_moodDefault rr_moodSleepy rr_passPresenceTo rr_noDuration:0,1 rr_wakeupDevice "
+"rr_locationHome rr_locationWayhome rr_locationUnderway rr_autoGoneAfter:12,16,24,26,28,30,36,48,60 rr_showAllStates:0,1 rr_realname:group,alias rr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rr_locations rr_moods rr_moodDefault rr_moodSleepy rr_passPresenceTo rr_noDuration:0,1 rr_wakeupDevice "
       . $readingFnAttributes;
 }
 
@@ -168,6 +168,15 @@ sub ROOMMATE_Define($$) {
         $hash, 0
     );
 
+    # Injecting AttrFn for use with RESIDENTS Toolkit
+    if ( !defined( $modules{dummy}{AttrFn} ) ) {
+        $modules{dummy}{AttrFn} = "RESIDENTStk_AttrFnDummy";
+    }
+    elsif ( $modules{dummy}{AttrFn} ne "RESIDENTStk_AttrFnDummy" ) {
+        Log3 $name, 5,
+"RESIDENTStk $name: concurrent AttrFn already defined for dummy module. Some attribute based functions like auto-creations will not be available.";
+    }
+
     return undef;
 }
 
@@ -202,7 +211,6 @@ sub ROOMMATE_Notify($$) {
     my ( $hash, $dev ) = @_;
     my $devName  = $dev->{NAME};
     my $hashName = $hash->{NAME};
-    my $hashName_attr;
 
     # process child notifies
     if ( $devName ne $hashName ) {
@@ -211,23 +219,72 @@ sub ROOMMATE_Notify($$) {
           if ( defined( $attr{$hashName}{rr_wakeupDevice} )
             && $attr{$hashName}{rr_wakeupDevice} ne "" );
 
-        # process only registered devices for wakeup function
-        if ( @registeredWakeupdevs && $devName ~~ @registeredWakeupdevs ) {
+        # if we have registered wakeup devices
+        if (@registeredWakeupdevs) {
 
-            return
-              if ( !$dev->{CHANGED} ); # Some previous notify deleted the array.
+            # if this is a notification of a registered wakeup device
+            if ( $devName ~~ @registeredWakeupdevs ) {
 
-            foreach my $change ( @{ $dev->{CHANGED} } ) {
+                # Some previous notify deleted the array.
+                return
+                  if ( !$dev->{CHANGED} );
 
-                # state changed
-                if ( $change =~ /OFF|([0-9]{2}:[0-9]{2})/ ) {
-                    Log3 $hash, 4,
-                        "ROOMMATE "
-                      . $hashName . ": "
-                      . $devName
-                      . ": notify about change to $change";
+                foreach my $change ( @{ $dev->{CHANGED} } ) {
 
-                    return RESIDENTStk_wakeupSet( $devName, $change );
+                    # state changed
+                    if ( $change =~ /OFF|([0-9]{2}:[0-9]{2})/ ) {
+                        Log3 $hash, 4,
+                            "ROOMMATE "
+                          . $hashName . ": "
+                          . $devName
+                          . ": notify about change to $change";
+
+                        RESIDENTStk_wakeupSet( $devName, $change );
+                    }
+                    else {
+                        Log3 $hash, 5,
+                            "ROOMMATE "
+                          . $hashName . ": "
+                          . $devName
+                          . ": received unhandled notify about change $change";
+                    }
+                }
+            }
+
+            # stuff for every registered wakeupdev
+            foreach my $wakeupDev (@registeredWakeupdevs) {
+
+                # if this is a notification of a registered sub dummy device
+                # of one of our wakeup devices
+                if (   defined( $attr{$wakeupDev}{wakeupResetSwitcher} )
+                    && $attr{$wakeupDev}{wakeupResetSwitcher} eq $devName
+                    && $defs{$devName}{TYPE} eq "dummy" )
+                {
+
+                    # Some previous notify deleted the array.
+                    return
+                      if ( !$dev->{CHANGED} );
+
+                    foreach my $change ( @{ $dev->{CHANGED} } ) {
+
+                        # state changed to on
+                        if ( $change eq "auto" ) {
+                            Log3 $hash, 4,
+                                "ROOMMATE "
+                              . $hashName . ": "
+                              . $devName
+                              . ": notify about change to $change";
+
+                            RESIDENTStk_wakeupSet($wakeupDev);
+                        }
+                        else {
+                            Log3 $hash, 5,
+                                "ROOMMATE "
+                              . $hashName . ": "
+                              . $devName
+                              . ": received unhandled notify about change $change";
+                        }
+                    }
                 }
             }
         }
@@ -708,12 +765,13 @@ sub ROOMMATE_Set($@) {
                     # create new dummy device
                     fhem "define $wakeuptimerName dummy";
                     fhem "attr $wakeuptimerName alias Wake-up Timer $i";
-                    fhem "attr $wakeuptimerName comment Auto-created by ROOMMATE module for use with RESIDENTS Toolkit";
+                    fhem
+"attr $wakeuptimerName comment Auto-created by ROOMMATE module for use with RESIDENTS Toolkit";
                     fhem
 "attr $wakeuptimerName devStateIcon OFF:general_aus\@red .*:general_an\@green:OFF";
                     fhem "attr $wakeuptimerName group " . $attr{$name}{group}
                       if ( defined( $attr{$name}{group} ) );
-                    fhem "attr $wakeuptimerName icon time_clock";
+                    fhem "attr $wakeuptimerName icon time_timer";
                     fhem "attr $wakeuptimerName room " . $attr{$name}{room}
                       if ( defined( $attr{$name}{room} ) );
                     fhem
@@ -737,7 +795,7 @@ sub ROOMMATE_Set($@) {
 
                     $created = 1;
                     return
-"Dummy $wakeuptimerName and other pending devices created and pre-configured. You may edit Macro_$wakeuptimerName to define your wake-up actions.";
+"Dummy $wakeuptimerName and other pending devices created and pre-configured. You may edit Macro_$wakeuptimerName to define your wake-up actions and at_$wakeuptimerName for optional at-device adjustments.";
                 }
             }
         }
