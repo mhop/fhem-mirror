@@ -62,7 +62,7 @@ sub RESIDENTS_Initialize($) {
     $hash->{NotifyFn} = "RESIDENTS_Notify";
     $hash->{UndefFn}  = "RESIDENTS_Undefine";
     $hash->{AttrList} =
-      "rgr_showAllStates:0,1 rgr_states rgr_wakeupDevice "
+"rgr_showAllStates:0,1 rgr_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rgr_wakeupDevice "
       . $readingFnAttributes;
 }
 
@@ -85,6 +85,15 @@ sub RESIDENTS_Define($$) {
         $attr{$name}{icon}   = "control_building_filled";
         $attr{$name}{room}   = "Residents";
         $attr{$name}{webCmd} = "state";
+    }
+
+    # Injecting AttrFn for use with RESIDENTS Toolkit
+    if ( !defined( $modules{dummy}{AttrFn} ) ) {
+        $modules{dummy}{AttrFn} = "RESIDENTStk_AttrFnDummy";
+    }
+    elsif ( $modules{dummy}{AttrFn} ne "RESIDENTStk_AttrFnDummy" ) {
+        Log3 $name, 5,
+"RESIDENTStk $name: concurrent AttrFn already defined for dummy module. Some attribute based functions like auto-creations will not be available.";
     }
 
     return undef;
@@ -128,7 +137,6 @@ sub RESIDENTS_Notify($$) {
     my ( $hash, $dev ) = @_;
     my $devName  = $dev->{NAME};
     my $hashName = $hash->{NAME};
-    my $hashName_attr;
 
     # process child notifies
     if ( $devName ne $hashName ) {
@@ -194,23 +202,72 @@ sub RESIDENTS_Notify($$) {
             }
         }
 
-        # process only registered devices for wakeup function
-        if ( @registeredWakeupdevs && $devName ~~ @registeredWakeupdevs ) {
+        # if we have registered wakeup devices
+        if (@registeredWakeupdevs) {
 
-            return
-              if ( !$dev->{CHANGED} ); # Some previous notify deleted the array.
+            # if this is a notification of a registered wakeup device
+            if ( $devName ~~ @registeredWakeupdevs ) {
 
-            foreach my $change ( @{ $dev->{CHANGED} } ) {
+                # Some previous notify deleted the array.
+                return
+                  if ( !$dev->{CHANGED} );
 
-                # state changed
-                if ( $change =~ /OFF|([0-9]{2}:[0-9]{2})/ ) {
-                    Log3 $hash, 4,
-                        "RESIDENTS "
-                      . $hashName . ": "
-                      . $devName
-                      . ": notify about change to $change";
+                foreach my $change ( @{ $dev->{CHANGED} } ) {
 
-                    return RESIDENTStk_wakeupSet( $devName, $change );
+                    # state changed
+                    if ( $change =~ /OFF|([0-9]{2}:[0-9]{2})/ ) {
+                        Log3 $hash, 4,
+                            "RESIDENTS "
+                          . $hashName . ": "
+                          . $devName
+                          . ": notify about change to $change";
+
+                        RESIDENTStk_wakeupSet( $devName, $change );
+                    }
+                    else {
+                        Log3 $hash, 5,
+                            "RESIDENTS "
+                          . $hashName . ": "
+                          . $devName
+                          . ": received unhandled notify about change $change";
+                    }
+                }
+            }
+
+            # stuff for every registered wakeupdev
+            foreach my $wakeupDev (@registeredWakeupdevs) {
+
+                # if this is a notification of a registered sub dummy device
+                # of one of our wakeup devices
+                if (   defined( $attr{$wakeupDev}{wakeupResetSwitcher} )
+                    && $attr{$wakeupDev}{wakeupResetSwitcher} eq $devName
+                    && $defs{$devName}{TYPE} eq "dummy" )
+                {
+
+                    # Some previous notify deleted the array.
+                    return
+                      if ( !$dev->{CHANGED} );
+
+                    foreach my $change ( @{ $dev->{CHANGED} } ) {
+
+                        # state changed to on
+                        if ( $change eq "auto" ) {
+                            Log3 $hash, 4,
+                                "RESIDENTS "
+                              . $hashName . ": "
+                              . $devName
+                              . ": notify about change to $change";
+
+                            RESIDENTStk_wakeupSet($wakeupDev);
+                        }
+                        else {
+                            Log3 $hash, 5,
+                                "RESIDENTS "
+                              . $hashName . ": "
+                              . $devName
+                              . ": received unhandled notify about change $change";
+                        }
+                    }
                 }
             }
         }
@@ -527,12 +584,13 @@ sub RESIDENTS_Set($@) {
                     # create new dummy device
                     fhem "define $wakeuptimerName dummy";
                     fhem "attr $wakeuptimerName alias Wake-up Timer $i";
-                    fhem "attr $wakeuptimerName comment Auto-created by RESIDENTS module for use with RESIDENTS Toolkit";
+                    fhem
+"attr $wakeuptimerName comment Auto-created by RESIDENTS module for use with RESIDENTS Toolkit";
                     fhem
 "attr $wakeuptimerName devStateIcon OFF:general_aus\@red .*:general_an\@green:OFF";
                     fhem "attr $wakeuptimerName group " . $attr{$name}{group}
                       if ( defined( $attr{$name}{group} ) );
-                    fhem "attr $wakeuptimerName icon time_clock";
+                    fhem "attr $wakeuptimerName icon time_timer";
                     fhem "attr $wakeuptimerName room " . $attr{$name}{room}
                       if ( defined( $attr{$name}{room} ) );
                     fhem
@@ -556,7 +614,7 @@ sub RESIDENTS_Set($@) {
 
                     $created = 1;
                     return
-"Dummy $wakeuptimerName and other pending devices created and pre-configured. You may edit Macro_$wakeuptimerName to define your wake-up actions.";
+"Dummy $wakeuptimerName and other pending devices created and pre-configured. You may edit Macro_$wakeuptimerName to define your wake-up actions and at_$wakeuptimerName for optional at-device adjustments.";
                 }
             }
         }
@@ -1177,6 +1235,9 @@ sub RESIDENTS_Datetime2Timestamp($) {
 							<br>
 							The wake-up behaviour may be influenced by the following device attributes:<br>
 							<li>
+								<i>wakeupAtdevice</i> - backlink the at device (mandatory)
+							</li>
+							<li>
 								<i>wakeupAutosave</i> - Triggers FHEM command 'save' after adjusting wake-up time value (defaults to 0=false)
 							</li>
 							<li>
@@ -1193,6 +1254,9 @@ sub RESIDENTS_Datetime2Timestamp($) {
 							</li>
 							<li>
 								<i>wakeupResetdays</i> - if wakeupDefaultTime is set you may restrict timer reset to specific days only. Mon=1,Tue=2,Wed=3,Thu=4,Fri=5,Sat=6,Sun=0 (optional)
+							</li>
+							<li>
+								<i>wakeupResetSwitcher</i> - DUMMY device to quickly turn on/off reset function (optional, device will be auto-created/-deleted)
 							</li>
 							<li>
 								<i>wakeupUserdevice</i> - backlink to RESIDENTS, ROOMMATE or GUEST device to check it's status (mandatory)
@@ -1403,6 +1467,9 @@ sub RESIDENTS_Datetime2Timestamp($) {
 							<br>
 							Die Weckfunktion kann wie folgt &uuml;ber Attribute beinflusst werden:<br>
 							<li>
+								<i>wakeupAtdevice</i> - Backlink zum at Ger&auml;t (notwendig)
+							</li>
+							<li>
 								<i>wakeupAutosave</i> - L&ouml;st das FHEM Kommando 'save' nach einer &Auml;nderung der Weckzeit aus (Standard 0=aus)
 							</li>
 							<li>
@@ -1419,6 +1486,9 @@ sub RESIDENTS_Datetime2Timestamp($) {
 							</li>
 							<li>
 								<i>wakeupResetdays</i> - sofern wakeupDefaultTime gesetzt ist, kann der Reset hier auf betimmte Tage begrenzt werden. Mon=1,Di=2,Mi=3,Do=4,Fr=5,Sa=6,So=0 (optional)
+							</li>
+							<li>
+								<i>wakeupResetSwitcher</i> - das DUMMY Device, welches zum schnellen ein/aus schalten der Resetfunktion verwendet wird (optional, Device wird automatisch angelegt/gelöscht)
 							</li>
 							<li>
 								<i>wakeupUserdevice</i> - Backlink zum RESIDENTS, ROOMMATE oder GUEST Ger&auml;t, um dessen Status zu pr&uuml;fen (notwendig)
