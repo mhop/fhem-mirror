@@ -110,9 +110,8 @@ at_Define($$)
     RemoveInternalTimer($hash);
     InternalTimer($nt, "at_Exec", $hash, 0);
     $hash->{NTM} = $ntm if($rel eq "+" || $fn);
-    my $val = IsDisabled($name) ?
-                 (AttrVal($name, "disable", undef) ? "disabled" : "inactive") :
-                 ("Next: ".FmtTime($nt));
+    my $d = IsDisabled($name);  # 1
+    my $val = ($d==3 ? "inactive" : ($d ? "disabled":("Next: ".FmtTime($nt))));
     readingsSingleUpdate($hash, "state", $val,
           !$hash->{READINGS}{state} || $hash->{READINGS}{state}{VAL} ne $val);
   }
@@ -138,13 +137,12 @@ at_Exec($)
   my $name = $hash->{NAME};
   Log3 $name, 5, "exec at command $name";
 
-  my $skip    = AttrVal($name, "skip_next", undef);
-  my $disable = IsDisabled($name);
-
+  my $skip = AttrVal($name, "skip_next", undef);
   delete $attr{$name}{skip_next} if($skip);
 
   my $command = SemicolonEscape($hash->{COMMAND});
-  my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
+  my $ret = AnalyzeCommandChain(undef, $command)
+        if(!$skip && !IsDisabled($name));
   Log3 $name, 3, "$name: $ret" if($ret);
 
   return if($hash->{DELETED});           # Deleted in the Command
