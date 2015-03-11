@@ -613,3 +613,7 @@
   
 - Fri Jan 30 2015 (fhainz)
   - added new module 70_Pushbullet
+
+- Wed Mar 11 2015 (loredo)
+  - added new RESIDENTS toolkit functions for RESIDENTS, ROOMMMATE and GUEST devices
+    first function: wakeuptimer
