@@ -695,7 +695,7 @@ IsDisabled($)
   return 0 if(!$devname || !defined($attr{$devname}));
 
   return 1 if($attr{$devname}{disable});
-  return 1 if($defs{$devname} && $defs{$devname}{STATE} &&
+  return 3 if($defs{$devname} && $defs{$devname}{STATE} &&
               $defs{$devname}{STATE} eq "inactive");
 
   my $dfi = $attr{$devname}{disabledForIntervals};
@@ -704,7 +704,7 @@ IsDisabled($)
     my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
     foreach my $ft (split(" ", $dfi)) {
       my ($from, $to) = split("-", $ft);
-      return 1 if($from && $to && $from le $hms && $hms le $to);
+      return 2 if($from && $to && $from le $hms && $hms le $to);
     }
   }
 
