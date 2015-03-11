@@ -550,15 +550,25 @@ LightScene_Set($@)
 
   if( !defined($cmd) ){ return "$name: set needs at least one parameter" };
 
-  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", sort keys %{$hash->{SCENES}}) ." save set setcmd scene:".join(",", sort keys %{$hash->{SCENES}})};
+  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", sort keys %{$hash->{SCENES}}) ." rename save set setcmd scene:".join(",", sort keys %{$hash->{SCENES}})};
 
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
   if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
   if( $cmd eq "remove" && !defined( $scene ) ) { return "Usage: set $name remove <scene_name>" };
+  if( $cmd eq "rename" && !defined( $scene ) ) { return "Usage: set $name rename <scene_alt> <scene_neu>" };
 
   if( $cmd eq "remove" ) {
     delete( $hash->{SCENES}{$scene} );
     return undef;
+
+  } elsif( $cmd eq "rename" ) {
+    my ($new) = @a;
+    if( !( $new ) ) { return "Usage: set $name rename <scene_alt> <scene_neu>" };
+
+    $hash->{SCENES}{$new} = $hash->{SCENES}{$scene};
+    delete( $hash->{SCENES}{$scene} );
+    return undef;
+
   } elsif( $cmd eq "set" || $cmd eq "setcmd" ) {
     my ($d, @args) = @a;
 
@@ -926,6 +936,8 @@ LightScene_editTable($) {
       </ul></li>
       <li>remove &lt;scene_name&gt;<br>
       remove &lt;scene_name&gt; from list of saved scenes</li>
+      <li>rename &lt;scene_old_name&gt; &lt;scene_new_name&gt;<br>
+      rename &lt;scene_old_name&gt; to &lt;scene_new_name&gt;</li>
     </ul><br>
 
   <a name="LightScene_Get"></a>
