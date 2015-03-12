@@ -7,6 +7,7 @@ text.paste { text-decoration:underline; stroke:none; fill:blue; cursor:pointer;}
 
 
 path.SVGplot     { stroke:black; fill:none; }
+rect.SVGplot     { stroke:black; fill:none; }
 polyline.SVGplot { stroke:black; fill:none; }
 .border  { stroke:black; fill:url(#gr_bg);}
 .vgrid   { stroke:gray; stroke-dasharray:2,6;}

@@ -6,6 +6,7 @@ text.legend { cursor:pointer; }
 circle#svgmarker { color:#278727; opacity:0.5; }
 
 path.SVGplot     { stroke:black; fill:none; }
+rect.SVGplot     { stroke:black; fill:none; }
 polyline.SVGplot { stroke:black; fill:none; }
 .border  { stroke:black; fill:url(#gr_bg); }
 .vgrid   { stroke:gray;  stroke-dasharray:2,6; }
