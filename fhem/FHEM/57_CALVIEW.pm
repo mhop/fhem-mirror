@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7009 2015-03-06 17:15:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7010 2015-03-06 17:15:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -196,7 +196,7 @@ sub getsummery($)
 <h3>CALVIEW</h3>
 <ul>This module creates a device with deadlines based on calendar-devices of the 57_Calendar.pm module.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeStarted Termine; 1 for modeStarted;modeUpcoming Termine&gt; &lt;updateintervall in ms (default 43200)&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeStarted Termine; 1 for modeStarted;modeUpcoming Termine&gt; &lt;updateintervall in sec (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar 1</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar,holiday 1 900</code></ul><br>
 <a name="CALVIEW set"></a>
@@ -220,7 +220,7 @@ sub getsummery($)
 <h3>CALVIEW</h3>
 <ul>Dieses Modul erstellt ein Device welches als Readings Termine eines oder mehrere Kalender(s), basierend auf dem 57_Calendar.pm Modul, besitzt.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeStarted Termine; 1 für modeStarted;modeUpcoming Termine&gt; &lt;updateintervall in ms (default 43200)&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeStarted Termine; 1 für modeStarted;modeUpcoming Termine&gt; &lt;updateintervall in sek (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender 1</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender,holiday 1 900</code></ul><br>
 <a name="CALVIEW set"></a>
