@@ -220,6 +220,22 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'delete') {
+    if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
+      $arg = $defs{$arg}{ID};
+    }
+
+    my $code = $name ."-". $arg;
+    if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+      CommandDelete( undef, "$modules{HUEDevice}{defptr}{$code}{NAME}" );
+      CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+    }
+
+    my $result = HUEBridge_Call($hash, undef, "lights/$arg", undef, 'DELETE');
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef;
+
   } elsif($cmd eq 'creategroup') {
 
     my @lights = ();
@@ -262,7 +278,7 @@ HUEBridge_Set($@)
     return undef;
 
   } else {
-    my $list = "creategroup deletegroup autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} == 2 );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -927,6 +943,8 @@ HUEBridge_HTTP_Request($$$@)
       Initiate the detection of new ZigBee devices. After aproximately one minute any newly detected
       devices can be listed with <code>get <bridge> devices</code> and the corresponding fhem devices
       can be created by <code>set <bridge> autocreate</code>.</li>
+    <li>delete &lt;name&gt;|&lt;id&gt;<br>
+      Deletes the given device in the bridge and deletes the associated fhem device.</li>
     <li>creategroup &lt;name&gt; &lt;light-1&gt[ &lt;light-2&gt;..&lt;lignt-n&gt;]<br>
       Create a group out of &lt;light-1&gt-&lt;light-n&gt in the bridge.
       The lights can be given as fhem device names or bridge device numbers.</li>
