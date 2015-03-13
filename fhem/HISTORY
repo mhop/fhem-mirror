@@ -617,3 +617,6 @@
 - Wed Mar 11 2015 (loredo)
   - added new RESIDENTS toolkit functions for RESIDENTS, ROOMMMATE and GUEST devices
     first function: wakeuptimer
+
+- Thu Mar 13 2015 (loredo)
+  - fixed CALVIEW commandref (ms to sec)
