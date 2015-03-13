@@ -82,9 +82,9 @@ sub CustomReadings_read($)
       $isCombined = 0;
     }
     
-    my $value = 0;
+    my $value;
     if ($isCombined) {
-      $value = shift @combinedOutput;
+      $value = shift @combinedOutput; 
             
       if (!($value)) {  
         $value = 0;
@@ -96,7 +96,7 @@ sub CustomReadings_read($)
       $value = eval($definition[1]);
     }
     
-    if($value) {
+    if(defined $value) {
       $value =~ s/^\s+|\s+$//g;
     }
     else {
