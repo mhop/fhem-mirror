@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  57_CALVIEW: fixed commandref
   - feature: GUEST: added support for RESIDENTS toolkit
   - feature: ROOMMATE: added support for RESIDENTS toolkit
   - feature: RESIDENTS: added support for RESIDENTS toolkit
