@@ -949,9 +949,13 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   
-  $p = "" if(!defined($p));
-  my @mI = unpack '(A2)*',$p; # split message info to bytes
   return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
+  
+  $p = "" if(!defined($p)); # generate some abreviations 
+  my @mI = unpack '(A2)*',$p; # split message info to bytes
+  my $mStp = $mI[0] ? $mI[0] : ""; #message subtype
+  my $mTyp = $mTp.$mStp;           #message type/subtype
+  
   # $shash will be replaced for multichannel commands
   my $shash  = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
   my $devH   = $shash;               # source device hash
@@ -1293,8 +1297,8 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($md =~ m/HM-CC-RT-DN/) { ##############################################
     my %ctlTbl=( 0=>"auto", 1=>"manual", 2=>"party",3=>"boost");
 
-    if   (  ($mTp eq "10" && $mI[0] eq "0A") #info-level/
-          ||($mTp eq "02" && $mI[0] eq "01")){#ackInfo
+    if   (  ($mTyp eq "100A") #info-level/
+          ||($mTyp eq "0201")){#ackInfo
 
       my ($err       ,$ctrlMode  ,$setTemp          ,$bTime,$pTemp,$pStart,$pEnd,$chn,$uk0,$lBat,$actTemp,$vp) = 
          (hex($mI[3]),hex($mI[5]),hex($mI[1].$mI[2]),"-"    ,"-"   ,"-"    ,"-"                             );
@@ -1376,9 +1380,9 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$devH,1,"battery:$lBat"] if ($lBat);
       push @evtEt,[$devH,1,"desired-temp:$setTemp"];
     }
-    elsif($mTp eq "59" && $p =~ m/^(..)/) {#inform team about new value
-      my $setTemp = sprintf("%.1f",int(hex($1)/4)/2);
-      my $ctrlMode = hex($1)&0x3;
+    elsif($mTp eq "59" && defined $mI[0]) {#inform team about new value
+      my $setTemp = sprintf("%.1f",int(hex($mI[0])/4)/2);
+      my $ctrlMode = hex($mI[0])&0x3;
       push @evtEt,[$shash,1,"desired-temp:$setTemp"];
       push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
 
@@ -1896,15 +1900,16 @@ sub CUL_HM_Parse($$) {#########################################################
 
   }
   elsif($st eq "powerSensor") {################################################
-    if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
-        ($mTp eq "10" && $p =~ m/^06/)) {  #    or Info_Status message here
+    if (($mTyp eq "0201") ||  # handle Ack_Status
+        ($mTyp eq "1006")) {  #    or Info_Status message here
 
-      my ($subType,$chn,$val,$err) = ($1,hex($2),hex($3)/2,hex($4))
-                          if($p =~ m/^(..)(..)(..)(..)/);
+      my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
       my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
+                             
+      push @evtEt,[$devH,1,"battery:".(($err&0x80)?"low"  :"ok"  )];
 
       push @evtEt,[$shash,1,"state:$val"];
     }
@@ -7566,7 +7571,7 @@ sub CUL_HM_complConfigTO($)  {# now perform consistancy check of register
   @{$modules{CUL_HM}{helper}{confCheckArr}} = ();
   CUL_HM_complConfig($_) foreach (CUL_HM_noDup(@arr));
 }
-sub CUL_HM_complConfig($;$)    {# read config if enabled and not complete
+sub CUL_HM_complConfig($;$)  {# read config if enabled and not complete
   my ($name,$dly) = @_;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   return if ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x07) < 5);
