@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.0
+# Version: 1.2.1
 #
 # Major Version History:
 # - 1.2.0 - 2015-03-11
@@ -143,7 +143,7 @@ sub ROOMMATE_Define($$) {
 
         $attr{$name}{alias} = "Status";
         $attr{$name}{devStateIcon} =
-".*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown";
+".*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown:home";
         $attr{$name}{icon}        = "people_sensor";
         $attr{$name}{rr_realname} = "alias";
         $attr{$name}{sortby}      = "1";
@@ -184,8 +184,8 @@ sub ROOMMATE_Define($$) {
 sub ROOMMATE_Undefine($$) {
     my ( $hash, $name ) = @_;
 
-    ROOMMATE_RemoveInternalTimer( "AutoGone",      $hash );
-    ROOMMATE_RemoveInternalTimer( "DurationTimer", $hash );
+    RESIDENTStk_RemoveInternalTimer( "AutoGone",      $hash );
+    RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 
     if ( defined( $hash->{RESIDENTGROUPS} ) ) {
         my @registeredResidentgroups =
@@ -230,28 +230,13 @@ sub ROOMMATE_Notify($$) {
                   if ( !$dev->{CHANGED} );
 
                 foreach my $change ( @{ $dev->{CHANGED} } ) {
-
-                    # state changed
-                    if ( $change =~ /OFF|([0-9]{2}:[0-9]{2})/ ) {
-                        Log3 $hash, 4,
-                            "ROOMMATE "
-                          . $hashName . ": "
-                          . $devName
-                          . ": notify about change to $change";
-
-                        RESIDENTStk_wakeupSet( $devName, $change );
-                    }
-                    else {
-                        Log3 $hash, 5,
-                            "ROOMMATE "
-                          . $hashName . ": "
-                          . $devName
-                          . ": received unhandled notify about change $change";
-                    }
+                    RESIDENTStk_wakeupSet( $devName, $change );
                 }
+
+                return;
             }
 
-            # stuff for every registered wakeupdev
+            # process sub-child notifies: *_wakeupDevice
             foreach my $wakeupDev (@registeredWakeupdevs) {
 
                 # if this is a notification of a registered sub dummy device
@@ -266,25 +251,11 @@ sub ROOMMATE_Notify($$) {
                       if ( !$dev->{CHANGED} );
 
                     foreach my $change ( @{ $dev->{CHANGED} } ) {
-
-                        # state changed to on
-                        if ( $change eq "auto" ) {
-                            Log3 $hash, 4,
-                                "ROOMMATE "
-                              . $hashName . ": "
-                              . $devName
-                              . ": notify about change to $change";
-
-                            RESIDENTStk_wakeupSet($wakeupDev);
-                        }
-                        else {
-                            Log3 $hash, 5,
-                                "ROOMMATE "
-                              . $hashName . ": "
-                              . $devName
-                              . ": received unhandled notify about change $change";
-                        }
+                        RESIDENTStk_wakeupSet( $wakeupDev, $change )
+                          if ( $change ne "off" );
                     }
+
+                    last;
                 }
             }
         }
@@ -470,14 +441,14 @@ sub ROOMMATE_Set($@) {
                 readingsBulkUpdate(
                     $hash,
                     "lastDurSleep",
-                    ROOMMATE_TimeDiff(
+                    RESIDENTStk_TimeDiff(
                         $datetime, $hash->{READINGS}{lastSleep}{VAL}
                     )
                 );
                 readingsBulkUpdate(
                     $hash,
                     "lastDurSleep_cr",
-                    ROOMMATE_TimeDiff(
+                    RESIDENTStk_TimeDiff(
                         $datetime, $hash->{READINGS}{lastSleep}{VAL}, "min"
                     )
                 );
@@ -547,14 +518,14 @@ sub ROOMMATE_Set($@) {
                         readingsBulkUpdate(
                             $hash,
                             "lastDurAbsence",
-                            ROOMMATE_TimeDiff(
+                            RESIDENTStk_TimeDiff(
                                 $datetime, $hash->{READINGS}{lastDeparture}{VAL}
                             )
                         );
                         readingsBulkUpdate(
                             $hash,
                             "lastDurAbsence_cr",
-                            ROOMMATE_TimeDiff(
+                            RESIDENTStk_TimeDiff(
                                 $datetime,
                                 $hash->{READINGS}{lastDeparture}{VAL}, "min"
                             )
@@ -571,14 +542,14 @@ sub ROOMMATE_Set($@) {
                         readingsBulkUpdate(
                             $hash,
                             "lastDurPresence",
-                            ROOMMATE_TimeDiff(
+                            RESIDENTStk_TimeDiff(
                                 $datetime, $hash->{READINGS}{lastArrival}{VAL}
                             )
                         );
                         readingsBulkUpdate(
                             $hash,
                             "lastDurPresence_cr",
-                            ROOMMATE_TimeDiff(
+                            RESIDENTStk_TimeDiff(
                                 $datetime, $hash->{READINGS}{lastArrival}{VAL},
                                 "min"
                             )
@@ -621,7 +592,7 @@ sub ROOMMATE_Set($@) {
                 ROOMMATE_AutoGone($hash);
             }
             elsif ( $state eq "absent" ) {
-                ROOMMATE_RemoveInternalTimer( "AutoGone", $hash );
+                RESIDENTStk_RemoveInternalTimer( "AutoGone", $hash );
             }
         }
     }
@@ -761,6 +732,8 @@ sub ROOMMATE_Set($@) {
                     $wakeuptimerName = $name . "_wakeuptimer" . $i;
                 }
                 else {
+                    my $sortby = AttrVal( $name, "sortby", -1 );
+                    $sortby++;
 
                     # create new dummy device
                     fhem "define $wakeuptimerName dummy";
@@ -768,36 +741,41 @@ sub ROOMMATE_Set($@) {
                     fhem
 "attr $wakeuptimerName comment Auto-created by ROOMMATE module for use with RESIDENTS Toolkit";
                     fhem
-"attr $wakeuptimerName devStateIcon OFF:general_aus\@red .*:general_an\@green:OFF";
+"attr $wakeuptimerName devStateIcon OFF:general_aus\@red:reset running:general_an\@blue:stop .*:general_an\@green:nextRun%20OFF";
                     fhem "attr $wakeuptimerName group " . $attr{$name}{group}
                       if ( defined( $attr{$name}{group} ) );
                     fhem "attr $wakeuptimerName icon time_timer";
                     fhem "attr $wakeuptimerName room " . $attr{$name}{room}
                       if ( defined( $attr{$name}{room} ) );
                     fhem
-"attr $wakeuptimerName setList state:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45";
+"attr $wakeuptimerName setList nextRun:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45 reset:noArg stop:noArg";
                     fhem "attr $wakeuptimerName userattr wakeupUserdevice";
+                    fhem "attr $wakeuptimerName sortby " . $sortby
+                      if ($sortby);
                     fhem "attr $wakeuptimerName wakeupUserdevice $name";
-                    fhem "attr $wakeuptimerName webCmd state";
+                    fhem "attr $wakeuptimerName webCmd nextRun";
 
                     # register slave device
-                    if ( defined( $attr{$name}{rr_wakeupDevice} ) ) {
-                        fhem "attr $name rr_wakeupDevice "
-                          . $attr{$name}{rr_wakeupDevice}
-                          . ",$wakeuptimerName";
-                    }
-                    else {
+                    my $wakeupDevice = AttrVal( $name, "rr_wakeupDevice", 0 );
+                    if ( !$wakeupDevice ) {
                         fhem "attr $name rr_wakeupDevice $wakeuptimerName";
+                    }
+                    elsif ( $wakeupDevice !~ /(.*,?)($wakeuptimerName)(.*,?)/ )
+                    {
+                        fhem "attr $name rr_wakeupDevice "
+                          . $wakeupDevice
+                          . ",$wakeuptimerName";
                     }
 
                     # trigger first update
-                    fhem "set $wakeuptimerName OFF";
+                    fhem "set $wakeuptimerName nextRun OFF";
 
                     $created = 1;
-                    return
-"Dummy $wakeuptimerName and other pending devices created and pre-configured. You may edit Macro_$wakeuptimerName to define your wake-up actions and at_$wakeuptimerName for optional at-device adjustments.";
                 }
             }
+
+            return
+"Dummy $wakeuptimerName and other pending devices created and pre-configured.\nYou may edit Macro_$wakeuptimerName to define your wake-up actions\nand at_$wakeuptimerName for optional at-device adjustments.";
         }
         else {
             return "Invalid 2nd argument, choose one of wakeuptimer ";
@@ -824,7 +802,7 @@ sub ROOMMATE_AutoGone($;$) {
     my $hash = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
     my $name = $hash->{NAME};
 
-    ROOMMATE_RemoveInternalTimer( "AutoGone", $hash );
+    RESIDENTStk_RemoveInternalTimer( "AutoGone", $hash );
 
     if ( defined( $hash->{READINGS}{state}{VAL} )
         && $hash->{READINGS}{state}{VAL} eq "absent" )
@@ -853,8 +831,8 @@ sub ROOMMATE_AutoGone($;$) {
         else {
             my $runtime = $timestamp + $timeout * 3600;
             Log3 $name, 4, "ROOMMATE $name: AutoGone timer scheduled: $runtime";
-            ROOMMATE_InternalTimer( "AutoGone", $runtime, "ROOMMATE_AutoGone",
-                $hash, 1 );
+            RESIDENTStk_InternalTimer( "AutoGone", $runtime,
+                "ROOMMATE_AutoGone", $hash, 1 );
         }
     }
 
@@ -873,7 +851,7 @@ sub ROOMMATE_DurationTimer($;$) {
     my $durAbsence  = "0";
     my $durSleep    = "0";
 
-    ROOMMATE_RemoveInternalTimer( "DurationTimer", $hash );
+    RESIDENTStk_RemoveInternalTimer( "DurationTimer", $hash );
 
     if ( !defined( $attr{$name}{rr_noDuration} )
         || $attr{$name}{rr_noDuration} == 0 )
@@ -888,7 +866,7 @@ sub ROOMMATE_DurationTimer($;$) {
             {
                 $durPresence =
                   $timestampNow -
-                  ROOMMATE_Datetime2Timestamp(
+                  RESIDENTStk_Datetime2Timestamp(
                     $hash->{READINGS}{lastArrival}{VAL} );
             }
         }
@@ -902,7 +880,7 @@ sub ROOMMATE_DurationTimer($;$) {
             {
                 $durAbsence =
                   $timestampNow -
-                  ROOMMATE_Datetime2Timestamp(
+                  RESIDENTStk_Datetime2Timestamp(
                     $hash->{READINGS}{lastDeparture}{VAL} );
             }
         }
@@ -916,21 +894,23 @@ sub ROOMMATE_DurationTimer($;$) {
             {
                 $durSleep =
                   $timestampNow -
-                  ROOMMATE_Datetime2Timestamp(
+                  RESIDENTStk_Datetime2Timestamp(
                     $hash->{READINGS}{lastSleep}{VAL} );
             }
         }
 
         my $durPresence_hr =
-          ( $durPresence > 0 ) ? ROOMMATE_sec2time($durPresence) : "00:00:00";
+          ( $durPresence > 0 )
+          ? RESIDENTStk_sec2time($durPresence)
+          : "00:00:00";
         my $durPresence_cr =
           ( $durPresence > 60 ) ? int( $durPresence / 60 + 0.5 ) : 0;
         my $durAbsence_hr =
-          ( $durAbsence > 0 ) ? ROOMMATE_sec2time($durAbsence) : "00:00:00";
+          ( $durAbsence > 0 ) ? RESIDENTStk_sec2time($durAbsence) : "00:00:00";
         my $durAbsence_cr =
           ( $durAbsence > 60 ) ? int( $durAbsence / 60 + 0.5 ) : 0;
         my $durSleep_hr =
-          ( $durSleep > 0 ) ? ROOMMATE_sec2time($durSleep) : "00:00:00";
+          ( $durSleep > 0 ) ? RESIDENTStk_sec2time($durSleep) : "00:00:00";
         my $durSleep_cr = ( $durSleep > 60 ) ? int( $durSleep / 60 + 0.5 ) : 0;
 
         readingsBeginUpdate($hash) if ( !$silent );
@@ -955,112 +935,10 @@ sub ROOMMATE_DurationTimer($;$) {
         readingsEndUpdate( $hash, 1 ) if ( !$silent );
     }
 
-    ROOMMATE_InternalTimer( "DurationTimer", $timestampNow + 60,
+    RESIDENTStk_InternalTimer( "DurationTimer", $timestampNow + 60,
         "ROOMMATE_DurationTimer", $hash, 1 );
 
     return undef;
-}
-
-###################################
-sub ROOMMATE_TimeDiff($$;$) {
-    my ( $datetimeNow, $datetimeOld, $format ) = @_;
-
-    my $timestampNow = ROOMMATE_Datetime2Timestamp($datetimeNow);
-    my $timestampOld = ROOMMATE_Datetime2Timestamp($datetimeOld);
-    my $timeDiff     = $timestampNow - $timestampOld;
-
-    # return seconds
-    return int( $timeDiff + 0.5 ) if ( defined($format) && $format eq "sec" );
-
-    # return minutes
-    return int( $timeDiff / 60 + 0.5 )
-      if ( defined($format) && $format eq "min" );
-
-    # return human readable format
-    my $hours = ( $timeDiff < 3600 ? 0 : int( $timeDiff / 3600 ) );
-    $timeDiff -= ( $hours == 0 ? 0 : ( $hours * 3600 ) );
-    my $minutes = ( $timeDiff < 60 ? 0 : int( $timeDiff / 60 ) );
-    my $seconds = $timeDiff % 60;
-
-    $hours   = "0" . $hours   if ( $hours < 10 );
-    $minutes = "0" . $minutes if ( $minutes < 10 );
-    $seconds = "0" . $seconds if ( $seconds < 10 );
-
-    return "$hours:$minutes:$seconds";
-}
-
-###################################
-sub ROOMMATE_Datetime2Timestamp($) {
-    my ($datetime) = @_;
-
-    my ( $date, $time, $y, $m, $d, $hour, $min, $sec, $timestamp );
-
-    ( $date, $time ) = split( ' ', $datetime );
-    ( $y,    $m,   $d )   = split( '-', $date );
-    ( $hour, $min, $sec ) = split( ':', $time );
-    $m -= 01;
-    $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
-
-    return $timestamp;
-}
-
-###################################
-sub ROOMMATE_sec2time($) {
-    my ($sec) = @_;
-
-    # return human readable format
-    my $hours = ( $sec < 3600 ? 0 : int( $sec / 3600 ) );
-    $sec -= ( $hours == 0 ? 0 : ( $hours * 3600 ) );
-    my $minutes = ( $sec < 60 ? 0 : int( $sec / 60 ) );
-    my $seconds = $sec % 60;
-
-    $hours   = "0" . $hours   if ( $hours < 10 );
-    $minutes = "0" . $minutes if ( $minutes < 10 );
-    $seconds = "0" . $seconds if ( $seconds < 10 );
-
-    return "$hours:$minutes:$seconds";
-}
-
-###################################
-sub ROOMMATE_InternalTimer($$$$$) {
-    my ( $modifier, $tim, $callback, $hash, $waitIfInitNotDone ) = @_;
-
-    my $mHash;
-    if ( $modifier eq "" ) {
-        $mHash = $hash;
-    }
-    else {
-        my $timerName = $hash->{NAME} . "_" . $modifier;
-        if ( exists( $hash->{TIMER}{$timerName} ) ) {
-            $mHash = $hash->{TIMER}{$timerName};
-        }
-        else {
-            $mHash = {
-                HASH     => $hash,
-                NAME     => $hash->{NAME} . "_" . $modifier,
-                MODIFIER => $modifier
-            };
-            $hash->{TIMER}{$timerName} = $mHash;
-        }
-    }
-    InternalTimer( $tim, $callback, $mHash, $waitIfInitNotDone );
-}
-
-###################################
-sub ROOMMATE_RemoveInternalTimer($$) {
-    my ( $modifier, $hash ) = @_;
-
-    my $timerName = $hash->{NAME} . "_" . $modifier;
-    if ( $modifier eq "" ) {
-        RemoveInternalTimer($hash);
-    }
-    else {
-        my $mHash = $hash->{TIMER}{$timerName};
-        if ( defined($mHash) ) {
-            delete $hash->{TIMER}{$timerName};
-            RemoveInternalTimer($mHash);
-        }
-    }
 }
 
 ###################################
@@ -1343,6 +1221,9 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>state</b> - reflects the current state
           </li>
           <li>
+            <b>wakeup</b> - becomes '1' while a wake-up program of this resident is being executed
+          </li>
+          <li>
             <b>wayhome</b> - depending on current location, it can become '1' if individual is on his/her way back home
           </li>
         </ul>
@@ -1617,6 +1498,9 @@ sub ROOMMATE_StartInternalTimers($$) {
           </li>
           <li>
             <b>state</b> - gibt den aktuellen Status wieder
+          </li>
+          <li>
+            <b>wakeup</b> - hat den Wert '1' w&auml;hrend ein Weckprogramm dieses Bewohners ausgef&uuml;hrt wird
           </li>
           <li>
             <b>wayhome</b> - abhängig vom aktullen Aufenthaltsort, kann der Wert '1' werden, wenn die Person auf dem weg zurück nach Hause ist
