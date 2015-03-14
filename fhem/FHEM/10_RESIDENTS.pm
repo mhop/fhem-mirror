@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.0
+# Version: 1.2.1
 #
 # Major Version History:
 # - 1.2.0 - 2015-03-11
@@ -80,7 +80,7 @@ sub RESIDENTS_Define($$) {
     if ($init_done) {
         $attr{$name}{alias} = "Residents";
         $attr{$name}{devStateIcon} =
-'.*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home';
+'.*home:status_available:absent .*absent:status_away_1:home .*gone:status_standby:home .*none:control_building_empty .*gotosleep:status_night:asleep .*asleep:status_night:awoken .*awoken:status_available:home .*:user_unknown:home';
         $attr{$name}{group}  = "Home State";
         $attr{$name}{icon}   = "control_building_filled";
         $attr{$name}{room}   = "Residents";
@@ -166,7 +166,10 @@ sub RESIDENTS_Notify($$) {
             foreach my $change ( @{ $dev->{CHANGED} } ) {
 
                 # state changed
-                if ( $change !~ /:/ || $change =~ /wayhome:/ ) {
+                if (   $change !~ /:/
+                    || $change =~ /wayhome:/
+                    || $change =~ /wakeup:/ )
+                {
                     Log3 $hash, 4,
                         "RESIDENTS "
                       . $hashName . ": "
@@ -200,6 +203,8 @@ sub RESIDENTS_Notify($$) {
                     readingsEndUpdate( $hash, 1 );
                 }
             }
+
+            return;
         }
 
         # if we have registered wakeup devices
@@ -213,28 +218,13 @@ sub RESIDENTS_Notify($$) {
                   if ( !$dev->{CHANGED} );
 
                 foreach my $change ( @{ $dev->{CHANGED} } ) {
-
-                    # state changed
-                    if ( $change =~ /OFF|([0-9]{2}:[0-9]{2})/ ) {
-                        Log3 $hash, 4,
-                            "RESIDENTS "
-                          . $hashName . ": "
-                          . $devName
-                          . ": notify about change to $change";
-
-                        RESIDENTStk_wakeupSet( $devName, $change );
-                    }
-                    else {
-                        Log3 $hash, 5,
-                            "RESIDENTS "
-                          . $hashName . ": "
-                          . $devName
-                          . ": received unhandled notify about change $change";
-                    }
+                    RESIDENTStk_wakeupSet( $devName, $change );
                 }
+
+                return;
             }
 
-            # stuff for every registered wakeupdev
+            # process sub-child notifies: *_wakeupDevice
             foreach my $wakeupDev (@registeredWakeupdevs) {
 
                 # if this is a notification of a registered sub dummy device
@@ -249,25 +239,11 @@ sub RESIDENTS_Notify($$) {
                       if ( !$dev->{CHANGED} );
 
                     foreach my $change ( @{ $dev->{CHANGED} } ) {
-
-                        # state changed to on
-                        if ( $change eq "auto" ) {
-                            Log3 $hash, 4,
-                                "RESIDENTS "
-                              . $hashName . ": "
-                              . $devName
-                              . ": notify about change to $change";
-
-                            RESIDENTStk_wakeupSet($wakeupDev);
-                        }
-                        else {
-                            Log3 $hash, 5,
-                                "RESIDENTS "
-                              . $hashName . ": "
-                              . $devName
-                              . ": received unhandled notify about change $change";
-                        }
+                        RESIDENTStk_wakeupSet( $wakeupDev, $change )
+                          if ( $change ne "off" );
                     }
+
+                    last;
                 }
             }
         }
@@ -580,6 +556,8 @@ sub RESIDENTS_Set($@) {
                     $wakeuptimerName = $name . "_wakeuptimer" . $i;
                 }
                 else {
+                    my $sortby = AttrVal( $name, "sortby", -1 );
+                    $sortby++;
 
                     # create new dummy device
                     fhem "define $wakeuptimerName dummy";
@@ -587,36 +565,41 @@ sub RESIDENTS_Set($@) {
                     fhem
 "attr $wakeuptimerName comment Auto-created by RESIDENTS module for use with RESIDENTS Toolkit";
                     fhem
-"attr $wakeuptimerName devStateIcon OFF:general_aus\@red .*:general_an\@green:OFF";
+"attr $wakeuptimerName devStateIcon OFF:general_aus\@red:reset running:general_an\@blue:stop .*:general_an\@green:nextRun%20OFF";
                     fhem "attr $wakeuptimerName group " . $attr{$name}{group}
                       if ( defined( $attr{$name}{group} ) );
                     fhem "attr $wakeuptimerName icon time_timer";
                     fhem "attr $wakeuptimerName room " . $attr{$name}{room}
                       if ( defined( $attr{$name}{room} ) );
                     fhem
-"attr $wakeuptimerName setList state:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45";
+"attr $wakeuptimerName setList nextRun:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45 reset:noArg stop:noArg";
                     fhem "attr $wakeuptimerName userattr wakeupUserdevice";
+                    fhem "attr $wakeuptimerName sortby " . $sortby
+                      if ($sortby);
                     fhem "attr $wakeuptimerName wakeupUserdevice $name";
-                    fhem "attr $wakeuptimerName webCmd state";
+                    fhem "attr $wakeuptimerName webCmd nextRun";
 
                     # register slave device
-                    if ( defined( $attr{$name}{rgr_wakeupDevice} ) ) {
-                        fhem "attr $name rgr_wakeupDevice "
-                          . $attr{$name}{rgr_wakeupDevice}
-                          . ",$wakeuptimerName";
-                    }
-                    else {
+                    my $wakeupDevice = AttrVal( $name, "rgr_wakeupDevice", 0 );
+                    if ( !$wakeupDevice ) {
                         fhem "attr $name rgr_wakeupDevice $wakeuptimerName";
+                    }
+                    elsif ( $wakeupDevice !~ /(.*,?)($wakeuptimerName)(.*,?)/ )
+                    {
+                        fhem "attr $name rgr_wakeupDevice "
+                          . $wakeupDevice
+                          . ",$wakeuptimerName";
                     }
 
                     # trigger first update
-                    fhem "set $wakeuptimerName OFF";
+                    fhem "set $wakeuptimerName nextRun OFF";
 
                     $created = 1;
-                    return
-"Dummy $wakeuptimerName and other pending devices created and pre-configured. You may edit Macro_$wakeuptimerName to define your wake-up actions and at_$wakeuptimerName for optional at-device adjustments.";
                 }
             }
+
+            return
+"Dummy $wakeuptimerName and other pending devices created and pre-configured.\nYou may edit Macro_$wakeuptimerName to define your wake-up actions\nand at_$wakeuptimerName for optional at-device adjustments.";
         }
         else {
             return "Invalid 2nd argument, choose one of wakeuptimer ";
@@ -657,6 +640,7 @@ sub RESIDENTS_UpdateReadings (@) {
     my $state_totalGuests  = 0;
     my $state_guestDev     = 0;
     my $wayhome            = 0;
+    my $wakeup             = 0;
     my $newstate;
     my $presence = "absent";
 
@@ -680,30 +664,34 @@ sub RESIDENTS_UpdateReadings (@) {
                 $state_totalPresent++;
             }
 
-            if ( $defs{$roommate}{READINGS}{state}{VAL} eq "gotosleep" ) {
+            elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "gotosleep" ) {
                 $state_gotosleep++;
                 $state_totalPresent++;
             }
 
-            if ( $defs{$roommate}{READINGS}{state}{VAL} eq "asleep" ) {
+            elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "asleep" ) {
                 $state_asleep++;
                 $state_totalPresent++;
             }
 
-            if ( $defs{$roommate}{READINGS}{state}{VAL} eq "awoken" ) {
+            elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "awoken" ) {
                 $state_awoken++;
                 $state_totalPresent++;
             }
 
-            if ( $defs{$roommate}{READINGS}{state}{VAL} eq "absent" ) {
+            elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "absent" ) {
                 $state_absent++;
                 $state_totalAbsent++;
             }
 
-            if ( $defs{$roommate}{READINGS}{state}{VAL} eq "gone" ) {
+            elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "gone" ) {
                 $state_gone++;
                 $state_totalAbsent++;
             }
+        }
+
+        if ( defined( $defs{$roommate}{READINGS}{wakeup}{VAL} ) ) {
+            $wakeup += $defs{$roommate}{READINGS}{wakeup}{VAL};
         }
 
         if ( defined( $defs{$roommate}{READINGS}{wayhome}{VAL} ) ) {
@@ -750,6 +738,10 @@ sub RESIDENTS_UpdateReadings (@) {
                 $state_totalGuests++;
                 $state_total++;
             }
+        }
+
+        if ( defined( $defs{$guest}{READINGS}{wakeup}{VAL} ) ) {
+            $wakeup += $defs{$guest}{READINGS}{wakeup}{VAL};
         }
 
         if ( defined( $defs{$guest}{READINGS}{wayhome}{VAL} ) ) {
@@ -800,6 +792,10 @@ sub RESIDENTS_UpdateReadings (@) {
     readingsBulkUpdate( $hash, "residentsGone", $state_gone )
       if ( !defined( $hash->{READINGS}{residentsGone}{VAL} )
         || $hash->{READINGS}{residentsGone}{VAL} ne $state_gone );
+
+    readingsBulkUpdate( $hash, "residentsTotalWakeup", $wakeup )
+      if ( !defined( $hash->{READINGS}{residentsTotalWakeup}{VAL} )
+        || $hash->{READINGS}{residentsTotalWakeup}{VAL} ne $wakeup );
 
     readingsBulkUpdate( $hash, "residentsTotalWayhome", $wayhome )
       if ( !defined( $hash->{READINGS}{residentsTotalWayhome}{VAL} )
@@ -911,14 +907,14 @@ sub RESIDENTS_UpdateReadings (@) {
             readingsBulkUpdate(
                 $hash,
                 "lastDurSleep",
-                RESIDENTS_TimeDiff(
+                RESIDENTStk_TimeDiff(
                     $datetime, $hash->{READINGS}{lastSleep}{VAL}
                 )
             );
             readingsBulkUpdate(
                 $hash,
                 "lastDurSleep_cr",
-                RESIDENTS_TimeDiff(
+                RESIDENTStk_TimeDiff(
                     $datetime, $hash->{READINGS}{lastSleep}{VAL}, "min"
                 )
             );
@@ -945,14 +941,14 @@ sub RESIDENTS_UpdateReadings (@) {
                 readingsBulkUpdate(
                     $hash,
                     "lastDurAbsence",
-                    RESIDENTS_TimeDiff(
+                    RESIDENTStk_TimeDiff(
                         $datetime, $hash->{READINGS}{lastDeparture}{VAL}
                     )
                 );
                 readingsBulkUpdate(
                     $hash,
                     "lastDurAbsence_cr",
-                    RESIDENTS_TimeDiff(
+                    RESIDENTStk_TimeDiff(
                         $datetime, $hash->{READINGS}{lastDeparture}{VAL},
                         "min"
                     )
@@ -969,14 +965,14 @@ sub RESIDENTS_UpdateReadings (@) {
                 readingsBulkUpdate(
                     $hash,
                     "lastDurPresence",
-                    RESIDENTS_TimeDiff(
+                    RESIDENTStk_TimeDiff(
                         $datetime, $hash->{READINGS}{lastArrival}{VAL}
                     )
                 );
                 readingsBulkUpdate(
                     $hash,
                     "lastDurPresence_cr",
-                    RESIDENTS_TimeDiff(
+                    RESIDENTStk_TimeDiff(
                         $datetime, $hash->{READINGS}{lastArrival}{VAL},
                         "min"
                     )
@@ -987,49 +983,6 @@ sub RESIDENTS_UpdateReadings (@) {
     }
 
     readingsEndUpdate( $hash, 1 );
-}
-
-###################################
-sub RESIDENTS_TimeDiff($$;$) {
-    my ( $datetimeNow, $datetimeOld, $format ) = @_;
-
-    my $timestampNow = RESIDENTS_Datetime2Timestamp($datetimeNow);
-    my $timestampOld = RESIDENTS_Datetime2Timestamp($datetimeOld);
-    my $timeDiff     = $timestampNow - $timestampOld;
-
-    # return seconds
-    return int( $timeDiff + 0.5 ) if ( defined($format) && $format eq "sec" );
-
-    # return minutes
-    return int( $timeDiff / 60 + 0.5 )
-      if ( defined($format) && $format eq "min" );
-
-    # return human readable format
-    my $hours = ( $timeDiff < 3600 ? 0 : int( $timeDiff / 3600 ) );
-    $timeDiff -= ( $hours == 0 ? 0 : ( $hours * 3600 ) );
-    my $minutes = ( $timeDiff < 60 ? 0 : int( $timeDiff / 60 ) );
-    my $seconds = $timeDiff % 60;
-
-    $hours   = "0" . $hours   if ( $hours < 10 );
-    $minutes = "0" . $minutes if ( $minutes < 10 );
-    $seconds = "0" . $seconds if ( $seconds < 10 );
-
-    return "$hours:$minutes:$seconds";
-}
-
-###################################
-sub RESIDENTS_Datetime2Timestamp($) {
-    my ($datetime) = @_;
-
-    my ( $date, $time, $y, $m, $d, $hour, $min, $sec, $timestamp );
-
-    ( $date, $time ) = split( ' ', $datetime );
-    ( $y,    $m,   $d )   = split( '-', $date );
-    ( $hour, $min, $sec ) = split( ':', $time );
-    $m -= 01;
-    $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
-
-    return $timestamp;
 }
 
 1;
@@ -1213,6 +1166,9 @@ sub RESIDENTS_Datetime2Timestamp($) {
             <b>residentsTotalPresent</b> - number of all residents who are currently at home
           </li>
           <li>
+            <b>residentsTotalWakeup</b> - number of all residents which currently have a wake-up program being executed
+          </li>
+          <li>
             <b>residentsTotalWayhome</b> - number of all active residents who are currently on their way back home
           </li>
           <li>
@@ -1256,7 +1212,7 @@ sub RESIDENTS_Datetime2Timestamp($) {
 								<i>wakeupResetdays</i> - if wakeupDefaultTime is set you may restrict timer reset to specific days only. Mon=1,Tue=2,Wed=3,Thu=4,Fri=5,Sat=6,Sun=0 (optional)
 							</li>
 							<li>
-								<i>wakeupResetSwitcher</i> - DUMMY device to quickly turn on/off reset function (optional, device will be auto-created/-deleted)
+								<i>wakeupResetSwitcher</i> - DUMMY device to quickly turn on/off reset function (optional, device will be auto-created)
 							</li>
 							<li>
 								<i>wakeupUserdevice</i> - backlink to RESIDENTS, ROOMMATE or GUEST device to check it's status (mandatory)
@@ -1445,6 +1401,9 @@ sub RESIDENTS_Datetime2Timestamp($) {
             <b>residentsTotalPresent</b> - Summe aller aktiven Bewohner, die momentan zu Hause sind
           </li>
           <li>
+            <b>residentsTotalWakeup</b> - Summe aller Bewohner, bei denen aktuell ein Weckprogramm ausgef&uuml;hrt wird
+          </li>
+          <li>
             <b>residentsTotalWayhome</b> - Summe aller aktiven Bewohner, die momentan auf dem Weg zurück nach Hause sind
           </li>
           <li>
@@ -1488,7 +1447,7 @@ sub RESIDENTS_Datetime2Timestamp($) {
 								<i>wakeupResetdays</i> - sofern wakeupDefaultTime gesetzt ist, kann der Reset hier auf betimmte Tage begrenzt werden. Mon=1,Di=2,Mi=3,Do=4,Fr=5,Sa=6,So=0 (optional)
 							</li>
 							<li>
-								<i>wakeupResetSwitcher</i> - das DUMMY Device, welches zum schnellen ein/aus schalten der Resetfunktion verwendet wird (optional, Device wird automatisch angelegt/gelöscht)
+								<i>wakeupResetSwitcher</i> - das DUMMY Device, welches zum schnellen ein/aus schalten der Resetfunktion verwendet wird (optional, Device wird automatisch angelegt)
 							</li>
 							<li>
 								<i>wakeupUserdevice</i> - Backlink zum RESIDENTS, ROOMMATE oder GUEST Ger&auml;t, um dessen Status zu pr&uuml;fen (notwendig)
