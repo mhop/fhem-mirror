@@ -90,7 +90,9 @@ TcpServer_Accept($$)
       SSL_server    => 1, 
       SSL_key_file  => "$mp/certs/server-key.pem",
       SSL_cert_file => "$mp/certs/server-cert.pem",
-      SSL_version   => 'SSLv23:!SSLv3:!SSLv2', #Forum #27565
+      #SSL_version   => 'SSLv23:!SSLv3:!SSLv2', #Forum #27565
+      SSL_version => 'TLSv12:!SSLv3', # Forum  #35004
+      SSL_cipher_list => 'HIGH:!RC4:!eNULL:!aNULL',
       Timeout       => 4,
       });
     my $err = $!;
