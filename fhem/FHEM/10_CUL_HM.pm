@@ -969,12 +969,7 @@ sub CUL_HM_Parse($$) {#########################################################
                     ($dst eq $id ? $ioName :
                                    $dst));
   if(!$shash && $mTp eq "00") { # generate device
-    my $md = $mI[1].$mI[2];
-    $md = $culHmModel->{$md}{name}  ?
-              $culHmModel->{$md}{name} :
-              "ID_".$md;
-    my $sname = "CUL_HM_".$md."_$src";
-    $sname =~ s/-/_/g;
+    my $sname = "HM_$src";
     Log3 undef, 2, "CUL_HM Unknown device $sname is now defined";
     DoTrigger("global","UNDEFINED $sname CUL_HM $src");
     # CommandDefine(undef,"$sname CUL_HM $src");
