@@ -34,6 +34,7 @@ use strict;
 use warnings;
 use IO::Socket;
 use Time::HiRes qw(gettimeofday);
+use Scalar::Util qw(looks_like_number);
 use Errno qw(:POSIX);
 
 ##################################################
@@ -222,19 +223,19 @@ use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
-my $currcfgfile="";		# current config/include file
-my $currlogfile;		# logfile, without wildcards
+my $currcfgfile="";             # current config/include file
+my $currlogfile;                # logfile, without wildcards
 my $cvsid = '$Id$';
 my $duplidx=0;                  # helper for the above pool
 my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand parameter passing
 my $intAtCnt=0;
 my $logopened = 0;              # logfile opened or using stdout
 my $namedef = "where <name> is a single device name, a list separated by komma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
-my $rcvdquit;			# Used for quit handling in init files
+my $rcvdquit;                   # Used for quit handling in init files
 my $readingsUpdateDelayTrigger; # needed internally
-my $sig_term = 0;		# if set to 1, terminate (saving the state)
+my $sig_term = 0;               # if set to 1, terminate (saving the state)
 my $wbName = ".WRITEBUFFER";    # Buffer-name for delayed writing via select
-my %comments;			# Comments from the include files
+my %comments;                   # Comments from the include files
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
 
@@ -258,7 +259,7 @@ $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
 $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
-		       "event-aggregator event-min-interval stateFormat";
+                       "event-aggregator event-min-interval stateFormat";
 
 
 %cmds = (
@@ -267,55 +268,55 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
            Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>"},
   "createlog"=> { ModuleName => "autocreate" },
   "define"  => { Fn=>"CommandDefine",
-	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
+           Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
   "deleteattr" => { Fn=>"CommandDeleteAttr",
-	    Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
+           Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
   "deletereading" => { Fn=>"CommandDeleteReading",
             Hlp=>"<devspec> [<attrname>],delete user defined reading for ".
                  "<devspec>" },
   "delete"  => { Fn=>"CommandDelete",
-	    Hlp=>"<devspec>,delete the corresponding definition(s)"},
+            Hlp=>"<devspec>,delete the corresponding definition(s)"},
   "displayattr"=> { Fn=>"CommandDisplayAttr",
-	    Hlp=>"<devspec> [attrname],display attributes" },
+            Hlp=>"<devspec> [attrname],display attributes" },
   "get"     => { Fn=>"CommandGet",
-	    Hlp=>"<devspec> <type dependent>,request data from <devspec>" },
+            Hlp=>"<devspec> <type dependent>,request data from <devspec>" },
   "include" => { Fn=>"CommandInclude",
-	    Hlp=>"<filename>,read the commands from <filenname>" },
+            Hlp=>"<filename>,read the commands from <filenname>" },
   "inform" => { Fn=>"CommandInform",
             ClientFilter => "telnet",
-	    Hlp=>"{on|off|raw|timer|status},echo all events to this client" },
+            Hlp=>"{on|off|raw|timer|status},echo all events to this client" },
   "iowrite" => { Fn=>"CommandIOWrite",
             Hlp=>"<iodev> <data>,write raw data with iodev" },
   "list"    => { Fn=>"CommandList",
-	    Hlp=>"[devspec],list definitions and status info" },
+            Hlp=>"[devspec],list definitions and status info" },
   "modify"  => { Fn=>"CommandModify",
-	    Hlp=>"device <options>,modify the definition (e.g. at, notify)" },
+            Hlp=>"device <options>,modify the definition (e.g. at, notify)" },
   "quit"    => { Fn=>"CommandQuit",
             ClientFilter => "telnet",
-	    Hlp=>",end the client session" },
+            Hlp=>",end the client session" },
   "exit"    => { Fn=>"CommandQuit",
             ClientFilter => "telnet",
-	    Hlp=>",end the client session" },
+            Hlp=>",end the client session" },
   "reload"  => { Fn=>"CommandReload",
-	    Hlp=>"<module-name>,reload the given module (e.g. 99_PRIV)" },
+            Hlp=>"<module-name>,reload the given module (e.g. 99_PRIV)" },
   "rename"  => { Fn=>"CommandRename",
-	    Hlp=>"<old> <new>,rename a definition" },
+            Hlp=>"<old> <new>,rename a definition" },
   "rereadcfg"  => { Fn=>"CommandRereadCfg",
-	    Hlp=>"[configfile],read in the config after deleting everything" },
+            Hlp=>"[configfile],read in the config after deleting everything" },
   "restore" => {
             Hlp=>"[list] [<filename|directory>],restore files saved by update"},
   "save"    => { Fn=>"CommandSave",
-	    Hlp=>"[configfile],write the configfile and the statefile" },
+            Hlp=>"[configfile],write the configfile and the statefile" },
   "set"     => { Fn=>"CommandSet",
-	    Hlp=>"<devspec> <type dependent>,transmit code for <devspec>" },
+            Hlp=>"<devspec> <type dependent>,transmit code for <devspec>" },
   "setreading" => { Fn=>"CommandSetReading",
-	    Hlp=>"<devspec> <reading> <value>,set reading for <devspec>" },
+            Hlp=>"<devspec> <reading> <value>,set reading for <devspec>" },
   "setstate"=> { Fn=>"CommandSetstate",
-	    Hlp=>"<devspec> <state>,set the state shown in the command list" },
+            Hlp=>"<devspec> <state>,set the state shown in the command list" },
   "setdefaultattr" => { Fn=>"CommandDefaultAttr",
-	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
+            Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "shutdown"=> { Fn=>"CommandShutdown",
-	    Hlp=>"[restart],terminate the server" },
+            Hlp=>"[restart],terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
             Hlp=>"<sec> [quiet],sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
@@ -621,8 +622,8 @@ while (1) {
         alarm(0) if($hash->{ALARMTIMEOUT});
 
         if(!defined($ret) && $werr == EWOULDBLOCK ) {
-	  $hash->{wantRead} = 1
-	    if(TcpServer_WantRead($hash));
+          $hash->{wantRead} = 1
+            if(TcpServer_WantRead($hash));
 
         } elsif(!$ret) { # zero=EOF, undef=error
           Log 4, "Write error to $p, deleting $hash->{NAME}";
@@ -733,7 +734,7 @@ GetLogLevel(@)
 
   return $df if(!defined($dev));
   return $attr{$dev}{loglevel}
-  	if(defined($attr{$dev}) && defined($attr{$dev}{loglevel}));
+        if(defined($attr{$dev}) && defined($attr{$dev}{loglevel}));
   return $df;
 }
 
@@ -930,7 +931,7 @@ AnalyzeCommand($$;$)
   Log 5, "Cmd: >$cmd<";
   return undef if(!$cmd);
 
-  if($cmd =~ m/^{.*}$/s) {		# Perl code
+  if($cmd =~ m/^{.*}$/s) {              # Perl code
     return "Forbidden command $cmd." if($allowed && $allowed !~ m/\bperl\b/);
     return AnalyzePerlCommand($cl, $cmd);
   }
@@ -959,7 +960,7 @@ AnalyzeCommand($$;$)
   if(!defined($cmds{$fn})) {
     foreach my $f (sort keys %cmds) {
       if(length($f) > length($fn) && lc(substr($f,0,length($fn))) eq lc($fn)) {
-	Log 5, "$fn => $f";
+        Log 5, "$fn => $f";
         $fn = $f;
         last;
       }
@@ -1021,7 +1022,7 @@ devspec2array($)
     my @res;
     foreach my $dName (split(":FILTER=", $l)) {
       my ($n,$op,$re) = ("NAME","=",$dName);
-      if($dName =~ m/^([^!]*)(=|!=)(.*)$/) {
+      if($dName =~ m/^([^!<>]*)(=|!=|<=|>=|<|>)(.*)$/) {
         ($n,$op,$re) = ($1,$2,$3);
         $isAttr = 1;    # Compatibility: return "" instead of $name
       }
@@ -1053,9 +1054,14 @@ devspec2array($)
         $val="" if(!defined($val));
 
         my $lre = ($n eq "room" ? "(^|,)($re)(,|\$)" : "^($re)\$");
+        my $valReNum = (looks_like_number($val) && looks_like_number($re) ? 1:0);
         eval { # a bad regexp is deadly
           if(($op eq  "=" && $val =~ m/$lre/s) ||
-             ($op eq "!=" && $val !~ m/$lre/s)) {
+             ($op eq "!=" && $val !~ m/$lre/s) ||
+             ($op eq "<"  && $valReNum && $val < $re) ||
+             ($op eq ">"  && $valReNum && $val > $re) ||
+             ($op eq "<=" && $valReNum && $val <= $re) ||
+             ($op eq ">=" && $valReNum && $val >= $re)) {
             push @res, $d 
           }
         };
@@ -1102,7 +1108,7 @@ CommandInclude($$)
   while(my $l = <$fh>) {
     $l =~ s/[\r\n]//g;
 
-    if($l =~ m/^(.*)\\ *$/) {		# Multiline commands
+    if($l =~ m/^(.*)\\ *$/) {       # Multiline commands
       $bigcmd .= "$1\n";
     } else {
       my $tret = AnalyzeCommandChain($cl, $bigcmd . $l);
@@ -1280,20 +1286,20 @@ WriteStatefile()
     if($r) {
       foreach my $c (sort keys %{$r}) {
 
-	my $rd = $r->{$c};
-	if(!defined($rd->{TIME})) {
-	  Log 4, "WriteStatefile $d $c: Missing TIME, using current time";
-	  $rd->{TIME} = TimeNow();
-	}
+        my $rd = $r->{$c};
+        if(!defined($rd->{TIME})) {
+          Log 4, "WriteStatefile $d $c: Missing TIME, using current time";
+          $rd->{TIME} = TimeNow();
+        }
 
         if(!defined($rd->{VAL})) {
-	  Log 4, "WriteStatefile $d $c: Missing VAL, setting it to 0";
-	  $rd->{VAL} = 0;
+          Log 4, "WriteStatefile $d $c: Missing VAL, setting it to 0";
+          $rd->{VAL} = 0;
         }
         my $val = $rd->{VAL};
         $val =~ s/;/;;/g;
         $val =~ s/\n/\\\n/g;
-	print SFH "setstate $d $rd->{TIME} $c $val\n";
+        print SFH "setstate $d $rd->{TIME} $c $val\n";
       }
     }
   }
@@ -1557,7 +1563,7 @@ CommandDefine($$)
   }
   my $name = $a[0];
   return "Usage: define <name> <type> <type dependent arguments>"
-  					if(int(@a) < 2);
+                if(int(@a) < 2);
   return "$name already defined, delete it first" if(defined($defs{$name}));
   return "Invalid characters in name (not A-Za-z0-9.:_): $name"
                         if($name !~ m/^[a-z0-9.:_]*$/i);
@@ -1621,7 +1627,7 @@ CommandModify($$)
   my @a = split("[ \t]+", $def, 2);
 
   return "Usage: modify <name> <type dependent arguments>"
-  					if(int(@a) < 1);
+                if(int(@a) < 1);
 
   # Return a list of modules
   return "Define $a[0] first" if(!defined($defs{$a[0]}));
@@ -1933,8 +1939,8 @@ CommandList($$)
 
     # Sort first by type then by name
     for my $d (sort { my $x=$modules{$defs{$a}{TYPE}}{ORDER}.$defs{$a}{TYPE} cmp
-		  	    $modules{$defs{$b}{TYPE}}{ORDER}.$defs{$b}{TYPE};
-		         $x=($a cmp $b) if($x == 0); $x; } keys %defs) {
+                            $modules{$defs{$b}{TYPE}}{ORDER}.$defs{$b}{TYPE};
+                         $x=($a cmp $b) if($x == 0); $x; } keys %defs) {
       next if(IsIgnored($d));
       my $t = $defs{$d}{TYPE};
       $str .= "\n$t:\n" if($t ne $lt);
@@ -2709,7 +2715,7 @@ ResolveDateWildcards($@)
 
   my ($f, @t) = @_;
   return $f if(!$f);
-  return $f if($f !~ m/%/);	# Be fast if there is no wildcard
+  return $f if($f !~ m/%/);     # Be fast if there is no wildcard
   $f =~ s/%L/$attr{global}{logdir}/g if($attr{global}{logdir}); #log directory
   return strftime($f,@t);
 }
@@ -2798,11 +2804,11 @@ GetTimeSpec($)
     } else {
       $tspec = "<empty string>" if(!$tspec);
       return ("the at function \"$fn\" must return a timespec and not $tspec.",
-      		undef, undef, undef, undef);
+                undef, undef, undef, undef);
     }
   } else {
     return ("Wrong timespec $tspec: either HH:MM:SS or {perlcode}",
-    		undef, undef, undef, undef);
+                undef, undef, undef, undef);
   }
   return (undef, $hr, $min, $sec, $fn);
 }
@@ -3143,7 +3149,8 @@ Dispatch($$$)
     }
   }
 
-  return undef if(!defined($found[0]) || $found[0] eq "");	# Special return: Do not notify
+  # Special return: Do not notify
+  return undef if(!defined($found[0]) || $found[0] eq "");
 
   foreach my $found (@found) {
 
@@ -3743,21 +3750,21 @@ readingsBulkUpdate($$$@)
   if($changed) {
     #Debug "Processing $reading: $value";
     my @v = grep { my $l = $_;
-		  $l =~ s/:.*//;
-		  ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attraggr"}};
+                  $l =~ s/:.*//;
+                  ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attraggr"}};
     if(@v) {
       # e.g. power:20:linear:avg
       my (undef, $duration, $method, $function) = split(":", $v[0], 4);
       my $ts;
       if(defined($readings->{".ts"})) {
-	$ts= $readings->{".ts"};
+        $ts= $readings->{".ts"};
       } else {
-	require "TimeSeries.pm";
-	$ts= TimeSeries->new( { method => $method, autoreset => $duration } );
-	$readings->{".ts"}= $ts;
-	# access from command line:
+        require "TimeSeries.pm";
+        $ts= TimeSeries->new( { method => $method, autoreset => $duration } );
+        $readings->{".ts"}= $ts;
+        # access from command line:
         # { $defs{"myClient"}{READINGS}{"myValue"}{".ts"}{max} }
-	#Debug "TimeSeries created.";
+        #Debug "TimeSeries created.";
       }
       my $now = $hash->{".updateTime"};
       $changed= $ts->elapsed($now);
