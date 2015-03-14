@@ -281,8 +281,7 @@ if (\$EVTPART0 eq \"stop\") {\
         && defined( $defs{$wakeupAtdevice} )
         && $defs{$wakeupAtdevice}{TYPE} eq "at" )
     {
-      Log3 $NAME, 4,
-        "RESIDENTStk $NAME: New wake-up time: $VALUE";
+        Log3 $NAME, 4, "RESIDENTStk $NAME: New wake-up time: $VALUE";
 
         readingsBeginUpdate( $defs{$NAME} );
         readingsBulkUpdate( $defs{$NAME}, "state", $VALUE )
@@ -307,8 +306,13 @@ if (\$EVTPART0 eq \"stop\") {\
 #
 sub RESIDENTStk_wakeupGetBegin($) {
     my ($NAME) = @_;
-    my $wakeupDefaultTime = AttrVal( $NAME, "wakeupDefaultTime", "07:00" );
-    my $wakeupTime = ReadingsVal( $NAME, "nextRun", $wakeupDefaultTime );
+		my $defaultBeginTime = "05:00";
+    my $wakeupDefaultTime = AttrVal( $NAME, "wakeupDefaultTime", $defaultBeginTime );
+    my $nextRun = ReadingsVal( $NAME, "nextRun", $wakeupDefaultTime );
+    my $wakeupTime = (
+        lc($nextRun) ne "off"
+        ? $nextRun
+        : ( lc($wakeupDefaultTime) ne "off" ? $wakeupDefaultTime : $defaultBeginTime ) );
     my $wakeupOffset = AttrVal( $NAME, "wakeupOffset", 0 );
     my $return;
 
@@ -320,9 +324,6 @@ sub RESIDENTStk_wakeupGetBegin($) {
         if ( $seconds < 0 ) { $seconds = 86400 + $seconds }
 
         $return = RESIDENTStk_sec2time($seconds);
-    }
-    else {
-        $return = "07:00";
     }
 
     return $return;
@@ -403,10 +404,10 @@ sub RESIDENTStk_wakeupRun($) {
         elsif ( $defs{$wakeupMacro}{TYPE} ne "notify" ) {
             return "$NAME: device $wakeupMacro is not of type notify";
         }
-				elsif ($wakeupUserdeviceWakeup) {
-          Log3 $NAME, 3,
-            "RESIDENTStk $NAME: Another wake-up program is already being executed, won't trigger $wakeupMacro";
-				}
+        elsif ($wakeupUserdeviceWakeup) {
+            Log3 $NAME, 3,
+"RESIDENTStk $NAME: Another wake-up program is already being executed, won't trigger $wakeupMacro";
+        }
         else {
             Log3 $NAME, 4,
               "RESIDENTStk $NAME: trigger $wakeupMacro (running=1)";
