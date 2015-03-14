@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0042 2015-03-04 20:00:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0043 2015-03-14 17:00:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -155,6 +155,10 @@
 #		0042    03.03.2015	Sailor				km200_Define					Added more services
 #		0042    03.03.2015	Sailor				km200_Set						Re-read of written value bug fixed.
 #		0042    04.03.2015	Sailor				km200_Set						Correction of type change for numeric values
+#		0043    09.03.2015	Sailor				km200_ParseHttpResponseInit		Read of "switchPrograms" implemented
+#		0043    09.03.2015	Sailor				km200_ParseHttpResponseDyn		Read of "switchPrograms" implemented
+#		0043    09.03.2015	Sailor				km200_ParseHttpResponseStat		Read of "switchPrograms" implemented
+#		0043    14.03.2015	Sailor				All								My 41st birthday version.
 ########################################################################################################################
 
 
@@ -164,6 +168,10 @@
 # *DbLog: X_DbLog_splitFn not completely implemented in order to hand over the units of the readings to DbLog database
 #         Unfortunately the global %hash of this module will not be transferred to the DbLog function. Therefore this 
 #         function is useless.
+#
+# *switchPrograms: Writing programs not yet implemented
+#
+# *notifications: Read of boiler controller error messages not yet implemented
 #
 ########################################################################################################################
 
@@ -223,7 +231,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0042";
+	my $ModuleVersion           = "0043";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -394,6 +402,18 @@ sub km200_Define($$)
 	"/heatSources/hs1/actualModulation",
 	"/heatSources/hs1/actualPower",
 	"/heatSources/hs1/fuel",
+	"/heatSources/hs1/fuel/density",
+	"/heatSources/hs1/fuel/caloricValue",
+	
+	"/heatSources/hs2/energyReservoir",
+	"/heatSources/hs2/reservoirAlert",
+	"/heatSources/hs2/nominalFuelConsumption",
+	"/heatSources/hs2/fuelConsmptCorrFactor",
+	"/heatSources/hs2/actualModulation",
+	"/heatSources/hs2/actualPower",
+	"/heatSources/hs2/fuel",
+	"/heatSources/hs2/fuel/density",
+	"/heatSources/hs2/fuel/caloricValue",
 	
 	"/notifications",
 
@@ -518,7 +538,6 @@ sub km200_Define($$)
 	
 	my @KM200_StatServices = (
 	"/gateway/uuid",
-	"/gateway/versionFirmware",
 	"/gateway/versionHardware",
 	"/system/brand",
 	"/system/bus",
@@ -1399,7 +1418,7 @@ sub km200_GetInitService($)
 	my $Service                      = $KM200_InitServices[$ServiceCounterInit];
 
 
-	### If this this loop is accessed for the first time, stop the timer
+	### If this this loop is accessed for the first time, stop the timer and set status
 	if ($ServiceCounterInit == 0)
 	{
 		### Console Message if enabled
@@ -1473,7 +1492,8 @@ sub km200_ParseHttpResponseInit($)
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be parsed by JSON         : $Service \n";}
 		};
 
-		if( exists $json -> {"value"})
+		### Check whether the type is a single value containing a string or float value
+		if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
 		{
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
@@ -1482,21 +1502,19 @@ sub km200_ParseHttpResponseInit($)
 			### Log entries for debugging purposes
 			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: value found for  : " .$Service;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: value            : " .$JsonValue;
-			### Log entries for debugging purposes
 
 			### Add service to the list of responding services
 			push (@KM200_RespondingServices, $Service);
-			### Add service to the list of responding services
 
 			### Save json-hash for DbLog-Split
 			$hash->{temp}{ServiceDbLogSplitHash} = $json;
-			### Save json-hash for DbLog-Split
 
 			### Write reading for fhem
 			readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
-			### Write reading for fhem
 
+			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read";}
 
 			
@@ -1511,26 +1529,295 @@ sub km200_ParseHttpResponseInit($)
 				# Do nothing
 				if ($hash->{CONSOLEMESSAGE} == true) {print "                      ";}
 			}
-			### Check whether service is writeable and write name of service in array
-			
-			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId \n";}
+
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId\n";}
 		}	
+		### Check whether the type is an switchProgram
+		elsif ($json -> {type} eq "switchProgram")
+		{
+			my $JsonId         = $json->{id};
+			my $JsonType       = $json->{type};
+			my @JsonValues     = $json->{switchPoints};
+
+			### Log entries for debugging purposes
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: value            : " .@JsonValues;
+
+			### Add service to the list of responding services
+			push (@KM200_RespondingServices, $Service);
+			
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read";}
+			
+			### Check whether service is writeable and write name of service in array
+			if ($json->{writeable} == 1)
+			{
+				if ($hash->{CONSOLEMESSAGE} == true) {print " and is writeable     ";}
+				push (@KM200_WriteableServices, $Service);
+			}
+			else
+			{
+				# Do nothing
+				if ($hash->{CONSOLEMESSAGE} == true) {print "                      ";}
+			}
+			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId\n";}
+			
+			### Set up variables
+			my $TempJsonId    = "";
+			my $TempReadingMo = "";
+			my $TempReadingTu = "";
+			my $TempReadingWe = "";
+			my $TempReadingTh = "";
+			my $TempReadingFr = "";
+			my $TempReadingSa = "";
+			my $TempReadingSu = "";
+			
+			foreach my $item (@{ $json->{switchPoints} })
+			{
+				### Create string for time and switchpoint in fixed format and write part of Reading String
+				my $temptime     = sprintf ('%04d', ($item->{time}/0.6));
+				my $tempsetpoint =  $item->{setpoint};
+				$tempsetpoint    =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(8-length($1)))/e;
+				my $TempReading  = $temptime . " " . $tempsetpoint;
+				
+				### Create ValueString for this day
+				if ($item->{dayOfWeek} eq "Mo")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingMo eq "")
+					{
+						### Write the first entry
+						$TempReadingMo = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingMo = $TempReadingMo . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Tu")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingTu eq "")
+					{
+						### Write the first entry
+						$TempReadingTu = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingTu = $TempReadingTu . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "We")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingWe eq "")
+					{
+						### Write the first entry
+						$TempReadingWe = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingWe = $TempReadingWe . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Th")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingTh eq "")
+					{
+						### Write the first entry
+						$TempReadingTh = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingTh = $TempReadingTh . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Fr")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingFr eq "")
+					{
+						### Write the first entry
+						$TempReadingFr = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingFr = $TempReadingFr . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Sa")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingSa eq "")
+					{
+						### Write the first entry
+						$TempReadingSa = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingSa = $TempReadingSa . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Su")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingSu eq "")
+					{
+						### Write the first entry
+						$TempReadingSu = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingSu = $TempReadingSu . " " . $TempReading;
+					}
+				}
+				else
+				{
+					if ($hash->{CONSOLEMESSAGE} == true) {print "dayOfWeek of unknow day: " . $item->{dayOfWeek};}
+				}
+			}
+
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "1-Mo";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingMo, 1);
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "2-Tu";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTu, 1);
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "3-We";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingWe, 1);
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "4-Th";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTh, 1);
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "5-Fr";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingFr, 1);
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "6-Sa";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSa, 1);
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "7-Su";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSu, 1);
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+		}
+		
+		### Check whether the type is an errorlist
+		elsif ($json -> {type} eq "errorList")
+		{
+			my $JsonId         = $json->{id};
+			my $JsonType       = $json->{type};
+
+			### Log entries for debugging purposes
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
+
+			
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read";}
+			
+			
+			### Check whether service is writeable and write name of service in array
+			if ($json->{writeable} == 1)
+			{
+				if ($hash->{CONSOLEMESSAGE} == true) {print " and is writeable     ";}
+				push (@KM200_WriteableServices, $Service);
+			}
+			else
+			{
+				# Do nothing
+				if ($hash->{CONSOLEMESSAGE} == true) {print "                      ";}
+			}
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId\n";}
+			if ($hash->{CONSOLEMESSAGE} == true) {print(" - JsonResponse: $json\n");}
+			if ($hash->{CONSOLEMESSAGE} == true) {print(" - JsonType    :  " . $json->{type}   . "\n");}
+			if ($hash->{CONSOLEMESSAGE} == true) 
+			{
+				print(" - JsonValues  :\n");
+				
+				foreach my $item (@{ $json->{values} })
+				{
+					print( $item . "\n");
+				}
+			print("End of list\n");
+			}
+		}
+		### Check whether the type is an refEnum which is indicating an empty parent directory
+		elsif ($json -> {type} eq "refEnum")
+		{
+			my $JsonId         = $json->{id};		
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service is an empty parent directory     : $JsonId\n";}
+		}
+		### Check whether the type is unknown
 		else
 		{
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - value not found for:" .$Service;
-			### Log entries for debugging purposes
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - type is unknown for:" .$Service;
+			
+			### Console Message if enabled
+			if ($hash->{CONSOLEMESSAGE} == true) {print "The data type is unknown for the following Service     : $Service \n";}
+			if ($hash->{CONSOLEMESSAGE} == true) {print(" - JsonResponse: " . $json          . "\n");}
+			if ($hash->{CONSOLEMESSAGE} == true) {print(" - Type        : " . $json->{type}  . "\n");}
+			if ($hash->{CONSOLEMESSAGE} == true) {print(" - Value       : " . $json->{value} . "\n");}
 		}
 	}
 	else 
 	{
+		### Log entries for debugging purposes
 		Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: ". $Service . " NOT available";
+		
+		### Console Message if enabled
 		if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read                   : $Service \n";}
 	}
 
 	### Log entries for debugging purposes
 	Log3 $name, 5, $name. " : km200_ParseHttpResponseInit    : response         : " .$data;
-	### Log entries for debugging purposes
+
 
 	if ($ServiceCounterInit < ($NumberInitServices-1))	### If the list of KM200ALLSERVICES has not been finished yet
 	{
@@ -1579,7 +1866,6 @@ sub km200_ParseHttpResponseInit($)
 		@{$hash->{Secret}{KM200WRITEABLESERVICES}}  = @KM200_WriteableServices;
 		@{$hash->{Secret}{KM200DYNSERVICES}}        = @KM200_DynServices;
 		@{$hash->{Secret}{KM200STATSERVICES}}       = @KM200_StatServices;
-		### Save arrays of services in hash
 
 		$hash->{status}{FlagInitRequest}            = false;
 		
@@ -1607,7 +1893,6 @@ sub km200_ParseHttpResponseInit($)
 	}
 	### Clear up temporary variables
 	$hash->{temp}{decodedcontent} = "";	
-	### Clear up temporary variables
 		
 	return;
 }
@@ -1693,11 +1978,12 @@ sub km200_ParseHttpResponseDyn($)
 		}
 		or do 
 		{
-		Log3 $name, 5, $name. " : km200_parseHttpResponseDyn - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
-		if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
+			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
+			if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
 		};
 		
-		if( exists $json -> {"value"})
+		### Check whether the type is a single value containing a string or float value
+		if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
 		{
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
@@ -1706,6 +1992,7 @@ sub km200_ParseHttpResponseDyn($)
 			### Log entries for debugging purposes
 			Log3 $name, 4, $name. " : km200_parseHttpResponseDyn: value found for  : " .$Service;
 			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn: id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: type             : " .$JsonType;
 			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn: value            : " .$JsonValue;
 			### Log entries for debugging purposes
 
@@ -1717,11 +2004,192 @@ sub km200_ParseHttpResponseDyn($)
 			readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 			### Write reading
 		}			
+		### Check whether the type is an switchProgram
+		elsif ($json -> {type} eq "switchProgram")
+		{
+			my $JsonId         = $json->{id};
+			my $JsonType       = $json->{type};
+
+			### Log entries for debugging purposes
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseDyn: value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: type             : " .$JsonType;
+			
+			### Set up variables
+			my $TempJsonId    = "";
+			my $TempReadingMo = "";
+			my $TempReadingTu = "";
+			my $TempReadingWe = "";
+			my $TempReadingTh = "";
+			my $TempReadingFr = "";
+			my $TempReadingSa = "";
+			my $TempReadingSu = "";
+			
+			foreach my $item (@{ $json->{switchPoints} })
+			{
+				### Create string for time and switchpoint in fixed format and write part of Reading String
+				my $temptime     = sprintf ('%04d', ($item->{time}/0.6));
+				my $tempsetpoint =  $item->{setpoint};
+				$tempsetpoint    =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(8-length($1)))/e;
+				my $TempReading  = $temptime . " " . $tempsetpoint;
+				
+				### Create ValueString for this day
+				if ($item->{dayOfWeek} eq "Mo")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingMo eq "")
+					{
+						### Write the first entry
+						$TempReadingMo = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingMo = $TempReadingMo . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Tu")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingTu eq "")
+					{
+						### Write the first entry
+						$TempReadingTu = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingTu = $TempReadingTu . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "We")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingWe eq "")
+					{
+						### Write the first entry
+						$TempReadingWe = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingWe = $TempReadingWe . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Th")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingTh eq "")
+					{
+						### Write the first entry
+						$TempReadingTh = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingTh = $TempReadingTh . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Fr")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingFr eq "")
+					{
+						### Write the first entry
+						$TempReadingFr = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingFr = $TempReadingFr . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Sa")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingSa eq "")
+					{
+						### Write the first entry
+						$TempReadingSa = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingSa = $TempReadingSa . " " . $TempReading;
+					}
+				}
+				elsif ($item->{dayOfWeek} eq "Su")
+				{
+					### If it is the first entry for this day
+					if ($TempReadingSu eq "")
+					{
+						### Write the first entry
+						$TempReadingSu = $TempReading;
+					}
+					### If it is NOT the first entry for this day
+					else
+					{
+						### Add the next entry
+						$TempReadingSu = $TempReadingSu . " " . $TempReading;
+					}
+				}
+				else
+				{
+					if ($hash->{CONSOLEMESSAGE} == true) {print "dayOfWeek of unknow day: " . $item->{dayOfWeek};}
+				}
+			}
+
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "1-Mo";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingMo, 1);
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "2-Tu";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTu, 1);
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "3-We";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingWe, 1);
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "4-Th";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTh, 1);
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "5-Fr";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingFr, 1);
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "6-Sa";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSa, 1);
+			
+			### Create new Service and write reading for fhem
+			$TempJsonId = $JsonId . "/" . "7-Su";
+			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSu, 1);
+		}
+		### Check whether the type is an errorlist
+		elsif ($json -> {type} eq "errorList")
+		{
+			my $JsonId         = $json->{id};
+			my $JsonType       = $json->{type};
+
+			### Log entries for debugging purposes
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseDyn: value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: type             : " .$JsonType;
+			
+		}
+		### Check whether the type is unknown
 		else
 		{
 			### Log entries for debugging purposes
-			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn - value not found for:" .$Service;
-			### Log entries for debugging purposes
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseDyn - type is unknown for:" .$Service;
 		}
 	}
 	else 
@@ -1836,11 +2304,12 @@ sub km200_ParseHttpResponseStat($)
 		}
 		or do 
 		{
-		Log3 $name, 5, $name. " : km200_parseHttpResponseStat - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
-		if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
+			Log3 $name, 5, $name. " : km200_parseHttpResponseStat - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
+			if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
 		};
 
-		if( exists $json -> {"value"})
+		### Check whether the type is a single value containing a string or float value
+		if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
 		{
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
@@ -1849,25 +2318,24 @@ sub km200_ParseHttpResponseStat($)
 			### Log entries for debugging purposes
 			Log3 $name, 4, $name. " : km200_parseHttpResponseStat: value found for  : " .$Service;
 			Log3 $name, 5, $name. " : km200_parseHttpResponseStat: id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseStat: type             : " .$JsonType;
 			Log3 $name, 5, $name. " : km200_parseHttpResponseStat: value            : " .$JsonValue;
 			### Log entries for debugging purposes
-			
 
 			### Save json-hash for DbLog-Split
 			$hash->{temp}{ServiceDbLogSplitHash} = $json;
 			### Save json-hash for DbLog-Split
 
-
 			### Write reading
 			readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 			### Write reading
 		}			
+		### Check whether the type is unknown
 		else
 		{
 			### Log entries for debugging purposes
-			Log3 $name, 5, $name. " : km200_parseHttpResponseStat - value not found for:" .$Service;
-			### Log entries for debugging purposes
-		}
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseStat - type is unknown for:" .$Service;
+		}		
 	}
 	else 
 	{
