@@ -129,15 +129,16 @@ SVG_FwDetail($@)
   return $ret;
 }
 
+
 sub
-jsSVG_getAttrs($)
+jsSVG_getAttrs($;$)
 {
-  my ($d) = @_;
+  my ($d , $flt) = @_;
   return join("&#01;", map { #00 arrives as 65533 in JS
      my $v=$attr{$d}{$_};
      $v =~ s/'/&#39;/g;
     "$_=$v";
-  } keys %{$attr{$d}});
+  } grep { $flt ? $flt->{$_} : 1 } keys %{$attr{$d}});
 }
 
 sub
@@ -168,26 +169,6 @@ SVG_FwFn($$$$)
     $pageHash->{jsLoaded} = 1 if($pageHash);
   }
 
-  if(AttrVal($FW_wname, "plotmode", "SVG") eq "jsSVG") {
-
-    my @d=split(":",$defs{$d}{DEF});
-    my $gplot;
-    if(open(FH, "$FW_gplotdir/$d[1].gplot")) {
-      $gplot = join("&#01;",<FH>);
-      $gplot =~ s/'/&#39;/g;
-      $gplot =~ s/\n//g;
-    }
-    close(FH);
-
-    $ret .= "<div id='jsSVG_$d' class='jsSVG' ".
-                "attr='".jsSVG_getAttrs($d)."' ".
-                "parentAttr='".jsSVG_getAttrs($FW_wname)."' ".
-                "gplotFile='$gplot' source='$d[0]'>".
-            "</div>";
-    return $ret;
-  }
-
-
   # plots navigation buttons
   if (AttrVal($d,"plotmode",$FW_plotmode) ne "gnuplot") {
     if((!$pageHash || !$pageHash->{buttons}) &&
@@ -200,6 +181,32 @@ SVG_FwFn($$$$)
       $pageHash->{buttons} = 1 if($pageHash);
       $ret .= "<br>";
     }
+  }
+
+
+  if(AttrVal($FW_wname, "plotmode", "SVG") eq "jsSVG") {
+    my @d=split(":",$defs{$d}{DEF});
+    my ($err, @svgplotfile) = FileRead("$FW_gplotdir/$d[1].gplot");
+       ($err, @svgplotfile) = FileRead("$FW_gplotdir/template.gplot") if($err);
+    my $gplot = join("&#01;", @svgplotfile);
+    $gplot =~ s/'/&#39;/g;
+    my %webattrflt = ( endPlotNow=>1, endPlotToday=>1, plotmode=>1,
+                       plotsize=>1,   nrAxis=>1,       stylesheetPrefix=>1 );
+    if(!$pageHash || !$pageHash->{jssvgLoaded}) {
+      $ret .=
+          "<script type='text/javascript' src='$FW_ME/pgm2/jsSVG.js'></script>";
+      $pageHash->{jssvgLoaded} = 1 if($pageHash);
+    }
+
+    SVG_calcOffsets($d[0], $d);
+    $ret .= "<div id='jsSVG_$d' class='jsSVG' ".
+                "data-webAttr='".jsSVG_getAttrs($FW_wname, \%webattrflt)."' ".
+                "data-svgAttr='".jsSVG_getAttrs($d)."' ".
+                "data-from='".$SVG_devs{$d[0]}{from}."' ".
+                "data-to='"  .$SVG_devs{$d[0]}{to}  ."' ".
+                "data-gplotFile='$gplot' source='$d[0]'>".
+            "</div>";
+    return $ret;
   }
 
   my $arg="$FW_ME/SVG_showLog?dev=$d".
@@ -1800,13 +1807,13 @@ SVG_render($$$$$$$$$$)
           $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
                 $x,$y+$h, $x,$y1, $x+$w,$y1, $x+$w,$y+$h);
        } else {
-          $barwidth = $barwidth*$tmul;
+          my $bw = $barwidth*$tmul;
           # bars are all of equal width (see far above !), 
           # position rounded to integer multiples of bar width
           foreach my $i (0..int(@{$dxp})-1) {
-            my ($x1, $y1) = ( $x +4 + $dxp->[$i] - $barwidth,
+            my ($x1, $y1) = ( $x +4 + $dxp->[$i] - $bw,
                                $y +$h-($dyp->[$i]-$min)*$hmul);
-            my ($x2, $y2) = ($barwidth, ($dyp->[$i]-$min)*$hmul);    
+            my ($x2, $y2) = ($bw, ($dyp->[$i]-$min)*$hmul);    
             SVG_pO "<rect $attributes $lStyle x=\"$x1\" y=\"$y1\" ".
                         "width=\"$x2\" height=\"$y2\"/>";
          }
