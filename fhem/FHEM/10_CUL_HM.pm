@@ -1976,11 +1976,10 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   elsif($st eq "powerMeter") {#################################################
-    if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
-        ($mTp eq "10" && $p =~ m/^06/)) {  #    or Info_Status message here
+    if (($mTyp eq "0201") ||  # handle Ack_Status
+        ($mTyp eq "1006")) {  #    or Info_Status message here
 
-      my ($subType,$chn,$val,$err) = ($1,hex($2),hex($3)/2,hex($4))
-                          if($p =~ m/^(..)(..)(..)(..)/);
+      my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
       my $chId = $src.$chn;
       $shash = $modules{CUL_HM}{defptr}{$chId}
@@ -1992,6 +1991,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
       push @evtEt,[$shash,1,"state:$vs"];
       push @evtEt,[$shash,1,"timedOn:".(($err&0x40)?"running":"off")];
+      push @evtEt,[$devH ,1,"battery:".(($err&0x80)?"low"    :"ok" )];
     }
     elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
       $shash = $modules{CUL_HM}{defptr}{$src."02"}
