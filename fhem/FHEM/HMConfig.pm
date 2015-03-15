@@ -466,17 +466,17 @@ my $K_actDetID = '000000'; # id of actionDetector
   RS485IdleTime   =>{a=> 29.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Idle Time"},
 #un-identified List0
 # addr Dec!!
-# SEC-WM55 02:01 (AES on?)
-# CC-RT    02:01 16:00
-# TC-IT    02:01 16:00
-# SEC-WDS  02:01 16:01(sabotage) ?
-# 4DIS     02:01 ?
-# HM-SEC-MDIR  02:01 ?
-# SEC-SC   02:00 ?
-# Blind          9:00 10:00 20:00
-# BL1TPBU  02:01 21:FF
-# Dim1TPBU 02:01 21:FF 22:00
-# HM-MOD-Re-8 30:49
+# SEC-WM55     02:01 (AES on?)
+# CC-RT        02:01 16:00
+# TC-IT        02:01 16:00
+# SEC-WDS      02:01 16:01(sabotage) ?
+# 4DIS         02:01 
+# HM-SEC-MDIR  02:01 
+# SEC-SC       02:00 
+# Blind               9:00 10:00 20:00
+# BL1TPBU      02:01 21:FF
+# Dim1TPBU     02:01 21:FF 22:00
+# HM-MOD-Re-8        30:49
 # tx: D1E8  9158 
 
 #Keymatic 3.3 unknown, seen 1 here

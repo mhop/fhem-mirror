@@ -1037,6 +1037,7 @@ sub CUL_HM_Parse($$) {#########################################################
       if($mTp =~ m /^4[01]/){ #someone is triggered##########
         my $chn = hex($mI[0])& 0x3f;
         my $cName = CUL_HM_id2Name($src.sprintf("%02X",$chn));
+        push @evtEt,[$defs{$cName},1,"trig_aes_$dname:$aesStat:$mNo"];
  
         my @peers = grep !/00000000/,split(",",AttrVal($cName,"peerIDs",""));
         foreach my $peer (grep /$dst/,@peers){
@@ -1046,7 +1047,6 @@ sub CUL_HM_Parse($$) {#########################################################
           push @evtEt,[$defs{$pName},1,"trig_aes_$cName:$aesStat:$mNo"];
         }
       }
-      CUL_HM_pushEvnts();
       $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
       return (CUL_HM_pushEvnts(),$name);
     }
@@ -1986,7 +1986,6 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
       push @evtEt,[$shash,1,"state:$vs"];
       push @evtEt,[$shash,1,"timedOn:".(($err&0x40)?"running":"off")];
-      push @evtEt,[$devH ,1,"battery:".(($err&0x80)?"low"    :"ok" )];
     }
     elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
       $shash = $modules{CUL_HM}{defptr}{$src."02"}
@@ -7039,7 +7038,7 @@ sub CUL_HM_UpdtReadBulk(@) { #update a bunch of readings and trigger the events
   }
   else{
     readingsBeginUpdate($hash);
-    foreach my $rd (@readings){
+    foreach my $rd (CUL_HM_noDup(@readings)){
       next if (!$rd);
       my ($rdName, $rdVal) = split(":",$rd, 2); 
       readingsBulkUpdate($hash,$rdName,
