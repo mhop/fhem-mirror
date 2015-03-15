@@ -174,7 +174,7 @@ sub WWO_RetrieveDataDirectly($)
   my $fd = 0;
   my $days_addon = "&fx=no";
   if ($days > 0) {$days_addon = "&num_of_days=" . $days;} 
-  my $theurl = "http://api.worldweatheronline.com/free/v1/weather.ashx?q=" . $location . "&extra=localObsTime&format=xml" . $days_addon . "&key=" . $apikey;
+  my $theurl = "http://api2.worldweatheronline.com/free/v1/weather.ashx?q=" . $location . "&extra=localObsTime&format=xml" . $days_addon . "&key=" . $apikey;
   #Debug "WWO: fecht url: $theurl";
   # my $xml = GetFileFromURL("http://free.worldweatheronline.com/feed/weather.ashx?q=" . $location . "&extra=localObsTime&format=xml" . $days_addon . "&key=" . $apikey);
   # my $xml = GetFileFromURL($theurl);
