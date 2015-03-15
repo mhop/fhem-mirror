@@ -202,6 +202,7 @@ SVG_FwFn($$$$)
     $ret .= "<div id='jsSVG_$d' class='jsSVG' ".
                 "data-webAttr='".jsSVG_getAttrs($FW_wname, \%webattrflt)."' ".
                 "data-svgAttr='".jsSVG_getAttrs($d)."' ".
+                "data-svgName='".$d."' ".
                 "data-from='".$SVG_devs{$d[0]}{from}."' ".
                 "data-to='"  .$SVG_devs{$d[0]}{to}  ."' ".
                 "data-gplotFile='$gplot' source='$d[0]'>".
@@ -1354,9 +1355,6 @@ SVG_render($$$$$$$$$$)
   if($conf{xrange} && $conf{xrange} =~ /\[(.*):(.*)\]/) {
     $xmin = $1 if($1 ne "");
     $xmax = $2 if($2 ne "");
-
-    #$fromsec = $xmin;
-    #$tosec   = $xmax;
   }
   $xtics = defined($conf{xtics}) ? $conf{xtics} : "";
 
@@ -1811,7 +1809,7 @@ SVG_render($$$$$$$$$$)
           # bars are all of equal width (see far above !), 
           # position rounded to integer multiples of bar width
           foreach my $i (0..int(@{$dxp})-1) {
-            my ($x1, $y1) = ( $x +4 + $dxp->[$i] - $bw,
+            my ($x1, $y1) = ( $x + $dxp->[$i] - $bw,
                                $y +$h-($dyp->[$i]-$min)*$hmul);
             my ($x2, $y2) = ($bw, ($dyp->[$i]-$min)*$hmul);    
             SVG_pO "<rect $attributes $lStyle x=\"$x1\" y=\"$y1\" ".
