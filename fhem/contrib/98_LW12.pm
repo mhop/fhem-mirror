@@ -73,8 +73,7 @@ sub LW12_Initialize( $ ) {
 
   # the attributes we have. Space separated list of attribute values in 
   # the form name:default1,default2
-  $hash->{AttrList}  = "disable:0,1 timeout updateInterval ".
-                       "verbose:0,1,2,3,4,5 ". 
+  $hash->{AttrList}  = "disable:0,1 timeout updateInterval ". 
                        $readingFnAttributes;
 
   # initialize the color picker
@@ -108,7 +107,7 @@ sub LW12_Define( $$ ) {
         channels => [(255) x 3],
     };
 
-# Erstes Update verzögern, falls beim fhem Start
+# Erstes Update verzoegern, falls beim fhem Start
 # ein Attribut gesetzt wird, damit nicht zwei Timer laufen.
 	InternalTimer(gettimeofday()+ 10, "LW12_updateStatus", $hash, 0);
 
