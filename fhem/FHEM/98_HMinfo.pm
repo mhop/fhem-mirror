@@ -172,7 +172,7 @@ sub HMinfo_status($){##########################################################
     if ($ehash->{helper}{role}{dev}){#---restrict to devices
       $nbrD++;
       push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev} && $ehash->{IODev}{NAME});
-      $IOccu{(split ":",AttrVal($eName,"IOgrp",""))[0]}=1;
+      $IOccu{(split ":",AttrVal($eName,"IOgrp","no"))[0]}=1;
       push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
 
       foreach (grep /ErrIoId_/, keys %{$ehash}){# detect addtional critical entries
