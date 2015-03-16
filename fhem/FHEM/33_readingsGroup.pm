@@ -336,6 +336,8 @@ lookup2($$$$;$$)
     $lookup = $vf;
   }
 
+  return undef if( !defined($lookup) );
+
   if( !ref($lookup) && $lookup =~ m/^{.*}$/) {
     my $DEVICE = $name;
     my $READING = $reading;
