@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7010 2015-03-06 17:15:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7011 2015-03-016 18:30:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -44,6 +44,7 @@ sub CALVIEW_Define($$){
 	if($modes == 1)	{$hash->{MODES} = "modeAlarm;modeStart;modeStarted;modeUpcoming";	}
 	elsif($modes == 0){$hash->{MODES} = "modeAlarm;modeStart;modeStarted";}
 	elsif($modes == 2){$hash->{MODES} = "all";	}
+	else {return "invalid mode \"$modes\", use 0,1 or 2!"}
 	InternalTimer(gettimeofday()+2, "CALVIEW_GetUpdate", $hash, 0);
 	return undef;
 }
@@ -196,7 +197,7 @@ sub getsummery($)
 <h3>CALVIEW</h3>
 <ul>This module creates a device with deadlines based on calendar-devices of the 57_Calendar.pm module.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeStarted Termine; 1 for modeStarted;modeUpcoming Termine&gt; &lt;updateintervall in sec (default 43200)&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeAlarm;modeStart;modeStarted; 1 for modeAlarm;modeStart;modeStarted;modeUpcoming; 2 for all (reading all)&gt; &lt;updateintervall in sec (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar 1</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar,holiday 1 900</code></ul><br>
 <a name="CALVIEW set"></a>
@@ -220,7 +221,7 @@ sub getsummery($)
 <h3>CALVIEW</h3>
 <ul>Dieses Modul erstellt ein Device welches als Readings Termine eines oder mehrere Kalender(s), basierend auf dem 57_Calendar.pm Modul, besitzt.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeStarted Termine; 1 für modeStarted;modeUpcoming Termine&gt; &lt;updateintervall in sek (default 43200)&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeAlarm;modeStart;modeStarted; 1 für modeAlarm;modeStart;modeStarted;modeUpcoming; 2 für alle (reading all)&gt; &lt;updateintervall in sek (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender 1</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender,holiday 1 900</code></ul><br>
 <a name="CALVIEW set"></a>
