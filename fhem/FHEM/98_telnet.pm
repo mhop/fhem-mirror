@@ -135,10 +135,13 @@ telnet_Define($$$)
   my ($hash, $def) = @_;
 
   my @a = split("[ \t][ \t]*", $def);
-  my ($name, $type, $port, $global) = split("[ \t]+", $def);
+  my ($name, $type, $pport, $global) = split("[ \t]+", $def);
 
-  my $isServer = 1 if(defined($port) && $port =~ m/^(IPV6:)?\d+$/);
-  my $isClient = 1 if($port && $port =~ m/^(IPV6:)?.*:\d+$/);
+  my $port = $pport;
+  $port =~ s/^IPV6://;
+
+  my $isServer = 1 if(defined($port) && $port =~ m/^\d+$/);
+  my $isClient = 1 if($port && $port =~ m/^(.+):\d+$/);
 
   return "Usage: define <name> telnet { [IPV6:]<tcp-portnr> [global] | ".
                                       " [IPV6:]serverName:port }"
@@ -148,7 +151,7 @@ telnet_Define($$$)
 
   # Make sure that fhem only runs once
   if($isServer) {
-    my $ret = TcpServer_Open($hash, $port, $global);
+    my $ret = TcpServer_Open($hash, $pport, $global);
     if($ret && !$init_done) {
       Log3 $name, 1, "$ret. Exiting.";
       exit(1);
