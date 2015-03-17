@@ -620,3 +620,6 @@
 
 - Thu Mar 13 2015 (loredo)
   - fixed CALVIEW commandref (ms to sec)
+
+- Tue Mar 17 2015 (wzut)
+  - added two new modules at contrib/Infratec/* for Infratec Power Modules
