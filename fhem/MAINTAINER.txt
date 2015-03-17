@@ -318,6 +318,7 @@ FHEM/lib/UPnP/*              Reinerlein           http://forum.fhem.de Multimedi
 FHEM/FhemUtils/*             mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/GPUtils.pm              ntruchsess           http://forum.fhem.de FHEM Development
 
+contrib/Infratec/*	     wzut	  	  http://forum.fhem.de Bastelecke
 contrib/YAF/*                danielweisensee      http://forum.fhem.de Frontends
 contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
 contrib/55_BBB_BMP180.pm     betateilchen         http://forum.fhem.de Einplatinencomputer
