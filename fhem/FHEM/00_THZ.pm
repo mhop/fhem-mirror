@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 02/2015
-my $thzversion = "0.139";
+my $thzversion = "0.140";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -165,6 +165,19 @@ my %parsinghash = (
 	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
 	      #[" x52: ",		52, 4, "hex2int", 1],
           [" roomSetTemp: ",56, 4, "hex2int", 10],  	[" x60: ", 		60, 4, "hex2int", 10],
+	      [" x64: ", 		64, 4, "hex2int", 10],  	[" insideTempRC: ",     68, 4, "hex2int", 10],
+	      [" x72: ", 		72, 4, "hex2int", 10],  	[" x76: ", 		76, 4, "hex2int", 10],
+	      [" onHysteresisNo: ", 	32, 2, "hex", 1],	[" offHysteresisNo: ", 34, 2, "hex", 1],
+	      [" HCBoosterStage: ",	36, 2, "hex", 1] 
+	     ],
+  "F4hc1214"  => [["outsideTemp: ", 4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
+	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
+	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
+	      [" heatTemp: ",		28, 4, "hex2int", 10],  
+	      [" seasonMode: ",		38, 2, "somwinmode", 1],   				#[" x40: ",		40, 4, "hex2int", 1],
+	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
+	      #[" x52: ",		52, 4, "hex2int", 1],
+          [" roomSetTemp: ",62, 4, "hex2int", 10],  	[" x60: ", 		60, 4, "hex2int", 10],
 	      [" x64: ", 		64, 4, "hex2int", 10],  	[" insideTempRC: ",     68, 4, "hex2int", 10],
 	      [" x72: ", 		72, 4, "hex2int", 10],  	[" x76: ", 		76, 4, "hex2int", 10],
 	      [" onHysteresisNo: ", 	32, 2, "hex", 1],	[" offHysteresisNo: ", 34, 2, "hex", 1],
@@ -554,7 +567,6 @@ my %getsonly2xx = (
   "p01-p12"				=> {cmd2=>"17", type =>"17pxx206", unit =>""},
   "sProgram"            => {cmd2=>"EE", type =>"EEprg206", unit =>""},
   "sDHW"				=> {cmd2=>"F3", type =>"F3dhw",    unit =>""},
-  "sHC1"				=> {cmd2=>"F4", type =>"F4hc1",    unit =>""},
   "sHC2"				=> {cmd2=>"F5", type =>"F5hc2",    unit =>""},
   "sSystem"				=> {cmd2=>"F6", type =>"F6sys206", unit =>""},
   "sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
@@ -563,13 +575,16 @@ my %getsonly2xx = (
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
  );
 my %getsonly206 = (
-    "pFan"              => {cmd2=>"01", type =>"01pxx206", unit =>""},
+     "sHC1"				=> {cmd2=>"F4", type =>"F4hc1",    unit =>""},
+	"pFan"              => {cmd2=>"01", type =>"01pxx206", unit =>""},
     "sLast10errors"     => {cmd2=>"D1", type =>"D1last206", unit =>""},
 	"sFirmware" 		=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
 	"sFirmware-Id" 		=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
  );
 my %getsonly214 = (
        "pFan"           => {cmd2=>"01", type =>"01pxx214", unit =>""},
+	    "sHC1"				=> {cmd2=>"F4", type =>"F4hc1214",    unit =>""},
+ 
  );
 
 
@@ -1012,12 +1027,11 @@ sub THZ_Get_Comunication($$) {
   if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
   
   #slow down for old firmwares
-  select(undef, undef, undef, 0.25) if ((AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06") or (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.14"));
-  
+  select(undef, undef, undef, 0.25) if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/ );
+  select(undef, undef, undef, 0.001);
   THZ_Write($hash,  "02"); 			# step1 --> STX start of text 	
   ($err, $msg) = THZ_ReadAnswer($hash);
 						#Expectedanswer1    is  "10"  DLE data link escape
-  
   if ($msg eq "10") 	{
      THZ_Write($hash,  $cmdHex); 		# step2 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
      ($err, $msg) = THZ_ReadAnswer($hash);
@@ -1057,7 +1071,7 @@ sub THZ_ReadAnswer($)
 	Log3 $hash->{NAME}, 5, "$hash->{NAME} start Funktion THZ_ReadAnswer";
 	###------Windows support
 	select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-        my $buf = DevIo_SimpleReadWithTimeout($hash, 0.5); 
+    my $buf = DevIo_SimpleReadWithTimeout($hash, 0.5); 
 	if(!defined($buf)) {
 	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
 	  return ("InterfaceNotRespondig", "");
@@ -1066,7 +1080,6 @@ sub THZ_ReadAnswer($)
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
 	my $countmax = 80;
-	#$countmax = 80	if (AttrVal($hash->{NAME}, "firmware" , "new") eq "2.06");
 	while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax))
 	{ ###------Windows support
 	  select(undef, undef, undef, 0.005) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
@@ -1315,7 +1328,7 @@ sub THZ_Parse1($$) {
   my $length = length($message);
   Log3 $hash->{NAME}, 5, "Message length: $length";
   my $parsingcmd = substr($message,2,2);
-  $parsingcmd = substr($message,2,6) if (($parsingcmd =~ m/(0A|0B|0C)/) and (AttrVal($hash->{NAME}, "firmware" , "4.39") ne "2.06") and (AttrVal($hash->{NAME}, "firmware" , "4.39") ne "2.14"));
+  $parsingcmd = substr($message,2,6) if (($parsingcmd =~ m/(0A|0B|0C)/) and (AttrVal($hash->{NAME}, "firmware" , "4.39")  !~ /^2/) );
   my $msgtype;
   my $parsingrule;
   my $parsingelement;
@@ -1453,7 +1466,7 @@ sub THZ_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
   
-  
+  $attrVal = "4.39" if ($cmd eq "del");
   
   if ( $attrName eq "firmware" )  {  
       if ($attrVal eq "2.06") {
@@ -1474,18 +1487,13 @@ sub THZ_Attr(@) {
         %gets=(%getsonly539, %sets);
         THZ_Refresh_all_gets($hash);
       }
-      #--
-      if (($attrVal eq "4.39") or ($cmd eq "del") or (($attrVal ne "5.39") and ($attrVal ne "2.06") and ($attrVal ne "2.14")))  {
+      else { #in all other cases I assume $attrVal eq "4.39" cambiato nella v0140
           THZ_RemoveInternalTimer("THZ_GetRefresh");
           %sets=%sets439;
           %gets=(%getsonly439, %sets);
           THZ_Refresh_all_gets($hash);
       }
   }
-  
-
-  
-  
   
   if( $attrName =~ /^interval_/ ) {
   #DevIo_CloseDev($hash);
@@ -1546,8 +1554,8 @@ sub function_heatSetTemp($$) {
   last if(($defs{$_}{TYPE}) =~ "THZ");
   }
 
-  if (AttrVal($devname, "firmware" , "4.39")  =~ "2.")  {
-  ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1) = (split ' ',ReadingsVal($devname,"pHeat1",0))[1,2,3];
+  if (AttrVal($devname, "firmware" , "4.39")  =~ /^2/ )  {
+    ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1) = (split ' ',ReadingsVal($devname,"pHeat1",0))[1,3,5];
   }  
   else {  
   $p13GradientHC1 	  = ReadingsVal($devname,"p13GradientHC1",0.4);
@@ -1564,10 +1572,11 @@ sub function_heatSetTemp($$) {
   my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
   my $c= -1 * $p13GradientHC1 /75;
   my $Simul_heatSetTemp; my $Simul_heatSetTemp_simplified;  my @ret; 
-  foreach my $i ($start..$stop) {
-   $Simul_heatSetTemp 		 = sprintf("%.1f", ($i * $i * $c + $i * $b + $a));
-   $Simul_heatSetTemp_simplified = sprintf("%.1f", ($i * $i * $c + $i * $b + $a1));
-   push(@ret, [$i, $Simul_heatSetTemp, $Simul_heatSetTemp_simplified]);
+  foreach ($start..$stop) {
+   my $tmp =$_ * $_ * $c + $_ * $b;
+   $Simul_heatSetTemp 		 = sprintf("%.1f", ( $tmp + $a));
+   $Simul_heatSetTemp_simplified = sprintf("%.1f", ($tmp + $a1));
+   push(@ret, [$_, $Simul_heatSetTemp, $Simul_heatSetTemp_simplified]);
   }
   my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . "% insideTemp=" . $insideTemp .'°C' ;
   return (\@ret, $titlestring, $heatSetTemp, $outside_tempFiltered);
@@ -1583,12 +1592,13 @@ sub function_heatSetTemp($$) {
 
 sub THZ_PrintcurveSVG {
 my ($ycurvevalues, $titlestring, $heatSetTemp, $outside_tempFiltered) = function_heatSetTemp(-15,20);
+my $v0min= 15;
+$v0min= 10 if ((($ycurvevalues->[33][1]) < $v0min ) or (($ycurvevalues->[33][2]) < $v0min)); #lower offset, if out of scale
 my $vstep= 5;
-$vstep= 10 if ((($ycurvevalues->[0][1])>36) or (($ycurvevalues->[0][2])>36)); #change scale if out of scale
-my$v0min= 15;
+$vstep= 10 if ((($ycurvevalues->[0][1])>($v0min+4*$vstep)) or (($ycurvevalues->[0][2])>($v0min+4*$vstep))); #increase step, if out of scale
 my $v1=$v0min+$vstep; my $v2=$v1+$vstep; my $v3=$v2+$vstep; my $v4=$v3+$vstep;
 my $ret =  <<'END';
-<?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="163" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
+<?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="164" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 <style type="text/css"><![CDATA[
 text       { font-family:Times; font-size:12px; }
 text.title { font-size:14	px; }
@@ -1629,12 +1639,12 @@ polyline { stroke:black; fill:none; }
     <stop offset="100%" style="stop-color:#0f0; stop-opacity:.6"/>
   </linearGradient>
 </defs>
-<rect x="48" y="19.2" width="704" height="121.6" rx="8" ry="8" fill="none" class="border"/>
-<text x="12" y="80" text-anchor="middle" class="ylabel" transform="rotate(270,12,80)">HC1 heat SetTemp °C</text>
-<text x="399" y="163.2" class="xlabel" text-anchor="middle">outside temperature filtered °C</text>
-<text x="44" y="155" class="ylabel" text-anchor="middle">-15</text>
+<rect x="48"  y="19.2" width="704" height="121.6" rx="8" ry="8" fill="none" class="border"/>
+<text x="12"  y="80" text-anchor="middle" class="ylabel" transform="rotate(270,12,80)">HC1 heat SetTemp °C</text>
+<text x="399" y="163.5" class="xlabel" text-anchor="middle">outside temperature filtered °C</text>
+<text x="44"  y="155" class="ylabel" text-anchor="middle">-15</text>
 <text x="145" y="155" class="ylabel" text-anchor="middle">-10</text>	<polyline points="145,19 145,140" class="hgrid"/>
-<text x="246" y="155" class="ylabel" text-anchor="middle">-5</text>	<polyline points="246,19 246,140" class="hgrid"/>
+<text x="246" y="155" class="ylabel" text-anchor="middle">-5</text>		<polyline points="246,19 246,140" class="hgrid"/>
 <text x="347" y="155" class="ylabel" text-anchor="middle">0</text>   	<polyline points="347,19 347,140" class="hgrid"/>
 <text x="448" y="155" class="ylabel" text-anchor="middle">5</text>   	<polyline points="448,19 448,140" class="hgrid"/>
 <text x="549" y="155" class="ylabel" text-anchor="middle">10</text>  	<polyline points="549,19 549,140" class="hgrid"/>
@@ -1643,17 +1653,17 @@ polyline { stroke:black; fill:none; }
 <g>
 END
 
-$ret .= '<polyline points="44,140 49,140"/> <text x="39.2" y="144" class="ylabel" text-anchor="end">' . $v0min . '</text>';
-$ret .= '<polyline points="44,110 49,110"/> <text x="39.2" y="114" class="ylabel" text-anchor="end">' . $v1    . '</text>';
-$ret .= '<polyline points="44,80 49,80"/>   <text x="39.2" y="84" class="ylabel" text-anchor="end">'  . $v2    . '</text>';
-$ret .= '<polyline points="44,49 49,49"/>   <text x="39.2" y="53" class="ylabel" text-anchor="end">'  . $v3    . '</text>';
-$ret .= '<polyline points="44,19 49,19"/>   <text x="39.2" y="23" class="ylabel" text-anchor="end">'  . $v4    . '</text>';
+$ret .= '<polyline points="44,140 49,140"/> <text x="39" y="144" class="ylabel" text-anchor="end">' . $v0min . '</text>';
+$ret .= '<polyline points="44,110 49,110"/> <text x="39" y="114" class="ylabel" text-anchor="end">' . $v1    . '</text>';
+$ret .= '<polyline points="44,80 49,80"/>   <text x="39" y="84" class="ylabel" text-anchor="end">'  . $v2    . '</text>';
+$ret .= '<polyline points="44,49 49,49"/>   <text x="39" y="53" class="ylabel" text-anchor="end">'  . $v3    . '</text>';
+$ret .= '<polyline points="44,19 49,19"/>   <text x="39" y="23" class="ylabel" text-anchor="end">'  . $v4    . '</text>';
 $ret .= '</g> <g>';
-$ret .= '<polyline points="751,140 756,140"/> <text x="760.8" y="144" class="ylabel">'. $v0min .'</text>';
-$ret .= '<polyline points="751,110 756,110"/> <text x="760.8" y="114" class="ylabel">'. $v1    .'</text>';
-$ret .= '<polyline points="751,80 756,80"/>   <text x="760.8" y="84" class="ylabel">' . $v2    .'</text>';
-$ret .= '<polyline points="751,49 756,49"/>   <text x="760.8" y="53" class="ylabel">' . $v3    .'</text>';
-$ret .= '<polyline points="751,19 756,19"/>   <text x="760.8" y="23" class="ylabel">' . $v4    .'</text>';
+$ret .= '<polyline points="751,140 756,140"/> <text x="760" y="144" class="ylabel">'. $v0min .'</text>';
+$ret .= '<polyline points="751,110 756,110"/> <text x="760" y="114" class="ylabel">'. $v1    .'</text>';
+$ret .= '<polyline points="751,80 756,80"/>   <text x="760" y="84" class="ylabel">' . $v2    .'</text>';
+$ret .= '<polyline points="751,49 756,49"/>   <text x="760" y="53" class="ylabel">' . $v3    .'</text>';
+$ret .= '<polyline points="751,19 756,19"/>   <text x="760" y="23" class="ylabel">' . $v4    .'</text>';
 $ret .= '</g>';
 
 
