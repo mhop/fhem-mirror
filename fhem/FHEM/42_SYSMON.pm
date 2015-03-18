@@ -1460,25 +1460,28 @@ SYSMON_getUptime2($$)
     my $hours = $4;
     my $minutes = $5;
     
-    $uptime = $days * 24;
-    $uptime += $hours;
-    $uptime *= 60;
-    $uptime += $minutes;
-    $uptime *= 60;
-    
+    if(defined($days) && defined($hours) && defined($minutes)) {
+      $uptime = $days * 24;
+      $uptime += $hours;
+      $uptime *= 60;
+      $uptime += $minutes;
+      $uptime *= 60;
+    }
     
     $map->{+UPTIME}=sprintf("%d",$uptime);
     $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
     
     my $loadavg=$6;
-    my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($loadavg));
-    if(defined($la1) && defined($la5) && defined($la15)) {
-      $la1 =~ s/,$//; 
-      $la5 =~ s/,$//; 
-      $la1 =~ s/,/./; 
-      $la5 =~ s/,/./; 
-      $la15 =~ s/,/./; 
-      $map->{+LOADAVG}="$la1 $la5 $la15";
+    if(defined($loadavg)) {
+      my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($loadavg));
+      if(defined($la1) && defined($la5) && defined($la15)) {
+        $la1 =~ s/,$//; 
+        $la5 =~ s/,$//; 
+        $la1 =~ s/,/./; 
+        $la5 =~ s/,/./; 
+        $la15 =~ s/,/./; 
+        $map->{+LOADAVG}="$la1 $la5 $la15";
+      }
     }
   }
   
@@ -2387,7 +2390,8 @@ sub SYSMON_getNetworkInfo ($$$)
 
     my $rxRaw = -1;
     my $txRaw = -1;
-    if(-e "/sys/class/net/$nName/statistics/rx_bytes" && -e "/sys/class/net/$nName/statistics/tx_bytes") {
+    #if(-e "/sys/class/net/$nName/statistics/rx_bytes" && -e "/sys/class/net/$nName/statistics/tx_bytes") {
+    if(SYSMON_isNetStatClass($hash, $nName)) {
         $rxRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/rx_bytes");
         $txRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/tx_bytes");
     }
@@ -3170,6 +3174,17 @@ SYSMON_isSysCpuNum($) {
   return $hash->{helper}{sys_cpu_num};
 }
 
+sub
+SYSMON_isNetStatClass($$) {
+  my ($hash, $nName) = @_;
+  if(!defined $hash->{helper}{'net_'.$nName.'_stat_class'}) {
+    $hash->{helper}{'net_'.$nName.'_stat_class'} = int(SYSMON_execute($hash, "[ -f /sys/class/net/$nName/statistics/rx_bytes ] && echo 1 || echo 0"));
+    # /sys/class/net/$nName/statistics/tx_bytes
+  }
+
+  return $hash->{helper}{'net_'.$nName.'_stat_class'};
+}
+
 sub SYSMON_PowerAcInfo($$)
 {
   #online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
@@ -3928,7 +3943,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <b>Power Supply Readings</b>
     <li>power_ac_stat<br>
-        status information to the AC socket: present (0|1), online (0|1), voltage, current<br>
+        status information to the AC socket: online (0|1), present (0|1), voltage, current<br>
         Example:<br>
         <code>power_ac_stat: 1 1 4.807 264</code><br>
     </li>
@@ -3948,7 +3963,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>power_battery_stat<br>
-        status information to the battery (if installed): present (0|1), online (0|1), voltage, current, actual capacity<br>
+        status information to the battery (if installed): online (0|1), present (0|1), voltage, current, actual capacity<br>
         Example:<br>
         <code>power_battery_stat: 1 1 4.807 264 100</code><br>
     </li>
@@ -4522,7 +4537,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <b>Readings zur Stromversorgung</b>
     <li>power_ac_stat<br>
-        Statusinformation f&uuml;r die AC-Buchse: present (0|1), online (0|1), voltage, current<br>
+        Statusinformation f&uuml;r die AC-Buchse: online (0|1), present (0|1), voltage, current<br>
         Beispiel:<br>
         <code>power_ac_stat: 1 1 4.807 264</code><br>
     </li>
@@ -4542,7 +4557,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>power_battery_stat<br>
-        Statusinformation f&uuml;r die Batterie (wenn vorhanden): present (0|1), online (0|1), voltage, current, actual capacity<br>
+        Statusinformation f&uuml;r die Batterie (wenn vorhanden): online (0|1), present (0|1), voltage, current, actual capacity<br>
         Beispiel:<br>
         <code>power_battery_stat: 1 1 4.807 264 100</code><br>
     </li>
