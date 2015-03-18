@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0043 2015-03-14 17:00:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0044 2015-03-18 20:30:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -159,6 +159,12 @@
 #		0043    09.03.2015	Sailor				km200_ParseHttpResponseDyn		Read of "switchPrograms" implemented
 #		0043    09.03.2015	Sailor				km200_ParseHttpResponseStat		Read of "switchPrograms" implemented
 #		0043    14.03.2015	Sailor				All								My 41st birthday version.
+#		0044    15.03.2015	Sailor				km200_Define					Added /system/appliance/type
+#		0044    18.03.2015	Sailor				km200_Define					Added additional services below /dhwCircuits/dhw...
+#		0044    15.03.2015	Sailor				km200_Set						First try-outs for switchProgram writings
+#		0044    18.03.2015	Sailor				km200_ParseHttpResponseInit		fullResponde = ERROR - bug corrected
+#		0044    18.03.2015	Sailor				km200_ParseHttpResponseDyn		fullResponde = ERROR - bug corrected
+#		0044    18.03.2015	Sailor				km200_ParseHttpResponseStat		fullResponde = ERROR - bug corrected
 ########################################################################################################################
 
 
@@ -231,7 +237,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0043";
+	my $ModuleVersion           = "0044";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -243,42 +249,60 @@ sub km200_Define($$)
 	"/",
 	
 	"/dhwCircuits",
-    "/dhwCircuits/dhw1",
-    "/dhwCircuits/dhw1/operationMode",
-	"/dhwCircuits/dhw1/waterFlow",
-	"/dhwCircuits/dhw1/workingTime",
-	"/dhwCircuits/dhw1/activeSwitchProgram",
 	"/dhwCircuits/dhw1/activeDhwTimeProgram",
+	"/dhwCircuits/dhw1/activeSwitchProgram",
+	"/dhwCircuits/dhw1/actualTemp",
 	"/dhwCircuits/dhw1/currentSetpoint",
 	"/dhwCircuits/dhw1/dhwSpLevels",
+	"/dhwCircuits/dhw1/dhwSpLevels/off",
+	"/dhwCircuits/dhw1/dhwSpLevels/on",
 	"/dhwCircuits/dhw1/dhwTimePrograms",
+	"/dhwCircuits/dhw1/dhwTimePrograms/AlwaysHotWater",
+	"/dhwCircuits/dhw1/dhwTimePrograms/Program1",
+	"/dhwCircuits/dhw1/dhwTimePrograms/Program2",
 	"/dhwCircuits/dhw1/extraDhw",
+	"/dhwCircuits/dhw1/extraDhw/activationStatus",
+	"/dhwCircuits/dhw1/extraDhw/status",
+	"/dhwCircuits/dhw1/extraDhw/stopTemp",
+	"/dhwCircuits/dhw1/extraDhw/time",
 	"/dhwCircuits/dhw1/setTemperature",
-	"/dhwCircuits/dhw1/switchPrograms",
-	"/dhwCircuits/dhw1/actualTemp",
 	"/dhwCircuits/dhw1/status",
+	"/dhwCircuits/dhw1/switchPrograms",
 	"/dhwCircuits/dhw1/temperatureLevels",
 	"/dhwCircuits/dhw1/temperatureLevels/off",
 	"/dhwCircuits/dhw1/temperatureLevels/on",
+	"/dhwCircuits/dhw1/waterFlow",
+	"/dhwCircuits/dhw1/workingTime",
+    "/dhwCircuits/dhw1",
+    "/dhwCircuits/dhw1/operationMode",
 
-    "/dhwCircuits/dhw2",
-    "/dhwCircuits/dhw2/operationMode",
-	"/dhwCircuits/dhw2/waterFlow",
-	"/dhwCircuits/dhw2/workingTime",
-	"/dhwCircuits/dhw2/activeSwitchProgram",
+	"/dhwCircuits",
 	"/dhwCircuits/dhw2/activeDhwTimeProgram",
+	"/dhwCircuits/dhw2/activeSwitchProgram",
+	"/dhwCircuits/dhw2/actualTemp",
 	"/dhwCircuits/dhw2/currentSetpoint",
 	"/dhwCircuits/dhw2/dhwSpLevels",
+	"/dhwCircuits/dhw2/dhwSpLevels/off",
+	"/dhwCircuits/dhw2/dhwSpLevels/on",
 	"/dhwCircuits/dhw2/dhwTimePrograms",
+	"/dhwCircuits/dhw2/dhwTimePrograms/AlwaysHotWater",
+	"/dhwCircuits/dhw2/dhwTimePrograms/Program1",
+	"/dhwCircuits/dhw2/dhwTimePrograms/Program2",
 	"/dhwCircuits/dhw2/extraDhw",
+	"/dhwCircuits/dhw2/extraDhw/activationStatus",
+	"/dhwCircuits/dhw2/extraDhw/status",
+	"/dhwCircuits/dhw2/extraDhw/stopTemp",
+	"/dhwCircuits/dhw2/extraDhw/time",
 	"/dhwCircuits/dhw2/setTemperature",
-	"/dhwCircuits/dhw2/switchPrograms",
-	"/dhwCircuits/dhw2/actualTemp",
 	"/dhwCircuits/dhw2/status",
+	"/dhwCircuits/dhw2/switchPrograms",
 	"/dhwCircuits/dhw2/temperatureLevels",
 	"/dhwCircuits/dhw2/temperatureLevels/off",
 	"/dhwCircuits/dhw2/temperatureLevels/on",
-
+	"/dhwCircuits/dhw2/waterFlow",
+	"/dhwCircuits/dhw2/workingTime",
+    "/dhwCircuits/dhw1",
+    "/dhwCircuits/dhw2/operationMode",
 
 	"/gateway",
 	"/gateway/DateTime",
@@ -329,8 +353,10 @@ sub km200_Define($$)
 	"/heatingCircuits/hc1/temperatureLevels",
 	"/heatingCircuits/hc1/temperatureLevels/comfort2",
 	"/heatingCircuits/hc1/temperatureLevels/eco",
+	"/heatingCircuits/hc1/temperatureLevels/exception",
 	"/heatingCircuits/hc1/temperatureLevels/day",
 	"/heatingCircuits/hc1/temperatureLevels/night",
+	"/heatingCircuits/hc1/temperatureLevels/normal",
 	"/heatingCircuits/hc1/temperatureRoomSetpoint",
 	"/heatingCircuits/hc1/temporaryRoomSetpoint",
 	
@@ -369,7 +395,9 @@ sub km200_Define($$)
 	"/heatingCircuits/hc2/temperatureLevels/day",
 	"/heatingCircuits/hc2/temperatureLevels/comfort2",
 	"/heatingCircuits/hc2/temperatureLevels/eco",
+	"/heatingCircuits/hc2/temperatureLevels/exception",
 	"/heatingCircuits/hc2/temperatureLevels/night",
+	"/heatingCircuits/hc2/temperatureLevels/normal",
 	"/heatingCircuits/hc2/temperatureRoomSetpoint",
 	"/heatingCircuits/hc2/temporaryRoomSetpoint",
 
@@ -466,6 +494,7 @@ sub km200_Define($$)
 	"/system/appliance/numberOfStarts",
 	"/system/appliance/powerSetpoint",
 	"/system/appliance/systemPressure",
+	"/system/appliance/type",
 	"/system/appliance/workingTime",
 	"/system/appliance/workingTime/centralHeating",
 	"/system/appliance/workingTime/secondBurner",
@@ -516,8 +545,8 @@ sub km200_Define($$)
 	"/system/holidayModes/hm4/hcMode",
 	"/system/holidayModes/hm4/dhwMode",
 	"/system/holidayModes/hm4/delete",
-		
-		
+	
+	
 	"/system/info",
 	
 	"/system/minOutdoorTemp",
@@ -569,8 +598,8 @@ sub km200_Define($$)
 
 		if ( length($EvalPassWord) == 16)
 		{
-				$km200_gateway_password = $EvalPassWord;
-				Log3 $name, 5, $name. " : km200 - Provided GatewayPassword provided as bareword has the correct length at least.";		
+			$km200_gateway_password = $EvalPassWord;
+			Log3 $name, 5, $name. " : km200 - Provided GatewayPassword provided as bareword has the correct length at least.";		
 		}
 		else # Check whether the password is eventually base64 encoded 
 		{
@@ -695,7 +724,10 @@ sub km200_Define($$)
 	@{$hash->{Secret}{KM200DONOTPOLL}}  		= ();
 	####END####### Writing values to global hash ################################################################END#####
 
-
+	###START###### Reset fullResponse error message ############################################################START####
+	readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
+	####END####### Reset fullResponse error message #############################################################END#####	
+	
 	###START###### For Debugging purpose only ##################################################################START####  
 	Log3 $name, 5, $name. " : km200 - Define H                              : " .$hash;
 	Log3 $name, 5, $name. " : km200 - Define D                              : " .$def;
@@ -1318,9 +1350,10 @@ sub km200_GetSingleService($)
 	my $km200_gateway_host      	= $hash->{URL};
 	my $name                    	= $hash->{NAME};
 	my $PollingTimeout              = $hash->{POLLINGTIMEOUT};
+	my $json                     	= "";
 	my $err;
 	my $data;
-	my $json;
+
 	
 	my $url ="http://" . $km200_gateway_host . $Service;
 
@@ -1333,12 +1366,14 @@ sub km200_GetSingleService($)
 
 	($err, $data) = HttpUtils_BlockingGet($param);
 
+	### If error message has been reported
 	if($err ne "") 
 	{
 		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
 		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_GetSingleService ERROR: $err\n");}
 		return "ERROR";
 	}
+	### If NO error message has been reported
 	else
 	{
 		$hash->{temp}{decodedcontent} = $data;
@@ -1356,8 +1391,13 @@ sub km200_GetSingleService($)
 			Log3 $name, 5, $name. " : km200_GetSingleService - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
 			if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
 			};
+			
+			
+			
+			
 
-			if( exists $json -> {"value"})
+			### Check whether the type is a single value containing a string or float value
+			if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
 			{
 				my $JsonId         = $json->{id};
 				my $JsonType       = $json->{type};
@@ -1371,10 +1411,163 @@ sub km200_GetSingleService($)
 				readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 				### Write reading for fhem
 			}	
+			
+			### Check whether the type is an switchProgram
+			elsif ($json -> {type} eq "switchProgram")
+			{
+				my $JsonId         = $json->{id};
+				my $JsonType       = $json->{type};
+
+				### Log entries for debugging purposes
+				Log3 $name, 4, $name. " : km200_ParseHttpResponseDyn: value found for  : " .$Service;
+				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: id               : " .$JsonId;
+				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: type             : " .$JsonType;
+				
+				### Set up variables
+				my $TempReturnVal = "";
+				my $TempReadingMo = "";
+				my $TempReadingTu = "";
+				my $TempReadingWe = "";
+				my $TempReadingTh = "";
+				my $TempReadingFr = "";
+				my $TempReadingSa = "";
+				my $TempReadingSu = "";
+				
+				foreach my $item (@{ $json->{switchPoints} })
+				{
+					### Create string for time and switchpoint in fixed format and write part of Reading String
+					my $temptime     = sprintf ('%04d', ($item->{time}/0.6));
+					my $tempsetpoint =  $item->{setpoint};
+					$tempsetpoint    =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(8-length($1)))/e;
+					my $TempReading  = $temptime . " " . $tempsetpoint;
+					
+					### Create ValueString for this day
+					if ($item->{dayOfWeek} eq "Mo")
+					{
+						### If it is the first entry for this day
+						if ($TempReadingMo eq "")
+						{
+							### Write the first entry
+							$TempReadingMo = $TempReading;
+						}
+						### If it is NOT the first entry for this day
+						else
+						{
+							### Add the next entry
+							$TempReadingMo = $TempReadingMo . " " . $TempReading;
+						}
+					}
+					elsif ($item->{dayOfWeek} eq "Tu")
+					{
+						### If it is the first entry for this day
+						if ($TempReadingTu eq "")
+						{
+							### Write the first entry
+							$TempReadingTu = $TempReading;
+						}
+						### If it is NOT the first entry for this day
+						else
+						{
+							### Add the next entry
+							$TempReadingTu = $TempReadingTu . " " . $TempReading;
+						}
+					}
+					elsif ($item->{dayOfWeek} eq "We")
+					{
+						### If it is the first entry for this day
+						if ($TempReadingWe eq "")
+						{
+							### Write the first entry
+							$TempReadingWe = $TempReading;
+						}
+						### If it is NOT the first entry for this day
+						else
+						{
+							### Add the next entry
+							$TempReadingWe = $TempReadingWe . " " . $TempReading;
+						}
+					}
+					elsif ($item->{dayOfWeek} eq "Th")
+					{
+						### If it is the first entry for this day
+						if ($TempReadingTh eq "")
+						{
+							### Write the first entry
+							$TempReadingTh = $TempReading;
+						}
+						### If it is NOT the first entry for this day
+						else
+						{
+							### Add the next entry
+							$TempReadingTh = $TempReadingTh . " " . $TempReading;
+						}
+					}
+					elsif ($item->{dayOfWeek} eq "Fr")
+					{
+						### If it is the first entry for this day
+						if ($TempReadingFr eq "")
+						{
+							### Write the first entry
+							$TempReadingFr = $TempReading;
+						}
+						### If it is NOT the first entry for this day
+						else
+						{
+							### Add the next entry
+							$TempReadingFr = $TempReadingFr . " " . $TempReading;
+						}
+					}
+					elsif ($item->{dayOfWeek} eq "Sa")
+					{
+						### If it is the first entry for this day
+						if ($TempReadingSa eq "")
+						{
+							### Write the first entry
+							$TempReadingSa = $TempReading;
+						}
+						### If it is NOT the first entry for this day
+						else
+						{
+							### Add the next entry
+							$TempReadingSa = $TempReadingSa . " " . $TempReading;
+						}
+					}
+					elsif ($item->{dayOfWeek} eq "Su")
+					{
+						### If it is the first entry for this day
+						if ($TempReadingSu eq "")
+						{
+							### Write the first entry
+							$TempReadingSu = $TempReading;
+						}
+						### If it is NOT the first entry for this day
+						else
+						{
+							### Add the next entry
+							$TempReadingSu = $TempReadingSu . " " . $TempReading;
+						}
+					}
+					else
+					{
+						if ($hash->{CONSOLEMESSAGE} == true) {print "dayOfWeek of unknow day: " . $item->{dayOfWeek};}
+					}
+				}
+
+				### Create new Service and write reading for fhem
+				$TempReturnVal =                  "1-Mo: " . $TempReadingMo . "\n";
+				$TempReturnVal = $TempReturnVal . "2-Tu: " . $TempReadingTu . "\n";
+				$TempReturnVal = $TempReturnVal . "3-We: " . $TempReadingWe . "\n";
+				$TempReturnVal = $TempReturnVal . "4-Th: " . $TempReadingTh . "\n";
+				$TempReturnVal = $TempReturnVal . "5-Fr: " . $TempReadingFr . "\n";
+				$TempReturnVal = $TempReturnVal . "6-Sa: " . $TempReadingSa . "\n";
+				$TempReturnVal = $TempReturnVal . "7-Su: " . $TempReadingSu . "\n";
+				$json -> {"value"} = $TempReturnVal;
+			}
+			### If the type is unknown
 			else
 			{
 				### Log entries for debugging purposes
-				Log3 $name, 4, $name. " : km200_GetSingleService - value not found for:" .$Service;
+				Log3 $name, 4, $name. " : km200_GetSingleService - type is unknown for: " .$Service;
 				### Log entries for debugging purposes
 			}
 		}
@@ -1462,7 +1655,7 @@ sub km200_ParseHttpResponseInit($)
 	my @KM200_InitServices       = @{$hash ->{Secret}{KM200ALLSERVICES}};	
 	my $NumberInitServices       = @KM200_InitServices;
 	my $Service                  = $KM200_InitServices[$ServiceCounterInit];
-	my $json;	
+	my $json -> {type}           = "";	
 	
 	
 	### Log entries for debugging purposes
@@ -1479,6 +1672,8 @@ sub km200_ParseHttpResponseInit($)
 
 	$hash->{temp}{decodedcontent} = $data;
 	my $decodedContent = km200_Decrypt($hash);
+	
+	### Check whether the decoded content is not empty and therefore available
 	if ($decodedContent ne "")
 	{	
 		eval 
@@ -1806,6 +2001,7 @@ sub km200_ParseHttpResponseInit($)
 			if ($hash->{CONSOLEMESSAGE} == true) {print(" - Value       : " . $json->{value} . "\n");}
 		}
 	}
+	### Check whether the decoded content is empty and therefore NOT available
 	else 
 	{
 		### Log entries for debugging purposes
@@ -1819,7 +2015,8 @@ sub km200_ParseHttpResponseInit($)
 	Log3 $name, 5, $name. " : km200_ParseHttpResponseInit    : response         : " .$data;
 
 
-	if ($ServiceCounterInit < ($NumberInitServices-1))	### If the list of KM200ALLSERVICES has not been finished yet
+	### If the list of KM200ALLSERVICES has not been finished yet
+	if ($ServiceCounterInit < ($NumberInitServices-1))
 	{
 		++$ServiceCounterInit;
 		$hash->{temp}{ServiceCounterInit}           = $ServiceCounterInit;
@@ -1827,7 +2024,8 @@ sub km200_ParseHttpResponseInit($)
 		@{$hash->{Secret}{KM200WRITEABLESERVICES}}  = @KM200_WriteableServices;
 		km200_GetInitService($hash);
 	}
-	else												### If the list of KM200ALLSERVICES is finished
+	### If the list of KM200ALLSERVICES is finished
+	else
 	{
 		$hash->{temp}{ServiceCounterInit} = 0;
 
@@ -1888,12 +2086,27 @@ sub km200_ParseHttpResponseInit($)
 		}
 		####END####### Initiate the timer for continuous polling of static values from KM200 #######################END#####
 
+		### Reset fullResponse error message
+		readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
+		
 		### Console Message if enabled
 		if ($hash->{CONSOLEMESSAGE} == true) {print("Sounding and importing of services is completed\n________________________________________________________________________________________________________\n\n");}
 	}
+	### If the Initialisation process has been interuppted with an error message
+	if (ReadingsVal($name,"fullResponse",0) eq "ERROR")
+	{
+		### Reset fullResponse error message
+		readingsSingleUpdate( $hash, "fullResponse", "Restarted after ERROR", 1);
+		
+		### Reset timer for init procedure and start over again until it works
+		InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
+		Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services restarted after fullResponse - error.";
+		
+	}
+	
 	### Clear up temporary variables
 	$hash->{temp}{decodedcontent} = "";	
-		
+	
 	return;
 }
 ####END####### Subroutine to download complete initial data set from gateway ###################################END#####
@@ -1955,7 +2168,7 @@ sub km200_ParseHttpResponseDyn($)
 	my @KM200_DynServices       = @{$hash ->{Secret}{KM200DYNSERVICES}};	
 	my $NumberDynServices       = @KM200_DynServices;
 	my $Service                 = $KM200_DynServices[$ServiceCounterDyn];
-	my $json;	
+	my $json -> {type}          = "";		
 	
 	Log3 $name, 5, $name. " : Parsing response of dynamic service received for: " . $Service;
 
@@ -2204,20 +2417,26 @@ sub km200_ParseHttpResponseDyn($)
 	$hash->{temp}{service}        = "";
 	### Clear up temporary variables
 
+	### If list is not complete yet
 	if ($ServiceCounterDyn < ($NumberDynServices-1))
 	{
 		++$ServiceCounterDyn;
 		$hash->{temp}{ServiceCounterDyn} = $ServiceCounterDyn;
 		km200_GetDynService($hash);
 	}
+	### If list is complete
 	else
 	{
-		$hash->{STATE}                   = "Initialized";
+		$hash->{STATE}                   = "Standby";
 		$hash->{temp}{ServiceCounterDyn} = 0;
 		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n________________________________________________________________________________________________________\n\n");}
+		
 		###START###### Re-Start the timer #####################################START####
 		InternalTimer(gettimeofday()+$hash->{INTERVALDYNVAL}, "km200_GetDynService", $hash, 1);
 		####END####### Re-Start the timer ######################################END#####
+		
+		### Update fullResponse Reading
+		readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
 		
 		$hash->{status}{FlagDynRequest}  = false;
 	}
@@ -2356,7 +2575,7 @@ sub km200_ParseHttpResponseStat($)
 	}
 	else
 	{
-		$hash->{STATE}                    = "Initialized";
+		$hash->{STATE}                    = "Standby";
 		$hash->{temp}{ServiceCounterStat} = 0;
 		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n________________________________________________________________________________________________________\n\n");}
 		
@@ -2364,6 +2583,9 @@ sub km200_ParseHttpResponseStat($)
 		InternalTimer(gettimeofday()+$hash->{INTERVALSTATVAL}, "km200_GetStatService", $hash, 1);
 		####END####### Re-Start the timer ######################################END#####
 
+		### Update fullResponse Reading
+		readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
+		
 		$hash->{status}{FlagStatRequest} = false;
 	}
 	return undef;
