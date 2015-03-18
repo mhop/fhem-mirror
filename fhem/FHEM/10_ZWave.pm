@@ -187,7 +187,7 @@ my %zwave_class = (
 
   ALARM                    => { id => '71', 
     get   => { alarm       => "04%02x", },
-    parse => { "..7105(..)(..)" => '"alarm_type_$1:level $2"',}, },
+    parse => { "..7105(..)(..)(.*)" => 'ZWave_alarmParse($1,$2,$3)',}, },
   MANUFACTURER_SPECIFIC    => { id => '72',
     get   => { model       => "04", },
     parse => { "087205(....)(....)(....)" => 'ZWave_mfsParse($1,$2,$3,0)',
@@ -935,6 +935,158 @@ ZWave_configCheckParam($$$$@)
 
   my $len = ($t eq "int" ? 8 : ($t eq "short" ? 4 : 2));
   return ("", sprintf("04%02x02%0*x", $h->{index}, $len, $arg[0]));
+}
+
+my %zwave_alarmType = (
+  "01"=>"Smoke",
+  "02"=>"CO",
+  "03"=>"CO2",
+  "04"=>"Heat",
+  "05"=>"Water",
+  "06"=>"AccessControl",
+  "07"=>"HomeSecurity",
+  "08"=>"PowerManagement",
+  "09"=>"System",
+  "0a"=>"Emergency",
+  "0b"=>"Clock",
+  "0c"=>"Appliance",
+  "0d"=>"HomeHealth"
+);
+
+my %zwave_alarmEvent = (
+  "0101"=>"detected",
+  "0102"=>"detected, Unknown Location",
+  "0103"=>"Alarm Test",
+  "0201"=>"detected",
+  "0202"=>"detected, Unknown Location",
+  "0301"=>"detected",
+  "0302"=>"detected, Unknown Location",
+  "0401"=>"Overheat detected",
+  "0402"=>"Overheat detected, Unknown Location",
+  "0403"=>"Rapid Temperature Rise",
+  "0404"=>"Rapid Temperature Rise, Unknown Location",
+  "0405"=>"Underheat detected",
+  "0406"=>"Underheat detected, Unknown Location",
+  "0501"=>"Leak detected",
+  "0502"=>"Leak detected, Unknown Location",
+  "0503"=>"Level Dropped",
+  "0504"=>"Level Dropped, Unknown Location",
+  "0505"=>"Replace Filter",
+  "0601"=>"Manual Lock Operation",
+  "0602"=>"Manual Unlock Operation",
+  "0603"=>"RF Lock Operation",
+  "0604"=>"RF Unlock Operation",
+  "0605"=>"Keypad Lock Operation",
+  "0606"=>"Keypad Unlock Operation",
+  "0607"=>"Manual Not Fully Locked Operation",
+  "0608"=>"RF Not Fully Locked Operation",
+  "0609"=>"Auto Lock Locked Operation",
+  "060a"=>"Auto Lock Not Fully Operation",
+  "060b"=>"Lock Jammed",
+  "060c"=>"All user codes deleted",
+  "060d"=>"Single user code deleted",
+  "060e"=>"New user code added",
+  "060f"=>"New user code not added due to duplicate code",
+  "0610"=>"Keypad temporary disabled",
+  "0611"=>"Keypad busy",
+  "0612"=>"New Program code Entered - Unique code for lock configuration",
+  "0613"=>"Manually Enter user Access code exceeds code limit",
+  "0614"=>"Unlock By RF with invalid user code",
+  "0615"=>"Locked by RF with invalid user codes",
+  "0616"=>"Window/Door is open",
+  "0617"=>"Window/Door is closed",
+  "0640"=>"Barrier performing Initialization process",
+  "0641"=>"Barrier operation (Open / Close) force has been exceeded.",
+  "0642"=>"Barrier motor has exceeded manufacturer's operational time limit",
+  "0643"=>"Barrier operation has exceeded physical mechanical limits.",
+  "0644"=>"Barrier unable to perform requested operation due to UL requirements.",
+  "0645"=>"Barrier Unattended operation has been disabled per UL requirements.",
+  "0646"=>"Barrier failed to perform Requested operation, device malfunction",
+  "0647"=>"Barrier Vacation Mode",
+  "0648"=>"Barrier Safety Beam Obstacle",
+  "0649"=>"Barrier Sensor Not Detected / Supervisory Error",
+  "064a"=>"Barrier Sensor Low Battery Warning",
+  "064b"=>"Barrier detected short in Wall Station wires",
+  "064c"=>"Barrier associated with non-Z-wave remote control.",
+  "0700"=>"Previous Events cleared",
+  "0701"=>"Intrusion",
+  "0702"=>"Intrusion, Unknown Location",
+  "0703"=>"Tampering, product covering removed",
+  "0704"=>"Tampering, Invalid Code",
+  "0705"=>"Glass Breakage",
+  "0706"=>"Glass Breakage, Unknown Location",
+  "0707"=>"Motion Detection",
+  "0708"=>"Motion Detection, Unknown Location",
+  "0800"=>"Previous Events cleared",
+  "0801"=>"Power has been applied",
+  "0802"=>"AC mains disconnected",
+  "0803"=>"AC mains re-connected",
+  "0804"=>"Surge Detection",
+  "0805"=>"Voltage Drop/Drift",
+  "0806"=>"Over-current detected",
+  "0807"=>"Over-voltage detected",
+  "0808"=>"Over-load detected",
+  "0809"=>"Load error",
+  "080a"=>"Replace battery soon",
+  "080b"=>"Replace battery now",
+  "080c"=>"Battery is charging",
+  "080d"=>"Battery is fully charged",
+  "080e"=>"Charge battery soon",
+  "080f"=>"Charge battery now!",
+  "0901"=>"hardware failure",
+  "0902"=>"software failure",
+  "0903"=>"hardware failure with OEM proprietary failure code",
+  "0904"=>"software failure with OEM proprietary failure code",
+  "0a01"=>"Contact Police",
+  "0a02"=>"Contact Fire Service",
+  "0a03"=>"Contact Medical Service",
+  "0b01"=>"Wake Up Alert",
+  "0b02"=>"Timer Ended",
+  "0b03"=>"Time remaining",
+  "0c01"=>"Program started",
+  "0c02"=>"Program in progress",
+  "0c03"=>"Program completed",
+  "0c04"=>"Replace main filter",
+  "0c05"=>"Failure to set target temperature",
+  "0c06"=>"Supplying water",
+  "0c07"=>"Water supply failure",
+  "0c08"=>"Boiling",
+  "0c09"=>"Boiling failure",
+  "0c0a"=>"Washing",
+  "0c0b"=>"Washing failure",
+  "0c0c"=>"Rinsing",
+  "0c0d"=>"Rinsing failure",
+  "0c0e"=>"Draining",
+  "0c0f"=>"Draining failure",
+  "0c10"=>"Spinning",
+  "0c11"=>"Spinning failure",
+  "0c12"=>"Drying",
+  "0c13"=>"Drying failure",
+  "0c14"=>"Fan failure",
+  "0c15"=>"Compressor failure",
+  "0d00"=>"Previous Events cleared",
+  "0d01"=>"Leaving Bed",
+  "0d02"=>"Sitting on bed",
+  "0d03"=>"Lying on bed",
+  "0d04"=>"Posture changed",
+  "0d05"=>"Sitting on edge of bed",
+  "0d06"=>"Volatile Organic Compound level"
+);
+
+sub
+ZWave_alarmParse($$$)
+{
+  my ($t,$l,$r) = @_;
+
+  if(!$r || $r !~ m/......(..)/ || !$zwave_alarmType{$t}) { # Version 1
+    return "alarm_type_$t:level $l";
+  }
+
+  my $e = $1;
+  return "alarm:$zwave_alarmType{$t}: ".
+        ($e eq "00" ? "Previous Events cleared" : 
+        ($zwave_alarmEvent{"$t$e"} ? $zwave_alarmEvent{"$t$e"} :
+         "unknown Event $e"));
 }
 
 sub
