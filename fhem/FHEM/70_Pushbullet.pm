@@ -163,7 +163,7 @@ sub Pushbullet_Set($@) {
     ($link, $title, $deviceNick, $deviceIden, $deviceEmail) = Pushbullet_checkArgs($hash, $cmd, @setValues);
     
     # Link check
-    return "URL is not valid. Correct sytax: set " . $name . " link http://www.google.com [| Title | Device] " if( $link !~ /^http:\/\// );
+    return "URL is not valid. Correct sytax: set " . $name . " link http://www.google.com [| Title | Device] " if( $link !~ /^(http|https):\/\// );
     
     # Push geht an Device
     $jsonHash       = {'type' => 'link', 'device_iden' => $deviceIden, 'title' => $title, 'url' => $link};
