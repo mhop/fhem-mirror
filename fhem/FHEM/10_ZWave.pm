@@ -165,6 +165,9 @@ my %zwave_class = (
                coveringStop   => "02" , },  },
   MTP_WINDOW_COVERING      => { id => '51', },
   CRC_16_ENCAP             => { id => '56', },
+  ASSOCIATION_GRP_INFO     => { id => '59', },
+  DEVICE_RESET_LOCALLY     => { id => '5a', },
+  ZWAVEPLUS_INFO           => { id => '5e', },
   MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
     get   => { mcEndpoints => "07",     # Endpoints
                mcCapability=> "09%02x"},
@@ -234,7 +237,7 @@ my %zwave_class = (
   VERSION                  => { id => '86',
     get   => { version      => "11",
                versionClass => "13%02x", },
-    parse => { "078612(..)(..)(..)(..)(..)" =>
+    parse => { "..8612(..)(..)(..)(..)(..)" =>
     'sprintf("version:Lib %d Prot %d.%d App %d.%d",'.
         'hex($1),hex($2),hex($3),hex($4),hex($5))', 
                "048614(..)(..)"             => '"versionClass_$1:$2"', }, },
