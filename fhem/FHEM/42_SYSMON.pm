@@ -2390,10 +2390,12 @@ sub SYSMON_getNetworkInfo ($$$)
 
     my $rxRaw = -1;
     my $txRaw = -1;
-    #if(-e "/sys/class/net/$nName/statistics/rx_bytes" && -e "/sys/class/net/$nName/statistics/tx_bytes") {
+    # if(-e "/sys/class/net/$nName/statistics/rx_bytes" && -e "/sys/class/net/$nName/statistics/tx_bytes") {
     if(SYSMON_isNetStatClass($hash, $nName)) {
         $rxRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/rx_bytes");
+        $rxRaw = -1 unless defined $rxRaw;
         $txRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/tx_bytes");
+        $txRaw = -1 unless defined $txRaw;
     }
     
   if($rxRaw<0||$txRaw<0) {   
