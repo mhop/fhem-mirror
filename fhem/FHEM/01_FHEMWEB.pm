@@ -2678,7 +2678,7 @@ FW_widgetOverride($$)
   push @list, split(" ", $fa) if($fa);
   push @list, split(" ", $da) if($da);
   foreach my $na (@list) {
-    my ($n,$a) = split(":", $na);
+    my ($n,$a) = split(":", $na, 2);
     $str =~ s/\b($n)\b(:[^ ]*)?/$1:$a/g;
   }
   return $str;
