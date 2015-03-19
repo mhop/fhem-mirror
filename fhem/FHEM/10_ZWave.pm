@@ -1078,15 +1078,18 @@ ZWave_alarmParse($$$)
 {
   my ($t,$l,$r) = @_;
 
-  if(!$r || $r !~ m/......(..)/ || !$zwave_alarmType{$t}) { # Version 1
+  if(!$r || $r !~ m/......(..)(.*)/ || !$zwave_alarmType{$t}) { # V1 or unknown
     return "alarm_type_$t:level $l";
   }
+  my ($e, $v4, $s) = ($1, $2, "alarm:$zwave_alarmType{$t}: ");
 
-  my $e = $1;
-  return "alarm:$zwave_alarmType{$t}: ".
-        ($e eq "00" ? "Previous Events cleared" : 
-        ($zwave_alarmEvent{"$t$e"} ? $zwave_alarmEvent{"$t$e"} :
-         "unknown Event $e"));
+  if($l eq "00") {
+    $s .= "Event cleared: ";
+    $e = $1 if($v4 && $v4 =~ m/..(..)../);
+  }
+
+  return $s . ($zwave_alarmEvent{"$t$e"} ?
+                $zwave_alarmEvent{"$t$e"} : "unknown event $e");
 }
 
 sub
@@ -1821,7 +1824,9 @@ s2Hex($)
   <ul>
 
   <br><br><b>Class ALARM</b>
-  <li>alarm_type_X:level Y</li>
+  <li>Devices with class version 1 support: alarm_type_X:level Y</li>
+  <li>For higher class versions more detailed events with 100+ different
+      strings in the form alarm:<string> are generated.</li>
 
   <br><br><b>Class ASSOCIATION</b>
   <li>assocGroup_X:Max Y Nodes A,B,...</li>
@@ -1876,7 +1881,7 @@ s2Hex($)
   <li>protection:[on|off|seq]</li>
 
   <br><br><b>Class SENSOR_ALARM</b>
-  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li>
+  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li> 
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>state:open</li>
