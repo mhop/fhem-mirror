@@ -508,7 +508,7 @@ FB_CALLMONITOR_reverseSearch($$)
     { 
         Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
 
-        $result = GetFileFromURL("http://www.klicktel.de/rueckwaertssuche/".$number, 5, undef, 1);
+        $result = GetFileFromURL("http://openapi.klicktel.de/searchapi/invers?key=0de6139a49055c37b9b2d7bb3933cb7b&number=".$number, 5, undef, 1);
         if(not defined($result))
         {
             if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -520,17 +520,13 @@ FB_CALLMONITOR_reverseSearch($$)
         }
         else
         {
-            if($result =~ /<a href="http\:\/\/www\.klicktel\.de\/.*html" target="_self">(.+?)<\/a>/)
+            if($result =~ /"displayname":"([^"]*?)"/)
             {
                 $invert_match = $1;
                 $invert_match = FB_CALLMONITOR_html2txt($invert_match);
                 FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
                 undef($result);
                 return $invert_match;
-            }
-            elsif(not $result =~ /Leider wurde zu dieser Suche kein Eintrag gefunden/)
-            {
-                Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from klicktel.de. Please contact the FHEM community.";
             }
         }
     }
@@ -573,7 +569,7 @@ FB_CALLMONITOR_reverseSearch($$)
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - using search.ch for reverse search of $number";
 
-        $result = GetFileFromURL("http://tel.search.ch/?was=".$number, 5, undef, 1);
+        $result = GetFileFromURL("http://tel.search.ch/api/?key=b0b1207cb7c9d0048867de887aa9a4fd&maxnum=1&was=".$number, 5, undef, 1);
         if(not defined($result))
         {
             if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -586,17 +582,31 @@ FB_CALLMONITOR_reverseSearch($$)
         else
         {
             #Log 2, $result;
-            if($result =~ /<section[^>]*>.*?<h1>(.+?)<\/h1>.*?<\/section>/s)
+            if($result =~ /<entry>(.+?)<\/entry>/s)
             {
-                $invert_match = $1;
+                my $xml = $1;
+                
+                $invert_match = "";
+                
+                if($xml =~ /<tel:firstname>(.+?)<\/tel:firstname>/)
+                {
+                    $invert_match .= $1;
+                }
+                
+                if($xml =~ /<tel:name>(.+?)<\/tel:name>/)
+                {
+                    $invert_match .= " $1";
+                }
+                
+                if($xml =~ /<tel:occupation>(.+?)<\/tel:occupation>/)
+                {
+                    $invert_match .= ", $1";
+                }
+                
                 $invert_match = FB_CALLMONITOR_html2txt($invert_match);
                 FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
                 undef($result);
                 return $invert_match;
-            }
-            elsif(not $result =~ /Keine Eintr.ge gefunden/)
-            {
-                Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from search.ch. Please contact the FHEM community.";
             }
         }
     }
@@ -659,17 +669,17 @@ sub FB_CALLMONITOR_html2txt($)
 
     $string =~ s/&nbsp;/ /g;
     $string =~ s/&amp;/&/g;
-    $string =~ s/(\xe4|&auml;)/ä/g;
-    $string =~ s/(\xc4|&Auml;)/Ä/g;
-    $string =~ s/(\xf6|&ouml;)/ö/g;
-    $string =~ s/(\xd6|&Ouml;)/Ö/g;
-    $string =~ s/(\xfc|&uuml;)/ü/g;
-    $string =~ s/(\xdc|&Uuml;)/Ü/g;
+    $string =~ s/(\xe4|&auml;|\\u00e4|\\u00E4)/ä/g;
+    $string =~ s/(\xc4|&Auml;|\\u00c4|\\u00C4)/Ä/g;
+    $string =~ s/(\xf6|&ouml;|\\u00f6|\\u00F6)/ö/g;
+    $string =~ s/(\xd6|&Ouml;|\\u00d6|\\u00D6)/Ö/g;
+    $string =~ s/(\xfc|&uuml;|\\u00fc|\\u00FC)/ü/g;
+    $string =~ s/(\xdc|&Uuml;|\\u00dc|\\u00DC)/Ü/g;
     $string =~ s/(\xdf|&szlig;)/ß/g;
     $string =~ s/<.+?>//g;
     $string =~ s/(^\s+|\s+$)//g;
 
-    return $string;
+    return trim($string);
 
 }
 
@@ -1409,6 +1419,11 @@ sub FB_CALLMONITOR_readPassword($;$)
   <li><b>missed_call</b> - This event will be raised in case of a missing incoming call. If available, also the name of the calling number will be displayed.</li>
   <li><b>missed_call_line</b> - Will be raised together with "missed_call". It shows the number of the internal line which received the missed call.</li> 
   </ul>
+  <br>
+  <b>Legal Notice:</b><br><br>
+  <ul>
+  <li>klicktel.de reverse search is powered by telegate MEDIA</li>
+  </ul>
 </ul>
 
 
@@ -1537,6 +1552,11 @@ sub FB_CALLMONITOR_readPassword($;$)
   <li><b>call_id</b> - Die Identifizierungsnummer eines einzelnen Gespr&auml;chs. Dient der Zuordnung bei zwei oder mehr parallelen Gespr&auml;chen, damit alle Events eindeutig einem Gespr&auml;ch zugeordnet werden k&ouml;nnen</li>
   <li><b>missed_call</b> - Dieses Event wird nur generiert, wenn ein eingehender Anruf nicht beantwortet wird. Sofern der Name dazu bekannt ist, wird dieser ebenfalls mit angezeigt.</li>
   <li><b>missed_call_line</b> - Analog zu "missed_call" wird dieses Event nur generiert, wenn ein eingehender Anruf nicht beantwortet wird. Es zeigt die Rufnummer an &uuml;ber, den dieser unbeantwortete Anruf eingegangen ist.</li>
+  </ul>
+  <br>
+  <b>Rechtlicher Hinweis:</b><br><br>
+  <ul>
+  <li>klicktel.de reverse search ist powered by telegate MEDIA</li>
   </ul>
 </ul>
 
