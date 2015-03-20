@@ -1,10 +1,11 @@
 #!/usr/bin/perl -w
 ################################################################
 # $Id$
-# vim: ts=2:et
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
 #  All rights reserved
+#
+#  Rework started: 2015 by betateilchen
 #
 #  This script free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -69,19 +70,19 @@ my %tblColName;
 my %tblSum;
 my %tblCnt;
 
-# cascading style sheet
-my $css = "http://fhem.de/../css/style.css";
-
-# exclude modules from top 10 graph
-my $excludeFromTop10modules = "at autocreate notify telnet weblink FileLog FHEMWEB Global SUNRISE_EL";
-my $excludeFromTop10definitions = "at autocreate notify telnet weblink FileLog FHEMWEB Global SUNRISE_EL";
-
 # directory cointains databases
 my $datadir = "./data";
+
+# cascading style sheet
+#my $css = "http://fhem.de/../css/style.css";
+my $css = "$datadir/style.css";
 
 # geo ip database file from http://www.maxmind.com/download/geoip/database/
 # should be updated once per month
 my $geoIPDat = "$datadir/GeoLiteCity.dat";
+
+# exclude modules from top 10
+my $excludeModules = "at autocreate dummy eventTypes notify telnet weblink FileLog FHEMWEB Global SUNRISE_EL";
 
 # database
 my $dbf = "$datadir/fhem_statistics_db.sqlite";
@@ -114,23 +115,22 @@ sub viewStatistics() {
   my $cArch         = drawPieChart("nodes","arch","Architecture",390,300,"chart_arch");
   my $cRelease      = drawPieChart("nodes","release","FHEM Release",390,300,"chart_release");
   my $cPerl         = drawPieChart("nodes","perl","Perl Version",390,300,"chart_perl");
-  my $cModulesTop10 = drawColumnChartTop10Modules("modules","modulestop10",,"Used",800,300,"chart_modulestop10");
-  my $cModDefTop10  = drawColumnChartTop10ModDef("modules","definitions","Definitions",800,300,"chart_moddeftop10");
+  my $cModulesTop10  = drawColumnChartTop10Modules("modules","modulestop10",,"Used",800,300,"chart_modulestop10");
+  my $cModDefTop10   = drawColumnChartTop10ModDef("modules","definitions","Definitions",800,300,"chart_moddeftop10");
   #my $cModules      = drawBarChartModules("modules","modules","Used","Definitions",800,600,"chart_modules");
-  my $mWorld        = drawRegionsMap("locations","countryname","world","map_world");
-  my $mEU           = drawRegionsMap("locations","countryname","150","map_europe");
-  my $mWesternEU    = drawMarkersMap("locations","city","155","map_germany");
-  my $tModules      = drawTable3cols("modules","total_modules","string","Module","number","Used","number","Definitions","table_modules");
+  my $mWorld         = drawRegionsMap("locations","countryname","world","map_world");
+  my $mEU            = drawRegionsMap("locations","countryname","150","map_europe");
+  my $mWesternEU     = drawMarkersMap("locations","city","155","map_germany");
+  my $tModules       = drawTable3cols("modules","total_modules","string","Module","number","Used","number","Definitions","table_modules");
   #my $tModDef       = drawTable("modules","total_moddef","string","Module","number","Definitions","table_moddef");
-  my $tModels       = drawTable2cols("models","total_models","string","Model","boolean","defined","table_models");
+  my $tModels        = drawTable2cols("models","total_models","string","Model","boolean","defined","table_models");
   my @res = $dbh->selectrow_array("SELECT created FROM db");
   my $since = "@res";
 
-  print header;
+#  print header;
   print start_html(
         -title  => 'fhem.de - Statistics',
         -author => 'm_fischer@gmx.de',
-        -base   => 'true',
         -style  => {-src => $css},
         -meta   => {'keywords' => 'fhem houseautomation statistics'},
         -script => [
@@ -149,17 +149,19 @@ sub viewStatistics() {
   my ($nodes) = $dbh->selectrow_array("SELECT COUNT(uniqueID) FROM nodes");
 
   print <<END;
+  <div id="menuScrollArea">
   <div id="logo"></div>
   <div id="menu">
-    <table><tbody><tr><td>
-    <table id="room">
+    <table><tr><td>
+    <table class="room">
       <tr><td></td></tr>
       <tr><td><b>back to</b></td></tr>
       <tr><td></td></tr> 
       <tr><td><a href="http://fhem.de">Homepage</a></td></tr>
       <tr><td></td></tr>
-    </tbody></table>
-    </td></tr></tbody></table>
+    </table>
+    </td></tr></table>
+  </div>
   </div>
 
   <div id="right">
@@ -184,11 +186,11 @@ sub viewStatistics() {
 
     <h4>Top 10 of most commonly used modules<small><sup>1</sup></small>...</h4>
     <div id="chart_modulestop10" style="width: 800px; height: 300px; border: 1px solid black;"></div>
-    <small><sup>1</sup> excluded from graph: $excludeFromTop10modules</small>
+    <small><sup>1</sup> excluded from graph: $excludeModules</small>
 
     <h4>Top 10 of total definitions by module<small><sup>1</sup></small>...</h4>
     <div id="chart_moddeftop10" style="width: 800px; height: 300px; border: 1px solid black;"></div>
-    <small><sup>1</sup> excluded from graph: $excludeFromTop10definitions</small>
+    <small><sup>1</sup> excluded from graph: $excludeModules</small>
 
 <!--
 //    <h4>Top 20 of most commonly used modules (with total definitions by module)...</h4>
@@ -218,7 +220,8 @@ sub viewStatistics() {
     <div style="clear:both;"></div>
 
     <div id="footer" style="position:relative; left: -100px; text-align: center;">
-      <p><small>Layout by M. Fischer - Click <a href="http://www.fischer-net.de/kontakt.html">here</a> to leave your comments.</small></p>
+      <p><small>Layout by M. Fischer<br/>
+         Rework 2015 started by betateilchen</small></p>
     </div>
   </div>
 END
@@ -282,13 +285,14 @@ END
 
 sub drawColumnChartTop10Modules(@) {
   my ($table,$postfix,$rowtitle,$width,$height,$divID) = @_;
-  $sth = $dbh->prepare("SELECT * FROM $table where 1=0");
+  $sth = $dbh->prepare("SELECT * FROM $table LIMIT 0");
   $sth->execute();
   my $res = $sth->{NAME};
   $sth->finish;
 
   my %hash = ();
   foreach my $column (@$res) {
+    next unless $column;
     #my ($sum) = $dbh->selectrow_array("SELECT sum($column) FROM $table");
     my ($sum) = $dbh->selectrow_array("SELECT count($column) FROM $table WHERE $column != 0");
     $hash{$column} = $sum;
@@ -298,7 +302,7 @@ sub drawColumnChartTop10Modules(@) {
   my $i=0;
   foreach my $column (sort {$hash{$b} <=> $hash{$a}} keys %hash) {
     next if($column eq "uniqueID");
-    next if($excludeFromTop10modules =~ /$column/);
+    next if($excludeModules =~ /$column/);
     $data .= "\t['$column',$hash{$column}],\n";
     $i++;
     last if($i == 10);
@@ -330,14 +334,14 @@ END
 
 sub drawColumnChartTop10ModDef(@) {
   my ($table,$postfix,$rowtitle,$width,$height,$divID) = @_;
-  $sth = $dbh->prepare("SELECT * FROM $table where 1=0");
+  $sth = $dbh->prepare("SELECT * FROM $table LIMIT 0");
   $sth->execute();
   my @res = @{$sth->{NAME}};
   $tblColName{$table} = \@res;
   $sth->finish;
 
   my @cols = map { "sum($_),count($_)" }
-             grep { $_ ne "uniqueID" } @res;
+             grep { $_ ne "uniqueID" && $_ } @res;
   $sth = $dbh->prepare("SELECT ".join(",",@cols)." FROM $table");
   $sth->execute();
   my @row = $sth->fetchrow_array;
@@ -354,7 +358,7 @@ sub drawColumnChartTop10ModDef(@) {
   my $data;
   my $i=0;
   foreach my $column (sort {$sum{$b} <=> $sum{$a}} keys %sum) {
-    next if($excludeFromTop10definitions =~ /$column/);
+    next if($excludeModules =~ /$column/);
     $data .= "\t['$column',$sum{$column}],\n";
     $i++;
     last if($i == 10);
@@ -438,6 +442,7 @@ sub drawMarkersMap(@) {
   my %hash = ();
   foreach my $row (@$res) {
     my ($value) = @$row;
+    $value =~ s/\'/_/g;
     my ($count) = $dbh->selectrow_array("SELECT COUNT(*) FROM $table WHERE $column = '$value'");
     #$value = "Germany" if($value eq "");
     next if($value eq "");
@@ -692,7 +697,7 @@ sub insertDB() {
     $sth = $dbh->prepare(q{DELETE FROM models WHERE uniqueID=?});
     $sth->execute($uniqueID);
 
-    # insert new modules of fhem node
+    # insert new models of fhem node
     $sth = $dbh->prepare("INSERT INTO models (uniqueID) VALUES (?)");
     $sth->execute($uniqueID);
 
