@@ -1239,10 +1239,11 @@ sub HMinfo_GetFn($@) {#########################################################
     my @model;
     foreach (keys %{$th}){
       my $mode = $th->{$_}{rxt};
-      $mode =~ s/c/config/;
-      $mode =~ s/w/wakeup/;
-      $mode =~ s/b/burst/;
-      $mode =~ s/l/lazyConf/;
+      $mode =~ s/\bc\b/config/;
+      $mode =~ s/\bw\b/wakeup/;
+      $mode =~ s/\bb\b/burst/;
+      $mode =~ s/\b3\b/3Burst/;
+      $mode =~ s/\bl\b/lazyConf/;
       $mode =~ s/\bf\b/burstCond/;
       $mode =~ s/:/,/g;
       $mode = "normal" if (!$mode);
