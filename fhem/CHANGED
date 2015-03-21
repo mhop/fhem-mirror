@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_Modbus.pm: added base module for modbus devices
+  - feature: 98_ModbusAttr.pm: added module for generic modbus devices
+             Readings can be defined by attributes comparable to HTTPMOD
+  - feature: 98_ModbusSET.pm: added module for SET Silent Heat pumps
   - change:  10_RESIDENTS: renamed reading residentsGuests to residentsTotalGuests
   - change:  SYSMON: warnings, docu
   - bugfix:  73_km200: Bugfix for fullResponse
