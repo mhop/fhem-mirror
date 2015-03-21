@@ -623,3 +623,7 @@
 
 - Tue Mar 17 2015 (wzut)
   - added two new modules at contrib/Infratec/* for Infratec Power Modules
+
+- Sat Mar 21 2015 (loredo)
+  - reading residentsGuests in module 10_RESIDENTS was renamed to residentsTotalGuests
+  - introducing new readings in module 10_RESIDENTS: residentsTotalGuestsAbsent and residentsTotalGuestsPresent
