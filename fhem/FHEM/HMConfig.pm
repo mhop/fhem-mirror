@@ -234,6 +234,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00A7" => {name=>"HM-Sen-RD-O"             ,st=>'sensRain'          ,cyc=>''      ,rxt=>''       ,lst=>'1:1,4:1p'     ,chn=>"Rain:1:1,Heating:2:2",}#stc:70 THSensor
  ,"00A8" => {name=>"HM-WDS30-OT2-SM"         ,st=>'THSensor'          ,cyc=>'12:00' ,rxt=>'c:w:f'  ,lst=>'p'            ,chn=>"T1:1:1,T2:2:2,T1_T2:3:3,T2_T1:4:4,Event:5:5",}
  ,"00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:6",}
+ ,"00AA" => {name=>"HM-SEC-SD-2"             ,st=>'smokeDetector'     ,cyc=>'99:00' ,rxt=>'c:3'    ,lst=>'p'            ,chn=>"",} 
  ,"00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
@@ -282,7 +283,9 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00DB" => {name=>"HM-Sen-MDIR-WM55"        ,st=>'motionAndBtn'      ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Motion:3:3",}
  ,"00DC" => {name=>"HM-Sen-DB-PCB"           ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}
  ,"00DD" => {name=>"HM-PB-4DIS-WM-2"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:20",}
- ,"00DE" => {name=>"HM-ES-TX-WM"             ,st=>'powerSensor'       ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>"",} # strom/gassensor
+ ,"00DE" => {name=>"HM-ES-TX-WM"             ,st=>'powerSensor'       ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>"",}         # strom/gassensor
+ ,"00E0" => {name=>"HM-RC-2-PBU-FM"          ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",}  # HM Wireless Sender 2-channel for brand switch systems, flush mount
+ ,"00E1" => {name=>"HM-RC-Dis-H-x-EU"        ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:20",} #"HM Remote Control with Displays"
  ,"00E3" => {name=>"HM-ES-PMSw1-Pl-DN-R3"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00E4" => {name=>"HM-ES-PMSw1-Pl-DN-R4"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
@@ -434,6 +437,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   backAtMotion    =>{a=> 13.6,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at motion"                  ,lit=>{off=>0,on=>1}},
   backAtCharge    =>{a=> 13.5,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at Charge"                  ,lit=>{off=>0,on=>1}},
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
+  stbyTime2       =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>120     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
   backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},
   btnLock         =>{a=> 15.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"                          ,lit=>{off=>0,on=>1}},#1 is proofen
 
@@ -464,6 +468,8 @@ my $K_actDetID = '000000'; # id of actionDetector
   modusBtnLock    =>{a=> 26.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"mode button lock"                     ,lit=>{off=>0,on=>200}},
   paramSel        =>{a=> 27.0,s=>1.0,l=>0,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"data transfered to peer"              ,lit=>{off=>0,T1=>1,T2=>2,T1_T2=>3,T2_T1=>4}},
   RS485IdleTime   =>{a=> 29.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Idle Time"},
+  wakeupDefChan   =>{a=> 32.0,s=>1.0,l=>0,min=>0  ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"wakeup default channel"},
+  wakeupBehavior  =>{a=> 33.0,s=>0.1,l=>0,min=>0  ,max=>20      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior"                      ,lit=>{off=>0,on=>1}},
 #un-identified List0
 # addr Dec!!
 # SEC-WM55     02:01 (AES on?)
@@ -477,6 +483,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # BL1TPBU      02:01 21:FF
 # Dim1TPBU     02:01 21:FF 22:00
 # HM-MOD-Re-8        30:49
+# HM-ES-TX-WM        5C:38 F1:FC
 # tx: D1E8  9158 
 
 #Keymatic 3.3 unknown, seen 1 here
@@ -906,6 +913,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,lowBatLimit     =>1,batDefectLimit  =>1
                          ,                                        transmitTryMax  =>1}
  ,"HM-Dis-TD-T"       =>{ lowBatLimitFS   =>1,ledMode         =>1}
+ ,"HM-RC-Dis-H-x-EU"  =>{ localResetDis   =>1,stbyTime2       =>1,language        =>1
+                         ,wakeupDefChan   =>1,wakeupBehavior  =>1}
 
  ,"HM-LC-Sw1-Pl"      =>{ confBtnTime     =>1,localResDis     =>1
                          ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
@@ -1495,6 +1504,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
 $culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
 $culHmModelSets{"HM-Dis-WM55"}         = $culHmModelSets{"HM-PB-4DIS-WM"};
+$culHmModelSets{"HM-RC-Dis-H-x-EU"}    = $culHmModelSets{"HM-PB-4DIS-WM"};
 
 #%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
@@ -1577,6 +1587,8 @@ $culHmModelSets{"HM-Dis-WM55"}         = $culHmModelSets{"HM-PB-4DIS-WM"};
                          ,press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."
                          ,inhibit        =>"[on|off]"
                          ,statusRequest  =>""},
+  "HM-ES-PMSw1-Pl00"  =>{ fwUpdate       =>"<filename> <bootTime> ..."
+                         ,getSerial      => ""},
   "HM-CC-RT-DN06"     =>{ press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."
                          },
   "HM-Dis-WM5501"     =>{ displayWM      =>"[long|short|help] <lineX> <textNo1> <color1> <icon1> [<textNo2> <color2> <icon2>] ...[<textNo6> <color6> <icon6>] "},
@@ -1612,7 +1624,7 @@ $culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT00"} = $culHmChanSets{"HM-CC-TC00"};
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
 
-$culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
+#$culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 
 %culHmFunctSets = (# command depending on function

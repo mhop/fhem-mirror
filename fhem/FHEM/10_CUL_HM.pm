@@ -927,7 +927,7 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
                   
 sub CUL_HM_Parse($$) {#########################################################
   my ($iohash, $msgIn) = @_;
-
+  
   my ($msg,$msgStat,$myRSSI,$msgIO) = split(":",$msgIn,4);
   # Msg format: Allnnffttssssssddddddpp...
   my ($t,$len,$mNo,$mFlg,$mTp,$src,$dst,$p) = unpack 'A1A2A2A2A2A6A6A*',$msg;
@@ -948,9 +948,9 @@ sub CUL_HM_Parse($$) {#########################################################
       return "";
     }
   }
-  
+ 
   return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
-  
+
   $p = "" if(!defined($p)); # generate some abreviations 
   my @mI = unpack '(A2)*',$p; # split message info to bytes
   my $mStp = $mI[0] ? $mI[0] : ""; #message subtype
@@ -1093,7 +1093,6 @@ sub CUL_HM_Parse($$) {#########################################################
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
-
   my $parse = CUL_HM_parseCommon($iohash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md);
   push @evtEt,[$shash,1,"powerOn:$tn"] if($parse eq "powerOn");
   push @evtEt,[$shash,1,""]            if($parse eq "parsed"); # msg is parsed but may
@@ -2150,12 +2149,17 @@ sub CUL_HM_Parse($$) {#########################################################
     #Event:      mTp=0x41 p(..)(..)(..) channel   , unknown, state (1 byte)
 
     if ($mTp eq "10" && $p =~ m/^06..(..)(..)/) {
+       # m:A0 A010 233FCE 1743BF 0601 01  00 31
       my ($state,$err) = (hex($1),hex($2));
-      push @evtEt,[$devH ,1,"battery:".(($err&0x80)?"low"  :"ok"  )];
+      push @evtEt,[$devH ,1,"battery:"     .(($err&0x80)?"low"     :"ok")];
       push @evtEt,[$shash,1,"level:"  .hex($state)];
       $state = (($state < 2)?"off":"smoke-Alarm");
       push @evtEt,[$shash,1,"state:$state"];
       push @evtEt,[$devH ,1,"powerOn:$tn"] if(length($p) == 8 && $mNo eq "00");
+      if ($md eq "HM-SEC-SD-2"){
+        push @evtEt,[$shash,1,"alarmTest:"   .(($err&0x02)?"failed"  :"ok")];
+        push @evtEt,[$shash,1,"smokeChamber:".(($err&0x04)?"degraded":"ok")];
+      }
       my $tName = ReadingsVal($name,"peerList","");#inform team
       $tName =~ s/,.*//;
       CUL_HM_updtSDTeam($tName,$name,$state);
@@ -6056,6 +6060,7 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
     my $rxtOfModel = $culHmModel->{$MId}{rxt} if ($MId && $culHmModel->{$MId}{rxt});
     if ($rxtOfModel){
       $rxtEntity |= ($rxtOfModel =~ m/b/)?0x02:0;#burst
+      $rxtEntity |= ($rxtOfModel =~ m/3/)?0x02:0;#tripple-burst todo currently unknown how it works
       $rxtEntity |= ($rxtOfModel =~ m/c/)?0x04:0;#config
       $rxtEntity |= ($rxtOfModel =~ m/w/)?0x08:0;#wakeup
       $rxtEntity |= ($rxtOfModel =~ m/l/)?0x10:0;#lazyConfig
