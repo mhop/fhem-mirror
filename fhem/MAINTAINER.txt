@@ -257,6 +257,9 @@ FHEM/98_HTTPMOD.pm           stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_IF.pm                damian-s             http://forum.fhem.de Automatisierung
 FHEM/98_JsonList.pm          mfr69bs              http://forum.fhem.de Automatisierung
 FHEM/98_JsonList2.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/98_Modbus.pm            stefanstrobel        http://forum.fhem.de Sonstiges
+FHEM/98_ModbusAttr.pm        stefanstrobel        http://forum.fhem.de Sonstiges
+FHEM/98_ModbusSET.pm         stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_PID20.pm             John                 http://forum.fhem.de Automatisierung
 FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends
