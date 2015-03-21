@@ -628,19 +628,21 @@ sub RESIDENTS_UpdateReadings (@) {
       :                                           "undefined";
     my $name = $hash->{NAME};
 
-    my $state_home         = 0;
-    my $state_gotosleep    = 0;
-    my $state_asleep       = 0;
-    my $state_awoken       = 0;
-    my $state_absent       = 0;
-    my $state_gone         = 0;
-    my $state_total        = 0;
-    my $state_totalPresent = 0;
-    my $state_totalAbsent  = 0;
-    my $state_totalGuests  = 0;
-    my $state_guestDev     = 0;
-    my $wayhome            = 0;
-    my $wakeup             = 0;
+    my $state_home               = 0;
+    my $state_gotosleep          = 0;
+    my $state_asleep             = 0;
+    my $state_awoken             = 0;
+    my $state_absent             = 0;
+    my $state_gone               = 0;
+    my $state_total              = 0;
+    my $state_totalPresent       = 0;
+    my $state_totalAbsent        = 0;
+    my $state_totalGuests        = 0;
+    my $state_totalGuestsPresent = 0;
+    my $state_totalGuestsAbsent  = 0;
+    my $state_guestDev           = 0;
+    my $wayhome                  = 0;
+    my $wakeup                   = 0;
     my $newstate;
     my $presence = "absent";
 
@@ -707,6 +709,7 @@ sub RESIDENTS_UpdateReadings (@) {
             if ( $defs{$guest}{READINGS}{state}{VAL} eq "home" ) {
                 $state_home++;
                 $state_totalPresent++;
+                $state_totalGuestsPresent++;
                 $state_totalGuests++;
                 $state_total++;
             }
@@ -714,6 +717,7 @@ sub RESIDENTS_UpdateReadings (@) {
             if ( $defs{$guest}{READINGS}{state}{VAL} eq "gotosleep" ) {
                 $state_gotosleep++;
                 $state_totalPresent++;
+                $state_totalGuestsPresent++;
                 $state_totalGuests++;
                 $state_total++;
             }
@@ -721,6 +725,7 @@ sub RESIDENTS_UpdateReadings (@) {
             if ( $defs{$guest}{READINGS}{state}{VAL} eq "asleep" ) {
                 $state_asleep++;
                 $state_totalPresent++;
+                $state_totalGuestsPresent++;
                 $state_totalGuests++;
                 $state_total++;
             }
@@ -728,6 +733,7 @@ sub RESIDENTS_UpdateReadings (@) {
             if ( $defs{$guest}{READINGS}{state}{VAL} eq "awoken" ) {
                 $state_awoken++;
                 $state_totalPresent++;
+                $state_totalGuestsPresent++;
                 $state_totalGuests++;
                 $state_total++;
             }
@@ -735,6 +741,7 @@ sub RESIDENTS_UpdateReadings (@) {
             if ( $defs{$guest}{READINGS}{state}{VAL} eq "absent" ) {
                 $state_absent++;
                 $state_totalAbsent++;
+                $state_totalGuestsAbsent++;
                 $state_totalGuests++;
                 $state_total++;
             }
@@ -756,9 +763,21 @@ sub RESIDENTS_UpdateReadings (@) {
       if ( !defined( $hash->{READINGS}{residentsTotal}{VAL} )
         || $hash->{READINGS}{residentsTotal}{VAL} ne $state_total );
 
-    readingsBulkUpdate( $hash, "residentsGuests", $state_totalGuests )
-      if ( !defined( $hash->{READINGS}{residentsGuests}{VAL} )
-        || $hash->{READINGS}{residentsGuests}{VAL} ne $state_totalGuests );
+    readingsBulkUpdate( $hash, "residentsTotalGuests", $state_totalGuests )
+      if ( !defined( $hash->{READINGS}{residentsTotalGuests}{VAL} )
+        || $hash->{READINGS}{residentsTotalGuests}{VAL} ne $state_totalGuests );
+
+    readingsBulkUpdate( $hash, "residentsTotalGuestsPresent",
+        $state_totalGuestsPresent )
+      if ( !defined( $hash->{READINGS}{residentsTotalGuestsPresent}{VAL} )
+        || $hash->{READINGS}{residentsTotalGuestsPresent}{VAL} ne
+        $state_totalGuestsPresent );
+
+    readingsBulkUpdate( $hash, "residentsTotalGuestsAbsent",
+        $state_totalGuestsAbsent )
+      if ( !defined( $hash->{READINGS}{residentsTotalGuestsAbsent}{VAL} )
+        || $hash->{READINGS}{residentsTotalGuestsAbsent}{VAL} ne
+        $state_totalGuestsAbsent );
 
     readingsBulkUpdate( $hash, "residentsTotalPresent", $state_totalPresent )
       if ( !defined( $hash->{READINGS}{residentsTotalPresent}{VAL} )
@@ -886,7 +905,7 @@ sub RESIDENTS_UpdateReadings (@) {
         && $newstate ne "absent" );
 
     Log3 $name, 4,
-"RESIDENTS $name: calculation result - residentsTotal:$state_total residentsGuests:$state_totalGuests residentsTotalPresent:$state_totalPresent residentsTotalAbsent:$state_totalAbsent residentsHome:$state_home residentsGotosleep:$state_gotosleep residentsAsleep:$state_asleep residentsAwoken:$state_awoken residentsAbsent:$state_absent residentsGone:$state_gone presence:$presence state:$newstate";
+"RESIDENTS $name: calculation result - residentsTotal:$state_total residentsTotalGuests:$state_totalGuests residentsTotalGuestsPresent:$state_totalGuestsPresent residentsTotalGuestsAbsent:$state_totalGuestsAbsent residentsTotalPresent:$state_totalPresent residentsTotalAbsent:$state_totalAbsent residentsHome:$state_home residentsGotosleep:$state_gotosleep residentsAsleep:$state_asleep residentsAwoken:$state_awoken residentsAbsent:$state_absent residentsGone:$state_gone presence:$presence state:$newstate";
 
     # safe current time
     my $datetime = FmtDateTime(time);
@@ -1151,9 +1170,6 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>residentsGotosleep</b> - number of residents with state 'gotosleep'
           </li>
           <li>
-            <b>residentsGuests</b> - number of active guests who are currently treated as part of the residents scope
-          </li>
-          <li>
             <b>residentsHome</b> - number of residents with state 'home'
           </li>
           <li>
@@ -1161,6 +1177,15 @@ sub RESIDENTS_UpdateReadings (@) {
           </li>
           <li>
             <b>residentsTotalAbsent</b> - number of all residents who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalGuests</b> - number of active guests who are currently treated as part of the residents scope
+          </li>
+          <li>
+            <b>residentsTotalGuestsAbsent</b> - number of all active guests who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalGuestsPresent</b> - number of all active guests who are currently at home
           </li>
           <li>
             <b>residentsTotalPresent</b> - number of all residents who are currently at home
@@ -1386,9 +1411,6 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>residentsGotosleep</b> - Anzahl der Bewohner mit Status 'gotosleep'
           </li>
           <li>
-            <b>residentsGuests</b> - Anzahl der aktiven Gäste, welche momentan du den Bewohnern dazugezählt werden
-          </li>
-          <li>
             <b>residentsHome</b> - Anzahl der Bewohner mit Status 'home'
           </li>
           <li>
@@ -1396,6 +1418,15 @@ sub RESIDENTS_UpdateReadings (@) {
           </li>
           <li>
             <b>residentsTotalAbsent</b> - Summe aller aktiven Bewohner, die unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalGuests</b> - Anzahl der aktiven Gäste, welche momentan du den Bewohnern dazugezählt werden
+          </li>
+          <li>
+            <b>residentsTotalGuestsAbsent</b> - Anzahl der aktiven Gäste, die momentan unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalGuestsPresent</b> - Anzahl der aktiven Gäste, die momentan zu Hause sind
           </li>
           <li>
             <b>residentsTotalPresent</b> - Summe aller aktiven Bewohner, die momentan zu Hause sind
