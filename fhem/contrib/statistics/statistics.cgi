@@ -74,8 +74,7 @@ my %tblCnt;
 my $datadir = "./data";
 
 # cascading style sheet
-#my $css = "http://fhem.de/../css/style.css";
-my $css = "$datadir/style.css";
+my $css = "http://fhem.de/../css/style.css";
 
 # geo ip database file from http://www.maxmind.com/download/geoip/database/
 # should be updated once per month
