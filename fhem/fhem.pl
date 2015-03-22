@@ -3810,14 +3810,17 @@ readingsSingleUpdate($$$$)
 ##############################################################################
 
 sub
-fhemTzOffset($) {
-    # see http://stackoverflow.com/questions/2143528/whats-the-best-way-to-get-the-utc-offset-in-perl
-    my $t = shift;
-    my @l = localtime($t);
-    my @g = gmtime($t);
+fhemTzOffset($)
+{
+  # see http://stackoverflow.com/questions/2143528/whats-the-best-way-to-get-the-utc-offset-in-perl
+  my $t = shift;
+  my @l = localtime($t);
+  my @g = gmtime($t);
 
-    # the offset is positive if the local timezone is ahead of GMT, e.g. we get 2*3600 seconds for CET DST vs GMT
-    return 60*(($l[2] - $g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24) * 60 + $l[1] - $g[1]);
+  # the offset is positive if the local timezone is ahead of GMT, e.g. we get
+  # 2*3600 seconds for CET DST vs GMT
+  return 60*(($l[2] - $g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24)*
+             60 + $l[1] - $g[1]);
 }
 
 sub
@@ -4131,6 +4134,33 @@ addStructChange($$$)
   shift @structChangeHist if(@structChangeHist > 9);
   $param = substr($param, 0, 40)."..." if(length($param) > 40);
   push @structChangeHist, "$cmd $param";
+}
+
+sub
+fhemFork()
+{
+  my $pid = fork;
+  if(!defined($pid)) {
+    Log 1, "Cannot fork: $!";
+    return undef;
+  }
+
+  return $pid if($pid);
+
+  # Child here
+  # Close all kind of FD. Reasons:
+  # - cannot restart FHEM if child keeps TCP Serverports open
+  # ...?
+  foreach my $d (sort keys %defs) {
+    my $h = $defs{$d};
+    $h->{DBH}->{InactiveDestroy} = 1 if($h->{TYPE} eq 'DbLog');
+    TcpServer_Close($h) if($h->{SERVERSOCKET});
+    if($h->{DeviceName}) {
+      require "$attr{global}{modpath}/FHEM/DevIo.pm";
+      DevIo_CloseDev($h,1);
+    }
+  }
+  return 0;
 }
 
 1;

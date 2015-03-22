@@ -400,7 +400,7 @@ FW_Read($)
     # Process SVG rendering as a parallel process
     my $p = $data{FWEXT};
     if(grep { $p->{$_}{FORKABLE} && $arg =~ m+^$FW_ME$_+ } keys %{$p}) {
-      my $pid = fork();
+      my $pid = fhemFork();
       if($pid) { # success, parent
 	use constant PRIO_PROCESS => 0;
 	setpriority(PRIO_PROCESS, $pid, getpriority(PRIO_PROCESS,$pid) + $pf);
@@ -424,7 +424,7 @@ FW_Read($)
   my $cacheable = FW_answerCall($arg);
   if($cacheable == -1){
     # Longpoll / inform request;
-    exit if($hash->{isChild});
+    POSIX::exit(0) if($hash->{isChild});
     return;
   }
 
@@ -455,7 +455,7 @@ FW_Read($)
     delete($defs{$name});
   }
 
-  exit if($hash->{isChild});
+  POSIX::exit(0) if($hash->{isChild});
 }
 
 sub
@@ -469,7 +469,7 @@ FW_closeConn($)
     TcpServer_Close($hash);
     delete($defs{$hash->{NAME}});
   }
-  exit if($hash->{isChild});
+  POSIX::exit(0) if($hash->{isChild});
 }
 
 ###########################
