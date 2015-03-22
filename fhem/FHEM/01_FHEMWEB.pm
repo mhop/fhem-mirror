@@ -1372,9 +1372,12 @@ FW_showRoom()
     FW_pO "<td><table class=\"column tblcol_$col\">" if($maxc != -1);
 
     # iterate over the distinct groups  
-    foreach my $g (sort keys %group) {
+    foreach my $g (sort { $maxc==-1 ?
+                    $a cmp $b :
+                    ($columns->{$a} ? $columns->{$a}->[0] : 99) <=>
+                    ($columns->{$b} ? $columns->{$b}->[0] : 99) } keys %group) {
 
-      next if($maxc != -1 && (!$columns->{$g} || $columns->{$g} != $col));
+      next if($maxc != -1 && (!$columns->{$g} || $columns->{$g}->[1] != $col));
 
       #################
       # Check if there is a device of this type in the room
@@ -1457,6 +1460,7 @@ FW_showRoom()
   FW_pO "</form>";
 }
 
+# Room1:col1group1,col1group2|col2group1,col2group2 Room2:...
 sub
 FW_parseColumns()
 {
@@ -1464,14 +1468,14 @@ FW_parseColumns()
   my $colNo = -1;
 
   foreach my $roomgroup (split("[ \t\r\n]+", AttrVal($FW_wname,"column",""))) {
-    my ($room, $groupcolumn)=split(":",$roomgroup);
-    last if(!defined($room) || !defined($groupcolumn));
-    next if($room ne $FW_room);
+    my ($room, $groupcolumn)=split(":",$roomgroup,2);
+    next if(!defined($groupcolumn) || $room ne $FW_room);
     $colNo = 1;
     foreach my $groups (split(/\|/,$groupcolumn)) {
+      my $lineNo = 1;
       foreach my $group (split(",",$groups)) {
         $group =~ s/%20/ /g; # Forum #33612
-        $columns{$group} = $colNo;
+        $columns{$group} = [$lineNo++, $colNo]; # Forum #23212
       }
       $colNo++;
     }
@@ -3220,8 +3224,10 @@ FW_widgetOverride($$)
        </code></ul>
        In this example in the LivingRoom the FS20 and the notify group is in
        the first column, the FHZ and the notify in the second.<br>
-       Note: some elements like SVG plots and readingsGroup can only be part of
+       Notes: some elements like SVG plots and readingsGroup can only be part of
        a column if they are part of a <a href="#group">group</a>.
+       This attribute can be used to sort the groups in a room, just specify
+       the groups in one column.
        </li>
 
      <a name="closeConn"></a>
@@ -3819,9 +3825,10 @@ FW_widgetOverride($$)
         Gruppe in der ersten Spalte, die FHZ und das notify in der zweiten
         Spalte angezeigt.<br>
        
-        Anmerkung: einige Elemente, wie SVG Plots und readingsGroup k&ouml;nnen
-        nur Teil einer Spalte sein wenn sie in <a href="#group">group</a>
-        stehen.
+        Anmerkungen: einige Elemente, wie SVG Plots und readingsGroup
+        k&ouml;nnen nur dann Teil einer Spalte sein wenn sie in <a
+        href="#group">group</a> stehen. Dieses Attribut kann man zum sortieren
+        der Gruppen auch dann verwenden, wenn man nur eine Spalte hat.
         </li><br>
 
      <a name="closeConn"></a>
