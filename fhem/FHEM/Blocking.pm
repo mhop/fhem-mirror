@@ -67,7 +67,7 @@ BlockingCall($$@)
   }
 
   # do fork
-  my $pid = fork;
+  my $pid = fhemFork;
   if(!defined($pid)) {
     Log 1, "Cannot fork: $!";
     return undef;
@@ -84,20 +84,6 @@ BlockingCall($$@)
   }
 
   # Child here
-
-  # Close all kind of FD. Reasons:
-  # - cannot restart FHEM if child keeps TCP Serverports open
-  # ...?
-  foreach my $d (sort keys %defs) {
-    my $h = $defs{$d};
-    $h->{DBH}->{InactiveDestroy} = 1 if($h->{TYPE} eq 'DbLog');
-    TcpServer_Close($h) if($h->{SERVERSOCKET});
-    if($h->{DeviceName}) {
-      require "$attr{global}{modpath}/FHEM/DevIo.pm";
-      DevIo_CloseDev($h,1);
-    }
-  }
-  
   no strict "refs";
   my $ret = &{$blockingFn}($arg);
   use strict "refs";
