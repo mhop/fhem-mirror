@@ -46,7 +46,8 @@
 #                   - added:   break condition for includes
 # 2015-02-24 - 8092 - added:   longpoll support (experimental)
 # 2015-02-25 - 8095 - changed: iframe handling for secret div
-# 2015-03-07 -      - fixed:   handling for bg img (Bugzilla #8)
+# 2015-03-07 - 8168 - fixed:   handling for bg img (Bugzilla #8)
+# 2015-03-22 -      - added:   attribute showTime
 #
 ##############################################
 # $Id: 55_InfoPanel.pm 8095 2015-02-25 10:33:21Z betateilchen $
@@ -133,7 +134,7 @@ sub InfoPanel_Initialize($) {
     $hash->{SetFn}     = "btIP_Set";
     $hash->{GetFn}     = "btIP_Get";
     $hash->{NotifyFn}  = "btIP_Notify";
-    $hash->{AttrList}  = "autoreread:1,0 bgcolor refresh size title noscript ";
+    $hash->{AttrList}  = "autoreread:1,0 bgcolor refresh size title noscript showTime:1,0 ";
     $hash->{AttrList} .= " bgcenter:1,0 bgdir bgopacity tmin" if $useImgTools;
 
     return undef;
@@ -873,7 +874,7 @@ sub btIP_returnSVG {
     $svg .= "$output\n";
     $svg = btIP_evalLayout($svg, $name, $defs{$name}{fhem}{layout});
 
-    readingsSingleUpdate($defs{$name},'state',localtime(),1);
+    readingsSingleUpdate($defs{$name},'state',localtime(),1) if(AttrVal($name,'showTime',1));
 
   }; #warn $@ if $@;
   if($@) {
