@@ -21,7 +21,7 @@ use vars qw($FW_wname);   # Web instance
 use vars qw(%FW_pos);     # scroll position
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
-sub FileLog_seekTo($$$$);
+sub FileLog_seekTo($$$$$);
 
 #####################################
 sub
@@ -37,7 +37,7 @@ FileLog_Initialize($)
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
-  $hash->{AttrList} = "disable:0,1 logtype ".
+  $hash->{AttrList} = "disable:0,1 logtype reformatFn ".
                       "nrarchive archivedir archivecmd addStateEvent:0,1";
 
   $hash->{FW_summaryFn}     = "FileLog_fhemwebFn";
@@ -56,7 +56,12 @@ FileLog_Define($@)
   my @a = split("[ \t][ \t]*", $def);
   my $fh;
 
-  return "wrong syntax: define <name> FileLog filename regexp" if(int(@a) != 4);
+  if(@a == 5 && $a[4] eq "readonly") {
+    $hash->{READONLY} = 1;
+    pop(@a);
+  }
+  return "wrong syntax: define <name> FileLog filename regexp [readonly]"
+        if(int(@a) != 4);
 
   return "Bad regexp: starting with *" if($a[3] =~ m/^\*/);
   eval { "Hallo" =~ m/^$a[3]$/ };
@@ -64,8 +69,10 @@ FileLog_Define($@)
 
   my @t = localtime;
   my $f = ResolveDateWildcards($a[2], @t);
-  $fh = new IO::File ">>$f";
-  return "Can't open $f: $!" if(!defined($fh));
+  if(!$hash->{READONLY}) {
+    $fh = new IO::File ">>$f";
+    return "Can't open $f: $!" if(!defined($fh));
+  }
 
   $hash->{FH} = $fh;
   $hash->{REGEXP} = $a[3];
@@ -127,6 +134,7 @@ FileLog_Log($$)
 {
   # Log is my entry, Dev is the entry of the changed device
   my ($log, $dev) = @_;
+  return if($log->{READONLY});
 
   my $ln = $log->{NAME};
   return if($attr{$ln} && $attr{$ln}{disable});
@@ -531,6 +539,7 @@ FileLog_Get($@)
     $internal = 1;
   }
 
+  my $reformatFn = AttrVal($name, "reformatFn", "");
 
   if($inf eq "-") {
     # In case now is after midnight, before the first event is logged.
@@ -569,13 +578,14 @@ FileLog_Get($@)
   Log3 $name, 4, "$name get: Input file $inf, from:$from  to:$to";
 
   my $ifh = new IO::File $inf if($inf);
-  FileLog_seekTo($inf, $ifh, $hash, $from) if($ifh);
+  FileLog_seekTo($inf, $ifh, $hash, $from, $reformatFn) if($ifh);
 
   # Return the the plain file data, $outf is ignored
   if(!@a) {
     return "" if(!$ifh);
     my $out = "";
     while(my $l = <$ifh>) {
+      if($reformatFn) { no strict; $l = &$reformatFn($l); use strict; }
       next if($l lt $from);
       last if($l gt $to);
       $out .= $l;
@@ -645,6 +655,7 @@ RESCAN:
     } else {
       $l = <$ifh> if($ifh);
       last if(!$l);
+      if($reformatFn) { no strict; $l = &$reformatFn($l); use strict; }
     }
 
     next if($l lt $from && !$rescan);
@@ -844,10 +855,11 @@ seekBackOneLine($$)
 }
 
 ###################################
+#($1-40587)*86400+$2
 sub
-FileLog_seekTo($$$$)
+FileLog_seekTo($$$$$)
 {
-  my ($fname, $fh, $hash, $ts) = @_;
+  my ($fname, $fh, $hash, $ts, $reformatFn) = @_;
 
   # If its cached
   if($hash->{pos} && $hash->{pos}{"$fname:$ts"}) {
@@ -866,6 +878,7 @@ FileLog_seekTo($$$$)
       $last = $next;
       last;
     }
+    if($reformatFn) { no strict; $data = &$reformatFn($data); use strict; }
     if($data !~ m/^\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /o) {
       $next = $fh->tell;
       $data = <$fh>;
@@ -873,6 +886,7 @@ FileLog_seekTo($$$$)
         $last = seekBackOneLine($fh, $next);
         last;
       }
+      if($reformatFn) { no strict; $data = &$reformatFn($data); use strict; }
 
       # If the second line is longer then the first,
       # binary search will never get it: 
@@ -894,7 +908,6 @@ FileLog_seekTo($$$$)
     }
   }
   $hash->{pos}{"$fname:$ts"} = $last;
-
 }
 
 sub
@@ -912,6 +925,7 @@ FileLog_sampleDataFn($$$$$)
   my $desc = "Input:Column,Regexp,DefaultValue,Function";
 
   my $fName = $defs{$flName}{currentlogfile};
+  my $reformatFn = AttrVal($flName, "reformatFn", "");
   my $fh = new IO::File $fName;
   if(!$fh) {
     $fName = "<undefined>" if(!defined($fName));
@@ -926,6 +940,7 @@ FileLog_sampleDataFn($$$$$)
   my $maxcols = 0;
   my %h;
   while($data = <$fh>) {
+    if($reformatFn) { no strict; $data = &$reformatFn($data); use strict; }
     my @cols = split(" ", $data);
     next if(@cols < 3);
     $maxcols = @cols if(@cols > $maxcols);
@@ -975,7 +990,7 @@ FileLog_sampleDataFn($$$$$)
   <a name="FileLogdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt;</code>
+    <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt; [readonly]</code>
     <br><br>
 
     Log events to <code>&lt;filename&gt;</code>. The log format is
@@ -1005,6 +1020,9 @@ FileLog_sampleDataFn($$$$$)
     at the beginning of the year)
     If you use <code>%V</code> you will also have to use %G
     instead of %Y for the year!<br>
+
+    If readonly is specified, then the file is used only for visualisation, and
+    it is not opened for writing.
     Examples:
     <ul>
       <code>define lamplog FileLog %L/lamp.log lamp</code><br>
@@ -1193,6 +1211,25 @@ FileLog_sampleDataFn($$$$$)
            attr ks300log1 logtype temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data
     </li><br>
 
+    <a name="reformatFn"></a>
+    <li>reformatFn<br>
+      used to convert "foreign" logfiles for the SVG Module, contains the name(!)
+      of a function, which will be called with a "raw" line from the original
+      file, and has to return a line in "FileLog" format.<br>
+      E.g. to visualize the NTP loopstats, set reformatFn to ntpLoopstats, and
+      copy the following into your 99_myUtils.pm:
+      <pre><code>
+      sub            
+      ntpLoopstats($)
+      {
+        my ($d) = @_;
+        return $d if($d !~ m/^(\d{5}) (\d+)\.(\d{3}) (.*)$/);
+        my ($r, $t) = ($4, FmtDateTime(($1-40587)*86400+$2));
+        $t =~ s/ /_/;
+        return "$t ntpLoopStats $r";
+      }</code></pre>
+      </li>
+
 
 
   </ul>
@@ -1211,7 +1248,7 @@ FileLog_sampleDataFn($$$$$)
   <a name="FileLogdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt;</code>
+    <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt; [readonly]</code>
     <br><br>
 
     Speichert Ereignisse in einer Log-Datei mit Namen <code>&lt;filename&gt;</code>. Das Log-Format ist
@@ -1245,6 +1282,10 @@ FileLog_sampleDataFn($$$$$)
 
     Bei der Verwendung von <code>%V</code> muss gleichzeitig f&uuml;r das Jahr
     ein <code>%G</code> anstelle von <code>%Y</code> benutzt werden.<br>
+
+    Falls man readonly spezifiziert, dann wird die Datei nur zum visualisieren
+    verwendet, und nicht zum Schreiben ge&ouml;ffnet.
+    <br>
 
     Beispiele:
     <ul>
@@ -1419,8 +1460,8 @@ FileLog_sampleDataFn($$$$$)
 
     <a name="logtype"></a>
     <li>logtype<br>
-        Wird vom pgm2 webfrontend ben&ouml;tigt, um gnuplot/SVG-Kurven aus den
-        Logdateien zu zeichnen. Der String wird aus komma-separierten Tokens
+        Wird vom SVG Modul ben&ouml;tigt, um daten grafisch aufzubereiten.
+        Der String wird aus komma-separierten Tokens
         (,) erzeugt, wobei jeder Token ein eigenes gnuplot-Programm bezeichnet.
         Die Token k&ouml;nnen Doppelpunkte (:) enthalten. Der Teil vor dem
         Doppelpunkt bezeichnet den Namen des Programms; der Teil nach dem
@@ -1455,10 +1496,32 @@ FileLog_sampleDataFn($$$$$)
           </li>
            <li>text<br>
                Zeigt das LogFile in seiner urspr&uuml;nglichen Form (Nur
-               Text).Eine gnuplot-Definition ist nicht notwendig.  </li> </ul>
-               Beispiel:<br> attr ks300log1 logtype
-               temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data </li><br>
+               Text).Eine gnuplot-Definition ist nicht notwendig.
+               </li>
+        </ul>
+        Beispiel:<br> attr ks300log1 logtype
+        temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data
+    </li><br>
 
+    <a name="reformatFn"></a>
+    <li>reformatFn<br>
+      wird verwendet, um "fremde" Dateien f&uuml;r die SVG-Anzeige ins
+      FileLog-Format zu konvertieren. Es enth&auml;lt nur den Namen einer
+      Funktion, der mit der urspr&uuml;nglichen Zeile aufgerufen wird.  Z.Bsp.
+      um die NTP loopstats Datei zu visualisieren kann man den Wert von
+      reformatFn auf ntpLoopstats setzen, und folgende Funktion in
+      99_myUtils.pm definieren:
+      <pre><code>
+      sub            
+      ntpLoopstats($)
+      {
+        my ($d) = @_;
+        return $d if($d !~ m/^(\d{5}) (\d+)\.(\d{3}) (.*)$/);
+        my ($r, $t) = ($4, FmtDateTime(($1-40587)*86400+$2));
+        $t =~ s/ /_/;
+        return "$t ntpLoopStats $r";
+      }</code></pre>
+      </li>
   </ul>
   <br>
 </ul>
