@@ -210,6 +210,13 @@ sub ENIGMA2_Set($@) {
 
     return "No Argument given" if ( !defined( $a[1] ) );
 
+    # depending on current FHEMWEB instance's allowedCommands,
+    # restrict set commands if there is "set-user" in it
+    my $adminMode = 1;
+    my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
+    $adminMode = 0
+      if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ );
+
     # load channel list
     if (
            defined($input)
@@ -233,7 +240,7 @@ sub ENIGMA2_Set($@) {
     my $usage =
         "Unknown argument "
       . $a[1]
-      . ", choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg reboot:noArg restartGui:noArg shutdown:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg msg remoteControl channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg record:noArg showText channel:"
+      . ", choose one of toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg msg remoteControl channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg record:noArg showText channel:"
       . $channels;
     $usage .= " mute:-,on,off"
       if ( defined( $hash->{READINGS}{mute}{VAL} )
@@ -247,6 +254,13 @@ sub ENIGMA2_Set($@) {
     $usage .= " input:tv,radio"
       if ( defined( $hash->{READINGS}{input}{VAL} )
         && $hash->{READINGS}{input}{VAL} ne "-" );
+
+    if ($adminMode) {
+        $usage .= " statusRequest:noArg";
+        $usage .= "	reboot:noArg";
+        $usage .= " restartGui:noArg";
+        $usage .= " shutdown:noArg";
+    }
 
     my $cmd = '';
     my $result;
