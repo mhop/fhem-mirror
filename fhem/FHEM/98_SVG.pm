@@ -207,6 +207,8 @@ SVG_FwFn($$$$)
                 "data-to='"  .$SVG_devs{$d[0]}{to}  ."' ".
                 "data-gplotFile='$gplot' source='$d[0]'>".
             "</div>";
+    $ret .= (SVG_PEdit($FW_wname,$d,$room,$pageHash) . "<br>")
+      if(!$pageHash);
     return $ret;
   }
 
@@ -420,7 +422,7 @@ SVG_PEdit($$$$)
     $o .= SVG_sel("axes_${idx}", "left,right", 
                     ($v && $v eq "x1y1") ? "left" : "right");
     $o .= SVG_sel("type_${idx}",
-                "lines,points,steps,fsteps,histeps,bars,".
+                "lines,points,steps,fsteps,histeps,bars,ibars,".
                         "cubic,quadratic,quadraticSmooth",
                 $conf{lType}[$idx]);
     my $ls = $conf{lStyle}[$idx]; 
@@ -1821,7 +1823,27 @@ SVG_render($$$$$$$$$$)
                         "width=\"$x2\" height=\"$y2\"/>";
          }
        }
+    } elsif( $lType eq "ibars" ) { # Forum #35268
+      if(@{$dxp} == 1) {
+        my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
+        $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
+                         $x,$y+$h, $x,$y1, $x+$w,$y1, $x+$w,$y+$h);
+      } else {
+        # interconnected bars (ibars):
+        # these bars will connect all datapoints. so the width of the bars
+        # might vary depending on the distance between data points
+        foreach my $i (1..int(@{$dxp})-1) {
+          my $x1 = $x + $dxp->[$i-1];
+          my $y1 = $y +$h-($dyp->[$i]-$min)*$hmul;
 
+          my $x2 = $x + $dxp->[$i]; # used to calculate bar width later
+
+          my $height =  ($dyp->[$i]-$min)*$hmul;
+          my $bw = $x2 - $x1;
+          SVG_pO "<rect $attributes $lStyle x=\"$x1\" y=\"$y1\" ".
+                        "width=\"$bw\" height=\"$height\"/>";
+        }
+      }
     } else {                            # lines and everything else
       my ($ymin, $ymax) = (99999999, -99999999);
       my %lt =(cubic=>"C",quadratic=>"Q",quadraticSmooth=>"T");
