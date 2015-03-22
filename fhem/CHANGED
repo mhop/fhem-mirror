@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: SYSMON: Freq. for 8 CPU Cores
   - feature: 98_Modbus.pm: added base module for modbus devices
   - feature: 98_ModbusAttr.pm: added module for generic modbus devices
              Readings can be defined by attributes comparable to HTTPMOD
