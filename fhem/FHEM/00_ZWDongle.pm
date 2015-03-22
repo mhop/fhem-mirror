@@ -297,8 +297,9 @@ ZWDongle_Get($@)
 
   return "No $type for dummies" if(IsDummy($name));
 
-  ZWDongle_Write($hash,  "00", sprintf($gets{$type}, @a));
-  my $re = "^01".substr($gets{$type},0,2);  # Start with <01><len><01><CMD>
+  my $out = sprintf($gets{$type}, @a);
+  ZWDongle_Write($hash,  "00", $out);
+  my $re = "^01".substr($out,0,2);  # Start with <01><len><01><CMD>
   my ($err, $ret) = ZWDongle_ReadAnswer($hash, "get $name $type", $re);
   return $err if($err);
 
