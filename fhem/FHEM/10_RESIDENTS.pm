@@ -267,6 +267,13 @@ sub RESIDENTS_Set($@) {
 
     return "No Argument given" if ( !defined( $a[1] ) );
 
+    # depending on current FHEMWEB instance's allowedCommands,
+    # restrict set commands if there is "set-user" in it
+    my $adminMode = 1;
+    my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
+    $adminMode = 0
+      if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ );
+
     # states
     my $states = (
         defined( $attr{$name}{rgr_states} ) ? $attr{$name}{rgr_states}
@@ -280,12 +287,13 @@ sub RESIDENTS_Set($@) {
     $states = $state . "," . $states
       if ( $state ne "initialized" && $states !~ /$state/ );
 
-    my $usage =
-      "Unknown argument " . $a[1] . ", choose one of addRoommate addGuest";
-    $usage .= " state:$states";
-    $usage .= " removeRoommate:" . $roommates if ( $roommates ne "" );
-    $usage .= " removeGuest:" . $guests if ( $guests ne "" );
-    $usage .= " create:wakeuptimer";
+    my $usage = "Unknown argument " . $a[1] . ", choose one of state:$states";
+    if ($adminMode) {
+        $usage .= " addRoommate addGuest";
+        $usage .= " removeRoommate:" . $roommates if ( $roommates ne "" );
+        $usage .= " removeGuest:" . $guests if ( $guests ne "" );
+        $usage .= " create:wakeuptimer";
+    }
 
     # states
     if (   $a[1] eq "state"

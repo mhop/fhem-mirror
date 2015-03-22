@@ -285,6 +285,13 @@ sub GUEST_Set($@) {
 
     return "No Argument given" if ( !defined( $a[1] ) );
 
+    # depending on current FHEMWEB instance's allowedCommands,
+    # restrict set commands if there is "set-user" in it
+    my $adminMode = 1;
+    my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
+    $adminMode = 0
+      if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ );
+
     # states
     my $states = (
         defined( $attr{$name}{rg_states} ) ? $attr{$name}{rg_states}
@@ -323,13 +330,14 @@ sub GUEST_Set($@) {
     }
     $locations =~ s/ /,/g;
 
-    my $usage = "Unknown argument " . $a[1] . ", choose one of";
-    $usage .= " state:$states";
+    my $usage = "Unknown argument " . $a[1] . ", choose one of state:$states";
     $usage .= " mood:$moods";
     $usage .= " location$locations";
-    $usage .= " create:wakeuptimer";
+    if ($adminMode) {
+        $usage .= " create:wakeuptimer";
 
-    #    $usage .= " compactMode:noArg largeMode:noArg";
+        #    $usage .= " compactMode:noArg largeMode:noArg";
+    }
 
     # silentSet
     if ( $a[1] eq "silentSet" ) {

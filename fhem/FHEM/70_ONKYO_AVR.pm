@@ -607,6 +607,13 @@ sub ONKYO_AVR_Set($@) {
 
     return "No argument given to ONKYO_AVR_Set" if ( !defined( $a[1] ) );
 
+    # depending on current FHEMWEB instance's allowedCommands,
+    # restrict set commands if there is "set-user" in it
+    my $adminMode = 1;
+    my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
+    $adminMode = 0
+      if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ );
+
     # Input alias handling
     if ( defined( $attr{$name}{inputs} ) && $attr{$name}{inputs} ne "" ) {
         my @inputs = split( ':', $attr{$name}{inputs} );
@@ -676,11 +683,16 @@ sub ONKYO_AVR_Set($@) {
     my $usage =
         "Unknown argument '"
       . $a[1]
-      . "', choose one of statusRequest:noArg toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg remoteControl input:"
+      . "', choose one of toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg input:"
       . $inputs_txt;
     $usage .= " sleep:off,5,10,15,30,60,90" if ( $zone eq "main" );
     $usage .= " mute:off,on"                if ( $state eq "on" );
     $usage .= " mute:,-"                    if ( $state ne "on" );
+
+    if ($adminMode) {
+        $usage .= " statusRequest:noArg";
+        $usage .= " remoteControl:noArg";
+    }
 
     my $cmd = '';
     my $result;
@@ -693,14 +705,14 @@ sub ONKYO_AVR_Set($@) {
     readingsBeginUpdate($hash);
 
     # statusRequest
-    if ( lc($a[1]) eq "statusrequest" ) {
+    if ( lc( $a[1] ) eq "statusrequest" ) {
         Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
         delete $hash->{helper}{receiver} if ( $state ne "absent" );
         ONKYO_AVR_GetStatus( $hash, 1 ) if ( !defined( $a[2] ) );
     }
 
     # toggle
-    elsif ( lc($a[1]) eq "toggle" ) {
+    elsif ( lc( $a[1] ) eq "toggle" ) {
         Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
 
         if ( $hash->{READINGS}{power}{VAL} eq "off" ) {
@@ -712,7 +724,7 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # on
-    elsif ( lc($a[1]) eq "on" ) {
+    elsif ( lc( $a[1] ) eq "on" ) {
         Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
@@ -738,7 +750,7 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # off
-    elsif ( lc($a[1]) eq "off" ) {
+    elsif ( lc( $a[1] ) eq "off" ) {
         Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
@@ -764,7 +776,7 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # sleep
-    elsif ( lc($a[1]) eq "sleep" && $zone eq "main" ) {
+    elsif ( lc( $a[1] ) eq "sleep" && $zone eq "main" ) {
         if ( !defined( $a[2] ) ) {
             $return = "No argument given, choose one of minutes off";
         }
@@ -802,7 +814,7 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # mute
-    elsif ( lc($a[1]) eq "mute" || lc($a[1]) eq "mutet" ) {
+    elsif ( lc( $a[1] ) eq "mute" || lc( $a[1] ) eq "mutet" ) {
         if ( defined( $a[2] ) ) {
             Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
         }
@@ -814,10 +826,10 @@ sub ONKYO_AVR_Set($@) {
             if ( !defined( $a[2] ) || $a[2] eq "toggle" ) {
                 $result = ONKYO_AVR_SendCommand( $hash, "mute", "toggle" );
             }
-            elsif ( lc($a[2]) eq "off" ) {
+            elsif ( lc( $a[2] ) eq "off" ) {
                 $result = ONKYO_AVR_SendCommand( $hash, "mute", "off" );
             }
-            elsif ( lc($a[2]) eq "on" ) {
+            elsif ( lc( $a[2] ) eq "on" ) {
                 $result = ONKYO_AVR_SendCommand( $hash, "mute", "on" );
             }
             else {
@@ -838,7 +850,7 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # volume
-    elsif ( lc($a[1]) eq "volume" ) {
+    elsif ( lc( $a[1] ) eq "volume" ) {
         if ( !defined( $a[2] ) ) {
             $return = "No argument given";
         }
@@ -879,11 +891,11 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # volumeUp/volumeDown
-    elsif ( lc($a[1]) =~ /^(volumeup|volumedown)$/ ) {
+    elsif ( lc( $a[1] ) =~ /^(volumeup|volumedown)$/ ) {
         Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( lc($a[1]) eq "volumeup" ) {
+            if ( lc( $a[1] ) eq "volumeup" ) {
                 $result = ONKYO_AVR_SendCommand( $hash, "volume", "level-up" );
             }
             else {
@@ -905,7 +917,7 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # input
-    elsif ( lc($a[1]) eq "input" ) {
+    elsif ( lc( $a[1] ) eq "input" ) {
         if ( !defined( $a[2] ) ) {
             $return = "No input given";
         }
@@ -935,7 +947,7 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # remoteControl
-    elsif ( lc($a[1]) eq "remotecontrol" ) {
+    elsif ( lc( $a[1] ) eq "remotecontrol" ) {
 
         # Reading commands for zone from HASH table
         my $commands = ONKYOdb::ONKYO_GetRemotecontrolCommand($zone);
