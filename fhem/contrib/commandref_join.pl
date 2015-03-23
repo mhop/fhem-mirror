@@ -114,7 +114,7 @@ foreach my $lang (@lang) {
 EOF
       }
     }
-    print "$lang $mods{$mod}: No <a name=\"$mod\"> link\n"
+    print "$lang $mods{$mod}: No a-tag with name=\"$mod\" \n"
         if(!$suffix && $docCount && !$hasLink);
 
     foreach $tag (TAGS) {
