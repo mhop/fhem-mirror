@@ -81,7 +81,10 @@ my $css = "http://fhem.de/../css/style.css";
 my $geoIPDat = "$datadir/GeoLiteCity.dat";
 
 # exclude modules from top 10
-my $excludeModules = "at autocreate dummy eventTypes notify telnet weblink FileLog FHEMWEB Global SUNRISE_EL";
+my $excludeModules = "at autocreate dummy eventTypes holiday notify telnet weblink FileLog FHEMWEB Global SUNRISE_EL";
+
+# set limit for statistics
+my $limit = "datetime('now', '-12 months')";
 
 # database
 my $dbf = "$datadir/fhem_statistics_db.sqlite";
@@ -115,23 +118,24 @@ sub viewStatistics() {
   my $cRelease      = drawPieChart("nodes","release","FHEM Release",390,300,"chart_release");
   my $cPerl         = drawPieChart("nodes","perl","Perl Version",390,300,"chart_perl");
   my $cModulesTop10  = drawColumnChartTop10Modules("modules","modulestop10",,"Used",800,300,"chart_modulestop10");
-  my $cModDefTop10   = drawColumnChartTop10ModDef("modules","definitions","Definitions",800,300,"chart_moddeftop10");
+  my $cModDefTop10;#   = drawColumnChartTop10ModDef("modules","definitions","Definitions",800,300,"chart_moddeftop10");
   #my $cModules      = drawBarChartModules("modules","modules","Used","Definitions",800,600,"chart_modules");
   my $mWorld         = drawRegionsMap("locations","countryname","world","map_world");
   my $mEU            = drawRegionsMap("locations","countryname","150","map_europe");
-  my $mWesternEU     = drawMarkersMap("locations","city","155","map_germany");
+#  my $mWesternEU     = drawMarkersMap("locations","city","155","map_germany");
+  my $mWesternEU     = drawMarkersMap("locations","regionname","155","map_germany");
   my $tModules       = drawTable3cols("modules","total_modules","string","Module","number","Used","number","Definitions","table_modules");
   #my $tModDef       = drawTable("modules","total_moddef","string","Module","number","Definitions","table_moddef");
-  my $tModels        = drawTable2cols("models","total_models","string","Model","boolean","defined","table_models");
+  my $tModels;#        = drawTable2cols("models","total_models","string","Model","boolean","defined","table_models");
   my @res = $dbh->selectrow_array("SELECT created FROM db");
   my $since = "@res";
 
 #  print header;
   print start_html(
         -title  => 'fhem.de - Statistics',
-        -author => 'm_fischer@gmx.de',
+#        -author => 'm_fischer@gmx.de',
         -style  => {-src => $css},
-        -meta   => {'keywords' => 'fhem houseautomation statistics'},
+        -meta   => {'keywords' => 'fhem homeautomation statistics'},
         -script => [
                       { -type => 'text/javascript',
                         -src  => 'https://www.google.com/jsapi',
@@ -145,7 +149,8 @@ sub viewStatistics() {
                    ],
   );
 
-  my ($nodes) = $dbh->selectrow_array("SELECT COUNT(uniqueID) FROM nodes");
+  my ($nodes)   = $dbh->selectrow_array("SELECT COUNT(uniqueID) FROM nodes");
+  my ($nodes12) = $dbh->selectrow_array("SELECT COUNT(uniqueID) FROM nodes WHERE lastseen > $limit");
 
   print <<END;
   <div id="menuScrollArea">
@@ -173,6 +178,7 @@ sub viewStatistics() {
     </noscript>
 
     <h3>Fhem Statistics ($nodes submissions since $since)</h3>
+    <h3>Statistics use $nodes12 submissions (last 12 months)</h3>
     <h4>Installed on...</h4>
     <div id="chart_os" style="float:left; border: 1px solid black; margin-right:18px;"></div>
     <div id="chart_arch" style="float:left; border: 1px solid black;"></div>
@@ -186,11 +192,11 @@ sub viewStatistics() {
     <h4>Top 10 of most commonly used modules<small><sup>1</sup></small>...</h4>
     <div id="chart_modulestop10" style="width: 800px; height: 300px; border: 1px solid black;"></div>
     <small><sup>1</sup> excluded from graph: $excludeModules</small>
-
+<!--
     <h4>Top 10 of total definitions by module<small><sup>1</sup></small>...</h4>
     <div id="chart_moddeftop10" style="width: 800px; height: 300px; border: 1px solid black;"></div>
     <small><sup>1</sup> excluded from graph: $excludeModules</small>
-
+-->
 <!--
 //    <h4>Top 20 of most commonly used modules (with total definitions by module)...</h4>
 //    <div id="chart_modules" style="width: 825px; height: 600px; border: 1px solid black;"></div>
@@ -210,11 +216,12 @@ sub viewStatistics() {
       <div id="table_modules" style="width: 390px; border: 1px solid black;"></div>
       <small><strong>Note:</strong> Click on a column header for sorting</small>
     </div>
-
     <div style="float:left; width: 390px;">
+<!--
       <h4>List of defined models...</h4>
       <div id="table_models" style="width: 390px; border: 1px solid black;"></div>
       <small><strong>Note:</strong> Click on a column header for sorting</small>
+-->
     </div>
     <div style="clear:both;"></div>
 
@@ -239,12 +246,14 @@ END
 
 sub drawPieChart(@) {
   my ($table,$column,$title,$width,$height,$divID) = @_;
-  my $res = $dbh->selectall_arrayref("SELECT DISTINCT $column FROM $table ORDER BY $column ASC");
+#  my $res = $dbh->selectall_arrayref("SELECT DISTINCT $column FROM $table ORDER BY $column ASC");
+
+  my $res = $dbh->selectall_arrayref("SELECT DISTINCT $column FROM $table WHERE lastseen > $limit ORDER BY $column ASC");
 
   my %hash = ();
   foreach my $row (@$res) {
     my ($value) = @$row;
-    my ($count) = $dbh->selectrow_array("SELECT COUNT(*) FROM $table WHERE $column = '$value'");
+    my ($count) = $dbh->selectrow_array("SELECT COUNT(*) FROM $table WHERE $column = '$value' AND lastseen > $limit");
     $hash{$value} = $count;
   }
 
@@ -292,8 +301,9 @@ sub drawColumnChartTop10Modules(@) {
   my %hash = ();
   foreach my $column (@$res) {
     next unless $column;
+    next if($column eq "uniqueID");
     #my ($sum) = $dbh->selectrow_array("SELECT sum($column) FROM $table");
-    my ($sum) = $dbh->selectrow_array("SELECT count($column) FROM $table WHERE $column != 0");
+    my ($sum) = $dbh->selectrow_array("SELECT count($column) FROM $table as t join nodes as n on t.uniqueID=n.uniqueID WHERE t.$column != 0 AND n.lastseen > $limit");
     $hash{$column} = $sum;
   }
 
@@ -341,7 +351,7 @@ sub drawColumnChartTop10ModDef(@) {
 
   my @cols = map { "sum($_),count($_)" }
              grep { $_ ne "uniqueID" && $_ } @res;
-  $sth = $dbh->prepare("SELECT ".join(",",@cols)." FROM $table");
+  $sth = $dbh->prepare("SELECT ".join(",",@cols)." FROM $table as t join nodes as n on t.uniqueID=n.uniqueID WHERE n.lastseen > $limit");
   $sth->execute();
   my @row = $sth->fetchrow_array;
   my %sum = ();
@@ -436,13 +446,13 @@ END
 
 sub drawMarkersMap(@) {
   my ($table,$column,$region,$divID) = @_;
-  my $res = $dbh->selectall_arrayref("SELECT DISTINCT $column FROM $table ORDER BY $column ASC");
+  my $res = $dbh->selectall_arrayref("SELECT DISTINCT $column FROM $table as t join nodes as n on t.uniqueID=n.uniqueID WHERE n.lastseen > $limit ORDER BY $column ASC");
 
   my %hash = ();
   foreach my $row (@$res) {
     my ($value) = @$row;
     $value =~ s/\'/_/g;
-    my ($count) = $dbh->selectrow_array("SELECT COUNT(*) FROM $table WHERE $column = '$value'");
+    my ($count) = $dbh->selectrow_array("SELECT COUNT(*) FROM $table as t join nodes as n on t.uniqueID=n.uniqueID WHERE $column = '$value' AND n.lastseen > $limit");
     #$value = "Germany" if($value eq "");
     next if($value eq "");
     $hash{$value} = $count;
@@ -480,12 +490,12 @@ END
 
 sub drawRegionsMap(@) {
   my ($table,$column,$region,$divID) = @_;
-  my $res = $dbh->selectall_arrayref("SELECT DISTINCT $column FROM $table ORDER BY $column ASC");
+  my $res = $dbh->selectall_arrayref("SELECT DISTINCT $column FROM $table as t join nodes as n on t.uniqueID=n.uniqueID WHERE n.lastseen > $limit ORDER BY $column ASC");
 
   my %hash = ();
   foreach my $row (@$res) {
     my ($value) = @$row;
-    my ($count) = $dbh->selectrow_array("SELECT COUNT(*) FROM $table WHERE $column = '$value'");
+    my ($count) = $dbh->selectrow_array("SELECT COUNT(*) FROM $table as t join nodes as n on t.uniqueID=n.uniqueID WHERE $column = '$value' AND n.lastseen > $limit");
     $hash{$value} = $count;
   }
 
@@ -649,9 +659,15 @@ sub createDB() {
 
 sub insertDB() {
   my $uniqueID = $data{uniqueID};
-  my $modules = $data{modules};
-  my $models = $data{models};
+  my $system   = $data{system};
+  my $modules  = $data{modules};
+  my $models   = $data{models};
   my $sth;
+
+# fill second database table
+  $dbh->do("CREATE TABLE IF NOT EXISTS nodes2 (uniqueID VARCHAR(32) PRIMARY KEY UNIQUE, ip VARCHAR(64), system BLOB, modules BLOB, models BLOB, lastSeen TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+  $sth = $dbh->prepare(q{REPLACE INTO nodes2 (uniqueID,ip,system,modules,models,lastSeen) VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)});
+  $sth->execute($uniqueID,$ip,$system,$modules,$models);
 
   # insert or update fhem node
   my ($release,$branch,$os,$arch,$perl);
