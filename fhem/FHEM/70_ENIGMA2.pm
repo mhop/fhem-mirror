@@ -214,8 +214,14 @@ sub ENIGMA2_Set($@) {
     # restrict set commands if there is "set-user" in it
     my $adminMode = 1;
     my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
-    $adminMode = 0
-      if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ );
+    if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ ) {
+        $adminMode = 0;
+        return "Forbidden command: set " . $a[1]
+          if ( lc( $a[1] ) eq "statusrequest"
+            || lc( $a[1] ) eq "reboot"
+            || lc( $a[1] ) eq "restartgui"
+            || lc( $a[1] ) eq "shutdown" );
+    }
 
     # load channel list
     if (
@@ -3045,6 +3051,10 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           <li>
             <b>msg</b> yesno,info... &nbsp;&nbsp;-&nbsp;&nbsp; allows more complex messages as showText, see commands as listed below
           </li>
+        </ul>
+        <ul>
+            <u>Note:</u> If you would like to retrict access to admin set-commands (-> statusRequest, reboot, restartGui, shutdown) you may your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
+            The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
         </ul>
       </div><br>
       <br>

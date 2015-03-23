@@ -285,8 +285,11 @@ sub PHTV_Set($@) {
     # restrict set commands if there is "set-user" in it
     my $adminMode = 1;
     my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
-    $adminMode = 0
-      if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ );
+    if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ ) {
+        $adminMode = 0;
+        return "Forbidden command: set " . $a[1]
+          if ( lc( $a[1] ) eq "statusrequest" );
+    }
 
     # Input alias handling
     if ( defined( $attr{$name}{inputs} ) && $attr{$name}{inputs} ne "" ) {
@@ -3350,6 +3353,10 @@ sub PHTV_min {
       <li><b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp;  stops current playback</li>
       <li><b>record</b> &nbsp;&nbsp;-&nbsp;&nbsp;  starts recording of current channel</li>
     </ul>
+  </ul>
+  <ul>
+     <u>Note:</u> If you would like to retrict access to admin set-commands (-> statusRequest) you may your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
+     The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
   </ul>
   <br>
   <br>
