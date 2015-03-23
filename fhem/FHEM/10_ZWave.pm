@@ -959,7 +959,7 @@ ZWave_configCheckParam($$$$@)
   return ("Parameter is not decimal", "") if($arg[0] !~ m/^[0-9]+$/);
 
   my $len = ($t eq "int" ? 8 : ($t eq "short" ? 4 : 2));
-  return ("", sprintf("04%02x02%0*x", $h->{index}, $len, $arg[0]));
+  return ("", sprintf("04%02x%02x%0*x", $h->{index}, $len/2, $len, $arg[0]));
 }
 
 my %zwave_alarmType = (
