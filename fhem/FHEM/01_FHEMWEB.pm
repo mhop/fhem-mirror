@@ -897,8 +897,7 @@ FW_updateHashes()
   $FW_room = AttrVal($FW_detail, "room", "Unsorted") if($FW_detail);
 
   if(AttrVal($FW_wname, "sortRooms", "")) { # Slow!
-    my @sortBy = map { s/%20/ /g; $_ }
-                 split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
+    my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
     my %sHash;                                                       
     map { $sHash{$_} = FW_roomIdx(\@sortBy,$_) } keys %FW_rooms;
     @FW_roomsArr = sort { $sHash{$a} cmp $sHash{$b} } keys %FW_rooms;
@@ -3078,9 +3077,9 @@ FW_widgetOverride($$)
 
     <a name="sortRooms"></a>
     <li>sortRooms<br>
-        Space separated list of rooms to override the default
-        sort order of the room links.
-        Space in room names to be written as %20 for this attribute.
+        Space separated list of rooms to override the default sort order of the
+        room links.  As the rooms in this attribute are actually regexps, space
+        in the roomname has to be specified as dot (.).
         Example:<br>
         attr WEB sortRooms DG OG EG Keller
         </li>
@@ -3232,7 +3231,8 @@ FW_widgetOverride($$)
        a column if they are part of a <a href="#group">group</a>.
        This attribute can be used to sort the groups in a room, just specify
        the groups in one column.
-       Space in the room name has to be written as %20 for this attribute.
+       Space in the room and group name has to be written as %20 for this
+       attribute.
        </li>
 
      <a name="closeConn"></a>
@@ -3668,8 +3668,9 @@ FW_widgetOverride($$)
     <a name="sortRooms"></a>
     <li>sortRooms<br>
         Durch Leerzeichen getrennte Liste von R&auml;umen, um deren Reihenfolge
-        zu definieren. Leerzeichen in Raumnamen muss als %20 spezifiziert
-        werden fuer dieses Attribut.
+        zu definieren.
+        Da die R&auml;ume in diesem Attribut als Regexp interpretiert werden,
+        sind Leerzeichen im Raumnamen als Punkt (.) zu hinterlegen.
         Beispiel:<br>
           attr WEB sortRooms DG OG EG Keller
         </li><br>
@@ -3836,8 +3837,8 @@ FW_widgetOverride($$)
         k&ouml;nnen nur dann Teil einer Spalte sein wenn sie in <a
         href="#group">group</a> stehen. Dieses Attribut kann man zum sortieren
         der Gruppen auch dann verwenden, wenn man nur eine Spalte hat.
-        Leerzeichen im Raumnamen sind f&uuml;r dieses Attribut als %20 zu
-        schreiben.
+        Leerzeichen im Raum- und Gruppennamen sind f&uuml;r dieses Attribut als
+        %20 zu schreiben.
         </li><br>
 
      <a name="closeConn"></a>
