@@ -611,8 +611,12 @@ sub ONKYO_AVR_Set($@) {
     # restrict set commands if there is "set-user" in it
     my $adminMode = 1;
     my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
-    $adminMode = 0
-      if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ );
+    if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ ) {
+        $adminMode = 0;
+        return "Forbidden command: set " . $a[1]
+          if ( lc( $a[1] ) eq "statusrequest"
+            || lc( $a[1] ) eq "remotecontrol" );
+    }
 
     # Input alias handling
     if ( defined( $attr{$name}{inputs} ) && $attr{$name}{inputs} ne "" ) {
@@ -1727,6 +1731,10 @@ sub ONKYO_AVR_RClayout() {
           <li>
             <b>remoteControl</b> &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help
           </li>
+        </ul>
+        <ul>
+            <u>Note:</u> If you would like to retrict access to admin set-commands (-> statusRequest, remoteControl) you may your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
+            The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
         </ul>
       </div><br>
       <br>

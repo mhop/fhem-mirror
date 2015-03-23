@@ -289,8 +289,11 @@ sub GUEST_Set($@) {
     # restrict set commands if there is "set-user" in it
     my $adminMode = 1;
     my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
-    $adminMode = 0
-      if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ );
+    if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ ) {
+        $adminMode = 0;
+        return "Forbidden command: set " . $a[1]
+          if ( lc( $a[1] ) eq "create" );
+    }
 
     # states
     my $states = (
@@ -1040,6 +1043,10 @@ sub GUEST_StartInternalTimers($$) {
             <b>create</b> &nbsp;&nbsp;wakeuptimer&nbsp;&nbsp; add several pre-configurations provided by RESIDENTS Toolkit. See separate section in <a href="#RESIDENTS">RESIDENTS module commandref</a> for details.
           </li>
         </ul>
+        <ul>
+            <u>Note:</u> If you would like to retrict access to admin set-commands (-> create) you may your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
+            The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
+        </ul>
       </div><br>
       <br>
       <div style="margin-left: 2em">
@@ -1318,6 +1325,10 @@ sub GUEST_StartInternalTimers($$) {
           <li>
             <b>create</b> &nbsp;&nbsp;wakeuptimer&nbsp;&nbsp; f&uuml;gt diverse Vorkonfigurationen auf Basis von RESIDENTS Toolkit hinzu. Siehe separate Sektion in der <a href="#RESIDENTS">RESIDENTS Modul Kommandoreferenz</a>.
           </li>
+        </ul>
+        <ul>
+            <u>Hinweis:</u> Sofern der Zugriff auf administrative set-Kommandos (-> create) eingeschr&auml;nkt werden soll, kann in einer FHEMWEB Instanz das Attribut allowedCommands &auml;hnlich wie 'set,set-user' erweitert werden.
+            Die Zeichenfolge 'set-user' stellt dabei sicher, dass beim Zugriff auf FHEM &uuml;ber diese FHEMWEB Instanz nur nicht-administrative set-Kommandos ausgef&uuml;hrt werden k&ouml;nnen.
         </ul>
       </div><br>
       <br>
