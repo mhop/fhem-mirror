@@ -435,8 +435,12 @@ FW_Read($)
      ($FW_httpheader{"Accept-Encoding"} &&
       $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
      $FW_use_zlib) {
-    $FW_RET = Compress::Zlib::memGzip($FW_RET);
-    $compressed = "Content-Encoding: gzip\r\n";
+    eval { $FW_RET = Compress::Zlib::memGzip($FW_RET); };
+    if($@) {
+      Log 1, "memGzip: $@"; $FW_RET=""; #Forum #29939
+    } else {
+      $compressed = "Content-Encoding: gzip\r\n";
+    }
   }
 
   my $length = length($FW_RET);
