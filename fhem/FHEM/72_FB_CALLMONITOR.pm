@@ -877,7 +877,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
                         $number =~ s/^\+/00/g;			            # Convert leading + to 00 country extension
                         $number =~ s/^$country_code/0/g;            # Replace own country code with leading 0
                         $number =~ s/^(\#[0-9]{1,10}\#)//g;	        # Remove phone control codes
-                        $number =~ s/\D//g if(not $number =~ /@/);	# Remove anything else isn't a number if it is no VoIP number
+                        $number =~ s/[^*\d]//g if(not $number =~ /@/);	# Remove anything else isn't a number if it is no VoIP number
 
                         if(not $number =~ /^0/ and not $number =~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
                         {
