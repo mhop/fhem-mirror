@@ -48,9 +48,13 @@
 # 2015-02-25 - 8095 - changed: iframe handling for secret div
 # 2015-03-07 - 8168 - fixed:   handling for bg img (Bugzilla #8)
 # 2015-03-22 -      - added:   attribute showTime
+# 2015-03-24 -      - added:   BACK as special link to return
+#                              to $FW_httpheader{Referer}
+#                     changed: limit refresh to at least 60 secs
+#                              to prevent performance issues
 #
 ##############################################
-# $Id: 55_InfoPanel.pm 8095 2015-02-25 10:33:21Z betateilchen $
+# $Id$
 
 package main;
 use strict;
@@ -769,6 +773,7 @@ sub btIP_findTarget {
   my $target = 'secret';
      $target = '_top' if $link =~ s/^-//;
      $target = '_blank' if $link =~ s/^\+//;
+  $link = $FW_httpheader{Referer} if $link eq 'BACK';
   return ($link,$target);
 }
 
@@ -791,7 +796,6 @@ sub btIP_xy {
 
 sub btIP_returnSVG {
   my ($name)= @_;
-
 
   #
   # increase counter
@@ -1362,6 +1366,7 @@ sub btIP_returnHTML {
   my ($name) = @_;
 
   my $refresh = AttrVal($name, 'refresh', 60);
+     $refresh = ($refresh && $refresh < 59) ? 60 : $refresh; 
   my $title   = AttrVal($name, 'title', $name);
   my $gen     = 'generated="'.(time()-1).'"';  
   my $code    = btIP_HTMLHead($name,$title,$refresh);
