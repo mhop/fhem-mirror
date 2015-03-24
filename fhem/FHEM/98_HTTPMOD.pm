@@ -35,7 +35,13 @@
 #               an neues HttpUtils angepasst
 #   2014-12-05  definierte Attribute werden zu userattr der Instanz hinzugefügt
 #               use $hash->{HTTPHEADER} or $hash->{httpheader}
-#	2014-12-22	Warnung in Set korrigiert
+#   2014-12-22  Warnung in Set korrigiert
+#   2015-02-11  added attributes for a generic get feature, new get function, attributes "map" for readings,
+#               modified the map attributes handling so it works with strings containing blanks
+#               and splits at ", " or ":"
+#   2015-02-15  attribute to select readings per get
+#   2015-02-17  new attributes getXXRegex, Map, Format, Expr, new semantics for default values of these attributes
+#               restructured HTTPMOD_Read
 #
                     
 package main;
@@ -66,17 +72,19 @@ sub HTTPMOD_Initialize($)
     $hash->{DefFn}   = "HTTPMOD_Define";
     $hash->{UndefFn} = "HTTPMOD_Undef";
     $hash->{SetFn}   = "HTTPMOD_Set";
-    #$hash->{GetFn}   = "HTTPMOD_Get";
+    $hash->{GetFn}   = "HTTPMOD_Get";
     $hash->{AttrFn}  = "HTTPMOD_Attr";
     $hash->{AttrList} =
-      "reading[0-9]*Name " .    # new syntax for readings
-      "reading[0-9]*Regex " .
+      "reading[0-9]+Name " .    # new syntax for readings
+      "reading[0-9]+Regex " .
       "reading[0-9]*Expr " .
+      "reading[0-9]*Map " .     # new feature
+      "reading[0-9]*Format " .  # new feature
       
       "readingsName.* " .       # old syntax
       "readingsRegex.* " .
       "readingsExpr.* " .
-      
+     
       "requestHeader.* " .  
       "requestData.* " .
       "reAuthRegex " .
@@ -86,6 +94,7 @@ sub HTTPMOD_Initialize($)
       "queueDelay " .
       "queueMax " .
       "minSendDelay " .
+      "showMatched " .
 
       "sid[0-9]*URL " .
       "sid[0-9]*IDRegex " .
@@ -103,6 +112,18 @@ sub HTTPMOD_Initialize($)
       "set[0-9]+Hint " .        # Direkte Fhem-spezifische Syntax für's GUI, z.B. "6,10,14" bzw. slider etc.
       "set[0-9]+Expr " .
       "set[0-9]*ReAuthRegex " .
+
+      "get[0-9]+Name " .
+      "get[0-9]*URL " .
+      "get[0-9]*Data.* " .
+      "get[0-9]*Header.* " .
+      "get[0-9]+Poll " .        # Todo: warum geht bei wildcards kein :0,1 Anhang ? -> in fhem.pl nachsehen
+      "get[0-9]+PollDelay " .
+      "get[0-9]*Regex " .
+      "get[0-9]*Expr " .
+      "get[0-9]*Map " .
+      "get[0-9]*Format " .
+      "get[0-9]*CheckAllReadings " .
       
       "do_not_notify:1,0 " . 
       "disable:0,1 " .
@@ -121,23 +142,36 @@ sub HTTPMOD_Define($$)
 
     return "wrong syntax: define <name> HTTPMOD URL interval"
       if ( @a < 3 );
-
     my $name    = $a[0];
-    my $url     = $a[2];
-    my $inter   = 300;
-    
-    if(int(@a) == 4) { 
-        $inter = $a[3]; 
-        if ($inter < 5) {
-            return "interval too small, please use something > 5, default is 300";
-        }
+
+    if ($a[2] eq "none") {
+        Log3 $name, 3, "$name: URL is none, no periodic updates will be limited to explicit GetXXPoll attribues (if defined)";
+        $hash->{MainURL}    = "";
+    } else {
+        $hash->{MainURL}    = $a[2];
     }
 
-    $hash->{MainURL}    = $url;
-    $hash->{Interval}   = $inter;
-  
+    if(int(@a) > 3) { 
+        if ($a[3] > 0) {
+            if ($a[3] >= 5) {
+                $hash->{Interval} = $a[3];
+            } else {
+                return "interval too small, please use something > 5, default is 300";
+            }
+        } else {
+            Log3 $name, 3, "$name: interval is 0, no periodic updates will done.";
+            $hash->{Interval} = 0;
+        }
+    } else {
+        $hash->{Interval} = 300;
+    }
+
+    Log3 $name, 3, "$name: Defined with URL $hash->{MainURL} and interval $hash->{Interval}";
+    
     # initial request after 2 secs, there the timer is set to interval for further updates
-    InternalTimer(gettimeofday()+2, "HTTPMOD_GetUpdate", "update:$name", 0);
+    # only if URL is specified and interval > 0
+    InternalTimer(gettimeofday()+2, "HTTPMOD_GetUpdate", "update:$name", 0)
+        if ($hash->{MainURL} && $hash->{Interval});
     return undef;
 }
 
@@ -173,14 +207,14 @@ HTTPMOD_Attr(@)
         if ($aName =~ "Regex") {    # catch all Regex like attributes
             eval { qr/$aVal/ };
             if ($@) {
-                Log3 $name, 3, "$name: Invalid regex in attr $name $aName $aVal: $@";
+                Log3 $name, 3, "$name: Attr with invalid regex in attr $name $aName $aVal: $@";
                 return "Invalid Regex $aVal";
             }
         } elsif ($aName =~ "Expr") { # validate all Expressions
             my $val = 1;
             eval $aVal;
             if ($@) {
-                Log3 $name, 3, "$name: Invalid Expression in attr $name $aName $aVal: $@";
+                Log3 $name, 3, "$name: Attr with invalid Expression in attr $name $aName $aVal: $@";
                 return "Invalid Expression $aVal";
             }
         }
@@ -204,7 +238,7 @@ sub HTTPMOD_Auth($@)
             $steps{$1} = 1;
         }
     }
-    Log3 $name, 4, "$name: start Auth with Steps: " . join (" ", sort keys %steps);
+    Log3 $name, 4, "$name: Auth called with Steps: " . join (" ", sort keys %steps);
 
     $hash->{sid} = "";
     foreach my $step (sort keys %steps) {
@@ -228,7 +262,11 @@ sub HTTPMOD_Auth($@)
         $ignoreredirects = AttrVal($name, "sid${step}IgnoreRedirects", undef);
         $retrycount      = 0;
         $type            = "Auth$step";
-        HTTPMOD_AddToQueue($hash, $url, $header, $data, $type, $retrycount, $ignoreredirects);
+        if ($url) {
+            HTTPMOD_AddToQueue($hash, $url, $header, $data, $type, $retrycount, $ignoreredirects);
+        } else {
+            Log3 $name, 3, "$name: no URL for $type";
+        }
     }
     return undef;
 }
@@ -258,6 +296,9 @@ sub HTTPMOD_DoSet($$$)
     if (!$url) {
         $url = AttrVal($name, "setURL", undef);
     }
+    if (!$url) {
+        $url = $hash->{MainURL};
+    }
     
     # ersetze $val in header, data und URL
     $header =~ s/\$val/$rawVal/g;
@@ -265,8 +306,13 @@ sub HTTPMOD_DoSet($$$)
     $url    =~ s/\$val/$rawVal/g;
  
     $type = "Set$setNum";
+
+    if ($url) {
+        HTTPMOD_AddToQueue($hash, $url, $header, $data, $type); 
+    } else {
+        Log3 $name, 3, "$name: no URL for $type";
+    }
     
-    HTTPMOD_AddToQueue($hash, $url, $header, $data, $type); # leave RetryCount, IgnoreRedirects and Prio
     return undef;
 }
 
@@ -279,12 +325,13 @@ sub HTTPMOD_Set($@)
     my ( $hash, @a ) = @_;
     return "\"set HTTPMOD\" needs at least an argument" if ( @a < 2 );
     
-    # @a is an array with DeviceName, SetName, Rest of Set Line
+    # @a is an array with DeviceName, setName and setVal
     my ($name, $setName, $setVal) = @a;
     my (%rmap, $setNum, $setOpt, $setList, $rawVal);
-	$setList = "";
+    $setList = "";
     
-    Log3 $name, 5, "$name: set called with $setName " . ($setVal ? $setVal : "");
+    Log3 $name, 5, "$name: set called with $setName " . ($setVal ? $setVal : "")
+        if ($setName ne "?");
 
     # verarbeite Attribute "set[0-9]*Name  set[0-9]*URL  set[0-9]*Data.*  set[0-9]*Header.* 
     # set[0-9]*Min  set[0-9]*Max  set[0-9]*Map  set[0-9]*Expr   set[0-9]*Hint
@@ -323,28 +370,29 @@ sub HTTPMOD_Set($@)
 
     # Ist überhaupt ein Wert übergeben?
     if (!defined($setVal)) {
-        Log3 $name, 3, "$name: no value given to set $setName";
+        Log3 $name, 3, "$name: set without value given for $setName";
         return "no value given to set $setName";
     }
-    Log3 $name, 5, "$name: Set found option $setName in attribute set${setNum}Name";
+    Log3 $name, 5, "$name: set found option $setName in attribute set${setNum}Name";
 
     # Eingabevalidierung von Sets mit Definition per Attributen
     # 1. Schritt, falls definiert, per Umkehrung der Map umwandeln (z.B. Text in numerische Codes)
     if (AttrVal($name, "set${setNum}Map", undef)) {     # gibt es eine Map?
         my $rm = AttrVal($name, "set${setNum}Map", undef);
-        $rm =~ s/([^ ,\$]+):([^ ,\$]+),? ?/$2 $1 /g;    # reverse map string erzeugen
-        %rmap = split (' ', $rm);                       # reverse hash aus dem reverse string                   
+        #$rm =~ s/([^ ,\$]+):([^ ,\$]+),? ?/$2 $1 /g;           # reverse map string erzeugen
+        $rm =~ s/([^, ][^,\$]*):([^, ][^,\$]*),? ?/$2:$1, /g;   # reverse map string erzeugen
+        %rmap = split (/, +|:/, $rm);                           # reverse hash aus dem reverse string                   
         if (defined($rmap{$setVal})) {                  # Eintrag für den übergebenen Wert in der Map?
             $rawVal = $rmap{$setVal};                   # entsprechender Raw-Wert für das Gerät
-            Log3 $name, 5, "$name: found $setVal in rmap and converted to $rawVal";
+            Log3 $name, 5, "$name: set found $setVal in rmap and converted to $rawVal";
         } else {
-            Log3 $name, 3, "$name: Set value $setVal did not match defined map";
+            Log3 $name, 3, "$name: set value $setVal did not match defined map";
             return "set value $setVal did not match defined map";
         }
     } else {
       # wenn keine map, dann wenigstens sicherstellen, dass Wert numerisch.
       if ($setVal !~ /^-?\d+\.?\d*$/) {
-        Log3 $name, 3, "$name: set value $setVal is not numeric";
+        Log3 $name, 3, "$name: set - value $setVal is not numeric";
         return "set value $setVal is not numeric";
       }
       $rawVal = $setVal;
@@ -353,13 +401,13 @@ sub HTTPMOD_Set($@)
     # 2. Schritt: falls definiert Min- und Max-Werte prüfen
     if (AttrVal($name, "set${setNum}Min", undef)) {
         my $min = AttrVal($name, "set${setNum}Min", undef);
-        Log3 $name, 5, "$name: checking value $rawVal against min $min";
+        Log3 $name, 5, "$name: is checking value $rawVal against min $min";
         return "set value $rawVal is smaller than Min ($min)"
             if ($rawVal < $min);
     }
     if (AttrVal($name, "set${setNum}Max", undef)) {
         my $max = AttrVal($name, "set${setNum}Max", undef);
-        Log3 $name, 5, "$name: checking value $rawVal against max $max";
+        Log3 $name, 5, "$name: set is checking value $rawVal against max $max";
         return "set value $rawVal is bigger than Max ($max)"
             if ($rawVal > $max);
     }
@@ -369,7 +417,7 @@ sub HTTPMOD_Set($@)
         my $val = $rawVal;
         my $exp = AttrVal($name, "set${setNum}Expr", undef);
         $rawVal = eval($exp);
-        Log3 $name, 5, "$name: converted value $val to $rawVal using expr $exp";
+        Log3 $name, 5, "$name: set converted value $val to $rawVal using expr $exp";
     }
     
     Log3 $name, 4, "$name: set will now set $setName -> $rawVal";
@@ -378,13 +426,88 @@ sub HTTPMOD_Set($@)
 }
 
 
+
+# put URL, Header, Data etc. in hash for HTTPUtils Get
+# for get with index $getNum
+#########################################################################
+sub HTTPMOD_DoGet($$)
+{
+    my ($hash, $getNum) = @_;
+    my $name = $hash->{NAME};
+    my ($url, $header, $data, $type, $count);
+    
+    # hole alle Header bzw. generischen Header ohne Nummer 
+    $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/get${getNum}Header/, keys %{$attr{$name}})));
+    if (length $header == 0) {
+        $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/getHeader/, keys %{$attr{$name}})));
+    }
+    # hole Bestandteile der Post data 
+    $data = join ("\r\n", map ($attr{$name}{$_}, sort grep (/get${getNum}Data/, keys %{$attr{$name}})));
+    if (length $data == 0) {
+        $data = join ("\r\n", map ($attr{$name}{$_}, sort grep (/getData/, keys %{$attr{$name}})));
+    }
+    # hole URL
+    $url = AttrVal($name, "get${getNum}URL", undef);
+    if (!$url) {
+        $url = AttrVal($name, "getURL", undef);
+    }
+    if (!$url) {
+        $url = $hash->{MainURL};
+    }
+    
+    $type = "Get$getNum";
+
+    if ($url) {
+        HTTPMOD_AddToQueue($hash, $url, $header, $data, $type); 
+    } else {
+        Log3 $name, 3, "$name: no URL for $type";
+    }
+    
+    return undef;
+}
+
+
 #
 # GET command
-# currently not used
 #########################################################################
 sub HTTPMOD_Get($@)
 {
-    return undef;
+    my ( $hash, @a ) = @_;
+    return "\"get HTTPMOD\" needs at least an argument" if ( @a < 2 );
+    
+    # @a is an array with DeviceName, getName
+    my ($name, $getName) = @a;
+    my ($getNum, $getList);
+    $getList = "";
+    
+    Log3 $name, 5, "$name: get called with $getName "
+        if ($getName ne "?");
+
+    # verarbeite Attribute "get[0-9]*Name  get[0-9]*URL  get[0-9]*Data.*  get[0-9]*Header.* 
+    
+    # Vorbereitung:
+    # suche den übergebenen getName in den Attributen, setze getNum falls gefunden
+    foreach my $aName (keys %{$attr{$name}}) {
+        if ($aName =~ "get([0-9]+)Name") {      # ist das Attribut ein "getXName" ?
+            my $getI  = $1;                     # merke die Nummer im Namen
+            my $iName = $attr{$name}{$aName};   # Name der get-Option diser Schleifen-Iteration
+            
+            if ($getName eq $iName) {           # ist es der im konkreten get verwendete getName?
+                $getNum = $getI;                # gefunden -> merke Nummer X im Attribut
+            }
+            $getList .= $iName . " ";           # speichere Liste mit allen gets für Rückgabe bei get ?
+        }
+    }
+    
+    # gültiger get Aufruf? ($getNum oben schon gesetzt?)
+    if(!defined ($getNum)) {
+        return "Unknown argument $getName, choose one of $getList";
+    } 
+    Log3 $name, 5, "$name: get found option $getName in attribute get${getNum}Name";
+    Log3 $name, 4, "$name: get will now request $getName";
+
+    my $result = HTTPMOD_DoGet($hash, $getNum);
+    return "$getName requested, watch readings";
 }
 
 
@@ -397,25 +520,139 @@ sub HTTPMOD_GetUpdate($)
     my (undef,$name) = split(':', $_[0]);
     my $hash = $defs{$name};
     my ($url, $header, $data, $type, $count);
+    my $now = gettimeofday();
     
-    RemoveInternalTimer ("update:$name");
-    InternalTimer(gettimeofday()+$hash->{Interval}, "HTTPMOD_GetUpdate", "update:$name", 0);
-    
-    return if(AttrVal($name, "disable", undef));
-
     Log3 $name, 4, "$name: GetUpdate called";
     
-    if ( $hash->{MainURL} eq "none" ) {
-        return 0;
+    RemoveInternalTimer ("update:$name");
+    InternalTimer($now + $hash->{Interval}, "HTTPMOD_GetUpdate", "update:$name", 0)
+        if ($hash->{Interval});
+    return if(AttrVal($name, "disable", undef));
+   
+    if ( $hash->{MainURL} ne "none" ) {
+        $url    = $hash->{MainURL};
+        $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/requestHeader/, keys %{$attr{$name}})));
+        $data   = join ("\r\n", map ($attr{$name}{$_}, sort grep (/requestData/, keys %{$attr{$name}})));
+        $type   = "Update";
+        
+        # queue main get request 
+        if ($url) {
+            HTTPMOD_AddToQueue($hash, $url, $header, $data, $type); 
+        } else {
+            Log3 $name, 3, "$name: no URL for $type";
+        }
     }
 
-    $url    = $hash->{MainURL};
-    $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/requestHeader/, keys %{$attr{$name}})));
-    $data   = join ("\r\n", map ($attr{$name}{$_}, sort grep (/requestData/, keys %{$attr{$name}})));
-    $type   = "Update";
-   
-    HTTPMOD_AddToQueue($hash, $url, $header, $data, $type); # leave RetryCount, IgnoreRedirects and Prio
+    # check if additional readings with individual URLs need to be requested
+    foreach my $poll (sort grep (/^get[0-9]+Poll$/, keys %{$attr{$name}})) {
+        $poll =~ /^get([0-9]+)Poll$/;
+        next if (!$1);
+        my $getNum  = $1;
+        my $getName = AttrVal($name, "get".$getNum."Name", ""); 
+        if ($getName) {
+            Log3 $name, 5, "$name: GetUpdate checks if poll required for $getName ($getNum)";
+            my $lastPoll = 0;
+            $lastPoll = $hash->{lastpoll}{$getName} 
+                if ($hash->{lastpoll} && $hash->{lastpoll}{$getName});
+            my $dueTime = $lastPoll + AttrVal($name, "get".$getNum."PollDelay", 0);
+            if ($now >= $dueTime) {
+                Log3 $name, 5, "$name: GetUpdate will request $getName";
+                $hash->{lastpoll}{$getName} = $now;
+                
+                # hole alle Header bzw. generischen Header ohne Nummer 
+                $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/get${getNum}Header/, keys %{$attr{$name}})));
+                if (length $header == 0) {
+                    $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/getHeader/, keys %{$attr{$name}})));
+                }
+                # hole Bestandteile der Post data 
+                $data = join ("\r\n", map ($attr{$name}{$_}, sort grep (/get${getNum}Data/, keys %{$attr{$name}})));
+                if (length $data == 0) {
+                    $data = join ("\r\n", map ($attr{$name}{$_}, sort grep (/getData/, keys %{$attr{$name}})));
+                }
+                # hole URL
+                $url = AttrVal($name, "get${getNum}URL", undef);
+                if (!$url) {
+                    $url = AttrVal($name, "getURL", undef);
+                }
+                if (!$url) {
+                    $url = $hash->{MainURL} if ( $hash->{MainURL} ne "none" );
+                }
+
+                $type    = "Get$getNum";
+                if ($url) {
+                    HTTPMOD_AddToQueue($hash, $url, $header, $data, $type); 
+                } else {
+                    Log3 $name, 3, "$name: no URL to get $type";
+                }
+            } else {
+                Log3 $name, 5, "$name: GetUpdate will skip $getName, delay not over";
+            }
+        }
+    }
 }
+
+
+# extract one reading for a buffer
+# and apply Expr, Map and Format
+###################################
+sub HTTPMOD_ExtractReading($$$$$$$)
+{
+    my ($hash, $buffer, $reading, $regex, $expr, $map, $format) = @_;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "$name: ExtractReading $reading with regex /$regex/...";
+    if ($buffer =~ /$regex/) {
+        my $val = $1;
+        
+        if ($expr) {
+            $val = eval $expr;
+            Log3 $name, 5, "$name: ExtractReading changed $reading with Expr $expr from $1 to $val";
+        }
+        
+        if ($map) {                                 # gibt es eine Map?
+            my %map = split (/, +|:/, $map);        # hash aus dem map string                   
+            if (defined($map{$val})) {              # Eintrag für den gelesenen Wert in der Map?
+                my $nVal = $map{$val};              # entsprechender sprechender Wert für den rohen Wert aus dem Gerät
+                Log3 $name, 5, "$name: ExtractReading found $val in map and converted to $nVal";
+                $val = $nVal;
+            } else {
+                Log3 $name, 3, "$name: ExtractReading cound not match $val to defined map";
+            }
+        }
+        
+        if ($format) {
+            Log3 $name, 5, "$name: ExtractReading for $reading does sprintf with format " . $format .
+                " value is $val";
+            $val = sprintf($format, $val);
+            Log3 $name, 5, "$name: ExtractReading for $reading sprintf result is $val";
+        }
+        
+        Log3 $name, 5, "$name: ExtractReading sets $reading to $val";
+        readingsBulkUpdate( $hash, $reading, $val );
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+# get attribute based specification
+# for format, map or similar
+# with generic default (empty variable part)
+#############################################
+sub HTTPMOD_GetFAttr($$$$)
+{
+    my ($name, $prefix, $num, $type) = @_;
+    my $val = "";
+    if (defined ($attr{$name}{$prefix . $num . $type})) {
+          $val = $attr{$name}{$prefix . $num . $type};
+    } elsif 
+       (defined ($attr{$name}{$prefix . $type})) {
+          $val = $attr{$name}{$prefix . $type};
+    }
+    return $val;
+}
+
 
 
 #
@@ -428,6 +665,7 @@ sub HTTPMOD_Read($$$)
     my $name    = $hash->{NAME};
     my $request = $hash->{REQUEST};
     my $type    = $request->{type};
+    
     $hash->{BUSY} = 0;
     RemoveInternalTimer ($hash); # Remove remaining timeouts of HttpUtils (should be done in HttpUtils)
     
@@ -436,7 +674,7 @@ sub HTTPMOD_Read($$$)
     my $header = $hash->{HTTPHEADER} . $hash->{httpheader};
     
     if ($err) {
-        Log3 $name, 3, "$name: read callback: request type was $type" . 
+        Log3 $name, 3, "$name: Read callback: request type was $type" . 
              ($header ? ",\r\nheader: $header" : ", no headers") . 
              ($buffer ? ",\r\nbuffer: $buffer" : ", buffer empty") . 
              ($err ? ", \r\nError $err" : "");
@@ -450,108 +688,117 @@ sub HTTPMOD_Read($$$)
     
     $buffer = $header . "\r\n\r\n" . $buffer if ($header);
     
-    if ($type =~ "Auth(.*)") {
-        my $step = $1;
-        # sid extrahieren
-        if (AttrVal($name, "sid${step}IDRegex", undef)) {
+    $type =~ "(Auth|Set|Get)(.*)";
+    my $num = $2;
+    
+    if ($type =~ "Auth") {
+        # Doing Authentication step -> extract sid
+        if (AttrVal($name, "sid${num}IDRegex", undef)) {
             if ($buffer =~ AttrVal($name, "sid1IDRegex", undef)) {
                 $hash->{sid} = $1;
-                Log3 $name, 5, "$name: set sid to $hash->{sid}";
+                Log3 $name, 5, "$name: Read set sid to $hash->{sid}";
             } else {
-                Log3 $name, 5, "$name: buffer did not match IDRegex " .
-                        AttrVal($name, "sid${step}IDRegex", undef);
+                Log3 $name, 5, "$name: Read could not match buffer to IDRegex " .
+                     AttrVal($name, "sid${num}IDRegex", undef);
             }
         }
-    } elsif ($type =~ "Set(.*)") {
-        my $setNum = $1;
-        my $ReAuthRegex = AttrVal($name, "set${setNum}ReAuthRegex", AttrVal($name, "setReAuthRegex", undef));
+        return undef;
+    } else {
+        # not in Auth, so check if Auth is necessary
+        my $ReAuthRegex;
+        if ($type =~ "Set") {
+            $ReAuthRegex = AttrVal($name, "set${num}ReAuthRegex", AttrVal($name, "setReAuthRegex", undef));
+        } else {
+            $ReAuthRegex = AttrVal($name, "reAuthRegex", undef);
+        }
         if ($ReAuthRegex) {
-            Log3 $name, 5, "$name: checking response with ReAuthRegex $ReAuthRegex";
+            Log3 $name, 5, "$name: Read is checking response with ReAuthRegex $ReAuthRegex";
             if ($buffer =~ $ReAuthRegex) {
-                Log3 $name, 4, "$name: New authentication required";
+                Log3 $name, 4, "$name: Read decided new authentication required";
                 if ($request->{retryCount} < 1) {
                     HTTPMOD_Auth $hash;
                     $request->{retryCount}++;
-                    Log3 $name, 4, "$name: ReQueuing set with new retryCount $request->{retryCount} ...";
+                    Log3 $name, 4, "$name: Read is requeuing request $type after Auth, retryCount $request->{retryCount} ...";
                     HTTPMOD_AddToQueue ($hash, $request->{url}, $request->{header}, 
                             $request->{data}, $request->{type}, $request->{retryCount}); 
                     return undef;
                 } else {
-                    Log3 $name, 4, "$name: no more retries left - did authentication not work?";
+                    Log3 $name, 4, "$name: Read has no more retries left - did authentication fail?";
                 }
             }
         }
-    } elsif ($type eq "Update") {
-        my $ReAuthRegex = AttrVal($name, "reAuthRegex", undef);
-        if ($ReAuthRegex) {
-            Log3 $name, 5, "$name: checking response with ReAuthRegex $ReAuthRegex";
-            if ($buffer =~ $ReAuthRegex) {
-                Log3 $name, 4, "$name: New authentication required";
-                if ($request->{retryCount} < 1) {
-                    HTTPMOD_Auth $hash;
-                    $request->{retryCount}++;
-                    Log3 $name, 4, "$name: ReQueueing GetUpdate with new retryCount $request->{retryCount} ...";
-                    HTTPMOD_AddToQueue ($hash, $request->{url}, $request->{header}, 
-                            $request->{data}, $request->{type}, $request->{retryCount});
-                    return undef;
-                } else {
-                    Log3 $name, 4, "$name: no more retries left - did authentication not work?";
-                }
+    }
+    
+    return undef if ($type =~ "Set");
+    
+    my $checkAll  = 0;  
+    my $unmatched = "";
+    my $matched   = "";
+    my ($reading, $regex, $expr, $map, $format);
+    readingsBeginUpdate($hash);
+    
+    if ($type =~ "Get") {
+        $checkAll = AttrVal($name, "get" . $num . "CheckAllReadings", 0);
+        $reading  = $attr{$name}{"get" . $num . "Name"};
+        $regex    = HTTPMOD_GetFAttr($name, "get", $num, "Regex");
+        Log3 $name, 5, "$name: Read is extracting Reading with $regex from HTTP Response to $type";
+        if (!$regex) {
+            $checkAll = 1;
+        } else {
+            $expr    = HTTPMOD_GetFAttr($name, "get", $num, "Expr");
+            $map     = HTTPMOD_GetFAttr($name, "get", $num, "Map");
+            $format  = HTTPMOD_GetFAttr($name, "get", $num, "Format");
+            if (HTTPMOD_ExtractReading($hash, $buffer, $reading, $regex, $expr, $map, $format)) {
+                $matched = ($matched ? "$matched $reading" : "$reading");
+            } else {
+                $unmatched = ($unmatched ? "$unmatched $reading" : "$reading");
             }
         }
-
-        Log3 $name, 5, "$name: start extracting Readings from Response to GetUpdate";
-        my $unmatched = "";
-        readingsBeginUpdate($hash);
+    }
+    
+    if (($type eq "Update") || ($checkAll)) {
+        Log3 $name, 5, "$name: Read starts extracting all Readings from HTTP Response to $type";
         foreach my $a (sort (grep (/readings?[0-9]*Name/, keys %{$attr{$name}}))) {
-            $a =~ /readings?([0-9]*)Name(.*)/;
-            my ($reading, $regex, $expr);
             if (($a =~ /readingsName(.*)/) && defined ($attr{$name}{'readingsName' . $1}) 
                   && defined ($attr{$name}{'readingsRegex' . $1})) {
                 # old syntax
-                $reading = $attr{$name}{'readingsName' . $1};
-                $regex   = $attr{$name}{'readingsRegex' . $1};
-                $expr    = "";
-                if (defined ($attr{$name}{'readingsExpr' . $1})) {
-                    $expr = $attr{$name}{'readingsExpr' . $1};
-                }
+                $reading = AttrVal($name, 'readingsName'  . $1, "");
+                $regex   = AttrVal($name, 'readingsRegex' . $1, "");
+                $expr    = AttrVal($name, 'readingsExpr'  . $1, "");
             } elsif(($a =~ /reading([0-9]+)Name/) && defined ($attr{$name}{"reading${1}Name"}) 
                   && defined ($attr{$name}{"reading${1}Regex"})) {
                 # new syntax
-                $reading = $attr{$name}{"reading${1}Name"};
-                $regex   = $attr{$name}{"reading${1}Regex"};
-                $expr    = "";
-                if (defined ($attr{$name}{"reading${1}Expr"})) {
-                    $expr = $attr{$name}{"reading${1}Expr"};
-                }
+                $reading = AttrVal($name, "reading${1}Name", "");
+                $regex   = AttrVal($name, "reading${1}Regex", "");
+                $expr    = HTTPMOD_GetFAttr($name, "reading", $1, "Expr");
+                $map     = HTTPMOD_GetFAttr($name, "reading", $1, "Map");
+                $format  = HTTPMOD_GetFAttr($name, "reading", $1, "Format");
             } else {
-                Log3 $name, 3, "$name: inconsistant attributes for $a";
+                Log3 $name, 3, "$name: Read found inconsistant attributes for $a";
                 next;
             }
-            Log3 $name, 5, "$name: Trying to extract Reading $reading with regex /$regex/...";
-            if ($buffer =~ /$regex/) {
-                my $val = $1;
-                if ($expr) {
-                    $val = eval $expr;
-                    Log3 $name, 5, "$name: change value for Reading $reading with Expr $expr from $1 to $val";
-                }
-                Log3 $name, 5, "$name: Set Reading $reading to $val";
-                readingsBulkUpdate( $hash, $reading, $val );
+            if (HTTPMOD_ExtractReading($hash, $buffer, $reading, $regex, $expr, $map, $format)) {
+                $matched = ($matched ? "$matched $reading" : "$reading");
             } else {
-                if ($unmatched) {
-                    $unmatched .= ", $reading";
-                } else {
-                    $unmatched = "$reading";
-                }
+                $unmatched = ($unmatched ? "$unmatched $reading" : "$reading");
             }
         }
-        readingsEndUpdate( $hash, 1 );
-        if ($unmatched) {
-            Log3 $name, 3, "$name: Response didn't match Reading(s) $unmatched";
-            Log3 $name, 4, "$name: response was $buffer";
-        }
-        return undef;
     }
+    if ($type =~ "(Update|Get)") {
+        if (!$matched) {
+            readingsBulkUpdate( $hash, "MATCHED_READINGS", "")
+                if (AttrVal($name, "showMatched", undef));
+            Log3 $name, 3, "$name: Read response to $type didn't match any Reading(s)";
+        } else {
+            readingsBulkUpdate( $hash, "MATCHED_READINGS", $matched)
+                if (AttrVal($name, "showMatched", undef));
+            Log3 $name, 4, "$name: Read response to $type matched Reading(s) $matched";
+            Log3 $name, 4, "$name: Read response to $type did not match $unmatched" if ($unmatched);
+        }
+    }
+    readingsEndUpdate( $hash, 1 );
+    HTTPMOD_HandleSendQueue("direct:".$name);
+    return undef;
 }
 
 
@@ -559,7 +806,6 @@ sub HTTPMOD_Read($$$)
 #######################################
 # Aufruf aus InternalTimer mit "queue:$name" 
 # oder direkt mit $direct:$name
-#todo: sobald letzter Request beantwortet ist (in Read) auch aufrufen.
 sub
 HTTPMOD_HandleSendQueue($)
 {
@@ -568,7 +814,7 @@ HTTPMOD_HandleSendQueue($)
   my $queue = $hash->{QUEUE};
   
   my $qlen = ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0);
-  Log3 $name, 5, "$name: handle send queue called, qlen = $qlen";
+  Log3 $name, 5, "$name: HandleSendQueue called, qlen = $qlen";
   RemoveInternalTimer ("queue:$name");
   
   if(defined($queue) && @{$queue} > 0) {
@@ -578,12 +824,12 @@ HTTPMOD_HandleSendQueue($)
   
     if (!$init_done) {      # fhem not initialized, wait with IO
       InternalTimer($now+$queueDelay, "HTTPMOD_HandleSendQueue", "queue:$name", 0);
-      Log3 $name, 3, "$name: init not done, delay sending from queue";
+      Log3 $name, 3, "$name: HandleSendQueue - init not done, delay sending from queue";
       return;
     }
     if ($hash->{BUSY}) {  # still waiting for reply to last request
       InternalTimer($now+$queueDelay, "HTTPMOD_HandleSendQueue", "queue:$name", 0);
-      Log3 $name, 5, "$name: still waiting for reply to last request, delay sending from queue";
+      Log3 $name, 5, "$name: HandleSendQueue - still waiting for reply to last request, delay sending from queue";
       return;
     }
 
@@ -594,7 +840,7 @@ HTTPMOD_HandleSendQueue($)
 
         if ($hash->{LASTSEND} && $now < $hash->{LASTSEND} + $minSendDelay) {
             InternalTimer($now+$queueDelay, "HTTPMOD_HandleSendQueue", "queue:$name", 0);
-            Log3 $name, 5, "$name: HandleSendQueue minSendDelay not over, rescheduling";
+            Log3 $name, 5, "$name: HandleSendQueue - minSendDelay not over, rescheduling";
             return;
         }   
         
@@ -658,7 +904,7 @@ HTTPMOD_AddToQueue($$$$$;$$$){
         $hash->{QUEUE} = [ \%request ];
     } else {
         if ($qlen > AttrVal($name, "queueMax", 20)) {
-            Log3 $name, 3, "$name: send queue too long, dropping request";
+            Log3 $name, 3, "$name: AddToQueue - send queue too long, dropping request";
         } else {
             if ($prio) {
                 unshift (@{$hash->{QUEUE}}, \%request); # an den Anfang
@@ -744,8 +990,10 @@ HTTPMOD_AddToQueue($$$$$;$$$){
         <ul><code>
             attr PM reading03Expr $val * 10<br>
         </code></ul>
+
+
         <br><br>
-        <b>Advanced configuration to define a <code>set</code> and send data to a device</b>
+        <b>Advanced configuration to define a <code>set</code> or <code>get</code> and send data to a device</b>
         <br><br>
         
         When a set option is defined by attributes, the module will use the value given to the set command and translate it into an HTTP-Request that sends the value to the device. <br><br>
@@ -765,7 +1013,38 @@ HTTPMOD_AddToQueue($$$$$;$$$){
         Post to URL <code>http://MyPoolManager/cgi-bin/webgui.fcgi</code> in the Post Data as <br>
         <code>{"set" :{"34.3118.value" :"10" }}</code><br>
         The optional attributes set01Min and set01Max define input validations that will be checked in the set function.<br>
-        the optional attribute set01Hint will define a selection list for the Fhemweb GUI.
+        the optional attribute set01Hint will define a selection list for the Fhemweb GUI.<br><br>
+
+        When a get option is defined by attributes, the module allows querying additional values from the device that require 
+        individual HTTP-Requests or special parameters to be sent<br><br>
+        Extension to the above example:<br><br>
+        <ul><code>
+            attr PM get01Name MyGetValue <br>
+            attr PM get01URL http://MyPoolManager/cgi-bin/directory/webgui.fcgi?special=1?sid=$sid <br>
+            attr PM getHeader1 Content-Type: application/json <br>
+            attr PM get01Data {"get" :{"30.1234.value"}} <br>
+        </code></ul>
+        <br>
+        This example defines a get option with the name MyGetValue. <br>
+        By issuing <code>get PM MyGetValue</code> in FHEM, the defined HTTP request is sent to the device.<br>
+        The HTTP response is then parsed using the same readingXXName and readingXXRegex attributes as above so
+        additional pairs will probably be needed there for additional values.<br><br>
+        
+        If the new get parameter should also be queried regularly, you can define the following optional attributes:<br>
+        <ul><code>
+            attr PM get01Poll 1<br>
+            attr PM get01PollDelay 300<br>
+        </code></ul>
+        <br>
+
+        The first attribute includes this reading in the automatic update cycle and the second defines an
+        alternative lower update frequency. When the interval defined initially is over and the normal readings
+        are read from the device, the update function will check for additional get parameters that should be included
+        in the update cycle.
+        If a PollDelay is specified for a get parameter, the update function also checks if the time passed since it has last read this value 
+        is more than the given PollDelay. If not, this reading is skipped and it will be rechecked in the next cycle when 
+        interval is over again. So the effective PollDelay will always be a multiple of the interval specified in the initial define.
+        
         <br><br>
         <b>Advanced configuration to create a valid session id that might be necessary in set options</b>
         <br><br>
@@ -798,6 +1077,7 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             attr PM sid3Data {"set" :{"35.5062.value" :"128" }}<br>
             attr PM sid4Data {"set" :{"42.8026.code" :"pincode" }}<br>
         </ul></code>
+        
     </ul>
     <br>
 
@@ -810,7 +1090,7 @@ HTTPMOD_AddToQueue($$$$$;$$$){
     <a name="HTTPMODget"></a>
     <b>Get-Commands</b><br>
     <ul>
-        none so far
+        as defined by the attributes get.*Name
     </ul>
     <br>
     <a name="HTTPMODattr"></a>
@@ -820,19 +1100,30 @@ HTTPMOD_AddToQueue($$$$$;$$$){
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         <br>
         <li><b>requestHeader.*</b></li> 
-            Define an additional HTTP Header to set in the HTTP request <br>
+            Define an optional additional HTTP Header to set in the HTTP request <br>
         <li><b>requestData</b></li>
-            POST Data to be sent in the request. If not defined, it will be a GET request as defined in HttpUtils used by this module<br>
-        <li><b>reading[0-9]*Name</b> or <b>readingsName.*</b></li>
+            optional POST Data to be sent in the request. If not defined, it will be a GET request as defined in HttpUtils used by this module<br>
+        <li><b>reading[0-9]+Name</b> or <b>readingsName.*</b></li>
             the name of a reading to extract with the corresponding readingRegex<br>
-        <li><b>reading[0-9]*Regex</b> ro <b>readingsRegex.*</b></li>
+        <li><b>reading[0-9]+Regex</b> ro <b>readingsRegex.*</b></li>
             defines the regex to be used for extracting the reading. The value to extract should be in a sub expression e.g. ([\d\.]+) in the above example <br>
         <li><b>reading[0-9]*Expr</b> or <b>readingsExpr.*</b></li>
-            defines an expression that is used in an eval to compute the readings value. The raw value will be in the variable $val.
+            defines an expression that is used in an eval to compute the readings value. <br>
+            The raw value will be in the variable $val.<br>
+            If specified as readingExpr then the attribute value is a default for all other readings that don't specify 
+            an explicit reading[0-9]*Expr.
+        <li><b>reading[0-9]*Map</b></li>
+            Map that defines a mapping from raw to visible values like "0:mittig, 1:oberhalb, 2:unterhalb". <br>
+            If specified as readingMap then the attribute value is a default for all other readings that don't specify 
+            an explicit reading[0-9]*Map.
+        <li><b>reading[0-9]*Format</b></li>
+            Defines a format string that will be used in sprintf to format a reading value.<br>
+            If specified as readingFormat then the attribute value is a default for all other readings that don't specify 
+            an explicit reading[0-9]*Format.
         <li><b>noShutdown</b></li>
             pass the noshutdown flag to HTTPUtils for webservers that need it (some embedded webservers only deliver empty pages otherwise)
         <li><b>disable</b></li>
-            stop doing HTTP requests while this attribute is set to 1
+            stop doing automatic HTTP requests while this attribute is set to 1
         <li><b>timeout</b></li>
             time in seconds to wait for an answer. Default value is 2
     </ul>
@@ -860,9 +1151,10 @@ HTTPMOD_AddToQueue($$$$$;$$$){
         <li><b>set[0-9]*URL</b></li>
             URL to be requested for the set option
         <li><b>set[0-9]*Data</b></li>
-            Data to be sent to the device as POST data when the set is executed
+            optional Data to be sent to the device as POST data when the set is executed. if this atribute is not specified, an HTTP GET method 
+            will be used instead of an HTTP POST
         <li><b>set[0-9]*Header</b></li>
-            HTTP Headers to be sent to the device when the set is executed
+            optional HTTP Headers to be sent to the device when the set is executed
         <li><b>set[0-9]+Min</b></li>
             Minimum value for input validation. 
         <li><b>set[0-9]+Max</b></li>
@@ -877,6 +1169,44 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             Regex that will detect when a session has expired an a new login needs to be performed.         
         <br>
         <br>
+        <li><b>get[0-9]+Name</b></li>
+            Name of a get option and Reading to be retrieved / extracted
+        <li><b>get[0-9]*URL</b></li>
+            URL to be requested for the get option. If this option is missing, the URL specified during define will be used.
+        <li><b>get[0-9]*Data</b></li>
+            optional data to be sent to the device as POST data when the get is executed. if this attribute is not specified, an HTTP GET method 
+            will be used instead of an HTTP POST
+        <li><b>get[0-9]*Header</b></li>
+            optional HTTP Headers to be sent to the device when the get is executed
+        <li><b>get[0-9]+Poll</b></li>
+            if set to 1 the get is executed automatically during the normal update cycle (after the interval provided in the define command has elapsed)
+        <li><b>get[0-9]+PollDelay</b></li>
+            if the value should not be read in each iteration (after the interval given to the define command), then a
+            minimum delay can be specified with this attribute. This has only an effect if the above Poll attribute has
+            also been set. Every time the update function is called, it checks if since this get has been read the last time, the defined delay has elapsed. If not, then it is skipped this time.<br>
+            PollDelay can be specified as seconds or as x[0-9]+ which means a multiple of the interval in the define command.
+        <li><b>get[0-9]*Regex</b></li>
+            If this attribute is specified, the Regex defined here is used to extract the value from the HTTP Response 
+            and assign it to a Reading with the name defined in the get[0-9]+Name attribute.<br>
+            if this attribute is not specified for an individual Reading but as getRegex, then it applies to all get options
+            where no specific Regex is defined.<br>
+            If neither a generic getRegex attribute nor a specific get[0-9]+Regex attribute is specified, then HTTPMOD
+            tries all Regex / Reading pairs defined in Reading[0-9]+Name and Reading[0-9]+Regex attributes and assigns the 
+            Readings that match.
+        <li><b>get[0-9]*Expr</b></li>
+            this attribute behaves just like Reading[0-9]*Expr but is applied to a get value. 
+        <li><b>get[0-9]*Map</b></li>
+            this attribute behaves just like Reading[0-9]*Map but is applied to a get value.
+        <li><b>get[0-9]*Format</b></li>
+            this attribute behaves just like Reading[0-9]*Format but is applied to a get value.
+        <li><b>get[0-9]*CheckAllReadings</b></li>
+            this attribute modifies the behavior of HTTPMOD when the HTTP Response of a get command is parsed. <br>
+            If this attribute is set to 1, then additionally to any matching of get specific regexes (get[0-9]*Regex), 
+            also all the Regex / Reading pairs defined in Reading[0-9]+Name and Reading[0-9]+Regex attributes are checked and if they match, the coresponding Readings are assigned as well.
+        <br>
+        <br>
+        <li><b>showMatched</b></li>
+            if set to 1 then HTTPMOD will create a reading that contains the names of all readings that could be matched in the last request.
         <li><b>queueDelay</b></li>
             HTTP Requests will be sent from a queue in order to avoid blocking when several Requests have to be sent in sequence. This attribute defines the delay between calls to the function that handles the send queue. It defaults to one second.
         <li><b>queueMax</b></li>
