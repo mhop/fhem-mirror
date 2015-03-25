@@ -928,8 +928,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-Sen-DB-PCB"     =>{                     ledMode         =>1}
  ,"HM-MOD-Re-8"       =>{ lowBatLimitBA3  =>1,ledMode         =>1}
  ,"HM-ES-PMSw1-Pl"    =>{ sign            =>1
-                         ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1}
-
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1}
  ,"HM-Sys-sRP-Pl"     =>{ compMode        =>1}
  ,"KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
@@ -1115,7 +1114,7 @@ $culHmRegModel{"HM-PB-4DIS-WM-2"}     = $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
                          ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
-#                         ,lgMultiExec     =>1,powerUpAction   =>1
+                         ,lgMultiExec     =>1,powerUpAction   =>1
                           }
  ,"HM-ES-PMSw1-Pl02"  =>{ averaging       =>1
                          ,txMinDly        =>1,txThrPwr        =>1,txThrCur        =>1,txThrVlt        =>1,txThrFrq        =>1
