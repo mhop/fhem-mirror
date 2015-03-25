@@ -15,14 +15,27 @@ use SetExtensions;
 
 my %codes = (
   "XMIToff" 		=> "off",
-  "XMITon" 			=> "on",		
+  "XMITon" 			=> "on", # Set to previous dim value (before switching it off)
+  "00" => "off",
+  "01" => "dim06%",
+  "02" => "dim12%",
+  "03" => "dim18%",
+  "04" => "dim25%",
+  "05" => "dim31%",
+  "06" => "dim37%",
+  "07" => "dim43%",
+  "08" => "dim50%",
+  "09" => "dim56%",
+  "0a" => "dim62%",
+  "0b" => "dim68%",
+  "0c" => "dim75%",
+  "0d" => "dim81%",
+  "0e" => "dim87%",
+  "0f" => "dim93%",
+  "10" => "dim100%",
   "XMITdimup" 	=> "dimup",
   "XMITdimdown" => "dimdown",
-  "XMITgroup"   => "group",
-  "XMITunit"   => "unit",
-  "XMITprotocol" => "protocol",
   "99" => "on-till",
- 
 );
 
 my %it_c2b;
@@ -43,8 +56,11 @@ my %bintotristate=(
 my %bintotristateV3=(
   "10" => "1",
   "01" => "0",
-  "11" => "D"
+  "00" => "D"
 );
+sub bin2dec {
+	unpack("N", pack("B32", substr("0" x 32 . shift, -32)));
+}
 sub
 IT_Initialize($)
 {
@@ -60,7 +76,10 @@ IT_Initialize($)
   $hash->{DefFn}     = "IT_Define";
   $hash->{UndefFn}   = "IT_Undef";
   $hash->{ParseFn}   = "IT_Parse";
-  $hash->{AttrList}  = "IODev ITfrequency ITrepetition switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 dummy:1,0 model:itremote,itswitch,itdimmer protocol:V1,V3 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ITfrequency ITrepetition switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 protocol:V1,V3 unit group dummy:1,0 " .
+                       "$readingFnAttributes " .
+                       "loglevel:0,1,2,3,4,5,6 " .
+                       "model:".join(",", sort keys %models);
 
   $hash->{AutoCreate}=
         { "IT.*" => { GPLOT => "", FILTER => "%NAME" } };
@@ -118,7 +137,17 @@ IT_Set($@)
 
   my $list = "";
   $list .= "off:noArg on:noArg " if( AttrVal($name, "model", "") ne "itremote" );
-  $list .= "dimUp:noArg dimDown:noArg on-till" if( AttrVal($name, "model", "") eq "itdimmer" );
+  if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
+      if($na > 1 && $a[0] eq "dim") {  
+            $a[0] = ($a[1] eq "0" ? "off" : sprintf("dim%02d%%",$a[1]) );
+            splice @a, 1, 1;
+            $na = int(@a);
+      }
+      $list = (join(" ", sort keys %it_c2b) . " dim:slider,0,6.25,100")
+        if( AttrVal($name, "model", "") eq "itdimmer" );
+  } else {
+    $list .= "dimUp:noArg dimDown:noArg on-till" if( AttrVal($name, "model", "") eq "itdimmer" );
+  }
 
   return SetExtensions($hash, $list, $name, @a) if( $a[0] eq "?" );
   return SetExtensions($hash, $list, $name, @a) if( !grep( $_ =~ /^$a[0]($|:)/, split( ' ', $list ) ) );
@@ -157,8 +186,38 @@ IT_Set($@)
 	}
 	
   my $v = $name ." ". join(" ", @a);
-  if ($hash->{$it_c2b{"protocol"}} eq "V3") {
-    $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{$it_c2b{"group"}}.$hash->{$c}.$hash->{$it_c2b{"unit"}});
+  if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
+    if( AttrVal($name, "model", "") eq "itdimmer" ) {
+      my @itvalues = split(' ', $v);
+      if ($itvalues[1] eq "dimup") {
+        $a[0] = "dim100%";
+        $hash->{READINGS}{dim}{VAL} = 100;
+        $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}."D".$hash->{READINGS}{unit}{VAL}."1111");
+      } elsif ($itvalues[1] eq "dimdown") {
+        $a[0] = "dim06%";
+        $hash->{READINGS}{dim}{VAL} = 6;
+        $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}."D".$hash->{READINGS}{unit}{VAL}."0000");
+      } elsif ($itvalues[1] =~ /dim/) {
+        my $dperc = substr($itvalues[1], 3, -1);
+        my $dec = (15*$dperc)/100;
+        my $bin = sprintf ("%b",$dec);
+        while (length($bin) < 4) {
+          # suffix 0
+          $bin = '0'.$bin;   
+        }
+        $hash->{READINGS}{dim}{VAL} = $dperc;
+        if ($dperc == 0) {  
+          $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}."0".$hash->{READINGS}{unit}{VAL});
+        } else {
+          $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}."D".$hash->{READINGS}{unit}{VAL}.$bin);
+        }
+      
+      } else {
+        $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}.$hash->{$c}.$hash->{READINGS}{unit}{VAL});
+      }
+    } else {
+      $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}.$hash->{$c}.$hash->{READINGS}{unit}{VAL});
+    }
   } else {
     $message = "is".uc($hash->{XMIT}.$hash->{$c});
 	}
@@ -206,7 +265,30 @@ IT_Set($@)
     $lh->{CHANGED}[0] = $v;
     $lh->{STATE} = $v;
     $lh->{READINGS}{state}{TIME} = $tn;
-    $lh->{READINGS}{state}{VAL} = $v;
+    if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
+      if( AttrVal($name, "model", "") eq "itdimmer" ) {
+        if ($v eq "on") {
+          $hash->{READINGS}{dim}{VAL} = "100";
+          $lh->{READINGS}{state}{VAL} = "on";
+        } elsif ($v eq "off") {
+          $hash->{READINGS}{dim}{VAL} = "0";
+          $lh->{READINGS}{state}{VAL} = "off";
+        } else {
+          if ($v eq "dim100%") {
+            $lh->{STATE} = "on";
+            $lh->{READINGS}{state}{VAL} = "on";
+          } elsif ($v eq "dim00%") {
+            $lh->{STATE} = "off";
+            $lh->{READINGS}{state}{VAL} = "off";
+          } else {
+            $lh->{STATE} = $v;
+            $lh->{READINGS}{state}{VAL} = $v;
+          }
+        }
+      }
+    } else {
+      $lh->{READINGS}{state}{VAL} = $v;
+    }
   }
   return $ret;
 }
@@ -277,9 +359,9 @@ IT_Define($$)
     $unitCode=$a[4];
     $oncode = 1;
     $offcode = 0;
-    $hash->{$it_c2b{"protocol"}}  = 'V3';
-    $hash->{$it_c2b{"unit"}}  = $unitCode;
-    $hash->{$it_c2b{"group"}}  = $groupBit;
+    $hash->{READINGS}{protocol}{VAL} = 'V3';
+    $hash->{READINGS}{unit}{VAL} = $unitCode;
+    $hash->{READINGS}{group}{VAL} = $groupBit;
   } else {
     return "Define $a[0]: wrong IT-Code format: specify a 10 digits 0/1/f "
   		if( ($a[2] !~ m/^[f0-1]{10}$/i) );
@@ -291,13 +373,14 @@ IT_Define($$)
     $housecode = $a[2];
     $oncode = $a[3];
     $offcode = $a[4];
-    $hash->{$it_c2b{"protocol"}}  = 'V1';
+    $hash->{READINGS}{protocol}{VAL}  = 'V1';
   }
 
 
   $hash->{XMIT} = lc($housecode);
   $hash->{$it_c2b{"on"}}  = lc($oncode);
   $hash->{$it_c2b{"off"}}  = lc($offcode);
+  
   
   if (int(@a) > 5) {
   	return "Define $a[0]: wrong dimup-code format: specify a 2 digits 0/1/f "
@@ -350,6 +433,7 @@ IT_Parse($$)
 {
   my ($hash, $msg) = @_;
   my $housecode;
+  my $dimCode;
   my $unitCode;
   my $groupBit;
   my $onoffcode;
@@ -360,12 +444,13 @@ IT_Parse($$)
     Log3 undef,4,"message not supported by IT \"$msg\"!";
     return undef;
   }
-  if (length($msg) != 7 && length($msg) != 17) {
+  if (length($msg) != 7 && length($msg) != 17 && length($msg) != 19) {
     Log3 undef,3,"message \"$msg\" too short!";
     return undef;
   }
   my $bin = undef;
-  if ( length($msg) == 17 ) {
+  my $isDimMode = 0;
+  if (length($msg) == 17) {
         my $bin1=sprintf("%024b",hex(substr($msg,1,length($msg)-1-8)));
         while (length($bin1) < 32) {
           # suffix 0
@@ -377,6 +462,23 @@ IT_Parse($$)
           $bin2 = '0'.$bin2;   
         }
         $bin = $bin1 . $bin2;
+  } elsif (length($msg) == 19 ) {
+        my $bin1=sprintf("%024b",hex(substr($msg,1,length($msg)-1-8-8)));
+        while (length($bin1) < 32) {
+          # suffix 0
+          $bin1 = '0'.$bin1;   
+        }
+        my $bin2=sprintf("%024b",hex(substr($msg,1+2,length($msg)-1-8-2)));
+        while (length($bin2) < 32) {
+          # suffix 0
+          $bin2 = '0'.$bin2;   
+        }
+        my $bin3=sprintf("%024b",hex(substr($msg,1+8+2,length($msg)-1)));
+        while (length($bin3) < 32) {
+          # suffix 0
+          $bin3 = '0'.$bin3;   
+        }
+        $bin = substr($bin1 . $bin2 . $bin3,24,length($bin1 . $bin2 . $bin3)-1);
   }
   else {
         $bin=sprintf("%024b",hex(substr($msg,1,length($msg)-1)));
@@ -405,11 +507,14 @@ IT_Parse($$)
   if (length($msg) == 7) {
     $housecode=substr($msgcode,0,length($msgcode)-2);
     $onoffcode=substr($msgcode,length($msgcode)-2,2);
-  } elsif (length($msg) == 17) {
+  } elsif (length($msg) == 17 || length($msg) == 19) {
     $groupBit=substr($msgcode,26,1);
     $onoffcode=substr($msgcode,27,1);
     $unitCode=substr($msgcode,28,4);
     $housecode=substr($msgcode,0,26).$groupBit.$unitCode;
+    if (length($msg) == 19) {
+      $dimCode=substr($msgcode,32,4);
+    }
   } else {
     Log3 undef,4,"Wrong IT message received: $msgcode";
     return "Wrong IT message received: $msgcode";
@@ -438,15 +543,29 @@ IT_Parse($$)
   $def=$modules{IT}{defptr}{lc($housecode)};
 
   foreach my $name (keys %{$def}) {
-    if (length($msg) == 17) {
-      if ($def->{$name}->{$it_c2b{"group"}} != $groupBit || $def->{$name}->{$it_c2b{"unit"}} != $unitCode) {
+    if (length($msg) == 17 || length($msg) == 19) {
+      if ($def->{$name}->{READINGS}{group}{VAL} != $groupBit || $def->{$name}->{READINGS}{unit}{VAL} != $unitCode) {
         next;
       }
     }
     if ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
       $newstate="on";
+      readingsSingleUpdate($def->{$name},"dim",1,1);
     } elsif ($def->{$name}->{$it_c2b{"off"}} eq lc($onoffcode)) {
       $newstate="off";
+      readingsSingleUpdate($def->{$name},"dim",0,1);
+    } elsif ('d' eq lc($onoffcode)) {
+      # dim
+      my $binVal = ((bin2dec($dimCode)+1)*100)/16;
+      $binVal =  int($binVal);
+      $newstate = sprintf("dim%02d%%",$binVal);
+      
+      readingsSingleUpdate($def->{$name},"dim",$binVal,1);
+      if ($binVal == 100) {
+        $newstate="on";
+      } elsif ($binVal == 0) {
+        $newstate="off";
+      } 
     } else {
       Log3 $def->{$name}{NAME},3,"Code $onoffcode not supported by $def->{$name}{NAME}.";
       next;
@@ -558,6 +677,8 @@ Examples:
     off
     on
     on-till           # Special, see the note
+    dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50%
+    dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%<br>
     <li><a href="#setExtensions">set extensions</a> are supported.</li>
 </pre>
     Examples:
@@ -664,6 +785,8 @@ Examples:
      <li>off</li>
      <li>dimdown</li>
      <li>dimup<br></li>
+     <li>dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50%<br>
+    dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%<br></li>
       Which event is sent is device dependent and can sometimes configured on
      the device.
   </ul>
