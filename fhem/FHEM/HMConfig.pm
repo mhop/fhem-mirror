@@ -236,7 +236,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00A9" => {name=>"HM-PB-6-WM55"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:6",}
  ,"00AA" => {name=>"HM-SEC-SD-2"             ,st=>'smokeDetector'     ,cyc=>'99:00' ,rxt=>'c:3'    ,lst=>'p'            ,chn=>"",} 
  ,"00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",}
- ,"00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
+ ,"00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,3:1p,4:3p.4p.5p.6p'
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:b'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2.3p,8:2,9:2'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,remote:6:6,SwitchTr:7:7",}
@@ -614,11 +614,11 @@ my $K_actDetID = '000000'; # id of actionDetector
   highHoldTime    =>{a=>143  ,s=>1  ,l=>1,min=>60 ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"hold time on high state"},
   evntRelFltTime  =>{a=>145  ,s=>1  ,l=>1,min=>1  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter release time "},
   triggerMode     =>{a=>146.0,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"define type of event report ",lit=>{off=>0,sensor=>33,switch=>34,button=>35}},
-  mtrType         =>{a=>149.0,s=>1  ,l=>1,min=>0   ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"type of measurement"         ,lit=>{gas=>1,IR=>2,LED=>4,unknown=>255}},
-  mtrConstIr      =>{a=>150.0,s=>2  ,l=>1,min=>1   ,max=>65536   ,c=>''         ,f=>''      ,u=>'U/kWh',d=>0,t=>"constant IR"},
-  mtrConstGas     =>{a=>152.0,s=>2  ,l=>1,min=>0001,max=>65.536  ,c=>''         ,f=>1000    ,u=>'m3/I' ,d=>0,t=>"constant gas"},
-  mtrConstLed     =>{a=>154.0,s=>2  ,l=>1,min=>1   ,max=>65536   ,c=>''         ,f=>''      ,u=>'i/kWh',d=>0,t=>"constant led"},
-  mtrSensIr       =>{a=>156.0,s=>1  ,l=>1,min=>-99 ,max=>99      ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"sensiblity IR"},
+  mtrType         =>{a=>149.0,s=>1  ,l=>1,min=>0   ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"type of measurement"         ,lit=>{gas=>1,IR=>2,LED=>4,unknown=>255}},
+  mtrConstIr      =>{a=>150.0,s=>2  ,l=>1,min=>1   ,max=>65536  ,c=>''         ,f=>''      ,u=>'U/kWh',d=>0,t=>"constant IR"},
+  mtrConstGas     =>{a=>152.0,s=>2  ,l=>1,min=>0001,max=>65.536 ,c=>''         ,f=>1000    ,u=>'m3/I' ,d=>0,t=>"constant gas"},
+  mtrConstLed     =>{a=>154.0,s=>2  ,l=>1,min=>1   ,max=>65536  ,c=>''         ,f=>''      ,u=>'i/kWh',d=>0,t=>"constant led"},
+  mtrSensIr       =>{a=>156.0,s=>1  ,l=>1,min=>-99 ,max=>99     ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"sensiblity IR"},
 
   #un-identified List1
 # SEC-WM55 08:01 (AES on?)
@@ -626,6 +626,7 @@ my $K_actDetID = '000000'; # id of actionDetector
 # SEC-SC   08:00 ?
 # RC19     08:00 ? RC19 Button 08:08
 # Bl1PBU   08:00 09:00 10:00
+# ES-PMSw1-Pl Ch1 : 93:20 94:45
 
 #  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"".
 #                                                                                                              "inactive=>unused\n".
@@ -926,7 +927,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1,localResDis     =>1}
  ,"HM-Sen-DB-PCB"     =>{                     ledMode         =>1}
  ,"HM-MOD-Re-8"       =>{ lowBatLimitBA3  =>1,ledMode         =>1}
- ,"HM-ES-PMSw1-Pl"    =>{ sign            =>1}
+ ,"HM-ES-PMSw1-Pl"    =>{ sign            =>1
+                         ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1}
 
  ,"HM-Sys-sRP-Pl"     =>{ compMode        =>1}
  ,"KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
