@@ -21,7 +21,7 @@
 #
 ################################################################
 #  Changelog:
-
+#  25.3.15 add force for set on and off
 
 package main;
 
@@ -60,7 +60,9 @@ sub InfratecPM_updateConfig($)
 
  readingsSingleUpdate($hash,"state","Initialized",1); 
 
- InfratecPM_Get($hash,$name,"status");
+ InternalTimer(gettimeofday()+$hash->{INTERVAL}, "InfratecPM_Status",$hash, 0) if ($hash->{INTERVAL});
+
+ #InfratecPM_Get($hash,$name,"status");
  return undef;
 
 }
@@ -91,6 +93,7 @@ sub InfratecPM_Define($$) {
 
     $hash->{Clients}    = ":InfratecOut:";
     $hash->{PORTS}      = 0;
+    $hash->{force}      = 0;
     $hash->{callback}   = \&InfratecPM_Read;
     readingsSingleUpdate($hash, "state", "defined",0);
 
@@ -110,6 +113,37 @@ sub InfratecPM_Undef($$)
 
 ################################################################################
 
+sub InfratecPM_force($) 
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    Log3 $name, 5, "Force : ".$hash->{lastcmd};
+    if ($hash->{force})
+    {
+     CommandSet(undef,$name." Out".$hash->{lastcmd}. " force");
+    }    
+    else 
+    {
+     InfratecPM_unforce($hash);
+    }
+return undef;
+}
+
+################################################################################
+
+sub InfratecPM_unforce($) 
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  $hash->{force} = 0;
+  Log3 $name, 5, "Unforce : ".$hash->{lastcmd};
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "InfratecPM_Status",$hash, 0) if ($hash->{INTERVAL});
+  return undef;
+}
+
+################################################################################
+
 sub InfratecPM_Read($$$)
 {
     my ($hash, $err, $buffer) = @_;
@@ -122,8 +156,9 @@ sub InfratecPM_Read($$$)
         $hash->{ERRORTIME} = TimeNow();
         Log3 $name, 3, "$name: Error -> $err";
         $hash->{ERRORCOUNT} ++;
-        if ($hash->{ERRORCOUNT} >9) {$hash->{INTERVAL} = 3600; }
         readingsSingleUpdate($hash, "state", "error", 0);
+        $hash->{INTERVAL} = 3600 if ($hash->{ERRORCOUNT} >9);
+        InternalTimer(gettimeofday()+$hash->{timeout}, "InfratecPM_force",$hash,0) if ($hash->{force});
         return;
     }
 
@@ -134,7 +169,8 @@ sub InfratecPM_Read($$$)
       $hash->{ERRORCOUNT} ++;
       $hash->{ERROR} = "empty return buffer";
       $hash->{ERRORTIME} = TimeNow();
-      if ($hash->{ERRORCOUNT} >9) {$hash->{INTERVAL} = 3600; }
+      $hash->{INTERVAL} = 3600 if ($hash->{ERRORCOUNT} >9);
+      InternalTimer(gettimeofday()+$hash->{timeout}, "InfratecPM_force",$hash,0) if ($hash->{force});
       return;
     }
 
@@ -182,7 +218,11 @@ sub InfratecPM_Read($$$)
   	Log3 $name, 3, "$name, autocreate InfratecOut for Out".$i;
         CommandDefine(undef, $val[0]." InfratecOut $name $i");
       }
-     } elsif (defined($val[0]) ne "") {$hash->{RETURNED} =$val[0]; }
+     } elsif (defined($val[0]) ne "") 
+              {
+               $hash->{RETURNED} =$val[0]; 
+               InfratecPM_unforce($hash) if (($hash->{RETURNED} eq "Done.") && $hash->{force});
+              }
    }
 
     readingsBulkUpdate($hash, "state",$state);
@@ -241,11 +281,13 @@ sub InfratecPM_Attr(@)
 sub InfratecPM_Get($@) {
    my ($hash, $name , @a) = @_;
    my $cmd = $a[0];
+   Log3 $name, 5, "Get: ".join(" ", @a);
 
    return "get $name needs one argument" if (int(@a) != 1);
 
    return "Unknown argument $cmd, choose one of status:noArg " if ($cmd ne "status");
 
+   InfratecPM_unforce($hash) if ($hash->{force});
    InfratecPM_Status($hash); 
 
    return undef;
@@ -255,10 +297,12 @@ sub InfratecPM_Get($@) {
 
 sub InfratecPM_Set($@) {
    my ($hash,  @a) = @_;
-   my $name    = $a[0];
-   my $port    = $a[1];
-   my $cmd     = $a[2];
+   my $name = $hash->{NAME};
+   my $port    = (defined($a[1])) ? $a[1] : "?" ;
+   my $cmd     = (defined($a[2])) ? $a[2] : "";
+   my $subcmd  = (defined($a[3])) ? $a[3] : "";
 
+   Log3 $name, 5, "Set: ".join(" ", @a);
  
   if(!defined($sets{$port})) 
    {
@@ -279,6 +323,8 @@ sub InfratecPM_Set($@) {
     $hash->{url}	.= $port."&f=".$cmd;
  
     $hash->{lastcmd} = $port." ".$cmd;
+    $hash->{force}   = ($subcmd eq "force") ? 1 : 0;
+    RemoveInternalTimer($hash) if ($hash->{force});
     HttpUtils_NonblockingGet($hash);
     return undef;
 
@@ -380,9 +426,9 @@ sub InfratecPM_summaryFn($$$$) {
   <a name="InfratecPMset"></a>
   <b>Set </b>
   <ul>
-    <li>Outx on<br>
+    <li>Outx on (force)<br>
 	turns Outx on</li><br>
-    <li>Outx off<br>
+    <li>Outx off (force)<br>
         turns Outx off</li><br>
     <li>Outx toggle<br>
         toggle Outx</li><br>
