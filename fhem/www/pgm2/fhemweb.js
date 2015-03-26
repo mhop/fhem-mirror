@@ -631,19 +631,21 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
     $('#editdlg').dialog(
       { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
         maxHeight:$(window).height()*3/4,
+        close:function(){ $('#editdlg').remove(); },
         buttons:[
         { text:"Cancel", click:function(){
-          $('#editdlg').remove();
+          $(this).dialog('close');
           addBlur();
         }},
         { text:"OK", click:function(){
           if(cm)
             $("#td_longText").val(cm.getValue());
           var res=$("#td_longText").val();
-          $('#editdlg').remove();
+          $(this).dialog('close');
           $(inp).val(res);
           addBlur();
-        }}]});
+        }}]
+      });
   };
 
   if( is_long )
