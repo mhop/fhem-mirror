@@ -57,6 +57,7 @@ SVG_Initialize($)
 
   $hash->{DefFn} = "SVG_Define";
   $hash->{AttrList} = "fixedoffset fixedrange startDate plotsize nrAxis ".
+                      "endPlotNow endPlotToday ".
                       "label title plotfunction captionLeft:1,0";
   $hash->{SetFn}    = "SVG_Set";
   $hash->{FW_summaryFn} = "SVG_FwFn";
@@ -112,6 +113,15 @@ SVG_Set($@)
   return $err if($err);
   $err = FileWrite($dstName, @rows);
   return $err;
+}
+
+sub
+SVG_Attr($$$$)
+{
+  my ($parent, $dev, $attr, $default) = @_;
+  my $val = AttrVal($dev, $attr, undef);
+  return $val if(defined($val));
+  return AttrVal($parent, $attr, $default);
 }
 
 ##################
@@ -170,7 +180,8 @@ SVG_FwFn($$$$)
   }
 
   # plots navigation buttons
-  if (AttrVal($d,"plotmode",$FW_plotmode) ne "gnuplot") {
+  my $pm = AttrVal($d,"plotmode",$FW_plotmode);
+  if($pm ne "gnuplot") {
     if((!$pageHash || !$pageHash->{buttons}) &&
        AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
 
@@ -184,7 +195,7 @@ SVG_FwFn($$$$)
   }
 
 
-  if(AttrVal($FW_wname, "plotmode", "SVG") eq "jsSVG") {
+  if($pm eq "jsSVG") {
     my @d=split(":",$defs{$d}{DEF});
     my ($err, @svgplotfile) = FileRead("$FW_gplotdir/$d[1].gplot");
        ($err, @svgplotfile) = FileRead("$FW_gplotdir/template.gplot") if($err);
@@ -218,7 +229,7 @@ SVG_FwFn($$$$)
                 "&amp;logfile=$hash->{LOGFILE}".
                 "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
 
-  if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
+  if($pm eq "SVG") {
     $ret .= "<div class=\"SVGplot SVG_$d\">";
 
     if(SVG_isEmbed($FW_wname)) {
@@ -849,7 +860,7 @@ SVG_calcOffsets($$)
   my @zrange = split(" ", $zoom); #fixedrange with offset
   if(defined($zrange[1])) { $off += $zrange[1]; $zoom=$zrange[0]; }  #fixedrange with offset
 
-  my $endPlotNow = (AttrVal($FW_wname, "endPlotNow", undef) && !$st);
+  my $endPlotNow = (SVG_Attr($FW_wname, $d, "endPlotNow", undef) && !$st);
   if($zoom eq "hour") {
     if($endPlotNow) {
       my $t = int(($now + $off*3600 - 3600)/300.0)*300 + 300;
@@ -900,7 +911,7 @@ SVG_calcOffsets($$)
 
   } elsif($zoom eq "week") {
     my @l = localtime($now);
-    my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
+    my $start = (SVG_Attr($FW_wname, $d, "endPlotToday", undef) ? 6 : $l[6]);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
     $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
@@ -909,7 +920,7 @@ SVG_calcOffsets($$)
 
  } elsif($zoom eq "month") {
     my ($endDay, @l);
-    if(AttrVal($FW_wname, "endPlotToday", undef)) {
+    if(SVG_Attr($FW_wname, $d, "endPlotToday", undef)) {
       @l = localtime($now+86400);
       $endDay = $l[3];
       $off--;
@@ -1249,9 +1260,8 @@ SVG_render($$$$$$$$$$)
   $SVG_RET="";
   my $SVG_ss = AttrVal($parent_name, "smallscreen", 0);
 
-  my $nr_axis = AttrVal($parent_name,"nrAxis","1,1");
   my ($nr_left_axis,$nr_right_axis,$use_left_axis,$use_right_axis) =
-                                split(",", AttrVal($name,"nrAxis",$nr_axis));
+                      split(",", SVG_Attr($parent_name, $name,"nrAxis","1,1"));
 
   $use_left_axis = $nr_left_axis if( !defined($use_left_axis) );
   $use_right_axis = $nr_right_axis if( !defined($use_right_axis) );
@@ -1520,7 +1530,7 @@ SVG_render($$$$$$$$$$)
         if(!$conf{xrange});
   $initoffset = $step;
 
-  if(AttrVal($FW_wname, "endPlotNow", undef) && $ddur>1.1 && $ddur<7.1) {
+  if(SVG_Attr($parent_name,$name,"endPlotNow",undef) && $ddur>1.1 && $ddur<6.9){
     my $now = time();
     $initoffset -= ($now+fhemTzOffset($now))%86400; # Forum #25768
   }
@@ -2503,6 +2513,8 @@ plotAsPng(@)
     <li><a href="#plotsize">plotsize</a></li><br>
 
     <li><a href="#plotmode">plotmode</a></li><br>
+    <li><a href="#endPlotNow">endPlotNow</a></li><br>
+    <li><a href="#endPlotToday">endPlotToday</a></li><br>
 
     <a name="label"></a>
     <li>label<br>
