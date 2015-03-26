@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 73_km200: Sounding changed from static list to automatic
   - feature: FHEMWEB: filter dialog for eventMonitor allows filtering for
              specific events
   - feature: 10_IT.pm: add support for intertechno protocol 3 dimmer
