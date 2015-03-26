@@ -17,11 +17,9 @@ consUpdate()
   if(consConn.readyState != 3)
     return;
 
-  var el = document.getElementById("console");
-  if(el) {
-    el.innerHTML=consTxt+consConn.responseText;
-    el.scrollTop = el.scrollHeight;    
-  }
+  $("#console")
+    .html(consTxt+consConn.responseText)
+    .scrollTop($("#console")[0].scrollHeight);
 }
 
 function
@@ -49,6 +47,28 @@ consStart()
     consFilter = ".*";
   consTxt = el.innerHTML;
   setTimeout("consFill()", 1000);
+  
+  $("a#eventFilter").click(function(evt){  // Event-Filter Dialog
+    $('body').append(
+      '<div id="evtfilterdlg">'+
+        '<div>Filter:</div><br>'+
+        '<div><input id="filtertext" value="'+consFilter+'"></div>'+
+      '</div>');
+
+    $('#evtfilterdlg').dialog({ modal:true,
+      close:function(){$('#evtfilterdlg').remove();},
+      buttons:[
+        { text:"Cancel", click:function(){ $(this).dialog('close'); }},
+        { text:"OK", click:function(){
+          var val = $("#filtertext").val().trim();
+          consFilter = val ? val : ".*";
+          $(this).dialog('close');
+          $("a#eventFilter").html(consFilter);
+          $("#console").html(consTxt);
+          consFill();
+        }}]
+    });
+  });
 }
 
 window.onload = consStart;

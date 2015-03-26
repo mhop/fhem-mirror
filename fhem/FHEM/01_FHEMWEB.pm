@@ -1840,14 +1840,9 @@ FW_style($$)
     FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\">".
           "</script>";
     FW_pO "<div id=\"content\">";
-    if($a[2] && $a[2] ne "1") {
-      FW_pO "<div id=\"console\" filter=\"$a[2]\">";
-      FW_pO "Events ($a[2] only):<br>\n";
-    } else {
-      FW_pO "<div id=\"console\">";
-      FW_pO "Events:<br>\n";
-    }
-    FW_pO "</div>";
+    my $filter = ($a[2] && $a[2] ne "1") ? $a[2] : ".*";
+    FW_pO "Events (Filter:<a href=\"#\" id=\"eventFilter\">$filter</a>):<br>\n";
+    FW_pO "<div id=\"console\"></div>";
     FW_pO "</div>";
 
   }
@@ -2305,9 +2300,10 @@ FW_Notify($$)
   my ($ntfy, $dev) = @_;
   my $h = $ntfy->{inform};
   return undef if(!$h);
+  my $isStatus = ($h->{type} =~ m/status/);
 
   my $dn = $dev->{NAME};
-  if($dn eq "global" && $h->{type} =~ m/status/) {
+  if($dn eq "global" && $isStatus) {
     my $vs = int(@structChangeHist) ? 'visible' : 'hidden';
     my $data = FW_longpollInfo($h->{fmt},
         "#FHEMWEB:$ntfy->{NAME}","\$('#saveCheck').css('visibility','$vs')","");
@@ -2323,18 +2319,14 @@ FW_Notify($$)
     return;
   }
 
-  if($h->{type} eq "raw") {
-    return undef if($dn !~ m/$h->{filter}/);
-  } else { # Status
-    return undef if(!$h->{devices}{$dn});
-  }
+  return undef if($isStatus && !$h->{devices}{$dn});
 
   my @data;
   my %extPage;
   my $isRaw = ($h->{type} =~ m/raw/);
   my $events = deviceEvents($dev, AttrVal($FW_wname, "addStateEvent",!$isRaw));
 
-  if($h->{type} =~ m/status/) {
+  if($isStatus) {
     # Why is saving this stuff needed? FLOORPLAN?
     my @old = ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
@@ -2382,7 +2374,8 @@ FW_Notify($$)
       my $max = int(@{$events});
       my $dt = $dev->{TYPE};
       for(my $i = 0; $i < $max; $i++) {
-        push @data,("$tn $dt $dn ".$events->[$i]."<br>");
+        my $line = ("$tn $dt $dn ".$events->[$i]."<br>");
+        push @data,$line if($line =~ m/$h->{filter}/);
       }
     }
   }
