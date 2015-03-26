@@ -26,7 +26,8 @@ my %zwave_class = (
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x", },
     get   => { basicStatus => "02",     }, 
-    parse => { "..200.(.*)"=> '"basicReport:$1"',}, },
+    parse => { "..2001(.*)"=> '"basicReport:$1"',
+               "..2002"    => "state:basicGet"  }},
   CONTROLLER_REPLICATION   => { id => '21', },
   APPLICATION_STATUS       => { id => '22', },
   ZIP_SERVICES             => { id => '23', },
@@ -48,7 +49,10 @@ my %zwave_class = (
     get   => { swmStatus   => "02",     }, 
     parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" : 
                                ($1 eq "ff" ? "state:on" : 
-                                             "state:dim ".hex($1)))',}, },
+                                             "state:dim ".hex($1)))',
+               "..260420"  => "state:swmBeginUp",
+               "..260460"  => "state:swmBeginDown",
+               "..2605"    => "state:swmEnd" } },
   SWITCH_ALL               => { id => '27',
     set   => { swaIncludeNone  => "0100",
                swaIncludeOff   => "0101",
@@ -280,7 +284,15 @@ my %zwave_class = (
   TIME_PARAMETERS          => { id => '8b', },
   GEOGRAPHIC_LOCATION      => { id => '8c', },
   COMPOSITE                => { id => '8d', },
-  MULTI_CHANNEL_ASSOCIATION=> { id => '8e', }, # aka MULTI_INSTANCE_ASSOCIATION
+  MULTI_CHANNEL_ASSOCIATION=> { id => '8e',    # aka MULTI_INSTANCE_ASSOCIATION
+    set   => { mcaAdd      => "01%02x%02x*",
+               mcaRemove   => "04%02x%02x*" },
+    get   => { mca         => "02%02x",
+               mcaGroupings=> "05" },
+    parse => { "..8e03(..)(..)(.*)"
+                           => '"mca_$1:max:$2 param:$3"',
+               "..8e06(.*)"=> '"mcaSupportedGroupings:".hex($1)' } },
+                                
   MULTI_CMD                => { id => '8f', }, # Handled in Parse
   ENERGY_PRODUCTION        => { id => '90', },
   MANUFACTURER_PROPRIETARY => { id => '91', }, # see also zwave_deviceSpecial
@@ -516,7 +528,7 @@ ZWave_Cmd($$@)
 
     } else {
       push @{$baseHash->{WakeUp}}, $data.$id;
-      return ($type eq "get" && AttrVal($name,"verbose",3) > 2 ? 
+      return (AttrVal($name,"verbose",3) > 2 ? 
                   "Scheduled for sending after WAKEUP" : undef);
     }
 
@@ -1103,6 +1115,10 @@ ZWave_alarmParse($$$)
 {
   my ($t,$l,$r) = @_;
 
+  if($t=="00" && $r && $r =~ m/^..(..)(..)/) { # Forum #35178
+    $l = $1; $t = $2;
+  }
+
   if(!$r || $r !~ m/......(..)(.*)/ || !$zwave_alarmType{$t}) { # V1 or unknown
     return "alarm_type_$t:level $l";
   }
@@ -1336,7 +1352,7 @@ ZWave_Parse($$@)
     }
 
     foreach my $k (keys %{$ptr}) {
-      if($arg =~ m/$k/) {
+      if($arg =~ m/^$k/) {
         my $val = $ptr->{$k};
         $val = eval $val if(index($val, '$') >= 0);
         push @event, $val;
@@ -1858,6 +1874,7 @@ s2Hex($)
 
   <br><b>Class BASIC</b>
   <li>basicReport:XY</li>
+  <li>state:basicGet:XY</li>
 
   <br><br><b>Class BATTERY</b>
   <li>battery:chargelevel %</li>
@@ -1949,6 +1966,9 @@ s2Hex($)
   <li>state:on</li>
   <li>state:off</li>
   <li>state:dim value</li>
+  <li>state:swmBeginUp</li>
+  <li>state:swmBeginDown</li>
+  <li>state:swmEnd</li>
     
   <br><br><b>Class SCENE_ACTIVATION</b>
   <li>scene_Id:level finalValue</li>
