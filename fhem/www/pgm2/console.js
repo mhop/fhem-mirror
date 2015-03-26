@@ -27,6 +27,10 @@ consFill()
 {
   FW_errmsg("");
 
+  if(consConn) {
+    consConn.onreadystatechange = undefined;
+    consConn.abort();
+  }
   consConn = new XMLHttpRequest();
   var query = document.location.pathname+"?XHR=1"+
        "&inform=type=raw;filter="+consFilter+
