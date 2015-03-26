@@ -884,16 +884,17 @@ ZWave_configParseModel($)
 
   my ($line, $class, %hash, $cmdName);
   while($gz->gzreadline($line)) {       # Search the "file" entry
-    last if($line =~ m/^<Product sourceFile="$cfg">$/);
+    last if($line =~ m/^\s*<Product.*sourceFile="$cfg"/);
   }
 
   while($gz->gzreadline($line)) {
-    last if($line =~ m+^</Product>+);
-    $class = $1 if($line =~ m/^<CommandClass.*id="([^"]*)"/);
+    last if($line =~ m+^\s*</Product>+);
+    $class = $1 if($line =~ m/^\s*<CommandClass.*id="([^"]*)"/);
     next if(!$class || $class ne "112");
-    if($line =~ m/^<Value /) {
+    if($line =~ m/^\s*<Value /) {
       my %h;
       $h{type}  = $1 if($line =~ m/type="([^"]*)"/i);
+      $h{size}  = $1 if($line =~ m/size="([^"]*)"/i);
       $h{genre} = $1 if($line =~ m/genre="([^"]*)"/i); # config, user
       $h{label} = $1 if($line =~ m/label="([^"]*)"/i);
       $h{min}   = $1 if($line =~ m/min="([^"]*)"/i);
@@ -908,8 +909,8 @@ ZWave_configParseModel($)
       $h{Help} .= "Full text for $cmdName is $h{label}<br>" if($shortened);
       $hash{$cmdName} = \%h;
     }
-    $hash{$cmdName}{Help} .= "$1<br>" if($line =~ m+^<Help>(.*)</Help>$+);
-    if($line =~ m/^<Item/) {
+    $hash{$cmdName}{Help} .= "$1<br>" if($line =~ m+^\s*<Help>(.*)</Help>$+);
+    if($line =~ m/^\s*<Item/) {
       my $label = $1 if($line =~ m/label="([^"]*)"/i);
       my $value = $1 if($line =~ m/value="([^"]*)"/i);
       my ($item, $shortened) = ZWave_cleanString($label, $value);
@@ -969,6 +970,10 @@ ZWave_configCheckParam($$$$@)
   }
 
   return ("Parameter is not decimal", "") if($arg[0] !~ m/^[0-9]+$/);
+
+  if($h->{size}) { # override type by size
+    $t = ($h->{size} eq "1" ? "byte" : ($h->{size} eq "2" ? "short" : "int"));
+  }
 
   my $len = ($t eq "int" ? 8 : ($t eq "short" ? 4 : 2));
   return ("", sprintf("04%02x%02x%0*x", $h->{index}, $len/2, $len, $arg[0]));
