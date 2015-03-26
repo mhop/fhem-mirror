@@ -286,7 +286,7 @@ my %zwave_class = (
   COMPOSITE                => { id => '8d', },
   MULTI_CHANNEL_ASSOCIATION=> { id => '8e',    # aka MULTI_INSTANCE_ASSOCIATION
     set   => { mcaAdd      => "01%02x%02x*",
-               mcaRemove   => "04%02x%02x*" },
+               mcaDel      => "04%02x*" },
     get   => { mca         => "02%02x",
                mcaGroupings=> "05" },
     parse => { "..8e03(..)(..)(.*)"
@@ -1311,10 +1311,11 @@ ZWave_Parse($$@)
     $arg = sprintf("%s%02x%s", $1, hex($2) & 0x7f, $3);
   }
 
-  my $baseHash;
+  my ($baseHash, $baseId, $ep) = ("",$id,"");
   if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP
+    $ep = ($1 ne "00" ? $1 : $2);
     $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
-    $id = "$id$1";
+    $id = "$id$ep";
     $arg = sprintf("%02x$3", length($3)/2);
   }
   my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
@@ -1322,8 +1323,10 @@ ZWave_Parse($$@)
 
 
   if(!$hash) {
-    $id = hex($id);
-    Log3 $ioName, 3, "Unknown ZWave device $homeId $id, please define it";
+    $id=hex($id); $baseId=hex($baseId); $ep=hex($ep);
+    my $ret = "UNDEFINED ZWave_Endpoint_$baseId.$ep ZWave $homeId $id";
+    Log3 $ioName, 3, "$ret, please define it";
+    DoTrigger("global", $ret);
     return "";
   }
 
@@ -1563,6 +1566,24 @@ s2Hex($)
   <li>positionSlat<br>
     drive slat to position %</li>
 
+  <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
+  <li>mcaAdd groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
+    Add a list of node or node:endpoint associations. The latter can be used to
+    create channels on remotes. E.g. to configure the button 1,2,... on the
+    zwave.me remote, use:
+    <ul>
+      set remote mcaAdd 2 0 1 2<br>
+      set remote mcaAdd 3 0 1 3<br>
+      ....
+    </ul>
+    For each button a separate FHEM device will be generated.
+    </li>
+  <li>mcaDel groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
+    delete node or node:endpoint associations.
+    Special cases: just specifying the groupId will delete everything for this
+    groupId. Specifying 0 for groupid will delete all associations.
+    </li>
+
   <br><br><b>Class PROTECTION</b>
   <li>protectionOff<br>
     device is unprotected</li>
@@ -1751,6 +1772,12 @@ s2Hex($)
     mcCapability_02:SWITCH_BINARY<br>
     <b>Note:</b> This is the best way to create the secondary nodes of a
     MULTI_CHANNEL device. The device is only created for channel 2 or greater.
+    </li>
+
+  <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
+  <li>mca groupid<br>
+    return the associations for the groupid. for the syntax of the returned
+    data see the mcaAdd command above.
     </li>
 
   <br><br><b>Class PROTECTION</b>
