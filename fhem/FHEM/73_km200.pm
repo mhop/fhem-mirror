@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0044 2015-03-18 20:30:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0045 2015-03-26 21:30:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -165,6 +165,8 @@
 #		0044    18.03.2015	Sailor				km200_ParseHttpResponseInit		fullResponde = ERROR - bug corrected
 #		0044    18.03.2015	Sailor				km200_ParseHttpResponseDyn		fullResponde = ERROR - bug corrected
 #		0044    18.03.2015	Sailor				km200_ParseHttpResponseStat		fullResponde = ERROR - bug corrected
+#		0045    26.03.2015	Sailor				km200_ParseHttpResponseInit		Automatic Service Search
+#		0045    26.03.2015	Sailor				km200_Attr						Changes for Automatic Service Search
 ########################################################################################################################
 
 
@@ -237,7 +239,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0044";
+	my $ModuleVersion           = "0045";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -247,322 +249,14 @@ sub km200_Define($$)
 	###START###### Define known services of gateway ###########################################################START####
 	my @KM200_AllServices = (
 	"/",
-	
 	"/dhwCircuits",
-	"/dhwCircuits/dhw1/activeDhwTimeProgram",
-	"/dhwCircuits/dhw1/activeSwitchProgram",
-	"/dhwCircuits/dhw1/actualTemp",
-	"/dhwCircuits/dhw1/currentSetpoint",
-	"/dhwCircuits/dhw1/dhwSpLevels",
-	"/dhwCircuits/dhw1/dhwSpLevels/off",
-	"/dhwCircuits/dhw1/dhwSpLevels/on",
-	"/dhwCircuits/dhw1/dhwTimePrograms",
-	"/dhwCircuits/dhw1/dhwTimePrograms/AlwaysHotWater",
-	"/dhwCircuits/dhw1/dhwTimePrograms/Program1",
-	"/dhwCircuits/dhw1/dhwTimePrograms/Program2",
-	"/dhwCircuits/dhw1/extraDhw",
-	"/dhwCircuits/dhw1/extraDhw/activationStatus",
-	"/dhwCircuits/dhw1/extraDhw/status",
-	"/dhwCircuits/dhw1/extraDhw/stopTemp",
-	"/dhwCircuits/dhw1/extraDhw/time",
-	"/dhwCircuits/dhw1/setTemperature",
-	"/dhwCircuits/dhw1/status",
-	"/dhwCircuits/dhw1/switchPrograms",
-	"/dhwCircuits/dhw1/temperatureLevels",
-	"/dhwCircuits/dhw1/temperatureLevels/off",
-	"/dhwCircuits/dhw1/temperatureLevels/on",
-	"/dhwCircuits/dhw1/waterFlow",
-	"/dhwCircuits/dhw1/workingTime",
-    "/dhwCircuits/dhw1",
-    "/dhwCircuits/dhw1/operationMode",
-
-	"/dhwCircuits",
-	"/dhwCircuits/dhw2/activeDhwTimeProgram",
-	"/dhwCircuits/dhw2/activeSwitchProgram",
-	"/dhwCircuits/dhw2/actualTemp",
-	"/dhwCircuits/dhw2/currentSetpoint",
-	"/dhwCircuits/dhw2/dhwSpLevels",
-	"/dhwCircuits/dhw2/dhwSpLevels/off",
-	"/dhwCircuits/dhw2/dhwSpLevels/on",
-	"/dhwCircuits/dhw2/dhwTimePrograms",
-	"/dhwCircuits/dhw2/dhwTimePrograms/AlwaysHotWater",
-	"/dhwCircuits/dhw2/dhwTimePrograms/Program1",
-	"/dhwCircuits/dhw2/dhwTimePrograms/Program2",
-	"/dhwCircuits/dhw2/extraDhw",
-	"/dhwCircuits/dhw2/extraDhw/activationStatus",
-	"/dhwCircuits/dhw2/extraDhw/status",
-	"/dhwCircuits/dhw2/extraDhw/stopTemp",
-	"/dhwCircuits/dhw2/extraDhw/time",
-	"/dhwCircuits/dhw2/setTemperature",
-	"/dhwCircuits/dhw2/status",
-	"/dhwCircuits/dhw2/switchPrograms",
-	"/dhwCircuits/dhw2/temperatureLevels",
-	"/dhwCircuits/dhw2/temperatureLevels/off",
-	"/dhwCircuits/dhw2/temperatureLevels/on",
-	"/dhwCircuits/dhw2/waterFlow",
-	"/dhwCircuits/dhw2/workingTime",
-    "/dhwCircuits/dhw1",
-    "/dhwCircuits/dhw2/operationMode",
-
 	"/gateway",
-	"/gateway/DateTime",
-	"/gateway/firmware",
-	"/gateway/haiPassword",
-	"/gateway/instPassword",
-	"/gateway/instAccess",
-	"/gateway/instWriteAccess",
-	"/gateway/language",
-	"/gateway/userpassword",
-	"/gateway/uuid",
-	"/gateway/versionFirmware",
-	"/gateway/versionHardware",
-
-	
 	"/heatingCircuits",
-	"/heatingCircuits/hc1",
-	"/heatingCircuits/hc1/activeSwitchProgram",
-	"/heatingCircuits/hc1/actualSupplyTemperature",
-	"/heatingCircuits/hc1/controlType",
-	"/heatingCircuits/hc1/currentOpModeInfo",
-	"/heatingCircuits/hc1/currentRoomSetpoint",
-	"/heatingCircuits/hc1/designTemp",
-	"/heatingCircuits/hc1/fastHeatupFactor",
-	"/heatingCircuits/hc1/heatingCurveSetting",
-	"/heatingCircuits/hc1/heatingCurveSetting/percentage",
-	"/heatingCircuits/hc1/heatingCurveSetting/increment",
-	"/heatingCircuits/hc1/heatingCurveSetting/decrement",
-	"/heatingCircuits/hc1/heatCurveMax",
-	"/heatingCircuits/hc1/heatCurveMin",
-	"/heatingCircuits/hc1/holidayMode",
-	"/heatingCircuits/hc1/holidayMode/activated",
-	"/heatingCircuits/hc1/holidayMode/startStop",
-	"/heatingCircuits/hc1/manualRoomSetpoint",
-	"/heatingCircuits/hc1/operationMode",
-	"/heatingCircuits/hc1/pumpModulation",
-	"/heatingCircuits/hc1/roomInfluence",
-	"/heatingCircuits/hc1/roomtemperature",
-	"/heatingCircuits/hc1/roomTempOffset",
-	"/heatingCircuits/hc1/setpointOptimization",
-	"/heatingCircuits/hc1/solarInfluence",
-	"/heatingCircuits/hc1/status",
-	"/heatingCircuits/hc1/suWiSwitchMode",
-	"/heatingCircuits/hc1/suWiThreshold",
-	"/heatingCircuits/hc1/switchPrograms",
-	"/heatingCircuits/hc1/switchPrograms/A",
-	"/heatingCircuits/hc1/switchPrograms/B",
-	"/heatingCircuits/hc1/temperatureLevels",
-	"/heatingCircuits/hc1/temperatureLevels/comfort2",
-	"/heatingCircuits/hc1/temperatureLevels/eco",
-	"/heatingCircuits/hc1/temperatureLevels/exception",
-	"/heatingCircuits/hc1/temperatureLevels/day",
-	"/heatingCircuits/hc1/temperatureLevels/night",
-	"/heatingCircuits/hc1/temperatureLevels/normal",
-	"/heatingCircuits/hc1/temperatureRoomSetpoint",
-	"/heatingCircuits/hc1/temporaryRoomSetpoint",
-	
-	"/heatingCircuits/hc2",
-	"/heatingCircuits/hc2/activeSwitchProgram",
-	"/heatingCircuits/hc2/actualSupplyTemperature",
-	"/heatingCircuits/hc2/controlType",
-	"/heatingCircuits/hc2/currentOpModeInfo",
-	"/heatingCircuits/hc2/currentRoomSetpoint",
-	"/heatingCircuits/hc2/designTemp",
-	"/heatingCircuits/hc2/fastHeatupFactor",
-	"/heatingCircuits/hc2/heatingCurveSetting",
-	"/heatingCircuits/hc2/heatingCurveSetting/percentage",
-	"/heatingCircuits/hc2/heatingCurveSetting/increment",
-	"/heatingCircuits/hc2/heatingCurveSetting/decrement",
-	"/heatingCircuits/hc2/heatCurveMax",
-	"/heatingCircuits/hc2/heatCurveMin",
-	"/heatingCircuits/hc2/holidayMode",
-	"/heatingCircuits/hc2/holidayMode/activated",
-	"/heatingCircuits/hc2/holidayMode/startStop",
-	"/heatingCircuits/hc2/manualRoomSetpoint",
-	"/heatingCircuits/hc2/operationMode",
-	"/heatingCircuits/hc2/pumpModulation",
-	"/heatingCircuits/hc2/roomInfluence",
-	"/heatingCircuits/hc2/roomtemperature",
-	"/heatingCircuits/hc2/roomTempOffset",
-	"/heatingCircuits/hc2/setpointOptimization",
-	"/heatingCircuits/hc2/solarInfluence",
-	"/heatingCircuits/hc2/status",
-	"/heatingCircuits/hc2/suWiSwitchMode",
-	"/heatingCircuits/hc2/suWiThreshold",
-	"/heatingCircuits/hc2/switchPrograms",
-	"/heatingCircuits/hc2/switchPrograms/A",
-	"/heatingCircuits/hc2/switchPrograms/B",
-	"/heatingCircuits/hc2/temperatureLevels",
-	"/heatingCircuits/hc2/temperatureLevels/day",
-	"/heatingCircuits/hc2/temperatureLevels/comfort2",
-	"/heatingCircuits/hc2/temperatureLevels/eco",
-	"/heatingCircuits/hc2/temperatureLevels/exception",
-	"/heatingCircuits/hc2/temperatureLevels/night",
-	"/heatingCircuits/hc2/temperatureLevels/normal",
-	"/heatingCircuits/hc2/temperatureRoomSetpoint",
-	"/heatingCircuits/hc2/temporaryRoomSetpoint",
-
 	"/heatSources",
-	"/heatSources/actualCHPower",
-	"/heatSources/actualDHWPower",
-	"/heatSources/actualPower",
-	"/heatSources/actualsupplytemperature",
-	"/heatSources/ChimneySweeper",
-	"/heatSources/CHpumpModulation",
-	"/heatSources/flameCurrent",
-	"/heatSources/flameStatus",
-	"/heatSources/gasAirPressure",
-	"/heatSources/nominalCHPower",
-	"/heatSources/nominalDHWPower",
-	"/heatSources/numberOfStarts",
-	"/heatSources/powerSetpoint",
-	"/heatSources/returnTemperature",
-	"/heatSources/systemPressure",
-	"/heatSources/workingTime",
-	"/heatSources/workingTime/totalSystem ",
-	"/heatSources/workingTime/secondBurner ",
-	"/heatSources/workingTime/centralHeating ",
-	
-
-	"/heatSources/hs1/energyReservoir",
-	"/heatSources/hs1/reservoirAlert",
-	"/heatSources/hs1/nominalFuelConsumption",
-	"/heatSources/hs1/fuelConsmptCorrFactor",
-	"/heatSources/hs1/actualModulation",
-	"/heatSources/hs1/actualPower",
-	"/heatSources/hs1/fuel",
-	"/heatSources/hs1/fuel/density",
-	"/heatSources/hs1/fuel/caloricValue",
-	
-	"/heatSources/hs2/energyReservoir",
-	"/heatSources/hs2/reservoirAlert",
-	"/heatSources/hs2/nominalFuelConsumption",
-	"/heatSources/hs2/fuelConsmptCorrFactor",
-	"/heatSources/hs2/actualModulation",
-	"/heatSources/hs2/actualPower",
-	"/heatSources/hs2/fuel",
-	"/heatSources/hs2/fuel/density",
-	"/heatSources/hs2/fuel/caloricValue",
-	
 	"/notifications",
-
 	"/recordings",
-	"/recordings/dhwCircuits",
-	"/recordings/heatingCircuits",
-	"/recordings/heatingCircuits/hc1",
-	"/recordings/heatingCircuits/hc1/roomtemperature",
-	"/recordings/heatSources",
-	"/recordings/heatSources/actualCHPower",
-	"/recordings/heatSources/actualDHWPower",
-	"/recordings/heatSources/actualPower",
-	"/recordings/system",
-	"/recordings/system/heatSources",
-	"/recordings/system/heatSources/hs1",
-	"/recordings/system/heatSources/hs1/actualPower",
-	"/recordings/system/sensors",
-	"/recordings/system/sensors/temperatures",
-	"/recordings/system/sensors/outdoorTemperatures",
-	"/recordings/system/sensors/outdoorTemperatures/t1",
-	"/recordings/system/sensors/temperatures/outdoor_t1",
-
 	"/solarCircuits",
-	"/solarCircuits/sc1",
-	"/solarCircuits/sc1/actuatorStatus",
-	"/solarCircuits/sc1/collectorTemperature",
-	"/solarCircuits/sc1/dhwTankTemperature",
-	"/solarCircuits/sc1/pumpModulation",
-	"/solarCircuits/sc1/solarYield",
-	"/solarCircuits/sc1/status",
-	
-	"/solarCircuits/sc2",
-	"/solarCircuits/sc2/actuatorStatus",
-	"/solarCircuits/sc2/collectorTemperature",
-	"/solarCircuits/sc2/dhwTankTemperature",
-	"/solarCircuits/sc2/pumpModulation",
-	"/solarCircuits/sc2/solarYield",
-	"/solarCircuits/sc2/status",
-
 	"/system",
-	"/system/appliance",
-	"/system/appliance/actualPower",
-	"/system/appliance/actualSupplyTemperature",
-	"/system/appliance/ChimneySweeper",
-	"/system/appliance/CHpumpModulation",
-	"/system/appliance/flameCurrent",
-	"/system/appliance/flameStatus",
-	"/system/appliance/gasAirPressure",
-	"/system/appliance/nominalBurnerLoad",
-	"/system/appliance/numberOfStarts",
-	"/system/appliance/powerSetpoint",
-	"/system/appliance/systemPressure",
-	"/system/appliance/type",
-	"/system/appliance/workingTime",
-	"/system/appliance/workingTime/centralHeating",
-	"/system/appliance/workingTime/secondBurner",
-	"/system/appliance/workingTime/totalSystem",
-
-	"/system/brand",
-	"/system/bus",
-	"/system/healthStatus",
-
-	"/system/heatSources",
-	"/system/heatSources/hs1",
-	"/system/heatSources/hs1/actualModulation",
-	"/system/heatSources/hs1/actualPower",
-	"/system/heatSources/hs1/energyReservoir",
-	"/system/heatSources/hs1/fuel",
-	"/system/heatSources/hs1/fuel/caloricValue",
-	"/system/heatSources/hs1/fuel/density",
-	"/system/heatSources/hs1/fuelConsmptCorrFactor",
-	"/system/heatSources/hs1/nominalFuelConsumption",
-	"/system/heatSources/hs1/reservoirAlert",
-	
-	"/system/holidayModes",
-	
-	"/system/holidayModes/hm1",
-	"/system/holidayModes/hm1/startStop",
-	"/system/holidayModes/hm1/assignedTo",
-	"/system/holidayModes/hm1/hcMode",
-	"/system/holidayModes/hm1/dhwMode",
-	"/system/holidayModes/hm1/delete",
-	
-	"/system/holidayModes/hm2",
-	"/system/holidayModes/hm2/startStop",
-	"/system/holidayModes/hm2/assignedTo",
-	"/system/holidayModes/hm2/hcMode",
-	"/system/holidayModes/hm2/dhwMode",
-	"/system/holidayModes/hm2/delete",
-	
-	"/system/holidayModes/hm3",
-	"/system/holidayModes/hm3/startStop",
-	"/system/holidayModes/hm3/assignedTo",
-	"/system/holidayModes/hm3/hcMode",
-	"/system/holidayModes/hm3/dhwMode",
-	"/system/holidayModes/hm3/delete",
-
-	"/system/holidayModes/hm4",
-	"/system/holidayModes/hm4/startStop",
-	"/system/holidayModes/hm4/assignedTo",
-	"/system/holidayModes/hm4/hcMode",
-	"/system/holidayModes/hm4/dhwMode",
-	"/system/holidayModes/hm4/delete",
-	
-	
-	"/system/info",
-	
-	"/system/minOutdoorTemp",
-	
-	"/system/sensors",
-	"/system/sensors/temperatures",
-	"/system/sensors/temperatures/chimney",
-	"/system/sensors/temperatures/hotWater_t1",
-	"/system/sensors/temperatures/hotWater_t2",
-	"/system/sensors/temperatures/outdoor_t1",
-	"/system/sensors/temperatures/return",
-	"/system/sensors/temperatures/supply_t1",
-	"/system/sensors/temperatures/supply_t1_setpoint",
-	"/system/sensors/temperatures/switch",
-
-	"/system/systemType"
 	);
 	
 	my @KM200_StatServices = (
@@ -717,7 +411,7 @@ sub km200_Define($$)
 	  $hash->{status}{FlagStatRequest}          = false;
 	  $hash->{Secret}{CRYPTKEYPRIVATE}          = $km200_crypt_key_private;
 	  $hash->{Secret}{CRYPTKEYINITIAL}          = $km200_crypt_key_initial;
-	@{$hash->{Secret}{KM200ALLSERVICES}}        = @KM200_AllServices;
+	@{$hash->{Secret}{KM200ALLSERVICES}}        = sort @KM200_AllServices;
 	@{$hash->{Secret}{KM200STATSERVICES}}       = @KM200_StatServices;
 	@{$hash->{Secret}{KM200RESPONDINGSERVICES}} = ();
 	@{$hash->{Secret}{KM200WRITEABLESERVICES}}  = ();
@@ -919,7 +613,6 @@ sub km200_Attr(@)
 	### Check whether DoNotPoll attribute have been provided
 	elsif($a[2] eq "DoNotPoll") 
 	{
-		my @KM200_AllServices = @{$hash->{Secret}{KM200ALLSERVICES}};
 		my @KM200_DONOTPOLL   = ();
 		my @temp              = @a;
 
@@ -934,50 +627,8 @@ sub km200_Attr(@)
 
 		### Save list of services not to be polled into hash
 		@{$hash->{Secret}{KM200DONOTPOLL}} = @KM200_DONOTPOLL;
-		
-		###START### Stop the current timer
-		RemoveInternalTimer($hash);
-		####END#### Stop the current timer
 
-		
-		###START###### Filter all services not to be polled out of known services = AllServices (new) #########START####
-		
-		### Search for all Services in @KM200_AllServices which containing the Service(hierarchy) not to be polled
-		my @KM200_DONOTPOLLTEMP = @KM200_DONOTPOLL;
-		foreach my $SearchWord(@KM200_DONOTPOLLTEMP)
-		{
-			my @DONOTPOLLGREP = grep {/^$SearchWord/}@KM200_AllServices;			
-			@KM200_DONOTPOLL  = (@KM200_DONOTPOLL, @DONOTPOLLGREP);
-		}
-		
-		### Delete double entries in array
-		@KM200_DONOTPOLL = &del_double(@KM200_DONOTPOLL);
-		
-		### For each Service not to be polled: Delete the Service from @KM200_AllServices and delete the reading in fhem
-		foreach my $SearchWord(@KM200_DONOTPOLL)
-		{
-			my $FoundPosition = first_index{ $_ eq $SearchWord }@KM200_AllServices;
-			if ($FoundPosition >= 0)
-			{
-				### Remove Service not to be polled from list of services
-				splice(@KM200_AllServices, $FoundPosition, 1);
-
-				### Delete Reading
-				fhem( "deletereading $name $SearchWord" );
-			}
-		}
-		
-		### Save list of services to be polled to hash
-		@{$hash->{Secret}{KM200ALLSERVICES}} = @KM200_AllServices;
-		
-		####END####### Filter all services not to be polled out of known services = AllServices (new) ##########END#####
-
-		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". @KM200_DONOTPOLL;
-		
-		###START###### Initiate the timer for first time polling of  values from KM200 but wait 5s ############START####
-		InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
-		Log3 $name, 5, $name. " : km200 - Internal timer for Init of services restarted after services set by attribute not to be polled.";
-		####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ############END#####
+		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". $a[3];
 	}
 	### If no attributes of the above known ones have been selected
 	else
@@ -1653,7 +1304,7 @@ sub km200_ParseHttpResponseInit($)
 	my @KM200_RespondingServices = @{$hash ->{Secret}{KM200RESPONDINGSERVICES}};
 	my @KM200_WriteableServices  = @{$hash ->{Secret}{KM200WRITEABLESERVICES}};
 	my @KM200_InitServices       = @{$hash ->{Secret}{KM200ALLSERVICES}};	
-	my $NumberInitServices       = @KM200_InitServices;
+	my $NumberInitServices       = "";
 	my $Service                  = $KM200_InitServices[$ServiceCounterInit];
 	my $json -> {type}           = "";	
 	
@@ -1984,9 +1635,36 @@ sub km200_ParseHttpResponseInit($)
 		### Check whether the type is an refEnum which is indicating an empty parent directory
 		elsif ($json -> {type} eq "refEnum")
 		{
-			my $JsonId         = $json->{id};		
+			my $JsonId         = $json->{id};
+			my $JsonType       = $json->{type};
+			my @JsonReferences = $json->{references};
+			
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service is an empty parent directory     : $JsonId\n";}
+			
+			### For each item found in this empty parent directory
+			foreach my $item (@{ $json->{references} })
+			{
+				### If the Service found is listed as blocked service
+				if ((grep {$_ eq $item->{id}} @{$hash->{Secret}{KM200DONOTPOLL}}) == 1)
+				{
+					### Ignore Service found
+					
+					### Console Message if enabled
+					if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service has been found but is blacklisted: " . $item->{id} . "\n";}
+				}
+				### If the Service found is NOT listed as blocked service
+				else
+				{
+					### Add service to the list of all known services
+					push (@{$hash ->{Secret}{KM200ALLSERVICES}}, $item->{id});
+				}
+			}
+			
+			### Sort the list of all services alphabetically
+			
+			### Sort the list of all services alphabetically
+			@{$hash ->{Secret}{KM200ALLSERVICES}} = sort @{$hash ->{Secret}{KM200ALLSERVICES}};
 		}
 		### Check whether the type is unknown
 		else
@@ -2014,7 +1692,10 @@ sub km200_ParseHttpResponseInit($)
 	### Log entries for debugging purposes
 	Log3 $name, 5, $name. " : km200_ParseHttpResponseInit    : response         : " .$data;
 
-
+	### Get the size of the array
+	@KM200_InitServices       = @{$hash ->{Secret}{KM200ALLSERVICES}};
+	$NumberInitServices       = @KM200_InitServices;
+	
 	### If the list of KM200ALLSERVICES has not been finished yet
 	if ($ServiceCounterInit < ($NumberInitServices-1))
 	{
