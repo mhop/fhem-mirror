@@ -3355,7 +3355,7 @@ sub PHTV_min {
     </ul>
   </ul>
   <ul>
-     <u>Note:</u> If you would like to retrict access to admin set-commands (-> statusRequest) you may your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
+     <u>Note:</u> If you would like to restrict access to admin set-commands (-> statusRequest) you may set your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
      The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
   </ul>
   <br>
