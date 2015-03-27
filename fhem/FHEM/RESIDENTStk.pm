@@ -123,12 +123,15 @@ sub RESIDENTStk_wakeupSet($$) {
     }
     if ( !defined( $defs{$wakeupMacro} ) ) {
         my $wakeUpMacroTemplate = "{\
-##\
+##=============================================================================\
 ## This is an example wake-up program running within a period of 30 minutes:\
 ## - drive shutters upwards slowly\
 ## - light up a HUE bulb from 2000K to 6500K\
 ## - have some voice notifications via SONOS\
 ## - have some wake-up chill music via SONOS during program run\
+##\
+## Actual FHEM commands are commented out by default as they would need\
+## to be adapted to your configuration.\
 ##\
 ## Available wake-up variables:\
 ## 1. \$EVTPART0 -> start or stop\
@@ -136,9 +139,9 @@ sub RESIDENTStk_wakeupSet($$) {
 ## 3. \$EVTPART2 -> wake-up begin time considering wakeupOffset attribute\
 ## 4. \$EVTPART3 -> enforced wakeup yes=1,no=0 from wakeupEnforced attribute\
 ## 5. \$EVTPART4 -> device name of the user which called this macro\
-##\
+##=============================================================================\
 \
-##------------------------------------------------------------------------------------\
+##-----------------------------------------------------------------------------\
 ## DELETE TEMP. AT-COMMANDS POTENTIALLY CREATED EARLIER BY THIS SCRIPT\
 ## Executed for start to cleanup in case this wake-up automation is re-started.\
 ## Executed for stop to cleanup in case the user ends this automation earlier.\
@@ -149,7 +152,7 @@ for (my \$i=1;; \$i <= 10;; \$i++) {\
 	}\
 }\
 \
-##------------------------------------------------------------------------------------\
+##-----------------------------------------------------------------------------\
 ## BEGIN WAKE-UP PROGRAM\
 ## Run first automation commands and create temp. at-devices for lagging actions.\
 ##\
@@ -173,14 +176,14 @@ if (\$EVTPART0 eq \"start\") {\
 	}\
 }\
 \
-#------------------------------------------------------------------------------------\
-# END WAKE-UP PROGRAM (OPTIONAL)\
-# Put some post wake-up tasks here like reminders after the actual wake-up period.\
-#\
-# Note: Will only be run when program ends normally after minutes specified in wakeupOffset.\
-#       If stop was user-forced by sending explicit set-command 'stop', this is not executed\
-#       assuming the user does not want any further automation activities.\
-#\
+##-----------------------------------------------------------------------------\
+## END WAKE-UP PROGRAM (OPTIONAL)\
+## Put some post wake-up tasks here like reminders after the actual wake-up period.\
+##\
+## Note: Will only be run when program ends normally after minutes specified in wakeupOffset.\
+##       If stop was user-forced by sending explicit set-command 'stop', this is not executed\
+##       assuming the user does not want any further automation activities.\
+##\
 if (\$EVTPART0 eq \"stop\") {\
 	Log3 \$NAME, 3, \"\$NAME: Wake-up program ended for \$EVTPART4 with target time \$EVTPART1\";;\
 \
@@ -206,7 +209,8 @@ if (\$EVTPART0 eq \"stop\") {\
         fhem "define $wakeupMacro notify $wakeupMacro $wakeUpMacroTemplate";
         fhem
           "attr $wakeupMacro comment Macro auto-created by RESIDENTS Toolkit";
-        if ($room) { fhem "attr $wakeupMacro room $room" }
+        fhem "attr $wakeupMacro room $room"
+          if ($room);
     }
     elsif ( $defs{$wakeupMacro}{TYPE} ne "notify" ) {
         Log3 $NAME, 3,
@@ -227,19 +231,73 @@ if (\$EVTPART0 eq \"stop\") {\
 "define $wakeupAtdevice at *{RESIDENTStk_wakeupGetBegin(\"$NAME\")} set $NAME trigger";
         fhem
 "attr $wakeupAtdevice comment Auto-created by RESIDENTS Toolkit: trigger wake-up timer at specific time";
-        if ($room) { fhem "attr $wakeupAtdevice room $room" }
+        fhem "attr $wakeupAtdevice room $room"
+          if ($room);
 
         # (re)create other notify and watchdog templates for userdevice
         #
 
         # macro: gotosleep
         if ( !defined( $defs{$macroNameGotosleep} ) ) {
+            my $templateGotosleep = "{\
+##=============================================================================\
+## This is an example macro when gettin' ready for bed.\
+##\
+## Actual FHEM commands are commented out by default as they would need\
+## to be adapted to your configuration.\
+##=============================================================================\
+\
+##-----------------------------------------------------------------------------\
+## LIGHT SCENE\
+##\
+\
+## Dim up floor light\
+#fhem \"set FL_Light:FILTER=pct=0 pct 20\";;\
+\
+## Dim down bright ceilling light in bedroom\
+#fhem \"set BR_Light:FILTER=pct!=0 pct 0 5\";;\
+\
+## Dim up HUE floor lamp with very low color temperature\
+#fhem \"set BR_FloorLamp ct 2000 : pct 80 : transitiontime 30\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## ENVIRONMENT SCENE\
+##\
+\
+## Turn down shutter to 28%\
+#fhem \"set BR_Shutter:FILTER=pct>28 pct 28\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## PLAY CHILLOUT MUSIC\
+## via SONOS at Bedroom and Bathroom\
+##\
+\
+## Stop playback bedroom's Sonos device might be involved in\
+#fhem \"set Sonos_Bedroom:transportState=PLAYING stop;;\";;\
+\
+## Make Bedroom's and Bathroom's Sonos devices a single device\
+## and do not touch other Sonos devices (this is why we use RemoveMember!)\
+#fhem \"sleep 0.5;; set Sonos_Bedroom RemoveMember Sonos_Bedroom\";;\
+#fhem \"sleep 1.0;; set Sonos_Bathroom RemoveMember Sonos_Bathroom\";;\
+\
+## Group Bedroom's and Bathroom's Sonos devices with Bedroom as master\
+#fhem \"sleep 2.0;; set Sonos_Bedroom AddMember Sonos_Bathroom;; set Sonos_Bedroom:FILTER=Shuffle!=1 Shuffle 1;; set Sonos_Bedroom,Sonos_Bathroom:FILTER=Volume!=12 Volume 12\";;\
+\
+## Start music from playlist\
+#fhem \"sleep 3.0;; set Sonos_Bedroom StartFavourite Evening%%20Chill\";;\
+\
+}";
+
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new macro device $macroNameGotosleep created";
-            fhem "define $macroNameGotosleep notify $macroNameGotosleep {}";
             fhem
-"attr $macroNameGotosleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after going to state gotosleep";
-            if ($room) { fhem "attr $macroNameGotosleep room $room" }
+"define $macroNameGotosleep notify $macroNameGotosleep $templateGotosleep";
+            fhem
+"attr $macroNameGotosleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when gettin' ready for bed";
+            fhem "attr $macroNameGotosleep room $room"
+              if ($room);
         }
 
         # wd: gotosleep
@@ -250,17 +308,65 @@ if (\$EVTPART0 eq \"stop\") {\
 "define $wdNameGotosleep watchdog $wakeupUserdevice:gotosleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|asleep|awoken) trigger $macroNameGotosleep";
             fhem
 "attr $wdNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
-            if ($room) { fhem "attr $wdNameGotosleep room $room" }
+            fhem "attr $wdNameGotosleep room $room"
+              if ($room);
         }
 
         # macro: asleep
         if ( !defined( $defs{$macroNameAsleep} ) ) {
+            my $templateAsleep = "{\
+##=============================================================================\
+## This is an example macro when jumpin' into bed and start to sleep.\
+##\
+## Actual FHEM commands are commented out by default as they would need\
+## to be adapted to your configuration.\
+##=============================================================================\
+\
+##-----------------------------------------------------------------------------\
+## LIGHT SCENE\
+##\
+\
+## In 15 seconds, turn off all lights in Bedroom using a structure\
+#fhem \"sleep 15;; set g_BR_Lights [FILTER=state!=off] off\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## ENVIRONMENT SCENE\
+##\
+\
+## In 12 seconds, close shutter if window is closed\
+#if (ReadingsVal(\"BR_Window\",\"state\",0) eq \"closed\") {\
+#	fhem \"sleep 12;; set BR_Shutter:FILTER=pct>0 close\";;\
+\
+## In 12 seconds, if window is not closed just make sure shutter is at least\
+## at 28% to allow some ventilation\
+#} else {\
+#	fhem \"sleep 12;; set BR_Shutter:FILTER=pct>28 pct 28\";;\
+#}\
+\
+\
+##-----------------------------------------------------------------------------\
+## PLAY WAKE-UP ANNOUNCEMENT\
+## via SONOS at Bedroom and stop playback elsewhere\
+##\
+\
+#my \$nextWakeup = ReadingsVal(\"rr_Bewohner\",\"nextWakeup\",0);;
+#my \$text = \"|Hint| Bewohner, es ist kein Wecker gestellt. Du könntest verschlafen! Trotzdem eine gute Nacht.\";;
+#if (\$nextWakeup ne \"OFF\") {
+#	\$text = \"|Hint| Bewohner, dein Wecker ist auf \$nextWakeup Uhr gestellt. Gute Nacht und schlaf gut.\";;
+#}
+#fhem \"set Sonos_Bedroom RemoveMember Sonos_Bedroom;; sleep 0.5;; set Sonos_Bedroom Speak 28 de \$text\";;\
+\
+}";
+
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new macro device $macroNameAsleep created";
-            fhem "define $macroNameAsleep notify $macroNameAsleep {}";
             fhem
-"attr $macroNameAsleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after going to state asleep";
-            if ($room) { fhem "attr $macroNameAsleep room $room" }
+              "define $macroNameAsleep notify $macroNameAsleep $templateAsleep";
+            fhem
+"attr $macroNameAsleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when jumpin' into bed and start to sleep";
+            fhem "attr $macroNameAsleep room $room"
+              if ($room);
         }
 
         # wd: asleep
@@ -271,17 +377,59 @@ if (\$EVTPART0 eq \"stop\") {\
 "define $wdNameAsleep watchdog $wakeupUserdevice:asleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|awoken) trigger $macroNameAsleep";
             fhem
 "attr $wdNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
-            if ($room) { fhem "attr $wdNameAsleep room $room" }
+            fhem "attr $wdNameAsleep room $room"
+              if ($room);
         }
 
         # macro: awoken
         if ( !defined( $defs{$macroNameAwoken} ) ) {
+            my $templateAwoken = "{\
+##=============================================================================\
+## This is an example macro after confirming to be awake.\
+##\
+## Actual FHEM commands are commented out by default as they would need\
+## to be adapted to your configuration.\
+##=============================================================================\
+\
+##-----------------------------------------------------------------------------\
+## LIGHT SCENE\
+##\
+\
+## Dim up HUE floor lamp to maximum with cold color temperature\
+#fhem \"set BR_FloorLamp:FILTER=pct<100 pct 100 : ct 6500 : transitiontime 30\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## ENVIRONMENT SCENE\
+##\
+\
+## In 22 seconds, turn up shutter at least until 60%\
+#fhem \"sleep 22;; set BR_Shutter:FILTER=pct<60 60\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## RAMP-UP ALL MORNING STUFF\
+##\
+\
+## Play morning announcement via SONOS at Bedroom\
+#fhem \"set Sonos_Bedroom Stop;; set Sonos_Bedroom Speak 40 de |Hint| Guten Morgen, Bewohner.\";;\
+\
+## In 10 seconds, start webradio playback in Bedroom\
+#fhem \"sleep 10;; set Sonos_Bedroom StartRadio /Charivari/;; sleep 2;; set Sonos_Bedroom Volume 15\";;\
+\
+## Make webradio stream available at Bathroom and\
+## Kitchen 5 seonds after it started\
+#fhem \"set Sonos_Bathroom,Sonos_Kitchen Volume 15;; sleep 15;; set Sonos_Bedroom AddMember Sonos_Bathroom;; set Sonos_Bedroom AddMember Sonos_Kitchen\";;\
+\
+}";
+
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new macro device $macroNameAwoken created";
-            fhem "define $macroNameAwoken notify $macroNameAwoken {}";
+            fhem "define $macroNameAwoken notify $macroNameAwoken $templateAwoken";
             fhem
-"attr $macroNameAwoken comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after going to state awoken";
-            if ($room) { fhem "attr $macroNameAwoken room $room" }
+"attr $macroNameAwoken comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after confirming to be awake";
+            fhem "attr $macroNameAwoken room $room"
+              if ($room);
         }
 
         # wd: awoken
@@ -292,7 +440,8 @@ if (\$EVTPART0 eq \"stop\") {\
 "define $wdNameAwoken watchdog $wakeupUserdevice:awoken 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|asleep) trigger $macroNameAwoken";
             fhem
 "attr $wdNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
-            if ($room) { fhem "attr $wdNameAwoken room $room" }
+            fhem "attr $wdNameAwoken room $room"
+              if ($room);
         }
 
     }
@@ -570,11 +719,12 @@ sub RESIDENTStk_wakeupRun($;$) {
     elsif ( !defined( $defs{$wakeupUserdevice} ) ) {
         return "$NAME: Non existing wakeupUserdevice $wakeupUserdevice";
     }
-    elsif ($defs{$wakeupUserdevice}{TYPE} ne "ROOMMATE"
+    elsif ($defs{$wakeupUserdevice}{TYPE} ne "RESIDENTS"
+        && $defs{$wakeupUserdevice}{TYPE} ne "ROOMMATE"
         && $defs{$wakeupUserdevice}{TYPE} ne "GUEST" )
     {
         return
-          "$NAME: device $wakeupUserdevice is not of type ROOMMATE or GUEST";
+"$NAME: device $wakeupUserdevice is not of type RESIDENTS, ROOMMATE or GUEST";
     }
     elsif ( $defs{$wakeupUserdevice}{TYPE} eq "GUEST"
         && ReadingsVal( $wakeupUserdevice, "state", "" ) eq "none" )
@@ -749,9 +899,11 @@ sub RESIDENTStk_AttrFnDummy(@) {
                 }
                 fhem
 "attr $aVal devStateIcon auto:time_automatic:off off:time_manual_mode:auto";
-                if ($group) { fhem "attr $aVal group $group" }
+                fhem "attr $aVal group $group"
+                  if ($group);
                 fhem "attr $aVal icon refresh";
-                if ($room) { fhem "attr $aVal room $room" }
+                fhem "attr $aVal room $room"
+                  if ($room);
                 fhem "attr $aVal setList state:auto,off";
                 fhem "attr $aVal webCmd state";
                 fhem "set $aVal auto";
