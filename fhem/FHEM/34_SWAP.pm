@@ -506,19 +506,21 @@ SWAP_Set($@)
       } else {
         my $len = $register->{size};
         if( !$len  ) {
-          my $max_position = 0;
+          my $max_pos = 0;
+          my $max_pos_size = 1;
           foreach my $endpoint ( @{$register->{endpoints}} ) {
             if( !defined($endpoint->{position}) ) {
               $len = $endpoint->{size};
               last;
             }
 
-            $max_position = maxNum( $max_position, int($endpoint->{position}) );
+            $max_pos = maxNum( $max_pos, int($endpoint->{position}) );
+            $max_pos_size = int($endpoint->{size} + 0.9 );
 
             $len += $endpoint->{size};
           }
 
-          $len = maxNum( $len, $max_position+1 );
+          $len = maxNum( $len, $max_pos+$max_pos_size );
         }
 
         return "value has to be ". $len ." byte(s) in size" if( $len*2 != length( $arg2 ) );
