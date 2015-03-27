@@ -415,7 +415,9 @@ sub FRITZBOX_Set($$@)
    return "Unknown argument $cmd or wrong parameter(s), choose one of $list";
 
 } # end FRITZBOX_Set
-
+# ctlmgr_ctl r timer settings/KidsTimerXML1/
+# ctlmgr_ctl r filter_profile settings/profile5/timeprofile_id
+# ctlmgr_ctl r filter_profile settings/profile5/name
 
 ##########################################
 sub FRITZBOX_Get($@)
@@ -756,7 +758,7 @@ sub FRITZBOX_Readout_Run($)
         # 1 Dect-Telefonname
          push @readoutCmdArray, [ "dect".$_, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name" ];
         # 2 Handset manufacturer
-         push @readoutCmdArray, [ "dect".$_."_manufacturer", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer" ];   
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer" ];   
         # 3 Internal Ring Tone Name
          push @readoutCmdArray, [ "dect".$_."_intRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone", "ringtone" ];
         # 4 Alarm Ring Tone Name
@@ -770,21 +772,26 @@ sub FRITZBOX_Readout_Run($)
         # 8 Customer Ring Tone Name
          push @readoutCmdArray, [ "dect".$_."_custRingToneName", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingToneName" ];
         # 9 Firmware Version
-         push @readoutCmdArray, [ "dect".$_."_fwVersion", "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion" ];   
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion" ];   
         # 10 Phone Model
-         push @readoutCmdArray, [ "dect".$_."_model", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model", "model" ];   
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model" ];   
+        # 11 Handset FonUser
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".($_-1)."/User", "" ];   
       }
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
       
       for (0..$dectCount-1)
       {
-         my $offset = $_ * 11;
-         my $intern = $resultArray->[ $offset ];
+         my $offset = $_ * 12;
+         my $intern = $resultArray->[ $offset + 11];
          if ( $intern )
          {
             push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ];
             push @readoutReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 2 ];
+            push @readoutReadings, "dect".$intern."_manufacturer|" . $resultArray->[ $offset + 2 ];
+            push @readoutReadings, "dect".$intern."_fwVersion|" . $resultArray->[ $offset + 1 ];
             push @readoutReadings, "fhem->$intern->model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
+            push @readoutReadings, "dect".$intern."_model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
          }
       }
 
@@ -917,7 +924,7 @@ sub FRITZBOX_Readout_Done($)
    my ($string) = @_;
    unless (defined $string)
    {
-      Log3 "FRITZBOX_Readout_Done", 1, "Fatal Error: no parameter handed over";
+      Log 1, "Fatal Error: no parameter handed over";
       return;
    }
 
@@ -940,7 +947,7 @@ sub FRITZBOX_Readout_Process($$)
    my ($hash,$string) = @_;
    unless (defined $hash)
    {
-      Log3 "FRITZBOX_Readout_Process", 1, "Fatal Error: no hash parameter handed over";
+      Log 1, "Fatal Error: no hash parameter handed over";
       return;
    }
   
@@ -1792,7 +1799,7 @@ sub FRITZBOX_Cmd_Done($)
    my ($string) = @_;
   unless (defined $string)
    {
-      Log3 "FRITZBOX_Cmd_Done", 1, "Fatal Error: no parameter handed over";
+      Log 1, "Fatal Error: no parameter handed over";
       return;
    }
 
@@ -2550,7 +2557,8 @@ sub FRITZBOX_fritztris($)
 <ul>
    Controls some features of a Fritz!Box router. Connected Fritz!Fon's (MT-F, MT-D, C3, C4) can be used as
    signaling devices. MP3 files and Text2Speech can be played as ring tone or when calling phones.
-   <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki-Link</b></a>
+   <br>
+   For detail instructions, look at and please maintain the <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a>.
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must once be set.
    <br/><br/>
@@ -2829,7 +2837,8 @@ sub FRITZBOX_fritztris($)
 <div  style="width:800px"> 
 <ul>
    Steuert gewisse Funktionen eines Fritz!Box Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien und Text (Text2Speech) k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
-   <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki-Link</b></a>
+   <br>
+   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
    <br/><br/>
    Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss einmalig das Passwort gesetzt werden.
    <br/><br/>
@@ -2884,7 +2893,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
          <br>
-         Schaltet die Rufumleitung (Nummer 1, 2 ...) für einzelne Rufnummern an oder aus.
+         Schaltet die Rufumleitung (Nummer 1, 2 ...) f&uuml;r einzelne Rufnummern an oder aus.
          <br>
          Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden.
          <br>
@@ -2939,7 +2948,7 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
          <br>
          Sendet eine Email &uuml;ber den Emailbenachrichtigungsservice der als Push Service auf der Fritz!Box konfiguriert wurde.
-         Mit "\n" kann einen Zeilenumbruch im Textkörper erzeut werden.
+         Mit "\n" kann einen Zeilenumbruch im Textk&ouml;rper erzeut werden.
          Alle Parameter k&ouml;nnen ausgelassen werden. Bitte kontrolliert, dass die Email nicht im Junk-Verzeichnis landet.
          <br>
       </li><br>
