@@ -1122,7 +1122,7 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>rgr_states</b> - list of states to be shown in FHEMWEB; separate entries by comma only and do NOT use spaces; unsupported states will lead to errors though
           </li>
           <li>
-            <b>rgr_wakeupDevice</b> - reference to renslaved DUMMY devices used as a wake-up timer (part of RESIDENTS Toolkit's wakeuptimer)
+            <b>rgr_wakeupDevice</b> - reference to enslaved DUMMY devices used as a wake-up timer (part of RESIDENTS Toolkit's wakeuptimer)
           </li>
         </ul>
       </div><br>
