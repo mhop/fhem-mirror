@@ -226,6 +226,9 @@ JeeLink_Set($@)
       elsif($hash->{model} =~ /pcaSerial/ ) {
         $detectedFirmware = "PCA301";
       }
+      elsif($hash->{model} =~ /ec3kSerial/ ) {
+        $detectedFirmware = "EC3000";
+      }
     }
     $hexFile = $firmwareFolder . "JeeLink_$detectedFirmware.hex";
     
