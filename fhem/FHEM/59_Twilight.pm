@@ -364,7 +364,7 @@ sub Twilight_WeatherCallback(@) {
 ################################################################################
 sub Twilight_StandardTimerSet($) {
   my ($hash) = @_;
-  my $midnight = time() - Twilight_midnight_seconds(time()) + 24*3600 + 30;
+  my $midnight = time() - Twilight_midnight_seconds(time()) + 24*3600 + 1;
 
   myRemoveInternalTimer       ("Midnight", $hash);
   myInternalTimer             ("Midnight", $midnight, "Twilight_Midnight", $hash, 0);
