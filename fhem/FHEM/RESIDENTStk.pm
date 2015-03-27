@@ -234,11 +234,14 @@ if (\$EVTPART0 eq \"stop\") {\
         fhem "attr $wakeupAtdevice room $room"
           if ($room);
 
-        # (re)create other notify and watchdog templates for userdevice
-        #
+        ########
+        # (re)create other notify and watchdog templates
+        # for ROOMMATE or GUEST devices
 
         # macro: gotosleep
-        if ( !defined( $defs{$macroNameGotosleep} ) ) {
+        if ( $defs{$wakeupUserdevice}{TYPE} ne "RESIDENTS"
+            && !defined( $defs{$macroNameGotosleep} ) )
+        {
             my $templateGotosleep = "{\
 ##=============================================================================\
 ## This is an example macro when gettin' ready for bed.\
@@ -313,7 +316,9 @@ if (\$EVTPART0 eq \"stop\") {\
         }
 
         # macro: asleep
-        if ( !defined( $defs{$macroNameAsleep} ) ) {
+        if ( $defs{$wakeupUserdevice}{TYPE} ne "RESIDENTS"
+            && !defined( $defs{$macroNameAsleep} ) )
+        {
             my $templateAsleep = "{\
 ##=============================================================================\
 ## This is an example macro when jumpin' into bed and start to sleep.\
@@ -376,13 +381,15 @@ if (\$EVTPART0 eq \"stop\") {\
             fhem
 "define $wdNameAsleep watchdog $wakeupUserdevice:asleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|awoken) trigger $macroNameAsleep";
             fhem
-"attr $wdNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
+"attr $wdNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
             fhem "attr $wdNameAsleep room $room"
               if ($room);
         }
 
         # macro: awoken
-        if ( !defined( $defs{$macroNameAwoken} ) ) {
+        if ( $defs{$wakeupUserdevice}{TYPE} ne "RESIDENTS"
+            && !defined( $defs{$macroNameAwoken} ) )
+        {
             my $templateAwoken = "{\
 ##=============================================================================\
 ## This is an example macro after confirming to be awake.\
@@ -425,7 +432,8 @@ if (\$EVTPART0 eq \"stop\") {\
 
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new macro device $macroNameAwoken created";
-            fhem "define $macroNameAwoken notify $macroNameAwoken $templateAwoken";
+            fhem
+              "define $macroNameAwoken notify $macroNameAwoken $templateAwoken";
             fhem
 "attr $macroNameAwoken comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after confirming to be awake";
             fhem "attr $macroNameAwoken room $room"
@@ -439,9 +447,211 @@ if (\$EVTPART0 eq \"stop\") {\
             fhem
 "define $wdNameAwoken watchdog $wakeupUserdevice:awoken 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|asleep) trigger $macroNameAwoken";
             fhem
-"attr $wdNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
+"attr $wdNameAwoken comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
             fhem "attr $wdNameAwoken room $room"
               if ($room);
+        }
+
+        ########
+        # (re)create other notify and watchdog templates
+        # for RESIDENT devices
+        #
+
+        my $RESIDENTGROUPS = "";
+        if ( $defs{$wakeupUserdevice}{TYPE} eq "RESIDENTS" ) {
+            $RESIDENTGROUPS = $wakeupUserdevice;
+        }
+        elsif (
+            defined(
+                $RESIDENTGROUPS = $defs{$wakeupUserdevice}{RESIDENTGROUPS}
+            )
+          )
+        {
+            $RESIDENTGROUPS = $defs{$wakeupUserdevice}{RESIDENTGROUPS};
+        }
+
+        for my $deviceName ( split /,/, $RESIDENTGROUPS ) {
+            my $macroRNameGotosleep = "Macro_" . $deviceName . "_gotosleep";
+            my $macroRNameAsleep    = "Macro_" . $deviceName . "_asleep";
+            my $macroRNameAwoken    = "Macro_" . $deviceName . "_awoken";
+            my $wdRNameGotosleep    = "wd_" . $deviceName . "_gotosleep";
+            my $wdRNameAsleep       = "wd_" . $deviceName . "_asleep";
+            my $wdRNameAwoken       = "wd_" . $deviceName . "_awoken";
+
+            # macro: gotosleep
+            if ( !defined( $defs{$macroRNameGotosleep} ) ) {
+                my $templateGotosleep = "{\
+##=============================================================================\
+## This is an example macro when all residents are gettin' ready for bed.\
+##\
+## Actual FHEM commands are commented out by default as they would need\
+## to be adapted to your configuration.\
+##=============================================================================\
+\
+##-----------------------------------------------------------------------------\
+## HOUSE MODE\
+## Enforce evening mode if we are still in day mode\
+##\
+\
+#fhem \"set HouseMode:FILTER=state=day evening\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## LIGHT SCENE\
+##\
+\
+## In 10 seconds, turn off lights in unused rooms using structures\
+#fhem \"sleep 10; set g_LR_Lights,g_KT_Lights [FILTER=state!=off] off\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## ENVIRONMENT SCENE\
+##\
+\
+## Turn off all media devices in the Living Room\
+#fhem \"set g_HSE_Media [FILTER=state!=off] off\";;\
+\
+}";
+
+                Log3 $NAME, 3,
+"RESIDENTStk $NAME: new macro device $macroRNameGotosleep created";
+                fhem
+"define $macroRNameGotosleep notify $macroRNameGotosleep $templateGotosleep";
+                fhem
+"attr $macroRNameGotosleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when all residents are gettin' ready for bed";
+                fhem "attr $macroRNameGotosleep room $room"
+                  if ($room);
+            }
+
+            # wd: gotosleep
+            if ( !defined( $defs{$wdRNameGotosleep} ) ) {
+                Log3 $NAME, 3,
+"RESIDENTStk $NAME: new watchdog device $wdRNameGotosleep created";
+                fhem
+"define $wdRNameGotosleep watchdog $deviceName:gotosleep 00:00:03 $deviceName:(home|absent|gone|none|asleep|awoken) trigger $macroRNameGotosleep";
+                fhem
+"attr $wdRNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
+                fhem "attr $wdRNameGotosleep room $room"
+                  if ($room);
+            }
+
+            # macro: asleep
+            if ( !defined( $defs{$macroRNameAsleep} ) ) {
+                my $templateAsleep = "{\
+##=============================================================================\
+## This is an example macro when all residents are in their beds.\
+##\
+## Actual FHEM commands are commented out by default as they would need\
+## to be adapted to your configuration.\
+##=============================================================================\
+\
+##-----------------------------------------------------------------------------\
+## HOUSE MODE\
+## Enforce night mode if we are still in evening mode\
+##\
+\
+#fhem \"set HouseMode:FILTER=state=evening night\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## LIGHT SCENE\
+##\
+\
+## In 20 seconds, turn off all lights in the house using structures\
+#fhem \"sleep 20;; set g_HSE_Lights [FILTER=state!=off] off\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## ENVIRONMENT SCENE\
+##\
+\
+## Stop playback at SONOS devices in shared rooms, e.g. Bathroom\
+#fhem \"set Sonos_Bathroom:FILTER=transportState=PLAYING Stop\";;\
+\
+}";
+
+                Log3 $NAME, 3,
+"RESIDENTStk $NAME: new macro device $macroRNameAsleep created";
+                fhem
+"define $macroRNameAsleep notify $macroRNameAsleep $templateAsleep";
+                fhem
+"attr $macroRNameAsleep comment Auto-created by RESIDENTS Toolkit: FHEM commands to run when all residents are in their beds";
+                fhem "attr $macroRNameAsleep room $room"
+                  if ($room);
+            }
+
+            # wd: asleep
+            if ( !defined( $defs{$wdRNameAsleep} ) ) {
+                Log3 $NAME, 3,
+"RESIDENTStk $NAME: new watchdog device $wdNameAsleep created";
+                fhem
+"define $wdRNameAsleep watchdog $deviceName:asleep 00:00:03 $deviceName:(home|absent|gone|none|gotosleep|awoken) trigger $macroRNameAsleep";
+                fhem
+"attr $wdRNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
+                fhem "attr $wdNameAsleep room $room"
+                  if ($room);
+            }
+
+            # macro: awoken
+            if ( !defined( $defs{$macroRNameAwoken} ) ) {
+                my $templateAwoken = "{\
+##=============================================================================\
+## This is an example macro when the first resident has confirmed to be awake\
+##\
+## Actual FHEM commands are commented out by default as they would need\
+## to be adapted to your configuration.\
+##=============================================================================\
+\
+##-----------------------------------------------------------------------------\
+## HOUSE MODE\
+## Enforce morning mode if we are still in night mode\
+##\
+\
+#fhem \"set HouseMode:FILTER=state=night morning\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## LIGHT SCENE\
+##\
+\
+## Turn on lights in the Kitchen already but set a timer to turn it off again\
+#fhem \"set KT_CounterLight on-for-timer 6300\";;\
+\
+\
+##-----------------------------------------------------------------------------\
+## PREPARATIONS\
+##\
+\
+## In 90 minutes, switch House Mode to 'day' and\
+## play voice announcement via SONOS\
+#if (!defined($defs{\"atTmp_HouseMode_day\"})) {\
+#	fhem \"define atTmp_HouseMode_day at +01:30:00 {if (ReadingsVal(\\\"HouseMode\\\", \\\"state\\\", 0) ne \\\"day\\\") {fhem \\\"set Sonos_Kitchen Speak 40 de |Notification| Tagesmodus wird etabliert.;;;; sleep 10;;;; set HouseMode day\\\"}}\";;\
+#}\
+\
+}";
+
+                Log3 $NAME, 3,
+"RESIDENTStk $NAME: new macro device $macroRNameAwoken created";
+                fhem
+"define $macroRNameAwoken notify $macroRNameAwoken $templateAwoken";
+                fhem
+"attr $macroRNameAwoken comment Auto-created by RESIDENTS Toolkit: FHEM commands to run after first resident confirmed to be awake";
+                fhem "attr $macroRNameAwoken room $room"
+                  if ($room);
+            }
+
+            # wd: awoken
+            if ( !defined( $defs{$wdRNameAwoken} ) ) {
+                Log3 $NAME, 3,
+"RESIDENTStk $NAME: new watchdog device $wdNameAwoken created";
+                fhem
+"define $wdRNameAwoken watchdog $deviceName:awoken 00:00:04 $deviceName:(home|absent|gone|none|gotosleep|asleep) trigger $macroRNameAwoken";
+                fhem
+"attr $wdRNameAwoken comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
+                fhem "attr $wdRNameAwoken room $room"
+                  if ($room);
+            }
+
         }
 
     }
