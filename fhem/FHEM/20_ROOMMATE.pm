@@ -1025,7 +1025,7 @@ sub ROOMMATE_StartInternalTimers($$) {
           </li>
         </ul>
         <ul>
-            <u>Note:</u> If you would like to retrict access to admin set-commands (-> create) you may your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
+            <u>Note:</u> If you would like to restrict access to admin set-commands (-> create) you may set your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
             The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
         </ul>
       </div><br>
@@ -1224,13 +1224,25 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>lastState</b> - the prior state
           </li>
           <li>
+            <b>lastWakeup</b> - time of last wake-up timer run
+          </li>
+          <li>
+            <b>lastWakeupDev</b> - device name of last wake-up timer
+          </li>
+          <li>
             <b>location</b> - the current location
           </li>
           <li>
-            <b>presence</b> - reflects the home presence state, depending on value of reading 'state' (can be 'present' or 'absent')
+            <b>mood</b> - the current mood
           </li>
           <li>
-            <b>mood</b> - the current mood
+            <b>nextWakeup</b> - time of next wake-up program run
+          </li>
+          <li>
+            <b>nextWakeupDev</b> - device name for next wake-up program run
+          </li>
+          <li>
+            <b>presence</b> - reflects the home presence state, depending on value of reading 'state' (can be 'present' or 'absent')
           </li>
           <li>
             <b>state</b> - reflects the current state
@@ -1507,13 +1519,25 @@ sub ROOMMATE_StartInternalTimers($$) {
             <b>lastState</b> - der vorherige Status
           </li>
           <li>
+            <b>lastWakeup</b> - Zeit der letzten Wake-up Timer Ausf&uuml;hring
+          </li>
+          <li>
+            <b>lastWakeupDev</b> - Device Name des zuletzt verwendeten Wake-up Timers
+          </li>
+          <li>
             <b>location</b> - der aktuelle Aufenthaltsort
           </li>
           <li>
-            <b>presence</b> - gibt den zu Hause Status in Abhängigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
+            <b>mood</b> - die aktuelle Stimmung
           </li>
           <li>
-            <b>mood</b> - die aktuelle Stimmung
+            <b>nextWakeup</b> - Zeit der n&auml;chsten Wake-up Timer Ausf&uuml;hrung
+          </li>
+          <li>
+            <b>nextWakeupDev</b> - Device Name des als n&auml;chstes ausgef&auml;hrten Wake-up Timer
+          </li>
+          <li>
+            <b>presence</b> - gibt den zu Hause Status in Abhängigkeit des Readings 'state' wieder (kann 'present' oder 'absent' sein)
           </li>
           <li>
             <b>state</b> - gibt den aktuellen Status wieder
