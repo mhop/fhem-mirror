@@ -103,7 +103,7 @@ FHEM/21_SONOSPLAYER          Reinerlein           http://forum.fhem.de Multimedi
 FHEM/22_ALL3076.pm           sachag               http://forum.fhem.de Snstiges
 FHEM/23_ALL4027.pm           sachag               http://forum.fhem.de Sonstiges
 FHEM/23_KOSTALPIKO.pm        john                 http://forum.fhem.de CodeSchnipsel
-FHEM/23_LUXTRONIK2.pm        tupol                http://forum.fhem.de Sonstiges
+FHEM/23_LUXTRONIK2.pm        tupol                http://forum.fhem.de Sonstiges (link als PM an tupol)
 FHEM/23_WEBIO.pm             sachag               http://forum.fhem.de Sonstiges
 FHEM/23_WEBIO_12DIGITAL.pm   sachag               http://forum.fhem.de Sonstiges
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
@@ -173,9 +173,9 @@ FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/57_CALVIEW.pm           chris1284            http://forum.fhem.de CodeSchnipsel
 FHEM/59_HCS.pm               mfr69bs              http://forum.fhem.de Automatisierung
-FHEM/59_OPENWEATHER.pm       tupol                http://forum.fhem.de Unterstuetzende Dienste
+FHEM/59_OPENWEATHER.pm       tupol                http://forum.fhem.de Unterstuetzende Dienste (Link als PM an tupol)
 FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstuetzende Dienste
-FHEM/59_PROPLANTA.pm         tupol                http://forum.fhem.de Unterstuetzende Dienste
+FHEM/59_PROPLANTA.pm         tupol                http://forum.fhem.de Unterstuetzende Dienste (Link als PM an tupol)
 FHEM/59_WWO.pm               baumrasen            http://forum.fhem.de Sonstiges
 FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/60_EM.pm                rudolfkoenig         http://forum.fhem.de SlowRF
@@ -188,7 +188,7 @@ FHEM/67_ECMDDevice.pm        borisneubert         http://forum.fhem.de Sonstige 
 FHEM/70_EGPM.pm              alexus               http://forum.fhem.de Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               http://forum.fhem.de Multimedia
 FHEM/70_Jabber.pm            BioS                 http://forum.fhem.de Unterstuetzende Dienste
-FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges
+FHEM/70_JSONMETER.pm         tupol                http://forum.fhem.de Sonstiges (Link als PM an tupol)
 FHEM/70_PHTV.pm              loredo               http://forum.fhem.de Multimedia
 FHEM/70_ONKYO_AVR.pm         loredo               http://forum.fhem.de Multimedia
 FHEM/70_PIONEERAVR.pm        hofrichter           http://forum.fhem.de Multimedia
@@ -209,7 +209,7 @@ FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedi
 FHEM/71_YAMAHA_BD.pm         markusbloch          http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_NP.pm         ra666ack             http://forum.fhem.de Multimedia
 FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstuetzende Dienste
-FHEM/72_FRITZBOX.pm          tupol                http://forum.fhem.de FRITZBOX
+FHEM/72_FRITZBOX.pm          tupol                http://forum.fhem.de FRITZBOX (link als PM an tupol)
 FHEM/73_km200.pm             sailor               http://forum.fhem.de Heizungssteuerung/Raumklima
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/73_MPD.pm               wzut                 http://forum.fhem.de Multimedia
@@ -286,7 +286,7 @@ FHEM/98_notice.pm            mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_pilight.pm           andreas-fey          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_rain.pm              baumrasen            http://forum.fhem.de Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
-FHEM/98_statistics.pm        tupol                http://forum.fhem.de Unterstuetzende Dienste
+FHEM/98_statistics.pm        tupol                http://forum.fhem.de Unterstuetzende Dienste (Link als PM an tupol)
 FHEM/98_structure.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_telnet.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_update.pm            rudolfkoenig         http://forum.fhem.de Sonstiges
