@@ -31,8 +31,9 @@ use warnings;
 use Time::HiRes qw(gettimeofday);    
 use HttpUtils;
 
-my %sets = ( "Out1" => "on,off,toggle" , "Out2" => "on,off,toggle");
+#my %sets = ( "Out1" => "on,off,toggle" , "Out2" => "on,off,toggle");
 
+my %sets = ();
 
 #########################################################################
 
@@ -80,20 +81,21 @@ sub InfratecPM_Define($$) {
     $hash->{host}  = $a[2];
     $hash->{port}  = (defined($a[3])) ? $a[3] : "80";
 
-    if( !defined( $attr{$a[0]}{user} ) ) { $attr{$a[0]}{user} = "admin"}
+    if( !defined( $attr{$a[0]}{user} ) ) { $attr{$a[0]}{user} = "admin";}
     $hash->{user}       = $attr{$a[0]}{user};
 
-    if( !defined( $attr{$a[0]}{password} ) ) { $attr{$a[0]}{password} = "1234"}
+    if( !defined( $attr{$a[0]}{password} ) ) { $attr{$a[0]}{password} = "1234";}
     $hash->{pwd}        = $attr{$a[0]}{password};
 
     if( !defined( $attr{$a[0]}{timeout} ) ) { $attr{$a[0]}{timeout} = "2"}
-    $hash->{timeout}        = $attr{$a[0]}{timeout};
+    $hash->{timeout} = (int($attr{$a[0]}{timeout}) > 1) ? $attr{$a[0]}{timeout} : "2";
 
-    if( !defined( $attr{$a[0]}{autocreate} ) ) { $attr{$a[0]}{autocreate} = "1"}
+    if( !defined( $attr{$a[0]}{autocreate} ) ) { $attr{$a[0]}{autocreate} = "1";}
 
     $hash->{Clients}    = ":InfratecOut:";
     $hash->{PORTS}      = 0;
     $hash->{force}      = 0;
+    $hash->{code}       = "";
     $hash->{callback}   = \&InfratecPM_Read;
     readingsSingleUpdate($hash, "state", "defined",0);
 
@@ -154,7 +156,9 @@ sub InfratecPM_Read($$$)
     {
         $hash->{ERROR} = $err;
         $hash->{ERRORTIME} = TimeNow();
-        Log3 $name, 3, "$name: Error -> $err";
+        my $msg = "$name: Error ";
+        $msg .= ($hash->{code}) ? "[".$hash->{code}."] -> $err" : "-> $err";
+        Log3 $name, 3, $msg;
         $hash->{ERRORCOUNT} ++;
         readingsSingleUpdate($hash, "state", "error", 0);
         $hash->{INTERVAL} = 3600 if ($hash->{ERRORCOUNT} >9);
@@ -174,7 +178,8 @@ sub InfratecPM_Read($$$)
       return;
     }
 
-   Log3 $name, 5, "$name, Message1: $buffer\r";
+   $hash->{RETURNED} = "";
+   Log3 $name, 5, "$name, [".$hash->{code}."] Message1: $buffer\r";
    $buffer =~s/\n//g;
    $buffer =~s/ //g;
    $buffer =~s/<br>/-/g;
@@ -194,12 +199,15 @@ sub InfratecPM_Read($$$)
 
    foreach (@ret)
    {
+     Log3 $name, 5, "$name , ret -> $_";
+
      my @val = split(":" , $_);
 
      if (!defined($val[1])) { $val[1] = "" }
 
      if(($val[1] eq "0") || ($val[1] eq "1")) # hier wollen wir nur die on/ff haben
      { 
+      #$val[0] =~s/ //g;
       if (!$i) {$state="";} # erster Port
       $i++; 
       $devstate = ($val[1] eq "0") ? "off" : "on"; 
@@ -207,7 +215,8 @@ sub InfratecPM_Read($$$)
 
       $hash->{helper}{$i."state"} = $val[1]; 
       $hash->{helper}{$i."name"} = $val[0];
-      Log3 $name, 5, "$name , Status $i: ".$hash->{helper}{$i."state"}."\r";
+      #Log3 $name, 5, "$name , Status $i: ".$hash->{helper}{$i."state"}."\r";
+      
       readingsBulkUpdate($hash, $val[0], $devstate);
 
       my $defptr = $modules{InfratecOut}{defptr}{$name.$i};
@@ -225,14 +234,22 @@ sub InfratecPM_Read($$$)
               }
    }
 
-    readingsBulkUpdate($hash, "state",$state);
+    if (($hash->{RETURNED} eq "Done.") || ($hash->{RETURNED} eq "Status"))
+    {
+     readingsBulkUpdate($hash, "state",$state);
+    }
+     else
+    {
+     Log3 $name, 2, "$name , Return : ".$hash->{RETURNED};
+     readingsBulkUpdate($hash, "state", $hash->{RETURNED});
+    }     
+   
     readingsEndUpdate($hash, 1 );
 
     # und wie viele Ports hat denn nun das Ding wirklich ?
-    if($i)
+    if($i && ($hash->{RETURNED} eq "Status") && !$hash->{PORTS})
     {
       $hash->{PORTS} = $i;  
-      %sets = ();
       for (my $j=1; $j<= $i; $j++) { $sets{"Out".$j}  = "on,off,toggle"; }
     }
      return;
@@ -252,6 +269,7 @@ sub InfratecPM_Attr(@)
 
    if ($attrName eq "timeout")
    {
+     if (int($attrVal)<"2") {$attrVal="2";}
      $hash->{timeout}  = $attrVal;
      $attr{$name}{timeout} = $attrVal;
    }
@@ -304,6 +322,11 @@ sub InfratecPM_Set($@) {
 
    Log3 $name, 5, "Set: ".join(" ", @a);
  
+   if(!defined($sets{Out1}) && $hash->{PORTS}) # neu aufbauen nach reload;
+   {
+    for (my $j=1; $j<= $hash->{PORTS}; $j++) { $sets{"Out".$j}  = "on,off,toggle"; }
+   }
+
   if(!defined($sets{$port})) 
    {
      my @commands = ();
@@ -319,8 +342,8 @@ sub InfratecPM_Set($@) {
     $port = substr($port,3,1);
     return "wrong port $port, please use 1 - ".$hash->{PORTS} if ((int($port)<1) || (int($port)>$hash->{PORTS})) ;
 
-    $hash->{url}	 = "http://$hash->{host}:$hash->{port}/sw?u=$hash->{user}&p=$hash->{pwd}&o=";
-    $hash->{url}	.= $port."&f=".$cmd;
+    $hash->{url}  = "http://$hash->{host}:$hash->{port}/sw?u=$hash->{user}&p=$hash->{pwd}&o=";
+    $hash->{url} .= $port."&f=".$cmd;
  
     $hash->{lastcmd} = $port." ".$cmd;
     $hash->{force}   = ($subcmd eq "force") ? 1 : 0;
@@ -344,7 +367,7 @@ sub InfratecPM_Status($)
 
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "InfratecPM_Status",$hash, 0) if ($hash->{INTERVAL});
 
-  $hash->{url}	 = "http://$hash->{host}:$hash->{port}/sw?s=0";
+  $hash->{url}     = "http://$hash->{host}:$hash->{port}/sw?s=0";
   $hash->{lastcmd} = "status";
   HttpUtils_NonblockingGet($hash);
 
