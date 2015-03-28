@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id:$
+#  $Id$
 #
 #  (c) 2015 Copyright: Wzut
 #  forum : http://forum.fhem.de/index.php/topic,34131.0.html
@@ -22,6 +22,7 @@
 ################################################################
 #  Changelog:
 #  25.3.15 add force for set on and off
+#  28.3.15 fix delete Outs
 
 package main;
 
