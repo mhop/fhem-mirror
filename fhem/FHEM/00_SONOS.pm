@@ -47,6 +47,9 @@
 # Changelog
 #
 # SVN-History:
+# 28.03.2015
+#	Die Wiederholungsintervalle (Tage) von Alarmen werden wieder korrekt erkannt, und gesetzt
+#	Bei PlaylistWithCovers wird nun auch ein Cover angezeigt, wenn der erste Titel ein Spotify-Titel ist
 # 28.02.2015
 #	Der Speak-Befehl kann jetzt auch eingeschobene MP3-Datei-Verweise verarbeiten. Diese werden im Text mit "|" eingeschlossen, und mit Leerzeichen abgetrennt. z.B.: "Dies ist ein |/path/to/tada.mp3| Test.". Funktioniert nur bei "Speak" (und nicht bei eigenen Programmaufrufen wie "Speak1")
 #	Es gibt für die einfachere Handhabung der neuen Speakmöglichkeiten zwei neue Attribute "targetSpeakMP3FileDir" und "targetSpeakMP3FileConverter". Mit "targetSpeakMP3FileDir" kann ein Standardverzeichnis für die eingschobenen MP3-Dateien angegeben werden, und mit "targetSpeakMP3FileConverter" kann ein MP3-Konverter definiert werden, der am Ende die zusammengebaute Durchsage-MP3-Datei nochmal sauber durchkodiert (um z.B. Restzeitanzeigeprobleme zu beheben).
@@ -3288,7 +3291,7 @@ sub SONOS_Discover() {
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$memberudn}) && SONOS_CheckProxyObject($udn, $SONOS_ZoneGroupTopologyProxy{$memberudn})) {
 						# Wenn der hinzuzufügende Player Koordinator einer anderen Gruppe ist,
 						# dann erst mal ein anderes Gruppenmitglied zum Koordinator machen
-						my @zoneTopology = SONOS_ConvertZoneGroupState($SONOS_ZoneGroupTopologyProxy{$memberudn}->GetZoneGroupState()->getValue('ZoneGroupState'));
+						#my @zoneTopology = SONOS_ConvertZoneGroupState($SONOS_ZoneGroupTopologyProxy{$memberudn}->GetZoneGroupState()->getValue('ZoneGroupState'));
 						
 						# Hier fehlt noch die Umstellung der bestehenden Gruppe...
 						
@@ -3732,8 +3735,14 @@ sub SONOS_MakeCoverURL($$) {
 				
 				if (defined($tmp) && $tmp =~ m/<item id=".+?".*?>.*?<upnp:albumArtURI>(.*?)<\/upnp:albumArtURI>.*?<\/item>/i) {
 					$resURL = $1;
+					$resURL =~ s/%25/%/ig;
 					
-					$resURL = $1.$resURL if (SONOS_Client_Data_Retreive($udn, 'reading', 'location', '') =~ m/^(http:\/\/.*?:.*?)\//i);
+					# Bei Spotify-URIs, die AlbumURL korrigieren...
+					if ($resURL =~ m/getaa.*?x-sonos-spotify%3aspotify%3atrack%3a(.*)%3f/i) {
+						$resURL = SONOS_getSpotifyCoverURL($1);
+					} else {
+						$resURL = $1.$resURL if (SONOS_Client_Data_Retreive($udn, 'reading', 'location', '') =~ m/^(http:\/\/.*?:.*?)\//i);
+					}
 				}
 			}
 		}
@@ -4035,8 +4044,8 @@ sub SONOS_CheckAndCorrectAlarmHash($) {
 		|| (!SONOS_isInList('IncludeLinkedZones', @keys))) {
 		return 0;
 	}
-		
-	# Converts some values
+	
+	# Convert some values
 	# Playmode
 	$hash->{PlayMode} = 'NORMAL';
 	$hash->{PlayMode} = 'SHUFFLE' if ($hash->{Repeat} && $hash->{Shuffle});
@@ -4048,13 +4057,20 @@ sub SONOS_CheckAndCorrectAlarmHash($) {
 		$hash->{Recurrence} = 'ONCE';
 	} else {
 		$hash->{Recurrence} = 'ON_';
+		$hash->{Recurrence} .= '0' if ($hash->{Recurrence_Sunday});
 		$hash->{Recurrence} .= '1' if ($hash->{Recurrence_Monday});
 		$hash->{Recurrence} .= '2' if ($hash->{Recurrence_Tuesday});
 		$hash->{Recurrence} .= '3' if ($hash->{Recurrence_Wednesday});
 		$hash->{Recurrence} .= '4' if ($hash->{Recurrence_Thursday});
 		$hash->{Recurrence} .= '5' if ($hash->{Recurrence_Friday});
 		$hash->{Recurrence} .= '6' if ($hash->{Recurrence_Saturday});
-		$hash->{Recurrence} .= '7' if ($hash->{Recurrence_Sunday});
+		
+		# Specials
+		$hash->{Recurrence} = 'DAILY' if (($hash->{Recurrence_Monday}) && ($hash->{Recurrence_Tuesday}) && ($hash->{Recurrence_Wednesday}) && ($hash->{Recurrence_Thursday}) && ($hash->{Recurrence_Friday}) && ($hash->{Recurrence_Saturday}) && ($hash->{Recurrence_Sunday}));
+		
+		$hash->{Recurrence} = 'WEEKDAYS' if (($hash->{Recurrence_Monday}) && ($hash->{Recurrence_Tuesday}) && ($hash->{Recurrence_Wednesday}) && ($hash->{Recurrence_Thursday}) && ($hash->{Recurrence_Friday}) && (!$hash->{Recurrence_Saturday}) && (!$hash->{Recurrence_Sunday}));
+		
+		$hash->{Recurrence} = 'WEEKENDS' if ((!$hash->{Recurrence_Monday}) && (!$hash->{Recurrence_Tuesday}) && (!$hash->{Recurrence_Wednesday}) && (!$hash->{Recurrence_Thursday}) && (!$hash->{Recurrence_Friday}) && ($hash->{Recurrence_Saturday}) && ($hash->{Recurrence_Sunday}));
 	}
 	
 	# If nothing is given, set 'ONCE'
@@ -4289,7 +4305,7 @@ sub SONOS_GetTrackProvider($;$) {
 		return 'Gruppenwiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 	} elsif ($songURI =~ m/x-rincon-stream:(RINCON_[\dA-Z]+)/) {
 		my $elem = 'LineIn';
-		$elem = $songTitle if ($songTitle);
+		$elem = $songTitle if (defined($songTitle) && $songTitle);
 		return $songTitle.'-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 	} elsif ($songURI =~ m/x-sonos-dock:(RINCON_[\dA-Z]+)/) {
 		return 'Dock-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
@@ -6177,13 +6193,13 @@ sub SONOS_AlarmCallback($$) {
 				# Recurrence ermitteln...
 				my $currentRecurrence = $1 if ($alarm =~ m/Recurrence="(.*?)"/i);
 				$alarms{$id}{Recurrence_Once} = 1 if ($currentRecurrence eq 'ONCE');
-				$alarms{$id}{Recurrence_Monday} = 1 if ($currentRecurrence =~ m/^ON_\d*?1/i);
-				$alarms{$id}{Recurrence_Tuesday} = 1 if ($currentRecurrence =~ m/^ON_\d*?2/i);
-				$alarms{$id}{Recurrence_Wednesday} = 1 if ($currentRecurrence =~ m/^ON_\d*?3/i);
-				$alarms{$id}{Recurrence_Thursday} = 1 if ($currentRecurrence =~ m/^ON_\d*?4/i);
-				$alarms{$id}{Recurrence_Friday} = 1 if ($currentRecurrence =~ m/^ON_\d*?5/i);
-				$alarms{$id}{Recurrence_Saturday} = 1 if ($currentRecurrence =~ m/^ON_\d*?6/i);
-				$alarms{$id}{Recurrence_Sunday} = 1 if ($currentRecurrence =~ m/^ON_\d*?7/i);
+				$alarms{$id}{Recurrence_Sunday} = 1 if (($currentRecurrence =~ m/^ON_\d*?0/i) || ($currentRecurrence =~ m/^WEEKENDS/i) || ($currentRecurrence =~ m/^DAILY/i));
+				$alarms{$id}{Recurrence_Monday} = 1 if (($currentRecurrence =~ m/^ON_\d*?1/i) || ($currentRecurrence =~ m/^WEEKDAYS/i) || ($currentRecurrence =~ m/^DAILY/i));
+				$alarms{$id}{Recurrence_Tuesday} = 1 if (($currentRecurrence =~ m/^ON_\d*?2/i) || ($currentRecurrence =~ m/^WEEKDAYS/i) || ($currentRecurrence =~ m/^DAILY/i));
+				$alarms{$id}{Recurrence_Wednesday} = 1 if (($currentRecurrence =~ m/^ON_\d*?3/i) || ($currentRecurrence =~ m/^WEEKDAYS/i) || ($currentRecurrence =~ m/^DAILY/i));
+				$alarms{$id}{Recurrence_Thursday} = 1 if (($currentRecurrence =~ m/^ON_\d*?4/i) || ($currentRecurrence =~ m/^WEEKDAYS/i) || ($currentRecurrence =~ m/^DAILY/i));
+				$alarms{$id}{Recurrence_Friday} = 1 if (($currentRecurrence =~ m/^ON_\d*?5/i) || ($currentRecurrence =~ m/^WEEKDAYS/i) || ($currentRecurrence =~ m/^DAILY/i));
+				$alarms{$id}{Recurrence_Saturday} = 1 if (($currentRecurrence =~ m/^ON_\d*?6/i) || ($currentRecurrence =~ m/^WEEKENDS/i) || ($currentRecurrence =~ m/^DAILY/i));
 				
 				SONOS_Log $udn, 5, 'Alarm-Event: Alarm-Decoded: '.SONOS_Stringify(\%alarms);
 			}
@@ -6191,7 +6207,6 @@ sub SONOS_AlarmCallback($$) {
 		
 		# Sets the approbriate Readings-Value
 		$Data::Dumper::Indent = 0;
-		# SONOS_Client_Notifier('SetAlarm:'.$udn.':'.$result->getValue('CurrentAlarmListVersion').';'.join(',', @alarmIDs).':'.Dumper(\%alarms));
 		SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'AlarmList', Dumper(\%alarms));
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'AlarmListIDs', join(',', @alarmIDs));
