@@ -1,12 +1,43 @@
 ##############################################
-# $Id: 14_CUL_TCM97001.pm 6689 2014-10-05 12:27:19Z rudolfkoenig $
+# From dancer0705
+# Receive TCM 97001 like temperature sensor
+#
+# Copyright (C) 2015 Bjoern Hempel
+#
+# This program is free software; you can redistribute it and/or modify it under 
+# the terms of the GNU General Public License as published by the Free Software 
+# Foundation; either version 2 of the License, or (at your option) any later 
+# version.
+#
+# This program is distributed in the hope that it will be useful, but 
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+# or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for 
+# more details.
+#
+# You should have received a copy of the GNU General Public License along with 
+# this program; if not, write to the 
+# Free Software Foundation, Inc., 
+# 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
+#
+##############################################
+# $Id: 14_CUL_TCM97001.pm 8286 2015-03-25 20:47:59Z dancer0705 $
+
 package main;
 
-# From dancer0705
-# Receive TCM 97001 temperature sensor
+
 
 use strict;
 use warnings;
+
+use SetExtensions;
+use constant { TRUE => 1, FALSE => 0 };
+
+my %models = (
+    "TCM97..."    => 'TCM97...',
+    "TCM21...."   => 'TCM21....',
+    "GT-WT-.."    => 'GT-WT-..',
+    "Rubicson"    => 'Rubicson',
+);
 
 sub
 CUL_TCM97001_Initialize($)
@@ -18,7 +49,9 @@ CUL_TCM97001_Initialize($)
   $hash->{UndefFn}   = "CUL_TCM97001_Undef";
   $hash->{ParseFn}   = "CUL_TCM97001_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
-                        $readingFnAttributes;
+                        "$readingFnAttributes " .
+                        "model:".join(",", sort keys %models);
+
   $hash->{AutoCreate}=
         { "CUL_TCM97001.*" => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME" } };
 }
@@ -54,36 +87,66 @@ CUL_TCM97001_Undef($$)
   return undef;
 }
 
+sub checkCRC {
+  my $msg = shift;
+  my @a = split("", $msg);
+  my $bitReverse = undef;
+  my $x = undef;
+  foreach $x (@a) {
+     my $bin3=sprintf("%04b",hex($x));
+    $bitReverse = $bitReverse . reverse($bin3); 
+  }
+  my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
+
+  #Split reversed a again
+  my @aReverse = split("", $hexReverse);
+
+  my $CRC = (hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])
+            +hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
+  if ($CRC + hex($aReverse[8]) == 15) {
+      return TRUE;
+  }
+  return FALSE;
+}
+
 ###################################
 sub
 CUL_TCM97001_Parse($$)
 {
   my ($hash, $msg) = @_;
   $msg = substr($msg, 1);
-  # Msg format: AAATT
-  my @a = split("", $msg); 
+  my @a = split("", $msg);
 
   my $id3 = hex($a[0] . $a[1]);
+  my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
   my $def = $modules{CUL_TCM97001}{defptr}{$id3};
-  if(!$def) {
-    Log3 $hash, 2, "CUL_TCM97001 Unknown device $id3, please define it";
-    if (length($msg) == 8) {
-      return "UNDEFINED CUL_TCM97001_$id3 CUL_TCM97001 $id3" if(!$def); 
-    } else {
-      return "UNDEFINED CUL_TCM97001_$id3 CUL_TCM97001 $id3" if(!$def); 
-    } 
-  }
+  my $def2 = $modules{CUL_TCM97001}{defptr}{$id4};
+  
   my $now = time();
 
-  my $name = $def->{NAME};
+  my $name = "UNKNOWN";
+  if($def) {
+    $name = $def->{NAME};
+  } elsif($def2) {
+    $name = $def2->{NAME};
+  }
+  
 
-  Log3 $name, 4, "CUL_TCM97001 $name $id3 ($msg)";
+  Log3 $name, 4, "CUL_TCM97001 $name $id3 or $id4 ($msg) length:" . length($msg);
 
-  my ($msgtype, $val);
+  my ($msgtype, $msgtypeH, $val, $valH);
 
+  my $packageOK = FALSE;
+  my $state="";
+  my $batbit=undef;
+  my $mode=undef;
+  my $hashumidity = FALSE;
+  my $hasbatcheck = FALSE;
+  my $model="UNKNOWN";
+  
   if (length($msg) == 8) {
-    # Only tmp device
+    # Only tmp TCM device
     #eg. 1000 1111 0100 0011 0110 1000 = 21.8C
     #eg. --> shift2  0100 0011 0110 10
     my $temp    = (hex($a[3].$a[4].$a[5]) >> 2) & 0xFFFF;  
@@ -98,42 +161,33 @@ CUL_TCM97001_Parse($$)
 
     $temp = $temp / 10;
 
-    $def->{lastT} = $now;
+    if($def) {
+      $def->{lastT} = $now;
+    } 
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($temp) );
     Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val";
 
 
     # I think bit 3 on byte 3 is battery warning
-    my $batbit    = (hex($a[2]) >> 0) & 0x4; 
+    $batbit    = (hex($a[2]) >> 0) & 0x4; 
 
-    my $mode    = (hex($a[5]) >> 0) & 0x1; 
+    $mode    = (hex($a[5]) >> 0) & 0x1; 
 
     my $unknown    = (hex($a[4]) >> 0) & 0x2; 
-    
-
-    my $state="";
     my $t = ReadingsVal($name, "temperature", undef);
 
     if(defined($t)) {
       $state="T: $t";
     }
-
-    readingsBeginUpdate($def);
-    readingsBulkUpdate($def, "state", $state);
-    readingsBulkUpdate($def, $msgtype, $val);
-    if ($batbit) {
-      readingsBulkUpdate($def, "Battery", "Low");
-    } else {
-      readingsBulkUpdate($def, "Battery", "ok");
-    }
+    
     if ($mode) {
-      Log3 $def, 5, "CUL_TCM97001 Mode: manual triggert";
+      Log3 $name, 5, "CUL_TCM97001 Mode: manual triggert";
     } else {
-      Log3 $def, 5, "CUL_TCM97001 Mode: auto triggert";
+      Log3 $name, 5, "CUL_TCM97001 Mode: auto triggert";
     }
     if ($unknown) {
-        Log3 $def, 5, "CUL_TCM97001 Unknown Bit: $unknown";
+        Log3 $name, 5, "CUL_TCM97001 Unknown Bit: $unknown";
     }
     my $debug = "TEMP:$val°C BATT:";
     if ($batbit) {
@@ -148,8 +202,11 @@ CUL_TCM97001_Parse($$)
     my @list = unpack("(A4)*", unpack ('B*', pack ('H*',$a[0].$a[1].$a[2].$a[3].$a[4].$a[5])));
     my $string = join(" ", @list);
     $debug = $debug . $string;
-    Log3 $def, 5, "CUL_TCM97001 DEBUG: $debug";
-    readingsEndUpdate($def, 1);
+    Log3 $name, 5, "CUL_TCM97001 DEBUG: $debug";
+
+    $packageOK = TRUE;
+    $hasbatcheck = TRUE;
+    $model="TCM97...";
   } elsif (length($msg) == 12) { 
     # Long with tmp
     # All nibbles must be reversed  
@@ -160,23 +217,22 @@ CUL_TCM97001_Parse($$)
     # D+E+F Temp 
     # G+H Hum
     my $bin = undef;
+    $hashumidity = TRUE;
+    my $readedModel = AttrVal($name, "model", undef);
 
-    my @a = split("", $msg);
-    my $bitReverse = undef;
-    my $x = undef;
-    foreach $x (@a) {
-       my $bin3=sprintf("%04b",hex($x));
-      $bitReverse = $bitReverse . reverse($bin3); 
-    }
-    my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
+    if (checkCRC($msg) == TRUE && (!$readedModel || $readedModel eq "TCM21....")) {
+        Log3 $name, 5, "CUL_TCM97001: CRC OK";
+        my @a = split("", $msg);
+        my $bitReverse = undef;
+        my $x = undef;
+        foreach $x (@a) {
+           my $bin3=sprintf("%04b",hex($x));
+          $bitReverse = $bitReverse . reverse($bin3); 
+        }
+        my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
 
-    #Split reversed a again
-    my @aReverse = split("", $hexReverse);
-
-    my $CRC = (hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])
-              +hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
-    if ($CRC + hex($aReverse[8]) == 15) {
-        Log3 $def, 5, "CUL_TCM97001: CRC OK";
+        #Split reversed a again
+        my @aReverse = split("", $hexReverse);
         my $temp = undef;
         if (hex($aReverse[5]) > 3) {
            # negative temp
@@ -186,20 +242,19 @@ CUL_TCM97001_Parse($$)
            $temp = (hex($aReverse[3]) + hex($aReverse[4]) * 16 + hex($aReverse[5]) * 256)/10;
         }
 
-        $def->{lastT} = $now;
+        if($def) {
+          $def->{lastT} = $now;
+        } 
         my $humidity = hex($aReverse[7]).hex($aReverse[6]);
 
-        $msgtype = "humidity";
-        $val = $humidity;
-        readingsBeginUpdate($def);
-        readingsBulkUpdate($def, $msgtype, $val);
+        $msgtypeH = "humidity";
+        $valH = $humidity;
 
         $msgtype = "temperature";
         $val = sprintf("%2.1f", ($temp) );
-        readingsBulkUpdate($def, $msgtype, $val);
+
         Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val H: $humidity"; 
 
-        my $state="";
         my $t = ReadingsVal($name, "temperature", undef);
         my $h = ReadingsVal($name, "humidity", undef);
         if(defined($t) && defined($h)) {
@@ -207,27 +262,17 @@ CUL_TCM97001_Parse($$)
 
         } elsif(defined($t)) {
           $state="T: $t";
-
         } elsif(defined($h)) {
           $state="H: $h";
+        }        
 
-        }
+        $batbit = hex($aReverse[2]) & 1;
+        $mode = (hex($aReverse[2]) & 8) >> 3;
 
-        readingsBulkUpdate($def, "state", $state);
-        
-
-        my $batbit = hex($aReverse[2]) & 1;
-        my $mode = (hex($aReverse[2]) & 8) >> 3;
-
-        if ($batbit) {
-          readingsBulkUpdate($def, "Battery", "Low");
-        } else {
-          readingsBulkUpdate($def, "Battery", "ok");
-        }
         if ($mode) {
-          Log3 $def, 5, "CUL_TCM97001 Mode: manual triggert";
+          Log3 $name, 5, "CUL_TCM97001 Mode: manual triggert";
         } else {
-          Log3 $def, 5, "CUL_TCM97001 Mode: auto triggert";
+          Log3 $name, 5, "CUL_TCM97001 Mode: auto triggert";
         }
         my $debug = "TEMP:$val°C HUM:$humidity :BATT:";
         if ($batbit) {
@@ -238,15 +283,134 @@ CUL_TCM97001_Parse($$)
         $debug = $debug . " HEX:0x";
         $debug = $debug . $hexReverse;
         $debug = $debug . " BIN:$bitReverse";
-        Log3 $def, 5, "CUL_TCM97001 DEBUG: $debug";
-        readingsEndUpdate($def, 1);
+        Log3 $name, 5, "CUL_TCM97001 DEBUG: $debug";
+        
+        $packageOK = TRUE;
+        $hasbatcheck = TRUE;
+        $model="TCM21....";
     } else {
-        Log3 $def, 5, "CUL_TCM97001: CRC Failed";
+        Log3 $name, 4, "CUL_TCM97001: CRC for TCM21.... Failed, checking other protocolls";
+        # Check for GT-WT-01
+        if (hex($a[0]) == 0x9) {
+          $model="GT-WT-..";
+          # Protocol prologue start everytime with 1001
+          # e.g. 91080F614C	    1001 0001 0000 1000 0000 1111 0110 0001 0100 1100
+          #                      A    B    C    D    E    F    G    H    I
+          # A = Startbit 1001
+          # B+C = Random Address
+          # D Bit 4 Battery, 3 Manual, 2+1 Channel 
+          # E+F+G Bit 15+16 negativ temp, 14-0 temp
+          # H+I Hum
+
+          my $temp    = (hex($a[4].$a[5].$a[6])) & 0x3FFF;  
+          my $negative    = (hex($a[4])) & 0xC; 
+
+          if ($negative == 0xC) {
+            $temp = (~$temp & 0x03FF) + 1;
+            $temp = -$temp;
+          }
+          $temp = $temp / 10;
+
+          if($def2) {
+            $def2->{lastT} = $now;
+          }
+          $msgtype = "temperature";
+          $val = sprintf("%2.1f", ($temp) );
+
+          my $humidity=undef;
+          if (hex($a[7]) != 0xC && hex($a[8]) != 0xC) {
+            $hashumidity = TRUE;
+            $humidity = hex($a[7].$a[8]);
+
+            $msgtypeH = "humidity";
+            $valH = $humidity;
+          }
+
+          Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id4 T: $val H: $humidity"; 
+        
+          my $t = ReadingsVal($name, "temperature", undef);
+          my $h = ReadingsVal($name, "humidity", undef);
+          if(defined($t) && defined($h)) {
+            $state="T: $t H: $h";
+          } elsif(defined($t)) {
+            $state="T: $t";
+          } elsif(defined($h)) {
+            $state="H: $h";
+          }
+
+          $batbit = (hex($a[3]) & 0x8) >> 3;
+          $mode = (hex($a[2]) & 0x4) >> 2;
+          $hasbatcheck = TRUE;
+          $packageOK = TRUE;
+      } elsif (hex($a[2]) == 0x8) {
+          $model="Rubicson";
+          # Protocol Rubicson has as nibble C every time 1000
+          # e.g. F4806B8E14	    1111 0100 1000 0000 0110 1011 1000 1110	0001 0100
+          #                      A    B    C    D    E    F    G    H    I
+          # A+B = Random Address
+          # C = Rubicson = 1000
+          # D+E+F 12 bit temp
+          # G+H+I Unknown
+          my $temp    = (hex($a[3].$a[4].$a[5])) & 0x3FFF;  
+          my $negative    = (hex($a[3])) & 0xC; 
+
+          if ($negative == 0xC) {
+            $temp = (~$temp & 0x03FF) + 1;
+            $temp = -$temp;
+          }
+          $temp = $temp / 10;
+
+          if($def) {
+            $def->{lastT} = $now;
+          }
+          $msgtype = "temperature";
+          $val = sprintf("%2.1f", ($temp) );
+
+          Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val"; 
+          my $t = ReadingsVal($name, "temperature", undef);
+
+          if(defined($t)) {
+            $state="T: $t";
+          }
+          $packageOK = TRUE;
+      }
     }
-
   }
+  
+  if ($packageOK == TRUE) {
+    if(!$def && !$def2) {
+      if ($model eq "GT-WT-..") {
+        Log3 $name, 2, "CUL_TCM97001 Unknown device $id4, please define it";
+        return "UNDEFINED CUL_TCM97001_$id4 CUL_TCM97001 $id4" if(!$def2); 
+      } else {
+        Log3 $name, 2, "CUL_TCM97001 Unknown device $id3, please define it";
+        return "UNDEFINED CUL_TCM97001_$id3 CUL_TCM97001 $id3" if(!$def); 
+      }
+    }
+    if ($model eq "GT-WT-..") {
+      $def = $def2;
+    }
+    readingsBeginUpdate($def);
+    readingsBulkUpdate($def, "state", $state);
+    $attr{$name}{model} = $model;
+    if ($hasbatcheck) {
+      if ($batbit) {
+        readingsBulkUpdate($def, "battery", "Low");
+      } else {
+        readingsBulkUpdate($def, "battery", "ok");
+      }
+    }
+    readingsBulkUpdate($def, $msgtype, $val);
+    if ($hashumidity == TRUE) {
+      readingsBulkUpdate($def, $msgtypeH, $valH);
+    }
+    readingsEndUpdate($def, 1);
+    return $name;
+  }
+  Log3 $name, 4, "CUL_TCM97001 Device not interpreted yet name $name msg $msg";
 
-  return $name;
+
+  return undef;
 }
 
 1;
@@ -258,7 +422,7 @@ CUL_TCM97001_Parse($$)
 <a name="CUL_TCM97001"></a>
 <h3>CUL_TCM97001</h3>
 <ul>
-  The CUL_TCM97001 module interprets temperature messages of TCM 97001 sensor received by the CUL.<br>
+  The CUL_TCM97001 module interprets temperature messages of TCM 97xxx, TCM 21xxxx, GT-WT-xx and Rubicson sensor received by the CUL.<br>
   <br>
   New received device packages are add in fhem category CUL_TCM97001 with autocreate.
   <br><br>
@@ -271,7 +435,7 @@ CUL_TCM97001_Parse($$)
   <ul>
      <li>temperature: $temp</li>
      <li>humidity: $hum</li>
-     <li>Battery: $bat</li>
+     <li>battery: $bat</li>
   </ul>
   <br>
 
