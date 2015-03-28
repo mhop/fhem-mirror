@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.1
+# Version: 1.0.2
 #
 # Version History:
 # - 1.0.0 - 2015-03-11
@@ -126,7 +126,7 @@ sub RESIDENTStk_wakeupSet($$) {
 ##=============================================================================\
 ## This is an example wake-up program running within a period of 30 minutes:\
 ## - drive shutters upwards slowly\
-## - light up a HUE bulb from 2000K to 6500K\
+## - light up a HUE bulb from 2000K to 5600K\
 ## - have some voice notifications via SONOS\
 ## - have some wake-up chill music via SONOS during program run\
 ##\
@@ -159,8 +159,8 @@ for (my \$i=1;; \$i <= 10;; \$i++) {\
 if (\$EVTPART0 eq \"start\") {\
 	Log3 \$NAME, 3, \"\$NAME: Wake-up program started for \$EVTPART4 with target time \$EVTPART1\";;\
 \
-#	fhem \"set BR_FloorLamp:FILTER=onoff=0 pct 1 : ct 2000 : transitiontime 0;; set BR_FloorLamp:FILTER=pct=1 pct 90 : ct 5600 : transitiontime 1770\";;\
-\
+#	fhem \"set BR_FloorLamp:FILTER=onoff=0 pct 1 : ct 2000 : transitiontime 0;; set BR_FloorLamp:FILTER=pct=1 pct 90 : ct 5600 : transitiontime 17700\";;\
+\	
 #	fhem \"define atTmp_1_\$NAME at +00:10:00 set BR_Shutter:FILTER=pct<20 pct 20\";;\
 #	fhem \"define atTmp_2_\$NAME at +00:20:00 set BR_Shutter:FILTER=pct<40 pct 40\";;\
 #	fhem \"define atTmp_4_\$NAME at +00:30:00 set Sonos_Bedroom Speak 33 de |Hint| Es ist \".\$EVTPART1.\" Uhr, Zeit zum aufstehen!;;;; set BR_FloorLamp:FILTER=pct<100 pct 100 60;;;; sleep 10;;;; set BR_Shutter:FILTER=pct<60 pct 60;;;; set Sonos_Bedroom:FILTER=Volume<10 Volume 10 10\";;\
@@ -294,7 +294,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new macro device $macroNameGotosleep created";
+              "RESIDENTStk $NAME: new notify macro device $macroNameGotosleep created";
             fhem
 "define $macroNameGotosleep notify $macroNameGotosleep $templateGotosleep";
             fhem
@@ -365,7 +365,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new macro device $macroNameAsleep created";
+              "RESIDENTStk $NAME: new notify macro device $macroNameAsleep created";
             fhem
               "define $macroNameAsleep notify $macroNameAsleep $templateAsleep";
             fhem
@@ -431,7 +431,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new macro device $macroNameAwoken created";
+              "RESIDENTStk $NAME: new notify macro device $macroNameAwoken created";
             fhem
               "define $macroNameAwoken notify $macroNameAwoken $templateAwoken";
             fhem
@@ -501,7 +501,7 @@ if (\$EVTPART0 eq \"stop\") {\
 ##\
 \
 ## In 10 seconds, turn off lights in unused rooms using structures\
-#fhem \"sleep 10; set g_LR_Lights,g_KT_Lights [FILTER=state!=off] off\";;\
+#fhem \"sleep 10;; set g_LR_Lights,g_KT_Lights [FILTER=state!=off] off\";;\
 \
 \
 ##-----------------------------------------------------------------------------\
@@ -514,7 +514,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new macro device $macroRNameGotosleep created";
+"RESIDENTStk $NAME: new notify macro device $macroRNameGotosleep created";
                 fhem
 "define $macroRNameGotosleep notify $macroRNameGotosleep $templateGotosleep";
                 fhem
@@ -571,7 +571,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new macro device $macroRNameAsleep created";
+"RESIDENTStk $NAME: new notify macro device $macroRNameAsleep created";
                 fhem
 "define $macroRNameAsleep notify $macroRNameAsleep $templateAsleep";
                 fhem
@@ -588,7 +588,7 @@ if (\$EVTPART0 eq \"stop\") {\
 "define $wdRNameAsleep watchdog $deviceName:asleep 00:00:03 $deviceName:(home|absent|gone|none|gotosleep|awoken) trigger $macroRNameAsleep";
                 fhem
 "attr $wdRNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
-                fhem "attr $wdNameAsleep room $room"
+                fhem "attr $wdRNameAsleep room $room"
                   if ($room);
             }
 
@@ -631,7 +631,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
                 Log3 $NAME, 3,
-"RESIDENTStk $NAME: new macro device $macroRNameAwoken created";
+"RESIDENTStk $NAME: new notify macro device $macroRNameAwoken created";
                 fhem
 "define $macroRNameAwoken notify $macroRNameAwoken $templateAwoken";
                 fhem
