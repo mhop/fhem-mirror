@@ -2,9 +2,11 @@
 # InterTechno Switch Manager as FHM-Module
 #
 # (c) Olaf Droegehorn / DHS-Computertechnik GmbH
+# (c) Björn Hempel
 # 
 # Published under GNU GPL License
-######################################################package main;
+######################################################
+package main;
 
 # $Id$
 
@@ -550,10 +552,14 @@ IT_Parse($$)
     }
     if ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
       $newstate="on";
-      readingsSingleUpdate($def->{$name},"dim",1,1);
+      if( AttrVal($name, "model", "") eq "itdimmer" ) {
+        readingsSingleUpdate($def->{$name},"dim",1,1);
+      }
     } elsif ($def->{$name}->{$it_c2b{"off"}} eq lc($onoffcode)) {
       $newstate="off";
-      readingsSingleUpdate($def->{$name},"dim",0,1);
+      if( AttrVal($name, "model", "") eq "itdimmer" ) {
+        readingsSingleUpdate($def->{$name},"dim",0,1);
+      }
     } elsif ('d' eq lc($onoffcode)) {
       # dim
       my $binVal = ((bin2dec($dimCode)+1)*100)/16;
