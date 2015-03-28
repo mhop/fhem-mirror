@@ -57,6 +57,44 @@ HUEBridge_Read($@)
 }
 
 sub
+HUEBridge_Detect($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "HUEBridge_Detect";
+
+  my ($err,$ret) = HttpUtils_BlockingGet({
+    url => "http://www.meethue.com/api/nupnp",
+    method => "GET",
+  });
+
+  if( defined($err) && $err ) {
+    Log3 $name, 3, "HUEBridge_Detect: error detecting bridge: ".$err;
+    return;
+  }
+
+  my $host = '';
+  if( defined($ret) && $ret ne '' && $ret =~ m/^[\[{].*[\]}]$/ ) {
+    my $obj = from_json($ret);
+
+    if( defined($obj->[0])
+        && defined($obj->[0]->{'internalipaddress'}) ) {
+      $host = $obj->[0]->{'internalipaddress'};
+    }
+  }
+
+  if( !defined($host) || $host eq '' ) {
+    Log3 $name, 3, 'HUEBridge_Detect: error detecting bridge.';
+    return;
+  }
+
+  Log3 $name, 3, "HUEBridge_Detect: ${host}";
+  $hash->{Host} = $host;
+
+  return $host;
+}
+
+sub
 HUEBridge_Define($$)
 {
   my ($hash, $def) = @_;
@@ -68,23 +106,8 @@ HUEBridge_Define($$)
   my ($name, $type, $host, $interval) = @args;
 
   if( !defined($host) ) {
-    my $ret = HUEBridge_HTTP_Request(0,"http://www.meethue.com/api/nupnp","GET",undef,undef,undef);
-
-    if( defined($ret) && $ret ne '' && $ret =~ m/^[\[{].*[\]}]$/ )
-      {
-        my $obj = from_json($ret);
-
-        if( defined($obj->[0])
-            && defined($obj->[0]->{'internalipaddress'}) ) {
-          }
-        $host = $obj->[0]->{'internalipaddress'};
-      }
-
-    if( !defined($host) ) {
-      return 'error detecting bridge.';
-    }
-
-    $hash->{DEF} = $host;
+    $hash->{NUPNP} = 1;
+    HUEBridge_Detect($hash);
   }
 
   $interval= 300 unless defined($interval);
@@ -138,6 +161,8 @@ sub HUEBridge_Undefine($$)
 sub HUEBridge_OpenDev($)
 {
   my ($hash) = @_;
+
+  HUEBridge_Detect($hash) if( defined($hash->{NUPNP}) );
 
   my $result = HUEBridge_Call($hash, undef, 'config', undef);
   if( !defined($result) ) {
@@ -529,11 +554,23 @@ HUEBridge_Call($$$$;$)
   my $json = undef;
   $json = encode_json($obj) if $obj;
 
-  if( !defined($attr{$name}{httpUtils}) ) {
-    return HUEBridge_HTTP_Call($hash,$path,$json,$method);
-  } else {
-    return HUEBridge_HTTP_Call2($hash,$chash,$path,$json,$method);
+  # @TODO: repeat twice?
+
+  for (my $attempt=0; $attempt<2; $attempt++) {
+    my $res = undef;
+    if( !defined($attr{$name}{httpUtils}) ) {
+      $res = HUEBridge_HTTP_Call($hash,$path,$json,$method);
+    } else {
+      $res = HUEBridge_HTTP_Call2($hash,$chash,$path,$json,$method);
+    }
+    if( defined($res) ) {
+      return $res;
+    }
+    Log3 $name, 3, "HUEBridge_Call: failed, retrying";
+    HUEBridge_Detect($hash);
   }
+  Log3 $name, 3, "HUEBridge_Call: failed";
+  return undef;
 }
 
 #JSON RPC over HTTP
