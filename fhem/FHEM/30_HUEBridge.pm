@@ -108,6 +108,8 @@ HUEBridge_Define($$)
   if( !defined($host) ) {
     $hash->{NUPNP} = 1;
     HUEBridge_Detect($hash);
+  } else {
+    delete $hash->{NUPNP};
   }
 
   $interval= 300 unless defined($interval);
@@ -555,20 +557,23 @@ HUEBridge_Call($$$$;$)
   $json = encode_json($obj) if $obj;
 
   # @TODO: repeat twice?
-
-  for (my $attempt=0; $attempt<2; $attempt++) {
+  for( my $attempt=0; $attempt<2; $attempt++ ) {
+    my $blocking;
     my $res = undef;
     if( !defined($attr{$name}{httpUtils}) ) {
+      $blocking = 1;
       $res = HUEBridge_HTTP_Call($hash,$path,$json,$method);
     } else {
+      $blocking = $attr{$name}{httpUtils} < 1;
       $res = HUEBridge_HTTP_Call2($hash,$chash,$path,$json,$method);
     }
-    if( defined($res) ) {
-      return $res;
-    }
+
+    return $res if( !$blocking || defined($res) );
+
     Log3 $name, 3, "HUEBridge_Call: failed, retrying";
     HUEBridge_Detect($hash);
   }
+
   Log3 $name, 3, "HUEBridge_Call: failed";
   return undef;
 }
