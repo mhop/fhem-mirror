@@ -925,6 +925,7 @@ AnalyzeCommand($$;$)
 {
   my ($cl, $cmd, $allowed) = @_;
 
+  $cmd = "" if(!defined($cmd)); # Forum #29963
   $cmd =~ s/^(\n|[ \t])*//;# Strip space or \n at the begginning
   $cmd =~ s/[ \t]*$//;
 
