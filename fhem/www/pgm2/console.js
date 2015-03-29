@@ -46,7 +46,7 @@ consStart()
 {
   var el = document.getElementById("console");
 
-  consFilter = el.getAttribute("filter");
+  consFilter = $("a#eventFilter").html();
   if(consFilter == undefined)
     consFilter = ".*";
   consTxt = el.innerHTML;
