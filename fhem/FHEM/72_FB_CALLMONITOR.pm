@@ -480,16 +480,6 @@ FB_CALLMONITOR_reverseSearch($$)
     
     chomp $number;
 
-    # Using internal phonebook if available and enabled
-    if((grep { /^(all|phonebook|internal)$/ } @attr_list) and defined($hash->{helper}{PHONEBOOK}))
-    {
-        if(defined($hash->{helper}{PHONEBOOK}{$number}))
-        {
-            Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
-            return $hash->{helper}{PHONEBOOK}{$number};
-        }
-    }
-
     # Using Cache if enabled
     if(AttrVal($name, "reverse-search-cache", "0") eq "1")
     {
@@ -500,6 +490,16 @@ FB_CALLMONITOR_reverseSearch($$)
             {
                 return $hash->{helper}{CACHE}{$number};
             }
+        }
+    }
+    
+    # Using internal phonebook if available and enabled
+    if((grep { /^(all|phonebook|internal)$/ } @attr_list) and defined($hash->{helper}{PHONEBOOK}))
+    {
+        if(defined($hash->{helper}{PHONEBOOK}{$number}))
+        {
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
+            return $hash->{helper}{PHONEBOOK}{$number};
         }
     }
 
