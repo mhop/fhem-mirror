@@ -101,7 +101,7 @@ foreach my $lang (@lang) {
     print "*** $lang $mods{$mod}: ignoring text due to DOS encoding\n"
         if($dosMode);
     print "*** $lang $mods{$mod}: No document text found\n"
-        if(!$suffix && !$docCount && !$dosMode);
+        if(!$suffix && !$docCount && !$dosMode && $mods{$mod} !~ m,/99_,);
     if($suffix && !$docCount && !$dosMode) {
       if($lang eq "DE") {
         print OUT << "EOF";
