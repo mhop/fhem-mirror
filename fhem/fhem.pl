@@ -3820,8 +3820,9 @@ fhemTzOffset($)
 
   # the offset is positive if the local timezone is ahead of GMT, e.g. we get
   # 2*3600 seconds for CET DST vs GMT
-  return 60*(($l[2] - $g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24)*
-             60 + $l[1] - $g[1]);
+  return 60*(($l[2] - $g[2] + 
+            ((($l[5] << 9)|$l[7]) <=> (($g[5] << 9)|$g[7])) * 24)*60 +
+            $l[1] - $g[1]);
 }
 
 sub
