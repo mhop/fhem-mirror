@@ -183,12 +183,24 @@ sub RESIDENTS_Notify($$) {
                 if ( $change !~ /:/ ) {
 
                     # get user realname
-                    my $realnamesrc = (
-                        defined( $attr{$devName}{rr_realname} )
-                          && $attr{$devName}{rr_realname} ne ""
-                        ? $attr{$devName}{rr_realname}
-                        : "group"
-                    );
+                    my $realnamesrc;
+                    if ( $dev->{TYPE} eq "GUEST" ) {
+                        $realnamesrc = (
+                            defined( $attr{$devName}{rg_realname} )
+                              && $attr{$devName}{rg_realname} ne ""
+                            ? $attr{$devName}{rg_realname}
+                            : "alias"
+                        );
+                    }
+                    else {
+                        $realnamesrc = (
+                            defined( $attr{$devName}{rr_realname} )
+                              && $attr{$devName}{rr_realname} ne ""
+                            ? $attr{$devName}{rr_realname}
+                            : "group"
+                        );
+                    }
+
                     my $realname = (
                         defined( $attr{$devName}{$realnamesrc} )
                           && $attr{$devName}{$realnamesrc} ne ""
