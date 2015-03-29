@@ -58,11 +58,11 @@ my $curReadingType = 0;
   my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
       ,["relative Feuchte", "humidity", 1]
       ,["Sichtweite", "visibility", 1]
-      ,["Windrichtung", "winddir", 10]
+      ,["Windrichtung", "windDir", 10]
       ,["Windgeschwindigkeit", "wind", 1]
       ,["Luftdruck", "pressure", 1]
       ,["Taupunkt", "dewPoint", 1]
-      ,["Uhrzeit", "obs_time", 6]
+      ,["Uhrzeit", "obsTime", 6]
       ,["Höhe der", "cloudBase", 8]
   );
 
@@ -993,7 +993,7 @@ PROPLANTA_Html($)
       <li><b>temperature</b> - Temperature in &deg;C</li>
       <li><b>visibility</b> - Sichtweite in km</li>
       <li><b>wind</b> - Windgeschwindigkeit in km/h</li>
-      <li><b>winddir</b> - Windrichtung in &deg;</li>
+      <li><b>windDir</b> - Windrichtung in &deg;</li>
    </ul>
    <br><br>
 </ul>
