@@ -3768,9 +3768,10 @@ readingsBulkUpdate($$$@)
         #Debug "TimeSeries created.";
       }
       my $now = $hash->{".updateTime"};
-      $changed= $ts->elapsed($now);
-      $value= $ts->{$function} if($changed);
-      $ts->add($now, $value); 
+      my $val = $value; # save value
+      $changed = $ts->elapsed($now);
+      $value = $ts->{$function} if($changed);
+      $ts->add($now, $val); 
     } else {
       # If no event-aggregator attribute, then remove stale series if any.
       delete $readings->{".ts"};
