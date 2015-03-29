@@ -51,12 +51,14 @@ my $curReadingType = 0;
   #   4 = Intensity-Text Col 2-5
   #   5 = Time Col 2-5
   #   6 = Time Col 3
-  #   7 = Image Col 2-5
+  #   7 = alternative text of image Col 2-5 (weather state)
   #   8 = MinMaxNummer Col 3
   #   9 = Date Col 2-5
+  #   10 = alternative text of Col 3 (Wind direction)
   my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
       ,["relative Feuchte", "humidity", 1]
       ,["Sichtweite", "visibility", 1]
+      ,["Windrichtung", "winddir", 10]
       ,["Windgeschwindigkeit", "wind", 1]
       ,["Luftdruck", "pressure", 1]
       ,["Taupunkt", "dewPoint", 1]
@@ -114,14 +116,6 @@ my $curReadingType = 0;
       ,["BD_15", "cloud15", 2]
       ,["BD_18", "cloud18", 2]
       ,["BD_21", "cloud21", 2]
-      ,["WGRAD_0", "winddir00", 2]
-      ,["WGRAD_3", "winddir03", 2]
-      ,["WGRAD_6", "winddir06", 2]
-      ,["WGRAD_9", "winddir09", 2]
-      ,["WGRAD_12", "winddir12", 2]
-      ,["WGRAD_15", "winddir15", 2]
-      ,["WGRAD_18", "winddir18", 2]
-      ,["WGRAD_21", "winddir21", 2]
       ,["MA", "moonRise", 5]
       ,["MU", "moonSet", 5]
   );
@@ -133,6 +127,24 @@ my $curReadingType = 0;
      ,"ja" => 1
      ,"m&auml;&szlig;ig" => 2
      ,"stark" => 3
+  );
+
+  my %winddir = ( "Nord" => 0
+     ,"Nord-Nordost" => 23
+     ,"Nordost" => 45
+     ,"Ost-Nordost" => 68
+     ,"Ost" => 90
+     ,"Ost-Südost" => 113
+     ,"Südost" => 135
+     ,"Süd-Südost" => 158
+     ,"Süd" => 180
+     ,"Süd-Südwest" => 203
+     ,"Südwest" => 225
+     ,"West-Südwest" => 248
+     ,"West" => 270
+     ,"Nord-Nordwest" => 203
+     ,"Nordwest" => 225
+     ,"Nord-Nordwest" => 248
   );
   
 sub 
@@ -326,7 +338,7 @@ sub start
    {
       if ( 2 <= $curCol && $curCol <= 5 )
       {
-       # Alternativer text
+       # process alternative text
          $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
          $text = $attr->{alt};
          $text =~ s/Wetterzustand: //;
@@ -338,6 +350,22 @@ sub start
        # Image URL
          push( @texte, $readingName."Icon" . "|" . $attr->{src} ); 
       }
+   }
+   #wind direction
+   elsif ($tagname eq "img" && $curReadingType == 10 && $curCol == 3 )
+   {
+    # process alternative text
+      $readingName = $curReadingName;
+      $text = $attr->{alt};
+      $text =~ s/Windrichtung: //;
+      $text = $winddir{$text} if defined $winddir{$text};
+      # $text =~ s/ö/oe/;
+      # $text =~ s/ä/ae/;
+      # $text =~ s/ü/ue/;
+      # $text =~ s/ß/ss/;
+      push( @texte, $readingName . "|" . $text ); 
+    # Image URL
+      push( @texte, $readingName."Icon" . "|" . $attr->{src} ); 
    }
 }
 
@@ -847,7 +875,6 @@ PROPLANTA_Html($)
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - weather situation <i>today morning|during day|in the evening|during night</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation <i>today</i> by <i>day</i></li>
-      <li><b>fc</b><i>0</i><b>_winddir</b><i>15</i> - Wind direction <i>today</i> at <i>15</i>:00 Uhr in &deg;</li>
       <li>etc.</li>
    </ul>
    <br>
@@ -952,7 +979,6 @@ PROPLANTA_Html($)
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tags&uuml;ber|abends|nachts</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tags&uuml;ber</i></li>
-      <li><b>fc</b><i>0</i><b>_winddir</b><i>15</i> - Windrichtung <i>heute</i> um <i>15</i>:00 Uhr in &deg;</li>
       <li>etc.</li>
    </ul>
    <br>
@@ -967,6 +993,7 @@ PROPLANTA_Html($)
       <li><b>temperature</b> - Temperature in &deg;C</li>
       <li><b>visibility</b> - Sichtweite in km</li>
       <li><b>wind</b> - Windgeschwindigkeit in km/h</li>
+      <li><b>winddir</b> - Windrichtung in &deg;</li>
    </ul>
    <br><br>
 </ul>
