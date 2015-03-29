@@ -1,0 +1,11 @@
+attr global statefile /users/neubert/Development/Perl/fhem-data/fhem.save   
+attr global verbose 5                  
+attr global port 7072 global 
+attr global modpath /users/neubert/Development/Perl/fhem-code/fhem
+define MyLog FileLog /users/neubert/Development/Perl/fhem-data/my.log .*
+define ui FHEMWEB 8083 global
+attr ui stylesheetPrefix dark
+attr ui room UI
+
+define T SubProcessTester
+
