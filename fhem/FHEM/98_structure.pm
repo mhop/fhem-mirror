@@ -134,7 +134,8 @@ structure_getChangedDevice($)
 }
 
 #############################
-sub structure_Notify($$)
+sub
+structure_Notify($$)
 {
   my ($hash, $dev) = @_;
   my $me = $hash->{NAME};
@@ -362,6 +363,7 @@ structure_Set($@)
     $hash->{STATE} = join(" ", @list[1..@list-1]);
 
     if( $hash->{STATE} =~ /^\[(FILTER=.*)]/ ) {
+      delete($hash->{INSET}); # Experimental, Forum #35382
       $filter = $1;
       @list = split(" ",
                     $list[0] ." ". substr($hash->{STATE}, length($filter)+2));

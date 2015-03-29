@@ -1,24 +1,39 @@
 DIR unused
 DIR www/images/default
+DIR www/images/openautomation
+DIR www/images/fhemSVG
+DIR www/images/bright
+DIR www/images/darktouchpad
 DIR www/gplot
 DIR www/pgm2
+DIR www/pgm2/images
+DIR www/jscolor
 DIR docs
 DIR FHEM/lib
-DEL FHEM/OWNet.pm
-MOV FHEM/release.* unused
-MOV FHEM/99_updatefhem.* unused
-MOV FHEM/99_CULflash.* unused
-MOV FHEM/99_JsonList.* unused
-MOV FHEM/99_backup.* unused
-MOV FHEM/99_update.* unused
-MOV FHEM/*.jpg www/images/default
-MOV FHEM/*.png www/images/default
-MOV FHEM/*.gplot www/gplot
-MOV FHEM/*.js www/pgm2
-MOV FHEM/*.svg www/pgm2
-MOV FHEM/*.css www/pgm2
-MOV FHEM/*.html docs
-MOV www/pgm2/*.gplot www/gplot
-MOV www/pgm2/*.jpg www/images/default
-MOV www/pgm2/*.png www/images/default
-MOV www/pgm2/*.html docs
+DIR FHEM/lib/Device
+DIR FHEM/lib/SWAP
+DIR FHEM/lib/SWAP/panStamp
+DIR FHEM/lib/SWAP/justme
+DIR FHEM/lib/Device/Firmata
+DIR contrib
+DIR demolog
+MOV www/pgm2/fhemweb_multiple.js unused
+MOV www/pgm2/fhemweb_noArg.js unused
+MOV www/pgm2/fhemweb_slider.js unused
+MOV www/pgm2/fhemweb_svg.js unused
+MOV www/pgm2/fhemweb_textField.js unused
+MOV www/pgm2/fhemweb_time.js unused
+MOV www/pgm2/darktouchpadsvg_defs.svg unused
+MOV www/pgm2/darktouchpadsvg_style.css unused
+MOV www/pgm2/ios6touchpadsvg_defs.svg unused
+MOV www/pgm2/ios6touchpadsvg_style.css unused
+MOV www/pgm2/ios7touchpadsvg_defs.svg unused
+MOV www/pgm2/ios7touchpadsvg_style.css unused
+MOV www/pgm2/iostouchpadsvg_defs.svg unused
+MOV www/pgm2/iostouchpadsvg_style.css unused
+MOV www/pgm2/darksmallscreensvg_defs.svg unused
+MOV www/pgm2/darksmallscreensvg_style.css unused
+MOV www/pgm2/ios7smallscreensvg_defs.svg unused
+MOV www/pgm2/ios7smallscreensvg_style.css unused
+MOV www/pgm2/iossmallscreensvg_defs.svg unused
+MOV www/pgm2/iossmallscreensvg_style.css unused
