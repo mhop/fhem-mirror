@@ -309,6 +309,7 @@ FHEM/RESIDENTStk.pm          loredo               http://forum.fhem.de Automatis
 FHEM/SetExtensions.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/SHC_datafields.pm       rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/SHC_parser.pm           rr2000               http://forum.fhem.de Sonstige Systeme
+FHEM/SubProcess.pm           borisneubert         http://forum.fhem.de FHEM Development
 FHEM/TcpServerUtils.pm       rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/TimeSeries.pm           borisneubert         http://forum.fhem.de FHEM Development
 FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstige Systeme
