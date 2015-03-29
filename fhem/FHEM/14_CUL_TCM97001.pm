@@ -1,6 +1,6 @@
 ##############################################
 # From dancer0705
-# Receive TCM 97001 like temperature sensor
+# Receive TCM 97xxx, TCM 21xxxx, GT-WT-xx and Rubicson like temperature sensor
 #
 # Copyright (C) 2015 Bjoern Hempel
 #
@@ -35,8 +35,9 @@ use constant { TRUE => 1, FALSE => 0 };
 my %models = (
     "TCM97..."    => 'TCM97...',
     "TCM21...."   => 'TCM21....',
-    "GT-WT-.."    => 'GT-WT-..',
+    "Prologue"    => 'Prologue',
     "Rubicson"    => 'Rubicson',
+    "Unknown"    => 'Unknown',
 );
 
 sub
@@ -122,18 +123,25 @@ CUL_TCM97001_Parse($$)
 
   my $def = $modules{CUL_TCM97001}{defptr}{$id3};
   my $def2 = $modules{CUL_TCM97001}{defptr}{$id4};
+  my $defUnknown = $modules{CUL_TCM97001}{defptr}{"Unknown"};
   
   my $now = time();
 
-  my $name = "UNKNOWN";
+  my $name = "Unknown";
   if($def) {
     $name = $def->{NAME};
   } elsif($def2) {
     $name = $def2->{NAME};
+  } elsif($defUnknown) {
+    $name = $defUnknown->{NAME};
   }
   
+  my $rssi;
+  my $l = length($msg);
+  $rssi = hex(substr($msg, $l-2, 2));
+  $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
 
-  Log3 $name, 4, "CUL_TCM97001 $name $id3 or $id4 ($msg) length:" . length($msg);
+  Log3 $name, 4, "CUL_TCM97001 $name $id3 or $id4 ($msg) length:" . length($msg) . " RSSI: $rssi";
 
   my ($msgtype, $msgtypeH, $val, $valH);
 
@@ -143,7 +151,7 @@ CUL_TCM97001_Parse($$)
   my $mode=undef;
   my $hashumidity = FALSE;
   my $hasbatcheck = FALSE;
-  my $model="UNKNOWN";
+  my $model="Unknown";
   
   if (length($msg) == 8) {
     # Only tmp TCM device
@@ -290,9 +298,9 @@ CUL_TCM97001_Parse($$)
         $model="TCM21....";
     } else {
         Log3 $name, 4, "CUL_TCM97001: CRC for TCM21.... Failed, checking other protocolls";
-        # Check for GT-WT-01
+        # Check for Prologue
         if (hex($a[0]) == 0x9) {
-          $model="GT-WT-..";
+          $model="Prologue";
           # Protocol prologue start everytime with 1001
           # e.g. 91080F614C	    1001 0001 0000 1000 0000 1111 0110 0001 0100 1100
           #                      A    B    C    D    E    F    G    H    I
@@ -379,7 +387,7 @@ CUL_TCM97001_Parse($$)
   
   if ($packageOK == TRUE) {
     if(!$def && !$def2) {
-      if ($model eq "GT-WT-..") {
+      if ($model eq "Prologue") {
         Log3 $name, 2, "CUL_TCM97001 Unknown device $id4, please define it";
         return "UNDEFINED CUL_TCM97001_$id4 CUL_TCM97001 $id4" if(!$def2); 
       } else {
@@ -387,7 +395,7 @@ CUL_TCM97001_Parse($$)
         return "UNDEFINED CUL_TCM97001_$id3 CUL_TCM97001 $id3" if(!$def); 
       }
     }
-    if ($model eq "GT-WT-..") {
+    if ($model eq "Prologue") {
       $def = $def2;
     }
     readingsBeginUpdate($def);
@@ -395,7 +403,7 @@ CUL_TCM97001_Parse($$)
     $attr{$name}{model} = $model;
     if ($hasbatcheck) {
       if ($batbit) {
-        readingsBulkUpdate($def, "battery", "Low");
+        readingsBulkUpdate($def, "battery", "low");
       } else {
         readingsBulkUpdate($def, "battery", "ok");
       }
@@ -405,10 +413,41 @@ CUL_TCM97001_Parse($$)
       readingsBulkUpdate($def, $msgtypeH, $valH);
     }
     readingsEndUpdate($def, 1);
+    if(defined($rssi)) {
+      $def->{RSSI} = $rssi;
+      #$addvals{RSSI} = $rssi;
+    }
     return $name;
-  }
-  Log3 $name, 4, "CUL_TCM97001 Device not interpreted yet name $name msg $msg";
+  } else {
+    Log3 $name, 4, "CUL_TCM97001 Device not interplmeted yet name $name msg $msg";
+    if (!$defUnknown) {
+      Log3 $name, 2, "CUL_TCM97001 Unknown device $name, please define it";
+      return "UNDEFINED CUL_TCM97001_$name CUL_TCM97001 $name" if(!$defUnknown); 
+    } 
 
+    $state="Code: $msg";
+
+    if ($defUnknown) {
+      $defUnknown->{lastT} = $now;
+    };
+
+    my $defSvg = $defs{"SVG_CUL_TCM97001_Unknown"}; 
+
+    if ($defSvg) {
+      CommandDelete(undef, $defSvg->{NAME});
+    }
+    $attr{$name}{model} = $model;
+    readingsBeginUpdate($defUnknown);
+    readingsBulkUpdate($defUnknown, "state", $state);
+    readingsEndUpdate($defUnknown, 1);
+    if(defined($rssi)) {
+      $defUnknown->{RSSI} = $rssi;
+    }
+    return $name;
+
+  }
+
+  
 
   return undef;
 }
