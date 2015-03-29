@@ -114,6 +114,14 @@ my $curReadingType = 0;
       ,["BD_15", "cloud15", 2]
       ,["BD_18", "cloud18", 2]
       ,["BD_21", "cloud21", 2]
+      ,["WGRAD_0", "winddir00", 2]
+      ,["WGRAD_3", "winddir03", 2]
+      ,["WGRAD_6", "winddir06", 2]
+      ,["WGRAD_9", "winddir09", 2]
+      ,["WGRAD_12", "winddir12", 2]
+      ,["WGRAD_15", "winddir15", 2]
+      ,["WGRAD_18", "winddir18", 2]
+      ,["WGRAD_21", "winddir21", 2]
       ,["MA", "moonRise", 5]
       ,["MU", "moonSet", 5]
   );
@@ -839,6 +847,7 @@ PROPLANTA_Html($)
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>today</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - weather situation <i>today morning|during day|in the evening|during night</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - icon of weather situation <i>today</i> by <i>day</i></li>
+      <li><b>fc</b><i>0</i><b>_winddir</b><i>15</i> - Wind direction <i>today</i> at <i>15</i>:00 Uhr in &deg;</li>
       <li>etc.</li>
    </ul>
    <br>
@@ -943,6 +952,7 @@ PROPLANTA_Html($)
       <li><b>fc</b><i>0</i><b>_uv</b> - UV-Index <i>heute</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Morning|Day|Evening|Night</i> - Wetterzustand <i>heute morgen|tags&uuml;ber|abends|nachts</i></li>
       <li><b>fc</b><i>0</i><b>_weather</b><i>Day</i><b>Icon</b> - Icon Wetterzustand <i>heute tags&uuml;ber</i></li>
+      <li><b>fc</b><i>0</i><b>_winddir</b><i>15</i> - Windrichtung <i>heute</i> um <i>15</i>:00 Uhr in &deg;</li>
       <li>etc.</li>
    </ul>
    <br>
