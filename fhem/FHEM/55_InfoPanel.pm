@@ -47,11 +47,12 @@
 # 2015-02-24 - 8092 - added:   longpoll support (experimental)
 # 2015-02-25 - 8095 - changed: iframe handling for secret div
 # 2015-03-07 - 8168 - fixed:   handling for bg img (Bugzilla #8)
-# 2015-03-22 -      - added:   attribute showTime
-# 2015-03-24 -      - added:   BACK as special link to return
+# 2015-03-22 - 8268 - added:   attribute showTime
+# 2015-03-24 - 8281 - added:   BACK as special link to return
 #                              to $FW_httpheader{Referer}
 #                     changed: limit refresh to at least 60 secs
 #                              to prevent performance issues
+# 2015-03-29 - 8334 - changed: commandref updated
 #
 ##############################################
 # $Id$
@@ -1299,7 +1300,7 @@ sub btIP_evalLayout {
    
 ##################
 #
-# here we answer any request to http://host:port/fhem/rss and below
+# here we answer any request to http://host:port/fhem/btip
 #
 
 sub btIP_addExtension {
@@ -1544,7 +1545,9 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 	<b>Attributes</b><br/><br/>
 	<ul>
 		<li><b>autoreread</b> - disables automatic layout reread after edit if set to 1</li>
-		<li><b>refresh</b> - time (in seconds) after which the HTML page will be reloaded automatically</li>
+		<li><b>refresh</b> - time (in seconds) after which the HTML page will be reloaded automatically.<br/>
+	        Any values below 60 seconds will not become valid.</li>
+		<li><b>showTime</b> - disables generation timestamp in state if set to 0</li>
 		<li><b>size</b> - The dimensions of the picture in the format
             <code>&lt;width&gt;x&lt;height&gt;</code></li>
 		<li><b>title</b> - webpage title to be shown in Browser</li>
