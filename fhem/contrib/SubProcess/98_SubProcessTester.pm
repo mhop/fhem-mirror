@@ -67,9 +67,13 @@ sub onRun($) {
   my $subprocess= shift;
   my $parent= $subprocess->parent();
   Log3 undef, 1,  "RUN RUN RUN RUN...";
+  my $foobar= $subprocess->{foobar};
   for(my $i= 0; $i< 10; $i++) {
     #Log3 undef, 1, "Step $i";
-    print $parent "$i\n";
+    # here we write something to the parent process
+    # this is received via the global select loop
+    # and evaluated in the ReadFn.
+    print $parent "$foobar $i\n";
     $parent->flush();
     sleep 5;
   }
@@ -122,6 +126,7 @@ sub SubProcessTester_DoInit($) {
   $hash->{fhem}{subprocess}= undef;
   
   my $subprocess= SubProcess->new( { onRun => \&onRun, onExit => \&onExit } );
+  $subprocess->{foobar}= "foo / bar";
   my $pid= $subprocess->run();
   return unless($pid);
 
@@ -168,6 +173,8 @@ sub SubProcessTester_Read($) {
   
   my $subprocess= $hash->{fhem}{subprocess};
   
+  # here we read from the global select loop what was
+  # written in the onRun function
   my ($bytes, $result);
   $bytes= sysread($subprocess->child(), $result, 1024*1024);
   if(defined($bytes)) {
