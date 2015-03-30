@@ -665,7 +665,7 @@ Examples:
    <br>
 Examples:
     <ul>
-      <code>define IT myITSwitch IT 00111100110101010110011111 0 0000</code>
+      <code>define myITSwitch IT 00111100110101010110011111 0 0000</code>
     </ul>
     
   </ul>
@@ -882,7 +882,7 @@ Beispiele:
 
     Beispiele:
     <ul>
-      <code>define IT myITSwitch IT 00111100110101010110011111 0 0000</code>
+      <code>define myITSwitch IT 00111100110101010110011111 0 0000</code>
     </ul>
   </ul>
   <br>
