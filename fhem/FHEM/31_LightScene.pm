@@ -495,9 +495,12 @@ LightScene_SaveDevice($$)
     } elsif( $subtype eq "dimmer" ) {
       $state = "bri ". ReadingsVal($d,'bri',"0");
     } elsif( $subtype =~ m/color|ct/ ) {
-      if( ReadingsVal($d,"colormode","") eq "ct" ) {
+      my $cm = ReadingsVal($d,"colormode","");
+      if( $cm eq "ct" ) {
         ReadingsVal($d,"ct","") =~ m/(\d+) .*/;
         $state = "bri ". ReadingsVal($d,'bri',"0") ." : ct ". $1;
+      } elsif( $cm eq "hs" ) {
+        $state = "bri ". ReadingsVal($d,'bri',"0") ." : hue ". ReadingsVal($d,'hue',"") ." : sat ". ReadingsVal($d,'sat',"");
       } else {
         $state = "bri ". ReadingsVal($d,'bri',"0") ." : xy ". ReadingsVal($d,'xy',"");
       }
