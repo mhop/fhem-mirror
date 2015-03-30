@@ -52,6 +52,7 @@ use constant {
 
 use constant {
   CPU_FREQ     => "cpu_freq",
+  CPU0_FREQ     => "cpu0_freq",
   CPU1_FREQ     => "cpu1_freq",
   CPU2_FREQ     => "cpu2_freq",
   CPU3_FREQ     => "cpu3_freq",
@@ -61,7 +62,23 @@ use constant {
   CPU7_FREQ     => "cpu7_freq",
   CPU_BOGOMIPS => "cpu_bogomips",
   CPU_TEMP     => "cpu_temp",
+  CPU0_TEMP     => "cpu0_temp",
+  CPU1_TEMP     => "cpu1_temp",
+  CPU2_TEMP     => "cpu2_temp",
+  CPU3_TEMP     => "cpu3_temp",
+  CPU4_TEMP     => "cpu4_temp",
+  CPU5_TEMP     => "cpu5_temp",
+  CPU6_TEMP     => "cpu6_temp",
+  CPU7_TEMP     => "cpu7_temp",
   CPU_TEMP_AVG => "cpu_temp_avg",
+  CPU0_TEMP_AVG => "cpu0_temp_avg",
+  CPU1_TEMP_AVG => "cpu1_temp_avg",
+  CPU2_TEMP_AVG => "cpu2_temp_avg",
+  CPU3_TEMP_AVG => "cpu3_temp_avg",
+  CPU4_TEMP_AVG => "cpu4_temp_avg",
+  CPU5_TEMP_AVG => "cpu5_temp_avg",
+  CPU6_TEMP_AVG => "cpu6_temp_avg",
+  CPU7_TEMP_AVG => "cpu7_temp_avg",
   LOADAVG      => "loadavg"
 };
 
@@ -228,22 +245,28 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{+DATE}               = "Date";
   $rMap->{+CPU_BOGOMIPS}       = "BogoMIPS";
   if(SYSMON_isCPUFreqRPiBBB($hash)) {
-    #$rMap->{"cpu_freq"}       = "CPU Frequenz";
-    $rMap->{"cpu_freq"}        = "CPU frequency";
-    $rMap->{"cpu1_freq"}        = "CPU frequency (second core)";
-    $rMap->{"cpu2_freq"}        = "CPU frequency (core 3)";
-    $rMap->{"cpu3_freq"}        = "CPU frequency (core 4)";
-    $rMap->{"cpu4_freq"}        = "CPU frequency (core 5)";
-    $rMap->{"cpu5_freq"}        = "CPU frequency (core 6)";
-    $rMap->{"cpu6_freq"}        = "CPU frequency (core 7)";
-    $rMap->{"cpu7_freq"}        = "CPU frequency (core 8)";
+    $rMap->{"cpu_freq"}       = "CPU frequency";
+    $rMap->{"cpu0_freq"}       = "CPU frequency";
+  }
+  foreach my $li (0..7) {
+    if(SYSMON_isCPUXFreq($hash, $li)) {
+      $rMap->{"cpu".$li."_freq"}        = "CPU frequency (core $li)";
+    }
   }
   if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash)) {
     #$rMap->{+CPU_TEMP}       = "CPU Temperatur";
     #$rMap->{"cpu_temp_avg"}  = "Durchschnittliche CPU Temperatur";
     $rMap->{+CPU_TEMP}        = "CPU temperature";
+    #$rMap->{"cpu0_temp"}      = "CPU temperature (core 0)";
     $rMap->{"cpu_temp_avg"}   = "Average CPU temperature";
+    #$rMap->{"cpu0_temp_avg"}   = "Average CPU temperature (core 0)";
   }
+  foreach my $li (0..7) {
+    if(SYSMON_isCPUTemp_X($hash, $li)) {
+      $rMap->{"cpu".$li."_temp"}      = "CPU temperature (core $li)";
+      $rMap->{"cpu".$li."_temp_avg"}   = "Average CPU temperature (core $li)";
+    }
+  }  
   
   if(SYSMON_isSysPowerAc($hash)) {
     #$rMap->{"power_ac_online"}  = "AC-Versorgung Status";
@@ -1081,13 +1104,18 @@ SYSMON_obtainParameters_intern($$)
       if (SYSMON_isCPUTempBBB($hash)) {
         $map = SYSMON_getCPUTemp_BBB($hash, $map);
       }
+      foreach my $li (0..7) {
+        if(SYSMON_isCPUTemp_X($hash, $li)) {
+          $map = SYSMON_getCPUTemp_X($hash, $map, $li);
+        }
+      }  
       if (SYSMON_isCPUTempFB($hash)) {
         $map = SYSMON_getCPUTemp_FB($hash, $map);
       }
-      if(SYSMON_isCPUFreqRPiBBB($hash)) {
-        $map = SYSMON_getCPUFreq($hash, $map, 0);
-      }
-      foreach my $li (1..7) {
+      #if(SYSMON_isCPUFreqRPiBBB($hash)) {
+      #  $map = SYSMON_getCPUFreq($hash, $map, 0);
+      #}
+      foreach my $li (0..7) {
         if(SYSMON_isCPUXFreq($hash, $li)) {
           $map = SYSMON_getCPUFreq($hash, $map, $li);
         }
@@ -1574,8 +1602,29 @@ SYSMON_getCPUTemp_BBB($$)
   $val = int($val);
   my $val_txt = sprintf("%.2f", $val/1000);
   $map->{+CPU_TEMP}="$val_txt";
+  $map->{"cpu0_temp"}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
-  $map->{+CPU_TEMP_AVG}="$t_avg";  
+  $map->{+CPU_TEMP_AVG}=$t_avg;  
+  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu0_temp_avg",$val_txt) + $val_txt ) / 4 );
+  $map->{"cpu0_temp_avg"}=$t_avg;  
+  return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert CPU Temperature (mehrere Kerne eines ?)
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPUTemp_X($$;$)
+{
+  my ($hash, $map, $cpuNum) = @_;
+  $cpuNum = 0 unless defined $cpuNum;
+  
+  my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp".($cpuNum+1)."_input 2>&1");
+  $val = int($val);
+  my $val_txt = sprintf("%.2f", $val/1000);
+  $map->{"cpu".$cpuNum."_temp"}="$val_txt";
+  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu".$cpuNum."_temp_avg",$val_txt) + $val_txt ) / 4 );
+  $map->{"cpu".$cpuNum."_temp_avg"}=$t_avg;  
   return $map;
 }
 
@@ -1612,10 +1661,12 @@ SYSMON_getCPUFreq($$;$)
   $val = int($val);
   my $val_txt = sprintf("%d", $val/1000);
   if($cpuNum == 0) {
+  	# aus Kompatibilitaetsgruenden
     $map->{+CPU_FREQ}="$val_txt";
-  } else {
-    $map->{"cpu".$cpuNum."_freq"}="$val_txt";
   }
+  
+  $map->{"cpu".$cpuNum."_freq"}="$val_txt";
+  
   return $map;
 }
 
@@ -3114,7 +3165,9 @@ SYSMON_isCPUFreqRPiBBB($) {
     #$hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
     # Diese abenteuerliche Konstruktion ist noetig, weil bei zu langen Zeilen ueber Telnet der Rest der Zeile als erstes Element kommt
     my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-    $hash->{helper}{sys_cpu_freq_rpi_bbb} = int($t[-1]);
+    if(defined(@t) && scalar(@t)>=1) {
+      $hash->{helper}{sys_cpu_freq_rpi_bbb} = int($t[-1]);
+    }
   }
 
   return $hash->{helper}{sys_cpu_freq_rpi_bbb};
@@ -3127,13 +3180,32 @@ sub SYSMON_isCPUTempFB($) {
 }
 
 sub
+SYSMON_isCPUTemp_X($$) {
+  my ($hash, $cpuNum) = @_;
+  
+  if(!defined $hash->{helper}{"sys_cpu".$cpuNum."_temp"}) {
+  	#/sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp2_input
+    #$hash->{helper}{"sys_cpu".$cpuNum."_temp"} = int(SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp".$cpuNum."_input ] && echo 1 || echo 0"));
+    # s. o. 
+    my @t = SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp".($cpuNum+1)."_input ] && echo 1 || echo 0");
+    if(defined(@t) && scalar(@t)>=1) {
+      $hash->{helper}{"sys_cpu".$cpuNum."_temp"} = int($t[-1]);
+    }
+  }
+
+  return $hash->{helper}{"sys_cpu".$cpuNum."_temp"};
+}
+
+sub
 SYSMON_isCPUXFreq($$) {
   my ($hash, $cpuNum) = @_;
   if(!defined $hash->{helper}{"sys_cpu".$cpuNum."_freq"}) {
     #$hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
     # s. o. 
     my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-    $hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int($t[-1]);
+    if(defined(@t) && scalar(@t)>=1) {
+      $hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int($t[-1]);
+    }
   }
 
   return $hash->{helper}{"sys_cpu".$cpuNum."_freq"};
