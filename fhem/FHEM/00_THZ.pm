@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 02/2015
-my $thzversion = "0.140";
+# by immi 04/2015
+my $thzversion = "0.141";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -23,7 +23,7 @@ my $thzversion = "0.140";
 #  GNU General Public License for more details.
 #
 ########################################################################################
- 
+
 
 package main;
 use strict;
@@ -237,11 +237,11 @@ my %parsinghash = (
 	      [" Date: ", 		12, 2, "year", 1],		["/", 		14, 2, "hex", 1],
 	      ["/", 			16, 2, "hex", 1]
 	     ],
-  "FCtime206" => [["Weekday: ", 7, 1,  "weekday", 1],	[" Hour: ",	8, 2, "hex", 1],
-	      [" Min: ",		10, 2,  "hex", 1], 		[" Sec: ",	12, 2, "hex", 1],
-	      [" Date: ", 		14, 2, "year", 1],		["/", 		18, 2, "hex", 1],
-	      ["/", 			20, 2, "hex", 1]
-	     ],
+  "FCtime206" => [["Weekday: ", 7, 1,  "weekday", 1],  [" pClockHour: ", 8, 2, "hex", 1],
+              [" pClockMinutes: ", 10, 2,  "hex", 1],   [" Sec: ", 12, 2, "hex", 1],
+              [" pClockYear: ", 14, 2, "hex", 1],       [" pClockMonth: ", 18, 2, "hex", 1],
+              [" pClockDay: ",  20, 2, "hex", 1]
+             ],
   "FDfirm" => [["version: ", 	4, 4, "hex", 100]
 	     ],
   "FEfirmId" => [[" HW: ",	30,  2, "hex", 1], [" SW: ",	32,  4, "swver", 1],
@@ -485,18 +485,23 @@ my %sets439 = (
   );
 
 my %sets206 = (
-  "p01RoomTempDay"		=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
+  "p01RoomTempDay"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
   "p02RoomTempNight"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
   "p03RoomTempStandby"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "30", 	unit =>" °C"},
   "p04DHWsetTempDay"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
   "p05DHWsetTempNight"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
   "p06DHWsetTempStandby"=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "55",	unit =>" °C"},
-  "p07FanStageDay"		=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
+  "p07FanStageDay"	=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
   "p08FanStageNight"	=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
   "p09FanStageStandby"	=> {parent=>"p01-p12", argMin =>   "0", argMax =>    "3",	unit =>""},
   "p10RoomTempManual"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
   "p11DHWsetTempManual"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
-  "p12FanStageManual"	=> {parent=>"p01-p12", argMin =>   "0", argMax =>   "3",	unit =>""}
+  "p12FanStageManual"  => {parent=>"p01-p12", argMin =>   "0", argMax =>   "3",        unit =>""},
+  "pClockDay"          => {parent=>"sTimedate", argMin =>  "1", argMax =>  "31", unit =>""},
+  "pClockMonth"        => {parent=>"sTimedate", argMin =>  "1", argMax =>  "12", unit =>""},
+  "pClockYear"         => {parent=>"sTimedate", argMin =>  "12", argMax =>  "20",  unit =>""},
+  "pClockHour"         => {parent=>"sTimedate", argMin =>  "0", argMax =>  "23", unit =>""},
+  "pClockMinutes"      => {parent=>"sTimedate", argMin =>  "0", argMax =>  "59", unit =>""}
  );
 
 
@@ -698,7 +703,7 @@ sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
  # unlink("data.txt");
   THZ_RemoveInternalTimer("THZ_GetRefresh");
-  readingsSingleUpdate($hash, "state", "opened", 1); # copied from cul 26.11.2014
+  #readingsSingleUpdate($hash, "state", "opened", 1); # copied from cul 26.11.2014
   my $timedelay= 5; 						#start after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
     my %par = (  hash => $hash, command => $cmdhash );
@@ -1567,8 +1572,8 @@ sub function_heatSetTemp($$) {
   $roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
   #########$insideTemp=23.8 ; $roomSetTemp = 20.5; $p13GradientHC1 = 0.31; $heatSetTemp = 25.4; $p15RoomInfluenceHC1 = 80; #$outside_tempFiltered = 4.9; $p14LowEndHC1 =1.5; $p99RoomThermCorrection = -2.8;
   
-  my $a= 0.83 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
-  my $a1= 0.83 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1;
+  my $a= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
+  my $a1= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1;
   my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
   my $c= -1 * $p13GradientHC1 /75;
   my $Simul_heatSetTemp; my $Simul_heatSetTemp_simplified;  my @ret; 
