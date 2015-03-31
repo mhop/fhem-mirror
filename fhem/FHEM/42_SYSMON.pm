@@ -1260,9 +1260,9 @@ SYSMON_obtainParameters_intern($$)
   #Log 3, "SYSMON >>> USER_DEFINED FUNCTIONS >>>>>>>>>>>>>>> START";
   my $userfn = AttrVal($name, "user-fn", undef);
   if(defined $userfn) {
-    my @userfn_list = split(/,\s*/, trim($userfn));
+    my @userfn_list = split(/,\s+/, trim($userfn));
     foreach my $ud (@userfn_list) {
-       # <fnName>:<Interval_Minutes>:<reading1>:<reading2>...
+       # <fnName>:<Interval_Minutes>:<reading1>:<reading2>..., [<fn-name>:...]
        my($fnName, $uInterval, @readings) = split(/:/, $ud);
        SYSMON_Log($hash, 5, "User-Defined Fn: [$fnName][$uInterval]");
        if(defined $uInterval) {
@@ -1508,6 +1508,8 @@ SYSMON_getUptime2($$)
       $uptime *= 60;
       $uptime += $minutes;
       $uptime *= 60;
+    } else {
+    	$uptime = 0;
     }
     
     $map->{+UPTIME}=sprintf("%d",$uptime);
@@ -4252,13 +4254,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     the number of available updates is daily recorded as 'sys_updates'.
     </li>
     <br>
-    <li>user-fn &lt;fn_name&gt;:&lt;interval_minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;],...<br>
+    <li>user-fn &lt;fn_name&gt;:&lt;interval_minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;], ...<br>
     List of perl user subroutines.<br>
     As &lt;fn_name&gt; can be used either the name of a Perl subroutine or a Perl expression.
     The perl function gets the device hash as parameter and must provide an array of values.
     These values are taken according to the parameter &lt;reading_nameX&gt; in Readings.<br>
     A Perl expression must be enclosed in curly braces and can use the following parameters: $ HASH (device hash) and $ NAME (device name). 
-    Return is expected analogous to a Perl subroutine.
+    Return is expected analogous to a Perl subroutine.<br>
+    Important! The separation between multiple user functions must be done with a comma AND a space! Within the function definition commas may not be followed by spaces.
     </li>
     <br>
     <li>disable<br>
@@ -4860,7 +4863,8 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Die Perlfunktion bekommt den Device-Hash als &Uuml;bergabeparameter und muss ein Array mit Werte liefern. 
     Diese Werte werden entsprechend den Parameter &lt;reading_nameX&gt; in Readings &uuml;bernommen.<br>
     Ein Perlausdruck muss in geschweifte Klammer eingeschlossen werden und kann folgende Paramter verwenden: $HASH (Device-Hash) und $NAME (Device-Name).
-    R&uuml;ckgabe wird analog einer Perlfunktion erwartet.
+    R&uuml;ckgabe wird analog einer Perlfunktion erwartet.<br>
+    Wichtig! Die Trennung zwischen mehreren Benutzerfunktionen muss mit einem Komma UND einem Leerzeichen erfolgen! Innerhalb der Funktiondefinition dürfen Kommas nicht durch Leerzeichen gefolgt werden.
     </li>
     <br>
     <li>disable<br>
