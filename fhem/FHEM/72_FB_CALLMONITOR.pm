@@ -481,15 +481,13 @@ FB_CALLMONITOR_reverseSearch($$)
     chomp $number;
 
     # Using Cache if enabled
-    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+
+    if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($hash->{helper}{CACHE}{$number}))
     {
-        if(defined($hash->{helper}{CACHE}{$number}))
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - using cache for reverse search of $number";
+        if($hash->{helper}{CACHE}{$number} ne "timeout" or $hash->{helper}{CACHE}{$number} ne "unknown")
         {
-            Log3 $name, 4, "FB_CALLMONITOR ($name) - using cache for reverse search of $number";
-            if($hash->{helper}{CACHE}{$number} ne "timeout")
-            {
-                return $hash->{helper}{CACHE}{$number};
-            }
+            return $hash->{helper}{CACHE}{$number};
         }
     }
     
@@ -503,6 +501,13 @@ FB_CALLMONITOR_reverseSearch($$)
         }
     }
 
+    # Using Cache if enabled
+    if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($hash->{helper}{CACHE}{$number}))
+    {
+        return $hash->{helper}{CACHE}{$number} if($hash->{helper}{CACHE}{$number} ne "timeout");
+    }
+
+    
     # Ask klicktel.de
     if((grep { /^(all|klicktel\.de)$/ } @attr_list))
     { 
