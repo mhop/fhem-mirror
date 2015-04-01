@@ -175,14 +175,10 @@ sub SubProcessTester_Read($) {
   
   # here we read from the global select loop what was
   # written in the onRun function
-  my ($bytes, $result);
-  $bytes= sysread($subprocess->child(), $result, 1024*1024);
-  if(defined($bytes)) {
+  my $result= $subprocess->read();
+  if(defined($result)) {
     chomp $result;
     readingsSingleUpdate($hash, "step", $result, 1);
-  } else {
-    Log3 $hash, 2, "$name: $!";
-    $result= undef;
   }
   return $result;
 }

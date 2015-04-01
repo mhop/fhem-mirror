@@ -114,6 +114,16 @@ sub parent() {
   return $self->{parent};
 }
 
+# this function is called from the parent to read from the child
+# returns undef on error or if nothing was read
+sub read() {
+
+  my $self= shift;
+  my ($bytes, $result);
+  $bytes= sysread($self->child(), $result, 1024*1024);
+  return defined($bytes) ? $result : undef;
+}
+
 # starts the child process
 sub run() {
 
