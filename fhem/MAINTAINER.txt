@@ -138,6 +138,7 @@ FHEM/37_SHC.pm               rr2000               http://forum.fhem.de Sonstige 
 FHEM/37_SHCdev.pm            rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/38_harmony.pm           justme1968           http://forum.fhem.de Multimedia
 FHEM/38_CO20.pm              justme1968           http://forum.fhem.de Sonstiges
+FHEM/38_JawboneUp.pm         domschl              http://forum.fhem.de Sonstiges
 FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
 FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
 FHEM/42_RFXMETER.pm          wherzig              http://forum.fhem.de RFXTRX
