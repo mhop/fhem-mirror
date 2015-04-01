@@ -354,7 +354,7 @@ jawboneUp_Attr($$$)
     <li>password<br>
       The password for the jawbone service.</li>
     <li>interval<br>
-      Optional polling intervall in seconds. Default is 3600, minimum is 900 (=5min).</li>
+      Optional polling intervall in seconds. Default is 3600, minimum is 900 (=15min).</li>
   </ul><br>
 
     Example:
