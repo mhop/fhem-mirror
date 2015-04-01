@@ -142,7 +142,7 @@ my $curReadingType = 0;
      ,"Südwest" => 225
      ,"West-Südwest" => 248
      ,"West" => 270
-     ,"Nord-Nordwest" => 203
+     ,"West-Nordwest" => 203
      ,"Nordwest" => 225
      ,"Nord-Nordwest" => 248
   );
