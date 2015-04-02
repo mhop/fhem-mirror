@@ -789,7 +789,7 @@ sub FRITZBOX_Readout_Run($)
             push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ];
             push @readoutReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 2 ];
             push @readoutReadings, "dect".$intern."_manufacturer|" . $resultArray->[ $offset + 2 ];
-            push @readoutReadings, "dect".$intern."_fwVersion|" . $resultArray->[ $offset + 1 ];
+            push @readoutReadings, "dect".$intern."_fwVersion|" . $resultArray->[ $offset + 9 ];
             push @readoutReadings, "fhem->$intern->model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
             push @readoutReadings, "dect".$intern."_model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
          }
