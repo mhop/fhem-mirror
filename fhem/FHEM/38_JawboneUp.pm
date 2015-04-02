@@ -13,6 +13,26 @@ use LWP::UserAgent 6;
 use IO::Socket::SSL;
 use WWW::Jawbone::Up;
 
+############# Extensions to WWW:Jawbone::Up for bandevents entry point ############
+
+use constant URI_BASE => 'https://jawbone.com';
+use constant URI_API  => URI_BASE . '/nudge/api/v.1.32';
+
+
+sub jawboneGetBandEvents($) {
+   my ($up) = @_;
+   my $options ||= {};
+#  my $t0=time()-3600;  # Time-intervalls lead to delay in update.
+#  my $t1=time()+3600;
+#  my $tt0="$t0";
+#  my $tt1="$t1";
+#  $options->{start_time} = $tt0;
+#  $options->{end_time}   = $tt1;
+    my $json = $up->_get(URI_API . '/users/@me/bandevents', $options);
+    return $json;
+}
+
+######################################
 sub
 jawboneUp_Initialize($)
 {
@@ -32,6 +52,9 @@ jawboneUp_Initialize($)
 
 #####################################
 
+my $min_poll = 300;   # Minium poll reate of Jawbone API in seconds
+my $safe_poll = 900;  # Safe default value in seconds.
+
 sub
 jawboneUp_Define($$)
 {
@@ -45,7 +68,7 @@ jawboneUp_Define($$)
   my $user = $a[2];
   my $password = $a[3];
     
-  $hash->{"module_version"} = "0.1.1";
+  $hash->{"module_version"} = "0.1.2";
   
   $hash->{user}=$user;
   $hash->{password}=$password;
@@ -61,8 +84,8 @@ jawboneUp_Define($$)
 	  $hash->{INTERVAL} = $a[4];
 	  }
 
-  if ($hash->{INTERVAL} < 900) {
-  	  $hash->{INTERVAL} = 900;
+  if ($hash->{INTERVAL} < $min_poll) {
+  	  $hash->{INTERVAL} = $min_poll;
   }
   
   delete($hash->{helper}{RUNNING_PID});
@@ -149,11 +172,53 @@ sub jawboneUp_DoBackground($)
     my $bd=$score->{"move"}{"bmr_calories_day"};
     my $at=$score->{"move"}{"active_time"};
     my $li=$score->{"move"}{"longest_idle"};
-    return "OK|$na|$st|$ca|$di|$bc|$bd|$at|$li";    
+
+    my $aw=$score->{"sleep"}{"awake"};
+    my $as=$score->{"sleep"}{"goals"}{"total"}[0];
+
+    # Second expensive call for band events
+    my $json=jawboneGetBandEvents($up);
+    my $nr=$json->{"data"}->{"size"};
+ 
+ #my $json="";
+ #my $nr=0;
+ 
+    my $sl=0; # sleep-mode
+    my $st=0; # stopwatch-mode
+    for (my $i=0; $i<$nr; $i++) {
+    	# my $tx=localtime($json->{"data"}->{"items"}[$i]->{"time_created"});
+	    my $act = $json->{"data"}->{"items"}[$i]->{"action"};
+	    if ($act eq "enter_sleep_mode") 
+	        {
+	        $sl=1;
+	        last;
+            }
+	    if ($act eq "exit_sleep_mode") 
+	        {
+	        $sl=0;
+	        last;
+            }
+	    }
+    for (my $i=0; $i<$nr; $i++) {
+    	# my $tx=localtime($json->{"data"}->{"items"}[$i]->{"time_created"});
+	    my $act = $json->{"data"}->{"items"}[$i]->{"action"};
+	    if ($act eq "enter_stopwatch_mode") 
+	        {
+	        $st=1;
+	        last;
+            }
+	    if ($act eq "exit_stopwatch_mode") 
+	        {
+	        $st=0;
+	        last;
+            }
+	    }
+
+    return "OK|$na|$st|$ca|$di|$bc|$bd|$at|$li|$aw|$as|$sl|$st";
   } 
   #Error: API doesn't return any information about errors...
   my $na=$hash->{NAME};
-  return "ERR|$na";    
+  return "ERR|$na";
 }
 
 ############ Accept result from background process: ##############
@@ -189,7 +254,7 @@ sub jawboneUp_DoneBackground($)
       $hash->{STATE} = "Connect-failure, retries: ".$hash->{"API_Failures"};
     }
   } else {  
-    if (@a < 9) {
+    if (@a < 13) {
       print ("Internal error at DoneBackground (0x003).\n");
       $hash->{STATE} = "Disconnected - disabled";
       $attr{$hash->{NAME}}{"disable"} = 1;
@@ -205,6 +270,12 @@ sub jawboneUp_DoneBackground($)
     readingsSingleUpdate($hash,"bmr_calories_day",$a[6],1);
     readingsSingleUpdate($hash,"active_time",$a[7],1);
     readingsSingleUpdate($hash,"longest_idle",$a[8],1);
+
+    readingsSingleUpdate($hash,"sleep_awake",$a[9],1);
+    readingsSingleUpdate($hash,"sleep_asleep",$a[10],1);
+
+    readingsSingleUpdate($hash,"sleep_mode",$a[11],1);
+    readingsSingleUpdate($hash,"stopwatch_mode",$a[12],1);
 
     $hash->{LAST_POLL} = FmtDateTime( gettimeofday() );
 
@@ -291,12 +362,12 @@ jawboneUp_Attr($$$)
 
   my $orig = $attrVal;
   $attrVal = int($attrVal) if($attrName eq "interval");
-  $attrVal = 900 if($attrName eq "interval" && $attrVal < 900 && $attrVal != 0);
+  $attrVal = $safe_poll if($attrName eq "interval" && $attrVal < $min_poll && $attrVal != 0);
 
   if( $attrName eq "interval" ) {
     my $hash = $defs{$name};
     $hash->{INTERVAL} = $attrVal;
-    $hash->{INTERVAL} = 900 if( !$attrVal );
+    $hash->{INTERVAL} = $safe_poll if( !$attrVal );
   } elsif( $attrName eq "disable" ) {
     my $hash = $defs{$name};
     RemoveInternalTimer($hash);
@@ -354,7 +425,7 @@ jawboneUp_Attr($$$)
     <li>password<br>
       The password for the jawbone service.</li>
     <li>interval<br>
-      Optional polling intervall in seconds. Default is 3600, minimum is 900 (=15min).</li>
+      Optional polling intervall in seconds. Default is 3600, minimum is 300 (=5min). It is not recommended to go below 900sec.</li>
   </ul><br>
 
     Example:
@@ -379,7 +450,15 @@ jawboneUp_Attr($$$)
     <li>distance<br>
     (Distance in km)</li>
     <li>longest_idle<br>
-    (Inactive time in seconds)</li>
+    (Inactive time in seconds)<br></li>
+    <li>sleep_awake<br>
+    (Awake time during sleep in seconds)</li>
+    <li>sleep_asleep<br>
+    (Actual sleep during sleep period time in seconds)<br></li>
+    <li>sleep_mode<br>
+    (0: sleep mode inactive, 1: sleep mode active) Note: this is not real-time since updates depend on the module's poll-intervall</li>
+    <li>stopwatch_mode<br>
+    (0: not in stopwatch mode, 1: stopwatch mode active) Note: not suitable for real-time measurements for the reasons above.</li>
   </ul><br>
 
   <a name="jawboneUp_Get"></a>
@@ -393,7 +472,7 @@ jawboneUp_Attr($$$)
   <b>Attributes</b>
   <ul>
     <li>interval<br>
-      the interval in seconds for updates. the default ist 3600 (=1h), minimum is 900 (=15min).</li>
+      the interval in seconds for updates. the default ist 3600 (=1h), minimum is 300 (=5min). It is not recommended to go below 900sec.</li>
     <li>disable<br>
       1 -> disconnect and stop polling</li>
   </ul>
