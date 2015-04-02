@@ -87,6 +87,7 @@ sub HUEDevice_Initialize($)
                       "delayedUpdate:1 ".
                       "realtimePicker:1 ".
                       "color-icons:1,2 ".
+                      "transitiontime ".
                       "model:".join(",", sort map { $_ =~ s/ /#/g ;$_} keys %hueModels)." ".
                       "subType:extcolordimmer,colordimmer,ctdimmer,dimmer,switch ".
                       $readingFnAttributes;
@@ -123,8 +124,8 @@ HUEDevice_devStateIcon($)
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB004" );
 
 
-  return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
-  return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
+  return ".*:$s@#".CommandGet("","$name RGB").":ct:hue:pct" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
+  return ".*:on@#".CommandGet("","$name rgb").":ct:hue:pct" if( AttrVal($name, "color-icons", 0) != 0 );
 
   return '<div style="width:32px;height:19px;'.
          'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
@@ -488,6 +489,12 @@ HUEDevice_Set($@)
     }
 
     HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
+  }
+
+  if( !defined($obj{transitiontime} ) ) {
+    my $transitiontime =  AttrVal($name, "transitiontime", undef);
+
+    $obj{transitiontime} = 0 + $transitiontime if( defined( $transitiontime ) );
   }
 
 #  if( $hash->{helper}->{update_timeout} == -1 ) {
@@ -1115,6 +1122,8 @@ HUEDevice_Parse($$)
       ctdimmer -> device has color temperature control<br>
       dimmer -> device has brightnes controll<br>
       switch -> device has on/off controll<br></li>
+    <li>transitiontime<br>
+      default transitiontime for all set commands if not specified directly in the set.</li>
     <li>delayedUpdate<br>
       1 -> the update of the device status after a set command will be delayed for 1 second. usefull if multiple devices will be switched.
 </li>
