@@ -222,6 +222,14 @@ sub jawboneUp_DoBackground($)
 }
 
 ############ Accept result from background process: ##############
+
+sub updReading($$$) {
+    my ($hash,$name,$val) = @_;
+    if ($hash->{READINGS}{$name}{VAL} != $val) {
+        readingsBulkUpdate($hash,$name,$val,1);
+    }
+}
+
 sub jawboneUp_DoneBackground($)
 {
   my ($string) = @_;
@@ -263,20 +271,23 @@ sub jawboneUp_DoneBackground($)
       $hash->{"API_Status"} = "API Failure. Unexpected format of return values: )".$string;
      return undef;
      }
-    readingsSingleUpdate($hash,"bg_steps",$a[2],1);
-    readingsSingleUpdate($hash,"calories",$a[3],1);
-    readingsSingleUpdate($hash,"distance",$a[4],1);
-    readingsSingleUpdate($hash,"bmr_calories",$a[5],1);
-    readingsSingleUpdate($hash,"bmr_calories_day",$a[6],1);
-    readingsSingleUpdate($hash,"active_time",$a[7],1);
-    readingsSingleUpdate($hash,"longest_idle",$a[8],1);
+     
+    readingsBeginUpdate($hash);
+    updReading($hash,"bg_steps",$a[2]);
+    updReading($hash,"calories",$a[3]);
+    updReading($hash,"distance",$a[4]);
+    updReading($hash,"bmr_calories",$a[5]);
+    updReading($hash,"bmr_calories_day",$a[6]);
+    updReading($hash,"active_time",$a[7]);
+    updReading($hash,"longest_idle",$a[8]);
 
-    readingsSingleUpdate($hash,"sleep_awake",$a[9],1);
-    readingsSingleUpdate($hash,"sleep_asleep",$a[10],1);
+    updReading($hash,"sleep_awake",$a[9]);
+    updReading($hash,"sleep_asleep",$a[10]);
 
-    readingsSingleUpdate($hash,"sleep_mode",$a[11],1);
-    readingsSingleUpdate($hash,"stopwatch_mode",$a[12],1);
-
+    updReading($hash,"sleep_mode",$a[11]);
+    updReading($hash,"stopwatch_mode",$a[12]);
+    readingsEndUpdate($hash, 1);
+    
     $hash->{LAST_POLL} = FmtDateTime( gettimeofday() );
 
     $hash->{STATE} = "Connected";
