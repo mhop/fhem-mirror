@@ -1607,7 +1607,7 @@ SYSMON_getCPUTemp_BBB($$)
   $map->{"cpu0_temp"}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}=$t_avg;  
-  my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu0_temp_avg",$val_txt) + $val_txt ) / 4 );
+  $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu0_temp_avg",$val_txt) + $val_txt ) / 4 );
   $map->{"cpu0_temp_avg"}=$t_avg;  
   return $map;
 }
@@ -3167,7 +3167,7 @@ SYSMON_isCPUFreqRPiBBB($) {
     #$hash->{helper}{sys_cpu_freq_rpi_bbb} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
     # Diese abenteuerliche Konstruktion ist noetig, weil bei zu langen Zeilen ueber Telnet der Rest der Zeile als erstes Element kommt
     my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-    if(defined(@t) && scalar(@t)>=1) {
+    if(@t) {
       $hash->{helper}{sys_cpu_freq_rpi_bbb} = int($t[-1]);
     }
   }
@@ -3190,7 +3190,7 @@ SYSMON_isCPUTemp_X($$) {
     #$hash->{helper}{"sys_cpu".$cpuNum."_temp"} = int(SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp".$cpuNum."_input ] && echo 1 || echo 0"));
     # s. o. 
     my @t = SYSMON_execute($hash, "[ -f /sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp".($cpuNum+1)."_input ] && echo 1 || echo 0");
-    if(defined(@t) && scalar(@t)>=1) {
+    if(@t) {
       $hash->{helper}{"sys_cpu".$cpuNum."_temp"} = int($t[-1]);
     }
   }
@@ -3205,7 +3205,7 @@ SYSMON_isCPUXFreq($$) {
     #$hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int(SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && echo 1 || echo 0"));
     # s. o. 
     my @t = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && echo 1 || echo 0");
-    if(defined(@t) && scalar(@t)>=1) {
+    if(@t) {
       $hash->{helper}{"sys_cpu".$cpuNum."_freq"} = int($t[-1]);
     }
   }
