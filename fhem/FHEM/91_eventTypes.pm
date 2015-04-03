@@ -19,7 +19,7 @@ eventTypes_Initialize($)
   $hash->{GetFn}    = "eventTypes_Get";
   $hash->{SetFn}    = "eventTypes_Set";
   $hash->{AttrFn}   = "eventTypes_Attr";
-  $hash->{AttrList} = "disable:0,1";
+  $hash->{AttrList} = "disable:0,1 ignoreList";
 }
 
 
@@ -75,8 +75,9 @@ eventTypes_Define($$)
   my $f = ResolveDateWildcards($a[2], @t);
 
   my ($err, @content) = FileRead($f);
-  my %h = ();
-  $modules{eventTypes}{ldata} = \%h;
+  my (%h1, %h2);
+  $hash->{ignoreList} = \%h2;
+  $modules{eventTypes}{ldata} = \%h1;
   foreach my $l (@content) {
     next if(!defined($l));
     my @l = split(" ", $l, 3);
@@ -84,7 +85,7 @@ eventTypes_Define($$)
       Log3 undef, 2, "eventTypes: $f: bogus line $l";
       next;
     }
-    $cnt += et_addEvt(\%h, $l[1], $l[2], $l[0]);
+    $cnt += et_addEvt(\%h1, $l[1], $l[2], $l[0]);
   }
 
   Log3 undef, 2, "eventTypes: loaded $cnt events from $f";
@@ -107,6 +108,7 @@ eventTypes_Notify($$)
   my $t = $eventSrc->{TYPE};
   my $n = $eventSrc->{NAME};
   return if(!defined($n) || !defined($t) || $n eq "global");
+  return if($me->{ignoreList}{$n});
 
   my $ret = "";
   my $h = $modules{eventTypes}{ldata};
@@ -122,6 +124,16 @@ eventTypes_Attr(@)
 {
   my @a = @_;
   my $do = 0;
+
+  if($a[0] eq "set" && $a[2] eq "ignoreList") {
+    my %h;
+    my $ldata = $modules{eventTypes}{ldata};
+    foreach my $i (split(", ", $a[3])) {
+      $h{$i} = 1;
+      delete $ldata->{$i};
+    }
+    $defs{$a[1]}{ignoreList} = \%h;
+  }
 
   if($a[0] eq "set" && $a[2] eq "disable") {
     $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
@@ -198,7 +210,8 @@ eventTypes_Get($@)
   <ul>
     <code>define &lt;name&gt; eventTypes &lt;filename&gt;</code>
     <br><br>
-    Collect event types for all devices. This service is used by frontends.
+    Collect event types for all devices. This service is used by frontends,
+    e.g. notify and FileLog, to assist you in selecting the correct events.
     The filename is used to store the collected events before shutdown.<br>
     More than one instance of eventTypes should not be necessary.
     Examples:
@@ -236,6 +249,11 @@ eventTypes_Get($@)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <a name="ignoreList"></a>
+    <li>ignoreList<br>
+      Comma separated device names to ignore whe collecting the events.
+      E.g. ECMD-Devices are used to post RAW data as events.
+      </li>
   </ul>
   <br>
 
