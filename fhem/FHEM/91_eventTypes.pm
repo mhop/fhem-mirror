@@ -27,20 +27,26 @@ sub
 et_addEvt($$$;$)
 {
   my ($h, $name, $evt, $cnt) = @_;
+  return 0 if($h->{$name} && int(keys %{$h->{$name}}) > 200); # Forum #35658
   return 0 if($evt =~ m/ CULHM (SND|RCV) /); # HM
   return 0 if($evt =~ m/RAWMSG/);            # HM
   return 0 if($evt =~ m/^R-/);               # HM register values
   return 0 if($evt =~ m/ UNKNOWNCODE /);
   return 0 if($evt =~ m/^\d+ global /);      # update
   return 0 if($evt =~ m/[<>]/);              # HTML
+  return 0 if($evt =~ m/googlecom$/);        # Kalender
+  return 0 if($evt =~ m/\.gif$/);            # Proplanta
   return 0 if(length($evt) > 80);            # Safety
 
+  $evt =~ s/ *$//;                           # HM?
   $evt =~ s/: [0-9A-F]*$/: .*/;              # PANSTAMP
   $evt =~ s/\b-?\d*\.?\d+\b/.*/g;            # Number to .*
   $evt =~ s/\.\*.*\.\*/.*/g;                 # Multiple wildcards to one
   $evt =~ s/set_\d+/set_.*/;                 # HM
+  $evt =~ s/\b\d+_next:\d+s\b/.*/g;          # HM motionCount
   $evt =~ s/^trigger: (.*_)\d+$/trigger: $1.*/; # HM
   $evt =~ s/\.\* \(\d+K\)/.*/g;              # HUE: Kelvin
+  $evt =~ s/  +/ /;                          #
 
   my $r = 1;
   if($cnt) {
