@@ -1066,7 +1066,7 @@ sub HMinfo_GetFn($@) {#########################################################
           my $h = InternalVal($dName,"IODev","");
           $dispDest .= "/$h->{NAME}";
         }
-        push @rssiList,sprintf("%-15s:%-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
+        push @rssiList,sprintf("%-15s %-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
                                ,$dName,$dispName,$dispDest
                                ,$defs{$dName}{helper}{rssi}{$dest}{lst}
                                ,$defs{$dName}{helper}{rssi}{$dest}{avg}
@@ -1076,7 +1076,7 @@ sub HMinfo_GetFn($@) {#########################################################
                                );
       }
     }
-    $ret = $cmd." done:"."\n    "."Device         :receive         from             last   avg      min<max    count"
+    $ret = $cmd." done:"."\n    "."Device          receive         from             last   avg      min<max    count"
                         ."\n    ".(join "\n    ",sort @rssiList)
                          ;
   }
