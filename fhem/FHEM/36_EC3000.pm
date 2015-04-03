@@ -25,6 +25,7 @@ EC3000_Initialize($)
   $hash->{ParseFn}   = "EC3000_Parse";
   $hash->{AttrFn}    = "EC3000_Attr";
   $hash->{AttrList}  = "IODev".
+                       " offLevel".
                        " $readingFnAttributes";
 }
 
@@ -63,9 +64,7 @@ EC3000_Define($$)
     Log3 $name, 1, "$name: no I/O device";
   }
 
-  #$attr{$name}{devStateIcon} = 'on:on:toggle off:off:toggle *.:light_exclamation:off' if( !defined( $attr{$name}{devStateIcon} ) );
-  #$attr{$name}{webCmd} = 'on:off:toggle:statusRequest' if( !defined( $attr{$name}{webCmd} ) );
-  #CommandAttr( undef, "$name userReadings consumptionTotal:consumption monotonic {ReadingsVal(\$name,'consumption',0)}" ) if( !defined( $attr{$name}{userReadings} ) );
+  $attr{$name}{stateFormat} = 'state (power W)' if( !defined( $attr{$name}{stateFormat} ) );
 
   return undef;
 }
@@ -118,11 +117,11 @@ EC3000_Parse($$)
     @bytes = split( ' ', substr($msg, 6) );
 
     $addr = sprintf( "%02X%02X", $bytes[0], $bytes[1] );
-    $secondsTotal = $bytes[2]*256*255*255 + $bytes[3]*256*255 + $bytes[4]*256 + $bytes[5];
-    $secondsOn = $bytes[6]*256*255*255 + $bytes[7]*256*255 + $bytes[8]*256 + $bytes[9];
-    $consumptionTotal = ($bytes[10]*256*255*255 + $bytes[11]*256*255 + $bytes[12]*256 + $bytes[13] )/1000.0;
-    $power = ($bytes[14]*256 + $bytes[15] )/10.0;
-    $powerMax = ($bytes[16]*256 + $bytes[17] )/10.0;
+    $secondsTotal = ($bytes[2]<<24) + ($bytes[3]<<16) + ($bytes[4]<<8) + $bytes[5];
+    $secondsOn = ($bytes[6]<<24) + ($bytes[7]<<16) + ($bytes[8]<<8) + $bytes[9];
+    $consumptionTotal = ( ($bytes[10]<<24) + ($bytes[11]<<16) + ($bytes[12]<<8) + $bytes[13] )/1000.0;
+    $power = ( ($bytes[14]<<8) + $bytes[15] )/10.0;
+    $powerMax = ( ($bytes[16]<<8) + $bytes[17] )/10.0;
     $resets = $bytes[18];
     $reception = $bytes[19];
   } else {
@@ -159,7 +158,11 @@ EC3000_Parse($$)
   readingsBulkUpdate($rhash, "consumption", $consumptionTotal);
   readingsBulkUpdate($rhash, "power", $power);
   readingsBulkUpdate($rhash, "powerMax", $powerMax);
-  readingsBulkUpdate($rhash, "state", $power) if( Value($rname) ne $power );
+
+  my $state = "on";
+  $state = "off" if( $power <= AttrVal($rname, "offLevel", 0) );
+  readingsBulkUpdate($rhash, "state", $state);
+
   readingsEndUpdate($rhash,1);
 
   return @list;
@@ -218,6 +221,8 @@ EC3000_Attr(@)
   <a name="EC3000_Attr"></a>
   <b>Attributes</b>
   <ul>
+    <li>offLevel<br>
+      a power level less or equal <code>offLevel</code> is considered to be off</li>
   </ul><br>
 </ul>
 
