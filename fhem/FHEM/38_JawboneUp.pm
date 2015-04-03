@@ -68,7 +68,7 @@ jawboneUp_Define($$)
   my $user = $a[2];
   my $password = $a[3];
     
-  $hash->{"module_version"} = "0.1.2";
+  $hash->{"module_version"} = "0.1.3";
   
   $hash->{user}=$user;
   $hash->{password}=$password;
@@ -173,7 +173,12 @@ sub jawboneUp_DoBackground($)
     my $at=$score->{"move"}{"active_time"};
     my $li=$score->{"move"}{"longest_idle"};
 
-    my $aw=$score->{"sleep"}{"awake"};
+    my $aw=$score->{"sleep"}{"awake"};    
+    my $ak=$score->{"sleep"}{"awakenings"};
+    my $lt=$score->{"sleep"}{"light"};
+    my $ts=$score->{"sleep"}{"time_to_sleep"};
+    my $bt=$score->{"sleep"}{"goals"}{"bedtime"}[0];
+    my $dp=$score->{"sleep"}{"goals"}{"deep"}[0];    
     my $as=$score->{"sleep"}{"goals"}{"total"}[0];
 
     # Second expensive call for band events
@@ -214,7 +219,7 @@ sub jawboneUp_DoBackground($)
             }
 	    }
 
-    return "OK|$na|$st|$ca|$di|$bc|$bd|$at|$li|$aw|$as|$sl|$sw";
+    return "OK|$na|$st|$ca|$di|$bc|$bd|$at|$li|$aw|$as|$sl|$sw|$ak|$lt|$ts|$bt|$dp";
   } 
   #Error: API doesn't return any information about errors...
   my $na=$hash->{NAME};
@@ -262,7 +267,7 @@ sub jawboneUp_DoneBackground($)
       $hash->{STATE} = "Connect-failure, retries: ".$hash->{"API_Failures"};
     }
   } else {  
-    if (@a < 13) {
+    if (@a < 18) {
       print ("Internal error at DoneBackground (0x003).\n");
       $hash->{STATE} = "Disconnected - disabled";
       $attr{$hash->{NAME}}{"disable"} = 1;
@@ -286,6 +291,13 @@ sub jawboneUp_DoneBackground($)
 
     updReading($hash,"sleep_mode",$a[11]);
     updReading($hash,"stopwatch_mode",$a[12]);
+    
+    updReading($hash,"awakenings",$a[13]);
+    updReading($hash,"light",$a[14]);
+    updReading($hash,"time_to_sleep",$a[15]);
+    updReading($hash,"bedtime",$a[16]);
+    updReading($hash,"deep",$a[17]);
+    
     readingsEndUpdate($hash, 1);
     
     $hash->{LAST_POLL} = FmtDateTime( gettimeofday() );
