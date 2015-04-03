@@ -294,7 +294,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new notify macro device $macroNameGotosleep created";
+"RESIDENTStk $NAME: new notify macro device $macroNameGotosleep created";
             fhem
 "define $macroNameGotosleep notify $macroNameGotosleep $templateGotosleep";
             fhem
@@ -365,7 +365,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new notify macro device $macroNameAsleep created";
+"RESIDENTStk $NAME: new notify macro device $macroNameAsleep created";
             fhem
               "define $macroNameAsleep notify $macroNameAsleep $templateAsleep";
             fhem
@@ -431,7 +431,7 @@ if (\$EVTPART0 eq \"stop\") {\
 }";
 
             Log3 $NAME, 3,
-              "RESIDENTStk $NAME: new notify macro device $macroNameAwoken created";
+"RESIDENTStk $NAME: new notify macro device $macroNameAwoken created";
             fhem
               "define $macroNameAwoken notify $macroNameAwoken $templateAwoken";
             fhem
@@ -1172,29 +1172,14 @@ sub RESIDENTStk_wakeupGetNext($) {
     my $definitiveNextTodayDev    = 0;
     my $definitiveNextTomorrowDev = 0;
 
-    # get holiday status for today and tomorrow
-    if (   $wakeupHolidays
-        && $holidayDevice
-        && defined( $defs{$holidayDevice} )
-        && $defs{$holidayDevice}{TYPE} eq "holiday" )
-    {
-        my $hdayTod = ReadingsVal( $holidayDevice, "state",    "" );
-        my $hdayTom = ReadingsVal( $holidayDevice, "tomorrow", "" );
-
-        if   ( $hdayTod ne "none" && $hdayTod ne "" ) { $holidayToday = 1 }
-        else                                          { $holidayToday = 0 }
-
-        if   ( $hdayTom ne "none" && $hdayTom ne "" ) { $holidayTomorrow = 1 }
-        else                                          { $holidayTomorrow = 0 }
-
-        Log3 $name, 4,
-"RESIDENTStk $name: 00 - Holidays to be considered - today=$holidayToday tomorrow=$holidayTomorrow";
-    }
+    my $holidayDevice = AttrVal( "global", "holiday2we", 0 );
+    my $hdayTod = ReadingsVal( $holidayDevice, "state",    "" );
+    my $hdayTom = ReadingsVal( $holidayDevice, "tomorrow", "" );
 
     # check for each registered wake-up device
     for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
         Log3 $name, 4,
-"RESIDENTStk $name: 01 - checking for next wake-up candidate $wakeupDevice";
+"RESIDENTStk $name: 00 - checking for next wake-up candidate $wakeupDevice";
 
         my $nextRun = ReadingsVal( $wakeupDevice, "nextRun", 0 );
         my $wakeupAtdevice = AttrVal( $wakeupDevice, "wakeupAtdevice", 0 );
@@ -1205,10 +1190,26 @@ sub RESIDENTStk_wakeupGetNext($) {
             : 0
         );
         my $wakeupDays     = AttrVal( $wakeupDevice, "wakeupDays",     "" );
-        my $holidayDevice  = AttrVal( "global",      "holiday2we",     0 );
         my $wakeupHolidays = AttrVal( $wakeupDevice, "wakeupHolidays", 0 );
-        my $holidayToday   = "";
-        my $holidayTomorrow = "";
+        my $holidayToday   = 0;
+        my $holidayTomorrow = 0;
+
+        # get holiday status for today and tomorrow
+        if (   $wakeupHolidays
+            && $holidayDevice
+            && defined( $defs{$holidayDevice} )
+            && $defs{$holidayDevice}{TYPE} eq "holiday" )
+        {
+            if ( $hdayTod ne "none" && $hdayTod ne "" ) { $holidayToday    = 1 }
+            if ( $hdayTom ne "none" && $hdayTom ne "" ) { $holidayTomorrow = 1 }
+
+            Log3 $name, 4,
+"RESIDENTStk $wakeupDevice: 01 - Holidays to be considered - today=$holidayToday tomorrow=$holidayTomorrow";
+        }
+        else {
+            Log3 $name, 4,
+              "RESIDENTStk $wakeupDevice: 01 - Not considering any holidays";
+        }
 
         # set day scope for today
         my @days = ($wday);
@@ -1268,7 +1269,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                         || $nextRunSec < $definitiveNextToday )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 05 - until now, will be next wake-up run today based on weekday decision";
+"RESIDENTStk $wakeupDevice: 05 - until now, will be NEXT WAKE-UP RUN today based on weekday decision";
                         $definitiveNextToday    = $nextRunSec;
                         $definitiveNextTodayDev = $wakeupDevice;
                     }
@@ -1294,7 +1295,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                         || $nextRunSec < $definitiveNextToday )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: 06 - until now, will be next wake-up run today based on holiday decision";
+"RESIDENTStk $wakeupDevice: 06 - until now, will be NEXT WAKE-UP RUN today based on holiday decision";
                         $definitiveNextToday    = $nextRunSec;
                         $definitiveNextTodayDev = $wakeupDevice;
                     }
@@ -1324,7 +1325,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                       )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: no run tomorrow due to holiday based on combined weekday and holiday decision (wakeupHolidays=$wakeupHolidays)";
+"RESIDENTStk $wakeupDevice: 05 - no run tomorrow due to holiday based on combined weekday and holiday decision (wakeupHolidays=$wakeupHolidays)";
                         next;
                     }
 
@@ -1333,7 +1334,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                         || $nextRunSec < $definitiveNextTomorrow )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: until now, will be next wake-up run tomorrow based on weekday decision";
+"RESIDENTStk $wakeupDevice: 05 - until now, will be NEXT WAKE-UP RUN tomorrow based on weekday decision";
                         $definitiveNextTomorrow    = $nextRunSec;
                         $definitiveNextTomorrowDev = $wakeupDevice;
                     }
@@ -1341,7 +1342,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                 }
                 else {
                     Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: won't be running tomorrow based on weekday decision";
+"RESIDENTStk $wakeupDevice: 05 - won't be running tomorrow based on weekday decision";
 
                 }
 
@@ -1360,7 +1361,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                         || $nextRunSec < $definitiveNextTomorrow )
                     {
                         Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: until now, will be next wake-up run tomorrow based on holiday decision (wakeupHolidays=$wakeupHolidays)";
+"RESIDENTStk $wakeupDevice: 06 - until now, will be NEXT WAKE-UP RUN tomorrow based on holiday decision (wakeupHolidays=$wakeupHolidays)";
                         $definitiveNextTomorrow    = $nextRunSec;
                         $definitiveNextTomorrowDev = $wakeupDevice;
                     }
@@ -1368,7 +1369,7 @@ sub RESIDENTStk_wakeupGetNext($) {
                 }
                 elsif ($wakeupHolidays) {
                     Log3 $name, 4,
-"RESIDENTStk $wakeupDevice: won't be running tomorrow based on holiday decision (wakeupHolidays=$wakeupHolidays)";
+"RESIDENTStk $wakeupDevice: 06 - won't be running tomorrow based on holiday decision (wakeupHolidays=$wakeupHolidays)";
                 }
 
             }
@@ -1380,15 +1381,28 @@ sub RESIDENTStk_wakeupGetNext($) {
         }
     }
 
-    return ( $definitiveNextTodayDev,
-        substr( RESIDENTStk_sec2time($definitiveNextToday), 0, -3 ) )
-      if ( $definitiveNextTodayDev && $definitiveNextToday );
+    if ( $definitiveNextTodayDev && $definitiveNextToday ) {
+        Log3 $name, 4,
+            "RESIDENTStk $name: 07 - next wake-up result: today at "
+          . RESIDENTStk_sec2time($definitiveNextToday)
+          . ", wakeupDevice="
+          . $definitiveNextTodayDev;
 
-    return ( $definitiveNextTomorrowDev,
-        substr( RESIDENTStk_sec2time($definitiveNextTomorrow), 0, -3 ) )
-      if ( $definitiveNextTomorrowDev && $definitiveNextTomorrow );
+        return ( $definitiveNextTodayDev,
+            substr( RESIDENTStk_sec2time($definitiveNextToday), 0, -3 ) );
+    }
+    elsif ( $definitiveNextTomorrowDev && $definitiveNextTomorrow ) {
+        Log3 $name, 4,
+            "RESIDENTStk $name: 07 - next wake-up result: tomorrow at "
+          . RESIDENTStk_sec2time($definitiveNextTomorrow)
+          . ", wakeupDevice="
+          . $definitiveNextTomorrowDev;
 
-    return;
+        return ( $definitiveNextTomorrowDev,
+            substr( RESIDENTStk_sec2time($definitiveNextTomorrow), 0, -3 ) );
+    }
+
+    return ( 0, 0 );
 }
 
 #####################################
