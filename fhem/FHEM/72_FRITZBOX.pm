@@ -783,15 +783,16 @@ sub FRITZBOX_Readout_Run($)
       for (0..$dectCount-1)
       {
          my $offset = $_ * 12;
-         my $intern = $resultArray->[ $offset + 11];
+         my $intern = $resultArray->[ $offset];
+         my $user = $resultArray->[ $offset + 11];
          if ( $intern )
          {
             push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ];
             push @readoutReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 2 ];
-            push @readoutReadings, "dect".$intern."_manufacturer|" . $resultArray->[ $offset + 2 ];
-            push @readoutReadings, "dect".$intern."_fwVersion|" . $resultArray->[ $offset + 9 ];
+            push @readoutReadings, "dect".$user."_manufacturer|" . $resultArray->[ $offset + 2 ];
+            push @readoutReadings, "dect".$user."_fwVersion|" . $resultArray->[ $offset + 9 ];
             push @readoutReadings, "fhem->$intern->model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
-            push @readoutReadings, "dect".$intern."_model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
+            push @readoutReadings, "dect".$user."_model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
          }
       }
 
