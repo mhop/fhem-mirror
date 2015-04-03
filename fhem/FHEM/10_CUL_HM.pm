@@ -1105,7 +1105,7 @@ sub CUL_HM_Parse($$) {#########################################################
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
-  my $parse = CUL_HM_parseCommon($iohash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md);
+  my $parse = CUL_HM_parseCommon($iohash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md,$dname);
   push @evtEt,[$shash,1,"powerOn:$tn"] if($parse eq "powerOn");
   push @evtEt,[$shash,1,""]            if($parse eq "parsed"); # msg is parsed but may
                                                              # be processed further
@@ -1505,11 +1505,9 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp"];
     }
     elsif($mTp =~ m/^4./) {
-      my ($chn, $tCnt,$lvl) = ($mI[0],$mI[1],hex($mI[2])/2);
+      my ($chn,$lvl) = ($mI[0],hex($mI[2])/2);
       my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
       if ($chnHash){
-        push @evtEt,[$chnHash,1,"state:Short".$target];
-        push @evtEt,[$chnHash,1,"trigger:Short_".$tCnt];
         push @evtEt,[$chnHash,1,"level:$lvl"];
       }
     }
@@ -1819,47 +1817,27 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($st =~ m /^(remote|pushButton|swi)$/
       ||$md eq "HM-SEN-EP") { #################################################
     if($mTp eq "40") {
-      my ($chn, $bno) = map{hex($_)} ($mI[0],$mI[1]);# button/event count 
-      my $buttonID = $chn&0x3f;# only 6 bit are valid
+      my ($chn) = map{hex($_)} ($mI[0]);# button/event count 
       my $btnName;
-      my $state = "";
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$buttonID)};
+      my $state = ($chn & 0x40)?"Long":"Short";
+      my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$chn&0x3f)};
 
       if ($chnHash){# use userdefined name - ignore irritating on-off naming
         $btnName = $chnHash->{NAME};
       }
       else{# Button not defined, use default naming
         $chnHash = $shash;
-        if ($st eq "swi"){#maintain history for event naming
-          $btnName = "Btn$chn";
-        }
-        else{
-          $btnName = "Btn".int(($buttonID+1)/2);
-          $state = ($chn&1 ? "off" : "on")
-        }
+        $btnName = "Btn$chn";
       }
-      my $trigType;
       if($chn & 0x40){# long press
-        if(!$shash->{BNO} || $shash->{BNO} ne $bno){#bno = event counter
-          $shash->{BNO}=$bno;
-          $shash->{BNOCNT}=0; # message counter reest
-        }
-        $shash->{BNOCNT}+=1;
-        $state .= "Long" .($mFlgH & 0x20 ? "Release" : "").
-                  " ".$shash->{BNOCNT}."-".$mFlg.$mTp."-";
-        $trigType = "Long";
+        $state .= ($mFlgH & 0x20 ? "Release" : "");
       }
-      else{# short press
-        $state .= ($st eq "swi")?"toggle":"Short";#swi only support toggle
-        $trigType = "Short";
-      }
+
       $shash->{helper}{addVal} = $chn;   #store to handle changesFread
-      push @evtEt,[$chnHash,1,"state:".$state.$target] if ($shash ne $chnHash);
-      push @evtEt,[$chnHash,1,"trigger:".$trigType."_".$bno];
       push @evtEt,[$devH,1,"battery:". (($chn&0x80)?"low":"ok")];
-      push @evtEt,[$devH,1,"state:$btnName $state$target"];
+      push @evtEt,[$devH,1,"state:$btnName $state"];
       if($md eq "HM-Dis-WM55"){
-        my $type = $trigType eq "Short"?"s":"l";
+        my $type = ($chn & 0x40)?"l":"s";
         if ($devH->{cmdStack}){# there are pending commands. we only send new ones
           delete $devH->{cmdStack};
           delete $devH->{cmdStacAESPend};
@@ -1870,7 +1848,7 @@ sub CUL_HM_Parse($$) {#########################################################
           delete $devH->{lastMsg};
         }
 
-        CUL_HM_calcDisWm($chnHash,$devH->{NAME},($trigType eq "Long"?"l":"s"));
+        CUL_HM_calcDisWm($chnHash,$devH->{NAME},$type);
         if (CUL_HM_getAttrInt($name,"aesCommReq") == 1){
           my @arr = ();
           $devH->{cmdStacAESPend} = \@arr;
@@ -2435,7 +2413,7 @@ sub CUL_HM_Parse($$) {#########################################################
 }
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independent
-  my ($ioHash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md) = @_;
+  my ($ioHash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md,$dname) = @_;
   my $shash = $modules{CUL_HM}{defptr}{$src};
   my $dstH = $modules{CUL_HM}{defptr}{$dst} if (defined $modules{CUL_HM}{defptr}{$dst});
   return "" if(!$shash->{DEF});# this should be from ourself
@@ -2845,6 +2823,18 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     elsif($mTp eq "40"){
       $level = $long;
+      my $state = ucfirst($long);
+      if($long eq "long"){# long press
+        if(!$cHash->{BNO} || $cHash->{BNO} ne $cnt){#cnt = event counter
+          $cHash->{BNO}=$cnt;
+          $cHash->{BNOCNT}=0; # message counter reset
+        }
+        $cHash->{BNOCNT}+=1;
+        $state .= ($mFlgH & 0x20 ? "Release" : "")." $cHash->{BNOCNT}_$cnt";
+      }
+
+      push @evtEt,[$cHash,1,"trigger:".(ucfirst($long))."_$cnt"];
+      push @evtEt,[$cHash,1,"state:".$state." (to $dname)"] if ($shash ne $cHash);
     }
     push @evtEt,[$cHash,1,"trigger_cnt:$cnt"];
 
@@ -9022,8 +9012,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       trigger [Long|Short]_$no trigger event from channel<br>
   </li>
      <li><B>swi</B><br>
-        Btn$x toggle<br>
-        Btn$x toggle (to $dest)<br>
+        Btn$x Short<br>
+        Btn$x Short (to $dest)<br>
         battery: [low|ok]<br>
      </li>
   <li><B>switch/dimmer/blindActuator</B><br>
@@ -10301,8 +10291,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         trigger [Long|Short]_$no trigger event from channel<br>
       </li>
       <li><B>swi</B><br>
-        Btn$x toggle<br>
-        Btn$x toggle (to $dest)<br>
+        Btn$x Short<br>
+        Btn$x Short (to $dest)<br>
         battery: [low|ok]<br>
       </li>
       <li><B>switch/dimmer/blindActuator</B><br>
