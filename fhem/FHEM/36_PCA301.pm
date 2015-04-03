@@ -28,6 +28,7 @@ PCA301_Initialize($)
   $hash->{AttrList}  = "IODev"
                        ." readonly:1"
                        ." forceOn:1"
+                       ." offLevel"
                        ." $readingFnAttributes";
 }
 
@@ -232,6 +233,8 @@ PCA301_Parse($$)
     my $power = ($bytes[6]*256 + $bytes[7]) / 10.0;
     my $consumption = ($bytes[8]*256 + $bytes[9]) / 100.0;
     my $state = $state; $state = $power if( $readonly );
+    my $off_level = AttrVal($rname, "offLevel", 0);
+    $state = "off" if( $readonly && $off_level && $power <= $off_level );
     readingsBeginUpdate($rhash);
     readingsBulkUpdate($rhash, "power", $power) if( $power != ReadingsVal($rname,"power",0) );
     readingsBulkUpdate($rhash, "consumption", $consumption) if( $consumption != ReadingsVal($rname,"consumption",0) );
@@ -333,10 +336,12 @@ PCA301_Attr(@)
   <a name="PCA301_Attr"></a>
   <b>Attributes</b>
   <ul>
-    <li>readonly<br>
-    if set to a value != 0 all switching commands (on, off, toggle, ...) will be disabled.</li>
     <li>forceOn<br>
-    try to switch on the device whenever an off status is received.</li>
+      try to switch on the device whenever an off status is received.</li>
+    <li>offLevel<br>
+      a power level less or equal <code>offLevel</code> is considered to be off.</li>
+    <li>readonly<br>
+      if set to a value != 0 all switching commands (on, off, toggle, ...) will be disabled.</li>
   </ul><br>
 </ul>
 
