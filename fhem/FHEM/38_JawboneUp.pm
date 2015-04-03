@@ -477,7 +477,19 @@ jawboneUp_Attr($$$)
     <li>sleep_awake<br>
     (Awake time during sleep in seconds)</li>
     <li>sleep_asleep<br>
-    (Actual sleep during sleep period time in seconds)<br></li>
+    (Actual sleep during sleep period, time in seconds)</li>
+    <li>awakenings<br>
+    (Awakenings)</li>
+    <li>light<br>
+    (Light sleep during sleep period, time in seconds)</li>
+    <li>time_to_sleep<br>
+    (Time to fall asleep in seconds)</li>
+    <li>bedtime<br>
+    (Time in bed)</li>
+    <li>deep<br>
+    (Deep sleep in seconds)</li>
+    <li>awake<br>
+    (Time awake in seconds)</li>
     <li>sleep_mode<br>
     (0: sleep mode inactive, 1: sleep mode active) Note: this is not real-time since updates depend on the module's poll-intervall</li>
     <li>stopwatch_mode<br>
