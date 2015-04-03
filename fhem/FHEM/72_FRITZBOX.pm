@@ -780,19 +780,26 @@ sub FRITZBOX_Readout_Run($)
       }
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
       
+      # Handset and DECT user can be in different orders but should have the same maximum number
       for (0..$dectCount-1)
       {
          my $offset = $_ * 12;
          my $intern = $resultArray->[ $offset];
-         my $user = $resultArray->[ $offset + 11];
-         if ( $intern )
+         push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ]
+            if $intern;
+
+         my $handsetUser = $resultArray->[ $offset + 11];
+         my $handsetIntern = $resultArray->[ ($handsetUser-1) * 12 ];
+         if ( $handsetUser )
          {
-            push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ];
+            push @readoutReadings, "dect".$handsetUser."_manufacturer|" . $resultArray->[ $offset + 2 ];
+            push @readoutReadings, "dect".$handsetUser."_fwVersion|" . $resultArray->[ $offset + 9 ];
+            push @readoutReadings, "dect".$handsetUser."_model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
+         }
+         if ( $handsetIntern )
+         {
             push @readoutReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 2 ];
-            push @readoutReadings, "dect".$user."_manufacturer|" . $resultArray->[ $offset + 2 ];
-            push @readoutReadings, "dect".$user."_fwVersion|" . $resultArray->[ $offset + 9 ];
             push @readoutReadings, "fhem->$intern->model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
-            push @readoutReadings, "dect".$user."_model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
          }
       }
 
