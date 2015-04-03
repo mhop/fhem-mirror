@@ -47,6 +47,12 @@
 # Changelog
 #
 # SVN-History:
+# .04.2015
+#	IsAlive-Check Anpassungen: Bei einer Antwort wird nun nicht mehr geprüft, ob diese von derselben Netzwerkschnittstelle stammt, an die der Ping gesendet wurde. Damit werden Player besser erkannt, die sowohl am Funknetz als auch am LAN angeschlossen sind.
+#	IsAlive-Check Anpassungen: Bei der Option 'tcp' wird nun versucht auf den Standard-Webport des Players zu verbinden (1400)
+#	Callback-Aufrufmethoden: Wenn ein Player eine Nachricht an Fhem sendet und dieser Player in Fhem als 'disappeared' geführt wird, dann wird der Discovery-Process neu angestartet, um diesen Player wieder sauber zu erkennen
+#	Sonos hat das Verfahren zum Hinzufügen von Spotify-Titeln angepasst. Jetzt kann man diese Titel auch wieder mit dem Modul einfügen und abspielen lassen
+#	Das Heraussuchen der Spotify-Cover (z.B. für Playlisten) schlug fehl, wenn die API kein Bild mit 640er Höhe angeboten hat. Nun wird das erste Cover verwendet, welches immer das größte sein sollte
 # 28.03.2015
 #	Die Wiederholungsintervalle (Tage) von Alarmen werden wieder korrekt erkannt, und gesetzt
 #	Bei PlaylistWithCovers wird nun auch ein Cover angezeigt, wenn der erste Titel ein Spotify-Titel ist
@@ -430,7 +436,7 @@ my %SONOS_ProviderList = ('^http:(\/\/.*)' => 'Radio',
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
 my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime);
-my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected currentAlbum currentArtist currentTitle GroupVolume GroupMute);
+my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected presence currentAlbum currentArtist currentTitle GroupVolume GroupMute);
 
 # Obsolete Einstellungen...
 my $SONOS_UseTelnetForQuestions = 1;
@@ -460,6 +466,7 @@ my $SONOS_DIDLFooter = '</DIDL-Lite>';
 my $SONOS_GOOGLETRANSLATOR_CHUNKSIZE = 95;
 
 # Basis UPnP-Object und Search-Referenzen
+my $SONOS_RestartControlPoint = 0;
 my $SONOS_Controlpoint;
 my $SONOS_Search;
 
@@ -3502,6 +3509,7 @@ sub SONOS_Discover() {
 					}
 				} elsif ($workType eq 'playURI') {
 					my $songURI = SONOS_ExpandURIForQueueing($params[0]);
+					SONOS_Log undef, 3, 'songURI: '.$songURI;
 					
 					my $volume;
 					if ($#params > 0) {
@@ -3510,6 +3518,8 @@ sub SONOS_Discover() {
 					
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 						my ($uri, $meta) = SONOS_CreateURIMeta($songURI);
+						SONOS_Log undef, 0, 'URI: '.$uri;
+						SONOS_Log undef, 0, 'Meta: '.$meta;
 						$SONOS_AVTransportControlProxy{$udn}->SetAVTransportURI(0, $uri, $meta);
 						
 						if (defined($volume)) {
@@ -3617,6 +3627,8 @@ sub SONOS_Discover() {
 					}
 					
 					SONOS_PlayURITemp($udn, $destURL, $volume);
+				} elsif ($workType eq 'restartControlPoint') {
+					SONOS_RestartControlPoint();
 				} else {
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': DoWork-Syntax ERROR');
 				}
@@ -3633,6 +3645,8 @@ sub SONOS_Discover() {
 
 	my $error;
 	do {
+		$SONOS_RestartControlPoint = 0;
+		
 		eval {
 			$SONOS_Controlpoint = UPnP::ControlPoint->new(SearchPort => 8008 + threads->tid() - 1, SubscriptionPort => 9009 + threads->tid() - 1, SubscriptionURL => '/eventSub', MaxWait => 30, IgnoreIP => \%ignoredIPs);
 			$SONOS_Search = $SONOS_Controlpoint->searchByType('urn:schemas-upnp-org:device:ZonePlayer:1', \&SONOS_Discover_Callback);
@@ -3651,7 +3665,7 @@ sub SONOS_Discover() {
 			# <spi> => Vielleicht noch auskommentieren
 			undef($error);
 		}
-	} while ($error);
+	} while ($error || $SONOS_RestartControlPoint);
 	
 	SONOS_Log undef, 3, 'UPnP-Thread wurde beendet.';
 	$SONOS_Thread = -1;
@@ -3738,7 +3752,7 @@ sub SONOS_MakeCoverURL($$) {
 					$resURL =~ s/%25/%/ig;
 					
 					# Bei Spotify-URIs, die AlbumURL korrigieren...
-					if ($resURL =~ m/getaa.*?x-sonos-spotify%3aspotify%3atrack%3a(.*)%3f/i) {
+					if ($resURL =~ m/getaa.*?x-sonos-spotify%3aspotify%3atrack%3a(.*?)%3f/i) {
 						$resURL = SONOS_getSpotifyCoverURL($1);
 					} else {
 						$resURL = $1.$resURL if (SONOS_Client_Data_Retreive($udn, 'reading', 'location', '') =~ m/^(http:\/\/.*?:.*?)\//i);
@@ -3773,7 +3787,7 @@ sub SONOS_getSpotifyCoverURL($;$) {
 	if ($oldStyle) {
 		$infos = $1 if (get('https://embed.spotify.com/oembed/?url='.$trackID) =~ m/"thumbnail_url":"(.*?)"/i);
 	} else {
-		$infos = $1 if (get('https://api.spotify.com/v1/tracks/'.$trackID) =~ m/"images".*?:.*?\[.*?{.*?"height".*?:.*?640,.*?"url".*?:.*?"(.*?)",.*?"width"/is);
+		$infos = $1 if (get('https://api.spotify.com/v1/tracks/'.$trackID) =~ m/"images".*?:.*?\[.*?{.*?"height".*?:.*?\d{3},.*?"url".*?:.*?"(.*?)",.*?"width"/is);
 	}
 	
 	$infos =~ s/\\//g;
@@ -3987,14 +4001,14 @@ sub SONOS_CreateURIMeta($) {
 	my $userID_Napster = uri_unescape(SONOS_Client_Data_Retreive('undef', 'reading', 'UserID_Napster', '-'));
 	
 	# Wenn es ein Spotify- oder Napster-Titel ist, dann den Benutzernamen extrahieren
-	if ($res =~ m/^(x-sonos-spotify:)(.*?)(\?.*?)/) {
+	if ($res =~ m/^(x-sonos-spotify:)(.*?)(\?.*)/) {
 		if ($userID_Spotify eq '-') {
 			SONOS_Log undef, 1, 'There are Spotify-Titles in list, and no Spotify-Username is known. Please empty the main queue and insert a random spotify-title in it for saving this information and do this action again!';
 			return;
 		}
-	
+		
 		$res = $1.uri_escape($2).$3;
-		$meta = $SONOS_DIDLHeader.'<item id="'.uri_escape($2).'" parentID="" restricted="true"><dc:title></dc:title><upnp:class>object.item.audioItem.musicTrack</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">'.$userID_Spotify.'</desc></item>'.$SONOS_DIDLFooter;
+		$meta = $SONOS_DIDLHeader.'<item id="00030020'.uri_escape($2).'" parentID="" restricted="true"><dc:title></dc:title><upnp:class>object.item.audioItem.musicTrack</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">'.$userID_Spotify.'</desc></item>'.$SONOS_DIDLFooter;
 	} elsif ($res =~ m/^(npsdy:)(.*?)(\.mp3)/) {
 		if ($userID_Napster eq '-') {
 			SONOS_Log undef, 1, 'There are Napster/Rhapsody-Titles in list, and no Napster-Username is known. Please empty the main queue and insert a random napster-title in it for saving this information and do this action again!';
@@ -4306,7 +4320,7 @@ sub SONOS_GetTrackProvider($;$) {
 	} elsif ($songURI =~ m/x-rincon-stream:(RINCON_[\dA-Z]+)/) {
 		my $elem = 'LineIn';
 		$elem = $songTitle if (defined($songTitle) && $songTitle);
-		return $songTitle.'-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
+		return $elem.'-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 	} elsif ($songURI =~ m/x-sonos-dock:(RINCON_[\dA-Z]+)/) {
 		return 'Dock-Wiedergabe: '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 	} elsif ($songURI =~ m/x-sonos-htastream:(RINCON_[\dA-Z]+):spdif/) {
@@ -4410,6 +4424,22 @@ sub SONOS_MakeSigHandlerReturnValue($$$) {
 	
 	#Antwort melden
 	SONOS_Client_Notifier('DoWorkAnswer:'.$udn.':'.$returnName.':'.$returnValue);
+}
+
+########################################################################################
+#
+#  SONOS_RestartControlPoint - Restarts the UPnP-ControlPoint
+#
+########################################################################################
+sub SONOS_RestartControlPoint() {
+	if (defined($SONOS_Controlpoint)) {
+		$SONOS_RestartControlPoint = 1;
+		
+		$SONOS_Controlpoint->stopSearch($SONOS_Search); 
+		$SONOS_Controlpoint->stopHandling();
+		
+		SONOS_Log undef, 4, 'ControlPoint is successfully stopped for restarting!';
+	}
 }
 
 ########################################################################################
@@ -5263,7 +5293,7 @@ sub SONOS_IsAlive($) {
 	my $location = SONOS_Client_Data_Retreive($udn, 'reading', 'location', '');
 	if ($location) {
 		SONOS_Log $udn, 5, "Location: $location";
-		my $host = ($1) if ($location =~ m/http:\/\/(.*?):/);
+		my ($host, $port) = ($1, $2) if ($location =~ m/http:\/\/(.*?):(.*?)\//);
 		
 		my $pingType = $SONOS_Client_Data{pingType};
 		return 1 if (lc($pingType) eq 'none');
@@ -5275,6 +5305,8 @@ sub SONOS_IsAlive($) {
 		}
 	
 		my $ping = Net::Ping->new($pingType, 1);
+		$ping->source_verify(0); # Es ist egal, von welcher Schnittstelle des Zielsystems die Antwort kommt
+		$ping->port_number($port) if (lc($pingType) eq 'tcp'); # Wenn TCP verwendet werden soll, dann auf HTTP-Port des Location-Documents (Standard: 1400) des Player verbinden
 		if ($ping->ping($host)) {
 			# Alive
 			SONOS_Log $udn, 4, "$host is alive";
@@ -5778,6 +5810,13 @@ sub SONOS_ServiceCallback($$) {
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of Transport-Event for Zone "'.$name.'".';
 	
+	# Prüfen, ob der Player auf 'disappeared' steht, und in diesem Fall den DiscoverProcess neu anstarten...
+	if (SONOS_Client_Data_Retreive($udn, 'reading', 'presence', 'disappeared') eq 'disappeared') {
+		SONOS_Log $udn, 1, "Transport-Event: device '$name' is marked as disappeared. Restarting discovery-process!";
+		
+		SONOS_RestartControlPoint();
+	}
+	
 	return 0;
 }
 
@@ -5973,6 +6012,13 @@ sub SONOS_RenderingCallback($$) {
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of Rendering-Event for Zone "'.$name.'".';
 	
+	# Prüfen, ob der Player auf 'disappeared' steht, und in diesem Fall den DiscoverProcess neu anstarten...
+	if (SONOS_Client_Data_Retreive($udn, 'reading', 'presence', 'disappeared') eq 'disappeared') {
+		SONOS_Log $udn, 1, "Rendering-Event: device '$name' is marked as disappeared. Restarting discovery-process!";
+		
+		SONOS_RestartControlPoint();
+	}
+	
 	return 0;
 }
 
@@ -6037,6 +6083,13 @@ sub SONOS_GroupRenderingCallback($$) {
 	
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of GroupRendering-Event for Zone "'.$name.'".';
+	
+	# Prüfen, ob der Player auf 'disappeared' steht, und in diesem Fall den DiscoverProcess neu anstarten...
+	if (SONOS_Client_Data_Retreive($udn, 'reading', 'presence', 'disappeared') eq 'disappeared') {
+		SONOS_Log $udn, 1, "GroupRendering-Event: device '$name' is marked as disappeared. Restarting discovery-process!";
+		
+		SONOS_RestartControlPoint();
+	}
 	
 	return 0;
 }
@@ -6222,6 +6275,13 @@ sub SONOS_AlarmCallback($$) {
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of Alarm-Event for Zone "'.$name.'".';
 	
+	# Prüfen, ob der Player auf 'disappeared' steht, und in diesem Fall den DiscoverProcess neu anstarten...
+	if (SONOS_Client_Data_Retreive($udn, 'reading', 'presence', 'disappeared') eq 'disappeared') {
+		SONOS_Log $udn, 1, "Alarm-Event: device '$name' is marked as disappeared. Restarting discovery-process!";
+		
+		SONOS_RestartControlPoint();
+	}
+	
 	return 0;
 }
 
@@ -6324,6 +6384,13 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of ZoneGroupTopology-Event for Zone "'.$name.'".';
 	
+	# Prüfen, ob der Player auf 'disappeared' steht, und in diesem Fall den DiscoverProcess neu anstarten...
+	if (SONOS_Client_Data_Retreive($udn, 'reading', 'presence', 'disappeared') eq 'disappeared') {
+		SONOS_Log $udn, 1, "ZoneGroupTopology-Event: device '$name' is marked as disappeared. Restarting discovery-process!";
+		
+		SONOS_RestartControlPoint();
+	}
+	
 	return 0;
 }
 
@@ -6405,6 +6472,13 @@ sub SONOS_DevicePropertiesCallback($$) {
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of DeviceProperties-Event for Zone "'.$name.'".';
 	
+	# Prüfen, ob der Player auf 'disappeared' steht, und in diesem Fall den DiscoverProcess neu anstarten...
+	if (SONOS_Client_Data_Retreive($udn, 'reading', 'presence', 'disappeared') eq 'disappeared') {
+		SONOS_Log $udn, 1, "DeviceProperties-Event: device '$name' is marked as disappeared. Restarting discovery-process!";
+		
+		SONOS_RestartControlPoint();
+	}
+	
 	return 0;
 }
 
@@ -6455,6 +6529,13 @@ sub SONOS_AudioInCallback($$) {
 	
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of AudioIn-Event for Zone "'.$name.'".';
+	
+	# Prüfen, ob der Player auf 'disappeared' steht, und in diesem Fall den DiscoverProcess neu anstarten...
+	if (SONOS_Client_Data_Retreive($udn, 'reading', 'presence', 'disappeared') eq 'disappeared') {
+		SONOS_Log $udn, 1, "AudioIn-Event: device '$name' is marked as disappeared. Restarting discovery-process!";
+		
+		SONOS_RestartControlPoint();
+	}
 	
 	return 0;
 }
