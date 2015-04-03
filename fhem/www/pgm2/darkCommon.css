@@ -4,5 +4,7 @@
 div.ui-dialog { border:3px solid white; padding: 0.2em; }
 div.ui-dialog div.ui-dialog-titlebar { display:none; }
 div.ui-widget-content { background:#444444; color:#CCCCCC; }
+.ui-widget { font-family:Arial,sans-serif!important; }
+.ui-button-text { font-weight:normal!important; color:#555!important; }
 
 div.detLink { display:inline-block; margin-right:0.5em; }
