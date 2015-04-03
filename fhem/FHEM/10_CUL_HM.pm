@@ -1037,14 +1037,26 @@ sub CUL_HM_Parse($$) {#########################################################
       if($mTp =~ m /^4[01]/){ #someone is triggered##########
         my $chn = hex($mI[0])& 0x3f;
         my $cName = CUL_HM_id2Name($src.sprintf("%02X",$chn));
-        push @evtEt,[$defs{$cName},1,"trig_aes_$dname:$aesStat:$mNo"];
- 
+        my $bCnt = hex($mI[1]);
+        push @evtEt,[$defs{$cName},1,"trig_aes_$dname:$aesStat:$bCnt"];
+
+        if($aesStat eq "ok"                     #aes ok
+           && defined $devH->{cmdStacAESPend}   #commands waiting
+           && $ioId eq $dst){                   #aes from IO device
+          foreach (@{$devH->{cmdStacAESPend}}) {
+            my ($h,$c) = split(";",$_);
+            CUL_HM_PushCmdStack(CUL_HM_id2Hash($h),$c);
+          }
+          CUL_HM_ProcessCmdStack($shash);
+        }
+        delete $devH->{cmdStacAESPend};          
+
         my @peers = grep !/00000000/,split(",",AttrVal($cName,"peerIDs",""));
         foreach my $peer (grep /$dst/,@peers){
           my $pName = CUL_HM_id2Name($peer);
           $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
           next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
-          push @evtEt,[$defs{$pName},1,"trig_aes_$cName:$aesStat:$mNo"];
+          push @evtEt,[$defs{$pName},1,"trig_aes_$cName:$aesStat:$bCnt"];
         }
       }
       $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
@@ -1850,6 +1862,7 @@ sub CUL_HM_Parse($$) {#########################################################
         my $type = $trigType eq "Short"?"s":"l";
         if ($devH->{cmdStack}){# there are pending commands. we only send new ones
           delete $devH->{cmdStack};
+          delete $devH->{cmdStacAESPend};
           delete $devH->{helper}{prt}{rspWait};
           delete $devH->{helper}{prt}{rspWaitSec};
           delete $devH->{helper}{prt}{mmcA};
@@ -1858,7 +1871,16 @@ sub CUL_HM_Parse($$) {#########################################################
         }
 
         CUL_HM_calcDisWm($chnHash,$devH->{NAME},($trigType eq "Long"?"l":"s"));
-        CUL_HM_PushCmdStack($shash,"++A011$id$src$_")foreach (@{$chnHash->{helper}{disp}{$type}});
+        if (CUL_HM_getAttrInt($name,"aesCommReq") == 1){
+          my @arr = ();
+          $devH->{cmdStacAESPend} = \@arr;
+          push (@{$devH->{cmdStacAESPend} },"$src;++A011$id$src$_")
+                foreach (@{$chnHash->{helper}{disp}{$type}});
+       }
+        else{
+          CUL_HM_PushCmdStack($shash,"++A011$id$src$_")
+                foreach (@{$chnHash->{helper}{disp}{$type}});
+        }
       }
     }
     else{# could be an Em8
@@ -2111,8 +2133,7 @@ sub CUL_HM_Parse($$) {#########################################################
       }
     }
   }
-  elsif($st eq "motionDetector") { ############################################
-    # Code with help of Bassem
+  elsif($st =~ m /^(motionDetector|motionAndBtn)$/) { #########################
     my $state = $mI[2];
     if(($mTp eq "10" ||$mTp eq "02") && $p =~ m/^0601..../) {
       my ($err,$bright)=(hex($mI[3]),hex($mI[2]));
@@ -2126,9 +2147,13 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$shash,1,"battery:".   (($err&0x80)?"low"  :"ok"  )];
     }
     elsif($mTp eq "41") {#01 is channel
-      my($cnt,$bright) = (hex($mI[1]),hex($mI[2]));
+      my($chn,$cnt,$bright) = (hex($mI[0]),hex($mI[1]),hex($mI[2]));
       my $nextTr = (@mI >3)? (int((1<<((hex($mI[3])>>4)-1))/1.1)."s")
                            : "-";
+      my $chId = $src.sprintf("%02X",$chn&0x3f);
+      $shash = $modules{CUL_HM}{defptr}{$chId}
+                             if($modules{CUL_HM}{defptr}{$chId});
+                             
       push @evtEt,[$shash,1,"state:motion"];
       push @evtEt,[$shash,1,"motion:on$target"];
       push @evtEt,[$shash,1,"motionCount:$cnt"."_next:$nextTr"];
@@ -2917,7 +2942,7 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
     else{
       return ();# duplicate alarm
     }
-    my ($sVal,$sProsa,$smokeSrc) = (hex($state),"off","-");
+    my ($sVal,$sProsa,$smokeSrc) = (hex($state),"off","none");
     if ($sVal > 1){
       $sProsa = "smoke-Alarm_".$No;
       $smokeSrc = $dName;
