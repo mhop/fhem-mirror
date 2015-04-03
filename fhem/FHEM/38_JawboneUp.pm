@@ -184,7 +184,7 @@ sub jawboneUp_DoBackground($)
  #my $nr=0;
  
     my $sl=0; # sleep-mode
-    my $st=0; # stopwatch-mode
+    my $sw=0; # stopwatch-mode
     for (my $i=0; $i<$nr; $i++) {
     	# my $tx=localtime($json->{"data"}->{"items"}[$i]->{"time_created"});
 	    my $act = $json->{"data"}->{"items"}[$i]->{"action"};
@@ -204,17 +204,17 @@ sub jawboneUp_DoBackground($)
 	    my $act = $json->{"data"}->{"items"}[$i]->{"action"};
 	    if ($act eq "enter_stopwatch_mode") 
 	        {
-	        $st=1;
+	        $sw=1;
 	        last;
             }
 	    if ($act eq "exit_stopwatch_mode") 
 	        {
-	        $st=0;
+	        $sw=0;
 	        last;
             }
 	    }
 
-    return "OK|$na|$st|$ca|$di|$bc|$bd|$at|$li|$aw|$as|$sl|$st";
+    return "OK|$na|$st|$ca|$di|$bc|$bd|$at|$li|$aw|$as|$sl|$sw";
   } 
   #Error: API doesn't return any information about errors...
   my $na=$hash->{NAME};
