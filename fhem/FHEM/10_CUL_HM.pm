@@ -3078,7 +3078,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   elsif($cmd =~ m /^(reg|regVal)$/) {  ########################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
     if ($regReq eq 'all'){
-      my @regArr = CUL_HM_getRegN($st,$md,$chn);
+      my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
 
       my @peers; # get all peers we have a reglist
       my @listWp; # list that require peers
@@ -3645,7 +3645,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     my (undef,undef,$regName,$data,$peerChnIn) = @a;
     $state = "";
-    my @regArr = CUL_HM_getRegN($st,$md,$chn);
+    my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
+    
     return "$regName failed: supported register are ".join(" ",sort @regArr)
             if (!grep /^$regName$/,@regArr );
 
@@ -6597,12 +6598,14 @@ sub CUL_HM_time2min($) { # minutes -> time
   return $m;
 }
 
-sub CUL_HM_getRegN($$$){ # get list of register for a model
-  my ($st,$md,$chn) = @_;
+sub CUL_HM_getRegN($$@){ # get list of register for a model
+  my ($st,$md,@chn) = @_;
   my @regArr = keys %{$culHmRegGeneral};
   push @regArr, keys %{$culHmRegType->{$st}}      if($culHmRegType->{$st});
   push @regArr, keys %{$culHmRegModel->{$md}}     if($culHmRegModel->{$md});
-  push @regArr, keys %{$culHmRegChan->{$md.$chn}} if($culHmRegChan->{$md.$chn});
+  foreach (@chn){
+    push @regArr, keys %{$culHmRegChan->{$md.$_}} if($culHmRegChan->{$md.$_});
+  }
   return @regArr;
 }
 sub CUL_HM_4DisText($) {      # convert text for 4dis
