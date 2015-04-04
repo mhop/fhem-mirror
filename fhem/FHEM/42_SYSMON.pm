@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.4";
+my $VERSION = "2.1.5";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -51,7 +51,8 @@ use constant {
 };
 
 use constant {
-  CPU_FREQ     => "cpu_freq",
+	CPU_CORE_CNT  => "cpu_core_count",
+  CPU_FREQ      => "cpu_freq",
   CPU0_FREQ     => "cpu0_freq",
   CPU1_FREQ     => "cpu1_freq",
   CPU2_FREQ     => "cpu2_freq",
@@ -128,6 +129,7 @@ SYSMON_Initialize($)
                       "telnet-time-out ".
                       "user-fn2 user-fn ".
                       "telnet-prompt-regx telnet-login-prompt-regx ".
+                      "exclude ".
                        $readingFnAttributes;
 }
 ### attr NAME user-defined osUpdates:1440:Aktualisierungen:cat ./updates.txt [,<readingsName>:<Interval_Minutes>:<Comment>:<Cmd>]
@@ -267,6 +269,8 @@ SYSMON_updateCurrentReadingsMap($) {
       $rMap->{"cpu".$li."_temp_avg"}   = "Average CPU temperature (core $li)";
     }
   }  
+  
+  $rMap->{+CPU_CORE_CNT}   = "Number of CPU cores";
   
   if(SYSMON_isSysPowerAc($hash)) {
     #$rMap->{"power_ac_online"}  = "AC-Versorgung Status";
@@ -763,8 +767,13 @@ SYSMON_Attr($$$)
   my $orig = AttrVal($name, $attrName, "");
   
   if( $orig ne $attrVal ) {
-    
     if( $cmd eq "set" ) {# set, del  
+      
+      if($attrName eq "exclude") {
+  		  my @elist = split(/,\s*/, trim($attrVal));
+  		  my %ehash = map { $_ => 1 } @elist;
+  		  $hash->{helper}->{excludes}=\%ehash;
+  	  }
 
       if($attrName eq "disable")
       {
@@ -784,6 +793,10 @@ SYSMON_Attr($$$)
       
       #return $attrName ." set to ". $attrVal;
       return undef;
+    } elsif( $cmd eq "del" ) {
+    	if($attrName eq "exclude") {
+  		  $hash->{helper}->{excludes}=undef;
+  	  }
     }
   }
   return;
@@ -1097,6 +1110,9 @@ SYSMON_obtainParameters_intern($$)
   if($m1 gt 0) { # Nur wenn > 0
     # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg, procstat, iostat
     if($refresh_all || ($ref % $m1) eq 0) {
+    	
+    	$map = SYSMON_getCPUCoreNum($hash, $map);
+    	
       #Log 3, "SYSMON -----------> DEBUG: read CPU-Temp"; 
       if(SYSMON_isCPUTempRPi($hash)) { # Rasp
          $map = SYSMON_getCPUTemp_RPi($hash, $map);
@@ -1367,6 +1383,8 @@ SYSMON_getUserDefined($$$$)
   my ($hash, $map, $uName, $uCmd) = @_;
   SYSMON_Log($hash, 5, "Name=[$uName] Cmd=[$uCmd]");
   
+  if($hash->{helper}->{excludes}{'user-defined'}) {return $map;}
+  
   my @out_arr = SYSMON_execute($hash, $uCmd);
   
   my $out_str = "";
@@ -1387,6 +1405,9 @@ SYSMON_getUserDefined($$$$)
 
 sub SYSMON_getUserDefinedFn($$$@) {
   my($hash, $map, $fnName, @readings) = @_;
+  
+  #SYSMON_Log($hash, 3, ">>>>>>>>>>>>>>>>>>>>> exclude: ".Dumper($hash->{helper}->{excludes}));
+  if($hash->{helper}->{excludes}{'user-defined'}) {return $map;}
   
   SYSMON_Log($hash, 5, "call User-Function: [$fnName]");
   if(defined $fnName) {
@@ -1425,8 +1446,7 @@ sub SYSMON_getUserDefinedFn($$$@) {
 
 #my $sys_cpu_core_num = undef;
 sub
-SYSMON_getCPUCoreNum($)
-{
+SYSMON_getCPUCoreNum_intern($) {
   my ($hash) = @_;
   
   return $hash->{helper}{sys_cpu_core_num} if $hash->{helper}{sys_cpu_core_num};
@@ -1450,6 +1470,19 @@ SYSMON_getCPUCoreNum($)
 }
 
 #------------------------------------------------------------------------------
+# leifert Anzahl CPU Kerne
+#------------------------------------------------------------------------------
+sub SYSMON_getCPUCoreNum($$) {
+	 my ($hash, $map) = @_;
+	 
+	 if($hash->{helper}->{excludes}{'cpucount'}) {return $map;}
+	 
+   my $cpuCoreCnt = SYSMON_getCPUCoreNum_intern($hash);
+   $map->{+CPU_CORE_CNT}=$cpuCoreCnt;
+   return $map;
+}
+
+#------------------------------------------------------------------------------
 # leifert Zeit seit dem Systemstart
 #------------------------------------------------------------------------------
 sub
@@ -1457,13 +1490,15 @@ SYSMON_getUptime($$)
 {
   my ($hash, $map) = @_;
 
+  if($hash->{helper}->{excludes}{'uptime'}) {return $map;}
+
   #my $uptime_str = qx(cat /proc/uptime );
   my $uptime_str = SYSMON_execute($hash, "cat /proc/uptime");
   if(defined($uptime_str)) {
     my ($uptime, $idle) = split(/\s+/, trim($uptime_str));
     if(defined($uptime) && int($uptime)!=0) {
       # Anzahl Cores beruecksichtigen
-      my $core_num = SYSMON_getCPUCoreNum($hash);
+      my $core_num = SYSMON_getCPUCoreNum_intern($hash);
       my $idle_percent = $idle/($uptime*$core_num)*100;
     
       $map->{+UPTIME}=sprintf("%d",$uptime);
@@ -1486,6 +1521,8 @@ sub
 SYSMON_getUptime2($$)
 {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'uptime'}) {return $map;}
 
 #TODO
   my $uptime = SYSMON_execute($hash,"uptime");
@@ -1539,6 +1576,8 @@ sub
 SYSMON_getFHEMUptime($$)
 {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'fhemuptime'}) {return $map;}
 
   #if(defined ($hash->{DEF_TIME})) {
   if(defined($fhem_started)) {
@@ -1558,6 +1597,8 @@ sub
 SYSMON_getLoadAvg($$)
 {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'loadavg'}) {return $map;}
 
   my $la_str = SYSMON_execute($hash, "cat /proc/loadavg");
   if(defined($la_str)) {
@@ -1577,10 +1618,11 @@ SYSMON_getLoadAvg($$)
 # leifert CPU Temperature (Raspberry Pi)
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUTemp_RPi($$)
-{
-  
+SYSMON_getCPUTemp_RPi($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'cputemp'}) {return $map;}
+  
   my $val = SYSMON_execute($hash, "cat /sys/class/thermal/thermal_zone0/temp 2>&1");  
   $val = int($val);
   if($val>1000) { # Manche Systeme scheinen die Daten verschieden zu skalieren (z.B. utilite)...
@@ -1597,9 +1639,11 @@ SYSMON_getCPUTemp_RPi($$)
 # leifert CPU Temperature (BeagleBone Black)
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUTemp_BBB($$)
-{
+SYSMON_getCPUTemp_BBB($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'cputemp'}) {return $map;}
+  
   my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
   $val = int($val);
   my $val_txt = sprintf("%.2f", $val/1000);
@@ -1616,9 +1660,11 @@ SYSMON_getCPUTemp_BBB($$)
 # leifert CPU Temperature (mehrere Kerne eines ?)
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUTemp_X($$;$)
-{
+SYSMON_getCPUTemp_X($$;$) {
   my ($hash, $map, $cpuNum) = @_;
+  
+  if($hash->{helper}->{excludes}{'cputemp'}) {return $map;}
+  
   $cpuNum = 0 unless defined $cpuNum;
   
   my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/hwmon/hwmon0/temp".($cpuNum+1)."_input 2>&1");
@@ -1634,10 +1680,11 @@ SYSMON_getCPUTemp_X($$;$)
 # leifert CPU Temperature (FritzBox)
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUTemp_FB($$)
-{
-  
+SYSMON_getCPUTemp_FB($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'cputemp'}) {return $map;}
+  
   my $val = SYSMON_execute($hash, "ctlmgr_ctl r cpu status/StatTemperature");  
   if(defined($val)) {
     if($val=~m/(\d+),/) {
@@ -1655,9 +1702,11 @@ SYSMON_getCPUTemp_FB($$)
 # leifert CPU Frequenz (Raspberry Pi, BeagleBone Black, Cubietruck, etc.)
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUFreq($$;$)
-{
+SYSMON_getCPUFreq($$;$) {
   my ($hash, $map, $cpuNum) = @_;
+  
+  if($hash->{helper}->{excludes}{'cpufreq'}) {return $map;}
+  
   $cpuNum = 0 unless defined $cpuNum;
   my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1");
   $val = int($val);
@@ -1690,9 +1739,11 @@ SYSMON_getCPUFreq($$;$)
 # leifert CPU Speed in BogoMIPS
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUBogoMIPS($$)
-{
+SYSMON_getCPUBogoMIPS($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'bogomips'}) {return $map;}
+  
   my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
   # nur einmalig ermitteln (wird sich ja nicht aendern
   if(!defined $old_val) {
@@ -1803,9 +1854,11 @@ SYSMON_getCPUBogoMIPS($$)
 #       this partition.
 #------------------------------------------------------------------------------
 sub
-SYSMON_getDiskStat($$)
-{
+SYSMON_getDiskStat($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'diskstat'}) {return $map;}
+  
   my @values = SYSMON_execute($hash, "cat /proc/diskstats");
 
   for my $entry (@values){
@@ -1903,9 +1956,11 @@ SYSMON_getDiskStat_intern($$$)
 #   ProzCPUuser = (CPUuser / GesammtCPU) * 100
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUProcStat($$)
-{
+SYSMON_getCPUProcStat($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'cpustat'}) {return $map;}
+  
   my @values = SYSMON_execute($hash, "cat /proc/stat");
   
   for my $entry (@values){
@@ -1967,9 +2022,10 @@ SYSMON_getCPUProcStat_intern($$$)
 #------------------------------------------------------------------------------
 # Liefert Werte fuer RAM und SWAP (Gesamt, Verwendet, Frei).
 #------------------------------------------------------------------------------
-sub SYSMON_getRamAndSwap($$)
-{
+sub SYSMON_getRamAndSwap($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'ramswap'}) {return $map;}
 
   #my @speicher = qx(free -m);
   my @speicher = SYSMON_execute($hash, "free");
@@ -2061,9 +2117,10 @@ sub SYSMON_isLinux()
 #------------------------------------------------------------------------------
 # Liefert Werte fuer RAM und SWAP (Gesamt, Verwendet, Frei).
 #------------------------------------------------------------------------------
-sub SYSMON_getRamAndSwapOSX($$)
-{
+sub SYSMON_getRamAndSwapOSX($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'ramswap'}) {return $map;}
   
   my $debug = 0; # Nur zum Testen!
 
@@ -2267,9 +2324,10 @@ sub SYSMON_fmtStorageAmount_($) {
 # Liefert Fuellstand fuer das angegebene Dateisystem (z.B. '/dev/root', '/dev/sda1' (USB stick)).
 # Eingabeparameter: HASH; MAP; FS-Bezeichnung
 #------------------------------------------------------------------------------
-sub SYSMON_getFileSystemInfo ($$$)
-{
+sub SYSMON_getFileSystemInfo ($$$) {
   my ($hash, $map, $fs) = @_;
+  
+  if($hash->{helper}->{excludes}{'filesystem'}) {return $map;}
   
   SYSMON_Log($hash, 5, "get $fs");
   
@@ -2366,9 +2424,11 @@ sub SYSMON_getFileSystemInfo ($$$)
 # Liefert Netztwerkinformationen
 # Parameter: HASH; MAP; DEVICE (eth0 or wlan0)
 #------------------------------------------------------------------------------
-sub SYSMON_getNetworkInfo ($$$)
-{
+sub SYSMON_getNetworkInfo ($$$) {
   my ($hash, $map, $device) = @_;
+  
+  if($hash->{helper}->{excludes}{'network'}) {return $map;}
+  
   SYSMON_Log($hash, 5, "get $device");
   my($nName, $nDef) = split(/:/, $device);
   if(!defined $nDef) {
@@ -2549,9 +2609,10 @@ sub SYSMON_getNetworkInfo ($$$)
 # Liefert Informationen, ob WLAN an oder aus ist (nur FritzBox)
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
-sub SYSMON_getFBWLANState($$)
-{
+sub SYSMON_getFBWLANState($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'network'}) {return $map;}
   
   #SYSMON_Log($hash, 5, "");
   
@@ -2564,9 +2625,10 @@ sub SYSMON_getFBWLANState($$)
 # Liefert Informationen, ob WLAN-Gastzugang an oder aus ist (nur FritzBox)
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
-sub SYSMON_getFBWLANGuestState($$)
-{
+sub SYSMON_getFBWLANGuestState($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'network'}) {return $map;}
   
   #SYSMON_Log($hash, 5, "");
   
@@ -2579,9 +2641,10 @@ sub SYSMON_getFBWLANGuestState($$)
 # Liefert IP Adresse im Internet (nur FritzBox)
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
-sub SYSMON_getFBInetIP($$)
-{
+sub SYSMON_getFBInetIP($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'network'}) {return $map;}
   
   $map->{+FB_INET_IP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/ipaddr");
   
@@ -2592,9 +2655,10 @@ sub SYSMON_getFBInetIP($$)
 # Liefert Status Internet-Verbindung (nur FritzBox)
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
-sub SYSMON_getFBInetConnectionState($$)
-{
+sub SYSMON_getFBInetConnectionState($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'network'}) {return $map;}
   
   $map->{+FB_INET_STATE}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connection_status");
   
@@ -2605,9 +2669,10 @@ sub SYSMON_getFBInetConnectionState($$)
 # Liefert Status Klingelsperre (nur FritzBox)
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
-sub SYSMON_getFBNightTimeControl($$)
-{
+sub SYSMON_getFBNightTimeControl($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'fbnightctrl'}) {return $map;}
   
   $map->{+FB_N_TIME_CTRL}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r box settings/night_time_control_enabled",1);
   
@@ -2618,9 +2683,10 @@ sub SYSMON_getFBNightTimeControl($$)
 # Liefert Anzahl der nicht abgehoerten Nachrichten auf dem Anrufbeantworter (nur FritzBox)
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
-sub SYSMON_getFBNumNewMessages($$)
-{
+sub SYSMON_getFBNumNewMessages($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'fbnewmessages'}) {return $map;}
   
   $map->{+FB_NUM_NEW_MESSAGES}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r tam status/NumNewMessages");
   
@@ -2631,9 +2697,10 @@ sub SYSMON_getFBNumNewMessages($$)
 # Liefert DECT-Temperatur einer FritzBox.
 # Parameter: HASH; MAP
 #------------------------------------------------------------------------------
-sub SYSMON_getFBDECTTemp($$)
-{
+sub SYSMON_getFBDECTTemp($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'fbdecttemp'}) {return $map;}
   
   $map->{+FB_DECT_TEMP}=SYSMON_acquireInfo_intern($hash, "ctlmgr_ctl r dect status/Temperature");
   
@@ -2645,8 +2712,7 @@ sub SYSMON_getFBDECTTemp($$)
 # Parameter: HASH
 # Return Hash mit Devices
 #------------------------------------------------------------------------------
-sub SYSMON_getFBLanDeviceList($)
-{
+sub SYSMON_getFBLanDeviceList($) {
   my ($hash) = @_;
   
   if(!SYSMON_isFB($hash)) {
@@ -2750,9 +2816,10 @@ sub SYSMON_acquireInfo_intern($$;$)
   return $ret;
 }
 
-sub SYSMON_FBVersionInfo($$)
-{
+sub SYSMON_FBVersionInfo($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'fbversion'}) {return $map;}
   
   my $data = SYSMON_execute($hash, "/etc/version --version --date");
   
@@ -2784,6 +2851,8 @@ sub SYSMON_FBVersionInfo($$)
 sub SYSMON_getFBStreamRate($$) {
   my ($hash, $map) = @_;
   
+  if($hash->{helper}->{excludes}{'fbdsl'}) {return $map;}
+  
   my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_ds_rate");
   unless($ds_rate) {
     return SYSMON_getFBStreamRate2($hash, $map);
@@ -2800,6 +2869,8 @@ sub SYSMON_getFBStreamRate($$) {
 # DSL-Geschwindigkeit mit neuer FritzOS (6.23)
 sub SYSMON_getFBStreamRate2($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'fbdsl'}) {return $map;}
   
   my $ds_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/in");
   my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r dslstatglobal status/out");
@@ -2829,6 +2900,8 @@ sub SYSMON_sec2Dauer($){
 sub SYSMON_getFBSyncTime($$) {
   my ($hash, $map) = @_;
   
+  if($hash->{helper}->{excludes}{'fbdsl'}) {return $map;}
+  
   my $data = SYSMON_execute($hash, "ctlmgr_ctl r sar status/modem_ShowtimeSecs");
   unless($data) {
     return SYSMON_getFBSyncTime2($hash, $map);
@@ -2846,6 +2919,8 @@ sub SYSMON_getFBSyncTime($$) {
 sub SYSMON_getFBSyncTime2($$) {
   my ($hash, $map) = @_;
   
+  if($hash->{helper}->{excludes}{'fbdsl'}) {return $map;}
+  
   my $data = SYSMON_execute($hash, "ctlmgr_ctl r dslstatistic status/ifacestat0/connect_time");
   
   if(defined($data) && $data ne "") {
@@ -2858,6 +2933,8 @@ sub SYSMON_getFBSyncTime2($$) {
 #Uebertragungsfehler abfragen (nicht behebbar und behebbar)
 sub SYSMON_getFBCRCFEC($$) {
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'fbdsl'}) {return $map;}
   
   my $ds_crc = SYSMON_execute($hash, "ctlmgr_ctl r sar status/ds_crc_per15min");
   my $us_crc = SYSMON_execute($hash, "ctlmgr_ctl r sar status/us_crc_per15min");
@@ -3279,10 +3356,12 @@ SYSMON_isNetStatClass($$) {
   return $hash->{helper}{'net_'.$nName.'_stat_class'};
 }
 
-sub SYSMON_PowerAcInfo($$)
-{
+sub SYSMON_PowerAcInfo($$) {
   #online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'powerinfo'}) {return $map;}
+  
   my $type="ac";
   my $base = "cat /sys/class/power_supply/".$type."/";
     
@@ -3302,10 +3381,12 @@ sub SYSMON_PowerAcInfo($$)
   return $map;
 }
 
-sub SYSMON_PowerUsbInfo($$)
-{
+sub SYSMON_PowerUsbInfo($$) {
   #online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'powerinfo'}) {return $map;}
+  
   my $type="usb";
   my $base = "cat /sys/class/power_supply/".$type."/";
     
@@ -3326,10 +3407,12 @@ sub SYSMON_PowerUsbInfo($$)
   return $map;
 }
 
-sub SYSMON_PowerBatInfo($$)
-{
+sub SYSMON_PowerBatInfo($$) {
   #online, present, current_now (/1000 =>mA), voltage_now (/1000000 => V)
   my ($hash, $map) = @_;
+  
+  if($hash->{helper}->{excludes}{'powerinfo'}) {return $map;}
+  
   my $type="battery";
   my $base = "cat /sys/class/power_supply/".$type."/";
     
@@ -3906,6 +3989,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   <b>Readings:</b>
   <br><br>
   <ul>
+    <li>cpu_core_count<br>
+        CPU core count
+    </li>
     <li>cpu_bogomips<br>
         CPU Speed: BogoMIPS
     </li>
@@ -4272,6 +4358,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     RegExp to detect login and command line prompt. (Only for access via Telnet.)
     </li>
     <br>
+    <li>exclude<br>
+    Allows to suppress reading certain information. <br>
+    supported values: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
+    loadavg, cputemp, cpufreq, bogomips, diskstat, cpustat, ramswap, filesystem, network, 
+    fbwlan, fbnightctrl, fbnewmessages, fbdecttemp, fbversion, fbdsl, powerinfo
+    </li>
+    <br>
     </ul><br>
 
   <b>Plots:</b><br><br>
@@ -4495,6 +4588,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   <b>Readings:</b>
   <br><br>
   <ul>
+    <li>cpu_core_count<br>
+        Anzahl der CPU Kerne
+    </li>
     <li>cpu_bogomips<br>
         CPU Speed: BogoMIPS
     </li>
@@ -4873,6 +4969,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
     RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur f&uuml;r Zugriffe &uuml;ber Telnet relevant.)
+    </li>
+    <br>
+    <li>exclude<br>
+    Erlaubt das Abfragen bestimmten Informationen zu unterbinden. <br>
+    Mögliche Werte: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
+    loadavg, cputemp, cpufreq, bogomips, diskstat, cpustat, ramswap, filesystem, network, 
+    fbwlan, fbnightctrl, fbnewmessages, fbdecttemp, fbversion, fbdsl, powerinfo
     </li>
     <br>
     </ul><br>
