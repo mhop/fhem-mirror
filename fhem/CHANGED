@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: SYSMON: new reading: cpu_core_count
+  - feature: SYSMON: Allows to suppress reading certain information.
   - change:  14_CUL_TCM97001: Add support for ABS700, NC_WS, GT-WT-02 and AURIOL sensors
   - added:   New modue 38_JawboneUp: Fitness and sleep statistics in FHEM
   - change:  FB_CALLMONITOR: use cache first for reverse search
