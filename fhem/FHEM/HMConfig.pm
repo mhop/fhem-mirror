@@ -1143,6 +1143,7 @@ $culHmRegModel{"HM-PB-4DIS-WM-2"}     = $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,seqPulse5       =>1,seqTolerance    =>1
                          ,peerNeedsBurst  =>1
                         }
+ ,"HM-Sen-MDIR-WM5500"=>{ intKeyVisib     =>1,cyclicInfoMsg   =>1,localResDis     =>1,transmDevTryMax =>1}
  ,"HM-Sen-MDIR-WM5501"=>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
                          ,sign            =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,localResDis     =>1
@@ -1150,8 +1151,8 @@ $culHmRegModel{"HM-PB-4DIS-WM-2"}     = $culHmRegModel{"HM-PB-4DIS-WM"};
   );
 
 #clones - - - - - - - - - - - - - - -
-$culHmRegChan{"HM-Sen-MDIR-WM5503"}   = $culHmRegType{motionDetector};
 $culHmRegChan{"HM-Sen-MDIR-WM5502"}   = $culHmRegChan{"HM-Sen-MDIR-WM5501"};
+$culHmRegChan{"HM-Sen-MDIR-WM5503"}   = $culHmRegType{motionDetector};
 
 
 $culHmRegChan{"HM-RC-19-B12"}         = $culHmRegChan{"HM-RC-1912"};
@@ -1174,6 +1175,7 @@ $culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegChan{"HM-CC-RT-DN06"};
 
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegChan{"HM-CC-TC02"};
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
+
 
 ##############################---templates---##################################
 #en-block programming of funktions

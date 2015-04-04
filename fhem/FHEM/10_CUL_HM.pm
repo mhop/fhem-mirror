@@ -3005,13 +3005,13 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   my $md = AttrVal($devName, "model", "");
 
   my $cmd = $a[1];
-  my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
-  return "" if (!defined $chn);
   
   my $roleC = $hash->{helper}{role}{chn}?1:0; #entity may act in multiple roles
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
+  
+  my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.($roleC?'01':'00');
 
   my $h = undef;
   $h = $culHmGlobalGets->{$cmd}       if(!$roleV);
