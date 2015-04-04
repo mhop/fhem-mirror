@@ -317,21 +317,7 @@ CUL_TCM97001_Parse($$)
         $def = $modules{CUL_TCM97001}{defptr}{$idType1};
         if($def) {
           $name = $def->{NAME};
-        }   
-        my $bin = undef;
-        my $bin1= undef;
-        $bin1=sprintf("%024b",hex(substr($msg,0,length($msg)-8)));
-        while (length($bin1) < (length($msg)-8)*4) {
-            # suffix 0
-            $bin1 = '0'.$bin1;   
         }
-        $bin1=substr($bin1,((length($msg)-8)*8));
-        my $bin2=sprintf("%024b",hex(substr($msg,length($msg)-8,length($msg)-1)));
-        while (length($bin2) < 32) {
-            # suffix 0
-            $bin2 = '0'.$bin2;   
-        }
-        $bin = $bin1 . $bin2;
 
         my @a = split("", $msg);
         my $bitReverse = undef;
@@ -646,7 +632,8 @@ CUL_TCM97001_Parse($$)
     $attr{$name}{model} = $model;
     return $name;
   } else {
-    Log3 $name, 4, "CUL_TCM97001 Device not interplmeted yet name $name msg $msg";
+    $name = $defUnknown->{NAME};
+    Log3 $name, 4, "CUL_TCM97001 Device not interplmeted yet name Unknown msg $msg";
     if (!$defUnknown) {
       Log3 "Unknown", 2, "CUL_TCM97001 Unknown device Unknown, please define it";
       return "UNDEFINED CUL_TCM97001_Unknown CUL_TCM97001 Unknown" if(!$defUnknown); 
@@ -656,13 +643,8 @@ CUL_TCM97001_Parse($$)
 
     if ($defUnknown) {
       $defUnknown->{lastT} = $now;
-    };
-
-    my $defSvg = $defs{"SVG_CUL_TCM97001_Unknown"}; 
-
-    if ($defSvg) {
-      CommandDelete(undef, $defSvg->{NAME});
     }
+
     $attr{$name}{model} = $model;
     readingsBeginUpdate($defUnknown);
     readingsBulkUpdate($defUnknown, "state", $state);
@@ -670,11 +652,15 @@ CUL_TCM97001_Parse($$)
     if(defined($rssi)) {
       $defUnknown->{RSSI} = $rssi;
     }
-    return $name;
 
+    my $defSvg = $defs{"SVG_CUL_TCM97001_Unknown"}; 
+
+    if ($defSvg) {
+      CommandDelete(undef, $defSvg->{NAME});
+    }
+    return $name;
   }
 
-  
 
   return undef;
 }
