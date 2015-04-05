@@ -158,7 +158,7 @@ FB_CALLMONITOR_Get($@)
 
     return "argument missing" if(int(@arguments) < 2);
 
-    if($arguments[1] eq "search")
+    if($arguments[1] eq "search" and int(@arguments) == 3)
     {
         return FB_CALLMONITOR_reverseSearch($hash, $arguments[2]);
     }
@@ -238,6 +238,7 @@ FB_CALLMONITOR_Set($@)
     my @sets = ();
     
     push @sets, "rereadPhonebook" if(defined($hash->{helper}{PHONEBOOK}) or AttrVal($name, "reverse-search" , "") =~ /(all|phonebook|internal)/);
+    push @sets, "rereadCache" if(defined(AttrVal($name, "reverse-search-cache-file" , undef)));
     push @sets, "password" if($hash->{helper}{PWD_NEEDED});
     
     $usage = "Unknown argument ".$a[1].", choose one of ".join(" ", @sets) if(scalar @sets > 0);
@@ -245,6 +246,11 @@ FB_CALLMONITOR_Set($@)
     if($a[1] eq "rereadPhonebook")
     {
         FB_CALLMONITOR_readPhonebook($hash);
+        return undef;
+    }
+    elsif($a[1] eq "rereadCache")
+    {
+        FB_CALLMONITOR_loadCacheFile($hash);
         return undef;
     }
     elsif($a[1] eq "password")
@@ -955,6 +961,10 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
             Log3 $name, 3, "FB_CALLMONITOR ($name) - could not open cache file: $err";
         }
     }
+    else
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to access cache file: $file";
+    }
 }
 
 #####################################
@@ -1338,6 +1348,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <a name="FB_CALLMONITORset"></a>
   <b>Set</b>
   <ul>
+  <li><b>rereadCache</b> - Reloads the cache file if configured (see attribute: <a href="#reverse-search-cache-file">reverse-search-cache-file</a>)</li>
   <li><b>rereadPhonebook</b> - Reloads the FritzBox phonebook (from given file, via telnet or directly if available)</li>
   <li><b>password</b> - set the FritzBox password (only available when password is really needed for network access to FritzBox phonebook, see attribute <a href="#fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>)</li>
   </ul>
@@ -1468,6 +1479,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <a name="FB_CALLMONITORset"></a>
   <b>Set-Kommandos</b>
   <ul>
+  <li><b>rereadCache</b> - Liest den Cache aus der Datei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#reverse-search-cache-file">reverse-search-cache-file</a>)</li>
   <li><b>rereadPhonebook</b> - Liest das Telefonbuch der FritzBox neu ein (per Datei, Telnet oder direkt lokal)</li>
   <li><b>password</b> - speichert das FritzBox Passwort, welches f&uuml;r das Einlesen aller Telefonb&uuml;cher direkt von der FritzBox ben&ouml;tigt wird. Dieses Kommando ist nur verf&uuml;gbar, wenn ein Passwort ben&ouml;tigt wird um das Telefonbuch via Netzwerk einzulesen, siehe dazu Attribut <a href="#fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>.</li>
   </ul>
