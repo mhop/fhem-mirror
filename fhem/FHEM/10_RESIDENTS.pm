@@ -1265,13 +1265,16 @@ sub RESIDENTS_UpdateReadings (@) {
 								<i>wakeupAtdevice</i> - backlink the at device (mandatory)
 							</li>
 							<li>
-								<i>wakeupAutosave</i> - Triggers FHEM command 'save' after adjusting wake-up time value (defaults to 0=false)
-							</li>
-							<li>
 								<i>wakeupDays</i> - only trigger macro at these days. Mon=1,Tue=2,Wed=3,Thu=4,Fri=5,Sat=6,Sun=0 (optional)
 							</li>
 							<li>
 								<i>wakeupDefaultTime</i> - after triggering macro reset the wake-up time to this default value (optional)
+							</li>
+							<li>
+								<i>wakeupEnforced</i> - Enforce wake-up (optional; 0=no, 1=yes, 2=if wake-up time is not wakeupDefaultTime)
+							</li>
+							<li>
+								<i>wakeupHolidays</i> - May trigger macro on holidays or non-holidays (optional; andHoliday=on holidays also considering wakeupDays, orHoliday=on holidays independently of wakeupDays, andNoHoliday=on non-holidays also considering wakeupDays, orNoHoliday=on non-holidays independently of wakeupDays)
 							</li>
 							<li>
 								<i>wakeupMacro</i> - name of the notify macro device (mandatory)
@@ -1280,10 +1283,10 @@ sub RESIDENTS_UpdateReadings (@) {
 								<i>wakeupOffset</i> - value in minutes to trigger your macro earlier than the user requested to be woken up, e.g. if you have a complex wake-up program over 30 minutes (defaults to 0)
 							</li>
 							<li>
-								<i>wakeupResetdays</i> - if wakeupDefaultTime is set you may restrict timer reset to specific days only. Mon=1,Tue=2,Wed=3,Thu=4,Fri=5,Sat=6,Sun=0 (optional)
+								<i>wakeupResetSwitcher</i> - DUMMY device to quickly turn on/off reset function (optional, device will be auto-created)
 							</li>
 							<li>
-								<i>wakeupResetSwitcher</i> - DUMMY device to quickly turn on/off reset function (optional, device will be auto-created)
+								<i>wakeupResetdays</i> - if wakeupDefaultTime is set you may restrict timer reset to specific days only. Mon=1,Tue=2,Wed=3,Thu=4,Fri=5,Sat=6,Sun=0 (optional)
 							</li>
 							<li>
 								<i>wakeupUserdevice</i> - backlink to RESIDENTS, ROOMMATE or GUEST device to check it's status (mandatory)
@@ -1525,13 +1528,16 @@ sub RESIDENTS_UpdateReadings (@) {
 								<i>wakeupAtdevice</i> - Backlink zum at Ger&auml;t (notwendig)
 							</li>
 							<li>
-								<i>wakeupAutosave</i> - L&ouml;st das FHEM Kommando 'save' nach einer &Auml;nderung der Weckzeit aus (Standard 0=aus)
-							</li>
-							<li>
 								<i>wakeupDays</i> - Makro nur an bestimmten Tagen ausl&ouml;sen. Mon=1,Di=2,Mi=3,Do=4,Fr=5,Sa=6,So=0 (optional)
 							</li>
 							<li>
 								<i>wakeupDefaultTime</i> - Stellt die Weckzeit nach dem ausl&ouml;sen zur&uuml;ck auf diesen Standardwert (optional)
+							</li>
+							<li>
+								<i>wakeupEnforced</i> - Forciertes wecken (optional; 0=nein, 1=ja, 2=wenn Weckzeit ungleich wakeupDefaultTime)
+							</li>
+							<li>
+								<i>wakeupHolidays</i> - Makro u.U. an Feiertagen oder Nicht-Feiertagen ausführen (optional; andHoliday=an Feiertagen ggf. zusammen mit wakeupDays, orHoliday=an Feiertagen unabhängig von wakeupDays, andNoHoliday=an Nicht-Feiertagen ggf. zusammen mit wakeupDays, orNoHoliday=an Nicht-Feiertagen unabhängig von wakeupDays)
 							</li>
 							<li>
 								<i>wakeupMacro</i> - Name des notify Makro Ger&auml;tes (notwendig)
@@ -1540,10 +1546,10 @@ sub RESIDENTS_UpdateReadings (@) {
 								<i>wakeupOffset</i> - Wert in Minuten, die das Makro fr&uuml;her ausgel&ouml;st werden soll, z.B. bei komplexen Weckprogrammen &uuml;ber einen Zeitraum von 30 Minuten (Standard ist 0)
 							</li>
 							<li>
-								<i>wakeupResetdays</i> - sofern wakeupDefaultTime gesetzt ist, kann der Reset hier auf betimmte Tage begrenzt werden. Mon=1,Di=2,Mi=3,Do=4,Fr=5,Sa=6,So=0 (optional)
+								<i>wakeupResetSwitcher</i> - das DUMMY Device, welches zum schnellen ein/aus schalten der Resetfunktion verwendet wird (optional, Device wird automatisch angelegt)
 							</li>
 							<li>
-								<i>wakeupResetSwitcher</i> - das DUMMY Device, welches zum schnellen ein/aus schalten der Resetfunktion verwendet wird (optional, Device wird automatisch angelegt)
+								<i>wakeupResetdays</i> - sofern wakeupDefaultTime gesetzt ist, kann der Reset hier auf betimmte Tage begrenzt werden. Mon=1,Di=2,Mi=3,Do=4,Fr=5,Sa=6,So=0 (optional)
 							</li>
 							<li>
 								<i>wakeupUserdevice</i> - Backlink zum RESIDENTS, ROOMMATE oder GUEST Ger&auml;t, um dessen Status zu pr&uuml;fen (notwendig)
