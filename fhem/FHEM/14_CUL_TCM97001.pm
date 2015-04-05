@@ -166,22 +166,20 @@ CUL_TCM97001_Parse($$)
   my @a = split("", $msg);
 
   my $id3 = hex($a[0] . $a[1]);
-  my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
+  #my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
   my $def = $modules{CUL_TCM97001}{defptr}{$id3};
-  my $def2 = $modules{CUL_TCM97001}{defptr}{$id4};
-  my $defUnknown = $modules{CUL_TCM97001}{defptr}{"Unknown"};
+  #my $def2 = $modules{CUL_TCM97001}{defptr}{$id4};
+  
   
   my $now = time();
 
   my $name = "Unknown";
   if($def) {
     $name = $def->{NAME};
-  } elsif($def2) {
-    $name = $def2->{NAME};
-  } elsif($defUnknown) {
-    $name = $defUnknown->{NAME};
-  }
+  #} elsif($def2) {
+  #  $name = $def2->{NAME};
+  } 
 
   my $readedModel = AttrVal($name, "model", "Unknown");
   
@@ -190,7 +188,8 @@ CUL_TCM97001_Parse($$)
   $rssi = hex(substr($msg, $l-2, 2));
   $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
 
-  Log3 $name, 4, "CUL_TCM97001 $name $id3 or $id4 ($msg) length:" . length($msg) . " RSSI: $rssi";
+  #Log3 $name, 4, "CUL_TCM97001 $name $id3 or $id4 ($msg) length:" . length($msg) . " RSSI: $rssi";
+  Log3 $name, 4, "CUL_TCM97001 $name $id3 ($msg) length:" . length($msg) . " RSSI: $rssi";
 
   my ($msgtype, $msgtypeH);
   
@@ -287,20 +286,20 @@ CUL_TCM97001_Parse($$)
   } elsif (length($msg) == 12) { 
     my $bin = undef;
     my $idType1 = hex($a[0] . $a[1]);
-    my $idType2 = hex($a[0] . $a[1] . $a[2]);
-    my $idType3 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
+    #my $idType2 = hex($a[0] . $a[1] . $a[2]);
+    #my $idType3 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
     $def = $modules{CUL_TCM97001}{defptr}{$idType1};
-    my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
-    my $def3 = $modules{CUL_TCM97001}{defptr}{$idType3};
+    #my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
+    #my $def3 = $modules{CUL_TCM97001}{defptr}{$idType3};
     if($def) {
       $name = $def->{NAME};
-    } elsif($def2) {
-      $def = $def2;
-      $name = $def->{NAME};
-    } elsif($def3) {
-      $def = $def3;
-      $name = $def->{NAME};
+    #} elsif($def2) {
+    #  $def = $def2;
+    #  $name = $def->{NAME};
+    #} elsif($def3) {
+    #  $def = $def3;
+    #  $name = $def->{NAME};
     }
     $readedModel = AttrVal($name, "model", "Unknown");
     Log3 $name, 4, "CUL_TCM97001 Define Name: $name  Model defined: $readedModel";
@@ -318,7 +317,6 @@ CUL_TCM97001_Parse($$)
         if($def) {
           $name = $def->{NAME};
         }
-
         my @a = split("", $msg);
         my $bitReverse = undef;
         my $x = undef;
@@ -357,8 +355,7 @@ CUL_TCM97001_Parse($$)
           $model="TCM21....";
           $readedModel=$model;
         } else {
-          $def = undef;
-          $name = "Unknown";
+            $name = "Unknown";
         }
     } 
 
@@ -371,7 +368,8 @@ CUL_TCM97001_Parse($$)
         # D+E+F Temperatur, wenn es negativ wird muss man negieren und dann 1 addieren, wie im ersten Post beschrieben.
         # G+H Hum - bit 0-7 
         # I CRC?
-      $def = $modules{CUL_TCM97001}{defptr}{$idType3};
+      #$def = $modules{CUL_TCM97001}{defptr}{$idType3};
+      $def = $modules{CUL_TCM97001}{defptr}{$idType1};
       if($def) {
         $name = $def->{NAME};
       } 
@@ -386,8 +384,10 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($temp, $humidity)) {
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
-          return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
+          #Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
+          #return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
+          $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+          return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
         }
         $hashumidity = TRUE;
         $hasbatcheck = TRUE;        
@@ -395,8 +395,7 @@ CUL_TCM97001_Parse($$)
         $model="GT-WT-02";
         $readedModel=$model;
       } else {
-        $def = undef;
-        $name = "Unknown";
+          $name = "Unknown";
       }
     }
       #Log3 $name, 4, "CUL_TCM97001: CRC for TCM21.... Failed, checking other protocolls";
@@ -411,7 +410,8 @@ CUL_TCM97001_Parse($$)
         # D Bit 4 Battery, 3 Manual, 2+1 Channel 
         # E+F+G Bit 15+16 negativ temp, 14-0 temp
         # H+I Hum
-        $def = $modules{CUL_TCM97001}{defptr}{$idType3};
+        #$def = $modules{CUL_TCM97001}{defptr}{$idType3};
+        $def = $modules{CUL_TCM97001}{defptr}{$idType1};
         if($def) {
           $name = $def->{NAME};
         }         
@@ -434,8 +434,10 @@ CUL_TCM97001_Parse($$)
         $mode = (hex($a[3]) & 0x4) >> 2;
         if (checkValues($temp, $humidity)) {
           if(!$def) {
-            Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
-            return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
+            Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+            return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
+#            Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
+#            return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
           }
           $hashumidity = TRUE;    
           $hasbatcheck = TRUE;
@@ -443,8 +445,7 @@ CUL_TCM97001_Parse($$)
           $model="Prologue";
           $readedModel=$model;
         } else {
-          $def = undef;
-          $name = "Unknown";
+            $name = "Unknown";
         }
     } 
     
@@ -462,7 +463,8 @@ CUL_TCM97001_Parse($$)
       #         /     /          /  /  /   /   /             /  / Humidity
       #         0101  0010 1001  0 0 00   0 010 0011 0000   1 101 1101
       # Bit     0     4         12 13 14  16 17            28 29    36
-      $def = $modules{CUL_TCM97001}{defptr}{$idType3};
+      #$def = $modules{CUL_TCM97001}{defptr}{$idType3};
+      $def = $modules{CUL_TCM97001}{defptr}{$idType1};
       if($def) {
         $name = $def->{NAME};
       } 
@@ -483,8 +485,10 @@ CUL_TCM97001_Parse($$)
       $mode = (hex($a[3]) & 0x4) >> 2;
       if (checkValues($temp, $humidity)) {
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
-          return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
+          #Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
+          #return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
+          Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+          return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
         }
         $hashumidity = TRUE;
         $hasbatcheck = TRUE;
@@ -492,8 +496,7 @@ CUL_TCM97001_Parse($$)
         $model="NC_WS";
         $readedModel=$model;
       } else {
-        $def = undef;
-        $name = "Unknown";
+          $name = "Unknown";
       }
     } 
 
@@ -527,8 +530,7 @@ CUL_TCM97001_Parse($$)
         $model="Rubicson";
         $readedModel=$model;
       } else {
-        $def = undef;
-        $name = "Unknown";
+          $name = "Unknown";
       }
     }
 
@@ -572,8 +574,7 @@ CUL_TCM97001_Parse($$)
         $model="AURIOL";
         $readedModel=$model;
       } else {
-        $def = undef;
-        $name = "Unknown";
+          $name = "Unknown";
       }
     }
      
@@ -589,7 +590,7 @@ CUL_TCM97001_Parse($$)
     if ($hashumidity == TRUE) {
       $msgtypeH = "humidity";
       $valH = $humidity;
-      Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id4 T: $val H: $valH"; 
+      Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val H: $valH"; 
     } else {
       Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val";
     }
@@ -632,12 +633,14 @@ CUL_TCM97001_Parse($$)
     $attr{$name}{model} = $model;
     return $name;
   } else {
-    $name = $defUnknown->{NAME};
-    Log3 $name, 4, "CUL_TCM97001 Device not interplmeted yet name Unknown msg $msg";
+    my $defUnknown = $modules{CUL_TCM97001}{defptr}{"Unknown"};
+    
     if (!$defUnknown) {
       Log3 "Unknown", 2, "CUL_TCM97001 Unknown device Unknown, please define it";
       return "UNDEFINED CUL_TCM97001_Unknown CUL_TCM97001 Unknown" if(!$defUnknown); 
     } 
+    $name = $defUnknown->{NAME};
+    Log3 $name, 4, "CUL_TCM97001 Device not interplmeted yet name Unknown msg $msg";
 
     my $state="Code: $msg";
 
