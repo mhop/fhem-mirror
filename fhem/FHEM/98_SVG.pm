@@ -596,8 +596,11 @@ SVG_WriteGplot($)
   }
 
   my $wlName = $FW_webArgs{detail};
-  my $fName = "$FW_gplotdir/$defs{$wlName}{GPLOTFILE}.gplot";
-  return if(!$fName);
+  my $hash = $defs{$wlName};
+  if($hash->{GPLOTFILE} ne $wlName) {
+    Log 1, "WriteGplot: calling set $wlName copyGplotFile";
+    SVG_Set($hash, $wlName, "copyGplotFile");
+  }
 
   my @rows;
   push @rows, "# Created by FHEM/98_SVG.pm, ".TimeNow();
@@ -648,7 +651,7 @@ SVG_WriteGplot($)
     push @rows, $r;
   }
 
-  my $err = FileWrite($fName, @rows);
+  my $err = FileWrite("$FW_gplotdir/$hash->{GPLOTFILE}.gplot", @rows);
   $FW_RET .= "<div id='errmsg'>SVG_WriteGplot: $err</div>" if($err);
 
   return 0;
