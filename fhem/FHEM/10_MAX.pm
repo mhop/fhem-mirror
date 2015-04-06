@@ -16,6 +16,7 @@ sub MAX_Parse($$);
 sub MAX_Set($@);
 sub MAX_MD15Cmd($$$);
 sub MAX_DateTime2Internal($);
+sub MAX_DbLog_splitFn($);
 
 my @ctrl_modes = ( "auto", "manual", "temporary", "boost" );
 
@@ -75,6 +76,7 @@ MAX_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 keepAuto:0,1 scanTemp:0,1 ".
                        $readingFnAttributes;
+  $hash->{DbLog_splitFn} = "MAX_DbLog_splitFn";
   return undef;
 }
 
@@ -868,6 +870,23 @@ MAX_Parse($$)
   readingsBulkUpdate($shash, "state", $state);
   readingsEndUpdate($shash, 1);
   return $shash->{NAME}
+}
+
+#############################
+sub
+MAX_DbLog_splitFn($)
+{
+  my ($event) = @_;
+  my ($reading, $value, $unit) = "";
+
+  my @parts = split(/ /,$event);
+  $reading = shift @parts;
+  $reading =~ tr/://d;
+  $value = $parts[0];
+  $value = $parts[1] if (lc($value) =~ m/auto/);
+  $unit = "\xB0C" if(lc($reading) =~ m/temp/);
+  $unit = "%" if(lc($reading) =~ m/valve/);
+  return ($reading, $value, $unit);
 }
 
 1;
