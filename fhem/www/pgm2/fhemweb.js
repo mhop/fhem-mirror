@@ -755,6 +755,8 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
     function
     mouseMove(e)
     {
+      if(maxX == 0) // Forum #35846
+        maxX = slider.offsetWidth-sh.offsetWidth;
       var diff = e.clientX-lastX; lastX = e.clientX;
       offX += diff;
       if(offX < 0) offX = 0;
