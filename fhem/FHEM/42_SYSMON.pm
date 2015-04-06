@@ -62,6 +62,7 @@ use constant {
   CPU6_FREQ     => "cpu6_freq",
   CPU7_FREQ     => "cpu7_freq",
   CPU_BOGOMIPS => "cpu_bogomips",
+  CPU_MODEL_NAME=>"cpu_model_name",
   CPU_TEMP     => "cpu_temp",
   CPU0_TEMP     => "cpu0_temp",
   CPU1_TEMP     => "cpu1_temp",
@@ -246,6 +247,7 @@ SYSMON_updateCurrentReadingsMap($) {
   }
   $rMap->{+DATE}               = "Date";
   $rMap->{+CPU_BOGOMIPS}       = "BogoMIPS";
+  $rMap->{+CPU_MODEL_NAME}       = "CPU model name";
   if(SYSMON_isCPUFreqRPiBBB($hash)) {
     $rMap->{"cpu_freq"}       = "CPU frequency";
     $rMap->{"cpu0_freq"}       = "CPU frequency";
@@ -1087,7 +1089,7 @@ SYSMON_obtainParameters_intern($$)
     }
     
     if(SYSMON_isProcFS($hash)) {
-      $map = SYSMON_getCPUBogoMIPS($hash, $map);
+      $map = SYSMON_getCPUInfo($hash, $map);
     }
   
     if(SYSMON_isFB($hash)) {
@@ -1736,31 +1738,40 @@ SYSMON_getCPUFreq($$;$) {
 #}
 
 #------------------------------------------------------------------------------
-# leifert CPU Speed in BogoMIPS
+# leifert CPU Infos (Model name & Speed in BogoMIPS)
+# TEST:  {Dumper(SYSMON_getCPUInfo($defs{sysmon},undef))}
 #------------------------------------------------------------------------------
 sub
-SYSMON_getCPUBogoMIPS($$) {
+SYSMON_getCPUInfo($$) {
   my ($hash, $map) = @_;
   
-  if($hash->{helper}->{excludes}{'bogomips'}) {return $map;}
+  if($hash->{helper}->{excludes}{'cpuinfo'}) {return $map;}
   
-  my $old_val = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
+  my $old_val1 = ReadingsVal($hash->{NAME},CPU_BOGOMIPS,undef);
+  my $old_val2 = ReadingsVal($hash->{NAME},CPU_MODEL_NAME,undef);
   # nur einmalig ermitteln (wird sich ja nicht aendern
-  if(!defined $old_val) {
-    my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
-    #SYSMON_Log($hash, 5, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ".Dumper(@aval)); # TODO: Delete
-    my $val=$aval[0];
-    #SYSMON_Log($hash, 5, "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ".$val); # TODO: Delete
-    if(defined($val)){
-      #Log 3,"SYSMON -----------> DEBUG: read BogoMIPS = $val"; 
-      my ($dummy, $val_txt) = split(/:\s+/, $val);
-      if($val_txt) {
-        $val_txt = trim($val_txt);
-        $map->{+CPU_BOGOMIPS}="$val_txt";
+  if(!defined($old_val1) || !defined($old_val2)) {
+    #my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo | grep 'BogoMIPS'");
+    my @aval = SYSMON_execute($hash, "cat /proc/cpuinfo");
+    foreach my $line (@aval) {
+      my($key, $val) = split(/\s*:\s+/, $line);
+      if(defined($key)) {
+        if($key=~m/Processor/ || $key=~m/model name/) {
+          if($val) {
+            $val = trim($val);
+            $map->{+CPU_MODEL_NAME}=$val;
+          }
+        } elsif ($key=~m/BogoMIPS/) {
+          if($val) {
+            $val = trim($val);
+            $map->{+CPU_BOGOMIPS}=$val;
+          }
+        }
       }
     }
   } else {
-    $map->{+CPU_BOGOMIPS}=$old_val;
+    $map->{+CPU_BOGOMIPS}=$old_val1;
+    $map->{+CPU_MODEL_NAME}=$old_val2;
   }
   
   return $map;
@@ -1853,8 +1864,7 @@ SYSMON_getCPUBogoMIPS($$) {
 #       This is the total number of sectors requested to be written to
 #       this partition.
 #------------------------------------------------------------------------------
-sub
-SYSMON_getDiskStat($$) {
+sub SYSMON_getDiskStat($$) {
   my ($hash, $map) = @_;
   
   if($hash->{helper}->{excludes}{'diskstat'}) {return $map;}
@@ -3044,7 +3054,7 @@ sub SYSMON_ShowValuesFmt ($$$;@)
                         CPU_TEMP.":"."CPU temperature".": ".$deg."C", 
                         #CPU_FREQ.":".$hash->{helper}{cur_readings_map}->{+CPU_FREQ}.": "."MHz", 
                         CPU_FREQ.":"."CPU frequency".": "."MHz", 
-                        CPU_BOGOMIPS,
+                        CPU_MODEL_NAME, CPU_BOGOMIPS,
                         UPTIME_TEXT, FHEMUPTIME_TEXT, LOADAVG, RAM, SWAP, 
                         "power_ac_text", "power_usb_text", "power_battery_text");
 
@@ -3992,6 +4002,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>cpu_core_count<br>
         CPU core count
     </li>
+    <li>cpu_model_name<br>
+        CPU model name
+    </li>
     <li>cpu_bogomips<br>
         CPU Speed: BogoMIPS
     </li>
@@ -4361,7 +4374,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>exclude<br>
     Allows to suppress reading certain information. <br>
     supported values: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
-    loadavg, cputemp, cpufreq, bogomips, diskstat, cpustat, ramswap, filesystem, network, 
+    loadavg, cputemp, cpufreq, cpuinfo, diskstat, cpustat, ramswap, filesystem, network, 
     fbwlan, fbnightctrl, fbnewmessages, fbdecttemp, fbversion, fbdsl, powerinfo
     </li>
     <br>
@@ -4590,6 +4603,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
   <ul>
     <li>cpu_core_count<br>
         Anzahl der CPU Kerne
+    </li>
+    <li>cpu_model_name<br>
+        CPU Modellname
     </li>
     <li>cpu_bogomips<br>
         CPU Speed: BogoMIPS
@@ -4974,7 +4990,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <li>exclude<br>
     Erlaubt das Abfragen bestimmten Informationen zu unterbinden. <br>
     Mögliche Werte: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
-    loadavg, cputemp, cpufreq, bogomips, diskstat, cpustat, ramswap, filesystem, network, 
+    loadavg, cputemp, cpufreq, cpuinfo, diskstat, cpustat, ramswap, filesystem, network, 
     fbwlan, fbnightctrl, fbnewmessages, fbdecttemp, fbversion, fbdsl, powerinfo
     </li>
     <br>
