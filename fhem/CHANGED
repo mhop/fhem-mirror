@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - Bugfix:  Update of set-command introducing ReadBackDelay - attribute
   - feature: SYSMON: new reading 'cpu_model_name'
   - feature: FB_CALLMONITOR: new set command rereadCache
   - feature: SYSMON: new reading: cpu_core_count
