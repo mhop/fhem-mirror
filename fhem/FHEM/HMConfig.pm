@@ -1458,7 +1458,7 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
 # clones- - - - - - - - - - - - - - - - -
 $culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
-
+ 
 $culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
@@ -1492,7 +1492,7 @@ $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
                                            }
                      ,"HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[on|off]"}
                      ,"HM-SEC-SD"        =>{ statusRequest  =>""}
-                     ,"ActionDetector"   =>{ clear         => "[readings|all]"}
+                     ,"ActionDetector"   =>{ clear          => "[readings|all]"}
 );
 # clones- - - - - - - - - - - - - - - - -
 $culHmModelSets{"HM-CC-RT-DN-BoM"}    = $culHmModelSets{"HM-CC-RT-DN"};
@@ -1607,6 +1607,8 @@ $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
 
 $culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{"THSensor"};
+$culHmChanSets{"HM-SEN-EP01"}           = $culHmSubTypeSets{"THSensor"};
+$culHmChanSets{"HM-SEN-EP02"}           = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{"THSensor"};
 
