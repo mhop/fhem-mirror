@@ -308,7 +308,7 @@ if (\$EVTPART0 eq \"stop\") {\
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new watchdog device $wdNameGotosleep created";
             fhem
-"define $wdNameGotosleep watchdog $wakeupUserdevice:gotosleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|asleep|awoken) trigger $macroNameGotosleep; setstate defined $macroNameGotosleep";
+"define $wdNameGotosleep watchdog $wakeupUserdevice:gotosleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|asleep|awoken) trigger $macroNameGotosleep;; setstate  $macroNameGotosleep defined";
             fhem
 "attr $wdNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
             fhem "attr $wdNameGotosleep room $room"
@@ -379,7 +379,7 @@ if (\$EVTPART0 eq \"stop\") {\
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new watchdog device $wdNameAsleep created";
             fhem
-"define $wdNameAsleep watchdog $wakeupUserdevice:asleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|awoken) trigger $macroNameAsleep; setstate defined $macroNameAsleep";
+"define $wdNameAsleep watchdog $wakeupUserdevice:asleep 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|awoken) trigger $macroNameAsleep;; setstate $macroNameAsleep defined";
             fhem
 "attr $wdNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
             fhem "attr $wdNameAsleep room $room"
@@ -445,7 +445,7 @@ if (\$EVTPART0 eq \"stop\") {\
             Log3 $NAME, 3,
               "RESIDENTStk $NAME: new watchdog device $wdNameAwoken created";
             fhem
-"define $wdNameAwoken watchdog $wakeupUserdevice:awoken 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|asleep) trigger $macroNameAwoken; setstate defined $macroNameAwoken";
+"define $wdNameAwoken watchdog $wakeupUserdevice:awoken 00:00:04 $wakeupUserdevice:(home|absent|gone|none|gotosleep|asleep) trigger $macroNameAwoken;; setstate $macroNameAwoken defined";
             fhem
 "attr $wdNameAwoken comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
             fhem "attr $wdNameAwoken room $room"
@@ -528,7 +528,7 @@ if (\$EVTPART0 eq \"stop\") {\
                 Log3 $NAME, 3,
 "RESIDENTStk $NAME: new watchdog device $wdRNameGotosleep created";
                 fhem
-"define $wdRNameGotosleep watchdog $deviceName:gotosleep 00:00:03 $deviceName:(home|absent|gone|none|asleep|awoken) trigger $macroRNameGotosleep; setstate defined $macroRNameGotosleep";
+"define $wdRNameGotosleep watchdog $deviceName:gotosleep 00:00:03 $deviceName:(home|absent|gone|none|asleep|awoken) trigger $macroRNameGotosleep;; setstate $macroRNameGotosleep defined";
                 fhem
 "attr $wdRNameGotosleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state gotosleep";
                 fhem "attr $wdRNameGotosleep room $room"
@@ -585,7 +585,7 @@ if (\$EVTPART0 eq \"stop\") {\
                 Log3 $NAME, 3,
 "RESIDENTStk $NAME: new watchdog device $wdNameAsleep created";
                 fhem
-"define $wdRNameAsleep watchdog $deviceName:asleep 00:00:03 $deviceName:(home|absent|gone|none|gotosleep|awoken) trigger $macroRNameAsleep; setstate defined $macroRNameAsleep";
+"define $wdRNameAsleep watchdog $deviceName:asleep 00:00:03 $deviceName:(home|absent|gone|none|gotosleep|awoken) trigger $macroRNameAsleep;; setstate $macroRNameAsleep defined";
                 fhem
 "attr $wdRNameAsleep comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state asleep";
                 fhem "attr $wdRNameAsleep room $room"
@@ -645,7 +645,7 @@ if (\$EVTPART0 eq \"stop\") {\
                 Log3 $NAME, 3,
 "RESIDENTStk $NAME: new watchdog device $wdNameAwoken created";
                 fhem
-"define $wdRNameAwoken watchdog $deviceName:awoken 00:00:04 $deviceName:(home|absent|gone|none|gotosleep|asleep) trigger $macroRNameAwoken; setstate defined $macroRNameAwoken";
+"define $wdRNameAwoken watchdog $deviceName:awoken 00:00:04 $deviceName:(home|absent|gone|none|gotosleep|asleep) trigger $macroRNameAwoken;; setstate $macroRNameAwoken defined";
                 fhem
 "attr $wdRNameAwoken comment Auto-created by RESIDENTS Toolkit: trigger macro after going to state awoken";
                 fhem "attr $wdRNameAwoken room $room"
