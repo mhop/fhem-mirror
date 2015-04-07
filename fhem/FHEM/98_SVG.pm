@@ -1073,8 +1073,10 @@ SVG_doShowLog($$$$;$)
     (my $cachedate = TimeNow()) =~ s/ /_/g;
     my $SVGcache = (AttrVal($FW_wname, "SVGcache", undef) && $t lt $cachedate);
     my $cDir = "$FW_dir/SVGcache";
-    my $cName = "$cDir/$wl-$f-$t.svg";
-    if($SVGcache && open(CFH, $cName)) {
+    my $cFile = "$wl-$f-$t.svg";
+    $cFile =~ s/:/-/g; # For Windows / #11053
+    my $cPath = "$cDir/$cFile";
+    if($SVGcache && open(CFH, $cPath)) {
       FW_pO join("", <CFH>);
       close(CFH);
 
@@ -1087,7 +1089,7 @@ SVG_doShowLog($$$$;$)
       FW_pO $ret;
       if($SVGcache) {
         mkdir($cDir) if(! -d $cDir);
-        if(open(CFH, ">$cName")) {
+        if(open(CFH, ">$cPath")) {
           print CFH $ret;
           close(CFH);
         }
