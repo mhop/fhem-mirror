@@ -230,8 +230,8 @@ sub CUL_HM_updateConfig($){
       delete $attr{$name}{$_}
             foreach ( "autoReadReg","actCycle","actStatus","burstAccess","serialNr"
                      ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
-      $hash->{helper}{role}{vrt} = 1;
-      $hash->{helper}{role}{dev} = 1;
+      #$hash->{helper}{role}{vrt} = 1;
+      #$hash->{helper}{role}{dev} = 1;
       next;
     }
     CUL_HM_ID2PeerList($name,"",1); # update peerList out of peerIDs
@@ -3014,7 +3014,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.($roleC?'01':'00');
 
   my $h = undef;
-  $h = $culHmGlobalGets->{$cmd}       if(!$roleV);
+  $h = $culHmGlobalGets->{$cmd}       if(!$roleV      &&($roleD || $roleC));
   $h = $culHmVrtGets->{$cmd}          if(!defined($h) && $roleV);
   $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
   $h = $culHmModelGets->{$md}{$cmd}   if(!defined($h) && $culHmModelGets->{$md});
@@ -3023,10 +3023,10 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
 
   if(!defined($h)) {
     my @arr = ();
-    if(!$roleV)                 {foreach(keys %{$culHmGlobalGets}        ){push @arr,"$_:".$culHmGlobalGets->{$_}          }};
-    if($roleV)                  {foreach(keys %{$culHmVrtGets}           ){push @arr,"$_:".$culHmVrtGets->{$_}             }};
-    if($culHmSubTypeGets->{$st}){foreach(keys %{$culHmSubTypeGets->{$st}}){push @arr,"$_:".${$culHmSubTypeGets->{$st}}{$_} }};
-    if($culHmModelGets->{$md})  {foreach(keys %{$culHmModelGets->{$md}}  ){push @arr,"$_:".${$culHmModelGets->{$md}}{$_}   }};
+    if(!$roleV &&($roleD || $roleC)){foreach(keys %{$culHmGlobalGets}        ){push @arr,"$_:".$culHmGlobalGets->{$_}          }};
+    if($roleV)                      {foreach(keys %{$culHmVrtGets}           ){push @arr,"$_:".$culHmVrtGets->{$_}             }};
+    if($culHmSubTypeGets->{$st})    {foreach(keys %{$culHmSubTypeGets->{$st}}){push @arr,"$_:".${$culHmSubTypeGets->{$st}}{$_} }};
+    if($culHmModelGets->{$md})      {foreach(keys %{$culHmModelGets->{$md}}  ){push @arr,"$_:".${$culHmModelGets->{$md}}{$_}   }};
     
     foreach(@arr){
       my ($cmd,$val) = split(":",$_,2);
@@ -3281,7 +3281,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
   
   my $h = undef;
-  $h = $culHmGlobalSets->{$cmd}         if(                !$roleV);
+  $h = $culHmGlobalSets->{$cmd}         if(                !$roleV                    &&($roleD || $roleC));
   $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&( $roleV || !$st)           && $roleD);
   $h = $culHmGlobalSetsDevice->{$cmd}   if(!defined($h) && !$roleV                    && $roleD);
   $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && !$roleV                    && $roleD);
@@ -3299,13 +3299,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   if(!defined($h) && defined($culHmSubTypeSets->{$st}{pct}) && $cmd =~ m/^\d+/) {
     splice @a, 1, 0,"pct";#insert the actual command
   }
-  elsif(!defined($h)) {
+  elsif(!defined($h)) { ### unknown - return the commandlist
     my @arr1 = ();
-    if( $st ne "virtual")                    {foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
-    if(($st eq "virtual"||!$st)    && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
-    if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_:".$culHmGlobalSetsDevice->{$_}      }};
-    if( $st ne "virtual"           && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}};
-    if( $st ne "virtual"           && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_:".$culHmGlobalSetsChn->{$_}         }};
+    if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
+    if(( $roleV||!$st)             && $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
+    if( !$roleV                    && $roleD){foreach(keys %{$culHmGlobalSetsDevice}     ){push @arr1,"$_:".$culHmGlobalSetsDevice->{$_}      }};
+    if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}};
+    if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_:".$culHmGlobalSetsChn->{$_}         }};
     if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_:".${$culHmSubTypeSets->{$st}}{$_}   }};
     if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_:".${$culHmModelSets->{$md}}{$_}     }};
     if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."00"}}{$_} }};
@@ -8667,18 +8667,19 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          restore will not delete any peered channels, it will just add peer channels.<br>
          </li>
      <li><B>listDevice</B><br>
-         <li>when used with ccu it returns a list of Devices using the ccu service to assign an IO.<br>
-             </li>
-         <li>when used with ActionDetector user will get a comma separated list of entities being assigned to the action detector<br>
-             get ActionDetector listDevice          # returns all assigned entities<br>
-             get ActionDetector listDevice notActive# returns entities which habe not status alive<br>
-             get ActionDetector listDevice alive    # returns entities with status alive<br>
-             get ActionDetector listDevice unknown  # returns entities with status unknown<br>
-             get ActionDetector listDevice dead     # returns entities with status dead<br>
-             </li>
-         </li>
-     <br>
-  </ul>
+         <ul>
+              <li>when used with ccu it returns a list of Devices using the ccu service to assign an IO.<br>
+                  </li>
+              <li>when used with ActionDetector user will get a comma separated list of entities being assigned to the action detector<br>
+                  get ActionDetector listDevice          # returns all assigned entities<br>
+                  get ActionDetector listDevice notActive# returns entities which habe not status alive<br>
+                  get ActionDetector listDevice alive    # returns entities with status alive<br>
+                  get ActionDetector listDevice unknown  # returns entities with status unknown<br>
+                  get ActionDetector listDevice dead     # returns entities with status dead<br>
+                  </li> 
+             </ul>
+         </li>       
+  </ul><br>
 
   <a name="CUL_HMattr"></a><b>Attributes</b>
   <ul>
@@ -8691,12 +8692,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     <li><a name="CUL_HMaesCommReq">aesCommReq</a>
          if set HMLAN/USB is forced to request AES signature before sending ACK to the device.<br>
          This funktion strictly works with HMLAN/USB - it doesn't work for CUL type IOs.<br>
-    </li>
+        </li>
     <li><a name="#CUL_HMactAutoTry">actAutoTry</a>
          actAutoTry 0_off,1_on<br>
          setting this option enables Action Detector to send a statusrequest in case of a device is going to be marked dead.
          The attribut may be useful in case a device is being checked that does not send messages regularely - e.g. an ordinary switch. 
-      </li>
+        </li>
     <li><a name="#CUL_HMactCycle">actCycle</a>
          actCycle &lt;[hhh:mm]|off&gt;<br>
          Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maximum silent time for the device. 
@@ -8713,7 +8714,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
          </ul>
          The overall function can be viewed checking out the "ActionDetector" entity. The status of all entities is present in the READING section.<br>
          Note: This function can be enabled for devices with non-cyclic messages as well. It is up to the user to enter a reasonable cycletime.
-      </li>
+        </li>
     <li><a name="#CUL_HMautoReadReg">autoReadReg</a><br>
         '0' autoReadReg will be ignored.<br>
         '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
@@ -8727,14 +8728,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         of the readings and the display will be delayed depending on the size of the database.<br>
         Recommendations and constrains upon usage:<br>
         <ul>
-          use this attribute on the device or channel 01. Do not use it separate on each channel
-          of a multi-channel device to avoid duplicate execution<br>
-          usage on devices which only react to 'config' mode is not recommended since executen will
-          not start until config is triggered by the user<br>
-          usage on devices which support wakeup-mode is usefull. But consider that execution is delayed
-          until the device "wakes up".<br>
-        </ul>
-      </li>
+            use this attribute on the device or channel 01. Do not use it separate on each channel
+            of a multi-channel device to avoid duplicate execution<br>
+            usage on devices which only react to 'config' mode is not recommended since executen will
+            not start until config is triggered by the user<br>
+            usage on devices which support wakeup-mode is usefull. But consider that execution is delayed
+            until the device "wakes up".<br>
+            </ul>
+        </li>
     <li><a name="#CUL_HMburstAccess">burstAccess</a><br>
         can be set for the device entity if the model allowes conditionalBurst.
         The attribut will switch off burst operations (0_off) which causes less message load
@@ -9944,17 +9945,18 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         "restore" l&ouml;scht keine verkn&uuml;pften Kan&auml;le, es f&uuml;gt nur neue Peers hinzu.<br>
       </li>
       <li><B>listDevice</B><br>
-         <li>bei einer CCU gibt es eine Liste der Devices, welche den ccu service zum zuweisen der IOs zurück<br>
-           </li>
-         <li>beim ActionDetector wird eine Komma geteilte Liste der Entities zurückgegeben<br>
-             get ActionDetector listDevice          # returns alle assigned entities<br>
-             get ActionDetector listDevice notActive# returns entities ohne status alive<br>
-             get ActionDetector listDevice alive    # returns entities mit status alive<br>
-             get ActionDetector listDevice unknown  # returns entities mit status unknown<br>
-             get ActionDetector listDevice dead     # returns entities mit status dead<br>
-             </li>
-         </li>
-
+          <ul>
+              <li>bei einer CCU gibt es eine Liste der Devices, welche den ccu service zum zuweisen der IOs zurück<br>
+                </li>
+              <li>beim ActionDetector wird eine Komma geteilte Liste der Entities zurückgegeben<br>
+                  get ActionDetector listDevice          # returns alle assigned entities<br>
+                  get ActionDetector listDevice notActive# returns entities ohne status alive<br>
+                  get ActionDetector listDevice alive    # returns entities mit status alive<br>
+                  get ActionDetector listDevice unknown  # returns entities mit status unknown<br>
+                  get ActionDetector listDevice dead     # returns entities mit status dead<br>
+                  </li>
+              </ul>
+          </li>
     </ul><br>
     <a name="CUL_HMattr"></a><b>Attribute</b>
     <ul>
