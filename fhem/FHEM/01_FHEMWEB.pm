@@ -3203,6 +3203,21 @@ FW_widgetOverride($$)
             the jQuery knob widget will be displayed. The parameters are
             specified as a comma separated list of key:value pairs, where key
             does not have to contain the "data-" prefix.</li>
+
+          <li>if the modifier is of the form ":sortable,val1,val2,...", then
+            the user can create a new list from the elements of the given
+            list, can add new elements by entering a text, or delete some from
+            the list. This new list can be sorted via drag &amp; drop. The
+            result is a comma separated list. </li>
+
+          <li>if the modifier is of the form ":sortable-strict,val1,val2,...",
+            then it behaves like :sortable, without the possibility to enter
+            text.</li>
+
+          <li>if the modifier is of the form ":sortable-given,val1,val2,...",
+            then the specified list can be sorted via drag &amp; drop, no
+            elements can be added or deleted.  </li>
+
           <li>else a dropdown with all the modifier values is displayed</li>
         </ul>
         If this attribute is specified for a FHEMWEB instance, then it is
@@ -3210,7 +3225,8 @@ FW_widgetOverride($$)
         <ul>
           attr FS20dev widgetOverride on-till:time<br>
           attr WEB widgetOverride room:textField<br>
-          attr dimmer widgetOverride dim:knob,min:1,max:100,step:1,linecap:round<br>
+          attr dimmer widgetOverride
+          dim:knob,min:1,max:100,step:1,linecap:round<br>
         </ul>
         </li>
         <br>
@@ -3499,7 +3515,8 @@ FW_widgetOverride($$)
         <ul>
         mkdir certs<br>
         cd certs<br>
-        openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout server-key.pem
+        openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout
+        server-key.pem
         </ul>
 
       <br>
@@ -3708,7 +3725,8 @@ FW_widgetOverride($$)
         Anmerkung: Wenn das Icon ein SVG Bild ist, kann das @colorname Suffix
         verwendet werden um das Icon einzuf&auml;rben. Z.B.:<br>
         <ul>
-          attr Fax devStateIcon on:control_building_empty@red off:control_building_filled:278727
+          attr Fax devStateIcon on:control_building_empty@red
+          off:control_building_filled:278727
         </ul>
 
         </ul>
@@ -3802,7 +3820,33 @@ FW_widgetOverride($$)
             jQuery knob Widget wird angezeigt. Die Parameter werden als eine
             Komma separierte Liste von Key:Value Paaren spezifiziert, wobei das
             data- Pr&auml;fix entf&auml;llt. </li>
-
+            
+          <li>Ist der Modifier ":sortable,val1,val2,...", dann ist es
+            m&ouml;glich aus den gegebenen Werten eine Liste der
+            gew&uuml;nschten Werte durch Drag &amp; Drop zusammenzustellen. Die
+            Reihenfolge der Werte kann dabei entsprechend ge&auml;ndert werden.
+            Es m&uuml;ssen keine Werte explizit vorgegeben werden, das Widget
+            kann auch ohne vorgegebenen Werte benutzt werden.  Es k&ouml;nnen
+            eigene Werte zur Liste hinzugef&uuml;gt und einsortiert werden.
+            Das Ergebnis ist Komma-separiert entsprechend aufsteigend
+            sortiert.</li>
+            
+           <li>Ist der Modifier ":sortable-strict,val1,val2,...", dann ist es
+            m&ouml;glich aus den gegebenen Werten eine Liste der
+            gew&uuml;nschten Werte durch Drag &amp; Drop zusammenzustellen. Die
+            Reihenfolge der Werte kann dabei entsprechend ge&auml;ndert werden.
+            Es k&ouml;nnen jedoch keine eigenen Werte zur Liste
+            hinzugef&uuml;gt werden.  Das Ergebnis ist Komma-separiert
+            entsprechend aufsteigend sortiert.</li>
+            
+           <li>Ist der Modifier ":sortable-given,val1,val2,...", dann ist es
+            m&ouml;glich aus den gegebenen Werten eine sortierte Liste der
+            gew&uuml;nschten Werte durch Drag & Drop zusammenzustellen. Es
+            k&ouml;nnen keine Elemente gel&ouml;scht und hinzugef&uuml;gt
+            werden. Es m&uuml;ssen alle gegeben Werte benutzt und entsprechend
+            sortiert sein.  Das Ergebnis ist Komma-separiert entsprechend
+            aufsteigend sortiert.</li>
+            
           <li>In allen anderen F&auml;llen (oder falls der Modified explizit
             mit :select anfaegt) erscheint ein HTML select mit allen Modifier
             Werten.</li>
