@@ -21,7 +21,6 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-
 package main;
 use strict;
 use warnings;
@@ -31,7 +30,6 @@ use Time::Local 'timelocal_nocheck';
 
 use Data::Dumper;
 $Data::Dumper::Sortkeys = 1;
-
 ################################################################################
 sub WeekdayTimer_Initialize($){
   my ($hash) = @_;
@@ -191,10 +189,10 @@ sub WeekdayTimer_Profile($) {
      foreach  my $d (@{$tage}) {
 
         my $dayOfEchteZeit = $d;
-        if      ($d==7) {                                   # Weekend
-           $dayOfEchteZeit = ($wday ~~ [1..5]) ? 6 : $wday; # ggf. Samstag  
-        } elsif ($d==8) {                                   # day of Week
-           $dayOfEchteZeit = ($wday ~~ [0..6]) ? 1 : $wday; # ggf. Montag
+        if      ($d==7) {                                      # Weekend
+           $dayOfEchteZeit = ($wday>=1&&$wday<=5) ? 6 : $wday; # ggf. Samstag $wday ~~ [1..5]  
+        } elsif ($d==8) {                                      # day of Week
+           $dayOfEchteZeit = ($wday==0||$wday==6) ? 1 : $wday; # ggf. Montag  $wday ~~ [0, 6]
         }
 
         my $echtZeit = WeekdayTimer_EchteZeit($hash, $dayOfEchteZeit, $time); 
@@ -508,10 +506,18 @@ sub WeekdayTimer_Update($) {
      return;
   }
 
-  my $active = 1;
-  my $condition = WeekdayTimer_Condition ($hash, $tage);
+  my $active     = 1;
+  my $condition  = WeekdayTimer_Condition ($hash, $tage);
+  my $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
+  my $xPression  = "{".$tageAsHash.";;".$condition ."}";
+  my %specials= (
+         "%NAME"  => $hash->{DEVICE},
+         "%EVENT" => $newParam,
+  );
+  $xPression= EvalSpecials($xPression, %specials);  
+  $xPression =~ s/%%days/%days/g;
   if ($condition) {
-     $active = AnalyzeCommandChain(undef, "{". $condition ."}");
+     $active = AnalyzeCommandChain(undef, $xPression);
   }
   Log3 $hash, 4, "[$name] seems to be active: $condition" if($active);
 
@@ -663,7 +669,7 @@ sub WeekdayTimer_FensterOffen ($$$) {
 sub WeekdayTimer_Device_Schalten($$$) {
   my ($hash, $newParam, $tage)  = @_;
 
-  my ($command, $condition) = "";
+  my ($command, $condition, $tageAsHash) = "";
   my $name = $hash->{NAME};                                        ###
 
   my $now = time();
@@ -673,9 +679,10 @@ sub WeekdayTimer_Device_Schalten($$$) {
   $command = '{ fhem("set @ '. $setModifier .' %") }';
   $command = $hash->{COMMAND}               if (defined $hash->{COMMAND});
 
-  $condition = WeekdayTimer_Condition($hash, $tage);
-       
-  $command = "{ if " .$condition . " " . $command . "}";
+  $condition  = WeekdayTimer_Condition ($hash, $tage);
+  $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
+  
+  $command = "{" . $tageAsHash . "; if " .$condition . " " . $command . "}";
 
   my $isHeating = $setModifier gt "";
   my $aktParam  = ReadingsVal($hash->{DEVICE}, $setModifier, "");
@@ -690,17 +697,27 @@ sub WeekdayTimer_Device_Schalten($$$) {
   if ($command && !$disabled && $aktParam ne $newParam) {
     $newParam =~ s/:/ /g;
 
-    $command  = SemicolonEscape($command);
     my %specials= (
            "%NAME"  => $hash->{DEVICE},
            "%EVENT" => $newParam,
     );
     $command= EvalSpecials($command, %specials);
-
+    $command =~ s/%%days/%days/g;
+    
     Log3 $hash, 4, "[$name] command: $command executed";
     my $ret  = AnalyzeCommandChain(undef, $command);
     Log3 ($hash, 3, $ret) if($ret);
   } 
+}
+################################################################################
+sub WeekdayTimer_tageAsHash($$) {
+   my ($hash, $tage)  = @_;   
+   
+   my %days = map {$_ => 1} @$tage;
+   map {delete $days{$_}} (7,8);   
+   
+   # %% weil %,@ in device para verwandelt wird
+   return 'my%%days=map{$_=>1}'.'('.join (",", sort keys %days).')';
 }
 ################################################################################
 sub WeekdayTimer_Condition($$) {  
@@ -723,7 +740,7 @@ sub WeekdayTimer_TageAsCondition ($) {
    my $we       = $days{7}; delete $days{7};  # $we
    my $notWe    = $days{8}; delete $days{8};  #!$we
    
-   my $tageExp  = '($wday ~~ [' . join (",", sort keys %days) . "]";
+   my $tageExp  = '(defined $days{$wday}';
       $tageExp .= ' ||  $we' if defined $we; 
       $tageExp .= ' || !$we' if defined $notWe;
       $tageExp .= ')';

@@ -20,7 +20,6 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-
 package main;
 use strict;
 use warnings;
@@ -101,6 +100,11 @@ sub Heating_Control_Attr($$$) {
   }
   return undef;
 }
+########################################################################
+sub Heating_Control_SetTimer($) {
+  my ($hash) = @_;
+  return WeekdayTimer_SetTimer($hash);
+}  
 ########################################################################
 sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
 
