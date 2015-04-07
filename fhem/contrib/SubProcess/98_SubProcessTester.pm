@@ -52,29 +52,38 @@ SubProcessTester_Initialize($) {
   $hash->{ShutdownFn} = "SubProcessTester_Shutdown";
   #$hash->{ReadyFn} = "SubProcessTester_Ready";
   #$hash->{GetFn}   = "SubProcessTester_Get";
-  #$hash->{SetFn}   = "SubProcessTester_Set";
+  $hash->{SetFn}   = "SubProcessTester_Set";
   #$hash->{AttrFn}  = "SubProcessTester_Attr";
   #$hash->{AttrList}= "";
 }
 
 #####################################
 #
-# Functions called from sub process
+# Functions called from subprocess
 #
 #####################################
 
 sub onRun($) {
   my $subprocess= shift;
   my $parent= $subprocess->parent();
-  Log3 undef, 1,  "RUN RUN RUN RUN...";
+  Log3 undef, 1,  "SUBPROCESS: Running...";
   my $foobar= $subprocess->{foobar};
-  for(my $i= 0; $i< 10; $i++) {
+  for(my $i= 0; $i< 30; $i++) {
+  
+  
+    my $msg= $subprocess->readFromParent();
+    if(defined($msg)) {
+        Log3 undef, 1, "SUBPROCESS read from parent: $msg";
+        $subprocess->writeToParent("echo: $msg");
+    }
     #Log3 undef, 1, "Step $i";
     # here we write something to the parent process
     # this is received via the global select loop
     # and evaluated in the ReadFn.
-    print $parent "$foobar $i\n";
-    $parent->flush();
+    $subprocess->writeToParent("$foobar $i\n");
+    #print $parent "$foobar $i\n";
+    #$parent->flush();
+    # has the pa
     sleep 5;
   }
 }
@@ -117,6 +126,26 @@ sub SubProcessTester_Shutdown($$) {
   return undef;
 }
 
+sub SubProcessTester_Set() {
+
+  my ($hash, @a)= @_;
+
+  my $name= $hash->{NAME};
+  my $cmdname= $a[1];
+  my $value= $a[2];
+  if($cmdname eq "send") {
+    my $subprocess= $hash->{fhem}{subprocess};
+    Log3 $hash, 5, "Before send....";
+    $subprocess->writeToChild($value);
+    Log3 $hash, 5, "After send....";
+    return undef;
+  } else {
+    return "Unknown argument $cmdname, choose one of send";
+  }
+
+
+}
+
 #####################################
 
 sub SubProcessTester_DoInit($) {
@@ -126,7 +155,11 @@ sub SubProcessTester_DoInit($) {
   $hash->{fhem}{subprocess}= undef;
   
   my $subprocess= SubProcess->new( { onRun => \&onRun, onExit => \&onExit } );
+  # you can set your own variables like this:
   $subprocess->{foobar}= "foo / bar";
+  # remember: as soon as the subprocess is started, parent and child process live
+  # in separate processes and cannot share data anymore - changing variables in
+  # the parent does not affect variables in the child and vice versa.
   my $pid= $subprocess->run();
   return unless($pid);
 
@@ -175,7 +208,7 @@ sub SubProcessTester_Read($) {
   
   # here we read from the global select loop what was
   # written in the onRun function
-  my $result= $subprocess->read();
+  my $result= $subprocess->readFromChild();
   if(defined($result)) {
     chomp $result;
     readingsSingleUpdate($hash, "step", $result, 1);
