@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0045 2015-03-26 21:30:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0046 2015-04-07 21:30:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -167,6 +167,15 @@
 #		0044    18.03.2015	Sailor				km200_ParseHttpResponseStat		fullResponde = ERROR - bug corrected
 #		0045    26.03.2015	Sailor				km200_ParseHttpResponseInit		Automatic Service Search
 #		0045    26.03.2015	Sailor				km200_Attr						Changes for Automatic Service Search
+#		0046    27.03.2015	Sailor				km200_ParseHttpResponseInit		"my $json -> {type}" - bug corrected
+#		0046    27.03.2015	Sailor				km200_ParseHttpResponseDyn		"my $json -> {type}" - bug corrected
+#		0046    07.04.2015	Sailor				km200_Get						Changes for SwitchProgram writings - WORKING IN PROGRESS
+#		0046    07.04.2015	Sailor				km200_Set						Changes for SwitchProgram writings - WORKING IN PROGRESS
+#		0046    07.04.2015	Sailor				km200_GetSingleService			Changes for SwitchProgram writings - WORKING IN PROGRESS
+#		0046    07.04.2015	Sailor				km200_SetSingleService			Changes for SwitchProgram writings - WORKING IN PROGRESS
+#		0046    07.04.2015	Sailor				km200_SetSingleService			Introduction of delay-attribute between push and re-reading
+#		0046    07.04.2015	Sailor				km200_Attr						Introduction of delay-attribute between push and re-reading
+#		0046    07.04.2015	Sailor				=pod							Introduction of delay-attribute between push and re-reading
 ########################################################################################################################
 
 
@@ -188,7 +197,7 @@ package main;
 use strict;
 use warnings;
 use Blocking;
-use Time::HiRes qw(gettimeofday sleep);
+use Time::HiRes qw(gettimeofday sleep usleep);
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use base qw( Exporter );
 use List::MoreUtils qw(first_index);
@@ -224,6 +233,7 @@ sub km200_Initialize($)
 						       "PollingTimeout " .
 							   "ConsoleMessage " .
 							   "DoNotPoll " .
+							   "ReadBackDelay " .
 						       $readingFnAttributes;
 }
 ####END####### Initialize module ###############################################################################END#####
@@ -239,7 +249,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0045";
+	my $ModuleVersion           = "0046";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -400,6 +410,7 @@ sub km200_Define($$)
 	  $hash->{DISABLESTATVALPOLLING}            = false;
 	  $hash->{POLLINGTIMEOUT}                   = 5;
 	  $hash->{CONSOLEMESSAGE}					= false;
+	  $hash->{READBACKDELAY}					= 100;
 	  $hash->{temp}{ServiceCounterInit}         = 0;
 	  $hash->{temp}{ServiceCounterDyn}          = 0;
 	  $hash->{temp}{ServiceCounterStat}         = 0;
@@ -531,10 +542,11 @@ sub km200_Attr(@)
 	my $IntervalStatVal        = $hash->{INTERVALSTATVAL};
 	my $DelayDynVal            = $hash->{DELAYDYNVAL};
 	my $DelayStatVal           = $hash->{DELAYSTATVAL};
+	my $ReadBackDelay          = $hash->{READBACKDELAY};
 
 
 	### Check whether dynamic interval attribute has been provided
-	if($a[2] eq "IntervalDynVal") 
+	if ($a[2] eq "IntervalDynVal")
 	{
 
 		$IntervalDynVal = $a[3];
@@ -630,6 +642,22 @@ sub km200_Attr(@)
 
 		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". $a[3];
 	}
+	### Check whether time-out for Read-Back has been provided
+	if($a[2] eq "ReadBackDelay") 
+	{
+		$ReadBackDelay = $a[3];
+		###START### Check whether ReadBackDelay is valid
+		if ($ReadBackDelay >= 0)
+		{
+			$hash->{READBACKDELAY} = $ReadBackDelay;
+			Log3 $name, 5, $name. " : km200 - ReadBackDelay set to attribute value:" . $ReadBackDelay ." s";
+		}
+		else
+		{
+			return $name .": Error - Read-Back delay time must be positive. Default is 0us";
+		}
+		####END#### Check whether ReadBackDelay is valid
+	}
 	### If no attributes of the above known ones have been selected
 	else
 	{
@@ -677,38 +705,17 @@ sub km200_Get($@)
 	### Save chosen service into hash
 	$hash->{temp}{service} = $opt;
 
-	### Block other scheduled and unscheduled routines
-	$hash->{status}{FlagGetRequest} = true;
-
-	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("Obtaining value of                                     : $opt \n");}
-
 	### Read service-hash
-	my $ReturnHash = km200_GetSingleService($hash);
-
-	### De-block other scheduled and unscheduled routines
-	$hash->{status}{FlagGetRequest} = false;
-
-	eval 
-	{
-		### Extract value
-		$ReturnValue = $ReturnHash->{value};
-		1;
-	}
-	or do 
-	{
-		### Just copy string
-		$ReturnValue = $ReturnHash;	
-	};
+	$ReturnValue = km200_GetSingleService($hash);
 
 	### Delete temporary value
 	$hash->{temp}{service} = "";
-		
+	
 	### Console outputs for debugging purposes
 	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
 	
 	### Return value
-	return($ReturnValue);
+	return($ReturnValue->{value});
 }
 ####END####### Obtain value after "get" command by fhem ########################################################END#####
 
@@ -726,8 +733,9 @@ sub km200_Set($@)
 		
 	my $name = shift @a;
 	my $opt  = shift @a;
-	my $value = join("", @a);
+	my $value = join(" ", @a);
 	my %km200_sets;
+	my $ReturnMessage;
 
 	### Get the list of possible services and create a hash out of it
 	my @WriteableServices = @{$hash->{Secret}{KM200WRITEABLESERVICES}};
@@ -746,78 +754,19 @@ sub km200_Set($@)
 
 	### Save chosen service into hash
 	$hash->{temp}{service}  = $opt;
-	
-	
-	### Check whether value is numeric
-	if ($value =~ /^[0-9.-]+$/) 
-	{
-		### Save chosen value into hash
-		$hash->{temp}{postdata} = $value * 1;	
-
-		### Console outputs for debugging purposes
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Numeric value detected\n");}
-	}
-	else
-	{
-		### Save chosen value into hash
-		$hash->{temp}{postdata} = $value;	
-
-		### Console outputs for debugging purposes
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - String value detected\n");}
-	}
-
-
-	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing value: $value to the service                     : $opt\n");}
-
-	
-	### Block other scheduled and unscheduled routines
-	$hash->{status}{FlagGetRequest} = true;
+	$hash->{temp}{postdata} = $value;	
 	
 	### Call set sub
-	km200_PostSingleService($hash);
+	$ReturnMessage = km200_PostSingleService($hash);
 
-	### Read service-hash
-	my $ReturnHash = km200_GetSingleService($hash);
-
-	### De-block other scheduled and unscheduled routines
-	$hash->{status}{FlagGetRequest} = false;
-	
-	### Find out what has been returned
-	my $ReadValue = "";
-	eval 
-	{
-		### Extract value
-		$ReadValue = $ReturnHash->{value};
-		1;
-	}
-	or do 
-	{
-		### Just copy string
-		$ReadValue = $ReturnHash;	
-	};
-
-	### Return value
-	my $ReturnValue = "";
-	if ($ReadValue eq $value)
-	{	
-		$ReturnValue = "The service " . $opt . " has been changed to: " . $ReadValue;
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing $opt succesfully with value: $value\n");}
-	}
-	else
-	{
-		$ReturnValue = "ERROR - The service " . $opt . " could not changed to: " . $value . "\n" . "The curent value for the service " . $opt . " is: " . $ReadValue;
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing $opt was NOT successful\n");}
-	}
-
-	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
-	
 	### Delete temporary hash values
 	$hash->{temp}{postdata} = "";
 	$hash->{temp}{service}  = "";
 	
-	return($ReturnValue);
+	### Console outputs for debugging purposes
+	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
+
+	return($ReturnMessage);
 }
 ####END####### Manipulate service after "Set" command by fhem ##################################################END#####
 
@@ -833,12 +782,13 @@ sub str_repeat($$)
 
 
 ###START####### Removes double entries in arrays ##############################################################START####
-sub del_double
-{
-my %all;
-$all{$_}=0 for @_;
-return (keys %all);
-} 
+###VERSION 0046: Deleted since no use in module
+#sub del_double
+#{
+#	my %all;
+#	$all{$_}=0 for @_;
+#	return (keys %all);
+#} 
 ####END######## Removes double entries in arrays ###############################################################END#####
 
 
@@ -938,56 +888,511 @@ sub km200_PostSingleService($)
 	my $km200_gateway_host          = $hash->{URL} ;
 	my $name                        = $hash->{NAME} ;
 	my $PollingTimeout              = $hash->{POLLINGTIMEOUT};
+	
 	my $err;
 	my $data;
-	my $json;
+	my $jsonSend;
+	my $jsonRead;
 	my $JsonContent;
+	
+	### Console outputs for debugging purposes
+	if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing value: " . $hash->{temp}{postdata} . " to the service                     : ". $Service . "\n");}
+	
+	### Read the current json string 
+	$jsonRead = km200_GetSingleService($hash);	
+	
+	#### If the get-command returns an error due to an unknown Service requested
+	if ($jsonRead -> {type} eq "ERROR")
+	{
+print("km200_Set - jsonRead: " . $jsonRead -> {type} . " \n");
+		### Rescue original Service request
+		my $WriteService = $Service;
 
-	
-	my $url ="http://" . $km200_gateway_host . $Service;
-	
-	### Manipulate the value
-	$json->{value} = $hash->{temp}{postdata};
-	
-	### Encode as json
-	$JsonContent = encode_json($json);
-	
-	### Encrypt 
-	$hash->{temp}{jsoncontent} = $JsonContent;
-	$data = km200_Encrypt($hash);
+		### Try to replace the Post-String with nothing
+		$Service  =~ s/\/1-Mo//i;
+		$Service  =~ s/\/2-Tu//i;
+		$Service  =~ s/\/3-We//i;
+		$Service  =~ s/\/4-Th//i;
+		$Service  =~ s/\/5-Fr//i;
+		$Service  =~ s/\/6-Sa//i;
+		$Service  =~ s/\/7-Su//i;
 
-	
-	### Create parameter set for HttpUtils_BlockingGet
-	my $param = {
-					url        => $url,
-					timeout    => $PollingTimeout,
-					data       => $data,
-					method     => "POST",
-					header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
-				};
+		### Save corrected string in hash
+		$hash->{temp}{service} = $Service;
+
+
+		### Try to read the current json string again with the corrected service
+		$jsonRead = km200_GetSingleService($hash);	
+
+		### Check whether the type is an switchProgram
+		if ($jsonRead -> {type} eq "switchProgram")
+		{
+			### For each weekday, get current readings, delete all unnecessary blanks and transform to array
+			my $TempReadingVal;
+			
+			   $TempReadingVal		= ReadingsVal($name,($Service . "/1-Mo"),"");
+			   $TempReadingVal		=~ s/\s+/ /g;
+			   $TempReadingVal		=~ s/\s+$//g;
+			   my @TempReadingMo 		= split(/ /, $TempReadingVal,0);
+			   
+			   $TempReadingVal		= ReadingsVal($name,($Service . "/2-Tu"),"");
+			   $TempReadingVal		=~ s/\s+/ /g;
+			   $TempReadingVal		=~ s/\s+$//g;
+			my @TempReadingTu 		= split(/ /, $TempReadingVal,0);
+			   
+			   $TempReadingVal		= ReadingsVal($name,($Service . "/3-We"),"");
+			   $TempReadingVal		=~ s/\s+/ /g;
+			   $TempReadingVal		=~ s/\s+$//g;
+			my @TempReadingWe 		= split(/ /, $TempReadingVal,0);
+
+			   $TempReadingVal		= ReadingsVal($name,($Service . "/4-Th"),"");
+			   $TempReadingVal		=~ s/\s+/ /g;
+			   $TempReadingVal		=~ s/\s+$//g;
+			my @TempReadingTh 		= split(/ /, $TempReadingVal,0);
+			
+			   $TempReadingVal		= ReadingsVal($name,($Service . "/5-Fr"),"");
+			   $TempReadingVal		=~ s/\s+/ /g;
+			   $TempReadingVal		=~ s/\s+$//g;
+			my @TempReadingFr 		= split(/ /, $TempReadingVal,0);
+			
+			   $TempReadingVal		= ReadingsVal($name,($Service . "/6-Sa"),"");
+			   $TempReadingVal		=~ s/\s+/ /g;
+			   $TempReadingVal		=~ s/\s+$//g;
+			my @TempReadingSa 		= split(/ /, $TempReadingVal,0);
+			
+			   $TempReadingVal		= ReadingsVal($name,($Service . "/7-Su"),"");
+			   $TempReadingVal		=~ s/\s+/ /g;
+			   $TempReadingVal		=~ s/\s+$//g;
+			my @TempReadingSu 		= split(/ /, $TempReadingVal,0);
+
+			
+			### For value to be written, delete all unnecessary blanks and transform to array and get length of array
+			my $ReturnString		= $hash->{temp}{postdata};
+			$ReturnString 			=~ s/\s+/ /g;
+			$ReturnString 			=~ s/\s+$//g;
+print("km200_Set - TempReadingString                          : |" . $ReturnString . "|\n");
+			my @TempReading			= split(/ /, $ReturnString);
+			my $TempReadingLength	= @TempReading;
+
+
+			
+			### Obtain the allowed terminology for setpoints
+			$hash->{temp}{service}	= $jsonRead -> {setpointProperty}{id};
+			my $TempSetpointsJson	= km200_GetSingleService($hash);
+
+			
+			my @TempSetpointNames	=();
+			### For each item found in this empty parent directory
+			foreach my $item (@{ $TempSetpointsJson->{references} })
+			{
+				my $TempSetPoint = substr($item->{id}, (rindex($item->{id}, "/") - length($item->{id}) +1));
 				
-	### Write value with HttpUtils_BlockingGet
-	($err, $data) = HttpUtils_BlockingGet($param);
+				### Add service to the list of all known services
+				push (@TempSetpointNames, $TempSetPoint);
+print("km200_Set - TempSetPoint                               : " . $TempSetPoint . "\n");
+			}
+			
+			$hash->{temp}{service}	= $Service;
 
+			
+			### If number of switchpoints exceeds maximum allowed
+			if (($TempReadingLength / 2) > $jsonRead -> {maxNbOfSwitchPointsPerDay})
+			{
+				return ("ERROR - Too much Switchpoints for weeklist inserted. \n Do not add more than " . $jsonRead -> {maxNbOfSwitchPointsPerDay} . " SwitchPoints per day!\n");	
+			}
+			
+			### If content of array is not even
+			if (($TempReadingLength % 2)  != 0)
+			{
+				return "ERROR - At least one Switchtime or Switchpoint is missing. \n Make sure you always have couples of Switchtime and Switchpoint!\n";	
+			}
+			
+			### Check whether description of setpoints is the same as referenced and the data is in the right order
+			for (my $i=0;$i<$TempReadingLength;$i+=2)
+			{ 
+				### If the even element behind the uneven index [1, 3, 5, ...] is not one of the pre-defined setpoints
+				if (! grep /($TempReading[$i+1])/,@TempSetpointNames)
+				{
+					return "ERROR - At least for one Switchpoint the wrong terminology has been used. Only use one of the following items: " . join(' , ',@TempSetpointNames) ."\n";;
+				}
 
-	### If error messsage has been returned
-	if($err ne "") 
+				### If the uneven element behind the even index [0, 2, 4, ...]is not a number, hand back an error message
+				if ($TempReading[$i] !~ /^[0-9.-]+$/)
+				{
+					return "ERROR - At least for one Switchtime a number is expected at that position. \n Ensure the correct syntax of time and switchpoint. (E.g. 0600 eco)\n";
+				}
+			
+				### Convert timepoint into raster of defined switchPointTimeRaster
+print("km200_Set - TempReading[i] Before                      : " . $TempReading[$i] . " \n");
+				my $TempHours    = substr($TempReading[$i], 0, length($TempReading[$i])-2);
+				if ($TempHours > 23)
+				{
+					$TempHours = 23;
+				}
+				$TempHours 	 = sprintf('%02d', $TempHours);
+				my $TempMinutes	 = substr($TempReading[$i], -2);
+				if ($TempMinutes > 59)
+				{
+					$TempMinutes = 0;
+				}
+				$TempMinutes 	 = $TempMinutes / ($jsonRead -> {switchPointTimeRaster});
+				$TempMinutes 	 =~ s/^(.*?)\..*$/$1/;
+				$TempMinutes 	 = $TempMinutes * ($jsonRead -> {switchPointTimeRaster});
+				$TempMinutes 	 = sprintf('%02d', $TempMinutes );
+				$TempReading[$i] = $TempHours . $TempMinutes;
+print("km200_Set - TempReading[i] After                       : " . $TempReading[$i] . " \n");
+			}
+			
+			$hash->{temp}{postdata} = join(" ", @TempReading);
+			
+			### For the requested day to be changed, save new value
+			if    ($WriteService =~ m/1-Mo/i)
+			{
+				@TempReadingMo   = @TempReading;
+			}
+			elsif ($WriteService =~ m/2-Tu/i)
+			{
+				@TempReadingTu   = @TempReading;
+			}
+			elsif ($WriteService =~ m/3-We/i)
+			{
+				@TempReadingWe   = @TempReading;
+			}	
+			elsif ($WriteService =~ m/4-Th/i)
+			{
+				@TempReadingTh   = @TempReading;
+			}	
+			elsif ($WriteService =~ m/5-Fr/i)
+			{
+				@TempReadingFr   = @TempReading;
+			}	
+			elsif ($WriteService =~ m/6-Sa/i)
+			{
+				@TempReadingSa   = @TempReading;
+			}	
+			elsif ($WriteService =~ m/7-Su/i)
+			{
+				@TempReadingSu   = @TempReading;
+			}	
+
+			
+			### For every weekday create setpoint hash and push it to array of hashes of switchpoints to be send
+			my @SwitchPointsSend =();
+			
+			for (my $i=0;$i<$#TempReadingMo;$i+=2)
+			{
+				my $TempHashSend;
+				
+				$TempHashSend->{"dayOfWeek"} = "Mo";
+				$TempHashSend->{"setpoint"}  = $TempReadingMo[$i+1];
+				$TempHashSend->{"time"}      = $TempReadingMo[$i]*0.6;
+				
+				push @SwitchPointsSend, $TempHashSend;
+			}
+
+			for (my $i=0;$i<$#TempReadingTu;$i+=2)
+			{
+				my $TempHashSend;
+				
+				$TempHashSend->{"dayOfWeek"} = "Tu";
+				$TempHashSend->{"setpoint"}  = $TempReadingTu[$i+1];
+				$TempHashSend->{"time"}      = $TempReadingTu[$i]*0.6;
+				
+				push @SwitchPointsSend, $TempHashSend;
+			}			
+			
+			for (my $i=0;$i<$#TempReadingWe;$i+=2)
+			{
+				my $TempHashSend;
+				
+				$TempHashSend->{"dayOfWeek"} = "We";
+				$TempHashSend->{"setpoint"}  = $TempReadingWe[$i+1];
+				$TempHashSend->{"time"}      = $TempReadingWe[$i]*0.6;
+				
+				push @SwitchPointsSend, $TempHashSend;
+			}
+	
+			for (my $i=0;$i<$#TempReadingTh;$i+=2)
+			{
+				my $TempHashSend;
+				
+				$TempHashSend->{"dayOfWeek"} = "Th";
+				$TempHashSend->{"setpoint"}  = $TempReadingTh[$i+1];
+				$TempHashSend->{"time"}      = $TempReadingTh[$i]*0.6;
+				
+				push @SwitchPointsSend, $TempHashSend;
+			}
+			
+			for (my $i=0;$i<$#TempReadingFr;$i+=2)
+			{
+				my $TempHashSend;
+				
+				$TempHashSend->{"dayOfWeek"} = "Fr";
+				$TempHashSend->{"setpoint"}  = $TempReadingFr[$i+1];
+				$TempHashSend->{"time"}      = $TempReadingFr[$i]*0.6;
+				
+				push @SwitchPointsSend, $TempHashSend;
+			}
+			
+			for (my $i=0;$i<$#TempReadingSa;$i+=2)
+			{
+				my $TempHashSend;
+				
+				$TempHashSend->{"dayOfWeek"} = "Sa";
+				$TempHashSend->{"setpoint"}  = $TempReadingSa[$i+1];
+				$TempHashSend->{"time"}      = $TempReadingSa[$i]*0.6;
+				
+				push @SwitchPointsSend, $TempHashSend;
+			}
+			
+			for (my $i=0;$i<$#TempReadingSu;$i+=2)
+			{
+				my $TempHashSend;
+				
+				$TempHashSend->{"dayOfWeek"} = "Su";
+				$TempHashSend->{"setpoint"}  = $TempReadingSu[$i+1];
+				$TempHashSend->{"time"}      = $TempReadingSu[$i]*0.6;
+				
+				push @SwitchPointsSend, $TempHashSend;
+			}
+
+			### Save array of hashes of switchpoints into json hash to be send
+			#$jsonSend = $jsonRead;
+			#delete ($jsonSend->{value});
+			@{$jsonSend->{switchPoints}} = @SwitchPointsSend;
+			
+			### Create full URL of the current Service to be written
+			my $url ="http://" . $km200_gateway_host . $Service;
+
+			### Encode as json
+			$JsonContent = encode_json($jsonSend);
+print("km200_Set - JsonContent-SwitchPoint:                   " . $JsonContent . " \n");
+			
+			### Encrypt 
+			$hash->{temp}{jsoncontent} = $JsonContent;
+			$data = km200_Encrypt($hash);
+
+			
+			### Create parameter set for HttpUtils_BlockingGet
+			my $param = {
+							url        => $url,
+							timeout    => $PollingTimeout * 5,
+							data       => $data,
+							method     => "POST",
+							header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
+						};
+						
+			### Block other scheduled and unscheduled routines
+			$hash->{status}{FlagSetRequest} = true;
+
+			### Write value with HttpUtils_BlockingGet
+			($err, $data) = HttpUtils_BlockingGet($param);
+
+			### Reset flag
+			$hash->{status}{FlagSetRequest} = false;
+			
+			### If error messsage has been returned
+			if($err ne "") 
+			{
+				Log3 $name, 2, $name . " - ERROR: $err";
+				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
+				
+				
+				return $err;	
+			}
+
+print("km200_Set - READBACKDELAY / [ms]:                      " . $hash->{READBACKDELAY}*5 . " \n");
+			### Make a pause before ReadBack
+			usleep ($hash->{READBACKDELAY}*1000*5);
+
+			
+			### Read service-hash
+			my $GetReturnHash = km200_GetSingleService($hash);
+			
+			### Return value
+			my $ReturnValue = "";
+			if ($GetReturnHash->{switchPoints} eq $jsonSend->{switchPoints})
+			{	
+				$ReturnValue = "The service " . $Service . " has been changed to: " . $hash->{temp}{postdata};
+				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing $Service succesfully with value: $JsonContent\n");}
+			}
+			else
+			{
+				$ReturnValue = "ERROR - The service " . $Service . " could not changed to: " . $hash->{temp}{postdata} . "\n";
+				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing $Service was NOT successful\n");}
+			}
+
+			### Return the status message
+			return $ReturnValue;
+		}
+	}	
+	## Check whether the type is a single value containing a string
+	elsif($jsonRead->{type} eq "stringValue") 
 	{
-		Log3 $name, 2, $name . " - ERROR: $err";
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
-		return "ERROR";	
-	}
-	else
-	{
-		### ReRead the whole json hash by read-out the value
-		$json = km200_GetSingleService($hash);	
+print("km200_Set - jsonRead type: " . $jsonRead->{type} . " \n");	
+		### Save chosen value into hash to be send
+		$jsonSend->{value} = $hash->{temp}{postdata};
+
+		### Console outputs for debugging purposes
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - String value\n");}		
+
+		### Create full URL of the current Service to be written
+		my $url ="http://" . $km200_gateway_host . $Service;
+
+		### Encode as json
+		$JsonContent = encode_json($jsonSend);
+print("km200_Set - JsonContent-String: " . $JsonContent . " \n");
 		
-		### Log entries for debugging purposes
-		Log3 $name, 5, $name. " : km200_PostSingleService   : " .$json;
-		### Log entries for debugging purposes
+		### Encrypt 
+		$hash->{temp}{jsoncontent} = $JsonContent;
+		$data = km200_Encrypt($hash);
+
+		
+		### Create parameter set for HttpUtils_BlockingGet
+		my $param = {
+						url        => $url,
+						timeout    => $PollingTimeout,
+						data       => $data,
+						method     => "POST",
+						header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
+					};
+					
+		### Block other scheduled and unscheduled routines
+		$hash->{status}{FlagSetRequest} = true;
+
+		### Write value with HttpUtils_BlockingGet
+		($err, $data) = HttpUtils_BlockingGet($param);
+
+		### Reset flag
 		$hash->{status}{FlagSetRequest} = false;
 		
-		return $json;
+		### If error message has been returned
+		if($err ne "") 
+		{
+			Log3 $name, 2, $name . " - ERROR: $err";
+			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
+		
+			return $err;	
+		}
+
+		### Make a pause before ReadBack
+		usleep ($hash->{READBACKDELAY}*1000);
+		
+		### Read service-hash
+		my $ReadValue = km200_GetSingleService($hash);
+		
+		### Return value
+		my $ReturnValue = "";
+		if ($ReadValue->{value} eq $hash->{temp}{postdata})
+		{	
+			$ReturnValue = "The service " . $Service . " has been changed to: " . $ReadValue->{value};
+			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata} . "\n");}
+		}
+		else
+		{
+			$ReturnValue = "ERROR - The service " . $Service . " could not changed.";
+			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " was NOT successful\n");}
+		}
+
+		### Return the status message
+		return $ReturnValue;
+	}	
+	## Check whether the type is a single value containing a float value
+	elsif($jsonRead -> {type} eq "floatValue")
+	{
+		### Check whether value to be sent is numeric
+		if ($hash->{temp}{postdata} =~ /^[0-9.-]+$/) 
+		{
+			### Save chosen value into hash to be send
+			$jsonSend->{value} = ($hash->{temp}{postdata}) * 1;	
+
+			### Console outputs for debugging purposes
+			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Numeric value\n");}
+		
+			### Create full URL of the current Service to be written
+			my $url ="http://" . $km200_gateway_host . $Service;
+
+			### Encode as json
+			$JsonContent = encode_json($jsonSend);
+			
+			### Encrypt 
+			$hash->{temp}{jsoncontent} = $JsonContent;
+			$data = km200_Encrypt($hash);
+
+			
+			### Create parameter set for HttpUtils_BlockingGet
+			my $param = {
+							url        => $url,
+							timeout    => $PollingTimeout,
+							data       => $data,
+							method     => "POST",
+							header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
+						};
+						
+			### Block other scheduled and unscheduled routines
+			$hash->{status}{FlagSetRequest} = true;
+
+			### Write value with HttpUtils_BlockingGet
+			($err, $data) = HttpUtils_BlockingGet($param);
+
+			### Reset flag
+			$hash->{status}{FlagSetRequest} = false;
+			
+			### If error messsage has been returned
+			if($err ne "") 
+			{
+				Log3 $name, 2, $name . " - ERROR: $err";
+				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
+				
+				
+				return $err;	
+			}
+
+			### Make a pause before ReadBack
+			usleep ($hash->{READBACKDELAY}*1000);	
+			
+			### Read service-hash
+			my $ReadValue = km200_GetSingleService($hash);
+			
+
+			### Return value
+			my $ReturnValue = "";
+			if ($ReadValue->{value} eq $hash->{temp}{postdata})
+			{	
+				$ReturnValue = "The service " . $Service . " has been changed to: " . $ReadValue->{value} . "\n";
+				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata} . "\n");}
+			}
+			elsif ($jsonRead -> {type} == $ReadValue->{value})
+			{
+				$ReturnValue = "ERROR - The service " . $Service . " could not changed to: " . $hash->{temp}{postdata} . "\n The value is: " . $ReadValue->{value} . "\n";
+				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " was NOT successful\n");}
+			}
+			else
+			{
+				$ReturnValue = "The service " . $Service . " has been rounded to: " . $ReadValue->{value} . "\n";
+				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " was rounded and changed successful\n");}
+			}
+
+
+			### Return the status message
+			return $ReturnValue;
+		}
+		### If the value to be sent is NOT numeric
+		else
+		{
+			### Console outputs for debugging purposes
+			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - ERROR - Float value expected!\n");}
+			return ("km200_Set - ERROR - Float value expected!\n");
+		}
+	}
+	## If the type is unknown
+	else
+	{
+		### Log entries for debugging purposes
+		Log3 $name, 4, $name. " : km200_SetSingleService - type is unknown for: " .$Service;
+
+		### Console outputs for debugging purposes
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Type is unknown for $Service\n");}		
 	}
 }
 ####END####### Subroutine set individual data value ############################################################END##### 
@@ -1001,13 +1406,18 @@ sub km200_GetSingleService($)
 	my $km200_gateway_host      	= $hash->{URL};
 	my $name                    	= $hash->{NAME};
 	my $PollingTimeout              = $hash->{POLLINGTIMEOUT};
-	my $json                     	= "";
+	my $json -> {type}				= "";
+	   $json -> {value}				= "";
 	my $err;
 	my $data;
 
+	### Console outputs for debugging purposes
+	if ($hash->{CONSOLEMESSAGE} == true) {print("Obtaining value of                                     : " . $Service . "\n");}
 	
+	### Create full URL of the current Service to be read
 	my $url ="http://" . $km200_gateway_host . $Service;
 
+	### Create parameter set for HttpUtils_BlockingGet
 	my $param = {
 					url        => $url,
 					timeout    => $PollingTimeout,
@@ -1015,14 +1425,23 @@ sub km200_GetSingleService($)
 					header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
 				};
 
+	### Block other scheduled and unscheduled routines
+	$hash->{status}{FlagGetRequest} = true;
+
 	($err, $data) = HttpUtils_BlockingGet($param);
 
+	### Block other scheduled and unscheduled routines
+	$hash->{status}{FlagGetRequest} = false;
+	
 	### If error message has been reported
 	if($err ne "") 
 	{
 		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
 		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_GetSingleService ERROR: $err\n");}
-		return "ERROR";
+		my $ReturnMessage ="ERROR";
+		$json -> {type}   = $ReturnMessage;
+		$json -> {value}  = $ReturnMessage;
+		return $json;
 	}
 	### If NO error message has been reported
 	else
@@ -1042,10 +1461,6 @@ sub km200_GetSingleService($)
 			Log3 $name, 5, $name. " : km200_GetSingleService - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
 			if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
 			};
-			
-			
-			
-			
 
 			### Check whether the type is a single value containing a string or float value
 			if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
@@ -1061,6 +1476,8 @@ sub km200_GetSingleService($)
 				### Write reading for fhem
 				readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 				### Write reading for fhem
+
+				return $json
 			}	
 			
 			### Check whether the type is an switchProgram
@@ -1212,8 +1629,37 @@ sub km200_GetSingleService($)
 				$TempReturnVal = $TempReturnVal . "5-Fr: " . $TempReadingFr . "\n";
 				$TempReturnVal = $TempReturnVal . "6-Sa: " . $TempReadingSa . "\n";
 				$TempReturnVal = $TempReturnVal . "7-Su: " . $TempReadingSu . "\n";
-				$json -> {"value"} = $TempReturnVal;
+
+				
+				$json->{value} = $TempReturnVal;
+				
+				return $json
 			}
+			### Check whether the type is an refEnum which is indicating an empty parent directory
+			elsif ($json -> {type} eq "refEnum")
+			{
+				### Initialise Return Message
+				my $ReturnMessage = "";
+
+
+				### For each item found in this empty parent directory
+				foreach my $item (@{ $json->{references} })
+				{
+					### If it is the first item in the list
+					if ($ReturnMessage eq "")
+					{				
+						$ReturnMessage = $item->{id};
+					}
+					### If it is not the first item in the list
+					else
+					{
+						$ReturnMessage = $ReturnMessage . "\n" . $item->{id};
+					}
+				}
+				### Return list of available directories
+				$json->{value} = $ReturnMessage;
+				return $json;
+			}		
 			### If the type is unknown
 			else
 			{
@@ -1226,23 +1672,11 @@ sub km200_GetSingleService($)
 		{
 			Log3 $name, 4, $name. " : km200_GetSingleService: ". $Service . " NOT available";
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read                   : $Service \n";}
-		}
 		
-		### Log entries for debugging purposes
-		Log3 $name, 5, $name. " : km200_GetSingleService        : " .$json;
-		### Log entries for debugging purposes
-
-		### Reset Flag
-		$hash->{status}{FlagGetRequest} = false;
-		
-		### If json exists then return json otherwise return the raw decoded content
-		if( exists $json -> {"value"})
-		{
+			my $ReturnMessage = "ERROR";
+			$json -> {type}   = $ReturnMessage;
+			$json -> {value}  = $ReturnMessage;
 			return $json;
-		}
-		else
-		{
-			return $decodedContent;
 		}
 	}
 }
@@ -1306,7 +1740,8 @@ sub km200_ParseHttpResponseInit($)
 	my @KM200_InitServices       = @{$hash ->{Secret}{KM200ALLSERVICES}};	
 	my $NumberInitServices       = "";
 	my $Service                  = $KM200_InitServices[$ServiceCounterInit];
-	my $json -> {type}           = "";	
+	my $type;
+    my $json ->{type} = "";
 	
 	
 	### Log entries for debugging purposes
@@ -1546,13 +1981,17 @@ sub km200_ParseHttpResponseInit($)
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingMo, 1);
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
-			
+			### Add service to the list of writeable services
+			push (@KM200_WriteableServices, $TempJsonId);
+
 			
 			### Create new Service and write reading for fhem
 			$TempJsonId = $JsonId . "/" . "2-Tu";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTu, 1);
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Add service to the list of writeable services
+			push (@KM200_WriteableServices, $TempJsonId);
 			
 			
 			### Create new Service and write reading for fhem
@@ -1560,6 +1999,8 @@ sub km200_ParseHttpResponseInit($)
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingWe, 1);
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Add service to the list of writeable services
+			push (@KM200_WriteableServices, $TempJsonId);
 
 			
 			### Create new Service and write reading for fhem
@@ -1567,6 +2008,8 @@ sub km200_ParseHttpResponseInit($)
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTh, 1);
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Add service to the list of writeable services
+			push (@KM200_WriteableServices, $TempJsonId);
 
 			
 			### Create new Service and write reading for fhem
@@ -1574,6 +2017,8 @@ sub km200_ParseHttpResponseInit($)
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingFr, 1);
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Add service to the list of writeable services
+			push (@KM200_WriteableServices, $TempJsonId);
 
 			
 			### Create new Service and write reading for fhem
@@ -1581,6 +2026,8 @@ sub km200_ParseHttpResponseInit($)
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSa, 1);
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Add service to the list of writeable services
+			push (@KM200_WriteableServices, $TempJsonId);
 
 			
 			### Create new Service and write reading for fhem
@@ -1588,6 +2035,9 @@ sub km200_ParseHttpResponseInit($)
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSu, 1);
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Add service to the list of writeable services
+			push (@KM200_WriteableServices, $TempJsonId);
+
 		}
 		
 		### Check whether the type is an errorlist
@@ -1660,8 +2110,6 @@ sub km200_ParseHttpResponseInit($)
 					push (@{$hash ->{Secret}{KM200ALLSERVICES}}, $item->{id});
 				}
 			}
-			
-			### Sort the list of all services alphabetically
 			
 			### Sort the list of all services alphabetically
 			@{$hash ->{Secret}{KM200ALLSERVICES}} = sort @{$hash ->{Secret}{KM200ALLSERVICES}};
@@ -1849,7 +2297,8 @@ sub km200_ParseHttpResponseDyn($)
 	my @KM200_DynServices       = @{$hash ->{Secret}{KM200DYNSERVICES}};	
 	my $NumberDynServices       = @KM200_DynServices;
 	my $Service                 = $KM200_DynServices[$ServiceCounterDyn];
-	my $json -> {type}          = "";		
+	my $type;
+    my $json ->{type} = "";
 	
 	Log3 $name, 5, $name. " : Parsing response of dynamic service received for: " . $Service;
 
@@ -2439,6 +2888,19 @@ sub km200_ParseHttpResponseStat($)
 	</table>
 </ul></ul>
 
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td align="right" valign="top"><li><code>ReadBackDelay</code> : </li></td><td align="left" valign="top">A valid time in milliseconds [ms] for the delay between writing and re-reading of values after using the "set" - command. The value must be >=0ms.<BR>
+																												   The default value is 100 = 100ms = 0,1s.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+
 </ul>
 =end html
 
@@ -2600,6 +3062,18 @@ sub km200_ParseHttpResponseStat($)
 																													Die Liste kann auch Hierarchien von services enthalten. Dies bedeutet, das alle Services unterhalb dieses Services ebenfalls gel&ouml;scht werden.<BR>
 																													Der Default Wert ist (empty) somit werden alle bekannten Services abgefragt.<BR>
 			</td></tr>			
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td align="right" valign="top"><li><code>ReadBackDelay</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zurücklesen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>
+																												   Der  Default-Wert ist 100 = 100ms = 0,1s.<BR>
+			</td></tr>
 			</td>
 		</tr>
 	</table>
