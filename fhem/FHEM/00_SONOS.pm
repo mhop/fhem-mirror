@@ -48,6 +48,12 @@
 #
 # SVN-History:
 # .04.2015
+#	Neues Feature 'ExportSonosBibliothek': Hiermit kann eine Datei mit der textuellen Darstellung eines Struktur- und Titelhashs erzeugt werden, das die komplette Navigationsstruktur aus der Sonos-Bibliothek abbildet. Richtwerte bei ca. 20.000 Titeln auf einem Windows-Server mit Intel Core i5 mit 2.8GHz: Laufzeit: ca. 8Min, Arbeitsspeicher: ca. 1GB, Resultierende Datei: ca. 52MB
+#	Neues Feature 'DeletePlaylist': Hiermit kann eine Playlist gelöscht werden. Genauso wie bei LoadPlaylist kann man hier URL-Encoded arbeiten, oder einen regulären Ausdruck verwenden
+#	Neues Feature 'SnoozeAlarm': Hiermit kann ein gerade abspielender Alarm für die übergebene Zeit unterbrochen werden
+#	Neues Feature bei 'LoadPlaylist': Man kann nun einen Devicenamen angeben, dann wird dessen aktuelle Abspielliste kopiert
+#	Bei der Titelanzeige wird der Numerische Vergleichsfehler abgefangen, der auftritt, wenn der Player keinerlei aktuelle Abspielinformationen hat
+# 03.04.2015
 #	IsAlive-Check Anpassungen: Bei einer Antwort wird nun nicht mehr geprüft, ob diese von derselben Netzwerkschnittstelle stammt, an die der Ping gesendet wurde. Damit werden Player besser erkannt, die sowohl am Funknetz als auch am LAN angeschlossen sind.
 #	IsAlive-Check Anpassungen: Bei der Option 'tcp' wird nun versucht auf den Standard-Webport des Players zu verbinden (1400)
 #	Callback-Aufrufmethoden: Wenn ein Player eine Nachricht an Fhem sendet und dieser Player in Fhem als 'disappeared' geführt wird, dann wird der Discovery-Process neu angestartet, um diesen Player wieder sauber zu erkennen
@@ -391,6 +397,7 @@ sub SONOS_Log($$$);
 sub SONOS_StartClientProcessIfNeccessary($);
 sub SONOS_Client_Notifier($);
 sub SONOS_Client_ConsumeMessage($$);
+sub SONOS_RecursiveStructure($$$$);
 
 sub SONOS_RCLayout();
 
@@ -610,10 +617,30 @@ sub SONOS_RCLayoutSVG2() {
 
 ########################################################################################
 #
+# SONOS_LoadExportedSonosBibliothek - Sets the internal Value with the given Name in the given fhem-device with the loaded file given with filename
+#
+########################################################################################
+sub SONOS_LoadExportedSonosBibliothek($$$) {
+	my ($fileName, $deviceName, $internalName) = @_;
+	
+	my $fileInhalt = '';
+	
+	open FILE, '<'.$fileName;
+	binmode(FILE, ':encoding(utf-8)');
+	while (<FILE>) {
+		$fileInhalt .= $_;
+	}
+	close FILE;
+	
+	$defs{$deviceName}->{$internalName} = eval($fileInhalt);
+}
+
+########################################################################################
+#
 # SONOS_getCoverTitleRG - Returns the Cover- and Title-Readings for use in a ReadingsGroup
 #
 ########################################################################################
-sub SONOS_getCoverTitleRG($;$$) {
+sub SONOS_getCoverTitleRG($;$$) { 
 	my ($device, $width, $space) = @_;
 	$width = 500 if (!defined($width));
 	
@@ -744,7 +771,9 @@ sub SONOS_getTitleRG($;$) {
 	# 55
   
 	# Läuft Radio oder ein "normaler" Titel
-	if (ReadingsVal($device, 'currentNormalAudio', 1) == 1) {
+	my $currentNormalAudio = ReadingsVal($device, 'currentNormalAudio', 1);
+	$currentNormalAudio = 1 if (SONOS_Trim($currentNormalAudio) eq '');
+	if ($currentNormalAudio == 1) {
 		my $showNext = ReadingsVal($device, 'nextTitle', '') || ReadingsVal($device, 'nextArtist', '') || ReadingsVal($device, 'nextAlbum', '');
 		$infoString = sprintf('<div style="margin-left: -150px;">%s Titel %s von %s (%s)<br />Titel: <b>%s</b><br />Interpret: <b>%s</b><br />Album: <b>%s</b>'.($showNext ? '<div style="height: %s;"></div>Nächste Wiedergabe (%s):</div><div style="float: left; margin-left: 0px;"><img style="margin: 0px; padding: 0px; margin-right: 5px; border: 1px solid lightgray; height: 3.5em;" border="0" src="%s" /></div><div style="margin-left: 0px;">Titel: %s<br />Interpret: %s<br />Album: %s</div>' : ''),
 				$transportState, 
@@ -2672,6 +2701,44 @@ sub SONOS_Discover() {
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
 						$Data::Dumper::Indent = 2;
 					}
+				} elsif ($workType eq 'exportSonosBibliothek') {
+					my $filename = $params[0];
+					
+					# Anfragen durchführen...
+					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
+						my $exports = {'Structure' => {}, 'Titles' => {}};
+						
+						SONOS_Log undef, 3, 'ExportSonosBibliothek-Start';
+						my $startTime = gettimeofday();
+						SONOS_RecursiveStructure($udn, 'A:', $exports->{Structure}, $exports->{Titles});
+						SONOS_Log undef, 3, 'ExportSonosBibliothek-End. Runtime (in seconds): '.int(gettimeofday() - $startTime);
+						
+						my $countTitles = scalar(keys %{$exports->{Titles}});
+						
+						# In Datei wegschreiben
+						$Data::Dumper::Indent = 0;
+						eval {
+							#$Data::Dumper::Indent = 2;
+							#open FILE, '>M:/Hausautomation/fhem-dev/fhem/structure.txt';
+							#print FILE Dumper($exports->{Structure});
+							#close FILE;
+							#$Data::Dumper::Indent = 0;
+							
+							open FILE, '>'.$filename;
+							binmode(FILE, ':encoding(utf-8)');
+							print FILE Dumper($exports);
+							close FILE;
+						};
+						if ($@) {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Error during filewriting: '.$@);
+							return;
+						}
+						$Data::Dumper::Indent = 2;
+						
+						$exports = undef;
+						
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Successfully written to file "'.$filename.'", Titles: '.$countTitles.', Duration: '.int(gettimeofday() - $startTime).'s');
+					}
 				} elsif ($workType eq 'loadSearchlist') {
 					# Category holen
 					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
@@ -3150,35 +3217,34 @@ sub SONOS_Discover() {
 							}
 							close FILE;
 							
-							my $sliceSize = 16;
-							my $result;
-							my $count = 0;
+							# Elemente an die Queue anhängen
+							$answer .= SONOS_AddMultipleURIsToQueue($udn, \@URIs, \@Metas, $currentInsertPos);
+						} elsif ($playlistName =~ /^:device:(.*)/) {
+							my $sourceUDN = $1;
+							my @URIs = ();
+							my @Metas = ();
 							
-							SONOS_Log $udn, 5, "Start-Adding: Count ".scalar(@URIs)." / $sliceSize";
+							# Titel laden
+							my $playlistData;
+							my $startIndex = 0;
 							
-							for my $i (0..int(scalar(@URIs) / $sliceSize)) { # Da hier Nullbasiert vorgegangen wird, brauchen wir die letzte Runde nicht noch hinzuaddieren
-								my $startIndex = $i * $sliceSize;
-								my $endIndex = $startIndex + $sliceSize - 1;
-								$endIndex = SONOS_Min(scalar(@URIs) - 1, $endIndex);
+							do {
+								$playlistData = $SONOS_ContentDirectoryControlProxy{$sourceUDN}->Browse('Q:0', 'BrowseDirectChildren', '', $startIndex, 0, '');
+								my $tmp = decode('UTF-8', $playlistData->getValue('Result'));
 								
-								SONOS_Log $udn, 5, "Add($i) von $startIndex bis $endIndex (".($endIndex - $startIndex + 1)." Elemente)";
-								SONOS_Log $udn, 5, "Upload($currentInsertPos)-URI: ".join(' ', @URIs[$startIndex..$endIndex]);
-								SONOS_Log $udn, 5, "Upload($currentInsertPos)-Meta: ".join(' ', @Metas[$startIndex..$endIndex]);
-								
-								$result = $SONOS_AVTransportControlProxy{$udn}->AddMultipleURIsToQueue(0, 0, $endIndex - $startIndex + 1, join(' ', @URIs[$startIndex..$endIndex]), join(' ', @Metas[$startIndex..$endIndex]), '', '', $currentInsertPos, 0);
-								if (!$result->isSuccessful()) {
-									$answer .= 'Adding-Error: '.SONOS_UPnPAnswerMessage($result).' ';
+								while ($tmp =~ m/<item.*?>.*?<res.*?>(.*?)<\/res>.*?<\/item>/ig) {
+									my ($res, $meta) = SONOS_CreateURIMeta(decode_entities($1));
+									next if (!defined($res));
+									
+									push(@URIs, $res);
+									push(@Metas, $meta);
 								}
 								
-								$currentInsertPos += $endIndex - $startIndex + 1;
-								$count = $endIndex + 1;
-							}
+								$startIndex += $playlistData->getValue('NumberReturned');
+							} while ($startIndex < $playlistData->getValue('TotalMatches'));
 							
-							if ($result->isSuccessful()) {
-								$answer .= 'Added '.$count.' entries from file "'.$1.'". There are now '.$result->getValue('NewQueueLength').' entries in Queue. ';
-							} else {
-								$answer .= 'Adding: '.SONOS_UPnPAnswerMessage($result).' ';
-							}
+							# Elemente an die Queue anhängen
+							$answer .= SONOS_AddMultipleURIsToQueue($udn, \@URIs, \@Metas, $currentInsertPos);
 						} else {
 							my $browseResult = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('SQ:', 'BrowseDirectChildren', '', 0, 0, '');
 							my $tmp = $browseResult->getValue('Result');
@@ -3275,6 +3341,12 @@ sub SONOS_Discover() {
 						} else {
 							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_AnswerMessage(0));
 						}
+					}
+				} elsif ($workType eq 'setSnoozeAlarm') {
+					my $time = $params[0];
+					
+					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_UPnPAnswerMessage($SONOS_AVTransportControlProxy{$udn}->SnoozeAlarm(0, $time)));
 					}
 				} elsif ($workType eq 'setDailyIndexRefreshTime') {
 					my $time = $params[0];
@@ -3390,6 +3462,44 @@ sub SONOS_Discover() {
 							}
 						}
 					}
+				} elsif ($workType eq 'deletePlaylist') {
+					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
+					my $playlistName = $1 if ($regSearch);
+					$playlistName = uri_unescape($params[0]) if (!$regSearch);
+					
+					# RegEx prüfen...
+					if ($regSearch) {
+						eval { "" =~ m/$playlistName/ };
+						if($@) {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Bad RegExp "'.$playlistName.'": '.$@);
+							return;
+						}
+					}
+					
+					my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('SQ:', 'BrowseDirectChildren', '', 0, 0, '');
+					my $tmp = $result->getValue('Result');
+					
+					my %resultHash;
+					while ($tmp =~ m/<container id="(SQ:\d+)".*?<dc:title>(.*?)<\/dc:title>.*?<\/container>/ig) {
+						my $name = $2;
+						$resultHash{$name} = $1;
+						
+						# Den ersten Match ermitteln, und sich den echten Namen für die Zukunft merken...
+						if ($regSearch) {
+							if ($name =~ m/$playlistName/) {
+								$playlistName = $name;
+								$regSearch = 0;
+							}
+						}
+					}
+					
+					# Wenn RegSearch gesetzt war, und nichts gefunden wurde...
+					if (!$resultHash{$playlistName} || $regSearch) {
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Playlist "'.$playlistName.'" not found. Choose one of: "'.join('","', sort keys %resultHash).'"');
+						return;
+					}
+					
+					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Playlist "'.$playlistName.'" deleted: '.SONOS_UPnPAnswerMessage($SONOS_ContentDirectoryControlProxy{$udn}->DestroyObject($resultHash{$playlistName})));
 				} elsif ($workType eq 'deleteProxyObjects') {
 					# Wird vom Sonos-Device selber in IsAlive benötigt
 					SONOS_DeleteProxyObjects($udn);
@@ -3671,6 +3781,115 @@ sub SONOS_Discover() {
 	$SONOS_Thread = -1;
 	
 	return 1;
+}
+
+########################################################################################
+#
+#  SONOS_RecursiveStructure - Retrieves the structure of the Sonos-Bibliothek
+#
+########################################################################################
+sub SONOS_RecursiveStructure($$$$) {
+	my ($udn, $search, $exportsStruct, $exportsTitles) = @_;
+	
+	my $startIndex = 0;
+	my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse($search, 'BrowseDirectChildren', '', $startIndex, 0, '');
+	return if (!defined($result->getValue('NumberReturned')));
+	$startIndex += $result->getValue('NumberReturned');
+	my $tmp = decode('UTF-8', $result->getValue('Result'));
+	
+	# Alle Suchergebnisse vom Player abfragen...
+	while ($startIndex < $result->getValue('TotalMatches')) {
+		$result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse($search, 'BrowseDirectChildren', '', $startIndex, 0, '');
+		$tmp .= decode('UTF-8', $result->getValue('Result'));
+		
+		$startIndex += $result->getValue('NumberReturned');
+	}
+	
+	# Struktur verarbeiten...
+	while ($tmp =~ m/<container id="(.*?)".*?>(.*?)<\/container>/ig) {
+		my $id = $1;
+		my $item = $2;
+		
+		next if (SONOS_Trim($id) eq ''); # Wenn keine ID angegeben ist, dann überspringen
+		
+		$exportsStruct->{$id}->{ID} = $id;
+		$exportsStruct->{$id}->{Title} = $1 if ($item =~ m/<dc:title>(.*?)<\/dc:title>/i);
+		$exportsStruct->{$id}->{Artist} = $1 if ($item =~ m/<dc:creator>(.*?)<\/dc:creator>/i);
+		$exportsStruct->{$id}->{Cover} = SONOS_MakeCoverURL($udn, $1) if ($item =~ m/<upnp:albumArtURI>(.*?)<\/upnp:albumArtURI>/i);
+		$exportsStruct->{$id}->{Type} = 'Container';
+		$exportsStruct->{$id}->{Children} = {};
+		
+		# Wenn hier eine Titel-ID gesucht werden soll, die es bereits lokal gibt, dann nicht mehr anfragen...
+		if (!$exportsTitles->{$id}) {
+			SONOS_RecursiveStructure($udn, $id, $exportsStruct->{$id}->{Children}, $exportsTitles);
+		}
+	} 
+	
+	# Titel verarbeiten...
+	while ($tmp =~ m/<item id="(.*?)".*?>(.*?)<\/item>/ig) {
+		my $id = $1;
+		my $item = $2;
+		
+		next if (SONOS_Trim($id) eq ''); # Wenn keine ID angegeben ist, dann überspringen
+		
+		# Titel merken...
+		$exportsTitles->{$id}->{ID} = $id;
+		$exportsTitles->{$id}->{TrackURI} = SONOS_GetURIFromQueueValue($1) if ($item =~ m/<res.*?>(.*?)<\/res>/i);
+		$exportsTitles->{$id}->{Title} = $1 if ($item =~ m/<dc:title>(.*?)<\/dc:title>/i);
+		$exportsTitles->{$id}->{Artist} = $1 if ($item =~ m/<dc:creator>(.*?)<\/dc:creator>/i);
+		$exportsTitles->{$id}->{AlbumArtist} = $1 if ($item =~ m/<r:albumArtist>(.*?)<\/r:albumArtist>/i);
+		$exportsTitles->{$id}->{Album} = $1 if ($item =~ m/<upnp:album>(.*?)<\/upnp:album>/i);
+		$exportsTitles->{$id}->{Cover} = SONOS_MakeCoverURL($udn, $1) if ($item =~ m/<upnp:albumArtURI>(.*?)<\/upnp:albumArtURI>/i);
+		$exportsTitles->{$id}->{OriginalTrackNumber} = $1 if ($item =~ m/<upnp:originalTrackNumber>(.*?)<\/upnp:originalTrackNumber>/i);
+		
+		# Verweis in der Struktur merken...
+		$exportsStruct->{$id}->{ID} = $id;
+		$exportsStruct->{$id}->{Type} = 'Track';
+	}
+}
+
+########################################################################################
+#
+#  SONOS_AddMultipleURIsToQueue - Adds the given URIs to the current queue of the player
+#
+########################################################################################
+sub SONOS_AddMultipleURIsToQueue($$$$) {
+	my ($udn, $URIs, $Metas, $currentInsertPos) = @_;
+	my @URIs = @{$URIs};
+	my @Metas = @{$Metas};
+	
+	my $sliceSize = 16;
+	my $result;
+	my $count = 0;
+	my $answer = '';
+	
+	SONOS_Log $udn, 5, "Start-Adding: Count ".scalar(@URIs)." / $sliceSize";
+	
+	for my $i (0..int(scalar(@URIs) / $sliceSize)) { # Da hier Nullbasiert vorgegangen wird, brauchen wir die letzte Runde nicht noch hinzuaddieren
+		my $startIndex = $i * $sliceSize;
+		my $endIndex = $startIndex + $sliceSize - 1;
+		$endIndex = SONOS_Min(scalar(@URIs) - 1, $endIndex);
+		
+		SONOS_Log $udn, 5, "Add($i) von $startIndex bis $endIndex (".($endIndex - $startIndex + 1)." Elemente)";
+		SONOS_Log $udn, 5, "Upload($currentInsertPos)-URI: ".join(' ', @URIs[$startIndex..$endIndex]);
+		SONOS_Log $udn, 5, "Upload($currentInsertPos)-Meta: ".join(' ', @Metas[$startIndex..$endIndex]);
+		
+		$result = $SONOS_AVTransportControlProxy{$udn}->AddMultipleURIsToQueue(0, 0, $endIndex - $startIndex + 1, join(' ', @URIs[$startIndex..$endIndex]), join(' ', @Metas[$startIndex..$endIndex]), '', '', $currentInsertPos, 0);
+		if (!$result->isSuccessful()) {
+			$answer .= 'Adding-Error: '.SONOS_UPnPAnswerMessage($result).' ';
+		}
+		
+		$currentInsertPos += $endIndex - $startIndex + 1;
+		$count = $endIndex + 1;
+	}
+	
+	if ($result->isSuccessful()) {
+		$answer .= 'Added '.$count.' entries from file "'.$1.'". There are now '.$result->getValue('NewQueueLength').' entries in Queue. ';
+	} else {
+		$answer .= 'Adding: '.SONOS_UPnPAnswerMessage($result).' ';
+	}
+	
+	return $answer;
 }
 
 ########################################################################################
@@ -5036,7 +5255,7 @@ sub SONOS_Discover_Callback($$$) {
 			if ($transportService) {
 				$SONOS_TransportSubscriptions{$udn} = $transportService->subscribe(\&SONOS_ServiceCallback);
 				if (defined($SONOS_TransportSubscriptions{$udn})) {
-					SONOS_Log undef, 2, 'Service-subscribing successful with SID="'.$SONOS_TransportSubscriptions{$udn}->SID;
+					SONOS_Log undef, 2, 'Service-subscribing successful with SID='.$SONOS_TransportSubscriptions{$udn}->SID;
 				} else {
 					SONOS_Log undef, 1, 'Service-subscribing NOT successful';
 				}
@@ -5051,7 +5270,7 @@ sub SONOS_Discover_Callback($$$) {
 	  		$SONOS_RenderingSubscriptions{$udn} = $renderingService->subscribe(\&SONOS_RenderingCallback);
 	  		$SONOS_ButtonPressQueue{$udn} = Thread::Queue->new();
 	  		if (defined($SONOS_RenderingSubscriptions{$udn})) {
-	  			SONOS_Log undef, 2, 'Rendering-Service-subscribing successful with SID="'.$SONOS_RenderingSubscriptions{$udn}->SID;
+	  			SONOS_Log undef, 2, 'Rendering-Service-subscribing successful with SID='.$SONOS_RenderingSubscriptions{$udn}->SID;
 	  		} else {
 	  			SONOS_Log undef, 1, 'Rendering-Service-subscribing NOT successful';
 	  		}
@@ -5063,7 +5282,7 @@ sub SONOS_Discover_Callback($$$) {
 		if ($groupRenderingService && (SONOS_Client_Data_Retreive($udn, 'attr', 'minVolume', -1) != -1 || SONOS_Client_Data_Retreive($udn, 'attr', 'maxVolume', -1) != -1 || SONOS_Client_Data_Retreive($udn, 'attr', 'minVolumeHeadphone', -1) != -1 || SONOS_Client_Data_Retreive($udn, 'attr', 'maxVolumeHeadphone', -1)  != -1 )) {
 	  		$SONOS_GroupRenderingSubscriptions{$udn} = $groupRenderingService->subscribe(\&SONOS_GroupRenderingCallback);
 	  		if (defined($SONOS_GroupRenderingSubscriptions{$udn})) {
-	  			SONOS_Log undef, 2, 'GroupRendering-Service-subscribing successful with SID="'.$SONOS_GroupRenderingSubscriptions{$udn}->SID;
+	  			SONOS_Log undef, 2, 'GroupRendering-Service-subscribing successful with SID='.$SONOS_GroupRenderingSubscriptions{$udn}->SID;
 	  		} else {
 	  			SONOS_Log undef, 1, 'GroupRendering-Service-subscribing NOT successful';
 	  		}
@@ -5075,7 +5294,7 @@ sub SONOS_Discover_Callback($$$) {
 		if ($alarmService && (SONOS_Client_Data_Retreive($udn, 'attr', 'getAlarms', 0) != 0)) {
 			$SONOS_AlarmSubscriptions{$udn} = $alarmService->subscribe(\&SONOS_AlarmCallback);
 			if (defined($SONOS_AlarmSubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'Alarm-Service-subscribing successful with SID="'.$SONOS_AlarmSubscriptions{$udn}->SID;
+				SONOS_Log undef, 2, 'Alarm-Service-subscribing successful with SID='.$SONOS_AlarmSubscriptions{$udn}->SID;
 			} else {
 				SONOS_Log undef, 1, 'Alarm-Service-subscribing NOT successful';
 			}
@@ -5087,7 +5306,7 @@ sub SONOS_Discover_Callback($$$) {
 		if ($zoneGroupTopologyService) {
 			$SONOS_ZoneGroupTopologySubscriptions{$udn} = $zoneGroupTopologyService->subscribe(\&SONOS_ZoneGroupTopologyCallback);
 			if (defined($SONOS_ZoneGroupTopologySubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'ZoneGroupTopology-Service-subscribing successful with SID="'.$SONOS_ZoneGroupTopologySubscriptions{$udn}->SID;
+				SONOS_Log undef, 2, 'ZoneGroupTopology-Service-subscribing successful with SID='.$SONOS_ZoneGroupTopologySubscriptions{$udn}->SID;
 			} else {
 				SONOS_Log undef, 1, 'ZoneGroupTopology-Service-subscribing NOT successful';
 			}
@@ -5099,7 +5318,7 @@ sub SONOS_Discover_Callback($$$) {
 		if ($devicePropertiesService) {
 			$SONOS_DevicePropertiesSubscriptions{$udn} = $devicePropertiesService->subscribe(\&SONOS_DevicePropertiesCallback);
 			if (defined($SONOS_DevicePropertiesSubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'DeviceProperties-Service-subscribing successful with SID="'.$SONOS_DevicePropertiesSubscriptions{$udn}->SID;
+				SONOS_Log undef, 2, 'DeviceProperties-Service-subscribing successful with SID='.$SONOS_DevicePropertiesSubscriptions{$udn}->SID;
 			} else {
 				SONOS_Log undef, 1, 'DeviceProperties-Service-subscribing NOT successful';
 			}
@@ -5111,7 +5330,7 @@ sub SONOS_Discover_Callback($$$) {
 		if ($audioInService) {
 			$SONOS_AudioInSubscriptions{$udn} = $audioInService->subscribe(\&SONOS_AudioInCallback);
 			if (defined($SONOS_AudioInSubscriptions{$udn})) {
-				SONOS_Log undef, 2, 'AudioIn-Service-subscribing successful with SID="'.$SONOS_AudioInSubscriptions{$udn}->SID;
+				SONOS_Log undef, 2, 'AudioIn-Service-subscribing successful with SID='.$SONOS_AudioInSubscriptions{$udn}->SID;
 			} else {
 				SONOS_Log undef, 1, 'AudioIn-Service-subscribing NOT successful';
 			}
