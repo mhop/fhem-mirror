@@ -120,6 +120,7 @@ my %sets = (
 	'LoadPlaylist' => 'playlistname',
 	'StartPlaylist' => 'playlistname',
 	'SavePlaylist' => 'playlistname',
+	'DeletePlaylist' => 'playlistname',
 	'CurrentPlaylist' => '',
 	'EmptyPlaylist' => '',
 	'StartFavourite' => 'favouritename',
@@ -151,6 +152,7 @@ my %sets = (
 	'Track' => 'tracknumber|Random',
 	'currentTrack' => 'tracknumber',
 	'Alarm' => 'create|update|delete ID valueHash',
+	'SnoozeAlarm' => 'time',
 	'DailyIndexRefreshTime' => 'timestamp',
 	'SleepTimer' => 'time',
 	'AddMember' => 'member_devicename',
@@ -166,7 +168,8 @@ my %sets = (
 	'RoomIcon' => 'iconName',
 	'LoadSearchlist' => 'category categoryElem titleFilter/albumFilter/artistFilter maxElems',
 	'StartSearchlist' => 'category categoryElem titleFilter/albumFilter/artistFilter maxElems',
-	'ResetAttributesToDefault' => 'deleteOtherAttributes'
+	'ResetAttributesToDefault' => 'deleteOtherAttributes',
+	'ExportSonosBibliothek' => 'filename'
 );
 
 my @possibleRoomIcons = qw(bathroom library office foyer dining tvroom hallway garage garden guestroom den bedroom kitchen portable media family pool masterbedroom playroom patio living);
@@ -584,11 +587,17 @@ sub SONOSPLAYER_Set($@) {
 	} elsif (lc($key) eq 'loadplaylist') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
-	
+		
 		$value2 = 1 if (!defined($value2));
 		
 		if ($value =~ m/^file:(.*)/) {
 			SONOS_DoWork($udn, 'loadPlaylist', ':m3ufile:'.$1, $value2);
+		} elsif (defined($defs{$value})) {
+			my $dHash = SONOS_getDeviceDefHash($value);
+			SONOSPLAYER_Log undef, 3, 'Device: '.$dHash->{NAME}.' ~ '.$dHash->{UDN};
+			if (defined($dHash)) {
+				SONOS_DoWork($udn, 'loadPlaylist', ':device:'.$dHash->{UDN}, $value2);
+			}
 		} else {
 			SONOS_DoWork($udn, 'loadPlaylist', $value, $value2);
 		}
@@ -618,6 +627,8 @@ sub SONOSPLAYER_Set($@) {
 		} else {
 			SONOS_DoWork($udn, 'savePlaylist', $value, '');
 		}
+	} elsif (lc($key) eq 'deleteplaylist') {
+		SONOS_DoWork($udn, 'deletePlaylist', $value);
 	} elsif (lc($key) eq 'currentplaylist') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -634,6 +645,8 @@ sub SONOSPLAYER_Set($@) {
 		
 		SONOS_DoWork($udn, 'loadSearchlist', $value, $value2, $a[4], $a[5]);
 		SONOS_DoWork($udn, 'play');
+	} elsif (lc($key) eq 'exportsonosbibliothek') {
+		SONOS_DoWork($udn, 'exportSonosBibliothek', $value);
 	} elsif (lc($key) eq 'playuri') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -702,6 +715,11 @@ sub SONOSPLAYER_Set($@) {
 		}
 		
 		SONOS_DoWork($udn, 'setAlarm', $value, $value2, $text);
+	} elsif (lc($key) eq 'snoozealarm') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+		
+		SONOS_DoWork($udn, 'setSnoozeAlarm', $value);
 	} elsif (lc($key) eq 'dailyindexrefreshtime') {
 		SONOS_DoWork($udn, 'setDailyIndexRefreshTime', $value);
 	} elsif (lc($key) eq 'sleeptimer') {
@@ -985,6 +1003,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
 <b><code>DailyIndexRefreshTime &lt;time&gt;</code></b></a>
 <br />Sets the current DailyIndexRefreshTime for the whole bunch of Zoneplayers.</li>
+<li><a name="SONOSPLAYER_setter_ExportSonosBibliothek">
+<b><code>ExportSonosBibliothek &lt;filename&gt;</code></b></a>
+<br />Exports a file with a textual representation of a structure- and titlehash of the complete Sonos-Bibliothek. Warning: Will use a large amount of CPU-Time and RAM!</li>
 <li><a name="SONOSPLAYER_setter_Name">
 <b><code>Name &lt;Zonename&gt;</code></b></a>
 <br />Sets the Name for this Zone</li>
@@ -1000,6 +1021,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_RoomIcon">
 <b><code>RoomIcon &lt;Iconname&gt;</code></b></a>
 <br />Sets the Icon for this Zone</li>
+<li><a name="SONOSPLAYER_setter_SnoozeAlarm">
+<b><code>SnoozeAlarm &lt;Time&gt;</code></b></a>
+<br />Snoozes a currently playing alarm for the given time</li>
 <li><a name="SONOSPLAYER_setter_Wifi">
 <b><code>Wifi &lt;State&gt;</code></b></a>
 <br />Sets the WiFi-State of the given Player. Can be 'off', 'persist-off' or 'on'.</li>
@@ -1111,12 +1135,15 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_CurrentPlaylist">
 <b><code>CurrentPlaylist</code></b></a>
 <br /> Sets the current playing to the current queue, but doesn't start playing (e.g. after hearing of a radiostream, where the current playlist still exists but is currently "not in use")</li>
+<li><a name="SONOSPLAYER_setter_DeletePlaylist">
+<b><code>DeletePlaylist</code></b></a>
+<br /> Deletes the Sonos-Playlist with the given name. According to the possibilities of the playlistname have a close look at LoadPlaylist.</li>
 <li><a name="SONOSPLAYER_setter_EmptyPlaylist">
 <b><code>EmptyPlaylist</code></b></a>
 <br /> Clears the current queue</li>
 <li><a name="SONOSPLAYER_setter_LoadPlaylist">
-<b><code>LoadPlaylist &lt;Playlistname&gt; [EmptyQueueBeforeImport]</code></b></a>
-<br /> Loads the named playlist to the current playing queue. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistname can be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')<br />If EmptyQueueBeforeImport is given and set to 1, the queue will be emptied before the import process. If not given, the parameter will be interpreted as 1.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/hits.2014/</code>.</li>
+<b><code>LoadPlaylist &lt;Playlistname|Fhem-Devicename&gt; [EmptyQueueBeforeImport]</code></b></a>
+<br /> Loads the named playlist to the current playing queue. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistnamen can be an Fhem-Devicename, then the current playlist of this referenced player will be copied. The Playlistname can also be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')<br />If EmptyQueueBeforeImport is given and set to 1, the queue will be emptied before the import process. If not given, the parameter will be interpreted as 1.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/hits.2014/</code>.</li>
 <li><a name="SONOSPLAYER_setter_LoadRadio">
 <b><code>LoadRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Loads the named radiostation (favorite). The current queue will not be touched but deactivated. The parameter should be URL-encoded for proper naming of lists with special characters.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/radio/</code>.</li>
@@ -1281,6 +1308,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
 <b><code>DailyIndexRefreshTime &lt;time&gt;</code></b></a>
 <br />Setzt die aktuell gültige DailyIndexRefreshTime für alle Zoneplayer.</li>
+<li><a name="SONOSPLAYER_setter_ExportSonosBibliothek">
+<b><code>ExportSonosBibliothek &lt;filename&gt;</code></b></a>
+<br />Exportiert eine Datei mit der textuellen Darstellung eines Struktur- und Titelhashs, das die komplette Navigationsstruktur aus der Sonos-Bibliothek abbildet. Achtung: Benötigt eine große Menge CPU-Zeit und Arbeitsspeicher für die Ausführung!</li>
 <li><a name="SONOSPLAYER_setter_Name">
 <b><code>Name &lt;Zonename&gt;</code></b></a>
 <br />Legt den Namen der Zone fest.</li>
@@ -1296,6 +1326,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_RoomIcon">
 <b><code>RoomIcon &lt;Iconname&gt;</code></b></a>
 <br />Legt das Icon für die Zone fest</li>
+<li><a name="SONOSPLAYER_setter_SnoozeAlarm">
+<b><code>SnoozeAlarm &lt;Time&gt;</code></b></a>
+<br />Unterbricht eine laufende Alarmwiedergabe für den übergebenen Zeitraum.</li>
 <li><a name="SONOSPLAYER_setter_Wifi">
 <b><code>Wifi &lt;State&gt;</code></b></a>
 <br />Setzt den WiFi-Zustand des Players. Kann 'off', 'persist-off' oder 'on' sein.</li>
@@ -1407,12 +1440,15 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_CurrentPlaylist">
 <b><code>CurrentPlaylist</code></b></a>
 <br /> Setzt den Abspielmodus auf die aktuelle Abspielliste, startet aber keine Wiedergabe (z.B. nach dem Hören eines Radiostreams, wo die aktuelle Abspielliste noch existiert, aber gerade "nicht verwendet" wird)</li>
+<li><a name="SONOSPLAYER_setter_DeletePlaylist">
+<b><code>DeletePlaylist</code></b></a>
+<br /> Löscht die bezeichnete Playliste. Zum möglichen Format des Playlistenamen unter LoadPlaylist nachsehen.</li>
 <li><a name="SONOSPLAYER_setter_EmptyPlaylist">
 <b><code>EmptyPlaylist</code></b></a>
 <br /> Leert die aktuelle Abspielliste</li>
 <li><a name="SONOSPLAYER_setter_LoadPlaylist">
-<b><code>LoadPlaylist &lt;Playlistname&gt; [EmptyQueueBeforeImport]</code></b></a>
-<br /> Lädt die angegebene Playlist in die aktuelle Abspielliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).<br />Wenn der Parameter EmptyQueueBeforeImport mit ''1'' angegeben wirde, wird die aktuelle Abspielliste vor dem Import geleert. Standardmäßig wird hier ''1'' angenommen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/hits.2014/</code>.</li>
+<b><code>LoadPlaylist &lt;Playlistname|Fhem-Devicename&gt; [EmptyQueueBeforeImport]</code></b></a>
+<br /> Lädt die angegebene Playlist in die aktuelle Abspielliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann ein Fhem-Sonosplayer-Devicename sein, dann wird dessen aktuelle Abpielliste kopiert. Der Playlistname kann aber auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).<br />Wenn der Parameter EmptyQueueBeforeImport mit ''1'' angegeben wirde, wird die aktuelle Abspielliste vor dem Import geleert. Standardmäßig wird hier ''1'' angenommen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/hits.2014/</code>.</li>
 <li><a name="SONOSPLAYER_setter_LoadRadio">
 <b><code>LoadRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Startet den angegebenen Radiostream. Der Name bezeichnet einen Sender in der Radiofavoritenliste. Die aktuelle Abspielliste wird nicht verändert. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/radio/</code>.</li>
