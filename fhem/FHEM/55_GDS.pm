@@ -683,7 +683,7 @@ sub decodeCAPData($$$){
 	$readings{"a_".$anum."_effective"}		= $alertsXml->{info}[$info]{effective}					if($_gdsAll);
 	$readings{"a_".$anum."_onset"}			= $alertsXml->{info}[$info]{onset};
 	$readings{"a_".$anum."_expires"}		= $alertsXml->{info}[$info]{expires};
-	$readings{"a_".$anum."_valid"}			= checkCAPValid($readings{"a_".$anum."_expires"});
+	$readings{"a_".$anum."_valid"}			= checkCAPValid($readings{"a_".$anum."_onset"},$readings{"a_".$anum."_expires"});
 	$readings{"a_".$anum."_onset_local"}	= capTrans($readings{"a_".$anum."_onset"});
 	$readings{"a_".$anum."_expires_local"}	= capTrans($readings{"a_".$anum."_expires"});
 	$readings{"a_".$anum."_sent_local"}		= capTrans($readings{"a_".$anum."_sent"});
@@ -740,14 +740,21 @@ sub decodeCAPData($$$){
   # return (12-$gt[2]);
 # }
 
-sub checkCAPValid($){
-	my ($expires) = @_;
+sub checkCAPValid($$){
+	my ($onset,$expires) = @_;
 	my $valid = 0;
 	my $offset = _calctz(time,localtime(time))*3600; # used from 99_SUNRISE_EL
+    my $t = (time - $offset);
+
+	$onset =~ s/T/ /;
+	$onset =~ s/\+/ \+/;
+	$onset = time_str2num($onset);
+
 	$expires =~ s/T/ /;
 	$expires =~ s/\+/ \+/;
 	$expires = time_str2num($expires);
-	$valid = 1 if($expires gt (time-$offset));
+
+	$valid = 1 if($onset lt $t && $expires gt $t);
 	return $valid;
 }
 
@@ -1316,6 +1323,8 @@ sub gdsHeadlines($;$) {
 #	2015-01-03	added	multiple alerts handling
 #
 #   2015-01-30  changed use own FWEXT instead of HTTPSRV
+#
+#   2015-04-07  fixed   a_X_valid calculation: use onset, too
 #
 ####################################################################################################
 #
