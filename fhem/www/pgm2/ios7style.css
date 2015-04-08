@@ -143,6 +143,28 @@ select {  margin-left:5px; margin-right:5px; background: #fff; border:0px; }
 /* timepicker */
 .set .set { margin-bottom:2px; margin-top:3px; }
 
+/* sortable Widget */
+ul.sortable-src, ul.sortable-dest {
+min-width: 130px; min-height:1.8em;
+list-style-type: none; border: 2px solid black;
+vertical-align:middle; border-radius: 3px;
+margin: 3px; background: #aaa;
+padding: 2px;
+} 
+ul.sortable-src li, ul.sortable-dest li {
+  color: black!important; font-size: 0.8em;
+  line-height: 1.6em; vertical-align:middle;
+  text-align:left; border-radius:3px;
+  margin: 3px; padding: 2px;
+  padding-left:4px;  min-width: 120px; 
+} 
+ul.sortable-dest { background:  #147bff; } 
+span.sort-item-delete-link {
+  float:right; margin:0px;vertical-align:middle;
+  margin-left:3px; padding:0px;
+ } 
+.ui-state-highlight { height: 1.1em; line-height: 1.1em; } 
+
 /* save button */
 .changed a, .changed { color:#fc3e39!important; }
 #saveCheck { position: absolute; top: 10px; right: 10px; padding: 0; }

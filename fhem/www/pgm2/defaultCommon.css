@@ -54,9 +54,9 @@ ul.sortable-src, ul.sortable-dest {
 } 
 ul.sortable-src li, ul.sortable-dest li { 
   color: black!important;font-size: 0.8em;
-  line-height: 1.6em; white-space: nowrap; 
-  vertical-align:middle; text-align:left;
-  border-radius:3px; margin: 3px; padding: 2px; padding-left:4px;
+  line-height: 1.6em; vertical-align:middle;
+  text-align:left; border-radius:3px; 
+  margin: 3px; padding: 2px; padding-left:4px;
   min-width: 120px;
 } 
 ul.sortable-dest { background:  #278727; } 
