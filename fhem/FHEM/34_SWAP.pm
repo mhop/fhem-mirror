@@ -803,6 +803,8 @@ SWAP_regName($$$)
 {
   my ($rid, $ep, $endpoint) = @_;
 
+  $ep = "0$ep" if( length($ep) == 0 );
+
   if( !defined($endpoint) ) {
     return $rid if( $ep == 0 && !defined($endpoint->{position}) );
     return $rid .'.'. $ep;
@@ -1023,7 +1025,8 @@ SWAP_Parse($$)
     $rhash->{product} = $products->{$productcode} if( defined($productcode) && defined($products->{$productcode} ) );
 
     if( $first ) {
-      SWAP_Set( $rhash, $rname, "statusRequest" );
+      my $time = 1+rand(5);
+      fhem( "sleep $time; set $rname statusRequest" );
     } else {
       SWAP_Send($rhash, $rhash->{addr}, QUERY, "01" );
       SWAP_Send($rhash, $rhash->{addr}, QUERY, "02" );
