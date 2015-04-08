@@ -81,10 +81,25 @@ select {  margin-left:5px; margin-right:5px; }
 .downText,.makeSelect select { margin:0.7em; }
 
 /* sortable Widget */
-ul.sortable-src, ul.sortable-dest {min-width: 130px; min-height:1.8em; list-style-type: none;border: 2px solid white;vertical-align:middle; border-radius: 3px; margin: 3px; background: #aaa; padding: 2px;} 
-ul.sortable-src li, ul.sortable-dest li { color: black!important;font-size: 0.8em; line-height: 1.6em; white-space: nowrap; vertical-align:middle; text-align:left; border-radius:3px; margin: 3px; padding: 2px; padding-left:4px;  min-width: 120px; } 
+ul.sortable-src, ul.sortable-dest {
+  min-width: 130px; min-height:1.8em;
+  list-style-type: none; border: 2px solid white;
+  vertical-align:middle; border-radius: 3px;
+  margin: 3px; background: #aaa; padding: 2px;
+} 
+ul.sortable-src li, ul.sortable-dest li { 
+  color: black!important; font-size: 0.8em;
+  line-height: 1.6em; vertical-align:middle;
+  text-align:left; border-radius: 3px;
+  margin: 3px; padding: 2px; padding-left:4px;
+  min-width: 120px;
+} 
 ul.sortable-dest { background:  #101010; } 
-span.sort-item-delete-link { float:right; margin:0px;vertical-align:middle; margin-left:3px; padding:0px;} 
+span.sort-item-delete-link { 
+  float:right; margin:0px;
+  vertical-align:middle; margin-left:3px;
+  padding:0px;
+} 
 .ui-state-highlight { height: 1.1em; line-height: 1.1em; } 
 
 
