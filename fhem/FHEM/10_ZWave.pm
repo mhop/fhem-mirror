@@ -97,7 +97,23 @@ my %zwave_class = (
   METER                    => { id => '32',
     get   => { meter       => "01" },
     parse => { "..3202(.*)"=> 'ZWave_ParseMeter($hash, $1)' }, },
-  ZIP_ADV_SERVER           => { id => '33', },
+  COLOR_CONTROL           => { id => '33',
+    get   => { ccCapabilityGet   => '01', # no more args
+               ccStatus          => '03', # no more args
+             },
+    set   => { # Forum #36050
+               resettoWhiteWarm   => '050a00ff0101020003000400',
+                                              # 100% warm, minimal cold, otherwise bulb is dimmed
+               resettoWhiteCold   => '050a000001ff020003000400',
+               resettoRed         => '050a0000010002ff03000400', # 100% red
+               resettoGreen       => '050a00000100020003ff0400', # 100% green
+               resettoBlue        => '050a000001000200030004ff', # 100% blue
+               resettoYellow      => '050A00000100027f037f0400', # 50% red, 50% green
+                },
+    parse => { "043302(.*)"  => 'ccCapabilityGetResponse:$1', #answer to ccCapabilityGet
+               "043304(.*)"  => 'ccStatusResponse:$1', },
+    },
+
   ZIP_ADV_CLIENT           => { id => '34', },
   METER_PULSE              => { id => '35', },
   BASIC_TARIFF_INFO        => { id => '36', },
