@@ -1,3 +1,5 @@
+// $Id$
+
 // Wrapper for the widget.
 FW_widgets['sortable'] = { createFn:FW_sortableCreate, };
 FW_widgets['sortable-strict'] = { createFn:FW_sortableCreate, };
