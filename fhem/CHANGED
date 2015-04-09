@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new fhemweb widgets. see widgetOverride in commandref
   - Bugfix:  73_km200 - Fix for get-command responding with false error message
   - Feature: 73_km200 - Get and Set command blocked during initialisation process
   - Feature: 73_km200 - Optional Argument for get command introduced
