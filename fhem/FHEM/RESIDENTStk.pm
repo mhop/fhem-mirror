@@ -1114,7 +1114,7 @@ sub RESIDENTStk_AttrFnDummy(@) {
     my ( $cmd, $name, $aName, $aVal ) = @_;
 
     # set attribute
-    if ( $cmd eq "set" ) {
+    if ( $init_done && $cmd eq "set" ) {
 
         # wakeupResetSwitcher
         if ( $aName eq "wakeupResetSwitcher" ) {
