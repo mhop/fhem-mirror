@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0046 2015-04-07 21:30:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0047 2015-04-09 20:30:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -7,11 +7,12 @@
 #     from Rudolf Koenig to avoid a full blockage of the fhem main system during the
 #     polling procedure.
 #
-#     Author          : Matthias Deeke 
-#     Contributions   :	Olaf Droegehorn, Andreas Hahn, Rudolf Koenig, Markus Bloch, Stefan M., Furban, KaiKr, grossi33
-#     e-mail          :	matthias.deeke(AT)deeke(PUNKT)eu
-#     Fhem Forum      : http://forum.fhem.de/index.php/topic,25540.0.html
-#     Fhem Wiki       : http://www.fhemwiki.de/wiki/Buderus_Web_Gateway
+#     Author                     : Matthias Deeke 
+#     Contributions              : Olaf Droegehorn, Andreas Hahn, Rudolf Koenig, Markus Bloch,
+#     Contributions (continued)  : Stefan M., Furban, KaiKr, grossi33, Morkin
+#     e-mail                     : matthias.deeke(AT)deeke(PUNKT)eu
+#     Fhem Forum                 : http://forum.fhem.de/index.php/topic,25540.0.html
+#     Fhem Wiki                  : http://www.fhemwiki.de/wiki/Buderus_Web_Gateway
 #
 #     This file is part of fhem.
 #
@@ -176,6 +177,12 @@
 #		0046    07.04.2015	Sailor				km200_SetSingleService			Introduction of delay-attribute between push and re-reading
 #		0046    07.04.2015	Sailor				km200_Attr						Introduction of delay-attribute between push and re-reading
 #		0046    07.04.2015	Sailor				=pod							Introduction of delay-attribute between push and re-reading
+#		0047    08.04.2015	Sailor				km200_Get						Implementation of optional return of Json-string
+#		0047    08.04.2015	Sailor				km200_GetSingleService			Implementation of optional return of Json-string
+#		0047    08.04.2015	Sailor				=pod							Implementation of optional return of Json-string
+#		0047    09.04.2015	Sailor				km200_Get						Blocking get-command during initialisation phase
+#		0047    09.04.2015	Sailor				km200_Set						Blocking set-command during initialisation phase
+#		0047    09.04.2015	Sailor				km200_SetSingleService			Bugfix for error message
 ########################################################################################################################
 
 
@@ -186,9 +193,7 @@
 #         Unfortunately the global %hash of this module will not be transferred to the DbLog function. Therefore this 
 #         function is useless.
 #
-# *switchPrograms: Writing programs not yet implemented
-#
-# *notifications: Read of boiler controller error messages not yet implemented
+# *switchPrograms: Writing of switchPoints not yet implemented
 #
 ########################################################################################################################
 
@@ -249,7 +254,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0046";
+	my $ModuleVersion           = "0047";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -679,10 +684,12 @@ sub km200_Get($@)
 		return "\"get km200\" needs at least one argument";
 	}
 		
-	my $name = shift @a;
-	my $opt  = shift @a;
+	my $name     = shift @a;
+	my $service  = shift @a;
+	my $option   = shift @a;
 	my %km200_gets;
 	my $ReturnValue;
+	my $ReturnMessage;
 	
 	### Get the list of possible services and create a hash out of it
 	my @GetServices = @{$hash->{Secret}{KM200ALLSERVICES}};
@@ -693,29 +700,51 @@ sub km200_Get($@)
 	}
 	
 	### Remove trailing slash if available
-	$opt = $1 if($opt=~/(.*)\/$/);
+	$service = $1 if($service=~/(.*)\/$/);
 	
 	### If service chosen in GUI does not exist
-	if(!$km200_gets{$opt}) 
+	if(!$km200_gets{$service}) 
 	{
 		my @cList = keys %km200_gets;
-		return "Unknown argument $opt, choose one of " . join(" ", @cList);
+		return "Unknown argument $service, choose one of " . join(" ", @cList);
 	}
 	
-	### Save chosen service into hash
-	$hash->{temp}{service} = $opt;
+	### Check whether the initialisation process has been finished
+	if ($hash->{temp}{ServiceCounterInit} == false)
+	{
+		### Save chosen service into hash
+		$hash->{temp}{service} = $service;
 
-	### Read service-hash
-	$ReturnValue = km200_GetSingleService($hash);
+		### Read service-hash
+		$ReturnValue = km200_GetSingleService($hash);
 
-	### Delete temporary value
+		### If the "get" - option has been set to "Json" for the return of the raw Json-string
+		if ($option =~ m/json/i)
+		{
+			$ReturnMessage = $hash->{temp}{JsonRaw};
+		}
+		### If no option has been chosen, just return the result of the value.
+		else
+		{
+			$ReturnMessage = $ReturnValue->{value};
+		}
+	}
+	### If the initialisation process has NOT been finished
+	else
+	{
+		$ReturnMessage = "The initialisation process is still ongoing. Please wait for the STATE changing to \"Standby\"";
+	}
+		
+	
+	### Delete temporary values
 	$hash->{temp}{service} = "";
+	$hash->{temp}{JsonRaw} = "";
 	
 	### Console outputs for debugging purposes
 	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
 	
 	### Return value
-	return($ReturnValue->{value});
+	return($ReturnMessage);
 }
 ####END####### Obtain value after "get" command by fhem ########################################################END#####
 
@@ -732,7 +761,7 @@ sub km200_Set($@)
 	}
 		
 	my $name = shift @a;
-	my $opt  = shift @a;
+	my $service  = shift @a;
 	my $value = join(" ", @a);
 	my %km200_sets;
 	my $ReturnMessage;
@@ -746,19 +775,28 @@ sub km200_Set($@)
 	}
 	
 	### If service chosen in GUI does not exist
-	if(!$km200_sets{$opt}) 
+	if(!$km200_sets{$service}) 
 	{
 		my @cList = keys %km200_sets;
-		return "Unknown argument $opt, choose one of " . join(" ", @cList);
+		return "Unknown argument $service, choose one of " . join(" ", @cList);
 	}
 
-	### Save chosen service into hash
-	$hash->{temp}{service}  = $opt;
-	$hash->{temp}{postdata} = $value;	
+	### Check whether the initialisation process has been finished
+	if ($hash->{temp}{ServiceCounterInit} == false)
+	{
+		### Save chosen service into hash
+		$hash->{temp}{service}  = $service;
+		$hash->{temp}{postdata} = $value;	
+		
+		### Call set sub
+		$ReturnMessage = km200_PostSingleService($hash);
+	}
+	### If the initialisation process has NOT been finished
+	else
+	{
+		$ReturnMessage = "The initialisation process is still ongoing. Please wait for the STATE changing to \"Standby\"";
+	}
 	
-	### Call set sub
-	$ReturnMessage = km200_PostSingleService($hash);
-
 	### Delete temporary hash values
 	$hash->{temp}{postdata} = "";
 	$hash->{temp}{service}  = "";
@@ -1362,7 +1400,7 @@ print("km200_Set - JsonContent-String: " . $JsonContent . " \n");
 				$ReturnValue = "The service " . $Service . " has been changed to: " . $ReadValue->{value} . "\n";
 				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata} . "\n");}
 			}
-			elsif ($jsonRead -> {type} == $ReadValue->{value})
+			elsif ($jsonRead -> {value} == $ReadValue->{value})
 			{
 				$ReturnValue = "ERROR - The service " . $Service . " could not changed to: " . $hash->{temp}{postdata} . "\n The value is: " . $ReadValue->{value} . "\n";
 				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " was NOT successful\n");}
@@ -1471,11 +1509,11 @@ sub km200_GetSingleService($)
 
 				### Save json-hash for DbLog-Split
 				$hash->{temp}{ServiceDbLogSplitHash} = $json;
-				### Save json-hash for DbLog-Split
+				$hash->{temp}{JsonRaw} = $decodedContent;
+				
 				
 				### Write reading for fhem
 				readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
-				### Write reading for fhem
 
 				return $json
 			}	
@@ -1630,8 +1668,11 @@ sub km200_GetSingleService($)
 				$TempReturnVal = $TempReturnVal . "6-Sa: " . $TempReadingSa . "\n";
 				$TempReturnVal = $TempReturnVal . "7-Su: " . $TempReadingSu . "\n";
 
-				
+				### Save weeklist in "value"
 				$json->{value} = $TempReturnVal;
+				
+				### Save raw Json string
+				$hash->{temp}{JsonRaw} = $decodedContent;
 				
 				return $json
 			}
@@ -1658,6 +1699,10 @@ sub km200_GetSingleService($)
 				}
 				### Return list of available directories
 				$json->{value} = $ReturnMessage;
+				
+				### Save raw Json string
+				$hash->{temp}{JsonRaw} = $decodedContent;
+				
 				return $json;
 			}		
 			### If the type is unknown
@@ -1722,6 +1767,10 @@ sub km200_GetInitService($)
 					callback   =>  \&km200_ParseHttpResponseInit
 				};
 
+	### Set flag for initialisation
+	$hash->{status}{FlagInitRequest} = true;
+	
+	### Get the value
 	HttpUtils_NonblockingGet($param);
 }
 ####END####### Subroutine initial contact of services via HttpUtils ############################################END#####
@@ -2051,10 +2100,11 @@ sub km200_ParseHttpResponseInit($)
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
 
+			### Add service to the list of responding services
+			push (@KM200_RespondingServices, $Service);
 			
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read";}
-			
 			
 			### Check whether service is writeable and write name of service in array
 			if ($json->{writeable} == 1)
@@ -2069,17 +2119,32 @@ sub km200_ParseHttpResponseInit($)
 			}
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId\n";}
-			if ($hash->{CONSOLEMESSAGE} == true) {print(" - JsonResponse: $json\n");}
-			if ($hash->{CONSOLEMESSAGE} == true) {print(" - JsonType    :  " . $json->{type}   . "\n");}
-			if ($hash->{CONSOLEMESSAGE} == true) 
+
+			my $TempServiceIndex = 0;
+			foreach my $item (@{ $json->{values} })
 			{
-				print(" - JsonValues  :\n");
+				### Increment Service-Index
+				$TempServiceIndex++;
 				
-				foreach my $item (@{ $json->{values} })
-				{
-					print( $item . "\n");
-				}
-			print("End of list\n");
+				### Create message string with fixed blocksize
+				my $TempTime      = $item->{t};
+				   $TempTime      =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(20-length($1)))/e;
+				my $TempErrorCode = $item->{dcd};
+				   $TempErrorCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(3 -length($1)))/e;
+				my $TempAddCode   = $item->{ccd};    
+				   $TempAddCode   =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(4 -length($1)))/e;
+				my $TempClassCode = $item->{cat};    
+				   $TempClassCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(2- length($1)))/e;
+				my $TempErrorMessage = "Time: " . $TempTime . "-ErrorCode: " . $TempErrorCode . " -AddCode: " . $TempAddCode . " -Category: " . $TempClassCode;
+
+				### Create Service with Increment
+				my $TempServiceString = $Service . "/Error-" . $TempServiceIndex;
+				
+				### Write Reading
+				readingsSingleUpdate( $hash, $TempServiceIndex, $TempErrorMessage, 1);
+				
+				### Console Message if enabled
+				if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read                      : $TempServiceString\n";}
 			}
 		}
 		### Check whether the type is an refEnum which is indicating an empty parent directory
@@ -2156,11 +2221,6 @@ sub km200_ParseHttpResponseInit($)
 	### If the list of KM200ALLSERVICES is finished
 	else
 	{
-		$hash->{temp}{ServiceCounterInit} = 0;
-
-		### Set status of km200 fhem module
-		$hash->{STATE} = "Standby";
-		
 		###START###### Filter all static services out of responsive services = responsive dynamic services ########START####
 		my @KM200_DynServices = @KM200_RespondingServices;
 
@@ -2220,6 +2280,12 @@ sub km200_ParseHttpResponseInit($)
 		
 		### Console Message if enabled
 		if ($hash->{CONSOLEMESSAGE} == true) {print("Sounding and importing of services is completed\n________________________________________________________________________________________________________\n\n");}
+
+		### Set status of km200 fhem module
+		$hash->{STATE} = "Standby";
+
+		### Disable flag
+		$hash->{temp}{ServiceCounterInit} = false;
 	}
 	### If the Initialisation process has been interuppted with an error message
 	if (ReadingsVal($name,"fullResponse",0) eq "ERROR")
@@ -2230,7 +2296,6 @@ sub km200_ParseHttpResponseInit($)
 		### Reset timer for init procedure and start over again until it works
 		InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
 		Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services restarted after fullResponse - error.";
-		
 	}
 	
 	### Clear up temporary variables
@@ -2241,7 +2306,7 @@ sub km200_ParseHttpResponseInit($)
 ####END####### Subroutine to download complete initial data set from gateway ###################################END#####
 
 
-###START###### Subroutine obtaining dynamic services via HttpUtils ##############################################################START####
+###START###### Subroutine obtaining dynamic services via HttpUtils ############################################START####
 sub km200_GetDynService($)
 {
 	my ($hash, $def)                 = @_;
@@ -2516,17 +2581,41 @@ sub km200_ParseHttpResponseDyn($)
 			$TempJsonId = $JsonId . "/" . "7-Su";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSu, 1);
 		}
-		### Check whether the type is an errorlist
+				### Check whether the type is an errorlist
 		elsif ($json -> {type} eq "errorList")
 		{
 			my $JsonId         = $json->{id};
 			my $JsonType       = $json->{type};
 
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseDyn: value found for  : " .$Service;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: id               : " .$JsonId;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: type             : " .$JsonType;
-			
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
+
+
+			my $TempServiceIndex = 0;
+			foreach my $item (@{ $json->{values} })
+			{
+				### Increment Service-Index
+				$TempServiceIndex++;
+				
+				### Create message string with fixed blocksize
+				my $TempTime      = $item->{t};
+				   $TempTime      =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(20-length($1)))/e;
+				my $TempErrorCode = $item->{dcd};
+				   $TempErrorCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(3 -length($1)))/e;
+				my $TempAddCode   = $item->{ccd};    
+				   $TempAddCode   =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(4 -length($1)))/e;
+				my $TempClassCode = $item->{cat};    
+				   $TempClassCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(2- length($1)))/e;
+				my $TempErrorMessage = "Time: " . $TempTime . "-ErrorCode: " . $TempErrorCode . " -AddCode: " . $TempAddCode . " -Category: " . $TempClassCode;
+
+				### Create Service with Increment
+				my $TempServiceString = $Service . "/Error-" . $TempServiceIndex;
+				
+				### Write Reading
+				readingsSingleUpdate( $hash, $TempServiceIndex, $TempErrorMessage, 1);
+			}
 		}
 		### Check whether the type is unknown
 		else
@@ -2803,7 +2892,7 @@ sub km200_ParseHttpResponseStat($)
 	</td></tr>
 </table>
 
-<table><tr><td><ul><code>get &lt;service&gt;</code></ul></td></tr></table>
+<table><tr><td><ul><code>get &lt;service&gt; &lt;option&gt;</code></ul></td></tr></table>
 
 <ul><ul>
 	<table>
@@ -2814,6 +2903,18 @@ sub km200_ParseHttpResponseStat($)
 		</tr>
 	</table>
 </ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td align="right" valign="top"><code>&lt;option&gt;</code> : </td><td align="left" valign="top">The optional Argument for the result of the get-command e.g.:  "<code>json</code>"<BR>
+																											 &nbsp;&nbsp;The following options are available:<BR>
+																											 &nbsp;&nbsp;json - Returns the raw json-answer from the KMxxx as string.
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
 
 <BR>
 
@@ -2982,13 +3083,24 @@ sub km200_ParseHttpResponseStat($)
 	</td></tr>
 </table>
 
-<table><tr><td><ul><code>get &lt;service&gt;</code></ul></td></tr></table>
+<table><tr><td><ul><code>get &lt;service&gt; &lt;option&gt;</code></ul></td></tr></table>
 
 <ul><ul>
 	<table>
 		<tr>
 			<td align="right" valign="top"><code>&lt;service&gt;</code> : </td><td align="left" valign="top">Der Name des Service welcher ausgelesen werden soll. Z.B.:  "<code>/heatingCircuits/hc1/operationMode</code>"<BR>
 																											 &nbsp;&nbsp;Es gibt nur den Wert, aber nicht die Werteliste oder den m&ouml;glichen Wertebereich zur&uuml;ck.<BR>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td align="right" valign="top"><code>&lt;option&gt;</code> : </td><td align="left" valign="top">Das optionelle Argument für die Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>
+																											 &nbsp;&nbsp;Folgende Optionen sind verfügbar:<BR>
+																											 &nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zurück. 
 			</td>
 		</tr>
 	</table>
