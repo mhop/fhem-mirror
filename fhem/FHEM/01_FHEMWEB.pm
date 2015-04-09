@@ -3218,6 +3218,35 @@ FW_widgetOverride($$)
             then the specified list can be sorted via drag &amp; drop, no
             elements can be added or deleted.  </li>
 
+          <li>if the modifier is of the form ":uzsuToggle,state1,state2",
+            a toggle button with two possible states is displayed. the first
+            is the active state.</li>
+
+          <li>if the modifier is of the form ":uzsuSelect,val1,val2,...",
+            a button bar with a button per value is displayed from which
+            multiple values can be selected. the result is comma separated.</li>
+
+          <li>if the modifier is of the form ":uzsuSelectRadio,val1,val2,...",
+            a button bar with a button per value is displayed from which only
+            one value can be selected.</li>
+
+          <li>if the modifier is of the form ":uzsuDropDown,val1,val2,...",
+            a dropdown with all values is displayed.</li>
+
+          <li>if the modifier is of the form ":uzsuTimerEntry[,modifier2]",
+            uzsuSelect, uzsuDropDown and uzsuToggle are combined into a single
+            line display to select a timer entry. an optional modifier can be
+            given to select the switching value. see examples below.
+            the result is a comma separated list of days followed by a time,
+            an enabled indicator and the switching value all separated by a|.
+            eg: Mo,Di,Sa,So|00:00|enabled|19.5</li>
+
+          <li>if the modifier is of the form ":uzsu[,modifier2]",
+            multiple uzsuTimerEntry widets are combined to allow the setting
+            of multiple switching times an optional modifier can be
+            given to select the switching value. see examples below.
+            the result is a space separeted list of uzsuTimerEntry results.</li>
+
           <li>else a dropdown with all the modifier values is displayed</li>
         </ul>
         If this attribute is specified for a FHEMWEB instance, then it is
@@ -3227,6 +3256,24 @@ FW_widgetOverride($$)
           attr WEB widgetOverride room:textField<br>
           attr dimmer widgetOverride
           dim:knob,min:1,max:100,step:1,linecap:round<br>
+          <br>
+          attr myToggle widgetOverride state:uzsuToggle,123,xyz<br>
+          attr mySelect widgetOverride state:uzsuSelect,abc,123,456,xyz<br>
+          attr myTemp widgetOverride state:uzsuDropDown,18,18.5,19,19.5,20,20.5,21,21.5,22,22.5,23<br>
+          attr myTimerEntry widgetOverride state:uzsuTimerEntry<br>
+          attr myTimer widgetOverride state:uzsu<br>
+          <br>
+          the following gives some examples of for the modifier2 parameter of uzsuTimerEntry and uzsu to
+          combine the setting of a timer with another widget to select the switching value :
+          <pre>
+... widgetOverride state:uzsu,slider,0,5,100                                         -> a slider
+... widgetOverride state:uzsu,uzsuToggle,off,on                                      -> a on/off button
+... widgetOverride state:uzsu,uzsuDropDown,18,19,20,21,22,23                         -> a dropDownMenue
+... widgetOverride state:uzsu,knob,min:18,max:24,step:0.5,linecap:round,fgColor:red  -> a knob widget
+... widgetOverride state:uzsu,colorpicker                                            -> a colorpicker
+... widgetOverride state:uzsu,colorpicker,CT,2700,50,5000                            -> a colortemperature selector
+          </pre>
+
         </ul>
         </li>
         <br>
@@ -3846,8 +3893,42 @@ FW_widgetOverride($$)
             werden. Es m&uuml;ssen alle gegeben Werte benutzt und entsprechend
             sortiert sein.  Das Ergebnis ist Komma-separiert entsprechend
             aufsteigend sortiert.</li>
+
+          <li>Ist der Modifier ":uzsuToggle,zust1,zust2", dann ist es
+            m&ouml;gliche mit einem Toggle-Button zwischen zwei
+            Zust&auml;nden zu w&auml;hlen. Der Erste ist der aktive Zustand.</li>
+
+          <li>Ist der Modifier ":uzsuSelect,val1,val2,...", dann ist es
+            m&ouml;gliche in einer Buttonleiste meherere Werte auszuw&auml;hlen.
+            Das Ergebnis ist Komma-separiert.</li>
+
+          <li>Ist der Modifier ":uzsuSelectRadio,val1,val2,...", dann ist es
+            m&ouml;gliche in einer Buttonleiste einen aus meherere Werten
+            auszuw&auml;hlen.</li>
+
+          <li>Ist der Modifier ":uzsuDropDown,val1,val2,...", dann ist es
+            m&ouml;gliche mit einem DropDown Men&uuml; einen der Werte
+            auszuw&auml;hlen.</li>
+
+          <li>Ist der Modifier ":uzsuTimerEntry[,modifier2]", werden je ein
+            uzsuSelect, uzsuDropDown und uzsuToggle Widget kombiniert um
+            einen Schaltzeitpunkt auszuw&auml;hlen. &Uuml;ber den optionalen
+            modifier2 kann ein Widget zur Auswahl des Schaltwertes angegeben
+            werden. Siehe Beispiele unten.
+            Das Ergebniss is eine komma-separiert Liste von Wochentagen gefolgt
+            vom Zeitpunkt, eine Aktiv-Indikator und dem Schaltwert, jeweils
+            durch | abetrennt.
+            Zum Beispiel: Mo,Di,Sa,So|00:00|enabled|19.5</li>
+
+          <li>Ist der Modifier ":uzsu[,modifier2]", werden mehere
+            uzsuTimerEntry Widets kombiniert um eine beliebige Anzahl an
+            Schaltzeiten einzugeben. &Uuml;ber den optionalen
+            modifier2 kann ein Widget zur Auswahl des Schaltwertes angegeben           
+            werden. Siehe Beispiele unten.
+            Das Ergebiss ist eine durch leerzeichen getrennte Liste von
+            uzsuTimerEntry Ergebnissen.</li>
             
-          <li>In allen anderen F&auml;llen (oder falls der Modified explizit
+          <li>In allen anderen F&auml;llen (oder falls der Modifier explizit
             mit :select anfaegt) erscheint ein HTML select mit allen Modifier
             Werten.</li>
 
@@ -3859,6 +3940,24 @@ FW_widgetOverride($$)
           attr FS20dev widgetOverride on-till:time<br>
           attr WEB widgetOverride room:textField<br>
           attr dimmer widgetOverride dim:knob,min:1,max:100,step:1,linecap:round<br>
+          <br>
+          attr myToggle widgetOverride state:uzsuToggle,123,xyz<br>
+          attr mySelect widgetOverride state:uzsuSelect,abc,123,456,xyz<br>
+          attr myTemp widgetOverride state:uzsuDropDown,18,18.5,19,19.5,20,20.5,21,21.5,22,22.5,23<br>
+          attr myTimerEntry widgetOverride state:uzsuTimerEntry<br>
+          attr myTimer widgetOverride state:uzsu<br>
+          <br>
+          Im Folgenden wird die Verwendung des modifier2 parameters von uzsuTimerEntry und uzsu gezeigt um
+          die Auswahl des Schaltzeitpunktes mit der Auswahl des Schaltwertes zu kombinieren:
+          <pre>
+... widgetOverride state:uzsu,slider,0,5,100                                         -> ein slider
+... widgetOverride state:uzsu,uzsuToggle,off,on                                      -> ein on/off button
+... widgetOverride state:uzsu,uzsuDropDown,18,19,20,21,22,23                         -> ein dropDownMenue
+... widgetOverride state:uzsu,knob,min:18,max:24,step:0.5,linecap:round,fgColor:red  -> ein knob widget
+... widgetOverride state:uzsu,colorpicker                                            -> ein colorpicker
+... widgetOverride state:uzsu,colorpicker,CT,2700,50,5000                            -> ein colortemperature slider
+          </pre>
+
         </ul>
         </li><br>
 
