@@ -822,6 +822,7 @@ HUEDevice_Parse($$)
 
   $hash->{modelid} = $result->{modelid};
   $hash->{uniqueid} = $result->{uniqueid};
+  $hash->{manufacturername} = $result->{manufacturername};
   $hash->{swversion} = $result->{swversion};
 
   if( $hash->{helper}->{devtype} eq 'S' ) {
