@@ -188,26 +188,28 @@ sub WeekdayTimer_Profile($) {
      
      foreach  my $d (@{$tage}) {
 
-        my $dayOfEchteZeit = $d;
-        if      ($d==7) {                                      # Weekend
-           $dayOfEchteZeit = ($wday>=1&&$wday<=5) ? 6 : $wday; # ggf. Samstag $wday ~~ [1..5]  
-        } elsif ($d==8) {                                      # day of Week
-           $dayOfEchteZeit = ($wday==0||$wday==6) ? 1 : $wday; # ggf. Montag  $wday ~~ [0, 6]
-        }
+        my    @listeDerTage = ($d);
+        push (@listeDerTage, (0, 6) ) if ($d==7);
+        push (@listeDerTage, (1..5) ) if ($d==8);
 
-        my $echtZeit = WeekdayTimer_EchteZeit($hash, $dayOfEchteZeit, $time); 
-        $hash->{profile}{$d}{$echtZeit}        = $parameter;
+        map { my $day = $_; 
+           my $dayOfEchteZeit = $day;
+              $dayOfEchteZeit = ($wday>=1&&$wday<=5) ? 6 : $wday  if ($day==7); # ggf. Samstag $wday ~~ [1..5]  
+              $dayOfEchteZeit = ($wday==0||$wday==6) ? 1 : $wday  if ($day==8); # ggf. Montag  $wday ~~ [0, 6]
+            my $echtZeit = WeekdayTimer_EchteZeit($hash, $dayOfEchteZeit, $time); 
+            $hash->{profile}{$day}{$echtZeit} = $parameter;
+        } @listeDerTage;      
      }
   }
 # ------------------------------------------------------------------------------
   foreach  my $st (@{$hash->{SWITCHINGTIMES}}) {
-     my ($tage,$time,$parameter)     = WeekdayTimer_SwitchingTime ($hash, $st);
-     my $echtZeit                    = WeekdayTimer_EchteZeit     ($hash, $wday, $time); 
-     my ($stunde, $minute, $sekunde) = split (":",$echtZeit);              
+     my ($tage,$time,$parameter)       = WeekdayTimer_SwitchingTime ($hash, $st);
+     my $echtZeit                      = WeekdayTimer_EchteZeit     ($hash, $wday, $time); 
+     my ($stunde, $minute, $sekunde)   = split (":",$echtZeit);              
 
-     $hash->{profil}     {$echtZeit}{PARA}  = $parameter;
-     $hash->{profil}     {$echtZeit}{TIM}   = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, 0);
-     $hash->{profil}     {$echtZeit}{TAGE}  = $tage;
+     $hash->{profil}{$echtZeit}{PARA}  = $parameter;
+     $hash->{profil}{$echtZeit}{TIM}   = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, 0);
+     $hash->{profil}{$echtZeit}{TAGE}  = $tage;
   }
 # ------------------------------------------------------------------------------
   Log3 $hash, 4,  "[$hash->{NAME}] " . sunrise_abs() . " " . sunset_abs() . " " . $longDays{$language}[$wday]; 
@@ -221,7 +223,11 @@ sub WeekdayTimer_Profile($) {
        $hash->{$profilKey} = $profiltext;
        Log3 $hash, 4,  "[$hash->{NAME}] $profiltext ($profilKey)";  
   }
+
+  # für logProxy umhaengen
+  $hash->{helper}{SWITCHINGTIME} = $hash->{profile};
   delete $hash->{profile};
+  #Log3 $hash, 3, "profile: " . Dumper $hash;
 }
 ################################################################################   
 sub WeekdayTimer_SwitchingTime($$) {
@@ -468,15 +474,17 @@ sub WeekdayTimer_SetTimer($) {
      $hash->{profil}{$time}{NEXTSWITCH} = $nextSwitch;
                
      my $timToSwitch = $hash->{profil}{$time}{TIM};
+     my $tage        = $hash->{profil}{$time}{TAGE};
         $nextPara    = $hash->{profil}{$time}{PARA};
         $nextSwitch  = $time;
      
      $timToSwitch -= 24*3600 if ($i == $#reverseSwitches);
      my $secondsToSwitch = $timToSwitch - $now;
      
+     my $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $nextPara);
      if ($secondsToSwitch>$grenzSeconds && !$switchedInThePast) {    
        myInternalTimer       ("$time", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0);
-       $switchedInThePast = ($secondsToSwitch<0);
+       $switchedInThePast = ($secondsToSwitch<0 && $activeTimer) ;
      }
   }     
 }
@@ -506,20 +514,9 @@ sub WeekdayTimer_Update($) {
      return;
   }
 
-  my $active     = 1;
-  my $condition  = WeekdayTimer_Condition ($hash, $tage);
-  my $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
-  my $xPression  = "{".$tageAsHash.";;".$condition ."}";
-  my %specials= (
-         "%NAME"  => $hash->{DEVICE},
-         "%EVENT" => $newParam,
-  );
-  $xPression= EvalSpecials($xPression, %specials);  
-  $xPression =~ s/%%days/%days/g;
-  if ($condition) {
-     $active = AnalyzeCommandChain(undef, $xPression);
-  }
-  Log3 $hash, 4, "[$name] seems to be active: $condition" if($active);
+  my $active = 1;
+     $active = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam);
+  Log3 $hash, 4, "[$name] timer seems to be active today: ".join("",@$tage)."|$time|$newParam" if($active);
 
   # ggf. Device schalten
   WeekdayTimer_Device_Schalten($hash, $newParam, $tage);
@@ -533,6 +530,20 @@ sub WeekdayTimer_Update($) {
 
   return 1; 
      
+}
+################################################################################
+sub WeekdayTimer_isAnActiveTimer ($$$) {
+  my ($hash, $tage, $newParam)  = @_;
+  
+  my %specials   = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
+  
+  my $condition  = WeekdayTimer_Condition ($hash, $tage);
+  my $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
+  my $xPression  = "{".$tageAsHash.";;".$condition ."}";
+     $xPression  = EvalSpecials($xPression, %specials);  
+     $xPression  =~ s/%%days/%days/g;
+  
+  return AnalyzeCommandChain(undef, $xPression);
 }
 ################################################################################
 sub WeekdayTimer_isHeizung($) {
@@ -696,11 +707,8 @@ sub WeekdayTimer_Device_Schalten($$$) {
   #Kommando ausführen
   if ($command && !$disabled && $aktParam ne $newParam) {
     $newParam =~ s/:/ /g;
-
-    my %specials= (
-           "%NAME"  => $hash->{DEVICE},
-           "%EVENT" => $newParam,
-    );
+    
+    my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
     $command= EvalSpecials($command, %specials);
     $command =~ s/%%days/%days/g;
     
