@@ -4881,9 +4881,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $devHash->{helper}{prt}{sProc} != 1    # not processing
         ){
     if($rxType & 0x02){# handle burst Access devices - add burst Bit
-      my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
-      $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
-      CUL_HM_ProcessCmdStack($devHash);
+      CUL_HM_SndCmd($devHash,"++B112$id$dst");
+#      my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
+#      $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
+#      CUL_HM_ProcessCmdStack($devHash);
     }
     elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
       $hash->{helper}{prt}{brstWu}=1;# start auto-burstWakeup
@@ -5547,7 +5548,7 @@ sub CUL_HM_SndCmd($$) {
   }
 
   $cmd =~ m/^(..)(.*)$/;
-  my ($mn, $cmd2) = ($1, $2);
+  my ($mn, $cmd2) =  unpack 'A2A*',$cmd;
 
   if($mn eq "++") {
     $mn = $io->{HM_CMDNR} ? (($io->{HM_CMDNR} +1)&0xff) : 1;
