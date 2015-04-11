@@ -948,6 +948,10 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-TC-IT-WM-W-EU"  =>{ burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,cyclicInfoMsg   =>1
                          ,btnLock         =>1,globalBtnLock   =>1,modusBtnLock    =>1,lowBatLimitRT   =>1
                         },
+ ,"HM-SEN-EP"         =>{ seqPulse1       =>1,seqPulse2       =>1,seqPulse3       =>1,seqPulse4       =>1
+                         ,seqPulse5       =>1,seqTolerance    =>1
+                         ,peerNeedsBurst  =>1
+                        }
   );
 
 #clones - - - - - - - - - - - - - - -
@@ -1136,10 +1140,6 @@ $culHmRegModel{"HM-PB-4DIS-WM-2"}     = $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,cndTxFalling    =>1,cndTxRising     =>1,
                          ,cndTxCycBelow   =>1,cndTxCycAbove   =>1,cndTxDecAbove   =>1,cndTxDecBelow   =>1,
                           }
- ,"HM-SEN-EP"         =>{ seqPulse1       =>1,seqPulse2       =>1,seqPulse3       =>1,seqPulse4       =>1
-                         ,seqPulse5       =>1,seqTolerance    =>1
-                         ,peerNeedsBurst  =>1
-                        }
  ,"HM-Sen-MDIR-WM5500"=>{ intKeyVisib     =>1,cyclicInfoMsg   =>1,localResDis     =>1,transmDevTryMax =>1}
  ,"HM-Sen-MDIR-WM5501"=>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
                          ,sign            =>1
