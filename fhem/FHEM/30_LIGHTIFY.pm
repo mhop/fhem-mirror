@@ -8,6 +8,8 @@ use warnings;
 
 use Color;
 
+use JSON;
+
 use IO::Socket::INET;
 use IO::File;
 use IO::Handle;
@@ -36,7 +38,7 @@ LIGHTIFY_Initialize($)
   $hash->{SetFn}    = "LIGHTIFY_Set";
   #$hash->{GetFn}    = "LIGHTIFY_Get";
   $hash->{AttrFn}   = "LIGHTIFY_Attr";
-  $hash->{AttrList} = "disable:1";
+  $hash->{AttrList} = "disable:1,0 pollDevices:1";
 }
 
 #####################################
@@ -150,15 +152,22 @@ LIGHTIFY_Undefine($$)
   return undef;
 }
 sub
-LIGHTIFY_sendRaw($$)
+LIGHTIFY_sendRaw($$;$)
 {
-  my ($hash, $hex) = @_;
+  my ($hash, $hex, $force) = @_;
   my $name = $hash->{NAME};
 
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
   return "not connected" if( !$hash->{CD} );
 
-  if( $hash->{UNCONFIRMED} ) {
+  if( !$force && $hash->{UNCONFIRMED} ) {
+    foreach my $cmd (@{$hash->{SEND_QUEUE}}) {
+      if( $hex eq $cmd ) {
+        Log3 $name, 4, "$name: discard:". $hex;
+        return undef if( $hex eq $cmd );
+      }
+    }
+
     Log3 $name, 4, "$name: enque:". $hex;
     push  @{$hash->{SEND_QUEUE}}, $hex;
     return undef;
@@ -178,7 +187,8 @@ LIGHTIFY_sendRaw($$)
   #return "not connected" if( !$hash->{CD} );
   syswrite($hash->{CD}, pack('H*', $hex));
 
-  $hash->{UNCONFIRMED}++;
+
+  $hash->{UNCONFIRMED}++ if( !$force );
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+1, "LIGHTIFY_sendNext", $hash, 0);
@@ -193,12 +203,21 @@ LIGHTIFY_Write($@)
 
   return undef if( !$chash );
 
+  my $fake = $chash->{helper}->{update_timeout} != 0;
+  my $force = $chash->{helper}->{update_timeout} == -1;
+
+  my $json = { state => { reachable => 1,
+                        }
+             };
+
   if( $obj ) {
     if( defined($obj->{on}) ) {
       my $onoff = "00";
       $onoff = "01" if( $obj->{on} );
 
-      LIGHTIFY_sendRaw( $hash, setOnOff ." 00 00 00 00 $chash->{ID} $onoff" );
+      LIGHTIFY_sendRaw( $hash, setOnOff ." 00 00 00 00 $chash->{ID} $onoff", $force ) if( $obj->{on} != $chash->{helper}{on} );
+
+      $json->{state}{on} = $obj->{on} ? JSON::true : JSON::false;
     }
 
     if( defined($obj->{ct}) ) {
@@ -209,7 +228,11 @@ LIGHTIFY_Write($@)
       $transitiontime = $obj->{transitiontime} if( defined($obj->{transitiontime}) );
       $transitiontime = sprintf( '%02x%02x', $transitiontime & 0xff, $transitiontime >> 8 );
 
-      LIGHTIFY_sendRaw( $hash, setCT ." 00 00 00 00 $chash->{ID} $ct $transitiontime" );
+      LIGHTIFY_sendRaw( $hash, setCT ." 00 00 00 00 $chash->{ID} $ct $transitiontime", $force );
+
+      $json->{state}{colormode} = 'ct';
+      $json->{state}{ct} = $obj->{ct};
+
     } elsif( defined($obj->{hue}) || defined($obj->{sat}) ) {
       my $hue = ReadingsVal($chash->{NAME}, 'hue', 65535 );
       my $sat = ReadingsVal($chash->{NAME}, 'sat', 254 );
@@ -217,6 +240,11 @@ LIGHTIFY_Write($@)
       $hue = $obj->{hue} if( defined($obj->{hue}) );
       $sat = $obj->{sat} if( defined($obj->{sat}) );
       $bri = $obj->{bri} if( defined($obj->{bri}) );
+
+      $json->{state}{colormode} = 'hs';
+      $json->{state}{bri} = $obj->{bri};
+      $json->{state}{hue} = $obj->{hue};
+      $json->{state}{sat} = $obj->{sat};
 
       my $h = $hue / 65535.0;
       my $s = $sat / 254.0;
@@ -231,8 +259,11 @@ LIGHTIFY_Write($@)
       $transitiontime = $obj->{transitiontime} if( defined($obj->{transitiontime}) );
       $transitiontime = sprintf( '%02x%02x', $transitiontime & 0xff, $transitiontime >> 8 );
 
-      LIGHTIFY_sendRaw( $hash, setRGB ." 00 00 00 00 $chash->{ID} $rgb ff $transitiontime" );
-    } elsif( defined($obj->{bri}) ) {
+      LIGHTIFY_sendRaw( $hash, setRGB ." 00 00 00 00 $chash->{ID} $rgb ff $transitiontime", $force );
+    }
+
+    if( defined($obj->{bri})
+        && !defined($obj->{hue}) && !defined($obj->{sat}) ) {
       my $bri = $obj->{bri};
       $bri /= 2.54;
       $bri = sprintf( "%02x", $bri );
@@ -241,11 +272,26 @@ LIGHTIFY_Write($@)
       $transitiontime = $obj->{transitiontime} if( defined($obj->{transitiontime}) );
       $transitiontime = sprintf( '%02x%02x', $transitiontime & 0xff, $transitiontime >> 8 );
 
-      LIGHTIFY_sendRaw( $hash, setDim ." 00 00 00 00 $chash->{ID} $bri $transitiontime" );
+      LIGHTIFY_sendRaw( $hash, setDim ." 00 00 00 00 $chash->{ID} $bri $transitiontime", $force );
+
+      $json->{state}{bri} = $obj->{bri};
     }
+
   }
 
-  LIGHTIFY_sendRaw( $hash, getDevices ." 00 00 00 00 01" );
+  if( $obj && $fake ) {
+    HUEDevice_Parse( $chash, $json );
+
+    $chash->{helper}->{update_timeout} = AttrVal($name, "delayedUpdate", 0);;
+    #$chash->{helper}->{update_timeout} = 1 if( !$chash->{helper}->{update_timeout} );
+
+    RemoveInternalTimer($chash);            
+    InternalTimer(gettimeofday()+$chash->{helper}->{update_timeout}, "HUEDevice_GetUpdate", $chash, 0);
+
+  } else {
+    LIGHTIFY_sendRaw( $hash, getDevices ." 00 00 00 00 01" );
+
+  }
 
   return undef;
 }
