@@ -266,7 +266,8 @@ FHEM2FHEM_OpenDev($$)
   DoTrigger($name, "CONNECTED") if($reopen);
   syswrite($hash->{TCPDev}, $hash->{portpassword} . "\n")
         if($hash->{portpassword});
-  my $msg = $hash->{informType} eq "LOG" ? "inform on" : "inform raw";
+  my $msg = $hash->{informType} eq "LOG" ? 
+                "inform on $hash->{regexp}" : "inform raw";
   syswrite($hash->{TCPDev}, $msg . "\n");
   return undef;
 }
