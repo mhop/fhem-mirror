@@ -210,7 +210,7 @@ my %zwave_class = (
   ZWAVEPLUS_INFO           => { id => '5e', },
   ZIP_GATEWAY              => { id => '5f', },
   MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
-    get   => { mcEndpoints => "07",     # Endpoints
+    get   => { mcEndpoints => "07",
                mcCapability=> "09%02x"},
     parse => { "^046008(..)(..)" => '"mcEndpoints:total ".hex($2).'.
                                  '(hex($1)&0x80 ? ", dynamic":"").'.
@@ -1328,7 +1328,13 @@ ZWave_Parse($$@)
   }
 
   my ($baseHash, $baseId, $ep) = ("",$id,"");
-  if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP
+  if($arg =~ /^..6006(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP, V1, Forum #36126
+    $ep = $1;
+    $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
+    $id = "$id$ep";
+    $arg = sprintf("%02x$2", length($2)/2);
+  }
+  if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP, V2
     $ep = ($1 ne "00" ? $1 : $2);
     $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
     $id = "$id$ep";
