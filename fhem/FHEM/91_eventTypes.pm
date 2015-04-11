@@ -107,11 +107,25 @@ eventTypes_Notify($$)
 
   my $t = $eventSrc->{TYPE};
   my $n = $eventSrc->{NAME};
-  return if(!defined($n) || !defined($t) || $n eq "global");
+  return if(!defined($n) || !defined($t));
   return if($me->{ignoreList}{$n});
 
-  my $ret = "";
   my $h = $modules{eventTypes}{ldata};
+
+  if($n eq "global") {
+    foreach my $oe (@{$events}) {
+      if($oe =~ m/^DELETED (.+)$/) {
+        delete $h->{$1};
+      }
+      if($oe =~ m/^RENAMED (.+) (.+)$/) {
+        $h->{$2} = $h->{$1};
+        delete $h->{$1};
+      }
+    }
+    return undef;
+  }
+
+  my $ret = "";
   foreach my $oe (@{$events}) {
     next if(!defined($oe) || $oe =~ m/^\s*$/);
     et_addEvt($h, $n, $oe);
