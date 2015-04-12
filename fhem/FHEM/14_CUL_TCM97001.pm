@@ -12,7 +12,7 @@
 #  - "GT-WT-02"
 #  - "AURIOL"
 #
-# Unsupported models are saved in an device named CUL_TCM97001_Unknown
+# Unsupported models are saved in a device named CUL_TCM97001_Unknown
 #
 # Copyright (C) 2015 Bjoern Hempel
 #
@@ -201,9 +201,11 @@ CUL_TCM97001_Parse($$)
   my $hashumidity = FALSE;
   my $hasbatcheck = FALSE;
   my $hastrend = FALSE;
+  my $haschannel = FALSE;
   my $model="Unknown";
   my $temp = undef;
   my $humidity=undef;  
+  my $channel = undef;
 
   if (length($msg) == 8) {
     # Only tmp TCM device
@@ -373,6 +375,7 @@ CUL_TCM97001_Parse($$)
       if($def) {
         $name = $def->{NAME};
       } 
+      $channel    = (hex($a[2])) & 0x3;
       $temp    = (hex($a[3].$a[4].$a[5])) & 0x3FF;  
       my $negative    = (hex($a[3])) & 0xC; 
       if ($negative == 0xC) {
@@ -390,7 +393,8 @@ CUL_TCM97001_Parse($$)
           return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
         }
         $hashumidity = TRUE;
-        $hasbatcheck = TRUE;        
+        $hasbatcheck = TRUE;  
+        $haschannel = TRUE;     
         $packageOK = TRUE;
         $model="GT-WT-02";
         $readedModel=$model;
@@ -401,7 +405,6 @@ CUL_TCM97001_Parse($$)
       #Log3 $name, 4, "CUL_TCM97001: CRC for TCM21.... Failed, checking other protocolls";
       # Check for Prologue
     if ($readedModel eq "Prologue" || (hex($a[0]) == 0x9 && $readedModel eq "Unknown")) {
-       # Log3 $name, 2, "ccccccccccccccccccccccccccccc";
         # Protocol prologue start everytime with 1001
         # e.g. 91080F614C	    1001 0001 0000 1000 0000 1111 0110 0001 0100 1100
         #                      A    B    C    D    E    F    G    H    I
@@ -429,7 +432,7 @@ CUL_TCM97001_Parse($$)
           $humidity = hex($a[7].$a[8]);
         }
 
-
+        $channel = (hex($a[3])) & 0x3;
         $batbit = (hex($a[3]) & 0x8) >> 3;
         $mode = (hex($a[3]) & 0x4) >> 2;
         if (checkValues($temp, $humidity)) {
@@ -442,6 +445,7 @@ CUL_TCM97001_Parse($$)
           $hashumidity = TRUE;    
           $hasbatcheck = TRUE;
           $packageOK = TRUE;
+          $haschannel = TRUE;
           $model="Prologue";
           $readedModel=$model;
         } else {
@@ -476,8 +480,8 @@ CUL_TCM97001_Parse($$)
         $temp = -$temp;
       }
       $temp = $temp / 10;
-
-      $hashumidity = TRUE;
+      
+      $channel = (hex($a[3])) & 0x3;
       $humidity = hex($a[7].$a[8]) & 0x7F;
 
       $batbit = (hex($a[3]) & 0x8) >> 3;
@@ -493,6 +497,7 @@ CUL_TCM97001_Parse($$)
         $hashumidity = TRUE;
         $hasbatcheck = TRUE;
         $packageOK = TRUE;
+        $haschannel = TRUE; 
         $model="NC_WS";
         $readedModel=$model;
       } else {
@@ -609,18 +614,24 @@ CUL_TCM97001_Parse($$)
     readingsBulkUpdate($def, "state", $state);
 
     if($hastrend) {
+      my $readTrend = ReadingsVal($name, "trend", "unknown");
       if ($trend == 1) {
-        readingsBulkUpdate($def, "trend", "falling");
+        if ($readTrend ne  "falling") { readingsBulkUpdate($def, "trend", "falling"); }
       } else {
-        readingsBulkUpdate($def, "trend", "rising");
+        if ($readTrend ne  "rising") { readingsBulkUpdate($def, "trend", "rising"); }
       }
     }
     if ($hasbatcheck) {
+      my $battery = ReadingsVal($name, "battery", "unknown");
       if ($batbit) {
-        readingsBulkUpdate($def, "battery", "low");
+        if ($battery ne  "low") { readingsBulkUpdate($def, "battery", "low"); }
       } else {
-        readingsBulkUpdate($def, "battery", "ok");
+        if ($battery ne  "ok") { readingsBulkUpdate($def, "battery", "ok"); }
       }
+    }
+    if ($haschannel) {
+      my $readChannel = ReadingsVal($name, "channel", undef);
+      if ($readChannel ne $channel) { readingsBulkUpdate($def, "channel", $channel); }
     }
     readingsBulkUpdate($def, $msgtype, $val);
     if ($hashumidity == TRUE) {
@@ -640,7 +651,7 @@ CUL_TCM97001_Parse($$)
       return "UNDEFINED CUL_TCM97001_Unknown CUL_TCM97001 Unknown" if(!$defUnknown); 
     } 
     $name = $defUnknown->{NAME};
-    Log3 $name, 4, "CUL_TCM97001 Device not interplmeted yet name Unknown msg $msg";
+    Log3 $name, 4, "CUL_TCM97001 Device not implemented yet name Unknown msg $msg";
 
     my $state="Code: $msg";
 
@@ -677,25 +688,124 @@ CUL_TCM97001_Parse($$)
 <a name="CUL_TCM97001"></a>
 <h3>CUL_TCM97001</h3>
 <ul>
-  The CUL_TCM97001 module interprets temperature messages of TCM 97xxx, TCM 21xxxx, GT-WT-xx and Rubicson sensor received by the CUL.<br>
+  The CUL_TCM97001 module interprets temperature sensor messages received by the CUL.<br>
+  <br>
+  <b>Supported models:</b>
+  <ul>
+    <li>TCM97...</li>
+    <li>ABS700</li>
+    <li>TCM21....</li>
+    <li>Prologue</li>
+    <li>Rubicson</li>
+    <li>NC_WS</li>
+    <li>GT-WT-02</li>
+    <li>AURIOL</li>
+  </ul>
   <br>
   New received device packages are add in fhem category CUL_TCM97001 with autocreate.
   <br><br>
 
-  <a name="CUL_TCM97001define"></a>
-  <b>Define</b> <ul>The received devices created automatically.</ul><br>
-
-  <a name="CUL_TCM97001events"></a>
-  <b>Generated events:</b>
-  <ul>
-     <li>temperature: $temp</li>
-     <li>humidity: $hum</li>
-     <li>battery: $bat</li>
+  <a name="CUL_TCM97001_Define"></a>
+  <b>Define</b> 
+  <ul>The received devices created automatically.<br>
+  The ID of the defive are the first two Hex values of the package as dezimal.<br>
   </ul>
   <br>
+  <a name="CUL_TCM97001 Events"></a>
+  <b>Generated events:</b>
+  <ul>
+     <li>temperature: The temperature</li>
+     <li>humidity: The humidity (if available)</li>
+     <li>battery: The battery state: low or ok (if available)</li>
+     <li>channel: The Channelnumber (if available)</li>
+     <li>trend: The temperature trend (if available)</li>
+  </ul>
+  <br>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#IODev">IODev</a>
+      Note: by setting this attribute you can define different sets of 8
+      devices in FHEM, each set belonging to a CUL. It is important, however,
+      that a device is only received by the CUL defined, e.g. by using
+      different Frquencies (433MHz vs 868MHz)
+      </li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#model">model</a> (TCM97..., ABS700, TCM21...., Prologue, Rubicson, NC_WS, GT-WT-02, AURIOL, Unknown)</li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+
+  <a name="CUL_TCM97001_Set"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="CUL_TCM97001_Parse"></a>
+  <b>Set</b> <ul>N/A</ul><br>
 
 </ul>
 
-
 =end html
+
+=begin html_DE
+
+<a name="CUL_TCM97001"></a>
+<h3>CUL_TCM97001</h3>
+<ul>
+  Das CUL_TCM97001 Module verarbeitet vom CUL empfangene Nachrichten von Temperatur-Sensoren.<br>
+  <br>
+  <b>Unterstütze Modelle:</b>
+  <ul>
+    <li>TCM97...</li>
+    <li>ABS700</li>
+    <li>TCM21....</li>
+    <li>Prologue</li>
+    <li>Rubicson</li>
+    <li>NC_WS</li>
+    <li>GT-WT-02</li>
+    <li>AURIOL</li>
+  </ul>
+  <br>
+  Neu empfangene Sensoren werden in der fhem Kategory CUL_TCM97001 per autocreate angelegt.
+  <br><br>
+
+  <a name="CUL_TCM97001_Define"></a>
+  <b>Define</b> 
+  <ul>Die empfangenen Sensoren werden automatisch angelegt.<br>
+  Die ID der angelgten Sensoren sind die ersten zwei HEX Werte des empfangenen Paketes in dezimaler Schreibweise.<br>
+  </ul>
+  <br>
+  <a name="CUL_TCM97001 Events"></a>
+  <b>Generierte Events:</b>
+  <ul>
+     <li>temperature: Die aktuelle Temperatur</li>
+     <li>humidity: Die aktuelle Luftfeutigkeit (falls verfügbar)</li>
+     <li>battery: Der Batteriestatus: low oder ok (falls verfügbar)</li>
+     <li>channel: Kanalnummer (falls verfügbar)</li>
+     <li>trend: Der Temperaturtrend (falls verfügbar)</li>
+  </ul>
+  <br>
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#IODev">IODev</a>
+      Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
+      "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
+      Anmerkung: Beim Start weist fhem einem InterTechno-Ger&auml;t kein IO-Ger&auml;t zu. 
+      Das Attribut IODev ist daher IMMER zu setzen.
+      </li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#model">model</a> (TCM97..., ABS700, TCM21...., Prologue, Rubicson, NC_WS, GT-WT-02, AURIOL, Unknown)</li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+  </ul>
+
+  <a name="CUL_TCM97001_Set"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="CUL_TCM97001_Parse"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+</ul>
+
+=end html_DE
 =cut
