@@ -8,8 +8,6 @@
 ######################################################
 package main;
 
-# $Id$
-
 use strict;
 use warnings;
 
@@ -874,9 +872,9 @@ Beispiele:
    F&uuml;r Intertechno Protokoll 3 ist der &lt;housecode&gt; eine 26-stellige Zahl. Zus&auml;tzlich wird noch ein 1 stelliger Gruppen-Code, sowie 
    ein 4-stelliger unit code verwendet.
    <ul>
-   <li><code>&lt;address&gt;</code> is a 26 digit number (0/1)</li>
-   <li><code>&lt;group&gt;</code> is a 1 digit number (0/1)</li>
-   <li><code>&lt;unit&gt;</code> is a 4 digit number (0/1)</li>
+   <li><code>&lt;address&gt;</code> ist eine 26-stellige Nummer (0/1)</li>
+   <li><code>&lt;group&gt;</code> ist eine 1-stellige Nummer (0/1)</li>
+   <li><code>&lt;unit&gt;</code> ist eine 4-stellige Nummer (0/1)</li>
    </ul>
    <br>
 
@@ -929,7 +927,7 @@ Beispiele:
     <a name="IODev"></a>
     <li>IODev<br>
         Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
-        "logische" Ger&auml;t ausf??hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
+        "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
         Anmerkung: Beim Start weist fhem einem InterTechno-Ger&auml;t kein IO-Ger&auml;t zu. 
         Das Attribut IODev ist daher IMMER zu setzen.</li><br>
 
