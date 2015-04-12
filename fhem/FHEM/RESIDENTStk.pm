@@ -1199,23 +1199,16 @@ sub RESIDENTStk_AttrFnDummy(@) {
 
 sub RESIDENTStk_wakeupGetNext($) {
     my ($name) = @_;
+    my $wakeupDeviceAttrName = "";
 
-    my $wakeupDeviceList = (
-          AttrVal( $name, "rgr_wakeupDevice", 0 )
-        ? AttrVal( $name, "rgr_wakeupDevice", 0 )
-        : (
-              AttrVal( $name, "rr_wakeupDevice", 0 )
-            ? AttrVal( $name, "rr_wakeupDevice", 0 )
-            : (
-                  AttrVal( $name, "rg_wakeupDevice", 0 )
-                ? AttrVal( $name, "rg_wakeupDevice", 0 )
-                : 0
-            )
-        )
-    );
+    $wakeupDeviceAttrName = "rgr_wakeupDevice"
+      if ( defined( $attr{$name}{"rgr_wakeupDevice"} ) );
+    $wakeupDeviceAttrName = "rr_wakeupDevice"
+      if ( defined( $attr{$name}{"rr_wakeupDevice"} ) );
+    $wakeupDeviceAttrName = "rg_wakeupDevice"
+      if ( defined( $attr{$name}{"rg_wakeupDevice"} ) );
 
-    return "Device $name does not seem to have any wakeup devices registered."
-      if ( !$wakeupDeviceList );
+    my $wakeupDeviceList = AttrVal( $name, $wakeupDeviceAttrName, 0 );
 
     my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
       localtime(time);
@@ -1237,6 +1230,26 @@ sub RESIDENTStk_wakeupGetNext($) {
 
     # check for each registered wake-up device
     for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
+        next if !$wakeupDevice;
+
+        if ( !defined( $defs{$wakeupDevice} ) ) {
+            Log3 $name, 4,
+"RESIDENTStk $name: 00 - ignoring reference to non-existing wakeupDevice $wakeupDevice";
+
+            my $wakeupDeviceListNew = $wakeupDeviceList;
+            $wakeupDeviceListNew =~ s/,$wakeupDevice,/,/g;
+            $wakeupDeviceListNew =~ s/$wakeupDevice,//g;
+            $wakeupDeviceListNew =~ s/,$wakeupDevice//g;
+
+            if ( $wakeupDeviceListNew ne $wakeupDeviceList ) {
+                Log3 $name, 3,
+"RESIDENTStk $name: reference to non-existing wakeupDevice '$wakeupDevice' was removed";
+                fhem "attr $name $wakeupDeviceAttrName $wakeupDeviceListNew";
+            }
+
+            next;
+        }
+
         Log3 $name, 4,
 "RESIDENTStk $name: 00 - checking for next wake-up candidate $wakeupDevice";
 
@@ -1244,7 +1257,8 @@ sub RESIDENTStk_wakeupGetNext($) {
         my $wakeupAtdevice = AttrVal( $wakeupDevice, "wakeupAtdevice", 0 );
         my $wakeupOffset   = AttrVal( $wakeupDevice, "wakeupOffset",   0 );
         my $wakeupAtNTM    = (
-            defined( $defs{$wakeupAtdevice}{NTM} )
+            defined( $defs{$wakeupAtdevice} )
+              && defined( $defs{$wakeupAtdevice}{NTM} )
             ? substr( $defs{$wakeupAtdevice}{NTM}, 0, -3 )
             : 0
         );
