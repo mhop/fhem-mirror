@@ -2793,8 +2793,10 @@ sub CUL_HM_parseCommon(@){#####################################################
         $ret = "STATresp";
       }
       else{
-        my ($chn) = ($1) if($p =~ m/^..(..)/);
-        if ($chn eq "00"){# this is power on
+        if ($chn eq "00"
+            || (   $mNo eq "00" 
+                && $chn eq "01" 
+                && $shash->{helper}{mRssi}{mNo} !~ m/^F/)){# this is power on
           my $name = $shash->{NAME};
           CUL_HM_qStateUpdatIfEnab($name);
           CUL_HM_qAutoRead($name,2);
@@ -4882,10 +4884,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $devHash->{helper}{prt}{sProc} != 1    # not processing
         ){
     if($rxType & 0x02){# handle burst Access devices - add burst Bit
-      CUL_HM_SndCmd($devHash,"++B112$id$dst");
-#      my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
-#      $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
-#      CUL_HM_ProcessCmdStack($devHash);
+      if($st eq "thermostat"){ # others do not support B112
+        CUL_HM_SndCmd($devHash,"++B112$id$dst");
+      }
+      else{
+        my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
+        $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
+        CUL_HM_ProcessCmdStack($devHash);
+      }
     }
     elsif (CUL_HM_getAttrInt($name,"burstAccess")){ #burstConditional - have a try
       $hash->{helper}{prt}{brstWu}=1;# start auto-burstWakeup
