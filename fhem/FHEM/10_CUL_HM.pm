@@ -94,6 +94,7 @@ sub CUL_HM_getChnLvl($);
 sub CUL_HM_initRegHash();
 sub CUL_HM_fltCvT($);
 sub CUL_HM_CvTflt($);
+sub CUL_HM_getRegN($$@);
 sub CUL_HM_4DisText($);
 sub CUL_HM_TCtempReadings($);
 sub CUL_HM_repReadings($);
