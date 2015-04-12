@@ -703,6 +703,7 @@ FW_answerCall($)
       FW_pO '<meta name="viewport" content="width=768"/>';
     }
     FW_pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
+    FW_pO '<meta name="mobile-web-app-capable" content="yes"/>'; # Forum #36183
     FW_pO '<link rel="apple-touch-icon" href="'.$icon.'"/>';
     FW_pO '<link rel="shortcut-icon"    href="'.$icon.'"/>';
   }
