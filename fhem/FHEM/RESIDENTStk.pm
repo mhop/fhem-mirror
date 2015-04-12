@@ -228,7 +228,7 @@ if (\$EVTPART0 eq \"stop\") {\
         Log3 $NAME, 3,
           "RESIDENTStk $NAME: new at-device $wakeupAtdevice created";
         fhem
-"define $wakeupAtdevice at *{RESIDENTStk_wakeupGetBegin(\"$NAME\")} set $NAME trigger";
+"define $wakeupAtdevice at *{RESIDENTStk_wakeupGetBegin(\"$NAME\",\"$wakeupAtdevice\")} set $NAME trigger";
         fhem
 "attr $wakeupAtdevice comment Auto-created by RESIDENTS Toolkit: trigger wake-up timer at specific time";
         fhem "attr $wakeupAtdevice room $room"
@@ -787,7 +787,7 @@ if (\$EVTPART0 eq \"stop\") {\
 
             # Update at-device
             fhem
-"set $wakeupAtdevice modifyTimeSpec {RESIDENTStk_wakeupGetBegin(\"$NAME\")}";
+"set $wakeupAtdevice modifyTimeSpec {RESIDENTStk_wakeupGetBegin(\"$NAME\",\"$wakeupAtdevice\")}";
         }
         if ( ReadingsVal( $NAME, "state", 0 ) ne $VALUE && !$running ) {
             readingsBulkUpdate( $defs{$NAME}, "state", $VALUE );
@@ -826,12 +826,47 @@ if (\$EVTPART0 eq \"stop\") {\
 #
 # Get current wakeup begin
 #
-sub RESIDENTStk_wakeupGetBegin($) {
-    my ($NAME) = @_;
+sub RESIDENTStk_wakeupGetBegin($;$) {
+    my ( $NAME, $wakeupAtdevice ) = @_;
     my $nextRun = ReadingsVal( $NAME, "nextRun", 0 );
     my $wakeupDefaultTime = AttrVal( $NAME, "wakeupDefaultTime", 0 );
     my $wakeupOffset      = AttrVal( $NAME, "wakeupOffset",      0 );
     my $wakeupTime;
+
+    if ($atDeviceName) {
+        Log3 $NAME, 4,
+"RESIDENTStk $NAME: RESIDENTStk_wakeupGetBegin() run by at-device $atDeviceName";
+    }
+
+    # just give any valuable return to at-device
+    # if wakeuptimer device does not exit anymore
+    # and run self-destruction to clean up
+    if ( !defined( $defs{$NAME} ) ) {
+        Log3 $NAME, 3,
+          "RESIDENTStk $NAME: this wake-up timer device does not exist anymore";
+        my $atName = "at_" . $NAME;
+
+        if (   $wakeupAtdevice
+            && defined( $defs{$wakeupAtdevice} )
+            && $defs{$wakeupAtdevice}{TYPE} eq "at" )
+        {
+            Log3 $NAME, 3,
+"RESIDENTStk $NAME: Cleaning up at-device $wakeupAtdevice (self-destruction)";
+            fhem "sleep 1; delete $wakeupAtdevice";
+        }
+        elsif ( defined( $defs{$atName} )
+            && $defs{$atName}{TYPE} eq "at" )
+        {
+            Log3 $NAME, 3, "RESIDENTStk $NAME: Cleaning up at-device $atName";
+            fhem "sleep 1; delete $atName";
+        }
+        else {
+            Log3 $NAME, 3,
+"RESIDENTStk $NAME: Could not automatically clean up at-device, please perform manual cleanup.";
+        }
+
+        return "05:00";
+    }
 
     # use nextRun value if not OFF
     if ( $nextRun && lc($nextRun) ne "off" ) {
@@ -1093,7 +1128,8 @@ sub RESIDENTStk_wakeupRun($;$) {
           "RESIDENTStk $NAME: Resetting based on wakeupDefaultTime";
         fhem
 "set $NAME:FILTER=nextRun!=$wakeupDefaultTime nextRun $wakeupDefaultTime";
-    } elsif ( !$running ) {
+    }
+    elsif ( !$running ) {
         fhem "setreading $NAME:FILTER=state!=$nextRun state $nextRun";
     }
 
