@@ -449,7 +449,7 @@ ZWave_Cmd($$@)
   }
 
   if($type eq "set" && $cmd eq "rgb") {
-     if($a[0] =~ m/0-9A-F/i && $a[0] =~ /^(..)(..)(..)$/) {
+     if($a[0] && $a[0] =~ m/^[0-9A-F]+$/i && $a[0] =~ /^(..)(..)(..)$/) {
        @a = (hex($1), hex($2), hex($3));
      } else {
        return "set rgb: a 6-digit hex number is required";
