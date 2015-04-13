@@ -2661,6 +2661,13 @@ SignalHandling()
                     $msg !~ m/ redefined at /);
     $inWarnSub = 0;
   };  
+  $SIG{__DIE__} = sub {
+    my ($msg) = @_;
+    Log 1, "DIE: $msg";
+    stacktrace();
+    exit(1);
+  };
+
 }
 
 
