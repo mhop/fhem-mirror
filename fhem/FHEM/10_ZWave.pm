@@ -97,28 +97,20 @@ my %zwave_class = (
   METER                    => { id => '32',
     get   => { meter       => "01" },
     parse => { "..3202(.*)"=> 'ZWave_ParseMeter($hash, $1)' }, },
-  COLOR_CONTROL           => { id => '33',
-    get   => { ccCapabilityGet   => '01', # no more args
-               ccStatus          => '03', # no more args
+  COLOR_CONTROL            => { id => '33',
+    get   => { ccCapabilityGet  => '01', # no more args
+               ccStatus    => '03', # no more args
              },
     set   => { # Forum #36050
-               resettoWhiteWarm   => '050a00ff0101020003000400',
-                                              # 100% warm, minimal cold, otherwise bulb is dimmed
-               resettoWhiteCold   => '050a000001ff020003000400',
-               resettoRed         => '050a0000010002ff03000400', # 100% red
-               resettoGreen       => '050a00000100020003ff0400', # 100% green
-               resettoBlue        => '050a000001000200030004ff', # 100% blue
-               resettoYellow      => '050A00000100027f037f0400', # 50% red, 50% green
-                },
-    parse => { "043302(.*)"  => 'ccCapabilityGetResponse:$1', #answer to ccCapabilityGet
-               "043304(.*)"  => 'ccStatusResponse:$1', },
-    },
-
+               rgb         => '050a0000010002%02x03%02x04%02x',
+               wcrgb       => '050a00%02x01%02x02%02x03%02x04%02x', },
+    parse => { "043302(.*)"=> 'ccCapabilityGetResponse:$1',
+               "043304(.*)"=> 'ccStatusResponse:$1', }, },
   ZIP_ADV_CLIENT           => { id => '34', },
   METER_PULSE              => { id => '35', },
   BASIC_TARIFF_INFO        => { id => '36', },
   HRV_STATUS               => { id => '37', 
-    get   => { hrvStatus    => "01%02x",
+    get   => { hrvStatus   => "01%02x",
                hrvStatusSupported => "03",},
     parse => { "0637020042(....)" =>
                    'sprintf("outdoorTemperature: %0.1f C", s2Hex($1)/100)',
@@ -337,6 +329,7 @@ my %zwave_cmdArgs = (
   set => {
     dim          => "slider,0,1,99",
     indicatorDim => "slider,0,1,99",
+    rgb          => "colorpicker,RGB",
   },
   get => {
   },
@@ -453,6 +446,14 @@ ZWave_Cmd($$@)
         $cmdList{$k}{id}  = $zwave_class{$cl}{id};
       }
     }
+  }
+
+  if($type eq "set" && $cmd eq "rgb") {
+     if($a[0] =~ m/0-9A-F/i && $a[0] =~ /^(..)(..)(..)$/) {
+       @a = (hex($1), hex($2), hex($3));
+     } else {
+       return "set rgb: a 6-digit hex number is required";
+     }
   }
 
   if(!$cmdList{$cmd}) {
@@ -1327,6 +1328,11 @@ ZWave_Parse($$@)
     $arg = sprintf("%s%02x%s", $1, hex($2) & 0x7f, $3);
   }
 
+  if($arg =~ /^..5601(.*)..../) { # CRC_16_ENCAP: Unwrap encapsulated command
+    #Log3 $ioName, 4, "CRC FIX, MSG: ($1)"; # see Forum #23494
+    $arg = sprintf("%02x$1", length($1)/2);
+  }
+
   my ($baseHash, $baseId, $ep) = ("",$id,"");
   if($arg =~ /^..6006(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP, V1, Forum #36126
     $ep = $1;
@@ -1664,6 +1670,18 @@ s2Hex($)
     set configuration for a specific scene.
 	Parameters are: groupId, sceneId, dimmingDuration.
     </li>	
+
+  <br><br><b>Class COLOR_CONTROL</b>
+  <li>rgb<br>
+    Set the color of the device as a 6 digit RGB Value (RRGGBB), each color is
+    specified with a value from 00 to ff.</li>
+  <li>wcrgb<br>
+    Used for sending warm white, cold white, red, green and blue values
+    to device. Values must be decimal (0 - 255) and separated by blanks.
+    <ul>
+      set &lt;name&gt; wcrgb 0 255 0 0 0 (setting full cold white)<br>
+    </ul>
+    </li>
 	
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>tmOff</li>
