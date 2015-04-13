@@ -389,29 +389,33 @@ DOIF_CheckTimers($$$$$)
   my ($hash,$timer,$condition,$trigger,$timerarray)=@_;
   $timer =~ s/\s//g;
   while ($timer ne "") {
-     if ($timer=~ /^\s*\+\(/) { 
+     if ($timer=~ /^\+\(/) { 
       ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\(\)]'); 
       return ($time,$err) if ($err);
       $time="+(".$time.")";
       ($result,$err)=ReplaceAllReadingsDoIf($hash,$time,-3,0);
       return ($time,$err) if ($err);
-    } elsif ($timer=~ /^\s*\(/) { 
+    } elsif ($timer=~ /^\(/) { 
       ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\(\)]'); 
       return ($time,$err) if ($err);
       $time="(".$time.")";
       ($result,$err)=ReplaceAllReadingsDoIf($hash,$time,-3,0);
       return ($time,$err) if ($err);
-    } elsif ($timer=~ /^\s*\{/) { 
+    } elsif ($timer=~ /^\{/) { 
       ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\{\}]'); 
       return ($time,$err) if ($err);
       $time="{".$time."}";
-    } elsif ($timer=~ /^\s*\+\[/) { 
+    } elsif ($timer=~ m/^\+\[([0-9]+)\]:([0-5][0-9])/g) {
+      $pos=pos($timer);
+      $time=substr($timer,0,$pos);
+      $timer=substr($timer,$pos);
+    } elsif ($timer=~ /^\+\[/) { 
       ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\[\]]'); 
       return ($time,$err) if ($err);
       $time="+[".$time."]";
       ($result,$err)=ReplaceAllReadingsDoIf($hash,$time,-3,0);
       return ($time,$err) if ($err);
-    } elsif ($timer=~ /^\s*\[/) { 
+    } elsif ($timer=~ /^\[/) { 
       ($beginning,$time,$err,$timer)=GetBlockDoIf($timer,'[\[\]]'); 
       return ($time,$err) if ($err);
       $time="[".$time."]";
@@ -839,6 +843,7 @@ DOIF_DetTime($)
           $h = $hour;
         }
       }
+      $rel=0;
     } else {
       $m=$align;
       if ($hr > 1) {
@@ -875,18 +880,20 @@ DOIF_CalcTime($)
   my $device;
   my $pos;
   my $ret;
-  
-  if ($block =~ /^\s*\+/g) {
+  if ($block=~ m/^\+\[([0-9]+)\]:([0-5][0-9])$/) {
+    ($err,$rel,$block)=DOIF_DetTime($block);
+    return ($block,$err,$rel);
+  } elsif ($block =~ /^\+\(/ or $block =~ /^\+\[/) {
     $relGlobal=1;
-    $pos=pos($block);
-    $block=substr($block,$pos);
-  }
-  
-  if ($block =~ /^\s*\(/) {
+    #$pos=pos($block);
+    $block=substr($block,1);
+  } 
+
+  if ($block =~ /^\(/) {
     ($beginning,$tailBlock,$err,$tailBlock)=GetBlockDoIf($block,'[\(\)]');
     return ($tailBlock,$err) if ($err);
   } else { 
-    if ($block =~ /^\s*\[/) {
+    if ($block =~ /^\[/) {
       ($beginning,$block,$err,$tailBlock)=GetBlockDoIf($block,'[\[\]]');
       return ($block,$err) if ($err);
       ($block,$err,$device,$reading,$internal)=ReplaceReadingEvalDoIf($block,1);
@@ -1276,9 +1283,9 @@ Many examples with english identifiers - see german section.
 <ul>
 DOIF ist ein universelles Modul, welches sowohl ereignis- als auch zeitgesteuert arbeitet.<br>
 <br>
-Es vereinigt die Funktionalität eines notify-, at-, watchdog-Befehls in Kombination mit logischen Abfragen unter einem Dach.<br>
-<br>
-Damit können insb. komplexere Problemstellungen innerhalb eines DOIF-Moduls gelöst werden, die sonst nur mit Hilfe einzelner Module an mehreren Stellen in FHEM vorgenommen werden müssten. Das führt zu übersichtlichen Lösungen und vereinfacht deren Pflege.<br>
+Es vereinigt die Funktionalität eines notify-, at-, watchdog-Befehls in Kombination mit logischen Abfragen unter einem Dach.
+Damit können insb. komplexere Problemstellungen innerhalb eines DOIF-Moduls gelöst werden, die sonst nur mit Hilfe einzelner Module an mehreren Stellen in FHEM vorgenommen werden müssten.
+Das führt zu übersichtlichen Lösungen und vereinfacht deren Pflege.<br>
 <br>
 Logische Abfragen werden in Bedingungen mit Hilfe von Perl-Operatoren erstellt.
 Diese werden mit Angaben von Stati, Readings, Internals, Events von Devices oder Zeiten in eckigen Klammern kombiniert. Ebenso können beliebige Perl-Funktionen angegeben werden, die in FHEM definiert sind.
@@ -1427,7 +1434,7 @@ DOELSEIF ([:45])<br>
 <br>
 Das Format lautet: [+:MM] MM sind Minutenangaben zwischen 1 und 59.<br>
 <br>
-<u>Anwendungsbeispiel</u>: Gong alle funfzehn Minuten um XX:00 XX:15 XX:30 XX:45<br>
+<u>Anwendungsbeispiel</u>: Gong alle fünfzehn Minuten um XX:00 XX:15 XX:30 XX:45<br>
 <br>
 <code>define di_gong DOIF ([+:15]) (set Gong_mp3 playTone 1)<br>
 attr di_gong do always</code><br>
@@ -1453,7 +1460,11 @@ Hinter der Zeitangabe kann ein oder mehrere Wochentage als Ziffer getrennt mit e
 <br>
 <b>Zeitsteuerung mit Zeitintervallen</b><br>
 <br>
-Zeitintervalle werden im Format angegeben: <code>[&lt;begin&gt;-&lt;end&gt;]</code> für <code>&lt;begin&gt;</code> bzw. <code>&lt;end&gt;</code> wird das gleiche Zeitformat verwendet, wie bei einzelnen Zeitangaben.<br>
+Zeitintervalle werden im Format angegeben: <code>[&lt;begin&gt;-&lt;end&gt;]</code>,
+für <code>&lt;begin&gt;</code> bzw. <code>&lt;end&gt;</code> wird das gleiche Zeitformat verwendet,
+wie bei einzelnen Zeitangaben. Getriggert wird das Modul zum Zeitpunkt <code>&lt;begin&gt;</code> und zum Zeitpunkt <code>&lt;end&gt;</code>.
+Soll ein Zeitintervall ohne Zeittrigger lediglich zur Abfrage dienen, so muss hinter der eckigen Klammer ein Fragezeichen angegeben werden (siehe Beispiele weiter unten).
+Das Zeitintervall ist als logischer Ausdruck ab dem Zeitpunkt <code>&lt;begin&gt;</code> wahr und ab dem Zeitpunkt <code>&lt;end&gt;</code> nicht mehr wahr.<br>
 <br>
 <u>Anwendungsbeispiele</u>:<br>
 <br>
@@ -1549,7 +1560,7 @@ Zeiten im Format HH:MM bzw. Stati oder Readings, die Zeitangaben in dieser Form 
 <br>
 Lampe wird nach Sonnenuntergang zwischen 900 und 1500 (900+600) Sekunden zufällig zeitverzögert eingeschaltet. Ausgeschaltet wird die Lampe nach 23:00 Uhr um bis zu 600 Sekunden zufällig verzögert:<br>
 <br>
-<code>define di_light DOIF ([({sunset()}+300+int(rand(600)))])<br>
+<code>define di_light DOIF ([({sunset()}+900+int(rand(600)))])<br>
    <ol>(set lamp on)</ol>
 DOELSEIF ([([23:00]+int(rand(600)))])<br>
    <ol>(set lamp off) </ol></code>
