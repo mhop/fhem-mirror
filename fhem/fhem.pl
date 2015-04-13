@@ -2663,7 +2663,7 @@ SignalHandling()
   };  
   $SIG{__DIE__} = sub {
     my ($msg) = @_;
-    Log 1, "DIE: $msg";
+    Log 1, "PERL ERROR: $msg";
     stacktrace();
     exit(1);
   };
