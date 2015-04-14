@@ -47,7 +47,9 @@
 # Changelog
 #
 # SVN-History:
-# .04.2015
+# 14.04.2015
+#	Zusätzliche Fehlerüberprüfung und -ausgabe beim Herunterladen der Cover-Bilder eingebaut, sowie relative URLs unterbunden
+# 07.04.2015
 #	Neues Feature 'ExportSonosBibliothek': Hiermit kann eine Datei mit der textuellen Darstellung eines Struktur- und Titelhashs erzeugt werden, das die komplette Navigationsstruktur aus der Sonos-Bibliothek abbildet. Richtwerte bei ca. 20.000 Titeln auf einem Windows-Server mit Intel Core i5 mit 2.8GHz: Laufzeit: ca. 8Min, Arbeitsspeicher: ca. 1GB, Resultierende Datei: ca. 52MB
 #	Neues Feature 'DeletePlaylist': Hiermit kann eine Playlist gelöscht werden. Genauso wie bei LoadPlaylist kann man hier URL-Encoded arbeiten, oder einen regulären Ausdruck verwenden
 #	Neues Feature 'SnoozeAlarm': Hiermit kann ein gerade abspielender Alarm für die übergebene Zeit unterbrochen werden
@@ -6994,23 +6996,35 @@ sub SONOS_ImageDownloadMimeType($) {
 #						dest = The local file-uri of the old file
 #
 # Return 1 = New file have been written
-#				 0 = nothing happened, because the filecontents are identical
+#				 0 = nothing happened, because the filecontents are identical or an error has occurred
 #
 ########################################################################################
 sub SONOS_DownloadReplaceIfChanged($$) {
 	my ($url, $dest) = @_;
 	
-	# Reading new file
-	my $newFile = get $url;
+	SONOS_Log undef, 5, 'Call of SONOS_DownloadReplaceIfChanged("'.$url.'", "'.$dest.'")';
 	
-	if (not defined($newFile)) {
-		SONOS_Log undef, 4, 'Couldn\'t retrieve file "'.$url.'" via web. Trying to copy directly...';
+	# Be sure URL is absolute
+	return 0 if ($url =~ m/^\./i);
+	
+	# Reading new file
+	my $newFile;
+	eval {
+		$newFile = get $url;
 		
-		$newFile = SONOS_ReadFile($url);
 		if (not defined($newFile)) {
-			SONOS_Log undef, 4, 'Couldn\'t even copy file "'.$url.'" directly... exiting...';
-			return 0;
+			SONOS_Log undef, 4, 'Couldn\'t retrieve file "'.$url.'" via web. Trying to copy directly...';
+			
+			$newFile = SONOS_ReadFile($url);
+			if (not defined($newFile)) {
+				SONOS_Log undef, 4, 'Couldn\'t even copy file "'.$url.'" directly... exiting...';
+				return 0;
+			}
 		}
+	};
+	if ($@) {
+		SONOS_Log undef, 0, 'Error during SONOS_DownloadReplaceIfChanged("'.$url.'", "'.$dest.'"): '.$@;
+		return 0;
 	}
 
 	# Reading old file (if it exists)
