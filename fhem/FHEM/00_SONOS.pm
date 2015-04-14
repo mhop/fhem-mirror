@@ -7005,7 +7005,7 @@ sub SONOS_DownloadReplaceIfChanged($$) {
 	SONOS_Log undef, 5, 'Call of SONOS_DownloadReplaceIfChanged("'.$url.'", "'.$dest.'")';
 	
 	# Be sure URL is absolute
-	return 0 if ($url =~ m/^\./i);
+	return 0 if ($url !~ m/^http:\/\//i);
 	
 	# Reading new file
 	my $newFile;
