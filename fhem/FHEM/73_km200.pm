@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0047 2015-04-09 20:30:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0048 2015-04-14 21:30:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -9,7 +9,7 @@
 #
 #     Author                     : Matthias Deeke 
 #     Contributions              : Olaf Droegehorn, Andreas Hahn, Rudolf Koenig, Markus Bloch,
-#     Contributions (continued)  : Stefan M., Furban, KaiKr, grossi33, Morkin
+#     Contributions (continued)  : Stefan M., Furban, KaiKr, grossi33, Morkin, DLindner
 #     e-mail                     : matthias.deeke(AT)deeke(PUNKT)eu
 #     Fhem Forum                 : http://forum.fhem.de/index.php/topic,25540.0.html
 #     Fhem Wiki                  : http://www.fhemwiki.de/wiki/Buderus_Web_Gateway
@@ -183,6 +183,10 @@
 #		0047    09.04.2015	Sailor				km200_Get						Blocking get-command during initialisation phase
 #		0047    09.04.2015	Sailor				km200_Set						Blocking set-command during initialisation phase
 #		0047    09.04.2015	Sailor				km200_SetSingleService			Bugfix for error message
+#		0048    09.04.2015	Sailor				km200_Attr						Improving DoNotPoll for root services
+#		0048    10.04.2015	Sailor				km200_GetSingleService			Handback of complete error list
+#		0048    14.04.2015	Sailor				km200_ParseHttpResponseInit		errorList missing service - bug corrected
+#		0048    14.04.2015	Sailor				km200_Get						"0" - floatvalue - bug corrected by formating number
 ########################################################################################################################
 
 
@@ -254,7 +258,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0047";
+	my $ModuleVersion           = "0048";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -475,7 +479,6 @@ sub km200_Define($$)
 	}
 	####END####### Check whether communication to the physical unit is possible ################################END#####
 
-
 	###START###### Initiate the timer for first time polling of  values from KM200 but wait 5s ################START####
 	InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
 	Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services started for the first time.";
@@ -526,11 +529,15 @@ sub km200_Undefine($$)
 	my $name = $hash->{NAME};	
 	my $url  = $hash->{URL};
 
-  	# Stop the internal timer for this module
+  	### Stop the internal timer for this module
 	RemoveInternalTimer($hash);
 
 	Log3 $name, 3, $name. " - km200 has been undefined. The KM unit at $url will no longer polled.";
 
+	### Console output if activated
+	if ($hash->{CONSOLEMESSAGE} == true) {print("km200 has been undefined. The KM unit at $url will no longer polled.\n");}
+	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
+	
 	return undef;
 }
 ####END####### Deactivate module module after "undefine" command by fhem #######################################END#####
@@ -642,9 +649,31 @@ sub km200_Attr(@)
 		### Transform string entries seperated by blank into array
 		@KM200_DONOTPOLL = split(/ /, $temp[0]);
 
+		### Remove trailing slash of each item if available
+		
+		### For each item found in this empty parent directory
+		foreach my $item (@KM200_DONOTPOLL)
+		{
+			### Delete trailing slash
+			$item =~ s/\/$//;
+		}
+		
 		### Save list of services not to be polled into hash
 		@{$hash->{Secret}{KM200DONOTPOLL}} = @KM200_DONOTPOLL;
 
+		
+		### For every blacklisted service
+		foreach my $SearchWord(@KM200_DONOTPOLL)
+		{
+			### Filter all blocked root services out of services to be polled 
+			my $FoundPosition = first_index{ $_ eq $SearchWord }@{$hash->{Secret}{KM200ALLSERVICES}};
+			if ($FoundPosition >= 0)
+			{
+				splice(@{$hash->{Secret}{KM200ALLSERVICES}}, $FoundPosition, 1);
+			}
+		}
+
+		### Message for debugging purposes
 		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". $a[3];
 	}
 	### Check whether time-out for Read-Back has been provided
@@ -726,7 +755,16 @@ sub km200_Get($@)
 		### If no option has been chosen, just return the result of the value.
 		else
 		{
-			$ReturnMessage = $ReturnValue->{value};
+			### If type is a floatvalue then format decimals
+			if ($ReturnValue->{type} eq "floatValue")
+			{
+				$ReturnMessage = sprintf("%.1f", $ReturnValue->{value});
+			}
+			### If type is something else just pass throught
+			else
+			{
+				$ReturnMessage = $ReturnValue->{value};
+			}
 		}
 	}
 	### If the initialisation process has NOT been finished
@@ -742,7 +780,7 @@ sub km200_Get($@)
 	
 	### Console outputs for debugging purposes
 	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
-	
+
 	### Return value
 	return($ReturnMessage);
 }
@@ -817,17 +855,6 @@ sub str_repeat($$)
     return(${string}x${count});
 }
 ####END######## Repeats "string" for "count" times #############################################################END#####
-
-
-###START####### Removes double entries in arrays ##############################################################START####
-###VERSION 0046: Deleted since no use in module
-#sub del_double
-#{
-#	my %all;
-#	$all{$_}=0 for @_;
-#	return (keys %all);
-#} 
-####END######## Removes double entries in arrays ###############################################################END#####
 
 
 ###START###### Subroutine Encrypt Data ########################################################################START####
@@ -1676,12 +1703,42 @@ sub km200_GetSingleService($)
 				
 				return $json
 			}
+			### Check whether the type is an errorlist
+			elsif ($json -> {type} eq "errorList")
+			{
+				
+				my $TempErrorList    = "";
+				
+				### For every item in the list of errors coming from the KM200
+				foreach my $item (@{ $json->{values} })
+				{					
+					### Create message string with fixed blocksize
+					my $TempTime      = $item->{t};
+					   $TempTime      =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(20-length($1)))/e;
+					my $TempErrorCode = $item->{dcd};
+					   $TempErrorCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(3 -length($1)))/e;
+					my $TempAddCode   = $item->{ccd};    
+					   $TempAddCode   =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(4 -length($1)))/e;
+					my $TempClassCode = $item->{cat};    
+					   $TempClassCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(2- length($1)))/e;
+					my $TempErrorMessage = "Time: " . $TempTime . "-ErrorCode: " . $TempErrorCode . " -AddCode: " . $TempAddCode . " -Category: " . $TempClassCode;
+
+					### Create List
+					$TempErrorList = $TempErrorList . $TempErrorMessage . "\n";
+				}
+				### Save raw Json string
+				$hash->{temp}{JsonRaw} = $decodedContent;
+				
+				### Save errorList
+				$json->{value} = $TempErrorList;
+				
+				return $json;
+			}
 			### Check whether the type is an refEnum which is indicating an empty parent directory
 			elsif ($json -> {type} eq "refEnum")
 			{
 				### Initialise Return Message
 				my $ReturnMessage = "";
-
 
 				### For each item found in this empty parent directory
 				foreach my $item (@{ $json->{references} })
@@ -2088,7 +2145,6 @@ sub km200_ParseHttpResponseInit($)
 			push (@KM200_WriteableServices, $TempJsonId);
 
 		}
-		
 		### Check whether the type is an errorlist
 		elsif ($json -> {type} eq "errorList")
 		{
@@ -2136,12 +2192,12 @@ sub km200_ParseHttpResponseInit($)
 				my $TempClassCode = $item->{cat};    
 				   $TempClassCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(2- length($1)))/e;
 				my $TempErrorMessage = "Time: " . $TempTime . "-ErrorCode: " . $TempErrorCode . " -AddCode: " . $TempAddCode . " -Category: " . $TempClassCode;
-
+				
 				### Create Service with Increment
-				my $TempServiceString = $Service . "/Error-" . $TempServiceIndex;
+				my $TempServiceString = $Service . "/Error-" . (sprintf("%02d", $TempServiceIndex));
 				
 				### Write Reading
-				readingsSingleUpdate( $hash, $TempServiceIndex, $TempErrorMessage, 1);
+				readingsSingleUpdate( $hash, $TempServiceString, $TempErrorMessage, 1);
 				
 				### Console Message if enabled
 				if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read                      : $TempServiceString\n";}
@@ -2160,10 +2216,12 @@ sub km200_ParseHttpResponseInit($)
 			### For each item found in this empty parent directory
 			foreach my $item (@{ $json->{references} })
 			{
+				my $SearchWord = $item->{id};
+				
 				### If the Service found is listed as blocked service
-				if ((grep {$_ eq $item->{id}} @{$hash->{Secret}{KM200DONOTPOLL}}) == 1)
+				if ((grep {$_ eq $SearchWord} @{$hash->{Secret}{KM200DONOTPOLL}}) == 1)
 				{
-					### Ignore Service found
+					### Do nothing
 					
 					### Console Message if enabled
 					if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service has been found but is blacklisted: " . $item->{id} . "\n";}
@@ -2175,7 +2233,6 @@ sub km200_ParseHttpResponseInit($)
 					push (@{$hash ->{Secret}{KM200ALLSERVICES}}, $item->{id});
 				}
 			}
-			
 			### Sort the list of all services alphabetically
 			@{$hash ->{Secret}{KM200ALLSERVICES}} = sort @{$hash ->{Secret}{KM200ALLSERVICES}};
 		}
@@ -2581,19 +2638,14 @@ sub km200_ParseHttpResponseDyn($)
 			$TempJsonId = $JsonId . "/" . "7-Su";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSu, 1);
 		}
-				### Check whether the type is an errorlist
+		### Check whether the type is an errorlist
 		elsif ($json -> {type} eq "errorList")
 		{
-			my $JsonId         = $json->{id};
-			my $JsonType       = $json->{type};
-
-			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: value found for  : " .$Service;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
-
-
+			my $JsonId           = $json->{id};
+			my $JsonType         = $json->{type};
 			my $TempServiceIndex = 0;
+			
+			### For every notification do
 			foreach my $item (@{ $json->{values} })
 			{
 				### Increment Service-Index
@@ -2609,12 +2661,12 @@ sub km200_ParseHttpResponseDyn($)
 				my $TempClassCode = $item->{cat};    
 				   $TempClassCode =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(2- length($1)))/e;
 				my $TempErrorMessage = "Time: " . $TempTime . "-ErrorCode: " . $TempErrorCode . " -AddCode: " . $TempAddCode . " -Category: " . $TempClassCode;
-
-				### Create Service with Increment
-				my $TempServiceString = $Service . "/Error-" . $TempServiceIndex;
+				
+				### Create Service with Increment and leading 0
+				my $TempServiceString = $Service . "/Error-" . (sprintf("%02d", $TempServiceIndex));
 				
 				### Write Reading
-				readingsSingleUpdate( $hash, $TempServiceIndex, $TempErrorMessage, 1);
+				readingsSingleUpdate( $hash, $TempServiceString, $TempErrorMessage, 1);
 			}
 		}
 		### Check whether the type is unknown
