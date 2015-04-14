@@ -2661,13 +2661,7 @@ SignalHandling()
                     $msg !~ m/ redefined at /);
     $inWarnSub = 0;
   };  
-  $SIG{__DIE__} = sub {
-    my ($msg) = @_;
-    Log 1, "PERL ERROR: $msg";
-    stacktrace();
-    exit(1);
-  };
-
+  # $SIG{__DIE__} = sub {...} #Removed. Forum #35796
 }
 
 
