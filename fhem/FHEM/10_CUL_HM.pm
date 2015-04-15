@@ -138,10 +138,9 @@ sub CUL_HM_Initialize($) {
   $hash->{AttrFn}    = "CUL_HM_Attr";
   $hash->{Attr}{dev} =  "ignore:1,0 dummy:1,0 "  # -- device only attributes
                        ."IODev IOList IOgrp "        
-                       ."actCycle "            # also for action detector                       
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
-                       ."actAutoTry:0_off,1_on "
+                       ."actCycle "            # also for action detector                       
                        ;
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
                         "serialNr firmware .stc .devInfo "
@@ -160,6 +159,7 @@ sub CUL_HM_Initialize($) {
                        ."rawToReadable unit "#"KFM-Sensor" only
                        ."expert:0_off,1_on,2_full "
                        ."param "
+                       ."actAutoTry:0_off,1_on "
                        ;
   $hash->{AttrList}  =  
                         $hash->{Attr}{glb}
@@ -9977,7 +9977,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
       <li><a name="#CUL_HMactAutoTry">actAutoTry</a>
          actAutoTry 0_off,1_on<br>
-         setzen der Option erlaubt dem ActionDetector ein statusrequest zu senden falls das Device dead markiert werden soll.
+         setzen erlaubt dem ActionDetector ein statusrequest zu senden falls das Device dead markiert werden soll.
          Das Attribut kann fuer Devices nützlich sein, welche sich nicht von selbst zyklisch melden.
       </li>
       <li><a href="#actCycle">actCycle</a>
