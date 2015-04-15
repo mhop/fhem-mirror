@@ -734,17 +734,34 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <ul>
   <code>define &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
   <br>
-  Definiert ein Ger&auml;t. Sie m&uuml;ssen Ger&auml;te einrichten um sie zu beeinflussen (z.B. 
-  das Kommando set on/off auszuf&uuml;hren). Gleichfalls ist das Logfile besser 
-  lesbar wenn es z.B.
-  "lamp off" anstatt "Device 5673, Button 00, Code 00 (off)" als Text enth&auml;lt. <br>
-  Geben Sie an der Befehlszeile "define &lt;name&gt; ?" ein, um eine Liste der 
-  verf&uuml;gbaren &quot;types&quot; zu erhalten.<br>
-  Nach der Durchf&uuml;hrung das globale Ereignis "MODIFIED" wird generiert.
+
+  Definiert ein Ger&auml;t. Sie m&uuml;ssen Ger&auml;te einrichten um sie zu
+  beeinflussen (z.B. das Kommando set on/off auszuf&uuml;hren). Gleichfalls
+  ist das Logfile besser lesbar wenn es z.B.  "lamp off" anstatt "Device 5673,
+  Button 00, Code 00 (off)" als Text enth&auml;lt. <br>
+
+  Nach der Durchf&uuml;hrung wird das globale Ereignis "DEFINED" generiert.
   <br><br>
 
-  Jedes Ger&auml;t besitzt unterschiedliche hinzuf&uuml;gbare Argumente per Definition, 
-  lesen Sie sich bitte die zu dem jeweiligen Ger&auml;t geh&ouml;renden Abschnitte durch.<br>
+  Je nach Typ ben&ouml;tigt man unterscheidliche Argumente, lesen Sie sich
+  bitte die zu dem jeweiligen Ger&auml;t geh&ouml;renden Abschnitte durch.
+  <br>
+</ul>
+
+<a name="defmod"></a>
+<h3>defmod</h3>
+<ul>
+  <code>defmod &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
+  <br>
+  Definiert ein Ger&auml;t, oder &auml;ndert es, falls es exisitiert. Um
+  z.Bsp. eine Lampe 10 Minuten nach der letzten Meldung eines Bewegungsmelders
+  abzuschalten, k&ouml;nnte man folgendes definieren:
+  <ul><code>
+    define mdNtfy notify motionDetector defmod mdOff at +00:10 set lamp off
+  </code></ul>
+  Falls man statt defmod ein define verwenden w&uuml;rde, dann w&uuml;rde eine
+  Meldung innerhalb von 10 Minuten nach der letzten Meldung zu einem Fehler
+  f&uuml;hren, da mdOff noch existiert.
   <br>
 </ul>
 

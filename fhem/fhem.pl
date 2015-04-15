@@ -129,6 +129,7 @@ sub utf8ToLatin1($);
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
 sub CommandDefine($$);
+sub CommandDefMod($$);
 sub CommandDelete($$);
 sub CommandDeleteAttr($$);
 sub CommandDeleteReading($$);
@@ -268,7 +269,9 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
            Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>"},
   "createlog"=> { ModuleName => "autocreate" },
   "define"  => { Fn=>"CommandDefine",
-           Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
+           Hlp=>"<name> <type> <options>,define a device" },
+  "defmod"  => { Fn=>"CommandDefMod",
+           Hlp=>"<name> <type> <options>,define or modify a device" },
   "deleteattr" => { Fn=>"CommandDeleteAttr",
            Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
   "deletereading" => { Fn=>"CommandDeleteReading",
@@ -1553,7 +1556,7 @@ sub
 CommandDefine($$)
 {
   my ($cl, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def, 3);
+  my @a = split("[ \t]+", $def, 3);
   my $ignoreErr;
 
   # used by RSS in fhem.cfg.demo, with no GD installed
@@ -1648,6 +1651,22 @@ CommandModify($$)
 
   delete($hash->{OLDDEF});
   return $ret;
+}
+
+#####################################
+sub
+CommandDefMod($$)
+{
+  my ($cl, $def) = @_;
+  my @a = split("[ \t]+", $def, 3);
+  return "Usage: defmod <name> <type> <type dependent arguments>"
+                if(int(@a) < 2);
+  if($defs{$a[0]}) {
+    $def = $a[2] ? "$a[0] $a[2]" : $a[0];
+    return CommandModify($cl, $def);
+  } else {
+    return CommandDefine($cl, $def);
+  }
 }
 
 #############

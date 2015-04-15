@@ -43,6 +43,7 @@
       <a href="#copy">copy</a> &nbsp;
       <a href="#createlog">createlog</a> &nbsp;
       <a href="#define">define</a> &nbsp;
+      <a href="#defmod">defmod</a> &nbsp;
       <a href="#delete">delete</a> &nbsp;
       <a href="#deleteattr">deleteattr</a> &nbsp;
       <a href="#deletereading">deletereading</a> &nbsp;
@@ -710,7 +711,6 @@ The following local attributes are used by a wider range of devices:
   Define a device. You need devices if you want to manipulate them (e.g.
   set on/off), and the logfile is also more readable if it contains e.g.
   "lamp off" instead of "Device 5673, Button 00, Code 00 (off)". <br>
-  Use "define &lt;name&gt; ?" to get a list of possible types.<br>
   After definition, the global event "DEFINED" will be generated, see the
   notify section for details.<br>
   <br><br>
@@ -719,6 +719,23 @@ The following local attributes are used by a wider range of devices:
   corresponding device section for details.<br>
   <br>
 </ul>
+
+<a name="defmod"></a>
+<h3>defmod</h3>
+<ul>
+  <code>defmod &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
+  <br>
+  Define a device or modify it, if it already exists. E.g. to switch off a lamp
+  10 Minutes after the last message from the motion detector, you may use
+  <ul><code>
+    define mdNtfy notify motionDetector defmod mdOff at +00:10 set lamp off
+  </code></ul>
+  Using define here for the mdOff will generate an error if the motion detector
+  triggers within the 10 minutes after the first event, as the mdOff at
+  definition still exists.
+  <br>
+</ul>
+
 
 <a name="delete"></a>
 <h3>delete</h3>
