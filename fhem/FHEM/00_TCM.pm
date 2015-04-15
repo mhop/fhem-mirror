@@ -148,7 +148,7 @@ TCM_Write($$$)
   } else {
     # TCM 310 (ESP3)
     $bstring = "55" . $fn . TCM_CRC8($fn) . $msg . TCM_CRC8($msg);
-    Log3 $name, 5, "TCM $name sending ESP3: $bstring";
+    Log3 $name, 2, "TCM $name sending ESP3: $bstring";
   }
   DevIo_SimpleWrite($hash, $bstring, 1);
   # next commands will be sent with a delay
@@ -522,12 +522,16 @@ TCM_Parse310($$$)
       next if($k eq "cmd" || $k eq "arg");
       my ($off, $len, $type) = split(",", $ptr->{$k});
       my $data = substr($rawmsg, $off*2, $len*2);
-      $data = pack('H*', $data) if($type && $type eq "STR");
-      #push @ans, "$k=$data";
+      if($type && $type eq "STR") {
+        $data = pack('H*', $data);
+        ####
+        # remove trailing 0x00 
+        #$data =~ s/[^A-Za-z0-9#\.\-_]//g;
+        $data =~ tr/A-Za-z0-9#.-_//cd;
+      }
       push @ans, "$k: $data";
     }
     $msg = join(" ", @ans);
-    #$msg = join(",", @ans);
   }
   if ($msg eq "") {
     Log3 $name, 2, "TCM $name RESPONSE: OK";
