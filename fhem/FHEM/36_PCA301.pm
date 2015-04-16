@@ -204,6 +204,8 @@ PCA301_Parse($$)
   my $rhash = $modules{PCA301}{defptr}{$raddr};
   my $rname = $rhash?$rhash->{NAME}:$raddr;
 
+  return "" if( IsIgnored($rname) );
+
    if( !$modules{PCA301}{defptr}{$raddr} ) {
      Log3 $name, 3, "PCA301 Unknown device $rname, please define it";
 
