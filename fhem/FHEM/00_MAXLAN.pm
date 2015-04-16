@@ -52,7 +52,8 @@ MAXLAN_Initialize($)
   $hash->{UndefFn} = "MAXLAN_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 set-clock-on-init:1,0 " .
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " .
-                     "timezone:CET-CEST,GMT-BST,EET-EEST,FET-FEST,MSK-MSD,GMT,CET,EET";
+                     "timezone:CET-CEST,GMT-BST,EET-EEST,FET-FEST,MSK-MSD,GMT,CET,EET " .
+                     $readingFnAttributes;
 }
 
 #####################################
