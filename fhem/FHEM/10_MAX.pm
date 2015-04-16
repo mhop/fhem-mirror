@@ -271,7 +271,7 @@ MAX_Set($@)
       #This enables the automatic/schedule mode where the thermostat follows the weekly program
 
       #There can be a temperature supplied, which will be kept until the next switch point of the weekly program
-      if(@args > 1) {
+      if(@args == 2) {
         if($args[1] eq "eco") {
           $temperature = MAX_ReadingsVal($hash,"ecoTemperature");
         } elsif($args[1] eq "comfort") {
@@ -279,30 +279,37 @@ MAX_Set($@)
         } else {
           $temperature = MAX_ParseTemperature($args[1]);
         }
-      } else {
+      } elsif(@args == 1) {
         $temperature = 0; #use temperature from weekly program
+      } else {
+        return "To many parameters: desiredTemperature auto [<temperature>]";
       }
 
       $ctrlmode = 0; #auto
     } else {
-      return "To many parameters to desiredTemperature: expected one" if(@args > 1);
 
       if($args[0] eq "boost") {
+        return "To many parameters: desiredTemperature boost" if(@args > 1);
         $temperature = 0;
         $ctrlmode = 3;
         #TODO: auto mode with temperature is also possible
+
       } elsif($args[0] eq "eco") {
         $temperature = MAX_ReadingsVal($hash,"ecoTemperature");
       } elsif($args[0] eq "comfort") {
         $temperature = MAX_ReadingsVal($hash,"comfortTemperature");
-      }else{
+      } else {
         $temperature = MAX_ParseTemperature($args[0]);
       }
-    }
 
-    if(@args > 1 and ($args[1] eq "until") and ($ctrlmode == 1)) {
-      $ctrlmode = 2; #temporary
-      $until = sprintf("%06x",MAX_DateTime2Internal($args[2]." ".$args[3]));
+      if(@args > 1) {
+        #@args == 3 and $args[1] == "until"
+        return "Second parameter must be 'until'" if($args[1] ne "until");
+        return "Not enough parameters: desiredTemperature <temp> [until <date> <time>]" if(@args == 3);
+        return "To many parameters: desiredTemperature <temp> [until <date> <time>]" if(@args > 4);
+        $ctrlmode = 2; #switch manual to temporary
+        $until = sprintf("%06x",MAX_DateTime2Internal($args[2]." ".$args[3]));
+      }
     }
 
     my $payload = sprintf("%02x",int($temperature*2.0) | ($ctrlmode << 6));
