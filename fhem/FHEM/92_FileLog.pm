@@ -89,7 +89,7 @@ sub
 FileLog_Undef($$)
 {
   my ($hash, $name) = @_;
-  close($hash->{FH});
+  close($hash->{FH}) if($hash->{FH});
   return undef;
 }
 
