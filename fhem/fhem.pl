@@ -247,15 +247,47 @@ $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
 $modules{Global}{ORDER} = -1;
 $modules{Global}{LOADED} = 1;
-$modules{Global}{AttrList} =
-  "archivecmd apiversion archivedir configfile lastinclude logfile " .
-  "modpath nrarchive pidfilename port statefile title " .
-  "mseclog:1,0 version nofork:1,0 language:EN,DE logdir holiday2we " .
-  "autoload_undefined_devices:1,0 dupTimeout latitude longitude altitude " .
-  "backupcmd backupdir backupsymlink backup_before_update " .
-  "exclude_from_update motd restoreDirs uniqueID ".
-  "sendStatistics:onUpdate,manually,never updateInBackground:1,0 ".
-  "showInternalValues:1,0 stacktrace:1,0 ";
+no warnings 'qw';
+my @globalAttrList = qw(
+  altitude
+  apiversion
+  archivecmd
+  archivedir
+  autoload_undefined_devices:1,0
+  backup_before_update
+  backupcmd
+  backupdir
+  backupsymlink
+  configfile
+  dupTimeout
+  exclude_from_update
+  holiday2we
+  language:EN,DE
+  lastinclude
+  latitude
+  logdir
+  logfile
+  longitude
+  modpath
+  motd
+  mseclog:1,0
+  nofork:1,0
+  nrarchive
+  pidfilename
+  port
+  restartDelay
+  restoreDirs
+  sendStatistics:onUpdate,manually,never
+  showInternalValues:1,0
+  stacktrace:1,0
+  statefile
+  title
+  uniqueID
+  updateInBackground:1,0
+  version
+);
+use warnings 'qw';
+$modules{Global}{AttrList} = join(" ", @globalAttrList);
 $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
@@ -1433,7 +1465,8 @@ CommandShutdown($$)
   unlink($attr{global}{pidfilename}) if($attr{global}{pidfilename});
   if($param && $param eq "restart") {
     if ($^O !~ m/Win/) {
-      system("(sleep 2; exec $^X $0 $attr{global}{configfile})&");
+      system("(sleep " . AttrVal("global", "restartDelay", 2) .
+                                 "; exec $^X $0 $attr{global}{configfile})&");
     } elsif ($winService->{AsAService}) {
       # use the OS SCM to stop and start the service
       exec('cmd.exe /C net stop fhem & net start fhem');
