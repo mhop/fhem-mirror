@@ -1226,6 +1226,7 @@ CommandRereadCfg($$)
   $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
   $inform{$name} = $informMe if($informMe);
   @structChangeHist = ();
+  $lastDefChange++;
   DoTrigger("global", "REREADCFG", 1);
 
   $init_done = 1;
