@@ -168,14 +168,26 @@ TRX_Get($@)
 
   my $msg;
   my $name=$a[0];
-  my $reading= $a[1];
+  my $reading=$a[1];
 
-  $msg="$name => No Get function ($reading) implemented";
-  Log3 $name, 1, $msg if ($reading ne "?");
+  if ($reading eq "protocols") {
+	$msg = $hash->{Protocols}
+  }
+  elsif ($reading eq "frequence") {
+	$msg = $hash->{Freq};
+  }
+  elsif ($reading eq "firmware") {
+	$msg = $hash->{Firmware};
+  }
+  else {
+	$msg = "$name => No Get function ($reading) implemented";
+	Log3 $name, 1, $msg if ($reading ne "?");
+  }
   return $msg;
 }
 
 #####################################
+# Set
 sub
 TRX_SetState($$$$)
 {
@@ -201,6 +213,92 @@ TRX_Clear($)
   }
 }
 
+sub
+TRX_GetStatus($)
+{
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $char = undef ; # ?
+
+  # Get Status
+  my $init = pack('H*', "0D00000102000000000000000000");
+  DevIo_SimpleWrite($hash, $init, 0);
+  my $buf = unpack('H*',DevIo_TimeoutRead($hash, 0.1));
+
+  if (! $buf) {
+    	Log3 $name, 1, "TRX: Initialization Error: No character read";
+	return "TRX: Initialization Error $name: no char read";
+  } elsif ($buf !~ m/0d0100....................../) {
+    	Log3 $name, 1, "TRX: Initialization Error hexline='$buf', expected 0d0100......................";
+	return "TRX: Initialization Error %name expected 0D0100, but char=$char received.";
+  } else {
+    	Log3 $name,1, "TRX: Init OK";
+  	$hash->{STATE} = "Initialized";
+	# Analyse result and display it:
+	if ($buf =~ m/0d0100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/) {
+		my $status = "";
+
+		my $seqnbr = $1;
+		my $cmnd = $2;
+		my $msg1 = $3;
+		my $msg2 = hex($4);
+		my $msg3 = hex($5);
+		my $msg4 = hex($6);
+		my $msg5 = hex($7);
+  		my $freq = { 
+			'50' => '310MHz',
+			'51' => '315MHz',
+			'52' => '433.92MHz receiver only',
+			'53' => '433.92MHz transceiver',
+			'55' => '868.00MHz',
+			'56' => '868.00MHz FSK',
+			'57' => '868.30MHz',
+			'58' => '868.30MHz FSK',
+			'59' => '868.35MHz',
+			'5a' => '868.35MHz FSK',
+			'5b' => '868.95MHz'
+                 }->{$msg1} || 'unknown Mhz';
+		$status .= $freq;
+		$status .= ", " . sprintf "firmware=%d",$msg2;
+		$status .= ", protocols enabled: ";
+		my $proto = "";
+		$proto .= "undecoded " if ($msg3 & 0x80); 
+		$proto .= "RFU " if ($msg3 & 0x40); 
+		$proto .= "ByronSX " if ($msg3 & 0x20); 
+		$proto .= "RSL " if ($msg3 & 0x10); 
+		$proto .= "Lighting4 " if ($msg3 & 0x08); 
+		$proto .= "FineOffset/Viking " if ($msg3 & 0x04); 
+		$proto .= "Rubicson " if ($msg3 & 0x02); 
+		$proto .= "AE/Blyss " if ($msg3 & 0x01); 
+		$proto .= "BlindsT1/T2/T3/T4 " if ($msg4 & 0x80); 
+		$proto .= "BlindsT0  " if ($msg4 & 0x40); 
+		$proto .= "ProGuard " if ($msg4 & 0x20); 
+		$proto .= "FS20 " if ($msg4 & 0x10); 
+		$proto .= "LaCrosse " if ($msg4 & 0x08); 
+		$proto .= "Hideki " if ($msg4 & 0x04); 
+		$proto .= "LightwaveRF " if ($msg4 & 0x02); 
+		$proto .= "Mertik " if ($msg4 & 0x01); 
+		$proto .= "Visonic " if ($msg5 & 0x80); 
+		$proto .= "ATI " if ($msg5 & 0x40); 
+		$proto .= "OREGON " if ($msg5 & 0x20); 
+		$proto .= "KOPPLA " if ($msg5 & 0x10); 
+		$proto .= "HOMEEASY " if ($msg5 & 0x08); 
+		$proto .= "AC " if ($msg5 & 0x04); 
+		$proto .= "ARC " if ($msg5 & 0x02); 
+		$proto .= "X10 " if ($msg5 & 0x01);
+		$status .= $proto;
+		#my $hexline = unpack('H*', $buf); 
+    		Log3 $name, 4, "TRX: Init status hexline='$buf'";
+    		Log3 $name, 1, "TRX: Init status: '$status'";
+		# store infos
+		$hash->{Freq} = $freq;
+		$hash->{Protocols} = $proto;
+		$hash->{Mode} = $buf;
+		$hash->{Firmware} = $msg2;
+	}
+  }
+}
+
 #####################################
 sub
 TRX_DoInit($)
@@ -210,7 +308,6 @@ TRX_DoInit($)
   my $err;
   my $msg = undef;
   my $buf;
-  my $char = undef ;
 
 
   if(defined($attr{$name}) && defined($attr{$name}{"do_not_init"})) {
@@ -231,79 +328,8 @@ TRX_DoInit($)
 
   TRX_Clear($hash);
 
-  #
-  # Get Status
-  $init = pack('H*', "0D00000102000000000000000000");
-  DevIo_SimpleWrite($hash, $init, 0);
-  $buf = unpack('H*',DevIo_TimeoutRead($hash, 0.1));
-
-  if (! $buf) {
-    	Log3 $name, 1, "TRX: Initialization Error: No character read";
-	return "TRX: Initialization Error $name: no char read";
-  } elsif ($buf !~ m/0d0100....................../) {
-    	Log3 $name, 1, "TRX: Initialization Error hexline='$buf', expected 0d0100......................";
-	return "TRX: Initialization Error %name expected 0D0100, but char=$char received.";
-  } else {
-    	Log3 $name,1, "TRX: Init OK";
-  	$hash->{STATE} = "Initialized";
-	# Analyse result and display it:
-	if ($buf =~ m/0d0100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/) {
-		my $status = "";
-
-		my $seqnbr = $1;
-		my $cmnd = $2;
-		my $msg1 = $3;
-		my $msg2 = ord(pack('H*', $4));
-		my $msg3 = ord(pack('H*', $5));
-		my $msg4 = ord(pack('H*', $6));
-		my $msg5 = ord(pack('H*', $7));
-  		my $freq = { 
-			'50' => '310MHz',
-			'51' => '315MHz',
-			'52' => '433.92MHz receiver only',
-			'53' => '433.92MHz transceiver',
-			'55' => '868.00MHz',
-			'56' => '868.00MHz FSK',
-			'57' => '868.30MHz',
-			'58' => '868.30MHz FSK',
-			'59' => '868.35MHz',
-			'5a' => '868.35MHz FSK',
-			'5b' => '868.95MHz'
-                 }->{$msg1} || 'unknown Mhz';
-		$status .= $freq;
-		$status .= ", " . sprintf "firmware=%d",$msg2;
-		$status .= ", protocols enabled: ";
-		$status .= "undecoded " if ($msg3 & 0x80); 
-		$status .= "RFU " if ($msg3 & 0x40); 
-		$status .= "ByronSX " if ($msg3 & 0x20); 
-		$status .= "RSL " if ($msg3 & 0x10); 
-		$status .= "Lighting4 " if ($msg3 & 0x08); 
-		$status .= "FineOffset/Viking " if ($msg3 & 0x04); 
-		$status .= "Rubicson " if ($msg3 & 0x02); 
-		$status .= "AE/Blyss " if ($msg3 & 0x01); 
-		$status .= "BlindsT1/T2/T3/T4 " if ($msg4 & 0x80); 
-		$status .= "BlindsT0  " if ($msg4 & 0x40); 
-		$status .= "ProGuard " if ($msg4 & 0x20); 
-		$status .= "FS20 " if ($msg4 & 0x10); 
-		$status .= "LaCrosse " if ($msg4 & 0x08); 
-		$status .= "Hideki " if ($msg4 & 0x04); 
-		$status .= "LightwaveRF " if ($msg4 & 0x02); 
-		$status .= "Mertik " if ($msg4 & 0x01); 
-		$status .= "Visonic " if ($msg5 & 0x80); 
-		$status .= "ATI " if ($msg5 & 0x40); 
-		$status .= "OREGON " if ($msg5 & 0x20); 
-		$status .= "KOPPLA " if ($msg5 & 0x10); 
-		$status .= "HOMEEASY " if ($msg5 & 0x08); 
-		$status .= "AC " if ($msg5 & 0x04); 
-		$status .= "ARC " if ($msg5 & 0x02); 
-		$status .= "X10 " if ($msg5 & 0x01); 
-		my $hexline = unpack('H*', $buf);
-    		Log3 $name, 4, "TRX: Init status hexline='$hexline'";
-    		Log3 $name, 1, "TRX: Init status: '$status'";
-	}
-  }
-  #
-
+  TRX_GetStatus($hash);
+ 
   # Reset the counter
   delete($hash->{XMIT_TIME});
   delete($hash->{NR_CMD_LAST_H});
@@ -344,11 +370,11 @@ TRX_Read($)
     # the buffer contains at least the number of bytes we need
     my $rmsg;
     $rmsg = substr($TRX_data, 0, $num_bytes+1);
-    #my $hexline = unpack('H*', $rmsg);
-    Log3 $name, 5, "TRX_Read rmsg '$hexline'";
+    #$hexline = unpack('H*', $rmsg);
+    #Log3 $name, 5, "TRX_Read rmsg '$hexline'";
     $TRX_data = substr($TRX_data, $num_bytes+1);;
     #$hexline = unpack('H*', $TRX_data);
-    Log3 $name, 5, "TRX_Read TRX_data '$hexline'";
+    #Log3 $name, 5, "TRX_Read TRX_data '$hexline'";
     #
     TRX_Parse($hash, $hash, $name, unpack('H*', $rmsg));
     $num_bytes = ord(substr($TRX_data,0,1));
