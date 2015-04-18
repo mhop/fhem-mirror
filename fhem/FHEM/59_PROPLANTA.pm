@@ -33,6 +33,8 @@
 # parser for the weather data
 package MyProplantaParser;
 use base qw(HTML::Parser);
+use Time::HiRes qw(usleep nanosleep);
+
 our @texte = ();
 my $lookupTag = "span|b";
 my $curTag    = "";
@@ -163,6 +165,8 @@ sub text
    my ( $self, $text ) = @_;
    my $found = 0;
    my $readingName;
+   # Wait 1ms to reduce CPU load and hence blocking of FHEM by it (workaround until a better solution is available)
+   usleep (1000);
    if ( $curTag =~ $lookupTag )
    {
       $curTextPos++;
@@ -391,6 +395,7 @@ my $missingModul;
 eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
 eval "use HTTP::Request;1" or $missingModul .= "HTTP::Request ";
 eval "use HTML::Parser;1" or $missingModul .= "HTML::Parser ";
+eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
 
 require 'Blocking.pm';
 require 'HttpUtils.pm';
@@ -469,8 +474,8 @@ sub PROPLANTA_Define($$)
    
    RemoveInternalTimer($hash);
    
-   #Get first data after 12 seconds
-   InternalTimer( gettimeofday() + 12, "PROPLANTA_Start", $hash, 0 );
+   #Get first data after 32 seconds
+   InternalTimer( gettimeofday() + 32, "PROPLANTA_Start", $hash, 0 );
 
    return undef;
 }
@@ -557,11 +562,11 @@ sub PROPLANTA_Start($)
    
    $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
    
-   if(!$hash->{fhem}{LOCAL} && $hash->{INTERVAL} > 0) {
-    # set up timer if automatically call
+   if($hash->{INTERVAL} > 0) {
+    # reset timer if interval is defined
       RemoveInternalTimer( $hash );
       InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PROPLANTA_Start", $hash, 1 );  
-      return undef if( AttrVal($name, "disable", 0 ) == 1 );
+      return undef if AttrVal($name, "disable", 0 ) == 1 && !$hash->{fhem}{LOCAL};
    }
    
    if ( AttrVal( $name, 'URL', '') eq '' && not defined( $hash->{URL} ) )
@@ -569,20 +574,37 @@ sub PROPLANTA_Start($)
       PROPLANTA_Log $hash, 3, "missing URL";
       return;
    }
-  
-   $hash->{helper}{RUNNING_PID} =
-           BlockingCall( 
-           "PROPLANTA_Run",   # callback worker task
-           $name,                    # name of the device
-           "PROPLANTA_Done",  # callback result method
-           120,                       # timeout seconds
-           "PROPLANTA_Aborted", #  callback for abortion
-           $hash );                 # parameter for abortion
+   
+# "Set update"-action will kill a running update child process
+   if (defined ($hash->{helper}{RUNNING_PID}) && $hash->{fhem}{LOCAL})
+   {
+      BlockingKill($hash->{helper}{RUNNING_PID});
+      delete( $hash->{helper}{RUNNING_PID} );
+      PROPLANTA_Log $hash, 4, "Killing old forked process";
+   }
+   
+   unless (defined ($hash->{helper}{RUNNING_PID}))
+   {
+      $hash->{helper}{RUNNING_PID} =
+              BlockingCall( 
+              "PROPLANTA_Run",   # callback worker task
+              $name,                    # name of the device
+              "PROPLANTA_Done",  # callback result method
+              120,                       # timeout seconds
+              "PROPLANTA_Aborted", #  callback for abortion
+              $hash );                 # parameter for abortion
+      PROPLANTA_Log $hash, 4, "Start forked process to capture html";
+   }
+   else
+   {
+      PROPLANTA_Log $hash, 1, "Could not start forked process, old process still running";
+   }
 }
 
 #####################################
 sub PROPLANTA_Run($)
 {
+   setpriority( 0, 0, 10);
    my ($name) = @_;
    my $ptext=$name;
    my $URL;
@@ -656,22 +678,26 @@ sub PROPLANTA_Run($)
    
    return $ptext;
 }
+
 #####################################
 # asyncronous callback by blocking
 sub PROPLANTA_Done($)
 {
    my ($string) = @_;
    return unless ( defined($string) );
-   
+     
    # all term are separated by "|" , the first is the name of the instance
    my ( $name, %values ) = split( "\\|", $string );
    my $hash = $defs{$name};
    return unless ( defined($hash->{NAME}) );
    
-   # delete the marker for RUNNING_PID process
+   PROPLANTA_Log $hash, 4, "Forked process successfully finished";
+
+# delete the marker for RUNNING_PID process
    delete( $hash->{helper}{RUNNING_PID} );  
 
-   # Wetterdaten speichern
+
+# Wetterdaten speichern
    readingsBeginUpdate($hash);
 
    if ( defined $values{Error} )
@@ -718,11 +744,13 @@ sub PROPLANTA_Done($)
    }
    readingsEndUpdate( $hash, 1 );
 }
+
 #####################################
 sub PROPLANTA_Aborted($)
 {
    my ($hash) = @_;
    delete( $hash->{helper}{RUNNING_PID} );
+   PROPLANTA_Log $hash, 4, "Forked process timed out";
 }
 
 ##### noch nicht fertig ###########
@@ -788,6 +816,8 @@ PROPLANTA_Html($)
    The module extracts weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br>
    The website provides a forecast for 12 days, for the first 7 days in a 3-hours-interval.
+   <br>
+   This modul causes a high CPU load. It is recommended to reduce the number of captured forecast days.
    <br>
    It uses the perl moduls HTTP::Request, LWP::UserAgent and HTML::Parse.
    <br/><br/>
@@ -893,6 +923,8 @@ PROPLANTA_Html($)
    Das Modul extrahiert Wetterdaten von der Website <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br/>
    Es stellt eine Vorhersage f&uuml;r 12 Tage zur Verf&uuml;gung - w&auml;hrend der ersten 7 Tage im 3-Stunden-Intervall.
+   <br>
+   Dieses Modul erzeugt eine hohe CPU-Last. Es wird deshalb empfohlen, die auszulesenden Vorhersagetage zu reduzieren.
    <br>
    <i>Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent und HTML::Parse</i>.
    <br/><br/>
