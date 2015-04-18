@@ -1,5 +1,6 @@
 ##############################################
 # $Id$
+# 2015-04-18
 
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
 # Copyright: Jan Schneider (timberwolf at tec-observer dot de)
@@ -1600,6 +1601,7 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           $sendDimCmd = 1;
+	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } elsif ($cmd eq "dimup") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
@@ -1615,6 +1617,7 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           $sendDimCmd = 1;
+	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } elsif ($cmd eq "dimdown") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
@@ -1630,6 +1633,7 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           $sendDimCmd = 1;
+	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } elsif ($cmd eq "on") {
           $rampTime = 1;
@@ -1655,12 +1659,14 @@ sub EnOcean_Set($@)
             }
           }
           $sendDimCmd = 1;
+	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } elsif ($cmd eq "off") {
           $dimVal = 0;
           $rampTime = 1;
           $setCmd = 8;
           $sendDimCmd = 1;
+	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } else {
           my $cmdList = "dim:slider,0,1,100 on:noArg off:noArg teach:noArg";
