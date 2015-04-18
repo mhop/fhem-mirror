@@ -148,7 +148,7 @@ TCM_Write($$$)
   } else {
     # TCM 310 (ESP3)
     $bstring = "55" . $fn . TCM_CRC8($fn) . $msg . TCM_CRC8($msg);
-    Log3 $name, 2, "TCM $name sending ESP3: $bstring";
+    Log3 $name, 5, "TCM $name sending ESP3: $bstring";
   }
   DevIo_SimpleWrite($hash, $bstring, 1);
   # next commands will be sent with a delay
