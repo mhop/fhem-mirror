@@ -2383,6 +2383,15 @@ sub FRITZBOX_SendMail($@)
    {
       chop $field{body};
       $field{body} =~ s/"/\\"/g;
+# change none ASCII chars in octal code for ISO-8859-1 (acc. http://www.pjb.com.au/comp/diacritics.html)
+      $field{body} =~ s/Ä|Ã„/\\304/g;
+      $field{body} =~ s/Ö|Ã–/\\326/g;
+      $field{body} =~ s/Ü|Ãœ/\\334/g;
+      $field{body} =~ s/ß|ÃŸ/\\337/g;
+      $field{body} =~ s/ä|Ã¤/\\344/g;
+      $field{body} =~ s/ö|Ã¶/\\366/g;
+      $field{body} =~ s/ü|Ã¼/\\374/g;
+   
       push @cmdArray, '/bin/echo -e "'.$field{body}.'" >/var/tmp/fhem_nachricht.txt';
       $cmd .=  " -i '/var/tmp/fhem_nachricht.txt'";
    }
@@ -2405,8 +2414,8 @@ sub FRITZBOX_SendMail($@)
    return undef;
 }
 
-sub ##########################################
-FRITZBOX_StartRadio($@) 
+##########################################
+sub FRITZBOX_StartRadio($@) 
 {
    my ($hash, @val) = @_;
    my @cmdArray;
