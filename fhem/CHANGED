@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLMONITOR: new reverse search method "textfile" for custom
+                             definitions 
+  - bugfix:  FB_CALLMONITOR: correct reverse search of Call-By-Call outgoing calls
+  - feature: FB_CALLMONITOR: reverse search order can now be configured
   - bugfix:  57_CALVIEW: fixed tomorrow dates when new month
   - bugfix:  73_km200 - Fix for handling back "0" floatvalues with get-command
   - bugfix:  73_km200 - Fix for wrong service as reading for errorLists
