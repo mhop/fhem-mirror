@@ -103,16 +103,23 @@ sub Heating_Control_Attr($$$) {
 ########################################################################
 sub Heating_Control_SetTimer($) {
   my ($hash) = @_;
-  return WeekdayTimer_SetTimer($hash);
+  WeekdayTimer_DeleteTimer($hash);
+  WeekdayTimer_SetTimer($hash);
 }  
 ########################################################################
-sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
-
-  foreach my $hc ( sort keys %{$modules{Heating_Control}{defptr}} ) {
-     my $hash = $modules{Heating_Control}{defptr}{$hc};
-
+sub Heating_Control_SetTemp($) {
+  my ($name) = @_;
+  
+  my $hash = $modules{Heating_Control}{defptr}{$name};
+  if(defined $hash) {
      Heating_Control_SetTimer($hash);
      Log3 undef, 3, "Heating_Control_SetTimer() for $hash->{NAME} done!";
+  }   
+}
+########################################################################
+sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
+  foreach my $hcName ( sort keys %{$modules{Heating_Control}{defptr}} ) {
+     Heating_Control_SetTemp($hcName);
   }
   Log3 undef,  3, "Heating_Control_SetAllTemps() done!";
 }

@@ -164,8 +164,9 @@ sub WeekdayTimer_Define($$) {
   
  #WeekdayTimer_DeleteTimer($hash);  am Anfang dieser Routine
   WeekdayTimer_Profile    ($hash);
-  WeekdayTimer_SetTimer   ($hash);
-  
+  #WeekdayTimer_SetTimer   ($hash); # per timer - nach init
+  InternalTimer(time(), "$hash->{TYPE}_SetTimer", $hash, 0);
+
   WeekdayTimer_SetTimerForMidnightUpdate( { HASH => $hash} );
   
   return undef;
@@ -227,7 +228,6 @@ sub WeekdayTimer_Profile($) {
   # für logProxy umhaengen
   $hash->{helper}{SWITCHINGTIME} = $hash->{profile};
   delete $hash->{profile};
-  #Log3 $hash, 3, "profile: " . Dumper $hash;
 }
 ################################################################################   
 sub WeekdayTimer_SwitchingTime($$) {
@@ -481,10 +481,13 @@ sub WeekdayTimer_SetTimer($) {
      $timToSwitch -= 24*3600 if ($i == $#reverseSwitches);
      my $secondsToSwitch = $timToSwitch - $now;
      
-     my $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $nextPara);
+     readingsSingleUpdate ($hash,  "state", "inactive", 1);
+     my $isActiveTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $nextPara);
      if ($secondsToSwitch>$grenzSeconds && !$switchedInThePast) {    
-       myInternalTimer       ("$time", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0);
-       $switchedInThePast = ($secondsToSwitch<0 && $activeTimer) ;
+        if ($secondsToSwitch>0 || $isActiveTimer) {
+           myInternalTimer ("$time", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0)
+        };
+        $switchedInThePast = ($secondsToSwitch<0 && $isActiveTimer) ;
      }
   }     
 }
@@ -541,7 +544,6 @@ sub WeekdayTimer_isAnActiveTimer ($$$) {
   my $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
   my $xPression  = "{".$tageAsHash.";;".$condition ."}";
      $xPression  = EvalSpecials($xPression, %specials);  
-     $xPression  =~ s/%%days/%days/g;
   
   return AnalyzeCommandChain(undef, $xPression);
 }
@@ -710,7 +712,6 @@ sub WeekdayTimer_Device_Schalten($$$) {
     
     my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
     $command= EvalSpecials($command, %specials);
-    $command =~ s/%%days/%days/g;
     
     Log3 $hash, 4, "[$name] command: $command executed";
     my $ret  = AnalyzeCommandChain(undef, $command);
@@ -724,8 +725,7 @@ sub WeekdayTimer_tageAsHash($$) {
    my %days = map {$_ => 1} @$tage;
    map {delete $days{$_}} (7,8);   
    
-   # %% weil %,@ in device para verwandelt wird
-   return 'my%%days=map{$_=>1}'.'('.join (",", sort keys %days).')';
+   return 'my $days={};map{$days->{$_}=1}'.'('.join (",", sort keys %days).')';
 }
 ################################################################################
 sub WeekdayTimer_Condition($$) {  
@@ -748,7 +748,7 @@ sub WeekdayTimer_TageAsCondition ($) {
    my $we       = $days{7}; delete $days{7};  # $we
    my $notWe    = $days{8}; delete $days{8};  #!$we
    
-   my $tageExp  = '(defined $days{$wday}';
+   my $tageExp  = '(defined $days->{$wday}';
       $tageExp .= ' ||  $we' if defined $we; 
       $tageExp .= ' || !$we' if defined $notWe;
       $tageExp .= ')';
@@ -766,14 +766,22 @@ sub WeekdayTimer_Attr($$$) {
   }
   return undef;
 }
+########################################################################
+sub WeekdayTimer_SetParm($) {
+  my ($name) = @_;
+  
+  my $hash = $modules{WeekdayTimer}{defptr}{$name};
+  if(defined $hash) {
+     WeekdayTimer_DeleteTimer($hash);
+     WeekdayTimer_SetTimer($hash);
+     Log3 undef, 3, "WeekdayTimer_SetParm() for $hash->{NAME} done!";
+  }   
+}
 ################################################################################
 sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
 
-  foreach my $hc ( sort keys %{$modules{WeekdayTimer}{defptr}} ) {
-     my $hash = $modules{WeekdayTimer}{defptr}{$hc};
-
-     WeekdayTimer_SetTimer($hash);
-     Log3 undef, 3, "WeekdayTimer_SetAllParms() for $hash->{NAME} done!";
+  foreach my $wdName ( sort keys %{$modules{WeekdayTimer}{defptr}} ) {
+     WeekdayTimer_SetParm($wdName);
   }
   Log3 undef,  3, "WeekdayTimer_SetAllParms() done!";
 }
