@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  57_CALVIEW: fixed tomorrow dates when new month
   - bugfix:  73_km200 - Fix for handling back "0" floatvalues with get-command
   - bugfix:  73_km200 - Fix for wrong service as reading for errorLists
   - bugfix:  73_km200 - Fix DoNotPoll of root services
