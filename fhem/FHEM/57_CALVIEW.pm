@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7011 2015-03-016 18:30:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7012 2015-04-019 11:30:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -79,12 +79,11 @@ sub CALVIEW_GetUpdate($){
 	my $samedatecounter = 2;
 	my $lastterm;
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-    $year += 1900; $mon += 1; my $nextday= $mday + 1;
-    if($nextday < 10){$nextday = "0$nextday";}
-	if($mday < 10){$mday = "0$mday";}
-    if($mon < 10){$mon = "0$mon";}
-	my $date = "$mday.$mon.$year";
-	my $datenext = "$nextday.$mon.$year";
+	$year += 1900; $mon += 1; 	
+	my $date = sprintf('%02d.%02d.%04d', $mday, $mon, $year);
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time + 86400);
+	$year += 1900; $mon += 1; 		
+	my $datenext = sprintf('%02d.%02d.%04d', $mday, $mon, $year);
 	my @termineNew;
 	foreach my $item (@termine ){
 		my @tempstart=split(/\s+/,$item->[0]);
