@@ -98,9 +98,10 @@ FB_CALLMONITOR_Initialize($)
                          "country-code ".
                          "remove-leading-zero:0,1 ".
                          "reverse-search-cache-file ".
-                         "reverse-search:multiple-strict,phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at ".
+                         "reverse-search:sortable-strict,phonebook,textfile,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at ".
                          "reverse-search-cache:0,1 ".
                          "reverse-search-phonebook-file ".
+                         "reverse-search-text-file ".
                          "fritzbox-remote-phonebook:0,1 ".
                          "fritzbox-remote-phonebook-via:web,telnet ".
                          "fritzbox-remote-phonebook-exclude ".
@@ -158,9 +159,9 @@ FB_CALLMONITOR_Get($@)
 
     return "argument missing" if(int(@arguments) < 2);
 
-    if($arguments[1] eq "search" and int(@arguments) == 3)
+    if($arguments[1] eq "search" and int(@arguments) >= 3)
     {
-        return FB_CALLMONITOR_reverseSearch($hash, $arguments[2]);
+        return FB_CALLMONITOR_reverseSearch($hash, FB_CALLMONITOR_normalizePhoneNumber($hash, join '', @arguments[2..$#arguments]));
     }
     elsif($arguments[1] eq "showPhonebookIds" and exists($hash->{helper}{PHONEBOOK_NAMES}))
     {
@@ -220,9 +221,31 @@ FB_CALLMONITOR_Get($@)
         
         return $head."\n".("-" x ($number_width + $name_width + 3))."\n".$table;
     }
+    elsif($arguments[1] eq "showTextfileEntries" and exists($hash->{helper}{TEXTFILE}))
+    {
+        my $table = "";
+       
+        my $number_width = 0;
+        my $name_width = 0;
+        
+        foreach my $number (keys %{$hash->{helper}{TEXTFILE}})
+        {
+            $number_width = length($number) if($number_width < length($number));
+            $name_width = length($hash->{helper}{TEXTFILE}{$number}) if($name_width < length($hash->{helper}{TEXTFILE}{$number}));
+        }
+        my $head = sprintf("%-".$number_width."s   %s" ,"Number", "Name"); 
+        foreach my $number (sort { lc($hash->{helper}{TEXTFILE}{$a}) cmp lc($hash->{helper}{TEXTFILE}{$b}) } keys %{$hash->{helper}{TEXTFILE}})
+        {
+            
+            my $string = sprintf("%-".$number_width."s - %s" , $number,$hash->{helper}{TEXTFILE}{$number}); 
+            $table .= $string."\n";
+        }
+        
+        return $head."\n".("-" x ($number_width + $name_width + 3))."\n".$table;
+    }
     else
     {
-        return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds" : "").(exists($hash->{helper}{PHONEBOOK}) ? " showPhonebookEntries" : "").(exists($hash->{helper}{CACHE}) ? " showCacheEntries" : ""); 
+        return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds" : "").(exists($hash->{helper}{PHONEBOOK}) ? " showPhonebookEntries" : "").(exists($hash->{helper}{CACHE}) ? " showCacheEntries" : "").(exists($hash->{helper}{TEXTFILE}) ? " showTextfileEntries" : ""); 
     }
 
 }
@@ -239,6 +262,7 @@ FB_CALLMONITOR_Set($@)
     
     push @sets, "rereadPhonebook" if(defined($hash->{helper}{PHONEBOOK}) or AttrVal($name, "reverse-search" , "") =~ /(all|phonebook|internal)/);
     push @sets, "rereadCache" if(defined(AttrVal($name, "reverse-search-cache-file" , undef)));
+    push @sets, "rereadTextfile" if(defined(AttrVal($name, "reverse-search-text-file" , undef)));
     push @sets, "password" if($hash->{helper}{PWD_NEEDED});
     
     $usage = "Unknown argument ".$a[1].", choose one of ".join(" ", @sets) if(scalar @sets > 0);
@@ -251,6 +275,11 @@ FB_CALLMONITOR_Set($@)
     elsif($a[1] eq "rereadCache")
     {
         FB_CALLMONITOR_loadCacheFile($hash);
+        return undef;
+    }
+    elsif($a[1] eq "rereadTextfile")
+    {
+        FB_CALLMONITOR_loadTextFile($hash);
         return undef;
     }
     elsif($a[1] eq "password")
@@ -282,6 +311,7 @@ FB_CALLMONITOR_Read($)
     my $reverse_search = undef;
     my $data = $buf;
     my $area_code = AttrVal($name, "local-area-code", "");
+    my $country_code = AttrVal($name, "country-code", "0049");
     my $external_number = undef;
   
     foreach $data (split(/^/m, $buf))
@@ -294,26 +324,42 @@ FB_CALLMONITOR_Read($)
       
         $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING" and $array[3] ne "");
         $external_number = $array[5] if($array[1] eq "CALL" and $array[3] ne "");
-        $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1" and defined($external_number));
-      
-        if(defined($external_number) and not $external_number =~ /^0/ and $area_code ne "")
+        
+        if(defined($external_number))
         {
-            if($area_code =~ /^0[1-9]\d+$/)
-            {
-                $external_number = $area_code.$external_number;
-            }
-            else
-            {
-                Log3 $name, 2, "FB_CALLMONITOR ($name) - given local area code '$area_code' is not an area code. therefore will be ignored";
-            }
-        }
-
-        # Remove trailing hash sign and everything afterwards
-        $external_number =~ s/#.*$// if(defined($external_number));
+            $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1");
       
-        $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
+            if($array[1] eq "CALL")
+            {
+                # Remove Call-By-Call number (Germany)
+                $external_number =~ s/^(010\d\d|0100\d\d)//g if($country_code eq "0049");
+                
+                # Remove Call-By-Call number (Austria)
+                $external_number =~ s/^10\d\d//g if($country_code eq "0043");
+                
+                # Remove Call-By-Call number (Swiss)
+                $external_number =~ s/^(107\d\d|108\d\d)//g if($country_code eq "0041");
+            }
+            
+            if(not $external_number =~ /^0/ and $area_code ne "")
+            {
+                if($area_code =~ /^0[1-9]\d+$/)
+                {
+                    $external_number = $area_code.$external_number;
+                }
+                else
+                {
+                    Log3 $name, 2, "FB_CALLMONITOR ($name) - given local area code '$area_code' is not an area code. therefore will be ignored";
+                }
+            }
+
+            # Remove trailing hash sign and everything afterwards
+            $external_number =~ s/#.*$//;
+      
+            $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(AttrVal($name, "reverse-search", "none") ne "none");
        
-        Log3 $name, 4, "FB_CALLMONITOR ($name) - reverse search returned: $reverse_search" if(defined($reverse_search));
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - reverse search returned: $reverse_search" if(defined($reverse_search));
+        }
         
         if($array[1] eq "CALL" or $array[1] eq "RING")
         {
@@ -408,19 +454,22 @@ FB_CALLMONITOR_Attr($@)
     
     if($cmd eq "set")
     {    
-    
-        if((($attrib eq "reverse-search" and $value =~ /(all|internal|phonebook)/) or $attrib eq "reverse-search-phonebook-file" or $attrib eq "fritzbox-remote-phonebook") and $init_done == 1)
+        if((($attrib eq "reverse-search" and $value =~ /phonebook/) or $attrib eq "reverse-search-phonebook-file" or $attrib eq "fritzbox-remote-phonebook") and $init_done)
         {
             $attr{$name}{$attrib} = $value;   
             return FB_CALLMONITOR_readPhonebook($hash);
         }
-        
         
         if($attrib eq "reverse-search-cache-file")
         {
             return FB_CALLMONITOR_loadCacheFile($hash, $value);
         }
         
+        if($attrib eq "reverse-search-text-file")
+        {
+            return FB_CALLMONITOR_loadTextFile($hash, $value);
+        }
+            
         if($attrib eq "disable")
         {
             if($value eq "0")
@@ -445,6 +494,11 @@ FB_CALLMONITOR_Attr($@)
         {
             delete($hash->{helper}{CACHE}) if(defined($hash->{helper}{CACHE}));
         } 
+        
+        if($attrib eq "reverse-search-text-file")
+        {
+            delete($hash->{helper}{TEXTFILE}) if(defined($hash->{helper}{TEXTFILE}));
+        }
         
         if($attrib eq "disable")
         {
@@ -481,190 +535,205 @@ FB_CALLMONITOR_reverseSearch($$)
     my ($hash, $number) = @_;
     my $name = $hash->{NAME};
     my $result;
+    my $status;
     my $invert_match = undef;
-    my @attr_list = split("(,|\\|)", AttrVal($name, "reverse-search", "none"));
+    my @attr_list = split("(,|\\|)", AttrVal($name, "reverse-search", ""));
     
-    chomp $number;
-
-    # Using Cache if enabled
-
-    if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($hash->{helper}{CACHE}{$number}))
+    
+    foreach my $method (@attr_list)
     {
-        Log3 $name, 4, "FB_CALLMONITOR ($name) - using cache for reverse search of $number";
-        if($hash->{helper}{CACHE}{$number} ne "timeout" or $hash->{helper}{CACHE}{$number} ne "unknown")
+    
+        # Using internal phonebook if available and enabled
+        if($method eq "phonebook")
         {
-            return $hash->{helper}{CACHE}{$number};
+            if(exists($hash->{helper}{PHONEBOOK}) and defined($hash->{helper}{PHONEBOOK}{$number}))
+            {
+                Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
+                return $hash->{helper}{PHONEBOOK}{$number};
+            }
         }
+
+        # Using user defined textfile 
+         elsif($method eq "textfile")
+        {
+            if(exists($hash->{helper}{TEXTFILE}) and defined($hash->{helper}{TEXTFILE}{$number}))
+            {
+                Log3 $name, 4, "FB_CALLMONITOR ($name) - using textfile for reverse search of $number";
+                return $hash->{helper}{TEXTFILE}{$number};
+            }
+        }
+        elsif($method =~ /^(klicktel.de|dasoertliche.de|dasschnelle.at|search.ch)$/)
+        {      
+            # Using Cache if enabled
+            if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($hash->{helper}{CACHE}{$number}))
+            {
+                Log3 $name, 4, "FB_CALLMONITOR ($name) - using cache for reverse search of $number";
+                if($hash->{helper}{CACHE}{$number} ne "timeout" or $hash->{helper}{CACHE}{$number} ne "unknown")
+                {
+                    return $hash->{helper}{CACHE}{$number};
+                }
+            }    
+            
+        
+            # Ask klicktel.de
+            if($method eq "klicktel.de")
+            { 
+                Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
+
+                $result = GetFileFromURL("http://openapi.klicktel.de/searchapi/invers?key=0de6139a49055c37b9b2d7bb3933cb7b&number=".$number, 5, undef, 1);
+                if(not defined($result))
+                {
+                    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+                    {
+                        $status = "timeout";
+                        undef($result);
+                    }
+                }
+                else
+                {
+                    if($result =~ /"displayname":"([^"]*?)"/)
+                    {
+                        $invert_match = $1;
+                        $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                        FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                        undef($result);
+                        return $invert_match;
+                    }
+                    
+                    $status = "unknown";
+                }
+            }
+
+            # Ask dasoertliche.de
+            elsif($method eq "dasoertliche.de")
+            {
+                Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasoertliche.de for reverse search of $number";
+
+                $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
+                if(not defined($result))
+                {
+                    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+                    {
+                        $status = "timeout";
+                        undef($result);
+                    }
+                }
+                else
+                {
+                    #Log 2, $result;
+                    if($result =~ /<a href="http\:\/\/.+?\.dasoertliche\.de.+?".+?class="name ".+?><span class="">(.+?)<\/span>/)
+                    {
+                        $invert_match = $1;
+                        $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                        FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                        undef($result);
+                        return $invert_match;
+                    }
+                    elsif(not $result =~ /wir konnten keine Treffer finden/)
+                    {
+                        Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
+                    }
+                    
+                    $status = "unknown";
+                }
+            }
+        
+
+            # SWITZERLAND ONLY!!! Ask search.ch
+            elsif($method eq  "search.ch")
+            {
+                Log3 $name, 4, "FB_CALLMONITOR ($name) - using search.ch for reverse search of $number";
+
+                $result = GetFileFromURL("http://tel.search.ch/api/?key=b0b1207cb7c9d0048867de887aa9a4fd&maxnum=1&was=".$number, 5, undef, 1);
+                if(not defined($result))
+                {
+                    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+                    {
+                        $status = "timeout";
+                        undef($result);
+                    }
+                }
+                else
+                {
+                    #Log 2, $result;
+                    if($result =~ /<entry>(.+?)<\/entry>/s)
+                    {
+                        my $xml = $1;
+                        
+                        $invert_match = "";
+                        
+                        if($xml =~ /<tel:firstname>(.+?)<\/tel:firstname>/)
+                        {
+                            $invert_match .= $1;
+                        }
+                        
+                        if($xml =~ /<tel:name>(.+?)<\/tel:name>/)
+                        {
+                            $invert_match .= " $1";
+                        }
+                        
+                        if($xml =~ /<tel:occupation>(.+?)<\/tel:occupation>/)
+                        {
+                            $invert_match .= ", $1";
+                        }
+                        
+                        $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                        FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                        undef($result);
+                        return $invert_match;
+                    }
+                    
+                    $status = "unknown";
+                }
+            }
+
+            # Austria ONLY!!! Ask dasschnelle.at
+            elsif($method eq "dasschnelle.at")
+            {
+                Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasschnelle.at for reverse search of $number";
+
+                $result = GetFileFromURL("http://www.dasschnelle.at/result/index/results?PerPage=5&pageNum=1&what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
+                if(not defined($result))
+                {
+                    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+                    {
+                        $status = "timeout";
+                        undef($result);
+                    }
+                }
+                else
+                {
+                    #Log 2, $result;
+                    if($result =~ /name\s+:\s+"(.+?)",/)
+                    {
+                        $invert_match = "";
+
+                        while($result =~ /name\s+:\s+"(.+?)",/g)
+                        {
+                            $invert_match = $1 if(length($1) > length($invert_match));
+                        }
+
+                        $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+                        FB_CALLMONITOR_writeToCache($hash, $number, $invert_match);
+                        undef($result);
+                        return $invert_match;
+                    }
+                    elsif(not $result =~ /Es wurden keine passenden Eintr.ge gefunden/)
+                    {
+                        Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
+                    }
+                    
+                    $status = "unknown";
+                }
+            }
+        }
+        
     }
     
-    # Using internal phonebook if available and enabled
-    if((grep { /^(all|phonebook|internal)$/ } @attr_list) and defined($hash->{helper}{PHONEBOOK}))
-    {
-        if(defined($hash->{helper}{PHONEBOOK}{$number}))
-        {
-            Log3 $name, 4, "FB_CALLMONITOR ($name) - using internal phonebook for reverse search of $number";
-            return $hash->{helper}{PHONEBOOK}{$number};
-        }
-    }
-
-    # Using Cache if enabled
-    if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($hash->{helper}{CACHE}{$number}))
-    {
-        return $hash->{helper}{CACHE}{$number} if($hash->{helper}{CACHE}{$number} ne "timeout");
-    }
-
-    
-    # Ask klicktel.de
-    if((grep { /^(all|klicktel\.de)$/ } @attr_list))
-    { 
-        Log3 $name, 4, "FB_CALLMONITOR ($name) - using klicktel.de for reverse search of $number";
-
-        $result = GetFileFromURL("http://openapi.klicktel.de/searchapi/invers?key=0de6139a49055c37b9b2d7bb3933cb7b&number=".$number, 5, undef, 1);
-        if(not defined($result))
-        {
-            if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-            {
-                $hash->{helper}{CACHE}{$number} = "timeout";
-                undef($result);
-                return "timeout";
-            }
-        }
-        else
-        {
-            if($result =~ /"displayname":"([^"]*?)"/)
-            {
-                $invert_match = $1;
-                $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
-                undef($result);
-                return $invert_match;
-            }
-        }
-    }
-
-    # Ask dasoertliche.de
-    if(grep { /^(all|dasoertliche\.de)$/ } @attr_list)
-    {
-        Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasoertliche.de for reverse search of $number";
-
-        $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
-        if(not defined($result))
-        {
-            if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-            {
-                $hash->{helper}{CACHE}{$number} = "timeout";
-                undef($result);
-                return "timeout";
-            }
-        }
-        else
-        {
-            #Log 2, $result;
-            if($result =~ /<a href="http\:\/\/.+?\.dasoertliche\.de.+?".+?class="name ".+?><span class="">(.+?)<\/span>/)
-            {
-                $invert_match = $1;
-                $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
-                undef($result);
-                return $invert_match;
-            }
-            elsif(not $result =~ /wir konnten keine Treffer finden/)
-            {
-                Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasoertliche.de. Please contact the FHEM community.";
-            }
-        }
-    }
-
-    # SWITZERLAND ONLY!!! Ask search.ch
-    if(grep { /^search\.ch$/ } @attr_list)
-    {
-        Log3 $name, 4, "FB_CALLMONITOR ($name) - using search.ch for reverse search of $number";
-
-        $result = GetFileFromURL("http://tel.search.ch/api/?key=b0b1207cb7c9d0048867de887aa9a4fd&maxnum=1&was=".$number, 5, undef, 1);
-        if(not defined($result))
-        {
-            if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-            {
-                $hash->{helper}{CACHE}{$number} = "timeout";
-                undef($result);
-                return "timeout";
-            }
-        }
-        else
-        {
-            #Log 2, $result;
-            if($result =~ /<entry>(.+?)<\/entry>/s)
-            {
-                my $xml = $1;
-                
-                $invert_match = "";
-                
-                if($xml =~ /<tel:firstname>(.+?)<\/tel:firstname>/)
-                {
-                    $invert_match .= $1;
-                }
-                
-                if($xml =~ /<tel:name>(.+?)<\/tel:name>/)
-                {
-                    $invert_match .= " $1";
-                }
-                
-                if($xml =~ /<tel:occupation>(.+?)<\/tel:occupation>/)
-                {
-                    $invert_match .= ", $1";
-                }
-                
-                $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
-                undef($result);
-                return $invert_match;
-            }
-        }
-    }
-
-    # Austria ONLY!!! Ask dasschnelle.at
-    if(grep { /^dasschnelle\.at$/ } @attr_list)
-    {
-        Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasschnelle.at for reverse search of $number";
-
-        $result = GetFileFromURL("http://www.dasschnelle.at/result/index/results?PerPage=5&pageNum=1&what=".$number."&where=&rubrik=0&bezirk=0&orderBy=Standard&mapsearch=false", 5, undef, 1);
-        if(not defined($result))
-        {
-            if(AttrVal($name, "reverse-search-cache", "0") eq "1")
-            {
-                $hash->{helper}{CACHE}{$number} = "timeout";
-                undef($result);
-                return "timeout";
-            }
-        }
-        else
-        {
-            #Log 2, $result;
-            if($result =~ /name\s+:\s+"(.+?)",/)
-            {
-                $invert_match = "";
-
-                while($result =~ /name\s+:\s+"(.+?)",/g)
-                {
-                $invert_match = $1 if(length($1) > length($invert_match));
-                }
-
-                $invert_match = FB_CALLMONITOR_html2txt($invert_match);
-                FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
-                undef($result);
-                return $invert_match;
-            }
-            elsif(not $result =~ /Es wurden keine passenden Eintr.ge gefunden/)
-            {
-                Log3 $name, 3, "FB_CALLMONITOR ($name) - the reverse search result for $number could not be extracted from dasschnelle.at. Please contact the FHEM community.";
-            }
-        }
-    }
-
-    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+    if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($status))
     { 
         # If no result is available set cache result and return undefined 
-        $hash->{helper}{CACHE}{$number} = "unknown";
+        $hash->{helper}{CACHE}{$number} = $status;
     }
 
     return undef;
@@ -704,25 +773,28 @@ sub FB_CALLMONITOR_writeToCache($$$)
     my $err;
     my @cachefile;
     my $phonebook_file;
-    
-    $file =~ s/(^\s+|\s+$)//g;
   
-    $hash->{helper}{CACHE}{$number} = $txt;
-  
-    if($file ne "")
-    {
-        Log3 $name, 4, "FB_CALLMONITOR ($name) - opening cache file $file for writing $number ($txt)";
-        
-        foreach my $key (keys %{$hash->{helper}{CACHE}})
+    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+    { 
+        $file =~ s/(^\s+|\s+$)//g;
+      
+        $hash->{helper}{CACHE}{$number} = $txt;
+      
+        if($file ne "")
         {
-            push @cachefile, "$key|".$hash->{helper}{CACHE}{$key};
-        }
-        
-        $err = FileWrite($file,@cachefile);
-        
-        if(defined($err) && $err)
-        {
-            Log3 $name, 2, "FB_CALLMONITOR ($name) - could not write cache file: $err";
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - opening cache file $file for writing $number ($txt)";
+            
+            foreach my $key (keys %{$hash->{helper}{CACHE}})
+            {
+                push @cachefile, "$key|".$hash->{helper}{CACHE}{$key};
+            }
+            
+            $err = FileWrite($file,@cachefile);
+            
+            if(defined($err) && $err)
+            {
+                Log3 $name, 2, "FB_CALLMONITOR ($name) - could not write cache file: $err";
+            }
         }
     }
 }
@@ -866,8 +938,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
     my $number;
     my $count_contacts = 0;
 
-    my $area_code = AttrVal($name, "local-area-code", "");
-    my $country_code = AttrVal($name, "country-code", "0049");
+   
     if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/) 
     {
     
@@ -883,18 +954,8 @@ sub FB_CALLMONITOR_parsePhonebook($$)
                 {
                     if($1 ne "intern" and $1 ne "memo") 
                     {
-                        $number = $2;
-                        $number =~ s/\s//g;			                # Remove spaces
-                        $number =~ s/^\+/00/g;			            # Convert leading + to 00 country extension
-                        $number =~ s/^$country_code/0/g;            # Replace own country code with leading 0
-                        $number =~ s/^(\#[0-9]{1,10}\#)//g;	        # Remove phone control codes
-                        $number =~ s/[^*\d]//g if(not $number =~ /@/);	# Remove anything else isn't a number if it is no VoIP number
-
-                        if(not $number =~ /^0/ and not $number =~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
-                        {
-                                $number = $area_code.$number;
-                        }     
-                        
+                        $number = FB_CALLMONITOR_normalizePhoneNumber($hash, $2);
+                       
                         $count_contacts++;
                         Log3 $name, 4, "FB_CALLMONITOR ($name) - found $contact_name with number $number";
                         $hash->{helper}{PHONEBOOK}{$number} = FB_CALLMONITOR_html2txt($contact_name) if(not defined($hash->{helper}{PHONEBOOK}{$number}));
@@ -927,7 +988,6 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
     my $name = $hash->{NAME};
     my $err;
     $file = AttrVal($hash->{NAME}, "reverse-search-cache-file", "") unless(defined($file));
-    $file =~ s/(^\s+|\s+$)//g;
 
     if($file ne "" and -r $file)
     { 
@@ -943,8 +1003,8 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
             {
                 if(not $line =~ /^\s*$/)
                 {
-                    $line =~ s/\n//g;
-                    @tmpline = split("\\|", $line);
+                    chomp $line;
+                    @tmpline = split("\\|", $line, 2);
                     
                     if(@tmpline == 2)
                     {
@@ -964,6 +1024,62 @@ sub FB_CALLMONITOR_loadCacheFile($;$)
     else
     {
         Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to access cache file: $file";
+    }
+}
+
+#####################################
+# loads the reverse search cache from file
+sub FB_CALLMONITOR_loadTextFile($;$)
+{
+    my ($hash, $file) = @_;
+
+    my @file;
+    my @tmpline;
+    my $count_contacts;
+    my $name = $hash->{NAME};
+    my $err;
+    $file = AttrVal($hash->{NAME}, "reverse-search-text-file", "") unless(defined($file));
+  
+
+    if($file ne "" and -r $file)
+    { 
+        delete($hash->{helper}{TEXTFILE}) if(defined($hash->{helper}{TEXTFILE}));
+  
+        Log3 $hash->{NAME}, 3, "FB_CALLMONITOR ($name) - loading textfile $file";
+        
+        ($err, @file) = FileRead($file);
+        
+        unless(defined($err) and $err)
+        {      
+            foreach my $line (@file)
+            {
+                $line =~ s/#.*$//g;
+                $line =~ s/\/\/.*$//g;
+                
+                
+                if(not $line =~ /^\s*$/)
+                {
+                
+                    chomp $line;
+                    @tmpline = split(/,/, $line,2);
+                    if(@tmpline == 2)
+                    {
+                        $hash->{helper}{TEXTFILE}{FB_CALLMONITOR_normalizePhoneNumber($hash, $tmpline[0])} = trim($tmpline[1]);
+                    }
+                }
+            }
+
+            $count_contacts = scalar keys %{$hash->{helper}{TEXTFILE}};
+            Log3 $name, 2, "FB_CALLMONITOR ($name) - read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from textfile"; 
+        }
+        else
+        {
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - could not open textfile: $err";
+        }
+    }
+    else
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to access textfile: $file";
     }
 }
 
@@ -1309,6 +1425,34 @@ sub FB_CALLMONITOR_readPassword($;$)
     }
 }
 
+
+sub FB_CALLMONITOR_normalizePhoneNumber($$)
+{
+
+    my ($hash, $number) = @_;
+    my $name = $hash->{NAME};
+    
+    my $area_code = AttrVal($name, "local-area-code", "");
+    my $country_code = AttrVal($name, "country-code", "0049");
+    
+
+    $number =~ s/\s//g;			                    # Remove spaces
+    $number =~ s/^(\#[0-9]{1,10}\#)//g;	            # Remove phone control codes
+    $number =~ s/[^*\d]//g if(not $number =~ /@/);	# Remove anything else isn't a number if it is no VoIP number
+    $number =~ s/^\+/00/g;			                # Convert leading + to 00 country extension
+    $number =~ s/^$country_code/0/g;                # Replace own country code with leading 0
+
+
+
+    if(not $number =~ /^0/ and not $number =~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
+    {
+       $number = $area_code.$number;
+    }   
+
+
+    return $number;
+}
+  
 1;
 
 =pod
@@ -1350,6 +1494,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <ul>
   <li><b>rereadCache</b> - Reloads the cache file if configured (see attribute: <a href="#reverse-search-cache-file">reverse-search-cache-file</a>)</li>
   <li><b>rereadPhonebook</b> - Reloads the FritzBox phonebook (from given file, via telnet or directly if available)</li>
+  <li><b>rereadTextfile</b> - Reloads the user given textfile if configured (see attribute: <a href="#reverse-search-text-file">reverse-search-text-file</a>)</li>
   <li><b>password</b> - set the FritzBox password (only available when password is really needed for network access to FritzBox phonebook, see attribute <a href="#fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>)</li>
   </ul>
   <br>
@@ -1361,6 +1506,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <li><b>showPhonebookIds</b> - returns a list of all available phonebooks on the FritzBox (not available when using telnet to retrieve remote phonebook)</li>
   <li><b>showPhonebookEntries</b> - returns a list of all currently known phonebook entries (only available when using phonebook funktionality)</li>
   <li><b>showCacheEntries</b> - returns a list of all currently known cache entries (only available when using reverse search caching funktionality)</li>
+  <li><b>showTextfileEntries</b> - returns a list of all known entries from user given textfile (only available when using reverse search caching funktionality)</li>
   </ul>
   <br>
 
@@ -1374,10 +1520,10 @@ sub FB_CALLMONITOR_readPassword($;$)
 	<br><br>
 	Possible values: 0 => Callmonitor is activated, 1 => Callmonitor is deactivated.<br>
     Default Value is 0 (activated)<br><br>
-    <li><a name="reverse-search">reverse-search</a> (phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
+    <li><a name="reverse-search">reverse-search</a> (phonebook,textfile,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
     Enables the reverse searching of the external number (at dial and call receiving).
-    This attribute contains a comma separated list of providers which should be used to reverse search a name to a specific phone number. The phonebook (and cache) will always use first, afterwards all web providers.
-    It is possible to select a specific web service, which should be used for reverse searching.
+    This attribute contains a comma separated list of providers which should be used to reverse search a name to a specific phone number. 
+    The reverse search process will try to lookup the name according to the order of providers given in this attribute (from left to right). The first valid result from the given provider order will be used as reverse search result.
     <br><br>per default, reverse search is disabled.<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
     If this attribute is activated each reverse-search result is saved in an internal cache
@@ -1387,6 +1533,16 @@ sub FB_CALLMONITOR_readPassword($;$)
     <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
     Write the internal reverse-search-cache to the given file and use it next time FHEM starts.
     So all reverse search results are persistent written to disk and will be used instantly after FHEM starts.<br><br>
+    <li><a name="reverse-search-text-file">reverse-search-text-file</a> &lt;file&gt;</li>
+    Define a custom list of numbers and their according names in a textfile. This file uses comma separated values per line in form of:
+    <pre>
+    &lt;number1&gt;,&lt;name1&gt;
+    &lt;number2&gt;,&lt;name2&gt;
+    ...
+    &lt;numberN&gt;,&lt;nameN&gt;
+    </pre>
+    You can use the hash sign to comment entries in this file.
+    <br><br>
     <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;file&gt;</li>
     This attribute can be used to specify the (full) path to a phonebook file in FritzBox format (XML structure). Using this option it is possible to use the phonebook of a FritzBox even without FHEM running on a Fritzbox.
     The phonebook file can be obtained by an export via FritzBox web UI<br><br>
@@ -1402,7 +1558,7 @@ sub FB_CALLMONITOR_readPassword($;$)
     <li><a name="local-area-code">local-area-code</a></li>
     Use the given local area code for reverse search in case of a local call (e.g. 0228 for Bonn, Germany)<br><br>
     <li><a name="country-code">country-code</a></li>
-    Your local country code. This is needed to identify phonenumbers in your phonebook with your local country code as a national phone number instead of an international one (e.g. 0049 for Germany, 0043 for Austria or 001 for USA)<br><br>
+    Your local country code. This is needed to identify phonenumbers in your phonebook with your local country code as a national phone number instead of an international one as well as handling Call-By-Call numbers in german speaking countries (e.g. 0049 for Germany, 0043 for Austria or 001 for USA)<br><br>
     Default Value is 0049 (Germany)<br><br>
     <li><a name="fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
     If this attribute is activated, the phonebook should be obtained direct from the FritzBox via remote network connection (in case FHEM is not running on a FritzBox). This is only possible if a password (and depending on configuration a username as well) is configured.<br><br>
@@ -1481,6 +1637,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <ul>
   <li><b>rereadCache</b> - Liest den Cache aus der Datei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#reverse-search-cache-file">reverse-search-cache-file</a>)</li>
   <li><b>rereadPhonebook</b> - Liest das Telefonbuch der FritzBox neu ein (per Datei, Telnet oder direkt lokal)</li>
+  <li><b>rereadTextfile</b> - Liest die nutzereigene Textdatei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#reverse-search-text-file">reverse-search-text-file</a>)</li>
   <li><b>password</b> - speichert das FritzBox Passwort, welches f&uuml;r das Einlesen aller Telefonb&uuml;cher direkt von der FritzBox ben&ouml;tigt wird. Dieses Kommando ist nur verf&uuml;gbar, wenn ein Passwort ben&ouml;tigt wird um das Telefonbuch via Netzwerk einzulesen, siehe dazu Attribut <a href="#fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>.</li>
   </ul>
   <br>
@@ -1492,6 +1649,7 @@ sub FB_CALLMONITOR_readPassword($;$)
   <li><b>showPhonebookIds</b> - gibt eine Liste aller verf&uuml;gbaren Telefonb&uuml;cher auf der FritzBox zur&uuml;ck (nicht verf&uuml;gbar wenn das Telefonbuch via Telnet-Verbindung eingelesen wird)</li>
   <li><b>showPhonebookEntries</b> - gibt eine Liste aller bekannten Telefonbucheintr&auml;ge zur&uuml;ck (nur verf&uuml;gbar, wenn eine R&uuml;ckw&auml;rtssuche via Telefonbuch aktiviert ist)</li>
   <li><b>showCacheEntries</b> - gibt eine Liste aller bekannten Cacheeintr&auml;ge zur&uuml;ck (nur verf&uuml;gbar, wenn die Cache-Funktionalit&auml;t der R&uuml;ckw&auml;rtssuche aktiviert ist))</li>
+  <li><b>showTextEntries</b> - gibt eine Liste aller Eintr&auml;ge aus der nutzereigenen Textdatei zur&uuml;ck (nur verf&uuml;gbar, wenn eine Textdatei als Attribut definiert ist))</li>
   </ul>
   <br>
 
@@ -1507,9 +1665,12 @@ sub FB_CALLMONITOR_readPassword($;$)
     Standardwert ist 0 (aktiv)<br><br>
     <li><a name="reverse-search">reverse-search</a> (phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer (bei eingehenden/ausgehenden Anrufen).
-    Dieses Attribut enth&auml;lt eine komma-separierte Liste mit allen Anbietern die f&uuml;r eine R&uuml;ckw&auml;rtssuche benutzt werden sollen. Das interne Telefonbuch (phonebook) und der Cache (sofern aktiviert) wird dabei immer zuerst benutzt. Falls die Rufnummer dort nicht verzeichnet ist, werden externe Suchanbieter verwendet.
+    Dieses Attribut enth&auml;lt eine komma-separierte Liste mit allen Anbietern die f&uuml;r eine R&uuml;ckw&auml;rtssuche benutzt werden sollen.
+    Die R&uuml;ckw&auml;rtssuche prüft in der gegebenen Reihenfolge (von links nach rechts) ob der entsprechende Anbieter (Telefonbuch, Textdatei oder Internetanbieter) die Rufnummer auflösen können.
+    Das erste Resultat was dabei gefunden wird, wird als Ergebnis für die R&uuml;ckw&auml;rtssuche verwendet.
     Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher f&uuml;r die R&uuml;ckw&auml;rtssuche verwendet werden soll.
-    Der Wert "phonebook" verwendet ausschlie&szlig;lich das interne Telefonbuch der FritzBox (siehe Attribut reverse-search-phonebook-file)<br><br>
+    Der Anbieter "textfile" verwendet die nutzereigene Textdatei, sofern definiert (siehe Attribut reverse-search-text-file).
+    Der Anbieter "phonebook" verwendet das Telefonbuch der FritzBox (siehe Attribut reverse-search-phonebook-file oder fritzbox-remote-phonebook).<br><br>
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (nicht gesetzt)<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
     Wenn dieses Attribut gesetzt ist, werden alle Ergebisse der R&uuml;ckw&auml;rtssuche in einem modul-internen Cache gespeichert
@@ -1520,6 +1681,16 @@ sub FB_CALLMONITOR_readPassword($;$)
     Da der Cache nur im Arbeitsspeicher existiert, ist er nicht persistent und geht beim stoppen von FHEM verloren.
     Mit diesem Parameter werden alle Cache-Ergebnisse in eine Textdatei geschrieben (z.B. /usr/share/fhem/telefonbuch.txt) 
     und beim n&auml;chsten Start von FHEM wieder in den Cache geladen und genutzt.
+    <br><br>
+    <li><a name="reverse-search-cache-file">reverse-search-text-file</a> &lt;Dateipfad&gt;</li>
+    L&auml;dt eine nutzereigene Textdatei welche eine eigene Namenszuordnungen für Rufnummern enth&auml;lt. Diese Datei enth&auml;lt zeilenweise komma-separierte Werte nach folgendem Schema:
+    <pre>
+    &lt;Nummer1&gt;,&lt;Name1&gt;
+    &lt;Nummer2&gt;,&lt;Name2&gt;
+    ...
+    &lt;NummerN&gt;,&lt;NameN&gt;
+    </pre>
+    Die Datei kann dabei auch Kommentar-Zeilen enthalten mit # vorangestellt.
     <br><br>
     <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;Dateipfad&gt</li>
     Mit diesem Attribut kann man optional den Pfad zu einer Datei angeben, welche ein Telefonbuch im FritzBox-Format (XML-Struktur) enth&auml;lt.
@@ -1537,7 +1708,7 @@ sub FB_CALLMONITOR_readPassword($;$)
     <li><a name="local-area-code">local-area-code</a></li>
     Verwendet die gesetze Vorwahlnummer bei R&uuml;ckw&auml;rtssuchen von Ortsgespr&auml;chen (z.B. 0228 f&uuml;r Bonn)<br><br>
     <li><a name="country-code">country-code</a></li>
-    Die Landesvorwahl wird ben&ouml;tigt um Telefonbucheintr&auml;ge mit lokaler Landesvorwahl als Inlands-Rufnummern zu erkennen (z.B. 0049 f&uuml;r Deutschland, 0043 f&uuml;r &Ouml;sterreich oder 001 f&uuml;r USA).<br><br>
+    Die Landesvorwahl wird ben&ouml;tigt um Telefonbucheintr&auml;ge mit lokaler Landesvorwahl als Inlands-Rufnummern, als auch um Call-By-Call-Vorwahlen richtig zu erkennen (z.B. 0049 f&uuml;r Deutschland, 0043 f&uuml;r &Ouml;sterreich oder 001 f&uuml;r USA).<br><br>
     Standardwert ist 0049 (Deutschland)<br><br>
     <li><a name="fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
     Wenn dieses Attribut aktiviert ist, wird das FritzBox Telefonbuch direkt von der FritzBox gelesen. Dazu ist das FritzBox Passwort und je nach FritzBox Konfiguration auch ein Username notwendig, der in den entsprechenden Attributen konfiguriert sein muss.<br><br>
