@@ -91,11 +91,11 @@ CommandJsonList2($$)
   for(my $i1 = 0; $i1 < int(@d); $i1++) {
     my $d = $d[$i1];
     next if(IsIgnored($d));
-    $cnt++;
 
     my $h = $defs{$d};
     my $n = $h->{NAME};
     next if(!$h || !$n);
+    $cnt++;
 
     $ret .= "  {\n";
     $ret .= "    \"Name\":\"".JsonList2_Escape($n)."\",\n";
