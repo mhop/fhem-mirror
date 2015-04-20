@@ -726,12 +726,12 @@ sub FRITZBOX_Readout_Run($)
 
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
 
-      # @radio = ();
+      my @radio = ();
       for (0..$radioCount-1)
       {
          if ($resultArray->[$_] ne "")
          {
-            # $radio[$_] = $resultArray->[$_];
+            $radio[$_] = $resultArray->[$_];
             push @readoutReadings, "fhem->radio->".$_."|".$resultArray->[$_];
          }
       }
