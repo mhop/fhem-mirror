@@ -645,6 +645,7 @@ sub FRITZBOX_Readout_Run($)
    my @readoutCmdArray;
    my $resultArray;
    my @readoutReadings;
+   my %dectFonID;
    my $i;
    my $startTime = time();
 
@@ -672,6 +673,7 @@ sub FRITZBOX_Readout_Run($)
      # Init and Counters
       push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol" ];
       push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol/User/count" ];
+      push @readoutCmdArray, ["", "ctlmgr_ctl r dect settings/Handset/count" ];
       push @readoutCmdArray, ["fhem->radioCount", "ctlmgr_ctl r configd settings/WEBRADIO/count" ];
       push @readoutCmdArray, ["", "ctlmgr_ctl r user settings/user/count" ];
       push @readoutCmdArray, ["", 'echo $CONFIG_AB_COUNT'];
@@ -698,14 +700,18 @@ sub FRITZBOX_Readout_Run($)
          unless defined $resultArray;
 
       my $dectCount = $resultArray->[1];
-      $dectCount = 0 unless $dectCount=~ /\d/;
-      my $radioCount = $resultArray->[2];
+      $dectCount = 1 unless $dectCount=~ /\d/;
+      $dectCount--;
+      my $handsetCount = $resultArray->[2];
+      $handsetCount = 1 unless $dectCount=~ /\d/;
+      $handsetCount--;
+      my $radioCount = $resultArray->[3];
       $radioCount = 0 unless $radioCount=~ /\d/;
-      my $userCount = $resultArray->[3];
-      my $fonCount = $resultArray->[4];
-      my $lanDeviceCount = $resultArray->[5];
-      my $tamCount = $resultArray->[6];
-      my $divCount = $resultArray->[8];
+      my $userCount = $resultArray->[4];
+      my $fonCount = $resultArray->[5];
+      my $lanDeviceCount = $resultArray->[6];
+      my $tamCount = $resultArray->[7];
+      my $divCount = $resultArray->[9];
       
       
    # Internetradioliste erzeugen
@@ -751,58 +757,77 @@ sub FRITZBOX_Readout_Run($)
          }  
       }
 
+# Dect Telefonnummern bestimmen
       for (1..$dectCount)
       {
         # 0 Dect-Interne Nummer
          push @readoutCmdArray, [ "dect".$_."_intern", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Intern" ];
         # 1 Dect-Telefonname
          push @readoutCmdArray, [ "dect".$_, "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Name" ];
-        # 2 Handset manufacturer
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Manufacturer" ];   
-        # 3 Internal Ring Tone Name
+        # 2 Internal Ring Tone Name
          push @readoutCmdArray, [ "dect".$_."_intRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/IntRingTone", "ringtone" ];
-        # 4 Alarm Ring Tone Name
+        # 3 Alarm Ring Tone Name
          push @readoutCmdArray, [ "dect".$_."_alarmRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/AlarmRingTone0", "ringtone" ];
-        # 5 Radio Name
+        # 4 Radio Name
          push @readoutCmdArray, [ "dect".$_."_radio", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/RadioRingID", "radio" ];
-        # 6 Background image
+        # 5 Background image
          push @readoutCmdArray, [ "dect".$_."_imagePath", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/ImagePath" ];
-        # 7 Customer Ring Tone
+        # 6 Customer Ring Tone
          push @readoutCmdArray, [ "dect".$_."_custRingTone", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingTone" ];
-        # 8 Customer Ring Tone Name
+        # 7 Customer Ring Tone Name
          push @readoutCmdArray, [ "dect".$_."_custRingToneName", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/G722RingToneName" ];
-        # 9 Firmware Version
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".($_-1)."/FWVersion" ];   
-        # 10 Phone Model
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".($_-1)."/Model" ];   
-        # 11 Handset FonUser
-         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".($_-1)."/User", "" ];   
+        # 8 UserID
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r telcfg settings/Foncontrol/User".$_."/Id" ];
       }
       $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
       
-      # Handset and DECT user can be in different orders but should have the same maximum number
-      for (0..$dectCount-1)
+      for (1..$dectCount)
       {
-         my $offset = $_ * 12;
-         my $intern = $resultArray->[ $offset];
-         push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ]
-            if $intern;
-
-         my $handsetUser = $resultArray->[ $offset + 11];
-         my $handsetIntern = $resultArray->[ ($handsetUser-1) * 12 ];
-         if ( $handsetUser )
+         my $offset = $_ * 9 - 9;
+         my $intern = $resultArray->[$offset];
+         my $ID = $resultArray->[ $offset + 8 ];
+         if ($intern)
          {
-            push @readoutReadings, "dect".$handsetUser."_manufacturer|" . $resultArray->[ $offset + 2 ];
-            push @readoutReadings, "dect".$handsetUser."_fwVersion|" . $resultArray->[ $offset + 9 ];
-            push @readoutReadings, "dect".$handsetUser."_model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
-         }
-         if ( $handsetIntern )
-         {
-            push @readoutReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 2 ];
-            push @readoutReadings, "fhem->$intern->model|" . FRITZBOX_Readout_Format($hash, "model", $resultArray->[ $offset + 10 ] );
+            push @readoutReadings, "fhem->$intern->name|" . $resultArray->[ $offset + 1 ];
+            $dectFonID{$ID}{User} = $_;
+            $dectFonID{$ID}{Intern} = $intern;
          }
       }
 
+# Assign data of DECT handset to DECT numbers
+      for (0..$handsetCount)
+      {
+        # 0 Handset FonUser
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/User", "" ];   
+        # 1 Handset manufacturer
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/Manufacturer" ];   
+        # 2 Phone Model
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/Model", "model" ];   
+        # 3 Firmware Version
+         push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/FWVersion" ];   
+      }
+      $resultArray = FRITZBOX_Readout_Query( $hash, \@readoutCmdArray, \@readoutReadings );
+   
+   # Handset and DECT user can be in different orders
+      for (0..$handsetCount)
+      {
+         my $offset = $_ * 4;
+         my $dectUserID = $resultArray->[$offset];
+         if ($dectUserID)
+         {
+            my $dectUser = $dectFonID{$dectUserID}{User};
+            push @readoutReadings, "dect".$dectUser."_manufacturer|" . $resultArray->[ $offset + 1 ];
+            FRITZBOX_Log $hash, 5, "dect".$dectUser."_manufacturer: " . $resultArray->[ $offset + 1 ];
+            push @readoutReadings, "dect".$dectUser."_model|" . $resultArray->[ $offset + 2 ];
+            FRITZBOX_Log $hash, 5, "dect".$dectUser."_model: " . $resultArray->[ $offset + 2 ];
+            push @readoutReadings, "dect".$dectUser."_fwVersion|" . $resultArray->[ $offset + 3 ];
+            FRITZBOX_Log $hash, 5, "dect".$dectUser."_fwVersion: " . $resultArray->[ $offset + 3 ];
+            my $intern = $dectFonID{$dectUserID}{Intern};
+            push @readoutReadings, "fhem->$intern->brand|" . $resultArray->[ $offset + 1 ];
+            push @readoutReadings, "fhem->$intern->model|" . $resultArray->[ $offset + 2 ];;
+         }
+      }
+      
    # Analog Fons Name
       for (1..$fonCount)
       {
