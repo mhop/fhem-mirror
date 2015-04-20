@@ -381,7 +381,7 @@ SVG_PEdit($$$$)
                                 &{$fn}($src, \@argArr, $lmax,\%conf, $FW_wname);
       use strict "refs";
       $desc = $ldesc;
-      push @paramHtml, @{$paramHtml};
+      push @paramHtml, @{$paramHtml} if($paramHtml);
       map { push @exampleHtml, $example } (0..$lmax-1);
 
     } else {

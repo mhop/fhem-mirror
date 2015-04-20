@@ -923,6 +923,7 @@ FileLog_sampleDataFn($$$$$)
 {
   my ($flName, $flog, $max, $conf, $wName) = @_;
   my $desc = "Input:Column,Regexp,DefaultValue,Function";
+  my @htmlArr;
 
   my $fName = $defs{$flName}{currentlogfile};
   my $reformatFn = AttrVal($flName, "reformatFn", "");
@@ -930,7 +931,7 @@ FileLog_sampleDataFn($$$$$)
   if(!$fh) {
     $fName = "<undefined>" if(!defined($fName));
     Log3 $wName, 1, "FileLog get sample data: $fName: $!";
-    return ($desc, undef, "");
+    return ($desc, \@htmlArr, "");
   }
   $fh->seek(0, 2); # Go to the end
   my $sz = $fh->tell;
@@ -961,7 +962,6 @@ FileLog_sampleDataFn($$$$$)
   FileLog_addTics($conf->{y2tics}, \%tickh);
   $colnums = join(",", sort keys %tickh).",$colnums" if(%tickh);
 
-  my @htmlArr;
   for(my $r=0; $r < $max; $r++) {
     my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":::"), 4);
     my $ret = "";
