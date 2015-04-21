@@ -303,7 +303,7 @@ logProxy_WeekProfile2Plot($$$;$)
       next if( SVG_time_to_sec($timestamp) < $fromsec );
 
       # add first value at start of plot range
-      if( !$ret && $prev_value ) {
+      if( !$ret && defined($prev_value) ) {
         $min = $prev_value if( $prev_value < $min );
         $max = $prev_value if( $prev_value > $max );
         $ret .= "$from $prev_value\n";
