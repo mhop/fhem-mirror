@@ -506,6 +506,13 @@ ZWave_Cmd($$@)
     return "$type $cmd needs $parTxt" if($nArg != int(@a));
   }
 
+  if($cmdFmt !~ m/%s/) {
+    for(my $i1 = 0; $i1<int(@a); $i1++) {
+      return "Error: $a[$i1] is not a decimal number"
+        if($a[$i1] !~ m/^[-\d]+$/);
+    }
+  }
+
   if($cmd =~ m/^config/) {
     my ($err, $cmd) = ZWave_configCheckParam($hash, $type, $cmd, $cmdFmt, @a);
     return $err if($err);
