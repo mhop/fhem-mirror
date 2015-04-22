@@ -113,7 +113,8 @@ readingsGroup_updateDevices($;$)
         foreach my $d (sort keys %defs) {
           next if( IsIgnored($d) );
           next if( !defined($defs{$d}{$lattr}) );
-          next if( $defs{$d}{$lattr} !~ m/^$re$/);
+          next if( $lattr ne 'IODev' && $defs{$d}{$lattr} !~ m/^$re$/);
+          next if( $lattr eq 'IODev' && $defs{$d}{$lattr}{NAME} !~ m/^$re$/);
           $list{$d} = 1;
           push @devices, [$d,$device[1]];
         }
