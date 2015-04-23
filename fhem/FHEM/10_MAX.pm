@@ -261,12 +261,6 @@ MAX_Set($@)
     my $until = undef;
     my $ctrlmode = 1; #0=auto, 1=manual; 2=temporary
 
-    if(AttrVal($hash->{NAME},"keepAuto","0") ne "0"
-      && MAX_ReadingsVal($hash,"mode") eq "auto") {
-      Log3 $hash, 5, "MAX_Set: staying in auto mode";
-      $ctrlmode = 0; #auto
-    }
-
     if($args[0] eq "auto") {
       #This enables the automatic/schedule mode where the thermostat follows the weekly program
 
@@ -282,19 +276,31 @@ MAX_Set($@)
       } elsif(@args == 1) {
         $temperature = 0; #use temperature from weekly program
       } else {
-        return "To many parameters: desiredTemperature auto [<temperature>]";
+        return "Too many parameters: desiredTemperature auto [<temperature>]";
       }
 
       $ctrlmode = 0; #auto
+    } elsif($args[0] eq "boost") {
+      return "Too many parameters: desiredTemperature boost" if(@args > 1);
+      $temperature = 0;
+      $ctrlmode = 3;
+      #TODO: auto mode with temperature is also possible
+
     } else {
+      if($args[0] eq "manual") {
+        #User explicitly asked for manual mode
+        $ctrlmode = 1; #manual, possibly overwriting keepAuto
+        shift @args;
+        return "Not enough parameters after 'desiredTemperature manual'" if(@args == 0);
 
-      if($args[0] eq "boost") {
-        return "To many parameters: desiredTemperature boost" if(@args > 1);
-        $temperature = 0;
-        $ctrlmode = 3;
-        #TODO: auto mode with temperature is also possible
+      } elsif(AttrVal($hash->{NAME},"keepAuto","0") ne "0"
+        && MAX_ReadingsVal($hash,"mode") eq "auto") {
+        #User did not ask for any mode explicitly, but has keepAuto
+        Log3 $hash, 5, "MAX_Set: staying in auto mode";
+        $ctrlmode = 0; #auto
+      }
 
-      } elsif($args[0] eq "eco") {
+      if($args[0] eq "eco") {
         $temperature = MAX_ReadingsVal($hash,"ecoTemperature");
       } elsif($args[0] eq "comfort") {
         $temperature = MAX_ReadingsVal($hash,"comfortTemperature");
@@ -305,8 +311,8 @@ MAX_Set($@)
       if(@args > 1) {
         #@args == 3 and $args[1] == "until"
         return "Second parameter must be 'until'" if($args[1] ne "until");
-        return "Not enough parameters: desiredTemperature <temp> [until <date> <time>]" if(@args == 3);
-        return "To many parameters: desiredTemperature <temp> [until <date> <time>]" if(@args > 4);
+        return "Not enough parameters: desiredTemperature [manual] <temp> [until <date> <time>]" if(@args == 3);
+        return "Too many parameters: desiredTemperature [manual] <temp> [until <date> <time>]" if(@args > 4);
         $ctrlmode = 2; #switch manual to temporary
         $until = sprintf("%06x",MAX_DateTime2Internal($args[2]." ".$args[3]));
       }
@@ -932,17 +938,30 @@ MAX_DbLog_splitFn($)
   <a name="MAXset"></a>
   <b>Set</b>
   <ul>
-    <li>desiredTemperature &lt;value&gt; [until &lt;date&gt;]<br>
-        For devices of type HeatingThermostat only. &lt;value&gt; maybe one of
+    <li>desiredTemperature auto [&lt;temperature&gt;]<br>
+        For devices of type HeatingThermostat only. If &lt;temperature&gt; is omitted,
+        the current temperature according to the week profile is used. If &lt;temperature&gt; is provided,
+        it is used until the next switch point of the week porfile. It maybe one of
         <ul>
-          <li>degree celcius between 3.5 and 30.5 in 0.5 degree steps</li>
+          <li>degree celcius between 4.5 and 30.5 in 0.5 degree steps</li>
           <li>"on" or "off" set the thermostat to full or no heating, respectively</li>
           <li>"eco" or "comfort" using the eco/comfort temperature set on the device (just as the right-most physical button on the device itself does)</li>
-          <li>"auto &lt;temperature&gt;". The weekly program saved on the thermostat is processed. If the optional &lt;temperature&gt; is given, it is set as desiredTemperature until the next switch point of the weekly program.</li>
-          <li>"boost", activates the boost mode, where for boostDuration minutes the valve is opened up boostValveposition percent.</li>
+        </ul></li>
+    <li>desiredTemperature [manual] &lt;value&gt; [until &lt;date&gt;]<br>
+        For devices of type HeatingThermostat only. &lt;value&gt; maybe one of
+        <ul>
+          <li>degree celcius between 4.5 and 30.5 in 0.5 degree steps</li>
+          <li>"on" or "off" set the thermostat to full or no heating, respectively</li>
+          <li>"eco" or "comfort" using the eco/comfort temperature set on the device (just as the right-most physical button on the device itself does)</li>
         </ul>
-        All values but "auto" maybe accompanied by the "until" clause, with &lt;data&gt; in format "dd.mm.yyyy HH:MM" (minutes may only be "30" or "00"!)
-        to set a temporary temperature until that date/time. Make sure that the cube/device has a correct system time.</li>
+        The optional "until" clause, with &lt;data&gt; in format "dd.mm.yyyy HH:MM" (minutes may only be "30" or "00"!),
+        sets the temperature until that date/time. Make sure that the cube/device has a correct system time.
+        If the keepAuto attribute is 1 and the device is currently in auto mode, 'desiredTemperature &lt;value&gt;'
+        behaves as 'desiredTemperature auto &lt;value&gt;'. If the 'manual' keyword is used, the keepAuto attribute is ignored
+        and the device goes into manual mode.</li>
+    <li>desiredTemperature boost<br>
+      For devices of type HeatingThermostat only.
+      Activates the boost mode, where for boostDuration minutes the valve is opened up boostValveposition percent.</li>
     <li>groupid &lt;id&gt;<br>
       For devices of type HeatingThermostat only.
       Writes the given group id the device's memory. To sync all devices in one room, set them to the same groupid greater than zero.</li>
