@@ -213,7 +213,7 @@ FHEM/72_FB_CALLMONITOR.pm    markusbloch          http://forum.fhem.de Unterstue
 FHEM/72_FRITZBOX.pm          tupol                http://forum.fhem.de FRITZBOX (link als PM an tupol)
 FHEM/73_km200.pm             sailor               http://forum.fhem.de Heizungssteuerung/Raumklima
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
-FHEM/73_MPD.pm               wzut                 http://forum.fhem.de Multimedia
+FHEM/73_MPD.pm               Wzut                 http://forum.fhem.de Multimedia
 FHEM/75_MSG.pm               ruebedo              http://forum.fhem.de Automatisierung
 FHEM/76_MSGFile.pm           ruebedo              http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           ruebedo              http://forum.fhem.de Automatisierung
@@ -250,6 +250,7 @@ FHEM/98_apptime.pm           martinp876           http://forum.fhem.de Sonstiges
 FHEM/98_ComfoAir.pm          StefanStrobel        http://forum.fhem.de Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_DOIF.pm              damian-s             http://forum.fhem.de Automatisierung
+FHEM/98_EDIPLUG.pm           Wzut                 http://forum.fhem.de Sonstige Systeme
 FHEM/98_FReplacer.pm         stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_GEOFANCY.pm          loredo               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_HMinfo.pm            martinp876           http://forum.fhem.de HomeMatic
@@ -265,6 +266,8 @@ FHEM/98_PID20.pm             John                 http://forum.fhem.de Automatis
 FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatisierung
+FHEM/98_UbiquitiPM.pm        Wzut                 http://forum.fhem.de Sonstige Systeme
+FHEM/98_UbiquitiOut.pm       Wzut                 http://forum.fhem.de Sonstige Systeme
 FHEM/98_WeekdayTimer.pm      dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_WOL.pm               dietmar63            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
@@ -278,7 +281,6 @@ FHEM/98_copy.pm              justme1968           http://forum.fhem.de Sonstiges
 FHEM/98_CustomReadings.pm    HCS                  http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_dewpoint.pm          Joachim              http://forum.fhem.de Automatisierung
 FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/98_EDIPLUG.pm           wzut                 http://forum.fhem.de Sonstige Systeme
 FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_help.pm              betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_HourCounter.pm       john                 http://forum.fhem.de MAX
