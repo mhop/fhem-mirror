@@ -1088,9 +1088,10 @@ devspec2array($)
           $val = $attr{$d}{$n} if($attr{$d});
         }
         $val="" if(!defined($val));
+        $val = $val->{NAME} if(ref($val) eq 'HASH' && $val->{NAME}); # IODev
 
         my $lre = ($n eq "room" ? "(^|,)($re)(,|\$)" : "^($re)\$");
-        my $valReNum = (looks_like_number($val) && looks_like_number($re) ? 1:0);
+        my $valReNum =(looks_like_number($val) && looks_like_number($re) ? 1:0);
         eval { # a bad regexp is deadly
           if(($op eq  "=" && $val =~ m/$lre/s) ||
              ($op eq "!=" && $val !~ m/$lre/s) ||
@@ -2011,7 +2012,9 @@ CommandList($$)
 
         if($defs{$sdev}) {
           if(defined($defs{$sdev}{$arg[1]})) {
-            $str .= sprintf("%-20s %s\n", $sdev, $defs{$sdev}{$arg[1]});
+            my $val = $defs{$sdev}{$arg[1]};
+            $val = $val->{NAME} if(ref($val) eq 'HASH' && $val->{NAME});
+            $str .= sprintf("%-20s %s\n", $sdev, $val);
 
           } elsif($defs{$sdev}{READINGS} &&
                   defined($defs{$sdev}{READINGS}{$arg[1]})) {
