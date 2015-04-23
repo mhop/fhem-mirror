@@ -984,11 +984,13 @@ harmony_Read($)
 
             }
 
-          } elsif( $content =~ m/\?startactivity/ ) {
-            if( $cdata =~ m/done=(\d*):total=(\d*):deviceId=(\d*)/ ) {
+          } elsif( $content =~ m/\?startactivity/i ) {
+            if( $cdata =~ m/done=(\d*):total=(\d*)(:deviceId=(\d*))?/ ) {
               my $done = $1;
               my $total = $2;
-              my $id = $3;
+              my $id = $4;
+
+              $id = "<unknown>" if( !defined($id) );
 
               my $label = harmony_labelOfDevice($hash,$id,$id);
 
