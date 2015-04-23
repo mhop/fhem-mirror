@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  98_EDIPLUG: change kW/h to kWh and fix missing Id
   - feature: FB_CALLMONITOR: new reverse search method "textfile" for custom
                              definitions 
   - bugfix:  FB_CALLMONITOR: correct reverse search of Call-By-Call outgoing calls
