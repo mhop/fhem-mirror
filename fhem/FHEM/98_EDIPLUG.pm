@@ -1,6 +1,6 @@
 ################################################################
 #
-#  $Id:$
+#  $Id$
 #
 #  (c) 2014 Copyright: Wzut based on 98_EDIPLUG.pm tre (ternst)
 #  All rights reserved
@@ -242,9 +242,9 @@ sub EDIPLUG_Read($$$)
      $hash->{helper}{power}  = $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowPower'};
      
      readingsBulkUpdate($hash, "power_now", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowPower'}." W");
-     readingsBulkUpdate($hash, "power_day", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Day'}." kW/h");
-     readingsBulkUpdate($hash, "power_week", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Week'}." kW/h");
-     readingsBulkUpdate($hash, "power_month", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Month'}." kW/h");
+     readingsBulkUpdate($hash, "power_day", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Day'}." kWh");
+     readingsBulkUpdate($hash, "power_week", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Week'}." kWh");
+     readingsBulkUpdate($hash, "power_month", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Month'}." kWh");
 
      $state = ($hash->{POWER} ne "OFF") ? $hash->{POWER}." / ".$hash->{helper}{power}. " W / ".$hash->{helper}{current}." A" : $hash->{POWER};
     }
