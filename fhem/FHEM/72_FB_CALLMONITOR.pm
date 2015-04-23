@@ -1079,7 +1079,23 @@ sub FB_CALLMONITOR_loadTextFile($;$)
     }
     else
     {
-        Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to access textfile: $file";
+        @tmpline = ("###########################################################################################",
+                    "# This file was created by FHEM and contains user defined reverse search entries          #",
+                    "# Please insert your number entries in the following format:                              #",
+                    "#                                                                                         #",
+                    "#     <number>,<name>                                                                     #",
+                    "#     <number>,<name>                                                                     #",
+                    "#                                                                                         #",
+                    "###########################################################################################",
+                    "# e.g.",
+                    "# 0123/456789,Mum",
+                    "# +49 123 45 67 8,Dad",
+                    "# 45678,Boss",
+                    "####"
+                    );                     
+        $err = FileWrite($file,@tmpline);
+        
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to create textfile $file: $err" if(defined($err) and $err ne "");
     }
 }
 
@@ -1436,10 +1452,10 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     my $country_code = AttrVal($name, "country-code", "0049");
     
 
-    $number =~ s/\s//g;			                    # Remove spaces
-    $number =~ s/^(\#[0-9]{1,10}\#)//g;	            # Remove phone control codes
-    $number =~ s/[^*\d]//g if(not $number =~ /@/);	# Remove anything else isn't a number if it is no VoIP number
-    $number =~ s/^\+/00/g;			                # Convert leading + to 00 country extension
+    $number =~ s/\s//g;                             # Remove spaces
+    $number =~ s/^(\#[0-9]{1,10}\#)//g;             # Remove phone control codes
+    $number =~ s/^\+/00/g;                          # Convert leading + to 00 country extension
+    $number =~ s/[^*\d]//g if(not $number =~ /@/);  # Remove anything else isn't a number if it is no VoIP number
     $number =~ s/^$country_code/0/g;                # Replace own country code with leading 0
 
 
@@ -1526,8 +1542,8 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     The reverse search process will try to lookup the name according to the order of providers given in this attribute (from left to right). The first valid result from the given provider order will be used as reverse search result.
     <br><br>per default, reverse search is disabled.<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
-    If this attribute is activated each reverse-search result is saved in an internal cache
-    and will be used instead of reverse searching every time the same number.<br><br>
+    If this attribute is activated each reverse-search result from an internet provider is saved in an internal cache
+    and will be used instead of requesting each internet provider every time with the same number. The cache only contains reverse-search results from internet providers.<br><br>
     Possible values: 0 => off , 1 => on<br>
     Default Value is 0 (off)<br><br>
     <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
@@ -1541,7 +1557,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     ...
     &lt;numberN&gt;,&lt;nameN&gt;
     </pre>
-    You can use the hash sign to comment entries in this file.
+    You can use the hash sign to comment entries in this file. If the specified file does not exists, it will be created by FHEM.
     <br><br>
     <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;file&gt;</li>
     This attribute can be used to specify the (full) path to a phonebook file in FritzBox format (XML structure). Using this option it is possible to use the phonebook of a FritzBox even without FHEM running on a Fritzbox.
@@ -1673,8 +1689,9 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     Der Anbieter "phonebook" verwendet das Telefonbuch der FritzBox (siehe Attribut reverse-search-phonebook-file oder fritzbox-remote-phonebook).<br><br>
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (nicht gesetzt)<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
-    Wenn dieses Attribut gesetzt ist, werden alle Ergebisse der R&uuml;ckw&auml;rtssuche in einem modul-internen Cache gespeichert
-    und alle existierenden Ergebnisse aus dem Cache genutzt anstatt eine erneute R&uuml;ckw&auml;rtssuche durchzuf&uuml;hren.<br><br>
+    Wenn dieses Attribut gesetzt ist, werden alle Ergebisse von Internetanbietern in einem modul-internen Cache gespeichert
+    und alle existierenden Ergebnisse aus dem Cache genutzt anstatt eine erneute Anfrage bei einem Internet-Anbieter durchzuf&uuml;hren. 
+    Der Cache ist immer an die Internetanbieter gekoppelt und speichert nur Ergebnisse von Internetanbietern.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>
     <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;Dateipfad&gt;</li>
@@ -1690,7 +1707,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     ...
     &lt;NummerN&gt;,&lt;NameN&gt;
     </pre>
-    Die Datei kann dabei auch Kommentar-Zeilen enthalten mit # vorangestellt.
+    Die Datei kann dabei auch Kommentar-Zeilen enthalten mit # vorangestellt. Sollte die Datei nicht existieren, wird sie durch FHEM erstellt.
     <br><br>
     <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;Dateipfad&gt</li>
     Mit diesem Attribut kann man optional den Pfad zu einer Datei angeben, welche ein Telefonbuch im FritzBox-Format (XML-Struktur) enth&auml;lt.
