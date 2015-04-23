@@ -542,6 +542,7 @@ CUL_ReadAnswer($$$$)
       $mculdata = $2;
       (undef, $line) = CUL_prefix(0, $ohash, $line); # Delete prefix
       if($regexp && $line !~ m/$regexp/) {
+        $line =~ s/[\n\r]+//g;
         CUL_Parse($ohash, $hash, $ohash->{NAME}, $line);
       } else {
         return (undef, $line);
