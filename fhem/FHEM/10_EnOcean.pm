@@ -1,6 +1,5 @@
 ##############################################
 # $Id$
-# 2015-04-18
 
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
 # Copyright: Jan Schneider (timberwolf at tec-observer dot de)
@@ -374,8 +373,8 @@ EnOcean_Initialize($)
                        "demandRespAction demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
                        "demandRespMin:A0,AI,B0,BI,C0,CI,D0,DI demandRespRandomTime " .
                        "demandRespThreshold:slider,0,1,15 demandRespTimeoutLevel:max,last destinationID " .
-                       "devChannel devMode:master,slave devUpdate:off,auto,demand,polling,interrupt dimValueOn " .
-                       "disable:0,1 disabledForIntervals " .
+                       "devChannel devMode:master,slave devUpdate:off,auto,demand,polling,interrupt " .
+                       "dimMax dimMin dimValueOn disable:0,1 disabledForIntervals " .
                        "displayContent:default,humidity,off,setPointTemp,tempertureExtern,temperatureIntern,time,no_change " .
                        "eep gwCmd:" . join(",", sort @EnO_gwCmd) . " humitity humidityRefDev " .
                        "keyRcv keySnd macAlgo:no,3,4 " .
@@ -456,6 +455,10 @@ sub EnOcean_Get($@)
   my ($hash, @a) = @_;
   return "no get value specified" if (@a < 2);
   my $name = $hash->{NAME};
+  if (IsDisabled($name)) {
+    Log3 $name, 4, "EnOcean $name get commands disabled.";  
+    return;
+  }
   my $cmdID;
   my $cmdList = "";
   my $data;
@@ -1574,6 +1577,11 @@ sub EnOcean_Set($@)
       } elsif ($gwCmd eq "dimming") {
         # Dimming
         $gwCmdID = 2;
+        my $dimMax = AttrVal($name, "dimMax", 255);
+        my $dimMin = AttrVal($name, "dimMin", "off");
+        if ($dimMax =~ m/^\d+$/ && $dimMin =~ m/^\d+$/ && $dimMin > $dimMax) {
+          ($dimMax, $dimMin) = ($dimMin , $dimMax);
+        }
         my $dimVal = ReadingsVal($name, "dim", undef);
         my $rampTime = AttrVal($name, "rampTime", 1);
         my $sendDimCmd = 0;
@@ -1601,7 +1609,6 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           $sendDimCmd = 1;
-	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } elsif ($cmd eq "dimup") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
@@ -1617,7 +1624,6 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           $sendDimCmd = 1;
-	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } elsif ($cmd eq "dimdown") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
@@ -1633,7 +1639,6 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           $sendDimCmd = 1;
-	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } elsif ($cmd eq "on") {
           $rampTime = 1;
@@ -1648,7 +1653,7 @@ sub EnOcean_Set($@)
             $dimVal = ReadingsVal ($name, "dimValueLast", 100);
             if ($dimVal < 1) { $dimVal = 100; }
           } else {
-            if ($dimValueOn !~ m/^[+-]?\d+$/) {
+            if ($dimValueOn !~ m/^\d+$/) {
               $dimVal = 100;
             } elsif ($dimValueOn > 100) {
               $dimVal = 100;
@@ -1659,14 +1664,12 @@ sub EnOcean_Set($@)
             }
           }
           $sendDimCmd = 1;
-	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } elsif ($cmd eq "off") {
           $dimVal = 0;
           $rampTime = 1;
           $setCmd = 8;
           $sendDimCmd = 1;
-	  readingsSingleUpdate ($hash, "dim", $dimVal, 1);
 
         } else {
           my $cmdList = "dim:slider,0,1,100 on:noArg off:noArg teach:noArg";
@@ -1686,11 +1689,27 @@ sub EnOcean_Set($@)
             # Dimming value relative
             if ($manufID ne "00D") {$setCmd = $setCmd | 4;}
           }
-          if ($dimVal > 100) { $dimVal = 100; }
-          if ($dimVal <= 0) { $dimVal = 0; $setCmd = 8; }
-          if ($rampTime > 255) { $rampTime = 255; }
-          if ($rampTime < 0) { $rampTime = 0; }
+          if ($cmd eq "off" && $dimMin =~ m/^\d+$/ && $dimMin == 0) {
+            # switch off
+          
+          } elsif ($cmd eq "off" && $dimMin =~ m/^\d+$/) {
+            $dimVal = $dimMin;
+            $setCmd = 9;          
+          } elsif ($dimMax eq "off" || $dimVal == 0 && $dimMin eq "off" || $dimVal < 0) {
+            # switch off
+            $dimVal = 0;
+            $setCmd = 8;
+          } elsif ($dimMin eq "off") {
+          
+          } elsif ($dimVal < $dimMin) {
+            $dimVal = $dimMin;
+          }
+          $dimVal = $dimMax if ($dimVal > $dimMax);
+          $dimVal = 100 if ($dimVal > 100);
+          $rampTime = 0 if ($rampTime < 0);
+          $rampTime = 255 if ($rampTime > 255);
           #$updateState = 0;
+          readingsSingleUpdate ($hash, "dim", $dimVal, 1);
           $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $dimVal, $rampTime, $setCmd;
         }
 
@@ -6863,6 +6882,14 @@ sub EnOcean_Attr(@)
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
+  } elsif ($attrName =~ m/^dimMax|dimMin$/) {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^off|[\d+]$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
   } elsif ($attrName eq "displayContent") {
     if (!defined $attrVal){
     
@@ -10685,6 +10712,15 @@ EnOcean_Undef($$)
       device operation mode.
     </li>
     <li><a href="#devStateIcon">devStateIcon</a></li>
+    <li><a name="EnOcean_dimMax">dimMax</a> dim/%|off, [dimMax] = 255 is default.<br>
+      maximum brightness value<br>
+      dimMax is supported for the profile gateway/dimming.
+      </li>
+    <li><a name="EnOcean_dimMin">dimMin</a> dim/%|off, [dimMax] = off is default.<br>
+      minimum brightness value<br>
+      If [dimMax] = off, then the actuator takes down the ramp time set there.
+      dimMin is supported for the profile gateway/dimming.
+      </li>
     <li><a name="dimValueOn">dimValueOn</a> dim/%|last|stored,
       [dimValueOn] = 100 is default.<br>
       Dim value for the command "on".<br>
@@ -10694,7 +10730,7 @@ EnOcean_Undef($$)
       bidirectional dimmer if [dimValueOn] = last.<br>
       The dimmer switched to the last Fhem dim value if [dimValueOn] =
       stored.<br>
-      dimValueOn is supported for dimmer.
+      dimValueOn is supported for the profile gateway/dimming.
       </li>
     <li><a href="#EnOcean_disable">disable</a> 0|1<br>
       If applied set commands will not be executed.
