@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   New modules 10_pilight_ctrl, 30_pilight_dimmer, 30_pilight_switch
+             and 30_pilight_temp to support pilight (sending and receiving)
   - bugfix:  98_EDIPLUG: change kW/h to kWh and fix missing Id
   - feature: FB_CALLMONITOR: new reverse search method "textfile" for custom
                              definitions 

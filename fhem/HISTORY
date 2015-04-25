@@ -627,3 +627,6 @@
 - Sat Mar 21 2015 (loredo)
   - reading residentsGuests in module 10_RESIDENTS was renamed to residentsTotalGuests
   - introducing new readings in module 10_RESIDENTS: residentsTotalGuestsAbsent and residentsTotalGuestsPresent
+
+- Sat Apr 25 2015 (risiko)
+  - added new modules to support pilight (sending and receiving): switch, dimmer, temperature and humidity
