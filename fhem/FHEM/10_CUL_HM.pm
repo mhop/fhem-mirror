@@ -6020,6 +6020,12 @@ sub CUL_HM_ID2PeerList ($$$) {
         CUL_HM_UpdtReadSingle($hash,"state","peered",0);
       }
     }
+    elsif( ($md =~ m/HM-CC-RT-DN/      && $chn=~ m/(03|06)/)
+         ||($md eq "HM-TC-IT-WM-W-EU"  && $chn=~ m/(03|06)/)){
+      if (AttrVal($hash,"state","unpeered") eq "unpeered"){
+        CUL_HM_UpdtReadSingle($hash,"state","unknown",0);
+      }
+    }
   }
   else{
     delete $hash->{READINGS}{peerList};
@@ -7349,7 +7355,7 @@ sub CUL_HM_qEntity($$){  # add to queue
 
   my $devN = CUL_HM_getDeviceName($name);
   return if (AttrVal($devN,"subType","") eq "virtual");
-  return if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
+  $name =  $devN if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
   if ($devN eq $name){#config for all device
     $defs{$devN}{helper}{q}{$q}="00";
   }

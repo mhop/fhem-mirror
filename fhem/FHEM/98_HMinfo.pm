@@ -1613,13 +1613,13 @@ sub HMinfo_loadConfig($@) {####################################################
   $filter = "." if (!$filter);
   my $ret;
 
-  open(aSave, "$fName") || return("Can't open $fName: $!");
+  open(rFile, "$fName") || return("Can't open $fName: $!");
   my @el = ();
   my @elincmpl = ();
   my @entryNF = ();
   my %changes;
   my @rUpdate;
-  while(<aSave>){
+  while(<rFile>){
     chomp;
     my $line = $_;
     $line =~ s/\r//g;
@@ -1670,7 +1670,7 @@ sub HMinfo_loadConfig($@) {####################################################
                                      $defs{$eN}{READINGS}{$reg}{VAL} !~ m/00:00/);
     }
   }
-  close(aSave);
+  close(rFile);
   foreach my $eN (keys %changes){
     foreach my $reg (keys %{$changes{$eN}}){
       $defs{$eN}{READINGS}{$reg}{VAL} = $changes{$eN}{$reg};
@@ -1752,14 +1752,8 @@ sub HMinfo_saveConfig($) {#####################################################
   my ($param) = @_;
   my ($id,$fN,$opt,$filter,$strict) = split ",",$param;
   $strict = "" if (!defined $strict);
-  my @entities;
   foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
     CUL_HM_Get($defs{$dName},$dName,"saveConfig",$fN,$strict);
-    push @entities,$dName;
-    foreach my $chnId (CUL_HM_getAssChnIds($dName)){
-      my $dName = CUL_HM_id2Name($chnId);
-      push @entities, $dName if($dName !~ m/_chn:/);
-    }
   }
   HMinfo_purgeConfig($param) if (-e $fN && 200000 < -s $fN);# auto purge if file to big
   return $id;
