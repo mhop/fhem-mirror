@@ -61,6 +61,7 @@ FHEM/10_SOMFY.pm             thdankert            http://forum.fhem.de Sonstiges
 FHEM/10_UNIRoll.pm           c-herrmann           http://forum.fhem.de SlowRF
 FHEM/10_ZWave.pm             rudolfkoenig         http://forum.fhem.de ZWave
 FHEM/10_RESIDENTS.pm         loredo               http://forum.fhem.de Automatisierung
+FHEM/10_pilight_ctrl.pm      risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/11_FHT.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/11_FHT8V.pm             rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/11_OWDevice.pm          borisneubert/mfr69bs http://forum.fhem.de 1Wire
@@ -111,6 +112,9 @@ FHEM/30_HUEBridge.pm         justme1968           http://forum.fhem.de Beleuchtu
 FHEM/30_LIGHTIFY.pm          justme1968           http://forum.fhem.de Beleuchtung
 FHEM/30_MilightBridge.pm     mattwire             http://forum.fhem.de Beleuchtung
 FHEM/30_ENECSYSGW.pm         akw                  http://forum.fhem.de Sonstige Systeme
+FHEM/30_pilight_dimmer.pm    risiko               http://forum.fhem.de Sonstige Systeme
+FHEM/30_pilight_switch.pm    risiko               http://forum.fhem.de Sonstige Systeme
+FHEM/30_pilight_temp.pm      risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Beleuchtung
 FHEM/31_MilightDevice.pm     mattwire             http://forum.fhem.de Beleuchtung
 FHEM/31_ENECSYSINV.pm        akw                  http://forum.fhem.de Sonstige Systeme
