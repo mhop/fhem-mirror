@@ -93,9 +93,12 @@ sub Heating_Control_SetTimerOfDay($) {
 sub Heating_Control_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
-  if( $attrName eq "disable" ) {
-     my $hash = $defs{$name};
+  my $hash = $defs{$name};
+  if(       $attrName eq "disable" ) {
      readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
+  } elsif ( $attrName eq "switchInThePast" ) {
+     $attr{$name}{$attrName} = $attrVal;
+     Heating_Control_SetTimerOfDay({ HASH => $hash}); 
   }
   return undef;
 }

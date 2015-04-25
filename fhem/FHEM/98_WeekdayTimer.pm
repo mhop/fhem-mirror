@@ -493,7 +493,7 @@ sub WeekdayTimer_SetTimer($) {
      if ($secondsToSwitch>$grenzSeconds && !$switchedInThePast) {    
         if ($secondsToSwitch>0 || $isActiveTimer) {
         
-           Log3 $hash, 4, "[$name] timer seems to be active today: ".join("",@$tage)."|$time|$nextPara" if($isActiveTimer);
+           Log3 $hash, 4, "[$name]:setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$nextPara" if($isActiveTimer);
            myInternalTimer ("$time", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0);
 
            my ($stunde, $minute, $sekunde)   = split (":",$nextSwitch);              
@@ -535,7 +535,7 @@ sub WeekdayTimer_Update($) {
 
   my $active = 1;
      $active = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam);
-  Log3 $hash, 4, "[$name] timer seems to be active today: ".join("",@$tage)."|$time|$newParam" if($active);
+  Log3 $hash, 4, "[$name]:Update   - timer seems to be active today: ".join("",@$tage)."|$time|$newParam" if($active);
 
   # ggf. Device schalten
   WeekdayTimer_Device_Schalten($hash, $newParam, $tage);
