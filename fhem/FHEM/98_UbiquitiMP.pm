@@ -3,7 +3,7 @@
 #  $Id$
 #
 #  (c) 2015 Copyright: Wzut
-#  forum : http://forum.fhem.de/index.php/topic,34131.0.html
+#  forum : http://forum.fhem.de/index.php/topic,35722.0.html
 #  All rights reserved
 #
 #  This code is free software; you can redistribute it and/or modify
@@ -25,6 +25,9 @@
 #  10.04.15 add enable/disable 
 #  18.04.15 add toggle
 #  20.04.15 add Groups
+#  first svn Version
+#  23.04.15 add Set Extensions for 1 Port Ubi , change Client to UbiquitiOut, 
+#  25.06.15 add german docu, fix some timing problems
 
 package main;
 
@@ -56,33 +59,37 @@ sub UbiquitiMP_Initialize($)
 
 sub UbiquitiMP_updateConfig($)
 {
-  # this routine is called 10 sec after the last define of a restart
+  # this routine is called 5 sec after the last define of a restart
   # this gives FHEM sufficient time to fill in attributes
 
  my ($hash) = @_;
  my $name = $hash->{NAME};
  
- $hash->{INTERVAL} = AttrVal($name, "interval", 300);
-
- readingsSingleUpdate($hash,"state","Initialized",1); 
-
- $hash->{".led"} = AttrVal($name, "ledconnect", 0);
- if ($hash->{".led"}) # Farben nach Kommando
+ if (!$init_done)
  {
-    $hash->{".led"} = 0 if ($hash->{".led"} eq "off");
-    $hash->{".led"} = 1 if ($hash->{".led"} eq "blue");
-    $hash->{".led"} = 2 if ($hash->{".led"} eq "yellow");
-    $hash->{".led"} = 3 if ($hash->{".led"} eq "both");
-    $hash->{".led"} = 4 if ($hash->{".led"} eq "alternate");
+   RemoveInternalTimer($hash);
+   InternalTimer(gettimeofday()+5,"UbiquitiMP_updateConfig", $hash, 0);
+   return;
  }
 
- #$hash->{SNAME} = "";
- #$hash->{BNAME} = "";
+
+ $hash->{INTERVAL} = AttrVal($name, "interval", 300);
+ $hash->{".led"}   = AttrVal($name, "ledconnect", 0);
+
+ if ($hash->{".led"}) # Farben nach Kommando
+ {
+    $hash->{".led"} = "0" if ($hash->{".led"} eq "off");
+    $hash->{".led"} = "1" if ($hash->{".led"} eq "blue");
+    $hash->{".led"} = "2" if ($hash->{".led"} eq "yellow");
+    $hash->{".led"} = "3" if ($hash->{".led"} eq "both");
+    $hash->{".led"} = "4" if ($hash->{".led"} eq "alternate");
+ }
+
  $hash->{MAC} = "";
  $hash->{lastcmd} = "Init";
-
+ $hash->{".init"} = 1;
  RemoveInternalTimer($hash);
- InternalTimer(gettimeofday()+($hash->{".timeout"}*2), "UbiquitiMP_GetStatus",$hash, 0) if ($hash->{".timeout"});
+ InternalTimer(gettimeofday()+5, "UbiquitiMP_GetStatus",$hash, 0);
 
   return undef;
 }
@@ -96,7 +103,7 @@ sub UbiquitiMP_Define($$) {
     my @a = split("[ \t][ \t]*", $def);
 
     return "wrong syntax: define <name> UbiquitiMP <IP or FQDN>" if(int(@a) < 3);
-     
+
     $hash->{".host"}  = $a[2];
 
     if( !defined( $attr{$a[0]}{user} ) ) { $attr{$a[0]}{user} = "ubnt";}
@@ -107,8 +114,8 @@ sub UbiquitiMP_Define($$) {
 
     if( !defined( $attr{$a[0]}{subDevices} ) ) { $attr{$a[0]}{subDevices} = "1";}
 
-    if( !defined( $attr{$a[0]}{timeout} ) ) { $attr{$a[0]}{timeout} = "2"}
-    $hash->{".timeout"} = (int($attr{$a[0]}{timeout}) > 1) ? $attr{$a[0]}{timeout} : "2";
+    if( !defined( $attr{$a[0]}{timeout} ) ) { $attr{$a[0]}{timeout} = "5"}
+    $hash->{".timeout"} = (int($attr{$a[0]}{timeout}) > 1) ? $attr{$a[0]}{timeout} : "5";
 
     if( !defined( $attr{$a[0]}{subDevices} ) ) { $attr{$a[0]}{subDevices} = "1"}
     $hash->{".subdevices"} = $attr{$a[0]}{subDevices};
@@ -121,7 +128,7 @@ sub UbiquitiMP_Define($$) {
     readingsSingleUpdate($hash, "state", "defined",0);
 
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+10, "UbiquitiMP_updateConfig",$hash,0); # in 10 Sekunden machen wir den Rest
+    InternalTimer(gettimeofday()+5, "UbiquitiMP_updateConfig",$hash,0); # in 5 Sekunden machen wir den Rest
 
     return undef;
 }
@@ -158,7 +165,7 @@ sub UbiquitiMP_force($)
   { 
     Log3 $name, 5, "$name, BC force process started with PID(".$hash->{helper}{RUNNING_PID}{pid}.") cmd : $cmdlist";
   }
-   else  
+   else
   { # das war wohl schon wieder nix :(
    InternalTimer(gettimeofday()+(int($hash->{".timeout"})*3), "UbiquitiMP_force",$hash, 0);
   }
@@ -179,7 +186,7 @@ sub UbiquitiMP_Attr(@)
 
    if ($attrName eq "timeout")
    {
-     if (int($attrVal)<"2") {$attrVal="2";}
+     if (int($attrVal) < 2) {$attrVal="5";}
      $hash->{".timeout"}  = $attrVal;
      $attr{$name}{timeout} = $attrVal;
    }
@@ -206,11 +213,11 @@ sub UbiquitiMP_Attr(@)
    }
    elsif ($attrName eq "ledconnect")
    {
-       $hash->{".led"} = 0 if ($attrVal eq "off");
-       $hash->{".led"} = 1 if ($attrVal eq "blue");
-       $hash->{".led"} = 2 if ($attrVal eq "yellow");
-       $hash->{".led"} = 3 if ($attrVal eq "both");
-       $hash->{".led"} = 4 if ($attrVal eq "alternate");
+       $hash->{".led"} = "0" if ($attrVal eq "off");
+       $hash->{".led"} = "1" if ($attrVal eq "blue");
+       $hash->{".led"} = "2" if ($attrVal eq "yellow");
+       $hash->{".led"} = "3" if ($attrVal eq "both");
+       $hash->{".led"} = "4" if ($attrVal eq "alternate");
        $attr{$name}{ledconnect} = $attrVal;
    }
    elsif ($attrName eq "groupPorts")
@@ -228,7 +235,6 @@ sub UbiquitiMP_Attr(@)
 sub UbiquitiMP_Get($@) {
    my ($hash, $name , @a) = @_;
    my $cmd = $a[0];
-   #Log3 $name, 5, "Get: ".join(" ", @a);
 
    return "get $name needs one argument" if (int(@a) != 1);
 
@@ -252,7 +258,7 @@ sub UbiquitiMP_Get($@) {
   }
    else  
   { # das war wohl nix :(
-    Log3 $name, 5,  "$name, BC process start failed !"; 
+    Log3 $name, 3,  "$name, BC process start failed, cmd : $cmd "; 
     return $name.", can't execute get command as NonBlockingCall";
   }
 
@@ -287,7 +293,7 @@ sub UbiquitiMP_Set($@) {
      }
       return "$name wrong command, please use on of on,off,toggle,lock,unlock,enable,disable or reset" if($cmd !~ /^(on|off|lock|unlock|reset|enable|disable|toggle)$/);
    }
-   else
+   else # die mPower mini
    {
      $port    = "Out1";
      $cmd     = (defined($a[1])) ? $a[1] : "";
@@ -329,9 +335,9 @@ sub UbiquitiMP_Set($@) {
     $hash->{force}   = ($subcmd eq "force") ? $hash->{helper}{RUNNING_PID}{pid} : 0;
     Log3 $name, 5, "$name, BC process started with PID(".$hash->{helper}{RUNNING_PID}{pid}.") cmd : $cmdlist , subcmd : $subcmd"; 
   }
-   else  
+   else
   { # das war wohl nix :(
-    Log3 $name, 5,  "$name, BC process start failed !";
+    Log3 $name, 3,  "$name, BC process start failed , cmd : $cmdlist , subcmd : $subcmd";
     UbiquitiMP_force($hash) if ($hash->{force}) ; # muessen wir das wiederholen ?
     return $name.", can't execute set as NonBlockingCall";
   }
@@ -368,7 +374,7 @@ sub UbiquitiMP_BCStart($)
     $sock->login( Name => $hash->{".user"}, Password => $hash->{".pwd"} );
     if (!$sock->errmsg)
     {
-      $sock->cmd("echo '".$hash->{".led"}."' >/proc/led/status") if ($hash->{".led"});
+      $sock->cmd("echo '".$hash->{".led"}."' >/proc/led/status") if ($hash->{".led"} ne "0");
       
       if (($cmd eq "reset")  || ($cmd eq "toggle")  || 
           ($cmd eq "lock")   || ($cmd eq "unlock")  ||
@@ -405,7 +411,7 @@ sub UbiquitiMP_BCStart($)
           }
          } # foreach
 
-         select(undef, undef, undef, 0.5); # 500 ms warten !
+         select(undef, undef, undef, 0.25); # 250 ms warten !
 
          @ret = $sock->cmd("/sbin/cgi /usr/www/mfi/sensors.cgi"); # neue Statuswerte holen
          if($ret[2]) 
@@ -418,7 +424,7 @@ sub UbiquitiMP_BCStart($)
        $output .= "|1|$cmd|";
        foreach(@a)
        {
-        select(undef, undef, undef, 0.5); 
+        select(undef, undef, undef, 0.25); 
         @ret = $sock->cmd($_); 
         Log3 $name, 5, "$name, ret -> ".$ret[0]; 
         if ($cmd eq "status") { if($ret[2]) { ($ret[2],undef) = split("MF",$ret[2]); $output .= $ret[2]; } else { if ($ret[0]) {$ret[0] =~s/^MF.*//g; $output .= "|".$ret[0];}}}
@@ -426,7 +432,7 @@ sub UbiquitiMP_BCStart($)
        }
       }
 
-      $sock->cmd("echo '0' >/proc/led/status") if ($hash->{".led"});
+      $sock->cmd("echo '0' >/proc/led/status") if ($hash->{".led"} ne "0");
       $sock->close;
 
       $output =~s/\n//g;
@@ -505,7 +511,7 @@ sub UbiquitiMP_BCAborted($)
   {
     UbiquitiMP_force($hash);
   }
-  elsif  ($hash->{lastcmd} eq "GetStatus") # war das ein erfolgloser auto status update ?
+  elsif  ($hash->{lastcmd} eq "GetStatus") # war das ein erfolgloses auto status update ?
   {
    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "UbiquitiMP_GetStatus",$hash, 0) if($hash->{INTERVAL});
   }
@@ -535,7 +541,6 @@ sub UbiquitiMP_Status($$@)
   $json = JSON->new->utf8(0)->decode($js);
 
   my $sensors = scalar keys $json->{sensors};
-  #$sensors = 1 if ($sensors);
 
   if ((!$hash->{PORTS}) && ($sensors > 0)) # nur einmal zu Begin bzw nach reload
   {
@@ -546,11 +551,10 @@ sub UbiquitiMP_Status($$@)
   # bei der 1 Port Ubi default keine Subdevices , bei den anderen ja
   my $subdev = (int($hash->{PORTS}) >1) ? AttrVal($name, "subDevices", 1) : AttrVal($name, "subDevices", 0);
 
-
   @ener = split(" ",$a[2]) if (defined($a[2]));
  
   readingsBeginUpdate($hash);
-  
+
   for (my $i=0; $i<$sensors; $i++)
   {
    if (index(AttrVal($name, "ignoreList", "") , $i+1) == -1) # welche Ports ignorieren ?
@@ -725,7 +729,6 @@ sub UbiquitiMP_Info($$)
     if ($ports > 0)
     {
       $hash->{PORTS} = $ports; 
-      #$hash->{PORTS} = 1;
       UbiquitiMP_createSets($hash);
     }
   }
@@ -742,6 +745,13 @@ sub UbiquitiMP_Info($$)
     }
   } 
 
+  if ($hash->{".init"}) # kommen wir ueber einen Neustart ?
+  {
+   readingsSingleUpdate($hash,"state","Initialized",1); 
+   delete($hash->{".init"});
+   InternalTimer(gettimeofday()+$hash->{".timeout"}, "UbiquitiMP_GetStatus",$hash, 0);
+  }
+
   return undef;
 }
 
@@ -753,11 +763,9 @@ sub UbiquitiMP_GetStatus($)
   my $name = $hash->{NAME};
   my $cmd = $name;
 
-  #RemoveInternalTimer($hash);
- 
   Log3 $name, 5, "$name, GetStatus Interval : ".$hash->{INTERVAL};
   
-  if ($hash->{lastcmd} eq "Init") # kommen wir ueber einen Neustart ?
+  if ($hash->{".init"}) # kommen wir ueber einen Neustart ?
   { 
    $cmd .=  "#info#cat /etc/board.info | grep board";
   }
@@ -777,7 +785,7 @@ sub UbiquitiMP_GetStatus($)
   }
   else  
   { # das ging schief wiederholen nach doppelter timeout Wartezeit 
-    Log3 $name, 5,  "$name, BC process start failed !"; 
+    Log3 $name, 3,  "$name, BC process GetStatus start failed !"; 
     InternalTimer(gettimeofday()+(int($hash->{".timeout"})*2), "UbiquitiMP_GetStatus",$hash, 0);
   }
 
@@ -831,9 +839,9 @@ sub UbiquitiMP_summaryFn($$$$) {
          }
          }
         } else { $html .= $state };
-	
+
         $html .= "</nobr>";
-	return $html;	
+        return $html;
 }
 
 ################################################################################
@@ -887,6 +895,12 @@ sub UbiquitiMP_createSets($)
 <a name="UbiquitiMP"></a>
 <h3>UbiquitiMP</h3>
 <ul>
+  <table>
+  <tr><td>
+  FHEM module for the Ubiquiti mFi mPower modules<br>
+  Please read also the <a href="http://www.fhemwiki.de/wiki/Ubiquit_mFi/mPower">Wiki</a> at http://www.fhemwiki.de/wiki/Ubiquit_mFi/mPower<br>
+  FHEM Forum : http://forum.fhem.de/index.php/topic,35722.0.html 
+  </td></tr></table>
   <a name="UbiquitiMPdefine"></a>
   <b>Define</b>
   <ul>
@@ -902,33 +916,100 @@ sub UbiquitiMP_createSets($)
   <a name="UbiquitiMPset"></a>
   <b>Set </b>
   <ul>
-    <li>Outx on / off (force) -> turns Port x on or off</li><br>
-    <li>Outx toggle -> toggle port </li><br>
-    <li>Outx lock / unlock -> protects port to switch port on/off</li><br>
-    <li>Outx reset -> reset power counter for this port</li><br>
-    <li>Outx enable / disable -> power counting for this port</li><br>
+    <li>Outx on / off (force) -> turns Port x on or off</li>
+    <li>Outx toggle -> toggle port </li>
+    <li>Outx lock / unlock -> protects port to switch port on/off</li>
+    <li>Outx reset -> reset power counter for this port</li>
+    <li>Outx enable / disable -> power counting for this port</li>
    </ul>
   <a name="UbiquitiMPget"></a>
   <b>Get</b>
   <ul>
-   <li>status -> returns the status of all Outs</li><br>
-   <li>info -> returns some internal informations of the device</li><br>
+   <li>status -> returns the status of all Outs</li>
+   <li>info -> returns some internal informations of the device</li>
    <li>reboot -> reboot the device</li><br>
   </ul>
   <a name="UbiquitiMPattr"></a>
   <b>Attributes</b>
   <ul>
-    <li>ignoreList -> list of ignored ports<br> e.g. attr name ignoreList 456<br>ignores all values of ports 4,5 & 6<br></li><br>
+    <li>ignoreList -> list of ignored ports<br> e.g. attr name ignoreList 456<br>ignores all values of ports 4,5 & 6<br></li>
     <li>groupPorts -> space separeted list to group ports so you can use them like a single device<br>
     e.g. attr name groupList TV=12 Media=4,5,6 (GroupName=Port numbers in the group)<br>
-    set name TV on  or set name Media toggle </li><br>
-    <li>ledconnect -> </li><br>
-    <li>subDevices -> use a single sub devices for each out port (default 1) requires 98_UbiquitiOut.pm</li><br>
-    <li>interval -> polling interval in seconds, set to 0 to disable polling (default 60)</li><br>
-    <li>timeout -> seconds to wait for a answer from the Power Module (default 2)</li><br>
-    <li>user -> defined user on the Power Module (default ubnt)</li><br>
+    set name TV on  or set name Media toggle </li>
+    <li>ledconnect -> led color since fhem connect</li>
+    <li>subDevices -> use a single sub devices for each out port<br> 
+    (default 1 for the 3 and 6 port mPower, default 0 for the mPower mini) requires 98_UbiquitiOut.pm</li>
+    <li>interval -> polling interval in seconds, set to 0 to disable polling (default 300)</li>
+    <li>timeout -> seconds to wait for a answer from the Power Module (default 5 seconds)</li>
+    <li>user -> defined user on the Power Module (default ubnt)</li>
     <li>password -> password for user (default ubnt)</li>
   </ul>
  <br>
  </ul>
 =end html
+
+=begin html_DE
+
+<a name="UbiquitiMP"></a>
+<h3>UbiquitiMP</h3>
+<ul>
+  <table>
+  <tr><td>
+  FHEM Modul f&uuml;r die Ubiquiti mFi mPower Schaltsteckdosen<br>
+  Mehr Informationen zu den verschiedenen mPower Modellen im <a href="http://www.fhemwiki.de/wiki/Ubiquit_mFi/mPower">Wiki</a> unter http://www.fhemwiki.de/wiki/Ubiquit_mFi/mPower<br>
+  FHEM Forum : http://forum.fhem.de/index.php/topic,35722.0.html 
+  </td></tr></table>
+  <a name="UbiquitiMPdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; UbiquitiMP &lt;IP or FQDN&gt;</code><br> 
+    Beispiel :<br>
+    define Ubi UbiquitiMP 192.168.0.100<br>
+    define Ubi UbiquitiMP myhost.dyndns.org<br>
+    Perl Net::Telnet und das Perl JSON Modul werden ben&ouml;tigt. 
+    Bei einem Raspberry Pi k&ouml;nnen diese leicht mit den folgenden beiden Befehlen installiert werden:<br>
+    apt-get install libjson-perl<br>
+    apt-get install libnet-telnet-perl
+  </ul>
+  <br>
+  <a name="UbiquitiMPset"></a>
+  <b>Set </b>
+  <ul>
+    <li>Outx on / off (force) -> schaltet den Port x an oder aus</li>
+    <li>Outx toggle -> schaltet den Port aus wenn er an ist und umgekehrt</li>
+    <li>Outx lock / unlock -> Ist lock bei einem Port gesetzt kann er nicht mehr an oder aus geschaltet werden</li>
+    <li>Outx reset -> setzt den internen Verbrauchsz&auml;hler f&uuml;r diesen Port zur&uuml;ck</li>
+    <li>Outx enable / disable -> interne Verbrauchsmessung f&uuml;r diesen Port ein / aus schalten</li>
+    <br><b>Bei der mPower mini entf&auml;llt die Angabe von Outx !</b><br>
+    Zus&auml;tzlich unterst&uuml;tzt die mini die <a href="#setExtensions">set Extensions</a> direkt
+   </ul>
+  <a name="UbiquitiMPget"></a>
+  <b>Get</b>
+  <ul>
+   <li>status -> Gibt den aktuellen Status aller Ports zur&uuml;ck</li>
+   <li>info -> liefert einige interne Parameter des Ger&auml;tes</li>
+   <li>reboot -> Startet das Ger&auml;t neu</li><br>
+  </ul>
+  <a name="UbiquitiMPattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>ignoreList -> Liste der Ports die bei Abfragen ignoriert werden sollen, Bsp. <code>attr Ubi ignoreList 456</code><br>
+    ignoriert alle Werte der Ports 4,5 und 6</li><br>
+    <li>groupPorts -> Durch Kommas getrennte Liste um Ports in Gruppen zusammen zu fassen.<br>
+    Die Gruppen k&ouml;nnen danach wie win einzelner Port behandelt werden.<br>
+    Bsp. <code>attr Ubi groupList TV=12 Media=4,5,6</code> (GruppenName=Port Nummer des Ports in der Gruppe)<br>
+    <code>set Ubi TV on</code> oder <code>set Ubi Media toggle</code></li><br>
+    <li>ledconnect -> Farbe der LED beim Zugriff mit fhem</li><br>
+    <li>subDevices -> Legt f&uuml;r jeden Port ein eigenes Subdevice an<br> 
+    (Default 1 f&uuml;r die 3 and 6 Port mPower, Default 0 f&uuml;r die mPower 1 Port mini) ben&ouml;tigt zus&auml;tzlich das Modul 98_UbiquitiOut.pm</li><br>
+    <li>interval -> Abfrage Interval in Sekunden, kann ausgeschaltet werden mit dem Wert 0 (Default ist 300)</li><br>
+    <li>timeout -> Wartezeit in Sekunden bevor eine Abfrage mit einer Fehlermeldung abgebrochen wird (Default ist 5 Sekunden)<br>
+    Werte unter zwei Sekunden werden vom Modul nicht angenommen !</li><br>
+    <li>user -> Login Username (Default ubnt)</li><br>
+    <li>password -> Login Passwort (Default ubnt)</li>
+  </ul>
+ <br>
+ </ul>
+=end html_DE
+=cut
+
