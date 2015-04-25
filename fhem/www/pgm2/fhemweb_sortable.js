@@ -154,8 +154,8 @@ FW_sortableCreateTable(elements, selected)
         table += '<td align="center"><b>Selected</b><ul class="sortable-dest">';   
       
         for(var i=0; i<selected.length; i++) {
-            if(selected[i].trim().length) 
-            table+='<li class="sortable-item ui-state-default" '+($.inArray(selected[i], elements) != -1 ? 'key="'+$.inArray(selected[i], elements)+'" ' : '')+'value="'+selected[i]+'">'+selected[i]+'</li>';
+            if(selected[i].trim().length && (elements[0] == "sortable"  || (elements[0] == "sortable-strict" && $.inArray(selected[i], elements) != -1)))
+                table+='<li class="sortable-item ui-state-default" '+($.inArray(selected[i], elements) != -1 ? 'key="'+$.inArray(selected[i], elements)+'" ' : '')+'value="'+selected[i]+'">'+selected[i]+'</li>';
         }
     }
     else if(elements[0] == "sortable-given")
