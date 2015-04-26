@@ -1039,7 +1039,8 @@ sub CUL_HM_Parse($$) {#########################################################
         my $chn = hex($mI[0])& 0x3f;
         my $cName = CUL_HM_id2Name($src.sprintf("%02X",$chn));
         my $bCnt = hex($mI[1]);
-        push @evtEt,[$defs{$cName},1,"trig_aes_$dname:$aesStat:$bCnt"];
+        push @evtEt,[$defs{$cName},1,"trig_aes_$dname:$aesStat:$bCnt"] 
+              if (defined $defs{$cName});
 
         if($aesStat eq "ok"                     #aes ok
            && defined $devH->{cmdStacAESPend}   #commands waiting
@@ -2978,24 +2979,27 @@ sub CUL_HM_updtSDTeam(@){#in: TeamName, optional caller name and its new state
 sub CUL_HM_pushEvnts(){########################################################
   #write events to Readings and collect touched devices
   my @ent = ();
-  @evtEt = sort {($a->[0] cmp $b->[0])|| ($a->[1] cmp $b->[1])} @evtEt;
-  $evtDly = 0;# switch delay trigger off
-  my ($h,$x) = ("","");
-  my @evts = ();
-  foreach my $e(@evtEt){
-    if(scalar(@{$e} != 3)){
-      Log 2,"CUL_HM set reading invalid:".join(",",@{$e});
-      next;
+  if (scalar(@evtEt) > 0){
+    @evtEt = sort {($a->[0] cmp $b->[0])|| ($a->[1] cmp $b->[1])} @evtEt;
+    $evtDly = 0;# switch delay trigger off
+    my ($h,$x) = ("","");
+    my @evts = ();
+    foreach my $e(@evtEt){
+      if(scalar(@{$e} != 3)){
+        Log 2,"CUL_HM set reading invalid:".join(",",@{$e});
+        next;
+      }
+      if ($h ne ${$e}[0] || $x ne ${$e}[1]){
+        push @ent,CUL_HM_UpdtReadBulk($h,$x,@evts);
+        @evts = ();
+        ($h,$x) = (${$e}[0],${$e}[1]);
+      }
+      push @evts,${$e}[2] if (${$e}[2]);
     }
-    if ($h ne ${$e}[0] || $x ne ${$e}[1]){
-      push @ent,CUL_HM_UpdtReadBulk($h,$x,@evts);
-      @evts = ();
-      ($h,$x) = (${$e}[0],${$e}[1]);
-    }
-    push @evts,${$e}[2] if (${$e}[2]);
+    @evtEt = ();
+    push @ent,CUL_HM_UpdtReadBulk($h,$x,@evts);
   }
-  @evtEt = ();
-  push @ent,CUL_HM_UpdtReadBulk($h,$x,@evts);
+
   return @ent;
 }
 
@@ -3722,8 +3726,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $rName =~ s/_chn:.*//;
       my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
       if ($curVal !~ m/^(set_|)(\d+)$/){
-	    return "peer required for $regName" if ($curVal =~ m/peer/);
-	    return "cannot calculate value. Please issue set $name getConfig first - $curVal";
+	return "peer required for $regName" if ($curVal =~ m/peer/);
+	return "cannot calculate value. Please issue set $name getConfig first - $curVal";
       }
                  ;
       $curVal = $2; # we expect one byte in int, strap 'set_' possibly
