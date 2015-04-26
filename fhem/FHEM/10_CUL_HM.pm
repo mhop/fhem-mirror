@@ -1820,8 +1820,11 @@ sub CUL_HM_Parse($$) {#########################################################
     if($mTp eq "40") {
       my ($chn) = map{hex($_)} ($mI[0]);# button/event count 
       my $btnName;
+      my $bat   = ($chn&0x80)?"low":"ok";
+      my $type  = ($chn & 0x40)?"l":"s";
       my $state = ($chn & 0x40)?"Long":"Short";
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$chn&0x3f)};
+      $chn = $chn & 0x3f;
+      my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$chn)};
 
       if ($chnHash){# use userdefined name - ignore irritating on-off naming
         $btnName = $chnHash->{NAME};
@@ -1830,15 +1833,13 @@ sub CUL_HM_Parse($$) {#########################################################
         $chnHash = $shash;
         $btnName = "Btn$chn";
       }
-      if($chn & 0x40){# long press
+      if($type eq "l"){# long press
         $state .= ($mFlgH & 0x20 ? "Release" : "");
       }
 
-      $shash->{helper}{addVal} = $chn;   #store to handle changesFread
-      push @evtEt,[$devH,1,"battery:". (($chn&0x80)?"low":"ok")];
+      push @evtEt,[$devH,1,"battery:$bat"];
       push @evtEt,[$devH,1,"state:$btnName $state"];
       if($md eq "HM-Dis-WM55"){
-        my $type = ($chn & 0x40)?"l":"s";
         if ($devH->{cmdStack}){# there are pending commands. we only send new ones
           delete $devH->{cmdStack};
           delete $devH->{cmdStacAESPend};
