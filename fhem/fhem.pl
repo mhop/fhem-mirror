@@ -4042,7 +4042,7 @@ notifyRegexpChanged($$)
   my $dev;
   $dev = $1 if(($re =~ m/^([^:]*)$/ || $re =~ m/^([^:]*):(.*)$/));
 
-  if($dev && defined($defs{$dev}) && $re !~ m/\|/) {
+  if($dev && defined($defs{$dev})) {
     $hash->{NOTIFYDEV} = $dev;
   } else {
     delete($hash->{NOTIFYDEV}); # when called by modify
