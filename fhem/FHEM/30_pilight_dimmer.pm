@@ -1,5 +1,4 @@
 ##############################################
-# $Id: 20_pilight_dimmer.pm 2015-02-26 Risiko $
 #
 # Usage
 # 
@@ -115,6 +114,7 @@ sub pilight_dimmer_Set($$)
   Log3 $me, 4, "$me(Set): $msg";
   
   IOWrite($hash, $msg);
+  return undef;
 }
 
 

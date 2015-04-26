@@ -1,5 +1,4 @@
 ##############################################
-# $Id: 20_pilight_switch.pm 0.11 2015-03-29 Risiko $
 #
 # Usage
 # 
@@ -109,6 +108,7 @@ sub pilight_switch_Set($$)
   
   my $msg = "$me,$v";
   IOWrite($hash, $msg);
+  return undef;
 }
 
 
