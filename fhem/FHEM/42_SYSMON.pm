@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.5";
+my $VERSION = "2.1.8";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -93,6 +93,7 @@ use constant {
   ETH0        => "eth0",
   WLAN0       => "wlan0",
   DIFF_SUFFIX => "_diff",
+  SPEED_SUFFIX => "_speed",
   IP_SUFFIX   => "_ip",
   IP6_SUFFIX  => "_ip6",
   FB_WLAN_STATE       => "wlan_state",
@@ -251,16 +252,20 @@ SYSMON_updateCurrentReadingsMap($) {
   if(SYSMON_isCPUFreqRPiBBB($hash)) {
     $rMap->{"cpu_freq"}       = "CPU frequency";
     $rMap->{"cpu0_freq"}       = "CPU frequency";
+    $rMap->{"cpu_freq_stat"}       = "CPU frequency stat";
+    $rMap->{"cpu0_freq_stat"}       = "CPU frequency stat";
   }
   foreach my $li (0..7) {
     if(SYSMON_isCPUXFreq($hash, $li)) {
       $rMap->{"cpu".$li."_freq"}        = "CPU frequency (core $li)";
+      $rMap->{"cpu".$li."_freq_stat"}        = "CPU frequency (core $li) stat";
     }
   }
   if(SYSMON_isCPUTempRPi($hash) || SYSMON_isCPUTempBBB($hash) || SYSMON_isCPUTempFB($hash)) {
     #$rMap->{+CPU_TEMP}       = "CPU Temperatur";
     #$rMap->{"cpu_temp_avg"}  = "Durchschnittliche CPU Temperatur";
     $rMap->{+CPU_TEMP}        = "CPU temperature";
+    $rMap->{+CPU_TEMP.'_stat'}= "CPU temperature stat";
     #$rMap->{"cpu0_temp"}      = "CPU temperature (core 0)";
     $rMap->{"cpu_temp_avg"}   = "Average CPU temperature";
     #$rMap->{"cpu0_temp_avg"}   = "Average CPU temperature (core 0)";
@@ -268,7 +273,8 @@ SYSMON_updateCurrentReadingsMap($) {
   foreach my $li (0..7) {
     if(SYSMON_isCPUTemp_X($hash, $li)) {
       $rMap->{"cpu".$li."_temp"}      = "CPU temperature (core $li)";
-      $rMap->{"cpu".$li."_temp_avg"}   = "Average CPU temperature (core $li)";
+      $rMap->{"cpu".$li."_temp_avg"}  = "Average CPU temperature (core $li)";
+      $rMap->{"cpu".$li."_temp_stat"} = "CPU temperature stat (core $li)";
     }
   }  
   
@@ -340,6 +346,7 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{"stat_cpu_diff"}     = "CPU statistics (diff)";
   $rMap->{"stat_cpu_percent"}  = "CPU statistics (diff, percent)";
   $rMap->{"stat_cpu_text"}     = "CPU statistics (text)";
+  $rMap->{"cpu_idle_stat"}     = "CPU min/max/avg (idle)";
   
   $rMap->{"stat_cpu_user_percent"} = "CPU statistics user %";
   $rMap->{"stat_cpu_nice_percent"} = "CPU statistics nice %";
@@ -355,6 +362,7 @@ SYSMON_updateCurrentReadingsMap($) {
     $rMap->{"stat_cpu".$i."_diff"}    = "CPU".$i." statistics (diff)";
     $rMap->{"stat_cpu".$i."_percent"} = "CPU".$i." statistics (diff, percent)";
     $rMap->{"stat_cpu".$i."_text"} = "CPU".$i." statistics (text)";
+    $rMap->{"cpu".$i."_idle_stat"}     = "CPU".$i." min/max/avg (idle)";
   }
   
   # Filesystems <readingName>[:<mountPoint>[:<Comment>]]
@@ -407,6 +415,7 @@ SYSMON_updateCurrentReadingsMap($) {
       
       $rMap->{$nName}           =  $nPt;
       $rMap->{$nName."_diff"}   =  $nPt." (diff)";
+      $rMap->{$nName."_speed"}   =  $nPt." (speed)";
       $rMap->{$nName."_rx"}     =  $nPt." (RX)";
       $rMap->{$nName."_tx"}     =  $nPt." (TX)";
       $rMap->{$nName."_ip"}     =  $nPt." (IP)";
@@ -420,6 +429,7 @@ SYSMON_updateCurrentReadingsMap($) {
       my $nName = "ath0";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -428,6 +438,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "ath1";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -436,6 +447,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "cpmac0";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -444,6 +456,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "dsl";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -452,6 +465,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = ETH0;
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -460,6 +474,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "guest";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -468,6 +483,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "hotspot";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -476,6 +492,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "lan";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -484,6 +501,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = "vdsl";
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -493,6 +511,7 @@ SYSMON_updateCurrentReadingsMap($) {
       my $nName = ETH0;
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -501,6 +520,7 @@ SYSMON_updateCurrentReadingsMap($) {
       $nName = WLAN0;
       $rMap->{$nName}         = "Network adapter ".$nName;
       $rMap->{$nName."_diff"} = "Network adapter ".$nName." (diff)";
+      $rMap->{$nName."_speed"} = "Network adapter ".$nName." (speed)";
       $rMap->{$nName."_rx"} = "Network adapter ".$nName." (RX)";
       $rMap->{$nName."_tx"} = "Network adapter ".$nName." (TX)";
       $rMap->{$nName."_ip"} = "Network adapter ".$nName." (IP)";
@@ -1376,6 +1396,25 @@ SYSMON_getValues($;@)
   return \%shadow_map;
 }
 
+sub SYSMON_getComputeStat($$$$) {
+	my ($hash, $map, $val, $name) = @_;
+	
+	my $t = ReadingsVal($hash->{NAME},$name,"$val $val $val");
+	
+	my($min, $max, $avg) = split(/ /,$t);
+	$min = $val if $min>$val;
+	$max = $val if $max<$val;
+	$avg = (3*$avg + $val)/4;
+	
+	$t = sprintf( "%.2f %.2f %.2f", $min, $max, $avg );
+	
+	$map->{$name} = $t;
+	
+	#SYSMON_Log($hash, 3, ">>>>>>>>>>>>>>>>> ".$name." => $t");
+	
+	return $map;
+}
+
 #------------------------------------------------------------------------------
 # Liest Benutzerdefinierte Eintraege
 #------------------------------------------------------------------------------
@@ -1502,7 +1541,9 @@ SYSMON_getUptime($$)
       # Anzahl Cores beruecksichtigen
       my $core_num = SYSMON_getCPUCoreNum_intern($hash);
       my $idle_percent = $idle/($uptime*$core_num)*100;
-    
+      
+      $idle = $idle/$core_num;
+
       $map->{+UPTIME}=sprintf("%d",$uptime);
       #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
       $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
@@ -1634,6 +1675,9 @@ SYSMON_getCPUTemp_RPi($$) {
   $map->{+CPU_TEMP}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
   $map->{+CPU_TEMP_AVG}="$t_avg";
+  
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_TEMP."_stat");
+  
   return $map;
 }
 
@@ -1655,6 +1699,9 @@ SYSMON_getCPUTemp_BBB($$) {
   $map->{+CPU_TEMP_AVG}=$t_avg;  
   $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu0_temp_avg",$val_txt) + $val_txt ) / 4 );
   $map->{"cpu0_temp_avg"}=$t_avg;  
+  
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_TEMP."_stat");
+  
   return $map;
 }
 
@@ -1675,6 +1722,9 @@ SYSMON_getCPUTemp_X($$;$) {
   $map->{"cpu".$cpuNum."_temp"}="$val_txt";
   my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},"cpu".$cpuNum."_temp_avg",$val_txt) + $val_txt ) / 4 );
   $map->{"cpu".$cpuNum."_temp_avg"}=$t_avg;  
+  
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, "cpu".$cpuNum."_temp"."_stat");
+  
   return $map;
 }
 
@@ -1695,6 +1745,9 @@ SYSMON_getCPUTemp_FB($$) {
       $map->{+CPU_TEMP}="$val_txt";
       my $t_avg = sprintf( "%.1f", (3 * ReadingsVal($hash->{NAME},CPU_TEMP_AVG,$val_txt) + $val_txt ) / 4 );
       $map->{+CPU_TEMP_AVG}="$t_avg";
+      
+      $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_TEMP."_stat");
+      
     }
   }
   return $map;
@@ -1710,15 +1763,17 @@ SYSMON_getCPUFreq($$;$) {
   if($hash->{helper}->{excludes}{'cpufreq'}) {return $map;}
   
   $cpuNum = 0 unless defined $cpuNum;
-  my $val = SYSMON_execute($hash, "cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1");
+  my $val = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1 || echo 0");
   $val = int($val);
   my $val_txt = sprintf("%d", $val/1000);
   if($cpuNum == 0) {
   	# aus Kompatibilitaetsgruenden
     $map->{+CPU_FREQ}="$val_txt";
+    #$map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_FREQ."_stat");
   }
   
   $map->{"cpu".$cpuNum."_freq"}="$val_txt";
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, "cpu".$cpuNum."_freq"."_stat");
   
   return $map;
 }
@@ -1995,8 +2050,8 @@ SYSMON_getCPUProcStat_intern($$$)
 {
   my ($hash, $map, $entry) = @_;
   
-  my($pName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($entry));
-  $pName = "stat_".$pName;
+  my($tName, $neuCPUuser, $neuCPUnice, $neuCPUsystem, $neuCPUidle, $neuCPUiowait, $neuCPUirq, $neuCPUsoftirq) = split(/\s+/, trim($entry));
+  my $pName = "stat_".$tName;
   $map->{$pName}=$neuCPUuser." ".$neuCPUnice." ".$neuCPUsystem." ".$neuCPUidle." ".$neuCPUiowait." ".$neuCPUirq." ".$neuCPUsoftirq;
   
   my $lastVal = ReadingsVal($hash->{NAME},$pName,undef);
@@ -2024,6 +2079,8 @@ SYSMON_getCPUProcStat_intern($$$)
     
     $map->{$pName."_percent"}=sprintf ("%.2f %.2f %.2f %.2f %.2f %.2f %.2f",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
     $map->{$pName."_text"}=sprintf ("user: %.2f %%, nice: %.2f %%, sys: %.2f %%, idle: %.2f %%, io: %.2f %%, irq: %.2f %%, sirq: %.2f %%",$PercentCPUuser,$PercentCPUnice,$PercentCPUsystem,$PercentCPUidle,$PercentCPUiowait,$PercentCPUirq,$PercentCPUsoftirq);
+    
+    $map = SYSMON_getComputeStat($hash, $map, $PercentCPUidle, $tName."_idle_stat");
   }
 
   return $map;
@@ -2603,6 +2660,11 @@ sub SYSMON_getNetworkInfo ($$$) {
         if($d_tt<0) {$d_tt=0;}
         my $out_txt_diff = "RX: ".sprintf ("%.2f", $d_rx)." MB, TX: ".sprintf ("%.2f", $d_tx)." MB, Total: ".sprintf ("%.2f", $d_tt)." MB";
         $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
+      }
+      
+      my $speed = SYSMON_execute($hash, "[ -f /sys/class/net/eth0/speed ] && cat /sys/class/net/eth0/speed || echo not available");
+      if(defined($speed)) {
+      	 $map->{$nName.SPEED_SUFFIX} = $speed;
       }
     }
   } else {
@@ -3662,7 +3724,7 @@ sub SYSMON_Open_Connection($)
    $telnet->print( $pwd );
 
    SYSMON_Log($hash, 5, "Wait for command prompt");
-   my $tlogin_prompt=AttrVal($name,'telnet-login-prompt-regx','(#|\$)\s*$|Login failed.');
+   my $tlogin_prompt=AttrVal($name,'telnet-login-prompt-regx','(#|\$|>)\s*$|Login failed.');
    #unless ( ($before,$match) = $telnet->waitfor( '/# $|Login failed./i' ))
    unless ( ($before,$match) = $telnet->waitfor( '/'.$tlogin_prompt.'/i' ))
    {
@@ -4069,6 +4131,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
     </li>
     <br>
+    <li>Network Speed (if avialable)<br>
+    speed of the network connection.
+    <br>
+    Examples:<br>
+    <code>eth0_speed 100</code><br>
+    </li>
+    <br>
     <li>File system information<br>
       Usage of the desired file systems.<br>
       Example:<br>
@@ -4171,7 +4240,25 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
         The capacity must be defined in script.bin (e.g. ct-hdmi.bin). Parameter name pmu_battery_cap. Convert with bin2fex (bin2fex -> script.fex -> edit -> fex2bin -> script.bin).<br>
     </li>
+    <br>
+    <li>cpuX_freq_stat<br>
+        Frequency statistics for CPU X: minimum,  maximum und average values<br>
+        Example:<br>
+        <code>cpu0_freq_stat: 100 1000 900</code><br>
+    </li>
     <br>    
+        <li>cpuX_idle_stat<br>
+        Idle statistik for CPU X: minimum,  maximum und average values<br>
+        Example:<br>
+        <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
+    </li>
+    <br>       
+        <li>cpu_temp_stat<br>
+        Temperature statistik for CPU: minimum,  maximum und average values<br>
+        Example:<br>
+        <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
+    </li>
+    <br>
   <br>
   </ul>
 
@@ -4673,6 +4760,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
     </li>
     <br>
+    <li>Network Speed (wenn verf&uuml;gbar)<br>
+    Geschwindigkeit der aktuellen Netzwerkverbindung.
+    <br>
+    Beispiel:<br>
+    <code>eth0_speed 100</code><br>
+    </li>
+    <br>
     <li>Dateisysteminformationen<br>
         Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
         Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
@@ -4780,6 +4874,24 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Die Kapazit&auml;t soll in script.bin (z.B. ct-hdmi.bin) eingestellt werden (Parameter pmu_battery_cap). Mit bin2fex konvertieren (bin2fex -> script.fex -> edit -> fex2bin -> script.bin)<br>
     </li>
     <br>    
+    <li>cpuX_freq_stat<br>
+        Frequenz-Statistik f&uuml;r die CPU X: Minimum,  Maximum und Durchschnittswert<br>
+        Beispiel:<br>
+        <code>cpu0_freq_stat: 100 1000 900</code><br>
+    </li>
+    <br>    
+        <li>cpuX_idle_stat<br>
+        Leerlaufzeit-Statistik f&uuml;r die CPU X: Minimum,  Maximum und Durchschnittswert<br>
+        Beispiel:<br>
+        <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
+    </li>
+    <br>    
+        <li>cpu[X]_temp_stat<br>
+        Temperatur-Statistik f&uuml;r CPU: minimum,  maximum und average values<br>
+        Beispiel:<br>
+        <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
+    </li>
+    <br>
   <br>
   </ul>
 
@@ -4976,7 +5088,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Diese Werte werden entsprechend den Parameter &lt;reading_nameX&gt; in Readings &uuml;bernommen.<br>
     Ein Perlausdruck muss in geschweifte Klammer eingeschlossen werden und kann folgende Paramter verwenden: $HASH (Device-Hash) und $NAME (Device-Name).
     R&uuml;ckgabe wird analog einer Perlfunktion erwartet.<br>
-    Wichtig! Die Trennung zwischen mehreren Benutzerfunktionen muss mit einem Komma UND einem Leerzeichen erfolgen! Innerhalb der Funktiondefinition dürfen Kommas nicht durch Leerzeichen gefolgt werden.
+    Wichtig! Die Trennung zwischen mehreren Benutzerfunktionen muss mit einem Komma UND einem Leerzeichen erfolgen! Innerhalb der Funktiondefinition d&uuml;rfen Kommas nicht durch Leerzeichen gefolgt werden.
     </li>
     <br>
     <li>disable<br>
