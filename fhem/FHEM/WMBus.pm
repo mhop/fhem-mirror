@@ -39,6 +39,9 @@ use constant {
 	CI_RESP_4 => 0x7a,  # Response from device, 4 Bytes
 	CI_RESP_12 => 0x72, # Response from device, 12 Bytes
 	CI_RESP_0 => 0x78,  # Response from device, 0 Byte header, variable length
+	CI_ERROR => 0x70,   # Error from device, only specified for wired M-Bus but used by Easymeter WMBUS module
+	CI_TL_4 => 0x8a,    # Transport layer from device, 4 Bytes
+	CI_TL_12 => 0x8b,   # Transport layer from device, 12 Bytes
 	
 	# DIF types (Data Information Field), see page 32
 	DIF_NONE => 0x00,
@@ -421,6 +424,13 @@ my %VIFInfo = (
     unit         => '',
     calcFunc     => \&valueCalcNumeric,
   },
+  VIF_OWNER_NO =>  {                          # Eigentumsnummer (used by Easymeter even though the standard allows this only for writung to a slave)
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b01111001,
+    bias         => 0,
+    unit         => '',
+  },  
   VIF_AVERAGING_DURATION_SEC      => {                     #  seconds
     typeMask     => 0b01111111,
     expMask      => 0b00000000,
@@ -744,6 +754,41 @@ my %VIFInfo_other = (
     unit         => '',
     calcFunc     => \&valueCalcMultCorr1000,
   },  
+  VIF_FUTURE_VALUE => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b01111110,
+    bias         => 0,
+    unit         => '',
+  },  
+  VIF_MANUFACTURER_SPECIFIC => {
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b01111111,
+    bias         => 0,
+    unit         => 'manufacturer specific',
+  },  
+  
+);
+
+# For Easymeter (manufacturer specific)
+my %VIFInfo_ESY = (       
+  VIF_ELECTRIC_POWER_PHASE => {
+    typeMask     => 0b01000000,
+    expMask      => 0b00000000,
+    type         => 0b00000000,
+    bias         => -2,
+    unit         => 'W',
+    calcFunc     => \&valueCalcNumeric,
+  },
+  VIF_ELECTRIC_POWER_PHASE_NO => {
+    typeMask     => 0b01111110,
+    expMask      => 0b00000000,
+    type         => 0b00101000,
+    bias         => 0,
+    unit         => 'phase #',
+    calcFunc     => \&valueCalcNumeric,
+  },
 );
 
 # see 4.2.3, page 24
@@ -791,6 +836,10 @@ my %validDeviceTypes = (
  0x28 => 'Waste water',
  0x29 => 'Garbage',
  0x2a => 'Carbon dioxide',
+ 0x31 => 'OMS MUC',
+ 0x32 => 'OMS unidirectional repeater',
+ 0x33 => 'OMS bidirectional repeater',
+ 0x37 => 'Radio converter (Meter side)',
 );
 
 
@@ -984,7 +1033,11 @@ sub findVIF($$$) {
         
         $dataBlockRef->{type} = $vifType;
         $dataBlockRef->{unit} = $vifInfoRef->{$vifType}{unit};
-        $dataBlockRef->{valueFactor} = 10 ** ($dataBlockRef->{exponent} + $bias);
+        if (defined $dataBlockRef->{exponent} && defined $bias) {
+          $dataBlockRef->{valueFactor} = 10 ** ($dataBlockRef->{exponent} + $bias);
+        } else {
+          $dataBlockRef->{valueFactor} = 1;
+        }
         $dataBlockRef->{calcFunc} = $vifInfoRef->{$vifType}{calcFunc};
         
         #printf("type %s bias %d exp %d valueFactor %d unit %s\n", $dataBlockRef->{type}, $bias, $dataBlockRef->{exponent}, $dataBlockRef->{valueFactor},$dataBlockRef->{unit});
@@ -1015,6 +1068,7 @@ sub decodeValueInformationBlock($$$) {
   $dataBlockRef->{type}	= '';
   # The unit and multiplier is taken from the table for primary VIF
   $vifInfoRef = \%VIFInfo;
+  
 
 	EXTENSION: while (1) {
 		$vif = unpack('C', substr($vib,$offset++,1));
@@ -1050,17 +1104,32 @@ sub decodeValueInformationBlock($$$) {
       $analyzeVIF = 0;
 			last EXTENSION;
 		} elsif ($vif == 0x7F) {
-			# manufacturer specific data, can't be interpreted
-			$dataBlockRef->{type} = "MANUFACTURER SPECIFIC";
-			$dataBlockRef->{unit} = "";
-			$analyzeVIF = 0;
-			last EXTENSION;
+			
+			if ($self->{manufacturer} eq 'ESY') {
+        # Easymeter
+        $vif = unpack('C', substr($vib,$offset++,1));
+        $vifInfoRef = \%VIFInfo_ESY;
+      } else {
+        # manufacturer specific data, can't be interpreted
+        
+        $dataBlockRef->{type} = "MANUFACTURER SPECIFIC";
+        $dataBlockRef->{unit} = "";
+        $analyzeVIF = 0;
+			}
+      last EXTENSION;
 	  } else {
 	    # enhancement of VIFs other than $FD and $FB (see page 84ff.)
 	    #print "other extension\n";
       $dataBlockExt = {};
-      $dataBlockExt->{value} = $vif;
-      if (findVIF($vif, \%VIFInfo_other, $dataBlockExt)) {
+      if ($self->{manufacturer} eq 'ESY') {
+        $vifInfoRef = \%VIFInfo_ESY;
+        $dataBlockExt->{value} = unpack('C',substr($vib,2,1)) * 100;
+      } else {
+        $dataBlockExt->{value} = $vif;
+        $vifInfoRef = \%VIFInfo_other;
+      }
+      
+      if (findVIF($vif, $vifInfoRef, $dataBlockExt)) {
         push @VIFExtensions, $dataBlockExt;
       } else {
         $dataBlockRef->{type} = 'unknown';
@@ -1230,8 +1299,7 @@ sub decodePayload($$) {
 			$value = $words[0] + $words[1] << 16 + $words[2] << 32;
 			$offset += 6;
 		} elsif ($dataBlock->{dataField} == DIF_INT64) {
-			my @lwords = unpack('VV', substr($payload, $offset, 8));
-			$value = $lwords[0] + $lwords[1] << 32; 
+			$value = unpack('Q<', substr($payload, $offset, 8));
 			$offset += 8;
 		} elsif ($dataBlock->{dataField} == DIF_FLOAT32) {
 			#not allowed according to wmbus standard, Qundis seems to use it nevertheless
@@ -1240,13 +1308,19 @@ sub decodePayload($$) {
 		} elsif ($dataBlock->{dataField} == DIF_VARLEN) {
 			my $lvar = unpack('C',substr($payload, $offset++, 1));
 			#print "in datablock $dataBlockNo: LVAR field " . sprintf("%x", $lvar) . "\n";
+			#printf "payload len %d offset %d\n", length($payload), $offset;
 			if ($lvar <= 0xbf) {
 				if ($dataBlock->{type} eq "MANUFACTURER SPECIFIC") {
 					# special handling, LSE seems to lie about this
 					$value = unpack('H*',substr($payload, $offset, $lvar));
+					#print "VALUE: " . $value . "\n";
 				} else {
 					#  ASCII string with LVAR characters
 					$value = unpack('a*',substr($payload, $offset, $lvar));
+          if ($self->{manufacturer} eq 'ESY') {
+            # Easymeter stores the string backwards!
+            $value = reverse($value);
+          }
 				}
         $offset += $lvar;
       } elsif ($lvar >= 0xc0 && $lvar <= 0xcf) {
@@ -1286,6 +1360,7 @@ sub decodePayload($$) {
 		for my $VIFExtension (@$VIFExtensions) {
 		  $dataBlock->{extension} = $VIFExtension->{unit};
       if (defined $VIFExtension->{calcFunc}) {
+        #printf("Extension value %d, valueFactor %d\n", $VIFExtension->{value}, $VIFExtension->{valueFactor});
         $dataBlock->{extension} .= ", " . $VIFExtension->{calcFunc}->($VIFExtension->{value}, $dataBlock); 
       } elsif (defined $VIFExtension->{value}) {
         $dataBlock->{extension} .= ", " . sprintf("%x",$VIFExtension->{value});
@@ -1358,7 +1433,7 @@ sub decodeApplicationLayer($) {
 		# unsupported
     $self->{cw} = 0;
     $self->decodeConfigword();
-		$self->{errormsg} = 'Unsupported CI Field ' . sprintf("%x", $self->{cifield});
+		$self->{errormsg} = 'Unsupported CI Field ' . sprintf("%x", $self->{cifield}) . ", remaining payload is " . unpack("H*", substr($applicationlayer,$offset));
 		$self->{errorcode} = ERR_UNKNOWN_CIFIELD;
 		return 0;
 	}
@@ -1383,6 +1458,7 @@ sub decodeApplicationLayer($) {
       $payload = $self->decrypt(substr($applicationlayer,$offset));
       if (unpack('n', $payload) == 0x2f2f) {
         $self->{decrypted} = 1;
+        #printf("decrypted payload %s\n", unpack("H*", $payload));
       } else {
         # Decryption verification failed
         $self->{errormsg} = 'Decryption failed, wrong key?';
