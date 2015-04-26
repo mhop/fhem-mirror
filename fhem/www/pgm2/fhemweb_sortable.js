@@ -70,6 +70,7 @@ FW_sortableCreate(elName, devName, vArr, currVal, set, params, cmd)
         
         FW_sortableSrcListSort();
         FW_sortableUpdateLinks();
+        return false;
     });
     
     // add click handler for quick add by click on list item in source list
@@ -91,6 +92,7 @@ FW_sortableCreate(elName, devName, vArr, currVal, set, params, cmd)
                 FW_sortableUpdateLinks();
             }
         });
+        return false;
     });
         
     // create the dialog
