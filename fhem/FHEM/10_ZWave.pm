@@ -12,10 +12,7 @@ sub ZWave_Parse($$@);
 sub ZWave_Set($@);
 sub ZWave_Get($@);
 sub ZWave_Cmd($$@);
-sub ZWave_ParseMeter($$);
-sub ZWave_ParseScene($);
 sub ZWave_SetClasses($$$$);
-sub ZWave_getParse($$$);
 
 use vars qw(%zw_func_id);
 use vars qw(%zw_type6);
@@ -71,7 +68,7 @@ my %zwave_class = (
   SCENE_ACTIVATION         => { id => '2b',
     set   => { sceneActivate => "01%02x%02x",}, 
     parse => { "042b01(..)(..)"  => '"scene_$1:$2"',
-               "042b01(..)ff" => 'ZWave_ParseScene($1)',}, },
+               "042b01(..)ff" => 'ZWave_sceneParse($1)',}, },
   SCENE_ACTUATOR_CONF      => { id => '2c',
     set   => { sceneConfig => "01%02x%02x80%02x",},
     get   => { sceneConfig => "02%02x",          },
@@ -93,10 +90,10 @@ my %zwave_class = (
                },},
   SENSOR_MULTILEVEL        => { id => '31', 
     get   => { smStatus    => "04" },
-    parse => { "..3105(..)(..)(.*)" => 'ZWave_ParseMultilevel($1,$2,$3)'},},
+    parse => { "..3105(..)(..)(.*)" => 'ZWave_multilevelParse($1,$2,$3)'},},
   METER                    => { id => '32',
     get   => { meter       => "01" },
-    parse => { "..3202(.*)"=> 'ZWave_ParseMeter($hash, $1)' }, },
+    parse => { "..3202(.*)"=> 'ZWave_meterParse($hash, $1)' }, },
   COLOR_CONTROL            => { id => '33',
     get   => { ccCapabilityGet  => '01', # no more args
                ccStatus    => '03', # no more args
@@ -199,7 +196,10 @@ my %zwave_class = (
   CENTRAL_SCENE            => { id => '5b', },
   IP_ASSOCIATION           => { id => '5c', },
   ANTITHEFT                => { id => '5d', },
-  ZWAVEPLUS_INFO           => { id => '5e', },
+  ZWAVEPLUS_INFO           => { id => '5e',
+    get   => { zwavePlusInfo=>"01"},
+    parse => { "095e02(..)(..)(..)(....)(....)"
+                                => 'ZWave_plusInfoParse($1,$2,$3,$4,$5)'},},
   ZIP_GATEWAY              => { id => '5f', },
   MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
     get   => { mcEndpoints => "07",
@@ -250,9 +250,9 @@ my %zwave_class = (
     parse => { "038003(..)"=> '"battery:".($1 eq "ff" ? "low":hex($1)." %")'},},
   CLOCK                    => { id => '81',
     get   => { clock           => "05" },
-    set   => { clock           => 'ZWave_ClockSet()' },
+    set   => { clock           => 'ZWave_clockSet()' },
     parse => { "028105"        => "clock:get",
-               "048106(..)(..)"=> 'ZWave_ClockParse($1,$2)' }},
+               "048106(..)(..)"=> 'ZWave_clockParse($1,$2)' }},
   HAIL                     => { id => '82', },
   WAKE_UP                  => { id => '84', 
     set   => { wakeupInterval => "04%06x%02x",
@@ -604,7 +604,7 @@ ZWave_HrvStatus($)
 }
 
 sub
-ZWave_ParseMeter($$)
+ZWave_meterParse($$)
 {
   my ($hash,$val) = @_;
   return if($val !~ m/^(..)(..)(.*)$/);
@@ -633,7 +633,7 @@ ZWave_ParseMeter($$)
 }
 
 sub
-ZWave_ParseMultilevel($$$)
+ZWave_multilevelParse($$$)
 {
   my ($type,$fl,$arg) = @_; 
   my %ml_tbl = (
@@ -696,7 +696,7 @@ ZWave_SetClasses($$$$)
 }
 
 sub
-ZWave_ParseScene($)
+ZWave_sceneParse($)
 {
   my ($p)=@_;
   my @arg = ("unknown", "on", "off", 
@@ -847,23 +847,23 @@ ZWave_ccsParse($$)
 }
 
 sub
-ZWave_ClockAdjust($)
+ZWave_clockAdjust($)
 {
   my $d = shift;
   return $d if($d !~ m/^13(..)048104....05$/);
-  my ($err, $nd) = ZWave_ClockSet();
+  my ($err, $nd) = ZWave_clockSet();
   return "13${1}0481${nd}05";
 }
 
 sub
-ZWave_ClockSet()
+ZWave_clockSet()
 {
   my @l = localtime();
   return ("", sprintf("04%02x%02x", ($l[6]<<5)|$l[2], $l[1]));
 }
 
 sub
-ZWave_ClockParse($$)
+ZWave_clockParse($$)
 {
   my ($p1,$p2) = @_;
   $p1 = hex($p1); $p2 = hex($p2);
@@ -1186,6 +1186,39 @@ ZWave_configParse($$$)
   return "config_$cmdId:$val";
 }
 
+my %zwave_roleType = (
+  "00"=>"CentralStaticController",
+  "01"=>"SubStaticController",
+  "02"=>"PortableController",
+  "03"=>"PortableReportingController",
+  "04"=>"PortableSlave",
+  "05"=>"AlwaysOnSlave",
+  "06"=>"SleepingReportingSlave",
+  "07"=>"SleepingListeningSlave"
+);
+
+my %zwave_nodeType = (
+  "00"=>"Z-Wave+Node",
+  "01"=>"Z-Wave+IpRouter",
+  "02"=>"Z-Wave+IpGateway",
+  "03"=>"Z-Wave+IpClientAndIpNode",
+  "04"=>"Z-Wave+IpClientAndZwaveNode"
+);
+
+sub 
+ZWave_plusInfoParse($$$$$)
+{
+  my ($version, $roleType, $nodeType, $installerIconType, $userIconType) = @_;
+  return "zwavePlusInfo: " .
+    "version:" . $version . 
+    " role:" .
+      ($zwave_roleType{"$roleType"} ? $zwave_roleType{"$roleType"} :"unknown") .
+    " node:" .
+      ($zwave_nodeType{"$nodeType"} ? $zwave_nodeType{"$nodeType"} :"unknown") .
+    " installerIcon:". $installerIconType . 
+    " userIcon:". $userIconType;
+}
+
 sub
 ZWave_getHash($$$)
 {
@@ -1271,7 +1304,7 @@ ZWave_Parse($$@)
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash && $hash->{WakeUp} && @{$hash->{WakeUp}}) { # Always the base hash
       foreach my $wuCmd (@{$hash->{WakeUp}}) {
-        IOWrite($hash, "00", ZWave_ClockAdjust($wuCmd));
+        IOWrite($hash, "00", ZWave_clockAdjust($wuCmd));
         Log3 $hash, 4, "Sending stored command: $wuCmd";
       }
       @{$hash->{WakeUp}}=();
@@ -1408,7 +1441,7 @@ ZWave_Parse($$@)
   my $wu = $baseHash->{WakeUp};
   if($arg =~ m/^028407/ && $wu && @{$wu}) {
     foreach my $wuCmd (@{$wu}) {
-      IOWrite($hash, "00", ZWave_ClockAdjust($wuCmd));
+      IOWrite($hash, "00", ZWave_clockAdjust($wuCmd));
       Log3 $hash, 4, "Sending stored command: $wuCmd";
     }
     @{$baseHash->{WakeUp}}=();
@@ -1918,7 +1951,11 @@ s2Hex($)
     Stop moving the window cover. Blinds are partially open (closed).
   </li>
 
-
+  <br><br><b>Class ZWAVEPLUS_INFO</b>
+  <li>zwavePlusInfo<br>
+    request the zwavePlusInfo
+    </li>
+  
   </ul>
   <br>
 
@@ -2082,6 +2119,9 @@ s2Hex($)
   <li>wakeup:notification</li>
   <li>wakeupReport:interval:X target:Y</li>
   <li>wakeupIntervalCapabilitiesReport:min W max X default Y step Z</li>
+  
+  <br><br><b>Class ZWAVEPLUS_INFO</b>
+  <li>zwavePlusInfo:version: V role: W node: X installerIcon: Y userIcon: Z</li>
 
   </ul>
 </ul>
