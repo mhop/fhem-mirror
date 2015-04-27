@@ -90,16 +90,10 @@ sub Heating_Control_SetTimerOfDay($) {
   return WeekdayTimer_SetTimerOfDay($hash);
 }
 ########################################################################
-sub Heating_Control_Attr($$$) {
+sub Heating_Control_Attr($$$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
-
-  my $hash = $defs{$name};
-  if(       $attrName eq "disable" ) {
-     readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
-  } elsif ( $attrName eq "switchInThePast" ) {
-     $attr{$name}{$attrName} = $attrVal;
-     Heating_Control_SetTimerOfDay({ HASH => $hash}); 
-  }
+  
+  WeekdayTimer_Attr($cmd, $name, $attrName, $attrVal);  
   return undef;
 }
 ########################################################################
