@@ -37,13 +37,17 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.8";
+my $VERSION = "2.1.9";
 
 use constant {
   PERL_VERSION    => "perl_version",
   DATE            => "date",
   UPTIME          => "uptime",
   UPTIME_TEXT     => "uptime_text",
+  STARTTIME_TEXT  => "starttime_text",
+  STARTTIME       => "starttime",
+  FHEMSTARTTIME_TEXT => "fhemstarttime_text",
+  FHEMSTARTTIME   => "fhemstarttime",
   FHEMUPTIME      => "fhemuptime",
   FHEMUPTIME_TEXT => "fhemuptime_text",
   IDLETIME        => "idletime",
@@ -340,6 +344,11 @@ SYSMON_updateCurrentReadingsMap($) {
   
   $rMap->{"uptime"}          = "System up time";
   $rMap->{"uptime_text"}     = "System up time";
+  $rMap->{+STARTTIME_TEXT}   = "System start time";
+  $rMap->{+STARTTIME}        = "System start time";
+
+  $rMap->{+FHEMSTARTTIME}    = "Fhem start time";
+  $rMap->{+FHEMSTARTTIME_TEXT} = "Fhem start time";
 
   # Werte fuer GesamtCPU
   $rMap->{"stat_cpu"}          = "CPU statistics";
@@ -1548,6 +1557,10 @@ SYSMON_getUptime($$)
       #$map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes, %02d seconds",SYSMON_decode_time_diff($uptime));
       $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
     
+      my $startTime = time()-$uptime;
+      $map->{+STARTTIME} = sprintf("%d",$startTime);
+      $map->{+STARTTIME_TEXT} = strftime("%d.%m.%Y %H:%M:%S", localtime($startTime));
+    
       $map->{+IDLETIME}=sprintf("%d %.2f %%",$idle, $idle_percent);
       $map->{+IDLETIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($idle)).sprintf(" (%.2f %%)",$idle_percent);
       #$map->{+IDLETIME_PERCENT} = sprintf ("%.2f %",$idle_percent);
@@ -1595,6 +1608,10 @@ SYSMON_getUptime2($$)
     $map->{+UPTIME}=sprintf("%d",$uptime);
     $map->{+UPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($uptime));
     
+    my $startTime = time()-$uptime;
+    $map->{+STARTTIME} = sprintf("%d",$startTime);
+    $map->{+STARTTIME_TEXT} = strftime("%d.%m.%Y %H:%M:%S", localtime($startTime));
+    
     my $loadavg=$6;
     if(defined($loadavg)) {
       my ($la1, $la5, $la15, $prc, $lastpid) = split(/\s+/, trim($loadavg));
@@ -1628,6 +1645,10 @@ SYSMON_getFHEMUptime($$)
     my $fhemuptime = time()-$fhem_started;
     $map->{+FHEMUPTIME} = sprintf("%d",$fhemuptime);
     $map->{+FHEMUPTIME_TEXT} = sprintf("%d days, %02d hours, %02d minutes",SYSMON_decode_time_diff($fhemuptime));
+    
+    my $startTime = time()-$fhemuptime;
+    $map->{+FHEMSTARTTIME} = sprintf("%d",$startTime);
+    $map->{+FHEMSTARTTIME_TEXT} = strftime("%d.%m.%Y %H:%M:%S", localtime($startTime));
   }
 
   return $map;
@@ -1769,10 +1790,11 @@ SYSMON_getCPUFreq($$;$) {
   if($cpuNum == 0) {
   	# aus Kompatibilitaetsgruenden
     $map->{+CPU_FREQ}="$val_txt";
-    #$map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_FREQ."_stat");
+    $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_FREQ."_stat");
   }
   
   $map->{"cpu".$cpuNum."_freq"}="$val_txt";
+
   $map = SYSMON_getComputeStat($hash, $map, $val_txt, "cpu".$cpuNum."_freq"."_stat");
   
   return $map;
@@ -4051,7 +4073,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
      Filesystem informations<br><br>
      </li>
      <li>The following parameters are always updated with the base interval (regardless of the Mx-parameter):<br>
-     fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text<br><br>
+     fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text, starttime, starttime_text<br><br>
      </li>
     </ul>
     To query a remote system at least the address (HOST) must be specified. Accompanied by the port and / or user name, if necessary. The password (if needed) has to be defined once with the command 'set password <password>'. For MODE parameter are 'telnet' and 'local' only allowed. 'local' does not require any other parameters and can also be omitted.
@@ -4090,6 +4112,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       Time since the start of the FHEM server: human-readable output (text representation).
     </li>
     <br>
+    <li>fhemstarttime<br>
+      Start time (in seconds since 1.1.1970 1:00:00) of FHEM server.
+    </li>
+    <br>
+    <li>fhemstarttime_text<br>
+      Start time of the FHEM server: human-readable output (text representation).
+    </li>
+    <br>
     <li>idletime<br>
       Time spent by the system since the start in the idle mode (period of inactivity).
     </li>
@@ -4116,6 +4146,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>uptime_text<br>
       System uptime (human readable).
+    </li>
+    <br>
+    <li>starttime<br>
+      System starttime.
+    </li>
+    <br>
+    <li>starttime_text<br>
+      System starttime (human readable).
     </li>
     <br>
     <li>Network statistics<br>
@@ -4676,7 +4714,7 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
      Filesystem-Informationen<br><br>
      </li>
      <li>folgende Parameter werden immer anhand des Basisintervalls (unabh&auml;ngig von den Mx-Parameters) aktualisiert:<br>
-     fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text<br><br>
+     fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text, starttime, starttime_text<br><br>
      </li>
     </ul>
     F&uuml;r Abfrage eines entfernten Systems muss mindestens deren Adresse (HOST) angegeben werden, bei Bedarf erg&auml;nzt durch den Port und/oder den Benutzernamen. 
@@ -4717,6 +4755,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
         Zeit seit dem Start des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
     </li>
     <br>
+    <li>fhemstarttime<br>
+        Startzeit (in Sekunden seit 1.1.1970 1:00:00) des FHEM-Servers.
+    </li>
+    <br>
+    <li>fhemstarttime_text<br>
+        Startzeit des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
+    </li>
+    <br>
     <li>idletime<br>
         Zeit (in Sekunden und in Prozent), die das System (nicht der FHEM-Server!)
         seit dem Start in dem Idle-Modus verbracht hat. Also die Zeit der Inaktivit&auml;t.
@@ -4744,6 +4790,14 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>uptime_text<br>
         Zeit seit dem Systemstart in menschenlesbarer Form.
+    </li>
+    <br>
+    <li>starttime<br>
+        Systemstart (Sekunden seit Thu Jan  1 01:00:00 1970).
+    </li>
+    <br>
+    <li>starttime_text<br>
+        Systemstart in menschenlesbarer Form.
     </li>
     <br>
     <li>Netzwerkinformationen<br>
