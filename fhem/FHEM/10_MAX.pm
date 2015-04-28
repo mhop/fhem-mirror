@@ -896,7 +896,7 @@ MAX_DbLog_splitFn($)
   $reading = shift @parts;
   $reading =~ tr/://d;
   $value = $parts[0];
-  $value = $parts[1] if (lc($value) =~ m/auto/);
+  $value = $parts[1] if(defined($value) && lc($value) =~ m/auto/);
   $unit = "\xB0C" if(lc($reading) =~ m/temp/);
   $unit = "%" if(lc($reading) =~ m/valve/);
   return ($reading, $value, $unit);
