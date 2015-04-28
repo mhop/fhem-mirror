@@ -492,7 +492,7 @@ statistics_doStatisticMinMax ($$$$$)
   
   # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/(-?[\d.]*).*/$1/e;
+   $value =~ s/\s*(-?[\d.]*).*/$1/e;
 
    statistics_Log $hash, 4, "Calculating min/avg/max statistics for '".$dev->{NAME}.":$readingName = $value'";
   # statistics_doStatisticMinMaxSingle: $hash, $readingName, $value, $saveLast
@@ -597,7 +597,7 @@ sub statistics_doStatisticTendency ($$$)
    
   # Get reading, cut out first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/([-\d.]*).*/$1/e;
+   $value =~ s/\s*(-?[\d.]*).*/$1/e;
    statistics_Log $hash, 4, "Calculating hourly tendency statistics for '".$dev->{NAME}.":$readingName = $value'";
 
    my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . "Tendency";
@@ -670,7 +670,7 @@ sub statistics_doStatisticDelta ($$$$)
    
   # Get reading, extract first number without units
    my $value = $dev->{READINGS}{$readingName}{VAL};
-   $value =~ s/([-\d.]*).*/$1/e;
+   $value =~ s/\s*(-?[\d.]*).*/$1/e;
    statistics_Log $hash, 4, "Calculating delta statistics for '".$dev->{NAME}.":$readingName = $value'";
 
    my $hiddenReadingName = ".".$dev->{NAME}.":".$readingName;
@@ -820,7 +820,7 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
    my $result = 0;
    foreach (@hidden) { $result += $_; }
    $result = sprintf "%.".$decPlaces."f", $result;
-   if ($#hidden + 1 != $specialPeriod) { $result .= " (".($#hidden+1).".hours)"; }
+   if ($#hidden != $specialPeriod) { $result .= " (".$#hidden.".hours)"; }
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
    
   # Store hidden stack
