@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 0.50 2015-04-17 Risiko $
+# $Id: 10_pilight_ctrl.pm 0.51 2015-04-19 Risiko $
 #
 # Usage
 # 
@@ -22,6 +22,7 @@
 # V 0.29 2015-04-12 - fix: identify intertechno_old as switch
 # V 0.50 2015-04-17 - fix: queue of sending messages
 #                   - fix: same spelling errors - thanks to pattex
+# V 0.51 2015-04-29 - CHG: rename attribute ignore to ignoreProtocol because with ignore the whole device is ignored in FHEMWEB
 ############################################## 
 package main;
 
@@ -64,7 +65,7 @@ sub pilight_ctrl_Initialize($)
   $hash->{DefFn}   = "pilight_ctrl_Define";
   $hash->{UndefFn} = "pilight_ctrl_Undef";
   $hash->{SetFn}   = "pilight_ctrl_Set";
-  $hash->{AttrList}= "ignore brands ContactAsSwitch ".$readingFnAttributes;
+  $hash->{AttrList}= "ignoreProtocol brands ContactAsSwitch ".$readingFnAttributes;
   
   $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:";
   #$hash->{MatchList} = \%matchList; #only for autocreate
@@ -563,11 +564,11 @@ sub pilight_ctrl_Parse($$)
     last if ($unit ne "");
   }
 
-  my @ignoreIDs = split(",",AttrVal($me, "ignore","")); 
+  my @ignoreIDs = split(",",AttrVal($me, "ignoreProtocol","")); 
   my %ignoreHash;
   @ignoreHash{@ignoreIDs}=();  
   if (exists $ignoreHash{"$proto:$id"} || exists $ignoreHash{"$proto:*"}) {
-    Log3 $me, 5, "$me(Parse): $proto:$id is in ignore list";
+    Log3 $me, 5, "$me(Parse): $proto:$id is in ignoreProtocol list";
     return;
   }
   
@@ -736,9 +737,10 @@ sub pilight_ctrl_SimpleWrite(@)
   <a name="pilight_ctrl_attr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="ignore">ignore</a><br>
+    <li><a name="ignoreProtocol">ignoreProtocol</a><br>
         Comma separated list of protocol:id combinations to ignore.<br>
-        Example: <code>ignore tfa:0 </code>
+        protocol:* ignores the complete protocol.<br>
+        Example: <code>ignoreProtocol tfa:0 </code>
     </li>
     <li><a name="brands">brands</a><br>
         Comma separated list of <search>:<replace> combinations to rename protocol names. <br>
