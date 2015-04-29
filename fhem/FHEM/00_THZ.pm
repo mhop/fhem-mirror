@@ -1,8 +1,8 @@
-##############################################
+﻿##############################################
 # 00_THZ
 # $Id$
 # by immi 04/2015
-my $thzversion = "0.141";
+my $thzversion = "0.142";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -65,78 +65,78 @@ my %parsinghash = (
   #msgtype => parsingrule  
  
   "01pxx206" => [["p37Fanstage1AirflowInlet: ", 4, 4, "hex", 1],[" p38Fanstage2AirflowInlet: ", 8, 4, "hex", 1],    [" p39Fanstage3AirflowInlet: ", 12, 4, "hex", 1],
-          [" p40Fanstage1AirflowOutlet: ", 16, 4, "hex", 1],    [" p41Fanstage2AirflowOutlet: ", 20, 4, "hex", 1],  [" p42Fanstage3AirflowOutlet: ", 24, 4, "hex", 1],
-          [" p43UnschedVent3: ", 28, 4, "hex", 1],        		[" p44UnschedVent2: ", 32, 4, "hex", 1],       		[" p45UnschedVent1: ", 36, 4, "hex", 1],
-          [" p46UnschedVent0: ", 40, 4, "hex", 1],        		[" p75PassiveCooling: ", 44, 4, "hex", 1]
-          ],
+              [" p40Fanstage1AirflowOutlet: ", 16, 4, "hex", 1],[" p41Fanstage2AirflowOutlet: ", 20, 4, "hex", 1],  [" p42Fanstage3AirflowOutlet: ", 24, 4, "hex", 1],
+              [" p43UnschedVent3: ", 	28, 4, "hex", 1],       [" p44UnschedVent2: ", 32, 4, "hex", 1],       		[" p45UnschedVent1: ", 36, 4, "hex", 1],
+              [" p46UnschedVent0: ", 	40, 4, "hex", 1],  	[" p75PassiveCooling: ", 44, 4, "hex", 1]
+              ],
   "01pxx214" => [["p37Fanstage1AirflowInlet: ", 4, 2, "hex", 1],[" p38Fanstage2AirflowInlet: ", 6, 2, "hex", 1],    [" p39Fanstage3AirflowInlet: ", 8, 2, "hex", 1],
-		  [" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],	[" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
-		  [" p43UnschedVent3: ", 16, 4, "hex", 1],				[" p44UnschedVent2: ", 20, 4, "hex", 1],			[" p45UnschedVent1: ", 24, 4, "hex", 1],
-      	  [" p46UnschedVent0: ", 28, 4, "hex", 1],				[" p75PassiveCooling: ", 32, 2, "hex", 1]
+	      [" p40Fanstage1AirflowOutlet: ", 10, 2, "hex", 1],[" p41Fanstage2AirflowOutlet: ", 12, 2, "hex", 1],	[" p42Fanstage3AirflowOutlet: ", 14, 2, "hex", 1],
+	      [" p43UnschedVent3: ", 	16, 4, "hex", 1],	[" p44UnschedVent2: ", 20, 4, "hex", 1],			[" p45UnschedVent1: ", 24, 4, "hex", 1],
+	      [" p46UnschedVent0: ", 	28, 4, "hex", 1],	[" p75PassiveCooling: ", 32, 2, "hex", 1]
 	      ],
   "03pxx206" => [["UpTempLimitDefrostEvaporatorEnd: ", 4, 4, "hex", 10],  [" MaxTimeDefrostEvaporator: ", 8, 4, "hex", 1], 	[" LimitTempCondenserElectBoost: ", 12, 4, "hex", 10],
-		  [" LimitTempCondenserDefrostTerm: ", 16, 4, "hex", 10],   [" CompressorRestartDelay: ", 20, 2, "hex", 1], 	[" MainFanSpeed: ", 22, 2, "hex", 1]
-		  ],
+	      [" LimitTempCondenserDefrostTerm: ", 16, 4, "hex", 10],   [" CompressorRestartDelay: ", 20, 2, "hex", 1], 	[" MainFanSpeed: ", 22, 2, "hex", 1]
+	      ],
   "04pxx206" => [["MaxDefrostDurationAAExchenger: ", 4, 2, "hex", 1],	[" DefrostStartThreshold: ", 6, 4, "hex", 10],		[" VolumeFlowFilterReplacement: ", 10, 4, "hex", 1]
-		  ],
-  "05pxx206" => [["p13GradientHC1: ", 4, 4, "hex", 10],			[" p14LowEndHC1: ", 8, 4, "hex", 10],		[" p15RoomInfluenceHC1: ", 12, 2, "hex", 10],
-		  [" p16GradientHC2: ", 14, 4, "hex", 10],				[" p17LowEndHC2: ", 18, 4, "hex", 10],		[" p18RoomInfluenceHC2: ", 22, 2, "hex", 10],
-		  [" p19FlowProportionHC1: ", 24, 4, "hex", 1],			[" p20FlowProportionHC2: ", 28, 4, "hex", 1],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
-		  [" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],		[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10], [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
-		  ],
-  "06pxx206" => [["p21Hyst1: ", 4, 2, "hex", 10],		[" p22Hyst2: ", 6, 2, "hex", 10],		  		[" p23Hyst3: ", 8, 2, "hex", 10],
-		  [" p24Hyst4: ", 10, 2, "hex", 10],			[" p25Hyst5: ", 12, 2, "hex", 10],		  		[" p26Hyst6: ", 14, 2, "hex", 10],
-		  [" p27Hyst7: ", 16, 2, "hex", 10],			[" p28Hyst8: ", 18, 2, "hex", 10],		  		[" p29HystAsymmetry: ", 20, 2, "hex", 1],
-		  [" p30integralComponent: ", 22, 4, "hex", 1],	[" p31MaxBoostStages: ", 26, 2, "hex", 1],	  	[" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
-		  [" p49SummerModeTemp: ", 32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10], [" p77OutTempAdjust: ", 40, 4, "hex", 1],
-		  [" p78DualModePoint: ", 44, 4, "hex2int", 10],[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
-		  ],
-  "07pxx206" => [["p32HystDHW: ", 4, 2, "hex", 10],		[" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],	 [" p34TempLimitBoostDHW: ", 8, 4, "hex2int", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
-		  [" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],[" PasteurisationTemp: ", 16, 4, "hex", 10],	 [" MaxBoostStagesDHW: ", 20, 2, "hex", 1],
-		  [" p84EnableDHWBuffer: ", 22, 2, "hex", 1]
-		  ],
-  "08pxx206" => [["p80EnableSolar: ", 4, 2, "hex", 1],	[" p81DiffTempSolarLoading: ", 6, 4, "hex", 10], [" p82DelayCompStartSolar: ", 10, 2, "hex", 1],
-		  [" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	[" HystDiffTempSolar: ", 16, 4, "hex", 10],	 [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
-		  ],
-  "09his" => [["compressorHeating: ", 4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
-	      [" compressorDHW: ",	12, 4, "hex", 1],		[" boosterDHW: ",	16, 4, "hex", 1],
+	      ],
+  "05pxx206" => [["p13GradientHC1: ", 	4, 4, "hex", 10],	[" p14LowEndHC1: ", 8, 4, "hex", 10],		[" p15RoomInfluenceHC1: ", 12, 2, "hex", 10],
+	      [" p16GradientHC2: ", 	14, 4, "hex", 10],	[" p17LowEndHC2: ", 18, 4, "hex", 10],		[" p18RoomInfluenceHC2: ", 22, 2, "hex", 10],
+	      [" p19FlowProportionHC1: ", 24, 4, "hex", 1],	[" p20FlowProportionHC2: ", 28, 4, "hex", 1],	[" MaxSetHeatFlowTempHC1: ", 32, 4, "hex", 10],
+	      [" MinSetHeatFlowTempHC1: ", 36, 4, "hex", 10],	[" MaxSetHeatFlowTempHC2: ", 40, 4, "hex", 10], [" MinSetHeatFlowTempHC2: ", 44, 4, "hex", 10],
+	      ],
+  "06pxx206" => [["p21Hyst1: ", 	4, 2, "hex", 10],	[" p22Hyst2: ", 6, 2, "hex", 10],		  		[" p23Hyst3: ", 8, 2, "hex", 10],
+	      [" p24Hyst4: ", 		10, 2, "hex", 10],	[" p25Hyst5: ", 12, 2, "hex", 10],		  		[" p26Hyst6: ", 14, 2, "hex", 10],
+	      [" p27Hyst7: ", 		16, 2, "hex", 10],	[" p28Hyst8: ", 18, 2, "hex", 10],		  		[" p29HystAsymmetry: ", 20, 2, "hex", 1],
+	      [" p30integralComponent: ", 22, 4, "hex", 1],	[" p31MaxBoostStages: ", 26, 2, "hex", 1],	  	[" MaxHeatFlowTemp: ", 28, 4, "hex", 10],
+	      [" p49SummerModeTemp: ", 	32, 4, "hex", 10],	[" p50SummerModeHysteresis: ", 36, 4, "hex", 10], [" p77OutTempAdjust: ", 40, 4, "hex", 1],
+	      [" p78DualModePoint: ", 	44, 4, "hex2int", 10],	[" p79ReHeatingDelay: ", 48, 2, "hex", 1]
+	      ],
+  "07pxx206" => [["p32HystDHW: ", 	4, 2, "hex", 10],	[" p33BoosterTimeoutDHW: ", 6, 2, "hex", 1],	 [" p34TempLimitBoostDHW: ", 8, 4, "hex2int", 10],    	[" p35PasteurisationInterval: ", 12, 2, "hex", 1],
+	      [" p36MaxDurationDHWLoad: ", 14, 2, "hex", 1],	[" PasteurisationTemp: ", 16, 4, "hex", 10],	 [" MaxBoostStagesDHW: ", 20, 2, "hex", 1],
+	      [" p84EnableDHWBuffer: ", 22, 2, "hex", 1]
+	      ],
+  "08pxx206" => [["p80EnableSolar: ", 	4, 2, "hex", 1],	[" p81DiffTempSolarLoading: ", 6, 4, "hex", 10], [" p82DelayCompStartSolar: ", 10, 2, "hex", 1],
+	      [" p84DHWTempSolarMode: ", 12, 4, "hex", 10],	[" HystDiffTempSolar: ", 16, 4, "hex", 10],	 [" CollectLimitTempSolar: ", 20, 4, "hex", 10]
+	      ],
+  "09his" => [["compressorHeating: ", 	4, 4,  "hex", 1],	[" compressorCooling: ",  8, 4, "hex", 1],
+	      [" compressorDHW: ",	12, 4, "hex", 1],	[" boosterDHW: ",	16, 4, "hex", 1],
 	      [" boosterHeating: ",	20, 4, "hex", 1]
 	      ],
-  "09his206" => [["operatingHours1: ", 4, 4, "hex", 1],	[" operatingHours2: ",  8, 4, "hex", 1],
-	      [" heatingHours: ",	12, 4, "hex", 1],		[" DHWhours: ",	16, 4, "hex", 1],
+  "09his206" => [["operatingHours1: ", 	4, 4, "hex", 1],	[" operatingHours2: ",  8, 4, "hex", 1],
+	      [" heatingHours: ",	12, 4, "hex", 1],	[" DHWhours: ",	16, 4, "hex", 1],
 	      [" coolingHours: ",	20, 4, "hex", 1]
 	      ],
   "0Apxx206" => [["p54MinPumpCycles: ", 4, 2, "hex", 1],	[" p55MaxPumpCycles: ", 6, 4, "hex", 1],	 [" p56OutTempMaxPumpCycles: ", 10, 4, "hex", 10],
-		  [" p57OutTempMinPumpCycles: ", 14, 4, "hex", 10], [" p58SuppressTempCaptPumpStart: ", 18, 4, "hex", 1]
+	      [" p57OutTempMinPumpCycles: ", 14, 4, "hex", 10], [" p58SuppressTempCaptPumpStart: ", 18, 4, "hex", 1]
 	      ],
-  "0Bpxx206" => [["pHTG1StartTime: ", 4, 4, "hex2time", 1],	[" pHTG1EndTime: ", 8, 4, "hex2time", 1],	[" pHTG1Weekdays: ", 12, 2, "hex2wday", 1],
-	      [" pHTG1Enable: ", 14, 2, "hex", 1],				[" pHTG2StartTime: ", 16, 4, "hex2time", 1],	[" pHTG2EndTime: ", 20, 4, "hex2time", 1],
-		  [" pHTG2Weekdays: ", 24, 2, "hex2wday", 1],		[" pHTG2Enable: ", 26, 2, "hex", 1]
+  "0Bpxx206" => [["pHTG1StartTime: ", 	4, 4, "hex2time", 1],	[" pHTG1EndTime: ", 8, 4, "hex2time", 1],	[" pHTG1Weekdays: ", 12, 2, "hex2wday", 1],
+	      [" pHTG1Enable: ", 	14, 2, "hex", 1],	[" pHTG2StartTime: ", 16, 4, "hex2time", 1],	[" pHTG2EndTime: ", 20, 4, "hex2time", 1],
+	      [" pHTG2Weekdays: ", 	24, 2, "hex2wday", 1],	[" pHTG2Enable: ", 26, 2, "hex", 1]
 	      ], 
-  "0Cpxx206" => [["pDHWStartTime: ", 4, 4, "hex2time", 1],	[" pDHWEndTime: ", 8, 4, "hex2time", 1],	[" pDHWWeekdays: ", 12, 2, "hex2wday", 1],
-		  [" pDHWEnable: ", 14, 2, "hex", 1],
+  "0Cpxx206" => [["pDHWStartTime: ", 	4, 4, "hex2time", 1],	[" pDHWEndTime: ", 8, 4, "hex2time", 1],	[" pDHWWeekdays: ", 12, 2, "hex2wday", 1],
+	      [" pDHWEnable: ", 	14, 2, "hex", 1],
 	      ], 
-  "0Dpxx206" => [["pFAN1StartTime: ", 4, 4, "hex2time", 1], [" pFAN1EndTime: ", 8, 4, "hex2time", 1], 	[" pFAN1Weekdays: ", 12, 2, "hex2wday", 1],
-		  [" pFAN1Enable: ", 14, 2, "hex", 1], 				[" pFAN2StartTime: ", 16, 4, "hex2time", 1],	[" pFAN2EndTime: ", 20, 4, "hex2time", 1],
-		  [" pFAN2Weekdays: ", 24, 2, "hex2wday", 1],		[" pFAN2Enable: ", 26, 2, "hex", 1]
+  "0Dpxx206" => [["pFAN1StartTime: ", 	4, 4, "hex2time", 1], 	[" pFAN1EndTime: ", 8, 4, "hex2time", 1], 	[" pFAN1Weekdays: ", 12, 2, "hex2wday", 1],
+	      [" pFAN1Enable: ", 	14, 2, "hex", 1], 	[" pFAN2StartTime: ", 16, 4, "hex2time", 1],	[" pFAN2EndTime: ", 20, 4, "hex2time", 1],
+	      [" pFAN2Weekdays: ", 	24, 2, "hex2wday", 1],	[" pFAN2Enable: ", 26, 2, "hex", 1]
 	      ], 
   "0Epxx206" => [["p59RestartBeforeSetbackEnd: ", 4, 4, "hex", 1]
 	      ], 
   "0Fpxx206" => [["pA0DurationUntilAbsenceStart: ", 4, 4, "hex", 10], [" pA0AbsenceDuration: ", 8, 4, "hex", 10], [" pA0EnableAbsenceProg: ", 12, 2, "hex", 1]
 	      ], 	 
-  "10pxx206" => [["p70StartDryHeat: ", 4, 2, "hex", 1],	[" p71BaseTemp: ", 6, 4, "hex", 10],	[" p72PeakTemp: ", 10, 4, "hex", 10],
-		  [" p73TempDuration: ", 14, 4, "hex", 1],		[" p74TempIncrease: ", 18, 4, "hex", 10]
+  "10pxx206" => [["p70StartDryHeat: ", 	4, 2, "hex", 1],	[" p71BaseTemp: ", 6, 4, "hex", 10],	[" p72PeakTemp: ", 10, 4, "hex", 10],
+	      [" p73TempDuration: ", 	14, 4, "hex", 1],	[" p74TempIncrease: ", 18, 4, "hex", 10]
 	      ],
   "16sol" => [["collector_temp: ",	4, 4, "hex2int", 10],	[" dhw_temp: ", 	 8, 4, "hex2int", 10],
-	      [" flow_temp: ",		12, 4, "hex2int", 10],		[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
-	      [" x20: ",		20, 4, "hex2int", 1],			[" x24: ",		24, 4, "hex2int", 1], 
-	      [" x28: ",		28, 4, "hex2int", 1], 			[" x32: ",		32, 2, "hex2int", 1] 
+	      [" flow_temp: ",		12, 4, "hex2int", 10],	[" ed_sol_pump_temp: ",	16, 4, "hex2int", 10],
+	      [" x20: ",		20, 4, "hex2int", 1],	[" x24: ",		24, 4, "hex2int", 1], 
+	      [" x28: ",		28, 4, "hex2int", 1], 	[" x32: ",		32, 2, "hex2int", 1] 
 	      ],
   "17pxx206" => [["p01RoomTempDay: ", 	4, 4,  "hex",  10],	[" p02RoomTempNight: ",		8,  4, "hex", 10],
 	      [" p03RoomTempStandby: ",	12, 4,  "hex", 10], 	[" p04DHWsetTempDay: ",		16, 4,  "hex", 10], 
 	      [" p05DHWsetTempNight: ",	20, 4,  "hex", 10], 	[" p06DHWsetTempStandby: ",	24, 4,  "hex", 10], 
-	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 			[" p08FanStageNight: ",		30, 2,  "hex", 1],
-	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 		[" p10RoomTempManual: ",	34, 4,  "hex", 10],
+	      [" p07FanStageDay: ",	28, 2,  "hex", 1], 	[" p08FanStageNight: ",		30, 2,  "hex", 1],
+	      [" p09FanStageStandby: ",	32, 2,  "hex", 1], 	[" p10RoomTempManual: ",	34, 4,  "hex", 10],
 	      [" p11DHWsetTempManual: ", 38, 4,  "hex", 10],  	[" p12FanStageManual: ",	42, 2,  "hex", 1],
 	      ],
   "D1last" => [["number_of_faults: ",	4, 2, "hex", 1],	
@@ -151,22 +151,22 @@ my %parsinghash = (
 	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 100],
 	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 100]
 	      ],
-  "F3dhw"  => [["dhw_temp: ",	4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
+  "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
 	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
-	      [" x20: ", 		20, 4, "hex2int", 1],		[" heat_block_time: ", 	24, 4, "hex2int", 1], 
-	      [" BoosterStage: ",	28, 2, "hex", 1],		[" x30: ",		30, 4, "hex", 1],
-	      [" opMode: ",		34, 2, "opmodehc", 1],		[" x36: ",		36, 4, "hex", 1]
+	      [" x20: ", 		20, 4, "hex2int", 1],	[" heat_block_time: ", 	24, 4, "hex2int", 1], 
+	      [" BoosterStage: ",	28, 2, "hex", 1],	[" x30: ",		30, 4, "hex", 1],
+	      [" opMode: ",		34, 2, "opmodehc", 1],	[" x36: ",		36, 4, "hex", 1]
  	      ],
-  "F4hc1"  => [["outsideTemp: ", 4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
+  "F4hc1"  => [["outsideTemp: ", 	4, 4, "hex2int", 10],	[" x08: ",	 	8, 4, "hex2int", 10],
 	      [" returnTemp: ",		12, 4, "hex2int", 10],  [" integralHeat: ",	16, 4, "hex2int", 1],
 	      [" flowTemp: ",		20, 4, "hex2int", 10],	[" heatSetTemp: ", 	24, 4, "hex2int", 10], 
 	      [" heatTemp: ",		28, 4, "hex2int", 10],  
 	      [" seasonMode: ",		38, 2, "somwinmode", 1],   				#[" x40: ",		40, 4, "hex2int", 1],
 	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
 	      #[" x52: ",		52, 4, "hex2int", 1],
-          [" roomSetTemp: ",56, 4, "hex2int", 10],  	[" x60: ", 		60, 4, "hex2int", 10],
-	      [" x64: ", 		64, 4, "hex2int", 10],  	[" insideTempRC: ",     68, 4, "hex2int", 10],
-	      [" x72: ", 		72, 4, "hex2int", 10],  	[" x76: ", 		76, 4, "hex2int", 10],
+	      [" roomSetTemp: ",	56, 4, "hex2int", 10],  [" x60: ", 		60, 4, "hex2int", 10],
+	      [" x64: ", 		64, 4, "hex2int", 10],  [" insideTempRC: ",     68, 4, "hex2int", 10],
+	      [" x72: ", 		72, 4, "hex2int", 10],  [" x76: ", 		76, 4, "hex2int", 10],
 	      [" onHysteresisNo: ", 	32, 2, "hex", 1],	[" offHysteresisNo: ", 34, 2, "hex", 1],
 	      [" HCBoosterStage: ",	36, 2, "hex", 1] 
 	     ],
@@ -177,20 +177,20 @@ my %parsinghash = (
 	      [" seasonMode: ",		38, 2, "somwinmode", 1],   				#[" x40: ",		40, 4, "hex2int", 1],
 	      [" integralSwitch: ",	44, 4, "hex2int", 1],	[" opMode: ",		48, 2, "opmodehc", 1],
 	      #[" x52: ",		52, 4, "hex2int", 1],
-          [" roomSetTemp: ",62, 4, "hex2int", 10],  	[" x60: ", 		60, 4, "hex2int", 10],
-	      [" x64: ", 		64, 4, "hex2int", 10],  	[" insideTempRC: ",     68, 4, "hex2int", 10],
-	      [" x72: ", 		72, 4, "hex2int", 10],  	[" x76: ", 		76, 4, "hex2int", 10],
+	      [" roomSetTemp: ",	62, 4, "hex2int", 10],  [" x60: ", 		60, 4, "hex2int", 10],
+	      [" x64: ", 		64, 4, "hex2int", 10],  [" insideTempRC: ",     68, 4, "hex2int", 10],
+	      [" x72: ", 		72, 4, "hex2int", 10],  [" x76: ", 		76, 4, "hex2int", 10],
 	      [" onHysteresisNo: ", 	32, 2, "hex", 1],	[" offHysteresisNo: ", 34, 2, "hex", 1],
 	      [" HCBoosterStage: ",	36, 2, "hex", 1] 
 	     ],
-  "F5hc2"  => [["outsideTemp: ", 4, 4, "hex2int", 10],	[" returnTemp: ",	8, 4, "hex2int", 10],
+  "F5hc2"  => [["outsideTemp: ", 4, 4, "hex2int", 10],		[" returnTemp: ",	8, 4, "hex2int", 10],
 	      [" vorlaufTemp: ",	12, 4, "hex2int", 10],  [" heatSetTemp: ",	16, 4, "hex2int", 10],
 	      [" heatTemp: ", 		20, 4, "hex2int", 10],	[" stellgroesse: ",	24, 4, "hex2int", 10], 
 	      [" seasonMode: ",		30, 2, "somwinmode",1],	[" opMode: ",		36, 2, "opmodehc", 1]
 	     ],
   "F6sys206" => [["LüfterstufeManuell: ", 30, 2, "hex", 1],	[" RestlaufzeitLüfter: ", 36, 4, "hex", 1]
 	     ],
-  "FBglob" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
+  "FBglob" => [["outsideTemp: ", 8, 4, "hex2int", 10],		[" flowTemp: ",		12, 4, "hex2int", 10],
 	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
 	      [" dhwTemp: ",	 	24, 4, "hex2int", 10], 	[" flowTempHC2: ",	28, 4, "hex2int", 10],
 	      [" evaporatorTemp: ",	36, 4, "hex2int", 10],  [" condenserTemp: ",	40, 4, "hex2int", 10],
@@ -200,16 +200,16 @@ my %parsinghash = (
 	      [" solarPump: ",		44, 1, "bit3", 1],  	[" compressor: ",		47, 1, "bit3", 1],
 	      [" boosterStage3: ",	46, 1, "bit0", 1],  	[" boosterStage2: ",		46, 1, "bit1", 1],
 	      [" boosterStage1: ",	46, 1, "bit2", 1],  	[" highPressureSensor: ",	49, 1, "nbit0", 1],
-	      [" lowPressureSensor: ",	49, 1, "nbit1", 1], [" evaporatorIceMonitor: ",	49, 1, "bit2", 1],
+	      [" lowPressureSensor: ",	49, 1, "nbit1", 1], 	[" evaporatorIceMonitor: ",	49, 1, "bit2", 1],
 	      [" signalAnode: ",	49, 1, "bit3", 1],  	[" evuRelease: ",		48, 1, "bit0", 1],
 	      [" ovenFireplace: ",	48, 1, "bit1", 1],  	[" STB: ",			48, 1, "bit2", 1],
-	      [" outputVentilatorPower: ",	50, 4, "hex", 10],  	[" inputVentilatorPower: ",	54, 4, "hex", 10],	[" mainVentilatorPower: ",	58, 4, "hex", 10],
-	      [" outputVentilatorSpeed: ",	62, 4, "hex", 1],	[" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
-	      [" outside_tempFiltered: ",	74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
-	      [" dewPoint: ",			82, 4, "hex2int", 10],
-	      [" P_Nd: ",			86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
-	      [" actualPower_Qc: ",		94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
-	      [" collectorTemp: ",		4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
+	      [" outputVentilatorPower: ",50, 4, "hex", 10],  	[" inputVentilatorPower: ",	54, 4, "hex", 10],	[" mainVentilatorPower: ",	58, 4, "hex", 10],
+	      [" outputVentilatorSpeed: ",62, 4, "hex", 1],	[" inputVentilatorSpeed: ",	66, 4, "hex", 1],  	[" mainVentilatorSpeed: ",	70, 4, "hex", 1],
+	      [" outside_tempFiltered: ",74, 4, "hex2int", 10],	[" relHumidity: ",		78, 4, "hex2int", 10],
+	      [" dewPoint: ",		82, 4, "hex2int", 10],
+	      [" P_Nd: ",		86, 4, "hex2int", 100],	[" P_Hd: ",			90, 4, "hex2int", 100],
+	      [" actualPower_Qc: ",	94, 8, "esp_mant", 1],	[" actualPower_Pel: ",		102, 8, "esp_mant", 1],
+	      [" collectorTemp: ",	4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
   "FBglob206" => [["outsideTemp: ", 8, 4, "hex2int", 10],	[" flowTemp: ",		12, 4, "hex2int", 10],
 	      [" returnTemp: ",		16, 4, "hex2int", 10],	[" hotGasTemp: ", 	20, 4, "hex2int", 10],
@@ -221,37 +221,37 @@ my %parsinghash = (
 	      [" solarPump: ",		44, 1, "bit2", 1],  	[" compressor: ",		44, 1, "bit0", 1],
 	      [" boosterStage3: ",	44, 1, "bit3", 1],  	[" boosterStage2: ",		44, 1, "n.a.", 1],
 	      [" boosterStage1: ",	44, 1, "bit1", 1],  	[" highPressureSensor: ",	49, 1, "n.a.", 1],
-	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  [" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
+	      [" lowPressureSensor: ",	49, 1, "n.a.", 1],  	[" evaporatorIceMonitor: ",	49, 1, "n.a.", 1],
 	      [" signalAnode: ",	49, 1, "n.a.", 1],  	[" evuRelease: ",		48, 1, "n.a.", 1],
 	      [" ovenFireplace: ",	48, 1, "n.a.", 1],  	[" STB: ",			48, 1, "n.a.", 1],
-	      [" outputVentilatorPower: ",	48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
-	      [" outputVentilatorSpeed: ",	56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
-	      [" outside_tempFiltered: ",	64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
-	      [" dewPoint: ",			5, 4, "n.a.", 1],
-	      [" P_Nd: ",			5, 4, "n.a.", 1],		[" P_Hd: ",			5, 4, "n.a.", 1],
-	      [" actualPower_Qc: ",	5, 8, "n.a.", 1],		[" actualPower_Pel: ",		5, 8, "n.a.", 1],
+	      [" outputVentilatorPower: ",48, 2, "hex", 1],  	[" inputVentilatorPower: ",	50, 2, "hex", 1],	[" mainVentilatorPower: ",	52, 2, "hex", 1],
+	      [" outputVentilatorSpeed: ",56, 2, "hex", 1],	[" inputVentilatorSpeed: ",	58, 2, "hex", 1],  	[" mainVentilatorSpeed: ",	60, 2, "hex", 1],
+	      [" outside_tempFiltered: ",64, 4, "hex2int", 10],	[" relHumidity: ",		70, 4, "n.a.", 1],
+	      [" dewPoint: ",		5, 4, "n.a.", 1],
+	      [" P_Nd: ",		5, 4, "n.a.", 1],	[" P_Hd: ",			5, 4, "n.a.", 1],
+	      [" actualPower_Qc: ",	5, 8, "n.a.", 1],	[" actualPower_Pel: ",		5, 8, "n.a.", 1],
 	      [" collectorTemp: ",	4,  4, "hex2int", 10],	[" insideTemp: ",		32, 4, "hex2int", 10] #, [" x84: ",			84, 4, "donottouch", 1]
 	      ],
-  "FCtime" => [["Weekday: ", 4, 1,  "weekday", 1],	[" Hour: ",	6, 2, "hex", 1],
-	      [" Min: ",		8, 2,  "hex", 1], 		[" Sec: ",	10, 2, "hex", 1],
-	      [" Date: ", 		12, 2, "year", 1],		["/", 		14, 2, "hex", 1],
+  "FCtime" => [["Weekday: ", 4, 1,  "weekday", 1],		[" Hour: ",	6, 2, "hex", 1],
+	      [" Min: ",		8, 2,  "hex", 1], 	[" Sec: ",	10, 2, "hex", 1],
+	      [" Date: ", 		12, 2, "year", 1],	["/", 		14, 2, "hex", 1],
 	      ["/", 			16, 2, "hex", 1]
 	     ],
-  "FCtime206" => [["Weekday: ", 7, 1,  "weekday", 1],  [" pClockHour: ", 8, 2, "hex", 1],
-              [" pClockMinutes: ", 10, 2,  "hex", 1],   [" Sec: ", 12, 2, "hex", 1],
-              [" pClockYear: ", 14, 2, "hex", 1],       [" pClockMonth: ", 18, 2, "hex", 1],
+  "FCtime206" => [["Weekday: ", 7, 1,  "weekday", 1],  		[" pClockHour: ", 8, 2, "hex", 1],
+              [" pClockMinutes: ", 10, 2,  "hex", 1],  	 	[" Sec: ", 12, 2, "hex", 1],
+              [" pClockYear: ", 14, 2, "hex", 1],       	[" pClockMonth: ", 18, 2, "hex", 1],
               [" pClockDay: ",  20, 2, "hex", 1]
              ],
   "FDfirm" => [["version: ", 	4, 4, "hex", 100]
 	     ],
-  "FEfirmId" => [[" HW: ",	30,  2, "hex", 1], [" SW: ",	32,  4, "swver", 1],
+  "FEfirmId" => [[" HW: ",	30,  2, "hex", 1], 		[" SW: ",	32,  4, "swver", 1],
 		 [" Date: ", 	36, 22, "hex2ascii", 1]
 	     ],
   "0A0176Dis" => [[" switchingProg: ",	11, 1, "bit0", 1],  	[" compressor: ",	11, 1, "bit1", 1],
 	      [" heatingHC: ",		11, 1, "bit2", 1],  	[" heatingDHW: ",	10, 1, "bit0", 1],
 	      [" boosterHC: ",		10, 1, "bit1", 1],  	[" filterBoth: ",	9, 1, "bit0", 1],
-	      [" ventStage: ",		9, 1, "bit1", 1],  		[" pumpHC: ",		9, 1, "bit2", 1],
-	      [" defrost: ",		9, 1, "bit3", 1],  		[" filterUp: ",		8, 1, "bit0", 1],
+	      [" ventStage: ",		9, 1, "bit1", 1],  	[" pumpHC: ",		9, 1, "bit2", 1],
+	      [" defrost: ",		9, 1, "bit3", 1],  	[" filterUp: ",		8, 1, "bit0", 1],
 	      [" filterDown: ",	8, 1, "bit1", 1]
 	      ],
   "0clean"    => [["", 8, 2, "hex", 1]             
@@ -266,9 +266,9 @@ my %parsinghash = (
 	      ],
   "6gradient" => [["", 8, 4, "hex", 100]             
               ],
-  "7prog"     => [["", 8, 2, "quater", 1], 	["--", 10, 2, "quater", 1]
+  "7prog"     => [["", 8, 2, "quater", 1], 			["--", 10, 2, "quater", 1]
               ],
-  "8party"    => [["", 10, 2, "quater", 1],	["--", 8, 2, "quater", 1]
+  "8party"    => [["", 10, 2, "quater", 1],			["--", 8, 2, "quater", 1]
               ],
   "9holy"     => [["", 10, 2, "quater", 1]
               ]
@@ -281,49 +281,53 @@ my %parsinghash = (
 # 
 ########################################################################################
 
+my %sets439technician =(
+#"flowTem"				=> {parent=>"sGlobal", argMin =>  "1", argMax =>   "88", unit =>" °C"},
+  "zPumpHC"				=> {cmd2=>"0A0052", argMin =>   "0", argMax =>  "1",	type =>"0clean",  unit =>""},
+  "zPumpDHW"				=> {cmd2=>"0A0056", argMin =>   "0", argMax =>  "1",	type =>"0clean",  unit =>""}  
+);
+
 my %sets439 = (
-  #"flowTem"				=> {parent=>"sGlobal", argMin =>  "1", argMax =>   "88", unit =>" °C"},
-  #"pOpMode:1,2"				=> {cmd2=>"0A0112", type   =>  "2opmode"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency
-  "pOpMode"					=> {cmd2=>"0A0112", type   =>  "2opmode"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
-  "p01RoomTempDayHC1"		=> {cmd2=>"0B0005", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC1"		=> {cmd2=>"0B0008", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC1"	=> {cmd2=>"0B013D", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p01RoomTempDayHC1SummerMode"		=> {cmd2=>"0B0569", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p13GradientHC1"			=> {cmd2=>"0B010E", argMin =>   "0", argMax =>    "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
-  "p14LowEndHC1"			=> {cmd2=>"0B059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
-  "p15RoomInfluenceHC1"		=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean",  unit =>" %"},
-  "p19FlowProportionHC1"	=> {cmd2=>"0B059D", argMin =>   "0", argMax =>  "100",	type =>"1clean",  unit =>" %"}, #in % 0..100%
-  "p01RoomTempDayHC2"		=> {cmd2=>"0C0005", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC2"		=> {cmd2=>"0C0008", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC2"			=> {cmd2=>"0C013D", argMin =>  "10", argMax =>   "28", 	type =>"5temp",  unit =>" °C"},
-  "p01RoomTempDayHC2SummerMode"		=> {cmd2=>"0C0569", argMin =>  "10", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-  "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "10", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-  "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "10", argMax =>   "28",	type =>"5temp",  unit =>" °C"},
-  "p16GradientHC2"			=> {cmd2=>"0C010E", argMin =>   "0", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
-  "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "20", 	type =>"5temp",  unit =>" K"},
-  "p18RoomInfluenceHC2"		=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"}, 
-  "p04DHWsetDayTemp"		=> {cmd2=>"0A0013", argMin =>  "13", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
-  "p05DHWsetNightTemp"		=> {cmd2=>"0A05BF", argMin =>  "13", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
-  "p83DHWsetSolarTemp"		=> {cmd2=>"0A05BE", argMin =>  "13", argMax =>   "75",	type =>"5temp",  unit =>" °C"},
-  "p06DHWsetStandbyTemp"	=> {cmd2=>"0A0581", argMin =>  "13", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
-  "p11DHWsetManualTemp"		=> {cmd2=>"0A0580", argMin =>  "13", argMax =>   "54",	type =>"5temp",  unit =>" °C"},
+  "pOpMode"				=> {cmd2=>"0A0112", type   =>  "2opmode"},  # 1 Standby bereitschaft; 11 in Automatic; 3 DAYmode; SetbackMode; DHWmode; Manual; Emergency 
+  "p01RoomTempDayHC1"			=> {cmd2=>"0B0005", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC1"			=> {cmd2=>"0B0008", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC1"		=> {cmd2=>"0B013D", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC1SummerMode"		=> {cmd2=>"0B0569", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC1SummerMode"	=> {cmd2=>"0B056B", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p13GradientHC1"			=> {cmd2=>"0B010E", argMin => "0.1", argMax =>    "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
+  "p14LowEndHC1"			=> {cmd2=>"0B059E", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
+  "p15RoomInfluenceHC1"			=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean",  unit =>" %"},
+  "p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin =>   "0", argMax =>  "100",	type =>"1clean",  unit =>" %"}, #in % 0..100%
+  "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC2"			=> {cmd2=>"0C0008", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
+  "p01RoomTempDayHC2SummerMode"		=> {cmd2=>"0C0569", argMin =>  "12", argMax =>   "27",	type =>"5temp",  unit =>" °C"},
+  "p02RoomTempNightHC2SummerMode"	=> {cmd2=>"0C056B", argMin =>  "12", argMax =>   "27",	type =>"5temp",  unit =>" °C"},
+  "p03RoomTempStandbyHC2SummerMode"	=> {cmd2=>"0C056A", argMin =>  "12", argMax =>   "27",	type =>"5temp",  unit =>" °C"},
+  "p16GradientHC2"			=> {cmd2=>"0C010E", argMin => "0.1", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
+  "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
+  "p18RoomInfluenceHC2"			=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"}, 
+  "p04DHWsetDayTemp"			=> {cmd2=>"0A0013", argMin =>  "14", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
+  "p05DHWsetNightTemp"			=> {cmd2=>"0A05BF", argMin =>  "14", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
+  "p83DHWsetSolarTemp"			=> {cmd2=>"0A05BE", argMin =>  "14", argMax =>   "75",	type =>"5temp",  unit =>" °C"},
+  "p06DHWsetStandbyTemp"		=> {cmd2=>"0A0581", argMin =>  "14", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
+  "p11DHWsetManualTemp"			=> {cmd2=>"0A0580", argMin =>  "14", argMax =>   "54",	type =>"5temp",  unit =>" °C"},
   "p07FanStageDay"			=> {cmd2=>"0A056C", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
-  "p08FanStageNight"		=> {cmd2=>"0A056D", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
-  "p09FanStageStandby"		=> {cmd2=>"0A056F", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
-  "p99FanStageParty"		=> {cmd2=>"0A0570", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
-  "p75passiveCooling"		=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "2",	type =>"1clean",  unit =>""},
+  "p08FanStageNight"			=> {cmd2=>"0A056D", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
+  "p09FanStageStandby"			=> {cmd2=>"0A056F", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
+  "p99FanStageParty"			=> {cmd2=>"0A0570", argMin =>   "0", argMax =>    "3",	type =>"1clean",  unit =>""},
+  "p75passiveCooling"			=> {cmd2=>"0A0575", argMin =>   "0", argMax =>    "2",	type =>"1clean",  unit =>""},
   "p21Hyst1"				=> {cmd2=>"0A05C0", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p22Hyst2"				=> {cmd2=>"0A05C1", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p23Hyst3"				=> {cmd2=>"0A05C2", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
   "p24Hyst4"				=> {cmd2=>"0A05C3", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
   "p25Hyst5"				=> {cmd2=>"0A05C4", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
-  "p29HystAsymmetry"		=> {cmd2=>"0A05C5", argMin =>   "1", argMax =>    "5",	type =>"1clean",  unit =>""}, 
-  "p30integralComponent"	=> {cmd2=>"0A0162", argMin =>  "10", argMax =>  "999",	type =>"1clean",  unit =>" Kmin"}, 
+  "p29HystAsymmetry"			=> {cmd2=>"0A05C5", argMin =>   "1", argMax =>    "5",	type =>"1clean",  unit =>""}, 
+  "p30integralComponent"		=> {cmd2=>"0A0162", argMin =>  "10", argMax =>  "999",	type =>"1clean",  unit =>" Kmin"}, 
   "p32HystDHW"				=> {cmd2=>"0A0140", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
-  "p33BoosterTimeoutDHW"	=> {cmd2=>"0A0588", argMin =>   "0", argMax =>  "200",	type =>"1clean",  unit =>" min"}, #during DHW heating
-  "p79BoosterTimeoutHC"		=> {cmd2=>"0A05A0", argMin =>   "0", argMax =>   "60",	type =>"1clean",  unit =>" min"}, #delayed enabling of booster heater
+  "p33BoosterTimeoutDHW"		=> {cmd2=>"0A0588", argMin =>   "0", argMax =>  "200",	type =>"1clean",  unit =>" min"}, #during DHW heating
+  "p79BoosterTimeoutHC"			=> {cmd2=>"0A05A0", argMin =>   "0", argMax =>   "60",	type =>"1clean",  unit =>" min"}, #delayed enabling of booster heater
   "p46UnschedVent0"			=> {cmd2=>"0A0571", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
   "p45UnschedVent1"			=> {cmd2=>"0A0572", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
   "p44UnschedVent2"			=> {cmd2=>"0A0573", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
@@ -334,33 +338,33 @@ my %sets439 = (
   "p40Fanstage1AirflowOutlet"		=> {cmd2=>"0A0579", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
   "p41Fanstage2AirflowOutlet"		=> {cmd2=>"0A057A", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
   "p42Fanstage3AirflowOutlet"		=> {cmd2=>"0A057B", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#abluft extrated
-  "p49SummerModeTemp"				=> {cmd2=>"0A0116", argMin =>  "11", argMax =>   "24",	type =>"5temp",  unit =>" °C"},		#threshold for summer mode !! 
-  "p50SummerModeHysteresis"			=> {cmd2=>"0A05A2", argMin => "0.5", argMax =>    "5",	type =>"5temp",  unit =>" K"},		#Hysteresis for summer mode !! 
-  "p78DualModePoint"				=> {cmd2=>"0A01AC", argMin => "-10", argMax =>   "20",	type =>"5temp",  unit =>" °C"},
-  "p54MinPumpCycles"				=> {cmd2=>"0A05B8", argMin =>  "1",  argMax =>   "24",	type =>"1clean",  unit =>""},
-  "p55MaxPumpCycles"				=> {cmd2=>"0A05B7", argMin =>  "25", argMax =>  "200",	type =>"1clean",  unit =>""},
-  "p56OutTempMaxPumpCycles"			=> {cmd2=>"0A05B9", argMin =>  "1",  argMax =>   "20",	type =>"5temp",  unit =>" °C"},
-  "p57OutTempMinPumpCycles"			=> {cmd2=>"0A05BA", argMin =>  "1",  argMax =>   "25",	type =>"5temp",  unit =>" °C"},
-  "p76RoomThermCorrection"			=> {cmd2=>"0A0109", argMin =>  "-5", argMax =>    "5", 	type =>"4temp",  unit =>" K"},
+  "p49SummerModeTemp"			=> {cmd2=>"0A0116", argMin =>  "11", argMax =>   "24",	type =>"5temp",  unit =>" °C"},		#threshold for summer mode !! 
+  "p50SummerModeHysteresis"		=> {cmd2=>"0A05A2", argMin => "0.5", argMax =>    "5",	type =>"5temp",  unit =>" K"},		#Hysteresis for summer mode !! 
+  "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin => "-10", argMax =>   "20",	type =>"5temp",  unit =>" °C"},
+  "p54MinPumpCycles"			=> {cmd2=>"0A05B8", argMin =>  "1",  argMax =>   "24",	type =>"1clean",  unit =>""},
+  "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", argMax =>  "200",	type =>"1clean",  unit =>""},
+  "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "1",  argMax =>   "20",	type =>"5temp",  unit =>" °C"},
+  "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "1",  argMax =>   "25",	type =>"5temp",  unit =>" °C"},
+  "p76RoomThermCorrection"		=> {cmd2=>"0A0109", argMin =>  "-5", argMax =>    "5", 	type =>"4temp",  unit =>" K"},
   "p35PasteurisationInterval"		=> {cmd2=>"0A0586", argMin =>  "1",  argMax =>   "30", 	type =>"1clean",  unit =>""},
-  "p35PasteurisationTemp"			=> {cmd2=>"0A0587", argMin =>  "10", argMax =>   "65", 	type =>"5temp",  unit =>" °C"},
-  "p34BoosterDHWTempAct"	=> {cmd2=>"0A0589", argMin => "-10", 	argMax =>   "10", 	type =>"5temp",  unit =>" °C"},
-  "p99DHWmaxFlowTemp"		=> {cmd2=>"0A058C", argMin =>  "10", 	argMax =>   "75",	type =>"5temp",  unit =>" °C"},
-  "p89DHWeco"				=> {cmd2=>"0A058D", argMin =>  "0",  	argMax =>   "1", 	type =>"1clean",  unit =>""},
-  "p99startUnschedVent"		=> {cmd2=>"0A05DD", argMin =>  "0",  	argMax =>   "3", 	type =>"1clean",  unit =>""},
-  "pClockDay"				=> {cmd2=>"0A0122", argMin =>  "1", 	argMax =>  "31", 	type =>"0clean",  unit =>""},
-  "pClockMonth"				=> {cmd2=>"0A0123", argMin =>  "1", 	argMax =>  "12",	type =>"0clean",  unit =>""},
-  "pClockYear"				=> {cmd2=>"0A0124", argMin =>  "12", 	argMax =>  "20",	type =>"0clean",  unit =>""},
-  "pClockHour"				=> {cmd2=>"0A0125", argMin =>  "0", 	argMax =>  "23", 	type =>"0clean",  unit =>""},
-  "pClockMinutes"			=> {cmd2=>"0A0126", argMin =>  "0", 	argMax =>  "59", 	type =>"0clean",  unit =>""},
-  "pHolidayBeginDay"		=> {cmd2=>"0A011B", argMin =>  "1", 	argMax =>  "31", 	type =>"0clean",  unit =>""},
-  "pHolidayBeginMonth"		=> {cmd2=>"0A011C", argMin =>  "1", 	argMax =>  "12",	type =>"0clean",  unit =>""},
-  "pHolidayBeginYear"		=> {cmd2=>"0A011D", argMin =>  "12", 	argMax =>  "20",	type =>"0clean",  unit =>""},
-  "pHolidayBeginTime"		=> {cmd2=>"0A05D3", argMin =>  "00:00", argMax =>  "23:59", type =>"9holy",   unit =>""},
-  "pHolidayEndDay"			=> {cmd2=>"0A011E", argMin =>  "1", 	argMax =>  "31",	type =>"0clean",  unit =>""},
-  "pHolidayEndMonth"		=> {cmd2=>"0A011F", argMin =>  "1", 	argMax =>  "12",	type =>"0clean",  unit =>""},
-  "pHolidayEndYear"			=> {cmd2=>"0A0120", argMin =>  "12", 	argMax =>  "20",	type =>"0clean",  unit =>""},
-  "pHolidayEndTime"			=> {cmd2=>"0A05D4", argMin =>  "00:00", argMax =>  "23:59", 	type =>"9holy",  unit =>""}, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
+  "p35PasteurisationTemp"		=> {cmd2=>"0A0587", argMin =>  "10", argMax =>   "65", 	type =>"5temp",  unit =>" °C"},
+  "p34BoosterDHWTempAct"		=> {cmd2=>"0A0589", argMin => "-10", argMax =>  "10",	type =>"5temp",  unit =>" °C"},
+  "p99DHWmaxFlowTemp"			=> {cmd2=>"0A058C", argMin =>  "10", argMax =>  "75",	type =>"5temp",  unit =>" °C"},
+  "p89DHWeco"				=> {cmd2=>"0A058D", argMin =>  "0",  argMax =>   "1", 	type =>"1clean",  unit =>""},
+  "p99startUnschedVent"			=> {cmd2=>"0A05DD", argMin =>  "0",  argMax =>   "3", 	type =>"1clean",  unit =>""},
+  "pClockDay"				=> {cmd2=>"0A0122", argMin =>  "1",  argMax =>  "31", 	type =>"0clean",  unit =>""},
+  "pClockMonth"				=> {cmd2=>"0A0123", argMin =>  "1",  argMax =>  "12",	type =>"0clean",  unit =>""},
+  "pClockYear"				=> {cmd2=>"0A0124", argMin =>  "12", argMax =>  "20",	type =>"0clean",  unit =>""},
+  "pClockHour"				=> {cmd2=>"0A0125", argMin =>  "0",  argMax =>  "23", 	type =>"0clean",  unit =>""},
+  "pClockMinutes"			=> {cmd2=>"0A0126", argMin =>  "0",  argMax =>  "59", 	type =>"0clean",  unit =>""},
+  "pHolidayBeginDay"			=> {cmd2=>"0A011B", argMin =>  "1",  argMax =>  "31", 	type =>"0clean",  unit =>""},
+  "pHolidayBeginMonth"			=> {cmd2=>"0A011C", argMin =>  "1",  argMax =>  "12",	type =>"0clean",  unit =>""},
+  "pHolidayBeginYear"			=> {cmd2=>"0A011D", argMin =>  "12", argMax =>  "20",	type =>"0clean",  unit =>""},
+  "pHolidayBeginTime"			=> {cmd2=>"0A05D3", argMin =>  "00:00", argMax =>  "23:59", type =>"9holy",   unit =>""},
+  "pHolidayEndDay"			=> {cmd2=>"0A011E", argMin =>  "1", 	argMax =>  "31",  type =>"0clean",  unit =>""},
+  "pHolidayEndMonth"			=> {cmd2=>"0A011F", argMin =>  "1", 	argMax =>  "12",  type =>"0clean",  unit =>""},
+  "pHolidayEndYear"			=> {cmd2=>"0A0120", argMin =>  "12", 	argMax =>  "20",  type =>"0clean",  unit =>""},
+  "pHolidayEndTime"			=> {cmd2=>"0A05D4", argMin =>  "00:00", argMax =>  "23:59", type =>"9holy",  unit =>""}, # the answer look like  0A05D4-0D0A05D40029 for year 41 which is 10:15
   #"party-time"				=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""}, # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   "programHC1_Mo_0"			=> {cmd2=>"0B1410", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   "programHC1_Mo_1"			=> {cmd2=>"0B1411", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
@@ -383,15 +387,15 @@ my %sets439 = (
   "programHC1_So_0"			=> {cmd2=>"0B1470", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programHC1_So_1"			=> {cmd2=>"0B1471", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programHC1_So_2"			=> {cmd2=>"0B1472", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Mo-Fr_0"		=> {cmd2=>"0B1480", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Mo-Fr_1"		=> {cmd2=>"0B1481", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Mo-Fr_2"		=> {cmd2=>"0B1482", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Sa-So_0"		=> {cmd2=>"0B1490", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Sa-So_1"		=> {cmd2=>"0B1491", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Sa-So_2"		=> {cmd2=>"0B1492", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Mo-So_0"		=> {cmd2=>"0B14A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Mo-So_1"		=> {cmd2=>"0B14A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC1_Mo-So_2"		=> {cmd2=>"0B14A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Mo-Fr_0"			=> {cmd2=>"0B1480", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Mo-Fr_1"			=> {cmd2=>"0B1481", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Mo-Fr_2"			=> {cmd2=>"0B1482", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Sa-So_0"			=> {cmd2=>"0B1490", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Sa-So_1"			=> {cmd2=>"0B1491", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Sa-So_2"			=> {cmd2=>"0B1492", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Mo-So_0"			=> {cmd2=>"0B14A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Mo-So_1"			=> {cmd2=>"0B14A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC1_Mo-So_2"			=> {cmd2=>"0B14A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programHC2_Mo_0"			=> {cmd2=>"0C1510", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},  #1 is monday 0 is first prog; start and end; value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
   "programHC2_Mo_1"			=> {cmd2=>"0C1511", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programHC2_Mo_2"			=> {cmd2=>"0C1512", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
@@ -413,15 +417,15 @@ my %sets439 = (
   "programHC2_So_0"			=> {cmd2=>"0C1570", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programHC2_So_1"			=> {cmd2=>"0C1571", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programHC2_So_2"			=> {cmd2=>"0C1572", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Mo-Fr_0"		=> {cmd2=>"0C1580", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Mo-Fr_1"		=> {cmd2=>"0C1581", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Mo-Fr_2"		=> {cmd2=>"0C1582", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Sa-So_0"		=> {cmd2=>"0C1590", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Sa-So_1"		=> {cmd2=>"0C1591", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Sa-So_2"		=> {cmd2=>"0C1592", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Mo-So_0"		=> {cmd2=>"0C15A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Mo-So_1"		=> {cmd2=>"0C15A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programHC2_Mo-So_2"		=> {cmd2=>"0C15A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Mo-Fr_0"			=> {cmd2=>"0C1580", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Mo-Fr_1"			=> {cmd2=>"0C1581", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Mo-Fr_2"			=> {cmd2=>"0C1582", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Sa-So_0"			=> {cmd2=>"0C1590", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Sa-So_1"			=> {cmd2=>"0C1591", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Sa-So_2"			=> {cmd2=>"0C1592", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Mo-So_0"			=> {cmd2=>"0C15A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Mo-So_1"			=> {cmd2=>"0C15A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programHC2_Mo-So_2"			=> {cmd2=>"0C15A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programDHW_Mo_0"			=> {cmd2=>"0A1710", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programDHW_Mo_1"			=> {cmd2=>"0A1711", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programDHW_Mo_2"			=> {cmd2=>"0A1712", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
@@ -443,15 +447,15 @@ my %sets439 = (
   "programDHW_So_0"			=> {cmd2=>"0A1770", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programDHW_So_1"			=> {cmd2=>"0A1771", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programDHW_So_2"			=> {cmd2=>"0A1772", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Mo-Fr_0"		=> {cmd2=>"0A1780", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Mo-Fr_1"		=> {cmd2=>"0A1781", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Mo-Fr_2"		=> {cmd2=>"0A1782", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Sa-So_0"		=> {cmd2=>"0A1790", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Sa-So_1"		=> {cmd2=>"0A1791", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Sa-So_2"		=> {cmd2=>"0A1792", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Mo-So_0"		=> {cmd2=>"0A17A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Mo-So_1"		=> {cmd2=>"0A17A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programDHW_Mo-So_2"		=> {cmd2=>"0A17A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Mo-Fr_0"			=> {cmd2=>"0A1780", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Mo-Fr_1"			=> {cmd2=>"0A1781", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Mo-Fr_2"			=> {cmd2=>"0A1782", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Sa-So_0"			=> {cmd2=>"0A1790", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Sa-So_1"			=> {cmd2=>"0A1791", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Sa-So_2"			=> {cmd2=>"0A1792", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Mo-So_0"			=> {cmd2=>"0A17A0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Mo-So_1"			=> {cmd2=>"0A17A1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programDHW_Mo-So_2"			=> {cmd2=>"0A17A2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programFan_Mo_0"			=> {cmd2=>"0A1D10", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programFan_Mo_1"			=> {cmd2=>"0A1D11", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programFan_Mo_2"			=> {cmd2=>"0A1D12", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
@@ -473,15 +477,15 @@ my %sets439 = (
   "programFan_So_0"			=> {cmd2=>"0A1D70", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programFan_So_1"			=> {cmd2=>"0A1D71", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
   "programFan_So_2"			=> {cmd2=>"0A1D72", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Mo-Fr_0"		=> {cmd2=>"0A1D80", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Mo-Fr_1"		=> {cmd2=>"0A1D81", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Mo-Fr_2"		=> {cmd2=>"0A1D82", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Sa-So_0"		=> {cmd2=>"0A1D90", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Sa-So_1"		=> {cmd2=>"0A1D91", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Sa-So_2"		=> {cmd2=>"0A1D92", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Mo-So_0"		=> {cmd2=>"0A1DA0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Mo-So_1"		=> {cmd2=>"0A1DA1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
-  "programFan_Mo-So_2"		=> {cmd2=>"0A1DA2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""}
+  "programFan_Mo-Fr_0"			=> {cmd2=>"0A1D80", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programFan_Mo-Fr_1"			=> {cmd2=>"0A1D81", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programFan_Mo-Fr_2"			=> {cmd2=>"0A1D82", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programFan_Sa-So_0"			=> {cmd2=>"0A1D90", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programFan_Sa-So_1"			=> {cmd2=>"0A1D91", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programFan_Sa-So_2"			=> {cmd2=>"0A1D92", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programFan_Mo-So_0"			=> {cmd2=>"0A1DA0", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programFan_Mo-So_1"			=> {cmd2=>"0A1DA1", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""},
+  "programFan_Mo-So_2"			=> {cmd2=>"0A1DA2", argMin =>  "00:00", argMax =>  "24:00", type =>"7prog",  unit =>""}
   );
 
 my %sets206 = (
@@ -513,11 +517,11 @@ my %sets206 = (
 ########################################################################################
 
 my %getsonly439 = (
-#	"debug_read_raw_register_slow"	=> { },
-  "sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
-  "sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
-  "sHC1"				=> {cmd2=>"F4", type =>"F4hc1", unit =>""},
-  "sHC2"				=> {cmd2=>"F5", type =>"F5hc2", unit =>""},
+#"debug_read_raw_register_slow"	=> { },
+  "sSol"			=> {cmd2=>"16", type =>"16sol", unit =>""},
+  "sDHW"			=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
+  "sHC1"			=> {cmd2=>"F4", type =>"F4hc1", unit =>""},
+  "sHC2"			=> {cmd2=>"F5", type =>"F5hc2", unit =>""},
   "sHistory"			=> {cmd2=>"09", type =>"09his", unit =>""},
   "sLast10errors"		=> {cmd2=>"D1", type =>"D1last", unit =>""},
   "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob", unit =>""},  #allFB
@@ -527,14 +531,14 @@ my %getsonly439 = (
   "sDisplay" 			=> {cmd2=>"0A0176", type =>"0A0176Dis", unit =>""},
   "sBoostDHWTotal" 		=> {cmd2=>"0A0924", cmd3=>"0A0925",	type =>"1clean", unit =>" kWh"},
   "sBoostHCTotal"	 	=> {cmd2=>"0A0928", cmd3=>"0A0929",	type =>"1clean", unit =>" kWh"},
-  "sHeatRecoveredDay" 	=> {cmd2=>"0A03AE", cmd3=>"0A03AF",	type =>"1clean", unit =>" Wh"},
-  "sHeatRecoveredTotal" => {cmd2=>"0A03B0", cmd3=>"0A03B1",	type =>"1clean", unit =>" kWh"},
+  "sHeatRecoveredDay" 		=> {cmd2=>"0A03AE", cmd3=>"0A03AF",	type =>"1clean", unit =>" Wh"},
+  "sHeatRecoveredTotal" 	=> {cmd2=>"0A03B0", cmd3=>"0A03B1",	type =>"1clean", unit =>" kWh"},
   "sHeatDHWDay" 		=> {cmd2=>"0A092A", cmd3=>"0A092B",	type =>"1clean", unit =>" Wh"},
   "sHeatDHWTotal" 		=> {cmd2=>"0A092C", cmd3=>"0A092D",	type =>"1clean", unit =>" kWh"},
   "sHeatHCDay" 			=> {cmd2=>"0A092E", cmd3=>"0A092F",	type =>"1clean", unit =>" Wh"},
   "sHeatHCTotal"	 	=> {cmd2=>"0A0930", cmd3=>"0A0931",	type =>"1clean", unit =>" kWh"},
   "sElectrDHWDay" 		=> {cmd2=>"0A091A", cmd3=>"0A091B",	type =>"1clean", unit =>" Wh"},
-  "sElectrDHWTotal" 	=> {cmd2=>"0A091C", cmd3=>"0A091D",	type =>"1clean", unit =>" kWh"},
+  "sElectrDHWTotal" 		=> {cmd2=>"0A091C", cmd3=>"0A091D",	type =>"1clean", unit =>" kWh"},
   "sElectrHCDay" 		=> {cmd2=>"0A091E", cmd3=>"0A091F",	type =>"1clean", unit =>" Wh"},
   "sElectrHCTotal"		=> {cmd2=>"0A0920", cmd3=>"0A0921",	type =>"1clean", unit =>" kWh"},
   "party-time"			=> {cmd2=>"0A05D1", argMin =>  "00:00", argMax =>  "23:59", type =>"8party", unit =>""} # value 1Ch 28dec is 7 ; value 1Eh 30dec is 7:30
@@ -542,25 +546,25 @@ my %getsonly439 = (
 
 
 my %getsonly539 = (  #info from belu and godmorgon
-  "sFlowRate"           => {cmd2=>"0A033B",   type =>"1clean", unit =>" cl/min"},
-  "sHumMaskingTime"     => {cmd2=>"0A064F",   type =>"1clean", unit =>" min"},
+  "sFlowRate"          		=> {cmd2=>"0A033B",   type =>"1clean", unit =>" cl/min"},
+  "sHumMaskingTime"     	=> {cmd2=>"0A064F",   type =>"1clean", unit =>" min"},
   "sHumThreshold"		=> {cmd2=>"0A0650",   type =>"1clean", unit =>" %"},
-  "sOutputReduction"    => {cmd2=>"0A06A4",   type =>"1clean", unit =>" %"},
-  "sOutputIncrease"     => {cmd2=>"0A06A5",   type =>"1clean", unit =>" %"},
+  "sOutputReduction"    	=> {cmd2=>"0A06A4",   type =>"1clean", unit =>" %"},
+  "sOutputIncrease"     	=> {cmd2=>"0A06A5",   type =>"1clean", unit =>" %"},
   "sHumProtection"		=> {cmd2=>"0A09D1",   type =>"1clean", unit =>""},
-  "sSetHumidityMin"     => {cmd2=>"0A09D2",   type =>"1clean", unit =>" %"},
-  "sSetHumidityMax"     => {cmd2=>"0A09D3",   type =>"1clean", unit =>" %"}
+  "sSetHumidityMin"     	=> {cmd2=>"0A09D2",   type =>"1clean", unit =>" %"},
+  "sSetHumidityMax"     	=> {cmd2=>"0A09D3",   type =>"1clean", unit =>" %"}
  );
 %getsonly539=(%getsonly539, %getsonly439);
 
 my %getsonly2xx = (
-  "pExpert"				=> {cmd2=>"02", type =>"02pxx206", unit =>""},
+  "pExpert"			=> {cmd2=>"02", type =>"02pxx206", unit =>""},
   "pDefrostEva"			=> {cmd2=>"03", type =>"03pxx206", unit =>""},
   "pDefrostAA"			=> {cmd2=>"04", type =>"04pxx206", unit =>""},
-  "pHeat1"				=> {cmd2=>"05", type =>"05pxx206", unit =>""},
-  "pHeat2"				=> {cmd2=>"06", type =>"06pxx206", unit =>""},
-  "pDHW"				=> {cmd2=>"07", type =>"07pxx206", unit =>""},
-  "pSolar"				=> {cmd2=>"08", type =>"08pxx206", unit =>""},
+  "pHeat1"			=> {cmd2=>"05", type =>"05pxx206", unit =>""},
+  "pHeat2"			=> {cmd2=>"06", type =>"06pxx206", unit =>""},
+  "pDHW"			=> {cmd2=>"07", type =>"07pxx206", unit =>""},
+  "pSolar"			=> {cmd2=>"08", type =>"08pxx206", unit =>""},
   "pCircPump"			=> {cmd2=>"0A", type =>"0Apxx206", unit =>""},
   "pHeatProg"			=> {cmd2=>"0B", type =>"0Bpxx206", unit =>""},
   "pDHWProg"			=> {cmd2=>"0C", type =>"0Cpxx206", unit =>""},
@@ -568,28 +572,27 @@ my %getsonly2xx = (
   "pRestart"			=> {cmd2=>"0E", type =>"0Epxx206", unit =>""},
   "pAbsence"			=> {cmd2=>"0F", type =>"0Fpxx206", unit =>""},
   "pDryHeat"			=> {cmd2=>"10", type =>"10pxx206", unit =>""},
-  "sSol"				=> {cmd2=>"16", type =>"16sol",    unit =>""},
-  "p01-p12"				=> {cmd2=>"17", type =>"17pxx206", unit =>""},
-  "sProgram"            => {cmd2=>"EE", type =>"EEprg206", unit =>""},
-  "sDHW"				=> {cmd2=>"F3", type =>"F3dhw",    unit =>""},
-  "sHC2"				=> {cmd2=>"F5", type =>"F5hc2",    unit =>""},
-  "sSystem"				=> {cmd2=>"F6", type =>"F6sys206", unit =>""},
+  "sSol"			=> {cmd2=>"16", type =>"16sol",    unit =>""},
+  "p01-p12"			=> {cmd2=>"17", type =>"17pxx206", unit =>""},
+  "sProgram"  			=> {cmd2=>"EE", type =>"EEprg206", unit =>""},
+  "sDHW"			=> {cmd2=>"F3", type =>"F3dhw",    unit =>""},
+  "sHC2"			=> {cmd2=>"F5", type =>"F5hc2",    unit =>""},
+  "sSystem"			=> {cmd2=>"F6", type =>"F6sys206", unit =>""},
   "sHistory"			=> {cmd2=>"09", type =>"09his206", unit =>""},
   "sLast10errors"		=> {cmd2=>"D1", type =>"D1last206", unit =>""},
   "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob206", unit =>""},  #allFB
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime206", unit =>""},
  );
 my %getsonly206 = (
-     "sHC1"				=> {cmd2=>"F4", type =>"F4hc1",    unit =>""},
-	"pFan"              => {cmd2=>"01", type =>"01pxx206", unit =>""},
-    "sLast10errors"     => {cmd2=>"D1", type =>"D1last206", unit =>""},
-	"sFirmware" 		=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
-	"sFirmware-Id" 		=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
+  "sHC1"			=> {cmd2=>"F4", type =>"F4hc1",    unit =>""},
+  "pFan"              		=> {cmd2=>"01", type =>"01pxx206", unit =>""},
+  "sLast10errors"     		=> {cmd2=>"D1", type =>"D1last206", unit =>""},
+  "sFirmware" 			=> {cmd2=>"FD", type =>"FDfirm",   unit =>""},
+  "sFirmware-Id" 		=> {cmd2=>"FE", type =>"FEfirmId", unit =>""},
  );
 my %getsonly214 = (
-       "pFan"           => {cmd2=>"01", type =>"01pxx214", unit =>""},
-	    "sHC1"				=> {cmd2=>"F4", type =>"F4hc1214",    unit =>""},
- 
+  "pFan"          		=> {cmd2=>"01", type =>"01pxx214", unit =>""},
+  "sHC1"			=> {cmd2=>"F4", type =>"F4hc1214",    unit =>""},
  );
 
 
@@ -651,7 +654,7 @@ sub THZ_Initialize($)
 		    ."interval_sBoostHCTotal:0,3600,7200,28800,43200,86400 "
 		    ."interval_sFlowRate:0,3600,7200,28800,43200,86400 "
 		    ."interval_sDisplay:0,60,120,180,300 "
-		    ."firmware:4.39,2.06,2.14,5.39 "
+		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
 
@@ -818,17 +821,63 @@ sub THZ_Ready($)
 #
 ########################################################################################
 sub THZ_Set($@){
-  my ($hash, @a) = @_;
+  my ($hash,  @a) = @_;
   my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
+  my $name = $hash->{NAME}; 
   return "\"set $name\" needs at least two parameters: <device-parameter> and <value-to-be-modified>" if(@a < 2);
   my $cmd = $a[1];
   my $arg = $a[2];
   my $arg1 = "00:00";
   my ($err, $msg) =("", " ");
   my $cmdhash = $sets{$cmd};
-  return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets) if(!defined($cmdhash));
+  #return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets) if(!defined($cmdhash));
+  if(!defined($cmdhash)) {
+    my $setList;
+    foreach my $key (sort keys %sets) {
+      my $value = $sets{$key};
+      $setList .= $key;
+      #if (($value->{type} eq "0clean" or $value->{type} eq "1clean") and $value->{unit} eq "") {
+      if (($value->{type} eq "0clean" or $value->{type} eq "1clean")) {
+	  #if (($value->{argMax} - $value->{argMin})<2 ) {$setList .= ":uzsuToggle," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
+	  if (($value->{argMax} - $value->{argMin})<13 ) {$setList .= ":uzsuSelectRadio," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
+	  else  					 {$setList .= ":textField ";}
+	  #else						 {$setList .= ":slider,$value->{argMin},1,$value->{argMax} ";}
+	  #else						 {$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:1 " ;}
+	  }
+      elsif ($value->{type} eq "2opmode"){
+	  $setList .= ":" . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
+	  #$setList .= ":uzsuSelectRadio," . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
+	  #attr Mythz widgetOverride pOpMode:uzsuDropDown,automatic,standby
+	  }
+      #elsif ($value->{type} eq "9holy"){
+	  #$setList .= ":time ";
+	  # $setList .= ":textField ";
+	  # }
+     # elsif ($value->{type} eq "5temp") {
+	#   $setList .= ":slider,$value->{argMin},0.1,$value->{argMax},1 "  ;
+      	    #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.1 "  ;
+	    #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.1,angleOffset:-125,angleArc:250 "
+	    #attr Mythz widgetOverride p01RoomTempDayHC1:knob,min:22,max:26,step:0.1,angleOffset:-125,angleArc:250
+	    #attr Mythz widgetOverride p01RoomTempDayHC1:slider,$value->{argMin},0.1,$value->{argMax}
+	    #attr Mythz widgetOverride p01RoomTempDayHC1:uzsuDropDown,21,29
+	    #attr Mythz widgetOverride p01RoomTempDayHC1:uzsuSelectRadio,44,234,21
+	 #  }
+      #elsif ($value->{type} eq "6gradient") {
+	  #   $setList .= ":slider,$value->{argMin},0.01,$value->{argMax},1 " ;
+	  #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.01 "  ;
+	  #   }
+      else {
+      #$setList .= ":textField ";
+      $setList .= " ";
+      }
+    }
+    return "Unknown argument $cmd, choose one of  $setList";
+  }
+  
   return "\"set $name $cmd\" needs at least one further argument: <value-to-be-modified>" if(!defined($arg));
+ 
+  
+  
   my $cmdHex2 = $cmdhash->{cmd2};
   my $argMax = $cmdhash->{argMax};
   my $argMin = $cmdhash->{argMin};
@@ -959,9 +1008,13 @@ sub THZ_Get($@){
   } 
   
   my $cmdhash = $gets{$cmd};
-  return "Unknown argument $cmd, choose one of " .
-        join(" ", sort keys %gets) if(!defined($cmdhash));
-
+  #return "Unknown argument $cmd, choose one of " .   join(" ", sort keys %gets) if(!defined($cmdhash));
+  if(!defined($cmdhash)) {
+    my $getList;
+    foreach my $key (sort keys %gets) {$getList .= "$key:noArg ";}
+    return "Unknown argument $cmd, choose one of  $getList";
+  }
+  
   Log3 $hash->{NAME}, 5, "THZ_Get: Try to get '$cmd'";
   
   my $parent = $cmdhash->{parent};	#if I have a father read from it
@@ -1020,7 +1073,7 @@ sub THZ_Get($@){
 
 #####################################
 #
-# THZ_Get_Comunication- provides a method for reading comunication called from THZ_Get
+# THZ_Get_Comunication- provides a method for comunication called from THZ_Get or THZ_Set
 #
 # Parameter hash and CMD2 or 3 
 #
@@ -1076,7 +1129,7 @@ sub THZ_ReadAnswer($)
 	Log3 $hash->{NAME}, 5, "$hash->{NAME} start Funktion THZ_ReadAnswer";
 	###------Windows support
 	select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-    my $buf = DevIo_SimpleReadWithTimeout($hash, 0.5); 
+	my $buf = DevIo_SimpleReadWithTimeout($hash, 0.5); 
 	if(!defined($buf)) {
 	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
 	  return ("InterfaceNotRespondig", "");
@@ -1415,8 +1468,9 @@ sub THZ_debugread($){
   my ($hash) = @_;
   my ($err, $msg) =("", " ");
  # my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'FB', 'FC', 'FD', 'FE');
- #my @numbers=('0A0597','0A0598', '0A0599', '0A059A', '0A059B', '0A059C',);
-  my @numbers=('0A05DD',  'FE', '0A0122', '0A0123', '0A0124', '0A0125', '0A0126', '0A0127'  );  
+ #my @numbers=('0A011B', '0B011B', '0C011B');
+  #my @numbers=(1, 3, 4, 5, 8, 12, 13, 14, 15, 17, 18, 19, 20, 22, 26, 39, 40, 82, 83, 86, 87, 96, 117, 128, 239, 265, 268, 269, 270, 271, 274, 275, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 297, 299, 317, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 603, 607, 612, 613, 634, 647, 650, 961, 1385, 1386, 1387, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 830, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 1555, 272, 1489, 1490, 1491, 1492, 1631, 933, 934, 1634, 928, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, 2029, 2030, 2031, 2032, 2033);
+  my @numbers=(1, 3, 12, 13, 14, 15, 19, 20, 22, 26, 39,  82, 83, 86, 87, 96, 239, 265, 268, 274, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 613, 634, 961, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409,  1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 2970, 2971, 2975, 2976, 2977, 2978, 2979, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 272, 1489, 1491, 1492, 1631, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, );
   #my @numbers = (1..256);
   #my @numbers = (1..65535);
   #my @numbers = (1..3179);
@@ -1425,8 +1479,8 @@ sub THZ_debugread($){
   foreach $indice(@numbers) {	
     #my $cmd = sprintf("%02X", $indice);
     #my $cmd = sprintf("%04X", $indice);
-    #my $cmd = "0A" . sprintf("%04X",  $indice);
-    my $cmd = $indice;
+    my $cmd = "0A" . sprintf("%04X",  $indice);
+#   my $cmd = $indice;
     my $cmdHex2 = THZ_encodecommand($cmd,"get"); 
     #($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
     #STX start of text
@@ -1458,7 +1512,7 @@ sub THZ_debugread($){
 		  close (MYFILE);
 		  #Log3 $hash->{NAME}, 3, "$cmd  -  $msg";
     }    
-    select(undef, undef, undef, 1.255); 
+    select(undef, undef, undef, 0.2); 
   }
 }
 
@@ -1492,13 +1546,20 @@ sub THZ_Attr(@) {
         %gets=(%getsonly539, %sets);
         THZ_Refresh_all_gets($hash);
       }
+      elsif ($attrVal eq "4.39technician") {
+        THZ_RemoveInternalTimer("THZ_GetRefresh");
+        %sets=(%sets439, %sets439technician);
+        %gets=(%getsonly439, %sets);
+        THZ_Refresh_all_gets($hash);
+      }
       else { #in all other cases I assume $attrVal eq "4.39" cambiato nella v0140
-          THZ_RemoveInternalTimer("THZ_GetRefresh");
-          %sets=%sets439;
-          %gets=(%getsonly439, %sets);
-          THZ_Refresh_all_gets($hash);
+        THZ_RemoveInternalTimer("THZ_GetRefresh");
+        %sets=%sets439;
+        %gets=(%getsonly439, %sets);
+        THZ_Refresh_all_gets($hash);
       }
   }
+  
   
   if( $attrName =~ /^interval_/ ) {
   #DevIo_CloseDev($hash);
@@ -1710,13 +1771,6 @@ return ($FW_RETTYPE, $ret);
 #####################################
 
 
-
-
-
-
-
-
-
 1;
 
 
@@ -1752,26 +1806,33 @@ return ($FW_RETTYPE, $ret);
     </code></ul>
     <br>
       <ul><code>
-      define Mythz THZ /dev/ttyUSB0@115200 <br>
-      attr Mythz interval_sGlobal 	300      # internal polling interval 5min  <br>
-      attr Mythz interval_sHistory 	28800  # internal polling interval 8h    <br>
-      attr Mythz interval_sLast10errors 86400 # internal polling interval 24h    <br>
-      attr Mythz interval_sSol	 	86400 # internal polling interval 24h    <br>
-      attr Mythz interval_sDHW	 	86400 # internal polling interval 24h    <br>
-      attr Mythz interval_sHC1	 	86400 # internal polling interval 24h    <br>
-      attr Mythz interval_sHC2	 	86400 # internal polling interval 24h    <br>
-      define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
+      define Mythz THZ /dev/ttyUSB0@115200 			<br>
+      define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz 	<br>
+      attr Mythz event-min-interval s.*:4800			<br>
+      attr Mythz event-on-change-reading .*			<br>
+      attr Mythz interval_sDHW 400				<br>
+      attr Mythz interval_sElectrDHWDay 2400			<br>
+      attr Mythz interval_sElectrDHWTotal 43200			<br>
+      attr Mythz interval_sGlobal 400				<br>
+      attr Mythz interval_sHC1 400				<br>
+      attr Mythz interval_sHeatDHWDay 2400			<br>
+      attr Mythz interval_sHeatDHWTotal 43200			<br>
+      attr Mythz interval_sHeatRecoveredDay 2400		<br>
+      attr Mythz interval_sHeatRecoveredTotal 43200		<br>
+      attr Mythz interval_sHistory 86400			<br>
+      attr Mythz interval_sLast10errors 86400			<br>
+      attr Mythz room pompa					<br>
+      attr FileLog_Mythz  room pompa				<br>
       </code></ul>
      <br> 
-   If the attributes interval_allFB and interval_history are not defined (or 0), their internal polling is disabled.
+   If the attributes interval_XXXX are not defined (or 0 seconds), their internal polling is disabled.
    <br>
-   This module is starting to support (read-only experimental mode) older firmware 2.06; the following attribute adapts decoding and blocks any write back to the heatpump  <br>
+   This module is starting to support older firmware 2.06 or newer firmware 5.39; the following attribute adapts decoding   <br>
     <br>
       <ul><code>
       attr Mythz firmware 2.06 <br>
       </code></ul>
      <br>
-    This module is starting to support newer firmware 5.39; the following attribute adapts decoding <br>
     <br>
       <ul><code>
       attr Mythz firmware 5.39 <br>
@@ -1821,26 +1882,32 @@ return ($FW_RETTYPE, $ret);
     </code></ul>
     <br>
       <ul><code>
-      define Mythz THZ /dev/ttyUSB0@115200 <br>
-      attr Mythz interval_sGlobal 	 300            # Internes Polling Intervall 5min   <br>
-      attr Mythz interval_sHistory 	 28800        # Internes Polling Intervall 8h     <br>
-      attr Mythz interval_sLast10errors	 86400   # Internes Polling Intervall 24h    <br>
-      attr Mythz interval_sSol		 86400  # Internes Polling Intervall 24h    <br>
-      attr Mythz interval_sDHW		 86400  # Internes Polling Intervall 24h    <br>
-      attr Mythz interval_sHC1		 86400  # Internes Polling Intervall 24h    <br>
-      attr Mythz interval_sHC2		 86400  # Internes Polling Intervall 24h    <br>
-      define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz <br>
+      define Mythz THZ /dev/ttyUSB0@115200 			<br>
+      define FileLog_Mythz FileLog ./log/Mythz-%Y.log Mythz 	<br>
+      attr Mythz event-min-interval s.*:4800			<br>
+      attr Mythz event-on-change-reading .*			<br>
+      attr Mythz interval_sDHW 400				<br>
+      attr Mythz interval_sElectrDHWDay 2400			<br>
+      attr Mythz interval_sElectrDHWTotal 43200			<br>
+      attr Mythz interval_sGlobal 400				<br>
+      attr Mythz interval_sHC1 400				<br>
+      attr Mythz interval_sHeatDHWDay 2400			<br>
+      attr Mythz interval_sHeatDHWTotal 43200			<br>
+      attr Mythz interval_sHeatRecoveredDay 2400		<br>
+      attr Mythz interval_sHeatRecoveredTotal 43200		<br>
+      attr Mythz interval_sHistory 86400			<br>
+      attr Mythz interval_sLast10errors 86400			<br>
+      attr Mythz room pompa					<br>
+      attr FileLog_Mythz  room pompa				<br>
       </code></ul>
      <br> 
-   Wenn die Attribute interval_allFB und interval_history nicht definiert sind (oder 0), ist das interne Polling deaktiviert.
+   Wenn die Attribute interval_XXXXXXX nicht definiert sind (oder 0), ist das interne Polling deaktiviert.
       
   </ul>
   <br>
 </ul>
  
 =end html_DE
-
-
 =cut
 
 
