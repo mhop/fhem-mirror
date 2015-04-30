@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.1.9";
+my $VERSION = "2.2.0";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -331,12 +331,14 @@ SYSMON_updateCurrentReadingsMap($) {
   $rMap->{"loadavg_15"}      = "Load average 15";
   
   $rMap->{"ram"}             = "RAM";
+  $rMap->{"ram_used_stat"}   = "RAM used stat";
   $rMap->{"ram_total"}       = "RAM total";
   $rMap->{"ram_used"}        = "RAM used";
   $rMap->{"ram_free"}        = "RAM free";
   $rMap->{"ram_free_percent"}= "RAM free %";
   
   $rMap->{"swap"}            = "swap";
+  $rMap->{"swap_used_stat"}  = "swap used stat";
   $rMap->{"swap_total"}      = "swap total";
   $rMap->{"swap_used"}       = "swap used";
   $rMap->{"swap_free"}       = "swap free";
@@ -2150,6 +2152,8 @@ sub SYSMON_getRamAndSwap($$) {
   #my $percentage_ram;
   #my $percentage_swap;
   
+  my $used_clean;
+  
   if(defined($total) && $total > 0) {
   
     $total   = $total / 1024;
@@ -2162,14 +2166,16 @@ sub SYSMON_getRamAndSwap($$) {
       # Bei FritzBox wird dieser Wert nicht ausgageben
       $cached  = 0;
     }
-
-    $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, ($used - $buffers - $cached), (($used - $buffers - $cached) / $total * 100), ($free + $buffers + $cached));
+    $used_clean = $used - $buffers - $cached;
+    $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used_clean, ($used_clean / $total * 100), ($free + $buffers + $cached));
   }
   else
   {
     $ram = "n/a";
   }
   $map->{+RAM} = $ram;
+  
+  $map = SYSMON_getComputeStat($hash, $map, $used_clean, "ram_used_stat");
   
   # wenn kein swap definiert ist, ist die Groesse (total2) gleich Null. Dies wuerde eine Exception (division by zero) ausloesen
   if(defined($total2) && $total2 > 0 && defined($used2) && defined($free2)) {
@@ -2183,6 +2189,7 @@ sub SYSMON_getRamAndSwap($$) {
   }
 
   $map->{+SWAP} = $swap;
+  $map = SYSMON_getComputeStat($hash, $map, $used2, "swap_used_stat");
   
   return $map;
 }
@@ -2281,6 +2288,7 @@ sub SYSMON_getRamAndSwapOSX($$) {
     my $ram = sprintf("Total: %.2f MB, Used: %.2f MB, %.2f %%, Free: %.2f MB", $total, $used , ($used / $total * 100), $free);
     #Log 3, "SYSMON >>>>>>>>>>>>>>>>>>>>>>>>> OSX: RAM:  ".$ram;
     $map->{+RAM} = $ram;
+    $map = SYSMON_getComputeStat($hash, $map, $used, "ram_used_stat");
   
     my @avm = SYSMON_execute($hash, "sysctl vm.swapusage");
     if($debug) {
@@ -2378,6 +2386,7 @@ sub SYSMON_getRamAndSwapOSX($$) {
       my $free2  = SYSMON_fmtStorageAmount_($3);
       my $swap = sprintf("Total: %.2f MB, Used: %.2f MB,  %.2f %%, Free: %.2f MB", $total2, $used2, ($used2 / $total2 * 100), $free2);
       $map->{+SWAP} = $swap; 
+      $map = SYSMON_getComputeStat($hash, $map, $used2, "swap_used_stat");
       #Log 3, "SYSMON >>>>>>>>>>>>>>>>>>>>>>>>> OSX: SWAP: ".$swap;
     }
   }
@@ -4280,21 +4289,33 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>
     <li>cpuX_freq_stat<br>
-        Frequency statistics for CPU X: minimum,  maximum und average values<br>
+        Frequency statistics for CPU X: minimum,  maximum and average values<br>
         Example:<br>
         <code>cpu0_freq_stat: 100 1000 900</code><br>
     </li>
     <br>    
         <li>cpuX_idle_stat<br>
-        Idle statistik for CPU X: minimum,  maximum und average values<br>
+        Idle statistik for CPU X: minimum,  maximum and average values<br>
         Example:<br>
         <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
     </li>
     <br>       
-        <li>cpu_temp_stat<br>
-        Temperature statistik for CPU: minimum,  maximum und average values<br>
+        <li>cpu[X]_temp_stat<br>
+        Temperature statistik for CPU: minimum,  maximum and average values<br>
         Example:<br>
         <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
+    </li>
+    <br>       
+    <li>ram_used_stat<br>
+        RAM usage statistics: minimum,  maximum and average values<br>
+        Example:<br>
+        <code>ram_used_stat: 267.55 1267.75 855.00</code><br>
+    </li>
+    <br>
+    <li>swap_used_stat<br>
+        SWAP usage statistics: minimum,  maximum and average values<br>
+        Example:<br>
+        <code>swap_used_stat: 0 1024.00 250.00</code><br>
     </li>
     <br>
   <br>
@@ -4929,21 +4950,33 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     </li>
     <br>    
     <li>cpuX_freq_stat<br>
-        Frequenz-Statistik f&uuml;r die CPU X: Minimum,  Maximum und Durchschnittswert<br>
+        Frequenz-Statistik f&uuml;r die CPU X: Minimum, Maximum und Durchschnittswert<br>
         Beispiel:<br>
         <code>cpu0_freq_stat: 100 1000 900</code><br>
     </li>
     <br>    
         <li>cpuX_idle_stat<br>
-        Leerlaufzeit-Statistik f&uuml;r die CPU X: Minimum,  Maximum und Durchschnittswert<br>
+        Leerlaufzeit-Statistik f&uuml;r die CPU X: Minimum, Maximum und Durchschnittswert<br>
         Beispiel:<br>
         <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
     </li>
     <br>    
         <li>cpu[X]_temp_stat<br>
-        Temperatur-Statistik f&uuml;r CPU: minimum,  maximum und average values<br>
+        Temperatur-Statistik f&uuml;r CPU: Minimum, Maximum und Durchschnittswert<br>
         Beispiel:<br>
         <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
+    </li>
+    <br>
+        <li>ram_used_stat<br>
+        Statistik der RAM-Nutzung: Minimum, Maximum und Durchschnittswert<br>
+        Example:<br>
+        <code>ram_used_stat: 267.55 1267.75 855.00</code><br>
+    </li>
+    <br>
+    <li>swap_used_stat<br>
+        Statistik der SWAP-Nutzung: Minimum, Maximum und Durchschnittswert<br>
+        Example:<br>
+        <code>swap_used_stat: 0 1024.00 250.00</code><br>
     </li>
     <br>
   <br>
