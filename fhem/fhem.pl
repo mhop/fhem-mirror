@@ -4040,7 +4040,7 @@ notifyRegexpChanged($$)
   my ($hash, $re) = @_;
 
   my $dev;
-  $dev = $1 if(($re =~ m/^([^:]*)$/ || $re =~ m/^([^:]*):(.*)$/));
+  $dev = $1 if($re =~ m/^([^:]*)$/ || $re =~ m/^([^:]*):(.*)$/);
 
   if($dev && defined($defs{$dev}) && $re !~ m/\|/) { # Forum #36663
     $hash->{NOTIFYDEV} = $dev;
