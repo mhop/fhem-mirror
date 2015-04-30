@@ -199,7 +199,7 @@ CUL_WS_Parse($$)
 
     if($typbyte == 5 && int(@a) > 5) {           # brightness
       my $fakt = 1;
-      my $rawfakt = ($a[5])+0;
+      my $rawfakt = ($a[6])+0;
       if($rawfakt == 1) { $fakt =   10; }
       if($rawfakt == 2) { $fakt =  100; }
       if($rawfakt == 3) { $fakt = 1000; }
