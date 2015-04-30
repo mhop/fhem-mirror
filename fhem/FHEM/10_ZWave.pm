@@ -38,7 +38,8 @@ my %zwave_class = (
   SWITCH_MULTILEVEL        => { id => '26', 
     set   => { off         => "0100",
                on          => "01FF",
-               dim         => "01%02x" },
+               dim         => "01%02x",
+               stop        => "05" },
     get   => { swmStatus   => "02",     }, 
     parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" : 
                                ($1 eq "ff" ? "state:on" : 
@@ -346,8 +347,8 @@ my %zwave_deviceSpecial = (
       set   => { positionSlat=>"010f26010100%02x", 
                  positionBlinds=>"010f260102%02x00",},
       get   => { position=>"010f2602020000", },
-      parse => { "010f260303(..)(..)" =>'sprintf("position:Blinds %d Slat %d",'.
-                                            'hex($1),hex($2))' } } },
+      parse => { "0891010f260303(..)(..)" =>
+                  'sprintf("position:Blinds %d Slat %d",hex($1),hex($2))' } } },
    Philio_PAN04 => {
      METER => {
       get   => { meter       => "01",
@@ -1697,7 +1698,9 @@ s2Hex($)
   <li>on, off<br>
     the same as for SWITCH_BINARY.</li>
   <li>dim value<br>
-    dim to the requested value (0..100)</li>
+    dim/jump to the requested value (0..100)</li>
+  <li>stop<br>
+    stop dimming/operation</li>
 
 	
   <br><br><b>Class SCENE_ACTIVATION</b>
