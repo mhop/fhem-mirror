@@ -37,7 +37,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.2.0";
+my $VERSION = "2.2.2";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -4038,6 +4038,139 @@ sub SYSMON_Log($$$) {
 #   $string =~ s/\s+$//;
 #   return $string;
 #}
+
+## -----------------------------------------------------------------------------
+## Visualisation module. provided by snx.
+##
+## usage:
+##   SYSMON_weblinkHeader(<weblink device>[,<text>]) : create a clickable device header
+##   SYSMON_ShowBarChartHtml(<sysmon device>[,<bar color>[,<border color>]]) : create a bar chart for sysmon device
+## 
+## example:
+##   define wlSysmon weblink htmlCode {SYSMON_weblinkHeader('wlSysmon').SYSMON_ShowBarChartHtml('sysmon')}
+##   define wlSysmon weblink htmlCode {SYSMON_weblinkHeader('wlSysmon','Cubietruck').SYSMON_ShowBarChartHtml('sysmon','steelblue','gray')}
+##
+## -----------------------------------------------------------------------------
+sub SYSMON_weblinkHeader($;$){
+  my $dev = shift;
+  my $text = shift||$dev;
+  return '<div><a href="?detail='.$dev.'"><b>'.$text.'</b></a></div>';
+}
+
+sub SYSMON_ShowBarChartHtml($;$$){
+  my $dev = shift;
+  
+  my $colFill = shift || 'lightCoral';
+  my $colBorder = shift || 'black';
+  
+  my $htmlRow .= ''
+  . '<tr>'
+  . '  <td>#NAME#</td>'
+  . '  <td>#VALUE#</td>'
+  . '</tr>';
+  my $htmlBar .= ''
+  . '<div style="position:relative;height:1.1em;min-width:200px;border:1px solid '.$colBorder.';overflow:hidden;">' 
+  . '  <div style="position:absolute;height:1.1em;background:'.$colFill.';width:#PERC#%;">'
+  . '  </div>'
+  . '  <p style="position:absolute;height:1.1em;width:100%;text-align:center;margin:0">#TEXT#</p>'
+  . '</div>';
+
+  # access sysmon data..
+  #my $sysmon = SYSMON_getValues($dev);
+  my $sysmon = {};  
+  foreach my $r (keys($main::defs{$dev}{READINGS})){
+    $sysmon->{$r} = $main::defs{$dev}{READINGS}{$r}{VAL};
+  }
+  
+  my $html = '<table>';
+
+  # cpu load..
+  if (defined($sysmon->{'stat_cpu_percent'})){
+    #0.28 0.00 0.20 99.43 0.02 0.00 0.07
+    my (undef,undef,undef,$cpuI,undef,undef,undef) = split(/\s+/,$sysmon->{'stat_cpu_percent'});
+    my $cpuLoadP = sprintf("%.1f",(100-$cpuI));
+    my $cpuLoadT = $cpuLoadP." %";
+    $html .= $htmlRow =~ s/#NAME#/cpu load/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$cpuLoadP/r =~ s/#TEXT#/$cpuLoadT/r;
+  }
+  
+  # cpu temp..
+  if (defined($sysmon->{'cpu_temp'})){
+    my $cpuTempT = $sysmon->{'cpu_temp'}." &deg;C";
+    my $cpuTempP = $sysmon->{'cpu_temp'};
+    $html .= $htmlRow =~ s/#NAME#/cpu temp/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$cpuTempP/r =~ s/#TEXT#/$cpuTempT/r;
+  }
+
+  # cpu freq..
+  if (defined($sysmon->{'cpu_freq'})){
+    my $cpuFreqT = $sysmon->{'cpu_freq'}." MHz";
+    my $cpuFreqP = $sysmon->{'cpu_freq'}/10;
+    $html .= $htmlRow =~ s/#NAME#/cpu freq/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$cpuFreqP/r =~ s/#TEXT#/$cpuFreqT/r;
+  }
+
+  #mem ram..
+  if (defined($sysmon->{'ram'})){
+    #Total: 927.08 MB, Used: 47.86 MB, 5.16 %, Free: 879.22 MB
+    my (undef,$ramT,$ramUn,undef,$ramU,undef,$ramP,undef,undef,$ramF,undef) = split(/[\s,]+/,$sysmon->{'ram'});
+    $ramT = sprintf("%.0f",$ramU)." / ".sprintf("%.0f",$ramT)." ".$ramUn;
+    $html .= $htmlRow =~ s/#NAME#/mem ram/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$ramP/r =~ s/#TEXT#/$ramT/r;
+  }
+
+  #mem swap..
+  if (defined($sysmon->{'swap'})){
+    #Total: 100.00 MB, Used: 0.00 MB, 0.00 %, Free: 100.00 MB
+    my (undef,$swapT,$swapUn,undef,$swapU,undef,$swapP,undef,undef,$swapF,undef) = split(/[\s,]+/,$sysmon->{'swap'});
+    $swapT = sprintf("%.0f",$swapU)." / ".sprintf("%.0f",$swapT)." ".$swapUn;
+    $html .= $htmlRow =~ s/#NAME#/mem swap/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$swapP/r =~ s/#TEXT#/$swapT/r;
+  }
+
+  #sd-card..
+  if (defined($sysmon->{'fs_root'})){
+    #Total: 14831 MB, Used: 2004 MB, 15 %, Available: 12176 MB at /
+    #my $sd = R("$dev:fs_root");
+    my (undef,$sdT,undef,undef,$sdU,undef,$sdP,undef,undef,$sdF,undef) = split(/[\s,]+/,$sysmon->{'fs_root'});
+    $sdT = sprintf("%.1f",($sdU/1024))." / ".sprintf("%.1f",($sdT/1024))." GB";
+    $html .= $htmlRow =~ s/#NAME#/root fs/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$sdP/r =~ s/#TEXT#/$sdT/r;
+  }
+  
+  # uptime system / idle..
+  if (defined($sysmon->{'uptime'})){
+    my $upSystem = SYSMON_secsToReadable($sysmon->{'uptime'});
+    if (defined($sysmon->{uptime})){
+      #25386 99.32 %
+      my (undef,$idle,undef) = split(/\s+/,$sysmon->{'idletime'});
+      $upSystem .= " ($idle % idle)";
+    }
+    $html .= $htmlRow =~ s/#NAME#/system uptime/r =~ s/#VALUE#/$upSystem/r;
+  }
+  
+  # uptime fhem..
+  if (defined($sysmon->{'fhemuptime'})){
+    my $upFhem = SYSMON_secsToReadable($sysmon->{'fhemuptime'});
+    $html .= $htmlRow =~ s/#NAME#/fhem uptime/r =~ s/#VALUE#/$upFhem/r;
+  }
+ 
+  $html .= '</table>';
+  return $html;
+}
+
+
+sub SYSMON_secsToReadable($){
+  my $secs = shift;
+  my $y = floor($secs / 60/60/24/365);
+  my $d = floor($secs/60/60/24) % 365;
+  my $h = floor(($secs / 3600) % 24);
+  my $m = floor(($secs / 60) % 60);
+  my $s = $secs % 60;
+  my $string = '';
+  $string .= $y.'y ' if ($y > 0);
+  $string .= $d.'d ' if ($d > 0);
+  $string .= $h.'h ' if ($h > 0);
+  $string .= $m.'m ' if ($m > 0);
+  $string .= $s.'s' if ($s > 0);
+  return $string;
+}
+
+# -----------------------------------------------------------------------------
 
 1;
 
