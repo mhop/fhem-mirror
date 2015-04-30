@@ -31,18 +31,14 @@ my %zwave_class = (
   ZIP_SERVER               => { id => '24', },
   SWITCH_BINARY            => { id => '25',
     set   => { off         => "0100",
-               on          => "01FF",
-               reportOn    => "03FF",
-               reportOff   => "0300",     },
+               on          => "01FF" },
     get   => { swbStatus   => "02",       },
     parse => { "03250300"  => "state:off",
                "032503ff"  => "state:on",  }, } ,
   SWITCH_MULTILEVEL        => { id => '26', 
     set   => { off         => "0100",
                on          => "01FF",
-               dim         => "01%02x", 
-               reportOn    => "03FF",
-               reportOff   => "0300",     },
+               dim         => "01%02x" },
     get   => { swmStatus   => "02",     }, 
     parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" : 
                                ($1 eq "ff" ? "state:on" : 
@@ -508,7 +504,7 @@ ZWave_Cmd($$@)
     return "$type $cmd needs $parTxt" if($nArg != int(@a));
   }
 
-  if($cmdFmt !~ m/%s/) {
+  if($cmdFmt !~ m/%s/ && $cmd !~ m/^config/) {
     for(my $i1 = 0; $i1<int(@a); $i1++) {
       return "Error: $a[$i1] is not a decimal number"
         if($a[$i1] !~ m/^[-\d]+$/);
@@ -1696,12 +1692,9 @@ s2Hex($)
     switch the device on</li>
   <li>off<br>
     switch the device off</li>
-  <li>reportOn,reportOff<br>
-    activate/deactivate the reporting of device state changes to the
-    association group.</li>
 
   <br><br><b>Class SWITCH_MULTILEVEL</b>
-  <li>on, off, reportOn, reportOff<br>
+  <li>on, off<br>
     the same as for SWITCH_BINARY.</li>
   <li>dim value<br>
     dim to the requested value (0..100)</li>
