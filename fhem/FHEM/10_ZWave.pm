@@ -224,21 +224,23 @@ my %zwave_class = (
 
   ALARM                    => { id => '71', 
     get   => { alarm       => "04%02x", },
-    parse => { "..7105(..)(..)(.*)" => 'ZWave_alarmParse($1,$2,$3)',}, },
+    parse => { "..7105(..)(..)(.*)" => 'ZWave_alarmParse($1,$2,$3)'} },
   MANUFACTURER_SPECIFIC    => { id => '72',
     get   => { model       => "04", },
     parse => { "087205(....)(....)(....)" => 'ZWave_mfsParse($1,$2,$3,0)',
                "087205(....)(....)(.{4})" => 'ZWave_mfsParse($1,$2,$3,1)',
-               "087205(....)(.{4})(.{4})" => '"modelId:$1-$2-$3"', }},
+               "087205(....)(.{4})(.{4})" => '"modelId:$1-$2-$3"'} },
   POWERLEVEL               => { id => '73', },
   PROTECTION               => { id => '75',
     set   => { protectionOff => "0100",
                protectionSeq => "0101",
-               protectionOn  => "0102", },
+               protectionOn  => "0102",
+               protectionBytes  => "01%02x%02x",},
     get   => { protection    => "02", },
     parse => { "03750300"    => "protection:off",
                "03750301"    => "protection:seq",
-               "03750302"    => "protection:on", }, },
+               "03750302"    => "protection:on",
+               "047503(..)(..)"  => 'ZWave_protectionParse($1, $2)'} },
   LOCK                     => { id => '76', },
   NODE_NAMING              => { id => '77', },
   FIRMWARE_UPDATE_MD       => { id => '7a', },
@@ -1163,6 +1165,17 @@ ZWave_alarmParse($$$)
 }
 
 sub
+ZWave_protectionParse($$)
+{
+  my ($lp, $rp) = @_;
+  my $lpt = "Local: ". ($lp eq "00" ? "unprotected" :
+                       ($lp eq "01" ? "by sequence" : "No operation possible"));
+  my $rpt = "RF: ".    ($rp eq "00" ? "unprotected" :
+                       ($rp eq "01" ? "No control"  : "No response"));
+  return "protection:$lpt $rpt";
+}
+
+sub
 ZWave_configParse($$$)
 {
   my ($hash, $cmdId, $val) = @_;
@@ -1659,6 +1672,8 @@ s2Hex($)
     device is protected</li>
   <li>protectionSeq<br>
     device can be operated, if a certain sequence is keyed.</li>
+  <li>protectionBytes LocalProtectionByte RFProtectionByte<br>
+    for commandclass PROTECTION V2 - see devicemanual for supported protectionmodes</li>
 
   <br><br><b>Class SWITCH_ALL</b>
   <li>swaIncludeNone<br>
