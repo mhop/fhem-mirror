@@ -199,19 +199,21 @@ doUpdate($$)
       next if($fName !~ m/$arg/);
 
     } else {
+      my $sz = -s "$root/$fName";
       next if($lh{$fName} &&
               $lh{$fName}{TS} eq $r[1] &&
+              $sz && $sz eq $r[2] &&
               $lh{$fName}{LEN} eq $r[2]);
 
     }
 
     uLog 1, "List of new / modified files since last update:"
       if($arg eq "check" && $nChanged == 0);
+
+    $needJoin = 1 if($fName =~ m/commandref_frame/ || $fName =~ m/\d+.*.pm/);
+    next if($fName =~ m/commandref.*html/ && $fName !~ m/frame/ && $canJoin);
     $nChanged++;
-    if($fName =~ m,docs/commandref(_..)?.html, && $canJoin) {
-      $needJoin = 1;
-      next;
-    }
+
     uLog 1, "$r[0] $fName";
     next if($arg eq "check");
 
@@ -255,7 +257,9 @@ doUpdate($$)
     chdir($root);
     uLog(1, "Calling $^X $cj, this may take a while");
     my $ret = `$^X $cj`;
-    uLog(1, $ret) if($ret);
+    foreach my $l (split(/[\r\n]+/, $ret)) {
+      uLog(1, $l);
+    }
   }
 
   uLog(1, "");
