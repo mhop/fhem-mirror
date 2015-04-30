@@ -794,6 +794,10 @@ CUL_Parse($$$$@)
     Dispatch($hash, $rmsg, undef);
     return;
   }
+  if($rmsg =~ m/^V/) {                            # CUN* keepalive
+    Log3 $name, 4, "CUL_Parse: $name $rmsg";
+    return;
+  }
 
   my $rssi;
   my $dmsg = $rmsg;
