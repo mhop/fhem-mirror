@@ -217,7 +217,7 @@ my %zwave_class = (
                configWord  => "04%02x02%04x",
                configLong  => "04%02x04%08x", },
     get   => { config      => "05%02x", },
-    parse => { "^..70..(..)..(.*)" => 'ZWave_configParse($hash,$1,$2)'} },
+    parse => { "^..70..(..)(..)(.*)" => 'ZWave_configParse($hash,$1,$2,$3)'} },
 
   ALARM                    => { id => '71', 
     get   => { alarm       => "04%02x", },
@@ -1173,9 +1173,10 @@ ZWave_protectionParse($$)
 }
 
 sub
-ZWave_configParse($$$)
+ZWave_configParse($$$$)
 {
-  my ($hash, $cmdId, $val) = @_;
+  my ($hash, $cmdId, $size, $val) = @_;
+  $val = substr($val, 0, 2*$size);
   $val = hex($val);
   $cmdId = hex($cmdId);
 
