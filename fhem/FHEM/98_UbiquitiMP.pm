@@ -426,7 +426,7 @@ sub UbiquitiMP_BCStart($)
        {
         select(undef, undef, undef, 0.25); 
         @ret = $sock->cmd($_); 
-        Log3 $name, 5, "$name, ret -> ".$ret[0]; 
+        Log3 $name, 5, "$name, ret -> ".$ret[0] if ($ret[0]); 
         if ($cmd eq "status") { if($ret[2]) { ($ret[2],undef) = split("MF",$ret[2]); $output .= $ret[2]; } else { if ($ret[0]) {$ret[0] =~s/^MF.*//g; $output .= "|".$ret[0];}}}
         if ($cmd eq "info")   { $c = join(";",@ret); $c =~s/\$//g; $c =~s/\"//g; ($c,$v) = split("MF.v",$c); $output .= $c; $output .= "version=$v";}
        }
@@ -934,7 +934,7 @@ sub UbiquitiMP_createSets($)
   <ul>
     <li>ignoreList -> list of ignored ports<br> e.g. attr name ignoreList 456<br>ignores all values of ports 4,5 & 6<br></li>
     <li>groupPorts -> space separeted list to group ports so you can use them like a single device<br>
-    e.g. attr name groupList TV=12 Media=4,5,6 (GroupName=Port numbers in the group)<br>
+    e.g. attr name groupPorts TV=12 Media=4,5,6 (GroupName=Port numbers in the group)<br>
     set name TV on  or set name Media toggle </li>
     <li>ledconnect -> led color since fhem connect</li>
     <li>subDevices -> use a single sub devices for each out port<br> 
@@ -995,9 +995,9 @@ sub UbiquitiMP_createSets($)
   <ul>
     <li>ignoreList -> Liste der Ports die bei Abfragen ignoriert werden sollen, Bsp. <code>attr Ubi ignoreList 456</code><br>
     ignoriert alle Werte der Ports 4,5 und 6</li><br>
-    <li>groupPorts -> Durch Kommas getrennte Liste um Ports in Gruppen zusammen zu fassen.<br>
+    <li>groupPorts -> Durch Kommatas getrennte Liste um Ports in Gruppen zusammen zu fassen.<br>
     Die Gruppen k&ouml;nnen danach wie win einzelner Port behandelt werden.<br>
-    Bsp. <code>attr Ubi groupList TV=12 Media=4,5,6</code> (GruppenName=Port Nummer des Ports in der Gruppe)<br>
+    Bsp. <code>attr Ubi groupPorts TV=12 Media=4,5,6</code> (GruppenName=Port Nummer des Ports in der Gruppe)<br>
     <code>set Ubi TV on</code> oder <code>set Ubi Media toggle</code></li><br>
     <li>ledconnect -> Farbe der LED beim Zugriff mit fhem</li><br>
     <li>subDevices -> Legt f&uuml;r jeden Port ein eigenes Subdevice an<br> 
