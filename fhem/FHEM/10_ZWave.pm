@@ -23,8 +23,8 @@ my %zwave_class = (
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x", },
     get   => { basicStatus => "02",     }, 
-    parse => { "..2001(.*)"=> '"basicReport:$1"',
-               "..2002"    => "state:basicGet"  }},
+    parse => { "..2003(.*)"=> '"basicReport:$1"',
+               "..2002"    => "state:basicGet"  }}, # sent by the remote
   CONTROLLER_REPLICATION   => { id => '21', },
   APPLICATION_STATUS       => { id => '22', },
   ZIP_SERVICES             => { id => '23', },
