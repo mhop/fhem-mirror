@@ -252,7 +252,8 @@ my %zwave_class = (
     set   => { clock           => 'ZWave_clockSet()' },
     parse => { "028105"        => "clock:get",
                "048106(..)(..)"=> 'ZWave_clockParse($1,$2)' }},
-  HAIL                     => { id => '82', },
+  HAIL                     => { id => '82',
+    parse => { "028201"    => "hail:01"}},
   WAKE_UP                  => { id => '84', 
     set   => { wakeupInterval => "04%06x%02x",
                wakeupNoMoreInformation => "08", },
@@ -2015,6 +2016,9 @@ s2Hex($)
   <li>config_X:Y<br>
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config messages are available.</li>
+  
+  <br><br><b>Class HAIL</b>
+  <li>hail:01<br></li>
 
   <br><br><b>Class HRV_STATUS</b>
   <li>outdoorTemperature: %0.1f C</li>
