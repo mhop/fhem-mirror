@@ -28,6 +28,7 @@
 #  first svn Version
 #  23.04.15 add Set Extensions for 1 Port Ubi , change Client to UbiquitiOut, 
 #  25.06.15 add german docu, fix some timing problems
+#  02.05.15 fix groupPorts change at runtime
 
 package main;
 
@@ -120,10 +121,11 @@ sub UbiquitiMP_Define($$) {
     if( !defined( $attr{$a[0]}{subDevices} ) ) { $attr{$a[0]}{subDevices} = "1"}
     $hash->{".subdevices"} = $attr{$a[0]}{subDevices};
 
-    $hash->{Clients}    = ":UbiquitiOut:";
-    $hash->{PORTS}      = 0;
-    $hash->{force}      = 0;
-    $hash->{ERRORCOUNT} = 0;
+    $hash->{Clients}      = ":UbiquitiOut:";
+    $hash->{PORTS}        = 0;
+    $hash->{force}        = 0;
+    $hash->{ERRORCOUNT}   = 0;
+    $hash->{".grouplist"} = "";
 
     readingsSingleUpdate($hash, "state", "defined",0);
 
@@ -225,6 +227,14 @@ sub UbiquitiMP_Attr(@)
      $attr{$name}{groupPorts} = $attrVal;
      UbiquitiMP_createSets($hash);
    }
+ }
+ elsif ($cmd eq "del")
+ {
+  if ($attrName eq "groupPorts")
+  {
+   $attr{$name}{groupPorts} = "";
+   UbiquitiMP_createSets($hash);
+  }
  }
 
    return undef;
@@ -870,19 +880,29 @@ sub UbiquitiMP_createSets($)
   for (my $j=1; $j<= $hash->{PORTS}; $j++) { $sets{"Out".$j}  = $setcmds; $hash->{group_ALL} .= "$j,"; }
   $sets{"ALL"}  = $setcmds;
   chop($hash->{group_ALL}); # das letzte Komma weg
- 
+
+  if ($hash->{".grouplist"})
+   {
+    @a = split("," , $hash->{".grouplist"});
+    foreach (@a) { delete $hash->{"group_".$_}; } 
+    $hash->{".grouplist"} = "";
+   }
+
   if ($list)
   { 
-  @a = split(" " , $list);
-  foreach (@a)
-  {
+ 
+   @a = split(" " , $list);
+   foreach (@a)
+   {
     @b = split("=" , $_);
-    if ($b[0] && $b[1])
+    if ($b[0] && (index($b[1],",") > 0))
       {
        $hash->{"group_".$b[0]} = $b[1];
        $sets{$b[0]}  = $setcmds; 
+       $hash->{".grouplist"} .= $b[0].",";
       }
     }
+    chop($hash->{".grouplist"});
   } 
   return;
 }
