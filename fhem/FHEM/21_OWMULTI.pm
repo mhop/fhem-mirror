@@ -38,11 +38,11 @@
 #
 # attr <name> tempOffset <float>        = temperature offset in degree Celsius added to the raw temperature reading 
 # attr <name> tempUnit  <string>        = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit, default is Celsius
-# attr <name> VName   <string>|<string> = name for the channel | a type description for the measured value
-# attr <name> VUnit   <string>|<string> = unit of measurement for the voltage channel | its abbreviation 
+# attr <name> VName   <string>[|<string>] = name for the channel [|name used in state reading]
+# attr <name> VUnit   <string>[|<string>] = unit of measurement for the channel [|unit used in state reading] 
 # attr <name> Vfunction <string>        = arbitrary functional expression involving the values VDD, V, T 
 #                                         VDD is replaced by the measured supply voltage in Volt, 
-#                                         V by the measured external voltage
+#                                         V by the measured external voltage (the channel)
 #                                         T by the measured and corrected temperature in its unit
 #
 ########################################################################################
@@ -82,7 +82,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.22";
+my $owx_version="5.23";
 #-- flexible channel name
 my $owg_channel;
 
@@ -340,27 +340,23 @@ sub OWMULTI_ChannelNames($) {
   my ($tunit,$toffset,$tfactor,$tabbr,$vfunc);
 
   #-- Set channel name, channel unit for voltage channel
-  $cname = defined($attr{$name}{"VName"})  ? $attr{$name}{"VName"} : "voltage|voltage";
+  $cname = defined($attr{$name}{"VName"})  ? $attr{$name}{"VName"} : "voltage";
   @cnama = split(/\|/,$cname);
   if( int(@cnama)!=2){
-    Log 1, "OWMULTI: Incomplete channel name specification $cname. Better use $cname|<type of data>"
-      if( $state eq "defined");
-    push(@cnama,"unknown");
+    push(@cnama,$cnama[0]);
   }
  
   #-- unit
   $unit = defined($attr{$name}{"VUnit"})  ? $attr{$name}{"VUnit"} : "Volt|V";
   @unarr= split(/\|/,$unit);
   if( int(@unarr)!=2 ){
-    Log 1, "OWMULTI: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>"
-      if( $state eq "defined");
-    push(@unarr,"");  
+    push(@unarr,$unarr[0]);  
   }
     
   #-- put into readings
   $owg_channel = $cnama[0]; 
   $hash->{READINGS}{$owg_channel}{VAL}      = " ";  
-  $hash->{READINGS}{$owg_channel}{TYPE}     = $cnama[1];  
+  $hash->{READINGS}{$owg_channel}{ABBR}     = $cnama[1];  
   $hash->{READINGS}{$owg_channel}{UNIT}     = $unarr[0];
   $hash->{READINGS}{$owg_channel}{UNITABBR} = $unarr[1];
     
@@ -385,7 +381,7 @@ sub OWMULTI_ChannelNames($) {
   }
   
   #-- these values are rather complex to obtain, therefore save them in the hash
-  $hash->{READINGS}{"temperature"}{TYPE}     = "temperature";
+  $hash->{READINGS}{"temperature"}{ABBR}     = "T";
   $hash->{READINGS}{"temperature"}{UNIT}     = $tunit;
   $hash->{READINGS}{"temperature"}{UNITABBR} = $tabbr;
   $hash->{tempf}{offset}                     = $toffset;
@@ -416,7 +412,7 @@ sub OWMULTI_FormatValues($) {
   #-- correct values for proper offset, factor 
   $toffset = $hash->{tempf}{offset};
   $tfactor = $hash->{tempf}{factor};
-  $tval    = ($hash->{owg_val}->[0] + $toffset)*$tfactor;
+  $tval    = int(10*($hash->{owg_val}->[0] + $toffset)*$tfactor+0.5)/10;
   
   #-- attribute VFunction defined ?
   $vfunc   = defined($attr{$name}{"VFunction"}) ? $attr{$name}{"VFunction"} : "V";
@@ -433,18 +429,20 @@ sub OWMULTI_FormatValues($) {
   if( !$vfunc ){
     $vval = "";
   } elsif( $vfunc ne "" ){
-    $vval = int( $vfunc*1000 )/1000;
+    $vval = int( $vfunc*10+0.5)/10;
   } else {
     #-- todo ?  
   }
   
   #-- string buildup for return value, STATE 
-  $svalue .= sprintf( "%s: %5.2f %s (T: %5.2f %s)", $owg_channel, $vval,$hash->{READINGS}{$owg_channel}{UNITABBR},$tval,$hash->{READINGS}{"temperature"}{UNITABBR});
+  $svalue .= sprintf( "%s: %5.1f %s (T: %5.1f %s)", 
+    $hash->{READINGS}{$owg_channel}{ABBR}, $vval,$hash->{READINGS}{$owg_channel}{UNITABBR},
+    $tval,$hash->{READINGS}{"temperature"}{UNITABBR});
   
   #-- put into READINGS
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,$owg_channel,$vval);
-  readingsBulkUpdate($hash,"VDD",$hash->{owg_val}->[1]);
+  readingsBulkUpdate($hash,"VDD",sprintf("%4.2f %s",$hash->{owg_val}->[1],"V"));
   readingsBulkUpdate($hash,"temperature",$tval);
   
   #-- STATE
@@ -1322,17 +1320,17 @@ sub OWXMULTI_PT_SetValues($@) {
         <h4>Attributes</h4>
         <ul>
             <li><a name="owmulti_vname"><code>attr &lt;name&gt; VName
-                        &lt;string&gt;|&lt;string&gt;</code></a>
-                <br />name for the channel | a type description for the measured value. </li>
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />name for the channel [|name used in state reading]. </li>
             <li><a name="owmulti_vunit"><code>attr &lt;name&gt; VUnit
-                        &lt;string&gt;|&lt;string&gt;</code></a>
-                <br />unit of measurement for this channel | its abbreviation. </li>
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />unit of measurement for this channel [|unit used in state reading]. </li>
             <li><a name="owmulti_vfunction"><code>attr &lt;name&gt; VFunction
                     &lt;string&gt;</code></a>
                 <br />arbitrary functional expression involving the values VDD, V, T. Example see
                 above. <ul>
                     <li>VDD is replaced by the measured supply voltage in Volt,</li>
-                    <li> V by the measured external voltage,</li>
+                    <li> V by the measured external voltage (the channel),</li>
                     <li>T by the measured and corrected temperature in its unit</li>
                 </ul></li>
             <li><a name="owmulti_tempOffset"><code>attr &lt;name&gt; tempOffset &lt;float&gt;</code>

@@ -44,9 +44,9 @@
 # attr <name> LogM <string> = device name (not file name) of monthly log file
 # attr <name> LogY <string> = device name (not file name) of yearly log file
 # attr <name> nomemory      = 1|0 (when set to 1, disabels use of internal memory)
-# attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
-# attr <name> <channel>Unit <string>|<string> = unit of measurement for this channel | its abbreviation 
-# attr <name> <channel>Rate <string>|<string> = name for the channel ratw | a type description for the measured value
+# attr <name> <channel>Name <string>[|<string>] = name for the channel [|name used in state reading]
+# attr <name> <channel>Unit <string>[|<string>] = unit of measurement for this channel [|unit used in state reading] 
+# attr <name> <channel>Rate <string>[|<string>] = name for the channel rate [|name used in state reading]
 # attr <name> <channel>Offset <float>  = offset added to the reading in this channel 
 # attr <name> <channel>Factor <float>  = factor multiplied to (reading+offset) in this channel 
 # attr <name> <channel>Mode <string>   = counting mode = normal(default) or daily
@@ -85,7 +85,7 @@ use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
 
-#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+#add FHEM/lib to @INC if it's not already included. Should rather be in fhem.pl than here though...
 BEGIN {
 	if (!grep(/FHEM\/lib$/,@INC)) {
 		foreach my $inc (grep(/FHEM$/,@INC)) {
@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.27";
+my $owx_version="5.31";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -369,25 +369,21 @@ sub OWCOUNT_ChannelNames($) {
 
   for (my $i=0;$i<int(@owg_fixed);$i++){
     #-- name
-    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|event";
+    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];
     @cnama = split(/\|/,$cname);
     if( int(@cnama)!=2){
-      Log3 $name,1, "OWCOUNT: Incomplete channel name specification $cname. Better use $cname|<type of data>"
-        if( $state eq "defined");
-      push(@cnama,"unknown");
+      push(@cnama,$cnama[0]);
     }
      #-- unit
     $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "counts|cts";
     @unarr= split(/\|/,$unit);
     if( int(@unarr)!=2 ){
-      Log3 $name,1, "OWCOUNT: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>"
-        if( $state eq "defined");
-      push(@unarr,"");  
+      push(@unarr,$unarr[0]);  
     }
     
     #-- put into readings
     $owg_channel[$i]=$cnama[0];
-    $hash->{READINGS}{$owg_channel[$i]}{TYPE}     = $cnama[1];  
+    $hash->{READINGS}{$owg_channel[$i]}{ABBR}     = $cnama[1];  
     $hash->{READINGS}{$owg_channel[$i]}{UNIT}     = $unarr[0];
     $hash->{READINGS}{$owg_channel[$i]}{UNITABBR} = $unarr[1];
     
@@ -399,9 +395,7 @@ sub OWCOUNT_ChannelNames($) {
     $cname = defined($attr{$name}{$owg_fixed[$i]."Rate"})  ? $attr{$name}{$owg_fixed[$i]."Rate"} : $cnama[0]."_rate|".$cnama[1]."_rate";
     @cnama = split(/\|/,$cname);
     if( int(@cnama)!=2){
-      Log3 $name,1, "OWCOUNT: Incomplete rate name specification $cname. Better use $cname|<type of data>"
-        if( $state eq "defined");
-      push(@cnama,"unknown");
+      push(@cnama,$cnama[0]);
     }
    
     #-- rate unit
@@ -415,7 +409,7 @@ sub OWCOUNT_ChannelNames($) {
     }       
     #-- put into readings    
     $owg_rate[$i]=$cnama[0];
-    $hash->{READINGS}{$owg_rate[$i]}{TYPE}     = $cnama[1];  
+    $hash->{READINGS}{$owg_rate[$i]}{ABBR}     = $cnama[1];  
     $hash->{READINGS}{$owg_rate[$i]}{UNIT}     = $unarr[0].$runit;
     $hash->{READINGS}{$owg_rate[$i]}{UNITABBR} = $unarr[1].$runit;
    
@@ -568,13 +562,10 @@ sub OWCOUNT_FormatValues($) {
         } #-- end daybreak
       
         #-- string buildup for return value and STATE
-        #-- 1 decimal
-        if( $factor == 1.0 ){
-          $svalue .= sprintf( "%s: %5.2f %s %s: %5.2f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
+        #-- 1 or 3 decimals
+        my $fs = ( $factor == 1.0 )? "%s: %5.2f %s %s: %5.2f %s":"%s: %5.3f %s %s: %5.3f %s";
+        $svalue .= sprintf( $fs, $hash->{READINGS}{$owg_channel[$i]}{ABBR}, $vval,$unit,$hash->{READINGS}{$owg_rate[$i]}{ABBR},$vrate,$runit);
         #-- 3 decimals
-        } else {
-          $svalue .= sprintf( "%s: %5.3f %s %s: %5.3f %s", $owg_channel[$i], $vval,$unit,$owg_rate[$i],$vrate,$runit);
-        }  
       }
       readingsBulkUpdate($hash,$owg_channel[$i],$vval);
       readingsBulkUpdate($hash,$owg_rate[$i],$vrate);
@@ -591,32 +582,32 @@ sub OWCOUNT_FormatValues($) {
     #-- daily/monthly accumulated value
     @monthv = OWCOUNT_GetMonth($hash);
     @yearv  = OWCOUNT_GetYear($hash);
-    #-- error check
+    #-- put in monthly and yearly sums
     if( int(@monthv) == 2 ){
       $total0 = $monthv[0]->[1];
       $total1 = $monthv[1]->[1];
+      $dvalue    = sprintf("D%02d ",$day).$dvalue;
+      $dvalue    = sprintf($dvalue,$total0,$total1);
+      readingsBulkUpdate($hash,"day",$dvalue);
     }else{
       Log3 $name,3,"OWCOUNT: No monthly summary possible, ".$monthv[0];
-      $total0 = "";
-      $total1 = "";
+      $total0 = 0;
+      $total1 = 0;
     };
+    
     if( int(@yearv) == 2 ){
       $total2 = $yearv[0]->[1];
       $total3 = $yearv[1]->[1];
+      if ( $monthbreak == 1){
+        $mvalue  = sprintf("M%02d ",$month+1).$mvalue;
+        $mvalue  = sprintf($mvalue,$total0,$total2,$total1,$total3);
+        readingsBulkUpdate($hash,"month",$mvalue);
+      }  
     }else{
       Log3 $name,3,"OWCOUNT: No yearly summary possible, ".$yearv[0];
-      $total2 = "";
-      $total3 = "";
+      $total2 = 0;
+      $total3 = 0;
     };
-    #-- put in monthly and yearly sums
-    $dvalue    = sprintf("D%02d ",$day).$dvalue;
-    $dvalue    = sprintf($dvalue,$total0,$total1);
-    readingsBulkUpdate($hash,"day",$dvalue);
-    if ( $monthbreak == 1){
-      $mvalue  = sprintf("M%02d ",$month+1).$mvalue;
-      $mvalue  = sprintf($mvalue,$total0,$total2,$total1,$total3); 
-      readingsBulkUpdate($hash,"month",$mvalue);
-    }  
   }
       
   #-- STATE
@@ -1244,8 +1235,8 @@ sub OWCOUNT_ParseMidnight($$$) {
   }
   if ( defined $strval ) {
     #-- parse float from midnight
-    $strval =~ s/[^\d\.]+//g;
-    $strval = 0.0 if($strval !~ /^\d+\.\d*$/);
+    $strval =~ s/[^-\d\.]+//g;
+    $strval = 0.0 if($strval !~ /^-?\d+\.\d*$/);
     $strval = int($strval*100)/100;
   } else {
     $strval = 0.0;
@@ -2146,14 +2137,14 @@ sub OWXCOUNT_PT_InitializeDevicePage($$$) {
         <p>For each of the following attributes, the channel identification A,B may be used.</p>
         <ul>
             <li><a name="owcount_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
-                        &lt;string&gt;|&lt;string&gt;</code></a>
-                <br />name for the channel | a type description for the measured value. </li>
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />name for the channel [|name used in state reading]. </li>
             <li><a name="owcount_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
-                        &lt;string&gt;|&lt;string&gt;</code></a>
-                <br />unit of measurement for this channel | its abbreviation. </li>
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />unit of measurement for this channel [|unit used in state reading.] </li>
             <li><a name="owcount_crate"><code>attr &lt;name&gt; &lt;channel&gt;Rate
-                        &lt;string&gt;|&lt;string&gt;</code></a>
-                <br />name for the channel rate | a type description for the measured value. </li>
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />name for the channel rate [|name used in state reading]</li>
             <li><a name="owcount_coffset"><code>attr &lt;name&gt; &lt;channel&gt;Offset
                         &lt;float&gt;</code></a>
                 <br />offset added to the reading in this channel. </li>

@@ -46,9 +46,9 @@
 # Note: attributes are read only during initialization procedure - later changes are not used.
 #
 # attr <name> stateS <string> = character string denoting external shortening condition, default is (ext)
-#                                        overwritten by an attribute setting "red angled arrow downwward"
+#                                        overwritten by an attribute setting "red angled arrow downward"
 #
-# attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
+# attr <name> <channel>Name <string>|<string> = name for the channel [|name used in state reading]
 # attr <name> <channel>Unit <string>|<string> = values to display in state variable for on|off condition
 #
 ########################################################################################
@@ -89,7 +89,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="5.22";
+my $owx_version="5.24";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -378,16 +378,14 @@ sub OWSWITCH_ChannelNames($) {
 
   for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
     #-- name
-    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|onoff";
+    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];
     @cnama = split(/\|/,$cname);
     if( int(@cnama)!=2){
-      Log 1, "OWSWITCH: Incomplete channel name specification $cname. Better use $cname|<type of data>"
-        if( $state eq "defined");
-      push(@cnama,"unknown");
+      push(@cnama,$cnama[0]);
     }
     #-- put into readings 
     $owg_channel[$i] = $cnama[0]; 
-    $hash->{READINGS}{$owg_channel[$i]}{TYPE}     = $cnama[1];  
+    $hash->{READINGS}{$owg_channel[$i]}{ABBR}     = $cnama[1];  
  
     #-- unit
     my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "ON|OFF";
@@ -449,7 +447,7 @@ sub OWSWITCH_FormatValues($) {
       $vstr.= $sname if( ($vval == 0) && ($vvax == 1) );
       readingsBulkUpdate($hash,$owg_channel[$i],$vstr);
     } 
-    $svalue .= sprintf( "%s: %s" , $owg_channel[$i], $vstr);
+    $svalue .= sprintf( "%s: %s" , $hash->{READINGS}{$owg_channel[$i]}{ABBR}, $vstr);
 
     #-- insert space 
     if( $i<($cnumber{$attr{$name}{"model"}}-1) ){
@@ -1248,7 +1246,7 @@ sub OWXSWITCH_SetState($$) {
       return "device $owx_dev not accessible in writing"; 
     }
     OWX_Reset($master);
-    #return OWXSWITCH_BinValues($hash,"ds2406.setstate.$value",1,undef,$owx_dev,substr($res,9,4),undef,substr($res,13));
+    return OWXSWITCH_BinValues($hash,"ds2406.setstate.$value",1,undef,$owx_dev,substr($res,9,4),undef,substr($res,13));
     return;
   #--  family = 29 => DS2408
   } elsif( $hash->{OW_FAMILY} eq "29" ) {
@@ -1262,7 +1260,7 @@ sub OWXSWITCH_SetState($$) {
       return "device $owx_dev not accessible in writing"; 
     }
     OWX_Reset($master);
-    #return OWXSWITCH_BinValues($hash,"ds2408.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+    return OWXSWITCH_BinValues($hash,"ds2408.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
     return;
   #-- family = 3A => DS2413      
   } elsif( $hash->{OW_FAMILY} eq "3A" ) {
@@ -1276,7 +1274,7 @@ sub OWXSWITCH_SetState($$) {
       return "device $owx_dev not accessible in writing"; 
     }
     OWX_Reset($master);
-    #return OWXSWITCH_BinValues($hash,"ds2413.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
+    return OWXSWITCH_BinValues($hash,"ds2413.setstate",1,undef,$owx_dev,undef,undef,substr($res,12));
     return;
   }else {
     return "unknown device family $hash->{OW_FAMILY}\n";
@@ -1615,10 +1613,10 @@ sub OWXSWITCH_PT_SetOutput($$$) {
         <h4>Attributes</h4> For each of the following attributes, the channel identification A,B,...
         may be used. <ul>
             <li><a name="owswitch_states"><code>&lt;name&gt; stateS &lt;string&gt;</code></a>
-                <br/> character string denoting external shortening condition, default is "red angled arrow downwward"</li>
+                <br/> character string denoting external shortening condition, default is "red angled arrow downward"</li>
             <li><a name="owswitch_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
-                        &lt;string&gt;|&lt;string&gt;</code></a>
-                <br />name for the channel | a type description for the measured value. </li>
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />name for the channel [|name used in state reading] </li>
             <li><a name="owswitch_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
                         &lt;string&gt;|&lt;string&gt;</code></a>
                 <br />display for on | off condition </li>
