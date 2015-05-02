@@ -47,6 +47,8 @@ et_addEvt($$$;$)
   $evt =~ s/^trigger: (.*_)\d+$/trigger: $1.*/; # HM
   $evt =~ s/\.\* \(\d+K\)/.*/g;              # HUE: Kelvin
   $evt =~ s/  +/ /;                          #
+  $evt =~ s/HASH\(0x.*/.*/;                  # buggy event (Forum #36818)
+  $evt =~ s/[\n\r].*//s;                     # typical ECMD problem
 
   my $r = 1;
   if($cnt) {
