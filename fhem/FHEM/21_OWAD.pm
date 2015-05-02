@@ -38,8 +38,8 @@
 # attr <name> stateAH0  "<string>"     = character string for denoting high normal condition, default is empty
 # attr <name> stateAL1  "<string>"     = character string for denoting low alarm condition, default is down triangle
 # attr <name> stateAH1  "<string>"     = character string for denoting high alarm condition, default is up triangle
-# attr <name> <channel>Name   <string>|<string> = name for the channel | a type description for the measured value
-# attr <name> <channel>Unit   <string>|<string> = unit of measurement for this channel | its abbreviation 
+# attr <name> <channel>Name   <string>[|<string>] = name for the channel [|name used in state reading]
+# attr <name> <channel>Unit   <string>[|<string>] = unit of measurement for this channel [|unit used in state reading] 
 #
 # ATTENTION: Usage of Offset/Factor is deprecated, replace by Function attribute
 # attr <name> <channel>Offset <float>  = offset added to the reading in this channel 
@@ -74,23 +74,9 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
-use GPUtils qw(:all);
-use Time::HiRes qw( gettimeofday );
-
-#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
-BEGIN {
-	if (!grep(/FHEM\/lib$/,@INC)) {
-		foreach my $inc (grep(/FHEM$/,@INC)) {
-			push @INC,$inc."/lib";
-		};
-	};
-};
-
-use ProtoThreads;
-no warnings 'deprecated';
 sub Log($$);
 
-my $owx_version="5.19";
+my $owx_version="5.12";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -157,8 +143,6 @@ sub OWAD_Initialize ($) {
   $hash->{UndefFn} = "OWAD_Undef";
   $hash->{GetFn}   = "OWAD_Get";
   $hash->{SetFn}   = "OWAD_Set";
-  $hash->{NotifyFn}= "OWAD_Notify";
-  $hash->{InitFn}  = "OWAD_Init";
   $hash->{AttrFn}  = "OWAD_Attr";
  
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
@@ -190,6 +174,8 @@ sub OWAD_Initialize ($) {
   $hash->{owg_vlow} = [];
   $hash->{owg_vhigh} = [];
   
+  #-- this function is needed for asynchronous execution of the device reads 
+  $hash->{AfterExecuteFn} = "OWXAD_BinValues";
   #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
@@ -264,44 +250,27 @@ sub OWAD_Define ($$) {
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
   $hash->{ERRCOUNT}   = 0;
+  $hash->{ASYNC}      = 0; #-- false for now
   
   #-- Couple to I/O device
-  AssignIoPort($hash);
-  if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
+  AssignIoPort($hash); 
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) ){
     return "OWAD: Warning, no 1-Wire I/O device found for $name.";
-  } else {
-    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
-
   $main::modules{OWAD}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWAD:    Device $name defined."; 
 
-  $hash->{NOTIFYDEV} = "global";
+  #-- Initialization reading according to interface type
+  my $interface= $hash->{IODev}->{TYPE};
   
-  if ($init_done) {
-    OWAD_Init($hash);
-  }
-  return undef; 
-}
-
-sub OWAD_Notify ($$) {
-  my ($hash,$dev) = @_;
-  if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
-    OWAD_Init($hash);
-  } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
-  }
-}
-
-sub OWAD_Init ($) {
-  my ($hash)=@_;
   #-- Start timer for updates
-  RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+10, "OWAD_InitializeDevice", $hash, 0);
+  InternalTimer(time()+60, "OWAD_GetValues", $hash, 0);
+
   return undef; 
 }
-  
+
 #######################################################################################
 #
 # OWAD_Attr - Set one attribute value for device
@@ -327,7 +296,7 @@ sub OWAD_Attr(@) {
         $hash->{INTERVAL} = $value;
         if ($init_done) {
           RemoveInternalTimer($hash);
-          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
+          InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
         }
         last;
       };
@@ -338,17 +307,7 @@ sub OWAD_Attr(@) {
           if( $hash->{READINGS}{"state"}{VAL} eq "defined" );
         $ret = OWAD_Set($hash,($name,$key,$value));
         last;
-      };
-      $key eq "IODev" and do {
-        AssignIoPort($hash,$value);
-        if( defined($hash->{IODev}) ) {
-          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
-          if ($init_done) {
-            OWAD_Init($hash);
-          }
-        }
-        last;
-      };
+      }
     }
   } elsif ( $do eq "del" ) {
     ARGUMENT_HANDLER: {
@@ -379,12 +338,10 @@ sub OWAD_ChannelNames($) {
 
   for (my $i=0;$i<int(@owg_fixed);$i++){
     #-- name
-    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|voltage";
+    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];
     @cnama = split(/\|/,$cname);
     if( int(@cnama)!=2){
-      Log 1, "OWAD: Incomplete channel name specification $cname. Better use $cname|<type of data>"
-        if( $state eq "defined");
-      push(@cnama,"unknown");
+      push(@cnama,$cnama[0]);
     }
     $owg_channel[$i]=$cnama[0];
  
@@ -392,13 +349,11 @@ sub OWAD_ChannelNames($) {
     $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "Volt|V";
     @unarr= split(/\|/,$unit);
     if( int(@unarr)!=2 ){
-      Log 1, "OWAD: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>"
-        if( $state eq "defined");
-      push(@unarr,"");  
+      push(@unarr,$unarr[0]);  
     }
    
     #-- put into readings
-    $hash->{READINGS}{$owg_channel[$i]}{TYPE}     = $cnama[1];  
+    $hash->{READINGS}{$owg_channel[$i]}{ABBR}     = $cnama[1];  
     $hash->{READINGS}{$owg_channel[$i]}{UNIT}     = $unarr[0];
     $hash->{READINGS}{$owg_channel[$i]}{UNITABBR} = $unarr[1];
   }
@@ -492,7 +447,7 @@ sub OWAD_FormatValues($) {
     $main::attr{$name}{$owg_fixed[$i]."High"}=$vhigh;            
         
     #-- string buildup for return value, STATE and alarm
-    $svalue .= sprintf( "%s: %5.3f %s", $owg_channel[$i], $vval,$hash->{READINGS}{$owg_channel[$i]}{UNITABBR});
+    $svalue .= sprintf( "%s: %5.3f %s", $hash->{READINGS}{$owg_channel[$i]}{ABBR}, $vval,$hash->{READINGS}{$owg_channel[$i]}{UNITABBR});
              
     #-- Test for alarm condition
     $alarm = "none";
@@ -585,17 +540,9 @@ sub OWAD_Get($@) {
   
   #-- get present
   if($a[1] eq "present") {
-    #-- asynchronous mode
-    if( $hash->{ASYNC} ){
-      my ($task,$task_state);
-      eval {
-        OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
-      };
-      return GP_Catch($@) if $@;
-      return "$name.present => ".ReadingsVal($name,"present","unknown");
-    } else {
-      $value = OWX_Verify($master,$hash->{ROM_ID});
-    }
+    #-- hash of the busmaster
+    my $master       = $hash->{IODev};
+    $value           = OWX_Verify($master,$owx_dev);
     $hash->{PRESENT} = $value;
     return "$name.present => $value";
   } 
@@ -617,11 +564,6 @@ sub OWAD_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"reading",1);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        $ret = OWX_ASYNC_RunToCompletion($hash,OWXAD_PT_GetPage($hash,"reading",1));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"reading",1);
@@ -631,7 +573,7 @@ sub OWAD_Get($@) {
     }
   
     #-- process results
-    if( defined($ret) ){
+    if( defined($ret)  ){
       $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
       if( $hash->{ERRCOUNT} > 5 ){
         $hash->{INTERVAL} = 9999;
@@ -646,11 +588,6 @@ sub OWAD_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"alarm",1);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        $ret = OWX_ASYNC_RunToCompletion($hash,OWXAD_PT_GetPage($hash,"alarm",1));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"alarm",1);
@@ -660,7 +597,7 @@ sub OWAD_Get($@) {
     }
   
     #-- process results
-    if( defined($ret) ){
+    if( defined($ret)  ){
       $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
       if( $hash->{ERRCOUNT} > 5 ){
         $hash->{INTERVAL} = 9999;
@@ -683,11 +620,6 @@ sub OWAD_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"status",1);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        $ret = OWX_ASYNC_RunToCompletion($hash,OWXAD_PT_GetPage($hash,"status",1));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"status",1);
@@ -697,7 +629,7 @@ sub OWAD_Get($@) {
     }
   
     #-- process results
-    if( defined($ret) ){
+    if( defined($ret)  ){
       $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
       if( $hash->{ERRCOUNT} > 5 ){
         $hash->{INTERVAL} = 9999;
@@ -757,14 +689,18 @@ sub OWAD_GetValues($) {
   my $value   = "";
   my $ret     = "";
   my ($ret1,$ret2,$ret3);
-
+  
+  #-- check if device needs to be initialized
+  OWAD_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
+  
   #-- define warnings
   my $warn        = "none";
   $hash->{ALARM}  = "0";
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
    
   #-- Get readings, alarms and stati according to interface type
   if( $interface eq "OWX" ){
@@ -773,14 +709,7 @@ sub OWAD_GetValues($) {
       $ret1 = OWXAD_GetPage($hash,"reading",0);
       $ret2 = OWXAD_GetPage($hash,"alarm",0);
       $ret3 = OWXAD_GetPage($hash,"status",1);
-    #}
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"reading",0));
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"alarm",0));
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"status",1));
-    };
-    $ret .= GP_Catch($@) if $@;
+    #} 
   }elsif( $interface eq "OWServer" ){
     $ret1 = OWFSAD_GetPage($hash,"reading",0);
     $ret2 = OWFSAD_GetPage($hash,"alarm",0);
@@ -870,12 +799,6 @@ sub OWAD_InitializeDevice($) {
   if( $interface eq "OWX" ){
     $ret1 = OWXAD_SetPage($hash,"status");
     $ret2 = OWXAD_SetPage($hash,"alarm");
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"alarm"));
-    };
-    $ret .= GP_Catch($@) if $@;
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret1 = OWFSAD_SetPage($hash,"status");
@@ -893,7 +816,7 @@ sub OWAD_InitializeDevice($) {
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
   
-  return OWAD_GetValues($hash);
+  return undef;
 }
 
 #######################################################################################
@@ -948,7 +871,7 @@ sub OWAD_Set($@) {
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 1);
     return undef;
   }
   
@@ -993,11 +916,6 @@ sub OWAD_Set($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_SetPage($hash,"status");
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_SetPage($hash,"status");
@@ -1044,11 +962,6 @@ sub OWAD_Set($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_SetPage($hash,"alarm");
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_SetPage($hash,"alarm");
@@ -1308,35 +1221,34 @@ sub OWFSAD_SetPage($$) {
 ########################################################################################
 
 sub OWXAD_BinValues($$$$$$$$) {
-  my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
+  my ($hash, $context, $success, $reset, $owx_dev, $command, $final, $res) = @_;
   
   #-- always check for success, unused are reset
   return unless ($success and $context);
   #Log 1,"OWXAD_BinValues context = $context";
-  my $final = ($context =~ /\.final$/ );
   
   my ($i,$j,$k,@data,$ow_thn,$ow_tln);
   
   #-- process results
-  @data=split(//,$res);
+  @data=split(//,substr($res,3,10));
   return "invalid data length, ".int(@data)." instead of 10 bytes"
     if (@data != 10); 
   return "invalid CRC"
-    if (OWX_CRC16($command.substr($res,0,8),$data[8],$data[9])==0);    
+    if (OWX_CRC16(substr($res,9,11),$data[11],$data[12])==0);    
       
   #=============== get the voltage reading ===============================
-  if( $context =~ /^ds2450.getreading/ ){
+  if( $context eq "ds2450.getreading"){
     for( $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_val}->[$i]= (ord($data[2*$i])+256*ord($data[1+2*$i]) )/(1<<$owg_resoln[$i]) * $owg_range[$i]/1000;
     }
   #=============== get the alarm reading ===============================
-  } elsif ( $context =~ /^ds2450.getalarm/ ){
+  } elsif ( $context eq "ds2450.getalarm" ) {
     for( $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_vlow}->[$i]  = int(ord($data[2*$i])/256 * $owg_range[$i]+0.5)/1000;
       $hash->{owg_vhigh}->[$i] = int(ord($data[1+2*$i])/256 * $owg_range[$i]+0.5)/1000;
     }
   #=============== get the status reading ===============================
-  } elsif ( $context =~ /^ds2450.getstatus/ ) {  
+  } elsif ( $context eq "ds2450.getstatus" ) {  
     my ($sb1,$sb2);
     for( my $i=0;$i<int(@owg_fixed);$i++){
       $sb1 = ord($data[2*$i]); 
@@ -1392,7 +1304,7 @@ sub OWXAD_BinValues($$$$$$$$) {
   } 
   #-- and now from raw to formatted values
   $hash->{PRESENT}  = 1;
-  if( $final ){
+  if( $final==1 ){
     my $value = OWAD_FormatValues($hash);
     Log 5, $value;
   }
@@ -1409,9 +1321,9 @@ sub OWXAD_BinValues($$$$$$$$) {
 #
 ########################################################################################
 
-sub OWXAD_GetPage($$$@) {
+sub OWXAD_GetPage($$$) {
 
-  my ($hash,$page,$final,$sync) = @_;
+  my ($hash,$page,$final) = @_;
   
   my ($select, $res, $res2, $res3, @data, $an, $vn);
   
@@ -1427,13 +1339,22 @@ sub OWXAD_GetPage($$$@) {
   #=============== get the voltage reading ===============================
   if( $page eq "reading") {
     #-- issue the match ROM command \x55 and the start conversion command
-    OWX_Reset($master);
-    $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
-    if( $res eq 0 ){
-      return "not accessible for conversion";
+    #-- asynchronous mode
+    # difficult here, shoul dbe put into Binvalues as in OWSWITCH
+    if( $hash->{ASYNC} ){
+      if (!OWX_Execute( $master, "getpageconvert", 1, $owx_dev, "\x3C\x0F\x00\xFF\xFF", 0, 20 )) {
+        return "not accessible for conversion";
+      }
+    #-- synchronous mode
+    } else {
+      OWX_Reset($master);
+      $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
+      if( $res eq 0 ){
+        return "not accessible for conversion";
+      } 
+      #-- conversion needs some 5 ms per channel
+      select(undef,undef,undef,0.02);
     } 
-    #-- conversion needs some 5 ms per channel
-    select(undef,undef,undef,0.02);
 
     #-- issue the match ROM command \x55 and the read conversion page command
     #   \xAA\x00\x00 
@@ -1451,18 +1372,30 @@ sub OWXAD_GetPage($$$@) {
   #=============== wrong value requested ===============================
   } else {
     return "wrong memory page requested from $owx_dev";
+  } 
+  #-- asynchronous mode
+  if( $hash->{ASYNC} ){
+    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+    if (OWX_Execute( $master, "ds2450.get".$page, 1, $owx_dev, $select, 10, undef)) {
+      return OWX_AwaitExecuteResponse( $master, "getpage$page", $owx_dev );
+    } else {
+      return "$owx_dev not accessible in reading $page page"; 
+	}
+  #-- synchronous mode
+  } else {
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+    $res=OWX_Complex($master,$owx_dev,$select,10);
+    return "$owx_dev not accessible in reading page $page"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=22);
+    #-- for processing we also need the 3 command bytes
+    OWXAD_BinValues($hash,"ds2450.get".$page,1,undef,$owx_dev,undef,$final,substr($res,9,13));
   }
-  my $context = "ds2450.get".$page.($final ? ".final" : "");
-  #-- reset the bus
-  OWX_Reset($master);
-  #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-  $res=OWX_Complex($master,$owx_dev,$select,10);
-  return "$owx_dev not accessible in reading page $page"
-    if( $res eq 0 );
-  return "$owx_dev has returned invalid data"
-    if( length($res)!=22);
-  #-- for processing we also need the 3 command bytes
-  return OWXAD_BinValues($hash,$context,1,undef,$owx_dev,$select,10,substr($res,12,10));
+
+  return undef;
 }
 
 ########################################################################################
@@ -1530,161 +1463,22 @@ sub OWXAD_SetPage($$) {
   } else {
     return "wrong memory page write attempt";
   } 
-  OWX_Reset($master);
-  $res=OWX_Complex($master,$owx_dev,$select,0);
-  if( $res eq 0 ){
+  #-- asynchronous mode
+  if( $hash->{ASYNC} ){
+    if (OWX_Execute( $master, "setpage", 1, $owx_dev, $select, 0, undef )) {
+		return undef;
+	} else {
     return "device $owx_dev not accessible for writing"; 
+    }
+  #-- synchronous mode
+  } else {
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,0);
+    if( $res eq 0 ){
+      return "device $owx_dev not accessible for writing"; 
+    }
   }
   return undef;
-}
-
-########################################################################################
-#
-# OWXAD_PT_GetPage - Get one memory page from device
-#
-# Parameter hash = hash of device addressed
-#           page = "reading", "alarm" or "status"
-#           final= 1 if FormatValues is to be called
-#
-########################################################################################
-
-sub OWXAD_PT_GetPage($$$) {
-
-  my ($hash,$page,$final) = @_;
-  
-  return PT_THREAD(sub {
-
-    my ($thread) = @_;
-
-    my ($res, $res2, $res3, @data, $an, $vn);
-
-    #-- ID of the device, hash of the busmaster
-    my $owx_dev = $hash->{ROM_ID};
-    my $master  = $hash->{IODev};
-
-    my ($i,$j,$k);
-
-    PT_BEGIN($thread);
-
-    #=============== get the voltage reading ===============================
-    if( $page eq "reading") {
-      #-- issue the match ROM command \x55 and the start conversion command
-
-      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 );
-      $thread->{ExecuteTime} = gettimeofday() + 0.07; # was 0.02
-      PT_WAIT_THREAD($thread->{pt_execute});
-      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-      PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-      delete $thread->{ExecuteTime};
-
-      #-- issue the match ROM command \x55 and the read conversion page command
-      #   \xAA\x00\x00 
-      $thread->{'select'}="\xAA\x00\x00";
-    #=============== get the alarm reading ===============================
-    } elsif ( $page eq "alarm" ) {
-      #-- issue the match ROM command \x55 and the read alarm page command 
-      #   \xAA\x10\x00 
-      $thread->{'select'}="\xAA\x10\x00";
-    #=============== get the status reading ===============================
-    } elsif ( $page eq "status" ) {
-      #-- issue the match ROM command \x55 and the read status memory page command 
-      #   \xAA\x08\x00 r
-      $thread->{'select'}="\xAA\x08\x00";
-    #=============== wrong value requested ===============================
-    } else {
-      die "wrong memory page requested from $owx_dev";
-    }
-    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 10 );
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    my $response = $thread->{pt_execute}->PT_RETVAL();
-    my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},10,$response);
-    if ($res) {
-      die $res;
-    }
-    PT_END;
-  });
-}
-
-########################################################################################
-#
-# OWXAD_PT_SetPage - Set one page of device
-#
-# Parameter hash = hash of device addressed
-#           page = "alarm" or "status"
-#
-########################################################################################
-
-sub OWXAD_PT_SetPage($$) {
-
-  my ($hash,$page) = @_;
-
-  return PT_THREAD(sub {
-
-    my ($thread) = @_;
-    my ($select, $res, $res2, $res3, @data);
-
-    #-- ID of the device, hash of the busmaster
-    my $owx_dev = $hash->{ROM_ID};
-    my $master  = $hash->{IODev};
-
-    my ($i,$j,$k);
-
-    PT_BEGIN($thread);
-
-    #=============== set the alarm values ===============================
-    if ( $page eq "alarm" ) {
-      #-- issue the match ROM command \x55 and the set alarm page command 
-      #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
-      $select="\x55\x10\x00";
-      for( $i=0;$i<int(@owg_fixed);$i++){
-        $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vlow}->[$i]*256000/$owg_range[$i]); 
-        $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vhigh}->[$i]*256000/$owg_range[$i]);
-      }
-
-    #++Use of uninitialized value within @owg_vlow in multiplication  at 
-    #++/usr/share/fhem/FHEM/21_OWAD.pm line 1362.
-    #=============== set the status ===============================
-    } elsif ( $page eq "status" ) {
-      my ($sb1,$sb2)=(0,0);
-      #-- issue the match ROM command \x55 and the set status memory page command 
-      #   \x55\x08\x00 reading 8 data bytes and 2 CRC bytes
-      $select="\x55\x08\x00";
-      for( $i=0;$i<int(@owg_fixed);$i++){
-        #if( $owg_mode[$i] eq "input" ){
-        if( 1 > 0){
-          #-- resolution (TODO: check !)
-          $sb1 = $owg_resoln[$i] & 15;
-          #-- alarm enabled        
-          if( defined($hash->{owg_slow}->[$i]) ){
-            $sb2   =  ( $hash->{owg_slow}->[$i] ne 0  ) ? 4 : 0;
-          }
-          if( defined($hash->{owg_shigh}->[$i]) ){
-            $sb2  += ( $hash->{owg_shigh}->[$i] ne 0 ) ? 8 : 0;
-          }
-          #-- range 
-          $sb2 |= 1 
-            if( $owg_range[$i] > 2560 );
-        } else {
-          $sb1 = 128;
-          $sb2 = 0;
-        }
-        $select .= sprintf "%c\xFF\xFF\xFF",$sb1;
-        $select .= sprintf "%c\xFF\xFF\xFF",$sb2;
-      }
-    #=============== wrong page write attempt  ===============================
-    } else {
-      PT_EXIT("wrong memory page write attempt");
-    }
-    #"setpage"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $select, 0 );
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    PT_END;
-  });
 }
 
 1;
@@ -1787,11 +1581,11 @@ sub OWXAD_PT_SetPage($$) {
                 triangle, e.g. the code &amp;#x25B4; leading to the sign &#x25B4; </li>
         </ul> For each of the following attributes, the channel identification A,B,C,D may be used. <ul>
             <li><a name="owad_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
-                        &lt;string&gt;|&lt;string&gt;</code></a>
-                <br />name for the channel | a type description for the measured value. </li>
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />name for the channel [|name used in state reading]. </li>
             <li><a name="owad_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
-                        &lt;string&gt;|&lt;string&gt;</code></a>
-                <br />unit of measurement for this channel | its abbreviation. </li>
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />unit of measurement for this channel [|unit used in state reading]. </li>
             <li><a name="owad_coffset"><b>deprecated</b>: <code>attr &lt;name&gt; &lt;channel&gt;Offset
                         &lt;float&gt;</code></a>
                 <br />offset added to the reading in this channel. </li>
