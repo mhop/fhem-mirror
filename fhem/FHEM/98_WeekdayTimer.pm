@@ -101,8 +101,8 @@ sub WeekdayTimer_Get($@) {
 sub WeekdayTimer_Undef($$) {
   my ($hash, $arg) = @_;
 
-  foreach my $time (keys %{$hash->{profil}}) {
-     myRemoveInternalTimer($time, $hash);
+  foreach my $idx (keys %{$hash->{profil}}) {
+     myRemoveInternalTimer($idx, $hash);
   }
   myRemoveInternalTimer("SetTimerOfDay", $hash);
   delete $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}};
@@ -206,14 +206,17 @@ sub WeekdayTimer_Profile($) {
      }
   }
 # ------------------------------------------------------------------------------
+  my $idx = 0;
   foreach  my $st (@{$hash->{SWITCHINGTIMES}}) {
      my ($tage,$time,$parameter)       = WeekdayTimer_SwitchingTime ($hash, $st);
      my $echtZeit                      = WeekdayTimer_EchteZeit     ($hash, $wday, $time); 
      my ($stunde, $minute, $sekunde)   = split (":",$echtZeit);              
-
-     $hash->{profil}{$echtZeit}{PARA}  = $parameter;
-     $hash->{profil}{$echtZeit}{TIM}   = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, 0);
-     $hash->{profil}{$echtZeit}{TAGE}  = $tage;
+     
+     $idx++;
+     $hash->{profil}{$idx}{TIME}  = $time;
+     $hash->{profil}{$idx}{PARA}  = $parameter;
+     $hash->{profil}{$idx}{EPOCH} = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, 0);
+     $hash->{profil}{$idx}{TAGE}  = $tage;
   }
 # ------------------------------------------------------------------------------
   Log3 $hash, 4,  "[$hash->{NAME}] " . sunrise_abs() . " " . sunset_abs() . " " . $longDays{$language}[$wday]; 
@@ -473,12 +476,13 @@ sub WeekdayTimer_SetTimer($) {
   
   readingsSingleUpdate ($hash,  "state", "inactive", 1);
   for(my $i=0; $i<=$#switches; $i++) {
-     my $time = $switches[$i];
   
-     my $timToSwitch = $hash->{profil}{$time}{TIM};
-     my $tage        = $hash->{profil}{$time}{TAGE};
-     my $para        = $hash->{profil}{$time}{PARA};
-     my $switch      = $time;
+     my $idx = $switches[$i];
+     
+     my $time        = $hash->{profil}{$idx}{TIME};
+     my $timToSwitch = $hash->{profil}{$idx}{EPOCH};
+     my $tage        = $hash->{profil}{$idx}{TAGE};
+     my $para        = $hash->{profil}{$idx}{PARA};
      
      my $secondsToSwitch = $timToSwitch - $now;
      
@@ -487,7 +491,7 @@ sub WeekdayTimer_SetTimer($) {
      
      if ($secondsToSwitch>-5) {
         Log3 $hash, 4, "[$name]:setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$para" if($isActiveTimer);
-        myInternalTimer ("$time", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0);
+        myInternalTimer ("$idx", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0);
      }
   }
   
@@ -515,6 +519,8 @@ sub WeekdayTimer_searchAktNext($$) {
   my ($nextTag, $nextTime, $nextParameter);
   my ($aktTag,  $aktTime,  $aktParameter);
   
+  my $language = $hash->{LANGUAGE};
+  
   my @realativeWdays  = ($wday..6,0..$wday-1,$wday..6,0..6);  
  #Log3 $hash, 3, "[$name] wdays @realativeWdays";
   for (my $i=0;$i<=$#realativeWdays;$i++) {
@@ -530,13 +536,13 @@ sub WeekdayTimer_searchAktNext($$) {
         my $epoch = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, $relativeDay);
 
        #Log3 $hash, 3, "[$name] $time $time---->".FmtDateTime($epoch);
-     
+  
         if ($epoch >= $now) {
            $nextTag       = $relWday;
            $nextTime      = $epoch;
            $nextParameter = $hash->{helper}{SWITCHINGTIME}{$relWday}{$time};
-           Log3 $hash, 4, "[$name] $aktTag  aktTime,  aktParameter  ".FmtDateTime($aktTime) . " -->> $aktParameter";
-           Log3 $hash, 4, "[$name] $nextTag  nextTime, nextParameter ".FmtDateTime($nextTime). " -->> $nextParameter";
+           Log3 $hash, 4, "[$name] akt:  ".FmtDateTime($aktTime) ."(".$hash->{shortDays}{$language}[$aktTag]. ") -->> $aktParameter";
+           Log3 $hash, 4, "[$name] next: ".FmtDateTime($nextTime)."(".$hash->{shortDays}{$language}[$nextTag].") -->> $nextParameter";
            return ($aktTime,  $aktParameter, $nextTime, $nextParameter);
         }
         $aktTag       = $relWday;
@@ -571,9 +577,8 @@ sub WeekdayTimer_Update($) {
   }
   
   my $active = 1;
-  if (defined $hash->{CONDITION}) {
-     $active = AnalyzeCommandChain(undef, "{".$hash->{CONDITION}."}");
-  }
+     $active = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam);
+  Log3 $hash, 4, "[$name]:Update   - timer seems to be active today: ".join("",@$tage)."|$time|$newParam" if($active);
   
   # ggf. Device schalten
   WeekdayTimer_Device_Schalten($hash, $newParam, $tage);
@@ -749,8 +754,9 @@ sub WeekdayTimer_Device_Schalten($$$) {
   #modifier des Zieldevices auswaehlen
   my $setModifier = WeekdayTimer_isHeizung($hash);
   
-  $command = '{ fhem("set @ '. $setModifier .' %") }';
-  $command = $hash->{COMMAND}               if (defined $hash->{COMMAND});
+  $command = "set @ " . $setModifier . " %";
+  $command = $hash->{COMMAND}   if (defined $hash->{COMMAND});
+  $command = "{ fhem('" . $command . "') }";
 
   $condition  = WeekdayTimer_Condition ($hash, $tage);
   $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
@@ -764,7 +770,7 @@ sub WeekdayTimer_Device_Schalten($$$) {
 
   my $disabled = AttrVal($hash->{NAME}, "disable", 0);
   my $disabled_txt = $disabled ? " " : " not";
-  Log3 $hash, 5, "[$name] aktParam:$aktParam newParam:$newParam - is $disabled_txt disabled";
+  Log3 $hash, 4, "[$name] aktParam:$aktParam newParam:$newParam - is $disabled_txt disabled";
 
   #Kommando ausführen
   if ($command && !$disabled && $aktParam ne $newParam) {
@@ -865,7 +871,7 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
   <a name="weekdayTimer_define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; WeekdayTimer &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
+    <code>define &lt;name&gt; WeekdayTimer &lt;device&gt; [&lt;language&gt;] [<u>weekdays</u>] &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
     <br><br>
 
     to set a weekly profile for &lt;device&gt;<br><br>
@@ -883,23 +889,90 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
       The device to switch at the given time.
     </ul>
     <p>
+    <ul><b>language</b><br>
+      Specifies the language used for definition and profiles.
+      de,en,fr are possible. The parameter is optional.
+    </ul>
+    <p>
+    <ul><b>weekdays</b><br>
+      Specifies the days for all timer in the <b>WeekdayTimer</b>.
+      The parameter is optional. For details see the weekdays part in profile.
+    </ul>
+    <p>
     <ul><b>profile</b><br>
-      Define the weekly profile. All timings are separated by space. A switchingtime is defined by the following example:<br>
+      Define the weekly profile. All timings are separated by space. A switchingtime is defined
+      by the following example: <br><br>
+      
       <ul><b>[&lt;weekdays&gt;|]&lt;time&gt;|&lt;parameter&gt;</b></ul><br>
-      <u>weekdays:</u> optional, if not set every day is used. Otherwise you can define a day as a number or as shortname.<br>
-      <u>time:</u>define the time to switch, format: HH:MM(HH in 24 hour format). Within the {} you can use the variable $date(epoch) to get the exact switchingtimes of the week. Example: {sunrise_abs_dat($date)}<br>
+      
+      <u>weekdays:</u> optional, if not set every day of the week is used.<br>
+        Otherwise you can define a day with its number or its shortname.<br>
+        <ul> 
+        <li>0,su  sunday</li>
+        <li>1,mo  monday</li>
+        <li>2,tu  tuesday</li>
+        <li>3,we  wednesday</li>
+        <li>4 ...</li>
+        <li>7,$we  weekend  ($we)</li>
+        <li>8,!$we weekday  (!$we)</li>
+        </ul><br>
+         It is possible to define $we or !$we in daylist to easily allow weekend an holiday. $we !$we are coded as 7 8, when using a numeric daylist.<br><br>
+      <u>time:</u>define the time to switch, format: HH:MM:[SS](HH in 24 hour format) or a Perlfunction like {sunrise_abs()}. Within the {} you can use the variable $date(epoch) to get the exact switchingtimes of the week. Example: {sunrise_abs_dat($date)}<br><br>
       <u>parameter:</u>the parameter to be set, using any text value like <b>on</b>, <b>off</b>, <b>dim30%</b>, <b>eco</b> or <b>comfort</b> - whatever your device understands.<br>
     </ul>
     <p>
     <ul><b>command</b><br>
-      If no condition is set, all other is interpreted as a command. Perl-code is setting up
-      by well-known Block with {}.<br>
+      If no condition is set, all the rest is interpreted as a command. Perl-code is setting up
+      by the well-known Block with {}.<br>
       Note: if a command is defined only this command is executed. In case of executing
-      a "set desired-temp" command, you must define it explicit.<br>
+      a "set desired-temp" command, you must define the hole commandpart explicitly by yourself.<br>
+  <!-- -------------------------------------------------------------------------- -->
+  <!----------------------------------------------------------------------------- -->
+  <!-- -------------------------------------------------------------------------- -->
+      <li>in the command section you can access the event:
+      <ul>
+        <li>The variable $EVENT will contain the complete event, e.g.
+          <code>measured-temp: 21.7 (Celsius)</code></li>
+        <li>$EVTPART0,$EVTPART1,$EVTPART2,etc contain the space separated event
+          parts (e.g. <code>$EVTPART0="measured-temp:", $EVTPART1="21.7",
+          $EVTPART2="(Celsius)"</code>. This data is available as a local
+          variable in perl, as environment variable for shell scripts, and will
+          be textually replaced for FHEM commands.</li>
+        <li>$NAME contains the device to send the event, e.g.
+          <code>myFht</code></li>
+       </ul></li>
+
+      <li>Note: the following is deprecated and will be removed in a future
+        release. The described replacement is attempted if none of the above
+        variables ($NAME/$EVENT/etc) found in the command.
+      <ul>
+        <li>The character <code>%</code> will be replaced with the received
+        event, e.g. with <code>on</code> or <code>off</code> or
+        <code>measured-temp: 21.7 (Celsius)</code><br> It is advisable to put
+        the <code>%</code> into double quotes, else the shell may get a syntax
+        error.</li>
+
+        <li>The character <code>@</code> will be replaced with the device
+        name.</li>
+
+        <li>To use % or @ in the text itself, use the double mode (%% or
+        @@).</li>
+
+        <li>Instead of <code>%</code> and <code>@</code>, the parameters
+        <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code> (same
+        as <code>@</code>) and <code>%TYPE</code> (contains the device type,
+        e.g.  <code>FHT</code>) can be used. The space separated event "parts"
+        are available as %EVTPART0, %EVTPART1, etc.  A single <code>%</code>
+        looses its special meaning if any of these parameters appears in the
+        definition.</li>
+      </ul></li>
+  <!-- -------------------------------------------------------------------------- -->
+  <!----------------------------------------------------------------------------- -->
+  <!-- -------------------------------------------------------------------------- -->
       The following parameter are replaced:<br>
         <ol>
           <li>@ => the device to switch</li>
-          <li>% => the new parameter</li>
+          <li>% => the new temperature</li>
         </ol>
     </ul>
     <p>
@@ -921,11 +994,32 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
         <code>define dimmer WeekdayTimer livingRoom Sa-Su,We|07:00|dim30% Sa-Su,We|21:00|dim90% (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
         The dimmer is only set to dimXX% if the dummy variable WeAreThere is "yes"(not a real live example).<p>
 
-        If you want to have set all WeekdayTimer their current value (after a phase of exception),
-        you can call the function <b> WeekdayTimer_SetAllParms ()</b>.
-        This call can be automatically coupled to a dummy by notify:
-        <code>define WDStatus2 notify Dummy:. * {WeekdayTimer_SetAllParms ()}</code>
-
+        If you want to have set all WeekdayTimer their current value (after a temperature lowering phase holidays)
+        you can call the function <b>WeekdayTimer_SetParm(&lt;"WD-device"&gt;)</b> or <b>WeekdayTimer_SetAllParms()</b>.<br>
+        This call can be automatically coupled to a dummy by a notify:<br>
+        <code>define dummyNotify notify Dummy:. * {WeekdayTimer_SetAllTemps()}</code>
+        <br><p>
+        Some definitions without comment:
+        <code>
+        <pre> 
+        define hc    Heating_Control  HeizungKueche de        7|23:35|25        34|23:30|22 23:30|16 23:15|22     8|23:45|16 
+        define hc    Heating_Control  HeizungKueche de        fr,$we|23:35|25   34|23:30|22 23:30|16 23:15|22    12|23:45|16  
+        define hc    Heating_Control  HeizungKueche de        20:35|25          34|14:30|22 21:30|16 21:15|22    12|23:00|16 
+        
+        define hw    Heating_Control  HeizungKueche de        mo-so, $we|{sunrise_abs_dat($date)}|18      mo-so, $we|{sunset_abs_dat($date)}|22  
+        define ht    Heating_Control  HeizungKueche de        mo-so,!$we|{sunrise_abs_dat($date)}|18      mo-so,!$we|{sunset_abs_dat($date)}|22 
+        
+        define hh    Heating_Control  HeizungKueche de        {sunrise_abs_dat($date)}|19           {sunset_abs_dat($date)}|21  
+        define hx    Heating_Control  HeizungKueche de        22:35|25  23:00|16    
+        </code></pre>
+        The daylist can be given globaly for the whole Heating_Control:<p>
+        <code><pre>
+        define HeizungWohnen_an_wt    Heating_Control HeizungWohnen de  !$we     09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   $we     09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   78      09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de   57      09:00|19  (heizungAnAus("Ein"))  
+        define HeizungWohnen_an_we    Heating_Control HeizungWohnen de  fr,$we   09:00|19  (heizungAnAus("Ein"))  
+        </code></pre>
     </ul>
   </ul>
 
@@ -975,6 +1069,10 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
     }
     </pre>    
     </li>
+    <li>switchInThePast<br> 
+    defines that the depending device will be switched in the past in definition and startup phase when the device is not recognized as a heating.
+    Heatings are always switched in the past.
+    </li>    
     
     <li><a href="#disable">disable</a></li>
     <li><a href="#loglevel">loglevel</a></li>
@@ -982,7 +1080,6 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#stateFormat">stateFormat</a></li>
   </ul><br>
-
 
 =end html
 
