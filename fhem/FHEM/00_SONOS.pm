@@ -47,6 +47,8 @@
 # Changelog
 #
 # SVN-History:
+# 02.05.2015
+#	Es gibt drei neue Readings "FavouritesVersion", "RadiosVersion" und "PlaylistsVersion", die bei einer Änderung des jeweiligen Bereichs durch einen Sonos Controller aktualisiert werden, und auf die man mit einem Notify reagieren kann, um z.B. ein "get player FavouritesWithCovers" ausführen zu können. Damit entfällt die Notwendigkeit von zeitgesteuerten Aktualisierungen.
 # 14.04.2015
 #	Zusätzliche Fehlerüberprüfung und -ausgabe beim Herunterladen der Cover-Bilder eingebaut, sowie relative URLs unterbunden
 # 07.04.2015
@@ -445,7 +447,7 @@ my %SONOS_ProviderList = ('^http:(\/\/.*)' => 'Radio',
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
 my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime);
-my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected presence currentAlbum currentArtist currentTitle GroupVolume GroupMute);
+my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected presence currentAlbum currentArtist currentTitle GroupVolume GroupMute FavouritesVersion RadiosVersion PlaylistsVersion);
 
 # Obsolete Einstellungen...
 my $SONOS_UseTelnetForQuestions = 1;
@@ -498,6 +500,7 @@ my %SONOS_ZoneGroupTopologyProxy;
 my %SONOS_TransportSubscriptions;
 my %SONOS_RenderingSubscriptions;
 my %SONOS_GroupRenderingSubscriptions;
+my %SONOS_ContentDirectorySubscriptions;
 my %SONOS_AlarmSubscriptions; 
 my %SONOS_ZoneGroupTopologySubscriptions;
 my %SONOS_DevicePropertiesSubscriptions;
@@ -3556,6 +3559,22 @@ sub SONOS_Discover() {
 						}
 					}
 					
+					if (defined($SONOS_ContentDirectorySubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_ContentDirectorySubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
+						eval {
+							$SONOS_ContentDirectorySubscriptions{$udn}->renew();
+							SONOS_Log $udn, 3, 'ContentDirectory-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
+						};
+						if ($@) {
+							SONOS_Log $udn, 3, 'Error! ContentDirectory-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
+							
+							# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
+							# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
+							if ($@ =~ m/Can.t connect to/) {
+								SONOS_DeleteProxyObjects($udn);
+							}
+						}
+					}
+					
 					if (defined($SONOS_AlarmSubscriptions{$udn}) && (Time::HiRes::time() - $SONOS_AlarmSubscriptions{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
 						eval {
 							$SONOS_AlarmSubscriptions{$udn}->renew();
@@ -5078,6 +5097,7 @@ sub SONOS_Discover_Callback($$$) {
 		my $renderingService;
 		
 		my $groupRenderingService;
+		my $contentDirectoryService;
 		
 		# Hier die Subdevices durchgehen...
 		for my $subdevice ($device->children) {
@@ -5097,7 +5117,8 @@ sub SONOS_Discover_Callback($$$) {
 			
 			if ($subdevice->UDN =~ /.*_MS/i) { 
 				# Wir haben hier das Media-Server Subdevice
-				$SONOS_ContentDirectoryControlProxy{$udn} = $subdevice->getService('urn:schemas-upnp-org:service:ContentDirectory:1')->controlProxy if ($subdevice->getService('urn:schemas-upnp-org:service:ContentDirectory:1'));
+				$contentDirectoryService = $subdevice->getService('urn:schemas-upnp-org:service:ContentDirectory:1');
+				$SONOS_ContentDirectoryControlProxy{$udn} = $contentDirectoryService->controlProxy if ($contentDirectoryService);
 			}
 		}
 		   
@@ -5290,6 +5311,18 @@ sub SONOS_Discover_Callback($$$) {
 	  		}
 	    } else {
 	    	undef($SONOS_GroupRenderingSubscriptions{$udn});
+	    }
+	    
+		# ContentDirectory-Subscription
+		if ($contentDirectoryService) {
+	  		$SONOS_ContentDirectorySubscriptions{$udn} = $contentDirectoryService->subscribe(\&SONOS_ContentDirectoryCallback);
+	  		if (defined($SONOS_ContentDirectorySubscriptions{$udn})) {
+	  			SONOS_Log undef, 2, 'ContentDirectory-Service-subscribing successful with SID='.$SONOS_ContentDirectorySubscriptions{$udn}->SID;
+	  		} else {
+	  			SONOS_Log undef, 1, 'ContentDirectory-Service-subscribing NOT successful';
+	  		}
+	    } else {
+	    	undef($SONOS_ContentDirectorySubscriptions{$udn});
 	    }
 	    
 		# Alarm-Subscription
@@ -5601,6 +5634,7 @@ sub SONOS_DeleteProxyObjects($) {
 	delete $SONOS_TransportSubscriptions{$udn};
 	delete $SONOS_RenderingSubscriptions{$udn};
 	delete $SONOS_GroupRenderingSubscriptions{$udn};
+	delete $SONOS_ContentDirectorySubscriptions{$udn};
 	delete $SONOS_AlarmSubscriptions{$udn}; 
 	delete $SONOS_ZoneGroupTopologySubscriptions{$udn};
 	delete $SONOS_DevicePropertiesSubscriptions{$udn};
@@ -6317,6 +6351,78 @@ sub SONOS_GroupRenderingCallback($$) {
 
 ########################################################################################
 #
+#  SONOS_ContentDirectoryCallback - ContentDirectory-Callback, 
+#
+# Parameter $service = Service-Representing Object
+#						$properties = Properties, that have been changed in this event
+#
+########################################################################################
+sub SONOS_ContentDirectoryCallback($$) {
+	my ($service, %properties) = @_;
+	
+	my $udn = $SONOS_Locations{$service->base};
+	my $udnShort = $1 if ($udn =~ m/(.*?)_MR/i);
+	
+	if (!$udn) {
+		SONOS_Log undef, 1, 'ContentDirectory-Event receive error: SonosPlayer not found; Searching for \''.$service->eventSubURL.'\'!';
+		return;
+	}
+	
+	my $name = SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn);
+	
+	# If the Device is disabled, return here...
+	if (SONOS_Client_Data_Retreive($udn, 'attr', 'disable', 0) == 1) {
+		SONOS_Log $udn, 3, "ContentDirectory-Event: device '$name' disabled. No Events/Data will be processed!";
+		return;
+	}
+	
+	SONOS_Log $udn, 3, 'Event: Received ContentDirectory-Event for Zone "'.$name.'".';
+	$SONOS_Client_SendQueue_Suspend = 1;
+	
+	# Check if the correct ServiceType
+	if ($service->serviceType() ne 'urn:schemas-upnp-org:service:ContentDirectory:1') {
+		SONOS_Log $udn, 1, 'ContentDirectory-Event receive error: Wrong Servicetype, was \''.$service->serviceType().'\'!';
+		return;
+	}
+	
+	SONOS_Log $udn, 4, "ContentDirectory-Event: All correct with this service-call till now. UDN='uuid:".$udn."'";
+	
+	#FavoritesUpdateID...
+	if (defined($properties{FavoritesUpdateID})) {
+		my $containerUpdateIDs = '';
+		$containerUpdateIDs = $properties{ContainerUpdateIDs} if ($properties{ContainerUpdateIDs});
+		
+		my $favouritesUpdateID = $1 if ($containerUpdateIDs =~ m/FV:2,\d+?/i);
+		my $radiosUpdateID = $1 if ($containerUpdateIDs =~ m/R:0,\d+?/i);
+		
+		# Wenn beide nicht geliefert wurden, dann beide setzen...
+		$containerUpdateIDs = '' if (!defined($favouritesUpdateID) && !defined($radiosUpdateID));
+		
+		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'FavouritesVersion', $properties{FavoritesUpdateID}) if (defined($favouritesUpdateID) || ($containerUpdateIDs eq ''));
+		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'RadiosVersion', $properties{FavoritesUpdateID}) if (defined($radiosUpdateID) || ($containerUpdateIDs eq ''));
+	}
+	
+	#SavedQueuesUpdateID...
+	my $savedQueuesUpdateID = SONOS_Client_Data_Retreive($udn, 'reading', 'PlaylistsVersion', '~~');
+	if (defined($properties{SavedQueuesUpdateID}) && ($properties{SavedQueuesUpdateID} ne $savedQueuesUpdateID)) {
+		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'PlaylistsVersion', $properties{SavedQueuesUpdateID});
+	}
+	
+	$SONOS_Client_SendQueue_Suspend = 0;
+	SONOS_Log $udn, 3, 'Event: End of ContentDirectory-Event for Zone "'.$name.'".';
+	
+	# Prüfen, ob der Player auf 'disappeared' steht, und in diesem Fall den DiscoverProcess neu anstarten...
+	if (SONOS_Client_Data_Retreive($udn, 'reading', 'presence', 'disappeared') eq 'disappeared') {
+		SONOS_Log $udn, 1, "ContentDirectory-Event: device '$name' is marked as disappeared. Restarting discovery-process!";
+		
+		SONOS_RestartControlPoint();
+	}
+	
+	return 0;
+}
+
+########################################################################################
+#
 #  SONOS_AddToButtonQueue - Adds the given Event-Name to the ButtonQueue
 #
 ########################################################################################
@@ -7008,7 +7114,7 @@ sub SONOS_DownloadReplaceIfChanged($$) {
 	return 0 if ($url !~ m/^http:\/\//i);
 	
 	# Reading new file
-	my $newFile;
+	my $newFile = '';
 	eval {
 		$newFile = get $url;
 		
@@ -7023,9 +7129,12 @@ sub SONOS_DownloadReplaceIfChanged($$) {
 		}
 	};
 	if ($@) {
-		SONOS_Log undef, 0, 'Error during SONOS_DownloadReplaceIfChanged("'.$url.'", "'.$dest.'"): '.$@;
+		SONOS_Log undef, 2, 'Error during SONOS_DownloadReplaceIfChanged("'.$url.'", "'.$dest.'"): '.$@;
 		return 0;
 	}
+	
+	# Wenn keine neue Datei ermittelt wurde, dann abbrechen...
+	return 0 if (!defined($newFile) || ($newFile eq ''));
 
 	# Reading old file (if it exists)
 	my $oldFile = SONOS_ReadFile($dest);
