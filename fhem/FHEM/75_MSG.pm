@@ -136,7 +136,7 @@ MSG_Set($@)
 						From          => $from,
 						To            => $to,
 						Subject       => $subject,
-						Type          => 'text/plain',
+						Type          => 'text/plain; charset=UTF-8', #'multipart/mixed', # was 'text/plain'
 						Data          => $mess
 						);
 						
@@ -144,7 +144,7 @@ MSG_Set($@)
 				my $smtp;
 				my $smtperrmsg = "SMTP Error: ";
 				$smtp = Net::SMTP::SSL->new($smtphost, Port=>$smtpport) or return $smtperrmsg . " Can't connect to host $smtphost";
-				$smtp->auth(@auth[0], @auth[1]) or return $smtperrmsg . " Can't authenticate: " . $smtp->message();
+				$smtp->auth($auth[0], $auth[1]) or return $smtperrmsg . " Can't authenticate: " . $smtp->message();
 				$smtp->mail($from) or return $smtperrmsg . $smtp->message();
 				$smtp->to($to) or return $smtperrmsg . $smtp->message();
 				if($cc ne '')
