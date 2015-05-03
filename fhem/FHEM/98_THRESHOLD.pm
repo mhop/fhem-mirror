@@ -60,7 +60,7 @@ THRESHOLD_Define($$$)
                "<sensor>:<reading1>:<hysteresis>:<target_value>:<offset> AND|OR <sensor2>:<reading2>:<state> ".
          "<actor>|<cmd1_gt>|<cmd2_lt>|<cmd_default_index>|<state_cmd1_gt>:<state_cmd2_lt>|state_format";
     Log3 $pn,2, $msg;
-    return $msg;
+    return $msg if ($init_done);
   } 
   
   # Sensor
@@ -69,7 +69,7 @@ THRESHOLD_Define($$$)
   if(!$defs{$sensor}) {
     my $msg = "$pn: Unknown sensor device $sensor specified";
     Log3 $pn,2, $msg;
-    return $msg;
+    return $msg if ($init_done);
   }
   
   $reading = "temperature" if (!defined($reading));
@@ -85,7 +85,7 @@ THRESHOLD_Define($$$)
   } elsif ($hysteresis !~ m/^[\d\.]*$/ ) {
       my $msg = "$pn: value:$hysteresis, hysteresis needs a numeric parameter";
       Log3 $pn,2, $msg;
-      return $msg;
+      return $msg if ($init_done);
   }	
   if (defined($s6)) { # target_sensor:target_reading:offset
     $target_sensor=$s4;
@@ -114,7 +114,7 @@ THRESHOLD_Define($$$)
     if (!$defs{$target_sensor}) {
         my $msg = "$pn: Unknown sensor device $target_sensor specified";
         Log3 $pn,2, $msg;
-        return $msg;
+        return $msg if ($init_done);
     } 
   }
  
@@ -148,7 +148,7 @@ THRESHOLD_Define($$$)
         if(!$defs{$sensor2}) {
         my $msg = "$pn: Unknown sensor2 device $sensor2 specified";
         Log3 $pn,2, $msg;
-        return $msg;
+        return $msg if ($init_done);
         }
       } 
       $sensor2_reading = "state" if (!defined ($sensor2_reading));
@@ -166,7 +166,7 @@ THRESHOLD_Define($$$)
     if (!$defs{$actor}) {
        my $msg = "$pn: Unknown actor device $actor specified";
        Log3 $pn,2, $msg;
-       return $msg;
+       return $msg if ($init_done);
     }
   }
   if (@b == 1) { # no actor parameters
@@ -192,7 +192,7 @@ THRESHOLD_Define($$$)
     if ($cmd_default !~ m/^[0-2]$/ ) {
          my $msg = "$pn: value:$cmd_default, cmd_default_index needs 0,1,2";
          Log3 $pn,2, $msg;
-         return $msg;
+         return $msg if ($init_done);
     }
     if (defined($b[4])) {
       my ($st_cmd1_gt, $st_cmd2_lt) = split(":", $b[4], 2);
