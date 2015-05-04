@@ -106,6 +106,7 @@ package main;
 use strict;
 use warnings;
 
+use Time::HiRes qw(tv_interval);
 use Scalar::Util qw(looks_like_number);
 
 use constant {
@@ -316,24 +317,27 @@ sub I2C_TSL2561_Define($$) {
   my ($hash, $def) = @_;
   my @a = split('[ \t][ \t]*', $def);
   my $name = $a[0];
+  my $device;
   
   readingsSingleUpdate($hash, 'state', STATE_UNDEFINED, 1);
 
-  Log3 $name, 5, "I2C_TSL2561_Define start";
+  Log3 $name, 1, "I2C_TSL2561_Define start: " . @a . "/" . join(' ', @a);
   
   $hash->{HiPi_exists} = $libcheck_hasHiPi if ($libcheck_hasHiPi);    
   $hash->{HiPi_used} = 0;
   
   my $address = undef;
   my $msg = '';
-  if ((@a < 3)) {
+  if (@a < 3) {
     $msg = 'wrong syntax: define <name> I2C_TSL2561 [devicename] address';
-  } elsif ((@a == 3)) {
+  } elsif (@a == 3) {
     $address = lc($a[2]);
   } else {
+    $device = $a[2];
     $address = lc($a[3]);
     if ($libcheck_hasHiPi) {
       $hash->{HiPi_used} = 1;
+      delete $validAdresses{'auto'};
     } else {
       $msg = '$name error: HiPi library not installed';
     }                
@@ -344,7 +348,14 @@ sub I2C_TSL2561_Define($$) {
   }    
   
   $address = $validAdresses{$address};
-  if (defined($address) && (!$hash->{HiPi_used} || !$address eq TSL2561_ADDR_AUTO)) {
+  if (!defined($address)) {
+    $msg = "Wrong address, must be one of " . join(' ', keys %validAdresses);
+    Log3 ($hash, 1, $msg);
+    return $msg;
+  }
+  
+  $hash->{I2C_Address} = hex($address);
+  if (!$hash->{HiPi_used}) {
     if ($address eq TSL2561_ADDR_AUTO) {
       # start with lowest address in auto mode
       $hash->{autoAddress} = 1;
@@ -352,11 +363,6 @@ sub I2C_TSL2561_Define($$) {
     } else {
       $hash->{autoAddress} = 0;
     }
-    $hash->{I2C_Address} = hex($address);
-  } else {
-    $msg = "Wrong address, must be one of " . TSL2561_ADDR_LOW . ", " . TSL2561_ADDR_FLOAT . " or " . TSL2561_ADDR_HIGH . " (and " . TSL2561_ADDR_AUTO . " for IODev)";
-    Log3 ($hash, 1, $msg);
-    return $msg;
   }
   
   # create default attributes
@@ -394,7 +400,7 @@ sub I2C_TSL2561_Define($$) {
   readingsSingleUpdate($hash, 'state', STATE_DEFINED, 1);
   
   eval { 
-    I2C_TSL2561_Init($hash, [ @a[ 2 .. scalar(@a) - 1 ] ] ); 
+    I2C_TSL2561_Init($hash, $device); 
   };
   Log3 ($hash, 1, $hash->{NAME} . ': ' . I2C_TSL2561_Catch($@)) if $@;;
 
@@ -403,13 +409,12 @@ sub I2C_TSL2561_Define($$) {
 }
   
 sub I2C_TSL2561_Init($$) {
-  my ($hash, $args) = @_;
+  my ($hash, $dev) = @_;
   my $name = $hash->{NAME};
   
   if ($hash->{HiPi_used}) {
     # check for existing i2c device  
     my $i2cModulesLoaded = 0;
-    my $dev = shift @$args;
     $i2cModulesLoaded = 1 if -e $dev;
     if ($i2cModulesLoaded) {
       if (-r $dev && -w $dev) {
@@ -591,7 +596,7 @@ sub I2C_TSL2561_Poll($) {
   }
 }
 
-sub I2C_TSL2561_Set($) {
+sub I2C_TSL2561_Set($@) {
   my ( $hash, @args ) = @_;
   my $name = $hash->{NAME};
 
