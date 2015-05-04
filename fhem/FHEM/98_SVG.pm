@@ -818,7 +818,7 @@ SVG_calcOffsets($$)
 {
   my ($d,$wl) = @_;
 
-  my $pm = AttrVal($d,"plotmode",$FW_plotmode);
+  my $pm = AttrVal($wl,"plotmode",$FW_plotmode);
   return if($pm eq "gnuplot");
 
   my ($fr, $fo);
@@ -843,8 +843,7 @@ SVG_calcOffsets($$)
     $fo = AttrVal( $wl, "fixedoffset", undef);
   }
 
-  my $off = $FW_pos{$d};
-  $off = 0 if(!$off);
+  my $off = 0;
   $off += $FW_pos{off} if($FW_pos{off});
   $off = $fo if(defined($fo) && $fo =~ m/^[+-]?\d+$/);
 
@@ -863,7 +862,7 @@ SVG_calcOffsets($$)
   my @zrange = split(" ", $zoom); #fixedrange with offset
   if(defined($zrange[1])) { $off += $zrange[1]; $zoom=$zrange[0]; }  #fixedrange with offset
 
-  my $endPlotNow = (SVG_Attr($FW_wname, $d, "endPlotNow", undef) && !$st);
+  my $endPlotNow = (SVG_Attr($FW_wname, $wl, "endPlotNow", undef) && !$st);
   if($zoom eq "hour") {
     if($endPlotNow) {
       my $t = int(($now + $off*3600 - 3600)/300.0)*300 + 300;
@@ -914,7 +913,7 @@ SVG_calcOffsets($$)
 
   } elsif($zoom eq "week") {
     my @l = localtime($now);
-    my $start = (SVG_Attr($FW_wname, $d, "endPlotToday", undef) ? 6 : $l[6]);
+    my $start = (SVG_Attr($FW_wname, $wl, "endPlotToday", undef) ? 6 : $l[6]);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
     $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
@@ -923,7 +922,7 @@ SVG_calcOffsets($$)
 
  } elsif($zoom eq "month") {
     my ($endDay, @l);
-    if(SVG_Attr($FW_wname, $d, "endPlotToday", undef)) {
+    if(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
       @l = localtime($now+86400);
       $endDay = $l[3];
       $off--;
