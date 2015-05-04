@@ -340,6 +340,11 @@ sub XBMC_ResetMediaReadings($)
   readingsBulkUpdate($hash, "currentTrack", "" );
   
   readingsEndUpdate($hash, 1);
+  
+  # delete streamdetails readings
+  # NOTE: we actually delete the readings (unlike the other readings)
+  #       because they are stream count dependent
+  fhem("deletereading $hash->{NAME} sd_.*");
 }
 
 sub XBMC_ResetPlayerReadings($)
@@ -424,7 +429,7 @@ sub XBMC_PlayerOnPlay($$)
       "params" => { 
         "movieid" => $obj->{params}->{data}->{item}->{id},
         #http://wiki.xbmc.org/index.php?title=JSON-RPC_API/v6#Video.Fields.Movie
-        "properties" => ["title","file","year","originaltitle"]
+        "properties" => ["title","file","year","originaltitle","streamdetails"]
       },
       "id" => $id
     };
@@ -579,7 +584,7 @@ sub XBMC_ProcessResponse($$)
   return undef;
 }
 
-sub XBMC_is3DFile($$) {
+sub XBMC_Is3DFile($$) {
   my ($hash, $filename) = @_;
   
   return ($filename =~ /([-. _]3d[-. _]|.*3dbd.*)/i);
@@ -622,18 +627,31 @@ sub XBMC_CreateReading($$$) {
   elsif($key eq 'file') {
     $key = 'currentMedia';
     
-    my $is3D = XBMC_is3DFile($hash, $value);
-    XBMC_CreateReading($hash, "3dfile", $is3D ? "on" : "off");
+    readingsBulkUpdate($hash,'3dfile', XBMC_Is3DFile($hash, $value) ? "on" : "off");
   }
   elsif($key =~ /(album|artist|track|title)/) {
     $key = 'current' . ucfirst($key);
+  }
+  elsif($key eq 'streamdetails') {
+    foreach my $mediakey (keys %{$value}) {
+      my $arrRef = $value->{$mediakey};
+      for (my $i = 0; $i <= $#$arrRef; $i++) {
+        my $propRef = $arrRef->[$i];
+        foreach my $propkey (keys %{$propRef}) {
+          readingsBulkUpdate($hash, "sd_" . $mediakey . $i . $propkey, $propRef->{$propkey});
+        }
+      }
+    }
+    
+    # we dont want to create a "streamdetails" reading
+    $key = undef; 
   }
   if(ref($value) eq 'ARRAY') {
     if(int(@$value)) {
       $value = join(',',@$value);
     }
   }
-  readingsBulkUpdate($hash,$key,$value);
+  readingsBulkUpdate($hash,$key,$value) if defined $key;
 }
 
 #Parses a given string and returns ($msg,$tail). If the string contains a complete message 
@@ -1487,6 +1505,7 @@ sub XBMC_HTTP_Request($$@)
   <li><b>volume</b> - value between 0 and 100 stating the current volume setting</li>
   <li><b>year</b> - year of the movie being played</li>
   <li><b>3dfile</b> - is a 3D movie according to filename</li>
+  <li><b>sd_<type><n>_<reading></b> - stream details of the current medium. type can be video, audio or subtitle, n is the stream index (a stream can have multiple audio/video streams)</li>
   </ul>
   <br><br>
   <u>Remarks on the events</u><br><br>
