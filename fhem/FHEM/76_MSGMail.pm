@@ -5,7 +5,6 @@ package main;
 
 use strict;
 use warnings;
-use Switch;
 my %sets = (
   "add" => "MSGMail",
   "clear" => "MSGMail",

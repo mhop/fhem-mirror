@@ -5,7 +5,6 @@ package main;
 
 use strict;
 use warnings;
-use Switch;
 use MIME::Lite;
 use Net::SMTP::SSL;
 my %sets = (
