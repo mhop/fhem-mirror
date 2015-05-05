@@ -47,7 +47,7 @@ sub MilightBridge_Initialize($)
   $hash->{UndefFn}  = "MilightBridge_Undefine";
   $hash->{NotifyFn} = "MilightBridge_Notify";
   $hash->{AttrFn}   = "MilightBridge_Attr";
-  $hash->{AttrList} = "port sendInterval disable:0,1 ".$readingFnAttributes;
+  $hash->{AttrList} = "port sendInterval disable:0,1 checkInterval ".$readingFnAttributes;
 
   return undef;
 }
@@ -96,6 +96,7 @@ sub MilightBridge_Define($$)
 
   # Set Attributes
   $attr{$name}{"event-on-change-reading"} = "state" if (!defined($attr{$name}{"event-on-change-reading"}));
+  $attr{$name}{"checkInterval"} = 10 if (!defined($attr{$name}{"checkInterval"}));
 
   # Set state
   $hash->{SENDFAIL} = 0;
@@ -134,6 +135,14 @@ sub MilightBridge_Attr($$$$) {
     else
     {
       $hash->{INTERVAL} = $attr{$name}{"sendInterval"};
+    }
+  }
+  if ($attribute eq "checkInterval")
+  {
+    if (($value !~ /^\d*$/) || ($value < 5))
+    {
+      $attr{$name}{"checkInterval"} = 10;
+      return "checkInterval is required in s (default: 10, min: 5)";
     }
   }
   elsif ($attribute eq "port")
@@ -208,8 +217,8 @@ sub MilightBridge_State(@)
   # Update send fail flag
   readingsSingleUpdate( $hash, "sendFail", $hash->{SENDFAIL}, 1 );
 
-  # Check state every 10 seconds  
-  InternalTimer(gettimeofday() + 10, "MilightBridge_State", $hash, 0);
+  # Check state every X seconds  
+  InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, "checkInterval", "10"), "MilightBridge_State", $hash, 0);
   
   return undef;
 }
@@ -380,6 +389,10 @@ sub MilightBridge_CmdQueue_Send(@)
     <li>
       <b>sendInterval</b><br/>
          Default: 100ms. The bridge has a minimum send delay of 100ms between commands.
+    </li>
+    <li>
+      <b>checkInterval</b><br/>
+         Default: 10s. Time after the bridge connection is re-checked.
     </li>
     <li>
       <b>port</b><br/>
