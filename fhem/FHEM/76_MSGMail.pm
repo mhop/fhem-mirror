@@ -1,6 +1,6 @@
-##############################################
+########################################################
 # $Id$
-##############################################
+########################################################
 package main;
 
 use strict;
@@ -73,7 +73,7 @@ MSGMail_Set($@)
 ##### we like to clear our buffer, first clear all lines of @data
 ##### and then set the counter to 0 and the status to clear
 	
-	if($a[0] eq "clear")
+	elsif($a[0] eq "clear")
 	{
 		my $i;
 		for($i=0;$i<ReadingsVal($name,"msgcount",0);$i++)
@@ -88,7 +88,7 @@ MSGMail_Set($@)
 	
 ##### we like to see the buffer
 
-	if($a[0] eq "list")
+	elsif($a[0] eq "list")
 	{
 		my $i;
 		my $mess = "---- Lines of data for $name ----\n";
