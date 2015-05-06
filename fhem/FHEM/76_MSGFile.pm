@@ -1,15 +1,27 @@
-##############################################
+########################################################
 # $Id$
-##############################################
+########################################################
+#
+# Created 2012 by rbente
+#
+########################################################
+#
+# History:
+#
+# 2015-05-06: tidy up code for restructuring
+# 2015-05-05: remove dependency on Switch
+#
+#
 package main;
 
 use strict;
 use warnings;
 my %sets = (
-  "add" => "MSGFile",
-  "clear" => "MSGFile",
-  "list" => "MSGFile"
+    "add"   => "MSGFile",
+    "clear" => "MSGFile",
+    "list"  => "MSGFile"
 );
+
 ##############################################
 # Initialize Function
 #  Attributes are:
@@ -19,15 +31,14 @@ my %sets = (
 #     CR          0 = no CR added to the end of the line
 #                 1 = CR added to the end of the line
 ##############################################
-sub
-MSGFile_Initialize($)
+sub MSGFile_Initialize($)
 {
-  my ($hash) = @_;
+    my ($hash) = @_;
 
-  $hash->{SetFn}     = "MSGFile_Set";
-  $hash->{DefFn}     = "MSGFile_Define";
-  $hash->{UndefFn}   = "MSGFile_Undef";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 filename filemode:new,append CR:0,1";
+    $hash->{SetFn}    = "MSGFile_Set";
+    $hash->{DefFn}    = "MSGFile_Define";
+    $hash->{UndefFn}  = "MSGFile_Undef";
+    $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 filename filemode:new,append CR:0,1";
 }
 
 ##############################################
@@ -35,76 +46,71 @@ MSGFile_Initialize($)
 # all the data are stored in the global array  @data
 # as counter we use a READING named msgcount
 ##############################################
-sub
-MSGFile_Set($@)
+sub MSGFile_Set($@)
 {
-  my ($hash, @a) = @_;
+    my ($hash, @a) = @_;
     return "Unknown argument $a[1], choose one of ->  " . join(" ", sort keys %sets)
-  	if(!defined($sets{$a[1]}));
+      if (!defined($sets{ $a[1] }));
 
-  
-  my $name = shift @a;
+    my $name = shift @a;
 
-	return "no set value specified" if(int(@a) < 1);
-	return "Unknown argument ?" if($a[0] eq "?");
-	my $v = join(" ", @a);
+    return "no set value specified" if (int(@a) < 1);
+    return "Unknown argument ?" if ($a[0] eq "?");
+    my $v = join(" ", @a);
 
-##### we like to add another line of data	
-	if($a[0] eq "add")
-	{
-##### split the line in command and data	
-		my $mx = shift @a;
-		my $my = join(" ",@a);
-##### check if we like to have and CR at the end of the line		
-		if(AttrVal($name, "CR", "0") eq "1")
-		{
-			$my = $my . "\n";
-		}
-##### get the highest number of lines, store the line in  @data and increase 
-##### the counter, at the end set the status
-		my $count = $hash->{READINGS}{msgcount}{VAL};
-		$data{$name}{$count} = $my;
-		$hash->{READINGS}{msgcount}{TIME} = TimeNow();
-		$hash->{READINGS}{msgcount}{VAL}  = $count + 1;
-		$hash->{STATE} = "addmsg";
+    # we like to add another line of data
+    if ($a[0] eq "add")
+    {
+        # split the line in command and data
+        my $mx = shift @a;
+        my $my = join(" ", @a);
+        # check if we like to have and CR at the end of the line
+        if (AttrVal($name, "CR", "0") eq "1")
+        {
+            $my = $my . "\n";
+        }
+        # get the highest number of lines, store the line in  @data and increase
+        # the counter, at the end set the status
+        my $count = $hash->{READINGS}{msgcount}{VAL};
+        $data{$name}{$count}              = $my;
+        $hash->{READINGS}{msgcount}{TIME} = TimeNow();
+        $hash->{READINGS}{msgcount}{VAL}  = $count + 1;
+        $hash->{STATE}                    = "addmsg";
 
-	}
-	
-##### we like to clear our buffer, first clear all lines of @data
-##### and then set the counter to 0 and the status to clear
-	if($a[0] eq "clear")
-	{
-		my $i;
-		for($i=0;$i<ReadingsVal($name,"msgcount",0);$i++)
-		{
-			$data{$name}{$i} = "";
-		}
-		$hash->{READINGS}{msgcount}{TIME} = TimeNow();
-		$hash->{READINGS}{msgcount}{VAL} = 0;
-		$hash->{STATE} = "clear";
+    }
+    # we like to clear our buffer, first clear all lines of @data
+    # and then set the counter to 0 and the status to clear
+    elsif ($a[0] eq "clear")
+    {
+        my $i;
+        for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+        {
+            $data{$name}{$i} = "";
+        }
+        $hash->{READINGS}{msgcount}{TIME} = TimeNow();
+        $hash->{READINGS}{msgcount}{VAL}  = 0;
+        $hash->{STATE}                    = "clear";
 
-	}
+    }
+    # we like to see the buffer
+    elsif ($a[0] eq "list")
+    {
+        my $i;
+        my $mess = "---- Lines of data for $name ----\n";
+        for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+        {
+            $mess .= $data{$name}{$i};
+        }
+        return "$mess---- End of data for $name ----";
+    }
 
-##### we like to see the buffer
+    Log GetLogLevel($name, 2), "messenger set $name $v";
 
-	if($a[0] eq "list")
-	{
-		my $i;
-		my $mess = "---- Lines of data for $name ----\n";
-		for($i=0;$i<ReadingsVal($name,"msgcount",0);$i++)
-		{
-			$mess .= $data{$name}{$i};
-		}
-		return "$mess---- End of data for $name ----";
-	}
-	
-  Log GetLogLevel($name,2), "messenger set $name $v";
-
-#   set stats  
- # $hash->{CHANGED}[0] = $v;
-  $hash->{READINGS}{state}{TIME} = TimeNow();
-  $hash->{READINGS}{state}{VAL} = $v;
-  return undef;
+    # set stats
+    # $hash->{CHANGED}[0] = $v;
+    $hash->{READINGS}{state}{TIME} = TimeNow();
+    $hash->{READINGS}{state}{VAL}  = $v;
+    return undef;
 }
 
 ##############################################
@@ -112,43 +118,42 @@ MSGFile_Set($@)
 # set the counter to 0
 # and filemode to "new"
 ##############################################
-sub
-MSGFile_Define($$)
+sub MSGFile_Define($$)
 {
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
-  my $errmsg = "wrong syntax: define <name> MSGFile filename";
-  my $name = $hash->{NAME};
+    my ($hash, $def) = @_;
+    my @a      = split("[ \t][ \t]*", $def);
+    my $errmsg = "wrong syntax: define <name> MSGFile filename";
+    my $name   = $hash->{NAME};
 
-  return $errmsg    if(@a != 3);
-  $attr{$name}{filename} = $a[2];
-  $attr{$name}{filemode} = "new";
-  $attr{$name}{CR} = "1";
-  
+    return $errmsg if (@a != 3);
+    $attr{$name}{filename} = $a[2];
+    $attr{$name}{filemode} = "new";
+    $attr{$name}{CR}       = "1";
 
-  $hash->{STATE} = "ready";
-  $hash->{TYPE}  = "MSGFile";
-  $hash->{READINGS}{msgcount}{TIME} = TimeNow();
-  $hash->{READINGS}{msgcount}{VAL}  = 0;
-  return undef;
+    $hash->{STATE}                    = "ready";
+    $hash->{TYPE}                     = "MSGFile";
+    $hash->{READINGS}{msgcount}{TIME} = TimeNow();
+    $hash->{READINGS}{msgcount}{VAL}  = 0;
+    return undef;
 }
+
 ##############################################
 # Undefine Function
 # flush all lines of data
 ##############################################
-sub
-MSGFile_Undef($$)
+sub MSGFile_Undef($$)
 {
-	my ($hash, $name) = @_;
-	my $i;
-############  flush the data 
-	for($i=0;$i<ReadingsVal($name,"msgcount",0);$i++)
-	{
-		$data{$name}{$i} = "";
-	}
+    my ($hash, $name) = @_;
+    my $i;
 
-	delete($modules{MSGFile}{defptr}{$hash->{CODE}}) if($hash && $hash->{CODE});
-	return undef;
+    # flush the data
+    for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+    {
+        $data{$name}{$i} = "";
+    }
+
+    delete($modules{MSGFile}{defptr}{ $hash->{CODE} }) if ($hash && $hash->{CODE});
+    return undef;
 }
 1;
 
