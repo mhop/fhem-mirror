@@ -2693,7 +2693,7 @@ sub SYSMON_getNetworkInfo ($$$) {
         $map->{$nName.DIFF_SUFFIX} = $out_txt_diff;
       }
       
-      my $speed = SYSMON_execute($hash, "[ -f /sys/class/net/$nName/speed ] && cat /sys/class/net/$nName/speed || echo not available");
+      my $speed = SYSMON_execute($hash, "[ -f /sys/class/net/$nName/speed ] && cat /sys/class/net/$nName/speed 2>/dev/null || echo not available");
       if(defined($speed)) {
       	 $map->{$nName.SPEED_SUFFIX} = $speed;
       }
