@@ -154,7 +154,7 @@ sub WeekdayTimer_Define($$) {
   $hash->{NAME}           = $name;
   $hash->{DEVICE}         = $device;
   $hash->{SWITCHINGTIMES} = \@switchingtimes;
-  $attr{$name}{verbose}   = 4 if ($name =~ m/^tst.*/ );
+  $attr{$name}{verbose}   = 4 if (!defined $attr{$name}{verbose} && $name =~ m/^tst.*/ );
  #$attr{$name}{verbose}   = 4;
 
   $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}} = $hash;
@@ -454,7 +454,6 @@ sub WeekdayTimer_SetTimerOfDay($) {
     WeekdayTimer_SetTimerForMidnightUpdate( { HASH => $hash} );
 }
 ################################################################################
-
 sub WeekdayTimer_SetTimer($) {
   my $hash = shift; 
   my $name = $hash->{NAME};
@@ -495,11 +494,16 @@ sub WeekdayTimer_SetTimer($) {
      }
   }
   
-  my ($aktTime,$aktParameter,$nextTime,$nextParameter) = WeekdayTimer_searchAktNext($hash, time()+5);
+  my ($idx, $aktTime,$aktParameter,$nextTime,$nextParameter) = 
+     WeekdayTimer_searchAktNext($hash, time()+5);
   readingsSingleUpdate ($hash,  "nextUpdate", FmtDateTime($nextTime), 1);
   readingsSingleUpdate ($hash,  "nextValue",  $nextParameter,         1);  
   
   if ($switchInThePast) {  
+     # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
+     if (WeekdayTimer_FensterOffen($hash, $aktParameter, $idx)) {
+        return;
+     }
      WeekdayTimer_Device_Schalten($hash,    $aktParameter, [7,8]);
      my $active = 1;
      if (defined $hash->{CONDITION}) {
@@ -529,9 +533,10 @@ sub WeekdayTimer_searchAktNext($$) {
      my $relWday     = $realativeWdays[$i];
      
     #Log3 $hash, 3, "[$name] $i relWday  $relWday $relativeDay";
-     
+     my $idx=0;
      foreach my $time (sort keys %{$hash->{helper}{SWITCHINGTIME}{$relWday}}) {
         
+        $idx++;
         my ($stunde, $minute, $sekunde)   = split (":",$time);              
         my $epoch = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, $relativeDay);
 
@@ -543,7 +548,7 @@ sub WeekdayTimer_searchAktNext($$) {
            $nextParameter = $hash->{helper}{SWITCHINGTIME}{$relWday}{$time};
            Log3 $hash, 4, "[$name] akt:  ".FmtDateTime($aktTime) ."(".$hash->{shortDays}{$language}[$aktTag]. ") -->> $aktParameter";
            Log3 $hash, 4, "[$name] next: ".FmtDateTime($nextTime)."(".$hash->{shortDays}{$language}[$nextTag].") -->> $nextParameter";
-           return ($aktTime,  $aktParameter, $nextTime, $nextParameter);
+           return ($idx, $aktTime,  $aktParameter, $nextTime, $nextParameter);
         }
         $aktTag       = $relWday;
         $aktTime      = $epoch;
@@ -564,15 +569,16 @@ sub WeekdayTimer_Update($) {
   return if (!defined($hash));
 
   my $name     = $hash->{NAME};
-  my $time     = $myHash->{MODIFIER};
+  my $idx      = $myHash->{MODIFIER};
   my $now      = time();
 
   # Schaltparameter ermitteln
-  my $tage        = $hash->{profil}{$time}{TAGE};
-  my $newParam    = $hash->{profil}{$time}{PARA};
+  my $tage        = $hash->{profil}{$idx}{TAGE};
+  my $time        = $hash->{profil}{$idx}{TIME};
+  my $newParam    = $hash->{profil}{$idx}{PARA};
 
   # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
-  if (WeekdayTimer_FensterOffen($hash, $newParam, $time)) {
+  if (WeekdayTimer_FensterOffen($hash, $newParam, $idx)) {
      return;
   }
   
