@@ -589,7 +589,7 @@ sub WeekdayTimer_Update($) {
   # ggf. Device schalten
   WeekdayTimer_Device_Schalten($hash, $newParam, $tage);
 
-  my ($aktTime,  $aktParameter, $nextTime, $nextParameter) =
+  my ($indx, $aktTime,  $aktParameter, $nextTime, $nextParameter) =
      WeekdayTimer_searchAktNext($hash, time()+5);
      
   readingsBeginUpdate($hash);
@@ -762,12 +762,8 @@ sub WeekdayTimer_Device_Schalten($$$) {
   
   $command = "set @ " . $setModifier . " %";
   $command = $hash->{COMMAND}   if (defined $hash->{COMMAND});
-  $command = "{ fhem('" . $command . "') }";
-
-  $condition  = WeekdayTimer_Condition ($hash, $tage);
-  $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
-  
-  $command = "{" . $tageAsHash . "; if " .$condition . " " . $command . "}";
+ 
+  my $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam); 
 
   my $isHeating = $setModifier gt "";
   my $aktParam  = ReadingsVal($hash->{DEVICE}, $setModifier, "");
@@ -779,7 +775,7 @@ sub WeekdayTimer_Device_Schalten($$$) {
   Log3 $hash, 4, "[$name] aktParam:$aktParam newParam:$newParam - is $disabled_txt disabled";
 
   #Kommando ausführen
-  if ($command && !$disabled && $aktParam ne $newParam) {
+  if ($command && !$disabled && $aktParam ne $newParam && $activeTimer) {
     $newParam =~ s/:/ /g;
     
     my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
