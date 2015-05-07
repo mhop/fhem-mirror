@@ -1769,6 +1769,13 @@ s2Hex($)
     The value is a whole number and read as celsius.
   </li>
 
+  <br><br><b>Class USER_CODE</b>
+  <li>userCode id status code</br>
+    set code and status for the id n. n ist starting at 1, status is 0 for
+    available (deleted) and 1 for set (occupied). code is a hexadecimal string.
+    </li>
+
+
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value<br>
     Set the wakeup interval of battery operated devices to the given value in
@@ -1943,6 +1950,11 @@ s2Hex($)
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpoint<br>
     request the setpoint
+    </li>
+
+  <br><br><b>Class USER_CODE</b>
+  <li>userCode n</br>
+    request status and code for the id n
     </li>
 
   <br><br><b>Class VERSION</b>
@@ -2142,6 +2154,9 @@ s2Hex($)
                   [frost protection|energy saving|unused]</li>
   <li>ccsChanged:<number></li>
   <li>ccs_[mon|tue|wed|thu|fri|sat|sun]:HH:MM temp HH:MM temp...</li>
+
+  <br><br><b>Class USER_CODE</b>
+  <li>userCode:id x status y code z</li>
 
   <br><br><b>Class VERSION</b>
   <li>version:Lib A Prot x.y App a.b</li>
