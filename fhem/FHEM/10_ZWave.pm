@@ -23,8 +23,9 @@ my %zwave_class = (
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x", },
     get   => { basicStatus => "02",     }, 
-    parse => { "..2003(.*)"=> '"basicReport:$1"',
-               "..2002"    => "state:basicGet"  }}, # sent by the remote
+    parse => { "..2001(.*)"=> '"state:basicSet $1"', # Forum #36980
+               "..2002"    => "state:basicGet",      # sent by the remote
+               "..2003(.*)"=> '"basicReport:$1"' }},
   CONTROLLER_REPLICATION   => { id => '21', },
   APPLICATION_STATUS       => { id => '22', },
   ZIP_SERVICES             => { id => '23', },
@@ -185,7 +186,7 @@ my %zwave_class = (
   NETWORK_SCHEDULE         => { id => '53', },
   NETWORK_MANAGEMENT_PRIMARY=>{ id => '54', },
   TRANSPORT_SERVICE        => { id => '55', },
-  CRC_16_ENCAP             => { id => '56', },
+  CRC_16_ENCAP             => { id => '56', }, # Parse is handled in the code
   APPLICATION_CAPABILITY   => { id => '57', },
   ZIP_ND                   => { id => '58', },
   ASSOCIATION_GRP_INFO     => { id => '59', },
@@ -2003,7 +2004,8 @@ s2Hex($)
 
   <br><b>Class BASIC</b>
   <li>basicReport:XY</li>
-  <li>state:basicGet:XY</li>
+  <li>state:basicGet</li>
+  <li>state:basicSet XY</li>
 
   <br><br><b>Class BATTERY</b>
   <li>battery:chargelevel %</li>
