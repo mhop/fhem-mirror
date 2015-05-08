@@ -4,6 +4,9 @@
 #
 # History:
 #
+# 2015-05-09: Move mail related code to MSGMail, 
+#             and  file related code to MSGFile,
+#             rewrite to use delegates for compatibility
 # 2015-05-07: Determine which SSL implementation to use
 # 2015-05-06: Tidy up code for restructuring
 # 2015-05-05: Remove dependency on Switch
@@ -13,18 +16,11 @@ package main;
 
 use strict;
 use warnings;
-use MIME::Lite;
-#use Net::SMTP::SSL;
-
-use Net::SMTP; # libnet-3.06 has SSL included, so we need to check the version
 
 my %sets = (
     "send"  => "MSG",
     "write" => "MSG",
 );
-
-my $MSGMail_SSL = 0;
-my $MSGMail_SMTP = 0;
 
 sub MSG_Initialize($)
 {
@@ -33,54 +29,6 @@ sub MSG_Initialize($)
     $hash->{SetFn}    = "MSG_Set";
     $hash->{DefFn}    = "MSG_Define";
     $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6";
-
-    my $name = "MSG";
-
-    # check version of libnet - if < 3.00, try to load Net::SMTP::SSL
-    $MSGMail_SMTP = $Net::SMTP::VERSION;
-    if ($Net::SMTP::VERSION >= 3)
-    {
-        $MSGMail_SSL = 1;
-    }
-    else
-    {
-        eval "use Net::SMTP::SSL";
-        if ($@) 
-        {
-            Log 0, $@ if($@);
-            $MSGMail_SSL = 0;
-        }
-        else
-        {
-            $MSGMail_SSL = 1;
-        }
-    }
-    Log 2, "$name: SSL is ".(($MSGMail_SSL) ? ("available, provided by Net::SMTP".(($MSGMail_SMTP<3.00)?"::SSL":"")):"not available");
-}
-
-sub MSGMail_conn($)
-{
-    my ($hash) = @_;
-    my ($name) = $hash->{NAME};
-
-    my $smtphost = AttrVal($name, "smtphost", "");
-    my $smtpport = AttrVal($name, "smtpport", "465");    # 465 is the default port
-
-    if ($MSGMail_SSL)
-    {
-        if ($MSGMail_SMTP < 3.00)
-        {
-            Log3 $name, 3, "$name: try to connect with Net::SMTP::SSL";
-            return Net::SMTP::SSL->new($smtphost, Port => $smtpport);
-        }
-        else
-        {
-            Log3 $name, 3, "$name: try to connect with Net::SMTP";
-            return Net::SMTP->new(Host=>$smtphost, Port=>$smtpport, SSL=>1);
-        }
-    }
-    Log3 $name, 0, "$name: SSL not available. Connection will fail";
-    return undef;
 }
 
 sub MSG_Set($@)
@@ -106,126 +54,14 @@ sub MSG_Set($@)
         {
             return "TYPE for $defs{$a[1]} not defined";
         }
-
-        ####################################################################################################
-        ##
-        ##     M S G F i l e
-        ##
-        ####################################################################################################
         elsif ($defs{ $a[1] }{TYPE} eq "MSGFile")
         {
-
-            return "No filename specified, use  attr <name> filename <filename> $a[1] $defs{$a[1]}{TYPE}"
-              if (!AttrVal($a[1], "filename", ""));
-
-            #  open the file, new = delete file before create it
-            #                 append = add lines to the existing file contents
-            if (AttrVal($a[1], "filemode", "") eq "new")
-            {
-                open(FHEMMSGFILE, ">" . AttrVal($a[1], "filename", ""))
-                  || return "Can not open the file: $!";
-            }
-            else
-            {
-                open(FHEMMSGFILE, ">>" . AttrVal($a[1], "filename", ""))
-                  || return "Can not open the file: $!";
-            }
-
-            # loop thru the stored lines and write them to the file
-            #   number of lines are in the Readings / msgcount
-            my $i;
-            if (ReadingsVal($a[1], "msgcount", 0) > 0)
-            {
-                for ($i = 0 ; $i < ReadingsVal($a[1], "msgcount", 0) ; $i++)
-                {
-                    print FHEMMSGFILE $data{ $a[1] }{$i}
-                      || return "Can not write to the file: $!";
-                }
-            }
-
-            # close the file and send a message to the log
-            close(FHEMMSGFILE);
-            Log 1, "<MSG> write to File: " . AttrVal($a[1], "filename", "");
-        }    # END MSGFile
-
-        ####################################################################################################
-        ##
-        ##     M S G M a i l
-        ##
-        ##  We use MAIL::Lite to compose the message, because it works very well at this and
-        ##  we use Net::SMTP::SSL to connect to the smtp host and manage the authenification,
-        ##  because MAIL:Lite is not very easy to manage with SSL connections
-        ####################################################################################################
-
+            fhem("set $a[1] write");
+        }
         elsif ($defs{ $a[1] }{TYPE} eq "MSGMail")
         {
-            # check all required data
-            my $from = AttrVal($a[1], "from", "");
-            return "No <from> address specified, use  attr $a[1] from <mail-address>"
-              if (!$from);
-            my $to = AttrVal($a[1], "to", "");
-            return "No <to> address specified, use  attr $a[1] to <mail-address>"
-              if (!$to);
-            my $subject = AttrVal($a[1], "subject", "");
-            return "No <subject> specified, use  attr $a[1] subject <text>"
-              if (!$subject);
-            my $authfile = AttrVal($a[1], "authfile", "");
-            return "No <authfile> specified, use  attr $a[1] authfile <filename>"
-              if (!$authfile);
-            my $smtphost = AttrVal($a[1], "smtphost", "");
-            return "No <smtphost> name specified, use  attr $a[1] sntphost <hostname>"
-              if (!$smtphost);
-            my $smtpport = AttrVal($a[1], "smtpport", "465");    # 465 is the default port
-            my $cc       = AttrVal($a[1], "cc",       "");       # Carbon Copy
-            open(FHEMAUTHFILE, "<" . $authfile)
-              || return "Can not open authfile $authfile: $!";
-            my @auth = <FHEMAUTHFILE>;
-            close(FHEMAUTHFILE);
-            chomp(@auth);
-
-            # Log 1, "MSG User = <" . @auth[0] . ">  Passwort = <" . @auth[1] . ">";
-
-            # compose message
-            my $i;
-            my $mess = "";
-            for ($i = 0 ; $i < ReadingsVal($a[1], "msgcount", 0) ; $i++)
-            {
-                $mess .= $data{ $a[1] }{$i};
-            }
-
-            my $mailmsg = MIME::Lite->new(
-                From    => $from,
-                To      => $to,
-                Subject => $subject,
-                Type    => 'text/plain; charset=UTF-8',    #'multipart/mixed', # was 'text/plain'
-                Data    => $mess
-            );
-
-            # login to the SMTP Host using SSL and send the message
-            my $smtp;
-            my $smtperrmsg = "SMTP Error: ";
-            
-            #$smtp = Net::SMTP::SSL->new($smtphost, Port => $smtpport)
-            $smtp = MSGMail_conn($defs{ $a[1] })
-              or return $smtperrmsg . " Can't connect to host $smtphost";
-            $smtp->auth($auth[0], $auth[1])
-              or return $smtperrmsg . " Can't authenticate: " . $smtp->message();
-            $smtp->mail($from) or return $smtperrmsg . $smtp->message();
-            $smtp->to($to)     or return $smtperrmsg . $smtp->message();
-            if ($cc ne '')
-            {
-                Log 1, "CC = $cc";
-                $smtp->cc($cc) or return $smtperrmsg . $smtp->message();
-            }
-            $smtp->data() or return $smtperrmsg . $smtp->message();
-            $smtp->datasend($mailmsg->as_string)
-              or return $smtperrmsg . $smtp->message();
-            $smtp->dataend() or return $smtperrmsg . $smtp->message();
-            $smtp->quit()    or return $smtperrmsg . $smtp->message();
-
-            Log 1, "<MSG> send EMail: <$subject>";
-
-        }    ###>  END MSGMail
+            fhem("set $a[1] send");
+        }
         else
         {
             return "MSG Filetype $defs{$a[1]}{TYPE} unknown";
@@ -263,16 +99,22 @@ sub MSG_Define($$)
 <a name="MSG"></a>
 <h3>MSG</h3>
 <ul>
-  The MSG device is the backend device for all the message handling (I/O-engine).
-  Under normal conditions only one MSG device is needed to serve multiple frontend
-  message devices like file or email.
+  The MSG device is deprecated.<br><br>
+  It used to be the backend device for I/O-handling of <a href="#MSGMail">MSGMail</a>
+  and <a href="#MSGFile">MSGFile</a> devices.
+  The MSG device can still be used for this purpose, but actually delegates send and
+  write commands to the <a href="#MSGMail">MSGMail</a> and <a href="#MSGFile">MSGFile</a>
+  devices, respectively.<br><br>
+  Before removing a deprecated MSG device from an installation, make sure to change
+  code in user functions, accordingly.
   <br><br>
   <a name="MSGdefine"></a>
   <b>Define</b>
   <ul>
   <code>define &lt;name&gt; MSG </code><br><br>
-  Specifies the MSG device. A single MSG device could serve multiple MSG frontends.
-  But, for special conditions there could be defined more than one MSG device.
+  Specifies the MSG device. This is no longer required since 
+  <a href="#MSGFile">MSGFile</a> and <a href="#MSGMail">MSGMail</a>
+  devices provide all necessary functionality.
   </ul>
   <br>
   <a name="MSGset"></a>
@@ -282,18 +124,12 @@ sub MSG_Define($$)
   </ul>
   Notes:
   <ul>
-  To send the data, both send or write could be used.<br>
-  The devicename is the name of a frontenddevice previously
-  defined. Based on the type of the frontend device, the MSG device
-  will send out the lines of data.
+  To process the data, both 'send' and 'write' can be used.<br>
+  The MSG device will delegate the command to the device specified 
+  by 'devicename' and automatically use 'send' for 
+  <a href="#MSGMail">MSGMail</a> and 'write' for 
+  <a href="#MSGFile">MSGFile</a> devices.
   <br>
-  Frontend devices are available for:<br>
-  	<ul><li><a href="#MSGFile">File</a></li>
-  	<li><a href="#MSGMail">EMail with SSL Authentification</a></li></ul>
-  For details about this devices, please review the device-definitions.<br>
-  After sending/writing the data, the data stills exists with the
-  frontend device, MSG do not delete/purge any data, this must be done
-  by the frontend device.
   <br><br>
   	Examples:
   	<ul>
@@ -302,12 +138,8 @@ sub MSG_Define($$)
   </ul>
   <a name="MSGVattr"></a>
   <b>Attributes</b>
-  <ul>
-      <li><a href="#IODev">IODev</a></li>
-      <li><a href="#dummy">dummy</a></li>
-      <li><a href="#ignore">ignore</a></li>
+    <ul>
       <li><a href="#loglevel">loglevel</a></li>
-      <li><a href="#eventMap">eventMap</a></li><br>
     </ul>
   </ul>
 <br><br>
