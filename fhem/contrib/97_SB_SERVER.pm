@@ -9,6 +9,12 @@
 #
 # ############################################################################
 #
+#  Written by bugster_de
+#
+#  Contributions from: Siggi85, Oliv06, ChrisD
+#
+# ############################################################################
+#
 #  This is absolutley open source. Please feel free to use just as you
 #  like. Please note, that no warranty is given and no liability 
 #  granted
@@ -611,7 +617,7 @@ sub SB_SERVER_Read( $ ) {
     $buf = $hash->{PARTIAL} . $buf;
 
     $buf = uri_unescape( $buf );
-    Log3( $hash, 1, "SB_SERVER_Read: the buf: $buf" );  # CD TEST 6
+    Log3( $hash, 6, "SB_SERVER_Read: the buf: $buf" );  # CD TEST 6
 
 
     # if we have received multiline commands, they are split by \n
@@ -667,7 +673,7 @@ sub SB_SERVER_Write( $$$ ) {
     my ( $hash, $fn, $msg ) = @_;
     my $name = $hash->{NAME};
 
-    Log3( $hash, 1, "SB_SERVER_Write($name): called with FN:$fn" ); # unless($fn=~m/\?/);  # CD TEST 4
+    Log3( $hash, 4, "SB_SERVER_Write($name): called with FN:$fn" ); # unless($fn=~m/\?/);  # CD TEST 4
 
     if( !defined( $fn ) ) {
 	return( undef );
