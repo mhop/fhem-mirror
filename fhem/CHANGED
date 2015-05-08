@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  MSG: Determine which SSL implementation to use for sending mail
+             (required for libnet-3.06)
   - change: MilightDevice/MilightBridge: Fixes, features, changes (by MarkusM)
   - bugfix: SYSMON: network speed
   - improved: I2C_TSL2561: asynchronous measurements, new readings (by jensb), 
