@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  MSG: Replace file and mail related code with delegates
+  - change:  MSGFile: Assimilate file related code from 75_MSG 
+                      to make it standalone, without requiring MSG device
+  - change:  MSGMail: Assimilate mail related code from 75_MSG
+                      to make it standalone, without requiring MSG device
   - bugfix:  MSG: Determine which SSL implementation to use for sending mail
              (required for libnet-3.06)
   - change: MilightDevice/MilightBridge: Fixes, features, changes (by MarkusM)

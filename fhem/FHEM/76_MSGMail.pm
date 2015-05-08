@@ -2,25 +2,29 @@
 # $Id$
 ########################################################
 #
-# Created 2012 by rbente
-#
-########################################################
-#
 # History:
 #
-# 2015-05-06: tidy up code for restructuring
-# 2015-05-05: remove dependency on Switch
-#
+# 2015-05-09: Assimilate mail related code from 75_MSG
+# 2015-05-06: Tidy up code for restructuring
+# 2015-05-05: Remove dependency on Switch
+# 2012      : Created by rbente
 #
 package main;
 
 use strict;
 use warnings;
+use MIME::Lite;
+use Net::SMTP;    # libnet-3.06 has SSL included, so we need to check the version
+
 my %sets = (
     "add"   => "MSGMail",
     "clear" => "MSGMail",
-    "list"  => "MSGMail"
+    "list"  => "MSGMail",
+    "send"  => "MSGMail"
 );
+
+my $MSGMail_SSL  = 0;
+my $MSGMail_SMTP = 0;
 
 ##############################################
 # Initialize Function
@@ -43,79 +47,33 @@ sub MSGMail_Initialize($)
     $hash->{DefFn}    = "MSGMail_Define";
     $hash->{UndefFn}  = "MSGMail_Undef";
     $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 authfile smtphost smtpport subject from to cc CR:0,1";
-}
 
-##############################################
-# Set Function
-# all the data are stored in the global array  @data
-# as counter we use a READING named msgcount
-##############################################
-sub MSGMail_Set($@)
-{
-    my ($hash, @a) = @_;
-    return "Unknown argument $a[1], choose one of ->  " . join(" ", sort keys %sets)
-      if (!defined($sets{ $a[1] }));
-    my $name = shift @a;
+    my $name = "MSGMail";
 
-    return "no set value specified" if (int(@a) < 1);
-
-    #	return "Unknown argument ?" if($a[0] eq "?");
-    my $v = join(" ", @a);
-    # we like to add another line of data
-    if ($a[0] eq "add")
+    # check version of libnet - if < 3.00, try to load Net::SMTP::SSL
+    $MSGMail_SMTP = $Net::SMTP::VERSION;
+    if ($Net::SMTP::VERSION >= 3)
     {
-        # split the line in command and data
-        my $mx = shift @a;
-        my $my = join(" ", @a);
-        # check if we like to have and CR at the end of the line
-        if (AttrVal($name, "CR", "0") eq "1")
-        {
-            $my = $my . "\n";
-        }
-        # get the highest number of lines, stored the line in  @data and increase
-        # the counter, at the end set the status
-        my $count = $hash->{READINGS}{msgcount}{VAL};
-        $data{$name}{$count}              = $my;
-        $hash->{READINGS}{msgcount}{TIME} = TimeNow();
-        $hash->{READINGS}{msgcount}{VAL}  = $count + 1;
-        $hash->{STATE}                    = "addmsg";
-
+        $MSGMail_SSL = 1;
     }
-    # we like to clear our buffer, first clear all lines of @data
-    # and then set the counter to 0 and the status to clear
-
-    elsif ($a[0] eq "clear")
+    else
     {
-        my $i;
-        for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+        eval "use Net::SMTP::SSL";
+        if ($@)
         {
-            $data{$name}{$i} = "";
+            Log 0, $@ if ($@);
+            $MSGMail_SSL = 0;
         }
-        $hash->{READINGS}{msgcount}{TIME} = TimeNow();
-        $hash->{READINGS}{msgcount}{VAL}  = 0;
-        $hash->{STATE}                    = "clear";
-
-    }
-
-    # we like to see the buffer
-
-    elsif ($a[0] eq "list")
-    {
-        my $i;
-        my $mess = "---- Lines of data for $name ----\n";
-        for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+        else
         {
-            $mess .= $data{$name}{$i};
+            $MSGMail_SSL = 1;
         }
-        return "$mess---- End of data for $name ----";
     }
-    Log GetLogLevel($name, 2), "messenger set $name $v";
-
-    #   set stats
-    # $hash->{CHANGED}[0] = $v;
-    $hash->{READINGS}{state}{TIME} = TimeNow();
-    $hash->{READINGS}{state}{VAL}  = $v;
-    return undef;
+    Log 2,
+      "$name: SSL is "
+      . ( ($MSGMail_SSL)
+        ? ("available, provided by Net::SMTP" . (($MSGMail_SMTP < 3.00) ? "::SSL" : ""))
+        : "not available");
 }
 
 ##############################################
@@ -130,6 +88,7 @@ sub MSGMail_Define($$)
     my $name   = $hash->{NAME};
 
     return $errmsg if (@a != 6);
+
     # set all  the Attributes
     $attr{$name}{from}     = $a[2];
     $attr{$name}{to}       = $a[3];
@@ -153,6 +112,7 @@ sub MSGMail_Undef($$)
 {
     my ($hash, $name) = @_;
     my $i;
+
     #  flush the data
     for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
     {
@@ -160,6 +120,183 @@ sub MSGMail_Undef($$)
     }
 
     delete($modules{MSGMail}{defptr}{ $hash->{CODE} }) if ($hash && $hash->{CODE});
+    return undef;
+}
+
+##############################################
+# Set Function
+# all the data are stored in the global array  @data
+# as counter we use a READING named msgcount
+##############################################
+sub MSGMail_Set($@)
+{
+    my ($hash, @a) = @_;
+    return "Unknown argument $a[1], choose one of ->  " . join(" ", sort keys %sets)
+      if (!defined($sets{ $a[1] }));
+    my $name = shift @a;
+
+    return "no set value specified" if (int(@a) < 1);
+
+    #	return "Unknown argument ?" if($a[0] eq "?");
+    my $v = join(" ", @a);
+
+    # we like to add another line of data
+    if ($a[0] eq "add")
+    {
+        # split the line in command and data
+        my $mx = shift @a;
+        my $my = join(" ", @a);
+
+        # check if we like to have and CR at the end of the line
+        if (AttrVal($name, "CR", "0") eq "1")
+        {
+            $my = $my . "\n";
+        }
+
+        # get the highest number of lines, stored the line in  @data and increase
+        # the counter, at the end set the status
+        my $count = $hash->{READINGS}{msgcount}{VAL};
+        $data{$name}{$count}              = $my;
+        $hash->{READINGS}{msgcount}{TIME} = TimeNow();
+        $hash->{READINGS}{msgcount}{VAL}  = $count + 1;
+        $hash->{STATE}                    = "addmsg";
+    }
+
+    # we like to clear our buffer, first clear all lines of @data
+    # and then set the counter to 0 and the status to clear
+
+    elsif ($a[0] eq "clear")
+    {
+        my $i;
+        for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+        {
+            $data{$name}{$i} = "";
+        }
+        $hash->{READINGS}{msgcount}{TIME} = TimeNow();
+        $hash->{READINGS}{msgcount}{VAL}  = 0;
+        $hash->{STATE}                    = "clear";
+    }
+
+    # we like to see the buffer
+
+    elsif ($a[0] eq "list")
+    {
+        my $i;
+        my $mess = "---- Lines of data for $name ----\n";
+        for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+        {
+            $mess .= $data{$name}{$i};
+        }
+        return "$mess---- End of data for $name ----";
+    }
+
+    elsif ($a[0] eq "send")
+    {
+        # check all required data
+        my $from     = AttrVal($name, "from",     "");
+        my $to       = AttrVal($name, "to",       "");
+        my $subject  = AttrVal($name, "subject",  "");
+        my $authfile = AttrVal($name, "authfile", "");
+        my $smtphost = AttrVal($name, "smtphost", "");
+        my $smtpport = AttrVal($name, "smtpport", "465");    # 465 is the default port
+        my $cc       = AttrVal($name, "cc",       "");       # Carbon Copy
+
+        return "No <from> address specified, use  attr $name from <mail-address>"
+          if (!$from);
+        return "No <to> address specified, use  attr $name to <mail-address>"
+          if (!$to);
+        return "No <subject> specified, use  attr $name subject <text>"
+          if (!$subject);
+        return "No <authfile> specified, use  attr $name authfile <filename>"
+          if (!$authfile);
+        return "No <smtphost> name specified, use  attr $name sntphost <hostname>"
+          if (!$smtphost);
+
+        open(FHEMAUTHFILE, "<" . $authfile)
+          || return "Can not open authfile $authfile: $!";
+        my @auth = <FHEMAUTHFILE>;
+        close(FHEMAUTHFILE);
+        chomp(@auth);
+
+        # Log 1, "MSG User = <" . @auth[0] . ">  Passwort = <" . @auth[1] . ">";
+
+        # compose message
+        my $i;
+        my $mess = "";
+        for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+        {
+            $mess .= $data{ $name }{$i};
+        }
+
+        my $mailmsg = MIME::Lite->new(
+            From    => $from,
+            To      => $to,
+            Subject => $subject,
+            Type    => 'text/plain; charset=UTF-8',    #'multipart/mixed', # was 'text/plain'
+            Data    => $mess
+        );
+
+        # login to the SMTP Host using SSL and send the message
+        my $smtp;
+        my $smtperrmsg = "SMTP Error: ";
+
+        #$smtp = Net::SMTP::SSL->new($smtphost, Port => $smtpport)
+        $smtp = MSGMail_conn($defs{ $name })
+          or return $smtperrmsg . " Can't connect to host $smtphost";
+        $smtp->auth($auth[0], $auth[1])
+          or return $smtperrmsg . " Can't authenticate: " . $smtp->message();
+        $smtp->mail($from) or return $smtperrmsg . $smtp->message();
+        $smtp->to($to)     or return $smtperrmsg . $smtp->message();
+        if ($cc ne '')
+        {
+            Log 1, "CC = $cc";
+            $smtp->cc($cc) or return $smtperrmsg . $smtp->message();
+        }
+        $smtp->data() or return $smtperrmsg . $smtp->message();
+        $smtp->datasend($mailmsg->as_string)
+          or return $smtperrmsg . $smtp->message();
+        $smtp->dataend() or return $smtperrmsg . $smtp->message();
+        $smtp->quit()    or return $smtperrmsg . $smtp->message();
+
+        Log 1, "<MSG> send EMail: <$subject>";
+
+    }    ###>  END MSGMail
+
+    Log GetLogLevel($name, 2), "messenger set $name $v";
+
+    #   set stats
+    # $hash->{CHANGED}[0] = $v;
+    $hash->{READINGS}{state}{TIME} = TimeNow();
+    $hash->{READINGS}{state}{VAL}  = $v;
+    return undef;
+}
+
+##############################################
+# Helper Function to connect to mail server
+# Returns a smtp connection (see Net:SMTP)
+##############################################
+sub MSGMail_conn($)
+{
+    my ($hash) = @_;
+    my ($name) = $hash->{NAME};
+
+    my $smtphost = AttrVal($name, "smtphost", "");
+    my $smtpport = AttrVal($name, "smtpport", "465");    # 465 is the default port
+
+    if ($MSGMail_SSL)
+    {
+        if ($MSGMail_SMTP < 3.00)
+        {
+            Log3 $name, 3, "$name: try to connect with Net::SMTP::SSL";
+            return Net::SMTP::SSL->new($smtphost, Port => $smtpport);
+        }
+        else
+        {
+            Log3 $name, 3, "$name: try to connect with Net::SMTP";
+            return Net::SMTP->new(Host => $smtphost, Port => $smtpport, SSL => 1);
+        }
+    }
+    Log3 $name, 0, "$name: SSL not available. Connection will fail";
     return undef;
 }
 
@@ -171,13 +308,12 @@ sub MSGMail_Undef($$)
 <a name="MSGMail"></a>
 <h3>MSGMail</h3>
 <ul>
-  The MSGMail device is a frontend device for mail message handling.
-  With a MSGMaildevice data is fowarded to a mail provider and send to a recipent.
-  Multiple MSGMail devices could be defined.
-  MSGMail supports by the moment only mail provider, which uses SSL secured connection
-  like Googlemail, GMX, Yahoo or 1und1 for example.
-  To send an email, a MSG device is necessary.<br>
-  <b>MAIL::Lite</b> and <b>Net::SMTP::SSL</b> from CPAN is needed to use MSGMail!!
+  The MSGMail device is used to send mail messages to a recipient by connecting 
+  to a SMTP server. Currently MSGMail supports only servers, that allow SSL secured connections
+  like Googlemail, GMX, Yahoo or 1und1. 
+  MSGMail requires the perl pacakge <b>MAIL::Lite</b>. 
+  For SSL support, Net::SMTP version 3.06 is required. On systems with an older version of Net::SMTP, 
+  MSGMail requires the package <b>Net::SMTP::SSL</b>.
   <br><br>
 
   <a name="MSGMailDefine"></a>
@@ -196,7 +332,7 @@ sub MSGMail_Undef($$)
 
   <a name="MSGMailSet"></a>
   <b>Set</b><br>
-  <ul><code>set &lt;name&gt; add|clear|list [text]</code><br>
+  <ul><code>set &lt;name&gt; add|clear|list|send [text]</code><br>
 	Set is used to manipulate the message buffer of the device. The message
 	buffer is an array of lines of data, stored serial based on the incoming
 	time into the buffer. Lines of data inside the buffer could not be deleted
@@ -205,9 +341,10 @@ sub MSGMail_Undef($$)
 	"add" will be interpreted as text message. To add a carriage return to the data,
 	please use the CR attribute.
 	</ul>
-	<ul><b>clear</b><br> to flash the message buffer and set the line counter to 0.
+	<ul><b>clear</b><br> to flush the message buffer and set the line counter to 0.
 		All the lines of data are deleted and the buffer is flushed.</ul>
 	<ul><b>list</b><br> to list the message buffer.<br></ul><br>
+        <ul><b>send</b><br> to send the message buffer.<br></ul><br>
 		<br>
 		Examples:
 		<ul>
@@ -215,14 +352,13 @@ sub MSGMail_Undef($$)
 			<code>set myMail add Dies ist Textzeile 2</code><br>
 			<code>set myMail clear</code><br><br>
 			Full working example to send two lines of data to a recipent:<br>
-			<code>define myMsg MSG</code><br>
 			<code>define myMail MSGMail donald.duck@entenhausen.com dagobert.duck@duck-banking.com smtp.entenhausen.net /etc/fhem/msgmailauth</code><br>
 			<code>attr myMail smtpport 9999</code><br>
 			<code>attr myMail subject i need more money</code><br>
 			<code>attr myMail CR 0</code><br>
 			<code>set myMail add Please send me </code><br>
 			<code>set myMail add 1.000.000 Taler</code><br>
-			<code>set myMsg send myMail</code><br>
+			<code>set myMail send</code><br>
 			<code>set myMail clear</code><br>
 		</ul><br>
   </ul>
