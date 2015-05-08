@@ -1382,7 +1382,6 @@ harmony_parseToken($$)
   RemoveInternalTimer($hash);
 
   my $error = $json->{ErrorCode};
-Log 1, $error;
   if( $error && $error != 200 ) {
     Log3 $name, 2, "$name: error ($error): $json->{Message}";
     $hash->{lastError} = $json->{Message};
