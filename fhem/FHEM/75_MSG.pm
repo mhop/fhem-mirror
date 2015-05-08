@@ -2,26 +2,29 @@
 # $Id$
 ####################################################
 #
-# Created 2012 by rbente
-#
-####################################################
-#
 # History:
 #
-# 2015-05-06: tidy up code for restructuring
-# 2015-05-05: remove dependency on Switch
-#
+# 2015-05-07: Determine which SSL implementation to use
+# 2015-05-06: Tidy up code for restructuring
+# 2015-05-05: Remove dependency on Switch
+# 2012      : Created by rbente
 #
 package main;
 
 use strict;
 use warnings;
 use MIME::Lite;
-use Net::SMTP::SSL;
+#use Net::SMTP::SSL;
+
+use Net::SMTP; # libnet-3.06 has SSL included, so we need to check the version
+
 my %sets = (
     "send"  => "MSG",
     "write" => "MSG",
 );
+
+my $MSGMail_SSL = 0;
+my $MSGMail_SMTP = 0;
 
 sub MSG_Initialize($)
 {
@@ -30,6 +33,54 @@ sub MSG_Initialize($)
     $hash->{SetFn}    = "MSG_Set";
     $hash->{DefFn}    = "MSG_Define";
     $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6";
+
+    my $name = "MSG";
+
+    # check version of libnet - if < 3.00, try to load Net::SMTP::SSL
+    $MSGMail_SMTP = $Net::SMTP::VERSION;
+    if ($Net::SMTP::VERSION >= 3)
+    {
+        $MSGMail_SSL = 1;
+    }
+    else
+    {
+        eval "use Net::SMTP::SSL";
+        if ($@) 
+        {
+            Log 0, $@ if($@);
+            $MSGMail_SSL = 0;
+        }
+        else
+        {
+            $MSGMail_SSL = 1;
+        }
+    }
+    Log 2, "$name: SSL is ".(($MSGMail_SSL) ? ("available, provided by Net::SMTP".(($MSGMail_SMTP<3.00)?"::SSL":"")):"not available");
+}
+
+sub MSGMail_conn($)
+{
+    my ($hash) = @_;
+    my ($name) = $hash->{NAME};
+
+    my $smtphost = AttrVal($name, "smtphost", "");
+    my $smtpport = AttrVal($name, "smtpport", "465");    # 465 is the default port
+
+    if ($MSGMail_SSL)
+    {
+        if ($MSGMail_SMTP < 3.00)
+        {
+            Log3 $name, 3, "$name: try to connect with Net::SMTP::SSL";
+            return Net::SMTP::SSL->new($smtphost, Port => $smtpport);
+        }
+        else
+        {
+            Log3 $name, 3, "$name: try to connect with Net::SMTP";
+            return Net::SMTP->new(Host=>$smtphost, Port=>$smtpport, SSL=>1);
+        }
+    }
+    Log3 $name, 0, "$name: SSL not available. Connection will fail";
+    return undef;
 }
 
 sub MSG_Set($@)
@@ -108,7 +159,6 @@ sub MSG_Set($@)
 
         elsif ($defs{ $a[1] }{TYPE} eq "MSGMail")
         {
-
             # check all required data
             my $from = AttrVal($a[1], "from", "");
             return "No <from> address specified, use  attr $a[1] from <mail-address>"
@@ -154,7 +204,9 @@ sub MSG_Set($@)
             # login to the SMTP Host using SSL and send the message
             my $smtp;
             my $smtperrmsg = "SMTP Error: ";
-            $smtp = Net::SMTP::SSL->new($smtphost, Port => $smtpport)
+            
+            #$smtp = Net::SMTP::SSL->new($smtphost, Port => $smtpport)
+            $smtp = MSGMail_conn($defs{ $a[1] })
               or return $smtperrmsg . " Can't connect to host $smtphost";
             $smtp->auth($auth[0], $auth[1])
               or return $smtperrmsg . " Can't authenticate: " . $smtp->message();
