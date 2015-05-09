@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 0.51 2015-04-19 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.00 2015-05-09 Risiko $
 #
 # Usage
 # 
@@ -23,6 +23,8 @@
 # V 0.50 2015-04-17 - fix: queue of sending messages
 #                   - fix: same spelling errors - thanks to pattex
 # V 0.51 2015-04-29 - CHG: rename attribute ignore to ignoreProtocol because with ignore the whole device is ignored in FHEMWEB
+# V 1.00 2015-05-09 - NEW: white list for defined submodules activating by ignoreProtocol *
+# V 1.01 2015-05-09 - NEW: add quigg_gt* protocol (e.q quigg_gt7000)
 ############################################## 
 package main;
 
@@ -65,6 +67,7 @@ sub pilight_ctrl_Initialize($)
   $hash->{DefFn}   = "pilight_ctrl_Define";
   $hash->{UndefFn} = "pilight_ctrl_Undef";
   $hash->{SetFn}   = "pilight_ctrl_Set";
+  $hash->{NotifyFn}= "pilight_ctrl_Notify";
   $hash->{AttrList}= "ignoreProtocol brands ContactAsSwitch ".$readingFnAttributes;
   
   $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:";
@@ -100,6 +103,9 @@ sub pilight_ctrl_Define($$)
   
   my @sendQueue = ();
   $hash->{helper}->{sendQueue} = \@sendQueue;
+  
+  my @whiteList = ();
+  $hash->{helper}->{whiteList} = \@whiteList;
   
   #$attr{$me}{verbose} = 5;
   
@@ -401,6 +407,62 @@ sub pilight_ctrl_Send($)
 }
 
 #####################################
+sub pilight_ctrl_addWhiteList($$)
+{
+  my ($own, $dev) = @_;
+  my $me = $own->{NAME};
+  my $devName = $dev->{NAME};
+  
+  Log3 $me, 4, "$me(addWhiteList): add $devName to white list";
+  my $entry = {};
+  
+  my $id =       (defined($dev->{ID}))       ? $dev->{ID}      : "";
+  my $protocol = (defined($dev->{PROTOCOL})) ? $dev->{PROTOCOL}: "";
+  
+  my %whiteHash;
+  @whiteHash{@{$own->{helper}->{whiteList}}}=();
+  if (!exists $whiteHash{"$protocol:$id"}) { 
+    push @{$own->{helper}->{whiteList}}, "$protocol:$id";
+  }
+}
+
+#####################################
+sub pilight_ctrl_createWhiteList($)
+{
+  my ($own) = @_;
+  splice($own->{helper}->{whiteList});
+  foreach my $d (keys %defs)   
+  { 
+    my $module   = $defs{$d}{TYPE};
+    next if ($module !~ /pilight_[d|s|t].*/);
+    
+    pilight_ctrl_addWhiteList($own,$defs{$d});
+  }
+}
+
+#####################################
+sub pilight_ctrl_Notify($$)
+{
+  my ($own, $dev) = @_;
+  my $me = $own->{NAME}; # own name / hash
+  my $devName = $dev->{NAME}; # Device that created the events
+  
+  return undef if ($devName ne "global");
+  
+  my $max = int(@{$dev->{CHANGED}}); # number of events / changes
+  for (my $i = 0; $i < $max; $i++) {
+    my $s = $dev->{CHANGED}[$i];
+    
+    next if(!defined($s));
+    if ( $s =~/DEFINED/ or $s =~/INITIALIZED/ or $s =~/DELETED/) {
+      Log3 $me, 4, "$me(Notify): create white list";
+      pilight_ctrl_createWhiteList($own);
+    }
+  }
+  return undef;
+}
+
+#####################################
 sub pilight_ctrl_SendDone($)
 {
   my ($string) = @_;
@@ -565,13 +627,23 @@ sub pilight_ctrl_Parse($$)
   }
 
   my @ignoreIDs = split(",",AttrVal($me, "ignoreProtocol","")); 
-  my %ignoreHash;
-  @ignoreHash{@ignoreIDs}=();  
-  if (exists $ignoreHash{"$proto:$id"} || exists $ignoreHash{"$proto:*"}) {
-    Log3 $me, 5, "$me(Parse): $proto:$id is in ignoreProtocol list";
-    return;
-  }
   
+  # white or ignore list
+  if (@ignoreIDs == 1 && $ignoreIDs[0] eq "*"){ # use list
+      my %whiteHash;
+      @whiteHash{@{$hash->{helper}->{whiteList}}}=();
+      if (!exists $whiteHash{"$proto:$id"}) {
+        Log3 $me, 4, "$me(Parse): $proto:$id not in white list";
+        return;
+      }
+  } else {  #ignore list
+    my %ignoreHash;
+    @ignoreHash{@ignoreIDs}=();  
+    if (exists $ignoreHash{"$proto:$id"} || exists $ignoreHash{"$proto:*"}) {
+      Log3 $me, 5, "$me(Parse): $proto:$id is in ignoreProtocol list";
+      return;
+    }
+  }
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"rcv_raw",$rmsg);
   readingsEndUpdate($hash, 1);
@@ -591,6 +663,7 @@ sub pilight_ctrl_Parse($$)
     case m/rsl366/      {$protoID = 1;}
     case m/cleverwatts/ {$protoID = 1;}
     case m/intertechno_old/ {$protoID = 1;}
+    case m/quigg_gt/    {$protoID = 1;}
     
     case m/dimmer/      {$protoID = 2;}
     case m/contact/     {$protoID = 3;}
@@ -740,7 +813,11 @@ sub pilight_ctrl_SimpleWrite(@)
     <li><a name="ignoreProtocol">ignoreProtocol</a><br>
         Comma separated list of protocol:id combinations to ignore.<br>
         protocol:* ignores the complete protocol.<br>
-        Example: <code>ignoreProtocol tfa:0 </code>
+        * All incomming messages will be ignored. Only protocol id combinations from defined submodules will be accepted<br>
+        Example: 
+        <li><code>ignoreProtocol tfa:0</code></li>
+        <li><code>ignoreProtocol tfa:*</code></li>
+        <li><code>ignoreProtocol *</code></li>
     </li>
     <li><a name="brands">brands</a><br>
         Comma separated list of <search>:<replace> combinations to rename protocol names. <br>
