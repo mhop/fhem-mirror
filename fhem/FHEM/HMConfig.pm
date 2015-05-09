@@ -1354,7 +1354,9 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 );
 %culHmModelGets = (
                     "CCU-FHEM"     =>{ "listDevice"=>"" },
-                    ActionDetector =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive] ..." },
+                    ActionDetector =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive] ..." 
+                                      ,"info"      =>""
+                                     },
 );
 
 ##############################---set---########################################
@@ -1492,7 +1494,9 @@ $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
                                            }
                      ,"HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[on|off]"}
                      ,"HM-SEC-SD"        =>{ statusRequest  =>""}
-                     ,"ActionDetector"   =>{ clear          => "[readings|all]"}
+                     ,"ActionDetector"   =>{ clear          => "[readings|all]"
+                                            ,update         => ""
+                                           }
 );
 # clones- - - - - - - - - - - - - - - - -
 $culHmModelSets{"HM-CC-RT-DN-BoM"}    = $culHmModelSets{"HM-CC-RT-DN"};
@@ -1596,7 +1600,7 @@ $culHmModelSets{"HM-RC-Dis-H-x-EU"}    = $culHmModelSets{"HM-PB-4DIS-WM"};
                                             }
                      ,"HM-CC-RT-DN06"     =>{ press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."}
                      ,"HM-Dis-WM5501"     =>{ displayWM      =>"[long|short|help] <lineX> <textNo1> <color1> <icon1> [<textNo2> <color2> <icon2>] ...[<textNo6> <color6> <icon6>] "}
-                     ,"CCU-FHEM00"        =>{ update       =>""
+                     ,"CCU-FHEM00"        =>{ update         =>""
                                              ,hmPairForSec =>"<sec>"
                                              ,hmPairSerial =>"<serial>"
                                              ,defIgnUnknown=>""
