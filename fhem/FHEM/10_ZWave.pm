@@ -80,12 +80,8 @@ my %zwave_class = (
   SENSOR_BINARY            => { id => '30', 
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
-               "033003ff"  => "state:open", 
-               "043003(..)0c" => '"motion:$1"',  #Philio PHI_PSP01, PSM02-1
-               "043003(..)08" => '"tamper:$1"',  #Philio PHI_PSP01, PSM02-1
-               "043003000a"   => "state:closed", #Philio PSM02-1
-               "043003ff0a"   => "state:open",   #Philio PSM02-1
-               } },
+               "033003ff"  => "state:open",
+               "043003(..)(..)"=> 'ZWave_sensorbinaryV2Parse($1,$2)' } },
   SENSOR_MULTILEVEL        => { id => '31', 
     get   => { smStatus    => "04" },
     parse => { "..3105(..)(..)(.*)" => 'ZWave_multilevelParse($1,$2,$3)'} },
@@ -1247,6 +1243,32 @@ ZWave_plusInfoParse($$$$$)
     " userIcon:". $userIconType;
 }
 
+my %zwave_sensorBinaryTypeV2 = (
+  	"00"=>"unknown",
+	"01"=>"generalPurpose",
+	"02"=>"smoke",
+	"03"=>"CO",
+	"04"=>"CO2",
+	"05"=>"heat",
+	"06"=>"water",
+	"07"=>"freeze",
+	"08"=>"tamper",
+	"09"=>"aux",
+	"0a"=>"doorWindow",
+	"0b"=>"tilt",
+	"0c"=>"motion",
+	"0d"=>"glassBreak"
+);
+
+sub
+ZWave_sensorbinaryV2Parse($$)
+{
+  my ($value, $sensorType) = @_;
+  return ($zwave_sensorBinaryTypeV2{"$sensorType"} ? 
+          $zwave_sensorBinaryTypeV2{"$sensorType"} :"unknown") . 
+          ":".$value;
+}
+
 sub
 ZWave_getHash($$$)
 {
@@ -1908,7 +1930,7 @@ s2Hex($)
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>sbStatus<br>
-    return the status of the node, as state:open or state:closed.
+    return the status of the node.
     </li>
 
   <br><br><b>Class SENSOR_MULTILEVEL</b>
@@ -2086,11 +2108,24 @@ s2Hex($)
   <li>alarm_type_X:level Y node $nodeID seconds $seconds</li> 
 
   <br><br><b>Class SENSOR_BINARY</b>
+  <li>SENSORY_BINARY V1:</li>
   <li>state:open</li>
   <li>state:closed</li>
-  <li>motion:00|ff</li>
-  <li>tamper:00|ff   </li>
-
+  <li>SENSORY_BINARY V2:</li>
+  <li>unknown:[00|ff]</li>
+  <li>generalPurpose:[00|ff]</li>
+  <li>smoke:[00|ff]</li>
+  <li>CO:[00|ff]</li>
+  <li>CO2:[00|ff]</li>
+  <li>heat:[00|ff]</li>
+  <li>water:[00|ff]</li>
+  <li>freeze:[00|ff]</li>
+  <li>tamper:[00|ff]</li>
+  <li>aux:[00|ff]</li>
+  <li>doorWindow:[00|ff]</li>
+  <li>tilt:[00|ff]</li>
+  <li>motion:[00|ff]</li>
+  <li>glassBreak:[00|ff]</li>
 
   <br><br><b>Class SENSOR_MULTILEVEL</b>
   <li>temperature $val [C|F]</li>
