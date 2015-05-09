@@ -168,7 +168,8 @@ ZWDongle_Initialize($)
   $hash->{GetFn}   = "ZWDongle_Get";
   $hash->{AttrFn}  = "ZWDongle_Attr";
   $hash->{UndefFn} = "ZWDongle_Undef";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1";
+  $hash->{AttrList}=
+        "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 homeId";
 }
 
 #####################################
@@ -338,6 +339,7 @@ ZWDongle_Get($@)
     $msg = sprintf("HomeId:%s CtrlNodeId:%s", 
                 substr($ret,4,8), substr($ret,12,2));
     $hash->{homeId} = substr($ret,4,8);
+    $attr{NAME}{homeId} = substr($ret,4,8);
 
   } elsif($type eq "version") {                 ############################
     $msg = join("",  map { chr($_) } @r[2..13]);
@@ -629,6 +631,10 @@ ZWDongle_Attr($$$$)
       DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
 
     }
+
+  } elsif($attr eq "homeId") {
+    $hash->{homeId} = $value;
+
   }
 
   return undef;  
@@ -755,6 +761,9 @@ ZWDongle_Ready($)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#disable">disable</a></li>
+    <li><a href="#homeId">homeId</a><br>
+      Stores the homeId of the dongle. Is a workaround for some buggy dongles,
+      wich sometimes report a wrong/nonexisten homeId (Forum #35126)</li>
   </ul>
   <br>
 
