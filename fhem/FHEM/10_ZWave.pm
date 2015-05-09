@@ -1170,8 +1170,10 @@ ZWave_alarmParse($$$)
     $e = $1 if($v4 && $v4 =~ m/..(..)../);
   }
 
-  return $s . ($zwave_alarmEvent{"$t$e"} ?
-                $zwave_alarmEvent{"$t$e"} : "unknown event $e");
+  $s .= ($zwave_alarmEvent{"$t$e"} ?
+         $zwave_alarmEvent{"$t$e"} : "unknown event $e");
+  $s .= ", arg $v4" if($v4 && $l ne "00");
+  return $s;
 }
 
 sub
