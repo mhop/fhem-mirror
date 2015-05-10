@@ -1723,6 +1723,7 @@ sub YAMAHA_NP_html2txt
       <li><b>standbyMode</b> - Reports the standby mode (eco|normal).</li>
       <li><b>state</b> - Reports the current power state and an absence of the device (on|off|absent)</li>
       <br><br><u>Player related readings:</u><br><br>
+      <i>Note: In order to update the following readings use "statusRequest playerStatus" first.</i><br><br>
       <li><b>playerPlaybackInfo</b> - Reports current player state (play|stop|pause).</li>
       <li><b>playerDeviceType</b> - Reports the device type (ipod|msc).</li>
       <li><b>playerIpodMode</b> - Reports the Ipod Mode (normal|off)</li>
@@ -1738,6 +1739,7 @@ sub YAMAHA_NP_html2txt
       <li><b>playerAlbumArtID</b> - Reports the album art ID (if available) of the currently played audio.</li>
       <li><b>playerAlbumArtFormat</b> - Reports the album art format (if available) of the currently played audio.</li>
       <br><br><u>Player List (Menu) related readings:</u><br><br>
+      <i>Note: In order to update the following readings use "statusRequest playerStatus" first.</i><br><br>
       <li><b>playerListCurrentLine</b> - Reports the current active list line as displayd.</li>
       <li><b>playerListLine_1..._8</b> - Reports the content of the Line 1...8 as provided by the device.</li>
       <li><b>playerListLine_Attribute_1..._8</b> - Reports the attribute of the Line 1...8 (Container|Item|Unselectable).</li>
@@ -1745,6 +1747,7 @@ sub YAMAHA_NP_html2txt
       <li><b>playerListMenuName</b> - Reports the name of the current list/menu.</li>
       <li><b>playerListStatus</b> - Reports the status of the current list/menu (Busy|Ready).</li>
       <br><br><u>Tuner related readings:</u><br><br>
+      <i>Note: In order to update the following readings use "statusRequest tunerStatus" first.</i><br><br>
       <li><b>tunerAudioModeDAB</b> - Reports current audio mode (Mono|Stereo).</li>
       <li><b>tunerBand</b> - Reports the currently selected tuner band (FM|DAB). DAB if available.</li>
       <li><b>tunerBitRateDAB</b> - Reports current DAB stream bit rate (kbit/s).</li>
@@ -1761,6 +1764,7 @@ sub YAMAHA_NP_html2txt
       <li><b>tunerDLSDAB</b> - Reports the dynamic label segment of the selected DAB service.</li>
       <li><b>tunerEnsembleLabelDAB</b> - Reports the ensemble label of the selected DAB service.</li>
       <br><br><u>Timer related readings:</u><br><br>
+      <i>Note: In order to update the following readings use "statusRequest timerStatus" first.</i><br><br>
       <li><b>timer</b> - Reports the time mode (on|off).</li>
       <li><b>timerRepeat</b> - Reports the timer repeat mode (once|every).</li>
       <li><b>timerStartTime</b> - Reports the timer start time (HH:MM).</li>
@@ -1965,6 +1969,7 @@ sub YAMAHA_NP_html2txt
         <li><b>standbyMode</b> - Abfrage des standby Modus (eco|normal).</li>
         <li><b>state</b> - Abfrage des aktuellen Power Zustands und Anwesenheit (on|off|absent).</li>
         <br><br><u>Player Readings:</u><br><br>
+        <i>Bemerkung: Die folgenden Readings werden mit dem Befehl "statusRequest playerStatus" aktualisiert.</i><br><br>
         <li><b>playerPlaybackInfo</b> - Abfrage des aktuellen Player Status (play|stop|pause).</li>
         <li><b>playerDeviceType</b> - Abfrage des Device Typs (ipod|msc).</li>
         <li><b>playerIpodMode</b> - Abfrage des *Pod/*Pad/*Phone Modus (normal|off)</li>
@@ -1980,6 +1985,7 @@ sub YAMAHA_NP_html2txt
         <li><b>playerAlbumArtID</b> - Abfrage der AlbumArtID (falls verf&uuml;gbar) der aktuellen Wiedergabe.</li>
         <li><b>playerAlbumArtFormat</b> - Abfrage des AlbumArt Formats (falls verf&uuml;gbar) der aktuellen Wiedergabe.</li>
         <br><br><u>Player List (Menu) Readings:</u><br><br>
+        <i>Bemerkung: Die folgenden Readings werden mit dem Befehl "statusRequest playerStatus" aktualisiert.</i><br><br>
         <li><b>playerListCurrentLine</b> - Abfrage der aktuellen Listenzeile (wie im Ger&auml;t angezeigt).</li>
         <li><b>playerListLine_1..._8</b> - Abfrage des Listeninhalts Zeile 1...8 (Das Ger&auml;t liefert 8 Zeilen Pakete).</li>
         <li><b>playerListLine_Attribute_1..._8</b> - Abfrage der Listenzeilenattribute Zeile 1...8 (Container|Item|Unselectable).</li>
@@ -1987,6 +1993,7 @@ sub YAMAHA_NP_html2txt
         <li><b>playerListMenuName</b> - Abfrage der bezeichnung der aktuellen Liste/Menus.</li>
         <li><b>playerListStatus</b> - Abfrage des aktuellen Status der Liste/Menus (Busy|Ready).</li>        
         <br><br><u>Tuner Readings:</u><br><br>
+        <i>Bemerkung: Die folgenden Readings werden mit dem Befehl "statusRequest tunerStatus" aktualisiert.</i><br><br>
         <li><b>tunerAudioModeDAB</b> - Abfrage des aktuellen DAB Audio-Modus (Mono|Stereo)..</li>
         <li><b>tunerBand</b> - Abfrage des aktuellen Radio-Bandes (FM|DAB). DAB falls verf&uuml;gbar.</li>
         <li><b>tunerBitRate</b> - Abfrage der aktuellen DAB Stream Bitrate (kbit/s).</li>
@@ -2003,6 +2010,7 @@ sub YAMAHA_NP_html2txt
         <li><b>tunerDLSDAB</b> - Abfrage des 'Dynamic Label Segment' des gew&auml;hlten DAB Senders.</li>
         <li><b>tunerEnsembleLabelDAB</b> - Abfrage des 'Ensemble Label' des gew&auml;hlten DAB Senders.</li>
         <br><br><u>Timer Readings:</u><br><br>
+        <i>Bemerkung: Die folgenden Readings werden mit dem Befehl "statusRequest timerStatus" aktualisiert.</i><br><br>
         <li><b>timer</b> - Abfrage des Time Modus (Wecker) (on|off).</li>
         <li><b>timerRepeat</b> - Abfrage des Timer Wiederholungs Modus (once|every).</li>
         <li><b>timerStartTime</b> - Abfrage der Timer Startzeit (HH:MM).</li>
