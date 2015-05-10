@@ -191,7 +191,7 @@ doUpdate($$)
       $isExcl = 1 if($fName =~ m/$ex/);
     }
     if($isExcl) {
-      uLog 4, "update: skipping $fName, matches exclude_from_update";
+      uLog 1, "update: skipping $fName, matches exclude_from_update";
       next;
     }
 
