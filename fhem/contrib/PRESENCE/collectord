@@ -65,46 +65,32 @@ my %queues;
 my $thread_counter = 0;
 
 my %state;
-
 my %handle;
-
 my %socket_to_handle;
-
 my $uuid;
-
-
-
-
 
 
 Getopt::Long::Configure('bundling');
 GetOptions(
-        "d"   => \$opt_d, "daemon"     => \$opt_d,
-        "v+"   => \$opt_v, "verbose+"     => \$opt_v,
-        "l=s"   => \$opt_l, "logfile=s"     => \$opt_l,
-        "c=s"   => \$opt_c, "configfile=s"     => \$opt_c,
-        "p=i"   => \$opt_p, "port=i"     => \$opt_p,
-	"P=s"   => \$opt_P, "pid-file=s"     => \$opt_P,
-        "h"   => \$opt_h, "help"        => \$opt_h);
-
-
+        "d"     => \$opt_d, "daemon"       => \$opt_d,
+        "v+"    => \$opt_v, "verbose+"     => \$opt_v,
+        "l=s"   => \$opt_l, "logfile=s"    => \$opt_l,
+        "c=s"   => \$opt_c, "configfile=s" => \$opt_c,
+        "p=i"   => \$opt_p, "port=i"       => \$opt_p,
+        "P=s"   => \$opt_P, "pid-file=s"   => \$opt_P,
+        "h"     => \$opt_h, "help"         => \$opt_h
+        );
 
 
 Log 0, "=================================================" if($opt_l);
-
-
-
-
-
-
 
 sub print_usage () {
         print "Usage:\n";
         print "  collectord -c <configfile> [-d] [-p <port>] [-P <pidfile>] \n";
         print "  collectord [-h | --help]\n";
-	print "\n\nOptions:\n";
-	print "  -c, --configfile <configfile>\n";
-	print "     The config file which contains the room and timeout definitions\n";
+        print "\n\nOptions:\n";
+        print "  -c, --configfile <configfile>\n";
+        print "     The config file which contains the room and timeout definitions\n";
         print "  -p, --port\n";
         print "     TCP Port which should be used (Default: 5222)\n";
         print "  -P, --pid-file\n";
@@ -117,10 +103,7 @@ sub print_usage () {
         print "     log to the given logfile\n";
         print "  -h, --help\n";
         print "     Print detailed help screen\n";
- 
 }
-
-
 
 if($opt_h)
 {
@@ -134,7 +117,6 @@ if(-e "$opt_P")
      	print STDERR timestamp()." aborted...\n";
 	exit 1;
 }
-
 
 if(not $opt_c)
 {
@@ -153,7 +135,6 @@ if(not -e "$opt_c" or not -r "$opt_c")
 
 }
 
-
 Log 0, "started with PID $$";
 
 readConfig($opt_c);
@@ -163,21 +144,19 @@ if($opt_d)
 	daemonize();
 }
 
-
-
+# Write PID file
 open(PIDFILE, ">$opt_P");
 print PIDFILE $$."\n";
 close PIDFILE;
 
-
 $server = new IO::Socket::INET (
-LocalPort => $opt_p,
-Proto => 'tcp',
-Listen => 5,
-Reuse => 1,
-Type => SOCK_STREAM,
-KeepAlive => 1,
-Blocking => 0
+    LocalPort => $opt_p,
+    Proto => 'tcp',
+    Listen => 5,
+    Reuse => 1,
+    Type => SOCK_STREAM,
+    KeepAlive => 1,
+    Blocking => 0
 ) or die "error while creating socket: $!\n";
 
 Log 1, "created socket on ".$server->sockhost()." with port ".$server->sockport();
@@ -246,31 +225,31 @@ while(1)
 	    
 	    if(not $value =~ /^(absence|present)$/)
 	    {
-		$handle{$uuid}{client}->send("$value;$room\n") if(defined($handle{$uuid}{client}));
-		
-		if($value eq "socket_closed")
-		{
-		    delete($state{$uuid}{rooms}{$room});
-		}
-	    }
-	    else
-	    {
-		$state{$uuid}{rooms}{$room} = $value.(defined($name)?";".$name:"");
-		
-		$result = aggregateRooms($state{$uuid}{rooms});
-	    
-		if(defined($result))
-		{
-		    if(not defined($state{$uuid}{lastresult}{value}) or (($state{$uuid}{lastresult}{value} eq "$result" and ($state{$uuid}{lastresult}{timestamp} + $handle{$uuid}{timeout}) < time()) or $state{$uuid}{lastresult}{value} ne "$result"))
-		    {
-			if(defined($handle{$uuid}{client}))
-			{
-		    	    $handle{$uuid}{client}->send("$result\n");
-		    	    $state{$uuid}{lastresult}{value} = "$result";
-		    	    $state{$uuid}{lastresult}{timestamp} = time();
-		    	}
-	    	    }
-		}
+            $handle{$uuid}{client}->send("$value;$room\n") if(defined($handle{$uuid}{client}));
+            
+            if($value eq "socket_closed")
+            {
+                delete($state{$uuid}{rooms}{$room});
+            }
+        }
+        else
+        {
+            $state{$uuid}{rooms}{$room} = $value.(defined($name)?";".$name:"");
+        
+            $result = aggregateRooms($state{$uuid}{rooms});
+            
+            if(defined($result))
+            {
+                if(not defined($state{$uuid}{lastresult}{value}) or (($state{$uuid}{lastresult}{value} eq "$result" and ($state{$uuid}{lastresult}{timestamp} + $handle{$uuid}{timeout}) < time()) or $state{$uuid}{lastresult}{value} ne "$result"))
+                {
+                    if(defined($handle{$uuid}{client}))
+                    {
+                        $handle{$uuid}{client}->send("$result\n");
+                        $state{$uuid}{lastresult}{value} = "$result";
+                        $state{$uuid}{lastresult}{timestamp} = time();
+                    }
+                }
+            }
 		
 	    }
 	    
@@ -311,7 +290,7 @@ while(1)
 				if($buf)
 				{
 					# replace leading and trailing white spaces
-	                                $buf =~ s/(^\s*|\s*$)//g;
+                    $buf =~ s/(^\s*|\s*$)//g;
 					
 					# if the message is a new command, accept the command and create threads for all rooms to process the command
 					if($buf =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*\|\s*\d+\s*$/)
@@ -349,8 +328,8 @@ while(1)
 						    # create a new uuid if not exist for socket
 						    if(not defined($socket_to_handle{$client}))
 						    {
-							$socket_to_handle{$client} = generateUUID();
-							Log 2, "generating new UUID for client ".$client->peerhost()." - ".$socket_to_handle{$client};
+                                $socket_to_handle{$client} = generateUUID();
+                                Log 2, "generating new UUID for client ".$client->peerhost()." - ".$socket_to_handle{$client};
 						    }
 						
 						    $uuid = $socket_to_handle{$client};
@@ -366,17 +345,17 @@ while(1)
 						    while (($room, $value) = each %config)
 						    {
 						        
-							$thread_counter++;
-							$queues{$thread_counter} = Thread::Queue->new();
-							my $new_thread = threads->new(\&doQuery, ($value, $room, $address, $uuid));
-						        Log 1, "created thread ".$new_thread->tid()." for processing device $address in room $room for peer ".$client->peerhost()." (UUID: $uuid)"; 	
-							
-							# detach from the thread, so the thread starts processing independantly
-							$new_thread->detach();
-							
-							# save the socket/room relationship to know which thread belongs to which client request (for stop command)
-							$handle{$uuid}{threads}{$room} = $new_thread;
-							$state{$uuid}{rooms}{$room} = "";
+                                $thread_counter++;
+                                $queues{$thread_counter} = Thread::Queue->new();
+                                my $new_thread = threads->new(\&doQuery, ($value, $room, $address, $uuid));
+                                    Log 1, "created thread ".$new_thread->tid()." for processing device $address in room $room for peer ".$client->peerhost()." (UUID: $uuid)"; 	
+                                
+                                # detach from the thread, so the thread starts processing independantly
+                                $new_thread->detach();
+                                
+                                # save the socket/room relationship to know which thread belongs to which client request (for stop command)
+                                $handle{$uuid}{threads}{$room} = $new_thread;
+                                $state{$uuid}{rooms}{$room} = "";
 						    }
 						}
 					}
@@ -472,7 +451,6 @@ while(1)
 					
 					# now close the socket, that's it
 					close $client;
-
 				}
 			}
 		}
@@ -487,9 +465,6 @@ while(1)
 		Log 1, "server shutdown";
 		exit;
 	}
-	
-
-
 }
 
 Log 2, "leaving main loop";
@@ -504,20 +479,19 @@ Log 2, "leaving main loop";
 # to fork the process from the terminal 
 sub daemonize
 {
-
     POSIX::setsid or die "setsid $!";
     
     my $pid = fork();
 
     if($pid < 0)
     {
-	print STDERR "cannot fork: $!\n";
-	exit 1;
+        print STDERR "cannot fork: $!\n";
+        exit 1;
     }
     elsif($pid)
     {
      	Log 0, "forked with PID $pid";
-	exit 0;
+        exit 0;
     }
 
     chdir "/";
@@ -529,15 +503,11 @@ sub daemonize
     open (STDIN, "</dev/null");
     open (STDOUT, ">/dev/null");
     open (STDERR, ">&STDOUT");
-
-
 }
 
 # the thread subroutine which performs a request for a specific room
 sub doQuery($$$)
 {
-
-
 
     my ($do_config, $do_room, $do_address, $do_uuid) = @_;
     my $return;
@@ -548,8 +518,6 @@ sub doQuery($$$)
     my @client_handle;
     my $reconnect_count = 0;
     my $client_socket = undef;
-    # if the thread gets a termination signal, the thread must be shutdown by itself
-    
     
     my $last_contact = gettimeofday();
     
@@ -558,206 +526,195 @@ sub doQuery($$$)
     my $current_state = "absence";
     
     $client_socket = new IO::Socket::INET (
-	PeerHost => $values{address},
-	PeerPort => $values{port},
-	Proto => 'tcp',
-	Type => SOCK_STREAM,
-	KeepAlive => 1,
-	Blocking => 1
+        PeerHost => $values{address},
+        PeerPort => $values{port},
+        Proto => 'tcp',
+        Type => SOCK_STREAM,
+        KeepAlive => 1,
+        Blocking => 1
 	) or ( $log_queue->enqueue(threads->tid()."|$room : could not create socket to ".$values{address}." - $! -"));
 
     $selector = IO::Select->new($client_socket);
 
     if(defined($client_socket))
     {
-
-	# send the given address to the presence daemon
-	$client_socket->send($do_address."|".$values{absence_timeout}."\n");
+        # send the given address to the presence daemon
+        $client_socket->send($do_address."|".$values{absence_timeout}."\n");
     }
     else
     {   
         $selector->remove($client_socket);
         $client_socket = undef;
-       
     }
     
-	
     # thread main loop
     THREADLOOP: while($run)
     {
     
-	if(defined($client_socket) and not $last_contact > (gettimeofday() - ($current_state eq "absence" ? $values{absence_timeout} : $values{presence_timeout}) - 60))
-	{
-	    $log_queue->enqueue(threads->tid()."|$room socket to ".$values{address}.":".$values{port}." did not report anything in expected time, resetting socket (last contact: ".strftime("%Y-%m-%d %H:%M:%S", localtime($last_contact)).")");
-	    
-	    $selector->remove($client_socket);
-	    shutdown($client_socket, 2);
-	    close($client_socket);
-	    $client_socket = undef;
-	}
+        if(defined($client_socket) and not $last_contact > (gettimeofday() - ($current_state eq "absence" ? $values{absence_timeout} : $values{presence_timeout}) - 60))
+        {
+            $log_queue->enqueue(threads->tid()."|$room socket to ".$values{address}.":".$values{port}." did not report anything in expected time, resetting socket (last contact: ".strftime("%Y-%m-%d %H:%M:%S", localtime($last_contact)).")");
+            
+            $selector->remove($client_socket);
+            shutdown($client_socket, 2);
+            close($client_socket);
+            $client_socket = undef;
+        }
 	
-	if(exists($queues{threads->tid()}) and $queues{threads->tid()}->pending)
-	{
-	    $cmd = $queues{threads->tid()}->dequeue;
-	    $log_queue->enqueue(threads->tid()."|received command: $cmd");
-	    
-	    if($cmd eq "now")
-	    {
-		$log_queue->enqueue(threads->tid()."|sending \"now\" command to ".$values{address}.":".$values{port});
-		$client_socket->send("now\n") if(defined($client_socket));
-	    }
-	    elsif($cmd eq "stop")
-	    {
-		 $log_queue->enqueue(threads->tid()."|$room terminating thread ".threads->tid()." for $address");
-		 $client_socket->shutdown() if(defined($client_socket));
-		 $selector->remove($client_socket) if(defined($selector));
-		 close($client_socket) if(defined($client_socket));
-		 $client_socket = undef;
-		 delete($queues{threads->tid()}) if(exists($queues{threads->tid()}));
-		 $run = 0;
-		 last THREADLOOP;
-	    }
-	    elsif($cmd =~ /^new\|/)
-	    {
-		($cmd, $do_address) = split("\\|", $cmd);
-		
-		$log_queue->enqueue(threads->tid()."|sending new address $do_address to ".$values{address}.":".$values{port});
-		
-		if($current_state eq "present")
-		{
-		    $client_socket->send($do_address."|".$values{presence_timeout}."\n") if(defined($client_socket));
-		}
-		else
-		{
-		    $client_socket->send($do_address."|".$values{absence_timeout}."\n") if(defined($client_socket));
-		}
-	    }
-	}
+        if(exists($queues{threads->tid()}) and $queues{threads->tid()}->pending)
+        {
+            $cmd = $queues{threads->tid()}->dequeue;
+            $log_queue->enqueue(threads->tid()."|received command: $cmd");
+            
+            if($cmd eq "now")
+            {
+                $log_queue->enqueue(threads->tid()."|sending \"now\" command to ".$values{address}.":".$values{port});
+                $client_socket->send("now\n") if(defined($client_socket));
+            }
+            elsif($cmd eq "stop")
+            {
+                $log_queue->enqueue(threads->tid()."|$room terminating thread ".threads->tid()." for $address");
+                $client_socket->shutdown() if(defined($client_socket));
+                $selector->remove($client_socket) if(defined($selector));
+                close($client_socket) if(defined($client_socket));
+                $client_socket = undef;
+                delete($queues{threads->tid()}) if(exists($queues{threads->tid()}));
+                $run = 0;
+                last THREADLOOP;
+            }
+            elsif($cmd =~ /^new\|/)
+            {
+                ($cmd, $do_address) = split("\\|", $cmd);
+                
+                $log_queue->enqueue(threads->tid()."|sending new address $do_address to ".$values{address}.":".$values{port});
+            
+                if($current_state eq "present")
+                {
+                    $client_socket->send($do_address."|".$values{presence_timeout}."\n") if(defined($client_socket));
+                }
+                else
+                {
+                    $client_socket->send($do_address."|".$values{absence_timeout}."\n") if(defined($client_socket));
+                }
+            }
+        }
 	
-	if(not defined($client_socket))
-	{
-	    # if it's the first occurance
-	    if(!$reconnect_count)
-	    {
-		# Tell this the client;
-		$status_queue->enqueue("$do_uuid;$room;socket_closed");
-			
-		# create a log message
-		$log_queue->enqueue(threads->tid()."|$room socket to ".$values{address}.":".$values{port}." for device $do_address closed. Trying to reconnect...");
-	    }
-	    
-	    # now try to re-establish the connection
-	    $client_socket = new IO::Socket::INET (
-	    PeerHost => $values{address},
-	    PeerPort => $values{port},
-	    Proto => 'tcp',
-	    Type => SOCK_STREAM,
-	    KeepAlive => 1,
-	    Blocking => 1
-	    ) or ( $reconnect_count++ );
-	    
-	    if(defined($client_socket))
-	    {
-		# give a success message
-		$log_queue->enqueue(threads->tid()."|$room reconnected to ".$values{address}.":".$values{port}." after $reconnect_count tries for device $do_address (UUID: $do_uuid)");
-		$status_queue->enqueue("$do_uuid;$room;socket_reconnected");
-		
-		# reset the reconnect counter
-		$reconnect_count = 0;
-		
-		# set the last contact date to now
-		$last_contact = gettimeofday();
-		
-		# add the new established socket to the IO selector for incoming data monitoring.
-		$selector->add($client_socket);
-		# send the given address to the presence daemon
-		$client_socket->send($do_address."|".$values{absence_timeout}."\n");
-	    }
-	    else
-	    {
-		sleep(9);
-	    }
-	}
+        if(not defined($client_socket))
+        {
+            # if it's the first occurance
+            if(!$reconnect_count)
+            {
+                # Tell this the client;
+                $status_queue->enqueue("$do_uuid;$room;socket_closed");
+                    
+                # create a log message
+                $log_queue->enqueue(threads->tid()."|$room socket to ".$values{address}.":".$values{port}." for device $do_address closed. Trying to reconnect...");
+            }
+            
+            # now try to re-establish the connection
+            $client_socket = new IO::Socket::INET (
+                PeerHost => $values{address},
+                PeerPort => $values{port},
+                Proto => 'tcp',
+                Type => SOCK_STREAM,
+                KeepAlive => 1,
+                Blocking => 1
+            ) or ( $reconnect_count++ );
+            
+            if(defined($client_socket))
+            {
+                # give a success message
+                $log_queue->enqueue(threads->tid()."|$room reconnected to ".$values{address}.":".$values{port}." after $reconnect_count tries for device $do_address (UUID: $do_uuid)");
+                $status_queue->enqueue("$do_uuid;$room;socket_reconnected");
+                
+                # reset the reconnect counter
+                $reconnect_count = 0;
+                
+                # set the last contact date to now
+                $last_contact = gettimeofday();
+                
+                # add the new established socket to the IO selector for incoming data monitoring.
+                $selector->add($client_socket);
+                # send the given address to the presence daemon
+                $client_socket->send($do_address."|".$values{absence_timeout}."\n");
+            }
+            else
+            {
+                sleep(9);
+            }
+        }
 	
-	# if the socket has a message available
-	if(@client_handle = $selector->can_read(1))
-	{
-		
-		# get all socket handles which has a message available
-		foreach my $local_client (@client_handle)
-		{
-			# get the message from the socket handle
-			$return = <$local_client>;
-			
-			# if the message is defined (not EOF) handle the message...
-			if($return)
-			{
-			
-				# set the last contact date
-				$last_contact = gettimeofday();
-			
-				# remove trailing whitespaces and newlines
-				chomp($return);
-				
-				# if the message is "command accepted"
-				if($return =~ /command accepted/)
-				{
-					# log this to the thread log queue
-					$log_queue->enqueue(threads->tid()."|$room accepted command for $do_address");
-				}
-				elsif($return =~ /command rejected/) # if the message is "command rejected" also log it to the log queue
-				{
-					$log_queue->enqueue(threads->tid()."|$room REJECTED command for $do_address");
-				}
-				else # else its a status message
-				{
-					# put the message to the status queue with uuid for identification and the room name
-					$status_queue->enqueue("$do_uuid;$room;".$return);
-					
-					# if the state changes from present to absence
-					if(defined($previous_state) and $previous_state eq "present" and  lc($return) =~ /^absence/)
-					{
-					    # log the timout change to the log queue
-					    $log_queue->enqueue(threads->tid()."|$room changing to absence timeout (".$values{absence_timeout}.") for device $do_address");
-					    
-					    $current_state = "absence";
-					    
-					    # send the new command with the configured absence timeout
-					    $local_client->send($do_address."|".$values{absence_timeout}."\n");
-					}
-					elsif(defined($previous_state) and $previous_state eq "absence" and  lc($return) =~ /^present/)
-					{
-					    $log_queue->enqueue(threads->tid()."|$room changing to presence timeout (".$values{presence_timeout}.") for device $do_address");
-					    
-					    $current_state = "present";
-					    
-					    # if the state changes from absence to present, set the presence timeout
-					    $local_client->send($do_address."|".$values{presence_timeout}."\n");
-					}
-					
-					# set the previous state to the current state
-					($previous_state, undef) = split(";", lc($return));
-					 
-				}
-	
-	
-			}
-			else # the socket is EOF which means the connection was closed
-			{	
-				
-				$selector->remove($local_client);
-				
-				shutdown($local_client, 2);
-				close($local_client);
-				$client_socket = undef;
-				
-	
-			}
-			
-		}
-	}
-	
-	
+        # if the socket has a message available
+        if(@client_handle = $selector->can_read(1))
+        {
+            
+            # get all socket handles which has a message available
+            foreach my $local_client (@client_handle)
+            {
+                # get the message from the socket handle
+                $return = <$local_client>;
+                
+                # if the message is defined (not EOF) handle the message...
+                if($return)
+                {
+                
+                    # set the last contact date
+                    $last_contact = gettimeofday();
+                
+                    # remove trailing whitespaces and newlines
+                    chomp($return);
+                    
+                    # if the message is "command accepted"
+                    if($return =~ /command accepted/)
+                    {
+                        # log this to the thread log queue
+                        $log_queue->enqueue(threads->tid()."|$room accepted command for $do_address");
+                    }
+                    elsif($return =~ /command rejected/) # if the message is "command rejected" also log it to the log queue
+                    {
+                        $log_queue->enqueue(threads->tid()."|$room REJECTED command for $do_address");
+                    }
+                    else # else its a status message
+                    {
+                        # put the message to the status queue with uuid for identification and the room name
+                        $status_queue->enqueue("$do_uuid;$room;".$return);
+                        
+                        # if the state changes from present to absence
+                        if(defined($previous_state) and $previous_state eq "present" and  lc($return) =~ /^absence/)
+                        {
+                            # log the timout change to the log queue
+                            $log_queue->enqueue(threads->tid()."|$room changing to absence timeout (".$values{absence_timeout}.") for device $do_address");
+                            
+                            $current_state = "absence";
+                            
+                            # send the new command with the configured absence timeout
+                            $local_client->send($do_address."|".$values{absence_timeout}."\n");
+                        }
+                        elsif(defined($previous_state) and $previous_state eq "absence" and  lc($return) =~ /^present/)
+                        {
+                            $log_queue->enqueue(threads->tid()."|$room changing to presence timeout (".$values{presence_timeout}.") for device $do_address");
+                            
+                            $current_state = "present";
+                            
+                            # if the state changes from absence to present, set the presence timeout
+                            $local_client->send($do_address."|".$values{presence_timeout}."\n");
+                        }
+                        
+                        # set the previous state to the current state
+                        ($previous_state, undef) = split(";", lc($return));
+                    }
+                }
+                else # the socket is EOF which means the connection was closed
+                {	
+                    
+                    $selector->remove($local_client);
+                    
+                    shutdown($local_client, 2);
+                    close($local_client);
+                    $client_socket = undef;
+                }
+            }
+        }
     }
 
     $log_queue->enqueue(threads->tid()."|exiting thread");
@@ -768,14 +725,13 @@ sub doQuery($$$)
 sub readConfig
 {
 
-my ($ini) = @_;
+    my ($ini) = @_;
 
-my $section;
-my $keyword;
-my $value;
+    my $section;
+    my $keyword;
+    my $value;
 
-my $errorcount = 0;
-
+    my $errorcount = 0;
 
     Log 1, "reading configuration file";
 
@@ -784,11 +740,11 @@ my $errorcount = 0;
     open (INI, "$ini") or (print STDERR timestamp()."Can't open $ini: $!\n" and exit(1));
         while (<INI>) {
             chomp;
-            if (/^\s*?\[(\w+?)\]/) {
+            if (/^\s*?\[([^\]\n\r]+?)\]/) {
                 $section = $1;
                 
             }
-            if (/^\s*(\w+?)=(.+?)\s*(#.*)?$/) {
+            if (/^\s*(\w+?)=(.+?)\s*(#.*)?$/ and defined($section)) {
                 $keyword = $1;
                 $value = $2 ;
                 # put them into hash
@@ -802,130 +758,124 @@ my $errorcount = 0;
     foreach my $room (keys %config)
     {
 
-	if(not exists($config{$room}{address}))
-	{
-    	    Log 0, "room $room has no value for address configured";
-    	    $errorcount++;
-	}
-	else
-	{
-	    if(not $config{$room}{address} =~ /^[a-zA-Z0-9.-]+$/)
-	    {
-		Log 0, "no valid address for room $room found: ".$config{$room}{address};
-		$errorcount++;
-	    }
+        if(not exists($config{$room}{address}))
+        {
+                Log 0, "room $room has no value for address configured";
+                $errorcount++;
+        }
+        else
+        {
+            if(not $config{$room}{address} =~ /^[a-zA-Z0-9.-]+$/)
+            {
+            Log 0, "no valid address for room $room found: ".$config{$room}{address};
+            $errorcount++;
+            }
+        
+        }
+    
+        if(not exists($config{$room}{port}))
+        {
+                Log 0, "room >>$room<< has no value for >>port<< configured";
+                $errorcount++;
+        }
+        else
+        {
+            if(not $config{$room}{port} =~ /^\d+$/)
+            {
+            Log 0, "value >>port<< for room >>$room<< is not a number: ".$config{$room}{port};
+            $errorcount++;
+            }
+        }
+        
+        if(not exists($config{$room}{absence_timeout}))
+        {
+                Log 0, "room >>$room<< has no value for >>absence_timeout<< configured";
+                $errorcount++;
+        }
+        else
+        {
+            if(not $config{$room}{absence_timeout} =~ /^\d+$/)
+            {
+            Log 0, "value >>absence_timeout<< value for room >>$room<< is not a number: ".$config{$room}{absence_timeout};
+            $errorcount++;
+            }
+        }
 	
-	}
-    
-    
-    
-	if(not exists($config{$room}{port}))
-	{
-    	    Log 0, "room >>$room<< has no value for >>port<< configured";
-    	    $errorcount++;
-	}
-	else
-	{
-	    if(not $config{$room}{port} =~ /^\d+$/)
-	    {
-		Log 0, "value >>port<< for room >>$room<< is not a number: ".$config{$room}{port};
-		$errorcount++;
-	    }
-	}
-    
-	if(not exists($config{$room}{absence_timeout}))
-	{
-    	    Log 0, "room >>$room<< has no value for >>absence_timeout<< configured";
-    	    $errorcount++;
-	}
-	else
-	{
-	    if(not $config{$room}{absence_timeout} =~ /^\d+$/)
-	    {
-		Log 0, "value >>absence_timeout<< value for room >>$room<< is not a number: ".$config{$room}{absence_timeout};
-		$errorcount++;
-	    }
-	}
-	
-	if(not exists($config{$room}{presence_timeout}))
-	{
-    	    Log 0, "room >>$room<< has no value for >>presence_timeout<< configured";
-    	    $errorcount++;
-	}
-	else
-	{
-	    if(not $config{$room}{presence_timeout} =~ /^\d+$/)
-	    {
-	        Log 0, "value >>presence_timeout<< value for room >>$room<< is not a number: ".$config{$room}{presence_timeout};
-		$errorcount++;
-	    }
-	}
+        if(not exists($config{$room}{presence_timeout}))
+        {
+                Log 0, "room >>$room<< has no value for >>presence_timeout<< configured";
+                $errorcount++;
+        }
+        else
+        {
+            if(not $config{$room}{presence_timeout} =~ /^\d+$/)
+            {
+                Log 0, "value >>presence_timeout<< value for room >>$room<< is not a number: ".$config{$room}{presence_timeout};
+            $errorcount++;
+            }
+        }
  
-	foreach my $param (keys %{$config{$room}})
-	{
-	    if(not $param =~ /(address|port|absence_timeout|presence_timeout)/)
-	    {
-		Log 0, "invalid parameter $param in room $room";
-		$errorcount++;
-	    }
+        foreach my $param (keys %{$config{$room}})
+        {
+            if(not $param =~ /(address|port|absence_timeout|presence_timeout)/)
+            {
+            Log 0, "invalid parameter $param in room $room";
+            $errorcount++;
+            }
 
-	}
+        }
     }
 
     if($errorcount)
     { 
-	print STDERR timestamp()." found $errorcount config errors. exiting....\n";
-	exit 2;
+        print STDERR timestamp()." found $errorcount config errors. exiting....\n";
+        exit 2;
     }
     else
     {
-	Log 0, "no config errors found";
+        Log 0, "no config errors found";
     }
 }
 
 
 sub aggregateRooms
-
 {
 
-my ($hash) = @_;
+    my ($hash) = @_;
 
-my $previous = "absence";
+    my $previous = "absence";
 
-my @rooms;
-my $key;
-my $value;
-my $temp_name;
-foreach $key  (keys %$hash)
-{
- if($hash->{$key} ne "")
- {
- 
- ($value, $name) = split(";", $hash->{$key});
-  if($value eq "present")
-  {
-     push @rooms, $key;
-     $temp_name = $name;
-  }
- }
- else
- {
-    return undef;
- }
-}
+    my @rooms;
+    my $key;
+    my $value;
+    my $temp_name;
+    
+    foreach $key  (keys %$hash)
+    {
+        if($hash->{$key} ne "")
+        {
+            ($value, $name) = split(";", $hash->{$key});
+            
+            if($value eq "present")
+            {
+                push @rooms, $key;
+                $temp_name = $name;
+            }
+        }
+        else
+        {
+            return undef;
+        }
+    }
 
-
-if(@rooms > 0)
-{
-return "present;$temp_name;".join(",",sort  @rooms);
-}
-else
-{
-
-return  "absence";
-}
-
-
+    if(@rooms > 0)
+    {
+        return "present;$temp_name;".join(",",sort  @rooms);
+    }
+    else
+    {
+        return  "absence";
+    }
 }
 
 
@@ -935,17 +885,15 @@ sub generateUUID
 
     while(defined($handle{$uuid}))
     {
-	$uuid = Digest::MD5::md5_hex(rand);
+        $uuid = Digest::MD5::md5_hex(rand);
     }
 
     return $uuid;
 }
 
-
 sub timestamp
 {
-
-return POSIX::strftime("%Y-%m-%d %H:%M:%S",localtime);
+    return POSIX::strftime("%Y-%m-%d %H:%M:%S",localtime);
 }
 
 
@@ -956,8 +904,9 @@ sub Log($$)
 
     if($message =~ /^\d+\|/)
     {
-      ($thread, $message) = split("\\|", $message);
+        ($thread, $message) = split("\\|", $message);
     }
+    
     if($loglevel <= $opt_v)
     {
         if($opt_l)
@@ -973,6 +922,5 @@ sub Log($$)
 
         close(LOGFILE);
     }
-
 }
 
