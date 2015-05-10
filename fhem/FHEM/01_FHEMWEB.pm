@@ -1556,6 +1556,7 @@ FW_returnFileAsStream($$$$$)
     return 0;
   }
   binmode(FH) if($type !~ m/text/); # necessary for Windows
+  my $sz = -s $path;
 
   $etag = defined($etag) ? "ETag: \"$etag\"\r\n" : "";
   my $expires = $cacheable ? ("Expires: ".gmtime(time()+900)." GMT\r\n"): "";
@@ -1569,6 +1570,9 @@ FW_returnFileAsStream($$$$$)
 
   my $d = Compress::Zlib::deflateInit(-WindowBits=>31) if($compr);
   FW_outputChunk($FW_chash, $FW_RET, $d);
+  FW_outputChunk($FW_chash,
+        "<a href='#end_of_file'>jump to the end</a><br><br>", $d)
+    if($doEsc && $sz > 2048);
   my $buf;
   while(sysread(FH, $buf, 2048)) {
     if($doEsc) { # FileLog special
@@ -1578,6 +1582,8 @@ FW_returnFileAsStream($$$$$)
     FW_outputChunk($FW_chash, $buf, $d);
   }
   close(FH);
+  FW_outputChunk($FW_chash, "<a name='end_of_file'></a>", $d)
+    if($doEsc && $sz > 2048);
   FW_outputChunk($FW_chash, $suffix, $d);
 
   if($compr) {
