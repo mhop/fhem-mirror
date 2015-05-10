@@ -199,7 +199,9 @@ doUpdate($$)
       next if($fName !~ m/$arg/);
 
     } else {
-      my $sz = -s "$root/$fName";
+      my $fPath = "$root/$fName";
+      $fPath = $0 if($fPath =~ m/$mainPgm/);
+      my $sz = -s $fPath;
       next if($lh{$fName} &&
               $lh{$fName}{TS} eq $r[1] &&
               $sz && $sz eq $r[2] &&
