@@ -2602,7 +2602,9 @@ sub CUL_HM_parseCommon(@){#####################################################
         $attr{$shash->{NAME}}{autoReadReg}= 
               AttrVal($shash->{NAME},"autoReadReg","4_reqStatus");
         CUL_HM_qAutoRead($shash->{NAME},0);
-        CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
+          # stack cmds if waiting. Do noch start if we have a burst device
+          # it may not paire
+        CUL_HM_appFromQ($shash->{NAME},"cf") if ($rxt == 0x04);
         
         $respRemoved = 1;#force command stack processing
         $paired = 1;
@@ -2865,8 +2867,6 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($mTp eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
-#   CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IoId($shash).$src);
-#   CUL_HM_ProcessCmdStack($shash);
   }
   if ($rspWait->{mNo}             &&
       $rspWait->{mNo} eq $mNo     &&
