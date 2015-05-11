@@ -38,6 +38,7 @@ ModbusAttr_Initialize($)
     my ($modHash) = @_;
 
     require "$attr{global}{modpath}/FHEM/98_Modbus.pm";
+    require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
     ModbusLD_Initialize($modHash);                          # Generic function of the Modbus module does the rest
     
