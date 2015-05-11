@@ -464,6 +464,19 @@ sub ROOMMATE_Set($@) {
                     )
                 );
             }
+            
+            # stop any running wakeup-timers in case user went away
+            if ( $newstate eq "away" || $newstate eq "gone"|| $newstate eq "none" ) {
+              my $wakeupDeviceList = AttrVal( $name, "rr_wakeupDevice", 0 );
+              
+              for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
+                  next if !$wakeupDevice;
+
+                  if ( defined( $defs{$wakeupDevice} ) && $defs{$wakeupDevice}{TYPE} eq "dummy" ) {
+                    fhem "set $wakeupDevice:FILTER=running!=0 stop";
+                  }
+              }
+            }
 
             # calculate presence state
             my $newpresence =
