@@ -164,7 +164,7 @@ doUpdate($$)
   my @rl = upd_getChanges($root, $basePath);
   ###########################
   # process the remote controlfile
-  my $nChanged = 0;
+  my ($nChanged,$nSkipped) = (0,0);
   my $isSingle = ($arg ne "all" && $arg ne "force"  && $arg ne "check");
   foreach my $r (@remList) {
     my @r = split(" ", $r, 4);
@@ -190,23 +190,29 @@ doUpdate($$)
     foreach my $ex (@excl) {
       $isExcl = 1 if($fName =~ m/$ex/);
     }
-    if($isExcl) {
-      uLog 1, "update: skipping $fName, matches exclude_from_update";
-      next;
-    }
 
     if($isSingle) {
       next if($fName !~ m/$arg/);
+      if($isExcl) {
+        uLog 1, "update: skipping $fName, matches exclude_from_update";
+        $nSkipped++;
+        next;
+      }
 
     } else {
       my $fPath = "$root/$fName";
       $fPath = $0 if($fPath =~ m/$mainPgm/);
-      my $sz = -s $fPath;
-      next if($lh{$fName} &&
-              $lh{$fName}{TS} eq $r[1] &&
-              $sz && $sz eq $r[2] &&
-              $lh{$fName}{LEN} eq $r[2]);
+      my $fileOk = ($lh{$fName} &&
+                    $lh{$fName}{TS} eq $r[1] &&
+                    $lh{$fName}{LEN} eq $r[2]);
+      if($isExcl && !$fileOk) {
+        uLog 1, "update: skipping $fName, matches exclude_from_update";
+        $nSkipped++;
+        next;
+      }
 
+      my $sz = -s $fPath;
+      next if($isExcl || ($fileOk && defined($sz) && $sz eq $r[2]));
     }
 
     uLog 1, "List of new / modified files since last update:"
@@ -238,7 +244,7 @@ doUpdate($$)
     return if(!upd_writeFile($root, $restoreDir, $fName, $remFile));
   }
 
-  if($nChanged == 0) {
+  if($nChanged == 0 && $nSkipped == 0) {
     uLog 1, "nothing to do...";
     return;
   }
@@ -254,6 +260,8 @@ doUpdate($$)
     return if(!upd_writeFile($root, $restoreDir,
                            "FHEM/$ctrlFileName", $remCtrlFile));
   }
+
+  return "" if(!$nChanged);
 
   if($canJoin && $needJoin) {
     chdir($root);
