@@ -110,6 +110,7 @@ my $curReadingType = 0;
       ,["NS_15", "rain15", 2]
       ,["NS_18", "rain18", 2]
       ,["NS_21", "rain21", 2]
+      ,["NS_24H", "rain", 2]
       ,["BD_0", "cloud00", 2]
       ,["BD_3", "cloud03", 2]
       ,["BD_6", "cloud06", 2]
@@ -460,10 +461,20 @@ sub PROPLANTA_Define($$)
    { # {my $test="http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html";; $test =~ s/LOKALERORT/München/g;; return $test;;}
       return "Wrong country code '$lang': use " . join(" | ",  keys( %url_template_1 ) ) unless defined( $url_template_1{$lang} );
       my $URL = $url_template_1{$lang};
-      $URL =~ s/LOKALERORT/$a[2]/g;
+      my $ort= $a[2];
+# change Umlaute from UTF8 in Percent-encode 
+      $ort =~ s/Ä|Ã„/%C4/g;
+      $ort =~ s/Ö|Ã–/%D6/g;
+      $ort =~ s/Ü|Ãœ/%DC/g;
+      $ort =~ s/ß|ÃŸ/%DF/g;
+      $ort =~ s/ä|Ã¤/%E4/g;
+      $ort =~ s/ö|Ã¶/%F6/g;
+      $ort =~ s/ü|Ã¼/%FC/g;
+      
+      $URL =~ s/LOKALERORT/$ort/g;
       $hash->{URL} = $URL;
       $URL = $url_template_2{$lang};
-      $URL =~ s/LOKALERORT/$a[2]/g;
+      $URL =~ s/LOKALERORT/$ort/g;
       $hash->{URL2} = $URL;
    }
 
