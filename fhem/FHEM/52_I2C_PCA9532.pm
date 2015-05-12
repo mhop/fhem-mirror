@@ -47,7 +47,8 @@ sub I2C_PCA9532_Initialize($) {
 	$hash->{GetFn}    = "I2C_PCA9532_Get";
 	$hash->{I2CRecFn} = "I2C_PCA9532_I2CRec";
 	$hash->{AttrList} = "IODev do_not_notify:1,0 ignore:1,0 showtime:1,0".
-											"poll_interval T0:slider,0,1,255 T1:slider,0,1,255 OutputPorts OnStartup InputPorts ".
+											"poll_interval T0:slider,0,1,255 T1:slider,0,1,255 OnStartup InputPorts ".
+											"OutputPorts:multiple-strict,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 ".
 											"$readingFnAttributes";
 }
 ###############################################################################
@@ -443,6 +444,7 @@ sub I2C_PCA9532_UpdReadings($$$) {
 
 <a name="I2C_PCA9532"></a>
 <h3>I2C_PCA9532</h3>
+(en | <a href="commandref_DE.html#I2C_PCA9532">de</a>)
 <ul>
 	<a name="I2C_PCA9532"></a>
 		Provides an interface to the PCA9532 I2C 16 channel PWM IC. 
@@ -507,7 +509,7 @@ sub I2C_PCA9532_UpdReadings($$$) {
 		<li>OnStartup<br>
 			Comma separated list of output ports/PWM registers and their desired state after start<br>
 			Without this atribut all output ports will set to last state<br>
-			Default: -, valid values: <port>=on|off|PWM0|PWM1|last or PWM0|PWM1=0..255|last where <port> = 0 - 15<br><br>
+			Default: -, valid values: &lt;port&gt;=on|off|PWM0|PWM1|last or PWM0|PWM1=0..255|last where &lt;port&gt; = 0 - 15<br><br>
 		</li>
 		<li>T0/T1<br>
 			Sets PWM0/PWM1 to another Frequency. The Formula is: Fx = 152/(Tx + 1) The corresponding frequency value is shown under internals.<br>
@@ -527,6 +529,7 @@ sub I2C_PCA9532_UpdReadings($$$) {
 
 <a name="I2C_PCA9532"></a>
 <h3>I2C_PCA9532</h3>
+(<a href="commandref.html#I2C_PCA9532">en</a> | de)
 <ul>
 	<a name="I2C_PCA9532"></a>
 		Erm&ouml;glicht die Verwendung eines PCA9532 I2C 16 Kanal PWM IC. 
@@ -591,7 +594,7 @@ sub I2C_PCA9532_UpdReadings($$$) {
 		<li>OnStartup<br>
 			Durch Komma getrennte Output Ports/PWM Register und ihr gew&uuml;nschter Status nach dem Start.<br>
 			Ohne dieses Attribut werden alle Ausg&auml;nge nach dem Start auf den letzten Status gesetzt.<br>
-			Standard: -, g&uuml;ltige Werte: <port>=on|off|PWM0|PWM1|last oder PWM0|PWM1=0..255|last wobei <port> = 0 - 15<br><br>
+			Standard: -, g&uuml;ltige Werte: &lt;port&gt;=on|off|PWM0|PWM1|last oder PWM0|PWM1=0..255|last wobei &lt;port&gt; = 0 - 15<br><br>
 		</li>
 		<li>T0/T1<br>
 			&Auml;nderung der Frequenzwerte von PWM0/PWM1 nach der Formel: Fx = 152/(Tx + 1). Der entsprechende Frequenzwert wird unter Internals angezeigt.<br>

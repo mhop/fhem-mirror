@@ -61,10 +61,13 @@ sub I2C_MCP23017_Initialize($) {
 	$hash->{GetFn}    = "I2C_MCP23017_Get";
 	$hash->{I2CRecFn} = "I2C_MCP23017_I2CRec";
 	$hash->{AttrList} = "IODev do_not_notify:1,0 ignore:1,0 showtime:1,0".
-						"poll_interval OutputPorts ".
-											"Pullup invert_input Interrupt OnStartup ".
+                      "poll_interval OnStartup ".
+											"OutputPorts:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7,B0,B1,B2,B3,B4,B5,B6,B7 ".
+                      "Pullup:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7,B0,B1,B2,B3,B4,B5,B6,B7 ".
+                      "invert_input:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7,B0,B1,B2,B3,B4,B5,B6,B7 ".
+                      "Interrupt:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7,B0,B1,B2,B3,B4,B5,B6,B7 ".
 											"InterruptOut:separate_active-low,separate_active-high,separate_open-drain,connected_active-low,connected_active-high,connected_open-drain ".
-						"$readingFnAttributes";
+                      "$readingFnAttributes";
 }
 ###############################################################################
 sub I2C_MCP23017_Define($$) {
@@ -491,6 +494,7 @@ sub I2C_MCP23017_UpdReadings($$$) {																						#nach Rueckmeldung read
 
 <a name="I2C_MCP23017"></a>
 <h3>I2C_MCP23017</h3>
+(en | <a href="commandref_DE.html#I2C_MCP23017">de</a>)
 <ul>
 	<a name="I2C_MCP23017"></a>
 		Provides an interface to the MCP23017 16 channel port extender IC. On Raspberry Pi the Interrupt Pin's can be connected to an GPIO and <a href="#RPI_GPIO">RPI_GPIO</a> can be used to get the port values if an interrupt occurs.<br>
@@ -600,6 +604,7 @@ sub I2C_MCP23017_UpdReadings($$$) {																						#nach Rueckmeldung read
 
 <a name="I2C_MCP23017"></a>
 <h3>I2C_MCP23017</h3>
+(<a href="commandref.html#I2C_MCP23017">en</a> | de)
 <ul>
 	<a name="I2C_MCP23017"></a>
 		Erm&ouml;glicht die Verwendung eines MCP23017 I2C 16 Bit Portexenders. 
