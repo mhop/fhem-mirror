@@ -26,7 +26,8 @@ sub I2C_PCF8574_Initialize($) {
   $hash->{ParseFn}   = 	"I2C_PCF8574_Parse";
   $hash->{I2CRecFn}  = 	"I2C_PCF8574_I2CRec";
   $hash->{AttrList}  = 	"IODev do_not_notify:1,0 ignore:1,0 showtime:1,0 ".
-												"poll_interval InputPorts OnStartup ".
+												"poll_interval OnStartup ".
+												"InputPorts:multiple-strict,0,1,2,3,4,5,6,7 ".
 												"$readingFnAttributes";
 }
 ###################################
@@ -339,6 +340,7 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 
 <a name="I2C_PCF8574"></a>
 <h3>I2C_PCF8574</h3>
+(en | <a href="commandref_DE.html#I2C_PCF8574">de</a>)
 <ul>
 	<a name="I2C_PCF8574"></a>
 		Provides an interface to the PCA9532 8 channel port extender IC. On Raspberry Pi the Interrupt Pin can be connected to an GPIO and <a href="#RPI_GPIO">RPI_GPIO</a> can be used to get the port values if an interrupt occurs.<br>
@@ -398,7 +400,7 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 		<li>OnStartup<br>
 			Comma separated list of output ports and their desired state after start<br>
 			Without this atribut all output ports will set to last state<br>
-			Default: -, valid values: <port>=on|off|last where <port> = 0 - 7<br><br>
+			Default: -, valid values: &lt;port&gt;=on|off|last where &lt;port&gt; = 0 - 7<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
 		<li><a href="#ignore">ignore</a></li>
@@ -414,6 +416,7 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 
 <a name="I2C_PCF8574"></a>
 <h3>I2C_PCF8574</h3>
+(<a href="commandref.html#I2C_PCF8574">en</a> | de)
 <ul>
 	<a name="I2C_PCF8574"></a>
 		Erm&ouml;glicht die Verwendung eines PCF8574 I2C 8 Bit Portexenders. 
@@ -474,7 +477,7 @@ sub I2C_PCF8574_Parse($$) {	#wird ueber dispatch vom physical device aufgerufen 
 		<li>OnStartup<br>
 			Durch Komma getrennte Output Ports und ihr gew&uuml;nschter Status nach dem Start.<br>
 			Ohne dieses Attribut werden alle Ausg&auml;nge nach dem Start auf den letzten Status gesetzt.<br>
-			Standard: -, g&uuml;ltige Werte: <port>=on|off|last wobei <port> = 0 - 7<br><br>
+			Standard: -, g&uuml;ltige Werte: &lt;port&gt;=on|off|last wobei &lt;port&gt; = 0 - 7<br><br>
 		</li>
 		<li><a href="#IODev">IODev</a></li>
 		<li><a href="#ignore">ignore</a></li>

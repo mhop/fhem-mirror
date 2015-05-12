@@ -58,10 +58,13 @@ sub I2C_MCP23008_Initialize($) {
 	$hash->{GetFn}    = "I2C_MCP23008_Get";
 	$hash->{I2CRecFn} = "I2C_MCP23008_I2CRec";
 	$hash->{AttrList} = "IODev do_not_notify:1,0 ignore:1,0 showtime:1,0".
-						"poll_interval OutputPorts ".
-											"Pullup invert_input Interrupt OnStartup ".
-											"InterruptOut:separate_active-low,separate_active-high,separate_open-drain ".
-						"$readingFnAttributes";
+                      "poll_interval OnStartup ".
+                      "OutputPorts:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7 ".
+                      "Pullup:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7 ".
+                      "invert_input:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7 ".
+                      "Interrupt:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7 ".
+                      "InterruptOut:separate_active-low,separate_active-high,separate_open-drain ".
+                      "$readingFnAttributes";
 }
 ###############################################################################
 sub I2C_MCP23008_Define($$) {
@@ -490,6 +493,7 @@ sub I2C_MCP23008_UpdReadings($$$) {																						#nach Rueckmeldung read
 
 <a name="I2C_MCP23008"></a>
 <h3>I2C_MCP23008</h3>
+(en | <a href="commandref_DE.html#I2C_MCP23008">de</a>)
 <ul>
 	<a name="I2C_MCP23008"></a>
 		Provides an interface to the MCP23008 16 channel port extender IC. On Raspberry Pi the Interrupt Pin's can be connected to an GPIO and <a href="#RPI_GPIO">RPI_GPIO</a> can be used to get the port values if an interrupt occurs.<br>
@@ -590,6 +594,7 @@ sub I2C_MCP23008_UpdReadings($$$) {																						#nach Rueckmeldung read
 
 <a name="I2C_MCP23008"></a>
 <h3>I2C_MCP23008</h3>
+(<a href="commandref.html#I2C_MCP23008">en</a> | de)
 <ul>
 	<a name="I2C_MCP23008"></a>
 		Erm&ouml;glicht die Verwendung eines MCP23008 I2C 8 Bit Portexenders. 
