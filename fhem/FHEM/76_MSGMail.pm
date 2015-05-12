@@ -4,6 +4,7 @@
 #
 # History:
 #
+# 2015-05-11: Improve error logging to assist problem solving
 # 2015-05-09: Assimilate mail related code from 75_MSG
 # 2015-05-06: Tidy up code for restructuring
 # 2015-05-05: Remove dependency on Switch
@@ -69,11 +70,13 @@ sub MSGMail_Initialize($)
             $MSGMail_SSL = 1;
         }
     }
-    Log 2,
+    Log 0,
       "$name: SSL is "
-      . ( ($MSGMail_SSL)
+      . (
+          ($MSGMail_SSL)
         ? ("available, provided by Net::SMTP" . (($MSGMail_SMTP < 3.00) ? "::SSL" : ""))
-        : "not available");
+        : "not available"
+      );
 }
 
 ##############################################
@@ -225,7 +228,7 @@ sub MSGMail_Set($@)
         my $mess = "";
         for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
         {
-            $mess .= $data{ $name }{$i};
+            $mess .= $data{$name}{$i};
         }
 
         my $mailmsg = MIME::Lite->new(
@@ -241,24 +244,28 @@ sub MSGMail_Set($@)
         my $smtperrmsg = "SMTP Error: ";
 
         #$smtp = Net::SMTP::SSL->new($smtphost, Port => $smtpport)
-        $smtp = MSGMail_conn($defs{ $name })
-          or return $smtperrmsg . " Can't connect to host $smtphost";
+        $smtp = MSGMail_conn($defs{$name})
+          or return MSGMail_error($name, "Can't connect to host $smtphost",
+            $smtperrmsg . " Can't connect to host $smtphost");
         $smtp->auth($auth[0], $auth[1])
-          or return $smtperrmsg . " Can't authenticate: " . $smtp->message();
-        $smtp->mail($from) or return $smtperrmsg . $smtp->message();
-        $smtp->to($to)     or return $smtperrmsg . $smtp->message();
+          or
+          return MSGMail_error($name, "Can't authenticate", $smtperrmsg . " Can't authenticate: " . $smtp->message());
+        $smtp->mail($from)
+          or return MSGMail_error($name, "Error setting sender '$from'", $smtperrmsg . $smtp->message());
+        $smtp->to($to) or return MSGMail_error($name, "Error setting receiver '$to'", $smtperrmsg . $smtp->message());
         if ($cc ne '')
         {
-            Log 1, "CC = $cc";
-            $smtp->cc($cc) or return $smtperrmsg . $smtp->message();
+            Log3 $name, 1, "$name: CC = $cc";
+            $smtp->cc($cc)
+              or return MSGMail_error($name, "Error setting carbon-copy $cc", $smtperrmsg . $smtp->message());
         }
-        $smtp->data() or return $smtperrmsg . $smtp->message();
+        $smtp->data() or return MSGMail_error($name, "Error setting data", $smtperrmsg . $smtp->message());
         $smtp->datasend($mailmsg->as_string)
-          or return $smtperrmsg . $smtp->message();
-        $smtp->dataend() or return $smtperrmsg . $smtp->message();
-        $smtp->quit()    or return $smtperrmsg . $smtp->message();
+          or return MSGMail_error($name, "Error sending email", $smtperrmsg . $smtp->message());
+        $smtp->dataend() or return MSGMail_error($name, "Error ending transaction", $smtperrmsg . $smtp->message());
+        $smtp->quit()    or return MSGMail_error($name, "Error saying good-bye",    $smtperrmsg . $smtp->message());
 
-        Log 1, "<MSG> send EMail: <$subject>";
+        Log3 $name, 1, "$name: successfully sent email w/ subject '$subject'";
 
     }    ###>  END MSGMail
 
@@ -269,6 +276,13 @@ sub MSGMail_Set($@)
     $hash->{READINGS}{state}{TIME} = TimeNow();
     $hash->{READINGS}{state}{VAL}  = $v;
     return undef;
+}
+
+sub MSGMail_error($$$)
+{
+    my ($name, $msg, $error) = @_;
+    Log3 $name, 0, "$name: $msg: $error";
+    return $error;
 }
 
 ##############################################
