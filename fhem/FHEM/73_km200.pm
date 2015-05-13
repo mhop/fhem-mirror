@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0048 2015-04-14 21:30:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0049 2015-05-13 12:30:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -187,6 +187,15 @@
 #		0048    10.04.2015	Sailor				km200_GetSingleService			Handback of complete error list
 #		0048    14.04.2015	Sailor				km200_ParseHttpResponseInit		errorList missing service - bug corrected
 #		0048    14.04.2015	Sailor				km200_Get						"0" - floatvalue - bug corrected by formating number
+#		0049    14.04.2015	Sailor				km200_GetSingleService			Sorting error notifications descending by timestamps
+#		0049    14.04.2015	Sailor				km200_ParseHttpResponseInit		Sorting error notifications descending by timestamps
+#		0049    14.04.2015	Sailor				km200_ParseHttpResponseDyn		Sorting error notifications descending by timestamps
+#		0049    13.05.2015	Sailor				km200_ParseHttpResponseInit		Correcting bug about wrong schedule times
+#		0049    13.05.2015	Sailor				km200_ParseHttpResponseDyn		Correcting bug about wrong schedule times
+#		0049    13.05.2015	Sailor				km200_GetSingleService			Correcting bug about wrong schedule times
+#		0049    13.05.2015	Sailor				km200_PostSingleService			Correcting bug about wrong schedule times
+#		0049    13.05.2015	Sailor				km200_PostSingleService			Implementing writing of SwitchPrograms
+#		0049    13.05.2015	Sailor				km200_GetSingleService			Implementing re-writing of Readings for SwitchPrograms
 ########################################################################################################################
 
 
@@ -196,8 +205,6 @@
 # *DbLog: X_DbLog_splitFn not completely implemented in order to hand over the units of the readings to DbLog database
 #         Unfortunately the global %hash of this module will not be transferred to the DbLog function. Therefore this 
 #         function is useless.
-#
-# *switchPrograms: Writing of switchPoints not yet implemented
 #
 ########################################################################################################################
 
@@ -258,7 +265,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0048";
+	my $ModuleVersion           = "0049";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -953,7 +960,6 @@ sub km200_PostSingleService($)
 	my $km200_gateway_host          = $hash->{URL} ;
 	my $name                        = $hash->{NAME} ;
 	my $PollingTimeout              = $hash->{POLLINGTIMEOUT};
-	
 	my $err;
 	my $data;
 	my $jsonSend;
@@ -969,7 +975,6 @@ sub km200_PostSingleService($)
 	#### If the get-command returns an error due to an unknown Service requested
 	if ($jsonRead -> {type} eq "ERROR")
 	{
-print("km200_Set - jsonRead: " . $jsonRead -> {type} . " \n");
 		### Rescue original Service request
 		my $WriteService = $Service;
 
@@ -1035,7 +1040,6 @@ print("km200_Set - jsonRead: " . $jsonRead -> {type} . " \n");
 			my $ReturnString		= $hash->{temp}{postdata};
 			$ReturnString 			=~ s/\s+/ /g;
 			$ReturnString 			=~ s/\s+$//g;
-print("km200_Set - TempReadingString                          : |" . $ReturnString . "|\n");
 			my @TempReading			= split(/ /, $ReturnString);
 			my $TempReadingLength	= @TempReading;
 
@@ -1054,7 +1058,6 @@ print("km200_Set - TempReadingString                          : |" . $ReturnStri
 				
 				### Add service to the list of all known services
 				push (@TempSetpointNames, $TempSetPoint);
-print("km200_Set - TempSetPoint                               : " . $TempSetPoint . "\n");
 			}
 			
 			$hash->{temp}{service}	= $Service;
@@ -1088,24 +1091,22 @@ print("km200_Set - TempSetPoint                               : " . $TempSetPoin
 				}
 			
 				### Convert timepoint into raster of defined switchPointTimeRaster
-print("km200_Set - TempReading[i] Before                      : " . $TempReading[$i] . " \n");
 				my $TempHours    = substr($TempReading[$i], 0, length($TempReading[$i])-2);
 				if ($TempHours > 23)
 				{
 					$TempHours = 23;
 				}
-				$TempHours 	 = sprintf('%02d', $TempHours);
 				my $TempMinutes	 = substr($TempReading[$i], -2);
 				if ($TempMinutes > 59)
 				{
-					$TempMinutes = 0;
+					$TempMinutes = 59;
 				}
 				$TempMinutes 	 = $TempMinutes / ($jsonRead -> {switchPointTimeRaster});
 				$TempMinutes 	 =~ s/^(.*?)\..*$/$1/;
 				$TempMinutes 	 = $TempMinutes * ($jsonRead -> {switchPointTimeRaster});
-				$TempMinutes 	 = sprintf('%02d', $TempMinutes );
-				$TempReading[$i] = $TempHours . $TempMinutes;
-print("km200_Set - TempReading[i] After                       : " . $TempReading[$i] . " \n");
+				$TempMinutes 	 = sprintf ('%02d', $TempMinutes);
+				$TempReading[$i] = ($TempHours . $TempMinutes);
+
 			}
 			
 			$hash->{temp}{postdata} = join(" ", @TempReading);
@@ -1147,83 +1148,88 @@ print("km200_Set - TempReading[i] After                       : " . $TempReading
 			for (my $i=0;$i<$#TempReadingMo;$i+=2)
 			{
 				my $TempHashSend;
-				
 				$TempHashSend->{"dayOfWeek"} = "Mo";
+				my $TempHours                = substr($TempReadingMo[$i], 0, length($TempReadingMo[$i])-2);
+				my $TempMinutes	             = substr($TempReadingMo[$i], -2);
+				if ($TempMinutes != 0) {$TempMinutes 	 = $TempMinutes / 60;}
+				$TempHashSend->{"time"}      = ($TempHours + $TempMinutes) * 60;			
 				$TempHashSend->{"setpoint"}  = $TempReadingMo[$i+1];
-				$TempHashSend->{"time"}      = $TempReadingMo[$i]*0.6;
-				
 				push @SwitchPointsSend, $TempHashSend;
 			}
 
 			for (my $i=0;$i<$#TempReadingTu;$i+=2)
 			{
 				my $TempHashSend;
-				
 				$TempHashSend->{"dayOfWeek"} = "Tu";
+				my $TempHours                = substr($TempReadingTu[$i], 0, length($TempReadingTu[$i])-2);
+				my $TempMinutes	             = substr($TempReadingTu[$i], -2);
+				if ($TempMinutes != 0) {$TempMinutes 	 =  $TempMinutes / 60;}
+				$TempHashSend->{"time"}      = ($TempHours + $TempMinutes) * 60;
 				$TempHashSend->{"setpoint"}  = $TempReadingTu[$i+1];
-				$TempHashSend->{"time"}      = $TempReadingTu[$i]*0.6;
-				
 				push @SwitchPointsSend, $TempHashSend;
 			}			
 			
 			for (my $i=0;$i<$#TempReadingWe;$i+=2)
 			{
 				my $TempHashSend;
-				
 				$TempHashSend->{"dayOfWeek"} = "We";
+				my $TempHours                = substr($TempReadingWe[$i], 0, length($TempReadingWe[$i])-2);
+				my $TempMinutes	             = substr($TempReadingWe[$i], -2);
+				if ($TempMinutes != 0) {$TempMinutes 	 =  $TempMinutes / 60;}
+				$TempHashSend->{"time"}      = ($TempHours + $TempMinutes) * 60;
 				$TempHashSend->{"setpoint"}  = $TempReadingWe[$i+1];
-				$TempHashSend->{"time"}      = $TempReadingWe[$i]*0.6;
-				
 				push @SwitchPointsSend, $TempHashSend;
 			}
 	
 			for (my $i=0;$i<$#TempReadingTh;$i+=2)
 			{
 				my $TempHashSend;
-				
 				$TempHashSend->{"dayOfWeek"} = "Th";
+				my $TempHours                = substr($TempReadingTh[$i], 0, length($TempReadingTh[$i])-2);
+				my $TempMinutes	             = substr($TempReadingTh[$i], -2);
+				if ($TempMinutes != 0) {$TempMinutes 	 =  $TempMinutes / 60;}
+				$TempHashSend->{"time"}      = ($TempHours + $TempMinutes) * 60;
 				$TempHashSend->{"setpoint"}  = $TempReadingTh[$i+1];
-				$TempHashSend->{"time"}      = $TempReadingTh[$i]*0.6;
-				
 				push @SwitchPointsSend, $TempHashSend;
 			}
 			
 			for (my $i=0;$i<$#TempReadingFr;$i+=2)
 			{
 				my $TempHashSend;
-				
 				$TempHashSend->{"dayOfWeek"} = "Fr";
+				my $TempHours                = substr($TempReadingFr[$i], 0, length($TempReadingFr[$i])-2);
+				my $TempMinutes	             = substr($TempReadingFr[$i], -2);
+				if ($TempMinutes != 0) {$TempMinutes 	 =  $TempMinutes / 60;}
+				$TempHashSend->{"time"}      = ($TempHours + $TempMinutes) * 60;
 				$TempHashSend->{"setpoint"}  = $TempReadingFr[$i+1];
-				$TempHashSend->{"time"}      = $TempReadingFr[$i]*0.6;
-				
 				push @SwitchPointsSend, $TempHashSend;
 			}
 			
 			for (my $i=0;$i<$#TempReadingSa;$i+=2)
 			{
 				my $TempHashSend;
-				
 				$TempHashSend->{"dayOfWeek"} = "Sa";
+				my $TempHours                = substr($TempReadingSa[$i], 0, length($TempReadingSa[$i])-2);
+				my $TempMinutes	             = substr($TempReadingSa[$i], -2);
+				if ($TempMinutes != 0) {$TempMinutes 	 =  $TempMinutes / 60;}
+				$TempHashSend->{"time"}      = ($TempHours + $TempMinutes) * 60;
 				$TempHashSend->{"setpoint"}  = $TempReadingSa[$i+1];
-				$TempHashSend->{"time"}      = $TempReadingSa[$i]*0.6;
-				
 				push @SwitchPointsSend, $TempHashSend;
 			}
 			
 			for (my $i=0;$i<$#TempReadingSu;$i+=2)
 			{
 				my $TempHashSend;
-				
 				$TempHashSend->{"dayOfWeek"} = "Su";
+				my $TempHours                = substr($TempReadingSu[$i], 0, length($TempReadingSu[$i])-2);
+				my $TempMinutes	 = substr($TempReadingSu[$i], -2);
+				if ($TempMinutes != 0) {$TempMinutes 	 =  $TempMinutes / 60;}
+				$TempHashSend->{"time"}      = ($TempHours + $TempMinutes) * 60;
 				$TempHashSend->{"setpoint"}  = $TempReadingSu[$i+1];
-				$TempHashSend->{"time"}      = $TempReadingSu[$i]*0.6;
-				
 				push @SwitchPointsSend, $TempHashSend;
 			}
 
 			### Save array of hashes of switchpoints into json hash to be send
-			#$jsonSend = $jsonRead;
-			#delete ($jsonSend->{value});
 			@{$jsonSend->{switchPoints}} = @SwitchPointsSend;
 			
 			### Create full URL of the current Service to be written
@@ -1231,12 +1237,19 @@ print("km200_Set - TempReading[i] After                       : " . $TempReading
 
 			### Encode as json
 			$JsonContent = encode_json($jsonSend);
-print("km200_Set - JsonContent-SwitchPoint:                   " . $JsonContent . " \n");
+
+			### Delete the name of hash, "{" and "}" out of json String. No idea why but result of Try-and-Error method
+			$JsonContent =~ s/{"switchPoints"://;
+			$JsonContent =~ s/]}/]/g;
+
+			### Delete the string marker out of json String and change time-string to integer.
+			$JsonContent =~ s/,"time":"/,"time":/g;
+			$JsonContent =~ s/"},{/},{/g;			
+			
 			
 			### Encrypt 
 			$hash->{temp}{jsoncontent} = $JsonContent;
 			$data = km200_Encrypt($hash);
-
 			
 			### Create parameter set for HttpUtils_BlockingGet
 			my $param = {
@@ -1256,35 +1269,37 @@ print("km200_Set - JsonContent-SwitchPoint:                   " . $JsonContent .
 			### Reset flag
 			$hash->{status}{FlagSetRequest} = false;
 			
-			### If error messsage has been returned
+			### If error message has been returned
 			if($err ne "") 
 			{
 				Log3 $name, 2, $name . " - ERROR: $err";
 				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
-				
-				
 				return $err;	
 			}
 
-print("km200_Set - READBACKDELAY / [ms]:                      " . $hash->{READBACKDELAY}*5 . " \n");
+			if ($hash->{CONSOLEMESSAGE} == true) {print("Waiting for processing time (READBACKDELAY / [ms])     : " . $hash->{READBACKDELAY} . " \n");}
 			### Make a pause before ReadBack
-			usleep ($hash->{READBACKDELAY}*1000*5);
+			usleep ($hash->{READBACKDELAY}*1000);
 
-			
-			### Read service-hash
-			my $GetReturnHash = km200_GetSingleService($hash);
+			### Read service-hash and format it so it is compareable to the sent content
+			my $ReReadContent = km200_GetSingleService($hash);
+			   $ReReadContent = $ReReadContent->{switchPoints};
+			   $ReReadContent = encode_json($ReReadContent);
+			   $ReReadContent =~ s/{"switchPoints"://;
+			   $ReReadContent =~ s/]}/]/g;
+		
 			
 			### Return value
 			my $ReturnValue = "";
-			if ($GetReturnHash->{switchPoints} eq $jsonSend->{switchPoints})
-			{	
-				$ReturnValue = "The service " . $Service . " has been changed to: " . $hash->{temp}{postdata};
-				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing $Service succesfully with value: $JsonContent\n");}
+			if ($ReReadContent eq $JsonContent)
+			{
+				$ReturnValue = "The service " . $Service . " has been changed succesfully!";
+				if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service succesfully \n");}
 			}
 			else
 			{
-				$ReturnValue = "ERROR - The service " . $Service . " could not changed to: " . $hash->{temp}{postdata} . "\n";
-				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing $Service was NOT successful\n");}
+				$ReturnValue = "ERROR - The service " . $Service . " could not changed! \n";
+				if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service was NOT succesfully \n");}
 			}
 
 			### Return the status message
@@ -1293,8 +1308,7 @@ print("km200_Set - READBACKDELAY / [ms]:                      " . $hash->{READBA
 	}	
 	## Check whether the type is a single value containing a string
 	elsif($jsonRead->{type} eq "stringValue") 
-	{
-print("km200_Set - jsonRead type: " . $jsonRead->{type} . " \n");	
+	{	
 		### Save chosen value into hash to be send
 		$jsonSend->{value} = $hash->{temp}{postdata};
 
@@ -1306,7 +1320,6 @@ print("km200_Set - jsonRead type: " . $jsonRead->{type} . " \n");
 
 		### Encode as json
 		$JsonContent = encode_json($jsonSend);
-print("km200_Set - JsonContent-String: " . $JsonContent . " \n");
 		
 		### Encrypt 
 		$hash->{temp}{jsoncontent} = $JsonContent;
@@ -1569,11 +1582,18 @@ sub km200_GetSingleService($)
 				foreach my $item (@{ $json->{switchPoints} })
 				{
 					### Create string for time and switchpoint in fixed format and write part of Reading String
-					my $temptime     = sprintf ('%04d', ($item->{time}/0.6));
+					my $temptime     = $item->{time} / 60;
+					my $temptimeHH   = int($temptime);
+					my $temptimeMM   = ($temptime - $temptimeHH) * 60;
+
+					$temptimeHH = sprintf ('%02d', $temptimeHH);
+					$temptimeMM = sprintf ('%02d', $temptimeMM);
+					$temptime = $temptimeHH . $temptimeMM;
+					
 					my $tempsetpoint =  $item->{setpoint};
 					$tempsetpoint    =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(8-length($1)))/e;
 					my $TempReading  = $temptime . " " . $tempsetpoint;
-					
+
 					### Create ValueString for this day
 					if ($item->{dayOfWeek} eq "Mo")
 					{
@@ -1700,17 +1720,50 @@ sub km200_GetSingleService($)
 				
 				### Save raw Json string
 				$hash->{temp}{JsonRaw} = $decodedContent;
+	
 				
+				my $TempJsonId;
+				
+				### Create new Service and write reading for fhem
+				$TempJsonId = $JsonId . "/" . "1-Mo";
+				readingsSingleUpdate( $hash, $TempJsonId, $TempReadingMo, 1);
+
+				### Create new Service and write reading for fhem
+				$TempJsonId = $JsonId . "/" . "2-Tu";
+				readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTu, 1);
+
+				### Create new Service and write reading for fhem
+				$TempJsonId = $JsonId . "/" . "3-We";
+				readingsSingleUpdate( $hash, $TempJsonId, $TempReadingWe, 1);
+
+				### Create new Service and write reading for fhem
+				$TempJsonId = $JsonId . "/" . "4-Th";
+				readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTh, 1);
+
+				### Create new Service and write reading for fhem
+				$TempJsonId = $JsonId . "/" . "5-Fr";
+				readingsSingleUpdate( $hash, $TempJsonId, $TempReadingFr, 1);
+
+				### Create new Service and write reading for fhem
+				$TempJsonId = $JsonId . "/" . "6-Sa";
+				readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSa, 1);
+
+				### Create new Service and write reading for fhem
+				$TempJsonId = $JsonId . "/" . "7-Su";
+				readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSu, 1);
+
 				return $json
 			}
 			### Check whether the type is an errorlist
 			elsif ($json -> {type} eq "errorList")
 			{
-				
 				my $TempErrorList    = "";
 				
-				### For every item in the list of errors coming from the KM200
-				foreach my $item (@{ $json->{values} })
+				### Sort list by timestamps descending
+				my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
+
+				### For every notification do
+				foreach my $item (@TempSortedErrorList)
 				{					
 					### Create message string with fixed blocksize
 					my $TempTime      = $item->{t};
@@ -1965,11 +2018,18 @@ sub km200_ParseHttpResponseInit($)
 			foreach my $item (@{ $json->{switchPoints} })
 			{
 				### Create string for time and switchpoint in fixed format and write part of Reading String
-				my $temptime     = sprintf ('%04d', ($item->{time}/0.6));
+				my $temptime     = $item->{time} / 60;
+				my $temptimeHH   = int($temptime);
+				my $temptimeMM   = ($temptime - $temptimeHH) * 60;
+
+				$temptimeHH = sprintf ('%02d', $temptimeHH);
+				$temptimeMM = sprintf ('%02d', $temptimeMM);
+				$temptime = $temptimeHH . $temptimeMM;
+				
 				my $tempsetpoint =  $item->{setpoint};
 				$tempsetpoint    =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(8-length($1)))/e;
 				my $TempReading  = $temptime . " " . $tempsetpoint;
-				
+
 				### Create ValueString for this day
 				if ($item->{dayOfWeek} eq "Mo")
 				{
@@ -2176,8 +2236,16 @@ sub km200_ParseHttpResponseInit($)
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId\n";}
 
+			
+			
+			
+			
 			my $TempServiceIndex = 0;
-			foreach my $item (@{ $json->{values} })
+			
+			### Sort list by timestamps descending
+			my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
+
+			foreach my $item (@TempSortedErrorList)
 			{
 				### Increment Service-Index
 				$TempServiceIndex++;
@@ -2493,11 +2561,18 @@ sub km200_ParseHttpResponseDyn($)
 			foreach my $item (@{ $json->{switchPoints} })
 			{
 				### Create string for time and switchpoint in fixed format and write part of Reading String
-				my $temptime     = sprintf ('%04d', ($item->{time}/0.6));
+				my $temptime     = $item->{time} / 60;
+				my $temptimeHH   = int($temptime);
+				my $temptimeMM   = ($temptime - $temptimeHH) * 60;
+
+				$temptimeHH = sprintf ('%02d', $temptimeHH);
+				$temptimeMM = sprintf ('%02d', $temptimeMM);
+				$temptime = $temptimeHH . $temptimeMM;
+				
 				my $tempsetpoint =  $item->{setpoint};
 				$tempsetpoint    =~ s/^(.+)$/sprintf("%s%s", $1, ' 'x(8-length($1)))/e;
 				my $TempReading  = $temptime . " " . $tempsetpoint;
-				
+
 				### Create ValueString for this day
 				if ($item->{dayOfWeek} eq "Mo")
 				{
@@ -2644,9 +2719,12 @@ sub km200_ParseHttpResponseDyn($)
 			my $JsonId           = $json->{id};
 			my $JsonType         = $json->{type};
 			my $TempServiceIndex = 0;
-			
+
+			### Sort list by timestamps descending
+			my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
+
 			### For every notification do
-			foreach my $item (@{ $json->{values} })
+			foreach my $item (@TempSortedErrorList)
 			{
 				### Increment Service-Index
 				$TempServiceIndex++;
@@ -3150,9 +3228,9 @@ sub km200_ParseHttpResponseStat($)
 <ul><ul>
 	<table>
 		<tr>
-			<td align="right" valign="top"><code>&lt;option&gt;</code> : </td><td align="left" valign="top">Das optionelle Argument für die Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>
-																											 &nbsp;&nbsp;Folgende Optionen sind verfügbar:<BR>
-																											 &nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zurück. 
+			<td align="right" valign="top"><code>&lt;option&gt;</code> : </td><td align="left" valign="top">Das optionelle Argument f𲠤ie Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>
+																											 &nbsp;&nbsp;Folgende Optionen sind verf𧢡r:<BR>
+																											 &nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zur𣫮 
 			</td>
 		</tr>
 	</table>
@@ -3235,7 +3313,7 @@ sub km200_ParseHttpResponseStat($)
 	<table>
 		<tr>
 			<td>
-			<tr><td align="right" valign="top"><li><code>ReadBackDelay</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zurücklesen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>
+			<tr><td align="right" valign="top"><li><code>ReadBackDelay</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zur𣫬esen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>
 																												   Der  Default-Wert ist 100 = 100ms = 0,1s.<BR>
 			</td></tr>
 			</td>
