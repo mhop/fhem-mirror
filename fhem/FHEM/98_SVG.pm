@@ -1105,7 +1105,8 @@ SVG_getData($$$$$)
 {
   my ($d, $f,$t,$srcDesc,$showData) = @_;
   my (@da, $ret, @vals); 
-  my @keys = ("min","max","avg","cnt","currval","mindate","maxdate","lastraw");
+  my @keys = ("min","mindate","max","maxdate","currval","currdate",
+              "firstval","firstdate","avg","cnt","lastraw");
 
   foreach my $src (@{$srcDesc->{order}}) {
     my $s = $srcDesc->{src}{$src};
@@ -2331,8 +2332,10 @@ plotAsPng(@)
       expression, so you have access e.g. to the Value functions.<br><br>
 
       If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
-      mindate, maxdate, avg, cnt, sum, currval (last value) and currdate (last
-      date) values of the individual curves, by accessing the corresponding
+      mindate, maxdate, avg, cnt, sum, firstval, firstdate, currval (last
+      value) and currdate (last date) values of the individual curves, by
+      accessing the corresponding
+
       values from the data hash, see the example below:<br>
 
       <ul>
