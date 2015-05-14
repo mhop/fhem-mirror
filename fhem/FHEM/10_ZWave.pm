@@ -220,15 +220,15 @@ my %zwave_class = (
                configLong  => "04%02x04%08x" },
     get   => { config      => "05%02x" },
     parse => { "^..70..(..)(..)(.*)" => 'ZWave_configParse($hash,$1,$2,$3)'} },
-
   ALARM                    => { id => '71', 
     get   => { alarm       => "04%02x" },
     parse => { "..7105(..)(..)(.*)" => 'ZWave_alarmParse($1,$2,$3)'} },
   MANUFACTURER_SPECIFIC    => { id => '72',
     get   => { model       => "04" },
-    parse => { "087205(....)(....)(....)" => 'ZWave_mfsParse($1,$2,$3,0)',
-               "087205(....)(....)(.{4})" => 'ZWave_mfsParse($1,$2,$3,1)',
-               "087205(....)(.{4})(.{4})" => '"modelId:$1-$2-$3"'} },
+    parse => { "087205(....)(....)(....)" =>'ZWave_mfsParse($hash,$1,$2,$3,0)',
+               "087205(....)(....)(.{4})" =>'ZWave_mfsParse($hash,$1,$2,$3,1)',
+               "087205(....)(.{4})(.{4})" =>'ZWave_mfsParse($hash,$1,$2,$3,2)'},
+    init  => { ORDER=>49, CMD => '"get $NAME model"' } },
   POWERLEVEL               => { id => '73' },
   PROTECTION               => { id => '75',
     set   => { protectionOff => "0100",
@@ -272,7 +272,8 @@ my %zwave_class = (
     set   => { associationAdd => "01%02x%02x*",
                associationDel => "04%02x%02x*" },
     get   => { association => "02%02x",      },
-    parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"'} },
+    parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"'},
+    init  => { ORDER=> 1, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
     get   => { version      => "11",
                versionClass => "13%02x" },
@@ -341,10 +342,12 @@ my %zwave_cmdArgs = (
 
 my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
-                           "013c-0001-0003" => "Philio_PAN04" );
+                           "013c-0001-0003" => "Philio_PAN04",
+                           "0115-0100-0102" => "ZME_KFOB" );
 
 # Patching certain devices.
-my %zwave_deviceSpecial = (
+use vars qw(%zwave_deviceSpecial);
+%zwave_deviceSpecial = (
    Fibaro_FGRM222 => {
      MANUFACTURER_PROPRIETARY => {
       set   => { positionSlat=>"010f26010100%02x", 
@@ -354,10 +357,13 @@ my %zwave_deviceSpecial = (
                   'sprintf("position:Blinds %d Slat %d",hex($1),hex($2))' } } },
    Philio_PAN04 => {
      METER => {
-      get   => { meter       => "01",
-                 meterWatt   => "0110",       #Watt
-                 meterVoltage=> "0120",       #Voltage
-                 meterAmpere => "0128"  } } } #Ampere
+      get_ADD => { meterWatt   => "0110",       #Watt
+                   meterVoltage=> "0120",       #Voltage
+                   meterAmpere => "0128"  } } },#Ampere
+   ZME_KFOB => {
+     ZWAVEPLUS_INFO => {
+      # Example only. ORDER must be >= 50
+      init => { ORDER=>50, CMD => '"get $NAME zwavePlusInfo"' } } }
 );
 
 sub
@@ -405,25 +411,52 @@ ZWave_Define($$)
   $modules{ZWave}{defptr}{"$homeId $id"} = $hash;
   AssignIoPort($hash);  # FIXME: should take homeId into account
 
-  if(@a) {
+  if(@a) {      # Autocreate: set the classes, execute the init calls
+    $hash->{lastMsgTimestamp} = time(); # device is awake.
     ZWave_SetClasses($homeId, $id, undef, $a[0]);
-
-    if($attr{$name}{classes} =~ m/ASSOCIATION/) {
-      my $iodev = $hash->{IODev};
-      my $homeReading = ReadingsVal($iodev->{NAME}, "homeId", "") if($iodev);
-      my $ctrlId = $1 if($homeReading && $homeReading =~ m/CtrlNodeId:(..)/);
-
-      if($ctrlId) {
-        Log3 $name, 1, "Adding the controller $ctrlId to association group 1";
-        IOWrite($hash, "00", "130a04850101${ctrlId}05");
-
-      } else {
-        Log3 $name, 1, "Cannot associate $name, missing controller id";
-      }
-    }
+    ZWave_execInits($hash, 0);
   }
   return undef;
 }
+
+sub
+ZWave_doExecInits($)
+{
+  my ($cmdArr) = @_;
+
+  my $cmd = shift @{$cmdArr};
+  my $ret = AnalyzeCommand(undef, $cmd);
+  Log 1, "ZWAVE INIT: $cmd: $ret" if ($ret);
+  InternalTimer(gettimeofday()+0.5, "ZWave_doExecInits", $cmdArr, 0)
+    if(@{$cmdArr});
+}
+
+sub
+ZWave_execInits($$)
+{
+  my ($hash, $min) = @_;  # min = 50 for model-specific stuff
+  my @clList = split(" ", $attr{$hash->{NAME}}{classes});
+  my (@initList, %seen);
+  foreach my $cl (@clList) {
+    next if($seen{$cl});
+    $seen{$cl} = 1;
+    my $ptr = ZWave_getHash($hash, $cl, "init");
+    push @initList, $ptr if($ptr && $ptr->{ORDER} >= $min);
+  }
+
+  my $NAME = $hash->{NAME};
+  my $iodev = $hash->{IODev};
+  my $homeReading = ReadingsVal($iodev->{NAME}, "homeId", "") if($iodev);
+  my $CTRLID = $1 if($homeReading && $homeReading =~ m/CtrlNodeId:(..)/);
+
+  my @cmd;
+  foreach my $i (sort { $a->{ORDER}<=>$b->{ORDER} } @initList) {
+    push @cmd, eval $i->{CMD};
+  }
+  InternalTimer(gettimeofday()+0.5, "ZWave_doExecInits", \@cmd, 0)
+    if(@cmd);
+}
+
 
 ###################################
 sub
@@ -433,7 +466,6 @@ ZWave_Cmd($$@)
   return "no $type argument specified" if(int(@a) < 2);
   my $name = shift(@a);
   my $cmd  = shift(@a);
-
 
   # Collect the commands from the distinct classes
   my %cmdList;
@@ -549,12 +581,9 @@ ZWave_Cmd($$@)
     my $awake = ($baseHash->{lastMsgTimestamp} &&
                   time() - $baseHash->{lastMsgTimestamp} < 2);
 
-    if($awake && @{$baseHash->{WakeUp}} == 0) {
-      push @{$baseHash->{WakeUp}}, ""; # Block the next
-
-    } else {
+    if(!$awake) {
       push @{$baseHash->{WakeUp}}, $data.$id;
-      return (AttrVal($name,"verbose",3) > 2 ? 
+      return (AttrVal($name,"verbose",3) > 2 ?
                   "Scheduled for sending after WAKEUP" : undef);
     }
 
@@ -741,9 +770,16 @@ ZWave_mcCapability($$)
 }
 
 sub
-ZWave_mfsParse($$$$)
+ZWave_mfsParse($$$$$)
 {
-  my ($mf, $prod, $id, $config) = @_;
+  my ($hash, $mf, $prod, $id, $config) = @_;
+
+  if($config == 2) {
+    setReadingsVal($hash, "modelId", "$mf-$prod-$id", TimeNow());
+    ZWave_execInits($hash, 50);
+    return "modelId:$mf-$prod-$id";
+  }
+
   my $xml = $attr{global}{modpath}.
             "/FHEM/lib/openzwave_manufacturer_specific.xml";
   ($mf, $prod, $id) = (lc($mf), lc($prod), lc($id)); # Just to make it sure
@@ -759,7 +795,7 @@ ZWave_mfsParse($$$$)
       if($l =~ m/<Product type="([^"]*)".*id="([^"]*)".*name="([^"]*)"/) {
         if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
           if($config) {
-            $ret = "modelConfig:$1" if($l =~ m/config="([^"]*)"/);
+            $ret = "modelConfig:".(($l =~ m/config="([^"]*)"/) ? $1:"unknown");
             return $ret;
           } else {
             $ret = "model:$mName $3";
@@ -1275,25 +1311,33 @@ sub
 ZWave_getHash($$$)
 {
   my ($hash, $cl, $type) = @_;
-
-  my $ptr = $zwave_class{$cl}{$type}
+  my $ptr; # must be standalone, as there is a $ptr in the calling fn.
+  $ptr = $zwave_class{$cl}{$type}
       if($zwave_class{$cl} && $zwave_class{$cl}{$type});
 
   if($cl eq "CONFIGURATION" && $type ne "parse") {
     my $mc = ZWave_configGetHash($hash);
     if($mc) {
       my $mcp = $mc->{$type};
-      my %nptr = ();
-      map({$nptr{$_} = $ptr->{$_}} keys %{$ptr});
-      map({$nptr{$_} = $mcp->{$_}} keys %{$mcp});
-      $ptr = \%nptr;
+      if($mcp) {
+        my %nptr = ();
+        map({$nptr{$_} = $ptr->{$_}} keys %{$ptr});
+        map({$nptr{$_} = $mcp->{$_}} keys %{$mcp});
+        $ptr = \%nptr;
+      }
     }
   }
 
   my $modelId = ReadingsVal($hash->{NAME}, "modelId", "");
   $modelId = $zwave_modelIdAlias{$modelId} if($zwave_modelIdAlias{$modelId});
   my $p = $zwave_deviceSpecial{$modelId};
-  $ptr = $p->{$cl}{$type} if($p && $p->{$cl} && $p->{$cl}{$type});
+  if($p && $p->{$cl}) {
+    $ptr = $p->{$cl}{$type} if($p->{$cl}{$type});
+
+    my $add = $p->{$cl}{$type."_ADD"};
+    $ptr = {} if($add && !$ptr);
+    map { $ptr->{$_} = $add->{$_} } keys %{$add} if($add);
+  }
 
   return $ptr;
 }
@@ -1320,7 +1364,7 @@ ZWave_Parse($$@)
       Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
       return "";
     }
-    Log3 $ioName, 4, "$ioName: unhandled ANSWER: $cmd $arg";
+    Log3 $ioName, 4, "$ioName unhandled ANSWER: $cmd $arg";
     return "";
   }
 
@@ -1483,7 +1527,7 @@ ZWave_Parse($$@)
       if($arg =~ m/^$k/) {
         my $val = $ptr->{$k};
         $val = eval $val if(index($val, '$') >= 0);
-        push @event, $val;
+        push @event, $val if(defined($val));
       }
     }
     push @event, "UNPARSED:$className $arg" if(!@event);

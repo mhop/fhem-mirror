@@ -85,8 +85,10 @@ use vars qw(%zw_type6);
   '34'  => 'RTC_TIMER_READ',
   '35'  => 'RTC_TIMER_DELETE',
   '36'  => 'RTC_TIMER_CALL',
+  '40'  => 'ZW_SET_LEARN_NODE_STATE',
   '41'  => 'ZW_GET_NODE_PROTOCOL_INFO',
   '42'  => 'ZW_SET_DEFAULT',
+  '43'  => 'ZW_NEW_CONTROLLER',
   '44'  => 'ZW_REPLICATION_COMMAND_COMPLETE',
   '45'  => 'ZW_REPLICATION_SEND_DATA',
   '46'  => 'ZW_ASSIGN_RETURN_ROUTE',
@@ -772,7 +774,8 @@ ZWDongle_Ready($)
   <ul>
   <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|controller|done|failed]
     </li>
-  <li>ZW_REMOVE_NODE_TO_NETWORK [learnReady|nodeFound|slave|controller|done|failed]
+  <li>ZW_REMOVE_NODE_FROM_NETWORK 
+                        [learnReady|nodeFound|slave|controller|done|failed]
     </li>
   <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
     </li>
