@@ -31,7 +31,7 @@ my %sets = (
                         param => {on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
   "removeFailedNode" => { cmd => "61%02x" },   # ZW_REMOVE_FAILED_NODE_ID
-  "replaceFailedNode"=> { cmd => "64%02x" },   # ZW_REPLACE_FAILED_NODE
+  "replaceFailedNode"=> { cmd => "63%02x" },   # ZW_REPLACE_FAILED_NODE
   "neighborUpdate"   => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "reopen"           => { cmd => "" },
