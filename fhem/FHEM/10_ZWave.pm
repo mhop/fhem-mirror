@@ -1523,14 +1523,16 @@ ZWave_Parse($$@)
       next;
     }
 
+    my $matched = 0;
     foreach my $k (keys %{$ptr}) {
       if($arg =~ m/^$k/) {
         my $val = $ptr->{$k};
         $val = eval $val if(index($val, '$') >= 0);
         push @event, $val if(defined($val));
+        $matched++;
       }
     }
-    push @event, "UNPARSED:$className $arg" if(!@event);
+    push @event, "UNPARSED:$className $arg" if(!$matched);
   }
 
   my $wu = $baseHash->{WakeUp};
