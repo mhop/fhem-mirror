@@ -6,11 +6,14 @@ set xlabel " "
 set title '<L1>'
 set ytics 
 set y2tics 
+set y3tics ("on" 1, "off" 0)
 set grid y2tics
 set ylabel "Spannung (V)"
 set y2label "Strom (mA)"
+set y3label ""
 set yrange [4.4:5.2]
-#set y2range [0:1000]
+#set yrange [-0.1:5.2]
+set y2range [0:1000]
 set y3range [0:2]
 
 #FileLog 6:power_ac_stat\x3a:0:

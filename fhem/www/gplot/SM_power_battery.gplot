@@ -6,13 +6,16 @@ set xlabel " "
 set title '<L1>'
 set ytics 
 set y2tics 
+set y3tics ("on" 1, "off" 0)
 set grid y2tics
 set ylabel "Spannung (V)"
 set y2label "Strom (mA)"
-set yrange [4.4:5.2]
-#set y2range [0:1000]
+set y3label ""
+set y4label "Ladung"
+set yrange [3.0:5.2]
+set y2range [-5:1000]
 set y3range [0:2]
-set y3range [0:100]
+set y4range [0:105]
 
 #FileLog 6:power_battery_stat\x3a:0:
 # --- FileLog 7:power_battery_stat\x3a:0:$fld[6]/1000
@@ -23,5 +26,5 @@ set y3range [0:100]
 
 plot "<IN>" using 1:2 axes x1y1 title 'Spannung' ls l0 lw 1.2 with lines,\
      "<IN>" using 1:2 axes x1y2 title 'Strom' ls l2 lw 1.2 with lines,\
-     "<IN>" using 1:2 axes x1y4 title 'Ladung' ls l3 lw 1.2 with lines,\
+     "<IN>" using 1:2 axes x1y4 title 'Ladung' ls l3 lw 1.8 with lines,\
      "<IN>" using 1:2 axes x1y3 title 'Online' ls l1fill lw 0 with steps
