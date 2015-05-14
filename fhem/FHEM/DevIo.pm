@@ -141,25 +141,33 @@ DevIo_Expect($$$)
     # the device has failed to deliver a result
   DevIo_setStates($hash, "failed");
   DoTrigger($name, "FAILED");
+
   # reopen device
   # unclear how to know whether the following succeeded
-  Log3 $name, 2, "$name: first attempt to read timed out, trying to close and open the device.";
-  # The next two lines are required to avoid a deadlock when the remote end closes the connection
-  # upon DevIo_OpenDev, as e.g.    netcat -l <port>      does.
+  Log3 $name, 2, "$name: first attempt to read timed out, ".
+                        "trying to close and open the device.";
+
+  # The next two lines are required to avoid a deadlock when the remote end
+  # closes the connection upon DevIo_OpenDev, as e.g. netcat -l <port> does.
   DevIo_CloseDev($hash);
   DevIo_OpenDev($hash, 0, undef); # where to get the initfn from? 
+
   # write something again
   return undef unless defined(DevIo_SimpleWrite($hash, $msg, 0));
+
   # read answer again
   $answer= DevIo_SimpleReadWithTimeout($hash, $timeout);
+
   # success
   if($answer ne "") {
     DevIo_setStates($hash, "opened");
     DoTrigger($name, "CONNECTED");
     return $answer;
   }
+
   # ultimate failure
-  Log3 $name, 2, "$name: second attempt to read timed out, this is an unrecoverable error.";
+  Log3 $name, 2,
+    "$name: second attempt to read timed out, this is an unrecoverable error.";
   DoTrigger($name, "DISCONNECTED");
   return undef; # undef means ultimate failure
 }
@@ -174,6 +182,11 @@ DevIo_OpenDev($$$)
   my $po;
   my $baudrate;
   ($dev, $baudrate) = split("@", $dev);
+
+  if($hash->{DevIoJustClosed}) {
+    delete $hash->{DevIoJustClosed};
+    return;
+  }
 
   $hash->{PARTIAL} = "";
   Log3 $name, 3, ($hash->{DevioText} ? $hash->{DevioText} : "Opening").
@@ -397,6 +410,7 @@ DevIo_Disconnected($)
   DevIo_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   DevIo_setStates($hash, "disconnected");
+  $hash->{DevIoJustClosed} = 1;                     # Avoid a direct reopen
 
   DoTrigger($name, "DISCONNECTED");
 }
