@@ -160,6 +160,7 @@ doUpdate($$)
   }
 
   my @excl = split(" ", AttrVal("global", "exclude_from_update", ""));
+  my $noSzCheck = AttrVal("global", "updateNoFileCheck", configDBUsed());
 
   my @rl = upd_getChanges($root, $basePath);
   ###########################
@@ -211,17 +212,23 @@ doUpdate($$)
         next;
       }
 
-      my $sz = -s $fPath;
-      next if($isExcl || ($fileOk && defined($sz) && $sz eq $r[2]));
+      if($noSzCheck) {
+        next if($isExcl || $fileOk);
+
+      } else {
+        my $sz = -s $fPath;
+        next if($isExcl || ($fileOk && defined($sz) && $sz eq $r[2]));
+
+      }
     }
+
+    $needJoin = 1 if($fName =~ m/commandref_frame/ || $fName =~ m/\d+.*.pm/);
+    next if($fName =~ m/commandref.*html/ && $fName !~ m/frame/ && $canJoin);
 
     uLog 1, "List of new / modified files since last update:"
       if($arg eq "check" && $nChanged == 0);
 
-    $needJoin = 1 if($fName =~ m/commandref_frame/ || $fName =~ m/\d+.*.pm/);
-    next if($fName =~ m/commandref.*html/ && $fName !~ m/frame/ && $canJoin);
     $nChanged++;
-
     uLog 1, "$r[0] $fName";
     next if($arg eq "check");
 
@@ -526,6 +533,13 @@ upd_initRestoreDirs($)
         Monitor.
         </li><br>
 
+    <a name="updateNoFileCheck"></a>
+    <li>updateNoFileCheck<br>
+        If set, the command won't compare the local file size with the expected
+        size. This attribute was introduced to satisfy some experienced FHEM
+        user, its default value is 0.
+        </li><br>
+
     <a name="backup_before_update"></a>
     <li>backup_before_update<br>
         If this attribute is set, an update will back up your complete
@@ -613,6 +627,14 @@ upd_initRestoreDirs($)
         separaten Prozess ausgef&uuml;hrt, und alle Meldungen werden per Event
         &uuml;bermittelt. In der telnet Sitzung wird inform, in FHEMWEB wird
         das Event Monitor aktiviert.
+        </li><br>
+
+    <a name="updateNoFileCheck"></a>
+    <li>updateNoFileCheck<br>
+        Wenn dieses Attribut gesetzt ist, wird die Gr&ouml;&szlig;e der bereits
+        vorhandenen, lokalen Datei nicht mit der Sollgr&ouml;&szlig;e
+        verglichen. Dieses Attribut wurde nach nicht genau spezifizierten Wnsch
+        erfahrener FHEM Benutzer eingefuehrt, die Voreinstellung ist 0.
         </li><br>
 
     <a name="backup_before_update"></a>

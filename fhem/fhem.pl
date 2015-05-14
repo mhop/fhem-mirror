@@ -284,6 +284,7 @@ my @globalAttrList = qw(
   title
   uniqueID
   updateInBackground:1,0
+  updateNoFileCheck:1,0
   version
 );
 use warnings 'qw';
