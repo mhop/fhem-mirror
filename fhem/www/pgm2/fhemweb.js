@@ -711,7 +711,7 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
   if(currVal < min || currVal > max)
     currVal = min;
 
-  var newEl = $('<div style="display:inline-block">').get(0);
+  var newEl = $('<div style="display:inline-block" tabindex="0">').get(0);
   var slider = $('<div class="slider" id="slider.'+devName+'">').get(0);
   $(newEl).append(slider);
 
@@ -733,6 +733,20 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
     if(elName)
       slider.nextSibling.setAttribute('value', currVal);
   }
+
+  $(newEl).keydown(function(e){
+    if(e.keyCode == 37) currVal -= stp;
+    if(e.keyCode == 39) currVal += stp;
+    if(currVal < min) currVal = min;
+    if(currVal > max) currVal = max;
+    offX = (currVal-min)*maxX/(max-min);
+    sh.innerHTML = currVal;
+    sh.setAttribute('style', 'left:'+offX+'px;');
+    if(cmd)
+      cmd(currVal);
+    if(elName)
+      slider.nextSibling.setAttribute('value', currVal);
+  });
 
   function
   touchFn(e, fn)
