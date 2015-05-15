@@ -330,7 +330,7 @@ ZWDongle_Get($@)
     for my $byte (0..31) {
       my $bits = $r[10+$byte];
       for my $bit (0..7) {
-        my $id = sprintf("%02x", $byte*8+$bit);
+        my $id = sprintf("%02x", $byte*8+$bit+1);
         push @list, ($zw_func_id{$id} ? $zw_func_id{$id} : "UNKNOWN_$id")
                 if($bits & (1<<$bit));
       }
