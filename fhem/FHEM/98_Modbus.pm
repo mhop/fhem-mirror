@@ -764,7 +764,16 @@ ModbusLD_SetIODev($)
 {
     my ($hash) = @_;
     my $name   = $hash->{NAME};
-    my $ioDev  = AttrVal($name, "IODev", "");
+    my $ioName = AttrVal($name, "IODev", "");
+    my $ioDev;
+    if ($ioName) {
+        if ($defs{$ioName}) {         # gibt es den Geräte hash zum IODev Attribut?
+            $ioDev = $defs{$ioName};
+            Log3 $name, 5, "$name: SetIODev is using $ioName given in attribute";
+        } else {
+            Log3 $name, 3, "$name: SetIODev can't use $ioName - device does not exist";
+        }
+    }
     if (!$ioDev) {
         for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
             if ( $defs{$p}{TYPE} eq "Modbus") {
@@ -772,16 +781,14 @@ ModbusLD_SetIODev($)
                 last;
             }
         }
-        if ($ioDev) {
-            $attr{$name}{IODev} = $ioDev->{NAME};       # set IODev attribute
-            Log3 $name, 5, "$name: SetIODev $ioDev->{NAME}";
-        } else {
-            Log3 $name, 3, "$name: SetIODev found no physical modbus device";
-        }
-    } else {
-        Log3 $name, 5, "$name: SetIODev is using $ioDev->{NAME} given in attribute";
     }
-    $hash->{IODev} = $ioDev;
+    if ($ioDev) {
+        $attr{$name}{IODev} = $ioDev->{NAME};       # set IODev attribute
+        $hash->{IODev} = $ioDev;                    # set internal to io device hash
+        Log3 $name, 5, "$name: SetIODev $ioDev->{NAME}";
+    } else {
+        Log3 $name, 3, "$name: SetIODev found no physical modbus device";
+    }
     return $ioDev;
 }
 
@@ -814,7 +821,7 @@ ModbusLD_Define($$)
     $hash->{getList} = "";
     $hash->{setList} = "";
     
-    if ($dest) {        
+    if ($dest) {                                    # Modbus TCP mit IP Adresse angegeben.
         $hash->{IODev}       = $hash;               # Modul ist selbst IODev
         $hash->{defptr}{$id} = $hash;               # ID verweist zurück auf eigenes Modul  
         $hash->{DeviceName}  = $dest;               # needed by DevIo to get Device, Port, Speed etc.
