@@ -4,6 +4,7 @@
 #
 # History:
 #
+# 2015-05-15: Add attribute mailtype as suggested by Roger (forum #37206)
 # 2015-05-11: Improve error logging to assist problem solving
 # 2015-05-09: Assimilate mail related code from 75_MSG
 # 2015-05-06: Tidy up code for restructuring
@@ -47,7 +48,7 @@ sub MSGMail_Initialize($)
     $hash->{SetFn}    = "MSGMail_Set";
     $hash->{DefFn}    = "MSGMail_Define";
     $hash->{UndefFn}  = "MSGMail_Undef";
-    $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 authfile smtphost smtpport subject from to cc CR:0,1";
+    $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 authfile smtphost smtpport subject mailtype:plain,html from to cc CR:0,1";
 
     my $name = "MSGMail";
 
@@ -97,6 +98,7 @@ sub MSGMail_Define($$)
     $attr{$name}{to}       = $a[3];
     $attr{$name}{smtphost} = $a[4];
     $attr{$name}{authfile} = $a[5];
+    $attr{$name}{mailtype} = "plain";
     $attr{$name}{subject}  = "FHEM ";
     $attr{$name}{CR}       = "1";
 
@@ -203,6 +205,10 @@ sub MSGMail_Set($@)
         my $smtphost = AttrVal($name, "smtphost", "");
         my $smtpport = AttrVal($name, "smtpport", "465");    # 465 is the default port
         my $cc       = AttrVal($name, "cc",       "");       # Carbon Copy
+        my $mtype    = AttrVal($name, "mailtype", "plain");
+
+        my $mailtype = "text/plain";
+        $mailtype= "text/$mtype" if ($mtype =~ m/^(plain|html)$/);
 
         return "No <from> address specified, use  attr $name from <mail-address>"
           if (!$from);
@@ -235,7 +241,7 @@ sub MSGMail_Set($@)
             From    => $from,
             To      => $to,
             Subject => $subject,
-            Type    => 'text/plain; charset=UTF-8',    #'multipart/mixed', # was 'text/plain'
+            Type    => "$mailtype; charset=UTF-8",    #'multipart/mixed', # was 'text/plain'
             Data    => $mess
         );
 
@@ -357,8 +363,8 @@ sub MSGMail_conn($)
 	</ul>
 	<ul><b>clear</b><br> to flush the message buffer and set the line counter to 0.
 		All the lines of data are deleted and the buffer is flushed.</ul>
-	<ul><b>list</b><br> to list the message buffer.<br></ul><br>
-        <ul><b>send</b><br> to send the message buffer.<br></ul><br>
+	<ul><b>list</b><br> to list the message buffer.<br></ul>
+        <ul><b>send</b><br> to send the message buffer.<br></ul>
 		<br>
 		Examples:
 		<ul>
@@ -409,7 +415,11 @@ sub MSGMail_conn($)
 		of the file. FHEM must have access to this file to read the userid and password.
 		<br>
 		</li>
-    <li><a href="MSGFilenameCR">CR</a><br>
+    <li><a href="MSGMailmailtype">mailtype</a> plain|html<br>
+                Use this attribute to select the contenttype to text/plain or text/html.
+                If text/html is selected, valid html code must be provided as content. No checks are applied!
+                Per default this attribute is 'plain'</li>
+    <li><a href="MSGMailCR">CR</a><br>
 		set the option to write a carriage return at the end of the line.
 		CR could be set to 0 or 1, 1 enables this feature.
 		Per default this attribute is enabled</li>
