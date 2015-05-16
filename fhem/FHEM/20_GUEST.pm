@@ -388,6 +388,7 @@ sub GUEST_Set($@) {
 
         Log3 $name, 2, "GUEST set $name " . $newstate if ( !$silent );
 
+        # if state changed
         if ( $state ne $newstate ) {
             readingsBeginUpdate($hash);
 
@@ -463,19 +464,6 @@ sub GUEST_Set($@) {
                 );
             }
 
-            # stop any running wakeup-timers in case user went away
-            if ( $newstate eq "away" || $newstate eq "gone" ) {
-              my $wakeupDeviceList = AttrVal( $name, "rg_wakeupDevice", 0 );
-              
-              for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
-                  next if !$wakeupDevice;
-
-                  if ( defined( $defs{$wakeupDevice} ) && $defs{$wakeupDevice}{TYPE} eq "dummy" ) {
-                    fhem "set $wakeupDevice:FILTER=running!=0 stop";
-                  }
-              }
-            }
-
             # calculate presence state
             my $newpresence =
               (      $newstate ne "none"
@@ -483,6 +471,28 @@ sub GUEST_Set($@) {
                   && $newstate ne "absent" )
               ? "present"
               : "absent";
+
+            # stop any running wakeup-timers in case state changed
+            my $wakeupState = AttrVal( $name, "wakeup", 0 );
+            if ($wakeupState) {
+                my $wakeupDeviceList = AttrVal( $name, "rg_wakeupDevice", 0 );
+
+                for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
+                    next if !$wakeupDevice;
+
+                    if ( defined( $defs{$wakeupDevice} )
+                        && $defs{$wakeupDevice}{TYPE} eq "dummy" )
+                    {
+                        my $wakeupNormalStop;
+                        $wakeupNormalStop =
+                          AttrVal( $wakeupDevice, "lastRun", "00:00" )
+                          if ( $newpresence eq "present" );
+
+                        fhem
+"set $wakeupDevice:FILTER=running!=0 stop $wakeupNormalStop";
+                    }
+                }
+            }
 
             # if presence changed
             if ( $newpresence ne $presence ) {
