@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 30_pilight_temp: reading battery state, attribut corrTemp to correct temperature
   - change:  73_km200: Wrong SwitchProgram time format fixed
   - feature: 73_km200: SwitchPrograms can be written/changed
   - change:  MSGMail: Improve error logging to assist problem solving

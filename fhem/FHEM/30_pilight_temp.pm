@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 20_pilight_temp.pm 0.11 2015-03-29 Risiko $
+# $Id: 20_pilight_temp.pm 0.12 2015-05-16 Risiko $
 #
 # Usage
 # 
@@ -9,6 +9,8 @@
 #
 # V 0.10 2015-03-29 - initial beta version 
 # V 0.11 2015-03-29 - FIX:  $readingFnAttributes
+# V 0.12 2015-05-16 - NEW:  reading battery
+# V 0.12 2015-05-16 - NEW:  attribut corrTemp, a factor to modify temperatur 
 ############################################## 
 
 package main;
@@ -29,7 +31,7 @@ sub pilight_temp_Initialize($)
   $hash->{DefFn}    = "pilight_temp_Define";
   $hash->{Match}    = "^PITEMP";
   $hash->{ParseFn}  = "pilight_temp_Parse";
-  $hash->{AttrList} = $readingFnAttributes;
+  $hash->{AttrList} = "corrTemp ".$readingFnAttributes;
 }
 
 #####################################
@@ -67,7 +69,7 @@ sub pilight_temp_Parse($$)
 
   Log3 $backend, 4, "pilight_temp_Parse: RCV -> $rmsg";
   
-  my ($dev,$protocol,$id,$temp,$humidity,@args) = split(",",$rmsg);
+  my ($dev,$protocol,$id,$temp,$humidity,$battery,@args) = split(",",$rmsg);
   return () if($dev ne "PITEMP");
   
   my $chash;
@@ -82,10 +84,14 @@ sub pilight_temp_Parse($$)
   
   return () if (!defined($chash->{NAME}));
   
+  my $corrTemp = AttrVal($chash->{NAME}, "corrTemp",1);  
+  $temp = $temp * $corrTemp;
+  
   readingsBeginUpdate($chash);
   readingsBulkUpdate($chash,"state",$temp);
   readingsBulkUpdate($chash,"temperature",$temp);
-  readingsBulkUpdate($chash,"humidity",$humidity) if (defined($humidity) && $humidity ne "");
+  readingsBulkUpdate($chash,"humidity",$humidity) if (defined($humidity)  && $humidity  ne "");
+  readingsBulkUpdate($chash,"battery",$battery)   if (defined($battery)   && $battery   ne "");
   readingsEndUpdate($chash, 1); 
   
   return $chash->{NAME};
@@ -133,8 +139,19 @@ sub pilight_temp_Parse($$)
       humidity<br>
       present the current humidity (if sensor support it)
     </li>
+    <li>
+      battery<br>
+      present the battery state of the senor (if sensor support it)
+    </li>
   </ul>
   <br>
+  <a name="pilight_temp_attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a name="corrTemp">corrTemp</a><br>
+      A factor (e.q. 0.1) to correct the temperture value. Default: 1
+    </li>
+  </ul>
 </ul>
 
 =end html
