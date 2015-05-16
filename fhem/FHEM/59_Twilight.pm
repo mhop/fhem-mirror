@@ -416,7 +416,7 @@ sub Twilight_fireEvent($)
 
    if ($hash->{TW}{$nextEvent}{TIME} ne "nan") {
       $nextEventTime  = FmtTime($hash->{TW}{$nextEvent}{TIME});
-      Log3 $hash, 3,
+      Log3 $hash, 4,
         sprintf  ("[$hash->{NAME}] %-10s %-08s  ", $event, FmtTime($eventTime)).
         sprintf  ("===> %-10s %-08s  ", $nextEvent, $nextEventTime).
         sprintf  ("===> state/light/deg==$state/$light/%+.1f°", $deg);        
@@ -427,7 +427,7 @@ sub Twilight_fireEvent($)
    
        
    my $doTrigger = !(defined($hash->{LOCAL})) && ( abs($delta)<6 || $swip  && $state gt $oldState);
-   Log3 $hash, 3, "swip-delta-oldState-doTrigger===>$swip/$delta/$oldState/$doTrigger";
+  #Log3 $hash, 3, "swip-delta-oldState-doTrigger===>$swip/$delta/$oldState/$doTrigger";
 
    readingsBeginUpdate($hash);
    readingsBulkUpdate ($hash, "state",           $state);
