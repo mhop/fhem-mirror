@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.00 2015-05-09 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.02 2015-05-16 Risiko $
 #
 # Usage
 # 
@@ -25,6 +25,7 @@
 # V 0.51 2015-04-29 - CHG: rename attribute ignore to ignoreProtocol because with ignore the whole device is ignored in FHEMWEB
 # V 1.00 2015-05-09 - NEW: white list for defined submodules activating by ignoreProtocol *
 # V 1.01 2015-05-09 - NEW: add quigg_gt* protocol (e.q quigg_gt7000)
+# V 1.02 2015-05-16 - NEW: battery state for temperature sensors
 ############################################## 
 package main;
 
@@ -718,7 +719,9 @@ sub pilight_ctrl_Parse($$)
         return if ($temp eq "");
         
         my $humidity = (defined($data->{$s}{humidity})) ? $data->{$s}{humidity} : "";
-        my $msg = "PITEMP,$proto,$id,$temp,$humidity";
+        my $battery = (defined($data->{$s}{battery})) ? $data->{$s}{battery} : "";
+        
+        my $msg = "PITEMP,$proto,$id,$temp,$humidity,$battery";
         return Dispatch($hash, $msg,undef);
     }
     else  {Log3 $me, 3, "$me(Parse): unknown protocol -> $proto"; return;}
