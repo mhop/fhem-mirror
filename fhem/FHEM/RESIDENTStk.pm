@@ -90,7 +90,7 @@ sub RESIDENTStk_wakeupSet($$) {
 
     # check for required userattr attribute
     my $userattributes =
-"wakeupOffset:slider,0,1,120 wakeupDefaultTime:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45 wakeupMacro wakeupUserdevice wakeupAtdevice wakeupResetSwitcher wakeupResetdays:multiple-strict,0,1,2,3,4,5,6 wakeupDays:multiple-strict,0,1,2,3,4,5,6 wakeupHolidays:andHoliday,orHoliday,andNoHoliday,orNoHoliday wakeupEnforced:0,1,2";
+"wakeupOffset:slider,0,1,120 wakeupDefaultTime:OFF,00:00,00:15,00:30,00:45,01:00,01:15,01:30,01:45,02:00,02:15,02:30,02:45,03:00,03:15,03:30,03:45,04:00,04:15,04:30,04:45,05:00,05:15,05:30,05:45,06:00,06:15,06:30,06:45,07:00,07:15,07:30,07:45,08:00,08:15,08:30,08:45,09:00,09:15,09:30,09:45,10:00,10:15,10:30,10:45,11:00,11:15,11:30,11:45,12:00,12:15,12:30,12:45,13:00,13:15,13:30,13:45,14:00,14:15,14:30,14:45,15:00,15:15,15:30,15:45,16:00,16:15,16:30,16:45,17:00,17:15,17:30,17:45,18:00,18:15,18:30,18:45,19:00,19:15,19:30,19:45,20:00,20:15,20:30,20:45,21:00,21:15,21:30,21:45,22:00,22:15,22:30,22:45,23:00,23:15,23:30,23:45 wakeupMacro wakeupUserdevice wakeupAtdevice wakeupResetSwitcher wakeupResetdays:multiple-strict,0,1,2,3,4,5,6 wakeupDays:multiple-strict,0,1,2,3,4,5,6 wakeupHolidays:andHoliday,orHoliday,andNoHoliday,orNoHoliday wakeupEnforced:0,1,2 wakeupWaitPeriod:slider,0,1,360";
     if ( !$userattr || $userattr ne $userattributes ) {
         Log3 $NAME, 4,
 "RESIDENTStk $NAME: adjusting dummy device for required attribute userattr";
@@ -914,13 +914,18 @@ sub RESIDENTStk_wakeupRun($;$) {
     my $wakeupOffset        = AttrVal( $NAME,    "wakeupOffset",        0 );
     my $wakeupEnforced      = AttrVal( $NAME,    "wakeupEnforced",      0 );
     my $wakeupResetSwitcher = AttrVal( $NAME,    "wakeupResetSwitcher", 0 );
+    my $wakeupWaitPeriod    = AttrVal( $NAME,    "wakeupWaitPeriod",    360 );
     my $holidayDevice       = AttrVal( "global", "holiday2we",          0 );
     my $lastRun = ReadingsVal( $NAME, "lastRun", "06:00" );
+    my $lastRunTimestamp =
+      ReadingsTimestamp( $NAME, "lastRun", "1970-01-01 00:00:00" );
     my $nextRun = ReadingsVal( $NAME, "nextRun", "06:00" );
-    my $running = ReadingsVal( $NAME, "running", 0 );
+    my $nextRunTimestamp =
+      ReadingsTimestamp( $NAME, "nextRun", "1970-01-01 00:00:00" );
     my $wakeupUserdeviceWakeup = ReadingsVal( $wakeupUserdevice, "wakeup", 0 );
     my $room         = AttrVal( $NAME, "room", 0 );
     my $running      = 0;
+    my $preventRun   = 0;
     my $holidayToday = "";
 
     if (   $wakeupHolidays
@@ -939,11 +944,19 @@ sub RESIDENTStk_wakeupRun($;$) {
 
     my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
       localtime( time + $wakeupOffset * 60 );
+    $mon += 01;
 
     $hour = "0" . $hour if ( $hour < 10 );
     $min  = "0" . $min  if ( $min < 10 );
 
     my $nowRun = $hour . ":" . $min;
+    my $nowRunSec =
+      RESIDENTStk_Datetime2Timestamp( $year . "-"
+          . $mon . "-"
+          . $mday . " "
+          . $hour . ":"
+          . $min . ":"
+          . $sec );
 
     if ( $nextRun ne $nowRun ) {
         $lastRun = $nowRun;
@@ -952,6 +965,24 @@ sub RESIDENTStk_wakeupRun($;$) {
     else {
         $lastRun = $nextRun;
         Log3 $NAME, 4, "RESIDENTStk $NAME: lastRun = nextRun = $lastRun";
+    }
+
+    # do not run if wakeupWaitPeriod expiration was not reached yet
+    my $expLastRun =
+      RESIDENTStk_Datetime2Timestamp($lastRunTimestamp) - 1 +
+      $wakeupOffset * 60 +
+      $wakeupWaitPeriod * 60;
+    my $expNextRun = RESIDENTStk_Datetime2Timestamp($nextRunTimestamp) - 1 +
+      $wakeupWaitPeriod * 60;
+    if (   $expLastRun > $nowRunSec
+        && $expNextRun < time() )
+    {
+        $preventRun = 1;
+    }
+    else {
+        Log3 $NAME, 5,
+"RESIDENTStk $NAME: wakeupWaitPeriod threshold reached (expLastRun=$expLastRun nowRunSec=$nowRunSec expNextRun=$expNextRun localtime="
+          . time() . ")";
     }
 
     my @days = ($wday);
@@ -1052,6 +1083,11 @@ sub RESIDENTStk_wakeupRun($;$) {
         elsif ($wakeupUserdeviceWakeup) {
             Log3 $NAME, 3,
 "RESIDENTStk $NAME: Another wake-up program is already being executed for device $wakeupUserdevice, won't trigger $wakeupMacro";
+        }
+        elsif ( $preventRun && !$forceRun ) {
+            Log3 $NAME, 4,
+"RESIDENTStk $NAME: won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastRun (expLastRun=$expLastRun nowRunSec=$nowRunSec expNextRun=$expNextRun localtime="
+              . time() . ")";
         }
         else {
             # conditional enforced wake-up:

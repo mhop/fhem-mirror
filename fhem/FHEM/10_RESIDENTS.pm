@@ -649,11 +649,15 @@ sub RESIDENTS_Set($@) {
 
 sub RESIDENTS_UpdateReadings (@) {
     my ($hash) = @_;
-    my $state =
-      ( defined $hash->{READINGS}{state}{VAL} ) ? $hash->{READINGS}{state}{VAL}
-      : ( defined $hash->{STATE} )              ? $hash->{STATE}
-      :                                           "undefined";
     my $name = $hash->{NAME};
+    my $state =
+      ( defined( $hash->{READINGS}{state}{VAL} ) )
+      ? $hash->{READINGS}{state}{VAL}
+      : "none";
+    my $presence =
+      ( defined( $hash->{READINGS}{presence}{VAL} ) )
+      ? $hash->{READINGS}{presence}{VAL}
+      : "absent";
 
     my $state_home               = 0;
     my $state_gotosleep          = 0;
@@ -671,7 +675,6 @@ sub RESIDENTS_UpdateReadings (@) {
     my $wayhome                  = 0;
     my $wakeup                   = 0;
     my $newstate;
-    my $presence = "absent";
 
     my @registeredRoommates =
       split( /,/, $hash->{ROOMMATES} )
@@ -925,35 +928,48 @@ sub RESIDENTS_UpdateReadings (@) {
         $newstate = "unspecified";
     }
 
-    # stop any running wakeup-timers in case user went away
-    if ( $newstate eq "away" || $newstate eq "gone"|| $newstate eq "none" ) {
-      my $wakeupDeviceList = AttrVal( $name, "rgr_wakeupDevice", 0 );
-      
-      for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
-          next if !$wakeupDevice;
-
-          if ( defined( $defs{$wakeupDevice} ) && $defs{$wakeupDevice}{TYPE} eq "dummy" ) {
-            fhem "set $wakeupDevice:FILTER=running!=0 stop";
-          }
-      }
-    }
-
     # calculate presence state
-    $presence = "present"
-      if ( $newstate ne "gone"
-        && $newstate ne "none"
-        && $newstate ne "absent" );
+    my $newpresence =
+      ( $newstate ne "none" && $newstate ne "gone" && $newstate ne "absent" )
+      ? "present"
+      : "absent";
 
     Log3 $name, 4,
-"RESIDENTS $name: calculation result - residentsTotal:$state_total residentsTotalGuests:$state_totalGuests residentsTotalGuestsPresent:$state_totalGuestsPresent residentsTotalGuestsAbsent:$state_totalGuestsAbsent residentsTotalPresent:$state_totalPresent residentsTotalAbsent:$state_totalAbsent residentsHome:$state_home residentsGotosleep:$state_gotosleep residentsAsleep:$state_asleep residentsAwoken:$state_awoken residentsAbsent:$state_absent residentsGone:$state_gone presence:$presence state:$newstate";
+"RESIDENTS $name: calculation result - residentsTotal:$state_total residentsTotalGuests:$state_totalGuests residentsTotalGuestsPresent:$state_totalGuestsPresent residentsTotalGuestsAbsent:$state_totalGuestsAbsent residentsTotalPresent:$state_totalPresent residentsTotalAbsent:$state_totalAbsent residentsHome:$state_home residentsGotosleep:$state_gotosleep residentsAsleep:$state_asleep residentsAwoken:$state_awoken residentsAbsent:$state_absent residentsGone:$state_gone presence:$newpresence state:$newstate";
 
     # safe current time
     my $datetime = FmtDateTime(time);
 
     # if state changed
-    if ( !defined( $hash->{READINGS}{state}{VAL} )
-        || $state ne $newstate )
-    {
+    if ( $state ne $newstate ) {
+
+        # stop any running wakeup-timers in case state changed
+        my $wakeupState = AttrVal( $name, "wakeup", 0 );
+        if ($wakeupState) {
+            my $wakeupDeviceList = AttrVal( $name, "rgr_wakeupDevice", 0 );
+
+            for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
+                next if !$wakeupDevice;
+
+                if ( defined( $defs{$wakeupDevice} )
+                    && $defs{$wakeupDevice}{TYPE} eq "dummy" )
+                {
+                    # forced-stop only if resident is not present anymore
+                    my $wakeupNormalStop;
+                    if (   $newstate ne "gone"
+                        && $newstate ne "none"
+                        && $newstate ne "absent" )
+                    {
+                        $wakeupNormalStop =
+                          AttrVal( $wakeupDevice, "lastRun", "00:00" );
+                    }
+
+                    fhem
+"set $wakeupDevice:FILTER=running!=0 stop $wakeupNormalStop";
+                }
+            }
+        }
+
         # if newstate is asleep, start sleep timer
         readingsBulkUpdate( $hash, "lastSleep", $datetime )
           if ( $newstate eq "asleep" );
@@ -984,10 +1000,8 @@ sub RESIDENTS_UpdateReadings (@) {
     }
 
     # if presence changed
-    if ( !defined( $hash->{READINGS}{presence}{VAL} )
-        || $hash->{READINGS}{presence}{VAL} ne $presence )
-    {
-        readingsBulkUpdate( $hash, "presence", $presence );
+    if ( $newpresence ne $presence ) {
+        readingsBulkUpdate( $hash, "presence", $newpresence );
 
         # update statistics
         if ( $presence eq "present" ) {
@@ -1304,6 +1318,9 @@ sub RESIDENTS_UpdateReadings (@) {
 							<li>
 								<i>wakeupUserdevice</i> - backlink to RESIDENTS, ROOMMATE or GUEST device to check it's status (mandatory)
 							</li>
+							<li>
+								<i>wakeupWaitPeriod</i> - waiting period threshold in minutes until wake-up program may be triggered again, e.g. if you manually set an earlier wake-up time than normal while using wakeupDefaultTime. Does not apply in case wake-up time was changed during this period; defaults to 360 minutes / 6h (optional)
+							</li>
 						</ul>
 					</li>
         </ul>
@@ -1566,6 +1583,9 @@ sub RESIDENTS_UpdateReadings (@) {
 							</li>
 							<li>
 								<i>wakeupUserdevice</i> - Backlink zum RESIDENTS, ROOMMATE oder GUEST Ger&auml;t, um dessen Status zu pr&uuml;fen (notwendig)
+							</li>
+							<li>
+								<i>wakeupWaitPeriod</i> - Schwelle der Wartezeit in Minuten bis das Weckprogramm erneut ausgeführt werden kann, z.B. wenn manuell eine frühere Weckzeit gesetzt wurde als normal während wakeupDefaultTime verwendet wird. Greift nicht, wenn die Weckzeit während dieser Zeit geändert wurde; Standard ist 360 Minuten / 6h (optional)
 							</li>
 						</ul>
 					</li>
