@@ -49,8 +49,8 @@ sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 
 
   #List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#";
-  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#";
+  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#V1.73#";
+  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.64#V1.69#V1.70#V1.73#";
 
 sub ##########################################
 LUXTRONIK2_Log($$$)
@@ -1750,7 +1750,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
-  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70.</i>
+  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73.</i>
   <br>
   More Info on the particular <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">page of FHEM-Wiki</a> (in German).
   <br>
