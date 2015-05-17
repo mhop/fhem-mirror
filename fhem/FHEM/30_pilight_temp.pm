@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 20_pilight_temp.pm 0.12 2015-05-16 Risiko $
+# $Id: 30_pilight_temp.pm 0.13 2015-05-17 Risiko $
 #
 # Usage
 # 
@@ -11,6 +11,7 @@
 # V 0.11 2015-03-29 - FIX:  $readingFnAttributes
 # V 0.12 2015-05-16 - NEW:  reading battery
 # V 0.12 2015-05-16 - NEW:  attribut corrTemp, a factor to modify temperatur 
+# V 0.13 2015-05-17 - NEW:  attribut corrHumidity, a factor to modify humidity 
 ############################################## 
 
 package main;
@@ -31,7 +32,7 @@ sub pilight_temp_Initialize($)
   $hash->{DefFn}    = "pilight_temp_Define";
   $hash->{Match}    = "^PITEMP";
   $hash->{ParseFn}  = "pilight_temp_Parse";
-  $hash->{AttrList} = "corrTemp ".$readingFnAttributes;
+  $hash->{AttrList} = "corrTemp corrHumidity ".$readingFnAttributes;
 }
 
 #####################################
@@ -90,7 +91,13 @@ sub pilight_temp_Parse($$)
   readingsBeginUpdate($chash);
   readingsBulkUpdate($chash,"state",$temp);
   readingsBulkUpdate($chash,"temperature",$temp);
-  readingsBulkUpdate($chash,"humidity",$humidity) if (defined($humidity)  && $humidity  ne "");
+  
+  if (defined($humidity)  && $humidity  ne "") {
+    my $corrHumidity = AttrVal($chash->{NAME}, "corrHumidity",1);
+    $humidity = $humidity * $corrHumidity;
+    readingsBulkUpdate($chash,"humidity",$humidity);
+  }
+  
   readingsBulkUpdate($chash,"battery",$battery)   if (defined($battery)   && $battery   ne "");
   readingsEndUpdate($chash, 1); 
   
@@ -150,6 +157,9 @@ sub pilight_temp_Parse($$)
   <ul>
     <li><a name="corrTemp">corrTemp</a><br>
       A factor (e.q. 0.1) to correct the temperture value. Default: 1
+    </li>
+    <li><a name="corrHumidity">corrHumidity</a><br>
+      A factor (e.q. 0.1) to correct the humidity value. Default: 1
     </li>
   </ul>
 </ul>
