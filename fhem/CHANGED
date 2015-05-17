@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  14_CUL_TCM97001: Fix some uninitialized vars, update docu
   - feature: 30_pilight_temp: attribut corrHumidity to correct humidity
   - feature: 76_MSGMail: Add attribute mailtype as suggested by Roger 
                          (forum #37206)
