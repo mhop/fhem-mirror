@@ -568,7 +568,7 @@ ZWave_Cmd($$@)
   Log3 $name, 2, "ZWave $type $name $cmd";
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
-  if($isMc) {  # Multi-Channel, encapsulate
+  if($id =~ m/(....)/) {  # Multi-Channel, encapsulate
     my ($baseId,$ch) = ($1, $2);
     $id = $baseId;
     $cmdFmt = "0d01$ch$cmdId$cmdFmt";
@@ -736,7 +736,8 @@ ZWave_SetClasses($$$$)
         $zwave_id2class{lc($classId)} : "UNKNOWN_".lc($classId);
   }
   my $name = $def->{NAME};
-  $attr{$name}{classes} = join(" ", @classes) if(@classes);
+  $attr{$name}{classes} = join(" ", @classes)
+        if(@classes && !$attr{$name}{classes});
   $def->{DEF} = "$homeId ".hex($id);
   return "";
 }
