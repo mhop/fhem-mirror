@@ -50,6 +50,7 @@ sub HMinfo_Define($$){#########################################################
                             .",reduced:off"
                             .",motorErr:ok"
                             .",error:none"
+                            .",uncertain:no"
                             .",uncertain:yes"
                             .",smoke_detect:none"
                             .",cover:closed"
@@ -317,7 +318,7 @@ sub HMinfo_getParam(@) { ######################################################
   my $eName = $ehash->{NAME};
   my $found = 0;
   foreach (@param){
-    my $para = CUL_HM_Get($ehash,$eName,"param",$_);
+    my $para =  ;
     push @paramList,sprintf("%-15s",($para eq "undefined"?" -":$para));
     $found = 1 if ($para ne "undefined") ;
   }
@@ -755,7 +756,7 @@ sub HMinfo_tempListTmplView() { ###############################################
   $ret .= "\ndevices not using tempList templates:\n      =>  "   .join("\n      =>  ",@dWoTmpl) if (@dWoTmpl);
   return $ret;
 }
-sub HMinfo_tempListTmplGenLog($$) { ############################################
+sub HMinfo_tempListTmplGenLog($$) { ###########################################
   my ($hiN,$fN) = @_;
 
   $fN = AttrVal($hiN,"configDir",".")."/tempList.cfg" if(!$fN);
