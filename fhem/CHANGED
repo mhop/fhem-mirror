@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_Text2Speech.pm; language now selectable
+  - feature: 93_DBLog.pm
+             - SuppressUndef (http://forum.fhem.de/index.php/topic,36615.msg289041.html)
+             - Hinzufuegen von Anfang und Ende-Werten beim Ploten in engen Grenzen
+               (http://forum.fhem.de/index.php?topic=34006)
+             - add new Attribute: DbLogInclude: 93_DbLog_DbLogInclude.diff
+             - recognizing of DbLogTyp using DbReadings: 93_DbLog_dbReadings_using_DbLogType.diff
   - bugfix:  14_CUL_TCM97001: Fix some uninitialized vars, update docu
   - feature: 30_pilight_temp: attribut corrHumidity to correct humidity
   - feature: 76_MSGMail: Add attribute mailtype as suggested by Roger 
