@@ -2266,11 +2266,10 @@ sub CUL_HM_Parse($$) {#########################################################
     #Info Level: mTp=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
     #AckStatus:  mTp=0x02 p(..)(..)(..)(..) subty=01, chn, state,err (3bit)
 
-    if(($mTp eq "10" && $p =~ m/^06/) ||
-       ($mTp eq "02" && $p =~ m/^01/)) {
-      $p =~ m/^..(..)(..)(..)/;
-      my ($chn,$val, $err) = ($1,hex($2), hex($3));
-       $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
+    if(($mTyp eq "1006") ||
+       ($mTyp eq "0201")) {
+      my ($chn,$val, $err) = ($mI[1],hex($mI[2]), hex($mI[3]));
+      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
                              if($modules{CUL_HM}{defptr}{"$src$chn"});
 
       my $stErr = ($err >>1) & 0x7;
@@ -2279,13 +2278,19 @@ sub CUL_HM_Parse($$) {#########################################################
       $error = 'clutch failure' if ($stErr == 1);
       $error = 'none'           if ($stErr == 0);
       my %dir = (0=>"none",1=>"up",2=>"down",3=>"undef");
-
+      my $state = "";
+      RemoveInternalTimer ($name."uncertain:permanent");
+      CUL_HM_unQEntity($name,"qReqStat");
+      if ($err & 0x30) { # uncertain - we have to check
+        CUL_HM_stateUpdatDly($name,13);
+        InternalTimer(gettimeofday()+20,"CUL_HM_readValIfTO", $name.":uncertain:permanent", 0);
+        $state = " (uncertain)";
+      }
       push @evtEt,[$shash,1,"unknown:40"] if($err&0x40);
       push @evtEt,[$shash,1,"battery:"   .(($err&0x80) ? "low":"ok")];
       push @evtEt,[$shash,1,"uncertain:" .(($err&0x30) ? "yes":"no")];
       push @evtEt,[$shash,1,"direction:" .$dir{($err>>4)&3}];
       push @evtEt,[$shash,1,"error:" .    ($error)];
-      my $state = ($err & 0x30) ? " (uncertain)" : "";
       push @evtEt,[$shash,1,"lock:"  .   (($val == 1) ? "unlocked" : "locked")];
       push @evtEt,[$shash,1,"state:" .   (($val == 1) ? "unlocked" : "locked") . $state];
     }
@@ -3572,9 +3577,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "peerBulk") { #################################################
     $state = "";
     my $pL = $a[2];
+    
     return "unknown action: $a[3] - use set or unset"
              if ($a[3] && $a[3] !~ m/^(set|unset)/);
-    my $set = ($a[3] eq "unset")?"02":"01";
+    my $set = ($a[3] && $a[3] eq "unset")?"02":"01";
     foreach my $peer (grep(!/^self/,split(',',$pL))){
       my $pID = CUL_HM_peerChId($peer,$dst);
       return "unknown peer".$peer if (length($pID) != 8);# peer only to channel
@@ -7551,6 +7557,11 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
     return 0;
   }
   return 1;
+}
+
+sub CUL_HM_readValIfTO($){# 
+  my ($name,$rd,$val) = split(":",shift);#  uncertain:$name:$reading:$value
+  readingsSingleUpdate($defs{$name},$rd,$val,1);
 }
 
 sub CUL_HM_getAttr($$$){#return attrValue - consider device if empty
