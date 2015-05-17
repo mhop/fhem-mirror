@@ -318,7 +318,7 @@ sub HMinfo_getParam(@) { ######################################################
   my $eName = $ehash->{NAME};
   my $found = 0;
   foreach (@param){
-    my $para =  ;
+    my $para = CUL_HM_Get($ehash,$eName,"param",$_);
     push @paramList,sprintf("%-15s",($para eq "undefined"?" -":$para));
     $found = 1 if ($para ne "undefined") ;
   }
