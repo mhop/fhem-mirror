@@ -437,6 +437,7 @@ ZWave_execInits($$)
   my ($hash, $min) = @_;  # min = 50 for model-specific stuff
   my @clList = split(" ", $attr{$hash->{NAME}}{classes});
   my (@initList, %seen);
+
   foreach my $cl (@clList) {
     next if($seen{$cl});
     $seen{$cl} = 1;
@@ -482,6 +483,13 @@ ZWave_Cmd($$@)
     }
   }
 
+  my $id = $hash->{id};
+  my $isMc = ($id =~ m/(....)/);
+  if($type eq "set" && !$isMc) {
+    $cmdList{neighborUpdate}{fmt} = "48$id";
+    $cmdList{neighborUpdate}{id} = "";
+  }
+
   if($type eq "set" && $cmd eq "rgb") {
      if($a[0] && $a[0] =~ m/^[0-9A-F]+$/i && $a[0] =~ /^(..)(..)(..)$/) {
        @a = (hex($1), hex($2), hex($3));
@@ -514,7 +522,6 @@ ZWave_Cmd($$@)
 
   ################################
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
-  my $id = $hash->{id};
   my $cmdFmt = $cmdList{$cmd}{fmt};
   my $cmdId  = $cmdList{$cmd}{id};
 
@@ -561,7 +568,7 @@ ZWave_Cmd($$@)
   Log3 $name, 2, "ZWave $type $name $cmd";
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
-  if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
+  if($isMc) {  # Multi-Channel, encapsulate
     my ($baseId,$ch) = ($1, $2);
     $id = $baseId;
     $cmdFmt = "0d01$ch$cmdId$cmdFmt";
@@ -570,9 +577,17 @@ ZWave_Cmd($$@)
     $baseClasses = AttrVal($baseHash->{NAME}, "classes", "");
   }
 
-  my $len = sprintf("%02x", length($cmdFmt)/2+1);
 
-  my $data = "13$id$len$cmdId${cmdFmt}05"; # 13==SEND_DATA, 05=AUTO_ROUTE+ACK
+  my $data;
+  if($cmd eq "neighborUpdate") {
+    $data = $cmdFmt;
+
+  } else {
+    my $len = sprintf("%02x", length($cmdFmt)/2+1);
+    $data = "13$id$len$cmdId${cmdFmt}05"; # 13==SEND_DATA, 05=AUTO_ROUTE+ACK
+
+  }
+
   if($baseClasses =~ m/WAKE_UP/) {
     if(!$baseHash->{WakeUp}) {
       my @arr = ();
@@ -1519,7 +1534,7 @@ ZWave_Parse($$@)
 
     my $ptr = ZWave_getHash($hash, $className, "parse");
     if(!$ptr) {
-      Log3 $hash, 4, "$name: Unknown message ($className $arg)";
+      push @event, "UNPARSED:$className $arg";
       next;
     }
 

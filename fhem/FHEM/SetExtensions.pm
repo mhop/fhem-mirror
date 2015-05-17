@@ -13,6 +13,8 @@ SetExtensions($$@)
 {
   my ($hash, $list, $name, $cmd, @a) = @_;
 
+  return "Unknown argument $cmd, choose one of " if(!$list);
+
   my %se_list = (
     "on-for-timer"  => 1,
     "off-for-timer" => 1,
