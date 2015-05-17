@@ -2282,7 +2282,7 @@ sub CUL_HM_Parse($$) {#########################################################
       RemoveInternalTimer ($name."uncertain:permanent");
       CUL_HM_unQEntity($name,"qReqStat");
       if ($err & 0x30) { # uncertain - we have to check
-        CUL_HM_stateUpdatDly($name,13);
+        CUL_HM_stateUpdatDly($name,13) if(ReadingsVal($name,"uncertain","no") eq "no");
         InternalTimer(gettimeofday()+20,"CUL_HM_readValIfTO", $name.":uncertain:permanent", 0);
         $state = " (uncertain)";
       }
