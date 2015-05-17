@@ -149,7 +149,9 @@ sub checkCRC_GTWT02 {
 sub checkValues {
   my $temp = shift;
   my $humidy = shift;
-
+  if (!defined($humidy)) {
+    $humidy = 50;
+  }
   if ($temp < 60 && $temp > -30
       && $humidy > 0 && $humidy < 100) {
     return TRUE;
@@ -185,11 +187,17 @@ CUL_TCM97001_Parse($$)
   
   my $rssi;
   my $l = length($msg);
-  $rssi = hex(substr($msg, $l-2, 2));
-  $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
-
-  #Log3 $name, 4, "CUL_TCM97001 $name $id3 or $id4 ($msg) length:" . length($msg) . " RSSI: $rssi";
-  Log3 $name, 4, "CUL_TCM97001 $name $id3 ($msg) length:" . length($msg) . " RSSI: $rssi";
+  $rssi = substr($msg, $l-2, 2);
+  undef($rssi) if ($rssi eq "00");
+  
+  if (defined($rssi))
+  {
+	  $rssi = hex($rssi);
+    $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74)) if defined($rssi);
+    Log3 $name, 4, "CUL_TCM97001 $name $id3 ($msg) length: $l RSSI: $rssi";
+  } else {
+    Log3 $name, 4, "CUL_TCM97001 $name $id3 ($msg) length: $l"; 
+  }
 
   my ($msgtype, $msgtypeH);
   
@@ -253,7 +261,7 @@ CUL_TCM97001_Parse($$)
       if (checkValues($temp, 50)) {
         if(!$def) {
           Log3 $name, 2, "CUL_TCM97001 Unknown device $tcm97id, please define it";
-          return "UNDEFINED CUL_TCM97001_$tcm97id CUL_TCM97001 $tcm97id" if(!$def); 
+          return "UNDEFINED CUL_TCM97001_$tcm97id CUL_TCM97001 $tcm97id"; 
         }        
         $packageOK = TRUE;
         $hasbatcheck = TRUE;
@@ -273,11 +281,11 @@ CUL_TCM97001_Parse($$)
         $temp = -$temp;
       }
       $batbit = ((hex($a[4]) & 0x8) != 0x8);
-
+      $mode = (hex($a[4]) & 0x4) >> 2;
       if (checkValues($temp, 50)) {
         if(!$def) {
           Log3 $name, 2, "CUL_TCM97001 Unknown device $tcm97id, please define it";
-          return "UNDEFINED CUL_TCM97001_$tcm97id CUL_TCM97001 $tcm97id" if(!$def); 
+          return "UNDEFINED CUL_TCM97001_$tcm97id CUL_TCM97001 $tcm97id"; 
         }
         $hasbatcheck = TRUE;
         $packageOK = TRUE;
@@ -315,6 +323,7 @@ CUL_TCM97001_Parse($$)
         # C Bit 1 Battery
         # D+E+F Temp 
         # G+H Hum
+        # I CRC
         $def = $modules{CUL_TCM97001}{defptr}{$idType1};
         if($def) {
           $name = $def->{NAME};
@@ -331,12 +340,11 @@ CUL_TCM97001_Parse($$)
         #Split reversed a again
         my @aReverse = split("", $hexReverse);
 
-        my $CRC = (hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])
-                  +hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
-
         if (hex($aReverse[5]) > 3) {
            # negative temp
-           $temp = ((-hex($aReverse[3]) + -hex($aReverse[4]) * 16 + -hex($aReverse[5]) * 256)+1+4096)/10;
+           $temp = ((hex($aReverse[3]) + hex($aReverse[4]) * 16 + hex($aReverse[5]) * 256));
+           $temp = (~$temp & 0x03FF) + 1;
+           $temp = -$temp/10;
         } else {
            # positive temp
            $temp = (hex($aReverse[3]) + hex($aReverse[4]) * 16 + hex($aReverse[5]) * 256)/10;
@@ -349,7 +357,7 @@ CUL_TCM97001_Parse($$)
         if (checkValues($temp, $humidity)) {
           if(!$def) {
               Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
-              return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
+              return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1"; 
           }
           $hashumidity = TRUE;    
           $packageOK = TRUE;
@@ -387,12 +395,12 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($temp, $humidity)) {
         if(!$def) {
-          #Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
-          #return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
           $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
-          return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
+          return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1"; 
         }
-        $hashumidity = TRUE;
+        if ($humidity >= 20) {
+          $hashumidity = TRUE;
+        }
         $hasbatcheck = TRUE;  
         $haschannel = TRUE;     
         $packageOK = TRUE;
@@ -428,7 +436,6 @@ CUL_TCM97001_Parse($$)
         $temp = $temp / 10;
 
         if (hex($a[7]) != 0xC && hex($a[8]) != 0xC) {
-          $hashumidity = TRUE;
           $humidity = hex($a[7].$a[8]);
         }
 
@@ -438,11 +445,13 @@ CUL_TCM97001_Parse($$)
         if (checkValues($temp, $humidity)) {
           if(!$def) {
             Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
-            return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
-#            Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
-#            return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
+            return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1"; 
           }
-          $hashumidity = TRUE;    
+          if (defined($humidity)) {
+            if ($humidity >= 20) {
+              $hashumidity = TRUE;
+            }  
+          }  
           $hasbatcheck = TRUE;
           $packageOK = TRUE;
           $haschannel = TRUE;
@@ -592,26 +601,18 @@ CUL_TCM97001_Parse($$)
     my ($val, $valH, $state);
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($temp) );
+    $state="T: $val";
     if ($hashumidity == TRUE) {
       $msgtypeH = "humidity";
       $valH = $humidity;
+      $state="$state H: $valH";
       Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val H: $valH"; 
     } else {
       Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val";
     }
-    #Log3 $name, 2, "xxxxxxxx $model ......... $name .......... $val .... $valH ... $def";
-    my $t = ReadingsVal($name, "temperature", undef);
-    my $h = ReadingsVal($name, "humidity", undef);
-    if(defined($t) && defined($h)) {
-      $state="T: $t H: $h";
-    } elsif(defined($t)) {
-      $state="T: $t";
-    } elsif(defined($h)) {
-      $state="H: $h";
-    }
 
     readingsBeginUpdate($def);
-    readingsBulkUpdate($def, "state", $state);
+
 
     if($hastrend) {
       my $readTrend = ReadingsVal($name, "trend", "unknown");
@@ -630,17 +631,20 @@ CUL_TCM97001_Parse($$)
       }
     }
     if ($haschannel) {
-      my $readChannel = ReadingsVal($name, "channel", undef);
-      if ($readChannel ne $channel) { readingsBulkUpdate($def, "channel", $channel); }
+      my $readChannel = ReadingsVal($name, "channel", "");
+      if (defined($readChannel) && $readChannel ne $channel) { readingsBulkUpdate($def, "channel", $channel); }
     }
     readingsBulkUpdate($def, $msgtype, $val);
     if ($hashumidity == TRUE) {
       readingsBulkUpdate($def, $msgtypeH, $valH);
     }
+    
+    readingsBulkUpdate($def, "state", $state);
+    
     readingsEndUpdate($def, 1);
     if(defined($rssi)) {
       $def->{RSSI} = $rssi;
-    }
+    } 
     $attr{$name}{model} = $model;
     return $name;
   } else {
@@ -648,7 +652,7 @@ CUL_TCM97001_Parse($$)
     
     if (!$defUnknown) {
       Log3 "Unknown", 2, "CUL_TCM97001 Unknown device Unknown, please define it";
-      return "UNDEFINED CUL_TCM97001_Unknown CUL_TCM97001 Unknown" if(!$defUnknown); 
+      return "UNDEFINED CUL_TCM97001_Unknown CUL_TCM97001 Unknown"; 
     } 
     $name = $defUnknown->{NAME};
     Log3 $name, 4, "CUL_TCM97001 Device not implemented yet name Unknown msg $msg";
@@ -688,7 +692,7 @@ CUL_TCM97001_Parse($$)
 <a name="CUL_TCM97001"></a>
 <h3>CUL_TCM97001</h3>
 <ul>
-  The CUL_TCM97001 module interprets temperature sensor messages received by the CUL.<br>
+  The CUL_TCM97001 module interprets temperature sensor messages received by a Device like CUL, CUN, SIGNALduino etc.<br>
   <br>
   <b>Supported models:</b>
   <ul>
@@ -725,8 +729,8 @@ CUL_TCM97001_Parse($$)
   <ul>
     <li><a href="#IODev">IODev</a>
       Note: by setting this attribute you can define different sets of 8
-      devices in FHEM, each set belonging to a CUL. It is important, however,
-      that a device is only received by the CUL defined, e.g. by using
+      devices in FHEM, each set belonging to a Device which is capable of receiving the signals. It is important, however,
+      that a device is only received by the defined IO Device, e.g. by using
       different Frquencies (433MHz vs 868MHz)
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -751,7 +755,7 @@ CUL_TCM97001_Parse($$)
 <a name="CUL_TCM97001"></a>
 <h3>CUL_TCM97001</h3>
 <ul>
-  Das CUL_TCM97001 Module verarbeitet vom CUL empfangene Nachrichten von Temperatur-Sensoren.<br>
+  Das CUL_TCM97001 Module verarbeitet von einem IO Gerät (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur-Sensoren.<br>
   <br>
   <b>Unterstütze Modelle:</b>
   <ul>
@@ -789,8 +793,6 @@ CUL_TCM97001_Parse($$)
     <li><a href="#IODev">IODev</a>
       Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
       "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
-      Anmerkung: Beim Start weist fhem einem InterTechno-Ger&auml;t kein IO-Ger&auml;t zu. 
-      Das Attribut IODev ist daher IMMER zu setzen.
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
