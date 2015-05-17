@@ -44,7 +44,19 @@ my $mplayerNoDebug  = '-really-quiet';
 my $mplayerAudioOpts 	= '-ao alsa:device=';
 #my $ttsAddr 			= 'http://translate.google.com/translate_tts?tl=de&q=';
 my $ttsHost         = 'translate.google.com';
-my $ttsPath         = '/translate_tts?tl=de&q=';
+my $ttsLang         = 'tl=';
+my $ttsQuery        = 'q=';
+my $ttsPath         = '/translate_tts?';
+my %language        = ("Deutsch"        => "de",
+                       "English-US"     => "en-us",
+                       "Schwedisch"     => "sv",
+                       "Indian-Hindi"   => "hi",
+                       "Arabic"         => "ar",
+                       "France"         => "fr",
+                       "Spain"          => "es",
+                       "Italian"        => "it",
+                       "Chinese"        => "cn"
+                      );
 
 ##########################
 sub Text2Speech_Initialize($)
@@ -66,6 +78,7 @@ sub Text2Speech_Initialize($)
                        " TTS_FileMapping".
                        " TTS_FileTemplateDir".
 		                   " TTS_VolumeAdjust".
+                       " TTS_Language:".join(",", sort keys %language).
                        " ".$readingFnAttributes;
 }
 
@@ -168,7 +181,7 @@ sub Text2Speech_Attr(@) {
   } elsif ($a[2] eq "TTS_UseMP3Wrap") {
     return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
     return "Attribute TTS_UseMP3Wrap is required by Attribute TTS_SentenceAppendix! Please delete it first." 
-      if(AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef));
+      if(($a[0] eq "del") && (AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef)));
 
   } elsif ($a[2] eq "TTS_SentenceAppendix") { 
     return "This Attribute is only available in direct mode" if($hash->{MODE} ne "DIRECT");
@@ -326,7 +339,8 @@ sub Text2Speech_Set($@)
       delete($hash->{VOLUME}) if($vol > 100);
     } elsif ($hash->{MODE} eq "REMOTE") {
       Text2Speech_Write($hash, "volume $vol");
-    } else {return undef;}  
+    } else {return undef;}
+    readingsSingleUpdate($hash, "volume", (($vol>100)?0:$vol), 1);  
   }
 
   return undef;
@@ -389,7 +403,7 @@ sub Text2Speech_PrepareSpeech($$) {
 
     # bei Angabe direkter MP3-Files wird hier ein temporäres Template vergeben
     for(my $i=0; $i<(@text); $i++) {
-      @FileTplPc = ($text[$i] =~ /:([^:]+):/g);
+      @FileTplPc = ($text[$i] =~ /:(\w+.mp3):/g);
       for(my $j=0; $j<(@FileTplPc); $j++) {
         my $time = time();
         $time =~ s/\.//g;
@@ -553,9 +567,10 @@ sub Text2Speech_Download($$$) {
 
   my $HttpResponse;
   my $fh;
+  my $TTS_Language = AttrVal($hash->{NAME}, "TTS_Language", "Deutsch");
 
-  Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". "http://" . $ttsHost . $ttsPath . uri_escape($text);
-  $HttpResponse = GetHttpFile($ttsHost, $ttsPath . uri_escape($text));
+  Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". "http://" . $ttsHost . $ttsPath . $ttsLang . $language{$TTS_Language} . "&" . $ttsQuery . uri_escape($text);
+  $HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $language{$TTS_Language} . "&" . $ttsQuery . uri_escape($text));
 
   $fh = new IO::File ">$file";
   if(!defined($fh)) {
@@ -574,8 +589,11 @@ sub Text2Speech_DoIt($) {
 
   my $TTS_CacheFileDir = AttrVal($hash->{NAME}, "TTS_CacheFileDir", "cache");
   my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
+  my $TTS_Language = AttrVal($hash->{NAME}, "TTS_Language", "Deutsch");
   my $verbose = AttrVal($hash->{NAME}, "verbose", 3);
   my $cmd;
+
+  Log3 $hash->{NAME}, 4, "Verwende TTS Spracheinstellung: ".$TTS_Language;
 
   if($TTS_Ressource eq "Google") {
 
@@ -602,7 +620,7 @@ sub Text2Speech_DoIt($) {
 
       #Abspielliste erstellen
       foreach my $t (@{$hash->{helper}{Text2Speech}}) {
-        if(-e $TTS_CacheFileDir."/".$t) { $filename = $t;} else {$filename = md5_hex($t) . ".mp3";} # falls eine bestimmte mp3-Datei gespielt werden soll
+        if(-e $TTS_CacheFileDir."/".$t) { $filename = $t;} else {$filename = md5_hex($language{$TTS_Language} ."|". $t) . ".mp3";} # falls eine bestimmte mp3-Datei gespielt werden soll
         $file = $TTS_CacheFileDir."/".$filename;
         if(-e $file) {
           push(@Mp3WrapFiles, $file);
@@ -648,7 +666,7 @@ sub Text2Speech_DoIt($) {
       $filename = $hash->{helper}{Text2Speech}[0];
       Log3 $hash->{NAME}, 4, "Text2Speech: $filename als direkte MP3 Datei erkannt!";
     } else {
-      $filename = md5_hex($hash->{helper}{Text2Speech}[0]) . ".mp3";
+      $filename = md5_hex($language{$TTS_Language} ."|". $hash->{helper}{Text2Speech}[0]) . ".mp3";
       Log3 $hash->{NAME}, 4, "Text2Speech: Textbaustein ist keine direkte MP3 Datei, ermittle MD5 CacheNamen: $filename";
     } 
     $file = $TTS_CacheFileDir."/".$filename;
@@ -657,7 +675,7 @@ sub Text2Speech_DoIt($) {
     if(! -e $file) { # Datei existiert noch nicht im Cache
       Text2Speech_Download($hash, $file, $hash->{helper}{Text2Speech}[0]);
     } else {
-      Log3 $hash->{NAME}, 4, "Text2Speech: '$file' gefunden, kein Download";
+      Log3 $hash->{NAME}, 4, "Text2Speech: $file gefunden, kein Download";
     }
 
     if(-e $file) { # Datei existiert jetzt
