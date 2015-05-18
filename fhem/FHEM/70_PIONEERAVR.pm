@@ -20,7 +20,7 @@
 #
 ##############################################################################
 #
-# This module handles the communication with a Pioneer AV receiver and controls the main zone. 
+# This module handles the communication with a Pioneer AV receiver and controls the main zone. Tests are done with a Pioneer VSX923 
 
 # this is the module for the communication interface and to control the main zone - 
 #   it opens the device (via rs232 or TCP), and its ReadFn is called after the global select reports, that data is available.
@@ -143,6 +143,7 @@ PIONEERAVR_Define($$) {
 
   DevIo_CloseDev($hash);
 
+  # $hash->{DeviceName} is needed for DevIo_OpenDev()
   $hash->{Protocol}= $protocol;
   my $devicename= $a[3];
   $hash->{DeviceName} = $devicename;
@@ -163,7 +164,10 @@ PIONEERAVR_Define($$) {
     $hash->{helper}{AVAILABLE} = 1;
     readingsSingleUpdate( $hash, "presence", "present", 1 );
   }
-  
+
+  # $hash->{helper}{INPUTNAMES} lists the default input names and their inputNr as provided by Pioneer. 
+  # This module tries to read those names and the alias names from the AVR receiver and tries to check if this input is enabled or disabled
+  # So this list is just a fall back if the module can't read the names ...
   $hash->{helper}{INPUTNAMES} = {
 	"00" => {"name" => "phono",				"aliasName" => "",	"enabled" => "1",	"inpuLevelAdjust" => 1},
 	"01" => {"name" => "cd",				"aliasName" => "",	"enabled" => "1"},
@@ -199,7 +203,7 @@ PIONEERAVR_Define($$) {
 	"48" => {"name" => "mhl",				"aliasName" => "",	"enabled" => "1"},			
 	"53" => {"name" => "spotify",			"aliasName" => "",	"enabled" => "1"}
 	};
-  # ----------------Human Readable command mapping table-----------------------
+  # ----------------Human Readable command mapping table for "set" commands-----------------------
   $hash->{helper}{SETS} = {
 	'main' => {
 		'on'                 => 'PO',
@@ -246,6 +250,14 @@ PIONEERAVR_Define($$) {
 		'stopNetwork'		 => '20NW',
 		'repeatNetwork'		 => '34NW',
 		'shuffleNetwork'	 => '35NW',
+		'selectLine01'		 => '01GFH',
+		'selectLine02'		 => '02GFH',
+		'selectLine03'		 => '03GFH',
+		'selectLine04'		 => '04GFH',
+		'selectLine05'		 => '05GFH',
+		'selectLine06'		 => '06GFH',
+		'selectLine07'		 => '07GFH',
+		'selectLine08'		 => '08GFH',
 		'playIpod'	    	 => '00IP',
 		'pauseIpod'	    	 => '01IP',
 		'stopIpod'	    	 => '02IP',
@@ -335,7 +347,7 @@ PIONEERAVR_Define($$) {
 		'inputDown'			 => 'ZEB'
 	}
   };
-  # ----------------Human Readable command mapping table-----------------------
+  # ----------------Human Readable command mapping table for "get" commands-----------------------
   $hash->{helper}{GETS}  = {
 	'main' => {
 		'bass'            	   => '?BA',
@@ -347,7 +359,7 @@ PIONEERAVR_Define($$) {
 		'listeningMode'        => '?S',
 		'listeningModePlaying' => '?L',
 		'macAddress'		   => '?SVB',
-		'model'                => '?RGD',
+		'avrModel'             => '?RGD',
 		'mute'                 => '?M',
 		'networkPorts'		   => '?SUM',
 		'networkSettings'	   => '?SUL',
@@ -382,7 +394,7 @@ PIONEERAVR_Define($$) {
 		'power'              => '?ZEP'
 	}
   };
-  # ----------------Human Readable command mapping table-----------------------
+  # ----------------Human Readable command mapping table for the remote control-----------------------
     $hash->{helper}{REMOTECONTROL} = {
 		"cursorUp"       	  => "CUP",
 		"cursorDown"       	  => "CDN",
@@ -396,7 +408,7 @@ PIONEERAVR_Define($$) {
 		"videoParameter"	  => "VPA",
 		"homeMenu"			  => "HM"
   };
-  
+  # Translation table for the possible speaker systems
   $hash->{helper}{SPEAKERSYSTEMS} = {
 	"10"=>"9.1ch FH/FW",
 	"00"=>"Normal(SB/FH)",
@@ -416,10 +428,13 @@ PIONEERAVR_Define($$) {
 	"20"=>"5.1ch C+Surr Bi-Amp"
   };
 	
+  # In some Pioneer AVR models you can give tuner presets a name -> e.g. instead of "A1" it writes in the display "BBC1"
+  # This modules tries to read those tuner preset names and write them into this list
   $hash->{helper}{TUNERCHANNELNAMES} = {
 	"A1"=>""
   };
-	
+
+  # Translation table for all available ListeningModes - provided by Pioneer   
   $hash->{helper}{LISTENINGMODES} = {
 	"0001"=>"stereoCyclic",
 	"0010"=>"standard",
@@ -539,6 +554,7 @@ PIONEERAVR_Define($$) {
 	"0152"=>"optimumSurround"
   };
 
+  # Translation table for all available playing ListeningModes - provided by Pioneer
  $hash->{helper}{LISTENINGMODESPLAYING} = {
 	"0101"=>"[)(]PLIIx MOVIE",
 	"0102"=>"[)(]PLII MOVIE",
@@ -674,14 +690,28 @@ PIONEERAVR_Define($$) {
 	"0f01"=>"MULTI CH IN"
   };
   
-    $hash->{helper}{LINEDATATYPES} = {
+  # for some inputs (e.g. internetRadio) the Pioneer AVR gives more information about the current program
+  # The information is displayed on a (to the Pioneer avr) connected screen
+  # This information is categorized - below are the categories ("dataTypes")  
+  $hash->{helper}{SCREENTYPES} = {
+	"00"=>"Massage",
+	"01"=>"List",
+	"02"=>"Playing(Play)",
+	"03"=>"Playing(Pause)",
+	"04"=>"Playing(Fwd)",
+	"05"=>"Playing(Rev)",
+	"06"=>"Playing(Stop)",
+	"99"=>"Drawing invalid"
+  };
+  
+  $hash->{helper}{LINEDATATYPES} = {
 	"00"=>"normal",																		
 	"01"=>"directory",																			
 	"02"=>"music",																		
 	"03"=>"photo",																			
 	"04"=>"video",																			
 	"05"=>"nowPlaying",																		
-	"20"=>"currentTrack",																		
+	"20"=>"currentTitle",																		
 	"21"=>"currentArtist",																		
 	"22"=>"currentAlbum",																		
 	"23"=>"time",							
@@ -695,12 +725,66 @@ PIONEERAVR_Define($$) {
 	"31"=>"buffer",
 	"33"=>"station"
   };
+  $hash->{helper}{SCREENTYPES} = {
+	"00"=>"Massage",
+	"01"=>"List",
+	"02"=>"Playing(Play)",
+	"03"=>"Playing(Pause)",
+	"04"=>"Playing(Fwd)",
+	"05"=>"Playing(Rev)",
+	"06"=>"Playing(Stop)",
+	"99"=>"Drawing invalid"
+  };
+ # indicates what the source of the screen information is 
+ $hash->{helper}{SOURCEINFO} = {
+	"00"=>"Internet Radio",
+	"01"=>"MEDIA SERVER",
+	"02"=>"iPod",
+	"03"=>"USB",
+	"04"=>"(Reserved)",
+	"05"=>"(Reserved)",
+	"06"=>"(Reserved)",
+	"07"=>"PANDORA",
+	"10"=>"AirPlay",
+	"11"=>"Digital Media Renderer(DMR)",
+	"99"=>"(Indeterminate)"
+  };
+  
+  $hash->{helper}{CLEARONINPUTCHANGE} = {
+  	"00"=>"screenLine01",
+	"01"=>"screenLine02",
+	"02"=>"screenLine03",
+	"03"=>"screenLine04",
+	"04"=>"screenLine05",
+	"05"=>"screenLine06",
+	"06"=>"screenLine07",
+	"07"=>"screenLine08",
+	"09"=>"screenLineType01",
+	"10"=>"screenLineType02",
+	"11"=>"screenLineType03",
+	"12"=>"screenLineType04",
+	"13"=>"screenLineType05",
+	"14"=>"screenLineType06",
+	"15"=>"screenLineType07",
+	"16"=>"screenLineType08",
+	"17"=>"screenLineHasFocus",
+	"17"=>"screenLineNumbers",
+	"18"=>"screenType",
+	"19"=>"screenName",
+	"20"=>"screenHierarchy",
+	"21"=>"screenTopMenuKey",
+	"22"=>"screenIpodKey",
+	"23"=>"screenReturnKey"
+	};
   
   ### initialize timer
   $hash->{helper}{nextConnectionCheck} = gettimeofday()+120;
+  
   #### statusRequest
-  #### Update Input alias names, available Inputs
+  # Update Input alias names, available and enabled Inputs
+  # This updates $hash->{helper}{INPUTNAMES}
   PIONEERAVR_askForInputNames($hash,5);
+  
   #### we execute all 'get <name> XXX'   
   PIONEERAVR_statusUpdate($hash);
 
@@ -795,7 +879,7 @@ PIONEERAVR_Set($@)
   my @setsPlayer= ("play","pause","stop","repeat","shuffle","prev","next","rev","fwd","up","down","right","left","enter","return","menu"); # available commands for certain inputs (@playerInputNr)
   my @playerInputNr= ("13","17","18","26","27","33","38","41","44","45","48","53"); 		# Input number for usbDac, ipodUsb, xmRadio, homeMediaGallery, sirius, adapterPort, internetRadio, pandora, mediaServer, Favorites, mhl, spotify
   my @setsTuner = ("channelUp","channelDown","channelStraight","channel"); 					# available commands for input tuner 
-  my @setsWithoutArg= ("off","toggle","volumeUp","volumeDown","muteOn","muteOff","muteToggle","inputUp","inputDown"); # set commands without arguments
+  my @setsWithoutArg= ("off","toggle","volumeUp","volumeDown","muteOn","muteOff","muteToggle","inputUp","inputDown","selectLine01","selectLine02","selectLine03","selectLine04","selectLine05","selectLine06","selectLine07","selectLine08" ); # set commands without arguments
   my $playerCmd= "";
   my $inputNr= "";
 
@@ -841,6 +925,7 @@ PIONEERAVR_Set($@)
   if ( $inputNr ~~ @playerInputNr ) {
 	$list .= " play:noArg stop:noArg pause:noArg repeat:noArg shuffle:noArg prev:noArg next:noArg rev:noArg fwd:noArg up:noArg down:noArg";
 	$list .= " right:noArg left:noArg enter:noArg return:noArg menu:noArg";
+	$list .= " selectLine01:noArg selectLine02:noArg selectLine03:noArg selectLine04:noArg selectLine05:noArg selectLine06:noArg selectLine07:noArg selectLine08:noArg";
   }  
   if ( $cmd eq "?" ) {
 	return SetExtensions($hash, $list, $name, $cmd, @args);
@@ -1259,11 +1344,16 @@ sub PIONEERAVR_Read($)
 		$hash->{helper}{main}{CURINPUTNR} = $inputNr;
 
 #		if($inputNr != "17" and $inputNr != "44" and $inputNr != "45"){
-		#readingsBeginUpdate($hash);
-		foreach my $key ( keys %{$hash->{helper}{LINEDATATYPES}} ) {
-			readingsBulkUpdate($hash, $hash->{helper}{LINEDATATYPES}->{$key} , "");
+		# clear screen information on input change...
+		foreach my $key ( keys %{$hash->{helper}{CLEARONINPUTCHANGE}} ) {
+			readingsBulkUpdate($hash, $hash->{helper}{CLEARONINPUTCHANGE}->{$key} , "");
+			Log3 $hash,5,"PIONEERAVR $name: Main Input change ... clear screen... reading:" . $hash->{helper}{CLEARONINPUTCHANGE}->{$key};
 		}
-		#readingsEndUpdate($hash, 1);
+		foreach my $key ( keys %{$hash->{helper}{CLEARONINPUTCHANGE}} ) {
+			readingsBulkUpdate($hash, $hash->{helper}{CLEARONINPUTCHANGE}->{$key} , "");
+			Log3 $hash,5,"PIONEERAVR $name: Main Input change ... clear screen... reading:" . $hash->{helper}{CLEARONINPUTCHANGE}->{$key};
+		}
+		
 		# input names
 		# RGBXXY(14char)
 		# XX -> input number
@@ -1492,13 +1582,60 @@ sub PIONEERAVR_Read($)
 		readingsBulkUpdate($hash, "displayPrevious", ReadingsVal($name,"display","") );
 		readingsBulkUpdate($hash, "display", $display );
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Display update to: $display";	
+	
+	# screen type and screen name
+	} elsif ( $line =~ m/^(GCH|GCI)(\d{2})(\d)(\d)(\d)(\d)(\d)\"(.*)\"$/ ) {
+		# Format: 
+		#   $2: screen type
+		#     00:Massage
+		#     01:List
+		#     02:Playing(Play)
+		#     03:Playing(Pause)
+		#     04:Playing(Fwd)
+		#     05:Playing(Rev)
+		#     06：Playing(Stop)
+		#     99:Drawing invalid
 
-	# displayInformation
+		#   $3: 0:Same hierarchy 1:Updated hierarchy (Next or Previous list)
+		#   $4: Top menu key flag
+		#     0:Invalidity
+		#	  1:Effectiveness
+		#   $5: iPod Control Key Information
+		#     0:Invalidity
+		#	  1:Effectiveness
+		#   $6: Return Key Information
+		#     0:Invalidity
+		#	  1:Effectiveness
+		#	$7: always 0
+		
+		#   $8: Screen name (UTF8) max. 128 byte
+		my $screenType = $hash->{helper}{SCREENTYPES}{$2};
+		
+		readingsBulkUpdate($hash, "screenType", $screenType); 
+		readingsBulkUpdate($hash, "screenName", $8);
+		readingsBulkUpdate($hash, "screenHierarchy", $3);
+		readingsBulkUpdate($hash, "screenTopMenuKey", $4);
+		readingsBulkUpdate($hash, "screenIpodKey", $5);
+		readingsBulkUpdate($hash, "screenReturnKey", $6);
+
+	# Source information
+	} elsif ( $line =~ m/^(GHH)(\d{2})$/ ) {
+		my $sourceInfo = $hash->{helper}{SOURCEINFO}{$2};
+		readingsBulkUpdate($hash, "sourceInfo", $sourceInfo );
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Screen source information: $2 $sourceInfo";	
+
+		
+	# Screen line numbers
+	} elsif ( $line =~ m/^(GBH|GBI)(\d{2})$/ ) {
+		readingsBulkUpdate($hash, "screenLineNumbers", $2+0 );
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Screen line numbers = $2";	
+
+	# screenInformation
 	} elsif ( $line =~ m/^(GEH|GEI)(\d{2})(\d)(\d{2})\"(.*)\"$/ ) {
 		# Format: 
-		#   $1: Line number
-		#   $2: Focus (yes(1)/no(0)/greyed out(9)
-		#   $3: Line data type:
+		#   $2: Line number
+		#   $3: Focus (yes(1)/no(0)/greyed out(9)
+		#   $4: Line data type:
 		#     00:Normal（no mark type）																				
 		#     01:Directory																				
 		#     02:Music																				
@@ -1518,11 +1655,25 @@ sub PIONEERAVR_Read($)
 		#     31:Buffer																				
 		#     32:Channel																				
 		#     33:Station																				
-		#   $4: Display line information (UTF8)
+		#   $5: Display line information (UTF8)
 		my $lineDataType = $hash->{helper}{LINEDATATYPES}{$4};
-	
-		readingsBulkUpdate($hash, $lineDataType, $5);
-		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: displayDataType $lineDataType: " . dq($5);	
+		
+		# screen lines
+		my $screenLine = "screenLine".$2;
+		my $screenLineType = "screenLineType".$2;
+		readingsBulkUpdate($hash, $screenLine, $5); 
+		readingsBulkUpdate($hash, $screenLineType, $lineDataType);
+		if ($3 == 1) {
+		  readingsBulkUpdate($hash, "screenLineHasFocus", $2);
+		}
+   		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: screen line $2 ($screenLine) type: $lineDataType: " . dq($5);
+		
+		# for being coherent with http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
+		if ($4 ~~ ["20", "21", "22"]) {
+  		  readingsBulkUpdate($hash, $lineDataType, $5);
+  		  Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: displayDataType $lineDataType: " . dq($5);
+		}
+
 	# Tuner channel names
 	} elsif ( $line =~ m/^TQ(\w\d)\"(.{8})\"$/ ) {
 		$hash->{helper}{TUNERCHANNELNAMES}{$1} = $2;
@@ -1556,17 +1707,17 @@ sub PIONEERAVR_Read($)
 		} else {
 			$hash->{dhcp}= "on";
 		}
-		$hash->{ipAddress}= $2.".".$3.".".$4.".".$5;
-		$hash->{netmask}= $6.".".$7.".".$8.".".$9;
-		$hash->{defaultGateway}= $10.".".$11.".".$12.".".$13;
-		$hash->{dns1}= $14.".".$15.".".$16.".".$17;
-		$hash->{dns2}= $18.".".$19.".".$20.".".$21;
+		$hash->{ipAddress}= sprintf("%d.%d.%d.%d",$2 ,$3 ,$4 ,$5);
+		$hash->{netmask}= sprintf("%d.%d.%d.%d",$6,$7,$8,$9);
+		$hash->{defaultGateway}= sprintf("%d.%d.%d.%d",$10,$11,$12,$13);
+		$hash->{dns1}= sprintf("%d.%d.%d.%d",$14,$15,$16,$17);
+		$hash->{dns2}= sprintf("%d.%d.%d.%d",$18,$19,$20,$21);
 		if ($22 == 0) {
 			$hash->{proxy}= "off";
 		} else {
 			$hash->{proxy}= "on";
 			$hash->{proxyName}= $23;
-			$hash->{proxyPort}= $24;
+			$hash->{proxyPort}= 0+$24;
 		}
 	# network ports 1-4
 	} elsif ( $line =~ m/^SUM(\d{5})(\d{5})(\d{5})(\d{5})$/ ) {
@@ -1574,28 +1725,28 @@ sub PIONEERAVR_Read($)
 		if ( $1 == 99999) {
 			$hash->{networkPort1}= "disabled";
 		} else {
-			$hash->{networkPort1}= $1;
+			$hash->{networkPort1}= 0+$1;
 		}
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: NetworkPort1 is " . $1;	
 	# network port2
 		if ( $2 == 99999) {
 			$hash->{networkPort2}= "disabled";
 		} else {
-			$hash->{networkPort2}= $2;
+			$hash->{networkPort2}= 0+$2;
 		}
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: NetworkPort2 is " . $2;	
 	# network port3
 		if ( $3 == 99999) {
 			$hash->{networkPort3}= "disabled";
 		} else {
-			$hash->{networkPort3}= $3;
+			$hash->{networkPort3}= 0+$3;
 		}
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: NetworkPort3 is " . $3;	
 	# network port4
 		if ( $4 == 99999) {
 			$hash->{networkPort4}= "disabled";
 		} else {
-			$hash->{networkPort4}= $4;
+			$hash->{networkPort4}= 0+$4;
 		}
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: NetworkPort4 is " . $4;	
 
@@ -1604,10 +1755,10 @@ sub PIONEERAVR_Read($)
 		$hash->{macAddress}= $1.":".$2.":".$3.":".$4.":".$5.":".$6;			
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: NetworkPort1 is " . $1;	
 		
-	# model
+	# avrModel
 	} elsif ( $line =~ m/^RGD<\d{3}><(.*)\/.*>$/ ) {
-		#$hash->{model}= $1;			
-		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Model is " . $1;	
+		$hash->{avrModel}= $1;			
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: avrModel is " . $1;	
 		
 	# Software version
 	} elsif ( $line =~ m/^SSI\"(.*)\"$/ ) {
@@ -2003,6 +2154,7 @@ RC_layout_PioneerAVR() {
 	<li>enter<br>for the same inputs as play</li>
 	<li>return<br>for the same inputs as play</li>
 	<li>menu<br>for the same inputs as play</li>
+	<li>selectLine01 - selectLine08<br>for the same inputs as play<br>if a "screen" is open (on the TV) (e.g. to browse the directory of the music collection) the line on the sreen can be selected directly</li>
 	<li>remoteControl <attr> where <attr> is one of:
 	<ul>
 		<li>cursorDown</li>
@@ -2049,7 +2201,7 @@ RC_layout_PioneerAVR() {
 	<li>listeningMode<br> </li>
 	<li>listeningModePlaying<br> </li>
 	<li>macAddress<br> </li>
-	<li>model<br> </li>
+	<li>avrModel<br> </li>
 	<li>mute<br> </li>
 	<li>networkPorts<br> </li>
 	<li>networkSettings<br> </li>
@@ -2195,6 +2347,7 @@ RC_layout_PioneerAVR() {
 	<li>enter<br>für die gleichen Eingangsquellen wie "play"</li>
 	<li>return<br>für die gleichen Eingangsquellen wie "play"</li>
 	<li>menu<br>für die gleichen Eingangsquellen wie "play"</li>
+	<li>selectLine01 - selectLine08<br>für die gleichen Eingangsquellen wie "play"<br>Wird am Bildschirm ein Pioneer-Menu angezeigt, kann hiermit die gewünschte zeile direkt angewählt werden</li>
 	<li>remoteControl <attr> wobei <attr> eines von folgenden sein kann:
 	<ul>
 		<li>cursorDown</li>
@@ -2243,7 +2396,7 @@ RC_layout_PioneerAVR() {
 	<li>listeningMode<br> </li>
 	<li>listeningModePlaying<br> </li>
 	<li>macAddress<br> </li>
-	<li>model<br> </li>
+	<li>avrModel<br> </li>
 	<li>mute<br> </li>
 	<li>networkPorts<br> </li>
 	<li>networkSettings<br> </li>
