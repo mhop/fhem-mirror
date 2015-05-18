@@ -102,7 +102,7 @@ JeeLink_Define($$)
 
   if(@a != 3) {
     my $msg = "wrong syntax: define <name> JeeLink {none | devicename[\@baudrate] ".
-                        "| devicename\@directio}";
+                        "| devicename\@directio | hostname:port}";
     Log3 undef, 2, $msg;
     return $msg;
   }
@@ -124,7 +124,7 @@ JeeLink_Define($$)
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  $dev .= "\@57600" if( $dev !~ m/\@/ );
+  $dev .= "\@57600" if( $dev !~ m/\@/ && $def !~ m/:/ );
   $hash->{DeviceName} = $dev;
 
   my $ret = DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
@@ -231,8 +231,8 @@ JeeLink_Set($@)
       }
     }
     $hexFile = $firmwareFolder . "JeeLink_$detectedFirmware.hex";
-    
-    
+
+
     return "No firmware detected. Please use the firmwareName parameter" if(!$detectedFirmware);
     return "The file '$hexFile' does not exist" if(!-e $hexFile);
 
@@ -833,6 +833,7 @@ JeeLink_SimpleWrite(@)
   $msg .= "\n" unless($nocr);
 
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
+  syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
   syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
 
   # Some linux installations are broken with 0.001, T01 returns no answer
@@ -1006,10 +1007,10 @@ sub JeeLink_getIndexOfArray($@) {
     The JeeLink needs the right firmware to be able to receive and deliver the sensor data to fhem. In addition to the way using the
     arduino IDE to flash the firmware into the JeeLink this provides a way to flash it directly from FHEM.<br><br>
 
-    The firmwareName argument is optional. If not given, set flash checks the firmware type that is currently installed on the JeeLink and 
+    The firmwareName argument is optional. If not given, set flash checks the firmware type that is currently installed on the JeeLink and
     updates it with the same type.<br><br>
-    
-    
+
+
     There are some requirements:
     <ul>
       <li>avrdude must be installed on the host<br>

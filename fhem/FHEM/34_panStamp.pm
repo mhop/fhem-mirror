@@ -61,7 +61,7 @@ panStamp_Define($$)
 
   if(@a < 3 || @a > 6) {
     my $msg = "wrong syntax: define <name> panStamp {none | devicename[\@baudrate] ".
-                        "| devicename\@directio} [<address> [<channel> [<syncword>]]]";
+                        "| devicename\@directio | hostname:port} [<address> [<channel> [<syncword>]]]";
     Log3 undef, 2, $msg;
     return $msg;
   }
@@ -91,7 +91,7 @@ panStamp_Define($$)
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  $dev .= "\@38400" if( $dev !~ m/\@/ );
+  $dev .= "\@38400" if( $dev !~ m/\@/ && $dev !~ m/:/ );
 
   $hash->{address} = uc($address);
   $hash->{channel} = uc($channel);
@@ -518,6 +518,7 @@ panStamp_SimpleWrite(@)
   $msg .= "\r" unless($nocr);
 
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
+  syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
   syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
 
   # Some linux installations are broken with 0.001, T01 returns no answer
