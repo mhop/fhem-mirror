@@ -313,7 +313,7 @@ PIONEERAVR_Define($$) {
 		'leftMhl'		 	 => '03MHL',
 		'enterMhl'		 	 => '17MHL',
 		'returnMhl'		 	 => '06MHL',
-		'menuMhl'		 	 => '05MHL'
+		'menuMhl'		 	 => '05MHL'		
 	},
 	'zone2' => {
 		'on'                 => 'APO',
@@ -350,16 +350,18 @@ PIONEERAVR_Define($$) {
   # ----------------Human Readable command mapping table for "get" commands-----------------------
   $hash->{helper}{GETS}  = {
 	'main' => {
+		'avrModel'             => '?RGD',
 		'bass'            	   => '?BA',
 		'channel'              => '?PR',
 		'currentListIpod'      => '?GAI',
 		'currentListNetwork'   => '?GAH',
 		'display'              => '?FL',
+		'eq'                   => '?ATC',
 		'input'                => '?F',
 		'listeningMode'        => '?S',
 		'listeningModePlaying' => '?L',
 		'macAddress'		   => '?SVB',
-		'avrModel'             => '?RGD',
+		'mcaccMemory'          => '?MC',
 		'mute'                 => '?M',
 		'networkPorts'		   => '?SUM',
 		'networkSettings'	   => '?SUL',
@@ -369,6 +371,7 @@ PIONEERAVR_Define($$) {
 		'softwareVersion'      => '?SSI',
 		'speakers'             => '?SPK',
 		'speakerSystem'        => '?SSF',
+		'standingWave'	       => '?ATD',
 		'tone'			       => '?TO',
 		'tunerFrequency'       => '?FR',
 		'tunerChannelNames'    => '?TQ',
@@ -911,6 +914,7 @@ PIONEERAVR_Set($@)
 	. " volumeStraight:slider,-80,1," . AttrVal($name, "volumeLimitStraight", (AttrVal($name, "volumeLimit", 100)*0.92-80))
 	. " signalSelect:auto,analog,digital,hdmi,cycle"
 	. " speakers:off,A,B,A+B raw"
+	. " mcaccMemory:1,2,3,4,5,6 eq:on,off standingWave:on,off"
 	. " remoteControl:"
 	. join(',', sort keys (%{$hash->{helper}{REMOTECONTROL}}));
 
@@ -1188,7 +1192,49 @@ PIONEERAVR_Set($@)
 			return $err;			
 		}
 		return undef;	
-		
+	
+	#mcacc memory
+	} elsif ($cmd eq "mcaccMemory") {
+		if ($arg > 0 and $arg < 7) {
+		  my $setCmd = $arg."MC";
+		  Log3 $name, 5, "PIONEERAVR $name: setting MCACC memory to ".dq($arg);
+		  PIONEERAVR_Write($hash, $setCmd);
+		  return undef;
+		} else {
+		my $err= "PIONEERAVR $name: Error: unknown argument $arg in set ... mcaccMemory!";
+			Log3 $name, 5, $err;
+			return $err;
+		}
+	
+	# eq on/off/toggle
+	} elsif ( $cmd eq "eq" ) {
+		if ($arg eq "on") {
+			PIONEERAVR_Write($hash, "1ATC");
+#			readingsSingleUpdate($hash, "eq", "on", 1 );
+		}
+		elsif ($arg eq "off") {
+			PIONEERAVR_Write($hash, "0ATC");
+#			readingsSingleUpdate($hash, "eq", "off", 1 );
+		} else {
+			my $err= "PIONEERAVR $name: Error: unknown set ... eq argument: $arg !";
+			Log3 $name, 3, $err;
+			return $err;
+		}
+	# standingWave on/off/toggle
+	} elsif ( $cmd eq "standingWave" ) {
+	if ($arg eq "on") {
+		PIONEERAVR_Write($hash, "1ATD");
+#		readingsSingleUpdate($hash, "standingWave", "on", 1 );
+	}
+	elsif ($arg eq "off") {
+		PIONEERAVR_Write($hash, "0ATD");
+#		readingsSingleUpdate($hash, "standingWave", "off", 1 );
+	} else {
+		my $err= "PIONEERAVR $name: Error: unknown set ... standingWave argument: $arg !";
+		Log3 $name, 3, $err;
+		return $err;
+	}
+	
 	####remoteControl
 	} elsif ( $cmd eq "remoteControl" ) {
 		Log3 $name, 5, "PIONEERAVR $name: set $cmd $arg";
@@ -1576,12 +1622,38 @@ sub PIONEERAVR_Read($)
 			readingsBulkUpdate($hash, "state", $state );
 #			$hash->{STATE} = $state;
 		}
+	# MCACC memory 
+	} elsif ( $line =~ m/^(MC)(\d)$/ ) {
+		readingsBulkUpdate($hash, "mcaccMemory", $2 );
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: MCACC memory: selected memory is: $2";	
+		
 	# Display updates
 	} elsif ( substr($line,0,2) eq "FL" ) {
 		my $display = pack("H*",substr($line,4,28));
 		readingsBulkUpdate($hash, "displayPrevious", ReadingsVal($name,"display","") );
 		readingsBulkUpdate($hash, "display", $display );
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Display update to: $display";	
+	
+	# eq 
+	} elsif ( $line =~ m/^ATC([0|1])/) {
+		if ($1 == "1") {
+			readingsBulkUpdate($hash, "eq", "on");
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: eq is on";	
+		} 
+		else {
+			readingsBulkUpdate($hash, "eq", "off");
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: eq is off";	
+		}
+		
+	} elsif ( $line =~ m/^ATD([0|1])/) {
+		if ($1 == "1") {
+			readingsBulkUpdate($hash, "standingWave", "on");
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: standingWave is on";	
+		} 
+		else {
+			readingsBulkUpdate($hash, "standingWave", "off");
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: standingWave is off";	
+		}
 	
 	# screen type and screen name
 	} elsif ( $line =~ m/^(GCH|GCI)(\d{2})(\d)(\d)(\d)(\d)(\d)\"(.*)\"$/ ) {
@@ -2123,6 +2195,9 @@ RC_layout_PioneerAVR() {
 	<li>inputDown<br>change input to previous input</li>
 	<li>signalSelect <auto|analog|digital|hdmi|cycle></li>
 	<li>speakers <off|A|B|A+B></li>
+	<li>mcaccMemory <1...6> selects one of the up to 6 stored MCACC settings of the main zone</li>
+	<li>eq <on|off> for the main zone</li>
+	<li>standingWave <on|off> for the main zone</li>
 	<li>listeningMode</li>
 	<li>play <br>starts playback for the following inputs: 
 	<ul>
@@ -2316,6 +2391,9 @@ RC_layout_PioneerAVR() {
 	<li>inputDown<br>vorherige Eingangsquelle der Main Zone auswählen</li>
 	<li>signalSelect <auto|analog|digital|hdmi|cycle></li>
 	<li>speakers <off|A|B|A+B></li>
+	<li>mcaccMemory <1...6> Wählt einen der bis zu 6 gespeicherten MCACC Einstellungen der Main Zone</li>
+	<li>eq <on|off> der Main Zone</li>
+	<li>standingWave <on|off> der Main Zone</li>
 	<li>listeningMode</li>
 	<li>play <br>Startet die Wiedergabe für folgende Eingangsquellen: 
 	<ul>
