@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_km200; Floating point calculation error fixed
+  - feature: 73_km200; Writing of complete week-list in one single set command
   - feature: 98_Text2Speech.pm; language now selectable
   - feature: 93_DBLog.pm
              - SuppressUndef (http://forum.fhem.de/index.php/topic,36615.msg289041.html)
