@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 70_PIONEERAVR: new set <dev> hdmiOut <1/2>to switch hdmi outputs
+             - new set <name> networkStandby (on|off) Needed to turn on/off...
+			 - new readings hdmiOut, screenLineNumber[First,Last,Total]
+			 - commandref reworked
   - bugfix:  73_km200; Floating point calculation error fixed
   - feature: 73_km200; Writing of complete week-list in one single set command
   - feature: 98_Text2Speech.pm; language now selectable
