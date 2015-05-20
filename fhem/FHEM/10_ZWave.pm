@@ -566,7 +566,7 @@ ZWave_Cmd($$@)
   Log3 $name, 2, "ZWave $type $name $cmd";
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
-  if($id =~ m/(....)/) {  # Multi-Channel, encapsulate
+  if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
     my ($baseId,$ch) = ($1, $2);
     $id = $baseId;
     $cmdFmt = "0d01$ch$cmdId$cmdFmt";
