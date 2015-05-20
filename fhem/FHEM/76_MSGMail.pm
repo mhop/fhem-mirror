@@ -4,6 +4,7 @@
 #
 # History:
 #
+# 2015-05-19: Add MSGMail_Attr()
 # 2015-05-15: Add attribute mailtype as suggested by Roger (forum #37206)
 # 2015-05-11: Improve error logging to assist problem solving
 # 2015-05-09: Assimilate mail related code from 75_MSG
@@ -45,10 +46,12 @@ sub MSGMail_Initialize($)
 {
     my ($hash) = @_;
 
-    $hash->{SetFn}    = "MSGMail_Set";
-    $hash->{DefFn}    = "MSGMail_Define";
-    $hash->{UndefFn}  = "MSGMail_Undef";
-    $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 authfile smtphost smtpport subject mailtype:plain,html from to cc CR:0,1";
+    $hash->{SetFn}   = "MSGMail_Set";
+    $hash->{DefFn}   = "MSGMail_Define";
+    $hash->{UndefFn} = "MSGMail_Undef";
+    $hash->{AttrFn}  = "MSGMail_Attr";
+    $hash->{AttrList} =
+      "loglevel:0,1,2,3,4,5,6" . " authfile smtphost smtpport" . " subject mailtype:plain,html from to cc CR:0,1";
 
     my $name = "MSGMail";
 
@@ -71,8 +74,7 @@ sub MSGMail_Initialize($)
             $MSGMail_SSL = 1;
         }
     }
-    Log 0,
-      "$name: SSL is "
+    Log 0, "$name: SSL is "
       . (
           ($MSGMail_SSL)
         ? ("available, provided by Net::SMTP" . (($MSGMail_SMTP < 3.00) ? "::SSL" : ""))
@@ -125,6 +127,40 @@ sub MSGMail_Undef($$)
     }
 
     delete($modules{MSGMail}{defptr}{ $hash->{CODE} }) if ($hash && $hash->{CODE});
+    return undef;
+}
+
+##############################################
+# Attr Function
+#
+# Check sanity of attribute values; no need to actually set attributes, this is done by FHEM
+# return undef if OK, otherwise return error message
+#
+# authfile smtphost smtpport subject mailtype:plain,html from to cc
+##############################################
+sub MSGMail_Attr(@)
+{
+    my ($cmd, $name, $attrName, $attrVal) = @_;
+    my $hash = $defs{$name};
+
+    return if ($cmd ne "set");
+
+    if ($attrName eq "loglevel")    # loglevel:0,1,2,3,4,5,6
+    {
+        return if ($attrVal =~ m/^[0-6]$/);
+        return "Valid values for loglevel are 0,1,2,3,4,5,6";
+    }
+    elsif ($attrName eq "mailtype")    # mailtype:plain,html
+    {
+        return if ($attrVal =~ m/^(plain|html)$/);
+        return "Valid values for mailtype are plain,html";
+    }
+    elsif ($attrName eq "CR") # CR:0,1
+    {
+        return if ($attrVal =~ m/^[01]$/);
+        return "Valid values for mailtype are 0,1";
+    }
+
     return undef;
 }
 
@@ -203,12 +239,12 @@ sub MSGMail_Set($@)
         my $subject  = AttrVal($name, "subject",  "");
         my $authfile = AttrVal($name, "authfile", "");
         my $smtphost = AttrVal($name, "smtphost", "");
-        my $smtpport = AttrVal($name, "smtpport", "465");    # 465 is the default port
-        my $cc       = AttrVal($name, "cc",       "");       # Carbon Copy
+        my $smtpport = AttrVal($name, "smtpport", "465");     # 465 is the default port
+        my $cc       = AttrVal($name, "cc",       "");        # Carbon Copy
         my $mtype    = AttrVal($name, "mailtype", "plain");
 
         my $mailtype = "text/plain";
-        $mailtype= "text/$mtype" if ($mtype =~ m/^(plain|html)$/);
+        $mailtype = "text/$mtype" if ($mtype =~ m/^(plain|html)$/);
 
         return "No <from> address specified, use  attr $name from <mail-address>"
           if (!$from);
