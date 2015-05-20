@@ -86,8 +86,11 @@ my %zwave_class = (
     get   => { smStatus    => "04" },
     parse => { "..3105(..)(..)(.*)" => 'ZWave_multilevelParse($1,$2,$3)'} },
   METER                    => { id => '32',
-    get   => { meter       => "01" },
-    parse => { "..3202(.*)"=> 'ZWave_meterParse($hash, $1)' } },
+    set   => { meterReset => "05" },
+    get   => { meter       => 'Zwave_meterGet("%s")',
+               meterSupported => "03" },
+    parse => { "..3202(.*)" => 'ZWave_meterParse($hash, $1)',
+               "..3204(.*)" => 'ZWave_meterSupportedParse($hash, $1)' } },
   COLOR_CONTROL            => { id => '33',
     get   => { ccCapabilityGet  => '01', # no more args
                ccStatus    => '03', # no more args
@@ -355,11 +358,6 @@ use vars qw(%zwave_deviceSpecial);
       get   => { position=>"010f2602020000", },
       parse => { "0891010f260303(..)(..)" =>
                   'sprintf("position:Blinds %d Slat %d",hex($1),hex($2))' } } },
-   Philio_PAN04 => {
-     METER => {
-      get_ADD => { meterWatt   => "0110",       #Watt
-                   meterVoltage=> "0120",       #Voltage
-                   meterAmpere => "0128"  } } },#Ampere
    ZME_KFOB => {
      ZWAVEPLUS_INFO => {
       # Example only. ORDER must be >= 50
@@ -649,33 +647,130 @@ ZWave_HrvStatus($)
   return join("\n", @l);
 }
 
+my %zwm_unit = (
+  energy=> ["kWh", "kVAh", "W", "pulseCount", "V", "A", "PowerFactor"],
+  gas   => ["m3", "feet3", "undef", "pulseCount"],
+  water => ["m3", "feet3", "USgallons", "pulseCount"]
+);
+
 sub
 ZWave_meterParse($$)
 {
   my ($hash,$val) = @_;
   return if($val !~ m/^(..)(..)(.*)$/);
-  my ($v1, $v2, $v3) = (hex($1) & 0x1f, hex($2), $3);
-  my @prectab = (1,10,100,1000,10000,100000,1000000, 10000000);
-  my $prec  = $prectab[($v2 >> 5) & 0x7];
+  my ($v1, $v2, $v3) = (hex($1), hex($2), $3);
+  
+  my $name = $hash->{NAME};
+
+  # rate_type currently not used / not reported
+  my $rate_type = ($v1 >> 5) & 0x3;
+  my @rate_type_text =("undef","consumed", "produced");
+  my $rate_type_text = ($rate_type > $#rate_type_text ? 
+                        "undef" : $rate_type_text[$rate_type]);
+
+  my $meter_type = ($v1 & 0x1f);
+  my @meter_type_text =("undef", "energy", "gas", "water", "undef");
+  my $meter_type_text = ($meter_type > $#meter_type_text ? 
+                        "undef" : $meter_type_text[$meter_type]); 
+    
+  my $precision = ($v2 >>5) & 0x7;
+  # no definition for text or numbers, used as -> (10 ** hex($precision))
+
+  # V3 use 3 bit, in V2 there are only 2 bit available
+  # V3 use bit 7 of first byte as bit 3 of scale
   my $scale = ($v2 >> 3) & 0x3;
-  my $size  = ($v2 >> 0) & 0x7;
-  my @txt = ("undef", "energy", "gas", "water");
-  my $txt = ($v1 > $#txt ? "undef" : $txt[$v1]);
-  my %unit = (energy => ["kWh", "kVAh", "W", "pulseCount"],
-              gas   => ["m3",  "feet3", "undef", "pulseCount"],
-              water => ["m3",  "feet3", "USgallons", "pulseCount"]);
-  my $unit = $txt eq "undef" ? "undef" : $unit{$txt}[$scale];
-  $txt = "power" if ($unit eq "W");
-  $v3 = hex(substr($v3, 0, 2*$size))/$prec;
+  $scale |= (($v1 & 0x80) >> 5);
+  
+  my $unit_text = ($meter_type_text eq "undef" ? 
+                        "undef" : $zwm_unit{$meter_type_text}[$scale]);
+  
+  my $size = $v2 & 0x7; 
 
-  my $modelId = ReadingsVal($hash->{NAME}, "modelId", "");
-  $modelId = $zwave_modelIdAlias{$modelId} if($zwave_modelIdAlias{$modelId});
-  if($modelId eq "Philio_PAN04") {
-    if($prec==100 && $scale==1 && $size==2) { $unit="A"; $txt="current" }
-    if($prec== 10 && $scale==0 && $size==2) { $unit="V"; $txt="voltage" }
-  }
+  $meter_type_text = "power" if ($unit_text eq "W");
+  $meter_type_text = "voltage" if ($unit_text eq "V");
+  $meter_type_text = "current" if ($unit_text eq "A");
+  
+  my $mv = hex(substr($v3, 0, 2*$size));
+  $mv = $mv / (10 ** $precision);
+  $mv -= (2 ** ($size*8)) if $mv >= (2 ** ($size*8-1));
+  $v3 = substr($v3, 2*$size, length($v3)-(2*$size));
 
-  return "$txt:$v3 $unit";
+  if (length($v3) < 4) { # V1 report
+    return "$meter_type_text: $mv $unit_text";  
+
+  } else { # V2 or greater report
+    my $delta_time = hex(substr($v3, 0, 4));
+    $v3 = substr($v3, 4, length($v3)-4);
+    
+    if ($delta_time == 0) { # no previous meter value
+      return "$meter_type_text: $mv $unit_text";
+
+    } else { # previous meter value present
+      my $pmv = hex(substr($v3, 0, 2*$size));
+      $pmv = $pmv / (10 ** $precision);
+      $pmv -= (2 ** ($size*8)) if $pmv >= (2 ** ($size*8-1));
+
+      if ($delta_time == 65535) {
+        $delta_time = "unknown";
+      } else {
+        $delta_time .= " s";
+      };
+      return "$meter_type_text: $mv $unit_text previous: $pmv delta_time: ".
+                "$delta_time"; # V2 report
+    };
+  };
+}
+
+
+sub
+Zwave_meterGet($)
+{
+  my ($scale) = @_;
+   
+  if ($scale eq "%s") { # no parameter specified, use V1 get without scale
+    return("", "01");
+  };
+  
+  if (($scale < 0) || ($scale > 6)) {
+    return("argument must be one of: 0 to 6","");
+  } else {
+    $scale = $scale << 3;
+    #~ Log 1, "cmd" .sprintf('01%02x', $scale);
+    return("",sprintf('01%02x', $scale));
+  };
+
+}
+
+
+sub
+ZWave_meterSupportedParse($$)
+{
+  my ($hash,$val) = @_;
+  return if($val !~ m/^(..)(..)$/);
+  my ($v1, $v2) = (hex($1), hex($2));
+  
+  my $name = $hash->{NAME};
+  
+  my $meter_reset = $v1 & 0x80;
+  my $meter_reset_text = $meter_reset ? "yes" : "no";
+
+  my $meter_type = ($v1 & 0x1f);
+  my @meter_type_text =("undef", "energy", "gas", "water", "undef");
+  my $meter_type_text = ($meter_type > $#meter_type_text ? 
+                            "undef" : $meter_type_text[$meter_type]); 
+ 
+  my $scale = $v2 & 0x7f;
+  my $unit_text="";
+ 
+  for (my $i=0; $i <= 6; $i++) {
+    if ($scale & 2**$i) {
+        $unit_text .= ", " if (length($unit_text)>0);
+        $unit_text .= $i.":".$zwm_unit{$meter_type_text}[$i];
+    };
+  };
+  
+  return "meterSupported: type: $meter_type_text scales: $unit_text resetable:".
+            " $meter_reset_text";
 }
 
 sub
@@ -1749,6 +1844,14 @@ s2Hex($)
   <li>positionSlat<br>
     drive slat to position %</li>
 
+  <br><br><b>Class METER</b>
+  <li>meterReset<br>
+    Reset all accumulated meter values.<br>
+    Note: see meterSupported command and its output to detect if resetting the
+    value is supported by the device.<br>
+    The command will reset ALL accumulated values, it is not possible to
+    choose a single value.</li>
+  
   <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
   <li>mcaAdd groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
     Add a list of node or node:endpoint associations. The latter can be used to
@@ -1951,17 +2054,24 @@ s2Hex($)
     </li>
 
   <br><br><b>Class METER</b>
-  <li>meter<br>
-    request the meter report.
+  <li>meter scale<br>
+    return the meter report for the requested scale.<br>
+    Note: protocol V1 does not support the scale parameter, the parameter will
+    be ignored and the default scale will be returned.<br>
+    For protocol V2 and higher, scale is supported and depends on the type of
+    the meter (energy, gas or water).<br>
+    The device may not support all scales, see the meterSupported command and
+    its output. If the scale parameter is omitted, the default unit will be
+    reported.<br>
+    Example: For an electric meter, meter 0 will report energy in kWh,
+    meter 2 will report power in W and meter 6 will report current in A
+    (if these scales are supported).<br>
     </li>
-  <li>meterWatt<br>
-    request the power report (Philio PHI_PAN04 only)
-    </li>
-  <li>meterVoltage<br>
-    request the voltage report (Philio PHI_PAN04 only)
-    </li>
-  <li>meterAmpere<br>
-    request the current report (Philio PHI_PAN04 only)
+  <li>meterSupported<br>
+    request the type of the meter, the supported scales and the capability to
+    reset the accumulated value.<br>
+    Note: The output contains the decimal numbers of the supported scales that
+    can be used as parameter for the meter command.
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
@@ -2158,10 +2268,14 @@ s2Hex($)
   <li>modelConfig:configLocation</li>
 
   <br><br><b>Class METER</b>
-  <li>energy:val [kWh|kVAh|pulseCount]</li>
+  <li>energy:val [kWh|kVAh|pulseCount|powerFactor]</li>
   <li>gas:val [m3|feet3|pulseCount]</li>
   <li>water:val [m3|feet3|USgallons|pulseCount]</li>
   <li>power:val W</li>
+  <li>voltage:val V</li>
+  <li>current:val A</li>
+  <li>meterSupported:type:[meter_type] scales:[list of supported scales]
+    resetable:[yes|no]</li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
   <li>endpoints:total X $dynamic $identical</li>
