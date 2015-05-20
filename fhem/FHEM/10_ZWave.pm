@@ -244,7 +244,13 @@ my %zwave_class = (
                "03750302"    => "protection:on",
                "047503(..)(..)"  => 'ZWave_protectionParse($1, $2)'} },
   LOCK                     => { id => '76' },
-  NODE_NAMING              => { id => '77' },
+  NODE_NAMING              => { id => '77',
+    set   => { name     => '(undef, "0100".unpack("H*", "%s"))',
+               location => '(undef, "0400".unpack("H*", "%s"))' },
+    get   => { name     => '02',
+               location => '05' },
+    parse => { '..770300(.*)' => '"name:".pack("H*", $1)',
+               '..770600(.*)' => '"location:".pack("H*", $1)' } },
   FIRMWARE_UPDATE_MD       => { id => '7a' },
   GROUPING_NAME            => { id => '7b' },
   REMOTE_ASSOCIATION_ACTIVATE=>{id => '7c' },
@@ -1870,6 +1876,12 @@ s2Hex($)
     groupId. Specifying 0 for groupid will delete all associations.
     </li>
 
+  <br><br><b>Class NODE_NAMING</b>
+  <li>name NAME<br>
+    Store NAME in the EEPROM. Note: only ASCII is supported.</li>
+  <li>location LOCATION<br>
+    Store LOCATION in the EEPROM. Note: only ASCII is supported.</li>
+  
   <br><br><b>Class PROTECTION</b>
   <li>protectionOff<br>
     device is unprotected</li>
@@ -2093,6 +2105,12 @@ s2Hex($)
     data see the mcaAdd command above.
     </li>
 
+  <br><br><b>Class NODE_NAMING</b>
+  <li>name<br>
+    Get the name from the EEPROM. Note: only ASCII is supported.</li>
+  <li>location<br>
+    Get the location from the EEPROM. Note: only ASCII is supported.</li>
+  
   <br><br><b>Class PROTECTION</b>
   <li>protection<br>
     returns the protection state. It can be on, off or seq.</li>
@@ -2281,6 +2299,10 @@ s2Hex($)
   <li>endpoints:total X $dynamic $identical</li>
   <li>mcCapability_X:class1 class2 ...</li>
 
+  <br><br><b>Class NODE_NAMING</b>
+  <li>name:NAME</li>
+  <li>location:LOCATION</li>
+  
   <br><br><b>Class PROTECTION</b>
   <li>protection:[on|off|seq]</li>
 
