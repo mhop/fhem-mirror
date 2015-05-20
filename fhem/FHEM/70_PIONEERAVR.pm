@@ -803,10 +803,8 @@ PIONEERAVR_Define($$) {
   
   #### statusRequest
   # Update Input alias names, available and enabled Inputs
-  # This updates $hash->{helper}{INPUTNAMES}
-  PIONEERAVR_askForInputNames($hash,5);
-  
-  #### we execute all 'get <name> XXX'   
+  #    This updates $hash->{helper}{INPUTNAMES}  
+  #### Additionally we execute all 'get <name> XXX'   
   PIONEERAVR_statusUpdate($hash);
 
   return $ret;
@@ -2118,6 +2116,7 @@ sub PIONEERAVR_statusUpdate($) {
 		select(undef, undef, undef, 0.1);
 	}
   }
+  PIONEERAVR_askForInputNames($hash,5);
 }
 #########################################################
 sub PIONEERAVR_askForInputNames($$) {
