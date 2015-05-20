@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.02 2015-05-16 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.03 2015-05-20 Risiko $
 #
 # Usage
 # 
@@ -26,6 +26,7 @@
 # V 1.00 2015-05-09 - NEW: white list for defined submodules activating by ignoreProtocol *
 # V 1.01 2015-05-09 - NEW: add quigg_gt* protocol (e.q quigg_gt7000)
 # V 1.02 2015-05-16 - NEW: battery state for temperature sensors
+# V 1.03 2015-05-20 - NEW: handle screen messages (up,down) 
 ############################################## 
 package main;
 
@@ -44,8 +45,8 @@ sub pilight_ctrl_ClientAccepted(@);
 sub pilight_ctrl_Send($);
 
 my %sets = ( "reset:noArg" => "");
-my %matchList = ( "1:pilight_switch" => "^SWITCH",
-                  "2:pilight_dimmer" => "^SWITCH|^DIMMER",
+my %matchList = ( "1:pilight_switch" => "^PISWITCH",
+                  "2:pilight_dimmer" => "^PISWITCH|^PIDIMMER|^PISCREEN",
                   "3:pilight_temp"   => "^PITEMP") ;
                   
 my @idList   = ("id","systemcode","gpio"); 
@@ -414,16 +415,24 @@ sub pilight_ctrl_addWhiteList($$)
   my $me = $own->{NAME};
   my $devName = $dev->{NAME};
   
+  my $id =       (defined($dev->{ID}))       ? $dev->{ID}      : return;
+  my $protocol = (defined($dev->{PROTOCOL})) ? $dev->{PROTOCOL}: return;
+  
   Log3 $me, 4, "$me(addWhiteList): add $devName to white list";
   my $entry = {};
-  
-  my $id =       (defined($dev->{ID}))       ? $dev->{ID}      : "";
-  my $protocol = (defined($dev->{PROTOCOL})) ? $dev->{PROTOCOL}: "";
   
   my %whiteHash;
   @whiteHash{@{$own->{helper}->{whiteList}}}=();
   if (!exists $whiteHash{"$protocol:$id"}) { 
     push @{$own->{helper}->{whiteList}}, "$protocol:$id";
+  }
+  
+  #spezial 2nd protocol for dimmer 
+  if (defined($dev->{PROTOCOL2})) {
+    $protocol = $dev->{PROTOCOL2};
+    if (!exists $whiteHash{"$protocol:$id"}) { 
+      push @{$own->{helper}->{whiteList}}, "$protocol:$id";
+    }
   }
 }
 
@@ -455,8 +464,19 @@ sub pilight_ctrl_Notify($$)
     my $s = $dev->{CHANGED}[$i];
     
     next if(!defined($s));
-    if ( $s =~/DEFINED/ or $s =~/INITIALIZED/ or $s =~/DELETED/) {
-      Log3 $me, 4, "$me(Notify): create white list";
+    my ($what,$who) = split(' ',$s);
+    
+    if ( $what =~ m/INITIALIZED/ ) {
+      Log3 $me, 4, "$me(Notify): create white list for $s";
+      pilight_ctrl_createWhiteList($own);
+    } elsif ( $what =~ m/DEFINED/ ){
+      my $hash = $defs{$who};
+      next if(!$hash);
+      my $module = $hash->{TYPE};
+      next if ($module !~ /pilight_[d|s|t].*/);
+      pilight_ctrl_addWhiteList($own,$hash);
+    } elsif ( $what =~ m/DELETED/ ){
+      Log3 $me, 4, "$me(Notify): create white list for $s";
       pilight_ctrl_createWhiteList($own);
     }
   }
@@ -685,7 +705,7 @@ sub pilight_ctrl_Parse($$)
     case m/lm75/        {$protoID = 4;}
     case m/lm76/        {$protoID = 4;}
     
-    case m/screen/      {return;}
+    case m/screen/      {$protoID = 5;}
     case m/firmware/    {return;}    
     else                {Log3 $me, 3, "$me(Parse): unknown protocol -> $proto"; return;}
   }
@@ -696,10 +716,10 @@ sub pilight_ctrl_Parse($$)
   }
     
   switch($protoID){
-    case 1 { return Dispatch($hash, "SWITCH,$proto,$id,$unit,$state",undef ); }
+    case 1 { return Dispatch($hash, "PISWITCH,$proto,$id,$unit,$state",undef ); }
     case 2 {
       my $dimlevel = (defined($data->{$s}{dimlevel})) ? $data->{$s}{dimlevel} : "";
-      my $msg = "DIMMER,$proto,$id,$unit,$state";
+      my $msg = "PIDIMMER,$proto,$id,$unit,$state";
       $msg.= ",$dimlevel" if ($dimlevel ne "");
       return Dispatch($hash, $msg ,undef);
     }
@@ -710,7 +730,7 @@ sub pilight_ctrl_Parse($$)
         $state =~ s/opened/on/g;
         $state =~ s/closed/off/g;
         Log3 $me, 5, "$me(Parse): contact as switch for $id";
-        return Dispatch($hash, "SWITCH,$proto,$id,$unit,$state",undef);
+        return Dispatch($hash, "PISWITCH,$proto,$id,$unit,$state",undef);
       }
       return;
     }
@@ -724,6 +744,7 @@ sub pilight_ctrl_Parse($$)
         my $msg = "PITEMP,$proto,$id,$temp,$humidity,$battery";
         return Dispatch($hash, $msg,undef);
     }
+    case 5 { return Dispatch($hash, "PISCREEN,$proto,$id,$unit,$state",undef); }
     else  {Log3 $me, 3, "$me(Parse): unknown protocol -> $proto"; return;}
   }
   return;

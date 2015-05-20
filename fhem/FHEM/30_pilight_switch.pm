@@ -1,4 +1,5 @@
 ##############################################
+# $Id: 30_pilight_switch.pm 0.12 2015-05-18 Risiko $
 #
 # Usage
 # 
@@ -8,6 +9,7 @@
 #
 # V 0.10 2015-02-22 - initial beta version
 # V 0.11 2015-03-29 - FIX:  $readingFnAttributes
+# V 0.12 2015-05-18 - FIX:  add version information
 ############################################## 
 
 package main;
@@ -26,7 +28,7 @@ sub pilight_switch_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "pilight_switch_Define";
-  $hash->{Match}    = "^SWITCH";
+  $hash->{Match}    = "^PISWITCH";
   $hash->{ParseFn}  = "pilight_switch_Parse";
   $hash->{SetFn}    = "pilight_switch_Set";
   $hash->{AttrList} = $readingFnAttributes;
@@ -71,7 +73,7 @@ sub pilight_switch_Parse($$)
   Log3 $backend, 4, "pilight_switch_Parse: RCV -> $rmsg";
   
   my ($dev,$protocol,$id,$unit,$state,@args) = split(",",$rmsg);
-  return () if($dev ne "SWITCH");
+  return () if($dev ne "PISWITCH");
   
   my $chash;
   foreach my $n (keys %{ $modules{pilight_switch}{defptr}{lc($protocol)} }) { 

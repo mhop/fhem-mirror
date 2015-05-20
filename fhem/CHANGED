@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 30_pilight_dimmer: up|down commands to change the dimlevel
   - bugfix:  76_MSGMail: Add MSGMail_Attr()
   - feature: 70_PIONEERAVR: new set <dev> hdmiOut <1/2>to switch hdmi outputs
              - new set <name> networkStandby (on|off) Needed to turn on/off...
