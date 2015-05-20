@@ -23,7 +23,7 @@ sub I2C_SHT21_Attr(@);
 sub I2C_SHT21_Poll($);
 sub I2C_SHT21_Set($@);
 sub I2C_SHT21_Undef($$);
-
+sub I2C_SHT21_DbLog_splitFn($);
 
 my %sets = (
 	'readValues' => 1,
@@ -38,10 +38,10 @@ sub I2C_SHT21_Initialize($) {
 	$hash->{SetFn}    = 'I2C_SHT21_Set';
 	$hash->{UndefFn}  = 'I2C_SHT21_Undef';
   $hash->{I2CRecFn} = 'I2C_SHT21_I2CRec';
-
 	$hash->{AttrList} = 'IODev do_not_notify:0,1 showtime:0,1 poll_interval:1,2,5,10,20,30 ' .
-				'roundHumidityDecimal:0,1,2 roundTemperatureDecimal:0,1,2 ' .
+						'roundHumidityDecimal:0,1,2 roundTemperatureDecimal:0,1,2 ' .
 						$readingFnAttributes;
+  $hash->{DbLog_splitFn} = "I2C_SHT21_DbLog_splitFn";
 }
 
 sub I2C_SHT21_Define($$) {
@@ -267,6 +267,18 @@ sub I2C_SHT21_readHumidity($) {
 	return; # $retVal;
 }
 
+sub I2C_SHT21_DbLog_splitFn($) {
+    my ($event) = @_;
+    Log3 undef, 5, "in DbLog_splitFn empfangen: $event"; 
+    my ($reading, $value, $unit) = "";
+    my @parts = split(/ /,$event);
+    $reading = shift @parts;
+    $reading =~ tr/://d;
+    $value = $parts[0];
+    $unit = "\xB0C" if(lc($reading) =~ m/temp/);
+    $unit = "%" 	if(lc($reading) =~ m/humi/);
+    return ($reading, $value, $unit);
+}
 
 1;
 

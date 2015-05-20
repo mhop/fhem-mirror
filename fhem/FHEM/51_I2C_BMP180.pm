@@ -54,6 +54,7 @@ sub I2C_BMP180_readUncompensatedTemperature($);
 sub I2C_BMP180_readUncompensatedPressure($$);
 sub I2C_BMP180_calcTrueTemperature($$);
 sub I2C_BMP180_calcTruePressure($$$);
+sub I2C_BMP180_DbLog_splitFn($);
 
 my $libcheck_hasHiPi = 1;
 
@@ -86,6 +87,7 @@ sub I2C_BMP180_Initialize($) {
 											'roundPressureDecimal:0,1,2 roundTemperatureDecimal:0,1,2 ' .
 											$readingFnAttributes;
 	$hash->{AttrList} .= " useHiPiLib:0,1 " if( $libcheck_hasHiPi );
+    $hash->{DbLog_splitFn} = "I2C_BMP180_DbLog_splitFn";
 }
 
 =head2 I2C_BMP180_Define
@@ -514,6 +516,20 @@ sub I2C_BMP180_calcTruePressure($$$) {
 	$p += (($x1 + $x2 + 3791) / 16);
 
 	return $p;
+}
+
+sub I2C_BMP180_DbLog_splitFn($) {
+    my ($event) = @_;
+    Log3 undef, 5, "in DbLog_splitFn empfangen: $event"; 
+    my ($reading, $value, $unit) = "";
+
+    my @parts = split(/ /,$event);
+    $reading = shift @parts;
+    $reading =~ tr/://d;
+    $value = $parts[0];
+    $unit = "\xB0C" if(lc($reading) =~ m/temp/);
+    $unit = "hPa" 	if(lc($reading) =~ m/pres/);
+    return ($reading, $value, $unit);
 }
 
 1;
