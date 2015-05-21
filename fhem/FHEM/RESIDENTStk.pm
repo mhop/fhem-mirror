@@ -47,7 +47,8 @@ sub RESIDENTStk_wakeupSet($$) {
     my @notify = split / /, $notifyValue;
     if (
         lc( $notify[0] ) !~
-        /^(off|nextrun|trigger|start|stop|reset|auto|([0-9]{2}:[0-9]{2}))$/ )
+        /^(off|nextrun|trigger|start|stop|end|reset|auto|([0-9]{2}:[0-9]{2}))$/
+      )
     {
         Log3 $NAME, 5,
             "RESIDENTStk $NAME: received unspecified notify '"
@@ -694,9 +695,9 @@ if (\$EVTPART0 eq \"stop\") {\
         RESIDENTStk_wakeupRun($NAME);
     }
 
-    # stop
+    # stop | end
     #
-    elsif ( $VALUE eq "stop" && $running ) {
+    elsif ( ( $VALUE eq "stop" || $VALUE eq "end" ) && $running ) {
         Log3 $NAME, 4, "RESIDENTStk $NAME: stopping wake-up program";
         fhem "setreading $NAME running 0";
         fhem "set $NAME nextRun $nextRun";
@@ -728,7 +729,7 @@ if (\$EVTPART0 eq \"stop\") {\
                 $wakeupEnforced = 0;
             }
 
-            if ( defined( $notify[1] ) ) {
+            if ( defined( $notify[1] ) || $VALUE eq "end" ) {
                 Log3 $NAME, 4,
 "RESIDENTStk $NAME: trigger $wakeupMacro stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice";
                 fhem
