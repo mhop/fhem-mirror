@@ -395,7 +395,7 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($temp, $humidity)) {
         if(!$def) {
-          $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+          Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
           return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1"; 
         }
         if ($humidity >= 20) {
