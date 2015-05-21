@@ -152,6 +152,7 @@ FHEMWEB_Initialize($)
     longpoll:0,1
     longpollSVG:1,0
     menuEntries
+    nameDisplay
     ploteditor:always,onClick,never
     plotfork:1,0
     plotmode:gnuplot,gnuplot-scroll,SVG
@@ -1370,6 +1371,7 @@ FW_showRoom()
   # row counter
   my $row=1;
   my %extPage = ();
+  my $nameDisplay = AttrVal($FW_wname,"nameDisplay",undef);
 
   my ($columns, $maxc) = FW_parseColumns();
   FW_pO "<tr class=\"column\">" if($maxc != -1);
@@ -1397,6 +1399,7 @@ FW_showRoom()
 
         FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
         my $devName = AttrVal($d, "alias", $d);
+        $devName = eval $nameDisplay if(defined($nameDisplay));
         my $icon = AttrVal($d, "icon", "");
         $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
@@ -3000,6 +3003,20 @@ FW_widgetOverride($$)
         </li>
         <br>
 
+    <a name="nameDisplay"></a>
+    <li>nameDisplay<br>
+        The argument is perl code, which is executed for each single device in
+        the room to determine the name displayed. $d is the name of the current
+        device, and $devName is the value of the alias attribute or the name of
+        the device, if no alias is set.  E.g. you can add a a global userattr
+        named alias_hu for the Hungarian translation, and specify nameDisplay
+        for the hungarian FHEMWEB instance as
+        <ul>
+          AttrVal($d, "alias_hu", $devName)
+        </ul>
+        </li>
+        <br>
+
     <a name="longpoll"></a>
     <li>longpoll<br>
         Affects devices states in the room overview only.<br>
@@ -3665,6 +3682,22 @@ FW_widgetOverride($$)
         attr WEB menuEntries AlarmOn,http://fhemhost:8083/fhem?cmd=set%20alarm%20on<br>
         </li><br>
 
+    <a name="nameDisplay"></a>
+    <li>nameDisplay<br>
+        Das Argument ist Perl-Code, was f&uuml;r jedes Ger&auml;t in der
+        Raum-&Uuml;bersicht ausgef&uuml;hrt wird, um den angezeigten Namen zu
+        berechnen. Dabei kann man die Variable $d f&uuml;r den aktuellen
+        Ger&auml;tenamen, und $devName f&uuml;r den aktuellen alias bzw. Name,
+        falls alias nicht gesetzt ist, verwenden.  Z.Bsp. f&uuml;r eine FHEMWEB
+        Instanz mit ungarischer Anzeige f&uuml;gt man ein global userattr
+        alias_hu hinzu, und man setzt nameDisplay f&uuml;r diese FHEMWEB
+        Instanz auf dem Wert:
+        <ul>
+          AttrVal($d, "alias_hu", $devName)
+        </ul>
+        </li>
+        <br>
+
     <a name="longpoll"></a>
     <li>longpoll<br>
         Dies betrifft die Aktualisierung der Ger&auml;testati in der
@@ -3842,7 +3875,7 @@ FW_widgetOverride($$)
     <li>widgetOverride<br>
         Leerzeichen separierte Liste von Name/Modifier Paaren, mit dem man den
         vom Modulautor fuer einen bestimmten Parameter (Set/Get/Attribut)
-        vorgesehene Widgets aendern kann.
+        vorgesehene Widgets &auml;ndern kann.
         <ul>
           <li>Ist der Modifier ":noArg", wird kein weiteres Eingabefeld
             angezeigt.</li>
