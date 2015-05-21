@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0050 2015-05-18 20:00:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0051 2015-05-21 20:00:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -200,6 +200,8 @@
 #		0050    18.05.2015	Sailor				km200_ParseHttpResponseInit	    Correcting bug of floating point errors
 #		0050    18.05.2015	Sailor				km200_ParseHttpResponseDyn      Correcting bug of floating point errors
 #		0050    18.05.2015	Sailor				km200_PostSingleService         Implementing feature of posting complete "string of hash" to switchProgram
+#		0051    20.05.2015	Sailor				km200_GetSingleService          Correcting bug of floating point errors
+#		0051    21.05.2015	Sailor				km200_PostSingleService         Implementing switchPoint-hash by switchPoint-hash comparison
 ########################################################################################################################
 
 
@@ -269,7 +271,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0050";
+	my $ModuleVersion           = "0051";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -1275,26 +1277,89 @@ sub km200_PostSingleService($)
 			### Make a pause before ReadBack
 			usleep ($hash->{READBACKDELAY}*1000);
 
-			### Read service-hash and format it so it is compareable to the sent content
-			my $ReReadContent = km200_GetSingleService($hash);
-			   $ReReadContent = $ReReadContent->{switchPoints};
-			   $ReReadContent = encode_json($ReReadContent);
-			   $ReReadContent =~ s/{"switchPoints"://;
-			   $ReReadContent =~ s/]}/]/g;
+		### Read service-hash and format it so it is compareable to the sent content
+		my $ReReadContent = km200_GetSingleService($hash);
+		   $ReReadContent = $ReReadContent->{switchPoints};
+		   $ReReadContent = encode_json($ReReadContent);
+		   $ReReadContent =~ s/{"switchPoints"://;
+		   $ReReadContent =~ s/]}/]/g;
+		   
+		### Transform back into array of hashes
+		eval 
+			{
+				$ReReadContent = decode_json(encode_utf8($ReReadContent));
+				$JsonContent = decode_json(encode_utf8($JsonContent));
+				1;
+			}
+		or do 
+			{
+			};
 		
+		### Set Counter for found items in SwitchPrograms
+		my $FoundJsonItem = 0;
+		
+				
+		### For every item of the array of SwitchPrograms to be send
+		foreach my $ReReadItem (@{$ReReadContent})
+		{
+			### Set Counter for found items of ReRead values
+			my $FoundReReadItem = 0;
 			
-			### Return value
-			my $ReturnValue = "";
-			if ($ReReadContent eq $JsonContent)
+			### For every item of the array of SwitchPrograms after Re-Reading 
+			foreach my $JsonItem (@{$JsonContent})
 			{
-				$ReturnValue = "The service " . $Service . " has been changed succesfully!";
-				if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service succesfully \n");}
+
+				### If the current Switchprogram - hash does not have the same amount of keys
+				if (%$ReReadItem != %$JsonItem) 
+				{
+					### Do nothing
+					#print "they don't have the same number of keys\n";
+				} 
+				### If the current Switchprogram - hash do have the same amount of keys
+				else 
+				{
+					### Compare key names and values
+					my %cmp = map { $_ => 1 } keys %$ReReadItem;
+					for my $key (keys %$JsonItem) 
+					{
+						last unless exists $cmp{$key};
+						last unless $$ReReadItem{$key} eq $$JsonItem{$key};
+						delete $cmp{$key};
+					}
+					if (%cmp) 
+					{
+						### Do nothing
+						#print "they don't have the same keys or values\n";
+					} 
+					else 
+					{
+						### Inkrement Counter
+						$FoundReReadItem = 1;
+						#print "they have the same keys and values\n";
+					}
+				}
 			}
-			else
-			{
-				$ReturnValue = "ERROR - The service " . $Service . " could not changed! \n";
-				if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service was NOT succesfully \n");}
+
+			### If item has been found
+			if ($FoundReReadItem == 1)
+			{ 
+				### Inkrement Counter for found identical SwitchPoints
+				$FoundJsonItem++;
 			}
+		}
+		
+		my $ReturnValue;
+		
+		if 	($FoundJsonItem == @{$ReReadContent})
+		{
+			$ReturnValue = "The service " . $Service . " has been changed succesfully!";
+			if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service succesfully \n");}
+		}	
+		else
+		{
+			$ReturnValue = "ERROR - The service " . $Service . " could not changed! \n";
+			if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service was NOT succesfully \n");}
+		}
 
 			### Return the status message
 			return $ReturnValue;
@@ -1350,14 +1415,78 @@ sub km200_PostSingleService($)
 		   $ReReadContent = encode_json($ReReadContent);
 		   $ReReadContent =~ s/{"switchPoints"://;
 		   $ReReadContent =~ s/]}/]/g;
+		   
+		### Transform back into array of hashes
+		eval 
+			{
+				$ReReadContent = decode_json(encode_utf8($ReReadContent));
+				$JsonContent = decode_json(encode_utf8($JsonContent));
+				1;
+			}
+		or do 
+			{
+			};
 		
-		### Return value
-		my $ReturnValue = "";
-		if ($ReReadContent eq $JsonContent)
+		### Set Counter for found items in SwitchPrograms
+		my $FoundJsonItem = 0;
+		
+				
+		### For every item of the array of SwitchPrograms to be send
+		foreach my $ReReadItem (@{$ReReadContent})
+		{
+			### Set Counter for found items of ReRead values
+			my $FoundReReadItem = 0;
+			
+			### For every item of the array of SwitchPrograms after Re-Reading 
+			foreach my $JsonItem (@{$JsonContent})
+			{
+
+				### If the current Switchprogram - hash does not have the same amount of keys
+				if (%$ReReadItem != %$JsonItem) 
+				{
+					### Do nothing
+					#print "they don't have the same number of keys\n";
+				} 
+				### If the current Switchprogram - hash do have the same amount of keys
+				else 
+				{
+					### Compare key names and values
+					my %cmp = map { $_ => 1 } keys %$ReReadItem;
+					for my $key (keys %$JsonItem) 
+					{
+						last unless exists $cmp{$key};
+						last unless $$ReReadItem{$key} eq $$JsonItem{$key};
+						delete $cmp{$key};
+					}
+					if (%cmp) 
+					{
+						### Do nothing
+						#print "they don't have the same keys or values\n";
+					} 
+					else 
+					{
+						### Inkrement Counter
+						$FoundReReadItem = 1;
+						#print "they have the same keys and values\n";
+					}
+				}
+			}
+
+			### If item has been found
+			if ($FoundReReadItem == 1)
+			{ 
+				### Inkrement Counter for found identical SwitchPoints
+				$FoundJsonItem++;
+			}
+		}
+		
+		my $ReturnValue;
+		
+		if 	($FoundJsonItem == @{$ReReadContent})
 		{
 			$ReturnValue = "The service " . $Service . " has been changed succesfully!";
 			if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service succesfully \n");}
-		}
+		}	
 		else
 		{
 			$ReturnValue = "ERROR - The service " . $Service . " could not changed! \n";
@@ -1643,10 +1772,12 @@ sub km200_GetSingleService($)
 				foreach my $item (@{ $json->{switchPoints} })
 				{
 					### Create string for time and switchpoint in fixed format and write part of Reading String
-					my $temptime     = $item->{time} / 60;
+					
+					my $time = $item->{time};
+					my $temptime     = $time / 60;
 					my $temptimeHH   = int($temptime);
-					my $temptimeMM   = ($temptime - $temptimeHH) * 60;
-
+					my $temptimeMM   = ($time - ($temptimeHH * 60));
+					
 					$temptimeHH = sprintf ('%02d', $temptimeHH);
 					$temptimeMM = sprintf ('%02d', $temptimeMM);
 					$temptime = $temptimeHH . $temptimeMM;
@@ -2437,6 +2568,8 @@ sub km200_ParseHttpResponseInit($)
 		@{$hash->{Secret}{KM200DYNSERVICES}}        = @KM200_DynServices;
 		@{$hash->{Secret}{KM200STATSERVICES}}       = @KM200_StatServices;
 
+		
+		### Reset flag for initialisation
 		$hash->{status}{FlagInitRequest}            = false;
 		
 		
@@ -2495,12 +2628,12 @@ sub km200_GetDynService($)
 	my ($hash, $def)                 = @_;
 	my $km200_gateway_host           =   $hash->{URL};
 	my $name                         =   $hash->{NAME};
-	$hash->{status}{FlagDynRequest}  = true;
 	$hash->{STATE}                   = "Polling";
 	my @KM200_DynServices            = @{$hash->{Secret}{KM200DYNSERVICES}};
 	my $ServiceCounterDyn            =   $hash->{temp}{ServiceCounterDyn};
 	my $PollingTimeout               =   $hash->{POLLINGTIMEOUT};
 	
+	### If at least one service to be polled is available
 	if (@KM200_DynServices != 0)
 	{
 		my $Service                  =   $KM200_DynServices[$ServiceCounterDyn];
@@ -2524,8 +2657,13 @@ sub km200_GetDynService($)
 						callback   =>  \&km200_ParseHttpResponseDyn
 					};
 
+		### Set Status Flag in order state running dynamic request
+		$hash->{status}{FlagDynRequest}           = true;
+
+		### Get data
 		HttpUtils_NonblockingGet($param);
 	}
+	### If no service to be polled is available
 	else
 	{
 		Log3 $name, 5, $name . " : No dynamic values available to be read. Skipping download.";
@@ -2550,6 +2688,9 @@ sub km200_ParseHttpResponseDyn($)
 	
 	Log3 $name, 5, $name. " : Parsing response of dynamic service received for: " . $Service;
 
+	### Reset Status Flag
+	$hash->{status}{FlagDynRequest}           = false;
+	
 	if($err ne "")
 	{
 		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
@@ -2886,6 +3027,11 @@ sub km200_GetStatService($)
 						header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
 						callback   =>  \&km200_ParseHttpResponseStat
 					};
+
+		### Set Status Flag in order state running static request
+		$hash->{status}{FlagStatRequest}           = true;
+
+		### Get data
 		HttpUtils_NonblockingGet($param);
 	}
 	else
@@ -2911,6 +3057,9 @@ sub km200_ParseHttpResponseStat($)
 	my $json;	
 	
 	Log3 $name, 5, $name. " : Parsing response of static service received for: " . $Service;
+
+	### Reset Status Flag
+	$hash->{status}{FlagStatRequest}           = false;
 	
 	if($err ne "")
 	{
