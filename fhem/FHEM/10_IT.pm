@@ -42,12 +42,12 @@ my %it_c2b;
 
 my $it_defrepetition = 6;   ## Default number of InterTechno Repetitions
 
-my $it_simple ="off on";
 my %models = (
     itremote    => 'sender',
     itswitch    => 'simple',
     itdimmer    => 'dimmer',
 );
+
 my %bintotristate=(
   "00" => "0",
   "01" => "F",
@@ -58,6 +58,13 @@ my %bintotristateV3=(
   "01" => "0",
   "00" => "D"
 );
+my %bintotristateHE=(
+  "10" => "1",
+  "01" => "0",
+  "11" => "2",
+  "00" => "D"
+);
+
 sub bin2dec {
 	unpack("N", pack("B32", substr("0" x 32 . shift, -32)));
 }
@@ -76,7 +83,7 @@ IT_Initialize($)
   $hash->{DefFn}     = "IT_Define";
   $hash->{UndefFn}   = "IT_Undef";
   $hash->{ParseFn}   = "IT_Parse";
-  $hash->{AttrList}  = "IODev ITfrequency ITrepetition switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 protocol:V1,V3 unit group dummy:1,0 " .
+  $hash->{AttrList}  = "IODev ITfrequency ITrepetition switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 protocol:V1,V3,HE_EU,HE800 unit group dummy:1,0 " .
                        "$readingFnAttributes " .
                        "loglevel:0,1,2,3,4,5,6 " .
                        "model:".join(",", sort keys %models);
@@ -137,22 +144,55 @@ IT_Set($@)
 
   my $list = "";
   $list .= "off:noArg on:noArg " if( AttrVal($name, "model", "") ne "itremote" );
+
+  my $c = $it_c2b{$a[0]};
+
   if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
       if($na > 1 && $a[0] eq "dim") {  
             $a[0] = ($a[1] eq "0" ? "off" : sprintf("dim%02d%%",$a[1]) );
             splice @a, 1, 1;
             $na = int(@a);
+      } elsif ($na == 2 && ($a[0] =~ /dim/)) {
+        return "Bad time spec" if($na == 2 && $a[1] !~ m/^\d*\.?\d+$/);
+  
+        my $val;    
+        
+        #$a[0] = ($a[1] eq "0" ? "off" : sprintf("dim%02d%%",$a[1]) );
+        #splice @a, 1, 1;
+        #$na = int(@a);
+        if($na == 2) {                                # Timed command. 
+          $c = sprintf("%02X", (hex($c) | 0x20)); # Set the extension bit 
+          ########################
+          # Calculating the time.
+          LOOP: for(my $i = 0; $i <= 12; $i++) {
+            for(my $j = 0; $j <= 15; $j++) {
+              $val = (2**$i)*$j*0.25;
+              if($val >= $a[1]) {
+                if($val != $a[1]) {
+                  Log3 $name, 2, "$name: changing timeout to $val from $a[1]";
+                }
+                $c .= sprintf("%x%x", $i, $j);
+                last LOOP;
+              }
+            }
+          }
+           Log GetLogLevel($name,2), "NOT Implemented now!";
+           return "Specified timeout too large, max is 15360" if(length($c) == 2);
+        }
       }
       $list = (join(" ", sort keys %it_c2b) . " dim:slider,0,6.25,100")
         if( AttrVal($name, "model", "") eq "itdimmer" );
   } else {
     $list .= "dimUp:noArg dimDown:noArg on-till" if( AttrVal($name, "model", "") eq "itdimmer" );
   }
+  if ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
+    $list .= " learn_on_codes:noArg learn_off_codes:noArg";
+  }
 
   return SetExtensions($hash, $list, $name, @a) if( $a[0] eq "?" );
   return SetExtensions($hash, $list, $name, @a) if( !grep( $_ =~ /^$a[0]($|:)/, split( ' ', $list ) ) );
 
-  my $c = $it_c2b{$a[0]};
+  
 
   return IT_Do_On_Till($hash, @a) if($a[0] eq "on-till");
   return "Bad time spec" if($na == 2 && $a[1] !~ m/^\d*\.?\d+$/);
@@ -218,6 +258,32 @@ IT_Set($@)
     } else {
       $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}.$hash->{$c}.$hash->{READINGS}{unit}{VAL});
     }
+  } elsif ($hash->{READINGS}{protocol}{VAL} eq "HE_EU") {
+    
+    my $masterVal = "11";
+    if ($hash->{READINGS}{mode}{VAL} eq "master") {
+      if ($hash->{$c} eq "01") {
+        $masterVal = "01";
+      }
+    }
+    $message = "ise".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-7).$hash->{$c}.$masterVal.$hash->{READINGS}{unit}{VAL});
+  } elsif ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
+    my $cVal;
+    (undef, $cVal) = split(" ", $v, 2);	# Not interested in the name...
+    my $count = $hash->{"count"};
+    if ($count > 3) {
+      $count = 0;
+    }
+    if ($cVal eq "learn_on_codes" || $cVal eq "learn_off_codes") {
+      $message = "ish0";
+    } elsif ($cVal eq "on") {
+      my $sendVal = $hash->{READINGS}{"on_" . $count}{VAL};
+      $message = "ish".uc($sendVal);
+      
+    } else {
+      my $sendVal = $hash->{READINGS}{"off_" . $count}{VAL};
+      $message = "ish".uc($sendVal);
+    }
   } else {
     $message = "is".uc($hash->{XMIT}.$hash->{$c});
 	}
@@ -265,6 +331,22 @@ IT_Set($@)
     $lh->{CHANGED}[0] = $v;
     $lh->{STATE} = $v;
     $lh->{READINGS}{state}{TIME} = $tn;
+    if ($hash->{READINGS}{protocol}{VAL} eq "HE800") {
+      if ($v eq "learn_on_codes") {
+        $lh->{"learn"}  = 'ON';
+        readingsSingleUpdate($lh, "init_count", 0, 1);
+      } elsif ($v eq "learn_off_codes") {
+        $lh->{"learn"}  = 'OFF';
+        readingsSingleUpdate($lh, "init_count", 0, 1);
+      } else {
+        my $count = $hash->{"count"};
+        $count = $count + 1;
+        if ($count > 3) {
+          $count = 0;
+        }
+        $hash->{"count"}  = $count;
+      }
+    }
     if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
         if ($v eq "on") {
@@ -335,7 +417,7 @@ IT_Define($$)
                         "off-code on-code [dimup-code] [dimdown-code] or for protocol V3 " .
                         "define <name> IT <26 bit Address> <1 bit group bit> <4 bit unit>";
 
-  return $u if(int(@a) < 5);
+  return $u if(int(@a) < 3);
 
   my $housecode;
   
@@ -344,7 +426,15 @@ IT_Define($$)
   my $unitCode;
   my $groupBit;
 
-  if (length($a[2]) == 26) {
+  if ($a[3] eq "HE800") {
+    $housecode = $a[2];
+    $hash->{READINGS}{protocol}{VAL}  = 'HE800';
+    $hash->{"count"}  = '0';
+    $oncode = "N/A";
+    $offcode = "N/A";
+    $unitCode="N/A";
+    #return "FALSE";
+  } elsif (length($a[2]) == 26) {
     # Is Protocol V3
     return "Define $a[0]: wrong IT-Code format: specify a 26 digits 0/1 "
   		if( ($a[2] !~ m/^[0-1]{26}$/i) );
@@ -362,6 +452,28 @@ IT_Define($$)
     $hash->{READINGS}{protocol}{VAL} = 'V3';
     $hash->{READINGS}{unit}{VAL} = $unitCode;
     $hash->{READINGS}{group}{VAL} = $groupBit;
+  } elsif (length($a[2]) == 46) { # HE_EU
+    return "Define $a[0]: wrong IT-Code format: specify a 29 digits 0/1 "
+  		if( ($a[2] !~ m/^[0-1]{46}$/i) );
+    return "Define $a[0]: wrong group format: specify a 1 digits 0/1 "
+    	if( ($a[3] !~ m/^[0-1]{1}$/i) );
+    return "Define $a[0]: wrong unit format: specify a 7 digits 0/1 "
+    	if( ($a[4] !~ m/^[0-1]{7}$/i) );
+    $housecode = $a[2].$a[4];
+    $groupBit = $a[3];
+    $unitCode=$a[4];
+    if ($groupBit == "1") {
+      # looks like a master key
+      $hash->{READINGS}{mode}{VAL} = "master";
+      $oncode = "01";
+      $offcode = "00";
+    } else {
+      $hash->{READINGS}{mode}{VAL} = "single";
+      $oncode = "10";
+      $offcode = "01";
+    }
+    $hash->{READINGS}{unit}{VAL} = $unitCode;
+    $hash->{READINGS}{protocol}{VAL}  = 'HE_EU';
   } else {
     return "Define $a[0]: wrong IT-Code format: specify a 10 digits 0/1/f "
   		if( ($a[2] !~ m/^[f0-1]{10}$/i) );
@@ -444,13 +556,14 @@ IT_Parse($$)
     Log3 undef,4,"message not supported by IT \"$msg\"!";
     return undef;
   }
-  if (length($msg) != 7 && length($msg) != 17 && length($msg) != 19) {
-    Log3 undef,3,"message \"$msg\" too short!";
+  if (length($msg) != 7 && length($msg) != 12 && length($msg) != 17 && length($msg) != 19 && length($msg) != 20) {
+    Log3 undef,3,"message \"$msg\" (" . length($msg) . ") too short!";
     return undef;
   }
+  Log3 undef,4,"message \"$msg\" (" . length($msg) . ")";
   my $bin = undef;
   my $isDimMode = 0;
-  if (length($msg) == 17) {
+  if (length($msg) == 17) { # IT V3
         my $bin1=sprintf("%024b",hex(substr($msg,1,length($msg)-1-8)));
         while (length($bin1) < 32) {
           # suffix 0
@@ -462,7 +575,7 @@ IT_Parse($$)
           $bin2 = '0'.$bin2;   
         }
         $bin = $bin1 . $bin2;
-  } elsif (length($msg) == 19 ) {
+  } elsif (length($msg) == 19 ) { # IT V3 Dimm
         my $bin1=sprintf("%024b",hex(substr($msg,1,length($msg)-1-8-8)));
         while (length($bin1) < 32) {
           # suffix 0
@@ -479,8 +592,29 @@ IT_Parse($$)
           $bin3 = '0'.$bin3;   
         }
         $bin = substr($bin1 . $bin2 . $bin3,24,length($bin1 . $bin2 . $bin3)-1);
-  }
-  else {
+  } elsif (length($msg) == 20 && (substr($msg, 1, 1)) eq 'h') { # HomeEasy EU
+        #Log3 undef,3,"HEX Part1: " . substr($msg,2,8);
+        my $bin1=sprintf("%024b",hex(substr($msg,2,8)));
+        while (length($bin1) < 32) {
+          # suffix 0
+          $bin1 = '0'.$bin1;   
+        }
+        #Log3 undef,3,"HEX Part2: " . substr($msg,2+8,7);
+        my $bin2=sprintf("%024b",hex(substr($msg,2+8,7)));
+        #$bin2 = substr($bin2,4);
+        while (length($bin2) < 28) {
+          # suffix 0
+          $bin2 = '0'.$bin2;   
+        }
+        $bin = $bin1 . $bin2;# . $bin3;
+  } elsif (length($msg) == 12 && (substr($msg, 1, 1)) eq 'h') { # HomeEasy HE800
+        my $bin1=sprintf("%024b",hex(substr($msg,2,8)));
+        while (length($bin1) < 32) {
+          # suffix 0
+          $bin1 = '0'.$bin1;   
+        }
+        $bin = $bin1;# . $bin3;
+  } else { # IT
         $bin=sprintf("%024b",hex(substr($msg,1,length($msg)-1)));
   }
 
@@ -488,21 +622,29 @@ IT_Parse($$)
     # suffix 0 
     $bin = '0'.$bin;   
   }
-  #Log3 undef,4,"BIN: $bin";
   my $msgcode="";
-  while (length($bin)>=2) {
-    if (length($msg) == 7) {
-      if (substr($bin,0,2) != "10") {
-        $msgcode=$msgcode.$bintotristate{substr($bin,0,2)};
+  if (length($msg) == 12 && (substr($msg, 1, 1)) eq 'h') { # HomeEasy HE800;
+    $msgcode=substr($bin, 0, 28);
+  } elsif (length($msg) == 20 && (substr($msg, 1, 1)) eq 'h') { # HomeEasy EU;
+    $msgcode=substr($bin, 0, 57);
+  } else {
+    while (length($bin)>=2) {
+      if (length($msg) == 7) {
+        if (substr($bin,0,2) != "10") {
+          $msgcode=$msgcode.$bintotristate{substr($bin,0,2)};
+        } else {
+          Log3 undef,4,"unknown tristate in \"$bin\"";
+          return "unknown tristate in \"$bin\""
+        }
+      } elsif (length($msg) == 20 && (substr($msg, 1, 1)) eq 'h') { # HomeEasy EU
+        $msgcode=$msgcode.$bintotristateHE{substr($bin,0,2)};
       } else {
-        Log3 undef,4,"unknown tristate in \"$bin\"";
-        return "unknown tristate in \"$bin\""
+        $msgcode=$msgcode.$bintotristateV3{substr($bin,0,2)};
       }
-    } else {
-      $msgcode=$msgcode.$bintotristateV3{substr($bin,0,2)};
+      $bin=substr($bin,2,length($bin)-2);
     }
-    $bin=substr($bin,2,length($bin)-2);
-  }
+  }   
+
   
   if (length($msg) == 7) {
     $housecode=substr($msgcode,0,length($msgcode)-2);
@@ -515,6 +657,14 @@ IT_Parse($$)
     if (length($msg) == 19) {
       $dimCode=substr($msgcode,32,4);
     }
+  } elsif (length($msg) == 20 && (substr($msg, 1, 1)) eq 'h') { # HomeEasy EU
+    $onoffcode=substr($msgcode,46,2);
+    $groupBit=substr($msgcode,48,2);
+    $unitCode=substr($msgcode,50,7);
+    $housecode=substr($msgcode,0,46).$unitCode;
+  } elsif (length($msg) == 12 && (substr($msg, 1, 1)) eq 'h') { # HomeEasy HE800
+    $housecode=substr($msgcode,0,6).substr($msgcode,26,2);
+    $onoffcode=0;
   } else {
     Log3 undef,4,"Wrong IT message received: $msgcode";
     return "Wrong IT message received: $msgcode";
@@ -534,21 +684,74 @@ IT_Parse($$)
         $tmpOnCode = "FF";
       } 
       return "UNDEFINED IT_$housecode IT $housecode $tmpOnCode $tmpOffCode" if(!$def);
+    } elsif (length($msg) == 20) { # HE_EU
+      my $isGroupCode = '0';
+      if (($onoffcode == '01' && $groupBit == '01') || ($onoffcode == '00' && $groupBit == '11')) {
+        # Group Code found
+        $isGroupCode = '1';
+      }
+      Log3 undef,2,"$housecode not defined (Address: ".substr($msgcode,0,46)." Unit: $unitCode Switch code: $onoffcode GroupCode: $isGroupCode)";
+      #return "$housecode not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)!";
+      return "UNDEFINED IT_$housecode IT " . substr($msgcode,0,46) . " $isGroupCode $unitCode" if(!$def);
+    } elsif (length($msg) == 12 && (substr($msg, 1, 1)) eq 'h') { # HE800
+      Log3 undef,2,"$housecode not defined (HE800)";
+      return "UNDEFINED IT_$housecode IT " . "$housecode HE800 $msgcode" if(!$def);
     } else {
-      Log3 undef,4,"$housecode not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)";
+      Log3 undef,2,"$housecode not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)";
       #return "$housecode not defined (Address: ".substr($msgcode,0,26)." Group: $groupBit Unit: $unitCode Switch code: $onoffcode)!";
       return "UNDEFINED IT_$housecode IT " . substr($msgcode,0,26) . " $groupBit $unitCode" if(!$def);
     }
   }
   $def=$modules{IT}{defptr}{lc($housecode)};
-
+#$lh->{"learn"}  = 'ON';
   foreach my $name (keys %{$def}) {
     if (length($msg) == 17 || length($msg) == 19) {
       if ($def->{$name}->{READINGS}{group}{VAL} != $groupBit || $def->{$name}->{READINGS}{unit}{VAL} != $unitCode) {
         next;
       }
     }
-    if ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
+    if ($def->{$name}->{READINGS}{protocol}{VAL}  eq 'HE800') {
+      my $learnVal = "n/a";      
+      if (defined($def->{$name}->{"learn"})) {
+         $learnVal = $def->{$name}->{"learn"} . "";
+      } else {
+        $def->{$name}->{"learn"}  = 'Disabled';
+      }
+      if ($learnVal  eq 'ON') {
+          my $count = $def->{$name}->{READINGS}->{"init_count"}{VAL};
+          readingsSingleUpdate($def->{$name}, "init_count", $count + 1, 1);
+          readingsSingleUpdate($def->{$name}, "on_" . $count, $msgcode, 1);
+          if ($count == 3) {
+            $def->{$name}->{"learn"}  = 'Disabled';
+          }
+      } elsif ($learnVal  eq 'OFF') {
+          my $count = $def->{$name}->{READINGS}->{"init_count"}{VAL};
+          readingsSingleUpdate($def->{$name}, "init_count", $count + 1, 1);
+          readingsSingleUpdate($def->{$name}, "off_" . $count, $msgcode, 1);
+          if ($count == 3) {
+            $def->{$name}->{"learn"}  = 'Disabled';
+          }
+      } else {
+        $newstate="Unknown, Please learn codes!";
+        # search for on code
+        for (my $i=0; $i < 4; $i++) {
+           my $value = $def->{$name}->{READINGS}->{"on_" . $i}{VAL};
+           if (defined($value)) {
+             if ($value eq $msgcode) {
+                $newstate="on";
+             }
+           }
+        }
+        for (my $i=0; $i < 4; $i++) {
+           my $value = $def->{$name}->{READINGS}->{"off_" . $i}{VAL};
+           if (defined($value)) {
+            if ($value eq $msgcode) {
+              $newstate="off";
+            }
+           }
+        }
+      }
+    } elsif ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
       $newstate="on";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
         readingsSingleUpdate($def->{$name},"dim",1,1);
