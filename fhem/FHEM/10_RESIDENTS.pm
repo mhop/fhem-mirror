@@ -999,7 +999,7 @@ sub RESIDENTS_UpdateReadings (@) {
         readingsBulkUpdate( $hash, "presence", $newpresence );
 
         # update statistics
-        if ( $presence eq "present" ) {
+        if ( $newpresence eq "present" ) {
             readingsBulkUpdate( $hash, "lastArrival", $datetime );
 
             # absence duration
