@@ -1399,7 +1399,10 @@ FW_showRoom()
 
         FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
         my $devName = AttrVal($d, "alias", $d);
-        $devName = eval $nameDisplay if(defined($nameDisplay));
+        if(defined($nameDisplay)) {
+          my ($DEVICE, $ALIAS) = ($d, $devName);
+          $devName = eval $nameDisplay;
+        }
         my $icon = AttrVal($d, "icon", "");
         $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
@@ -3006,11 +3009,11 @@ FW_widgetOverride($$)
     <a name="nameDisplay"></a>
     <li>nameDisplay<br>
         The argument is perl code, which is executed for each single device in
-        the room to determine the name displayed. $d is the name of the current
-        device, and $devName is the value of the alias attribute or the name of
-        the device, if no alias is set.  E.g. you can add a a global userattr
-        named alias_hu for the Hungarian translation, and specify nameDisplay
-        for the hungarian FHEMWEB instance as
+        the room to determine the name displayed. $DEVICE is the name of the
+        current device, and $ALIAS is the value of the alias attribute or the
+        name of the device, if no alias is set.  E.g. you can add a a global
+        userattr named alias_hu for the Hungarian translation, and specify
+        nameDisplay for the hungarian FHEMWEB instance as
         <ul>
           AttrVal($d, "alias_hu", $devName)
         </ul>
@@ -3679,15 +3682,16 @@ FW_widgetOverride($$)
         Komma getrennte Liste; diese Links werden im linken Men&uuml; angezeigt.
         Beispiel:<br>
         attr WEB menuEntries fhem.de,http://fhem.de,culfw.de,http://culfw.de<br>
-        attr WEB menuEntries AlarmOn,http://fhemhost:8083/fhem?cmd=set%20alarm%20on<br>
+        attr WEB menuEntries
+                      AlarmOn,http://fhemhost:8083/fhem?cmd=set%20alarm%20on<br>
         </li><br>
 
     <a name="nameDisplay"></a>
     <li>nameDisplay<br>
         Das Argument ist Perl-Code, was f&uuml;r jedes Ger&auml;t in der
         Raum-&Uuml;bersicht ausgef&uuml;hrt wird, um den angezeigten Namen zu
-        berechnen. Dabei kann man die Variable $d f&uuml;r den aktuellen
-        Ger&auml;tenamen, und $devName f&uuml;r den aktuellen alias bzw. Name,
+        berechnen. Dabei kann man die Variable $DEVICE f&uuml;r den aktuellen
+        Ger&auml;tenamen, und $ALIAS f&uuml;r den aktuellen alias bzw. Name,
         falls alias nicht gesetzt ist, verwenden.  Z.Bsp. f&uuml;r eine FHEMWEB
         Instanz mit ungarischer Anzeige f&uuml;gt man ein global userattr
         alias_hu hinzu, und man setzt nameDisplay f&uuml;r diese FHEMWEB
