@@ -1,7 +1,6 @@
 
 # $Id$
-#
-# TODO:
+
 
 package main;
 
@@ -11,19 +10,18 @@ use SetExtensions;
 
 sub LaCrosse_Parse($$);
 
-sub
-LaCrosse_Initialize($)
-{
+
+sub LaCrosse_Initialize($) {
   my ($hash) = @_;
 
   $hash->{Match}     = "^\\S+\\s+9 ";
   $hash->{SetFn}     = "LaCrosse_Set";
-  #$hash->{GetFn}     = "LaCrosse_Get";
+  ###$hash->{GetFn}     = "LaCrosse_Get";
   $hash->{DefFn}     = "LaCrosse_Define";
   $hash->{UndefFn}   = "LaCrosse_Undef";
   $hash->{FingerprintFn}   = "LaCrosse_Fingerprint";
   $hash->{ParseFn}   = "LaCrosse_Parse";
-  #$hash->{AttrFn}    = "LaCrosse_Attr";
+  ###$hash->{AttrFn}    = "LaCrosse_Attr";
   $hash->{AttrList}  = "IODev"
                        ." ignore:1"
                        ." doAverage:1"
@@ -33,9 +31,7 @@ LaCrosse_Initialize($)
                        ." $readingFnAttributes";
 }
 
-sub
-LaCrosse_Define($$)
-{
+sub LaCrosse_Define($$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
@@ -53,15 +49,8 @@ LaCrosse_Define($$)
 
   $hash->{corr1} = ((int(@a) > 3) ? $a[3] : 0);
   $hash->{corr2} = ((int(@a) > 4) ? $a[4] : 0);
-  #$hash->{corr3} = ((int(@a) > 5) ? $a[5] : 0);
-  #$hash->{corr4} = ((int(@a) > 6) ? $a[6] : 0);
 
-
-  #return "$addr is not a 1 byte hex value" if( $addr !~ /^[\da-f]{2}$/i );
-  #return "$addr is not an allowed address" if( $addr eq "00" );
-
-  return "LaCrosse device $addr already used for $modules{LaCrosse}{defptr}{$addr}->{NAME}." if( $modules{LaCrosse}{defptr}{$addr}
-                                                                                             && $modules{LaCrosse}{defptr}{$addr}->{NAME} ne $name );
+  return "LaCrosse device $addr already used for $modules{LaCrosse}{defptr}{$addr}->{NAME}." if( $modules{LaCrosse}{defptr}{$addr} && $modules{LaCrosse}{defptr}{$addr}->{NAME} ne $name );
 
   $hash->{addr} = $addr;
 
@@ -70,17 +59,17 @@ LaCrosse_Define($$)
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
     Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
-  } else {
+  } 
+  else {
     Log3 $name, 1, "$name: no I/O device";
   }
 
   return undef;
 }
 
-#####################################
-sub
-LaCrosse_Undef($$)
-{
+
+#-----------------------------------#
+sub LaCrosse_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   my $addr = $hash->{addr};
@@ -91,10 +80,8 @@ LaCrosse_Undef($$)
 }
 
 
-#####################################
-sub
-LaCrosse_Get($@)
-{
+#-----------------------------------#
+sub LaCrosse_Get($@) {
   my ($hash, $name, $cmd, @args) = @_;
 
   return "\"get $name\" needs at least one parameter" if(@_ < 3);
@@ -104,16 +91,24 @@ LaCrosse_Get($@)
   return "Unknown argument $cmd, choose one of $list";
 }
 
-sub
-LaCrosse_Fingerprint($$)
-{
+#-----------------------------------#
+sub LaCrosse_Attr(@) {
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  return undef;
+}
+
+
+#-----------------------------------#
+sub LaCrosse_Fingerprint($$) {
   my ($name, $msg) = @_;
 
   return ( "", $msg );
 }
 
-sub
-LaCrosse_CalcDewpoint (@) {
+
+#-----------------------------------#
+sub LaCrosse_CalcDewpoint (@) {
   my ($temp,$hum) = @_;
 
   my($SDD, $DD, $a, $b, $v, $DP);
@@ -121,7 +116,8 @@ LaCrosse_CalcDewpoint (@) {
   if($temp>=0) {
     $a = 7.5;
     $b = 237.3;
-  } else {
+  } 
+  else {
     $a = 7.6;
     $b = 240.7;
   }
@@ -135,16 +131,13 @@ LaCrosse_CalcDewpoint (@) {
   return $DP;
 }
 
-sub
-LaCrosse_RemoveReplaceBattery($)
-{
+#-----------------------------------#
+sub LaCrosse_RemoveReplaceBattery($) {
   my $hash = shift;
   delete($hash->{replaceBattery});
 }
 
-sub
-LaCrosse_Set($@)
-{
+sub LaCrosse_Set($@) {
   my ($hash, $name, $cmd, $arg, $arg2) = @_;
 
   my $list = "replaceBatteryForSec";
@@ -159,31 +152,139 @@ LaCrosse_Set($@)
     $hash->{replaceBattery} = $arg2?2:1;
     InternalTimer(gettimeofday()+$arg, "LaCrosse_RemoveReplaceBattery", $hash, 0);
 
-  } else {
+  }
+  else {
     return "Unknown argument $cmd, choose one of ".$list;
   }
 
   return undef;
 }
 
-sub
-LaCrosse_Parse($$)
-{
+#-----------------------------------#
+sub LaCrosse_Parse($$) {
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
 
-  my( @bytes, $addr, $battery_new, $type, $channel, $temperature, $battery_low, $humidity );
-  if( $msg =~ m/^OK/ ) {
+  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain );    
+  $temperature = 0xFFFF;
+  $humidity = 0xFF;
+  $windDirection = 0xFFFF;
+  $windSpeed = 0xFFFF;
+  $windGust = 0xFFFF;
+  $rain = 0xFFFF;  
+  
+  if( $msg =~ m/^OK 9/ ) {
+    # Temperature sensor - Format:
+    #      0  1   3   3   4
+    # ----------------------
+    # OK 9 56 1   4   156 37     ID = 56  T: 18.0  H: 37  no NewBatt
+    # OK 9 49 1   4   182 54     ID = 49  T: 20.6  H: 54  no NewBatt
+    # OK 9 55 129 4 192 56       ID = 55  T: 21.6  H: 56  WITH NewBatt 
+    
+    # OK 9 2 1   4 212 106       ID = 2   T: 23.6  H: -- Channel: 1
+    # OK 9 2 130 4 225 125       ID = 2   T: 24.9  H: -- Channel: 2
+    
+    # OK 9 ID XXX XXX XXX XXX
+    # |  | |  |   |   |   |
+    # |  | |  |   |   |   --- Humidity incl. WeakBatteryFlag
+    # |  | |  |   |   |------ Temp * 10 + 1000 LSB
+    # |  | |  |   |---------- Temp * 10 + 1000 MSB
+    # |  | |  |-------------- Sensor type (1 or 2) +128 if NewBatteryFlag
+    # |  | |----------------- Sensor ID
+    # |  |------------------- fix "9"
+    # |---------------------- fix "OK"
+
     @bytes = split( ' ', substr($msg, 5) );
 
     $addr = sprintf( "%02X", $bytes[0] );
     $battery_new = ($bytes[1] & 0x80) >> 7;
+    $battery_low = ($bytes[4] & 0x80) >> 7;
+    $typeNumber = 0;
+    $typeName = "T(H)";
     $type = ($bytes[1] & 0x70) >> 4;
     $channel = $bytes[1] & 0x0F;
     $temperature = ($bytes[2]*256 + $bytes[3] - 1000)/10;
-    $battery_low = ($bytes[4] & 0x80) >> 7;
     $humidity = $bytes[4] & 0x7f;
-  } else {
+  } 
+  elsif ($msg =~ m/^OK WS/) {
+    # Weather station - Format:
+    #        0   1   2   3   4   5   6   7   8   9   10  11  12  13
+    #   -----------------------------------------------------------
+    #  OK WS 14  1   4   208 53  0   0   7   8   0   29  0   31  1  I D=0E  23.2°C  52%rH  0mm  Dir.: 180.0°  Wind:2.9m/s  Gust:3.1m/s  new Batt.
+    #  OK WS ID  XXX TTT TTT HHH RRR RRR DDD DDD SSS SSS GGG GGG FFF
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |   |-- Flags *
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |------ WindGust * 10 LSB (0.0 ... 50.0 m/s)           FF/FF = none 
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |---------- WindGust * 10 MSB
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |-------------- WindSpeed  * 10 LSB(0.0 ... 50.0 m/s)          FF/FF = none  
+    #  |  |  |   |   |   |   |   |   |   |   |   |------------------ WindSpeed  * 10 MSB
+    #  |  |  |   |   |   |   |   |   |   |   |---------------------- WindDirection * 10 LSB (0.0 ... 365.0 Degrees) FF/FF = none
+    #  |  |  |   |   |   |   |   |   |   |-------------------------- WindDirection * 10 MSB
+    #  |  |  |   |   |   |   |   |   |------------------------------ Rain * 0.5mm LSB (0 ... 9999 mm)               FF/FF = none
+    #  |  |  |   |   |   |   |   |---------------------------------- Rain * 0.5mm MSB
+    #  |  |  |   |   |   |   |-------------------------------------- Humidity (1 ... 99 %rH)                        FF = none
+    #  |  |  |   |   |   |------------------------------------------ Temp * 10 + 1000 LSB (-40 ... +60 °C)          FF/FF = none
+    #  |  |  |   |   |---------------------------------------------- Temp * 10 + 1000 MSB
+    #  |  |  |   |-------------------------------------------------- Sensor type (1=TX22)
+    #  |  |  |------------------------------------------------------ Sensor ID (1 ... 63)
+    #  |  |--------------------------------------------------------- fix "WS"
+    #  |------------------------------------------------------------ fix "OK"
+    #
+    #  * Flags: 128  64  32  16  8  4  2  1        
+    #                                  |  |
+    #                                  |  |--- New battery
+    #                                  |------ ERROR
+    
+    @bytes = split( ' ', substr($msg, 5) );
+    
+    $addr = sprintf( "%02X", $bytes[0] );
+    $typeNumber = $bytes[1];
+    $typeName = $typeNumber == 1 ? "TX22" : "unknown";
+    
+    $battery_new = $bytes[13] & 0x01;
+    $battery_low = $bytes[13] & 0x02;
+    $type = 0;
+    $channel = 1;
+
+    my $rh = $modules{LaCrosse}{defptr}{$addr};
+    
+    if($bytes[2] != 0xFF && $bytes[3] != 0xFF) {
+      $temperature = ($bytes[2]*256 + $bytes[3] - 1000)/10;
+      $rh->{"bufferedT"} = $temperature;
+    }
+    else {
+      if(defined($rh->{"bufferedT"})) {
+        $temperature = $rh->{"bufferedT"};
+      }
+    }
+    
+    if($bytes[4] != 0xFF) {
+      $humidity = $bytes[4];
+      if (defined($rh)) {
+        $rh->{"bufferedH"} = $humidity;
+      }
+    }
+    else {
+      if(defined($rh->{"bufferedH"})) {
+        $humidity = $rh->{"bufferedH"};
+      }
+    }
+    
+    
+    if($bytes[5] != 0xFF && $bytes[6] != 0xFF) {
+      $rain = ($bytes[5]*256 + $bytes[6]) * 0.5;
+    }
+    if($bytes[7] != 0xFF && $bytes[8] != 0xFF) {
+      $windDirection = ($bytes[7]*256 + $bytes[8]) / 10;
+    }
+    if($bytes[9] != 0xFF && $bytes[10] != 0xFF) {
+      $windSpeed = ($bytes[9] * 256 + $bytes[10]) / 10;
+    }
+    if($bytes[11] != 0xFF && $bytes[12] != 0xFF) {
+      $windGust = ($bytes[11] * 256 + $bytes[12]) / 10;
+    }
+    
+  }
+  else {
     DoTrigger($name, "UNKNOWNCODE $msg");
     Log3 $name, 3, "$name: Unknown code $msg, help me!";
     return "";
@@ -235,71 +336,120 @@ LaCrosse_Parse($$)
   push(@list, $rname);
 
   $rhash->{LaCrosse_lastRcv} = TimeNow();
+  $rhash->{"sensorType"} = "$typeNumber=$typeName"; 
 
-  if( $type == 0x00 ) {
+  if( $type == 0x00) {
     $channel = "" if( $channel == 1 );
-
-    if( my $resolution = AttrVal( $rname, "resolution", 0 ) ) {
-      $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
-      $humidity = int($humidity / $resolution + 0.5) * $resolution;
+                                         
+    # Handle resolution
+    if(my $resolution = AttrVal( $rname, "resolution", 0 )) {
+      if ($temperature != 0xFFFF) {
+        $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
+      }
+      if ($humidity != 0xFF) {
+        $humidity = int($humidity / $resolution + 0.5) * $resolution;
+      }
     }
-
-    if( AttrVal( $rname, "doAverage", 0 )
-        && defined($rhash->{"previousT$channel"}) ) {
+  
+    # Calculate average
+    if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousT$channel"}) && $temperature != 0xFFFF ) {
       $temperature = ($rhash->{"previousT$channel"}*3+$temperature)/4;
     }
-    if( AttrVal( $rname, "doAverage", 0 )
-        && defined($rhash->{"previousH$channel"}) ) {
+    if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousH$channel"}) && $humidity != 0xFF ) {
       $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
     }
-
+    
+    # Check filterThreshold
     if( defined($rhash->{"previousT$channel"})
         && abs($rhash->{"previousH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
         && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) ) {
 
       readingsBeginUpdate($rhash);
 
+      # Battery state
+      readingsBulkUpdate($rhash, "battery$channel", $battery_low?"low":"ok");
+
+      # Calculate dewpoint
       my $dewpoint;
-      if( AttrVal( $rname, "doDewpoint", 0 ) && $humidity && $humidity <= 99 ) {
+      if( AttrVal( $rname, "doDewpoint", 0 ) && $humidity && $humidity <= 99 && $temperature != 0xFFFF ) {
         $dewpoint = LaCrosse_CalcDewpoint($temperature,$humidity);
         $dewpoint = int($dewpoint*10 + 0.5) / 10;
         readingsBulkUpdate($rhash, "dewpoint$channel", $dewpoint);
       }
+      
+      # Round and write temperature and humidity
+      if ($temperature != 0xFFFF) {           
+        $temperature = int($temperature*10 + 0.5) / 10;
+        readingsBulkUpdate($rhash, "temperature$channel", $temperature + $rhash->{corr1});
+      }
+      if ($humidity && $humidity <= 99) {
+        $humidity = int($humidity*10 + 0.5) / 10;
+        readingsBulkUpdate($rhash, "humidity$channel", $humidity + $rhash->{corr2} );
+      }
 
-      $temperature = int($temperature*10 + 0.5) / 10;
-      $humidity = int($humidity*10 + 0.5) / 10;
-
-      readingsBulkUpdate($rhash, "temperature$channel", $temperature + $rhash->{corr1});
-      readingsBulkUpdate($rhash, "humidity$channel", $humidity + $rhash->{corr2} ) if( $humidity && $humidity <= 99 );
-
+      # STATE
       if( !$channel ) {
         my $state = "T: ". ($temperature + $rhash->{corr1});
         $state .= " H: ". ($humidity + $rhash->{corr2}) if( $humidity && $humidity <= 99 );
         $state .= " D: $dewpoint" if( $dewpoint );
+        
         readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
       }
 
-      readingsBulkUpdate($rhash, "battery$channel", $battery_low?"low":"ok");
-
       readingsEndUpdate($rhash,1);
-    } else {
-      readingsSingleUpdate($rhash, "battery$channel", $battery_low?"low":"ok" , 1);
+    } 
+    else {
+      readingsSingleUpdate($rhash, "battery$channel", $battery_low ? "low" : "ok", 1);
     }
 
-    $rhash->{"previousH$channel"} = $humidity;
     $rhash->{"previousT$channel"} = $temperature;
+    $rhash->{"previousH$channel"} = $humidity;
+    
+    readingsBeginUpdate($rhash);
+    
+    if ($typeNumber > 0 && $windSpeed != 0xFFFF) {
+      readingsBulkUpdate($rhash, "windSpeed", $windSpeed );
+    }
+    
+    if ($typeNumber > 0 && $windGust != 0xFFFF) {
+      readingsBulkUpdate($rhash, "windGust", $windGust );
+    }
+    
+    if ($typeNumber > 0 && $rain != 0xFFFF) {
+      readingsBulkUpdate($rhash, "rain", $rain );
+    }
+    
+    if ($typeNumber > 0 && $windDirection != 0xFFFF) {
+      readingsBulkUpdate($rhash, "windDirectionDegree", $windDirection );
+      
+      my $windDirectionText = "---";
+      if    ($windDirection >=    0 && $windDirection <=  11.2) { $windDirectionText = "N"; }
+      elsif ($windDirection >  11.2 && $windDirection <=  33.7) { $windDirectionText = "NNE"; }
+      elsif ($windDirection >  33.7 && $windDirection <=  56.2) { $windDirectionText = "NE"; }
+      elsif ($windDirection >  56.2 && $windDirection <=  78.7) { $windDirectionText = "ENE"; }
+      elsif ($windDirection >  78.7 && $windDirection <= 101.2) { $windDirectionText = "E"; }
+      elsif ($windDirection > 101.2 && $windDirection <= 123.7) { $windDirectionText = "ESE"; }
+      elsif ($windDirection > 123.7 && $windDirection <= 146.2) { $windDirectionText = "SE"; }
+      elsif ($windDirection > 146.2 && $windDirection <= 168.7) { $windDirectionText = "SSE"; }
+      elsif ($windDirection > 168.7 && $windDirection <= 191.2) { $windDirectionText = "S"; }
+      elsif ($windDirection > 191.2 && $windDirection <= 213.7) { $windDirectionText = "SSW"; }
+      elsif ($windDirection > 213.7 && $windDirection <= 236.2) { $windDirectionText = "SW"; }
+      elsif ($windDirection > 236.2 && $windDirection <= 258.7) { $windDirectionText = "WSW"; }
+      elsif ($windDirection > 258.7 && $windDirection <= 281.2) { $windDirectionText = "W"; }
+      elsif ($windDirection > 281.2 && $windDirection <= 303.7) { $windDirectionText = "WNW"; }
+      elsif ($windDirection > 303.7 && $windDirection <= 326.2) { $windDirectionText = "NW"; }
+      elsif ($windDirection > 326.2 && $windDirection <= 348.7) { $windDirectionText = "NNW"; };
+      
+      readingsBulkUpdate($rhash, "windDirectionText", $windDirectionText );
+    }
+    
+    readingsEndUpdate($rhash,1);
+    
   }
 
   return @list;
 }
 
-sub
-LaCrosse_Attr(@)
-{
-  my ($cmd, $name, $attrName, $attrVal) = @_;
-
-  return undef;
-}
 
 1;
 
@@ -311,7 +461,7 @@ LaCrosse_Attr(@)
 <ul>
 
   <tr><td>
-  FHEM module for LaCrosse Temperature and Humidity sensors.<br><br>
+  FHEM module for LaCrosse Temperature and Humidity sensors and weather stations like WS 1600 (TX22 sensor).<br><br>
 
   It can be integrated in to FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>
 
@@ -348,9 +498,11 @@ LaCrosse_Attr(@)
   <ul>
     <li>battery[]<br>
       ok or low</li>
-    <li>temperature[]<br>
+    <li>temperature (°C)<br>
       Notice: see the filterThreshold attribute.</li>
-    <li>humidity</li>
+    <li>humidity (%rH)</li>
+    <li>Wind speed (m/s), gust (m/s) and direction (degree)</li>
+    <li>Rain (mm)</li>
   </ul><br>
 
   <a name="LaCrosse_Attr"></a>
