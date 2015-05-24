@@ -1188,7 +1188,8 @@ The following local attributes are used by a wider range of devices:
 <ul>
   <code>sleep &lt;sec&gt; [quiet]</code>
   <br><br>
-  Sleep for a given amount, millisecond accuracy.<br>
+  Sleep for a given amount. The unit is seconds, with millisecond accuracy, as
+  you can specify decimal places.<br>
   When called in a notify/at/etc, then nonempty return values of the following
   commands is logged to the global logfile with loglevel 2.<br>
   If quiet is specified, then skip this logging.
@@ -1202,8 +1203,8 @@ The following local attributes are used by a wider range of devices:
           Windsensor 1w_temp</code>
   </ul>
   <br>
-  Note: sleep followed by another command and issued in at/notify/etc is not
-  blocking fhem<br>
+  Note: sleep followed by another command is not blocking FHEM, and is
+  comparable to a nameless at<br>
 </ul>
 
 <a name="version"></a>

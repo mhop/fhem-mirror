@@ -1263,10 +1263,11 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <ul>
   <code>sleep &lt;sec&gt; [quiet]</code>
   <br><br>
-  Wartet f&uuml;r die angegebene Anzahl von Millisekunden.<br>
+  Wartet f&uuml;r die angegebene Anzahl von Sekunden, Millisekunden genau,
+  da man Nachkommastellen spezifizieren kann.<br>
   Falls sleep in at/notify/etc aufgerufen wurde, und die nachfolgenden
-  Kommandos einen nicht leeren Text zur&uuml;ckgeliefert haben, dann wird dieser
-  Text mit loglevel 2 protokolliert.<br>
+  Kommandos einen nicht leeren Text zur&uuml;ckgeliefert haben, dann wird
+  dieser Text mit loglevel 2 protokolliert.<br>
   quiet vermeidet diese Protokollierung.
   <br><br>
   Beispiele:
@@ -1278,8 +1279,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
           Windsensor 1w_temp</code>
   </ul>
   <br>
-  Bemerkung: sleep gefolgt von weiteren Befehlen und aufgerufen in
-  at/notify/etc blockiert die Abarbeitung von FHEM nicht.<br>
+  Bemerkung: sleep gefolgt von weiteren Befehlen blockiert die Abarbeitung von
+  FHEM nicht, und ist vergleichbar mit einem namenlosen at Kommando.<br>
 </ul>
 
 <a name="version"></a>
