@@ -288,10 +288,13 @@ $owdevice{"3B"} = {
 };
 $owdevice{"7E"} = {
     # EDS0066 - Multisensor temperature Pressure
-    "read" => [ qw(EDS0066/temperature EDS0066/pressure)],
+    "read" => [ qw(EDS0066/temperature EDS0066/pressure),
+                qw(EDS0068/temperature EDS0068/pressure EDS0068/dew_point EDS0068/humidity EDS0068/light) ],
     "write" => [],
-    "poll" => [ qw(EDS0066/temperature EDS0066/pressure) ],
-    "state" => [ qw(EDS0066/temperature EDS0066/pressure) ],
+    "poll" => [ qw(EDS0066/temperature EDS0066/pressure), 
+                qw(EDS0068/temperature EDS0068/pressure EDS0068/dew_point EDS0068/humidity EDS0068/light) ],
+    "state" => [ qw(EDS0066/temperature EDS0066/pressure), 
+                 qw(EDS0068/temperature EDS0068/pressure EDS0068/dew_point EDS0068/humidity EDS0068/light) ],
     "interface" => "multisensor",
 };
 $owdevice{"81"} = {
