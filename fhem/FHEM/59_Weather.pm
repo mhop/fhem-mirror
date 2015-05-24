@@ -96,20 +96,41 @@ my @YahooCodes_nl = (
        'af en toe sneeuwbuien', 'hevige sneeuwval', 'deels bewolkt',
        'onweersbuien', 'sneeuwbuien', 'af en toe onweersbuien');
 
+my @YahooCodes_fr = (
+       'tornade', 'tempête tropicale', 'ouragan', 'tempête sévère', 'orage', 'pluie et neige',
+       'pluie et grésil', 'neige et grésil', 'bruine verglassante', 'bruine', 'pluie verglassante' ,'averse',
+       'averses', 'tourbillon de neige', 'légères averses de neige', 'rafale de neige', 'neige', 'grêle',
+       'giboulées', 'poussières', 'brouillard', 'brume', 'enfumé', 'orageux',
+       'venteux', 'froid', 'nuageux',
+       'couverte', # night
+       'couvert', # day
+       'partiellement couverte', # night
+       'partiellement couvert', # day
+       'clair',
+       'ensoleillé',
+       'douce', #night
+       'agréable', #day
+       'pluie et grêle',
+       'chaud', 'orages isolés', 'tempêtes éparses', 'orages épars', 'averses éparses', 'tempête de neige',
+       'chûtes de neiges éparses', 'tempêtes de neige', 'partielement nuageux', 'averses orageuses', 'chûte de neige', 'chûtes de neige isolées');
+
 
 my %pressure_trend_txt_en = ( 0 => "steady", 1 => "rising", 2 => "falling" );
 my %pressure_trend_txt_de = ( 0 => "gleichbleibend", 1 => "steigend", 2 => "fallend" );
 my %pressure_trend_txt_nl = ( 0 => "stabiel", 1 => "stijgend", 2 => "dalend" );
+my %pressure_trend_txt_fr = ( 0 => "stable", 1 => "croissant", 2 => "décroissant" );
 my %pressure_trend_sym = ( 0 => "=", 1 => "+", 2 => "-" );
 
 
 my @directions_txt_en = ('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW');
 my @directions_txt_de = ('N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW');
 my @directions_txt_nl = ('N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO', 'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW');
+my @directions_txt_fr = ('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO');
 
 my %wdays_txt_en = ('Mon' => 'Mon', 'Tue' => 'Tue', 'Wed'=> 'Wed', 'Thu' => 'Thu', 'Fri' => 'Fri', 'Sat' => 'Sat', 'Sun' => 'Sun');
 my %wdays_txt_de = ('Mon' => 'Mo', 'Tue' => 'Di', 'Wed'=> 'Mi', 'Thu' => 'Do', 'Fri' => 'Fr', 'Sat' => 'Sa', 'Sun' => 'So');
 my %wdays_txt_nl = ('Mon' => 'Maa', 'Tue' => 'Din', 'Wed'=> 'Woe', 'Thu' => 'Don', 'Fri' => 'Vri', 'Sat' => 'Zat', 'Sun' => 'Zon');
+my %wdays_txt_fr= ('Mon' => 'Lun', 'Tue' => 'Mar', 'Wed'=> 'Mer', 'Thu' => 'Jeu', 'Fri' => 'Ven', 'Sat' => 'Sam', 'Sun' => 'Dim');
 
 my @iconlist = (
        'storm', 'storm', 'storm', 'thunderstorm', 'thunderstorm', 'rainsnow',
@@ -270,6 +291,11 @@ sub Weather_RetrieveDataFinished($$$)
       %wdays_txt_i18n= %wdays_txt_nl;
       @directions_txt_i18n= @directions_txt_nl;
       %pressure_trend_txt_i18n= %pressure_trend_txt_nl;
+    } elsif($lang eq "fr") {
+      @YahooCodes_i18n= @YahooCodes_fr;
+      %wdays_txt_i18n= %wdays_txt_fr;
+      @directions_txt_i18n= @directions_txt_fr;
+      %pressure_trend_txt_i18n= %pressure_trend_txt_fr;
     } else {
       @YahooCodes_i18n= @YahooCodes_en;
       %wdays_txt_i18n= %wdays_txt_en;
@@ -383,7 +409,8 @@ sub Weather_RetrieveDataFinished($$$)
       my $temperature= $hash->{READINGS}{temperature}{VAL};
       my $humidity= $hash->{READINGS}{humidity}{VAL};
       my $wind= $hash->{READINGS}{wind}{VAL};
-      my $val= "T: $temperature  H: $humidity  W: $wind";
+      my $pressure=  $hash->{READINGS}{pressure}{VAL};
+      my $val= "T: $temperature  H: $humidity  W: $wind  P: $pressure";
       Log3 $hash, 4, "Weather ". $hash->{NAME} . ": $val";
       readingsBulkUpdate($hash, "state", $val);
       readingsEndUpdate($hash, $doTrigger ? 1 : 0);
@@ -659,6 +686,7 @@ WeatherAsHtmlD($;$)
     The optional language parameter may be one of
     <code>de</code>,
     <code>en</code>,
+    <code>fr</code>,
     <code>nl</code>,
 
     It determines the natural language in which the forecast information appears.
@@ -761,7 +789,7 @@ WeatherAsHtmlD($;$)
 
     Der optionale Parameter  <code>interval</code> gibt die Dauer in Sekunden zwischen den einzelnen Aktualisierungen der Wetterdaten an. Der Standardwert ist 3600 (1 Stunde). Wird kein Wert angegeben, gilt der Standardwert.<br><br>
 
-    Der optionale Parameter für die möglichen Sprachen darf einen der folgende Werte annehmen: <code>de</code>, <code>en</code> oder <code>nl</code>. Er bezeichnet die natürliche Sprache, in der die Wetterinformationen dargestellt werden. Der Standardwert ist <code>en</code>. Wird für die Sprache kein Wert angegeben, gilt der Standardwert. Wird allerdings der Parameter für die Sprache gesetzt, muss ebenfalls ein Wert für das Abfrageintervall gesetzt werden.<br><br>
+    Der optionale Parameter für die möglichen Sprachen darf einen der folgende Werte annehmen: <code>de</code>, <code>en</code>, <code>fr</code> oder <code>nl</code>. Er bezeichnet die natürliche Sprache, in der die Wetterinformationen dargestellt werden. Der Standardwert ist <code>en</code>. Wird für die Sprache kein Wert angegeben, gilt der Standardwert. Wird allerdings der Parameter für die Sprache gesetzt, muss ebenfalls ein Wert für das Abfrageintervall gesetzt werden.<br><br>
         
                 
     Beispiele:
