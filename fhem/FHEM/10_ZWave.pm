@@ -272,9 +272,9 @@ my %zwave_class = (
                wakeupIntervalCapabilities => "09" },
     parse => { "028407"    => 'wakeup:notification',
                "..8406(......)(..)" =>
-                '"wakeupReport:interval ".hex($1)." target ".hex($2)',
+                         '"wakeupReport:interval ".hex($1)." target ".hex($2)',
                "..840a(......)(......)(......)(......)" =>
-                '"wakeupIntervalCapabilitiesReport:min ".hex($1).'.
+                         '"wakeupIntervalCapabilitiesReport:min ".hex($1).'.
                          '" max ".hex($2)." default ".hex($3)." step ".hex($4)'
              } },
   ASSOCIATION              => { id => '85', 
@@ -617,7 +617,7 @@ ZWave_Cmd($$@)
     no strict "refs";
     my $iohash = $hash->{IODev};
     my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
-    my ($err, $data) = &{$fn}($iohash, $cmd, "^000400$id") if($fn);
+    my ($err, $data) = &{$fn}($iohash, $cmd, "^000400${id}..$cmdId") if($fn);
     use strict "refs";
 
     return $err if($err);

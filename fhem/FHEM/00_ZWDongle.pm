@@ -496,14 +496,13 @@ ZWDongle_Read($@)
   # buffer after a timeout is my only idea of solving this problem.
   my $ts   = gettimeofday();
   my $data = ($hash->{ReadTime} && $ts-$hash->{ReadTime} > 1) ?
-                        "" : $hash->{PARTIAL};
-  $hash->{ReadTime} = $ts;      # Flush old data.
+                        $buf : $hash->{PARTIAL}.$buf;
+  $hash->{ReadTime} = $ts;
 
 
-  Log3 $name, 5, "ZWDongle/RAW: $data/$buf";
-  $data .= $buf;
+  Log3 $name, 5, "ZWDongle RAW buffer: $data";
+
   my $msg;
-
   while(length($data) > 0) {
     my $fb = substr($data, 0, 2);
 
@@ -547,6 +546,7 @@ ZWDongle_Read($@)
            "$name: wrong checksum: received $rcs, computed $ccs for $len$msg";
       DevIo_SimpleWrite($hash, "15", 1)         # Send NACK
         if(++$hash->{nrNAck} < 5);
+      $msg = undef;
       next;
     }
     $hash->{nrNAck} = 0;
@@ -554,7 +554,9 @@ ZWDongle_Read($@)
     Log3 $name, 5, "ZWDongle_Read $name: $msg";
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
+    $hash->{PARTIAL} = $data;	 # Recursive call by ZWave get, Forum #37418
     ZWDongle_Parse($hash, $name, $msg);
+    $data = $hash->{PARTIAL};
     $msg = undef;
   }
 
@@ -572,6 +574,7 @@ ZWDongle_ReadAnswer($$$)
   return ("No FD (dummy device?)", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
   my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
+  Log3 $hash, 4, "ZWDongle_ReadAnswer arg:$arg regexp:$regexp";
 
   for(;;) {
 
