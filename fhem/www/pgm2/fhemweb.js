@@ -118,6 +118,18 @@ FW_jqueryReadyFn()
   });
   */
 
+  $("form input.get[type=submit]").click(function(e) { //"get" via XHR to dialog
+    e.preventDefault();
+    var cmd = "", el=this;
+    $(el).parent().find("input,[name]").each(function() {
+      cmd += (cmd?"&":"")+$(this).attr("name")+"="+$(this).val();
+    });
+    FW_cmd(FW_root+"?"+cmd+"&XHR=1", function(data) {
+      FW_okDialog('<pre>'+data+'</pre>', el);
+    });
+  });
+  
+
   $("#saveCheck")
     .css("cursor", "pointer")
     .click(function(){
