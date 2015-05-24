@@ -29,7 +29,7 @@ sub XBMC_Initialize($$)
   $hash->{ReadFn}   = "XBMC_Read";  
   $hash->{ReadyFn}  = "XBMC_Ready";
   $hash->{UndefFn}  = "XBMC_Undefine";
-  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,standby pingInterval " . $readingFnAttributes;
+  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,standby updateInterval " . $readingFnAttributes;
   
   $data{RC_makenotify}{XBMC} = "XBMC_RCmakenotify";
   $data{RC_layout}{XBMC_RClayout}  = "XBMC_RClayout";
@@ -70,7 +70,7 @@ sub XBMC_Define($$)
     return "Username and/or password missing.";
   }
   
-  $attr{$hash->{NAME}}{"pingInterval"} = 60;
+  $attr{$hash->{NAME}}{"updateInterval"} = 60;
   
   return undef;
 }
@@ -171,20 +171,47 @@ sub XBMC_Init($)
   
   XBMC_Update($hash);
   
-  XBMC_QueueCheckConnection($hash);
+  XBMC_QueueIntervalUpdate($hash);
   
   return undef;
 }
 
-sub XBMC_QueueCheckConnection($;$) {
+sub XBMC_QueueIntervalUpdate($;$) {
   my ($hash, $time) = @_;
   # AFAIK when using http this module is not using a persistent TCP connection
   if($hash->{Protocol} ne 'http') {
     if (!defined($time)) {
-      $time = AttrVal($hash->{NAME},'pingInterval','60');
+      $time = AttrVal($hash->{NAME},'updateInterval','60');
     }
-    InternalTimer(time() + $time, "XBMC_CheckConnection", $hash, 0);
+    InternalTimer(time() + $time, "XBMC_Check", $hash, 0);
   }
+}
+
+sub XBMC_Check($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  Log3 $name, 5, "XBMC_Check";
+
+  XBMC_CheckConnection($hash);
+  
+  XBMC_Update($hash);
+  
+  #xbmc seems alive. so keep bugging it
+  XBMC_QueueIntervalUpdate($hash);
+}
+
+sub XBMC_UpdatePlayerItem($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+ 
+  Log3 $name, 4, "XBMC_UpdatePlayerItem";
+  if (($hash->{STATE} eq 'disconnected') or (ReadingsVal($name, "playStatus","") ne 'playing')) {
+    Log3 $name, 4, "XBMC_UpdatePlayerItem - cancelled";
+    return;
+  }
+  
+  XBMC_PlayerGetItem($hash, -1);   
 }
 
 sub XBMC_CheckConnection($) {
@@ -215,9 +242,6 @@ sub XBMC_CheckConnection($) {
   
   $hash->{LAST_PING} = time();
   DevIo_SimpleWrite($hash, $json, 0);
- 
-  #xbmc seems alive. so keep bugging it
-  XBMC_QueueCheckConnection($hash);
 }
 
 sub XBMC_Update($) 
@@ -240,6 +264,8 @@ sub XBMC_Update($)
   };
   XBMC_Call($hash,$obj,1);
   XBMC_PlayerUpdate($hash,-1); #-1 -> update all existing players
+  
+  XBMC_UpdatePlayerItem($hash);
 }
 
 sub XBMC_PlayerUpdate($$) 
@@ -254,6 +280,26 @@ sub XBMC_PlayerUpdate($$)
     }
   };
   push(@{$obj->{params}->{properties}}, 'partymode') if(AttrVal($hash->{NAME},'compatibilityMode','xbmc') eq 'xbmc');
+  if($playerid >= 0) {    
+    $obj->{params}->{playerid} = $playerid;
+    XBMC_Call($hash,$obj,1);
+  }
+  else {
+    XBMC_PlayerCommand($hash,$obj,0);
+  }
+}
+
+sub XBMC_PlayerGetItem($$) 
+{
+  my $hash = shift;
+  my $playerid = shift;
+  my $obj  = {
+    "method" => "Player.GetItem",
+    "params" => { 
+      "properties" => ["artist", "album", "thumbnail", "file", "title",
+                        "track", "year", "streamdetails"]
+    }
+  };
   if($playerid >= 0) {    
     $obj->{params}->{playerid} = $playerid;
     XBMC_Call($hash,$obj,1);
@@ -290,7 +336,7 @@ sub XBMC_ProcessRead($$)
   Log3($name, 5, "XBMC_Read: Incoming data: " . $data);
   
   $buffer = $buffer  . $data;
-  Log3($name, 4, "XBMC_Read: Current processing buffer (PARTIAL + incoming data): " . $buffer);
+  Log3($name, 5, "XBMC_Read: Current processing buffer (PARTIAL + incoming data): " . $buffer);
 
   my ($msg,$tail) = XBMC_ParseMsg($hash, $buffer);
   #processes all complete messages
@@ -367,9 +413,9 @@ sub XBMC_PlayerOnPlay($$)
   my ($hash,$obj) = @_;
   my $name = $hash->{NAME};
   my $id = XBMC_CreateId();
-  my $playerId;
   my $type = $obj->{params}->{data}->{item}->{type};
   if(AttrVal($hash->{NAME},'compatibilityMode','xbmc') eq 'plex' || !defined($obj->{params}->{data}->{item}->{id}) || $type eq "picture" || $type eq "unknown") {
+    # we either got unknown or picture OR an item not in the library (id not existing)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,'playStatus','playing');
     readingsBulkUpdate($hash,'type',$type);
@@ -380,15 +426,11 @@ sub XBMC_PlayerOnPlay($$)
       }
     }
     readingsEndUpdate($hash, 1);
-    
-    if ($type eq "unknown") {
-        #   this is special. we get here for example when playing a stream
-        #   xbmc is not able to assign the correct player so the playerid might be wrong
-        #   http://forum.kodi.tv/showthread.php?tid=174872
-        $playerId = -1; #signal that we are unsure about the playerId and that we want to call Player.GetActivePlayers first
-    }
+
+    XBMC_PlayerGetItem($hash, -1);
   } 
   elsif($type eq "song") {
+    # 
     my $req = {
       "method" => "AudioLibrary.GetSongDetails",
       "params" => { 
@@ -460,12 +502,11 @@ sub XBMC_PlayerOnPlay($$)
     XBMC_Call($hash, $req,1);
   }
 
-  if (not defined($playerId)) {
-    # this happens when we did not had a type 'unknown'
-    # so basically always :)
-    $playerId = $obj->{params}->{data}->{player}->{playerid};
-  }
-  XBMC_PlayerUpdate($hash, $playerId);
+  # the playerId in the message is not reliable
+  #   xbmc is not able to assign the correct player so the playerid might be wrong
+  #   http://forum.kodi.tv/showthread.php?tid=174872
+  # so we ask for the acutally running players by passing -1
+  XBMC_PlayerUpdate($hash, -1);
 }
 
 sub XBMC_ProcessNotification($$) 
@@ -486,13 +527,14 @@ sub XBMC_ProcessNotification($$)
   elsif($obj->{method} eq "Player.OnPropertyChanged") {
     XBMC_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
   }
-  elsif($obj->{method} eq "Player.OnSeek") {
-    #XBMC_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
-    Log3($name, 4, "Discard Player.OnSeek event because it is irrelevant");
-  }
-  elsif($obj->{method} eq "Player.OnSpeedChanged") {
-    #XBMC_PlayerUpdate($hash,$obj->{params}->{data}->{player}->{playerid});
-    Log3($name, 4, "Discard Player.OnSpeedChanged event because it is irrelevant");
+  elsif($obj->{method} =~ /(Player\.OnSeek|Player\.OnSpeedChanged|Player\.OnPropertyChanged)/) {
+    my $base = $obj->{params}->{data}->{player};
+    readingsBeginUpdate($hash);
+    foreach my $key (keys %$base) {
+      my $item = $base->{$key};
+      XBMC_CreateReading($hash,$key,$item);
+    }
+    readingsEndUpdate($hash, 1);
   }
   elsif($obj->{method} eq "Player.OnStop") {
     readingsSingleUpdate($hash,"playStatus",'stopped',1);
@@ -504,7 +546,7 @@ sub XBMC_ProcessNotification($$)
     XBMC_ResetMediaReadings($hash);
     XBMC_PlayerOnPlay($hash, $obj);
   }
-  elsif($obj->{method} =~ /(.*).On(.*)/) {
+  elsif($obj->{method} =~ /(Playlist|AudioLibrary|VideoLibrary|System).On(.*)/) {
     readingsSingleUpdate($hash,lc($1),lc($2),1);
     
     if (lc($1) eq "system") {
@@ -520,7 +562,7 @@ sub XBMC_ProcessNotification($$)
         #and force a connection check in some seconds when we think XBMC actually has shut down
         $hash->{LAST_PONG} = 0;
         RemoveInternalTimer($hash);
-        XBMC_QueueCheckConnection($hash,  5);
+        XBMC_QueueIntervalUpdate($hash,  5);
       }
     }
   }
@@ -565,13 +607,22 @@ sub XBMC_ProcessResponse($$)
     $hash->{PendingPlayerCMDs}{$id} = undef;
   }  
   else {
-    my $properties = $obj->{result};
-    if($properties && $properties ne 'OK') {
-      if ($properties ne 'pong') {
+    my $result = $obj->{result};
+    if($result && $result ne 'OK') {
+      if ($result ne 'pong') {
         readingsBeginUpdate($hash);
-        foreach my $key (keys %$properties) {
-          my $value = $properties->{$key};
-          XBMC_CreateReading($hash,$key,$value);
+        foreach my $key (keys %$result) {
+          if ($key eq 'item') {
+            my $item = $obj->{result}->{item};
+            foreach my $ikey (keys %$item) {
+              my $value = $item->{$ikey};
+              XBMC_CreateReading($hash,$ikey,$value);
+            }
+          }
+          else {
+            my $value = $result->{$key};
+            XBMC_CreateReading($hash,$key,$value);
+          }
         }
         readingsEndUpdate($hash, 1);
       }
@@ -593,8 +644,12 @@ sub XBMC_Is3DFile($$) {
 sub XBMC_CreateReading($$$);
 sub XBMC_CreateReading($$$) {
   my $hash = shift;
+  my $name = $hash->{NAME};
   my $key = shift;
   my $value = shift;
+  
+  return if ($key =~ /(playerid)/);
+  
   if($key eq 'version') {
     my $version = '';
     $version = $value->{major};
@@ -606,7 +661,7 @@ sub XBMC_CreateReading($$$) {
   elsif($key eq 'skin') {
     $value = $value->{name} . '(' . $value->{id} . ')';
   }
-  elsif($key eq 'totaltime' || $key eq 'time') {
+  elsif($key =~ /(totaltime|time|seekoffset)/) {
     $value = sprintf('%02d:%02d:%02d.%03d',$value->{hours},$value->{minutes},$value->{seconds},$value->{milliseconds});
   }
   elsif($key eq 'shuffled') {
@@ -630,6 +685,7 @@ sub XBMC_CreateReading($$$) {
     readingsBulkUpdate($hash,'3dfile', XBMC_Is3DFile($hash, $value) ? "on" : "off");
   }
   elsif($key =~ /(album|artist|track|title)/) {
+    $value = "" if $value eq -1;
     $key = 'current' . ucfirst($key);
   }
   elsif($key eq 'streamdetails') {
@@ -647,11 +703,18 @@ sub XBMC_CreateReading($$$) {
     $key = undef; 
   }
   if(ref($value) eq 'ARRAY') {
-    if(int(@$value)) {
-      $value = join(',',@$value);
+    $value = join(',',@$value);
+  }
+  
+  if (defined $key) {
+    if ($key =~ /(seekoffset)/) {
+      # for these readings we do only events - no readings
+      DoTrigger($name, "$key: $value");
+    }
+    else {
+      readingsBulkUpdate($hash,$key,$value) ;
     }
   }
-  readingsBulkUpdate($hash,$key,$value) if defined $key;
 }
 
 #Parses a given string and returns ($msg,$tail). If the string contains a complete message 
@@ -1165,7 +1228,7 @@ sub XBMC_Call($$$)
   }
   $obj->{jsonrpc} = "2.0"; #JSON RPC version has to be passed
   my $json = JSON->new->utf8(0)->encode($obj);
-  Log3($name, 5, "XBMC_Call: Sending: " . $json); 
+  Log3($name, 4, "XBMC_Call: Sending: " . $json); 
   if($hash->{Protocol} eq 'http') {
     return XBMC_HTTP_Call($hash,$json,$id);
   }
@@ -1534,6 +1597,8 @@ sub XBMC_HTTP_Request($$@)
       If XBMC does not run all the time it used to be the case that FHEM blocks because it cannot reach XBMC (only happened 
     if TCP was used). If you encounter problems like FHEM not responding for a few seconds then you should set <code>attr &lt;XBMC_device&gt; fork enable</code>
     which will move the search for XBMC into a separate process.</li>
+    <li>updateInterval<br>
+      The interval which is used to check if Kodi is still alive (by sending a JSON ping) and also it is used to update current player item.</li>
   </ul>
 </ul>
 
