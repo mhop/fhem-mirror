@@ -26,9 +26,9 @@ sub ZWave_HandleSendStack($);
 # https://bitbucket.org/bradsjm/aeonzstickdriver
 my %sets = (
   "addNode"          => { cmd => "4a%02x@",    # ZW_ADD_NODE_TO_NETWORK'
-                        param => {on=>0x81, off=>0x05 } },
+                        param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
   "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
-                        param => {on=>0x81, off=>0x05 } },
+                        param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
   "removeFailedNode" => { cmd => "61%02x" },   # ZW_REMOVE_FAILED_NODE_ID
   "replaceFailedNode"=> { cmd => "63%02x" },   # ZW_REPLACE_FAILED_NODE
@@ -108,6 +108,7 @@ use vars qw(%zw_type6);
   '56'  => 'ZW_GET_SUC_NODE_ID',
   '57'  => 'ZW_SEND_SUC_ID',
   '59'  => 'ZW_REDISCOVERY_NEEDED',
+  '5e'  => 'ZW_EXPLORE_REQUEST_INCLUSION',
   '60'  => 'ZW_REQUEST_NODE_INFO',
   '61'  => 'ZW_REMOVE_FAILED_NODE_ID',
   '62'  => 'ZW_IS_FAILED_NODE',
@@ -131,9 +132,16 @@ use vars qw(%zw_type6);
   'a4'  => 'ZW_SET_SLAVE_LEARN_MODE',
   'a5'  => 'ZW_GET_VIRTUAL_NODES',
   'a6'  => 'ZW_IS_VIRTUAL_NODE',
+  'b6'  => 'ZW_WATCHDOG_ENABLE',
+  'b7'  => 'ZW_WATCHDOG_DISABLE',
+  'b8'  => 'ZW_WATCHDOG_KICK',
+  'b9'  => 'ZW_SET_EXT_INT_LEVEL',
+  'ba'  => 'ZW_RF_POWERLEVEL_GET',
   'bb'  => 'ZW_GET_NEIGHBOR_COUNT',
   'bc'  => 'ZW_ARE_NODES_NEIGHBOURS',
   'bd'  => 'ZW_TYPE_LIBRARY',
+  'be'  => 'ZW_SEND_TEST_FRAME',
+  'bf'  => 'ZW_GET_PROTOCOL_STATUS',
   'd0'  => 'ZW_SET_PROMISCUOUS_MODE',
 );
 
@@ -699,17 +707,19 @@ ZWDongle_Ready($)
   <b>Set</b>
   <ul>
 
-  <li>addNode [on|off]<br>
+  <li>addNode [nwOn|on|off]<br>
     Activate (or deactivate) inclusion mode. The controller (i.e. the dongle)
     will accept inclusion (i.e. pairing/learning) requests only while in this
     mode. After activating inclusion mode usually you have to press a switch
     three times within 1.5 seconds on the node to be included into the network
     of the controller. If autocreate is active, a fhem device will be created
-    after inclusion.</li>
+    after inclusion. "on" activates standard inclusion. "nwOn" activates network 
+    wide inclusion (only SDK 4.5-4.9, SDK 6.x and above).</li>
 
-  <li>removeNode [on|off]<br>
-    Activate (or deactivate) exclusion mode. Note: the corresponding fhem
-    device have to be deleted manually.</li>
+  <li>removeNode [nwOn|on|off]<br>
+    Activate (or deactivate) exclusion mode. "on" activates standard exclusion. 
+    "nwOn" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and above). 
+    Note: the corresponding fhem device have to be deleted manually.</li>
 
   <li>createNode id<br>
     Request the class information for the specified node, and create a fhem
