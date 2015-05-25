@@ -282,7 +282,7 @@ my %zwave_class = (
                associationDel => "04%02x%02x*" },
     get   => { association => "02%02x",      },
     parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"'},
-    init  => { ORDER=> 1, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
+    init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
     get   => { version      => "11",
                versionClass => "13%02x" },
@@ -322,7 +322,14 @@ my %zwave_class = (
   AV_CONTENT_DIRECTORY_MD  => { id => '95' },
   AV_RENDERER_STATUS       => { id => '96' },
   AV_CONTENT_SEARCH_MD     => { id => '97' },
-  SECURITY                 => { id => '98' },
+  SECURITY                 => { id => '98',
+    set   => { "secKey"    => '(undef, "06%s")',
+               "secScheme" => "0400",
+               "secNonce"  => "40" },
+    get   => { "secSupported" => "02" },
+    parse => { "..9803(.*)" => '"secSupported:$1"',
+               "..9805(.*)" => 'ZWave_securityInit($hash, $1)',
+               "..9880(.*)" => 'ZWave_securityInit($hash, $1)' } },
   AV_TAGGING_MD            => { id => '99' },
   IP_CONFIGURATION         => { id => '9a' },
   ASSOCIATION_COMMAND_CONFIGURATION
@@ -418,7 +425,6 @@ ZWave_Define($$)
   if(@a) {      # Autocreate: set the classes, execute the init calls
     $hash->{lastMsgTimestamp} = time(); # device is awake.
     ZWave_SetClasses($homeId, $id, undef, $a[0]);
-    ZWave_execInits($hash, 0);
   }
   return undef;
 }
@@ -598,7 +604,7 @@ ZWave_Cmd($$@)
       $baseHash->{WakeUp} = \@arr;
     }
     my $awake = ($baseHash->{lastMsgTimestamp} &&
-                  time() - $baseHash->{lastMsgTimestamp} < 2);
+                  time() - $baseHash->{lastMsgTimestamp} < 3);
 
     if(!$awake) {
       push @{$baseHash->{WakeUp}}, $data.$id;
@@ -1425,6 +1431,40 @@ ZWave_sensorbinaryV2Parse($$)
 }
 
 sub
+ZWave_securityInit(@)
+{
+  my ($hash, $param) = @_;
+  my $iodev = $hash->{IODev};
+  my $name = $hash->{NAME};
+
+  $hash->{secStatus} = 0 if(!$hash->{secStatus});
+  my $status = ++$hash->{secStatus};
+
+  Log3 $iodev, 4, "$hash->{NAME}: securityInit status $status";
+  if($status == 1) {
+    ZWave_Set($hash, $name, "secScheme");
+    return ""; # not evaluated
+
+  } elsif($status == 2) {
+    Log3 $iodev, 4, "secScheme report: $param";
+    my $key = AttrVal($iodev->{NAME}, "networkKey", "");
+    ZWave_Set($hash, $name, ("secKey", $key));
+    return undef;       # No Event/Reading
+
+  } elsif($status == 3) {
+    ZWave_Set($hash, $name, "secNonce");
+    return undef;       # No Event/Reading
+
+  } else {
+    Log3 $iodev, 4, "secNonce report: $param";
+    delete $iodev->{secInitName};
+    delete $hash->{secStatus};
+
+  }
+}
+
+
+sub
 ZWave_getHash($$$)
 {
   my ($hash, $cl, $type) = @_;
@@ -1474,6 +1514,26 @@ ZWave_Parse($$@)
     $iodev->{errReported} = 1;
     return "";
   }
+
+  if($msg =~ m/^01(..)(..*)/) { # 01==ANSWER
+    my ($cmd, $arg) = ($1, $2);
+    $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
+    if($cmd eq "ZW_SEND_DATA") {
+      Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
+      my $si = $iodev->{secInitName};
+      ZWave_securityInit($defs{$si}) # No extra response for set networkKey
+        if($si && $defs{$si} && $defs{$si}{secStatus} &&
+           $defs{$si}{secStatus} == 2);
+      return "";
+    }
+    if($cmd eq "SERIAL_API_SET_TIMEOUTS" && $arg =~ m/(..)(..)/) {
+      Log3 $ioName, 2, "SERIAL_API_SET_TIMEOUTS: ACK:$1 BYTES:$2";
+      return "";
+    }
+    Log3 $ioName, 4, "$ioName unhandled ANSWER: $cmd $arg";
+    return "";
+  }
+
   if($msg !~ m/^00(..)(..)(..)(.*)/) { # 00=REQUEST
     Log3 $ioName, 4, "$ioName: UNKNOWN msg $msg";
     return "";
@@ -1490,7 +1550,7 @@ ZWave_Parse($$@)
   if($cmd eq 'ZW_ADD_NODE_TO_NETWORK' ||
      $cmd eq 'ZW_REMOVE_NODE_FROM_NETWORK') {
     my @vals = ("learnReady", "nodeFound", "slave",
-                "controller", "", "done", "failed");
+                "controller", "protocolDone", "done", "failed");
     $evt = ($id eq "00" || hex($id)>@vals+1) ? "unknownArg" : $vals[hex($id)-1];
     if($evt eq "slave" &&
        $arg =~ m/(..)....(..)..(.*)$/) {
@@ -1498,6 +1558,26 @@ ZWave_Parse($$@)
       return ZWave_SetClasses($homeId, $id, $type6, $classes)
         if($cmd eq 'ZW_ADD_NODE_TO_NETWORK');
     }
+
+    if($evt eq "protocolDone" && $arg =~ m/(..)../) {# done comes at addNode off
+      delete $iodev->{secInitName};
+      my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
+      return "" if(!$dh);
+
+      $dh->{lastMsgTimestamp} = time();
+      my $classes = AttrVal($dh->{NAME}, "classes", "");
+      if($classes =~ m/SECURITY/) {
+        my $key = AttrVal($ioName, "networkKey", "");
+        if($key) {
+          $iodev->{secInitName} = $dh->{NAME};
+          return ZWave_securityInit($dh);
+        } else {
+          Log3 $ioName, 2, "No secure inclusion as $ioName has no networkKey";
+        }
+      }
+      return ZWave_execInits($dh, 0);
+    }
+
 
   } elsif($cmd eq "ZW_APPLICATION_UPDATE" && $arg =~ m/....(..)..(.*)$/) {
     my ($type6,$classes) = ($1, $2);
