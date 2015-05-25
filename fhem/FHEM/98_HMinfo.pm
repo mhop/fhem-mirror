@@ -50,8 +50,7 @@ sub HMinfo_Define($$){#########################################################
                             .",reduced:off"
                             .",motorErr:ok"
                             .",error:none"
-                            .",uncertain:no"
-                            .",uncertain:yes"
+                            .",uncertain:[no|yes],"
                             .",smoke_detect:none"
                             .",cover:closed"
                             ;

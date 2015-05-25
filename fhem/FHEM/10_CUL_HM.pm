@@ -7031,9 +7031,12 @@ sub CUL_HM_ActCheck($) {# perform supervision
               $actHash->{helper}{$devId}{try} = $actHash->{helper}{$devId}{try}
                                                  ? ($actHash->{helper}{$devId}{try} +1)
                                                  : 1;
-              if (CUL_HM_Set($defs{$devName},$devName,"help") =~ m/statusRequest/){
+              my $cmds = CUL_HM_Set($defs{$devName},$devName,"help");
+              if ($cmds =~ m/(statusRequest|getSerial)/){
                 # send statusrequest if possible
-                CUL_HM_Set($defs{$devName},$devName,"statusRequest");
+                CUL_HM_Set($defs{$devName},$devName,
+                           ($cmds =~ m/statusRequest/?"statusRequest"
+                                                     :"getSerial" ));
                 $cntUnkn++; $state = "unknown";
               }
               else{
