@@ -574,7 +574,7 @@ ZWDongle_ReadAnswer($$$)
   return ("No FD (dummy device?)", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
   my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
-  Log3 $hash, 4, "ZWDongle_ReadAnswer arg:$arg regexp:$regexp";
+  Log3 $hash, 4, "ZWDongle_ReadAnswer arg:$arg regexp:".($regexp ? $regexp:"");
 
   for(;;) {
 
