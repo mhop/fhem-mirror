@@ -185,7 +185,7 @@ ZWDongle_Initialize($)
   $hash->{AttrFn}  = "ZWDongle_Attr";
   $hash->{UndefFn} = "ZWDongle_Undef";
   $hash->{AttrList}=
-        "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 homeId";
+    "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 homeId networkKey";
 }
 
 #####################################
@@ -650,21 +650,6 @@ ZWDongle_Parse($$$)
 
   my %addvals = (RAWMSG => $rmsg);
 
-  if($rmsg =~ m/^01(..)(..*)/) { # 01==ANSWER
-    my ($cmd, $arg) = ($1, $2);
-    $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
-    if($cmd eq "ZW_SEND_DATA") {
-      Log3 $hash, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
-      return "";
-    }
-    if($cmd eq "SERIAL_API_SET_TIMEOUTS" && $arg =~ m/(..)(..)/) {
-      Log3 $hash, 2, "SERIAL_API_SET_TIMEOUTS: ACK:$1 BYTES:$2";
-      return "";
-    }
-    Log3 $hash, 4, "$name unhandled ANSWER: $cmd $arg";
-    return "";
-  }
-
   Dispatch($hash, $rmsg, \%addvals);
 }
 
@@ -692,6 +677,11 @@ ZWDongle_Attr($$$$)
   } elsif($attr eq "homeId") {
     $hash->{homeId} = $value;
 
+  } elsif($attr eq "networkKey") {
+    if(!$value || $value !~ m/^[0-9A-F]{32}$/i) {
+      return "attr $name networkKey: not a hex string with a length of 32";
+    }
+    return;
   }
 
   return undef;  
