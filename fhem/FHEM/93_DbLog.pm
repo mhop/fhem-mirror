@@ -877,6 +877,9 @@ DbLog_Get($@)
     $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
+    $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
+    $sqlspec{max_value}      = "MAX(VALUE)";
+    $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
   } elsif ($hash->{DBMODEL} eq "MYSQL") {
     $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
     $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
@@ -888,10 +891,16 @@ DbLog_Get($@)
     $sqlspec{get_timestamp}  = "TIMESTAMP";
     $sqlspec{from_timestamp} = "'$from'";
     $sqlspec{to_timestamp}   = "'$to'";
+    $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
+    $sqlspec{max_value}      = "MAX(VALUE)";
+    $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
   } else {
     $sqlspec{get_timestamp}  = "TIMESTAMP";
     $sqlspec{from_timestamp} = "'$from'";
     $sqlspec{to_timestamp}   = "'$to'";
+    $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
+    $sqlspec{max_value}      = "MAX(VALUE)";
+    $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
   }
 
   if($outf =~ m/(all|array)/) {
@@ -1150,7 +1159,7 @@ DbLog_Get($@)
         }
 
         # Wenn Attr SuppressUndef gesetzt ist, dann ausfiltern aller undef-Werte
-        $writeout = 0 if (($sql_value == undef) && AttrVal($hash->{NAME}, "suppressUndef", 0));
+        $writeout = 0 if (!defined($sql_value) && AttrVal($hash->{NAME}, "suppressUndef", 0));
  
         ###################### Ausgabe ###########################
         if($writeout) {
