@@ -34,21 +34,26 @@ my %sets = (
   "replaceFailedNode"=> { cmd => "63%02x" },   # ZW_REPLACE_FAILED_NODE
   "neighborUpdate"   => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
+  "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
+                                              # SERIAL_API_APPL_NODE_INFORMATION
+  "timeouts"         => { cmd => "06%02x%02x"},# SERIAL_API_SET_TIMEOUTS
   "reopen"           => { cmd => "" },
 );
 
 my %gets = (
   "caps"            => "07",      # SERIAL_API_GET_CAPABILITIES
   "ctrlCaps"        => "05",      # ZW_GET_CONTROLLER_CAPS
-  "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
-  "isFailedNode"    => "62%02x",  # ZW_IS_FAILED_NODE
-  "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
-  "homeId"          => "20",      # MEMORY_GET_ID
-  "version"         => "15",      # ZW_GET_VERSION
   "getVirtualNodes" => "a5",      # ZW_GET_VIRTUAL_NODES
+  "homeId"          => "20",      # MEMORY_GET_ID
+  "isFailedNode"    => "62%02x",  # ZW_IS_FAILED_NODE
   "neighborList" => "80%02x0101", # GET_ROUTING_TABLE_LINE include dead links,
                                   #              include non-routing neigbors
-  "raw"       => "%s",            # hex
+  "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
+  "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
+  "random"          => "1c%02x",  # ZW_GET_RANDOM
+  "version"         => "15",      # ZW_GET_VERSION
+
+  "raw"             => "%s",            # hex
 );
 
 # Known controller function. 
@@ -134,7 +139,7 @@ use vars qw(%zw_type6);
   'a6'  => 'ZW_IS_VIRTUAL_NODE',
   'b6'  => 'ZW_WATCHDOG_ENABLE',
   'b7'  => 'ZW_WATCHDOG_DISABLE',
-  'b8'  => 'ZW_WATCHDOG_KICK',
+  'b8'  => 'ZW_WATCHDOG_CHECK',
   'b9'  => 'ZW_SET_EXT_INT_LEVEL',
   'ba'  => 'ZW_RF_POWERLEVEL_GET',
   'bb'  => 'ZW_GET_NEIGHBOR_COUNT',
@@ -158,6 +163,7 @@ use vars qw(%zw_type6);
   '11' => 'SWITCH_MULTILEVEL',
 );
 
+my $serInit;
 
 sub
 ZWDongle_Initialize($)
@@ -264,6 +270,12 @@ ZWDongle_Set($@)
   }
 
   my $cmd = $sets{$type}{cmd};
+  my $fb = substr($cmd, 0, 2);
+  if($fb =~ m/^[0-8A-F]+$/i &&
+     ReadingsVal($name, "caps","") !~ m/\b$zw_func_id{$fb}\b/) {
+    return "$type is unsupported by this controller";
+  }
+
   my $par = $sets{$type}{param};
   if($par && !$par->{noArg}) {
     return "Unknown argument for $type, choose one of ".join(" ",keys %{$par})
@@ -302,6 +314,12 @@ ZWDongle_Get($@)
         join(" ", map { $gets{$_} =~ m/%/ ? $_ : "$_:noArg" } sort keys %gets)
         if(!defined($gets{$type}));
 
+  my $fb = substr($gets{$type}, 0, 2);
+  if($fb =~ m/^[0-8A-F]+$/i && !$serInit &&
+     ReadingsVal($name, "caps","") !~ m/\b$zw_func_id{$fb}\b/) {
+    return "$type is unsupported by this controller";
+  }
+
   my @ga = split("%", $gets{$type}, -1);
   my $nargs = int(@ga)-1;
   return "get $name $type needs $nargs arguments" if($nargs != int(@a));
@@ -311,7 +329,7 @@ ZWDongle_Get($@)
   my $out = sprintf($gets{$type}, @a);
   ZWDongle_Write($hash,  "00", $out);
   my $re = "^01".substr($out,0,2);  # Start with <01><len><01><CMD>
-  my ($err, $ret) = ZWDongle_ReadAnswer($hash, "get $name $type", $re);
+  my ($err, $ret) = ZWDongle_ReadAnswer($hash, $type, $re);
   return $err if($err);
 
   my $msg="";
@@ -399,6 +417,10 @@ ZWDongle_Get($@)
     }
     $msg = join(",", @list);
 
+  } elsif($type eq "random") {                  ############################
+    return "$name: Cannot generate" if($ret !~ m/^011c01(..)(.*)$/);
+    $msg = $2; @a = ();
+
   }
 
   $type .= "_".join("_", @a) if(@a);
@@ -429,11 +451,17 @@ ZWDongle_DoInit($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
+  $serInit = 1;
 
   DevIo_SetHwHandshake($hash) if($hash->{FD});
   ZWDongle_Clear($hash);
-  ZWDongle_Get($hash, $name, "devList"); # Make the following query faster (?)
+  ZWDongle_Get($hash, $name, "caps");   $serInit = 0;
   ZWDongle_Get($hash, $name, "homeId");
+  ZWDongle_Get($hash, $name, ("random", 32));         # Sec relevant
+  ZWDongle_Set($hash, $name, ("timeouts", 100, 15));  # Sec relevant
+  ZWDongle_Clear($hash);                              # Wait, timeouts needs ack
+  # NODEINFO_LISTENING, Generic Static controller, Specific Static Controller, 0
+  ZWDongle_Set($hash, $name, ("setNIF", 1, 2, 1, 0)); # Sec relevant (?)
   $hash->{PARTIAL} = "";
   $hash->{STATE} = "Initialized";
   return undef;
@@ -621,6 +649,22 @@ ZWDongle_Parse($$$)
   $hash->{RAWMSG} = $rmsg;
 
   my %addvals = (RAWMSG => $rmsg);
+
+  if($rmsg =~ m/^01(..)(..*)/) { # 01==ANSWER
+    my ($cmd, $arg) = ($1, $2);
+    $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
+    if($cmd eq "ZW_SEND_DATA") {
+      Log3 $hash, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
+      return "";
+    }
+    if($cmd eq "SERIAL_API_SET_TIMEOUTS" && $arg =~ m/(..)(..)/) {
+      Log3 $hash, 2, "SERIAL_API_SET_TIMEOUTS: ACK:$1 BYTES:$2";
+      return "";
+    }
+    Log3 $hash, 4, "$name unhandled ANSWER: $cmd $arg";
+    return "";
+  }
+
   Dispatch($hash, $rmsg, \%addvals);
 }
 
@@ -732,8 +776,9 @@ ZWDongle_Ready($)
   <li>neighborUpdate<br>
     Requests controller to update his routing table which is based on
     slave's neighbor list. The update may take significant time to complete.
-    With the event "done" or "failed" ZWDongle will notify the end of the update process.
-    To read node's neighbor list see neighborList get below.</li>
+    With the event "done" or "failed" ZWDongle will notify the end of the
+    update process.  To read node's neighbor list see neighborList get
+    below.</li>
 
   <li>reopen<br>
     First close and then open the device. Used for debugging purposes.
@@ -763,6 +808,10 @@ ZWDongle_Ready($)
     returns the list of neighbor nodeIds of specified node.
     Provides insights to actual network topology.
     List includes dead links and non-routing neighbors</li>
+
+  <li>random N<br>
+    request N random bytes from the controller.
+    </li>
 
   <li>raw<br>
     Send raw data to the controller. Developer only.</li>

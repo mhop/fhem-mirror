@@ -1474,17 +1474,6 @@ ZWave_Parse($$@)
     $iodev->{errReported} = 1;
     return "";
   }
-  if($msg =~ m/^01(..)(..*)/) { # 01==ANSWER
-    my ($cmd, $arg) = ($1, $2);
-    $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
-    if($cmd eq "ZW_SEND_DATA") {
-      Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
-      return "";
-    }
-    Log3 $ioName, 4, "$ioName unhandled ANSWER: $cmd $arg";
-    return "";
-  }
-
   if($msg !~ m/^00(..)(..)(..)(.*)/) { # 00=REQUEST
     Log3 $ioName, 4, "$ioName: UNKNOWN msg $msg";
     return "";
