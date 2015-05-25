@@ -992,10 +992,9 @@ sub CUL_HM_Parse($$) {#########################################################
       my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoId_$src"},2);
       push @evtEt,[$dstH,1,"sabotageAttackId:ErrIoId_$src cnt:$evntCnt"];
     }
-
     if( defined $dstH->{helper}{cSnd} && 
-          $dstH->{helper}{cSnd} ne substr($msg,7)){
-      Log3 $dname,2,"CUL_HM $dname attack:$dstH->{helper}{cSnd}:".substr($msg,7).".";
+          $dstH->{helper}{cSnd} =~ m/substr($msg,7)/){
+      Log3 $dname,2,"CUL_HM $dname attack:$dstH->{helper}{cSnd}:".substr($msg,7);
       CUL_HM_eventP($dstH,"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoAttack"},2);
       push @evtEt,[$dstH,1,"sabotageAttack:ErrIoAttack cnt:$evntCnt"];
@@ -5407,7 +5406,8 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
       else{
         CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss");
       }
-      $hash->{helper}{cSnd} = substr($cmd,8);
+      $hash->{helper}{cSnd} =~ s/.*,// if($hash->{helper}{cSnd});
+      $hash->{helper}{cSnd} .= ",".substr($cmd,8);
     }
     elsif($mTp eq '11'){
       my $to = "";
@@ -5420,7 +5420,8 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         }
       }
       CUL_HM_respWaitSu ($hash,"cmd:=$cmd","mNo:=$mNo","reSent:=$rss",$to);
-      $hash->{helper}{cSnd} = substr($cmd,8);
+      $hash->{helper}{cSnd} =~ s/.*,// if($hash->{helper}{cSnd});
+      $hash->{helper}{cSnd} .= ",".substr($cmd,8);
     }
     elsif($mTp eq '12' && $mFlg & 0x10){#wakeup with burst
       # response setup - do not repeat, set counter to 250
