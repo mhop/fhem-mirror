@@ -422,12 +422,12 @@ PRESENCE_Read($)
 
     if($buf eq "absence")
     {
-        readingsBulkUpdate($hash, "state", "absent");
+        readingsBulkUpdate($hash, "state", "absent") unless($hash->{helper}{DISABLED});
         readingsBulkUpdate($hash, "presence", "absent");
     }
     elsif($buf =~ /present;(.+?)$/)
     {
-        readingsBulkUpdate($hash, "state", "present");
+        readingsBulkUpdate($hash, "state", "present") unless($hash->{helper}{DISABLED});
         readingsBulkUpdate($hash, "presence", "present");
 
         if($1 =~ /^(.*);(.+)$/)
