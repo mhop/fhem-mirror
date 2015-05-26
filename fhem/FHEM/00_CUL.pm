@@ -502,6 +502,8 @@ CUL_ReadAnswer($$$$)
   my ($mculdata, $rin) = ("", '');
   my $buf;
   my $to = 3;                                         # 3 seconds timeout
+  $mculdata = $hash->{PARTIAL} if(defined($hash->{PARTIAL}));
+
   $to = $ohash->{RA_Timeout} if($ohash->{RA_Timeout});  # ...or less
   for(;;) {
 
@@ -540,10 +542,12 @@ CUL_ReadAnswer($$$$)
     while(($mculdata =~ m/^([^\n]*\n)(.*)/s) || $anydata) {
       my $line = ($anydata ? $mculdata : $1);
       $mculdata = $2;
+      $hash->{PARTIAL} = $mculdata; # for recursive calls
       (undef, $line) = CUL_prefix(0, $ohash, $line); # Delete prefix
       if($regexp && $line !~ m/$regexp/) {
         $line =~ s/[\n\r]+//g;
         CUL_Parse($ohash, $hash, $ohash->{NAME}, $line);
+        $mculdata = $hash->{PARTIAL};
       } else {
         return (undef, $line);
       }
@@ -780,7 +784,9 @@ CUL_Read($)
     my $rmsg;
     ($rmsg,$culdata) = split("\n", $culdata, 2);
     $rmsg =~ s/\r//;
+    $hash->{PARTIAL} = $culdata; # for recursive calls
     CUL_Parse($hash, $hash, $name, $rmsg) if($rmsg);
+    $culdata = $hash->{PARTIAL};
   }
   $hash->{PARTIAL} = $culdata;
 }
