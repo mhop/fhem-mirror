@@ -49,7 +49,7 @@ foreach my $file (`find $ARGV[0] -name \*.xml`) {
     #$l =~ s/^ *//g;
     $l =~ s/ *$//g;
     next if($l eq "");
-    if($l !~ m/>$/ || $l =~ m/^<Help>$/) { $buffer .= " ".$l; next; }
+    if($l !~ m/>$/ || $l =~ m/^\s*<Help>\s*$/) { $buffer .= " ".$l; next; }
     if($buffer && $l =~ m/>$/) { $l = "$buffer $l"; $buffer=""; }
     $l =~ s/<!--.*-->//g;
     $l =~ s/ *$//g;
