@@ -189,7 +189,8 @@ my %zwave_class = (
   APPLICATION_CAPABILITY   => { id => '57' },
   ZIP_ND                   => { id => '58' },
   ASSOCIATION_GRP_INFO     => { id => '59' },
-  DEVICE_RESET_LOCALLY     => { id => '5a' },
+  DEVICE_RESET_LOCALLY     => { id => '5a',
+    parse => { "025a01"    => "deviceResetLocally:yes" } },
   CENTRAL_SCENE            => { id => '5b' },
   IP_ASSOCIATION           => { id => '5c' },
   ANTITHEFT                => { id => '5d' },
@@ -2330,6 +2331,9 @@ s2Hex($)
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config messages are available.</li>
   
+  <br><br><b>Class DEVICE_RESET_LOCALLY</b>
+  <li>deviceResetLocally:yes<br></li>
+
   <br><br><b>Class HAIL</b>
   <li>hail:01<br></li>
 
