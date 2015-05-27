@@ -596,21 +596,59 @@ SYSSTAT_getUptime($)
       return $uptime;
     }
 
-  my $uptime = SYSSTAT_readCmd($hash,"uptime",0);
+  my $uptime = SYSSTAT_readFile($hash,"/proc/uptime","");
+  if($uptime) {
 
-  $uptime = $1 if( $uptime && $uptime =~ m/[[:alpha:]]{2}\s+(((\d+)\D+,?\s+)?(\d+):(\d+))/ );
-  $uptime = "0 days, $uptime" if( $uptime && !$2);
+    $uptime = $1 if ( $uptime && $uptime =~ /^\s*([0-9.]+)\s+([0-9.]+)/ );
 
-  if( AttrVal($name, "uptime", 0) == 2 ) {
-    my $days = $3?$3:0;
-    my $hours = $4;
-    my $minutes = $5;
+    if( AttrVal($name, "uptime", 0) != 2 ) {
+      # cut off partial seconds
+      $uptime = int( $uptime );
+      my $seconds = $uptime % 60;
+      $uptime = int($uptime / 60);
+      my $minutes = $uptime % 60;
+      $uptime = int($uptime / 60);
 
-    $uptime = $days * 24;
-    $uptime += $hours;
-    $uptime *= 60;
-    $uptime += $minutes;
-    $uptime *= 60;
+      my $hours = $uptime % 24;
+      my $days = int($uptime / 24);
+
+      $uptime = sprintf( "%d days, %d:%.2d", $days, $hours, $minutes);
+      Log3 $name, 4, "$name: uptime returned :$uptime: via proc-uptime file ";    # JVI
+    }
+
+  # fallback if by any reason parsing /proc/uptime does not work
+  } else {
+    my $uptime = SYSSTAT_readCmd($hash,"uptime",0);
+
+    ############# match uptime time statement with the different formats seen on linux
+    # examples
+    #     18:52:21 up 26 days, 21:08,  2 users,  load average: 0.04, 0.03, 0.05
+    #     18:52:21 up 26 days, 55 min,  1 user,  load average: 0.05, 0.05, 0.05
+    #     18:52:21 up 55 min,  1 user,  load average: 0.05, 0.05, 0.05
+    #     18:52:21 up 21:08,  1 user,  load average: 0.05, 0.05, 0.05
+    #
+    # complex expression to match only the time parts of the uptime result
+    # $1 is complete up time information of uptime result
+    # $2 is # days part of the uptime
+    # $3 just the # from the "# days"" part or nothing if no days are given
+    # $4 is complete hour/minutes or # min information
+    # $5 is hours part if hours:min are given
+    # $6 is minutes part if hours:min are given
+    # $7 is minutes if # min is given
+    $uptime = $1 if ( $uptime && $uptime =~ m/[[:alpha:]]{2}\s*(((\d*)\s*[[:alnum:]]*,?)?\s+((\d+):(\d+)|(\d+)\s+[[:alpha:]]+in[[:alpha:]]*)),?/ );
+    $uptime = "0 days, $uptime" if( $uptime && !$2);
+    if( AttrVal($name, "uptime", 0) == 2 ) {
+      my $days = $3?$3:0;
+      my $hours = $5?$5:0;
+      my $minutes = $6?$6:$7;
+
+      $uptime = $days * 24;
+      $uptime += $hours;
+      $uptime *= 60;
+      $uptime += $minutes;
+      $uptime *= 60;
+    }
+    Log3 $name, 4, "$name: uptime returned :$uptime: via cmdline ";    # JVI
   }
 
   return $uptime;
@@ -776,14 +814,14 @@ SYSSTAT_getStat($)
 <a name="SYSSTAT"></a>
 <h3>SYSSTAT</h3>
 <ul>
-  Das Modul stellt Systemstatistiken f&uuml;r den Rechner, auf dem FHEM l&auml;uft bzw. 
+  Das Modul stellt Systemstatistiken f&uuml;r den Rechner, auf dem FHEM l&auml;uft bzw.
   f&uuml;r ein entferntes Linux System, das per vorkonfiguriertem ssh Zugang ohne Passwort
   erreichbar ist, zur Vef&uuml;gung.<br><br>
 
   Notes:
   <ul>
     <li>Dieses Modul ben&ouml;tigt  <code>Sys::Statistics::Linux</code> f&uuml;r Linux.<br>
-        Es kann mit '<code>cpan install Sys::Statistics::Linux</code>'<br> 
+        Es kann mit '<code>cpan install Sys::Statistics::Linux</code>'<br>
         bzw. auf Debian mit '<code>apt-get install libsys-statistics-linux-perl</code>'
         installiert werden.</li>
 
@@ -813,9 +851,9 @@ SYSSTAT_getStat($)
     definiert ein SYSSTAT Device.<br><br>
 
     Die (Prozessor)last wird alle &lt;interval&gt; Sekunden aktualisiert. Standard bzw. Minimum ist 60.<br><br>
-    Die Plattennutzung wird alle &lt;interval_fs&gt; Sekunden aktualisiert. Standardwert ist &lt;interval&gt;*60 
+    Die Plattennutzung wird alle &lt;interval_fs&gt; Sekunden aktualisiert. Standardwert ist &lt;interval&gt;*60
     und Minimum ist 60.
-    &lt;interval_fs&gt; wird nur angen&auml;hert und funktioniert am Besten, wenn &lt;interval_fs&gt; 
+    &lt;interval_fs&gt; wird nur angen&auml;hert und funktioniert am Besten, wenn &lt;interval_fs&gt;
     ein ganzzahliges Vielfaches von &lt;interval&gt; ist.<br><br>
 
     Wenn &lt;host&gt; angegeben wird, muss der Zugang per ssh ohne Passwort m&ouml;glich sein.<br><br>
@@ -832,10 +870,10 @@ SYSSTAT_getStat($)
   <b>Readings</b>
   <ul>
     <li>load<br>
-    die durchschnittliche (Prozessor)last der letzten 1 Minute (f&uuml;r Windows Rechner mit 
+    die durchschnittliche (Prozessor)last der letzten 1 Minute (f&uuml;r Windows Rechner mit
     snmp angen&auml;hertem Wert)</li>
     <li>state<br>
-    die durchschnittliche (Prozessor)last der letzten 1, 5 und 15 Minuten (f&uuml;r Windows 
+    die durchschnittliche (Prozessor)last der letzten 1, 5 und 15 Minuten (f&uuml;r Windows
     Rechner die Nutzung pro CPU via snmp ermittelt)</li>
     <li>user, system, idle, iowait<br>
     den Prozentsatz der entsprechenden Systemlast (nur f&uuml;r Linux Systeme)</li>
@@ -874,7 +912,7 @@ SYSSTAT_getStat($)
       1 -> snmp wird verwendet, um Last, Einschaltzeit und Dateisysteme (inkl. physikalischem und
       virtuellem Speicher) zu &uuml;berwachen</li>
     <li>stat<br>
-      1 -> &uuml;berwacht Prozentsatz der user, system, idle und iowait Last 
+      1 -> &uuml;berwacht Prozentsatz der user, system, idle und iowait Last
       (nur auf Linux Systemen verf&uuml;gbar)</li>
     <li>raspberrytemperature<br>
       Wenn gesetzt und  > 0 wird der Temperatursensor auf dem Raspberry Pi ausgelesen.<br>
