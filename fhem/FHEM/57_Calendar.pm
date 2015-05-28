@@ -1076,9 +1076,13 @@ sub Calendar_Get($@) {
     return "argument is missing" if($#a != 2);
     my $regexp= $a[2];
     my @uids;
-    foreach my $event ($eventsObj->events()) {
-      push @uids, $event->uid() if($event->summary() =~ m/$regexp/);
-    }
+    eval {
+        foreach my $event ($eventsObj->events()) {
+            push @uids, $event->uid() if($event->summary() =~ m/$regexp/);
+        }
+    };
+    Log3($hash, 2, "Calendar " . $hash->{NAME} . 
+        ": The regular expression $regexp caused a problem: $@") if($@);
     return join(";", @uids);
   
   } else {
