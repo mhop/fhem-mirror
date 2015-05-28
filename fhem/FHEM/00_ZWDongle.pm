@@ -439,7 +439,7 @@ ZWDongle_Clear($)
   # Clear the pipe
   $hash->{RA_Timeout} = 0.3;
   for(;;) {
-    my ($err, undef) = ZWDongle_ReadAnswer($hash, "Clear", undef);
+    my ($err, undef) = ZWDongle_ReadAnswer($hash, "Clear", "wontmatch");
     last if($err && $err =~ m/^Timeout/);
   }
   delete($hash->{RA_Timeout});
