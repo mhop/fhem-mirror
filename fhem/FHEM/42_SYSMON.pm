@@ -863,12 +863,15 @@ SYSMON_Update($;$)
       $refresh_all = 1;
     }
 
+    SYSMON_obtainLocalCPUFreq($hash);
+    
+    my $map;
     if(!AttrVal($name, "nonblocking", 1)) {
       # direkt call
       
       # Parameter holen
-      my $map = SYSMON_obtainParameters($hash, $refresh_all);
-
+      $map = SYSMON_obtainParameters($hash, $refresh_all);
+			
       # Mark setzen 
       if(!$hash->{helper}{u_first_mark}) {
         $hash->{helper}{u_first_mark} = 1;
@@ -886,9 +889,47 @@ SYSMON_Update($;$)
       
       $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall("SYSMON_blockingCall", $name."|".$refresh_all, "SYSMON_blockingFinish", 55, "SYSMON_blockingAbort", $hash);
     }
-      
+    
+    
+       
   }
 
+}
+
+sub SYSMON_obtainLocalCPUFreq($) {
+	my ($hash) = @_;
+	
+	my $map;
+	#--------------------------------------------------------------------------
+  my $base=$DEFAULT_INTERVAL_BASE; 
+  my $im = "1 1 1 10";
+  # Wenn wesentliche Parameter nicht definiert sind, soll aktualisierung immer vorgenommen werden
+  if((defined $hash->{INTERVAL_BASE})) {
+    $base = $hash->{INTERVAL_BASE};
+  }
+  if((defined $hash->{INTERVAL_MULTIPLIERS})) {
+    $im = $hash->{INTERVAL_MULTIPLIERS};
+  }
+
+  my $ref =  int(time()/$base);
+  my ($m1, $m2, $m3, $m4) = split(/\s+/, $im);
+  
+  if($m1 gt 0) { # Nur wenn > 0
+    # M1: cpu_freq, cpu_temp, cpu_temp_avg, loadavg, procstat, iostat
+    if(($ref % $m1) eq 0) {
+	    # Sonderlocke: CPUFreq
+	    my $mode = $hash->{MODE};
+	    if ($mode eq 'local') {
+		    foreach my $li (0..7) {
+		      if(SYSMON_isCPUXFreq($hash, $li)) {
+		        $map = SYSMON_getCPUFreqLocal($hash, $map, $li);
+		      }
+		    }
+	    }
+	  }
+	}
+  #--------------------------------------------------------------------------
+  SYSMON_updateReadings($hash,$map);
 }
 
 sub SYSMON_blockingCall($) {
@@ -1778,6 +1819,41 @@ SYSMON_getCPUTemp_FB($$) {
 
 #------------------------------------------------------------------------------
 # leifert CPU Frequenz (Raspberry Pi, BeagleBone Black, Cubietruck, etc.)
+# Sonderlocke fuer lokale Erfassung (damit die CPU nicht auf Max. gefahren wird)
+# Dazu darf nicht in BlockingCall und keine System-Aufrufe wie 'cat' etc.
+#------------------------------------------------------------------------------
+sub
+SYSMON_getCPUFreqLocal($$;$) {
+	my ($hash, $map, $cpuNum) = @_;
+	
+	if($hash->{helper}->{excludes}{'cpufreq'}) {return $map;}
+  
+  $cpuNum = 0 unless defined $cpuNum;
+  
+	my $val;
+  if(open(my $fh, '<', "/sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq")) {
+    $val = <$fh>;
+    close($fh);
+  }
+  
+  $val = int($val);
+  my $val_txt = sprintf("%d", $val/1000);
+  if($cpuNum == 0) {
+  	# aus Kompatibilitaetsgruenden
+    $map->{+CPU_FREQ}="$val_txt";
+    $map = SYSMON_getComputeStat($hash, $map, $val_txt, CPU_FREQ."_stat");
+  }
+  
+  $map->{"cpu".$cpuNum."_freq"}="$val_txt";
+
+  $map = SYSMON_getComputeStat($hash, $map, $val_txt, "cpu".$cpuNum."_freq"."_stat");
+  
+  return $map;
+}
+
+#------------------------------------------------------------------------------
+# leifert CPU Frequenz (Raspberry Pi, BeagleBone Black, Cubietruck, etc.)
+# Nur Remote Aufrufe
 #------------------------------------------------------------------------------
 sub
 SYSMON_getCPUFreq($$;$) {
@@ -1786,7 +1862,25 @@ SYSMON_getCPUFreq($$;$) {
   if($hash->{helper}->{excludes}{'cpufreq'}) {return $map;}
   
   $cpuNum = 0 unless defined $cpuNum;
-  my $val = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1 || echo 0");
+  
+  my $val;
+  
+  my $mode = $hash->{MODE};
+  if ($mode eq 'local') {
+  	# do nothing
+  	return $map;
+  }
+  # XXX Hack: Versuch zu vermeiden, dass Frequenz immer als Maximum gelesen wird
+  #my $mode = $hash->{MODE};#AttrVal( $name, 'mode', 'local');
+  #if ($mode eq 'local') {
+  #  if(open(my $fh, '<', "/sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq")) {
+  #    $val = <$fh>;
+  #    close($fh);
+  #  }
+  #} else {
+    $val = SYSMON_execute($hash, "[ -f /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq ] && cat /sys/devices/system/cpu/cpu".$cpuNum."/cpufreq/scaling_cur_freq 2>&1 || echo 0");
+  #}
+  
   $val = int($val);
   my $val_txt = sprintf("%d", $val/1000);
   if($cpuNum == 0) {
@@ -3555,8 +3649,7 @@ sub SYSMON_PowerBatInfo($$) {
 }
 #-------------
 
-sub
-SYSMON_execute($$)
+sub SYSMON_execute($$)
 {
   my ($hash, $cmd) = @_;
   return SYSMON_Exec($hash, $cmd);
@@ -4039,6 +4132,405 @@ sub SYSMON_Log($$$) {
 #   return $string;
 #}
 
+
+# --- SNX ---------------------------------------------------------------------
+
+# SYSMON_ShowBarChartHtml(<device>,<options>);
+# device: name of the linked sysmon instance
+# options: perl hash { key=>value, key=>value, .. } containing options. possible keys are:
+# - bars: comma separated list of bars to show. possible bars are:
+#   - us: uptime system
+#   - uf: uptime fhem
+#   - cf[|<core>]: cpu frequency - <core> is the target cpu core number [0..n]
+#   - cl[|<core>]: cpu load - <core> is the target cpu core number [0..n]
+#   - ct: cpu temperature
+#   - mr: memory ram
+#   - ms: memory swap
+#   - fs|<name> file system - <name> is the target reading name
+#   the default value (if you do not provide bars option) is: us,uf,cl,ct,cf,mr,ms,fs:fs_root
+#   a bar won't displayed if the appropriate reading doesn't exist (e.g. cpu_freq @ fritzbox) or is empty (e.g. cpu_temp @ fritz box), even if you defined the bar to show.
+# - title_<bar>: bar title. if you use a bar in the bars option, but do not provide a title the default title will be displayed. possible bar names and their default title are:
+#   - us: uptime
+#   - uf: uptime fhem
+#   - cf: cpu% freq
+#   - cl: cpu% load
+#   - ct: cpu temp
+#   - mr: mem ram
+#   - ms: mem swap
+#   - fs: fs %
+#   - fsx: {fs_root=>"fs root"}
+#   - cfx: 
+#   - clx: 
+#   you can use the variable % within:
+#   - cf,cl: % will be replaced by the cpu core number
+#   - fs: % will be replaced by the reading name
+#   using bar names ending with x you can provide title for specific bars (e.g. cpu1, cpu2, fs_root, fs_boot).
+#   it has to be a perl hash too, where key is depending of the type:
+#   - fsx: name of the filesystem reading (e.g. fs_root, fs_boot)
+#   - cfx: cpu core number
+#   - clx: cpu core number
+#   - ctx: cpu core number
+#   if you provide a title for a specific bar (e.g title_cfx=>{1=>"cpu1 freq"}), this will be prefered and 'override' the general title (e.g. title_cf=>"cpu freq")
+# - stat: display of statistic data [min, max, avg]. possible values:
+#   - 0: no statistic data
+#   - 1: colored ranges (min to avg, avg to max) as bar overlay, hover-info  for pc, click-info for tablet/mobile
+# - weblink: name of a weblink instance. if you use this method inside a weblink you can provide the name if the weblink instance. due to that the title will appear as a link targeting the weblink instance detail page.
+# - title: the title of the chart. the default title is the name of the linked sysmon instance. if you supplied the weblink option this will be the default title.
+#     supply empty value to prevent title output. 
+# - color<type>: html/css color definition. possible type names and their default colors are:
+#   - Border: bar border (black)
+#   - Fill: bar content (tan)
+#   - Text: bar text (empty -> css style default) 
+#   - Stat: statistic data [min, max, avg] indicatator (=border -> if you change border, this will changed as well)
+#   - MinAvg: statistic data range1 - min to avg
+#   - AvgMax: staristic data range2 - avg to max
+#   color can be any html/css color definition:
+#   - name: red
+#   - hex: #ff0000
+#   - rgb: rgb(255,0,0)
+#          rgba(255,0,0,.5)
+#
+# example usage inside a weblink instance:
+# - no customization..
+#   define wlRasPi1 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi")}
+# - define which bars to show (cpu load, cpu temperature and filesystem fs_root)..
+#   define wlRasPi2 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{bars=>"cl,ct,fs|fs_root"})}
+# - show bars for each cpu core (in this case we've got 4 cores)..
+#   define wlRasPi3 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{bars=>"ct,cl,cl|0,cl|1,cl|2,cl|3"})}
+# - customize bar titles (cpu load => CPULoad, uptime system => System Uptime, common filesystem FileSystem <readingName> and the specific root filesystem (reading fs_root) => Root)..
+#   define wlRasPi4 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{title_cl=>"CPULoad",title_us=>"System Uptime",title_fs=>"FileSystem %",title_fs2=>{fs_root=>"Root"}})}
+# - customize colors (bar will be filled red, the text will be white)
+#   define wlRasPi5 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{colorFill=>"red",colorText=>"#fff"})}
+# - let the chart title become a link to the weblink instance
+#   define wlRasPi6 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{weblink=>"wlRasPi6"})}
+# - customize chart title
+#   define wlRasPi7 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{title=>"This is my Chart"})}
+# - disable statistical data
+#   define wlRasPi8 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{stat=>0})}
+# - mix previous options
+#   define wlRasPi9 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{weblink=>"wlRasPi9", title=>"Rasperry Pi", stat=>0, bars=>"cl,ct,us,fs|fs_root,fs|fs_boot", title_cl=>"CPU load", title_ct=>"CPU temperature", title_fs=>"FileSystem %", title_fsx=>{fs_root=>"Root"}, colorBorder=>"blue", colorFill=>"lightgray" ,colorText=>"blue"})}
+
+
+sub SYSMON_ShowBarChartHtml($;$) {
+  my ($dev,$opt) = @_;
+  # extend with default options..
+  $opt->{colorBorder} = $opt->{colorBorder} || 'black';
+  $opt->{colorFill} = $opt->{colorFill} || 'tan';
+  $opt->{colorText} = $opt->{colorText} || ''; # use font color by style..
+  $opt->{colorStat} = $opt->{colorStat} || $opt->{colorBorder};
+  $opt->{colorMinAvg} = $opt->{colorMinAvg} || 'lightsalmon';
+  $opt->{colorAvgMax} = $opt->{colorAvgMax} || 'lightgreen';
+  $opt->{title} = defined($opt->{title}) ? $opt->{title} : ( $opt->{weblink} || $dev );
+  $opt->{weblink} = $opt->{weblink} || '';
+  $opt->{bars} = $opt->{bars} || 'uf,us,cl,ct,cf,mr,ms,fs|fs_root';
+  $opt->{title_uf} = $opt->{title_uf} || 'uptime fhem';
+  $opt->{title_us} = $opt->{title_us} || 'uptime';
+  $opt->{title_ct} = $opt->{title_ct} || 'cpu temp';
+  $opt->{title_cf} = $opt->{title_cf} || 'cpu% freq';
+  $opt->{title_cl} = $opt->{title_cl} || 'cpu% load';
+  $opt->{title_mr} = $opt->{title_mr} || 'mem ram';
+  $opt->{title_ms} = $opt->{title_ms} || 'mem swap';
+  $opt->{title_fs} = $opt->{title_fs} || 'fs %';
+  $opt->{title_fsx} = $opt->{title_fsx} || {fs_root=>'fs root'};
+  $opt->{stat} = defined($opt->{stat}) ? $opt->{stat} : 1;
+  # bar string to array/hash..
+  $opt->{barList} = ();
+  foreach my $bar (split(/\s*,+\s*/,$opt->{bars})){
+    my ($type,$param) = split(/\|/,$bar);
+    #push(@{$opt->{barList}},{id=>Data::GUID->new->as_string,type=>$type,param=>$param},);
+    push(@{$opt->{barList}},{id=>time=~s/[^0-9]//gr,type=>$type,param=>$param},);
+  }
+  # html templates..
+  my $htmlTitleSimple = '<div><b>#TITLE#</b></div>';
+  my $htmlTitleWeblink = '<div><a href="?detail=#WEBLINK#"><b>#TITLE#</b></a></div>';
+  my $htmlRow = ''
+  . '<tr>'
+  . '  <td>#NAME#</td>'
+  . '  <td>#VALUE#</td>'
+  . '</tr>';
+  my $htmlBarSimple = ''
+  . '<div style="position:relative;min-width:200px;border:1px solid '.$opt->{colorBorder}.';cursor:default;">' 
+  . '  <div style="overflow:hidden;">'
+  . '    <div style="height:1.5em;background:'.$opt->{colorFill}.';width:#CURP#%;"></div>'
+  . '    <div style="position:absolute;top:.2em;height:1.3em;width:100%;text-align:center;color:'.$opt->{colorText}.'">#CURT#</div>'
+  . '  </div>'
+  . '</div>';
+  my $htmlBarStat = ''
+  . '<div id="#ID#" onclick="tgl(this)" style="position:relative;min-width:200px;border:1px solid '.$opt->{colorBorder}.';cursor:default;">' 
+  . '  <div id="#ID#Cur" style="overflow:hidden;transition:height .4s, opacity .4s;">'
+  . '    <div style="height:1.5em;background:'.$opt->{colorFill}.';width:#CURP#%;"></div>'
+  . '    <div style="position:absolute;top:.2em;height:1.3em;width:100%;text-align:center;color:'.$opt->{colorText}.'" title="min: #MINT# | avg: #AVGT# | max: #MAXT#">#CURT#</div>'
+  . '    <div style="position:absolute;top:0;height:.3em;background:'.$opt->{colorAvgMax}.';border-right:1px solid '.$opt->{colorStat}.';width:#MAXP#%;"></div>'
+  . '    <div style="position:absolute;top:0;height:.3em;background:'.$opt->{colorMinAvg}.';border-right:1px solid '.$opt->{colorStat}.';width:#AVGP#%;"></div>'
+  . '    <div style="position:absolute;top:0;height:.3em;background:'.$opt->{colorFill}.';border-right:1px solid '.$opt->{colorStat}.';width:#MINP#%;"></div>'
+  . '  </div>'
+  . '  <div id="#ID#MAM" style="height:0;opacity:0;overflow:hidden;transition:height .4s, opacity .4s;">'
+  . '    <div style="position:relative;">'
+  . '      <div style="height:.5em;background:tan;width:#MINP#%;"></div>'
+  . '    </div>'
+  . '    <div style="position:relative;">'
+  . '      <div style="height:.5em;background:tan;width:#AVGP#%;"></div>'
+  . '    </div>'
+  . '    <div style="position:relative;">'
+  . '      <div style="height:.5em;background:tan;width:#MAXP#%;"></div>'
+  . '    </div>'
+  . '    <div style="position:absolute;top:0;height:1.5em;width:100%;text-align:center;color:'.$opt->{colorText}.'" title="min: #MINT# | avg: #AVGT# | max: #MAXT#">#MINT# < #AVGT# < #MAXT#</div>'
+  . '  </div>'
+  . '</div>';
+  my $htmlScript .= ''
+  . '<script>'
+  . 'function tgl(o) {'
+  . '  var c=document.getElementById(o.id+"Cur");'
+  . '  var m=document.getElementById(o.id+"MAM");'
+  . '  var s,h;'
+  . '  if (o.mam=="yes") { o.mam=""; s=c.style; h=m.style; } else { o.mam="yes"; s=m.style; h=c.style; }'
+  . '  s.height="auto"; s.opacity=1; h.height=0; h.opacity=0;'
+  . '}'
+  . '</script>';
+  # access sysmon data..
+  #my $sysmon = SYSMON_getValues($dev);
+  my $sysmon = {};
+  my $html='';
+  if(defined($main::defs{$dev}{READINGS})) {
+    foreach my $r (keys($main::defs{$dev}{READINGS})){
+      $sysmon->{$r} = $main::defs{$dev}{READINGS}{$r}{VAL};
+    }
+  } else {
+    $html = 'Unknown device: '.$dev;
+  }
+  # build bar chart html..
+
+  # ..title
+  if (defined($opt->{title}) and $opt->{title} ne ''){
+    if (defined($opt->{weblink}) and $opt->{weblink} ne ''){
+      $html .= $htmlTitleWeblink =~ s/#TITLE#/$opt->{title}/r =~ s/#WEBLINK#/$opt->{weblink}/r;
+    }
+    else{
+      $html .= $htmlTitleSimple =~ s/#TITLE#/$opt->{title}/r;
+    }
+  }
+  # ..bars
+  my $htmlBar = ($opt->{stat} eq 1) ? $htmlBarStat : $htmlBarSimple;
+  $html .= '<table>';
+  foreach my $bar (@{$opt->{barList}}){
+  	$bar->{param} = $bar->{param} || '';
+    my $title = $opt->{'title_'.$bar->{type}.'x'}{$bar->{param}} || $opt->{'title_'.$bar->{type}};
+    if ($bar->{type} eq 'us'){
+      # uptime system / idle..
+      if (defined($sysmon->{uptime})){
+        my $upSystem = SYSMON_secsToReadable($sysmon->{uptime});
+         # idle..
+        if (defined($sysmon->{idletime})){
+          #25386 99.32 %
+          my (undef,$idleP,undef) = split(/\s+/,$sysmon->{idletime});
+          $upSystem .= " ($idleP % idle)";
+        }
+        $html .= $htmlRow
+                    =~ s/#NAME#/$title/gr
+                    =~ s/#VALUE#/$upSystem/gr;
+      }
+    }
+    elsif ($bar->{type} eq 'uf'){
+      # uptime fhem..
+      if (defined($sysmon->{fhemuptime})){
+        my $upFhem = SYSMON_secsToReadable($sysmon->{fhemuptime});
+        $html .= $htmlRow
+                    =~ s/#NAME#/$title/gr
+                    =~ s/#VALUE#/$upFhem/gr;
+      }
+    }
+    elsif ($bar->{type} eq 'cf'){
+      my $name = 'cpu'.$bar->{param}.'_freq';
+      my $nameS = $name.'_stat';
+      # cpu freq..
+      if (defined($sysmon->{$name})){
+        my %cf = ();
+        # min max avg..
+        if (defined($sysmon->{$nameS})){
+          #600.00 900.00 845.36
+          ($cf{min}, $cf{max}, $cf{avg}) = split(/\s+/,$sysmon->{$nameS});
+        }
+        $cf{curP} = sprintf("%.1f",$sysmon->{$name}/10);
+        $cf{curT} = sprintf("%.0f",$sysmon->{$name})." MHz";
+        $cf{minP} = sprintf("%.1f",($cf{min}/10));
+        $cf{minT} = sprintf("%.0f",$cf{min})." MHz";
+        $cf{maxP} = sprintf("%.1f",($cf{max}/10));
+        $cf{maxT} = sprintf("%.0f",$cf{max})." MHz";
+        $cf{avgP} = sprintf("%.1f",($cf{avg}/10));
+        $cf{avgT} = sprintf("%.0f",$cf{avg})." MHz";
+        $cf{title} = $title =~ s/%/$bar->{param}/gr;
+        $html .= $htmlRow
+                    =~ s/#NAME#/$cf{title}/gr
+                    =~ s/#VALUE#/$htmlBar/gr
+                                    =~ s/#ID#/$bar->{id}/gr
+                                    =~ s/#CURP#/$cf{curP}/gr =~ s/#CURT#/$cf{curT}/gr
+                                    =~ s/#MINP#/$cf{minP}/gr =~ s/#MINT#/$cf{minT}/gr
+                                    =~ s/#MAXP#/$cf{maxP}/gr =~ s/#MAXT#/$cf{maxT}/gr
+                                    =~ s/#AVGP#/$cf{avgP}/gr =~ s/#AVGT#/$cf{avgT}/gr;
+      }
+    }
+    elsif ($bar->{type} eq 'ct'){
+      # cpu temp..
+      if (defined($sysmon->{cpu_temp}) and $sysmon->{cpu_temp} > 0){
+        my %ct = ();
+        # min max avg..
+        if (defined($sysmon->{cpu_temp_stat})){
+          #40.62 42.24 41.54
+          ($ct{min}, $ct{max}, $ct{avg}) = split(/\s+/,$sysmon->{cpu_temp_stat});
+        }
+        $ct{curP} = sprintf("%.1f",$sysmon->{cpu_temp});
+        $ct{curT} = $ct{curP}." &deg;C";
+        $ct{minP} = sprintf("%.1f",$ct{min});
+        $ct{minT} = $ct{minP}." &deg;C";
+        $ct{maxP} = sprintf("%.1f",$ct{max});
+        $ct{maxT} = $ct{maxP}." &deg;C";
+        $ct{avgP} = sprintf("%.1f",$ct{avg});
+        $ct{avgT} = $ct{avgP}." &deg;C";
+        $ct{title} = $title =~ s/%/$bar->{param}/gr;
+        $html .= $htmlRow
+                    =~ s/#NAME#/$ct{title}/gr
+                    =~ s/#VALUE#/$htmlBar/gr
+                                    =~ s/#ID#/$bar->{id}/gr
+                                    =~ s/#CURP#/$ct{curP}/gr =~ s/#CURT#/$ct{curT}/gr
+                                    =~ s/#MINP#/$ct{minP}/gr =~ s/#MINT#/$ct{minT}/gr
+                                    =~ s/#MAXP#/$ct{maxP}/gr =~ s/#MAXT#/$ct{maxT}/gr
+                                    =~ s/#AVGP#/$ct{avgP}/gr =~ s/#AVGT#/$ct{avgT}/gr;
+      }
+    }
+    elsif ($bar->{type} eq 'cl'){
+      my $name = 'stat_cpu'.$bar->{param}.'_percent';
+      my $nameS = 'cpu'.$bar->{param}.'_idle_stat';
+      # cpu load..
+      if (defined($sysmon->{$name})){
+        my %cl = ();
+        #0.28 0.00 0.20 99.43 0.02 0.00 0.07
+        (undef,undef,undef,$cl{I},undef,undef,undef) = split(/\s+/,$sysmon->{$name});
+        # min max avg..
+        if ($opt->{stat} eq 1 and defined($sysmon->{$nameS})){
+          #92.53 99.75 98.84
+          ($cl{min},$cl{max},$cl{avg}) = split(/\s+/,$sysmon->{$nameS});
+        }
+        $cl{curP} = sprintf("%.1f",100-$cl{I});
+        $cl{curT} = $cl{curP}." %";
+        $cl{minP} = sprintf("%.1f",100-$cl{max});
+        $cl{minT} = $cl{minP}." %";
+        $cl{maxP} = sprintf("%.1f",100-$cl{min});
+        $cl{maxT} = $cl{maxP}." %";
+        $cl{avgP} = sprintf("%.1f",100-$cl{avg});
+        $cl{avgT} = $cl{avgP}." %";
+        $cl{title} = $title =~ s/%/$bar->{param}/gr;
+        $html .= $htmlRow
+                    =~ s/#NAME#/$cl{title}/gr
+                    =~ s/#VALUE#/$htmlBar/gr
+                                    =~ s/#ID#/$bar->{id}/gr
+                                    =~ s/#CURP#/$cl{curP}/gr =~ s/#CURT#/$cl{curT}/gr
+                                    =~ s/#MINP#/$cl{minP}/gr =~ s/#MINT#/$cl{minT}/gr
+                                    =~ s/#MAXP#/$cl{maxP}/gr =~ s/#MAXT#/$cl{maxT}/gr
+                                    =~ s/#AVGP#/$cl{avgP}/gr =~ s/#AVGT#/$cl{avgT}/gr;
+      }
+    }
+    elsif ($bar->{type} =~ /^m[r|s]$/){
+      my $name = ($bar->{type} eq 'mr') ? 'ram' : 'swap';
+      my $nameS = $name.'_used_stat';
+      #mem ram / swap..
+      if (defined($sysmon->{$name})){
+        my %mx = ();
+        #Total: 927.08 MB, Used: 47.86 MB, 5.16 %, Free: 879.22 MB
+        if($sysmon->{$name} ne 'n/a') {
+          (undef,$mx{T},$mx{Un},undef,$mx{U},undef,$mx{P},undef,undef,$mx{F},undef) = split(/[\s,]+/,$sysmon->{$name});
+          # min max avg..
+          if (defined($sysmon->{$nameS})){
+            #..
+            ($mx{min},$mx{max},$mx{avg}) = split(/\s+/,$sysmon->{$nameS});
+          }
+          #if ($mx{T} gt 1024){ # geht ned..
+          #if (int($mx{T}) gt 1024){ # geht ned..
+          if (length($mx{T}) gt 6){
+            $mx{U} /= 1024;
+            $mx{T} /= 1024;
+            $mx{min} /= 1024;
+            $mx{max} /= 1024;
+            $mx{avg} /= 1024;
+            $mx{Un} = 'GB';
+          }
+          $mx{curP} = sprintf("%.1f",$mx{U}/$mx{T}*100);
+          $mx{curT} = sprintf("%.0f",$mx{U})." / ".sprintf("%.0f",$mx{T})." ".$mx{Un};
+          $mx{minP} = sprintf("%.1f",$mx{min}/$mx{T}*100);
+          $mx{minT} = sprintf("%.0f",$mx{min})." ".$mx{Un};
+          $mx{maxP} = sprintf("%.1f",$mx{max}/$mx{T}*100);
+          $mx{maxT} = sprintf("%.0f",$mx{max})." ".$mx{Un};
+          $mx{avgP} = sprintf("%.1f",$mx{avg}/$mx{T}*100);
+          $mx{avgT} = sprintf("%.0f",$mx{avg})." ".$mx{Un};
+          $html .= $htmlRow
+                      =~ s/#NAME#/$title/gr
+                      =~ s/#VALUE#/$htmlBar/gr
+                                      =~ s/#ID#/$bar->{id}/gr
+                                      =~ s/#CURP#/$mx{curP}/gr    =~ s/#CURT#/$mx{curT}/gr
+                                      =~ s/#MINP#/$mx{minP}/gr =~ s/#MINT#/$mx{minT}/gr
+                                      =~ s/#MAXP#/$mx{maxP}/gr =~ s/#MAXT#/$mx{maxT}/gr
+                                      =~ s/#AVGP#/$mx{avgP}/gr =~ s/#AVGT#/$mx{avgT}/gr;
+        }
+      }
+    }
+    elsif ($bar->{type} eq 'fs'){
+      #storage..
+      if (defined($sysmon->{$bar->{param}})){
+        my %fs = ();
+        #Total: 14831 MB, Used: 2004 MB, 15 %, Available: 12176 MB at /
+        (undef,$fs{T},$fs{Un},undef,$fs{U},undef,$fs{P},undef,undef,$fs{F},undef) = split(/[\s,]+/,$sysmon->{$bar->{param}});
+        if ($fs{T} gt 0){
+          if (scalar($fs{T}) > 10000){ # geht ned..
+          #if (int($fs{T}) gt 1024){ # geht ned..
+          #if (length($fs{T}) gt 4){
+            $fs{U} /= 1024;
+            $fs{T} /= 1024;
+            $fs{Un} = 'GB';
+          }
+          $fs{curP} = sprintf("%.1f",$fs{U}/$fs{T}*100);
+          $fs{curT} = sprintf("%.1f",$fs{U})." / ".sprintf("%.1f",$fs{T})." ".$fs{Un};
+          #$fs{minP} = sprintf("%.1f",($fs{min}/$fs{T}*100));
+          #$fs{minT} = sprintf("%.0f",$fs{min})." ".$fs{Un};
+          #$fs{maxP} = sprintf("%.1f",$fs{max}/$fs{T}*100);
+          #$fs{maxT} = sprintf("%.0f",$fs{max})." ".$fs{Un};
+          #$fs{avgP} = sprintf("%.1f",$fs{avg}/$fs{T}*100);
+          #$fs{avgT} = sprintf("%.0f",$fs{avg})." ".$fs{Un};
+          $fs{title} = $title =~ s/%/$bar->{param}/gr;
+          $html .= $htmlRow
+                      =~ s/#NAME#/$fs{title}/gr
+                      =~ s/#VALUE#/$htmlBarSimple/gr
+                                      =~ s/#ID#/$bar->{id}/gr
+                                      =~ s/#CURP#/$fs{curP}/gr    =~ s/#CURT#/$fs{curT}/gr;
+                                      #=~ s/#MINP#/$fs{minP}/gr =~ s/#MINT#/$fs{minT}/gr
+                                      #=~ s/#MAXP#/$fs{maxP}/gr =~ s/#MAXT#/$fs{maxT}/gr
+                                      #=~ s/#AVGP#/$fs{avgP}/gr =~ s/#AVGT#/$fs{avgT}/gr;
+        }
+      }
+    }
+  }
+  $html .= '</table>';
+  $html .= $htmlScript if ($opt->{stat} eq 1);
+  return $html;
+}
+
+
+sub SYSMON_secsToReadable($){
+  my $secs = shift;
+  my $y = floor($secs / 60/60/24/365);
+  my $d = floor($secs/60/60/24) % 365;
+  my $h = floor(($secs / 3600) % 24);
+  my $m = floor(($secs / 60) % 60);
+  my $s = $secs % 60;
+  my $string = '';
+  $string .= $y.'y ' if ($y > 0);
+  $string .= $d.'d ' if ($d > 0);
+  $string .= $h.'h ' if ($h > 0);
+  $string .= $m.'m ' if ($m > 0);
+  $string .= $s.'s' if ($s > 0);
+  return $string;
+}
+
+# --- SNX ---------------------------------------------------------------------
+
 ## -----------------------------------------------------------------------------
 ## Visualisation module. provided by snx.
 ##
@@ -4051,13 +4543,13 @@ sub SYSMON_Log($$$) {
 ##   define wlSysmon weblink htmlCode {SYSMON_weblinkHeader('wlSysmon','Cubietruck').SYSMON_ShowBarChartHtml('sysmon','steelblue','gray')}
 ##
 ## -----------------------------------------------------------------------------
-sub SYSMON_weblinkHeader($;$){
+sub SYSMON_weblinkHeader_alt($;$){
   my $dev = shift;
   my $text = shift||$dev;
   return '<div><a href="?detail='.$dev.'"><b>'.$text.'</b></a></div>';
 }
 
-sub SYSMON_ShowBarChartHtml($;$$){
+sub SYSMON_ShowBarChartHtml_alt($;$$){
   my $dev = shift;
   
   my $colFill = shift || 'lightCoral';
