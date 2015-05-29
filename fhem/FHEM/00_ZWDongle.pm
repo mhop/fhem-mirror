@@ -453,6 +453,7 @@ ZWDongle_DoInit($)
   my $name = $hash->{NAME};
   $serInit = 1;
 
+  $hash->{homeId} = "initial"; # Get-Answers may land in ZWave.pm
   DevIo_SetHwHandshake($hash) if($hash->{FD});
   ZWDongle_Clear($hash);
   ZWDongle_Get($hash, $name, "caps");   $serInit = 0;
