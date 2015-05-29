@@ -1467,6 +1467,7 @@ $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{powerMeter}      = $culHmSubTypeSets{outputUnit};
 
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
+$culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
 
 %culHmModelSets = (# channels of this subtype-------------
                       "HM-CC-VD"         =>{ valvePos       =>"[off|0.0..99.0]"}
