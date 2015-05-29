@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0051 2015-05-21 20:00:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0052 2015-05-29 15:45:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -202,6 +202,9 @@
 #		0050    18.05.2015	Sailor				km200_PostSingleService         Implementing feature of posting complete "string of hash" to switchProgram
 #		0051    20.05.2015	Sailor				km200_GetSingleService          Correcting bug of floating point errors
 #		0051    21.05.2015	Sailor				km200_PostSingleService         Implementing switchPoint-hash by switchPoint-hash comparison
+#		0052    29.05.2015	Sailor				km200_PostSingleService         Correcting bug for post transmission comparison
+#		0052    29.05.2015	Sailor				km200_ParseHttpResponseInit     Correcting bug for error list sorting
+#		0052    29.05.2015	Sailor				km200_ParseHttpResponseDyn      Correcting bug for error list sorting
 ########################################################################################################################
 
 
@@ -271,7 +274,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0051";
+	my $ModuleVersion           = "0052";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -1308,9 +1311,8 @@ sub km200_PostSingleService($)
 			### For every item of the array of SwitchPrograms after Re-Reading 
 			foreach my $JsonItem (@{$JsonContent})
 			{
-
 				### If the current Switchprogram - hash does not have the same amount of keys
-				if (%$ReReadItem != %$JsonItem) 
+				if (%$ReReadItem ne %$JsonItem) 
 				{
 					### Do nothing
 					#print "they don't have the same number of keys\n";
@@ -2432,7 +2434,9 @@ sub km200_ParseHttpResponseInit($)
 			
 			### Sort list by timestamps descending
 			my $TempServiceIndex = 0;
-			my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
+#			my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
+			my @TempSortedErrorList =  sort ( @{ $json->{values} } );
+
 
 			foreach my $item (@TempSortedErrorList)
 			{
@@ -2501,9 +2505,6 @@ sub km200_ParseHttpResponseInit($)
 			
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The data type is unknown for the following Service     : $Service \n";}
-			if ($hash->{CONSOLEMESSAGE} == true) {print(" - JsonResponse: " . $json          . "\n");}
-			if ($hash->{CONSOLEMESSAGE} == true) {print(" - Type        : " . $json->{type}  . "\n");}
-			if ($hash->{CONSOLEMESSAGE} == true) {print(" - Value       : " . $json->{value} . "\n");}
 		}
 	}
 	### Check whether the decoded content is empty and therefore NOT available
@@ -2921,7 +2922,9 @@ sub km200_ParseHttpResponseDyn($)
 			my $TempServiceIndex = 0;
 
 			### Sort list by timestamps descending
-			my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
+#			my @TempSortedErrorList =  sort { $b->{t} <=> $a->{t} } @{ $json->{values} };
+			my @TempSortedErrorList =  sort ( @{ $json->{values} } );
+
 
 			### For every notification do
 			foreach my $item (@TempSortedErrorList)
