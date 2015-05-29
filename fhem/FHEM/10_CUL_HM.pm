@@ -3677,6 +3677,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             )
            .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
             if ($data eq "?");
+
+    if ($reg->{lit} && $reg->{lit}{$data} ){
+      $data = $reg->{lit}{$data};#conv special value past to calculation
+    }     
+            
     return "value:$data out of range $reg->{min} to $reg->{max} for Reg \""
            .$regName."\""
             if (!($conv =~ m/^(lit|hex|min2time)$/)&&
