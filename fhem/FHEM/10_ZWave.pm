@@ -287,9 +287,14 @@ my %zwave_class = (
   VERSION                  => { id => '86',
     get   => { version      => "11",
                versionClass => "13%02x" },
-    parse => { "..8612(..)(..)(..)(..)(..)" =>
-    'sprintf("version:Lib %d Prot %d.%d App %d.%d",'.
-        'hex($1),hex($2),hex($3),hex($4),hex($5))', 
+    parse => { "078612(..........)" => 'sprintf("version:Lib %d Prot '.
+                '%d.%d App %d.%d", unpack("C*",pack("H*","$1")))',
+               "098612(..............)" => 'sprintf("version:Lib %d Prot '.
+                 '%d.%d App %d.%d HW %d FWCounter %d",'.
+                 'unpack("C*",pack("H*","$1")))',
+               "0b8612(..................)" => 'sprintf("version:Lib %d Prot '.
+                 '%d.%d App %d.%d HW %d FWCounter %d FW %d.%d",'.
+                 'unpack("C*",pack("H*","$1")))',
                "048614(..)(..)"             => '"versionClass_$1:$2"' } },
   INDICATOR                => { id => '87',
     set   => { indicatorOff    => "0100",
@@ -2469,7 +2474,11 @@ s2Hex($)
   <li>userCode:id x status y code z</li>
 
   <br><br><b>Class VERSION</b>
+  <li>V1:</li>
   <li>version:Lib A Prot x.y App a.b</li>
+  <li>V2:</li>
+  <li>version:Lib A Prot x.y App a.b HW B FWCounter C FW c.d</li>
+  <li>V1 and V2:</li>
   <li>versionClass_$classId:$version</li>
 
   <br><br><b>Class WAKE_UP</b>
