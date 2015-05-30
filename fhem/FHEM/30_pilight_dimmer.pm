@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_dimmer.pm 0.53 2015-05-30 Risiko $
+# $Id: 30_pilight_dimmer.pm 0.54 2015-05-30 Risiko $
 #
 # Usage
 # 
@@ -13,6 +13,7 @@
 # V 0.51 2015-05-21 - CHG: modifications for dimers without dimlevel
 # V 0.52 2015-05-25 - CHG: attributes dimlevel_on, dimlevel_off 
 # V 0.53 2015-05-30 - FIX: set dimlevel 0
+# V 0.54 2015-05-30 - FIX: StateFn
 ############################################## 
 
 package main;
@@ -23,10 +24,6 @@ use Time::HiRes qw(gettimeofday);
 use JSON;
 use Switch;  #libswitch-perl
 
-sub pilight_dimmer_Parse($$);
-sub pilight_dimmer_Define($$);
-sub pilight_dimmer_Fingerprint($$);
-
 sub pilight_dimmer_Initialize($)
 {
   my ($hash) = @_;
@@ -35,6 +32,7 @@ sub pilight_dimmer_Initialize($)
   $hash->{Match}    = "^PISWITCH|^PIDIMMER|^PISCREEN";
   $hash->{ParseFn}  = "pilight_dimmer_Parse";
   $hash->{SetFn}    = "pilight_dimmer_Set";
+  $hash->{StateFn}  = "pilight_dimmer_State";
   $hash->{AttrList} = "dimlevel_max dimlevel_step dimlevel_max_device dimlevel_on dimlevel_off ".$readingFnAttributes;
 }
 
@@ -56,6 +54,7 @@ sub pilight_dimmer_Define($$)
   my $unit = $a[4];
 
   $hash->{STATE} = "defined";
+  
   $hash->{PROTOCOL} = lc($protocol);  
   $hash->{ID} = $id;  
   $hash->{UNIT} = $unit;
@@ -64,7 +63,7 @@ sub pilight_dimmer_Define($$)
   $hash->{helper}{OWN_DIM} = 1;
   $hash->{helper}{OWN_DIM} = 0 if ($hash->{PROTOCOL} =~ /screen/);
   
-  $hash->{helper}{ISSCREEN} = 1 if ($hash->{PROTOCOL} =~ /screen/ or $hash->{PROTOCOL2} =~ /screen/);
+  $hash->{helper}{ISSCREEN} = 1 if ($hash->{PROTOCOL} =~ /screen/ or (defined($hash->{PROTOCOL2}) and $hash->{PROTOCOL2}) =~ /screen/);
   
   #$attr{$me}{verbose} = 5;
   
@@ -78,7 +77,6 @@ sub pilight_dimmer_Parse($$)
 {
   my ($mhash, $rmsg, $rawdata) = @_;
   my $backend = $mhash->{NAME};
-  my $dimlevel = undef;
 
   Log3 $backend, 4, "pilight_dimmer_Parse: RCV -> $rmsg";
   
@@ -265,6 +263,17 @@ sub pilight_dimmer_Set($$)
   return undef;
 }
 
+#####################################
+sub pilight_dimmer_State($$$$)
+{
+  my ($hash, $time, $name, $val) = @_;
+  my $me = $hash->{NAME};
+  
+  #$hash->{STATE} wird nur ersetzt, wenn $hash->{STATE}  == ??? fhem.pl Z: 2469
+  #machen wir es also selbst
+  $hash->{STATE} = $val if ($name eq "state");
+  return undef;
+}
 
 1;
 

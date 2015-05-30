@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_switch.pm 0.12 2015-05-18 Risiko $
+# $Id: 30_pilight_switch.pm 0.13 2015-05-30 Risiko $
 #
 # Usage
 # 
@@ -10,6 +10,7 @@
 # V 0.10 2015-02-22 - initial beta version
 # V 0.11 2015-03-29 - FIX:  $readingFnAttributes
 # V 0.12 2015-05-18 - FIX:  add version information
+# V 0.13 2015-05-30 - FIX:  StateFn
 ############################################## 
 
 package main;
@@ -21,7 +22,7 @@ use JSON;
 
 sub pilight_switch_Parse($$);
 sub pilight_switch_Define($$);
-sub pilight_switch_Fingerprint($$);
+
 
 sub pilight_switch_Initialize($)
 {
@@ -31,6 +32,7 @@ sub pilight_switch_Initialize($)
   $hash->{Match}    = "^PISWITCH";
   $hash->{ParseFn}  = "pilight_switch_Parse";
   $hash->{SetFn}    = "pilight_switch_Set";
+  $hash->{StateFn}  = "pilight_switch_State";
   $hash->{AttrList} = $readingFnAttributes;
 }
 
@@ -60,6 +62,18 @@ sub pilight_switch_Define($$)
   
   $modules{pilight_switch}{defptr}{lc($protocol)}{$me} = $hash;
   AssignIoPort($hash);
+  return undef;
+}
+
+#####################################
+sub pilight_switch_State($$$$)
+{
+  my ($hash, $time, $name, $val) = @_;
+  my $me = $hash->{NAME};
+  
+  #$hash->{STATE} wird nur ersetzt, wenn $hash->{STATE}  == ??? fhem.pl Z: 2469
+  #machen wir es also selbst
+  $hash->{STATE} = $val if ($name eq "state");
   return undef;
 }
 
