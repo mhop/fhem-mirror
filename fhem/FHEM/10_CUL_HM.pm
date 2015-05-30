@@ -1102,7 +1102,8 @@ sub CUL_HM_Parse($$) {#########################################################
   $shash->{lastMsg} = $msgX;
   delete $shash->{helper}{rpt};# new message, rm recent ack
   my @ack; # ack and responses, might be repeated
-
+  $devH->{helper}{HM_CMDNR} = hex($mNo);
+  
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
@@ -5582,8 +5583,8 @@ sub CUL_HM_SndCmd($$) {
   my ($mn, $cmd2) =  unpack 'A2A*',$cmd;
 
   if($mn eq "++") {
-    $mn = $io->{HM_CMDNR} ? (($io->{HM_CMDNR} +1)&0xff) : 1;
-    $io->{HM_CMDNR} = $mn;
+    $mn = $hash->{helper}{HM_CMDNR} ? (($hash->{helper}{HM_CMDNR} +1)&0xff) : 1;
+    $hash->{helper}{HM_CMDNR} = $mn;
   }
   elsif($cmd =~ m/^[+-]/){; #continue pure
     IOWrite($hash, "", $cmd);
