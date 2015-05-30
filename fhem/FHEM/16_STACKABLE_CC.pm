@@ -15,6 +15,7 @@ STACKABLE_CC_Initialize($)
   $hash->{DefFn}     = "STACKABLE_CC_Define";
   $hash->{UndefFn}   = "STACKABLE_CC_Undef";
   $hash->{ParseFn}   = "STACKABLE_CC_Parse";
+  $hash->{NotifyFn}  = "STACKABLE_CC_Notify";
   $hash->{AttrFn}    = "CUL_Attr";
   $hash->{AttrList}  = "IODev ignore:0,1 ".$modules{CUL}{AttrList};
 
@@ -54,9 +55,41 @@ STACKABLE_CC_Define($$)
   $hash->{StackLevel} = $io->{StackLevel} ? $io->{StackLevel}+1 : 1;
   $hash->{STATE} = "Defined";
 
+  notifyRegexpChanged($hash, $a[2]);
   CUL_DoInit($hash);
 
   return undef;
+}
+
+sub
+STACKABLE_CC_DoNotify($)
+{
+  my ($ntfy) = @_;
+  DoTrigger($ntfy->{NAME}, $ntfy->{TriggerText});
+  delete $ntfy->{TriggerText};
+}
+
+sub
+STACKABLE_CC_Notify($$)
+{
+  my ($ntfy, $dev) = @_;
+  my $events = deviceEvents($dev, 0);
+
+  for(my $i = 0; $i < @{$events}; $i++) {
+
+    if($events->[$i] eq "DISCONNECTED") {
+      $ntfy->{STATE} = "disconnected";
+      setReadingsVal($ntfy, "state", "disconnected", TimeNow());
+      $ntfy->{TriggerText} = $events->[$i];
+      InternalTimer(gettimeofday()+0.1, "STACKABLE_CC_DoNotify", $ntfy, 0);
+
+    } elsif($events->[$i] eq "CONNECTED") {
+      CUL_DoInit($ntfy);
+      $ntfy->{TriggerText} = $events->[$i];
+      InternalTimer(gettimeofday()+0.001, "STACKABLE_CC_DoNotify", $ntfy, 0);
+
+    }
+  }
 }
 
 #####################################
