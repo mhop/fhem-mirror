@@ -233,7 +233,16 @@ my %zwave_class = (
                "087205(....)(....)(.{4})" =>'ZWave_mfsParse($hash,$1,$2,$3,1)',
                "087205(....)(.{4})(.{4})" =>'ZWave_mfsParse($hash,$1,$2,$3,2)'},
     init  => { ORDER=>49, CMD => '"get $NAME model"' } },
-  POWERLEVEL               => { id => '73' },
+  POWERLEVEL               => { id => '73',
+    set   => { powerlevel     => "01%02x%02x",
+               powerlevelTest => "04%02x%02x%04x" },
+    get   => { powerlevel     => "02",
+               powerlevelTest => "05" },
+    parse => { "047303(..)(..)" => 
+                   '"powerlvl:current ".hex($1)." remain ".hex($2)',
+               "067306(..)(..)(....)" =>
+                   '"powerlvlTest:node ".hex($1)." status ".hex($2).
+                    " frameAck ".hex($3)',} },
   PROTECTION               => { id => '75',
     set   => { protectionOff => "0100",
                protectionSeq => "0101",
@@ -1956,6 +1965,14 @@ s2Hex($)
     Store NAME in the EEPROM. Note: only ASCII is supported.</li>
   <li>location LOCATION<br>
     Store LOCATION in the EEPROM. Note: only ASCII is supported.</li>
+
+  <br><br><b>Class POWERLEVEL</b>
+  <li>Class is only used in an installation or test situation</li>
+  <li>powerlevel level timeout/s<br>
+    set powerlevel to level [0-9] for timeout/s [1-255].<br>
+    level 0=normal, level 1=-1dBm, .., level 9=-9dBm.</li>
+  <li>powerlevelTest nodeId level frames <br>
+    send number of frames [1-65535] to nodeId with level [0-9].</li>
   
   <br><br><b>Class PROTECTION</b>
   <li>protectionOff<br>
@@ -2186,6 +2203,12 @@ s2Hex($)
   <li>location<br>
     Get the location from the EEPROM. Note: only ASCII is supported.</li>
   
+  <br><br><b>Class POWERLEVEL</b>
+  <li>powerlevel<br>
+    Get the current powerlevel and remaining time in this level.</li>
+  <li>powerlevelTest<br>
+    Get the result of last powerlevelTest.</li>
+
   <br><br><b>Class PROTECTION</b>
   <li>protection<br>
     returns the protection state. It can be on, off or seq.</li>
@@ -2380,6 +2403,12 @@ s2Hex($)
   <br><br><b>Class NODE_NAMING</b>
   <li>name:NAME</li>
   <li>location:LOCATION</li>
+
+  <br><br><b>Class POWERLEVEL</b>
+  <li>powerlvl:current x remain y</li>
+  <li>NOTE: "current 0 remain 0" means normal mode without timeout</li>
+  <li>powerlvlTest:node x status y frameAck z</li>
+  <li>NOTE: status 0=failed, 1=success (at least one ACK), 2=in progress</li>
   
   <br><br><b>Class PROTECTION</b>
   <li>protection:[on|off|seq]</li>
