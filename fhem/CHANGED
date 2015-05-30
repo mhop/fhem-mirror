@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 30_pilight_dimmer: new attributes dimlevel_on, dimlevel_off
+             dimmers without direct dimlevel support (switch combined with screen)
   - bugfix:  73_km200: Bugfix for sorting and comparison method
   - bugfix: SYSMON: CPU frequency
   - feature: OWServer/OWDevice: new device EDS00XX (forum #37453)
