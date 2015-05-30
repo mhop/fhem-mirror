@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_dimmer.pm 0.50 2015-05-20 Risiko $
+# $Id: 30_pilight_dimmer.pm 0.53 2015-05-30 Risiko $
 #
 # Usage
 # 
@@ -10,6 +10,9 @@
 # V 0.10 2015-02-26 - initial beta version 
 # V 0.50 2015-05-20 - NEW: handle screen messages (up,down)
 # V 0.50 2015-05-20 - NEW: max dimlevel for gui and device
+# V 0.51 2015-05-21 - CHG: modifications for dimers without dimlevel
+# V 0.52 2015-05-25 - CHG: attributes dimlevel_on, dimlevel_off 
+# V 0.53 2015-05-30 - FIX: set dimlevel 0
 ############################################## 
 
 package main;
@@ -18,6 +21,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use JSON;
+use Switch;  #libswitch-perl
 
 sub pilight_dimmer_Parse($$);
 sub pilight_dimmer_Define($$);
@@ -31,7 +35,7 @@ sub pilight_dimmer_Initialize($)
   $hash->{Match}    = "^PISWITCH|^PIDIMMER|^PISCREEN";
   $hash->{ParseFn}  = "pilight_dimmer_Parse";
   $hash->{SetFn}    = "pilight_dimmer_Set";
-  $hash->{AttrList} = "dimlevel_max dimlevel_step dimlevel_max_device ".$readingFnAttributes;
+  $hash->{AttrList} = "dimlevel_max dimlevel_step dimlevel_max_device dimlevel_on dimlevel_off ".$readingFnAttributes;
 }
 
 #####################################
@@ -72,7 +76,6 @@ sub pilight_dimmer_Define($$)
 ###########################################
 sub pilight_dimmer_Parse($$)
 {
-  
   my ($mhash, $rmsg, $rawdata) = @_;
   my $backend = $mhash->{NAME};
   my $dimlevel = undef;
@@ -94,17 +97,13 @@ sub pilight_dimmer_Parse($$)
   
   return () if (!defined($chash->{NAME}));
   
-  my $max_default = 15;
-  $max_default = 100 if ($chash->{helper}{OWN_DIM} != 1);
-  
-  my $dimlevel_max_dev = AttrVal($chash->{NAME}, "dimlevel_max_device",$max_default);
+  my $dimlevel_max_dev = AttrVal($chash->{NAME}, "dimlevel_max_device",15);
   my $dimlevel_max     = AttrVal($chash->{NAME}, "dimlevel_max",$dimlevel_max_dev);
   my $dimlevel_step    = AttrVal($chash->{NAME}, "dimlevel_step",1);
   my $dimlevel_old     = ReadingsVal($chash->{NAME},"dimlevel",0);
+  my $state_old        = ReadingsVal($chash->{NAME},"state",0);
   
   Log3 $chash->{NAME}, 4, "pilight_dimmer_Parse: RCV -> $rmsg";
-  
-  readingsBeginUpdate($chash);
   
   if ($state eq "up") {
     $dimlevel = $dimlevel_old + $dimlevel_step;
@@ -121,11 +120,15 @@ sub pilight_dimmer_Parse($$)
     }
   }
   
-  readingsBulkUpdate($chash,"state",$state);
+  readingsBeginUpdate($chash);
+  readingsBulkUpdate($chash,"state",$state) if ("$state_old" ne "$state");
   if (defined($dimlevel)) {
     $chash->{helper}{DEV_DIMLEVEL} = $dimlevel;
+    Log3 $chash->{NAME}, 5, "pilight_dimmer_Parse: $dimlevel $dimlevel_max_dev $dimlevel_max";
     $dimlevel = $dimlevel / $dimlevel_max_dev * $dimlevel_max;
+    Log3 $chash->{NAME}, 5, "pilight_dimmer_Parse: $dimlevel_old $dimlevel";
     $dimlevel = int($dimlevel+0.5);
+    Log3 $chash->{NAME}, 5, "pilight_dimmer_Parse: $dimlevel_old round $dimlevel";
     readingsBulkUpdate($chash,"dimlevel",$dimlevel);
   }
   readingsEndUpdate($chash, 1); 
@@ -163,6 +166,19 @@ sub pilight_dimmer_Write($$$)
 }
 
 #####################################
+sub pilight_dimmer_ConvDimToDev($$)
+{
+    my ($me,$dimlevel_gui) = @_;
+    
+    my $dimlevel_max_dev =  AttrVal($me, "dimlevel_max_device",15);
+    my $dimlevel_max =  AttrVal($me, "dimlevel_max",$dimlevel_max_dev);
+  
+    my $dimlevel = $dimlevel_gui / $dimlevel_max * $dimlevel_max_dev;
+    $dimlevel = int($dimlevel + 0.5);
+    return $dimlevel;
+}
+
+#####################################
 sub pilight_dimmer_Set($$)
 {  
   my ($hash, @a) = @_;
@@ -173,39 +189,67 @@ sub pilight_dimmer_Set($$)
   my $dimlevel_step =  AttrVal($me, "dimlevel_step",1);  
   my $dimlevel_max =  AttrVal($me, "dimlevel_max",$dimlevel_max_dev);
   
-  my $canSet = "on off";
-  $canSet .= " up down" if ($hash->{helper}{ISSCREEN});
+  my $canSet = "on:noArg off:noArg";
+  $canSet .= " up:noArg down:noArg" if ($hash->{helper}{ISSCREEN});
   
   return "Unknown argument ?, choose one of $canSet dimlevel:slider,0,$dimlevel_step,$dimlevel_max" if($a[0] eq "?");
   
   my $set = $a[0];
   my $dimlevel = undef;
+  my $currlevel = ReadingsVal($me,"dimlevel",0);
   
-  if ($a[0] eq "dimlevel") {
-    if ($hash->{helper}{OWN_DIM} == 1) {
-      $dimlevel = $a[1] / $dimlevel_max * $dimlevel_max_dev;
-      $dimlevel = int($dimlevel + 0.5);
-      $set = "on";
-    } elsif ($hash->{helper}{ISSCREEN}){
-      my $newlevel = $a[1];
-      my $currlevel = ReadingsVal($me,"dimlevel",0);
-      my $cnt = int(($newlevel - $currlevel) / $dimlevel_step);
-      return undef if ($cnt==0);
-      $set = "up"  if ($cnt>0);
-      $set = "down" if ($cnt<0);
-      for (my $i=0; $i < abs($cnt); $i++) {
-         pilight_dimmer_Write($hash,$set,undef);
-      }
-      return undef;
-    } else {
-      Log3 $me, 1, "$me(Set): error setting dimlevel"; 
-      return undef;
-    }
-  } elsif ( ($set eq "up" or $set eq "down") and !$hash->{helper}{ISSCREEN}) {
+  if ($set =~ m/up|down/ and !$hash->{helper}{ISSCREEN}) {
     Log3 $me, 1, "$me(Set): up|down not supported";
     return undef;
-  } elsif ( $set eq "off" ) {
-    delete $hash->{helper}{DEV_DIMLEVEL};
+  }
+  
+  if ($hash->{helper}{OWN_DIM} == 1) {
+    switch($set) {
+      case "dimlevel" {
+        $dimlevel = pilight_dimmer_ConvDimToDev($me,$a[1]);
+        $set = "on";
+      }
+      case "on"   { 
+        my $dimlevel_on = AttrVal($me, "dimlevel_on",$currlevel);
+        $dimlevel_on = $dimlevel_max if ($dimlevel_on eq "dimlevel_max");
+        $dimlevel = pilight_dimmer_ConvDimToDev($me,$currlevel);
+      }
+    }
+  } else { # device without dimlevel support
+    switch($set) {
+      case "dimlevel" {
+        my $newlevel = $a[1];
+        my $cnt = int(($newlevel - $currlevel) / $dimlevel_step);      
+        
+        return undef if ($cnt==0);
+        $set = "up"  if ($cnt>0);
+        $set = "down" if ($cnt<0);
+        
+        $cnt = abs($cnt) - 1; # correction for loop -1 
+        
+        if ($newlevel == 0) {
+          $set = "off";
+          $cnt=0; #break for loop
+          my $dimlevel_off = AttrVal($me, "dimlevel_off",$newlevel);          
+          readingsSingleUpdate($hash,"dimlevel",$dimlevel_off,1);
+        }
+        
+        Log3 $me, 5, "$me(Set): cnt $cnt";
+        
+        for (my $i=0; $i < $cnt; $i++) {
+           pilight_dimmer_Write($hash,$set,undef);
+        }
+      }
+      case "on" { 
+        my $dimlevel_on = AttrVal($me, "dimlevel_on",$currlevel);
+        $dimlevel_on = $dimlevel_max if ($dimlevel_on eq "dimlevel_max");
+        readingsSingleUpdate($hash,"dimlevel",$dimlevel_on,1);
+        }
+      case "off" { 
+        my $dimlevel_off = AttrVal($me, "dimlevel_off",$currlevel);
+        readingsSingleUpdate($hash,"dimlevel",$dimlevel_off,1);
+        }
+    }
   }
   
   if (defined($dimlevel)) {
@@ -214,6 +258,8 @@ sub pilight_dimmer_Set($$)
       return undef if ($dimOld == $dimlevel);
     }
   }
+  
+  delete $hash->{helper}{DEV_DIMLEVEL} if ($set eq "off");
   
   pilight_dimmer_Write($hash,$set,$dimlevel); 
   return undef;
@@ -291,12 +337,20 @@ sub pilight_dimmer_Set($$)
   <ul>
     <li><a name="dimlevel_max_device">dimlevel_max_device</a><br>
         Maximum of the dimlevel of the device - default 15<br>
+        Have to be less or equal than dimlevel_max<br>
     </li>
     <li><a name="dimlevel_max">dimlevel_max</a><br>
         Maximum of the dimlevel in FHEM - default dimlevel_max_device<br>
     </li>
     <li><a name="dimlevel_step">dimlevel_step</a><br>
         Step of the dimlevel - default 1<br>
+    </li>
+    <li><a name="dimlevel_on">dimlevel_on</a><br>
+        Change dimlevel to value if on set - default no changing<br>
+        Could be a numeric value or dimlevel_max<br>
+    </li>
+     <li><a name="dimlevel_off">dimlevel_off</a><br>
+         Change dimlevel to value if off set - default no changing<br>
     </li>
   </ul>
   <br>
