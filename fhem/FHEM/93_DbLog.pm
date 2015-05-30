@@ -522,7 +522,7 @@ sub DbLog_Log($$) {
     for (my $i = 0; $i < $max; $i++) {
       my $s = $dev->{CHANGED}[$i];
       $s = "" if(!defined($s));
-      if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
+      if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
         my $ts = $ts_0;
         $ts = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
         # $ts is in SQL format YYYY-MM-DD hh:mm:ss
@@ -2024,7 +2024,7 @@ sub dbReadings($@) {
       Thise DbLog-Device-Attribute specifies how the device specific Attributes DbLogExclude and DbLogInclude are handled.
          If this Attribute is missing it defaults to "Exclude".
          <ul>
-               <li>Exclude: DbLog behaves just as usual. This means everything will be logged by default and anything excluded
+               <li>Exclude: DbLog behaves just as usual. This means everything specified in the regex in DEF will be logged by default and anything excluded
                        via the DbLogExclude attribute will not be logged</li>
                <li>Include: Nothing will be logged, except the readings specified via regex in the DbLogInclude attribute
                </li>
@@ -2394,9 +2394,9 @@ sub dbReadings($@) {
                <li>Exclude: DbLog verhaelt sich wie bisher auch, alles was ueber die RegExp im DEF angegeben ist, wird geloggt, bis auf das,
                was ueber die RegExp in DbLogExclude ausgeschlossen wird<br>
                Das Attribut DbLogInclude wird in diesem Fall nicht beruecksichtigt</li>
-               <li>Include: Es wird nur das geloggt, was ueber die RegExp im DEF angegenben wurde und sonst nichts, es sei denn es wird
-                       ueber die RegExp in DbLogInclude eingeschlossen.<br>
-                       Das Attribut DbLogExclude wird in diesem Fall nicht beruecksichtigt.
+               <li>Include: Es wird nur das geloggt was ueber die RegExp in DbLogInclude eingeschlossen wird.<br>
+                       Das Attribut DbLogExclude wird in diesem Fall nicht beruecksichtigt, ebenso wenig, wie
+                       die regex im DEF.
                </li>
                <li>Exclude/Include: Funktioniert im Wesentlichen, wie "Exclude", nur das sowohl DbLogExclude, als auch DbLogInclude
                        geprueft werden: Readings, die durch DbLogExclude zwar ausgeschlossen wurden, mit DbLogInclude aber wiederum eingeschlossen wwrden,
