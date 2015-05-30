@@ -1934,6 +1934,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$p;
       $eCnt = ($eCnt&0x7fffff)/10;          #0.0  ..838860.7  Wh
       $P = $P   /100;                       #0.0  ..167772.15 W
+      
       push @evtEt,[$shash,1,"energy:"   .$eCnt];
       push @evtEt,[$shash,1,"power:"    .$P];    
 
@@ -1963,13 +1964,19 @@ sub CUL_HM_Parse($$) {#########################################################
       
       push @evtEt,[$defs{$devH->{channel_02}},1,"state:$eCnt"] if ($devH->{channel_02});
       push @evtEt,[$defs{$devH->{channel_03}},1,"state:$P"   ] if ($devH->{channel_03});
-      
+
+      my $el = ReadingsVal($shash->{NAME},"energy",0);# get Energy last
+      my $eo = ReadingsVal($shash->{NAME},"energyOffset",0);
       if($eCnt == 0 && hex($mNo) < 3 ){
         push @evtEt,[$devH,1,"powerOn:$tn"];
-        my $eo = ReadingsVal($shash->{NAME},"energy",0)+
-                 ReadingsVal($shash->{NAME},"energyOffset",0);
+        $eo += $el;
         push @evtEt,[$shash,1,"energyOffset:".$eo];
       }
+      elsif($el > 800000 && $el < $eCnt ){# handle overflow
+        $eo += 838860.7;
+        push @evtEt,[$shash,1,"energyOffset:".$eo];
+      }
+      push @evtEt,[$shash,1,"energyCalc:".($eo + $eCnt)];
     }
   }
   elsif($st eq "powerMeter") {#################################################
@@ -2014,12 +2021,18 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$defs{$devH->{channel_05}},1,"state:$U"   ] if ($devH->{channel_05});
       push @evtEt,[$defs{$devH->{channel_06}},1,"state:$F"   ] if ($devH->{channel_06});
       
+      my $el = ReadingsVal($shash->{NAME},"energy",0);# get Energy last
+      my $eo = ReadingsVal($shash->{NAME},"energyOffset",0);
       if($eCnt == 0 && hex($mNo) < 3 ){
         push @evtEt,[$devH,1,"powerOn:$tn"];
-        my $eo = ReadingsVal($shash->{NAME},"energy",0)+
-                 ReadingsVal($shash->{NAME},"energyOffset",0);
+        $eo += $el;
         push @evtEt,[$shash,1,"energyOffset:".$eo];
       }
+      elsif($el > 800000 && $el < $eCnt ){# handle overflow
+        $eo += 838860.7;
+        push @evtEt,[$shash,1,"energyOffset:".$eo];
+      }
+      push @evtEt,[$shash,1,"energyCalc:".($eo + $eCnt)];
     }
   }
   elsif($st eq "repeater"){ ###################################################
