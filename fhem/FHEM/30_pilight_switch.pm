@@ -124,7 +124,10 @@ sub pilight_switch_Set($$)
   
   my $msg = "$me,$v";
   IOWrite($hash, $msg);
-  return undef;
+  #keinen Trigger bei Set auslösen
+  #Aktualisierung erfolgt in Parse
+  my $skipTrigger = 1; 
+  return undef,$skipTrigger;
 }
 
 

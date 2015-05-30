@@ -112,9 +112,9 @@ sub pilight_dimmer_Parse($$)
   if ($state eq "down") {    
     $dimlevel = $dimlevel_old - $dimlevel_step;
     $state="on";
-    if ($dimlevel < 0) {
+    if ($dimlevel <= 0) {
       $state="off";
-      $dimlevel = 0;
+      $dimlevel= AttrVal($chash->{NAME}, "dimlevel_off",0);
     }
   }
   
@@ -127,7 +127,7 @@ sub pilight_dimmer_Parse($$)
     Log3 $chash->{NAME}, 5, "pilight_dimmer_Parse: $dimlevel_old $dimlevel";
     $dimlevel = int($dimlevel+0.5);
     Log3 $chash->{NAME}, 5, "pilight_dimmer_Parse: $dimlevel_old round $dimlevel";
-    readingsBulkUpdate($chash,"dimlevel",$dimlevel);
+    readingsBulkUpdate($chash,"dimlevel",$dimlevel) if ($dimlevel_old != $dimlevel);
   }
   readingsEndUpdate($chash, 1); 
   
@@ -260,7 +260,10 @@ sub pilight_dimmer_Set($$)
   delete $hash->{helper}{DEV_DIMLEVEL} if ($set eq "off");
   
   pilight_dimmer_Write($hash,$set,$dimlevel); 
-  return undef;
+  #keinen Trigger bei Set auslösen
+  #Aktualisierung erfolgt in Parse
+  my $skipTrigger = 1; 
+  return undef,$skipTrigger;
 }
 
 #####################################
