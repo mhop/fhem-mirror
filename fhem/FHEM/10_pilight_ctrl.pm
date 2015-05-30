@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.03 2015-05-20 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.04 2015-05-30 Risiko $
 #
 # Usage
 # 
@@ -26,7 +26,8 @@
 # V 1.00 2015-05-09 - NEW: white list for defined submodules activating by ignoreProtocol *
 # V 1.01 2015-05-09 - NEW: add quigg_gt* protocol (e.q quigg_gt7000)
 # V 1.02 2015-05-16 - NEW: battery state for temperature sensors
-# V 1.03 2015-05-20 - NEW: handle screen messages (up,down) 
+# V 1.03 2015-05-20 - NEW: handle screen messages (up,down)
+# V 1.04 2015-05-30 - FIX:  StateFn  
 ############################################## 
 package main;
 
@@ -70,6 +71,7 @@ sub pilight_ctrl_Initialize($)
   $hash->{UndefFn} = "pilight_ctrl_Undef";
   $hash->{SetFn}   = "pilight_ctrl_Set";
   $hash->{NotifyFn}= "pilight_ctrl_Notify";
+  $hash->{StateFn} = "pilight_ctrl_State";
   $hash->{AttrList}= "ignoreProtocol brands ContactAsSwitch ".$readingFnAttributes;
   
   $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:";
@@ -112,6 +114,18 @@ sub pilight_ctrl_Define($$)
   #$attr{$me}{verbose} = 5;
   
   return pilight_ctrl_TryConnect($hash);
+}
+
+#####################################
+sub pilight_ctrl_State($$$$)
+{
+  my ($hash, $time, $name, $val) = @_;
+  my $me = $hash->{NAME};  
+  # gespeicherten Readings löschen
+  if ($name eq "state" || $name eq "rcv_raw") {
+      setReadingsVal($hash, $name, undef, TimeNow());
+  }
+  return undef;
 }
 
 sub pilight_ctrl_Close($)

@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_temp.pm 0.13 2015-05-17 Risiko $
+# $Id: 30_pilight_temp.pm 0.14 2015-05-30 Risiko $
 #
 # Usage
 # 
@@ -11,7 +11,8 @@
 # V 0.11 2015-03-29 - FIX:  $readingFnAttributes
 # V 0.12 2015-05-16 - NEW:  reading battery
 # V 0.12 2015-05-16 - NEW:  attribut corrTemp, a factor to modify temperatur 
-# V 0.13 2015-05-17 - NEW:  attribut corrHumidity, a factor to modify humidity 
+# V 0.13 2015-05-17 - NEW:  attribut corrHumidity, a factor to modify humidity
+# V 0.14 2015-05-30 - FIX:  StateFn 
 ############################################## 
 
 package main;
@@ -23,7 +24,6 @@ use JSON;
 
 sub pilight_temp_Parse($$);
 sub pilight_temp_Define($$);
-sub pilight_temp_Fingerprint($$);
 
 sub pilight_temp_Initialize($)
 {
@@ -32,6 +32,7 @@ sub pilight_temp_Initialize($)
   $hash->{DefFn}    = "pilight_temp_Define";
   $hash->{Match}    = "^PITEMP";
   $hash->{ParseFn}  = "pilight_temp_Parse";
+  $hash->{StateFn}  = "pilight_temp_State";
   $hash->{AttrList} = "corrTemp corrHumidity ".$readingFnAttributes;
 }
 
@@ -59,6 +60,18 @@ sub pilight_temp_Define($$)
   
   $modules{pilight_temp}{defptr}{lc($protocol)}{$me} = $hash;
   AssignIoPort($hash);
+  return undef;
+}
+
+#####################################
+sub pilight_temp_State($$$$)
+{
+  my ($hash, $time, $name, $val) = @_;
+  my $me = $hash->{NAME};
+  
+  #$hash->{STATE} wird nur ersetzt, wenn $hash->{STATE}  == ??? fhem.pl Z: 2469
+  #machen wir es also selbst
+  $hash->{STATE} = $val if ($name eq "state");
   return undef;
 }
 
