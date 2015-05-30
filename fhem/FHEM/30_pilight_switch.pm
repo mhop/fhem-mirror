@@ -10,7 +10,7 @@
 # V 0.10 2015-02-22 - initial beta version
 # V 0.11 2015-03-29 - FIX:  $readingFnAttributes
 # V 0.12 2015-05-18 - FIX:  add version information
-# V 0.13 2015-05-30 - FIX:  StateFn
+# V 0.13 2015-05-30 - FIX:  StateFn, noArg
 ############################################## 
 
 package main;
@@ -115,7 +115,7 @@ sub pilight_switch_Set($$)
   my $me = shift @a;
 
   return "no set value specified" if(int(@a) < 1);
-  return "Unknown argument ?, choose one of on off" if($a[0] eq "?");
+  return "Unknown argument ?, choose one of on:noArg off:noArg" if($a[0] eq "?");
 
   my $v = join(" ", @a);
   Log3 $me, 4, "$me(Set): $v";
