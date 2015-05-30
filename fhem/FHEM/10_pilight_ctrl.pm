@@ -99,7 +99,7 @@ sub pilight_ctrl_Define($$)
   $hash->{DeviceName} = $dev;
   $hash->{STATE} = "defined";
   $hash->{API} = "6.0"; 
-  $hash->{API} = "5.0" if (defined($a[3]));
+  $hash->{API} = "5.0" if (defined($a[3]) && $a[3] =~/5/);
   $hash->{RETRY_INTERVAL} = 60;
   
   $hash->{helper}{CON} = "define";
