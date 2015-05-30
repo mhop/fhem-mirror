@@ -545,17 +545,30 @@ sub RPII2C_HWACCESS_ioctl($$) {
 		<b>preliminary:</b><br>
 		<ul>
 			<li>
-				load I2C kernel modules:<br>
-				open /etc/modules<br>
-				<ul><code>sudo nano /etc/modules</code></ul><br>
-				add these lines<br>
-				<ul><code>
-					i2c-dev<br>
-					i2c-bcm2708<br>
-				</code></ul>
+				load I2C kernel modules (choose <b>one</b> of the following options):<br>
+				<ul>
+				<li>
+          open /etc/modules<br>
+          <ul><code>sudo nano /etc/modules</code></ul><br>
+          add these lines<br>
+          <ul><code>
+            i2c-dev<br>
+            i2c-bcm2708<br>
+          </code></ul>
+				</li>
+				<li>
+          Since Kernel 3.18.x on raspberry pi and maybe on other boards too, device tree support was implemented and enabled by default.
+          To enable I2C support just add
+          <ul><code>device_tree_param=i2c0=on,i2c1=on</code></ul> to /boot/config.txt
+          You can also enable just one of the I2C. In this case remove the unwantet one from the line.
+				</li>
+				<li>
+          On Raspbian images since 2015 just start <code>sudo raspi-config</code> and enable I2C there. Parameters will be added automaticly to /boot/config.txt
+				</li>
+				reboot
+				</ul>
 			</li><br>
-			
-			<li>Choose <b>one</b> of the three follwing methodes do grant access to <code>/dev/i2c-*</code> for FHEM user:
+			<li>Choose <b>only one</b> of the three follwing methodes do grant access to <code>/dev/i2c-*</code> for FHEM user:
 				<ul>
 				<li>
 					<code>sudo apt-get install i2c-tools<br>
@@ -690,17 +703,32 @@ sub RPII2C_HWACCESS_ioctl($$) {
 		Dieses Modul funktioniert gruns&auml;tzlich auf allen Linux Systemen, die <code>/dev/i2c-x</code> bereitstellen.<br><br>
 		
 		<b>Vorbereitung:</b><br>
-		<ul>
+      <ul>
 			<li>
-				I2C Kernelmodule laden:<br>
-				modules Datei &ouml;ffnen<br>
-				<ul><code>sudo nano /etc/modules</code></ul><br>
-				folgendes einf&uuml;gen<br>
-				<ul><code>
-					i2c-dev<br>
-					i2c-bcm2708<br>
+				I2C Kernelmodule laden (chose <b>one</b> of the following options):<br>
+				<ul>
+				<li>
+          I2C Kernelmodule laden:<br>
+          modules Datei &ouml;ffnen<br>
+          <ul><code>sudo nano /etc/modules</code></ul><br>
+          folgendes einf&uuml;gen<br>
+          <ul><code>
+            i2c-dev<br>
+            i2c-bcm2708<br>
 				</code></ul>
-			</li> <br>
+				</li>
+				<li>
+          Seit Kernel 3.18.x auf dem Raspberry Pi und evtl. auch auf anderen Systemen ist der "Device tree support" implementiert und standardm&auml;&szlig;ig aktiviert.
+          Um I2C Unterst&uuml;tzung zu aktivieren mu&szlig;
+          <ul><code>device_tree_param=i2c0=on,i2c1=on</code></ul> zur /boot/config.txt hinzu gef&uuml;gt werden.
+          Wenn nur einer der Busse genutzt wird, kann der andere einfach aus der Zeile entfernt werden.
+				</li>
+				<li>
+          Bei Raspbian Images seit 2015 kann der I2C Bus einfach &uuml;ber <code>sudo raspi-config</code> aktiviert werden. Die Parameter werden automatisch in die /boot/config.txt eingetragen.
+				</li>
+				Neustart
+				</ul>
+			</li><br>
 			<li><b>Eine</b> der folgenden drei M&ouml;glichkeiten w&auml;hlen um dem FHEM User Zugriff auf <code>/dev/i2c-*</code> zu geben:
 				<ul>
 				<li>
