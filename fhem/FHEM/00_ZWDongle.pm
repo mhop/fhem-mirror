@@ -491,6 +491,8 @@ ZWDongle_Write($$$@)
     push @{$hash->{SendStack}}, $msg;
     return if(int(@{$hash->{SendStack}}) > 1);
   }
+  $hash->{LastMsg}=$msg;
+  $hash->{RetransmitCount} = 0;
   $msg = "$fn$msg";
   $msg = sprintf("%02x%s", length($msg)/2+1, $msg);
   $msg = "01$msg" . ZWDongle_CheckSum($msg);
@@ -537,18 +539,31 @@ ZWDongle_Read($@)
 
     if($fb eq "06") {   # ACK
       $data = substr($data, 2);
+      delete $hash->{LastMsg};
+      delete $hash->{RetransmitCount};
       next;
     }
     if($fb eq "15") {   # NACK
       Log3 $name, 1, "$name: NACK received";
       undef @{$hash->{SendStack}};
+      delete $hash->{LastMsg};
+      delete $hash->{RetransmitCount};
       $data = substr($data, 2);
       next;
     }
     if($fb eq "18") {   # CAN
-      if(int(@{$hash->{SendStack}})) {
-        Log3 $name, 4, "$name: CANCEL received, retransmitting.";
-        ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
+      if(defined($hash->{LastMsg})){
+        if(++$hash->{RetransmitCount} <= 5) {
+          Log3 $name, 4, "$name: CANCEL received, retransmit nr. ".
+                        $hash->{RetransmitCount};
+          ZWDongle_Write($hash, "00", $hash->{LastMsg}, 1);
+
+        } else {
+          Log3 $name, 4, "$name: CANCEL received, no more retransmits";
+          delete $hash->{LastMsg};
+          delete $hash->{RetransmitCount};
+
+        }
       } else {
         Log3 $name, 4, "$name: CANCEL received, nothing to retransmit.";
       }
