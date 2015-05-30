@@ -565,7 +565,7 @@ ZWDongle_Read($@)
 
         }
       } else {
-        Log3 $name, 4, "$name: CANCEL received, nothing to retransmit.";
+        Log3 $name, 4, "$name: got CANCEL, but nothing to retransmit";
       }
       $data = substr($data, 2);
       next;
