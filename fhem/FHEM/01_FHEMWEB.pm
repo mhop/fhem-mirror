@@ -626,13 +626,17 @@ FW_answerCall($)
   if($FW_XHR || $FW_jsonp) {
     $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
     $FW_RETTYPE = "text/plain; charset=$FW_encoding";
+
     if($FW_jsonp) {
       $FW_cmdret =~ s/'/\\'/g;
       # Escape newlines in JavaScript string
       $FW_cmdret =~ s/\n/\\\n/g;
       FW_pO "$FW_jsonp('$FW_cmdret');";
+
     } else {
+      $FW_cmdret = FW_addLinks($FW_cmdret) if($FW_webArgs{addLinks});
       FW_pO $FW_cmdret;
+
     }
     return 0;
   }
@@ -661,7 +665,7 @@ FW_answerCall($)
     if($cmd =~ m/^define +([^ ]+) /) { # "redirect" after define to details
       $FW_detail = $1;
     }
-    elsif($cmd =~ m/^copy +([^ ]+) +([^ ]+)/) { # "redirect" after define to details
+    elsif($cmd =~ m/^copy +([^ ]+) +([^ ]+)/) { # redirect define to details
       $FW_detail = $2;
     }
   }
@@ -770,19 +774,7 @@ FW_answerCall($)
       $FW_cmdret = $1;
 
     } else {             # "linkify" output (e.g. for list)
-      $FW_cmdret = FW_htmlEscape($FW_cmdret);
-
-      my @lines = split( /\n/, $FW_cmdret ); # Adding links
-      $FW_cmdret = "";
-      foreach my $line (@lines) {
-        $FW_cmdret .= "\n" if( $FW_cmdret );
-        foreach my $word ( split( / /, $line ) ) {
-          $word = "<a href=\"$FW_ME$FW_subdir?detail=$word$FW_CSRF\">$word</a>"
-                if( $defs{$word} );
-          $FW_cmdret .= "$word ";
-        }
-      }
-
+      $FW_cmdret = FW_addLinks(FW_htmlEscape($FW_cmdret));
       $FW_cmdret =~ s/:\S+//g if($FW_cmdret =~ m/unknown.*choose one of/i);
       $FW_cmdret = "<pre>$FW_cmdret</pre>" if($FW_cmdret =~ m/\n/);
     }
@@ -824,6 +816,22 @@ FW_answerCall($)
   }
   FW_pO "</body></html>";
   return 0;
+}
+
+sub
+FW_addLinks($)
+{
+  my @lines = split( /\n/, shift); # Adding links
+  my $ret = "";
+  foreach my $line (@lines) {
+    $ret .= "\n" if( $ret );
+    foreach my $word ( split( / /, $line ) ) {
+      $word = "<a href=\"$FW_ME$FW_subdir?detail=$word$FW_CSRF\">$word</a>"
+            if( $defs{$word} );
+      $ret .= "$word ";
+    }
+  }
+  return $ret;
 }
 
 
@@ -2615,6 +2623,7 @@ FW_htmlEscape($)
   $txt =~ s/&/&amp;/g;
   $txt =~ s/</&lt;/g;
   $txt =~ s/>/&gt;/g;
+  $txt =~ s/\n/<br>/g;
   return $txt;
 }
 
