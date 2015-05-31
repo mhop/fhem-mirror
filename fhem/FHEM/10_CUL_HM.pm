@@ -3710,7 +3710,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             )
            .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
             if ($data eq "?");
-    if ($reg->{lit} && defined $reg->{lit}{$data} ){
+    if (   $conv ne 'lit' 
+        && $reg->{lit} 
+        && defined $reg->{lit}{$data} ){
       $data = $reg->{lit}{$data};#conv special value past to calculation
     }     
             
