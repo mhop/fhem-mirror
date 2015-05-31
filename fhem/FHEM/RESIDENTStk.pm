@@ -80,14 +80,15 @@ sub RESIDENTStk_wakeupSet($$) {
     my $lastRun = ReadingsVal( $NAME, "lastRun", "07:00" );
     my $nextRun = ReadingsVal( $NAME, "nextRun", "07:00" );
     my $running = ReadingsVal( $NAME, "running", 0 );
-    my $atName  = "at_" . $NAME;
-    my $wdNameGotosleep    = "wd_" . $wakeupUserdevice . "_gotosleep";
-    my $wdNameAsleep       = "wd_" . $wakeupUserdevice . "_asleep";
-    my $wdNameAwoken       = "wd_" . $wakeupUserdevice . "_awoken";
-    my $macroName          = "Macro_" . $NAME;
-    my $macroNameGotosleep = "Macro_" . $wakeupUserdevice . "_gotosleep";
-    my $macroNameAsleep    = "Macro_" . $wakeupUserdevice . "_asleep";
-    my $macroNameAwoken    = "Macro_" . $wakeupUserdevice . "_awoken";
+    my $wakeupUserdeviceState = ReadingsVal( $wakeupUserdevice, "state", 0 );
+    my $atName                = "at_" . $NAME;
+    my $wdNameGotosleep       = "wd_" . $wakeupUserdevice . "_gotosleep";
+    my $wdNameAsleep          = "wd_" . $wakeupUserdevice . "_asleep";
+    my $wdNameAwoken          = "wd_" . $wakeupUserdevice . "_awoken";
+    my $macroName             = "Macro_" . $NAME;
+    my $macroNameGotosleep    = "Macro_" . $wakeupUserdevice . "_gotosleep";
+    my $macroNameAsleep       = "Macro_" . $wakeupUserdevice . "_asleep";
+    my $macroNameAwoken       = "Macro_" . $wakeupUserdevice . "_awoken";
 
     # check for required userattr attribute
     my $userattributes =
@@ -140,6 +141,7 @@ sub RESIDENTStk_wakeupSet($$) {
 ## 3. \$EVTPART2 -> wake-up begin time considering wakeupOffset attribute\
 ## 4. \$EVTPART3 -> enforced wakeup yes=1,no=0 from wakeupEnforced attribute\
 ## 5. \$EVTPART4 -> device name of the user which called this macro\
+## 6. \$EVTPART5 -> current state of user\
 ##=============================================================================\
 \
 ##-----------------------------------------------------------------------------\
@@ -158,7 +160,7 @@ for (my \$i=1;; \$i <= 10;; \$i++) {\
 ## Run first automation commands and create temp. at-devices for lagging actions.\
 ##\
 if (\$EVTPART0 eq \"start\") {\
-	Log3 \$NAME, 3, \"\$NAME: Wake-up program started for \$EVTPART4 with target time \$EVTPART1\";;\
+	Log3 \$NAME, 3, \"\$NAME: Wake-up program started for \$EVTPART4 with target time \$EVTPART1. Current state: \$EVTPART5\";;\
 \
 #	fhem \"set BR_FloorLamp:FILTER=onoff=0 pct 1 : ct 2000 : transitiontime 0;; set BR_FloorLamp:FILTER=pct=1 pct 90 : ct 5600 : transitiontime 17700\";;\
 \	
@@ -186,7 +188,7 @@ if (\$EVTPART0 eq \"start\") {\
 ##       assuming the user does not want any further automation activities.\
 ##\
 if (\$EVTPART0 eq \"stop\") {\
-	Log3 \$NAME, 3, \"\$NAME: Wake-up program ended for \$EVTPART4 with target time \$EVTPART1\";;\
+	Log3 \$NAME, 3, \"\$NAME: Wake-up program ended for \$EVTPART4 with target time \$EVTPART1. Current state: \$EVTPART5\";;\
 \
 	# if wake-up should be enforced, auto-change user state from 'asleep' to 'awoken'\
 	# after a small additional nap to kick you out of bed if user did not confirm to be awake :-)\
@@ -731,15 +733,15 @@ if (\$EVTPART0 eq \"stop\") {\
 
             if ( defined( $notify[1] ) || $VALUE eq "end" ) {
                 Log3 $NAME, 4,
-"RESIDENTStk $NAME: trigger $wakeupMacro stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice";
+"RESIDENTStk $NAME: trigger $wakeupMacro stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
                 fhem
-"trigger $wakeupMacro stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice";
+"trigger $wakeupMacro stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
             }
             else {
                 Log3 $NAME, 4,
-"RESIDENTStk $NAME: trigger $wakeupMacro forced-stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice";
+"RESIDENTStk $NAME: trigger $wakeupMacro forced-stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
                 fhem
-"trigger $wakeupMacro forced-stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice";
+"trigger $wakeupMacro forced-stop $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
 
                 fhem "set $wakeupUserdevice:FILTER=state=asleep awoken";
             }
@@ -781,6 +783,8 @@ if (\$EVTPART0 eq \"stop\") {\
         && defined( $defs{$wakeupAtdevice} )
         && $defs{$wakeupAtdevice}{TYPE} eq "at" )
     {
+        # Update wakeuptimer device
+        #
         readingsBeginUpdate( $defs{$NAME} );
         if ( ReadingsVal( $NAME, "nextRun", 0 ) ne $VALUE ) {
             Log3 $NAME, 4, "RESIDENTStk $NAME: New wake-up time: $VALUE";
@@ -800,24 +804,22 @@ if (\$EVTPART0 eq \"stop\") {\
 
         # Update user device
         #
+        readingsBeginUpdate( $defs{$wakeupUserdevice} );
         my ( $nextWakeupDev, $nextWakeup ) =
           RESIDENTStk_wakeupGetNext($wakeupUserdevice);
-        if ( $nextWakeupDev && $nextWakeup ) {
-            fhem
-"setreading $wakeupUserdevice:FILTER=nextWakeupDev!=$nextWakeupDev nextWakeupDev $nextWakeupDev";
-            fhem
-"setreading $wakeupUserdevice:FILTER=nextWakeup!=$nextWakeup nextWakeup $nextWakeup";
+        if ( !$nextWakeupDev || !$nextWakeup ) {
+            $nextWakeupDev = "none";
+            $nextWakeup    = "OFF";
         }
-        else {
-            fhem
-"setreading $wakeupUserdevice:FILTER=nextWakeupDev!=none nextWakeupDev none";
-            fhem
-"setreading $wakeupUserdevice:FILTER=nextWakeup!=OFF nextWakeup OFF";
-        }
-
-        if ( !$running ) {
-            fhem "setreading $wakeupUserdevice:FILTER=wakeup!=0 wakeup 0";
-        }
+        readingsBulkUpdate( $defs{$wakeupUserdevice},
+            "nextWakeupDev", $nextWakeupDev )
+          if ( ReadingsVal( $defs{$wakeupUserdevice}, "nextWakeupDev", 0 ) ne
+            $nextWakeupDev );
+        readingsBulkUpdate( $defs{$wakeupUserdevice},
+            "nextWakeup", $nextWakeup )
+          if ( ReadingsVal( $defs{$wakeupUserdevice}, "nextWakeup", 0 ) ne
+            $nextWakeup );
+        readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
 
     }
 
@@ -923,6 +925,7 @@ sub RESIDENTStk_wakeupRun($;$) {
     my $nextRun = ReadingsVal( $NAME, "nextRun", "06:00" );
     my $nextRunTimestamp =
       ReadingsTimestamp( $NAME, "nextRun", "1970-01-01 00:00:00" );
+    my $wakeupUserdeviceState  = ReadingsVal( $wakeupUserdevice, "state",  0 );
     my $wakeupUserdeviceWakeup = ReadingsVal( $wakeupUserdevice, "wakeup", 0 );
     my $room         = AttrVal( $NAME, "room", 0 );
     my $running      = 0;
@@ -1016,8 +1019,8 @@ sub RESIDENTStk_wakeupRun($;$) {
         return
 "$NAME: device $wakeupUserdevice is not of type RESIDENTS, ROOMMATE or GUEST";
     }
-    elsif ( $defs{$wakeupUserdevice}{TYPE} eq "GUEST"
-        && ReadingsVal( $wakeupUserdevice, "state", "" ) eq "none" )
+    elsif ($defs{$wakeupUserdevice}{TYPE} eq "GUEST"
+        && $wakeupUserdeviceState eq "none" )
     {
         Log3 $NAME, 4,
 "RESIDENTStk $NAME: GUEST device $wakeupUserdevice has status value 'none' so let's disable this alarm timer";
@@ -1058,14 +1061,14 @@ sub RESIDENTStk_wakeupRun($;$) {
         Log3 $NAME, 4,
 "RESIDENTStk $NAME: weekday restriction in conjunction with $wakeupHolidays in use - not triggering wake-up program this time";
     }
-    elsif (ReadingsVal( $wakeupUserdevice, "state", "" ) eq "absent"
-        || ReadingsVal( $wakeupUserdevice, "state", "" ) eq "gone"
-        || ReadingsVal( $wakeupUserdevice, "state", "" ) eq "gotosleep"
-        || ReadingsVal( $wakeupUserdevice, "state", "" ) eq "awoken" )
+    elsif ($wakeupUserdeviceState eq "absent"
+        || $wakeupUserdeviceState eq "gone"
+        || $wakeupUserdeviceState eq "gotosleep"
+        || $wakeupUserdeviceState eq "awoken" )
     {
         Log3 $NAME, 4,
 "RESIDENTStk $NAME: we should not start any wake-up program for resident device $wakeupUserdevice being in state '"
-          . ReadingsVal( $wakeupUserdevice, "state", "" )
+          . $wakeupUserdeviceState
           . "' - not triggering wake-up program this time";
     }
 
@@ -1106,8 +1109,10 @@ sub RESIDENTStk_wakeupRun($;$) {
             Log3 $NAME, 4,
               "RESIDENTStk $NAME: trigger $wakeupMacro (running=1)";
             fhem
-"trigger $wakeupMacro start $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice";
+"trigger $wakeupMacro start $lastRun $wakeupOffset $wakeupEnforced $wakeupUserdevice $wakeupUserdeviceState";
 
+            # Update user device with last wakeup details
+            #
             readingsBeginUpdate( $defs{$wakeupUserdevice} );
             readingsBulkUpdate( $defs{$wakeupUserdevice},
                 "lastWakeup", $lastRun );
@@ -1141,6 +1146,24 @@ sub RESIDENTStk_wakeupRun($;$) {
 
         }
     }
+
+    # Update user device with next wakeup details
+    #
+    readingsBeginUpdate( $defs{$wakeupUserdevice} );
+    my ( $nextWakeupDev, $nextWakeup ) =
+      RESIDENTStk_wakeupGetNext($wakeupUserdevice);
+    if ( !$nextWakeupDev || !$nextWakeup ) {
+        $nextWakeupDev = "none";
+        $nextWakeup    = "OFF";
+    }
+    readingsBulkUpdate( $defs{$wakeupUserdevice},
+        "nextWakeupDev", $nextWakeupDev )
+      if ( ReadingsVal( $defs{$wakeupUserdevice}, "nextWakeupDev", 0 ) ne
+        $nextWakeupDev );
+    readingsBulkUpdate( $defs{$wakeupUserdevice}, "nextWakeup", $nextWakeup )
+      if ( ReadingsVal( $defs{$wakeupUserdevice}, "nextWakeup", 0 ) ne
+        $nextWakeup );
+    readingsEndUpdate( $defs{$wakeupUserdevice}, 1 );
 
     if ( $running && $wakeupOffset > 0 ) {
         readingsBeginUpdate( $defs{$NAME} );
