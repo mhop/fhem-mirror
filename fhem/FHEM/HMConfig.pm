@@ -513,7 +513,7 @@ my $K_actDetID = '000000'; # id of actionDetector
   redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>0,t=>"reduced temperatur recover"},
   redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>''         ,f=>2       ,u=>"%"   ,d=>0,t=>"reduced power level"},
   powerUpAction   =>{a=> 86.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>"behavior on power up"                 ,lit=>{off=>0,on=>1}},
-  statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0.5,max=>15.5    ,c=>''         ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"             ,lit=>{unused=>0}},
+  statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0  ,max=>15.5    ,c=>''         ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"             ,lit=>{unused=>0}},
   statusInfoRandom=>{a=> 87.5,s=>0.3,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>"s"   ,d=>0,t=>"status message random delay"},
   characteristic  =>{a=> 88.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                     ,lit=>{linear=>0,square=>1}},
   logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
@@ -610,8 +610,8 @@ my $K_actDetID = '000000'; # id of actionDetector
   cndTxThrhLo     =>{a=>139  ,s=>2  ,l=>1,min=>0  ,max=>3000    ,c=>''         ,f=>''      ,u=>'mV'  ,d=>0,t=>"threshold high condition"},
   highHoldTime    =>{a=>143  ,s=>1  ,l=>1,min=>60 ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"hold time on high state"},
   evntRelFltTime  =>{a=>145  ,s=>1  ,l=>1,min=>1  ,max=>7620    ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter release time "},
-  triggerMode     =>{a=>146.0,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"define type of event report ",lit=>{off=>0,sensor=>33,switch=>34,button=>35}},
-  mtrType         =>{a=>149.0,s=>1  ,l=>1,min=>0   ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"type of measurement"         ,lit=>{gas=>1,IR=>2,LED=>4,unknown=>255}},
+  triggerMode     =>{a=>146.0,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"define type of event report "         ,lit=>{off=>0,sensor=>33,switch=>34,button=>35}},
+  mtrType         =>{a=>149.0,s=>1  ,l=>1,min=>0   ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''     ,d=>0,t=>"type of measurement"                 ,lit=>{gas=>1,IR=>2,LED=>4,unknown=>255}},
   mtrConstIr      =>{a=>150.0,s=>2  ,l=>1,min=>1   ,max=>65536  ,c=>''         ,f=>''      ,u=>'U/kWh',d=>0,t=>"constant IR"},
   mtrConstGas     =>{a=>152.0,s=>2  ,l=>1,min=>0001,max=>65.536 ,c=>''         ,f=>1000    ,u=>'m3/I' ,d=>0,t=>"constant gas"},
   mtrConstLed     =>{a=>154.0,s=>2  ,l=>1,min=>1   ,max=>65536  ,c=>''         ,f=>''      ,u=>'i/kWh',d=>0,t=>"constant led"},
@@ -1353,10 +1353,10 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                     none4Type  =>{ "test"=>"" },
 );
 %culHmModelGets = (
-                    "CCU-FHEM"     =>{ "listDevice"=>"" },
-                    ActionDetector =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive] ..." 
+                    "CCU-FHEM"     =>{ "listDevice"=>""}
+                   ,ActionDetector =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive] ..." 
                                       ,"info"      =>""
-                                     },
+                                     }
 );
 
 ##############################---set---########################################
@@ -1365,7 +1365,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]"
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] <regName> <value> ... [<peerChannel>]"
-                      ,clear         => "[readings|trigger|register|rssi|msgEvents|all]"
+                      ,clear         => "[readings|trigger|register|rssi|msgEvents|attack|all]"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
                        raw           => "data ..."
@@ -1605,6 +1605,7 @@ $culHmModelSets{"HM-RC-Dis-H-x-EU"}    = $culHmModelSets{"HM-PB-4DIS-WM"};
                                              ,hmPairForSec =>"<sec>"
                                              ,hmPairSerial =>"<serial>"
                                              ,defIgnUnknown=>""
+                                             ,assignIO     =>"<IO> [set|unset]..."
                                             }
 );
 # clones- - - - - - - - - - - - - - - - -
