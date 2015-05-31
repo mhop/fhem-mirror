@@ -15,8 +15,8 @@ sub ZWDongle_Parse($$$);
 sub ZWDongle_Read($@);
 sub ZWDongle_ReadAnswer($$$);
 sub ZWDongle_Ready($);
-sub ZWDongle_Write($$$@);
-sub ZWave_HandleSendStack($);
+sub ZWDongle_Write($$$);
+sub ZWave_ProcessSendStack($);
 
 
 # See also:
@@ -228,6 +228,9 @@ ZWDongle_Define($$)
   $hash->{DeviceName} = $dev;
   $hash->{CallbackNr} = 0;
   $hash->{nrNAck} = 0;
+  $hash->{WaitForAck}=0;
+  $hash->{SendRetrys}=0;
+  $hash->{MaxSendRetrys}=3;
   my @empty;
   $hash->{SendStack} = \@empty;
   
@@ -437,12 +440,13 @@ ZWDongle_Clear($)
   my $hash = shift;
 
   # Clear the pipe
-  $hash->{RA_Timeout} = 0.3;
+  $hash->{RA_Timeout} = 1.0;
   for(;;) {
     my ($err, undef) = ZWDongle_ReadAnswer($hash, "Clear", "wontmatch");
     last if($err && $err =~ m/^Timeout/);
   }
   delete($hash->{RA_Timeout});
+  $hash->{PARTIAL} = "";
 }
 
 #####################################
@@ -453,17 +457,17 @@ ZWDongle_DoInit($)
   my $name = $hash->{NAME};
   $serInit = 1;
 
-  $hash->{homeId} = "initial"; # Get-Answers may land in ZWave.pm
   DevIo_SetHwHandshake($hash) if($hash->{FD});
+  $hash->{PARTIAL} = "";
+  
   ZWDongle_Clear($hash);
   ZWDongle_Get($hash, $name, "caps");   $serInit = 0;
   ZWDongle_Get($hash, $name, "homeId");
   ZWDongle_Get($hash, $name, ("random", 32));         # Sec relevant
   ZWDongle_Set($hash, $name, ("timeouts", 100, 15));  # Sec relevant
-  ZWDongle_Clear($hash);                              # Wait, timeouts needs ack
   # NODEINFO_LISTENING, Generic Static controller, Specific Static Controller, 0
   ZWDongle_Set($hash, $name, ("setNIF", 1, 2, 1, 0)); # Sec relevant (?)
-  $hash->{PARTIAL} = "";
+  ZWDongle_Clear($hash);                              # Wait, timeouts needs ack
   $hash->{STATE} = "Initialized";
   return undef;
 }
@@ -481,33 +485,79 @@ ZWDongle_CheckSum($)
 
 #####################################
 sub
-ZWDongle_Write($$$@)
+ZWDongle_Write($$$)
 {
-  my ($hash,$fn,$msg,$noStack) = @_;
+  my ($hash,$fn,$msg) = @_;
 
-  if(!$noStack && $msg =~ m/^13/) { # SEND_DATA, wait for ACK
-    InternalTimer(gettimeofday()+1, "ZWave_HandleSendStack", $hash, 0)
-      if(!int(@{$hash->{SendStack}}));
-    push @{$hash->{SendStack}}, $msg;
-    return if(int(@{$hash->{SendStack}}) > 1);
-  }
-  $hash->{LastMsg}=$msg;
-  $hash->{RetransmitCount} = 0;
+  Log3 $hash, 5, "ZWDongle_Write msg $msg";
+
+  # assemble complete message
   $msg = "$fn$msg";
   $msg = sprintf("%02x%s", length($msg)/2+1, $msg);
   $msg = "01$msg" . ZWDongle_CheckSum($msg);
-  DevIo_SimpleWrite($hash, $msg, 1);
+ 
+  # push message on stack
+  push @{$hash->{SendStack}}, $msg;
+
+  # assure that wakeupNoMoreInformation is the last message on the sendStack
+  if($msg =~ m/^01....13(..)/) {
+    my $wNMI;
+    my @s = grep { /^01....13..028408/ ? ($wNMI=$_,0):1 } @{$hash->{SendStack}};
+    if($wNMI) {
+      Log3 $hash, 5, "ZWDongle_Write reordered sendStack";
+      push @s, $wNMI;       
+      $hash->{SendStack} = \@s;
+    }
+  }
+
+  #send first message if not waiting for ACK
+  ZWave_ProcessSendStack($hash);
 }
 
 sub
-ZWave_HandleSendStack($)
+ZWave_ProcessSendStack($)
 {
-  my $hash = shift;
-  shift @{$hash->{SendStack}};
-  RemoveInternalTimer($hash);   # remove timer to avoid re-trigger
-  return if(!@{$hash->{SendStack}});
-  ZWDongle_Write($hash, "00", $hash->{SendStack}->[0], 1);
-  InternalTimer(gettimeofday()+1, "ZWave_HandleSendStack", $hash, 0);
+  my ($hash) = @_;
+    
+  Log3 $hash, 5, "ZWave_ProcessSendStack: ".@{$hash->{SendStack}}.
+                        " items on stack, waitForAck ".$hash->{WaitForAck};
+  
+  RemoveInternalTimer($hash); 
+    
+  my $ts = gettimeofday();  
+  if($hash->{WaitForAck}){
+    if($ts-$hash->{SendTime} > 1){
+      Log3 $hash, 2,
+        "ZWave_ProcessSendStack: timeout sending message -> trigger resend";
+      $hash->{SendRetrys}++;
+      $hash->{WaitForAck} = 0;
+
+    } else {
+      Log3 $hash, 5, "ZWave_ProcessSendStack: waiting for ACK -> check again";
+      InternalTimer($ts+1, "ZWave_ProcessSendStack", $hash, 0);
+      return;
+
+    }
+}
+
+  if($hash->{SendRetrys} > $hash->{MaxSendRetrys}){
+    Log3 $hash, 1,
+        "ZWave_ProcessSendStack: max send retrys reached -> cancel sending";
+    shift @{$hash->{SendStack}};
+    $hash->{WaitForAck} = 0;
+    $hash->{SendRetrys} = 0;
+    $hash->{MaxSendRetrys} = 3;
+  }
+  
+  return if(!@{$hash->{SendStack}} || $hash->{WaitForAck});
+  
+  my $msg = $hash->{SendStack}->[0];
+  Log3 $hash, 5, "ZWave_ProcessSendStack: sending msg ".$msg;
+
+  DevIo_SimpleWrite($hash, $msg, 1);
+  $hash->{WaitForAck} = 1;
+  $hash->{SendTime} = $ts;
+  InternalTimer($ts+1, "ZWave_ProcessSendStack", $hash, 0);
 }
 
 #####################################
@@ -538,41 +588,42 @@ ZWDongle_Read($@)
     my $fb = substr($data, 0, 2);
 
     if($fb eq "06") {   # ACK
+      Log3 $name, 5, "$name: ACK received";
       $data = substr($data, 2);
-      delete $hash->{LastMsg};
-      delete $hash->{RetransmitCount};
-      next;
-    }
-    if($fb eq "15") {   # NACK
-      Log3 $name, 1, "$name: NACK received";
-      undef @{$hash->{SendStack}};
-      delete $hash->{LastMsg};
-      delete $hash->{RetransmitCount};
-      $data = substr($data, 2);
-      next;
-    }
-    if($fb eq "18") {   # CAN
-      if(defined($hash->{LastMsg})){
-        if(++$hash->{RetransmitCount} <= 5) {
-          Log3 $name, 4, "$name: CANCEL received, retransmit nr. ".
-                        $hash->{RetransmitCount};
-          ZWDongle_Write($hash, "00", $hash->{LastMsg}, 1);
-
-        } else {
-          Log3 $name, 4, "$name: CANCEL received, no more retransmits";
-          delete $hash->{LastMsg};
-          delete $hash->{RetransmitCount};
-
-        }
-      } else {
-        Log3 $name, 4, "$name: got CANCEL, but nothing to retransmit";
+      # ZWDongle messages are removed if ZW_SEND_DATA:OK is received
+      if(!@{$hash->{SendStack}} || $hash->{SendStack}->[0] !~ m/^......13/) {
+        shift @{$hash->{SendStack}};
+        $hash->{WaitForAck} = 0;
+        $hash->{SendRetrys} = 0;
+        $hash->{MaxSendRetrys} = 3;
       }
+      next;
+    }
+
+    if($fb eq "15") {   # NACK
+      Log3 $name, 4, "$name: NACK received, resending the message";
+      $hash->{WaitForAck} = 0;
+      $hash->{SendRetrys}++;
       $data = substr($data, 2);
       next;
     }
+
+    if($fb eq "18") {   # CAN
+      Log3 $name, 4, "$name: CAN received, resending the message";
+      $hash->{WaitForAck} = 0;
+      $hash->{SendRetrys}++;
+      $hash->{MaxSendRetrys}++ if($hash->{MaxSendRetrys}<7);
+      $data = substr($data, 2);
+      next;
+    }
+
     if($fb ne "01") {   # SOF
       Log3 $name, 1, "$name: SOF missing (got $fb instead of 01)";
-      undef @{$hash->{SendStack}};
+      if(++$hash->{nrNAck} < 5){
+        Log3 $name, 5, "ZWDongle_Read SOF Error -> sending NACK";
+        DevIo_SimpleWrite($hash, "15", 1);         # Send NACK
+      }
+      $data="";
       last;
     }
 
@@ -588,14 +639,28 @@ ZWDongle_Read($@)
     if($rcs ne $ccs) {
       Log3 $name, 1,
            "$name: wrong checksum: received $rcs, computed $ccs for $len$msg";
-      DevIo_SimpleWrite($hash, "15", 1)         # Send NACK
-        if(++$hash->{nrNAck} < 5);
+      if(++$hash->{nrNAck} < 5) {
+        Log3 $name, 5, "ZWDongle_Read wrong checksum -> sending NACK";
+        DevIo_SimpleWrite($hash, "15", 1);
+      }
       $msg = undef;
+      $data="";
       next;
     }
     $hash->{nrNAck} = 0;
+    Log3 $name, 5, "ZWDongle_Read -> sending ACK";
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
-    Log3 $name, 5, "ZWDongle_Read $name: $msg";
+    Log3 $name, 5, "ZWDongle_Read $name: processing $msg";
+    
+    # SEND_DATA OK: remove message from SendStack. TODO: check the callbackId
+    if($msg =~ m/^0013..00/ ){
+      Log3 $name, 5,
+        "ZWDongle_Read $name: ZW_SEND_DATA:OK received -> removing message";
+      shift @{$hash->{SendStack}};
+      $hash->{WaitForAck} = 0;
+      $hash->{SendRetrys} = 0;
+      $hash->{MaxSendRetrys} = 3;    
+    }
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     $hash->{PARTIAL} = $data;	 # Recursive call by ZWave get, Forum #37418
@@ -605,7 +670,15 @@ ZWDongle_Read($@)
   }
 
   $hash->{PARTIAL} = $data;
-  return $msg if(defined($local));
+  
+  # trigger sending of next message
+  ZWave_ProcessSendStack($hash) if(length($data) == 0);
+  
+  if(defined($local)){
+    Log3 $name, 5, "ZWDongle_Read returning local msg ".
+        ($msg ? $msg:"undef")." hash PARTIAL: ".$hash->{PARTIAL};
+    return $msg;
+  }
   return undef;
 }
 
@@ -631,34 +704,52 @@ ZWDongle_ReadAnswer($$$)
         if(length($buf) == 0);
 
     } else {
-      return ("Device lost when reading answer for get $arg", undef)
-        if(!$hash->{FD});
+      if(!$hash->{FD}) {
+        Log3 $hash, 1, "ZWDongle_ReadAnswer: device lost";
+        return ("Device lost when reading answer for get $arg", undef);
+      }
+
       my $rin = '';
       vec($rin, $hash->{FD}, 1) = 1;
       my $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
-        next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
         my $err = $!;
+        Log3 $hash, 5, "ZWDongle_ReadAnswer: nfound < 0 / err:$err";
+        next if ($err == EAGAIN() || $err == EINTR() || $err == 0);
         DevIo_Disconnected($hash);
         return("ZWDongle_ReadAnswer $arg: $err", undef);
       }
-      return ("Timeout reading answer for get $arg", undef)
-        if($nfound == 0);
-      $buf = DevIo_SimpleRead($hash);
-      return ("No data", undef) if(!defined($buf));
 
+      if($nfound == 0){
+        Log3 $hash, 5, "ZWDongle_ReadAnswer: select timeout";
+        return ("Timeout reading answer for get $arg", undef);
+      }
+
+      $buf = DevIo_SimpleRead($hash);
+      if(!defined($buf)){
+        Log3 $hash, 1,"ZWDongle_ReadAnswer: no data read";
+        return ("No data", undef);
+      }
+      Log3 $hash, 5, "ZWDongle_ReadAnswer: read ".length($buf)." bytes";
     }
 
     my $ret = ZWDongle_Read($hash, $buf, $regexp);
-    return (undef, $ret) if(defined($ret));
+    if(defined($ret)){
+      Log3 $hash, 5, "ZWDongle_ReadAnswer: returning $ret";
+      return (undef, $ret);
+    }
   }
-
 }
 
 sub
 ZWDongle_Parse($$$)
 {
   my ($hash, $name, $rmsg) = @_;
+
+  if(!defined($hash->{STATE}) || $hash->{STATE} ne "Initialized"){
+    Log3 $hash, 4,"ZWDongle_Parse dongle not initialized";
+    return;
+  }
 
   $hash->{"${name}_MSGCNT"}++;
   $hash->{"${name}_TIME"} = TimeNow();
