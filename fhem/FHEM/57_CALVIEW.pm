@@ -81,7 +81,7 @@ sub CALVIEW_GetUpdate($){
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 	$year += 1900; $mon += 1; 	
 	my $date = sprintf('%02d.%02d.%04d', $mday, $mon, $year);
-	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time + 86400);
+	($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time + 86400);
 	$year += 1900; $mon += 1; 		
 	my $datenext = sprintf('%02d.%02d.%04d', $mday, $mon, $year);
 	my @termineNew;
