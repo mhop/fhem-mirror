@@ -136,6 +136,8 @@ sub CUL_HM_Initialize($) {
   $hash->{GetFn}     = "CUL_HM_Get";
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrFn}    = "CUL_HM_Attr";
+  $hash->{NotifyFn}  = "CUL_HM_Notify";
+
   $hash->{Attr}{dev} =  "ignore:1,0 dummy:1,0 "  # -- device only attributes
                        ."IODev IOList IOgrp "        
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
@@ -209,8 +211,8 @@ sub CUL_HM_updateConfig($){
   # this gives FHEM sufficient time to fill in attributes
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
+  RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    RemoveInternalTimer("updateConfig");
     InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
     return;
   }
@@ -890,6 +892,17 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
       && $hash->{IODev}->{TYPE} eq "HMLAN"){
     IOWrite($hash, "", "init:$p[0]");
   }
+}
+
+sub CUL_HM_Notify(@){#################################
+  my ($ntfy, $dev) = @_;
+  return "" if ($dev->{NAME} ne "global");
+
+  my $events = deviceEvents($dev, AttrVal($ntfy->{NAME}, "addStateEvent", 0));
+  return if(!$events); # Some previous notify deleted the array.
+  return "" if (grep !/INITIALIZED/,@{$events});
+  delete $modules{CUL_HM}{NotifyFn};
+  CUL_HM_updateConfig("startUp");
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
@@ -3163,7 +3176,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
         $max = "literal";
       }
       elsif (defined($reg->{lit})){
-        $help .= " spacial:".join(",",keys%{$reg->{lit}});
+        $help .= " special:".join(",",keys%{$reg->{lit}});
       }
       push @rI,sprintf("%4d: %-16s | %3s %-14s | %8s | %s\n",
               $reg->{l},$regName,$min,$max.$reg->{u},
@@ -3484,9 +3497,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my (undef,undef,$sectIn) = @a;
     my @sectL;
     if ($sectIn eq "all") {
-      @sectL = ("rssi","msgEvents","readings");#readings is last - it schedules a reread possible
+      @sectL = ("rssi","msgEvents","readings","attack");#readings is last - it schedules a reread possible
     }
-    elsif($sectIn =~ m/(rssi|trigger|msgEvents|readings|register|unknownDev)/){
+    elsif($sectIn =~ m/(rssi|trigger|msgEvents|readings|register|unknownDev|attack)/){
       @sectL = ($sectIn);
     }
     else{
@@ -3546,6 +3559,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         delete $defs{$name}{helper}{rssi};
         delete ($hash->{$_}) foreach (grep(/^rssi/,keys %{$hash}))
       }
+      elsif($sect eq "attack"){
+        delete $defs{$name}{helper}{rssi};
+        delete ($hash->{$_}) foreach (grep(/^protErrIo(Id|Attack)/,keys %{$hash}));
+        delete $hash->{READINGS}{$_}
+            foreach (grep /^sabotageAttack/,keys %{$hash->{READINGS}});
+     }
     }
     $state = "";
   }
@@ -3691,8 +3710,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             )
            .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
             if ($data eq "?");
-
-    if ($reg->{lit} && $reg->{lit}{$data} ){
+    if ($reg->{lit} && defined $reg->{lit}{$data} ){
       $data = $reg->{lit}{$data};#conv special value past to calculation
     }     
             
@@ -4904,7 +4922,21 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $hash->{hmPairSerial} = $serial;
     InternalTimer(gettimeofday()+30, "CUL_HM_RemoveHMPair", "hmPairForSec:$name", 1);
   }
-
+  elsif($cmd eq "assignIO") { #################################################
+    $state = "";
+    my $io = $a[2];
+    return "use set of unset - $a[3] not allowed" 
+          if ($a[3] && $a[3] != m/^(set|unset)$/);
+    my $set = ($a[3] && $a[3] eq "unset")?0:1;
+    if ($set){
+      CommandAttr(undef, "$io hmId $dst");
+    }
+    else{
+      CommandDeleteAttr(undef, "$io hmId");
+    }
+    CUL_HM_UpdtCentral($name);
+  }
+                                             
   else{
     return "$cmd not implemented - contact sysop";
   }
@@ -7261,28 +7293,21 @@ sub CUL_HM_storeRssi(@){
         if (AttrVal($name,"rssiLog",undef));
  return ;
 }
+
 sub CUL_HM_UpdtCentral($){
   my $name = shift;
   my $id = CUL_HM_name2Id($name);
   return if(!$init_done || length($id) != 6);
   
-  delete $defs{$_}{owner_CCU} # remove assignments in IO dev to this CCU
-        foreach (grep !/^$/,
-                 map{InternalVal($_,"owner_CCU","") eq $name ? $_ : ""}
-                 keys %defs);
-
-  my @l = grep !/^$/,
-          map{AttrVal($_,"IODev","")} 
-          map{CUL_HM_id2Name($_)}
-          grep /^.{6}$/,
-          keys %{$modules{CUL_HM}{defptr}};
-  my @myIos;# get all IOs using 'my' ID
-  foreach (CUL_HM_noDup(@l))  {
-    push @myIos,$_ if (CUL_HM_h2IoId($defs{$_}) eq $id);
+  foreach (keys %defs){# remove existing IO assignements
+    next if (   AttrVal($_,"hmId","")          ne $id 
+             && InternalVal($_,"owner_CCU","") ne $name);
+    delete $defs{$_}{owner_CCU}; 
   }
-  $defs{$name}{assignedIOs} = join(",",@myIos);
+
+  $defs{$name}{assignedIOs} = join(",",devspec2array("hmId=$id"));
   
-  foreach my $ioN(split",",AttrVal($name,"IOList","")){
+  foreach my $ioN(split",",AttrVal($name,"IOList","")){# set parameter in IO
     next if (!$defs{$ioN});
     if (  $defs{$ioN}{TYPE} eq "HMLAN"){;
     }
@@ -7313,17 +7338,17 @@ sub CUL_HM_UpdtCentral($){
       CUL_HM_ID2PeerList ($ccuChnName,unpack('A8',CUL_HM_name2Id($pn)."01"),1); 
     }
   }
-  my $io = AttrVal($name,"IODev","empty");
+  my @ioList = split(",",AttrVal($name,"IOList",""));# prepare array for quick access
+  $defs{$name}{helper}{io}{ioList} = \@ioList;
+  my $io = AttrVal($name,"IODev","empty");# assign IODev to vccu
   if (AttrVal($name,"IOList","") !~ m/$io/){
-    foreach(split",",AttrVal($name,"IOList","")){
+    foreach(@ioList){
       if ($defs{$_}){
         $attr{$name}{IODev} = $_;
         last;
       }
     }
   }
-  my @ioList = split(",",AttrVal($name,"IOList",""));
-  $defs{$name}{helper}{io}{ioList} = \@ioList;
   
   CUL_HM_UpdtCentralState($name);
 }
@@ -7968,13 +7993,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   
       Universal commands (available to most hm devices):
       <ul>
-        <li><B>clear &lt;[readings|register|msgEvents|all]&gt;</B><a name="CUL_HMclear"></a><br>
+        <li><B>clear &lt;[rssi|readings|register|msgEvents|attack|all]&gt;</B><a name="CUL_HMclear"></a><br>
           A set of variables can be removed.<br>
           <ul>
             readings: all readings will be deleted. Any new reading will be added usual. May be used to eliminate old data<br>
             register: all captured register-readings in FHEM will be removed. This has NO impact to the values in the device.<br>
             msgEvents:  all message event counter will be removed. Also commandstack will be cleared. <br>
             rssi:  collected rssi values will be cleared. <br>
+            attack:  information regarding an attack will be removed. <br>
             all:  all of the above. <br>
           </ul>
         </li>
@@ -9305,13 +9331,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       
       Allgemeine Befehle (verf&uuml;gbar f&uuml;r die meisten HM-Ger&auml;te):
       <ul>
-        <li><B>clear &lt;[readings|register|msgEvents|all]&gt;</B><a name="CUL_HMclear"></a><br>
+        <li><B>clear &lt;[rssi|readings|register|msgEvents|attack|all]&gt;</B><a name="CUL_HMclear"></a><br>
             Eine Reihe von Variablen kann entfernt werden.<br>
           <ul>
             readings: Alle Messwerte werden gel&ouml;scht, neue Werte werden normal hinzugef&uuml;gt. Kann benutzt werden um alte Daten zu entfernen<br>
             register: Alle in FHEM aufgezeichneten Registerwerte werden entfernt. Dies hat KEINEN Einfluss auf Werte im Ger&auml;t.<br>
             msgEvents: Alle Anchrichtenz&auml;hler werden gel&ouml;scht. Ebenso wird der Befehlsspeicher zur&uuml;ckgesetzt. <br>
             rssi: gesammelte RSSI-Werte werden gel&ouml;scht.<br>
+            attack: Einträge bezüglich einer Attack werden gelöscht.<br>
             all: alles oben genannte.<br>
           </ul>
         </li>
