@@ -124,7 +124,7 @@ FW_jqueryReadyFn()
     $(el).parent().find("input,[name]").each(function() {
       cmd += (cmd?"&":"")+$(this).attr("name")+"="+$(this).val();
     });
-    FW_cmd(FW_root+"?"+cmd+"&XHR=1", function(data) {
+    FW_cmd(FW_root+"?"+cmd+"&XHR=1&addLinks=1", function(data) {
       FW_okDialog('<pre>'+data+'</pre>', el);
     });
   });
