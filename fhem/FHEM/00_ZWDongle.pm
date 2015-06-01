@@ -497,17 +497,21 @@ ZWDongle_Write($$$)
   $msg = "01$msg" . ZWDongle_CheckSum($msg);
  
   # push message on stack
-  push @{$hash->{SendStack}}, $msg;
+  my $ss = $hash->{SendStack};
+  push @{$ss}, $msg;
 
   # assure that wakeupNoMoreInformation is the last message on the sendStack
   if($msg =~ m/^01....13(..)/) {
+    my $wNMIre = '01....13..028408';
     my $wNMI;
-    my @s = grep { /^01....13..028408/ ? ($wNMI=$_,0):1 } @{$hash->{SendStack}};
+    my $w1 = shift @{$ss} if($ss->[0] =~ m/$wNMIre/); # keep the first, #35126
+    my @s = grep { /^$wNMIre/ ? ($wNMI=$_,0):1 } @{$ss};
     if($wNMI) {
       Log3 $hash, 5, "ZWDongle_Write reordered sendStack";
       push @s, $wNMI;       
       $hash->{SendStack} = \@s;
     }
+    unshift($hash->{SendStack}, $w1) if($w1);
   }
 
   #send first message if not waiting for ACK
@@ -591,7 +595,7 @@ ZWDongle_Read($@)
       Log3 $name, 5, "$name: ACK received";
       $data = substr($data, 2);
       # ZWDongle messages are removed if ZW_SEND_DATA:OK is received
-      if(!@{$hash->{SendStack}} || $hash->{SendStack}->[0] !~ m/^......13/) {
+      if(!@{$hash->{SendStack}} || $hash->{SendStack}->[0] !~ m/^01....13/) {
         shift @{$hash->{SendStack}};
         $hash->{WaitForAck} = 0;
         $hash->{SendRetrys} = 0;
