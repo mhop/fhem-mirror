@@ -72,7 +72,7 @@ my @valid_halign = qw(start middle end);
 
 my $useImgTools = 1;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental';
 
 sub btIP_Define;
 sub btIP_Undef;

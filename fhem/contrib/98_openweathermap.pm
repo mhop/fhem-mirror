@@ -74,6 +74,8 @@ use XML::Simple;
 eval {require JSON};
 use feature qw/say switch/;
 
+no if $] >= 5.017011, warnings => 'experimental';
+
 require LWP::UserAgent;			# test
 my	$ua = LWP::UserAgent->new;	# test
 	$ua->timeout(10);				# test
