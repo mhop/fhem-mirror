@@ -2623,7 +2623,7 @@ FW_htmlEscape($)
   $txt =~ s/&/&amp;/g;
   $txt =~ s/</&lt;/g;
   $txt =~ s/>/&gt;/g;
-  $txt =~ s/\n/<br>/g;
+#  $txt =~ s/\n/<br>/g;
   return $txt;
 }
 
