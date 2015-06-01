@@ -39,6 +39,8 @@ use XML::Simple;
 use HttpUtils;
 require LWP::UserAgent;
 
+no if $] >= 5.017011, warnings => 'experimental';
+
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
 	$alertsXml, %capCityHash, %capCellHash, $sList, $aList);
 
