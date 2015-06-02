@@ -419,10 +419,11 @@ CUL_Clear($)
   # Clear the pipe
   $hash->{RA_Timeout} = 0.1;
   for(;;) {
-    my ($err, undef) = CUL_ReadAnswer($hash, "Clear", 0, undef);
+    my ($err, undef) = CUL_ReadAnswer($hash, "Clear", 0, "wontmatch");
     last if($err);
   }
   delete($hash->{RA_Timeout});
+  $hash->{PARTIAL} = "";
 }
 
 #####################################
@@ -438,7 +439,7 @@ CUL_DoInit($)
   my ($ver, $try) = ("", 0);
   while($try++ < 3 && $ver !~ m/^V/) {
     CUL_SimpleWrite($hash, "V");
-    ($err, $ver) = CUL_ReadAnswer($hash, "Version", 0, undef);
+    ($err, $ver) = CUL_ReadAnswer($hash, "Version", 0, "^V");
     return "$name: $err" if($err && ($err !~ m/Timeout/ || $try == 3));
     $ver = "" if(!$ver);
   }
