@@ -878,6 +878,7 @@ MAX_Parse($$)
   $state .= " (rf error)" if($shash->{rferror});
 
   readingsBulkUpdate($shash, "state", $state);
+  readingsBulkUpdate($shash, "RSSI", $shash->{RSSI}) if ($shash->{RSSI});
   readingsEndUpdate($shash, 1);
   return $shash->{NAME}
 }
