@@ -6500,7 +6500,7 @@ sub CUL_HM_updtRegDisp($$$) {
   foreach my $rgN (@regArr){
     next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);
-    next if (!$rgVal || $rgVal =~ m /invalid/);
+    next if (!defined $rgVal || $rgVal =~ m /invalid/);
     my $rdN = ((!$expLvl && !$culHmRegDefine->{$rgN}->{d})?".":"").$pReg.$rgN;
     push (@changedRead,$rdN.":".$rgVal)
           if (ReadingsVal($name,$rdN,"") ne $rgVal);
