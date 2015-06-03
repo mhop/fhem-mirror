@@ -2142,8 +2142,11 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($st =~ m /^(motionDetector|motionAndBtn)$/) { #########################
     my $state = $mI[2];
-    if(($mTp eq "10" ||$mTp eq "02") && $p =~ m/^0601..../) {
-      my ($err,$bright)=(hex($mI[3]),hex($mI[2]));
+    if(($mTp eq "10" ||$mTp eq "02") && $p =~ m/^06....../) {
+      my ($chn,$err,$bright)=(hex($mI[1]),hex($mI[3]),hex($mI[2]));
+      my $chId = $src.sprintf("%02X",$chn&0x3f);
+      $shash = $modules{CUL_HM}{defptr}{$chId}
+                             if($modules{CUL_HM}{defptr}{$chId});
       push @evtEt,[$shash,1,"brightness:".$bright];
       if ($md eq "HM-Sec-MDIR"){
         push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on":"off")];
