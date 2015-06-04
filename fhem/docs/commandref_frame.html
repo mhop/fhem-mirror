@@ -436,6 +436,24 @@ Device specific attributes are documented in the corresponding device section.
         attr store eventMap /on-for-timer 10:open/off:closed/<br>
         set store open
         </code></ul>
+        The explicit variant of this attribute has the following syntax:
+        <ul><code>
+        attr store eventMap { dev=>{"on"=>"open"}, usr=>{"open"=>"on"} }<br>
+        attr store eventMap { dev=>{"^on(-for-timer)?(.*)"=>"open$2"},
+                              usr=>{"^open(.*)"=>"on$1"},
+                              fw=>{"^open(.*)"=>"open"} }
+        </code></ul>
+        This variant must be used, if the mapping is not symmetrical, the first
+        part (dev) representing the device to user mapping, i.e. if the device
+        reports on 100 or on-for-timer 100, the user will see open 100.  The
+        second part (usr) is the other direction, if the user specified open
+        10, the device will receive on 10.  On both occasions the key will be
+        first compared directly with the text, and if it is not equal, then it
+        will be tried to match it as a regexp.  When using regexps in the usr
+        part with wildcards, the fw part must be filled with the exact same
+        keys to enable a correct display in the FHEMWEB set dropdown list in
+        the detail view.
+
         </li><br>
     
 

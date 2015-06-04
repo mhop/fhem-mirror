@@ -2202,17 +2202,7 @@ getAllSets($)
   $a2 = "" if($a2 =~ /^No set implemented for/);
   return "" if($a2 eq "");
 
-  my $em = AttrVal($d, "eventMap", undef);
-  if($em) {
-    # Delete the first word of the translation (.*:), else it will be
-    # interpreted as the single possible value for a dropdown
-    # Why is the .*= deleted?
-    $em = join(" ", grep { !/ / }
-                    map { $_ =~ s/.*?=//s;
-                          $_ =~ s/.*?://s; $_ } 
-                    attrSplit($em));
-    $a2 = "$em $a2";
-  }
+  $a2 = $defs{$d}{".eventMapCmd"}." $a2" if(defined($defs{$d}{".eventMapCmd"}));
   return $a2;
 }
 
@@ -2368,6 +2358,17 @@ CommandAttr($$)
     if($attrName eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
       push @rets,"$sdev: unknown IODev specified";
       next;
+    }
+
+    if($attrName eq "eventMap") {
+      delete $hash->{".eventMapHash"};
+      delete $hash->{".eventMapCmd"};
+      $attr{$sdev}{eventMap} = (defined $a[2] ? $a[2] : 1);
+      my $r = ReplaceEventMap($sdev, "test", 1); # refresh eventMapCmd
+      if($r =~ m/^ERROR in eventMap for /) {
+        delete($attr{$sdev}{eventMap});
+        return $r;
+      }
     }
 
     $a[0] = $sdev;
@@ -3345,24 +3346,37 @@ attrSplit($)
 }
 
 #######################
-# $dir: 0 = User to Fhem (i.e. set), 1 = Fhem to User (i.e trigger)
+# $dir: 0: User to Device (i.e. set) 1: Device to Usr (i.e trigger)
+# $dir: 0: $str is an array pointer  1: $str is a a string
 sub
 ReplaceEventMap($$$)
 {
   my ($dev, $str, $dir) = @_;
   my $em = $attr{$dev}{eventMap};
+
   return $str    if($dir && !$em);
   return @{$str} if(!$dir && (!$em || int(@{$str}) < 2 || $str->[1] eq "?"));
-  my $dname = shift @{$str} if(!$dir);
 
-  my $nstr = join(" ", @{$str}) if(!$dir);
-  my $changed;
+  return ReplaceEventMap2($dev, $str, $dir, $em) if($em =~ m/^{.*}$/);
   my @emList = attrSplit($em);
+
+  if(!defined $defs{$dev}{".eventMapCmd"}) {
+    # Delete the first word of the translation (.*:), else it will be
+    # interpreted as the single possible value for a dropdown
+    # Why is the .*= deleted?
+    $defs{$dev}{".eventMapCmd"} = join(" ", grep { !/ / }
+                  map { $_ =~ s/.*?=//s; $_ =~ s/.*?://s; "$_:noArg" } @emList);
+  }
+
+  my $dname = shift @{$str} if(!$dir);
+  my $nstr = join(" ", @{$str}) if(!$dir);
+
+  my $changed;
   foreach my $rv (@emList) {
     # Real-Event-Regexp:GivenName[:modifier]
     my ($re, $val, $modifier) = split(":", $rv, 3);
     next if(!defined($val));
-    if($dir) {  # event -> GivenName
+    if($dir) {  # dev -> usr
       my $reIsWord = ($re =~ m/^\w*$/); # dim100% is not \w only, cant use \b
       if($reIsWord) {
         if($str =~ m/\b$re\b/) {
@@ -3376,7 +3390,7 @@ ReplaceEventMap($$$)
         }
       }
 
-    } else {    # GivenName -> set command
+    } else {    # usr -> dev
       if($nstr eq $val) { # for special translations like <> and <<
         $nstr = $re;
         $changed = 1;
@@ -3406,6 +3420,68 @@ ReplaceEventMap($$$)
     unshift @{$str}, $dname;
     return @{$str};
   }
+}
+
+# $dir: 0:usr,$str is array pointer, 1:dev, $str is string
+# perl notation: { dev=>{"re1"=>"Evt1",...}, dpy=>{"re2"=>"Set 1",...}}
+sub
+ReplaceEventMap2($$$)
+{
+  my ($dev, $str, $dir) = @_;
+
+  my $hash = $defs{$dev};
+  my $emh = $hash->{".eventMapHash"};
+  if(!$emh) {
+    eval "\$emh = $attr{$dev}{eventMap}";
+    if($@) {
+      my $msg = "ERROR in eventMap for $dev: $@";
+      Log 1, $msg;
+      return $msg;
+    }
+    $hash->{".eventMapHash"} = $emh;
+
+    $defs{$dev}{".eventMapCmd"} = "";
+    if($emh->{usr}) {
+      my @cmd;
+      my $fw = $emh->{fw};
+      $defs{$dev}{".eventMapCmd"} = join(" ",
+          map { ($fw && $fw->{$_}) ? $fw->{$_}:$_} sort keys %{$emh->{usr} });
+    }
+  }
+
+  if($dir == 1) {
+    $emh = $emh->{dev};
+    if($emh) {
+      foreach my $k (keys %{$emh}) {
+        return $emh->{$k} if($str eq $k);
+        return eval '"'.$emh->{$k}.'"' if($str =~ m/$k/);
+      }
+    }
+    return $str;
+  }
+
+  $emh = $emh->{usr};
+  return @{$str} if(!$emh);
+    
+  my $dname = shift @{$str};
+  my $nstr = join(" ", @{$str});
+  foreach my $k (keys %{$emh}) {
+    my $nv;
+    if($nstr eq $k) {
+      $nv = $emh->{$k};
+
+    } elsif($nstr =~ m/$k/) {
+      $nv = eval '"'.$emh->{$k}.'"';
+
+    }
+    if($nv) {
+      my @arr = split(" ",$nv);
+      unshift @arr, $dname;
+      return @arr;
+    }
+  }
+  unshift @{$str}, $dname;
+  return @{$str};
 }
 
 sub
