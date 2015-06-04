@@ -1897,7 +1897,7 @@ s2Hex($)
 
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
   <li>coveringClose<br>
-    Starts closing the window cover. Moving stops if blinds are fully colsed or
+    Starts closing the window cover. Moving stops if blinds are fully closed or
     a coveringStop command was issued. 
     </li>
   <li>coveringOpen<br>
