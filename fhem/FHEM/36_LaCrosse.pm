@@ -165,13 +165,14 @@ sub LaCrosse_Parse($$) {
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
 
-  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain );    
+  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain );    
   $temperature = 0xFFFF;
   $humidity = 0xFF;
   $windDirection = 0xFFFF;
   $windSpeed = 0xFFFF;
   $windGust = 0xFFFF;
   $rain = 0xFFFF;  
+  $error = 0;
   
   if( $msg =~ m/^OK 9/ ) {
     # Temperature sensor - Format:
@@ -229,10 +230,11 @@ sub LaCrosse_Parse($$) {
     #  |  |--------------------------------------------------------- fix "WS"
     #  |------------------------------------------------------------ fix "OK"
     #
-    #  * Flags: 128  64  32  16  8  4  2  1        
-    #                                  |  |
-    #                                  |  |--- New battery
-    #                                  |------ ERROR
+    #   * Flags: 128  64  32  16  8   4   2   1        
+    #                                 |   |   |
+    #                                 |   |   |-- New battery
+    #                                 |   |------ ERROR
+    #                                 |---------- Low battery
     
     @bytes = split( ' ', substr($msg, 5) );
     
@@ -241,7 +243,8 @@ sub LaCrosse_Parse($$) {
     $typeName = $typeNumber == 1 ? "TX22" : "unknown";
     
     $battery_new = $bytes[13] & 0x01;
-    $battery_low = $bytes[13] & 0x02;
+    $battery_low = $bytes[13] & 0x04;
+    $error = $bytes[13] & 0x02;
     $type = 0;
     $channel = 1;
 
@@ -365,6 +368,10 @@ sub LaCrosse_Parse($$) {
         && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) ) {
 
       readingsBeginUpdate($rhash);
+
+      if ($typeNumber > 0) {
+        readingsBulkUpdate($rhash, "error", $error ? "1" : "0");
+      }
 
       # Battery state
       readingsBulkUpdate($rhash, "battery$channel", $battery_low?"low":"ok");
