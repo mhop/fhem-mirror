@@ -2,8 +2,7 @@
 /* by Sandra Ohmayer */
 /* http://www.animeschatten.net */
 /* jQuery is required*/
-
-$( document ).ready(function() {
+$(document).ready(function() {
 	/* 
 	/* Style Config
 	*/
@@ -14,35 +13,31 @@ $( document ).ready(function() {
 	var switchtomobilemode = 376;
 	var hdrheight = 44;
 	var inputpadding = 251;
-	
 	/* 
 	/* Functions
-	*/	
-
+	*/
 	// Set style height and width
 	var recalculateStyleHeight = function() {
 		var height = window.innerHeight;
-		$("#menu").height(height-hdrheight);
-		$("#content").height(height-hdrheight);
-		$("#right").height(height-hdrheight);	
+		$("#menu").height(height - hdrheight);
+		$("#content").height(height - hdrheight);
+		$("#right").height(height - hdrheight);
 	};
-	
 	var recalculateStyleWithMenu = function() {
 		var width = $("body").width();
 		$("body").removeClass("hideMenu");
-		
 		if (switchtomobilemode > width) {
 			$("#menu").width(width);
 			$("#content").width(0);
 			$("#right").width(0);
 			$("#content").hide()
 			$("#right").hide();
-			$("#hdr input").width(width-inputpadding+menuwidth-logowidth);
+			$("#hdr input").width(width - inputpadding + menuwidth - logowidth);
 		} else {
 			$("#menu").width(menuwidth);
-			$("#content").width(width-menuwidth-paddingwidth-1);
-			$("#right").width(width-menuwidth-paddingwidth-1);
-			$("#hdr input").width(width-inputpadding);
+			$("#content").width(width - menuwidth - paddingwidth - 1);
+			$("#right").width(width - menuwidth - paddingwidth - 1);
+			$("#hdr input").width(width - inputpadding);
 			$("#content").show()
 			$("#right").show();
 		}
@@ -50,52 +45,59 @@ $( document ).ready(function() {
 	var recalculateStyleWithoutMenu = function() {
 		var width = $("body").width();
 		$("body").addClass("hideMenu");
-		
 		if (switchtomobilemode > width) {
-			$("#hdr input").width(width-inputpadding+menuwidth-logowidth);
-			$("#content").width(width-mobilepaddingwidth);
-			$("#right").width(width-mobilepaddingwidth);	
+			$("#hdr input").width(width - inputpadding + menuwidth - logowidth);
+			$("#content").width(width - mobilepaddingwidth);
+			$("#right").width(width - mobilepaddingwidth);
 		} else {
-			$("#hdr input").width(width-inputpadding);
-			$("#content").width(width-paddingwidth);
-			$("#right").width(width-paddingwidth);	
+			$("#hdr input").width(width - inputpadding);
+			$("#content").width(width - paddingwidth);
+			$("#right").width(width - paddingwidth);
 		}
-		
 		$("#menu").width(0);
-		
 		$("#content").show()
 		$("#right").show();
 	};
-	
 	// Show / Hide menu
 	var toggleMenuOnFHEMIcon = function() {
-			if ($("body").hasClass("hideMenu")) {
-				recalculateStyleWithMenu();
-			} else {
-				recalculateStyleWithoutMenu();
-			}	
+		if ($("body").hasClass("hideMenu")) {
+			recalculateStyleWithMenu();
+		} else {
+			recalculateStyleWithoutMenu();
+		}
 	};
-	
-
-
 	/* 
 	/* DOM manipulation
-	*/	
-	
+	*/
 	// init viewport
-	$('meta[name="viewport"]').attr('content', 'width=device-width, user-scalable=0, initial-scale=1.0');
+	$('head').append('<meta name="viewport" content=width=device-width, user-scalable=0, initial-scale=1.0/>');
+
+	var ismobile = (/iphone|ipod|android|blackberry|opera|mini|windows\sce|palm|smartphone|iemobile/i.test(navigator.userAgent.toLowerCase()));
+	var istablet = (/ipad|android|android 3.0|xoom|sch-i800|playbook|tablet|kindle/i.test(navigator.userAgent.toLowerCase()));
 	
+	var isAndroid = function() {
+			return navigator.userAgent.match(/Android/i);
+	};
+	
+	
+	if (ismobile) {
+		$("body").addClass("isMobile");
+		if (isAndroid()) {
+			$("body").addClass("isAndroidPhone");
+		}
+	} else if(istablet) {
+		if (isAndroid()) {
+			$("body").addClass("isAndroidTablet");
+		}
+	}
 	// init height and width
 	recalculateStyleHeight();
-	
-	
 	// hide menu
-	if($("body").width() < window.innerHeight) {
+	if ($("body").width() < window.innerHeight) {
 		recalculateStyleWithoutMenu();
 	} else {
 		recalculateStyleWithMenu();
 	}
-	
 	// Logo - add toggle link
 	var parentLink = $("#logo").parent("a");
 	if (typeof(parentLink.attr("href")) == "undefined") {
@@ -104,39 +106,35 @@ $( document ).ready(function() {
 		parentLink.attr("href", "#");
 	}
 	$("#logo").click(toggleMenuOnFHEMIcon);
-	
 	/* 
 	/* Event Handlers
 	*/
-	
 	// Resize
 	$(window).resize(function() {
 		recalculateStyleHeight();
-		if($("body").width() < window.innerHeight) {
+		if ($("body").width() < window.innerHeight) {
 			recalculateStyleWithoutMenu();
 		} else {
 			recalculateStyleWithMenu();
 		}
-    });
+	});
 	$(window).bind('orientationchange', function(event) {
 		//alert("orientationchange width: "+window.innerWidth+" height: "+window.innerHeight);
 		recalculateStyleHeight();
-		if($("body").width() < window.innerHeight) {
+		if ($("body").width() < window.innerHeight) {
 			recalculateStyleWithoutMenu();
 		} else {
 			recalculateStyleWithMenu();
 		}
 	});
 	// Touch - Color picker
-	$(document).on('touchstart', function (e) {
+	$(document).on('touchstart', function(e) {
 		var container = $("#colorpicker");
-		
 		if (!container.is(e.target) // if the target of the click isn't the container...
-		&& container.has(e.target).length === 0  // ... nor a descendant of the container
-		&& !$("input").is(e.target) && container.length > 0) // ... is not an input
-			{
-				container.remove();
-			}
+			&& container.has(e.target).length === 0 // ... nor a descendant of the container
+			&& !$("input").is(e.target) && container.length > 0) // ... is not an input
+		{
+			container.remove();
+		}
 	});
-	
 });
