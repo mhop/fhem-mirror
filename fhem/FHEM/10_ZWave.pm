@@ -177,9 +177,13 @@ my %zwave_class = (
   SCHEDULE_ENTRY_LOCK      => { id => '4e' },
   ZI_6LOWPAN               => { id => '4f' },
   BASIC_WINDOW_COVERING    => { id => '50',
-    set   => { coveringClose  => "0140",
-               coveringOpen   => "0100",
-               coveringStop   => "02"  },  },
+    set   => { coveringClose => "0140",
+               coveringOpen => "0100",
+               coveringStop => "02"  },
+   parse => { "03500140"   => "covering:close",
+              "03500100"   => "covering:open",
+              "03500200"   => "covering:stop",
+              "03500240"   => "covering:stop" } },
   MTP_WINDOW_COVERING      => { id => '51' },
   NETWORK_MANAGEMENT_PROXY => { id => '52' },
   NETWORK_SCHEDULE         => { id => '53' },
@@ -1883,7 +1887,6 @@ s2Hex($)
   the controller to the first association group of the node corresponding to
   the fhem device, i.e it issues a "set name associationAdd 1
   controllerNodeId"</li>
-
   <li>associationDel groupId nodeId ...<br>
   Remove the specified list of nodeIds from the assotion group groupId.</li>
 
@@ -1892,10 +1895,18 @@ s2Hex($)
     Send value (0-255) to this device. The interpretation is device dependent,
     e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
 
-  <br><br><b>Class CLOCK</b>
-  <li>set<br>
-    set the clock to the current date/time (no argument required)
+  <br><br><b>Class BASIC_WINDOW_COVERING</b>
+  <li>coveringClose<br>
+    Starts closing the window cover. Moving stops if blinds are fully colsed or
+    a coveringStop command was issued. 
     </li>
+  <li>coveringOpen<br>
+    Starts opening the window cover.  Moving stops if blinds are fully open or
+    a coveringStop command was issued. 
+    </li>
+  <li>coveringStop<br>
+    Stop moving the window cover. Blinds are partially open (closed).
+  </li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
   <li>ccs [mon|tue|wed|thu|fri|sat|sun] HH:MM tempDiff HH:MM tempDiff ...<br>
@@ -1906,6 +1917,23 @@ s2Hex($)
     and 12, with one decimal point, measured in Kelvin (or Centigrade).
     </li>
 
+  <br><br><b>Class CLOCK</b>
+  <li>clock<br>
+    set the clock to the current date/time (no argument required)
+    </li>
+
+  <br><br><b>Class COLOR_CONTROL</b>
+  <li>rgb<br>
+    Set the color of the device as a 6 digit RGB Value (RRGGBB), each color is
+    specified with a value from 00 to ff.</li>
+  <li>wcrgb<br>
+    Used for sending warm white, cold white, red, green and blue values
+    to device. Values must be decimal (0 - 255) and separated by blanks.
+    <ul>
+      set &lt;name&gt; wcrgb 0 255 0 0 0 (setting full cold white)<br>
+    </ul>
+    </li>
+	
   <br><br><b>Class CONFIGURATION</b>
   <li>configByte cfgAddress 8bitValue<br>
       configWord cfgAddress 16bitValue<br>
@@ -1983,6 +2011,24 @@ s2Hex($)
   <li>protectionBytes LocalProtectionByte RFProtectionByte<br>
     for commandclass PROTECTION V2 - see devicemanual for supported protectionmodes</li>
 
+  <br><br><b>Class SCENE_ACTIVATION</b>
+  <li>sceneConfig<br>
+    activate settings for a specific scene.
+	Parameters are: sceneId, dimmingDuration (00..ff)
+    </li>
+	
+  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
+  <li>sceneConfig<br>
+    set configuration for a specific scene.
+	Parameters are: sceneId, dimmingDuration, finalValue (00..ff)
+    </li>
+	
+  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
+  <li>groupConfig<br>
+    set configuration for a specific scene.
+	Parameters are: groupId, sceneId, dimmingDuration.
+    </li>	
+
   <br><br><b>Class SWITCH_ALL</b>
   <li>swaIncludeNone<br>
     the device does not react to swaOn and swaOff commands</li>
@@ -2013,38 +2059,6 @@ s2Hex($)
   <li>stop<br>
     stop dimming/operation</li>
 
-	
-  <br><br><b>Class SCENE_ACTIVATION</b>
-  <li>sceneConfig<br>
-    activate settings for a specific scene.
-	Parameters are: sceneId, dimmingDuration (00..ff)
-    </li>
-	
-	
-  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
-  <li>sceneConfig<br>
-    set configuration for a specific scene.
-	Parameters are: sceneId, dimmingDuration, finalValue (00..ff)
-    </li>
-	
-  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
-  <li>groupConfig<br>
-    set configuration for a specific scene.
-	Parameters are: groupId, sceneId, dimmingDuration.
-    </li>	
-
-  <br><br><b>Class COLOR_CONTROL</b>
-  <li>rgb<br>
-    Set the color of the device as a 6 digit RGB Value (RRGGBB), each color is
-    specified with a value from 00 to ff.</li>
-  <li>wcrgb<br>
-    Used for sending warm white, cold white, red, green and blue values
-    to device. Values must be decimal (0 - 255) and separated by blanks.
-    <ul>
-      set &lt;name&gt; wcrgb 0 255 0 0 0 (setting full cold white)<br>
-    </ul>
-    </li>
-	
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>tmOff</li>
   <li>tmCooling</li>
@@ -2068,7 +2082,6 @@ s2Hex($)
     set code and status for the id n. n ist starting at 1, status is 0 for
     available (deleted) and 1 for set (occupied). code is a hexadecimal string.
     </li>
-
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value<br>
@@ -2115,7 +2128,7 @@ s2Hex($)
     </li>
 
   <br><br><b>Class CLOCK</b>
-  <li>get<br>
+  <li>clock<br>
     request the clock data
     </li>
 
@@ -2127,7 +2140,7 @@ s2Hex($)
     specific config commands are available.
     </li>
 
-  <br><br><b>HRV_STATUS</b>
+  <br><br><b>Class HRV_STATUS</b>
   <li>hrvStatus<br>
     report the current status (temperature, etc)
     </li>
@@ -2212,6 +2225,16 @@ s2Hex($)
   <li>protection<br>
     returns the protection state. It can be on, off or seq.</li>
 
+  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
+  <li>sceneConfig<br>
+    returns the settings for a given scene. Parameter is sceneId
+    </li>
+
+  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
+  <li>groupConfig<br>
+    returns the settings for a given group. Parameter is groupId
+    </li>
+
   <br><br><b>Class SENSOR_ALARM</b>
   <li>alarm alarmType<br>
     return the nodes alarm status of the requested alarmType. 00 = GENERIC,
@@ -2244,17 +2267,6 @@ s2Hex($)
     return the status of the node, as state:on, state:off or state:dim value.
     </li>
 	
-  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
-  <li>sceneConfig<br>
-    returns the settings for a given scene. Parameter is sceneId
-    </li>
-
-  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
-  <li>groupConfig<br>
-    returns the settings for a given group. Parameter is groupId
-    </li>
-	
-
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>thermostatMode<br>
     request the mode
@@ -2290,20 +2302,6 @@ s2Hex($)
     step seconds
   </li>
 
-
-   <br><br><b>Class BASIC_WINDOW_COVERING</b>
-  <li>coveringClose<br>
-    Starts closing the window cover. Moving stops if blinds are fully colsed or
-    a coveringStop command was issued. 
-    </li>
-  <li>coveringOpen<br>
-    Starts opening the window cover.  Moving stops if blinds are fully open or
-    a coveringStop command was issued. 
-    </li>
-  <li>coveringStop<br>
-    Stop moving the window cover. Blinds are partially open (closed).
-  </li>
-
   <br><br><b>Class ZWAVEPLUS_INFO</b>
   <li>zwavePlusInfo<br>
     request the zwavePlusInfo
@@ -2333,7 +2331,7 @@ s2Hex($)
   <b>Generated events:</b>
   <ul>
 
-  <br><br><b>Class ALARM</b>
+  <br><b>Class ALARM</b>
   <li>Devices with class version 1 support: alarm_type_X:level Y</li>
   <li>For higher class versions more detailed events with 100+ different
       strings in the form alarm:<string> are generated.</li>
@@ -2341,13 +2339,22 @@ s2Hex($)
   <br><br><b>Class ASSOCIATION</b>
   <li>assocGroup_X:Max Y Nodes A,B,...</li>
 
-  <br><b>Class BASIC</b>
+  <br><br><b>Class BASIC</b>
   <li>basicReport:XY</li>
   <li>state:basicGet</li>
   <li>state:basicSet XY</li>
 
+  <br><br><b>Class BASIC_WINDOW_COVERING</b>
+  <li>covering:[open:close:stop]</li>
+
   <br><br><b>Class BATTERY</b>
   <li>battery:chargelevel %</li>
+
+  <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
+  <li>ccsOverride:[no|temporary|permanent],
+                  [frost protection|energy saving|unused]</li>
+  <li>ccsChanged:<number></li>
+  <li>ccs_[mon|tue|wed|thu|fri|sat|sun]:HH:MM temp HH:MM temp...</li>
 
   <br><br><b>Class CLOCK</b>
   <li>clock:get</li>
@@ -2412,6 +2419,16 @@ s2Hex($)
   <br><br><b>Class PROTECTION</b>
   <li>protection:[on|off|seq]</li>
 
+  <br><br><b>Class SCENE_ACTIVATION</b>
+  <li>scene_Id:level finalValue</li>
+    
+  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
+  <li>scene_Id:level dimmingDuration finalValue</li>
+  
+  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
+  <li>group_Id:scene dimmingDuration</li>
+ 
+ 
   <br><br><b>Class SENSOR_ALARM</b>
   <li>alarm_type_X:level Y node $nodeID seconds $seconds</li> 
 
@@ -2473,16 +2490,6 @@ s2Hex($)
   <li>state:swmBeginDown</li>
   <li>state:swmEnd</li>
     
-  <br><br><b>Class SCENE_ACTIVATION</b>
-  <li>scene_Id:level finalValue</li>
-    
-  <br><br><b>Class SCENE_ACTUATOR_CONF</b>
-  <li>scene_Id:level dimmingDuration finalValue</li>
-  
-  <br><br><b>Class SCENE_CONTROLLER_CONF</b>
-  <li>group_Id:scene dimmingDuration</li>
- 
- 
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>off</li>
   <li>cooling</li>
@@ -2491,12 +2498,6 @@ s2Hex($)
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpointTemp:$temp [C|F] [heating|cooling]</li>
-
-  <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
-  <li>ccsOverride:[no|temporary|permanent],
-                  [frost protection|energy saving|unused]</li>
-  <li>ccsChanged:<number></li>
-  <li>ccs_[mon|tue|wed|thu|fri|sat|sun]:HH:MM temp HH:MM temp...</li>
 
   <br><br><b>Class USER_CODE</b>
   <li>userCode:id x status y code z</li>
