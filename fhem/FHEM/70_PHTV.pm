@@ -1219,7 +1219,7 @@ sub PHTV_Set($@) {
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             PHTV_SendCommand( $hash, "sources/current",
-                '"id": ' . $input_id, $input_id );
+              '"id": "' . $input_id . '"', $input_id );
 
             if ( $hash->{READINGS}{input}{VAL} ne $a[2] ) {
                 readingsSingleUpdate( $hash, "input", $a[2], 1 );
