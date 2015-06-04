@@ -7,6 +7,8 @@ use warnings;
 use feature qw/say switch/;
 use configDB;
 
+no if $] >= 5.017011, warnings => 'experimental';
+
 sub CommandConfigdb($$);
 
 my @pathname;
