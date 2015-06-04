@@ -1069,6 +1069,7 @@ sub Calendar_Get($@) {
       $keep= $#texts+1 if($keep> $#texts);
       splice @texts, $keep if($keep>= 0);  
     }
+    return "" if($#texts<0);
     return join("\n", @texts);
     
   } elsif($cmd eq "find") {
