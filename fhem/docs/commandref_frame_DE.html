@@ -453,6 +453,25 @@ Ger&auml;t dokumentiert.
         attr store eventMap /on-for-timer 10:open/off:closed/<br>
         set store open
       </code></ul>
+      Die explizite Variante dieses Attributes hat folgenden Syntax:
+      <ul><code>
+      attr store eventMap { dev=>{"on"=>"open"}, usr=>{"open"=>"on"} }<br>
+      attr store eventMap { dev=>{"^on(-for-timer)?(.*)"=>"open$2"},
+                            usr=>{"^open(.*)"=>"on$1"},
+                            fw=>{"^open(.*)"=>"open"} }
+      </code></ul>
+      Diese Variante muss dann verwendet werden, falls das Mapping nicht
+      symmetrisch ist. Der erste Teil (dev) spezifiziert dabei die Richtung
+      Ger&auml;t zu Benutzer, d.h. falls das Ger&auml;t on 100 oder
+      on-for-timer 100 meldet, dann wird der Benutzer open 100 zu sehen
+      bekommen. Der zweite Teil (usr) spezifiziert die Richtung Benutzer zu
+      Ger&auml;t, d.h. wenn man "set XX open 100" eingibt, dann wird das
+      Kommando "on 100" an das Ger&auml;t gesendet. In beiden F&auml;llen wird
+      der Schl&uuml;ssel zuerst direkt, und dann als Regexp mit dem Wert
+      verglichen. Falls man Regexps mit Wildcards im usr Teil verwendet, dann
+      muss man den fw Teil mit dem exakt gleichen Schl&uuml;sseln
+      ausf&uuml;llen, damit FHEMWEB in der Detail-Ansicht den set-Auswahl
+      richtig anzeigen kann.
       </li><br>
 
 </ul>
@@ -1211,7 +1230,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <ul>
   <code>setstate &lt;devspec&gt; &lt;value&gt;</code>
   <br><br>
-  Der Befehl setzt den STATE Eintrag des Ger&aauml;tes direkt, ohne Ereignisse
+  Der Befehl setzt den STATE Eintrag des Ger&auml;tes direkt, ohne Ereignisse
   zu generieren oder ein Signal an das Ger&auml;t zu senden. Dieser Eintrag ist
   ma&szlig;gebend f&uuml;r die Status-Anzeige in diversen Frontends.  Dieser
   Befehl wird auch im <a href="#statefile">statefile</a> benutzt.<br> Siehe den
