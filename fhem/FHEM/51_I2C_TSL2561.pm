@@ -479,9 +479,9 @@ sub I2C_TSL2561_Attr (@) {
     
     Log3 $name, 5, "I2C_TSL2561_Attr: attr gain is " . $gain;
     if ($gain == 1) {
-            I2C_TSL2561_SetGain($hash, TSL2561_GAIN_1X);
+      I2C_TSL2561_SetGain($hash, TSL2561_GAIN_1X);
     } elsif ($gain == 16) {
-            I2C_TSL2561_SetGain($hash, TSL2561_GAIN_16X);
+      I2C_TSL2561_SetGain($hash, TSL2561_GAIN_16X);
     } elsif (defined($val)) {
       $msg = 'Wrong gain defined. must be 1 or 16';
     }
@@ -489,11 +489,11 @@ sub I2C_TSL2561_Attr (@) {
     my $time = (defined($val) && looks_like_number($val) && $val > 0) ? $val : 0;
     
     if ($time == 13) {
-            I2C_TSL2561_SetIntegrationTime($hash, TSL2561_INTEGRATIONTIME_13MS);
+      I2C_TSL2561_SetIntegrationTime($hash, TSL2561_INTEGRATIONTIME_13MS);
     } elsif ($time == 101) {
-            I2C_TSL2561_SetIntegrationTime($hash, TSL2561_INTEGRATIONTIME_101MS);
+      I2C_TSL2561_SetIntegrationTime($hash, TSL2561_INTEGRATIONTIME_101MS);
     } elsif ($time == 402) {
-            I2C_TSL2561_SetIntegrationTime($hash, TSL2561_INTEGRATIONTIME_402MS);
+      I2C_TSL2561_SetIntegrationTime($hash, TSL2561_INTEGRATIONTIME_402MS);
     } elsif (defined($val)) {
       $msg = 'Wrong integrationTime defined. must be 13 or 101 or 402';
     }
@@ -900,7 +900,10 @@ sub I2C_TSL2561_GetData($) {
 sub I2C_TSL2561_SetIntegrationTime($$) {
   my ($hash, $time) = @_;
   my $name = $hash->{NAME};
-  
+ 
+  # store the value even if $hash->{tsl2561Package} ist not set (yet). That happens
+  # during fhem startup.
+  $hash->{tsl2561IntegrationTime} = $time;
   # Enable the device by setting the control bit to 0x03
   my $success = 0;
   if (!AttrVal($hash->{NAME}, "disable", 0) && defined($hash->{tsl2561Package})) {
@@ -953,6 +956,9 @@ sub I2C_TSL2561_SetGain($$) {
   my ($hash, $gain) = @_;
   my $name = $hash->{NAME};
 
+  # store the value even if $hash->{tsl2561Package} ist not set (yet). That happens
+  # during fhem startup.
+  $hash->{tsl2561Gain} = $gain;
   # Enable the device by setting the control bit to 0x03
   my $success = 0;
   if (!AttrVal($hash->{NAME}, "disable", 0) && defined($hash->{tsl2561Package})) {
