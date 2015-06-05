@@ -70,7 +70,8 @@ $(document).ready(function() {
 	/* DOM manipulation
 	*/
 	// init viewport
-	$('head').append('<meta name="viewport" content=width=device-width, user-scalable=0, initial-scale=1.0/>');
+	$('meta[name="viewport"]').remove();
+	$('head').append('<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />');
 
 	var ismobile = (/iphone|ipod|android|blackberry|opera|mini|windows\sce|palm|smartphone|iemobile/i.test(navigator.userAgent.toLowerCase()));
 	var istablet = (/ipad|android|android 3.0|xoom|sch-i800|playbook|tablet|kindle/i.test(navigator.userAgent.toLowerCase()));
@@ -119,13 +120,8 @@ $(document).ready(function() {
 		}
 	});
 	$(window).bind('orientationchange', function(event) {
+		$(window).trigger('resize');
 		//alert("orientationchange width: "+window.innerWidth+" height: "+window.innerHeight);
-		recalculateStyleHeight();
-		if ($("body").width() < window.innerHeight) {
-			recalculateStyleWithoutMenu();
-		} else {
-			recalculateStyleWithMenu();
-		}
 	});
 	// Touch - Color picker
 	$(document).on('touchstart', function(e) {
@@ -137,4 +133,6 @@ $(document).ready(function() {
 			container.remove();
 		}
 	});
+	
+
 });
