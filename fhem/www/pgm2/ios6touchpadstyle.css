@@ -1,6 +1,5 @@
-@import ios6Common.css;
-
-@import ios6dashboard.css;
+@import url("ios6dashboard.css");
+@import url("ios6Common.css");
 
 /* iOS 6 Theme for FHEM */
 /* by Sandra Ohmayer */
@@ -250,7 +249,7 @@ textarea,select,input {
 	border:1px solid #d4d7db;
 	border-bottom-color:#c6c8cd;
 	background-color:#f7f7f7;
-	padding-left:1.5em;
+	padding-left:0.5em;
 	margin:7px;
 	outline:none;
 	-moz-box-shadow:0 1px #f7f7f7,inset 0 1px 1px #b6b8bd,inset 0 -2px 2px #fff;
@@ -261,7 +260,7 @@ textarea,select,input {
 textarea,input[type="text"] {
 	background-color:#fff;
 	-webkit-appearance:none;
-	width:90%
+	/*width:90%*/
 }
 
 input[type="checkbox"] {
@@ -269,7 +268,7 @@ input[type="checkbox"] {
 }
 
 select,input[type="submit"],input[type="reset"],input[type="button"] {
-	width:35%;
+	/*width:35%;*/
 	min-width:90px;
 	font:normal 14px Helvetica,Sans-serif;
 	height:25px
@@ -495,6 +494,10 @@ table.room tr.sel a svg {
 	width:100%!important
 }
 
+#content > form > .CodeMirror {
+  height: initial !important;
+}
+
 #menuScrollArea {
 	float:left
 }
@@ -576,6 +579,10 @@ table.block {
 table.block td {
 	text-align:left;
 	vertical-align:middle
+}
+
+.dval {
+  word-break: break-all;
 }
 
 table.block td {
