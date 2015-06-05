@@ -10,7 +10,7 @@ $(document).ready(function() {
 	var paddingwidth = 60;
 	var mobilepaddingwidth = 20;
 	var logowidth = 28;
-	var switchtomobilemode = 376;
+	var switchtomobilemode = 415;
 	var hdrheight = 44;
 	var inputpadding = 251;
 	/* 
