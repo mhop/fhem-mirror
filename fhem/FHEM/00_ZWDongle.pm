@@ -26,9 +26,9 @@ sub ZWave_ProcessSendStack($);
 # https://bitbucket.org/bradsjm/aeonzstickdriver
 my %sets = (
   "addNode"          => { cmd => "4a%02x@",    # ZW_ADD_NODE_TO_NETWORK'
-                        param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
+                          param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
   "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
-                        param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
+                          param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
   "removeFailedNode" => { cmd => "61%02x" },   # ZW_REMOVE_FAILED_NODE_ID
   "replaceFailedNode"=> { cmd => "63%02x" },   # ZW_REPLACE_FAILED_NODE
@@ -292,6 +292,15 @@ ZWDongle_Set($@)
     $hash->{CallbackNr} = $c;
     $c = sprintf("%02x", $c);
     $cmd =~ s/\@/$c/g;
+  }
+
+  if($type eq "addNode") {
+    if(@a == 2 && $a[2] =~ m/^sec/i) {
+      $hash->{addSecure} = pop(@a);
+    } else {
+      delete($hash->{addSecure});
+    }
+    Log 1, "CMD:".join("/",@a)."/";
   }
 
   my @ca = split("%", $cmd, -1);
@@ -652,9 +661,8 @@ ZWDongle_Read($@)
       next;
     }
     $hash->{nrNAck} = 0;
-    Log3 $name, 5, "ZWDongle_Read -> sending ACK";
+    Log3 $name, 5, "ZWDongle_Read $name: ACK, processing $msg";
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
-    Log3 $name, 5, "ZWDongle_Read $name: processing $msg";
     
     # SEND_DATA OK: remove message from SendStack. TODO: check the callbackId
     if($msg =~ m/^0013..00/ ){
@@ -669,6 +677,7 @@ ZWDongle_Read($@)
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     $hash->{PARTIAL} = $data;	 # Recursive call by ZWave get, Forum #37418
     ZWDongle_Parse($hash, $name, $msg);
+
     $data = $hash->{PARTIAL};
     $msg = undef;
   }
@@ -855,14 +864,17 @@ ZWDongle_Ready($)
   <b>Set</b>
   <ul>
 
-  <li>addNode [nwOn|on|off]<br>
+  <li>addNode [nwOn|on|off] [sec]<br>
     Activate (or deactivate) inclusion mode. The controller (i.e. the dongle)
     will accept inclusion (i.e. pairing/learning) requests only while in this
     mode. After activating inclusion mode usually you have to press a switch
     three times within 1.5 seconds on the node to be included into the network
     of the controller. If autocreate is active, a fhem device will be created
-    after inclusion. "on" activates standard inclusion. "nwOn" activates network 
-    wide inclusion (only SDK 4.5-4.9, SDK 6.x and above).</li>
+    after inclusion. "on" activates standard inclusion. "nwOn" activates network
+    wide inclusion (only SDK 4.5-4.9, SDK 6.x and above).<br>
+    If sec is specified, the ZWDongle networkKey ist set, and the device
+    supports the SECURITY class, then a secure inclusion is attempted.
+    </li>
 
   <li>removeNode [nwOn|on|off]<br>
     Activate (or deactivate) exclusion mode. "on" activates standard exclusion. 
