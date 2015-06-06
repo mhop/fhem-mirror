@@ -209,7 +209,7 @@ FHEM/70_XBMC.pm              vbs                  http://forum.fhem.de Multimedi
 FHEM/70_Pushbullet.pm        fhainz               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_Pushover.pm          Johannes_B           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/70_PushNotifier.pm      xusader              http://forum.fhem.de Unterstuetzende Dienste
-FHEM/70_Pushalot.pm          Talkabout            http://forum.fhem.de Codeschnipsel
+FHEM/70_Pushalot.pm          Talkabout            http://forum.fhem.de Unterstuetzende Dienste
 FHEM/71_PHILIPS_AUDIO.pm     ra666ack             http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_AVR.pm        markusbloch          http://forum.fhem.de Multimedia
 FHEM/71_YAMAHA_BD.pm         markusbloch          http://forum.fhem.de Multimedia
