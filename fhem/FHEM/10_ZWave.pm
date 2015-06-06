@@ -195,7 +195,10 @@ my %zwave_class = (
   ASSOCIATION_GRP_INFO     => { id => '59' },
   DEVICE_RESET_LOCALLY     => { id => '5a',
     parse => { "025a01"    => "deviceResetLocally:yes" } },
-  CENTRAL_SCENE            => { id => '5b' },
+  CENTRAL_SCENE            => { id => '5b',
+    parse => { "055b03..00(..)" => '"cSceneSet:".hex($1)',
+               "055b03..02(..)" => '"cSceneDim:".hex($1)',
+               "055b03..01(..)" => '"cSceneDimEnd:".hex($1)'}  },
   IP_ASSOCIATION           => { id => '5c' },
   ANTITHEFT                => { id => '5d' },
   ZWAVEPLUS_INFO           => { id => '5e',
@@ -1584,14 +1587,17 @@ ZWave_Parse($$@)
       return "" if(!$dh);
 
       $dh->{lastMsgTimestamp} = time();
-      my $classes = AttrVal($dh->{NAME}, "classes", "");
-      if($classes =~ m/SECURITY/) {
-        my $key = AttrVal($ioName, "networkKey", "");
-        if($key) {
-          $iodev->{secInitName} = $dh->{NAME};
-          return ZWave_securityInit($dh);
-        } else {
-          Log3 $ioName, 2, "No secure inclusion as $ioName has no networkKey";
+
+      if($iodev->{addSecure}) {
+        my $classes = AttrVal($dh->{NAME}, "classes", "");
+        if($classes =~ m/SECURITY/) {
+          my $key = AttrVal($ioName, "networkKey", "");
+          if($key) {
+            $iodev->{secInitName} = $dh->{NAME};
+            return ZWave_securityInit($dh);
+          } else {
+            Log3 $ioName, 2, "No secure inclusion as $ioName has no networkKey";
+          }
         }
       }
       return ZWave_execInits($dh, 0);
@@ -2349,6 +2355,11 @@ s2Hex($)
 
   <br><br><b>Class BATTERY</b>
   <li>battery:chargelevel %</li>
+
+  <br><br><b>Class CENTRAL_SCENE</b>
+  <li>cSceneSet:X</li>
+  <li>cSceneDim:X</li>
+  <li>cSceneDimEnd:X</li>
 
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
   <li>ccsOverride:[no|temporary|permanent],
