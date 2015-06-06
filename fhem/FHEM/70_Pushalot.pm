@@ -14,23 +14,23 @@
 #
 #
 # You can send messages via the following command:
-# set <Pushalot_device> message "<message>" ["<title>"] ["<link>"] ["<link_title>"] ["<image>"] [<important>] [<silent>]
+# set <Pushalot_device> message "<message>" ["<title>"] ["<image>"] ["<link>"] ["<link_title>"] [<important>] [<silent>]
 #
 # Examples:
 # set PushNotification message "This is my message."
 # set PushNotification message "This is my message." "With Title"
-# set PushNotification message "This is my message." "With Title" "http://www.xyz.com""
-# set PushNotification message "This is my message." "With Title" "http://www.xyz.com" "Link Title"
-# set PushNotification message "This is my message." "With Title" "http://www.xyz.com" "Link Title" "http://www.xyz/image.png"
-# set PushNotification message "This is my message." "With Title" "http://www.xyz.com" "Link Title" "http://www.xyz/image.png" True False
+# set PushNotification message "This is my message." "With Title" "http://www.xyz/image.png"
+# set PushNotification message "This is my message." "With Title" "http://www.xyz/image.png" "http://www.xyz.com""
+# set PushNotification message "This is my message." "With Title" "http://www.xyz/image.png" "http://www.xyz.com" "Link Title"
+# set PushNotification message "This is my message." "With Title" "http://www.xyz/image.png" "http://www.xyz.com" "Link Title"  True False
 #
 # Explantation:
 #
 #  - The first parameter is the message to send
 #  - The second parameter is an optional title for the message
-#  - The third parameter is an optional link for the message
-#  - The fourth parameter is an optional link title for the message
-#  - The fifth parameter is an optional image for the message
+#  - The third parameter is an optional image for the message
+#  - The fourth parameter is an optional link for the message
+#  - The fifth parameter is an optional link title for the message
 #  - The sixth parameter defines whether the message should be marked as important
 #  - The seventh parameter defines whether the message should be delivered silently
 #
@@ -131,7 +131,9 @@ sub Pushalot_Set($@)
   }
 }
 
+#------------------------------------------------------------------------------
 sub Pushalot_Build_Body($@)
+#------------------------------------------------------------------------------
 {
   my ($hash, @args) = @_;
 
@@ -172,12 +174,50 @@ sub Pushalot_Send($$)
 {
   my ($hash,$body) = @_;
 
-  $response = GetFileFromURL($hash->{helper}{Url}, 10, $body, 0, 5);
+  my $params = {
+    url         => $hash->{helper}{Url},
+    timeout     => 10,
+    hash        => $hash,
+    data        => $body,
+    message     => $body,
+    method      => "POST",
+    callback    => \&Pushalot_Callback
+  };
 
-  return Pushalot_Parse_Result($hash, $message, $response);
+  HttpUtils_NonblockingGet($params);
+
+  return undef;
 }
 
+#------------------------------------------------------------------------------
+sub Pushalot_Callback($)
+#------------------------------------------------------------------------------
+{
+  my ($params, $err, $data) = @_;
+  my $hash = $params->{hash};
+
+  if($err ne "")
+  {
+    $returnObject = {
+      Success     => false,
+      Status      => 500,
+      Description => "Request could not be completed: " . $err
+    };
+
+    Pushalot_Parse_Result($hash, $params->{message}, encode_json $returnObject);
+  }
+
+  elsif($data ne "")
+  {
+    Pushalot_Parse_Result($hash, $params->{message}, $data);
+  }
+
+  return undef;
+}
+
+#------------------------------------------------------------------------------
 sub Pushalot_Parse_Result($$$)
+#------------------------------------------------------------------------------
 {
   my ($hash, $message, $result) = @_;
 
@@ -190,10 +230,6 @@ sub Pushalot_Parse_Result($$$)
   readingsBulkUpdate($hash, "last-status", $returnObject->{"Status"});
   readingsBulkUpdate($hash, "last-description", $returnObject->{"Description"});
   readingsEndUpdate($hash, 1);
-
-  return undef if($returnObject->{"Status"} == 200);
-
-  return $returnObject->{"Description"};
 }
 
     
@@ -244,7 +280,7 @@ sub Pushalot_Parse_Result($$$)
   <a name="PushalotSet"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;Pushalot_device&gt; "&lt;message&gt;" ["&lt;title&gt;"] ["&lt;link&gt;"] ["&lt;link_title&gt;"] ["&lt;image&gt;"] ["&lt;important&gt;"] ["&lt;silent&gt;"]</code>
+    <code>set &lt;Pushalot_device&gt; "&lt;message&gt;" ["&lt;title&gt;"] ["&lt;image&gt;"] ["&lt;link&gt;"] ["&lt;link_title&gt;"] ["&lt;important&gt;"] ["&lt;silent&gt;"]</code>
     <br>
     <br>
     <table>
@@ -261,16 +297,16 @@ sub Pushalot_Parse_Result($$$)
         <td>The title of the message.</td>
       </tr>
       <tr>
+        <td>&lt;image&gt;</td>
+        <td>An optional image URL that is shown in the message.</td>
+      </tr>
+      <tr>
         <td>&lt;link&gt;</td>
         <td>An optional link that should be appended to the message body.</td>
       </tr>
       <tr>
         <td>&lt;link_title&gt;</td>
         <td>An optional link title. If no title is set, the URL is shown as title in the message.</td>
-      </tr>
-      <tr>
-        <td>&lt;image&gt;</td>
-        <td>An optional image URL that is shown in the message.</td>
       </tr>
       <tr>
         <td>&lt;important&gt;</td>
@@ -286,11 +322,11 @@ sub Pushalot_Parse_Result($$$)
     <ul>
       <code>set PushNotification message "This is my message."</code><br>
       <code>set PushNotification message "This is my message." "With Title"</code><br>
-      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com"</code><br>
-      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com" "Link Title"</code><br>
-      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com" "Link Title" "http://www.xyz.com/image.png"</code><br>
-      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com" "Link Title" "http://www.xyz.com/image.png" True</code><br>
-      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com" "Link Title" "http://www.xyz.com/image.png" True False</code><br>
+      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png"</code><br>
+      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png" "http://www.xyz.com"</code><br>
+      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" </code><br>
+      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" True</code><br>
+      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" True False</code><br>
     </ul>
     <br>
   </ul>
@@ -351,7 +387,7 @@ sub Pushalot_Parse_Result($$$)
   <a name="PushalotSet"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;Pushalot_device&gt; "&lt;message&gt;" ["&lt;title&gt;"] ["&lt;link&gt;"] ["&lt;link_title&gt;"] ["&lt;image&gt;"] ["&lt;important&gt;"] ["&lt;silent&gt;"]</code>
+    <code>set &lt;Pushalot_device&gt; "&lt;message&gt;" ["&lt;title&gt;"] ["&lt;image&gt;"] ["&lt;link&gt;"] ["&lt;link_title&gt;"] ["&lt;important&gt;"] ["&lt;silent&gt;"]</code>
     <br>
     <br>
     <table>
@@ -368,16 +404,16 @@ sub Pushalot_Parse_Result($$$)
         <td>Der Titel der Nachricht.</td>
       </tr>
       <tr>
+        <td>&lt;image&gt;</td>
+        <td>Optionale Bild-URL die in der Nachricht angezeigt werden soll.</td>
+      </tr>
+      <tr>
         <td>&lt;link&gt;</td>
         <td>Ein optionaler Link der an die Nachricht angehängt werden soll.</td>
       </tr>
       <tr>
         <td>&lt;link_title&gt;</td>
         <td>Optionaler Link Titel. Wenn kein Titel angegeben wird, ist dieser die URL.</td>
-      </tr>
-      <tr>
-        <td>&lt;image&gt;</td>
-        <td>Optionale Bild-URL die in der Nachricht angezeigt werden soll.</td>
       </tr>
       <tr>
         <td>&lt;important&gt;</td>
@@ -393,11 +429,11 @@ sub Pushalot_Parse_Result($$$)
     <ul>
       <code>set PushNotification message "Das ist meine Nachricht."</code><br>
       <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel"</code><br>
-      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com"</code><br>
-      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com" "Link Titel"</code><br>
-      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com" "Link Titel" "http://www.xyz.com/image.png"</code><br>
-      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com" "Link Titel" "http://www.xyz.com/image.png" True</code><br>
-      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com" "Link Title" "http://www.xyz.com/image.png" True False</code><br>
+      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png"</code><br>
+      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png" "http://www.xyz.com"</code><br>
+      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Titel" </code><br>
+      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Titel" True</code><br>
+      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" True False</code><br>
     </ul>
     <br>
     Notes:
