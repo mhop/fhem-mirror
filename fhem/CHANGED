@@ -4,40 +4,47 @@
   - changed: 57_CALVIEW.pm: code cleanup
   - bugfix:  30_pilight_*: restore (StateFn), trigger changes twice
   - feature: 30_pilight_dimmer: new attributes dimlevel_on, dimlevel_off
-             dimmers without direct dimlevel support (switch combined with screen)
+             dimmers without direct dimlevel support (switch combined with
+             screen)
   - bugfix:  73_km200: Bugfix for sorting and comparison method
   - bugfix: SYSMON: CPU frequency
   - feature: OWServer/OWDevice: new device EDS00XX (forum #37453)
   - feature: 59_Weather: french translations and pressure shown in 
              state (phervier)
   - feature: 36_LaCrosse: Implemented WS 1600
-  - feature: 10_IT: Add HE800 support see (http://forum.fhem.de/index.php/topic,36399.msg296739.html#msg296739)
+  - feature: 10_IT: Add HE800 support see
+             http://forum.fhem.de/index.php/topic,36399.msg296739.html#msg296739
   - bugfix:  73_km200 - Bugfix for faulty comparison method
   - bugfix:  70_PIONEERAVR: set statusRequest updates now input names
   - feature: 30_pilight_dimmer: up|down commands to change the dimlevel
   - bugfix:  76_MSGMail: Add MSGMail_Attr()
   - feature: 70_PIONEERAVR: new set <dev> hdmiOut <1/2>to switch hdmi outputs
              - new set <name> networkStandby (on|off) Needed to turn on/off...
-			 - new readings hdmiOut, screenLineNumber[First,Last,Total]
-			 - commandref reworked
+             - new readings hdmiOut, screenLineNumber[First,Last,Total]
+             - commandref reworked
   - bugfix:  73_km200; Floating point calculation error fixed
   - feature: 73_km200; Writing of complete week-list in one single set command
   - feature: 98_Text2Speech.pm; language now selectable
   - feature: 93_DBLog.pm
-             - SuppressUndef (http://forum.fhem.de/index.php/topic,36615.msg289041.html)
-             - Hinzufuegen von Anfang und Ende-Werten beim Ploten in engen Grenzen
+             - SuppressUndef
+               http://forum.fhem.de/index.php/topic,36615.msg289041.html
+             - Hinzufuegen von Anfang und Ende-Werten beim Ploten in engen
+               Grenzen
                (http://forum.fhem.de/index.php?topic=34006)
              - add new Attribute: DbLogInclude: 93_DbLog_DbLogInclude.diff
-             - recognizing of DbLogTyp using DbReadings: 93_DbLog_dbReadings_using_DbLogType.diff
+             - recognizing of DbLogTyp using DbReadings:
+               93_DbLog_dbReadings_using_DbLogType.diff
   - bugfix:  14_CUL_TCM97001: Fix some uninitialized vars, update docu
   - feature: 30_pilight_temp: attribut corrHumidity to correct humidity
   - feature: 76_MSGMail: Add attribute mailtype as suggested by Roger 
                          (forum #37206)
-  - feature: 30_pilight_temp: reading battery state, attribut corrTemp to correct temperature
+  - feature: 30_pilight_temp: reading battery state, attribut corrTemp to
+             correct temperature
   - change:  73_km200: Wrong SwitchProgram time format fixed
   - feature: 73_km200: SwitchPrograms can be written/changed
   - change:  MSGMail: Improve error logging to assist problem solving
-  - feature: 10_pilight_ctrl possibility to ignore all incomming messages, added protocol quigg_gt*
+  - feature: 10_pilight_ctrl possibility to ignore all incomming messages,
+             added protocol quigg_gt*
   - change:  MSG: Replace file and mail related code with delegates
   - change:  MSGFile: Assimilate file related code from 75_MSG 
                       to make it standalone, without requiring MSG device
@@ -52,10 +59,12 @@
   - feature: SYSMON: method to create html bar chart (thanks to snx)
   - added: SYSMON: new statistic readings for RAM and SWAP
   - change: pilight_ctrl: rename attribut ignore to ignoreProtocol
-  - added: SYSMON: some new readings: starttime_text, starttime, fhemstarttime_text, fhemstarttime
+  - added: SYSMON: some new readings: starttime_text, starttime,
+            fhemstarttime_text, fhemstarttime
   - fixed: SYSMON: cpu_freq_stat
   - fixed:  SYSMON: some warnings
-  - added:  SYSMON: new readings <network>_speed, cpuX_freq_stat, cpuX_idle_stat, cpu_temp_stat 
+  - added:  SYSMON: new readings <network>_speed, cpuX_freq_stat,
+            cpuX_idle_stat, cpu_temp_stat 
   - improved:  SYSMON: documentation
   - change:  WMBus: support for Easymeter
   - added:   New modules 10_pilight_ctrl, 30_pilight_dimmer, 30_pilight_switch
@@ -63,7 +72,8 @@
   - bugfix:  98_EDIPLUG: change kW/h to kWh and fix missing Id
   - feature: FB_CALLMONITOR: new reverse search method "textfile" for custom
                              definitions 
-  - bugfix:  FB_CALLMONITOR: correct reverse search of Call-By-Call outgoing calls
+  - bugfix:  FB_CALLMONITOR: correct reverse search of Call-By-Call outgoing
+             calls
   - feature: FB_CALLMONITOR: reverse search order can now be configured
   - bugfix:  57_CALVIEW: fixed tomorrow dates when new month
   - bugfix:  73_km200 - Fix for handling back "0" floatvalues with get-command
@@ -74,7 +84,8 @@
   - Bugfix:  CUL_TCM97001: Add temperature trend, update documentation
   - feature: new fhemweb widgets. see widgetOverride in commandref
   - Bugfix:  73_km200 - Fix for get-command responding with false error message
-  - Feature: 73_km200 - Get and Set command blocked during initialisation process
+  - Feature: 73_km200 - Get and Set command blocked during initialisation
+             process
   - Feature: 73_km200 - Optional Argument for get command introduced
   - Bugfix:  55_GDS - use onset for a_X_valid calculation
   - Bugfix:  Update of set-command introducing ReadBackDelay - attribute
@@ -82,7 +93,8 @@
   - feature: FB_CALLMONITOR: new set command rereadCache
   - feature: SYSMON: new reading: cpu_core_count
   - feature: SYSMON: Allows to suppress reading certain information.
-  - change:  14_CUL_TCM97001: Add support for ABS700, NC_WS, GT-WT-02 and AURIOL sensors
+  - change:  14_CUL_TCM97001: Add support for ABS700, NC_WS, GT-WT-02 and
+             AURIOL sensors
   - added:   New modue 38_JawboneUp: Fitness and sleep statistics in FHEM
   - change:  FB_CALLMONITOR: use cache first for reverse search
   - feature: 14_CUL_TCM97001: Add receiving for GT-WT-.. and Rubicson sensors
@@ -90,18 +102,20 @@
   - feature: FHEMWEB: filter dialog for eventMonitor allows filtering for
              specific events
   - feature: 10_IT.pm: add support for intertechno protocol 3 dimmer
-  - feature: 51_I2C_TSL2561.pm: add support for using IODev, allows use without 
+  - feature: 51_I2C_TSL2561.pm: add support for using IODev, allows use without
              HiPi being installed. By jensb, forum id 277192
   - feature: SYSMON: Freq. for 8 CPU Cores
   - feature: 98_Modbus.pm: added base module for modbus devices
   - feature: 98_ModbusAttr.pm: added module for generic modbus devices
              Readings can be defined by attributes comparable to HTTPMOD
   - feature: 98_ModbusSET.pm: added module for SET Silent Heat pumps
-  - change:  10_RESIDENTS: renamed reading residentsGuests to residentsTotalGuests
+  - change:  10_RESIDENTS: renamed reading residentsGuests to
+             residentsTotalGuests
   - change:  SYSMON: warnings, docu
   - bugfix:  73_km200: Bugfix for fullResponse
   - feature: 73_km200: New services found
-  - change:  57_CALVIEW: commandref improved and improved def check (for mode-parameter)
+  - change:  57_CALVIEW: commandref improved and improved def check (for
+             mode-parameter)
   - feature: 73_km200: Read of switchPrograms added
   - bugfix:  57_CALVIEW: fixed commandref
   - feature: GUEST: added support for RESIDENTS toolkit
@@ -154,10 +168,10 @@
              new get command showPhonebookIds. Details can be read in
              commandref (by JoWiemann)
   - feature: 02_RSS.pm: new attribut autoreread; new NotifyFn and UndefFN;
-	     new layout commands textboxf, embed, push, pop;
-	     FWext is automatically deleted after deletion of last
-	     RSS device; RSS Overview and elements opened in new tab; 
-	     refresh 0 to disable autorefresh; new function plotFromUrl
+             new layout commands textboxf, embed, push, pop;
+             FWext is automatically deleted after deletion of last
+             RSS device; RSS Overview and elements opened in new tab; 
+             refresh 0 to disable autorefresh; new function plotFromUrl
   - bugfix:  SOMFY: use correct attributename when calculating updatetime
   - feature: 95_FLOORPLAN.pm: arrange by drag&drop, 
              copy, rename, delete processes userattr fp_<name>
@@ -327,26 +341,32 @@
   - feature: 15_CUL_EM added attribute maxPeak (arnoaugustin)
   - bugfix: 10_IT changed "setstate" to avoid eventMap errors (arnoaugustin)
   - feature: new module 37_harmony.pm added (justme1968)
-  - change: WMBUS: use _ instead of : as readings separator, better support for EnergyCam
+  - change: WMBUS: use _ instead of : as readings separator, better support for
+            EnergyCam
   - feature: new module 23_KOSTALPIKO added (john)
-  - feature: new module 98_HourCounter added, 99_UtilsHourCounter.pm added to contrib (john)
+  - feature: new module 98_HourCounter added, 99_UtilsHourCounter.pm added to
+             contrib (john)
   - added: MYSENSORS: connect to serial or Ethernet MySensors Gateway
   - added: MYSENSORS_DEVICE: represent a MySensors sensor- or actor node
   - feature: global ATTR/DELETEATTR/MODIFIED events
   - feature: 55_GDS.pm - attr disable added
   - bugfix: SYSMON: prevent endless loop at startup with 'disable' attribute  
-  - feature: SYSMON: added FritzBox informations: DSL rate, DSLAM sync time, count of CRC an FEC
+  - feature: SYSMON: added FritzBox informations: DSL rate, DSLAM sync time,
+             count of CRC an FEC
   - bugfix: SYSMON: unwanted characters in dsl info lines
   - change: 57_Calendar: process continuation lines, get/set syntax checks
   - bugfix: SYSMON: fix availability of cpu/kernel_max
   - bugfix: SYSMON: numeric check
   - change: 59_Weather: change icons for conditions 31, 34, 36
   - added: MQTT: connect fhem with mqtt
-  - added: MQTT_BRIDGE: bidirectional mapping of existing fhem-device to mqtt-topic
-  - added: MQTT_DEVICE: fhem-device that can be controlled by and publishes to mqtt
+  - added: MQTT_BRIDGE: bidirectional mapping of existing fhem-device to
+           mqtt-topic
+  - added: MQTT_DEVICE: fhem-device that can be controlled by and publishes to
+           mqtt
   - added: I2C_LCD: module to drive PCF8574T based LCD connected via I2C
   - added: I2C_DS1307: module to read time and date from DS1307 connected by i2c
-  - added: OWX_ASYNC: asynchronous, non-blocking version of OWX for DS2480, DS9097 and FRM
+  - added: OWX_ASYNC: asynchronous, non-blocking version of OWX for DS2480,
+           DS9097 and FRM
   - feature FRM: work as physical IODev for I2C_XXX modules
     added: FRM_ROTENC: read rotary-encoders with FRM
     added: FRM_RGB: control rgb-leds with FRM
@@ -365,15 +385,16 @@
   - feature: 57_Calendar: deal with non-existent end times
   - bugfix: SOMFY: fix non-working on/off-for-timer methods
                    made positioning attributes optional
-  - feature: SOMFY: support for exact positioning (one-time setup of run times required)
-                    support for parse()-function, requires newest CULFW.
+  - feature: SOMFY: support for exact positioning (one-time setup of run times
+             required) support for parse()-function, requires newest CULFW.
   - feature: userattr is now also device attribute
   - feature: ZWave: Fibaro_FGRM222 MANUFACTURER_PROPRIETARY class
   - feature: sequence: reportEvents attribtue added
   - feature: SYSMON: RAM and SWAP Readings on OSX
   - change:  34_NUT: removed calculation of values. Use userReadings instead.
                      removed autogeneration of attr model and serNo.
-  - feature: SYSMON: improvement: support network information (IP, IPv6) on german linux
+  - feature: SYSMON: improvement: support network information (IP, IPv6) on
+             german linux
   - feature: Synology DiskStation NAS basic spk file creation
   - change:  34_NUT: readingFnAttributes added; creation of units deleted;
                 changed attr asReadings to use comma instead of space
