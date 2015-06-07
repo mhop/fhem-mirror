@@ -274,6 +274,9 @@ sub CUL_HM_updateConfig($){
         }
       }
     }
+    elsif ($md =~ m/(CCU-FHEM)/){
+      HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
+    }
     elsif ($st eq "dimmer"  ) {#setup virtual dimmer channels
       my $mId = CUL_HM_getMId($hash);
       #configure Dimmer virtual channel assotiation
@@ -833,7 +836,9 @@ sub CUL_HM_Attr(@) {#################################
     else{
       delete $attr{$name}{$attrName};
     }
-    HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
+    if ($init_done){
+      HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
+    }
     return $retVal;
   }
   
