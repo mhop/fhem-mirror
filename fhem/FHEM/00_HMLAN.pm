@@ -196,6 +196,7 @@ sub HMLAN_Attr(@) {############################################################
   elsif($aName =~ m /^hmKey/){
     my $retVal= "";
     if ($cmd eq "set"){
+      # eQ3 default key A4E375C6B09FD185F27C4E96FC273AE4
       my $kno = ($aName eq "hmKey")?1:substr($aName,5,1);
       my ($no,$val) = (sprintf("%02X",$kno),$aVal);
       if ($aVal =~ m/:/){#number given
@@ -886,14 +887,17 @@ sub HMLAN_assignIDs($){
 
 sub HMLAN_writeAesKey($) {#####################################################
   my ($name) = @_;
+  return if (!$name || !$defs{$name});
+  my $vccu = InternalVal($name,"owner_CCU",$name);
+  $vccu = $name if(!AttrVal($vccu,"hmKey",""));#General if keys are not in vccu
+  foreach my $i (1..5){
+     my ($kNo,$k) = split(":",AttrVal($vccu,"hmKey".($i== 1?"":$i),""));
+     HMLAN_SimpleWrite($defs{$name}, "Y0$i,".($k?"$kNo,$k":"00,"));
+   }
+ }
 
-  my ($k,$kNo);
-  foreach my $i (1..3){
-    ($kNo,$k) = ("0".$i,AttrVal($name,"hmKey".($i== 1?"":$i),""));
-    ($kNo,$k) = split(":",$k);
-    HMLAN_SimpleWrite($defs{$name}, "Y0$i,".($k?"$kNo,$k":"00,"));
-  }
-}
+ 
+ 
 sub HMLAN_KeepAlive($) {#######################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
