@@ -794,6 +794,7 @@ my $K_actDetID = '000000'; # id of actionDetector
                          ,ledFlashUnlocked=>1,ledFlashLocked  =>1
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtOff           =>1
+                         ,ActionType      =>1
                          ,KeyJtOn         =>1,KeyJtOff        =>1
                          ,OnTime          =>1
                         }
