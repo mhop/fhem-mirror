@@ -4513,21 +4513,21 @@ sub SYSMON_ShowBarChartHtml($;$) {
 }
 
 
-sub SYSMON_secsToReadable($){
-  my $secs = shift;
-  my $y = floor($secs / 60/60/24/365);
-  my $d = floor($secs/60/60/24) % 365;
-  my $h = floor(($secs / 3600) % 24);
-  my $m = floor(($secs / 60) % 60);
-  my $s = $secs % 60;
-  my $string = '';
-  $string .= $y.'y ' if ($y > 0);
-  $string .= $d.'d ' if ($d > 0);
-  $string .= $h.'h ' if ($h > 0);
-  $string .= $m.'m ' if ($m > 0);
-  $string .= $s.'s' if ($s > 0);
-  return $string;
-}
+#sub SYSMON_secsToReadable($){
+#  my $secs = shift;
+#  my $y = floor($secs / 60/60/24/365);
+#  my $d = floor($secs/60/60/24) % 365;
+#  my $h = floor(($secs / 3600) % 24);
+#  my $m = floor(($secs / 60) % 60);
+#  my $s = $secs % 60;
+#  my $string = '';
+#  $string .= $y.'y ' if ($y > 0);
+#  $string .= $d.'d ' if ($d > 0);
+#  $string .= $h.'h ' if ($h > 0);
+#  $string .= $m.'m ' if ($m > 0);
+#  $string .= $s.'s' if ($s > 0);
+#  return $string;
+#}
 
 # --- SNX ---------------------------------------------------------------------
 
