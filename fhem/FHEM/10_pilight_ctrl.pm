@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.04 2015-05-30 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.05 2015-06-07 Risiko $
 #
 # Usage
 # 
@@ -28,6 +28,7 @@
 # V 1.02 2015-05-16 - NEW: battery state for temperature sensors
 # V 1.03 2015-05-20 - NEW: handle screen messages (up,down)
 # V 1.04 2015-05-30 - FIX:  StateFn  
+# V 1.05 2015-06-07 - FIX:  Reset 
 ############################################## 
 package main;
 
@@ -136,14 +137,6 @@ sub pilight_ctrl_Close($)
   BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
   
   RemoveInternalTimer($hash);
-  foreach my $d (sort keys %defs) {
-    if(defined($defs{$d}) &&
-       defined($defs{$d}{IODev}) &&
-       $defs{$d}{IODev} == $hash)
-      { 
-        delete $defs{$d}{IODev}; 
-      } 
-  }
   DevIo_CloseDev($hash); 
 }
 
@@ -154,6 +147,15 @@ sub pilight_ctrl_Undef($$)
   my $me = $hash->{NAME};
   
   pilight_ctrl_Close($hash);
+  
+  foreach my $d (sort keys %defs) {
+    if(defined($defs{$d}) &&
+       defined($defs{$d}{IODev}) &&
+       $defs{$d}{IODev} == $hash)
+      { 
+        delete $defs{$d}{IODev}; 
+      } 
+  }
   return undef;
 }
 
@@ -415,7 +417,7 @@ sub pilight_ctrl_Send($)
     my $rcv;
     $socket->recv($rcv,1024);
     $rcv =~ s/\n/ /g;
-    Log3 $me, 5, "$me(Send): RCV -> $rcv";
+    Log3 $me, 4, "$me(Send): RCV -> $rcv";
   }
   $socket->close();
   
@@ -602,7 +604,7 @@ sub pilight_ctrl_Parse($$)
   my ($hash, $rmsg) = @_;
   my $me = $hash->{NAME};
 
-  Log3 $me, 4, "$me(Parse): RCV -> $rmsg";
+  Log3 $me, 5, "$me(Parse): RCV -> $rmsg";
 
   next if(!$rmsg || length($rmsg) < 1);
 
@@ -614,6 +616,8 @@ sub pilight_ctrl_Parse($$)
   
   if ($hash->{helper}{CON} eq "identify")  # we are in identify process
   { 
+    Log3 $me, 4, "$me(Parse): identify -> $rmsg";
+    
     $hash->{helper}{CON} = "identify-failed";
     my $ret = pilight_ctrl_ClientAccepted($hash,$data);
     
@@ -668,7 +672,7 @@ sub pilight_ctrl_Parse($$)
       my %whiteHash;
       @whiteHash{@{$hash->{helper}->{whiteList}}}=();
       if (!exists $whiteHash{"$proto:$id"}) {
-        Log3 $me, 4, "$me(Parse): $proto:$id not in white list";
+        Log3 $me, 5, "$me(Parse): $proto:$id not in white list";
         return;
       }
   } else {  #ignore list
