@@ -33,7 +33,7 @@
 # parser for the weather data
 package MyProplantaParser;
 use base qw(HTML::Parser);
-use Time::HiRes qw(usleep nanosleep);
+use Time::HiRes qw(usleep);
 
 our @texte = ();
 my $lookupTag = "span|b";
