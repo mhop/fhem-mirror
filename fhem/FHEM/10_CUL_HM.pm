@@ -1006,7 +1006,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$dstH,1,"sabotageAttackId:ErrIoId_$src cnt:$evntCnt"];
     }
     if( defined $dstH->{helper}{cSnd} && 
-          $dstH->{helper}{cSnd} =~ m/substr($msg,7)/){
+          $dstH->{helper}{cSnd} !~ m/substr($msg,7)/){
       Log3 $dname,2,"CUL_HM $dname attack:$dstH->{helper}{cSnd}:".substr($msg,7);
       CUL_HM_eventP($dstH,"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoAttack"},2);
@@ -1115,7 +1115,6 @@ sub CUL_HM_Parse($$) {#########################################################
   $shash->{lastMsg} = $msgX;
   delete $shash->{helper}{rpt};# new message, rm recent ack
   my @ack; # ack and responses, might be repeated
-  $devH->{helper}{HM_CMDNR} = hex($mNo);
   
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
 
@@ -1124,6 +1123,7 @@ sub CUL_HM_Parse($$) {#########################################################
   push @evtEt,[$shash,1,"powerOn:$tn"] if($parse eq "powerOn");
   push @evtEt,[$shash,1,""]            if($parse eq "parsed"); # msg is parsed but may
                                                              # be processed further
+  $devH->{helper}{HM_CMDNR} = hex($mNo);
   if   ($parse eq "ACK" ||
         $parse eq "done"   ){# remember - ACKinfo will be passed on
     push @evtEt,[$shash,1,""];
@@ -2834,7 +2834,8 @@ sub CUL_HM_parseCommon(@){#####################################################
         if ($chn eq "00"
             || (   $mNo eq "00" 
                 && $chn eq "01" 
-                && $shash->{helper}{mRssi}{mNo} !~ m/^F/)){# this is power on
+#                && $shash->{helper}{mRssi}{mNo} !~ m/^F/)){# this is power on
+                && $shash->{helper}{HM_CMDNR} < 250)){# this is power on
           my $name = $shash->{NAME};
           CUL_HM_qStateUpdatIfEnab($name);
           CUL_HM_qAutoRead($name,2);
