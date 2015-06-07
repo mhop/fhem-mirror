@@ -142,7 +142,8 @@ sub CUL_HM_Initialize($) {
                        ."IODev IOList IOgrp "        
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
-                       ."actCycle "            # also for action detector                       
+                       ."actCycle "            # also for action detector    
+                       ."hmKey hmKey2 hmKey3 hmKey4 hmKey5 "                       
                        ;
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
                         "serialNr firmware .stc .devInfo "
@@ -741,7 +742,7 @@ sub CUL_HM_Attr(@) {#################################
     }
   }
   elsif($attrName eq "IOList"){
-    return "use $attrName only for ccu device" 
+    return "use $attrName only for vccu device" 
             if (!$hash->{helper}{role}{dev}
                 || AttrVal($name,"model","CCU-FHEM") !~ "CCU-FHEM");
     if($cmd eq "set"){$attr{$name}{$attrName} = $attrVal;}
@@ -809,6 +810,33 @@ sub CUL_HM_Attr(@) {#################################
       return "$attrName only usable for ActionDetector" if(CUL_HM_hash2Id($hash) ne "000000");#only for device
     }
   }
+  elsif($attrName =~ m /^hmKey/){
+    my $retVal= "";
+    return "use $attrName only for vccu device" 
+            if (!$hash->{helper}{role}{dev}
+                || AttrVal($name,"model","CCU-FHEM") !~ "CCU-FHEM");
+    if ($cmd eq "set"){
+      # eQ3 default key A4E375C6B09FD185F27C4E96FC273AE4
+      my $kno = ($attrName eq "hmKey")?1:substr($attrName,5,1);
+      my ($no,$val) = (sprintf("%02X",$kno),$attrVal);
+      if ($attrVal =~ m/:/){#number given
+        ($no,$val) = split ":",$attrVal;
+        return "illegal number:$no" if (hex($no) < 1 || hex($no) > 255 || length($no) != 2);
+      }
+      $attr{$name}{$attrName} = "$no:".
+                               (($val =~ m /^[0-9A-Fa-f]{32}$/ )
+                                 ? $val
+                                 : unpack('H*', md5($val)));
+      $retVal = "$attrName set to $attr{$name}{$attrName}"
+            if($attrVal ne $attr{$name}{$attrName});
+    }
+    else{
+      delete $attr{$name}{$attrName};
+    }
+    HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
+    return $retVal;
+  }
+  
   
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
@@ -7250,7 +7278,7 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
 }
 sub CUL_HM_storeRssi(@){
   my ($name,$peerName,$val,$mNo) = @_;
-  return if (!$val || !defined  $defs{$name});
+  return if (!$val || !$name|| !defined  $defs{$name});
   my $hash = $defs{$name};
   if (AttrVal($peerName,"subType","") eq "virtual"){
     my $h = InternalVal($name,"IODev","");#CUL_HM_name2IoName($peerName);
@@ -7637,7 +7665,7 @@ sub CUL_HM_getAttr($$$){#return attrValue - consider device if empty
 sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   $default = 0 if (!defined $default);
-  if($defs{$name}){
+  if($name && $defs{$name}){
     my $val = (defined $attr{$name}{$attrName})
                  ?$attr{$name}{$attrName}
                  :"";
