@@ -251,6 +251,7 @@ sub LaCrosse_Parse($$) {
       else {$typeName = "unknown";}
     }
     
+    
     $battery_new = $bytes[13] & 0x01;
     $battery_low = $bytes[13] & 0x04;
     $error = $bytes[13] & 0x02;
@@ -259,7 +260,7 @@ sub LaCrosse_Parse($$) {
 
     my $rh = $modules{LaCrosse}{defptr}{$addr};
     
-    if($bytes[2] != 0xFF && $bytes[3] != 0xFF) {
+    if($bytes[2] != 0xFF) {
       $temperature = ($bytes[2]*256 + $bytes[3] - 1000)/10;
       $rh->{"bufferedT"} = $temperature;
     }
@@ -281,21 +282,21 @@ sub LaCrosse_Parse($$) {
       }
     }
     
-    if($bytes[5] != 0xFF && $bytes[6] != 0xFF) {
+    if($bytes[5] != 0xFF) {
       $rain = ($bytes[5]*256 + $bytes[6]) * 0.5;
     }
     
-    if($bytes[7] != 0xFF && $bytes[8] != 0xFF) {
+    if($bytes[7] != 0xFF) {
       $windDirection = ($bytes[7]*256 + $bytes[8]) / 10;
     }
-    if($bytes[9] != 0xFF && $bytes[10] != 0xFF) {
+    if($bytes[9] != 0xFF) {
       $windSpeed = ($bytes[9] * 256 + $bytes[10]) / 10;
     }
-    if($bytes[11] != 0xFF && $bytes[12] != 0xFF) {
+    if($bytes[11] != 0xFF) {
       $windGust = ($bytes[11] * 256 + $bytes[12]) / 10;
     }
-    
-    if(@bytes > 15 && $bytes[14] != 0xFF && $bytes[15] != 0xFF) {
+     
+    if(@bytes > 15 && $bytes[14] != 0xFF) {
      $pressure = $bytes[14] * 256 + $bytes[15];
     }
     
