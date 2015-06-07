@@ -7,6 +7,7 @@ package main;
 use strict;
 use warnings;
 use SetExtensions;
+use Switch;
 
 sub LaCrosse_Parse($$);
 
@@ -165,13 +166,14 @@ sub LaCrosse_Parse($$) {
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
 
-  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain );    
+  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain, $pressure );    
   $temperature = 0xFFFF;
   $humidity = 0xFF;
   $windDirection = 0xFFFF;
   $windSpeed = 0xFFFF;
   $windGust = 0xFFFF;
   $rain = 0xFFFF;  
+  $pressure = 0xFFFF;
   $error = 0;
   
   if( $msg =~ m/^OK 9/ ) {
@@ -209,26 +211,28 @@ sub LaCrosse_Parse($$) {
   } 
   elsif ($msg =~ m/^OK WS/) {
     # Weather station - Format:
-    #        0   1   2   3   4   5   6   7   8   9   10  11  12  13
-    #   -----------------------------------------------------------
-    #  OK WS 14  1   4   208 53  0   0   7   8   0   29  0   31  1  I D=0E  23.2°C  52%rH  0mm  Dir.: 180.0°  Wind:2.9m/s  Gust:3.1m/s  new Batt.
-    #  OK WS ID  XXX TTT TTT HHH RRR RRR DDD DDD SSS SSS GGG GGG FFF
-    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |   |-- Flags *
-    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |------ WindGust * 10 LSB (0.0 ... 50.0 m/s)           FF/FF = none 
-    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |---------- WindGust * 10 MSB
-    #  |  |  |   |   |   |   |   |   |   |   |   |   |-------------- WindSpeed  * 10 LSB(0.0 ... 50.0 m/s)          FF/FF = none  
-    #  |  |  |   |   |   |   |   |   |   |   |   |------------------ WindSpeed  * 10 MSB
-    #  |  |  |   |   |   |   |   |   |   |   |---------------------- WindDirection * 10 LSB (0.0 ... 365.0 Degrees) FF/FF = none
-    #  |  |  |   |   |   |   |   |   |   |-------------------------- WindDirection * 10 MSB
-    #  |  |  |   |   |   |   |   |   |------------------------------ Rain * 0.5mm LSB (0 ... 9999 mm)               FF/FF = none
-    #  |  |  |   |   |   |   |   |---------------------------------- Rain * 0.5mm MSB
-    #  |  |  |   |   |   |   |-------------------------------------- Humidity (1 ... 99 %rH)                        FF = none
-    #  |  |  |   |   |   |------------------------------------------ Temp * 10 + 1000 LSB (-40 ... +60 °C)          FF/FF = none
-    #  |  |  |   |   |---------------------------------------------- Temp * 10 + 1000 MSB
-    #  |  |  |   |-------------------------------------------------- Sensor type (1=TX22)
-    #  |  |  |------------------------------------------------------ Sensor ID (1 ... 63)
-    #  |  |--------------------------------------------------------- fix "WS"
-    #  |------------------------------------------------------------ fix "OK"
+    #        0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15
+    #   -------------------------------------------------------------------
+    #  OK WS 14  1   4   208 53  0   0   7   8   0   29  0   31  1   4   1      I D=0E  23.2°C  52%rH  0mm  Dir.: 180.0°  Wind:2.9m/s  Gust:3.1m/s  new Batt. 1025 hPa
+    #  OK WS ID  XXX TTT TTT HHH RRR RRR DDD DDD SSS SSS GGG GGG FFF PPP PPP
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |--    Pressure LSB
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |   |   |------    Pressure MSB
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |   |----------    Flags *
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |--------------    WindGust * 10 LSB (0.0 ... 50.0 m/s)           FF/FF = none 
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |------------------    WindGust * 10 MSB
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |----------------------    WindSpeed  * 10 LSB(0.0 ... 50.0 m/s)          FF/FF = none  
+    #  |  |  |   |   |   |   |   |   |   |   |   |--------------------------    WindSpeed  * 10 MSB
+    #  |  |  |   |   |   |   |   |   |   |   |------------------------------    WindDirection * 10 LSB (0.0 ... 365.0 Degrees) FF/FF = none
+    #  |  |  |   |   |   |   |   |   |   |----------------------------------    WindDirection * 10 MSB
+    #  |  |  |   |   |   |   |   |   |--------------------------------------    Rain * 0.5mm LSB (0 ... 9999 mm)               FF/FF = none
+    #  |  |  |   |   |   |   |   |------------------------------------------    Rain * 0.5mm MSB
+    #  |  |  |   |   |   |   |----------------------------------------------    Humidity (1 ... 99 %rH)                        FF = none
+    #  |  |  |   |   |   |--------------------------------------------------    Temp * 10 + 1000 LSB (-40 ... +60 °C)          FF/FF = none
+    #  |  |  |   |   |------------------------------------------------------    Temp * 10 + 1000 MSB
+    #  |  |  |   |----------------------------------------------------------    Sensor type (1=TX22, 2=NodeSensor)
+    #  |  |  |--------------------------------------------------------------    Sensor ID (0 ... 63)
+    #  |  |-----------------------------------------------------------------    fix "WS"
+    #  |--------------------------------------------------------------------    fix "OK"
     #
     #   * Flags: 128  64  32  16  8   4   2   1        
     #                                 |   |   |
@@ -240,7 +244,12 @@ sub LaCrosse_Parse($$) {
     
     $addr = sprintf( "%02X", $bytes[0] );
     $typeNumber = $bytes[1];
-    $typeName = $typeNumber == 1 ? "TX22" : "unknown";
+
+    switch($typeNumber) {
+      case 1 {$typeName = "TX22";}
+      case 2 {$typeName = "NodeSensor";}
+      else {$typeName = "unknown";}
+    }
     
     $battery_new = $bytes[13] & 0x01;
     $battery_low = $bytes[13] & 0x04;
@@ -272,10 +281,10 @@ sub LaCrosse_Parse($$) {
       }
     }
     
-    
     if($bytes[5] != 0xFF && $bytes[6] != 0xFF) {
       $rain = ($bytes[5]*256 + $bytes[6]) * 0.5;
     }
+    
     if($bytes[7] != 0xFF && $bytes[8] != 0xFF) {
       $windDirection = ($bytes[7]*256 + $bytes[8]) / 10;
     }
@@ -284,6 +293,10 @@ sub LaCrosse_Parse($$) {
     }
     if($bytes[11] != 0xFF && $bytes[12] != 0xFF) {
       $windGust = ($bytes[11] * 256 + $bytes[12]) / 10;
+    }
+    
+    if(@bytes > 15 && $bytes[14] != 0xFF && $bytes[15] != 0xFF) {
+     $pressure = $bytes[14] * 256 + $bytes[15];
     }
     
   }
@@ -448,6 +461,10 @@ sub LaCrosse_Parse($$) {
       elsif ($windDirection > 326.2 && $windDirection <= 348.7) { $windDirectionText = "NNW"; };
       
       readingsBulkUpdate($rhash, "windDirectionText", $windDirectionText );
+    }
+    
+    if ($typeNumber > 0 && $pressure != 0xFFFF) {
+      readingsBulkUpdate($rhash, "pressure", $pressure );
     }
     
     readingsEndUpdate($rhash,1);
