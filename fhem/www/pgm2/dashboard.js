@@ -51,7 +51,7 @@ function dashboard_loadsvgIcon(svgIcon, svgColor, destObj) { //search Icon in ev
 	if (!svgIcon.match('.svg')) {svgIcon = svgIcon+'.svg';}
 	groupdata[i] = groupdata[i].replace('.','');
 	groupdata[i] = groupdata[i].replace('/opt/fhem','');
-    dashboard_showsvgIcon(document.location.pathname+groupdata[i]+"/"+svgIcon, svgColor, destObj);
+    dashboard_showsvgIcon(document.location.pathname.replace(/\/+$/, '')+groupdata[i]+"/"+svgIcon, svgColor, destObj);
   }
  }
 }
