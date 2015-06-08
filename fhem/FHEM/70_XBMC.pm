@@ -167,7 +167,7 @@ sub XBMC_Init($)
         
   #since we just successfully connected to XBMC I guess its safe to assume the device is awake
   readingsSingleUpdate($hash,"system","wake",1);
-  $hash->{LAST_PING} = $hash->{LAST_PONG} = time();
+  $hash->{LAST_RECV} = time();
   
   XBMC_Update($hash);
   
@@ -179,25 +179,26 @@ sub XBMC_Init($)
 sub XBMC_QueueIntervalUpdate($;$) {
   my ($hash, $time) = @_;
   # AFAIK when using http this module is not using a persistent TCP connection
-  if($hash->{Protocol} ne 'http') {
-    if (!defined($time)) {
-      $time = AttrVal($hash->{NAME},'updateInterval','60');
-    }
-    InternalTimer(time() + $time, "XBMC_Check", $hash, 0);
+  
+  return if(($hash->{Protocol} eq 'http') || ($hash->{STATE} eq "disconnected"));
+  
+  if (!defined($time)) {
+    $time = AttrVal($hash->{NAME},'updateInterval',60);
   }
+  InternalTimer(time() + $time, "XBMC_Check", $hash, 0);
 }
 
 sub XBMC_Check($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   
-  Log3 $name, 5, "XBMC_Check";
+  Log3 $name, 4, "XBMC_Check";
 
-  XBMC_CheckConnection($hash);
+  return if(!XBMC_CheckConnection($hash));
   
   XBMC_Update($hash);
   
-  #xbmc seems alive. so keep bugging it
+  #xbmc seems alive if we get here. so keep bugging it
   XBMC_QueueIntervalUpdate($hash);
 }
 
@@ -207,7 +208,7 @@ sub XBMC_UpdatePlayerItem($) {
  
   Log3 $name, 4, "XBMC_UpdatePlayerItem";
   if (($hash->{STATE} eq 'disconnected') or (ReadingsVal($name, "playStatus","") ne 'playing')) {
-    Log3 $name, 4, "XBMC_UpdatePlayerItem - cancelled";
+    Log3 $name, 4, "XBMC_UpdatePlayerItem - cancelled (disconnected or not playing)";
     return;
   }
   
@@ -220,28 +221,21 @@ sub XBMC_CheckConnection($) {
  
   if ($hash->{STATE} eq "disconnected") {
     # we are already disconnected
-    return;
+    return 0;
   }
-  
-  #do not call XBMC_CheckConnection a second time before the pong had a chance to arrive
-  #otherwise the connection will be considered as lost
-  if ($hash->{LAST_PING} > $hash->{LAST_PONG}) {
-    Log3 $name, 3, "Last ping (" . $hash->{LAST_PING} . ") is greather than last pong (" . $hash->{LAST_PONG} . ")";
-    DevIo_Disconnected($hash);
-    return;
-  }
-  
-  my $obj = {
-    "method" => "JSONRPC.Ping",
-  };
-  $obj->{id} = XBMC_CreateId();
-  $obj->{jsonrpc} = "2.0"; #JSON RPC version has to be passed
 
-  # remember: we only get here when using TCP (not HTTP)
-  my $json = encode_json($obj);
+  my $lastRecvDiff = (time() - $hash->{LAST_RECV});
+  my $updateInt = AttrVal($hash->{NAME},'updateInterval',60);
   
-  $hash->{LAST_PING} = time();
-  DevIo_SimpleWrite($hash, $json, 0);
+  # give it 50% tolerance. sticking hard to updateInt might fail if the fhem timer gets delayed for some seconds
+  if ($lastRecvDiff > ($updateInt * 1.5)) {
+    Log3 $name, 3, "XBMC_CheckConnection: Connection lost! Last data from Kodi received $lastRecvDiff s ago";
+    DevIo_Disconnected($hash);
+    return 0;
+  }
+  Log3 $name, 4, "XBMC_CheckConnection: Connection still alive. Last data from Kodi received $lastRecvDiff s ago";
+  
+  return 1;
 }
 
 sub XBMC_Update($) 
@@ -263,7 +257,9 @@ sub XBMC_Update($)
     }
   };
   XBMC_Call($hash,$obj,1);
-  XBMC_PlayerUpdate($hash,-1); #-1 -> update all existing players
+  
+  #-1 -> update all existing players
+  XBMC_PlayerUpdate($hash,-1); 
   
   XBMC_UpdatePlayerItem($hash);
 }
@@ -341,6 +337,7 @@ sub XBMC_ProcessRead($$)
   my ($msg,$tail) = XBMC_ParseMsg($hash, $buffer);
   #processes all complete messages
   while($msg) {
+    $hash->{LAST_RECV} = time();
     Log3($name, 4, "XBMC_Read: Decoding JSON message. Length: " . length($msg) . " Content: " . $msg); 
     my $obj = JSON->new->utf8(0)->decode($msg);
     #it is a notification if a method name is present
@@ -558,9 +555,9 @@ sub XBMC_ProcessNotification($$)
         Log3($name, 3, "XBMC notified that it is going to sleep");
         #if we immediatlely close our DevIO then fhem will instantly try to reconnect which might
         #succeed because XBMC needs a moment to actually shutdown.
-        #So cancel the current timer, fake that the last pong has arrived ages ago
+        #So cancel the current timer, fake that the last data has arrived ages ago
         #and force a connection check in some seconds when we think XBMC actually has shut down
-        $hash->{LAST_PONG} = 0;
+        $hash->{LAST_RECV} = 0;
         RemoveInternalTimer($hash);
         XBMC_QueueIntervalUpdate($hash,  5);
       }
@@ -609,27 +606,21 @@ sub XBMC_ProcessResponse($$)
   else {
     my $result = $obj->{result};
     if($result && $result ne 'OK') {
-      if ($result ne 'pong') {
-        readingsBeginUpdate($hash);
-        foreach my $key (keys %$result) {
-          if ($key eq 'item') {
-            my $item = $obj->{result}->{item};
-            foreach my $ikey (keys %$item) {
-              my $value = $item->{$ikey};
-              XBMC_CreateReading($hash,$ikey,$value);
-            }
-          }
-          else {
-            my $value = $result->{$key};
-            XBMC_CreateReading($hash,$key,$value);
+      readingsBeginUpdate($hash);
+      foreach my $key (keys %$result) {
+        if ($key eq 'item') {
+          my $item = $obj->{result}->{item};
+          foreach my $ikey (keys %$item) {
+            my $value = $item->{$ikey};
+            XBMC_CreateReading($hash,$ikey,$value);
           }
         }
-        readingsEndUpdate($hash, 1);
+        else {
+          my $value = $result->{$key};
+          XBMC_CreateReading($hash,$key,$value);
+        }
       }
-      else {
-        #Pong
-        $hash->{LAST_PONG} = time();
-      }
+      readingsEndUpdate($hash, 1);
     }
   }
   return undef;
