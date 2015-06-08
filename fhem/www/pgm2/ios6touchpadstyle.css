@@ -180,7 +180,6 @@ and (orientation : portrait) {
 	width:360px
 }
 .isAndroidTablet {
-	width:1080px;
 }
 }
 
@@ -190,7 +189,6 @@ and (orientation : landscape) {
 	width:640px
 }
 .isAndroidTablet {
-	width:1920px;
 }
 }
 
