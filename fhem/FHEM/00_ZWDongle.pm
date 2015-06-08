@@ -797,7 +797,7 @@ ZWDongle_Attr($$$$)
   } elsif($attr eq "homeId") {
     $hash->{homeId} = $value;
 
-  } elsif($attr eq "networkKey") {
+  } elsif($attr eq "networkKey" && $cmd eq "set") {
     if(!$value || $value !~ m/^[0-9A-F]{32}$/i) {
       return "attr $name networkKey: not a hex string with a length of 32";
     }
