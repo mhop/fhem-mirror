@@ -74,7 +74,7 @@ sub HMLAN_Initialize($) {
   $hash->{UndefFn} = "HMLAN_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "addvaltrigger " .
-                     "hmId hmKey hmKey2 hmKey3 hmKey4 hmKey5 " .
+                     "hmId hmKey hmKey2 hmKey3 ".#hmKey4 hmKey5 " .
                      "respTime " .
                      "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
                      "hmMsgLowLimit ".
@@ -890,7 +890,7 @@ sub HMLAN_writeAesKey($) {#####################################################
   return if (!$name || !$defs{$name});
   my $vccu = InternalVal($name,"owner_CCU",$name);
   $vccu = $name if(!AttrVal($vccu,"hmKey",""));#General if keys are not in vccu
-  foreach my $i (1..5){
+  foreach my $i (1..3){
      my ($kNo,$k) = split(":",AttrVal($vccu,"hmKey".($i== 1?"":$i),""));
      HMLAN_SimpleWrite($defs{$name}, "Y0$i,".($k?"$kNo,$k":"00,"));
    }
