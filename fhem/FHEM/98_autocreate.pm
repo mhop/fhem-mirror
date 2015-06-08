@@ -68,7 +68,7 @@ autocreate_Initialize($)
   $hash->{NotifyFn} = "autocreate_Notify";
   $hash->{AttrFn}   = "autocreate_Attr";
   $hash->{AttrList}= "autosave filelog device_room weblink weblink_room " .
-                     "disable ignoreTypes";
+                     "disable ignoreTypes autocreateThreshold";
   my %ahash = ( Fn=>"CommandCreateLog",
         Hlp=>"<device>,create log/weblink for <device>",
         ModuleName => "autocreate" );
@@ -125,6 +125,83 @@ autocreate_Notify($$)
 
       my $it = AttrVal($me, "ignoreTypes", undef);
       next if($it && $name =~ m/$it/i);
+
+      my $at = AttrVal($me, "autocreateThreshold", undef);
+      LoadModule($type) if( !$at );
+      if( $at || $modules{$type}{AutoCreate} ) {
+        my @at = split( '[, ]', $at?$at:"" );
+
+        my $hash = $defs{$me};
+
+        my $now = gettimeofday();
+
+        #remove old events
+        foreach my $t (keys %{$hash->{received}}) {
+          my @v = grep { my $l = $_;
+                         $l =~ s/:.*//;
+                         ($t=~ m/^$l$/) ? $_ : undef} @at;
+          my (undef,undef,$interval) = split( ':', $v[0]?$v[0]:"" );
+          if( !@v ) {
+            if( my $fp = $modules{$t}{AutoCreate} ) {
+              foreach my $k (keys %{$fp}) {
+                next if($name  !~ m/^$k$/);
+                (undef, $interval) = split( ':', $fp->{$k}{autocreateThreshold} );
+                last;
+              }
+            }
+          }
+          $interval = 60 if( !$interval );
+
+          foreach my $a (keys %{$hash->{received}{$t}}) {
+            foreach my $time (keys %{$hash->{received}{$t}{$a}}) {
+              if( $time < $now - $interval ) {
+                #Log3 $me, 5, "autocreate: removed event for '$t $a' with timestamp $time";
+                delete( $hash->{received}{$t}{$a}{$time} );
+              }
+
+            }
+            delete( $hash->{received}{$t}{$a} ) if( !%{$hash->{received}{$t}{$a}} );
+
+          }
+          delete( $hash->{received}{$t} ) if( !%{$hash->{received}{$t}} );
+
+        }
+
+        my @v = grep { my $l = $_;
+                       $l =~ s/:.*//;
+                       ($type=~ m/^$l$/) ? $_ : undef} @at;
+        #if there is an entry for this type
+        if( @v || $modules{$type}{AutoCreate} ) {
+          my( undef, $min_count, $interval ) = split( ':', $v[0]?$v[0]:"" );
+          if( !@v ) {
+            if( my $fp = $modules{$type}{AutoCreate} ) {
+              foreach my $k (keys %{$fp}) {
+                next if($name  !~ m/^$k$/);
+                ($min_count, $interval) = split( ':', $fp->{$k}{autocreateThreshold} );
+                last;
+              }
+            }
+          }
+          $min_count = 2 if( !$min_count );
+          $interval = 60 if( !$interval );
+
+          #add this event
+          $hash->{received}{$type}{$arg}{$now} = 1;
+
+          my $count = keys %{$hash->{received}{$type}{$arg}};
+          Log3 $me, 4, "autocreate: received $count event(s) for '$type $arg' during the last $interval seconds";
+
+          if( $count < $min_count ) {
+            Log3 $me, 4, "autocreate: ignoring event for '$type $arg': at least $min_count needed";
+
+            next;
+          }
+
+          #forget entries for this type
+          delete( $hash->{received}{$type}{$arg} );
+          delete( $hash->{received}{$type} ) if( !%{$hash->{received}{$type}} );
+        }
+      }
 
       my ($cmd, $ret);
       my $hash = $defs{$name};  # Called from createlog
@@ -584,6 +661,14 @@ autocreate_Attr(@)
         This is a regexp, to ignore certain devices, e.g. you neighbours FHT.
         You can specify more than one, with usual regexp syntax, e.g.<br>
         attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7
+        </li><br>
+
+    <a name="autocreateThreshold"></a>
+    <li>autocreateThreshold<br>
+        A list of &lt;type&gt;:&lt;count&gt;:&lt;interval&gt; triplets. A new
+        device is only created if there have been at least <code>count</code> events
+        of TYPE <code>type</code> in the last <code>interval</code> seconds.<br>
+        <code>attr autocreateThreshold LaCrosse:2:30,EMT7110:2:60</code>
         </li>
 
   </ul>
@@ -738,6 +823,16 @@ autocreate_Attr(@)
         <code>
         attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7
         </code>
+        </li><br>
+
+    <a name="autocreateThreshold"></a>
+    <li>autocreateThreshold<br>
+        Eine Liste of &lt;type&gt;:&lt;count&gt;:&lt;interval&gt; tripeln. Ein
+        neues Device wird nur dann erzeugt wenn es mindestens <code>count</code>
+        Events für den TYPE <code>type</code> in den letzten <code>interval</code>
+        Sekunden gegeben hat.<br>
+        Beispiel:<br>
+        <code>attr autocreateThreshold LaCrosse:2:30,EMT7110:2:60</code>
         </li>
 
   </ul>
