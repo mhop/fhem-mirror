@@ -1378,6 +1378,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                        raw           => "data ..."
                       ,reset         => ""
                       ,unpair        => ""
+                      ,assignHmKey   => ""
 );
 
 %culHmSubTypeDevSets = (# device of this subtype

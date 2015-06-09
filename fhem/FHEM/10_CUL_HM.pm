@@ -4980,7 +4980,18 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     CUL_HM_UpdtCentral($name);
   }
-                                             
+ 
+  elsif($cmd eq "assignHmKey") { ##############################################
+    $state = "";
+    my $oldKeyIdx = ReadingsVal($name, "aesKeyNbr", "00");
+    return "current key unknown" if (!defined $oldKeyIdx || $oldKeyIdx eq "");
+
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.'01'.
+                        sprintf("%02X",$oldKeyIdx));
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.'01'.
+                        sprintf("%02X",($oldKeyIdx+1)));
+  }
+ 
   else{
     return "$cmd not implemented - contact sysop";
   }
@@ -5233,6 +5244,7 @@ sub CUL_HM_getConfig($){
     }
   }
 }
+
 
 sub CUL_HM_calcDisWmSet($){
   my $dh = shift; 
