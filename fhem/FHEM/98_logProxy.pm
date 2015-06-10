@@ -655,7 +655,25 @@ logProxy_xy2Plot($)
 
   return ($ret,$min,$max,$last);
 }
+#create plot data from date-y-array
+sub
+logProxy_values2Plot($)
+{
+  my ($array) = @_;
+  my $ret = ";c 0\n";
 
+  my $min = 999999;
+  my $max = -999999;
+  my $last;
+
+  return ($ret,$min,$max,$last) if( !ref($array) eq "ARRAY" );
+
+  foreach my $point ( @{$array} ) {
+    $ret .= "$point->[0] $point->[1]\n";
+  }
+
+  return ($ret,$min,$max,$last);
+}
 sub
 logProxy_Get($@)
 {
@@ -1282,6 +1300,8 @@ logProxy_Get($@)
           the following list: hour,qday,day,week,month,year and the values representing the step with for the zoom level.</li>
         <li>logProxy_xy2Plot(\@xyArray) is a sample implementation of a function that will accept a ref to an array
           of xy-cordinate pairs as the data to be plotted.</li>
+        <li>logProxy_values2Plot(\@xyArray) is a sample implementation of a function that will accept a ref to an array
+          of date-y-cordinate pairs as the data to be plotted.</li>
         <li>The perl expressions have access to $from and $to for the begining and end of the plot range and also to the
           SVG specials min, max, avg, cnt, sum, currval (last value) and currdate (last date) values of the individual curves
           already plotted are available as $data{&lt;special-n&gt;}.<br>
