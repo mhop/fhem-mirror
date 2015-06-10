@@ -676,7 +676,7 @@ ZWDongle_Read($@)
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     $hash->{PARTIAL} = $data;	 # Recursive call by ZWave get, Forum #37418
-    ZWDongle_Parse($hash, $name, $msg);
+    ZWDongle_Parse($hash, $name, $msg) if($init_done);
 
     $data = $hash->{PARTIAL};
     $msg = undef;
