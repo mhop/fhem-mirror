@@ -433,7 +433,7 @@ sub LW12_Write( $$ ) {
 		$s->close();
     }
 	else {
-		Log3 $name, 3, "Can't connect to socket!";
+		Log3 $name, 4, "LW12: Can't connect to LW12!";
 	}
 }
 
