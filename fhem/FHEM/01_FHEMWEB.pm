@@ -47,6 +47,7 @@ sub FW_textfieldv($$$$);
 sub FW_updateHashes();
 sub FW_visibleDevices(;$);
 sub FW_widgetOverride($$);
+sub FW_Read($$);
 
 use vars qw($FW_dir);     # base directory for web server
 use vars qw($FW_icondir); # icon base directory
@@ -139,7 +140,6 @@ FHEMWEB_Initialize($)
     allowfrom
     basicAuth
     basicAuthMsg
-    closeConn:1,0
     column
     defaultRoom
     editConfig:1,0
@@ -257,9 +257,9 @@ FW_Undef($$)
 
 #####################################
 sub
-FW_Read($)
+FW_Read($$)
 {
-  my ($hash) = @_;
+  my ($hash, $reread) = @_;
   my $name = $hash->{NAME};
 
   if($hash->{SERVERSOCKET}) {   # Accept and create a child
@@ -293,39 +293,46 @@ FW_Read($)
   }
 
 
-  # Data from HTTP Client
-  my $buf;
-  my $ret = sysread($c, $buf, 1024);
+  if(!$reread) {
+    # Data from HTTP Client
+    my $buf;
+    my $ret = sysread($c, $buf, 1024);
 
-  if(!defined($ret) && $! == EWOULDBLOCK ){
-    $hash->{wantWrite} = 1
-      if(TcpServer_WantWrite($hash));
-    return;
-  } elsif(!$ret) { # 0==EOF, undef=error
-    CommandDelete(undef, $name);
-    Log3 $FW_wname, 4, "Connection closed for $name: ".
-                (defined($ret) ? 'EOF' : $!);
-    return;
-  }
-
-  $hash->{BUF} .= $buf;
-  if($hash->{SSL} && $c->can('pending')) {
-    while($c->pending()) {
-      sysread($c, $buf, 1024);
-      $hash->{BUF} .= $buf;
+    if(!defined($ret) && $! == EWOULDBLOCK ){
+      $hash->{wantWrite} = 1
+        if(TcpServer_WantWrite($hash));
+      return;
+    } elsif(!$ret) { # 0==EOF, undef=error
+      CommandDelete(undef, $name);
+      Log3 $FW_wname, 4, "Connection closed for $name: ".
+                  (defined($ret) ? 'EOF' : $!);
+      return;
+    }
+    $hash->{BUF} .= $buf;
+    if($hash->{SSL} && $c->can('pending')) {
+      while($c->pending()) {
+        sysread($c, $buf, 1024);
+        $hash->{BUF} .= $buf;
+      }
     }
   }
 
+
   if(!$hash->{HDR}) {
-    return if($hash->{BUF} !~ m/^(.*)(\n\n|\r\n\r\n)(.*)$/s);
+    return if($hash->{BUF} !~ m/^(.*?)(\n\n|\r\n\r\n)(.*)$/s);
     $hash->{HDR} = $1;
     $hash->{BUF} = $3;
     if($hash->{HDR} =~ m/Content-Length: ([^\r\n]*)/s) {
       $hash->{CONTENT_LENGTH} = $1;
     }
   }
-  return if($hash->{CONTENT_LENGTH} &&
-            length($hash->{BUF})<$hash->{CONTENT_LENGTH});
+
+  my $POSTdata = "";
+  if($hash->{CONTENT_LENGTH}) {
+    return if(length($hash->{BUF})<$hash->{CONTENT_LENGTH});
+    $POSTdata = substr($hash->{BUF}, 0, $hash->{CONTENT_LENGTH});
+    $hash->{BUF} = substr($hash->{BUF}, $hash->{CONTENT_LENGTH});
+  }
 
   @FW_httpheader = split(/[\r\n]+/, $hash->{HDR});
   %FW_httpheader = map {
@@ -369,7 +376,7 @@ FW_Read($)
              $FW_headercors.
              "Content-Length: 0\r\n\r\n");
       delete $hash->{CONTENT_LENGTH};
-      delete $hash->{BUF};
+      FW_Read($hash, 1) if($hash->{BUF});
       return;
     };
     if(!$pwok) {
@@ -380,7 +387,7 @@ FW_Read($)
              $FW_headercors.
              "Content-Length: 0\r\n\r\n");
       delete $hash->{CONTENT_LENGTH};
-      delete $hash->{BUF};
+      FW_Read($hash, 1) if($hash->{BUF});
       return;
     };
   }
@@ -388,9 +395,8 @@ FW_Read($)
 
   my $now = time();
   my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3);
-  $arg .= "&".$hash->{BUF} if($hash->{CONTENT_LENGTH});
+  $arg .= "&".$POSTdata if($POSTdata);
   delete $hash->{CONTENT_LENGTH};
-  delete $hash->{BUF};
   $hash->{LASTACCESS} = $now;
 
   $arg = "" if(!defined($arg));
@@ -413,9 +419,11 @@ FW_Read($)
         # child.
 	TcpServer_Disown( $hash );
 	delete($defs{$name});
+        FW_Read($hash, 1) if($hash->{BUF});
 	return;
 
       } elsif(defined($pid)){ # child
+        delete $hash->{BUF};
 	$hash->{isChild} = 1;
 
       } # fork failed and continue in parent
@@ -467,14 +475,8 @@ sub
 FW_closeConn($)
 {
   my ($hash) = @_;
-  if(AttrVal($hash->{SNAME}, "closeConn",               # Forum #20294
-                             !$FW_httpheader{Connection} ||
-                              $FW_httpheader{Connection} ne "keep-alive" ||
-                              $FW_userAgent =~ m/(iPhone|iPad|iPod|Darwin)/)) {
-    TcpServer_Close($hash);
-    delete($defs{$hash->{NAME}});
-  }
   POSIX::exit(0) if($hash->{isChild});
+  FW_Read($hash, 1) if($hash->{BUF});
 }
 
 ###########################
@@ -3331,13 +3333,6 @@ FW_widgetOverride($$)
        attribute.
        </li>
 
-     <a name="closeConn"></a>
-     <li>closeConn<br>
-        If set, a TCP Connection will only serve one HTTP request. Seems to
-        solve problems for certain hardware combinations like slow
-        FHEM-Server, and iPad/iPhone as Web-client.
-        </li><br>
-
      <a name="CssFiles"></a>
      <li>CssFiles<br>
         Space separated list of .css files to be included. The filenames
@@ -4032,14 +4027,6 @@ FW_widgetOverride($$)
         der Gruppen auch dann verwenden, wenn man nur eine Spalte hat.
         Leerzeichen im Raum- und Gruppennamen sind f&uuml;r dieses Attribut als
         %20 zu schreiben.
-        </li><br>
-
-     <a name="closeConn"></a>
-     <li>closeConn<br>
-        Falls gesetzt, wird pro TCP Verbindung nur ein HTTP Request
-        durchgefuehrt. Fuer bestimmte Hardware-Kombinationen (langsamer FHEM
-        Server, iPad/iPhone als Client) scheint dieses Attribu Ladeprobleme zu
-        beheben.
         </li><br>
 
      <a name="CssFiles"></a>
