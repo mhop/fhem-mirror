@@ -94,8 +94,8 @@ holiday_refresh($$)
           $mday, $mmonth, $myear, $mrest) = localtime($timex);
       $myear = $myear+1900;
       $mmonth = $mmonth+1;
-      #Log 4, "$name: Ostern ".($lt[5]+1900)." ist am " .sprintf("%02d-%02d",
-      #                $Od, $Om) ." Target day: $mday-$mmonth-$myear"; 
+      #Log 1, "$name: Ostern:".sprintf("%04d-%02d-%02d", $lt[5]+1900, $Om, $Od).
+      #             " Target:".sprintf("%04d-%02d-%02d", $myear, $mmonth, $mday);
 
       next if($mday != $fd[3] || $mmonth != $fd[4]+1);
       $found = $a[2];
