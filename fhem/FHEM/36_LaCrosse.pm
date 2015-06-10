@@ -7,7 +7,6 @@ package main;
 use strict;
 use warnings;
 use SetExtensions;
-use Switch;
 
 sub LaCrosse_Parse($$);
 
@@ -245,12 +244,15 @@ sub LaCrosse_Parse($$) {
     $addr = sprintf( "%02X", $bytes[0] );
     $typeNumber = $bytes[1];
 
-    switch($typeNumber) {
-      case 1 {$typeName = "TX22";}
-      case 2 {$typeName = "NodeSensor";}
-      else {$typeName = "unknown";}
+    if($typeNumber == 1) {
+      $typeName = "TX22";
     }
-    
+    elsif($typeNumber == 2) {
+      $typeName = "NodeSensor";
+    }
+    else {
+      $typeName = "unknown";
+    }
     
     $battery_new = $bytes[13] & 0x01;
     $battery_low = $bytes[13] & 0x04;
