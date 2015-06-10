@@ -39,6 +39,8 @@ et_addEvt($$$;$)
   return 0 if(length($evt) > 80);            # Safety
 
   $evt =~ s/ *$//;                           # HM?
+  $evt =~ s/(Long|LongRelease) \d+_\d+/$1 .* /; # HM?
+  $evt =~ s/rgb: [0-9a-f]{6}/rgb: .*/;       # Hue
   $evt =~ s/: [0-9A-F]*$/: .*/;              # PANSTAMP
   $evt =~ s/\b-?\d*\.?\d+\b/.*/g;            # Number to .*
   $evt =~ s/\.\*.*\.\*/.*/g;                 # Multiple wildcards to one
