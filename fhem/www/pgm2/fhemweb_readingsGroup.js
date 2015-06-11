@@ -62,7 +62,10 @@ FW_readingsGroupToggle2(d) {
       var pm = row.querySelectorAll('[id=plusminus]');
       if( pm.length ) {
         for(var i=0; i<pm.length; i++){
-          pm[i].innerHTML = pm[i].innerHTML == '+'? '-' : '+';
+          if( pm[i].innerHTML == '+' )
+            pm[i].innerHTML = '-';
+          else if( pm[i].innerHTML == '-' )
+            pm[i].innerHTML = '+';
         }
       } else {
         row.style.display = row.style.display=='none' ? '' : 'none';
@@ -86,7 +89,7 @@ FW_readingsGroupToggle2(d) {
                 pm[i].innerHTML = '+';
               }
             } else {
-              row.style.display = (r==1 ? '' : 'none');
+              row.style.display = (r==0 ? '' : 'none');
             }
           }
         }
