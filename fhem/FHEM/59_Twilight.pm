@@ -37,8 +37,9 @@ use warnings;
 use POSIX;
 use HttpUtils;
 use Math::Trig;
+use Time::Local 'timelocal_nocheck'; 
 
-sub Twilight_calc($$$$$$$);
+sub Twilight_calc($$);
 sub Twilight_my_gmt_offset();
 sub Twilight_midnight_seconds($);
 
