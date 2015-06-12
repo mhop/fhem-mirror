@@ -3819,7 +3819,7 @@ FW_widgetOverride($$)
     <li>cmdIcon<br>
         Leerzeichen getrennte Auflistung von cmd:iconName Paaren.
         Falls gesetzt, wird das webCmd text durch den icon gesetzt.
-        Em einfachsten setzt man cmdIcon indem man "Extend devStateIcon" im
+        Am einfachsten setzt man cmdIcon indem man "Extend devStateIcon" im
         Detail-Ansicht verwendet, und den Wert nach cmdIcon kopiert.<br>
         Beispiel:<ul>
         attr lamp cmdIcon on:control_centr_arrow_up off:control_centr_arrow_down
