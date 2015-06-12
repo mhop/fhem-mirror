@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 01_FHEMWEB: add cmdIcon
   - bugfix:  10_pilight_ctrl: set reset - lost connection to submodules
   - bugfix:  70_Pushalot: corrected parameter order for image
   - change:  70_Pushalot: changed http call to non-blocking

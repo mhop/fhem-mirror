@@ -176,7 +176,7 @@ FHEMWEB_Initialize($)
 
   ###############
   # Initialize internal structures
-  map { addToAttrList($_) } ( "webCmd", "icon", "devStateIcon",
+  map { addToAttrList($_) } ( "webCmd", "icon", "cmdIcon", "devStateIcon",
                               "widgetOverride",  "sortby", "devStateStyle");
   InternalTimer(time()+60, "FW_closeInactiveClients", 0, 0);
 
@@ -1435,6 +1435,10 @@ FW_showRoom()
         # Commands, slider, dropdown
         my $smallscreenCommands = AttrVal($FW_wname, "smallscreenCommands", "");
         if((!$FW_ss || $smallscreenCommands) && $cmdlist) {
+          my @a = split("[: ]", AttrVal($d, "cmdIcon", ""));
+          Log 1, "ERROR: bad cmdIcon definition for $d" if(@a % 2);
+          my %cmdIcon = @a;
+
           foreach my $cmd (split(":", $cmdlist)) {
             my $htmlTxt;
             my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
@@ -1452,7 +1456,9 @@ FW_showRoom()
               FW_pO $htmlTxt;
 
             } else {
-              FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3";
+              my $nCmd = $cmdIcon{$cmd} ? 
+                            FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
+              FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 1, "col3";
             }
           }
         }
@@ -3136,6 +3142,16 @@ FW_widgetOverride($$)
         </li>
         <br>
 
+    <a name="cmdIcon"></a>
+    <li>cmdIcon<br>
+        Space separated list of cmd:iconName pairs. If set, the webCmd text is
+        replaced with the icon. An easy method to set this value is to use 
+        "Extend devStateIcon" in the detail-view, and copy its value.<br>
+        Example:<ul>
+        attr lamp cmdIcon on:control_centr_arrow_up off:control_centr_arrow_down
+        </ul>
+        </li><br>
+
     <a name="devStateIcon"></a>
     <li>devStateIcon<br>
         First form:<br>
@@ -3797,6 +3813,17 @@ FW_widgetOverride($$)
         Der Wert dieses Attributs wird zum sortieren von Ger&auml;ten in
         R&auml;umen verwendet, sonst w&auml;re es der Alias oder, wenn keiner
         da ist, der Ger&auml;tename selbst.
+        </li><br>
+
+    <a name="cmdIcon"></a>
+    <li>cmdIcon<br>
+        Leerzeichen getrennte Auflistung von cmd:iconName Paaren.
+        Falls gesetzt, wird das webCmd text durch den icon gesetzt.
+        Em einfachsten setzt man cmdIcon indem man "Extend devStateIcon" im
+        Detail-Ansicht verwendet, und den Wert nach cmdIcon kopiert.<br>
+        Beispiel:<ul>
+        attr lamp cmdIcon on:control_centr_arrow_up off:control_centr_arrow_down
+        </ul>
         </li><br>
 
     <a name="devStateIcon"></a>
