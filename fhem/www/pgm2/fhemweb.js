@@ -54,7 +54,7 @@ FW_jqueryReadyFn()
   if(document.body.getAttribute("longpoll"))
     setTimeout("FW_longpoll()", 100);
 
-  $("a[href]").each(function() { FW_replaceLink(this); })
+  $("a").each(function() { FW_replaceLink(this); })
   $("head script").each(function() {
     var sname = $(this).attr("src"),
         p = FW_scripts[sname];
@@ -270,7 +270,7 @@ FW_okDialog(txt, parent)
   });
 
   FW_replaceWidgets(div);
-  $(div).find("a[href]").each(function(){FW_replaceLink(this);}); //Forum #33766
+  $(div).find("a").each(function(){FW_replaceLink(this);}); //Forum #33766
 
   if(parent)
     $(div).dialog( "option", "position", {
@@ -339,10 +339,18 @@ function
 FW_replaceLink(el)
 {
   var attr = $(el).attr("href");
+  if(!attr) {
+    attr = $(el).attr("onclick");   // Tablet/smallScreen version
+    if(!attr)
+      return;
+    attr = attr.replace(/^location.href='/,'');
+    attr = attr.replace(/'$/,'');
+  }
   var ma = attr.match(/^(.*\?)(cmd[^=]*=.*)$/);
   if(ma == null || ma.length == 0 || !ma[2].match(/=(save|set)/))
     return;
   $(el).removeAttr("href");
+  $(el).removeAttr("onclick");
   $(el).click(function() { FW_cmd(attr+"&XHR=1"); });
   $(el).css("cursor", "pointer");
 }
@@ -397,7 +405,7 @@ FW_doUpdate()
           $(this).html(d[2]);     // Readings-Value
           if(d[0].match(/-ts$/))  // timestamps
             $(this).addClass('changed');
-          $(this).find("a[href]").each(function() { FW_replaceLink(this) });
+          $(this).find("a").each(function() { FW_replaceLink(this) });
         }
       });
     }
