@@ -1097,8 +1097,11 @@ FileLog_sampleDataFn($$$$$)
 
     <ul>
       <li>&lt;infile&gt;<br>
-        Name of the logfile to grep. "-" is the current logfile, or you can
-        specify an older file (or a file from the archive).</li>
+        Name of the logfile to open. Special case: "-" is the currently active
+        logfile, "CURRENT" opens the file corresponding to the "from"
+        parameter.
+        </li>
+
       <li>&lt;outfile&gt;<br>
         If it is "-", you get the data back on the current connection, else it
         is the prefix for the output file. If more than one file is specified,
@@ -1365,9 +1368,9 @@ FileLog_sampleDataFn($$$$$)
 
     <ul>
       <li>&lt;infile&gt;<br>
-        Name des Logfiles, auf das zugegriffen werden soll. "-" steht f&uuml;r
-        das aktuelle Logfile. Man kann auch auf ein &auml;lteres File zugreifen
-        (oder eines aus dem Archiv).</li>
+        Name des Logfiles, auf das zugegriffen werden soll. Sonderf&auml;lle:
+        "-" steht f&uuml;r das aktuelle Logfile, und "CURRENT" &ouml;ffnet die
+        zum "from" passende Datei.</li>
 
       <li>&lt;outfile&gt;<br>
         Bei einem  "-", bekommt man die Daten auf der aktuellen Verbindung
