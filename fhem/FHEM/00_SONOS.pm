@@ -47,6 +47,12 @@
 # Changelog
 #
 # SVN-History:
+# 14.06.2015
+#	Zwei weitere Ausnahmen für das Neustarten des SubThreads eingefügt.
+#	ControlPoint.pm: Beim Renew von Subscription wurde aus dem "carp" ein "croak" gemacht. Dadurch greifen die darüberliegenden Auffangmassnahmen.
+#	Neues Feature: Bookmarks für Playlisten und Titel
+#	Changelog in der Quelltextdatei enthält nur noch für die letzten vier Veröffentlichungen. Die komplette Liste ist nur noch im Wiki vorhanden. Dadurch wird die Dateigröße geringer.
+#	SetEQ eingebaut, um Subwoofer und Surroundeinstellungen vornehmen zu können: "SurroundEnable", "SurroundLevel", "SubEnable", "SubGain" und "AudioDelay"
 # 02.05.2015
 #	Es gibt drei neue Readings "FavouritesVersion", "RadiosVersion" und "PlaylistsVersion", die bei einer Änderung des jeweiligen Bereichs durch einen Sonos Controller aktualisiert werden, und auf die man mit einem Notify reagieren kann, um z.B. ein "get player FavouritesWithCovers" ausführen zu können. Damit entfällt die Notwendigkeit von zeitgesteuerten Aktualisierungen.
 # 14.04.2015
@@ -57,273 +63,6 @@
 #	Neues Feature 'SnoozeAlarm': Hiermit kann ein gerade abspielender Alarm für die übergebene Zeit unterbrochen werden
 #	Neues Feature bei 'LoadPlaylist': Man kann nun einen Devicenamen angeben, dann wird dessen aktuelle Abspielliste kopiert
 #	Bei der Titelanzeige wird der Numerische Vergleichsfehler abgefangen, der auftritt, wenn der Player keinerlei aktuelle Abspielinformationen hat
-# 03.04.2015
-#	IsAlive-Check Anpassungen: Bei einer Antwort wird nun nicht mehr geprüft, ob diese von derselben Netzwerkschnittstelle stammt, an die der Ping gesendet wurde. Damit werden Player besser erkannt, die sowohl am Funknetz als auch am LAN angeschlossen sind.
-#	IsAlive-Check Anpassungen: Bei der Option 'tcp' wird nun versucht auf den Standard-Webport des Players zu verbinden (1400)
-#	Callback-Aufrufmethoden: Wenn ein Player eine Nachricht an Fhem sendet und dieser Player in Fhem als 'disappeared' geführt wird, dann wird der Discovery-Process neu angestartet, um diesen Player wieder sauber zu erkennen
-#	Sonos hat das Verfahren zum Hinzufügen von Spotify-Titeln angepasst. Jetzt kann man diese Titel auch wieder mit dem Modul einfügen und abspielen lassen
-#	Das Heraussuchen der Spotify-Cover (z.B. für Playlisten) schlug fehl, wenn die API kein Bild mit 640er Höhe angeboten hat. Nun wird das erste Cover verwendet, welches immer das größte sein sollte
-# 28.03.2015
-#	Die Wiederholungsintervalle (Tage) von Alarmen werden wieder korrekt erkannt, und gesetzt
-#	Bei PlaylistWithCovers wird nun auch ein Cover angezeigt, wenn der erste Titel ein Spotify-Titel ist
-# 28.02.2015
-#	Der Speak-Befehl kann jetzt auch eingeschobene MP3-Datei-Verweise verarbeiten. Diese werden im Text mit "|" eingeschlossen, und mit Leerzeichen abgetrennt. z.B.: "Dies ist ein |/path/to/tada.mp3| Test.". Funktioniert nur bei "Speak" (und nicht bei eigenen Programmaufrufen wie "Speak1")
-#	Es gibt für die einfachere Handhabung der neuen Speakmöglichkeiten zwei neue Attribute "targetSpeakMP3FileDir" und "targetSpeakMP3FileConverter". Mit "targetSpeakMP3FileDir" kann ein Standardverzeichnis für die eingschobenen MP3-Dateien angegeben werden, und mit "targetSpeakMP3FileConverter" kann ein MP3-Konverter definiert werden, der am Ende die zusammengebaute Durchsage-MP3-Datei nochmal sauber durchkodiert (um z.B. Restzeitanzeigeprobleme zu beheben).
-#	Beim internen Entfernen der Player-Objekte (wenn z.B. die Subscription nicht erneuert werden konnte), werden nun alle Referenzen entfernt. Teilweise wurden Subscription-Referenzen noch aufbewahrt.
-# 19.02.2015
-#	Das Attribut "verbose" am Sonos-Device wird nun zur Laufzeit an den SubProzess übertragen und wirkt dort sofort.
-#	Beim initialen Erkennen der wichtigsten Abspielparameter während des Discover-Prozesses gab es einen Fehler, der das Setzen verhindert hat
-# 14.02.2015
-#	Festen Lib-Pfad für Synology-Stations hinzugefügt.
-#	Im Modul 21_SONOSPLAYER wurde ein require auf das Modul 00_SONOS eingefügt.
-#	Es gibt jetzt einen neuen Setter "ResetAttributesToDefault", mit dem man die Attribute eines Devices auf den Standard beim Anlegen zurücksetzen lassen kann. Die notwendigen Informationen werden frisch vom Player angefordert, und können sich somit, auf den ursprünglichen Anlege-Zeitpunkt bezogen, verändert haben.
-#	Ein Fehler bei der Verarbeitung von Devicebeschreibungen wurde in der Datei "Common.pm" des UPnP-Moduls behoben.
-#	Es gibt jetzt zwei neue Readings "GroupVolume" und "GroupMute", die automatisch aktualisiert werden. Damit passt jetzt auch die Anzeige des Slider beim Setter "GroupVolume" und die Vorauswahl beim Setter "GroupMute".
-#	Fehlermeldungen für Speak wurden erweitert.
-#	Bei der Verwendung von "targetSpeakFileHashCache" wird nun auch Digest::SHA versucht, wenn Digest::SHA1 nicht funktioniert.
-#	Es gibt zwei neue Reading "currentTrackProvider" und "nextTrackProvider", in dem die 'Quelle' der aktuellen (bzw. nächsten) Wiedergabe abgelegt wird. Damit kann man sich Anzeigen lassen, ob der aktuelle Titel z.B. von Spotify oder aus der hausinternen Bibliothek kommt.
-# 06.02.2015
-#	Der Getter "EthernetPortStatus" hat jetzt auch die Portnummern 2 und 3 zur Auswahl.
-#	Es gibt ein neues Reading "OutputFixed" sowie ein zugehöriger Setter zum Setzen des Wertes.
-#	Es wurde im Standard-RemoteControl-Design ein :blank zwischen den Steuerbefehlen und den drei Umschaltbefehlen ("MuteT", "ShuffleT" und "RepeatT") eingefügt.
-#	Es gibt ein neues Reading "roomNameAlias", das den Namen enthält, der für das Attribut "alias" beim Erkennen des Players verwendet werden würde (z.B. "Wohnzimmer - Rechts"). Wird zu Laufzeit mit aktualisiert.
-#	Es gibt zwei neue Setter-Befehle "LoadSearchlist" und "StartSearchlist". Mit diesen kann eine dynamisch erzeugte Playliste mit Titeln aus der Sonos-Bibliothek geladen werden. Nähere Informationen dazu im Wiki.
-#	Es gibt einen neuen Getter-Befehl "SearchlistCategories", mit dem die möglichen Kategorien für den Aufruf von "LoadSearchlist" oder "StartSearchlist" ermittelt werden können.
-# 01.02.2015
-#	Es gibt nun zwei neue Befehle "ShuffleT" und "RepeatT", die jeweils den aktuellen Zustand von "Shuffle" und "Repeat" umschalten
-#	Das angelegte RemoteControl sowie die RemoteControl Vorlagen enthalten nun zwei neue Icons für Shuffle-Umschaltung und Repeat-Umschaltung
-# 31.01.2015
-#	Es gibt jetzt drei Sonos-Vorlagen für RemoteControl: "Sonos", "SonosSVG_Buttons" und "SonosSVG_Icons". 
-#	Es gibt jetzt ein neues Standardlayout (SonosSVG_Buttons) für die Erzeugung der RemoteControl.
-#	Es gibt jetzt ein Attribut "ignoredIPs", mit dem man problematische oder unerwünschte IPs bei der UPnP-Erkennung ausschließen kann.
-# 30.01.2015
-#	Commandref wurde optisch übersichtlicher gestaltet, und die Windows-Hinweise eingefügt.
-#	Bei der Anzeige des nächsten Titels in der Standard-ReadingsGroup stand "Artist". Das wurde auf "Interpret" korrigiert.
-#	Es gibt jetzt eine Prozedur "SONOSPLAYER_GetSlavePlayerNames()", mit der man sich die Teilnehmer einer Gruppe liefern lassen kann. Der Master wird nicht mit zurückgegeben. Man kann den Namen eines beliebigen Teilnehmers angeben.
-# 27.01.2015
-#	Bei den Befehlen "AddMember", "RemoveMember" und "CreateStereoPair" werden nun alle in Fhem verfügbaren Sonosplayer in einer Auswahl angeboten. Das erfolgt allerdings ungeachtet der Gültigkeit eines Players in diesem Kontext (z.B. kann man keinen Player aus der Gruppe entfernen, der nicht in der Gruppe ist, die Auswahl bietet aber alle an).
-#	Es gibt jetzt eine Prozedur "SONOSPLAYER_GetMasterPlayerName()" mit der man sich den Devicenamen des Masterplayer zu dem übergebenen Playernamen geben lassen kann.
-#	Es gibt einen neuen Setter "Mute" am Sonos-Device. Damit kann man mit einem Schritt bei allen Playern den Mute-Zustand setzen.
-# 26.01.2015
-#	Beim Setzen von "disable" am Sonos-Device wurde der "state" und "STATE" der Player nicht korrekt gesetzt. 
-# 24.01.2015
-#	Wenn man seine Player umbenannt hatte, wurde ein Attribut-Kommando (für das Model-Attribut) falsch aufgerufen und hat eine Fehlermeldung im Fhem-Log verursacht (z.B. "Please define Sonos_Wohnzimmer first")
-# 19.01.2015
-#	Verweise auf die "alte" Wikiseite "Sonos Anwendungsbeispiel" in der commandref durch die "neue" Seite "SONOS" ersetzt.
-#	Wenn kein Pingtype definiert wurde, dann wurde fälschlicherweise nicht der Standard "syn" verwendet, sondern "none"
-# 16.01.2015
-#	Speak hatte eine fehlerhafte Überprüfung der Attribute, und konnte nicht ausgeführt werden.
-#	Bei Streams wird das Reading "currentTrackPosition" nun fest auf "0:00:00" gesetzt, und nicht mehr beim Player angefragt
-# 15.01.2015
-#	Für die Setter "LoadPlaylist", "StartPlaylist", "LoadRadio", "StartRadio" und "StartFavourite" kann man jetzt anstatt des Namens einen regulären Ausdruck verwenden.
-#	Beim Erkennen der Player werden einige Abspielreadings ("transportState", "currentTrackURI", "currentTrackDuration", "currentTrackPosition", "currentTrack", "numberOfTracks", "currentStreamAudio" und "currentNormalAudio") nun direkt abgeholt, und werden somit aktuell korrekt gesetzt.
-#	Beim Anlegen der neuen Devices werden die Aliasnamen nun mit der Funktion im Team erweitert
-#	Der Mechanismus zum Starten des SubProzesses wurde angepasst, um auf Synology-Begebenheiten Rücksicht zu nehmen
-#	Die Coverdarstellung für einige Spotify-Titel wurde korrigiert, indem eine andere Spotify-API verwendet wird
-#	Bei Playlist-Covern wird nun das Cover des ersten Titels mit AlbumArt angezeigt
-#	Bei Favourite-Covern werden nun Album-Favoriten auch mit Cover dargestellt (das Cover des ersten Titels mit AlbumArt)
-#	Ein Album aus der lokalen Bibliothek konnte mittels "StartFavourite" nicht korrekt gestartet werden (es wurde nicht als Liste übertragen, sondern als Titel gestartet)
-#	LogLevel für die "Connection accepted"-Meldungen auf 3 hochgesetzt
-#	Es gibt jetzt ein Attribut "disable" am Sonos-Device. Wird es auf 1 gesetzt, wird der SubProzess beendet und verarbeitet somit keine Sonos-Nachrichten mehr. Wird es auf 0 gesetzt (oder gelöscht), wird der SubProzess wieder gestartet.
-# 08.01.2015
-#	Bei der Wiedergabeanweisung "PlayURI" gab es einen Fehler
-# 05.01.2105
-#	Die Cover beim Abspielen "von diesem Gerät" (also iPad, oder Android-Tablet) wurden nicht angezeigt.
-# 04.01.2015
-#	Bei der Ermittlung des Readings "AlbumArtist" gab es einen Fehler, wenn dieser von Sonos nicht übermittelt wurde.
-#	Wenn ein Player einen Dock (iPod) wiedergibt, dann werden die Titelinformationen dort mitgesetzt. Damit entfällt die Anzeige des Titels z.B. mit 'iPod von Reinerlein'.
-# 03.01.2015
-#	Dokumentation angepasst (commandref und Installationsdoku im Dateiheader)
-#	Fehler bei der Dockbehandlung behoben
-# 02.01.2015
-#	Anzeige bei der Wiedergabe eines Docks verbessert. Dort werden nun der Titel und Album/Artist-Informationen und ein Dock-Cover angezeigt.
-#	Getter/Setter bei Bedarf um ":noArg" erweitert.
-#	Getter/Setter sind nun nicht mehr CaseSensitive
-#	Setter für "Treble" und "Bass" haben nun auch einen Slider
-#	Setter "Icon" in "RoomIcon" umbenannt, damit die Auswahlliste den aktuellen vorauswählt
-#	Beim Erzeugen der Sonosplayer-Devices wird nun das Attribut "alias" auf den Sonos-Raumnamen gesetzt.
-#	Zusätzlich zu "StopAll" oder "PauseAll" gibt es am Sonos-Device nun auch "Stop" und "Pause" mit der gleichen Funktionalität
-# 01.01.2015
-#	Anzeige in der Player-ReadingsGroup für die Darstellung von disappeared angepasst, dabei auch gleich die Höhenverhältnisse etwas angepasst.
-# 31.12.2014
-#	Das Bilden von Stereopaaren wird nun unterstützt. Dafür gibt es die Anweisungen 'CreateStereoPair' und 'SeparateStereoPair' an einem Playerdevice.
-# 28.12.2014
-#	Umlaute: Die Erkennung von Umlauten war wegen der Quelltextumstellung auf UTF8 fehlerhaft. Das betraf nur die Zonennamenumwandlung, wo z.B. aus 'Küche' ein 'Kueche' gemacht wird.
-#	Sonos-Coverlieferung: Es waren noch ein paar Return-Anweisungen zuviel drin.
-# 26.12.2014:
-#	DeleteFn für Sonos wurde implementiert. Das Sonos-Device löscht erst alle SonosPlayer-Devices und beendet den selbst gestarteten SubProzess. Danach wird das Sonos-Device selber von Fhem abgeräumt.
-#	DeleteFn für SonosPlayer wurde implementiert. Es werden erst alle automatisch erzeugten Devices (RemoteControl und ReadingsGroups) entfernt, sofern sie noch unter dem Originalnamen existieren.
-#	ReportUnresponsiveDevice hat manchmal versucht, die Mitteilung an "sich selbst" zu senden, was naturgemäß nicht klappen kann.
-#
-# 2.6:	Die Zeichenkodierung bei Datenübernahme vom Zoneplayer kann nun über das Attribut characterDecoding eingestellt werden
-#		Bei Gruppen-/LineIn-/SPDIF-Wiedergabe wird wieder die liefernde Zone angezeigt (als Albumname)
-#		SetCurrentPlaylist hatte einen Tippfehler, und konnte dementsprechend nicht ausgeführt werden
-#		Unter Ubuntu gibt es die SHA1-Library nicht mehr, sodass man dort eine andere einbinden muss (SHA)
-#		Wenn bei den Methoden zum heraussuchen der FHEM-Devices etwas nicht gefunden wurde, dann wird jetzt eine Fehlermeldung mit dem gesuchten Merkmal ausgegeben
-#		Es können jetzt IP-Adressen von der UPnP-Verarbeitung ausgeschlossen werden
-#		Es wird nun ein fester Mimetype 'jpg' für Google Music und Simfy festgelegt
-#		Beim Alarm-Reading-Setzen wurde etwas doppelt gesetzt, was u.U. zu Fehlern führen konnte
-#		Die Read-Function wurde robuster gegen Übertragungsprobleme gemacht
-#		Das Wiederherstellen des Playerzustands nach einem PlayURITemp sieht nun auch den PlayBar-Eingang vor
-#		Es wird nun anstatt der WebCmd-Auflistung ein RemoteControl beim Erstellen der Komponenten erzeugt
-#		Wenn sich doch noch ein UPnP-Device als Player ausgibt, dann wird dies nun etwas sicherer erkannt
-#		Der Eingang einer Playbar kann nun auf anderen Playern wiedergegeben werden (mittels des Fhem-Namens)
-#		Lesen wurde auf DevIo_SimpleRead umgestellt (stand auf DevIo_DoSimpleRead). Dadurch wird das Fehlerhandling vereinfacht.
-#		Man kann die Zeit für das Warten auf den Subprozess nun beim Define mit angeben. Standardmäßig wird 8 verwendet.
-#		Es wird nun in regelmäßigen Abständen (Intervall wie bei der Prüfung der Sonosplayer) geprüft, ob die Verbindung zum Subprozess noch funktioniert
-#		Die Readings, die beim Start nicht geladen werden dürfen, werden beim Start von Fhem nun initialisiert. Damit wird die Fehlermeldung in MOTD verhindert
-#		Der Zeitstempel in der Konsolenausgabe berücksichtigt nun auch die Global-Angabe, ob Millisekunden mit ausgegeben werden sollen
-#		Der Start wurde komplett überarbeitet. Nun sind die einzelnen Wartebereiche in Timer ausgelagert, sodass Fhem nicht mit warten blockiert wird.
-#		Die Wiederherstellung des alten Playerzustands nach einem PlayURITemp (und damit auch bei Speak) wird nun auch bei Dateien gemacht, die mit 0s Dauer ermittelt werden (da sie sehr kurz sind).
-#		Der Aufruf der Google Text2Speech-Engine wird nun bei mehr als 95 Zeichen in mehrere Aufrufe aufgeteilt. Damit sind nun auch lange Texte über Google möglich, allerdings geht die Textmelodie u.U. verloren.
-#		Man kann jetzt für die Speak-Erzeugung ein JPG- oder PNG-Bild angeben. Dies kann für jedes Speak-Programm getrennt erfolgen.
-#		Beim Speak-Aufruf werden Umlaute nun auch korrekt an den Text2Speech-Generator (z.B. Google) übergeben, und korrekt in den MP3-Tag geschrieben
-#		Spotify-Cover werden nun in größerer Auflösung (meist 640x640 Pixel) direkt von Spotify heruntergeladen, und enthalten dann nicht mehr das Spotify-Logo
-#		Es gibt zwei neue Readings 'currentAlbumArtURL' und 'nextAlbumArtURL', die die Originalpfade zum eigenen Download darstellen
-#		Es gibt nun zwei Prozeduren, die als Grundlage oder Beispiel für die Verwendung von ReadingsGroups dienen können: 'SONOS_getTitleRG' und 'SONOS_getCoverRG'
-#		Beim automatischen Erzeugen der Sonos-Devices werden nun ReadingsGroups mit mehr Informationen erzeugt. Dies kann (und soll) auch als Vorlage für eigene Ideen Verwendet werden
-#		Es gibt eine weitere ReadingsGroup-Vorlage (steht auch im Wiki), mit der Listen (Playlisten, Favoriten und Radios) dargestellt werden können
-#		Es gibt zwei neue Attribute "proxyCacheTime" und "proxyCacheDir", die einen Cache im Proxy aktivieren
-#		Es gibt drei neue Getter am Sonosplayer-Device: "FavouritesWithCover", "PlaylistsWithCover" und "RadiosWithCovers". Diese geben eine Datenstruktur zurück, die den Titel und das Cover des Elements enthält.
-#		Die Prozeduren für die Anzeige des aktuellen und nächsten Titels verwenden nun ausschließlich DIV-Container (anstatt Tabellen). Dadurch klappt die Anzeige auch in einem Dashboard.
-#		Die Standard-ReadingsGroup-Anzeige durch die Prozeduren sind nun Parametrisiert. Man kann die minimale Breite der Anzeige sowie den Abstand zwischen aktuellem und nächstem Titel in Pixel festlegen
-#		Manche Sender (z.B. Capital Radio Türkiye) haben verbotene Newlines in den Titelinformationen mitgesendet. Diese werden nun entfernt.
-#		Man kann das Cover nun anklicken (oder antippen), und erhält dann die Coverdarstellung in einer Vollbilddarstellung mit Abspielstatus und Titelinformationen
-#		Es gibt zwei neue Befehle 'StartPlaylist' und 'StartRadio', die die gleichen Parameter wie ihre Pendants mit 'Load' am Anfang haben, nur dass hier das Abspielen gleich gestartet wird.
-#		Es gibt jetzt ein Reading 'currentTrackPosition', welches bei jedem Transportstate-Wechsel (neuer Titel, Play/Pause/Stop usw.) gesetzt wird. Damit kann man die verbleibende Restzeit eines laufenden Titels ermitteln, bzw. den Pausezeitpunkt anzeigen.
-#		Beim Wiedergeben von TV oder sonstigen externen Quellen, wird jetzt nicht mehr das 'leere' Cover angezeigt, sondern ein TV-Cover bzw. ein Default-Input-Cover
-#		Aufnahme in das offizielle Release von Fhem
-#
-# 2.5:	Verwendung und Speicherung der Benutzer-IDs für Spotify und Napster wurden stabiler gegenüber Sonderzeichen gemacht
-#		Spotify-URLs werden im Reading 'currentTrackURI' und 'nextTrackURI' lesbarer abgelegt
-#		Ein Fehler beim Öffnen von M3U-Playlistdateien wurde behoben (dafür Danke an John)
-#		Überholt: Für die Informationsanfragen an Fhem durch den SubProzess wird nun standardmäßig der Telnet-Port von Fhem verwendet. Wenn das fehlschlägt, wird auf den alten Mechanismus zurückgeschaltet
-#		Neu: Es werden keine Informationsanfragen mehr zwischen Fhem und dem SubProzess ausgetauscht. Notwendige Informationen müssen vorher übertragen werden. Das bedeutet, dass bei einer Attributänderung ein Neustart von Fhem erfolgen muss.
-#		Es wurde ein Standard-Layout für das RemoteControl-Hilfsmodul angelegt
-#		Der Verbose-Level des Sonos-Devices wird nun auch an den SubProzess weitergereicht (auch zur Laufzeit), und beim initialen Start des SubProzess-Threads mitgegeben.
-#		AlbumArt von Napster erhält nun den festen Mimetype 'jpg', da dieser nicht übertragen wird
-#		Es werden nun die durch Fhem definierten Standard-Attribute mit angeboten
-#		Es gab ein Problem mit der Befehlsverarbeitung, wenn das Verbose-Attribut an einem Sonos-Device gesetzt war.
-#		Es wird nun auf Änderungsevents für den Zonennamen und das Zonenicon reagiert, und die entsprechenden Readings aktualisiert
-#		Es gibt jetzt zwei neue Setter: 'Name' und 'Icon', mit dem der Name und das Icon der Zone eingestellt werden kann
-#		Es gibt jetzt einen Getter 'PossibleRoomIcons', welcher die möglichen Angaben für den neuen Setter 'Icon' liefert
-#		Das Reading 'ZoneGroupID' wird nun auf eine andere Weise ermittelt und gesetzt
-#		Es gib jetzt ein neues Reading 'AlarmRunning', welches auf '1' steht, wenn gerade eine Alarmabspielung aktiv ist
-#		Die Namens- und Aufgabenerkennung beim Ermitteln der Player wurde angepasst
-#		Der Aufruf von AddMember und RemoveMember wurde bzgl. des SonosDevice-Namen abgesichert, sodass hier kein Absturz mehr bei einer falschen Deviceangabe erfolgt
-#		Es gibt jetzt ein neues Reading 'AlarmRunningID', welches bei einer Alarmausführung die ID des aktiven Alarms enthält
-#		Das Senden von Aktualisierungen an Fhem wurde etwas sicherer gemacht, wenn Fhem auf der anderen Seite gerade nicht zuhören kann
-#		Die Readings 'AlarmList', 'AlarmListIDs' und 'AlarmListVersion' werden nicht mehr aus dem Statefile geladen, da dort Sonderzeichen wie '#' zum Abschneiden der restlichen Zeile führen
-#		Anpassung der UPnP-Klasse, damit das Device-Beschreibungsdokument nur noch einmal geladen wird (anstatt wie bisher zweimal)
-#		Anpassung im Bereich der Cover Aktualisierung über FhemWeb. Das geht jetzt mit viel weniger Aufwand durch.
-#		Es gibt jetzt einen Setter 'SnapshotGroupVolume', der das aktuelle Lautstärkenverhältnis der einzelnen Player einer Gruppe für die folgenden Aufrufe des Setter 'GroupVolume' festhält. Die Anweisungen 'PlayURI' und 'PlayURITemp' (sowie darauf aufbauende Aufrufe wie 'Speak') führen diese Anweisung selbsttätig beim Starten durch.
-#		Wenn beim Auffrischen der Subscriptions ein Fehler auftritt, der darauf schließen läßt, dass der Player weg ist, dann wird die entsprechende Referenz aufgeräumt
-#		Man kann als relative Angabe bei setVolume nun einen Prozentwert angeben, z.B. '+20%'. Damit wird die Lautstärke um den jeweiligen prozentualen Anteil erhöht oder abgesenkt.
-#		Es gibt jetzt ein Reading 'LineInConnected', welches eine '1' enthält, wenn der Line-In-Eingang angeschlossen wurde, sonst '0'.
-#
-# 2.4:	Initiale Lautstärkenermittlung wurde nun abgesichert, falls die Anfrage beim Player fehlschlägt
-#		Verbesserte Gruppenerkennung für die Anzeige der Informationen wie Titel usw.
-#		Fallback (Log) für den Aufruf von Log3 geschaffen, damit auch alte FHEM-Versionen funktionieren
-#		Es wurde eine Korrektur im verwendetetn UPnP-Modul gemacht, die eine bessere Verarbeitung der eingehenden Datagramme gewährleistet (dafür Danke an Sacha)
-#		Es werden nun zusätzliche Readings (beginnend mit 'next') mit den Informationen über den nächsten Titel befüllt. Diese können natürlich auch für InfoSummarize verwendet werden
-#		Es kann nun ein Eintrag aus der Sonos-Favoritenliste gestartet werden (Playlist oder Direkteintrag)
-#		Das Benennen der Sonos-Fhem-Devices wird nun auf Namensdoppelungen hin überprüft, und der Name eindeutig gemacht. Dabei wird im Normalfall das neue Reading 'fieldType' an den Namen angehangen. Nur der Master einer solchen Paarung bekommt dann den Original-Raumnamen als Fhem-Devicenamen
-#		Es gibt ein neues Reading 'fieldType', mit dem man erkennen kann, an welcher Position in einer Paarung dieser Zoneplayer steht
-#		Diverse Probleme mit Gruppen und Paarungen beim neu Erkennen der Sonos-Landschaft wurden beseitigt
-#		Es gibt jetzt einen Getter 'EthernetPortStatus', der den Status des gewünschten Ethernet-Ports liefert
-#		Es gibt jetzt einen Setter 'Reboot', der einen Neustart des Zoneplayers durchführt
-#		Es gibt jetzt einen Setter 'Wifi', mit dem der Zustand des Wifi-Ports eines Zoneplayers gesetzt werden kann
-#		Wenn ein Player als "Disappeared" erkannt wird, wird dem Sonos-System dies mitgeteilt, sodass er aus allen Listen und Controllern verschwindet
-#		Kleinere Korrektur, die eine bessere Verarbeitung der Kommunikation zwischen Fhem und dem Subprozess bewirkt
-#
-# 2.3:	Die Antwort von 'SetCurrentPlaylist' wurde korrigiert. Dort kam vorher 'SetToCurrentPlaylist' zurück.
-#		VolumeStep kann nun auch als Attribut definiert werden. Das fehlte in der zulässigen Liste noch.
-#		Speak kann nun auch für lokale Binary-Aufrufe konfiguriert werden.
-#		Speak kann nun einen Hash-Wert auf Basis des gegebenen Textes in den Dateinamen einarbeiten, und diese dann bei Gleichheit wiederverwenden (Caching)
-#		Sonos kann nun ein "set StopAll" oder "set PauseAll" ausführen, um alle Player/Gruppen auf einen Schlag zu stoppen/pausieren
-#		Beim Discover-Event wird nun genauer geprüft, ob sich überhaupt ein ZonePlayer gemeldet hat
-#		Die UserIDs für Napster und Spotify werden wieder korrekt ermittelt. Damit kann auch wieder ein Playlistenimport erfolgen.
-#		Loudness Einstell- und Abfragbar
-#		Bass Einstell- und Abfragbar
-#		Treble Einstell- und Abfragbar
-#		Volume kann nun auch als RampToVolume ausgeführt werden
-#
-# 2.2:	Befehlswarteschlange wieder ausgebaut. Dadurch gibt es nur noch das Reading LastActionResult, und alles wird viel zügiger ausgeführt, da Fhem nicht auf die Ausführung warten muss.
-#		TempPlaying berücksichtigt nun auch die Wiedergabe von Line-In-Eingängen (also auch Speak)
-#		Veraltete, mittlerweile unbenutzte, Readings werden nun gelöscht
-#		SetLEDState wurde hinzugefügt
-#		Die IsAlive-Überprüfung kann mit 'none' abgeschaltet werden
-#		CurrentTempPlaying wird nicht mehr benötigt
-#
-# 2.1:	Neuen Befehl 'CurrentPlaylist' eingeführt
-#
-# 2.0:	Neue Konzeptbasis eingebaut
-#		Man kann Gruppen auf- und wieder abbauen
-#		Es gibt neue Lautstärke- und Mute-Einstellungen für Gruppen ingesamt
-#		Man kann Button-Events definieren
-#
-# 1.13:	Neuer Abspielzustand 'TRANSITIONING' wird berücksichtigt
-#		Der Aufruf von 'GetDeviceDefHash' wird nun mit dem Parameter 'undef' anstatt ohne einen Parameter durchgeführt
-#
-# 1.12:	TrackURI hinzugefügt
-#		LoadPlayList und SavePlayList können nun auch Dateinamen annehmen, um eine M3U-Datei zu erzeugen/als Abspielliste zu laden
-#		Alarme können ausgelesen, gesetzt und gelöscht werden
-#		SleepTimer kann gesetzt und ausgelesen werden
-#		Reading DailyIndexRefreshTime hinzugefügt
-#		Bei AddURIToQueue und PlayURI können jetzt auch (wie bei LoadPlayList) Spotify und Napster-Ressourcen angegeben werden
-#		Beim Erzeugen des Cover-Weblinks wird nun nur noch die Breite festgelegt, damit Nicht-Quadratische Cover auch korrekt dargestellt werden
-#		SONOS_Stringify gibt Strings nun in einfachen Anführungszeichen aus (und maskiert etwaig enthaltene im String selbst)
-#
-# 1.11:	Ein Transport-Event-Subscribing wird nur dann gemacht, wenn es auch einen Transport-Service gibt. Die Bridge z.B. hat sowas nicht.
-#		Bei PlayURITemp wird nun der Mute-Zustand auf UnMute gesetzt, und anschließend wiederhergestellt
-#		Shuffle, Repeat und CrossfadeMode können nun gesetzt und abgefragt werden. Desweiteren wird der Status beim Transport-Event aktualisiert.
-#		Umlaute bei "generateInfoSmmarize3" durch "sichere" Schreibweise ersetzt (Lautst&auml;rke -> Lautstaerke)
-#
-# 1.10:	IsAlive beendet nicht mehr den Thread, wenn der Player nicht mehr erreichbar ist, sondern löscht nur noch die Proxy-Referenzen
-#		FHEMWEB-Icons werden nur noch im Hauptthread aktualisiert
-#		Getter 'getBalance' und Setter 'setBalance' eingeführt.
-#		HeadphoneConnected inkl. minVolumeHeadphone und maxVolumeHeadphone eingeführt
-#		InfoSummarize um die Möglichkeit der Volume/Balance/HeadphoneConnected-Felder erweitert. Außerdem werden diese Info-Felder nun auch bei einem Volume-Event neu berechnet (und triggern bei Bedarf auch!)
-#		InfoSummarize-Features erweitert: 'instead' und 'emptyval' hinzugefügt
-#		IsAlive prüft nicht mehr bei jedem Durchgang bis zum Thread runter, ob die Subscriptions erneuert werden müssen 
-#
-# 1.9:	RTL.it Informationen werden nun schöner dargestellt (Da steht eine XML-Struktur im Titel)
-#		Wenn kein Cover vom Sonos geliefert werden kann, wird das FHEM-Logo als Standard verwendet (da dieses sowieso auf dem Rechner vorliegt)
-#		UPnP-Fehlermeldungen eingebaut, um bei einer Nichtausführung nähere Informationen erhalten zu können
-#
-# 1.8:	Device-Removed wird nun sicher ausgeführt. Manchmal bekommt man wohl deviceRemoved-Events ohne ein vorheriges deviceAdded-Event. Dann gibt es die gesuchte Referenz nicht.
-#		Renew-Subscriptions wurden zu spät ausgeführt. Da war alles schon abgelaufen, und konnte nicht mehr verlängert werden.
-#		ZonePlayer-Icon wird nun immer beim Discover-Event heruntergeladen. Damit wird es auch wieder aktualisiert, wenn FHEM das Icon beim Update verwirft.
-#		MinVolume und MaxVolume eingeführt. Damit kann nun der Lautstärkeregelbereich der ZonePlayer festgelegt werden
-#		Umlaute beim Übertragen in das Reading State werden wieder korrekt übertragen. Das Problem waren die etwaigen doppelten Anführungsstriche. Diese werden nun maskiert.
-#		Sonos Docks werden nun auch erkannt. Dieses hat eine andere Device-Struktur, weswegen der Erkennungsprozess angepasst werden musste.
-#
-# 1.7:	Umlaute werden bei Playernamen beim Anlegen des Devices korrekt umgewandelt, und nicht in Unterstriche
-#		Renew-Subscription eingebaut, damit ein Player nicht die Verbindung zum Modul verliert
-#		CurrentTempPlaying wird nun auch sauber beim Abbrechen des Restore-Vorgangs zurückgesetzt
-#		Die Discovermechanik umgebaut, damit dieser Thread nach einem Discover nicht neu erzeugt werden muss.
-#
-# 1.6:	Speak hinzugefügt (siehe Doku im Wiki)
-#		Korrektur von PlayURITemp für Dateien, für die Sonos keine Abspiellänge zur Verfügung stellt
-#		Korrektur des Thread-Problems welches unter *Nix-Varianten auftrat (Windows war nicht betroffen)
-#
-# 1.5:	PlayURI, PlayURITemp und AddURIToQueue hinzugefügt (siehe Doku im Wiki)
-#
-# 1.4:	Exception-Handling bei der Befehlsausführung soll FHEM besser vor verschwundenen Playern schützen 
-#		Variable $SONOS_ThisThreadEnded sichert die korrekte Beendigung des vorhandenen Threads, trotz Discover-Events in der Pipeline
-#		Einrückungen im Code korrigiert
-#
-# 1.3:	StopHandling prüft nun auch, ob die Referenz noch existiert
-#
-# 1.2:	Proxy-Objekte werden beim Disappearen des Player entfernt, und sorgen bei einem nachfolgenden Aufruf für eine saubere Fehlermeldung
-#		Probleme mit Anführungszeichen " in Liedtiteln und Artist-Angaben. Diese Zeichen werden nun ersetzt
-#		Weblink wurde mit fehlendem "/" am Anfang angelegt. Dadurch hat dieser nicht im Floorplan funktionert
-#		pingType wird nun auf Korrektheit geprüft.
-#		Play:3 haben keinen Audio-Eingang, deshalb funktioniert das Holen eines Proxy dafür auch nicht. Jetzt ist das Holen abgesichert.
-#
-# 1.1: 	Ping-Methode einstellbar über Attribut 'pingType'
-#
-# 1.0:	Initial Release
 #
 ########################################################################################
 #
@@ -380,7 +119,8 @@ use feature 'state';
 
 
 ########################################################
-# IP-Adressen, die vom UPnP-Modul ignoriert werden sollen
+# IP-Adressen, die vom UPnP-Modul ignoriert werden sollen.
+# Diese können über ein Attribut gesetzt werden.
 ########################################################
 my %ignoredIPs = ();
 
@@ -419,8 +159,19 @@ if (lc(substr($0, -7)) eq 'fhem.pl') {
 }
 use lib ($gPath.'/lib', $gPath.'/FHEM/lib', './FHEM/lib', './lib', './FHEM', './', '/usr/local/FHEM/share/fhem/FHEM/lib');
 print 'Current: "'.$0.'", gPath: "'.$gPath."\"\n";
-use UPnP::ControlPoint;
-require 'DevIo.pm' if (lc(substr($0, -7)) eq 'fhem.pl');
+
+if (lc(substr($0, -7)) eq 'fhem.pl') {
+	require 'DevIo.pm';
+} else {
+	use UPnP::ControlPoint;
+	
+	########################################################
+	# Change all carp-calls in the UPnP-Module to croak-calls
+	# This will ensure you can "catch" carp with an enclosing
+	# "eval{}"-Block
+	########################################################
+	#*UPnP::ControlPoint::carp = \&UPnP::ControlPoint::croak;
+}
 
 
 ########################################################################################
@@ -436,7 +187,11 @@ my %sets = (
 	'Stop' => '',
 	'PauseAll' => '',
 	'Pause' => '',
-	'Mute' => 'state'
+	'Mute' => 'state',
+	'LoadBookmarks' => '',
+	'SaveBookmarks' => '',
+	'DisableBookmark' => 'groupname',
+	'EnableBookmark' => 'groupname'
 );
 
 my %SONOS_ProviderList = ('^http:(\/\/.*)' => 'Radio',
@@ -446,8 +201,8 @@ my %SONOS_ProviderList = ('^http:(\/\/.*)' => 'Radio',
 						'^npsdy:' => 'Napster');
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
-my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime);
-my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected presence currentAlbum currentArtist currentTitle GroupVolume GroupMute FavouritesVersion RadiosVersion PlaylistsVersion);
+my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents characterDecoding generateProxyAlbumArtURLs proxyCacheTime bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition);
+my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected presence currentAlbum currentArtist currentTitle GroupVolume GroupMute FavouritesVersion RadiosVersion PlaylistsVersion QueueVersion QueueHash);
 
 # Obsolete Einstellungen...
 my $SONOS_UseTelnetForQuestions = 1;
@@ -471,7 +226,7 @@ my $SONOS_Thread_IsAlive_Counter_MaxMerci = 2;
 # Some Constants
 my @SONOS_PINGTYPELIST = qw(none tcp udp icmp syn);
 my $SONOS_DEFAULTPINGTYPE = 'syn';
-my $SONOS_SUBSCRIPTIONSRENEWAL = 1800; 
+my $SONOS_SUBSCRIPTIONSRENEWAL = 1800;
 my $SONOS_DIDLHeader = '<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">';
 my $SONOS_DIDLFooter = '</DIDL-Lite>';
 my $SONOS_GOOGLETRANSLATOR_CHUNKSIZE = 95;
@@ -505,6 +260,21 @@ my %SONOS_AlarmSubscriptions;
 my %SONOS_ZoneGroupTopologySubscriptions;
 my %SONOS_DevicePropertiesSubscriptions;
 my %SONOS_AudioInSubscriptions;
+
+# Bookmark-Daten
+my %SONOS_BookmarkQueueHash;
+my %SONOS_BookmarkTitleHash;
+my %SONOS_BookmarkQueueDefinition;
+my %SONOS_BookmarkTitleDefinition;
+
+my %SONOS_BookmarkSpeicher;
+$SONOS_BookmarkSpeicher{OldTracks} = ();
+$SONOS_BookmarkSpeicher{NumTracks} = ();
+$SONOS_BookmarkSpeicher{OldTrackURIs} = ();
+$SONOS_BookmarkSpeicher{OldTitles} = ();
+$SONOS_BookmarkSpeicher{OldTrackPositions} = ();
+$SONOS_BookmarkSpeicher{OldTrackDurations} = ();
+$SONOS_BookmarkSpeicher{OldTransportstate} = ();
 
 # Locations -> UDN der einzelnen Player merken, damit die Event-Verarbeitung schneller geht
 my %SONOS_Locations;
@@ -551,7 +321,7 @@ sub SONOS_Initialize ($) {
 	$hash->{GetFn}   = 'SONOS_Get';
 	$hash->{SetFn}   = 'SONOS_Set';
 	$hash->{AttrFn}  = 'SONOS_Attribute';
-	# $hash->{NotifyFn}  = 'SONOS_Notify';
+	$hash->{NotifyFn}  = 'SONOS_Notify';
 	
 	# CGI
 	my $name = "sonos";
@@ -563,7 +333,7 @@ sub SONOS_Initialize ($) {
 	eval {
 		no strict;
 		no warnings;
-		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir characterDecoding '.$readingFnAttributes;
+		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir characterDecoding bookmarkSaveDir bookmarkReadingUsedForTitle bookmarkTitleDefinition bookmarkPlaylistDefinition '.$readingFnAttributes;
 		use strict;
 		use warnings;
 	};
@@ -1188,6 +958,11 @@ sub SONOS_StopSubProcess($) {
 ########################################################################################
 sub SONOS_Notify() {
 	my ($hash, $notifyhash) = @_;
+	
+	# Bei einem globalen save auch die bookmarks sichern...
+	if (($notifyhash->{NAME} eq 'global') && ($notifyhash->{CHANGED}[0] eq 'SAVE')) {
+		SONOS_DoWork('SONOS', 'SaveBookmarks', '');
+	}
 	
 	return undef;
 }
@@ -2190,6 +1965,14 @@ sub SONOS_Set($@) {
 			my @currentElem = @{$cElem};
 			SONOS_DoWork(SONOS_getDeviceDefHash($currentElem[0])->{UDN}, $commandType, $commandValue);
 		}
+	} elsif (lc($key) eq 'savebookmarks') {
+		SONOS_DoWork('SONOS', 'SaveBookmarks', $value);
+	} elsif (lc($key) eq 'loadbookmarks') {
+		SONOS_DoWork('SONOS', 'LoadBookmarks', $value);
+	} elsif (lc($key) eq 'disablebookmark') {
+		SONOS_DoWork('SONOS', 'DisableBookmark', $value);
+	} elsif (lc($key) eq 'enablebookmark') {
+		SONOS_DoWork('SONOS', 'EnableBookmark', $value);
 	} else {
 		return 'Not implemented yet!';
 	}
@@ -2270,6 +2053,27 @@ sub SONOS_Discover() {
 				if ($workType eq 'setVerbose') {
 					$SONOS_Client_LogLevel = $params[0];
 					SONOS_Log undef, 0, "Setting LogLevel to new value: $SONOS_Client_LogLevel";
+				} elsif ($workType eq 'JumpToBookmark') {
+					if ($SONOS_BookmarkTitleDefinition{$params[0]}) {
+						
+					}
+				} elsif ($workType eq 'LoadBookmarks') {
+					SONOS_LoadBookmarkValues($params[0]);
+				} elsif ($workType eq 'SaveBookmarks') {
+					SONOS_SaveBookmarkValues($params[0]);
+				} elsif ($workType eq 'DisableBookmark') {
+					$SONOS_BookmarkTitleDefinition{$params[0]}{Disabled} = 1 if ($SONOS_BookmarkTitleDefinition{$params[0]});
+					$SONOS_BookmarkQueueDefinition{$params[0]}{Disabled} = 1 if ($SONOS_BookmarkQueueDefinition{$params[0]});
+				} elsif ($workType eq 'EnableBookmark') {
+					delete($SONOS_BookmarkTitleDefinition{$params[0]}{Disabled}) if ($SONOS_BookmarkTitleDefinition{$params[0]});
+					delete($SONOS_BookmarkQueueDefinition{$params[0]}{Disabled}) if ($SONOS_BookmarkQueueDefinition{$params[0]});
+				} elsif ($workType eq 'setEQ') {
+					my $command = $params[0];
+					my $value = $params[1];
+					
+					if (SONOS_CheckProxyObject($udn, $SONOS_RenderingControlProxy{$udn})) {
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).' ('.$command.'): '.SONOS_UPnPAnswerMessage($SONOS_RenderingControlProxy{$udn}->SetEQ(0, $command, $value)));
+					}
 				} elsif ($workType eq 'setName') {
 					my $value1 = SONOS_Utf8ToLatin1($params[0]);
 					
@@ -3773,7 +3577,9 @@ sub SONOS_Discover() {
 		
 		return 1;
 	};
-
+	
+	SONOS_LoadBookmarkValues();
+	
 	my $error;
 	do {
 		$SONOS_RestartControlPoint = 0;
@@ -3786,17 +3592,18 @@ sub SONOS_Discover() {
 		$error = $@;
 		
 		# Nur wenn es der Fehler mit der XML-Struktur ist, dann den UPnP-Handler nochmal anstarten...  
-		if (($error =~ m/multiple roots, wrong element '.*?'/si) || ($error =~ m/junk '.*?' after XML element/si) || ($error =~ m/mismatched tag '.*?'/si) || ($error =~ m/500 Can't connect to/si)) {
+		if (($error =~ m/multiple roots, wrong element '.*?'/si) || ($error =~ m/junk '.*?' after XML element/si) || ($error =~ m/mismatched tag '.*?'/si) || ($error =~ m/no element found/si) || ($error =~ m/500 Can't connect to/si) || ($error =~ m/not properly closed tag '.*?'/si) || ($error =~ m/Bad arg length for Socket::unpack_sockaddr_in/si)) {
 			SONOS_Log undef, 2, "Error during UPnP-Handling, restarting handling: $error";
 			SONOS_StopControlPoint();
 		} else {
 			SONOS_Log undef, 2, "Error during UPnP-Handling: $error";
 			SONOS_StopControlPoint();
 			
-			# <spi> => Vielleicht noch auskommentieren
 			undef($error);
 		}
 	} while ($error || $SONOS_RestartControlPoint);
+	
+	SONOS_SaveBookmarkValues();
 	
 	SONOS_Log undef, 3, 'UPnP-Thread wurde beendet.';
 	$SONOS_Thread = -1;
@@ -4631,6 +4438,20 @@ sub SONOS_GetTimeSeconds($) {
 
 ########################################################################################
 #
+#  SONOS_ConvertSecondsToTime - Converts seconds (e.g. 252) into a Time-String like '0:04:12'
+#
+#  Parameter $seconds = The seconds that have to be converted
+#
+########################################################################################
+sub SONOS_ConvertSecondsToTime($) {
+	my ($seconds) = @_;
+	
+	return sprintf('%01d:%02d:%02d', $seconds / 3600, ($seconds%3600) / 60, $seconds%60) if ($seconds > 0);
+	return '0:00:00';
+}
+
+########################################################################################
+#
 #  SONOS_CheckProxyObject - Checks for existence of $proxyObject (=return 1) or not (=return 0). Additionally in case of error it lays an error-answer in the queue
 #
 #  Parameter $proxyObject = The Proxy that has to be checked
@@ -5247,7 +5068,9 @@ sub SONOS_Discover_Callback($$$) {
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'transportState', $result->getValue('CurrentTransportState'));
 					
 					$result = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
-					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackURI', $result->getValue('TrackURI'));
+					my $tmp = $result->getValue('TrackURI');
+					$tmp =~ s/&apos;/'/gi;
+					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackURI', $tmp);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackProvider', SONOS_GetTrackProvider($result->getValue('TrackURI')));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackDuration', $result->getValue('TrackDuration'));
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentTrackPosition', $result->getValue('RelTime'));
@@ -5805,6 +5628,7 @@ sub SONOS_ServiceCallback($$) {
 	SONOS_Log $udn, 4, "Transport-Event: All correct with this service-call till now. UDN='uuid:$udn'";
 	$SONOS_Client_SendQueue_Suspend = 1;
 	
+	
 	# Determine the base URLs for downloading things from player
 	my $groundURL = ($1) if ($service->base =~ m/(http:\/\/.*?:\d+)/i);
 	SONOS_Log $udn, 4, "Transport-Event: GroundURL: $groundURL";
@@ -5818,6 +5642,46 @@ sub SONOS_ServiceCallback($$) {
 
 	# Verarbeitung starten	
 	SONOS_Log $udn, 4, 'Transport-Event: LastChange: '.$properties{LastChangeDecoded};
+	
+	
+	# Alte Bookmarks aktualisieren, gespeicherte Trackposition bei Bedarf anspringen...
+	SONOS_RefreshCurrentBookmarkQueueValues($udn);
+	{ # Start local area...
+		my $bufferedURI = '';
+		$bufferedURI = SONOS_GetURIFromQueueValue($1) if ($properties{LastChangeDecoded} =~ m/<CurrentTrackURI val="(.*?)"\/>/i);
+		$bufferedURI =~ s/&apos;/'/gi;
+		
+		my $bufferedTrackDuration = 0;
+		$bufferedTrackDuration = SONOS_GetTimeSeconds(decode_entities($1)) if ($properties{LastChangeDecoded} =~ m/<CurrentTrackDuration val="(.*?)"\/>/i);
+		
+		my $bufferedTrackPosition = 0;
+		if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+			$bufferedTrackPosition = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
+			if ($bufferedTrackPosition !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
+				$bufferedTrackPosition = '0:00:00';
+			}
+			$bufferedTrackPosition = SONOS_GetTimeSeconds($bufferedTrackPosition);
+		}
+		
+		if (($SONOS_BookmarkSpeicher{OldTrackURIs}{$udn} ne $bufferedURI) && SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+			my $timestamp = scalar(gettimeofday());
+			
+			foreach my $gKey (SONOS_getBookmarkGroupKeys('Title', $udn)) {
+				if (defined($SONOS_BookmarkTitleHash{$gKey}{$bufferedURI}) && SONOS_getBookmarkTitleIsRelevant($gKey, $timestamp, $bufferedURI, $bufferedTrackPosition, $bufferedTrackDuration)) {
+					my $newTrackposition = $SONOS_BookmarkTitleHash{$gKey}{$bufferedURI}{TrackPosition};
+					my $result = $SONOS_AVTransportControlProxy{$udn}->Seek(0, 'REL_TIME', SONOS_ConvertSecondsToTime($newTrackposition));
+					
+					$Data::Dumper::Indent = 0;
+					SONOS_Log $udn, 3, 'Player "'.SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn).'" jumped to the bookmarked trackposition '.SONOS_ConvertSecondsToTime($newTrackposition).' (Group "'.$gKey.'") ~ Bookmarkdata: '.Dumper($SONOS_BookmarkTitleHash{$gKey}{$bufferedURI});
+					$Data::Dumper::Indent = 2;
+					
+					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', 'JumpToTrackPosition "'.SONOS_ConvertSecondsToTime($newTrackposition).'": '.SONOS_UPnPAnswerMessage($result));
+					
+					last;
+				}
+			}
+		}
+	}
 	
 	
 	# Bulkupdate hier starten...
@@ -5850,6 +5714,8 @@ sub SONOS_ServiceCallback($$) {
 		# Wenn der TransportState den neuen Wert 'Transitioning' hat, dann diesen auf Playing umsetzen, da das hier ausreicht.
 		$currentValue = 'PLAYING' if $currentValue eq 'TRANSITIONING';
 		SONOS_Client_Notifier('SetCurrent:TransportState:'.$currentValue);
+		
+		$SONOS_BookmarkSpeicher{OldTransportstate}{$udn} = $currentValue;
 	}
 	
 	# Wird hier gerade eine Alarm-Abspielung durchgeführt (oder beendet)?
@@ -5882,12 +5748,19 @@ sub SONOS_ServiceCallback($$) {
 		SONOS_Client_Notifier('SetCurrent:NumberOfTracks:'.decode_entities($1)) if ($properties{LastChangeDecoded} =~ m/<NumberOfTracks val="(.*?)"\/>/i);
 		
 		# Current Tracknumber ermitteln
-		SONOS_Client_Notifier('SetCurrent:Track:'.decode_entities($1)) if ($properties{LastChangeDecoded} =~ m/<CurrentTrack val="(.*?)"\/>/i);
-		
+		if ($properties{LastChangeDecoded} =~ m/<CurrentTrack val="(.*?)"\/>/i) {
+			SONOS_Client_Notifier('SetCurrent:Track:'.decode_entities($1));
+			
+			# Für die Bookmarkverwaltung ablegen
+			$SONOS_BookmarkSpeicher{OldTracks}{$udn} = decode_entities($1);
+		}
 		
 		# Current TrackURI ermitteln
 		my $currentTrackURI = SONOS_GetURIFromQueueValue($1) if ($properties{LastChangeDecoded} =~ m/<CurrentTrackURI val="(.*?)"\/>/i);
+		$currentTrackURI =~ s/&apos;/'/gi;
 		SONOS_Client_Notifier('SetCurrent:TrackURI:'.$currentTrackURI);
+		# Für die Bookmarkverwaltung ablegen
+		$SONOS_BookmarkSpeicher{OldTrackURIs}{$udn} = $currentTrackURI;
 		
 		# Wenn es ein Spotify-Track ist, dann den Benutzernamen sichern, damit man diesen beim nächsten Export zur Verfügung hat
 		if ($currentTrackURI =~ m/^x-sonos-spotify:/i) {
@@ -5902,7 +5775,10 @@ sub SONOS_ServiceCallback($$) {
 		}
 		
 		# Current Trackdauer ermitteln
-		SONOS_Client_Notifier('SetCurrent:TrackDuration:'.decode_entities($1)) if ($properties{LastChangeDecoded} =~ m/<CurrentTrackDuration val="(.*?)"\/>/i);
+		if ($properties{LastChangeDecoded} =~ m/<CurrentTrackDuration val="(.*?)"\/>/i) {
+			SONOS_Client_Notifier('SetCurrent:TrackDuration:'.decode_entities($1));
+			$SONOS_BookmarkSpeicher{OldTrackDurations}{$udn} = SONOS_GetTimeSeconds(decode_entities($1));
+		}
 		
 		# Current Track Metadaten ermitteln
 		my $currentTrackMetaData = decode_entities($1) if ($properties{LastChangeDecoded} =~ m/<CurrentTrackMetaData val="(.*?)"\/>/is);
@@ -5932,6 +5808,7 @@ sub SONOS_ServiceCallback($$) {
 			if ($service->controlProxy()->GetMediaInfo(0)->getValue('CurrentURIMetaData') =~ m/<dc:title>(.*?)<\/dc:title>/i) {
 				SONOS_Client_Notifier('SetCurrent:Sender:'.$1);
 				SONOS_Client_Notifier('SetCurrent:TrackProvider:'.SONOS_GetTrackProvider($currentTrackURI, $1));
+				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = $1;
 			}
 			
 			# Sender-Läuft ermitteln
@@ -5950,6 +5827,8 @@ sub SONOS_ServiceCallback($$) {
 				$currentValue =~ s/\[e\]amp\[p\]/&/ig;
 			}
 			SONOS_Client_Notifier('SetCurrent:SenderInfo:'.encode_entities($currentValue));
+			
+			$SONOS_BookmarkSpeicher{OldTrackDurations}{$udn} = 0;
 		} else {
 			SONOS_Log $udn, 4, "Transport-Event: Normal erkannt!";
 			SONOS_Client_Notifier('SetCurrent:NormalAudio:1');
@@ -5961,13 +5840,20 @@ sub SONOS_ServiceCallback($$) {
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1));
 				SONOS_Client_Notifier('SetCurrent:Title:Gruppenwiedergabe');
 				SONOS_Client_Notifier('SetCurrent:Artist:');
+				
+				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = 'Gruppenwiedergabe von '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 			} elsif ($currentTrackURI =~ m/x-rincon-stream:(RINCON_[\dA-Z]+)/) {
 				# LineIn-Wiedergabe feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1));
 				
+				# Fallback
+				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
+				
 				if ($currentTrackMetaData =~ m/<dc:title>(.*?)<\/dc:title>/i) {
 					SONOS_Client_Notifier('SetCurrent:Title:'.SONOS_replaceSpecialStringCharacters(decode_entities($1)));
 					$currentTitle = $1;
+					
+					$SONOS_BookmarkSpeicher{OldTitles}{$udn} = $1.' von '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 				}
 				SONOS_Client_Notifier('SetCurrent:Artist:');
 				
@@ -5981,12 +5867,16 @@ sub SONOS_ServiceCallback($$) {
 				$currentTitle = $tmpTitle;
 				SONOS_Client_Notifier('SetCurrent:Artist:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentArtist', ''));
 				
+				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'currentTitle', $tmpTitle);
+				
 				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_dock.jpg:');
 			} elsif ($currentTrackURI =~ m/x-sonos-htastream:(RINCON_[\dA-Z]+):spdif/) {
 				# LineIn-Wiedergabe der Playbar feststellen, und dann andere Informationen anzeigen
 				SONOS_Client_Notifier('SetCurrent:Album:'.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1));
 				SONOS_Client_Notifier('SetCurrent:Title:SPDIF-Wiedergabe');
 				SONOS_Client_Notifier('SetCurrent:Artist:');
+				
+				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = 'SPDIF-Wiedergabe von '.SONOS_Client_Data_Retreive($1.'_MR', 'reading', 'roomName', $1);
 				
 				SONOS_Client_Notifier('ProcessCover:'.$udn.':0:/fhem/sonos/cover/input_tv.jpg:');
 			} else {
@@ -6004,6 +5894,8 @@ sub SONOS_ServiceCallback($$) {
 				
 				# Album ermitteln
 				SONOS_Client_Notifier('SetCurrent:Album:'.$1) if ($currentTrackMetaData =~ m/<upnp:album>(.*?)<\/upnp:album>/i);
+				
+				$SONOS_BookmarkSpeicher{OldTitles}{$udn} = '('.$currentArtist.') '.$currentTitle;
 			}
 			
 			SONOS_Client_Notifier('SetCurrent:TrackProvider:'.SONOS_GetTrackProvider($currentTrackURI, $currentTitle));
@@ -6024,8 +5916,10 @@ sub SONOS_ServiceCallback($$) {
 		SONOS_Client_Notifier('SetCurrent:nextTrackDuration:'.decode_entities($1)) if ($nextTrackMetaData =~ m/<res.*?duration="(.*?)".*?>/i);
 		
 		if ($properties{LastChangeDecoded} =~ m/<r:NextTrackURI val="(.*?)"\/>/i) {
-			SONOS_Client_Notifier('SetCurrent:nextTrackURI:'.SONOS_GetURIFromQueueValue($1));
-			SONOS_Client_Notifier('SetCurrent:nextTrackProvider:'.SONOS_GetTrackProvider(SONOS_GetURIFromQueueValue($1)));
+			my $tmp = SONOS_GetURIFromQueueValue($1);
+			$tmp =~ s/&apos;/'/gi;
+			SONOS_Client_Notifier('SetCurrent:nextTrackURI:'.$tmp);
+			SONOS_Client_Notifier('SetCurrent:nextTrackProvider:'.SONOS_GetTrackProvider($tmp));
 		}
 		
 		$tempURIground = decode_entities($nextTrackMetaData);
@@ -6056,8 +5950,13 @@ sub SONOS_ServiceCallback($$) {
 				$trackPosition = '0:00:00';
 			}
 			SONOS_Client_Notifier('SetCurrent:TrackPosition:'.$trackPosition);
+			$SONOS_BookmarkSpeicher{OldTrackPositions}{$udn} = SONOS_GetTimeSeconds($trackPosition);
+			$SONOS_BookmarkSpeicher{OldTimestamp}{$udn} = scalar(gettimeofday()) - SONOS_GetTimeSeconds($trackPosition);
 		}
 	}
+	
+	# Neue Bookmarks aktualisieren
+	SONOS_RefreshCurrentBookmarkQueueValues($udn);
 	
 	# Trigger/Transfer the whole bunch and generate InfoSummarize
 	SONOS_Client_Notifier('CurrentBulkUpdate:'.$udn);
@@ -6402,6 +6301,20 @@ sub SONOS_ContentDirectoryCallback($$) {
 		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'RadiosVersion', $properties{FavoritesUpdateID}) if (defined($radiosUpdateID) || ($containerUpdateIDs eq ''));
 	}
 	
+	#QueueUpdateID...
+	if (defined($properties{ContainerUpdateIDs})) {
+		my $oldVersion = SONOS_Client_Data_Retreive($udn, 'reading', 'QueueVersion', '~~');
+		my $newVersion = '';
+		$newVersion = $1 if ($properties{ContainerUpdateIDs} =~ m/Q:0,(\d+)/i);
+		
+		if ($oldVersion ne $newVersion) {
+			SONOS_Client_Data_Refresh('ReadingsSingleUpdate', $udn, 'QueueVersion', $newVersion);
+			
+			# Für die Queue-Bookmarkverarbeitung den Queue-Hash neu berechnen und u.U. auf anderen Titel springen...
+			SONOS_CalculateQueueHash($udn);
+		}
+	}
+	
 	#SavedQueuesUpdateID...
 	my $savedQueuesUpdateID = SONOS_Client_Data_Retreive($udn, 'reading', 'PlaylistsVersion', '~~');
 	if (defined($properties{SavedQueuesUpdateID}) && ($properties{SavedQueuesUpdateID} ne $savedQueuesUpdateID)) {
@@ -6419,6 +6332,320 @@ sub SONOS_ContentDirectoryCallback($$) {
 	}
 	
 	return 0;
+}
+
+########################################################################################
+#
+#  SONOS_SaveBookmarkValues - Saves the current queue-values for Bookmarks
+#
+########################################################################################
+sub SONOS_SaveBookmarkValues(;$$) {
+	my ($gKey, $type) = @_;
+	
+	my $pathname = SONOS_Client_Data_Retreive('undef', 'attr', 'bookmarkSaveDir', '.');
+	
+	SONOS_Log undef, 4, 'Calling SONOS_SaveBookmarkValues("'.(defined($gKey) ? $gKey : 'undef').'", "'.(defined($type) ? $type : 'undef').'") ~ SaveDir: "'.$pathname.'"';
+	
+	my @types = ();
+	if (defined($type) && ($type ne '')) {
+		push(@types, $type);
+	} else {
+		@types = qw(Queue Title);
+	}
+	
+	foreach my $type (@types) {
+		my @groups = ();
+		if (defined($gKey) && ($gKey ne '')) {
+			push(@groups, $gKey);
+		} else {
+			my $hashList = \%SONOS_BookmarkTitleHash;
+			$hashList = \%SONOS_BookmarkQueueHash if (lc($type) eq 'queue');
+			
+			foreach my $group (keys %{$hashList}) {
+				push(@groups, $group);
+			}
+		}
+		
+		foreach my $group (@groups) {
+			# ReadOnly-Gruppen niemals speichern
+			next if ((lc($type) eq 'queue') && defined($SONOS_BookmarkQueueDefinition{$group}{ReadOnly}) && $SONOS_BookmarkQueueDefinition{$group}{ReadOnly});
+			next if ((lc($type) ne 'queue') && defined($SONOS_BookmarkTitleDefinition{$group}{ReadOnly}) && $SONOS_BookmarkTitleDefinition{$group}{ReadOnly});
+			
+			my $filename;
+			$filename = $pathname.'/SONOS_BookmarksPlaylists_'.$group.'.save' if (lc($type) eq 'queue');
+			$filename = $pathname.'/SONOS_BookmarksTitles_'.$group.'.save' if (lc($type) ne 'queue');
+			
+			my $data;
+			$data = $SONOS_BookmarkQueueHash{$group} if (lc($type) eq 'queue');
+			$data = $SONOS_BookmarkTitleHash{$group} if (lc($type) ne 'queue');
+			
+			if (defined($data)) {
+				eval {
+					open FILE, '>'.$filename;
+					binmode(FILE, ':encoding(utf-8)');
+					
+					$Data::Dumper::Indent = 0;
+					print FILE Dumper($data);
+					$Data::Dumper::Indent = 2;
+					
+					close FILE;
+					
+					SONOS_Log undef, 3, 'Successfully saved '.$type.'-Bookmarks of group "'.$group.'" to file "'.$filename.'"!';
+					SONOS_MakeSigHandlerReturnValue('undef', 'LastActionResult', 'SaveBookmarks: Success!');
+				};
+				if ($@) {
+					SONOS_Log undef, 2, 'Error during saving '.$type.'-Bookmarks of group "'.$group.'" to file "'.$filename.'": '.$@;
+					SONOS_MakeSigHandlerReturnValue('undef', 'LastActionResult', 'SaveBookmarks: Error! '.$@);
+				}
+			}
+		}
+	}
+}
+
+########################################################################################
+#
+#  SONOS_LoadBookmarkValues - Loads the current queue-values for Bookmarks
+#
+########################################################################################
+sub SONOS_LoadBookmarkValues(;$$) {
+	my ($gKey, $type) = @_;
+	
+	my $pathname = SONOS_Client_Data_Retreive('undef', 'attr', 'bookmarkSaveDir', '.');
+	
+	SONOS_Log undef, 4, 'Calling SONOS_LoadBookmarkValues("'.(defined($gKey) ? $gKey : 'undef').'", "'.(defined($type) ? $type : 'undef').'") ~ SaveDir: "'.$pathname.'"';
+	
+	my @types = ();
+	if (defined($type) && ($type ne '')) {
+		push(@types, $type);
+	} else {
+		@types = qw(Queue Title);
+	}
+	
+	foreach my $type (@types) {
+		my @groups = ();
+		if (defined($gKey) && ($gKey ne '')) {
+			push(@groups, $gKey);
+		} else {
+			my $hashList = \%SONOS_BookmarkTitleDefinition;
+			$hashList = \%SONOS_BookmarkQueueDefinition if (lc($type) eq 'queue');
+			
+			foreach my $group (keys %{$hashList}) {
+				push(@groups, $group);
+			}
+		}
+		
+		foreach my $group (@groups) {
+			my $filename;
+			$filename = $pathname.'/SONOS_BookmarksPlaylists_'.$group.'.save' if (lc($type) eq 'queue');
+			$filename = $pathname.'/SONOS_BookmarksTitles_'.$group.'.save' if (lc($type) ne 'queue');
+			
+			eval {
+				if (open FILE, '<'.$filename) {
+					binmode(FILE, ':encoding(utf-8)');
+					
+					my $fileInhalt = '';
+					while (<FILE>) {
+						$fileInhalt .= $_;
+					}
+					close FILE;
+					
+					$SONOS_BookmarkQueueHash{$group} = eval($fileInhalt) if (lc($type) eq 'queue');
+					$SONOS_BookmarkTitleHash{$group} = eval($fileInhalt) if (lc($type) ne 'queue');
+					
+					SONOS_Log undef, 3, 'Successfully loaded '.$type.'-Bookmarks of group "'.$group.'" from file "'.$filename.'"!';
+					SONOS_MakeSigHandlerReturnValue('undef', 'LastActionResult', 'LoadBookmarks: Group "'.$group.'" Success!');
+				}
+			};
+			if ($@) {
+				SONOS_Log undef, 2, 'Error during loading '.$type.'-Bookmarks of group "'.$group.'" from file "'.$filename.'": '.$@;
+				SONOS_MakeSigHandlerReturnValue('undef', 'LastActionResult', 'LoadBookmarks: Group "'.$group.'" Error! '.$@);
+			}
+		}
+	}
+}
+
+########################################################################################
+#
+#  SONOS_CalculateQueueHash - Calculates the Hash over all Queue members and jumps to the saved position
+#
+########################################################################################
+sub SONOS_CalculateQueueHash($) {
+	my ($udn) = @_;
+	
+	SONOS_RefreshCurrentBookmarkQueueValues($udn);
+	
+	if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
+		my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('Q:0', 'BrowseDirectChildren', '', 0, 0, '');
+		my $tmp = $result->getValue('Result');
+		
+		my $numberReturned = $result->getValue('NumberReturned');
+		my $totalMatches = $result->getValue('TotalMatches');
+		while ($numberReturned < $totalMatches) {
+			$result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('Q:0', 'BrowseDirectChildren', '', $numberReturned, 0, '');
+			$tmp .= $result->getValue('Result');
+			
+			$numberReturned += $result->getValue('NumberReturned');
+			$totalMatches = $result->getValue('TotalMatches');
+		}
+		
+		my $hashIn = $totalMatches.':';
+		while ($tmp =~ m/<item id="(.*?)".*?>(.*?)<\/item>/ig) {
+			my $item = $2;
+			
+			my $uri = $1 if ($item =~ m/<res.*?>(.*?)<\/res>/i);
+			$uri =~ s/&apos;/'/gi;
+			
+			$hashIn .= $uri.':';
+		}
+		
+		# Neuen Hashwert berechnen
+		my $newHash = md5_hex($hashIn);
+		
+		# Werte aktualisieren
+		SONOS_Client_Data_Refresh('ReadingsSingleUpdate', $udn, 'QueueHash', $newHash);
+		
+		# Aktuellen Track ermitteln...
+		my $newTrack = 0;
+		if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+			$newTrack = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('Track');
+		}
+		
+		# Soll was getan werden?
+		foreach my $gKey (SONOS_getBookmarkGroupKeys('Queue', $udn)) {
+			if (defined($SONOS_BookmarkQueueHash{$gKey}{$newHash}) && SONOS_getBookmarkQueueIsRelevant($gKey, $newHash, scalar(gettimeofday()), $totalMatches)) {
+				$newTrack = $SONOS_BookmarkQueueHash{$gKey}{$newHash}{Track};
+				
+				# Hier muss jetzt die gespeicherte Position angesprungen werden...
+				if (($SONOS_BookmarkSpeicher{OldTracks}{$udn} != $newTrack) && SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+					my $result = $SONOS_AVTransportControlProxy{$udn}->Seek(0, 'TRACK_NR', $newTrack);
+					
+					$Data::Dumper::Indent = 0;
+					SONOS_Log $udn, 3, 'Player "'.SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn).'" jumped to the bookmarked track #'.$newTrack.' (Group "'.$gKey.'") ~ Bookmarkdata: '.Dumper($SONOS_BookmarkQueueHash{$gKey}{$newHash});
+					$Data::Dumper::Indent = 2;
+					
+					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', 'JumpToTrack #'.$newTrack.': '.SONOS_UPnPAnswerMessage($result));
+					
+					last; # Nur den ersten gültigen Eintrag suchen/ausführen...
+				}
+			}
+		}
+		
+		$SONOS_BookmarkSpeicher{OldTracks}{$udn} = $newTrack;
+		$SONOS_BookmarkSpeicher{NumTracks}{$udn} = $totalMatches;
+	}
+}
+
+########################################################################################
+#
+#  SONOS_RefreshCurrentBookmarkQueueValues - Saves the current queue-values for Bookmarks
+#
+########################################################################################
+sub SONOS_RefreshCurrentBookmarkQueueValues($) {
+	my ($udn) = @_;
+	
+	# Aktuelle Werte im Speicher sicherstellen...
+	$SONOS_BookmarkSpeicher{OldTracks}{$udn} = 0 if (!defined($SONOS_BookmarkSpeicher{OldTracks}{$udn}));
+	$SONOS_BookmarkSpeicher{NumTracks}{$udn} = 0 if (!defined($SONOS_BookmarkSpeicher{NumTracks}{$udn}));
+	$SONOS_BookmarkSpeicher{OldTrackURIs}{$udn} = '' if (!defined($SONOS_BookmarkSpeicher{OldTrackURIs}{$udn}));
+	$SONOS_BookmarkSpeicher{OldTrackPositions}{$udn} = 0 if (!defined($SONOS_BookmarkSpeicher{OldTrackPositions}{$udn}));
+	$SONOS_BookmarkSpeicher{OldTrackDurations}{$udn} = 0 if (!defined($SONOS_BookmarkSpeicher{OldTrackDurations}{$udn}));
+	$SONOS_BookmarkSpeicher{OldTransportstate}{$udn} = 'STOPPED' if (!defined($SONOS_BookmarkSpeicher{OldTransportstate}{$udn}));
+	$SONOS_BookmarkSpeicher{OldTimestamp}{$udn} = scalar(gettimeofday()) if (!defined($SONOS_BookmarkSpeicher{OldTimestamp}{$udn}));
+	$SONOS_BookmarkSpeicher{OldTitles}{$udn} = '' if (!defined($SONOS_BookmarkSpeicher{OldTitles}{$udn}));
+	
+	# Große Logausgabe fürs debugging...
+	SONOS_Log $udn, 5, '___________________________________________________________________________';
+	SONOS_Log $udn, 5, 'OldTracks: '.$SONOS_BookmarkSpeicher{OldTracks}{$udn};
+	SONOS_Log $udn, 5, 'NumTracks: '.$SONOS_BookmarkSpeicher{NumTracks}{$udn};
+	SONOS_Log $udn, 5, 'OldTrackURIs: '.$SONOS_BookmarkSpeicher{OldTrackURIs}{$udn};
+	SONOS_Log $udn, 5, 'OldTrackPositions: '.$SONOS_BookmarkSpeicher{OldTrackPositions}{$udn};
+	SONOS_Log $udn, 5, 'OldTrackDurations: '.$SONOS_BookmarkSpeicher{OldTrackDurations}{$udn};
+	SONOS_Log $udn, 5, 'OldTransportstate: '.$SONOS_BookmarkSpeicher{OldTransportstate}{$udn};
+	SONOS_Log $udn, 5, 'OldTimestamp: '.$SONOS_BookmarkSpeicher{OldTimestamp}{$udn};
+	SONOS_Log $udn, 5, 'OldTitle: '.$SONOS_BookmarkSpeicher{OldTitles}{$udn};
+	
+	# Gemeinsamer Zeitstempel...
+	my $timestamp = scalar(gettimeofday());
+	
+	# Aktuelle Werte für Title sichern...
+	my $trackURI = $SONOS_BookmarkSpeicher{OldTrackURIs}{$udn};
+	if ($trackURI) {
+		foreach my $gKey (SONOS_getBookmarkGroupKeys('Title', $udn)) {
+			next if ($SONOS_BookmarkTitleDefinition{$gKey}{Chapter});
+			
+			# Passt der Titel zum RegEx-Filter?
+			if ($trackURI !~ m/$SONOS_BookmarkTitleDefinition{$gKey}{TrackURIRegEx}/) {
+				SONOS_Log $udn, 5, 'Skipped Title because of no match to m/'.$SONOS_BookmarkTitleDefinition{$gKey}{TrackURIRegEx}.'/';
+				delete($SONOS_BookmarkTitleHash{$gKey}{$trackURI});
+				next;
+			}
+			
+			# Config-Parameter ausgeben...
+			SONOS_Log $udn, 5, 'Match Title! Defined group "'.$gKey.'" ~ RemainingLength: '.$SONOS_BookmarkTitleDefinition{$gKey}{RemainingLength}.' ~ MinTitleLength: '.$SONOS_BookmarkTitleDefinition{$gKey}{MinTitleLength};
+			
+			# U.u. eine Trackposition berechnen...
+			my $trackPosition = $SONOS_BookmarkSpeicher{OldTrackPositions}{$udn};
+			$trackPosition = ($timestamp - $SONOS_BookmarkSpeicher{OldTimestamp}{$udn}) if ($SONOS_BookmarkSpeicher{OldTransportstate}{$udn} eq 'PLAYING');
+			SONOS_Log $udn, 5, 'Used TrackPosition: '.SONOS_ConvertSecondsToTime($trackPosition);
+			
+			# Wenn der Titel bereits im Bereich der RemainingTime ist oder die Mindestgröße unterschreitet, dann aus den Bookmarks löschen
+			if (($SONOS_BookmarkSpeicher{OldTrackDurations}{$udn} - $trackPosition <= $SONOS_BookmarkTitleDefinition{$gKey}{RemainingLength})
+			|| ($SONOS_BookmarkSpeicher{OldTrackDurations}{$udn} < $SONOS_BookmarkTitleDefinition{$gKey}{MinTitleLength})) {
+				delete($SONOS_BookmarkTitleHash{$gKey}{$trackURI});
+				next;
+			}
+			
+			# Sonst die Werte aktualisieren/hinzufügen...
+			$SONOS_BookmarkTitleHash{$gKey}{$trackURI}{TrackPosition} = $trackPosition;
+			$SONOS_BookmarkTitleHash{$gKey}{$trackURI}{LastAccess} = $timestamp;
+			$SONOS_BookmarkTitleHash{$gKey}{$trackURI}{LastPlayer} = $udn;
+			$SONOS_BookmarkTitleHash{$gKey}{$trackURI}{Title} = $SONOS_BookmarkSpeicher{OldTitles}{$udn}.' - Position 1';
+		}
+	}
+	
+	# Aktuelle Werte für Queue sichern...
+	my $listHash = SONOS_Client_Data_Retreive($udn, 'reading', 'QueueHash', '');
+	if ($listHash) {
+		foreach my $gKey (SONOS_getBookmarkGroupKeys('Queue', $udn)) {
+			if (SONOS_getBookmarkQueueIsRelevant($gKey, $listHash, undef, $SONOS_BookmarkSpeicher{NumTracks}{$udn})) {
+				$SONOS_BookmarkQueueHash{$gKey}{$listHash}{Track} = $SONOS_BookmarkSpeicher{OldTracks}{$udn};
+				$SONOS_BookmarkQueueHash{$gKey}{$listHash}{LastAccess} = $timestamp;
+				$SONOS_BookmarkQueueHash{$gKey}{$listHash}{LastPlayer} = $udn;
+				$SONOS_BookmarkQueueHash{$gKey}{$trackURI}{Title} = $SONOS_BookmarkSpeicher{OldTitles}{$udn};
+			}
+		}
+	}
+	
+	SONOS_Log $udn, 5, '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~';
+}
+
+########################################################################################
+#
+#  SONOS_getBookmarkQueueRelevant - Decide wether or not this Bookmark is relevant
+#
+########################################################################################
+sub SONOS_getBookmarkQueueIsRelevant($$$$) {
+	my ($gKey, $listHash, $timestamp, $listLength) = @_;
+	
+	return ((!defined($timestamp) || ($SONOS_BookmarkQueueDefinition{$gKey}{MaxAge} >= ($timestamp - $SONOS_BookmarkQueueHash{$gKey}{$listHash}{LastAccess})))
+			&& ($SONOS_BookmarkQueueDefinition{$gKey}{MinListLength} <= $listLength)
+			&& ($SONOS_BookmarkQueueDefinition{$gKey}{MaxListLength} >= $listLength));
+}
+
+########################################################################################
+#
+#  SONOS_getBookmarkTitleRelevant - Decide wether or not this Bookmark is relevant
+#
+########################################################################################
+sub SONOS_getBookmarkTitleIsRelevant($$$$$) {
+	my ($gKey, $timestamp, $trackURI, $titlePosition, $titleLength) = @_;
+	
+	return 0 if ($SONOS_BookmarkTitleDefinition{$gKey}{Chapter});
+	
+	return (($trackURI =~ m/$SONOS_BookmarkTitleDefinition{$gKey}{TrackURIRegEx}/)
+			&& (!defined($timestamp) || ($SONOS_BookmarkTitleDefinition{$gKey}{MaxAge} >= ($timestamp - $SONOS_BookmarkTitleHash{$gKey}{$trackURI}{LastAccess})))
+			&& ($SONOS_BookmarkTitleDefinition{$gKey}{MinTitleLength} <= $titleLength)
+			&& ($SONOS_BookmarkTitleDefinition{$gKey}{RemainingLength} <= ($titleLength - $titlePosition)));
 }
 
 ########################################################################################
@@ -8014,6 +8241,96 @@ sub SONOS_Client_ConsumeMessage($$) {
 		foreach my $elem (split(/\|/, $deviceValues)) { 
 			if ($elem =~ m/(.*?)=(.*)/) {
 				$elemValues{$1} = uri_unescape($2);
+				
+				if ($1 eq 'bookmarkPlaylistDefinition') {
+					# <Gruppenname>:<PlayerDeviceRegEx>:<MinListLength>:<MaxListLength>:<MaxAge> [...]
+					%SONOS_BookmarkQueueDefinition = ();
+					my $def = $elemValues{$1};
+					
+					foreach my $elem (split(/ /, $def)) {
+						# Sicherstellen, das alle Stellen vorhanden sind...
+						$elem .= ':' while (SONOS_CountInString(':', $elem) < 5);
+						
+						# Zerlegen
+						if ($elem =~ m/(.*?):(.*?):(\d*):(\d*):(.*?):(.*)/) {
+							my $key = $1;
+							$SONOS_BookmarkQueueDefinition{$key}{PlayerDeviceRegEx} = ($2 ne '') ? $2 : '.*';
+							$SONOS_BookmarkQueueDefinition{$key}{MinListLength} = ($3 ne '') ? $3 : 0;
+							$SONOS_BookmarkQueueDefinition{$key}{MaxListLength} = ($4 ne '') ? $4 : 99999;
+							$SONOS_BookmarkQueueDefinition{$key}{MaxAge} = ($5 ne '') ? $5 : '28*24*60*60';
+							$SONOS_BookmarkQueueDefinition{$key}{ReadOnly} = ($6 ne '') ? $6 : 0;
+							
+							# RegEx prüfen
+							eval { "" =~ m/$SONOS_BookmarkQueueDefinition{$key}{PlayerDeviceRegEx}/ };
+							if($@) {
+								SONOS_Log undef, 0, 'SetData - bookmarkPlaylistDefinition: Bad PlayerDeviceRegExp "'.$SONOS_BookmarkQueueDefinition{$key}{PlayerDeviceRegEx}.'": '.$@;
+								delete($SONOS_BookmarkQueueDefinition{$key});
+								next;
+							}
+							
+							# MaxAge berechnen...
+							eval { $SONOS_BookmarkQueueDefinition{$key}{MaxAge} = eval($SONOS_BookmarkQueueDefinition{$key}{MaxAge}); };
+							if($@) {
+								SONOS_Log undef, 0, 'SetData - bookmarkPlaylistDefinition: Bad MaxAge "'.$SONOS_BookmarkQueueDefinition{$key}{MaxAge}.'": '.$@;
+								delete($SONOS_BookmarkQueueDefinition{$key});
+								next;
+							}
+						}
+					}
+					
+					SONOS_Log undef, 4, 'BookmarkQueueDefinition: '.Dumper(\%SONOS_BookmarkQueueDefinition);
+				}
+				
+				if ($1 eq 'bookmarkTitleDefinition') {
+					# <Gruppenname>:<PlayerdeviceRegEx>:<TrackURIRegEx>:<MinTitleLength>:<RemainingLength>:<MaxAge>:<ReadOnly> [...]
+					%SONOS_BookmarkTitleDefinition = ();
+					my $def = $elemValues{$1};
+					
+					foreach my $elem (split(/ /, $def)) {
+						# Sicherstellen, das alle Stellen vorhanden sind...
+						$elem .= ':' while (SONOS_CountInString(':', $elem) < 6);
+						
+						# Zerlegen
+						if ($elem =~ m/(.*?):(.*?):(.*?):(\d*):(\d*):(.*?):(.*)/) {
+							my $key = $1;
+							$SONOS_BookmarkTitleDefinition{$key}{PlayerDeviceRegEx} = ($2 ne '') ? $2 : '.*';
+							$SONOS_BookmarkTitleDefinition{$key}{TrackURIRegEx} = ($3 ne '') ? $3 : '.*';
+							$SONOS_BookmarkTitleDefinition{$key}{MinTitleLength} = ($4 ne '') ? $4 : 60;
+							$SONOS_BookmarkTitleDefinition{$key}{RemainingLength} = ($5 ne '') ? $5 : 10;
+							$SONOS_BookmarkTitleDefinition{$key}{MaxAge} = ($6 ne '') ? $6 : '28*24*60*60';
+							$SONOS_BookmarkTitleDefinition{$key}{ReadOnly} = 0;
+							$SONOS_BookmarkTitleDefinition{$key}{ReadOnly} = 1 if (lc($7) eq 'readonly');
+							$SONOS_BookmarkTitleDefinition{$key}{Chapter} = 0;
+							$SONOS_BookmarkTitleDefinition{$key}{Chapter} = 1 if (lc($7) eq 'chapter');
+							
+							# RegEx prüfen...
+							eval { "" =~ m/$SONOS_BookmarkTitleDefinition{$key}{PlayerDeviceRegEx}/ };
+							if($@) {
+								SONOS_Log undef, 0, 'SetData - bookmarkTitleDefinition: Bad PlayerDeviceRegExp "'.$SONOS_BookmarkTitleDefinition{$key}{PlayerDeviceRegEx}.'": '.$@;
+								delete($SONOS_BookmarkTitleDefinition{$key});
+								next;
+							}
+							
+							# RegEx prüfen...
+							eval { "" =~ m/$SONOS_BookmarkTitleDefinition{$key}{TrackURIRegEx}/ };
+							if($@) {
+								SONOS_Log undef, 0, 'SetData - bookmarkTitleDefinition: Bad TrackURIRegEx "'.$SONOS_BookmarkTitleDefinition{$key}{TrackURIRegEx}.'": '.$@;
+								delete($SONOS_BookmarkTitleDefinition{$key});
+								next;
+							}
+							
+							# MaxAge berechnen...
+							eval { $SONOS_BookmarkTitleDefinition{$key}{MaxAge} = eval($SONOS_BookmarkTitleDefinition{$key}{MaxAge}); };
+							if($@) {
+								SONOS_Log undef, 0, 'SetData - bookmarkTitleDefinition: Bad MaxAge "'.$SONOS_BookmarkTitleDefinition{$key}{MaxAge}.'": '.$@;
+								delete($SONOS_BookmarkTitleDefinition{$key});
+								next;
+							}
+						}
+					}
+					
+					SONOS_Log undef, 4, 'BookmarkTitleDefinition: '.Dumper(\%SONOS_BookmarkTitleDefinition);
+				}
 			}
 		}
 		 
@@ -8051,6 +8368,29 @@ sub SONOS_Client_ConsumeMessage($$) {
 		SONOS_Log undef, 2, "ConsumMessage: Sorry. I don't understand you - '$msg'.";
 		send($client, "Sorry. I don't understand you - '$msg'.\r\n", 0);
 	}
+}
+
+########################################################################################
+# SONOS_getBookmarkGroupKeys: Retrieves the approbriate GroupKeys to the given UDN
+########################################################################################
+sub SONOS_getBookmarkGroupKeys($$;$) {
+	my ($type, $udn, $disabled) = @_;
+	$disabled = 0 if (!defined($disabled));
+	
+	my $deviceName = SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn);
+	
+	my @result = ();
+	my $hashList = \%SONOS_BookmarkTitleDefinition;
+	$hashList = \%SONOS_BookmarkQueueDefinition if (lc($type) eq 'queue');
+	
+	foreach my $key (keys %{$hashList}) {
+		if ($deviceName =~ m/$hashList->{$key}{PlayerDeviceRegEx}/) {
+			push(@result, $key) if (!$disabled && (!defined($hashList->{$key}{Disabled}) || !$hashList->{$key}{Disabled}));
+			push(@result, $key) if ($disabled && defined($hashList->{$key}{Disabled}) && $hashList->{$key}{Disabled});
+		}
+	}
+	
+	return @result;
 }
 
 ########################################################################################
@@ -8147,7 +8487,7 @@ sub SONOS_Client_IsAlive() {
 <h3>SONOS</h3>
 <p>FHEM-Module to communicate with the Sonos-System via UPnP</p>
 <p>For more informations have also a closer look at the wiki at <a href="http://www.fhemwiki.de/wiki/SONOS">http://www.fhemwiki.de/wiki/SONOS</a></p>
-<p>For correct functioning of this module it is neccessary to have some Perl-Modules installed, which has eventually installed manually:<ul>
+<p>For correct functioning of this module it is neccessary to have some Perl-Modules installed, which are eventually installed already manually:<ul>
 <li><code>LWP::Simple</code></li>
 <li><code>LWP::UserAgent</code></li>
 <li><code>SOAP::Lite</code></li>
@@ -8206,6 +8546,20 @@ You can start this client on your own (to let it run instantly and independent f
 <b><code>Stop</code></b></a>
 <br />Alias for StopAll.</li>
 </ul></li>
+<li><b>Bookmark-Commands</b><ul>
+<li><a name="SONOS_setter_DisableBookmark">
+<b><code>DisableBookmark &lt;Groupname&gt;</code></b></a>
+<br />Disables the group with the given name.</li>
+<li><a name="SONOS_setter_EnableBookmark">
+<b><code>EnableBookmark &lt;Groupname&gt;</code></b></a>
+<br />Enables the group with the given name.</li>
+<li><a name="SONOS_setter_LoadBookmarks">
+<b><code>LoadBookmarks [Groupname]</code></b></a>
+<br />Loads the given group (or all if parameter not set) from the filesystem.</li>
+<li><a name="SONOS_setter_SaveBookmarks">
+<b><code>SaveBookmarks [Groupname]</code></b></a>
+<br />Saves the given group (or all if parameter not set) to the filesystem.</li>
+</ul></li>
 <li><b>Group-Commands</b><ul>
 <li><a name="SONOS_setter_Groups">
 <b><code>Groups &lt;GroupDefinition&gt;</code></b></a>
@@ -8237,6 +8591,14 @@ The order in the sublists are important, because the first entry defines the so-
 </a><br />With this attribute you can define IP-addresses, which has to be ignored by the UPnP-System of this module. e.g. "192.168.0.11,192.168.0.37"</li>
 <li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> One of (none,tcp,udp,icmp,syn). Defines which pingType for alive-Checking has to be used. If set to 'none' no checks will be done.</li>
+</ul></li>
+<li><b>Bookmark Configuration</b><ul>
+<li><a name="SONOS_attribut_bookmarkSaveDir"><b><code>bookmarkSaveDir &lt;path&gt;</code></b>
+</a><br /> Defines a directory where the saved bookmarks can be placed. If not defined, "." will be used.</li>
+<li><a name="SONOS_attribut_bookmarkTitleDefinition"><b><code>bookmarkTitleDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;TrackURIRegEx&gt;:&lt;MinTitleLength&gt;:&lt;RemainingLength&gt;:&lt;MaxAge&gt;:&lt;ReadOnly&gt;</code></b>
+</a><br /> Definition of Bookmarks for titles.</li>
+<li><a name="SONOS_attribut_bookmarkPlaylistDefinition"><b><code>bookmarkPlaylistDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;MinListLength&gt;:&lt;MaxListLength&gt;:&lt;MaxAge&gt;</code></b>
+</a><br /> Definition of bookmarks for playlists.</li>
 </ul></li>
 <li><b>Proxy Configuration</b><ul>
 <li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><b><code>generateProxyAlbumArtURLs &lt;int&gt;</code></b>
@@ -8347,6 +8709,20 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 <b><code>Stop</code></b></a>
 <br />Synonym für StopAll.</li>
 </ul></li>
+<li><b>Bookmark-Befehle</b><ul>
+<li><a name="SONOS_setter_DisableBookmark">
+<b><code>DisableBookmark &lt;Groupname&gt;</code></b></a>
+<br />Deaktiviert die angegebene Gruppe.</li>
+<li><a name="SONOS_setter_EnableBookmark">
+<b><code>EnableBookmark &lt;Groupname&gt;</code></b></a>
+<br />Aktiviert die angegebene Gruppe.</li>
+<li><a name="SONOS_setter_LoadBookmarks">
+<b><code>LoadBookmarks [Groupname]</code></b></a>
+<br />Lädt die angegebene Gruppe (oder alle Gruppen, wenn nicht angegeben) aus den entsprechenden Dateien.</li>
+<li><a name="SONOS_setter_SaveBookmarks">
+<b><code>SaveBookmarks [Groupname]</code></b></a>
+<br />Speichert die angegebene Gruppe (oder alle Gruppen, wenn nicht angegeben) in die entsprechenden Dateien.</li>
+</ul></li>
 <li><b>Gruppenbefehle</b><ul>
 <li><a name="SONOS_setter_Groups">
 <b><code>Groups &lt;GroupDefinition&gt;</code></b></a>
@@ -8378,6 +8754,14 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 </a><br />Mit diesem Attribut können IP-Adressen angegeben werden, die vom UPnP-System ignoriert werden sollen. Z.B.: "192.168.0.11,192.168.0.37"</li>
 <li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> Eines von (none,tcp,udp,icmp,syn). Gibt an, welche Methode für die Ping-Überprüfung verwendet werden soll. Wenn 'none' angegeben wird, dann wird keine Überprüfung gestartet.</li>
+</ul></li>
+<li><b>Bookmark-Einstellungen</b><ul>
+<li><a name="SONOS_attribut_bookmarkSaveDir"><b><code>bookmarkSaveDir &lt;path&gt;</code></b>
+</a><br /> Das Verzeichnis, in dem die Dateien für die gespeicherten Bookmarks abgelegt werden sollen. Wenn nicht festgelegt, dann wird "." verwendet.</li>
+<li><a name="SONOS_attribut_bookmarkTitleDefinition"><b><code>bookmarkTitleDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;TrackURIRegEx&gt;:&lt;MinTitleLength&gt;:&lt;RemainingLength&gt;:&lt;MaxAge&gt;:&lt;ReadOnly&gt; [...]</code></b>
+</a><br /> Die Definition für die Verwendung von Bookmarks für Titel.</li>
+<li><a name="SONOS_attribut_bookmarkPlaylistDefinition"><b><code>bookmarkPlaylistDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;MinListLength&gt;:&lt;MaxListLength&gt;:&lt;MaxAge&gt; [...]</code></b>
+</a><br /> Die Definition für die Verwendung von Bookmarks für aktuelle Abspiellisten/Playlisten.</li>
 </ul></li>
 <li><b>Proxy-Einstellungen</b><ul>
 <li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><b><code>generateProxyAlbumArtURLs &lt;int&gt;</code></b>
