@@ -31,7 +31,7 @@ function FW_processCallListUpdate(data)
     if(/^max-lines/.test(data))
     {
         var tmp = data.split(",");
-        table.find("tr[number]").filter(function(index,obj) {return ($(obj).attr("number") > tmp[1]);}).remove();
+        table.find("tr[number]").filter(function(index,obj) {return (parseInt($(obj).attr("number")) > parseInt(tmp[1]));}).remove();
         return;    
     }
    
