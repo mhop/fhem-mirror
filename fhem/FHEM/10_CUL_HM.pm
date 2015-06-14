@@ -936,10 +936,11 @@ sub CUL_HM_Notify(@){#################################
   return "" if ($dev->{NAME} ne "global");
 
   my $events = deviceEvents($dev, AttrVal($ntfy->{NAME}, "addStateEvent", 0));
-  return if(!$events); # Some previous notify deleted the array.
-  return "" if (grep !/INITIALIZED/,@{$events});
+  return undef if(!$events); # Some previous notify deleted the array.
+  return undef if (grep !/INITIALIZED/,@{$events});
   delete $modules{CUL_HM}{NotifyFn};
   CUL_HM_updateConfig("startUp");
+  return undef;
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
