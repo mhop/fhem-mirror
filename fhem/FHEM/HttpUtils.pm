@@ -273,7 +273,7 @@ HttpUtils_DataComplete($)
   return 0 if($ret !~ m/^(.*?)\r\n\r\n(.*)$/s);
   my $hdr = $1;
   my $data = $2;
-  return 0 if($hdr !~ m/Content-Length:\s*(\d+)/s);
+  return 0 if($hdr !~ m/Content-Length:\s*(\d+)/si);
   return 0 if(length($data) < $1);
   return 1;
 }
