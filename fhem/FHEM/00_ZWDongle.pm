@@ -516,15 +516,20 @@ ZWDongle_Write($$$)
   # assure that wakeupNoMoreInformation is the last message on the sendStack
   if($msg =~ m/^01....13(..)/) {
     my $wNMIre = '01....13..028408';
+
+    if($ss->[0] =~ m/$wNMIre/) {
+      Log3 $hash, 2,
+        "ZWDongle_Write: command after wakeupNoMoreInformation dropped";
+      return;
+    }
+
     my $wNMI;
-    my $w1 = shift @{$ss} if($ss->[0] =~ m/$wNMIre/); # keep the first, #35126
     my @s = grep { /^$wNMIre/ ? ($wNMI=$_,0):1 } @{$ss};
     if($wNMI) {
-      Log3 $hash, 5, "ZWDongle_Write reordered sendStack";
+      Log3 $hash, 5, "ZWDongle_Write wakeupNoMoreInformation moved to the end";
       push @s, $wNMI;       
       $hash->{SendStack} = \@s;
     }
-    unshift($hash->{SendStack}, $w1) if($w1);
   }
 
   ZWave_ProcessSendStack($hash);
