@@ -1005,7 +1005,7 @@ sub renew {
 		$self->{_startTime} = Time::HiRes::time();
 	}
 	else {
-		carp("Renewal of subscription failed with error: " . 
+		croak("Renewal of subscription failed with error: " . 
 			 $response->code . " " . $response->message);
 	}
 	
