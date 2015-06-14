@@ -228,11 +228,9 @@ ZWDongle_Define($$)
   $hash->{DeviceName} = $dev;
   $hash->{CallbackNr} = 0;
   $hash->{nrNAck} = 0;
-  $hash->{WaitForAck}=0;
-  $hash->{SendRetrys}=0;
-  $hash->{MaxSendRetrys}=3;
   my @empty;
   $hash->{SendStack} = \@empty;
+  ZWDongle_shiftSendStack($hash, 5, undef);
   
   my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
   return $ret;
@@ -264,6 +262,7 @@ ZWDongle_Set($@)
     return "Unknown argument $type, choose one of " . join(" ",@r);
   }
 
+  Log3 $hash, 4, "ZWDongle set $name $type ".join(" ",@a);
   if($type eq "reopen") {
     return if(AttrVal($name, "dummy",undef) || AttrVal($name, "disable",undef));
     DevIo_CloseDev($hash);
@@ -295,12 +294,11 @@ ZWDongle_Set($@)
   }
 
   if($type eq "addNode") {
-    if(@a == 2 && $a[2] =~ m/^sec/i) {
+    if(@a == 2 && $a[1] =~ m/^sec/i) {
       $hash->{addSecure} = pop(@a);
     } else {
       delete($hash->{addSecure});
     }
-    Log 1, "CMD:".join("/",@a)."/";
   }
 
   my @ca = split("%", $cmd, -1);
@@ -332,6 +330,7 @@ ZWDongle_Get($@)
     return "$type is unsupported by this controller";
   }
 
+  Log3 $hash, 4, "ZWDongle get $name $type ".join(" ",@a);
   my @ga = split("%", $gets{$type}, -1);
   my $nargs = int(@ga)-1;
   return "get $name $type needs $nargs arguments" if($nargs != int(@a));
@@ -474,9 +473,9 @@ ZWDongle_DoInit($)
   ZWDongle_Get($hash, $name, "homeId");
   ZWDongle_Get($hash, $name, ("random", 32));         # Sec relevant
   ZWDongle_Set($hash, $name, ("timeouts", 100, 15));  # Sec relevant
+  ZWDongle_ReadAnswer($hash, "timeouts", "^0106");
   # NODEINFO_LISTENING, Generic Static controller, Specific Static Controller, 0
   ZWDongle_Set($hash, $name, ("setNIF", 1, 2, 1, 0)); # Sec relevant (?)
-  ZWDongle_Clear($hash);                              # Wait, timeouts needs ack
   $hash->{STATE} = "Initialized";
   return undef;
 }
@@ -498,11 +497,16 @@ ZWDongle_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
 
-  Log3 $hash, 5, "ZWDongle_Write msg $msg";
+  if($fn !~ m/^[0-9A-F]+$/i) { # ACK initiated from ZWDongle 
+    ZWDongle_shiftSendStack($hash, 5, $fn);
+    return;
+  }
 
+  Log3 $hash, 5, "ZWDongle_Write $fn $msg";
   # assemble complete message
   $msg = "$fn$msg";
   $msg = sprintf("%02x%s", length($msg)/2+1, $msg);
+
   $msg = "01$msg" . ZWDongle_CheckSum($msg);
  
   # push message on stack
@@ -523,8 +527,20 @@ ZWDongle_Write($$$)
     unshift($hash->{SendStack}, $w1) if($w1);
   }
 
-  #send first message if not waiting for ACK
   ZWave_ProcessSendStack($hash);
+}
+
+sub
+ZWDongle_shiftSendStack($$$)
+{
+  my ($hash, $level, $txt) = @_;
+  my $ss = $hash->{SendStack};
+  my $cmd = shift @{$ss};
+  Log3 $hash, $level, "$txt, removing $cmd from sendstack" if($txt && $cmd);
+
+  $hash->{WaitForAck}=0;
+  $hash->{SendRetries}=0;
+  $hash->{MaxSendRetries}=3;
 }
 
 sub
@@ -532,44 +548,38 @@ ZWave_ProcessSendStack($)
 {
   my ($hash) = @_;
     
-  Log3 $hash, 5, "ZWave_ProcessSendStack: ".@{$hash->{SendStack}}.
-                        " items on stack, waitForAck ".$hash->{WaitForAck};
+  #Log3 $hash, 1, "ZWave_ProcessSendStack: ".@{$hash->{SendStack}}.
+  #                      " items on stack, waitForAck ".$hash->{WaitForAck};
   
   RemoveInternalTimer($hash); 
     
   my $ts = gettimeofday();  
+
   if($hash->{WaitForAck}){
-    if($ts-$hash->{SendTime} > 1){
-      Log3 $hash, 2,
-        "ZWave_ProcessSendStack: timeout sending message -> trigger resend";
-      $hash->{SendRetrys}++;
+    if($ts-$hash->{SendTime} >= 1){
+      Log3 $hash, 2, "ZWave_ProcessSendStack: no ACK, resending message";
+      $hash->{SendRetries}++;
       $hash->{WaitForAck} = 0;
 
     } else {
-      Log3 $hash, 5, "ZWave_ProcessSendStack: waiting for ACK -> check again";
       InternalTimer($ts+1, "ZWave_ProcessSendStack", $hash, 0);
       return;
 
     }
-}
+  }
 
-  if($hash->{SendRetrys} > $hash->{MaxSendRetrys}){
-    Log3 $hash, 1,
-        "ZWave_ProcessSendStack: max send retrys reached -> cancel sending";
-    shift @{$hash->{SendStack}};
-    $hash->{WaitForAck} = 0;
-    $hash->{SendRetrys} = 0;
-    $hash->{MaxSendRetrys} = 3;
+  if($hash->{SendRetries} > $hash->{MaxSendRetries}){
+    ZWDongle_shiftSendStack($hash, 1, "ERROR: max send retries reached");
   }
   
   return if(!@{$hash->{SendStack}} || $hash->{WaitForAck});
   
   my $msg = $hash->{SendStack}->[0];
-  Log3 $hash, 5, "ZWave_ProcessSendStack: sending msg ".$msg;
 
   DevIo_SimpleWrite($hash, $msg, 1);
   $hash->{WaitForAck} = 1;
   $hash->{SendTime} = $ts;
+
   InternalTimer($ts+1, "ZWave_ProcessSendStack", $hash, 0);
 }
 
@@ -594,38 +604,39 @@ ZWDongle_Read($@)
   $hash->{ReadTime} = $ts;
 
 
-  Log3 $name, 5, "ZWDongle RAW buffer: $data";
+  #Log3 $name, 5, "ZWDongle RAW buffer: $data";
 
   my $msg;
   while(length($data) > 0) {
+
     my $fb = substr($data, 0, 2);
 
     if($fb eq "06") {   # ACK
-      Log3 $name, 5, "$name: ACK received";
-      $data = substr($data, 2);
-      # ZWDongle messages are removed if ZW_SEND_DATA:OK is received
-      if(!@{$hash->{SendStack}} || $hash->{SendStack}->[0] !~ m/^01....13/) {
-        shift @{$hash->{SendStack}};
-        $hash->{WaitForAck} = 0;
-        $hash->{SendRetrys} = 0;
-        $hash->{MaxSendRetrys} = 3;
+      # ZWDongle messages are removed upon first ACK.
+      # Other network messages are removed if ZW_SEND_DATA:OK is received
+      my $sst = $hash->{SendStack}->[0];
+      if($sst && $sst !~ m/^01....13/) {
+        ZWDongle_shiftSendStack($hash, 5, "ACK received");
       }
+
+
+      $data = substr($data, 2);
       next;
     }
 
     if($fb eq "15") {   # NACK
-      Log3 $name, 4, "$name: NACK received, resending the message";
+      Log3 $name, 4, "ZWDongle_Read $name: NACK received";
       $hash->{WaitForAck} = 0;
-      $hash->{SendRetrys}++;
+      $hash->{SendRetries}++;
       $data = substr($data, 2);
       next;
     }
 
     if($fb eq "18") {   # CAN
-      Log3 $name, 4, "$name: CAN received, resending the message";
+      Log3 $name, 4, "ZWDongle_Read $name: CAN received";
       $hash->{WaitForAck} = 0;
-      $hash->{SendRetrys}++;
-      $hash->{MaxSendRetrys}++ if($hash->{MaxSendRetrys}<7);
+      $hash->{SendRetries}++;
+      $hash->{MaxSendRetries}++ if($hash->{MaxSendRetries}<7);
       $data = substr($data, 2);
       next;
     }
@@ -661,17 +672,12 @@ ZWDongle_Read($@)
       next;
     }
     $hash->{nrNAck} = 0;
-    Log3 $name, 5, "ZWDongle_Read $name: ACK, processing $msg";
+    Log3 $name, 4, "ZWDongle_Read $name: sending ACK, processing $msg";
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
     
     # SEND_DATA OK: remove message from SendStack. TODO: check the callbackId
     if($msg =~ m/^0013..00/ ){
-      Log3 $name, 5,
-        "ZWDongle_Read $name: ZW_SEND_DATA:OK received -> removing message";
-      shift @{$hash->{SendStack}};
-      $hash->{WaitForAck} = 0;
-      $hash->{SendRetrys} = 0;
-      $hash->{MaxSendRetrys} = 3;    
+      ZWDongle_shiftSendStack($hash, 5, "ZW_SEND_DATA:OK received");
     }
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
@@ -687,11 +693,7 @@ ZWDongle_Read($@)
   # trigger sending of next message
   ZWave_ProcessSendStack($hash) if(length($data) == 0);
   
-  if(defined($local)){
-    Log3 $name, 5, "ZWDongle_Read returning local msg ".
-        ($msg ? $msg:"undef")." hash PARTIAL: ".$hash->{PARTIAL};
-    return $msg;
-  }
+  return $msg if(defined($local));
   return undef;
 }
 
@@ -743,12 +745,11 @@ ZWDongle_ReadAnswer($$$)
         Log3 $hash, 1,"ZWDongle_ReadAnswer: no data read";
         return ("No data", undef);
       }
-      Log3 $hash, 5, "ZWDongle_ReadAnswer: read ".length($buf)." bytes";
     }
 
     my $ret = ZWDongle_Read($hash, $buf, $regexp);
     if(defined($ret)){
-      Log3 $hash, 5, "ZWDongle_ReadAnswer: returning $ret";
+      Log3 $hash, 4, "ZWDongle_ReadAnswer for $arg: $ret";
       return (undef, $ret);
     }
   }
@@ -760,7 +761,7 @@ ZWDongle_Parse($$$)
   my ($hash, $name, $rmsg) = @_;
 
   if(!defined($hash->{STATE}) || $hash->{STATE} ne "Initialized"){
-    Log3 $hash, 4,"ZWDongle_Parse dongle not initialized";
+    Log3 $hash, 4,"ZWDongle_Parse $rmsg: dongle not yet initialized";
     return;
   }
 
