@@ -1751,17 +1751,24 @@ ZWave_Parse($$@)
     push @event, "UNPARSED:$className $arg" if(!$matched);
   }
 
-  my $wu = $baseHash->{WakeUp};
-  if($arg =~ m/^028407/ && $wu && @{$wu}) {
-    foreach my $wuCmd (@{$wu}) {
-      IOWrite($hash, "00", ZWave_clockAdjust($wuCmd));
-      Log3 $hash, 4, "Sending stored command: $wuCmd";
+  if($arg =~ m/^028407/) {
+    my $wu = $baseHash->{WakeUp};
+    if($wu && @{$wu}) {
+      foreach my $wuCmd (@{$wu}) {
+        IOWrite($hash, "00", ZWave_clockAdjust($wuCmd));
+        Log3 $hash, 4, "Sending stored command: $wuCmd";
+      }
+      @{$baseHash->{WakeUp}}=();
+      #send a final wakeupNoMoreInformation
+      my $nodeId = $baseHash->{id};
+      Log3 $hash, 4, "Sending wakeupNoMoreInformation to node: $nodeId";
+      IOWrite($hash, "00", "13${nodeId}02840805");
+    } else {
+      InternalTimer(gettimeofday()+0.1, sub($) {
+        my $nodeId = $hash->{id};
+        IOWrite($hash, "00", "13${nodeId}02840805");
+      }, $hash, 0);
     }
-    @{$baseHash->{WakeUp}}=();
-    #send a final wakeupNoMoreInformation
-    my $nodeId = $baseHash->{id};
-    Log3 $hash, 4, "Sending wakeupNoMoreInformation to node: $nodeId";
-    IOWrite($hash, "00", "13${nodeId}02840805");
   }
   $baseHash->{lastMsgTimestamp} = time();
 
@@ -1780,6 +1787,7 @@ ZWave_Parse($$@)
   return join("\n", @event) if($srcCmd);
   return $name;
 }
+
 
 #####################################
 sub
