@@ -275,8 +275,11 @@ sub CUL_HM_updateConfig($){
       }
     }
     elsif ($md =~ m/(CCU-FHEM)/){
-      if(eval "defined(&HMLAN_writeAesKey)"){
-        HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
+      if($hash->{helper}{role}{dev}){
+        if(eval "defined(&HMLAN_writeAesKey)"){
+          HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
+        }
+        CUL_HM_UpdtCentral($name);
       }
     }
     elsif ($st eq "dimmer"  ) {#setup virtual dimmer channels
@@ -317,9 +320,6 @@ sub CUL_HM_updateConfig($){
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
-      if($hash->{helper}{role}{dev} && $md eq "CCU-FHEM"){
-        CUL_HM_UpdtCentral($name);
-      }
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
