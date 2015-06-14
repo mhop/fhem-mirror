@@ -1180,7 +1180,8 @@ ZWave_configCheckParam($$$$@)
     my $v = $h->{Item}{$arg[0]};
     return ("Unknown parameter $arg[0] for $cmd, use one of ".
                 join(",", keys %{$h->{Item}}), "") if(!defined($v));
-    return ("", sprintf("04%02x01%02x", $h->{index}, $v));
+    my $len = ($v > 65535 ? 8 : ($v > 255 ? 4 : 2));
+    return ("", sprintf("04%02x%02d%0*x", $h->{index}, $len/2, $len, $v));
   }
   if($t eq "button") {
     return ("", sprintf("04%02x01%02x", $h->{index}, $h->{value}));
