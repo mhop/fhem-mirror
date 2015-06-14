@@ -307,7 +307,7 @@ sub Twilight_fireEvent($) {
    my $delta      = int($eventTime - time());
    my $oldState   = ReadingsVal($name,"state","0");
        
-   my $nextEventTime = ($hash->{TW}{$nextEvent}{TIME} > 0) ? FmtDateTime($hash->{TW}{$nextEvent}{TIME}) : "undefined";
+   my $nextEventTime = ($hash->{TW}{$nextEvent}{TIME} > 0) ? FmtTime($hash->{TW}{$nextEvent}{TIME}) : "undefined";
    
    my $doTrigger = !(defined($hash->{LOCAL})) && ( abs($delta)<6 || $swip  && $state gt $oldState);
   #Log3 $hash, 3, "[$hash->{NAME}] swip-delta-oldState-doTrigger===>$swip/$delta/$oldState/$doTrigger";
