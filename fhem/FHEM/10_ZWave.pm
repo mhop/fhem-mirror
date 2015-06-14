@@ -350,8 +350,8 @@ my %zwave_class = (
                "secNonce"  => "40" },
     get   => { "secSupported" => "02" },
     parse => { "..9803(.*)" => '"secSupported:$1"',
-               "..9805(.*)" => 'ZWave_securityInit($hash, $1)',
-               "..9880(.*)" => 'ZWave_securityInit($hash, $1)' } },
+               "..9805(.*)" => 'ZWave_secureInit($hash, $1)', # secScheme
+               "..9880(.*)" => 'ZWave_secureInit($hash, $1)' } },
   AV_TAGGING_MD            => { id => '99' },
   IP_CONFIGURATION         => { id => '9a' },
   ASSOCIATION_COMMAND_CONFIGURATION
@@ -380,7 +380,6 @@ my %zwave_cmdArgs = (
 
 my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
-                           "013c-0001-0003" => "Philio_PAN04",
                            "0115-0100-0102" => "ZME_KFOB" );
 
 # Patching certain devices.
@@ -1454,7 +1453,7 @@ ZWave_sensorbinaryV2Parse($$)
 }
 
 sub
-ZWave_securityInit(@)
+ZWave_secureInit(@)
 {
   my ($hash, $param) = @_;
   my $iodev = $hash->{IODev};
@@ -1463,7 +1462,10 @@ ZWave_securityInit(@)
   $hash->{secStatus} = 0 if(!$hash->{secStatus});
   my $status = ++$hash->{secStatus};
 
-  Log3 $iodev, 4, "$hash->{NAME}: securityInit status $status";
+  my @stTxt = ( "secScheme", "secKey", "secNonce", "done");
+  my $stTxt = ($status > int(@stTxt) ? "ERR" : $stTxt[$status-1]);
+  Log3 $iodev, 4, "*** $hash->{NAME}: secureInit status $status/$stTxt";
+
   if($status == 1) {
     ZWave_Set($hash, $name, "secScheme");
     return ""; # not evaluated
@@ -1475,10 +1477,11 @@ ZWave_securityInit(@)
     return undef;       # No Event/Reading
 
   } elsif($status == 3) {
+    IOWrite($hash, "secKey ACK", "");
     ZWave_Set($hash, $name, "secNonce");
     return undef;       # No Event/Reading
 
-  } else {
+  } elsif($status == 4) {
     Log3 $iodev, 4, "secNonce report: $param";
     delete $iodev->{secInitName};
     delete $hash->{secStatus};
@@ -1544,7 +1547,7 @@ ZWave_Parse($$@)
     if($cmd eq "ZW_SEND_DATA") {
       Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
       my $si = $iodev->{secInitName};
-      ZWave_securityInit($defs{$si}) # No extra response for set networkKey
+      ZWave_secureInit($defs{$si}) # No extra response for set networkKey
         if($si && $defs{$si} && $defs{$si}{secStatus} &&
            $defs{$si}{secStatus} == 2);
       return "";
@@ -1595,7 +1598,7 @@ ZWave_Parse($$@)
           my $key = AttrVal($ioName, "networkKey", "");
           if($key) {
             $iodev->{secInitName} = $dh->{NAME};
-            return ZWave_securityInit($dh);
+            return ZWave_secureInit($dh);
           } else {
             Log3 $ioName, 2, "No secure inclusion as $ioName has no networkKey";
           }
@@ -1757,8 +1760,8 @@ ZWave_Parse($$@)
     @{$baseHash->{WakeUp}}=();
     #send a final wakeupNoMoreInformation
     my $nodeId = $baseHash->{id};
-    IOWrite($hash, "00", "13${nodeId}02840805");
     Log3 $hash, 4, "Sending wakeupNoMoreInformation to node: $nodeId";
+    IOWrite($hash, "00", "13${nodeId}02840805");
   }
   $baseHash->{lastMsgTimestamp} = time();
 
