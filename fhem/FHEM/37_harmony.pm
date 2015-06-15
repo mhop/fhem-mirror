@@ -533,10 +533,12 @@ harmony_Set($$@)
     return undef if( !defined($hash->{config}) );
 
     my $activities;
-    foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
-      next if( $activity->{id} == -1 );
-      $activities .= "," if( $activities );
-      $activities .= $activity->{label};
+    if( $hash->{config}->{activity} ) {
+      foreach my $activity (sort { ($a->{activityOrder}||0) <=> ($b->{activityOrder}||0) } @{$hash->{config}->{activity}}) {
+        next if( $activity->{id} == -1 );
+        $activities .= "," if( $activities );
+        $activities .= $activity->{label};
+       }
      }
 
     if( my $activity = harmony_activityOfId($hash, -1) ) {
@@ -552,15 +554,17 @@ harmony_Set($$@)
 
     my $hidDevices;
     my $autocreateDevices;
-    foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
-      if( $device->{IsKeyboardAssociated} ) {
-        $hidDevices .= "," if( $hidDevices );
-        $hidDevices .= harmony_labelOfDevice($hash, $device->{id} );
-      }
+    if( $hash->{config}->{device} ) {
+      foreach my $device (sort { $a->{id} <=> $b->{id} } @{$hash->{config}->{device}}) {
+        if( $device->{IsKeyboardAssociated} ) {
+          $hidDevices .= "," if( $hidDevices );
+          $hidDevices .= harmony_labelOfDevice($hash, $device->{id} );
+        }
 
-      if( !defined($modules{$hash->{TYPE}}{defptr}{$device->{id}}) ) {
-        $autocreateDevices .= "," if( $autocreateDevices );
-        $autocreateDevices .= harmony_labelOfDevice($hash, $device->{id} );
+        if( !defined($modules{$hash->{TYPE}}{defptr}{$device->{id}}) ) {
+          $autocreateDevices .= "," if( $autocreateDevices );
+          $autocreateDevices .= harmony_labelOfDevice($hash, $device->{id} );
+        }
       }
     }
 
