@@ -77,6 +77,14 @@ $(document).ready(function($){
 			$( 'input#fp_ar_input_left[class="' + device + '"]' ).val(X);
 			$( 'input#fp_ar_input_top[class="' + device + '"]' ).val(Y);
 
+					    event = event || window.event;
+		    //event.preventDefault();
+		    if (typeof event.stopPropagation != "undefined") {
+		        event.stopPropagation();
+		    } else {
+		        event.cancelBubble = true;
+		    }
+
 		},
   
 		stop: function( event, ui) {
@@ -94,7 +102,9 @@ $(document).ready(function($){
 			var cmd = "attr " + device + " fp_" + fp_name + " " + Y + "," + X + "," + style + "," + text + "," + text2;
 			FW_cmd('/fhem/floorplan/'+fp_name+'?XHR=1&cmd='+cmd);
 
-//			return false;
+			// prevent from further propagating event 
+			$( event.originalEvent.target ).one('click', function(e){ e.stopImmediatePropagation(); } );
+
         }
     });
 
