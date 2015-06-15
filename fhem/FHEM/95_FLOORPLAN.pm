@@ -49,6 +49,7 @@
 # 0038: added arrange by drag&drop provided by Markus (mluckey), added longpollfilter (nesges), 
 #       added processing of global userattr fp_<name> and their value per device for rename, copy, delete (Jan 31, 2015)
 # 0039: added style 8 for commands-popup provided by André (justme68) (Feb 17, 2015)
+# 0040: fixed "no commands for IT devices", drag&drop won't switch device-status anymore (June 15, 2015)
 #
 ################################################################
 #
@@ -672,6 +673,9 @@ FP_show(){
                 no strict "refs";
                 $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_ME,
                                                    $d, $FW_room, $cmd, $values);
+                if ($htmlTxt eq '') {
+                  $FW_ME = $oldMe;
+                }
                 use strict "refs";
                 last if(defined($htmlTxt));
               }
@@ -684,7 +688,7 @@ FP_show(){
                 $h .= "<p><a href='$FW_ME$FW_subdir?$link$FW_CSRF'>$cmd</a></p>";
               }
             } else {
-			  if(defined($htmlTxt)) {
+			  if(defined($htmlTxt && $htmlTxt ne '')) {
 		        $htmlTxt =~ s/>desired-temp/>/;        #for FHT
 			    $htmlTxt =~ s/>desiredTemperature/>/;  #for MAX!
                 FW_pO $htmlTxt;
