@@ -686,7 +686,7 @@ ZWDongle_Read($@)
       my $m = $1;
       my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
                  '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
-      $m = $msg{$m} ? "UNKNOWN $m" : $msg{$m};
+      $m = $msg{$m} ? $msg{$m} : "UNKNOWN $m";
       ZWDongle_shiftSendStack($hash, 5, "ZW_SEND_DATA:$m received");
     }
     
