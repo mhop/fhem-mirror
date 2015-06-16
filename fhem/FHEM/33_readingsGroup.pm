@@ -42,7 +42,7 @@ sub readingsGroup_Initialize($)
   $hash->{SetFn}    = "readingsGroup_Set";
   $hash->{GetFn}    = "readingsGroup_Get";
   $hash->{AttrFn}   = "readingsGroup_Attr";
-  $hash->{AttrList} = "disable:1,2,3 style timestampStyle ". join( " ", @mapping_attrs ) ." separator nolinks:1 noheading:1 nonames:1 notime:1 nostate:1 alwaysTrigger:1 sortDevices:1 visibility:hidden,hideable,collapsed,collapsible";
+  $hash->{AttrList} = "disable:1,2,3 style timestampStyle ". join( " ", @mapping_attrs ) ." separator nolinks:1 noheading:1 nonames:1 notime:1 nostate:1 firstCalcRow:1,2,3,4 alwaysTrigger:1,2 sortDevices:1 visibility:hidden,hideable,collapsed,collapsible setList setFn:textField-long";
 
   $hash->{FW_detailFn}  = "readingsGroup_detailFn";
   $hash->{FW_summaryFn}  = "readingsGroup_detailFn";
@@ -94,7 +94,7 @@ readingsGroup_updateDevices($;$)
       $hash->{DEF} =~ s/\s*[{].*$//g;
       last;
     } else {
-      my @device = split(":", $param);
+      my @device = split(":", $param, 2);
 
       if( $device[1] && $device[1] =~ m/^FILTER=/ ) {
         my $devspec = shift(@device);
@@ -162,8 +162,9 @@ readingsGroup_updateDevices($;$)
     for( my $i = 0; $i <= $#list; ++$i ) {
       my $regex = $list[$i];
       while ($regex
-             && ( ($regex =~ m/^</ && $regex !~ m/>$/)          #handle , in <...>
-                  || ($regex =~ m/@\{/ && $regex !~ m/}$/) )    #handle , in reading@{...}
+             && ( ($regex =~ m/^</ && $regex !~ m/>$/)           #handle , in <...>
+                  || ($regex =~ m/@\{/ && $regex !~ m/}$/)       #handle , in reading@{...}
+                  || ($regex =~ m/^$.*\(/ && $regex !~ m/\)/) )  #handle , in $<calc>(...)
              && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
       }
@@ -171,7 +172,7 @@ readingsGroup_updateDevices($;$)
       next if( !$regex );
 
       if( $regex =~ m/^<.*>$/ ) {
-      } elsif( $regex =~ m/(.*)@(.*)/ ) {
+      } elsif( $regex !~ m/^\$/ && $regex =~ m/(.*)@(.*)/ ) {
         $regex = $1;
 
         next if( $regex && $regex =~ m/^\+(.*)/ );
@@ -232,9 +233,12 @@ sub readingsGroup_Define($$)
   my $name = shift(@args);
   my $type = shift(@args);
 
-  readingsGroup_updateDevices($hash);
-
   $hash->{STATE} = 'Initialized';
+
+  if( $init_done ) {
+    readingsGroup_updateDevices($hash);
+    readingsGroup_inithtml($hash);
+  }
 
   return undef;
 }
@@ -328,6 +332,7 @@ lookup2($$$$;$$)
 
   if( ref($lookup) eq 'HASH' ) {
     my $vf = "";
+    $vf = $lookup->{""} if( defined( $lookup->{""} ) );
     $vf = $lookup->{$reading} if( defined($reading) && exists($lookup->{$reading}) );
     $vf = $lookup->{$name.".".$reading} if( defined($reading) && exists($lookup->{$name.".".$reading}) );
     $vf = $lookup->{$reading.".".$value} if( defined($value) && exists($lookup->{$reading.".".$value}) );
@@ -390,6 +395,144 @@ readingsGroup_makeLink($$$)
   return ($v, $devStateIcon);
 }
 
+
+sub
+readingsGroup_value2html($$$$$$$$$)
+{
+  my ($hash,$calc,$name,$name2,$n,$v,$cell_row,$cell_column,$type) = @_;
+  my $d = $hash->{NAME};
+
+  my $informid = "informId=\"$d-$name.$n\"";
+
+  my $value_orig = $v;
+  if( $calc ) {
+    $v = rgCalc($hash,$calc,$cell_row,$cell_column);
+    $hash->{helper}{values}{calc}[$cell_column][$cell_row] = $calc;
+
+    $informid = "informId=\"$d-calc:$cell_row:$cell_column\"";
+
+    $value_orig = $v;
+    $v = "" if( !defined($v) );
+  }
+
+  my $value_format = lookup2($hash->{helper}{valueFormat},$name,$n,$v,$cell_row,$cell_column);
+  return (undef) if( !defined($value_format) );
+  if(  $value_format =~ m/%/ ) {
+    $v = sprintf( $value_format, $v );
+  } elsif( $value_format ne "" ) {
+    $v = $value_format;
+  }
+  my $value_formated = $v;
+
+
+  my $room = AttrVal($name2, "room", "");
+  my $alias = AttrVal($name2, "alias", $name2);
+  my $group = AttrVal($name2, "group", "");
+
+  my $cmd;
+  my $devStateIcon;
+  if( my $value_icon = $hash->{helper}{valueIcon} ) {
+    if( my $icon = lookup($value_icon,$name,$alias,$n,$v,$room,$group,$cell_row,"") ) {
+      if( $icon =~ m/^[\%\$]devStateIcon$/ ) {
+        my %extPage = ();
+        my ($allSets, $cmdlist, $txt) = FW_devState($name, $room, \%extPage);
+        $devStateIcon = $txt;
+      } else {
+        $devStateIcon = FW_makeImage( $icon, $v, "icon" );
+        $cmd = lookup2($hash->{helper}{commands},$name,$n,$icon);
+        $cmd = lookup2($hash->{helper}{commands},$name,$n,$v) if( !$cmd );
+      }
+    }
+  }
+
+  my $webCmdFn = 0;
+  if( !$devStateIcon ) {
+    $cmd = lookup2($hash->{helper}{commands},$name,$n,$v);
+
+    if( $cmd && $cmd =~ m/^([\w\/.-]*):(\S*)?(\s\S*)?$/ ) {
+      my $set = $1;
+      my $values = $2;
+      $set .= $3 if( $3 );
+
+      if( !$values ) {
+        my %extPage = ();
+        my ($allSets, undef, undef) = FW_devState($name, $room, \%extPage);
+        $allSets = getAllAttr($name) if( $type eq 'attr' );
+        my ($set) = split( ' ', $set, 2 );
+        if( $allSets && $allSets =~ m/\b$set:([^ ]*)/) {
+          $values = $1;
+        }
+      }
+
+      my $room = $FW_webArgs{room};
+      $room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
+
+      my $htmlTxt;
+      foreach my $fn (sort keys %{$data{webCmdFn}}) {
+        no strict "refs";
+        $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,$name,$room,$set,$values);
+        use strict "refs";
+        last if(defined($htmlTxt));
+      }
+
+      if( $htmlTxt && $htmlTxt =~ m/^<td>(.*)<\/td>$/ ) {
+         $htmlTxt = $1;
+        }
+      if( $htmlTxt && $htmlTxt =~ m/class='fhemWidget'/ ) {
+        $htmlTxt =~ s/class='fhemWidget'/class='fhemWidget' informId='$d-$name.$n'/;
+        $informid = "";
+      }
+
+      if( $htmlTxt ) {
+        if( $type eq 'attr' ) {
+          my $current = AttrVal( $name, $n, 'unknown' );
+          $htmlTxt =~ s/cmd=/type='attr' cmd=/;
+          $htmlTxt =~ s/current='[^']*'/current='$current'/;
+        }
+
+        $v = $htmlTxt;
+        $webCmdFn = 1;
+      }
+    }
+  }
+  ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd) if( !$webCmdFn );
+
+  if( my $value_prefix = $hash->{helper}{valuePrefix} ) {
+    if( my $value_prefix = lookup2($value_prefix,$name,$n,$v) ) {
+      $v = $value_prefix . $v;
+      $devStateIcon = $value_prefix . $devStateIcon if( $devStateIcon );
+    }
+  }
+
+  if( my $value_suffix = $hash->{helper}{valueSuffix} ) {
+    if( my $value_suffix = lookup2($value_suffix,$name,$n,$value_formated) ) {
+      $v .= $value_suffix;
+      $devStateIcon .= $value_suffix if( $devStateIcon );
+    }
+  }
+  my $value_prefix_suffix = $v;
+
+
+  $hash->{helper}{values}{orig}[$cell_column][$cell_row] = $value_orig;
+  $hash->{helper}{values}{formated}[$cell_column][$cell_row] = $value_formated;
+  $hash->{helper}{values}{prefixsuffix}[$cell_column][$cell_row] = $value_prefix_suffix;
+
+  my $value_style = lookup2($hash->{helper}{valueStyle},$name,$n,$v,$cell_row,$cell_column);
+  $v = "<div $value_style>$v</div>" if( $value_style && !$devStateIcon );
+
+  return($informid,$v,$devStateIcon)
+}
+sub
+readingsGroup_inithtml($)
+{
+  my($hash) = @_;
+
+  if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 ) {
+    ${hash}->{inDetailFn} = 1;
+    readingsGroup_2html($hash);
+    delete ${hash}->{inDetailFn};
+  }
+}
 sub
 readingsGroup_2html($;$)
 {
@@ -412,6 +555,10 @@ readingsGroup_2html($;$)
       readingsGroup_updateDevices($hash);
     }
   }
+
+  delete( $hash->{helper}{recalc} );
+  delete( $hash->{helper}{values} );
+  delete( $hash->{helper}{positions} );
 
   my $d = $hash->{NAME};
 
@@ -470,7 +617,7 @@ readingsGroup_2html($;$)
   }
 
   my $row = 1;
-  my $cell_row = 0;
+  my $cell_row = 1;
   my $ret;
   $ret .= "<table>";
   my $txt = AttrVal($d, "alias", $d);
@@ -495,7 +642,6 @@ readingsGroup_2html($;$)
     @list = split(",",$regex) if( $regex );
     my $first = 1;
     my $multi = @list;
-    ++$cell_row;
     my $cell_column = 1;
     #foreach my $regex (@list) {
     for( my $i = 0; $i <= $#list; ++$i ) {
@@ -503,13 +649,16 @@ readingsGroup_2html($;$)
       my $name2 = $name2;
       my $regex = $list[$i];
       while ($regex
-             && ( ($regex =~ m/^</ && $regex !~ m/>$/)          #handle , in <...>
-                  || ($regex =~ m/@\{/ && $regex !~ m/}$/) )    #handle , in reading@{...}
+             && ( ($regex =~ m/^</ && $regex !~ m/>$/)            #handle , in <...>
+                  || ($regex =~ m/@\{/ && $regex !~ m/}$/)        #handle , in reading@{...}
+                  || ($regex =~ m/^\$.*\(/ && $regex !~ m/\)/) )  #handle , in $<calc>(...)
              && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
       }
       my $h = $h;
+      my $type;
       my $force_show = 0;
+      my $calc;
       if( $regex && $regex =~ m/^<(.*)>$/ ) {
         my $txt = $1;
         my $readings;
@@ -529,12 +678,12 @@ readingsGroup_2html($;$)
           next if( !defined($txt) );
         }
 
-        my $row_style = lookup2($hash->{helper}{rowStyle},$name,$1,undef,$cell_row,undef);
         my $cell_style0 = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,0);
         my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$1,undef,$cell_row,$cell_column);
         my $name_style = lookup2($hash->{helper}{nameStyle},$name,$1,undef,$cell_row,$cell_column);
         my $value_columns = lookup2($hash->{helper}{valueColumns},$name,$1,undef,$cell_row,$cell_column);
 
+        my $row_style = lookup2($hash->{helper}{rowStyle},$name,$1,undef,$cell_row,undef);
         if( !$FW_webArgs{"detail"} ) {
           if( $visibility && $visibility eq "collapsed" && $txt ne '-' && $txt ne '+' && $txt ne '+-' ) {
             $row_style = 'style=""' if( !$row_style );
@@ -548,6 +697,11 @@ readingsGroup_2html($;$)
           $first = 0;
           ++$cell_row;
           $cell_column = 1;
+          next;
+        } elsif( $txt eq 'hr' ) {
+          $ret .= sprintf("<tr $row_style class=\"%s\">", ($row&1)?"odd":"even");
+          $row++;
+          $ret .= "<td style='padding:0px' colspan='99'><hr/></td>";
           next;
         } elsif( $txt eq '-' || $txt eq '+' || $txt eq '+-' ) {
           my $collapsed = $visibility && ( $visibility eq "collapsed" ) && !$FW_webArgs{"detail"};
@@ -649,13 +803,13 @@ readingsGroup_2html($;$)
         }
 
         my $informid = "";
-        $informid = "informId=\"$d-$name.i$item.item\"" if( $readings );
+        $informid = "informId=\"$d-item:$item\"" if( $readings );
         $ret .= "<td $value_columns><div $cell_style $name_style $informid>$txt</div></td>";
         $first = 0;
         ++$cell_column;
         next;
       } else {
-        if( $regex && $regex =~ m/(.*)@([!]?)(.*)/ ) {
+        if( $regex && $regex !~ m/^\$/ && $regex =~ m/(.*)@([!]?)(.*)/ ) {
           $regex = $1;
           my $force_device = $2;
           $name = $3;
@@ -671,17 +825,32 @@ readingsGroup_2html($;$)
         }
 
         $force_show = 0;
+        $type = undef;
+        $calc = undef;
         my $modifier = "";
-        if( $regex && $regex =~ m/^([+?!]*)(.*)/ ) {
+        if( $regex && $regex =~ m/^([+?!\$]*)(.*)/ ) {
           $modifier = $1;
           $regex = $2;
         }
 
         if( $modifier =~ m/\+/ ) {
         } elsif( $modifier =~ m/\?/ ) {
+          $type = 'attr';
           $h = $attr{$name};
         } else {
           $h = $h->{READINGS} if( $h );
+        }
+
+        if( $modifier =~ m/\$/ ) {
+          $force_show = 1;
+          $h = undef;
+          $calc = $regex;
+          $name = $d;
+          #if( $regex =~ m/([^\(]*)/ ) {
+          if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
+            $regex = $7;
+            $regex = $1 if( !defined($regex) );
+          }
         }
 
         $force_show = 1 if( $modifier =~ m/\!/ );
@@ -715,13 +884,16 @@ readingsGroup_2html($;$)
           $v = FW_htmlEscape($val);
         }
 
-        my $informid = "informId=\"$d-$name.$n\"";
-        my $row_style = lookup2($hash->{helper}{rowStyle},$name,$n,$v,$cell_row,undef);
+        my($informid,$devStateIcon);
+        ($informid,$v,$devStateIcon) = readingsGroup_value2html($hash,$calc,$name,$name2,$n,$v,$cell_row,$cell_column,$type);
+        next if( !defined($informid) );
+
         my $cell_style0 = lookup2($hash->{helper}{cellStyle},$name,$n,$v,$cell_row,0);
         my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$n,$v,$cell_row,$cell_column);
         my $name_style = lookup2($hash->{helper}{nameStyle},$name,$n,$v,$cell_row,$cell_column);
-        my $value_style = lookup2($hash->{helper}{valueStyle},$name,$n,$v,$cell_row,$cell_column);
+        #my $value_style = lookup2($hash->{helper}{valueStyle},$name,$n,$v,$cell_row,$cell_column);
 
+        my $row_style = lookup2($hash->{helper}{rowStyle},$name,$n,$v,$cell_row,undef);
         if( !$FW_webArgs{"detail"} ) {
           if( $visibility && $visibility eq "collapsed" ) {
             $row_style = 'style=""' if( !$row_style );
@@ -729,116 +901,35 @@ readingsGroup_2html($;$)
           }
         }
 
-        my $value_format = lookup2($hash->{helper}{valueFormat},$name,$n,$v);
-        next if( !defined($value_format) );
-        if(  $value_format =~ m/%/ ) {
-          $v = sprintf( $value_format, $v );
-        } elsif( $value_format ne "" ) {
-          $v = $value_format;
-        }
 
-        my $value_column = lookup2($hash->{helper}{valueColumn},$name,$n,undef);
         my $value_columns = lookup2($hash->{helper}{valueColumns},$name,$n,$v);
-
-        my $a = AttrVal($name2, "alias", $name2);
-        my $m = "$a$separator$n";
-        $m = $a if( $multi != 1 );
-        my $room = AttrVal($name2, "room", "");
-        my $group = AttrVal($name2, "group", "");
-        my $txt = lookup($hash->{helper}{mapping},$name2,$a,($multi!=1?"":$n),$v,$room,$group,$cell_row,$m);
-
-        if( my $name_icon = $hash->{helper}{nameIcon}  ) {
-          if( my $icon = lookup($name_icon ,$name,$a,$n,$v,$room,$group,$cell_row,"") ) {
-            $txt = FW_makeImage( $icon, $txt, "icon" );
-          }
-        }
-
-        my $cmd;
-        my $devStateIcon;
-        if( my $value_icon = $hash->{helper}{valueIcon} ) {
-          if( my $icon = lookup($value_icon,$name,$a,$n,$v,$room,$group,$cell_row,"") ) {
-            if( $icon =~ m/^[\%\$]devStateIcon$/ ) {
-              my %extPage = ();
-              my ($allSets, $cmdlist, $txt) = FW_devState($name, $room, \%extPage);
-              $devStateIcon = $txt;
-            } else {
-              $devStateIcon = FW_makeImage( $icon, $v, "icon" );
-              $cmd = lookup2($hash->{helper}{commands},$name,$n,$icon);
-              $cmd = lookup2($hash->{helper}{commands},$name,$n,$v) if( !$cmd );
-            }
-          }
-        }
-
-        my $webCmdFn = 0;
-        if( !$devStateIcon ) {
-          $cmd = lookup2($hash->{helper}{commands},$name,$n,$v) if( !$devStateIcon );
-
-          if( $cmd && $cmd =~ m/^([\w\/.-]*):(\S*)?(\s\S*)?$/ ) {
-            my $set = $1;
-            my $values = $2;
-            $set .= $3 if( $3 );
-
-            if( !$values ) {
-              my %extPage = ();
-              my ($allSets, undef, undef) = FW_devState($name, $room, \%extPage);
-              my ($set) = split( ' ', $set, 2 );
-              if( $allSets && $allSets =~ m/\b$set:([^ ]*)/) {
-                $values = $1;
-              }
-            }
-
-            my $room = $FW_webArgs{room};
-            $room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
-
-            my $htmlTxt;
-            foreach my $fn (sort keys %{$data{webCmdFn}}) {
-              no strict "refs";
-              $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,$name,$room,$set,$values);
-              use strict "refs";
-              last if(defined($htmlTxt));
-            }
-
-           if( $htmlTxt && $htmlTxt =~ m/^<td>(.*)<\/td>$/ ) {
-              $htmlTxt = $1;
-             }
-           if( $htmlTxt && $htmlTxt =~ m/class='fhemWidget'/ ) {
-             $htmlTxt =~ s/class='fhemWidget'/class='fhemWidget' informId='$d-$name.$n'/;
-             $informid = "";
-           }
-
-           if( $htmlTxt ) {
-              $v = $htmlTxt;
-              $webCmdFn = 1;
-            }
-          }
-        }
-        ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd) if( !$webCmdFn );
-
-        if( $hash->{helper}{valuePrefix} ) {
-          if( my $value_prefix = lookup2($hash->{helper}{valuePrefix},$name,$n,$v) ) {
-            $v = $value_prefix . $v;
-            $devStateIcon = $value_prefix . $devStateIcon if( $devStateIcon );
-          }
-        }
-
-        if( $hash->{helper}{valueSuffix} ) {
-          if( my $value_suffix = lookup2($hash->{helper}{valueSuffix},$name,$n,$v) ) {
-            $v .= $value_suffix;
-            $devStateIcon .= $value_suffix if( $devStateIcon );
-          }
-        }
 
         if( $first || $multi == 1 ) {
           $ret .= sprintf("<tr $row_style class=\"%s\">", ($row&1)?"odd":"even");
           $row++;
+
+          if( $show_names ) {
+            my $room = AttrVal($name2, "room", "");
+            my $alias = AttrVal($name2, "alias", $name2);
+            my $group = AttrVal($name2, "group", "");
+
+            my $m = "$alias$separator$n";
+            $m = $alias if( $multi != 1 );
+            my $txt = lookup($hash->{helper}{mapping},$name2,$alias,($multi!=1?"":$n),$v,$room,$group,$cell_row,$m);
+
+            if( my $name_icon = $hash->{helper}{nameIcon}  ) {
+              if( my $icon = lookup($name_icon ,$name,$alias,$n,$v,$room,$group,$cell_row,"") ) {
+                $txt = FW_makeImage( $icon, $txt, "icon" );
+              }
+            }
+
+            $txt = "<div $cell_style0>$txt</div>" if( !$show_links );
+            $txt = "<a $cell_style0 href=\"$FW_ME$FW_subdir?detail=$name\">$txt</a>" if( $show_links );
+            $ret .= "<td $value_columns><div $name_style class=\"dname\">$txt</div></td>";
+          }
         }
 
-        $txt = "<div $cell_style0>$txt</div>" if( !$show_links );
-        $txt = "<a $cell_style0 href=\"$FW_ME$FW_subdir?detail=$name\">$txt</a>" if( $show_links );
-        $v = "<div $value_style>$v</div>" if( $value_style && !$devStateIcon );
-
-        $ret .= "<td $value_columns><div $name_style class=\"dname\">$txt</div></td>" if( $show_names && ($first || $multi == 1) );
-
+        my $value_column = lookup2($hash->{helper}{valueColumn},$name,$n,undef);
         if( $value_column && $multi ) {
           while ($cell_column < $value_column ) {
             $ret .= "<td></td>";
@@ -850,10 +941,16 @@ readingsGroup_2html($;$)
         $ret .= "<td $value_columns><div $cell_style $informid>$v</div></td>" if( !$devStateIcon );
         $ret .= "<td><div $timestamp_style informId=\"$d-$name.$n-ts\">$t</div></td>" if( $show_time && $t );
 
+        if( !$calc ) {
+          $hash->{helper}{positions}{"$name.$n"} .= "," if( $hash->{helper}{positions}{"$name.$n"} );
+          $hash->{helper}{positions}{"$name.$n"} .= "$cell_row:$cell_column";
+        }
+
         $first = 0;
         ++$cell_column;
       }
     }
+    ++$cell_row;
   }
   if( $disable > 0 ) {
     $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
@@ -894,10 +991,12 @@ readingsGroup_Notify($$)
 
   if( grep(m/^INITIALIZED$/, @{$events}) ) {
     readingsGroup_updateDevices($hash);
+    readingsGroup_inithtml($hash);
     return undef;
   }
   elsif( grep(m/^REREADCFG$/, @{$events}) ) {
     readingsGroup_updateDevices($hash);
+    readingsGroup_inithtml($hash);
     return undef;
   }
 
@@ -909,6 +1008,7 @@ readingsGroup_Notify($$)
   my $devices = $hash->{DEVICES};
   $devices = $hash->{DEVICES2} if( $hash->{DEVICES2} );
 
+  my %triggers = ();
   my $max = int(@{$events});
   for (my $i = 0; $i < $max; $i++) {
     my $s = $events->[$i];
@@ -947,11 +1047,14 @@ readingsGroup_Notify($$)
         } else {
           Log3 $name, 5, "$name: no longer visible, ignoring notify";
           delete( $hash->{mayBeVisible} );
+          delete( $hash->{helper}{recalc} );
+          delete( $hash->{helper}{values} );
+          delete( $hash->{helper}{positions} );
           return undef;
         }
       }
 
-      my ($reading,$value) = split(": ",$events->[$i],2);
+      my ($reading,$value) = split(": ",$events->[$i], 2);
       next if( !defined($value) );
       next if( $reading =~ m/^\./);
       $reading = "" if( !defined($reading) );
@@ -978,12 +1081,17 @@ readingsGroup_Notify($$)
           }
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
           my $modifier = "";
-          if( $regex && $regex =~ m/^([+?!]*)(.*)/ ) {
+          if( $regex && $regex =~ m/^([+?!\$]*)(.*)/ ) {
             $modifier = $1;
             $regex = $2;
           }
           next if( $modifier =~ m/\+/ );
           next if( $modifier =~ m/\?/ );
+
+          my $calc = undef;
+          if( $modifier =~ m/\$/ ) {
+            $calc = $regex;
+          }
 
           if( $regex && $regex =~ m/^<(.*)>$/ ) {
             my $txt = $1;
@@ -1014,7 +1122,7 @@ readingsGroup_Notify($$)
                 ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
               }
 
-              DoTrigger( $name, "$n.i$item.item: $txt" );
+              DoTrigger( $name, "item:$item: $txt" );
             }
 
             next;
@@ -1025,6 +1133,8 @@ readingsGroup_Notify($$)
           my $value_style = lookup2($hash->{helper}{valueStyle},$n,$reading,$value);
 
           my $value = $value;
+
+          my $value_orig = $value;
           if( my $value_format = $hash->{helper}{valueFormat} ) {
             my $value_format = lookup2($hash->{helper}{valueFormat},$n,$reading,$value);
 
@@ -1036,14 +1146,15 @@ readingsGroup_Notify($$)
               $value = $value_format;
             }
           }
+          my $value_formated = $value;
 
           my $cmd;
           my $devStateIcon;
           if( my $value_icon = $hash->{helper}{valueIcon} ) {
-            my $a = AttrVal($n, "alias", $n);
+            my $alias = AttrVal($n, "alias", $n);
             my $room = AttrVal($n, "room", "");
             my $group = AttrVal($n, "group", "");
-            if( my $icon = lookup($value_icon,$n,$a,$reading,$value,$room,$group,1,"") ) {
+            if( my $icon = lookup($value_icon,$n,$alias,$reading,$value,$room,$group,1,"") ) {
               if( $icon eq "%devStateIcon" ) {
                 my %extPage = ();
                 my ($allSets, $cmdlist, $txt) = FW_devState($n, $room, \%extPage);
@@ -1093,6 +1204,7 @@ readingsGroup_Notify($$)
               $devStateIcon = $value_prefix . $devStateIcon if( $devStateIcon );
             }
           }
+          my $value_prefix_suffix = $value;
 
           if( $hash->{helper}{valueSuffix} ) {
             if( my $value_suffix = lookup2($hash->{helper}{valueSuffix},$n,$reading,$value) ) {
@@ -1103,13 +1215,154 @@ readingsGroup_Notify($$)
 
           $value = "<div $value_style>$value</div>" if( $value_style );
 
-          DoTrigger( $name, "$n.$reading: $value" );
+          #FIXME: create {'$n.$reading'} = $value hash to avaid multiple events and calculations if same reading is included multiple times
+          $triggers{"$n.$reading"} = $value;
+
+          if( my $cells = $hash->{helper}{positions}{"$n.$reading"} ) {
+            foreach my $cell ( split( ',', $cells ) ) {
+              my ($cell_row,$cell_column) = split( ':', $cell );
+              $hash->{helper}{values}{orig}[$cell_column][$cell_row] = $value_orig;
+              $hash->{helper}{values}{formated}[$cell_column][$cell_row] = $value_formated;
+              $hash->{helper}{values}{prefixsuffix}[$cell_column][$cell_row] = $value_prefix_suffix;
+            }
+          }
+
+        }
+      }
+    }
+
+    readingsBeginUpdate($hash) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
+    foreach my $trigger (keys %triggers) {
+      DoTrigger( $name, "$trigger: $triggers{$trigger}" );
+
+      sub
+      updateRefs($$)
+      {
+        my( $hash, $refs ) = @_;
+        foreach my $ref ( split( ',', $refs ) ) {
+          my ($row,$col) = split( ':', $ref );
+
+          my $calc = $hash->{helper}{values}{calc}[$col][$row];
+
+          my $func = $calc;
+          if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
+            $func = $7;
+            $func = $1 if( !defined($func) );
+          }
+          my($informid,$v,$devStateIcon) = readingsGroup_value2html($hash,$calc,$name,$name,$func,$func,$row,$col,undef);
+          $v = "" if( !defined($v) );
+
+          #FIXME: use FW_directNotify
+          DoTrigger( $name, "calc:$row:$col: $v" ) if( $hash->{mayBeVisible} );
+
+          if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 ) {
+            #DoTrigger( $name, "$func: $hash->{helper}{values}{formated}[$col][$row]" );
+            readingsBulkUpdate($hash, $func, $hash->{helper}{values}{formated}[$col][$row]);
+          }
+
+          if( my $refs = $hash->{helper}{recalc}[$col][$row] ) {
+            updateRefs( $hash, $refs );
+          }
+        }
+      }
+
+      if( my $cells = $hash->{helper}{positions}{$trigger} ) {
+        foreach my $cell ( split( ',', $cells ) ) {
+          my ($cell_row,$cell_column) = split( ':', $cell );
+          if( my $refs = $hash->{helper}{recalc}[$cell_column][$cell_row] ) {
+            updateRefs( $hash, $refs );
+          }
+        }
+      }
+
+    }
+    readingsEndUpdate($hash,1) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
+  }
+
+  return undef;
+}
+
+sub
+rgCount($$)
+{
+  my ($val,$values) = @_;
+
+  my $count = 0;
+
+  if( $val =~ m/^\/(.*)\/$/ ) {
+    my $regex = $1;
+    foreach my $v (@{$values}) {
+      ++$count if( $v =~ m/$regex/ );
+    }
+  } elsif( $val =~ m/^!(.*)/ ) {
+    my $val = $1;
+    foreach my $v (@{$values}) {
+      ++$count if( $v ne $val );
+    }
+  } else {
+    foreach my $v (@{$values}) {
+      ++$count if( $v eq $val );
+    }
+  }
+
+  return $count;
+}
+use List::Util qw(min max sum);
+sub
+rgCalc($$$$)
+{
+  my ($hash,$calc,$cell_row,$cell_column) = @_;
+  my $name = $hash->{NAME};
+
+  return undef if( !defined($hash->{helper}{values}) );
+
+  my $args;
+  my $cells;
+  if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
+    $calc = $1;
+    $cells = $5;
+    $args = $3 if( defined($cells) );
+    $cells = $3 if( !defined($cells) );
+  }
+
+  my $firstCalcRow = AttrVal($name, "firstCalcRow", 1);
+
+  $cells = '$firstCalcRow..$ROW-1' if( !$cells );
+
+  my @values = ();
+  foreach my $cell ( split( ';', $cells ) ) {
+    my ($rows,$cols) = split( ':', $cell );
+    $rows = '$firstCalcRow..$ROW-1' if( !$rows );
+    $cols = $cell_column if( !defined($cols) );
+
+    my $ROW = $cell_row;
+    my $COLUMN = $cell_column;
+    foreach my $col (eval "($cols)") {
+      foreach my $row (eval "($rows)") {
+        my $value = $hash->{helper}{values}{orig}[$col][$row];
+        if( defined($value) ) {
+          #$value =~ s/[^-\.\d]//g;
+          push @values, $value;
+        }
+
+        if( ${hash}->{inDetailFn} ) {
+          #FIXME: also add indirect cells
+          $hash->{helper}{recalc}[$col][$row] .= "," if( $hash->{helper}{recalc}[$col][$row] );
+          $hash->{helper}{recalc}[$col][$row] .= "$cell_row:$cell_column";
         }
       }
     }
   }
 
-  return undef;
+  if( $calc eq 'avg' ) {
+    my $cnt = scalar @values;
+    return undef if( !$cnt );
+    return ( sum @values ) / $cnt;
+  } elsif( $calc eq 'count' ) {
+    return rgCount( $args, \@values );
+  }
+
+  return eval $calc .' @values';
 }
 
 sub
@@ -1128,6 +1381,29 @@ readingsGroup_Set($@)
     return undef;
   }
 
+  if( my $setList = AttrVal($name, "setList", undef) ) {
+    $list .= " ". $setList;
+
+    return "Unknown argument $cmd, choose one of $list" if( $cmd eq '?' );
+
+    foreach my $set (split(" ", $setList)) {
+      if( "$set " =~ m/^${cmd}[ :]/ ) {
+
+        my $v = join(" ", @a);
+        my $set_fn = AttrVal( $hash->{NAME}, "setFn", "" );
+        if( $set_fn =~ m/^{.*}$/ ) {
+          my $CMD = $cmd;
+          my $ARGS = $param ." ". join(" ", @a);
+
+          my $set_fn = eval $set_fn;
+          Log3 $name, 3, $name .": setFn: ". $@ if($@);
+
+          return $set_fn;
+        }
+      }
+    }
+
+  }
 
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -1159,13 +1435,15 @@ readingsGroup_Attr($$$;$)
 
   if( $attrName eq "alwaysTrigger" ) {
     my $hash = $defs{$name};
-    $attrVal = 1 if($attrVal);
+    #$attrVal = 1 if($attrVal);
 
     if( $cmd eq "set" ) {
       $hash->{alwaysTrigger} = $attrVal;
     } else {
       delete $hash->{alwaysTrigger};
     }
+
+    readingsGroup_inithtml($hash);
 
   } elsif( grep { $_ =~ m/$attrName(:.*)?/ }  @mapping_attrs ) {
     my $hash = $defs{$name};
@@ -1235,6 +1513,7 @@ readingsGroup_Attr($$$;$)
       <li>If regex starts with a '+' it will be matched against the internal values of the device instead of the readings.</li>
       <li>If regex starts with a '?' it will be matched against the attributes of the device instead of the readings.</li>
       <li>If regex starts with a '!' the display of the value will be forced even if no reading with this name is available.</li>
+      <li>If regex starts with a '$' the calculation with value columns and rows is possible.</li>
       <li>regex can be of the form &lt;regex&gt;@device to use readings from a different device.<br>
           if the device name part starts with a '!' the display will be foreced.
           use in conjunction with ! in front of the reading name.</li>
@@ -1243,6 +1522,7 @@ readingsGroup_Attr($$$;$)
           inserted as a reading or:
           <ul><li>the item will be skipped if STRING is undef</li>
               <li>if STRING is br a new line will be started</li>
+              <li>if STRING is hr a horizontal line will be inserted</li>
               <li>if STRING is of the form %ICON[%CMD] ICON will be used as the name of an icon instead of a text and CMD
                   as the command to be executed if the icon is clicked. also see the commands attribute.</li></ul>
           if readings is given the perl expression will be reevaluated during longpoll updates.</li>
@@ -1335,7 +1615,7 @@ readingsGroup_Attr($$$;$)
         If set to 1 the reading timestamp is not displayed.</li><br>
       <li>mapping<br>
         Can be a simple string or a perl expression enclosed in {} that returns a hash that maps reading names
-        to the displayed name.  The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
+        to the displayed name. The keys can be either the name of the reading or &lt;device&gt;.&lt;reading&gt;.
         %DEVICE, %ALIAS, %ROOM, %GROUP, %ROW and %READING are replaced by the device name, device alias, room attribute,
         group attribute and reading name respectively. You can also prefix these keywords with $ instead of %. Examples:<br>
           <code>attr temperatures mapping $DEVICE-$READING</code><br>
@@ -1344,6 +1624,13 @@ readingsGroup_Attr($$$;$)
       <li>separator<br>
         The separator to use between the device alias and the reading name if no mapping is given. Defaults to ':'
         a space can be enteread as <code>&amp;nbsp;</code></li><br>
+      <li>setList<br>
+        Space separated list of commands, which will be returned upon "set name ?",
+        so the FHEMWEB frontend can construct a dropdown and offer on/off switches.
+        set commands not in this list will be rejected.</li><br>
+      <li>setFn<br>
+        perl expresion that will be executed for the commands from the setList.
+        has access to $CMD and $ARGS.</li><br>
       <li>style<br>
         Specify an HTML style for the readings table, e.g.:<br>
           <code>attr temperatures style style="font-size:20px"</code></li><br>
@@ -1386,7 +1673,7 @@ readingsGroup_Attr($$$;$)
         in {} that returns a hash that maps reading value to the icon name. e.g.:<br>
           <code>attr devices valueIcon $VALUE</code><br>
           <code>attr devices valueIcon {state => '%VALUE'}</code><br>
-          <code>attr devices valueIcon {state => '%devStateIcon'}</code>
+          <code>attr devices valueIcon {state => '%devStateIcon'}</code><br>
           <code>attr rgMediaPlayer valueIcon { "playStatus.paused" => "rc_PLAY", "playStatus.playing" => "rc_PAUSE" }</code></li><br>
       <li>commands<br>
         Can be used in to different ways:
@@ -1396,8 +1683,10 @@ readingsGroup_Attr($$$;$)
         <li>Or if the mapped command is of the form &lt;command&gt;:[&lt;modifier&gt;] then the normal <a href="#FHEMWEB">FHEMWEB</a>
         webCmd widget for &lt;modifier&gt; will be used for this command. if &lt;modifier&gt; is omitted then the FHEMWEB lookup mechanism for &lt;command&gt; will be used. eg:<br>
         <code>attr rgMediaPlayer commands { volume => "volume:slider,0,1,100" }</code><br>
-        <code>attr lights commands { pct => "pct:", dim => "dim:" }</code></li><br>
-        </ul></li>
+        <code>attr lights commands { pct => "pct:", dim => "dim:" }</code></li>
+        <li>commands can be used for attribtues. eg:<br>
+        <code>attr <rg> commands { disable => "disable:" }</code></li>
+        </ul></li><br>
       <li>visibility<br>
         if set to hidden or hideable will display a small button to the left of the readingsGroup name to expand/hide the contents of the readingsGroup. if a readingsGroup is expanded then all others in the same group will be hidden.<br>
         <ul>
@@ -1416,17 +1705,24 @@ readingsGroup_Attr($$$;$)
         </ul>
     </ul><br>
 
-      The style, nameStyle and valueStyle attributes can also contain a perl expression enclosed in {} that returns the style
+      For the hash version of all mapping attributes it is possible to give a default value
+      with <code>{ '' => &lt;default&gt; }</code>.<br><br>
+
+      The style attributes can also contain a perl expression enclosed in {} that returns the style
       string to use. For nameStyle and valueStyle The perl code can use $DEVICE,$READING and $VALUE, e.g.:<br>
-    <ul>
+      <ul>
           <code>attr batteries valueStyle {($VALUE ne "ok")?'style="color:red"':'style="color:green"'}</code><br>
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
-    </ul>
+      </ul><br>
+
       Note: Only valueStyle, valueFomat, valueIcon and <{...}@reading> are evaluated during longpoll updates
       and valueStyle has to return a non empty style for every possible value. All other perl expressions are
       evaluated only once during html creation and will not reflect value updates with longpoll.
       Refresh the page to update the dynamic style. For nameStyle the color attribut is not working at the moment,
-      the font-... and background attributes do work.
+      the font-... and background attributes do work.<br><br>
+
+      Calculation: to be written...<br>
+      eg: <code>define rg readingsGroup .*:temperature rg:$avg</code>
 </ul>
 
 =end html
