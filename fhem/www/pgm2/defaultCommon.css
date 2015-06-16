@@ -77,8 +77,9 @@ span.sort-item-delete-link {
 .set .set { margin-bottom:2px; margin-top:3px; }             /* timepicker */
 
 pre { white-space: pre-wrap; }
-svg { height:32px; width:32px; 
-      fill:#278727; vertical-align:middle; margin:2px 0; }
+svg { height:32px; width:32px; vertical-align:middle; margin:2px 0; }
+svg:not([fill]) { fill:#278727; };
+
 svg.on,svg.FS20_on { fill:orange; }
 
 /* next lines are for remotecontrol */
