@@ -144,8 +144,8 @@ autocreate_Notify($$)
           if( !@v ) {
             if( my $fp = $modules{$t}{AutoCreate} ) {
               foreach my $k (keys %{$fp}) {
-                next if($name  !~ m/^$k$/);
-                (undef, $interval) = split( ':', $fp->{$k}{autocreateThreshold} );
+                next if($name !~ m/^$k$/ || !$fp->{$k}{autocreateThreshold});
+                (undef, $interval) = split( ':',$fp->{$k}{autocreateThreshold});
                 last;
               }
             }
@@ -155,12 +155,13 @@ autocreate_Notify($$)
           foreach my $a (keys %{$hash->{received}{$t}}) {
             foreach my $time (keys %{$hash->{received}{$t}{$a}}) {
               if( $time < $now - $interval ) {
-                #Log3 $me, 5, "autocreate: removed event for '$t $a' with timestamp $time";
+                #Log3 $me, 5,
+                # "autocreate: removed event for '$t $a' with timestamp $time";
                 delete( $hash->{received}{$t}{$a}{$time} );
               }
 
             }
-            delete( $hash->{received}{$t}{$a} ) if( !%{$hash->{received}{$t}{$a}} );
+            delete($hash->{received}{$t}{$a}) if(!%{$hash->{received}{$t}{$a}});
 
           }
           delete( $hash->{received}{$t} ) if( !%{$hash->{received}{$t}} );
@@ -176,8 +177,9 @@ autocreate_Notify($$)
           if( !@v ) {
             if( my $fp = $modules{$type}{AutoCreate} ) {
               foreach my $k (keys %{$fp}) {
-                next if($name  !~ m/^$k$/);
-                ($min_count, $interval) = split( ':', $fp->{$k}{autocreateThreshold} );
+                next if($name !~ m/^$k$/ || !$fp->{$k}{autocreateThreshold});
+                ($min_count, $interval) =
+                                    split(':', $fp->{$k}{autocreateThreshold});
                 last;
               }
             }
@@ -189,11 +191,12 @@ autocreate_Notify($$)
           $hash->{received}{$type}{$arg}{$now} = 1;
 
           my $count = keys %{$hash->{received}{$type}{$arg}};
-          Log3 $me, 4, "autocreate: received $count event(s) for '$type $arg' during the last $interval seconds";
+          Log3 $me, 4, "autocreate: received $count event(s) for ".
+                        "'$type $arg' during the last $interval seconds";
 
           if( $count < $min_count ) {
-            Log3 $me, 4, "autocreate: ignoring event for '$type $arg': at least $min_count needed";
-
+            Log3 $me, 4, "autocreate: ignoring event for ".
+                        "'$type $arg': at least $min_count needed";
             next;
           }
 
@@ -666,9 +669,10 @@ autocreate_Attr(@)
     <a name="autocreateThreshold"></a>
     <li>autocreateThreshold<br>
         A list of &lt;type&gt;:&lt;count&gt;:&lt;interval&gt; triplets. A new
-        device is only created if there have been at least <code>count</code> events
-        of TYPE <code>type</code> in the last <code>interval</code> seconds.<br>
-        <code>attr autocreateThreshold LaCrosse:2:30,EMT7110:2:60</code>
+        device is only created if there have been at least <code>count</code>
+        events of TYPE <code>type</code> in the last <code>interval</code>
+        seconds.<br> <code>attr autocreateThreshold
+        LaCrosse:2:30,EMT7110:2:60</code>
         </li>
 
   </ul>
@@ -829,8 +833,8 @@ autocreate_Attr(@)
     <li>autocreateThreshold<br>
         Eine Liste of &lt;type&gt;:&lt;count&gt;:&lt;interval&gt; tripeln. Ein
         neues Device wird nur dann erzeugt wenn es mindestens <code>count</code>
-        Events für den TYPE <code>type</code> in den letzten <code>interval</code>
-        Sekunden gegeben hat.<br>
+        Events f&uuml;r den TYPE <code>type</code> in den letzten
+        <code>interval</code> Sekunden gegeben hat.<br>
         Beispiel:<br>
         <code>attr autocreateThreshold LaCrosse:2:30,EMT7110:2:60</code>
         </li>
