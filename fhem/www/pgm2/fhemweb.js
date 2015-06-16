@@ -37,11 +37,13 @@ FW_replaceWidgets(parent)
     var cmd=$(this).attr("cmd");
     var rd=$(this).attr("reading");
     var params = cmd.split(" ");
+    var type=$(this).attr("type");
+    if( type == undefined ) type = "set";
     FW_replaceWidget(this, dev, $(this).attr("arg").split(","),
       $(this).attr("current"), rd, params[0], params.slice(1),
       function(arg) {
-        FW_cmd(FW_root+"?cmd=set "+dev+(params[0]=="state" ? "":" "+params[0])+
-                        " "+arg+"&XHR=1");
+        FW_cmd(FW_root+"?cmd="+type+" "+dev+
+                (params[0]=="state" ? "":" "+params[0])+" "+arg+"&XHR=1");
       });
   });
 }
