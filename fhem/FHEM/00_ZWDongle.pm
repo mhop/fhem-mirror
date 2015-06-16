@@ -681,9 +681,13 @@ ZWDongle_Read($@)
     Log3 $name, 4, "ZWDongle_Read $name: sending ACK, processing $msg";
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
     
-    # SEND_DATA OK: remove message from SendStack. TODO: check the callbackId
-    if($msg =~ m/^0013..00/ ){
-      ZWDongle_shiftSendStack($hash, 5, "ZW_SEND_DATA:OK received");
+    # SEND_DATA answer: remove message from SendStack. TODO: check callbackId
+    if($msg =~ m/^0013..(..)/ ){
+      my $m = $1;
+      my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
+                 '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
+      $m = $msg{$m} ? "UNKNOWN $m" : $msg{$m};
+      ZWDongle_shiftSendStack($hash, 5, "ZW_SEND_DATA:$m received");
     }
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
