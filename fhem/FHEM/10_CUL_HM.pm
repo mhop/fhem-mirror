@@ -1039,17 +1039,27 @@ sub CUL_HM_Parse($$) {#########################################################
       )){
     my $ioId = AttrVal($dstH->{IODev}{NAME},"hmId","-");
     if($ioId ne $src){
+      if (   !defined $dstH->{"prot"."ErrIoId_$src"} 
+          && ReadingsVal($dname,"sabotageAttackId_ErrIoId_$src:",undef)){
+        (undef,$dstH->{"prot"."ErrIoId_$src"}) =
+          split(":",ReadingsVal($dname,"sabotageAttackId_ErrIoId_$src:",undef));
+      }
       CUL_HM_eventP($dstH,"ErrIoId_$src");
       my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoId_$src"},2);
-      push @evtEt,[$dstH,1,"sabotageAttackId:ErrIoId_$src cnt:$evntCnt"];
+      push @evtEt,[$dstH,1,"sabotageAttackId_ErrIoId_$src: cnt:$evntCnt"];
     }
     my $tm = substr($msg,8);
     if( defined $dstH->{helper}{cSnd} && 
           $dstH->{helper}{cSnd} !~ m/$tm/){
+      if (   !defined $dstH->{"prot"."ErrIoAttack"} 
+          && ReadingsVal($dname,"sabotageAttack_ErrIoAttack cnt:",undef)){
+        $dstH->{"prot"."ErrIoAttack"} =
+          ReadingsVal($dname,"sabotageAttack_ErrIoAttack cnt:",undef);
+      }
       Log3 $dname,2,"CUL_HM $dname attack:$dstH->{helper}{cSnd}:".$tm;
       CUL_HM_eventP($dstH,"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoAttack"},2);
-      push @evtEt,[$dstH,1,"sabotageAttack:ErrIoAttack cnt:$evntCnt"];
+      push @evtEt,[$dstH,1,"sabotageAttack_ErrIoAttack cnt:$evntCnt"];
     }
   }
   ###########

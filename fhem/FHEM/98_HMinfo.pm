@@ -535,7 +535,8 @@ sub HMinfo_paramCheck(@) { ####################################################
       elsif (AttrVal($eName,"aesCommReq",0) && $IoDev->{TYPE} ne "HMLAN")
                                     { push @aesInval,"$eName ";}
                                     
-      if (!$defs{$eName}{helper}{role}{vrt}){
+      if (   !$defs{$eName}{helper}{role}{vrt} 
+          && AttrVal($eName,"model","") ne "CCU-FHEM"){
         if ($pairId eq "undefined") { push @noID,$eName;}
         elsif ($pairId !~ m /$ioHmId/
              && $IoDev )            { push @idMismatch,"$eName paired:$pairId IO attr: ${ioHmId}.";}
