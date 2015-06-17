@@ -161,7 +161,9 @@ yowsup_Connect($)
       my $cmd = AttrVal($name, "cmd", "/opt/local/bin/yowsup-cli demos -c /root/config.yowsup --yowsup" );
       Log3 $name, 2, "$name: starting yoswup-cli: $cmd";
 
-      exec split( ' ', $cmd ) or Log 1, "exec failed!!!";
+      exec split( ' ', $cmd ) or Log3 $name, 1, "exec failed";
+
+      Log3 $name, 1, "set the cmd attribut to: <path1>/yowsup-cli demos -c <path2>/config.yowsup --yowsup";
 
       POSIX::_exit(0);;
     }
