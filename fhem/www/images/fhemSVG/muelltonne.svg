@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with EazyDraw for Mac ( http://www.eazydraw.com/ ) -->
+
+<svg
+    version="1.1"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:cc="http://creativecommons.org/ns#"
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:svg="http://www.w3.org/2000/svg"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns="http://www.w3.org/2000/svg"
+    width="75.19404"
+    height="108.865735169"
+    viewBox="0, 0, 75.19404, 108.865735169"
+    preserveAspectRatio="none"
+    fill="FHEM_COLOR"
+    stroke="FHEM_COLOR"
+    id="svg2">
+   <defs
+       id="defs_CA598402"/>
+   <metadata
+       id="metadata7">
+      <rdf:RDF>
+         <cc:Work
+             rdf:about="">
+            <dc:format>image/svg+xml</dc:format>
+            <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+            <dc:title></dc:title>
+         </cc:Work>
+      </rdf:RDF>
+   </metadata>
+   <g
+       id="layer_Paper"
+       style="fill-opacity:1;stroke-opacity:1;fill-rule:nonzero;stroke-linecap:square;stroke-linejoin:miter;stroke-width:1;stroke-miterlimit:10">
+      <polyline
+          style=""
+          id="973933F1"
+          points="7.51443,9.61018 12.82855,107.47788 55.34153,107.47788 60.65566,9.61018 7.51443,9.61018"/>
+      <g
+          id="B73933F1">
+         <path
+             style="fill:#000001;stroke-linecap:butt;stroke-width:1.372928029753;stroke-miterlimit:4"
+             id="383933F1"
+             d="M66.861317335,98.49985192 C66.861317335,103.873258831 62.505305012,108.229271154 57.131898101,108.229271154 C51.758491191,108.229271154 47.402492596,103.873258831 47.402492596,98.49985192 C47.402492596,93.126458739 51.758491191,88.770446415 57.131898101,88.770446415
+C62.505305012,88.770446415 66.861317335,93.126458739 66.861317335,98.49985192 z"/>
+         <path
+             style="fill:#2E3535;stroke-linecap:butt;stroke-width:0.830742673873;stroke-miterlimit:4"
+             id="A83933F1"
+             d="M64.546924643,98.623761381 C64.546924643,102.687987149 61.252215813,105.982695979 57.187981737,105.982695979 C53.123755969,105.982695979 49.829038832,102.687987149 49.829038832,98.623761381 C49.829038832,94.559527305 53.123755969,91.264818475 57.187981737,91.264818475
+C61.252215813,91.264818475 64.546924643,94.559527305 64.546924643,98.623761381 z"/>
+         <path
+             style="stroke-linecap:butt;stroke-miterlimit:4"
+             id="093933F1"
+             d="M59.038168563,98.551768854 C59.038168563,99.544582174 58.233324651,100.349426085 57.240511332,100.349426085 C56.247687866,100.349426085 55.442843954,99.544582174 55.442843954,98.551768854 C55.442843954,97.558945388 56.247687866,96.754101477 57.240511332,96.754101477
+C58.233324651,96.754101477 59.038168563,97.558945388 59.038168563,98.551768854 z"/>
+      </g>
+      <polyline
+          style=""
+          id="A93933F1"
+          points="0,8.3972 66.7947,8.3972 66.7947,6.87688 75.14404,6.87688 75.14404,5.35656 0,5.35656 0,8.3972"/>
+      <polyline
+          style=""
+          id="F93933F1"
+          points="4.98643,3.71456 7.63175,0.05 60.53833,0.05 63.18365,3.71456 4.98643,3.71456"/>
+      <polyline
+          style="fill:none;stroke:#363636;stroke-linecap:butt;stroke-width:0.39426696;stroke-miterlimit:4"
+          id="6A3933F1"
+          points="6.00406,9.64872 61.88441,9.64872 61.88441,9.64872 61.88441,9.64872"/>
+      <line
+          style="fill:none;stroke:#363636;stroke-linecap:butt;stroke-width:0.39426696;stroke-miterlimit:4"
+          id="BA3933F1"
+          x1="3.21004"
+          y1="4.06069"
+          x2="64.67842"
+          y2="4.06069"/>
+   </g>
+</svg>

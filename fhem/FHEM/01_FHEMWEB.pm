@@ -1997,9 +1997,11 @@ FW_makeImage(@)
         $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);
         $data =~ s/fill="#000000"/fill="$col"/g;
         $data =~ s/fill:#000000/fill:$col/g;
+        $data =~ s/FHEM_COLOR/$col/g;
       } else {
         $data =~ s/fill="#000000"//g;
         $data =~ s/fill:#000000//g;
+        $data =~ s/FHEM_COLOR//g;
       }
       return $data;
     } else {
