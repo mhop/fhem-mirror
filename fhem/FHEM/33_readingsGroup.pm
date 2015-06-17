@@ -164,7 +164,7 @@ readingsGroup_updateDevices($;$)
       while ($regex
              && ( ($regex =~ m/^</ && $regex !~ m/>$/)           #handle , in <...>
                   || ($regex =~ m/@\{/ && $regex !~ m/}$/)       #handle , in reading@{...}
-                  || ($regex =~ m/^$.*\(/ && $regex !~ m/\)/) )  #handle , in $<calc>(...)
+                  || ($regex =~ m/^\$.*\(/ && $regex !~ m/\)/) ) #handle , in $<calc>(...)
              && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
       }
