@@ -137,7 +137,7 @@ sub FB_CALLLIST_Attr($@)
             if($init_done)
             {
                 # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
-                FB_CALLLIST_cleanupList($hash) if($init_done);
+                FB_CALLLIST_cleanupList($hash);
                 
                 # Inform all FHEMWEB clients
                 FB_CALLLIST_updateFhemWebClients($hash);
@@ -176,7 +176,7 @@ sub FB_CALLLIST_Attr($@)
                 if($init_done)
                 {
                     # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
-                    FB_CALLLIST_cleanupList($hash) if($init_done);
+                    FB_CALLLIST_cleanupList($hash);
                     
                     # Inform all FHEMWEB clients
                     FB_CALLLIST_updateFhemWebClients($hash);
