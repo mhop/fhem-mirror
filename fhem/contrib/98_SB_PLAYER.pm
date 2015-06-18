@@ -44,7 +44,8 @@
 #  DISPLAYTYPE      what sort of display is there, if any
 #
 # ##############################################################################
-
+# based on 98_SB_PLAYER.pm beta 0043 CD/MM/Matthew
+# ##############################################################################
 
 package main;
 use strict;
@@ -75,7 +76,7 @@ use constant { true => 1, false => 0 };
 use constant TTS_IDLE                                    => 0;
 use constant TTS_TEXT2SPEECH_BUSY                        => 4;
 use constant TTS_TEXT2SPEECH_ACTIVE                      => 6;
-use constant TTS_POWERON                                 => 10;
+use constant TTS_WAITFORPOWERON                          => 10;
 use constant TTS_SAVE                                    => 20;
 use constant TTS_UNSYNC                                  => 30;
 use constant TTS_SETVOLUME                               => 40;
@@ -93,7 +94,7 @@ use constant TTS_EXT_TEXT2SPEECH_ACTIVE                  => 2006;
 my %ttsstates = (   0   =>'idle',
                     4   =>'Text2Speech busy, waiting',
                     6   =>'Text2Speech active',
-                    10  =>'power on',
+                    10  =>'wait for power on',
                     20  =>'save state',
                     30  =>'unsync player',
                     40  =>'set volume',
@@ -107,6 +108,8 @@ my %ttsstates = (   0   =>'idle',
                     1000=>'active',
                     2004=>'Text2Speech busy, waiting',
                     2006=>'Text2Speech active');
+                    
+my $SB_PLAYER_hasDataDumper = 1;        # CD 0036
                     
 # ----------------------------------------------------------------------------
 #  Initialisation routine called upon start-up of FHEM
@@ -158,7 +161,12 @@ sub SB_PLAYER_Initialize( $ ) {
     $hash->{AttrList}  .= "syncVolume ";
     $hash->{AttrList}  .= "amplifierDelayOff ";                     # CD 0012
     $hash->{AttrList}  .= "updateReadingsOnSet:true,false ";        # CD 0017
+    $hash->{AttrList}  .= "statusRequestInterval ";                 # CD 0037
     $hash->{AttrList}  .= $readingFnAttributes;
+    
+    # CD 0036 aus 37_sonosBookmarker
+    eval "use Data::Dumper";
+    $SB_PLAYER_hasDataDumper = 0 if($@); 
 }
 
 # CD 0007 start
@@ -247,7 +255,26 @@ sub SB_PLAYER_Attr( @ ) {
         } else {
             delete($hash->{helper}{ttsDelay}) if(defined($hash->{helper}{ttsDelay}));
         }
-    }    
+    }
+    # CD 0037
+    elsif( $args[ 0 ] eq "statusRequestInterval" ) {
+      RemoveInternalTimer( $hash );
+      if( $cmd eq "set" ) {
+        if (defined($args[1])) {
+          InternalTimer( gettimeofday() + $args[1], 
+                         "SB_PLAYER_GetStatus", 
+                         $hash, 
+                         0 ) if $args[1]>0;
+        } else {
+            return "missing value for statusRequestInterval";
+        }
+      } else {
+        InternalTimer( gettimeofday() + 5, 
+                       "SB_PLAYER_GetStatus", 
+                       $hash, 
+                       0 );
+      }
+    }
     return;
     # CD 0012
 }
@@ -542,6 +569,11 @@ sub SB_PLAYER_Define( $$ ) {
 
     $hash->{helper}{ttsstate}=TTS_IDLE;  # CD 0028
     
+    SB_PLAYER_LoadPlayerStates($hash) if($SB_PLAYER_hasDataDumper==1);   # CD 0036
+    
+    $hash->{helper}{playerStatusOK}=0;          # CD 0042
+    $hash->{helper}{playerStatusOKCounter}=0;   # CD 0042
+    
     # do and update of the status
     InternalTimer( gettimeofday() + 10, 
                    "SB_PLAYER_GetStatus", 
@@ -565,7 +597,7 @@ sub SB_PLAYER_tcb_QueryCoverArt($) {    # CD 0014 Name geändert
         if (defined($hash->{SYNCGROUP}) && ($hash->{SYNCGROUP} ne '?') && ($hash->{SYNCMASTER} ne 'none')) {    # CD 0018 none hinzugefügt
             my @pl=split(",",$hash->{SYNCGROUP});
             foreach (@pl) {
-                IOWrite( $hash, "$_ status - 1 tags:Kc\n" );
+                IOWrite( $hash, "$_ status - 1 tags:Kcu\n" );   # CD 0039 u hinzugefügt
             }
         }
     }
@@ -606,7 +638,7 @@ sub SB_PLAYER_tcb_TTSRestore( $ ) {
     # CD 0033 end
         if(!defined($hash->{helper}{ttsOptions}{nosaverestore})) {
             SB_PLAYER_SetTTSState($hash,TTS_RESTORE,0,0);
-            SB_PLAYER_Recall( $hash );
+            SB_PLAYER_Recall( $hash, "xxTTSxx del" );
         } else {
             SB_PLAYER_SetTTSState($hash,TTS_IDLE,0,1);
         }
@@ -688,13 +720,20 @@ sub SB_PLAYER_Parse( $$ ) {
             if ($args[ 1 ] eq "?") {
                 # it is a request
             } else {
-                SB_PLAYER_UpdateVolumeReadings( $hash, $args[ 1 ], true );
-                # CD 0007 start
-                if((defined($hash->{helper}{setSyncVolume}) && ($hash->{helper}{setSyncVolume} != $args[ 1 ]))|| (!defined($hash->{helper}{setSyncVolume}))) {
-                    SB_PLAYER_SetSyncedVolume($hash,$args[ 1 ]);
+                # CD 0040 start
+                if( ( index( $args[ 1 ], "+" ) != -1 ) || ( index( $args[ 1 ], "-" ) != -1 ) ) {
+                    # that was a relative value. We do nothing and fire an update
+                    IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume ?\n" );
+                } else {
+                # CD 0040 end
+                    SB_PLAYER_UpdateVolumeReadings( $hash, $args[ 1 ], true );
+                    # CD 0007 start
+                    if((defined($hash->{helper}{setSyncVolume}) && ($hash->{helper}{setSyncVolume} != $args[ 1 ]))|| (!defined($hash->{helper}{setSyncVolume}))) {
+                        SB_PLAYER_SetSyncedVolume($hash,$args[ 1 ]);
+                    }
+                    delete $hash->{helper}{setSyncVolume};
+                    # CD 0007 end
                 }
-                delete $hash->{helper}{setSyncVolume};
-                # CD 0007 end
             }
         }
 
@@ -725,6 +764,7 @@ sub SB_PLAYER_Parse( $$ ) {
         } 
 
     } elsif( $cmd eq "mode" ) {
+        my $updateSyncedPlayers=0;  # CD 0039
         # alittle more complex to fulfill FHEM Development guidelines
         Log3( $hash, 5, "SB_PLAYER_Parse($name): mode:$cmd args:$args[0]" ); 
         if( $args[ 0 ] eq "play" ) {
@@ -751,6 +791,7 @@ sub SB_PLAYER_Parse( $$ ) {
                 IOWrite( $hash, $hash->{helper}{ttsMaster} . " fhemrelay ttsplaying\n" );
             }
             # CD 0028 end
+            $updateSyncedPlayers=1;     # CD 0039 gesyncte Player aktualisieren
         } elsif( $args[ 0 ] eq "stop" ) {
             # CD 0028 start
             if($hash->{helper}{ttsstate}==TTS_PLAYING) {
@@ -771,12 +812,29 @@ sub SB_PLAYER_Parse( $$ ) {
             # CD 0028 end
             readingsBulkUpdate( $hash, "playStatus", "stopped" );
             SB_PLAYER_Amplifier( $hash );
+            $updateSyncedPlayers=1;     # CD 0039 gesyncte Player aktualisieren
         } elsif( $args[ 0 ] eq "pause" ) {
             readingsBulkUpdate( $hash, "playStatus", "paused" );
             SB_PLAYER_Amplifier( $hash );
+            $updateSyncedPlayers=1;     # CD 0039 gesyncte Player aktualisieren
         } else {
             readingsBulkUpdate( $hash, "playStatus", $args[ 0 ] );
         }
+        
+        # CD 0039 gesyncte Player aktualisieren
+        if($updateSyncedPlayers==1) {
+            if ($hash->{PLAYERMAC} eq $hash->{SYNCMASTER}) {
+                if (defined($hash->{SYNCGROUP}) && ($hash->{SYNCGROUP} ne '?') && ($hash->{SYNCMASTER} ne 'none')) {
+                    my @pl=split(",",$hash->{SYNCGROUP});
+                    foreach (@pl) {
+                        if ($hash->{PLAYERMAC} ne $_) {
+                            IOWrite( $hash, "$_ mode ?\n" );
+                        }
+                    }
+                }
+            }
+        }
+        # CD 0039 end
 
     } elsif( $cmd eq "newmetadata" ) {
         # the song has changed, but we are easy and just ask the player
@@ -878,6 +936,16 @@ sub SB_PLAYER_Parse( $$ ) {
             } else {
                 readingsBulkUpdate( $hash, "repeat", "?" );
             }
+            # CD 0039 Änderung am Master, gesyncte Player aktualisieren
+            if ($hash->{PLAYERMAC} eq $hash->{SYNCMASTER}) {
+                if (defined($hash->{SYNCGROUP}) && ($hash->{SYNCGROUP} ne '?') && ($hash->{SYNCMASTER} ne 'none')) {
+                    my @pl=split(",",$hash->{SYNCGROUP});
+                    foreach (@pl) {
+                        IOWrite( $hash, "$_ playlist repeat ?\n" );
+                    }
+                }
+            }
+            # CD 0039 end
         } elsif( $args[ 0 ] eq "shuffle" ) {
             if( $args[ 1 ] eq "0" ) {
                 readingsBulkUpdate( $hash, "shuffle", "off" );
@@ -888,6 +956,16 @@ sub SB_PLAYER_Parse( $$ ) {
             } else {
                 readingsBulkUpdate( $hash, "shuffle", "?" );
             }
+            # CD 0039 Änderung am Master, gesyncte Player aktualisieren
+            if ($hash->{PLAYERMAC} eq $hash->{SYNCMASTER}) {
+                if (defined($hash->{SYNCGROUP}) && ($hash->{SYNCGROUP} ne '?') && ($hash->{SYNCMASTER} ne 'none')) {
+                    my @pl=split(",",$hash->{SYNCGROUP});
+                    foreach (@pl) {
+                        IOWrite( $hash, "$_ playlist shuffle ?\n" );
+                    }
+                }
+            }
+            # CD 0039 end
             SB_PLAYER_GetStatus( $hash );       # CD 0014
         } elsif( $args[ 0 ] eq "name" ) {
             # CD 0014 start
@@ -985,6 +1063,13 @@ sub SB_PLAYER_Parse( $$ ) {
                 # CD 0030 end
                     SB_PLAYER_SetTTSState($hash,TTS_WAITFORPLAY,1,0);
                     IOWrite( $hash, "$hash->{PLAYERMAC} play\n" );
+                    # CD 0038 Timeout hinzugefügt
+                    RemoveInternalTimer( "TimeoutTTSWaitForPlay:$name");
+                    InternalTimer( gettimeofday() + 10.00, 
+                       "SB_PLAYER_tcb_TimeoutTTSWaitForPlay",
+                       "TimeoutTTSWaitForPlay:$name", 
+                       0 );
+                    # CD 0038 end
                 }
             }
             # CD 0029 start
@@ -1181,6 +1266,16 @@ sub SB_PLAYER_Parse( $$ ) {
                     readingsBulkUpdate( $hash, "state", "on" );
                     readingsBulkUpdate( $hash, "power", "on" );
                     SB_PLAYER_Amplifier( $hash );
+                    # CD 0038 start
+                    if($hash->{helper}{ttsstate}==TTS_WAITFORPOWERON) {
+                        # CD 0042 readingsBulkUpdate abwarten
+                        RemoveInternalTimer( "TTSStartAfterPowerOn:$name");
+                        InternalTimer( gettimeofday() + 0.01, 
+                           "SB_PLAYER_tcb_TTSStartAfterPowerOn",
+                           "TTSStartAfterPowerOn:$name", 
+                           0 );
+                    }
+                    # CD 0038 end
                     # CD 0030 send play only after power is on
                     if(defined($hash->{helper}{playAfterPowerOn})) {
                         IOWrite( $hash, "$hash->{PLAYERMAC} play ".$hash->{helper}{playAfterPowerOn}."\n" );
@@ -1230,6 +1325,49 @@ sub SB_PLAYER_Parse( $$ ) {
             } elsif( $args[ 1 ] eq "syncgroupid" ) {
                 IOWrite( $hash, "$hash->{PLAYERMAC} status 0 500 tags:Kcu\n" );     # CD 0030 u added to tags
             # CD 0018 end
+            # CD 0039 für gesyncte Player bei Änderung am Slave erhält der Master eine prefset Meldung, an alle Slaves weitergeben
+            } elsif( $args[ 1 ] eq "repeat" ) {
+                if( $args[ 2 ] eq "0" ) {
+                    readingsBulkUpdate( $hash, "repeat", "off" );
+                } elsif( $args[ 2 ] eq "1") {
+                    readingsBulkUpdate( $hash, "repeat", "one" );
+                } elsif( $args[ 2 ] eq "2") {
+                    readingsBulkUpdate( $hash, "repeat", "all" );
+                } else {
+                    readingsBulkUpdate( $hash, "repeat", "?" );
+                }
+                if ($hash->{PLAYERMAC} eq $hash->{SYNCMASTER}) {
+                    if (defined($hash->{SYNCGROUP}) && ($hash->{SYNCGROUP} ne '?') && ($hash->{SYNCMASTER} ne 'none')) {
+                        my @pl=split(",",$hash->{SYNCGROUP});
+                        if(@pl>1) {
+                            foreach (@pl) {
+                                IOWrite( $hash, "$_ playlist repeat ?\n" );
+                            }
+                        }
+                    }
+                }
+            } elsif( $args[ 1 ] eq "shuffle" ) {
+                if( $args[ 2 ] eq "0" ) {
+                    readingsBulkUpdate( $hash, "shuffle", "off" );
+                } elsif( $args[ 2 ] eq "1") {
+                    readingsBulkUpdate( $hash, "shuffle", "song" );
+                } elsif( $args[ 2 ] eq "2") {
+                    readingsBulkUpdate( $hash, "shuffle", "album" );
+                } else {
+                    readingsBulkUpdate( $hash, "shuffle", "?" );
+                }
+                if ($hash->{PLAYERMAC} eq $hash->{SYNCMASTER}) {
+                    if (defined($hash->{SYNCGROUP}) && ($hash->{SYNCGROUP} ne '?') && ($hash->{SYNCMASTER} ne 'none')) {
+                        my @pl=split(",",$hash->{SYNCGROUP});
+                        if(@pl>1) {
+                            foreach (@pl) {
+                                IOWrite( $hash, "$_ playlist shuffle ?\n" );
+                            }
+                        }
+                    }
+                }
+                SB_PLAYER_GetStatus( $hash );
+            # CD 0039 end
             }
         } else {
             readingsBulkUpdate( $hash, "lastunkowncmd", 
@@ -1295,7 +1433,7 @@ sub SB_PLAYER_Parse( $$ ) {
     # CD 0018 sync Meldungen auswerten, alle anderen Player abfragen
     } elsif( $cmd eq "sync" ) {
         foreach my $e ( keys %{$hash->{helper}{SB_PLAYER_SyncMasters}} ) {
-            IOWrite( $hash, $hash->{helper}{SB_PLAYER_SyncMasters}{$e}{MAC}." status 0 500 tags:Kc\n" );
+            IOWrite( $hash, $hash->{helper}{SB_PLAYER_SyncMasters}{$e}{MAC}." status 0 500 tags:Kcu\n" );   # CD 0039 u hinzugefügt
         }
     # CD 0018
     # CD 0022 fhemrelay ist keine Meldung des LMS sondern eine Info die von einem anderen Player über 98_SB_PLAYER kommt
@@ -1406,8 +1544,49 @@ sub SB_PLAYER_tcb_TTSDelay( $ ) {
 
     SB_PLAYER_SetTTSState($hash,TTS_WAITFORPLAY,0,0);
     IOWrite( $hash, "$hash->{PLAYERMAC} play\n" );
+    # CD 0038 Timeout hinzugefügt
+    RemoveInternalTimer( "TimeoutTTSWaitForPlay:$name");
+    InternalTimer( gettimeofday() + 10.00, 
+       "SB_PLAYER_tcb_TimeoutTTSWaitForPlay",
+       "TimeoutTTSWaitForPlay:$name", 
+       0 );
+    # CD 0038 end
 }
 # CD 0030
+
+# CD 0038
+# ----------------------------------------------------------------------------
+#  TTS 'wait for play' timeout
+# ----------------------------------------------------------------------------
+sub SB_PLAYER_tcb_TimeoutTTSWaitForPlay( $ ) {
+    my($in ) = shift;
+    my(undef,$name) = split(':',$in);
+    my $hash = $defs{$name};
+
+    if($hash->{helper}{ttsstate}==TTS_WAITFORPLAY) {
+      readingsBeginUpdate( $hash );
+      SB_PLAYER_TTSStopped($hash);
+      if( AttrVal( $name, "donotnotify", "false" ) eq "true" ) {
+          readingsEndUpdate( $hash, 0 );
+      } else {
+          readingsEndUpdate( $hash, 1 );
+      }
+    }
+}
+
+# ----------------------------------------------------------------------------
+#  TTS 'wait for power on' timeout
+# ----------------------------------------------------------------------------
+sub SB_PLAYER_tcb_TimeoutTTSWaitForPowerOn( $ ) {
+    my($in ) = shift;
+    my(undef,$name) = split(':',$in);
+    my $hash = $defs{$name};
+
+    if($hash->{helper}{ttsstate}==TTS_WAITFORPOWERON) {
+        SB_PLAYER_SetTTSState($hash,TTS_IDLE,0,0);
+    }
+}
+# CD 0038
 
 # CD 0034
 # ----------------------------------------------------------------------------
@@ -1429,6 +1608,28 @@ sub SB_PLAYER_tcb_TTSStopped( $ ) {
     }
 }
 # CD 0034 end
+
+# CD 0042
+# ----------------------------------------------------------------------------
+#  start tts after power on, wait if startup is not complete
+# ----------------------------------------------------------------------------
+sub SB_PLAYER_tcb_TTSStartAfterPowerOn( $ ) {
+    my($in ) = shift;
+    my(undef,$name) = split(':',$in);
+    my $hash = $defs{$name};
+
+    if(($hash->{helper}{playerStatusOK}==1)||($hash->{helper}{playerStatusOKCounter}>10)) {
+        SB_PLAYER_PrepareTalk($hash);
+        SB_PLAYER_LoadTalk($hash);
+    } else {
+        InternalTimer( gettimeofday() + 1, 
+           "SB_PLAYER_tcb_TTSStartAfterPowerOn",
+           "TTSStartAfterPowerOn:$name", 
+           0 );
+        $hash->{helper}{playerStatusOKCounter}++;
+    }
+}
+# CD 0042 end
 
 # ----------------------------------------------------------------------------
 #  called when talk is stopped, check if there are queued elements
@@ -1507,7 +1708,7 @@ sub SB_PLAYER_Get( $@ ) {
 
     if( $cmd eq "?" ) {
         my $res = "Unknown argument ?, choose one of " . 
-            "volume " . $hash->{FAVSET} . " ";
+            "volume " . $hash->{FAVSET} . " savedStates ";
         return( $res );
         
     } elsif( ( $cmd eq "volume" ) || ( $cmd eq "volumeStraight" ) ) {
@@ -1516,6 +1717,16 @@ sub SB_PLAYER_Get( $@ ) {
     } elsif( $cmd eq $hash->{FAVSET} ) {
         return( "$hash->{FAVSELECT}" );
 
+    # CD 0036 start
+    } elsif( $cmd eq 'savedStates' ) {
+      my $out="";
+      if (defined($hash->{helper}{savedPlayerState})) {
+        foreach my $pl ( keys %{$hash->{helper}{savedPlayerState}} ) {
+          $out.=$pl."\n" unless ($pl=~/xxTTSxx/);
+        }
+      }
+      return( $out );
+    # CD 0036 end
     } else {
         my $msg = "SB_PLAYER_Get: $name: unkown argument";
         Log3( $hash, 5, $msg );
@@ -1575,6 +1786,12 @@ sub SB_PLAYER_Notify( $$ ) {
     if ($dev_hash->{NAME} eq "global" && grep (m/^INITIALIZED$|^REREADCFG$/,@{$dev_hash->{CHANGED}})){
     }
 
+    # CD 0036 start
+    if( grep(m/^SAVE$/, @{$dev_hash->{CHANGED}}) ) {
+        SB_PLAYER_SavePlayerStates($hash) if($SB_PLAYER_hasDataDumper==1);
+    }
+    # CD 0036 end
+    
     # CD 0033 start
     if(defined($hash->{helper}{text2speech}{name}) && ($hash->{helper}{text2speech}{name} eq $devName)) {
         $hash->{helper}{ttsExtstate}=TTS_IDLE if(!defined($hash->{helper}{ttsExtstate}));
@@ -1623,7 +1840,7 @@ sub SB_PLAYER_Set( $@ ) {
 
     #my $name = $hash->{NAME};
 
-    Log3( $hash, 5, "SB_PLAYER_Set: called with $cmd" );
+    Log3( $hash, 5, "SB_PLAYER_Set: called with $cmd");
 
     # check if we have received a command
     if( !defined( $cmd ) ) { 
@@ -1637,7 +1854,7 @@ sub SB_PLAYER_Set( $@ ) {
         # this one should give us a drop down list
         my $res = "Unknown argument ?, choose one of " . 
             "on off stop:noArg play:noArg pause:noArg " . 
-            "save:noArg recall:noArg " . # CD 0014
+            "save " . # CD 0014 # CD 0036 removed :noArg
             "volume:slider,0,1,100 " . 
             "volumeStraight:slider,0,1,100 " . 
             "volumeUp:noArg volumeDown:noArg " . 
@@ -1654,6 +1871,15 @@ sub SB_PLAYER_Set( $@ ) {
         $res .= "sync:" . $hash->{SYNCMASTERS} . " ";
         # add the playlists
         $res .= "playlists:-," . $hash->{SERVERPLAYLISTS} . " ";    # CD 0014 '-' hinzugefügt
+        # add player saved lists      # CD 0036
+        my $out="";
+        if (defined($hash->{helper}{savedPlayerState})) {
+          foreach my $pl ( keys %{$hash->{helper}{savedPlayerState}} ) {
+            $out.=$pl."," unless ($pl=~/xxTTSxx/);
+          }
+          $out=~s/,$//;
+        }
+        $res .= "recall:$out ";
         # CD 0016 start {ALARMSCOUNT} verschieben nach reload
         if (defined($hash->{ALARMSCOUNT})) {
             $hash->{helper}{ALARMSCOUNT}=$hash->{ALARMSCOUNT};
@@ -1669,6 +1895,13 @@ sub SB_PLAYER_Set( $@ ) {
         return( $res );
     }
 
+    # CD 0038 Befehle ignorieren wenn Player nicht vorhanden ist
+    # CD 0040 wieder deaktiviert
+    # if(ReadingsVal($name,"presence","x") ne "present") {
+        # return "$name: player is not available";
+    # }
+    # CD 0038 end
+    
     my $updateReadingsOnSet=AttrVal($name, "updateReadingsOnSet", false);           # CD 0017
     my $donotnotify=AttrVal($name, "donotnotify", "true");                          # CD 0017 # CD 0028 added "
     
@@ -1930,6 +2163,8 @@ sub SB_PLAYER_Set( $@ ) {
         my $tl='';
         # CD 0033 Unterstützung für Dateien und URLs hinzugefügt, teilweise aus 00_SONOS übernommen
         my $targetSpeakMP3FileDir = AttrVal( $name, "ttsMP3FileDir", "" );  # CD 0033
+        my $filename; # CD 0038
+        
         if (length($ttstext)>0) {
             my @words=split(' ',$ttstext);
             for my $w (@words) {
@@ -1938,10 +2173,25 @@ sub SB_PLAYER_Set( $@ ) {
                     push(@textlines,$tl) if($tl ne '');
                     $tl='';
                 
-                    my $filename = $1;
+                    $filename = $1;
                     $filename = $targetSpeakMP3FileDir.'/'.$filename if ($filename !~ m/^(\/|[a-z]:)/i);
                     $filename = $filename.'.mp3' if ($filename !~ m/\.mp3$/i);
-                    push(@textlines, '|'.$filename.'|');            
+                    push(@textlines, '|'.$filename.'|');
+                    $filename=undef;
+                # CD 0038 Leerzeichen in Dateinamen zulassen
+                } elsif ($w =~ m/^\|(.*)/) {
+                    $filename = $1;
+                } elsif (($w =~ m/(.*)\|/) && defined($filename)) {
+                    $filename .= " ".$1;
+
+                    push(@textlines,$tl) if($tl ne '');
+                    $tl='';
+                
+                    $filename = $targetSpeakMP3FileDir.'/'.$filename if ($filename !~ m/^(\/|[a-z]:)/i);
+                    $filename = $filename.'.mp3' if ($filename !~ m/\.mp3$/i);
+                    push(@textlines, '|'.$filename.'|');
+                    $filename=undef;
+                # CD 0038
                 } else {
                     $w =~ s/[\\|*~<>^\n\(\)\[\]\{\}[:cntrl:]]/ /g;
                     $w =~ s/\s+/ /g;
@@ -1962,24 +2212,48 @@ sub SB_PLAYER_Set( $@ ) {
 
         if($hash->{helper}{ttsstate}==TTS_IDLE) {
             # talk ist nicht aktiv
-            SB_PLAYER_PrepareTalk($hash);
+            # CD 0038 Player zuerst einschalten
+            if(ReadingsVal($name,"power","x") ne "on") {
+                SB_PLAYER_SetTTSState($hash,TTS_WAITFORPOWERON,0,0);
+                RemoveInternalTimer( "TimeoutTTSWaitForPowerOn:$name");
+                if($hash->{helper}{playerStatusOK}==1) {    # CD 0042
+                    IOWrite( $hash, "$hash->{PLAYERMAC} power 1\n" );
+                    InternalTimer( gettimeofday() + 5.00, 
+                       "SB_PLAYER_tcb_TimeoutTTSWaitForPowerOn",
+                       "TimeoutTTSWaitForPowerOn:$name", 
+                       0 );
+                    $hash->{helper}{ttsPowerWasOff}=1;
+                # CD 0042 start
+                } else {
+                    InternalTimer( gettimeofday() + 10.00, 
+                       "SB_PLAYER_tcb_TimeoutTTSWaitForPowerOn",
+                       "TimeoutTTSWaitForPowerOn:$name", 
+                       0 );
+                }
+                # CD 0042 end
+            } else {
+            # CD 0038 end
+                SB_PLAYER_PrepareTalk($hash);
+            }
         } else {
         
         }
         for my $outstr (@textlines) {
             if ($outstr =~ m/\|(.*)\|/) {               # CD 0033
-                push(@{$hash->{helper}{ttsqueue}},$1);  # CD 0033
+                Log3($hash, defined($hash->{helper}{ttsOptions}{debug})?0:6,"SB_PLAYER_Set: $name: add to ttsqueue: $1"); # CD 0036
+                push(@{$hash->{helper}{ttsqueue}},uri_escape(decode('utf-8',$1)));  # CD 0033 # CD 0038 uri_escape(decode... hinzugefügt
             } else {
                 $outstr =~ s/\s/+/g;
                 $outstr = uri_escape( $outstr );
                 $outstr = AttrVal( $name, "ttslink", "none" )  
                     . "&tl=" . AttrVal( $name, "ttslanguage", "de" )
                     . "&q=". $outstr;
+                Log3($hash, defined($hash->{helper}{ttsOptions}{debug})?0:6,"SB_PLAYER_Set: $name: add to ttsqueue: $outstr");  # CD 0036
                 push(@{$hash->{helper}{ttsqueue}},$outstr);
             }
         }
         
-        SB_PLAYER_LoadTalk($hash);  # CD 0033
+        SB_PLAYER_LoadTalk($hash) if($hash->{helper}{ttsstate}==TTS_LOADPLAYLIST);  # CD 0033 # CD 0038 auf TTS_LOADPLAYLIST prüfen
 
         # CD 0028 end
     } elsif( ( $cmd eq "playlist" ) || 
@@ -2008,6 +2282,12 @@ sub SB_PLAYER_Set( $@ ) {
                          "contributor.namesearch:$outstr\n" );           # CD 0014 'titlesearch' durch 'namesearch' ersetzt
             } elsif( $arg[ 0 ] eq "play" ) {
                 IOWrite( $hash, "$hash->{PLAYERMAC} playlist play $outstr\n" );
+            # CD 0038 start
+            } elsif( $arg[ 0 ] eq "add" ) {
+                IOWrite( $hash, "$hash->{PLAYERMAC} playlist add $outstr\n" );
+            } elsif( $arg[ 0 ] eq "insert" ) {
+                IOWrite( $hash, "$hash->{PLAYERMAC} playlist insert $outstr\n" );
+            # CD 0038 end
             } elsif( $arg[ 0 ] eq "year" ) {
                 IOWrite( $hash, "$hash->{PLAYERMAC} playlist loadtracks " . 
                          "track.year:$outstr\n" );
@@ -2017,7 +2297,36 @@ sub SB_PLAYER_Set( $@ ) {
             #} elsif( $arg[ 0 ] eq "comment" ) {                                # CD 0014 funktioniert nicht
             #    IOWrite( $hash, "$hash->{PLAYERMAC} playlist loadtracks " . 
             #             "comments.value:$outstr\n" );
+            # CD 0038 loadalbum wieder hergestellt und überarbeitet
             } else {
+                my $genre='*';
+                my $album='*';
+                my $artist='*';
+                my $t=0;
+                foreach( @arg ) {
+                    if( $_ =~ /^(genre:)(.*)/ ) {
+                        $genre=$2;
+                        $t=1;
+                    } elsif ( $_ =~ /^(album:)(.*)/ ) {
+                        $album=$2;
+                        $t=2;
+                    } elsif ( $_ =~ /^(artist:)(.*)/ ) {
+                        $artist=$2;
+                        $t=3;
+                    } else {
+                        $genre.=" ".$_ if($t==1);
+                        $album.=" ".$_ if($t==2);
+                        $artist.=" ".$_ if($t==3);
+                    }
+                }
+                if( $t>0 ) {
+                    $genre=uri_escape(decode('utf-8',$genre)) if($genre ne '*');
+                    $album=uri_escape(decode('utf-8',$album)) if($album ne '*');
+                    $artist=uri_escape(decode('utf-8',$artist)) if($artist ne '*');
+                    IOWrite( $hash, "$hash->{PLAYERMAC} playlist loadalbum " . 
+                             "$genre $artist $album\n" );
+                }
+            # CD 0038 end
             }
         # CD 0014 end
         } else {
@@ -2110,9 +2419,17 @@ sub SB_PLAYER_Set( $@ ) {
 
     # CD 0014 start
     } elsif( ( $cmd eq "save" ) || ( $cmd eq "SAVE" ) ) {
-        SB_PLAYER_Save($hash);
+        if(defined($arg[0])) {
+          SB_PLAYER_Save($hash, $arg[0]);
+        } else {
+          SB_PLAYER_Save($hash, "");
+        }
     } elsif( ( $cmd eq "recall" ) || ( $cmd eq "RECALL" ) ) {
-        SB_PLAYER_Recall($hash);
+        if(defined($arg[0])) {
+          SB_PLAYER_Recall($hash, join(" ", @arg));
+        } else {
+          SB_PLAYER_Recall($hash, "");
+        }
     # CD 0014 end
     } elsif( $cmd eq "statusRequest" ) {
         RemoveInternalTimer( $hash );
@@ -2138,15 +2455,32 @@ sub SB_PLAYER_Set( $@ ) {
             @dvs=split(",",$arg[0]);
             foreach (@dvs) {
                 my $dev=$_;
+                my $mac;
                 # CD 0018 end
                 if( defined( $hash->{helper}{SB_PLAYER_SyncMasters}{$dev}{MAC} ) ) {
-                    IOWrite( $hash, "$hash->{PLAYERMAC} sync " . 
-                             "$hash->{helper}{SB_PLAYER_SyncMasters}{$dev}{MAC}\n" );
-                    $doGetStatus=1;
+                    $mac=$hash->{helper}{SB_PLAYER_SyncMasters}{$dev}{MAC};
                 } else {
-                    my $msg = "SB_PLAYER_Set: no MAC for player ".$dev.".";
-                    Log3( $hash, 3, $msg );
-                    #return( $msg );        # CD 0018 wenn keine MAC vorhanden weitermachen
+                    # CD 0038 Player nicht gefunden, testen ob Name zu einem FHEM-Gerät passt
+                    if(defined($defs{$dev}) && defined($defs{$dev}{TYPE}) && ($defs{$dev}{TYPE} eq 'SB_PLAYER') && defined($defs{$dev}{PLAYERMAC})) {
+                        $mac=$defs{$dev}{PLAYERMAC};
+                    } else {
+                    # CD 0038 end
+                        my $msg = "SB_PLAYER_Set: no MAC for player ".$dev.".";
+                        Log3( $hash, 3, $msg );
+                        #return( $msg );        # CD 0018 wenn keine MAC vorhanden weitermachen
+                    }
+                }
+                if(defined($mac)) {
+                    # CD 0038 wenn asSlave angegeben ist, wird der erste Player zur Gruppe des 2. hinzugefügt
+                    if((@arg == 2) && ($arg[1] eq "asSlave")) {
+                        IOWrite( $hash, "$mac sync " . 
+                                 "$hash->{PLAYERMAC}\n" );
+                    } else {
+                    # CD 0038 end
+                        IOWrite( $hash, "$hash->{PLAYERMAC} sync " . 
+                                 "$mac\n" );
+                    }
+                    $doGetStatus=1;
                 }
             }   # CD 0018
             SB_PLAYER_GetStatus( $hash ) if($doGetStatus==1);
@@ -2250,7 +2584,7 @@ sub SB_PLAYER_PrepareTalk($) {
     # talk ist nicht aktiv
     if(!defined($hash->{helper}{ttsOptions}{nosaverestore})) {
         SB_PLAYER_SetTTSState($hash,TTS_SAVE,0,0);
-        SB_PLAYER_Save( $hash ) if(!defined($hash->{helper}{saveLocked}));
+        SB_PLAYER_Save( $hash, "xxTTSxx" ) if(!defined($hash->{helper}{saveLocked}));
     }
     $hash->{helper}{saveLocked}=1;
     IOWrite( $hash, "$hash->{PLAYERMAC} playlist repeat 0\n" );
@@ -2268,93 +2602,130 @@ sub SB_PLAYER_PrepareTalk($) {
 # CD 0014 start
 # ----------------------------------------------------------------------------
 #  recall player state
+#
+#  CD 0036 added $statename
 # ----------------------------------------------------------------------------
-sub SB_PLAYER_Recall($) {
-    my ( $hash ) = @_;
+sub SB_PLAYER_Recall($$) {
+    my ( $hash, $arg ) = @_;   # CD 0036
     my $name = $hash->{NAME};
+    
+    # CD 0036 start
+    my $del=0;
+    my $delonly=0;
+    my $forceoff=0;
+    my $forceon=0;
+    my $forceplay=0;
+    my $forcestop=0;
 
+    my $statename;
+    my @args=split " ",$arg;
+    
+    if(defined($args[0])) {
+      $statename=$args[0];
+    } else {
+      $statename='default';
+    }
+
+    # Optionen auswerten
+    for my $opt (@args) {
+        $del=1 if($opt=~ m/^del$/);
+        $delonly=1 if($opt=~ m/^delonly$/);
+        $forceoff=1 if($opt=~ m/^off$/);
+        $forceon=1 if(($opt=~ m/^on$/)||($opt=~ m/^play$/));
+        $forceplay=1 if($opt=~ m/^play$/);
+        $forcestop=1 if($opt=~ m/^stop$/);
+    }
+    
+    $forceoff=0 if($forceon==1);
+    $forcestop=0 if($forceplay==1);
+    
+    # CD 0036 end
+    
     # wurde überhaupt etwas gespeichert ?
-    if(defined($hash->{helper}{savedPlayerState})) {
-        # CD 0029 start
-        if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
-            Log3( $hash, 0, "SB_PLAYER_Recall: $name: restoring...");
-            $hash->{helper}{ttsOptions}{logloaddone}=1;
-            $hash->{helper}{ttsOptions}{logplay}=1;
-        }
-        # CD 0029 end
-        IOWrite( $hash, "$hash->{PLAYERMAC} playlist shuffle 0\n");
-        if (defined($hash->{helper}{savedPlayerState}{playlistIds})) {
-            # wegen Shuffle Playlist neu erzeugen
-            # CD 0030 start
-            IOWrite( $hash, "$hash->{PLAYERMAC} playlist clear\n");
-            my @playlistIds=split(',',$hash->{helper}{savedPlayerState}{playlistIds});
-            for my $id (@playlistIds) {
-                if($id>=0) {
-                    IOWrite( $hash, "$hash->{PLAYERMAC} playlistcontrol cmd:add track_id:".$id."\n");
-                } else {
-                    if(defined($hash->{helper}{savedPlayerState}{playlistUrls}) && defined($hash->{helper}{savedPlayerState}{playlistUrls}{$id})) {
-                        IOWrite( $hash, "$hash->{PLAYERMAC} playlist add ".$hash->{helper}{savedPlayerState}{playlistUrls}{$id}."\n");
+    if(defined($hash->{helper}{savedPlayerState}) && defined($hash->{helper}{savedPlayerState}{$statename})) {
+        if($delonly==0) {
+            # CD 0029 start
+            if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
+                Log3( $hash, 0, "SB_PLAYER_Recall: $name: restoring...");
+                $hash->{helper}{ttsOptions}{logloaddone}=1;
+                $hash->{helper}{ttsOptions}{logplay}=1;
+            }
+            # CD 0029 end
+            IOWrite( $hash, "$hash->{PLAYERMAC} playlist shuffle 0\n");
+            if (defined($hash->{helper}{savedPlayerState}{$statename}{playlistIds})) {
+                # wegen Shuffle Playlist neu erzeugen
+                # CD 0030 start
+                IOWrite( $hash, "$hash->{PLAYERMAC} playlist clear\n");
+                my @playlistIds=split(',',$hash->{helper}{savedPlayerState}{$statename}{playlistIds});
+                for my $id (@playlistIds) {
+                    if($id>=0) {
+                        IOWrite( $hash, "$hash->{PLAYERMAC} playlistcontrol cmd:add track_id:".$id."\n");
                     } else {
-                        Log3( $hash, 2, "SB_PLAYER_Recall: $name: no url found for id ".$id);
+                        if(defined($hash->{helper}{savedPlayerState}{$statename}{playlistUrls}) && defined($hash->{helper}{savedPlayerState}{$statename}{playlistUrls}{$id})) {
+                            IOWrite( $hash, "$hash->{PLAYERMAC} playlist add ".$hash->{helper}{savedPlayerState}{$statename}{playlistUrls}{$id}."\n");
+                        } else {
+                            Log3( $hash, 2, "SB_PLAYER_Recall: $name: no url found for id ".$id);
+                        }
                     }
                 }
-            }
-            IOWrite( $hash, "$hash->{PLAYERMAC} playlist index ".$hash->{helper}{savedPlayerState}{playlistCurrentTrack}."\n");
-            # CD 0030 end
-        } else {
-            # auf dem Server gespeichterte Playlist fortsetzen
-            if( $hash->{helper}{savedPlayerState}{playStatus} eq "playing" ) {
-                IOWrite( $hash, "$hash->{PLAYERMAC} playlist resume fhem_$hash->{NAME}\n" );
+                IOWrite( $hash, "$hash->{PLAYERMAC} playlist index ".$hash->{helper}{savedPlayerState}{$statename}{playlistCurrentTrack}."\n");
+                # CD 0030 end
             } else {
-                IOWrite( $hash, "$hash->{PLAYERMAC} playlist resume fhem_$hash->{NAME} noplay:1\n" );
+                # auf dem Server gespeicherte Playlist fortsetzen
+                if( $hash->{helper}{savedPlayerState}{$statename}{playStatus} eq "playing" ) {
+                    IOWrite( $hash, "$hash->{PLAYERMAC} playlist resume fhem_$hash->{NAME}_$statename\n" );
+                } else {
+                    IOWrite( $hash, "$hash->{PLAYERMAC} playlist resume fhem_$hash->{NAME}_$statename noplay:1\n" );
+                }
             }
-        }
-        if ($hash->{helper}{savedPlayerState}{volumeStraight} ne '?') {
-            IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume $hash->{helper}{savedPlayerState}{volumeStraight}\n" );
-            SB_PLAYER_SetSyncedVolume($hash,$hash->{helper}{savedPlayerState}{volumeStraight});
-        }
-        if ($hash->{helper}{savedPlayerState}{repeat} ne ReadingsVal($name,"repeat","?")) {
-            if( $hash->{helper}{savedPlayerState}{repeat} eq "off" ) {
-                IOWrite( $hash, "$hash->{PLAYERMAC} playlist repeat 0\n" );
-            } elsif( $hash->{helper}{savedPlayerState}{repeat} eq "one" ) {
-                IOWrite( $hash, "$hash->{PLAYERMAC} playlist repeat 1\n" );
-            } elsif( $hash->{helper}{savedPlayerState}{repeat} eq "all" ) {
-                IOWrite( $hash, "$hash->{PLAYERMAC} playlist repeat 2\n" );
+            if ($hash->{helper}{savedPlayerState}{$statename}{volumeStraight} ne '?') {
+                IOWrite( $hash, "$hash->{PLAYERMAC} mixer volume $hash->{helper}{savedPlayerState}{$statename}{volumeStraight}\n" );
+                SB_PLAYER_SetSyncedVolume($hash,$hash->{helper}{savedPlayerState}{$statename}{volumeStraight});
             }
-        }
-        # CD 0028 start
-        if ($hash->{helper}{savedPlayerState}{power} eq "off") {
-            IOWrite( $hash, "$hash->{PLAYERMAC} power 0\n" );
-            if($hash->{helper}{ttsstate}==TTS_RESTORE) {
-                SB_PLAYER_SetTTSState($hash,TTS_IDLE,0,1);
+            if ($hash->{helper}{savedPlayerState}{$statename}{repeat} ne ReadingsVal($name,"repeat","?")) {
+                if( $hash->{helper}{savedPlayerState}{$statename}{repeat} eq "off" ) {
+                    IOWrite( $hash, "$hash->{PLAYERMAC} playlist repeat 0\n" );
+                } elsif( $hash->{helper}{savedPlayerState}{$statename}{repeat} eq "one" ) {
+                    IOWrite( $hash, "$hash->{PLAYERMAC} playlist repeat 1\n" );
+                } elsif( $hash->{helper}{savedPlayerState}{$statename}{repeat} eq "all" ) {
+                    IOWrite( $hash, "$hash->{PLAYERMAC} playlist repeat 2\n" );
+                }
             }
-        } else {
-        # CD 0028 end
-            if ($hash->{helper}{savedPlayerState}{playStatus} eq "stopped" ) {
-                IOWrite( $hash, "$hash->{PLAYERMAC} stop\n" );
-                # CD 0028 start
+            # CD 0028 start
+            if ((($hash->{helper}{savedPlayerState}{$statename}{power} eq "off") && ($forceon!=1))||($forceoff==1)) {  # CD 0036 added $forceon and $forceoff
+                IOWrite( $hash, "$hash->{PLAYERMAC} power 0\n" );
                 if($hash->{helper}{ttsstate}==TTS_RESTORE) {
                     SB_PLAYER_SetTTSState($hash,TTS_IDLE,0,1);
                 }
-                # CD 0028 end
-            } elsif( $hash->{helper}{savedPlayerState}{playStatus} eq "playing" ) {
-                my $secbuf = AttrVal( $name, "fadeinsecs", 10 );
-                IOWrite( $hash, "$hash->{PLAYERMAC} play $secbuf\n" );
-                IOWrite( $hash, "$hash->{PLAYERMAC} time $hash->{helper}{savedPlayerState}{elapsedTime}\n" ) if(defined($hash->{helper}{savedPlayerState}{elapsedTime}));
-                # CD 0028 start
-                if($hash->{helper}{ttsstate}==TTS_RESTORE) {
-                    SB_PLAYER_SetTTSState($hash,TTS_IDLE,0,1);
+            } else {
+            # CD 0028 end
+                if ((($hash->{helper}{savedPlayerState}{$statename}{playStatus} eq "stopped" ) && ($forceplay!=1))||($forcestop==1)) { # CD 0036 added $forceplay and $forcestop
+                    IOWrite( $hash, "$hash->{PLAYERMAC} stop\n" );
+                    # CD 0028 start
+                    if($hash->{helper}{ttsstate}==TTS_RESTORE) {
+                        SB_PLAYER_SetTTSState($hash,TTS_IDLE,0,1);
+                    }
+                    # CD 0028 end
+                } elsif(( $hash->{helper}{savedPlayerState}{$statename}{playStatus} eq "playing" )||($forceplay==1)) {  # CD 0036 added $forceplay
+                    my $secbuf = AttrVal( $name, "fadeinsecs", 10 );
+                    IOWrite( $hash, "$hash->{PLAYERMAC} play $secbuf\n" );
+                    IOWrite( $hash, "$hash->{PLAYERMAC} time $hash->{helper}{savedPlayerState}{$statename}{elapsedTime}\n" ) if(defined($hash->{helper}{savedPlayerState}{$statename}{elapsedTime}));
+                    # CD 0028 start
+                    if($hash->{helper}{ttsstate}==TTS_RESTORE) {
+                        SB_PLAYER_SetTTSState($hash,TTS_IDLE,0,1);
+                    }
+                    # CD 0028 end
+                } elsif( $hash->{helper}{savedPlayerState}{$statename}{playStatus} eq "paused" ) {
+                    # paused kann nicht aus stop erreicht werden -> Playlist starten und dann pausieren
+                    $hash->{helper}{recallPause}=1;
+                    $hash->{helper}{recallPending}=1;
                 }
-                # CD 0028 end
-            } elsif( $hash->{helper}{savedPlayerState}{playStatus} eq "paused" ) {
-                # paused kann nicht aus stop erreicht werden -> Playlist starten und dann pausieren
-                $hash->{helper}{recallPause}=1;
-                $hash->{helper}{recallPending}=1;
             }
+            # CD 0028 restore names
+            readingsSingleUpdate( $hash,"playlists", $hash->{helper}{savedPlayerState}{$statename}{playlist},(AttrVal($name, "donotnotify", "true") eq "true")?0:1) if(defined($hash->{helper}{savedPlayerState}{$statename}{playlist}));
+            readingsSingleUpdate( $hash,"favorites", $hash->{helper}{savedPlayerState}{$statename}{favorite},(AttrVal($name, "donotnotify", "true") eq "true")?0:1) if(defined($hash->{helper}{savedPlayerState}{$statename}{favorite}));
         }
-        # CD 0028 restore names
-        readingsSingleUpdate( $hash,"playlists", $hash->{helper}{savedPlayerState}{playlist},(AttrVal($name, "donotnotify", "true") eq "true")?0:1) if(defined($hash->{helper}{savedPlayerState}{playlist}));
-        readingsSingleUpdate( $hash,"favorites", $hash->{helper}{savedPlayerState}{favorite},(AttrVal($name, "donotnotify", "true") eq "true")?0:1) if(defined($hash->{helper}{savedPlayerState}{favorite}));
+        delete($hash->{helper}{savedPlayerState}{$statename}) if(($del==1)||($delonly==1));
     }
 }
 
@@ -2385,80 +2756,99 @@ sub SB_PLAYER_SetTTSState($$$$) {
         }
     }
     delete($hash->{helper}{ttsqueue}) if(defined($hash->{helper}{ttsqueue}) && ($state==TTS_IDLE));
+    delete($hash->{helper}{ttsPowerWasOff}) if (defined($hash->{helper}{ttsPowerWasOff}) && ($state==TTS_IDLE));
 }
 
 # ----------------------------------------------------------------------------
 #  save player state
+# 
+# CD 0036 added $statename
 # ----------------------------------------------------------------------------
-sub SB_PLAYER_Save($) {
-    my ( $hash ) = @_;
+sub SB_PLAYER_Save($$) {
+    my ( $hash, $statename ) = @_;
     my $name = $hash->{NAME};
 
-    delete($hash->{helper}{savedPlayerState}) if(defined($hash->{helper}{savedPlayerState}));
+    $statename='default' unless defined($statename);
+
+    delete($hash->{helper}{savedPlayerState}{$statename}) if(defined($hash->{helper}{savedPlayerState}) && defined($hash->{helper}{savedPlayerState}{$statename}));
     SB_PLAYER_EstimateElapsedTime($hash);
-    $hash->{helper}{savedPlayerState}{power}=ReadingsVal($name,"power","on");   # CD 0028
-    $hash->{helper}{savedPlayerState}{SYNCGROUP}=$hash->{SYNCGROUP} if(defined($hash->{SYNCGROUP}));    # CD 0028
-    $hash->{helper}{savedPlayerState}{SYNCMASTER}=$hash->{SYNCMASTER} if(defined($hash->{SYNCMASTER})); # CD 0028
-    $hash->{helper}{savedPlayerState}{elapsedTime}=$hash->{helper}{elapsedTime}{VAL};
-    $hash->{helper}{savedPlayerState}{playlistCurrentTrack}=ReadingsVal($name,"playlistCurrentTrack",1)-1;
-    $hash->{helper}{savedPlayerState}{playStatus}=ReadingsVal($name,"playStatus","?");
-    $hash->{helper}{savedPlayerState}{repeat}=ReadingsVal($name,"repeat","?");
-    $hash->{helper}{savedPlayerState}{volumeStraight}=ReadingsVal($name,"volumeStraight","?");
-    $hash->{helper}{savedPlayerState}{playlist}=ReadingsVal($name,"playlists","-");
-    $hash->{helper}{savedPlayerState}{favorite}=ReadingsVal($name,"favorites","-");
+    $hash->{helper}{savedPlayerState}{$statename}{power}=ReadingsVal($name,"power","on");   # CD 0028
+    $hash->{helper}{savedPlayerState}{$statename}{power}="off" if(($statename eq "xxTTSxx") && defined($hash->{helper}{ttsPowerWasOff})); # CD 0038
+    $hash->{helper}{savedPlayerState}{$statename}{SYNCGROUP}=$hash->{SYNCGROUP} if(defined($hash->{SYNCGROUP}));    # CD 0028
+    $hash->{helper}{savedPlayerState}{$statename}{SYNCMASTER}=$hash->{SYNCMASTER} if(defined($hash->{SYNCMASTER})); # CD 0028
+    $hash->{helper}{savedPlayerState}{$statename}{elapsedTime}=$hash->{helper}{elapsedTime}{VAL};
+    $hash->{helper}{savedPlayerState}{$statename}{playlistCurrentTrack}=ReadingsVal($name,"playlistCurrentTrack",1)-1;
+    $hash->{helper}{savedPlayerState}{$statename}{playStatus}=ReadingsVal($name,"playStatus","?");
+    $hash->{helper}{savedPlayerState}{$statename}{repeat}=ReadingsVal($name,"repeat","?");
+    $hash->{helper}{savedPlayerState}{$statename}{volumeStraight}=ReadingsVal($name,"volumeStraight","?");
+    $hash->{helper}{savedPlayerState}{$statename}{playlist}=ReadingsVal($name,"playlists","-");
+    $hash->{helper}{savedPlayerState}{$statename}{favorite}=ReadingsVal($name,"favorites","-");
 
     # CD 0029 start
     delete($hash->{helper}{ttsOptions}{logloaddone}) if(defined($hash->{helper}{ttsOptions}{logloaddone}));
     delete($hash->{helper}{ttsOptions}{logplay}) if(defined($hash->{helper}{ttsOptions}{logplay}));
     # CD 0029 end
 
-    # nur 1 Track -> playlist save verwenden
-    if((ReadingsVal($name,"playlistTracks",1)<=1)&&(!defined($hash->{helper}{ttsOptions}{internalsave}))) {
-        IOWrite( $hash, "$hash->{PLAYERMAC} playlist save fhem_$hash->{NAME} silent:1\n" );
-        # CD 0029 start
-        if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
-            Log3( $hash, 0, "SB_PLAYER_Save: $name: 1 track in playlist, using playlist save");
-        }
-        # CD 0029 end
-    } else {
-        # mehr als 1 Track, auf shuffle prüfen (playlist resume funktioniert nicht richtig wenn shuffle nicht auf off steht)
-        # bei negativen Ids (Remote-Streams) und shuffle geht die vorherige Reihenfolge verloren, kein Workaround bekannt
-        # es werden maximal 500 Ids gespeichert, bei mehr als 500 Einträgen in der Playlists geht die vorherige Reihenfolge verloren (zu ändern)
-        if ((    (ReadingsVal($name,"shuffle","?") eq "off") ||
-                (!defined($hash->{helper}{playlistIds})) ||
-                ($hash->{helper}{playlistIds}=~ /-/) ||
-                (ReadingsVal($name,"playlistTracks",0)>500)) && !defined($hash->{helper}{ttsOptions}{internalsave})) {
-            IOWrite( $hash, "$hash->{PLAYERMAC} playlist save fhem_$hash->{NAME} silent:1\n" );
-            # CD 0029 start
-            if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
-                Log3( $hash, 0, "SB_PLAYER_Save: $name: multiple tracks in playlist, using playlist save");
-            }
-            # CD 0029 end
-        } else {
-            $hash->{helper}{savedPlayerState}{playlistIds}=$hash->{helper}{playlistIds};
-            $hash->{helper}{savedPlayerState}{playlistUrls}=$hash->{helper}{playlistUrls};
-            if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
-                # CD 0029 start
-                if(defined($hash->{helper}{ttsOptions}{internalsave})) {
-                    Log3( $hash, 0, "SB_PLAYER_Save: $name: forcing {helper}{playlistIds}: ".$hash->{helper}{playlistIds}) if(defined($hash->{helper}{playlistIds}));  # CD 0033 if added
-                    #Log3( $hash, 0, "SB_PLAYER_Save: $name: warning - negative playlist ids cannot be restored") if ($hash->{helper}{playlistIds}=~ /-/);
-                } else {
-                    Log3( $hash, 0, "SB_PLAYER_Save: $name: multiple tracks in playlist, shuffle active, using {helper}{playlistIds} (".$hash->{helper}{playlistIds}.")");
-                }
-                # CD 0029 end
-            }
-        }
+    # CD 0036 immer intern speichern
+    $hash->{helper}{savedPlayerState}{$statename}{playlistIds}=$hash->{helper}{playlistIds};
+    $hash->{helper}{savedPlayerState}{$statename}{playlistUrls}=$hash->{helper}{playlistUrls};
+    if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
+      Log3( $hash, 0, "SB_PLAYER_Save: $name: saving {helper}{playlistIds}: ".$hash->{helper}{playlistIds}) if(defined($hash->{helper}{playlistIds}));
     }
+    # CD 0036
+    
+    # CD 0036, alte Version, deaktivert
+    # ---------------------------------
+    if(1==0) {
+      # nur 1 Track -> playlist save verwenden
+      if((ReadingsVal($name,"playlistTracks",1)<=1)&&(!defined($hash->{helper}{ttsOptions}{internalsave}))) {
+          IOWrite( $hash, "$hash->{PLAYERMAC} playlist save fhem_$hash->{NAME}_$statename silent:1\n" );
+          # CD 0029 start
+          if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
+              Log3( $hash, 0, "SB_PLAYER_Save: $name: 1 track in playlist, using playlist save");
+          }
+          # CD 0029 end
+      } else {
+          # mehr als 1 Track, auf shuffle prüfen (playlist resume funktioniert nicht richtig wenn shuffle nicht auf off steht)
+          # bei negativen Ids (Remote-Streams) und shuffle geht die vorherige Reihenfolge verloren, kein Workaround bekannt
+          # es werden maximal 500 Ids gespeichert, bei mehr als 500 Einträgen in der Playlists geht die vorherige Reihenfolge verloren (zu ändern)
+          if ((    (ReadingsVal($name,"shuffle","?") eq "off") ||
+                  (!defined($hash->{helper}{playlistIds})) ||
+                  ($hash->{helper}{playlistIds}=~ /-/) ||
+                  (ReadingsVal($name,"playlistTracks",0)>500)) && !defined($hash->{helper}{ttsOptions}{internalsave})) {
+              IOWrite( $hash, "$hash->{PLAYERMAC} playlist save fhem_$hash->{NAME}_$statename silent:1\n" );
+              # CD 0029 start
+              if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
+                  Log3( $hash, 0, "SB_PLAYER_Save: $name: multiple tracks in playlist, using playlist save");
+              }
+              # CD 0029 end
+          } else {
+              $hash->{helper}{savedPlayerState}{$statename}{playlistIds}=$hash->{helper}{playlistIds};
+              $hash->{helper}{savedPlayerState}{$statename}{playlistUrls}=$hash->{helper}{playlistUrls};
+              if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
+                  # CD 0029 start
+                  if(defined($hash->{helper}{ttsOptions}{internalsave})) {
+                      Log3( $hash, 0, "SB_PLAYER_Save: $name: forcing {helper}{playlistIds}: ".$hash->{helper}{playlistIds}) if(defined($hash->{helper}{playlistIds}));  # CD 0033 if added
+                      #Log3( $hash, 0, "SB_PLAYER_Save: $name: warning - negative playlist ids cannot be restored") if ($hash->{helper}{playlistIds}=~ /-/);
+                  } else {
+                      Log3( $hash, 0, "SB_PLAYER_Save: $name: multiple tracks in playlist, shuffle active, using {helper}{playlistIds} (".$hash->{helper}{playlistIds}.")");
+                  }
+                  # CD 0029 end
+              }
+          }
+      }
+    }
+    # ---------------------------------
     # CD 0029 start
     if(($hash->{helper}{ttsstate}!=TTS_IDLE) && defined($hash->{helper}{ttsOptions}{debugsaverestore})) {
-        Log3( $hash, 0, "SB_PLAYER_Save: $name: power ".$hash->{helper}{savedPlayerState}{power} );
-        Log3( $hash, 0, "SB_PLAYER_Save: $name: elapsedTime ".$hash->{helper}{savedPlayerState}{elapsedTime} ) if (defined($hash->{helper}{savedPlayerState}{elapsedTime} ));
-        Log3( $hash, 0, "SB_PLAYER_Save: $name: playlistCurrentTrack ".$hash->{helper}{savedPlayerState}{playlistCurrentTrack} );
-        Log3( $hash, 0, "SB_PLAYER_Save: $name: playStatus ".$hash->{helper}{savedPlayerState}{playStatus} );
-        Log3( $hash, 0, "SB_PLAYER_Save: $name: repeat ".$hash->{helper}{savedPlayerState}{repeat} );
-        Log3( $hash, 0, "SB_PLAYER_Save: $name: volumeStraight ".$hash->{helper}{savedPlayerState}{volumeStraight} );
-        Log3( $hash, 0, "SB_PLAYER_Save: $name: playlist ".$hash->{helper}{savedPlayerState}{playlist} );
-        Log3( $hash, 0, "SB_PLAYER_Save: $name: favorite ".$hash->{helper}{savedPlayerState}{favorite} );
+        Log3( $hash, 0, "SB_PLAYER_Save: $name: power ".$hash->{helper}{savedPlayerState}{$statename}{power} );
+        Log3( $hash, 0, "SB_PLAYER_Save: $name: elapsedTime ".$hash->{helper}{savedPlayerState}{$statename}{elapsedTime} ) if (defined($hash->{helper}{savedPlayerState}{$statename}{elapsedTime} ));
+        Log3( $hash, 0, "SB_PLAYER_Save: $name: playlistCurrentTrack ".$hash->{helper}{savedPlayerState}{$statename}{playlistCurrentTrack} );
+        Log3( $hash, 0, "SB_PLAYER_Save: $name: playStatus ".$hash->{helper}{savedPlayerState}{$statename}{playStatus} );
+        Log3( $hash, 0, "SB_PLAYER_Save: $name: repeat ".$hash->{helper}{savedPlayerState}{$statename}{repeat} );
+        Log3( $hash, 0, "SB_PLAYER_Save: $name: volumeStraight ".$hash->{helper}{savedPlayerState}{$statename}{volumeStraight} );
+        Log3( $hash, 0, "SB_PLAYER_Save: $name: playlist ".$hash->{helper}{savedPlayerState}{$statename}{playlist} );
+        Log3( $hash, 0, "SB_PLAYER_Save: $name: favorite ".$hash->{helper}{savedPlayerState}{$statename}{favorite} );
     }
     # CD 0029 end
 }
@@ -2801,10 +3191,13 @@ sub SB_PLAYER_GetStatus( $ ) {
 
     # do and update of the status
     RemoveInternalTimer( $hash );   # CD 0014
-    InternalTimer( gettimeofday() + 300, 
+
+    my $iv=AttrVal($name, "statusRequestInterval", 300);  # CD 0037
+
+    InternalTimer( gettimeofday() + $iv, 
                    "SB_PLAYER_GetStatus", 
                    $hash, 
-                   0 );
+                   0 ) if $iv>0;
 
     Log3( $hash, 5, "SB_PLAYER_GetStatus: leaving" );
 
@@ -2894,8 +3287,25 @@ sub SB_PLAYER_RecBroadcast( $$@ ) {
         if( $args[ 0 ] eq "ADD" ) {
             # CD 0014 Playlists mit fhem_* ignorieren
             if($args[3]=~/^fhem_.*/) {
-                Log3( $hash, 5, "SB_PLAYER_RecbroadCast($name): - skipping - PLAYLISTS ADD " . 
+              # CD 0036 start
+              if($args[3]=~/$name/) {
+                my $plname=$args[1];
+                # kein Name ?
+                if($args[1]=~/^fhem_$name$/) {
+                  $plname='default';
+                } else {
+                  $plname=~s/^fhem_$name//;
+                  $plname=~s/^_//;
+                }
+                Log3( $hash, 4, "SB_PLAYER_RecbroadCast($name): - adding - PLAYLISTS ADD " . 
+                      "name:$args[1] id:$args[2] uid:$plname" );
+                $hash->{helper}{myPlaylists}{$plname}{ID} = $args[ 2 ];
+                $hash->{helper}{myPlaylists}{$plname}{NAME} = $args[ 1 ];
+              } else {
+              # CD 0036 end
+                Log3( $hash, 5, "SB_PLAYER_RecbroadCast($name): - ignoring - PLAYLISTS ADD " . 
                       "name:$args[1] id:$args[2] uid:$args[3]" );
+              }
             } else {
             # CD 0014 end
                 Log3( $hash, 5, "SB_PLAYER_RecbroadCast($name): PLAYLISTS ADD " . 
@@ -2917,6 +3327,7 @@ sub SB_PLAYER_RecBroadcast( $$@ ) {
             #end
         } elsif( $args[ 0 ] eq "FLUSH" ) {
             undef( %{$hash->{helper}{SB_PLAYER_Playlists}} );
+            undef( %{$hash->{helper}{myPlaylists}} );  # CD 0036
             $hash->{SERVERPLAYLISTS} = "";
             delete($hash->{helper}{alarmPlaylists}) if (defined($hash->{helper}{alarmPlaylists}));      # CD 0016
         } else {
@@ -3289,7 +3700,7 @@ sub SB_PLAYER_ParsePlayerStatus( $$ ) {
     my $cur = "";
     my $playlistIds = "";           # CD 0014
     my $refreshIds=0;               # CD 0014
-    
+
     # typically the start index being a number
     if( $dataptr->[ 0 ] =~ /^([0-9])*/ ) {
         shift( @{$dataptr} );
@@ -3403,9 +3814,26 @@ sub SB_PLAYER_ParsePlayerStatus( $$ ) {
 
         } elsif( $cur =~ /^(power:)([0-9\.]*)/ ) {
             if( $2 eq "1" ) {
+                readingsBulkUpdate( $hash, "state", "on" ); # CD 0041 hinzugefügt
                 readingsBulkUpdate( $hash, "power", "on" );
                 SB_PLAYER_Amplifier( $hash );
+                # CD 0042 start
+                if($hash->{helper}{ttsstate}==TTS_WAITFORPOWERON) {
+                    RemoveInternalTimer( "TTSStartAfterPowerOn:$name");
+                    InternalTimer( gettimeofday() + 0.01, 
+                       "SB_PLAYER_tcb_TTSStartAfterPowerOn",
+                       "TTSStartAfterPowerOn:$name", 
+                       0 );
+                }
+                # CD 0042 end
             } else {
+                # CD 0042 start
+                if(($hash->{helper}{playerStatusOK}==0) && ($hash->{helper}{ttsstate}==TTS_WAITFORPOWERON)) {
+                    $hash->{helper}{ttsPowerWasOff}=1;
+                    IOWrite( $hash, "$hash->{PLAYERMAC} power 1\n" );
+                }
+                # CD 0042 end
+                readingsBulkUpdate( $hash, "state", "off" ); # CD 0041 hinzugefügt
                 readingsBulkUpdate( $hash, "power", "off" );
                 SB_PLAYER_Amplifier( $hash );
             }
@@ -3565,6 +3993,8 @@ sub SB_PLAYER_ParsePlayerStatus( $$ ) {
 
         }
     }
+    $hash->{helper}{playerStatusOK}=1;  # CD 0042
+    
     # Matthew 0019 start
     if( $hash->{SYNCED} ne "yes") {
         readingsBulkUpdate( $hash, "synced", "none" );
@@ -3715,6 +4145,77 @@ sub SB_PLAYER_SetSyncedVolume( $$ ) {
     return;
 }
 
+# ----------------------------------------------------------------------------
+#  load/save player state
+#
+#  CD 0036
+# ----------------------------------------------------------------------------
+sub SB_PLAYER_PlayerStatefileName($)
+{
+  my( $name ) = @_;
+
+  my $statefile = $attr{global}{statefile};
+  $statefile = substr $statefile,0,rindex($statefile,'/')+1;
+  return $statefile ."sbps_$name.dd.save";
+} 
+
+sub SB_PLAYER_SavePlayerStates($)
+{
+  my( $hash ) = @_;
+  my $name = $hash->{NAME};
+
+  return "No saved playlists found" unless(defined($hash->{helper}{savedPlayerState}));
+  return "No statefile specified" if(!$attr{global}{statefile});
+  my $statefile = SB_PLAYER_PlayerStatefileName($name);
+
+  if(open(FH, ">$statefile")) {
+    my $t = localtime;
+    print FH "#$t\n";
+
+    my $dumper = Data::Dumper->new([]);
+    $dumper->Terse(1);
+
+    $dumper->Values([$hash->{helper}{savedPlayerState}]);
+    print FH $dumper->Dump;
+
+    close(FH);
+  } else {
+
+    my $msg = "SB_PLAYER_SavePlayerStates: Cannot open $statefile: $!";
+    Log3 $hash, 1, $msg;
+  }
+
+  return undef;
+} 
+
+sub SB_PLAYER_LoadPlayerStates($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  return "No statefile specified" if(!$attr{global}{statefile});
+  my $statefile = SB_PLAYER_PlayerStatefileName($name);
+
+  if(open(FH, "<$statefile")) {
+    my $encoded;
+    while (my $line = <FH>) {
+      chomp $line;
+      next if($line =~ m/^#.*$/);
+      $encoded .= $line;
+    }
+    close(FH);
+
+    return if( !defined($encoded) );
+
+    my $decoded = eval $encoded;
+    $hash->{helper}{savedPlayerState} = $decoded;
+  } else {
+    my $msg = "SB_PLAYER_LoadPlayerStates: no playlists file found";
+    Log3 undef, 4, $msg;
+  }
+  return undef;
+} 
+
 # ##############################################################################
 #  No PERL code beyond this line
 # ##############################################################################
@@ -3757,37 +4258,60 @@ sub SB_PLAYER_SetSyncedVolume( $$ ) {
    <ul>
       <li><b>play</b> -  starts the playback (might only work if previously paused).</li>
      <li><b>pause [&lt;0|1&gt;]</b> -  toggles between play and pause. With parameter 0 it unpauses and with 1 it pauses the player, it doesn't matter which state it had before</li>
-     <li><b>stop</b> -  stop the playback</li>
-     <li><b>next|channelUp</b> -  jump to the next track</li>
-     <li><b>prev|channelDown</b> -  jump to the previous track or the beginning of the current track.</li>
+     <li><b>stop</b> -  stops the playback</li>
+     <li><b>next|channelUp</b> -  jumps to the next track</li>
+     <li><b>prev|channelDown</b> -  jumps to the previous track or the beginning of the current track.</li>
      <li><b>mute</b> -  toggles between muted and unmuted</li>
      <li><b>volume &lt;n&gt;</b> -  sets the volume to &lt;n&gt;. &lt;n&gt; must be a number between 0 and 100</li>
      <li><b>volumeStraight &lt;n&gt;</b> -  same as volume</li>
      <li><b>volumeDown &lt;n&gt;</b> -  volume down</li>
      <li><b>volumeUp &lt;n&gt;</b> -  volume up</li>
-     <li><b>on</b> -  set the player on if possible. Otherwise it does play</li>
-     <li><b>off</b> -  set the player off if possible. Otherwise it does stop</li>
-     <li><b>shuffle &lt;on|off|song|album&gt;</b> -  Enables/Disables shuffle mode</li>
-     <li><b>repeat &lt;one|all|off&gt;</b> -  Sets the repeat mode</li>
+     <li><b>on</b> -  sets the player on if possible. Otherwise it does play</li>
+     <li><b>off</b> -  sets the player off if possible. Otherwise it does stop</li>
+     <li><b>shuffle on|off|song|album</b> -  Enables/Disables shuffle mode</li>
+     <li><b>repeat one|all|off</b> -  Sets the repeat mode</li>
      <li><b>sleep &lt;n&gt;</b> -  Sets the player off in &lt;n&gt; seconds and fade the player volume down</li>   
-     <li><b>favorites &lt;favorit&gt;</b> -  Empty the current playlist and start the selected playlist. Favorites are selectable through a dropdown list</li>   
-     <li><b>talk|sayText &lt;text&gt;</b> -  Empty the current playlist and speaks the selected text with google TTS</li>
-     <li><b>playlist &lt;track|album|artist|genre|year&gt; &lt;x&gt;</b> -  Empty the current playlist and starts the track, album or artist &lt;x&gt;</li>
-     <li><b>playlist &lt;genre&gt; &lt;artist&gt; &lt;album&gt;</b> -  Empty the current playlist starts the track which will match the search. You can use * as wildcard for everything</li>
-     Example:
-     <code>set myplayer playlist * Whigfield *</code>
+     <li><b>favorites &lt;favorit&gt;</b> -  Empties the current playlist and starts the selected playlist. Favorites are selectable through a dropdown list</li>   
+     <li><b>talk|sayText &lt;text&gt;</b> -  Saves the current playlist, speaks the selected text with google TTS and resumes saved playlist</li>
+     <li><b>playlist track|album|artist|genre|year &lt;x&gt;</b> -  Empties the current playlist and starts the track, album or artist &lt;x&gt;</li>
+     <li><b>playlist genre:&lt;genre&gt; artist:&lt;artist&gt; album:&lt;album&gt;</b> -  Empties the current playlist and starts the track which will match the search. You can use * as wildcard for everything.</li>
+     <br>Example:<br>
+     <code>set myplayer playlist genre:* artist:Whigfield album:*</code><br><br>
+     <li><b>playlist play &lt;filename|playlistname&gt;</b> -  Empties the current playlist and starts the track or playlist</li>
+     <li><b>playlist add &lt;filename|playlistname&gt;</b> -  Adds the specified file or playlist at the end of the current playlist</li>
+     <li><b>playlist insert &lt;filename|playlistname&gt;</b> -   Inserts the specified file or playlist after the current song
+     in the current playlist.</li>
      <li><b>statusRequest</b> -  Update of all readings</li>
-     <li><b>sync</b> -  Sync with other SB_Player for multiroom function. Other players are selectable through a dropdown list. The shown player is the master</li> /* CHECK BESCHREIBUNG
-     <li><b>unsync</b> -  Unsync the player from multiroom group</li>
-     <li><b>playlists</b> -  Empty the current playlist and start the selected playlist. Playlists are selectable through a dropdown list</li>
+     <li><b>sync &lt;playerName[,playerName...]&gt; [new|asSlave]</b> -  Syncs with other players for multiroom function. Other players are selectable
+     through a dropdown list. The shown player is the master. Options:</li>
+    <ul>
+      <li>new - creates a new group with the selected players instead of adding to existing group</li>
+      <li>asSlave - adds player as slave to a player/group</li>
+    </ul><br>
+     Examples:<br>
+     <code>set playerA sync playerB</code>&nbsp;&nbsp;&nbsp;&nbsp;adds playerB to playerA's group<br>
+     <code>set playerA sync playerB,playerC,playerD</code>&nbsp;&nbsp;&nbsp;&nbsp;adds playerB, C and D to playerA's group<br>
+     <code>set playerA sync playerB new</code>&nbsp;&nbsp;&nbsp;&nbsp;creates a new group with playerA and B, playerA is master<br>
+     <code>set playerA sync playerB asSlave</code>&nbsp;&nbsp;&nbsp;&nbsp;adds playerA to playerB's group<br><br>
+     <li><b>unsync</b> -  Unsyncs the player from multiroom group</li>
+     <li><b>playlists</b> -  Empties the current playlist and starts the selected playlist. Playlists are selectable through a dropdown list</li>
      <li><b>cliraw &lt;command&gt;</b> -  Sends the &lt;command&gt; to the LMS CLI for selected player</li>
-   </ul>
-  <br>Show<br>
+     <li><b>save [name]</b> -  Saves the current player state</li>
+     <li><b>recall [name] [options] </b> -  Recalls a saved player state, options:</li>
+    <ul>
+      <li>del - delete saved state after restore</li>
+      <li>delonly - delete saved state without restoring</li>
+      <li>off - ignore saved power setting, turn player off after restore</li>
+      <li>on - ignore saved power setting, turn player on after restore</li>
+      <li>play - ignore saved play state, start playing after restore</li>
+      <li>stop - ignore saved play state, stop player after restore</li>
+    </ul>
+    <li><b>show &lt;line1&gt; &lt;line2&gt; &lt;duration&gt;</b> - displays text on the player</li>
    <ul>
-      <code>set sbradio show &lt;line1&gt; &lt;line2&gt; &lt;duration&gt;</code>
-     <li><b>line1</b> -  Text for first line</li>
-     <li><b>line2</b> -  Text for second line</li>
-     <li><b>duration</b> -  Duration for apperance in seconds</li>
+     <li>line1 -  Text for first line</li>
+     <li>line2 -  Text for second line</li>
+     <li>duration -  Duration for apperance in seconds</li>
+   </ul>
    </ul>
   <br>Alarms<br>
    <ul>
@@ -3829,6 +4353,18 @@ set sbradio alarm2 set 4 17:18:00</code>
       Sets the delay in seconds before turning the amplifier off after the player has stopped or been turned off.</li><br>
     <li>updateReadingsOnSet<br>
       If set to true most readings are immediately updated when a set command is executed without waiting for the reply from the server.</li><br>
+    <li>statusRequestInterval<br>
+      Defines the interval in seconds for the automatic status request. Default: 300</li><br>
+    <li>ttsDelay<br>
+      Delay in seconds before starting text to speech playback. If two values, separated by comma, are given, the first is used if
+      the player is on, the second if the player is off.</li><br>
+    <li>ttsMP3FileDir<br>
+      The directory which should be used as a default for text-embedded MP3-Files.</li><br>
+    <li>ttsPrefix<br>
+      Text prepended to every text to speech output</li><br>
+    <li>ttsVolume<br>
+      Volume for text to speech, if not set the current volume will be used. If the attribute <code>ttsoptions</code> contains <code>ignorevolumelimit</code>
+      the defined volume limit will be ignoerd for text to speech</li><br>
   </ul>
 </ul>
 =end html
