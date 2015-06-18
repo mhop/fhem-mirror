@@ -711,8 +711,7 @@ sub HMLAN_Parse($$) {##########################################################
 
     Dispatch($hash, $dmsg, \%addvals) if($mFld[5] !~ m/99.112999999000000/);#ignore overload test
   }
-  elsif($mFld[0] eq 'HHM-LAN-IF'){#HMLAN version info
-
+  elsif($mFld[0] =~ m /HHM-(LAN|USB)-IF/){#HMLAN version info
     $hash->{uptime} = HMLAN_uptime($mFld[5],$hash);
     
     $hash->{helper}{assIdRep} = hex($mFld[6]);
@@ -726,8 +725,8 @@ sub HMLAN_Parse($$) {##########################################################
     $hash->{helper}{q}{keepAliveRpt} = 0;
     Log3 $hash, ($hash->{helper}{log}{sys}?0:5)
               , 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
-                                   .' sNo:'.$mFld[2].' d:'.$mFld[3]
-                                   .' O:'  .$mFld[4].' t:'.$mFld[5].' IDcnt:'.$mFld[6];
+                                   ." sNo:$mFld[2] d:$mFld[3]"
+                                   ." O:$mFld[4] t:$mFld[5] IDcnt:$mFld[6] L:".hex($mFld[7]);
     my $myId = AttrVal($name, "hmId", "");
     $myId = $attr{$name}{hmId} = $mFld[4] if (!$myId);
     
