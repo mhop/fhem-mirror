@@ -24,7 +24,7 @@ yowsup_Initialize($)
   #$hash->{GetFn}    = "yowsup_Get";
   $hash->{AttrFn}   = "yowsup_Attr";
   $hash->{AttrList} = "disable:1 ";
-  $hash->{AttrList} .= "acceptFrom cmd ". $readingFnAttributes;
+  $hash->{AttrList} .= "acceptFrom cmd home ". $readingFnAttributes;
 }
 
 #####################################
@@ -157,6 +157,12 @@ yowsup_Connect($)
       close $parent;
 
       $ENV{PYTHONUNBUFFERED} = 1;
+
+      if( my $home = AttrVal($name, "home", undef ) ) {
+        $home = $ENV{'PWD'} if( $home eq 'PWD' );
+        $ENV{'HOME'} = $home;
+        Log3 $name, 2, "$name: setting \$HOME to $home";
+      }
 
       my $cmd = AttrVal($name, "cmd", "/opt/local/bin/yowsup-cli demos -c /root/config.yowsup --yowsup" );
       Log3 $name, 2, "$name: starting yoswup-cli: $cmd";
@@ -528,13 +534,21 @@ yowsup_Attr($$$)
     <li>cmd<br>
       complette commandline to start the  yowsup cli client<br>
       eg: attr WhatsApp cmd /opt/local/bin/yowsup-cli demos -c /root/config.yowsup --yowsup</li>
+
+    <li>home<br>
+      set $HOME for the started yowsup process<br>
+      PWD -> set to $PWD<br>
+      anything else -> use as $HOME</li>
+
     <li>accept_from<br>
       comma separated list of contacts (numbers) from which messages will be accepted</li>
+
     <li>commandPrefix<br>
       not set -> don't accept commands<br>
       0 -> don't accept commands<br>
       1 -> allow commands, every message is interpreted as a fhem command<br>
       anything else -> if the message starts with this prefix then everything after the prefix is taken as the command</li>
+
     <li>allowedCommands<br>
       A comma separated list of commands that are allowed from this contact.<br>
       If set to an empty list <code>, (i.e. comma only)</code> no commands are accepted.<br>
