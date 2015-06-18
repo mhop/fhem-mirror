@@ -251,6 +251,16 @@ sub readingsGroup_Undefine($$)
 }
 
 sub
+rgVal2Num($)
+{
+  my ($num) = @_;
+
+  $num =~ s/[^-\.\d]//g;
+
+  return $num;
+}
+
+sub
 lookup($$$$$$$$$)
 {
   my($mapping,$name,$alias,$reading,$value,$room,$group,$row,$default) = @_;
@@ -260,6 +270,8 @@ lookup($$$$$$$$$)
       my $DEVICE = $name;
       my $READING = $reading;
       my $VALUE = $value;
+      my $NUM = $VALUE;
+      $NUM =~ s/[^-\.\d]//g;
       my $ROW = $row;
       my $m = eval $mapping;
       if( $@ ) {
@@ -320,6 +332,8 @@ lookup2($$$$;$$)
     my $DEVICE = $name;
     my $READING = $reading;
     my $VALUE = $value;
+    my $NUM = $VALUE;
+    $NUM =~ s/[^-\.\d]//g;
     my $ROW = $row;
     my $COLUMN = $column;
     my $l = eval $lookup;
@@ -396,6 +410,93 @@ readingsGroup_makeLink($$$)
 }
 
 
+package readingsGroup;
+sub
+rgCount($$)
+{
+  my ($val,$values) = @_;
+
+  my $count = 0;
+
+  if( $val =~ m/^\/(.*)\/$/ ) {
+    my $regex = $1;
+    foreach my $v (@{$values}) {
+      ++$count if( $v =~ m/$regex/ );
+    }
+  } elsif( $val =~ m/^!(.*)/ ) {
+    my $val = $1;
+    foreach my $v (@{$values}) {
+      ++$count if( $v ne $val );
+    }
+  } else {
+    foreach my $v (@{$values}) {
+      ++$count if( $v eq $val );
+    }
+  }
+
+  return $count;
+}
+
+use List::Util qw(min max sum);
+sub
+rgCalc($$$$)
+{
+  my ($hash,$calc,$cell_row,$cell_column) = @_;
+  my $name = $hash->{NAME};
+
+  return undef if( !defined($hash->{helper}{values}) );
+
+  my $args;
+  my $cells;
+  if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
+    $calc = $1;
+    $cells = $5;
+    $args = $3 if( defined($cells) );
+    $cells = $3 if( !defined($cells) );
+  }
+
+  my $firstCalcRow = main::AttrVal($name, "firstCalcRow", 1);
+
+  $cells = '$firstCalcRow..$ROW-1' if( !$cells );
+
+  my @values = ();
+  foreach my $cell ( split( ';', $cells ) ) {
+    my ($rows,$cols) = split( ':', $cell );
+    $rows = '$firstCalcRow..$ROW-1' if( !$rows );
+    $cols = $cell_column if( !defined($cols) );
+
+    my $ROW = $cell_row;
+    my $COLUMN = $cell_column;
+    foreach my $col (eval "($cols)") {
+      foreach my $row (eval "($rows)") {
+        my $value = $hash->{helper}{values}{orig}[$col][$row];
+        if( defined($value) ) {
+          #$value =~ s/[^-\.\d]//g;
+          push @values, $value;
+        }
+
+        if( ${hash}->{inDetailFn} ) {
+          #FIXME: also add indirect cells
+          $hash->{helper}{recalc}[$col][$row] .= "," if( $hash->{helper}{recalc}[$col][$row] );
+          $hash->{helper}{recalc}[$col][$row] .= "$cell_row:$cell_column";
+        }
+      }
+    }
+  }
+
+  if( $calc eq 'avg' ) {
+    my $cnt = scalar @values;
+    return undef if( !$cnt );
+    return ( sum @values ) / $cnt;
+  } elsif( $calc eq 'count' ) {
+    return rgCount( $args, \@values );
+  }
+
+  return eval $calc .' @values';
+}
+
+package main;
+
 sub
 readingsGroup_value2html($$$$$$$$$)
 {
@@ -406,7 +507,7 @@ readingsGroup_value2html($$$$$$$$$)
 
   my $value_orig = $v;
   if( $calc ) {
-    $v = rgCalc($hash,$calc,$cell_row,$cell_column);
+    $v = readingsGroup::rgCalc($hash,$calc,$cell_row,$cell_column);
     $hash->{helper}{values}{calc}[$cell_column][$cell_row] = $calc;
 
     $informid = "informId=\"$d-calc:$cell_row:$cell_column\"";
@@ -1235,10 +1336,18 @@ readingsGroup_Notify($$)
     foreach my $trigger (keys %triggers) {
       DoTrigger( $name, "$trigger: $triggers{$trigger}" );
 
+      my $count = 0;
+      sub updateRefs($$);
       sub
       updateRefs($$)
       {
         my( $hash, $refs ) = @_;
+
+        if( ++$count > 20 ) {
+          Log3 $name, 2, "$name: recursionDetected: $refs";
+          return;
+        }
+
         foreach my $ref ( split( ',', $refs ) ) {
           my ($row,$col) = split( ':', $ref );
 
@@ -1264,6 +1373,8 @@ readingsGroup_Notify($$)
             updateRefs( $hash, $refs );
           }
         }
+
+        --$count;
       }
 
       if( my $cells = $hash->{helper}{positions}{$trigger} ) {
@@ -1280,89 +1391,6 @@ readingsGroup_Notify($$)
   }
 
   return undef;
-}
-
-sub
-rgCount($$)
-{
-  my ($val,$values) = @_;
-
-  my $count = 0;
-
-  if( $val =~ m/^\/(.*)\/$/ ) {
-    my $regex = $1;
-    foreach my $v (@{$values}) {
-      ++$count if( $v =~ m/$regex/ );
-    }
-  } elsif( $val =~ m/^!(.*)/ ) {
-    my $val = $1;
-    foreach my $v (@{$values}) {
-      ++$count if( $v ne $val );
-    }
-  } else {
-    foreach my $v (@{$values}) {
-      ++$count if( $v eq $val );
-    }
-  }
-
-  return $count;
-}
-use List::Util qw(min max sum);
-sub
-rgCalc($$$$)
-{
-  my ($hash,$calc,$cell_row,$cell_column) = @_;
-  my $name = $hash->{NAME};
-
-  return undef if( !defined($hash->{helper}{values}) );
-
-  my $args;
-  my $cells;
-  if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
-    $calc = $1;
-    $cells = $5;
-    $args = $3 if( defined($cells) );
-    $cells = $3 if( !defined($cells) );
-  }
-
-  my $firstCalcRow = AttrVal($name, "firstCalcRow", 1);
-
-  $cells = '$firstCalcRow..$ROW-1' if( !$cells );
-
-  my @values = ();
-  foreach my $cell ( split( ';', $cells ) ) {
-    my ($rows,$cols) = split( ':', $cell );
-    $rows = '$firstCalcRow..$ROW-1' if( !$rows );
-    $cols = $cell_column if( !defined($cols) );
-
-    my $ROW = $cell_row;
-    my $COLUMN = $cell_column;
-    foreach my $col (eval "($cols)") {
-      foreach my $row (eval "($rows)") {
-        my $value = $hash->{helper}{values}{orig}[$col][$row];
-        if( defined($value) ) {
-          #$value =~ s/[^-\.\d]//g;
-          push @values, $value;
-        }
-
-        if( ${hash}->{inDetailFn} ) {
-          #FIXME: also add indirect cells
-          $hash->{helper}{recalc}[$col][$row] .= "," if( $hash->{helper}{recalc}[$col][$row] );
-          $hash->{helper}{recalc}[$col][$row] .= "$cell_row:$cell_column";
-        }
-      }
-    }
-  }
-
-  if( $calc eq 'avg' ) {
-    my $cnt = scalar @values;
-    return undef if( !$cnt );
-    return ( sum @values ) / $cnt;
-  } elsif( $calc eq 'count' ) {
-    return rgCount( $args, \@values );
-  }
-
-  return eval $calc .' @values';
 }
 
 sub
@@ -1709,7 +1737,7 @@ readingsGroup_Attr($$$;$)
       with <code>{ '' => &lt;default&gt; }</code>.<br><br>
 
       The style attributes can also contain a perl expression enclosed in {} that returns the style
-      string to use. For nameStyle and valueStyle The perl code can use $DEVICE,$READING and $VALUE, e.g.:<br>
+      string to use. For nameStyle and valueStyle The perl code can use $DEVICE,$READING,$VALUE and $NUM, e.g.:<br>
       <ul>
           <code>attr batteries valueStyle {($VALUE ne "ok")?'style="color:red"':'style="color:green"'}</code><br>
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
