@@ -29,7 +29,6 @@ package main;
 use strict;
 use warnings;
 
-use Time::HiRes qw(gettimeofday);
 use MIME::Base64;
 use Data::Dumper;
 
@@ -135,11 +134,14 @@ sub FB_CALLLIST_Attr($@)
                 Log3 $name, 4, "FB_CALLLIST ($name) - filter stored as list $value";
             } 
             
-            # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
-            FB_CALLLIST_cleanupList($hash);
-            
-            # Inform all FHEMWEB clients
-            FB_CALLLIST_updateFhemWebClients($hash);
+            if($init_done)
+            {
+                # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
+                FB_CALLLIST_cleanupList($hash) if($init_done);
+                
+                # Inform all FHEMWEB clients
+                FB_CALLLIST_updateFhemWebClients($hash);
+            }
         }
         elsif($attrib eq "connection-mapping")
         {
@@ -153,7 +155,7 @@ sub FB_CALLLIST_Attr($@)
                     Log3 $name, 4, "FB_CALLLIST ($name) - connection map stored as hash: $value";
                     
                     # Inform all FHEMWEB clients
-                    FB_CALLLIST_updateFhemWebClients($hash);
+                    FB_CALLLIST_updateFhemWebClients($hash) if($init_done);
                 } 
                 else
                 {
@@ -170,10 +172,15 @@ sub FB_CALLLIST_Attr($@)
             if($value =~ /^incoming|outgoing|missed-call|completed|active$/)
             {
                 $attr{$name}{$attrib} = $value;
-                FB_CALLLIST_cleanupList($hash);
                 
-                # Inform all FHEMWEB clients
-                FB_CALLLIST_updateFhemWebClients($hash);
+                if($init_done)
+                {
+                    # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
+                    FB_CALLLIST_cleanupList($hash) if($init_done);
+                    
+                    # Inform all FHEMWEB clients
+                    FB_CALLLIST_updateFhemWebClients($hash);
+                }
             }
         }       
     }
@@ -387,7 +394,6 @@ sub FB_CALLLIST_cleanupList($)
         # delete calls which do not match the configured internal-number-filter
         if(exists($hash->{helper}{LINE_FILTER}))
         {
-            Log3 $name, 5, "FB_CALLLIST ($name) - internal-number-filter is defined, checking if MSN is allowed";
             push @list, grep { not FB_CALLLIST_checkForInternalNumberFilter($hash, $hash->{helper}{DATA}{$_}{internal_number}) }  keys %{$hash->{helper}{DATA}};
         }
         
@@ -494,7 +500,7 @@ sub FB_CALLLIST_list2html($;$)
     my $line;
     
     my $old_locale = setlocale(LC_ALL);
-    $ret .= "<table class=\"wide\"><tr><td>";
+    $ret .= "<table><tr><td>";
     $ret .= "<div class=\"devType\"><a href=\"$FW_ME$FW_subdir?detail=$name\">$alias</a>".(IsDisabled($name) ? " (disabled)" : "")."</div>" unless($FW_webArgs{"detail"});
     $ret .= "</td></tr>";
     $ret .= "<tr><td>";
@@ -646,7 +652,7 @@ sub FB_CALLLIST_saveList($)
 
         my $err = setKeyValue("FB_CALLLIST-$name", $dump);
 
-        Log3 $name, 3, "FB_CALLLIST ($name) - error while saving the current call list - $err" if(defined($err));
+        Log3 $name, 3, "FB_CALLLIST ($name) - error while saving the current call list: $err" if(defined($err));
     }
 }
 
@@ -665,7 +671,7 @@ sub FB_CALLLIST_loadList($)
     
     if(defined($err))
     {
-        Log3 $name, 3, "FB_CALLLIST ($name) - error while loading the old call list state- $err";
+        Log3 $name, 3, "FB_CALLLIST ($name) - error while loading the old call list state: $err";
         return undef;
     }
     
@@ -756,7 +762,7 @@ sub FB_CALLLIST_returnOrderedJSONOutput($$)
 }
 
 #####################################
-# Check, if a given internal number (MSN) matches the configured internal-number-filter (if set). returns true if number matches
+# Check, if a given internal number matches the configured internal-number-filter (if set). returns true if number matches
 sub FB_CALLLIST_checkForInternalNumberFilter($$)
 {
     my ($hash, $line_number) = @_;
@@ -764,11 +770,11 @@ sub FB_CALLLIST_checkForInternalNumberFilter($$)
     
     if(exists($hash->{helper}{LINE_FILTER}))
 	{
-        Log3 $name, 5, "FB_CALLLIST ($name) - internal-number-filter is defined, checking if MSN is allowed";
+        Log3 $name, 5, "FB_CALLLIST ($name) - internal-number-filter is defined, checking if internal number $line_number is allowed";
 
 		if(defined($line_number) and not exists($hash->{helper}{LINE_FILTER}{$line_number}))
 		{
-		    Log3 $name, 5, "FB_CALLLIST ($name) - MSN $line_number does not match the current internal-number-filter: ".Dumper($hash->{helper}{LINE_FILTER});
+		    Log3 $name, 5, "FB_CALLLIST ($name) - internal number $line_number does not match the current internal-number-filter: ".Dumper($hash->{helper}{LINE_FILTER});
 			return undef;
 		}
         else
@@ -789,7 +795,7 @@ sub FB_CALLLIST_updateFhemWebClients($)
 
     if(exists($hash->{helper}{DATA}) and (scalar keys %{$hash->{helper}{DATA}}) > 0)
     {
-        Log3 $name, 5, "FB_CALLLIST ($name) -  inform all FHEMWEB clients";
+        Log3 $name, 5, "FB_CALLLIST ($name) - inform all FHEMWEB clients";
         
         # inform all FHEMWEB clients about changes
         foreach my $line (FB_CALLLIST_list2html($hash, 1))
@@ -802,7 +808,7 @@ sub FB_CALLLIST_updateFhemWebClients($)
     }
     else
     {
-        Log3 $name, 5, "FB_CALLLIST ($name) -  list is empty, sending a clear command to all FHEMWEB clients";
+        Log3 $name, 5, "FB_CALLLIST ($name) - list is empty, sending a clear command to all FHEMWEB clients";
         
         # inform all FHEMWEB clients about empty list
         my @columns = split(",",AttrVal($name, "visible-columns", "row,state,timestamp,name,number,internal,connection,duration"));
@@ -873,9 +879,9 @@ sub FB_CALLLIST_returnTableHeader($)
 <ul>
   <tr><td>
   The FB_CALLLIST module creates a call history list by processing events of a <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a> definition.
-  It logs all calls and displays them in a history table.
+  It logs all calls and displays them in a historic table.
   <br><br>
-  You need a defined FB_CALLMONITOR instance where you can attach FB_CALLLIST to use this module<br><br>
+  You need a defined FB_CALLMONITOR instance where you can attach FB_CALLLIST to process the call events.<br><br>
   Depending on your configuration the status will be shown as icons or as text. You need to have the fhemSVG icon set configured in your corresponding FHEMWEB instance (see FHEMWEB attribute <a href="#iconPath">iconPath</a>).
   <br><br>
   The icons have different colors.<br><br>
@@ -926,7 +932,7 @@ sub FB_CALLLIST_returnTableHeader($)
   <ul>
 
     <li><a name="disable">disable</a> 0,1</li>
-	Optional attribute to disable the call list update. When disabled, call events will be processed and the list will not be updated.
+	Optional attribute to disable the call list update. When disabled, call events will be processed and the list wouldn't be updated accordingly.
 	<br><br>
 	Possible values: 0 => FB_CALLLIST is activated, 1 => FB_CALLLIST is deactivated.<br>
     Default Value is 0 (activated)<br><br>
@@ -1030,9 +1036,10 @@ sub FB_CALLLIST_returnTableHeader($)
   Es speichert alle Anrufe und zeigt sie in einer historischen Tabelle an.
   <br><br>
   Es wird eine bereits konfigurierte FB_CALLMONITOR Definition ben&ouml;tigt, von der FB_CALLLIST die Events entsprechend verarbeiten kann.<br><br>
-  Abh&auml;ngig von der Konfiguration der Attribute wird der Status als Icon oder als Textzeichen ausgegeben. Um die Icons korrekt anzeigen zu k&ouml;nnen muss das fhemSVG Icon-Set in der entsprechenden FHEMWEB-Instanz konfiguriert sein (siehe dazu FHEMWEB Attribut <a href="#iconPath">iconPath</a>).
+  Abh&auml;ngig von der Konfiguration der Attribute wird der Status als Icon oder als Textzeichen ausgegeben.
+  Um die Icons korrekt anzeigen zu k&ouml;nnen, muss das fhemSVG Icon-Set in der entsprechenden FHEMWEB-Instanz konfiguriert sein (siehe dazu FHEMWEB Attribut <a href="#iconPath">iconPath</a>).
   <br><br>
-  Die Icons haben verschiedene Farben.<br><br>
+  Die Icons haben verschiedene Farben:<br><br>
   <ul>
   <li><font color="blue"><b>blau</b></font> - Eingehender Anruf (aktiv oder beendet)</li>
   <li><font color="green"><b>gr&uuml;n</b></font> - Ausgehender Anruf (aktiv oder beendet))</li>
@@ -1046,9 +1053,9 @@ sub FB_CALLLIST_returnTableHeader($)
     <tr><td><code>=&gt; ((o))</code></td><td> - Eingehender Anruf (klingelt)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
     <tr><td><code>&lt;= [=]</code></td><td> - Ausgehender Anruf (laufendes Gespr&auml;ch)</td></tr>
     <tr><td><code>=&gt; [=]</code></td><td> - Eingehender Anruf (laufendes Gespr&auml;ch)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;= X</code></td><td> - Ausgehender erfolgloser Anruf (Gegenseite nicht abgenommen)</td></tr>
-    <tr><td><code>=&gt; X</code></td><td> - Eingehender erfolgloser Anruf (Verpasster Anruf)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>=&gt; O_O</code></td><td> - Eingehender Anruf der durch einen Anrufbeantworter entgegen genommen wurde</td></tr><tr><td colspan="2">&nbsp;</td></tr>
+    <tr><td><code>&lt;= X</code></td><td> - Ausgehender, erfolgloser Anruf (Gegenseite nicht abgenommen)</td></tr>
+    <tr><td><code>=&gt; X</code></td><td> - Eingehender, erfolgloser Anruf (Verpasster Anruf)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
+    <tr><td><code>=&gt; O_O</code></td><td> - Eingehender Anruf, der durch einen Anrufbeantworter entgegen genommen wurde</td></tr><tr><td colspan="2">&nbsp;</td></tr>
     <tr><td><code>&lt;=</code></td><td> - Ausgehender Anruf (beendet)</td></tr>
     <tr><td><code>=&gt;</code></td><td> - Eingehender Anruf (beendet)</td></tr>
     </table>
@@ -1097,15 +1104,15 @@ sub FB_CALLLIST_returnTableHeader($)
     Ist dieses Attribut gesetzt, werden nur bestimmte Typen von Anrufen in der Liste angezeigt:<br><br>
     <ul>
     <li><code>all</code> - Alle Anrufe werden angezeigt</li>
-    <li><code>incoming</code> - Alle eingehenden Anrufe werden angezeigt (aktive und abgeschlossen)</li>
+    <li><code>incoming</code> - Alle eingehenden Anrufe werden angezeigt (aktive und abgeschlossene)</li>
     <li><code>outgoing</code> - Alle ausgehenden Anrufe werden angezeigt (aktive und abgeschlossene)</li>
     <li><code>missed-calls</code> - Alle eingehenden, verpassten Anrufe werden angezeigt.</li>
-    <li><code>completed</code> - Alle abgeschlossenen Anrufe werden angezeigt (eingehen und ausgehend)</li>
+    <li><code>completed</code> - Alle abgeschlossenen Anrufe werden angezeigt (eingehend und ausgehend)</li>
     <li><code>active</code> - Alle aktuell laufenden Anrufe werden angezeigt (eingehend und ausgehend)</li>
     </ul><br>
     Standardwert ist "all" (alle Anrufe anzeigen)<br><br>
     <li><a name="list-order">list-order</a> descending,ascending</li>
-    Gibt an ob der neueste Anruf in der ersten Zeile (aufsteigend =&gt; descending) oder in der letzten Zeile (absteigend =&gt; ascending) in der Liste angezeigt werden soll. Dementsprechend rollt die Liste dann nach oben durch oder nach unten.<br><br>
+    Gibt an ob der neueste Anruf in der ersten Zeile (aufsteigend =&gt; descending) oder in der letzten Zeile (absteigend =&gt; ascending) in der Liste angezeigt werden soll. Dementsprechend rollt die Liste dann nach oben oder unten durch.<br><br>
     Standardwert ist "descending" (absteigend, neuester Anruf in der ersten Zeile)<br><br>
     <li><a name="internal-number-filter">internal-number-filter</a> &lt;hash&gt;</li>
     Dieses Attribut erm&ouml;glicht das Filtern der angezeigten Anrufe auf bestimmte interne Rufnummern sowie das Zuordnen von Namen zu den internen Rufnummern.<br><br>
