@@ -46,10 +46,10 @@
 <g
    id="measure_x5F_battery_x5F_25"
    transform="matrix(1.6008149,0,0,1.6008149,-109.98896,-107.6324)"
-   style="fill:none;stroke:#000000;stroke-opacity:1">
+   style="stroke:#000000;stroke-opacity:1">
 	<g
    id="g5"
-   style="fill:none;stroke:#000000;stroke-opacity:1">
+   style="stroke:#000000;stroke-opacity:1">
 		<path
    style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:#000000;fill-opacity:1;stroke:none;stroke-width:10;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans"
    d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"
@@ -62,7 +62,7 @@
    inkscape:connector-curvature="0" />
 	</g>
 	<g
-   style="fill:none;stroke:#000000;stroke-opacity:1;display:none"
+   style="stroke:#000000;stroke-opacity:1;display:none"
    id="g11">
 		<path
    style="fill:none;stroke:#000000;stroke-width:10;stroke-opacity:1;display:inline"
