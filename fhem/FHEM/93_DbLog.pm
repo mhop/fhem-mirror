@@ -580,7 +580,7 @@ sub DbLog_Log($$) {
        
                           if(($now-$lt < $v2[1]) && ($lv eq $value)) {
                                 # innerhalb MinIntervall und LastValue=Value
-                                $DoIt = 1;
+                                $DoIt = 0;
                           }
                         }
                   }
