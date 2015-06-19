@@ -558,7 +558,7 @@ readingsGroup_value2html($$$$$$$$$)
       if( !$values ) {
         my %extPage = ();
         my ($allSets, undef, undef) = FW_devState($name, $room, \%extPage);
-        $allSets = getAllAttr($name) if( $type eq 'attr' );
+        $allSets = getAllAttr($name) if( $type && $type eq 'attr' );
         my ($set) = split( ' ', $set, 2 );
         if( $allSets && $allSets =~ m/\b$set:([^ ]*)/) {
           $values = $1;
@@ -585,7 +585,7 @@ readingsGroup_value2html($$$$$$$$$)
       }
 
       if( $htmlTxt ) {
-        if( $type eq 'attr' ) {
+        if( $type && $type eq 'attr' ) {
           my $current = AttrVal( $name, $n, 'unknown' );
           $htmlTxt =~ s/cmd=/type='attr' cmd=/;
           $htmlTxt =~ s/current='[^']*'/current='$current'/;
