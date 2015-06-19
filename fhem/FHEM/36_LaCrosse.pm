@@ -29,6 +29,8 @@ sub LaCrosse_Initialize($) {
                        ." filterThreshold"
                        ." resolution"
                        ." $readingFnAttributes";
+                       
+  $hash->{AutoCreate} = { "LaCrosse.*" => { autocreateThreshold => "2:120" } };                     
 }
 
 sub LaCrosse_Define($$) {
@@ -339,9 +341,40 @@ sub LaCrosse_Parse($$) {
         return "";
       }
     }
-    Log3 $name, 3, "LaCrosse: Unknown device $rname, please define it";
-
-    Log3 $name, 3, "LaCrosse: check commandref on usage of LaCrossePairForSec" if( !$hash->{LaCrossePair} && !defined($modules{LaCrosse}{defptr}) );
+    
+    # get info about autocreate
+    my $autoCreateState = 0;
+    my $laCrosseInIgnoreTypes = 0;
+    foreach my $d (keys %defs) {
+      next if($defs{$d}{TYPE} ne "autocreate");
+      $autoCreateState = 1;
+      $autoCreateState = 2 if(!AttrVal($defs{$d}{NAME}, "disable", undef));
+     
+      my $it = AttrVal($defs{$d}{NAME}, "ignoreTypes", "");
+      if("LaCrosse" =~ m/$it/i) {
+        $laCrosseInIgnoreTypes = 1
+      }
+    }
+    
+    # $autoCreateState
+    # ----------------
+    # 0 = autoreate not defined
+    # 1 = autocreate defined
+    # 2 = autocreate active
+    
+    #$laCrosseInIgnoreTypes
+    #----------------------
+    # 0 = no
+    # 1 = yes
+    
+    # decide how to log
+    my $loglevel = 4;
+    if($autoCreateState < 2 && $laCrosseInIgnoreTypes == 0) {
+      $loglevel = 3;
+    }
+    
+    Log3 $name, $loglevel, "LaCrosse: Unknown device $rname, please define it";
+    Log3 $name, $loglevel, "LaCrosse: check commandref on usage of LaCrossePairForSec" if( !$hash->{LaCrossePair} && !defined($modules{LaCrosse}{defptr}) );
    
     return "" if( !$hash->{LaCrossePair} );
 
@@ -547,6 +580,15 @@ sub LaCrosse_Parse($$) {
     <li>ignore<br>
     1 -> ignore this device.</li>
   </ul><br>
+  
+  <b>Logging and autocreate</b><br>
+  <ul>
+  <li>If autocreate is not active (not defined or disabled) and LaCrosse is not contained in the ignoreTypes attribute of autocreate then 
+  the <i>Unknown device xx, please define it</i> messages will be logged with loglevel 3. In all other cases they will be logged with loglevel 4. </li>
+  <li>The autocreateThreshold attribute of the autocreate module (see <a href="#autocreate">autocreate</a>) is respected. The default is 2:120, means, that
+  autocreate will create a device for a sensor only, if the sensor was received at least two times within two minutes.</li>  
+  </ul>
+  
 </ul>
 
 =end html
