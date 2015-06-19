@@ -255,7 +255,7 @@ rgVal2Num($)
 {
   my ($num) = @_;
 
-  $num =~ s/[^-\.\d]//g;
+  $num =~ s/[^-\.\d]//g if( defined($num) );
 
   return $num;
 }
@@ -271,7 +271,7 @@ lookup($$$$$$$$$)
       my $READING = $reading;
       my $VALUE = $value;
       my $NUM = $VALUE;
-      $NUM =~ s/[^-\.\d]//g;
+      $NUM =~ s/[^-\.\d]//g if( defined($NUM) );
       my $ROW = $row;
       my $m = eval $mapping;
       if( $@ ) {
@@ -333,7 +333,7 @@ lookup2($$$$;$$)
     my $READING = $reading;
     my $VALUE = $value;
     my $NUM = $VALUE;
-    $NUM =~ s/[^-\.\d]//g;
+    $NUM =~ s/[^-\.\d]//g if( defined($NUM) );
     my $ROW = $row;
     my $COLUMN = $column;
     my $l = eval $lookup;
