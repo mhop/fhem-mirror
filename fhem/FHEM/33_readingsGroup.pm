@@ -1336,12 +1336,13 @@ readingsGroup_Notify($$)
     foreach my $trigger (keys %triggers) {
       DoTrigger( $name, "$trigger: $triggers{$trigger}" );
 
-      my $count = 0;
+      our $count = 0;
       sub updateRefs($$);
       sub
       updateRefs($$)
       {
         my( $hash, $refs ) = @_;
+        my $name  = $hash->{NAME};
 
         if( ++$count > 20 ) {
           Log3 $name, 2, "$name: recursionDetected: $refs";
