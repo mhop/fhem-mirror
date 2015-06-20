@@ -523,6 +523,8 @@ sub pilight_ctrl_Notify($$)
   my $me = $own->{NAME}; # own name / hash
   my $devName = $dev->{NAME}; # Device that created the events
   
+  pilight_ctrl_CheckReadingState($own);
+  
   return undef if ($devName ne "global");
   
   my $max = int(@{$dev->{CHANGED}}); # number of events / changes
@@ -558,6 +560,8 @@ sub pilight_ctrl_SendDone($)
   
   Log3 $me, 4, "$me(SendDone): message successfully send" if ($ok);
   Log3 $me, 2, "$me(SendDone): sending message failed" if (!$ok);
+  
+  pilight_ctrl_CheckReadingState($hash);
   
   delete($hash->{helper}{RUNNING_PID});
 }
@@ -831,6 +835,8 @@ sub pilight_ctrl_Ready($)
     return if(defined($hash->{helper}{NEXT_TRY}) && $hash->{helper}{NEXT_TRY} && time() < $hash->{helper}{NEXT_TRY});
     return pilight_ctrl_TryConnect($hash);
   }
+  
+  pilight_ctrl_CheckReadingState($hash);
 }
 
 #####################################
