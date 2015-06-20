@@ -63,9 +63,6 @@ HTTPSRV_Define($$) {
   return "Usage: define <name> HTTPSRV <infix> <directory> <friendlyname>"  if(int(@a) != 5);
   my $name= $a[0];
   my $infix= $a[2];
-  if($infix !~ m-/$-) {
-    $infix = "$infix/";
-  }
   my $directory= $a[3];
   my $friendlyname= $a[4];
 
@@ -117,7 +114,7 @@ sub HTTPSRV_CGI() {
 
   my ($request) = @_;   # /$infix/filename
 
-  if($request =~ m,^(/[^/]+/)((.*)?)?$,) {
+  if($request =~ m,^(/[^/]+)(/(.*)?)?$,) {
     my $link= $1;
     my $filename= $3;
     my $name;
@@ -183,7 +180,7 @@ sub HTTPSRV_CGI() {
 <h3>HTTPSRV</h3>
 <ul>
   Provides a mini HTTP server plugin for FHEMWEB. It serves files from a given directory. 
-  It optionally accepts a query string to set readings of this device if an attribute allows the given reading.<p>
+  It optionally accepts a query string to set readings of this device if an attribute allows the given reading<p>
 
   HTTPSRV is an extension to <a href="HTTPSRV">FHEMWEB</a>. You must install FHEMWEB to use HTTPSRV.</p>
 
@@ -194,16 +191,14 @@ sub HTTPSRV_CGI() {
 
     Defines the HTTP server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually
     <code>http://hostname:8083/fhem</code>), <code>&lt;directory&gt;</code> is the absolute path the
-    files are served from, and <code>&lt;friendlyname&gt;</code> is the name displayed in the side menu of 
-    FHEMWEB. <code>&lt;infix&gt;</code> should contain a trailing slash, which is automatically added to
-    the definition if it is missing in the define statement.<p><p>
+    files are served from, and <code>&lt;friendlyname&gt;</code> is the name displayed in the side menu of FHEMWEB.<p><p>
 
     Example:
     <ul>
-      <code>define myJSFrontend HTTPSRV jsf /usr/share/jsfrontend/ My little frontend</code><br>
+      <code>define myJSFrontend HTTPSRV jsf /usr/share/jsfrontend My little frontend</code><br>
       or <br>
       <code>
-        define kindleweb HTTPSRV kindle /opt/fhem/kindle/ Kindle Web<br>
+        define kindleweb HTTPSRV kindle /opt/fhem/kindle Kindle Web<br>
         attr kindleweb readings KindleBatt
       </code><br>
     </ul>
