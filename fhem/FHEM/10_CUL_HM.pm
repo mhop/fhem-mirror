@@ -5604,7 +5604,7 @@ sub CUL_HM_sndIfOpen($) {
   my(undef,$io) = split(':',$_[0]);
   RemoveInternalTimer("sndIfOpen:$io");# should not be necessary, but
   my $ioHash = $defs{$io};
-  if (   $ioHash->{STATE} !~ m/^(opened|Initialized)$/
+  if (   ReadingsVal($io,"state","") !~ m/^(opened|Initialized)$/
       ||(defined $ioHash->{XmitOpen} && $ioHash->{XmitOpen} != 1)
 #     ||$modules{CUL_HM}{prot}{rspPend}>=$maxPendCmds
        ){#still no send allowed
@@ -5656,7 +5656,7 @@ sub CUL_HM_SndCmd($$) {
   my $io = $hash->{IODev};
   my $ioName = $io->{NAME};
   
-  if (  $io->{STATE} !~ m/^(opened|Initialized)$/          # we need to queue
+  if (  ReadingsVal($ioName,"state","") !~ m/^(opened|Initialized)$/  # we need to queue
       ||(hex substr($cmd,2,2) & 0x20) && (                 # check for commands with resp-req
            $modules{CUL_HM}{$ioName}{tmr}                  # queue already running
          ||(defined $io->{XmitOpen} && $io->{XmitOpen} != 1)#overload, dont send
@@ -5800,7 +5800,7 @@ sub CUL_HM_respPendTout($) {
       CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
       CUL_HM_protState($hash,"CMDs_pending");
     }
-    elsif ($hash->{IODev}->{STATE} !~ m/^(opened|Initialized)$/){#IO errors
+    elsif (ReadingsVal($hash->{IODev},"state","") !~ m/^(opened|Initialized)$/){#IO errors
       CUL_HM_eventP($hash,"IOdly");
       CUL_HM_ProcessCmdStack($hash) if($rxt & 0x03);#burst/all
     }
@@ -7464,7 +7464,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
     unshift @ios,@{$hash->{helper}{io}{prefIO}} if ($hash->{helper}{io}{prefIO});# set prefIO to first choice
     foreach my $iom (@ios){
       if (  !$defs{$iom}
-          || $defs{$iom}{STATE} eq "disconnected" 
+          || ReadingsVal($iom,"state","") eq "disconnected" 
           || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB?
         next;
       }
