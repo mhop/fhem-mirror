@@ -66,6 +66,7 @@ sub statistics_UpdateDevReading($$$$);
    ,"energy" => 2 
    ,"energy_current" => 1 
    ,"energy_total" => 2 
+   ,"energyCalc" => 2 
    ,"Total.Energy" => 2 
    ,"humidity" => 1
    ,"lightsensor" => 3 
@@ -134,6 +135,7 @@ statistics_Initialize($)
                    ."minAvgMaxReadings "
                    ."periodChangePreset "
                    ."specialDeltaPeriodHours "
+                   ."specialPeriod "
                    ."singularReadings "
                    ."tendencyReadings "
                    .$readingFnAttributes;
@@ -1096,7 +1098,7 @@ sub statistics_UpdateDevReading($$$$)
          <i>lightsensor, lock, motion, Window, window, state (if no other reading is recognized)</i>
       </li><br>
   </ul>
-   Further readings can be added via the correspondent <a href="#statisticsattr">attributes</a>.
+   Further readings can be added via the <a href="#statisticsattr">attributes</a> <code>deltaReadings, durationReadings, minAvgMaxReadings, tendencyReadings</code>.
    This allows also to assign a reading to another statistic type.
   <br>&nbsp;
   <br>
@@ -1187,7 +1189,7 @@ sub statistics_UpdateDevReading($$$$)
          <li>period: Hour|Day|Month|Year|<span style="color:blue;">1h|2h|3h|6h</span></li>
       </ul>
       <br>
-      Regulare expression of statistic values, which for which singular readings are created <u>additionally</u>. Eases the creation of plots. For duration readings the name of the state has to be used as statTypes.
+      Regulare expression of statistic values, which for which singular readings are created <u>additionally</u> to the summary readings. Eases the creation of plots. For duration readings the name of the state has to be used as statTypes.
       <br>
        Example: <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
@@ -1240,7 +1242,7 @@ sub statistics_UpdateDevReading($$$$)
          <i>lightsensor, lock, motion, Window, window, state (wenn kein anderer Ger&auml;tewert g&uuml;ltig)</i>
       </li><br>
   </ul>
-  &Uuml;ber die entsprechenden <a href="#statisticsattr">Attribute</a> k&ouml;nnen weitere Ger&auml;tewerte hinzugef&uuml;gt oder
+  &Uuml;ber die <a href="#statisticsattr">Attribute</a> <code>deltaReadings, durationReadings, minAvgMaxReadings, tendencyReadings</code> k&ouml;nnen weitere Ger&auml;tewerte hinzugef&uuml;gt oder
   einem anderem Statistik-Typ zugeordnet werden. 
   <br>&nbsp;
   <br>
