@@ -13,8 +13,6 @@
   - bugfix:  70_Pushalot: corrected parameter order for image
   - change:  70_Pushalot: changed http call to non-blocking
   - feature: 70_Pushalot: module to send push notification to Windows Phone
-  - change:  02_HTTPSRV: require trailing slash in infix to foster
-             integration of TabletUI
   - feature: 59_Weather: polish translations (Lukasz)
   - changed: 57_CALVIEW.pm: code cleanup
   - bugfix:  30_pilight_*: restore (StateFn), trigger changes twice
