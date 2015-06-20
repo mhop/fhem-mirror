@@ -94,15 +94,16 @@ readingsGroup_updateDevices($;$)
       $hash->{DEF} =~ s/\s*[{].*$//g;
       last;
     } else {
-      my @device = split(":", $param, 2);
+      my @device = split(":", $param, 2);               # 2 -> to allow : in calc expressions
 
       if( $device[1] && $device[1] =~ m/^FILTER=/ ) {
+        my @device = split(":", $param);                # split all to get multiple FILTER but exclude the : before the readings
         my $devspec = shift(@device);
         while( @device && $device[0] =~ m/^FILTER=/ ) {
           $devspec .= ":";
-          $devspec .= shift(@device)
+          $devspec .= shift(@device);
         }
-        my $regex =  $device[0];
+        my $regex =  join(':', @device);                # merge the rest back again
         foreach my $d (devspec2array($devspec)) {
           $list{$d} = 1;
           push @devices, [$d,$regex];
