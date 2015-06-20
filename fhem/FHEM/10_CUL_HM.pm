@@ -276,10 +276,10 @@ sub CUL_HM_updateConfig($){
     }
     elsif ($md =~ m/(CCU-FHEM)/){
       if($hash->{helper}{role}{dev}){
+        CUL_HM_UpdtCentral($name); # first update, then keys
         if(eval "defined(&HMLAN_writeAesKey)"){
           HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
         }
-        CUL_HM_UpdtCentral($name);
       }
     }
     elsif ($st eq "dimmer"  ) {#setup virtual dimmer channels
@@ -3200,7 +3200,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
       if    ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
       elsif ($md =~ m/HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7)}
       elsif ($md =~ m/HM-TC-IT/    && $chn eq "02"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7,8,9)}
-      elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55|HM-RC-Dis-H-x-EU)/)
+      elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)/)
                                                    {$addInfo = CUL_HM_4DisText($hash)}
       elsif ($md eq "HM-Sys-sRP-Pl")               {$addInfo = CUL_HM_repReadings($hash)}
 
@@ -6580,7 +6580,7 @@ sub CUL_HM_updtRegDisp($$$) {
   elsif ($md =~ m/HM-TC-IT-WM-W-EU/){#handle temperature readings
     CUL_HM_TCITRTtempReadings($hash,$md,$list)  if ($list >= 7 && $chn eq "02");
   }
-  elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55|HM-RC-Dis-H-x-EU)/){#add text
+  elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)/){#add text
    CUL_HM_4DisText($hash)  if ($list == 1) ;
   }
   elsif ($st eq "repeater"){
@@ -8479,7 +8479,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>alarmOff</B> - switch off the alarm</li>
           </ul>
         </li>
-        <li>4Dis (HM-PB-4DIS-WM)
+        <li>4Dis (HM-PB-4DIS-WM|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)
           <ul>
             <li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
               Set the text on the display of the device. To this purpose issue
@@ -9774,7 +9774,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>alarmOff</B> - schaltet den Alarm aus</li>
           </ul>
         </li>
-        <li>4Dis (HM-PB-4DIS-WM)
+        <li>4Dis (HM-PB-4DIS-WM|HM-PB-4DIS-WM|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)
           <ul>
             <li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
               Zeigt Text auf dem Display eines Ger&auml;ts an. F&uuml;r diesen Zweck muss zuerst ein set-Befehl
