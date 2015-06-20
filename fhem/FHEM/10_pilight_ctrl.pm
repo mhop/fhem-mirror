@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.05 2015-06-07 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.06 2015-06-20 Risiko $
 #
 # Usage
 # 
@@ -29,6 +29,7 @@
 # V 1.03 2015-05-20 - NEW: handle screen messages (up,down)
 # V 1.04 2015-05-30 - FIX:  StateFn  
 # V 1.05 2015-06-07 - FIX:  Reset 
+# V 1.06 2015-06-20 - NEW:  set <ctrl> disconnect, checking reading state
 ############################################## 
 package main;
 
@@ -45,8 +46,9 @@ sub pilight_ctrl_Write($@);
 sub pilight_ctrl_SimpleWrite(@);
 sub pilight_ctrl_ClientAccepted(@);
 sub pilight_ctrl_Send($);
+sub pilight_ctrl_Reset($);
 
-my %sets = ( "reset:noArg" => "");
+my %sets = ( "reset:noArg" => "", "disconnect:noArg" => "");
 my %matchList = ( "1:pilight_switch" => "^PISWITCH",
                   "2:pilight_dimmer" => "^PISWITCH|^PIDIMMER|^PISCREEN",
                   "3:pilight_temp"   => "^PITEMP") ;
@@ -129,15 +131,37 @@ sub pilight_ctrl_State($$$$)
   return undef;
 }
 
+sub pilight_ctrl_CheckReadingState($)
+{
+  my ($hash) = @_;
+  my $me = $hash->{NAME};  
+  
+  my $state     = ReadingsVal($me,"state",undef);
+  if (defined($state) && $state ne "opened" && $state ne "disconnected") {
+    Log3 $me, 3, "$me(CheckReadingState): Unknown error: unnormal value for reading state";
+    setReadingsVal($hash, "state", undef, TimeNow());
+    $hash->{STATE} = $hash->{helper}{CON};
+    $hash->{STATE} = "opened" if ($hash->{helper}{CON} eq "connected");
+  }
+  return undef;
+}
+
 sub pilight_ctrl_Close($)
 {
   my $hash = shift;
   my $me = $hash->{NAME};
   
-  BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
+  if (exists($hash->{helper}{RUNNING_PID})) {
+    Log3 $me, 5, "$me(Close): call BlockingKill";
+    BlockingKill($hash->{helper}{RUNNING_PID});
+    delete($hash->{helper}{RUNNING_PID}); 
+  }
   
   RemoveInternalTimer($hash);
-  DevIo_CloseDev($hash); 
+  Log3 $me, 5, "$me(Close): close DevIo";
+  DevIo_CloseDev($hash);
+  $hash->{STATE} = "closed";
+  $hash->{helper}{CON} = "closed"; 
 }
 
 #####################################
@@ -180,9 +204,19 @@ sub pilight_ctrl_TryConnect($)
 }
 
 #####################################
+sub pilight_ctrl_Reset($)
+{
+  my ($hash) = @_;
+  pilight_ctrl_Close($hash);
+  return pilight_ctrl_TryConnect($hash);
+}
+
+#####################################
 sub pilight_ctrl_Set($@)
 {
   my ($hash, @a) = @_;
+  
+  pilight_ctrl_CheckReadingState($hash);
 
   return "set $hash->{NAME} needs at least one parameter" if(@a < 2);
 
@@ -193,9 +227,15 @@ sub pilight_ctrl_Set($@)
 
   if ($cmd eq "reset") 
   { 
+    return pilight_ctrl_Reset($hash);
+  }
+  
+  if ($cmd eq "disconnect") {
     pilight_ctrl_Close($hash);
-    return pilight_ctrl_TryConnect($hash);
-  } 
+    return undef;
+  }
+  
+  pilight_ctrl_CheckReadingState($hash);
 
   return "Unknown argument $cmd, choose one of ". join(" ", sort keys %sets); 
 }
@@ -205,6 +245,8 @@ sub pilight_ctrl_Check($)
 {
   my $hash = shift;
   my $me = $hash->{NAME};
+  
+  pilight_ctrl_CheckReadingState($hash);
   
   RemoveInternalTimer($hash); 
   
@@ -295,6 +337,12 @@ sub pilight_ctrl_Write($@)
   my ($hash,$rmsg) = @_;
   my $me = $hash->{NAME};
   
+  pilight_ctrl_CheckReadingState($hash);
+  
+  if ($hash->{helper}{CON} eq "closed") {
+    return;
+  }
+  
   if ($hash->{helper}{CON} ne "connected") {
     Log3 $me, 2, "$me(Write): ERROR: no connection to pilight-daemon $hash->{DeviceName}";
     return;
@@ -358,7 +406,9 @@ sub pilight_ctrl_Write($@)
   # we do not update the readings - we will do this at the response message
   
   push @{$hash->{helper}->{sendQueue}}, $msg;
-  pilight_ctrl_SendNonBlocking($hash); 
+  pilight_ctrl_SendNonBlocking($hash);
+  
+  pilight_ctrl_CheckReadingState($hash);
 }
 
 #####################################
@@ -507,6 +557,7 @@ sub pilight_ctrl_SendDone($)
   my $hash = $defs{$me};
   
   Log3 $me, 4, "$me(SendDone): message successfully send" if ($ok);
+  Log3 $me, 2, "$me(SendDone): sending message failed" if (!$ok);
   
   delete($hash->{helper}{RUNNING_PID});
 }
