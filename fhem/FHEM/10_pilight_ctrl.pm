@@ -894,9 +894,8 @@ sub pilight_ctrl_SimpleWrite(@)
   <a name="pilight_ctrl_set"></a>
   <p><b>Set</b></p>
   <ul>
-    <li>
-      <b>reset</b>
-    </li>
+    <li><b>reset</b> Reset the connection to the pilight daemon</li>
+    <li><b>disconnect</b>Diconnect from pilight daemon and do not reconnect automatically</li>
   </ul>
   <br>
   <a name="pilight_ctrl_readings"></a>
