@@ -7666,9 +7666,9 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
   }
   if (   !$ioName
       || ReadingsVal($ioName,"cond","init") !~ m /^(ok|Overload-released|init)$/#default init for CUL
-      || ( defined $defs{$ioName}{helper}{q}
-          && ($defs{$ioName}{helper}{q}{cap}{sum}/450)>
-               AttrVal($ioName,"hmMsgLowLimit",40))){
+      || ( defined $defs{$ioName}->{msgLoadCurrent}
+          && ( $defs{$ioName}->{msgLoadCurrent}>
+               AttrVal($ioName,"hmMsgLowLimit",40)))){
     return 0;
   }
   return 1;
