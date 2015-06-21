@@ -103,7 +103,7 @@ FB_CALLMONITOR_Initialize($)
                          "reverse-search-phonebook-file ".
                          "reverse-search-text-file ".
                          "fritzbox-remote-phonebook:0,1 ".
-                         "fritzbox-remote-phonebook-via:web,telnet ".
+                         "fritzbox-remote-phonebook-via:web,tr064,telnet ".
                          "fritzbox-remote-phonebook-exclude ".
                          "fritzbox-remote-timeout ".
                          "fritzbox-user ".
@@ -168,6 +168,7 @@ FB_CALLMONITOR_Get($@)
         my $table = "";
         my $head = "Id    Name";
         my $width = 10;
+
         foreach my $phonebookId (sort keys %{$hash->{helper}{PHONEBOOK_NAMES}})
         {
             my $string = sprintf("%-3s", $phonebookId)." - ".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}; 
@@ -834,9 +835,12 @@ sub FB_CALLMONITOR_readPhonebook($;$)
                 Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from remote phonebook via telnet";
             }
         }
-        elsif(AttrVal($name, "fritzbox-remote-phonebook-via", "web") eq "web")
+        elsif(AttrVal($name, "fritzbox-remote-phonebook-via", "web") =~ /(web|tr064)/)
         {
-            $err = FB_CALLMONITOR_identifyPhoneBooksViaWeb($hash, $testPassword);
+
+            my $do_with = $1;
+            $err = FB_CALLMONITOR_identifyPhoneBooksViaWeb($hash, $testPassword) if($do_with eq "web");
+            $err = FB_CALLMONITOR_identifyPhoneBooksViaTR064($hash, $testPassword) if($do_with eq "tr064");
             
             if(defined($err))
             {
@@ -862,7 +866,8 @@ sub FB_CALLMONITOR_readPhonebook($;$)
             
                 Log3 $name, 4, "FB_CALLMONITOR ($name) - requesting phonebook id $phonebookId (".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}.")";
                 
-                ($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebookViaWeb($hash, $phonebookId, $testPassword);
+                ($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebookViaWeb($hash, $phonebookId, $testPassword) if($do_with eq "web");
+                ($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebookViaTR064($hash, $phonebookId, $testPassword) if($do_with eq "tr064");
                 
                 if(defined($err))
                 {
@@ -884,8 +889,10 @@ sub FB_CALLMONITOR_readPhonebook($;$)
                     }
                 }
             }
+            
+            delete($hash->{helper}{PHONEBOOK_URL}) if(exists($hash->{helper}{PHONEBOOK_URL}))
         }
-	}
+    }
     else
     {
         Log3 $name, 4, "FB_CALLMONITOR ($name) - skipping remote phonebook";
@@ -1205,6 +1212,276 @@ sub FB_CALLMONITOR_readRemotePhonebookViaTelnet($;$)
 }
 
 #####################################
+# identifys the phonebooks defined on the FritzBox via TR064 interface (SOAP) and generate download url
+sub FB_CALLMONITOR_identifyPhoneBooksViaTR064($;$)
+{
+    my ($hash, $testPassword) = @_;
+    my $name = $hash->{NAME};
+
+    my ($fb_ip,undef) = split(/:/, ($hash->{DeviceName}), 2);
+    my $fb_user = AttrVal($name, "fritzbox-user", "admin");
+    my $fb_pw;
+    my $fb_sid;
+    my $FB_port = '49000';
+
+    $hash->{helper}{READ_PWD} = 1;
+    $fb_pw = FB_CALLMONITOR_readPassword($hash, $testPassword);
+    delete($hash->{helper}{READ_PWD}) if(exists($hash->{helper}{READ_PWD}));
+
+    unless(defined($fb_pw))
+    {
+        $hash->{helper}{PWD_NEEDED} = 1;
+        return "no password available to access FritzBox";
+    }
+    
+    Log3 $name, 4, "FB_CALLMONITOR ($name) - identifying available phonebooks";
+
+    my $TR064_control_url      = "/upnp/control/x_contact";
+    my $TR064_service_type     = "urn:dslforum-org:service:X_AVM-DE_OnTel:1";
+    my $TR064_service_command  = "GetPhonebookList"; # TR-064 Support X_AVM-DE_OnTel: GetPhonebookList
+
+    # generate challenge XML
+    my $xml_Challenge;
+    my $init_request = <<EOD;
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" >
+  <s:Header>
+    <h:InitChallenge xmlns:h="http://soap-authentication.org/digest/2001/10/" s:mustUnderstand="1">
+      <UserID>$fb_user</UserID>
+    </h:InitChallenge >
+  </s:Header>
+  <s:Body>
+    <u:SetEnable xmlns:u="urn:dslforum-org:service:X_AVM-DE_OnTel:1">
+    </u:SetEnable>
+  </s:Body>
+</s:Envelope>
+EOD
+   
+    # request SOAP auth challenge
+    my $param;
+    $param->{url}        = "http://$fb_ip:$FB_port$TR064_control_url";
+    $param->{noshutdown} = 1;
+    $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
+    $param->{loglevel}   = 4;
+    $param->{header}     = "SOAPACTION: $TR064_service_type#$TR064_service_command\r\nContent-Type: text/xml; charset=utf-8";
+    $param->{data}       = $init_request;
+    
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting TR-064 authentication challenge:\n$init_request";
+    
+    my ($err, $data)    = HttpUtils_BlockingGet($param);
+
+    if ($err ne "")
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebooks: $err";
+        return "error while requesting phonebooks: $err";
+    }
+
+    if($data eq "" and exists($param->{code}))
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting available phonebooks via TR-064";
+        return  "received no data after requesting available phonebooks via TR-064";
+    }
+    
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 challenge response:\n$data";
+
+    my ($nonce, $realm);
+    
+    if($data =~ /<Nonce>(.+?)<\/Nonce>/i)
+    {
+        $nonce = $1;
+    }
+    
+    if($data =~ /<Realm>(.+?)<\/Realm>/i)
+    {
+        $realm = $1;
+    }
+
+    # generate auth string
+    my $Auth = md5_hex(md5_hex($fb_user . ':' . $realm . ':' . $fb_pw) . ':' . $nonce);
+
+    Log3 $name, 4, "FB_CALLMONITOR ($name) - generated auth string for phonebook request: $Auth";
+    
+    # create "GetPhonebookList" XML request
+    my $do_request = <<EOD;
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Header>
+    <h:ClientAuth xmlns:h="http://soap-authentication.org/digest/2001/10/" s:mustUnderstand="1">
+      <Nonce>$nonce</Nonce>
+      <Auth>$Auth</Auth>
+      <UserID>$fb_user</UserID>
+      <Realm>$realm</Realm>
+    </h:ClientAuth>
+  </s:Header>
+  <s:Body>
+        <u:$TR064_service_command xmlns:u="$TR064_service_type">
+        </u:$TR064_service_command>
+  </s:Body>
+</s:Envelope>
+EOD
+
+    $param->{url}        = "http://$fb_ip:$FB_port$TR064_control_url";
+    $param->{noshutdown} = 1;
+    $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 30);
+    $param->{loglevel}   = 4;
+    $param->{method}     = "POST";
+    $param->{header}     = "SOAPACTION: $TR064_service_type#$TR064_service_command\r\nContent-Type: text/xml; charset=utf-8";
+    $param->{data}       = $do_request;
+
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting available phonebook id's:\n$do_request"; 
+    
+    ($err, $data) = HttpUtils_BlockingGet($param);
+
+    if ($err ne "")
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebook id's: $err";
+        return "error while requesting phonebooks: $err";
+    }
+
+    if($data eq "" and exists($param->{code}))
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting available phonebook id's";
+        return  "received no data after requesting available phonebook id's";
+    }
+    
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - received response:\n$data";
+
+    # if status is still "unauthenticated" => user/password combination is wrong
+    if($data =~ /<Status>Unauthenticated<\/Status>/i)
+    {
+        $hash->{helper}{PWD_NEEDED} = 1;
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to login via TR-064, wrong user/password";
+        return "unable to login via TR-064, wrong user/password" 
+    }
+
+    my @phonebooks;
+
+    # read list response (TR-064 id's: "0,1,2,...")
+    if($data =~ m/<NewPhonebookList>(.+?)<\/NewPhonebookList>/si)
+    {
+        @phonebooks = split(",",$1);
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - found ".scalar @phonebooks." phonebooks";
+    } 
+    else
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - no phonebooks found";
+        return  "no phonebooks could be found";
+    }
+
+    delete($hash->{helper}{PHONEBOOK_NAMES}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
+    delete($hash->{helper}{PHONEBOOK_URL}) if(exists($hash->{helper}{PHONEBOOK_URL}));
+
+    my $phb_id;
+
+    $TR064_service_command = "GetPhonebook"; # TR-064 Support � X_AVM-DE_OnTel: GetPhonebook Urls
+    $param->{header} = "SOAPACTION: $TR064_service_type#$TR064_service_command\r\nContent-Type: text/xml; charset=utf-8";
+
+    # request name and FritzBox phone id for each list item
+    foreach (@phonebooks) 
+    {
+        # request phonebook details for each TR-064 list item
+        my $do_request = <<EOD;
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Header>
+    <h:ClientAuth xmlns:h="http://soap-authentication.org/digest/2001/10/" s:mustUnderstand="1">
+      <Nonce>$nonce</Nonce>
+      <Auth>$Auth</Auth>
+      <UserID>$fb_user</UserID>
+      <Realm>$realm</Realm>
+    </h:ClientAuth>
+  </s:Header>
+  <s:Body>
+    <u:$TR064_service_command xmlns:u="$TR064_service_type">
+      <NewPhonebookID>$_</NewPhonebookID>
+    </u:$TR064_service_command>
+  </s:Body>
+</s:Envelope>
+EOD
+
+        $param->{data} = $do_request;
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - requesting phonebook description for id $_:\n$do_request";
+        ($err, $data)  = HttpUtils_BlockingGet($param);
+
+        if ($err ne "")
+        {
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebook description for id $_: $err";
+            return "error while requesting phonebook description for id $_: $err";
+        }
+
+        if($data eq "" and exists($param->{code}))
+        {
+            Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting phonebook description for id $_";
+            return  "received no data after requesting phonebook description for id $_";
+        }
+
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - received response with phonebook description for id $_:\n$data";
+
+        if($data =~ m/<NewPhonebookName>(.+?)<\/NewPhonebookName>.*?<NewPhonebookURL>.*?pbid=(\d+)\D*?<\/NewPhonebookURL>/si)
+        {
+            $phb_id = $2;
+            $hash->{helper}{PHONEBOOK_NAMES}{$phb_id} = $1;
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - found phonebook: $1 - $2";
+        }
+
+        if($data =~ m/<NewPhonebookURL>(.*?)<\/NewPhonebookURL>/i)
+        {
+            $hash->{helper}{PHONEBOOK_URL}{$phb_id} = $1;
+            $hash->{helper}{PHONEBOOK_URL}{$phb_id} =~ s/&amp;/&/g;
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - found phonebook url for id $phb_id: ".$hash->{helper}{PHONEBOOK_URL}{$phb_id};
+        }
+
+    }
+
+    Log3 $name, 4, "FB_CALLMONITOR ($name) - phonebooks found: ".join(", ", map { $hash->{helper}{PHONEBOOK_NAMES}{$_}." (id: $_)" } sort keys %{$hash->{helper}{PHONEBOOK_NAMES}}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
+
+    delete($hash->{helper}{PWD_NEEDED}) if(exists($hash->{helper}{PWD_NEEDED}));
+
+    return undef;
+}
+
+#####################################
+# loads internal and online phonebooks from extern FritzBox via web interface (http)
+sub FB_CALLMONITOR_readRemotePhonebookViaTR064($$;$)
+{
+    my ($hash, $phonebookId, $testPassword) = @_;
+    my $name = $hash->{NAME};
+
+    my ($fb_ip,undef) = split(/:/, ($hash->{DeviceName}), 2);
+    
+    return "unknown phonebook id: $phonebookId" unless(exists($hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}));
+    return "unknown phonebook url:" unless(exists($hash->{helper}{PHONEBOOK_URL}{$phonebookId}));
+        
+    my $phb_url = $hash->{helper}{PHONEBOOK_URL}{$phonebookId};
+
+    my $param;
+    $param->{url}        = $phb_url;
+    $param->{noshutdown} = 1;
+    $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
+    $param->{loglevel}   = 4;
+                     
+    Log3 $name, 4, "FB_CALLMONITOR ($name) - get export for phonebook: $phonebookId";             
+    
+    my ($err, $phonebook) = HttpUtils_BlockingGet($param);
+    
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - received http response code ".$param->{code} if(exists($param->{code}));
+    
+    if ($err ne "") 
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - got error while requesting phonebook: $err";
+        return "got error while requesting phonebook: $err";
+    }
+
+    if($phonebook eq "" and exists($param->{code}))
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data";
+        return  "received http code ".$param->{code}." without any data";
+    }
+
+    return (undef, $phonebook); 
+}
+
+#####################################
 # identifys the phonebooks defined on the FritzBox via web interface (http)
 sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
 {
@@ -1273,6 +1550,7 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
 
     return undef;
 }
+
 #####################################
 # loads internal and online phonebooks from extern FritzBox via web interface (http)
 sub FB_CALLMONITOR_readRemotePhonebookViaWeb($$;$)
@@ -1351,6 +1629,7 @@ sub FB_CALLMONITOR_readRemotePhonebookViaWeb($$;$)
     return (undef, $phonebook); 
     
 }
+
 #####################################
 # checks and store FritzBox password used for telnet connection
 sub FB_CALLMONITOR_storePassword($$)
@@ -1581,8 +1860,8 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     Possible values: 0 => off , 1 => on (use remote telnet connection to obtain FritzBox phonebook)<br>
     Default Value is 0 (off)<br><br>
     <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
-    Set the method how the phonebook should be requested via network. When set to "web", the phonebook is obtained from the web interface via HTTP. When set to "telnet", it uses a telnet connection to login and retrieve the phonebook (telnet must be activated via dial shortcode #96*7*)<br><br>
-    Possible values: web,telnet<br>
+    Set the method how the phonebook should be requested via network. When set to "web", the phonebook is obtained from the web interface via HTTP. When set to "telnet", it uses a telnet connection to login and retrieve the phonebook (telnet must be activated via dial shortcode #96*7*). When set to "tr064" the phonebook is obtained via TR-064 SOAP request.<br><br>
+    Possible values: web,telnet,tr064<br>
     Default Value is web (retrieve phonebooks via web interface)<br><br>
     <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
     A comma separated list of phonebook id's which should be excluded when retrieving all possible phonebooks via web method (see attribute <i>fritzbox-remote-phonebook-via</i>). All list possible values is provided by <a href="#FB_CALLMONITORget">get command</a> <i>showPhonebookIds</i>. This attribute is not applicable when using telnet method to obtain remote phonebook.<br><br>
@@ -1732,8 +2011,8 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>  
     <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
-    Setzt die Methode mit der das Telefonbuch von der FritzBox abgefragt werden soll. Bei der Methode "web", werden alle verf&uuml;gbaren Telefonb&uuml;cher (lokales sowie alle konfigurierten Online-Telefonb&uuml;cher) &uuml;ber die Web-Oberfl&auml;che eingelesen. Bei der Methode "telnet" wird eine Telnet-Verbindung zur FritzBox aufgebaut um das lokale Telefonbuch abzufragen (keine Online-Telefonb&uuml;cher). Dazu muss die Telnet-Funktion aktiviert sein (Telefon Kurzwahl: #96*7*)<br><br>
-    M&ouml;gliche Werte: web,telnet<br>
+    Setzt die Methode mit der das Telefonbuch von der FritzBox abgefragt werden soll. Bei der Methode "web", werden alle verf&uuml;gbaren Telefonb&uuml;cher (lokales sowie alle konfigurierten Online-Telefonb&uuml;cher) &uuml;ber die Web-Oberfl&auml;che eingelesen. Bei der Methode "telnet" wird eine Telnet-Verbindung zur FritzBox aufgebaut um das lokale Telefonbuch abzufragen (keine Online-Telefonb&uuml;cher). Dazu muss die Telnet-Funktion aktiviert sein (Telefon Kurzwahl: #96*7*). Bei der Methode "tr064" werden alle verf&uuml;gbaren Telefonb&uuml;cher &uuml;ber die TR-064 SOAP Schnittstelle ausgelesen. <br><br>
+    M&ouml;gliche Werte: web,telnet,tr064<br>
     Standardwert ist "web" (Abfrage aller verf&uuml;gbaren Telefonb&uuml;cher &uuml;ber die Web-Oberfl&auml;che)<br><br>
     <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
     Eine komma-separierte Liste von Telefonbuch-ID's welche beim einlesen &uuml;bersprungen werden sollen. Dieses Attribut greift nur beim einlesen der Telefonb&uuml;cher via "web"-Methode (siehe Attribut <i>fritzbox-remote-phonebook-via</i>). Eine Liste aller m&ouml;glichen Werte kann &uuml;ber das <a href="#FB_CALLMONITORget">Get-Kommando</a> <i>showPhonebookIds</i> angezeigt werden.<br><br>
