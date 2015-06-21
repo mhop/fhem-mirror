@@ -728,8 +728,9 @@ readingsGroup_2html($;$)
   $ret .= "<tr><td><table $style id='readingsGroup-$d' groupId=\"$group\" class=\"block wide readingsGroup\">";
   $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
 
+  my $item = 0;
   foreach my $device (@{$devices}) {
-    my $item = 0;
+    $item++;
     my $h = $defs{$device->[0]};
     my $regex = $device->[1];
     if( !$h && $device->[0] =~ m/^<.*>$/ ) {
@@ -764,7 +765,6 @@ readingsGroup_2html($;$)
       if( $regex && $regex =~ m/^<(.*)>$/ ) {
         my $txt = $1;
         my $readings;
-        $item++;
         if( $txt =~ m/^{(.*)}(@[\w\-|.*]+)?$/ ) {
           $txt = "{$1}";
           $readings = $2;
@@ -1163,8 +1163,9 @@ readingsGroup_Notify($$)
       $value = "" if( !defined($value) );
       my $show_state = !AttrVal( $name, "nostate", "0" );
 
+      my $item = 0;
       foreach my $device (@{$devices}) {
-        my $item = 0;
+        $item++;
         my $h = $defs{@{$device}[0]};
         next if( !$h );
         next if( $dev->{NAME} ne $h->{NAME} );
@@ -1198,7 +1199,6 @@ readingsGroup_Notify($$)
           if( $regex && $regex =~ m/^<(.*)>$/ ) {
             my $txt = $1;
             my $readings;
-            $item++;
             if( $txt =~ m/^{(.*)}(@([\w\-|.*]+))?$/ ) {
               $txt = "{$1}";
               $readings = $3;
