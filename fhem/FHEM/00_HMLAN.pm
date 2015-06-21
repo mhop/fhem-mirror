@@ -300,11 +300,11 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
   
   if ($hash->{helper}{q}{loadLast} != $t){
     $hash->{helper}{q}{loadLast} = $t;    
-    my (undef,@a) = split("/",$hash->{msgLoadHistory});
-    @a = ($hash->{msgLoadCurrent},@a);
+    my (undef,@a) = split(": ",$hash->{msgLoadHistory});
+    @a = ($hash->{msgLoadCurrent},split("/",$a[0]));
     
     $hash->{msgLoadHistory} = (60/$HMmlSlice)."min steps: "
-                             .join("/",@a[0...$HMmlSlice-1]);
+                             .join("/",@a[0...($HMmlSlice-1)]);
        # try to release high-load condition with a dummy message
        # one a while
     if (ReadingsVal($name,"cond","") =~ m /(Warning-HighLoad|ERROR-Overload)/){
