@@ -534,7 +534,7 @@ readingsGroup_value2html($$$$$$$$$)
   my $cmd;
   my $devStateIcon;
   if( my $value_icon = $hash->{helper}{valueIcon} ) {
-    if( my $icon = lookup($value_icon,$name,$alias,$n,$value_orig,$room,$group,$cell_row,"") ) {
+    if( my $icon = lookup($value_icon,$name,$alias,$n,$value_formated,$room,$group,$cell_row,"") ) {
       if( $icon =~ m/^[\%\$]devStateIcon$/ ) {
         my %extPage = ();
         my ($allSets, $cmdlist, $txt) = FW_devState($name, $room, \%extPage);
@@ -542,14 +542,14 @@ readingsGroup_value2html($$$$$$$$$)
       } else {
         $devStateIcon = FW_makeImage( $icon, $v, "icon" );
         $cmd = lookup2($hash->{helper}{commands},$name,$n,$icon);
-        $cmd = lookup2($hash->{helper}{commands},$name,$n,$value_orig) if( !$cmd );
+        $cmd = lookup2($hash->{helper}{commands},$name,$n,$value_formated) if( !$cmd );
       }
     }
   }
 
   my $webCmdFn = 0;
   if( !$devStateIcon ) {
-    $cmd = lookup2($hash->{helper}{commands},$name,$n,$value_orig);
+    $cmd = lookup2($hash->{helper}{commands},$name,$n,$value_formated);
 
     if( $cmd && $cmd =~ m/^([\w\/.-]*):(\S*)?(\s\S*)?$/ ) {
       my $set = $1;
@@ -600,14 +600,14 @@ readingsGroup_value2html($$$$$$$$$)
   ($v,$devStateIcon) = readingsGroup_makeLink($v,$devStateIcon,$cmd) if( !$webCmdFn );
 
   if( my $value_prefix = $hash->{helper}{valuePrefix} ) {
-    if( my $value_prefix = lookup2($value_prefix,$name,$n,$value_orig) ) {
+    if( my $value_prefix = lookup2($value_prefix,$name,$n,$value_formated) ) {
       $v = $value_prefix . $v;
       $devStateIcon = $value_prefix . $devStateIcon if( $devStateIcon );
     }
   }
 
   if( my $value_suffix = $hash->{helper}{valueSuffix} ) {
-    if( my $value_suffix = lookup2($value_suffix,$name,$n,$value_orig) ) {
+    if( my $value_suffix = lookup2($value_suffix,$name,$n,$value_formated) ) {
       $v .= $value_suffix;
       $devStateIcon .= $value_suffix if( $devStateIcon );
     }
