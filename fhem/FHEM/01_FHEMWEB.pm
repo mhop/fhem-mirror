@@ -431,9 +431,8 @@ FW_Read($$)
   }
 
   my $cacheable = FW_answerCall($arg);
-  if($cacheable == -1){
-    # Longpoll / inform request;
-    POSIX::exit(0) if($hash->{isChild});
+  if($cacheable == -1) {
+    FW_closeConn($hash);
     return;
   }
 
@@ -468,7 +467,7 @@ FW_Read($$)
     delete($defs{$name});
   }
 
-  POSIX::exit(0) if($hash->{isChild});
+  FW_closeConn($hash);
 }
 
 sub
@@ -525,10 +524,14 @@ FW_answerCall($)
 
     # if we do not have the icon, we convert the device state to the icon name
     if(!$iconPath) {
-      ($icon, undef, undef) = FW_dev2image($icon);
+      my ($img, $link, $isHtml) = FW_dev2image($icon);
       $cacheable = 0;
-      return 0 if(!$icon);
-      $iconPath = FW_iconPath($icon);
+      return 0 if(!$img);
+      $iconPath = FW_iconPath($img);
+      if($iconPath =~ m/\.svg$/i) {
+        FW_pO FW_makeImage($img, $img);
+        return 0;
+      }
     }
     $iconPath =~ m/(.*)\.([^.]*)/;
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
