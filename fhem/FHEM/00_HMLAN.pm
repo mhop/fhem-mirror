@@ -117,8 +117,10 @@ sub HMLAN_Define($$) {#########################################################
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
 
-  $hash->{helper}{q}{loadLast} = 0;
-  $hash->{msgLoadHistory}      = join("/",("-") x $HMmlSlice);
+  $hash->{helper}{q}{loadNo} = 0;
+  $hash->{helper}{q}{loadLast} = 0;    
+  $hash->{msgLoadHistory}      = (60/$HMmlSlice)."min steps: "
+                                .join("/",("-") x $HMmlSlice);
   $hash->{msgLoadCurrent}      = 0;
   
   $defs{$name}{helper}{log}{all} = 0;# selective log support
@@ -298,10 +300,12 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
 
   my $t = int(gettimeofday()/(3600/$HMmlSlice))%$HMmlSlice;
   
-  if ($hash->{helper}{q}{loadLast} != $t){
-    $hash->{helper}{q}{loadLast} = $t;    
+  if ($hash->{helper}{q}{loadNo} != $t){
+    $hash->{helper}{q}{loadNo} = $t;    
     my (undef,@a) = split(": ",$hash->{msgLoadHistory});
-    @a = ($hash->{msgLoadCurrent},split("/",$a[0]));
+    @a = ( ($hash->{msgLoadCurrent} - $hash->{helper}{q}{loadLast})
+          ,split("/",$a[0]));
+    $hash->{helper}{q}{loadLast} = $hash->{msgLoadCurrent};    
     
     $hash->{msgLoadHistory} = (60/$HMmlSlice)."min steps: "
                              .join("/",@a[0...($HMmlSlice-1)]);
