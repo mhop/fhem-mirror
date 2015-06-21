@@ -23,9 +23,9 @@ sub LaCrosse_Initialize($) {
   $hash->{ParseFn}   = "LaCrosse_Parse";
   ###$hash->{AttrFn}    = "LaCrosse_Attr";
   $hash->{AttrList}  = "IODev"
-                       ." ignore:1"
-                       ." doAverage:1"
-                       ." doDewpoint:1"
+                       ." ignore:1,0"
+                       ." doAverage:1,0"
+                       ." doDewpoint:1,0"
                        ." filterThreshold"
                        ." resolution"
                        ." $readingFnAttributes";
@@ -392,39 +392,52 @@ sub LaCrosse_Parse($$) {
 
   if( $type == 0x00) {
     $channel = "" if( $channel == 1 );
-                                         
-    # Handle resolution
-    if(my $resolution = AttrVal( $rname, "resolution", 0 )) {
-      if ($temperature != 0xFFFF) {
-        $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
-      }
-      if ($humidity != 0xFF) {
-        $humidity = int($humidity / $resolution + 0.5) * $resolution;
-      }
-    }
-  
-    # Calculate average
-    if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousT$channel"}) && $temperature != 0xFFFF ) {
-      $temperature = ($rhash->{"previousT$channel"}*3+$temperature)/4;
-    }
-    if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousH$channel"}) && $humidity != 0xFF ) {
-      $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
-    }
+    
+    # The raw values
+    $rhash->{"rawT$channel"} = $temperature;
+    $rhash->{"rawH$channel"} = $humidity;
+    
+    # Correction
+    $temperature += $rhash->{corr1};
+    $humidity += $rhash->{corr2};  
+    
+    my $previousT = $temperature;
+    my $previousH = $humidity;
     
     # Check filterThreshold
-    if( defined($rhash->{"previousT$channel"})
-        && abs($rhash->{"previousH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
-        && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) ) {
-
+    if(!defined($rhash->{"rawT$channel"}) 
+        || (defined($rhash->{"rawT$channel"})
+            && abs($rhash->{"rawH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
+            && abs($rhash->{"rawT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) )){
+      
+      # Calculate average
+      if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousT$channel"}) && $temperature != 0xFFFF ) {
+        $temperature = ($rhash->{"previousT$channel"}*3+$temperature)/4;
+        $previousT = $temperature;
+      }
+      if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousH$channel"}) && $humidity != 0xFF ) {
+        $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
+        $previousH = $humidity;
+      }    
+      
+      # Handle resolution
+      if(my $resolution = AttrVal( $rname, "resolution", 0 )) {
+        if ($temperature != 0xFFFF) {
+          $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
+        }
+        if ($humidity != 0xFF) {
+          $humidity = int($humidity*10 / $resolution + 0.5) * $resolution / 10;
+        }
+      }
+        
       readingsBeginUpdate($rhash);
-
       if ($typeNumber > 0) {
         readingsBulkUpdate($rhash, "error", $error ? "1" : "0");
       }
-
+      
       # Battery state
       readingsBulkUpdate($rhash, "battery$channel", $battery_low?"low":"ok");
-
+      
       # Calculate dewpoint
       my $dewpoint;
       if( AttrVal( $rname, "doDewpoint", 0 ) && $humidity && $humidity <= 99 && $temperature != 0xFFFF ) {
@@ -436,17 +449,17 @@ sub LaCrosse_Parse($$) {
       # Round and write temperature and humidity
       if ($temperature != 0xFFFF) {           
         $temperature = int($temperature*10 + 0.5) / 10;
-        readingsBulkUpdate($rhash, "temperature$channel", $temperature + $rhash->{corr1});
+        readingsBulkUpdate($rhash, "temperature$channel", $temperature);
       }
       if ($humidity && $humidity <= 99) {
         $humidity = int($humidity*10 + 0.5) / 10;
-        readingsBulkUpdate($rhash, "humidity$channel", $humidity + $rhash->{corr2} );
+        readingsBulkUpdate($rhash, "humidity$channel", $humidity);
       }
 
       # STATE
       if( !$channel ) {
-        my $state = "T: ". ($temperature + $rhash->{corr1});
-        $state .= " H: ". ($humidity + $rhash->{corr2}) if( $humidity && $humidity <= 99 );
+        my $state = "T: ". $temperature;
+        $state .= " H: ". ($humidity) if( $humidity && $humidity <= 99 );
         $state .= " D: $dewpoint" if( $dewpoint );
         
         readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
@@ -458,8 +471,8 @@ sub LaCrosse_Parse($$) {
       readingsSingleUpdate($rhash, "battery$channel", $battery_low ? "low" : "ok", 1);
     }
 
-    $rhash->{"previousT$channel"} = $temperature;
-    $rhash->{"previousH$channel"} = $humidity;
+    $rhash->{"previousT$channel"} = int($previousT*10 + 0.5) / 10;
+    $rhash->{"previousH$channel"} = int($previousH*10 + 0.5) / 10;
     
     readingsBeginUpdate($rhash);
     
@@ -533,7 +546,7 @@ sub LaCrosse_Parse($$) {
     <code>define &lt;name&gt; LaCrosse &lt;addr&gt; [corr1...corr2]</code> <br>
     <br>
     addr is a 2 digit hex number to identify the LaCrosse device.<br>
-    corr1..corr2 are up to 2 numerical correction factors, which will be added to the respective value to calibrate the device.<br><br>
+    corr1..corr2 are up to 2 numerical correction factors (corr1 for the temperature and corr2 for the humidity), which will be added to the respective value to calibrate the device.<br><br>
     Note: devices are autocreated only if LaCrossePairForSec is active for the <a href="#JeeLink">JeeLink</a> IODevice device.<br>
   </ul>
   <br>
