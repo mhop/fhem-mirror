@@ -7433,7 +7433,7 @@ sub CUL_HM_UpdtCentralState($){
       $state .= "$ioN:$cnd,";
     }
     else{ # handling CUL
-      my $st = InternalVal($ioN,"STATE","unknown");
+      my $st = ReadingsVal($ioN,"state","unknown");
       $state .= "$ioN:".($st ne "Initialized"?$st:"ok").",";
     }
     if (AttrVal($ioN,"hmId","") ne $defs{$name}{DEF}){
@@ -7442,7 +7442,7 @@ sub CUL_HM_UpdtCentralState($){
     }
   };
   $state = "IOs_ok" if (!$state);
-  $defs{$name}{STATE} = $state;
+  CUL_HM_UpdtReadSingle($defs{$name},"state",$state,1);
 }
 sub CUL_HM_assignIO($){ #check and assign IO
   # assign IO device
