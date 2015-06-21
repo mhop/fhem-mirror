@@ -139,6 +139,8 @@ sub pilight_ctrl_CheckReadingState($)
   my $state     = ReadingsVal($me,"state",undef);
   if (defined($state) && $state ne "opened" && $state ne "disconnected") {
     Log3 $me, 3, "$me(CheckReadingState): Unknown error: unnormal value for reading state";
+    my $l = fhem("list $me",1);
+    Log3 $me, 5, "$me(CheckReadingState): Unknown error: $l";
     setReadingsVal($hash, "state", undef, TimeNow());
     $hash->{STATE} = $hash->{helper}{CON};
     $hash->{STATE} = "opened" if ($hash->{helper}{CON} eq "connected");
