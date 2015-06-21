@@ -48,7 +48,7 @@ my %HMcond = ( 0  =>'ok'
 #                 =>'overload');
 
 my $HMOvLdRcvr = 6*60;# time HMLAN needs to recover from overload
-my $HMmlSlice = 6; # number of messageload slices per hour (10 = 6min)
+my $HMmlSlice = 12; # number of messageload slices per hour (10 = 6min)
 
 sub HMLAN_Initialize($) {
   my ($hash) = @_;
@@ -117,10 +117,10 @@ sub HMLAN_Define($$) {#########################################################
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
 
-  $hash->{helper}{q}{cap}{$_}   = 0 for (0..($HMmlSlice-1));
-  $hash->{helper}{q}{cap}{last} = 0;
-  $hash->{helper}{q}{cap}{sum}  = 0;
-  HMLAN_UpdtMsgCnt("UpdtMsg:".$name);
+  $hash->{helper}{q}{loadLast} = 0;
+  $hash->{msgLoadHistory}      = join("/",("-") x $HMmlSlice);
+  $hash->{msgLoadCurrent}      = 0;
+  
   $defs{$name}{helper}{log}{all} = 0;# selective log support
   $defs{$name}{helper}{log}{sys} = 0;
   my @al = ();
@@ -292,28 +292,19 @@ sub HMLAN_Attr(@) {############################################################
   return;
 }
 
-sub HMLAN_UpdtMsgCnt($) {######################################################
-  # update HMLAN capacity counter
-  # HMLAN will raise high-load after ~610 msgs per hour
-  #                  overload with send-stop after 670 msgs
-  # this count is an approximation and best guess - nevertheless it cannot
-  # read the real values of HMLAN that might persist e.g. after FHEM reboot
-  my($in ) = shift;
-  my(undef,$name) = split(':',$in);
-
-  HMLAN_UpdtMsgLoad($name,0);
-  InternalTimer(gettimeofday()+100, "HMLAN_UpdtMsgCnt", "UpdtMsg:".$name, 0);
-  return;
-}
 sub HMLAN_UpdtMsgLoad($$) {####################################################
-  my($name,$incr) = @_;
+  my($name,$val) = @_;
   my $hash = $defs{$name};
-  my $hCap = $hash->{helper}{q}{cap};
 
   my $t = int(gettimeofday()/(3600/$HMmlSlice))%$HMmlSlice;
-  if ($hCap->{last} != $t){
-    $hCap->{last} = $t;
-    $hCap->{$t} = 0;
+  
+  if ($hash->{helper}{q}{loadLast} != $t){
+    $hash->{helper}{q}{loadLast} = $t;    
+    my (undef,@a) = split("/",$hash->{msgLoadHistory});
+    @a = ($hash->{msgLoadCurrent},@a);
+    
+    $hash->{msgLoadHistory} = (60/$HMmlSlice)."min steps: "
+                             .join("/",@a[0...$HMmlSlice-1]);
        # try to release high-load condition with a dummy message
        # one a while
     if (ReadingsVal($name,"cond","") =~ m /(Warning-HighLoad|ERROR-Overload)/){
@@ -322,17 +313,8 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
                          .AttrVal($name,"hmId","999999")
                          ."000000");
     }
-  }
-  $hCap->{$hCap->{last}}+=$incr  if ($incr);
-  my @tl;
-  $hCap->{sum} = 0;
-  for (($t-$HMmlSlice+1)..$t){# we have 6 slices
-    push @tl,int($hCap->{$_%$HMmlSlice}/450);
-    $hCap->{sum} += $hCap->{$_%$HMmlSlice}; # need to recalc incase a slice was removed
-  }
-  $hash->{msgLoadEst} = "1hour:".int($hCap->{sum}/450)."% "
-                        .(60/$HMmlSlice)."min steps: ".join("/",reverse @tl);
-#testing only           ." :".$hCap->{sum}
+  }  
+  $hash->{msgLoadCurrent} = $val;
   return;
 }
 
@@ -618,10 +600,6 @@ sub HMLAN_Parse($$) {##########################################################
       if    ($stat & 0x03 && $dst eq $myId){HMLAN_qResp($hash,$src,0);}
       elsif ($stat & 0x08 && $src eq $myId){HMLAN_qResp($hash,$dst,0);}
 
-      HMLAN_UpdtMsgLoad($name,((hex($flg)&0x10)?($mLen*2+880)  #burst=17units *2
-                                               :($mLen*2+22))) #ACK=1 unit *2
-          if (($stat & 0x48) == 8);# reject - but not from repeater
-
       $hash->{helper}{ids}{$dst}{flg} = 0 if(defined $hash->{helper}{ids}{$dst});
                                            #got response => unblock sending
       if     ($stat & 0x0A){#08 and 02 dont need to go to CUL, internal ack only
@@ -638,13 +616,6 @@ sub HMLAN_Parse($$) {##########################################################
       }
       elsif ( $stat & 0x40)         {$CULinfo = "AESCom-".($stat & 0x10?"fail":"ok");
       }
-    }
-    else{
-      HMLAN_UpdtMsgLoad($name,(21))
-            if (   $letter eq "E"
-                && (hex($flg)&0x60) == 0x20 # ack but not from repeater
-                && $dst eq $attr{$name}{hmId}
-                && $hash->{helper}{ids}{$src});
     }
 
     my $rssi = hex($mFld[4])-65536;
@@ -723,10 +694,12 @@ sub HMLAN_Parse($$) {##########################################################
 
     $hash->{helper}{q}{keepAliveRec} = 1;
     $hash->{helper}{q}{keepAliveRpt} = 0;
+    my $load = defined $mFld[7] ? hex($mFld[7]):0;
     Log3 $hash, ($hash->{helper}{log}{sys}?0:5)
-              , 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
+              , 'HMLAN_Parse: '.$name.                 " V:$mFld[1]"
                                    ." sNo:$mFld[2] d:$mFld[3]"
-                                   ." O:$mFld[4] t:$mFld[5] IDcnt:$mFld[6] L:".hex($mFld[7]);
+                                   ." O:$mFld[4] t:$mFld[5] IDcnt:$mFld[6] L:$load %";
+    HMLAN_UpdtMsgLoad($name,$load);
     my $myId = AttrVal($name, "hmId", "");
     $myId = $attr{$name}{hmId} = $mFld[4] if (!$myId);
     
@@ -831,7 +804,6 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$dst
                              .' '        .$p;
 
-    HMLAN_UpdtMsgLoad($name,length($p)/2+20 +((hex($flg)&0x10)?440:0));#burst counts
   }
   else{
     Log3 $hash, ($hash->{helper}{log}{sys}?0:5), 'HMLAN_Send:  '.$name.' I:'.$msg;
@@ -858,7 +830,6 @@ sub HMLAN_DoInit($) {##########################################################
   delete $hash->{helper}{ref};
 
   HMLAN_condUpdate($hash,255);
-  $hash->{helper}{q}{cap}{$_}=0 foreach (keys %{$hash->{helper}{q}{cap}});
 
   $hash->{helper}{q}{keepAliveRec} = 1; # ok for first time
   $hash->{helper}{q}{keepAliveRpt} = 0; # ok for first time
@@ -886,7 +857,7 @@ sub HMLAN_assignIDs($){
 
 sub HMLAN_writeAesKey($) {#####################################################
   my ($name) = @_;
-  return if (!$name || !$defs{$name});
+  return if (!$name || !$defs{$name} || $defs{$name}{TYPE} ne "HMLAN");
   my $vccu = InternalVal($name,"owner_CCU",$name);
   $vccu = $name if(!AttrVal($vccu,"hmKey",""));#General if keys are not in vccu
   foreach my $i (1..3){
@@ -895,8 +866,6 @@ sub HMLAN_writeAesKey($) {#####################################################
    }
  }
 
- 
- 
 sub HMLAN_KeepAlive($) {#######################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
@@ -1183,10 +1152,12 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
           if dlyMax is high (several seconds) or bufferMin goes to "0" (normal is 4) the system
           suffers on internal delays. Reasons for the delay might be explored. As a quick solution
           wdTimer could be decreased to trigger HMLAN faster.</li>
-      <li><B>msgLoadEst</B><br>
-          estimation of load of HMLAN. As HMLAN has a max capacity of message transmit per hour
-          FHEM tries to estimate usage - see also
+      <li><B>msgLoadCurrent</B><br>
+          Current transmit load of HMLAN. When capacity reaches 100% HMLAN stops sending and waits for 
+          reduction. See also:
           <a href="#hmMsgLowLimit">hmMsgLowLimit</a><br></li>
+      <li><B>msgLoadHistory</B><br>
+          Historical transmition load of HMLAN.</li>
       <li><B>msgParseDly</B><br>
           calculates the delay of messages in ms from send in HMLAN until processing in FHEM.
           It therefore gives an indication about FHEM system performance.
@@ -1332,11 +1303,12 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
           leidet das System unter den internen Verz&ouml;gerungen. Den Gr&uuml;nden hierf&uuml;r muss 
           nachgegangen werdensystem. Als schnelle L&ouml;sung kann der Wert f&uuml;r wdTimer 
           verkleinert werden, um HMLAN schneller zu triggern.</li>
-      <li><B>msgLoadEst</B><br>
-          Absch&auml;tzung der Last auf dem HMLAN. Da HMLAN nur eine begrenzte Kapzit&auml;t hat, 
-          um je Stunde eine bestimmte Anzahl an Meldungen abzusetzen, versucht FHEM 
-          diese Last vorauszuberechnen - siehe auch 
+      <li><B>msgLoadCurrent</B><br>
+          Aktuelle Funklast des HMLAN. Da HMLAN nur eine begrenzte Kapzit&auml;t je Stunde hat 
+          Telegramme abzusetzen stellt es bei 100% das Senden ein. Siehe auch
           <a href="#hmMsgLowLimit">hmMsgLowLimit</a><br></li>
+      <li><B>msgLoadHistory</B><br>
+          Funklast vergangener Zeitabschnitte.</li>
       <li><B>msgParseDly</B><br>
           Kalkuliert die Verz&ouml;gerungen einer Meldung vom Zeitpunkt des Abschickens im HMLAN 
           bis zu Verarbeitung in FHEM. Deshalb ist dies ein Indikator f&uuml;r die Leistungsf&auml;higkeit 
