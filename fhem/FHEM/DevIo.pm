@@ -182,6 +182,15 @@ DevIo_OpenDev($$$)
   my $po;
   my $baudrate;
   ($dev, $baudrate) = split("@", $dev);
+  my ($databits, $parity, $stopbits) = (8, 'none', 1);
+  
+  if($baudrate =~ m/(\d+)(,([78])(,([NEO])(,([012]))?)?)?/) {
+    $baudrate = $1 if(defined($1));
+    $databits = $3 if(defined($3));
+    $parity = 'odd'  if(defined($5) && $5 eq 'O');
+    $parity = 'even' if(defined($5) && $5 eq 'E');
+    $stopbits = $7 if(defined($7));
+  }
 
   if($hash->{DevIoJustClosed}) {
     delete $hash->{DevIoJustClosed};
@@ -302,12 +311,13 @@ DevIo_OpenDev($$$)
 
     if($baudrate) {
       $po->reset_error();
-      Log3 $name, 3, "Setting $name baudrate to $baudrate"
-        if(!$hash->{DevioText});
+      my $p = ($parity eq "none" ? "N" : ($parity eq "odd" ? "O" : "E"));
+      Log3 $name, 3, "Setting $name serial parameters to ".
+                    "$baudrate,$databits,$p,$stopbits" if(!$hash->{DevioText});
       $po->baudrate($baudrate);
-      $po->databits(8);
-      $po->parity('none');
-      $po->stopbits(1);
+      $po->databits($databits);
+      $po->parity($parity);
+      $po->stopbits($stopbits);
       $po->handshake('none');
 
       # This part is for some Linux kernel versions whih has strange default
