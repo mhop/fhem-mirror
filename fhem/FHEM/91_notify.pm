@@ -299,7 +299,8 @@ notify_fhemwebFn($$$$)
        </ul></li>
 
       <li>Note: the following is deprecated and will be removed in a future
-        release. The described replacement is attempted if none of the above
+        release. It is only active for featurelevel up to 5.6.
+        The described replacement is attempted if none of the above
         variables ($NAME/$EVENT/etc) found in the command.
       <ul>
         <li>The character <code>%</code> will be replaced with the received
@@ -308,17 +309,16 @@ notify_fhemwebFn($$$$)
         the <code>%</code> into double quotes, else the shell may get a syntax
         error.</li>
 
-        <li>The character <code>@</code> will be replaced with the device
+        <li>The character @ will be replaced with the device
         name.</li>
 
         <li>To use % or @ in the text itself, use the double mode (%% or
         @@).</li>
 
-        <li>Instead of <code>%</code> and <code>@</code>, the parameters
-        <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code> (same
-        as <code>@</code>) and <code>%TYPE</code> (contains the device type,
-        e.g.  <code>FHT</code>) can be used. The space separated event "parts"
-        are available as %EVTPART0, %EVTPART1, etc.  A single <code>%</code>
+        <li>Instead of % and @, the parameters %EVENT (same as %), %NAME (same
+        as @) and %TYPE (contains the device type,
+        e.g.  FHT) can be used. The space separated event "parts"
+        are available as %EVTPART0, %EVTPART1, etc.  A single %
         looses its special meaning if any of these parameters appears in the
         definition.</li>
       </ul></li>
@@ -481,32 +481,33 @@ notify_fhemwebFn($$$$)
             Ger&auml;tes, z.B.  <code>myFht</code></li>
        </ul></li>
 
-      <li>Achtung: Folgende Vorgehensweise ist abgek&uuml;ndigt und wird in
-          einem zuk&uuml;nftigen Release von FHEM nicht mehr unterst&uuml;tzt.
-          Wenn keine der oben genannten Variablen ($NAME/$EVENT/usw.) in der
-          Anweisung gefunden wird, werden Platzhalter ersetzt.
+      <li>Achtung: Folgende Vorgehensweise ist abgek&uuml;ndigt, funktioniert
+          bis featurelevel 5.6 und wird in einem zuk&uuml;nftigen Release von
+          FHEM nicht mehr unterst&uuml;tzt.  Wenn keine der oben genannten
+          Variablen ($NAME/$EVENT/usw.) in der Anweisung gefunden wird, werden
+          Platzhalter ersetzt.
 
         <ul>
-          <li>Das Zeichen <code>%</code> wird ersetzt mit dem empfangenen
-          Ereignis (Event), z.B. mit <code>on</code> oder <code>off</code> oder
+          <li>Das Zeichen % wird ersetzt mit dem empfangenen
+          Ereignis (Event), z.B. mit on oder off oder
           <code>measured-temp: 21.7 (Celsius)</code>.
           </li>
 
-          <li>Das Zeichen <code>@</code> wird ersetzt durch den
+          <li>Das Zeichen @ wird ersetzt durch den
           Ger&auml;tenamen.</li>
 
           <li>Um % oder @ im Text selbst benutzen zu k&ouml;nnen, m&uuml;ssen
           sie verdoppelt werden (%% oder @@).</li>
 
-          <li>Anstelle von <code>%</code> und <code>@</code>, k&ouml;nnen die
-          Parameter <code>%EVENT</code> (funktionsgleich mit <code>%</code>),
-          <code>%NAME</code> (funktionsgleich mit <code>@</code>) und
-          <code>%TYPE</code> (enth&auml;lt den Typ des Ger&auml;tes, z.B.
-          <code>FHT</code>) benutzt werden. Die von Leerzeichen unterbrochenen
+          <li>Anstelle von % und @, k&ouml;nnen die
+          Parameter %EVENT (funktionsgleich mit %),
+          %NAME (funktionsgleich mit @) und
+          %TYPE (enth&auml;lt den Typ des Ger&auml;tes, z.B.
+          FHT) benutzt werden. Die von Leerzeichen unterbrochenen
           Teile eines Ereignisses (Event) sind verf&uuml;gbar als %EVTPART0,
-          %EVTPART1, usw.  Ein einzeln stehendes <code>%</code> verliert seine
-          %oben beschriebene Bedeutung, falls auch nur einer dieser Parameter
-          %in der Definition auftaucht.</li>
+          %EVTPART1, usw.  Ein einzeln stehendes % verliert seine
+          oben beschriebene Bedeutung, falls auch nur einer dieser Parameter
+          in der Definition auftaucht.</li>
 
         </ul></li>
 
