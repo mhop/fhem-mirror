@@ -246,6 +246,8 @@ yowsup_Set($$@)
     } elsif( $cmd eq 'send' ) {
       return "MASTER not connected" if( !$phash->{PID} );
 
+      readingsSingleUpdate( $hash, "sent", join( ' ', @args ), 1 );
+
       return yowsup_Write( $phash, "/message send $hash->{NUMBER} '". join( ' ', @args ) ."'" );
 
       return undef;
@@ -266,6 +268,8 @@ yowsup_Set($$@)
       return undef;
 
     } elsif( $cmd eq 'send' ) {
+      readingsSingleUpdate( $hash, "sent", join( ' ', @args ), 1 );
+
       return yowsup_Write( $hash, "/message send ". shift(@args) ." '". join( ' ', @args ) ."'" );
 
       return undef;
