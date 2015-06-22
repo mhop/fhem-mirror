@@ -221,6 +221,7 @@ use vars qw(%value);            # Current values, see commandref.html
 use vars qw($lastDefChange);    # number of last def/attr change
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
+use vars qw($featurelevel); 
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
                 "eventMap userReadings";
@@ -243,6 +244,7 @@ my @cmdList;                    # Remaining commands in a chain. Used by sleep
 $init_done = 0;
 $lastDefChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
+$featurelevel = 5.6;
 
 
 $modules{Global}{ORDER} = -1;
@@ -261,6 +263,7 @@ my @globalAttrList = qw(
   configfile
   dupTimeout
   exclude_from_update
+  featurelevel
   holiday2we
   language:EN,DE
   lastinclude
@@ -561,6 +564,7 @@ if($motd eq "$sc_text\n\n") {
 }
 
 my $osuser = "os $^O, user ".(getlogin || getpwuid($<) || "unknown");
+Log 0, "Featurelevel: $featurelevel";
 Log 0, "Server started with ".int(keys %defs).
         " defined entities (version $attr{global}{version}, $osuser, pid $$)";
 
@@ -921,8 +925,10 @@ AnalyzePerlCommand($$)
 
   # Make life easier for oneliners:
   %value = ();
-  foreach my $d (keys %defs) {
-    $value{$d} = $defs{$d}{STATE}
+  if($featurelevel <= 5.6) {
+    foreach my $d (keys %defs) {
+      $value{$d} = $defs{$d}{STATE}
+    }
   }
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
   my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
@@ -1437,8 +1443,9 @@ CommandSave($$)
       print $fh "attr $d $a $val\n";
     }
   }
+
   print SFH "include $attr{global}{lastinclude}\n"
-        if($attr{global}{lastinclude});
+        if($attr{global}{lastinclude} && $featurelevel <= 5.6);
 
   foreach my $key (keys %fh) {
     next if($fh{$key} eq "1"); ## R/O include files
@@ -1477,6 +1484,24 @@ CommandShutdown($$)
   exit(0);
 }
 
+
+#####################################
+sub
+ReplaceSetMagic(@)       # Forum #38276
+{
+  my $a = join(" ", @_);
+
+  $a =~ s/\[([a-z0-9._]+):([A-z0-9._]+)\]/{
+    my $x = ReadingsVal($1,$2,""); $x eq "" ? "$1:$2" : $x
+  }/egi;
+
+  $a =~ s/{([^}]+)}/{
+    my $x = eval $1; $@ ? $1 : $x
+  }/eg;
+
+  return split(" ", $a);
+}
+
 #####################################
 sub
 DoSet(@)
@@ -1493,6 +1518,8 @@ DoSet(@)
   return CallFn($dev, "SetFn", $hash, @a) if($a[1] && $a[1] eq "?");
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
+  @a = ReplaceSetMagic(@a) if($featurelevel >= 5.7);
+
   $hash->{".triggerUsed"} = 0; 
   my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, @a);
   return $ret if($ret);
@@ -2270,6 +2297,11 @@ GlobalAttr($$$$)
 
 
   }
+  elsif($name eq "featurelevel") {
+    return "$val is not in the form N.N" if($val !~ m/^\d\.\d$/);
+    $featurelevel = $val;
+    
+  }
 
   return undef;
 }
@@ -2822,7 +2854,7 @@ EvalSpecials($%)
     return $exec;
   }
 
-  $exec =~ s/%%/____/g;
+  $exec =~ s/%%/____/g if($featurelevel < 5.7);
 
 
   # perform macro substitution
@@ -2830,14 +2862,19 @@ EvalSpecials($%)
   foreach my $special (keys %specials) {
     $extsyntax+= ($exec =~ s/$special/$specials{$special}/g);
   }
-  if(!$extsyntax) {
-    $exec =~ s/%/$specials{"%EVENT"}/g;
-  }
-  $exec =~ s/____/%/g;
 
-  $exec =~ s/@@/____/g;
-  $exec =~ s/@/$specials{"%NAME"}/g;
-  $exec =~ s/____/@/g;
+  if($featurelevel < 5.7) {
+    if(!$extsyntax) {
+      $exec =~ s/%/$specials{"%EVENT"}/g;
+    }
+    $exec =~ s/____/%/g;
+  }
+
+  if($featurelevel < 5.7) {
+    $exec =~ s/@@/____/g;
+    $exec =~ s/@/$specials{"%NAME"}/g;
+    $exec =~ s/____/@/g;
+  }
 
   return $exec;
 }

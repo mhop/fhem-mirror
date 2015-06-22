@@ -1092,8 +1092,16 @@ The following local attributes are used by a wider range of devices:
   <br>
   Each device has different set parameters, see the corresponding device
   section for details.<br>
-  <br>
-  <br>
+  <br><br>
+  From featurelevel 5.7 on the set command replaces:
+  <ul>
+  <li>[device:reading] with the corresponding reading of device, if both device
+    and reading exists.</li>
+  <li>{perlExpression} with the result of perlExpression, if the expression
+    does not generates an error.</li>
+  </ul>
+  <br><br>
+
   <a name="setExtensions"></a>
   Some modules support a common list of <b>set extensions</b>, and point in
   their documentation to this section. If the module itself implements one of
@@ -1335,14 +1343,23 @@ The following local attributes are used by a wider range of devices:
         </ul>
     </li><br>
 
+    <a name="featurelevel"></a>
+    <li>featurelevel<br>
+        Enable/disable old or new features, based on FHEM version.
+        E.g. the $value hash for notify is only set for featurelevel up to 5.6,
+        as it is deprecated, use the Value() function instead.
+    </li><br>
+
     <a name="lastinclude"></a>
     <li>lastinclude<br>
         If this attribute is set, then the last command of the generated
         configfile (see the <a href="#save">save</a> command) will be<br>
         include &lt;lastinclude-value&gt;<br>
-        This attribute is DEPRECATED, use <a href="#notify">notify</a>, with
-        the INITIALIZED event to execute commands after initialization.
+        This attribute is DEPRECATED and valid for featurelevel up to 5.6, use
+        <a href="#notify">notify</a>, with the INITIALIZED event to execute
+        commands after initialization.
     </li><br>
+
 
     <a name="logfile"></a>
     <li>logfile<br>
