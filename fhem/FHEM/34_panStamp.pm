@@ -147,7 +147,7 @@ panStamp_Set($@)
   my $cmd = shift @a;
   my $arg = join("", @a);
 
-  my $list = "discover raw:noArg";
+  my $list = "discover raw";
   return $list if( $cmd eq '?' );
 
   if($cmd eq "raw") {
