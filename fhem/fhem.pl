@@ -1492,7 +1492,7 @@ ReplaceSetMagic(@)       # Forum #38276
   my $a = join(" ", @_);
 
   $a =~ s/\[([a-z0-9._]+):([A-z0-9._]+)\]/{
-    my $x = ReadingsVal($1,$2,""); $x eq "" ? "$1:$2" : "[$x]"
+    my $x = ReadingsVal($1,$2,""); $x eq "" ? "[$1:$2]" : $x
   }/egi;
 
   $a =~ s/{([^}]+)}/{
