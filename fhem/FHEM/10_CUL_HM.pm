@@ -2935,7 +2935,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         next if (!$pName || !$defs{$pName});
         $pName = CUL_HM_id2Name($dst) if (!$defs{$pName}); #$dst - device-id of $peer
         push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
-        push @evtEt,[$defs{$pName},1,"trigLast:$cName ".(($level ne "-")?":$level":"")];
+        push @evtEt,[$defs{$pName},1,"trigLast:$cName".(($level ne "-")?":$level":"")];
         
         CUL_HM_stateUpdatDly($pName,10) if ($mTp eq "40");#conditional request may not deliver state-req
       }
