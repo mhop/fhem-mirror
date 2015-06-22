@@ -1607,10 +1607,11 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                      ,"HM-CC-RT-DN06"     =>{ press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."}
                      ,"HM-Dis-WM5501"     =>{ displayWM      =>"[long|short|help] <lineX> <textNo1> <color1> <icon1> [<textNo2> <color2> <icon2>] ...[<textNo6> <color6> <icon6>] "}
                      ,"CCU-FHEM00"        =>{ update         =>""
-                                             ,hmPairForSec =>"<sec>"
-                                             ,hmPairSerial =>"<serial>"
-                                             ,defIgnUnknown=>""
-                                             ,assignIO     =>"<IO> [set|unset]..."
+                                             ,hmPairForSec   =>"<sec>"
+                                             ,hmPairSerial   =>"<serial>"
+                                             ,defIgnUnknown  =>""
+                                             ,virtual        =>"<noButtons>"
+                                             ,assignIO       =>"<IO> [set|unset]..."
                                             }
 );
 # clones- - - - - - - - - - - - - - - - -
