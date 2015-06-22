@@ -1496,7 +1496,9 @@ ReplaceSetMagic(@)       # Forum #38276
   }/egi;
 
   $a =~ s/{([^}]+)}/{
-    my $x = eval $1; $@ ? $1 : "{$x}"
+    my $x = eval $1;
+    Log 1, "ReplaceSetMagic: $1 -> $@" if($@);
+    $@ ? "{$1}" : $x
   }/eg;
 
   return split(" ", $a);
