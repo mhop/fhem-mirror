@@ -1189,7 +1189,7 @@ OpenLogfile($)
     $defs{global}{logfile} = $attr{global}{logfile};
 
     open(LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
-    redirectStdinStdErr() if($init_done);
+    redirectStdinStdErr();
     
   }
   LOG->autoflush(1);

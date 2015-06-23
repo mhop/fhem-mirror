@@ -29,7 +29,7 @@ use warnings;
 sub CommandBackup($$);
 sub parseConfig($);
 sub readModpath($$);
-sub createArchiv($);
+sub createArchiv($$);
 
 my @pathname;
 
@@ -96,7 +96,7 @@ CommandBackup($$)
   $ret = readModpath($modpath,$backupdir);
 
   # create archiv
-  $ret = createArchiv($backupdir);
+  $ret = createArchiv($backupdir, $cl);
 
   @pathname = [];
   undef @pathname;
@@ -159,9 +159,9 @@ readModpath($$)
 }
 
 sub
-createArchiv($)
+createArchiv($$)
 {
-  my $backupdir = shift;
+  my ($backupdir,$cl) = @_;
   my $backupcmd = (!defined($attr{global}{backupcmd}) ? undef : $attr{global}{backupcmd});
   my $symlink = (!defined($attr{global}{backupsymlink}) ? "no" : $attr{global}{backupsymlink});
   my $tarOpts;
@@ -188,6 +188,10 @@ createArchiv($)
 
   }
   Log 2, "Backup with command: $cmd";
+  if($cl && ref($cl) eq "HASH" && $cl->{TYPE} && $cl->{TYPE} eq "FHEMWEB") {
+    system("($cmd; echo Backup done) 2>&1 &");
+    return "Started the backup in the background, watch the log for details";
+  }
   $ret = `($cmd) 2>&1`;
 
   if($ret) {
