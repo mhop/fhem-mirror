@@ -12,7 +12,7 @@ dummy_Initialize($)
 
   $hash->{SetFn}     = "dummy_Set";
   $hash->{DefFn}     = "dummy_Define";
-  $hash->{AttrList}  = "setList ". $readingFnAttributes;
+  $hash->{AttrList}  = "readingList setList ". $readingFnAttributes;
 }
 
 ###################################
@@ -25,6 +25,13 @@ dummy_Set($@)
   return "no set value specified" if(int(@a) < 1);
   my $setList = AttrVal($name, "setList", " ");
   return "Unknown argument ?, choose one of $setList" if($a[0] eq "?");
+
+  my @rl = split(" ", AttrVal($name, "readingList", ""));
+  if(@rl && grep /\b$a[0]\b/, @rl) {
+    my $v = shift @a;
+    readingsSingleUpdate($hash, $v, join(" ",@a), 1);
+    return;
+  }
 
   my $v = join(" ", @a);
   Log3 $name, 4, "dummy set $name $v";
@@ -84,11 +91,15 @@ dummy_Define($$)
   <a name="dummyattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a name="readingList">readingList</a><br>
+      Space separated list of readings, which will be set, if the first
+      argument of the set command matches one of them.</li>
+
     <li><a name="setList">setList</a><br>
-        Space separated list of commands, which will be returned upon "set name ?",
-        so the FHEMWEB frontend can construct a dropdown and offer on/off
-        switches. Example: attr dummyName setList on off
-        </li>
+      Space separated list of commands, which will be returned upon "set name
+      ?", so the FHEMWEB frontend can construct a dropdown and offer on/off
+      switches. Example: attr dummyName setList on off </li>
+
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -135,13 +146,15 @@ dummy_Define($$)
   <a name="dummyattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="setList">setList</a><br>
-        Liste mit Werten durch Leerzeichen getrennt. Diese Liste wird mit "set
-        name ?" ausgegeben.  Damit kann das FHEMWEB-Frontend Auswahl-Men&uuml;s
-        oder Schalter erzeugen.<br>
-        Beispiel: attr dummyName setList on off
+    <li><a name="readingList">readingList</a><br>
+      Leerzeichen getrennte Liste mit Readings, die mit "set" gesetzt werden
+      k&ouml;nnen.</li>
 
-        </li>
+    <li><a name="setList">setList</a><br>
+      Liste mit Werten durch Leerzeichen getrennt. Diese Liste wird mit "set
+      name ?" ausgegeben.  Damit kann das FHEMWEB-Frontend Auswahl-Men&uuml;s
+      oder Schalter erzeugen.<br> Beispiel: attr dummyName setList on off </li>
+
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
