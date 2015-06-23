@@ -163,6 +163,28 @@ FHZ_Ready($)
 
 #####################################
 sub
+CommandChain($$)
+{
+  my ($retry, $list) = @_;
+  my $ov = $attr{global}{verbose};
+  my $oid = $init_done;
+
+  $init_done = 0;
+  $attr{global}{verbose} = 1;
+  foreach my $cmd (@{$list}) {
+    for(my $n = 0; $n < $retry; $n++) {
+      Log 1, sprintf("Trying again $cmd (%d out of %d)", $n+1,$retry) if($n>0);
+      my $ret = AnalyzeCommand(undef, $cmd);
+      last if(!defined($ret) || $ret !~ m/Timeout/);
+    }
+  }
+  $attr{global}{verbose} = $ov;
+  $init_done = $oid;
+}
+
+
+#####################################
+sub
 FHZ_Set($@)
 {
   my ($hash, @a) = @_;
