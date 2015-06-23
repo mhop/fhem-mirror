@@ -203,14 +203,12 @@ sub MilightBridge_State(@)
   
   # Do a ping check to see if bridge is reachable
   # check via ping
-  my $pingstatus = "ok";
+  my $pingstatus = "unreachable";
   my $p = Net::Ping->new('udp');
-  if( $p->ping($hash->{HOST}, 2)) {
-      $pingstatus = "ok";
-  } else {
-      $pingstatus = "unreachable";
-  }
+  my $alive = $p->ping($hash->{HOST}, 2);
   $p->close();
+  $pingstatus = "ok" if $alive;
+
   # And update state
   readingsSingleUpdate($hash, "state", $pingstatus, 1);
   

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 30_MilightBridge: Minor change to ping code to try and resolve 
+                            crash when hostname not in dns
   - bugfix: pilight_ctrl: reset - clear send queue
   - feature: pilight_ctrl: add attribute SendTimeout for aborting sending commands
   - feature: FB_CALLMONITOR: add TR-064 support for remote phonebook reading
