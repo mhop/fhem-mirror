@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: pilight_ctrl: reset - clear send queue
+  - feature: pilight_ctrl: add attribute SendTimeout for aborting sending commands
   - feature: FB_CALLMONITOR: add TR-064 support for remote phonebook reading
              via official AVM API (by JoWiemann) 
   - feature: 10_pilight_ctrl.pm: added disconnect

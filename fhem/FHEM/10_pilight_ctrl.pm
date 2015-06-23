@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.07 2015-06-23 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.08 2015-06-23 Risiko $
 #
 # Usage
 # 
@@ -31,6 +31,8 @@
 # V 1.05 2015-06-07 - FIX:  Reset 
 # V 1.06 2015-06-20 - NEW:  set <ctrl> disconnect, checking reading state
 # V 1.07 2015-06-23 - FIX:  reading state always contains a valid value, checking reading state removed
+# V 1.08 2015-06-23 - FIX:  clear send queue by reset
+# V 1.08 2015-06-23 - NEW:  attribute SendTimeout for abort sending command non blocking
 ############################################## 
 package main;
 
@@ -76,7 +78,7 @@ sub pilight_ctrl_Initialize($)
   $hash->{SetFn}   = "pilight_ctrl_Set";
   $hash->{NotifyFn}= "pilight_ctrl_Notify";
   $hash->{StateFn} = "pilight_ctrl_State";
-  $hash->{AttrList}= "ignoreProtocol brands ContactAsSwitch ".$readingFnAttributes;
+  $hash->{AttrList}= "ignoreProtocol brands ContactAsSwitch SendTimeout ".$readingFnAttributes;
   
   $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:";
   #$hash->{MatchList} = \%matchList; #only for autocreate
@@ -176,6 +178,8 @@ sub pilight_ctrl_Close($)
     BlockingKill($hash->{helper}{RUNNING_PID});
     delete($hash->{helper}{RUNNING_PID}); 
   }
+   
+  splice($hash->{helper}->{sendQueue});
   
   RemoveInternalTimer($hash);
   Log3 $me, 5, "$me(Close): close DevIo";
@@ -448,7 +452,7 @@ sub pilight_ctrl_Send($)
     PeerHost => $remote_ip,
     PeerPort => $remote_port,
     Proto => 'tcp',
-  ); 
+  );
   
   if (!$socket) {
     Log3 $me, 2, "$me(Send): ERROR. Can't open socket to pilight-daemon $remote_ip:$remote_port";
@@ -616,7 +620,7 @@ sub pilight_ctrl_SendNonBlocking($)
     my $blockingFn = "pilight_ctrl_Send";
     my $arg        = $me."|".$hash->{DeviceName}."|".$data;
     my $finishFn   = "pilight_ctrl_SendDone";
-    my $timeout    = 4;
+    my $timeout    = AttrVal($me, "SendTimeout",1);
     my $abortFn    = "pilight_ctrl_SendAbort";
   
     $hash->{helper}{RUNNING_PID} = BlockingCall($blockingFn, $arg, $finishFn, $timeout, $abortFn, $hash);
@@ -625,6 +629,7 @@ sub pilight_ctrl_SendNonBlocking($)
     Log3 $me, 5, "$me(Write): Blocking Call running - will try it later";     
   }
   
+  $queueSize = @{$hash->{helper}->{sendQueue}};
   InternalTimer(gettimeofday()+0.5,"pilight_ctrl_SendNonBlocking", $hash, 0) if ($queueSize > 0);
 }
 
@@ -946,6 +951,9 @@ sub pilight_ctrl_SimpleWrite(@)
         Comma separated list of ids which correspond to a contact but will be interpreted as switch. <br>
         In this case opened will be interpreted as on and closed as off.<br>
         Example: <code>ContactAsSwitch 12345</code> 
+    </li>
+    <li><a name="SendTimeout">SendTimeout</a><br>
+        Timeout [s] for aborting sending commands (non blocking) - default 1s
     </li>
   </ul>
   <br>
