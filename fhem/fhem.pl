@@ -49,7 +49,6 @@ sub AssignIoPort($;$);
 sub AttrVal($$$);
 sub CallFn(@);
 sub CheckDuplicate($$@);
-sub CommandChain($$);
 sub Debug($);
 sub DoSet(@);
 sub Dispatch($$$);
@@ -1495,10 +1494,10 @@ ReplaceSetMagic(@)       # Forum #38276
     my $x = ReadingsVal($1,$2,""); $x eq "" ? "[$1:$2]" : $x
   }/egi;
 
-  $a =~ s/{([^}]+)}/{
+  $a =~ s/({[^}]+})/{
     my $x = eval $1;
     Log 1, "ReplaceSetMagic: $1 -> $@" if($@);
-    $@ ? "{$1}" : $x
+    ($@ || ref($x) eq "HASH") ? $1 : $x
   }/eg;
 
   return split(" ", $a);
@@ -2782,27 +2781,6 @@ FmtTime($)
 
 #####################################
 sub
-CommandChain($$)
-{
-  my ($retry, $list) = @_;
-  my $ov = $attr{global}{verbose};
-  my $oid = $init_done;
-
-  $init_done = 0;       # Rudi: ???
-  $attr{global}{verbose} = 1; # ???
-  foreach my $cmd (@{$list}) {
-    for(my $n = 0; $n < $retry; $n++) {
-      Log 1, sprintf("Trying again $cmd (%d out of %d)", $n+1,$retry) if($n>0);
-      my $ret = AnalyzeCommand(undef, $cmd);
-      last if(!defined($ret) || $ret !~ m/Timeout/);
-    }
-  }
-  $attr{global}{verbose} = $ov;
-  $init_done = $oid;
-}
-
-#####################################
-sub
 ResolveDateWildcards($@)
 {
   use POSIX qw(strftime);
@@ -2856,7 +2834,7 @@ EvalSpecials($%)
     return $exec;
   }
 
-  $exec =~ s/%%/____/g if($featurelevel < 5.7);
+  $exec =~ s/%%/____/g if($featurelevel <= 5.6);
 
 
   # perform macro substitution
@@ -2865,14 +2843,14 @@ EvalSpecials($%)
     $extsyntax+= ($exec =~ s/$special/$specials{$special}/g);
   }
 
-  if($featurelevel < 5.7) {
+  if($featurelevel <= 5.6) {
     if(!$extsyntax) {
       $exec =~ s/%/$specials{"%EVENT"}/g;
     }
     $exec =~ s/____/%/g;
   }
 
-  if($featurelevel < 5.7) {
+  if($featurelevel <= 5.6) {
     $exec =~ s/@@/____/g;
     $exec =~ s/@/$specials{"%NAME"}/g;
     $exec =~ s/____/@/g;
