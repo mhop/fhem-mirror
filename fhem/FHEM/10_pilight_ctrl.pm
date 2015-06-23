@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.06 2015-06-20 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.07 2015-06-23 Risiko $
 #
 # Usage
 # 
@@ -30,6 +30,7 @@
 # V 1.04 2015-05-30 - FIX:  StateFn  
 # V 1.05 2015-06-07 - FIX:  Reset 
 # V 1.06 2015-06-20 - NEW:  set <ctrl> disconnect, checking reading state
+# V 1.07 2015-06-23 - FIX:  reading state always contains a valid value, checking reading state removed
 ############################################## 
 package main;
 
@@ -63,10 +64,10 @@ my @unitList = ("unit","unitcode","programcode");
 sub pilight_ctrl_Initialize($)
 {
   my ($hash) = @_;
-
+  
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
   require "$attr{global}{modpath}/FHEM/Blocking.pm";
-
+  
   $hash->{ReadFn}  = "pilight_ctrl_Read";
   $hash->{WriteFn} = "pilight_ctrl_Write";
   $hash->{ReadyFn} = "pilight_ctrl_Ready";
@@ -119,14 +120,33 @@ sub pilight_ctrl_Define($$)
   return pilight_ctrl_TryConnect($hash);
 }
 
+sub pilight_ctrl_setStates($$)
+{
+  my ($hash, $val) = @_;
+  $hash->{STATE} = $val;
+  $val = "disconnected" if ($val eq "closed");
+  setReadingsVal($hash, "state", $val, TimeNow());
+}
+
 #####################################
 sub pilight_ctrl_State($$$$)
 {
   my ($hash, $time, $name, $val) = @_;
   my $me = $hash->{NAME};  
-  # gespeicherten Readings löschen
-  if ($name eq "state" || $name eq "rcv_raw") {
-      setReadingsVal($hash, $name, undef, TimeNow());
+  
+  if ($name eq "STATE" && $val eq "closed") {
+    Log3 $me, 3, "$me(State): abort connecting because of saved STATE";
+    pilight_ctrl_Close($hash);
+    return undef;
+  }
+  
+  # gespeicherten Readings nicht wieder herstellen
+  if ($name eq "state" && $hash->{STATE}) {
+      setReadingsVal($hash, $name, "disconnected", TimeNow());
+  }
+  
+  if ($name eq "rcv_raw") {
+      setReadingsVal($hash, $name, "empty", TimeNow());
   }
   return undef;
 }
@@ -139,9 +159,7 @@ sub pilight_ctrl_CheckReadingState($)
   my $state     = ReadingsVal($me,"state",undef);
   if (defined($state) && $state ne "opened" && $state ne "disconnected") {
     Log3 $me, 3, "$me(CheckReadingState): Unknown error: unnormal value for reading state";
-    my $l = fhem("list $me",1);
-    Log3 $me, 5, "$me(CheckReadingState): Unknown error: $l";
-    setReadingsVal($hash, "state", undef, TimeNow());
+   
     $hash->{STATE} = $hash->{helper}{CON};
     $hash->{STATE} = "opened" if ($hash->{helper}{CON} eq "connected");
   }
@@ -162,8 +180,9 @@ sub pilight_ctrl_Close($)
   RemoveInternalTimer($hash);
   Log3 $me, 5, "$me(Close): close DevIo";
   DevIo_CloseDev($hash);
-  $hash->{STATE} = "closed";
-  $hash->{helper}{CON} = "closed"; 
+  pilight_ctrl_setStates($hash,"closed");
+  $hash->{helper}{CON} = "closed";
+  delete $hash->{DevIoJustClosed}; 
 }
 
 #####################################
@@ -191,13 +210,20 @@ sub pilight_ctrl_TryConnect($)
   my $hash = shift;
   my $me = $hash->{NAME};
   
+  Log3 $me, 5, "$me(TryConnect): $hash->{STATE}";
+  
   $hash->{helper}{CHECK} = 0;
     
   RemoveInternalTimer($hash); 
   
-  delete $hash->{NEXT_OPEN};  
+  delete $hash->{NEXT_OPEN}; 
+  delete $hash->{DevIoJustClosed};
+  
   my $ret = DevIo_OpenDev($hash, 0, "pilight_ctrl_DoInit");
   
+  #DevIO set state to opened
+  setReadingsVal($hash, "state", "disconnected", TimeNow());  
+    
   delete $hash->{NEXT_OPEN};
   $hash->{helper}{NEXT_TRY} = time()+$hash->{RETRY_INTERVAL};
   
@@ -217,8 +243,6 @@ sub pilight_ctrl_Reset($)
 sub pilight_ctrl_Set($@)
 {
   my ($hash, @a) = @_;
-  
-  pilight_ctrl_CheckReadingState($hash);
 
   return "set $hash->{NAME} needs at least one parameter" if(@a < 2);
 
@@ -236,8 +260,6 @@ sub pilight_ctrl_Set($@)
     pilight_ctrl_Close($hash);
     return undef;
   }
-  
-  pilight_ctrl_CheckReadingState($hash);
 
   return "Unknown argument $cmd, choose one of ". join(" ", sort keys %sets); 
 }
@@ -248,20 +270,19 @@ sub pilight_ctrl_Check($)
   my $hash = shift;
   my $me = $hash->{NAME};
   
-  pilight_ctrl_CheckReadingState($hash);
-  
   RemoveInternalTimer($hash); 
   
   $hash->{helper}{CHECK} = 0 if (!isdigit($hash->{helper}{CHECK}));
   $hash->{helper}{CHECK} +=1;
-  Log3 $me, 5, "$me(Check): $hash->{helper}{CON}";
+  Log3 $me, 5, "$me(Check): $hash->{STATE}";
   
-  if($hash->{STATE} eq "disconnected" && !defined($hash->{BASE})) {
+  if($hash->{STATE} eq "disconnected") {
     Log3 $me, 2, "$me(Check): Could not connect to pilight-daemon $hash->{DeviceName}";
     $hash->{helper}{CON} = "disconnected";
+    pilight_ctrl_setStates($hash,"disconnected");
   }
   
-  return if ($hash->{helper}{CON} eq "disconnected");
+  return if ($hash->{helper}{CON} eq "disconnected" || $hash->{helper}{CON} eq "closed");
   
   if ($hash->{helper}{CON} eq "define") { 
     Log3 $me, 2, "$me(Check): connection to $hash->{DeviceName} failed";
@@ -278,7 +299,7 @@ sub pilight_ctrl_Check($)
       DevIo_Disconnected($hash);
       $hash->{helper}{CHECK} = 0;
       $hash->{helper}{CON} = "disconnected";
-      $hash->{STATE} = "disconnected";
+      pilight_ctrl_setStates($hash,"disconnected");
       $hash->{helper}{NEXT_TRY} = time()+$hash->{RETRY_INTERVAL}; 
       return;
     }
@@ -287,6 +308,7 @@ sub pilight_ctrl_Check($)
   if ($hash->{helper}{CON} eq "identify-failed" || $hash->{helper}{CHECK} > 20) {
     delete $hash->{helper}{CHECK};
     $hash->{helper}{CON} = "disconnected";
+    pilight_ctrl_setStates($hash,"disconnected");
     Log3 $me, 2, "$me(Check): identification to pilight-daemon $hash->{DeviceName} failed";
     $hash->{helper}{NEXT_TRY} = time()+$hash->{RETRY_INTERVAL};
     return;
@@ -296,6 +318,7 @@ sub pilight_ctrl_Check($)
     Log3 $me, 2, "$me(Parse): connection to pilight-daemon $hash->{DeviceName} rejected";
     delete $hash->{helper}{CHECK};
     $hash->{helper}{CON} = "disconnected";
+    pilight_ctrl_setStates($hash,"disconnected");
     $hash->{helper}{NEXT_TRY} = time()+$hash->{RETRY_INTERVAL};
     return;
   }
@@ -303,6 +326,7 @@ sub pilight_ctrl_Check($)
   if ($hash->{helper}{CON} eq "connected") {
     delete $hash->{helper}{CHECK};
     delete $hash->{helper}{NEXT_TRY};
+    pilight_ctrl_setStates($hash,"connected");
     return;
   }
   
@@ -321,6 +345,8 @@ sub pilight_ctrl_DoInit($)
   my $msg;
   my $api;
 
+  Log3 $me, 5, "$me(DoInit): $hash->{STATE}";
+  
   $hash->{helper}{CON} = "identify";
 
   if ($hash->{API} eq "6.0") {
@@ -338,8 +364,6 @@ sub pilight_ctrl_Write($@)
 {
   my ($hash,$rmsg) = @_;
   my $me = $hash->{NAME};
-  
-  pilight_ctrl_CheckReadingState($hash);
   
   if ($hash->{helper}{CON} eq "closed") {
     return;
@@ -409,8 +433,6 @@ sub pilight_ctrl_Write($@)
   
   push @{$hash->{helper}->{sendQueue}}, $msg;
   pilight_ctrl_SendNonBlocking($hash);
-  
-  pilight_ctrl_CheckReadingState($hash);
 }
 
 #####################################
@@ -524,9 +546,7 @@ sub pilight_ctrl_Notify($$)
   my ($own, $dev) = @_;
   my $me = $own->{NAME}; # own name / hash
   my $devName = $dev->{NAME}; # Device that created the events
-  
-  pilight_ctrl_CheckReadingState($own);
-  
+
   return undef if ($devName ne "global");
   
   my $max = int(@{$dev->{CHANGED}}); # number of events / changes
@@ -562,8 +582,6 @@ sub pilight_ctrl_SendDone($)
   
   Log3 $me, 4, "$me(SendDone): message successfully send" if ($ok);
   Log3 $me, 2, "$me(SendDone): sending message failed" if (!$ok);
-  
-  pilight_ctrl_CheckReadingState($hash);
   
   delete($hash->{helper}{RUNNING_PID});
 }
@@ -830,15 +848,15 @@ sub pilight_ctrl_Parse($$)
 sub pilight_ctrl_Ready($)
 {
   my ($hash) = @_;
-  my $me = $hash->{NAME};  
+  my $me = $hash->{NAME};
   
-  if($hash->{STATE} eq "disconnected" && !defined($hash->{BASE}))
+  if($hash->{STATE} eq "disconnected")
   {
     return if(defined($hash->{helper}{NEXT_TRY}) && $hash->{helper}{NEXT_TRY} && time() < $hash->{helper}{NEXT_TRY});
     return pilight_ctrl_TryConnect($hash);
   }
   
-  pilight_ctrl_CheckReadingState($hash);
+  
 }
 
 #####################################
