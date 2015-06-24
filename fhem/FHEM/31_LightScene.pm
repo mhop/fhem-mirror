@@ -789,7 +789,6 @@ LightScene_Attr($@)
 
   if( $attrName eq "followDevices" ) {
     my $hash = $defs{$name};
-    $attrVal = 1 if($attrVal);
 
     if( $cmd eq "set" ) {
       $hash->{followDevices} = $attrVal;
