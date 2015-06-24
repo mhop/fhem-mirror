@@ -47,7 +47,6 @@ my %HMcond = ( 0  =>'ok'
 #                 =>'disconnected'
 #                 =>'overload');
 
-my $HMOvLdRcvr = 6*60;# time HMLAN needs to recover from overload
 my $HMmlSlice = 12; # number of messageload slices per hour (10 = 6min)
 
 sub HMLAN_Initialize($) {
@@ -117,6 +116,7 @@ sub HMLAN_Define($$) {#########################################################
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
 
+  $hash->{helper}{q}{scnt} = 0;
   $hash->{helper}{q}{loadNo} = 0;
   $hash->{helper}{q}{loadLast} = 0;    
   $hash->{msgLoadHistory}      = (60/$HMmlSlice)."min steps: "
@@ -808,6 +808,7 @@ sub HMLAN_SimpleWrite(@) {#####################################################
                              .' '        .$dst
                              .' '        .$p;
 
+    $hash->{helper}{q}{scnt}++;  
   }
   else{
     Log3 $hash, ($hash->{helper}{log}{sys}?0:5), 'HMLAN_Send:  '.$name.' I:'.$msg;
@@ -815,6 +816,10 @@ sub HMLAN_SimpleWrite(@) {#####################################################
 
   $msg .= "\r\n" unless($nonl);
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
+  if ($hash->{helper}{q}{scnt} == 10){
+    $hash->{helper}{q}{scnt} = 0;
+    HMLAN_KeepAlive("x:$name") ;
+  }
 }
 
 sub HMLAN_DoInit($) {##########################################################
