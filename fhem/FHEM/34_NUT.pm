@@ -3,6 +3,8 @@
 #
 # Abfrage einer UPS über die Network UPS Tools (www.networkupstools.org)
 #
+# 14.06.2015
+#
 
 # DEFINE bla NUT <upsname> [<host>[:<port>]]
 # Readings:
@@ -134,6 +136,8 @@ sub NUT_Ready($) {
 sub NUT_DevInit($) {
   my ($hash) = @_;
 
+  $hash->{pollValState} = 0;
+  delete $hash->{WaitForAnswer};
   NUT_ListVar($hash);
 
   return undef;
@@ -160,15 +164,27 @@ sub NUT_ListVar($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  if ($attr{$name}{disable} == 0) {
-    # TODO
-    # - Mechanismus, der verhindert, dass lauter Befehle abgesendet werden, während er noch auf Antworten wartet
+  if ($hash->{STATE} eq 'disconnected') {
+    # Verbindung scheint nicht zu bestehen
+    # Alles abbrechen, ich verlasse mich auf DevIo_OpenDev, dass es alles wieder anwirft, sobald die Verbindung wieder steht
+    $hash->{pollValState} = 0;
+    RemoveInternalTimer("pollTimer:".$name);
+    DevIo_OpenDev($hash, 1, "NUT_DevInit");
+    return;
+  }
+
+  if (not defined $attr{$name}{disable} or $attr{$name}{disable} == 0) {
 
     if (defined $hash->{WaitForAnswer}) {
       # Keine Antwort auf die letzte Frage -> NUT nicht mehr erreichbar!
       Log3 $name, 3, "NUT antwortet nicht";
       DevIo_Disconnected($hash);
-      DevIo_OpenDev($hash, 0, undef);
+      delete $hash->{DevIoJustClosed};
+      $hash->{pollValState} = 0;
+      delete $hash->{WaitForAnswer};
+      RemoveInternalTimer("pollTimer:".$name);
+      DevIo_OpenDev($hash, 1, "NUT_DevInit");
+      return;
     }
 
     my $ups = $hash->{UpsName};
