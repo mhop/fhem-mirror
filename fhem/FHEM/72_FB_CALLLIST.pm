@@ -45,6 +45,7 @@ FB_CALLLIST_Initialize($)
     $hash->{AttrList}  =  "number-of-calls:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
                           "internal-number-filter ".
                           "connection-mapping ".
+                          "create-readings:0,1 ".
                           "visible-columns:sortable-strict,row,state,timestamp,name,number,internal,connection,duration ".
                           "show-icons:0,1 ".
                           "list-type:all,incoming,outgoing,missed-calls,completed,active " .
@@ -52,7 +53,9 @@ FB_CALLLIST_Initialize($)
                           "list-order:ascending,descending ".
                           "language:de,en ".
                           "disable:0,1 ".
-                          "disabledForIntervals";
+                          "disabledForIntervals ".
+                          "do_not_notify:0,1 ".
+                          $readingFnAttributes;
 
     $hash->{FW_detailFn}  = "FB_CALLLIST_makeTable";
     $hash->{FW_summaryFn}  = "FB_CALLLIST_makeTable";
@@ -90,7 +93,7 @@ sub FB_CALLLIST_Define($$)
 	$hash->{FB} = $a[2];
     $hash->{NOTIFYDEV} = $a[2];
 	$hash->{STATE} = 'Initialized';
-    
+    $hash->{helper}{DEFAULT_COLUMN_ORDER} = "row,state,timestamp,name,number,internal,connection,duration";
     FB_CALLLIST_loadList($hash);
     
 	return undef;
@@ -403,6 +406,8 @@ sub FB_CALLLIST_cleanupList($)
             Log3 $name, 5, "FB_CALLLIST ($name) - deleting old call $index";
             delete($hash->{helper}{DATA}{$index}) if(exists($hash->{helper}{DATA}{$index}));
         }
+        
+        
     }
     else
     {
@@ -412,15 +417,16 @@ sub FB_CALLLIST_cleanupList($)
 
 #####################################
 #  returns the call state of a specific call as icon or text
-sub FB_CALLLIST_returnCallState($$)
+sub FB_CALLLIST_returnCallState($$;$)
 {
-    my ($hash, $index) = @_;
+    my ($hash, $index, $icons) = @_;
     
     return undef unless(exists($hash->{helper}{DATA}{$index}));
     
     my $data = \%{$hash->{helper}{DATA}{$index}};
-    my $icons = AttrVal($hash->{NAME}, "show-icons", 1);
     my $state;
+    
+    $icons = AttrVal($hash->{NAME}, "show-icons", 1) unless(defined($icons));
     
     if($data->{running_call})
     {
@@ -493,7 +499,9 @@ sub FB_CALLLIST_list2html($;$)
     
     my $name = $hash->{NAME};
     my $alias = AttrVal($hash->{NAME}, "alias", $hash->{NAME});
- 
+    
+    my $create_readings = AttrVal($hash->{NAME}, "create-readings",0);
+    
     my $ret = "";
     my $td_style = "style=\"padding-left:6px;padding-right:6px;\"";
     my @json_output = ();
@@ -526,6 +534,7 @@ sub FB_CALLLIST_list2html($;$)
         {
             @list = grep { !$hash->{helper}{DATA}{$_}{running_call} } @list;
         }
+
         
         foreach my $index (@list)
         {
@@ -540,6 +549,7 @@ sub FB_CALLLIST_list2html($;$)
             my $duration = FB_CALLLIST_formatDuration($hash, $index);
             
             $line = { 
+                        index => $index,
                         line => $count,
                         row => $count,
                         state => $state,
@@ -550,12 +560,15 @@ sub FB_CALLLIST_list2html($;$)
                         connection => $connection,
                         duration => $duration
                     };
+
             
             push @json_output,  FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
-            
+            FB_CALLLIST_updateReadings($hash, $line) if($to_json and $create_readings);
             $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, "number=\"$count\" class=\"fbcalllist ".($count % 2 == 1 ? "odd" : "even")."\"", "class=\"fbcalllist\" $td_style");
             $count++;
         }
+        
+
     }
     else
     {
@@ -570,7 +583,7 @@ sub FB_CALLLIST_list2html($;$)
             $string = "empty";
         }
         
-        my @columns = split(",",AttrVal($name, "visible-columns", "row,state,timestamp,name,number,internal,connection,duration"));
+        my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
         my $additional_columns = scalar(@columns);
         
         $ret .= "<tr align=\"center\" name=\"empty\"><td style=\"padding:10px;\" colspan=\"$additional_columns\"><i>$string</i></td></tr>";
@@ -722,7 +735,7 @@ sub FB_CALLLIST_returnOrderedHTMLOutput($$$$)
     
     my $name = $hash->{NAME};
     
-    my @order = split(",", AttrVal($name, "visible-columns", "row,state,timestamp,name,number,internal,connection,duration"));
+    my @order = split(",", AttrVal($name, "visible-columns",$hash->{helper}{DEFAULT_COLUMN_ORDER}));
     
     my @ret = ();
     
@@ -745,7 +758,7 @@ sub FB_CALLLIST_returnOrderedJSONOutput($$)
     
     my $name = $hash->{NAME};
     
-    my @order = split(",", AttrVal($name, "visible-columns", "row,state,timestamp,name,number,internal,connection,duration"));
+    my @order = split(",", AttrVal($name, "visible-columns",$hash->{helper}{DEFAULT_COLUMN_ORDER}));
     
     my @ret = ();
    
@@ -760,6 +773,32 @@ sub FB_CALLLIST_returnOrderedJSONOutput($$)
     
     return "{".join(",",@ret)."}";
 }
+
+
+sub FB_CALLLIST_updateReadings($$)
+{
+    my ($hash,$line) = @_;
+    
+    my $name = $hash->{NAME};
+    
+    my %line_tmp = %{$line};
+    
+    my @order = split(",", AttrVal($name, "visible-columns",$hash->{helper}{DEFAULT_COLUMN_ORDER}));
+      
+    $line_tmp{state} = FB_CALLLIST_returnCallState($hash, $line->{index}, 0);
+    
+    readingsBeginUpdate($hash);
+    
+    foreach my $col (@order)
+    {
+            readingsBulkUpdate($hash, $line_tmp{line}."-$col", $line_tmp{$col});
+    }
+    
+    readingsEndUpdate($hash, 1);
+    
+
+}
+
 
 #####################################
 # Check, if a given internal number matches the configured internal-number-filter (if set). returns true if number matches
@@ -798,20 +837,22 @@ sub FB_CALLLIST_updateFhemWebClients($)
         Log3 $name, 5, "FB_CALLLIST ($name) - inform all FHEMWEB clients";
         
         # inform all FHEMWEB clients about changes
+        my $count = 0;
         foreach my $line (FB_CALLLIST_list2html($hash, 1))
         {
             FW_directNotify($name, $line, 1);
+            $count++;
         }
         
         # send the current row count to ensure all other rows are deleted via JS
-        FW_directNotify($name,"max-lines,".(scalar keys %{$hash->{helper}{DATA}}), 1);
+        FW_directNotify($name,"max-lines,$count", 1);
     }
     else
     {
         Log3 $name, 5, "FB_CALLLIST ($name) - list is empty, sending a clear command to all FHEMWEB clients";
         
         # inform all FHEMWEB clients about empty list
-        my @columns = split(",",AttrVal($name, "visible-columns", "row,state,timestamp,name,number,internal,connection,duration"));
+        my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
         my $additional_columns = scalar(@columns);
         my $string;
         
@@ -930,7 +971,8 @@ sub FB_CALLLIST_returnTableHeader($)
   <a name="FB_CALLLISTattr"></a>
   <b>Attributes</b><br><br>
   <ul>
-
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="disable">disable</a> 0,1</li>
 	Optional attribute to disable the call list update. When disabled, call events will be processed and the list wouldn't be updated accordingly.
 	<br><br>
@@ -943,6 +985,10 @@ sub FB_CALLLIST_returnTableHeader($)
     <br><br>To specify an interval spawning midnight, you have to specify two intervals, e.g.:
     <pre>23:00-24:00 00:00-01:00</pre>
     Default Value is <i>empty</i> (no intervals defined, calllist is always active)<br><br>
+    <li><a name="create-readings">create-readings</a> 0,1</li>
+    If enabled, for all visible calls in the list, readings and events will be created. It is recommended to set the attribute <a href="#event-on-change-reading">event-on-change-reading</a> to <code>.*</code> (all readings), to reduce the amount of generated readings for certain call events.<br><br>
+    Possible values: 0 => no readings will be created, 1 => readings and events will be created.<br>
+    Default Value is 0 (no readings will be created)<br><br>
     <li><a name="number-of-calls">number-of-calls</a> 1..20</li>
     Defines the maximum number of displayed call entries in the list.<br><br>
     Default Value is 5 calls<br><br>
@@ -1084,6 +1130,8 @@ sub FB_CALLLIST_returnTableHeader($)
   <a name="FB_CALLLISTattr"></a>
   <b>Attributes</b><br><br>
   <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="disable">disable</a></li>
 	Optionales Attribut zur Deaktivierung der Anrufliste. Es werden dann keine Anruf-Events mehr verarbeitet und die Liste nicht weiter aktualisiert.
 	<br><br>
@@ -1097,6 +1145,11 @@ sub FB_CALLLIST_returnTableHeader($)
     Um einen Intervall um Mitternacht zu spezifizieren, muss man zwei einzelne Intervalle angeben, z.Bsp.:
     <pre>23:00-24:00 00:00-01:00</pre>
     Standardwert ist <i>nicht gesetzt</i> (aktiv)<br><br>
+    <li><a name="create-readings">create-readings</a> 0,1</li>
+    Sofern aktiviert, werden f&uuml;r alle sichtbaren Anrufe in der Liste entsprechende Readings und Events erzeugt.
+    Es wird empfohlen das Attribut <a href="#event-on-change-reading">event-on-change-reading</a> auf den Wert <code>.*</code> zu stellen um die hohe Anzahl an Events in bestimmten F&auml;llen zu minimieren.<br><br>
+    Possible values: 0 => no readings will be created, 1 => readings and events will be created.<br>
+    Default Value is 0 (no readings will be created)<br><br>
     <li><a name="number-of-calls">number-of-calls</a> 1..20</li>
     Setzt die maximale Anzahl an Eintr&auml;gen in der Anrufliste. Sollte die Anrufliste voll sein, wird das &auml;lteste Gespr&auml;ch gel&ouml;scht.<br><br>
     Standardwert sind 5 Eintr&auml;ge<br><br>
