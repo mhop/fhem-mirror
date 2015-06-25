@@ -230,11 +230,23 @@ sub FRITZBOX_Initilize_TR064 ($)
       FRITZBOX_Log $hash, 2,  "Cannot use TR-064. Perl modul ".$missingModulTR064."is missing on this system. Please install.";
       return;
    }
+   if ($missingModulWeb) {
+      FRITZBOX_Log $hash, 2,  "Cannot test TR-064 access. Perl modul ".$missingModulWeb."is missing on this system. Please install.";
+      return undef;
+   }
 
-   FRITZBOX_Log $hash, 4, "Open TR-064 connection";
-      
-# Security Port anfordern
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+
+      FRITZBOX_Log $hash, 4, "Check if TR-064 description 'http://".$host.":49000/tr64desc.xml' exists.";
+   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
+   my $response = $agent->get( "http://".$host.":49000/tr64desc.xml" );
+   if ( $response->is_error() ) {
+      FRITZBOX_Log $hash, 2, "Box $host doesn't have a TR-064-API.";
+      return undef;
+   }
+   
+# Security Port anfordern
+      FRITZBOX_Log $hash, 4, "Open TR-064 connection";
    my $s = SOAP::Lite
       -> uri('urn:dslforum-org:service:DeviceInfo:1')
       -> proxy('http://'.$host.':49000/upnp/control/deviceinfo')
@@ -505,8 +517,10 @@ sub FRITZBOX_Get($@)
    my ($hash, $name, $cmd, @val) = @_;
    my $returnStr;
 
-   if ( lc $cmd eq "luaquery"  && AttrVal( $name, "allowTR064Command", 0 ) ) {  
-      Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
+   if( lc $cmd eq "luaquery"  && AttrVal( $name, "allowTR064Command", 0 ) ) {  
+   # get Fritzbox luaQuery inetstat:status/Today/BytesReceivedLow
+   # get Fritzbox luaQuery telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)
+         Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
 
       return "Wrong number of arguments, usage: get $name luaQuery <query>"       if int @val !=1;
 
@@ -514,23 +528,25 @@ sub FRITZBOX_Get($@)
       $returnStr .= "----------------------------------------------------------------------\n";
       my $queryStr = "&result=".$val[0];
       my $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
-      my $tmp = Dumper ($result->{result});
-      $returnStr .= $tmp;
-      return $returnStr;
+      
+      my $tmp;
+      if (ref $result->{result} eq "") {     $tmp = $result->{result}; }
+      else {      $tmp = Dumper ($result->{result}); }
+      return $returnStr . $tmp;
    }
-   elsif (lc $cmd eq "ringtones") {
+   elsif( lc $cmd eq "ringtones" ) {
       Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
       $returnStr  = "Ring tones to use with 'set <name> ring <intern> <duration> <ringTone>'\n";
       $returnStr .= "----------------------------------------------------------------------\n";
       $returnStr .= join "\n", sort values %ringTone;
       return $returnStr;
    }
-   elsif ( lc $cmd eq "shellcommand" && int @val && AttrVal( $name, "allowShellCommand", 0 ) ) {  
+   elsif( lc $cmd eq "shellcommand" && int @val && AttrVal( $name, "allowShellCommand", 0 ) ) {  
       Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
       my $shCmd = join " ", @val;
       return FRITZBOX_Exec( $hash, $shCmd );
    }
-   elsif (lc $cmd eq "tr064command" && AttrVal( $name, "allowTR064Command", 0 )) {
+   elsif( lc $cmd eq "tr064command" && AttrVal( $name, "allowTR064Command", 0 ) ) {
 # http://fritz.box:49000/tr64desc.xml
 #get Fritzbox tr064command DeviceInfo:1 deviceinfo GetInfo
 #get Fritzbox tr064command X_VoIP:1 x_voip X_AVM-DE_GetPhonePort NewIndex 1
