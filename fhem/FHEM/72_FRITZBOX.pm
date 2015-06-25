@@ -148,6 +148,7 @@ sub FRITZBOX_Initialize($)
   $hash->{GetFn}    = "FRITZBOX_Get";
   $hash->{AttrFn}   = "FRITZBOX_Attr";
   $hash->{AttrList} = "allowShellCommand:0,1 "
+                ."allowTR064Command:0,1 "
                 ."boxUser "
                 ."disable:0,1 "
                 ."defaultCallerName "
@@ -513,22 +514,22 @@ sub FRITZBOX_Get($@)
       $returnStr .= join "\n", sort values %ringTone;
       return $returnStr;
    }
-   elsif (lc $cmd eq "tr064response") {
+   elsif (lc $cmd eq "tr064command" && AttrVal( $name, "allowTR064Command", 0 )) {
 # http://fritz.box:49000/tr64desc.xml
-#get Fritzbox tr064response DeviceInfo:1 deviceinfo GetInfo
-#get Fritzbox tr064response X_VoIP:1 x_voip X_AVM-DE_GetPhonePort NewIndex 1
-#get Fritzbox tr064response X_VoIP:1 x_voip X_AVM-DE_DialNumber NewX_AVM-DE_PhoneNumber **612
-#get Fritzbox tr064response X_VoIP:1 x_voip X_AVM-DE_DialHangup
-#get Fritzbox tr064response WLANConfiguration:3 wlanconfig3 X_AVM-DE_GetWLANExtInfo
-#get Fritzbox tr064response X_AVM-DE_OnTel:1 x_contact GetDECTHandsetList
-#get Fritzbox tr064response X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1
-#get Fritzbox tr064response X_AVM-DE_TAM:1 x_tam GetInfo NewIndex 0
-#get Fritzbox tr064response X_AVM-DE_TAM:1 x_tam SetEnable NewIndex 0 NewEnable 0
-#get Fritzbox tr064response InternetGatewayDevice:1 deviceinfo GetInfo
-#get Fritzbox tr064response LANEthernetInterfaceConfig:1 lanethernetifcfg GetStatistics
+#get Fritzbox tr064command DeviceInfo:1 deviceinfo GetInfo
+#get Fritzbox tr064command X_VoIP:1 x_voip X_AVM-DE_GetPhonePort NewIndex 1
+#get Fritzbox tr064command X_VoIP:1 x_voip X_AVM-DE_DialNumber NewX_AVM-DE_PhoneNumber **612
+#get Fritzbox tr064command X_VoIP:1 x_voip X_AVM-DE_DialHangup
+#get Fritzbox tr064command WLANConfiguration:3 wlanconfig3 X_AVM-DE_GetWLANExtInfo
+#get Fritzbox tr064command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetList
+#get Fritzbox tr064command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1
+#get Fritzbox tr064command X_AVM-DE_TAM:1 x_tam GetInfo NewIndex 0
+#get Fritzbox tr064command X_AVM-DE_TAM:1 x_tam SetEnable NewIndex 0 NewEnable 0
+#get Fritzbox tr064command InternetGatewayDevice:1 deviceinfo GetInfo
+#get Fritzbox tr064command LANEthernetInterfaceConfig:1 lanethernetifcfg GetStatistics
       Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
 
-      return "Wrong number of arguments, usage: get $name tr064response service control action [parameterName1 parameterValue1] [parameterName2 parameterValue2] ..."
+      return "Wrong number of arguments, usage: get $name tr064command service control action [parameterName1 parameterValue1] [parameterName2 parameterValue2] ..."
          if int @val <3 || int(@val) %2 !=1;
 
       $returnStr  = "Result of TR064 call\n";
@@ -550,10 +551,9 @@ sub FRITZBOX_Get($@)
       return FRITZBOX_Exec( $hash, $shCmd );
    }
    
-   my $list = "ringTones:noArg"
-           . " tr064Response";
-   $list .= " shellCommand" 
-      if AttrVal( $name, "allowShellCommand", 0 );
+   my $list = "ringTones:noArg";
+   $list .= " tr064Command"     if AttrVal( $name, "allowTr064Command", 0 );
+   $list .= " shellCommand"     if AttrVal( $name, "allowShellCommand", 0 );
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
@@ -3988,11 +3988,13 @@ sub FRITZBOX_fritztris($)
          Only available if the attribute "allowShellCommand" is set.
       </li><br>
 
-      <li><code>get &lt;name&gt; tr064Response &lt;service&gt; &lt;control&gt; &lt;action&gt; [[parameterName1 parameterValue1] ...] </code>
+      <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[parameterName1 parameterValue1] ...] </code>
          <br>
          Executes TR-064 actions (see <a href="http://avm.de/service/schnittstellen/">API description</a> of AVM and on the <a href="http://fritz.box:49000/tr64desc.xml">box</a>)
          <br>
-         Example: <code>get Fritzbox tr064response X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
+         Example: <code>get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
+         <br>
+         Only available if the attribute "allowTR064Command" is set.
       </li><br>
 
    </ul>  
@@ -4285,11 +4287,13 @@ sub FRITZBOX_fritztris($)
          Muss zuvor &uuml;ber das Attribute "allowShellCommand" freigeschaltet werden.
       </li><br>
 
-      <li><code>get &lt;name&gt; tr064Response &lt;service&gt; &lt;control&gt; &lt;action&gt; [[parameterName1 parameterValue1] ...] </code>
+      <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[parameterName1 parameterValue1] ...] </code>
          <br>
          F&uuml;hrt &uuml;ber TR-064 Aktionen aus (siehe <a href="http://avm.de/service/schnittstellen/">Schnittstellenbeschreibung</a> von AVM und auf der <a href="http://fritz.box:49000/tr64desc.xml">Box</a>)
          <br>
-         Beispiel: <code>get Fritzbox tr064Response X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
+         Beispiel: <code>get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
+         <br>
+         Muss zuvor &uuml;ber das Attribute "allowTR064Command" freigeschaltet werden.
       </li><br>
 
    </ul>  
@@ -4301,6 +4305,11 @@ sub FRITZBOX_fritztris($)
       <li><code>allowShellCommand &lt;0 | 1&gt;</code>
          <br>
          Freischalten des get-Befehls "shellCommand"
+      </li><br>
+      
+      <li><code>allowShellCommand &lt;0 | 1&gt;</code>
+         <br>
+         Freischalten des get-Befehls "tr064Command"
       </li><br>
       
       <li><code>defaultCallerName &lt;Text&gt;</code>
