@@ -914,6 +914,32 @@ ZWave_mcCapability($$)
 }
 
 sub
+ZWave_mfsAddClasses($$)
+{
+  my ($hash, $cfgFile) = @_;
+  my $name = $hash->{NAME};
+  my $attr = $attr{$name}{classes};
+  return if(!$cfgFile || !$attr);
+  my $changed;
+
+  ZWave_configParseModel($cfgFile);
+  my $ci = $zwave_modelConfig{$cfgFile}{classInfo};
+  foreach my $id (keys %{$ci}) {
+    my $v = $ci->{$id};
+    if($v =~ m/setasreport="true"/ || $v =~ m/action="add"/) {
+      $id = sprintf("%02x", $id);
+      my $cn = $zwave_id2class{$id};
+      next if($attr =~ m/$cn/);
+      $attr .= " $cn";
+      $changed = 1;
+    }
+  }
+  return if(!$changed);
+  addStructChange("attr", $name, "$name classes $attr");
+  $attr{$name}{classes} = $attr;
+}
+
+sub
 ZWave_mfsParse($$$$$)
 {
   my ($hash, $mf, $prod, $id, $config) = @_;
@@ -940,6 +966,7 @@ ZWave_mfsParse($$$$$)
         if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
           if($config) {
             $ret = "modelConfig:".(($l =~ m/config="([^"]*)"/) ? $1:"unknown");
+            ZWave_mfsAddClasses($hash, $1);
             return $ret;
           } else {
             $ret = "model:$mName $3";
@@ -1098,14 +1125,17 @@ ZWave_configParseModel($)
     return;
   }
 
-  my ($line, $class, %hash, $cmdName);
+  my ($line, $class, %hash, $cmdName, %classInfo);
   while($gz->gzreadline($line)) {       # Search the "file" entry
     last if($line =~ m/^\s*<Product.*sourceFile="$cfg"/);
   }
 
   while($gz->gzreadline($line)) {
     last if($line =~ m+^\s*</Product>+);
-    $class = $1 if($line =~ m/^\s*<CommandClass.*id="([^"]*)"/);
+    if($line =~ m/^\s*<CommandClass.*id="([^"]*)"(.*)$/) {
+      $class = $1;
+      $classInfo{$class} = $2;
+    }
     next if(!$class || $class ne "112");
     if($line =~ m/^\s*<Value /) {
       my %h;
@@ -1125,6 +1155,7 @@ ZWave_configParseModel($)
       $h{Help} .= "Full text for $cmdName is $h{label}<br>" if($shortened);
       $hash{$cmdName} = \%h;
     }
+
     $hash{$cmdName}{Help} .= "$1<br>" if($line =~ m+^\s*<Help>(.*)</Help>$+);
     if($line =~ m/^\s*<Item/) {
       my $label = $1 if($line =~ m/label="([^"]*)"/i);
@@ -1137,7 +1168,7 @@ ZWave_configParseModel($)
   }
   $gz->gzclose();
 
-  my %mc = (set=>{}, get=>{}, config=>{});
+  my %mc = (set=>{}, get=>{}, config=>{}, classInfo=>\%classInfo);
   foreach my $cmd (keys %hash) {
     my $h = $hash{$cmd};
     my $arg = ($h->{type} eq "button" ? "a" : "a%b");
@@ -1481,11 +1512,11 @@ ZWave_secureInit(@)
     ZWave_Set($hash, $name, "secNonce");
     return undef;       # No Event/Reading
 
-  } elsif($status == 4) {
+  } else {
     Log3 $iodev, 4, "secNonce report: $param";
     delete $iodev->{secInitName};
     delete $hash->{secStatus};
-
+    return ZWave_execInits($hash, 0);
   }
 }
 
