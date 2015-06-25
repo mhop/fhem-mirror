@@ -505,12 +505,30 @@ sub FRITZBOX_Get($@)
    my ($hash, $name, $cmd, @val) = @_;
    my $returnStr;
 
-   if (lc $cmd eq "ringtones") {
+   if ( lc $cmd eq "luaquery"  && AttrVal( $name, "allowTR064Command", 0 ) ) {  
+      Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
+
+      return "Wrong number of arguments, usage: get $name luaQuery <query>"       if int @val !=1;
+
+      $returnStr  = "Result of query = '$val[0]'\n";
+      $returnStr .= "----------------------------------------------------------------------\n";
+      my $queryStr = "&result=".$val[0];
+      my $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
+      my $tmp = Dumper ($result->{result});
+      $returnStr .= $tmp;
+      return $returnStr;
+   }
+   elsif (lc $cmd eq "ringtones") {
       Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
       $returnStr  = "Ring tones to use with 'set <name> ring <intern> <duration> <ringTone>'\n";
       $returnStr .= "----------------------------------------------------------------------\n";
       $returnStr .= join "\n", sort values %ringTone;
       return $returnStr;
+   }
+   elsif ( lc $cmd eq "shellcommand" && int @val && AttrVal( $name, "allowShellCommand", 0 ) ) {  
+      Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
+      my $shCmd = join " ", @val;
+      return FRITZBOX_Exec( $hash, $shCmd );
    }
    elsif (lc $cmd eq "tr064command" && AttrVal( $name, "allowTR064Command", 0 )) {
 # http://fritz.box:49000/tr64desc.xml
@@ -543,14 +561,10 @@ sub FRITZBOX_Get($@)
       $returnStr .= $tmp;
       return $returnStr;
    }
-   elsif ( lc $cmd eq "shellcommand" && int @val && AttrVal( $name, "allowShellCommand", 0 ) ) {  
-      Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
-      my $shCmd = join " ", @val;
-      return FRITZBOX_Exec( $hash, $shCmd );
-   }
    
    my $list = "ringTones:noArg";
-   $list .= " tr064Command"     if AttrVal( $name, "allowTr064Command", 0 );
+   $list .= " luaQuery"      if AttrVal( $name, "allowTR064Command", 0 );
+   $list .= " tr064Command"  if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " shellCommand"     if AttrVal( $name, "allowShellCommand", 0 );
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
@@ -1108,7 +1122,7 @@ sub FRITZBOX_Readout_Run_Web($)
 
    my $returnStr;
  
-   my $queryStr = "&radio=configd:settings/WEBRADIO/list(Id,Name)"; # Webradio
+   my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
    $queryStr .= "&init=telcfg settings/Foncontrol";
