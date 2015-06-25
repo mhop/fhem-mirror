@@ -287,14 +287,12 @@ sub FRITZBOX_Attr($@)
       # aName and aVal are Attribute name and value
    my $hash = $defs{$name};
 
-   if ($cmd eq "set")
-   {
-      if ($aName eq "fritzBoxIP" && $aVal ne "")
-      {
-         if ($hash->{REMOTE} == 0)
-         {
+   if ($cmd eq "set") {
+      if ($aName eq "fritzBoxIP" && $aVal ne "") {
+         $hash->{fhem}{lastHour} = 0; # Refresh all readings during next update
+         if ($hash->{REMOTE} == 0) {
             $hash->{REMOTE} = 1;
-            FRITZBOX_Log $hash, 3, "Changed to remote access because attribute 'fritzBoxIP' is defined.";
+               FRITZBOX_Log $hash, 3, "Changed to remote access because attribute 'fritzBoxIP' is defined.";
          }
       }
    }
@@ -1113,6 +1111,7 @@ sub FRITZBOX_Readout_Run_Web($)
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Id,Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
+   $queryStr .= "&init=telcfg settings/Foncontrol";
    $queryStr .= "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Name,Intern,IntRingTone,AlarmRingTone0,RadioRingID,ImagePath,G722RingTone,G722RingToneName)"; # DECT Numbers
    $queryStr .= "&fonPort=telcfg:settings/MSN/Port/list(Name,MSN)"; # Fon ports
    $queryStr .= "&alarmClock=telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)"; # Alarm Clock
