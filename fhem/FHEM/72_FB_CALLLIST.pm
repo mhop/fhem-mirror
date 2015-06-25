@@ -47,7 +47,7 @@ FB_CALLLIST_Initialize($)
                           "connection-mapping ".
                           "create-readings:0,1 ".
                           "visible-columns:sortable-strict,row,state,timestamp,name,number,internal,connection,duration ".
-                          "show-icons:0,1 ".
+                          "show-icons:1,0 ".
                           "list-type:all,incoming,outgoing,missed-calls,completed,active " .
                           "time-format-string ".
                           "list-order:ascending,descending ".
@@ -55,6 +55,7 @@ FB_CALLLIST_Initialize($)
                           "disable:0,1 ".
                           "disabledForIntervals ".
                           "do_not_notify:0,1 ".
+                          "no-heading:0,1 ".
                           $readingFnAttributes;
 
     $hash->{FW_detailFn}  = "FB_CALLLIST_makeTable";
@@ -502,15 +503,21 @@ sub FB_CALLLIST_list2html($;$)
     
     my $create_readings = AttrVal($hash->{NAME}, "create-readings",0);
     
-    my $ret = "";
     my $td_style = "style=\"padding-left:6px;padding-right:6px;\"";
     my @json_output = ();
     my $line;
     
     my $old_locale = setlocale(LC_ALL);
-    $ret .= "<table><tr><td>";
-    $ret .= "<div class=\"devType\"><a href=\"$FW_ME$FW_subdir?detail=$name\">$alias</a>".(IsDisabled($name) ? " (disabled)" : "")."</div>" unless($FW_webArgs{"detail"});
-    $ret .= "</td></tr>";
+    
+    my $ret .= "<table>";
+    
+    if(AttrVal($name, "no-heading", "0") eq "0")
+    {
+        $ret .=" <tr><td>";
+        $ret .= "<div class=\"devType\"><a href=\"$FW_ME$FW_subdir?detail=$name\">$alias</a>".(IsDisabled($name) ? " (disabled)" : "")."</div>" unless($FW_webArgs{"detail"});
+        $ret .= "</td></tr>";
+    }
+    
     $ret .= "<tr><td>";
     $ret .= "<div class=\"fhemWidget\" informId=\"$name\" cmd=\"\" arg=\"fbcalllist\" dev=\"$name\">"; # div tag to support inform updates
     $ret .= "<table class=\"block fbcalllist\">";
@@ -1063,6 +1070,10 @@ sub FB_CALLLIST_returnTableHeader($)
     <br><br>
     Possible values: a combination of <code>row,state,timestamp,name,number,internal,connection,duration</code><br>
     Default Value is "row,state,timestamp,name,number,internal,connection,duration" (show all columns)<br><br>
+    <li><a name="no-heading">no-heading</a> 0,1</li>
+    If activated the headline with a link to the detail page of the current definition will be hidden.<br><br>
+    Possible values: 0 => the heading line will be shown , 1 => the heading line will not be shown<br>
+    Default Value is 0 (the heading line will be shown)<br><br>
     </ul>
   <br>
   <a name="FB_CALLLISTevents"></a>
@@ -1227,6 +1238,10 @@ sub FB_CALLLIST_returnTableHeader($)
     <br><br>
     M&ouml;gliche Werte: Eine Kombination der folgenden Werte in der gew&uuml;nschten Reihenfolge: <code>row,state,timestamp,name,number,internal,connection,duration</code><br>
     Standardwert ist "row,state,timestamp,name,number,internal,connection,duration" (Anzeige aller Spalten)<br><br>
+    <li><a name="no-heading">no-heading</a> 0,1</li>
+    Sofern aktiviert, wird die &Uuml;berschriftenzeile ausserhalb der Liste inkl. Link auf die Detail-Seite der aktuellen Definition ausgeblendet.<br><br>
+    M&ouml;gliche Werte: 0 => &Uuml;berschriftenzeile wird angezeigt , 1 => &Uuml;berschriftenzeile wird ausgeblendet<br>
+    Standardwert ist 1 (&Uuml;berschriftenzeile wird angezeigt)<br><br>
     </ul>
   <br>
   <a name="FB_CALLLISTevents"></a>
