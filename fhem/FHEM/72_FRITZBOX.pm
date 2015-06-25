@@ -226,6 +226,8 @@ sub FRITZBOX_Initilize_TR064 ($)
    my ($hash) = @_;
    my $name = $hash->{NAME};
 
+   return   if AttrVal( $name, "forceTelnetConnection",  0 );   
+   
    if ($missingModulTR064) {
       FRITZBOX_Log $hash, 2,  "Cannot use TR-064. Perl modul ".$missingModulTR064."is missing on this system. Please install.";
       return;
