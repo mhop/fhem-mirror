@@ -2692,12 +2692,10 @@ sub FRITZBOX_Ring_Run_Web($)
    }
  
 # Store current values for fon and dect port
-   if( int @FritzFons ) {
-      my $queryStr = "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Intern,IntRingTone,RadioRingID)"; # DECT Numbers
-      $queryStr .= "&fonPort=telcfg:settings/MSN/Port/list(Name,MSN)"; # Fon ports
-      FRITZBOX_Log $hash, 4, "Read current dect and fon port values from box";
-      $startValue = FRITZBOX_Web_Query( $hash, $queryStr, 'UTF-8') ;
-   }
+   my $queryStr = "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Intern,IntRingTone,RadioRingID)"; # DECT Numbers
+   $queryStr .= "&fonPort=telcfg:settings/MSN/Port/list(Name,MSN)"; # Fon ports
+   FRITZBOX_Log $hash, 4, "Read current dect and fon port values from box";
+   $startValue = FRITZBOX_Web_Query( $hash, $queryStr, 'UTF-8') ;
 
 #Preparing 1st command array
    @webCmdArray = ();
@@ -2798,8 +2796,10 @@ sub FRITZBOX_Ring_Run_Web($)
 # Reset name of calling number
    if ($ringWithIntern =~ /^([1-2])$/) {
       my $fonName = $startValue->{fonPort}->[$ringWithIntern-1]->{Name};
-      push( @webCmdArray, "telcfg:settings/MSN/Port".($ringWithIntern-1)."/Name" => $fonName ) if $fonName; # darf nie leer sein
-      FRITZBOX_Log $hash, 4, "Reset name of calling number fon$ringWithIntern to '$fonName'";
+      if ($fonName) {# darf nie leer sein
+         push( @webCmdArray, "telcfg:settings/MSN/Port".($ringWithIntern-1)."/Name" => $fonName ) ; 
+            FRITZBOX_Log $hash, 4, "Reset name of calling number fon$ringWithIntern to '$fonName'";
+      }
    }
    
 # Switch of Internet Radio stations
