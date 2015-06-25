@@ -2734,8 +2734,15 @@ sub FRITZBOX_Ring_Run_Web($)
 # uses name of port 0-3 (dial port 1-4) to show messages on ringing phone
    my $ringWithIntern = AttrVal( $name, "ringWithIntern", 0 );
    if ( $ringWithIntern =~ /^([1-3])$/ ) {
-      push @webCmdArray, "telcfg:settings/MSN/Port".($ringWithIntern-1)."/Name" => $msg;
-      FRITZBOX_Log $hash, 4, "Change temporarily name of calling number fon$ringWithIntern to '$msg'";
+      if ($startValue->{fonPort}->[$ringWithIntern-1]->{Name}) {
+         push @webCmdArray, "telcfg:settings/MSN/Port".($ringWithIntern-1)."/Name" => $msg;
+            FRITZBOX_Log $hash, 4, "Change temporarily name of calling number fon$ringWithIntern to '$msg'";
+      }
+      else {
+         FRITZBOX_Log $hash, 2, "Error: Current name of calling number fon$ringWithIntern could not be determined -> Did not change the name.";
+         my $temp = Dumper( $startValue );
+         FRITZBOX_Log $hash, 3, "Debug info: \n".$temp;
+      }
       push @webCmdArray, "telcfg:settings/DialPort" => $ringWithIntern;
    } 
    elsif ($field{show}) {
@@ -2796,7 +2803,7 @@ sub FRITZBOX_Ring_Run_Web($)
    }
    
 # Switch of Internet Radio stations
-   if (!$ttsLink && $ringTone ==33 ) {
+   if (!$ttsLink && defined $ringTone && $ringTone ==33 ) {
       push @webCmdArray, "telcfg:command/Dial **".$intNo;
       push @webCmdArray, "telcfg:command/Hangup **".$intNo;
    }
@@ -3488,12 +3495,18 @@ sub FRITZBOX_TR064_Cmd($$$)
       my( $service, $control, $action, %params) = @{$_};
       my @soapParams;
 
+# {my $test="/upnp/control/test2";; $test =~ s#/upnp/control/##;; $test;;}
+   # clean service and control
+      $service =~ s/urn:dslforum-org:service://;
+      $control =~ s#/upnp/control/##;
+      
       my $logMsg = "service='$service', control='$control', action='$action'";
    # Prepare action parameter
       foreach (keys %params) {
          $logMsg .= ", parameter".(int(@soapParams)+1)."='$_' => '$params{$_}'" ;
          push @soapParams, SOAP::Data->name( $_ => $params{$_} );
       }
+      
       FRITZBOX_Log $hash, 4, "Perform TR064 call - ".$logMsg;
 
       my $s = SOAP::Lite
