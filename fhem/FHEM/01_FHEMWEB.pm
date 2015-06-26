@@ -826,7 +826,8 @@ FW_answerCall($)
 sub
 FW_addLinks($)
 {
-  my @lines = split( /\n/, shift); # Adding links
+  return undef if(!defined($_[0]));
+  my @lines = split( /\n/, $_[0]); # Adding links
   my $ret = "";
   foreach my $line (@lines) {
     $ret .= "\n" if( $ret );
