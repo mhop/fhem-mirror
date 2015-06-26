@@ -5800,7 +5800,7 @@ sub CUL_HM_respPendTout($) {
       CUL_HM_respPendRm($hash);# do not count problems with wakeup try, just wait
       CUL_HM_protState($hash,"CMDs_pending");
     }
-    elsif (ReadingsVal($hash->{IODev},"state","") !~ m/^(opened|Initialized)$/){#IO errors
+    elsif (ReadingsVal($hash->{IODev}->{NAME},"state","") !~ m/^(opened|Initialized)$/){#IO errors
       CUL_HM_eventP($hash,"IOdly");
       CUL_HM_ProcessCmdStack($hash) if($rxt & 0x03);#burst/all
     }
@@ -5817,6 +5817,7 @@ sub CUL_HM_respPendTout($) {
     }
     else{# manage retries
       $pHash->{rspWait}{reSent}++;
+
       CUL_HM_eventP($hash,"Resnd");
       Log3 $name,4,"CUL_HM_Resend: $name nr ".$pHash->{rspWait}{reSent};
       if ($hash->{protCondBurst}&&$hash->{protCondBurst} eq "on" ){
@@ -7494,7 +7495,6 @@ sub CUL_HM_assignIO($){ #check and assign IO
     AssignIoPort($hash);#let kernal decide
   }
 }
-
 
 sub CUL_HM_stateUpdatDly($$){#delayed queue of status-request
   my ($name,$time) = @_;
