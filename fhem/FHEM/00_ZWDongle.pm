@@ -465,7 +465,7 @@ ZWDongle_DoInit($)
   my $name = $hash->{NAME};
   $serInit = 1;
 
-  DevIo_SetHwHandshake($hash) if($hash->{FD});
+  DevIo_SetHwHandshake($hash) if($hash->{USBDev});
   $hash->{PARTIAL} = "";
   
   ZWDongle_Clear($hash);
