@@ -2741,7 +2741,7 @@ sub FRITZBOX_Ring_Run_Web($)
    elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM") {
       FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
       push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Name" => "FHEM";
-      push @webCmdArray, "ctlmgr_ctl w configd:settings/WEBRADIO".$fhemRadioStation."/Bitmap" => "1023";
+      push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Bitmap" => "1023";
    #Execute command array
       FRITZBOX_Web_PostCmd( $hash, \@webCmdArray )
    }
