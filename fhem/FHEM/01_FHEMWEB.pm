@@ -1024,7 +1024,8 @@ FW_detailSelect(@)
 {
   my ($d, $cmd, $list, $param) = @_;
   return if(!$list || $FW_hiddenroom{input});
-  my @al = sort map { s/:.*//;$_ } split(" ", $list);
+  my @al = map { s/:.*//;$_ } split(" ", $list);
+  @al = sort keys { map { $_ => 1 } @al }; # remove duplicate items in list
 
   my $selEl = (defined($al[0]) ? $al[0] : " ");
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
