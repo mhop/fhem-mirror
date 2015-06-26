@@ -953,6 +953,7 @@ sub HMLAN_qResp($$$) {#response-waiting queue##################################
     push @{$hashQ->{apIDs}},$id;
     if ($hashQ->{answerPend} >= $hashQ->{hmLanQlen}){
       $hash->{XmitOpen} = 2;#delay further sending
+      RemoveInternalTimer("hmClearQ:$hash->{NAME}");
       InternalTimer(gettimeofday()+10, "HMLAN_clearQ", "hmClearQ:$hash->{NAME}", 0);
     }
   }

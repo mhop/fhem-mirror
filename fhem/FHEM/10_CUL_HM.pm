@@ -7523,6 +7523,7 @@ sub CUL_HM_qAutoRead($$){
 sub CUL_HM_unQEntity($$){# remove entity from q
   my ($name,$q) = @_;
   my $devN = CUL_HM_getDeviceName($name);
+
   return if (AttrVal($devN,"subType","") eq "virtual");
   my $dq = $defs{$devN}{helper}{q};
   RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
@@ -7569,6 +7570,12 @@ sub CUL_HM_qEntity($$){  # add to queue
   InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
 }
 
+sub CUL_HM_readStateTo($){#staterequest not working
+  my ($eN) = @_;
+  $eN = substr($eN,6) if ($eN =~ m/^sUpdt:/);
+  CUL_HM_UpdtReadSingle($defs{$eN},"state","unreachable",1);
+  CUL_HM_stateUpdatDly($eN,1800);
+}
 sub CUL_HM_procQs($){#process non-wakeup queues
   # --- verify send is possible
 
@@ -7580,7 +7587,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
       next  if(!defined $defs{$devN}{IODev}{NAME});
       my $ioName = $defs{$devN}{IODev}{NAME};   
 
-      if (   (   ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|init)$/
+      if (   (   ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|Warning-HighLoad|init)$/
               && $q eq "qReqStat")
            ||(   CUL_HM_autoReadReady($ioName)
               && !$defs{$devN}{cmdStack}
@@ -7600,6 +7607,8 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         }
         else{
            CUL_HM_Set($defs{$eN},$eN,"statusRequest");
+           CUL_HM_unQEntity($eN,"qReqStat");
+           InternalTimer(gettimeofday()+5,"CUL_HM_readStateTo","sUpdt:$eN",0);
         }
       }
       last; # execute only one!
