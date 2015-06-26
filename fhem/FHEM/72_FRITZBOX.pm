@@ -47,10 +47,11 @@ eval "use Net::Telnet;1" or $missingModulTelnet .= "Net::Telnet ";
 eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
 eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
 
+use FritzBoxUtils; ## only for web access login
 #sudo apt-get install libjson-perl
 eval "use JSON::XS;1" or $missingModulWeb .= "JSON::XS ";
 eval "use LWP::UserAgent;1" or $missingModulWeb .= "LWP::UserAgent ";
-use FritzBoxUtils; ## only for web access login
+
 eval "use URI::Escape;1" or $missingModulTR064 .= "URI::Escape ";
 # sudo apt-get install libsoap-lite-perl
 eval "use SOAP::Lite;1" or $missingModulTR064 .= "Soap::Lite ";
@@ -519,7 +520,7 @@ sub FRITZBOX_Get($@)
    my ($hash, $name, $cmd, @val) = @_;
    my $returnStr;
 
-   if( lc $cmd eq "luaquery"  && AttrVal( $name, "allowTR064Command", 0 ) ) {  
+   if( lc $cmd eq "luaquery"  && AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT}) {  
    # get Fritzbox luaQuery inetstat:status/Today/BytesReceivedLow
    # get Fritzbox luaQuery telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)
          Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
@@ -579,10 +580,14 @@ sub FRITZBOX_Get($@)
       $returnStr .= $tmp;
       return $returnStr;
    }
-   
+   elsif( lc $cmd eq "tr064servicelist" ) {
+      return FRITZBOX_TR064_Get_ServiceList ($hash);
+   }
+      
    my $list = "ringTones:noArg";
    $list .= " luaQuery"      if AttrVal( $name, "allowTR064Command", 0 );
-   $list .= " tr064Command"  if AttrVal( $name, "allowTR064Command", 0 );
+   $list .= " tr064Command"  if AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT};;
+   $list .= " tr064ServiceList:noArg"      if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " shellCommand"     if AttrVal( $name, "allowShellCommand", 0 );
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
@@ -1410,9 +1415,11 @@ sub FRITZBOX_Readout_Process($$)
    # Statistics
       if ( defined $values{".box_TodayBytesReceivedLow"} && defined $hash->{READINGS}{".box_TodayBytesReceivedLow"}) {
          my $valueHigh = $values{".box_TodayBytesReceivedHigh"} - $hash->{READINGS}{".box_TodayBytesReceivedHigh"}{VAL};
-         my $time = time()-time_str2num($hash->{READINGS}{".box_TodayBytesReceivedLow"}{TIME});
+         $valueHigh *= 2**22;
          my $valueLow = $values{".box_TodayBytesReceivedLow"} - $hash->{READINGS}{".box_TodayBytesReceivedLow"}{VAL};;
-         readingsBulkUpdate( $hash, "box_rateDown", sprintf ("%.3f", ($valueHigh*2**22+$valueLow/2**10) / $time )); 
+         $valueLow /= 2**10;
+         my $time = time()-time_str2num($hash->{READINGS}{".box_TodayBytesReceivedLow"}{TIME});
+         readingsBulkUpdate( $hash, "box_rateDown", sprintf ("%.3f", ($valueHigh+$valueLow) / $time )); 
       }
       if ( defined $values{".box_TodayBytesSentLow"} && defined $hash->{READINGS}{".box_TodayBytesSentLow"}) {
          my $valueHigh = $values{".box_TodayBytesSentHigh"} - $hash->{READINGS}{".box_TodayBytesSentHigh"}{VAL};
@@ -3566,6 +3573,94 @@ sub FRITZBOX_TR064_Cmd($$$)
 
 } # End of FRITZBOX_TR064_Cmd
 
+#################################################
+# get Fritzbox tr064servicelist
+sub FRITZBOX_TR064_Get_ServiceList($)
+{
+   my ($hash) = @_;
+   my $name = $defs{NAME};
+
+   
+   if ( $missingModulWeb ) {
+      my $msg = "Error: Perl modul " . $missingModulWeb . "is missing on this system. Please install before using this modul.";
+      FRITZBOX_Log $hash, 2, $msg;
+      return $msg;
+   }
+
+   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $url = 'http://'.$host.":49000/tr64desc.xml";
+
+   my $returnStr = "TR-064 service actions on the device '$host'\n";
+
+      FRITZBOX_Log $hash, 5, "Getting service page $url";
+   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+   my $response = $agent->get( $url );
+
+   return "$url does not exist"     if $response->is_error();
+
+   my $content = $response->content;
+   my @serviceArray;
+   
+# Get basic service data
+   while( $content =~ /<service>(.*?)<\/service>/isg ) {
+      my $serviceXML = $1;
+      my @service;
+      my $service = $1     if $serviceXML =~ m/<servicetype>urn:dslforum-org:service:(.*?)<\/servicetype>/is;
+      my $control = $1     if $serviceXML =~ m/<controlurl>\/upnp\/control\/(.*?)<\/controlurl>/is;
+      my $scpd = $1     if $serviceXML =~ m/<scpdurl>(.*?)<\/scpdurl>/is;
+
+      push @serviceArray, [$service, $control, $scpd];
+   }
+
+# Get actions of each service
+   foreach (@serviceArray) {
+
+      $returnStr .= "_" x 100 ."\n\n";
+      $returnStr .= "Service: '$_->[0]'     Control: '$_->[1]'     XML: '$_->[2]'\n";
+      $returnStr .= "-" x 100 ."\n";
+   
+      $url = 'http://'.$host.":49000".$_->[2];
+
+         FRITZBOX_Log $hash, 5, "Getting action page $url";
+      my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+      my $response = $agent->get( $url );
+
+      return "ServiceSCPD $url does not exist"     if $response->is_error();
+
+      my $content = $response->content;
+      while( $content =~ /<action>(.*?)<\/action>/isg ) {
+
+         my $serviceXML = $1;
+         $serviceXML =~ /<name>(.*?)<\/name>/is;
+         my $action = $1;
+         $serviceXML =~ /<argumentlist>(.*?)<\/argumentlist>/is;
+         my $argXML = $1;
+
+         $returnStr .= "$action (";
+
+         my @argArray = ($argXML =~ /<argument>(.*?)<\/argument>/isg);
+         my @argOut;
+         foreach (@argArray) {
+            $_ =~ /<name>(.*?)<\/name>/is;
+            my $argName = $1;
+            $_ =~ /<direction>(.*?)<\/direction>/is;
+            my $argDir = $1;
+            if ($argDir eq "in") { $returnStr .= " $argName"; }
+            else { push @argOut, $argName; }
+         }
+         $returnStr .= " )";
+         $returnStr .= " = ("        if int @argOut;
+         foreach (@argOut) {
+            $returnStr .= " $_";
+         }
+         $returnStr .= " )"        if int @argOut;
+         $returnStr .= "\n";
+      }
+   }
+
+   return $returnStr;
+}
+   
 # Opens a Web connection to an external Fritzbox
 ############################################
 sub FRITZBOX_Web_OpenCon ($)
@@ -4055,7 +4150,7 @@ sub FRITZBOX_fritztris($)
          It needs to be the name of the path on the Fritz!Box. So, it should start with /var/InternerSpeicher if it equals in Windows \\ip-address\fritz.nas
       </li><br>
 
-      <li><code>forceTelnet &lt;0 | 1&gt;</code>
+      <li><code>forceTelnetConnection &lt;0 | 1&gt;</code>
          <br>
          Always use telnet for remote access (instead of access via the WebGUI or TR-064).
          <br>
@@ -4359,7 +4454,7 @@ sub FRITZBOX_fritztris($)
          Es muss ein Pfad auf der Fritz!Box sein. D.h., er sollte mit /var/InternerSpeicher starten, wenn es in Windows unter \\ip-address\fritz.nas erreichbar ist.
       </li><br>
 
-      <li><code>forceTelnet &lt;0 | 1&gt;</code>
+      <li><code>forceTelnetConnection &lt;0 | 1&gt;</code>
          <br>
          Erzwingt den Fernzugriff über Telnet (anstatt &uuml;ber die WebGUI oder TR-064).
          <br>
