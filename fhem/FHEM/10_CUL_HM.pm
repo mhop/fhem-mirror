@@ -6967,12 +6967,13 @@ sub CUL_HM_repReadings($) {   # parse repeater
   my @readList;
   push @readList,"repPeer_".sprintf("%02d",$_+1).":undefined" for(0..35);#set default empty
   my @retL;
+  my @repAttr;
+  push @repAttr," " for(0..35);
   foreach my$pId(sort keys %pCnt){
     my ($pdID,$bdcst,$no) = unpack('A6A2A2',$pId);
     my $fNo = $no-1;#shorthand field number, often used
     my $sName = CUL_HM_id2Name($pdID);
-
-    if ($sName eq $pdID && $pD[$fNo]){
+    if ($sName eq $pdID && $pD[$fNo] && $defs{$pD[$fNo]}){
       $sName = $defs{$pD[$fNo]}->{IODev}{NAME}
             if($attr{$defs{$pD[$fNo]}->{IODev}{NAME}}{hmId} eq $pdID);
     }
@@ -6984,9 +6985,13 @@ sub CUL_HM_repReadings($) {   # parse repeater
               ,($pB[$fNo] && (  ($bdcst eq "01" && $pB[$fNo] eq "y")
                               ||($bdcst eq "00" && $pB[$fNo] eq "n")) ?"ok":"fail")
               );
+    $repAttr[$fNo] = "$sName:"
+                .((!$pS[$fNo] || $pS[$fNo] ne $sName)?"-":$pD[$fNo])
+                .":".($pB[$fNo]?$pB[$fNo]:"-");          
     push @retL,$eS;
     $readList[$fNo]="repPeer_".$eS;
   }
+  $attr{$hash->{NAME}}->{repPeers} = join",",@repAttr;
   CUL_HM_UpdtReadBulk($hash,0,@readList);
   return "No Source          Dest            Bcast\n". join"\n", sort @retL;
 }
@@ -7464,7 +7469,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
     unshift @ios,@{$hash->{helper}{io}{prefIO}} if ($hash->{helper}{io}{prefIO});# set prefIO to first choice
     foreach my $iom (@ios){
       if (  !$defs{$iom}
-          || ReadingsVal($iom,"state","") eq "disconnected" 
+          || ReadingsVal($iom,"state","") =~ m/(disconnected|overload)/
           || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB?
         next;
       }
