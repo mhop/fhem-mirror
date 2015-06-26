@@ -184,21 +184,16 @@ sub FRITZBOX_Define($$)
    }
 
 #   unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
-   unless ( -X "/usr/bin/ctlmgr_ctl" )
-   {
+   unless ( -X "/usr/bin/ctlmgr_ctl" ) {
       $hash->{REMOTE} = 1;
       FRITZBOX_Log $hash, 4, "FRITZBOX runs in remote mode";
    }
-   elsif ( $< != 0 ) 
-   {
-      $msg = "Error - FHEM is not running under root (currently " .
-          ( getpwuid( $< ) )[ 0 ] .
-          ") but we need to be root";
-      FRITZBOX_Log $hash, 1, $msg;
-      return $msg;
+   elsif ( $< != 0 ) {
+      FRITZBOX_Log $hash, 3, "FHEM is not running under root user (currently " .
+          ( getpwuid( $< ) )[ 0 ] . "). FRITZBOX runs in remote mode.";
+      $hash->{REMOTE} = 1;
    }
-   else
-   {
+   else {
       $hash->{REMOTE} = 0;
       FRITZBOX_Log $hash, 4, "FRITZBOX runs in local mode";
    }
