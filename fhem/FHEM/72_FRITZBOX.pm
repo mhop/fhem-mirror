@@ -3590,7 +3590,8 @@ sub FRITZBOX_TR064_Get_ServiceList($)
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
    my $url = 'http://'.$host.":49000/tr64desc.xml";
 
-   my $returnStr = "TR-064 service actions on the device '$host'\n";
+   my $returnStr = "_" x 100 ."\n\n";
+   $returnStr .= " List of TR-064 services and actions that are allowed on the device '$host'\n";
 
       FRITZBOX_Log $hash, 5, "Getting service page $url";
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
@@ -3615,10 +3616,6 @@ sub FRITZBOX_TR064_Get_ServiceList($)
 # Get actions of each service
    foreach (@serviceArray) {
 
-      $returnStr .= "_" x 100 ."\n\n";
-      $returnStr .= "Service: '$_->[0]'     Control: '$_->[1]'     XML: '$_->[2]'\n";
-      $returnStr .= "-" x 100 ."\n";
-   
       $url = 'http://'.$host.":49000".$_->[2];
 
          FRITZBOX_Log $hash, 5, "Getting action page $url";
@@ -3628,6 +3625,18 @@ sub FRITZBOX_TR064_Get_ServiceList($)
       return "ServiceSCPD $url does not exist"     if $response->is_error();
 
       my $content = $response->content;
+
+# get version
+      $content =~ /<major>(.*?)<\/major>/isg;
+      my $version = $1;
+      $content =~ /<minor>(.*?)<\/minor>/isg;
+      $version .= ".".$1;
+      
+      $returnStr .= "_" x 100 ."\n\n";
+      $returnStr .= " Service: ".$_->[0]."     Control: ".$_->[1]."\n";
+      $returnStr .= " Spec: http://".$host.":49000".$_->[2]."    Version: ".$version."\n";
+      $returnStr .= "-" x 100 ."\n";
+
       while( $content =~ /<action>(.*?)<\/action>/isg ) {
 
          my $serviceXML = $1;
@@ -3636,7 +3645,7 @@ sub FRITZBOX_TR064_Get_ServiceList($)
          $serviceXML =~ /<argumentlist>(.*?)<\/argumentlist>/is;
          my $argXML = $1;
 
-         $returnStr .= "$action (";
+         $returnStr .= "  $action (";
 
          my @argArray = ($argXML =~ /<argument>(.*?)<\/argument>/isg);
          my @argOut;
@@ -4116,11 +4125,16 @@ sub FRITZBOX_fritztris($)
 
       <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[parameterName1 parameterValue1] ...] </code>
          <br>
-         Executes TR-064 actions (see <a href="http://avm.de/service/schnittstellen/">API description</a> of AVM and on the <a href="http://fritz.box:49000/tr64desc.xml">box</a>)
+         Executes TR-064 actions (see <a href="http://avm.de/service/schnittstellen/">API description</a> of AVM)
          <br>
          Example: <code>get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
          <br>
          Only available if the attribute "allowTR064Command" is set.
+      </li><br>
+
+      <li><code>get &lt;name&gt; tr064ServiceListe</code>
+         <br>
+         Shows a list of TR-064 services and actions that are allowed on the device.
       </li><br>
 
    </ul>  
@@ -4415,13 +4429,17 @@ sub FRITZBOX_fritztris($)
 
       <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[parameterName1 parameterValue1] ...] </code>
          <br>
-         F&uuml;hrt &uuml;ber TR-064 Aktionen aus (siehe <a href="http://avm.de/service/schnittstellen/">Schnittstellenbeschreibung</a> von AVM und auf der <a href="http://fritz.box:49000/tr64desc.xml">Box</a>)
+         F&uuml;hrt &uuml;ber TR-064 Aktionen aus (siehe <a href="http://avm.de/service/schnittstellen/">Schnittstellenbeschreibung</a> von AVM)
          <br>
          Beispiel: <code>get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDECTHandsetInfo NewDectID 1</code>
          <br>
          Muss zuvor &uuml;ber das Attribute "allowTR064Command" freigeschaltet werden.
       </li><br>
 
+      <li><code>get &lt;name&gt; tr064ServiceListe</code>
+         <br>
+         Zeigt die Liste der TR-064-Dienste und Aktionen, die auf dem Ger&auml;t erlaubt sind.
+      </li><br>
    </ul>  
   
    <a name="FRITZBOXattr"></a>
