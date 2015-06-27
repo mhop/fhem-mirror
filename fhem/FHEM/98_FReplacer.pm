@@ -14,6 +14,10 @@
 #   2014-11-08  added the attributes Reading.*, MaxAge.*, MinValue.*, MaxValue.* and Format.*
 #   2014-11-15  fixed bugs related to RepReading and InternalTimer
 #   2014-12-05  definierte Attribute werden der userattr list der Instanz hinzugefügt
+#   2014-12-25  little bug fixes, kleineres Datum ergänzt
+#   2015-03-22  flexibleres Datumsformat für das Reading LastUpdate per strftime ergänzt 
+#   2015-04-25  allow {expr} as replacement for MaxAge, MinValue and MaxValue
+#
 
 package main;
 
@@ -48,8 +52,10 @@ sub FReplacer_Initialize($)
                         "Rep[0-9]+MaxValue " .      # optional Max Value of Reading
                         "Rep[0-9]+Format " .        # optional Format string for Replacement
                         "Rep[0-9]+Expr " .          # optional Expression to be evaluated before using the replacement
+                        "Rep[0-9]+Comment " .       # optional comment or this replacement
                         "ReplacementEncode " .      # Ergebnis einer Ersetzung z.B. in UTF-8 Encoden
                         "PostCommand " .            # Systembefehl, der nach der Ersetzung ausgeführt wird
+                        "LUTimeFormat " .           # time format for strftime for LastUpdate
                         $readingFnAttributes;  
 }
 
@@ -129,7 +135,7 @@ FReplacer_Attr(@)
                 Log3 $name, 3, "$name: wrong format in attr $name $aName $aVal";
                 return "Invalid Format $aVal in $aName";
             }
-        } elsif ($aName =~ "Format") {
+        } elsif ($aName =~ "Rep[0-9]+Format") {
             my $useless = eval { sprintf ($aVal, 1) };
             if ($@) {
                 Log3 $name, 3, "$name: Invalid Format in attr $name $aName $aVal: $@";
@@ -184,8 +190,11 @@ FReplacer_Update($) {
         $content .= $_;
     }
     
-    my $time = strftime("%d.%m.%Y   %T", localtime);
+    my $timeFormat = AttrVal($name, "LUTimeFormat", "%d.%m.%Y %T");
+    my $time = strftime($timeFormat, localtime);
     readingsSingleUpdate($hash, "LastUpdate", $time, 1 );
+    my $time2 = strftime("%d.%m %R", localtime);
+    readingsSingleUpdate($hash, "LastUpdateSmall", $time2, 1 );
     
     foreach my $key (keys %{$attr{$name}}) {
         if ($key =~ /Rep([0-9]+)Regex/) {
@@ -214,7 +223,13 @@ FReplacer_Update($) {
                     my $rep = $2;
                     Log3 $name, 5, "$name: check max age $max";
                     if (gettimeofday() - time_str2num($timestamp) > $max) {
-                        Log3 $name, 5, "$name: reading too old - using $rep instead and skipping optional Expr and Format attributes";
+                        if ($rep =~ "{(.*)}") {
+                            Log3 $name, 5, "$name: reading too old - using Perl expression as MaxAge replacement: $1";
+                            $rep = eval($1);
+                            Log3 $name, 5, "$name: result is $rep";
+                        } else {
+                            Log3 $name, 5, "$name: reading too old - using $rep instead and skipping optional Expr and Format attributes";
+                        }
                         $replacement = $rep;
                         $skip = 1;
                     }
@@ -228,6 +243,11 @@ FReplacer_Update($) {
                     my $rep = $2;
                     Log3 $name, 5, "$name: check min value $lim";
                     if ($replacement < $lim) {
+                        if ($rep =~ "{(.*)}") {
+                            Log3 $name, 5, "$name: using Perl expression as replacement: $1";
+                            $rep = eval($1);
+                            Log3 $name, 5, "$name: result is $rep";
+                        }
                         Log3 $name, 5, "$name: reading too small - using $rep instead and skipping optional Expr and Format attributes";
                         $replacement = $rep;
                         $skip = 1;
@@ -242,6 +262,11 @@ FReplacer_Update($) {
                     my $rep = $2;
                     Log3 $name, 5, "$name: check max value $lim";
                     if ($replacement > $lim) {
+                        if ($rep =~ "{(.*)}") {
+                            Log3 $name, 5, "$name: using Perl expression as replacement: $1";
+                            $rep = eval($1);
+                            Log3 $name, 5, "$name: result is $rep";
+                        }
                         Log3 $name, 5, "$name: reading too big - using $rep instead and skipping optional Expr and Format attributes";
                         $replacement = $rep;
                         $skip = 1;
@@ -259,8 +284,8 @@ FReplacer_Update($) {
                 }
             }
             if ($attr{$name}{"Rep${index}Format"} && !$skip) {
-                Log3 $name, 5, "$name: doing sprintf with format" . $attr{$name}{"Rep${index}Format"} .
-                    "value is $replacement";
+                Log3 $name, 5, "$name: doing sprintf with format " . $attr{$name}{"Rep${index}Format"} .
+                    " value is $replacement";
                 $replacement = sprintf($attr{$name}{"Rep${index}Format"}, $replacement);
                 Log3 $name, 5, "$name: result is $replacement";
             }
@@ -347,12 +372,23 @@ FReplacer_Update($) {
             starts a replace without waiting for the interval
     </ul>
     <br>
+
     <a name="FReplacerget"></a>
     <b>Get-Commands</b><br>
     <ul>
         none
     </ul>
     <br>
+
+    <a name="FReplacerReadings"></a>
+    <b>Readings</b><br>
+    <ul>
+        <li><b>LastUpdate</b></li>
+            Date / Time of the last update of the output file / image. This reading is formatted with strftime and the default format string is "%d.%m.%Y %T".<br> This can be changed with the attribute LUTimeFormat.
+    </ul>
+    <br>
+
+
     <a name="FReplacerattr"></a>
     <b>Attributes</b><br><br>
     <ul>
@@ -362,11 +398,14 @@ FReplacer_Update($) {
             defines a device and reading to be used as replacement value. It is specified as devicename:readingname:default_value.<br>
             The default_value is optional and defaults to 0. If the reading doesn't exist, default_value is used.
         <li><b>Rep[0-9]+MaxAge</b></li>
-            this can optionally be used together with RepReading to define a maximum age of the reading. It is specified as seconds:replacement. If the corresponding reading has not been updated for the specified number of seconds, then the replacement string is used instead of the reading to do the replacement and further RepExpr or RepFormat attributes will be ignored for this value<br>
+            this can optionally be used together with RepReading to define a maximum age of the reading. It is specified as seconds:replacement. If the corresponding reading has not been updated for the specified number of seconds, then the replacement is used instead of the reading to do the replacement and further RepExpr or RepFormat attributes will be ignored for this value<br>
+            If you specify the replacement as {expr} then it is evaluated as a perl expression instead of a string.<br>
         <li><b>Rep[0-9]+MinValue</b></li>
             this can optionally be used together with RepReading to define a minimum value of the reading. It is specified as min:replacement. If the corresponding reading is too small, then the replacement string is used instead of the reading to do the replacement and further RepExpr or RepFormat attributes will be ignored for this value<br>
+            If you specify the replacement as {expr} then it is evaluated as a perl expression instead of a string.<br>
         <li><b>Rep[0-9]+MaxValue</b></li>
             this can optionally be used together with RepReading to define a maximum value of the reading. It is specified as max:replacement. If the corresponding reading is too big, then the replacement string is used instead of the reading to do the replacement and further RepExpr or RepFormat attributes will be ignored for this value<br>
+            If you specify the replacement as {expr} then it is evaluated as a perl expression instead of a string.<br>
         <li><b>Rep[0-9]+Expr</b></li>
             defines an optional expression that can be used to compute the replacement value. If RepExpr is used together with RepReading then the expression is evaluated after getting the reading and the value of the reading can be used in the expression as $replacement. <br>
             If only RepExpr is specified then readings can be retrieved with the perl function ReadingsVal() inside the expression. <br>
@@ -374,6 +413,8 @@ FReplacer_Update($) {
         <li><b>Rep[0-9]+Format</b></li>
             defines an optional format string to be used in a sprintf statement to format the replacement before it is applied.<br>
             Can be used with RepReading or RepExpr or both.
+        <li><b>LUTimeFormat</b></li>
+            defines a time format string (see Posix strftime format) to be used when creating the reading LastUpdate.
         <li><b>PostCommand</b></li>
             Execute an external command after writing the output file, e.g. to convert a resulting SVG file to a PNG file.
             For an eInk Kindle you need a PNG in 8 bit greyscale format. A simple example to call the convert utility from ImageMagick would be <br>
