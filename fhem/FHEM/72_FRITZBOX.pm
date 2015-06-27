@@ -1129,18 +1129,25 @@ sub FRITZBOX_Readout_Run_Web($)
    my $runNo;
    my $sid;
    
-   my $slowRun = 0;
    if ( int(time/3600) != $hash->{fhem}{lastHour} || $hash->{fhem}{LOCAL} == 1) {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->lastHour", int(time/3600);
-      $slowRun = 1;
+      
       FRITZBOX_Log $hash, 4, "Start update of slow changing device readings.";
-   }
-   else {
-      FRITZBOX_Log $hash, 4, "Start update of fast changing device readings.";
-   }
-
-   my $returnStr;
+   # Box model
+      my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+      my $url = "http://$host/cgi-bin/system_status";
+      
+      my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
+      my $response = $agent->get ($url);
+      my $content  = $response->content;
+      $content=$1 if $content =~ /<body>(.*)<\/body>/;
+      
+      my @result = split /-/, $content;
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+   }  
  
+   FRITZBOX_Log $hash, 4, "Start update of fast changing device readings.";
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
@@ -1171,6 +1178,9 @@ sub FRITZBOX_Readout_Run_Web($)
    $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
    if (exists $result->{Error}) {
       FRITZBOX_Log $hash, 2, "Error: ".$result->{Error};
+      my $returnStr = "Error|" . $result->{Error};
+      $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
+      return $name."|".encode_base64($returnStr,"");
    }
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
@@ -1339,24 +1349,8 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, ".box_TodayBytesSentHigh", $result->{TodayBytesSentHigh};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, ".box_TodayBytesSentLow", $result->{TodayBytesSentLow};
   
-   if ($slowRun == 1)
-   {
-   # Box model
-      my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
-      my $url = "http://$host/cgi-bin/system_status";
-      
-      my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
-      my $response = $agent->get ($url);
-      my $content  = $response->content;
-      $content=$1 if $content =~ /<body>(.*)<\/body>/;
-      
-      my @result = split /-/, $content;
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
-   }  
-   
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
-   $returnStr .= join('|', @roReadings );
+   my $returnStr = join('|', @roReadings );
 
    FRITZBOX_Log $hash, 4, "Captured " . @roReadings . " values";
    FRITZBOX_Log $hash, 5, "Handover (".length ($returnStr)."): ".$returnStr;
