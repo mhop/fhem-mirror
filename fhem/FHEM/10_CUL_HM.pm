@@ -9,6 +9,9 @@ use strict;
 use warnings;
 use HMConfig;
 
+eval "use Crypt::Rijndael";
+my $cryptFunc = ($@)?0:1;
+
 # ========================import constants=====================================
 
 my $culHmModel            =\%HMConfig::culHmModel;
@@ -1179,6 +1182,9 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   elsif($parse eq "NACK"){
     push @evtEt,[$shash,1,"state:NACK"];
+  }
+  elsif($parse eq "AES"){
+    ;# nothing todo
   }
   elsif($mTp eq "12") {#$lcm eq "09A112" Another fhem request (HAVE_DATA)
     ;
@@ -2566,6 +2572,15 @@ sub CUL_HM_parseCommon(@){#####################################################
         return "done";
       }
     }
+    if (defined($shash->{helper}{AESreqAck})) {
+      if ($shash->{helper}{AESreqAck} eq substr($p, -1 * length($shash->{helper}{AESreqAck}))) {
+        push @evtEt,[$shash,1,"aesCommToDev:ok"];
+      } 
+      else {
+        push @evtEt,[$shash,1,"aesCommToDev:fail"];
+      }
+      delete $shash->{helper}{AESreqAck};
+    }
 
     if   ($subType =~ m/^8/){#NACK
       #82 : peer not accepted - list full (VD)
@@ -2599,12 +2614,49 @@ sub CUL_HM_parseCommon(@){#####################################################
         }
       }
     }
-    elsif($subType eq "04"){ #ACK-AES, interim########
-      my (undef,$key,$aesKeyNbr) = unpack'A2A12A2',$p;
+    elsif($subType eq "04"){ #ACK-AES, ###############
+      my (undef,$challenge,$aesKeyNbr) = unpack'A2A12A2',$p;
       push @evtEt,[$shash,1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);# if   ($msgStat =~ m/AESKey/)
-      #push @evtEt,[$shash,1,"aesCommToDev:".substr($msgStat,7)];#elsif($msgStat =~ m/AESCom/){# AES communication to central
-      #$success = ""; #result not final, another response should come
-      $reply = "done";
+
+      if ($shash->{IODev}->{TYPE} eq "CUL" &&    #IO is CUL
+          defined($aesKeyNbr)) {
+        if ($cryptFunc == 1 &&                    #AES is available
+	    $shash->{helper}{prt}{rspWait}{cmd}){ #There is a previously executed command
+          my (undef, %keys) = CUL_HM_getKeys($shash);
+        
+          my $kNo = hex($aesKeyNbr) / 2;
+          Log3 $shash,5,"CUL_HM $shash->{NAME} signing request for $shash->{helper}{prt}{rspWait}{cmd} challenge: "
+                        .$challenge." kNo: ".$kNo;
+        
+          if (!defined($keys{$kNo})) {
+            Log3 $shash,1,"CUL_HM $shash->{NAME} unknown key for index $kNo, define it in the VCCU!";
+            $reply = "done";
+          } 
+          else {
+            my $key = $keys{$kNo} ^ pack("H12", $challenge);
+            my $cipher = Crypt::Rijndael->new($key, Crypt::Rijndael::MODE_ECB());
+            my($s,$us) = gettimeofday();
+            my $respRaw = pack("NnH20", $s, $us, substr($shash->{helper}{prt}{rspWait}{cmd}, 4, 20));
+            my $response = $cipher->encrypt($respRaw);
+            $shash->{helper}{AESreqAck} = uc(unpack("H*", substr($response,0,4)));
+            Log3 $shash,5,"CUL_HM $shash->{NAME} signing response: ".unpack("H*", $respRaw)
+                           ." should send $shash->{helper}{AESreqAck} to authenticate";
+            $response = $response ^ pack("H*", substr($shash->{helper}{prt}{rspWait}{cmd}, 24));
+            $response = $cipher->encrypt(substr($response, 0, 16));
+        
+            CUL_HM_SndCmd($shash, $mNo.$mFlg.'03'.CUL_HM_IoId($shash).$src.unpack("H*", $response));
+        
+            $reply = "AES";
+          }
+        } 
+        elsif ($cryptFunc != 1){                     #AES is not available
+          Log3 $shash,1,"CUL_HM ".$shash->{NAME}." need Crypt::Rijndael to answer signing request with CUL";
+          $reply = "done";
+        } 
+      }
+      else {
+        $reply = "done";
+      }
     }
     else{                    #ACK
       $success = "yes";
@@ -2872,6 +2924,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       @{$modules{CUL_HM}{helper}{qReqStat}} = grep { $_ ne $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{qReqStat}};
 
+      CUL_HM_unQEntity($shash->{NAME},"qReqStat");
       if ($pendType eq "StatusReq"){#it is the answer to our request
         my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc};
@@ -3429,6 +3482,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $_ = "$cmd:".join(",",@vArr);
       }
     }
+    @arr1 = ("--") if (!scalar @arr1);
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
@@ -4997,10 +5051,45 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $oldKeyIdx = ReadingsVal($name, "aesKeyNbr", "00");
     return "current key unknown" if (!defined $oldKeyIdx || $oldKeyIdx eq "");
 
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.'01'.
-                        sprintf("%02X",$oldKeyIdx));
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.'01'.
-                        sprintf("%02X",($oldKeyIdx+1)));
+    my ($key1,$key2);
+
+    if ($hash->{IODev}->{TYPE} eq "CUL") {
+      return "$cmd needs Crypt::Rijndael for updating keys with CUL"
+            if ($cryptFunc != 1);
+
+      my ($newKeyIdx, %keys) = CUL_HM_getKeys($hash);
+      my $oldKey = $keys{hex($oldKeyIdx)/2};
+
+      return "$cmd requires VCCU with hmKeys"                     if ($newKeyIdx == 0);
+      return "$cmd needs old key with index ".(hex($oldKeyIdx)/2) if (!defined($oldKey));
+
+      my $newKey = $keys{$newKeyIdx};
+      my $payload1 = pack("CCa8nN",1                      #changekey?
+                                  ,$newKeyIdx*2           #index for first part of key
+                                  ,substr($newKey, 0, 8)  #first 8 bytes of new key
+                                  ,rand(0xffff)           #random
+                                  ,0x7e296fa5);           #magic
+      my $payload2 = pack("CCa8nN",1                      #changekey?
+                                  ,($newKeyIdx*2)+1       #index for second part of key
+                                  ,substr($newKey, 8, 8)  #second 8 bytes of new key
+                                  ,rand(0xffff)           #random
+                                  ,0x7e296fa5);           #magic
+
+      my $cipher = Crypt::Rijndael->new($oldKey, Crypt::Rijndael::MODE_ECB());
+      Log3 $name,2,"CUL_HM $name assignHmKey index ".(hex($oldKeyIdx)/2)." to ".$newKeyIdx
+                                ." Key1: ".unpack("H*", $payload1)
+                                ." Key2: ".unpack("H*", $payload2);
+      
+      $key1 = unpack("H*", $cipher->encrypt($payload1));
+      $key2 = unpack("H*", $cipher->encrypt($payload2));
+    } 
+    else {
+      $key1 = sprintf("%02X",$oldKeyIdx);
+      $key2 = sprintf("%02X",($oldKeyIdx+1));
+    }
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.'01'.$key1);
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.'01'.$key2);
+
   }
  
   else{
@@ -6272,6 +6361,24 @@ sub CUL_HM_getAssChnNames($) { #in: name out:list of assotiated chan and device
   }
   return sort(@chnN);
 }
+sub CUL_HM_getKeys($) { #in: device-hash out:highest index, hash with keys
+  my ($hash) = @_;
+  my $highestIdx = 0;
+  my %keys = ();
+  $keys{0} = pack("H*", "A4E375C6B09FD185F27C4E96FC273AE4"); #index 0: eQ-3 default
+  if (defined($hash->{IODev}->{owner_CCU})) {
+    my $vccu = $hash->{IODev}->{owner_CCU};
+    foreach my $i (1..3){
+      my ($kNo,$k) = split(":",AttrVal($vccu,"hmKey".($i== 1?"":$i),""));
+      if (defined($k)) {
+        $keys{hex($kNo)} = pack("H*", $k);
+        $highestIdx = hex($kNo) if (hex($kNo) > $highestIdx);
+      }
+    }
+  }
+  return ($highestIdx, %keys);
+}
+
 #+++++++++++++++++ Conversions names, hashes, ids++++++++++++++++++++++++++++++
 #Performance opti: subroutines may consume up to 5 times the performance
 #
@@ -7574,7 +7681,7 @@ sub CUL_HM_readStateTo($){#staterequest not working
   my ($eN) = @_;
   $eN = substr($eN,6) if ($eN =~ m/^sUpdt:/);
   CUL_HM_UpdtReadSingle($defs{$eN},"state","unreachable",1);
-  CUL_HM_stateUpdatDly($eN,1800);
+  CUL_HM_stateUpdatDly($eN,1800 );
 }
 sub CUL_HM_procQs($){#process non-wakeup queues
   # --- verify send is possible
