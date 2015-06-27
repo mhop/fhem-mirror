@@ -237,14 +237,16 @@ sub HMinfo_status($){##########################################################
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
   my @tpc;
-  push @tpc,"$_:$protC{$_}" foreach (grep {$protC{$_}} keys(%protC));
-  if(@tpc){push @updates,"CRIT__protocol:".join",",@tpc;} else{delete $hash->{READINGS}{CRIT__protocol} };
   my @tpe;
-  push @tpe,"$_:$protE{$_}" foreach (grep {$protE{$_}} keys(%protE));
-  if(@tpe){push @updates,"ERR__protocol:".join",",@tpe;} else{ delete $hash->{READINGS}{ERR__protocol} };
   my @tpw;
-  push @tpw,"$_:$protW{$_}" foreach (grep {$protW{$_}} keys(%protW));
-  if(@tpw){push @updates,"W__protocol:".join",",@tpw  ;} else{ delete $hash->{READINGS}{W__protocol} };
+  my @tpu = devspec2array("TYPE=CUL_HM:FILTER=state=unreachable");
+  push @tpc,"$_:$protC{$_}"   foreach (grep {$protC{$_}} keys(%protC));
+  push @tpe,"$_:$protE{$_}"   foreach (grep {$protE{$_}} keys(%protE));
+  push @tpw,"$_:$protW{$_}"   foreach (grep {$protW{$_}} keys(%protW));
+  if(@tpc){push @updates,"CRIT__protocol:"  .join",",@tpc;} else{ delete $hash->{READINGS}{CRIT__protocol} };
+  if(@tpe){push @updates,"ERR__protocol:"   .join",",@tpe;} else{ delete $hash->{READINGS}{ERR__protocol} };
+  if(@tpw){push @updates,"W__protocol:"     .join",",@tpw;} else{ delete $hash->{READINGS}{W__protocol} };
+  if(@tpu){push @updates,"ERR__unreachable:".scalar(@tpu);} else{ delete $hash->{READINGS}{ERR__unreachable} };
 
   @protNamesC = grep !/^$/,HMinfo_noDup(@protNamesC);
   $hash->{CRI__protoNames} = join",",@protNamesC if(@protNamesC);
@@ -252,6 +254,7 @@ sub HMinfo_status($){##########################################################
   $hash->{ERR__protoNames} = join",",@protNamesE if(@protNamesE);
   @protNamesW = grep !/^$/,HMinfo_noDup(@protNamesW);
   $hash->{W__protoNames} = join",",@protNamesW if(@protNamesW);
+  $hash->{W__unreachNames} = join(",",@tpu) if(@tpu);
 
   if (defined $modules{CUL_HM}{helper}{qReqConf} &&
       @{$modules{CUL_HM}{helper}{qReqConf}}>0){
