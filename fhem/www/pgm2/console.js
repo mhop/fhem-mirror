@@ -60,6 +60,8 @@ consStart()
       '</div>');
 
     $('#evtfilterdlg').dialog({ modal:true,
+      position:{ my: "left top", at: "right bottom",
+                 of: this, collision: "flipfit" },
       close:function(){$('#evtfilterdlg').remove();},
       buttons:[
         { text:"Cancel", click:function(){ $(this).dialog('close'); }},
