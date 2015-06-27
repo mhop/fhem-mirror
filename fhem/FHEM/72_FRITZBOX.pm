@@ -340,7 +340,7 @@ sub FRITZBOX_Set($$@)
       if ( int @val > 0 && $val[0] =~ /^(1|2|3)$/ ) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return FRITZBOX_Set_Alarm_Web ($hash, @val)
-            unless $forceTelnet;
+            unless $forceTelnet || $hash->{REMOTE} == 0;
          return FRITZBOX_Set_Alarm_Telnet ($hash, @val);
       }
    
@@ -381,7 +381,7 @@ sub FRITZBOX_Set($$@)
          my $state = $val[0];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
-         if ($forceTelnet) { # Telnet
+         if ($forceTelnet || $hash->{REMOTE} == 0) { # Telnet
             FRITZBOX_Exec( $hash, "ctlmgr_ctl w dect settings/enabled $state");
          }
          else { #webcm
@@ -399,7 +399,7 @@ sub FRITZBOX_Set($$@)
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
-         if ($forceTelnet) { # Telnet
+         if ($forceTelnet || $hash->{REMOTE} == 0) { # Telnet
             FRITZBOX_Exec( $hash, "ctlmgr_ctl w telcfg settings/Diversity".( $val[0] - 1 )."/Active ".$state );
          }
          else { #webcm
@@ -460,7 +460,7 @@ sub FRITZBOX_Set($$@)
       {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return FRITZBOX_StartRadio_Web $hash, @val
-            unless $forceTelnet;
+            unless $forceTelnet || $hash->{REMOTE} == 0;
          return FRITZBOX_StartRadio_Telnet $hash, @val;
       }
       
@@ -471,7 +471,7 @@ sub FRITZBOX_Set($$@)
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
-         if ($forceTelnet) { # Telnet
+         if ($forceTelnet || $hash->{REMOTE} == 0) { # Telnet
             FRITZBOX_Exec( $hash, "ctlmgr_ctl w tam settings/TAM".( $val[0] - 1 )."/Active ".$state );
          }
          elsif ($hash->{SECPORT}) { #TR-064
@@ -1684,7 +1684,7 @@ sub FRITZBOX_Set_Cmd_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Call_Run_Web";
-      $cmdFunction = "FRITZBOX_Call_Run_Telnet" if $forceTelnet;
+      $cmdFunction = "FRITZBOX_Call_Run_Telnet" if $forceTelnet || $hash->{REMOTE} == 0;
    }
 # Preparing SET guestWLAN
    elsif ($val[0] eq "guestwlan") {
@@ -1693,7 +1693,7 @@ sub FRITZBOX_Set_Cmd_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_GuestWlan_Run_Web";
-      $cmdFunction = "FRITZBOX_GuestWlan_Run_Telnet" if $forceTelnet;
+      $cmdFunction = "FRITZBOX_GuestWlan_Run_Telnet" if $forceTelnet || $hash->{REMOTE} == 0;
    }
 # Preparing SET RING
    elsif ($val[0] eq "ring") {
@@ -1706,7 +1706,7 @@ sub FRITZBOX_Set_Cmd_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Ring_Run_Web";
-      $cmdFunction = "FRITZBOX_Ring_Run_Telnet" if $forceTelnet;
+      $cmdFunction = "FRITZBOX_Ring_Run_Telnet" if $forceTelnet || $hash->{REMOTE} == 0;
    }
 # Preparing SET WLAN
    elsif ($val[0] eq "wlan") {
@@ -1715,7 +1715,7 @@ sub FRITZBOX_Set_Cmd_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Wlan_Run_Web";
-      $cmdFunction = "FRITZBOX_Wlan_Run_Telnet" if $forceTelnet;
+      $cmdFunction = "FRITZBOX_Wlan_Run_Telnet" if $forceTelnet || $hash->{REMOTE} == 0;
    }
 # No valid set operation
    else {
@@ -2734,10 +2734,10 @@ sub FRITZBOX_Ring_Run_Web($)
 #Preparing 1st command array
    @webCmdArray = ();
    
-# Creation fhemRadioStation for ttsLink
    if (int (@FritzFons) == 0 && $ttsLink) {
       FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, parameter 'say:' will be ignored."
    }
+# Creation fhemRadioStation for ttsLink
    elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM") {
       FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
       push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Name" => "FHEM";
