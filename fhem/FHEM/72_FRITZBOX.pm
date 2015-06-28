@@ -1494,28 +1494,29 @@ sub FRITZBOX_Readout_Aborted($)
 sub FRITZBOX_Readout_Format($$$)
 {
    my ($hash, $format, $readout) = @_;
-   
-   return $readout 
-      unless defined $format;
-   return $readout 
-      unless $readout ne "" && $format ne "" ;
+
+   $readout = ""        unless defined $readout;
+
+   return $readout       unless defined $format;
+   return $readout       unless $readout ne "" && $format ne "" ;
 
    if ($format eq "aldays") {
       if ($readout eq "0") {
          $readout = "once";
-      } elsif ($readout >= 127) {
+      }
+      elsif ($readout >= 127) {
          $readout = "daily";
-      } else {
+      }
+      else {
          my $bitStr = $readout;
          $readout = "";
-         foreach (sort {$a <=> $b} keys %alarmDays)
-         {
+         foreach (sort {$a <=> $b} keys %alarmDays) {
             $readout .= (($bitStr & $_) == $_) ? $alarmDays{$_}." " : "";
          }
          chop $readout;
       }
-   
-   } elsif ($format eq "alnumber") {
+   } 
+   elsif ($format eq "alnumber") {
       my $intern = $readout;
       if (1 <= $readout && $readout <=2) {
          $readout = "FON $intern";
@@ -1529,58 +1530,53 @@ sub FRITZBOX_Readout_Format($$$)
       }
       $readout .= " (".$hash->{fhem}{$intern}{name}.")"
          if defined $hash->{fhem}{$intern}{name};
-   
-   } elsif ($format eq "altime") {
+   } 
+   elsif ($format eq "altime") {
       $readout =~ s/(\d\d)(\d\d)/$1:$2/;
-   
-   } elsif ($format eq "deviceip") {
+   } 
+   elsif ($format eq "deviceip") {
       $readout = $landevice{$readout}." ($readout)"
          if defined $landevice{$readout};
-   
-   } elsif ($format eq "model") {
+   } 
+   elsif ($format eq "model") {
       $readout = $fonModel{$readout} if defined $fonModel{$readout};
-   
-   } elsif ($format eq "mohtype") {
+   } 
+   elsif ($format eq "mohtype") {
       $readout = $mohtype[$readout] if defined $mohtype[$readout];
       $readout = "" if $readout eq "er";
-   
-   } elsif ($format eq "nounderline") {
+   } 
+   elsif ($format eq "nounderline") {
       $readout =~ s/_/ /g;
-
-   } elsif ($format eq "onoff") {
+   } 
+   elsif ($format eq "onoff") {
       $readout =~ s/er//;
       $readout =~ s/no-emu//;
       $readout =~ s/0/off/;
       $readout =~ s/1/on/;
-   
-   } elsif ($format eq "radio") {
-      if (defined $hash->{fhem}{radio}{$readout})
-      {
+   } 
+   elsif ($format eq "radio") {
+      if (defined $hash->{fhem}{radio}{$readout}) {
          $readout = $hash->{fhem}{radio}{$readout};
       }
-      else
-      {
+      else {
          $readout .= " (unknown)";
       }
-  
-   } elsif ($format eq "ringtone") {
+   } 
+   elsif ($format eq "ringtone") {
       $readout = $ringTone{$readout};
-   
-   } elsif ($format eq "secondsintime") {
-      if ($readout < 243600)
-      {
+   } 
+   elsif ($format eq "secondsintime") {
+      if ($readout < 243600) {
          $readout = sprintf "%d:%02d", int $readout/3600, int( ($readout %3600) / 60);
       }
-      else
-      {
+      else {
          $readout = sprintf "%dd %d:%02d", int $readout/24/3600, int ($readout%24*3600)/3600, int( ($readout %3600) / 60);
       }
-   } elsif ($format eq "usertype") {
+   } 
+   elsif ($format eq "usertype") {
       $readout = $userType{$readout};
-   
    }
 
-   $readout = "" unless defined $readout;
    return $readout;
 }
 
@@ -2691,7 +2687,7 @@ sub FRITZBOX_Ring_Run_Web($)
    @webCmdArray = ();
    
    if (int (@FritzFons) == 0 && $ttsLink) {
-      FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, parameter 'say:' will be ignored."
+      FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, parameter 'say:' will be ignored.";
    }
 # Creation fhemRadioStation for ttsLink
    elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM") {
