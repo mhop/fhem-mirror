@@ -3978,29 +3978,34 @@ fhemTzOffset($)
 }
 
 sub
-fhemTimeGm($$$$$$) {
-    # see http://de.wikipedia.org/wiki/Unixzeit
-    my ($sec,$min,$hour,$mday,$month,$year) = @_;
+fhemTimeGm($$$$$$) 
+{
+  # see http://de.wikipedia.org/wiki/Unixzeit
+  my ($sec,$min,$hour,$mday,$month,$year) = @_;
 
-    # $mday= 1..
-    # $month= 0..11
-    # $year is year-1900
-    
-    $year+= 1900;
-    my $isleapyear= $year % 4 ? 0 : $year % 100 ? 1 : $year % 400 ? 0 : 1;
-    my $leapyears= int(($year-1969)/4) - int(($year-1901)/100) + int(($year-1601)/400);
-    #Debug sprintf("%02d.%02d.%04d %02d:%02d:%02d %d leap years, is leap year: %d", $mday,$month+1,$year,$hour,$min,$sec,$leapyears,$isleapyear);
+  # $mday= 1..
+  # $month= 0..11
+  # $year is year-1900
+  
+  $year += 1900;
+  my $isleapyear= $year % 4 ? 0 : $year % 100 ? 1 : $year % 400 ? 0 : 1;
+ 
+  # Forum #38610
+  my $leapyears_date = int(($year-1)/4) -int(($year-1)/100) +int(($year-1)/400);
+  my $leapyears_1970 = int((1970 -1)/4) -int((1970 -1)/100) +int((1970 -1)/400);
+  my $leapyears = $leapyears_date - $leapyears_1970; 
 
-    if ( $^O eq 'MacOS' ) {
-      $year-= 1904;
-    } else {
-      $year-= 1970; # the Unix Epoch
-    }
+  if ( $^O eq 'MacOS' ) {
+    $year -= 1904;
+  } else {
+    $year -= 1970; # the Unix Epoch
+  }
 
-    my @d= (0,31,59,90,120,151,181,212,243,273,304,334); # no leap day
-    # add one day in leap years if month is later than February
-    $mday++ if($month>1 && $isleapyear);
-    return $sec+60*($min+60*($hour+24*($d[$month]+$mday-1+365*$year+$leapyears)));
+  my @d = (0,31,59,90,120,151,181,212,243,273,304,334); # no leap day
+  # add one day in leap years if month is later than February
+  $mday++ if($month>1 && $isleapyear);
+  return $sec+60*($min+60*($hour+24*
+              ($d[$month]+$mday-1+365*$year+$leapyears)));
 }
 
 sub
