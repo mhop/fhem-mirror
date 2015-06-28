@@ -1184,7 +1184,7 @@ sub CUL_HM_Parse($$) {#########################################################
     push @evtEt,[$shash,1,"state:NACK"];
   }
   elsif($parse eq "AES"){
-    ;# nothing todo
+    return CUL_HM_pushEvnts();# exit now, don't send ACK
   }
   elsif($mTp eq "12") {#$lcm eq "09A112" Another fhem request (HAVE_DATA)
     ;
@@ -1788,11 +1788,6 @@ sub CUL_HM_Parse($$) {#########################################################
           else{                                #invalid PhysLevel
             $rSUpdt = 1;
             CUL_HM_stateUpdatDly($name,5) if ($shash->{helper}{dlvl});# update to get level
-            # CUL_HM_stateUpdatDly($name,5);     # update to get level
-            # we have to relay on device. Ack may come from a conditional event (BM)
-            # if condition is not met device will not send status. 
-            # We need to avoid regular requests
-            # therefore only update if we initiated the request
           }
         }
       }
@@ -4160,7 +4155,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "led") { ######################################################
     if ($md eq "HM-OU-LED16"){
       my %color=(off=>0,red=>1,green=>2,orange=>3);
-      if (length($hash->{DEF}) == 6){# command called for a device, not a channel
+      if ($roleD){# command called for a device, not a channel
         my $col4all;
         if (defined($color{$a[2]})){
           $col4all = sprintf("%02X",$color{$a[2]}*85);#Color for 4 LEDS
@@ -5083,11 +5078,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $key2 = unpack("H*", $cipher->encrypt($payload2));
     } 
     else {
-      $key1 = sprintf("%02X",$oldKeyIdx);
-      $key2 = sprintf("%02X",($oldKeyIdx+1));
+      $key1 = sprintf("01%02X",$oldKeyIdx);
+      $key2 = sprintf("01%02X",($oldKeyIdx+1));
     }
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.'01'.$key1);
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.'01'.$key2);
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.$key1);
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'04'.$id.$dst.$key2);
 
   }
  
