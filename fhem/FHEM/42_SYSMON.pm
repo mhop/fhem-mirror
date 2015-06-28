@@ -29,6 +29,7 @@ package main;
 
 use strict;
 use warnings;
+use Scalar::Util qw(looks_like_number);
 
 use Blocking;
 
@@ -37,7 +38,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.2.2";
+my $VERSION = "2.2.4";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -1755,6 +1756,8 @@ SYSMON_getCPUTemp_BBB($$) {
   if($hash->{helper}->{excludes}{'cputemp'}) {return $map;}
   
   my $val = SYSMON_execute($hash, "cat /sys/class/hwmon/hwmon0/device/temp1_input 2>&1");
+  if(!looks_like_number($val)) {return $map;}
+  
   $val = int($val);
   my $val_txt = sprintf("%.2f", $val/1000);
   $map->{+CPU_TEMP}="$val_txt";
