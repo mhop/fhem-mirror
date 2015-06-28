@@ -60,6 +60,7 @@ my %gets = (
 # Note: Known != implemented, see %sets & %gets for the implemented ones.
 use vars qw(%zw_func_id);
 use vars qw(%zw_type6);
+
 %zw_func_id= (
   '02'  => 'SERIAL_API_GET_INIT_DATA',
   '03'  => 'SERIAL_API_APPL_NODE_INFORMATION',
@@ -83,6 +84,12 @@ use vars qw(%zw_type6);
   '22'  => 'MEMORY_PUT_BYTE',
   '23'  => 'MEMORY_GET_BUFFER',
   '24'  => 'MEMORY_PUT_BUFFER',
+  '27'  => 'FLASH_AUTO_PROG_SET',
+  '29'  => 'NVM_GET_ID',
+  '2a'  => 'NVM_EXT_READ_LONG_BUFFER',
+  '2b'  => 'NVM_EXT_WRITE_LONG_BUFFER',
+  '2c'  => 'NVM_EXT_READ_LONG_BYTE',
+  '2d'  => 'NVM_EXT_WRITE_LONG_BYTE',
   '30'  => 'CLOCK_SET',
   '31'  => 'CLOCK_GET',
   '32'  => 'CLOCK_COMPARE',
@@ -148,6 +155,10 @@ use vars qw(%zw_type6);
   'be'  => 'ZW_SEND_TEST_FRAME',
   'bf'  => 'ZW_GET_PROTOCOL_STATUS',
   'd0'  => 'ZW_SET_PROMISCUOUS_MODE',
+  'd2'  => 'WATCHDOG_START',
+  'd3'  => 'WATCHDOG_STOP',
+  'f2'  => 'ZME_FREQ_CHANGE',
+  'f4'  => 'ZME_BOOTLOADER_FLASH',
 );
 
 %zw_type6 = (
