@@ -2923,8 +2923,7 @@ sub CUL_HM_parseCommon(@){#####################################################
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       @{$modules{CUL_HM}{helper}{qReqStat}} = grep { $_ ne $shash->{NAME} }
                                        @{$modules{CUL_HM}{helper}{qReqStat}};
-
-      CUL_HM_unQEntity($shash->{NAME},"qReqStat");
+      CUL_HM_unQEntity($chnHash->{NAME},"qReqStat");
       if ($pendType eq "StatusReq"){#it is the answer to our request
         my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc};
