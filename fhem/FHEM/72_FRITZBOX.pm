@@ -61,12 +61,13 @@ sub FRITZBOX_Log($$$);
 sub FRITZBOX_Init($);
 sub FRITZBOX_Set_Cmd_Start($);
 sub FRITZBOX_Shell_Exec($$);
+sub FRITZBOX_StartRadio_Shell($@);
+sub FRITZBOX_StartRadio_Web($@);
 sub FRITZBOX_Readout_Add_Reading ($$$$@);
 sub FRITZBOX_Readout_Process($$);
 sub FRITZBOX_SendMail_Shell($@);
 sub FRITZBOX_SetCustomerRingTone($@);
 sub FRITZBOX_SetMOH($@);
-sub FRITZBOX_StartRadio_Shell($@);
 sub FRITZBOX_Wlan_Run($);
 sub FRITZBOX_Web_Query($$@);
 
@@ -333,7 +334,7 @@ sub FRITZBOX_Set($$@)
             # . " convertMOH"
             # . " convertRingTone"
 
-   my $forceShell = (AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || $hash->{REMOTE} == 0);
+   my $forceShell = ( AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || $hash->{REMOTE} == 0 );
 
 # set alarm
    if ( lc $cmd eq 'alarm') {
@@ -411,8 +412,7 @@ sub FRITZBOX_Set($$@)
       }
    } 
    elsif ( lc $cmd eq 'guestwlan') {
-      if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
-      {
+      if (int @val == 1 && $val[0] =~ /^(on|off)$/) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          push @cmdBuffer, "guestwlan ".join(" ", @val);
          return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
@@ -443,8 +443,7 @@ sub FRITZBOX_Set($$@)
    }
 #set Ring
    elsif ( lc $cmd eq 'ring') {
-      if (int @val > 0) 
-      {
+      if (int @val > 0) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          push @cmdBuffer, "ring ".join(" ", @val);
          return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
@@ -456,14 +455,12 @@ sub FRITZBOX_Set($$@)
       return undef;
    }
    elsif ( lc $cmd eq 'startradio') {
-      if (int @val > 0) 
-      {
+      if (int @val > 0) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return FRITZBOX_StartRadio_Web $hash, @val
             unless $forceShell;
          return FRITZBOX_StartRadio_Shell $hash, @val;
       }
-      
    } 
    elsif ( lc $cmd eq 'tam') {
       if ( int @val == 2 && defined( $hash->{READINGS}{"tam".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) {
@@ -495,8 +492,7 @@ sub FRITZBOX_Set($$@)
       return undef;
    }
    elsif ( lc $cmd eq 'wlan') {
-      if (int @val == 1 && $val[0] =~ /^(on|off)$/) 
-      {
+      if (int @val == 1 && $val[0] =~ /^(on|off)$/) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          push @cmdBuffer, "wlan ".join(" ", @val);
          return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
@@ -792,14 +788,12 @@ sub FRITZBOX_Readout_Run_Shell($)
    my $startTime = time();
 
    my $slowRun = 0;
-   if ( int(time/3600) != $hash->{fhem}{lastHour} || $hash->{fhem}{LOCAL} == 1)
-   {
+   if ( int(time/3600) != $hash->{fhem}{lastHour} || $hash->{fhem}{LOCAL} == 1) {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->lastHour", int(time/3600);
       $slowRun = 1;
       FRITZBOX_Log $hash, 4, "Start update of slow changing device readings.";
    }
-   else
-   {
+   else {
       FRITZBOX_Log $hash, 4, "Start update of fast changing device readings.";
    }
 
@@ -809,8 +803,7 @@ sub FRITZBOX_Readout_Run_Shell($)
    return $name."|".encode_base64("Error|$result","")
       if $result;
    
-   if ($slowRun == 1)
-   {
+   if ($slowRun == 1) {
       
      # Init and Counters
       push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Foncontrol" ];
@@ -1130,9 +1123,8 @@ sub FRITZBOX_Readout_Run_Web($)
    my $sid;
    
    if ( int(time/3600) != $hash->{fhem}{lastHour} || $hash->{fhem}{LOCAL} == 1) {
+         FRITZBOX_Log $hash, 4, "Start update of slow changing device readings.";
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->lastHour", int(time/3600);
-      
-      FRITZBOX_Log $hash, 4, "Start update of slow changing device readings.";
    # Box model
       my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
       my $url = "http://$host/cgi-bin/system_status";
@@ -1140,9 +1132,19 @@ sub FRITZBOX_Readout_Run_Web($)
       my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
       my $response = $agent->get ($url);
       my $content  = $response->content;
-      $content=$1 if $content =~ /<body>(.*)<\/body>/;
+      $content=$1    if $content =~ /<body>(.*)<\/body>/;
       
       my @result = split /-/, $content;
+      # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
+      # 0 FritzBox-Modell
+      # 1 Annex/Erweiterte Kennzeichnung
+      # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
+      # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
+      # 4+5 Hashcode
+      # 6 Status
+      # 7 Firmwareversion
+      # 8 Sub-Version/Unterversion der Firmware
+      # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
    }  
@@ -1290,8 +1292,7 @@ sub FRITZBOX_Readout_Run_Web($)
 
 #Get TAM readings
    $runNo = 1;
-   foreach ( @{ $result->{tam} } ) 
-   {
+   foreach ( @{ $result->{tam} } ) {
       $rName = "tam".$runNo;
       if ($_->{Display} eq "1")
       {
@@ -1314,8 +1315,7 @@ sub FRITZBOX_Readout_Run_Web($)
 # user profiles
    $runNo = 1;
    $rName = "user01";
-   foreach ( @{ $result->{userProfil} } ) 
-   {
+   foreach ( @{ $result->{userProfil} } ) {
    # do not show data for unlimited, blocked or default access rights
       if ($_->{filter_profile_UID} !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} )
       {
@@ -1333,8 +1333,7 @@ sub FRITZBOX_Readout_Run_Web($)
 # Diversity
    $runNo=1;
    $rName = "diversity1";
-   foreach ( @{ $result->{diversity} } ) 
-   {
+   foreach ( @{ $result->{diversity} } ) {
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName,          $_->{MSN};
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_state", $_->{Active}, "onoff" ;
      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_dest",  $_->{Destination};
@@ -1385,8 +1384,7 @@ sub FRITZBOX_Readout_Done($)
 sub FRITZBOX_Readout_Process($$)
 {
    my ($hash,$string) = @_;
-   unless (defined $hash)
-   {
+   unless (defined $hash) {
       Log 1, "Fatal Error: no hash parameter handed over";
       return;
    }
@@ -1474,7 +1472,6 @@ sub FRITZBOX_Readout_Process($$)
       readingsBulkUpdate( $hash, "lastReadout", $msg );
       FRITZBOX_Log $hash, 4, $msg;
    }
-
 
    readingsEndUpdate( $hash, 1 );
 }
