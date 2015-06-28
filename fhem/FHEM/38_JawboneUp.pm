@@ -13,6 +13,7 @@ use LWP::UserAgent 6;
 use IO::Socket::SSL;
 use WWW::Jawbone::Up;
 
+use Blocking;
 ############# Extensions to WWW:Jawbone::Up for bandevents entry point ############
 
 use constant URI_BASE => 'https://jawbone.com';
@@ -68,7 +69,7 @@ jawboneUp_Define($$)
   my $user = $a[2];
   my $password = $a[3];
     
-  $hash->{"module_version"} = "0.1.3";
+  $hash->{"module_version"} = "0.1.4";
   
   $hash->{user}=$user;
   $hash->{password}=$password;
@@ -165,25 +166,54 @@ sub jawboneUp_DoBackground($)
     my $score = $up->score;
     
     my $na=$hash->{NAME};
-    my $st=$score->{"move"}{"bg_steps"};
-    my $ca=$score->{"move"}{"calories"};
-    my $di=$score->{"move"}{"distance"};
-    my $bc=$score->{"move"}{"bmr_calories"};
-    my $bd=$score->{"move"}{"bmr_calories_day"};
-    my $at=$score->{"move"}{"active_time"};
-    my $li=$score->{"move"}{"longest_idle"};
 
-    my $aw=$score->{"sleep"}{"awake"};    
-    my $ak=$score->{"sleep"}{"awakenings"};
-    my $lt=$score->{"sleep"}{"light"};
-    my $ts=$score->{"sleep"}{"time_to_sleep"};
-    my $bt=$score->{"sleep"}{"goals"}{"bedtime"}[0];
-    my $dp=$score->{"sleep"}{"goals"}{"deep"}[0];    
-    my $as=$score->{"sleep"}{"goals"}{"total"}[0];
+    my $st="0"; my $ca="0";
+    my $di="0"; my $bc="0";
+    my $bd="0"; my $at="0";
+    my $li="0";
 
+    my $aw="0"; my $ak="0";
+    my $lt="0"; my $ts="0";
+    my $bt="0"; my $dp="0";
+    my $as="0";
+
+    $st=$score->{"move"}{"bg_steps"};
+    $ca=$score->{"move"}{"calories"};
+    $di=$score->{"move"}{"distance"};
+    $bc=$score->{"move"}{"bmr_calories"};
+    $bd=$score->{"move"}{"bmr_calories_day"};
+    $at=$score->{"move"}{"active_time"};
+    $li=$score->{"move"}{"longest_idle"};
+
+    $aw=$score->{"sleep"}{"awake"};    
+    $ak=$score->{"sleep"}{"awakenings"};
+    $lt=$score->{"sleep"}{"light"};
+    $ts=$score->{"sleep"}{"time_to_sleep"};
+    $bt=$score->{"sleep"}{"goals"}{"bedtime"}[0];
+    $dp=$score->{"sleep"}{"goals"}{"deep"}[0];    
+    $as=$score->{"sleep"}{"goals"}{"total"}[0];
+
+    if (not defined($st)) { $st="0" }
+    if (not defined($ca)) { $ca="0" }
+    if (not defined($di)) { $di="0" }
+    if (not defined($bc)) { $bc="0" }
+    if (not defined($bd)) { $bd="0" }
+    if (not defined($at)) { $at="0" }
+    if (not defined($li)) { $li="0" }
+    
+    if (not defined($aw)) { $aw="0" }
+    if (not defined($ak)) { $ak="0" }
+    if (not defined($lt)) { $lt="0" }
+    if (not defined($ts)) { $ts="0" }
+    if (not defined($bt)) { $bt="0" }
+    if (not defined($dp)) { $dp="0" }
+    if (not defined($as)) { $as="0" }
+    
     # Second expensive call for band events
     my $json=jawboneGetBandEvents($up);
-    my $nr=$json->{"data"}->{"size"};
+
+    my $nr=0;
+    $nr=$json->{"data"}->{"size"};
  
  #my $json="";
  #my $nr=0;
@@ -192,7 +222,9 @@ sub jawboneUp_DoBackground($)
     my $sw=0; # stopwatch-mode
     for (my $i=0; $i<$nr; $i++) {
     	# my $tx=localtime($json->{"data"}->{"items"}[$i]->{"time_created"});
-	    my $act = $json->{"data"}->{"items"}[$i]->{"action"};
+	    my $act="";
+	    $act = $json->{"data"}->{"items"}[$i]->{"action"};
+	    if (not defined($act)) { $act="" }
 	    if ($act eq "enter_sleep_mode") 
 	        {
 	        $sl=1;
@@ -206,7 +238,9 @@ sub jawboneUp_DoBackground($)
 	    }
     for (my $i=0; $i<$nr; $i++) {
     	# my $tx=localtime($json->{"data"}->{"items"}[$i]->{"time_created"});
-	    my $act = $json->{"data"}->{"items"}[$i]->{"action"};
+		my $act="";
+	    $act = $json->{"data"}->{"items"}[$i]->{"action"};
+	    if (not defined($act)) { $act="" }
 	    if ($act eq "enter_stopwatch_mode") 
 	        {
 	        $sw=1;
@@ -230,8 +264,10 @@ sub jawboneUp_DoBackground($)
 
 sub updReading($$$) {
     my ($hash,$name,$val) = @_;
-    if ($hash->{READINGS}{$name}{VAL} != $val) {
-        readingsBulkUpdate($hash,$name,$val,1);
+    if (defined($val)) {
+	if ($hash->{READINGS}{$name}{VAL} != $val) {
+	    readingsBulkUpdate($hash,$name,$val,1);
+	}
     }
 }
 
