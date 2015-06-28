@@ -1163,6 +1163,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&box_fwVersion=logic:status/nspver"; # FW Version
    $queryStr .= "&box_powerRate=power:status/rate_sumact"; # Power Rate
    $queryStr .= "&tam=tam:settings/TAM/list(Name,Display,Active,NumNewMessages,NumOldMessages)"; # TAM
+   $queryStr .= "&box_tr064=tr064:settings/enabled"; # TR064
    $queryStr .= "&box_tr069=tr069:settings/enabled"; # TR069
    $queryStr .= "&box_fwUpdate=updatecheck:status/update_available_hint";
    $queryStr .= "&userProfil=user:settings/user/list(name,filter_profile_UID,this_month_time,today_time,type)"; # User profiles
@@ -1277,6 +1278,7 @@ sub FRITZBOX_Readout_Run_Web($)
 # Box model and firmware
    FRITZBOX_Readout_Add_Reading ( $hash, \@roReadings, "box_fwVersion", $result->{box_fwVersion} );
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate", $result->{box_fwUpdate};
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064", $result->{box_tr064}, "onoff";
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069", $result->{box_tr069}, "onoff";
 
 # Alarm clock
@@ -3582,7 +3584,7 @@ sub FRITZBOX_TR064_Cmd($$$)
          push @soapParams, SOAP::Data->name( $_ => $params{$_} );
       }
       
-      FRITZBOX_Log $hash, 4, "Perform TR064 call - ".$logMsg;
+      FRITZBOX_Log $hash, 4, "Perform TR-064 call - ".$logMsg;
 
       my $s = SOAP::Lite
          -> uri("urn:dslforum-org:service:".$service)
