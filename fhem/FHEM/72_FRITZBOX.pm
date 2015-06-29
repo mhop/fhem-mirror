@@ -2511,23 +2511,31 @@ sub FRITZBOX_Ring_Run_Web($)
 # Store current values for fon and dect port
    my $queryStr = "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Intern,IntRingTone,RadioRingID)"; # DECT Numbers
    $queryStr .= "&fonPort=telcfg:settings/MSN/Port/list(Name,MSN)"; # Fon ports
+   $queryStr .= "&dialPort=telcfg:settings/DialPort"; #Dial Port
+   $queryStr .= "&useClickToDial=telcfg:settings/UseClickToDial"; # Use Click2Dial
    FRITZBOX_Log $hash, 4, "Read current dect and fon port values from box";
    $startValue = FRITZBOX_Web_Query( $hash, $queryStr, 'UTF-8') ;
    
 #Preparing 1st command array
    @webCmdArray = ();
    
+   # unless ($startValue->{useClickToDial}) {
+      # push @webCmdArray, "telcfg:settings/UseClickToDial" => 1;
+        # FRITZBOX_Log $hash, 3, "Switch ClickToDial on";
+   # }
+   
    if (int (@FritzFons) == 0 && $ttsLink) {
       FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, parameter 'say:' will be ignored.";
    }
 # Creation fhemRadioStation for ttsLink
    elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM") {
-      FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
       push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Name" => "FHEM";
       push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Bitmap" => "1023";
-   #Execute command array
-      FRITZBOX_Web_PostCmd( $hash, \@webCmdArray )
+         FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
    }
+   
+   #Execute command array
+   FRITZBOX_Web_PostCmd( $hash, \@webCmdArray )       if int @webCmdArray;
    
 #Preparing 2nd command array to set ring parameters
 # Change ring tone of Fritz!Fons
@@ -2551,22 +2559,22 @@ sub FRITZBOX_Ring_Run_Web($)
    if ( $ringWithIntern =~ /^([1-3])$/ ) {
       if ($startValue->{fonPort}->[$ringWithIntern-1]->{Name}) {
          push @webCmdArray, "telcfg:settings/MSN/Port".($ringWithIntern-1)."/Name" => $msg;
-            FRITZBOX_Log $hash, 4, "Change temporarily name of calling number fon$ringWithIntern to '$msg'";
+            FRITZBOX_Log $hash, 4, "Change temporarily name of dial port 'fon$ringWithIntern' to '$msg'";
       }
       else {
-         FRITZBOX_Log $hash, 2, "Error: Current name of calling number fon$ringWithIntern could not be determined -> Did not change the name.";
+         FRITZBOX_Log $hash, 2, "Error: Current name of dial port 'fon$ringWithIntern' could not be determined -> Did not change the name.";
          my $temp = Dumper( $startValue );
          FRITZBOX_Log $hash, 3, "Debug info: \n".$temp;
       }
       push @webCmdArray, "telcfg:settings/DialPort" => $ringWithIntern;
-         FRITZBOX_Log $hash, 5, "Set dial port to " . $dialPort{$ringWithIntern} . " (MSN ".$startValue->{fonPort}->[$ringWithIntern-1]{MSN} .").";
+         FRITZBOX_Log $hash, 4, "Set dial port to '" . $dialPort{$ringWithIntern} . "' (MSN: ".$startValue->{fonPort}->[$ringWithIntern-1]{MSN} .").";
    } 
    elsif ($field{show}) {
-      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined and standard dial port ".$hash->{READINGS}{box_stdDialPort}{VAL}." is used."
+      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined and standard dial port '".$hash->{READINGS}{box_stdDialPort}{VAL}."' is used."
    }
    # use standard dial port
    else {
-         FRITZBOX_Log $hash, 5, "Use standard dial port " . $hash->{READINGS}{box_stdDialPort}{VAL};
+         FRITZBOX_Log $hash, 5, "Use standard dial port '" . $hash->{READINGS}{box_stdDialPort}{VAL} ."'.";
    }
    
 # Set tts-Message
@@ -2595,10 +2603,11 @@ sub FRITZBOX_Ring_Run_Web($)
 #Preparing 4th command array to stop ringing 
    push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
    $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )      if $hash->{SECPORT};
-   push( @webCmdArray, "telcfg:command/Hangup" => "" )  unless $hash->{SECPORT};
+   push( @webCmdArray, "telcfg:command/Hangup" => "" )   unless $hash->{SECPORT};
       
 #Preparing 5th command array to reset everything
-   push @webCmdArray, "telcfg:settings/DialPort" => 50      if $ringWithIntern != 0 ;
+   push @webCmdArray, "telcfg:settings/DialPort" => $startValue->{dialPort}      if $ringWithIntern != 0 && defined $startValue->{dialPort};
+      FRITZBOX_Log $hash, 4, "Reset dial port to '".$dialPort{$startValue->{dialPort}}."'.";
 # Reset internal ring tones for the Fritz!Fons
    if ($ringTone) {
       foreach (@FritzFons) {
@@ -2619,11 +2628,11 @@ sub FRITZBOX_Ring_Run_Web($)
       my $fonName = $startValue->{fonPort}->[$ringWithIntern-1]->{Name};
       if ($fonName) {# darf nie leer sein
          push( @webCmdArray, "telcfg:settings/MSN/Port".($ringWithIntern-1)."/Name" => $fonName ) ; 
-            FRITZBOX_Log $hash, 4, "Reset name of calling number fon$ringWithIntern to '$fonName'";
+            FRITZBOX_Log $hash, 4, "Reset name of dial port fon$ringWithIntern to '$fonName'";
       }
    }
    
-# Switch of Internet Radio stations
+# ??? Switch of Internet Radio stations 
    if (!$ttsLink && defined $ringTone && $ringTone ==33 ) {
       push @webCmdArray, "telcfg:command/Dial **".$intNo;
       push @webCmdArray, "telcfg:command/Hangup **".$intNo;
@@ -3611,7 +3620,7 @@ sub FRITZBOX_TR064_Get_ServiceList($)
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
    my $url = 'http://'.$host.":49000/tr64desc.xml";
 
-   my $returnStr = "_" x 100 ."\n\n";
+   my $returnStr = "_" x 130 ."\n\n";
    $returnStr .= " List of TR-064 services and actions that are allowed on the device '$host'\n";
 
    return "TR-064 switched off."     if $hash->{READINGS}{box_tr064}{VAL} eq "off";
@@ -3649,26 +3658,28 @@ sub FRITZBOX_TR064_Get_ServiceList($)
 
       my $content = $response->content;
 
-# get version
+   # get version
       $content =~ /<major>(.*?)<\/major>/isg;
       my $version = $1;
       $content =~ /<minor>(.*?)<\/minor>/isg;
       $version .= ".".$1;
       
-      $returnStr .= "_" x 100 ."\n\n";
+      $returnStr .= "_" x 130 ."\n\n";
       $returnStr .= " Service: ".$_->[0]."     Control: ".$_->[1]."\n";
       $returnStr .= " Spec: http://".$host.":49000".$_->[2]."    Version: ".$version."\n";
-      $returnStr .= "-" x 100 ."\n";
-
+      $returnStr .= "-" x 130 ."\n";
+   
+   # get name and arguments of each action
       while( $content =~ /<action>(.*?)<\/action>/isg ) {
-
+         
          my $serviceXML = $1;
          $serviceXML =~ /<name>(.*?)<\/name>/is;
          my $action = $1;
          $serviceXML =~ /<argumentlist>(.*?)<\/argumentlist>/is;
          my $argXML = $1;
 
-         $returnStr .= "  $action (";
+         my $lineStr = "  $action (";
+         my $tab = " " x length( $lineStr );
 
          my @argArray = ($argXML =~ /<argument>(.*?)<\/argument>/isg);
          my @argOut;
@@ -3677,16 +3688,28 @@ sub FRITZBOX_TR064_Get_ServiceList($)
             my $argName = $1;
             $_ =~ /<direction>(.*?)<\/direction>/is;
             my $argDir = $1;
-            if ($argDir eq "in") { $returnStr .= " $argName"; }
+            if ($argDir eq "in") { 
+               # Wrap
+               if (length ($lineStr.$argName) > 129) {
+                  $returnStr .= $lineStr."\n" ;
+                  $lineStr = $tab;
+               }
+               $lineStr .= " $argName"; 
+            }
             else { push @argOut, $argName; }
          }
-         $returnStr .= " )";
-         $returnStr .= " = ("        if int @argOut;
+         $lineStr .= " )";
+         $lineStr .= " = ("        if int @argOut;
          foreach (@argOut) {
-            $returnStr .= " $_";
+            # Wrap
+            if (length ($lineStr.$_) > 129) {
+               $returnStr .= $lineStr."\n" ;
+               $lineStr = $tab ." " x 6;
+            }
+            $lineStr .= " $_";
          }
-         $returnStr .= " )"        if int @argOut;
-         $returnStr .= "\n";
+         $lineStr .= " )"        if int @argOut;
+         $returnStr .= $lineStr."\n";
       }
    }
 
@@ -4309,7 +4332,9 @@ sub FRITZBOX_fritztris($)
       <li><b>box_powerRate</b> - current power in percent of maximal power</li>
       <li><b>box_rateDown</b> - average download rate in the last update interval</li>
       <li><b>box_rateUp</b> - average upload rate in the last update interval</li>
-      <li><b>box_tr069</b> - provider remote access TR069 (safety issue!)</li>
+      <li><b>box_stdDialPort</b> - standard caller port when using the dial function of the box</li>
+      <li><b>box_tr064</b> - application interface TR-064 (needed by this modul)</li>
+      <li><b>box_tr069</b> - provider remote access TR-069 (safety issue!)</li>
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
 
@@ -4323,8 +4348,9 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_radio</b> - Current internet radio station ring tone of the DECT device <i>1</i></li>
 
-      <li><b>fon</b><i>1</i> - Internal name of the analog FON connection <i>1</i></li>
-      <li><b>fon</b><i>1</i><b>_intern</b> - Internal number of the analog FON connection <i>1</i></li>
+      <li><b>fon</b><i>1</i> - Internal name of the analog FON port <i>1</i></li>
+      <li><b>fon</b><i>1</i><b>_intern</b> - Internal number of the analog FON port <i>1</i></li>
+      <li><b>fon</b><i>1</i><b>_out</b> - Outgoing number of the analog FON port <i>1</i></li>
 
       <li><b>diversity</b><i>1</i> - Own (incoming) phone number of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
@@ -4582,7 +4608,7 @@ sub FRITZBOX_fritztris($)
     
       <li><code>ringWithIntern &lt;1 | 2 | 3&gt;</code>
          <br>
-         Um ein Telefon klingeln zu lassen, muss eine Anrufer spezifiziert werden. Normalerweise ist dies die Nummer 50 "ISDN:W&auml;hlhilfe".
+         Um ein Telefon klingeln zu lassen, muss in der Fritzbox eine Anrufer (W&auml;hlhilfe, Wert 'box_stdDialPort') spezifiziert werden.
          <br>
          Um w&auml;hrend des Klingelns eine Nachricht (Standard: "FHEM") anzuzeigen, kann hier die interne Nummer 1-3 angegeben werden.
          Der entsprechende analoge Telefonanschluss muss vorhanden sein.
@@ -4615,7 +4641,9 @@ sub FRITZBOX_fritztris($)
       <li><b>box_powerRate</b> - aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
       <li><b>box_rateDown</b> - durchschnittliche Download-Geschwindigkeit in kByte/s des letzten Aktualisierungsintervals</li>
       <li><b>box_rateUp</b> - durchschnittliche Upload-Geschwindigkeit in kByte/s des letzten Aktualisierungsintervals</li>
-      <li><b>box_tr069</b> - Provider-Fernwartung TR069 (sicherheitsrelevant!)</li>
+      <li><b>box_stdDialPort</b> - Standard-W&auml;hlhilfe-Anschluss, der f&uml;r die W&auml;hlfunktion des Ger&auml;tes genutzt wird</li>
+      <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul ben&ouml;tigt)</li>
+      <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
       
@@ -4631,6 +4659,7 @@ sub FRITZBOX_fritztris($)
       
       <li><b>fon</b><i>1</i> - Name des analogen Telefonanschlusses <i>1</i> an der Fritz!Box</li>
       <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
+      <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
       
       <li><b>diversity</b><i>1</i> - Eigene Rufnummer der Rufumleitung <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_dest</b> - Zielnummer der Rufumleitung <i>1</i></li>
