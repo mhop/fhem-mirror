@@ -3,7 +3,7 @@
 #
 #  72_FRITZBOX.pm
 #
-#  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
+#  (c) 2014-2015 Torsten Poitzsch < torsten . poitzsch at gmx . de >
 #
 #  This module handles the Fritz!Box router and the Fritz!Phone MT-F 
 #
@@ -208,7 +208,8 @@ sub FRITZBOX_Define($$)
    $hash->{helper}{TimerReadout} = $name.".Readout";
    $hash->{helper}{TimerCmd} = $name.".Cmd";
 
-   FRITZBOX_Initilize_TR064 ($hash);
+   my $tr064Port = FRITZBOX_TR064_Init ($hash);
+   $hash->{SECPORT} = $tr064Port    if $tr064Port;
 
    RemoveInternalTimer($hash->{helper}{TimerReadout});
  # Get first data after 6 seconds
@@ -216,61 +217,6 @@ sub FRITZBOX_Define($$)
  
    return undef;
 } #end FRITZBOX_Define
-
-#######################################################################
-sub FRITZBOX_Initilize_TR064 ($)
-{
-   my ($hash) = @_;
-   my $name = $hash->{NAME};
-
-   return   if AttrVal( $name, "forceTelnetConnection",  0 );   
-   
-   if ($missingModulTR064) {
-      FRITZBOX_Log $hash, 2,  "Cannot use TR-064. Perl modul ".$missingModulTR064."is missing on this system. Please install.";
-      return;
-   }
-   if ($missingModulWeb) {
-      FRITZBOX_Log $hash, 2,  "Cannot test TR-064 access. Perl modul ".$missingModulWeb."is missing on this system. Please install.";
-      return undef;
-   }
-
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
-
-      FRITZBOX_Log $hash, 4, "Check if TR-064 description 'http://".$host.":49000/tr64desc.xml' exists.";
-   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
-   my $response = $agent->get( "http://".$host.":49000/tr64desc.xml" );
-   if ( $response->is_error() ) {
-      FRITZBOX_Log $hash, 2, "Box $host doesn't have a TR-064-API.";
-      return undef;
-   }
-   
-# Security Port anfordern
-      FRITZBOX_Log $hash, 4, "Open TR-064 connection";
-   my $s = SOAP::Lite
-      -> uri('urn:dslforum-org:service:DeviceInfo:1')
-      -> proxy('http://'.$host.':49000/upnp/control/deviceinfo')
-      -> getSecurityPort();
-
-   my $port = $s->result;
-   unless( $port )
-   {
-      FRITZBOX_Log $hash, 2, "Could not get secure port: $!";
-      return undef;
-   }
-
-   $hash->{SECPORT} = $port;
-#   $hash->{TR064USER} = "dslf-config";
-
-   # jetzt die Zertifikatsüberprüfung (sofort) abschalten
-   BEGIN {
-      $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME}=0;
-   }
-
-   # dieser Code authentifiziert an der Box
-   sub SOAP::Transport::HTTP::Client::get_basic_credentials {return  "dslf-config" => $FRITZBOX_TR064pwd;}
-   
-   return undef;
-}
 
 #######################################################################
 sub FRITZBOX_Undefine($$)
@@ -584,152 +530,6 @@ sub FRITZBOX_Get($@)
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
-#######################################################################
-sub FRITZBOX_Set_Alarm_Shell($@)
-{
-   my ($hash, @val) = @_;
-   my $name = $hash->{NAME};
-   
-   my $alarm = $val[0];
-   shift @val;
-   
-   my $para = " ".join(" ", @val);
-   
-   my $state = 1; 
-   my $stateTxt = "on";
-   if ($para =~ /off/i) 
-   {
-      $state = 0;
-      $stateTxt = "off";
-   }
-   
-   my $time;
-   my $timeTxt;
-   if ($para =~ /([0-2]?\d):([0-5]\d)/ )
-   {
-      if ($1<10)
-      {
-         $time = 0;
-         $timeTxt = "0";
-      }
-      $time .= $1.$2;
-      $timeTxt .= $1.":".$2;
-      $time = undef if $time > 2359;
-   }
-
-   my $day; my $dayTxt;
-   my %alDayValues = %alarmDays;
-   $alDayValues{0} = "once";
-   $alDayValues{127} = "daily";
-   while (my ($key, $value) = each(%alDayValues) )
-   {
-      if ($para =~ /$value/i)
-      {
-         $day += $key ;
-         $dayTxt .= $value." ";
-      }
-   }
-   
-   my $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return "$name|Error|$result"
-      if $result;
-
-   readingsBeginUpdate($hash);
-
-   FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Active ".$state );
-   readingsBulkUpdate($hash,"alarm".$alarm."_state",$stateTxt);
-
-   if (defined $time)
-   {
-      FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Time ".$time );
-      readingsBulkUpdate($hash,"alarm".$alarm."_time",$timeTxt);
-   }
-
-   if (defined $day)
-   {
-      FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Weekdays ".$day );
-      chop $dayTxt;
-      readingsBulkUpdate($hash,"alarm".$alarm."_wdays",$dayTxt);
-   }
-
-   readingsEndUpdate($hash, 1);
-
-   FRITZBOX_Telnet_CloseCon( $hash );
-   
-   return undef;
-} # end FRITZBOX_Set_Alarm_Shell
-   
-#######################################################################
-sub FRITZBOX_Set_Alarm_Web($@)
-{
-   my ($hash, @val) = @_;
-   my $name = $hash->{NAME};
-   my @webCmdArray;
-   
-   my $alarm = $val[0];
-   shift @val;
-   
-   my $para = " ".join(" ", @val);
-   
-   my $state = 1; 
-   my $stateTxt = "on";
-   if ($para =~ /off/i) 
-   {
-      $state = 0;
-      $stateTxt = "off";
-   }
-   
-   my $time;
-   my $timeTxt;
-   if ($para =~ /([0-2]?\d):([0-5]\d)/ )
-   {
-      if ($1<10)
-      {
-         $time = 0;
-         $timeTxt = "0";
-      }
-      $time .= $1.$2;
-      $timeTxt .= $1.":".$2;
-      $time = undef if $time > 2359;
-   }
-
-   my $day; my $dayTxt;
-   my %alDayValues = %alarmDays;
-   $alDayValues{0} = "once";
-   $alDayValues{127} = "daily";
-   while (my ($key, $value) = each(%alDayValues) )
-   {
-      if ($para =~ /$value/i)
-      {
-         $day += $key ;
-         $dayTxt .= $value." ";
-      }
-   }
-   
-   readingsBeginUpdate($hash);
-
-   push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Active" => $state;
-   readingsBulkUpdate($hash,"alarm".$alarm."_state",$stateTxt);
-
-   if (defined $time)
-   {
-      push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Time" => $time;
-      readingsBulkUpdate($hash,"alarm".$alarm."_time",$timeTxt);
-   }
-
-   if (defined $day)
-   {
-      push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Weekdays" => $day;
-      chop $dayTxt;
-      readingsBulkUpdate($hash,"alarm".$alarm."_wdays",$dayTxt);
-   }
-
-   FRITZBOX_Web_PostCmd ($hash, \@webCmdArray);
-   readingsEndUpdate($hash, 1);
-   
-   return undef;
-} # end FRITZBOX_Set_Alarm_Web
-   
 # Starts the data capturing and sets the new readout timer
 #######################################################################
 sub FRITZBOX_Readout_Start($)
@@ -1179,9 +979,11 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&TodayBytesSentLow=inetstat:status/Today/BytesSentLow";
 
    $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
-   if (exists $result->{Error}) {
+   
+   if (defined $result->{Error}) {
       FRITZBOX_Log $hash, 2, "Error: ".$result->{Error};
       my $returnStr = "Error|" . $result->{Error};
+      $returnStr .= "|fhem->sidTime|0"    if defined $result->{ResetSID};
       $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
       return $name."|".encode_base64($returnStr,"");
    }
@@ -1400,6 +1202,10 @@ sub FRITZBOX_Readout_Process($$)
    if ( defined $values{Error} ) {
       readingsBulkUpdate( $hash, "lastReadout", $values{Error} );
       readingsBulkUpdate( $hash, "state", $values{Error} );
+      if (defined $values{"fhem->sidTime"}) {
+         $hash->{fhem}{sidTime} = $values{"fhem->sidTime"};
+            FRITZBOX_Log $hash, 4, "Reset SID";
+      }
    }
    else {
    # Statistics
@@ -1418,6 +1224,7 @@ sub FRITZBOX_Readout_Process($$)
          readingsBulkUpdate( $hash, "box_rateUp", sprintf ("%.3f", ($valueHigh*2**22+$valueLow/2**10) / $time )); 
       }
 
+   # Fill readings
       my $x = 0;
       while (my ($rName, $rValue) = each(%values) ) {
          if ($rName =~ /->/) {
@@ -1468,6 +1275,17 @@ sub FRITZBOX_Readout_Process($$)
             if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} != 0;
          readingsBulkUpdate( $hash, "state", $newState);
          FRITZBOX_Log $hash, 5, "SET state = '$newState'";
+      }
+
+   # adapt TR064-Mode
+      if ( $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
+            FRITZBOX_Log $hash, 3, "TR-064 is switched off";
+         delete $hash->{SECPORT};
+      }
+      elsif ( $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
+            FRITZBOX_Log $hash, 3, "TR-064 is switched on";
+         my $tr064Port = FRITZBOX_TR064_Init ($hash);
+         $hash->{SECPORT} = $tr064Port    if $tr064Port;
       }
 
       my $msg = keys( %values )." values captured in ".$values{readoutTime}." s";
@@ -2681,7 +2499,7 @@ sub FRITZBOX_Ring_Run_Web($)
    $queryStr .= "&fonPort=telcfg:settings/MSN/Port/list(Name,MSN)"; # Fon ports
    FRITZBOX_Log $hash, 4, "Read current dect and fon port values from box";
    $startValue = FRITZBOX_Web_Query( $hash, $queryStr, 'UTF-8') ;
-
+   
 #Preparing 1st command array
    @webCmdArray = ();
    
@@ -2726,6 +2544,7 @@ sub FRITZBOX_Ring_Run_Web($)
          my $temp = Dumper( $startValue );
          FRITZBOX_Log $hash, 3, "Debug info: \n".$temp;
       }
+         FRITZBOX_Log $hash, 5, "Calling number uses MSN ".$startValue->{fonPort}->[$ringWithIntern-1]{MSN};
       push @webCmdArray, "telcfg:settings/DialPort" => $ringWithIntern;
    } 
    elsif ($field{show}) {
@@ -2764,8 +2583,7 @@ sub FRITZBOX_Ring_Run_Web($)
    push @webCmdArray, "telcfg:settings/DialPort" => 50      if $ringWithIntern != 0 ;
 # Reset internal ring tones for the Fritz!Fons
    if ($ringTone) {
-      foreach (@FritzFons)
-      {
+      foreach (@FritzFons) {
          my $value = $startValue->{dectUser}->[$_]->{IntRingTone};
          push @webCmdArray, "telcfg:settings/Foncontrol/User".$_."/IntRingTone" => $value;
             FRITZBOX_Log $hash, 4, "Reset ring tone of dect$_ to $value";
@@ -2809,6 +2627,152 @@ sub FRITZBOX_Ring_Run_Web($)
    # return $name."|1|Ringing done";
 } # End FRITZBOX_Ring_Run_Web
 
+#######################################################################
+sub FRITZBOX_Set_Alarm_Shell($@)
+{
+   my ($hash, @val) = @_;
+   my $name = $hash->{NAME};
+   
+   my $alarm = $val[0];
+   shift @val;
+   
+   my $para = " ".join(" ", @val);
+   
+   my $state = 1; 
+   my $stateTxt = "on";
+   if ($para =~ /off/i) 
+   {
+      $state = 0;
+      $stateTxt = "off";
+   }
+   
+   my $time;
+   my $timeTxt;
+   if ($para =~ /([0-2]?\d):([0-5]\d)/ )
+   {
+      if ($1<10)
+      {
+         $time = 0;
+         $timeTxt = "0";
+      }
+      $time .= $1.$2;
+      $timeTxt .= $1.":".$2;
+      $time = undef if $time > 2359;
+   }
+
+   my $day; my $dayTxt;
+   my %alDayValues = %alarmDays;
+   $alDayValues{0} = "once";
+   $alDayValues{127} = "daily";
+   while (my ($key, $value) = each(%alDayValues) )
+   {
+      if ($para =~ /$value/i)
+      {
+         $day += $key ;
+         $dayTxt .= $value." ";
+      }
+   }
+   
+   my $result = FRITZBOX_Telnet_OpenCon( $hash );
+   return "$name|Error|$result"
+      if $result;
+
+   readingsBeginUpdate($hash);
+
+   FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Active ".$state );
+   readingsBulkUpdate($hash,"alarm".$alarm."_state",$stateTxt);
+
+   if (defined $time)
+   {
+      FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Time ".$time );
+      readingsBulkUpdate($hash,"alarm".$alarm."_time",$timeTxt);
+   }
+
+   if (defined $day)
+   {
+      FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/AlarmClock".($alarm-1)."/Weekdays ".$day );
+      chop $dayTxt;
+      readingsBulkUpdate($hash,"alarm".$alarm."_wdays",$dayTxt);
+   }
+
+   readingsEndUpdate($hash, 1);
+
+   FRITZBOX_Telnet_CloseCon( $hash );
+   
+   return undef;
+} # end FRITZBOX_Set_Alarm_Shell
+   
+#######################################################################
+sub FRITZBOX_Set_Alarm_Web($@)
+{
+   my ($hash, @val) = @_;
+   my $name = $hash->{NAME};
+   my @webCmdArray;
+   
+   my $alarm = $val[0];
+   shift @val;
+   
+   my $para = " ".join(" ", @val);
+   
+   my $state = 1; 
+   my $stateTxt = "on";
+   if ($para =~ /off/i) 
+   {
+      $state = 0;
+      $stateTxt = "off";
+   }
+   
+   my $time;
+   my $timeTxt;
+   if ($para =~ /([0-2]?\d):([0-5]\d)/ )
+   {
+      if ($1<10)
+      {
+         $time = 0;
+         $timeTxt = "0";
+      }
+      $time .= $1.$2;
+      $timeTxt .= $1.":".$2;
+      $time = undef if $time > 2359;
+   }
+
+   my $day; my $dayTxt;
+   my %alDayValues = %alarmDays;
+   $alDayValues{0} = "once";
+   $alDayValues{127} = "daily";
+   while (my ($key, $value) = each(%alDayValues) )
+   {
+      if ($para =~ /$value/i)
+      {
+         $day += $key ;
+         $dayTxt .= $value." ";
+      }
+   }
+   
+   readingsBeginUpdate($hash);
+
+   push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Active" => $state;
+   readingsBulkUpdate($hash,"alarm".$alarm."_state",$stateTxt);
+
+   if (defined $time)
+   {
+      push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Time" => $time;
+      readingsBulkUpdate($hash,"alarm".$alarm."_time",$timeTxt);
+   }
+
+   if (defined $day)
+   {
+      push @webCmdArray, "telcfg:settings/AlarmClock".($alarm-1)."/Weekdays" => $day;
+      chop $dayTxt;
+      readingsBulkUpdate($hash,"alarm".$alarm."_wdays",$dayTxt);
+   }
+
+   FRITZBOX_Web_PostCmd ($hash, \@webCmdArray);
+   readingsEndUpdate($hash, 1);
+   
+   return undef;
+} # end FRITZBOX_Set_Alarm_Web
+   
 #######################################################################
 sub FRITZBOX_SetMOH($@)
 {  
@@ -3632,11 +3596,13 @@ sub FRITZBOX_TR064_Get_ServiceList($)
    my $returnStr = "_" x 100 ."\n\n";
    $returnStr .= " List of TR-064 services and actions that are allowed on the device '$host'\n";
 
-      FRITZBOX_Log $hash, 5, "Getting service page $url";
+   return "TR-064 switched off."     if $hash->{READINGS}{box_tr064}{VAL} eq "off";
+
+   FRITZBOX_Log $hash, 5, "Getting service page $url";
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
    my $response = $agent->get( $url );
 
-   return "$url does not exist"     if $response->is_error();
+   return "$url does not exist."     if $response->is_error();
 
    my $content = $response->content;
    my @serviceArray;
@@ -3708,7 +3674,60 @@ sub FRITZBOX_TR064_Get_ServiceList($)
 
    return $returnStr;
 }
+
+#######################################################################
+sub FRITZBOX_TR064_Init ($)
+{
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   return   if AttrVal( $name, "forceTelnetConnection",  0 );   
    
+   if ($missingModulTR064) {
+      FRITZBOX_Log $hash, 2,  "Cannot use TR-064. Perl modul ".$missingModulTR064."is missing on this system. Please install.";
+      return undef;
+   }
+   if ($missingModulWeb) {
+      FRITZBOX_Log $hash, 2,  "Cannot test TR-064 access. Perl modul ".$missingModulWeb."is missing on this system. Please install.";
+      return undef;
+   }
+
+   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+
+      FRITZBOX_Log $hash, 4, "Check if TR-064 description 'http://".$host.":49000/tr64desc.xml' exists.";
+   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
+   my $response = $agent->get( "http://".$host.":49000/tr64desc.xml" );
+   if ( $response->is_error() ) {
+      FRITZBOX_Log $hash, 2, "The device '$host' doesn't have a TR-064 API or TR-064 is switched off.";
+      return undef;
+   }
+   
+# Security Port anfordern
+      FRITZBOX_Log $hash, 4, "Open TR-064 connection";
+   my $s = SOAP::Lite
+      -> uri('urn:dslforum-org:service:DeviceInfo:1')
+      -> proxy('http://'.$host.':49000/upnp/control/deviceinfo')
+      -> getSecurityPort();
+
+   my $port = $s->result;
+   unless( $port ) {
+      FRITZBOX_Log $hash, 2, "Could not get secure port: $!";
+      return undef;
+   }
+
+#   $hash->{TR064USER} = "dslf-config";
+
+   # jetzt die Zertifikatsüberprüfung (sofort) abschalten
+   BEGIN {
+      $ENV{PERL_LWP_SSL_VERIFY_HOSTNAME}=0;
+   }
+
+   # dieser Code authentifiziert an der Box
+   sub SOAP::Transport::HTTP::Client::get_basic_credentials {return  "dslf-config" => $FRITZBOX_TR064pwd;}
+   
+   return $port;
+}
+
 # Opens a Web connection to an external Fritzbox
 ############################################
 sub FRITZBOX_Web_OpenCon ($)
@@ -3823,6 +3842,15 @@ sub FRITZBOX_Web_Query($$@)
 
    if ($response->is_error) {
       my %retHash = ("Error" => $response->status_line);
+      return \%retHash;
+   }
+
+   if ($response->is_error) {
+      my %retHash = ("Error" => $response->status_line);
+      return \%retHash;
+   }
+   if ($response->content =~ "<html>") {
+      my %retHash = ("Error" => "Old SID not valid anymore.", "ResetSID" => "1");
       return \%retHash;
    }
 
