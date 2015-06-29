@@ -100,6 +100,15 @@ my %ringTone =  qw {
     33 InternetRadio 34 MusicList 
    };
 
+my %dialPort = qw {
+   1 fon1 2 fon2
+   3 fon3
+   50 allFons
+   60 dect1 61 dect2
+   62 dect3 63 dect4
+   64 dect5 65 dect6
+   };
+
 my %ringToneNumber;
 while (my ($key, $value) = each %ringTone) {
    $ringToneNumber{lc $value}=$key;
@@ -953,7 +962,8 @@ sub FRITZBOX_Readout_Run_Web($)
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
-   $queryStr .= "&init=telcfg settings/Foncontrol";
+   $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
+   $queryStr .= "&box_stdDialPort=telcfg:settings/DialPort"; #Dial Port
    $queryStr .= "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Name,Intern,IntRingTone,AlarmRingTone0,RadioRingID,ImagePath,G722RingTone,G722RingToneName)"; # DECT Numbers
    $queryStr .= "&fonPort=telcfg:settings/MSN/Port/list(Name,MSN)"; # Fon ports
    $queryStr .= "&alarmClock=telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)"; # Alarm Clock
@@ -1079,9 +1089,10 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->is_double_wlan", $result->{is_double_wlan};
 # Box model and firmware
    FRITZBOX_Readout_Add_Reading ( $hash, \@roReadings, "box_fwVersion", $result->{box_fwVersion} );
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate", $result->{box_fwUpdate};
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064", $result->{box_tr064}, "onoff";
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069", $result->{box_tr069}, "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate",    $result->{box_fwUpdate};
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr064",       $result->{box_tr064},       "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_tr069",       $result->{box_tr069},       "onoff";
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_stdDialPort", $result->{box_stdDialPort}, "dialport";
 
 # Alarm clock
    $runNo = 1;
@@ -1355,6 +1366,9 @@ sub FRITZBOX_Readout_Format($$$)
       $readout = $landevice{$readout}." ($readout)"
          if defined $landevice{$readout};
    } 
+   elsif ($format eq "dialport") {
+      $readout = $dialPort{$readout}   if $dialPort{$readout};
+   } 
    elsif ($format eq "model") {
       $readout = $fonModel{$readout} if defined $fonModel{$readout};
    } 
@@ -1380,7 +1394,7 @@ sub FRITZBOX_Readout_Format($$$)
       }
    } 
    elsif ($format eq "ringtone") {
-      $readout = $ringTone{$readout};
+      $readout = $ringTone{$readout}   if $ringTone{$readout};
    } 
    elsif ($format eq "secondsintime") {
       if ($readout < 243600) {
@@ -2544,11 +2558,15 @@ sub FRITZBOX_Ring_Run_Web($)
          my $temp = Dumper( $startValue );
          FRITZBOX_Log $hash, 3, "Debug info: \n".$temp;
       }
-         FRITZBOX_Log $hash, 5, "Calling number uses MSN ".$startValue->{fonPort}->[$ringWithIntern-1]{MSN};
       push @webCmdArray, "telcfg:settings/DialPort" => $ringWithIntern;
+         FRITZBOX_Log $hash, 5, "Set dial port to " . $dialPort{$ringWithIntern} . " (MSN ".$startValue->{fonPort}->[$ringWithIntern-1]{MSN} .").";
    } 
    elsif ($field{show}) {
-      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined."
+      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined and standard dial port ".$hash->{READINGS}{box_stdDialPort}{VAL}." is used."
+   }
+   # use standard dial port
+   else {
+         FRITZBOX_Log $hash, 5, "Use standard dial port " . $hash->{READINGS}{box_stdDialPort}{VAL};
    }
    
 # Set tts-Message
