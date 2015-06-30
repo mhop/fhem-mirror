@@ -1559,6 +1559,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                              ,off            =>""
                                              ,toggle         =>""
                                             }
+                     ,"HM-Sen-RD-O00"     =>{ fwUpdate       =>"<filename> <bootTime> ..."}
                      ,"HM-CC-RT-DN00"     =>{ sysTime        =>""
                                              ,fwUpdate       =>"<filename> <bootTime> ..."}
                      ,"HM-LC-Bl1PBU-FM00" =>{ fwUpdate       =>"<filename> <bootTime> ..."}
