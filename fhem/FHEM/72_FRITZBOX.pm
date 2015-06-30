@@ -511,7 +511,7 @@ sub FRITZBOX_Get($@)
 #get Fritzbox tr064command LANEthernetInterfaceConfig:1 lanethernetifcfg GetStatistics
       Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
 
-      return "Wrong number of arguments, usage: get $name tr064command service control action [parameterName1 parameterValue1] [parameterName2 parameterValue2] ..."
+      return "Wrong number of arguments, usage: get $name tr064command service control action [argName1 argValue1] [argName2 argValue2] ..."
          if int @val <3 || int(@val) %2 !=1;
 
       $returnStr  = "Result of TR064 call\n";
@@ -2569,12 +2569,12 @@ sub FRITZBOX_Ring_Run_Web($)
       push @webCmdArray, "telcfg:settings/DialPort" => $ringWithIntern;
          FRITZBOX_Log $hash, 4, "Set dial port to '" . $dialPort{$ringWithIntern} . "' (MSN: ".$startValue->{fonPort}->[$ringWithIntern-1]{MSN} .").";
    } 
-   elsif ($field{show}) {
-      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined and standard dial port '".$hash->{READINGS}{box_stdDialPort}{VAL}."' is used."
-   }
-   # use standard dial port
+# set dial port to 50 (all Fons)
    else {
-         FRITZBOX_Log $hash, 5, "Use standard dial port '" . $hash->{READINGS}{box_stdDialPort}{VAL} ."'.";
+      FRITZBOX_Log $hash, 3, "Parameter 'show:' ignored because attribute 'ringWithIntern' not defined."
+            if $field{show};
+      push @webCmdArray, "telcfg:settings/DialPort" => 50;
+         FRITZBOX_Log $hash, 4, "Set dial port to 50 (all fons)";
    }
    
 # Set tts-Message
@@ -2606,7 +2606,7 @@ sub FRITZBOX_Ring_Run_Web($)
    push( @webCmdArray, "telcfg:command/Hangup" => "" )   unless $hash->{SECPORT};
       
 #Preparing 5th command array to reset everything
-   push @webCmdArray, "telcfg:settings/DialPort" => $startValue->{dialPort}      if $ringWithIntern != 0 && defined $startValue->{dialPort};
+   push @webCmdArray, "telcfg:settings/DialPort" => $startValue->{dialPort}      if defined $startValue->{dialPort};
       FRITZBOX_Log $hash, 4, "Reset dial port to '".$dialPort{$startValue->{dialPort}}."'.";
 # Reset internal ring tones for the Fritz!Fons
    if ($ringTone) {
@@ -4231,7 +4231,7 @@ sub FRITZBOX_fritztris($)
          Only available if the attribute "allowShellCommand" is set.
       </li><br>
 
-      <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[parameterName1 parameterValue1] ...] </code>
+      <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[argName1 argValue1] ...] </code>
          <br>
          Executes TR-064 actions (see <a href="http://avm.de/service/schnittstellen/">API description</a> of AVM)
          <br>
@@ -4254,6 +4254,11 @@ sub FRITZBOX_fritztris($)
       <li><code>allowShellCommand &lt;0 | 1&gt;</code>
          <br>
          Enables the get command "shellCommand"
+      </li><br>
+
+      <li><code>allowTR064Command &lt;0 | 1&gt;</code>
+         <br>
+         Enables the get command "tr064Command"
       </li><br>
 
       <li><code>defaultCallerName &lt;Text&gt;</code>
@@ -4538,7 +4543,7 @@ sub FRITZBOX_fritztris($)
          Muss zuvor &uuml;ber das Attribute "allowShellCommand" freigeschaltet werden.
       </li><br>
 
-      <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[parameterName1 parameterValue1] ...] </code>
+      <li><code>get &lt;name&gt; tr064Command &lt;service&gt; &lt;control&gt; &lt;action&gt; [[argName1 argValue1] ...] </code>
          <br>
          F&uuml;hrt &uuml;ber TR-064 Aktionen aus (siehe <a href="http://avm.de/service/schnittstellen/">Schnittstellenbeschreibung</a> von AVM)
          <br>
@@ -4562,7 +4567,7 @@ sub FRITZBOX_fritztris($)
          Freischalten des get-Befehls "shellCommand"
       </li><br>
       
-      <li><code>allowShellCommand &lt;0 | 1&gt;</code>
+      <li><code>allowTR064Command &lt;0 | 1&gt;</code>
          <br>
          Freischalten des get-Befehls "tr064Command"
       </li><br>
@@ -4571,7 +4576,7 @@ sub FRITZBOX_fritztris($)
          <br>
          Standard-Text, der auf dem angerufenen internen Telefon als "Anrufer" gezeigt wird.
          <br>
-         Dies erfolgt, indem w&auml;hrend des Klingelns kurzzeitig der Name der internen anrufenden Nummer ge&auml;ndert wird.
+         Dies erfolgt, indem w&auml;hrend des Klingelns tempor&auml;r der Name der internen anrufenden Nummer ge&auml;ndert wird.
          <br>
          Es sind maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
       </li><br>
@@ -4585,7 +4590,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>forceTelnetConnection &lt;0 | 1&gt;</code>
          <br>
-         Erzwingt den Fernzugriff über Telnet (anstatt &uuml;ber die WebGUI oder TR-064).
+         Erzwingt den Fernzugriff &uuml;ber Telnet (anstatt &uuml;ber die WebGUI oder TR-064).
          <br>
          Dieses Attribut muss bei &auml;lteren Ger&auml;ten/Firmware aktiviert werden.
       </li><br>
@@ -4639,9 +4644,9 @@ sub FRITZBOX_fritztris($)
       <li><b>box_model</b> - Fritz!Box-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_powerRate</b> - aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
-      <li><b>box_rateDown</b> - durchschnittliche Download-Geschwindigkeit in kByte/s des letzten Aktualisierungsintervals</li>
-      <li><b>box_rateUp</b> - durchschnittliche Upload-Geschwindigkeit in kByte/s des letzten Aktualisierungsintervals</li>
-      <li><b>box_stdDialPort</b> - Standard-W&auml;hlhilfe-Anschluss, der f&uml;r die W&auml;hlfunktion des Ger&auml;tes genutzt wird</li>
+      <li><b>box_rateDown</b> - Download-Geschwindigkeit des letzten Intervals in kByte/s</li>
+      <li><b>box_rateUp</b> - Upload-Geschwindigkeit des letzten Intervals in kByte/s</li>
+      <li><b>box_stdDialPort</b> - Anschluss der ger&auml;teseitig von der W&auml;hlhilfe genutzt wird</li>
       <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul ben&ouml;tigt)</li>
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
