@@ -1187,7 +1187,7 @@ sub RESIDENTStk_wakeupRun($;$) {
         Log3 $NAME, 4,
           "RESIDENTStk $NAME: Resetting based on wakeupDefaultTime";
         fhem
-"set $NAME:FILTER=nextRun!=$wakeupDefaultTime nextRun $wakeupDefaultTime";
+"set $NAME:FILTER=state!=$wakeupDefaultTime nextRun $wakeupDefaultTime";
     }
     elsif ( !$running ) {
         fhem "setreading $NAME:FILTER=state!=$nextRun state $nextRun";
