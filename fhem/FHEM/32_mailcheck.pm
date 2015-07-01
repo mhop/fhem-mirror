@@ -41,7 +41,6 @@ mailcheck_Initialize($)
   $hash->{AttrList} = "debug:1 ".
                       "delete_message:1 ".
                       "disable:1 ".
-                      "disabledForIntervals ".
                       "interval ".
                       "logfile ".
                       "nossl:1 ";
@@ -526,7 +525,6 @@ mailcheck_Read($)
       1 -> don't use ssl.</li><br>
     <li>disable<br>
       1 -> disconnect and stop polling</li>
-    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...</li>
     <li>debug<br>
       1 -> enables debug output. default target is stdout.</li>
     <li>logfile<br>
