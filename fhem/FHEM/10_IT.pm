@@ -367,6 +367,8 @@ IT_Set($@)
             $lh->{READINGS}{state}{VAL} = $v;
           }
         }
+      } else {
+        $lh->{READINGS}{state}{VAL} = $v;
       }
     } else {
       $lh->{READINGS}{state}{VAL} = $v;
