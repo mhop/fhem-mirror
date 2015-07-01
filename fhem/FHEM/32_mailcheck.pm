@@ -41,6 +41,7 @@ mailcheck_Initialize($)
   $hash->{AttrList} = "debug:1 ".
                       "delete_message:1 ".
                       "disable:1 ".
+                      "disabledForIntervals ".
                       "interval ".
                       "logfile ".
                       "nossl:1 ";
@@ -130,7 +131,7 @@ mailcheck_Connect($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  return undef if( AttrVal($name, "disable", 0 ) == 1 );
+  return undef if( IsDisabled($name) > 0 );
 
   my $socket;
   if( AttrVal($name, "nossl", 0) ) {
@@ -525,6 +526,7 @@ mailcheck_Read($)
       1 -> don't use ssl.</li><br>
     <li>disable<br>
       1 -> disconnect and stop polling</li>
+    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...</li>
     <li>debug<br>
       1 -> enables debug output. default target is stdout.</li>
     <li>logfile<br>
