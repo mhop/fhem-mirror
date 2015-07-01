@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: SOMFY: New state and action handling (added virtual receiver capability)
   - change: FRITZBOX: for most features no telnet access needed anymore
             Execution of own TR-064 commands now possible
   - bugfix: FB_CALLMONITOR: fixing not working company numbers 
