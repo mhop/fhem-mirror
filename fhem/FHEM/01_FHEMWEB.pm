@@ -529,6 +529,7 @@ FW_answerCall($)
       return 0 if(!$img);
       $iconPath = FW_iconPath($img);
       if($iconPath =~ m/\.svg$/i) {
+        $FW_RETTYPE = ext2MIMEType("svg");
         FW_pO FW_makeImage($img, $img);
         return 0;
       }
