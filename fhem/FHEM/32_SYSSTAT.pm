@@ -41,7 +41,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "disable:1 raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 ssh_user ";
+  $hash->{AttrList} = "disable:1 disabledForIntervals raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 ssh_user ";
   $hash->{AttrList} .= " snmp:1";
   $hash->{AttrList} .= " filesystems showpercent";
   $hash->{AttrList} .= " useregex:1" if( $SYSSTAT_hasSysStatistics );
@@ -246,7 +246,7 @@ SYSSTAT_GetUpdate($)
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 0);
 
-    return if( AttrVal($name,"disable", 0) > 0 );
+    return if( IsDisabled($name) > 0 );
   }
 
   my $load = SYSSTAT_getLoadAVG( $hash );
@@ -782,6 +782,7 @@ SYSSTAT_getStat($)
       <code>attr sysstat filesystems /dev/.*</code><br>
       <code>attr sysstat filesystems 1,3,5</code><br>
     </ul></li></lu>
+    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...</li>
     <li>showpercent<br>
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
     <li>snmp<br>
