@@ -565,6 +565,7 @@ sub FRITZBOX_Readout_Start($)
    {
       FRITZBOX_Log $hash, 1, "Old readout process still running. Killing old process ".$hash->{helper}{READOUT_RUNNING_PID};
       BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} ); 
+      sleep 5; # giving the killed application some time to free the memory
       delete($hash->{helper}{READOUT_RUNNING_PID});
    }
    
@@ -1442,6 +1443,7 @@ sub FRITZBOX_Set_Cmd_Start($)
       FRITZBOX_Log $hash, 1, "Old command still running. Killing old command: ".$cmdBuffer[0];
       shift @cmdBuffer;
       BlockingKill( $hash->{helper}{CMD_RUNNING_PID} ); 
+      sleep 5; # giving the killed application some time to free the memory
       delete $hash->{helper}{CMD_RUNNING_PID};
       return unless int @cmdBuffer;
    }
@@ -1510,7 +1512,7 @@ sub FRITZBOX_Set_Cmd_Start($)
 # Starting new command
    $hash->{helper}{CMD_RUNNING_PID} = BlockingCall($cmdFunction, $handover,
                                        "FRITZBOX_Set_Cmd_Done", $timeout,
-                                       " FRITZBOX_Set_Cmd_Aborted", $hash);
+                                       "FRITZBOX_Set_Cmd_Aborted", $hash);
    return undef;
 } # end FRITZBOX_Set_Cmd_Start
 
@@ -3621,7 +3623,7 @@ sub FRITZBOX_TR064_Get_ServiceList($)
    my $url = 'http://'.$host.":49000/tr64desc.xml";
 
    my $returnStr = "_" x 130 ."\n\n";
-   $returnStr .= " List of TR-064 services and actions that are allowed on the device '$host'\n";
+   $returnStr .= " List of TR-064 services and actions that are provided by the device '$host'\n";
 
    return "TR-064 switched off."     if $hash->{READINGS}{box_tr064}{VAL} eq "off";
 
@@ -3665,8 +3667,8 @@ sub FRITZBOX_TR064_Get_ServiceList($)
       $version .= ".".$1;
       
       $returnStr .= "_" x 130 ."\n\n";
-      $returnStr .= " Service: ".$_->[0]."     Control: ".$_->[1]."\n";
       $returnStr .= " Spec: http://".$host.":49000".$_->[2]."    Version: ".$version."\n";
+      $returnStr .= " Service: ".$_->[0]."     Control: ".$_->[1]."\n";
       $returnStr .= "-" x 130 ."\n";
    
    # get name and arguments of each action
