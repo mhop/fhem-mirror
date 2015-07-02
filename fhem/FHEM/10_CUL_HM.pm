@@ -7637,6 +7637,7 @@ sub CUL_HM_unQEntity($$){# remove entity from q
     my @chns = split(",",$dq->{$q});
     my $chn = substr(CUL_HM_name2Id($name),6,2);
     @chns = grep !/$chn/,@chns;
+    @chns = grep !/00/,@chns;#remove device as well - just in case
     $dq->{$q} = join",",@chns;
   }
   $q = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
@@ -7783,7 +7784,7 @@ sub CUL_HM_autoReadReady($){# capacity for autoread available?
       || ReadingsVal($ioName,"cond","init") !~ m /^(ok|Overload-released|init)$/#default init for CUL
       || ( defined $defs{$ioName}->{msgLoadCurrent}
           && ( $defs{$ioName}->{msgLoadCurrent}>
-               AttrVal($ioName,"hmMsgLowLimit",40)))){
+               (defined $defs{$ioName}{helper}{loadLvl}?$defs{$ioName}{helper}{loadLvl}{bl}:40)))){
     return 0;
   }
   return 1;
@@ -8160,9 +8161,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                   requests by itself, and if it is configured with the 3-byte address
                   of a foreign CCU which is still configurerd with the default
                   password, it is able to answer signing requests correctly.</li>
-              <li>AES-Encryption is not useable with a CUL device as the interface,
-                  but it is supported with a HMLAN. Due to the issues above I do not
-                  recommend using Homematic encryption at all.</li>
+              <li>AES-Encryption is useable with a HMLAN or a CUL. When using
+                  a CUL, the perl-module Crypt::Rijndael needs to be installed.
+                  Due to the issues above I do not recommend using Homematic
+                  encryption at all.</li>
             </ul>
         </li>
       </ul>
@@ -8175,6 +8177,11 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   
       Universal commands (available to most hm devices):
       <ul>
+        <li><B>assignHmKey</B><a name="CUL_HMassignHmKey"></a><br>
+          Initiates a key-exchange with the device, exchanging the old AES-key of the device with the key with the highest
+          index defined by the attribute hmKey* in the HMLAN or VCCU. The old key is determined by the reading aesKeyNbr,
+          which specifies the index of the old key when the reading is divided by 2.
+        </li>
         <li><B>clear &lt;[rssi|readings|register|msgEvents|attack|all]&gt;</B><a name="CUL_HMclear"></a><br>
           A set of variables can be removed.<br>
           <ul>
@@ -8350,8 +8357,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         <li><B>sign [on|off]</B><a name="CUL_HMsign"></a><br>
           Activate or deactivate signing (also called AES encryption, see the <a
           href="#HMAES">note</a> above). Warning: if the device is attached via
-          a CUL, you won't be able to switch it (or deactivate signing) from
-          fhem before you reset the device directly.
+          a CUL, you need to install the perl-module Crypt::Rijndael to be
+          able to switch it (or deactivate signing) from fhem.
         </li>
         <li><B>statusRequest</B><a name="CUL_HMstatusRequest"></a><br>
           Update device status. For multichannel devices it should be issued on
@@ -8817,10 +8824,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           </ul><br>
         </li>
         <li>keyMatic<br><br>
-          <ul>The Keymatic uses the AES signed communication. Therefore the control
-              of the Keymatic is only together with the HM-LAN adapter possible. But
-              the CUL can read and react on the status information of the
-              Keymatic.</ul><br>
+          <ul>The Keymatic uses the AES signed communication. Control
+              of the Keymatic is possible with the HM-LAN adapter and the CUL.
+              To control the KeyMatic with a CUL, the perl-module Crypt::Rijndael
+              needs to be installed.</ul><br>
           <ul>
             <li><B>lock</B><br>
                The lock bolt moves to the locking position<br></li>
@@ -9497,9 +9504,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li>Der <a href="#HMLAN">HMLAN</a> Konfigurator beantwortet Signaturanforderungen selbstst&auml;ndig,
               ist dabei die 3-Byte-Adresse einer anderen CCU eingestellt welche noch immer das Standardpasswort hat,
               kann dieser Signaturanfragen korrekt beantworten.</li>
-            <li>AES-Verschl&uuml;sselung kann nicht bei einem CUL als Interface eingesetzt werden, wird allerdings
-              durch HMLAN unterst&uuml;tzt. Aufgrund dieser Einschr&auml;nkungen ist der Einsatz der Homematic-Verschl&uuml;sselung
-              nicht zu empfehlen!</li>
+            <li>AES-Verschl&uuml;sselung wird durch HMLAN und CUL unterst&uuml;tzt. Bei Einsatz eines CUL
+              ist das Perl-Modul Crypt::Rijndael notwendig. Aufgrund dieser Einschr&auml;nkungen ist der
+              Einsatz der Homematic-Verschl&uuml;sselung nicht zu empfehlen!</li>
           </ul>
         </li>
       </ul>
@@ -9677,8 +9684,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         </li>
         <li><B>sign [on|off]</B><a name="CUL_HMsign"></a><br>
           Ein- oder ausschalten der Signierung (auch "AES-Verschl&uuml;sselung" genannt, siehe <a
-          href="#HMAES">note</a>). Achtung: Wird das Ger&auml;t &uuml;ber einen CUL eingebunden ist schalten (oder
-          deaktivieren der Signierung) nicht m&ouml;glich, das Ger&auml;t muss direkt zur&uuml;ckgesetzt werden.
+          href="#HMAES">note</a>). Achtung: Wird das Ger&auml;t &uuml;ber einen CUL eingebunden, ist schalten (oder
+          deaktivieren der Signierung) nur m&ouml;glich, wenn das Perl-Modul Crypt::Rijndael installiert ist.
         </li>
         <li><B>statusRequest</B><a name="CUL_HMstatusRequest"></a><br>
           Aktualisieren des Ger&auml;testatus. F&uuml;r mehrkanalige Ger&auml;te sollte dies kanalbasiert
@@ -10108,10 +10115,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           </ul><br>
         </li>
         <li>keyMatic<br><br>
-          <ul>Keymatic verwendet eine AES-signierte Kommunikation. Deshalb ist die Steuerung von Keymatic
-            nur mit dem HM-LAN m&ouml;glich. But
-            Ein CUL kann aber Statusnachrichten von Keymatic mitlesen und darauf
-            reagieren.</ul><br>
+          <ul>Keymatic verwendet eine AES-signierte Kommunikation. Die Steuerung von KeyMatic
+            ist mit HMLAN und mit CUL m&ouml;glich.
+            Um die Keymatic mit einem CUL zu steuern, muss das Perl-Modul Crypt::Rijndael
+            installiert sein.</ul><br>
           <ul>
             <li><B>lock</B><br>
               Schließbolzen f&auml;hrt in Zu-Position<br></li>
