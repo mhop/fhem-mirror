@@ -898,7 +898,6 @@ sub FRITZBOX_Readout_Run_Shell($)
 } # End FRITZBOX_Readout_Run_Shell
 
 # http://fritz.box/cgi-bin/webcm?wlan:settings/guest_ap_enabled=1&sid=
-#http://fritz.box/query.lua?sid=<enter_your_sid_here>&network=landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse)
       # FRITZBOX_Log $hash, 3, "Web connection established with $sid";
       # my $urlcgi = 'http://'.$host.'/cgi-bin/webcm';
       # my $response = $agent->post( $urlcgi,
@@ -1079,9 +1078,14 @@ sub FRITZBOX_Readout_Run_Web($)
       if ($_->{active} == 1) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $_->{name};
       }
-   # Delete the mac readings if the device is not online anymore
+   # if the device is not online anymore, set the mac readings to 'inactive' and delete at next readout
       elsif (exists $hash->{READINGS}{$rName}) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "";
+         if ($hash->{READINGS}{$rName}{VAL} ne "inactive") {
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "inactive";
+         }
+         else {
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "";
+         }
       }
    }
 
