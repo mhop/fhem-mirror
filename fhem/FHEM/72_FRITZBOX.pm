@@ -1074,6 +1074,7 @@ sub FRITZBOX_Readout_Run_Web($)
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
       $landevice{$dIp}=$dName;
       my $rName = "mac_".$_->{mac};
+      $rName =~ s/:/_/;
 # Create a reading if a landevice is connected
       if ($_->{active} == 1) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $_->{name};
@@ -4688,7 +4689,7 @@ sub FRITZBOX_fritztris($)
       <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
       <br>
-      <li><b>mac_</b><i>01:26:FD:12:01:DA</i> - MAC Adresse und Namen eine <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Namen eine <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
       <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
       <br>
