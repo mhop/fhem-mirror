@@ -49,7 +49,8 @@ eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
 
 use FritzBoxUtils; ## only for web access login
 #sudo apt-get install libjson-perl
-eval "use JSON::XS;1" or $missingModulWeb .= "JSON::XS ";
+# eval "use JSON::XS;1" or $missingModulWeb .= "JSON::XS ";
+eval "use JSON;1" or $missingModulWeb .= "JSON ";
 eval "use LWP::UserAgent;1" or $missingModulWeb .= "LWP::UserAgent ";
 
 eval "use URI::Escape;1" or $missingModulTR064 .= "URI::Escape ";
@@ -963,6 +964,7 @@ sub FRITZBOX_Readout_Run_Web($)
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
+   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,name,mac,active)"; # LAN devices
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
    $queryStr .= "&box_stdDialPort=telcfg:settings/DialPort"; #Dial Port
    $queryStr .= "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Name,Intern,IntRingTone,AlarmRingTone0,RadioRingID,ImagePath,G722RingTone,G722RingToneName)"; # DECT Numbers
@@ -970,7 +972,6 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&alarmClock=telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)"; # Alarm Clock
    $queryStr .= "&diversity=telcfg:settings/Diversity/list(MSN,Active,Destination)"; # Diversity (Rufumleitung)
    $queryStr .= "&box_moh=telcfg:settings/MOHType"; # Music on Hold
-   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,name)"; # LAN devices
    $queryStr .= "&box_fwVersion=logic:status/nspver"; # FW Version
    $queryStr .= "&box_powerRate=power:status/rate_sumact"; # Power Rate
    $queryStr .= "&tam=tam:settings/TAM/list(Name,Display,Active,NumNewMessages,NumOldMessages)"; # TAM
@@ -1073,6 +1074,15 @@ sub FRITZBOX_Readout_Run_Web($)
       my $dName = $_->{name};
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
       $landevice{$dIp}=$dName;
+      my $rName = "mac_".$_->{mac};
+# Create a reading if a landevice is connected
+      if ($_->{active} == 1) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $_->{name};
+      }
+   # Delete the mac readings if the device is not online anymore
+      elsif (exists $hash->{READINGS}{$rName}) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "";
+      }
    }
 
 # WLANs
@@ -4328,7 +4338,7 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_target</b> - Internal number of the alarm clock <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_time</b> - Alarm time of the alarm clock <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of the alarm clock <i>1</i></li>
-
+      <br>
       <li><b>box_dect</b> - Current state of the DECT base</li>
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
@@ -4344,7 +4354,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_tr069</b> - provider remote access TR-069 (safety issue!)</li>
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
-
+      <br>
       <li><b>dect</b><i>1</i> - Name of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Alarm ring tone of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Customer ring tone of the DECT device <i>1</i></li>
@@ -4354,22 +4364,24 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_manufacturer</b> - Manufacturer of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_model</b> - Model of the DECT device <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_radio</b> - Current internet radio station ring tone of the DECT device <i>1</i></li>
-
-      <li><b>fon</b><i>1</i> - Internal name of the analog FON port <i>1</i></li>
-      <li><b>fon</b><i>1</i><b>_intern</b> - Internal number of the analog FON port <i>1</i></li>
-      <li><b>fon</b><i>1</i><b>_out</b> - Outgoing number of the analog FON port <i>1</i></li>
-
+      <br>
       <li><b>diversity</b><i>1</i> - Own (incoming) phone number of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_dest</b> - Destination of the call diversity <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_state</b> - Current state of the call diversity <i>1</i></li>
-
+      <br>
+      <li><b>fon</b><i>1</i> - Internal name of the analog FON port <i>1</i></li>
+      <li><b>fon</b><i>1</i><b>_intern</b> - Internal number of the analog FON port <i>1</i></li>
+      <li><b>fon</b><i>1</i><b>_out</b> - Outgoing number of the analog FON port <i>1</i></li>
+      <br>
+      <li><b>mac_</b><i>01:26:FD:12:01:DA</i> - mac address and name of an <u>active</u> network device</li>
+      <br>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
-
+      <br>
       <li><b>tam</b><i>1</i> - Name of the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_newMsg</b> - New messages on the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_oldMsg</b> - Old messages on the answering machine <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_state</b> - Current state of the answering machine <i>1</i></li>
-
+      <br>
       <li><b>user</b><i>01</i> - Name of user/IP <i>1</i> that is under parental control</li>
       <li><b>user</b><i>01</i>_thisMonthTime - this month internet usage of user/IP <i>1</i> (parental control)</li>
       <li><b>user</b><i>01</i>_todaySeconds - today's internet usage in seconds of user/IP <i>1</i> (parental control)</li>
@@ -4638,7 +4650,7 @@ sub FRITZBOX_fritztris($)
       <li><b>alarm</b><i>1</i><b>_target</b> - Interne Nummer des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_time</b> - Weckzeit des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>1</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
-      
+      <br>
       <li><b>box_dect</b> - Aktueller Status des DECT-Basis</li>
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
@@ -4653,7 +4665,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
-      
+      <br>
       <li><b>dect</b><i>1</i> - Name des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton beim Wecken &uuml;ber das DECT Telefon <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_custRingTone</b> - Benutzerspezifischer Klingelton des DECT Telefons <i>1</i></li>
@@ -4663,22 +4675,24 @@ sub FRITZBOX_fritztris($)
       <li><b>dect</b><i>1</i><b>_manufacturer</b> - Hersteller des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_model</b> - Modell des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_radio</b> - aktueller Internet-Radio-Klingelton des DECT Telefons <i>1</i></li>
-      
-      <li><b>fon</b><i>1</i> - Name des analogen Telefonanschlusses <i>1</i> an der Fritz!Box</li>
-      <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
-      <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
-      
+      <br>
       <li><b>diversity</b><i>1</i> - Eigene Rufnummer der Rufumleitung <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_dest</b> - Zielnummer der Rufumleitung <i>1</i></li>
       <li><b>diversity</b><i>1</i><b>_state</b> - Aktueller Status der Rufumleitung <i>1</i></li>
-      
+      <br>
+      <li><b>fon</b><i>1</i> - Name des analogen Telefonanschlusses <i>1</i> an der Fritz!Box</li>
+      <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
+      <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
+      <br>
+      <li><b>mac_</b><i>01:26:FD:12:01:DA</i> - MAC Adresse und Namen eine <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
+      <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
-      
+      <br>
       <li><b>tam</b><i>1</i> - Name des Anrufbeantworters <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_newMsg</b> - Anzahl neuer Nachrichten auf dem Anrufbeantworter <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_oldMsg</b> - Anzahl alter Nachrichten auf dem Anrufbeantworter <i>1</i></li>
       <li><b>tam</b><i>1</i><b>_state</b> - Aktueller Status des Anrufbeantworters <i>1</i></li>
-      
+      <br>
       <li><b>user</b><i>01</i> - Name von Nutzer/IP <i>1</i> f&uuml;r den eine Zugangsbeschr&auml;nkung (Kindersicherung) eingerichtet ist</li>
       <li><b>user</b><i>01</i>_thisMonthTime - Internetnutzung des Nutzers/IP <i>1</i> im aktuellen Monat (Kindersicherung)</li>
       <li><b>user</b><i>01</i>_todaySeconds - heutige Internetnutzung des Nutzers/IP <i>1</i> in Sekunden (Kindersicherung)</li>
