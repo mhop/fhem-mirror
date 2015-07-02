@@ -20,6 +20,7 @@ yowsup_Initialize($)
   $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "yowsup_Notify";
   $hash->{UndefFn}  = "yowsup_Undefine";
+  $hash->{ShutdownFn}  = "yowsup_Shutdown";
   $hash->{SetFn}    = "yowsup_Set";
   #$hash->{GetFn}    = "yowsup_Get";
   $hash->{AttrFn}   = "yowsup_Attr";
@@ -225,6 +226,16 @@ yowsup_Undefine($$)
 
   return undef;
 }
+sub
+yowsup_Shutdown($)
+{
+  my ($hash) = @_;
+
+  yowsup_Disconnect($hash);
+
+  return undef;
+}
+
 
 sub
 yowsup_Set($$@)
@@ -390,7 +401,7 @@ yowsup_Parse($$)
 
           my $allowed = AttrVal($cname, "allowedCommands", undef );
           my $ret = AnalyzeCommandChain( $hash, $cmd, $allowed );
-          
+
           Log3 $name, 4, "$cname: command result: $ret";
 
           yowsup_Write( $hash, "/message send $chash->{NUMBER} '$ret'" ) if( $ret );
