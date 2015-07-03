@@ -629,7 +629,7 @@ sub SOMFY_InternalSet($@) {
 		my @cList;
 
     # overwrite %sets with setList
-    my $atts = AttrVal($name,'setList',undef);
+    my $atts = AttrVal($name,'setList',"");
     my %setlist = split("[: ][ ]*", $atts);
 
 		foreach my $k (sort keys %sets) {
@@ -655,10 +655,8 @@ sub SOMFY_InternalSet($@) {
 	return "SOMFY_set: Bad time spec" if($cmd =~m/(on|off)-for-timer/ && $numberOfArgs == 2 && $arg1 !~ m/^\d*\.?\d+$/);
 
 	# read timing variables
-	my $t1downclose = AttrVal($name,'drive-down-time-to-close',undef);
-	my $t1down100 = AttrVal($name,'drive-down-time-to-100',undef);
-	my $t1upopen = AttrVal($name,'drive-up-time-to-open',undef);
-	my $t1up100 =  AttrVal($name,'drive-up-time-to-100',undef);
+  my ($t1down100, $t1downclose, $t1upopen, $t1up100) = SOMFY_getTimingValues($hash);
+	Log3($name,5,"SOMFY_set: $name -> timings ->  td1:$t1down100: tdc :$t1downclose:  tuo :$t1upopen:  tu1 :$t1up100: ");
 
 	my $model =  AttrVal($name,'model',$models{somfyblinds});
 	
@@ -692,7 +690,6 @@ sub SOMFY_InternalSet($@) {
 		}
 		$pos = sprintf( "%d", $pos );
 	}
-
 
 	Log3($name,4,"SOMFY_set: $name -> entering with mode :$mode: cmd :$cmd:  arg1 :$arg1:  pos :$pos: ");
 
@@ -1015,8 +1012,9 @@ sub SOMFY_UpdateState($$$$$) {
 	my ($hash, $newState, $move, $updateState, $doTrigger) = @_;
 
   my $addtlPosReading = AttrVal($hash->{NAME},'additionalPosReading',undef);
-  $addtlPosReading = undef if ( ( $addtlPosReading eq "" )  );
-  $addtlPosReading = undef if ( ( $addtlPosReading eq "state" ) or ( $addtlPosReading eq "position" ) or ( $addtlPosReading eq "exact" ) );
+  if ( defined($addtlPosReading )) {
+    $addtlPosReading = undef if ( ( $addtlPosReading eq "" ) or ( $addtlPosReading eq "state" ) or ( $addtlPosReading eq "position" ) or ( $addtlPosReading eq "exact" ) );
+  }
 
 	readingsBeginUpdate($hash);
 
@@ -1056,6 +1054,53 @@ sub SOMFY_UpdateState($$$$$) {
 	readingsEndUpdate($hash,$doTrigger); 
 } # end sub SOMFY_UpdateState
 
+
+###################################
+# Return timingvalues from attr and after correction
+sub SOMFY_getTimingValues($) {
+	my ($hash) = @_;
+
+	my $name = $hash->{NAME};
+
+	my $t1down100 = AttrVal($name,'drive-down-time-to-100',undef);
+	my $t1downclose = AttrVal($name,'drive-down-time-to-close',undef);
+	my $t1upopen = AttrVal($name,'drive-up-time-to-open',undef);
+	my $t1up100 =  AttrVal($name,'drive-up-time-to-100',undef);
+
+  return (undef, undef, undef, undef) if(!defined($t1downclose) || !defined($t1down100) || !defined($t1upopen) || !defined($t1up100));
+
+  if ( ( $t1downclose < 0 ) || ( $t1down100 < 0 ) || ( $t1upopen < 0 ) || ( $t1up100 < 0 ) ) {
+    Log3($name,1,"SOMFY_getTimingValues: $name time values need to be positive values");
+    return (undef, undef, undef, undef); 
+  }
+
+  if ( $t1downclose < $t1down100 ) {
+    Log3($name,1,"SOMFY_getTimingValues: $name close time needs to be higher or equal than time to pos100");
+    return (undef, undef, undef, undef); 
+  } elsif ( $t1downclose == $t1down100 ) {
+    $t1up100 = 0;
+  }
+
+  if ( $t1upopen <= $t1up100 ) {
+    Log3($name,1,"SOMFY_getTimingValues: $name open time needs to be higher or equal than time to pos100");
+    return (undef, undef, undef, undef); 
+  }
+
+  if ( $t1upopen < 1 ) {
+    Log3($name,1,"SOMFY_getTimingValues: $name time to open needs to be at least 1 second");
+    return (undef, undef, undef, undef); 
+  }
+
+  if ( $t1downclose < 1 ) {
+    Log3($name,1,"SOMFY_getTimingValues: $name time to close needs to be at least 1 second");
+    return (undef, undef, undef, undef); 
+  }
+
+  return ($t1down100, $t1downclose, $t1upopen, $t1up100); 
+}
+
+
+
 ###################################
 # call with hash, translated state
 sub SOMFY_CalcCurrentPos($$$$) {
@@ -1067,10 +1112,7 @@ sub SOMFY_CalcCurrentPos($$$$) {
 	my $newPos = $pos;
 	
 	# Attributes for calculation
-	my $t1down100 = AttrVal($name,'drive-down-time-to-100',undef);
-	my $t1downclose = AttrVal($name,'drive-down-time-to-close',undef);
-	my $t1upopen = AttrVal($name,'drive-up-time-to-open',undef);
-	my $t1up100 =  AttrVal($name,'drive-up-time-to-100',undef);
+  my ($t1down100, $t1downclose, $t1upopen, $t1up100) = SOMFY_getTimingValues($hash);
 
 	if(defined($t1down100) && defined($t1downclose) && defined($t1up100) && defined($t1upopen)) {
 		if( ( $t1downclose == $t1down100) && ( $t1up100 == 0 ) ) {
