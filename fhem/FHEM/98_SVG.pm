@@ -1591,7 +1591,7 @@ SVG_render($$$$$$$$$$)
   $hmin{x1y1}=$hmin{x1y2}, $hmax{x1y1}=$hmax{x1y2} if(!defined($hmin{x1y1}));
   $hmin{x1y2}=$hmin{x1y1}, $hmax{x1y2}=$hmax{x1y1} if(!defined($hmin{x1y2}));
 
-  my (%hstep,%htics,%axdrawn);
+  my (%hstep,%htics);
 
   #-- yrange handling for axes x1y1..x1y8
   for my $idx (0..7)  {
@@ -1615,16 +1615,15 @@ SVG_render($$$$$$$$$$)
     $htics{$a} = defined($conf{$yt}) ? $conf{$yt} : "";
 
     #-- Round values, compute a nice step  
-    ($hstep{$a}, $hmin{$a}, $hmax{$a}) = SVG_getSteps($conf{$yra},$hmin{$a},$hmax{$a});
-    $axdrawn{$a} = 0;
+    ($hstep{$a}, $hmin{$a}, $hmax{$a}) =
+        SVG_getSteps($conf{$yra},$hmin{$a},$hmax{$a});
 
-    #Log3 $name, 2, "Axis $a has interval [$hmin{$a},$hmax{$a}], step $hstep{$a}, tics $htics{$a}\n";
+    #Log3 $name, 2, "Axis $a has interval [$hmin{$a},$hmax{$a}],
+    # step $hstep{$a}, tics $htics{$a}\n";
   }
 
   #-- run through all axes for drawing (each only once !) 
   foreach my $a (sort keys %hmin) {
-    next if( $axdrawn{$a} );
-    $axdrawn{$a}=1;
 
     next if(!defined($hmin{$a})); # Bogus case
 
