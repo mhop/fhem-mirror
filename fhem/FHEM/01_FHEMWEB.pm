@@ -1057,6 +1057,7 @@ FW_doDetail($)
   my ($d) = @_;
 
   return if($FW_hiddenroom{detail});
+  return if(!defined($defs{$d}));
   my $h = $defs{$d};
   my $t = $h->{TYPE};
   $t = "MISSING" if(!defined($t));
