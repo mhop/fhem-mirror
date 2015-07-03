@@ -24,7 +24,7 @@ my %zwave_class = (
     set   => { basicValue  => "01%02x" },
     get   => { basicStatus => "02",     }, 
     parse => { "..2001(.*)"=> '"basicSet:$1"', # Forum #36980
-               "..2002"    => "basicGet",      # sent by the remote
+               "..2002"    => "basicGet:request", # sent by the remote
                "..2003(.*)"=> '"basicReport:$1"' }},
   CONTROLLER_REPLICATION   => { id => '21' },
   APPLICATION_STATUS       => { id => '22' },
