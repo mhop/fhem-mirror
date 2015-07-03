@@ -566,8 +566,8 @@ sub FRITZBOX_Readout_Start($)
    {
       FRITZBOX_Log $hash, 1, "Old readout process still running. Killing old process ".$hash->{helper}{READOUT_RUNNING_PID};
       BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} ); 
-      sleep 5; # giving the killed application some time to free the memory
-      delete($hash->{helper}{READOUT_RUNNING_PID});
+      sleep 5     unless $hash->{REMOTE} == 1; # giving the FritzBox some time to free the memory
+      delete( $hash->{helper}{READOUT_RUNNING_PID} );
    }
    
    my $runFn = "FRITZBOX_Readout_Run_Web";
@@ -1458,7 +1458,7 @@ sub FRITZBOX_Set_Cmd_Start($)
       FRITZBOX_Log $hash, 1, "Old command still running. Killing old command: ".$cmdBuffer[0];
       shift @cmdBuffer;
       BlockingKill( $hash->{helper}{CMD_RUNNING_PID} ); 
-      sleep 5; # giving the killed application some time to free the memory
+      sleep 5     unless $hash->{REMOTE}==1; # giving FritzBox some time to free the memory
       delete $hash->{helper}{CMD_RUNNING_PID};
       return unless int @cmdBuffer;
    }
