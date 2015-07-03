@@ -78,7 +78,7 @@ span.sort-item-delete-link {
 
 pre { white-space: pre-wrap; }
 svg { height:32px; width:32px; vertical-align:middle; margin:2px 0; }
-svg:not([fill]) { fill:#278727; }
+svg:not([fill]):not(.jssvg) { fill:#278727; }
 
 svg.on,svg.FS20_on { fill:orange; }
 

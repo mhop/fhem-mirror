@@ -1,55 +1,43 @@
 "use strict";
 var svgNS = "http://www.w3.org/2000/svg";
-var svg_b64 ="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 var svg_initialized={}, lastHidden;
+var svg_db, svg_dbtbl = "SVG_KEYVALUE", svg_pastedata;
 
-
-
-// Base64 encode the xy points (12 bit x, 12 bit y).
 function
-svg_compressPoints(pointList)
+svg_initDb(nextFn)
 {
-  var i, x, y, lx = -1, ly, ret = "";
-  var pl_arr = pointList.replace(/^  */,'').split(/[, ]/);
-  for(i = 0; i < pl_arr.length; i +=2) {
-    x = parseInt(pl_arr[i]);
-    y = parseInt(pl_arr[i+1]);
-    if(pl_arr.length > 500 && lx != -1 && x-lx < 2)    // Filter the data.
-      continue;
-    ret = ret+
-          svg_b64.charAt((x&0xfc0)>>6)+
-          svg_b64.charAt((x&0x3f))+
-          svg_b64.charAt((y&0xfc0)>>6)+
-          svg_b64.charAt((y&0x3f));
-    lx = x; ly = y;
-  }
-  return ret;
+  if(window.indexedDB == undefined)
+    return;
+  var dbreq = indexedDB.open("FHEM", 1)
+  dbreq.onsuccess = function(op) { svg_db = op.target.result; nextFn() }
+  dbreq.onerror   = function(op) { log("indexedDB.open Error: " + op.message); }
+  dbreq.onupgradeneeded = function(op) {
+    svg_db = op.target.result;
+    svg_db.createObjectStore(svg_dbtbl, { keyPath:"key" });
+  };
 }
 
 function
-svg_uncompressPoints(cmpData)
+svg_save(key, value)
 {
-  var i = 0, ret = "";
-  while(i < cmpData.length) {
-    var x = (svg_b64.indexOf(cmpData.charAt(i++))<<6)+
-             svg_b64.indexOf(cmpData.charAt(i++));
-    var y = (svg_b64.indexOf(cmpData.charAt(i++))<<6)+
-             svg_b64.indexOf(cmpData.charAt(i++));
-    ret += " "+x+","+y;
-  }
-  return ret;
+  if(!svg_db)
+    return;
+  var os = svg_db.transaction([svg_dbtbl],"readwrite")
+                 .objectStore(svg_dbtbl);
+  os.put({key:key, val:value});
 }
-
 
 function
-svg_getcookie()
+svg_load(key, nextFn)
 {
-  var c = document.cookie;
-  if(c == null)
-    return [];
-  var results = c.match('fhemweb=(.*?)(;|$)' );
-  return (results ? unescape(results[1]).split(":") : []);
+  if(!svg_db)
+    return;
+  var req = svg_db.transaction([svg_dbtbl],"readonly")
+                 .objectStore(svg_dbtbl)
+                 .get(key);
+  req.onsuccess = function(e) { if(req.result) nextFn(req.result.val); }
 }
+
 
 function
 svg_prepareHash(el)
@@ -83,7 +71,6 @@ sv_menu(evt, embed)
   var svg = $(label).closest("svg");
   var svgNode = $(svg).get(0);
   var lid = $(label).attr("line_id");
-  var data = svg_getcookie();
   var sel = $(svg).find("#"+lid);
   var selNode = $(sel).get(0);
   var tl = $(svg).find("#svg_title");
@@ -112,7 +99,7 @@ sv_menu(evt, embed)
       "Hide other lines",
       "Show all lines",
       selNode.showVal ? "Stop displaying values" : "Display plot values" ],
-    [undefined, data.length==0,
+    [undefined, svg_pastedata == undefined,
       !selNode.isHidden && (lines.length - hidden.length) == 1,
       !selNode.isHidden && (lines.length - hidden.length) == 1,
       hidden.length==0,
@@ -121,21 +108,26 @@ sv_menu(evt, embed)
 
       //////////////////////////////////// copy
       if(arg == 0) {
-        document.cookie="fhemweb="+
-              $(sel).attr("y_min")+":"+$(sel).attr("y_mul")+":"+
-              svg_compressPoints($(sel).attr(pn));
+        svg_pastedata = {
+          key:"svg_pastedata",
+          tag:sn, attr:pn,
+          y_min:$(sel).attr("y_min"),
+          y_mul:$(sel).attr("y_mul"),
+          datapoints:$(sel).attr(pn)
+        };
+        svg_save("svg_pastedata", svg_pastedata);
       }
 
       //////////////////////////////////// paste
       if(arg == 1) {
         var doc = $(svg).get(0).ownerDocument;
-        var o=doc.createElementNS(svgNS, "polyline");
-        o.setAttribute("class", "pasted");
-        o.setAttribute(pn, svg_uncompressPoints(data[2]));
+        var o=doc.createElementNS(svgNS, svg_pastedata.tag);
+        o.setAttribute("class", "SVGplot pasted");
+        o.setAttribute(svg_pastedata.attr, svg_pastedata.datapoints);
 
         var h  = parseFloat($(sel).attr("y_h"));
-        var ny_mul = parseFloat(data[1]);
-        var ny_min = parseInt(data[0]);
+        var ny_mul = parseFloat(svg_pastedata.y_mul);
+        var ny_min = parseInt(svg_pastedata.y_min);
         var y_mul  = parseFloat($(sel).attr("y_mul"));
         var y_min  = parseInt($(sel).attr("y_min"));
         var tr = 
@@ -331,6 +323,9 @@ svg_init(par)    // also called directly from perl, in race condition
 
 $(document).ready(function(){
   svg_init();                          // <embed><svg>
+  svg_initDb(function(){
+    svg_load("svg_pastedata", function(val) {svg_pastedata = val} );
+  });
   $("svg[id]").each(function(){        // <svg> (direct)
     if($(this).attr("id").indexOf("SVGPLOT") == 0)
       svg_init_one(undefined, this);
