@@ -1002,7 +1002,7 @@ SVG_doShowLog($$$$;$)
       my $oll = $attr{global}{verbose};
       $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
       my @path = split(" ",
-                        FW_fC("get $d $file $tmpfile $f $t $srcDesc->{all}"));
+                      FW_fC("get $d $file $tmpfile $f $t $srcDesc->{all}", 1));
       $attr{global}{verbose} = $oll;
 
       # replace the path with the temporary filenames of the filelog output
@@ -1029,7 +1029,7 @@ SVG_doShowLog($$$$;$)
       my $oll = $attr{global}{verbose};
       $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
       my @path = split(" ",
-                        FW_fC("get $d $file $tmpfile $f $t $srcDesc->{all}"));
+                      FW_fC("get $d $file $tmpfile $f $t $srcDesc->{all}", 1));
       $attr{global}{verbose} = $oll;
 
       # replace the path with the temporary filenames of the filelog output
@@ -1112,7 +1112,7 @@ SVG_getData($$$$$)
     my $s = $srcDesc->{src}{$src};
     my $fname = ($src eq $defs{$d}{LOGDEVICE} ? $defs{$d}{LOGFILE} : "CURRENT");
     my $cmd = "get $src $fname INT $f $t ".$s->{arg};
-    FW_fC($cmd);
+    FW_fC($cmd, 1);
     if($showData) {
       $ret .= "\n$cmd\n\n";
       $ret .= $$internal_data if(ref $internal_data eq "SCALAR");
