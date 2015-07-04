@@ -403,7 +403,7 @@ sub Text2Speech_PrepareSpeech($$) {
 
     # bei Angabe direkter MP3-Files wird hier ein temporäres Template vergeben
     for(my $i=0; $i<(@text); $i++) {
-      @FileTplPc = ($text[$i] =~ /:(\w+.mp3):/g);
+      @FileTplPc = ($text[$i] =~ /:(\w+.[mp3|ogg|wav]):/g);
       for(my $j=0; $j<(@FileTplPc); $j++) {
         my $time = time();
         $time =~ s/\.//g;
