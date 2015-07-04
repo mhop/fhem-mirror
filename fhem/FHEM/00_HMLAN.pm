@@ -77,6 +77,7 @@ sub HMLAN_Initialize($) {
                      "respTime " .
                      "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger ".
                      "hmMsgLowLimit ".
+                     "loadLevel ".
                      "hmLanQlen:1_min,2_low,3_normal,4_high,5_critical ".
                      "wdTimer:5,10,15,20,25 ".
                      "logIDs ".
@@ -116,8 +117,8 @@ sub HMLAN_Define($$) {#########################################################
   my @arr = ();
   @{$hash->{helper}{q}{apIDs}} = \@arr;
 
-  $hash->{helper}{q}{scnt} = 0;
-  $hash->{helper}{q}{loadNo} = 0;
+  $hash->{helper}{q}{scnt}     = 0;
+  $hash->{helper}{q}{loadNo}   = 0;
   $hash->{helper}{q}{loadLast} = 0;    
   $hash->{msgLoadHistory}      = (60/$HMmlSlice)."min steps: "
                                 .join("/",("-") x $HMmlSlice);
@@ -128,12 +129,13 @@ sub HMLAN_Define($$) {#########################################################
   my @al = ();
   @{$hash->{helper}{log}{ids}} = \@al;
 
-  $hash->{assignedIDsCnt} = 0;#define hash
+  $hash->{assignedIDsCnt}   = 0;#define hash
   $hash->{helper}{assIdRep} = 0;
   $hash->{helper}{assIdCnt} = 0;
   HMLAN_condUpdate($hash,253);#set disconnected
   readingsSingleUpdate($hash,"state","disconnected",1);
   $hash->{owner} = "";
+  HMLAN_Attr("delete",$name,"loadLevel");
 
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
@@ -220,10 +222,22 @@ sub HMLAN_Attr(@) {############################################################
   }
   elsif($aName eq "hmMsgLowLimit"){
     if ($cmd eq "set"){
-      return "hmMsgLowLimit:please add integer between 10 and 120"
+      return "hmMsgLowLimit:please add integer between 10 and 100"
           if (  $aVal !~ m/^(\d+)$/
               ||$aVal<10
-              ||$aVal >120 );
+              ||$aVal >100 );
+      delete $defs{$name}{helper}{loadLvl}{h}{$aVal};
+      my %lvlHr = reverse %{$defs{$name}{helper}{loadLvl}{h}};
+      $lvlHr{batchLevel} = $aVal;
+      my %lvlH = reverse %lvlHr;
+      $defs{$name}{helper}{loadLvl}{h} = \%lvlH;
+      my @a = sort { $b <=> $a } keys %lvlH;
+      $defs{$name}{helper}{loadLvl}{a} = \@a;
+      $attr{$name}{loadLevel} = join(",",map{"$_:$lvlH{$_}"}sort keys%lvlH);
+      $defs{$name}{helper}{loadLvl}{bl} = $aVal;
+    }
+    if ($init_done){
+      return "better use loadLevel batchLevel";
     }
   }
   elsif($aName eq "hmId"){
@@ -274,6 +288,40 @@ sub HMLAN_Attr(@) {############################################################
     return "logging set to $attr{$name}{$aName}"
         if ($aVal && $attr{$name}{$aName} ne $aVal);
   }
+  elsif($aName eq "loadLevel"){
+    my %lvlH;
+    my $batchLevel = 40;#defailt batch level
+    if ($cmd eq "set"){
+      foreach my $lvl(sort split(",",$aVal)){
+        next if(!$lvl);
+        my @lvlSp = split(":",$lvl);
+        return "$lvl not parsed. Only one Level per Entry:".scalar @lvlSp if (scalar @lvlSp != 2);
+        return "$lvlSp[0] must be between 0 and 100" if (  $lvlSp[0] !~ m/^(\d+)$/
+                                                                    ||$lvlSp[0]<0
+                                                                    ||$lvlSp[0] >100 );
+        $lvlH{$lvlSp[0]+0} = $lvlSp[1];
+      }
+      my %lvlHr = reverse %lvlH;
+      $lvlH{0}  = "low"        if (!defined $lvlH{0});
+      if (!defined $lvlHr{batchLevel}){
+        $lvlH{$batchLevel} = "batchLevel";
+      }
+      else{
+        $batchLevel = $lvlHr{batchLevel};
+      }
+    }
+    else{#delete
+      $lvlH{0}  = "low";
+      $lvlH{$batchLevel} = "batchLevel";
+      $lvlH{90} = "high";
+      $lvlH{99} = "suspended";
+    }
+    $defs{$name}{helper}{loadLvl}{h} = \%lvlH;
+    my @a = sort { $b <=> $a } keys %lvlH;
+    $defs{$name}{helper}{loadLvl}{a} = \@a;
+    $defs{$name}{helper}{loadLvl}{bl} = $batchLevel;
+    $attr{$name}{loadLevel} = join(",",map{"$_:$lvlH{$_}"}sort keys%lvlH) if ($cmd ne "set");
+  }
   elsif($aName eq "dummy"){
     if ($cmd eq "set" && $aVal != 0){
       RemoveInternalTimer( "keepAliveCk:".$name);
@@ -319,6 +367,9 @@ sub HMLAN_UpdtMsgLoad($$) {####################################################
     }
   }  
   $hash->{msgLoadCurrent} = $val;
+
+  my ($r) = grep { $_ <= $val } @{$hash->{helper}{loadLvl}{a}};
+  readingsSingleUpdate($hash,"loadLvl",$hash->{helper}{loadLvl}{h}{$r},1);
   return;
 }
 
@@ -1110,15 +1161,11 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
            <b>sys</b> will log system related messages like keep-alive<br>
            in order to enable all messages set "<b>all,sys</b>"<br>
         </li>
-        <li><a name="HMLANhmMsgLowLimit">hmMsgLowLimit</a><br>
-            max messages level of HMLAN allowed for low-level message queue
-            to be executed. Above this level processing will be postponed.<br>
-            HMLAN will allow a max of messages per hour, it will block sending otherwise.
-            After about 90% messages the low-priority queue (currently only CUL_HM autoReadReg)
-            will be delayed until the condition is cleared. <br>
-            hmMsgLowLimit allowes to reduce this level further.<br>
-            Note that HMLAN transmitt-level calculation is based on some estimations and
-            has some tolerance. <br>
+        <li><a name="HMLANloadLevel">loadLevel</a><br>
+            loadlevel will be mapped to reading vaues. <br>
+            0:low,30:mid,40:batchLevel,90:high,99:suspended<br>
+            the batchLevel value will be set to 40 if not entered. This is the level at which
+            background message generation e.g. for autoReadReg will be stopped<br>
             </li>
         <li><a href="#hmId">hmId</a></li>
         <li><a name="HMLANhmKey">hmKey</a></li>
@@ -1165,7 +1212,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
       <li><B>msgLoadCurrent</B><br>
           Current transmit load of HMLAN. When capacity reaches 100% HMLAN stops sending and waits for 
           reduction. See also:
-          <a href="#hmMsgLowLimit">hmMsgLowLimit</a><br></li>
+          <a href="#HMLANloadLevel">loadLevel</a><br></li>
       <li><B>msgLoadHistory</B><br>
           Historical transmition load of HMLAN.</li>
       <li><B>msgParseDly</B><br>
@@ -1252,18 +1299,12 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
            <b>sys</b> zeichnet alle systemrelevanten Meldungen wie keep-alive auf.<br>
            <b>all,sys</b> damit wird die Aufzeichnung aller Meldungen eingeschaltet<br>
         </li>
-        <li><a name="HMLANhmMsgLowLimit">hmMsgLowLimit</a><br>
-            maximale Anzahl der Meldungen, die HMLAN f&uuml;r weniger wichtige Meldungen zur 
-            Ausf&uuml;hrung zul&auml;sst. Bei dar&uuml;ber hinaus gehenden Meldungen wird die Verarbeitung aufgeschoben. <br>
-            HMLAM erlaubt eine maximale Anzahl von Meldungen pro Stunde. Wird diese &uuml;berschritten, 
-            wird die Aussendung der Meldungen blockiert. Nach ungef&auml;hr 90% der maximalen Anzahl 
-            wird die Liste der weniger wichtigen Meldungen (momentan nur CUL_HM autoReadReg) 
-            solange verz&ouml;gert abgearbeitet, bis die Rahmenbedingungen eine weitere Verarbeitung 
-            wieder zulassen. <br>
-            hmMsgLowLimit erm&ouml;glicht eine weitere Reduzierung dieses Grenzwertes.<br>
-            Hinweis: Der HMLAN berechnet die maximale Anzahl der auszusendenden Meldungen 
-            auf Basis einiger Annahmen und ist deshalb mit einer Toleranz behaftet.<br>
-            </li><br>
+        <li><a name="HMLANloadLevel">loadLevel</a><br>
+            loadlevel mapped den Auslastungslevel auf die Namen in ein Reading. <br>
+            0:low,30:mid,40:batchLevel,90:high,99:suspended<br>
+            Der batchLevel Wert wird auf 40 gesetzt., sollte er fehlen. 
+            Das ist der Levelbei dem die Hintergrundnachrichten z.B. durch autoReadReg gestoppt werden<br>
+        </li><br>
         <li><a href="#hmId">hmId</a></li><br>
         <li><a name="HMLANhmKey">hmKey</a></li><br>
         <li><a name="HMLANhmKey2">hmKey2</a></li><br>
@@ -1316,7 +1357,7 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
       <li><B>msgLoadCurrent</B><br>
           Aktuelle Funklast des HMLAN. Da HMLAN nur eine begrenzte Kapzit&auml;t je Stunde hat 
           Telegramme abzusetzen stellt es bei 100% das Senden ein. Siehe auch
-          <a href="#hmMsgLowLimit">hmMsgLowLimit</a><br></li>
+          <a href="#loadLevel">loadLevel</a><br></li>
       <li><B>msgLoadHistory</B><br>
           Funklast vergangener Zeitabschnitte.</li>
       <li><B>msgParseDly</B><br>
