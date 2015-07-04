@@ -155,7 +155,7 @@ sub CUL_HM_Initialize($) {
                        ."burstAccess:0_off,1_auto "
                        ."msgRepeat "
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
-                       ."aesCommReq:1,0 "      # IO will request AES if 
+                       ."aesKey:5,4,3,2,1,0  "
                        ;
   $hash->{Attr}{chn} =  "repPeers "            # -- channel only attributes
                        ."peerIDs "
@@ -166,6 +166,7 @@ sub CUL_HM_Initialize($) {
                        ."expert:0_off,1_on,2_full "
                        ."param "
                        ."actAutoTry:0_off,1_on "
+                       ."aesCommReq:1,0 "      # IO will request AES if 
                        ;
   $hash->{AttrList}  =  
                         $hash->{Attr}{glb}
@@ -723,7 +724,6 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "aesCommReq" ){
     if ($cmd eq "set"){
-      return "use $attrName only for device"        if (!$hash->{helper}{role}{dev});
       return "$attrName support 0 or 1 only"        if ($attrVal !~ m/[01]/);
       return "$attrName invalid for virtal devices" if ($hash->{role}{vrt});
       $attr{$name}{$attrName} = $attrVal;
@@ -731,7 +731,17 @@ sub CUL_HM_Attr(@) {#################################
     else{
       delete $attr{$name}{$attrName};
     }
-    CUL_HM_hmInitMsg($hash);
+    CUL_HM_hmInitMsg(CUL_HM_getDeviceHash($hash));
+  }
+  elsif($attrName eq "aesKey" ){
+    if ($cmd eq "set"){
+      return "$attrName support 0 to 5 only"        if ($attrVal < 0 || $attrVal > 5);
+      $attr{$name}{$attrName} = $attrVal;
+    }
+    else{
+      delete $attr{$name}{$attrName};
+    }
+    CUL_HM_hmInitMsg(CUL_HM_getDeviceHash($hash));
   }
   elsif($attrName eq "burstAccess"){
     if ($cmd eq "set"){
@@ -891,11 +901,24 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   my $rxt = CUL_HM_getRxType($hash);
   my $id = CUL_HM_hash2Id($hash);
   my @p;
-  if ($hash->{helper}{role}{vrt}){;}                     #virtual channels should not be assigned
-  elsif(!($rxt & ~0x04)) {@p = ("$id","00","01","FE1F");}#config only
-  elsif(  $rxt &  0x10)  {@p = ("$id","00","01","1E");  }#lazyConfig (01,00,1E also possible?)
-  else                   {@p = ("$id","00","01","00");  }
-# else                   {@p = ("$id","00","01","1E");  }
+
+  my %aH;
+  foreach (grep /channel/,keys %{$hash}){
+    my $chNo = substr($_,8,2);
+    $aH{$chNo} = AttrVal($hash->{$_},"aesCommReq",0);
+  }
+  my $mask = 0;
+  foreach my $no (keys %aH){
+    my $hNo = hex($no);
+    $mask |= (2 ** $hNo) * $aH{$no};
+  }
+  if    ($mask<256)   {$mask = join("",reverse unpack "(A2)*",sprintf("%02X",$mask));}
+  elsif ($mask<65536) {$mask = join("",reverse unpack "(A2)*",sprintf("%04X",$mask));}
+  else                {$mask = join("",reverse unpack "(A2)*",sprintf("%08X",$mask));}
+  my $key = sprintf("%02X",AttrVal($hash->{NAME},"aesKey","01"));
+  
+  @p = ("$id","00",$key,$mask) if (!$hash->{helper}{role}{vrt});
+
   if (AttrVal($hash->{NAME},"aesCommReq",0)){
     $p[1] = sprintf("%02X",(hex($p[1]) + 1));
     $p[3] = ($p[3]eq "")?"1E":$p[3];
@@ -918,7 +941,7 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
   # it will force HMLAN to send A112 (have data). HMLAN will return 
   # status "81" ACK if the device answers the A112 - FHEM should start sending Data by then
   # 
-  if($hash->{helper}{prt}{sProc}){
+  if($hash->{helper}{prt}{sProc} && $hash->{cmdStack}){
     $p[1] = sprintf("%02X",hex($p[1]) | $hash->{helper}{io}{rxt});
   }
 #  else{
