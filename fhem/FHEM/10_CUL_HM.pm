@@ -901,31 +901,27 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   my $rxt = CUL_HM_getRxType($hash);
   my $id = CUL_HM_hash2Id($hash);
   my @p;
-
-  my %aH;
+  my $name = $hash->{NAME};
+  my $mask = ($hash->{helper}{role}{chn} && AttrVal($name,"aesCommReq",0))?2:0;
   foreach (grep /channel/,keys %{$hash}){
-    my $chNo = substr($_,8,2);
-    $aH{$chNo} = AttrVal($hash->{$_},"aesCommReq",0);
+    $mask |= (2 **  hex(substr($_,8,2))) if(AttrVal($hash->{$_},"aesCommReq",0));
   }
-  my $mask = 0;
-  foreach my $no (keys %aH){
-    my $hNo = hex($no);
-    $mask |= (2 ** $hNo) * $aH{$no};
-  }
+
   if    ($mask<256)   {$mask = join("",reverse unpack "(A2)*",sprintf("%02X",$mask));}
   elsif ($mask<65536) {$mask = join("",reverse unpack "(A2)*",sprintf("%04X",$mask));}
   else                {$mask = join("",reverse unpack "(A2)*",sprintf("%08X",$mask));}
-  my $key = sprintf("%02X",AttrVal($hash->{NAME},"aesKey","01"));
+  my ($highestKey, undef) = CUL_HM_getKeys($hash);
+  my $key = sprintf("%02X",AttrVal($name,"aesKey",$highestKey));
   
   @p = ("$id","00",$key,$mask) if (!$hash->{helper}{role}{vrt});
 
-  if (AttrVal($hash->{NAME},"aesCommReq",0)){
+  if (AttrVal($name,"aesCommReq",0)){
     $p[1] = sprintf("%02X",(hex($p[1]) + 1));
     $p[3] = ($p[3]eq "")?"1E":$p[3];
   }
   $hash->{helper}{io}{newChn} = "";
   $hash->{helper}{io}{rxt} = (($rxt & 0x18)            #wakeup || #lazyConfig
-                             && AttrVal($hash->{NAME},"model",0) ne "HM-WDS100-C6-O") #Todo - not completely clear how it works
+                             && AttrVal($name,"model",0) ne "HM-WDS100-C6-O") #Todo - not completely clear how it works
                                  ?2:0;
   $hash->{helper}{io}{p} = \@p;
   CUL_HM_hmInitMsgUpdt($hash);
@@ -6385,11 +6381,14 @@ sub CUL_HM_getKeys($) { #in: device-hash out:highest index, hash with keys
   $keys{0} = pack("H*", "A4E375C6B09FD185F27C4E96FC273AE4"); #index 0: eQ-3 default
   if (defined($hash->{IODev}->{owner_CCU})) {
     my $vccu = $hash->{IODev}->{owner_CCU};
+    $vccu = $hash->{IODev}->{NAME} if(!AttrVal($vccu,"hmKey",""));# if keys are not in vccu
+
     foreach my $i (1..3){
       my ($kNo,$k) = split(":",AttrVal($vccu,"hmKey".($i== 1?"":$i),""));
+      $kNo = hex($kNo);
       if (defined($k)) {
-        $keys{hex($kNo)} = pack("H*", $k);
-        $highestIdx = hex($kNo) if (hex($kNo) > $highestIdx);
+        $keys{$kNo} = pack("H*", $k);
+        $highestIdx = $kNo if ($kNo > $highestIdx);
       }
     }
   }
