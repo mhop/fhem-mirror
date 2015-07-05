@@ -7,7 +7,7 @@
 # Released : 20.12.2013 Sascha Hermann
 # Version :
 # 1.00: Released to testers
-# 1.02: Don't show link on Groups with WebLinks. Hide GroupToogle Button (new Attribut dashboard_showtooglebuttons).
+# 1.02: Don't show link on Groups with WebLinks. Hide GroupToogle Button (new Attribut dashboard_showtogglebuttons).
 #       Set the Columnheight (new Attribur dashboard_colheight).
 # 1.03: Dashboard Entry over the Room-List, set the Room "Dashboard" to hiddenroom. Build weblink independently.
 #       Dashboard Row on Top and Bottom (no separately columns). Detail Button
@@ -49,11 +49,21 @@
 #       from Attribute dashboard_showtabs. Change Buttonbar Style. Clear CSS and Dashboard.js.
 # 2.12: Update Docu. CSS Class Changes. Insert Configdialog for Tabs. Change handling of parameters in both directions.
 # 2.13: Changed View of readingsHistory. Fix Linebrake in unlock state. Bugfix Display Group with similar group names.
+# 3.00: Tabs are loading via ajax (asynchronous).
+#	Removed attribute "dashboard_tabcount". The number of tabs is determined automatically based on the gorup definitions.
+#	Group names now also support regular expressions.
+#	Dashboard is not limited to 1 for every FHEMWEB instance.
+#	Dashboard link in left menu has the same name as the dashboard definition in fhem.cfg.
+#	dashboard_webfrontendfilter has been removed. To hide a dashboard put its name into the FHEMWEB instance's hiddenroom attribute.
+#	Flexible mode to be able to position groups absolutely on the dashboard screen.
+#	The number of columns can be defined per tab (additionally to the global definition)
+#	Optimized icon loading.
+#	Optimized fullscreen view.
+#	Minor improvements in javascript and css.
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden? -> widgets aus js über XHR nachladen und dann anzeigen (jquery xml nachladen...)
 # BUG: Variabler abstand wird nicht gesichert
-# BUG: dashboard_webfrontendfilter doesn't Work Antwort #469
 # BUG: Überlappen Gruppen andere? ->Zindex oberer reihe > als darunter liegenden
 #
 # Log 1, "[DASHBOARD simple debug] '".$g."' ";
@@ -92,7 +102,6 @@ use vars qw($FW_room);      # currently selected room
 use vars qw(%defs);		    # FHEM device/button definitions
 #use vars qw(%FW_groups);	# List of Groups
 use vars qw($FW_wname);   # Web instance
-use vars qw(%FW_hiddenroom);# hash of hidden rooms, used by weblink
 use vars qw(%FW_types);    # device types
 use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
@@ -106,18 +115,17 @@ my %group;
 my $dashboard_groupListfhem;
 my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
-my $dashboardname = "Dashboard"; # Link Text
-my $dashboardhiddenroom = "DashboardRoom"; # Hiddenroom
 my $dashboardversion = "2.13";
+my @fhemweb_instances = ();
 
 
 #############################################################################################
 sub Dashboard_Initialize ($) {
   my ($hash) = @_;
-		
+
   $hash->{DefFn}       = "Dashboard_define";
-  $hash->{SetFn}   	   = "Dashboard_Set";  
-  $hash->{GetFn}   = "Dashboard_Get";
+  $hash->{SetFn}       = "Dashboard_Set";  
+  $hash->{GetFn}       = "Dashboard_Get";
   $hash->{UndefFn}     = "Dashboard_undef";
   $hash->{FW_detailFn} = "Dashboard_DetailFN";    
   $hash->{AttrFn}      = "Dashboard_attr";
@@ -129,25 +137,9 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_rowbottomheight ".
 						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".						 
 						 "dashboard_showhelper:dont-use-this-attribut ". #obolet since 04.2014
-						 "dashboard_showtooglebuttons:0,1 ".						 
+						 "dashboard_showtogglebuttons:0,1 ".						 
 						 #new attribute vers. 2.00
-						 "dashboard_tabcount:1,2,3,4,5,6,7 ".
 						 "dashboard_activetab:1,2,3,4,5,6,7 ".						 
-						 "dashboard_tab1name ".
-						 "dashboard_tab2name ".
-						 "dashboard_tab3name ".
-						 "dashboard_tab4name ".
-						 "dashboard_tab5name ".
-						 "dashboard_tab1groups ".
-						 "dashboard_tab2groups ".
-						 "dashboard_tab3groups ".
-						 "dashboard_tab4groups ".
-						 "dashboard_tab5groups ".						 
-						 "dashboard_tab1sorting ".
-						 "dashboard_tab2sorting ".
-						 "dashboard_tab3sorting ".
-						 "dashboard_tab4sorting ".
-						 "dashboard_tab5sorting ".						 
 						 "dashboard_width ".
 						 "dashboard_rowcenterheight ".
 						 #new attribute vers. 2.01
@@ -157,30 +149,33 @@ sub Dashboard_Initialize ($) {
 						 #"dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-at-the-top-buttonbar-hidden,tabs-and-buttonbar-on-the-bottom,tabs-on-the-bottom-buttonbar-hidden,tabs-and-buttonbar-hidden ".
 						 "dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-and-buttonbar-on-the-bottom,tabs-and-buttonbar-hidden ".
 						 #new attribute vers. 2.03
-						 "dashboard_tab1icon ".
-						 "dashboard_tab2icon ".
-						 "dashboard_tab3icon ".
-						 "dashboard_tab4icon ".
-						 "dashboard_tab5icon ".
-						 #new attribute vers. 2.04
-						 "dashboard_webfrontendfilter ".
 						 #new attribute vers. 2.06
-						 "dashboard_customcss ".
-						 "dashboard_tab6name ".
-						 "dashboard_tab7name ".
-						 "dashboard_tab6groups ".	
-						 "dashboard_tab7groups ".	
-						 "dashboard_tab6sorting ".	
-						 "dashboard_tab7sorting ".	
-						 "dashboard_tab6icon ".
-						 "dashboard_tab7icon";					  
+						 "dashboard_customcss " .
+						 "dashboard_flexible " .
+						 #tab-specific attributes
+						 "dashboard_tab1name " .
+						 "dashboard_tab1groups " .
+						 "dashboard_tab1sorting " .
+						 "dashboard_tab1icon " .
+						 "dashboard_tab1colcount " .
+						 "dashboard_tab1rowcentercolwidth " .
+						 "dashboard_tab1backgroundimage " .
+						 # dynamic attributes
+						 "dashboard_tab[0-9]+name " .
+						 "dashboard_tab[0-9]+groups " .
+						 "dashboard_tab[0-9]+sorting " .
+						 "dashboard_tab[0-9]+icon " .
+						 "dashboard_tab[0-9]+colcount " .
+						 "dashboard_tab[0-9]+rowcentercolwidth " .
+						 "dashboard_tab[0-9]+backgroundimage " .
+						 "dashboard_backgroundimage";
 
 	$data{FWEXT}{jquery}{SCRIPT} = "/pgm2/".$fwjquery if (!$data{FWEXT}{jquery}{SCRIPT});
 	$data{FWEXT}{jqueryui}{SCRIPT} = "/pgm2/".$fwjqueryui if (!$data{FWEXT}{jqueryui}{SCRIPT});
 	$data{FWEXT}{z_dashboard}{SCRIPT} = "/pgm2/dashboard.js" if (!$data{FWEXT}{z_dashboard});					 
+	$data{FWEXT}{x_dashboard}{SCRIPT} = "/pgm2/svg.js" if (!$data{FWEXT}{x_dashboard});					 
   			 
-	$data{FWEXT}{Dashboardx}{LINK} = "?room=".$dashboardhiddenroom;
-	$data{FWEXT}{Dashboardx}{NAME} = $dashboardname;	
+	
 	
   return undef;
 }
@@ -192,7 +187,7 @@ sub Dashboard_DetailFN() {
 	my $ret = ""; 
 	$ret .= "<table class=\"block wide\" id=\"dashboardtoolbar\"  style=\"width:100%\">\n";
 	$ret .= "<tr><td>Helper:\n<div>\n";   
-	$ret .= "	   <a href=\"$FW_ME?room=$dashboardhiddenroom\"><button type=\"button\">Return to Dashboard</button></a>\n";
+	$ret .= "	   <a href=\"$FW_ME/dashboard/" . $d . "\"><button type=\"button\">Return to Dashboard</button></a>\n";
 	$ret .= "	   <a href=\"$FW_ME?cmd=shutdown restart\"><button type=\"button\">Restart FHEM</button></a>\n";
 	$ret .= "	   <a href=\"$FW_ME?cmd=save\"><button type=\"button\">Save config</button></a>\n";
 	$ret .= "  </div>\n";
@@ -228,6 +223,7 @@ sub Dashboard_Get($@) {
   my $res = "";
   
   my $arg = (defined($a[1]) ? $a[1] : "");
+  my $arg2 = (defined($a[2]) ? $a[2] : "");
   if ($arg eq "config") {
 		my $name = $hash->{NAME};
 		my $attrdata  = $attr{$name};
@@ -243,7 +239,7 @@ sub Dashboard_Get($@) {
 			my @iconFolders = split(":", AttrVal($FW_wname, "iconPath", "$FW_sp:default:fhemSVG:openautomation"));	
 			my $iconDirs = "";
 			foreach my $idir  (@iconFolders) {$iconDirs .= "$attr{global}{modpath}/www/images/".$idir.",";}
-			$res  .= "    \"icondirs\": \"$iconDirs\"";			
+			$res  .= "    \"icondirs\": \"$iconDirs\", \"dashboard_tabcount\": " . GetTabCount($hash, 0);
 			
 			$res .=  ($i != $x) ? ",\n" : "\n";
 			foreach my $attr (sort keys %$attrdata) {
@@ -270,6 +266,16 @@ sub Dashboard_Get($@) {
 		%group = BuildGroupList($dashboard_groupListfhem);
 		$res .= BuildGroupWidgets(1,1,1212,trim($dbgroup),"t1c1,".trim($dbgroup).",true,0,0:"); 
 		return $res;		
+#For dynamic loading of tabs
+  } elsif ($arg eq "tab" && $arg2 =~ /^\d+$/) {
+    return BuildDashboardTab($arg2, $hash->{NAME});
+  } elsif ($arg eq "icon") {
+    shift @a;
+    shift @a;
+
+    my $icon = join (' ', @a);
+
+    return FW_iconPath($icon);
   } else {
     return "Unknown argument $arg choose one of config:noArg groupWidget";
   }
@@ -277,22 +283,34 @@ sub Dashboard_Get($@) {
 
 sub Dashboard_define ($$) {
  my ($hash, $def) = @_;
+
+ my @args = split (" ", $def);
+
  my $now = time();
  my $name = $hash->{NAME}; 
  $hash->{VERSION} = $dashboardversion;
  readingsSingleUpdate( $hash, "state", "Initialized", 0 ); 
   
  RemoveInternalTimer($hash);
- InternalTimer      ($now + 5, 'CreateDashboardEntry', $hash, 0);
  InternalTimer      ($now + 5, 'CheckDashboardAttributUssage', $hash, 0);
  my $dashboard_groupListfhem = Dashboard_GetGroupList;
 
+  my $url = '/dashboard/' . $name;
+
+  $data{FWEXT}{$url}{CONTENTFUNC} = 'Dashboard_CGI';
+  $data{FWEXT}{$url}{LINK} = 'dashboard/' . $name;
+  $data{FWEXT}{$url}{NAME} = $name;
+		
  return;
 }
 
 sub Dashboard_undef ($$) {
   my ($hash,$arg) = @_;
-  
+
+  # remove dashboard links from left menu
+  my $url = '/dashboard/' . $hash->{NAME};
+  delete $data{FWEXT}{$url};
+
   RemoveInternalTimer($hash);
   
   return undef;
@@ -300,11 +318,48 @@ sub Dashboard_undef ($$) {
 
 sub Dashboard_attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  # add dynamic attributes
+  if ($cmd eq "set" && $attrName =~ m/dashboard_tab([1-9][0-9]*)groups/) {
+	addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "name");
+        addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "groups");
+        addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "sorting");
+        addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "icon");
+        addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "colcount");
+        addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "rowcentercolwidth");
+        addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "backgroundimage");
+  }
+
   return;  
 }
 
 #############################################################################################
 #############################################################################################
+
+sub Dashboard_CGI($)
+{
+  my ($htmlarg) = @_;
+
+  $htmlarg =~ s/^\///;                                                             # eliminate leading /
+  my @params = split(/\//,$htmlarg);                                               # split URL by /
+  my $ret = '';
+  my $name = $params[1];
+
+  FW_pO '<div id="content">';
+  
+  if ($name && defined($defs{$name})) {                                                                
+    $ret = Dashboard_SummaryFN($FW_wname,$name,$FW_room,undef);
+
+    FW_pO $ret;
+  }
+  else {
+    FW_pO 'Dashboard "' . $name . '" not found';
+  }
+
+  FW_pO '</div>';
+
+  return 0;
+}
 
 sub DashboardAsHtml($)
 {
@@ -335,64 +390,42 @@ sub Dashboard_SummaryFN($$$$)
  my $rowtopheight = AttrVal($defs{$d}{NAME}, "dashboard_rowtopheight", 250);
  my $rowbottomheight = AttrVal($defs{$d}{NAME}, "dashboard_rowbottomheight", 250);  
  my $showtabs = AttrVal($defs{$d}{NAME}, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
- my $showtooglebuttons = AttrVal($defs{$d}{NAME}, "dashboard_showtooglebuttons", 1); 
+ my $showtogglebuttons = AttrVal($defs{$d}{NAME}, "dashboard_showtogglebuttons", 1); 
  my $showfullsize  = AttrVal($defs{$d}{NAME}, "dashboard_showfullsize", 0); 
- my $webfrontendfilter = AttrVal($defs{$d}{NAME}, "dashboard_webfrontendfilter", "*"); 
+ my $flexible = AttrVal($defs{$d}{NAME}, "dashboard_flexible", 0);
  my $customcss = AttrVal($defs{$d}{NAME}, "dashboard_customcss", "none");
+ my $backgroundimage = AttrVal($defs{$d}{NAME}, "dashboard_backgroundimage", "");
  
  my $row = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
  my $debug = AttrVal($defs{$d}{NAME}, "dashboard_debug", "0");
  
  my $activetab = AttrVal($defs{$d}{NAME}, "dashboard_activetab", 1); 
- my $tabcount = AttrVal($defs{$d}{NAME}, "dashboard_tabcount", 1);  
+ my $tabcount = GetTabCount($defs{$d}, 1);  
  my $dbwidth = AttrVal($defs{$d}{NAME}, "dashboard_width", "100%"); 
- my @tabnames = (AttrVal($defs{$d}{NAME}, "dashboard_tab1name", "Dashboard-Tab 1"), 
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab2name", "Dashboard-Tab 2"),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab3name", "Dashboard-Tab 3"),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab4name", "Dashboard-Tab 4"),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab5name", "Dashboard-Tab 5"),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab6name", "Dashboard-Tab 6"),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab7name", "Dashboard-Tab 7"));
- my @tabgroups = (AttrVal($defs{$d}{NAME}, "dashboard_tab1groups", ""), 
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab2groups", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab3groups", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab4groups", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab5groups", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab6groups", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab7groups", ""));			
- my @tabsortings = (AttrVal($defs{$d}{NAME}, "dashboard_tab1sorting", ""), 
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab2sorting", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab3sorting", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab4sorting", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab5sorting", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab6sorting", ""),
-							   AttrVal($defs{$d}{NAME}, "dashboard_tab7sorting", ""));							   				   
+ my @tabnames = ();
+ my @tabsortings = ();
+
+ if ($showfullsize) {
+   if ($FW_RET =~ m/<body[^>]*class="([^"]+)"[^>]*>/) {
+     $FW_RET =~ s/style="$1"/style="$1 dashboard_fullsize"/;
+   }
+   else {
+     $FW_RET =~ s/<body/<body class="dashboard_fullsize"/;
+   }
+ }
+ 
+ for (my $i = 0; $i < $tabcount; $i++) {
+   $tabnames[$i] = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($i + 1) . "name", "Dashboard-Tab " . ($i + 1));
+   $tabsortings[$i] = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($i + 1) . "sorting", "");
+ }
+
  #############################################################################################
   
  if ($disable == 1) { 
 	readingsSingleUpdate( $defs{$d}, "state", "Disabled", 0 );
 	return "";
  }
- unless (@tabgroups) { 
- 	readingsSingleUpdate( $defs{$d}, "state", "No Groups set", 0 );
-	return "";
- }
  
- ############# Filter Dashboard display depending on $FW_wname ###################################
- if ($webfrontendfilter ne "*") {
-    my $filterhit = 0;
-	my @webfilter = split(",", $webfrontendfilter); 
-	for (my $i=0;$i<@webfilter;$i++){
-
-		if (trim($FW_wname) eq trim($webfilter[$i]) ) { $filterhit = 1; }
-	} 
-	if ($filterhit == 0) {
-	# construction site
-	#  $ret .= "No Dashboard configured for ".$FW_wname."<br>";  
-	#  $ret .= "Set Attribute dashboard_webfrontendfilter, see <a href=\"/fhem?detail=$d\" title=\"".$name."\">Details</a>";
-	  return $ret; 
-	}
- }
  ##################################################################################
  
  if ($debug == 1) { $debugfield = "edit" }; 
@@ -409,7 +442,7 @@ sub Dashboard_SummaryFN($$$$)
  
  #------------------- Check dashboard_sorting on false content ------------------------------------
  for (my $i=0;$i<@tabsortings;$i++){ 
-	if (($tabsortings[$i-1] !~ /[0-9]/ || $tabsortings[$i-1] !~ /:/ || $tabsortings[$i-1] !~ /,/  ) && ($tabsortings[$i-1] ne "," && $tabsortings[$i-1] ne "")){
+	if (($tabsortings[$i-1] !~ /[0-9]+/ || $tabsortings[$i-1] !~ /:/ || $tabsortings[$i-1] !~ /,/  ) && ($tabsortings[$i-1] ne "," && $tabsortings[$i-1] ne "")){
 		Log3 $d, 3, "[".$name." V".$dashboardversion."] Value of attribut dashboard_tab".$i."sorting is wrong. Saved sorting can not be set. Fix Value or delete the Attribute. [".$tabsortings[$i-1]."]";	
 	} else { Log3 $d, 5, "[".$name." V".$dashboardversion."] Sorting OK or Empty: dashboard_tab".$i."sorting "; }	
  }
@@ -445,11 +478,11 @@ sub Dashboard_SummaryFN($$$$)
 	$ret .= "<div id=\"dashboard_define\" style=\"display: none;\">$d</div>\n";
 	$ret .= "<table class=\"roomoverview dashboard\" id=\"dashboard\">\n";
 
-	$ret .= "<tr><td><div class=\"dashboardhidden\">\n"; 
-	 $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtooglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize,$customcss\">\n";
+	$ret .= "<tr style=\"height: 0px;\"><td><div class=\"dashboardhidden\">\n"; 
+	 $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtogglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize,$customcss,$flexible\">\n";
 	 $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
 	 $ret .= "</div></td></tr>\n"; 
-	 $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\">\n";  
+	 $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "") . " no-repeat !important;\">\n";  
 	 
 	 ########################### Dashboard Tab-Liste ##############################################
 	 $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   		
@@ -458,26 +491,9 @@ sub Dashboard_SummaryFN($$$$)
 	 ########################################################################################
 	 
 	 for (my $t=0;$t<$tabcount;$t++){ 
-		my @tabgroup = split(",", $tabgroups[$t]); #Set temp. position for groups without an stored position
-		for (my $i=0;$i<@tabgroup;$i++){	
-			my @stabgroup = split(":", trim($tabgroup[$i]));		
-			if (index($tabsortings[$t],','.trim($stabgroup[0]).',') < 0) {$tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:";}
-		}	
-			
-		%group = BuildGroupList($tabgroups[$t]);	
-		$ret .= "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings[$t]."\" class=\"dashboard dashboard_tabpanel\">\n";
-		$ret .= "   <ul class=\"dashboard_tabcontent\">\n";
-		$ret .= "	<table class=\"dashboard_tabcontent\">\n";	 
-			##################### Top Row (only one Column) #############################################
-			if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){ $ret .= BuildDashboardTopRow($t,$id,$tabgroups[$t],$tabsortings[$t]); }		
-			##################### Center Row (max. 5 Column) ############################################
-			if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "center-bottom" || $row eq "center"){ $ret .= BuildDashboardCenterRow($t,$id,$tabgroups[$t],$tabsortings[$t],$colcount);} 
-			############################# Bottom Row (only one Column) ############################################
-			if ($row eq "top-center-bottom" || $row eq "center-bottom" || $row eq "bottom"){ $ret .= BuildDashboardBottomRow($t,$id,$tabgroups[$t],$tabsortings[$t]); }
-			#############################################################################################	 
-		 $ret .= "	</table>\n";
-		 $ret .= " 	</ul>\n";
-		 $ret .= "	</div>\n"; 
+		if ($t == $activetab - 1) {
+			$ret .= BuildDashboardTab($t, $d);
+		}
 	 }
 	 $ret .= "</div></td></tr>\n";
 	 $ret .= "</table>\n";
@@ -494,6 +510,86 @@ sub Dashboard_SummaryFN($$$$)
  }
  
  return $ret; 
+}
+
+sub BuildDashboardTab($$)
+{
+	my ($t, $d) = @_;
+
+	my $id              = $defs{$d}{NR};
+	my $colcount        = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'colcount', AttrVal($defs{$d}{NAME}, "dashboard_colcount", 1));
+	my $colwidths       = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'rowcentercolwidth', AttrVal($defs{$d}{NAME}, "dashboard_rowcentercolwidth", 100));
+	my $backgroundimage = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'backgroundimage', "");
+        $colwidths          =~ tr/,/:/;
+	my $row             = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
+	my $tabcount        = GetTabCount($defs{$d}, 1);
+        my @tabgroups       = ();
+        my @tabsortings     = ();
+
+	for (my $i = 0; $i < $tabcount; $i++) {
+		$tabgroups[$i] = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($i + 1) . "groups", "");
+		$tabsortings[$i] = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($i + 1) . "sorting", "");
+	}
+
+	unless (@tabgroups) { 
+		readingsSingleUpdate( $defs{$d}, "state", "No Groups set", 0 );
+		return "";
+	}
+	
+        my $groups   = Dashboard_GetGroupList();
+        $groups   =~ s/#/ /g;
+	my @groups   = split(',', $groups);
+
+	my @temptabgroup = split(",", $tabgroups[$t]); #Set temp. position for groups without an stored position
+        my @tabgroup = ();
+
+	foreach my $g (@groups){ 
+		for (my $i=0;$i<@temptabgroup;$i++) {
+			my @stabgroup = split(":", trim($temptabgroup[$i]));		
+			my $matchGroup = trim($stabgroup[0]);
+
+			# fill groups that are matching the configured groups
+			if ($g =~ m/$matchGroup/ && $g ne $stabgroup[0]) {
+				push(@tabgroup, $g);
+			}
+			elsif ($g eq $stabgroup[0]) {
+				push(@tabgroup, $g);
+			}
+		}
+        }
+
+	for (my $i=0;$i<@tabgroup;$i++) {
+		my @stabgroup = split(":", trim($tabgroup[$i]));		
+		my $matchGroup = "," . trim($stabgroup[0]) . ",";
+
+		if ($tabsortings[$t] !~ m/$matchGroup/) {
+			$tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:";
+		}
+	}	
+
+	%group = BuildGroupList($tabgroups[$t]);	
+
+	my $ret =  "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings[$t]."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "none") . " no-repeat !important;\">\n";
+	$ret .= "   <ul class=\"dashboard_tabcontent\">\n";
+	$ret .= "	<table class=\"dashboard_tabcontent\">\n";	 
+	##################### Top Row (only one Column) #############################################
+	if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){
+		$ret .= BuildDashboardTopRow($t,$id,$tabgroups[$t],$tabsortings[$t]);
+	}
+	##################### Center Row (max. 5 Column) ############################################
+	if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "center-bottom" || $row eq "center") {
+		$ret .= BuildDashboardCenterRow($t,$id,$tabgroups[$t],$tabsortings[$t],$colcount);
+	}
+	############################# Bottom Row (only one Column) ############################################
+	if ($row eq "top-center-bottom" || $row eq "center-bottom" || $row eq "bottom"){
+		$ret .= BuildDashboardBottomRow($t,$id,$tabgroups[$t],$tabsortings[$t]);
+	}
+	#############################################################################################	 
+	$ret .= "	</table>\n";
+	$ret .= " 	</ul>\n";
+	$ret .= "	</div>\n";
+
+	return $ret;
 }
 
 sub BuildDashboardTopRow($$$$){
@@ -514,6 +610,18 @@ sub BuildDashboardCenterRow($$$$$){
  my $ret; 
  $ret .= "<tr><td  class=\"dashboard_row\">\n";
  $ret .= "<div id=\"dashboard_rowcenter_tab".$t."\" class=\"dashboard dashboard_rowcenter\">\n";
+
+ my $currentcol  = $colcount;
+ my $maxcolindex = $colcount - 1;
+ my $replace     = "t" . $t . "c" . $maxcolindex . ",";
+
+ # replace all sortings referencing not existing columns
+ # this does only work if there is not empty column inbetween
+ while (index($dbsorting, "t".$t."c".$currentcol.",") >= 0) {
+   my $search  = "t" . $t . "c" . $currentcol . ",";
+   $dbsorting  =~ s/$search/$replace/g;
+   $currentcol++;
+ }
 
  for (my $i=0;$i<$colcount;$i++){
 	$ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column".$i."\">\n";
@@ -545,29 +653,31 @@ sub BuildGroupWidgets($$$$$) {
  	my $counter = 0;
 	my @storedsorting = split(":", $dbsorting);		
 	my @dbgroup = split(",", $dbgroups);
-	my $widgetheader = ""; 
+	my $groupicon = ''; 
 		
 		foreach my $singlesorting (@storedsorting) {
-			my @groupdata = split(",", $singlesorting);					
-			if (scalar(@groupdata) > 1) {			
-				if (index($dbsorting, "t".$tab."c".$column.",".$groupdata[1]) >= 0  && index($dbgroups, $groupdata[1]) >= 0 && $groupdata[1] ne "" ) { #group is set to tab
-				
-					$widgetheader = $groupdata[1];
+			my @groupdata = split(",", $singlesorting);
+			my $groupMatch = $dbgroups;
+			$groupicon = '';
+			if (scalar(@groupdata) > 1) {
+				if (
+					   index($dbsorting, "t".$tab."c".$column.",".$groupdata[1]) >= 0
+					&& (
+						   index($dbgroups, $groupdata[1]) >= 0
+						|| $groupdata[1] =~ $groupMatch
+					)
+					&& $groupdata[1] ne ""
+				) { #group is set to tab
+					my $groupId = $id."t".$tab."c".$column."w".$counter;
 					foreach my $strdbgroup (@dbgroup) {
-						my @groupicon = split(":", trim($strdbgroup));			
-						if ($groupicon[0] eq $groupdata[1]) {
-							if ($#groupicon > 0) { $widgetheader = FW_makeImage($groupicon[1],$groupicon[1],"dashboard_tabicon") . "&nbsp;".$groupdata[1]; }
+						my @temp= split(":", trim($strdbgroup));			
+						if (defined($temp[1]) && $groupdata[1] eq $temp[0]) {
+							$groupicon = $temp[1];
 						}
 					}
 					
-					$ret .= "  <div class=\"dashboard dashboard_widget ui-widget\" data-groupwidget=\"".$singlesorting."\" id=\"".$id."t".$tab."c".$column."w".$counter."\">\n";
-					$ret .= "   <div class=\"dashboard_widgetinner\">\n";	
-					$ret .= "    <div class=\"dashboard_widgetheader ui-widget-header\">".$widgetheader."</div>\n";
-					$ret .= "    <div data-userheight=\"\" class=\"dashboard_content\">\n";
-					$ret .= BuildGroup($groupdata[1]);
-					$ret .= "    </div>\n";	
-					$ret .= "   </div>\n";	
-					$ret .= "  </div>\n";	
+					$ret .= BuildGroup( ($groupdata[1],$singlesorting,$groupId,$groupicon) );
+					
 					$counter++;
 				}
 			}
@@ -584,7 +694,8 @@ sub BuildGroupList($) {
 		$grp = trim($grp);
 		foreach my $g (@dashboardgroups){ 
 			my ($gtitle, $iconName) = split(":", trim($g));
-			$group{$grp}{$d} = 1 if($gtitle eq $grp); 			
+			my $titleMatch = "^" . $gtitle . "\$";
+			$group{$grp}{$d} = 1 if($grp =~ $titleMatch); 			
 		}
     }
  }  
@@ -601,21 +712,37 @@ sub Dashboard_GetGroupList() {
   return $ret;
 }
 
-sub BuildGroup($)
+sub BuildGroup
 {
- my ($currentgroup) = @_;
+ my ($currentgroup,$singleSorting,$groupId,$icon) = @_;
  my $ret = ""; 
  my $row = 1;
  my %extPage = ();
+ my $matchGroup = "^" . $currentgroup . "\$";
+ my $foundDevices = 0;
+ my $replaceGroup = "";
  
  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
  foreach my $g (keys %group) {
+	next if ($g !~ m/$matchGroup/);
+        $replaceGroup = "," . quotemeta($currentgroup) . ",";
+        $singleSorting =~ s/$replaceGroup/,$g,/;
+        $currentgroup = $g;
 
-	next if ($g ne $currentgroup);
+        $ret .= "  <div class=\"dashboard dashboard_widget ui-widget\" data-groupwidget=\"".$singleSorting."\" id=\"".$groupId."\">\n";
+	$ret .= "   <div class=\"dashboard_widgetinner\">\n";	
+	$ret .= "    <div class=\"dashboard_widgetheader ui-widget-header dashboard_group_header\">";
+        if ($icon) {
+          $ret .= FW_makeImage($icon,$icon,"dashboard_group_icon");
+        }
+        $ret .= $currentgroup."</div>\n";
+	$ret .= "    <div data-userheight=\"\" class=\"dashboard_content\">\n";
+
 	$ret .= "<table class=\"dashboard block wide\" id=\"TYPE_$currentgroup\">";
 	
 	 foreach my $d (sort { lc(AttrVal($a,"sortby",AttrVal($a,"alias",$a))) cmp lc(AttrVal($b,"sortby",AttrVal($b,"alias",$b))) } keys %{$group{$g}}) {	
+                $foundDevices++;
 		$ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
 		
 		my $type = $defs{$d}{TYPE};
@@ -624,7 +751,7 @@ sub BuildGroup($)
 
 		$icon = FW_makeImage($icon,$icon,"icon dashboard_groupicon") . "&nbsp;" if($icon);
 	
-		if ($type ne "weblink" && $type ne "SVG" && $type ne "readingsGroup" && $type ne "readingsHistory") { # Don't show Link by weblink, svg and readingsGroup
+		if (!$modules{$defs{$d}{TYPE}}{FW_atPageEnd}) { # Don't show Link for "atEnd"-devices
 			$ret .= FW_pH "detail=$d", "$icon$devName", 1, "col1", 1; 
 		}			
 		
@@ -634,20 +761,19 @@ sub BuildGroup($)
 		
 	    ##############   Customize Result for Special Types #####################
 		my @txtarray = split(">", $txt);				
-		if (($type eq "readingsGroup" || $type eq "readingsHistory") && $txtarray[0]  eq "<table") {		
-		    my $storeinfo = 0;
-			my $txtreturn = "";
-			my $linkreturn = "";
-
-			for (my $i=0;$i<@txtarray;$i++){		
-				if (index($txtarray[$i],"</table") > -1) {$storeinfo = 0; }
-				if ($storeinfo == 3) { $txtreturn .= $txtarray[$i].">"; }	
-				if ($storeinfo == 2 && index($txtarray[$i],"<td") > -1 ) { $storeinfo = $storeinfo+1;}				
-				if ($storeinfo == 1 && index($txtarray[$i],"<a href") > -1 ) { $linkreturn = $txtarray[$i].">"; }
-				if (index($txtarray[$i],"<table") > -1) {$storeinfo = $storeinfo+1; }
-			}
-			$ret .= "<td>$txtreturn</td>";
-		} else  { $ret .= "<td informId=\"$d\">$txt</td>"; }
+                if ($modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {
+			no strict "refs"; 
+			my $devret = &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d,
+                                                        $FW_room, \%extPage);
+ 			$ret .= "<td class=\"dashboard_dev_container\"";
+			if ($devret !~ /informId/i) {
+			  $ret .= " informId=\"$d\"";
+  			}
+			$ret .= ">$devret</td>";
+			use strict "refs"; 
+		} else  {
+			$ret .= "<td class=\"dashboard_dev_container\" informId=\"$d\">$txt</td>";
+		}
 		###########################################################
 
 		###### Commands, slider, dropdown
@@ -665,6 +791,8 @@ sub BuildGroup($)
 					}
 				}
 				if($htmlTxt) {
+					# add colspan to avoid squeezed table cells
+					$htmlTxt =~ s/<td>/<td colspan="10">/;
 					$ret .= $htmlTxt;
 				} else {
 					$ret .= FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3", 1;
@@ -674,14 +802,21 @@ sub BuildGroup($)
 		$ret .= "</tr>";
 	}
 	$ret .= "</table>";
+
+	$ret .= "    </div>\n";	
+ 	$ret .= "   </div>\n";	
+ 	$ret .= "  </div>\n";
  }
- if ($ret eq "") { 
+ if (!$foundDevices) { 
 	$ret .= "<table class=\"block wide\" id=\"TYPE_unknowngroup\">";
 	$ret .= "<tr class=\"odd\"><td class=\"changed\">Unknown Group: $currentgroup</td></tr>";
 	$ret .= "<tr class=\"even\"><td class=\"changed\">Check if the group attribute is really set</td></tr>";
 	$ret .= "<tr class=\"odd\"><td class=\"changed\">Check if the groupname is correct written</td></tr>";
 	$ret .= "</table>"; 	
  }
+
+ 	
+
  return $ret;
 }
 
@@ -701,7 +836,6 @@ sub CheckDashboardEntry($) {
 	my $timeToExec = $now + 5;
 	
 	RemoveInternalTimer($hash);
-	InternalTimer      ($timeToExec, 'CreateDashboardEntry', $hash, 0);
 	InternalTimer      ($timeToExec, 'CheckDashboardAttributUssage', $hash, 0);
 }
 
@@ -711,8 +845,6 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
  my $detailnote = "";
  
  # --------- Set minimal Attributes in the hope to make it easier for beginners --------------------
- my $tabcount = AttrVal($defs{$d}{NAME}, "dashboard_tabcount", "0");
- if ($tabcount eq "0") { FW_fC("attr ".$d." dashboard_tabcount 1"); }
  my $tab1groups = AttrVal($defs{$d}{NAME}, "dashboard_tab1groups", "<noGroup>");
  if ($tab1groups eq "<noGroup>") { FW_fC("attr ".$d." dashboard_tab1groups Set Your Groups - See Attribute dashboard_tab1groups-"); }
  # ------------------------------------------------------------------------------------------------- 
@@ -750,27 +882,18 @@ sub CheckDashboardAttributUssage($) { # replaces old disused attributes and thei
  }  
 }
 
-sub CreateDashboardEntry($) {
- my ($hash) = @_;
+sub
+GetTabCount ($$)
+{
+ my ($hash, $defaultTabCount) = @_;
  
- my $h = $hash->{NAME};
- if (!defined $defs{$h."_weblink"}) {
-	FW_fC("define ".$h."_weblink weblink htmlCode {DashboardAsHtml(\"".$h."\")}");
-	Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Weblink dosen't exists. Created weblink ".$h."_weblink. Don't forget to save config.";
- }
- FW_fC("attr ".$h."_weblink room ".$dashboardhiddenroom);
+ my $tabCount = 0;
 
- foreach my $dn (sort keys %defs) {
-  if ($defs{$dn}{TYPE} eq "FHEMWEB" && $defs{$dn}{NAME} !~ /FHEMWEB:/) {
-	my $hr = AttrVal($defs{$dn}{NAME}, "hiddenroom", "");	
-	if (index($hr,$dashboardhiddenroom) == -1){ 		
-		if ($hr eq "") {FW_fC("attr ".$defs{$dn}{NAME}." hiddenroom ".$dashboardhiddenroom);}
-		else {FW_fC("attr ".$defs{$dn}{NAME}." hiddenroom ".$hr.",".$dashboardhiddenroom);}
-		Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Added hiddenroom '".$dashboardhiddenroom."' to ".$defs{$dn}{NAME}.". Don't forget to save config.";
-	}	
-  }
+ while (AttrVal($hash->{NAME}, 'dashboard_tab' . ($tabCount + 1) . 'groups', '') ne "") {
+   $tabCount++;
  }
- 
+
+ return $tabCount ? $tabCount : $defaultTabCount;
 }
 
 1;
@@ -800,7 +923,7 @@ sub CreateDashboardEntry($) {
 	<code>
 	define anyViews Dashboard<br>
 	attr anyViews dashboard_colcount 2<br>
-	attr anyViews dashboard_rowcentercolwidth 30,70<br>
+	attr anyviews dashboard_rowcentercolwidth 30,70<br>
 	attr anyViews dashboard_tab1groups &lt;Group1&gt;,&lt;Group2&gt;,&lt;Group3&gt;<br>
 	</code>	
   </ul>
@@ -823,7 +946,7 @@ sub CreateDashboardEntry($) {
   <ul>
 	  <a name="dashboard_tabcount"></a>
 		<li>dashboard_tabcount<br>
-			Returns the number of displayed tabs.
+			Returns the number of displayed tabs. (Does not need to be set any more. It is read automatically from the configured tabs)
 			Default: 1
 		</li><br>	  
 	  <a name="dashboard_activetab"></a>
@@ -831,80 +954,15 @@ sub CreateDashboardEntry($) {
 			Specifies which tab is activated. Can be set manually, but is also set by the switch "Set" to the currently active tab.
 			Default: 1
 		</li><br>	 
-	  <a name="dashboard_tab1name"></a>
-		<li>dashboard_tab1name<br>
-			Title of Tab 1.
-			Default: Dashboard-Tab 1
+	  <a name="dashboard_tabXname"></a>
+		<li>dashboard_tabXname<br>
+			Title of Tab at position X.
 		</li><br>	   
-	  <a name="dashboard_tab2name"></a>
-		<li>dashboard_tab2name<br>
-			Title of Tab 2.
-			Default: Dashboard-Tab 2
-		</li><br>	    
-	   <a name="dashboard_tab3name"></a>
-		<li>dashboard_tab3name<br>
-			Title of Tab 3.
-			Default: Dashboard-Tab 3
-		</li><br>	 
-	   <a name="dashboard_tab4name"></a>
-		<li>dashboard_tab4name<br>
-			Title of Tab 4.
-			Default: Dashboard-Tab 4
-		</li><br>	 
-	   <a name="dashboard_tab5name"></a>
-		<li>dashboard_tab5name<br>
-			Title of Tab 5.
-			Default: Dashboard-Tab 5
-		</li><br>	
-	   <a name="dashboard_tab6name"></a>
-		<li>dashboard_tab6name<br>
-			Title of Tab 6.
-			Default: Dashboard-Tab 6
+	  <a name="dashboard_tabXsorting"></a>	
+		<li>dashboard_tabXsorting<br>
+			Contains the position of each group in Tab X. Value is written by the "Set" button. It is not recommended to take manual changes.
 		</li><br>		
-	   <a name="dashboard_tab7name"></a>
-		<li>dashboard_tab7name<br>
-			Title of Tab 7.
-			Default: Dashboard-Tab 7
-		</li><br>			
-		<a name="dashboard_webfrontendfilter"></a>	
-		<li>dashboard_webfrontendfilter<br>
-			If this attribute not set, or value is * the dashboard is displayed on all configured FHEMWEB instances. <br>
-			Set the Name of an FHEMWEB instance (eg WEB) to the Dashboard appears only in this.<br>
-			There may be several valid instances are separated by comma eg WEB,WEBtablet.<br>
-			This makes it possible to define an additional dashboard that only Show on Tablet (which of course an own instance FHEMWEB use).<br>
-			Default: *
-			<br>
-			It should NEVER two ore more active dashboards in a FHEMWEB instance!
-		</li><br>		
-	  <a name="dashboard_tab1sorting"></a>	
-		<li>dashboard_tab1sorting<br>
-			Contains the position of each group in Tab 1. Value is written by the "Set" button. It is not recommended to take manual changes.
-		</li><br>		
-	  <a name="dashboard_tab2sorting"></a>	
-		<li>dashboard_tab2sorting<br>
-			Contains the position of each group in Tab 2. Value is written by the "Set" button. It is not recommended to take manual changes.
-		</li><br>	
-	  <a name="dashboard_tab3sorting"></a>	
-		<li>dashboard_tab3sorting<br>
-			Contains the position of each group in Tab 3. Value is written by the "Set" button. It is not recommended to take manual changes.
-		</li><br>	
-	  <a name="dashboard_tab4sorting"></a>	
-		<li>dashboard_tab4sorting<br>
-			Contains the position of each group in Tab 4. Value is written by the "Set" button. It is not recommended to take manual changes.
-		</li><br>	
-	  <a name="dashboard_tab5sorting"></a>	
-		<li>dashboard_tab5sorting<br>
-			Contains the position of each group in Tab 5. Value is written by the "Set" button. It is not recommended to take manual changes.
-		</li><br>			
-	  <a name="dashboard_tab6sorting"></a>	
-		<li>dashboard_tab6sorting<br>
-			Contains the position of each group in Tab 6. Value is written by the "Set" button. It is not recommended to take manual changes.
-		</li><br>	
-	  <a name="dashboard_tab7sorting"></a>	
-		<li>dashboard_tab7sorting<br>
-			Contains the position of each group in Tab 7. Value is written by the "Set" button. It is not recommended to take manual changes.
-		</li><br>		
-		<a name="dashboard_row"></a>	
+	  <a name="dashboard_row"></a>	
 		<li>dashboard_row<br>
 			To select which rows are displayed. top only; center only; bottom only; top and center; center and bottom; top,center and bottom.<br>
 			Default: center
@@ -938,82 +996,41 @@ sub CreateDashboardEntry($) {
 			Height of the bottom row in which the groups may be positioned.<br>
 			Default: 250
 		</li><br>		
-	  <a name="dashboard_tab1groups"></a>	
-		<li>dashboard_tab1groups<br>
-			Comma-separated list of the names of the groups to be displayed in Tab 1.<br>
+	  <a name="dashboard_tabXgroups"></a>	
+		<li>dashboard_tabXgroups<br>
+			Comma-separated list of the names of the groups to be displayed in Tab X.<br>
 			Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
-			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow		
+			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow<br/>
+			Additionally a group can contain a regular expression to show all groups matching a criteria.
+			Example: .*Light.* to show all groups that contain the string "Light"
 		</li><br>		
-	  <a name="dashboard_tab2groups"></a>	
-		<li>2<br>
-			Comma-separated list of the names of the groups to be displayed in Tab 2.<br>
-			Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
-			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>			
-	  <a name="dashboard_tab3groups"></a>	
-		<li>dashboard_tab3groups<br>
-			Comma-separated list of the names of the groups to be displayed in Tab 3.<br>
-			Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
-			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>		
-	  <a name="dashboard_tab4groups"></a>	
-		<li>dashboard_tab4groups<br>
-			Comma-separated list of the names of the groups to be displayed in Tab 4.<br>
-			Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
-			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>			
-	  <a name="dashboard_tab5groups"></a>	
-		<li>dashboard_tab5groups<br>
-			Comma-separated list of the names of the groups to be displayed in Tab 5.<br>
-			Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
-			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>	
-	  <a name="dashboard_tab6groups"></a>	
-		<li>dashboard_tab6groups<br>
-			Comma-separated list of the names of the groups to be displayed in Tab 6.<br>
-			Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
-			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>	
-		<a name="dashboard_tab7groups"></a>	
-		<li>dashboard_tab7groups<br>
-			Comma-separated list of the names of the groups to be displayed in Tab 7.<br>
-			Each group can be given an icon for this purpose the group name, the following must be completed ":&lt;icon&gt;@&lt;color&gt;"<br>
-			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>	
-	  <a name="dashboard_tab1icon"></a>	
-		<li>dashboard_tab1icon<br>
-			Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
+	  <a name="dashboard_tabXicon"></a>	
+		<li>dashboard_tabXicon<br>
+			Set the icon for a Tab. There must exist an icon with the name ico.(png|svg) in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
 		</li><br>
-	  <a name="dashboard_tab2icon"></a>	
-		<li>dashboard_tab2icon<br>
-			Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
-		</li><br>	
-	  <a name="dashboard_tab3icon"></a>	
-		<li>dashboard_tab3icon<br>
-			Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
-		</li><br>	
-	  <a name="dashboard_tab4icon"></a>	
-		<li>dashboard_tab4icon<br>
-			Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
-		</li><br>	
-	  <a name="dashboard_tab5icon"></a>	
-		<li>dashboard_tab5icon<br>
-			Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
-		</li><br>	
-	  <a name="dashboard_tab6icon"></a>	
-		<li>dashboard_tab6icon<br>
-			Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
-		</li><br>	
-	  <a name="dashboard_tab7icon"></a>	
-		<li>dashboard_tab7icon<br>
-			Set the icon for a Tab. There must exist an icon with the name ico.png in the modpath directory. If the image is referencing an SVG icon, then you can use the @colorname suffix to color the image. 
-		</li><br>		
 	  <a name="dashboard_colcount"></a>	
 		<li>dashboard_colcount<br>
 			Number of columns in which the groups can be displayed. Nevertheless, it is possible to have multiple groups <br>
-			to be positioned in a column next to each other. This is dependent on the width of columns and groups. <br>
+			to be positioned in a column next to each other. This is depend on the width of columns and groups. <br>
 			Default: 1
 		</li><br>		
+         <a name="dashboard_tabXcolcount"></a>	
+		<li>dashboard_tabXcolcount<br>
+			Number of columns for a specific tab in which the groups can be displayed. Nevertheless, it is possible to have multiple groups <br>
+			to be positioned in a column next to each other. This depends on the width of columns and groups. <br>
+			Default: <dashboard_colcount>
+		</li><br>	
+	 <a name="dashboard_tabXbackgroundimage"></a>	
+		<li>dashboard_tabXbackgroundimage<br>
+			Shows a background image for the X tab. The image is not stretched in any way, it should therefore match the tab size or extend it.
+			Standard: 
+		</li><br>		
+         <a name="dashboard_flexible"></a>		
+		<li>dashboard_flexible<br>
+			If set to a value > 0, the widgets are not positioned in columns any more but can be moved freely to any position in the tab.<br/>
+			The value for this parameter also defines the grid, in which the position "snaps in".
+			Default: 0
+		</li><br>	
 	 <a name="dashboard_showfullsize"></a>	
 		<li>dashboard_showfullsize<br>
 			Hide FHEMWEB Roomliste (complete left side) and Page Header if Value is 1.<br>
@@ -1024,10 +1041,16 @@ sub CreateDashboardEntry($) {
 			Displays the Tabs/Buttonbar on top or bottom, or hides them. If the Buttonbar is hidden lockstate is "lock" is used.<br>
 			Default: tabs-and-buttonbar-at-the-top
 		</li><br>
-	 <a name="dashboard_showtooglebuttons"></a>		
-		<li>dashboard_showtooglebuttons<br>
+	 <a name="dashboard_showtogglebuttons"></a>		
+		<li>dashboard_showtogglebuttons<br>
 			Displays a Toogle Button on each Group do collapse.<br>
 			Default: 0
+		</li><br>	
+         <a name="dashboard_backgroundimage"></a>		
+		<li>dashboard_backgroundimage<br>
+			Displays a background image for the complete dashboard. The image is not stretched in any way so the size should match/extend the
+			dashboard height/width.
+			Default: 
 		</li><br>	
 	 <a name="dashboard_debug"></a>		
 		<li>dashboard_debug<br>
@@ -1085,7 +1108,7 @@ sub CreateDashboardEntry($) {
   <ul>
 	  <a name="dashboard_tabcount"></a>	
 		<li>dashboard_tabcount<br>
-			Gibt die Anzahl der angezeigten Tabs an.
+			Gibt die Anzahl der angezeigten Tabs an. (Dieser Parameter is veraletet, die Anzahl der Tabs wird aus der Dashboard-Konfiguration gelesen)
 			Standard: 1
 		</li><br>	  
 	  <a name="dashboard_activetab"></a>	
@@ -1093,79 +1116,14 @@ sub CreateDashboardEntry($) {
 			Gibt an welches Tab aktiviert ist. Kann manuell gesetzt werden, wird aber auch durch den Schalter "Set" auf das gerade aktive Tab gesetzt.
 			Standard: 1
 		</li><br>	  
-	  <a name="dashboard_tab1name"></a>
-		<li>dashboard_tab1name<br>
-			Titel des 1. Tab.
-			Standard: Dashboard-Tab 1
+	  <a name="dashboard_tabXname"></a>
+		<li>dashboard_tabXname<br>
+			Titel des X. Tab.
 		</li><br>	   
-	  <a name="dashboard_tab2name"></a>
-		<li>dashboard_tab2name<br>
-			Titel des 2. Tab.
-			Standard: Dashboard-Tab 2
-		</li><br>	    
-	   <a name="dashboard_tab3name"></a>
-		<li>dashboard_tab3name<br>
-			Titel des 3. Tab.
-			Standard: Dashboard-Tab 3
-		</li><br>	 
-	   <a name="dashboard_tab4name"></a>
-		<li>dashboard_tab4name<br>
-			Titel des 4. Tab.
-			Standard: Dashboard-Tab 4
-		</li><br>	 
-	   <a name="dashboard_tab5name"></a>
-		<li>dashboard_tab5name<br>
-			Titel des 5. Tab.
-			Standard: Dashboard-Tab 5
+	  <a name="dashboard_tabXsorting"></a>	
+		<li>dashboard_tabXsorting<br>
+			Enthält die Poistionierung jeder Gruppe im Tab X. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
 		</li><br>		
-	   <a name="dashboard_tab6name"></a>
-		<li>dashboard_tab6name<br>
-			Titel des 6. Tab.
-			Standard: Dashboard-Tab 6
-		</li><br>	
-	   <a name="dashboard_tab7name"></a>
-		<li>dashboard_tab7name<br>
-			Titel des 7. Tab.
-			Standard: Dashboard-Tab 7
-		</li><br>		
-		<a name="dashboard_webfrontendfilter"></a>	
-		<li>dashboard_webfrontendfilter<br>
-			Ist dieses Attribut nicht gesetzt, oder hat den Wert * wird das Dashboard auf allen konfigurierten FHEMWEB Instanzen angezeigt. <br>
-			Wird dem Attribut der Name einer FHEMWEB Instanz (z.B. WEB) zugewiesen so wird das Dashboard nur in dieser Instanz angezeigt. <br>
-			Es können auch mehrere Instanzen durch Komma getrennt angegeben werden, z.B. WEB,WEBtablet. Dadurch ist es möglich ein <br>
-			zusätzliches Dashboard zu definieren und dieses nur z.B. auf Tablet anzeigen zulassen (die natürlich eine eigenen FHEMWEB Instanz verwenden).<br>
-			Standard: *<br>
-			<br>
-			Es dürfen NIE zwei Dashboards in einer FHEMWEB instanz aktiv sein!		
-		</li><br>			
-	  <a name="dashboard_tab1sorting"></a>	
-		<li>dashboard_tab1sorting<br>
-			Enthält die Poistionierung jeder Gruppe im Tab 1. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
-		</li><br>		
-	  <a name="dashboard_tab2sorting"></a>	
-		<li>dashboard_tab2sorting<br>
-			Enthält die Poistionierung jeder Gruppe im Tab 2. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
-		</li><br>		
-	  <a name="dashboard_tab3sorting"></a>	
-		<li>dashboard_tab3sorting<br>
-			Enthält die Poistionierung jeder Gruppe im Tab 3. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
-		</li><br>		
-	  <a name="dashboard_tab4sorting"></a>	
-		<li>dashboard_tab4sorting<br>
-			Enthält die Poistionierung jeder Gruppe im Tab 4. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
-		</li><br>		
-	  <a name="dashboard_tab5sorting"></a>	
-		<li>dashboard_tab5sorting<br>
-			Enthält die Poistionierung jeder Gruppe im Tab 5. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
-		</li><br>	
-	  <a name="dashboard_tab65sorting"></a>	
-		<li>dashboard_tab6sorting<br>
-			Enthält die Poistionierung jeder Gruppe im Tab 6. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
-		</li><br>			
-	  <a name="dashboard_tab7sorting"></a>	
-		<li>dashboard_tab7sorting<br>
-			Enthält die Poistionierung jeder Gruppe im Tab 7. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht empfohlen dieses Attribut manuelle zu ändern
-		</li><br>			
 	  <a name="dashboard_row"></a>	
 		<li>dashboard_row<br>
 			Auswahl welche Zeilen angezeigt werden sollen. top (nur Oben), center (nur Mitte), bottom (nur Unten) und den Kombinationen daraus.<br>
@@ -1200,82 +1158,41 @@ sub CreateDashboardEntry($) {
 			Höhe der unteren Zeile, in der die Gruppen angeordnet werden.<br>
 			Standard: 250
 		</li><br>		
-	  <a name="dashboard_tab1groups"></a>	
+	  <a name="dashboard_tabXgroups"></a>	
 		<li>dashboard_tab1groups<br>
 			Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 1 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
 			Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
-			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow		
+			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow<br/>
+			Der Gruppenname kann ebenfalls einen regulären Ausdruck beinhalten, um alle Gruppen anzuzeigen, die darauf passen.<br/>
+			Beispiel: .*Licht.* zeigt alle Gruppen an, die das Wort "Licht" im Namen haben.
 		</li><br>		
-	  <a name="dashboard_tab2groups"></a>	
-		<li>dashboard_tab2groups<br>
-			Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 2 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
-			Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
-			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>		
-	  <a name="dashboard_tab3groups"></a>	
-		<li>dashboard_tab3groups<br>
-			Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 3 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
-			Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
-			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>	
-	  <a name="dashboard_tab4groups"></a>	
-		<li>dashboard_tab4groups<br>
-			Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 4 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
-			Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
-			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>	
-	  <a name="dashboard_tab5groups"></a>	
-		<li>dashboard_tab5groups<br>
-			Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 5 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
-			Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
-			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>	
-	  <a name="dashboard_tab6groups"></a>	
-		<li>dashboard_tab6groups<br>
-			Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 6 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
-			Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
-			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>	
-	  <a name="dashboard_tab7groups"></a>	
-		<li>dashboard_tab7groups<br>
-			Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 7 angezeigt werden. Falsche Gruppennamen werden hervorgehoben.<br>
-			Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt werden<br>
-			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow
-		</li><br>		
-	  <a name="dashboard_tab1icon"></a>	
-		<li>dashboard_tab1icon<br>
+	  <a name="dashboard_tabXicon"></a>	
+		<li>dashboard_tabXicon<br>
 			Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
 		</li><br>
-	  <a name="dashboard_tab2icon"></a>	
-		<li>dashboard_tab2icon<br>
-			Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
-		</li><br>	
-	  <a name="dashboard_tab3icon"></a>	
-		<li>dashboard_tab3icon<br>
-			Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
-		</li><br>	
-	  <a name="dashboard_tab4icon"></a>	
-		<li>dashboard_tab4icon<br>
-			Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
-		</li><br>	
-	  <a name="dashboard_tab5icon"></a>	
-		<li>dashboard_tab5icon<br>
-			Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
-		</li><br>	
-	  <a name="dashboard_tab6icon"></a>	
-		<li>dashboard_tab6icon<br>
-			Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
-		</li><br>	
-	  <a name="dashboard_tab7icon"></a>	
-		<li>dashboard_tab7icon<br>
-			Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
-		</li><br>		
 	  <a name="dashboard_colcount"></a>	
 		<li>dashboard_colcount<br>
 			Die Anzahl der Spalten in der  Gruppen dargestellt werden können. Dennoch ist es möglich, mehrere Gruppen <br>
 			in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite der Spalten und Gruppen. <br>
 			Gilt nur für die mittlere Spalte! <br>
 			Standard: 1
+		</li><br>		
+          <a name="dashboard_tabXcolcount"></a>	
+		<li>dashboard_tabXcolcount<br>
+			Die Anzahl der Spalten im Tab X in der  Gruppen dargestellt werden können. Dennoch ist es möglich, mehrere Gruppen <br>
+			in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite der Spalten und Gruppen. <br>
+			Gilt nur für die mittlere Spalte! <br>
+			Standard: <dashboard_colcount>
+		</li><br>		
+ 	  <a name="dashboard_tabXbackgroundimage"></a>	
+		<li>dashboard_tabXbackgroundimage<br>
+			Zeigt ein Hintergrundbild für den X-ten Tab an. Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs passen oder diese überschreiten.
+			Standard: 
+		</li><br>		
+  	  <a name="dashboard_flexible"></a>	
+		<li>dashboard_flexible<br>
+			Hat dieser Parameter  einen Wert > 0, dann können die Widgets in den Tabs frei positioniert werden und hängen nicht mehr an den Spalten fest. Der Wert gibt ebenfalls das Raster an, in dem die Positionierung "zu schnappt".
+			Standard: 0
 		</li><br>		
 	 <a name="dashboard_showfullsize"></a>	
 		<li>dashboard_showfullsize<br>
@@ -1287,10 +1204,15 @@ sub CreateDashboardEntry($) {
 			Zeigt die Tabs/Schalterleiste des Dashboards oben oder unten an, oder blendet diese aus. Wenn die Schalterleiste ausgeblendet wird ist das Dashboard gespert.<br>
 			Standard: tabs-and-buttonbar-at-the-top
 		</li><br>	
-	 <a name="dashboard_showtooglebuttons"></a>		
-		<li>dashboard_showtooglebuttons<br>
+	 <a name="dashboard_showtogglebuttons"></a>		
+		<li>dashboard_showtogglebuttons<br>
 			Zeigt eine Schaltfläche in jeder Gruppe mit der man diese auf- und zuklappen kann.<br>
 			Standard: 0
+		</li><br>	
+	<a name="dashboard_backgroundimage"></a>		
+		<li>dashboard_backgroundimage<br>
+			Zeig in Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards passen oder diese überschreiten.
+			Default: 
 		</li><br>	
 	 <a name="dashboard_debug"></a>		
 		<li>dashboard_debug<br>
