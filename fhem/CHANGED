@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: SYSMON: 'disable' not working at FHEM-start
   - bugfix: Text2Speech: ogg/wav as direkt mp3files are now possible 
   - bugfix: SOMFY: Added attr "additionalPosReading" to store current position
                    Bugfixing, made position calculation more stable
