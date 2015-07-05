@@ -168,9 +168,11 @@ sub FRITZBOX_Initialize($)
                 ."forceTelnetConnection:0,1 "
                 ."fritzBoxIP "
                 ."INTERVAL "
+                ."localM3UFile "
                 ."ringWithIntern:0,1,2 "
                 ."telnetUser "
                 ."telnetTimeOut "
+               # ."ttsRessource:Google,ESpeak "
                 .$readingFnAttributes;
 } # end FRITZBOX_Initialize
 
@@ -194,24 +196,9 @@ sub FRITZBOX_Define($$)
       return $msg;
    }
 
-#   unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
-   unless ( -X "/usr/bin/ctlmgr_ctl" ) {
-      $hash->{REMOTE} = 1;
-      FRITZBOX_Log $hash, 4, "FRITZBOX runs in remote mode";
-   }
-   elsif ( $< != 0 ) {
-      FRITZBOX_Log $hash, 3, "FHEM is not running under root user (currently " .
-          ( getpwuid( $< ) )[ 0 ] . "). FRITZBOX runs in remote mode.";
-      $hash->{REMOTE} = 1;
-   }
-   else {
-      $hash->{REMOTE} = 0;
-      FRITZBOX_Log $hash, 4, "FRITZBOX runs in local mode";
-   }
-   
    $hash->{STATE}              = "Initializing";
-   $hash->{fhem}{modulVersion} = '$Date$';
    $hash->{INTERVAL}           = 300; 
+   $hash->{fhem}{modulVersion} = '$Date$';
    $hash->{fhem}{lastHour}     = 0;
    $hash->{fhem}{LOCAL}        = 0;
 
@@ -222,12 +209,28 @@ sub FRITZBOX_Define($$)
    $hash->{SECPORT} = $tr064Port    if $tr064Port;
 
    RemoveInternalTimer($hash->{helper}{TimerReadout});
- # Get first data after 6 seconds
-   InternalTimer(gettimeofday() + 6, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
+ # Check APIs after fhem.cfg is processed
+   InternalTimer(gettimeofday() , "FRITZBOX_Define_Init", $hash->{helper}{TimerReadout}, 0);
  
    return undef;
 } #end FRITZBOX_Define
 
+# Continue with the device definition after fhem.cfg is loaded
+#######################################################################
+sub FRITZBOX_Define_Init($)
+{
+   my ($timerpara) = @_;
+
+   my $index = rindex( $timerpara, "." );    # rechter punkt
+   my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
+   my $name = substr $timerpara, 0, $index;                         # name extrahieren
+   my $hash = $defs{$name};
+      
+   FRITZBOX_Check_APIs ($hash);
+
+# Get first data after 6 seconds
+   InternalTimer(gettimeofday() + 6, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
+}
 #######################################################################
 sub FRITZBOX_Undefine($$)
 {
@@ -275,6 +278,7 @@ sub FRITZBOX_Set($$@)
    
    my $list = "alarm"
             . " call"
+            . " checkAPIs:noArg"
             . " customerRingTone"
             . " dect:on,off"
             . " diversity"
@@ -323,6 +327,10 @@ sub FRITZBOX_Set($$@)
          # Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          # return FRITZBOX_ConvertRingTone $hash, @val;
       # }
+   } 
+   elsif ( lc $cmd eq 'checkapis') {
+         Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
+      return FRITZBOX_Check_APIs($hash);
    } 
    elsif ( lc $cmd eq 'customerringtone') {
       if (int @val > 0) 
@@ -540,6 +548,127 @@ sub FRITZBOX_Get($@)
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
+# Checks which API is available on the Fritzbox
+#######################################################################
+sub FRITZBOX_Check_APIs($)
+{
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+   my $fritzShell = 0;
+   my $returnStr;
+   my $msg;
+   my $response;
+
+# Check if FHEM runs on a FritzBox under root user
+   # unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
+   if ( -X "/usr/bin/ctlmgr_ctl" ) {
+      if ( $< != 0 ) {
+         $msg = "FHEM is running on a Fritz!Box but not as 'root' user (currently " .
+               ( getpwuid( $< ) )[ 0 ] . "). Cannot run in local mode.";
+         FRITZBOX_Log $hash, 3, $msg;
+      }
+      else {
+         $fritzShell = 1;
+         $msg = "FHEM is running on a Fritz!Box as 'root' user.";
+         FRITZBOX_Log $hash, 5, $msg;
+      }
+      $returnStr .= $msg."\n";
+   }
+   
+# Determine local or remote mode
+   if ($fritzShell) {
+      $hash->{REMOTE} = 0;
+      $msg = "FRITZBOX modul runs in local mode.";
+   }
+   else {
+      $hash->{REMOTE} = 1;
+      $msg = "FRITZBOX modul runs in remote mode.";
+   }
+   FRITZBOX_Log $hash, 4, $msg;
+   $returnStr .= $msg."\n";
+
+   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   
+# Check if perl modules for remote APIs exists
+   if ($missingModulWeb) {
+      $msg = "Cannot check for APIs webcm, luaQuery and TR064 because perl modul $missingModulWeb is missing on this system.";
+      FRITZBOX_Log $hash, 4, $msg;
+      $returnStr .= "$msg\n";
+   }
+# Check for remote APIs
+   else {
+      my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 1);
+
+   # Check if webcm exists
+      $response = $agent->get( "http://".$host."/cgi-bin/webcm" );
+
+      if ($response->is_success) {
+         $hash->{WEBCM} = 1;
+         $msg = "API webcm found.";
+      }
+      else {
+         $hash->{WEBCM} = 0;
+         $msg = "API webcm does not exist: ".$response->status_line;
+      }
+      FRITZBOX_Log $hash, 4, $msg;
+      $returnStr .= "$msg\n";
+
+   # Check if query.lua exists
+      $response = $agent->get( "http://".$host."/query.lua" );
+
+      if ($response->is_success) {
+         $hash->{LUAQUERY} = 1;
+         $msg = "API luaQuery found.";
+      }
+      else {
+         $hash->{LUAQUERY} = 0;
+         $msg = "API luaQuery does not exist: ".$response->status_line;
+      }
+      FRITZBOX_Log $hash, 4, $msg;
+      $returnStr .= "$msg\n";
+
+   # Check if tr064 specification exists
+      $response = $agent->get( "http://".$host.":49000/tr64desc.xml" );
+
+      if ($response->is_success) {
+         $hash->{TR064} = 1;
+         $msg = "API TR-064 found.";
+      }
+      else {
+         $hash->{TR064} = 0;
+         $msg = "API TR-064 does not exist: ".$response->status_line;
+      }
+      FRITZBOX_Log $hash, 4, $msg;
+      $returnStr .= "$msg\n";
+   }
+   
+# Check if telnet modul exists
+   if ($missingModulTelnet) {
+      $msg = "Cannot check for telnet access because perl modul $missingModulTelnet is missing on this system.\n";
+      FRITZBOX_Log $hash, 4, $msg;
+      $returnStr .= "$msg\n";
+   }
+   else {
+      my $timeout = AttrVal( $name, "telnetTimeOut", "10");
+      my $telnet = new Net::Telnet ( Host=>$host, Port => 23, Timeout=>$timeout, Errmode=>'return', Prompt=>'/# $/');
+      if (!$telnet) {
+         $hash->{TELNET} = 0;
+         $telnet = undef;
+         $msg = "Could not open telnet connection to $host: $!";
+      }   
+      else {
+         $hash->{TELNET} = 1;
+         $telnet->close;
+         $msg = "Telnet connection availabel.";
+      }
+      FRITZBOX_Log $hash, 4, $msg;
+      $returnStr .= "$msg\n";
+   }
+   
+   return $returnStr;
+   
+} #end FRITZBOX_Check_APIs
+   
 # Starts the data capturing and sets the new readout timer
 #######################################################################
 sub FRITZBOX_Readout_Start($)
@@ -566,7 +695,8 @@ sub FRITZBOX_Readout_Start($)
    {
       FRITZBOX_Log $hash, 1, "Old readout process still running. Killing old process ".$hash->{helper}{READOUT_RUNNING_PID};
       BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} ); 
-      sleep 5     unless $hash->{REMOTE} == 1; # giving the FritzBox some time to free the memory
+      # stop FHEM, giving a FritzBox some time to free the memory 
+      sleep 5     unless $hash->{REMOTE}==1; 
       delete( $hash->{helper}{READOUT_RUNNING_PID} );
    }
    
@@ -1458,7 +1588,8 @@ sub FRITZBOX_Set_Cmd_Start($)
       FRITZBOX_Log $hash, 1, "Old command still running. Killing old command: ".$cmdBuffer[0];
       shift @cmdBuffer;
       BlockingKill( $hash->{helper}{CMD_RUNNING_PID} ); 
-      sleep 5     unless $hash->{REMOTE}==1; # giving FritzBox some time to free the memory
+      # stop FHEM, giving FritzBox some time to free the memory 
+      sleep 5     unless $hash->{REMOTE}==1; 
       delete $hash->{helper}{CMD_RUNNING_PID};
       return unless int @cmdBuffer;
    }
@@ -1936,8 +2067,6 @@ sub FRITZBOX_GuestWlan_Run_Shell($)
       if $state == 1;
 # Set guestWLAN
    push @readoutCmdArray, [ "", "ctlmgr_ctl w wlan settings/guest_ap_enabled $state"];
-# Wait 5 s until it is done (to avoid reading console messages)
-   # push @readoutCmdArray, [ "", "sleep 5"];
 # Read WLAN
    push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
 # Read 2nd WLAN
@@ -2482,16 +2611,23 @@ sub FRITZBOX_Ring_Run_Web($)
 
 # Create tts link to play as internet radio
    if ( $field{say} ) {
-      if ($fhemRadioStation)
-      {
+      if ($fhemRadioStation) {
          $ringTone = 33;
          chop $field{say};
+         # my $ttsRessource = AttrVal( $name, "ttsRessource", "Google" );
+         # Speak with espeak  # sudo apt-get install espeak
+         # if ($ttsRessource eq "ESpeak"){
+             # $cmd = "sudo espeak -vde+f3 -k5 -s150 \"" . $ttsText . "\""; 
+             # Log3 $hash, 4, "Text2Speech:" .$cmd;
+             # system($cmd);
+         # }
+
+      # speak with Translate.Google 
          # http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT];
          $ttsLink = $ttsLinkTemplate;
          my $ttsText = substr $field{say},0,100;
          my $ttsLang = "de";
-         if ($ttsText =~ /^\((en|es|fr|nl)\)/i )
-         {
+         if ($ttsText =~ /^\((en|es|fr|nl)\)/i ) {
             $ttsLang = $1;
             $ttsText =~ s/^\($1\)\s*//i;
          }
@@ -2500,8 +2636,7 @@ sub FRITZBOX_Ring_Run_Web($)
          $ttsLink =~ s/\[TEXT\]/$ttsText/;
          FRITZBOX_Log $hash, 5, "Created Text2Speech internet link: $ttsLink";
       }
-      else
-      {
+      else {
          FRITZBOX_Log $hash, 2, "Cannot do Text2Speech because box has no internet radio";
       }
    }
@@ -2536,10 +2671,12 @@ sub FRITZBOX_Ring_Run_Web($)
 #Preparing 1st command array
    @webCmdArray = ();
    
-   # unless ($startValue->{useClickToDial}) {
-      # push @webCmdArray, "telcfg:settings/UseClickToDial" => 1;
-        # FRITZBOX_Log $hash, 3, "Switch ClickToDial on";
-   # }
+   unless ($startValue->{useClickToDial}) {
+      push @webCmdArray, "telcfg:settings/UseClickToDial" => 1;
+      push @webCmdArray, "telcfg:settings/DialPort" => 50;
+      $startValue->{dialPort}=50;
+        FRITZBOX_Log $hash, 3, "Switch ClickToDial on, set dial port 50";
+   }
    
    if (int (@FritzFons) == 0 && $ttsLink) {
       FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, parameter 'say:' will be ignored.";
@@ -2559,12 +2696,10 @@ sub FRITZBOX_Ring_Run_Web($)
    if ($ringTone) {
       FRITZBOX_Log $hash, 3, "No Fritz!Fon identified, ring tone will be ignored."
          unless @FritzFons;
-      foreach (@FritzFons)
-      {
+      foreach (@FritzFons) {
          push @webCmdArray, "telcfg:settings/Foncontrol/User".$_."/IntRingTone" => $ringTone;
          FRITZBOX_Log $hash, 4, "Change temporarily internal ring tone of dect".$_." to $ringTone";
-         if ($ttsLink)
-         {
+         if ($ttsLink) {
             push @webCmdArray, "telcfg:settings/Foncontrol/User".$_."/RadioRingID" => $fhemRadioStation;
             FRITZBOX_Log $hash, 4, "Change temporarily radio station of dect".$_." to $fhemRadioStation (FHEM)";
          }
@@ -2595,9 +2730,26 @@ sub FRITZBOX_Ring_Run_Web($)
    }
    
 # Set tts-Message
-   push @webCmdArray, 'configd:settings/WEBRADIO'.$fhemRadioStation.'/URL' => $ttsLink
-      if $ttsLink;
-
+   if ($ttsLink) {
+      push @webCmdArray, 'configd:settings/WEBRADIO'.$fhemRadioStation.'/URL' => $ttsLink;
+   
+################ TEST Anfang ################
+   # Create m3u-file (if ring tone and radio station cannot be changed because of missing interfaces)
+      my $localM3UFile = AttrVal( $name, "localM3UFile", "" );
+      if ($localM3UFile) {
+         if (open my $fh, '>', $localM3UFile) {
+            print $fh $ttsLink."\n";
+            close $fh;
+            FRITZBOX_Log $hash, 5, "Filled m3u file '$localM3UFile'.";
+         } 
+         else {
+            my $msg = "Error: Cannot create save file '$localM3UFile' because $!\n";
+            FRITZBOX_Log $hash, 2, $msg;
+            # return $name."|0|" . $msg;
+         }
+      }
+################ TEST Ende ################
+   }
 #Execute command array
    $result = FRITZBOX_Web_PostCmd( $hash, \@webCmdArray )
       if int( @webCmdArray ) > 0;
@@ -3799,7 +3951,7 @@ sub FRITZBOX_Web_OpenCon ($)
       FRITZBOX_Log $hash, 2, "Error: Perl modul ".$missingModulWeb."is missing on this system. Please install before using this modul.";
       return undef;
    }
-   
+
 # Use old sid if last access later than 9.5 minutes
    my $sid = $hash->{fhem}{sid};
    return $sid
@@ -3834,6 +3986,14 @@ sub FRITZBOX_Web_PostCmd($$@)
 {
    my ($hash, $webCmdArray, $page) = @_;
    my $name = $hash->{NAME};
+   
+   unless ( $hash->{WEBCM} ) {
+      my $msg = "API webcm not available on the box.";
+      FRITZBOX_Log $hash, 4, $msg;
+      my @retArray = (0, $msg);
+      return \@retArray;
+   }
+
    my $sid = FRITZBOX_Web_OpenCon($hash);
    unless ($sid) {
       my @retArray = (0, "Didn't get a session ID");
@@ -3918,9 +4078,9 @@ sub FRITZBOX_Web_Query($$@)
 
    my $jsonResult ;
    if ($charSet eq "UTF-8") {
-      $jsonResult = JSON::XS->new->utf8->decode ($response->content);
+      $jsonResult = JSON->new->utf8->decode ($response->content);
    } else {
-      $jsonResult = JSON::XS->new->latin1->decode ($response->content);
+      $jsonResult = JSON   ->new->latin1->decode ($response->content);
    }
    $jsonResult->{sid} = $sid;
    return $jsonResult;
@@ -4309,6 +4469,16 @@ sub FRITZBOX_fritztris($)
      <li><code>INTERVAL &lt;seconds&gt;</code>
          <br>
          Polling-Interval. Default is 300 (seconds). Smallest possible value is 60.
+      </li><br>
+
+      <li><code>localM3UFile &lt;/path/fileName&gt;</code>
+         <br>
+         Can be used as a work around if the ring tone of a Fritz!Fon cannot be changed because of firmware restrictions (missing telnet or webcm).
+         <br>
+         How it works: If the FHEM server has also a web server running, the FritzFon can play a m3u file from this web server as an internet radio station.
+         For this an internet radio station on the FritzFon must point to the server URL of this file and the internal ring tone must be changed to that station.
+         <br>
+         If the attribute is set, the server file "localM3uFile" (local address of the FritzFon URL) will be filled with the URL of the text2speech engine (say:) or a MP3-File (play:). The FritzFon will then play this URL.
       </li><br>
 
       <li><code>telnetUser &lt;user name&gt;</code>
