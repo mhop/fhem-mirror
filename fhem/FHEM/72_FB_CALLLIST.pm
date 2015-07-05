@@ -45,8 +45,9 @@ FB_CALLLIST_Initialize($)
     $hash->{AttrList}  =  "number-of-calls:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
                           "internal-number-filter ".
                           "connection-mapping ".
+                          "external-mapping ".
                           "create-readings:0,1 ".
-                          "visible-columns:sortable-strict,row,state,timestamp,name,number,internal,connection,duration ".
+                          "visible-columns:sortable-strict,row,state,timestamp,name,number,internal,external,connection,duration ".
                           "show-icons:1,0 ".
                           "list-type:all,incoming,outgoing,missed-calls,completed,active " .
                           "time-format-string ".
@@ -68,16 +69,16 @@ FB_CALLLIST_Initialize($)
 # Define function
 sub FB_CALLLIST_Define($$)
 {
-	my ($hash, $def) = @_;
-	my @a = split("[ \t][ \t]*", $def);
-	my $retval = undef;
-	my $name = $a[0];
+    my ($hash, $def) = @_;
+    my @a = split("[ \t][ \t]*", $def);
+    my $retval = undef;
+    my $name = $a[0];
 
     if(!defined($a[2]))
-	{
-		$retval = "FB_CALLLIST_define: you must specify a FB_CALLMONITOR object for using FB_CALLLIST";
-		return $retval;
-	}
+    {
+        $retval = "FB_CALLLIST_define: you must specify a FB_CALLMONITOR object for using FB_CALLLIST";
+        return $retval;
+    }
     
     if(@a != 3) 
     {
@@ -85,19 +86,19 @@ sub FB_CALLLIST_Define($$)
         return $retval;
     }
 
-	unless(defined($defs{$a[2]}) and $defs{$a[2]}->{TYPE} eq "FB_CALLMONITOR")
-	{
-		$retval = "FB_CALLLIST_Define: $a[2] does not exists or ist not of type FB_CALLMONITOR";
-		return $retval;
-	}
+    unless(defined($defs{$a[2]}) and $defs{$a[2]}->{TYPE} eq "FB_CALLMONITOR")
+    {
+        $retval = "FB_CALLLIST_Define: $a[2] does not exists or ist not of type FB_CALLMONITOR";
+        return $retval;
+    }
 
-	$hash->{FB} = $a[2];
+    $hash->{FB} = $a[2];
     $hash->{NOTIFYDEV} = $a[2];
-	$hash->{STATE} = 'Initialized';
-    $hash->{helper}{DEFAULT_COLUMN_ORDER} = "row,state,timestamp,name,number,internal,connection,duration";
+    $hash->{STATE} = 'Initialized';
+    $hash->{helper}{DEFAULT_COLUMN_ORDER} = "row,state,timestamp,name,number,internal,external,connection,duration";
     FB_CALLLIST_loadList($hash);
     
-	return undef;
+    return undef;
 } 
 
 
@@ -118,7 +119,7 @@ sub FB_CALLLIST_Attr($@)
                 
                 if($table and (ref($table) eq 'HASH'))
                 {
-                    $hash->{helper}{LINE_FILTER} = $table;
+                    $hash->{helper}{INTERNAL_FILTER} = $table;
                     Log3 $name, 4, "FB_CALLLIST ($name) - filter stored as hash: $value";
                 } 
                 else
@@ -134,7 +135,7 @@ sub FB_CALLLIST_Attr($@)
                     $lines{$item} = $item; 
                 }
                 
-                $hash->{helper}{LINE_FILTER} = \%lines;
+                $hash->{helper}{INTERNAL_FILTER} = \%lines;
                 Log3 $name, 4, "FB_CALLLIST ($name) - filter stored as list $value";
             } 
             
@@ -171,6 +172,30 @@ sub FB_CALLLIST_Attr($@)
                 return "invalid connection mapping table: $value";
             } 
         } 
+        elsif($attrib eq "external-mapping")
+        {
+            if( $value =~ m/^{.*}$/ ) 
+            {
+                my $table = eval $value;
+                
+                if( $table &&(ref($table) eq 'HASH'))
+                {
+                    $hash->{helper}{EXTERNAL_MAP} = $table;
+                    Log3 $name, 4, "FB_CALLLIST ($name) - external map stored as hash: $value";
+                    
+                    # Inform all FHEMWEB clients
+                    FB_CALLLIST_updateFhemWebClients($hash) if($init_done);
+                } 
+                else
+                {
+                    return "invalid external mapping table: $value";
+                } 
+            }
+            else 
+            {
+                return "invalid external mapping table: $value";
+            } 
+        } 
         elsif($attrib eq "list-type")
         {
             if($value =~ /^incoming|outgoing|missed-call|completed|active$/)
@@ -192,12 +217,17 @@ sub FB_CALLLIST_Attr($@)
     {
         if($attrib eq "internal-number-filter")
         {
-            delete($hash->{helper}{LINE_FILTER}) if(exists($hash->{helper}{LINE_FILTER}));
+            delete($hash->{helper}{INTERNAL_FILTER}) if(exists($hash->{helper}{INTERNAL_FILTER}));
             return undef;
         }
         elsif($attrib eq "connection-mapping")
         {
             delete($hash->{helper}{CONNECTION_MAP}) if(exists($hash->{helper}{CONNECTION_MAP}));
+            return undef;
+        }
+        elsif($attrib eq "external-mapping")
+        {
+            delete($hash->{helper}{EXTERNAL_MAP}) if(exists($hash->{helper}{EXTERNAL_MAP}));
             return undef;
         }
     }
@@ -207,9 +237,9 @@ sub FB_CALLLIST_Attr($@)
 # SetFn for clearing the list
 sub FB_CALLLIST_Set($@)
 {
-	my ($hash, $name, $cmd, $value) = @_;
+    my ($hash, $name, $cmd, $value) = @_;
 
-	my $usage = "Unknown argument $cmd, choose one of clear:noArg";
+    my $usage = "Unknown argument $cmd, choose one of clear:noArg";
     
     if($cmd eq "clear")
     {
@@ -230,20 +260,20 @@ sub FB_CALLLIST_Set($@)
 # NotifyFn is trigger upon changes on FB_CALLMONITOR device. Imports the call data into call list
 sub FB_CALLLIST_Notify($$)
 {
-	my ($hash,$d) = @_;
+    my ($hash,$d) = @_;
     
-	return undef if(!defined($hash));
+    return undef if(!defined($hash));
 
-	my $name = $hash->{NAME};
+    my $name = $hash->{NAME};
    
- 	return undef if(IsDisabled($name)); 
+    return undef if(IsDisabled($name)); 
 
-	my $fb = $d->{NAME};
+    my $fb = $d->{NAME};
     
-	if ($fb ne $hash->{FB})
+    if ($fb ne $hash->{FB})
     {
-		return undef;
-	} 
+        return undef;
+    } 
  
     my $event = ReadingsVal($fb, "event", undef);
     my $call_id = ReadingsVal($fb, "call_id", undef);  
@@ -257,23 +287,21 @@ sub FB_CALLLIST_Notify($$)
         return undef
     }
     
-    if(exists($hash->{helper}{LINE_FILTER}))
-	{
+    if(exists($hash->{helper}{INTERNAL_FILTER}))
+    {
         Log3 $name, 5, "FB_CALLLIST ($name) - internal-number-filter is defined, checking if internal number is allowed";
     
-		my $line_number = ReadingsVal($fb, "internal_number", undef);
+        my $line_number = ReadingsVal($fb, "internal_number", undef);
 
-		if(defined($line_number) and not exists($hash->{helper}{LINE_FILTER}{$line_number}))
-		{
-		    Log3 $name, 5, "FB_CALLLIST ($name) - internal number $line_number does not match the current internal-number-filter. skipping call.";
-			return undef;
-		}
+        if(defined($line_number) and not exists($hash->{helper}{INTERNAL_FILTER}{$line_number}))
+        {
+            Log3 $name, 5, "FB_CALLLIST ($name) - internal number $line_number does not match the current internal-number-filter. skipping call.";
+            return undef;
+        }
         
         Log3 $name, 5, "FB_CALLLIST ($name) - call passed the internal-number-filter. proceeding...";
-	}
-	
-
-    
+    }
+ 
     my $data;
     
     if($event =~ /^call|ring$/)
@@ -286,6 +314,7 @@ sub FB_CALLLIST_Notify($$)
 
         $data->{external_number} = ReadingsVal($fb, "external_number", undef);
         $data->{external_name} = ReadingsVal($fb, "external_name", undef);
+        $data->{external_connection} = ReadingsVal($fb, "external_connection", undef);
         $data->{internal_number} =  ReadingsVal($fb, "internal_number", undef);    
         $data->{direction} = ReadingsVal($fb, "direction", undef);
         $data->{running_call} = 1;
@@ -396,7 +425,7 @@ sub FB_CALLLIST_cleanupList($)
         }
 
         # delete calls which do not match the configured internal-number-filter
-        if(exists($hash->{helper}{LINE_FILTER}))
+        if(exists($hash->{helper}{INTERNAL_FILTER}))
         {
             push @list, grep { not FB_CALLLIST_checkForInternalNumberFilter($hash, $hash->{helper}{DATA}{$_}{internal_number}) }  keys %{$hash->{helper}{DATA}};
         }
@@ -406,9 +435,7 @@ sub FB_CALLLIST_cleanupList($)
         {
             Log3 $name, 5, "FB_CALLLIST ($name) - deleting old call $index";
             delete($hash->{helper}{DATA}{$index}) if(exists($hash->{helper}{DATA}{$index}));
-        }
-        
-        
+        }     
     }
     else
     {
@@ -440,7 +467,6 @@ sub FB_CALLLIST_returnCallState($$;$)
         {
             $state = "=>  ((o))";
             $state = FW_makeImage("phone_ring\@blue",$state) if($icons);
-
         }
         elsif($data->{direction} eq "outgoing" and $data->{last_event} eq "connect" )
         {
@@ -551,7 +577,8 @@ sub FB_CALLLIST_list2html($;$)
             my $time = strftime(AttrVal($name, "time-format-string", "%a, %d %b %Y %H:%M:%S"), localtime($index));
             my $name = ($data->{external_name} eq "unknown" ? "-" : $data->{external_name});
             my $number = $data->{external_number};
-            my $internal = ((exists($hash->{helper}{LINE_FILTER}) and exists($hash->{helper}{LINE_FILTER}{$data->{internal_number}})) ? $hash->{helper}{LINE_FILTER}{$data->{internal_number}} : $data->{internal_number} );
+            my $external = ($data->{external_connection} ? ((exists($hash->{helper}{EXTERNAL_MAP}) and exists($hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}})) ? $hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}} : $data->{external_connection} ) : "-");
+            my $internal = ((exists($hash->{helper}{INTERNAL_FILTER}) and exists($hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}})) ? $hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}} : $data->{internal_number} );
             my $connection = ($data->{internal_connection} ? ((exists($hash->{helper}{CONNECTION_MAP}) and exists($hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}})) ? $hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}} : $data->{internal_connection} ) : "-");
             my $duration = FB_CALLLIST_formatDuration($hash, $index);
             
@@ -563,6 +590,7 @@ sub FB_CALLLIST_list2html($;$)
                         timestamp => $time,
                         name => $name,
                         number => $number,
+                        external => $external,
                         internal => $internal,
                         connection => $connection,
                         duration => $duration
@@ -814,20 +842,20 @@ sub FB_CALLLIST_checkForInternalNumberFilter($$)
     my ($hash, $line_number) = @_;
     my $name = $hash->{NAME};
     
-    if(exists($hash->{helper}{LINE_FILTER}))
-	{
+    if(exists($hash->{helper}{INTERNAL_FILTER}))
+    {
         Log3 $name, 5, "FB_CALLLIST ($name) - internal-number-filter is defined, checking if internal number $line_number is allowed";
 
-		if(defined($line_number) and not exists($hash->{helper}{LINE_FILTER}{$line_number}))
-		{
-		    Log3 $name, 5, "FB_CALLLIST ($name) - internal number $line_number does not match the current internal-number-filter: ".Dumper($hash->{helper}{LINE_FILTER});
-			return undef;
-		}
+        if(defined($line_number) and not exists($hash->{helper}{INTERNAL_FILTER}{$line_number}))
+        {
+            Log3 $name, 5, "FB_CALLLIST ($name) - internal number $line_number does not match the current internal-number-filter: ".Dumper($hash->{helper}{INTERNAL_FILTER});
+            return undef;
+        }
         else
         {
             Log3 $name, 5, "FB_CALLLIST ($name) - call passed the internal-number-filter. proceeding...";
         }
-	}
+    }
     
     return 1;
 }
@@ -894,6 +922,7 @@ sub FB_CALLLIST_returnTableHeader($)
             name => "Name",
             number => "Rufnummer",
             internal => "Intern",
+            external => "Extern",
             connection => "Via",
             duration => "Dauer"
         };
@@ -909,6 +938,7 @@ sub FB_CALLLIST_returnTableHeader($)
             name => "Name",
             number => "Number",
             internal => "Internal",
+            external => "External",
             connection => "Via",
             duration => "Duration"
         };
@@ -981,12 +1011,12 @@ sub FB_CALLLIST_returnTableHeader($)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="disable">disable</a> 0,1</li>
-	Optional attribute to disable the call list update. When disabled, call events will be processed and the list wouldn't be updated accordingly.
-	<br><br>
-	Possible values: 0 => FB_CALLLIST is activated, 1 => FB_CALLLIST is deactivated.<br>
+    Optional attribute to disable the call list update. When disabled, call events will be processed and the list wouldn't be updated accordingly.
+    <br><br>
+    Possible values: 0 => FB_CALLLIST is activated, 1 => FB_CALLLIST is deactivated.<br>
     Default Value is 0 (activated)<br><br>
     <li><a name="disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...</li>
-	Optional attribute to disable the call list update during a specific time interval. The attribute contains a space separated list of HH:MM tupels.
+    Optional attribute to disable the call list update during a specific time interval. The attribute contains a space separated list of HH:MM tupels.
     If the current time is between the two time specifications, the callist will be disabled and no longer updated.
     Instead of HH:MM you can also specify HH or HH:MM:SS. 
     <br><br>To specify an interval spawning midnight, you have to specify two intervals, e.g.:
@@ -1022,6 +1052,16 @@ sub FB_CALLLIST_returnTableHeader($)
     If this attribute is set, only the configured internal numbers will be shown in the list. All calls which are not taken via the configured internal numbers, were not be shown in the call list.
     <br><br>
     Default Value: <i>empty</i> (all internal numbers should be used, no exclusions and no mapping is performed)
+    <br><br>
+    <li><a name="connection-mapping">external-mapping</a> &lt;hash&gt;</li>
+    Defines a custom mapping of external connection values (reading: external_connection) to custom values. The mapping is performed in a hash table.<br><br>
+    e.g.<br>
+    <ul>
+    <code>attr &lt;name&gt; external-mapping {'ISDN' =&gt; 'Fixed Network', 'SIP0' =&gt; 'Operator A', 'SIP1' =&gt; 'Operator B'}</code>
+    </ul><br>   
+    The mapped name will be displayed in the table instead of the original value from FB_CALLMONITOR.
+    <br><br>
+    Default Value: <i>empty</i> (no mapping is performed)
     <br><br>
     <li><a name="connection-mapping">connection-mapping</a> &lt;hash&gt;</li>
     Defines a custom mapping of connection names to custom values. The mapping is performed in a hash table.<br><br>
@@ -1061,15 +1101,15 @@ sub FB_CALLLIST_returnTableHeader($)
     If you don't want to use icons you can deactivate them with this attribute.<br><br>
     Possible values: 0 => no icons , 1 => use icons<br>
     Default Value is 1 (use icons)<br><br>
-    <li><a name="visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,connection,duration</li>
+    <li><a name="visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,external,connection,duration</li>
     Defines the visible columns, as well as the order in which these columns are displayed in the call list (from left to right).
     Not all columns must be displayed, you can select only a subset of columns which will be displayed.
     <br><br>
     The possible values represents the corresponding column.
     The column "row" represents the row number within the current list.
     <br><br>
-    Possible values: a combination of <code>row,state,timestamp,name,number,internal,connection,duration</code><br>
-    Default Value is "row,state,timestamp,name,number,internal,connection,duration" (show all columns)<br><br>
+    Possible values: a combination of <code>row,state,timestamp,name,number,internal,external,connection,duration</code><br>
+    Default Value is "row,state,timestamp,name,number,internal,external,connection,duration" (show all columns)<br><br>
     <li><a name="no-heading">no-heading</a> 0,1</li>
     If activated the headline with a link to the detail page of the current definition will be hidden.<br><br>
     Possible values: 0 => the heading line will be shown , 1 => the heading line will not be shown<br>
@@ -1079,7 +1119,7 @@ sub FB_CALLLIST_returnTableHeader($)
   <a name="FB_CALLLISTevents"></a>
   <b>Generated Events:</b><br><br>
   <ul>
-  This module does not generate any events or readings. 
+  This module generates only readings if the attribute <a href="#create-readings">create-readings</a> is activated. The number and names of the readings depends on the selected columns (see attribute <a href="#visible-columns">visible-columns</a>) and the configured number of calls (see attribute <a href="#number-of-calls">number-of-calls</a>).
   </ul>
 </ul>
 =end html
@@ -1144,8 +1184,8 @@ sub FB_CALLLIST_returnTableHeader($)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="disable">disable</a></li>
-	Optionales Attribut zur Deaktivierung der Anrufliste. Es werden dann keine Anruf-Events mehr verarbeitet und die Liste nicht weiter aktualisiert.
-	<br><br>
+    Optionales Attribut zur Deaktivierung der Anrufliste. Es werden dann keine Anruf-Events mehr verarbeitet und die Liste nicht weiter aktualisiert.
+    <br><br>
     M&ouml;gliche Werte: 0 => Anrufliste ist aktiv, 1 => Anrufliste ist deaktiviert.<br>
     Standardwert ist 0 (aktiv)<br><br>
     <li><a name="disableForIntervals">disableForIntervals</a></li>
@@ -1195,6 +1235,16 @@ sub FB_CALLLIST_returnTableHeader($)
     Standardwert ist <i>nicht gesetzt</i> (alle internen Rufnummern werden angezeigt)
     <br>
     <br>
+    <li><a name="external-mapping">external-mapping</a> &lt;hash&gt;</li>
+    Definiert eine eigene Zuordnung der externen Anschlussbezeichnung (Reading: external_connection) zu eigenen Bezeichnungen. Die Zuordnung erfolgt &uuml;ber eine Hash-Struktur.<br><br>
+    z.B.<br>
+    <ul>
+    <code>attr &lt;name&gt; external-mapping {'ISDN' =&gt; 'Festnetz', 'SIP0' =&gt; 'Anbieter A', 'SIP1' => 'Anbieter B'}</code>
+    </ul><br>   
+    Die jeweils zugeordnete Bezeichnung wird in der Anrufliste dann entsprechend angezeigt anstatt des originalen Werten von FB_CALLMONITOR.
+    <br><br>
+    Standardwert ist  <i>nicht gesetzt</i> (Keine Zuordnung, es werden die Originalwerte verwendet)
+    <br><br>
     <li><a name="connection-mapping">connection-mapping</a> &lt;hash&gt;</li>
     Definiert eine eigene Zuordnung der Endger&auml;te (Reading: internal_connection) zu eigenen Bezeichnungen. Die Zuordnung erfolgt &uuml;ber eine Hash-Struktur.<br><br>
     z.B.<br>
@@ -1228,7 +1278,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Im Normalfall wird der Status eines jeden Anrufs mit einem Icon angezeigt. Dazu muss das fhemSVG Icon-Set im iconpath-Attribut der entsprechenden FHEMWEB Instanz konfiguriert sein. Sollte man keine Icons w&uuml;nschen, so kann man diese hiermit abschalten. Der Status wird dann mittels Textzeichen dargestellt.<br><br>
     M&ouml;gliche Werte: 0 => keine Icons , 1 => benutze Icons<br>
     Standardwert ist 1 (benutze Icons)<br><br>
-    <li><a name="visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,connection,duration</li>
+    <li><a name="visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,external,connection,duration</li>
     Legt fest, welche Spalten in welcher Reihenfolge (von links nach rechts) in der Anrufliste angezeigt werden sollen.
     Es m&uuml;ssen nicht alle verf&uuml;gbaren Spalten angezeigt werden.
     Es kann auch eine Auswahl von einzelnen Spalten angezeigt werden.
@@ -1236,8 +1286,8 @@ sub FB_CALLLIST_returnTableHeader($)
     Die m&ouml;glichen Werte repr&auml;sentieren die jeweilige Spalte.
     Der Wert "row" steht f&uuml;r die Zeilennummer innerhalb der Liste.
     <br><br>
-    M&ouml;gliche Werte: Eine Kombination der folgenden Werte in der gew&uuml;nschten Reihenfolge: <code>row,state,timestamp,name,number,internal,connection,duration</code><br>
-    Standardwert ist "row,state,timestamp,name,number,internal,connection,duration" (Anzeige aller Spalten)<br><br>
+    M&ouml;gliche Werte: Eine Kombination der folgenden Werte in der gew&uuml;nschten Reihenfolge: <code>row,state,timestamp,name,number,internal,external,connection,duration</code><br>
+    Standardwert ist "row,state,timestamp,name,number,internal,external,connection,duration" (Anzeige aller Spalten)<br><br>
     <li><a name="no-heading">no-heading</a> 0,1</li>
     Sofern aktiviert, wird die &Uuml;berschriftenzeile ausserhalb der Liste inkl. Link auf die Detail-Seite der aktuellen Definition ausgeblendet.<br><br>
     M&ouml;gliche Werte: 0 => &Uuml;berschriftenzeile wird angezeigt , 1 => &Uuml;berschriftenzeile wird ausgeblendet<br>
@@ -1247,7 +1297,7 @@ sub FB_CALLLIST_returnTableHeader($)
   <a name="FB_CALLLISTevents"></a>
   <b>Generierte Events:</b><br><br>
   <ul>
-  Dieses Modul generiert keine Events oder Readings.
+  Dieses Modul generiert Readings/Events sofern das Attribut <a href="#create-readings">create-readings</a> aktiviert ist. Die Anzahl, sowie der Name der Readings ist von den gew&auml;hlten Spalten (Attribut: <a href="#visible-columns">visible-columns</a>), sowie der Anzahl der anzuzeigenden Anrufe abh&auml;ngig (Attribut: <a href="#number-of-calls">number-of-calls</a>).
   </ul>
 </ul>
 =end html_DE
