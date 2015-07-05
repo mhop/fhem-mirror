@@ -6385,8 +6385,8 @@ sub CUL_HM_getKeys($) { #in: device-hash out:highest index, hash with keys
 
     foreach my $i (1..3){
       my ($kNo,$k) = split(":",AttrVal($vccu,"hmKey".($i== 1?"":$i),""));
-      $kNo = hex($kNo);
       if (defined($k)) {
+        $kNo = hex($kNo);
         $keys{$kNo} = pack("H*", $k);
         $highestIdx = $kNo if ($kNo > $highestIdx);
       }
