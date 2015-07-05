@@ -962,7 +962,15 @@ sub CUL_HM_Notify(@){#################################
   return undef if (grep !/INITIALIZED/,@{$events});
   delete $modules{CUL_HM}{NotifyFn};
   CUL_HM_updateConfig("startUp");
+  InternalTimer(gettimeofday()+7,"CUL_HM_setupHMLAN", "initHMLAN", 0);
   return undef;
+}
+
+sub CUL_HM_setupHMLAN(@){#################################
+  foreach (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")){
+    $defs{$_}{helper}{io}{newChn} = 0;
+    CUL_HM_hmInitMsgUpdt($defs{$_}); #update device init msg for HMLAN
+  }
 }
 
 #+++++++++++++++++ msg receive, parsing++++++++++++++++++++++++++++++++++++++++
@@ -6379,13 +6387,13 @@ sub CUL_HM_getKeys($) { #in: device-hash out:highest index, hash with keys
   my $highestIdx = 0;
   my %keys = ();
   $keys{0} = pack("H*", "A4E375C6B09FD185F27C4E96FC273AE4"); #index 0: eQ-3 default
-  if (defined($hash->{IODev}->{owner_CCU})) {
-    my $vccu = $hash->{IODev}->{owner_CCU};
-    $vccu = $hash->{IODev}->{NAME} if(!AttrVal($vccu,"hmKey",""));# if keys are not in vccu
-
+      
+  my $vccu = $hash->{IODev}->{owner_CCU};
+  $vccu = $hash->{IODev}->{NAME} if(!defined($vccu) || !AttrVal($vccu,"hmKey",""));# if keys are not in vccu
+  if (defined($vccu)) {
     foreach my $i (1..3){
       my ($kNo,$k) = split(":",AttrVal($vccu,"hmKey".($i== 1?"":$i),""));
-      if (defined($k)) {
+      if (defined($kNo) && defined($k)) {
         $kNo = hex($kNo);
         $keys{$kNo} = pack("H*", $k);
         $highestIdx = $kNo if ($kNo > $highestIdx);
