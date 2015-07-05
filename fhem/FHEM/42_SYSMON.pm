@@ -203,7 +203,7 @@ SYSMON_Define($$)
 
   #$hash->{DEF_TIME} = time() unless defined($hash->{DEF_TIME});
 
-  SYSMON_updateCurrentReadingsMap($hash);
+  #SYSMON_updateCurrentReadingsMap($hash);
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
@@ -242,6 +242,11 @@ sub
 SYSMON_updateCurrentReadingsMap($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  
+  if( AttrVal($name, "disable", "") eq "1" ) {
+    return undef;
+  }
+
   my $rMap;
   
   # Map aktueller Namen erstellen
