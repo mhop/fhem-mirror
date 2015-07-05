@@ -1934,7 +1934,7 @@ sub CUL_HM_Parse($$) {#########################################################
         }
 
         CUL_HM_calcDisWm($chnHash,$devH->{NAME},$type);
-        if (CUL_HM_getAttrInt($name,"aesCommReq") == 1){
+        if (AttrVal($btnName,"aesCommReq",0)){
           my @arr = ();
           $devH->{cmdStacAESPend} = \@arr;
           push (@{$devH->{cmdStacAESPend} },"$src;++A011$id$src$_")
