@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLMONITOR: new attribute "external-mapping", new column for 
+             external_connection reading (see commandref for details, by Michael)
   - feature: Dashboard: release version 3.0
   - bugfix: SYSMON: 'disable' not working at FHEM-start
   - bugfix: Text2Speech: ogg/wav as direkt mp3files are now possible 
