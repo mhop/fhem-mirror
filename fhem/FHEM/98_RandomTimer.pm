@@ -166,7 +166,7 @@ sub RandomTimer_Exec($) {
        Log3 $hash, 3, "[".$hash->{NAME}."]"." ending   RandomTimer on $hash->{DEVICE}: "
           . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
           . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
-        RandomTimer_down($hash);
+       #RandomTimer_down($hash);
         RandomTimer_setState($hash);
         $hash->{active} = 0;
       }
@@ -395,19 +395,19 @@ sub RandomTimer_device_switch ($)
    Log3 $hash, 4, "[".$hash->{NAME}. "]"." command: $command";
 
    my $ret  = AnalyzeCommandChain(undef, $command);
-   Log3 ($hash, 3, $ret)                  if($ret)
+   Log3 ($hash, 3, "[$hash->{NAME}] ERROR: " . $ret . " SENDING " . $command) if($ret)
 }
 ########################################################################
 sub RandomTimer_isDisabled($) {
    my ($hash) = @_;
-
+   
    my $disable     = AttrVal($hash->{NAME}, "disable",     0 );
    my $disableCond = AttrVal($hash->{NAME}, "disableCond", "");
    
    $disable = $disable || eval ($disableCond);
    if ($@) {
       $@ =~ s/\n/ /g; 
-      Log3 ($hash, 3, "[$hash->{NAME}] " . $@);
+      Log3 ($hash, 3, "[$hash->{NAME}] ERROR: " . $@ . " EVALUATING " . $disableCond);
    }
    $disable = 0 if (!defined($disable));
    
