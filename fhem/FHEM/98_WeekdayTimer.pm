@@ -155,7 +155,7 @@ sub WeekdayTimer_Define($$) {
   $hash->{DEVICE}         = $device;
   $hash->{SWITCHINGTIMES} = \@switchingtimes;
   $attr{$name}{verbose}   = 4 if (!defined $attr{$name}{verbose} && $name =~ m/^tst.*/ );
- #$attr{$name}{verbose}   = 4;
+ #$attr{$name}{verbose}   = 4;  
 
   $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}} = $hash;
   
@@ -446,10 +446,15 @@ sub WeekdayTimer_SetTimerOfDay($) {
     my ($myHash) = @_;
     my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
     return if (!defined($hash));
-
+    
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time());
+    my $secSinceMidnight = 3600*$hour + 60*$min + $sec;    
+    
+    $hash->{SETTIMERATMIDNIGHT} = 1  if ($secSinceMidnight <= 10);
     WeekdayTimer_DeleteTimer($hash);
     WeekdayTimer_Profile    ($hash);
     WeekdayTimer_SetTimer   ($hash);
+    delete $hash->{SETTIMERATMIDNIGHT};
     
     WeekdayTimer_SetTimerForMidnightUpdate( { HASH => $hash} );
 }
@@ -459,13 +464,13 @@ sub WeekdayTimer_SetTimer($) {
   my $name = $hash->{NAME};
   
   my $now  = time();  
-
+  
   my $isHeating         = WeekdayTimer_isHeizung($hash);
-  my $switchInThePast   = AttrVal($name, "switchInThePast", 0);
+  my $swip              = AttrVal($name, "switchInThePast", 0);
+  my $switchInThePast   = ($swip || $isHeating) && !defined $hash->{SETTIMERATMIDNIGHT};
   
   Log3 $hash, 4, "[$name] Heating recognized - switch in the past activated" if ($isHeating);
-  Log3 $hash, 4, "[$name] no switch in the yesterdays because of the devices type($hash->{DEVICE} is not recognized as heating) - use attr switchInThePast" if (!($isHeating || $switchInThePast));
-  $switchInThePast = $switchInThePast || $isHeating;
+  Log3 $hash, 4, "[$name] no switch in the yesterdays because of the devices type($hash->{DEVICE} is not recognized as heating) - use attr switchInThePast" if (!$switchInThePast && !defined $hash->{SETTIMERATMIDNIGHT});
   
   my @switches = sort keys %{$hash->{profil}};
   if ($#switches < 0) {
@@ -473,7 +478,7 @@ sub WeekdayTimer_SetTimer($) {
      return; 
   }   
   
-  readingsSingleUpdate ($hash,  "state", "inactive", 1);
+  readingsSingleUpdate ($hash,  "state", "inactive", 1) if (!defined $hash->{SETTIMERATMIDNIGHT});
   for(my $i=0; $i<=$#switches; $i++) {
   
      my $idx = $switches[$i];
@@ -486,12 +491,17 @@ sub WeekdayTimer_SetTimer($) {
      my $secondsToSwitch = $timToSwitch - $now;
      
      my $isActiveTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $para);
-     readingsSingleUpdate ($hash,  "state",      "active",    1) if ($isActiveTimer);
+     readingsSingleUpdate ($hash,  "state",      "active",    1) 
+        if (!defined $hash->{SETTIMERATMIDNIGHT} && $isActiveTimer);
      
      if ($secondsToSwitch>-5) {
-        Log3 $hash, 4, "[$name]:setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$para" if($isActiveTimer);
+        Log3 $hash, 4, "[$name] setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$para" if($isActiveTimer);
         myInternalTimer ("$idx", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0);
      }
+  }
+  
+  if (defined $hash->{SETTIMERATMIDNIGHT}) {
+     return;
   }
   
   my ($idx, $aktTime,$aktParameter,$nextTime,$nextParameter) = 
@@ -540,7 +550,7 @@ sub WeekdayTimer_searchAktNext($$) {
         my ($stunde, $minute, $sekunde)   = split (":",$time);              
         my $epoch = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, $relativeDay);
 
-       #Log3 $hash, 3, "[$name] $time $time---->".FmtDateTime($epoch);
+       #Log3 $hash, 3, "[$name] $time---->".FmtDateTime($epoch);
   
         if ($epoch >= $now) {
            $nextTag       = $relWday;
@@ -579,23 +589,29 @@ sub WeekdayTimer_Update($) {
 
   # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
   if (WeekdayTimer_FensterOffen($hash, $newParam, $idx)) {
+     readingsSingleUpdate ($hash,  "state", "open window", 1);
      return;
   }
   
-  my $active = 1;
-     $active = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam);
-  Log3 $hash, 4, "[$name]:Update   - timer seems to be active today: ".join("",@$tage)."|$time|$newParam" if($active);
+  my $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam);
+  Log3 $hash, 4, "[$name] Update   - timer seems to be active today: ".join("",@$tage)."|$time|$newParam" if($activeTimer);
   
-  # ggf. Device schalten
-  WeekdayTimer_Device_Schalten($hash, $newParam, $tage);
-
   my ($indx, $aktTime,  $aktParameter, $nextTime, $nextParameter) =
      WeekdayTimer_searchAktNext($hash, time()+5);
+
+  if ($newParam ne $aktParameter ) {
+    #Log3 $hash, 3, "[$name]*Update   - $newParam overwritten by $aktParameter (" . FmtDateTime($aktTime). ")"; 
+     Log3 $hash, 3, "[$name] Update   - $newParam overwritten by $aktParameter (" . FmtDateTime($aktTime). ")" if($activeTimer); 
+     $newParam = $aktParameter;
+  }   
+
+  # ggf. Device schalten
+  WeekdayTimer_Device_Schalten($hash, $newParam, $tage)   if($activeTimer);
      
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", FmtDateTime($nextTime));
   readingsBulkUpdate ($hash,  "nextValue",  $nextParameter);
-  readingsBulkUpdate ($hash,  "state",      $active ? $newParam : "inactive" );
+  readingsBulkUpdate ($hash,  "state",      $activeTimer ? $newParam : "inactive" );
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
 
   return 1; 
@@ -684,7 +700,7 @@ sub WeekdayTimer_FensterOffen ($$$) {
         Log3 $hash, 3, "[$name] switch of $hash->{DEVICE} delayed - $verzoegerteAusfuehrungCond is TRUE";
      }
      myRemoveInternalTimer("Update", $hash);
-     myInternalTimer      ("$time",  time()+60, "$hash->{TYPE}_Update", $hash, 0);
+     myInternalTimer      ("$time",  time()+55+int(rand(10)), "$hash->{TYPE}_Update", $hash, 0);
      $hash->{VERZOEGRUNG} = 1;
      return 1
   }
@@ -734,7 +750,7 @@ sub WeekdayTimer_FensterOffen ($$$) {
                        Log3 $hash, 3, "[$name] switch of $hash->{DEVICE} delayed - sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'";
                     }
                     myRemoveInternalTimer("Update", $hash);
-                    myInternalTimer      ("$time",  time()+60, "$hash->{TYPE}_Update", $hash, 0);
+                    myInternalTimer      ("$time",  time()+55+int(rand(10)), "$hash->{TYPE}_Update", $hash, 0);
                     $hash->{VERZOEGRUNG} = 1;
                     return 1
                  }
@@ -762,9 +778,11 @@ sub WeekdayTimer_Device_Schalten($$$) {
   
   $command = "set @ " . $setModifier . " %";
   $command = $hash->{COMMAND}   if (defined $hash->{COMMAND});
- 
-  my $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam); 
 
+#ort!!! vorverlegt
+ #my $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam); 
+  my $activeTimer = 1;
+  
   my $isHeating = $setModifier gt "";
   my $aktParam  = ReadingsVal($hash->{DEVICE}, $setModifier, "");
      $aktParam  = sprintf("%.1f", $aktParam)   if ($isHeating && $aktParam =~ m/^[0-9]{1,3}$/i);
