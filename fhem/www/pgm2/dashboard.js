@@ -212,9 +212,9 @@ function restoreOrder(ActiveTabId) {
 
  //--------------------------------------------- Set Row and Column Settings --------------------------------------------------------------------------------------------
  $("#dashboard").width(params[1]);
- if (ActiveTab.has("#dashboard_rowtop_tab"+ActiveTabId).length){ $("#dashboard_rowtop_tab"+ActiveTabId).height(params[8]);  }
- if (ActiveTab.has("#dashboard_rowcenter_tab"+ActiveTabId).length){ $("#dashboard_rowcenter_tab"+ActiveTabId).height(params[5]); } 
- if (ActiveTab.has("#dashboard_rowbottom_tab"+ActiveTabId).length){ $("#dashboard_rowbottom_tab"+ActiveTabId).height(params[9]); } 
+ if (ActiveTab.has("#dashboard_rowtop_tab"+ActiveTabId).length){ $("#dashboard_rowtop_tab"+ActiveTabId).css('min-height', params[8] + 'px');  }
+ if (ActiveTab.has("#dashboard_rowcenter_tab"+ActiveTabId).length){ $("#dashboard_rowcenter_tab"+ActiveTabId).css('min-height', params[5] + 'px'); } 
+ if (ActiveTab.has("#dashboard_rowbottom_tab"+ActiveTabId).length){ $("#dashboard_rowbottom_tab"+ActiveTabId).css('min-height', params[9] + 'px'); } 
 
  for (var i = 0, n = colCount; i <= n; i++) {  
 	if (ActiveTab.has("#dashboard_tab"+ActiveTabId+"column"+i).length) { $("#dashboard_tab"+ActiveTabId+"column"+i).width(aColWidth[i]+"%"); }
