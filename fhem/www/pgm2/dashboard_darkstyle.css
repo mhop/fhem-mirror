@@ -9,7 +9,7 @@
 
 /* Dashboard
 ------------------------------------------------------------------------*/
-#dashboard {margin-top: -20px;}
+#dashboard {margin-top: -10px;}
 #dashboard .dashboard_column { float: left; }
 #dashboard .dashboard_columnhelper { border: 1px dotted #CCCCCC;}
 #dashboard .dashboard_widgetinner .block .block {border: none; box-shadow: none;}
