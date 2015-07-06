@@ -715,7 +715,7 @@ sub CUL_HM_Attr(@) {#################################
       CUL_HM_UpdtCentral($name);
     }
     else{
-      CUL_HM_hmInitMsg($hash) if ($init_done);
+      CUL_HM_hmInitMsg($hash);
     }
     $attr{$name}{$attrName} = $attrVal if ($cmd eq "set");
   }
@@ -753,11 +753,6 @@ sub CUL_HM_Attr(@) {#################################
     }
     else{                    $hash->{protCondBurst} = "forced_off";}
     delete $hash->{helper}{rxType}; # needs new calculation
-  }
-  elsif($attrName eq "IODev"){
-    if ($cmd eq "set"){
-      return "use $attrName only for device" if (!$hash->{helper}{role}{dev});
-    }
   }
   elsif($attrName eq "IOList"){
     return "use $attrName only for vccu device" 
@@ -859,7 +854,6 @@ sub CUL_HM_Attr(@) {#################################
     return $retVal;
   }
   
-  
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
 }
@@ -897,6 +891,7 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   #p[1]: 00000010 = data pending - autosend wakeup and lazyConfig
   #                   if device send data
   #p[2]: is this the number of the AES key to be used? 
+  return if (!$init_done);
   my ($hash)=@_;
   my $rxt = CUL_HM_getRxType($hash);
   my $id = CUL_HM_hash2Id($hash);
@@ -969,7 +964,7 @@ sub CUL_HM_Notify(@){#################################
 sub CUL_HM_setupHMLAN(@){#################################
   foreach (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")){
     $defs{$_}{helper}{io}{newChn} = 0;
-    CUL_HM_hmInitMsgUpdt($defs{$_}); #update device init msg for HMLAN
+    CUL_HM_hmInitMsg($defs{$_}); #update device init msg for HMLAN
   }
 }
 
