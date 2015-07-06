@@ -276,6 +276,7 @@ ZWDongle_Set($@)
   Log3 $hash, 4, "ZWDongle set $name $type ".join(" ",@a);
   if($type eq "reopen") {
     return if(AttrVal($name, "dummy",undef) || AttrVal($name, "disable",undef));
+    delete $hash->{NEXT_OPEN};
     DevIo_CloseDev($hash);
     sleep(1);
     DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
@@ -589,7 +590,7 @@ ZWave_ProcessSendStack($)
     ZWDongle_shiftSendStack($hash, 1, "ERROR: max send retries reached");
   }
   
-  return if(!@{$hash->{SendStack}} || $hash->{WaitForAck});
+  return if(!@{$hash->{SendStack}} || $hash->{WaitForAck} || !$hash->{FD});
   
   my $msg = $hash->{SendStack}->[0];
 
