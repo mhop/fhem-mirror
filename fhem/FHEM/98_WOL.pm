@@ -230,11 +230,11 @@ sub WOL_wake($){
   
   Log3 $hash, 4, "[$name] keeping $name with MAC $mac IP $host busy";
 
-  if ($hash->{MODE} ~~ ["BOTH", "EW" ] ) {
+  if ($hash->{MODE} eq "BOTH" || $hash->{MODE} eq "EW"  ) {
      WOL_by_ew ($hash, $mac);
      readingsBulkUpdate   ($hash, "packet_via_EW", $mac);
   }
-  if ($hash->{MODE} ~~ ["BOTH", "UDP"] ) {
+  if ($hash->{MODE} eq "BOTH" || $hash->{MODE} eq "UDP"  ) {
      WOL_by_udp ($hash, $mac, $host);
      readingsBulkUpdate   ($hash, "packet_via_UDP", $host);
   }
