@@ -25,7 +25,7 @@ yowsup_Initialize($)
   #$hash->{GetFn}    = "yowsup_Get";
   $hash->{AttrFn}   = "yowsup_Attr";
   $hash->{AttrList} = "disable:1 ";
-  $hash->{AttrList} .= "acceptFrom cmd home ". $readingFnAttributes;
+  $hash->{AttrList} .= "acceptFrom cmd home nickname ". $readingFnAttributes;
 }
 
 #####################################
@@ -181,6 +181,7 @@ yowsup_Connect($)
     InternalTimer(gettimeofday()+20, "yowsup_Connect", $hash, 0);
   }
 }
+
 sub
 yowsup_Disconnect($)
 {
@@ -334,6 +335,9 @@ yowsup_Parse($$)
     if( $hash->{WAITING_FOR_LOGIN} ) {
       yowsup_Write( $hash, '/L' );
       yowsup_Write( $hash, '/presence available' );
+
+      yowsup_Write( $hash, "/presence name '". AttrVal($name, 'nickname', "") ."'" ) if(defined(AttrVal($name, 'nickname', undef)));
+
       #yowsup_Write( $hash, '/ping' );
 
       delete $hash->{WAITING_FOR_LOGIN};
@@ -554,6 +558,9 @@ yowsup_Attr($$$)
       set $HOME for the started yowsup process<br>
       PWD -> set to $PWD<br>
       anything else -> use as $HOME</li>
+
+    <li>nickname<br>
+      nickname that will be send as sender</li>
 
     <li>accept_from<br>
       comma separated list of contacts (numbers) from which messages will be accepted</li>
