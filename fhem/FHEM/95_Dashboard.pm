@@ -115,7 +115,7 @@ my %group;
 my $dashboard_groupListfhem;
 my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
-my $dashboardversion = "2.13";
+my $dashboardversion = "3.00";
 my @fhemweb_instances = ();
 
 
