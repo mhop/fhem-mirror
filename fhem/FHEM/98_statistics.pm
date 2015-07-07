@@ -100,8 +100,8 @@ sub statistics_UpdateDevReading($$$$);
 
 ##############################################################
 
-sub ##########################################
-statistics_Log($$$)
+##########################################
+sub statistics_Log($$$)
 {
    my ( $hash, $loglevel, $text ) = @_;
    my $xline       = ( caller(0) )[2];
@@ -114,8 +114,8 @@ statistics_Log($$$)
    Log3 $instName, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
 }
 
-sub ##########################################
-statistics_Initialize($)
+##########################################
+sub statistics_Initialize($)
 {
   my ($hash) = @_;
 
@@ -142,8 +142,7 @@ statistics_Initialize($)
 }
 
 ##########################
-sub
-statistics_Define($$)
+sub statistics_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
@@ -171,8 +170,8 @@ statistics_Define($$)
   return undef;
 }
 
-sub ########################################
-statistics_Undefine($$)
+########################################
+sub statistics_Undefine($$)
 {
   my ($hash, $arg) = @_;
 
@@ -181,8 +180,8 @@ statistics_Undefine($$)
   return undef;
 }
 
-sub ########################################
-statistics_Set($$@)
+########################################
+sub statistics_Set($$@)
 {
   my ($hash, $name, $cmd, $val) = @_;
   my $resultStr = "";
@@ -283,7 +282,6 @@ sub statistics_Notify($$)
    return;
 }
 
-
 ########################################
 sub statistics_PeriodChange($)
 {
@@ -373,7 +371,6 @@ sub statistics_DoStatisticsAll($$)
    
    if ($periodSwitch != 0 ) { WriteStatefile(); }
 }
-
 
 ##########################
 sub statistics_DoStatistics($$$)
@@ -484,8 +481,8 @@ sub statistics_DoStatistics($$$)
 }
 
 # Calculates Min/Average/Max Values
-sub ######################################## 
-statistics_doStatisticMinMax ($$$$$) 
+########################################
+sub statistics_doStatisticMinMax ($$$$$) 
 {
    my ($hash, $dev, $readingName, $periodSwitch, $doHourly) = @_;
    my $name = $hash->{NAME};
@@ -586,7 +583,6 @@ sub statistics_doStatisticMinMaxSingle ($$$$$$)
    return;
 }
 
-
 # Calculates tendency values 
 ######################################## 
 sub statistics_doStatisticTendency ($$$) 
@@ -656,7 +652,6 @@ sub statistics_doStatisticTendency ($$$)
    return ;
 }
 
-
 # Calculates deltas for day, month and year
 ######################################## 
 sub statistics_doStatisticDelta ($$$$) 
@@ -683,22 +678,24 @@ sub statistics_doStatisticDelta ($$$$)
    my @hidden; my @stat; my @last;
    my $firstRun = not exists($hash->{READINGS}{$hiddenReadingName});
 
-   if ( $firstRun ) { 
   # Show since-Value and initialize all readings
+   if ( $firstRun ) { 
       $showDate = 8;
       @stat = split / /, "Hour: 0 Day: 0 Month: 0 Year: 0";
       $stat[9] = strftime "%Y-%m-%d_%H:%M:%S", localtime();
       @last = split / /,  "Hour: - Day: - Month: - Year: -";
       statistics_Log $hash, 4, "Initializing statistic of '$hiddenReadingName'.";
-   } else {
+   } 
   # Do calculations if hidden reading exists
+   else {
       @stat = split / /, $dev->{READINGS}{$statReadingName}{VAL};
       @hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
       $showDate = $hidden[3];
       $decPlaces = statistics_maxDecPlaces($value, $hidden[5]);
       if (exists ($dev->{READINGS}{$statReadingName."Last"})) { 
          @last = split / /,  $dev->{READINGS}{$statReadingName."Last"}{VAL};
-      } else {
+      } 
+      else {
          @last = split / /,  "Hour: - Day: - Month: - Year: -";
       }
       my $deltaValue = $value - $hidden[1];
@@ -800,7 +797,8 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
    my $name = $hash->{NAME};
    
    my $specialPeriod = AttrVal($name, "specialDeltaPeriodHours", 0);
-   return if $specialPeriod == 0;
+   
+   return   if $specialPeriod == 0;
 
    my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . "SpecialPeriod";
    my $hiddenReadingName = ".".$dev->{NAME} . ":" . $readingName . "SpecialPeriod";
@@ -812,10 +810,9 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
 
    unshift @hidden, $value;
       statistics_Log $hash, 4, "Add $value to $hiddenReadingName";
-   while ( $#hidden > $specialPeriod ) 
-   { 
+   while ( $#hidden > $specialPeriod ) { 
       my $lastValue = pop @hidden;
-      statistics_Log $hash, 4, "Remove last value '$lastValue' from '$hiddenReadingName'";
+         statistics_Log $hash, 4, "Remove last value '$lastValue' from '$hiddenReadingName'";
    }
    
   # Calculate specialPeriodValue
@@ -828,7 +825,49 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
   # Store hidden stack
    $result = join( " ", @hidden );
    readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
-   statistics_Log $hash, 4, "Set '$hiddenReadingName = $result'";
+      statistics_Log $hash, 4, "Set '$hiddenReadingName = $result'";
+
+}
+
+# Calculates deltas for period of several hours
+######################################## 
+sub statistics_doStatisticSpecialPeriod2 ($$$$$) 
+{
+   my ($hash, $dev, $readingName,$statType, $period, $decPlaces, $value) = @_;
+   my $name = $hash->{NAME};
+   
+   my $specialPeriod = AttrVal($name, "specialPeriod", "");
+   
+   return   unless $specialPeriod;
+
+   if ("$devName:$readingName:$statType:$period=([\d:]+)" =~ /^($specialPeriod)$/) {
+
+   my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . ucfirst($statType) . ucfirst($period);
+   my $hiddenReadingName = ".".$dev->{NAME} . ":" . $readingName . ":" . $statType . ":" . $period;
+
+  # Update hidden stack
+   my @hidden = ();
+   if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) 
+      { @hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; }
+
+   unshift @hidden, $value;
+      statistics_Log $hash, 4, "Add $value to $hiddenReadingName";
+   while ( $#hidden > $specialPeriod ) { 
+      my $lastValue = pop @hidden;
+         statistics_Log $hash, 4, "Remove last value '$lastValue' from '$hiddenReadingName'";
+   }
+   
+  # Calculate specialPeriodValue
+   my $result = 0;
+   foreach (@hidden) { $result += $_; }
+   $result = sprintf "%.".$decPlaces."f", $result;
+   if ($#hidden != $specialPeriod) { $result .= " (".$#hidden.".hours)"; }
+   readingsBulkUpdate($dev, $statReadingName, $result, 1);
+   
+  # Store hidden stack
+   $result = join( " ", @hidden );
+   readingsSingleUpdate($hash, $hiddenReadingName, $result, 0);
+      statistics_Log $hash, 4, "Set '$hiddenReadingName = $result'";
 
 }
 
@@ -872,16 +911,17 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    my $firstRun = not exists($hash->{READINGS}{$hiddenReadingName});
    my $lastState;
    
-   if ( $firstRun ) { 
   # Show since-Value
+   if ( $firstRun ) { 
       $hidden{"showDate:"} = 1;
       $saveLast = 0;
       $lastState = $state;
       $hidden{"(since:"} = strftime ("%Y-%m-%d_%H:%M:%S)",localtime()  );
       $hidden{$state} = 0;
       $hidden{$state."_Count"} = 1; 
-   } else {
+   } 
   # Do calculations if hidden reading exists
+   else {
       %hidden = split / /, $hash->{READINGS}{$hiddenReadingName}{VAL}; # Internal values
       $lastState = $hidden{"lastState:"};
       my $timeDiff = int(gettimeofday())-$hidden{"lastTime:"};
@@ -894,21 +934,18 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    
   # Prepare new current reading, delete hidden reading if it is used again
    $result = "";
-   foreach my $key (sort keys %hidden)
-   {
+   foreach my $key (sort keys %hidden) {
       if ($key !~ /^(lastState|lastTime|showDate|\(since):$/) {
          # Create current summary reading
          $result .= " " if $result;
-         if ($key !~ /_Count:$/) 
-         {
+         if ($key !~ /_Count:$/) {
             #Store current value for single readings
             $stat{$key} = statistics_FormatDuration($hidden{$key});
             $result .= "$key ".$stat{$key};
             # Reset hidden reading if period change
             if ($saveLast) { delete $hidden{$key}; }
          }
-         else
-         {
+         else {
             $result .= "$key ".$hidden{$key};
             #Store current value for single readings
             $stat{$key} = $hidden{$key};
@@ -941,17 +978,14 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
    if ($singularReadings ne "") {
-      while (my ($statKey, $statValue) = each(%stat) )
-      {  
-         unless ($saveLast)
-         {
+      while (my ($statKey, $statValue) = each(%stat) ) {  
+         unless ($saveLast) {
             chop ($statKey);
             # statistics_storeSingularReadings  
             # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
             statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,$statKey,$period,$statValue,0,$saveLast);
          }
-         else
-         {
+         else {
             my $newValue = $hidden{$statKey};
             chop ($statKey);
             # statistics_storeSingularReadings  
@@ -959,12 +993,11 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
             statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,$statKey,$period,$newValue,$statValue,$saveLast);
          }
       }
-      
    }
 
   # Store hidden reading
    $result = "";
-   while (my ($key, $duration) = each(%hidden)){
+   while ( my ($key, $duration) = each(%hidden) ) {
       $result .= " " if $result;
       $result .= "$key $duration"; 
    }
@@ -974,26 +1007,24 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    return;
 }
 
-
 ####################
 sub statistics_storeSingularReadings ($$$$$$$$$$)
 {
    my ($hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast) = @_;
    return if $singularReadings eq "";
    
-   if ($statType =~ /Delta|Tendency/) { $statReadingName .= $period;}
-   else { $statReadingName .= $statType;}
+   if ($statType =~ /Delta|Tendency/) { $statReadingName .= $period; }
+   else { $statReadingName .= $statType; }
    my $devName=$dev->{NAME};
    if ("$devName:$readingName:$statType:$period" =~ /^($singularReadings)$/) {
       readingsBulkUpdate($dev, $statReadingName, $statValue, 1);
-      statistics_Log $hashName, 5, "Set ".$statReadingName." = $statValue";
+         statistics_Log $hashName, 5, "Set ".$statReadingName." = $statValue"; # Fehler um 24 Uhr
       if ($saveLast) {
          readingsBulkUpdate($dev, $statReadingName."Last", $lastValue, 1);
-         statistics_Log $hashName, 5, "Set ".$statReadingName."Last = $lastValue";
+            statistics_Log $hashName, 5, "Set ".$statReadingName."Last = $lastValue";
       } 
    }
 }
-
 
 ####################
 sub statistics_getStoredDevices ($)
@@ -1069,10 +1100,12 @@ sub statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
-(en | <a href="commandref_DE.html#statistics">de</a>)
+(en | <a href="http://fhem.de/commandref_DE.html#statistics">de</a>)
 <div style="width:800px">
 <ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
+   <br>
+   For detail instructions, look at and please maintain the <a href="http://www.fhemwiki.de/wiki/statistics"><b>FHEM-Wiki</b></a>.
   <br>
    Until now statistics for the following readings are automatically built:
    <ul>
@@ -1213,10 +1246,12 @@ sub statistics_UpdateDevReading($$$$)
 
 <a name="statistics"></a>
 <h3>statistics</h3>
-(<a href="commandref.html#statistics">en</a> | de)
+(<a href="http://fhem.de/commandref.html#statistics">en</a> | de)
 <div  style="width:800px">
 <ul>
   Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
+   <br>
+   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/Statistics"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
    <br>&nbsp;
    <br>
    Es unterscheidet in vier Statistik-Typen denen bereits standardm&auml;ssig Ger&auml;tewerte zugeordnet sind:
