@@ -42,7 +42,7 @@ SYSSTAT_Initialize($)
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
   $hash->{AttrList} = "disable:1 disabledForIntervals raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 ssh_user ";
-  $hash->{AttrList} .= " snmp:1";
+  $hash->{AttrList} .= " snmp:1 mibs" if( $SYSSTAT_hasSNMP );
   $hash->{AttrList} .= " filesystems showpercent";
   $hash->{AttrList} .= " useregex:1" if( $SYSSTAT_hasSysStatistics );
   $hash->{AttrList} .= " $readingFnAttributes";
@@ -285,24 +285,27 @@ SYSSTAT_GetUpdate($)
         push @snmpoids, sprintf( ".1.3.6.1.2.1.25.2.3.1.6.%i", $id );
       }
       my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
-      for my $id (@{$hash->{filesystems}}) {
-        my $unit = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.4.%i", $id )};
-        my $free = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.5.%i", $id )} - $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.6.%i", $id )};
+      if( $response ) {
+        for my $id (@{$hash->{filesystems}}) {
+          my $unit = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.4.%i", $id )};
+          my $free = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.5.%i", $id )} - $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.6.%i", $id )};
 
-       if( $showpercent ) {
-         $free =  100 * $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.6.%i", $id )} / $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.5.%i", $id )};
-         $free = sprintf( "%.1f", $free );
-       } else {
-         $free *= $unit;
-       }
-        my $name = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.3.%i", $id )};
-        if( $name =~ m/^([[:alpha:]]:\\)/ ) {
-          $name = $1
-        } else {
-          $name =~ s/ //g;
+         if( $showpercent ) {
+           $free =  100 * $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.6.%i", $id )} / $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.5.%i", $id )};
+           $free = sprintf( "%.1f", $free );
+         } else {
+           $free *= $unit;
+         }
+          my $name = $response->{sprintf( ".1.3.6.1.2.1.25.2.3.1.3.%i", $id )};
+          if( $name =~ m/^([[:alpha:]]:\\)/ ) {
+            $name = $1;
+            $name =~ s.\\./.g;
+          } else {
+            $name =~ s/ //g;
+          }
+
+          readingsBulkUpdate($hash,$name,$free);
         }
-
-        readingsBulkUpdate($hash,$name,$free);
       }
 
     } elsif( defined($hash->{diskusage} ) ) {
@@ -346,6 +349,25 @@ SYSSTAT_GetUpdate($)
           $temp = sprintf( "%.1f", (3 * ReadingsVal($name,"temperature",$temp) + $temp ) / 4 );
         }
       readingsBulkUpdate($hash,"temperature",$temp);
+    }
+  }
+
+  if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
+    if( my $mibs = AttrVal($name, "mibs", undef) ) {
+      my @snmpoids;
+      foreach my $entry (split(' ,', $mibs)) {
+        my($mib,undef) = split(':', $entry );
+        push @snmpoids, $mib;
+      }
+
+      my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
+
+      foreach my $entry (split(' ,', $mibs)) {
+        my($mib,$reading) = split(':', $entry );
+
+        my $result = $response->{$mib};
+        readingsBulkUpdate($hash,$reading,$result);
+      }
     }
   }
 
@@ -783,6 +805,8 @@ SYSSTAT_getStat($)
       <code>attr sysstat filesystems 1,3,5</code><br>
     </ul></li></lu>
     <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH-MM...</li>
+    <li>mibs<br>
+      space separated list of &lt;mib&gt;:&lt;reding&gt; pairs that sould be polled.</li>
     <li>showpercent<br>
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
     <li>snmp<br>
@@ -906,6 +930,8 @@ SYSSTAT_getStat($)
       <code>attr sysstat filesystems /dev/.*</code><br>
       <code>attr sysstat filesystems 1,3,5</code><br>
     </ul></li>
+    <li>mibs<br>
+      Leerzeichen getrennte Liste aus &lt;mib&gt;:&lt;reding&gt; Paaren die abgefragt werden sollen.</li>
     <li>showpercent<br>
       Wenn gesetzt, wird die Nutzung in Prozent angegeben. Wenn nicht gesetzt, wird der verf&uuml;bare
       Platz in Bytes angezeigt.</li>
