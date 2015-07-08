@@ -1124,6 +1124,7 @@ sub CUL_HM_Parse($$) {#########################################################
       if($mTp =~ m /^4[01]/){ #someone is triggered##########
         my $chn = hex($mI[0])& 0x3f;
         my $cName = CUL_HM_id2Name($src.sprintf("%02X",$chn));
+        $cName = CUL_HM_id2Name($src) if (!defined($defs{$cName}));
         my $bCnt = hex($mI[1]);
         push @evtEt,[$defs{$cName},1,"trig_aes_$dname:$aesStat:$bCnt"] 
               if (defined $defs{$cName});
