@@ -8,6 +8,74 @@ a {
   outline: 0;
 }
 
+body {
+  background: #e0e3e8 !important;
+}
+
+body.dashboard_fullsize #menuScrollArea {
+  display: none;
+}
+
+body.dashboard_fullsize #hdr {
+  display: none;
+}
+
+body.dashboard_fullsize #content {
+  position: inherit !important;
+  overflow: visible !important;
+  float: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0px !important;
+  border: none !important;
+}
+
+#dashboard .dashboard_rowcenter {
+  position: relative;
+}
+
+.dashboard_tabnav {
+-webkit-box-shadow: 0px 50px 50px -40px rgba(209,209,209,1), inset 0px -50px 70px -45px rgba(235,235,235,1);
+-moz-box-shadow: 0px 50px 50px -40px rgba(209,209,209,1), inset 0px -50px 70px -45px rgba(235,235,235,1);
+box-shadow: 0px 50px 50px -40px rgba(209,209,209,1), inset 0px -50px 70px -45px rgba(235,235,235,1);
+
+}
+ul.dashboard_tabcontent:before{
+  content: "";
+   display: block;
+   height: 2px;
+width:100%;
+margin-bottom: -2px;
+
+
+/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#e0e3e8+0,f3f3f3+10,f3f3f3+90,e0e3e8+100 */
+background: #e0e3e8; /* Old browsers */
+background: -moz-linear-gradient(left,  #e0e3e8 0%, #f3f3f3 10%, #f3f3f3 90%, #e0e3e8 100%); /* FF3.6+ */
+background: -webkit-gradient(linear, left top, right top, color-stop(0%,#e0e3e8), color-stop(10%,#f3f3f3), color-stop(90%,#f3f3f3), color-stop(100%,#e0e3e8)); /* Chrome,Safari4+ */
+background: -webkit-linear-gradient(left,  #e0e3e8 0%,#f3f3f3 10%,#f3f3f3 90%,#e0e3e8 100%); /* Chrome10+,Safari5.1+ */
+background: -o-linear-gradient(left,  #e0e3e8 0%,#f3f3f3 10%,#f3f3f3 90%,#e0e3e8 100%); /* Opera 11.10+ */
+background: -ms-linear-gradient(left,  #e0e3e8 0%,#f3f3f3 10%,#f3f3f3 90%,#e0e3e8 100%); /* IE10+ */
+background: linear-gradient(to right,  #e0e3e8 0%,#f3f3f3 10%,#f3f3f3 90%,#e0e3e8 100%); /* W3C */
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#e0e3e8', endColorstr='#e0e3e8',GradientType=1 ); /* IE6-9 */
+}
+table.dashboard_tabcontent:before{
+  content: "";
+   display: block;
+   height: 2px;
+width:100%;
+margin-bottom: 5px;
+/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#e0e3e8+10,d0d0d0+30,d0d0d0+70,e0e3e8+90 */
+background: #e0e3e8; /* Old browsers */
+background: -moz-linear-gradient(left,  #e0e3e8 10%, #d0d0d0 30%, #d0d0d0 70%, #e0e3e8 90%); /* FF3.6+ */
+background: -webkit-gradient(linear, left top, right top, color-stop(10%,#e0e3e8), color-stop(30%,#d0d0d0), color-stop(70%,#d0d0d0), color-stop(90%,#e0e3e8)); /* Chrome,Safari4+ */
+background: -webkit-linear-gradient(left,  #e0e3e8 10%,#d0d0d0 30%,#d0d0d0 70%,#e0e3e8 90%); /* Chrome10+,Safari5.1+ */
+background: -o-linear-gradient(left,  #e0e3e8 10%,#d0d0d0 30%,#d0d0d0 70%,#e0e3e8 90%); /* Opera 11.10+ */
+background: -ms-linear-gradient(left,  #e0e3e8 10%,#d0d0d0 30%,#d0d0d0 70%,#e0e3e8 90%); /* IE10+ */
+background: linear-gradient(to right,  #e0e3e8 10%,#d0d0d0 30%,#d0d0d0 70%,#e0e3e8 90%); /* W3C */
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#e0e3e8', endColorstr='#e0e3e8',GradientType=1 ); /* IE6-9 */
+
+}
+
 .ui-widget-overlay {background: #000000;opacity: .7;filter: Alpha(Opacity=30);position: fixed;top: 0;left: 0;width: 100%;height: 100%;}	
 .ui-corner-bottom,
 .ui-corner-top,
@@ -18,26 +86,23 @@ a {
 /* jQuery UI Fix*/
 #dashboardtabs, #dashboard_tabnav, .dashboard_tab, #dashboard-dialog .ui-widget-header {
   border: none !important;
-  background: none !important;
+  background: none;
 }
 
 /* Dashboard
 ------------------------------------------------------------------------*/
 .dashboardhidden { height:0px;}
-#dashboard {margin-top: -55px;}
-#dashboard .dashboard_column { float: left; }
+#dashboard .dashboard_column { float: left; min-width: 200px; }
 #dashboard .dashboard_columnhelper { border: 1px dotted #CCCCCC;}
 #dashboard .dashboard_row {
 	width: 100%; 
 	height:auto; 
+        min-height: 20px;
 	padding: 0;
 	overflow:inherit;
 }
 #dashboard input, #dashboard select {
 	margin:0px;
-}
-#dashboard  tr {
-	height:40px
 }
 #dashboard .dashboard_columncenter {height: inherit;}		
 #dashboard .dashboard_content { padding: 0.2em; }
@@ -79,17 +144,18 @@ top:  5px;
 background-color: #f5f5f5 !important;
 }
 #dashboard .dashboard-button-defineDetails{
-right: 0px; 
+right: 10px; top: 0px;
 background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyBpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBXaW5kb3dzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOkY4NjYwOTg0NEJFQzExRTI4MjI3OTFCOEEyNzY2MzE2IiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOkY4NjYwOTg1NEJFQzExRTI4MjI3OTFCOEEyNzY2MzE2Ij4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6Rjg2NjA5ODI0QkVDMTFFMjgyMjc5MUI4QTI3NjYzMTYiIHN0UmVmOmRvY3VtZW50SUQ9InhtcC5kaWQ6Rjg2NjA5ODM0QkVDMTFFMjgyMjc5MUI4QTI3NjYzMTYiLz4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7i4cyWAAAAsElEQVR42mJgoCEwA+IPUGxGrKZkIE6AsjOB+D8UZyKJReHTDNOwGoifIPEfAvFGJH4gIQMIYZyuWI3mCm8oRhZfhCvA0pCcvRGLmnVI3klDD9gPaE50gopvRDLMG00NSA8DCw6vcELpX0hifwnFeRrUef+hzsXlhSfYvMCA5GTkQPSAYvTAxQoyyYlGJiQDviOxFwPxCyQ+iL0eh1oUEA7EfniSciySPG0yE8kAIMAAicRYTX3YPyoAAAAASUVORK5CYII=') !important;
 }
 #dashboard .dashboard-button-setPosition{
-right: 34px; 
+right: 44px; top: 0px;
 background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAYUlEQVR4XtWRUQrAMAhDneyg9mT2ptugHRaCY/FnLJAveWKifCW7AS3Avlj2AmzrFUrDIYhgJNwvN4VcBDwiYC5/CyclBpDDoe2poATGEuegs3AswCUIk/8+pl2K8uE/6ATG4BstrVLVgQAAAABJRU5ErkJggg==') !important;}
+#dashboard .dashboard-button-setPosition:not(.ui-state-disabled) {background-color: red !important;}
 #dashboard .dashboard-button-goBack{
-right: 102px; 
+right: 112px; top: 0px; 
 background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAAZ0lEQVQ4jd3RMQqDQBBA0YekV0wj3v8QNqZTJBEtPY42K9l2p0s+TDHF/zAMf8kTE4aovOPEp1TucGRyE5XXUhnmJJfMCFUKVMp55EuLzfeENhBUY0mRA30kkr/xHQnckQWvaODHuADAUSEXjMLoMwAAAABJRU5ErkJggg==') !important;}
 #dashboard .dashboard-button-editTab{
-right: 68px; 
+right: 78px; top: 0px;
 background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABOklEQVR42o3SPUhCURjG8WPR1tBgU23SEEH0AUFDSURDtFU4FOQSQh9LlDgEUdSiU7QUuSq0RCAIYhTl0JCUIEFLRUQ1NLWIEGX9D74XRPJ4XvjB5V7Oc8597nUpuxnDBDbxWfnAZbG4Ce9w4xmzuLINaEALlrGBRnxjCzs2AWF4MA0vYmjHL7pwbwoYRxz9COABJ9jDG0KmE7Qhh0U5chR9mJSQF1MH+j3PcYcIbuFHM3bRjQ9TwLZ8smGcSuP7yMIn91StgFEcYwDzUpy+d4kU1qt3qwxoRR6rqvyzxKTAFfRgBD+mAF3clJxAF7iAEg7Ri9f/2nYCBmXBkjTdiQPcYA7JWt/aCdDveoFHzOAaR7LrmjJMdYCeL1X+baPSRckmYAgZuS4gLTs/qTrjBHQgiATOUKy30Jk/KjtDEXVEBowAAAAASUVORK5CYII=');}
 #dashboard .ui-button, #dashboard .ui-button:active {text-decoration: none;}
 #dashboard .ui-button .ui-button-text {display: block;line-height: normal;}
@@ -99,6 +165,7 @@ background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAY
 #dashboard .ui-resizable-se { cursor: se-resize;width: 12px; height: 12px; right: 1px;bottom: 1px; background-image: url('data:image/gif;base64,R0lGODlhEAAQAIABAJOnY////yH5BAEAAAEALAAAAAAQABAAAAIZjI+py+0IwDtx2ktlqI1zDCae9mXGGKZgAQA7');}
 #dashboard .ui-sortable-placeholder {border: 1px dotted #FFFFFF;  visibility: visible !important; height: 25px !important; width: 150px;}		
 #dashboard .block.wide {border-radius: 5px;}
+#dashboard .dashboard_widgetinner .block .block {border: none; box-shadow: none;}
 #dashboard .dashboard_tabcontent {width: 100%; padding: 0; margin: 0; }
 #dashboard .dashboard_widget {border-radius: 8px; float: left;} 
 #dashboard .dashboard_widgethelper {background-color: none; }	
@@ -117,13 +184,21 @@ padding:10px 0px 0px 3px;
 #dashboard .ui-helper-reset {margin: 0;padding: 0;border: 0;outline: 0;line-height: 2.5;text-decoration: none;font-size: 100%;list-style: none; background: none;}
 
 #dashboard .ui-tabs {
-	position: relative;
+	padding: 0px;
 }
 #dashboard .ui-tabs .ui-tabs-panel {display: block;border-width: 0;background: none;box-shadow: 0 0 0 0;border-radius: 0; padding: 0;}
-#dashboard .ui-tabs .ui-tabs-nav {margin: 0;padding: 0.2em 0.2em 0.4em;}
+#dashboard .ui-tabs .ui-tabs-nav {margin: 0;padding: 0.2em 140px 0.2em 0.2em;}
 #dashboard .ui-tabs .ui-tabs-nav li {
-list-style: none;float: left;position: relative;top: 0;margin: 1px .2em 0 0;padding: 2px;
-text-align:center; width:75px;}
+list-style: none;
+float: left;
+position: relative;
+top: 0;
+margin: 1px .2em 0 0;
+padding: 2px 5px;
+text-align:center; 
+ white-space: pre-line; 
+ width:100px;
+   line-height: 1.5;}
 #dashboard .ui-tabs .ui-tabs-nav li a {padding:0;}
 #dashboard .ui-tabs .ui-tabs-nav .ui-tabs-anchor {
 		font-weight:bold;
@@ -131,6 +206,8 @@ color:#000000;
 font-size:10px;
 text-shadow: 0px 1px #ffffff;
 word-wrap:break-word;
+  margin-bottom: 5px;
+  float: none;
 	}
 #dashboard .ui-tabs-icon {
 fill:#FFFFFF;
@@ -153,13 +230,17 @@ background-repeat:no-repeat;
 border-radius:7.5px;
 border: 1px solid #666666;
 display:block;
+-webkit-box-reflect: below 0px -webkit-gradient(linear, left top, left bottom, from(transparent), color-stop(75%, transparent) , to(rgba(250, 250, 250, 0.15)));
+margin-bottom: 10px;
+margin-top: 5px;
 }
-#ui-id-1 .ui-tabs-icon, #ui-id-2 .ui-tabs-icon, #ui-id-3 .ui-tabs-icon, #ui-id-4 .ui-tabs-icon, #ui-id-5 .ui-tabs-icon, #ui-id-6 .ui-tabs-icon, #ui-id-7 .ui-tabs-icon {
-background-color:#4b6dab;
+
+#dashboard .dashboard_tab .ui-tabs-icon {
+  background-color:#4b6dab;
 }
 
 #dashboard .ui-widget-header .ui-state-active .ui-tabs-icon {
-background-color:#777777;
+background-color:#000000;
 }
 #dashboard .ui-widget-header .ui-state-hover .ui-tabs-icon { 
 background-color:#777777;
@@ -273,3 +354,82 @@ border: 1px #999999 solid;
 .evo-cHist div {cursor: pointer;border: solid 1px #c0c0c0;padding: 3px;margin: 5px;width: 10px;height: 10px;float: left;}
 a.evo-hist {margin-left: 6px;}
 .evo-pointer {cursor: pointer;visibility:hidden;position:absolute;}
+
+/* Make readingGroups 100% wide */
+#dashboard td table {
+  width: 100%;
+}
+
+#dashboard .dashboard_dev_container > table > tbody > tr > td {
+  padding: 0px;
+}
+
+.col2 {
+  text-align: center;
+}
+
+.dashboard_widgetheader svg {
+  margin-right: 5px;
+}
+
+.dashboard_row .dashboard_widget {
+	max-width: 100%;
+}
+
+/* Small devices */
+@media screen and (max-width: 480px) {
+	.dashboard_tabnav {
+		position: absolute !important;
+		min-height: 40px;
+		width: 100%;
+		padding: 5px 0;
+		padding-right: 0px !important;
+		z-index: 100000;
+		top: -86px;
+	}
+	#dashboardtabs {
+		margin-top: 86px;
+		position: relative;
+	}
+	.dashboard_tabnav li {
+		display: none; /* hide all <li> items */
+		margin: 0;
+	}
+	.dashboard_tabnav .ui-state-active {
+		display: block; /* show only current <li> item */
+	}
+	.dashboard_tabnav a {
+		display: block;
+		padding: 5px 5px 5px 32px;
+	}
+	.dashboard_tabnav .ui-state-active a {
+		color: #666;
+	}
+
+	/* on nav hover */
+	.dashboard_tabnav:hover {
+		padding-right: 0px !important;
+		height: 300px;
+		overflow: auto;
+		background-color: #e0e3e8 !important;
+	}
+	.dashboard_tabnav:hover .dashboard-button {
+		visibility: hidden;
+	}
+	.dashboard_tabnav:hover li {
+		display: table-cell;
+		float: none;
+		margin: 0 0 5px;
+	}
+
+	.dashboard_tabnav:hover .ui-state-active {
+	}
+
+	.dashboard .dashboard_widget {
+		width: 100% !important;
+	}
+
+	.dashboard_row .dashboard_column {
+		width: 100% !important;
+	}
+}
