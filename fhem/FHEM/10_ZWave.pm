@@ -1508,7 +1508,7 @@ ZWave_secureInit(@)
     return undef;       # No Event/Reading
 
   } elsif($status == 3) {
-    IOWrite($hash, "secKey ACK", "");
+    #IOWrite($hash, "secKey ACK", "");
     ZWave_Set($hash, $name, "secNonce");
     return undef;       # No Event/Reading
 
