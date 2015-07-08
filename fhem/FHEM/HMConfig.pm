@@ -1471,7 +1471,6 @@ $culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
 $culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
-$culHmSubTypeSets{powerMeter}      = $culHmSubTypeSets{outputUnit};
 
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
@@ -1627,6 +1626,7 @@ $culHmChanSets{"HM-SEN-EP01"}           = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-SEN-EP02"}           = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{"THSensor"};
 $culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{"THSensor"};
+$culHmChanSets{"HM-ES-PMSw1-Pl01"}      = $culHmSubTypeSets{outputUnit};
 
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{"blindActuator"};
 
