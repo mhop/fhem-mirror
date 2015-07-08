@@ -190,7 +190,7 @@ IT_Set($@)
   }
 
   return SetExtensions($hash, $list, $name, @a) if( $a[0] eq "?" );
-  return SetExtensions($hash, $list, $name, @a) if( !grep( $_ =~ /^$a[0]($|:)/, split( ' ', $list ) ) );
+  return SetExtensions($hash, $list, $name, @a) if( !grep( $_ =~ /^\Q$a[0]\E($|:)/, split( ' ', $list ) ) );
 
   
 
@@ -367,8 +367,6 @@ IT_Set($@)
             $lh->{READINGS}{state}{VAL} = $v;
           }
         }
-      } else {
-        $lh->{READINGS}{state}{VAL} = $v;
       }
     } else {
       $lh->{READINGS}{state}{VAL} = $v;

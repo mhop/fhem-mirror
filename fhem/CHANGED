@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  10_IT: Correct command parsing (forum id 38467)
   - bugfix:  Dashboard: corrected version number
   - feature: SYSSTAT: added mibs attribute for snmp monitoring
   - bugfix:  Dashboard: fixed CSS height issue for rows (top, center, bottom)
