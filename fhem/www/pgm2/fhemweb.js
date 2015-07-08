@@ -354,7 +354,16 @@ FW_replaceLink(el)
     return;
   $(el).removeAttr("href");
   $(el).removeAttr("onclick");
-  $(el).click(function() { FW_cmd(attr+"&XHR=1"); });
+  $(el).click(function() { 
+    FW_cmd(attr+"&XHR=1", function(txt){
+      if(!txt)
+        return;
+      if(ma[2].match(/=set/)) // Forum #38875
+        FW_okDialog(txt, el);
+      else
+        FW_errmsg(txt, 5000);
+    });
+  });
   $(el).css("cursor", "pointer");
 }
 
