@@ -694,8 +694,8 @@ ZWDongle_Read($@)
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
     
     # SEND_DATA answer: remove message from SendStack. TODO: check callbackId
-    if($msg =~ m/^0(0|1)13..(..)/ ){
-      my ($r, $m) = ($1, $2);
+    if($msg =~ m/^0013..(..)/  || $msg =~ m/^0113(..)/ ){
+      my $m = $1;
       my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
                  '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
       $m = $msg{$m} ? $msg{$m} : "UNKNOWN $m";
