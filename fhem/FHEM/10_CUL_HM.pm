@@ -1888,7 +1888,7 @@ sub CUL_HM_Parse($$) {#########################################################
          #        a status info for chan 0 at power on
          #        chn3 (virtual chan) and not used up to now
          #        info from it is likely a power on!
-        push @evtEt,[$shash,1,"powerOn:$tn"]   if($chn eq "03");
+        push @evtEt,[$devH,1,"powerOn:$tn"]   if($chn eq "03");
       }
       elsif ($md eq "HM-SEC-SFA-SM"){ # && $chn eq "00")
         my $h = CUL_HM_getDeviceHash($shash);
@@ -3002,8 +3002,8 @@ sub CUL_HM_parseCommon(@){#####################################################
     if ($peerIDs =~ m/$dst/){# dst is available in the ID list
       foreach my $peer (grep /^$dst/,split(",",$peerIDs)){
         my $pName = CUL_HM_id2Name($peer);
+        $pName = CUL_HM_id2Name($dst) if (!$pName || !$defs{$pName}); #$dst - device-id of $peer
         next if (!$pName || !$defs{$pName});
-        $pName = CUL_HM_id2Name($dst) if (!$defs{$pName}); #$dst - device-id of $peer
         push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
         push @evtEt,[$defs{$pName},1,"trigLast:$cName".(($level ne "-")?":$level":"")];
         
