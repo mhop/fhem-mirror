@@ -458,7 +458,7 @@ yowsup_Write($$)
 
   return "not connected" if( !$hash->{PID} );
 
-  $data =~ s/\n/ /g;
+  $data =~ s/\n/\r/g;
 
   Log3 $name, 3, "$name: sending $data";
 
