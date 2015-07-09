@@ -38,6 +38,12 @@
 #  2015-07-03 additionalPosReading <name> for allowing to specify an additional reading to contain position for shutter
 #  2015-07-03 Cleanup of reading update routine
 #
+#  2015-07-06 viegener - Timing improvement for position calculation / timestamp used before extensive calculations
+#  2015-07-06 viegener - send stop command only when real movement needs to be stopped (to avoid conflict with my-pos for stopped shutters)
+#  2015-07-09 viegener - FIX: typo in set go-my (was incorrectly spelled: go_my) 
+#  2015-07-09 viegener - FIX: log and set command helper corrections 
+#
+#
 ######################################################
 #
 ### Known Issue - if timer is running and last command equals new command (only for open / close) - considered minor/but still relevant
@@ -67,11 +73,11 @@ my %codes = (
 );
 
 my %sets = (
-	"off" => "",
-	"on" => "",
-	"stop" => "",
-	"go-my" => "",
-	"prog" => "",
+	"off" => "noArg",
+	"on" => "noArg",
+	"stop" => "noArg",
+	"go-my" => "noArg",
+	"prog" => "noArg",
 	"on-for-timer" => "textField",
 	"off-for-timer" => "textField",
 	"z_custom" => "textField",
@@ -656,7 +662,7 @@ sub SOMFY_InternalSet($@) {
 
 	# read timing variables
   my ($t1down100, $t1downclose, $t1upopen, $t1up100) = SOMFY_getTimingValues($hash);
-	Log3($name,5,"SOMFY_set: $name -> timings ->  td1:$t1down100: tdc :$t1downclose:  tuo :$t1upopen:  tu1 :$t1up100: ");
+	#Log3($name,5,"SOMFY_set: $name -> timings ->  td1:$t1down100: tdc :$t1downclose:  tuo :$t1upopen:  tu1 :$t1up100: ");
 
 	my $model =  AttrVal($name,'model',$models{somfyblinds});
 	
@@ -743,12 +749,12 @@ sub SOMFY_InternalSet($@) {
 			$newState = 'moving';
 			$drivetime = $arg1;
 			if ( $drivetime == 0 ) {
-				$move = 'stop';
+				$move = 'stop';  
 			} else {
 				$updateState = 'moving';
 			}
 
-		} elsif($cmd =~m/stop|go_my/) { 
+		} elsif($cmd =~m/stop|go-my/) { 
 			$move = 'stop';
 			$newState = $state
 
@@ -766,8 +772,9 @@ sub SOMFY_InternalSet($@) {
 				# 	if pos == 200 - no state pos change / no timer
 			} elsif ( $posRounded >= 100 ) {
 				# 	elsif pos >= 100 - set timer for 100-to-closed  --> update timer(newState 200)
-				my $remTime = ( $t1downclose - $t1down100 ) * ( ($pos-100) / 100 );
+				my $remTime = ( $t1downclose - $t1down100 ) * ( (200-$pos) / 100 );
 				$updatetime = $remTime;
+
 				$updateState = 200;
 			} elsif ( $posRounded < 100 ) {
 				#		elseif pos < 100 - set timer for remaining time to 100+time-to-close  --> update timer( newState 200)
@@ -814,7 +821,8 @@ sub SOMFY_InternalSet($@) {
 				my $remTime = ( $t1upopen - $t1up100 ) * ( ( $pos - $arg1) / 100 );
 				$drivetime = $remTime;
 				if ( $drivetime == 0 ) {
-					$move = 'stop';
+					# $move = 'stop';    # avoid sending stop to move to my-pos 
+          $move = 'none';  
 				} else {
 					$updateState = $arg1;
 				}
@@ -835,7 +843,7 @@ sub SOMFY_InternalSet($@) {
 			###				return "SOMFY_set: Pos not currently known please open or close first";
 			}
 
-		} elsif($cmd =~m/stop|go_my/) { 
+		} elsif($cmd =~m/stop|go-my/) { 
 			#		update pos according to current detail pos
 			$move = 'stop';
 			
@@ -844,7 +852,7 @@ sub SOMFY_InternalSet($@) {
 			$move = 'off';
 			$drivetime = $arg1;
 			if ( $drivetime == 0 ) {
-				$move = 'stop';
+				$move = 'stop';   
 			} else {
 				$updateState = 	SOMFY_CalcCurrentPos( $hash, $move, $pos, $arg1 );
 			}
@@ -886,8 +894,10 @@ sub SOMFY_InternalSet($@) {
 		if(exists($sendCommands{$move})) {
 			$args[0] = $sendCommands{$move};
 			SOMFY_SendCommand($hash,@args);
+		} elsif ( $move eq 'none' ) {
+      # do nothing if commmand / move is set to none
 		} else {
-			Log3($name,1,"SOMFY_set: Error - unknown mvoe for sendCommands: $move");
+			Log3($name,1,"SOMFY_set: Error - unknown move for sendCommands: $move");
 		}
 	}	
 
@@ -973,13 +983,15 @@ sub SOMFY_TimedUpdate($) {
 	Log3($hash->{NAME},5,"SOMFY_TimedUpdate : pos so far : $pos");
 	
 	my $dt = SOMFY_UpdateStartTime($hash);
+  my $nowt = gettimeofday();
+  
 	$pos = SOMFY_CalcCurrentPos( $hash, $hash->{move}, $pos, $dt );
 #	my $posRounded = SOMFY_RoundInternal( $pos );
 	
 	Log3($hash->{NAME},5,"SOMFY_TimedUpdate : delta time : $dt   new rounde pos (rounded): $pos ");
 	
 	$hash->{runningtime} = $hash->{runningtime} - $dt;
-	if ( $hash->{runningtime} <= 0) {
+	if ( $hash->{runningtime} <= 0.1) {
 		if ( defined( $hash->{runningcmd} ) ) {
 			SOMFY_SendCommand($hash, $hash->{runningcmd});
 		}
@@ -999,7 +1011,9 @@ sub SOMFY_TimedUpdate($) {
 		} else {
 			Log3($hash->{NAME},4,"SOMFY_TimedUpdate: $hash->{NAME} -> update state in $hash->{runningtime} sec");
 		}
-		InternalTimer(gettimeofday()+$utime,"SOMFY_TimedUpdate",$hash,0);
+    my $nstt = max($nowt+$utime-0.01, gettimeofday()+.1 );
+    Log3($hash->{NAME},5,"SOMFY_TimedUpdate: $hash->{NAME} -> next time to stop: $nstt");
+		InternalTimer($nstt,"SOMFY_TimedUpdate",$hash,0);
 	}
 	
 	Log3($hash->{NAME},5,"SOMFY_TimedUpdate DONE");
