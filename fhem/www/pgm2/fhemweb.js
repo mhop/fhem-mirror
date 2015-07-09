@@ -349,9 +349,19 @@ FW_replaceLink(el)
     attr = attr.replace(/^location.href='/,'');
     attr = attr.replace(/'$/,'');
   }
+
+
   var ma = attr.match(/^(.*\?)(cmd[^=]*=.*)$/);
-  if(ma == null || ma.length == 0 || !ma[2].match(/=(save|set)/))
+  if(ma == null || ma.length == 0 || !ma[2].match(/=(save|set)/)) {
+    ma = attr.match(new RegExp("^"+FW_root)); // Avoid "Connection lost" @iOS
+    if(ma) {
+      $(el).click(function() {
+        FW_leaving = 1;
+        location.href = attr;
+      });
+    }
     return;
+  }
   $(el).removeAttr("href");
   $(el).removeAttr("onclick");
   $(el).click(function() { 
