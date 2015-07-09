@@ -37,7 +37,7 @@ FileLog_Initialize($)
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
-  $hash->{AttrList} = "disable:0,1 logtype reformatFn ".
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals logtype reformatFn ".
                       "nrarchive archivedir archivecmd addStateEvent:0,1";
 
   $hash->{FW_summaryFn}     = "FileLog_fhemwebFn";
@@ -137,7 +137,7 @@ FileLog_Log($$)
   return if($log->{READONLY});
 
   my $ln = $log->{NAME};
-  return if($attr{$ln} && $attr{$ln}{disable});
+  return if(IsDisabled($ln));
   my $events = deviceEvents($dev, AttrVal($ln, "addStateEvent", 0));
   return if(!$events);
 
@@ -1180,6 +1180,7 @@ FileLog_sampleDataFn($$$$$)
         </li><br>
 
     <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
     <a name="logtype"></a>
     <li>logtype<br>
