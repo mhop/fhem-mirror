@@ -244,14 +244,9 @@ sub FRITZBOX_Attr($@)
       # aName and aVal are Attribute name and value
    my $hash = $defs{$name};
 
-   if ($cmd eq "set") {
-      if ($aName eq "fritzBoxIP" && $aVal ne "") {
-         $hash->{fhem}{lastHour} = 0; # Refresh all readings during next update
-         if ($hash->{REMOTE} == 0) {
-            $hash->{REMOTE} = 1;
-               FRITZBOX_Log $hash, 3, "Changed to remote access because attribute 'fritzBoxIP' is defined.";
-         }
-      }
+   if ($aName eq "fritzBoxIP" && $hash->{APICHECKED} == 1) {
+      $hash->{APICHECKED} = 0;
+      FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
    }
 
    return undef;
@@ -316,7 +311,7 @@ sub FRITZBOX_Set($$@)
       # }
    } 
    elsif ( lc $cmd eq 'checkapis') {
-         Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
+      Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
       $hash->{APICHECKED} = 0;
       FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
       return undef;
@@ -548,9 +543,8 @@ sub FRITZBOX_Readout_Start($)
    my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
    my $name = substr $timerpara, 0, $index;                         # name extrahieren
    my $hash = $defs{$name};
-      
-   my $runFn = "FRITZBOX_Readout_Run_Web";
-   $runFn = "FRITZBOX_Readout_Run_Shell"     if AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || $hash->{REMOTE} == 0;
+
+   my $runFn;
    
 # First run is an API check
    unless ( $hash->{APICHECKED} ) {
@@ -558,10 +552,16 @@ sub FRITZBOX_Readout_Start($)
       $hash->{STATE} = "Check APIs";
       $runFn = "FRITZBOX_API_Check_Run";
    }
-# Set timer value   
-   elsif ($hash->{INTERVAL} < 60 && $hash->{INTERVAL} != 0 ) {
-      $hash->{INTERVAL} = 60;
-      $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
+# Run shell or web api, restrict interval
+   else {
+      $runFn = "FRITZBOX_Readout_Run_Web";
+      $runFn = "FRITZBOX_Readout_Run_Shell"     if AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || $hash->{REMOTE} == 0;
+
+   # Set timer value   
+      if ($hash->{INTERVAL} < 60 && $hash->{INTERVAL} != 0 ) {
+         $hash->{INTERVAL} = 60;
+         $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
+      }
    }
    
    if($hash->{INTERVAL} != 0) {
@@ -597,19 +597,21 @@ sub FRITZBOX_API_Check_Run($)
    my $response;
    my $startTime = time();
 
-# Check if FHEM runs on a FritzBox under root user
-   # unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
-   if ( -X "/usr/bin/ctlmgr_ctl" ) {
-      if ( $< != 0 ) {
-         FRITZBOX_Log $hash, 3, "FHEM is running on a Fritz!Box but not as 'root' user (currently " .
-                                 ( getpwuid( $< ) )[ 0 ] . "). Cannot run in local mode.";
-      }
-      else {
-         $fritzShell = 1;
-         FRITZBOX_Log $hash, 5, "FHEM is running on a Fritz!Box as 'root' user.";
+# if no FritzBoxIP is set, check if FHEM runs on a FritzBox under root user
+    # unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
+   if ( AttrVal( $name, "fritzBoxIP", "" ) eq "" ) {
+      if ( -X "/usr/bin/ctlmgr_ctl" ) {
+         if ( $< != 0 ) {
+            FRITZBOX_Log $hash, 3, "FHEM is running on a Fritz!Box but not as 'root' user (currently " .
+                                    ( getpwuid( $< ) )[ 0 ] . "). Cannot run in local mode.";
+         }
+         else {
+            $fritzShell = 1;
+            FRITZBOX_Log $hash, 5, "FHEM is running on a Fritz!Box as 'root' user.";
+         }
       }
    }
-   
+
 # Determine local or remote mode
    if ($fritzShell) {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->REMOTE", 0;
@@ -1240,7 +1242,7 @@ sub FRITZBOX_Readout_Run_Web($)
 # Power Rate
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_powerRate", $result->{box_powerRate};
 # Box Features
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->is_double_wlan", $result->{is_double_wlan};
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->is_double_wlan", $result->{is_double_wlan},  "01";
 # Box model and firmware
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion",   $result->{box_fwVersion};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwUpdate",    $result->{box_fwUpdate};
@@ -1489,7 +1491,10 @@ sub FRITZBOX_Readout_Format($$$)
    return $readout       unless defined $format;
    return $readout       unless $readout ne "" && $format ne "" ;
 
-   if ($format eq "aldays") {
+   if ($format eq "01") {
+      $readout = 0   if $readout ne "1";
+   }
+   elsif ($format eq "aldays") {
       if ($readout eq "0") {
          $readout = "once";
       }
