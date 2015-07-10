@@ -509,11 +509,6 @@ ZWDongle_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
 
-  if($fn !~ m/^[0-9A-F]+$/i) { # ACK initiated from ZWDongle 
-    ZWDongle_shiftSendStack($hash, 5, $fn);
-    return;
-  }
-
   Log3 $hash, 5, "ZWDongle_Write $fn $msg";
   # assemble complete message
   $msg = "$fn$msg";
@@ -630,14 +625,7 @@ ZWDongle_Read($@)
     my $fb = substr($data, 0, 2);
 
     if($fb eq "06") {   # ACK
-      # ZWDongle messages are removed upon first ACK.
-      # Other network messages are removed if ZW_SEND_DATA:OK is received
-      my $sst = $hash->{SendStack}->[0];
-      if($sst && $sst !~ m/^01....13/) {
-        ZWDongle_shiftSendStack($hash, 5, "ACK received");
-      }
-
-
+      ZWDongle_shiftSendStack($hash, 5, "ACK received");
       $data = substr($data, 2);
       next;
     }
@@ -692,15 +680,6 @@ ZWDongle_Read($@)
     $hash->{nrNAck} = 0;
     Log3 $name, 4, "ZWDongle_Read $name: sending ACK, processing $msg";
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
-    
-    # SEND_DATA answer: remove message from SendStack. TODO: check callbackId
-    if($msg =~ m/^0013..(..)/  || $msg =~ m/^0113(..)/ ){
-      my $m = $1;
-      my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
-                 '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
-      $m = $msg{$m} ? $msg{$m} : "UNKNOWN $m";
-      ZWDongle_shiftSendStack($hash, 5, "ZW_SEND_DATA:$m received");
-    }
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     $hash->{PARTIAL} = $data;	 # Recursive call by ZWave get, Forum #37418
