@@ -833,14 +833,14 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
 ######################################## 
 sub statistics_doStatisticSpecialPeriod2 ($$$$$) 
 {
-   my ($hash, $dev, $readingName,$statType, $period, $decPlaces, $value) = @_;
+   my ($hash, $devName, $readingName,$statType, $period, $decPlaces, $value) = @_;
    my $name = $hash->{NAME};
    
    my $specialPeriod = AttrVal($name, "specialPeriod", "");
    
    return   unless $specialPeriod;
 
-   if ("$devName:$readingName:$statType:$period=([\d:]+)" =~ /^($specialPeriod)$/) {
+   # if ("$devName:$readingName:$statType:$period=([\d:]+)" =~ /^($specialPeriod)$/) {
 
    my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . ucfirst($statType) . ucfirst($period);
    my $hiddenReadingName = ".".$dev->{NAME} . ":" . $readingName . ":" . $statType . ":" . $period;
@@ -1278,7 +1278,7 @@ sub statistics_UpdateDevReading($$$$)
       </li><br>
   </ul>
   &Uuml;ber die <a href="#statisticsattr">Attribute</a> <code>deltaReadings, durationReadings, minAvgMaxReadings, tendencyReadings</code> k&ouml;nnen weitere Ger&auml;tewerte hinzugef&uuml;gt oder
-  einem anderem Statistik-Typ zugeordnet werden. 
+  einem anderen Statistik-Typ zugeordnet werden. 
   <br>&nbsp;
   <br>
   
