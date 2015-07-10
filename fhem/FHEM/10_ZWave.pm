@@ -634,7 +634,7 @@ ZWave_Cmd($$@)
     }
 
   } else {
-    $data .= $id  if($type eq "set"); # callback=>id
+    $data .= $id; # callback=>id
 
   }
   IOWrite($hash, "00", $data);
