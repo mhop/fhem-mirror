@@ -589,7 +589,7 @@ WeatherAsHtmlV($;$)
 
   my $width= int(ICONSCALE*ICONWIDTH);
       
-  my $ret = sprintf('<table class="weather"><tr><th width=%d></th><th></th></tr>', $width);
+  my $ret = '<table class="weather">';
   $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue">%s<br>%s°C  %s%%<br>%s</td></tr>',
         $width,
         WeatherIconIMGTag(ReadingsVal($d, "icon", "")),
