@@ -219,26 +219,21 @@ RSS_splitRequest($) {
 
   # http://hostname:8083/fhem/rss
   # http://hostname:8083/fhem/rss/myDeviceName.rss
-  # http://hostname:8083/fhem/rss/myDeviceName.jpg
-  # |--------- url ----------|     |---name --| ext
+  # http://hostname:8083/fhem/rss/myDeviceName.jpg&t=47110.815
+  # |--------- url ----------|    |---name --| ext |--query--|
 
   my ($request) = @_;
 
-  if($request =~ /^.*\/rss$/) {
-    # http://localhost:8083/fhem/rss
-    return (undef,undef); # name, ext
+  # http://hostname:8083/fhem/rss/myDeviceName.rss
+  # http://hostname:8083/fhem/rss/myDeviceName.jpg
+  # http://hostname:8083/fhem/rss/myDeviceName.png
+  # http://hostname:8083/fhem/rss/myDeviceName.html
+  use constant REGEXP => '^.*\/rss\/([^\/]*)\.(jpg|png|rss|html)(&(.*))?$';
+  if($request =~ REGEXP) {
+        return ($1,$2,$4);
   } else {
-    # http://hostname:8083/fhem/rss/myDeviceName.rss
-    # http://hostname:8083/fhem/rss/myDeviceName.jpg
-    # http://hostname:8083/fhem/rss/myDeviceName.png
-    # http://hostname:8083/fhem/rss/myDeviceName.html
-    my $call= $request;
-    $call =~ s/^.*\/rss\/([^\/]*)$/$1/;
-    my $name= $call;
-    $name =~ s/^(.*)\.(jpg|png|rss|html)$/$1/;
-    my $ext= $call;
-    $ext =~ s/^$name\.(.*)$/$1/;
-    return ($name,$ext);
+        #main::Debug "not matched";
+        return(undef,undef,undef);
   }
 }
 
@@ -834,7 +829,13 @@ RSS_CGI(){
 
   my ($request) = @_;   # /rss or /rss/name.rss or /rss/name.jpg or /rss/name.png
   
-  my ($name,$ext)= RSS_splitRequest($request); # name, ext (rss, jpg, png)
+  my ($name,$ext,$query)= RSS_splitRequest($request); # name, ext (rss, jpg, png, html), query
+  # query is unused 
+  
+  #main::Debug "Request: $request";
+  #main::Debug " Name  : $name";
+  #main::Debug " Ext   : $ext";
+  #main::Debug " Query : $query";
 
   if(defined($name)) {
     if($ext eq "") {
