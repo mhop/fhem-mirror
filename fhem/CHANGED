@@ -1,11 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 02_RSS: replaced refresh method by javascript DOM gymnastics
   - change: 59_Weather: removed empty header row from WeatherAsHtmlV
   - feature: 02_HTTPSRV: support tabletui (Forum #37232)
   - bugfix:  SOMFY: Only send stop if position changed
                     improved timing for position update
 		    fix typos (go-my instead of go_my)
-  - feature: ios6touchpadstyle: style adjustments for the Dashboard module version 3.0
+  - feature: ios6touchpadstyle: style adjustments for the Dashboard 
+             module version 3.0
   - bugfix:  10_IT: Correct command parsing (forum id 38467)
   - bugfix:  Dashboard: corrected version number
   - feature: SYSSTAT: added mibs attribute for snmp monitoring
