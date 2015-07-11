@@ -1620,15 +1620,15 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
 # clones- - - - - - - - - - - - - - - - -
 $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
 
-$culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{"THSensor"};
-$culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{"THSensor"};
-$culHmChanSets{"HM-SEN-EP01"}           = $culHmSubTypeSets{"THSensor"};
-$culHmChanSets{"HM-SEN-EP02"}           = $culHmSubTypeSets{"THSensor"};
-$culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{"THSensor"};
-$culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{"THSensor"};
-$culHmChanSets{"HM-ES-PMSw1-Pl01"}      = $culHmSubTypeSets{outputUnit};
+$culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{THSensor};
+$culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{THSensor};
+$culHmChanSets{"HM-SEN-EP01"}           = $culHmSubTypeSets{THSensor};
+$culHmChanSets{"HM-SEN-EP02"}           = $culHmSubTypeSets{THSensor};
+$culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{THSensor};
+$culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{THSensor};
+$culHmChanSets{"HM-ES-PMSw1-Pl01"}      = $culHmSubTypeSets{switch};
 
-$culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{"blindActuator"};
+$culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
 
 $culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
 
