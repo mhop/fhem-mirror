@@ -833,7 +833,7 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
 ######################################## 
 sub statistics_doStatisticSpecialPeriod2 ($$$$$) 
 {
-   my ($hash, $devName, $readingName,$statType, $period, $decPlaces, $value) = @_;
+   my ($hash, $dev, $readingName,$statType, $period, $decPlaces, $value) = @_;
    my $name = $hash->{NAME};
    
    my $specialPeriod = AttrVal($name, "specialPeriod", "");
