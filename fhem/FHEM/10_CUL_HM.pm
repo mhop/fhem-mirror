@@ -7666,8 +7666,8 @@ sub CUL_HM_unQEntity($$){# remove entity from q
     @chns = grep !/00/,@chns;#remove device as well - just in case
     $dq->{$q} = join",",@chns;
   }
-  $q = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
-  my $mQ = $modules{CUL_HM}{helper}{$q};
+  my $cq = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
+  my $mQ = $modules{CUL_HM}{helper}{$cq};
   return if(!$mQ || scalar(@{$mQ}) == 0);
   @{$mQ} = grep !/^$devN$/,@{$mQ} if ($dq->{$q} eq "");
 }
