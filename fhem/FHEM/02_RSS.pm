@@ -45,6 +45,7 @@ RSS_addExtension($$$) {
     $data{FWEXT}{$url}{FUNC} = $func;
     $data{FWEXT}{$url}{LINK} = "+$link";
     $data{FWEXT}{$url}{NAME} = $friendlyname;
+    $data{FWEXT}{$url}{SCRIPT} = "RSS.js";
     $data{FWEXT}{$url}{FORKABLE} = 0;
 }
 
@@ -255,8 +256,8 @@ RSS_returnRSS($) {
 sub
 RSS_getScript() {
 
-  my $scripts= "";
   my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
+  my $scripts= "";
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
@@ -275,16 +276,10 @@ RSS_HTMLHead($$) {
   
   my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
   my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
-  my $r= (defined($refresh) && $refresh > 0) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
-  # css and js header output should be coded only in one place
-  my $css= "";
-  #my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>\n";
-  #$css= sprintf($cssTemplate, "pgm2/style.css");
-  #$css.= sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
-  #map { $css.= sprintf($cssTemplate, $_); } split(" ", AttrVal($FW_wname, "CssFiles", ""));
   my $scripts= RSS_getScript();
-  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$r$css$scripts</head>\n";
+  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$scripts</head>\n";
 }
+
 
 sub 
 RSS_HTMLTail() {
@@ -301,9 +296,15 @@ RSS_returnHTML($) {
   my $refresh= AttrVal($name, 'refresh', 60);
   my $areas= AttrVal($name, 'areas', "");
   my $embed= $defs{$name}{".embed"};
-  $defs{$name}{".embed"} = undef;
+  my $r= (defined($refresh) && ($refresh> 0)) ? " onload=\"setTimeout(function(){reloadImage(\'img0\')},$refresh*1000);\"" : "";
   my $code= RSS_HTMLHead($name, $refresh) . 
-       "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n<div id=\"rss_$name\" style=\"z-index:1;\" >\n<img src=\"$img\" usemap=\"#map\"/>\n<map name=\"map\" id=\"map\">\n$areas\n</map>\n</div>\n$embed</body>\n" .
+                "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n" .
+                    "<div id=\"rss_$name\" style=\"z-index:1;\" >\n" .
+                      "<img id=\"img0\" src=\"$img\" usemap=\"#map\"$r/>\n" .
+                      "<map name=\"map\" id=\"map\">\n$areas\n</map>\n" .
+                    "</div>\n" .
+                    "$embed\n" .
+                "</body>\n" .
 	    RSS_HTMLTail();
   return ("text/html; charset=utf-8", $code);
 }
@@ -531,6 +532,8 @@ RSS_evalLayout($$@) {
   $params{x}= 0;
   $params{y}= 0;
   
+  $defs{$name}{".embed"}= "";
+  
 
   my ($x,$y,$z,$x1,$y1,$x2,$y2,$scale,$bgcolor,$boxwidth,$text,$imgtype,$srctype,$arg,$format);
 
@@ -545,7 +548,7 @@ RSS_evalLayout($$@) {
           if($line=~ s/\\$//) { $cont= $line; undef $line; }
           next unless($line);
           $cont= "";
-          #Debug "$name: evaluating >$line<";
+          Debug "$name: evaluating >$line<";
           # split line into command and definition
           my ($cmd, $def)= split("[ \t]+", $line, 2);
           #Debug "CMD= \"$cmd\", DEF= \"$def\"";
@@ -680,6 +683,7 @@ RSS_evalLayout($$@) {
 	      $defs{$name}{".embed"} .= "<div id=\"$text\" style=\"position:".$format."; left:".$x."px; top:".$y."px; z-index:$z;\">\n";
 	      $defs{$name}{".embed"} .= $arg."\n";
 	      $defs{$name}{".embed"} .= "</div>\n";
+	      main::Debug "SET EMBED=" . $defs{$name}{".embed"};
 	  } else {
 	      Log3 $name, 2, "$name: Illegal command $cmd in layout definition.";
 	  } 
