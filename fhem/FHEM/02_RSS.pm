@@ -219,7 +219,7 @@ RSS_splitRequest($) {
 
   # http://hostname:8083/fhem/rss
   # http://hostname:8083/fhem/rss/myDeviceName.rss
-  # http://hostname:8083/fhem/rss/myDeviceName.jpg&t=47110.815
+  # http://hostname:8083/fhem/rss/myDeviceName.jpg?t=47110.815
   # |--------- url ----------|    |---name --| ext |--query--|
 
   my ($request) = @_;
@@ -228,7 +228,7 @@ RSS_splitRequest($) {
   # http://hostname:8083/fhem/rss/myDeviceName.jpg
   # http://hostname:8083/fhem/rss/myDeviceName.png
   # http://hostname:8083/fhem/rss/myDeviceName.html
-  use constant REGEXP => '^.*\/rss\/([^\/]*)\.(jpg|png|rss|html)(&(.*))?$';
+  use constant REGEXP => '^.*\/rss\/([^\/]*)\.(jpg|png|rss|html)(\?(.*))?$';
   if($request =~ REGEXP) {
         return ($1,$2,$4);
   } else {
