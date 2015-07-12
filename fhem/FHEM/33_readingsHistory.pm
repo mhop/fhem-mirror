@@ -227,6 +227,8 @@ readingsHistory_lookup2($$$$)
     $lookup = $vf;
   }
 
+  return $lookup if( !defined($lookup) );
+
   if( !ref($lookup) && $lookup =~ m/^{.*}$/) {
     my $DEVICE = $name;
     my $READING = $reading;
