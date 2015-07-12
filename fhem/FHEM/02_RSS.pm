@@ -548,7 +548,7 @@ RSS_evalLayout($$@) {
           if($line=~ s/\\$//) { $cont= $line; undef $line; }
           next unless($line);
           $cont= "";
-          Debug "$name: evaluating >$line<";
+          #Debug "$name: evaluating >$line<";
           # split line into command and definition
           my ($cmd, $def)= split("[ \t]+", $line, 2);
           #Debug "CMD= \"$cmd\", DEF= \"$def\"";
@@ -683,7 +683,7 @@ RSS_evalLayout($$@) {
 	      $defs{$name}{".embed"} .= "<div id=\"$text\" style=\"position:".$format."; left:".$x."px; top:".$y."px; z-index:$z;\">\n";
 	      $defs{$name}{".embed"} .= $arg."\n";
 	      $defs{$name}{".embed"} .= "</div>\n";
-	      main::Debug "SET EMBED=" . $defs{$name}{".embed"};
+	      #main::Debug "SET EMBED=" . $defs{$name}{".embed"};
 	  } else {
 	      Log3 $name, 2, "$name: Illegal command $cmd in layout definition.";
 	  } 
