@@ -1626,7 +1626,9 @@ $culHmChanSets{"HM-SEN-EP01"}           = $culHmSubTypeSets{THSensor};
 $culHmChanSets{"HM-SEN-EP02"}           = $culHmSubTypeSets{THSensor};
 $culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{THSensor};
 $culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{THSensor};
+
 $culHmChanSets{"HM-ES-PMSw1-Pl01"}      = $culHmSubTypeSets{switch};
+$culHmChanSets{"HM-ES-PMSw1-Pl02"}      = $culHmSubTypeSets{outputUnit};
 
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
 

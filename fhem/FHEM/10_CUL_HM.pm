@@ -2119,6 +2119,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$shash,1,"energyOffset:".$eo];
       }
       push @evtEt,[$shash,1,"energyCalc:".($eo + $eCnt)];
+      CUL_HM_unQEntity($shash->{NAME},"qReqStat");
     }
   }
   elsif($st eq "repeater"){ ###################################################
