@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, February 2015
+# SONOS.pm (c) by Reiner Leins, July 2015 
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -44,9 +44,12 @@
 # define Sonos SONOS localhost:4711 30
 #
 ########################################################################################
-# Changelog
+# Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 12.07.2015
+#	Es gibt zwei neue Setter "GroupVolumeU" und "GroupVolumeD", um die Gruppenlautstärke um 'VolumeStep'-Einheiten zu erhöhen oder zu verringern.
+#	Innerhalb des SubProzesses wurden die Devicenamen der bereits in Fhem definierten Player nicht korrekt verwendet. Das machte sich erst mit dem neuen Feature Bookmarks bemerkbar.
 # 14.06.2015
 #	Zwei weitere Ausnahmen für das Neustarten des SubThreads eingefügt.
 #	ControlPoint.pm: Beim Renew von Subscription wurde aus dem "carp" ein "croak" gemacht. Dadurch greifen die darüberliegenden Auffangmassnahmen.
@@ -57,12 +60,6 @@
 #	Es gibt drei neue Readings "FavouritesVersion", "RadiosVersion" und "PlaylistsVersion", die bei einer Änderung des jeweiligen Bereichs durch einen Sonos Controller aktualisiert werden, und auf die man mit einem Notify reagieren kann, um z.B. ein "get player FavouritesWithCovers" ausführen zu können. Damit entfällt die Notwendigkeit von zeitgesteuerten Aktualisierungen.
 # 14.04.2015
 #	Zusätzliche Fehlerüberprüfung und -ausgabe beim Herunterladen der Cover-Bilder eingebaut, sowie relative URLs unterbunden
-# 07.04.2015
-#	Neues Feature 'ExportSonosBibliothek': Hiermit kann eine Datei mit der textuellen Darstellung eines Struktur- und Titelhashs erzeugt werden, das die komplette Navigationsstruktur aus der Sonos-Bibliothek abbildet. Richtwerte bei ca. 20.000 Titeln auf einem Windows-Server mit Intel Core i5 mit 2.8GHz: Laufzeit: ca. 8Min, Arbeitsspeicher: ca. 1GB, Resultierende Datei: ca. 52MB
-#	Neues Feature 'DeletePlaylist': Hiermit kann eine Playlist gelöscht werden. Genauso wie bei LoadPlaylist kann man hier URL-Encoded arbeiten, oder einen regulären Ausdruck verwenden
-#	Neues Feature 'SnoozeAlarm': Hiermit kann ein gerade abspielender Alarm für die übergebene Zeit unterbrochen werden
-#	Neues Feature bei 'LoadPlaylist': Man kann nun einen Devicenamen angeben, dann wird dessen aktuelle Abspielliste kopiert
-#	Bei der Titelanzeige wird der Numerische Vergleichsfehler abgefangen, der auftritt, wenn der Player keinerlei aktuelle Abspielinformationen hat
 #
 ########################################################################################
 #
@@ -5036,14 +5033,19 @@ sub SONOS_Discover_Callback($$$) {
 				SONOS_Client_Notifier($elem);
 			}
 			
-			SONOS_Log undef, 1, "Successfully autocreated SonosPlayer '$saveRoomName' ($modelNumber) Software Revision $displayVersion with ID '$udn'";
+			# Name sichern...
+			SONOS_Client_Data_Refresh('', $udn, 'NAME', $name);
+			
+			SONOS_Log undef, 1, "Successfully autocreated SonosPlayer '$saveRoomName' ($modelNumber) as '$name' with Software Revision $displayVersion and ID '$udn'";
 		} else {
-			SONOS_Log undef, 2, "SonosPlayer '$saveRoomName' ($modelNumber) with ID '$udn' is already defined and will only be updated";
+			# Wenn das Device schon existiert, dann den dort verwendeten Namen holen
+			$name = SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn);
+			
+			SONOS_Log undef, 2, "SonosPlayer '$saveRoomName' ($modelNumber) with ID '$udn' is already defined (as '$name') and will only be updated";
 		}
 	
 		# Wenn der Player noch nicht auf der "Aktiv"-Liste steht, dann draufpacken...
 		push @{$SONOS_Client_Data{PlayerAlive}}, $udn if (!SONOS_isInList($udn, @{$SONOS_Client_Data{PlayerAlive}}));
-		SONOS_Client_Data_Refresh('', $udn, 'NAME', $name);
 		
 		# Readings aktualisieren
 		SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
@@ -8278,7 +8280,7 @@ sub SONOS_Client_ConsumeMessage($$) {
 						}
 					}
 					
-					SONOS_Log undef, 4, 'BookmarkQueueDefinition: '.Dumper(\%SONOS_BookmarkQueueDefinition);
+					SONOS_Log undef, 4, 'BookmarkPlaylistDefinition: '.Dumper(\%SONOS_BookmarkQueueDefinition);
 				}
 				
 				if ($1 eq 'bookmarkTitleDefinition') {
