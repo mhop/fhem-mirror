@@ -243,7 +243,9 @@ function restoreOrder(ActiveTabId) {
 				width = $(this).find(".dashboard_content").children().outerWidth()+10;
 			}
 		}
-		$(this).outerWidth(width);
+		if (width) {
+		  $(this).outerWidth(width);
+  		}
 		//---------------------------------------------------------------------------------------------------------------	
 		//-------------------------------- Height of an Group. | Min. Height if need ---------------------------	
 		
@@ -492,11 +494,16 @@ function dashboard_load_tab(tabIndex) {
 function dashboard_insert_tab(tabIndex, content) {
   $('#dashboardtabs').append(content);
   $("#dashboardtabs").tabs('refresh');
+
+  // call FHEM specific widget replacement
   FW_replaceWidgets($("#dashboard_tab" + tabIndex));
+
   dashboard_init_tab(tabIndex);
+
+  // call FHEMWEB specific link replacement
   $("#dashboard_tab" + tabIndex + " a").each(function() { FW_replaceLink(this); });
+
   restoreOrder(tabIndex);
-  restoreGroupVisibility(tabIndex);
   if (gridSize = is_dashboard_flexible()) {
 	  var $container = $("#dashboard_rowcenter_tab" + tabIndex);
 	  $("#dashboard_tab" + tabIndex + " .dashboard_widget").draggable({
@@ -515,11 +522,16 @@ function dashboard_insert_tab(tabIndex, content) {
 	  });
   }
   makeResizable('.dashboard_widget');
+
+  // call the initialization of reading groups
+  FW_readingsGroupReadyFn($('#dashboard_tab' + tabIndex));
+
   if ((DashboardConfigHash['lockstate']  == "lock") || (dashboard_buttonbar == "hidden")) {
   	dashboard_setlock();
   } else {
   	dashboard_unsetlock();
   }
+  restoreGroupVisibility(tabIndex);
 }
 
 function dashboard_init_tab(tabIndex) {
@@ -537,7 +549,7 @@ function dashboard_init_tab(tabIndex) {
 			} else {
 				hideGroupForButton(this);			
 			}				 
-			saveOrder();
+			//saveOrder();
 			event.stopImmediatePropagation();
 		});
 	} else { $("#dashboard_tab" + tabIndex + " .dashboard_widgetheader").addClass( "dashboard_widgetheader ui-corner-all" );}
@@ -565,7 +577,7 @@ function hideGroupForButton(button) {
 				
 	$(button).parent().removeClass("dashboard_widgetmax");			
 	$(button).parent().addClass("dashboard_widgetmin");
-	$.cookie($parentElement.attr('id') + '_hidden', '1');
+	$.cookie($parentElement.attr('id') + '_hidden', '1', {expires : 365});
 }
 
 function showGroupForButton(button) {
