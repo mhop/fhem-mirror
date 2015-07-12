@@ -244,7 +244,7 @@ sub FRITZBOX_Attr($@)
       # aName and aVal are Attribute name and value
    my $hash = $defs{$name};
 
-   if ($aName eq "fritzBoxIP" && $hash->{APICHECKED} == 1) {
+   if ($aName =~ /fritzBoxIP|m3uFileLocal|m3uFileURL/ && $hash->{APICHECKED} == 1) {
       $hash->{APICHECKED} = 0;
       FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
    }
@@ -545,10 +545,16 @@ sub FRITZBOX_Readout_Start($)
    my $hash = $defs{$name};
 
    my $runFn;
+
+# Set timer value (min. 60)
+   $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
+   $hash->{INTERVAL} = 60     if $hash->{INTERVAL} < 60 && $hash->{INTERVAL} != 0;
+
+   my $interval = $hash->{INTERVAL};
    
 # First run is an API check
    unless ( $hash->{APICHECKED} ) {
-      $hash->{INTERVAL} = 6;
+      $interval = 6;
       $hash->{STATE} = "Check APIs";
       $runFn = "FRITZBOX_API_Check_Run";
    }
@@ -557,17 +563,12 @@ sub FRITZBOX_Readout_Start($)
       $runFn = "FRITZBOX_Readout_Run_Web";
       $runFn = "FRITZBOX_Readout_Run_Shell"     if AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || $hash->{REMOTE} == 0;
 
-   # Set timer value   
-      if ($hash->{INTERVAL} < 60 && $hash->{INTERVAL} != 0 ) {
-         $hash->{INTERVAL} = 60;
-         $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
-      }
    }
    
-   if($hash->{INTERVAL} != 0) {
-    RemoveInternalTimer($hash->{helper}{TimerReadout});
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
-    return undef if( AttrVal($name, "disable", 0 ) == 1 );
+   if($interval != 0) {
+      RemoveInternalTimer($hash->{helper}{TimerReadout});
+      InternalTimer(gettimeofday()+$interval, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
+      return undef if( AttrVal($name, "disable", 0 ) == 1 );
   }
 
 # Kill running process if "set update" is used
@@ -580,7 +581,7 @@ sub FRITZBOX_Readout_Start($)
    }
    
    $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall($runFn, $name,
-                                                       "FRITZBOX_Readout_Done", 55,
+                                                       "FRITZBOX_Readout_Done", $interval-2,
                                                        "FRITZBOX_Readout_Aborted", $hash)
                          unless exists( $hash->{helper}{READOUT_RUNNING_PID} );
 
@@ -2774,24 +2775,20 @@ sub FRITZBOX_Ring_Run_Web($)
    
 # Set tts-Message
    if ($ttsLink) {
-      push @webCmdArray, 'configd:settings/WEBRADIO'.$fhemRadioStation.'/URL' => $ttsLink;
-   
-################ TEST Anfang ################
    # Create m3u-file (if ring tone and radio station cannot be changed because of missing interfaces)
-      # my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", "./www/images/".$name.".m3u" );
-      # if ($m3uFileLocal) {
-         # if (open my $fh, '>', $m3uFileLocal) {
-            # print $fh $ttsLink."\n";
-            # close $fh;
-            # FRITZBOX_Log $hash, 5, "Filled m3u file '$m3uFileLocal'.";
-         # } 
-         # else {
-            # my $msg = "Error: Cannot create save file '$m3uFileLocal' because $!\n";
-            # FRITZBOX_Log $hash, 2, $msg;
-            # return $name."|0|" . $msg;
-         # }
-      # }
-################ TEST Ende ################
+      if ( $hash->{M3U_LOCAL} ne "undefined" ) {
+         if (open my $fh, '>', $hash->{M3U_LOCAL}) {
+            print $fh $ttsLink."\n";
+            close $fh;
+            FRITZBOX_Log $hash, 4, "Filled m3u file '".$hash->{M3U_LOCAL}."' with '$ttsLink'.";
+            $ttsLink = $hash->{M3U_URL}      if $hash->{M3U_URL} ne "undefined";
+         } 
+         else {
+            my $msg = "Error: Cannot create save file '".$hash->{M3U_LOCAL},"' because $!\n";
+            FRITZBOX_Log $hash, 4, $msg;
+         }
+      }
+      push @webCmdArray, 'configd:settings/WEBRADIO'.$fhemRadioStation.'/URL' => $ttsLink;
    }
 #Execute command array
    $result = FRITZBOX_Web_PostCmd( $hash, \@webCmdArray )
