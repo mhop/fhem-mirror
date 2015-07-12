@@ -357,7 +357,11 @@ FW_replaceLink(el)
     if(ma) {
       $(el).click(function() {
         FW_leaving = 1;
-        location.href = attr;
+        if($(el).attr("target") == "_blank") {
+          window.open(url, '_blank').focus();
+        } else {
+          location.href = attr;
+        }
       });
     }
     return;
