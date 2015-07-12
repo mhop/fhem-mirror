@@ -357,6 +357,7 @@ PIONEERAVR_Define($$) {
   # ----------------Human Readable command mapping table for "get" commands-----------------------
   $hash->{helper}{GETS}  = {
 	'main' => {
+		'audioInfo'            => '?AST',
 		'avrModel'             => '?RGD',
 		'bass'            	   => '?BA',
 		'channel'              => '?PR',
@@ -419,6 +420,84 @@ PIONEERAVR_Define($$) {
 		"videoParameter"	  => "VPA",
 		"homeMenu"			  => "HM"
   };
+  
+  # ----------------Human Readable command mapping table for the remote control-----------------------
+  # Audio input signal type
+  $hash->{helper}{AUDIOINPUTSIGNAL} = {
+    "00"=>"ANALOG",
+	"01"=>"ANALOG",
+	"02"=>"ANALOG",
+	"03"=>"PCM",
+	"04"=>"PCM",
+	"05"=>"DOLBY DIGITAL",
+	"06"=>"DTS",
+	"07"=>"DTS-ES Matrix",
+	"08"=>"DTS-ES Discrete",
+	"09"=>"DTS 96/24",
+	"10"=>"DTS 96/24 ES Matrix",
+	"11"=>"DTS 96/24 ES Discrete",
+	"12"=>"MPEG-2 AAC",
+	"13"=>"WMA9 Pro",
+	"14"=>"DSD (HDMI or File via DSP route)",
+	"15"=>"HDMI THROUGH",
+	"16"=>"DOLBY DIGITAL PLUS",
+	"17"=>"DOLBY TrueHD",
+	"18"=>"DTS EXPRESS",
+	"19"=>"DTS-HD Master Audio",
+	"20"=>"DTS-HD High Resolution",
+	"21"=>"DTS-HD High Resolution",
+	"22"=>"DTS-HD High Resolution",
+	"23"=>"DTS-HD High Resolution",
+	"24"=>"DTS-HD High Resolution",
+	"25"=>"DTS-HD High Resolution",
+	"26"=>"DTS-HD High Resolution",
+	"27"=>"DTS-HD Master Audio",
+	"28"=>"DSD (HDMI or File via DSD DIRECT route)",
+	"64"=>"MP3",
+	"65"=>"WAV",
+	"66"=>"WMA",
+	"67"=>"MPEG4-AAC",
+	"68"=>"FLAC",
+	"69"=>"ALAC(Apple Lossless)",
+	"70"=>"AIFF",
+	"71"=>"DSD (USB-DAC)"
+  };
+ 
+  # Audio input frequency
+  $hash->{helper}{AUDIOINPUTFREQUENCY} = {
+    "00"=>"32kHz",
+	"01"=>"44.1kHz",
+	"02"=>"48kHz",
+	"03"=>"88.2kHz",
+	"04"=>"96kHz",
+	"05"=>"176.4kHz",
+	"06"=>"192kHz",
+	"07"=>"---",
+	"32"=>"2.8MHz",
+	"33"=>"5.6MHz"
+  };
+
+  # Audio output frequency
+  $hash->{helper}{AUDIOOUTPUTFREQUENCY} = {
+    "00"=>"32kHz",
+	"01"=>"44.1kHz",
+	"02"=>"48kHz",
+	"03"=>"88.2kHz",
+	"04"=>"96kHz",
+	"05"=>"176.4kHz",
+	"06"=>"192kHz",
+	"07"=>"---",
+	"32"=>"2.8MHz",
+	"33"=>"5.6MHz"
+  }; 
+  # working PQLS
+  $hash->{helper}{PQLSWORKING} = {
+    "0"=>"PQLS OFF",
+	"1"=>"PQLS 2ch",
+	"2"=>"PQLS Multi ch",
+	"3"=>"PQLS Bitstream"
+  };
+
   # Translation table for the possible speaker systems
   $hash->{helper}{SPEAKERSYSTEMS} = {
 	"10"=>"9.1ch FH/FW",
@@ -723,17 +802,17 @@ PIONEERAVR_Define($$) {
   };
   
   $hash->{helper}{LINEDATATYPES} = {
-	"00"=>"normal",																		
-	"01"=>"directory",																			
-	"02"=>"music",																		
-	"03"=>"photo",																			
-	"04"=>"video",																			
-	"05"=>"nowPlaying",																		
-	"20"=>"currentTitle",																		
-	"21"=>"currentArtist",																		
-	"22"=>"currentAlbum",																		
-	"23"=>"time",							
-	"24"=>"genre",										
+	"00"=>"normal",							
+	"01"=>"directory",
+	"02"=>"music",
+	"03"=>"photo",
+	"04"=>"video",
+	"05"=>"nowPlaying",
+	"20"=>"currentTitle",
+	"21"=>"currentArtist",
+	"22"=>"currentAlbum",
+	"23"=>"time",
+	"24"=>"genre",
 	"25"=>"currentChapterNumber",
 	"26"=>"format",
 	"27"=>"bitPerSample",
@@ -1367,7 +1446,7 @@ sub PIONEERAVR_Read($)
 	#Log3 $name, 5, "PIONEERAVR $name: line to do soon: " . dq($buf) unless ($buf eq "");
 	if (( $line eq "R" ) ||( $line eq "" )) {
 		Log3 $hash, 5, "PIONEERAVR $name: Supressing received " . dq($line);
-		next; 
+		# next; 
 	# Main zone volume
 	} elsif ( substr($line,0,3) eq "VOL" ) {
 		my $volume = substr($line,3,3);
@@ -1406,7 +1485,6 @@ sub PIONEERAVR_Read($)
 		readingsBulkUpdate($hash, "treble", ($1 *(-1)) + 6 );				
 		Log3 $name, 5, "PIONEERAVR $name: ". dq($line) ." interpreted as: Main Zone - New treble = ".$1 . " (raw treble data).";
 
-
 	# Main zone Mute				
 	} elsif ( substr($line,0,3) eq "MUT" ) {
 		my $mute = substr($line,3,1);
@@ -1417,8 +1495,96 @@ sub PIONEERAVR_Read($)
 		else {
 			readingsBulkUpdate($hash, "mute", "on" );
 			Log3 $name, 5, "PIONEERAVR $name: ".dq($line) ." interpreted as: Main Zone - Mute on ";
-		}				
-	# Main zone Input			
+		}
+
+	} elsif ( $line=~ m/^AST(\d{2})(\d{2})(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d{2})(\d{2})(\d{4})(\d)(\d{2})(\d)$/ ) {
+		# Audio information parameters
+		#  data1-data2:Audio Input Signal
+		#  data3-data4:Audio Input Frequency
+		#  data5-data25:Audio Input Channel Format (ignored)
+		#  data26-data43:Audio Output Channel (ignored)
+		#  data44-data45:Audio Output Frequency
+		#  data46-data47:Audio Output bit
+		#  data48-data51:Reserved
+		#  data52:Working PQLS
+		#  data53-data54:Working Auto Phase Control Plus (in ms)(ignored)
+		#  data55:Working Auto Phase Control Plus (Reverse Phase) (0... no revers phase, 1...reverse phase)(ignored)
+		if ( defined ( $hash->{helper}{AUDIOINPUTSIGNAL}->{$1}) ) {
+			readingsBulkUpdate($hash, "audioInputSignal", $hash->{helper}{AUDIOINPUTSIGNAL}->{$1} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio input signal: ". dq($1);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown audio input signal: ". dq($1);	
+		}
+		if ( defined ( $hash->{helper}{AUDIOINPUTFREQUENCY}->{$2}) ) {
+			readingsBulkUpdate($hash, "audioInputFrequency", $hash->{helper}{AUDIOINPUTFREQUENCY}->{$2} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio input frequency: ". dq($2);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown audio input frequency: ". dq($2);	
+		}
+		readingsBulkUpdate($hash, "audioInputFormatL", $3);
+		readingsBulkUpdate($hash, "audioInputFormatC", $4);
+		readingsBulkUpdate($hash, "audioInputFormatR", $5);
+		readingsBulkUpdate($hash, "audioInputFormatSL", $6);
+		readingsBulkUpdate($hash, "audioInputFormatSR", $7);
+		readingsBulkUpdate($hash, "audioInputFormatSLB", $8);
+		readingsBulkUpdate($hash, "audioInputFormatS", $9);
+		readingsBulkUpdate($hash, "audioInputFormatSBR", $10);
+		readingsBulkUpdate($hash, "audioInputFormatLFE", $11);
+		readingsBulkUpdate($hash, "audioInputFormatFHL", $12);
+		readingsBulkUpdate($hash, "audioInputFormatFHR", $13);
+		readingsBulkUpdate($hash, "audioInputFormatFWL", $14);
+		readingsBulkUpdate($hash, "audioInputFormatFWR", $15);
+		readingsBulkUpdate($hash, "audioInputFormatXL", $16);
+		readingsBulkUpdate($hash, "audioInputFormatXC", $17);
+		readingsBulkUpdate($hash, "audioInputFormatXR", $18);
+#		readingsBulkUpdate($hash, "audioInputFormatReserved1", $19);
+#		readingsBulkUpdate($hash, "audioInputFormatReserved2", $20);
+#		readingsBulkUpdate($hash, "audioInputFormatReserved3", $21);
+#		readingsBulkUpdate($hash, "audioInputFormatReserved4", $22);
+#		readingsBulkUpdate($hash, "audioInputFormatReserved5", $23);
+		readingsBulkUpdate($hash, "audioOutputFormatL", $24);
+		readingsBulkUpdate($hash, "audioOutputFormatC", $25);
+		readingsBulkUpdate($hash, "audioOutputFormatR", $26);
+		readingsBulkUpdate($hash, "audioOutputFormatSL", $27);
+		readingsBulkUpdate($hash, "audioOutputFormatSR", $28);
+		readingsBulkUpdate($hash, "audioOutputFormatSBL", $29);
+		readingsBulkUpdate($hash, "audioOutputFormatSB", $30);
+		readingsBulkUpdate($hash, "audioOutputFormatSBR", $31);
+		readingsBulkUpdate($hash, "audioOutputFormatSW", $32);
+		readingsBulkUpdate($hash, "audioOutputFormatFHL", $33);
+		readingsBulkUpdate($hash, "audioOutputFormatFHR", $34);
+		readingsBulkUpdate($hash, "audioOutputFormatFWL", $35);
+		readingsBulkUpdate($hash, "audioOutputFormatFWR", $36);
+#		readingsBulkUpdate($hash, "audioOutputFormatReserved1", $37);
+#		readingsBulkUpdate($hash, "audioOutputFormatReserved2", $38);
+#		readingsBulkUpdate($hash, "audioOutputFormatReserved3", $39);
+#		readingsBulkUpdate($hash, "audioOutputFormatReserved4", $40);
+#		readingsBulkUpdate($hash, "audioOutputFormatReserved5", $41);
+		
+		if ( defined ( $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$42}) ) {
+			readingsBulkUpdate($hash, "audioOutputFrequency", $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$42} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio output frequency: ". dq($42);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown audio output frequency: ". dq($42);	
+		}
+		readingsBulkUpdate($hash, "audioOutputBit", $43);
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio input bit: ". dq($43);	
+		if ( defined ( $hash->{helper}{PQLSWORKING}->{$45}) ) {
+			readingsBulkUpdate($hash, "pqlsWorking", $hash->{helper}{PQLSWORKING}->{$45} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working PQLS: ". dq($45);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown working PQLS: ". dq($45);	
+		}
+		readingsBulkUpdate($hash, "audioAutoPhaseControlMS", $46);
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working audio auto phase control plus (in ms): ". dq($46);	
+		readingsBulkUpdate($hash, "audioAutoPhaseControlRevPhase", $47);
+		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working audio auto phase control plus reverse phase: ". dq($47);	
+
+		# Main zone Input			
 	} elsif ( $line =~ m/^FN(\d\d)$/) {
 		my $inputNr = $1;
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: Main Zone - Input is set to inputNr: $inputNr ";
@@ -1780,25 +1946,25 @@ sub PIONEERAVR_Read($)
 		#   $2: Line number
 		#   $3: Focus (yes(1)/no(0)/greyed out(9)
 		#   $4: Line data type:
-		#     00:Normal（no mark type）																				
-		#     01:Directory																				
-		#     02:Music																				
-		#     03:Photo																				
-		#     04:Video																				
-		#     05:Now Playing																				
-		#     20:Track																				
-		#     21:Artist																				
-		#     22:Album																				
-		#     23:Time																				
-		#     24:Genre																				
-		#     25:Chapter number																				
-		#     26:Format																				
-		#     27:Bit Per Sample																				
-		#     28:Sampling Rate																				
-		#     29:Bitrate																				
-		#     31:Buffer																				
-		#     32:Channel																				
-		#     33:Station																				
+		#     00:Normal（no mark type）
+		#     01:Directory
+		#     02:Music
+		#     03:Photo
+		#     04:Video
+		#     05:Now Playing
+		#     20:Track
+		#     21:Artist
+		#     22:Album
+		#     23:Time
+		#     24:Genre
+		#     25:Chapter number
+		#     26:Format
+		#     27:Bit Per Sample
+		#     28:Sampling Rate
+		#     29:Bitrate
+		#     31:Buffer
+		#     32:Channel			
+		#     33:Station
 		#   $5: Display line information (UTF8)
 		my $lineDataType = $hash->{helper}{LINEDATATYPES}{$4};
 		
@@ -2348,6 +2514,7 @@ RC_layout_PioneerAVR() {
   <b>Get</b>
   <ul>
 	<li><b>loadInputNames</b> - reads the names of the inputs from the Pioneer AV receiver and checks if those inputs are enabled</li>
+	<li><b>audioInfo</b> - get the current audio parameters from the Pioneer AV receiver (e.g. audioInputSignal, audioInputFormatXX, audioOutputFrequency)</li>
 	<li><b>display</b> - updates the reading 'display' and 'displayPrevious' with what is shown on the display of the Pioneer AV receiver</li>
 	<li><b>bass</b> -  updates the reading 'bass'</li>
 	<li><b>channel</b> -  </li>
@@ -2560,6 +2727,7 @@ RC_layout_PioneerAVR() {
     <br><br>
 	Falls unten keine Beschreibung für das "get-Kommando" angeführt ist, siehe gleichnamiges "Set-Kommando"
 	<li><b>loadInputNames</b> - liest die Namen der Eingangsquellen vom Pioneer AV Receiver	und überprüft, ob sie aktiviert sind</li>
+	<li><b>audioInfo</b> - Holt die aktuellen Audio Parameter vom Pioneer AV receiver (z.B. audioInputSignal, audioInputFormatXX, audioOutputFrequency)</li>
 	<li><b>display</b> - Aktualisiert das reading 'display' und 'displayPrevious' mit der aktuellen Anzeige des Displays Pioneer AV Receiver</li>
 	<li><b>bass</b> - aktualisiert das reading 'bass'</li>
 	<li><b>channel</b> - </li>
@@ -2605,6 +2773,13 @@ RC_layout_PioneerAVR() {
   <b>Generated Readings/Events:</b>
   	<br/><br/>
 	<ul>
+		<li><b>audioAutoPhaseControlMS</b> - aktuell konfigurierte Auto Phase Control in ms</li>
+		<li><b>audioAutoPhaseControlRevPhase</b> - aktuell konfigurierte Auto Phase Control reverse Phase -> 1 bedeutet: reverse phase</li>
+		<li><b>audioInputFormat<XXX></b> - Zeigt ob im Audio Eingangssignal der Kanal XXX vorhanden ist (1 bedeutet: ist vorhanden)</li>
+		<li><b>audioInputFrequency</b> - Frequenz des Eingangssignals</li>
+		<li><b>audioInputSignal</b> - Art des inputsignals (z.B. ANALOG, PCM, DTS,...)</li>
+		<li><b>audioOutputFormat<XXX></b> - Zeigt ob im Audio Ausgangssignal der Kanal XXX vorhanden ist (1 bedeutet: ist vorhanden)</li>
+		<li><b>audioOutputFrequency</b> - Frequenz des Ausgangssignals</li>
 		<li><b>bass</b> - aktuell konfigurierte Bass-Einstellung</li>
 		<li><b>channel</b> - Tuner Preset (1...9)</li>
 		<li><b>channelStraight</b> - Tuner Preset wie am Display des Pioneer AV Receiver angezeigt, z.B. A2</li>
@@ -2618,6 +2793,7 @@ RC_layout_PioneerAVR() {
 		<li><b>mcaccMemory</b> - MCACC Voreinstellung</li>
 		<li><b>mute</b> - Stummschaltung</li>
 		<li><b>power</b> - Main Zone eingeschaltet oder in Standby?</li>
+		<li><b>pqlsWorking</b> - aktuelle PQLS Einstellung</li>
 		<li><b>presence</b> - Kann der Pioneer AV Receiver via Ethernet erreicht werden?</li>
 		<li><b>screenHirarchy</b> - Hierarchie des aktuell angezeigten On Screen Displays (OSD)</li>
 		<li><b>screenLine01...08</b> - Inhalt der Zeile 01...08 des OSD</li>
