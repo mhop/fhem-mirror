@@ -391,7 +391,8 @@ use vars qw(%zwave_deviceSpecial);
                  positionBlinds=>"010f260102%02x00"},
       get   => { position=>"010f2602020000", },
       parse => { "0891010f260303(..)(..)" =>
-                  'sprintf("position:Blinds %d Slat %d",hex($1),hex($2))' } } },
+                  'sprintf("position:Blinds %d Slat %d",hex($1),hex($2))',
+                 "0891010f260302(..)00" =>'"position:".hex($1)' } } },
    ZME_KFOB => {
      ZWAVEPLUS_INFO => {
       # Example only. ORDER must be >= 50
@@ -2009,9 +2010,9 @@ s2Hex($)
 
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
   <li>positionBlinds<br>
-    drive blinds to position %</li>
+    Fibaro FGRM-222 only: drive blinds to position %</li>
   <li>positionSlat<br>
-    drive slat to position %</li>
+    Fibaro FGRM-222 only: drive slat to position %</li>
 
   <br><br><b>Class METER</b>
   <li>meterReset<br>
@@ -2136,9 +2137,9 @@ s2Hex($)
     </li>
 
   <br><br><b>Class WAKE_UP</b>
-  <li>wakeupInterval value<br>
+  <li>wakeupInterval value nodeId<br>
     Set the wakeup interval of battery operated devices to the given value in
-    seconds. Upon wakeup the device sends a wakeup notification.</li>
+    seconds. Upon wakeup the device sends a wakeup notification to nodeId.</li>
   <li>wakeupNoMoreInformation<br>
     put a battery driven device into sleep mode. </li>
 
@@ -2208,7 +2209,7 @@ s2Hex($)
   
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
   <li>position<br>
-    Fibaro FGRM-222: return the blinds position and slat angle.
+    Fibaro FGRM-222 only: return the blinds position and slat angle.
     </li>
 
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
@@ -2348,7 +2349,7 @@ s2Hex($)
     return the wakeup interval in seconds, in the form<br>
     wakeupReport:interval seconds target id
     </li>
-  <li>wakeupIntervalCapabilities (only versionClass 2)<br>
+  <li>wakeupIntervalCapabilities (V2 only)<br>
     return the wake up interval capabilities in seconds, in the form<br>
     wakeupIntervalCapabilitiesReport:min seconds max seconds default seconds
     step seconds
@@ -2442,7 +2443,11 @@ s2Hex($)
   <li>indState:[on|off|dim value]</li>
 
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
-  <li>position:Blinds [%] Slat [%]</li>
+  <li>Fibaro FGRM-222 with ReportsType Fibar CC only:</li>
+  <li>position:Blinds [%] Slat [%]<br>
+    (VenetianBlindMode)</li>
+  <li>position:[%]<br>
+    (RollerBlindMode)</li>
   
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
   <li>modelId:hexValue hexValue hexValue</li>
@@ -2468,10 +2473,10 @@ s2Hex($)
   <li>location:LOCATION</li>
 
   <br><br><b>Class POWERLEVEL</b>
-  <li>powerlvl:current x remain y</li>
-  <li>NOTE: "current 0 remain 0" means normal mode without timeout</li>
-  <li>powerlvlTest:node x status y frameAck z</li>
-  <li>NOTE: status 0=failed, 1=success (at least one ACK), 2=in progress</li>
+  <li>powerlvl:current x remain y<br>
+    NOTE: "current 0 remain 0" means normal mode without timeout</li>
+  <li>powerlvlTest:node x status y frameAck z<br>
+    NOTE: status 0=failed, 1=success (at least one ACK), 2=in progress</li>
   
   <br><br><b>Class PROTECTION</b>
   <li>protection:[on|off|seq]</li>
