@@ -276,7 +276,7 @@ sub FRITZBOX_Set($$@)
             # . " convertMOH"
             # . " convertRingTone"
 
-   my $forceShell = ( AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || $hash->{REMOTE} == 0 );
+   my $forceShell = ( AttrVal( $name, "forceTelnetConnection",  0 ) == 1 || defined $hash->{REMOTE} && $hash->{REMOTE} == 0 );
 
 # set alarm
    if ( lc $cmd eq 'alarm') {
@@ -630,7 +630,7 @@ sub FRITZBOX_API_Check_Run($)
    }
 # Check for remote APIs
    else {
-      my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 1);
+      my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
 
    # Check if webcm exists
       $response = $agent->get( "http://".$host."/cgi-bin/webcm" );
@@ -667,6 +667,51 @@ sub FRITZBOX_API_Check_Run($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
          FRITZBOX_Log $hash, 4, "API TR-064 does not exist: ".$response->status_line;
       }
+
+   # Check if m3u can be created and the URL tested
+      my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", "./www/images/".$name.".m3u" );
+      if (open my $fh, '>', $m3uFileLocal) {
+         print $fh "http://translate.google.com/translate_tts?ie=UTF-8&tl=fr&q=Lirumlaruml%C3%B6ffelstielwerdasnichtkannderkannnichtviel";
+         close $fh;
+         FRITZBOX_Log $hash, 4, "Created m3u file '$m3uFileLocal'.";
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_LOCAL", $m3uFileLocal;
+
+      # Get the m3u-URL
+         my $m3uFileURL = AttrVal( $name, "m3uFileURL", "undefined" );
+      # if not defined then try to build the correct URL for the file
+         if ( $m3uFileURL eq "undefined" ) {
+         # Getting IP of FHEM host
+            FRITZBOX_Log $hash, 4, "Try to get my IP address.";
+            my $socket = IO::Socket::INET->new( Proto => 'tcp', PeerAddr => $host, PeerPort    => 'http(80)' );
+            my $ip = $socket->sockhost; #A side-effect of making a socket connection is that our IP address is available from the 'sockhost' method
+            FRITZBOX_Log $hash, 4, "Could not determine my ip address"  unless $ip;
+         # Get a web port
+            my $port;
+               FRITZBOX_Log $hash, 4, "Try to get a FHEMWEB port.";
+            foreach( keys %defs ) {
+            if ( $defs{$_}->{TYPE} eq "FHEMWEB" && defined $defs{$_}->{PORT} ) {
+                  $port = $defs{$_}->{PORT};
+                  last;
+               }
+            }
+            FRITZBOX_Log $hash, 4, "Could not find a FHEMWEB device."  unless $port;
+            $m3uFileURL = "http://$ip:$port/fhem/images/$name.m3u"     if defined $ip && defined $port;
+         }
+      # Check if m3u can be accessed
+         unless ( $m3uFileURL eq "undefined" ) {
+            FRITZBOX_Log $hash, 4, "Try to get '$m3uFileURL'";
+            $response = $agent->get( $m3uFileURL );
+            if ($response->is_error) {
+               FRITZBOX_Log $hash, 4, "Failed to get '$m3uFileURL': ".$response->status_line;
+               $m3uFileURL = "undefined"     ;
+            }
+         }
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_URL", $m3uFileURL;
+      } 
+      else {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_LOCAL", "undefined";
+         FRITZBOX_Log $hash, 4, "Error: Cannot create save file '$m3uFileLocal' because $!\n";
+      }
    }
    
 # Check if telnet modul exists
@@ -687,27 +732,6 @@ sub FRITZBOX_API_Check_Run($)
          FRITZBOX_Log $hash, 4, "Telnet connection availabel.";
       }
    }
-
-# Check if m3u can be created and the URL tested
-   # my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", "./www/images/".$name.".m3u" );
-   # if (open my $fh, '>', $m3uFileLocal) {
-      # print "http://translate.google.com/translate_tts?ie=UTF-8&tl=fr&q=Lirumlaruml%C3%B6ffelstielwerdasnichtkannderkannnichtviel";
-      # close $fh;
-      # FRITZBOX_Log $hash, 4, "Created m3u file '$m3uFileLocal'.";
-      # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_LOCAL", $m3uFileLocal;
-      # my $m3uFileURL = AttrVal( $name, "m3uFileURL", "" );
-      # unless ( $m3uFileURL ) {
-         # my $port = 8083;
-         # my $ip = "192.169.178.23";
-         # my $m3uFileName ="fhem/images/".$name.".m3u";
-         # $m3uFileURL = "http://$ip:$port/$m3uFileName";
-         # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_URL", $m3uFileURL;
-      # }
-   # } 
-   # else {
-      # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_LOCAL", "";
-      # FRITZBOX_Log $hash, 4, "Error: Cannot create save file '$m3uFileLocal' because $!\n";
-   # }
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", 1;
 
@@ -4567,7 +4591,7 @@ sub FRITZBOX_fritztris($)
       <li><b>fon</b><i>1</i><b>_intern</b> - Internal number of the analog FON port <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_out</b> - Outgoing number of the analog FON port <i>1</i></li>
       <br>
-      <li><b>mac_</b><i>01:26:FD:12:01:DA</i> - mac address and name of an <u>active</u> network device</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an <u>active</u> network device</li>
       <br>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
       <br>
@@ -4878,7 +4902,7 @@ sub FRITZBOX_fritztris($)
       <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Namen eine <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
       <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
       <br>
