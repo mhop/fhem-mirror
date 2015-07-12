@@ -3935,7 +3935,7 @@ readingsBulkUpdate($$$@)
   my $rv = "$reading: $value";
   if($changed) {
     if($reading eq "state") {
-      $rv = "$value";
+      $rv = $value;
       $hash->{CHANGEDWITHSTATE} = [];
     }
     addEvent($hash, $rv);
