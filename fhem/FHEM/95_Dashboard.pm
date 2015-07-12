@@ -542,25 +542,45 @@ sub BuildDashboardTab($$)
 
 	my @temptabgroup = split(",", $tabgroups[$t]); #Set temp. position for groups without an stored position
         my @tabgroup = ();
+	my @index = ();
 
-	foreach my $g (@groups){ 
-		for (my $i=0;$i<@temptabgroup;$i++) {
-			my @stabgroup = split(":", trim($temptabgroup[$i]));		
-			my $matchGroup = trim($stabgroup[0]);
+	for (my $i=0;$i<@temptabgroup;$i++) {
+		my @stabgroup = split(":", trim($temptabgroup[$i]));		
+		@index = grep { @groups[$_] eq @stabgroup[0] } (0 .. @groups-1);
 
-			# fill groups that are matching the configured groups
-			if ($g =~ m/$matchGroup/ && $g ne $stabgroup[0]) {
-				push(@tabgroup, $g);
-			}
-			elsif ($g eq $stabgroup[0]) {
-				push(@tabgroup, $g);
+		if (@index > 0) {
+			for (my $j=0; $j<@index;$j++) {
+				my $groupname = @groups[@index[$j]];
+				if (@stabgroup > 1) {
+					$groupname .= ':' . @stabgroup[1];
+				}
+				push(@tabgroup,$groupname);
 			}
 		}
-        }
+		else {
+			my $matchGroup = '^' . @stabgroup[0] . '$';
+			@index = grep { @groups[$_] =~ m/$matchGroup/ } (0 .. @groups-1);
+
+			if (@index > 0) {
+				for (my $j=0; $j<@index;$j++) {
+					my $groupname = @groups[@index[$j]];
+					if (@stabgroup > 1) {
+						$groupname .= ':' . @stabgroup[1];
+					}
+					push(@tabgroup,$groupname);
+				}
+			}
+		}
+		
+	}
+
+	
+
+	$tabgroups[$t] = join(',', @tabgroup);
 
 	for (my $i=0;$i<@tabgroup;$i++) {
 		my @stabgroup = split(":", trim($tabgroup[$i]));		
-		my $matchGroup = "," . trim($stabgroup[0]) . ",";
+		my $matchGroup = "," . quotemeta(trim($stabgroup[0])) . ",";
 
 		if ($tabsortings[$t] !~ m/$matchGroup/) {
 			$tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:";
@@ -657,15 +677,11 @@ sub BuildGroupWidgets($$$$$) {
 		
 		foreach my $singlesorting (@storedsorting) {
 			my @groupdata = split(",", $singlesorting);
-			my $groupMatch = $dbgroups;
 			$groupicon = '';
 			if (scalar(@groupdata) > 1) {
 				if (
 					   index($dbsorting, "t".$tab."c".$column.",".$groupdata[1]) >= 0
-					&& (
-						   index($dbgroups, $groupdata[1]) >= 0
-						|| $groupdata[1] =~ $groupMatch
-					)
+					&& index($dbgroups, $groupdata[1]) >= 0
 					&& $groupdata[1] ne ""
 				) { #group is set to tab
 					my $groupId = $id."t".$tab."c".$column."w".$counter;
@@ -694,7 +710,7 @@ sub BuildGroupList($) {
 		$grp = trim($grp);
 		foreach my $g (@dashboardgroups){ 
 			my ($gtitle, $iconName) = split(":", trim($g));
-			my $titleMatch = "^" . $gtitle . "\$";
+			my $titleMatch = "^" . quotemeta($gtitle) . "\$";
 			$group{$grp}{$d} = 1 if($grp =~ $titleMatch); 			
 		}
     }
@@ -718,14 +734,13 @@ sub BuildGroup
  my $ret = ""; 
  my $row = 1;
  my %extPage = ();
- my $matchGroup = "^" . $currentgroup . "\$";
  my $foundDevices = 0;
  my $replaceGroup = "";
  
  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
  foreach my $g (keys %group) {
-	next if ($g !~ m/$matchGroup/);
+	next if ($g ne $currentgroup);
         $replaceGroup = "," . quotemeta($currentgroup) . ",";
         $singleSorting =~ s/$replaceGroup/,$g,/;
         $currentgroup = $g;

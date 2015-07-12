@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  Dashboard: group names now also can contain regex special characters
+                        restoring of saved group state works now as expected
+                        fixed issue that some readingGroups are not updated correcly
   - change: 02_RSS: replaced refresh method by javascript DOM gymnastics
   - change: 59_Weather: removed empty header row from WeatherAsHtmlV
   - feature: 02_HTTPSRV: support tabletui (Forum #37232)
