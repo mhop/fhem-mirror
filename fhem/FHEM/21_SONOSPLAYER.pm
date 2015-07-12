@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, February 2015
+# SONOSPLAYER.pm (c) by Reiner Leins, July 2015 
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -117,6 +117,8 @@ my %sets = (
 	'AddMember' => 'member_devicename',
 	'RemoveMember' => 'member_devicename',
 	'GroupVolume' => 'volumelevel',
+	'GroupVolumeD' => '',
+	'GroupVolumeU' => '',
 	'SnapshotGroupVolume' => '',
 	'GroupMute' => 'state',
 	'CreateStereoPair' => 'RightPlayer',
@@ -429,10 +431,14 @@ sub SONOSPLAYER_Set($@) {
 		$udn = $hash->{UDN};
 	
 		if ($value =~ m/^[+-]{1}/) {
-			SONOS_DoWork($udn, 'setRelativeGroupVolume',  $value, $value2);
+			SONOS_DoWork($udn, 'setRelativeGroupVolume',  $value);
 		} else {
 			SONOS_DoWork($udn, 'setGroupVolume', $value, $value2);
 		}
+	} elsif (lc($key) eq 'groupvolumed') {
+		SONOS_DoWork($udn, 'setRelativeGroupVolume', -AttrVal($hash->{NAME}, 'VolumeStep', 7));
+	} elsif (lc($key) eq 'groupvolumeu') {
+		SONOS_DoWork($udn, 'setRelativeGroupVolume', AttrVal($hash->{NAME}, 'VolumeStep', 7));
 	} elsif (lc($key) eq 'snapshotgroupvolume') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -1174,6 +1180,12 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_GroupVolume">
 <b><code>GroupVolume &lt;VolumeLevel&gt;</code></b></a>
 <br />Sets the group-volume in the way the original controller does. This means, that the relative volumelevel between the different players will be saved during change.</li>
+<li><a name="SONOSPLAYER_setter_GroupVolumeD">
+<b><code>GroupVolumeD</code></b></a>
+<br /> Turns the group volume by volumeStep-ticks down.</li>
+<li><a name="SONOSPLAYER_setter_GroupVolumeU">
+<b><code>GroupVolumeU</code></b></a>
+<br /> Turns the group volume by volumeStep-ticks up.</li>
 <li><a name="SONOSPLAYER_setter_RemoveMember">
 <b><code>RemoveMember &lt;devicename&gt;</code></b></a>
 <br />Removes the given device, so that they both are not longer a group. The current playing of the current device goes on normally. The cutted device stops his playing and has no current playlist anymore (since Sonos Version 4.2 the old playlist will be restored).</li>
@@ -1494,6 +1506,12 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_GroupVolume">
 <b><code>GroupVolume &lt;VolumeLevel&gt;</code></b></a>
 <br />Setzt die Gruppenlautstärke in der Art des Original-Controllers. Das bedeutet, dass das Lautstärkeverhältnis der Player zueinander beim Anpassen erhalten bleibt.</li>
+<li><a name="SONOSPLAYER_setter_GroupVolumeD">
+<b><code>GroupVolumeD</code></b></a>
+<br /> Verringert die aktuelle Gruppenlautstärke um volumeStep-Einheiten.</li>
+<li><a name="SONOSPLAYER_setter_GroupVolumeU">
+<b><code>GroupVolumeU</code></b></a>
+<br /> Erhöht die aktuelle Gruppenlautstärke um volumeStep-Einheiten.</li>
 <li><a name="SONOSPLAYER_setter_RemoveMember">
 <b><code>RemoveMember &lt;devicename&gt;</code></b></a>
 <br />Entfernt dem Device das übergebene Device, sodass die beiden keine Gruppe mehr bilden. Die Wiedergabe des aktuellen Devices läuft normal weiter. Das abgetrennte Device stoppt seine Wiedergabe, und hat keine aktuelle Abspielliste mehr (seit Sonos Version 4.2 hat der Player wieder die Playliste von vorher aktiv).</li>
