@@ -28,7 +28,7 @@ package main;
 
 use strict;
 use warnings;
-use IO::Socket;
+# use IO::Socket;
 use Time::HiRes qw(gettimeofday);
 use Time::Local 'timelocal_nocheck';
 
@@ -162,7 +162,6 @@ sub RandomTimer_Exec($) {
    if ($active) {
       # wenn temporär ausgeschaltet
       if ($disabled) {
-       #Log3 $hash, 3, "[".$hash->{NAME}. "] RandomTimer for $hash->{DEVICE} going down";
        Log3 $hash, 3, "[".$hash->{NAME}."]"." ending   RandomTimer on $hash->{DEVICE}: "
           . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
           . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
@@ -401,17 +400,20 @@ sub RandomTimer_device_switch ($)
 sub RandomTimer_isDisabled($) {
    my ($hash) = @_;
    
-   my $disable     = AttrVal($hash->{NAME}, "disable",     0 );
-   my $disableCond = AttrVal($hash->{NAME}, "disableCond", 0 );
+   my $disable = AttrVal($hash->{NAME}, "disable", 0 );   
+   return $disable if($disable);
    
-   $disable = $disable || eval ($disableCond);
-   if ($@) {
-      $@ =~ s/\n/ /g; 
-      Log3 ($hash, 3, "[$hash->{NAME}] ERROR: " . $@ . " EVALUATING " . $disableCond);
+   my $disableCond = AttrVal($hash->{NAME}, "disableCond", "nf" );
+   if ($disableCond eq "nf") {
+     return 0;
+   } else {   
+      $disable = eval ($disableCond);
+      if ($@) {
+         $@ =~ s/\n/ /g; 
+         Log3 ($hash, 3, "[$hash->{NAME}] ERROR: " . $@ . " EVALUATING " . $disableCond);
+      }
+      return $disable;
    }
-   $disable = 0 if (!defined($disable));
-   
-   return $disable;
 }
 ########################################################################
 sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
