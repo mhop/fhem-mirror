@@ -2260,7 +2260,12 @@ sub PIONEERAVR_checkConnection ($) {
     # we got a reply -> connection is good -> restore state
 	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- state: ".$hash->{STATE}." restored to: ".$state;
 	$hash->{STATE} = $state;
-	$hash->{PARTIAL} .= $connState;
+	Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- connstate: ".dq($connState)." PARTIAL: ".dq($hash->{PARTIAL});
+	if ($connState =~ m/^R\r?\n?$/) {
+      Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_checkConnection() --- connstate=R -> do nothing: ".dq($connState)." PARTIAL: ".dq($hash->{PARTIAL});
+	} else {
+	  $hash->{PARTIAL} .= $connState;
+	}
   } 
   if (AttrVal($name, "checkConnection", "enable") eq "enable" ) {
 	$hash->{helper}{nextConnectionCheck}  = gettimeofday()+120; 
