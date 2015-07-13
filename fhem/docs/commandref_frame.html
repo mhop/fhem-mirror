@@ -1456,6 +1456,14 @@ The following local attributes are used by a wider range of devices:
         overview and by xmllist.
     </li><br>
 
+    <a name="sslVersion"></a>
+    <li>sslVersion<br>
+        Specifies the accepted cryptography algorithms by all modules using the
+        TcpServices helper module. The current default TLSv12:!SSLv3 is thought
+        to be more secure than the previously used SSLv23:!SSLv3:!SSLv2, but it
+        causes problems with some not updated web services.
+    </li><br>
+
     <a name="stacktrace"></a>
     <li>stacktrace<br>
         if set (to 1), dump a stacktrace to the log for each "PERL WARNING".

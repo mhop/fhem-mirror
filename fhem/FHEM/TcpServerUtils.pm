@@ -83,6 +83,10 @@ TcpServer_Accept($$)
   #$clientinfo[0]->blocking(0);  # Forum #24799
 
   if($hash->{SSL}) {
+    # Forum #27565: SSLv23:!SSLv3:!SSLv2', #35004: TLSv12:!SSLv3
+    my $sslVersion = AttrVal($hash->{NAME}, "sslVersion", 
+                     AttrVal("global", "sslVersion", "TLSv12:!SSLv3"));
+
     # Certs directory must be in the modpath, i.e. at the same level as the
     # FHEM directory
     my $mp = AttrVal("global", "modpath", ".");
@@ -90,8 +94,7 @@ TcpServer_Accept($$)
       SSL_server    => 1, 
       SSL_key_file  => "$mp/certs/server-key.pem",
       SSL_cert_file => "$mp/certs/server-cert.pem",
-      #SSL_version   => 'SSLv23:!SSLv3:!SSLv2', #Forum #27565
-      SSL_version => 'TLSv12:!SSLv3', # Forum  #35004
+      SSL_version => $sslVersion,
       SSL_cipher_list => 'HIGH:!RC4:!eNULL:!aNULL',
       Timeout       => 4,
       });
