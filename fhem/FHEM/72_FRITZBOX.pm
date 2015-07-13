@@ -42,6 +42,7 @@ my $missingModulTelnet;
 my $missingModulWeb;
 my $missingModulTR064;
 our $FRITZBOX_TR064pwd;
+our $FRITZBOX_TR064user;
 
 eval "use Net::Telnet;1" or $missingModulTelnet .= "Net::Telnet ";
 eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
@@ -570,7 +571,7 @@ sub FRITZBOX_Readout_Start($)
 
    }
    
-   if($interval != 0) {
+   if( $interval != 0 ) {
       RemoveInternalTimer($hash->{helper}{TimerReadout});
       InternalTimer(gettimeofday()+$interval, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
       return undef if( AttrVal($name, "disable", 0 ) == 1 );
@@ -585,8 +586,9 @@ sub FRITZBOX_Readout_Start($)
       delete( $hash->{helper}{READOUT_RUNNING_PID} );
    }
    
+   FRITZBOX_Log $hash, 4, "Fork process $runFn";
    $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall($runFn, $name,
-                                                       "FRITZBOX_Readout_Done", $interval-2,
+                                                       "FRITZBOX_Readout_Done", 55,
                                                        "FRITZBOX_Readout_Aborted", $hash)
                          unless exists( $hash->{helper}{READOUT_RUNNING_PID} );
 
@@ -1706,6 +1708,7 @@ sub FRITZBOX_Set_Cmd_Start($)
    }
 
 # Starting new command
+   FRITZBOX_Log $hash, 4, "Fork process $cmdFunction";
    $hash->{helper}{CMD_RUNNING_PID} = BlockingCall($cmdFunction, $handover,
                                        "FRITZBOX_Set_Cmd_Done", $timeout,
                                        "FRITZBOX_Set_Cmd_Aborted", $hash);
@@ -3765,8 +3768,9 @@ sub FRITZBOX_TR064_Cmd($$$)
       return undef;
    }
 
-# Set Password for TR064 access
+# Set Password und User for TR064 access
    $FRITZBOX_TR064pwd = FRITZBOX_readPassword($hash);
+   $FRITZBOX_TR064user = AttrVal( $name, "boxUser", "dslf-config" );   
    
    my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
    
@@ -3978,7 +3982,7 @@ sub FRITZBOX_TR064_Init ($)
    }
 
    # dieser Code authentifiziert an der Box
-   sub SOAP::Transport::HTTP::Client::get_basic_credentials {return  "dslf-config" => $FRITZBOX_TR064pwd;}
+   sub SOAP::Transport::HTTP::Client::get_basic_credentials {return  $FRITZBOX_TR064user => $FRITZBOX_TR064pwd;}
    
    return $port;
 }
