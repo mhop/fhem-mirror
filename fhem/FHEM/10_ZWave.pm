@@ -452,14 +452,37 @@ ZWave_Define($$)
 }
 
 sub
+ZWave_initFromModelfile($$)
+{
+  my ($name, $ctrlId) = @_;
+  my @res;
+  my $cfg = ReadingsVal($name, "modelConfig", "");
+  return @res if(!$cfg);
+  ZWave_configParseModel($cfg) if(!$zwave_modelConfig{$cfg});
+  my $mc = $zwave_modelConfig{$cfg};
+  return @res if(!$mc);
+  for my $grp (keys %{$mc->{group}}) {
+    next if($grp eq '1');
+    next if($mc->{group}{$grp} !~ m/auto="true"/);
+    push @res, "set $name associationAdd $grp $ctrlId";
+  }
+  return @res;
+}
+
+sub
 ZWave_doExecInits($)
 {
-  my ($cmdArr) = @_;
+  my ($param) = @_;
+  my $cmdArr = $param->{cmdArr};
 
   my $cmd = shift @{$cmdArr};
   my $ret = AnalyzeCommand(undef, $cmd);
   Log 1, "ZWAVE INIT: $cmd: $ret" if ($ret);
-  InternalTimer(gettimeofday()+0.5, "ZWave_doExecInits", $cmdArr, 0)
+
+  push(@{$cmdArr}, ZWave_initFromModelfile($1, $param->{ctrlId}))
+                if($cmd =~ m/^get (.*) model$/);
+
+  InternalTimer(gettimeofday()+0.5, "ZWave_doExecInits", $param, 0)
     if(@{$cmdArr});
 }
 
@@ -486,8 +509,9 @@ ZWave_execInits($$)
   foreach my $i (sort { $a->{ORDER}<=>$b->{ORDER} } @initList) {
     push @cmd, eval $i->{CMD};
   }
-  InternalTimer(gettimeofday()+0.5, "ZWave_doExecInits", \@cmd, 0)
-    if(@cmd);
+
+  InternalTimer(gettimeofday()+0.5, "ZWave_doExecInits",
+        { cmdArr=>\@cmd, ctrlId=>$CTRLID }, 0) if(@cmd);
 }
 
 
@@ -1126,7 +1150,7 @@ ZWave_configParseModel($)
     return;
   }
 
-  my ($line, $class, %hash, $cmdName, %classInfo);
+  my ($line, $class, %hash, $cmdName, %classInfo, %group);
   while($gz->gzreadline($line)) {       # Search the "file" entry
     last if($line =~ m/^\s*<Product.*sourceFile="$cfg"/);
   }
@@ -1137,6 +1161,7 @@ ZWave_configParseModel($)
       $class = $1;
       $classInfo{$class} = $2;
     }
+    $group{$1} = $line if($line =~ m/^\s*<Group.*index="([^"]*)".*$/);
     next if(!$class || $class ne "112");
     if($line =~ m/^\s*<Value /) {
       my %h;
@@ -1169,7 +1194,7 @@ ZWave_configParseModel($)
   }
   $gz->gzclose();
 
-  my %mc = (set=>{}, get=>{}, config=>{}, classInfo=>\%classInfo);
+  my %mc = (set=>{}, get=>{}, config=>{},classInfo=>\%classInfo,group=>\%group);
   foreach my $cmd (keys %hash) {
     my $h = $hash{$cmd};
     my $arg = ($h->{type} eq "button" ? "a" : "a%b");
