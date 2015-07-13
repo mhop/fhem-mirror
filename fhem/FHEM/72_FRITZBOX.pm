@@ -403,10 +403,15 @@ sub FRITZBOX_Set($$@)
       return undef;
    }
    elsif ( lc $cmd eq 'startradio') {
+      
       if (int @val > 0) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
-         return FRITZBOX_StartRadio_Web $hash, @val
-            unless $forceShell;
+         unless ($forceShell) {
+            return FRITZBOX_StartRadio_Web $hash, @val if $hash->{WEBCM};
+            my $msg = "startRadio cannot be performed. Device '$name' misses API 'webcm'.";
+            Log3 $name, 2, $msg;
+            return $msg;
+         }
          return FRITZBOX_StartRadio_Shell $hash, @val;
       }
    } 
@@ -3793,7 +3798,6 @@ sub FRITZBOX_TR064_Cmd($$$)
          -> call( $action => @soapParams );
       
       if ($s->fault) { # will be defined if Fault element is in the message
-            my $fdetail = Dumper($s->faultdetail); # returns value of 'detail' element as string or object
             # my $fcode =  $s->faultcode;   #
             # my $fstring =  $s->faultstring; # also available
             # my $factor =  $s->faultactor;
@@ -3801,6 +3805,7 @@ sub FRITZBOX_TR064_Cmd($$$)
             my $edesc =  $s->faultdetail->{'UPnPError'}->{'errorDescription'};
             FRITZBOX_Log $hash, 2, "TR064-Error $ecode:$edesc ($logMsg)";
             @{$cmdArray} = ();
+            my $fdetail = Dumper($s->faultdetail); # returns value of 'detail' element as string or object
             return "Error\n".$fdetail;
       }
 
