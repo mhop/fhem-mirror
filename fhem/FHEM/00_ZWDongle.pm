@@ -585,7 +585,9 @@ ZWave_ProcessSendStack($)
     ZWDongle_shiftSendStack($hash, 1, "ERROR: max send retries reached");
   }
   
-  return if(!@{$hash->{SendStack}} || $hash->{WaitForAck} || !$hash->{FD});
+  return if(!@{$hash->{SendStack}} ||
+               $hash->{WaitForAck} ||
+               !DevIo_IsOpen($hash));
   
   my $msg = $hash->{SendStack}->[0];
 
