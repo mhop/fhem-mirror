@@ -406,6 +406,13 @@ DevIo_CloseDev($@)
 }
 
 sub
+DevIo_IsOpen($)
+{
+  my ($hash) = @_;
+  return ($hash->{TCPDev} || $hash->{USBDev} || $hash->{DIODev});
+}
+
+sub
 DevIo_Disconnected($)
 {
   my $hash = shift;
