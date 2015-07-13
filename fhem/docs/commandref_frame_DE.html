@@ -1552,6 +1552,14 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
       xmllist Befehl, und bei der FHEMWEB Raumansicht gepr&uuml;ft.
     </li><br>
 
+    <a name="sslVersion"></a>
+    <li>sslVersion<br>
+        Setzt die akzeptierten Crypto-Algorithmen im TcpServices Hilfsmodul.
+        Die Voreinstellung TLSv12:!SSLv3 wird als sicherer erachtet als die
+        vorherige SSLv23:!SSLv3:!SSLv2, aber sie kann Probleme mit nicht
+        ausreichend aktualisierten Netzwerk-Diensten verursachen.
+    </li><br>
+
     <a name="stacktrace"></a>
     <li>stacktrace<br>
         Falls gesetzt (auf 1), schreibt ins FHEM-Log zus&auml;tzlich zu jedem

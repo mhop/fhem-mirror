@@ -164,6 +164,7 @@ FHEMWEB_Initialize($)
     reverseLogs:0,1
     roomIcons
     sortRooms
+    sslVersion
     smallscreen:unused
     smallscreenCommands:0,1
     stylesheetPrefix
@@ -3395,6 +3396,9 @@ FW_widgetOverride($$)
         smallscreen landscape mode.
         </li><br>
 
+     <li>sslVersion<br>
+        See the global attribute sslVersion.
+        </li><br>
 
     </ul>
   </ul>
@@ -4103,6 +4107,10 @@ FW_widgetOverride($$)
      <li>smallscreenCommands<br>
         Falls auf 1 gesetzt werden Kommandos, Slider und Dropdown Men&uuml;s im
         Smallscreen Landscape Modus angezeigt.
+        </li><br>
+
+     <li>sslVersion<br>
+        Siehe das global Attribut sslVersion.
         </li><br>
 
     </ul>

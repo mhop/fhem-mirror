@@ -185,9 +185,11 @@ HttpUtils_Connect2($)
       Log3 $hash, $hash->{loglevel}, $@;
     } else {
       $hash->{conn}->blocking(1);
+      my $sslVersion = AttrVal($hash->{NAME}, "sslVersion", 
+                       AttrVal("global", "sslVersion", "SSLv23:!SSLv3:!SSLv2"));
       IO::Socket::SSL->start_SSL($hash->{conn}, {
           Timeout     => $hash->{timeout},
-          SSL_version => 'SSLv23:!SSLv3:!SSLv2', #Forum #27565
+          SSL_version => $sslVersion
         }) || undef $hash->{conn};
     }
   }

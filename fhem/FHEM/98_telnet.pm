@@ -22,7 +22,7 @@ telnet_Initialize($)
   $hash->{NotifyFn}= "telnet_SecurityCheck";
   $hash->{AttrList} = "globalpassword password prompt ".
                         "allowfrom SSL connectTimeout connectInterval ".
-                        "encoding:utf8,latin1";
+                        "encoding:utf8,latin1 sslVersion";
   $hash->{ActivateInformFn} = "telnet_ActivateInform";
 
   my %lhash = ( Fn=>"CommandTelnetEncoding",
@@ -471,9 +471,13 @@ telnet_ActivateInform($;$)
 
     <a name="encoding"></a>
     <li>encoding<br>
-        Sets the encoding for the data send to the client. Possible values are latin1 and utf8. Default is utf8.
+        Sets the encoding for the data send to the client. Possible values are
+        latin1 and utf8. Default is utf8.
         </li><br>
 
+     <li>sslVersion<br>
+        See the global attribute sslVersion.
+        </li><br>
 
   </ul>
 
@@ -634,6 +638,9 @@ telnet_ActivateInform($;$)
         M&ouml;gliche Werte sind utf8 und latin1. Standardwert ist utf8. 
     </li><br>
 
+     <li>sslVersion<br>
+        Siehe das global Attribut sslVersion.
+        </li><br>
 
   </ul>
 

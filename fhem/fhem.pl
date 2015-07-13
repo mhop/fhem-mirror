@@ -281,6 +281,7 @@ my @globalAttrList = qw(
   restoreDirs
   sendStatistics:onUpdate,manually,never
   showInternalValues:1,0
+  sslVersion
   stacktrace:1,0
   statefile
   title
