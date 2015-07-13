@@ -2789,7 +2789,7 @@ sub FRITZBOX_Ring_Run_Web($)
             $ttsLink = $hash->{M3U_URL}      if $hash->{M3U_URL} ne "undefined";
          } 
          else {
-            my $msg = "Error: Cannot create save file '".$hash->{M3U_LOCAL},"' because $!\n";
+            my $msg = "Error: Cannot create save file '".$hash->{M3U_LOCAL}."' because: ".$!."\n";
             FRITZBOX_Log $hash, 4, $msg;
          }
       }
