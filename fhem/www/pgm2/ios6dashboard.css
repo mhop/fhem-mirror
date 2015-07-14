@@ -255,10 +255,10 @@ background: none;
 	}
 #dashboard .ui-state-default a {color: #333333;text-decoration: none;}
 #dashboard .ui-state-disabled {opacity: .35;filter:Alpha(Opacity=35);}
-#dashboard .ui-state-active a {color: #ffffff;text-decoration: none;}
-#dashboard .ui-state-hover {color: #ffffff;}
+#dashboard .ui-state-active a {color: #000000!important;text-decoration: underline;}
+#dashboard .ui-state-hover {color: #000000;}
 #dashboard .ui-state-hover a,
-#dashboard .ui-state-focus a:hover {color: #ffffff;text-decoration: none;}
+#dashboard .ui-state-focus a:hover {color: #000000;text-decoration: underline;}
 
 /* Dashboard Dialog
 ------------------------------------------------------------------------*/	
@@ -364,10 +364,6 @@ a.evo-hist {margin-left: 6px;}
   padding: 0px;
 }
 
-.col2 {
-  text-align: center;
-}
-
 .dashboard_widgetheader svg {
   margin-right: 5px;
 }
@@ -403,7 +399,7 @@ a.evo-hist {margin-left: 6px;}
 		padding: 5px 5px 5px 32px;
 	}
 	.dashboard_tabnav .ui-state-active a {
-		color: #666;
+		color: #888888 !important;
 	}
 
 	/* on nav hover */
