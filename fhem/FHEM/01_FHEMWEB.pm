@@ -2890,11 +2890,9 @@ FW_widgetOverride($$)
     <li>plotEmbed 0<br>
         SVG plots are rendered as part of &lt;embed&gt; tags, as in the past
         this was the only way to display SVG, and it allows to render them in
-        parallel, see plotfork. As of iOS 8, if FHEMWEB is called from the Home
-        Screen, the SVG is fetched but not displayed, which is IMHO a bug.
+        parallel, see plotfork.
         Setting plotEmbed to 0 will render SVG in-place, but as a side-effect
         makes the plotfork attribute meaningless.<br>
-        This attribute defaults to 0 on iOS8 devices, and 1 elsewhere.
     </li><br>
 
 
@@ -3569,13 +3567,9 @@ FW_widgetOverride($$)
         SVG Grafiken werden als Teil der &lt;embed&gt; Tags dargestellt, da
         fr&uuml;her das der einzige Weg war SVG darzustellen, weiterhin
         erlaubt es das parallele Berechnen via plotfork (s.o.)
-        Ab iOS 8 werden SVG Grafiken in einem embed Tag nicht dargestellt,
-        falls FHEMWEB vom HomeScreen gestartet wurde (mAn ist das ein Bug in
-        iOS8).
         Falls plotEmbed auf 0 gesetzt wird, dann werden die SVG Grafiken als
         Teil der HTML-Seite generiert, was leider das plotfork Attribut
-        wirkungslos macht. Die Voreinstellung ist 0 auf iOS 8 Ger&auml;ten, und
-        1 sonst.
+        wirkungslos macht.
     </li><br>
 
 

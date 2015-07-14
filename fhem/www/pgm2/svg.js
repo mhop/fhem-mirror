@@ -134,7 +134,7 @@ sv_menu(evt, embed)
             "translate(0,"+ (h/y_mul+y_min-h/ny_mul-ny_min)*y_mul +") "+
             "scale(1, "+ (y_mul/ny_mul) +") ";
         o.setAttribute("transform", tr);
-        doc.documentElement.appendChild(o);
+        svgNode.appendChild(o);
       }
 
       //show/hide
