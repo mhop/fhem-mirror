@@ -385,6 +385,7 @@ PIONEERAVR_Define($$) {
 		'tunerFrequency'       => '?FR',
 		'tunerChannelNames'    => '?TQ',
 		'treble'               => '?TR',		
+		'videoInfo'            => '?VST',
 		'volume'               => '?V'
 	},
 	'zone2' => {
@@ -786,12 +787,77 @@ PIONEERAVR_Define($$) {
 	"2"=>"2",
 	"3"=>"OFF"
   };
-  
+
+  #Video Input Terminals
+  $hash->{helper}{VIDEOINPUTTERMINAL} = {  
+    "0"=>"---",
+	"1"=>"VIDEO",
+	"2"=>"S-VIDEO",
+	"3"=>"COMPONENT",
+	"4"=>"HDMI",
+	"5"=>"Self OSD/JPEG"
+  };
+  #Video resolutions
+  $hash->{helper}{VIDEORESOLUTION} = {  
+    "00"=>"---",
+	"01"=>"480/60i",
+	"02"=>"576/50i",
+	"03"=>"480/60p",
+	"04"=>"576/50p",
+	"05"=>"720/60p",
+	"06"=>"720/50p",
+	"07"=>"1080/60i",
+	"08"=>"1080/50i",
+	"09"=>"1080/60p",
+	"10"=>"1080/50p",
+	"11"=>"1080/24p",
+	"12"=>"4Kx2K/24Hz",
+	"13"=>"4Kx2K/25Hz",
+	"14"=>"4Kx2K/30Hz",
+	"15"=>"4Kx2K/24Hz(SMPTE)",
+	"16"=>"4Kx2K/50Hz",
+	"17"=>"4Kx2K/60Hz"
+  };
+  #Video aspect ratios
+  $hash->{helper}{VIDEOASPECTRATIO} = {  
+    "0"=>"---",
+	"1"=>"4:3",
+	"2"=>"16:9",
+	"3"=>"14:9"
+  };
+  #Video colour format
+  $hash->{helper}{VIDEOCOLOURFORMAT} = {  
+    "0"=>"---",
+	"1"=>"RGB Limit",
+	"2"=>"RGB Full",
+	"3"=>"YcbCr444",
+	"4"=>"YcbCr422",
+	"5"=>"YcbCr420"
+  };
+  #Video bit (VIDEOCOLOURDEPTH)
+  $hash->{helper}{VIDEOCOLOURDEPTH} = {  
+    "0"=>"---",
+	"1"=>"24bit (8bit*3)",
+	"2"=>"30bit (10bit*3)",
+	"3"=>"36bit (12bit*3)",
+	"4"=>"48bit (16bit*3)"
+  };
+  #Video extended colour space
+  $hash->{helper}{VIDEOCOLOURSPACE} = {  
+    "0"=>"---",
+	"1"=>"Standard",
+	"2"=>"xvYCC601",
+	"3"=>"xvYCC709",
+	"4"=>"sYCC",
+	"5"=>"AdobeYCC601",
+	"6"=>"AdobeRGB"
+  };
+
   # for some inputs (e.g. internetRadio) the Pioneer AVR gives more information about the current program
   # The information is displayed on a (to the Pioneer avr) connected screen
   # This information is categorized - below are the categories ("dataTypes")  
   $hash->{helper}{SCREENTYPES} = {
-	"00"=>"Massage",
+	"00"=>"Message",
 	"01"=>"List",
 	"02"=>"Playing(Play)",
 	"03"=>"Playing(Pause)",
@@ -1497,18 +1563,11 @@ sub PIONEERAVR_Read($)
 			Log3 $name, 5, "PIONEERAVR $name: ".dq($line) ." interpreted as: Main Zone - Mute on ";
 		}
 
-	} elsif ( $line=~ m/^AST(\d{2})(\d{2})(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d{2})(\d{2})(\d{4})(\d)(\d{2})(\d)$/ ) {
+	} elsif ( $line=~ m/^AST(\d{2})(\d{2})(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d*)$/ ) {
 		# Audio information parameters
 		#  data1-data2:Audio Input Signal
 		#  data3-data4:Audio Input Frequency
-		#  data5-data25:Audio Input Channel Format (ignored)
-		#  data26-data43:Audio Output Channel (ignored)
-		#  data44-data45:Audio Output Frequency
-		#  data46-data47:Audio Output bit
-		#  data48-data51:Reserved
-		#  data52:Working PQLS
-		#  data53-data54:Working Auto Phase Control Plus (in ms)(ignored)
-		#  data55:Working Auto Phase Control Plus (Reverse Phase) (0... no revers phase, 1...reverse phase)(ignored)
+		#  data5-data20 (for some models data5-data25):Audio Input Channel Format 
 		if ( defined ( $hash->{helper}{AUDIOINPUTSIGNAL}->{$1}) ) {
 			readingsBulkUpdate($hash, "audioInputSignal", $hash->{helper}{AUDIOINPUTSIGNAL}->{$1} );
 			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio input signal: ". dq($1);	
@@ -1539,51 +1598,65 @@ sub PIONEERAVR_Read($)
 		readingsBulkUpdate($hash, "audioInputFormatXL", $16);
 		readingsBulkUpdate($hash, "audioInputFormatXC", $17);
 		readingsBulkUpdate($hash, "audioInputFormatXR", $18);
-#		readingsBulkUpdate($hash, "audioInputFormatReserved1", $19);
-#		readingsBulkUpdate($hash, "audioInputFormatReserved2", $20);
-#		readingsBulkUpdate($hash, "audioInputFormatReserved3", $21);
-#		readingsBulkUpdate($hash, "audioInputFormatReserved4", $22);
-#		readingsBulkUpdate($hash, "audioInputFormatReserved5", $23);
-		readingsBulkUpdate($hash, "audioOutputFormatL", $24);
-		readingsBulkUpdate($hash, "audioOutputFormatC", $25);
-		readingsBulkUpdate($hash, "audioOutputFormatR", $26);
-		readingsBulkUpdate($hash, "audioOutputFormatSL", $27);
-		readingsBulkUpdate($hash, "audioOutputFormatSR", $28);
-		readingsBulkUpdate($hash, "audioOutputFormatSBL", $29);
-		readingsBulkUpdate($hash, "audioOutputFormatSB", $30);
-		readingsBulkUpdate($hash, "audioOutputFormatSBR", $31);
-		readingsBulkUpdate($hash, "audioOutputFormatSW", $32);
-		readingsBulkUpdate($hash, "audioOutputFormatFHL", $33);
-		readingsBulkUpdate($hash, "audioOutputFormatFHR", $34);
-		readingsBulkUpdate($hash, "audioOutputFormatFWL", $35);
-		readingsBulkUpdate($hash, "audioOutputFormatFWR", $36);
-#		readingsBulkUpdate($hash, "audioOutputFormatReserved1", $37);
-#		readingsBulkUpdate($hash, "audioOutputFormatReserved2", $38);
-#		readingsBulkUpdate($hash, "audioOutputFormatReserved3", $39);
-#		readingsBulkUpdate($hash, "audioOutputFormatReserved4", $40);
-#		readingsBulkUpdate($hash, "audioOutputFormatReserved5", $41);
-		
-		if ( defined ( $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$42}) ) {
-			readingsBulkUpdate($hash, "audioOutputFrequency", $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$42} );
-			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio output frequency: ". dq($42);	
-		}
-		else {
-			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown audio output frequency: ". dq($42);	
-		}
-		readingsBulkUpdate($hash, "audioOutputBit", $43);
-		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio input bit: ". dq($43);	
-		if ( defined ( $hash->{helper}{PQLSWORKING}->{$45}) ) {
-			readingsBulkUpdate($hash, "pqlsWorking", $hash->{helper}{PQLSWORKING}->{$45} );
-			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working PQLS: ". dq($45);	
-		}
-		else {
-			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown working PQLS: ". dq($45);	
-		}
-		readingsBulkUpdate($hash, "audioAutoPhaseControlMS", $46);
-		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working audio auto phase control plus (in ms): ". dq($46);	
-		readingsBulkUpdate($hash, "audioAutoPhaseControlRevPhase", $47);
-		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working audio auto phase control plus reverse phase: ". dq($47);	
+		if ( $19=~ m/^(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d{2})(\d{2})(\d{4})(\d)(\d{2})(\d)$/ ) {
+		#  Some Pioneer AVR models (e.g. VSX-921) return less then 55 data bytes - the first 20 bytes can still be used
+		#  here are the bytes 21-55 processed ... e.g. for VSX-923
+		#  data26-data43:Audio Output Channel 
+		#  data44-data45:Audio Output Frequency
+		#  data46-data47:Audio Output bit
+		#  data48-data51:Reserved
+		#  data52:Working PQLS
+		#  data53-data54:Working Auto Phase Control Plus (in ms)(ignored)
+		#  data55:Working Auto Phase Control Plus (Reverse Phase) (0... no revers phase, 1...reverse phase)
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." AST with 55 data bytes ";	
 
+			#readingsBulkUpdate($hash, "audioInputFormatReserved1", $1);
+			#readingsBulkUpdate($hash, "audioInputFormatReserved2", $2);
+			#readingsBulkUpdate($hash, "audioInputFormatReserved3", $3);
+			#readingsBulkUpdate($hash, "audioInputFormatReserved4", $4);
+			#readingsBulkUpdate($hash, "audioInputFormatReserved5", $5);
+			readingsBulkUpdate($hash, "audioOutputFormatL", $6);
+			readingsBulkUpdate($hash, "audioOutputFormatC", $7);
+			readingsBulkUpdate($hash, "audioOutputFormatR", $8);
+			readingsBulkUpdate($hash, "audioOutputFormatSL", $9);
+			readingsBulkUpdate($hash, "audioOutputFormatSR", $10);
+			readingsBulkUpdate($hash, "audioOutputFormatSBL", $11);
+			readingsBulkUpdate($hash, "audioOutputFormatSB", $12);
+			readingsBulkUpdate($hash, "audioOutputFormatSBR", $13);
+			readingsBulkUpdate($hash, "audioOutputFormatSW", $14);
+			readingsBulkUpdate($hash, "audioOutputFormatFHL", $15);
+			readingsBulkUpdate($hash, "audioOutputFormatFHR", $16);
+			readingsBulkUpdate($hash, "audioOutputFormatFWL", $17);
+			readingsBulkUpdate($hash, "audioOutputFormatFWR", $18);
+	#		readingsBulkUpdate($hash, "audioOutputFormatReserved1", $19);
+	#		readingsBulkUpdate($hash, "audioOutputFormatReserved2", $20);
+	#		readingsBulkUpdate($hash, "audioOutputFormatReserved3", $21);
+	#		readingsBulkUpdate($hash, "audioOutputFormatReserved4", $22);
+	#		readingsBulkUpdate($hash, "audioOutputFormatReserved5", $23);
+			
+			if ( defined ( $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$24}) ) {
+				readingsBulkUpdate($hash, "audioOutputFrequency", $hash->{helper}{AUDIOOUTPUTFREQUENCY}->{$24} );
+				Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio output frequency: ". dq($24);	
+			}
+			else {
+				Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown audio output frequency: ". dq($24);	
+			}
+			readingsBulkUpdate($hash, "audioOutputBit", $25);
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: audio input bit: ". dq($25);	
+			if ( defined ( $hash->{helper}{PQLSWORKING}->{$27}) ) {
+				readingsBulkUpdate($hash, "pqlsWorking", $hash->{helper}{PQLSWORKING}->{$27} );
+				Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working PQLS: ". dq($27);	
+			}
+			else {
+				Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown working PQLS: ". dq($27);	
+			}
+			readingsBulkUpdate($hash, "audioAutoPhaseControlMS", $28);
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working audio auto phase control plus (in ms): ". dq($28);	
+			readingsBulkUpdate($hash, "audioAutoPhaseControlRevPhase", $29);
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: working audio auto phase control plus reverse phase: ". dq($29);	
+		} else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." AST with NOT 55 data bytes ... some audio parameters like audioOutputFormatXXX could not be set";
+		}
 		# Main zone Input			
 	} elsif ( $line =~ m/^FN(\d\d)$/) {
 		my $inputNr = $1;
@@ -1779,6 +1852,146 @@ sub PIONEERAVR_Read($)
 			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown hdmiOut: ". dq($2);	
 		}
 		
+	} elsif ( $line=~ m/^VST(\d)(\d{2})(\d)(\d)(\d)(\d)(\d{2})(\d)(\d)(\d)(\d)(\d{2})(\d)(\d)(\d{2})(\d)(\d)(\d*)$/ ) {
+		# Video information parameters
+		#  data1:Video Input Signal
+		#  data2-data3:Video Input Resolution
+		#  data4:Video Input aspect ratio
+		#  data5:Video input colour format (HDMI only)
+		#  data6:Video input bit rate (HDMI only) VIDEOCOLOURDEPTH
+		#  data7:Input extend color space(HDMI only)
+		#  data8-9:Output Resolution
+		#  data10:Output aspect
+		#  data11:Output color format(HDMI only)
+		#  data12:Output bit(HDMI only)
+		#  data13:Output extend color space(HDMI only)
+		#  data14-15:HDMI 1 Monitor Recommend Resolution Information
+		#  data16:HDMI 1 Monitor DeepColor
+		#  data17-21:HDMI 1 Monitor Extend Color Space
+		#  data22-23:HDMI 2 Monitor Recommend Resolution Information
+		#  data24:HDMI 2 Monitor DeepColor
+		#  data25-29:HDMI 2 Monitor Extend Color Space
+		#  data30-49: HDMI3 & HDMI4 (not used)
+		if ( defined ( $hash->{helper}{VIDEOINPUTTERMINAL}->{$1}) ) {
+			readingsBulkUpdate($hash, "videoInputTerminal", $hash->{helper}{VIDEOINPUTTERMINAL}->{$1} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input terminal: ". dq($1);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: unknown video input terminal: ". dq($1);	
+		}
+		if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$2}) ) {
+			readingsBulkUpdate($hash, "videoInputResolution", $hash->{helper}{VIDEORESOLUTION}->{$2} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input resolution: ". dq($2);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input resolution: ". dq($2);	
+		}
+		if ( defined ( $hash->{helper}{VIDEOASPECTRATIO}->{$3}) ) {
+			readingsBulkUpdate($hash, "videoInputAspectRatio", $hash->{helper}{VIDEOASPECTRATIO}->{$3} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input aspect ratio: ". dq($3);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input aspect ratio: ". dq($3);	
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURFORMAT}->{$4}) ) {
+			readingsBulkUpdate($hash, "videoInputColourFormat", $hash->{helper}{VIDEOCOLOURFORMAT}->{$4} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input colour format: ". dq($4);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input colour format: ". dq($4);	
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$5}) ) {
+			readingsBulkUpdate($hash, "videoInputColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$5} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input colour depth: ". dq($5);
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input colour depth: ". dq($5);
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$6}) ) {
+			readingsBulkUpdate($hash, "videoInputColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$6} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input colour space: ". dq($6);
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video input colour space: ". dq($6);
+		}
+		if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$7}) ) {
+			readingsBulkUpdate($hash, "videoOutputResolution", $hash->{helper}{VIDEORESOLUTION}->{$7} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output resolution: ". dq($7);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output resolution: ". dq($7);	
+		}
+		if ( defined ( $hash->{helper}{VIDEOASPECTRATIO}->{$8}) ) {
+			readingsBulkUpdate($hash, "videoOutputAspectRatio", $hash->{helper}{VIDEOASPECTRATIO}->{$8} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output aspect ratio: ". dq($8);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output aspect ratio: ". dq($8);	
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURFORMAT}->{$9}) ) {
+			readingsBulkUpdate($hash, "videoOutputColourFormat", $hash->{helper}{VIDEOCOLOURFORMAT}->{$9} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output colour format: ". dq($9);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output colour format: ". dq($9);	
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$10}) ) {
+			readingsBulkUpdate($hash, "videoOutputColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$10} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output colour depth: ". dq($10);
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output colour depth: ". dq($10);
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$11}) ) {
+			readingsBulkUpdate($hash, "videoOutputColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$11} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output colour space: ". dq($11);
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: video output colour space: ". dq($11);
+		}
+		if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$12}) ) {
+			readingsBulkUpdate($hash, "hdmi1RecommendedResolution", $hash->{helper}{VIDEORESOLUTION}->{$12} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: HDMI 1 Monitor Recommend Resolution Information: ". dq($12);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: HDMI 1 Monitor Recommend Resolution Information: ". dq($12);	
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$13}) ) {
+			readingsBulkUpdate($hash, "hdmi1ColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$13} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: hdmi1 colour depth: ". dq($13);
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: hdmi1 output colour depth: ". dq($13);
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$14}) ) {
+			readingsBulkUpdate($hash, "hdmi1ColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$14} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: hdmi1 colour space: ". dq($14);
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: hdmi1 output colour space: ". dq($14);
+		}
+		if ( defined ( $hash->{helper}{VIDEORESOLUTION}->{$15}) ) {
+			readingsBulkUpdate($hash, "hdmi2RecommendedResolution", $hash->{helper}{VIDEORESOLUTION}->{$15} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: HDMI2 Monitor Recommend Resolution Information: ". dq($15);	
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: HDMI2 Monitor Recommend Resolution Information: ". dq($15);	
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURDEPTH}->{$16}) ) {
+			readingsBulkUpdate($hash, "hdmi2ColourDepth", $hash->{helper}{VIDEOCOLOURDEPTH}->{$16} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: hdmi2 colour depth: ". dq($16);
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: hdmi2 output colour depth: ". dq($16);
+		}
+		if ( defined ( $hash->{helper}{VIDEOCOLOURSPACE}->{$17}) ) {
+			readingsBulkUpdate($hash, "hdmi2ColourSpace", $hash->{helper}{VIDEOCOLOURSPACE}->{$17} );
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: hdmi2 colour space: ". dq($17);
+		}
+		else {
+			Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: hdmi2 output colour space: ". dq($17);
+		}
+
 	# Speaker			
 	} elsif ( substr($line,0,3) eq "SPK" ) {
 		my $speakers = substr($line,3,1);
@@ -1891,7 +2104,7 @@ sub PIONEERAVR_Read($)
 	} elsif ( $line =~ m/^(GCH|GCI)(\d{2})(\d)(\d)(\d)(\d)(\d)\"(.*)\"$/ ) {
 		# Format: 
 		#   $2: screen type
-		#     00:Massage
+		#     00:Message
 		#     01:List
 		#     02:Playing(Play)
 		#     03:Playing(Pause)
@@ -2066,8 +2279,9 @@ sub PIONEERAVR_Read($)
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: NetworkPort1 is " . $1;	
 		
 	# avrModel
-	} elsif ( $line =~ m/^RGD<\d{3}><(.*)\/.*>$/ ) {
-		$hash->{avrModel}= $1;			
+	} elsif ( $line =~ m/^RGD<\d{3}><(.*)\/(.*)>$/ ) {
+		$hash->{avrModel}= $1;
+		$hash->{avrSoftwareType}= $2;		
 		Log3 $hash,5,"PIONEERAVR $name: ".dq($line) ." interpreted as: avrModel is " . $1;	
 		
 	# Software version
