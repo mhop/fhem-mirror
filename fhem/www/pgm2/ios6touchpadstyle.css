@@ -311,11 +311,14 @@ pre {
 svg {
 	height:28px;
 	width:28px;
-	fill:#7b7b7b;
 	vertical-align:middle;
 	margin-right:5px
 }
 
+svg:not([fill]) {
+	fill:#7b7b7b;
+}
+ 
 svg.on,svg.FS20_on {
 	fill:orange
 }
@@ -509,15 +512,14 @@ table.room tr.sel a svg {
 }
 
 #errmsg {
-	padding:6px;
-	width:100%;
-	color:#fff;
-	font-weight:700;
-	position:absolute;
-	top:5px;
-	left:225px;
-	z-index:99;
-	text-shadow:0 1px #000
+    padding:6px;
+    color:#fff;
+    font-weight:700;
+    position:absolute;
+    top:5px;
+    left:225px;
+    z-index:99;
+    text-shadow:0 1px #000
 }
 
 .devType,.devType a,.makeTable,.makeTable a {
