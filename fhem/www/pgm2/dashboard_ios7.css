@@ -168,10 +168,6 @@ body.dashboard_fullsize #content {
   border: none !important;
 }
 
-.col2 {
-  text-align: center;
-}
-
 .dashboard_widgetheader svg {
   margin-right: 5px;
 }
