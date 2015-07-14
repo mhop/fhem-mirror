@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7013 2015-04-019 11:30:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7014 2015-07-14 08:10:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -20,15 +20,16 @@ sub CALVIEW_Initialize($)
 	$hash->{SetFn}   = "CALVIEW_Set";		
 	$hash->{AttrList} = "do_not_notify:1,0 " . 
 						"maxreadings " .
-						"oldStyledReadings:1,0 " .						
+						"oldStyledReadings:1,0 " .
+						"modes:multiple,all,modeAlarm,modeAlarmOrStart,modeAlarmed,modeChanged,modeEnd,modeEnded,modeStart,modeStarted,modeUpcoming,stateChanged,stateDeleted,stateNew,stateUpdated ".
 						$readingFnAttributes; 
 }
 sub CALVIEW_Define($$){
 	my ( $hash, $def ) = @_;
 	my @a = split( "[ \t][ \t]*", $def );
 	return "\"set CALVIEW\" needs at least an argument" if ( @a < 2 );
-	my $name 		= $a[0];   
-	my $inter	= 43200; 
+	my $name = $a[0];   
+	my $inter = 43200; 
 	$inter= $a[4] if($#a==4);
 	my $modes = $a[3];
 	my @calendars = split( ",", $a[2] );
@@ -41,9 +42,10 @@ sub CALVIEW_Define($$){
 	$hash->{KALENDER} 	= $a[2];
 	$hash->{STATE}	= "Initialized";
 	$hash->{INTERVAL} = $inter;
-	if($modes == 1)	{$hash->{MODES} = "modeAlarm;modeStart;modeStarted;modeUpcoming";	}
-	elsif($modes == 0){$hash->{MODES} = "modeAlarm;modeStart;modeStarted";}
-	elsif($modes == 2){$hash->{MODES} = "all";	}
+	$modes = 1 if (!defined($modes));
+	if($modes == 1)	{$attr{$name}{modes} = "modeAlarm,modeStart,modeStarted,modeUpcoming";}
+	elsif($modes == 0){$attr{$name}{modes} = "modeAlarm,modeStart,modeStarted";}
+	elsif($modes == 2){$attr{$name}{modes} = "all";}
 	else {return "invalid mode \"$modes\", use 0,1 or 2!"}
 	InternalTimer(gettimeofday()+2, "CALVIEW_GetUpdate", $hash, 0);
 	return undef;
@@ -171,8 +173,8 @@ sub getsummery($)
 	my $name = $hash->{NAME};
 	# my $calendername  = $hash->{KALENDER};
 	my @calendernamen = split( ",", $hash->{KALENDER});
-	my $modi = $hash->{MODES};
-	my @modes = split(/;/,$modi);
+	my $modi = $attr{$name}{modes};
+	my @modes = split(/,/,$modi);
 	foreach my $calendername (@calendernamen){
 		foreach my $mode (@modes){
 			my $all = ReadingsVal($calendername, $mode, "");
@@ -196,7 +198,7 @@ sub getsummery($)
 <h3>CALVIEW</h3>
 <ul>This module creates a device with deadlines based on calendar-devices of the 57_Calendar.pm module.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeAlarm;modeStart;modeStarted; 1 for modeAlarm;modeStart;modeStarted;modeUpcoming; 2 for all (reading all)&gt; &lt;updateintervall in sec (default 43200)&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeAlarm;modeStart;modeStarted; 1 for modeAlarm;modeStart;modeStarted;modeUpcoming; 2 for all (reading all);  3 for modeAlarmOrStart;modeUpcoming &gt; &lt;updateintervall in sec (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar 1</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar,holiday 1 900</code></ul><br>
 <a name="CALVIEW set"></a>
@@ -207,6 +209,9 @@ sub getsummery($)
 <b>Attribute</b>
 <li>maxreadings<br>
         defines the number of max term as readings
+</li><br>
+<li>modes<br>
+		here the CALENDAR modes can be selected , to be displayed in the view
 </li><br>
 <li>oldStyledReadings<br>
 		1 readings look like "2015.06.21-00:00" with value "Start of Summer"
@@ -220,7 +225,7 @@ sub getsummery($)
 <h3>CALVIEW</h3>
 <ul>Dieses Modul erstellt ein Device welches als Readings Termine eines oder mehrere Kalender(s), basierend auf dem 57_Calendar.pm Modul, besitzt.</ul>
 <b>Define</b>
-<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeAlarm;modeStart;modeStarted; 1 für modeAlarm;modeStart;modeStarted;modeUpcoming; 2 für alle (reading all)&gt; &lt;updateintervall in sek (default 43200)&gt;</code></ul><br>
+<ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeAlarm;modeStart;modeStarted; 1 für modeAlarm;modeStart;modeStarted;modeUpcoming; 2 für alle (reading all); 3 für modeAlarmOrStart;modeUpcoming &gt &lt;updateintervall in sek (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender 1</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender,holiday 1 900</code></ul><br>
 <a name="CALVIEW set"></a>
@@ -231,6 +236,9 @@ sub getsummery($)
 <b>Attributes</b>
 <li>maxreadings<br>
         bestimmt die Anzahl der Termine als Readings
+</li><br>
+<li>modes<br>
+        hier können die CALENDAR modi gewählt werden, welche in der View angezeigt werden sollen
 </li><br>
 <li>oldStyledReadings<br>
 		1 aktiviert die Termindarstellung im "alten" Format "2015.06.21-00:00" mit Wert "Start of Summer"
