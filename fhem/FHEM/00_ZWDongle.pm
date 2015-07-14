@@ -463,7 +463,7 @@ ZWDongle_Clear($)
   $hash->{RA_Timeout} = 1.0;
   for(;;) {
     my ($err, undef) = ZWDongle_ReadAnswer($hash, "Clear", "wontmatch");
-    last if($err && $err =~ m/^Timeout/);
+    last if($err && ($err =~ m/^Timeout/ || $err =~ m/No FD/));
   }
   delete($hash->{RA_Timeout});
   $hash->{PARTIAL} = "";
