@@ -4304,7 +4304,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a web or telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must once be set.
    <br/><br/>
-   The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel. An update of FritzOS might hence lead to modul errors if AVM changes the interface.
+   The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel. The modul works best with Fritz!OS 6.24. AVM has removed internal interfaces from later Fritz!OS versions without replacement. For these versions, some modul functions are hence restricted or do not work at all.
    <br>
    The modul was tested on Fritz!Box 7390 and 7490 with Fritz!OS 6.20 and higher.
    <br>
@@ -4487,6 +4487,13 @@ sub FRITZBOX_fritztris($)
          Enables the get command "tr064Command"
       </li><br>
 
+      <li><code>boxUser &lt;user name&gt;</code>
+         <br>
+         User name that is used for TR064 access. By default no user name is required to login.
+         <br>
+         If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
+      </li><br>
+
       <li><code>defaultCallerName &lt;Text&gt;</code>
          <br>
          The default text to show on the ringing phone as 'caller'.
@@ -4630,9 +4637,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Web oder Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss einmalig das Passwort gesetzt werden.
    <br/><br/>
-   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Eine Aktualisierung des FritzOS kann also zu Modul-Fehlern f&uuml;hren, wenn AVM diese Schnittstelle &auml;ndert.
-   <br>
-   Das Modul wurde an der Fritz!Box 7390 und 7490 mit Fritz!OS 6.20 und h&ouml;her getestet.
+   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen ersatzlos gestrichen. Einige Modul-Funktionen sind dadurch nicht oder nur eingeschr&auml;nkt verf&uuml;gbar.
    <br>
    Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -4810,6 +4815,12 @@ sub FRITZBOX_fritztris($)
          Freischalten des get-Befehls "tr064Command"
       </li><br>
       
+      <li><code>boxUser &lt;user name&gt;</code>
+         <br>
+         Benutzername f&uuml;r den TR064-Zugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
+         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
+      </li><br>
+    
       <li><code>defaultCallerName &lt;Text&gt;</code>
          <br>
          Standard-Text, der auf dem angerufenen internen Telefon als "Anrufer" gezeigt wird.
