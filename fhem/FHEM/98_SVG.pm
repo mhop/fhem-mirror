@@ -162,8 +162,8 @@ SVG_getplotsize($)
 sub
 SVG_isEmbed($)
 {
-  return (AttrVal($FW_wname, "plotEmbed",
-                        $FW_userAgent !~ m/(iPhone|iPad|iPod).*OS (8|9)/));
+  return (AttrVal($FW_wname, "plotEmbed", 1));
+                        # $FW_userAgent !~ m/(iPhone|iPad|iPod).*OS (8|9)/));
 }
 
 ##################
