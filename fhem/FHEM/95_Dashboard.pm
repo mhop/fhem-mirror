@@ -345,20 +345,20 @@ sub Dashboard_CGI($)
   my $ret = '';
   my $name = $params[1];
 
-  FW_pO '<div id="content">';
+  $ret = '<div id="content">';
   
   if ($name && defined($defs{$name})) {                                                                
-    $ret = Dashboard_SummaryFN($FW_wname,$name,$FW_room,undef);
-
-    FW_pO $ret;
+    $ret .= Dashboard_SummaryFN($FW_wname,$name,$FW_room,undef);
   }
   else {
-    FW_pO 'Dashboard "' . $name . '" not found';
+    $ret .= 'Dashboard "' . $name . '" not found';
   }
 
-  FW_pO '</div>';
+  $ret .= '</div>';
 
-  return 0;
+  FW_pO $ret;
+
+  return 1;
 }
 
 sub DashboardAsHtml($)
@@ -546,26 +546,26 @@ sub BuildDashboardTab($$)
 
 	for (my $i=0;$i<@temptabgroup;$i++) {
 		my @stabgroup = split(":", trim($temptabgroup[$i]));		
-		@index = grep { @groups[$_] eq @stabgroup[0] } (0 .. @groups-1);
+		@index = grep { $groups[$_] eq $stabgroup[0] } (0 .. @groups-1);
 
 		if (@index > 0) {
 			for (my $j=0; $j<@index;$j++) {
-				my $groupname = @groups[@index[$j]];
+				my $groupname = @groups[$index[$j]];
 				if (@stabgroup > 1) {
-					$groupname .= ':' . @stabgroup[1];
+					$groupname .= ':' . $stabgroup[1];
 				}
 				push(@tabgroup,$groupname);
 			}
 		}
 		else {
-			my $matchGroup = '^' . @stabgroup[0] . '$';
-			@index = grep { @groups[$_] =~ m/$matchGroup/ } (0 .. @groups-1);
+			my $matchGroup = '^' . $stabgroup[0] . '$';
+			@index = grep { $groups[$_] =~ m/$matchGroup/ } (0 .. @groups-1);
 
 			if (@index > 0) {
 				for (my $j=0; $j<@index;$j++) {
-					my $groupname = @groups[@index[$j]];
+					my $groupname = @groups[$index[$j]];
 					if (@stabgroup > 1) {
-						$groupname .= ':' . @stabgroup[1];
+						$groupname .= ':' . $stabgroup[1];
 					}
 					push(@tabgroup,$groupname);
 				}
