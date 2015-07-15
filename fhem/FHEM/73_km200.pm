@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0052 2015-05-29 15:45:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0053 2015-07-15 15:00:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -205,6 +205,13 @@
 #		0052    29.05.2015	Sailor				km200_PostSingleService         Correcting bug for post transmission comparison
 #		0052    29.05.2015	Sailor				km200_ParseHttpResponseInit     Correcting bug for error list sorting
 #		0052    29.05.2015	Sailor				km200_ParseHttpResponseDyn      Correcting bug for error list sorting
+#		0053    15.07.2015	Sailor				km200_Define					Delaying first sounding to 30s in order to reduce errors due to fhem starting phase
+#		0053    15.07.2015	Sailor				km200_Attr						Implementing new sounding-init after change attribute "DoNotPoll"
+#		0053    15.07.2015	Sailor				km200_Define					Static Service deleted
+#		0053    15.07.2015	Sailor				km200_Attr						Static Service deleted
+#		0053    15.07.2015	Sailor				km200_ParseHttpResponseInit		Static Service deleted
+#		0053    15.07.2015	Sailor				km200_GetStatService			Deleted
+#		0053    15.07.2015	Sailor				km200_ParseHttpResponseStat		Deleted
 ########################################################################################################################
 
 
@@ -254,7 +261,6 @@ sub km200_Initialize($)
     $hash->{AttrList}        = "do_not_notify:1,0 " .
 						       "loglevel:0,1,2,3,4,5,6 " .
 						       "IntervalDynVal " .
-						       "IntervalStatVal " .
 						       "PollingTimeout " .
 							   "ConsoleMessage " .
 							   "DoNotPoll " .
@@ -274,7 +280,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0052";
+	my $ModuleVersion           = "0053";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -292,15 +298,6 @@ sub km200_Define($$)
 	"/recordings",
 	"/solarCircuits",
 	"/system",
-	);
-	
-	my @KM200_StatServices = (
-	"/gateway/uuid",
-	"/gateway/versionHardware",
-	"/system/brand",
-	"/system/bus",
-	"/system/info",
-	"/system/systemType"
 	);
 	####END####### Define known services of gateway ############################################################END#####
 
@@ -430,15 +427,11 @@ sub km200_Define($$)
       $hash->{VERSION}                          = $ModuleVersion;
 	  $hash->{INTERVALDYNVAL}                   = 60;
 	  $hash->{DELAYDYNVAL}                      = 60;
-	  $hash->{INTERVALSTATVAL}                  = 3600;
-	  $hash->{DELAYSTATVAL}                     = 120;
-	  $hash->{DISABLESTATVALPOLLING}            = false;
 	  $hash->{POLLINGTIMEOUT}                   = 5;
 	  $hash->{CONSOLEMESSAGE}					= false;
 	  $hash->{READBACKDELAY}					= 100;
 	  $hash->{temp}{ServiceCounterInit}         = 0;
 	  $hash->{temp}{ServiceCounterDyn}          = 0;
-	  $hash->{temp}{ServiceCounterStat}         = 0;
 	  $hash->{temp}{ServiceDbLogSplitHash}      = ();
 	  $hash->{status}{FlagInitRequest}          = false;
 	  $hash->{status}{FlagGetRequest}           = false;
@@ -448,7 +441,7 @@ sub km200_Define($$)
 	  $hash->{Secret}{CRYPTKEYPRIVATE}          = $km200_crypt_key_private;
 	  $hash->{Secret}{CRYPTKEYINITIAL}          = $km200_crypt_key_initial;
 	@{$hash->{Secret}{KM200ALLSERVICES}}        = sort @KM200_AllServices;
-	@{$hash->{Secret}{KM200STATSERVICES}}       = @KM200_StatServices;
+	@{$hash->{Secret}{KM200ALLSERVICESBACKUP}}  = sort @KM200_AllServices;
 	@{$hash->{Secret}{KM200RESPONDINGSERVICES}} = ();
 	@{$hash->{Secret}{KM200WRITEABLESERVICES}}  = ();
 	@{$hash->{Secret}{KM200DONOTPOLL}}  		= ();
@@ -495,8 +488,8 @@ sub km200_Define($$)
 	}
 	####END####### Check whether communication to the physical unit is possible ################################END#####
 
-	###START###### Initiate the timer for first time polling of  values from KM200 but wait 5s ################START####
-	InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
+	###START###### Initiate the timer for first time polling of  values from KM200 but wait 10s ###############START####
+	InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 0);
 	Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services started for the first time.";
 	####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ################END#####
 	
@@ -565,11 +558,8 @@ sub km200_Attr(@)
 	my @a                      = @_;
 	my $name                   = $a[1];
 	my $hash                   = $defs{$name};
-	my $DisableStatValPolling  = $hash->{DISABLESTATVALPOLLING};
 	my $IntervalDynVal         = $hash->{INTERVALDYNVAL};
-	my $IntervalStatVal        = $hash->{INTERVALSTATVAL};
 	my $DelayDynVal            = $hash->{DELAYDYNVAL};
-	my $DelayStatVal           = $hash->{DELAYSTATVAL};
 	my $ReadBackDelay          = $hash->{READBACKDELAY};
 
 
@@ -589,33 +579,6 @@ sub km200_Attr(@)
 			return $name .": Error - Gateway interval for IntervalDynVal too small - server response time longer than defined interval, please use something >=20, default is 90";
 		}
 		####END#### Check whether polling interval is not too short
-	}
-	### Check whether static interval attribute has been provided
-	elsif($a[2] eq "IntervalStatVal") 
-	{
-		$IntervalStatVal = $a[3];
-
-		if ($IntervalStatVal == 0) ### Check whether statical values supposed to be polled at all. The attribute "IntervalStatVal" set to "0" means no polling for statical values.
-		{
-			$DisableStatValPolling = true;
-			$hash->{DISABLESTATVALPOLLING} = $DisableStatValPolling;
-			Log3 $name, 5, $name. " : km200 - Polling for static values diabled";
-		}
-		else
-		{
-			###START### Check whether polling interval is not too short	
-			if ($IntervalStatVal > 19)
-			{
-				$DisableStatValPolling = false;
-				$hash->{INTERVALSTATVAL} = $IntervalStatVal;
-				Log3 $name, 5, $name. " : km200 - IntervalStatVal set to attribute value:" . $IntervalStatVal ." s";
-			}
-			else
-			{
-				return $name .": Error - Gateway interval for IntervalStatVal too small - server response time longer than defined interval, please use something >=20, default is 3600";
-			}
-			####END#### Check whether polling interval is not too short	
-		}
 	}
 	### Check whether polling timeout attribute has been provided
 	elsif($a[2] eq "PollingTimeout") 
@@ -677,6 +640,8 @@ sub km200_Attr(@)
 		### Save list of services not to be polled into hash
 		@{$hash->{Secret}{KM200DONOTPOLL}} = @KM200_DONOTPOLL;
 
+		### Get original list of root services back
+		@{$hash->{Secret}{KM200ALLSERVICES}} = @{$hash->{Secret}{KM200ALLSERVICESBACKUP}};
 		
 		### For every blacklisted service
 		foreach my $SearchWord(@KM200_DONOTPOLL)
@@ -688,9 +653,26 @@ sub km200_Attr(@)
 				splice(@{$hash->{Secret}{KM200ALLSERVICES}}, $FoundPosition, 1);
 			}
 		}
-
+		### ConsoleMessages
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200 module is only polling the following services!\n  @{$hash->{Secret}{KM200ALLSERVICES}} \n");}
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200 module is NOT  polling the following services! \n @{$hash->{Secret}{KM200DONOTPOLL}}   \n");}
+		
 		### Message for debugging purposes
 		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". $a[3];
+
+		### Stop the current timer
+		RemoveInternalTimer($hash);
+		
+		### Interrupting all currently running Polling
+		@{$hash->{Secret}{KM200DYNSERVICES}} = "";
+		$hash->{temp}{ServiceCounterDyn} = 0;
+
+		### Delete all Readings
+		fhem( "deletereading $name .*" );
+
+		### Re-start the sounding of  values from KM200 but wait the period of $hash->{POLLINGTIMEOUT} + 1s
+		InternalTimer(gettimeofday()+$hash->{POLLINGTIMEOUT}+1, "km200_GetInitService", $hash, 0);
+		Log3 $name, 5, $name. " : km200 - Sounding of services re-started after change of DoNotPoll attribute";
 	}
 	### Check whether time-out for Read-Back has been provided
 	if($a[2] eq "ReadBackDelay") 
@@ -2536,38 +2518,12 @@ sub km200_ParseHttpResponseInit($)
 	### If the list of KM200ALLSERVICES is finished
 	else
 	{
-		###START###### Filter all static services out of responsive services = responsive dynamic services ########START####
 		my @KM200_DynServices = @KM200_RespondingServices;
-
-		foreach my $SearchWord(@{$hash->{Secret}{KM200STATSERVICES}})
-		{
-			my $FoundPosition = first_index{ $_ eq $SearchWord }@KM200_DynServices;
-			if ($FoundPosition >= 0)
-			{
-				splice(@KM200_DynServices, $FoundPosition, 1);
-			}
-		}
-		####END####### Filter all static services out of responsive services = responsive dynamic services #########END#####
-
-		###START###### Filter all responsive services out of known static services = responsive static services ###START####
-		my @KM200_StatServices = ();
-
-		foreach my $SearchWord(@KM200_RespondingServices)
-		{
-			my $FoundPosition = first_index{ $_ eq $SearchWord }@{$hash->{Secret}{KM200STATSERVICES}};
-			if ($FoundPosition >= 0)
-			{
-				push (@KM200_StatServices, $SearchWord);
-			}
-		}
-		####END####### Filter all responsive services out of known static services = responsive static services ####END#####
-		
 		
 		### Save arrays of services in hash
 		@{$hash->{Secret}{KM200RESPONDINGSERVICES}} = @KM200_RespondingServices;
 		@{$hash->{Secret}{KM200WRITEABLESERVICES}}  = @KM200_WriteableServices;
 		@{$hash->{Secret}{KM200DYNSERVICES}}        = @KM200_DynServices;
-		@{$hash->{Secret}{KM200STATSERVICES}}       = @KM200_StatServices;
 
 		
 		### Reset flag for initialisation
@@ -2578,19 +2534,6 @@ sub km200_ParseHttpResponseInit($)
 		InternalTimer(gettimeofday()+($hash->{INTERVALDYNVAL}), "km200_GetDynService", $hash, 0);
 		Log3 $name, 4, $name. " : km200 - Define: InternalTimer for dynamic values started with interval of: ".($hash->{INTERVALDYNVAL});
 		####END####### Initiate the timer for continuous polling of dynamical values from KM200 ####################END#####
-
-		
-		###START###### Initiate the timer for continuous polling of static values from KM200 ######################START####
-		if ($hash->{DISABLESTATVALPOLLING} == false)
-		{
-			InternalTimer(gettimeofday()+($hash->{INTERVALSTATVAL}), "km200_GetStatService", $hash, 0);
-			Log3 $name, 4, $name. " : km200 - Define: InternalTimer for static values started with interval of: ".($hash->{INTERVALSTATVAL});
-		}
-		else
-		{
-			Log3 $name, 4, $name. " : km200 - Define: No InternalTimer for static values since polling disabled by \"attr IntervalStatVal 0\" in fhem.cfg ";
-		}
-		####END####### Initiate the timer for continuous polling of static values from KM200 #######################END#####
 
 		### Reset fullResponse error message
 		readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
@@ -2995,162 +2938,6 @@ sub km200_ParseHttpResponseDyn($)
 	return undef;
 }
 ####END####### Subroutine to download complete dynamic data set from gateway ###################################END#####
-
-###START###### Subroutine obtaining static services via HttpUtils #############################################START####
-sub km200_GetStatService($)
-{
-	my ($hash, $def)                 = @_;
-	my $km200_gateway_host           =   $hash->{URL};
-	my $name                         =   $hash->{NAME};
-	$hash->{status}{FlagStatRequest} = true;
-	$hash->{STATE}                   = "Polling";
-	my @KM200_StatServices           = @{$hash->{Secret}{KM200STATSERVICES}};
-	my $ServiceCounterStat           =   $hash->{temp}{ServiceCounterStat};	
-	my $PollingTimeout               =   $hash->{POLLINGTIMEOUT};
-
-	if (@KM200_StatServices != 0)
-	{
-		my $Service                  =   $KM200_StatServices[$ServiceCounterStat];
-
-		### Console outputs for debugging purposes
-		if ($ServiceCounterStat == 0)
-		{
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Starting download of static services\n");}
-		}
-		
-		if ($hash->{CONSOLEMESSAGE} == true) {print("$Service\n");}
-		### Console outputs for debugging purposes
-		
-		my $url = "http://" . $km200_gateway_host . $Service;
-		my $param = {
-						url        => $url,
-						timeout    => $PollingTimeout,
-						hash       => $hash,
-						method     => "GET",
-						header     => "agent: TeleHeater/2.2.3\r\nUser-Agent: TeleHeater/2.2.3\r\nAccept: application/json",
-						callback   =>  \&km200_ParseHttpResponseStat
-					};
-
-		### Set Status Flag in order state running static request
-		$hash->{status}{FlagStatRequest}           = true;
-
-		### Get data
-		HttpUtils_NonblockingGet($param);
-	}
-	else
-	{
-		Log3 $name, 5, $name . " : No static values available to be read. Skipping download.";
-		if ($hash->{CONSOLEMESSAGE} == true) {print("No static values available to be read. Skipping download.\n")}
-	}
-		
-}
-####END####### Subroutine get static data value ################################################################END#####
-
-###START###### Subroutine to download complete static data set from gateway ###################################START####
-# For all responding static services read the respective values from gateway
-sub km200_ParseHttpResponseStat($)
-{
-    my ($param, $err, $data)    = @_;
-    my $hash                    =   $param->{hash};
-    my $name                    =   $hash ->{NAME};
-	my $ServiceCounterStat      =   $hash ->{temp}{ServiceCounterStat};
-	my @KM200_StatServices      = @{$hash ->{Secret}{KM200STATSERVICES}};	
-	my $NumberStatServices      = @KM200_StatServices;
-	my $Service                 = $KM200_StatServices[$ServiceCounterStat];
-	my $json;	
-	
-	Log3 $name, 5, $name. " : Parsing response of static service received for: " . $Service;
-
-	### Reset Status Flag
-	$hash->{status}{FlagStatRequest}           = false;
-	
-	if($err ne "")
-	{
-		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
-        readingsSingleUpdate($hash, "fullResponse", "ERROR", 1);
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_ParseHttpResponseStat ERROR: $err\n");}
-	}
-
-	$hash->{temp}{decodedcontent} = $data;
-	my $decodedContent = km200_Decrypt($hash);
-	
-	if ($decodedContent ne "")
-	{
-		eval 
-		{
-			$json = decode_json(encode_utf8($decodedContent));
-			1;
-		}
-		or do 
-		{
-			Log3 $name, 5, $name. " : km200_parseHttpResponseStat - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
-		};
-
-		### Check whether the type is a single value containing a string or float value
-		if(($json -> {type} eq "stringValue") || ($json -> {type} eq "floatValue"))
-		{
-			my $JsonId         = $json->{id};
-			my $JsonType       = $json->{type};
-			my $JsonValue      = $json->{value};
-			
-			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_parseHttpResponseStat: value found for  : " .$Service;
-			Log3 $name, 5, $name. " : km200_parseHttpResponseStat: id               : " .$JsonId;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseStat: type             : " .$JsonType;
-			Log3 $name, 5, $name. " : km200_parseHttpResponseStat: value            : " .$JsonValue;
-			### Log entries for debugging purposes
-
-			### Save json-hash for DbLog-Split
-			$hash->{temp}{ServiceDbLogSplitHash} = $json;
-			### Save json-hash for DbLog-Split
-
-			### Write reading
-			readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
-			### Write reading
-		}			
-		### Check whether the type is unknown
-		else
-		{
-			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseStat - type is unknown for:" .$Service;
-		}		
-	}
-	else 
-	{
-		Log3 $name, 5, $name. " : km200_parseHttpResponseStat - Data not available on km200 for http://" . $param->{url};
-	}
-
-	
-	### Clear up temporary variables
-	$hash->{temp}{decodedcontent} = "";	
-	$hash->{temp}{service}        = "";
-	### Clear up temporary variables
-
-	if ($ServiceCounterStat < ($NumberStatServices-1))
-	{
-		++$ServiceCounterStat;
-		$hash->{temp}{ServiceCounterStat} = $ServiceCounterStat;
-		km200_GetStatService($hash);
-	}
-	else
-	{
-		$hash->{STATE}                    = "Standby";
-		$hash->{temp}{ServiceCounterStat} = 0;
-		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n________________________________________________________________________________________________________\n\n");}
-		
-		###START###### Re-Start the timer #####################################START####
-		InternalTimer(gettimeofday()+$hash->{INTERVALSTATVAL}, "km200_GetStatService", $hash, 1);
-		####END####### Re-Start the timer ######################################END#####
-
-		### Update fullResponse Reading
-		readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
-		
-		$hash->{status}{FlagStatRequest} = false;
-	}
-	return undef;
-}
-####END####### Subroutine to download complete static data set from gateway ####################################END#####
 
 1;
 
