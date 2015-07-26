@@ -276,6 +276,11 @@ sub isDeleted {
   return $self->isState("deleted");
 }
 
+sub isExpired {
+  my ($self)= @_;
+  return $self->isState("expired");
+}
+
 
 sub stateChanged {
   my ($self)= @_;
@@ -399,8 +404,9 @@ sub fromVEvent {
     $self->{lastModified}= tm($vevent->value("DTSTAMP"));
     #main::Debug "DTSTAMP: $self->{lastModified} ";
   }  
-  $self->{summary}= $vevent->value("SUMMARY");
-  $self->{location}= $vevent->value("LOCATION");
+  $self->{summary}= defined($vevent->value("SUMMARY")) ? $vevent->value("SUMMARY") : "";
+  $self->{location}= defined($vevent->value("LOCATION")) ? $vevent->value("LOCATION") : "";
+  
 
   #Dates to exclude in reoccuring rule
   my @exdate;
@@ -495,6 +501,14 @@ sub asText {
 
 sub asFull {
   my ($self)= @_;
+  #main::Log3 undef,1,$self->uid();
+  #main::Log3 undef,1,$self->state();
+  #main::Log3 undef,1,$self->mode();
+  #main::Log3 undef,1,ts($self->{alarm});
+  #main::Log3 undef,1,ts($self->{start});
+  #main::Log3 undef,1,ts($self->{end});
+  #main::Log3 undef,1,$self->{summary};
+  #main::Log3 undef,1,$self->{location};
   return sprintf("%s %7s %8s %s %s-%s %s %s",
     $self->uid(),
     $self->state(),
@@ -736,13 +750,13 @@ sub updateFromCalendar {
   my $uid;
   my $event;
 
-  # we first remove all elements which were previously marked for deletion
+  # we first remove all elements which were previously marked for deletion or are expired
   foreach $event ($self->events()) {
-    if($event->isDeleted() || $removeall) {
+    if($event->isDeleted() || $event->isExpired() || $removeall) {
       $self->deleteEvent($event->uid());
     }
   }
-
+  
   # we iterate over the VEVENTs in the calendar
   my @vevents= grep { $_->{type} eq "VEVENT" } @{$calendar->{entries}};
   foreach my $vevent (@vevents) {
@@ -780,12 +794,16 @@ sub updateFromCalendar {
     }
   }
 
-  # untouched elements get marked as deleted
+  # untouched elements get marked as deleted, expired elements as expired
   foreach $event ($self->events()) {
     if($event->lastSeen() != $t) {
       $event->setState("deleted");
+    } elsif($event->mode() eq "end") {
+      $event->setState("expired");
     }
   }
+ 
+  
 }
 
 #####################################
@@ -1256,6 +1274,7 @@ sub Calendar_Undef($$) {
   <tr><td>known</td><td>The calendar event was already there before the most recent update.</td></tr>
   <tr><td>updated</td><td>The calendar event was already there before the most recent update but it has changed since it
   was last retrieved.</td></tr>
+  <tr><td>expired</td><td>The calendar event was already there before the most recent update and has ended. The calendar event will be removed from all lists at the next update.</td></tr>
   <tr><td>deleted</td><td>The calendar event was there before the most recent update but is no longer. You removed it from the source calendar. The calendar event will be removed from all lists at the next update.</td></tr>
   </table><br>
   Calendar events that lie completely in the past (current time on wall clock is later than the calendar event's end time)
@@ -1462,6 +1481,7 @@ sub Calendar_Undef($$) {
   <tr><td>new</td><td>Das Kalender-Ereignis wurde das erste Mal beim letzten Update gefunden. Entweder war dies das erste Mal des Kalenderzugriffs oder Du hast einen neuen Kalendereintrag zum Quellkalender hinzugef&uuml;gt.</td></tr>
   <tr><td>known</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update.</td></tr>
   <tr><td>updated</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update, wurde aber ge&auml;ndert.</td></tr>
+  <tr><td>expired</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update und ist beendet. Das Kalender-Ereignis wird beim n&auml;chsten Update von allen Listen entfernt.</td></tr>
   <tr><td>deleted</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update, wurde aber seitdem gel&ouml;scht. Das Kalender-Ereignis wird beim n&auml;chsten Update von allen Listen entfernt.</td></tr>
   </table><br>
   Kalender-Ereignisse, welche vollst&auml;ndig in der Vergangenheit liegen (aktuelle Zeit liegt nach dem Ende-Termin des Kalendereintrags) werden nicht bezogen und sind daher nicht im Kalender verf&uuml;gbar.
