@@ -25,7 +25,7 @@ yowsup_Initialize($)
   #$hash->{GetFn}    = "yowsup_Get";
   $hash->{AttrFn}   = "yowsup_Attr";
   $hash->{AttrList} = "disable:1 ";
-  $hash->{AttrList} .= "acceptFrom cmd home nickname ". $readingFnAttributes;
+  $hash->{AttrList} .= "cmd home nickname ". $readingFnAttributes;
 }
 
 #####################################
@@ -48,6 +48,8 @@ yowsup_Define($$)
 
     $modules{yowsup}{defptr}{yowsup} = $hash;
 
+    addToDevAttrList( $name, "acceptFrom" );
+
   } else {
     return "no yowsup MASTER defined." if( !defined($modules{yowsup}{defptr}{yowsup}) );
 
@@ -58,6 +60,8 @@ yowsup_Define($$)
 
     addToDevAttrList( $name, "commandPrefix" );
     addToDevAttrList( $name, "allowedCommands" );
+
+    addToDevAttrList( $name, "acceptFrom" ) if( $number =~ m/\./ );
 
     $hash->{NUMBER} = $number;
   }
@@ -260,7 +264,10 @@ yowsup_Set($$@)
 
       readingsSingleUpdate( $hash, "sent", join( ' ', @args ), 1 );
 
-      return yowsup_Write( $phash, "/message send $hash->{NUMBER} '". join( ' ', @args ) ."'" );
+      my $number = $hash->{NUMBER};
+      $number =~ s/\./-/;
+
+      return yowsup_Write( $phash, "/message send $number '". join( ' ', @args ) ."'" );
 
       return undef;
     }
@@ -282,7 +289,10 @@ yowsup_Set($$@)
     } elsif( $cmd eq 'send' ) {
       readingsSingleUpdate( $hash, "sent", join( ' ', @args ), 1 );
 
-      return yowsup_Write( $hash, "/message send ". shift(@args) ." '". join( ' ', @args ) ."'" );
+      my $number = shift(@args);
+      $number =~ s/\./-/;
+
+      return yowsup_Write( $hash, "/message send $number '". join( ' ', @args ) ."'" );
 
       return undef;
 
@@ -351,9 +361,10 @@ yowsup_Parse($$)
 
   }
 
-  if( $data =~ m/^CHATSTATE:.*State: (\S*).*From: (\d*)/s ) {
+  if( $data =~ m/^CHATSTATE:.*State: (\S*).*From: ([\d-]*)/s ) {
     my $chatstate = $1;
     my $number = $2;
+    $number =~ s/-/\./;
 
     if( my $chash = $modules{yowsup}{defptr}{$number} ) {
       readingsSingleUpdate( $chash, "chatstate", $chatstate, 1 );
@@ -367,6 +378,14 @@ yowsup_Parse($$)
     my $time = $2;
     my $id = $3;
     my $message = $4;
+    my $last_sender;
+
+    if( $number =~ m/(\d*)\/(\d*)-(\d*)/ ) {
+      $number = "$2.$3";
+      $last_sender = $1;
+    }
+
+    $message =~ s/\n$//;
 
     my $chash = $modules{yowsup}{defptr}{$number};
     if( !$chash ) {
@@ -387,8 +406,14 @@ yowsup_Parse($$)
     }
 
     if( $chash ) {
-      readingsSingleUpdate( $chash, "message", $message, 1 );
-      readingsSingleUpdate( $chash, "chatstate", "received", 1 );
+      readingsBeginUpdate($chash);
+      if( $last_sender ) {
+        readingsBulkUpdate( $chash, "chatstate", "received from: $last_sender" );
+      } else {
+        readingsBulkUpdate( $chash, "chatstate", "received" );
+      }
+      readingsBulkUpdate( $chash, "message", $message );
+      readingsEndUpdate($chash, 1);
 
       my $cname = $chash->{NAME};
       if( my $prefix = AttrVal($cname, "commandPrefix", undef ) ) {
@@ -401,16 +426,28 @@ yowsup_Parse($$)
         }
 
         if( $cmd ) {
-          Log3 $name, 3, "$cname: received command: $cmd";
+          my $accept_from = AttrVal($cname, "acceptFrom", undef );
+          if( !$accept_from || $last_sender || ",$accept_from," =~/,$last_sender,/ ) {
+            Log3 $name, 3, "$cname: received command: $cmd";
 
-          my $allowed = AttrVal($cname, "allowedCommands", undef );
-          my $ret = AnalyzeCommandChain( $hash, $cmd, $allowed );
+            my $allowed = AttrVal($cname, "allowedCommands", undef );
+            my $ret = AnalyzeCommandChain( $hash, $cmd, $allowed );
 
-          Log3 $name, 4, "$cname: command result: $ret";
+            Log3 $name, 4, "$cname: command result: $ret";
 
-          yowsup_Write( $hash, "/message send $chash->{NUMBER} '$ret'" ) if( $ret );
+            my $number = $chash->{NUMBER};
+            $number =~ s/\./-/;
+
+            yowsup_Write( $hash, "/message send $number '$ret'" ) if( $ret );
+
+          } else {
+            Log3 $cname, 3, "$cname: commands: ". $last_sender?$last_sender:$number ." not allowed";
+
+          }
         }
 
+      } else {
+        Log3 $cname, 3, "$cname: commands not allowed";
       }
 
     } else {
@@ -457,6 +494,9 @@ yowsup_Write($$)
   my $name = $hash->{NAME};
 
   return "not connected" if( !$hash->{PID} );
+
+  #my $ls = chr(226) . chr(128) . chr(168);
+  #$data =~ s/\n/$ls/g;
 
   $data =~ s/\n/\r/g;
 
