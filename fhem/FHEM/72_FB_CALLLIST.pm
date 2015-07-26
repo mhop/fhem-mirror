@@ -44,6 +44,7 @@ FB_CALLLIST_Initialize($)
     $hash->{AttrFn}    = "FB_CALLLIST_Attr";
     $hash->{AttrList}  =  "number-of-calls:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
                           "internal-number-filter ".
+                          "icon-mapping ".
                           "connection-mapping ".
                           "external-mapping ".
                           "create-readings:0,1 ".
@@ -150,11 +151,11 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "connection-mapping")
         {
-            if( $value =~ m/^{.*}$/ ) 
+            if($value and $value =~ m/^{.*}$/ ) 
             {
                 my $table = eval $value;
                 
-                if( $table &&(ref($table) eq 'HASH'))
+                if($table and ref($table) eq 'HASH')
                 {
                     $hash->{helper}{CONNECTION_MAP} = $table;
                     Log3 $name, 4, "FB_CALLLIST ($name) - connection map stored as hash: $value";
@@ -172,13 +173,40 @@ sub FB_CALLLIST_Attr($@)
                 return "invalid connection mapping table: $value";
             } 
         } 
+        elsif($attrib eq "icon-mapping")
+        {
+            if($value and $value =~ m/^{.*}$/ ) 
+            {
+                $value =~ s/@/\\\@/g;
+                $value =~ s/\$/\\\$/g;
+                $value =~ s/%/\\\%/g;
+                my $table = eval $value;
+                
+                if($table and ref($table) eq 'HASH')
+                {
+                    $hash->{helper}{ICON_MAP} = $table;
+                    Log3 $name, 4, "FB_CALLLIST ($name) - icon map stored as hash: $value";
+                    
+                    # Inform all FHEMWEB clients
+                    FB_CALLLIST_updateFhemWebClients($hash) if($init_done);
+                } 
+                else
+                {
+                    return "invalid icon mapping table: $value";
+                } 
+            }
+            else 
+            {
+                return "invalid icon mapping table: $value";
+            } 
+        } 
         elsif($attrib eq "external-mapping")
         {
-            if( $value =~ m/^{.*}$/ ) 
+            if($value and $value =~ m/^{.*}$/ ) 
             {
                 my $table = eval $value;
                 
-                if( $table &&(ref($table) eq 'HASH'))
+                if($table and ref($table) eq 'HASH')
                 {
                     $hash->{helper}{EXTERNAL_MAP} = $table;
                     Log3 $name, 4, "FB_CALLLIST ($name) - external map stored as hash: $value";
@@ -198,7 +226,7 @@ sub FB_CALLLIST_Attr($@)
         } 
         elsif($attrib eq "list-type")
         {
-            if($value =~ /^incoming|outgoing|missed-call|completed|active$/)
+            if($value and $value =~ /^incoming|outgoing|missed-call|completed|active$/)
             {
                 $attr{$name}{$attrib} = $value;
                 
@@ -223,6 +251,11 @@ sub FB_CALLLIST_Attr($@)
         elsif($attrib eq "connection-mapping")
         {
             delete($hash->{helper}{CONNECTION_MAP}) if(exists($hash->{helper}{CONNECTION_MAP}));
+            return undef;
+        }
+        elsif($attrib eq "icon-mapping")
+        {
+            delete($hash->{helper}{ICON_MAP}) if(exists($hash->{helper}{ICON_MAP}));
             return undef;
         }
         elsif($attrib eq "external-mapping")
@@ -444,6 +477,42 @@ sub FB_CALLLIST_cleanupList($)
 }
 
 #####################################
+#  returns the icon depending on icon mapping
+sub FB_CALLLIST_returnIcon($$$)
+{
+    my ($hash, $icon, $text) = @_;
+    
+    my $icon_name;
+    
+    my $standard = {
+        
+        "incoming.connected" => "phone_ring_in\@blue",
+        "outgoing.connected" => "phone_ring_out\@green",
+    
+        "incoming.ring" => "phone_ring\@blue",
+        "outgoing.ring" => "phone_ring\@green",
+        
+        "incoming.missed" => "phone_missed_in\@red",
+        "outgoing.missed" => "phone_missed_out\@green",
+        
+        "incoming.done" => "phone_call_end_in\@blue",
+        "outgoing.done" => "phone_call_end_out\@green",
+        
+        "incoming.tam" => "phone_answering\@blue"
+    };
+    
+    $icon_name = $standard->{$icon} if(exists($standard->{$icon}));
+    $icon_name = $hash->{helper}{ICON_MAP}{$icon} if(exists($hash->{helper}{ICON_MAP}{$icon}));
+
+    my $result = FW_makeImage($icon_name);
+    
+    
+    return $result if($result ne $icon_name);
+    return $text;
+}
+
+
+#####################################
 #  returns the call state of a specific call as icon or text
 sub FB_CALLLIST_returnCallState($$;$)
 {
@@ -461,43 +530,42 @@ sub FB_CALLLIST_returnCallState($$;$)
         if($data->{direction} eq "incoming" and $data->{last_event} eq "connect" )
         {
             $state = "=>  [=]";
-            $state = FW_makeImage("phone_ring_in\@blue",$state) if($icons);
+            $state = FB_CALLLIST_returnIcon($hash,"incoming.connected", $state) if($icons);
         }
         elsif($data->{direction} eq "incoming" and $data->{last_event} eq "ring")
         {
             $state = "=>  ((o))";
-            $state = FW_makeImage("phone_ring\@blue",$state) if($icons);
+            $state = FB_CALLLIST_returnIcon($hash,"incoming.ring", $state) if($icons);
         }
         elsif($data->{direction} eq "outgoing" and $data->{last_event} eq "connect" )
         {
             $state = "<=  [=]";
-            $state = FW_makeImage("phone_ring_out\@green",$state) if($icons);
+            $state = FB_CALLLIST_returnIcon($hash,"outgoing.connected", $state) if($icons);
         }
         elsif($data->{direction} eq "outgoing" and $data->{last_event} eq "call")
         {
             $state = "<= ((o))";
-            $state = FW_makeImage("phone_ring\@green",$state) if($icons);
+            $state = FB_CALLLIST_returnIcon($hash,"outgoing.ring", $state) if($icons);
         }
     }
     else
     {
-        if($data->{direction} eq "incoming")
+        if($data->{direction} eq "incoming" and ((not exists($data->{internal_connection}) ) or (exists($data->{internal_connection}) and not $data->{internal_connection} =~ /Answering_Machine/)))
         {
             $state = "=>".($data->{missed_call} ? " X" : "");
-            $state = FW_makeImage("phone_missed_in\@red",$state) if($icons and $data->{missed_call});
-            $state = FW_makeImage("phone_call_end_in\@blue",$state) if($icons and !$data->{missed_call});      
-            
-            if(exists($data->{internal_connection}) and $data->{internal_connection} =~ /Answering_Machine/)
-            {
-                $state = "=> O_O";
-                $state = FW_makeImage("phone_answersing\@blue",$state) if($icons);;
-            }
+            $state = FB_CALLLIST_returnIcon($hash, "incoming.done", $state) if($icons and not $data->{missed_call});      
+            $state = FB_CALLLIST_returnIcon($hash, "incoming.missed", $state) if($icons and $data->{missed_call});
+        }
+        elsif($data->{direction} eq "incoming" and exists($data->{internal_connection}) and $data->{internal_connection} =~ /Answering_Machine/)
+        {
+            $state = "=> O_O";
+            $state = FB_CALLLIST_returnIcon($hash,"incoming.tam", $state) if($icons);
         }
         elsif($data->{direction} eq "outgoing")
         {
             $state = "<=".($data->{missed_call} ? " X" : "");
-            $state = FW_makeImage("phone_missed_out\@green",$state) if($icons and $data->{missed_call});
-            $state = FW_makeImage("phone_call_end_out\@green",$state) if($icons and !$data->{missed_call});
+            $state = FB_CALLLIST_returnIcon($hash, "outgoing.done", $state) if($icons and not $data->{missed_call});
+            $state = FB_CALLLIST_returnIcon($hash, "outgoing.missed", $state) if($icons and $data->{missed_call});
         }
     }
   
@@ -960,7 +1028,7 @@ sub FB_CALLLIST_returnTableHeader($)
   It logs all calls and displays them in a historic table.
   <br><br>
   You need a defined FB_CALLMONITOR instance where you can attach FB_CALLLIST to process the call events.<br><br>
-  Depending on your configuration the status will be shown as icons or as text. You need to have the fhemSVG icon set configured in your corresponding FHEMWEB instance (see FHEMWEB attribute <a href="#iconPath">iconPath</a>).
+  Depending on your configuration the status will be shown as icons or as text. You need to have the openautomation icon set configured in your corresponding FHEMWEB instance (see FHEMWEB attribute <a href="#iconPath">iconPath</a>).
   <br><br>
   The icons have different colors.<br><br>
   <ul>
@@ -972,17 +1040,20 @@ sub FB_CALLLIST_returnTableHeader($)
   If you use no icons (see <a href="#show-icons">show-icons</a>) the following states will be shown:<br><br>
   <ul>
    <table>
-    <tr><td><code>&lt;= ((o))</code></td><td> - outgoing call (ringing)</td></tr>
-    <tr><td><code>=&gt; ((o))</code></td><td> - incoming call (ringing)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;= [=]</code></td><td> - outgoing call (currently active)</td></tr>
-    <tr><td><code>=&gt; [=]</code></td><td> - incoming call (currently active)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;= X</code></td><td> - outgoing unsuccessful call (nobody picked up)</td></tr>
-    <tr><td><code>=&gt; X</code></td><td> - incoming unsuccessful call (missed call)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>=&gt; O_O</code></td><td> - incoming finished call recorded on answering machine</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;=</code></td><td> - outgoing finished call</td></tr>
-    <tr><td><code>=&gt;</code></td><td> - incoming finished call</td></tr>
+    <tr><td><code>&lt;= ((o))</code></td><td> - outgoing call (ringing) - icon: <code>outgoing.ring</code> </td></tr>
+    <tr><td><code>=&gt; ((o))</code></td><td> - incoming call (ringing) - icon: <code>incoming.ring</code></td></tr><tr><td colspan="2">&nbsp;</td></tr>
+    <tr><td><code>&lt;= [=]</code></td><td> - outgoing call (currently active) - icon: <code>outgoing.connected</code></td></tr>
+    <tr><td><code>=&gt; [=]</code></td><td> - incoming call (currently active) - icon: <code>incoming.connected</code></td></tr><tr><td colspan="2">&nbsp;</td></tr>
+    <tr><td><code>&lt;= X</code></td><td> - outgoing unsuccessful call (nobody picked up) - icon: <code>outgoing.missed</code></td></tr>
+    <tr><td><code>=&gt; X</code></td><td> - incoming unsuccessful call (missed call) - icon: <code>incoming.missed</code></td></tr><tr><td colspan="2">&nbsp;</td></tr>
+    <tr><td><code>=&gt; O_O</code></td><td> - incoming finished call recorded on answering machine - icon: <code>incoming.tam</code></td></tr><tr><td colspan="2">&nbsp;</td></tr>
+    <tr><td><code>&lt;=</code></td><td> - outgoing finished call - icon: <code>outgoing.done</code></td></tr>
+    <tr><td><code>=&gt;</code></td><td> - incoming finished call - icon: <code>incoming.done</code></td></tr>
     </table>
   </ul>
+  <br>
+  The default icon mapping for all states can be changed by the corresponding attribute.
+  <br>
   <br>
   
   <a name="FB_CALLLISTdefine"></a>
@@ -1053,13 +1124,33 @@ sub FB_CALLLIST_returnTableHeader($)
     <br><br>
     Default Value: <i>empty</i> (all internal numbers should be used, no exclusions and no mapping is performed)
     <br><br>
-    <li><a name="connection-mapping">external-mapping</a> &lt;hash&gt;</li>
+    <li><a name="external-mapping">external-mapping</a> &lt;hash&gt;</li>
     Defines a custom mapping of external connection values (reading: external_connection) to custom values. The mapping is performed in a hash table.<br><br>
     e.g.<br>
     <ul>
     <code>attr &lt;name&gt; external-mapping {'ISDN' =&gt; 'Fixed Network', 'SIP0' =&gt; 'Operator A', 'SIP1' =&gt; 'Operator B'}</code>
     </ul><br>   
-    The mapped name will be displayed in the table instead of the original value from FB_CALLMONITOR.
+    <li><a name="icon-mapping">icon-mapping</a> &lt;hash&gt;</li>
+    Defines a custom mapping of call states to custom icons. The mapping is performed in a hash table.<br><br>
+    e.g.<br>
+    <ul>
+    <code>attr &lt;name&gt; icon-mapping {'incoming.connected' =&gt; 'phone_ring_in@yellow', 'outgoing.missed' =&gt; 'phone_missed_out@red'}</code>
+    </ul><br>   
+    The mapped name will be displayed in the table instead of the original value from FB_CALLMONITOR. If you use SVG-based icons, you can set the desired color as name or HTML color code via an optional "@<i>color</i>".
+    <br><br>
+    Possible values and their default icon are:<br><br>
+    <ul>
+    <li><b>incoming.ring</b> =&gt; phone_ring@blue</li>
+    <li><b>outgoing.ring</b> =&gt; phone_ring@green</li>
+    <li><b>incoming.connected</b> =&gt; phone_ring_in@blue</li>
+    <li><b>outgoing.connected</b> =&gt; phone_ring_in@green</li>
+    
+    <li><b>incoming.missed</b> =&gt; phone_missed_in@red</li>
+    <li><b>outgoing.missed</b> =&gt; phone_missed_out@green</li>
+    <li><b>incoming.done</b> =&gt; phone_call_end_in@blue</li>
+    <li><b>outgoing.done</b> =&gt; phone_call_end_out@green</li>
+    <li><b>incoming.tam</b> =&gt; phone_answering@blue</li>
+    </ul>
     <br><br>
     Default Value: <i>empty</i> (no mapping is performed)
     <br><br>
@@ -1096,8 +1187,8 @@ sub FB_CALLLIST_returnTableHeader($)
     Possible values: en => English , de => German<br>
     Default Value is en (English)<br><br>
     <li><a name="show-icons">show-icons</a> 0,1</li>
-    Normally the call state is shown with icons (used from the fhemSVG icon set).
-    You need to have fhemSVG in your iconpath attribute of your appropriate FHEMWEB definition to use this icons.
+    Normally the call state is shown with icons (used from the openautomation icon set).
+    You need to have openautomation in your iconpath attribute of your appropriate FHEMWEB definition to use this icons.
     If you don't want to use icons you can deactivate them with this attribute.<br><br>
     Possible values: 0 => no icons , 1 => use icons<br>
     Default Value is 1 (use icons)<br><br>
@@ -1134,7 +1225,7 @@ sub FB_CALLLIST_returnTableHeader($)
   <br><br>
   Es wird eine bereits konfigurierte FB_CALLMONITOR Definition ben&ouml;tigt, von der FB_CALLLIST die Events entsprechend verarbeiten kann.<br><br>
   Abh&auml;ngig von der Konfiguration der Attribute wird der Status als Icon oder als Textzeichen ausgegeben.
-  Um die Icons korrekt anzeigen zu k&ouml;nnen, muss das fhemSVG Icon-Set in der entsprechenden FHEMWEB-Instanz konfiguriert sein (siehe dazu FHEMWEB Attribut <a href="#iconPath">iconPath</a>).
+  Um die Icons korrekt anzeigen zu k&ouml;nnen, muss das openautomation Icon-Set in der entsprechenden FHEMWEB-Instanz konfiguriert sein (siehe dazu FHEMWEB Attribut <a href="#iconPath">iconPath</a>).
   <br><br>
   Die Icons haben verschiedene Farben:<br><br>
   <ul>
@@ -1199,8 +1290,8 @@ sub FB_CALLLIST_returnTableHeader($)
     <li><a name="create-readings">create-readings</a> 0,1</li>
     Sofern aktiviert, werden f&uuml;r alle sichtbaren Anrufe in der Liste entsprechende Readings und Events erzeugt.
     Es wird empfohlen das Attribut <a href="#event-on-change-reading">event-on-change-reading</a> auf den Wert <code>.*</code> zu stellen um die hohe Anzahl an Events in bestimmten F&auml;llen zu minimieren.<br><br>
-    Possible values: 0 => no readings will be created, 1 => readings and events will be created.<br>
-    Default Value is 0 (no readings will be created)<br><br>
+    M&ouml;gliche Werte: 0 => keine Readings erstellen, 1 => Readings und Events werden erzeugt.<br>
+    Standardwert ist 0 (keine Readings erstellen)<br><br>
     <li><a name="number-of-calls">number-of-calls</a> 1..20</li>
     Setzt die maximale Anzahl an Eintr&auml;gen in der Anrufliste. Sollte die Anrufliste voll sein, wird das &auml;lteste Gespr&auml;ch gel&ouml;scht.<br><br>
     Standardwert sind 5 Eintr&auml;ge<br><br>
@@ -1255,6 +1346,29 @@ sub FB_CALLLIST_returnTableHeader($)
     <br><br>
     Standardwert ist  <i>nicht gesetzt</i> (Keine Zuordnung, es werden die Originalwerte verwendet)
     <br><br>
+    <li><a name="icon-mapping">icon-mapping</a> &lt;hash&gt;</li>
+    Definiert eine eigene Zuordnung eines Anrufstatus zu einem Icon. Die Zuordnung erfolgt &uuml;ber eine Hash-Struktur.<br><br>
+    z.B.<br>
+    <ul>
+    <code>attr &lt;name&gt; icon-mapping {'incoming.connected' =&gt; 'phone_ring_in@yellow', 'outgoing.missed' =&gt; 'phone_missed_out@red'}</code>
+    </ul><br>   
+    Das entsprechende Icon wird an Stelle des Original-Icons bzw. Text verwendet. Sofern SVG-basierte Icons verwendet werden, kann man die Farbe optional definieren durch das Anfügen via @ mit Name oder einem HTML Farbcode.
+    <br><br>
+    M&ouml;gliche Werte und ihre Standard-Icons sind:<br><br>
+    <ul>
+    <li><b>incoming.ring</b> =&gt; phone_ring@blue</li>
+    <li><b>outgoing.ring</b> =&gt; phone_ring@green</li>
+    <li><b>incoming.connected</b> =&gt; phone_ring_in@blue</li>
+    <li><b>outgoing.connected</b> =&gt; phone_ring_in@green</li>
+    <li><b>incoming.missed</b> =&gt; phone_missed_in@red</li>
+    <li><b>outgoing.missed</b> =&gt; phone_missed_out@green</li>
+    <li><b>incoming.done</b> =&gt; phone_call_end_in@blue</li>
+    <li><b>outgoing.done</b> =&gt; phone_call_end_out@green</li>
+    <li><b>incoming.tam</b> =&gt; phone_answering@blue</li>
+    </ul>
+    <br><br>
+    Standardwert ist <i>nicht gesetzt</i> (Keine Zuordnung, es werden die Standard-Icons verwendet, sofern Icons akitivert sind)
+    <br><br>
     <li><a name="time-format-string">time-format-string</a> &lt;string&gt;</li>
     Definiert einen Formatierungs-String welcher benutzt wird um die Zeitangaben in der Anrufliste nach eigenen W&uuml;nschen anzupassen. Es stehen hier eine ganze Reihe an Platzhaltern zur Verf&uuml;gung um die einzelnen Elemente einer Datums-/Zeitangabe einzeln zu setzen. Die m&ouml;glichen Werte sind alle Standard POSIX strftime() Platzhalter. G&auml;ngige Platzhalter sind:<br><br>
     <ul>
@@ -1275,7 +1389,7 @@ sub FB_CALLLIST_returnTableHeader($)
     M&ouml;gliche Werte: en => Englisch , de => Deutsch<br>
     Standardwert ist en (Englisch)<br><br>
     <li><a name="show-icons">show-icons</a> 0,1</li>
-    Im Normalfall wird der Status eines jeden Anrufs mit einem Icon angezeigt. Dazu muss das fhemSVG Icon-Set im iconpath-Attribut der entsprechenden FHEMWEB Instanz konfiguriert sein. Sollte man keine Icons w&uuml;nschen, so kann man diese hiermit abschalten. Der Status wird dann mittels Textzeichen dargestellt.<br><br>
+    Im Normalfall wird der Status eines jeden Anrufs mit einem Icon angezeigt. Dazu muss das openautomation Icon-Set im iconpath-Attribut der entsprechenden FHEMWEB Instanz konfiguriert sein. Sollte man keine Icons w&uuml;nschen, so kann man diese hiermit abschalten. Der Status wird dann mittels Textzeichen dargestellt.<br><br>
     M&ouml;gliche Werte: 0 => keine Icons , 1 => benutze Icons<br>
     Standardwert ist 1 (benutze Icons)<br><br>
     <li><a name="visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,external,connection,duration</li>
