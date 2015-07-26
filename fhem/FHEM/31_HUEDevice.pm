@@ -218,6 +218,7 @@ sub HUEDevice_Define($$)
     $hash->{helper}{effect} = '';
 
     $hash->{helper}{percent} = -1;
+    $hash->{helper}{rgb} = "";
 
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
@@ -491,8 +492,8 @@ HUEDevice_Set($@)
     HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
   }
 
-  if( !defined($obj{transitiontime} ) ) {
-    my $transitiontime =  AttrVal($name, "transitiontime", undef);
+  if( %obj && !defined($obj{transitiontime} ) ) {
+    my $transitiontime = AttrVal($name, "transitiontime", undef);
 
     $obj{transitiontime} = 0 + $transitiontime if( defined( $transitiontime ) );
   }
@@ -983,7 +984,9 @@ HUEDevice_Parse($$)
 
   readingsEndUpdate($hash,1);
 
-  readingsSingleUpdate($hash,"rgb", CommandGet("","$name rgb"),1 );
+  my $rgb = CommandGet("","$name rgb");
+  if( $rgb ne $hash->{helper}{rgb} ) { readingsSingleUpdate($hash,"rgb", $rgb,1); };
+  $hash->{helper}{rgb} = $rgb;
 }
 
 1;
