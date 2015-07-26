@@ -43,7 +43,7 @@ svg.dashboard_tabicon { fill:#929292; }
 #dashboard .dashboard_widgetheader {background: none repeat scroll 0 0 #FFFFFF; /*border: 1px solid #FFFFFF;
 					box-shadow: 5px 5px 5px #000000;*/ margin: 0.2em; padding-bottom: 4px; padding-top: 3px; padding-left: 0.7em; font-weight: normal;}			
 #dashboard .ui-widget .ui-widget {font-size: 1em; font-family: Arial,Helvetica,sans-serif;}
-#dashboard .ui-widget-header {background-color: #FFFFFF;/*color: #ffffff;*/}
+#dashboard .ui-widget-header {border: none; background: #FFFFFF;/*color: #ffffff;*/}
 #dashboard .ui-helper-clearfix:before,
 #dashboard .ui-helper-clearfix:after {content: "";display: table;border-collapse: collapse;}
 #dashboard .ui-helper-clearfix:after {clear: both;}

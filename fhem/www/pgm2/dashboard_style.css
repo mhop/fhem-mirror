@@ -42,7 +42,7 @@
 #dashboard .dashboard_widgetinner .block .block {border: none; box-shadow: none;}
 #dashboard .dashboard_tabcontent {width: 100%; padding: 0; margin: 0; }
 #dashboard .dashboard_widget {border-radius: 8px; float: left;} 
-#dashboard .dashboard_widgethelper {background-color: #D7FFFF; }
+#dashboard .dashboard_widgethelper {background-color: #A8A870; }
 #dashboard .dashboard_widgetheader {background: none repeat scroll 0 0 #F0F0D8; border: 1px solid #808080;
 					margin: 0.2em; padding-bottom: 4px; padding-top: 3px; padding-left: 0.7em; font-weight: normal;}			
 #dashboard .ui-widget .ui-widget {font-size: 1em; font-family: Arial,Helvetica,sans-serif;}
@@ -60,6 +60,7 @@
 #dashboard .ui-tabs .ui-tabs-nav .ui-tabs-anchor {float: left;padding: .5em .5em;text-decoration: none;}
 #dashboard .ui-tabs-icon {width: 23px;height: 23px; margin: -8px 2px -6px -3px; padding-right: 2px;/*float: left;vertical-align: top;margin-left: 0.3em;margin-top: 0.5em;*/}
 #dashboard .dashboard_tabnav_hidden{background-color: #F8F8d5;}
+#dashboard .dashboard_tabnav {background: #e9e9c8 !important;}
 #dashboard .ui-widget-header .ui-state-default {border: 1px solid #278727;background-color: #d5d5b7;font-weight: normal;color: #F0F0dd;}
 #dashboard .ui-widget-header .ui-state-active{border: 1px solid #278727;background: #F8F8d5;font-weight: normal;color: #278727;}
 #dashboard .ui-state-default a {color: #F8F8d5;text-decoration: none;}
@@ -169,10 +170,6 @@ body.dashboard_fullsize #content {
   height: 100% !important;
   padding: 0px !important;
   border: none !important;
-}
-
-.col2 {
-  text-align: center;
 }
 
 .dashboard_widgetheader svg {

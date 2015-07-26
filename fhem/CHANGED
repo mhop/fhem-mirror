@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 95_Dashboard: added new attribute dashboard_tabXdevices which
+               supports devspec definitions for shown dashboard groups.
+               Storage of current opened tab and restore when opening dashboard.
+               Fixed some CSS issues (text alignment, colors ...)
   - change:  SYSMON: warning (userdefined readings), reading for perl version
   - feature: 38_CO20.pm: added advanced features, retries and timeout (by Markus M.)
   - feature: 32_yowsup.pm: added support for groups

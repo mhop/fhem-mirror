@@ -499,39 +499,6 @@ function dashboard_insert_tab(tabIndex, content) {
   FW_replaceWidgets($("#dashboard_tab" + tabIndex));
 
   dashboard_init_tab(tabIndex);
-
-  // call FHEMWEB specific link replacement
-  $("#dashboard_tab" + tabIndex + " a").each(function() { FW_replaceLink(this); });
-
-  restoreOrder(tabIndex);
-  if (gridSize = is_dashboard_flexible()) {
-	  var $container = $("#dashboard_rowcenter_tab" + tabIndex);
-	  $("#dashboard_tab" + tabIndex + " .dashboard_widget").draggable({
-		cursor: 'move',
-		grid: [gridSize,gridSize],
-		containment: [$container.offset().left,$container.offset().top],
-		stop: function() { saveOrder(); }
-	  });
-  }
-  else {
-	  $("#dashboard_tab" + tabIndex + " .dashboard_column").sortable({
-		connectWith: ['.dashboard_column', '.ui-row'],
-		cursor: 'move',
-		tolerance: 'pointer',
-		stop: function() { saveOrder(); }
-	  });
-  }
-  makeResizable('.dashboard_widget');
-
-  // call the initialization of reading groups
-  FW_readingsGroupReadyFn($('#dashboard_tab' + tabIndex));
-
-  if ((DashboardConfigHash['lockstate']  == "lock") || (dashboard_buttonbar == "hidden")) {
-  	dashboard_setlock();
-  } else {
-  	dashboard_unsetlock();
-  }
-  restoreGroupVisibility(tabIndex);
 }
 
 function dashboard_init_tab(tabIndex) {
@@ -553,6 +520,39 @@ function dashboard_init_tab(tabIndex) {
 			event.stopImmediatePropagation();
 		});
 	} else { $("#dashboard_tab" + tabIndex + " .dashboard_widgetheader").addClass( "dashboard_widgetheader ui-corner-all" );}
+
+	  // call FHEMWEB specific link replacement
+	  $("#dashboard_tab" + tabIndex + " a").each(function() { FW_replaceLink(this); });
+
+	  restoreOrder(tabIndex);
+	  if (gridSize = is_dashboard_flexible()) {
+		  var $container = $("#dashboard_rowcenter_tab" + tabIndex);
+		  $("#dashboard_tab" + tabIndex + " .dashboard_widget").draggable({
+			cursor: 'move',
+			grid: [gridSize,gridSize],
+			containment: [$container.offset().left,$container.offset().top],
+			stop: function() { saveOrder(); }
+		  });
+	  }
+	  else {
+		  $("#dashboard_tab" + tabIndex + " .dashboard_column").sortable({
+			connectWith: ['.dashboard_column', '.ui-row'],
+			cursor: 'move',
+			tolerance: 'pointer',
+		stop: function() { saveOrder(); }
+		  });
+	  }
+	  makeResizable('.dashboard_widget');
+
+	  // call the initialization of reading groups
+	  FW_readingsGroupReadyFn($('#dashboard_tab' + tabIndex));
+
+	  if ((DashboardConfigHash['lockstate']  == "lock") || (dashboard_buttonbar == "hidden")) {
+		dashboard_setlock();
+	  } else {
+		dashboard_unsetlock();
+	  }
+	  restoreGroupVisibility(tabIndex);
 }
 
 function restoreGroupVisibility(tabId) {
@@ -602,7 +602,6 @@ function dashboard_buildDashboard(){
 	var params = dashboard_get_params();
 	dashboard_buttonbar = params[4];
 
-	dashboard_init_tab(0);
 
         if (DashboardConfigHash['dashboard_showfullsize'] == 1){ //disable roomlist and header	
 		//$("#menuScrollArea").remove();
@@ -616,16 +615,25 @@ function dashboard_buildDashboard(){
 	$("#dashboardtabs").tabs({
 		active: 0,
 		create: function(event, ui) { 
-			$( "#dashboardtabs" ).tabs( "option", "active", DashboardConfigHash['dashboard_activetab']-1);//set active Tab
+			/*$( "#dashboardtabs" ).tabs( "option", "active", 2);//set active Tab
 			restoreOrder(); 
-			restoreGroupVisibility(0);
+			restoreGroupVisibility(0);*/
 		},
 		activate: function (event, ui) {
 			var tabIndex = ui.newTab.parent().children('li').index(ui.newTab);
+			$.cookie('dashboard_activetab', tabIndex + 1, {expires : 365});
 			//restoreOrder(tabIndex); 
 			//restoreGroupVisibility(tabIndex);
 		}		
 	});	
+
+        var iActiveTab = getTabIndexFromTab($('#dashboardtabs .dashboard_tabpanel'));
+        
+	$( "#dashboardtabs" ).tabs( "option", "active", iActiveTab);//set active Tab
+	dashboard_init_tab(iActiveTab);
+	restoreOrder(iActiveTab); 
+	restoreGroupVisibility(iActiveTab);
+
 	if ($("#dashboard_tabnav").hasClass("dashboard_tabnav_bottom")) { $(".dashboard_tabnav").appendTo(".dashboard_tabs"); } //set Tabs on the Bottom	
 	$(".dashboard_tab_hidden").css("display", "none"); //hide Tabs
 
