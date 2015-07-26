@@ -50,7 +50,7 @@ sub HMinfo_Define($$){#########################################################
                             .",reduced:off"
                             .",motorErr:ok"
                             .",error:none"
-                            .",uncertain:[no|yes],"
+                            .",uncertain:[no|yes]"
                             .",smoke_detect:none"
                             .",cover:closed"
                             ;
@@ -109,6 +109,15 @@ sub HMinfo_Attr(@) {###########################################################
       $modules{CUL_HM}{helper}{hmManualOper} = substr($attrVal,0,1);
     }
   }
+  elsif($attrName eq "sumERROR"){
+    if ($cmd eq "set"){
+      foreach (split ",",$attrVal){    #prepare reading filter for error counts
+        my ($p,@a) = split ":",$_;
+        return "parameter illegal - " 
+              if(!$p || !$a[0]);
+      }
+    }
+  }
   return;
 }
 
@@ -126,6 +135,7 @@ sub HMinfo_status($){##########################################################
   my %sum;
   #--- used for error counts
   my @erro = split ",",$attr{$name}{sumERROR};
+  
   my %errFlt;
   my %err;
   my @errNames;
