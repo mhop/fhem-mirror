@@ -1,9 +1,19 @@
 ##############################################
 # $Id$
+# MH various changes/fixes from forum e.g dpt9, 0 is not necessarily off, ...
+# MH 20140313 changed Log to Log3, verbose instead of loglevel
+# MH 20140313 testing setstate....
+# MH 20141202 changing to readingsupdate
+# MH 20150518 . based on SVN 10_EIB.pm 8584 2015-05-15 18:46:52Z andi291 
+# ABU 20150617 added dpt1, removed special handling of dpt5, added default-values for messages without dpt, changed retVal of EIB_ParseByDatapointType
+# MH 20150622 added getGx/setGx Readings and Attr EIBreadingX
+# ABU 20150617 cleanup unused lines, finalized dpt-handling, cleanup logging, added debug-par
 package main;
 
 use strict;
 use warnings;
+
+my $debug=0;
 
 # Open Tasks
 #  - precision for model percent to 0,1
@@ -34,6 +44,9 @@ my %models = (
 
 my %eib_dpttypes = (
 
+  #Binary value
+  "dpt1" 		=> {"CODE"=>"dpt1", "UNIT"=>"",  "factor"=>1},
+
   # 1-Octet unsigned value
   "dpt5" 		=> {"CODE"=>"dpt5", "UNIT"=>"",  "factor"=>1},
   "percent" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>100/255, "slider"=>"0,1,100"},
@@ -41,6 +54,7 @@ my %eib_dpttypes = (
   "angle" 		=> {"CODE"=>"dpt5", "UNIT"=>"&deg;", "factor"=>360/255}, # alias for dpt5.003
   "dpt5.004" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1},
   "percent255" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1 , "slider"=>"0,1,255"}, #alias for dpt5.004
+  "dpt5.Slider"	=> {"CODE"=>"dpt5", "UNIT"=>"",  "factor"=>100/255, "slider"=>"0,1,100"}, ##MH same as percent w.o. unit
 
   # 2-Octet unsigned Value (current, length, brightness)
   "dpt7" 		=> {"CODE"=>"dpt7", "UNIT"=>""},
@@ -85,10 +99,6 @@ my %eib_dpttypes = (
 
   # 14-Octet String
   "dpt16"         => {"CODE"=>"dpt16", "UNIT"=>""},
-
-
-
-  
 );
 
 
@@ -104,9 +114,10 @@ EIB_Initialize($)
   $hash->{DefFn}     = "EIB_Define";
   $hash->{UndefFn}   = "EIB_Undef";
   $hash->{ParseFn}   = "EIB_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 " .
+						"EIBreadingX:1,0 " .
 						"$readingFnAttributes " .
-  						"model:".join(",", keys %eib_dpttypes);					
+						"model:".join(",", keys %eib_dpttypes);
 }
 
 
@@ -168,11 +179,12 @@ sub
 EIB_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
-  Log(5,"EIB setState tim: $tim vt: $vt val: $val");
+  Log3 $hash, 5,"EIB setState for $hash->{NAME} tim: $tim vt: $vt val: $val";
 
   $val = $1 if($val =~ m/^(.*) \d+$/);
-  #return "Undefined value $val" if(!defined($eib_c2b{$val}));
-  return undef;
+  #return "Undefined value from EIBsetstate $val" if(!defined($eib_c2b{$val}));
+  #return undef;
+  return undef if(!defined($eib_c2b{$val}));
 }
 
 ###################################
@@ -223,8 +235,7 @@ EIB_Set($@)
   return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
 
   my $v = join(" ", @a);
-  #Log GetLogLevel($name,2), "EIB set $v";
-  Log 5, "EIB set $v";
+  Log3 $name, 5, "EIB set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
   if($value eq "raw" && defined($arg1)) {                                
@@ -233,17 +244,18 @@ EIB_Set($@)
     $c = $arg1;
   } elsif ($value eq "value" && defined($arg1)) {
   	# value to be translated according to datapoint type
-  	$c = EIB_EncodeByDatapointType($hash,$name,$arg1);
+  	$c = EIB_EncodeByDatapointType($hash,$name,$arg1,$groupnr); #MH add group in call
   	
   	# set the value to the back translated value
-  	$v = EIB_ParseByDatapointType($hash,$name,$c);
+  	$v = EIB_ParseByDatapointType($hash,$name,$c,$groupnr); # MH probably stupid - but required!!!!
   }
 
   my $groupcode = $hash->{CODE}{$groupnr};
-  #IOWrite($hash, "B", "w" . $groupcode . $c);
-  my $model = $attr{$name}{"model"};
+  $model = $attr{$name}{"model"}; ##MH 
+  $model = "" unless defined($model); ##MH avoid uninit msg
+
   my $code = $eib_dpttypes{"$model"}{"CODE"};
-  if ($code eq 'dpt7') {
+  if (defined($code) && $code eq 'dpt7') { #MH avoid uninit msg
     IOWrite($hash, "B", "b" . $groupcode . $c);
   }
   else {
@@ -263,7 +275,7 @@ EIB_Set($@)
     my $dur = $arg1;
     my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
     $modules{EIB}{ldata}{$name} = $to;
-    Log 4, "Follow: +$to set $name off g$groupnr";
+    Log3 $name, 4, "Follow: +$to set $name off g$groupnr"; 
     CommandDefine(undef, $name . "_timer at +$to set $name off g$groupnr");
   }
 
@@ -279,18 +291,18 @@ EIB_Set($@)
   if($value =~ m/on-till/ && defined($arg1)) {
 	  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($arg1);
 	  if($err) {
-	  	Log(2,"Error trying to parse timespec for $a[0] $a[1] $a[2] : $err");
+	  	Log3 $name, 2, "Error trying to parse timespec for $a[0] $a[1] $a[2] : $err";
 	  }
 	  else {
 		  my @lt = localtime;
 		  my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
 		  my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
 		  if($hms_now ge $hms_till) {
-		    Log 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
+		    Log3 $name, 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
 		  }
 		  else {
 		    $modules{EIB}{till}{$name} = $hms_till;
-		    Log 4, "Follow: $hms_till set $name off g$groupnr";
+		    Log3 $name, 4, "Follow: $hms_till set $name off g$groupnr";
 		    CommandDefine(undef, $name . "_till at $hms_till set $name off g$groupnr");
 		  }
 	  }
@@ -299,22 +311,14 @@ EIB_Set($@)
 
   ##########################
   # Look for all devices with the same code, and set state, timestamp
-  my $code = "$hash->{GROUP}";
+  $code = "$hash->{GROUP}"; ##MH reuse variable
   my $tn = TimeNow();
-  #foreach my $n (keys %{ $modules{EIB}{defptr}{$code} }) {
-  
-  #  my $lh = $modules{EIB}{defptr}{$code}{$n};
-  #  $lh->{CHANGED}[0] = $v;
-  #  $lh->{STATE} = $v;
-  #  $lh->{READINGS}{state}{TIME} = $tn;
-  #  $lh->{READINGS}{state}{VAL} = $v;
 
-  #	readingsSingleUpdate($lh,"state",$v,1);
-  #}
-  
   my $defptr = $modules{EIB}{defptr}{$code};
   foreach my $n (keys %{ $defptr }) {
     readingsSingleUpdate($defptr->{$n}, "state", $v, 1);
+    readingsSingleUpdate($defptr->{$n},"setG" . $groupnr,$v,1) if (AttrVal($defptr->{$n}{NAME},'EIBreadingX',0) == 1); #MH reading setGroup
+    print "setg = $defptr->{$n}{NAME} , $groupnr , attr = " . AttrVal($defptr->{$n}{NAME},'EIBreadingX',0) .  " \n" if ($debug eq 1);
   }
   return $ret;
 }
@@ -351,9 +355,9 @@ EIB_Parse($$)
 	    if($def) {
 		    foreach my $n (keys %{ $def }) {
 		      my $lh = $def->{$n};
-	          foreach my $c (keys %{ $lh->{CODE} } ) 
+			  foreach my $gnr (keys %{ $lh->{CODE} } ) #MH
 		      {
-	    	    $c = $lh->{CODE}{$c};
+	    	    my $c = $lh->{CODE}{$gnr}; #MH
 	    	    if($c eq $dev)
 	    	    {
 			      $n = $lh->{NAME};        # It may be renamed
@@ -361,18 +365,16 @@ EIB_Parse($$)
 			      next if(IsIgnored($n));   # Little strange.
 			
 				  # parse/translate by datapoint type
-			      $v = EIB_ParseByDatapointType($lh,$n,$rawv);
+			      $v = EIB_ParseByDatapointType($lh,$n,$rawv,$gnr); # MH added optional groupnr
 			
-			      #$lh->{CHANGED}[0] = $v;
-			      #$lh->{STATE} = $v;
 			      $lh->{RAWSTATE} = $rawv;
 			      $lh->{LASTGROUP} = $dev;
-			      #$lh->{READINGS}{state}{TIME} = TimeNow();
-			      #$lh->{READINGS}{state}{VAL} = $v;
 				  
 				  readingsSingleUpdate($lh,"state",$v,1);
+				  readingsSingleUpdate($lh,'getG' . $gnr,$v,1) if (defined($attr{$n}{"EIBreadingX"}) && $attr{$n}{"EIBreadingX"} == 1); #MH get readingsvalue
+				  print "GETG = $n , group= $gnr , attr = " . $attr{$n}{"EIBreadingX"} .  " \n"  if ($debug eq 1);
 				  
-				  Log 5, "EIB $n $v";
+				  Log3 $n, 5, "EIB $n $v";
 				  
 			      push(@list, $n);
 			      $found = 1;
@@ -387,39 +389,56 @@ EIB_Parse($$)
    	if($found==0)
    	{
 	    my $dev_name = eib_hex2name($dev);
-   		Log(3, "EIB Unknown device $dev ($dev_name), Value $val, please define it");
+   		Log3 $dev, 3, "EIB Unknown device $dev ($dev_name), Value $val, please define it";
    		return "UNDEFINED EIB_$dev EIB $dev";
    	}
   }
 }
 
 sub
-EIB_EncodeByDatapointType($$$)
+EIB_EncodeByDatapointType($$$$) #MH added  groupnr
 {
-	my ($hash, $name, $value) = @_;
-	my $model = $attr{$name}{"model"};
-	
-	# nothing to do if no model is given
-	return $value if(!defined($model));
+	my ($hash, $name, $value, $gnr) = @_;
+		my @model_array = split(" ",$attr{$name}{"model"}) if (defined($attr{$name}{"model"}));
+		my $model = $model_array[0];
+
+	if (!defined($model)) {
+		Log3 $hash, 4,"EIB encode $value for $name";
+		return $value;
+	}
+
+	if (defined($gnr)) {
+		$model = $model_array[$gnr-1] if (defined($model_array[$gnr-1]));
+	}
+
+	Log3 $hash, 5,"EIB_EncodeByDatapointType: $name, Value= $value, model= $model";
 	
 	my $dpt = $eib_dpttypes{"$model"};
-	Log(4,"EIB encode $value for $name model: $model dpt: $dpt");
-	return $value if(!defined($dpt));
+
+	if (!defined($dpt)) {
+		Log3 $hash, 4,"EIB encode $value for $name model: $model";
+		return $value;
+	}
 
 	my $code = $eib_dpttypes{"$model"}{"CODE"};
 	my $unit = $eib_dpttypes{"$model"}{"UNIT"};
 	my $transval = undef;
 	my $adjustment = $eib_dpttypes{"$model"}{"ADJUSTMENT"};
 	
-	Log(4,"EIB encode $value for $name model: $model dpt: $code unit: $unit");
+	Log3 $hash, 4,"EIB encode $value for $name model: $model dpt: $code unit: $unit";
 	
-	if ($code eq "dpt5") 
+	if ($code eq "dpt1") 
+	{
+		$transval = $value;
+		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
+	}
+	elsif ($code eq "dpt5") 
 	{
 		my $dpt5factor = $eib_dpttypes{"$model"}{"factor"};
 		my $fullval = sprintf("00%.2x",($value/$dpt5factor));
 		$transval = $fullval;
 				
-		Log(5,"EIB $code encode $value = $fullval factor = $dpt5factor translated: $transval");
+		Log3 $hash, 5,"EIB $code encode $value = $fullval factor = $dpt5factor translated: $transval";
 		
 	} elsif ($code eq "dpt7") 
 	{
@@ -432,25 +451,12 @@ EIB_EncodeByDatapointType($$$)
 			$transval = $fullval;
 		}
 				
-		Log(5,"EIB $code encode $value = $fullval translated: $transval");
+		Log3 $hash, 5,"EIB $code encode $value = $fullval translated: $transval";
 		
 	} elsif($code eq "dpt9") 
 	{
-		#my $sign = $value<0?-1:1;
-		#my $absval = abs($value);
-		#my $exp = $absval==0?0:int(log($absval)/log(2));
-		#my $mant = $absval / (2**$exp) *100;
-		#$mant = ((~($mant+1))&0x07FF) if($sign<0);
-		
-		#my $fullval = $mant+2048*$exp;
-		#$fullval |=0x8000 if($sign<0);
-		
-		#$transval = sprintf("00%.4x",$fullval);
-		
-		#Log(5,"EIB $code encode $value = $fullval sign: $sign mant: $mant exp: $exp translated: $transval");
-		
 		$transval = encode_dpt9($value);		
-		Log(5,"EIB $code encode $value translated: $transval");	
+		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
 		
 	} elsif ($code eq "dpt10") 
 	{
@@ -458,6 +464,7 @@ EIB_EncodeByDatapointType($$$)
 		my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 		$year+=1900;
 		$mon++;
+		$value =  sprintf("%02d:%02d:%02d",$hours,$mins,$secs); # value for log
 		
         # calculate offset for weekday
 		if ($wday eq "0") {
@@ -465,12 +472,11 @@ EIB_EncodeByDatapointType($$$)
 		}
 		my $hoffset = 32*$wday;
  		
-		#my $fullval = $secs + ($mins<<8) + ($hours<<16);
 		my $fullval = $secs + ($mins<<8) + (($hoffset + $hours)<<16);
 
 		$transval = sprintf("00%.6x",$fullval);
 				
-		Log(5,"EIB $code encode $value = $fullval hours: $hours mins: $mins secs: $secs translated: $transval");
+		Log3 $hash, 5,"EIB $code encode $value = $fullval hours: $hours mins: $mins secs: $secs translated: $transval";
 		
 	} elsif ($code eq "dpt10_ns") 
 	{
@@ -491,7 +497,7 @@ EIB_EncodeByDatapointType($$$)
 
 		$transval = sprintf("00%.6x",$fullval);
 				
-		Log(5,"EIB $code encode $value = $fullval hours: $hours mins: $mins secs: $secs translated: $transval");
+		Log3 $hash, 5,"EIB $code encode $value = $fullval hours: $hours mins: $mins secs: $secs translated: $transval";
 		
 	} elsif ($code eq "dpt11") 
 	{
@@ -503,81 +509,97 @@ EIB_EncodeByDatapointType($$$)
 		my $fullval = ($year-2000) + ($month<<8) + ($day<<16);
 		$transval = sprintf("00%.6x",$fullval);
 
-		Log(5,"EIB $code encode $value = $fullval day: $day month: $month year: $year translated: $transval");
+		Log3 $hash, 5,"EIB $code encode $value = $fullval day: $day month: $month year: $year translated: $transval";
 		
 	} elsif ($code eq "dpt12") 
 	{
 		my $fullval = sprintf("00%.8x",$value);
 		$transval = $fullval;
 				
-		Log(5,"EIB $code encode $value = $fullval translated: $transval");
+		Log3 $hash, 5,"EIB $code encode $value" . '=' . " $fullval translated: $transval";
 		
 	} elsif($code eq "dpt14") 
 	{
 		$transval = encode_dpt14($value);		
-		Log(5,"EIB $code encode $value translated: $transval");	
+		Log3 $hash, 5,"EIB $code encode $value translated: $transval";	
 		
 	} elsif ($code eq "dptxx") {
 		
 	}
 	
-	
 	# set state to translated value
 	if(defined($transval))
 	{
-		Log(4,"EIB $name translated $value $unit to $transval");
+		Log3 $hash, 4,"EIB $name translated $value $unit to $transval";
 		$value = "$transval";
 	}
 	else
 	{
-		Log(4,"EIB $name model $model value $value could not be translated/encoded. Just do a dec2hex translation");
-		$value = sprintf("00%.2x",$value);
-		
+		Log3 $hash, 4,"EIB $name model $model value $value could not be translated/encoded. Just do a dec2hex translation";
+		$value = sprintf("00%.2x",$value);		
 	}
 	
 	return $value;
 }
 
 sub
-EIB_ParseByDatapointType($$$)
+EIB_ParseByDatapointType($$$$) #MH added groupnr
 {
-	my ($hash, $name, $value) = @_;
-	my $model = $attr{$name}{"model"};
+	my ($hash, $name, $value, $gnr) = @_; #MH
+	my @model_array = split(" ",$attr{$name}{"model"}) if (defined($attr{$name}{"model"}));
+	my $model = $model_array[0];
 	
 	# nothing to do if no model is given
 	return $value if(!defined($model));
 	
+	if (defined($gnr)) {
+		$model = $model_array[$gnr-1] if defined ($model_array[$gnr-1]);
+	}
+	
+	print "EIB_ParseByDatapointType: $name, val= $value, Group= $gnr, Model= $model \n" if ($debug eq 1);
+	
 	my $dpt = $eib_dpttypes{"$model"};
 	
-	Log(4,"EIB parse $value for $name model: $model dpt: $dpt");
-	return $value if(!defined($dpt));
+	#nothing to do if no dpt is given
+	if (!defined($dpt)) {
+	    Log3 $hash, 4,"EIB parse $value for $name model: $model" if (defined($model));
+		Log3 $hash, 4,"EIB parse $value for $name" if (!defined($model));
+		return $value;
+	}
 	
 	my $code = $eib_dpttypes{"$model"}{"CODE"};
 	my $unit = $eib_dpttypes{"$model"}{"UNIT"};
 	my $transval = undef;
 	
-	Log(4,"EIB parse $value for $name model: $model dpt: $code unit: $unit");
+	Log3 $hash, 5,"EIB parse $value for $name model: $model dpt: $code unit: $unit";
+	print "EIB_ParseByDatapointType: $name, val= $value, Group= $gnr, Model= $model, code= $code, unit= $unit \n"  if ($debug eq 1);
 	
-	if ($code eq "dpt5") 
+	#ABU aus Übersichtlichkeitsgründen voran gestellt
+	if ($code ne "dpt1")
 	{
-		if ($value eq "on") 
-		{
-		  $value = "1";
-		}
+	    $value = 0 if ($value eq "off"); 
+		$value = 1 if ($value eq "on"); 
+	}
+	
+	#Je nach DPT ist was zu tun...
+	if ($code eq "dpt1") 
+	{
+		$value = "off" if ($value eq 0); 
+		$value = "on" if ($value eq 1); 
 
+		$transval = $value;				
+	}
+	elsif ($code eq "dpt5") 
+	{
 		my $dpt5factor = $eib_dpttypes{"$model"}{"factor"};
 		my $fullval = hex($value);
 		$transval = $fullval;
-		$transval = sprintf("%.0f",$transval * $dpt5factor) if($dpt5factor != 0);
-				
-		Log(5,"EIB $code parse $value = $fullval factor = $dpt5factor translated: $transval");
+		$transval = sprintf("%.0f",$transval * $dpt5factor) if($dpt5factor != 0);		
 		
 	} elsif ($code eq "dpt7") 
 	{
 		my $fullval = hex($value);
 		$transval = $fullval;		
-				
-		Log(5,"EIB $code parse $value = $fullval translated: $transval");
 		
 	} elsif($code eq "dpt9") 
 	{
@@ -590,9 +612,6 @@ EIB_ParseByDatapointType($$$)
 		
 		$transval = (1<<$exp)*0.01*$mant;
 		
-		Log(5,"EIB $code parse $value = $fullval sign: $sign mant: $mant exp: $exp translated: $transval");	
-		
-		
 	} elsif ($code eq "dpt10") 
 	{
 		# Time
@@ -602,8 +621,6 @@ EIB_ParseByDatapointType($$$)
 		my $secs  = ($fullval & 0x3F);
 		$transval = sprintf("%02d:%02d:%02d",$hours,$mins,$secs);
 				
-		Log(5,"EIB $code parse $value = $fullval hours: $hours mins: $mins secs: $secs translated: $transval");
-		
 	} elsif ($code eq "dpt10_ns") 
 	{
 		# Time
@@ -613,8 +630,6 @@ EIB_ParseByDatapointType($$$)
 		my $secs  = ($fullval & 0x3F);
 		$transval = sprintf("%02d:%02d",$hours,$mins);
 				
-		Log(5,"EIB $code parse $value = $fullval hours: $hours mins: $mins translated: $transval");
-		
 	} elsif ($code eq "dpt11") 
 	{
 		# Date
@@ -627,15 +642,11 @@ EIB_ParseByDatapointType($$$)
 		$year += 2000 if($year<90);
 		$transval = sprintf("%02d.%02d.%04d",$day,$month,$year);
 				
-		Log(5,"EIB $code parse $value = $fullval day: $day month: $month year: $year translated: $transval");
-		
 	} elsif ($code eq "dpt12") 
 	{
 		my $fullval = hex($value);
 		$transval = $fullval;		
 				
-		Log(5,"EIB $code parse $value = $fullval translated: $transval");
-		
 	} elsif ($code eq "dpt14") # contributed by Olaf
     	{
         	# 4 byte single precision float
@@ -650,12 +661,10 @@ EIB_ParseByDatapointType($$$)
 
         	$transval = $sign * (2 ** $expo) * ($mant / (1 <<23));
                 
-        	Log(5,"EIB $code parse $value translated: $transval");
 	} elsif ($code eq "dpt16") {
 
-	    $transval= decode_dpt16($value);
+		$transval= decode_dpt16($value);
 
-		Log(5,"EIB $code parse $value translated: $transval");
 	} elsif ($code eq "dptxx") {
 		
 	}
@@ -663,12 +672,14 @@ EIB_ParseByDatapointType($$$)
 	# set state to translated value
 	if(defined($transval))
 	{
-		Log(4,"EIB $name translated to $transval $unit");
+		Log3 $hash, 4, "EIB_ParseByDatapointType: $name, origval= $value, transval= $transval, Group= $gnr, Model= $model, code= $code, unit= $unit";
+		print "EIB_ParseByDatapointType: $name, origval= $value, transval= $transval, Group= $gnr, Model= $model, code= $code, unit= $unit \n" if ($debug eq 1);
 		$value = "$transval $unit";
+		$value =~ s/^\s+|\s+$//g;
 	}
 	else
 	{
-		Log(4,"EIB $name model $model value $value could not be translated.");
+		Log3 $hash, 4, "EIB_ParseByDatapointType: $name, origval= $value could not be translated, Group= $gnr, Model= $model, code= $code, unit= $unit"; #MH
 	}
 	
 	return $value;
@@ -691,6 +702,7 @@ sub decode_dpt16($)
   }
   return sprintf("%s","$res");
 }
+
 #############################
 sub
 eib_hex2name($)
@@ -711,7 +723,7 @@ eib_name2hex($)
 {
   my $v = shift;
   my $r = $v;
-  Log(5, "name2hex: $v");
+#  Log(5, "name2hex: $v");
   if($v =~ /^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{1,3})$/) {
   	$r = sprintf("%01x%01x%02x",$1,$2,$3);
   }
@@ -724,7 +736,7 @@ eib_name2hex($)
 
 #############################
 # 2byte signed float
-sub encode_dpt9 {
+sub encode_dpt9($) {
     my $state = shift;
     my $data;
 	my $retVal;
@@ -740,8 +752,6 @@ sub encode_dpt9 {
     }
     $data = $sign | ($exp << 11) | ($mant & 0x07ff);
 	
-	#Log(1,"State: $state Sign: $sign Exp: $exp Mant: $mant Data: $data");	
-	
 	$retVal = sprintf("00%.4x",$data);
 	
     return $retVal;
@@ -755,8 +765,6 @@ sub encode_dpt14 {
 	my $packed_float = pack "f", $real; 
 	my $data  = sprintf("%04X", unpack("L",  pack("f", $real))); 
 
-	#Log(1,"Shift: $real Value: $data");	
-
     return $data
 }
 
@@ -767,139 +775,136 @@ sub encode_dpt14 {
 
 <a name="EIB"></a>
 <h3>EIB / KNX</h3>
-<ul>
-  EIB/KNX is a standard for building automation / home automation.
-  It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.
+<div style="margin-left: 2em">
+<p>EIB/KNX is a standard for building automation / home automation.
+  It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.</p>
 
-  While the module <a href="#TUL">TUL</a> represents the connection to the EIB network,
+<p>While the module <a href="#TUL">TUL</a> represents the connection to the EIB network,
   the EIB modules represent individual EIB devices. This module provides a basic set of operations (on, off, on-till, etc.)
   to switch on/off EIB devices. Sophisticated setups can be achieved by combining a number of
-  EIB module instances or by sending raw hex values to the network (set <devname> raw <hexval>).
+  EIB module instances or by sending raw hex values to the network (set &lt;devname&gt; raw &lt;hexval&gt;).</p>
 
-  EIB/KNX defines a series of Datapoint Type as standard data types used
-  to allow general interpretation of values of devices manufactured by diferent companies.
-  This datatypes are used to interpret the status of a device, so the state in FHEM will then
-  show the correct value.
+<p>EIB/KNX defines a series of Datapoint Type as standard data types used
+  to allow general interpretation of values of devices manufactured by different companies.
+  These datatypes are used to interpret the status of a device, so the state in FHEM will then
+  show the correct value.</p>
 
-  <br><br>
-  <a name="EIBdefine"></a>
-  <b>Define</b>
-  <ul>
+  <p><a name="EIBdefine"></a> <b>Define</b></p>
+  <div style="margin-left: 2em">
     <code>define &lt;name&gt; EIB &lt;main group&gt; [&lt;additional group&gt; ..]</code>
-    <br><br>
-
-    Define an EIB device, connected via a <a href="#TUL">TUL</a>. The
+    
+    <p>Define an EIB device, connected via a <a href="#TUL">TUL</a>. The
     &lt;group&gt; parameters are either a group name notation (0-15/0-15/0-255) or the hex representation of the value (0-f0-f0-ff).
-    The &lt;main group&gt;  is used for sending of commands to the EIB network.
-    The state of the instance will be updated when a new state is received from the network for any of the given groups.
-    This is usefull for example for toggle switches where a on command is send to one group and the real state (on or off) is
-    responded back on a second group.
+    The &lt;main group&gt;  is used for sending of commands to the EIB network.</p>
+    <p>The state of the instance will be updated when a new state is received from the network for any of the given groups.
+    This is useful for example for toggle switches where a on command is send to one group and the real state (on or off) is
+    responded back on a second group.</p>
 
-    For actors and sensors the
-    <a href="#autocreate">autocreate</a> module may help.<br>
-
-    Example:
+    <p>For actors and sensors the <a href="#autocreate">autocreate</a> module may help.</p>
+    <p>Example:</p>
+      <pre>
+      define lamp1 EIB 0/10/12
+      define lamp1 EIB 0/10/12 0/0/5
+      define lamp1 EIB 0A0C
+      </pre>
+  </div>
+  
+  <p><a name="EIBset"></a> <b>Set</b></p>
+  <div style="margin-left: 2em">
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt; g&lt;groupnr&gt;]</code>
+    <p>where value one of:</p>
     <ul>
-      <code>define lamp1 EIB 0/10/12</code><br>
-      <code>define lamp1 EIB 0/10/12 0/0/5</code><br>
-      <code>define lamp1 EIB 0A0C</code><br>
+	  <li><b>on</b> switch on device</li>
+	  <li><b>off</b> switch off device</li>
+	  <li><b>on-for-timer</b> &lt;secs&gt; switch on the device for the given time. After the specified seconds a switch off command is sent.</li>
+	  <li><b>on-till</b> &lt;time spec&gt; switches the device on. The device will be switched off at the given time.</li>
+      <li><b>raw</b> &lt;hexvalue&gt; sends the given value as raw data to the device.</li>
+      <li><b>value</b> &lt;decimal value&gt; transforms the value according to the chosen model and send the result to the device.</li>
     </ul>
-  </ul>
-  <br>
+    <p>Example:</p>
+    <pre>
+      set lamp1 on
+      set lamp1 off
+      set lamp1 on-for-timer 10
+      set lamp1 on-till 13:15:00
+      set lamp1 raw 234578
+      set lamp1 value 23.44
+    </pre>
 
-  <a name="EIBset"></a>
-  <b>Set</b>
+	<p>When as last argument a g&lt;groupnr&gt; is present, the command will be sent
+	to the EIB group indexed by the groupnr (starting by 1, in the order as given in Define).</p>
+	<pre>
+      define lamp1 EIB 0/10/01 0/10/02
+      set lamp1 on g2 (will send "on" to 0/10/02)
+	</pre>
+
+	<p>A dimmer can be used with a slider as shown in following example:</p>
+	<pre>
+      define dim1 EIB 0/0/5
+      attr dim1 model percent
+      attr dim1 webCmd value
+	</pre>
+	
+	<p>The current date and time can be sent to the bus by the following settings:</p>
+	<pre>
+      define timedev EIB 0/0/7
+      attr timedev model dpt10
+      attr timedev eventMap /value now:now/
+      attr timedev webCmd now
+      
+      define datedev EIB 0/0/8
+      attr datedev model dpt11
+      attr datedev eventMap /value now:now/
+      attr datedev webCmd now
+      
+      # send every midnight the new date
+      define dateset at *00:00:00 set datedev value now
+      
+      # send every hour the current time
+      define timeset at +*01:00:00 set timedev value now
+	</pre>	
+  </div>
+ 
+  <p><a name="EIBget"></a> <b>Get</b></p>
+  <div style="margin-left: 2em">  
+  <p>not implemented</p>
+  </div>
+    
+  <p><a name="EIBattr"></a> <b>Attributes</b></p>
+  <div style="margin-left: 2em">   
   <ul>
-    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt; g&lt;groupnr&gt;]</code><br>
-    where value one of:
-	<li><b>on</b> switch on device</li>
-	<li><b>off</b> switch off device</li>
-	<li><b>on-for-timer</b> <secs> switch on the device for the given time. After the specified seconds a switch off command is sent.</li>
-	<li><b>on-till</b> <time spec> switches the device on. The device will be switched off at the given time.</li>
-    <li><b>raw</b> <hexvalue> sends the given value as raw data to the device.</li>
-    <li><b>value</b> <decimal value> transforms the value according to the chosen model and send the result to the device.</li>
-
-    <br>Example:
-    <ul><code>
-      set lamp1 on<br>
-      set lamp1 off<br>
-      set lamp1 on-for-timer 10<br>
-      set lamp1 on-till 13:15:00<br>
-      set lamp1 raw 234578<br>
-      set lamp1 value 23.44<br>
-    </code></ul>
-
-	When as last argument a g&lt;groupnr&gt; is present, the command will be sent
-	to the EIB group indexed by the groupnr (starting by 1, in the order as given in Define).
-	<br>Example:
-	<ul><code>
-	   define lamp1 EIB 0/10/01 0/10/02<br>
-	   set lamp1 on g2 (will send "on" to 0/10/02)
-	</code></ul>
-
-	A dimmer can be used with a slider as shown in following example:
-	<br><ul><code>
-		define dim1 EIB 0/0/5
-		attr dim1 model percent
-		attr dim1 webCmd value
-	</code></ul>
-	
-	The current date and time can be sent to the bus by the following settings:
-	<br><ul><code>
-	
-	define timedev EIB 0/0/7
-	attr timedev model dpt10
-	attr timedev eventMap /value now:now/
-	attr timedev webCmd now
-	
-	define datedev EIB 0/0/8
-	attr datedev model dpt11
-	attr datedev eventMap /value now:now/
-	attr datedev webCmd now
-	
-	# send every midnight the new date
-	define dateset at *00:00:00 set datedev value now
-	
-	# send every hour the current time
-	define timeset at +*01:00:00 set timedev value now
-	</code></ul>	
-	
-  </ul>
-  <br>
-
-  <a name="EIBattr"></a>
-  <b>Attributes</b>
-  <ul>
-
     <li><a href="#IODev">IODev</a></li>
     <li><a href="#alias">alias</a></li>
     <li><a href="#comment">comment</a></li>
     <li><a href="#devStateIcon">devStateIcon</a></li>
     <li><a href="#devStateStyle">devStateStyle</a></li>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
+<!--    <li><a href="#do_not_notify">do_not_notify</a></li> -->
     <li><a href="#dummy">dummy</a></li>
-    <li><a href="#event-aggregator">event-aggregator</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>    
+<!--    <li><a href="#event-aggregator">event-aggregator</a></li>
     <li><a href="#event-min-interval">event-min-interval</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+-->
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#group">group</a></li>
     <li><a href="#icon">icon</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
+<!--    <li><a href="#loglevel">loglevel</a></li> -->
     <li><a href="#room">room</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#sortby">sortby</a></li>
-    <li><a href="#stateFormat">stateFormat</a></li>
+<!--    <li><a href="#stateFormat">stateFormat</a></li>
     <li><a href="#userReadings">userReadings</a></li>
+-->
     <li><a href="#userattr">userattr</a></li>
     <li><a href="#verbose">verbose</a></li>
     <li><a href="#webCmd">webCmd</a></li>
     <li><a href="#widgetOverride">widgetOverride</a></li>
-    <li><a href="#model">model</a>
-      set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>).<br>
-      The device state in FHEM is interpreted and shown according to the specification.
+    <li><b>model</b> - 
+      set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>). The device state in FHEM is interpreted and shown according to the specification.
       <ul>
+        <li>dpt1   will be interpreted as on/off</li>
       	<li>dpt5</li>
       	<li>dpt5.003</li>
       	<li>angle</li>
@@ -938,12 +943,29 @@ sub encode_dpt14 {
       	<li>dpt14</li>
       	<li>dpt16</li>
       </ul>
+      <p>If the EIBreadingX is set, you can specify multiple blank separated models to cope with multiple groups in the define statement. The setting cannot be done thru the pulldown-menu, you have to specify them with <code>attr &lt;device&gt; model &lt;dpt1&gt; &lt;dpt2&gt; &lt;dpt3&gt;</code></p> 
     </li>
-  </ul>
 
-  </ul>
-  <br>
-
+    <li><b>EIBreadingX</b> - 
+    Enable additional readings for this EIB-device. With this Attribute set, a reading setG&lt;x&gt; will be updated when a set command is issued from FHEM, a reading getG&lt;x&gt; will be updated as soon a Value is received from EIB-Bus (&lt;x&gt; stands for the groupnr. - see define statement). The logic for the state reading remains unchanged. This is especially useful when the define statement contains more than one group parameter. 
+    <p>If set to 1, the following additional readings will be available:</p>
+      <pre>
+      setGx will be updated on a SET command issued by FHEM. &lt;x&gt; stands for the groupnr. - see define statement
+      getGx will be updated on reception of a message from EIB-bus.
+      </pre>
+      <p>Example:</p>
+      <pre>
+      define myDimmer EIB 0/1/1 0/1/2
+      attr myDimmer EIBreadingX 1
+      attr myDimmer model dpt1 dpt5.slider # GA 0/1/1 will be interpreted as on/off, GA 0/1/2 will be handled as dpt5 and show a slider on FHEMWEB
+      attr myDimmer eventmap /on:An/off:Aus/value g2:dim/
+      attr myDimmer webcmd on off dim
+      attr myDimmer stateFormat getG2 % # copies actual dim-level (as sent/received to/from dimmer) into STATE 
+      </pre>    
+     </li>
+  </ul>   
+  </div>
+</div>
 
 =end html
 =cut
