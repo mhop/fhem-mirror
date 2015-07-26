@@ -60,6 +60,7 @@
 #	Optimized icon loading.
 #	Optimized fullscreen view.
 #	Minor improvements in javascript and css.
+# 3.10: added attribute dashboard_tabXdevices, which can contain devspec definitions and thus allow to also shown not grouped devices
 #
 # Known Bugs/Todos:
 # BUG: Nicht alle Inhalte aller Tabs laden, bei Plots dauert die bedienung des Dashboards zu lange. -> elemente hidden? -> widgets aus js über XHR nachladen und dann anzeigen (jquery xml nachladen...)
@@ -115,9 +116,7 @@ my %group;
 my $dashboard_groupListfhem;
 my $fwjquery = "jquery.min.js";
 my $fwjqueryui = "jquery-ui.min.js";
-my $dashboardversion = "3.00";
-my @fhemweb_instances = ();
-
+my $dashboardversion = "3.10";
 
 #############################################################################################
 sub Dashboard_Initialize ($) {
@@ -132,11 +131,9 @@ sub Dashboard_Initialize ($) {
   $hash->{AttrList}    = "disable:0,1 ".
   						 "dashboard_colcount:1,2,3,4,5 ".						 						 
 						 "dashboard_debug:0,1 ".						 
-						 "dashboard_lockstate:dont-use-this-attribut ". #obolet since 04.2014
 						 "dashboard_rowtopheight ".
 						 "dashboard_rowbottomheight ".
 						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".						 
-						 "dashboard_showhelper:dont-use-this-attribut ". #obolet since 04.2014
 						 "dashboard_showtogglebuttons:0,1 ".						 
 						 #new attribute vers. 2.00
 						 "dashboard_activetab:1,2,3,4,5,6,7 ".						 
@@ -146,15 +143,16 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_rowcentercolwidth ".
 						 "dashboard_showfullsize:0,1 ".
 						 #new attribute vers. 2.02
-						 #"dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-at-the-top-buttonbar-hidden,tabs-and-buttonbar-on-the-bottom,tabs-on-the-bottom-buttonbar-hidden,tabs-and-buttonbar-hidden ".
 						 "dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-and-buttonbar-on-the-bottom,tabs-and-buttonbar-hidden ".
-						 #new attribute vers. 2.03
 						 #new attribute vers. 2.06
 						 "dashboard_customcss " .
+						 #new attribute vers. 3.00
 						 "dashboard_flexible " .
 						 #tab-specific attributes
 						 "dashboard_tab1name " .
 						 "dashboard_tab1groups " .
+						 #new attribute vers. 3.10
+						 "dashboard_tab1devices " .
 						 "dashboard_tab1sorting " .
 						 "dashboard_tab1icon " .
 						 "dashboard_tab1colcount " .
@@ -163,6 +161,8 @@ sub Dashboard_Initialize ($) {
 						 # dynamic attributes
 						 "dashboard_tab[0-9]+name " .
 						 "dashboard_tab[0-9]+groups " .
+						 #new attribute vers. 3.10
+						 "dashboard_tab[0-9]+devices " .
 						 "dashboard_tab[0-9]+sorting " .
 						 "dashboard_tab[0-9]+icon " .
 						 "dashboard_tab[0-9]+colcount " .
@@ -239,7 +239,7 @@ sub Dashboard_Get($@) {
 			my @iconFolders = split(":", AttrVal($FW_wname, "iconPath", "$FW_sp:default:fhemSVG:openautomation"));	
 			my $iconDirs = "";
 			foreach my $idir  (@iconFolders) {$iconDirs .= "$attr{global}{modpath}/www/images/".$idir.",";}
-			$res  .= "    \"icondirs\": \"$iconDirs\", \"dashboard_tabcount\": " . GetTabCount($hash, 0);
+			$res  .= "    \"icondirs\": \"$iconDirs\", \"dashboard_tabcount\": " . GetTabCount($hash, 0). ", \"dashboard_activetab\": " . GetActiveTab($hash->{NAME});
 			
 			$res .=  ($i != $x) ? ",\n" : "\n";
 			foreach my $attr (sort keys %$attrdata) {
@@ -248,7 +248,10 @@ sub Dashboard_Get($@) {
 				if (@splitattr == 2) {
 					$res .= "    \"".Dashboard_Escape($attr)."\": \"".$splitattr[0]."\",\n";
 					$res .= "    \"".Dashboard_Escape($attr)."color\": \"".$splitattr[1]."\"";
-				} else { $res .= "    \"".Dashboard_Escape($attr)."\": \"".$attrdata->{$attr}."\"";}
+				} elsif ($attr ne "dashboard_activetab") { $res .= "    \"".Dashboard_Escape($attr)."\": \"".$attrdata->{$attr}."\"";}
+				else {
+					next;
+				}
 				$res .=  ($i != $x) ? ",\n" : "\n";
 			}
 			$res .= "  }\n";
@@ -258,15 +261,15 @@ sub Dashboard_Get($@) {
   } elsif ($arg eq "groupWidget") {
 #### Comming Soon ######
 # For dynamic load of GroupWidgets from JavaScript  
-		my $dbgroup = "";
+		#my $dbgroup = "";
 		#for (my $p=2;$p<@a;$p++){$dbgroup .= @a[$p]." ";} #For Groupnames with Space
-		for (my $p=2;$p<@a;$p++){$dbgroup .= $a[$p]." ";} #For Groupnames with Space
+		#for (my $p=2;$p<@a;$p++){$dbgroup .= $a[$p]." ";} #For Groupnames with Space
  
-		$dashboard_groupListfhem = Dashboard_GetGroupList;
-		%group = BuildGroupList($dashboard_groupListfhem);
-		$res .= BuildGroupWidgets(1,1,1212,trim($dbgroup),"t1c1,".trim($dbgroup).",true,0,0:"); 
-		return $res;		
-#For dynamic loading of tabs
+		#$dashboard_groupListfhem = Dashboard_GetGroupList;
+		#%group = BuildGroupList($dashboard_groupListfhem);
+		#$res .= BuildGroupWidgets(1,1,1212,trim($dbgroup),"t1c1,".trim($dbgroup).",true,0,0:"); 
+		#return $res;		
+  #For dynamic loading of tabs
   } elsif ($arg eq "tab" && $arg2 =~ /^\d+$/) {
     return BuildDashboardTab($arg2, $hash->{NAME});
   } elsif ($arg eq "icon") {
@@ -277,7 +280,7 @@ sub Dashboard_Get($@) {
 
     return FW_iconPath($icon);
   } else {
-    return "Unknown argument $arg choose one of config:noArg groupWidget";
+    return "Unknown argument $arg choose one of config:noArg groupWidget tab icon";
   }
 }
 
@@ -293,7 +296,6 @@ sub Dashboard_define ($$) {
   
  RemoveInternalTimer($hash);
  InternalTimer      ($now + 5, 'CheckDashboardAttributUssage', $hash, 0);
- my $dashboard_groupListfhem = Dashboard_GetGroupList;
 
   my $url = '/dashboard/' . $name;
 
@@ -320,8 +322,15 @@ sub Dashboard_attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
 
   # add dynamic attributes
-  if ($cmd eq "set" && $attrName =~ m/dashboard_tab([1-9][0-9]*)groups/) {
+  if (
+    $cmd eq "set" &&
+    (
+         $attrName =~ m/dashboard_tab([1-9][0-9]*)groups/
+      || $attrName =~ m/dashboard_tab([1-9][0-9]*)devices/
+    )
+  ) {
 	addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "name");
+        addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "devices");
         addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "groups");
         addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "sorting");
         addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "icon");
@@ -358,7 +367,7 @@ sub Dashboard_CGI($)
 
   FW_pO $ret;
 
-  return 1;
+  return 0;
 }
 
 sub DashboardAsHtml($)
@@ -399,7 +408,7 @@ sub Dashboard_SummaryFN($$$$)
  my $row = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
  my $debug = AttrVal($defs{$d}{NAME}, "dashboard_debug", "0");
  
- my $activetab = AttrVal($defs{$d}{NAME}, "dashboard_activetab", 1); 
+ my $activetab = GetActiveTab($d);
  my $tabcount = GetTabCount($defs{$d}, 1);  
  my $dbwidth = AttrVal($defs{$d}{NAME}, "dashboard_width", "100%"); 
  my @tabnames = ();
@@ -407,7 +416,7 @@ sub Dashboard_SummaryFN($$$$)
 
  if ($showfullsize) {
    if ($FW_RET =~ m/<body[^>]*class="([^"]+)"[^>]*>/) {
-     $FW_RET =~ s/style="$1"/style="$1 dashboard_fullsize"/;
+     $FW_RET =~ s/class="$1"/class="$1 dashboard_fullsize"/;
    }
    else {
      $FW_RET =~ s/<body/<body class="dashboard_fullsize"/;
@@ -451,7 +460,6 @@ sub Dashboard_SummaryFN($$$$)
  if ($room ne "all") { 
  
 	################################ 
-	$dashboard_groupListfhem = Dashboard_GetGroupList;
 	################################
  
 	$ret .= "<div id=\"tabEdit\" class=\"dashboard-dialog-content dashboard-widget-content\" title=\"Dashboard-Tab\" style=\"display:none;\">\n";		
@@ -519,90 +527,89 @@ sub BuildDashboardTab($$)
 	my $id              = $defs{$d}{NR};
 	my $colcount        = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'colcount', AttrVal($defs{$d}{NAME}, "dashboard_colcount", 1));
 	my $colwidths       = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'rowcentercolwidth', AttrVal($defs{$d}{NAME}, "dashboard_rowcentercolwidth", 100));
-	my $backgroundimage = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'backgroundimage', "");
         $colwidths          =~ tr/,/:/;
+	my $backgroundimage = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'backgroundimage', "");
 	my $row             = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
 	my $tabcount        = GetTabCount($defs{$d}, 1);
-        my @tabgroups       = ();
-        my @tabsortings     = ();
+        my $tabgroups       = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($t + 1) . "groups", "");
+        my $tabsortings     = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($t + 1) . "sorting", "");
+        my $tabdevicegroups = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($t + 1) . "devices", "");
 
-	for (my $i = 0; $i < $tabcount; $i++) {
-		$tabgroups[$i] = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($i + 1) . "groups", "");
-		$tabsortings[$i] = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($i + 1) . "sorting", "");
-	}
-
-	unless (@tabgroups) { 
-		readingsSingleUpdate( $defs{$d}, "state", "No Groups set", 0 );
+	unless ($tabgroups || $tabdevicegroups) { 
+		readingsSingleUpdate( $defs{$d}, "state", "No Groups or devices set", 0 );
 		return "";
 	}
 	
-        my $groups   = Dashboard_GetGroupList();
+        my @temptabdevicegroup = split(' ', $tabdevicegroups);
+        my @tabdevicegroups = ();
+
+	# make sure device groups without a group name are splitted into
+	# separate groups for every device they are containing
+        for my $devicegroup (@temptabdevicegroup) {
+          my @groupparts = split(':', $devicegroup);
+
+          if (@groupparts == 1) {
+            my @devices = map { $_ . ':' . $_ } devspec2array($groupparts[0]);
+            push(@tabdevicegroups, @devices);
+          }
+          else {
+            push(@tabdevicegroups, $devicegroup);
+          }
+        }
+
+	my $groups   = Dashboard_GetGroupList();
         $groups   =~ s/#/ /g;
-	my @groups   = split(',', $groups);
-
-	my @temptabgroup = split(",", $tabgroups[$t]); #Set temp. position for groups without an stored position
-        my @tabgroup = ();
-	my @index = ();
-
+        my @groups   = split(',', $groups);
+        my @temptabgroup = split(",", $tabgroups);
+	
+        # resolve group names from regular expressions
 	for (my $i=0;$i<@temptabgroup;$i++) {
 		my @stabgroup = split(":", trim($temptabgroup[$i]));		
-		@index = grep { $groups[$_] eq $stabgroup[0] } (0 .. @groups-1);
+		my @index = grep { $groups[$_] eq $stabgroup[0] } (0 .. @groups-1);
+
+                if (@index == 0) {
+			my $matchGroup = '^' . $stabgroup[0] . '$';
+			@index = grep { $groups[$_] =~ m/$matchGroup/ } (0 .. @groups-1);
+		}
 
 		if (@index > 0) {
 			for (my $j=0; $j<@index;$j++) {
 				my $groupname = @groups[$index[$j]];
+				$groupname .= ':' . 'group=' . $groupname;
 				if (@stabgroup > 1) {
 					$groupname .= ':' . $stabgroup[1];
 				}
-				push(@tabgroup,$groupname);
+				push(@tabdevicegroups,$groupname);
 			}
 		}
-		else {
-			my $matchGroup = '^' . $stabgroup[0] . '$';
-			@index = grep { $groups[$_] =~ m/$matchGroup/ } (0 .. @groups-1);
-
-			if (@index > 0) {
-				for (my $j=0; $j<@index;$j++) {
-					my $groupname = @groups[$index[$j]];
-					if (@stabgroup > 1) {
-						$groupname .= ':' . $stabgroup[1];
-					}
-					push(@tabgroup,$groupname);
-				}
-			}
-		}
-		
 	}
 
-	
+        $tabgroups = join('§§§', @tabdevicegroups);
 
-	$tabgroups[$t] = join(',', @tabgroup);
-
-	for (my $i=0;$i<@tabgroup;$i++) {
-		my @stabgroup = split(":", trim($tabgroup[$i]));		
+        # add sortings for groups not already having a defined sorting
+        for (my $i=0;$i<@tabdevicegroups;$i++) {
+		my @stabgroup = split(":", trim($tabdevicegroups[$i]));		
 		my $matchGroup = "," . quotemeta(trim($stabgroup[0])) . ",";
 
-		if ($tabsortings[$t] !~ m/$matchGroup/) {
-			$tabsortings[$t] = $tabsortings[$t]."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:";
+		if ($tabsortings !~ m/$matchGroup/) {
+			$tabsortings = $tabsortings."t".$t."c".GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:";
 		}
-	}	
+	}
 
-	%group = BuildGroupList($tabgroups[$t]);	
-
-	my $ret =  "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings[$t]."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "none") . " no-repeat !important;\">\n";
+	my $ret =  "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "none") . " no-repeat !important;\">\n";
 	$ret .= "   <ul class=\"dashboard_tabcontent\">\n";
 	$ret .= "	<table class=\"dashboard_tabcontent\">\n";	 
 	##################### Top Row (only one Column) #############################################
 	if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){
-		$ret .= BuildDashboardTopRow($t,$id,$tabgroups[$t],$tabsortings[$t]);
+		$ret .= BuildDashboardTopRow($t,$id,$tabgroups,$tabsortings);
 	}
 	##################### Center Row (max. 5 Column) ############################################
 	if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "center-bottom" || $row eq "center") {
-		$ret .= BuildDashboardCenterRow($t,$id,$tabgroups[$t],$tabsortings[$t],$colcount);
+		$ret .= BuildDashboardCenterRow($t,$id,$tabgroups,$tabsortings,$colcount);
 	}
 	############################# Bottom Row (only one Column) ############################################
 	if ($row eq "top-center-bottom" || $row eq "center-bottom" || $row eq "bottom"){
-		$ret .= BuildDashboardBottomRow($t,$id,$tabgroups[$t],$tabsortings[$t]);
+		$ret .= BuildDashboardBottomRow($t,$id,$tabgroups,$tabsortings);
 	}
 	#############################################################################################	 
 	$ret .= "	</table>\n";
@@ -613,12 +620,12 @@ sub BuildDashboardTab($$)
 }
 
 sub BuildDashboardTopRow($$$$){
- my ($t,$id, $dbgroups, $dbsorting) = @_;
+ my ($t,$id, $devicegroups, $groupsorting) = @_;
  my $ret; 
  $ret .= "<tr><td  class=\"dashboard_row\">\n";
  $ret .= "<div id=\"dashboard_rowtop_tab".$t."\" class=\"dashboard dashboard_rowtop\">\n";
  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column100\">\n";
- $ret .= BuildGroupWidgets($t,"100",$id,$dbgroups,$dbsorting); 
+ $ret .= BuildGroupWidgets($t,"100",$id,$devicegroups,$groupsorting); 
  $ret .= "		</div>\n";
  $ret .= "</div>\n";
  $ret .= "</td></tr>\n";
@@ -626,9 +633,9 @@ sub BuildDashboardTopRow($$$$){
 }
 
 sub BuildDashboardCenterRow($$$$$){
- my ($t,$id, $dbgroups, $dbsorting, $colcount) = @_;
- my $ret; 
- $ret .= "<tr><td  class=\"dashboard_row\">\n";
+ my ($t,$id, $devicegroups, $groupsorting, $colcount) = @_;
+
+ my $ret = "<tr><td  class=\"dashboard_row\">\n";
  $ret .= "<div id=\"dashboard_rowcenter_tab".$t."\" class=\"dashboard dashboard_rowcenter\">\n";
 
  my $currentcol  = $colcount;
@@ -636,16 +643,16 @@ sub BuildDashboardCenterRow($$$$$){
  my $replace     = "t" . $t . "c" . $maxcolindex . ",";
 
  # replace all sortings referencing not existing columns
- # this does only work if there is not empty column inbetween
- while (index($dbsorting, "t".$t."c".$currentcol.",") >= 0) {
+ # this does only work if there is no empty column inbetween
+ while (index($groupsorting, "t".$t."c".$currentcol.",") >= 0) {
    my $search  = "t" . $t . "c" . $currentcol . ",";
-   $dbsorting  =~ s/$search/$replace/g;
+   $groupsorting  =~ s/$search/$replace/g;
    $currentcol++;
  }
 
  for (my $i=0;$i<$colcount;$i++){
 	$ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column".$i."\">\n";
-	$ret .= BuildGroupWidgets($t,$i,$id,$dbgroups,$dbsorting); 
+	$ret .= BuildGroupWidgets($t,$i,$id,$devicegroups,$groupsorting); 
 	$ret .= "		</div>\n";
  }
  $ret .= "</div>\n";
@@ -654,12 +661,12 @@ sub BuildDashboardCenterRow($$$$$){
 }
 
 sub BuildDashboardBottomRow($$$$){
- my ($t,$id, $dbgroups, $dbsorting) = @_;
+ my ($t,$id, $devicegroups, $groupsorting) = @_;
  my $ret; 
  $ret .= "<tr><td  class=\"dashboard_row\">\n";
  $ret .= "<div id=\"dashboard_rowbottom_tab".$t."\" class=\"dashboard dashboard_rowbottom\">\n";
  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column200\">\n";
- $ret .= BuildGroupWidgets($t,"200",$id,$dbgroups,$dbsorting); 
+ $ret .= BuildGroupWidgets($t,"200",$id,$devicegroups,$groupsorting); 
  $ret .= "		</div>\n";
  $ret .= "</div>\n";
  $ret .= "</td></tr>\n";
@@ -667,38 +674,36 @@ sub BuildDashboardBottomRow($$$$){
 }
 
 sub BuildGroupWidgets($$$$$) {
-	my ($tab,$column,$id,$dbgroups, $dbsorting) = @_;
+	my ($tab,$column,$id,$devicegroups, $groupsorting) = @_;
 	my $ret = "";
 
  	my $counter = 0;
-	my @storedsorting = split(":", $dbsorting);		
-	my @dbgroup = split(",", $dbgroups);
+        my %sorting = ();
+
+        foreach (split(":", $groupsorting)) {
+          my @parts = split (',', $_);
+          $sorting{$parts[1]} = $_;
+        }
 	my $groupicon = ''; 
+
+        my @devicegroups = split('§§§', $devicegroups);
+
+        foreach my $singlegroup (@devicegroups) {
+          # make sure that splitting with colon is not destroying the devspec that might
+	  # also contain a colon followed by a filter
+          my ($groupname, $groupdevices, $groupicon) = split(/:(?!FILTER=)/, $singlegroup);
+
+          # if the device is not stored in the current column, skip it
+          next if (index($sorting{$groupname}, 't'.$tab.'c'.$column) < 0);
+
+	  my $groupId    = $id."t".$tab."c".$column."w".$counter;
+
+	  $ret .= BuildGroup( ($groupname,$groupdevices,$sorting{$groupname},$groupId,$groupicon) );
+
+          $counter++;
+        }
 		
-		foreach my $singlesorting (@storedsorting) {
-			my @groupdata = split(",", $singlesorting);
-			$groupicon = '';
-			if (scalar(@groupdata) > 1) {
-				if (
-					   index($dbsorting, "t".$tab."c".$column.",".$groupdata[1]) >= 0
-					&& index($dbgroups, $groupdata[1]) >= 0
-					&& $groupdata[1] ne ""
-				) { #group is set to tab
-					my $groupId = $id."t".$tab."c".$column."w".$counter;
-					foreach my $strdbgroup (@dbgroup) {
-						my @temp= split(":", trim($strdbgroup));			
-						if (defined($temp[1]) && $groupdata[1] eq $temp[0]) {
-							$groupicon = $temp[1];
-						}
-					}
-					
-					$ret .= BuildGroup( ($groupdata[1],$singlesorting,$groupId,$groupicon) );
-					
-					$counter++;
-				}
-			}
-		} 
- return $ret; 
+     	return $ret; 
 }
 
 sub BuildGroupList($) {
@@ -730,34 +735,36 @@ sub Dashboard_GetGroupList() {
 
 sub BuildGroup
 {
- my ($currentgroup,$singleSorting,$groupId,$icon) = @_;
- my $ret = ""; 
- my $row = 1;
- my %extPage = ();
- my $foundDevices = 0;
- my $replaceGroup = "";
+ 	my ($groupname,$devices,$sorting,$groupId,$icon) = @_;
+ 	my $ret = ""; 
+ 	my $row = 1;
+ 	my %extPage = ();
+ 	my $foundDevices = 0;
+ 	my $replaceGroup = "";
  
- my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
+ 	my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
- foreach my $g (keys %group) {
-	next if ($g ne $currentgroup);
-        $replaceGroup = "," . quotemeta($currentgroup) . ",";
-        $singleSorting =~ s/$replaceGroup/,$g,/;
-        $currentgroup = $g;
-
-        $ret .= "  <div class=\"dashboard dashboard_widget ui-widget\" data-groupwidget=\"".$singleSorting."\" id=\"".$groupId."\">\n";
+	$ret .= "  <div class=\"dashboard dashboard_widget ui-widget\" data-groupwidget=\"".$sorting."\" id=\"".$groupId."\">\n";
 	$ret .= "   <div class=\"dashboard_widgetinner\">\n";	
-	$ret .= "    <div class=\"dashboard_widgetheader ui-widget-header dashboard_group_header\">";
-        if ($icon) {
-          $ret .= FW_makeImage($icon,$icon,"dashboard_group_icon");
-        }
-        $ret .= $currentgroup."</div>\n";
-	$ret .= "    <div data-userheight=\"\" class=\"dashboard_content\">\n";
 
-	$ret .= "<table class=\"dashboard block wide\" id=\"TYPE_$currentgroup\">";
-	
-	 foreach my $d (sort { lc(AttrVal($a,"sortby",AttrVal($a,"alias",$a))) cmp lc(AttrVal($b,"sortby",AttrVal($b,"alias",$b))) } keys %{$group{$g}}) {	
+        if ($groupname && $groupname ne $devices) {
+		$ret .= "    <div class=\"dashboard_widgetheader ui-widget-header dashboard_group_header\">";
+		if ($icon) {
+			$ret.= FW_makeImage($icon,$icon,"dashboard_group_icon");
+        	}
+        	$ret .= $groupname . "</div>\n";
+	}
+	$ret .= "    <div data-userheight=\"\" class=\"dashboard_content\">\n";
+	$ret .= "<table class=\"dashboard block wide\" id=\"TYPE_$groupname\">";
+
+	my %seen;
+	# make sure devices are not contained twice in the list
+	my @devices = grep { ! $seen{$_} ++ } devspec2array($devices);
+
+	foreach my $d (@devices) {	
+                next if (!defined($defs{$d}));
                 $foundDevices++;
+
 		$ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
 		
 		my $type = $defs{$d}{TYPE};
@@ -774,7 +781,7 @@ sub BuildGroup
 			
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 		
-	    ##############   Customize Result for Special Types #####################
+	        ##############   Customize Result for Special Types #####################
 		my @txtarray = split(">", $txt);				
                 if ($modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {
 			no strict "refs"; 
@@ -787,12 +794,12 @@ sub BuildGroup
 			$ret .= ">$devret</td>";
 			use strict "refs"; 
 		} else  {
-			$ret .= "<td class=\"dashboard_dev_container\" informId=\"$d\">$txt</td>";
+			$ret .= "<td informId=\"$d\">$txt</td>";
 		}
 		###########################################################
 
 		###### Commands, slider, dropdown
-        if(!$FW_ss && $cmdlist) {
+		if(!$FW_ss && $cmdlist) {
 			foreach my $cmd (split(":", $cmdlist)) {
 				my $htmlTxt;
 				my @c = split(' ', $cmd);
@@ -816,23 +823,21 @@ sub BuildGroup
 		}
 		$ret .= "</tr>";
 	}
+	
 	$ret .= "</table>";
-
 	$ret .= "    </div>\n";	
  	$ret .= "   </div>\n";	
  	$ret .= "  </div>\n";
- }
- if (!$foundDevices) { 
-	$ret .= "<table class=\"block wide\" id=\"TYPE_unknowngroup\">";
-	$ret .= "<tr class=\"odd\"><td class=\"changed\">Unknown Group: $currentgroup</td></tr>";
-	$ret .= "<tr class=\"even\"><td class=\"changed\">Check if the group attribute is really set</td></tr>";
-	$ret .= "<tr class=\"odd\"><td class=\"changed\">Check if the groupname is correct written</td></tr>";
-	$ret .= "</table>"; 	
- }
 
- 	
+	if (!$foundDevices) { 
+		$ret .= "<table class=\"block wide\" id=\"TYPE_unknowngroup\">";
+		$ret .= "<tr class=\"odd\"><td class=\"changed\">Devices for group not found: $groupname</td></tr>";
+		$ret .= "<tr class=\"even\"><td class=\"changed\">Check if the device/group attribute is really set</td></tr>";
+		$ret .= "<tr class=\"odd\"><td class=\"changed\">Check if the device spec is correctly written</td></tr>";
+		$ret .= "</table>"; 	
+	}
 
- return $ret;
+	return $ret;
 }
 
 sub GetMaxColumnId($$) {
@@ -904,11 +909,32 @@ GetTabCount ($$)
  
  my $tabCount = 0;
 
- while (AttrVal($hash->{NAME}, 'dashboard_tab' . ($tabCount + 1) . 'groups', '') ne "") {
+ while (
+      AttrVal($hash->{NAME}, 'dashboard_tab' . ($tabCount + 1) . 'groups', '') ne ""
+   || AttrVal($hash->{NAME}, 'dashboard_tab' . ($tabCount + 1) . 'devices', '') ne ""
+ ) {
    $tabCount++;
  }
 
  return $tabCount ? $tabCount : $defaultTabCount;
+}
+
+sub
+GetActiveTab ($)
+{
+  my ($d) = @_;
+
+  if (defined($FW_httpheader{Cookie})) {
+    my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));
+    if (defined($cookie{dashboard_activetab})) {
+      my $activeTab = $cookie{dashboard_activetab};
+      if ($activeTab <= GetTabCount($defs{$d}, 1)) {
+        return $activeTab;
+      }
+    }
+  }
+
+  return AttrVal($defs{$d}{NAME}, 'dashboard_activetab', 1);
 }
 
 1;
@@ -1018,6 +1044,13 @@ GetTabCount ($$)
 			Example: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow<br/>
 			Additionally a group can contain a regular expression to show all groups matching a criteria.
 			Example: .*Light.* to show all groups that contain the string "Light"
+		</li><br>		
+          <a name="dashboard_tabXdevices"></a>	
+		<li>dashboard_tabXdevices<br>
+			devspec list of devices that should appear in the tab. The format is:<br/>
+    			GROUPNAME:devspec1,devspec2,...,devspecN:ICONNAME</br/>
+			THe icon name is optional. Also the group name is optional. In case of missing group name, the matching devices are not grouped but shown as separate widgets without titles. For further details on the devspec format see:<br/>
+			<a href="http://192.168.20.20:8083/fhem/docs/commandref.html#devspec">Dev-Spec</a>
 		</li><br>		
 	  <a name="dashboard_tabXicon"></a>	
 		<li>dashboard_tabXicon<br>
@@ -1180,6 +1213,13 @@ GetTabCount ($$)
 			Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow<br/>
 			Der Gruppenname kann ebenfalls einen regulären Ausdruck beinhalten, um alle Gruppen anzuzeigen, die darauf passen.<br/>
 			Beispiel: .*Licht.* zeigt alle Gruppen an, die das Wort "Licht" im Namen haben.
+		</li><br>		
+	  <a name="dashboard_tabXdevices"></a>	
+		<li>dashboard_tabXdevices<br>
+ 			devspec Liste von Geräten, die im Tab angezeigt werden sollen. Das format ist:<br/>
+    			GROUPNAME:devspec1,devspec2,...,devspecN:ICONNAME</br/>
+			Das Icon ist optional. Auch der Gruppenname muss nicht vorhanden sein. Im Falle dass dieser fehlt, werden die gefunden Geräte nicht gruppiert sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich devspec:
+			<a href="http://192.168.20.20:8083/fhem/docs/commandref.html#devspec">Dev-Spec</a>
 		</li><br>		
 	  <a name="dashboard_tabXicon"></a>	
 		<li>dashboard_tabXicon<br>
