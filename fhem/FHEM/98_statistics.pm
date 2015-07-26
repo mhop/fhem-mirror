@@ -608,18 +608,18 @@ sub statistics_doStatisticTendency ($$$)
       @stat = split / /, "1h: - 2h: - 3h: - 6h: -";
       statistics_Log $hash,4,"Initializing statistic of '$hiddenReadingName'.";
       $hash->{READINGS}{$hiddenReadingName}{VAL} = "";
-    } else {
+    } 
+   else {
       @stat = split / /, $dev->{READINGS}{$statReadingName}{VAL};
    }
 
-   my $result = $value;
    statistics_Log $hash, 4, "Add $value to $hiddenReadingName";
+   my $result = $value;
    if (exists ($hash->{READINGS}{$hiddenReadingName}{VAL})) { $result .= " " . $hash->{READINGS}{$hiddenReadingName}{VAL}; }
    @hidden = split / /, $result; # Internal values
 
 # determine decPlaces with stored values
-   foreach (@hidden)
-   {
+   foreach (@hidden) {
       $decPlaces = statistics_maxDecPlaces($_, $decPlaces);
    }
    
@@ -640,9 +640,9 @@ sub statistics_doStatisticTendency ($$$)
    if ($singularReadings ne "") {
       # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
       statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","1h",$stat[1],0,0);
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","2h",$stat[1],0,0);
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","3h",$stat[1],0,0);
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","6h",$stat[1],0,0);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","2h",$stat[3],0,0);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","3h",$stat[5],0,0);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Tendency","6h",$stat[7],0,0);
    }
 
    $result = join( " ", @hidden );
@@ -888,6 +888,8 @@ sub statistics_doStatisticDuration ($$$$)
    statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Day", $state, ($periodSwitch >= 2 || $periodSwitch <= -2);
   # Monthly Statistic 
    statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Month", $state, ($periodSwitch >= 3 || $periodSwitch <= -3);
+  # Yearly Statistic 
+   statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Year", $state, ($periodSwitch == 4 || $periodSwitch == -4);
 
    return ;
 
