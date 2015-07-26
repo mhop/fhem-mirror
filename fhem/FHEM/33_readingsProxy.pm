@@ -119,7 +119,9 @@ readingsProxy_update($$)
     $value = $value_fn if( $value_fn );
   }
 
-  readingsSingleUpdate($hash, "state", $value, 1)
+  #readingsSingleUpdate($hash, "state", $value, 1)
+  readingsSingleUpdate($hash, "state", $value, 0);
+  DoTrigger( $name, "$value" );
 }
 
 sub
