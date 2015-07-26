@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 38_CO20.pm: added advanced features, retries and timeout (by Markus M.)
+  - feature: 32_yowsup.pm: added support for groups
   - feature: FB_CALLLIST: new attribute icon-mapping for customizing the icons for all
              call states. For details see commandref
   - bugfix: 73_km200: Removal of Static polling and new sounding after attribute change
