@@ -286,6 +286,8 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00DE" => {name=>"HM-ES-TX-WM"             ,st=>'powerSensor'       ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>"",}         # strom/gassensor
  ,"00E0" => {name=>"HM-RC-2-PBU-FM"          ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",}  # HM Wireless Sender 2-channel for brand switch systems, flush mount
  ,"00E1" => {name=>"HM-RC-Dis-H-x-EU"        ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:20",} #"HM Remote Control with Displays"
+ ,"00E2" => {name=>"HM-ES-PMSw1-Pl-DN-R2"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
+                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00E3" => {name=>"HM-ES-PMSw1-Pl-DN-R3"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00E4" => {name=>"HM-ES-PMSw1-Pl-DN-R4"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
@@ -296,6 +298,8 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00E7" => {name=>"HM-LC-Sw1-Pl-DN-R3"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00E8" => {name=>"HM-LC-Sw1-Pl-DN-R4"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00E9" => {name=>"HM-LC-Sw1-Pl-DN-R5"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+ ,"00EA" => {name=>"HM-ES-PMSw1-DR"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
+                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00F0" => {name=>"HM-LC-Sw1-DR"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
