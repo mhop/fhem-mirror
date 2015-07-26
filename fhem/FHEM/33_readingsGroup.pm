@@ -291,6 +291,8 @@ lookup($$$$$$$$$)
       $default = $mapping;
     }
 
+    return $default if( !defined($default) );
+
     if( !ref($default) && $default =~ m/^{.*}$/) {
       my $DEVICE = $name;
       my $READING = $reading;
