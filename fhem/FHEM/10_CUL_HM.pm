@@ -208,7 +208,6 @@ sub CUL_HM_Initialize($) {
   $hash->{hmIoMaxDly}     = 60;# poll timeout - stop poll and discard
   $hash->{hmAutoReadScan} = 4; # delay autoConf readings
   $hash->{helper}{hmManualOper} = 0;# default automode
-  
 }
 
 sub CUL_HM_updateConfig($){
@@ -218,7 +217,7 @@ sub CUL_HM_updateConfig($){
   # Purpose is to parse attributes and read config
   RemoveInternalTimer("updateConfig");
   if (!$init_done){
-    InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
+    InternalTimer(1,"CUL_HM_updateConfig", "updateConfig", 0);#start asap once FHEM is operational
     return;
   }
 
@@ -502,6 +501,7 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{q}{qReqConf} = ""; # queue autoConfig requests 
     $hash->{helper}{q}{qReqStat} = ""; # queue statusRequest for this device
     $hash->{helper}{mRssi}{mNo}  = "";
+    $hash->{helper}{HM_CMDNR}    = 1;
     CUL_HM_prtInit ($hash);
     $hash->{helper}{io}{vccu} = "";
     $hash->{helper}{io}{prefIO} = "";
@@ -957,7 +957,7 @@ sub CUL_HM_Notify(@){#################################
   return undef if (grep !/INITIALIZED/,@{$events});
   delete $modules{CUL_HM}{NotifyFn};
   CUL_HM_updateConfig("startUp");
-  InternalTimer(gettimeofday()+7,"CUL_HM_setupHMLAN", "initHMLAN", 0);
+  InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
   return undef;
 }
 
@@ -998,10 +998,6 @@ sub CUL_HM_setupHMLAN(@){#################################
                 , txt08_2=>15,txt09_1=>16,txt09_2=>17,txt10_1=>18,txt10_2=>19
                 );
                  
-                  
-                  
-                  
-                  
 sub CUL_HM_Parse($$) {#########################################################
   my ($iohash, $msgIn) = @_;
   
@@ -1111,7 +1107,73 @@ sub CUL_HM_Parse($$) {#########################################################
     return (CUL_HM_pushEvnts(),$name,@entities);
   }
 
-  if ($msgStat){
+#  #----------Check AES response from device (CUL)---------
+#  if (   $devH->{helper}{aesCommRq}{msg} 
+#      && $ioId eq $dst 
+#      && $mTp eq "03") {
+#
+#    CUL_HM_respPendRm($devH);
+#    my $aesM = $devH->{helper}{aesCommRq}{msg};
+#    my (undef, %keys) = CUL_HM_getKeys($devH);
+#    my $key = $keys{$devH->{helper}{aesCommRq}{kNo}};
+#    $key = $key ^ pack("H12", $devH->{helper}{aesCommRq}{challenge});
+#
+#    my $cipher = Crypt::Rijndael->new($key, Crypt::Rijndael::MODE_ECB());
+#    my $iv = pack("H*", substr($aesM, 23));
+#    my $response =  $cipher->decrypt(pack("H32", $p)) ^ $iv;
+#    my $authbytes = unpack("H8", $response);
+#    $response = $cipher->decrypt(substr($response, 0, 16));
+#
+#    my $cmd = uc unpack("H20",substr($response, 6, 1) .
+#                           chr(ord(substr($response, 7, 1)) & 0xbf) . #~RPTED
+#                           substr($response, 8, 8));
+#
+#    my $origcmd = uc substr($aesM, 3, 2) .
+#                  sprintf("%02X", (hex(substr($aesM, 5, 2)) & 0xbf)) . #~RPTED
+#                  substr($aesM, 7, 16);
+# 
+#    Log3 $devH,5,"CUL_HM $dname iv: ".unpack("H*", $iv)
+#                ."\n             decrypted cmd: $cmd"
+#                ."\n             original  cmd: $origcmd";
+# 
+#    if ($cmd eq $origcmd) {
+#      Log3 $devH,4,"CUL_HM ".$dname." signature: good, authbytes: ${authbytes}";
+#      $msgStat = "AESCom-ok";
+#      #send stored ACKs
+#      if (@{$devH->{helper}{aesCommRq}{acksPend}}) {
+#        $devH->{helper}{rpt}{IO}  = $ioName;
+#        $devH->{helper}{rpt}{flg} = substr($msg,5,1);
+#        $devH->{helper}{rpt}{ack} = $devH->{helper}{aesCommRq}{acksPend};
+#        $devH->{helper}{rpt}{ts}  = gettimeofday();
+#        my $i = 0;
+#        while ($i<@{$devH->{helper}{aesCommRq}{acksPend}}) {
+#          CUL_HM_SndCmd( ${$devH->{helper}{aesCommRq}{acksPend}}[$i++]
+#                        ,${$devH->{helper}{aesCommRq}{acksPend}}[$i++].$authbytes);
+#        }
+#      }
+#    } 
+#    else {
+#      Log3 $devH,4,"CUL_HM ".$dname." signature: bad";
+#      $msgStat = "AESCom-fail";
+#    }
+# 
+#    $respRemoved = $devH->{helper}{aesCommRq}{rr};
+#
+#    ($t,$len,$mNo,$mFlg,$mTp,$src,$dst,$p) = unpack 'A1A2A2A2A2A6A6A*',$aesM;
+#    $mFlgH = hex($mFlg);
+#    @mI = unpack '(A2)*',$p;
+# 
+#    $devH->{helper}{prt}{rspWait}{$_} = $devH->{helper}{aesCommRq}{rspWait}{$_}
+#      foreach (keys%{$devH->{helper}{aesCommRq}{rspWait}});   #back to original message
+# 
+#    CUL_HM_ProcessCmdStack($devH) if ($respRemoved);
+#    CUL_HM_sndIfOpen("x:".$ioName);
+# 
+#    delete($devH->{helper}{aesCommRq});
+#  }
+ 
+
+ if ($msgStat){
     if   ($msgStat =~ m/AESKey/){
       push @evtEt,[$shash,1,"aesKeyNbr:".substr($msgStat,7)];
       $msgStat = ""; # already processed
@@ -1906,20 +1968,20 @@ sub CUL_HM_Parse($$) {#########################################################
       ||$md eq "HM-SEN-EP") { #################################################
     if($mTp eq "40") {
       my ($chn) = map{hex($_)} ($mI[0]);# button/event count 
-      my $btnName;
       my $bat   = ($chn&0x80)?"low":"ok";
       my $type  = ($chn & 0x40)?"l":"s";
       my $state = ($chn & 0x40)?"Long":"Short";
       $chn = $chn & 0x3f;
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$chn)};
+      
+      my $chId = $src.sprintf("%02X",$chn);
+      $shash = $modules{CUL_HM}{defptr}{$chId}
+                             if($modules{CUL_HM}{defptr}{$chId});
+      $name = $shash->{NAME};
 
-      if ($chnHash){# use userdefined name - ignore irritating on-off naming
-        $btnName = $chnHash->{NAME};
-      }
-      else{# Button not defined, use default naming
-        $chnHash = $shash;
-        $btnName = "Btn$chn";
-      }
+      my $btnName = $shash->{helper}{role}{chn} 
+                         ? $name
+                         : "Btn$chn";
+
       if($type eq "l"){# long press
         $state .= ($mFlgH & 0x20 ? "Release" : "");
       }
@@ -1937,16 +1999,16 @@ sub CUL_HM_Parse($$) {#########################################################
           delete $devH->{lastMsg};
         }
 
-        CUL_HM_calcDisWm($chnHash,$devH->{NAME},$type);
+        CUL_HM_calcDisWm($shash,$devH->{NAME},$type);
         if (AttrVal($btnName,"aesCommReq",0)){
           my @arr = ();
           $devH->{cmdStacAESPend} = \@arr;
           push (@{$devH->{cmdStacAESPend} },"$src;++A011$id$src$_")
-                foreach (@{$chnHash->{helper}{disp}{$type}});
+                foreach (@{$shash->{helper}{disp}{$type}});
        }
         else{
-          CUL_HM_PushCmdStack($shash,"++A011$id$src$_")
-                foreach (@{$chnHash->{helper}{disp}{$type}});
+          CUL_HM_PushCmdStack($devH,"++A011$id$src$_")
+                foreach (@{$shash->{helper}{disp}{$type}});
         }
       }
     }
@@ -2053,14 +2115,18 @@ sub CUL_HM_Parse($$) {#########################################################
 
       my $el = ReadingsVal($shash->{NAME},"energy",0);# get Energy last
       my $eo = ReadingsVal($shash->{NAME},"energyOffset",0);
-      if($eCnt == 0 && hex($mNo) < 3 ){
+      if($eCnt == 0 && hex($mNo) < 3 && !$shash->{helper}{pon}){
         push @evtEt,[$devH,1,"powerOn:$tn"];
         $eo += $el;
         push @evtEt,[$shash,1,"energyOffset:".$eo];
+        $shash->{helper}{pon} = 1;# power on is detected - only ssend once
       }
       elsif($el > 800000 && $el < $eCnt ){# handle overflow
         $eo += 838860.7;
         push @evtEt,[$shash,1,"energyOffset:".$eo];
+      }
+      else{
+        delete $shash->{helper}{pon};
       }
       push @evtEt,[$shash,1,"energyCalc:".($eo + $eCnt)];
     }
@@ -2109,14 +2175,18 @@ sub CUL_HM_Parse($$) {#########################################################
       
       my $el = ReadingsVal($shash->{NAME},"energy",0);# get Energy last
       my $eo = ReadingsVal($shash->{NAME},"energyOffset",0);
-      if($eCnt == 0 && hex($mNo) < 3 ){
+      if($eCnt == 0 && hex($mNo) < 3 && !$shash->{helper}{pon}){
         push @evtEt,[$devH,1,"powerOn:$tn"];
         $eo += $el;
         push @evtEt,[$shash,1,"energyOffset:".$eo];
+        $shash->{helper}{pon} = 1;# power on is detected - only ssend once
       }
       elsif($el > 800000 && $el < $eCnt ){# handle overflow
         $eo += 838860.7;
         push @evtEt,[$shash,1,"energyOffset:".$eo];
+      }
+      else{
+        delete $shash->{helper}{pon};
       }
       push @evtEt,[$shash,1,"energyCalc:".($eo + $eCnt)];
       CUL_HM_unQEntity($shash->{NAME},"qReqStat");
@@ -2499,6 +2569,39 @@ sub CUL_HM_Parse($$) {#########################################################
          && @evtEt            #only ack if we identified it
          && (!@ack)           #sender requested ACK
          );
+
+#  #----------Generate AES challenge for device (CUL)---------
+#  if (   $devH->{IODev}->{TYPE} eq "CUL" 
+#      && $cryptFunc == 1 
+#      && $ioId eq $dst
+#      && AttrVal($name,"aesCommReq",0) 
+#      && $mTp !~ m/^0[23]/ 
+#      && $mTyp ne "1001" ) {
+#
+#    my ($kNo, %keys) = CUL_HM_getKeys($devH);
+#    $kNo = AttrVal($dname,"aesKey",$kNo);
+#    if (defined($keys{$kNo})) {
+#      my $challenge = sprintf("%08X%04X",rand(0xffffffff), rand(0xffff));
+#
+#      Log3 $shash,4,"CUL_HM $name requesting signature with challenge $challenge for key $kNo";
+#
+#      @{$devH->{helper}{aesCommRq}{acksPend}} = @ack if (@ack);
+#      $devH->{helper}{aesCommRq}{msg} = $msg;
+#      $devH->{helper}{aesCommRq}{challenge} = $challenge;
+#      $devH->{helper}{aesCommRq}{kNo} = $kNo;
+#      $devH->{helper}{aesCommRq}{rr} = $respRemoved;
+#      $devH->{helper}{aesCommRq}{rspWait}{$_} = $devH->{helper}{prt}{rspWait}{$_}
+#            foreach (keys%{$devH->{helper}{prt}{rspWait}});
+#
+#      @ack = ($devH,"${mNo}A002${ioId}${src}04${challenge}".sprintf("%02X", $kNo*2));
+#      $respRemoved = 0;
+#    } 
+#    else {
+#      $devH->{helper}{aesCommRq}{msg} = "";
+#      Log3 $shash,1,"CUL_HM ".$shash->{NAME}." required key ${kNo} not defined in VCCU!";
+#    }
+#  }
+
   if (@ack) {# send acks and store for repeat
     $devH->{helper}{rpt}{IO}  = $ioName;
     $devH->{helper}{rpt}{flg} = substr($msg,5,1);
@@ -2511,7 +2614,7 @@ sub CUL_HM_Parse($$) {#########################################################
     Log3 $name,5,"CUL_HM $name sent ACK:".(int(@ack));
   }
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
-  CUL_HM_sndIfOpen(".x:".$ioName);
+  CUL_HM_sndIfOpen("x:".$ioName);
   
   #------------ process events ------------------
   push @evtEt,[$shash,1,"noReceiver:src:$src ".$mFlg.$mTp." $p"] 
@@ -2940,8 +3043,6 @@ sub CUL_HM_parseCommon(@){#####################################################
                        ,(-1)*(hex($rssi))
                        ,$mNo)
             if ($rssi && $rssi ne '00' && $rssi ne'80');
-      @{$modules{CUL_HM}{helper}{qReqStat}} = grep { $_ ne $shash->{NAME} }
-                                       @{$modules{CUL_HM}{helper}{qReqStat}};
       CUL_HM_unQEntity($chnHash->{NAME},"qReqStat");
       if ($pendType eq "StatusReq"){#it is the answer to our request
         my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
@@ -5802,7 +5903,7 @@ sub CUL_HM_SndCmd($$) {
   my ($mn, $cmd2) =  unpack 'A2A*',$cmd;
 
   if($mn eq "++") {
-    $mn = $hash->{helper}{HM_CMDNR} ? (($hash->{helper}{HM_CMDNR} +1)&0xff) : 1;
+    $mn = ($hash->{helper}{HM_CMDNR} + 1) & 0xff;
     $hash->{helper}{HM_CMDNR} = $mn;
   }
   elsif($cmd =~ m/^[+-]/){; #continue pure
@@ -6408,7 +6509,7 @@ sub CUL_HM_getKeys($) { #in: device-hash out:highest index, hash with keys
 #getRead:  $val  = $hash->{READINGS}{$rlName}     ?$hash->{READINGS}{$rlName}{VAL}      :"";
 #          $val  = $defs{$name}{READINGS}{$rlName}?$defs{$name}{READINGS}{$rlName}{VAL} :"";
 #          $time = $hash->{READINGS}{$rlName}     ?$hash->{READINGS}{$rlName}{time}     :"";
-
+ 
 sub CUL_HM_h2IoId($) {      #in: ioHash out: ioHMid
   my ($io) = @_;
   return "000000" if (ref($io) ne 'HASH');
@@ -7667,7 +7768,9 @@ sub CUL_HM_unQEntity($$){# remove entity from q
     @chns = grep !/00/,@chns;#remove device as well - just in case
     $dq->{$q} = join",",@chns;
   }
-  my $cq = $q."Wu" if (CUL_HM_getRxType($defs{$name}) & 0x1C);
+  my $cq = (CUL_HM_getRxType($defs{$name}) & 0x1C)?($q."Wu") : $q;
+  return if(  !$modules{CUL_HM}{helper}{$cq} 
+            || scalar(@{$modules{CUL_HM}{helper}{$cq}}) == 0);
   my $mQ = $modules{CUL_HM}{helper}{$cq};
   return if(!$mQ || scalar(@{$mQ}) == 0);
   @{$mQ} = grep !/^$devN$/,@{$mQ} if ($dq->{$q} eq "");
@@ -7687,11 +7790,9 @@ sub CUL_HM_qEntity($$){  # add to queue
                                       $defs{$devN}{helper}{q}{$q}
                                       .",".substr(CUL_HM_name2Id($name),6,2));
   }
-
   $q .= "Wu" if (!(CUL_HM_getRxType($defs{$name}) & 0x03));#normal or wakeup q?
   $q = $modules{CUL_HM}{helper}{$q};
-  @{$q} = CUL_HM_noDup(@{$q},$devN);
-
+  @{$q} = CUL_HM_noDup(@{$q},$devN); #we only q device - channels are stored in the device
   my $wT = (@{$modules{CUL_HM}{helper}{qReqStat}})?
                               "1":
                               $modules{CUL_HM}{hmAutoReadScan};
@@ -7712,16 +7813,17 @@ sub CUL_HM_procQs($){#process non-wakeup queues
   foreach my $q ("qReqStat","qReqConf"){
     if   (@{$mq->{$q}}){
       my $devN = ${$mq->{$q}}[0];
-      CUL_HM_assignIO($defs{$devN}); 
-      next  if(!defined $defs{$devN}{IODev}{NAME});
-      my $ioName = $defs{$devN}{IODev}{NAME};   
+      my $devH = $defs{$devN};
+      CUL_HM_assignIO($devH); 
+      next  if(!defined $devH->{IODev}{NAME});
+      my $ioName = $devH->{IODev}{NAME};   
 
       if (   (   ReadingsVal($ioName,"cond","") =~ m /^(ok|Overload-released|Warning-HighLoad|init)$/
               && $q eq "qReqStat")
            ||(   CUL_HM_autoReadReady($ioName)
-              && !$defs{$devN}{cmdStack}
+              && !$devH->{cmdStack}
               && $q eq "qReqConf")){
-        my $dq = $defs{$devN}{helper}{q};
+        my $dq = $devH->{helper}{q};
         my @chns = split(",",$dq->{$q});
         my $nOpen = scalar @chns;
         if (@chns > 1){$dq->{$q} = join ",",@chns[1..$nOpen-1];}
@@ -7736,7 +7838,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         }
         else{
            CUL_HM_Set($defs{$eN},$eN,"statusRequest");
-           CUL_HM_unQEntity($eN,"qReqStat");
+           CUL_HM_unQEntity($eN,"qReqStat") if (!$dq->{$q});
            InternalTimer(gettimeofday()+5,"CUL_HM_readStateTo","sUpdt:$eN",0);
         }
       }
@@ -10314,8 +10416,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
       <li><a href="#do_not_notify">do_not_notify</a></li>
       <li><a href="#ignore">ignore</a></li>
       <li><a href="#dummy">dummy</a></li>
-      <li><a href="#showtime">showtime</a></li>
+      <li><a href="#showtime">showtime</a></li> 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <li><a name="CUL_HMaesCommReq">aesCommReq</a>
+           wenn gesetzt wird HMLAN/USB AES signature anfordern bevor ACK zum Device gesendet wird.<br>
+           Die Funktion abeitet aktuell nur mit HMLAN/USB.<br>
+      </li>
       <li><a name="#CUL_HMactAutoTry">actAutoTry</a>
          actAutoTry 0_off,1_on<br>
          setzen erlaubt dem ActionDetector ein statusrequest zu senden falls das Device dead markiert werden soll.
