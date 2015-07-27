@@ -393,10 +393,6 @@ sub LaCrosse_Parse($$) {
   if( $type == 0x00) {
     $channel = "" if( $channel == 1 );
     
-    # The raw values
-    $rhash->{"rawT$channel"} = $temperature;
-    $rhash->{"rawH$channel"} = $humidity;
-    
     # Correction
     $temperature += $rhash->{corr1};
     $humidity += $rhash->{corr2};  
@@ -405,19 +401,17 @@ sub LaCrosse_Parse($$) {
     my $previousH = $humidity;
     
     # Check filterThreshold
-    if(!defined($rhash->{"rawT$channel"}) 
-        || (defined($rhash->{"rawT$channel"})
-            && abs($rhash->{"rawH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
-            && abs($rhash->{"rawT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) )){
+    if(!defined($rhash->{"previousT$channel"}) 
+        || (defined($rhash->{"previousT$channel"})
+            && abs($rhash->{"previousH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
+            && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) )){
       
       # Calculate average
       if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousT$channel"}) && $temperature != 0xFFFF ) {
         $temperature = ($rhash->{"previousT$channel"}*3+$temperature)/4;
-        $previousT = $temperature;
       }
       if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousH$channel"}) && $humidity != 0xFF ) {
         $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
-        $previousH = $humidity;
       }    
       
       # Handle resolution
@@ -468,6 +462,8 @@ sub LaCrosse_Parse($$) {
       readingsEndUpdate($rhash,1);
     } 
     else {
+      $rhash->{"bufferedT"} = undef;
+      $rhash->{"bufferedH"} = undef;
       readingsSingleUpdate($rhash, "battery$channel", $battery_low ? "low" : "ok", 1);
     }
 
@@ -485,7 +481,10 @@ sub LaCrosse_Parse($$) {
     }
     
     if ($typeNumber > 0 && $rain != 0xFFFF) {
-      readingsBulkUpdate($rhash, "rain", $rain );
+      if(!defined($rhash->{"previousR"}) || (defined($rhash->{"previousR"}) && abs($rhash->{"previousR"} - $rain) <= AttrVal( $rname, "filterThreshold", 10 ))){
+        readingsBulkUpdate($rhash, "rain", $rain );
+      }
+      $rhash->{"previousR"} = $rain;
     }
     
     if ($typeNumber > 0 && $windDirection != 0xFFFF) {
