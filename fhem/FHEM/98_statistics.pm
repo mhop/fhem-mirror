@@ -2,7 +2,7 @@
 # $Id$
 #
 #  98_statistic.pm
-#
+# 
 #  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
 #
 #  This module computes statistic data of and for readings of other modules
