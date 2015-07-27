@@ -1,5 +1,5 @@
 
-# $Id$
+# $Id: 30_HUEBridge.pm 8979 2015-07-15 19:30:30Z justme1968 $
 
 # "Hue Personal Wireless Lighting" is a trademark owned by Koninklijke Philips Electronics N.V.,
 # see www.meethue.com for more information.
@@ -189,6 +189,7 @@ sub HUEBridge_OpenDev($)
 sub HUEBridge_Pair($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   $hash->{STATE} = 'Pairing';
 
@@ -200,6 +201,8 @@ sub HUEBridge_Pair($)
 
       return undef;
     }
+
+  $attr{$name}{key} = $result->{success}{username} if( $result->{success}{username} ); 
 
   $hash->{STATE} = 'Paired';
 
