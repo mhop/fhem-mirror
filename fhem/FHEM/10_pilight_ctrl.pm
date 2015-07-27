@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.08 2015-06-23 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.09 2015-07-21 Risiko $
 #
 # Usage
 # 
@@ -33,6 +33,7 @@
 # V 1.07 2015-06-23 - FIX:  reading state always contains a valid value, checking reading state removed
 # V 1.08 2015-06-23 - FIX:  clear send queue by reset
 # V 1.08 2015-06-23 - NEW:  attribute SendTimeout for abort sending command non blocking
+# V 1.09 2015-07-21 - NEW:  support submodule pilight_raw to send raw codes
 ############################################## 
 package main;
 
@@ -54,7 +55,8 @@ sub pilight_ctrl_Reset($);
 my %sets = ( "reset:noArg" => "", "disconnect:noArg" => "");
 my %matchList = ( "1:pilight_switch" => "^PISWITCH",
                   "2:pilight_dimmer" => "^PISWITCH|^PIDIMMER|^PISCREEN",
-                  "3:pilight_temp"   => "^PITEMP") ;
+                  "3:pilight_temp"   => "^PITEMP",
+                  "4:pilight_raw"    => "^PIRAW") ;
                   
 my @idList   = ("id","systemcode","gpio"); 
 my @unitList = ("unit","unitcode","programcode");
@@ -80,7 +82,7 @@ sub pilight_ctrl_Initialize($)
   $hash->{StateFn} = "pilight_ctrl_State";
   $hash->{AttrList}= "ignoreProtocol brands ContactAsSwitch SendTimeout ".$readingFnAttributes;
   
-  $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:";
+  $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:pilight_raw:";
   #$hash->{MatchList} = \%matchList; #only for autocreate
 }
 
@@ -387,8 +389,8 @@ sub pilight_ctrl_Write($@)
   my $id = $defs{$cName}->{ID};
   my $unit = $defs{$cName}->{UNIT};
   
-  $id = "\"".$id."\""   if (!isdigit($id));
-  $unit = "\"".$unit."\"" if (!isdigit($unit));
+  $id = "\"".$id."\""     if (defined($id) && !isdigit($id));
+  $unit = "\"".$unit."\"" if (defined($unit) && !isdigit($unit));
         
   my $code;
   switch($cType){
@@ -417,6 +419,9 @@ sub pilight_ctrl_Write($@)
         $code = "{\"protocol\":[\"$proto\"],\"id\":$id,\"unit\":$unit,\"$state\":1";
         $code .= ",\"dimlevel\":$args[0]" if (defined($args[0]));
         $code .= "}";
+    }
+    case m/raw/ {
+      $code = "{\"protocol\":[\"$proto\"],\"code\":\"$state\"}";
     }
     else  {Log3 $me, 3, "$me(Write): unsupported client ($cName) -> $cType"; return;}
   }
