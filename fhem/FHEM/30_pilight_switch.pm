@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_switch.pm 0.13 2015-05-30 Risiko $
+# $Id: 30_pilight_switch.pm 0.14 2015-07-27 Risiko $
 #
 # Usage
 # 
@@ -11,6 +11,7 @@
 # V 0.11 2015-03-29 - FIX:  $readingFnAttributes
 # V 0.12 2015-05-18 - FIX:  add version information
 # V 0.13 2015-05-30 - FIX:  StateFn, noArg
+# V 0.14 2015-07-27 - NEW:  SetExtensions on-for-timer
 ############################################## 
 
 package main;
@@ -19,6 +20,10 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use JSON;
+
+use SetExtensions;
+
+my %sets = ("on:noArg"=>0, "off:noArg"=>0);
 
 sub pilight_switch_Parse($$);
 sub pilight_switch_Define($$);
@@ -111,19 +116,19 @@ sub pilight_switch_Parse($$)
 #####################################
 sub pilight_switch_Set($$)
 {  
-  my ($hash, @a) = @_;
-  my $me = shift @a;
-
-  return "no set value specified" if(int(@a) < 1);
-  return "Unknown argument ?, choose one of on:noArg off:noArg" if($a[0] eq "?");
-
-  my $v = join(" ", @a);
-  Log3 $me, 4, "$me(Set): $v";
-
-  #readingsSingleUpdate($hash,"state",$v,1);
+  my ($hash, $me, $cmd, @a) = @_;
+  return "no set value specified" unless defined($cmd);
   
-  my $msg = "$me,$v";
+  my @match = grep( $_ =~ /^$cmd($|:)/, keys %sets );
+  return SetExtensions($hash, join(" ", keys %sets), $me, $cmd, @a) unless @match == 1;
+  return "$cmd expects $sets{$match[0]} parameters" unless (@a eq $sets{$match[0]});
+  
+  my $v = join(" ", @a);
+  Log3 $me, 4, "$me(Set): $cmd $v";
+
+  my $msg = "$me,$cmd";
   IOWrite($hash, $msg);
+  
   #keinen Trigger bei Set auslösen
   #Aktualisierung erfolgt in Parse
   my $skipTrigger = 1; 
@@ -165,6 +170,9 @@ sub pilight_switch_Set($$)
     </li>
     <li>
       <b>off</b>
+    </li>
+    <li>
+      <a href="#setExtensions">set extensions</a> are supported<br>
     </li>
   </ul>
   <br>

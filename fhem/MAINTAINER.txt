@@ -115,6 +115,7 @@ FHEM/30_ENECSYSGW.pm         akw                  http://forum.fhem.de Sonstige 
 FHEM/30_pilight_dimmer.pm    risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_switch.pm    risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_temp.pm      risiko               http://forum.fhem.de Sonstige Systeme
+FHEM/30_pilight_raw.pm       risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Beleuchtung
 FHEM/31_MilightDevice.pm     mattwire             http://forum.fhem.de Beleuchtung
 FHEM/31_ENECSYSINV.pm        akw                  http://forum.fhem.de Sonstige Systeme

@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_dimmer.pm 0.54 2015-05-30 Risiko $
+# $Id: 30_pilight_dimmer.pm 0.55 2015-07-27 Risiko $
 #
 # Usage
 # 
@@ -14,6 +14,7 @@
 # V 0.52 2015-05-25 - CHG: attributes dimlevel_on, dimlevel_off 
 # V 0.53 2015-05-30 - FIX: set dimlevel 0
 # V 0.54 2015-05-30 - FIX: StateFn
+# V 0.55 2015-07-27 - NEW: SetExtensions on-for-timer
 ############################################## 
 
 package main;
@@ -23,6 +24,8 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use JSON;
 use Switch;  #libswitch-perl
+
+use SetExtensions;
 
 sub pilight_dimmer_Initialize($)
 {
@@ -179,33 +182,37 @@ sub pilight_dimmer_ConvDimToDev($$)
 #####################################
 sub pilight_dimmer_Set($$)
 {  
-  my ($hash, @a) = @_;
-  my $me = shift @a;
-
-  return "no set value specified" if(int(@a) < 1);
+  my ($hash, $me, $cmd, @a) = @_;
+  
+  return "no set value specified" unless defined($cmd);
+  
   my $dimlevel_max_dev =  AttrVal($me, "dimlevel_max_device",15);
   my $dimlevel_step =  AttrVal($me, "dimlevel_step",1);  
   my $dimlevel_max =  AttrVal($me, "dimlevel_max",$dimlevel_max_dev);
   
-  my $canSet = "on:noArg off:noArg";
-  $canSet .= " up:noArg down:noArg" if ($hash->{helper}{ISSCREEN});
+  my %sets = ("on:noArg"=>0, "off:noArg"=>0);
+  $sets{"dimlevel:slider,0,$dimlevel_step,$dimlevel_max"} = 1;
   
-  return "Unknown argument ?, choose one of $canSet dimlevel:slider,0,$dimlevel_step,$dimlevel_max" if($a[0] eq "?");
+  $sets{"up:noArg"} = 0 if ($hash->{helper}{ISSCREEN});
+  $sets{"down:noArg"} = 0 if ($hash->{helper}{ISSCREEN});
   
-  my $set = $a[0];
+  my @match = grep( $_ =~ /^$cmd($|:)/, keys %sets );
+  return SetExtensions($hash, join(" ", keys %sets), $me, $cmd, @a) unless @match == 1;
+  return "$cmd expects $sets{$match[0]} parameters" unless (@a eq $sets{$match[0]});
+  
   my $dimlevel = undef;
   my $currlevel = ReadingsVal($me,"dimlevel",0);
   
-  if ($set =~ m/up|down/ and !$hash->{helper}{ISSCREEN}) {
+  if ($cmd =~ m/up|down/ and !$hash->{helper}{ISSCREEN}) {
     Log3 $me, 1, "$me(Set): up|down not supported";
     return undef;
   }
   
   if ($hash->{helper}{OWN_DIM} == 1) {
-    switch($set) {
+    switch($cmd) {
       case "dimlevel" {
-        $dimlevel = pilight_dimmer_ConvDimToDev($me,$a[1]);
-        $set = "on";
+        $dimlevel = pilight_dimmer_ConvDimToDev($me,$a[0]);
+        $cmd = "on";
       }
       case "on"   { 
         my $dimlevel_on = AttrVal($me, "dimlevel_on",$currlevel);
@@ -214,19 +221,19 @@ sub pilight_dimmer_Set($$)
       }
     }
   } else { # device without dimlevel support
-    switch($set) {
+    switch($cmd) {
       case "dimlevel" {
-        my $newlevel = $a[1];
+        my $newlevel = $a[0];
         my $cnt = int(($newlevel - $currlevel) / $dimlevel_step);      
         
         return undef if ($cnt==0);
-        $set = "up"  if ($cnt>0);
-        $set = "down" if ($cnt<0);
+        $cmd = "up"  if ($cnt>0);
+        $cmd = "down" if ($cnt<0);
         
         $cnt = abs($cnt) - 1; # correction for loop -1 
         
         if ($newlevel == 0) {
-          $set = "off";
+          $cmd = "off";
           $cnt=0; #break for loop
           my $dimlevel_off = AttrVal($me, "dimlevel_off",$newlevel);          
           readingsSingleUpdate($hash,"dimlevel",$dimlevel_off,1);
@@ -235,7 +242,7 @@ sub pilight_dimmer_Set($$)
         Log3 $me, 5, "$me(Set): cnt $cnt";
         
         for (my $i=0; $i < $cnt; $i++) {
-           pilight_dimmer_Write($hash,$set,undef);
+           pilight_dimmer_Write($hash,$cmd,undef);
         }
       }
       case "on" { 
@@ -257,9 +264,9 @@ sub pilight_dimmer_Set($$)
     }
   }
   
-  delete $hash->{helper}{DEV_DIMLEVEL} if ($set eq "off");
+  delete $hash->{helper}{DEV_DIMLEVEL} if ($cmd eq "off");
   
-  pilight_dimmer_Write($hash,$set,$dimlevel); 
+  pilight_dimmer_Write($hash,$cmd,$dimlevel); 
   #keinen Trigger bei Set auslösen
   #Aktualisierung erfolgt in Parse
   my $skipTrigger = 1; 
@@ -328,6 +335,9 @@ sub pilight_dimmer_State($$$$)
     </li>
     <li>
       <b>dimlevel</b>
+    </li>
+    <li>
+      <a href="#setExtensions">set extensions</a> are supported<br>
     </li>
   </ul>
   <br>
