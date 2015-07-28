@@ -38,7 +38,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.2.5";
+my $VERSION = "2.2.6";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -2672,7 +2672,7 @@ sub SYSMON_getNetworkInfo ($$$) {
   #--- DEBUG ---
 
   # check if network available
-  if (index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error') < 0)
+  if (defined($dataThroughput[0]) && index($dataThroughput[0], 'Fehler') < 0 && index($dataThroughput[0], 'error') < 0)
   {
     #Log 3, "SYSMON>>>>>>>>>>>>>>>>> OK >>>".$dataThroughput[0];
     my $dataThroughput = undef;
@@ -2727,12 +2727,12 @@ sub SYSMON_getNetworkInfo ($$$) {
     # if(-e "/sys/class/net/$nName/statistics/rx_bytes" && -e "/sys/class/net/$nName/statistics/tx_bytes") {
     if(SYSMON_isNetStatClass($hash, $nName)) {
         $rxRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/rx_bytes");
-        $rxRaw = -1 unless defined $rxRaw;
+        $rxRaw = -1 unless (defined($rxRaw) && looks_like_number($rxRaw));
         $txRaw = SYSMON_execute($hash, "cat /sys/class/net/$nName/statistics/tx_bytes");
-        $txRaw = -1 unless defined $txRaw;
+        $txRaw = -1 unless (defined($txRaw) && looks_like_number($txRaw));
     }
-    
-  if($rxRaw<0||$txRaw<0) {   
+
+  if($rxRaw<0||$txRaw<0) {
     if(defined $dataThroughput) {
       # remove RX bytes or TX bytes from string
       $dataThroughput =~ s/RX bytes://;
