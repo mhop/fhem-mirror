@@ -177,9 +177,8 @@ sub FB_CALLLIST_Attr($@)
         {
             if($value and $value =~ m/^{.*}$/ ) 
             {
-                $value =~ s/@/\\\@/g;
-                $value =~ s/\$/\\\$/g;
-                $value =~ s/%/\\\%/g;
+                $value =~ s/"/'/g; # workaround for array variable interpretation
+                
                 my $table = eval $value;
                 
                 if($table and ref($table) eq 'HASH')
