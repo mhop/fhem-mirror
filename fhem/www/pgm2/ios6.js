@@ -101,6 +101,7 @@ $(document).ready(function() {
 	}
 	// Logo - add toggle link
 	var parentLink = $("#logo").parent("a");
+	$(parentLink).unbind("click");
 	if (typeof(parentLink.attr("href")) == "undefined") {
 		parentLink.attr("onclick", "#");
 	} else {

@@ -607,6 +607,10 @@ table.block tr:last-child td {
 	padding-right:10px;
 }
 
+.block > tbody > tr > td:last-child {
+	padding-right:10px;
+}
+
 .roomoverview table.block td:first-child {
 	min-width:50px
 }
