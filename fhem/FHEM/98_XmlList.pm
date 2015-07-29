@@ -80,7 +80,7 @@ CommandXmlList($$)
                         XmlEscape($c), XmlEscape($p->{$c}));
       }
       $str .= sprintf("\t\t\t<INT key=\"IODev\" value=\"%s\"/>\n",
-                                        $p->{IODev}{NAME}) if($p->{IODev});
+                        $p->{IODev}{NAME}) if($p->{IODev} && $p->{IODev}{NAME});
  
       foreach my $c (sort keys %{$attr{$d}}) {
         next if(!$si && $c =~ m/^\./);

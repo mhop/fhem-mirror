@@ -917,7 +917,7 @@ CUL_Parse($$$$@)
   }
 
   $hash->{"${name}_MSGCNT"}++;
-  $hash->{"${name}_TIME"} =
+  $hash->{"${name}_TIME"} = TimeNow();
   # showtime attribute
   readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 0);
   $hash->{RAWMSG} = $rmsg;
