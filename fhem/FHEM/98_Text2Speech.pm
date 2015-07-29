@@ -569,8 +569,8 @@ sub Text2Speech_Download($$$) {
   my $fh;
   my $TTS_Language = AttrVal($hash->{NAME}, "TTS_Language", "Deutsch");
 
-  Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". "http://" . $ttsHost . $ttsPath . $ttsLang . $language{$TTS_Language} . "&" . $ttsQuery . uri_escape($text);
-  $HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $language{$TTS_Language} . "&" . $ttsQuery . uri_escape($text));
+  Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". "http://" . $ttsHost . $ttsPath . $ttsLang . $language{$TTS_Language} . "&client=t&prev=input&" . $ttsQuery . uri_escape($text);
+  $HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $language{$TTS_Language} . "&client=t&prev=input&" . $ttsQuery . uri_escape($text));
 
   $fh = new IO::File ">$file";
   if(!defined($fh)) {
