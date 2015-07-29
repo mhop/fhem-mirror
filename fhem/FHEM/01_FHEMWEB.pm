@@ -338,6 +338,7 @@ FW_Read($$)
   @FW_httpheader = split(/[\r\n]+/, $hash->{HDR});
   %FW_httpheader = map {
                          my ($k,$v) = split(/: */, $_, 2);
+                         $k =~ s/(\w+)/\u$1/g; # Forum #39203
                          $k=>(defined($v) ? $v : 1);
                        } @FW_httpheader;
   delete($hash->{HDR});
@@ -345,7 +346,7 @@ FW_Read($$)
   $FW_userAgent = $FW_httpheader{"User-Agent"};
   my @origin = grep /Origin/, @FW_httpheader;
   $FW_headercors = (AttrVal($FW_wname, "CORS", 0) ?
-              "Access-Control-Allow-".$origin[0]."\r\n".
+              (($#origin<0) ? "": "Access-Control-Allow-".$origin[0]."\r\n").
               "Access-Control-Allow-Methods: GET OPTIONS\r\n".
               "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
               "Access-Control-Allow-Credentials: true\r\n".
@@ -358,7 +359,7 @@ FW_Read($$)
   my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
   if($basicAuth) {
     my $secret = $FW_httpheader{Authorization};
-    $secret =~ s/^Basic // if($secret);
+    $secret =~ s/^Basic //i if($secret);
     my $pwok = ($secret && $secret eq $basicAuth);
     if($secret && $basicAuth =~ m/^{.*}$/ || $headerOptions[0]) {
       eval "use MIME::Base64";
@@ -721,10 +722,8 @@ FW_answerCall($)
   }
 
   # meta refresh in rooms only
-  if ($FW_room) {
-    my $rf = AttrVal($FW_wname, "refresh", "");
-    FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
-  }
+  my $rf = AttrVal($FW_wname, "refresh", "");
+  FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
 
   ########################
   # CSS

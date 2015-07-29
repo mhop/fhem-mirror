@@ -407,6 +407,13 @@ Device specific attributes are documented in the corresponding device section.
         rooms for certain FHEMWEB instances.
         </li>
 
+    <a name="genericDisplayType"></a>
+    <li>genericDisplayType<br>
+        used by some frontends (but not FHEMWEB) to offer a default image or
+        appropriate commands for this device. Currently the following values
+        are supported: switch,outlet,light,blind,speaker,thermostat
+        </li>
+
     <a name="group"></a>
     <li>group<br>
         Group devices. Recognized by web-pgm2 (module <a href="#FHEMWEB">FHEMWEB</a>), it makes
@@ -1215,23 +1222,25 @@ The following local attributes are used by a wider range of devices:
 <ul>
   <code>sleep &lt;sec&gt; [quiet]</code>
   <br><br>
-  Sleep for a given amount. The unit is seconds, with millisecond accuracy, as
-  you can specify decimal places.<br>
+  sleep followed by another command is comparable to a nameless <a
+  href="#at">at</a>, it executes the following commands after waiting the
+  specified time. The unit is seconds, with millisecond accuracy, as you can
+  specify decimal places.<br><br>
+
   When called in a notify/at/etc, then nonempty return values of the following
-  commands is logged to the global logfile with loglevel 2.<br>
-  If quiet is specified, then skip this logging.
+  commands are logged to the global logfile with loglevel 2.<br> If quiet is
+  specified, then skip this logging.
   <br><br>
   Example:
   <ul>
-    <code>sleep 0.5</code><br>
-    <code>define n3 notify btn3.* set lamp toggle;;sleep 0.5;;set lamp
-          toggle</code><br>
-    <code>define a3 at +*00:05 set Windsensor 1w_measure;; sleep 2 quiet;; get
-          Windsensor 1w_temp</code>
+    define n3 notify btn3.* set lamp on;;sleep 1.5;;set lamp off<br>
+    define a3 at +*00:05 set Windsensor 1w_measure;; sleep 2 quiet;; get
+          Windsensor 1w_temp
   </ul>
   <br>
-  Note: sleep followed by another command is not blocking FHEM, and is
-  comparable to a nameless at<br>
+  Note: a sleep not followed by any command will block FHEM, is deprecated, and
+  it issues a WARNING in the FHEM log.
+  <br>
 </ul>
 
 <a name="version"></a>

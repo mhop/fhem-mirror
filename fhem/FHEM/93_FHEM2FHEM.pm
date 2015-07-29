@@ -230,6 +230,8 @@ FHEM2FHEM_OpenDev($$)
     return;
   }
 
+  return if(IsDisabled($name));
+
   my $conn;
   if($hash->{SSL}) {
     eval "use IO::Socket::SSL";

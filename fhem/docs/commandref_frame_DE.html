@@ -423,6 +423,14 @@ Ger&auml;t dokumentiert.
        Ger&auml;te, die dem Raum mit der Bezeichnung "hidden" zugeordnet
        werden, erscheinen nicht auf der Webseite.
 
+    <a name="genericDisplayType"></a>
+    <li>genericDisplayType<br>
+        Wird von bestimmten Frontends (aber nicht FHEMWEB) verwendet, um
+        f&uuml;r das Ger&auml;t passende Voreinstellungen (Bild/Befehle/etc)
+        anzubieten. Z.Zt werden folgende Werte unterst&uuml;tzt:
+        switch,outlet,light,blind,speaker,thermostat
+        </li>
+
     <a name="group"></a>
     <li>group<br>
        Ger&auml;tegruppen. FHEMWEB zeigt Ger&auml;te die in die gleiche Gruppe
@@ -1290,8 +1298,12 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <ul>
   <code>sleep &lt;sec&gt; [quiet]</code>
   <br><br>
-  Wartet f&uuml;r die angegebene Anzahl von Sekunden, Millisekunden genau,
-  da man Nachkommastellen spezifizieren kann.<br>
+  sleep gefolgt von weiteren Befehlen ist vergleichbar mit einem namenlosen <a
+  href="#at">at</a> Kommando, es f&uuml;hrt die nachfolgenden Befehle aus,
+  nachdem es die spezifizierte Zeitspanne gewartet hat. Die Einheit ist
+  Sekunde, Millisekunden genau, da man Nachkommastellen spezifizieren
+  kann.<br><br>
+
   Falls sleep in at/notify/etc aufgerufen wurde, und die nachfolgenden
   Kommandos einen nicht leeren Text zur&uuml;ckgeliefert haben, dann wird
   dieser Text mit loglevel 2 protokolliert.<br>
@@ -1306,8 +1318,9 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
           Windsensor 1w_temp</code>
   </ul>
   <br>
-  Bemerkung: sleep gefolgt von weiteren Befehlen blockiert die Abarbeitung von
-  FHEM nicht, und ist vergleichbar mit einem namenlosen at Kommando.<br>
+  Bemerkung: falls sleep von keinem Befehl gefolgt wird, dann wird FHEM
+  blockiert. Das ist unerw&uuml;nscht, und im FHEM-Log wird eine Warnung
+  protokolliert.
 </ul>
 
 <a name="version"></a>

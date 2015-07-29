@@ -263,6 +263,7 @@ my @globalAttrList = qw(
   dupTimeout
   exclude_from_update
   featurelevel
+  genericDisplayType:switch,outlet,light,blind,speaker,thermostat
   holiday2we
   language:EN,DE
   lastinclude
@@ -2603,6 +2604,8 @@ CommandSleep($$)
     @cmdList=();
 
   } else {
+    Log 1,
+     "WARNING: sleep without additional commands is deprecated and blocks FHEM";
     select(undef, undef, undef, $sec);
 
   }
