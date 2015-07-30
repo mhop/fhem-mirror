@@ -42,6 +42,17 @@
 #   2015-02-15  attribute to select readings per get
 #   2015-02-17  new attributes getXXRegex, Map, Format, Expr, new semantics for default values of these attributes
 #               restructured HTTPMOD_Read
+#   2015-04-27  Integrated modification of jowiemann partially
+#               settings: interval, reread, stop, start
+#               DEVSTATE was not implemented because "disabled" is visible as attribute
+#               and stopped / started is visible as TRIGGERTIME.
+#               also the attribute disabled will not touch the internal timer.
+#   2015-05-10  Integrated xpath extension as suggested in the forum
+#   2015-06-22  added set[0-9]*NoArg and get[0-9]*URLExpr, get[0-9]*HeaderExpr and get[0-9]*DataExpr
+#	Todo:		set[0-9]*TextArg
+#				response-encoding
+#				multi page log extraction
+#
 #
                     
 package main;
@@ -94,7 +105,7 @@ sub HTTPMOD_Initialize($)
       "queueDelay " .
       "queueMax " .
       "minSendDelay " .
-      "showMatched " .
+      "showMatched:0,1 " .
 
       "sid[0-9]*URL " .
       "sid[0-9]*IDRegex " .
@@ -112,11 +123,17 @@ sub HTTPMOD_Initialize($)
       "set[0-9]+Hint " .        # Direkte Fhem-spezifische Syntax für's GUI, z.B. "6,10,14" bzw. slider etc.
       "set[0-9]+Expr " .
       "set[0-9]*ReAuthRegex " .
-
+      "set[0-9]*NoArg " .       # don't expect a value - for set on / off and similar.
+      
       "get[0-9]+Name " .
       "get[0-9]*URL " .
       "get[0-9]*Data.* " .
       "get[0-9]*Header.* " .
+
+      "get[0-9]*URLExpr " .
+      "get[0-9]*DatExpr " .
+      "get[0-9]*HdrExpr " .
+
       "get[0-9]+Poll " .        # Todo: warum geht bei wildcards kein :0,1 Anhang ? -> in fhem.pl nachsehen
       "get[0-9]+PollDelay " .
       "get[0-9]*Regex " .
@@ -127,6 +144,9 @@ sub HTTPMOD_Initialize($)
       
       "do_not_notify:1,0 " . 
       "disable:0,1 " .
+      "enableControlSet:0,1 " .
+      "enableXPath:0,1 " .
+      "enableXPath-Strict:0,1 " .
       $readingFnAttributes;  
 }
 
@@ -167,11 +187,20 @@ sub HTTPMOD_Define($$)
     }
 
     Log3 $name, 3, "$name: Defined with URL $hash->{MainURL} and interval $hash->{Interval}";
-    
-    # initial request after 2 secs, there the timer is set to interval for further updates
-    # only if URL is specified and interval > 0
-    InternalTimer(gettimeofday()+2, "HTTPMOD_GetUpdate", "update:$name", 0)
-        if ($hash->{MainURL} && $hash->{Interval});
+
+    # Initial request after 2 secs, for further updates the timer will be set according to interval.
+    # but only if URL is specified and interval > 0
+    if ($hash->{MainURL} && $hash->{Interval}) {
+        my $firstTrigger = gettimeofday() + 2;
+        $hash->{TRIGGERTIME}     = $firstTrigger;
+        $hash->{TRIGGERTIME_FMT} = FmtDateTime($firstTrigger);
+        RemoveInternalTimer("update:$name");
+        InternalTimer($firstTrigger, "HTTPMOD_GetUpdate", "update:$name", 0);
+        Log3 $name, 5, "$name: InternalTimer set to call GetUpdate in 2 seconds for the first time";
+    } else {
+       $hash->{TRIGGERTIME} = 0;
+       $hash->{TRIGGERTIME_FMT} = "";
+    }
     return undef;
 }
 
@@ -216,6 +245,16 @@ HTTPMOD_Attr(@)
             if ($@) {
                 Log3 $name, 3, "$name: Attr with invalid Expression in attr $name $aName $aVal: $@";
                 return "Invalid Expression $aVal";
+            }
+        } elsif ($aName eq "enableXPath") {
+            if(!eval("use HTML::TreeBuilder::XPath;1")) {
+                Log3 $name, 3, "$name: Please install HTML::TreeBuilder::XPath to use the xpath-Option";
+                return "Please install HTML::TreeBuilder::XPath to use the xpath-Option";
+            }
+        } elsif ($aName eq "enableXPath-Strict") {
+            if(!eval("use XML::XPath;use XML::XPath::XMLParser;1")) {
+                Log3 $name, 3, "$name: Please install XML::XPath and XML::XPath::XMLParser to use the xpath-strict-Option";
+                return "Please install XML::XPath and XML::XPath::XMLParser to use the xpath-strict-Option";
             }
         }
         addToDevAttrList($name, $aName);
@@ -329,10 +368,53 @@ sub HTTPMOD_Set($@)
     my ($name, $setName, $setVal) = @a;
     my (%rmap, $setNum, $setOpt, $setList, $rawVal);
     $setList = "";
+
+    if (AttrVal($name, "disable", undef)) {
+        Log3 $name, 5, "$name: set called with $setName but device is disabled"
+            if ($setName ne "?");
+        return undef;
+    }
     
     Log3 $name, 5, "$name: set called with $setName " . ($setVal ? $setVal : "")
         if ($setName ne "?");
 
+    if (AttrVal($name, "enableControlSet", undef)) {        # spezielle Sets freigeschaltet?
+        $setList = "interval reread:noArg stop:noArg start:noArg ";
+        if ($setName eq 'interval') {
+            if (int $setVal > 5) {
+                $hash->{Interval} = $setVal;
+                my $nextTrigger = gettimeofday() + $hash->{Interval};
+                RemoveInternalTimer("update:$name");    
+                $hash->{TRIGGERTIME} = $nextTrigger;
+                $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
+                InternalTimer($nextTrigger, "HTTPMOD_GetUpdate", "update:$name", 0);
+                Log3 $name, 3, "$name: timer interval changed to $hash->{Interval} seconds";
+                return undef;
+            } elsif (int $setVal <= 5) {
+                Log3 $name, 3, "$name: interval $setVal (sec) to small (must be >5), continuing with $hash->{Interval} (sec)";
+            } else {
+                Log3 $name, 3, "$name: no interval (sec) specified in set, continuing with $hash->{Interval} (sec)";
+            }
+        } elsif ($setName eq 'reread') {
+            HTTPMOD_GetUpdate("reread:$name");
+            return undef;
+        } elsif ($setName eq 'stop') {
+            RemoveInternalTimer("update:$name");    
+            $hash->{TRIGGERTIME} = 0;
+            $hash->{TRIGGERTIME_FMT} = "";
+            Log3 $name, 3, "$name: internal interval timer stopped";
+            return undef;
+        } elsif ($setName eq 'start') {
+            my $nextTrigger = gettimeofday() + $hash->{Interval};
+            $hash->{TRIGGERTIME} = $nextTrigger;
+            $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
+            RemoveInternalTimer("update:$name");
+            InternalTimer($nextTrigger, "HTTPMOD_GetUpdate", "update:$name", 0);
+            Log3 $name, 5, "$name: internal interval timer set to call GetUpdate in " . int($hash->{Interval}). " seconds";
+            return undef;
+        } 
+    }
+        
     # verarbeite Attribute "set[0-9]*Name  set[0-9]*URL  set[0-9]*Data.*  set[0-9]*Header.* 
     # set[0-9]*Min  set[0-9]*Max  set[0-9]*Map  set[0-9]*Expr   set[0-9]*Hint
     
@@ -367,62 +449,68 @@ sub HTTPMOD_Set($@)
     if(!defined ($setNum)) {
         return "Unknown argument $setName, choose one of $setList";
     } 
-
-    # Ist überhaupt ein Wert übergeben?
-    if (!defined($setVal)) {
-        Log3 $name, 3, "$name: set without value given for $setName";
-        return "no value given to set $setName";
-    }
     Log3 $name, 5, "$name: set found option $setName in attribute set${setNum}Name";
 
-    # Eingabevalidierung von Sets mit Definition per Attributen
-    # 1. Schritt, falls definiert, per Umkehrung der Map umwandeln (z.B. Text in numerische Codes)
-    if (AttrVal($name, "set${setNum}Map", undef)) {     # gibt es eine Map?
-        my $rm = AttrVal($name, "set${setNum}Map", undef);
-        #$rm =~ s/([^ ,\$]+):([^ ,\$]+),? ?/$2 $1 /g;           # reverse map string erzeugen
-        $rm =~ s/([^, ][^,\$]*):([^, ][^,\$]*),? ?/$2:$1, /g;   # reverse map string erzeugen
-        %rmap = split (/, +|:/, $rm);                           # reverse hash aus dem reverse string                   
-        if (defined($rmap{$setVal})) {                  # Eintrag für den übergebenen Wert in der Map?
-            $rawVal = $rmap{$setVal};                   # entsprechender Raw-Wert für das Gerät
-            Log3 $name, 5, "$name: set found $setVal in rmap and converted to $rawVal";
-        } else {
-            Log3 $name, 3, "$name: set value $setVal did not match defined map";
-            return "set value $setVal did not match defined map";
+    if (!AttrVal($name, "set${setNum}NoArg", undef)) {      # soll überhaupt ein Wert übergeben werden?
+        if (!defined($setVal)) {                            # Ist ein Wert übergeben?
+            Log3 $name, 3, "$name: set without value given for $setName";
+            return "no value given to set $setName";
         }
-    } else {
-      # wenn keine map, dann wenigstens sicherstellen, dass Wert numerisch.
-      if ($setVal !~ /^-?\d+\.?\d*$/) {
-        Log3 $name, 3, "$name: set - value $setVal is not numeric";
-        return "set value $setVal is not numeric";
-      }
-      $rawVal = $setVal;
-    }
-    
-    # 2. Schritt: falls definiert Min- und Max-Werte prüfen
-    if (AttrVal($name, "set${setNum}Min", undef)) {
-        my $min = AttrVal($name, "set${setNum}Min", undef);
-        Log3 $name, 5, "$name: is checking value $rawVal against min $min";
-        return "set value $rawVal is smaller than Min ($min)"
-            if ($rawVal < $min);
-    }
-    if (AttrVal($name, "set${setNum}Max", undef)) {
-        my $max = AttrVal($name, "set${setNum}Max", undef);
-        Log3 $name, 5, "$name: set is checking value $rawVal against max $max";
-        return "set value $rawVal is bigger than Max ($max)"
-            if ($rawVal > $max);
-    }
 
-    # 3. Schritt: Konvertiere mit setexpr falls definiert
-    if (AttrVal($name, "set${setNum}Expr", undef)) {
-        my $val = $rawVal;
-        my $exp = AttrVal($name, "set${setNum}Expr", undef);
-        $rawVal = eval($exp);
-        Log3 $name, 5, "$name: set converted value $val to $rawVal using expr $exp";
+        # Eingabevalidierung von Sets mit Definition per Attributen
+        # 1. Schritt, falls definiert, per Umkehrung der Map umwandeln (z.B. Text in numerische Codes)
+        if (AttrVal($name, "set${setNum}Map", undef)) {     # gibt es eine Map?
+            my $rm = AttrVal($name, "set${setNum}Map", undef);
+            #$rm =~ s/([^ ,\$]+):([^ ,\$]+),? ?/$2 $1 /g;           # reverse map string erzeugen
+            $rm =~ s/([^, ][^,\$]*):([^, ][^,\$]*),? ?/$2:$1, /g;   # reverse map string erzeugen
+            %rmap = split (/, +|:/, $rm);                           # reverse hash aus dem reverse string                   
+            if (defined($rmap{$setVal})) {                  # Eintrag für den übergebenen Wert in der Map?
+                $rawVal = $rmap{$setVal};                   # entsprechender Raw-Wert für das Gerät
+                Log3 $name, 5, "$name: set found $setVal in rmap and converted to $rawVal";
+            } else {
+                Log3 $name, 3, "$name: set value $setVal did not match defined map";
+                return "set value $setVal did not match defined map";
+            }
+        } else {
+          # wenn keine map, dann wenigstens sicherstellen, dass Wert numerisch.
+          if ($setVal !~ /^-?\d+\.?\d*$/) {
+            Log3 $name, 3, "$name: set - value $setVal is not numeric";
+            return "set value $setVal is not numeric";
+          }
+          $rawVal = $setVal;
+        }
+        
+        # 2. Schritt: falls definiert Min- und Max-Werte prüfen
+        if (AttrVal($name, "set${setNum}Min", undef)) {
+            my $min = AttrVal($name, "set${setNum}Min", undef);
+            Log3 $name, 5, "$name: is checking value $rawVal against min $min";
+            return "set value $rawVal is smaller than Min ($min)"
+                if ($rawVal < $min);
+        }
+        if (AttrVal($name, "set${setNum}Max", undef)) {
+            my $max = AttrVal($name, "set${setNum}Max", undef);
+            Log3 $name, 5, "$name: set is checking value $rawVal against max $max";
+            return "set value $rawVal is bigger than Max ($max)"
+                if ($rawVal > $max);
+        }
+
+        # 3. Schritt: Konvertiere mit setexpr falls definiert
+        if (AttrVal($name, "set${setNum}Expr", undef)) {
+            my $val = $rawVal;
+            my $exp = AttrVal($name, "set${setNum}Expr", undef);
+            $rawVal = eval($exp);
+            Log3 $name, 5, "$name: set converted value $val to $rawVal using expr $exp";
+        }
+        
+        Log3 $name, 4, "$name: set will now set $setName -> $rawVal";
+        my $result = HTTPMOD_DoSet($hash, $setNum, $rawVal);
+        return "$setName -> $rawVal";
+    } else {
+        Log3 $name, 4, "$name: set will now set $setName";
+        HTTPMOD_DoSet($hash, $setNum, 0);
+        return $setName;
     }
     
-    Log3 $name, 4, "$name: set will now set $setName -> $rawVal";
-    my $result = HTTPMOD_DoSet($hash, $setNum, $rawVal);
-    return "$setName -> $rawVal";
 }
 
 
@@ -441,16 +529,36 @@ sub HTTPMOD_DoGet($$)
     if (length $header == 0) {
         $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/getHeader/, keys %{$attr{$name}})));
     }
+    if (AttrVal($name, "get${getNum}HdrExpr", undef)) {
+        my $exp = AttrVal($name, "get${getNum}HdrExpr", undef);
+        my $old = $header;
+        $header = eval($exp);
+        Log3 $name, 5, "$name: get converted the header $old\n to $header\n using expr $exp";
+    }   
+    
     # hole Bestandteile der Post data 
     $data = join ("\r\n", map ($attr{$name}{$_}, sort grep (/get${getNum}Data/, keys %{$attr{$name}})));
     if (length $data == 0) {
         $data = join ("\r\n", map ($attr{$name}{$_}, sort grep (/getData/, keys %{$attr{$name}})));
     }
+    if (AttrVal($name, "get${getNum}DatExpr", undef)) {
+        my $exp = AttrVal($name, "get${getNum}DatExpr", undef);
+        my $old = $data;
+        $data = eval($exp);
+        Log3 $name, 5, "$name: get converted the post data $old\n to $data\n using expr $exp";
+    }   
+
     # hole URL
     $url = AttrVal($name, "get${getNum}URL", undef);
     if (!$url) {
         $url = AttrVal($name, "getURL", undef);
     }
+    if (AttrVal($name, "get${getNum}URLExpr", undef)) {
+        my $exp = AttrVal($name, "get${getNum}URLExpr", undef);
+        my $old = $url;
+        $url = eval($exp);
+        Log3 $name, 5, "$name: get converted the url $old to $url using expr $exp";
+    }   
     if (!$url) {
         $url = $hash->{MainURL};
     }
@@ -479,6 +587,12 @@ sub HTTPMOD_Get($@)
     my ($name, $getName) = @a;
     my ($getNum, $getList);
     $getList = "";
+
+    if (AttrVal($name, "disable", undef)) {
+        Log3 $name, 5, "$name: get called with $getName but device is disabled"
+            if ($getName ne "?");
+        return undef;
+    }
     
     Log3 $name, 5, "$name: get called with $getName "
         if ($getName ne "?");
@@ -517,18 +631,27 @@ sub HTTPMOD_Get($@)
 ###################################
 sub HTTPMOD_GetUpdate($)
 {
-    my (undef,$name) = split(':', $_[0]);
+    my ($calltype,$name) = split(':', $_[0]);
     my $hash = $defs{$name};
     my ($url, $header, $data, $type, $count);
     my $now = gettimeofday();
     
-    Log3 $name, 4, "$name: GetUpdate called";
+    Log3 $name, 4, "$name: GetUpdate called ($calltype)";
     
-    RemoveInternalTimer ("update:$name");
-    InternalTimer($now + $hash->{Interval}, "HTTPMOD_GetUpdate", "update:$name", 0)
-        if ($hash->{Interval});
-    return if(AttrVal($name, "disable", undef));
-   
+    if ($calltype eq "update" && $hash->{Interval}) {
+        RemoveInternalTimer ("update:$name");
+        my $nt = gettimeofday() + $hash->{Interval};
+        $hash->{TRIGGERTIME}     = $nt;
+        $hash->{TRIGGERTIME_FMT} = FmtDateTime($nt);
+        InternalTimer($nt, "HTTPMOD_GetUpdate", "update:$name", 0);
+        Log3 $name, 5, "$name: internal interval timer set to call GetUpdate again in " . int($hash->{Interval}). " seconds";
+    }
+    
+    if (AttrVal($name, "disable", undef)) {
+        Log3 $name, 5, "$name: GetUpdate called but device is disabled";
+        return undef;
+    }
+    
     if ( $hash->{MainURL} ne "none" ) {
         $url    = $hash->{MainURL};
         $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/requestHeader/, keys %{$attr{$name}})));
@@ -599,11 +722,52 @@ sub HTTPMOD_ExtractReading($$$$$$$)
 {
     my ($hash, $buffer, $reading, $regex, $expr, $map, $format) = @_;
     my $name = $hash->{NAME};
+    my $val;
+    my $match;
 
-    Log3 $name, 5, "$name: ExtractReading $reading with regex /$regex/...";
-    if ($buffer =~ /$regex/) {
-        my $val = $1;
+    if (AttrVal($name, "enableXPath", undef) && $regex =~ /^xpath:(.*)/) {
+        Log3 $name, 5, "$name: ExtractReading $reading with xpath $1 ...";
+        my $xpath = $1;
+        my $tree  = HTML::TreeBuilder::XPath->new;
+        my $html  = $buffer;
+        $html =~ s/.*?(\r\n){2}//s; # remove HTTP-header
+            
+        # if the xpath isn't syntactically correct, fhem would crash
+        # the use of eval prevents this from happening
+        $val = eval('
+            $tree->parse($html);
+            $val = join ",", $tree->findvalues($xpath);
+            $tree->delete();
+            $val;
+        ');
+        $match = $val;
+    } elsif (AttrVal($name, "enableXPath-Strict", undef) && $regex =~ /^xpath-strict:(.*)/) {
+        Log3 $name, 5, "$name: ExtractReading $reading with strict xpath $1 ...";
+        my $xpath = $1;
+        my $xml= $buffer;
+        $xml =~ s/.*?(\r\n){2}//s; # remove HTTP-header
         
+        # if the xml isn't wellformed, fhem would crash
+        # the use of eval prevents this from happening
+        $val = eval('
+            my $xp = XML::XPath->new(xml => $xml);
+            my $nodeset = $xp->find($xpath);
+            my @vals;
+            foreach my $node ($nodeset->get_nodelist) {
+                push @vals, XML::XPath::XMLParser::as_string($node);
+            }
+            $val = join ",", @vals;
+            $xp->cleanup();
+            $val;
+        ');
+        $match = $val;
+    } else {
+        Log3 $name, 5, "$name: ExtractReading $reading with regex /$regex/...";
+        $match = ($buffer =~ /$regex/);
+        $val = $1 if ($match);
+    }
+    
+    if ($match) {
         if ($expr) {
             $val = eval $expr;
             Log3 $name, 5, "$name: ExtractReading changed $reading with Expr $expr from $1 to $val";
@@ -631,6 +795,7 @@ sub HTTPMOD_ExtractReading($$$$$$$)
         readingsBulkUpdate( $hash, $reading, $val );
         return 1;
     } else {
+        Log3 $name, 5, "$name: ExtractReading $reading did not match (val is >$val<)";
         return 0;
     }
 }
@@ -778,9 +943,9 @@ sub HTTPMOD_Read($$$)
                 next;
             }
             if (HTTPMOD_ExtractReading($hash, $buffer, $reading, $regex, $expr, $map, $format)) {
-                $matched = ($matched ? "$matched $reading" : "$reading");
+                $matched = ($matched ne "" ? "$matched $reading" : "$reading");
             } else {
-                $unmatched = ($unmatched ? "$unmatched $reading" : "$reading");
+                $unmatched = ($unmatched ne "" ? "$unmatched $reading" : "$reading");
             }
         }
     }
@@ -1085,6 +1250,18 @@ HTTPMOD_AddToQueue($$$$$;$$$){
     <b>Set-Commands</b><br>
     <ul>
         as defined by the attributes set.*Name
+        If you set the attribute enableControlSet to 1, the following additional built in set commands are available:<br>
+        <ul>
+            <li><b>interval</b></li>
+                set new interval time in seconds and restart the timer<br>
+            <li><b>reread</b></li>
+                request the defined URL and try to parse it just like the automatic update would do it every Interval seconds without modifying the running timer. <br>
+            <li><b>stop</b></li>
+                stop interval timer.<br>
+            <li><b>start</b></li>
+                restart interval timer to call GetUpdate after interval seconds<br>
+        </ul>
+        <br>
     </ul>
     <br>
     <a name="HTTPMODget"></a>
@@ -1126,6 +1303,12 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             stop doing automatic HTTP requests while this attribute is set to 1
         <li><b>timeout</b></li>
             time in seconds to wait for an answer. Default value is 2
+        <li><b>enableControlSet</b></li>
+            enables the built in set commands interval, stop, start, reread.
+        <li><b>enableXPath</b></li>
+            enables the use of "xpath:" instead of a regular expression to parse the HTTP response
+        <li><b>enableXPath-Strict</b></li>
+            enables the use of "xpath-strict:" instead of a regular expression to parse the HTTP response
     </ul>
     <br>
     <b> advanced attributes </b>
@@ -1167,6 +1350,8 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             Explicit hint for fhemWEB that will be returned when set ? is seen.
         <li><b>set[0-9]*ReAuthRegex</b></li>
             Regex that will detect when a session has expired an a new login needs to be performed.         
+        <li><b>set[0-9]*NoArg</b></li>
+            Defines that this set option doesn't require arguments. It allows sets like "on" or "off" without further values.
         <br>
         <br>
         <li><b>get[0-9]+Name</b></li>
@@ -1178,6 +1363,14 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             will be used instead of an HTTP POST
         <li><b>get[0-9]*Header</b></li>
             optional HTTP Headers to be sent to the device when the get is executed
+            
+        <li><b>get[0-9]*URLExpr</b></li>
+            optional Perl expression that allows modification of the URL at runtime. The origial value is available as $old.
+        <li><b>get[0-9]*DatExpr</b></li>
+            optional Perl expression that allows modification of the Post data at runtime. The origial value is available as $old.
+        <li><b>get[0-9]*HdrExpr</b></li>
+            optional Perl expression that allows modification of the Headers at runtime. The origial value is available as $old.
+            
         <li><b>get[0-9]+Poll</b></li>
             if set to 1 the get is executed automatically during the normal update cycle (after the interval provided in the define command has elapsed)
         <li><b>get[0-9]+PollDelay</b></li>
@@ -1203,6 +1396,15 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             this attribute modifies the behavior of HTTPMOD when the HTTP Response of a get command is parsed. <br>
             If this attribute is set to 1, then additionally to any matching of get specific regexes (get[0-9]*Regex), 
             also all the Regex / Reading pairs defined in Reading[0-9]+Name and Reading[0-9]+Regex attributes are checked and if they match, the coresponding Readings are assigned as well.
+        <br>
+        <li><b>get[0-9]*URLExpr</b></li>
+            Defines a Perl expression to specify the HTTP Headers for this request. This overwrites any other header specification and should be used carefully only if needed e.g. to pass additional variable data to a web service. The original Header is availabe as $old.
+        <li><b>get[0-9]*DatExpr</b></li>
+            Defines a Perl expression to specify the HTTP Post data for this request. This overwrites any other post data specification and should be used carefully only if needed e.g. to pass additional variable data to a web service.
+            The original Data is availabe as $old.
+        <li><b>get[0-9]*HdrExpr</b></li>
+            Defines a Perl expression to specify the URL for this request. This overwrites any other URL specification and should be used carefully only if needed e.g. to pass additional variable data to a web service.
+            The original URL is availabe as $old.
         <br>
         <br>
         <li><b>showMatched</b></li>
