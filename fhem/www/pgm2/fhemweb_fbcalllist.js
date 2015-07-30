@@ -1,14 +1,5 @@
 // $Id$
 
-// WORKAROUND - should be removed if a more suitable solution is found
-// remove all similar informid's in all parent elements to ensure further updates
-$(function () {
-    $("div[arg=fbcalllist][informid]").each(function (index, obj) {
-        name = $(obj).attr("dev");
-        $(obj).parents("[informid="+name+"]").removeAttr("informid");
-    });
-});
-
 function FW_processCallListUpdate(data)
 {
     var table = $(this).find("table.fbcalllist").first();
