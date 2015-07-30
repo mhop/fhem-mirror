@@ -46,13 +46,28 @@
 #   2015-02-26  defaultpoll in poll und defaultpolldelay in polldelay umbenannt
 #               attribute für timing umbenannt
 #   2015-03-8   added coils / discrete inputs
+#   2015-04-13  Statistics for bus usage
+#   2015-05-15  fixed bugs in SetIODev
+#   2015-05-18  alternative statistics / profiling 
+#               fixed delays, to be taken from logical device - not physical
+#               added missing dev-x-defExpr attribute to DevAttrList
+#   2015-07-05  added revRegs / defRevRegs attributes
+#   2015-07-17  added bswapRegs to reverse Byte-order on arbitrary length string (thanks to Marco)
+#   2015-07-22  added encode and decode
+#
+#               TODO: revRegs und bswapRegs for writing values 
 #
 
 package main;
 
 use strict;
 use warnings;
-use Time::HiRes qw( time );
+
+# return time as float, not just full seconds
+use Time::HiRes qw( gettimeofday tv_interval);
+
+use POSIX qw(strftime);
+use Encode qw(decode encode);
 
 sub Modbus_Initialize($);
 sub Modbus_Define($$);
@@ -124,6 +139,7 @@ Modbus_Initialize($)
     $modHash->{AttrList}= "do_not_notify:1,0 " . 
         "queueMax " .
         "queueDelay " .
+        "profileInterval " .
         $readingFnAttributes;
 }
 
@@ -167,7 +183,7 @@ Modbus_Undef($$)
     RemoveInternalTimer ("timeout:$name");
     RemoveInternalTimer ("queue:$name");
     # lösche auch die Verweise aus logischen Modulen auf dieses physische.
-    foreach my $d (values $ioHash->{defptr}) {
+    foreach my $d (values %{$ioHash->{defptr}}) {
         Log3 $name, 3, "removing IO device for $d->{NAME}";
         delete $d->{IODev};
         RemoveInternalTimer ("update:$d->{NAME}");
@@ -274,12 +290,12 @@ ModbusLD_ObjKey($$) {
     my $modHash   = $modules{$hash->{TYPE}};
     my $parseInfo = $modHash->{parseInfo};
 
-    foreach my $a (keys $attr{$name}) {
+    foreach my $a (keys %{$attr{$name}}) {
         if ($a =~ /obj-([cdih][1-9][0-9]*)-reading/ && $attr{$name}{$a} eq $reading) {
             return $1;
         }
     }
-    foreach my $k (keys $parseInfo) {
+    foreach my $k (keys %{$parseInfo}) {
         return $k if ($parseInfo->{$k}{reading} && ($parseInfo->{$k}{reading} eq $reading));
     }
     return "";
@@ -301,9 +317,8 @@ Modbus_ParseObj($$$;$) {
     my $type      = substr($objCombi, 0, 1);
     my $startAdr  = substr($objCombi, 1);
     my $lastAdr   = ($quantity ? $startAdr + $quantity -1 : 0);
-    my ($unpack, $format, $expr, $map, $rest, $len);
-    Log3 $name, 5, "$name: ParseObj called with " . unpack ("H*", $data) . " and start $startAdr" .
-            ($quantity ? ", quantity $quantity" : "");
+    my ($unpack, $format, $expr, $map, $revRegs, $bswapRegs, $rest, $len, $encode, $decode);
+    Log3 $name, 5, "$name: ParseObj called with " . unpack ("H*", $data) . " and start $startAdr" .  ($quantity ? ", quantity $quantity" : "");
 
     if ($type =~ "[cd]") {
         $quantity = 1 if (!$quantity);
@@ -320,16 +335,57 @@ Modbus_ParseObj($$$;$) {
         my $reading = ModbusLD_ObjInfo($logHash, $key, "reading");  # "" if nothing specified
         if ($reading) {
             if ($type =~ "[cd]") {
-                $unpack = "a";          # for coils just take the next 0/1 from the string
+                $unpack    = "a";       # for coils just take the next 0/1 from the string
+                $len       = 1;         # one byte contains one bit from the 01 string unpacked above
+                $revRegs   = 0;         # not applicable
+                $bswapRegs = 0;         # not applicable
             } else {
-                $unpack  = ModbusLD_ObjInfo($logHash, $key, "unpack", "defUnpack", "n"); # if nothing specified, use big endian unsigned int
+                $unpack  = ModbusLD_ObjInfo($logHash, $key, "unpack", "defUnpack", "n"); # default to big endian unsigned int
+                $len       = ModbusLD_ObjInfo($logHash, $key, "len", "defLen", 1);          # default to 1 Reg / 2 Bytes
+                $revRegs   = ModbusLD_ObjInfo($logHash, $key, "revRegs", "defRevRegs");     # do not reverse register order by default
+                $bswapRegs = ModbusLD_ObjInfo($logHash, $key, "bswapRegs", "defBswapRegs"); # dont reverse bytes in registers by default
+                $encode    = ModbusLD_ObjInfo($logHash, $key, "encode", "defEncode");       # character encoding 
+                $decode    = ModbusLD_ObjInfo($logHash, $key, "decode", "defDecode");       # character decoding 
+                if ($revRegs && $len > 1) {
+                    Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading: reversing order of registers before unpacking";
+                    my $p1 = substr($rest, 0, $len * 2);    # the first len bytes
+                    my $p2 = substr($rest, $len * 2);       # everything after len
+                    my $pn = "";
+                    while ($p1) {
+                        $pn = substr($p1, 0, 2) . $pn;
+                        $p1 = substr($p1, 2);
+                    }
+                    Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading: data string before is " . unpack ("H*", $rest);
+                    $rest = $pn . $p2;
+                    Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading: data string after is  " . unpack ("H*", $rest);
+                } else {
+                    #Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading: NOT reversing order of registers, revRegs = $revRegs, len = $len ";
+                }
+                if ($bswapRegs && $len > 1) {
+                    Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading: reversing byte order of registers before unpacking";
+                    my $nval = "";
+                    for (my $i = 0; $i < $len; $i++) { 
+                        $nval = $nval . substr($rest,$i*2 + 1,1) . substr($rest,$i*2,1);
+                    }; 
+                    Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading: data string before is " . unpack ("H*", $rest);
+                    $rest = $nval;
+                    Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading: data string after is " . unpack ("H*", $rest);
+                }
             };
-            $format  = ModbusLD_ObjInfo($logHash, $key, "format", "defFormat");         # no format if nothing specified
-            $expr    = ModbusLD_ObjInfo($logHash, $key, "expr", "defExpr");             # no expr if not specified
-            $map     = ModbusLD_ObjInfo($logHash, $key, "map", "defMap");               # no map if not specified
+            $format  = ModbusLD_ObjInfo($logHash, $key, "format", "defFormat");          # no format if nothing specified
+            $expr    = ModbusLD_ObjInfo($logHash, $key, "expr", "defExpr");              # no expr if not specified
+            $map     = ModbusLD_ObjInfo($logHash, $key, "map", "defMap");                # no map if not specified
             Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading, unpack=$unpack, expr=$expr, format=$format, map=$map";
             
             my $val = unpack ($unpack, $rest);      # verarbeite so viele register wie passend (ggf. über mehrere Register)
+            
+            if ($decode) {
+                $val = decode($decode, $val);
+            }
+            if ($encode) {
+                $val = encode($encode, $val);
+            }
+            
             # Exp zur Nachbearbeitung der Werte?
             if ($expr) {
                 Log3 $name, 5, "$name: ParseObj for $reading evaluates $val with expr $expr";
@@ -359,13 +415,11 @@ Modbus_ParseObj($$$;$) {
         # gehe zum nächsten Wert
         if ($type =~ "[cd]") {
             $startAdr++;
-            last if ($lastAdr && $startAdr > $lastAdr);
-            $len  = 1;
             $rest = substr($rest, 1);
+            last if ($lastAdr && $startAdr > $lastAdr);
         } else {
-            $len  = ModbusLD_ObjInfo($logHash, $key, "len", "defLen", 1);   # if no len in parseInfo / defLen in devInfo, assume 1 Reg / 2 Bytes
-            $rest = substr($rest, $len * 2);    
             $startAdr += $len;
+            $rest = substr($rest, $len * 2);    # take rest of rest starting at len*2 until the end  
         }
         Log3 $name, 5, "$name: ParseObj moves to next object, skip $len to $startAdr" if ($rest);
     }
@@ -373,6 +427,118 @@ Modbus_ParseObj($$$;$) {
 }
 
 
+#####################################
+sub 
+Modbus_Statistics($$$)
+{
+    my ($hash, $key, $value) = @_;
+    my $name = $hash->{NAME};
+    #my ($seconds, $minute, $hour, @rest) = localtime (gettimeofday());
+
+    my $pInterval = AttrVal($name, "profileInterval", 0);  
+    return if (!$pInterval);
+
+    my $now = gettimeofday();
+    my $pPeriod = int($now / $pInterval);
+
+    if (!defined ($hash->{statistics}{lastPeriod}) || ($pPeriod != $hash->{statistics}{lastPeriod})) {
+        readingsBeginUpdate($hash);
+        foreach my $k (keys %{$hash->{statistics}{sums}}) {
+            readingsBulkUpdate($hash, "Statistics_" . $k, $hash->{statistics}{sums}{$k});
+            $hash->{statistics}{sums}{$k} = 0;
+        }
+        readingsEndUpdate($hash, 1);
+        $hash->{statistics}{sums}{$key} = $value;
+        $hash->{statistics}{lastPeriod} = $pPeriod;
+    } else {
+        if ($hash->{statistics}{sums}{$key}) {
+            $hash->{statistics}{sums}{$key} += $value;
+        } else {
+            $hash->{statistics}{sums}{$key} = $value;
+        }
+    }
+}
+
+
+#####################################
+sub 
+Modbus_Profiler($$)
+{
+    my ($hash, $key) = @_;
+    my $name = $hash->{NAME};
+    
+    my $pInterval = AttrVal($name, "profileInterval", 0);  
+    return if (!$pInterval);
+    
+    my $now = gettimeofday();
+    my $pPeriod = int($now / $pInterval);
+    #my $micros = $now - (int ($now));
+    #my ($seconds, $minute, $hour, @rest) = localtime ($now);
+    
+    # erster Aufruf? dann lastKey setzen und Startzeit merken, lastPeriod setzen
+    if (!defined ($hash->{profiler}{lastKey})) {
+        $hash->{profiler}{lastKey}     = $key;
+        $hash->{profiler}{lastPeriod}  = $pPeriod;
+        $hash->{profiler}{start}{$key} = $now;
+        $hash->{profiler}{sums}{$key}  = 0 ;
+        Log3 $name, 5, "$name: Profiling: $key initialized, start $now";
+        return;
+    } 
+
+    # merke letzten Key - für diesen ist bisher die Zeit vergangen
+    my $lKey  = $hash->{profiler}{lastKey};
+    
+    # für den letzten Key: Diff seit Start
+    my $lDiff = ($now - $hash->{profiler}{start}{$lKey});
+    $lDiff    = 0 if (!$hash->{profiler}{start}{$lKey});
+    
+    # für den neuen Key: wenn noch kein start, dann startet die Messung jetzt
+    if (!$hash->{profiler}{start}{$key}) {
+        $hash->{profiler}{start}{$key} = $now;
+    }
+    
+    Log3 $name, 5, "$name: Profiling: $key, before $lKey, now is $now, $key started at " 
+        . $hash->{profiler}{start}{$key} . ", $lKey started at " . $hash->{profiler}{start}{$lKey};
+    
+    # neue Minute
+    if ($pPeriod != $hash->{profiler}{lastPeriod}) {
+        my $overP = $now - ($pPeriod * $pInterval);     # time over the pPeriod start
+        $overP = 0 if ($overP > $lDiff);    # if interval was modified things get inconsistant ...
+        Log3 $name, 5, "$name: Profiling: pPeriod changed, last pPeriod was " . $hash->{profiler}{lastPeriod} . 
+                    " now $pPeriod, total diff for $lKey is $lDiff,  over $overP over the pPeriod";     
+        Log3 $name, 5, "$name: Profiling: add " . ($lDiff - $overP) . " to sum for $key";
+        $hash->{profiler}{sums}{$lKey} += ($lDiff - $overP);
+        
+        readingsBeginUpdate($hash);
+        foreach my $k (keys %{$hash->{profiler}{sums}}) {
+            my $val = sprintf("%.2f", $hash->{profiler}{sums}{$k});
+            Log3 $name, 5, "$name: Profiling: set reading for $k to $val";
+            readingsBulkUpdate($hash, "Profiler_" . $k . "_sum", $val);
+            $hash->{profiler}{sums}{$k} = 0;
+            $hash->{profiler}{start}{$k} = 0;
+        }
+        readingsEndUpdate($hash, 0);
+        
+        $hash->{profiler}{start}{$key} = $now;
+        
+        Log3 $name, 5, "$name: Profiling: set new sum for $lKey to $overP";
+        $hash->{profiler}{sums}{$lKey} = $overP;
+        $hash->{profiler}{lastPeriod}  = $pPeriod;
+        $hash->{profiler}{lastKey}     = $key;
+    } else {
+        if ($key eq $hash->{profiler}{lastKey}) {
+            # nothing new - take time when key or pPeriod changes
+            return;
+        }
+        Log3 $name, 5, "$name: Profiling: add $lDiff to sum for $lKey " .
+            "(now is $now, start for $lKey was $hash->{profiler}{start}{$lKey})";
+        $hash->{profiler}{sums}{$lKey} += $lDiff;
+        $hash->{profiler}{start}{$key} = $now;
+        $hash->{profiler}{lastKey}     = $key;
+    }
+}
+
+    
 #####################################
 # Called from the read and readanswer functions with hash 
 # of device that is reading (phys / log depending on TCP / RTU
@@ -449,8 +615,9 @@ Modbus_ParseFrames($)
         return ("unexpected function code", undef);
     }
     
-    my $now  = gettimeofday();
-    $logHash->{LASTRECV} = $now;
+    # frame received, now handle data
+    $logHash->{helper}{lrecv} = gettimeofday();
+    Modbus_Profiler($ioHash, "Fhem");
     
     if ($fCode == 1 || $fCode == 2) {           # reply to read coils / discrete inputs
         my ($bytes, $coils) = unpack ('Ca*', $data);
@@ -519,6 +686,23 @@ Modbus_ParseFrames($)
 
 
 #####################################
+# End of BUSY
+# called with physical device hash
+sub
+Modbus_EndBUSY($)
+{
+    my $hash = shift;
+    my $name = $hash->{NAME};
+
+    $hash->{helper}{buffer} = "";
+    $hash->{BUSY} = 0;
+    delete $hash->{REQUEST};
+    Modbus_Profiler($hash, "Idle"); 
+    RemoveInternalTimer ("timeout:$name");
+}
+
+
+#####################################
 # Called from the global loop, when the select for hash->{FD} reports data
 # hash is hash of physical device or logical
 # depending on PROTOCOL TCP / RTU
@@ -530,18 +714,18 @@ Modbus_Read($)
     my $name = $hash->{NAME};
     my $buf  = DevIo_SimpleRead($hash);
     return if(!defined($buf));
-    
+
+    Modbus_Profiler($hash, "Read");
     Log3 $name, 5, "$name: raw read: " . unpack ('H*', $buf);
 
     $hash->{helper}{buffer} .= $buf;  
-    
+
     my ($err, $framedata) = Modbus_ParseFrames($hash);
     if ($framedata || $err) {
-        $hash->{helper}{buffer} = "";
-        $hash->{BUSY} = 0;
-        delete $hash->{REQUEST};
+        Modbus_EndBUSY ($hash);         # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig
+        #Modbus_Statistics($hash, "BusyTime", gettimeofday() - $hash->{helper}{lsend});
+        # Busy ist vorbei (hier oder bei Timeout), start in HandleSendQueue, lsend
 
-        RemoveInternalTimer ("timeout:$name");
         RemoveInternalTimer ("queue:$name"); 
         Modbus_HandleSendQueue ("direct:$name"); # don't wait for next regular handle queue slot
     }
@@ -590,18 +774,20 @@ sub Modbus_CRC($) {
 sub
 Modbus_TimeoutSend($)
 {
-  my $param = shift;
-  my (undef,$name) = split(':',$param);
-  my $ioHash = $defs{$name};
-  
-  Log3 $name, 4, "$name: timeout waiting for $ioHash->{REQUEST}{FCODE} " .
+    my $param = shift;
+    my (undef,$name) = split(':',$param);
+    my $ioHash = $defs{$name};
+
+    Log3 $name, 4, "$name: timeout waiting for $ioHash->{REQUEST}{FCODE} " .
                 "from $ioHash->{REQUEST}{DEVICE}{MODBUSID}, " .
                 "Request was $ioHash->{REQUESTHEX}, " .
                 "last Buffer: $ioHash->{RAWBUFFER}";
-  
-  $ioHash->{BUSY} = 0;
-  $ioHash->{helper}{buffer} = "";
-  delete $ioHash->{REQUEST};
+
+    Modbus_Statistics($ioHash, "Timeouts", 1);
+        
+    Modbus_EndBUSY ($ioHash);       # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig
+
+    Modbus_HandleSendQueue ("direct:$name"); # verwaltet auch idle und busy time statistics variables  
 };
 
 
@@ -616,30 +802,43 @@ Modbus_HandleSendQueue($;$)
   my $force  = shift;
   my $ioHash = $defs{$name};
   my $queue  = $ioHash->{QUEUE};
+  my $now    = gettimeofday();
   
   #Log3 $name, 5, "$name: handle queue" . ($force ? ", force" : "");
   RemoveInternalTimer ("queue:$name");
   
   if(defined($queue) && @{$queue} > 0) {
   
+    #if ($ioHash->{helper}{idlestart}) {
+    #   Modbus_Statistics($ioHash, "IdleTime", $now - $ioHash->{helper}{idlestart});
+    #   $ioHash->{helper}{idlestart} = 0;
+    #   # falls bisher idle, jetzt ist es vorbei. Start wenn HandleSendQueue nichts mehr zu tun hat.
+    #}
+    #if (!$ioHash->{helper}{waitstart}) {
+    #   $ioHash->{helper}{waitstart} = $now;
+    #   # Zeit vom Aufruf HandleSendQueue bis zum erfolgreichen Senden (Teil von Busytime)
+    #}
+
     my $queueDelay  = AttrVal($name, "queueDelay", 1);  
-    my $now = gettimeofday();
   
     if ($ioHash->{STATE} eq "disconnected") {
         InternalTimer($now+$queueDelay, "Modbus_HandleSendQueue", "queue:$name", 0);
         Log3 $name, 5, "$name: handle queue: device is disconnected, dropping requests in queue";
+        Modbus_Profiler($ioHash, "Idle");   
+
         delete $ioHash->{QUEUE};
         return;
     } 
     if (!$init_done) {      # fhem not initialized, wait with IO
-      InternalTimer($now+$queueDelay, "Modbus_HandleSendQueue", "queue:$name", 0);
-      Log3 $name, 3, "$name: handle queue not available yet (init not done), try again in $queueDelay seconds";
-      return;
+        InternalTimer($now+$queueDelay, "Modbus_HandleSendQueue", "queue:$name", 0);
+        Log3 $name, 3, "$name: handle queue not available yet (init not done), try again in $queueDelay seconds";
+        return;
     }
     if ($ioHash->{BUSY}) {  # still waiting for reply to last request
-      InternalTimer($now+$queueDelay, "Modbus_HandleSendQueue", "queue:$name", 0);
-      #Log3 $name, 5, "$name: handle queue busy, try again in $queueDelay seconds";
-      return;
+        InternalTimer($now+$queueDelay, "Modbus_HandleSendQueue", "queue:$name", 0);
+        #Log3 $name, 5, "$name: handle queue busy, try again in $queueDelay seconds";
+        #Modbus_Profiler($ioHash, "Wait");  
+        return;
     }
 
     $ioHash->{REQUEST} = $queue->[0];
@@ -648,53 +847,77 @@ Modbus_HandleSendQueue($;$)
     my $len     = $ioHash->{REQUEST}{LEN};
     
     if($bstring ne "") {    # if something to send - do so 
-
+    
         my $logHash   = $ioHash->{REQUEST}{DEVICE};
-        my $sendDelay = ModbusLD_DevInfo($ioHash, "timing", "sendDelay", 0.1);
-        my $commDelay = ModbusLD_DevInfo($ioHash, "timing", "commDelay", 0.1);
-        my $timeout   = ModbusLD_DevInfo($ioHash, "timing", "timeout", 2);
+        my $sendDelay = ModbusLD_DevInfo($logHash, "timing", "sendDelay", 0.1);
+        my $commDelay = ModbusLD_DevInfo($logHash, "timing", "commDelay", 0.1);
+        my $timeout   = ModbusLD_DevInfo($logHash, "timing", "timeout", 2);
         
-        if ($logHash->{LASTSEND} && $now < $logHash->{LASTSEND} + $sendDelay) {
+        my ($t1, $t2, $tN) = (0,0,0);
+        $t1 = $logHash->{helper}{lsend} + $sendDelay 
+            if ($logHash->{helper}{lsend});
+        $t2 = $logHash->{helper}{lrecv} + $commDelay
+            if ($logHash->{helper}{lrecv});
+        $tN = ($t1 > $t2 ? $t1 : $t2);
+        
+        if ($now < $t1) {
+            Modbus_Profiler($ioHash, "Delay");  
             if ($force) {
-                my $rest = $logHash->{LASTSEND} + $sendDelay - gettimeofday();
+                my $rest = $tN - gettimeofday();
                 Log3 $name, 5, "$name: handle queue sendDelay for device $logHash->{NAME} not over, sleep $rest forced";
                 sleep $rest if ($rest > 0 && $rest < $sendDelay);
+                $now = gettimeofday();
             } else {
-                InternalTimer($now+$queueDelay, "Modbus_HandleSendQueue", "queue:$name", 0);
-                Log3 $name, 5, "$name: handle queue sendDelay for device $logHash->{NAME} not over, try again in $queueDelay seconds";
+                InternalTimer($tN, "Modbus_HandleSendQueue", "queue:$name", 0);
+                Log3 $name, 5, "$name: handle queue sendDelay for device $logHash->{NAME} not over, try again later";
                 return;
             }
         }   
-        if ($logHash->{LASTRECV} && $now < $logHash->{LASTRECV} + $commDelay) {
+        if ($now < $t2) {
+            Modbus_Profiler($ioHash, "Delay");  
             if ($force) {
-                my $rest = $logHash->{LASTRECV} + $commDelay - gettimeofday();
+                my $rest = $tN - gettimeofday();
                 Log3 $name, 5, "$name: handle queue commDelay for device $logHash->{NAME} not over, sleep $rest forced";
                 sleep $rest if ($rest > 0 && $rest < $commDelay);
+                $now = gettimeofday();
             } else {
-                InternalTimer($now+$queueDelay, "Modbus_HandleSendQueue", "queue:$name", 0);
-                Log3 $name, 5, "$name: handle queue commDelay for device $logHash->{NAME} not over, try again in $queueDelay seconds";
+                InternalTimer($tN, "Modbus_HandleSendQueue", "queue:$name", 0);
+                Log3 $name, 5, "$name: handle queue commDelay for device $logHash->{NAME} not over, try again later";
                 return;
             }
         }   
         
-      $ioHash->{REQUESTHEX}     = unpack ('H*', $bstring); # for debugging / log
-      $ioHash->{BUSY}           = 1;        # modbus bus is busy until response is received
-      $ioHash->{helper}{buffer} = "";       # clear Buffer for reception
-      $logHash->{LASTSEND}      = $now;     # remember when last send to this device
-      
-      Log3 $name, 4, "$name: handle queue sends $ioHash->{REQUESTHEX} " .
-        "(fcode $ioHash->{REQUEST}{FCODE} to $ioHash->{REQUEST}{DEVICE}{MODBUSID} for $reading, len $len)";
+        #if ($ioHash->{helper}{waitstart}) {
+        #   Modbus_Statistics($ioHash, "WaitTime", gettimeofday() - $ioHash->{helper}{waitstart});
+        #   # Wartezeit auf jeden Fall vorbei
+        #}
+        Modbus_Profiler($ioHash, "Send");   
         
-      DevIo_SimpleWrite($ioHash, $bstring, 0);
+        
+        $ioHash->{REQUESTHEX}     = unpack ('H*', $bstring); # for debugging / log
+        $ioHash->{BUSY}           = 1;        # modbus bus is busy until response is received
+        $ioHash->{helper}{buffer} = "";       # clear Buffer for reception
+        $ioHash->{helper}{lsend}  = $now;     # remember when last send to this bus
+        $logHash->{helper}{lsend} = $now;     # remember when last send to this device
+      
+        Log3 $name, 4, "$name: handle queue sends $ioHash->{REQUESTHEX} " .
+            "(fcode $ioHash->{REQUEST}{FCODE} to $ioHash->{REQUEST}{DEVICE}{MODBUSID} for $reading, len $len)";
+        
+        DevIo_SimpleWrite($ioHash, $bstring, 0);
+        Modbus_Statistics($ioHash, "Requests", 1);
+        Modbus_Profiler($ioHash, "Wait");   
 
-      RemoveInternalTimer ("timeout:$name");
-      InternalTimer($now+$timeout, "Modbus_TimeoutSend", "timeout:$name", 0);
+        RemoveInternalTimer ("timeout:$name");
+        InternalTimer($now+$timeout, "Modbus_TimeoutSend", "timeout:$name", 0);
     }
     shift(@{$queue});           # remove first element from queue
     if(@{$queue} > 0) {         # more items in queue -> schedule next handle 
       InternalTimer($now+$queueDelay, "Modbus_HandleSendQueue", "queue:$name", 0);
     }
+  } else {
+    #$ioHash->{helper}{idlestart} = $now;
   }
+  #$ioHash->{helper}{waitstart} = 0;
 }
 
 
@@ -713,32 +936,35 @@ ModbusLD_Initialize($ )
 {
     my ($modHash) = @_;
 
-    $modHash->{DefFn}   = "ModbusLD_Define";
+    $modHash->{DefFn}   = "ModbusLD_Define";    # functions are provided by the Modbus base module
     $modHash->{UndefFn} = "ModbusLD_Undef";
-    $modHash->{ReadFn}  = "Modbus_Read";        # use base module read and ready
+    $modHash->{ReadFn}  = "Modbus_Read";
     $modHash->{ReadyFn} = "Modbus_Ready";
     $modHash->{AttrFn}  = "ModbusLD_Attr";
-    $modHash->{SetFn}   = "ModbusLD_Set";   # provided by physical module
-    $modHash->{GetFn}   = "ModbusLD_Get";   # provided by physical module
+    $modHash->{SetFn}   = "ModbusLD_Set";
+    $modHash->{GetFn}   = "ModbusLD_Get";
     $modHash->{AttrList}= 
         "do_not_notify:1,0 " . 
         "IODev " .                              # fhem.pl macht dann $hash->{IODev} = $defs{$ioname}
-                                                # todo: in _Attr Funktion bei IODev die defptr Registrierung zusätzlich setzen
         $readingFnAttributes;
 
     $modHash->{ObjAttrList} = 
         "obj-[cdih][1-9][0-9]*-reading " .
         "obj-[cdih][1-9][0-9]*-name " .
-        "obj-[cdih][1-9][0-9]*-set " .
         "obj-[cdih][1-9][0-9]*-min " .
         "obj-[cdih][1-9][0-9]*-max " .
         "obj-[cdih][1-9][0-9]*-hint " .
-        "obj-[cdih][1-9][0-9]*-expr " .
         "obj-[cdih][1-9][0-9]*-map " .
+        "obj-[cdih][1-9][0-9]*-set " .
         "obj-[cdih][1-9][0-9]*-setexpr " .
-        "obj-[cdih][1-9][0-9]*-format " .
+        "obj-[cdih][1-9][0-9]*-revRegs " .
+        "obj-[cdih][1-9][0-9]*-bswapRegs " .
         "obj-[cdih][1-9][0-9]*-len " .
         "obj-[cdih][1-9][0-9]*-unpack " .
+        "obj-[cdih][1-9][0-9]*-decode " .
+        "obj-[cdih][1-9][0-9]*-encode " .
+        "obj-[cdih][1-9][0-9]*-expr " .
+        "obj-[cdih][1-9][0-9]*-format " .
         "obj-[cdih][1-9][0-9]*-showget " .
         "obj-[cdih][1-9][0-9]*-poll " .
         "obj-[cdih][1-9][0-9]*-polldelay ";
@@ -747,11 +973,18 @@ ModbusLD_Initialize($ )
         "dev-([cdih]-)*read " .
         "dev-([cdih]-)*write " .
         "dev-([cdih]-)*combine " .
+
+        "dev-([cdih]-)*defRevRegs " .
+        "dev-([cdih]-)*defBswapRegs " .
         "dev-([cdih]-)*defLen " .
-        "dev-([cdih]-)*defFormat " .
         "dev-([cdih]-)*defUnpack " .
-        "dev-([cdih]-)*defPoll " .
+        "dev-([cdih]-)*defDecode " .
+        "dev-([cdih]-)*defEncode " .
+        "dev-([cdih]-)*defExpr " .
+        "dev-([cdih]-)*defFormat " .
         "dev-([cdih]-)*defShowGet " .
+        "dev-([cdih]-)*defPoll " .
+
         "dev-timing-timeout " .
         "dev-timing-sendDelay " .
         "dev-timing-commDelay ";
@@ -821,7 +1054,7 @@ ModbusLD_Define($$)
     $hash->{getList} = "";
     $hash->{setList} = "";
     
-    if ($dest) {                                    # Modbus TCP mit IP Adresse angegeben.
+    if ($dest) {                                    # Modbus TCP mit IP Adresse angegeben.                                                       
         $hash->{IODev}       = $hash;               # Modul ist selbst IODev
         $hash->{defptr}{$id} = $hash;               # ID verweist zurück auf eigenes Modul  
         $hash->{DeviceName}  = $dest;               # needed by DevIo to get Device, Port, Speed etc.
@@ -846,6 +1079,41 @@ ModbusLD_Define($$)
         ($ret ? ": " . $ret : "");
 
     return $ret;
+}
+
+
+#########################################################################
+sub
+ModbusLD_Attr(@)
+{
+    my ($cmd,$name,$aName,$aVal) = @_;
+    my $hash = $defs{$name};        # hash des logischen Devices
+
+    # todo: validate other attrs
+    # e.g. unpack not allowed for coils / discrete inputs, len not for coils,
+    # max combine,  etc.
+    # 
+    if ($cmd eq "set") {
+        if ($aName =~ "expr") {     # validate all Expressions
+            my $val = 1;
+            eval $aVal;
+            if ($@) {
+                Log3 $name, 3, "$name: Attr with invalid Expression in attr $name $aName $aVal: $@";
+                return "Invalid Expression $aVal";
+            }
+        } elsif ($aName eq "IODev") {   # defptr housekeeping
+            my $id = $hash->{MODBUSID};
+            if ($defs{$aVal}) {         # gibt es den Geräte hash zum IODev Attribut?
+                $hash->{IODev}{defptr}{$id} = $defs{$aVal};  # register logical device
+                Log3 $name, 5, "$name: Attr IODev - using $aVal";
+            } else {
+                Log3 $name, 3, "$name: Attr IODev can't use $aVal - device does not exist";
+            }
+        }
+        addToDevAttrList($name, $aName);
+        $hash->{".updateSetGet"} = 1;
+    }
+    return undef;
 }
 
 
@@ -913,31 +1181,6 @@ ModbusLD_UpdateGetSetList($)
 }
 
 
-#########################################################################
-sub
-ModbusLD_Attr(@)
-{
-    my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};        # hash des logischen Devices
-
-    # todo: validate other attrs
-    # e.g. unpack not allowed for coils / discrete inputs, len not for coils,
-    # max combine,  etc.
-    # 
-    if ($cmd eq "set") {
-        if ($aName =~ "expr") {     # validate all Expressions
-            my $val = 1;
-            eval $aVal;
-            if ($@) {
-                Log3 $name, 3, "$name: Attr with invalid Expression in attr $name $aName $aVal: $@";
-                return "Invalid Expression $aVal";
-            }
-        }
-        addToDevAttrList($name, $aName);
-        $hash->{".updateSetGet"} = 1;
-    }
-    return undef;
-}
 
 
 #####################################
@@ -968,15 +1211,15 @@ ModbusLD_Get($@)
         if ($ioHash->{BUSY}) {
             Log3 $name, 5, "$name: Get: Queue is stil busy - taking over the read with ReadAnswer";
             # Answer for last function code has not yet arrived
-            ($err, $result) = ModbusLD_ReadAnswer($hash);
-            
-            $ioHash->{helper}{buffer} = "";
-            $ioHash->{BUSY} = 0;
-            delete $ioHash->{REQUEST};
-            RemoveInternalTimer ("timeout:$ioHash->{NAME}");
+
+            ($err, $result) = ModbusLD_ReadAnswer($hash);            
+            Modbus_EndBUSY ($ioHash);       # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig
         }
+
         ModbusLD_Send($hash, $objCombi, "read", 0, 1);      # add at beginning of queue and force send / sleep if necessary
         ($err, $result) = ModbusLD_ReadAnswer($hash, $getName);
+        Modbus_EndBUSY ($ioHash);       # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig
+
         return $err if ($err);
         return $result;
     } else {
@@ -1024,12 +1267,9 @@ ModbusLD_Set($@)
         if ($ioHash->{BUSY}) {
             Log3 $name, 5, "$name: Set: Queue still busy - taking over the read with ReadAnswer";
             # Answer for last function code has not yet arrived
+
             ($err, $result) = ModbusLD_ReadAnswer($hash);
-            
-            $ioHash->{helper}{buffer} = "";
-            $ioHash->{BUSY} = 0;
-            delete $ioHash->{REQUEST};
-            RemoveInternalTimer ("timeout:$ioHash->{NAME}");
+            Modbus_EndBUSY ($ioHash);       # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig            
         }
         my $map     = ModbusLD_ObjInfo($hash, $objCombi, "map", "defMap");
         my $setmin  = ModbusLD_ObjInfo($hash, $objCombi, "min", "", "");        # default to ""
@@ -1072,13 +1312,18 @@ ModbusLD_Set($@)
         
         ModbusLD_Send($hash, $objCombi, "write", $rawVal, 1);   # add at beginning and force send / sleep if necessary
         ($err, $result) = ModbusLD_ReadAnswer($hash, $setName);
+        Modbus_EndBUSY ($ioHash);       # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig
+
         return $err if ($err);
                 
         if ($fCode == 16) {
             # read after write
             Log3 $name, 5, "$name: Set: sending read after write";
+            
             ModbusLD_Send($hash, $objCombi, "read", 0, 1);      # add at beginning and force send / sleep if necessary
             ($err, $result) = ModbusLD_ReadAnswer($hash, $setName);
+            Modbus_EndBUSY ($ioHash);       # set BUSY to 0, delete REQUEST, clear Buffer, do Profilig
+            
             return $err if ($err);          
         }
         return undef;               # no return code if no error 
@@ -1112,10 +1357,9 @@ ModbusLD_ReadAnswer($;$)
 
     # get timeout. In case ReadAnswer is called after a delay
     # only wait for remaining time
-    
-    my $to = AttrVal($name, "timeout", 
-                  $hash->{deviceInfo}{timing}{timeout});
-    $to = 2 if (!$to);
+    my $to = ModbusLD_DevInfo($hash, "timing", "timeout", 2);
+    #my $to = AttrVal($name, "timeout", $hash->{deviceInfo}{timing}{timeout});
+    #$to = 2 if (!$to);
 
     my $arg  = "timeout:$ioHash->{NAME}";       # key in internl Timer hash
     my $rest = $to;
@@ -1140,10 +1384,11 @@ ModbusLD_ReadAnswer($;$)
     
     delete $hash->{gotReadings}; 
     $reading = "" if (!$reading);
-    
+
+    Modbus_Profiler($ioHash, "Read");     
     for(;;) {
 
-        if($^O =~ m/Win/ && $ioHash->{USBDev}) {
+        if($^O =~ m/Win/ && $ioHash->{USBDev}) {        
             $ioHash->{USBDev}->read_const_time($to*1000);   # set timeout (ms)
             $buf = $ioHash->{USBDev}->read(999);
             if(length($buf) == 0) {
@@ -1169,7 +1414,7 @@ ModbusLD_ReadAnswer($;$)
                 Log3 $name, 3, "$name: Timeout2 in ReadAnswer" . ($reading ? " for $reading" : "");
                 return ("Timeout reading answer", undef);
             }
-        
+
             $buf = DevIo_SimpleRead($ioHash);
             if(!defined($buf)) {
                 Log3 $name, 3, "$name: ReadAnswer got no data" . ($reading ? " for $reading" : "");
@@ -1179,20 +1424,15 @@ ModbusLD_ReadAnswer($;$)
 
         if($buf) {
             $ioHash->{helper}{buffer} .= $buf;
-            $hash->{LASTRECV} = $now;   
-            Log3 $name, 5, "SetSilent ReadAnswer got: " . unpack ("H*", $ioHash->{helper}{buffer});
+            $hash->{helper}{lrecv} = $now;   
+            Log3 $name, 5, "ReadAnswer got: " . unpack ("H*", $ioHash->{helper}{buffer});
         }
 
         my ($err, $framedata) = Modbus_ParseFrames($ioHash);
         if ($framedata || $err) {
             Log3 $name, 5, "$name: ReadAnswer done" .
                 ($err ? ", err = $err" : "");
-                
             
-            $ioHash->{helper}{buffer} = "";
-            $ioHash->{BUSY} = 0;
-            delete $ioHash->{REQUEST};
-            RemoveInternalTimer ("timeout:$ioHash->{NAME}");
             if ($reading && defined($hash->{gotReadings}{$reading})) {  
                 return ($err, $hash->{gotReadings}{$reading});
             } else {
@@ -1229,6 +1469,7 @@ ModbusLD_GetUpdate($ ) {
         return;
     }
     Log3 $name, 5, "$name: GetUpdate called";
+    Modbus_Profiler($ioHash, "Fhem");   
     
     my @ObjList;
     my %readList;
@@ -1299,6 +1540,7 @@ ModbusLD_GetUpdate($ ) {
         $maxLen = ModbusLD_DevInfo($hash, $type, "combine", 1);
         Log3 $name, 5, "$name: GetUpdate: combine for $type is $maxLen";    
     }
+    Modbus_Profiler($ioHash, "Idle");       
     while (my ($objCombi, $span) = each %readList) {
         ModbusLD_Send($hash, $objCombi, "read", 0, 0, $readList{$objCombi});
     }
@@ -1429,8 +1671,6 @@ ModbusLD_Send($$$;$$$){
     Modbus_HandleSendQueue("direct:".$ioName, $force); # name is physical device
 }   
 
-
-
 1;
 
 =pod
@@ -1461,13 +1701,17 @@ ModbusLD_Send($$$;$$$){
     <ul>
         <code>define &lt;name&gt; Modbus &lt;device&gt; </code>
         <br><br>
-        A define of a physical device based on this module is only necessary if a shared physical device like a RS485 USB adapter is used. In the case Modbus TCP this module will be used as a library for other modules that define all the data objects and no define of the base module is needed.
+        A define of a physical device based on this module is only necessary if a shared physical device like a RS485 USB adapter is used. In the case of Modbus TCP this module will be used as a library for other modules that define all the data objects and no define of the base module is needed.
         <br>
         Example:<br>
         <br>
         <ul><code>define ModBusLine Modbus /dev/ttyUSB1@9600</code></ul>
         <br>
         In this example the module opens the given serial interface and other logical modules can access several Modbus devices connected to this bus concurrently.
+        If your device needs special communications parameters like even parity you can add the number of data bits, the parity and the number of stopbits separated by commas after the baudrate e.g.:
+        <br>
+        <ul><code>define ModBusLine Modbus /dev/ttyUSB2@38400,8,E,2</code></ul>
+        <br>
     </ul>
     <br>
 
@@ -1495,6 +1739,28 @@ ModbusLD_Send($$$;$$$){
             modify the delay used when sending requests to the device from the internal queue, defaults to 1 second <br>
         <li><b>queueMax</b></li> 
             max length of the send queue, defaults to 100<br>
+        <li><b>profileInterval</b></li> 
+            if set to something non zero it is the time period in seconds for which the module will create bus usage statistics. 
+            Pleas note that this number should be at least twice as big as the interval used for requesting values in logical devices that use this physical device<br>
+            The bus usage statistics create the following readings:
+            <ul>
+                <li><b>Profiler_Delay_sum</b></li>
+                    seconds used as delays to implement the defined sendDelay and commDelay
+                <li><b>Profiler_Fhem_sum</b></li>
+                    seconds spend processing in the module
+                <li><b>Profiler_Idle_sum</b></li>
+                    idle time 
+                <li><b>Profiler_Read_sum</b></li>
+                    seconds spent reading and validating the data read
+                <li><b>Profiler_Send_sum</b></li>
+                    seconds spent preparing and sending data
+                <li><b>Profiler_Wait_sum</b></li>
+                    seconds waiting for a response to a request
+                <li><b>Statistics_Requests</b></li>
+                    number of requests sent
+                <li><b>Statistics_Timeouts</b></li>
+                    timeouts encountered
+            </ul>
     </ul>
     <br>
 </ul>

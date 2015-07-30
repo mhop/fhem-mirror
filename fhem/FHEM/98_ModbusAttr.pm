@@ -24,6 +24,8 @@
 #   Changelog:
 #
 #   2015-03-09  initial release
+#	2015-07-22	added documentation for new features introduced in the base module 98_Modbus.pm
+#				that can be used here.
 #
 
 package main;
@@ -197,6 +199,24 @@ ModbusAttr_Initialize($)
         <li><b>obj-[cdih][1-9][0-9]*-unpack</b></li> 
             defines the unpack code to convert the raw data string read from the device to a reading. For an unsigned integer in big endian format this would be "n", for a signed 16 bit integer in big endian format this would be "s>" and for a 32 bit big endian float value this would be "f>". (see the perl documentation of the pack function).
         <br>
+        <li><b>obj-[cdih][1-9][0-9]*-revRegs</b></li> 
+            this is only applicable to objects that span several input registers or holding registers. <br>
+			when they are read then the order of the registers will be reversed before 
+			further interpretation / unpacking of the raw register string
+        <br>
+		<li><b>obj-[cdih][1-9][0-9]*-bswapRegs</b></li>
+            this is applicable to objects that span several input or holding registers. <br>
+            after the registers have been read, all 16-bit values are treated big-endian and are reversed to little-endian by swapping the two 8 bit bytes. This functionality is most likely used for reading (ASCII) strings from the device that are stored as big-endian 16-bit values. <br>
+            example: original reading is "324d3130203a57577361657320722020". After applying bswapRegs, the value will be "4d3230313a2057576173736572202020"
+            which will result in the ASCII string "M201: WWasser   ". Should be used with "(a*)" as -unpack value.
+		<br>
+        <li><b>obj-[cdih][1-9][0-9]*-decode</b></li> 
+            defines an encoding to be used in a call to the perl function decode to convert the raw data string read from the device to a reading. This can be used if the device delivers strings in an encoding like cp850 instead of utf8.
+        <br>
+        <li><b>obj-[cdih][1-9][0-9]*-encode</b></li> 
+            defines an encoding to be used in a call to the perl function encode to convert the raw data string read from the device to a reading. This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.
+        <br>
+		
         <li><b>obj-[cdih][1-9][0-9]*-showget</b></li> 
             every reading can also be requested by a get command. However these get commands are not automatically offered in fhemweb. By specifying this attribute, the get will be visible in fhemweb.
         <br>
@@ -223,9 +243,26 @@ ModbusAttr_Initialize($)
         <li><b>dev-([cdih]-)*defFormat</b></li> 
             defines a default format string to use for this object type in a sprintf function on the values read from the device.
         <br>
+        <li><b>dev-([cdih]-)*defExpr</b></li> 
+            defines a default Perl expression to use for this object type to convert raw values read.
+        <br>
         <li><b>dev-([cdih]-)*defUnpack</b></li> 
             defines the default unpack code for this object type. 
         <br>
+        <li><b>dev-([cdih]-)*defRevRegs</b></li> 
+            defines that the order of registers for objects that span several registers will be reversed before 
+			further interpretation / unpacking of the raw register string
+        <br>
+        <li><b>dev-([cdih]-)*defBswapRegs</b></li> 
+            per device default for swapping the bytes in Registers (see obj-bswapRegs above)
+        <br>
+        <li><b>dev-([cdih]-)*defDecode</b></li> 
+			defines a default for decoding the strings read from a different character set e.g. cp850
+        <br>
+        <li><b>dev-([cdih]-)*defEncode</b></li> 
+			defines a default for encoding the strings read (or after decoding from a different character set) e.g. utf8
+        <br>
+
         <li><b>dev-([cdih]-)*defPoll</b></li> 
             if set to 1 then all objects of this type will be included in the cyclic update by default. 
         <br>
