@@ -1450,7 +1450,7 @@ sub FRITZBOX_Readout_Process($$)
    # Fill all handed over readings
       my $x = 0;
       while (my ($rName, $rValue) = each(%values) ) {
-      #hash value
+      #hash values
          if ($rName =~ /->/) {
          # 3 levels
             my ($rName1,$rName2,$rName3) = split /->/, $rName;
@@ -1487,22 +1487,25 @@ sub FRITZBOX_Readout_Process($$)
          }
       }
 
+   # Create state with wlan state
       if ( defined $values{"box_wlan_2.4GHz"} ) {
          my $newState = "WLAN: ";
          if ( $values{"box_wlan_2.4GHz"} eq "on" ) {
             $newState .= "on";
-         } elsif ( $values{box_wlan_5GHz} ) {
+         } 
+         elsif ( $values{box_wlan_5GHz} ) {
             if ( $values{box_wlan_5GHz} eq "on") {
                $newState .= "on";
             } else {
                $newState .= "off";
             }
-         } else {
+         } 
+         else {
             $newState .= "off";
          }
          $newState .=" gWLAN: ".$values{box_guestWlan} ;
          $newState .=" (Remain: ".$values{box_guestWlanRemain}." min)"
-            if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} != 0;
+            if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
          readingsBulkUpdate( $hash, "state", $newState);
          FRITZBOX_Log $hash, 5, "SET state = '$newState'";
       }
@@ -4096,7 +4099,8 @@ sub FRITZBOX_Web_OpenCon ($)
       FRITZBOX_Log $hash, 2, "Error: No password set. Please define it with 'set $name password YourPassword'";
       return undef;
    }
-   my $user = AttrVal( $name, "telnetUser", "" );
+   my $user = AttrVal( $name, "boxUser", "" );
+   $user = AttrVal( $name, "telnetUser", "" ) if $user eq "";
 
    FRITZBOX_Log $hash, 4, "Open Web connection to $host";
    $sid = (FB_doCheckPW($host, $user, $pwd));
@@ -4427,7 +4431,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a web or telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must once be set.
    <br/><br/>
-   The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel. The modul works best with Fritz!OS 6.24. AVM has removed internal interfaces from later Fritz!OS versions without replacement. For these versions, some modul functions are hence restricted or do not work at all.
+   The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel. The modul works best with Fritz!OS 6.24. AVM has removed internal interfaces from later Fritz!OS versions without replacement. For these versions, some modul functions are hence restricted or do not work at all (see remarks to required API).
    <br>
    The modul was tested on Fritz!Box 7390 and 7490 with Fritz!OS 6.20 and higher.
    <br>
@@ -4456,6 +4460,8 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; alarm &lt;number&gt; [on|off] [time] [once|daily|Mo|Tu|We|Th|Fr|Sa|So]</code>
          <br>
          Switches the alarm number (1, 2 or 3) on or off (default is on). Sets the time and weekday. If no state is given it is switched on.
+         <br>
+         Requires the API: Telnet or webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; call &lt;number&gt; [duration] [say:text|play:MP3URL]</code>
@@ -4474,13 +4480,13 @@ sub FRITZBOX_fritztris($)
 
       <li><code>set &lt;name&gt; dect &lt;on|off&gt;</code>
          <br>
-         Switches the DECT base of the box on or off.
+         Switches the DECT base of the box on or off. Requires the API: Telnet or webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Switches the call diversity number (1, 2 ...) on or off.
-         A call diversity for an incoming number has to be created with the Fritz!Box web interface.
+         A call diversity for an incoming number has to be created with the Fritz!Box web interface. Requires the API: Telnet or webcm.
          <br>
          Note! The Fritz!Box allows also forwarding in accordance to the calling number. This is not included in this feature. 
       </li><br>
@@ -4535,6 +4541,8 @@ sub FRITZBOX_fritztris($)
          Sends an email via the email notification service that is configured in push service of the Fritz!Box. 
          Use "\n" for line breaks in the body.
          All parameters can be omitted. Make sure the messages are not classified as junk by your email client.
+         <br>
+         Requires Telnet access to the box.
          <br>
       </li><br>
 
@@ -4612,7 +4620,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>boxUser &lt;user name&gt;</code>
          <br>
-         User name that is used for TR064 access. By default no user name is required to login.
+         User name that is used for TR064 or other web based access. By default no user name is required to login.
          <br>
          If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
       </li><br>
@@ -4697,6 +4705,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
       <li><b>box_guestWlanRemain</b> - Remaining time until the guest WLAN is switched off</li>
+      <li><b>box_ipExtern</b> - Internet IP of the Fritz!Box</li>
       <li><b>box_model</b> - Fritz!Box model</li>
       <li><b>box_moh</b> - music-on-hold setting</li>
       <li><b>box_model</b> - Fritz!Box model</li>
@@ -4760,7 +4769,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Web oder Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss einmalig das Passwort gesetzt werden.
    <br/><br/>
-   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen ersatzlos gestrichen. Einige Modul-Funktionen sind dadurch nicht oder nur eingeschr&auml;nkt verf&uuml;gbar.
+   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen ersatzlos gestrichen. Einige Modul-Funktionen sind dadurch nicht oder nur eingeschr&auml;nkt verf&uuml;gbar (siehe Anmerkungen zu ben&ouml;tigten API).
    <br>
    Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -4787,6 +4796,8 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; alarm &lt;Nummer&gt; [on|off] [time] [once|daily|Mo|Tu|We|Th|Fr|Sa|So]</code>
          <br>
          Schaltet den Weckruf Nummer 1, 2 oder 3 an oder aus (Standard ist on). Setzt die Zeit und den Wochentag.
+         <br>
+         Ben&ouml;tigt die API: Telnet oder webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; call &lt;number&gt; [Dauer] [say:Text|play:MP3URL]</code>
@@ -4805,13 +4816,15 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; dect &lt;on|off&gt;</code>
          <br>
          Schaltet die DECT-Basis der Box an oder aus.
+         <br>
+         Ben&ouml;tigt die API: Telnet oder webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Schaltet die Rufumleitung (Nummer 1, 2 ...) f&uuml;r einzelne Rufnummern an oder aus.
          <br>
-         Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden.
+         Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden. Ben&ouml;tigt die API: Telnet oder webcm.
          <br>
          Achtung! Die Fritz!Box erm&ouml;glicht auch eine Weiterleitung in Abh&auml;ngigkeit von der anrufenden Nummer. Diese Art der Weiterleitung kann hiermit nicht geschaltet werden. 
       </li><br>
@@ -4866,6 +4879,8 @@ sub FRITZBOX_fritztris($)
          Sendet eine Email &uuml;ber den Emailbenachrichtigungsservice der als Push Service auf der Fritz!Box konfiguriert wurde.
          Mit "\n" kann einen Zeilenumbruch im Textk&ouml;rper erzeut werden.
          Alle Parameter k&ouml;nnen ausgelassen werden. Bitte kontrolliert, dass die Email nicht im Junk-Verzeichnis landet.
+         <br>
+         Ben&ouml;tigt einen Telnet Zugang zur Box.
          <br>
       </li><br>
       
@@ -4940,7 +4955,7 @@ sub FRITZBOX_fritztris($)
       
       <li><code>boxUser &lt;user name&gt;</code>
          <br>
-         Benutzername f&uuml;r den TR064-Zugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
+         Benutzername f&uuml;r den TR064- oder einen anderen webbasierten Zugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
          Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
       </li><br>
     
@@ -5013,6 +5028,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
       <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
+      <li><b>box_ipExtern</b> - Internet IP der Fritz!Box</li>
       <li><b>box_model</b> - Fritz!Box-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_powerRate</b> - aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
