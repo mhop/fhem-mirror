@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.6
+# Version: 1.2.7
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -76,7 +76,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5 "
+"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5 macaddr:textField "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -392,9 +392,32 @@ sub PHTV_Set($@) {
 
     }
 
-    # off
     # on
-    elsif ( lc( $a[1] ) eq "off" || lc( $a[1] ) eq "on" ) {
+    elsif ( lc( $a[1] ) eq "on" ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
+            if ( defined( $attr{$name}{macaddr} )
+                && $attr{$name}{macaddr} ne "" )
+            {
+                Log3 $name, 3, "PHTV set $name " . $a[1] . " (wakeup)";
+                PHTV_wake($hash);
+                RemoveInternalTimer($hash);
+                InternalTimer( gettimeofday() + 2, "PHTV_GetStatus", $hash, 0 );
+            }
+            else {
+                return
+"Attribute macaddr not set. Device needs to be reachable to turn it on.";
+            }
+        }
+        else {
+            Log3 $name, 3, "PHTV set $name " . $a[1];
+
+            $cmd = PHTV_GetRemotecontrolCommand("STANDBY");
+            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
+        }
+    }
+
+    # off
+    elsif ( lc( $a[1] ) eq "off" ) {
         Log3 $name, 3, "PHTV set $name " . $a[1];
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
@@ -402,7 +425,7 @@ sub PHTV_Set($@) {
             PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
         }
         else {
-            return "Device needs to be reachable to toggle standby mode.";
+            return "Device needs to be reachable to turn it off.";
         }
     }
 
@@ -600,11 +623,11 @@ sub PHTV_Set($@) {
                       if ( $layer > $hash->{READINGS}{ambiLEDLayers}{VAL} );
 
                     PHTV_Set( $hash, $name, "ambiPreset", "rainbow" );
-                    fhem("sleep 0.5");
 
                     # enable manual Ambilight color
                     PHTV_SendCommand( $hash, "ambilight/mode",
-                        '"current": "expert"', "expert" )
+                        '"current": "expert"',
+                        "expert", 0.5 )
                       if ( $hash->{READINGS}{ambiMode}{VAL} ne "expert" );
                 }
 
@@ -1219,7 +1242,7 @@ sub PHTV_Set($@) {
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             PHTV_SendCommand( $hash, "sources/current",
-              '"id": "' . $input_id . '"', $input_id );
+                '"id": "' . $input_id . '"', $input_id );
 
             if ( $hash->{READINGS}{input}{VAL} ne $a[2] ) {
                 readingsSingleUpdate( $hash, "input", $a[2], 1 );
@@ -1335,8 +1358,21 @@ sub PHTV_Define($$) {
 ############################################################################################################
 
 ###################################
-sub PHTV_SendCommand($$;$$) {
-    my ( $hash, $service, $cmd, $type ) = @_;
+sub PHTV_SendCommandDelayed($) {
+    my ($par) = @_;
+
+    Log3 $par->{hash}->{NAME}, 5,
+        "PHTV "
+      . $par->{hash}->{NAME}
+      . ": called function PHTV_SendCommandDelayed()";
+
+    PHTV_SendCommand( $par->{hash}, $par->{service}, $par->{cmd},
+        $par->{type} );
+}
+
+###################################
+sub PHTV_SendCommand($$;$$$) {
+    my ( $hash, $service, $cmd, $type, $delay ) = @_;
     my $name    = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     my $port    = $hash->{helper}{PORT};
@@ -1345,6 +1381,14 @@ sub PHTV_SendCommand($$;$$) {
     my $timestamp = gettimeofday();
     my $data;
     my $timeout;
+
+    if ( defined($delay) && $delay > 0 ) {
+        my %par =
+          ( hash => $hash, service => $service, cmd => $cmd, type => $type );
+        InternalTimer( gettimeofday() + $delay,
+            "PHTV_SendCommandDelayed", \%par, 0 );
+        return;
+    }
 
     if ( defined($cmd) && ref($cmd) eq "HASH" ) {
         $data = encode_json($cmd);
@@ -1621,6 +1665,16 @@ sub PHTV_ReceiveCommand($$$) {
                     }
                 }
 
+                # send on command in case device came up and
+                # macaddr attribute is set
+                if (   $newstate eq "on"
+                    && $newstate ne $state
+                    && defined( $attr{$name}{macaddr} )
+                    && $attr{$name}{macaddr} ne "" )
+                {
+                    PHTV_Set( $hash, $name, "on" );
+                }
+
                 # trigger query cascade in case the device
                 # just came up or sequential query is enabled
                 if ( $sequential
@@ -1634,10 +1688,14 @@ sub PHTV_ReceiveCommand($$$) {
                         && $attr{$name}{drippyFactor} ne ""
                         && $attr{$name}{drippyFactor} ge 0 )
                     {
-                        fhem("sleep $attr{$name}{drippyFactor}");
+                        RemoveInternalTimer($hash);
+                        InternalTimer(
+                            gettimeofday() + $attr{$name}{drippyFactor},
+                            "PHTV_GetStatus", $hash, 1 );
                     }
-
-                    PHTV_GetStatus( $hash, 1 );
+                    else {
+                        PHTV_GetStatus( $hash, 1 );
+                    }
                 }
             }
         }
@@ -2405,10 +2463,20 @@ sub PHTV_ReceiveCommand($$$) {
                             my @devices =
                               split( " ", $attr{$name}{$ambiHue} );
 
+                            Log3 $name, 5,
+"PHTV $name: processing devices from attribute $ambiHue";
+
                             foreach my $devled (@devices) {
                                 my ( $dev, $led, $sat, $bri ) =
                                   split( /:/, $devled );
                                 my @leds;
+
+                                my $logtext =
+"PHTV $name: processing $ambiHue -> $devled -> dev=$dev";
+                                $logtext .= " led=$led" if ( defined($led) );
+                                $logtext .= " sat=$sat" if ( defined($sat) );
+                                $logtext .= " bri=$bri" if ( defined($bri) );
+                                Log3 $name, 5, $logtext;
 
                                 # next for if HUE device is not ready
                                 if (   !defined( $defs{$dev} )
@@ -2417,6 +2485,8 @@ sub PHTV_ReceiveCommand($$$) {
                                     || $defs{$dev}{READINGS}{reachable}{VAL} ne
                                     "1" )
                                 {
+                                    Log3 $name, 5,
+"PHTV $name: $devled seems to be unreachable, skipping it";
                                     next;
                                 }
 
@@ -2469,6 +2539,8 @@ sub PHTV_ReceiveCommand($$$) {
                                         )
                                       )
                                     {
+                                        Log3 $name, 5,
+"PHTV $name: $devled - getting color from LED $l";
 
                                         my $hsb = PHTV_rgb2hsb(
                                             $return->{layer1}->{$s}->{$l}->{r},
@@ -2498,6 +2570,9 @@ sub PHTV_ReceiveCommand($$$) {
                                                 || $countLEDs == 0
                                               )
                                             {
+                                                Log3 $name, 5,
+"PHTV $name: $devled - LED $l added to sum of $countLEDs";
+
                                                 $Hsum += $hsb->{h};
                                                 $Ssum += $hsb->{s};
                                                 $Bsum += $hsb->{b};
@@ -2622,6 +2697,9 @@ sub PHTV_ReceiveCommand($$$) {
 
                                     # switch HUE bulb to color
                                     if ( $b ne "00" ) {
+                                        Log3 $name, 4,
+"PHTV $name: set $dev transitiontime $transitiontime : noUpdate : hsv $h$s$b";
+
                                         fhem(
 "set $dev transitiontime $transitiontime : noUpdate : hsv $h$s$b"
                                         );
@@ -2629,6 +2707,9 @@ sub PHTV_ReceiveCommand($$$) {
 
                                     # switch HUE bulb off if brightness is 0
                                     else {
+                                        Log3 $name, 4,
+"PHTV $name: set $dev transitiontime 5 : noUpdate : off (reason: brightness=$b)";
+
                                         fhem(
 "set $dev transitiontime 5 : noUpdate : off"
                                         );
@@ -2647,7 +2728,6 @@ sub PHTV_ReceiveCommand($$$) {
 
                     # latency compensation
                     if ( $waittime > 0 ) {
-                        fhem("sleep $waittime");
                         $hash->{helper}{ambiHueDelay} =
                           int( ( $duration + $waittime ) * 1000 + 0.5 );
                     }
@@ -2656,7 +2736,8 @@ sub PHTV_ReceiveCommand($$$) {
                           int( $duration * 1000 + 0.5 );
                     }
 
-                    PHTV_SendCommand( $hash, "ambilight/processed" );
+                    PHTV_SendCommand( $hash, "ambilight/processed", undef,
+                        undef, $waittime );
                 }
 
                 # cleanup after stopping ambiHue
@@ -2903,6 +2984,47 @@ sub PHTV_Undefine($$) {
     RemoveInternalTimer($hash);
 
     return;
+}
+
+###################################
+sub PHTV_wake ($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $mac_addr =
+      ( defined( $attr{$name}{macaddr} ) )
+      ? $attr{$name}{macaddr}
+      : "-";
+    my $address;
+    my $port;
+
+    if ( $mac_addr ne "-" ) {
+        if ( !defined $address ) { $address = '255.255.255.255' }
+        if ( !defined $port || $port !~ /^\d+$/ ) { $port = 9 }
+
+        my $sock = new IO::Socket::INET( Proto => 'udp' )
+          or die "socket : $!";
+        die "Can't create WOL socket" if ( !$sock );
+
+        my $ip_addr = inet_aton($address);
+        my $sock_addr = sockaddr_in( $port, $ip_addr );
+        $mac_addr =~ s/://g;
+        my $packet =
+          pack( 'C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16 );
+
+        setsockopt( $sock, SOL_SOCKET, SO_BROADCAST, 1 )
+          or die "setsockopt : $!";
+
+        Log3 $name, 4,
+          "PHTV $name: Waking up by sending Wake-On-Lan magic package to "
+          . $mac_addr;
+        send( $sock, $packet, 0, $sock_addr ) or die "send : $!";
+        close($sock);
+    }
+    else {
+        Log3 $name, 3, "PHTV $name: Attribute macaddr not set.";
+    }
+
+    return 1;
 }
 
 #####################################
