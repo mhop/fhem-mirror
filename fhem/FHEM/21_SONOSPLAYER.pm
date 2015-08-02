@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, July 2015 
+# SONOSPLAYER.pm (c) by Reiner Leins, August 2015 
 # rleins at lmsoft dot de
 #
 # $Id$
