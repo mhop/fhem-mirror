@@ -181,7 +181,7 @@ JeeLink_Set($@)
   my $arg = join(" ", @a);
 
 
-  my $list = "beep raw led:on,off led-on-for-timer reset LaCrossePairForSec setReceiverMode:LaCrosse,HX2272,FS20 flash";
+  my $list = "beep raw led:on,off led-on-for-timer reset LaCrossePairForSec setReceiverMode:LaCrosse,HX2272,FS20 flash parse";
   return $list if( $cmd eq '?' || $cmd eq '');
 
 
@@ -349,6 +349,9 @@ JeeLink_Set($@)
 
   } elsif ($cmd =~ m/reset/i) {
     return JeeLink_ResetDevice($hash);
+
+  } elsif( $cmd eq 'parse' ) {
+    JeeLink_Parse($hash, $hash, $name, $arg);
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
