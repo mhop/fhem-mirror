@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, July 2015 
+# SONOS.pm (c) by Reiner Leins, August 2015 
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -47,6 +47,9 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 02.08.2015
+#	uri_escape() umgestellt, sodass auch UTF8-Sonderzeichen übersetzt werden
+#	Google-Translator-URL parametrisiert und um die mittlerweile notwendigen Parameter 'client=t' und 'prev=input' erweitert
 # 12.07.2015
 #	Es gibt zwei neue Setter "GroupVolumeU" und "GroupVolumeD", um die Gruppenlautstärke um 'VolumeStep'-Einheiten zu erhöhen oder zu verringern.
 #	Innerhalb des SubProzesses wurden die Devicenamen der bereits in Fhem definierten Player nicht korrekt verwendet. Das machte sich erst mit dem neuen Feature Bookmarks bemerkbar.
@@ -58,8 +61,6 @@
 #	SetEQ eingebaut, um Subwoofer und Surroundeinstellungen vornehmen zu können: "SurroundEnable", "SurroundLevel", "SubEnable", "SubGain" und "AudioDelay"
 # 02.05.2015
 #	Es gibt drei neue Readings "FavouritesVersion", "RadiosVersion" und "PlaylistsVersion", die bei einer Änderung des jeweiligen Bereichs durch einen Sonos Controller aktualisiert werden, und auf die man mit einem Notify reagieren kann, um z.B. ein "get player FavouritesWithCovers" ausführen zu können. Damit entfällt die Notwendigkeit von zeitgesteuerten Aktualisierungen.
-# 14.04.2015
-#	Zusätzliche Fehlerüberprüfung und -ausgabe beim Herunterladen der Cover-Bilder eingebaut, sowie relative URLs unterbunden
 #
 ########################################################################################
 #
@@ -142,6 +143,7 @@ sub SONOS_RecursiveStructure($$$$);
 
 sub SONOS_RCLayout();
 
+sub SONOS_URI_Escape($);
 
 ########################################################
 # Verrenkungen um in allen Situationen das benötigte 
@@ -226,6 +228,7 @@ my $SONOS_DEFAULTPINGTYPE = 'syn';
 my $SONOS_SUBSCRIPTIONSRENEWAL = 1800;
 my $SONOS_DIDLHeader = '<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">';
 my $SONOS_DIDLFooter = '</DIDL-Lite>';
+my $SONOS_GOOGLETRANSLATOR_URL = 'http://translate.google.com/translate_tts?tl=%1$s&client=t&prev=input&q=%2$s'; # 1->Sprache, 2->Text
 my $SONOS_GOOGLETRANSLATOR_CHUNKSIZE = 95;
 
 # Basis UPnP-Object und Search-Referenzen
@@ -499,7 +502,7 @@ sub SONOS_getCoverTitleRG($;$$) {
 	</script>';
 	
 	$javascriptText =~ s/\n/ /g;
-	return $javascriptText.'<div style="float: left;" onclick="document.getElementById(\'global_fulldiv_'.$device.'\').innerHTML = \'&nbsp;\'; refreshFull'.$device.'(); '.($playing ? 'refreshTime'.$device.'();' : '').'">'.SONOS_getCoverRG($device).'</div><div style="display: none;" id="element_fulldiv_'.$device.'">'.uri_escape($fullscreenDiv).'</div><div style="margin-left: 150px; min-width: '.$width.'px;">'.SONOS_getTitleRG($device, $space).'</div>';
+	return $javascriptText.'<div style="float: left;" onclick="document.getElementById(\'global_fulldiv_'.$device.'\').innerHTML = \'&nbsp;\'; refreshFull'.$device.'(); '.($playing ? 'refreshTime'.$device.'();' : '').'">'.SONOS_getCoverRG($device).'</div><div style="display: none;" id="element_fulldiv_'.$device.'">'.SONOS_URI_Escape($fullscreenDiv).'</div><div style="margin-left: 150px; min-width: '.$width.'px;">'.SONOS_getTitleRG($device, $space).'</div>';
 }
 
 ########################################################################################
@@ -589,11 +592,11 @@ sub SONOS_getListRG($$;$) {
 	for my $key (keys %elems) {
 		my $command;
 		if ($reading eq 'Favourites') {
-			$command = 'cmd.'.$device.uri_escape('=set '.$device.' StartFavourite '.uri_escape($elems{$key}->{Title}));
+			$command = 'cmd.'.$device.SONOS_URI_Escape('=set '.$device.' StartFavourite '.SONOS_URI_Escape($elems{$key}->{Title}));
 		} elsif ($reading eq 'Playlists') {
-			$command = 'cmd.'.$device.uri_escape('=set '.$device.' StartPlaylist '.uri_escape($elems{$key}->{Title}));
+			$command = 'cmd.'.$device.SONOS_URI_Escape('=set '.$device.' StartPlaylist '.SONOS_URI_Escape($elems{$key}->{Title}));
 		} elsif ($reading eq 'Radios') {
-			$command = 'cmd.'.$device.uri_escape('=set '.$device.' StartRadio '.uri_escape($elems{$key}->{Title}));
+			$command = 'cmd.'.$device.SONOS_URI_Escape('=set '.$device.' StartRadio '.SONOS_URI_Escape($elems{$key}->{Title}));
 		}
 		$command = "FW_cmd('/fhem?XHR=1&$command')";
 		
@@ -1354,7 +1357,7 @@ sub SONOS_Read($) {
 					$URL = '/fhem/sonos/cover/'.$1;
 				} else {
 					my $sonosName = SONOS_getDeviceDefHash(undef)->{NAME};
-					$URL = '/fhem/sonos/proxy/aa?url='.uri_escape($URL) if (AttrVal($sonosName, 'generateProxyAlbumArtURLs', 0));
+					$URL = '/fhem/sonos/proxy/aa?url='.SONOS_URI_Escape($URL) if (AttrVal($sonosName, 'generateProxyAlbumArtURLs', 0));
 				}
 				
 				if ($nextReading eq 'next') {
@@ -1601,7 +1604,7 @@ sub SONOS_InitClientProcess($) {
 			my @values = ();
 			foreach my $key (keys %valueList) {
 				if (defined($key) && defined($valueList{$key})) {
-					push @values, $key.'='.uri_escape($valueList{$key});
+					push @values, $key.'='.SONOS_URI_Escape($valueList{$key});
 				}
 			}
 			
@@ -3807,11 +3810,11 @@ sub SONOS_MakeCoverURL($$) {
 	} else {
 		my $stream = 0;
 		$stream = 1 if ($resURL =~ /x-sonosapi-stream/);
-		$resURL = $1.'/getaa?'.($stream ? 's=1&' : '').'u='.uri_escape($resURL) if (SONOS_Client_Data_Retreive($udn, 'reading', 'location', '') =~ m/^(http:\/\/.*?:.*?)\//i);
+		$resURL = $1.'/getaa?'.($stream ? 's=1&' : '').'u='.SONOS_URI_Escape($resURL) if (SONOS_Client_Data_Retreive($udn, 'reading', 'location', '') =~ m/^(http:\/\/.*?:.*?)\//i);
 	}
 	
 	# Alles über Fhem als Proxy laufen lassen?
-	$resURL = '/fhem/sonos/proxy/aa?url='.uri_escape($resURL) if (($resURL !~ m/^\//) && SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
+	$resURL = '/fhem/sonos/proxy/aa?url='.SONOS_URI_Escape($resURL) if (($resURL !~ m/^\//) && SONOS_Client_Data_Retreive('undef', 'attr', 'generateProxyAlbumArtURLs', 0));
 	
 	SONOS_Log $udn, 5, 'MakeCoverURL-After: '.$resURL;
 	
@@ -3930,7 +3933,8 @@ sub SONOS_GetSpeakFile($$$$$) {
 				next;
 			}
 			
-			my $url = 'http://translate.google.com/translate_tts?tl='.uri_escape(lc($language)).'&q='.uri_escape($text);
+			#my $url = 'http://translate.google.com/translate_tts?tl='.SONOS_URI_Escape(lc($language)).'&client=t&prev=input&q='.SONOS_URI_Escape($text);
+			my $url = sprintf($SONOS_GOOGLETRANSLATOR_URL, SONOS_URI_Escape(lc($language)), SONOS_URI_Escape($text));
 		
 			SONOS_Log $udn, 3, 'Load Google generated MP3 ('.$counter.'. Element) from "'.$url.'" to "'.$destFileName.$counter.'"';
 			
@@ -4051,16 +4055,16 @@ sub SONOS_CreateURIMeta($) {
 			return;
 		}
 		
-		$res = $1.uri_escape($2).$3;
-		$meta = $SONOS_DIDLHeader.'<item id="00030020'.uri_escape($2).'" parentID="" restricted="true"><dc:title></dc:title><upnp:class>object.item.audioItem.musicTrack</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">'.$userID_Spotify.'</desc></item>'.$SONOS_DIDLFooter;
+		$res = $1.SONOS_URI_Escape($2).$3;
+		$meta = $SONOS_DIDLHeader.'<item id="00030020'.SONOS_URI_Escape($2).'" parentID="" restricted="true"><dc:title></dc:title><upnp:class>object.item.audioItem.musicTrack</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">'.$userID_Spotify.'</desc></item>'.$SONOS_DIDLFooter;
 	} elsif ($res =~ m/^(npsdy:)(.*?)(\.mp3)/) {
 		if ($userID_Napster eq '-') {
 			SONOS_Log undef, 1, 'There are Napster/Rhapsody-Titles in list, and no Napster-Username is known. Please empty the main queue and insert a random napster-title in it for saving this information and do this action again!';
 			return;
 		} 
 	
-		$res = $1.uri_escape($2).$3;
-		$meta = $SONOS_DIDLHeader.'<item id="RDCPI:GLBTRACK:'.uri_escape($2).'" parentID="" restricted="true"><dc:title></dc:title><upnp:class>object.item.audioItem.musicTrack</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">'.$userID_Napster.'</desc></item>'.$SONOS_DIDLFooter;
+		$res = $1.SONOS_URI_Escape($2).$3;
+		$meta = $SONOS_DIDLHeader.'<item id="RDCPI:GLBTRACK:'.SONOS_URI_Escape($2).'" parentID="" restricted="true"><dc:title></dc:title><upnp:class>object.item.audioItem.musicTrack</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">'.$userID_Napster.'</desc></item>'.$SONOS_DIDLFooter;
 	} else {
 		$res =~ s/ /%20/ig;
 		$res =~ s/"/&quot;/ig;
@@ -5767,13 +5771,13 @@ sub SONOS_ServiceCallback($$) {
 		# Wenn es ein Spotify-Track ist, dann den Benutzernamen sichern, damit man diesen beim nächsten Export zur Verfügung hat
 		if ($currentTrackURI =~ m/^x-sonos-spotify:/i) {
 			my $enqueuedTransportMetaData = decode_entities($1) if ($properties{LastChangeDecoded} =~ m/r:EnqueuedTransportURIMetaData val="(.*?)"\/>/i);
-			SONOS_Client_Notifier('ReadingsSingleUpdateIfChangedNoTrigger:undef:UserID_Spotify:'.uri_escape($1)) if ($enqueuedTransportMetaData =~ m/<desc .*?>(SA_.*?)<\/desc>/i);
+			SONOS_Client_Notifier('ReadingsSingleUpdateIfChangedNoTrigger:undef:UserID_Spotify:'.SONOS_URI_Escape($1)) if ($enqueuedTransportMetaData =~ m/<desc .*?>(SA_.*?)<\/desc>/i);
 		}
 		
 		# Wenn es ein Napster/Rhapsody-Track ist, dann den Benutzernamen sichern, damit man diesen beim nächsten Export zur Verfügung hat
 		if ($currentTrackURI =~ m/^npsdy:/i) {
 			my $enqueuedTransportMetaData = decode_entities($1) if ($properties{LastChangeDecoded} =~ m/r:EnqueuedTransportURIMetaData val="(.*?)"\/>/i);
-			SONOS_Client_Notifier('ReadingsSingleUpdateIfChangedNoTrigger:undef:UserID_Napster:'.uri_escape($1)) if ($enqueuedTransportMetaData =~ m/<desc .*?>(SA_.*?)<\/desc>/i);
+			SONOS_Client_Notifier('ReadingsSingleUpdateIfChangedNoTrigger:undef:UserID_Napster:'.SONOS_URI_Escape($1)) if ($enqueuedTransportMetaData =~ m/<desc .*?>(SA_.*?)<\/desc>/i);
 		}
 		
 		# Current Trackdauer ermitteln
@@ -7687,6 +7691,24 @@ sub SONOS_Min($$) {
 ########################################################################################
 sub SONOS_Max($$) {
 	$_[$_[0] < $_[1]]
+}
+
+########################################################################################
+#
+#  SONOS_URI_Escape - Escapes the given string.
+#
+########################################################################################
+sub SONOS_URI_Escape($) {
+	my ($txt) = @_;
+	
+	eval {
+		$txt = uri_escape($txt);
+	};
+	if ($@) {
+		$txt = uri_escape_utf8($txt);
+	};
+	
+	return $txt;
 }
 
 ########################################################################################
