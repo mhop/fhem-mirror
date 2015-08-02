@@ -642,8 +642,9 @@ sub HMLAN_Parse($$) {##########################################################
     #
     my ($HMcnd,$stat) = map{hex($_)} unpack('A2A2',($mFld[1]));
 
-    if ($HMcnd == 0x01 && $mFld[3] ne "FF"){#HMLAN responded to AES request
-      $CULinfo = "AESKey-".$mFld[3];
+    if ($HMcnd == 0x01){#HMLAN responded to AES request
+      $CULinfo = ($mFld[3] eq "FF")?"AESpending"
+                                   :"AESKey-".$mFld[3];
     }
     
     # config message: reset timer handling
@@ -667,10 +668,8 @@ sub HMLAN_Parse($$) {##########################################################
                                       $CULinfo = "AESerrReject";
                                       HMLAN_qResp($hash,$src,0);
       }
-      elsif (($stat & 0x70) == 0x20){$CULinfo = "AESok";
-      }
-      elsif ( $stat & 0x40)         {$CULinfo = "AESCom-".($stat & 0x10?"fail":"ok");
-      }
+      elsif (($stat & 0x70) == 0x20){$CULinfo = "AESCom-ok";                         }
+      elsif ( $stat & 0x40)         {$CULinfo = "AESCom-".($stat & 0x10?"fail":"ok");}
     }
 
     my $rssi = hex($mFld[4])-65536;
