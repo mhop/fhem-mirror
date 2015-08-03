@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  95_Dashboard: fixed style issue with colorpicker in ios6touchpad style
+               fixed issue with editing groups in the dashboard configuration dialog
   - feature: 30_pilight_dimmer.pm: SetExtensions (on-for-timer, etc.)
   - feature: 30_pilight_switch.pm: SetExtensions (on-for-timer, etc.)
   - feature: 30_pilight_raw.pm: send raw codes to pilight
