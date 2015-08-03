@@ -311,16 +311,17 @@ padding: 5px;
 
 /* Colorpicker 
 ------------------------------------------------------------------------*/
-.evo-pop {-index: 10000;
+.evo-pop.ui-widget-content {-index: 10000;
  width: 225px;
  padding: 3px 3px 0;
- background-color:#fefefe;
+ background-color:#fefefe !important;
  border: 1px #999999 solid;
+ transform: translate(-100px,0px);
  }
-.evo-pop-ie {z-index: 10000;
+.evo-pop-ie.ui-widget-content {z-index: 10000;
 width: 225px;
 padding: 3px;
-background-color:#fefefe;
+background-color:#fefefe !important;
 border: 1px #999999 solid;
  
 }
