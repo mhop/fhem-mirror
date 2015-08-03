@@ -17,7 +17,7 @@ set title '<L1>'
 set grid xtics y2tics
 
 set y2label "RAM-Nutzung MB"
-set y2range [0:495]
+set y2range [0:2000]
 
 #FileLog 5:ram\x3a:0:
 #FileLog 8:ram\x3a:0:
