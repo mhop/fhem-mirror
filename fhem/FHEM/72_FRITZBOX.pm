@@ -128,8 +128,8 @@ my %landevice = ();
 my @cmdBuffer=();
 my $cmdBufferTimeout=0;
 
-my $ttsCmdTemplate = 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]"';
-my $ttsLinkTemplate = 'http://translate.google.com/translate_tts?ie=UTF-8&tl=[SPRACHE]&q=[TEXT]';
+my $ttsCmdTemplate = 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&client=t&prev=input&tl=[SPRACHE]&q=[TEXT]"';
+my $ttsLinkTemplate = 'http://translate.google.com/translate_tts?ie=UTF-8&client=t&prev=input&tl=[SPRACHE]&q=[TEXT]';
 
 my $mohUpload = '/var/tmp/fhem_moh_upload';
 my $mohOld = '/var/tmp/fhem_fx_moh_old';
