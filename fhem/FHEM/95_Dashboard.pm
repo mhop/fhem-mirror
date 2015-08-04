@@ -762,6 +762,10 @@ sub BuildGroup
 	my %seen;
 	# make sure devices are not contained twice in the list
 	my @devices = grep { ! $seen{$_} ++ } devspec2array($devices);
+        # sort the devices in alphabetical order by sortby, alias, name
+        @devices = sort {
+		lc(AttrVal($a,'sortby',AttrVal($a,'alias',$a))) cmp lc(AttrVal($b,'sortby',AttrVal($b,'alias',$b)))
+	} @devices;
 
 	foreach my $d (@devices) {	
                 next if (!defined($defs{$d}));
