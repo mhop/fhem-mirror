@@ -3,7 +3,7 @@
 #
 # Abfrage einer UPS über die Network UPS Tools (www.networkupstools.org)
 #
-# 14.06.2015
+# 05.08.2015
 #
 
 # DEFINE bla NUT <upsname> [<host>[:<port>]]
@@ -164,16 +164,16 @@ sub NUT_ListVar($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  if ($hash->{STATE} eq 'disconnected') {
-    # Verbindung scheint nicht zu bestehen
-    # Alles abbrechen, ich verlasse mich auf DevIo_OpenDev, dass es alles wieder anwirft, sobald die Verbindung wieder steht
-    $hash->{pollValState} = 0;
-    RemoveInternalTimer("pollTimer:".$name);
-    DevIo_OpenDev($hash, 1, "NUT_DevInit");
-    return;
-  }
-
   if (not defined $attr{$name}{disable} or $attr{$name}{disable} == 0) {
+
+    if ($hash->{STATE} eq 'disconnected') {
+      # Verbindung scheint nicht zu bestehen
+      # Alles abbrechen, ich verlasse mich auf DevIo_OpenDev, dass es alles wieder anwirft, sobald die Verbindung wieder steht
+      $hash->{pollValState} = 0;
+      RemoveInternalTimer("pollTimer:".$name);
+      DevIo_OpenDev($hash, 1, "NUT_DevInit");
+      return;
+    }
 
     if (defined $hash->{WaitForAnswer}) {
       # Keine Antwort auf die letzte Frage -> NUT nicht mehr erreichbar!
@@ -201,6 +201,7 @@ sub NUT_ListVar($) {
 
   } else {
     Log3 $name, 5, "NUT polling disabled.";
+    delete $hash->{WaitForAnswer};
   }
 
   RemoveInternalTimer("pollTimer:".$name);
@@ -382,8 +383,6 @@ sub NUT_makeReadings($) {
         Values of the UPS which are used as Readings (ups.status is read anyway)<br>
         Example:<br>
         <code>attr theUPS asReadings battery.charge,battery.runtime,input.voltage,ups.load,ups.power,ups.realpower</code> </li><br>
-    <li><a name="">withUnits</a><br>
-        When set to 1, unit are attached to the readings.</li><br>
   </ul>
 </ul>
 
@@ -436,8 +435,6 @@ sub NUT_makeReadings($) {
         Mit Kommata getrennte Liste der USV-Werte, die als Readings verwendet werden sollen (ups.status wird auf jeden Fall gelesen).<br>
         Beispiel:<br>
         <code>attr dieUSV asReadings battery.charge,battery.runtime,input.voltage,ups.load,ups.power,ups.realpower</code> </li><br>
-    <li><a name="">withUnits</a><br>
-        Mit dem Setzen auf 1 werden die passenden Einheiten an die Readings angefügt.</li><br>
   </ul>
 </ul>
 
