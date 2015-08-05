@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  34_NUT: versucht bei disabled=1 nicht mehr, eine Verbindung aufzubauen
   - change:  57_CALVIEW: - replace unwanted backslash before a comma sign
   - bugfix:  95_Dashboard: fixed sorting for grouped devices
   - bugfix:  95_Dashboard: fixed style issue with colorpicker in ios6touchpad style
