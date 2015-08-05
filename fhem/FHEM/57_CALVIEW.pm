@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7014 2015-07-14 08:10:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7014 2015-08-05 10:50:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -92,6 +92,9 @@ sub CALVIEW_GetUpdate($){
 		my @tempend=split(/\s+/,$item->[2]);
 		my ($D,$M,$Y)=split(/\./,$tempstart[0]);
 		my @bts=str2time($M."/".$D."/".$Y." ".$tempstart[1]);
+		#replace the "\," with ","
+		$item->[1] =~ s/\\,/,/g;
+		$item->[4] =~ s/\\,/,/g;
 		push @termineNew,{
 			bdate => $tempstart[0],
 			btime => $tempstart[1],
