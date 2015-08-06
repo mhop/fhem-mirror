@@ -367,6 +367,9 @@ sub Dashboard_CGI($)
 
   FW_pO $ret;
 
+  # empty room to make sure no room actions are taken by the framework
+  $FW_room = '';
+
   return 0;
 }
 
