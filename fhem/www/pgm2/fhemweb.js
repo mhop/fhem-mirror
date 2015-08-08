@@ -354,7 +354,9 @@ FW_replaceLink(el)
   if(ma == null || ma.length == 0 || !ma[2].match(/=(save|set)/)) {
     ma = attr.match(new RegExp("^"+FW_root)); // Avoid "Connection lost" @iOS
     if(ma) {
-      $(el).click(function() {
+      $(el).click(function(e) {
+        if(e.shiftKey || e.ctrlKey || e.metaKey) // Open link in window/tab
+          return;
         FW_leaving = 1;
         if($(el).attr("target") == "_blank") {
           window.open(url, '_blank').focus();
