@@ -21,7 +21,8 @@ my %zwave_id2class;
 my %zwave_class = (
   NO_OPERATION             => { id => '00' },
   BASIC                    => { id => '20',
-    set   => { basicValue  => "01%02x" },
+    set   => { basicValue  => "01%02x",
+               basicSet    => "01%02x"  }, # Alias, Forum #38200
     get   => { basicStatus => "02",     }, 
     parse => { "..2001(.*)"=> '"basicSet:$1"', # Forum #36980
                "..2002"    => "basicGet:request", # sent by the remote
@@ -1972,6 +1973,9 @@ s2Hex($)
   <li>basicValue value<br>
     Send value (0-255) to this device. The interpretation is device dependent,
     e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
+  <li>basicValue value<br>
+    Alias for basicValue, to make mapping from the incoming events easier.
+    </li><br>
 
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
   <li>coveringClose<br>

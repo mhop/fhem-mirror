@@ -36,7 +36,6 @@ my %sets = (
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
                                               # SERIAL_API_APPL_NODE_INFORMATION
-  "timeouts"         => { cmd => "06%02x%02x"},# SERIAL_API_SET_TIMEOUTS
   "reopen"           => { cmd => "" },
 );
 
@@ -51,6 +50,7 @@ my %gets = (
   "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
   "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
   "random"          => "1c%02x",  # ZW_GET_RANDOM
+  "timeouts"        => "06%02x%02x", # SERIAL_API_SET_TIMEOUTS
   "version"         => "15",      # ZW_GET_VERSION
 
   "raw"             => "%s",            # hex
@@ -173,8 +173,6 @@ use vars qw(%zw_type6);
   '10' => 'SWITCH_BINARY',         'ff' => 'NON_INTEROPERABLE',
   '11' => 'SWITCH_MULTILEVEL',
 );
-
-my $serInit;
 
 sub
 ZWDongle_Initialize($)
@@ -337,7 +335,7 @@ ZWDongle_Get($@)
         if(!defined($gets{$type}));
 
   my $fb = substr($gets{$type}, 0, 2);
-  if($fb =~ m/^[0-8A-F]+$/i && !$serInit &&
+  if($fb =~ m/^[0-8A-F]+$/i && $type ne "caps" &&
      ReadingsVal($name, "caps","") !~ m/\b$zw_func_id{$fb}\b/) {
     return "$type is unsupported by this controller";
   }
@@ -475,20 +473,20 @@ ZWDongle_DoInit($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
-  $serInit = 1;
 
   DevIo_SetHwHandshake($hash) if($hash->{USBDev});
   $hash->{PARTIAL} = "";
   
   ZWDongle_Clear($hash);
-  ZWDongle_Get($hash, $name, "caps");   $serInit = 0;
+  ZWDongle_Get($hash, $name, "caps");
   ZWDongle_Get($hash, $name, "homeId");
   ZWDongle_Get($hash, $name, ("random", 32));         # Sec relevant
   ZWDongle_Set($hash, $name, ("timeouts", 100, 15));  # Sec relevant
   ZWDongle_ReadAnswer($hash, "timeouts", "^0106");
   # NODEINFO_LISTENING, Generic Static controller, Specific Static Controller, 0
   ZWDongle_Set($hash, $name, ("setNIF", 1, 2, 1, 0)); # Sec relevant (?)
-  $hash->{STATE} = "Initialized";
+
+  readingsSingleUpdate($hash, "state", "Initialized", 1);
   return undef;
 }
 
