@@ -36,7 +36,9 @@ my %zwave_class = (
                on          => "01FF" },
     get   => { swbStatus   => "02",       },
     parse => { "03250300"  => "state:off",
-               "032503ff"  => "state:on",  } } ,
+               "032503ff"  => "state:on", 
+               "03250100"  => "state:setOff",
+               "032501ff"  => "state:setOn"  } } ,
   SWITCH_MULTILEVEL        => { id => '26', 
     set   => { off         => "0100",
                on          => "01FF",
@@ -150,7 +152,12 @@ my %zwave_class = (
     parse => { "03400300"  => "state:off",
                "0340030b"  => "state:cooling",
                "03400301"  => "state:heating",
-               "0340031f"  => "state:manual",  } } ,
+               "0340031f"  => "state:manual",
+               "03400100"  => "state:setTmOff",
+               "03400101"  => "state:setTmHeating",
+               "0340010b"  => "state:setTmCooling",
+               "0340011f"  => "state:setTmManual",
+               } } ,
   PREPAYMENT_ENCAPSULATION => { id => '41' },
   THERMOSTAT_OPERATING_STATE=>{ id => '42' },
   THERMOSTAT_SETPOINT      => { id => '43',
@@ -2572,6 +2579,8 @@ s2Hex($)
   <br><br><b>Class SWITCH_BINARY</b>
   <li>state:on</li>
   <li>state:off</li>
+  <li>state:setOn</li>
+  <li>state:setOff</li>
 
   <br><br><b>Class SWITCH_MULTILEVEL</b>
   <li>state:on</li>
@@ -2586,6 +2595,10 @@ s2Hex($)
   <li>cooling</li>
   <li>heating</li>
   <li>manual</li>
+  <li>setTmOff</li>
+  <li>setTmHeating</li>
+  <li>setTmCooling</li>
+  <li>setTmManual</li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpointTemp:$temp [C|F] [heating|cooling]</li>
