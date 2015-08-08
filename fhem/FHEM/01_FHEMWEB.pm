@@ -1841,13 +1841,14 @@ FW_style($$)
   } elsif($a[1] eq "save") {
     my $fileName = $a[2];
     my $cfgDB = defined($a[3]) ? $a[3] : "";
-    my $forceType = ($cfgDB eq 'configDB') ? $cfgDB : "file";
     $fileName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
     $fileName =~ s,.*/,,g;        # Little bit of security
     my $filePath = FW_fileNameToPath($fileName);
+    my $isImg = ($fileName =~ m,\.(svg|png)$,);
+    my $forceType = ($cfgDB eq 'configDB' && !$isImg) ? $cfgDB : "file";
 
-    $FW_data =~ s/\r//g if($fileName !~ m,\.png$,);
+    $FW_data =~ s/\r//g if(!$isImg);
     my $err = FileWrite({FileName=>$filePath, ForceType=>$forceType},
                         split("\n", $FW_data));
     if($err) {
@@ -1856,7 +1857,7 @@ FW_style($$)
     }
     my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
     $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
-    $ret = FW_Set("","","rereadicons") if($fileName =~ m,\.(svg|png)$,);
+    $ret = FW_Set("","","rereadicons") if($isImg);
     DoTrigger("global", "FILEWRITE $filePath", 1) if(!$ret); # Forum #32592
     $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" :
                 "Saved the file $fileName to $forceType");
