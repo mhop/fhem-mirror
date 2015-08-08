@@ -357,6 +357,17 @@ sub Dashboard_CGI($)
   $ret = '<div id="content">';
   
   if ($name && defined($defs{$name})) {                                                                
+    my $showfullsize  = AttrVal($defs{$name}{NAME}, "dashboard_showfullsize", 0); 
+
+    if ($showfullsize) {
+      if ($FW_RET =~ m/<body[^>]*class="([^"]+)"[^>]*>/) {
+        $FW_RET =~ s/class="$1"/class="$1 dashboard_fullsize"/;
+      }
+      else {
+        $FW_RET =~ s/<body/<body class="dashboard_fullsize"/;
+      }
+    }
+
     $ret .= Dashboard_SummaryFN($FW_wname,$name,$FW_room,undef);
   }
   else {
@@ -417,15 +428,6 @@ sub Dashboard_SummaryFN($$$$)
  my @tabnames = ();
  my @tabsortings = ();
 
- if ($showfullsize) {
-   if ($FW_RET =~ m/<body[^>]*class="([^"]+)"[^>]*>/) {
-     $FW_RET =~ s/class="$1"/class="$1 dashboard_fullsize"/;
-   }
-   else {
-     $FW_RET =~ s/<body/<body class="dashboard_fullsize"/;
-   }
- }
- 
  for (my $i = 0; $i < $tabcount; $i++) {
    $tabnames[$i] = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($i + 1) . "name", "Dashboard-Tab " . ($i + 1));
    $tabsortings[$i] = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($i + 1) . "sorting", "");
