@@ -44,16 +44,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # modeStarted triggered on calendar update
 # http://forum.fhem.de/index.php?topic=28516
 #
-# take care of unitialized value warnings
-# http://forum.fhem.de/index.php?topic=28409
-#
 # *** Potential future extensions: 
 # 
 # add support for EXDATE
 # http://forum.fhem.de/index.php?topic=24485
-#
-# nonblocking retrieval
-# http://forum.fhem.de/index.php?topic=29622
 #
 # sequence of events fired sorted by time
 # http://forum.fhem.de/index.php?topic=29112
@@ -932,14 +926,30 @@ sub Calendar_GetUpdate($$) {
   my $ics;
   
   if($type eq "url"){ 
-    #$ics= GetFileFromURLQuiet($url,10,undef,0,5) if($type eq "url");
-    ($errmsg, $ics)= HttpUtils_BlockingGet( { url => $url, hideurl => 1, timeout => 10, } );
+
+  HttpUtils_NonblockingGet({
+      url => $url,
+      noshutdown => 1,
+      hash => $hash,
+      type => 'caldata',
+      removeall => $removeall,
+      callback => \&Calendar_ParseUpdate,
+    });
+    Log3 $hash, 4, "Calendar: Getting data from $url"; 
+
   } elsif($type eq "file") {
     if(open(ICSFILE, $url)) {
       while(<ICSFILE>) { 
         $ics .= $_; 
       }
       close(ICSFILE);
+      
+      my $paramhash;
+      $paramhash->{type} = 'caldata';
+      $paramhash->{removeall} = $removeall;
+      Calendar_ParseUpdate($paramhash,'',$ics);
+      return undef;
+      
     } else {
       Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not open file $url"; 
       return 0;
@@ -948,12 +958,30 @@ sub Calendar_GetUpdate($$) {
     # this case never happens by virtue of _Define, so just
     die "Software Error";
   }
-    
+
+  
+}
+
+###################################
+sub Calendar_ParseUpdate($$$) {
+
+  my ($param, $errmsg, $data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  my $removeall = $param->{removeall};
+  my $ics = $data;
+  if( $errmsg ) 
+  {
+    Log3 $name, 1, "$name: URL error: ".$errmsg;
+    $hash->{STATE} = "error";
+    return undef;
+  } 
   
   if(!defined($ics) or ("$ics" eq "") or ($errmsg ne "")) {
     Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL. $errmsg";
     return 0;
   }
+  Log3 $hash, 4, "Calendar: Parsing data"; 
   
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
