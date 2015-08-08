@@ -1847,7 +1847,7 @@ FW_style($$)
     $fileName =~ s,.*/,,g;        # Little bit of security
     my $filePath = FW_fileNameToPath($fileName);
 
-    $FW_data =~ s/\r//g;
+    $FW_data =~ s/\r//g if($fileName !~ m,\.png$,);
     my $err = FileWrite({FileName=>$filePath, ForceType=>$forceType},
                         split("\n", $FW_data));
     if($err) {
