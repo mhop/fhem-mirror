@@ -287,6 +287,8 @@ FHEM2FHEM_Disconnected($)
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";
 
+  return if(IsDisabled($name)); #Forum #39386
+
   # Without the following sleep the open of the device causes a SIGSEGV,
   # and following opens block infinitely. Only a reboot helps.
   sleep(5);
