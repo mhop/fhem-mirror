@@ -1729,8 +1729,12 @@ FW_fileNameToPath($)
   my $cfgFileName = $1;
   if($name eq $cfgFileName) {
     return $attr{global}{configfile};
-  } elsif($name =~ m/.*(css|svg)$/) {
+  } elsif($name =~ m/.*(css|_defs.svg)$/) {
     return "$FW_cssdir/$name";
+  } elsif($name =~ m/.*(png|svg)$/) {
+    my $d="";
+    map { $d = $_ if(!$d && -d "$FW_icondir/$_") } @FW_iconDirs;
+    return "$FW_icondir/$d/$name";
   } elsif($name =~ m/.*gplot$/) {
     return "$FW_gplotdir/$name";
   } else {
@@ -1852,6 +1856,7 @@ FW_style($$)
     }
     my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
     $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
+    $ret = FW_Set("","","rereadicons") if($fileName =~ m,\.(svg|png)$,);
     DoTrigger("global", "FILEWRITE $filePath", 1) if(!$ret); # Forum #32592
     $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" :
                 "Saved the file $fileName to $forceType");
