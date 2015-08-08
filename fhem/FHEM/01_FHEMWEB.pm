@@ -1000,6 +1000,9 @@ FW_makeTable($$$@)
         } elsif ($n =~ m/^fp_(.*)/ && $defs{$1}){ #special for Floorplan
           FW_pH "detail=$1", $val,1;
 
+        } elsif ($modules{$val} ) {
+          FW_pH "cmd=list%20TYPE=$val", $val,1;
+
         } else {
            FW_pO "<td><div class=\"dval\">".
                    join(",", map { ($_ ne $name && $defs{$_}) ?
@@ -1143,7 +1146,7 @@ FW_makeTableFromArray($$@) {
       FW_pF "<tr class=\"%s\"><td>", ($row&1)?"odd":"even";
       $row++;
       FW_pH "detail=$_", $_;
-      FW_pO "</td><td>$defs{$_}{TYPE}</td><td> </td>";
+      FW_pO "</td><td><a href=$FW_ME?cmd=list%20TYPE=$defs{$_}{TYPE}>$defs{$_}{TYPE}</a></td><td> </td>";
       FW_pO "</tr>";
     }
     FW_pO "</table></div>";
