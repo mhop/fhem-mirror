@@ -626,9 +626,16 @@ sub ENIGMA2_Set($@) {
                 $result = ENIGMA2_SendCommand( $hash, "remotecontrol",
                     "command=" . ENIGMA2_GetRemotecontrolCommand("OK") );
             }
+            elsif ( m/^\d+$/ && ( $_ <= 0 || $_ >= 10000 ) ) {
+                return "Numeric channel addressing '" . $_
+                  . "' needs to be a number between 1 and 9999.";
+            }
             else {
-                return "Argument " . $_
-                  . " is not a valid integer between 0 and 9999 or servicereference is invalid";
+                return
+                    "'"
+                  . $_
+                  . "' does not seem to be a valid channel. Known channels: "
+                  . $channels;
             }
         }
         else {
