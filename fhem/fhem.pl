@@ -1098,7 +1098,8 @@ devspec2array($)
         $val="" if(!defined($val));
         $val = $val->{NAME} if(ref($val) eq 'HASH' && $val->{NAME}); # IODev
 
-        my $lre = ($n eq "room" ? "(^|,)($re)(,|\$)" : "^($re)\$");
+        my $lre = ($n eq "room" || $n eq "group") ?
+                                "(^|,)($re)(,|\$)" : "^($re)\$";
         my $valReNum =(looks_like_number($val) && looks_like_number($re) ? 1:0);
         eval { # a bad regexp is deadly
           if(($op eq  "=" && $val =~ m/$lre/s) ||
